@@ -6,6 +6,8 @@ const (
 	CgroupLookupKnown             uint16 = 0
 	CgroupLookupUnknownRetryLater uint16 = 1
 	CgroupLookupUnknownPermanent  uint16 = 2
+	CgroupLookupPayloadExceeded   uint16 = 3
+	CgroupLookupOversizedItem     uint16 = 4
 
 	CgroupsLookupReqHdr  = 16
 	CgroupsLookupRespHdr = 16
@@ -15,8 +17,9 @@ const (
 )
 
 type CgroupsLookupRequestView struct {
-	ItemCount uint32
-	payload   []byte
+	ItemCount   uint32
+	packedStart int
+	payload     []byte
 }
 
 type CgroupsLookupResponseView struct {
@@ -38,7 +41,9 @@ type CgroupsLookupItemView struct {
 }
 
 func validateCgroupsLookupSemantics(status, orchestrator uint16, pathLen, nameLen, labelCount int) error {
-	if status != CgroupLookupKnown && status != CgroupLookupUnknownRetryLater && status != CgroupLookupUnknownPermanent {
+	if status != CgroupLookupKnown && status != CgroupLookupUnknownRetryLater &&
+		status != CgroupLookupUnknownPermanent && status != CgroupLookupPayloadExceeded &&
+		status != CgroupLookupOversizedItem {
 		return ErrBadLayout
 	}
 	if pathLen == 0 {
@@ -52,14 +57,11 @@ func validateCgroupsLookupSemantics(status, orchestrator uint16, pathLen, nameLe
 
 func EncodeCgroupsLookupRequest(paths [][]byte, buf []byte) (int, error) {
 	count := len(paths)
-	if uint64(count) > uint64(^uint32(0)) {
-		return 0, ErrOverflow
-	}
-	dirSize, ok := checkedMulInt(count, LookupDirEntrySize)
+	count32, ok := checkedU32Int(count)
 	if !ok {
 		return 0, ErrOverflow
 	}
-	packedStart, ok := checkedAddInt(CgroupsLookupReqHdr, dirSize)
+	packedStart, ok := cgroupsLookupRequestPackedStartForCount(count)
 	if !ok {
 		return 0, ErrOverflow
 	}
@@ -104,10 +106,21 @@ func EncodeCgroupsLookupRequest(paths [][]byte, buf []byte) (int, error) {
 	}
 	ne.PutUint16(buf[0:2], 1)
 	ne.PutUint16(buf[2:4], 0)
-	ne.PutUint32(buf[4:8], uint32(count))
+	ne.PutUint32(buf[4:8], count32)
 	ne.PutUint32(buf[8:12], 0)
 	ne.PutUint32(buf[12:16], 0)
 	return data, nil
+}
+
+func cgroupsLookupRequestPackedStartForCount(count int) (int, bool) {
+	if count < 0 || uint64(count) > uint64(^uint32(0)) {
+		return 0, false
+	}
+	dirSize, ok := checkedMulInt(count, LookupDirEntrySize)
+	if !ok {
+		return 0, false
+	}
+	return checkedAddInt(CgroupsLookupReqHdr, dirSize)
 }
 
 func DecodeCgroupsLookupRequest(buf []byte) (*CgroupsLookupRequestView, error) {
@@ -130,51 +143,91 @@ func DecodeCgroupsLookupRequest(buf []byte) (*CgroupsLookupRequestView, error) {
 	if err := validateLookupDir(buf, CgroupsLookupReqHdr, itemCount, len(buf)-dirEnd, 2, -1); err != nil {
 		return nil, err
 	}
-	for i := range itemCount {
-		base := CgroupsLookupReqHdr + int(i)*LookupDirEntrySize
-		off, length, err := lookupDirEntry(buf, base)
+	view := &CgroupsLookupRequestView{ItemCount: itemCount, packedStart: dirEnd, payload: buf}
+	for i := uint32(0); i < itemCount; i++ {
+		keyWithNul, key, err := view.itemBytes(i)
 		if err != nil {
 			return nil, err
 		}
-		key, err := lookupPayloadSlice(buf, dirEnd, off, length)
-		if err != nil {
-			return nil, err
-		}
-		if key[length-1] != 0 {
+		if keyWithNul[len(keyWithNul)-1] != 0 {
 			return nil, ErrMissingNul
 		}
-		if bytes.Contains(key[:length-1], []byte{0}) {
+		if bytes.IndexByte(key, 0) >= 0 {
 			return nil, ErrBadLayout
 		}
 	}
-	return &CgroupsLookupRequestView{ItemCount: itemCount, payload: buf}, nil
+	return view, nil
 }
 
 func (v *CgroupsLookupRequestView) Item(index uint32) (CStringView, error) {
-	if index >= v.ItemCount {
+	item, path, err := v.itemBytes(index)
+	if err != nil {
+		return CStringView{}, err
+	}
+	pathLen := len(path)
+	if uint64(pathLen) > uint64(^uint32(0)) {
 		return CStringView{}, ErrOutOfBounds
 	}
-	dirEnd, ok := lookupBuilderDataOffset(CgroupsLookupReqHdr, v.ItemCount)
-	if !ok {
-		return CStringView{}, ErrOverflow
+	return NewCStringView(item, uint32(pathLen)), nil // #nosec G115 -- bounded above.
+}
+
+func (v *CgroupsLookupRequestView) itemBytes(index uint32) ([]byte, []byte, error) {
+	if index >= v.ItemCount {
+		return nil, nil, ErrOutOfBounds
+	}
+	dirEnd := v.packedStart
+	if dirEnd == 0 {
+		var ok bool
+		dirEnd, ok = lookupBuilderDataOffset(CgroupsLookupReqHdr, v.ItemCount)
+		if !ok {
+			return nil, nil, ErrOverflow
+		}
+	}
+	dirOff64 := uint64(index) * uint64(LookupDirEntrySize)
+	if dirOff64 > uint64(maxIntValue()) || CgroupsLookupReqHdr > maxIntValue()-int(dirOff64) {
+		return nil, nil, ErrOverflow
+	}
+	base := CgroupsLookupReqHdr + int(dirOff64) // #nosec G115 -- bounded by maxIntValue above.
+	if base > len(v.payload)-LookupDirEntrySize {
+		return nil, nil, ErrOutOfBounds
+	}
+	off32 := ne.Uint32(v.payload[base : base+4])
+	length32 := ne.Uint32(v.payload[base+4 : base+8])
+	if uint64(off32) > uint64(maxIntValue()) || uint64(length32) > uint64(maxIntValue()) {
+		return nil, nil, ErrOutOfBounds
+	}
+	length := int(length32) // #nosec G115 -- bounded by maxIntValue above.
+	off := int(off32)       // #nosec G115 -- bounded by maxIntValue above.
+	item, err := lookupPayloadSlice(v.payload, dirEnd, off, length)
+	if err != nil {
+		return nil, nil, err
+	}
+	if length < 1 {
+		return nil, nil, ErrOutOfBounds
+	}
+	return item, item[:length-1], nil
+}
+
+func (v *CgroupsLookupRequestView) payloadExceededItemSize(index uint32) (int, error) {
+	if index >= v.ItemCount {
+		return 0, ErrOutOfBounds
 	}
 	base, ok := lookupDirOffset(CgroupsLookupReqHdr, index)
 	if !ok {
-		return CStringView{}, ErrOverflow
+		return 0, ErrOverflow
 	}
-	off, length, err := lookupDirEntry(v.payload, base)
+	_, length, err := lookupDirEntry(v.payload, base)
 	if err != nil {
-		return CStringView{}, err
+		return 0, err
 	}
-	item, err := lookupPayloadSlice(v.payload, dirEnd, off, length)
-	if err != nil {
-		return CStringView{}, err
+	size, ok := checkedAddInt(CgroupsLookupItemHdr, length)
+	if ok {
+		size, ok = checkedAddInt(size, 1)
 	}
-	stringLen, ok := checkedU32Int(length - 1)
 	if !ok {
-		return CStringView{}, ErrOutOfBounds
+		return 0, ErrOverflow
 	}
-	return NewCStringView(item, stringLen), nil
+	return size, nil
 }
 
 func DecodeCgroupsLookupResponse(buf []byte) (*CgroupsLookupResponseView, error) {
@@ -195,7 +248,7 @@ func DecodeCgroupsLookupResponse(buf []byte) (*CgroupsLookupResponseView, error)
 	if err := validateLookupDir(buf, CgroupsLookupRespHdr, itemCount, len(buf)-dirEnd, CgroupsLookupItemHdr, -1); err != nil {
 		return nil, err
 	}
-	for i := range itemCount {
+	for i := uint32(0); i < itemCount; i++ {
 		base := CgroupsLookupRespHdr + int(i)*LookupDirEntrySize
 		off, length, err := lookupDirEntry(buf, base)
 		if err != nil {
@@ -205,7 +258,7 @@ func DecodeCgroupsLookupResponse(buf []byte) (*CgroupsLookupResponseView, error)
 		if err != nil {
 			return nil, err
 		}
-		if _, err := decodeCgroupsLookupItem(item); err != nil {
+		if err := validateCgroupsLookupItem(item); err != nil {
 			return nil, err
 		}
 	}
@@ -241,87 +294,182 @@ func (v *CgroupsLookupResponseView) Item(index uint32) (*CgroupsLookupItemView, 
 	return decodeCgroupsLookupItem(item)
 }
 
-func decodeCgroupsLookupItem(item []byte) (*CgroupsLookupItemView, error) {
+// RawItem returns the validated raw wire item bytes for a response item.
+func (v *CgroupsLookupResponseView) RawItem(index uint32) ([]byte, error) {
+	return lookupResponseRawItem(v.payload, CgroupsLookupRespHdr, v.ItemCount, index)
+}
+
+// EncodeCgroupsLookupRawResponse encodes validated raw CGROUPS_LOOKUP response items.
+func EncodeCgroupsLookupRawResponse(items [][]byte, generation uint64, buf []byte) (int, error) {
+	return encodeLookupRawResponse(buf, CgroupsLookupRespHdr, generation, items, CgroupsLookupItemHdr, func(item []byte) error {
+		return validateCgroupsLookupItem(item)
+	})
+}
+
+func validateCgroupsLookupItem(item []byte) error {
 	if len(item) < CgroupsLookupItemHdr {
-		return nil, ErrTruncated
+		return ErrTruncated
 	}
 	status := ne.Uint16(item[2:4])
 	orchestrator := ne.Uint16(item[4:6])
 	pathOff, err := checkedWireU32Int(item, 8)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	pathLen, err := checkedWireU32Int(item, 12)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	nameOff, err := checkedWireU32Int(item, 16)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	nameLen, err := checkedWireU32Int(item, 20)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	labelCount := ne.Uint16(item[24:26])
 	if ne.Uint16(item[0:2]) != 1 || ne.Uint16(item[6:8]) != 0 || ne.Uint16(item[26:28]) != 0 {
-		return nil, ErrBadLayout
+		return ErrBadLayout
 	}
 	if err := validateCgroupsLookupSemantics(status, orchestrator, pathLen, nameLen, int(labelCount)); err != nil {
-		return nil, err
+		return err
 	}
 	if status != CgroupLookupKnown {
-		return decodeCgroupsLookupUnknownItem(item, status, pathOff, pathLen, nameOff)
+		return validateCgroupsLookupUnknownItem(item, pathOff, pathLen, nameOff)
 	}
-	path, pathEnd, err := lookupString(item, CgroupsLookupItemHdr, pathOff, pathLen)
+	pathEnd, err := lookupStringInto(item, CgroupsLookupItemHdr, pathOff, pathLen, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	name, nameEnd, err := lookupString(item, CgroupsLookupItemHdr, nameOff, nameLen)
+	nameEnd, err := lookupStringInto(item, CgroupsLookupItemHdr, nameOff, nameLen, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if overlap(pathOff, pathEnd, nameOff, nameEnd) {
-		return nil, ErrBadLayout
+		return ErrBadLayout
+	}
+	_, err = validateLabels(item, CgroupsLookupItemHdr, labelCount, max(pathEnd, nameEnd))
+	return err
+}
+
+func validateCgroupsLookupUnknownItem(item []byte, pathOff, pathLen, nameOff int) error {
+	pathEnd, err := lookupStringInto(item, CgroupsLookupItemHdr, pathOff, pathLen, nil)
+	if err != nil {
+		return err
+	}
+	nameEnd, err := lookupEmptyStringInto(item, CgroupsLookupItemHdr, nameOff, nil)
+	if err != nil {
+		return err
+	}
+	if overlap(pathOff, pathEnd, nameOff, nameEnd) {
+		return ErrBadLayout
+	}
+	if max(pathEnd, nameEnd) != len(item) {
+		return ErrBadLayout
+	}
+	return nil
+}
+
+func decodeCgroupsLookupItem(item []byte) (*CgroupsLookupItemView, error) {
+	var view CgroupsLookupItemView
+	if err := decodeCgroupsLookupItemInto(item, &view); err != nil {
+		return nil, err
+	}
+	return &view, nil
+}
+
+func decodeCgroupsLookupItemInto(item []byte, out *CgroupsLookupItemView) error {
+	if len(item) < CgroupsLookupItemHdr {
+		return ErrTruncated
+	}
+	status := ne.Uint16(item[2:4])
+	orchestrator := ne.Uint16(item[4:6])
+	pathOff, err := checkedWireU32Int(item, 8)
+	if err != nil {
+		return err
+	}
+	pathLen, err := checkedWireU32Int(item, 12)
+	if err != nil {
+		return err
+	}
+	nameOff, err := checkedWireU32Int(item, 16)
+	if err != nil {
+		return err
+	}
+	nameLen, err := checkedWireU32Int(item, 20)
+	if err != nil {
+		return err
+	}
+	labelCount := ne.Uint16(item[24:26])
+	if ne.Uint16(item[0:2]) != 1 || ne.Uint16(item[6:8]) != 0 || ne.Uint16(item[26:28]) != 0 {
+		return ErrBadLayout
+	}
+	if err := validateCgroupsLookupSemantics(status, orchestrator, pathLen, nameLen, int(labelCount)); err != nil {
+		return err
+	}
+	if status != CgroupLookupKnown {
+		return decodeCgroupsLookupUnknownItemInto(item, status, pathOff, pathLen, nameOff, out)
+	}
+	var path CStringView
+	pathEnd, err := lookupStringInto(item, CgroupsLookupItemHdr, pathOff, pathLen, viewOut(out, &path))
+	if err != nil {
+		return err
+	}
+	var name CStringView
+	nameEnd, err := lookupStringInto(item, CgroupsLookupItemHdr, nameOff, nameLen, viewOut(out, &name))
+	if err != nil {
+		return err
+	}
+	if overlap(pathOff, pathEnd, nameOff, nameEnd) {
+		return ErrBadLayout
 	}
 	table, err := validateLabels(item, CgroupsLookupItemHdr, labelCount, max(pathEnd, nameEnd))
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return &CgroupsLookupItemView{
-		Status:           status,
-		Orchestrator:     orchestrator,
-		Path:             path,
-		Name:             name,
-		LabelCount:       labelCount,
-		item:             item,
-		labelTableOffset: table,
-	}, nil
+	if out != nil {
+		*out = CgroupsLookupItemView{
+			Status:           status,
+			Orchestrator:     orchestrator,
+			Path:             path,
+			Name:             name,
+			LabelCount:       labelCount,
+			item:             item,
+			labelTableOffset: table,
+		}
+	}
+	return nil
 }
 
-func decodeCgroupsLookupUnknownItem(item []byte, status uint16, pathOff, pathLen, nameOff int) (*CgroupsLookupItemView, error) {
-	path, pathEnd, err := lookupString(item, CgroupsLookupItemHdr, pathOff, pathLen)
+func decodeCgroupsLookupUnknownItemInto(item []byte, status uint16, pathOff, pathLen, nameOff int, out *CgroupsLookupItemView) error {
+	var path CStringView
+	pathEnd, err := lookupStringInto(item, CgroupsLookupItemHdr, pathOff, pathLen, viewOut(out, &path))
 	if err != nil {
-		return nil, err
+		return err
 	}
-	name, nameEnd, err := lookupEmptyString(item, CgroupsLookupItemHdr, nameOff)
+	var name CStringView
+	nameEnd, err := lookupEmptyStringInto(item, CgroupsLookupItemHdr, nameOff, viewOut(out, &name))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if overlap(pathOff, pathEnd, nameOff, nameEnd) {
-		return nil, ErrBadLayout
+		return ErrBadLayout
 	}
 	labelTableOffset := max(pathEnd, nameEnd)
 	if labelTableOffset != len(item) {
-		return nil, ErrBadLayout
+		return ErrBadLayout
 	}
-	return &CgroupsLookupItemView{
-		Status:           status,
-		Path:             path,
-		Name:             name,
-		item:             item,
-		labelTableOffset: labelTableOffset,
-	}, nil
+	if out != nil {
+		*out = CgroupsLookupItemView{
+			Status:           status,
+			Path:             path,
+			Name:             name,
+			item:             item,
+			labelTableOffset: labelTableOffset,
+		}
+	}
+	return nil
 }
 
 func (v *CgroupsLookupItemView) Label(index uint32) (LookupLabelView, error) {
@@ -329,12 +477,14 @@ func (v *CgroupsLookupItemView) Label(index uint32) (LookupLabelView, error) {
 }
 
 type CgroupsLookupBuilder struct {
-	buf        []byte
-	generation uint64
-	itemCount  uint32
-	maxItems   uint32
-	dataOffset int
-	err        error
+	buf                   []byte
+	generation            uint64
+	itemCount             uint32
+	maxItems              uint32
+	dataOffset            int
+	err                   error
+	payloadExceededSuffix bool
+	payloadExceededBytes  []uint32
 }
 
 func NewCgroupsLookupBuilder(buf []byte, maxItems uint32, generation uint64) *CgroupsLookupBuilder {
@@ -352,7 +502,38 @@ func (b *CgroupsLookupBuilder) SetGeneration(generation uint64) {
 	b.generation = generation
 }
 
+func (b *CgroupsLookupBuilder) SetPayloadExceededItemLens(itemLens []int) {
+	suffixBytes, ok := buildPayloadExceededSuffixBytes(itemLens)
+	if !ok {
+		b.err = ErrOverflow
+		return
+	}
+	b.payloadExceededBytes = suffixBytes
+}
+
 func (b *CgroupsLookupBuilder) Add(status, orchestrator uint16, path, name []byte, labels []struct{ Key, Value []byte }) error {
+	return b.add(status, orchestrator, path, name, labels, false)
+}
+
+// AddRequestItem appends a response item using a path from a decoded request.
+// The request path has already been validated by DecodeCgroupsLookupRequest.
+func (b *CgroupsLookupBuilder) AddRequestItem(req *CgroupsLookupRequestView, index uint32, status, orchestrator uint16, name []byte, labels []struct{ Key, Value []byte }) error {
+	if req == nil {
+		b.err = ErrBadLayout
+		return ErrBadLayout
+	}
+	_, path, err := req.itemBytes(index)
+	if err != nil {
+		b.err = err
+		return err
+	}
+	return b.add(status, orchestrator, path, name, labels, true)
+}
+
+func (b *CgroupsLookupBuilder) add(status, orchestrator uint16, path, name []byte, labels []struct{ Key, Value []byte }, pathValidated bool) error {
+	if b.payloadExceededSuffix {
+		return b.addUnknown(CgroupLookupPayloadExceeded, path)
+	}
 	if b.itemCount >= b.maxItems {
 		b.err = ErrOverflow
 		return ErrOverflow
@@ -361,22 +542,26 @@ func (b *CgroupsLookupBuilder) Add(status, orchestrator uint16, path, name []byt
 		b.err = err
 		return err
 	}
-	if invalidSourceString(path, true) || invalidSourceString(name, false) {
+	if (!pathValidated && invalidSourceString(path, true)) || invalidSourceString(name, false) {
 		b.err = ErrBadLayout
 		return ErrBadLayout
 	}
 	if status != CgroupLookupKnown {
-		return b.addUnknown(status, path)
+		if err := b.addUnknown(status, path); err != nil {
+			if err == ErrOverflow {
+				return b.noteItemOverflow(path)
+			}
+			return err
+		}
+		return nil
 	}
 	labelCount, ok := checkedU16Int(len(labels))
 	if !ok {
-		b.err = ErrOverflow
-		return ErrOverflow
+		return b.noteItemOverflow(path)
 	}
 	itemStart, ok := checkedAlign8(b.dataOffset)
 	if !ok {
-		b.err = ErrOverflow
-		return ErrOverflow
+		return b.noteItemOverflow(path)
 	}
 	pathOff := CgroupsLookupItemHdr
 	nameOff, ok := checkedAddInt(pathOff, len(path))
@@ -384,30 +569,29 @@ func (b *CgroupsLookupBuilder) Add(status, orchestrator uint16, path, name []byt
 		nameOff, ok = checkedAddInt(nameOff, 1)
 	}
 	if !ok {
-		b.err = ErrOverflow
-		return ErrOverflow
+		return b.noteItemOverflow(path)
 	}
 	fixedEnd, ok := checkedAddInt(nameOff, len(name))
 	if ok {
 		fixedEnd, ok = checkedAddInt(fixedEnd, 1)
 	}
 	if !ok {
-		b.err = ErrOverflow
-		return ErrOverflow
+		return b.noteItemOverflow(path)
 	}
 	tableStart, tableBytes, itemSize, err := labelLayoutGo(fixedEnd, labels)
 	if err != nil {
+		if err == ErrOverflow {
+			return b.noteItemOverflow(path)
+		}
 		b.err = err
 		return err
 	}
 	itemEnd, ok := checkedAddInt(itemStart, itemSize)
-	if !ok {
-		b.err = ErrOverflow
-		return ErrOverflow
+	if !ok || itemEnd > len(b.buf) {
+		return b.noteItemOverflow(path)
 	}
-	if itemEnd > len(b.buf) {
-		b.err = ErrOverflow
-		return ErrOverflow
+	if !payloadExceededSuffixFits(len(b.buf), itemEnd, b.payloadExceededBytes, b.itemCount+1, b.maxItems) {
+		return b.noteItemOverflow(path)
 	}
 	pathOff32, ok := checkedU32Int(pathOff)
 	if !ok {
@@ -473,7 +657,16 @@ func (b *CgroupsLookupBuilder) Add(status, orchestrator uint16, path, name []byt
 	ne.PutUint32(b.buf[dir+4:dir+8], itemSize32)
 	b.dataOffset = itemStart + itemSize
 	b.itemCount++
+	b.err = nil
 	return nil
+}
+
+func (b *CgroupsLookupBuilder) noteItemOverflow(path []byte) error {
+	if b.itemCount == 0 {
+		return b.addUnknown(CgroupLookupOversizedItem, path)
+	}
+	b.payloadExceededSuffix = true
+	return b.addUnknown(CgroupLookupPayloadExceeded, path)
 }
 
 func (b *CgroupsLookupBuilder) addUnknown(status uint16, path []byte) error {
@@ -548,6 +741,7 @@ func (b *CgroupsLookupBuilder) addUnknown(status uint16, path []byte) error {
 	ne.PutUint32(b.buf[dir+4:dir+8], itemSize32)
 	b.dataOffset = itemStart + itemSize
 	b.itemCount++
+	b.err = nil
 	return nil
 }
 
@@ -573,11 +767,32 @@ func DispatchCgroupsLookup(req []byte, resp []byte, handler func(*CgroupsLookupR
 		return 0, ErrOverflow
 	}
 	builder := NewCgroupsLookupBuilder(resp, request.ItemCount, 0)
+	if request.ItemCount > 0 {
+		suffixBytes, ok := makePayloadExceededSuffixBytes(request.ItemCount)
+		if !ok {
+			return 0, ErrOverflow
+		}
+		for i := 0; i < len(suffixBytes)-1; i++ {
+			size, err := request.payloadExceededItemSize(uint32(i)) // #nosec G115 -- i is bounded by the checked suffixBytes length derived from ItemCount.
+			if err != nil {
+				return 0, err
+			}
+			size32, ok := checkedU32Int(size)
+			if !ok {
+				return 0, ErrOverflow
+			}
+			suffixBytes[i] = size32
+		}
+		if !finishPayloadExceededSuffixBytes(suffixBytes) {
+			return 0, ErrOverflow
+		}
+		builder.payloadExceededBytes = suffixBytes
+	}
 	if !handler(request, builder) {
 		if builder.Error() != nil {
 			return 0, builder.Error()
 		}
-		return 0, ErrBadLayout
+		return 0, ErrHandlerFailed
 	}
 	if builder.Error() != nil {
 		return 0, builder.Error()

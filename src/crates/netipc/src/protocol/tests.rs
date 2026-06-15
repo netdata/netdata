@@ -1311,6 +1311,7 @@ fn nipc_error_display_all_variants() {
         (NipcError::BadAlignment, "item not 8-byte aligned"),
         (NipcError::BadItemCount, "item count inconsistent"),
         (NipcError::Overflow, "builder out of space"),
+        (NipcError::HandlerFailed, "dispatch handler failed"),
     ];
     for (err, expected) in cases {
         let msg = format!("{}", err);

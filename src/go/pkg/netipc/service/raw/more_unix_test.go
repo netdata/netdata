@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
+	"unsafe"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/transport/posix"
@@ -241,6 +243,75 @@ func TestUnixClientCallTimeoutOnWedgedPeer(t *testing.T) {
 	cleanupAll(svc)
 }
 
+func TestUnixRawCallRecordsLimitExceededCapacity(t *testing.T) {
+	cfg := testServerConfig()
+	svc := uniqueUnixService("go_unix_limit_exceeded")
+	srv := startRawPosixSessionServer(t, svc, cfg,
+		func(session *posix.Session, hdr protocol.Header, payload []byte) error {
+			_ = payload
+			respHdr := protocol.Header{
+				Kind:            protocol.KindResponse,
+				Code:            hdr.Code,
+				MessageID:       hdr.MessageID,
+				TransportStatus: protocol.StatusLimitExceeded,
+			}
+			return session.Send(&respHdr, nil)
+		})
+
+	client := NewIncrementClient(testRunDir, svc, testClientConfig())
+	defer client.Close()
+	refreshUnixClientReady(t, client)
+
+	var reqBuf [protocol.IncrementPayloadSize]byte
+	if protocol.IncrementEncode(41, reqBuf[:]) == 0 {
+		t.Fatal("IncrementEncode failed")
+	}
+
+	_, _, err := client.doRawCallWithTimeout(protocol.MethodIncrement, reqBuf[:], 1000)
+	if !errors.Is(err, protocol.ErrOverflow) {
+		t.Fatalf("doRawCallWithTimeout error = %v, want %v", err, protocol.ErrOverflow)
+	}
+	if client.config.MaxResponsePayloadBytes != responseBufSize*2 {
+		t.Fatalf("response capacity = %d, want %d", client.config.MaxResponsePayloadBytes, responseBufSize*2)
+	}
+
+	srv.wait(t)
+	cleanupAll(svc)
+}
+
+func TestUnixRawCallRejectsUnknownTransportStatus(t *testing.T) {
+	cfg := testServerConfig()
+	svc := uniqueUnixService("go_unix_bad_transport_status")
+	srv := startRawPosixSessionServer(t, svc, cfg,
+		func(session *posix.Session, hdr protocol.Header, payload []byte) error {
+			_ = payload
+			respHdr := protocol.Header{
+				Kind:            protocol.KindResponse,
+				Code:            hdr.Code,
+				MessageID:       hdr.MessageID,
+				TransportStatus: 0xffff,
+			}
+			return session.Send(&respHdr, nil)
+		})
+
+	client := NewIncrementClient(testRunDir, svc, testClientConfig())
+	defer client.Close()
+	refreshUnixClientReady(t, client)
+
+	var reqBuf [protocol.IncrementPayloadSize]byte
+	if protocol.IncrementEncode(41, reqBuf[:]) == 0 {
+		t.Fatal("IncrementEncode failed")
+	}
+
+	_, _, err := client.doRawCallWithTimeout(protocol.MethodIncrement, reqBuf[:], 1000)
+	if !errors.Is(err, protocol.ErrBadLayout) {
+		t.Fatalf("doRawCallWithTimeout error = %v, want %v", err, protocol.ErrBadLayout)
+	}
+
+	srv.wait(t)
+	cleanupAll(svc)
+}
+
 func TestUnixClientAbortUnblocksCall(t *testing.T) {
 	cfg := testServerConfig()
 	svc := uniqueUnixService("go_unix_call_abort")
@@ -418,6 +489,10 @@ func TestUnixTryConnectInvalidServiceReturnsDisconnected(t *testing.T) {
 }
 
 func TestUnixPollFdRejectsInvalidFdAndHangup(t *testing.T) {
+	if got := pollFd(-1, 0); got != -1 {
+		t.Fatalf("pollFd(-1) = %d, want -1", got)
+	}
+
 	fds := []int{0, 0}
 	if err := syscall.Pipe(fds); err != nil {
 		t.Fatalf("Pipe failed: %v", err)
@@ -750,8 +825,67 @@ func TestUnixClientTransportWithoutSession(t *testing.T) {
 	if err := client.transportSend(&hdr, nil); !errors.Is(err, protocol.ErrTruncated) {
 		t.Fatalf("transportSend without session = %v, want ErrTruncated", err)
 	}
+	if strconv.IntSize >= 64 {
+		var sentinel byte
+		hugePayload := unsafe.Slice(&sentinel, int(uint64(^uint32(0))+1))
+		if err := client.transportSend(&hdr, hugePayload); !errors.Is(err, protocol.ErrOverflow) {
+			t.Fatalf("transportSend oversized payload = %v, want ErrOverflow", err)
+		}
+	}
 	if _, _, err := client.transportReceive(); !errors.Is(err, protocol.ErrTruncated) {
 		t.Fatalf("transportReceive without session = %v, want ErrTruncated", err)
+	}
+}
+
+func TestUnixCallWithRetryStopsWhenOverflowCannotGrowCapacity(t *testing.T) {
+	svc := uniqueUnixService("go_unix_retry_no_growth")
+	ts := startTestServer(svc, testSnapshotDispatch())
+	defer ts.stop()
+
+	client := NewSnapshotClient(testRunDir, svc, testClientConfig())
+	defer client.Close()
+	refreshUnixClientReady(t, client)
+
+	attempts := 0
+	err := client.callWithRetry(func() error {
+		attempts++
+		return protocol.ErrOverflow
+	})
+	if !errors.Is(err, protocol.ErrOverflow) {
+		t.Fatalf("callWithRetry no-growth error = %v, want ErrOverflow", err)
+	}
+	if attempts != 1 {
+		t.Fatalf("callWithRetry no-growth attempts = %d, want 1", attempts)
+	}
+	if client.state != StateBroken {
+		t.Fatalf("callWithRetry no-growth state = %d, want StateBroken", client.state)
+	}
+}
+
+func TestUnixCallWithRetryCapsOverflowGrowthRetries(t *testing.T) {
+	svc := uniqueUnixService("go_unix_retry_growth_cap")
+	ts := startTestServer(svc, testSnapshotDispatch())
+	defer ts.stop()
+
+	client := NewSnapshotClient(testRunDir, svc, testClientConfig())
+	defer client.Close()
+	refreshUnixClientReady(t, client)
+	client.config.MaxRequestPayloadBytes = protocol.MaxPayloadDefault
+
+	attempts := 0
+	err := client.callWithRetry(func() error {
+		attempts++
+		client.config.MaxRequestPayloadBytes++
+		return protocol.ErrOverflow
+	})
+	if !errors.Is(err, protocol.ErrOverflow) {
+		t.Fatalf("callWithRetry growth-cap error = %v, want ErrOverflow", err)
+	}
+	if attempts != 8 {
+		t.Fatalf("callWithRetry growth-cap attempts = %d, want 8", attempts)
+	}
+	if client.state != StateBroken {
+		t.Fatalf("callWithRetry growth-cap state = %d, want StateBroken", client.state)
 	}
 }
 

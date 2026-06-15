@@ -6,8 +6,7 @@
 
 use crate::protocol::{
     self, align8, ChunkHeader, Header, Hello, HelloAck, FLAG_BATCH, HEADER_SIZE, KIND_REQUEST,
-    KIND_RESPONSE, MAGIC_CHUNK, MAGIC_MSG, MAX_PAYLOAD_CAP, MAX_PAYLOAD_DEFAULT, PROFILE_BASELINE,
-    VERSION,
+    KIND_RESPONSE, MAGIC_CHUNK, MAGIC_MSG, MAX_PAYLOAD_DEFAULT, PROFILE_BASELINE, VERSION,
 };
 use std::collections::HashSet;
 use std::ffi::CString;
@@ -1258,6 +1257,7 @@ fn server_handshake(
         config.packet_size
     };
 
+    let s_req_pay = apply_default(config.max_request_payload_bytes, MAX_PAYLOAD_DEFAULT);
     let s_resp_pay = apply_default(config.max_response_payload_bytes, MAX_PAYLOAD_DEFAULT);
     let s_profiles = if config.supported_profiles == 0 {
         PROFILE_BASELINE
@@ -1351,7 +1351,7 @@ fn server_handshake(
         highest_bit(intersection)
     };
 
-    if hello.max_request_payload_bytes > MAX_PAYLOAD_CAP {
+    if hello.max_request_payload_bytes > s_req_pay {
         send_rejection(protocol::STATUS_LIMIT_EXCEEDED)?;
         return Err(UdsError::LimitExceeded);
     }

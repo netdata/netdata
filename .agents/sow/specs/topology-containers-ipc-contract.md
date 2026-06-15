@@ -1,7 +1,7 @@
 # Topology Containers IPC Contract
 
 Status: current
-Last updated: 2026-06-13
+Last updated: 2026-06-15
 
 ## Purpose
 
@@ -16,8 +16,10 @@ The goal is reliable container, orchestrator, and service identity in network to
 ## Wire Contract
 
 - The netipc lookup layout version is `1`.
-- The vendored wire-format baseline is commit `dba0a065f0`.
-- Size and offset contracts are enforced by `_Static_assert` in `src/libnetdata/netipc/src/protocol/netipc_protocol.c`.
+- The vendored wire-format baseline is `netdata/plugin-ipc` commit
+  `c83b1826707a9272d5816f582928f77e1c4187f1`.
+- Size and offset contracts are enforced by `_Static_assert` in the protocol
+  source files under `src/libnetdata/netipc/src/protocol/`.
 - `CGROUPS_LOOKUP` request/response headers are 16 bytes; each response item header is 28 bytes.
 - `APPS_LOOKUP` request/response headers are 16 bytes; each response item header is 60 bytes; each PID/starttime key is 8 bytes.
 - Producers and consumers must reject unknown layout versions. Any field addition or semantic change requires a layout-version bump and a new SOW.

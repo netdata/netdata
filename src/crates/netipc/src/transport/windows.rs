@@ -6,8 +6,7 @@
 
 use crate::protocol::{
     self, align8, ChunkHeader, Header, Hello, HelloAck, FLAG_BATCH, HEADER_SIZE, KIND_REQUEST,
-    KIND_RESPONSE, MAGIC_CHUNK, MAGIC_MSG, MAX_PAYLOAD_CAP, MAX_PAYLOAD_DEFAULT, PROFILE_BASELINE,
-    VERSION,
+    KIND_RESPONSE, MAGIC_CHUNK, MAGIC_MSG, MAX_PAYLOAD_DEFAULT, PROFILE_BASELINE, VERSION,
 };
 use std::collections::HashSet;
 use std::ptr;
@@ -1401,6 +1400,7 @@ fn server_handshake(
     session_id: u64,
 ) -> Result<NpSession, NpError> {
     let server_pkt_size = apply_default(config.packet_size, DEFAULT_PACKET_SIZE);
+    let s_req_pay = apply_default(config.max_request_payload_bytes, MAX_PAYLOAD_DEFAULT);
     let s_resp_pay = apply_default(config.max_response_payload_bytes, MAX_PAYLOAD_DEFAULT);
     let s_profiles = if config.supported_profiles != 0 {
         config.supported_profiles
@@ -1490,7 +1490,7 @@ fn server_handshake(
         highest_bit(intersection)
     };
 
-    if hello.max_request_payload_bytes > MAX_PAYLOAD_CAP {
+    if hello.max_request_payload_bytes > s_req_pay {
         send_rejection(protocol::STATUS_LIMIT_EXCEEDED);
         return Err(NpError::LimitExceeded);
     }
@@ -2133,7 +2133,7 @@ mod tests {
         let svc = unique_service("rs_dir_limits");
 
         let scfg = ServerConfig {
-            max_request_payload_bytes: 2048,
+            max_request_payload_bytes: 4096,
             max_request_batch_items: 8,
             max_response_payload_bytes: 8192,
             max_response_batch_items: 32,

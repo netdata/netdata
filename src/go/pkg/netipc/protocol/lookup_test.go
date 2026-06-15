@@ -1,6 +1,10 @@
 package protocol
 
-import "testing"
+import (
+	"bytes"
+	"strconv"
+	"testing"
+)
 
 func labels(items ...struct{ Key, Value []byte }) []struct{ Key, Value []byte } {
 	return items
@@ -620,8 +624,21 @@ func TestCgroupsLookupBuilderGuardCoverage(t *testing.T) {
 		}
 	}
 	tooManyLabels := make([]struct{ Key, Value []byte }, int(^uint16(0))+1)
-	if err := NewCgroupsLookupBuilder(resp[:], 1, 0).Add(CgroupLookupKnown, 0, []byte("/x"), nil, tooManyLabels); err != ErrOverflow {
-		t.Fatalf("cgroups too-many-labels error = %v, want ErrOverflow", err)
+	tooManyBuilder := NewCgroupsLookupBuilder(resp[:], 1, 0)
+	if err := tooManyBuilder.Add(CgroupLookupKnown, 0, []byte("/x"), nil, tooManyLabels); err != nil {
+		t.Fatalf("cgroups too-many-labels error = %v, want nil", err)
+	}
+	n := tooManyBuilder.Finish()
+	tooManyView, err := DecodeCgroupsLookupResponse(resp[:n])
+	if err != nil {
+		t.Fatalf("decode cgroups too-many-labels response: %v", err)
+	}
+	tooManyItem, err := tooManyView.Item(0)
+	if err != nil {
+		t.Fatalf("cgroups too-many-labels item: %v", err)
+	}
+	if tooManyItem.Status != CgroupLookupOversizedItem {
+		t.Fatalf("cgroups too-many-labels status = %d, want OVERSIZED_ITEM", tooManyItem.Status)
 	}
 
 	small := make([]byte, CgroupsLookupRespHdr+LookupDirEntrySize)
@@ -826,8 +843,21 @@ func TestAppsLookupBuilderGuardCoverage(t *testing.T) {
 		}
 	}
 	tooManyLabels := make([]struct{ Key, Value []byte }, int(^uint16(0))+1)
-	if err := NewAppsLookupBuilder(resp[:], 1, 0).Add(PidLookupKnown, AppsCgroupKnown, 0, 1, 0, 0, 0, []byte("x"), []byte("/x"), nil, tooManyLabels); err != ErrOverflow {
-		t.Fatalf("apps too-many-labels error = %v, want ErrOverflow", err)
+	tooManyBuilder := NewAppsLookupBuilder(resp[:], 1, 0)
+	if err := tooManyBuilder.Add(PidLookupKnown, AppsCgroupKnown, 0, 1, 0, 0, 0, []byte("x"), []byte("/x"), nil, tooManyLabels); err != nil {
+		t.Fatalf("apps too-many-labels error = %v, want nil", err)
+	}
+	n := tooManyBuilder.Finish()
+	tooManyView, err := DecodeAppsLookupResponse(resp[:n])
+	if err != nil {
+		t.Fatalf("decode apps too-many-labels response: %v", err)
+	}
+	tooManyItem, err := tooManyView.Item(0)
+	if err != nil {
+		t.Fatalf("apps too-many-labels item: %v", err)
+	}
+	if tooManyItem.Status != PidLookupOversizedItem {
+		t.Fatalf("apps too-many-labels status = %d, want OVERSIZED_ITEM", tooManyItem.Status)
 	}
 
 	small := make([]byte, AppsLookupRespHdr+LookupDirEntrySize)
@@ -947,8 +977,11 @@ func TestLookupInternalGuardCoverage(t *testing.T) {
 	if _, ok := checkedU32Int(-1); ok {
 		t.Fatalf("checkedU32Int(-1) succeeded")
 	}
-	if _, ok := checkedU32Int(int(uint64(^uint32(0)) + 1)); ok {
-		t.Fatalf("checkedU32Int(uint32 max + 1) succeeded")
+	if strconv.IntSize >= 64 {
+		maxU32 := ^uint32(0)
+		if _, ok := checkedU32Int(int(uint64(maxU32) + 1)); ok {
+			t.Fatalf("checkedU32Int(uint32 max + 1) succeeded")
+		}
 	}
 	if _, ok := checkedU16Int(-1); ok {
 		t.Fatalf("checkedU16Int(-1) succeeded")
@@ -1437,11 +1470,7 @@ func TestLookupDispatchCoverage(t *testing.T) {
 	}
 	n, err := DispatchCgroupsLookup(req[:reqLen], resp[:], func(request *CgroupsLookupRequestView, builder *CgroupsLookupBuilder) bool {
 		for i := uint32(0); i < request.ItemCount; i++ {
-			path, err := request.Item(i)
-			if err != nil {
-				return false
-			}
-			if err := builder.Add(CgroupLookupKnown, OrchestratorDocker, path.Bytes(), []byte("name"), nil); err != nil {
+			if err := builder.AddRequestItem(request, i, CgroupLookupKnown, OrchestratorDocker, []byte("name"), nil); err != nil {
 				return false
 			}
 		}
@@ -1453,11 +1482,18 @@ func TestLookupDispatchCoverage(t *testing.T) {
 	if _, err := DecodeCgroupsLookupResponse(resp[:n]); err != nil {
 		t.Fatalf("decode dispatched cgroups response: %v", err)
 	}
+	n, err = DispatchCgroupsLookup(req[:reqLen], resp[:], func(request *CgroupsLookupRequestView, builder *CgroupsLookupBuilder) bool {
+		_ = builder.AddRequestItem(request, request.ItemCount, CgroupLookupKnown, OrchestratorDocker, []byte("name"), nil)
+		return true
+	})
+	if err != ErrOutOfBounds || n != 0 {
+		t.Fatalf("dispatch cgroups request item out of bounds = n %d err %v, want ErrOutOfBounds", n, err)
+	}
 	n, err = DispatchCgroupsLookup(req[:reqLen], resp[:], func(*CgroupsLookupRequestView, *CgroupsLookupBuilder) bool {
 		return false
 	})
-	if err != ErrBadLayout || n != 0 {
-		t.Fatalf("dispatch cgroups handler false = n %d err %v", n, err)
+	if err != ErrHandlerFailed || n != 0 {
+		t.Fatalf("dispatch cgroups handler false = n %d err %v, want ErrHandlerFailed", n, err)
 	}
 	n, err = DispatchCgroupsLookup(req[:reqLen], resp[:], func(*CgroupsLookupRequestView, *CgroupsLookupBuilder) bool {
 		return true
@@ -1517,8 +1553,8 @@ func TestLookupDispatchCoverage(t *testing.T) {
 	n, err = DispatchAppsLookup(req[:reqLen], resp[:], func(*AppsLookupRequestView, *AppsLookupBuilder) bool {
 		return false
 	})
-	if err != ErrBadLayout || n != 0 {
-		t.Fatalf("dispatch apps handler false = n %d err %v", n, err)
+	if err != ErrHandlerFailed || n != 0 {
+		t.Fatalf("dispatch apps handler false = n %d err %v, want ErrHandlerFailed", n, err)
 	}
 	n, err = DispatchAppsLookup(req[:reqLen], resp[:], func(*AppsLookupRequestView, *AppsLookupBuilder) bool {
 		return true
@@ -1551,5 +1587,270 @@ func TestLookupDispatchCoverage(t *testing.T) {
 	}
 	if n, err := DispatchAppsLookup(req[:AppsLookupReqHdr-1], resp[:], nil); err != ErrTruncated || n != 0 {
 		t.Fatalf("dispatch apps bad request = n %d err %v", n, err)
+	}
+}
+
+func TestLookupRawResponseRoundTrip(t *testing.T) {
+	cgItem := validCgroupsLookupItemBytes(t)
+	var cgResp [512]byte
+	cgN, err := EncodeCgroupsLookupRawResponse([][]byte{cgItem}, 44, cgResp[:])
+	if err != nil {
+		t.Fatalf("encode raw cgroups response: %v", err)
+	}
+	cgView, err := DecodeCgroupsLookupResponse(cgResp[:cgN])
+	if err != nil {
+		t.Fatalf("decode raw cgroups response: %v", err)
+	}
+	if cgView.Generation != 44 || cgView.ItemCount != 1 {
+		t.Fatalf("raw cgroups header = generation %d count %d", cgView.Generation, cgView.ItemCount)
+	}
+	cgRaw, err := cgView.RawItem(0)
+	if err != nil {
+		t.Fatalf("raw cgroups item: %v", err)
+	}
+	if string(cgRaw) != string(cgItem) {
+		t.Fatalf("raw cgroups item changed")
+	}
+	if _, err := cgView.RawItem(1); err != ErrOutOfBounds {
+		t.Fatalf("raw cgroups out-of-bounds error = %v, want ErrOutOfBounds", err)
+	}
+	if _, err := EncodeCgroupsLookupRawResponse([][]byte{cgItem[:CgroupsLookupItemHdr-1]}, 0, cgResp[:]); err != ErrBadLayout {
+		t.Fatalf("short raw cgroups item error = %v, want ErrBadLayout", err)
+	}
+	if _, err := EncodeCgroupsLookupRawResponse([][]byte{cgItem}, 0, cgResp[:CgroupsLookupRespHdr+LookupDirEntrySize]); err != ErrOverflow {
+		t.Fatalf("small raw cgroups buffer error = %v, want ErrOverflow", err)
+	}
+	badCgItem := append([]byte(nil), cgItem...)
+	ne.PutUint16(badCgItem[2:4], 99)
+	if _, err := EncodeCgroupsLookupRawResponse([][]byte{badCgItem}, 0, cgResp[:]); err != ErrBadLayout {
+		t.Fatalf("invalid raw cgroups item error = %v, want ErrBadLayout", err)
+	}
+
+	appsItem := validAppsLookupItemBytes(t)
+	var appsResp [1024]byte
+	appsN, err := EncodeAppsLookupRawResponse([][]byte{appsItem}, 55, appsResp[:])
+	if err != nil {
+		t.Fatalf("encode raw apps response: %v", err)
+	}
+	appsView, err := DecodeAppsLookupResponse(appsResp[:appsN])
+	if err != nil {
+		t.Fatalf("decode raw apps response: %v", err)
+	}
+	if appsView.Generation != 55 || appsView.ItemCount != 1 {
+		t.Fatalf("raw apps header = generation %d count %d", appsView.Generation, appsView.ItemCount)
+	}
+	appsRaw, err := appsView.RawItem(0)
+	if err != nil {
+		t.Fatalf("raw apps item: %v", err)
+	}
+	if string(appsRaw) != string(appsItem) {
+		t.Fatalf("raw apps item changed")
+	}
+	if _, err := appsView.RawItem(1); err != ErrOutOfBounds {
+		t.Fatalf("raw apps out-of-bounds error = %v, want ErrOutOfBounds", err)
+	}
+	if _, err := EncodeAppsLookupRawResponse([][]byte{appsItem[:AppsLookupItemHdr-1]}, 0, appsResp[:]); err != ErrBadLayout {
+		t.Fatalf("short raw apps item error = %v, want ErrBadLayout", err)
+	}
+	if _, err := EncodeAppsLookupRawResponse([][]byte{appsItem}, 0, appsResp[:AppsLookupRespHdr+LookupDirEntrySize]); err != ErrOverflow {
+		t.Fatalf("small raw apps buffer error = %v, want ErrOverflow", err)
+	}
+	badAppsItem := append([]byte(nil), appsItem...)
+	ne.PutUint16(badAppsItem[2:4], 99)
+	if _, err := EncodeAppsLookupRawResponse([][]byte{badAppsItem}, 0, appsResp[:]); err != ErrBadLayout {
+		t.Fatalf("invalid raw apps item error = %v, want ErrBadLayout", err)
+	}
+}
+
+func TestLookupBuilderOverflowStatusSuffix(t *testing.T) {
+	t.Run("apps", func(t *testing.T) {
+		buf := make([]byte, 256)
+		builder := NewAppsLookupBuilder(buf, 3, 1)
+		if err := builder.Add(PidLookupKnown, AppsCgroupKnown, 0, 1, 0, 0, 0, []byte("a"), []byte("/a"), nil, nil); err != nil {
+			t.Fatalf("add first apps item: %v", err)
+		}
+		if err := builder.Add(PidLookupKnown, AppsCgroupKnown, 0, 2, 0, 0, 0, []byte("b"), bytes.Repeat([]byte("x"), 256), nil, nil); err != nil {
+			t.Fatalf("add overflow apps item: %v", err)
+		}
+		if err := builder.Add(PidLookupKnown, AppsCgroupKnown, 0, 3, 0, 0, 0, []byte("c"), []byte("/c"), nil, nil); err != nil {
+			t.Fatalf("add suffix apps item: %v", err)
+		}
+		view, err := DecodeAppsLookupResponse(buf[:builder.Finish()])
+		if err != nil {
+			t.Fatalf("decode apps overflow suffix: %v", err)
+		}
+		if view.ItemCount != 3 {
+			t.Fatalf("apps item count = %d, want 3", view.ItemCount)
+		}
+		item0, _ := view.Item(0)
+		item1, _ := view.Item(1)
+		item2, _ := view.Item(2)
+		if item0.Status != PidLookupKnown || item0.Pid != 1 {
+			t.Fatalf("apps item0 = %+v", item0)
+		}
+		if item1.Status != PidLookupPayloadExceeded || item1.Pid != 2 {
+			t.Fatalf("apps item1 = %+v", item1)
+		}
+		if item2.Status != PidLookupPayloadExceeded || item2.Pid != 3 {
+			t.Fatalf("apps item2 = %+v", item2)
+		}
+	})
+
+	t.Run("cgroups", func(t *testing.T) {
+		buf := make([]byte, 192)
+		builder := NewCgroupsLookupBuilder(buf, 3, 1)
+		if err := builder.Add(CgroupLookupKnown, 0, []byte("/a"), []byte("a"), nil); err != nil {
+			t.Fatalf("add first cgroups item: %v", err)
+		}
+		if err := builder.Add(CgroupLookupKnown, 0, []byte("/b"), bytes.Repeat([]byte("x"), 192), nil); err != nil {
+			t.Fatalf("add overflow cgroups item: %v", err)
+		}
+		if err := builder.Add(CgroupLookupKnown, 0, []byte("/c"), []byte("c"), nil); err != nil {
+			t.Fatalf("add suffix cgroups item: %v", err)
+		}
+		view, err := DecodeCgroupsLookupResponse(buf[:builder.Finish()])
+		if err != nil {
+			t.Fatalf("decode cgroups overflow suffix: %v", err)
+		}
+		if view.ItemCount != 3 {
+			t.Fatalf("cgroups item count = %d, want 3", view.ItemCount)
+		}
+		item0, _ := view.Item(0)
+		item1, _ := view.Item(1)
+		item2, _ := view.Item(2)
+		if item0.Status != CgroupLookupKnown || item0.Path.String() != "/a" {
+			t.Fatalf("cgroups item0 = %+v", item0)
+		}
+		if item1.Status != CgroupLookupPayloadExceeded || item1.Path.String() != "/b" {
+			t.Fatalf("cgroups item1 = %+v", item1)
+		}
+		if item2.Status != CgroupLookupPayloadExceeded || item2.Path.String() != "/c" {
+			t.Fatalf("cgroups item2 = %+v", item2)
+		}
+	})
+}
+
+func TestLookupBuilderExplicitPayloadExceededSuffixLens(t *testing.T) {
+	t.Run("apps", func(t *testing.T) {
+		buf := make([]byte, 246)
+		builder := NewAppsLookupBuilder(buf, 3, 11)
+		builder.SetPayloadExceededItemLens([]int{
+			appsLookupUnknownItemSize,
+			appsLookupUnknownItemSize,
+			appsLookupUnknownItemSize,
+		})
+		for _, pid := range []uint32{10, 11, 12} {
+			if err := builder.Add(PidLookupKnown, AppsCgroupKnown, OrchestratorDocker, pid, 0, 1000, 1, []byte("p"), []byte("/x"), nil, nil); err != nil {
+				t.Fatalf("add apps pid %d: %v", pid, err)
+			}
+		}
+		view, err := DecodeAppsLookupResponse(buf[:builder.Finish()])
+		if err != nil {
+			t.Fatalf("decode apps explicit suffix response: %v", err)
+		}
+		for i, want := range []struct {
+			pid    uint32
+			status uint16
+		}{
+			{10, PidLookupKnown},
+			{11, PidLookupPayloadExceeded},
+			{12, PidLookupPayloadExceeded},
+		} {
+			item, err := view.Item(uint32(i))
+			if err != nil {
+				t.Fatalf("apps item %d: %v", i, err)
+			}
+			if item.Pid != want.pid || item.Status != want.status {
+				t.Fatalf("apps item %d = pid/status %d/%d, want %d/%d", i, item.Pid, item.Status, want.pid, want.status)
+			}
+		}
+
+		bad := NewAppsLookupBuilder(make([]byte, AppsLookupRespHdr+LookupDirEntrySize), 1, 0)
+		bad.SetPayloadExceededItemLens([]int{-1})
+		if bad.Error() != ErrOverflow {
+			t.Fatalf("invalid apps suffix lens error = %v, want ErrOverflow", bad.Error())
+		}
+	})
+
+	t.Run("cgroups", func(t *testing.T) {
+		paths := [][]byte{[]byte("/a"), []byte("/b"), []byte("/c")}
+		itemLens := make([]int, len(paths))
+		for i, path := range paths {
+			itemLens[i] = cgroupsLookupUnknownFixedBytes + len(path) + 1
+		}
+
+		buf := make([]byte, 148)
+		builder := NewCgroupsLookupBuilder(buf, 3, 12)
+		builder.SetPayloadExceededItemLens(itemLens)
+		for i, path := range paths {
+			if err := builder.Add(CgroupLookupKnown, OrchestratorDocker, path, []byte("n"), nil); err != nil {
+				t.Fatalf("add cgroups path %d: %v", i, err)
+			}
+		}
+		view, err := DecodeCgroupsLookupResponse(buf[:builder.Finish()])
+		if err != nil {
+			t.Fatalf("decode cgroups explicit suffix response: %v", err)
+		}
+		for i, want := range []struct {
+			path   string
+			status uint16
+		}{
+			{"/a", CgroupLookupKnown},
+			{"/b", CgroupLookupPayloadExceeded},
+			{"/c", CgroupLookupPayloadExceeded},
+		} {
+			item, err := view.Item(uint32(i))
+			if err != nil {
+				t.Fatalf("cgroups item %d: %v", i, err)
+			}
+			if item.Path.String() != want.path || item.Status != want.status {
+				t.Fatalf("cgroups item %d = path/status %q/%d, want %q/%d", i, item.Path.String(), item.Status, want.path, want.status)
+			}
+		}
+
+		bad := NewCgroupsLookupBuilder(make([]byte, CgroupsLookupRespHdr+LookupDirEntrySize), 1, 0)
+		bad.SetPayloadExceededItemLens([]int{-1})
+		if bad.Error() != ErrOverflow {
+			t.Fatalf("invalid cgroups suffix lens error = %v, want ErrOverflow", bad.Error())
+		}
+	})
+}
+
+func TestCgroupsLookupBuilderAddRequestItemGuards(t *testing.T) {
+	buf := make([]byte, 256)
+	builder := NewCgroupsLookupBuilder(buf, 1, 0)
+	if err := builder.AddRequestItem(nil, 0, CgroupLookupKnown, OrchestratorDocker, []byte("n"), nil); err != ErrBadLayout {
+		t.Fatalf("nil request AddRequestItem error = %v, want ErrBadLayout", err)
+	}
+
+	var reqBuf [128]byte
+	reqLen, err := EncodeCgroupsLookupRequest([][]byte{[]byte("/x")}, reqBuf[:])
+	if err != nil {
+		t.Fatalf("encode cgroups request: %v", err)
+	}
+	req, err := DecodeCgroupsLookupRequest(reqBuf[:reqLen])
+	if err != nil {
+		t.Fatalf("decode cgroups request: %v", err)
+	}
+
+	builder = NewCgroupsLookupBuilder(buf, 1, 0)
+	if err := builder.AddRequestItem(req, 0, CgroupLookupKnown, OrchestratorDocker, []byte("bad\x00name"), nil); err != ErrBadLayout {
+		t.Fatalf("bad name AddRequestItem error = %v, want ErrBadLayout", err)
+	}
+
+	builder = NewCgroupsLookupBuilder(buf, 1, 33)
+	if err := builder.AddRequestItem(req, 0, CgroupLookupKnown, OrchestratorDocker, []byte("name"), nil); err != nil {
+		t.Fatalf("valid AddRequestItem: %v", err)
+	}
+	view, err := DecodeCgroupsLookupResponse(buf[:builder.Finish()])
+	if err != nil {
+		t.Fatalf("decode request-backed cgroups response: %v", err)
+	}
+	item, err := view.Item(0)
+	if err != nil {
+		t.Fatalf("request-backed cgroups item: %v", err)
+	}
+	if item.Path.String() != "/x" || item.Name.String() != "name" || item.Status != CgroupLookupKnown {
+		t.Fatalf("request-backed cgroups item = %+v", item)
 	}
 }

@@ -72,6 +72,8 @@ impl ManagedServer {
             let running = self.running.clone();
             let learned_request_payload_bytes = self.learned_request_payload_bytes.clone();
             let learned_response_payload_bytes = self.learned_response_payload_bytes.clone();
+            let request_payload_growth_ceiling = self.request_payload_growth_ceiling;
+            let response_payload_growth_ceiling = self.response_payload_growth_ceiling;
             let t = std::thread::spawn(move || {
                 handle_session_win_threaded(
                     session,
@@ -81,6 +83,8 @@ impl ManagedServer {
                     running,
                     learned_request_payload_bytes,
                     learned_response_payload_bytes,
+                    request_payload_growth_ceiling,
+                    response_payload_growth_ceiling,
                 );
             });
             session_threads.push(t);

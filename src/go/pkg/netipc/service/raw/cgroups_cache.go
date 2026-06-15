@@ -157,7 +157,7 @@ func (c *Cache) Lookup(hash uint32, name string) (CacheItem, bool) {
 	}
 
 	if len(c.buckets) > 0 {
-		mask, err := checkedLookupU32(len(c.buckets) - 1)
+		mask, err := cacheBucketMaskForLen(len(c.buckets))
 		if err != nil {
 			return CacheItem{}, false
 		}
@@ -182,13 +182,9 @@ func (c *Cache) Lookup(hash uint32, name string) (CacheItem, bool) {
 
 // Status returns a diagnostic snapshot for the L3 cache.
 func (c *Cache) Status() CacheStatus {
-	itemCount, err := checkedLookupU32(len(c.items))
-	if err != nil {
-		itemCount = ^uint32(0)
-	}
 	return CacheStatus{
 		Populated:           c.populated,
-		ItemCount:           itemCount,
+		ItemCount:           cacheStatusItemCountForLen(len(c.items)),
 		SystemdEnabled:      c.systemdEnabled,
 		Generation:          c.generation,
 		RefreshSuccessCount: c.refreshSuccessCount,
@@ -196,6 +192,18 @@ func (c *Cache) Status() CacheStatus {
 		ConnectionState:     c.client.state,
 		LastRefreshTs:       c.lastRefreshTs,
 	}
+}
+
+func cacheBucketMaskForLen(bucketLen int) (uint32, error) {
+	return checkedLookupU32(bucketLen - 1)
+}
+
+func cacheStatusItemCountForLen(itemLen int) uint32 {
+	itemCount, err := checkedLookupU32(itemLen)
+	if err != nil {
+		return ^uint32(0)
+	}
+	return itemCount
 }
 
 // SetCallTimeout sets the context-level default timeout for refresh calls.

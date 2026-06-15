@@ -1,16 +1,25 @@
 #include "netipc_protocol_cgroups_lookup_internal.h"
 
-_Static_assert(sizeof(nipc_cgroups_lookup_item_wire_t) == NIPC_CGROUPS_LOOKUP_ITEM_HDR_SIZE,
+#include <stdlib.h>
+
+_Static_assert(sizeof(nipc_cgroups_lookup_item_wire_t) ==
+                   NIPC_CGROUPS_LOOKUP_ITEM_HDR_SIZE,
                "cgroups lookup item header must be 28 bytes");
-_Static_assert(offsetof(nipc_cgroups_lookup_item_wire_t, layout_version) == 0, "");
+_Static_assert(offsetof(nipc_cgroups_lookup_item_wire_t, layout_version) == 0,
+               "");
 _Static_assert(offsetof(nipc_cgroups_lookup_item_wire_t, status) == 2, "");
-_Static_assert(offsetof(nipc_cgroups_lookup_item_wire_t, orchestrator) == 4, "");
+_Static_assert(offsetof(nipc_cgroups_lookup_item_wire_t, orchestrator) == 4,
+               "");
 _Static_assert(offsetof(nipc_cgroups_lookup_item_wire_t, reserved0) == 6, "");
 _Static_assert(offsetof(nipc_cgroups_lookup_item_wire_t, path_offset) == 8, "");
-_Static_assert(offsetof(nipc_cgroups_lookup_item_wire_t, path_length) == 12, "");
-_Static_assert(offsetof(nipc_cgroups_lookup_item_wire_t, name_offset) == 16, "");
-_Static_assert(offsetof(nipc_cgroups_lookup_item_wire_t, name_length) == 20, "");
-_Static_assert(offsetof(nipc_cgroups_lookup_item_wire_t, label_count) == 24, "");
+_Static_assert(offsetof(nipc_cgroups_lookup_item_wire_t, path_length) == 12,
+               "");
+_Static_assert(offsetof(nipc_cgroups_lookup_item_wire_t, name_offset) == 16,
+               "");
+_Static_assert(offsetof(nipc_cgroups_lookup_item_wire_t, name_length) == 20,
+               "");
+_Static_assert(offsetof(nipc_cgroups_lookup_item_wire_t, label_count) == 24,
+               "");
 _Static_assert(offsetof(nipc_cgroups_lookup_item_wire_t, reserved1) == 26, "");
 
 static nipc_error_t cgroups_lookup_validate_semantics(uint16_t status,
@@ -20,7 +29,9 @@ static nipc_error_t cgroups_lookup_validate_semantics(uint16_t status,
                                                       uint64_t label_count) {
   if (status != NIPC_CGROUP_LOOKUP_KNOWN &&
       status != NIPC_CGROUP_LOOKUP_UNKNOWN_RETRY_LATER &&
-      status != NIPC_CGROUP_LOOKUP_UNKNOWN_PERMANENT)
+      status != NIPC_CGROUP_LOOKUP_UNKNOWN_PERMANENT &&
+      status != NIPC_CGROUP_LOOKUP_PAYLOAD_EXCEEDED &&
+      status != NIPC_CGROUP_LOOKUP_OVERSIZED_ITEM)
     return NIPC_ERR_BAD_LAYOUT;
   if (path_len == 0)
     return NIPC_ERR_BAD_LAYOUT;
@@ -286,6 +297,8 @@ nipc_cgroups_lookup_resp_item(const nipc_cgroups_lookup_resp_view_t *view,
     return NIPC_ERR_BAD_ITEM_COUNT;
 
   size_t dir_size = (size_t)view->item_count * NIPC_LOOKUP_DIR_ENTRY_SIZE;
+  if (NIPC_CGROUPS_LOOKUP_RESP_HDR_SIZE > SIZE_MAX - dir_size)
+    return NIPC_ERR_BAD_ITEM_COUNT;
   size_t dir_end = NIPC_CGROUPS_LOOKUP_RESP_HDR_SIZE + dir_size;
   const uint8_t *dir = view->_payload + NIPC_CGROUPS_LOOKUP_RESP_HDR_SIZE;
   const uint8_t *packed = view->_payload + dir_end;
@@ -294,6 +307,79 @@ nipc_cgroups_lookup_resp_item(const nipc_cgroups_lookup_resp_view_t *view,
          sizeof(entry));
   return cgroups_lookup_decode_item_bytes(packed + entry.offset, entry.length,
                                           out);
+}
+
+nipc_error_t
+nipc_cgroups_lookup_resp_raw_item(const nipc_cgroups_lookup_resp_view_t *view,
+                                  uint32_t index, const uint8_t **item_out,
+                                  uint32_t *item_len_out) {
+  if (index >= view->item_count)
+    return NIPC_ERR_OUT_OF_BOUNDS;
+  if (mul_would_overflow((size_t)view->item_count, NIPC_LOOKUP_DIR_ENTRY_SIZE))
+    return NIPC_ERR_BAD_ITEM_COUNT;
+
+  size_t dir_size = (size_t)view->item_count * NIPC_LOOKUP_DIR_ENTRY_SIZE;
+  size_t dir_end = NIPC_CGROUPS_LOOKUP_RESP_HDR_SIZE + dir_size;
+  if (dir_end > view->_payload_len)
+    return NIPC_ERR_TRUNCATED;
+
+  const uint8_t *dir = view->_payload + NIPC_CGROUPS_LOOKUP_RESP_HDR_SIZE;
+  const uint8_t *packed = view->_payload + dir_end;
+  nipc_lookup_dir_entry_t entry;
+  memcpy(&entry, dir + (size_t)index * NIPC_LOOKUP_DIR_ENTRY_SIZE,
+         sizeof(entry));
+  uint64_t end;
+  if (nipc_lookup_add_u64_over_limit(entry.offset, entry.length,
+                                     view->_payload_len - dir_end, &end))
+    return NIPC_ERR_OUT_OF_BOUNDS;
+  *item_out = packed + entry.offset;
+  *item_len_out = entry.length;
+  return NIPC_OK;
+}
+
+nipc_error_t nipc_cgroups_lookup_raw_resp_encode(
+    const uint8_t *const *items, const uint32_t *item_lens, uint32_t item_count,
+    uint64_t generation, void *buf, size_t buf_len, size_t *encoded_len_out) {
+  if (item_count > 0 && (!items || !item_lens))
+    return NIPC_ERR_BAD_LAYOUT;
+  if (mul_would_overflow((size_t)item_count, NIPC_LOOKUP_DIR_ENTRY_SIZE))
+    return NIPC_ERR_OVERFLOW;
+
+  uint8_t *out = (uint8_t *)buf;
+  size_t dir_size = (size_t)item_count * NIPC_LOOKUP_DIR_ENTRY_SIZE;
+  if (NIPC_CGROUPS_LOOKUP_RESP_HDR_SIZE > SIZE_MAX - dir_size)
+    return NIPC_ERR_OVERFLOW;
+  size_t data_offset = NIPC_CGROUPS_LOOKUP_RESP_HDR_SIZE + dir_size;
+  if (data_offset > buf_len)
+    return NIPC_ERR_OVERFLOW;
+
+  for (uint32_t i = 0; i < item_count; i++) {
+    if (!items[i] || item_lens[i] < NIPC_CGROUPS_LOOKUP_ITEM_HDR_SIZE)
+      return NIPC_ERR_BAD_LAYOUT;
+    nipc_error_t err =
+        cgroups_lookup_decode_item_bytes(items[i], item_lens[i], NULL);
+    if (err != NIPC_OK)
+      return err;
+
+    size_t item_start = nipc_align8(data_offset);
+    if (item_start < data_offset || item_start > buf_len ||
+        item_lens[i] > buf_len - item_start)
+      return NIPC_ERR_OVERFLOW;
+    if (item_start > data_offset)
+      memset(out + data_offset, 0, item_start - data_offset);
+    memcpy(out + item_start, items[i], item_lens[i]);
+    nipc_lookup_builder_write_dir_entry(out, NIPC_CGROUPS_LOOKUP_RESP_HDR_SIZE,
+                                        i, item_start, item_lens[i]);
+    data_offset = item_start + item_lens[i];
+  }
+
+  size_t encoded =
+      nipc_lookup_finish_common(out, buf_len, item_count, data_offset,
+                                NIPC_CGROUPS_LOOKUP_RESP_HDR_SIZE, generation);
+  if (encoded == 0)
+    return NIPC_ERR_OVERFLOW;
+  *encoded_len_out = encoded;
+  return NIPC_OK;
 }
 
 nipc_error_t
@@ -313,6 +399,10 @@ void nipc_cgroups_lookup_builder_init(nipc_cgroups_lookup_builder_t *b,
   b->item_count = 0;
   b->max_items = max_items;
   b->error = NIPC_OK;
+  b->payload_exceeded_suffix = false;
+  b->payload_exceeded_item_lens = NULL;
+  b->payload_exceeded_suffix_bytes = NULL;
+  b->payload_exceeded_item_lens_count = 0;
   if (mul_would_overflow((size_t)max_items, NIPC_LOOKUP_DIR_ENTRY_SIZE)) {
     b->data_offset = SIZE_MAX;
   } else {
@@ -333,6 +423,45 @@ void nipc_cgroups_lookup_builder_set_generation(
   b->generation = generation;
 }
 
+void nipc_cgroups_lookup_builder_set_payload_exceeded_item_lens(
+    nipc_cgroups_lookup_builder_t *b, const uint32_t *item_lens,
+    uint32_t item_count) {
+  b->payload_exceeded_item_lens = item_lens;
+  b->payload_exceeded_suffix_bytes = NULL;
+  b->payload_exceeded_item_lens_count = item_count;
+}
+
+static bool
+cgroups_lookup_builder_suffix_fits(const nipc_cgroups_lookup_builder_t *b,
+                                   size_t data_offset, uint32_t first_index) {
+  if (b->payload_exceeded_suffix_bytes &&
+      b->payload_exceeded_item_lens_count == b->max_items) {
+    if (first_index > b->max_items)
+      return true;
+    size_t item_start = nipc_align8(data_offset);
+    if (item_start < data_offset || item_start > b->buf_len)
+      return false;
+    return (size_t)b->payload_exceeded_suffix_bytes[first_index] <=
+           b->buf_len - item_start;
+  }
+
+  if (!b->payload_exceeded_item_lens ||
+      b->payload_exceeded_item_lens_count != b->max_items)
+    return true;
+
+  for (uint32_t i = first_index; i < b->max_items; i++) {
+    size_t item_start = nipc_align8(data_offset);
+    if (item_start < data_offset || item_start > b->buf_len)
+      return false;
+    uint32_t item_len = b->payload_exceeded_item_lens[i];
+    if ((size_t)item_len > b->buf_len - item_start)
+      return false;
+    data_offset = item_start + (size_t)item_len;
+  }
+
+  return true;
+}
+
 uint32_t nipc_cgroups_lookup_builder_estimate_max_items(size_t buf_len) {
   if (buf_len <= NIPC_CGROUPS_LOOKUP_RESP_HDR_SIZE)
     return 0;
@@ -341,10 +470,41 @@ uint32_t nipc_cgroups_lookup_builder_estimate_max_items(size_t buf_len) {
                     (NIPC_LOOKUP_DIR_ENTRY_SIZE + min_item));
 }
 
-nipc_error_t nipc_cgroups_lookup_builder_add(
+static nipc_error_t cgroups_lookup_builder_add_checked(
     nipc_cgroups_lookup_builder_t *b, uint16_t status, uint16_t orchestrator,
     const char *path, uint32_t path_len, const char *name, uint32_t name_len,
-    const nipc_lookup_label_view_t *labels, uint16_t label_count) {
+    const nipc_lookup_label_view_t *labels, uint16_t label_count,
+    bool path_validated, bool allow_overflow_status);
+
+static nipc_error_t
+cgroups_lookup_builder_add_overflow_item(nipc_cgroups_lookup_builder_t *b,
+                                         uint16_t status, const char *path,
+                                         uint32_t path_len) {
+  return cgroups_lookup_builder_add_checked(b, status, 0, path, path_len, "", 0,
+                                            NULL, 0, true, false);
+}
+
+static nipc_error_t
+cgroups_lookup_builder_note_item_overflow(nipc_cgroups_lookup_builder_t *b,
+                                          const char *path, uint32_t path_len) {
+  if (b->item_count == 0)
+    return cgroups_lookup_builder_add_overflow_item(
+        b, NIPC_CGROUP_LOOKUP_OVERSIZED_ITEM, path, path_len);
+
+  b->payload_exceeded_suffix = true;
+  return cgroups_lookup_builder_add_overflow_item(
+      b, NIPC_CGROUP_LOOKUP_PAYLOAD_EXCEEDED, path, path_len);
+}
+
+static nipc_error_t cgroups_lookup_builder_add_checked(
+    nipc_cgroups_lookup_builder_t *b, uint16_t status, uint16_t orchestrator,
+    const char *path, uint32_t path_len, const char *name, uint32_t name_len,
+    const nipc_lookup_label_view_t *labels, uint16_t label_count,
+    bool path_validated, bool allow_overflow_status) {
+  if (b->payload_exceeded_suffix && allow_overflow_status)
+    return cgroups_lookup_builder_add_overflow_item(
+        b, NIPC_CGROUP_LOOKUP_PAYLOAD_EXCEEDED, path, path_len);
+
   if (b->item_count >= b->max_items) {
     b->error = NIPC_ERR_OVERFLOW;
     return b->error;
@@ -360,11 +520,20 @@ nipc_error_t nipc_cgroups_lookup_builder_add(
       {.ptr = path, .len = path_len, .require_non_empty = true},
       {.ptr = name, .len = name_len, .require_non_empty = false},
   };
-  err = nipc_lookup_builder_validate_strings(strings, 2);
-  if (err != NIPC_OK) {
-    b->error = err;
-    return b->error;
+  if (path_validated) {
+    err = nipc_lookup_builder_validate_strings(&strings[1], 1);
+    if (err != NIPC_OK) {
+      b->error = err;
+      return b->error;
+    }
+  } else {
+    err = nipc_lookup_builder_validate_strings(strings, 2);
+    if (err != NIPC_OK) {
+      b->error = err;
+      return b->error;
+    }
   }
+  b->error = NIPC_OK;
 
   nipc_lookup_builder_item_layout_t layout = {0};
   err = nipc_lookup_builder_layout_item(
@@ -372,11 +541,17 @@ nipc_error_t nipc_cgroups_lookup_builder_add(
       labels, label_count, &layout);
   if (err != NIPC_OK) {
     b->error = err;
+    if (err == NIPC_ERR_OVERFLOW && allow_overflow_status)
+      return cgroups_lookup_builder_note_item_overflow(b, path, path_len);
     return b->error;
   }
 
   size_t item_start = (size_t)layout.item_start;
   size_t item_size = (size_t)layout.item_size;
+  if (allow_overflow_status &&
+      !cgroups_lookup_builder_suffix_fits(b, item_start + item_size,
+                                          b->item_count + 1u))
+    return cgroups_lookup_builder_note_item_overflow(b, path, path_len);
 
   if (item_start > b->data_offset)
     memset(b->buf + b->data_offset, 0, item_start - b->data_offset);
@@ -414,6 +589,35 @@ nipc_error_t nipc_cgroups_lookup_builder_add(
   return NIPC_OK;
 }
 
+nipc_error_t nipc_cgroups_lookup_builder_add(
+    nipc_cgroups_lookup_builder_t *b, uint16_t status, uint16_t orchestrator,
+    const char *path, uint32_t path_len, const char *name, uint32_t name_len,
+    const nipc_lookup_label_view_t *labels, uint16_t label_count) {
+  return cgroups_lookup_builder_add_checked(b, status, orchestrator, path,
+                                            path_len, name, name_len, labels,
+                                            label_count, false, true);
+}
+
+nipc_error_t nipc_cgroups_lookup_builder_add_request_item(
+    nipc_cgroups_lookup_builder_t *b,
+    const nipc_cgroups_lookup_req_view_t *request, uint32_t index,
+    uint16_t status, uint16_t orchestrator, const char *name, uint32_t name_len,
+    const nipc_lookup_label_view_t *labels, uint16_t label_count) {
+  if (!request) {
+    b->error = NIPC_ERR_BAD_LAYOUT;
+    return b->error;
+  }
+  nipc_cgroups_lookup_req_item_t item;
+  nipc_error_t err = nipc_cgroups_lookup_req_item(request, index, &item);
+  if (err != NIPC_OK) {
+    b->error = err;
+    return b->error;
+  }
+  return cgroups_lookup_builder_add_checked(
+      b, status, orchestrator, item.path.ptr, item.path.len, name, name_len,
+      labels, label_count, true, true);
+}
+
 size_t nipc_cgroups_lookup_builder_finish(nipc_cgroups_lookup_builder_t *b) {
   return nipc_lookup_finish_common(
       b->buf, b->buf_len, b->item_count, b->data_offset,
@@ -421,30 +625,75 @@ size_t nipc_cgroups_lookup_builder_finish(nipc_cgroups_lookup_builder_t *b) {
 }
 
 nipc_error_t nipc_dispatch_cgroups_lookup(
-    const uint8_t *req, size_t req_len,
-    uint8_t *resp, size_t resp_size, size_t *resp_len,
-    nipc_cgroups_lookup_handler_fn handler, void *user)
-{
+    const uint8_t *req, size_t req_len, uint8_t *resp, size_t resp_size,
+    size_t *resp_len, nipc_cgroups_lookup_handler_fn handler, void *user) {
   nipc_cgroups_lookup_req_view_t request;
   nipc_error_t err = nipc_cgroups_lookup_req_decode(req, req_len, &request);
   if (err != NIPC_OK)
     return err;
 
+  uint32_t *payload_exceeded_suffix_bytes = NULL;
+  if (request.item_count > 0) {
+    if ((size_t)request.item_count >=
+        ((size_t)-1) / sizeof(*payload_exceeded_suffix_bytes))
+      return NIPC_ERR_OVERFLOW;
+    payload_exceeded_suffix_bytes =
+        (uint32_t *)malloc(((size_t)request.item_count + 1u) *
+                           sizeof(*payload_exceeded_suffix_bytes));
+    if (!payload_exceeded_suffix_bytes)
+      return NIPC_ERR_OVERFLOW;
+    for (uint32_t i = 0; i < request.item_count; i++) {
+      nipc_cgroups_lookup_req_item_t item;
+      err = nipc_cgroups_lookup_req_item(&request, i, &item);
+      if (err != NIPC_OK)
+        goto cleanup;
+      if (item.path.len > UINT32_MAX - NIPC_CGROUPS_LOOKUP_ITEM_HDR_SIZE - 2u) {
+        err = NIPC_ERR_OVERFLOW;
+        goto cleanup;
+      }
+      payload_exceeded_suffix_bytes[i] =
+          NIPC_CGROUPS_LOOKUP_ITEM_HDR_SIZE + item.path.len + 2u;
+    }
+    payload_exceeded_suffix_bytes[request.item_count] = 0;
+    for (uint32_t i = request.item_count; i > 0; i--) {
+      uint32_t idx = i - 1u;
+      size_t item_cost = payload_exceeded_suffix_bytes[idx];
+      if (payload_exceeded_suffix_bytes[idx + 1u] > 0u)
+        item_cost = nipc_align8(item_cost);
+      if (item_cost > UINT32_MAX ||
+          item_cost > UINT32_MAX - payload_exceeded_suffix_bytes[idx + 1u]) {
+        err = NIPC_ERR_OVERFLOW;
+        goto cleanup;
+      }
+      payload_exceeded_suffix_bytes[idx] =
+          (uint32_t)item_cost + payload_exceeded_suffix_bytes[idx + 1u];
+    }
+  }
+
   nipc_cgroups_lookup_builder_t builder;
   nipc_cgroups_lookup_builder_init(&builder, resp, resp_size,
                                    request.item_count, 0);
+  builder.payload_exceeded_suffix_bytes = payload_exceeded_suffix_bytes;
+  builder.payload_exceeded_item_lens_count = request.item_count;
 
   if (!handler(user, &request, &builder)) {
-    if (builder.error != NIPC_OK)
-      return builder.error;
-    return NIPC_ERR_HANDLER_FAILED;
+    err = builder.error != NIPC_OK ? builder.error : NIPC_ERR_HANDLER_FAILED;
+    goto cleanup;
   }
 
-  if (builder.error != NIPC_OK)
-    return builder.error;
-  if (builder.item_count != request.item_count)
-    return NIPC_ERR_BAD_ITEM_COUNT;
+  if (builder.error != NIPC_OK) {
+    err = builder.error;
+    goto cleanup;
+  }
+  if (builder.item_count != request.item_count) {
+    err = NIPC_ERR_BAD_ITEM_COUNT;
+    goto cleanup;
+  }
 
   *resp_len = nipc_cgroups_lookup_builder_finish(&builder);
-  return (*resp_len > 0) ? NIPC_OK : NIPC_ERR_OVERFLOW;
+  err = (*resp_len > 0) ? NIPC_OK : NIPC_ERR_OVERFLOW;
+
+cleanup:
+  free(payload_exceeded_suffix_bytes);
+  return err;
 }

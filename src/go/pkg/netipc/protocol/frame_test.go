@@ -2,6 +2,8 @@ package protocol
 
 import (
 	"bytes"
+	"errors"
+	"strconv"
 	"testing"
 )
 
@@ -271,6 +273,38 @@ func TestChunkDecodeBadVersion(t *testing.T) {
 	}
 }
 
+func TestChunkDecodeBadLayout(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		hdr  ChunkHeader
+	}{
+		{
+			name: "nonzero flags",
+			hdr: ChunkHeader{
+				Magic:           MagicChunk,
+				Version:         Version,
+				Flags:           1,
+				ChunkPayloadLen: 1,
+			},
+		},
+		{
+			name: "zero payload",
+			hdr: ChunkHeader{
+				Magic:           MagicChunk,
+				Version:         Version,
+				ChunkPayloadLen: 0,
+			},
+		},
+	} {
+		var buf [32]byte
+		tc.hdr.Encode(buf[:])
+		_, err := DecodeChunkHeader(buf[:])
+		if err != ErrBadLayout {
+			t.Fatalf("%s: got %v, want ErrBadLayout", tc.name, err)
+		}
+	}
+}
+
 func TestChunkEncodeTooSmall(t *testing.T) {
 	c := ChunkHeader{}
 	var buf [16]byte
@@ -364,6 +398,31 @@ func TestBatchDirDecodeOutOfBounds(t *testing.T) {
 	}
 }
 
+func TestBatchDirValidateGuards(t *testing.T) {
+	valid := make([]byte, 16)
+	ne.PutUint32(valid[0:4], 0)
+	ne.PutUint32(valid[4:8], 4)
+	ne.PutUint32(valid[8:12], 8)
+	ne.PutUint32(valid[12:16], 4)
+	if err := BatchDirValidate(valid, 2, 16); err != nil {
+		t.Fatalf("valid directory: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name string
+		buf  []byte
+		want error
+	}{
+		{name: "truncated", buf: make([]byte, 4), want: ErrTruncated},
+		{name: "bad alignment", buf: []byte{1, 0, 0, 0, 1, 0, 0, 0}, want: ErrBadAlignment},
+		{name: "out of bounds", buf: []byte{0, 0, 0, 0, 17, 0, 0, 0}, want: ErrOutOfBounds},
+	} {
+		if err := BatchDirValidate(tc.buf, 1, 16); err != tc.want {
+			t.Fatalf("%s: got %v, want %v", tc.name, err, tc.want)
+		}
+	}
+}
+
 func TestBatchItemGetBasic(t *testing.T) {
 	// Build a batch with 2 items using the builder.
 	buf := make([]byte, 1024)
@@ -415,6 +474,93 @@ func TestBatchItemGetTruncated(t *testing.T) {
 	_, err := BatchItemGet(buf, 1, 0)
 	if err != ErrTruncated {
 		t.Fatalf("got %v, want ErrTruncated", err)
+	}
+}
+
+func TestBatchItemGetDirectoryGuards(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		edit func([]byte)
+		want error
+	}{
+		{
+			name: "bad alignment",
+			edit: func(buf []byte) {
+				ne.PutUint32(buf[0:4], 1)
+				ne.PutUint32(buf[4:8], 1)
+			},
+			want: ErrBadAlignment,
+		},
+		{
+			name: "out of bounds",
+			edit: func(buf []byte) {
+				ne.PutUint32(buf[0:4], 8)
+				ne.PutUint32(buf[4:8], 100)
+			},
+			want: ErrOutOfBounds,
+		},
+	} {
+		buf := make([]byte, 16)
+		tc.edit(buf)
+		if _, err := BatchItemGet(buf, 1, 0); err != tc.want {
+			t.Fatalf("%s: got %v, want %v", tc.name, err, tc.want)
+		}
+	}
+}
+
+func TestBatchBuilderSyntheticOverflowGuards(t *testing.T) {
+	builder := &BatchBuilder{
+		buf:        make([]byte, 16),
+		maxItems:   1,
+		dirEnd:     8,
+		dataOffset: maxIntValue(),
+	}
+	if err := builder.Add(nil); !errors.Is(err, ErrOverflow) {
+		t.Fatalf("builder data alignment overflow = %v, want ErrOverflow", err)
+	}
+
+	builder = &BatchBuilder{
+		buf:        make([]byte, 16),
+		maxItems:   1,
+		dirEnd:     maxIntValue(),
+		dataOffset: 0,
+	}
+	if err := builder.Add(nil); !errors.Is(err, ErrOverflow) {
+		t.Fatalf("builder absolute-position overflow = %v, want ErrOverflow", err)
+	}
+
+	builder = &BatchBuilder{
+		buf:        make([]byte, 16),
+		itemCount:  1,
+		dirEnd:     maxIntValue(),
+		dataOffset: 1,
+	}
+	if total, count := builder.Finish(); total != 0 || count != 1 {
+		t.Fatalf("finish data-end overflow = total/count %d/%d, want 0/1", total, count)
+	}
+
+	builder = &BatchBuilder{
+		itemCount:  1,
+		dirEnd:     8,
+		dataOffset: maxIntValue(),
+	}
+	if total, count := builder.Finish(); total != 0 || count != 1 {
+		t.Fatalf("finish data alignment overflow = total/count %d/%d, want 0/1", total, count)
+	}
+
+	if strconv.IntSize < 64 {
+		t.Skip("synthetic 64-bit slice-header guard requires 64-bit int")
+	}
+	maxU32 := ^uint32(0)
+	overU32 := int(uint64(maxU32) + 1)
+	builder = &BatchBuilder{
+		buf:        make([]byte, 16),
+		maxItems:   1,
+		dirEnd:     0,
+		dataOffset: overU32,
+	}
+	if err := builder.Add(nil); !errors.Is(err, ErrOverflow) {
+		t.Fatalf("builder wire-offset overflow = %v, want ErrOverflow", err)
 	}
 }
 
@@ -472,6 +618,141 @@ func TestBatchBuilderCompaction(t *testing.T) {
 	}
 	if !bytes.Equal(got, []byte("compact")) {
 		t.Fatalf("got %q, want %q", got, "compact")
+	}
+}
+
+func TestBatchBuilderResetReuseAndPadding(t *testing.T) {
+	buf := bytes.Repeat([]byte{0xAA}, 64)
+	b := NewBatchBuilder(buf, 2)
+	if err := b.Add([]byte{1, 2, 3}); err != nil {
+		t.Fatalf("add first: %v", err)
+	}
+	if err := b.Add([]byte{4}); err != nil {
+		t.Fatalf("add second: %v", err)
+	}
+	total, count := b.Finish()
+	if count != 2 || total == 0 {
+		t.Fatalf("finish = total %d count %d", total, count)
+	}
+	if got := buf[16+3 : 16+8]; !bytes.Equal(got, []byte{0, 0, 0, 0, 0}) {
+		t.Fatalf("alignment padding = %x, want zeros", got)
+	}
+
+	b.Reset(buf, 1)
+	if err := b.Add([]byte("x")); err != nil {
+		t.Fatalf("add after reset: %v", err)
+	}
+	total, count = b.Finish()
+	if count != 1 {
+		t.Fatalf("reset count = %d, want 1", count)
+	}
+	got, err := BatchItemGet(buf[:total], count, 0)
+	if err != nil {
+		t.Fatalf("item after reset: %v", err)
+	}
+	if !bytes.Equal(got, []byte("x")) {
+		t.Fatalf("item after reset = %q, want x", got)
+	}
+}
+
+func TestBatchBuilderForcedOverflowGuards(t *testing.T) {
+	b := &BatchBuilder{
+		buf:        make([]byte, 64),
+		maxItems:   1,
+		dirEnd:     0,
+		dataOffset: maxIntValue() - 3,
+	}
+	if err := b.Add([]byte("x")); err != ErrOverflow {
+		t.Fatalf("data offset align overflow = %v, want ErrOverflow", err)
+	}
+
+	b = &BatchBuilder{
+		buf:        make([]byte, 64),
+		maxItems:   1,
+		dirEnd:     maxIntValue(),
+		dataOffset: 0,
+	}
+	if err := b.Add([]byte("x")); err != ErrOverflow {
+		t.Fatalf("absolute position overflow = %v, want ErrOverflow", err)
+	}
+
+	b = &BatchBuilder{
+		buf:        make([]byte, 64),
+		itemCount:  1,
+		dirEnd:     maxIntValue(),
+		dataOffset: 1,
+	}
+	if total, count := b.Finish(); total != 0 || count != 1 {
+		t.Fatalf("finish data-end overflow = total %d count %d, want 0/1", total, count)
+	}
+
+	b = &BatchBuilder{
+		buf:        make([]byte, 64),
+		itemCount:  1,
+		dirEnd:     0,
+		dataOffset: maxIntValue() - 3,
+	}
+	if total, count := b.Finish(); total != 0 || count != 1 {
+		t.Fatalf("finish align overflow = total %d count %d, want 0/1", total, count)
+	}
+
+	b = &BatchBuilder{
+		buf:        make([]byte, 64),
+		itemCount:  1,
+		dirEnd:     0,
+		dataOffset: maxIntValue() - 7,
+	}
+	if total, count := b.Finish(); total != 0 || count != 1 {
+		t.Fatalf("finish total overflow = total %d count %d, want 0/1", total, count)
+	}
+}
+
+func TestBatchDirectoryAndItemErrorGuards(t *testing.T) {
+	if n := BatchDirEncode([]BatchEntry{{Offset: 0, Length: 8}}, make([]byte, 7)); n != 0 {
+		t.Fatalf("short BatchDirEncode = %d, want 0", n)
+	}
+
+	dir := make([]byte, 8)
+	BatchDirEncode([]BatchEntry{{Offset: 1, Length: 8}}, dir)
+	if _, err := BatchDirDecode(dir, 1, 16); !errors.Is(err, ErrBadAlignment) {
+		t.Fatalf("BatchDirDecode bad alignment = %v, want ErrBadAlignment", err)
+	}
+	if err := BatchDirValidate(dir, 1, 16); !errors.Is(err, ErrBadAlignment) {
+		t.Fatalf("BatchDirValidate bad alignment = %v, want ErrBadAlignment", err)
+	}
+
+	BatchDirEncode([]BatchEntry{{Offset: 16, Length: 8}}, dir)
+	if _, err := BatchDirDecode(dir, 1, 16); !errors.Is(err, ErrOutOfBounds) {
+		t.Fatalf("BatchDirDecode out of bounds = %v, want ErrOutOfBounds", err)
+	}
+	if err := BatchDirValidate(dir, 1, 16); !errors.Is(err, ErrOutOfBounds) {
+		t.Fatalf("BatchDirValidate out of bounds = %v, want ErrOutOfBounds", err)
+	}
+
+	if _, err := BatchDirDecode(dir[:7], 1, 16); !errors.Is(err, ErrTruncated) {
+		t.Fatalf("BatchDirDecode truncated = %v, want ErrTruncated", err)
+	}
+	if err := BatchDirValidate(dir[:7], 1, 16); !errors.Is(err, ErrTruncated) {
+		t.Fatalf("BatchDirValidate truncated = %v, want ErrTruncated", err)
+	}
+
+	payload := make([]byte, 16)
+	BatchDirEncode([]BatchEntry{{Offset: 0, Length: 8}}, payload[:8])
+	copy(payload[8:], []byte("12345678"))
+	if _, err := BatchItemGet(payload, 1, 1); !errors.Is(err, ErrOutOfBounds) {
+		t.Fatalf("BatchItemGet index error = %v, want ErrOutOfBounds", err)
+	}
+	if _, err := BatchItemGet(payload[:7], 1, 0); !errors.Is(err, ErrTruncated) {
+		t.Fatalf("BatchItemGet truncated directory = %v, want ErrTruncated", err)
+	}
+
+	BatchDirEncode([]BatchEntry{{Offset: 1, Length: 1}}, payload[:8])
+	if _, err := BatchItemGet(payload, 1, 0); !errors.Is(err, ErrBadAlignment) {
+		t.Fatalf("BatchItemGet bad alignment = %v, want ErrBadAlignment", err)
+	}
+	BatchDirEncode([]BatchEntry{{Offset: 8, Length: 9}}, payload[:8])
+	if _, err := BatchItemGet(payload, 1, 0); !errors.Is(err, ErrOutOfBounds) {
+		t.Fatalf("BatchItemGet out of bounds = %v, want ErrOutOfBounds", err)
 	}
 }
 
@@ -1206,6 +1487,65 @@ func TestCgroupsResponseEmptyStrings(t *testing.T) {
 	}
 	if item.Path.String() != "" {
 		t.Fatalf("Path.String() = %q, want empty", item.Path.String())
+	}
+}
+
+func TestCgroupsBuilderForcedOverflowGuards(t *testing.T) {
+	b := &CgroupsBuilder{
+		buf:        make([]byte, 64),
+		maxItems:   1,
+		dataOffset: maxIntValue() - 3,
+	}
+	if err := b.Add(1, 0, 1, []byte("name"), []byte("/path")); err != ErrOverflow {
+		t.Fatalf("snapshot item align overflow = %v, want ErrOverflow", err)
+	}
+
+	b = &CgroupsBuilder{
+		buf:        make([]byte, 64),
+		maxItems:   1,
+		dataOffset: maxIntValue() - 7,
+	}
+	if err := b.Add(1, 0, 1, []byte("name"), []byte("/path")); err != ErrOverflow {
+		t.Fatalf("snapshot item end overflow = %v, want ErrOverflow", err)
+	}
+
+	if strconv.IntSize >= 64 {
+		if _, _, _, ok := cgroupsItemLayoutForLengths(maxIntValue(), len("/path")); ok {
+			t.Fatal("snapshot huge name layout should overflow")
+		}
+		if _, _, _, ok := cgroupsItemLayoutForLengths(len("name"), maxIntValue()); ok {
+			t.Fatal("snapshot huge path layout should overflow")
+		}
+		if _, _, _, ok := cgroupsItemLayoutForLengths(maxIntValue()-cgroupsItemHdr, 0); ok {
+			t.Fatal("snapshot item-size name layout should overflow")
+		}
+		if _, _, _, ok := cgroupsItemLayoutForLengths(0, maxIntValue()-cgroupsItemHdr); ok {
+			t.Fatal("snapshot item-size path layout should overflow")
+		}
+		if got := EstimateCgroupsMaxItems(maxIntValue()); got != ^uint32(0) {
+			t.Fatalf("huge estimate = %d, want uint32 max", got)
+		}
+	}
+
+	decreasing := make([]byte, cgroupsRespHdr+2*cgroupsDirEntry)
+	ne.PutUint32(decreasing[cgroupsRespHdr:cgroupsRespHdr+4], 16)
+	ne.PutUint32(decreasing[cgroupsRespHdr+cgroupsDirEntry:cgroupsRespHdr+cgroupsDirEntry+4], 8)
+	b = &CgroupsBuilder{
+		buf:        decreasing,
+		itemCount:  2,
+		dataOffset: 16,
+	}
+	if total := b.Finish(); total != 0 {
+		t.Fatalf("snapshot finish decreasing abs offset = %d, want 0", total)
+	}
+
+	b = &CgroupsBuilder{
+		buf:        make([]byte, 64),
+		itemCount:  1,
+		dataOffset: maxIntValue(),
+	}
+	if total := b.Finish(); total != 0 {
+		t.Fatalf("snapshot finish total overflow = %d, want 0", total)
 	}
 }
 

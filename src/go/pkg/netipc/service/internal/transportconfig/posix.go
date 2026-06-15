@@ -8,6 +8,7 @@ func PosixClient(config TypedConfig) posix.ClientConfig {
 	return posix.ClientConfig{
 		SupportedProfiles:       config.SupportedProfiles,
 		PreferredProfiles:       config.PreferredProfiles,
+		MaxRequestPayloadBytes:  config.MaxRequestPayloadBytes,
 		MaxRequestBatchItems:    config.MaxRequestBatchItems,
 		MaxResponsePayloadBytes: config.MaxResponsePayloadBytes,
 		MaxResponseBatchItems:   responseBatchItems(config),
@@ -19,6 +20,7 @@ func PosixServer(config TypedConfig) posix.ServerConfig {
 	return posix.ServerConfig{
 		SupportedProfiles:       config.SupportedProfiles,
 		PreferredProfiles:       config.PreferredProfiles,
+		MaxRequestPayloadBytes:  config.MaxRequestPayloadBytes,
 		MaxRequestBatchItems:    config.MaxRequestBatchItems,
 		MaxResponsePayloadBytes: config.MaxResponsePayloadBytes,
 		MaxResponseBatchItems:   responseBatchItems(config),

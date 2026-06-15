@@ -64,8 +64,9 @@ pub const PROFILE_SHM_WAITADDR: u32 = 0x08;
 // Defaults
 pub const MAX_PAYLOAD_DEFAULT: u32 = 1024;
 
-/// Hard cap on negotiated request payload sizes (1 MiB) — prevents a
-/// compromised peer from forcing excessive memory allocation.
+/// Zero-config automatic growth ceiling used only when callers did not
+/// configure larger payload budgets explicitly. This is not a protocol hard
+/// limit; peers may negotiate larger ceilings from initialization config.
 pub const MAX_PAYLOAD_CAP: u32 = 1024 * 1024;
 
 // Alignment
@@ -103,6 +104,8 @@ pub enum NipcError {
     BadItemCount,
     /// Builder ran out of space.
     Overflow,
+    /// Typed dispatch handler rejected an otherwise valid request.
+    HandlerFailed,
     /// Synchronous call timed out before a complete response arrived.
     Timeout,
     /// Synchronous call was aborted by the caller.
@@ -123,6 +126,7 @@ impl core::fmt::Display for NipcError {
             NipcError::BadAlignment => write!(f, "item not 8-byte aligned"),
             NipcError::BadItemCount => write!(f, "item count inconsistent"),
             NipcError::Overflow => write!(f, "builder out of space"),
+            NipcError::HandlerFailed => write!(f, "dispatch handler failed"),
             NipcError::Timeout => write!(f, "synchronous call timed out"),
             NipcError::Aborted => write!(f, "synchronous call aborted"),
         }
