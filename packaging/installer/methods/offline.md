@@ -24,13 +24,14 @@ For offline installation on Windows, see [Install Netdata on Windows](/packaging
 
 ## Step 1: Prepare the Offline Installation Package
 
-On your internet-connected machine, you'll need::
+On your internet-connected machine, you'll need:
 
 | Requirement             | Purpose                    |
 |-------------------------|----------------------------|
 | `curl` or `wget`        | Download the script        |
 | `sha256sum` or `shasum` | Verify script downloads    |
-| POSIX-compliant shell   | Required to run the script |
+| POSIX-compliant shell   | Required to run the script  |
+| `sudo`, `doas`, or `pkexec` | Gain root privileges (required to prepare) |
 
 :::note
 
@@ -97,28 +98,6 @@ This will create a directory like:
 ```
 
 It will contain everything required to install Netdata offline.
-
----
-
-## Choose Release Channel (Optional)
-
-To prepare for a specific channel (`nightly` or `stable`), add:
-
-```bash
---release-channel nightly
-```
-
-or
-
-```bash
---release-channel stable
-```
-
-Example:
-
-```bash
-sh /tmp/netdata-kickstart.sh --release-channel stable --prepare-offline-install-source ./netdata-offline
-```
 
 ---
 
