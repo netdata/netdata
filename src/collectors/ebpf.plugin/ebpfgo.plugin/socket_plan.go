@@ -1,8 +1,6 @@
 package main
 
 import (
-	"strings"
-
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
 )
 
@@ -98,7 +96,7 @@ func resolveSocketLegacyConfig() (SocketLegacyConfig, error) {
 }
 
 func BuildSocketLegacyPlan(cfg SocketLegacyConfig) LoadPlan {
-	flavor := selectSocketObjectFlavor(cfg.ObjectFlavor, cfg.KernelVersion, cfg.IsDebian)
+	flavor := selectConfiguredObjectFlavor(cfg.ObjectFlavor, cfg.KernelVersion, cfg.IsDebian)
 	loadMode := SelectLoadMode(cfg.HasBTF, LoadCore, cfg.KernelVersion, cfg.IsRHF)
 
 	selector := SelectIndex(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion)
@@ -113,17 +111,3 @@ func BuildSocketLegacyPlan(cfg SocketLegacyConfig) LoadPlan {
 	}
 }
 
-func selectSocketObjectFlavor(requested string, kver uint32, isDebian bool) ObjectFlavor {
-	switch strings.ToLower(strings.TrimSpace(requested)) {
-	case "", "buffer":
-		if kver >= minimumKernelVersionBuffer {
-			return ObjectFlavorBuffer
-		}
-	case "arena":
-		if kver >= minimumKernelVersionArena && !isDebian {
-			return ObjectFlavorArena
-		}
-	}
-
-	return ObjectFlavorBase
-}

@@ -348,6 +348,23 @@ func SelectObjectFlavor(kver uint32, hasResizableMaps bool, isDebian bool) Objec
 	return ObjectFlavorBase
 }
 
+// selectConfiguredObjectFlavor applies the user-requested flavor string from
+// config with a kernel-version gate.  Both cachestat and socket use the same
+// policy, so a single function prevents the two callers from diverging.
+func selectConfiguredObjectFlavor(requested string, kver uint32, isDebian bool) ObjectFlavor {
+	switch strings.ToLower(strings.TrimSpace(requested)) {
+	case "", "buffer":
+		if kver >= minimumKernelVersionBuffer {
+			return ObjectFlavorBuffer
+		}
+	case "arena":
+		if kver >= minimumKernelVersionArena && !isDebian {
+			return ObjectFlavorArena
+		}
+	}
+	return ObjectFlavorBase
+}
+
 func BuildObjectPathWithFlavor(
 	pluginsDir string,
 	selector uint32,
