@@ -3,6 +3,36 @@
 #include "../libnetdata.h"
 
 #if defined(OS_WINDOWS)
+static volatile LONG netdata_random_lock = 0;
+static uint64_t netdata_random_state = 1;
+
+static inline void netdata_windows_random_lock(void) {
+    while (InterlockedExchange(&netdata_random_lock, 1) == 1)
+        SwitchToThread();
+}
+
+static inline void netdata_windows_random_unlock(void) {
+    InterlockedExchange(&netdata_random_lock, 0);
+}
+
+void srandom(unsigned int seed) {
+    netdata_windows_random_lock();
+    // Keep the state non-zero so a zero seed still produces a usable sequence.
+    netdata_random_state = seed ? (uint64_t)seed : 1ULL;
+    netdata_windows_random_unlock();
+}
+
+long random(void) {
+    netdata_windows_random_lock();
+
+    // 64-bit LCG with a 31-bit output to match POSIX random()'s range contract.
+    netdata_random_state = netdata_random_state * 6364136223846793005ULL + 1ULL;
+    long value = (long)((netdata_random_state >> 33) & 0x7fffffffUL);
+
+    netdata_windows_random_unlock();
+    return value;
+}
+
 long netdata_registry_get_dword_from_open_key(unsigned int *out, void *lKey, char *name)
 {
     DWORD length = sizeof(*out);
