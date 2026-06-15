@@ -62,7 +62,7 @@ func defaultSocketLegacyConfig() SocketLegacyConfig {
 func resolveSocketLegacyConfig() (SocketLegacyConfig, error) {
 	cfg := defaultSocketLegacyConfig()
 
-	fileCfg, found, err := loadPluginConfigFiles()
+	fileCfg, found, err := loadSocketConfigFiles()
 	if err != nil {
 		return SocketLegacyConfig{}, err
 	}
