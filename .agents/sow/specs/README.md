@@ -16,9 +16,11 @@ research cannot be mistaken for product specification.
 | Spec | Scope | Main consumers |
 |---|---|---|
 | [go-v2-host-scope.md](go-v2-host-scope.md) | Go framework V2 host-scope and vnode metric routing contract. | Go V2 collector work, `metrix`, `jobruntime`, `chartengine`, go.d collector docs and skills. |
+| [mcp-build-run.md](mcp-build-run.md) | MCP build/run tool contracts: two-profile model, single build dir per worktree, dedicated-tree ownership, install-path/lock conventions, job/run lifecycle. | `packaging/tools/automation/mcp/` server work. |
 | [netflow-tier-commit-workers.md](netflow-tier-commit-workers.md) | NetFlow rollup-tier commit worker contract: ownership, doorbell protocol, shutdown order, stretch semantics, lock discipline, telemetry. | netflow-plugin ingest/tiering work, tier benchmark and soak/crash tests, network-flows operator docs. |
 | [prometheus-profiles.md](prometheus-profiles.md) | go.d prometheus chart-profile format, selection modes, app-segment resolution, and chart-context assembly. | prometheus collector profile work, chart-context/UI app-section contract, profile authoring. |
 | [query-planner-tier-selection.md](query-planner-tier-selection.md) | Automatic storage-tier selection for metric query planning. | Query planner code, API data paths, MCP metric query behavior. |
+| [rust-cross-crate-doc-references.md](rust-cross-crate-doc-references.md) | Cross-crate doc/comment reference rule for workspace Rust crates: verified links for public items, natural language for private ones. | All Rust crate work, refactoring reference searches, doc reviews. |
 | [sensitive-data-discipline.md](sensitive-data-discipline.md) | Sensitive-data rules for committed artifacts, scripts, skills, specs, SOWs, commit messages, and PR text. | All repository work, SOW audits, private/public skills, token-safe scripts. |
 | [snmp-profile-projection.md](snmp-profile-projection.md) | SNMP profile projection contract across metrics, topology, licensing, and BGP consumers. | SNMP profile authoring, ddsnmp loader/projection code, SNMP project skill. |
 | [snmp-traps/netdata.md](snmp-traps/netdata.md) | Netdata SNMP trap ingestion, enrichment, storage, journal, OTLP, profile, and metric design contract. | SNMP trap implementation, docs, generated profile work, receiver metrics, operator workflows. |

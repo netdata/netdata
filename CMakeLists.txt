@@ -4576,3 +4576,16 @@ include(NetdataRenderDocs)
 #
 
 include(Packaging)
+
+#
+# Optional convenience: wire the netdata-build MCP server (packaging/tools/
+# automation/mcp) into a local agent client. Explicit one-off — `ninja setup-mcp`
+# — not part of the build (no ALL). Mutates the USER's global opencode/Claude
+# config for this checkout; never touches the repo. See the tool's README.
+#
+add_custom_target(setup-mcp
+        COMMAND python3
+                "${CMAKE_SOURCE_DIR}/packaging/tools/automation/mcp/scripts/setup_mcp.py"
+                --tool all --source-dir "${CMAKE_SOURCE_DIR}"
+        USES_TERMINAL
+        COMMENT "Configuring netdata-build MCP server for opencode/Claude Code (global config)")

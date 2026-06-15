@@ -222,6 +222,7 @@ packaging/tools/agent-events/go.sum
 
 **/.claude/settings.local.json
 .mcp.json
+.netdata-mcp-build.lock
 .users_cache.json
 .channels_cache_v2.json
 build-ibm.sh
