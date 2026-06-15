@@ -312,7 +312,7 @@ A virtual node's identity is determined by its **`guid`** field — not its `hos
 The GUID for each virtual node is stored in its YAML configuration file under `/etc/netdata/vnodes/`. To look it up:
 
 ```bash
-cat /etc/netdata/vnodes/*.yaml
+cat /etc/netdata/vnodes/*
 ```
 
 Each file contains a `guid` field that uniquely identifies the vnode:
