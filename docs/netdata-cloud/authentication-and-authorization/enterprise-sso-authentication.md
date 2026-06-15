@@ -69,6 +69,6 @@ There is no separate MFA setting to enable inside Netdata Cloud — your identit
 
 :::note
 
-For Email, Google, and GitHub sign-in methods, Netdata Cloud does not currently offer built-in MFA. See [Authentication & Authorization](/docs/netdata-cloud/authentication-and-authorization/README.md#multi-factor-authentication-mfa) for MFA availability by sign-in method.
+See [Authentication & Authorization](/docs/netdata-cloud/authentication-and-authorization/README.md#multi-factor-authentication-mfa) for MFA availability by sign-in method.
 
 :::
