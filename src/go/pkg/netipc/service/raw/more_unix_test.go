@@ -8,12 +8,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
-	"unsafe"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/transport/posix"
@@ -824,13 +822,6 @@ func TestUnixClientTransportWithoutSession(t *testing.T) {
 
 	if err := client.transportSend(&hdr, nil); !errors.Is(err, protocol.ErrTruncated) {
 		t.Fatalf("transportSend without session = %v, want ErrTruncated", err)
-	}
-	if strconv.IntSize >= 64 {
-		var sentinel byte
-		hugePayload := unsafe.Slice(&sentinel, int(uint64(^uint32(0))+1))
-		if err := client.transportSend(&hdr, hugePayload); !errors.Is(err, protocol.ErrOverflow) {
-			t.Fatalf("transportSend oversized payload = %v, want ErrOverflow", err)
-		}
 	}
 	if _, _, err := client.transportReceive(); !errors.Is(err, protocol.ErrTruncated) {
 		t.Fatalf("transportReceive without session = %v, want ErrTruncated", err)

@@ -17,7 +17,7 @@ The goal is reliable container, orchestrator, and service identity in network to
 
 - The netipc lookup layout version is `1`.
 - The vendored wire-format baseline is `netdata/plugin-ipc` commit
-  `0f0202cdee0c2dc5660a91c77470215c2360c9d5`.
+  `96f5f2962188c2198e621fec5da8a4c90710b46a`.
 - Size and offset contracts are enforced by `_Static_assert` in the protocol
   source files under `src/libnetdata/netipc/src/protocol/`.
 - `CGROUPS_LOOKUP` request/response headers are 16 bytes; each response item header is 28 bytes.
