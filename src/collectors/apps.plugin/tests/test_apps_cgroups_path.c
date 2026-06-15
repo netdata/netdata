@@ -43,6 +43,12 @@ int main(void)
         return 1;
 
     if (!expect_path(
+            "v2 namespace-relative",
+            "0::/../../../kubepods-besteffort.slice/pod-a/cri-containerd-abc.scope\n",
+            "/../../../kubepods-besteffort.slice/pod-a/cri-containerd-abc.scope"))
+        return 1;
+
+    if (!expect_path(
             "crlf malformed line advances",
             "malformed\r\n0::/unified\r\n",
             "/unified"))

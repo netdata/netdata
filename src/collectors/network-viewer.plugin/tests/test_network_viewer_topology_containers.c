@@ -264,6 +264,54 @@ static bool test_retry_later_empty_path_fallback_gate(void)
     return ok;
 }
 
+static bool test_namespace_relative_non_known_container_scope(void)
+{
+    const char *path =
+        "/../../kubepods.slice/kubepods-besteffort.slice/podabc/"
+        "cri-containerd-0123456789abcdef.scope";
+    const char *fallback = "worker";
+    NV_TOPOLOGY_CONTAINER_FIELDS fields;
+
+    nv_container_fields_set_process_fallback(&fields, fallback);
+
+    CGROUP_TOPOLOGY_CLASSIFICATION classification;
+    cgroup_topology_classify(
+        NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER,
+        NIPC_ORCHESTRATOR_UNKNOWN,
+        path,
+        &classification);
+
+    strncpyz(fields.actor_type, classification.actor_type, sizeof(fields.actor_type) - 1);
+    strncpyz(fields.actor_kind, classification.actor_kind, sizeof(fields.actor_kind) - 1);
+    strncpyz(fields.systemd_unit_name, classification.systemd_unit_name, sizeof(fields.systemd_unit_name) - 1);
+
+    bool use_systemd_unit_name = strncmp(fields.actor_type, "systemd_", strlen("systemd_")) == 0;
+    bool ok =
+        expect_string(fields.actor_type, "container", "namespace-relative retry-later actor type") &&
+        expect_string(fields.actor_kind, "pending", "namespace-relative retry-later actor kind") &&
+        expect_true(!use_systemd_unit_name, "namespace-relative retry-later must not use systemd unit name") &&
+        expect_string(fields.container_name, fallback, "namespace-relative retry-later should keep process fallback");
+
+    nv_container_fields_set_process_fallback(&fields, fallback);
+    cgroup_topology_classify(
+        NIPC_APPS_CGROUP_UNKNOWN_PERMANENT,
+        NIPC_ORCHESTRATOR_UNKNOWN,
+        path,
+        &classification);
+    strncpyz(fields.actor_type, classification.actor_type, sizeof(fields.actor_type) - 1);
+    strncpyz(fields.actor_kind, classification.actor_kind, sizeof(fields.actor_kind) - 1);
+    strncpyz(fields.systemd_unit_name, classification.systemd_unit_name, sizeof(fields.systemd_unit_name) - 1);
+
+    use_systemd_unit_name = strncmp(fields.actor_type, "systemd_", strlen("systemd_")) == 0;
+    if(!use_systemd_unit_name)
+        strncpyz(fields.container_name, fallback, sizeof(fields.container_name) - 1);
+
+    ok = expect_true(!use_systemd_unit_name, "namespace-relative unknown-permanent must not use systemd unit name") && ok;
+    ok = expect_string(fields.container_name, fallback, "namespace-relative unknown-permanent should keep process fallback") && ok;
+
+    return ok;
+}
+
 static bool test_systemd_and_orchestrator(void)
 {
     char value[NV_TOPOLOGY_SYSTEMD_UNIT_MAX];
@@ -365,6 +413,7 @@ int main(void)
     ok = test_container_identity_gating() && ok;
     ok = test_process_fallback_container_fields() && ok;
     ok = test_retry_later_empty_path_fallback_gate() && ok;
+    ok = test_namespace_relative_non_known_container_scope() && ok;
     ok = test_systemd_and_orchestrator() && ok;
 
     return ok ? 0 : 1;

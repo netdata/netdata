@@ -116,6 +116,30 @@ static bool test_pending_container_path_without_cache(void)
     return ok;
 }
 
+static bool test_namespace_relative_container_scope_without_cache(void)
+{
+    struct pid_stat p = {
+        .pid = 1008,
+        .uid = 1001,
+        .comm = string_strdupz("worker"),
+        .cgroup_path = string_strdupz(
+            "/../../kubepods.slice/kubepods-besteffort.slice/podabc/"
+            "cri-containerd-0123456789abcdef.scope"),
+    };
+    APPS_PROCESS_ENRICHMENT out;
+
+    apps_process_enrichment_fill(&p, &out);
+
+    bool ok =
+        expect_str_eq(out.container_name, "[pending]", "namespace-relative pending container name mismatch") &&
+        expect_str_eq(out.actor_type, "container", "namespace-relative pending actor type mismatch") &&
+        expect_str_eq(out.actor_kind, "pending", "namespace-relative pending actor kind mismatch") &&
+        expect_str_eq(out.cgroup_status, "retry_later", "namespace-relative pending cgroup status mismatch");
+
+    pid_fixture_clear(&p);
+    return ok;
+}
+
 static bool test_known_k8s_labels(void)
 {
     struct cgroup_lookup_label labels[5] = {
@@ -165,6 +189,7 @@ int main(void)
         test_process_without_cgroup_path() &&
         test_systemd_user_scope_without_cache() &&
         test_pending_container_path_without_cache() &&
+        test_namespace_relative_container_scope_without_cache() &&
         test_known_k8s_labels();
 
     return ok ? 0 : 1;
