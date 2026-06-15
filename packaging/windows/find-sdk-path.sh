@@ -73,7 +73,24 @@ find_sdk_tools() {
 
 # Function to find tools in Visual Studio
 find_visual_studio_tools() {
-  studio_base_path="/c/Program Files/Microsoft Visual Studio/2022"
+  versions=("2026" "2022")
+  found=0
+
+  for version in "${versions[@]}"; do
+    if check_visual_studio_version "${version}"; then
+      found=1
+      break
+    fi
+  done
+
+  if [ "${found}" -ne 1 ]; then
+    echo "ERROR: Failed to find a usable version of Visual Studio"
+    return 1
+  fi
+}
+
+check_visual_studio_version() {
+  studio_base_path="/c/Program Files/Microsoft Visual Studio/${1}"
   echo "Checking for Visual Studio installations in: \"$studio_base_path\"" >&2
 
   if [ ! -d "$studio_base_path" ]; then
@@ -210,7 +227,6 @@ if [ "$tool_path" != "$system_root" ]; then
     echo "$tool_path"
   fi
 else
-  echo "$system_root"
   exit 1
 fi
 

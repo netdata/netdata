@@ -19,11 +19,18 @@ SCRIPT_DIR="$(dirname "$0")"
 # Create a temporary batch file
 temp_bat=$(mktemp --suffix=.bat)
 
+# Determine paths for SDKs
+win_sdk_path="$("${mylocation}/../../../packaging/windows/find-sdk-path.sh" --sdk -w)"
+vs_sdk_path="$("${mylocation}/../../../packaging/windows/find-sdk-path.sh" --visualstudio -w)"
+if [ -z "${win_sdk_path}" ] || [ -z "${vs_sdk_path}" ]; then
+    echo "ERROR: Failed to find required SDKs."
+    exit 1
+fi
 # Write the contents to the temporary batch file
 # Use cygpath directly within the heredoc
 cat << EOF > "$temp_bat"
 @echo off
-set "PATH=%SYSTEMROOT%;$("${mylocation}/../../../packaging/windows/find-sdk-path.sh" --sdk -w);$("${mylocation}/../../../packaging/windows/find-sdk-path.sh" --visualstudio -w)"
+set "PATH=%SYSTEMROOT%;${win_sdk_path};${vs_sdk_path}"
 call "$(cygpath -w -a "$SCRIPT_DIR/wevt_netdata_compile.bat")" "$(cygpath -w -a "$src_dir")" "$(cygpath -w -a "$dest_dir")"
 EOF
 
