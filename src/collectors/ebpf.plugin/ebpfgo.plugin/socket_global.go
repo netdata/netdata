@@ -62,6 +62,11 @@ func bytesToKbits(b uint64) int64 {
 	return int64(b * 8 / 1000)
 }
 
+// kbDelta is the frequent bytesToKbits(socketDelta(...)) combination.
+func kbDelta(cur, prev uint64) int64 {
+	return bytesToKbits(socketDelta(cur, prev))
+}
+
 func (s *socketGlobalState) Update(snap libbpfloader.SocketSnapshot) (socketGlobalPublish, bool) {
 	if !s.initialized {
 		s.prev = snap
@@ -69,37 +74,30 @@ func (s *socketGlobalState) Update(snap libbpfloader.SocketSnapshot) (socketGlob
 		return socketGlobalPublish{}, true
 	}
 
-	p := socketGlobalPublish{}
-
-	// TCP function chart (cross-mapped: "tcp_cleanup_rbuf" dim ← sendmsg data).
-	p.tcpDimCleanupCalls = socketDelta(snap.CallsTCPSendmsg, s.prev.CallsTCPSendmsg)
-	p.tcpDimSendmsgCalls = socketDelta(snap.CallsTCPCleanupRbuf, s.prev.CallsTCPCleanupRbuf)
-	p.tcpCloseCalls = socketDelta(snap.CallsTCPClose, s.prev.CallsTCPClose)
-
-	// TCP bandwidth chart (same cross-map: cleanup_rbuf dim = sent kbits negative).
-	p.tcpDimCleanupKbits = -bytesToKbits(socketDelta(snap.BytesTCPSendmsg, s.prev.BytesTCPSendmsg))
-	p.tcpDimSendmsgKbits = bytesToKbits(socketDelta(snap.BytesTCPCleanupRbuf, s.prev.BytesTCPCleanupRbuf))
-
-	// TCP error chart (same cross-map).
-	p.tcpDimCleanupErr = socketDelta(snap.ErrorTCPSendmsg, s.prev.ErrorTCPSendmsg)
-	p.tcpDimSendmsgErr = socketDelta(snap.ErrorTCPCleanupRbuf, s.prev.ErrorTCPCleanupRbuf)
-
-	p.tcpRetransmit = socketDelta(snap.TCPRetransmit, s.prev.TCPRetransmit)
-	p.tcpV4Conn = socketDelta(snap.CallsTCPConnectIPv4, s.prev.CallsTCPConnectIPv4)
-	p.tcpV6Conn = socketDelta(snap.CallsTCPConnectIPv6, s.prev.CallsTCPConnectIPv6)
-
-	p.udpRecvCalls = socketDelta(snap.CallsUDPRecvmsg, s.prev.CallsUDPRecvmsg)
-	p.udpSendCalls = socketDelta(snap.CallsUDPSendmsg, s.prev.CallsUDPSendmsg)
-	p.udpRecvKbits = bytesToKbits(socketDelta(snap.BytesUDPRecvmsg, s.prev.BytesUDPRecvmsg))
-	p.udpSendKbits = -bytesToKbits(socketDelta(snap.BytesUDPSendmsg, s.prev.BytesUDPSendmsg))
-	p.udpRecvErr = socketDelta(snap.ErrorUDPRecvmsg, s.prev.ErrorUDPRecvmsg)
-	p.udpSendErr = socketDelta(snap.ErrorUDPSendmsg, s.prev.ErrorUDPSendmsg)
-
-	p.inboundTCP = socketDelta(snap.InboundConnTCP, s.prev.InboundConnTCP)
-	p.inboundUDP = socketDelta(snap.InboundConnUDP, s.prev.InboundConnUDP)
-
+	prev := s.prev
 	s.prev = snap
-	return p, true
+
+	// Cross-map: "tcp_cleanup_rbuf" dim ← sendmsg data; "tcp_sendmsg" dim ← cleanup_rbuf data.
+	return socketGlobalPublish{
+		tcpDimCleanupCalls: socketDelta(snap.CallsTCPSendmsg,     prev.CallsTCPSendmsg),
+		tcpDimCleanupKbits: -kbDelta(snap.BytesTCPSendmsg,        prev.BytesTCPSendmsg),
+		tcpDimCleanupErr:   socketDelta(snap.ErrorTCPSendmsg,      prev.ErrorTCPSendmsg),
+		tcpDimSendmsgCalls: socketDelta(snap.CallsTCPCleanupRbuf,  prev.CallsTCPCleanupRbuf),
+		tcpDimSendmsgKbits: kbDelta(snap.BytesTCPCleanupRbuf,     prev.BytesTCPCleanupRbuf),
+		tcpDimSendmsgErr:   socketDelta(snap.ErrorTCPCleanupRbuf,  prev.ErrorTCPCleanupRbuf),
+		tcpCloseCalls:      socketDelta(snap.CallsTCPClose,         prev.CallsTCPClose),
+		tcpRetransmit:      socketDelta(snap.TCPRetransmit,          prev.TCPRetransmit),
+		tcpV4Conn:          socketDelta(snap.CallsTCPConnectIPv4,   prev.CallsTCPConnectIPv4),
+		tcpV6Conn:          socketDelta(snap.CallsTCPConnectIPv6,   prev.CallsTCPConnectIPv6),
+		udpRecvCalls:       socketDelta(snap.CallsUDPRecvmsg,        prev.CallsUDPRecvmsg),
+		udpSendCalls:       socketDelta(snap.CallsUDPSendmsg,        prev.CallsUDPSendmsg),
+		udpRecvKbits:       kbDelta(snap.BytesUDPRecvmsg,           prev.BytesUDPRecvmsg),
+		udpSendKbits:       -kbDelta(snap.BytesUDPSendmsg,          prev.BytesUDPSendmsg),
+		udpRecvErr:         socketDelta(snap.ErrorUDPRecvmsg,        prev.ErrorUDPRecvmsg),
+		udpSendErr:         socketDelta(snap.ErrorUDPSendmsg,        prev.ErrorUDPSendmsg),
+		inboundTCP:         socketDelta(snap.InboundConnTCP,         prev.InboundConnTCP),
+		inboundUDP:         socketDelta(snap.InboundConnUDP,         prev.InboundConnUDP),
+	}, true
 }
 
 // ---- rate-limited stderr ---------------------------------------------------
@@ -122,6 +120,10 @@ func socketRateLimitedStderr(site, msg string) {
 	fmt.Fprint(os.Stderr, msg)
 }
 
+func socketLogErr(site, what string, err error) {
+	socketRateLimitedStderr(site, fmt.Sprintf("ebpf-go.plugin: socket %s failed: %v\n", what, err))
+}
+
 // ---- collection loop -------------------------------------------------------
 
 // runSocketGlobalCollector is the socket plugin collection loop.
@@ -141,8 +143,7 @@ func runSocketGlobalCollector(handle *SocketLegacyHandle, stop <-chan struct{}, 
 	collectAndPublish := func() {
 		snap, err := handle.Runtime.Snapshot(handle.MapsPerCore)
 		if err != nil {
-			socketRateLimitedStderr("socket.snapshot",
-				fmt.Sprintf("ebpf-go.plugin: socket snapshot failed: %v\n", err))
+			socketLogErr("socket.snapshot", "snapshot", err)
 			return
 		}
 		if publish, ok := state.Update(snap); ok {
@@ -152,8 +153,7 @@ func runSocketGlobalCollector(handle *SocketLegacyHandle, stop <-chan struct{}, 
 		if store != nil {
 			pidEntries, pidErr := handle.Runtime.SnapshotPerPID()
 			if pidErr != nil {
-				socketRateLimitedStderr("socket.snapshot_per_pid",
-					fmt.Sprintf("ebpf-go.plugin: socket per-PID snapshot failed: %v\n", pidErr))
+				socketLogErr("socket.snapshot_per_pid", "per-PID snapshot", pidErr)
 			} else {
 				store.UpdateSocketApps(pidEntries)
 			}

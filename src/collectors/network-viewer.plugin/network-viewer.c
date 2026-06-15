@@ -6371,56 +6371,24 @@ static BUFFER *network_viewer_result(char *function) {
                                         NULL);
 
             // eBPF per-PID socket counters (populated on Linux when ebpfgo.plugin is running)
-            buffer_rrdf_table_add_field(wb, field_id++, "eBPFBytesSent", "eBPF TCP Bytes Sent by PID",
-                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, "bytes", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                        RRDF_FIELD_OPTS_NONE, NULL);
-            buffer_rrdf_table_add_field(wb, field_id++, "eBPFBytesRecv", "eBPF TCP Bytes Received by PID",
-                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, "bytes", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                        RRDF_FIELD_OPTS_NONE, NULL);
-            buffer_rrdf_table_add_field(wb, field_id++, "eBPFTCPSent", "eBPF TCP Send Calls by PID",
-                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, "calls", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                        RRDF_FIELD_OPTS_NONE, NULL);
-            buffer_rrdf_table_add_field(wb, field_id++, "eBPFTCPRecv", "eBPF TCP Receive Calls by PID",
-                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, "calls", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                        RRDF_FIELD_OPTS_NONE, NULL);
-            buffer_rrdf_table_add_field(wb, field_id++, "eBPFRetransmit", "eBPF TCP Retransmissions by PID",
-                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, "calls", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                        RRDF_FIELD_OPTS_NONE, NULL);
-            buffer_rrdf_table_add_field(wb, field_id++, "eBPFUDPSent", "eBPF UDP Send Calls by PID",
-                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, "calls", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                        RRDF_FIELD_OPTS_NONE, NULL);
-            buffer_rrdf_table_add_field(wb, field_id++, "eBPFUDPRecv", "eBPF UDP Receive Calls by PID",
-                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, "calls", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                        RRDF_FIELD_OPTS_NONE, NULL);
-            buffer_rrdf_table_add_field(wb, field_id++, "eBPFClose", "eBPF TCP Close Calls by PID",
-                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, "calls", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                        RRDF_FIELD_OPTS_NONE, NULL);
-            buffer_rrdf_table_add_field(wb, field_id++, "eBPFConnV4", "eBPF IPv4 TCP Connections by PID",
-                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, "connections", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                        RRDF_FIELD_OPTS_NONE, NULL);
-            buffer_rrdf_table_add_field(wb, field_id++, "eBPFConnV6", "eBPF IPv6 TCP Connections by PID",
-                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, "connections", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                        RRDF_FIELD_OPTS_NONE, NULL);
+#define NV_EBPF_FIELD(id, label, unit)                                             \
+            buffer_rrdf_table_add_field(wb, field_id++, id, label,                \
+                RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE,                  \
+                RRDF_FIELD_TRANSFORM_NONE, 0, unit, NAN,                           \
+                RRDF_FIELD_SORT_DESCENDING, NULL,                                  \
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,                   \
+                RRDF_FIELD_OPTS_NONE, NULL)
+            NV_EBPF_FIELD("eBPFBytesSent",  "eBPF TCP Bytes Sent by PID",       "bytes");
+            NV_EBPF_FIELD("eBPFBytesRecv",  "eBPF TCP Bytes Received by PID",   "bytes");
+            NV_EBPF_FIELD("eBPFTCPSent",    "eBPF TCP Send Calls by PID",       "calls");
+            NV_EBPF_FIELD("eBPFTCPRecv",    "eBPF TCP Receive Calls by PID",    "calls");
+            NV_EBPF_FIELD("eBPFRetransmit", "eBPF TCP Retransmissions by PID",  "calls");
+            NV_EBPF_FIELD("eBPFUDPSent",    "eBPF UDP Send Calls by PID",       "calls");
+            NV_EBPF_FIELD("eBPFUDPRecv",    "eBPF UDP Receive Calls by PID",    "calls");
+            NV_EBPF_FIELD("eBPFClose",      "eBPF TCP Close Calls by PID",      "calls");
+            NV_EBPF_FIELD("eBPFConnV4",     "eBPF IPv4 TCP Connections by PID", "connections");
+            NV_EBPF_FIELD("eBPFConnV6",     "eBPF IPv6 TCP Connections by PID", "connections");
+#undef NV_EBPF_FIELD
 
             // Count
             buffer_rrdf_table_add_field(wb, field_id++, "Count", "Number of sockets like this",
@@ -6446,38 +6414,19 @@ static BUFFER *network_viewer_result(char *function) {
 
         buffer_json_member_add_object(wb, "charts");
         {
-            buffer_json_member_add_object(wb, "Count by Direction");
-            {
-                buffer_json_member_add_string(wb, "type", "stacked-bar");
-                buffer_json_member_add_array(wb, "columns");
-                {
-                    buffer_json_add_array_item_string(wb, "Direction");
-                }
-                buffer_json_array_close(wb);
-            }
-            buffer_json_object_close(wb);
-
-            buffer_json_member_add_object(wb, "Count by Process");
-            {
-                buffer_json_member_add_string(wb, "type", "stacked-bar");
-                buffer_json_member_add_array(wb, "columns");
-                {
-                    buffer_json_add_array_item_string(wb, "Process");
-                }
-                buffer_json_array_close(wb);
-            }
-            buffer_json_object_close(wb);
-
-            buffer_json_member_add_object(wb, "Count by Protocol");
-            {
-                buffer_json_member_add_string(wb, "type", "stacked-bar");
-                buffer_json_member_add_array(wb, "columns");
-                {
-                    buffer_json_add_array_item_string(wb, "Protocol");
-                }
-                buffer_json_array_close(wb);
-            }
-            buffer_json_object_close(wb);
+#define NV_STACKED_BAR_CHART(name_, col_)                                          \
+            buffer_json_member_add_object(wb, name_);                              \
+            {                                                                      \
+                buffer_json_member_add_string(wb, "type", "stacked-bar");          \
+                buffer_json_member_add_array(wb, "columns");                       \
+                { buffer_json_add_array_item_string(wb, col_); }                   \
+                buffer_json_array_close(wb);                                       \
+            }                                                                      \
+            buffer_json_object_close(wb)
+            NV_STACKED_BAR_CHART("Count by Direction", "Direction");
+            NV_STACKED_BAR_CHART("Count by Process",   "Process");
+            NV_STACKED_BAR_CHART("Count by Protocol",  "Protocol");
+#undef NV_STACKED_BAR_CHART
         }
         buffer_json_object_close(wb); // charts
 
@@ -6497,95 +6446,26 @@ static BUFFER *network_viewer_result(char *function) {
 
         buffer_json_member_add_object(wb, "group_by");
         {
-            buffer_json_member_add_object(wb, "Direction");
-            {
-                buffer_json_member_add_string(wb, "name", "Direction");
-                buffer_json_member_add_array(wb, "columns");
-                {
-                    buffer_json_add_array_item_string(wb, "Direction");
-                }
-                buffer_json_array_close(wb);
-            }
-            buffer_json_object_close(wb);
-
-            buffer_json_member_add_object(wb, "Protocol");
-            {
-                buffer_json_member_add_string(wb, "name", "Protocol");
-                buffer_json_member_add_array(wb, "columns");
-                {
-                    buffer_json_add_array_item_string(wb, "Protocol");
-                }
-                buffer_json_array_close(wb);
-            }
-            buffer_json_object_close(wb);
-
-            buffer_json_member_add_object(wb, "Namespace");
-            {
-                buffer_json_member_add_string(wb, "name", "Namespace");
-                buffer_json_member_add_array(wb, "columns");
-                {
-                    buffer_json_add_array_item_string(wb, "Namespace");
-                }
-                buffer_json_array_close(wb);
-            }
-            buffer_json_object_close(wb);
-
-            buffer_json_member_add_object(wb, "Process");
-            {
-                buffer_json_member_add_string(wb, "name", "Process");
-                buffer_json_member_add_array(wb, "columns");
-                {
-                    buffer_json_add_array_item_string(wb, "Process");
-                }
-                buffer_json_array_close(wb);
-            }
-            buffer_json_object_close(wb);
-
+#define NV_GROUP_BY_SINGLE(key_, display_name_)                                    \
+            buffer_json_member_add_object(wb, key_);                               \
+            {                                                                      \
+                buffer_json_member_add_string(wb, "name", display_name_);          \
+                buffer_json_member_add_array(wb, "columns");                       \
+                { buffer_json_add_array_item_string(wb, key_); }                   \
+                buffer_json_array_close(wb);                                       \
+            }                                                                      \
+            buffer_json_object_close(wb)
+            NV_GROUP_BY_SINGLE("Direction", "Direction");
+            NV_GROUP_BY_SINGLE("Protocol",  "Protocol");
+            NV_GROUP_BY_SINGLE("Namespace", "Namespace");
+            NV_GROUP_BY_SINGLE("Process",   "Process");
             if(!aggregated) {
-                buffer_json_member_add_object(wb, "LocalIP");
-                {
-                    buffer_json_member_add_string(wb, "name", "Local IP");
-                    buffer_json_member_add_array(wb, "columns");
-                    {
-                        buffer_json_add_array_item_string(wb, "LocalIP");
-                    }
-                    buffer_json_array_close(wb);
-                }
-                buffer_json_object_close(wb);
-
-                buffer_json_member_add_object(wb, "LocalPort");
-                {
-                    buffer_json_member_add_string(wb, "name", "Local Port");
-                    buffer_json_member_add_array(wb, "columns");
-                    {
-                        buffer_json_add_array_item_string(wb, "LocalPort");
-                    }
-                    buffer_json_array_close(wb);
-                }
-                buffer_json_object_close(wb);
-
-                buffer_json_member_add_object(wb, "RemoteIP");
-                {
-                    buffer_json_member_add_string(wb, "name", "Remote IP");
-                    buffer_json_member_add_array(wb, "columns");
-                    {
-                        buffer_json_add_array_item_string(wb, "RemoteIP");
-                    }
-                    buffer_json_array_close(wb);
-                }
-                buffer_json_object_close(wb);
-
-                buffer_json_member_add_object(wb, "RemotePort");
-                {
-                    buffer_json_member_add_string(wb, "name", "Remote Port");
-                    buffer_json_member_add_array(wb, "columns");
-                    {
-                        buffer_json_add_array_item_string(wb, "RemotePort");
-                    }
-                    buffer_json_array_close(wb);
-                }
-                buffer_json_object_close(wb);
+                NV_GROUP_BY_SINGLE("LocalIP",    "Local IP");
+                NV_GROUP_BY_SINGLE("LocalPort",  "Local Port");
+                NV_GROUP_BY_SINGLE("RemoteIP",   "Remote IP");
+                NV_GROUP_BY_SINGLE("RemotePort", "Remote Port");
             }
+#undef NV_GROUP_BY_SINGLE
         }
         buffer_json_object_close(wb); // group_by
     }

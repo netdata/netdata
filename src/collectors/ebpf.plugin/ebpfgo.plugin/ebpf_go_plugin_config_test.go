@@ -6,6 +6,37 @@ import (
 	"testing"
 )
 
+// parseTempConfig writes content to a named temp file, parses it, and fails
+// the test on any error or missing-file result.
+func parseTempConfig(t *testing.T, filename, content string) pluginConfigFile {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, filename)
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	cfg, ok, err := parsePluginConfigFile(path)
+	if err != nil {
+		t.Fatalf("parse config: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected file to be detected as found")
+	}
+	return cfg
+}
+
+// checkBoolPtr asserts that got matches want: both nil, or both non-nil and equal.
+func checkBoolPtr(t *testing.T, name string, got, want *bool) {
+	t.Helper()
+	if want == nil {
+		if got != nil {
+			t.Fatalf("%s should be nil, got %v", name, *got)
+		}
+	} else if got == nil || *got != *want {
+		t.Fatalf("%s = %v, want %v", name, got, *want)
+	}
+}
+
 func TestParsePluginConfigFileLegacyKeys(t *testing.T) {
 	// Keys present in the stock cachestat.conf (old C plugin format) must be
 	// recognised and mapped to Go-plugin equivalents.
@@ -58,19 +89,7 @@ func TestParsePluginConfigFileLegacyKeys(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			dir := t.TempDir()
-			path := filepath.Join(dir, "cachestat.conf")
-			if err := os.WriteFile(path, []byte(tc.content), 0o600); err != nil {
-				t.Fatalf("write config: %v", err)
-			}
-
-			cfg, ok, err := parsePluginConfigFile(path)
-			if err != nil {
-				t.Fatalf("parse error: %v", err)
-			}
-			if !ok {
-				t.Fatal("expected file to be detected as found")
-			}
+			cfg := parseTempConfig(t, "cachestat.conf", tc.content)
 
 			if tc.wantFlavor != "" {
 				if cfg.ObjectFlavor == nil || *cfg.ObjectFlavor != tc.wantFlavor {
@@ -92,10 +111,7 @@ func TestParsePluginConfigFileLegacyKeys(t *testing.T) {
 }
 
 func TestParsePluginConfigFile(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "ebpf.d.conf")
-
-	content := []byte(`
+	cfg := parseTempConfig(t, "ebpf.d.conf", `
 [global]
     update every = 17
     pid table size = 4096
@@ -104,17 +120,6 @@ func TestParsePluginConfigFile(t *testing.T) {
     lifetime = 123
     ebpf object flavor = arena
 `)
-	if err := os.WriteFile(path, content, 0o600); err != nil {
-		t.Fatalf("write config: %v", err)
-	}
-
-	cfg, ok, err := parsePluginConfigFile(path)
-	if err != nil {
-		t.Fatalf("parse config: %v", err)
-	}
-	if !ok {
-		t.Fatal("expected config to be detected")
-	}
 
 	if cfg.UpdateEvery == nil || *cfg.UpdateEvery != 17 {
 		t.Fatalf("unexpected update every: %#v", cfg.UpdateEvery)
@@ -169,39 +174,9 @@ func TestParsePluginConfigFileEbpfPrograms(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			dir := t.TempDir()
-			path := filepath.Join(dir, "ebpf.d.conf")
-			if err := os.WriteFile(path, []byte(tc.content), 0o600); err != nil {
-				t.Fatalf("write config: %v", err)
-			}
-
-			cfg, ok, err := parsePluginConfigFile(path)
-			if err != nil {
-				t.Fatalf("parse error: %v", err)
-			}
-			if !ok {
-				t.Fatal("expected file to be detected as found")
-			}
-
-			if tc.wantSocket == nil {
-				if cfg.Socket != nil {
-					t.Fatalf("Socket should be nil, got %v", *cfg.Socket)
-				}
-			} else {
-				if cfg.Socket == nil || *cfg.Socket != *tc.wantSocket {
-					t.Fatalf("Socket = %v, want %v", cfg.Socket, *tc.wantSocket)
-				}
-			}
-
-			if tc.wantCachestat == nil {
-				if cfg.Cachestat != nil {
-					t.Fatalf("Cachestat should be nil, got %v", *cfg.Cachestat)
-				}
-			} else {
-				if cfg.Cachestat == nil || *cfg.Cachestat != *tc.wantCachestat {
-					t.Fatalf("Cachestat = %v, want %v", cfg.Cachestat, *tc.wantCachestat)
-				}
-			}
+			cfg := parseTempConfig(t, "ebpf.d.conf", tc.content)
+			checkBoolPtr(t, "Socket", cfg.Socket, tc.wantSocket)
+			checkBoolPtr(t, "Cachestat", cfg.Cachestat, tc.wantCachestat)
 		})
 	}
 }
