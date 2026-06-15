@@ -613,12 +613,6 @@ Metrics:
 | snmp.trap.source_attribution | vnode, fallback, ambiguous, failed, overflow_dropped, source_transitions | events/s |
 | snmp.trap.profile_metric_diagnostics | rule_missed, extraction_failed, attribution_failed, overflow_dropped, source_transitions | events/s |
 
-For `snmp.trap.profile_metric_diagnostics`, `attribution_failed` covers metric
-instances skipped because a source identity could not be derived or accepted.
-`overflow_dropped` covers metric instances skipped by source, resource, chart,
-or job cardinality caps.
-
-
 ### Per source
 
 Per-source receiver metrics for active, attributable SNMP trap sources.

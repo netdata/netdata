@@ -193,4 +193,18 @@ Metrics:
 | k8s.cgroup.net_carrier | up, down | state |
 | k8s.cgroup.net_mtu | mtu | octets |
 
+### Per cgroups plugin IPC
+
+cgroups.plugin netipc lookup-server and discovery signal health.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| netdata.collector.ipc.cgroups_lookup.server.requests | requests_responded, requests_error, lookup_miss_signals_sent, lookup_miss_signals_coalesced | requests/s |
+| netdata.collector.ipc.cgroups_lookup.server.request_duration_ms | le_1ms, le_5ms, le_10ms, le_50ms, le_100ms, le_500ms, le_1000ms, gt_1000ms | requests/s |
+| netdata.collector.cgroups.discovery.scans | discovery_scans_natural, discovery_scans_opportunistic | scans/s |
+
 
