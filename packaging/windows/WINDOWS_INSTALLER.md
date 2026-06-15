@@ -2,21 +2,14 @@
 
 Netdata provides a simple Windows installer for quick setup.
 
-:::note
+## Access and Limitations
 
-The Windows Agent is available for users with paid Netdata subscriptions.  
-Free users will have limited functionality.
+How you view monitoring data depends on your subscription and deployment mode:
 
-:::
-
-## Limitations for Free Users
-
-| Agent Type       | Limitation                                                                            |
-|------------------|---------------------------------------------------------------------------------------|
-| Standalone Agent | UI is locked — No local monitoring                                                    |
-| Child Agent      | No monitoring data in parent dashboard when streaming to a Linux-based Netdata parent |
-
-**What does "UI is locked" mean?** When running the Standalone Agent as a free user, the local dashboard at `http://localhost:19999` is not accessible — the Agent collects metrics but cannot display them locally. To view your Windows monitoring data, you must [connect the Agent to Netdata Cloud](https://app.netdata.cloud). Upgrading to a [paid Netdata subscription](https://www.netdata.cloud/pricing/) unlocks the local dashboard for full monitoring without Cloud dependency.
+- Paid/enterprise standalone Windows Agents can use the local dashboard at <http://localhost:19999>.
+- Free standalone Windows Agents collect metrics, but the local dashboard is locked. Use [Netdata Cloud](https://app.netdata.cloud) to view monitoring data.
+- Air-gapped free standalone installations cannot use Netdata Cloud, so monitoring data cannot be viewed in that setup.
+- Child Agents streaming to a Linux-based Netdata parent do not show monitoring data in the parent dashboard for free users.
 
 ## Download the Windows Installer (MSI)
 
@@ -31,19 +24,11 @@ Choose the version that suits your needs:
 
 :::warning
 
-Silent installation isn’t supported on Windows Server versions earlier than 2019 due to TLS compatibility issues.
-
-Use the [GUI installer](#graphical-installation-gui) instead.
+Silent installation isn’t supported on Windows Server versions earlier than 2019 when the workflow depends on downloading the installer over TLS. Use the [GUI installer](#graphical-installation-gui) instead.
 
 :::
 
-Use silent mode to deploy Netdata without user interaction (ideal for automation).
-
-:::tip
-
-Run the command prompt as Administrator.
-
-:::
+Use silent mode to deploy Netdata without user interaction. Run the command prompt as Administrator.
 
 ### Installation Command Options
 
@@ -105,41 +90,9 @@ msiexec /qn /i netdata-x64.msi
 
 :::note
 
-This offline method uses `msiexec /qn` to install from a locally available MSI. On Windows Server versions earlier than 2019, the *automated download* commands in this document may fail due to TLS compatibility issues—download the MSI on another machine (Step 1) or use the [GUI installer](#graphical-installation-gui).
+This offline method uses `msiexec /qn` with a locally available MSI. Netdata Cloud is unavailable in air-gapped environments, so standalone Agents run in local mode only. On Windows Server versions earlier than 2019, the *automated download* commands in this document may fail due to TLS compatibility issues, so download the MSI on another machine first or use the [GUI installer](#graphical-installation-gui).
 
 :::
-
-In an air-gapped environment, Netdata Cloud features are unavailable. The Agent runs in standalone local mode.
-
-:::tip
-
-Paid/enterprise users can use the local Dashboard for full monitoring without Cloud connectivity.
-
-:::
-
-:::note
-
-Free users on standalone Agents have limited functionality — the UI is locked and there is no local monitoring. See [Limitations for Free Users](#limitations-for-free-users) for details.
-
-:::
-
-### Step 4: Access the Local Dashboard
-
-See [Access Netdata Dashboard](#access-netdata-dashboard).
-
-:::caution
-
-Automatic updates require internet access and are not possible on air-gapped systems. To update, repeat the transfer process with a newer MSI.
-
-:::
-
-## Access Netdata Dashboard
-
-After installation, open your browser and go to:
-
-```
-http://localhost:19999
-```
 
 ## License Information
 
@@ -151,19 +104,15 @@ By using silent installation, you agree to:
 ## Where is Netdata?
 
 When Netdata is installed on Windows, it automatically registers as a Windows Service and appears in
-**Add or remove programs** (also known as **Programs and Features** or **Apps & features** in newer Windows versions).
-The service can be monitored through the [Netdata Dashboard](http://localhost:19999).
-To start, stop, or restart the service, use Windows Services (services.msc) or command-line tools
+**Add or remove programs** (also known as **Programs and Features** or **Apps & features** in newer Windows versions). To start, stop, or restart the service, use Windows Services (services.msc) or command-line tools
 
 ## Automatic Updates
 
 For users who want to keep their Windows agents automatically updated with the latest releases, you can set up automated updates.
 
-:::tip
+:::caution
 
-**What You'll Learn**
-
-How to set up automatic Netdata updates on Windows nodes using PowerShell and Task Scheduler.
+Automatic updates require internet access and are not possible on air-gapped systems. To update, repeat the transfer process with a newer MSI.
 
 :::
 
@@ -171,19 +120,9 @@ How to set up automatic Netdata updates on Windows nodes using PowerShell and Ta
 
 This setup will automatically download and install the latest Netdata build (stable or nightly) daily at your preferred time.
 
-**1. Create the directory and updater script**
+#### 1. Create the directory and updater script
 
-Run one of these PowerShell commands **as Administrator** (choose stable or nightly):
-
-:::info
-
-**Administrator Rights Required**
-
-Creating directories in ProgramData and running Task Scheduler with the highest privileges requires administrator access.
-
-Right-click on PowerShell and select "Run as administrator" before running these commands.
-
-:::
+Run one of these PowerShell commands **as Administrator** (choose stable or nightly). Creating directories in `ProgramData` and running Task Scheduler with the highest privileges requires administrator access.
 
 - Stable version
 
@@ -205,15 +144,9 @@ Right-click on PowerShell and select "Run as administrator" before running these
    '@ | Out-File -FilePath "$env:PROGRAMDATA\Netdata\netdata-updater.ps1" -Encoding UTF8
    ```
 
-:::info
-
-**Configuration Required**
-
 Replace `<CLAIM_TOKEN>` with your Netdata Cloud claim token and `<ROOM_ID>` with your room identifier.
 
-:::
-
-**2. Create an entry in `Task Scheduler`**
+#### 2. Create an entry in `Task Scheduler`
 
 | Tab          | Setting                              | Value                                                                                |
 |--------------|--------------------------------------|--------------------------------------------------------------------------------------|
