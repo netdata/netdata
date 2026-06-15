@@ -282,6 +282,19 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NET
       else()
         corrosion_add_target_rustflags(otel-plugin --cfg=tracing_unstable)
       endif()
+
+      # The workspace release profile propagates fat LTO, single-codegen-unit,
+      # and debuginfo settings through the whole dependency graph. On 32-bit
+      # targets that makes rustc-LLVM exhaust the ~3 GB process address space
+      # during codegen ("rustc-LLVM ERROR: out of memory"). Override Cargo's
+      # release profile so the otel-plugin build stays within budget.
+      if(CMAKE_SIZEOF_VOID_P EQUAL 4 AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        corrosion_set_env_vars(
+                otel-plugin
+                "CARGO_PROFILE_RELEASE_DEBUG=0"
+                "CARGO_PROFILE_RELEASE_LTO=off"
+                "CARGO_PROFILE_RELEASE_CODEGEN_UNITS=8")
+      endif()
     endif()
 
     if(ENABLE_PLUGIN_NETFLOW)
