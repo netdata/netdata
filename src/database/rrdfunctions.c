@@ -261,6 +261,9 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
 }
 
 bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_streaming, bool internal) {
+    if(unlikely(!name || !*name))
+        return false;
+
     char key[strlen(name) + 1];
     rrd_functions_sanitize(key, name, sizeof(key));
 
