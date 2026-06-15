@@ -400,8 +400,8 @@ void health_alarm_log_populate(
     char *source = (char *) sqlite3_column_text(res, SOURCE);
     alarm_log->command = source ? health_edit_command_from_source(source) : strdupz("UNKNOWN=0=UNKNOWN");
 
-    alarm_log->chart = strdupz((char *) sqlite3_column_text(res, CHART));
-    alarm_log->name = strdupz((char *) sqlite3_column_text(res, NAME));
+    alarm_log->chart = sqlite3_text_strdupz_empty(res, CHART);
+    alarm_log->name = sqlite3_text_strdupz_empty(res, NAME);
 
     alarm_log->when = sqlite3_column_int64(res, WHEN_KEY);
 
