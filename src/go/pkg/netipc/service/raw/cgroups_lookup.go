@@ -32,7 +32,7 @@ func cgroupsLookupRequestSizeForCount(count int, pathLenAt func(int) int) (int, 
 		return 0, err
 	}
 	data := size
-	for i := 0; i < count; i++ {
+	for i := range count {
 		data, err = checkedLookupAlign8(data)
 		if err != nil {
 			return 0, err
@@ -156,7 +156,7 @@ func (c *Client) CallCgroupsLookupWithTimeout(paths [][]byte, timeoutMs uint32) 
 			if err == protocol.ErrOverflow && start < len(paths) {
 				oneItemSize, serr := cgroupsLookupRequestSize(paths[start : start+1])
 				if serr == nil {
-					if cerr := c.ensureLookupRequestCapacity(oneItemSize); cerr == nil {
+					if c.ensureLookupRequestCapacity(oneItemSize) == nil {
 						continue
 					}
 				}

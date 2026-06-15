@@ -1951,10 +1951,10 @@ func TestLookupThirtyTwoBitGuardCoverage(t *testing.T) {
 		t.Fatalf("cgroups itemBytes over-int offset = %v, want ErrOutOfBounds", err)
 	}
 
-	if got := payloadExceededSuffixFits(0, 0, nil, 0, hugeLookupItems); !got {
+	if !payloadExceededSuffixFits(0, 0, nil, 0, hugeLookupItems) {
 		t.Fatal("payloadExceededSuffixFits should ignore unrepresentable maxItems")
 	}
-	if got := payloadExceededSuffixFits(0, 0, make([]uint32, 2), overMaxInt, 1); got {
+	if payloadExceededSuffixFits(0, 0, make([]uint32, 2), overMaxInt, 1) {
 		t.Fatal("payloadExceededSuffixFits should reject unrepresentable first index")
 	}
 	if _, ok := makePayloadExceededSuffixBytes(overMaxInt); ok {

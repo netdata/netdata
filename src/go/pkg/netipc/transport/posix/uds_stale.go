@@ -26,7 +26,7 @@ const (
 
 func dialStaleCandidate(path string) error {
 	var err error
-	for attempt := 0; attempt < staleDialAttempts; attempt++ {
+	for attempt := range staleDialAttempts {
 		var conn net.Conn
 		conn, err = net.DialTimeout("unixpacket", path, staleDialTimeout)
 		if err == nil {

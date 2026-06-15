@@ -100,10 +100,7 @@ func (s *Server) methodSupported(methodCode uint16) bool {
 }
 
 func serverNotePayloadCapacity(target *atomic.Uint32, payloadLen uint32, ceiling uint32) {
-	grown := nextPowerOf2U32(payloadLen)
-	if grown > ceiling {
-		grown = ceiling
-	}
+	grown := min(nextPowerOf2U32(payloadLen), ceiling)
 	for {
 		current := target.Load()
 		if grown <= current {

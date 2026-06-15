@@ -45,10 +45,7 @@ func appsLookupNextRequest(pids []uint32, maxPayload uint32) (int, int, error) {
 	if maxCount <= 0 {
 		return 0, 0, protocol.ErrOverflow
 	}
-	count := len(pids)
-	if count > maxCount {
-		count = maxCount
-	}
+	count := min(len(pids), maxCount)
 	size, err := appsLookupRequestSize(pids[:count])
 	if err != nil {
 		return 0, 0, err
@@ -88,7 +85,7 @@ func (c *Client) CallAppsLookupWithTimeout(pids []uint32, timeoutMs uint32) (*pr
 		if err != nil {
 			oneItemSize, serr := appsLookupRequestSize([]uint32{0})
 			if errors.Is(err, protocol.ErrOverflow) && start < len(pids) && serr == nil {
-				if cerr := c.ensureLookupRequestCapacity(oneItemSize); cerr == nil {
+				if c.ensureLookupRequestCapacity(oneItemSize) == nil {
 					continue
 				}
 			}

@@ -180,7 +180,7 @@ func lookupRawResponseSizeForCount(hdrSize, count int, itemLenAt func(int) int) 
 	if err != nil {
 		return 0, err
 	}
-	for i := 0; i < count; i++ {
+	for i := range count {
 		data, err = checkedLookupAlign8(data)
 		if err != nil {
 			return 0, err

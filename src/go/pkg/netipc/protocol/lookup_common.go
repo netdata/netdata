@@ -298,7 +298,7 @@ func validateLookupDir(buf []byte, dirStart int, itemCount uint32, packedAreaLen
 
 	prevEnd := uint64(0)
 	count := int(itemCount)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		base := dirStart + i*LookupDirEntrySize
 		off := ne.Uint32(buf[base : base+4])
 		length := ne.Uint32(buf[base+4 : base+8])
@@ -414,7 +414,7 @@ func validateLabels(item []byte, hdrSize int, labelCount uint16, fixedEnd int) (
 		return 0, ErrOutOfBounds
 	}
 
-	for i := uint16(0); i < labelCount; i++ {
+	for i := range labelCount {
 		entryRel, ok := checkedInt(uint64(i) * uint64(LookupLabelEntrySize))
 		if !ok {
 			return 0, ErrOutOfBounds
@@ -650,7 +650,7 @@ func finishLookupResponse(buf []byte, hdrSize int, itemCount uint32, dataOffset 
 	if finalPackedStart < firstItemAbs {
 		copy(buf[finalPackedStart:], buf[firstItemAbs:firstItemAbs+packedDataLen])
 	}
-	for i := 0; i < count; i++ {
+	for i := range count {
 		entry := hdrSize + i*LookupDirEntrySize
 		abs, ok := checkedInt(uint64(ne.Uint32(buf[entry : entry+4])))
 		if !ok || abs < firstItemAbs {

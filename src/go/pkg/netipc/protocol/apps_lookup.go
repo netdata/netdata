@@ -189,7 +189,7 @@ func DecodeAppsLookupRequest(buf []byte) (*AppsLookupRequestView, error) {
 	if err := validateLookupDir(buf, AppsLookupReqHdr, itemCount, len(buf)-dirEnd, 0, AppsLookupKeySize); err != nil {
 		return nil, err
 	}
-	for i := uint32(0); i < itemCount; i++ {
+	for i := range itemCount {
 		base := AppsLookupReqHdr + int(i)*LookupDirEntrySize
 		off, _, err := lookupDirEntry(buf, base)
 		if err != nil {
@@ -251,7 +251,7 @@ func DecodeAppsLookupResponse(buf []byte) (*AppsLookupResponseView, error) {
 	if err := validateLookupDir(buf, AppsLookupRespHdr, itemCount, len(buf)-dirEnd, AppsLookupItemHdr, -1); err != nil {
 		return nil, err
 	}
-	for i := uint32(0); i < itemCount; i++ {
+	for i := range itemCount {
 		base := AppsLookupRespHdr + int(i)*LookupDirEntrySize
 		off, length, err := lookupDirEntry(buf, base)
 		if err != nil {

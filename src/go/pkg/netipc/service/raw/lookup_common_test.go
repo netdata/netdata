@@ -637,7 +637,7 @@ func TestSimpleRawDispatchGuardCoverage(t *testing.T) {
 
 	t.Run("increment", func(t *testing.T) {
 		var req [protocol.IncrementPayloadSize]byte
-		if n := protocol.IncrementEncode(41, req[:]); n == 0 {
+		if protocol.IncrementEncode(41, req[:]) == 0 {
 			t.Fatal("encode increment request")
 		}
 		dispatch := IncrementDispatch(func(v uint64) (uint64, bool) {
@@ -668,7 +668,7 @@ func TestSimpleRawDispatchGuardCoverage(t *testing.T) {
 
 	t.Run("string reverse", func(t *testing.T) {
 		req := make([]byte, protocol.StringReverseHdrSize+4)
-		if n := protocol.StringReverseEncode("abc", req); n == 0 {
+		if protocol.StringReverseEncode("abc", req) == 0 {
 			t.Fatal("encode string reverse request")
 		}
 		dispatch := StringReverseDispatch(func(s string) (string, bool) {

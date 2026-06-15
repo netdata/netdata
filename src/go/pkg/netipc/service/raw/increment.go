@@ -128,7 +128,7 @@ func (c *Client) CallIncrementBatchWithTimeout(values []uint64, timeoutMs uint32
 		}
 
 		out := make([]uint64, itemCount)
-		for i := uint32(0); i < itemCount; i++ {
+		for i := range itemCount {
 			itemData, gerr := protocol.BatchItemGet(respPayload, itemCount, i)
 			if gerr != nil {
 				return gerr

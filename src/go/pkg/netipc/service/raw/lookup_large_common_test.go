@@ -30,7 +30,7 @@ var (
 func largeLookupPids(count int) []uint32 {
 	pids := make([]uint32, count)
 	var pid uint32 = 100000
-	for i := 0; i < count; i++ {
+	for i := range count {
 		pids[i] = pid
 		pid++
 	}
@@ -43,8 +43,8 @@ func largeLookupU32(value int) uint32 {
 
 func largeLookupPaths(count int) [][]byte {
 	paths := make([][]byte, count)
-	for i := 0; i < count; i++ {
-		paths[i] = []byte(fmt.Sprintf("/cg/%05d", i))
+	for i := range count {
+		paths[i] = fmt.Appendf(nil, "/cg/%05d", i)
 	}
 	return paths
 }

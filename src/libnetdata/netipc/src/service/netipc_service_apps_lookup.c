@@ -212,6 +212,15 @@ static nipc_error_t do_apps_lookup_attempt(nipc_client_ctx_t *ctx,
       }
       goto cleanup;
     }
+    if (req_count == 0) {
+      if (start != s->pid_count) {
+        err = NIPC_ERR_BAD_ITEM_COUNT;
+        goto cleanup;
+      }
+    } else if (!req_pids || !items || !item_ptrs || !item_lens) {
+      err = NIPC_ERR_BAD_LAYOUT;
+      goto cleanup;
+    }
     /* next_request_count returns only sizes bounded by the uint32 transport cap. */
     if (!nipc_service_platform_ensure_client_send_buffer(ctx, req_size)) {
       err = NIPC_ERR_OVERFLOW;

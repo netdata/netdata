@@ -144,7 +144,7 @@ func DecodeCgroupsLookupRequest(buf []byte) (*CgroupsLookupRequestView, error) {
 		return nil, err
 	}
 	view := &CgroupsLookupRequestView{ItemCount: itemCount, packedStart: dirEnd, payload: buf}
-	for i := uint32(0); i < itemCount; i++ {
+	for i := range itemCount {
 		keyWithNul, key, err := view.itemBytes(i)
 		if err != nil {
 			return nil, err
@@ -248,7 +248,7 @@ func DecodeCgroupsLookupResponse(buf []byte) (*CgroupsLookupResponseView, error)
 	if err := validateLookupDir(buf, CgroupsLookupRespHdr, itemCount, len(buf)-dirEnd, CgroupsLookupItemHdr, -1); err != nil {
 		return nil, err
 	}
-	for i := uint32(0); i < itemCount; i++ {
+	for i := range itemCount {
 		base := CgroupsLookupRespHdr + int(i)*LookupDirEntrySize
 		off, length, err := lookupDirEntry(buf, base)
 		if err != nil {

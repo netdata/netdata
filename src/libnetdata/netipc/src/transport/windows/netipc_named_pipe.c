@@ -647,12 +647,8 @@ static nipc_np_error_t server_handshake(HANDLE pipe,
       apply_default(cfg->packet_size, NIPC_NP_DEFAULT_PACKET_SIZE);
   uint32_t s_req_pay =
       apply_default(cfg->max_request_payload_bytes, NIPC_MAX_PAYLOAD_DEFAULT);
-  uint32_t s_req_bat =
-      apply_default(cfg->max_request_batch_items, NIPC_NP_DEFAULT_BATCH_ITEMS);
   uint32_t s_resp_pay =
       apply_default(cfg->max_response_payload_bytes, NIPC_MAX_PAYLOAD_DEFAULT);
-  uint32_t s_resp_bat =
-      apply_default(cfg->max_response_batch_items, NIPC_NP_DEFAULT_BATCH_ITEMS);
   uint32_t s_profiles =
       cfg->supported_profiles ? cfg->supported_profiles : NIPC_PROFILE_BASELINE;
   uint32_t s_preferred = cfg->preferred_profiles;
