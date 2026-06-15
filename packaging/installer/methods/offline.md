@@ -26,11 +26,11 @@ For offline installation on Windows, see [Install Netdata on Windows](/packaging
 
 On your internet-connected machine, you'll need:
 
-| Requirement             | Purpose                    |
-|-------------------------|----------------------------|
-| `curl` or `wget`        | Download the script        |
-| `sha256sum` or `shasum` | Verify script downloads    |
-| POSIX-compliant shell   | Required to run the script |
+| Requirement                 | Purpose                                    |
+|-----------------------------|--------------------------------------------|
+| `curl` or `wget`            | Download the script                        |
+| `sha256sum` or `shasum`     | Verify script downloads                    |
+| POSIX-compliant shell       | Required to run the script                 |
 | `sudo`, `doas`, or `pkexec` | Gain root privileges (required to prepare) |
 
 :::note
@@ -52,10 +52,14 @@ Run the following command:
   sudo sh /tmp/netdata-kickstart.sh --release-channel stable --prepare-offline-install-source ./netdata-offline
   ```
 
+The `--release-channel` flag controls which pre-built static binaries are downloaded into the offline package:
+
+- `--release-channel stable`: the latest stable release.
+- `--release-channel nightly`: the latest nightly build, for testing new features.
+
 :::note
 
 The folder name `netdata-offline` is just an example — use any name you want.
-To use the nightly channel instead, replace `stable` with `nightly`.
 
 :::
 
@@ -64,12 +68,12 @@ To use the nightly channel instead, replace `stable` with `nightly`.
 The script creates a directory with all necessary files:
 
 ```
-── netdata-offline
-   ├── channel             # Release channel info
-   ├── install.sh          # Installation script
-   ├── kickstart.sh        # Original kickstart script
-   ├── netdata-*.gz.run    # Netdata static packages for different architectures
-   └── sha256sums.txt      # Verification hashes
+./netdata-offline
+├── channel             # Release channel info
+├── install.sh          # Installation script
+├── kickstart.sh        # Original kickstart script
+├── netdata-*.gz.run    # Netdata static packages for different architectures
+└── sha256sums.txt      # Verification hashes
 ```
 
 ## Step 2: Transfer to Offline System
@@ -83,35 +87,9 @@ The installation script expects the exact directory structure and filenames.
 
 :::
 
-:::tip
-
-The folder name `netdata-offline` is just an example — use any name you want.
-
-:::
-
-### Output
-
-This will create a directory like:
-
-```
-./netdata-offline/
-```
-
-It will contain everything required to install Netdata offline.
-
----
-
 ## Install Netdata on the Target (Offline) System
 
-1. Copy the entire `netdata-offline` directory to your offline system.
-
-:::warning
-
-Don't rename or modify the files.
-
-:::
-
-2. On the offline system, run:
+On the offline system, navigate into the transferred directory and run the installer:
 
 ```bash
 cd netdata-offline
