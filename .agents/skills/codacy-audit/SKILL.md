@@ -98,6 +98,12 @@ Filter for `.data[] | select(.deltaType == "Added")` to identify the issues
 that still block the PR. Treat `commitInfo` fields as sensitive operational
 metadata; do not copy names or email addresses into committed artifacts.
 
+Operational gotcha: Codacy's PR issue API can lag behind the GitHub check-run
+after a new push. If `pr-issues.sh` still reports findings but the Codacy
+check-run for the current head SHA is green, inspect `.commitIssue.commitInfo.sha`
+in the dump. Findings anchored to an older commit are stale cache and should not
+be treated as current-head blockers.
+
 To restrict to a single tool (matches what Codacy reported on a CI run):
 
 ```
