@@ -77,7 +77,8 @@ find_visual_studio_tools() {
   found=0
 
   for version in "${versions[@]}"; do
-    if check_visual_studio_version "${version}"; then
+    if tool_path_candidate="$(check_visual_studio_version "${version}")"; then
+      echo "${tool_path_candidate}"
       found=1
       break
     fi
