@@ -4,6 +4,8 @@ The `netdatacli` executable offers a straightforward way to manage the Netdata A
 
 It is located in the same directory as the `netdata` binary.
 
+On Windows, `netdatacli` is available alongside the `netdata` executable (typically at `C:\Program Files\Netdata\usr\bin\`). It communicates with the running Agent over a named pipe using libuv, the same cross-platform IPC mechanism used on UNIX systems.
+
 Available commands:
 
 | Command                                                                         | Description                                                                                                                                                                                                                                                                                                                                                                 |
