@@ -57,15 +57,15 @@ func (s *socketFunctionStore) snapshot() (socketGlobalPublish, bool) {
 }
 
 // runStdinDispatcher reads os.Stdin for FUNCTION calls and dispatches them.
-// It exits when stdin is closed or "QUIT" is received.
-// closeStop is called on QUIT so that all collector goroutines also shut down.
+// It exits when stdin is closed or "QUIT" is received, and always calls
+// closeStop so collector goroutines shut down on both paths.
 func runStdinDispatcher(api *netdataapi.API, fnStore *socketFunctionStore, closeStop func()) {
+	defer closeStop()
 	sc := bufio.NewScanner(os.Stdin)
 	for sc.Scan() {
 		line := sc.Text()
 		switch {
 		case line == "QUIT":
-			closeStop()
 			return
 		case strings.HasPrefix(line, "FUNCTION "):
 			uid, name := parseMinimalFunctionLine(line)
