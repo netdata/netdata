@@ -176,8 +176,8 @@ func TestCollectJobLastExecution(t *testing.T) {
 				ageSeconds:      sql.NullInt64{Int64: 30, Valid: true},
 			},
 			wantStatus:   jobLastExecutionStatusOK,
-			wantDuration: ptrInt64(90),
-			wantAge:      ptrInt64(30),
+			wantDuration: new(int64(90)),
+			wantAge:      new(int64(30)),
 		},
 		"succeeded with failed step": {
 			exec: &sqlAgentJobLastExecution{
@@ -187,8 +187,8 @@ func TestCollectJobLastExecution(t *testing.T) {
 				hasFailedStep:   true,
 			},
 			wantStatus:   jobLastExecutionStatusWarning,
-			wantDuration: ptrInt64(120),
-			wantAge:      ptrInt64(60),
+			wantDuration: new(int64(120)),
+			wantAge:      new(int64(60)),
 		},
 		"failed": {
 			exec: &sqlAgentJobLastExecution{
@@ -197,8 +197,8 @@ func TestCollectJobLastExecution(t *testing.T) {
 				ageSeconds:      sql.NullInt64{Int64: 10, Valid: true},
 			},
 			wantStatus:   jobLastExecutionStatusError,
-			wantDuration: ptrInt64(8),
-			wantAge:      ptrInt64(10),
+			wantDuration: new(int64(8)),
+			wantAge:      new(int64(10)),
 		},
 		"canceled": {
 			exec: &sqlAgentJobLastExecution{
@@ -207,8 +207,8 @@ func TestCollectJobLastExecution(t *testing.T) {
 				ageSeconds:      sql.NullInt64{Int64: 20, Valid: true},
 			},
 			wantStatus:   jobLastExecutionStatusCanceled,
-			wantDuration: ptrInt64(15),
-			wantAge:      ptrInt64(20),
+			wantDuration: new(int64(15)),
+			wantAge:      new(int64(20)),
 		},
 		"unknown status with invalid age": {
 			exec: &sqlAgentJobLastExecution{
@@ -217,7 +217,7 @@ func TestCollectJobLastExecution(t *testing.T) {
 				ageSeconds:      sql.NullInt64{},
 			},
 			wantStatus:   jobLastExecutionStatusUnknown,
-			wantDuration: ptrInt64(42),
+			wantDuration: new(int64(42)),
 			notWantMetrics: []string{
 				"job_job_last_execution_age",
 			},
@@ -567,10 +567,6 @@ func TestCollector_CollectJobStatus(t *testing.T) {
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
-}
-
-func ptrInt64(v int64) *int64 {
-	return &v
 }
 
 func countCollectorChartsByID(c *Collector, id string) int {
