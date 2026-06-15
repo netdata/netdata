@@ -14,6 +14,7 @@ use super::test_support::{
 use super::*;
 use crate::plugin_config::DecapsulationMode as ConfigDecapsulationMode;
 use std::process::Command;
+use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
 const CHILD_ENV: &str = "NETFLOW_RESOURCE_BENCH_CHILD";
@@ -25,6 +26,8 @@ const WARMUP_ENV: &str = "NETFLOW_RESOURCE_BENCH_WARMUP_SECS";
 const MEASURE_ENV: &str = "NETFLOW_RESOURCE_BENCH_MEASURE_SECS";
 const HIGH_POOL_ENV: &str = "NETFLOW_RESOURCE_BENCH_HIGH_POOL_FLOWS";
 const LOW_POOL_ENV: &str = "NETFLOW_RESOURCE_BENCH_LOW_POOL_FLOWS";
+const SYNC_EVERY_ENTRIES_ENV: &str = "NETFLOW_RESOURCE_BENCH_SYNC_EVERY_ENTRIES";
+const SYNC_INTERVAL_MILLIS_ENV: &str = "NETFLOW_RESOURCE_BENCH_SYNC_INTERVAL_MILLIS";
 const STORAGE_DURATION_ENV: &str = "NETFLOW_STORAGE_BENCH_DURATION_SECS";
 const STORAGE_SAMPLE_ENV: &str = "NETFLOW_STORAGE_BENCH_SAMPLE_INTERVAL_SECS";
 const DEFAULT_STORAGE_DURATION_SECS: u64 = 900;
@@ -227,6 +230,30 @@ impl ChartSamplerBench {
     }
 }
 
+#[derive(Debug)]
+struct ListenerSyncBenchConfig {
+    sync_every_entries: Option<usize>,
+    sync_interval: Option<Duration>,
+}
+
+impl ListenerSyncBenchConfig {
+    fn from_env() -> Self {
+        Self {
+            sync_every_entries: optional_usize_env(SYNC_EVERY_ENTRIES_ENV),
+            sync_interval: optional_positive_millis_env(SYNC_INTERVAL_MILLIS_ENV),
+        }
+    }
+
+    fn apply_to(self, service: &mut IngestService) {
+        if let Some(sync_every_entries) = self.sync_every_entries {
+            service.cfg.listener.sync_every_entries = sync_every_entries;
+        }
+        if let Some(sync_interval) = self.sync_interval {
+            service.cfg.listener.sync_interval = sync_interval;
+        }
+    }
+}
+
 #[test]
 #[ignore = "manual paced resource-envelope benchmark"]
 fn bench_resource_envelope_matrix() {
@@ -361,7 +388,8 @@ fn run_resource_envelope_case(
     flows_per_sec: u64,
 ) -> ResourceEnvelopeReport {
     let current_exe = std::env::current_exe().expect("locate current test binary");
-    let output = Command::new(current_exe)
+    let mut command = Command::new(current_exe);
+    command
         .arg("--ignored")
         .arg("--exact")
         .arg("ingest::resource_bench_tests::bench_resource_envelope_child")
@@ -405,9 +433,11 @@ fn run_resource_envelope_case(
         .env(
             HIGH_POOL_ENV,
             env_usize(HIGH_POOL_ENV, DEFAULT_HIGH_POOL_FLOWS).to_string(),
-        )
-        .output()
-        .expect("run resource bench child");
+        );
+    forward_optional_env(&mut command, SYNC_EVERY_ENTRIES_ENV);
+    forward_optional_env(&mut command, SYNC_INTERVAL_MILLIS_ENV);
+
+    let output = command.output().expect("run resource bench child");
 
     if !output.status.success() {
         panic!(
@@ -508,6 +538,8 @@ fn run_writer_only_resource_envelope(
         layer: ResourceLayer::WriterOnly.label().to_string(),
         profile: profile.label().to_string(),
         protocol: protocol_name.to_string(),
+        listener_sync_every_entries: None,
+        listener_sync_interval_millis: None,
         requested_flows_per_sec: flows_per_sec,
         achieved_flows_per_sec: measurement_result.ingested_flows as f64 / elapsed.as_secs_f64(),
         cpu_percent_of_one_core: cpu_percent_of_one_core(proc_before, proc_after, elapsed),
@@ -559,6 +591,7 @@ fn run_plugin_resource_envelope(
         }
         _ => new_disk_benchmark_ingest_service(ConfigDecapsulationMode::None),
     };
+    ListenerSyncBenchConfig::from_env().apply_to(&mut service);
     configure_service_for_layer(&mut service, layer);
 
     let raw_only = matches!(layer, ResourceLayer::RawOnly);
@@ -648,6 +681,10 @@ fn run_plugin_resource_envelope(
         layer: layer.label().to_string(),
         profile: profile.label().to_string(),
         protocol: protocol_name.to_string(),
+        listener_sync_every_entries: Some(service.cfg.listener.sync_every_entries),
+        listener_sync_interval_millis: Some(duration_millis_u64(
+            service.cfg.listener.sync_interval,
+        )),
         requested_flows_per_sec: flows_per_sec,
         achieved_flows_per_sec: measurement_result.ingested_flows as f64 / elapsed.as_secs_f64(),
         cpu_percent_of_one_core: cpu_percent_of_one_core(proc_before, proc_after, elapsed),
@@ -898,6 +935,79 @@ fn production_shaped_resource_layer_accounts_for_chart_sampler_work() {
 }
 
 #[test]
+fn listener_sync_bench_config_applies_overrides() {
+    let (_tmp, mut service) =
+        new_production_benchmark_ingest_service(ConfigDecapsulationMode::None);
+    let config = ListenerSyncBenchConfig {
+        sync_every_entries: Some(1024),
+        sync_interval: Some(Duration::from_millis(250)),
+    };
+
+    config.apply_to(&mut service);
+
+    assert_eq!(service.cfg.listener.sync_every_entries, 1024);
+    assert_eq!(
+        service.cfg.listener.sync_interval,
+        Duration::from_millis(250)
+    );
+}
+
+#[test]
+fn listener_sync_bench_override_parsers_are_strict() {
+    assert_eq!(parse_usize_override("test", "0"), 0);
+    assert_eq!(parse_usize_override("test", "1024"), 1024);
+    assert_eq!(
+        parse_positive_millis_override("test", "250"),
+        Duration::from_millis(250)
+    );
+}
+
+#[test]
+#[should_panic(expected = "test must be an unsigned integer")]
+fn listener_sync_bench_usize_override_rejects_invalid_input() {
+    parse_usize_override("test", "invalid");
+}
+
+#[test]
+#[should_panic(expected = "test must be > 0 milliseconds")]
+fn listener_sync_bench_interval_override_rejects_zero_millis() {
+    parse_positive_millis_override("test", "0");
+}
+
+#[test]
+#[should_panic(expected = "test must be a positive integer")]
+fn listener_sync_bench_interval_override_rejects_invalid_input() {
+    parse_positive_millis_override("test", "invalid");
+}
+
+#[test]
+fn positive_sync_threshold_accumulates_until_threshold_then_records_raw_sync() {
+    let (_tmp, mut service) =
+        new_production_benchmark_ingest_service(ConfigDecapsulationMode::None);
+    service.cfg.listener.sync_every_entries = 2;
+
+    let (record_batches, _) = build_record_batches(ResourceProfile::Low);
+    let records: Vec<_> = record_batches
+        .iter()
+        .flat_map(|batch| batch.iter())
+        .take(2)
+        .cloned()
+        .collect();
+    assert_eq!(records.len(), 2);
+
+    let entries_since_sync =
+        service.handle_decoded_batch_with_handoffs_for_test(now_usec(), &records[..1], 0);
+    assert_eq!(entries_since_sync, 1);
+    assert_eq!(service.metrics.raw_journal_syncs.load(Ordering::Relaxed), 0);
+
+    let entries_since_sync =
+        service.handle_decoded_batch_with_handoffs_for_test(now_usec(), &records[1..], 1);
+
+    assert_eq!(entries_since_sync, 0);
+    assert_eq!(service.metrics.raw_journal_syncs.load(Ordering::Relaxed), 1);
+}
+
+#[test]
 fn paced_record_cursor_splits_batches_when_tick_budget_is_smaller_than_batch() {
     let record_batches = vec![
         vec![crate::flow::FlowRecord::default(); 5],
@@ -1069,4 +1179,44 @@ fn env_usize(name: &str, default: usize) -> usize {
         .and_then(|value| value.parse::<usize>().ok())
         .filter(|value| *value > 0)
         .unwrap_or(default)
+}
+
+fn optional_usize_env(name: &str) -> Option<usize> {
+    match std::env::var(name) {
+        Ok(value) => Some(parse_usize_override(name, &value)),
+        Err(std::env::VarError::NotPresent) => None,
+        Err(err) => panic!("read {name}: {err}"),
+    }
+}
+
+fn optional_positive_millis_env(name: &str) -> Option<Duration> {
+    match std::env::var(name) {
+        Ok(value) => Some(parse_positive_millis_override(name, &value)),
+        Err(std::env::VarError::NotPresent) => None,
+        Err(err) => panic!("read {name}: {err}"),
+    }
+}
+
+fn parse_usize_override(name: &str, value: &str) -> usize {
+    value
+        .parse::<usize>()
+        .unwrap_or_else(|_| panic!("{name} must be an unsigned integer, got {value:?}"))
+}
+
+fn parse_positive_millis_override(name: &str, value: &str) -> Duration {
+    let millis = value
+        .parse::<u64>()
+        .unwrap_or_else(|_| panic!("{name} must be a positive integer, got {value:?}"));
+    assert!(millis > 0, "{name} must be > 0 milliseconds");
+    Duration::from_millis(millis)
+}
+
+fn duration_millis_u64(duration: Duration) -> u64 {
+    duration.as_millis().try_into().unwrap_or(u64::MAX)
+}
+
+fn forward_optional_env(command: &mut Command, name: &str) {
+    if let Ok(value) = std::env::var(name) {
+        command.env(name, value);
+    }
 }

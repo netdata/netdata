@@ -20,6 +20,8 @@ pub(super) struct ResourceEnvelopeReport {
     pub(super) layer: String,
     pub(super) profile: String,
     pub(super) protocol: String,
+    pub(super) listener_sync_every_entries: Option<usize>,
+    pub(super) listener_sync_interval_millis: Option<u64>,
     pub(super) requested_flows_per_sec: u64,
     pub(super) achieved_flows_per_sec: f64,
     pub(super) cpu_percent_of_one_core: f64,
@@ -84,6 +86,28 @@ pub(super) fn print_resource_report(report: &ResourceEnvelopeReport) {
     eprintln!("Layer:                  {}", report.layer);
     eprintln!("Profile:                {}", report.profile);
     eprintln!("Protocol:               {}", report.protocol);
+    match (
+        report.listener_sync_every_entries,
+        report.listener_sync_interval_millis,
+    ) {
+        (Some(0), Some(sync_interval_millis)) => {
+            eprintln!(
+                "  listener sync:        periodic fsync disabled | sync tick interval {} ms",
+                sync_interval_millis
+            );
+        }
+        (Some(sync_every_entries), Some(sync_interval_millis)) => {
+            eprintln!(
+                "  listener sync:        every {} entries | interval {} ms",
+                sync_every_entries, sync_interval_millis
+            );
+        }
+        (None, None) => {}
+        _ => debug_assert!(
+            false,
+            "listener sync report fields must be both present or both absent"
+        ),
+    }
     eprintln!(
         "  offered load:         {} flows/s",
         report.requested_flows_per_sec
@@ -275,12 +299,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn resource_report_serializes_background_overhead_buckets() {
+    fn resource_report_serializes_background_overhead_and_listener_sync_metadata() {
         let report = ResourceEnvelopeReport {
             methodology: "test".to_string(),
             layer: "plugin-production-shaped".to_string(),
             profile: "low-cardinality-mixed".to_string(),
             protocol: "mixed".to_string(),
+            listener_sync_every_entries: Some(1024),
+            listener_sync_interval_millis: Some(1000),
             requested_flows_per_sec: 30,
             achieved_flows_per_sec: 30.0,
             cpu_percent_of_one_core: 1.0,
@@ -310,6 +336,8 @@ mod tests {
         let value = serde_json::to_value(&report).expect("serialize resource report");
 
         assert_eq!(value["sync_tick_calls"], 2);
+        assert_eq!(value["listener_sync_every_entries"], 1024);
+        assert_eq!(value["listener_sync_interval_millis"], 1000);
         assert_eq!(value["raw_journal_syncs_per_sec"], 8.0);
         assert_eq!(value["tier_journal_syncs_per_sec"], 9.0);
         assert_eq!(value["tier_flushes_per_sec"], 10.0);
