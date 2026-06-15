@@ -207,6 +207,10 @@ func (s *cachestatSharedMemoryStore) applySocketDataLocked() {
 	for i := range s.entries {
 		if data, ok := s.socketData[s.entries[i].pid]; ok {
 			s.entries[i].socket = data
+		} else {
+			// PID absent from the latest socket snapshot: reset to zero so
+			// consumers never see values from a prior cycle.
+			s.entries[i].socket = ebpfSocketPublishApps{}
 		}
 	}
 }
