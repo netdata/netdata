@@ -121,14 +121,17 @@ func handleNetworkProtocols(api *netdataapi.API, fnStore *socketFunctionStore, u
 }
 
 func sendFunctionError(api *netdataapi.API, uid string, code int, msg string) {
-	payload := fmt.Sprintf(`{"status":%d,"message":"%s"}`, code, msg)
+	b, _ := json.Marshal(struct {
+		Status  int    `json:"status"`
+		Message string `json:"message"`
+	}{Status: code, Message: msg})
 	pluginOutputMu.Lock()
 	api.FUNCRESULT(netdataapi.FunctionResult{
 		UID:             uid,
 		Code:            strconv.Itoa(code),
 		ContentType:     "application/json",
 		ExpireTimestamp: strconv.FormatInt(time.Now().Unix(), 10),
-		Payload:         payload,
+		Payload:         string(b),
 	})
 	pluginOutputMu.Unlock()
 }
