@@ -70,6 +70,10 @@ static bool test_proc_pid_cgroup_parser(void)
              "3:memory:/memory-path\n2:blkio:/blkio-path\n1:cpu,cpuacct:/cpuacct-path\n",
              "/cpuacct-path") && ok;
     ok = expect_path(
+             "v1 namespace-relative cpuacct precedence",
+             "3:memory:/memory-path\n1:cpu,cpuacct:/../../../kubepods.slice/pod-a/cri-containerd-abc.scope\n",
+             "/../../../kubepods.slice/pod-a/cri-containerd-abc.scope") && ok;
+    ok = expect_path(
              "v1 systemd fallback",
              "7:name=systemd:/init.scope\n9:freezer:/first-nonpreferred\n",
              "/init.scope") && ok;

@@ -33,19 +33,26 @@ static bool cgroup_find_procs_path_v1(char *path_buf, size_t path_buf_size, cons
     return false;
 }
 
-static bool cgroup_stat_dir_v1(const char *cg_id, struct stat *st) {
+static bool cgroup_stat_dir_under_base(const char *base, const char *cg_id, struct stat *st) {
+    if (!base || !*base)
+        return false;
+
     char path_buf[FILENAME_MAX + 1];
+    snprintfz(path_buf, sizeof(path_buf) - 1, "%s%s", base, cg_id);
+    return stat(path_buf, st) == 0;
+}
 
-    snprintfz(path_buf, sizeof(path_buf) - 1, "%s%s", cgroup_cpuset_base, cg_id);
-    if (stat(path_buf, st) == 0)
+static bool cgroup_stat_dir_v1(const char *cg_id, struct stat *st) {
+    if (cgroup_stat_dir_under_base(cgroup_cpuacct_base, cg_id, st))
         return true;
 
-    snprintfz(path_buf, sizeof(path_buf) - 1, "%s%s", cgroup_blkio_base, cg_id);
-    if (stat(path_buf, st) == 0)
+    if (cgroup_stat_dir_under_base(cgroup_cpuset_base, cg_id, st))
         return true;
 
-    snprintfz(path_buf, sizeof(path_buf) - 1, "%s%s", cgroup_memory_base, cg_id);
-    if (stat(path_buf, st) == 0)
+    if (cgroup_stat_dir_under_base(cgroup_blkio_base, cg_id, st))
+        return true;
+
+    if (cgroup_stat_dir_under_base(cgroup_memory_base, cg_id, st))
         return true;
 
     return false;

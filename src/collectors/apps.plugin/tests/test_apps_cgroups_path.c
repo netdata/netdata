@@ -61,6 +61,12 @@ int main(void)
         return 1;
 
     if (!expect_path(
+            "v1 namespace-relative cpuacct precedence",
+            "3:memory:/memory-path\n1:cpu,cpuacct:/../../../kubepods.slice/pod-a/cri-containerd-abc.scope\n",
+            "/../../../kubepods.slice/pod-a/cri-containerd-abc.scope"))
+        return 1;
+
+    if (!expect_path(
             "v1 blkio precedence",
             "3:memory:/memory-path\n2:blkio:/blkio-path\n4:name=systemd:/init.scope\n",
             "/blkio-path"))
