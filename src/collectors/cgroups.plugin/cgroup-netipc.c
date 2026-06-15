@@ -33,6 +33,31 @@ static bool cgroup_find_procs_path_v1(char *path_buf, size_t path_buf_size, cons
     return false;
 }
 
+static bool cgroup_stat_dir_under_base(const char *base, const char *cg_id, struct stat *st) {
+    if (!base || !*base)
+        return false;
+
+    char path_buf[FILENAME_MAX + 1];
+    snprintfz(path_buf, sizeof(path_buf) - 1, "%s%s", base, cg_id);
+    return stat(path_buf, st) == 0;
+}
+
+static bool cgroup_stat_dir_v1(const char *cg_id, struct stat *st) {
+    if (cgroup_stat_dir_under_base(cgroup_cpuacct_base, cg_id, st))
+        return true;
+
+    if (cgroup_stat_dir_under_base(cgroup_cpuset_base, cg_id, st))
+        return true;
+
+    if (cgroup_stat_dir_under_base(cgroup_blkio_base, cg_id, st))
+        return true;
+
+    if (cgroup_stat_dir_under_base(cgroup_memory_base, cg_id, st))
+        return true;
+
+    return false;
+}
+
 static int cgroup_snapshot_label_cb(
     const char *name, const char *value, RRDLABEL_SRC ls __maybe_unused, void *data) {
     cgroup_snapshot_entry_add_label((CGROUP_SNAPSHOT_ENTRY *)data, name, value);
@@ -77,6 +102,8 @@ void cgroup_snapshot_rebuild_and_publish(void) {
         snprintfz(name_buf, sizeof(name_buf) - 1, "%s%s", prefix, cg->chart_id);
 
         uint32_t enabled = cg->enabled;
+        struct stat dir_st;
+        bool has_dir_identity = false;
         if (cgroup_use_unified_cgroups) {
             struct stat st;
             snprintfz(path_buf, FILENAME_MAX, "%s%s/cgroup.procs", cgroup_unified_base, cg->id);
@@ -84,8 +111,15 @@ void cgroup_snapshot_rebuild_and_publish(void) {
                 path_buf[0] = '\0';
                 enabled = 0;
             }
+
+            char dir_path[FILENAME_MAX + 1];
+            snprintfz(dir_path, sizeof(dir_path) - 1, "%s%s", cgroup_unified_base, cg->id);
+            has_dir_identity = (stat(dir_path, &dir_st) == 0);
         } else if (!cgroup_find_procs_path_v1(path_buf, sizeof(path_buf), cg->id)) {
             enabled = 0;
+            has_dir_identity = cgroup_stat_dir_v1(cg->id, &dir_st);
+        } else {
+            has_dir_identity = cgroup_stat_dir_v1(cg->id, &dir_st);
         }
 
         e->known = (cg->processed && cg->pending_renames == 0);
@@ -96,6 +130,8 @@ void cgroup_snapshot_rebuild_and_publish(void) {
         e->options = cg->options;
         e->enabled = enabled;
         e->procs_path = string_strdupz(path_buf);
+        if (has_dir_identity)
+            cgroup_snapshot_entry_set_dir_identity(e, &dir_st);
 
         if (cg->chart_labels)
             rrdlabels_walkthrough_read(cg->chart_labels, cgroup_snapshot_label_cb, e);

@@ -237,7 +237,9 @@ Shows active network connections as a topology graph with self, process or conta
 The group_by selector controls the actor level. process_name groups sockets by process name, pid shows
 one actor per PID with scalar per-PID information, and container groups sockets by canonical
 container_name. For systemd services, container_name is the service name. For non-container,
-non-service processes, container_name falls back to the process name.
+non-service processes, container_name falls back to the process name. Unresolved cgroup
+namespace-relative paths remain pending or process fallback identities instead of being
+displayed as raw `cri-containerd-*.scope` systemd scope names.
 
 Fields that can vary across grouped processes, such as PID, UID, network namespace, command line,
 cgroup path, and detailed container metadata, are scalar columns in group_by:pid and merged actor
@@ -252,7 +254,7 @@ Processes and CGroups tables for the selected actor.
 | Require Cloud | no |
 | Performance | group_by:container performs APPS_LOOKUP cache reads to derive canonical container_name; cache warming runs asynchronously. |
 | Security | Free-form labels are denied by default. Raw cgroup paths may expose operator-chosen path segments and are hidden in table views by default. |
-| Availability | container_name uses APPS_LOOKUP data when available, keeps retry-later lookups pending, and falls back to process name only for known host/root or permanently unknown cgroup cases. |
+| Availability | container_name uses APPS_LOOKUP data when available, keeps retry-later lookups pending, and falls back to process name for host/root, permanently unknown, and unresolved namespace-relative cgroup cases. |
 
 #### Prerequisites
 

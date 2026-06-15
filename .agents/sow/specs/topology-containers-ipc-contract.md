@@ -1,7 +1,7 @@
 # Topology Containers IPC Contract
 
 Status: current
-Last updated: 2026-06-13
+Last updated: 2026-06-15
 
 ## Purpose
 
@@ -62,6 +62,16 @@ Consumers must not periodically refresh known entries only because time passed, 
 - `KNOWN`: all returned item fields are valid and cacheable.
 - `UNKNOWN_RETRY_LATER`: the producer may know later; cache the incomplete status with its generation so the consumer can throttle re-asks. Query again only if the key remains in the consumer's working set and the producer generation has advanced or the key identity changes.
 - `UNKNOWN_PERMANENT`: the producer will not know this key until the key identity or reachability changes; cache the negative status so the consumer does not re-query the same unreachable key every scan.
+
+Namespace-relative cgroup paths:
+
+- `/proc/<pid>/cgroup` may expose paths whose first real component is `..` when the reader is in a different cgroup namespace than the target process.
+- `apps.plugin` forwards these paths exactly as read and uses the raw path as its cache key.
+- `cgroups.plugin` may resolve a namespace-relative request internally against its canonical cgroup snapshot and return `KNOWN` metadata while echoing the original request path in the response.
+- If no snapshot generation exists yet, namespace-relative paths return `UNKNOWN_RETRY_LATER` without raw-path discovery signalling.
+- If a namespace-relative path cannot be resolved uniquely in the current snapshot generation, it remains `UNKNOWN_RETRY_LATER` and must not fall through to raw path reachability or permanent negative status.
+- Duplicate suffix matches fail closed as `UNKNOWN_RETRY_LATER`; cgroups.plugin must not guess between multiple canonical candidates.
+- Consumers must not normalize namespace-relative cgroup paths locally unless a future multi-reader design keys caches by the reader cgroup namespace identity.
 
 `APPS_LOOKUP` has two layers:
 
@@ -132,6 +142,7 @@ Role-specific telemetry covers request outcomes, cache outcomes, peer lifecycle,
 - container grouping is available when APPS_LOOKUP returns known container metadata;
 - orchestrator grouping is available from the `CGROUPS_LOOKUP` orchestrator value propagated through apps.plugin;
 - host/root and unknown cases remain explicit fallback states rather than fabricated container identities;
+- unresolved namespace-relative cgroup paths remain pending or process fallback identities and must not be displayed as `cri-containerd-*.scope` systemd actors;
 - `group_by:pid` exposes per-PID enrichment as scalar actor fields and actor labels;
 - grouped `process_name` and `container` views merge per-PID enrichment through deduplicated actor labels and schema-declared `set` aggregation metadata, not by replacing variable values with whichever PID happened to be processed first;
 - the tabular `network-connections` Function and apps.plugin `processes` Function expose the same per-PID cgroup/container/service enrichment fields where the PID context is available.
