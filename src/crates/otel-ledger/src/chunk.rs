@@ -2,10 +2,9 @@
 //!
 //! When a query needs an active WAL — one still being written, not yet
 //! rotated into an SFST — the ledger indexes its durable prefix in
-//! fixed-entry **chunks** and serves those plus a row-scanned tail (see
-//! `docs/wal-query-design.md`, milestone 3). The partitioning rule
-//! itself is framing math and lives in [`wal::prefix`]; this module
-//! owns the ledger's half:
+//! fixed-entry **chunks** and serves those plus a row-scanned tail. The
+//! partitioning rule itself is framing math and lives in [`wal::prefix`];
+//! this module owns the ledger's half:
 //!
 //! - [`ChunkCache`] — a process-wide memo of built chunk SFST byte
 //!   images, keyed `(wal_seq, chunk_index)`, with build singleflight and
@@ -18,7 +17,7 @@
 //! The per-query orchestration that uses these — capturing the
 //! durable-prefix snapshot under the registry lock, building the missing
 //! chunks, and handing the chunk images + tail range to the engine — is
-//! the query-path wiring (milestone 4), not here.
+//! the query-path wiring, not here.
 
 use std::collections::HashMap;
 use std::future::Future;

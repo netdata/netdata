@@ -1,8 +1,8 @@
 //! Equivalence harness: `WalScan` vs index-then-query, over identical
 //! WAL files.
 //!
-//! Toward the milestone-1 exit criterion in `docs/wal-query-design.md`:
-//! for any WAL file and any query, the row-scan evaluator's output must
+//! The equivalence criterion this harness enforces: for any WAL file and
+//! any query, the row-scan evaluator's output must
 //! be indistinguishable from indexing that WAL into an SFST and running
 //! the engine. Every fixture here goes through the *production* path —
 //! OTLP `ResourceLogs` → `otel_ingestor::arrow_bridge::encode` (real
@@ -15,7 +15,7 @@
 //! facets, timeline, field table — `wal_data_stats_equal_whole_file_index`)
 //! and the **row table** served through the live path (chunk SFSTs
 //! interleaved with the row-scanned tail under the cursor order —
-//! `wal_data_rows_match_whole_file_index`, milestone 4b). The row test
+//! `wal_data_rows_match_whole_file_index`). The row test
 //! uses monotonic timestamps so the chunked and whole-file total orders
 //! coincide; equal-timestamp tie-break legitimately differs across the
 //! WAL→SFST transition (the documented cursor seam).
@@ -916,7 +916,7 @@ fn candidate_from_bytes(
 
 #[test]
 fn wal_data_stats_equal_whole_file_index() {
-    // The milestone-4a gate: querying an active WAL through the live
+    // Statistics equivalence: querying an active WAL through the live
     // path — chunk SFSTs (built by index_range, fed in as Source::Memory)
     // plus a row-scanned tail, folded by the engine — must yield the
     // same *statistics* (matched, facets, histogram) as indexing the
@@ -1061,7 +1061,7 @@ fn tails_clone(ts: &[WalTail]) -> Vec<WalTail> {
 
 #[test]
 fn wal_data_rows_match_whole_file_index() {
-    // The milestone-4b gate: the row table served from the live path
+    // Row equivalence: the row table served from the live path
     // (chunk SFSTs interleaved with the row-scanned tail under the
     // cursor order) must match the rows from indexing the whole WAL.
     //

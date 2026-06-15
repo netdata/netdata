@@ -32,8 +32,7 @@
 //! This subsystem is the query *mechanism*: it evaluates the sources it
 //! is handed. Which bytes become a sealed SFST, an in-memory chunk, or a
 //! tail — and why the durable prefix is indexed while the tail is scanned
-//! — is *policy* resolved by the caller (the ledger); that rationale and
-//! the cost model live in `docs/wal-query-design.md`. The query is pure
+//! — is *policy* resolved by the caller (the ledger). The query is pure
 //! and synchronous; opening and decompressing sources is its only I/O,
 //! which the caller schedules off any async runtime thread.
 

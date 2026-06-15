@@ -5,7 +5,7 @@
 //! ([`scan`](WalScan::scan)) and computes the statistics with plain
 //! per-row loops ([`evaluate`](WalScan::evaluate)). It exists for data
 //! the indexer hasn't reached yet — the sub-chunk *tail* of an active
-//! WAL file (see `docs/wal-query-design.md`), whose bounded size is what
+//! WAL file, whose bounded size is what
 //! makes re-scanning per query affordable.
 //!
 //! # Semantic equality with the SFST engine

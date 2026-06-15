@@ -1,8 +1,7 @@
 //! Unit tests for the row-scan evaluator's semantics. These exercise the
 //! evaluation core against hand-built row sets; the WAL-file end and the
 //! full equivalence against the SFST engine over identical frames are
-//! covered by the property harness (milestone 1 of
-//! `docs/wal-query-design.md`).
+//! covered by the property harness in `wal_equivalence.rs`.
 
 use wal_otap::KvSink;
 use sfst::{FieldTier, Filter, Grid};

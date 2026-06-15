@@ -1094,7 +1094,7 @@ For decode-error entries (§11), the same translation applies:
 
 ### Injection-safety in the OTLP path
 
-OTLP is protobuf-encoded — attribute values are length-prefixed and cannot escape their field boundary on the wire. Newlines, NULs, and other control bytes in varbind values traverse OTLP safely. Downstream receivers' handling is out of scope for this spec; Netdata's own OTEL plugin (`src/crates/netdata-otel/otel-plugin/src/logs_service.rs`) writes flattened key/value pairs to systemd-journal using the journal-writer crate, so the same byte-safety properties of that crate apply when traps reach the journal via the OTEL path.
+OTLP is protobuf-encoded — attribute values are length-prefixed and cannot escape their field boundary on the wire. Newlines, NULs, and other control bytes in varbind values traverse OTLP safely. Downstream receivers' handling is out of scope for this spec; Netdata's own OTEL plugin (`src/crates/otel-ingestor/src/logs_service.rs`) ingests these logs into a write-ahead log with indexed segments (not systemd-journal) and preserves the raw byte values, so the byte-safety properties hold when traps reach storage via the OTEL path.
 
 ## 12. Receiver And Profile Metrics
 
