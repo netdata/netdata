@@ -32,14 +32,17 @@ type Client struct {
 	callCount      uint32
 	errorCount     uint32
 
-	callTimeoutMs  uint32
-	abortRequested atomic.Bool
-	abortMu        sync.Mutex
-	abortCh        chan struct{}
+	callTimeoutMs                 uint32
+	maxLogicalLookupItems         uint32
+	maxLogicalLookupSubcalls      uint32
+	maxLogicalLookupResponseBytes uint32
+	abortRequested                atomic.Bool
+	abortMu                       sync.Mutex
+	abortCh                       chan struct{}
 }
 
 func newClient(runDir, serviceName string, config windows.ClientConfig, expectedMethodCode uint16) *Client {
-	return &Client{
+	client := &Client{
 		state:              StateDisconnected,
 		runDir:             runDir,
 		serviceName:        serviceName,
@@ -48,6 +51,8 @@ func newClient(runDir, serviceName string, config windows.ClientConfig, expected
 		callTimeoutMs:      ClientCallTimeoutDefaultMs,
 		abortCh:            make(chan struct{}),
 	}
+	client.SetLookupLogicalConfig(LookupLogicalConfig{})
+	return client
 }
 
 func (c *Client) disconnect() {

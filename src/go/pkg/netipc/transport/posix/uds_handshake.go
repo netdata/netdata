@@ -103,9 +103,11 @@ func serverHandshake(fd int, config *ServerConfig, sessionID uint64) (*Session, 
 	}
 
 	sRespPay := applyDefault(config.MaxResponsePayloadBytes, protocol.MaxPayloadDefault)
+	sReqPay := applyDefault(config.MaxRequestPayloadBytes, protocol.MaxPayloadDefault)
 	ack, err := framing.ServerHandshake(framing.ServerHandshakeConfig{
 		ServerHelloConfig: framing.ServerHelloConfig{
 			PacketSize:              serverPktSize,
+			MaxRequestPayloadBytes:  sReqPay,
 			MaxResponsePayloadBytes: sRespPay,
 			SupportedProfiles:       config.SupportedProfiles,
 			PreferredProfiles:       config.PreferredProfiles,

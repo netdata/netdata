@@ -24,9 +24,13 @@ pub use raw::{CgroupsLookupHandler, ClientAbortHandle, ClientState, ClientStatus
 pub struct ClientConfig {
     pub supported_profiles: u32,
     pub preferred_profiles: u32,
+    pub max_request_payload_bytes: u32,
     pub max_request_batch_items: u32,
     pub max_response_payload_bytes: u32,
     pub auth_token: u64,
+    pub max_logical_lookup_items: u32,
+    pub max_logical_lookup_subcalls: u32,
+    pub max_logical_lookup_response_bytes: u32,
 }
 
 impl Default for ClientConfig {
@@ -34,9 +38,13 @@ impl Default for ClientConfig {
         Self {
             supported_profiles: PROFILE_BASELINE,
             preferred_profiles: 0,
+            max_request_payload_bytes: 0,
             max_request_batch_items: 0,
             max_response_payload_bytes: 0,
             auth_token: 0,
+            max_logical_lookup_items: 0,
+            max_logical_lookup_subcalls: 0,
+            max_logical_lookup_response_bytes: 0,
         }
     }
 }
@@ -46,6 +54,7 @@ impl ClientConfig {
         let mut transport = TransportClientConfig::default();
         transport.supported_profiles = self.supported_profiles;
         transport.preferred_profiles = self.preferred_profiles;
+        transport.max_request_payload_bytes = self.max_request_payload_bytes;
         transport.max_request_batch_items = self.max_request_batch_items;
         transport.max_response_payload_bytes = self.max_response_payload_bytes;
         transport.max_response_batch_items = self.max_request_batch_items;
@@ -58,6 +67,7 @@ impl ClientConfig {
 pub struct ServerConfig {
     pub supported_profiles: u32,
     pub preferred_profiles: u32,
+    pub max_request_payload_bytes: u32,
     pub max_request_batch_items: u32,
     pub max_response_payload_bytes: u32,
     pub auth_token: u64,
@@ -68,6 +78,7 @@ impl Default for ServerConfig {
         Self {
             supported_profiles: PROFILE_BASELINE,
             preferred_profiles: 0,
+            max_request_payload_bytes: 0,
             max_request_batch_items: 0,
             max_response_payload_bytes: 0,
             auth_token: 0,
@@ -80,6 +91,7 @@ impl ServerConfig {
         let mut transport = TransportServerConfig::default();
         transport.supported_profiles = self.supported_profiles;
         transport.preferred_profiles = self.preferred_profiles;
+        transport.max_request_payload_bytes = self.max_request_payload_bytes;
         transport.max_request_batch_items = self.max_request_batch_items;
         transport.max_response_payload_bytes = self.max_response_payload_bytes;
         transport.max_response_batch_items = self.max_request_batch_items;
@@ -94,13 +106,15 @@ pub struct CgroupsLookupClient {
 
 impl CgroupsLookupClient {
     pub fn new(run_dir: &str, service_name: &str, config: ClientConfig) -> Self {
-        Self {
-            inner: raw::RawClient::new_cgroups_lookup(
-                run_dir,
-                service_name,
-                config.into_transport(),
-            ),
-        }
+        let lookup_config = raw::LookupLogicalConfig {
+            max_items: config.max_logical_lookup_items,
+            max_subcalls: config.max_logical_lookup_subcalls,
+            max_response_bytes: config.max_logical_lookup_response_bytes,
+        };
+        let mut inner =
+            raw::RawClient::new_cgroups_lookup(run_dir, service_name, config.into_transport());
+        inner.set_lookup_logical_config(lookup_config);
+        Self { inner }
     }
 
     pub fn refresh(&mut self) -> bool {
@@ -214,9 +228,13 @@ mod tests {
         let cfg = ClientConfig {
             supported_profiles: PROFILE_BASELINE | PROFILE_SHM_FUTEX,
             preferred_profiles: PROFILE_SHM_FUTEX,
+            max_request_payload_bytes: 4096,
             max_request_batch_items: 17,
             max_response_payload_bytes: 8192,
             auth_token: 99,
+            max_logical_lookup_items: 0,
+            max_logical_lookup_subcalls: 0,
+            max_logical_lookup_response_bytes: 0,
         };
 
         let transport = cfg.into_transport();
@@ -225,6 +243,7 @@ mod tests {
             PROFILE_BASELINE | PROFILE_SHM_FUTEX
         );
         assert_eq!(transport.preferred_profiles, PROFILE_SHM_FUTEX);
+        assert_eq!(transport.max_request_payload_bytes, 4096);
         assert_eq!(transport.max_request_batch_items, 17);
         assert_eq!(transport.max_response_batch_items, 17);
         assert_eq!(transport.max_response_payload_bytes, 8192);
@@ -236,6 +255,7 @@ mod tests {
         let cfg = ServerConfig {
             supported_profiles: PROFILE_BASELINE | PROFILE_SHM_FUTEX,
             preferred_profiles: PROFILE_SHM_FUTEX,
+            max_request_payload_bytes: 4096,
             max_request_batch_items: 23,
             max_response_payload_bytes: 16384,
             auth_token: 123,
@@ -247,6 +267,7 @@ mod tests {
             PROFILE_BASELINE | PROFILE_SHM_FUTEX
         );
         assert_eq!(transport.preferred_profiles, PROFILE_SHM_FUTEX);
+        assert_eq!(transport.max_request_payload_bytes, 4096);
         assert_eq!(transport.max_request_batch_items, 23);
         assert_eq!(transport.max_response_batch_items, 23);
         assert_eq!(transport.max_response_payload_bytes, 16384);
@@ -307,3 +328,7 @@ mod tests {
         assert!(!running.load(Ordering::SeqCst));
     }
 }
+
+#[cfg(all(test, unix))]
+#[path = "cgroups_lookup_unix_tests.rs"]
+mod unix_tests;

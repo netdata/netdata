@@ -1,7 +1,8 @@
-use super::common::{ensure_client_scratch, next_power_of_2_u32};
+use super::common::{ensure_client_scratch, next_power_of_2_u32, LookupLogicalConfig};
 use crate::protocol::{self, NipcError, MAX_PAYLOAD_CAP};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 #[cfg(unix)]
 pub(super) use crate::transport::posix::ClientConfig;
@@ -80,6 +81,9 @@ pub struct RawClient {
     pub(super) error_count: u32,
 
     pub(super) call_timeout_ms: u32,
+    pub(super) max_logical_lookup_items: u32,
+    pub(super) max_logical_lookup_subcalls: u32,
+    pub(super) max_logical_lookup_response_bytes: u32,
     pub(super) abort_requested: Arc<AtomicBool>,
 }
 
@@ -136,6 +140,7 @@ impl RawClient {
         expected_method_code: u16,
         config: ClientConfig,
     ) -> Self {
+        let lookup_config = LookupLogicalConfig::default();
         RawClient {
             state: ClientState::Disconnected,
             run_dir: run_dir.to_string(),
@@ -155,6 +160,9 @@ impl RawClient {
             call_count: 0,
             error_count: 0,
             call_timeout_ms: CLIENT_CALL_TIMEOUT_DEFAULT_MS,
+            max_logical_lookup_items: lookup_config.max_items,
+            max_logical_lookup_subcalls: lookup_config.max_subcalls,
+            max_logical_lookup_response_bytes: lookup_config.max_response_bytes,
             abort_requested: Arc::new(AtomicBool::new(false)),
         }
     }
@@ -169,8 +177,92 @@ impl RawClient {
         CLIENT_CALL_TIMEOUT_DEFAULT_MS
     }
 
+    pub(super) fn lookup_deadline(&self, timeout_ms: u32) -> Result<Instant, NipcError> {
+        Instant::now()
+            .checked_add(Duration::from_millis(
+                self.resolved_call_timeout(timeout_ms) as u64,
+            ))
+            .ok_or(NipcError::Overflow)
+    }
+
+    pub(super) fn lookup_remaining_timeout(&self, deadline: Instant) -> Result<u32, NipcError> {
+        if self.abort_requested() {
+            return Err(NipcError::Aborted);
+        }
+        let now = Instant::now();
+        if now >= deadline {
+            return Err(NipcError::Timeout);
+        }
+        let remaining = deadline.duration_since(now).as_millis().max(1);
+        Ok(remaining.min(u32::MAX as u128) as u32)
+    }
+
     pub(super) fn abort_requested(&self) -> bool {
         self.abort_requested.load(Ordering::Acquire)
+    }
+
+    pub fn set_lookup_logical_config(&mut self, config: LookupLogicalConfig) {
+        let config = config.normalize();
+        self.max_logical_lookup_items = config.max_items;
+        self.max_logical_lookup_subcalls = config.max_subcalls;
+        self.max_logical_lookup_response_bytes = config.max_response_bytes;
+    }
+
+    pub(super) fn ensure_ready_for_logical_lookup(&mut self) -> Result<(), NipcError> {
+        if self.state != ClientState::Ready {
+            self.error_count += 1;
+            return Err(NipcError::BadLayout);
+        }
+        if self.abort_requested() {
+            self.disconnect();
+            self.state = ClientState::Broken;
+            self.error_count += 1;
+            return Err(NipcError::Aborted);
+        }
+        Ok(())
+    }
+
+    pub(super) fn ensure_lookup_request_capacity(
+        &mut self,
+        required: usize,
+    ) -> Result<bool, NipcError> {
+        if self.abort_requested() {
+            self.disconnect();
+            self.state = ClientState::Broken;
+            self.error_count += 1;
+            return Err(NipcError::Aborted);
+        }
+        let required = u32::try_from(required).map_err(|_| NipcError::Overflow)?;
+        let max_request_payload_bytes = if self.transport_config.max_request_payload_bytes == 0 {
+            crate::protocol::MAX_PAYLOAD_DEFAULT
+        } else {
+            self.transport_config.max_request_payload_bytes
+        };
+        if required > max_request_payload_bytes {
+            return Ok(false);
+        }
+        if self.session_max_request_payload_bytes() >= required {
+            return Ok(true);
+        }
+
+        let prev_req = self.session_max_request_payload_bytes();
+        self.disconnect();
+        self.state = ClientState::Broken;
+        self.state = self.try_connect();
+        if self.state != ClientState::Ready {
+            self.error_count += 1;
+            return Err(NipcError::Overflow);
+        }
+        self.reconnect_count += 1;
+        if self.session_max_request_payload_bytes() <= prev_req
+            || self.session_max_request_payload_bytes() < required
+        {
+            self.disconnect();
+            self.state = ClientState::Broken;
+            self.error_count += 1;
+            return Err(NipcError::Overflow);
+        }
+        Ok(true)
     }
 
     /// Set the context-level default timeout for blocking calls.

@@ -275,7 +275,7 @@ static nipc_error_t lookup_builder_layout_labels(
     return NIPC_OK;
 
   if (!labels)
-    return NIPC_ERR_OVERFLOW;
+    return NIPC_ERR_BAD_LAYOUT;
 
   if (nipc_lookup_align8_u64_over_limit(fixed_end, UINT32_MAX,
                                         &layout->table_start))

@@ -250,7 +250,33 @@ fn do_encode(dir: &str) {
     }
     {
         let mut buf = [0u8; 8192];
-        let b = CgroupsLookupBuilder::new(&mut buf, 0, 104);
+        let mut b = CgroupsLookupBuilder::new(&mut buf, 1, 104);
+        b.add(
+            CGROUP_LOOKUP_PAYLOAD_EXCEEDED,
+            0,
+            b"/payload-exceeded",
+            b"",
+            &[],
+        )
+        .unwrap();
+        let total = b.finish().unwrap();
+        write_file(
+            dir,
+            "cgroups_lookup_resp_payload_exceeded.bin",
+            &buf[..total],
+        );
+    }
+    {
+        let mut buf = [0u8; 8192];
+        let mut b = CgroupsLookupBuilder::new(&mut buf, 1, 105);
+        b.add(CGROUP_LOOKUP_OVERSIZED_ITEM, 0, b"/oversized", b"", &[])
+            .unwrap();
+        let total = b.finish().unwrap();
+        write_file(dir, "cgroups_lookup_resp_oversized_item.bin", &buf[..total]);
+    }
+    {
+        let mut buf = [0u8; 8192];
+        let b = CgroupsLookupBuilder::new(&mut buf, 0, 106);
         let total = b.finish().unwrap();
         write_file(dir, "cgroups_lookup_resp_empty.bin", &buf[..total]);
     }
@@ -371,7 +397,47 @@ fn do_encode(dir: &str) {
     }
     {
         let mut buf = [0u8; 8192];
-        let b = AppsLookupBuilder::new(&mut buf, 0, 205);
+        let mut b = AppsLookupBuilder::new(&mut buf, 1, 205);
+        b.add(
+            PID_LOOKUP_PAYLOAD_EXCEEDED,
+            0,
+            0,
+            1238,
+            0,
+            NIPC_UID_UNSET,
+            0,
+            b"",
+            b"",
+            b"",
+            &[],
+        )
+        .unwrap();
+        let total = b.finish().unwrap();
+        write_file(dir, "apps_lookup_resp_payload_exceeded.bin", &buf[..total]);
+    }
+    {
+        let mut buf = [0u8; 8192];
+        let mut b = AppsLookupBuilder::new(&mut buf, 1, 206);
+        b.add(
+            PID_LOOKUP_OVERSIZED_ITEM,
+            0,
+            0,
+            1239,
+            0,
+            NIPC_UID_UNSET,
+            0,
+            b"",
+            b"",
+            b"",
+            &[],
+        )
+        .unwrap();
+        let total = b.finish().unwrap();
+        write_file(dir, "apps_lookup_resp_oversized_item.bin", &buf[..total]);
+    }
+    {
+        let mut buf = [0u8; 8192];
+        let b = AppsLookupBuilder::new(&mut buf, 0, 207);
         let total = b.finish().unwrap();
         write_file(dir, "apps_lookup_resp_empty.bin", &buf[..total]);
     }
@@ -585,6 +651,46 @@ fn do_decode(dir: &str) -> bool {
         let data = read_file(dir, file);
         c.check(CgroupsLookupResponseView::decode(&data).is_ok(), file);
     }
+    {
+        let data = read_file(dir, "cgroups_lookup_resp_payload_exceeded.bin");
+        let view = CgroupsLookupResponseView::decode(&data);
+        c.check(view.is_ok(), "decode cgroups_lookup payload_exceeded");
+        if let Ok(v) = view {
+            let item = v.item(0).unwrap();
+            c.check(
+                item.status == CGROUP_LOOKUP_PAYLOAD_EXCEEDED,
+                "cgroups_lookup payload_exceeded status",
+            );
+            c.check(
+                item.path.as_bytes() == b"/payload-exceeded",
+                "cgroups_lookup payload_exceeded path",
+            );
+            c.check(
+                item.name.as_bytes().is_empty(),
+                "cgroups_lookup payload_exceeded name",
+            );
+        }
+    }
+    {
+        let data = read_file(dir, "cgroups_lookup_resp_oversized_item.bin");
+        let view = CgroupsLookupResponseView::decode(&data);
+        c.check(view.is_ok(), "decode cgroups_lookup oversized_item");
+        if let Ok(v) = view {
+            let item = v.item(0).unwrap();
+            c.check(
+                item.status == CGROUP_LOOKUP_OVERSIZED_ITEM,
+                "cgroups_lookup oversized_item status",
+            );
+            c.check(
+                item.path.as_bytes() == b"/oversized",
+                "cgroups_lookup oversized_item path",
+            );
+            c.check(
+                item.name.as_bytes().is_empty(),
+                "cgroups_lookup oversized_item name",
+            );
+        }
+    }
 
     // 10. APPS_LOOKUP request variants
     {
@@ -633,6 +739,40 @@ fn do_decode(dir: &str) -> bool {
     ] {
         let data = read_file(dir, file);
         c.check(AppsLookupResponseView::decode(&data).is_ok(), file);
+    }
+    {
+        let data = read_file(dir, "apps_lookup_resp_payload_exceeded.bin");
+        let view = AppsLookupResponseView::decode(&data);
+        c.check(view.is_ok(), "decode apps_lookup payload_exceeded");
+        if let Ok(v) = view {
+            let item = v.item(0).unwrap();
+            c.check(
+                item.status == PID_LOOKUP_PAYLOAD_EXCEEDED,
+                "apps_lookup payload_exceeded status",
+            );
+            c.check(item.pid == 1238, "apps_lookup payload_exceeded pid");
+            c.check(
+                item.comm.as_bytes().is_empty(),
+                "apps_lookup payload_exceeded comm",
+            );
+        }
+    }
+    {
+        let data = read_file(dir, "apps_lookup_resp_oversized_item.bin");
+        let view = AppsLookupResponseView::decode(&data);
+        c.check(view.is_ok(), "decode apps_lookup oversized_item");
+        if let Ok(v) = view {
+            let item = v.item(0).unwrap();
+            c.check(
+                item.status == PID_LOOKUP_OVERSIZED_ITEM,
+                "apps_lookup oversized_item status",
+            );
+            c.check(item.pid == 1239, "apps_lookup oversized_item pid");
+            c.check(
+                item.comm.as_bytes().is_empty(),
+                "apps_lookup oversized_item comm",
+            );
+        }
     }
 
     c.report("Rust decode")

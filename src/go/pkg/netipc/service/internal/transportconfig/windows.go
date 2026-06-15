@@ -8,6 +8,7 @@ func WindowsClient(config TypedConfig) windows.ClientConfig {
 	return windows.ClientConfig{
 		SupportedProfiles:       config.SupportedProfiles,
 		PreferredProfiles:       config.PreferredProfiles,
+		MaxRequestPayloadBytes:  config.MaxRequestPayloadBytes,
 		MaxRequestBatchItems:    config.MaxRequestBatchItems,
 		MaxResponsePayloadBytes: config.MaxResponsePayloadBytes,
 		MaxResponseBatchItems:   responseBatchItems(config),
@@ -19,6 +20,7 @@ func WindowsServer(config TypedConfig) windows.ServerConfig {
 	return windows.ServerConfig{
 		SupportedProfiles:       config.SupportedProfiles,
 		PreferredProfiles:       config.PreferredProfiles,
+		MaxRequestPayloadBytes:  config.MaxRequestPayloadBytes,
 		MaxRequestBatchItems:    config.MaxRequestBatchItems,
 		MaxResponsePayloadBytes: config.MaxResponsePayloadBytes,
 		MaxResponseBatchItems:   responseBatchItems(config),

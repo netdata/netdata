@@ -1,5 +1,5 @@
 use super::dispatch::DispatchHandler;
-use crate::protocol::MAX_PAYLOAD_DEFAULT;
+use crate::protocol::{MAX_PAYLOAD_CAP, MAX_PAYLOAD_DEFAULT};
 
 #[cfg(unix)]
 pub(super) use crate::transport::posix::ServerConfig;
@@ -23,6 +23,8 @@ pub struct ManagedServer {
     pub(super) running: Arc<AtomicBool>,
     pub(super) learned_request_payload_bytes: Arc<AtomicU32>,
     pub(super) learned_response_payload_bytes: Arc<AtomicU32>,
+    pub(super) request_payload_growth_ceiling: u32,
+    pub(super) response_payload_growth_ceiling: u32,
     pub(super) next_session_id: u64,
     pub(super) worker_count: usize,
     #[cfg(windows)]
@@ -67,6 +69,16 @@ impl ManagedServer {
         } else {
             MAX_PAYLOAD_DEFAULT
         };
+        let request_payload_growth_ceiling = if config.max_request_payload_bytes != 0 {
+            config.max_request_payload_bytes
+        } else {
+            MAX_PAYLOAD_CAP
+        };
+        let response_payload_growth_ceiling = if config.max_response_payload_bytes != 0 {
+            config.max_response_payload_bytes
+        } else {
+            MAX_PAYLOAD_CAP
+        };
 
         ManagedServer {
             run_dir: run_dir.to_string(),
@@ -77,6 +89,8 @@ impl ManagedServer {
             running: Arc::new(AtomicBool::new(false)),
             learned_request_payload_bytes: Arc::new(AtomicU32::new(learned_request)),
             learned_response_payload_bytes: Arc::new(AtomicU32::new(learned_response)),
+            request_payload_growth_ceiling,
+            response_payload_growth_ceiling,
             next_session_id: 1,
             worker_count: if worker_count < 1 { 1 } else { worker_count },
             #[cfg(windows)]

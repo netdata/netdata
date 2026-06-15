@@ -3,7 +3,9 @@
 package raw
 
 import (
+	"errors"
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -148,6 +150,42 @@ func TestCacheRefreshFailurePreserves(t *testing.T) {
 	cleanupAll(svc)
 }
 
+func TestCacheRefreshRejectsMalformedSnapshotItem(t *testing.T) {
+	svc := "go_cache_bad_item"
+	ensureRunDir()
+	cleanupAll(svc)
+
+	ts := startTestServer(svc, func(_ []byte, responseBuf []byte) (int, error) {
+		minRequired, ok := protocol.CgroupsBuilderMinBytes(1)
+		if !ok {
+			return 0, protocol.ErrOverflow
+		}
+		builder := protocol.NewCgroupsBuilder(responseBuf, 1, 1, 42)
+		if err := builder.Add(1001, 0, 1, []byte("docker-abc123"), []byte("/sys/fs/cgroup/docker/abc123")); err != nil {
+			return 0, err
+		}
+		n := builder.Finish()
+		responseBuf[minRequired+2] = 1
+		return n, nil
+	})
+	defer ts.stop()
+
+	cache := NewCache(testRunDir, svc, testClientConfig())
+	defer cache.Close()
+
+	if cache.Refresh() {
+		t.Fatal("refresh should fail when snapshot item validation fails")
+	}
+	if cache.Ready() {
+		t.Fatal("cache should not be ready after malformed first refresh")
+	}
+	if got := cache.Status().RefreshFailureCount; got != 1 {
+		t.Fatalf("refresh failure count = %d, want 1", got)
+	}
+
+	cleanupAll(svc)
+}
+
 func TestCacheReconnectRebuilds(t *testing.T) {
 	svc := "go_cache_reconn"
 	ensureRunDir()
@@ -258,6 +296,60 @@ func TestCacheEmpty(t *testing.T) {
 	}
 
 	cleanupAll(svc)
+}
+
+func TestCacheDirectFallbackAndControls(t *testing.T) {
+	cache := newCache(&Client{state: StateReady, abortCh: make(chan struct{})})
+	cache.populated = true
+	cache.items = []CacheItem{
+		{Hash: 100, Name: "alpha", Path: "/alpha"},
+		{Hash: 200, Name: "beta", Path: "/beta"},
+	}
+
+	item, found := cache.Lookup(200, "beta")
+	if !found || item.Path != "/beta" {
+		t.Fatalf("fallback lookup = %+v found %v", item, found)
+	}
+	if _, found := cache.Lookup(200, "missing"); found {
+		t.Fatal("fallback lookup should reject wrong name")
+	}
+	if _, found := cache.Lookup(999, "beta"); found {
+		t.Fatal("fallback lookup should reject wrong hash")
+	}
+
+	cache.SetCallTimeout(123)
+	if cache.client.callTimeoutMs != 123 {
+		t.Fatalf("cache call timeout = %d, want 123", cache.client.callTimeoutMs)
+	}
+	cache.Abort()
+	if !cache.client.abortRequested.Load() {
+		t.Fatal("cache abort did not mark client aborted")
+	}
+	cache.ClearAbort()
+	if cache.client.abortRequested.Load() {
+		t.Fatal("cache clear abort did not reset client abort state")
+	}
+	cache.Close()
+	if cache.Ready() || cache.items != nil || cache.buckets != nil {
+		t.Fatalf("closed cache retained state: ready=%v items=%v buckets=%v", cache.Ready(), cache.items, cache.buckets)
+	}
+}
+
+func TestCacheOverflowGuards(t *testing.T) {
+	if _, err := cacheBucketCountForItemCount(1<<30 + 1); err != protocol.ErrOverflow {
+		t.Fatalf("oversized bucket count error = %v, want ErrOverflow", err)
+	}
+	if strconv.IntSize < 64 {
+		t.Skip("oversized slice-header guard requires 64-bit int")
+	}
+
+	if _, err := cacheBucketMaskForLen(int(uint64(^uint32(0)) + 2)); !errors.Is(err, protocol.ErrOverflow) {
+		t.Fatalf("unrepresentable bucket count error = %v, want ErrOverflow", err)
+	}
+
+	if got := cacheStatusItemCountForLen(int(uint64(^uint32(0)) + 1)); got != ^uint32(0) {
+		t.Fatalf("overflow status item count = %d, want uint32 max", got)
+	}
 }
 
 func TestCacheLargeDataset(t *testing.T) {

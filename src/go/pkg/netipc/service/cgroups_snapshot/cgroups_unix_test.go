@@ -129,6 +129,9 @@ func TestSnapshotRoundTripUnix(t *testing.T) {
 
 	client := NewClient(testRunDirUnix, service, testUnixClientConfig())
 	defer client.Close()
+	client.SetCallTimeout(500)
+	client.Abort()
+	client.ClearAbort()
 	connectReadyUnix(t, client)
 
 	view, err := client.CallSnapshot()
@@ -160,6 +163,9 @@ func TestCacheRoundTripUnix(t *testing.T) {
 
 	cache := NewCache(testRunDirUnix, service, testUnixClientConfig())
 	defer cache.Close()
+	cache.SetCallTimeout(500)
+	cache.Abort()
+	cache.ClearAbort()
 
 	var updated bool
 	for range 200 {
@@ -215,6 +221,12 @@ func TestClientStatusAndServerWorkersUnix(t *testing.T) {
 	server := NewServerWithWorkers(testRunDirUnix, service, testUnixServerConfig(), testUnixHandler(), 2)
 	if server == nil || server.inner == nil {
 		t.Fatal("NewServerWithWorkers returned nil server")
+	}
+	server.Stop()
+
+	server = NewServer(testRunDirUnix, service+"_plain", testUnixServerConfig(), testUnixHandler())
+	if server == nil || server.inner == nil {
+		t.Fatal("NewServer returned nil server")
 	}
 	server.Stop()
 }
