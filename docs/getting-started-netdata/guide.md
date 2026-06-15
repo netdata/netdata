@@ -57,7 +57,9 @@ Getting started is as simple as visiting [app.netdata.cloud](https://app.netdata
 
 :::info
 
-**Why Cloud Connection is Essential:** Starting with Netdata v2.0, all dashboards use Netdata Cloud for authentication, providing enhanced security and unified experience across all platforms. This unlocks enterprise-grade monitoring capabilities for deployments of any size.
+**Why We Recommend Cloud Connection:** Netdata Cloud is the recommended way to access your dashboards, providing unified authentication, enhanced security, and access to advanced features across all your platforms. This unlocks enterprise-grade monitoring capabilities for deployments of any size.
+
+For offline or air-gapped environments, the local Agent dashboard remains accessible at `http://<agent-ip>:19999` without a Cloud sign-in.
 
 :::
 
