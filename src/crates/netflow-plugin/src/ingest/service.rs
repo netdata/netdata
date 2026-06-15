@@ -96,6 +96,8 @@ pub(crate) struct IngestService {
     pub(super) tier_handoff: Arc<super::tier_commit::TierHandoffShared>,
     pub(super) tier_worker_handles: Vec<std::thread::JoinHandle<()>>,
     pub(super) tier_accumulators: HashMap<TierKind, TierAccumulator>,
+    /// Refreshed under a write lock on the sync tick; production readers must
+    /// use non-blocking reads and fall back to the previous sample on contention.
     pub(super) open_tiers: Arc<RwLock<OpenTierState>>,
     pub(super) tier_flow_indexes: Arc<RwLock<TierFlowIndexStore>>,
     pub(super) facet_runtime: Arc<crate::facet_runtime::FacetRuntime>,
