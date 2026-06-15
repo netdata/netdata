@@ -774,7 +774,7 @@ download() {
   fi
 
   if [ -n "${WGET}" ]; then
-    run "${WGET}" -T 15 -o "${dl_log}" -O "${dest}" "${url}"
+    run "${WGET}" -S -T 15 -o "${dl_log}" -O "${dest}" "${url}"
 
     handle_wget_result "$?" "${url}" "${dl_log}" "downloading" "${dest}"
     return "$?"
@@ -787,10 +787,13 @@ get_actual_version() {
     major="${1}"
     channel="${2}"
     url="${RELEASE_INFO_URL}/${channel}/${major}"
+    set_tmpdir
+    tmp_file="${tmpdir}/version-info"
 
     if check_for_remote_file "${RELEASE_INFO_URL}"; then
         if check_for_remote_file "${url}"; then
-            download "${url}" -
+            download "${url}" "${tmp_file}"
+            cat "${tmp_file}"
         else
             echo "NONE"
         fi
@@ -1847,7 +1850,7 @@ try_package_install() {
     0) ;;
     1) NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1 ;;
     *)
-      error "Unable to communicate with Netdata package repositories"
+      warning "Unable to communicate with Netdata package repositories"
       return 1
       ;;
   esac
@@ -1862,7 +1865,7 @@ try_package_install() {
       return 3
       ;;
     *)
-      error "Unable to determine if native packages are being published for this system."
+      warning "Unable to determine if native packages are being published for this system."
       return 1
       ;;
   esac
@@ -2018,7 +2021,7 @@ try_static_install() {
     0) ;;
     1) NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1 ;;
     *)
-      error "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}"
+      warning "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}"
       return 1
       ;;
   esac
@@ -2273,7 +2276,7 @@ prepare_offline_install_source() {
         0) ;;
         1) NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1 ;;
         *)
-          error "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}"
+          warning "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}"
           return 1
           ;;
       esac
