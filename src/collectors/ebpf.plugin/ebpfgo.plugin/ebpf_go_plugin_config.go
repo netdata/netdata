@@ -56,6 +56,36 @@ func loadPluginConfigFiles() (pluginConfigFile, bool, error) {
 	return merged, found, nil
 }
 
+// loadCollectorConfigFiles merges the plugin-wide ebpf.d.conf with a
+// collector-specific override file, following the same 4-path load order used
+// by the old C plugin: stock global → stock override → user global → user override.
+// It is the shared implementation behind loadCachestatConfigFiles and
+// loadSocketConfigFiles; adding a new collector requires only a one-liner wrapper.
+func loadCollectorConfigFiles(legacyFile string) (pluginConfigFile, bool, error) {
+	userRoot, stockRoot := pluginConfigRoots()
+
+	var merged pluginConfigFile
+	found := false
+	for _, path := range []string{
+		filepath.Join(stockRoot, pluginPrimaryConfigFile),
+		filepath.Join(stockRoot, legacyFile),
+		filepath.Join(userRoot, pluginPrimaryConfigFile),
+		filepath.Join(userRoot, legacyFile),
+	} {
+		cfg, ok, err := parsePluginConfigFile(path)
+		if err != nil {
+			return pluginConfigFile{}, false, err
+		}
+		if !ok {
+			continue
+		}
+		found = true
+		merged.apply(cfg)
+	}
+
+	return merged, found, nil
+}
+
 func pluginConfigRoots() (userRoot, stockRoot string) {
 	userRoot = os.Getenv("NETDATA_USER_CONFIG_DIR")
 	if userRoot == "" {
