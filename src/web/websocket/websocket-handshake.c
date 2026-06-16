@@ -456,7 +456,10 @@ short int websocket_handle_handshake(struct web_client *w) {
         netdata_log_error("WEBSOCKET: Failed to send complete WebSocket handshake response"); // No client yet
         freez(accept_key);
         websocket_client_free(wsc);
-        return HTTP_RESP_INTERNAL_SERVER_ERROR;
+        // The socket was already taken over (and is now closed by websocket_client_free).
+        // Return the handshake code so the caller does NOT fall through to emitting an
+        // HTTP response on the dead descriptor.
+        return HTTP_RESP_WEBSOCKET_HANDSHAKE;
     }
 
     freez(accept_key);
@@ -499,7 +502,9 @@ short int websocket_handle_handshake(struct web_client *w) {
             // No protocol handler available - this shouldn't happen as we check earlier
             netdata_log_error("WEBSOCKET: No handler available for protocol %d", wsc->protocol);
             websocket_client_free(wsc);
-            return HTTP_RESP_BAD_REQUEST;
+            // Socket already taken over above; return the handshake code so the caller
+            // does not emit an HTTP response on the dead descriptor.
+            return HTTP_RESP_WEBSOCKET_HANDSHAKE;
     }
 
     // Register the client in our registry
