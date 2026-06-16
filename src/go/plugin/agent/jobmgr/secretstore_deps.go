@@ -9,15 +9,13 @@ import (
 	"strings"
 	"sync"
 
+	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
 
-var (
-	reSecretRef      = regexp.MustCompile(`\$\{([^}]+)\}`)
-	reUpperShorthand = regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`)
-)
+var reSecretRef = regexp.MustCompile(`\$\{([^}]+)\}`)
 
 type secretStoreDeps struct {
 	mu sync.RWMutex
@@ -268,11 +266,11 @@ func extractSecretStoreKeysFromString(value string, seen map[string]struct{}) {
 		inner := match[1]
 		scheme, rest, hasScheme := strings.Cut(inner, ":")
 		if !hasScheme {
-			if reUpperShorthand.MatchString(inner) {
-				continue
-			}
 			continue
 		}
+		// A scheme token may carry an output modifier (e.g. "store+urienc"); the
+		// dependency only cares about the base scheme.
+		scheme, _ = secretresolver.SplitSchemeModifier(scheme)
 		if scheme != "store" {
 			continue
 		}

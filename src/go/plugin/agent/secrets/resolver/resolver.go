@@ -123,6 +123,24 @@ func (r *Resolver) resolveRef(ctx context.Context, ref, original string, storeRe
 		return original, nil
 	}
 
+	// The scheme token may carry an optional output modifier ("scheme+modifier",
+	// e.g. "store+urienc") that post-processes the resolved value. The operand
+	// (name) is never parsed for the modifier, so a value containing '+' or ':' is
+	// left intact.
+	scheme, modifier := SplitSchemeModifier(scheme)
+	if !isKnownModifier(modifier) {
+		return "", fmt.Errorf("resolving secret '%s': unknown modifier '%s'", original, modifier)
+	}
+
+	value, err := r.resolveScheme(ctx, scheme, name, original, storeResolver)
+	if err != nil {
+		return "", err
+	}
+
+	return applyModifier(modifier, value), nil
+}
+
+func (r *Resolver) resolveScheme(ctx context.Context, scheme, name, original string, storeResolver StoreRefResolver) (string, error) {
 	if scheme == "store" {
 		if storeResolver == nil {
 			return "", fmt.Errorf("resolving secret '%s': secretstore resolver is not configured", original)

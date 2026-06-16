@@ -31,6 +31,7 @@ SECRETS_PAGE = {
         {"label": "Environment Variables", "anchor": "environment-variables"},
         {"label": "Files", "anchor": "files"},
         {"label": "Commands", "anchor": "commands"},
+        {"label": "Encoding Values for URIs", "anchor": "encoding-values-for-uris"},
         {"label": "Secretstores", "anchor": "secretstores"},
         {"label": "Supported Secretstore Backends", "anchor": "supported-secretstore-backends"},
         {"label": "How It Works", "anchor": "how-it-works"},
@@ -67,6 +68,7 @@ SECRETS_PAGE = {
         "Use `${cmd:...}` when you need dynamic secret retrieval via a trusted local command, such as 1Password CLI or a custom script.",
         "Use `${store:...}` when your organization manages secrets centrally in a cloud provider or Vault and you want Netdata to pull from that source directly.",
         "You can use different resolver types across different collectors, different jobs within the same collector, or even within the same configuration value. See [Mixing resolver types](#mixing-resolver-types).",
+        "When you embed a secret inside a URI or DSN, append `+urienc` to the reference scheme to percent-encode the resolved value. See [Encoding values for URIs](#encoding-values-for-uris).",
     ],
     "sections": {
         "env": {
@@ -114,6 +116,25 @@ jobs:
             ],
         },
     },
+    "uri_encoding": {
+        "heading": "## Encoding Values for URIs",
+        "body": (
+            "When a resolved secret is embedded inside a URI or DSN, characters such as `/`, `:`, `@`, or `+` "
+            "can break parsing. Append `+urienc` to the reference scheme to percent-encode the resolved value "
+            "so it is safe in any URI component. It works with every resolver: `${env+urienc:...}`, "
+            "`${file+urienc:...}`, `${cmd+urienc:...}`, and `${store+urienc:...}`."
+        ),
+        "example": """```yaml
+jobs:
+  - name: postgres_remote
+    dsn: "postgresql://postgres:${store+urienc:vault:vault_prod:secret/data/netdata/pg#password}@db.example.com:5432/postgres"
+```""",
+        "notes": [
+            "Encoding is opt-in. Without `+urienc`, the resolved value is used exactly as stored.",
+            "Every character outside the RFC 3986 unreserved set (`A-Za-z0-9` and `-` `.` `_` `~`) is percent-encoded.",
+            "Use `+urienc` only for a value that is a single URI component, such as a password. Applying it to a plain field, or to a value that is already a complete URL, leaves stray percent-encoded text.",
+        ],
+    },
     "store": {
         "heading": "## Secretstores",
         "body": "Use secretstores when you want Netdata collectors to fetch secrets from remote backends at runtime instead of storing them locally in collector configs.",
@@ -157,7 +178,9 @@ jobs:
             "  - name: mysql_prod\n"
             '    dsn: "${env:MYSQL_USER}:${store:vault:vault_prod:secret/data/netdata/mysql#password}@tcp(127.0.0.1:3306)/"\n'
             "```\n\n"
-            "Different jobs within the same collector config file can also use different resolver types."
+            "Different jobs within the same collector config file can also use different resolver types. "
+            "When a secretstore value is embedded inside a URI or DSN, append `+urienc` to the scheme "
+            "(`${store+urienc:<kind>:<name>:<operand>}`) to percent-encode it. See [Encoding values for URIs](#encoding-values-for-uris)."
         ),
         "multiple_stores": (
             "Each secretstore config file can contain multiple `jobs` entries, each with a unique store name. "
@@ -198,6 +221,7 @@ jobs:
             {"syntax": "`${file:relative/path}`", "message": "file path must be absolute"},
             {"syntax": "`${cmd:echo hello}`", "message": "command path must be absolute"},
             {"syntax": "`${cmd:/path/to/slow-command}`", "message": "command timed out after 10s"},
+            {"syntax": "`${env+foo:VAR_NAME}`", "message": "unknown modifier 'foo'"},
         ],
     },
 }
@@ -330,6 +354,7 @@ def build_page_context() -> Dict[str, Any]:
             SECRETS_PAGE["sections"]["file"],
             SECRETS_PAGE["sections"]["cmd"],
         ],
+        "uri_encoding": SECRETS_PAGE["uri_encoding"],
         "store": SECRETS_PAGE["store"],
         "secretstores": {
             "heading": SECRETS_PAGE["secretstores"]["heading"],

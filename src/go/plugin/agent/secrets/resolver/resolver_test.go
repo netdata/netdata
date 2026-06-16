@@ -234,6 +234,58 @@ func TestResolve(t *testing.T) {
 				assert.Equal(t, "found", l2["level3"])
 			},
 		},
+		"env ref with urienc percent-encodes value": {
+			buildCfg: func(t *testing.T) map[string]any {
+				t.Setenv("TEST_SECRET_URIENC", "pa/ss+word: a@~")
+				return map[string]any{"password": "${env+urienc:TEST_SECRET_URIENC}"}
+			},
+			assertCfg: func(t *testing.T, cfg map[string]any) {
+				assert.Equal(t, "pa%2Fss%2Bword%3A%20a%40~", cfg["password"])
+			},
+		},
+		"env ref without modifier keeps special chars raw": {
+			buildCfg: func(t *testing.T) map[string]any {
+				t.Setenv("TEST_SECRET_RAW", "pa/ss+word")
+				return map[string]any{"password": "${env:TEST_SECRET_RAW}"}
+			},
+			assertCfg: func(t *testing.T, cfg map[string]any) {
+				assert.Equal(t, "pa/ss+word", cfg["password"])
+			},
+		},
+		"file ref with urienc percent-encodes value": {
+			buildCfg: func(t *testing.T) map[string]any {
+				path := filepath.Join(t.TempDir(), "secret.txt")
+				require.NoError(t, os.WriteFile(path, []byte("a/b@c\n"), 0600))
+				return map[string]any{"password": "${file+urienc:" + path + "}"}
+			},
+			assertCfg: func(t *testing.T, cfg map[string]any) {
+				assert.Equal(t, "a%2Fb%40c", cfg["password"])
+			},
+		},
+		"urienc in dsn userinfo": {
+			buildCfg: func(t *testing.T) map[string]any {
+				t.Setenv("TEST_SECRET_DSN_PW", "p/w@1")
+				return map[string]any{"dsn": "postgresql://postgres:${env+urienc:TEST_SECRET_DSN_PW}@host:5432/db"}
+			},
+			assertCfg: func(t *testing.T, cfg map[string]any) {
+				assert.Equal(t, "postgresql://postgres:p%2Fw%401@host:5432/db", cfg["dsn"])
+			},
+		},
+		"unknown modifier error": {
+			buildCfg: func(t *testing.T) map[string]any {
+				return map[string]any{"val": "${env+nope:SOME_VAR}"}
+			},
+			wantErrContains: "unknown modifier 'nope'",
+		},
+		"empty modifier resolves raw": {
+			buildCfg: func(t *testing.T) map[string]any {
+				t.Setenv("TEST_SECRET_EMPTYMOD", "a/b")
+				return map[string]any{"val": "${env+:TEST_SECRET_EMPTYMOD}"}
+			},
+			assertCfg: func(t *testing.T, cfg map[string]any) {
+				assert.Equal(t, "a/b", cfg["val"])
+			},
+		},
 		"file ref and env ref together": {
 			buildCfg: func(t *testing.T) map[string]any {
 				t.Setenv("TEST_SECRET_FUSER", "admin")
@@ -372,6 +424,19 @@ func TestResolveWithStoreResolver(t *testing.T) {
 				assert.Equal(t, "admin:p@ss@host", cfg["dsn"])
 			},
 		},
+		"store+urienc encodes value and strips modifier from ref": {
+			cfg: map[string]any{
+				"dsn": "postgresql://u:${store+urienc:vault:vault_prod:secret/data/mysql#password}@host/db",
+			},
+			storeResolver: func(ctx context.Context, ref, original string) (string, error) {
+				require.NotNil(t, ctx)
+				assert.Equal(t, "vault:vault_prod:secret/data/mysql#password", ref)
+				return "pa/ss+word", nil
+			},
+			assertCfg: func(t *testing.T, cfg map[string]any) {
+				assert.Equal(t, "postgresql://u:pa%2Fss%2Bword@host/db", cfg["dsn"])
+			},
+		},
 		"store resolver receives canceled context": {
 			cfg: map[string]any{
 				"password": "${store:vault:vault_prod:secret/data/mysql#password}",
@@ -412,6 +477,16 @@ func TestResolveWithStoreResolver(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestResolveCmdURIEncode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping on windows")
+	}
+
+	cfg := map[string]any{"password": "${cmd+urienc:/bin/echo a/b@c}"}
+	require.NoError(t, New().Resolve(cfg))
+	assert.Equal(t, "a%2Fb%40c", cfg["password"])
 }
 
 func TestResolveRefUsesProviderRegistry(t *testing.T) {
