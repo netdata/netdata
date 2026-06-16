@@ -15,13 +15,14 @@ var (
 )
 
 func dnsRateLimitedStderr(site, msg string) {
-	dnsErrorMu.Lock()
-	defer dnsErrorMu.Unlock()
 	now := time.Now()
+	dnsErrorMu.Lock()
 	if last, ok := dnsErrorLastLog[site]; ok && now.Sub(last) < dnsErrorLogInterval {
+		dnsErrorMu.Unlock()
 		return
 	}
 	dnsErrorLastLog[site] = now
+	dnsErrorMu.Unlock()
 	fmt.Fprint(os.Stderr, msg)
 }
 

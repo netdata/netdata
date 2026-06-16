@@ -108,13 +108,14 @@ var (
 )
 
 func socketRateLimitedStderr(site, msg string) {
-	socketErrorMu.Lock()
-	defer socketErrorMu.Unlock()
 	now := time.Now()
+	socketErrorMu.Lock()
 	if last, ok := socketErrorLastLog[site]; ok && now.Sub(last) < socketErrorLogInterval {
+		socketErrorMu.Unlock()
 		return
 	}
 	socketErrorLastLog[site] = now
+	socketErrorMu.Unlock()
 	fmt.Fprint(os.Stderr, msg)
 }
 
