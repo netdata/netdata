@@ -130,7 +130,7 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/docker.conf
       - name: docker_container_down
         metric: docker.container_state
-        info: Docker container ${label:container_name} is currently not running. This alert is disabled by default. To enable it, modify the chart labels filter in the stock health configuration (docker.conf) from container_name=!* to match your container names.
+        info: Docker container ${label:container_name} is currently exited. This alert is disabled by default. To enable it, modify the chart labels filter in the stock health configuration (docker.conf) from container_name=!* to match your container names.
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/docker.conf
     functions:
       description: |
