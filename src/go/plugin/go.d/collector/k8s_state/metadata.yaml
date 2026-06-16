@@ -52,9 +52,9 @@ modules:
     setup:
       prerequisites:
         list:
-          - title: Enable the collector explicitly
+          - title: Enable the collector module in go.d.conf
             description: |
-              This collector is **disabled by default**. The stock `go.d/k8s_state.conf` already defines the `k8s_state` job, but the module is not enabled. To turn it on, add `k8s_state: yes` to the `modules:` section of `go.d.conf` (or enable it via the Helm chart / Netdata Cloud UI), then restart the Netdata Agent.
+              This collector is **disabled by default** and the `go.d.plugin` does not load it until it is explicitly enabled. Add `k8s_state: yes` to the `modules:` section of `go.d.conf`, then restart the Netdata Agent. Once the module is loaded, the `k8s_state` job appears in the dynamic configuration (dyncfg) UI and can be configured from there. Module enablement in `go.d.conf` itself cannot be done through the dyncfg UI — the UI only manages job-level configuration for already-loaded modules.
           - title: Network access to the Kubernetes API server
             description: |
               The Netdata Agent must be able to reach the Kubernetes API server.
@@ -79,9 +79,15 @@ modules:
             title: Config
             enabled: true
           list:
-            - name: Per-collector job configuration
+            - name: Enable the module in go.d.conf
               description: |
-                The stock `go.d/k8s_state.conf` already defines this job. Editing this file customizes the job (for example the collection interval); it does **not** enable the module. To enable the module, set `k8s_state: yes` in the `modules:` section of `go.d.conf`.
+                Add `k8s_state: yes` to the `modules:` section of `go.d.conf` to load the module. The stock `go.d/k8s_state.conf` already defines the job; this step only enables the module so the plugin loads it. After restarting the Agent, the job becomes available in the dyncfg UI.
+              config: |
+                modules:
+                  k8s_state: yes
+            - name: Per-collector job configuration (file-based)
+              description: |
+                The stock `go.d/k8s_state.conf` already defines this job. Editing this file customizes the job (for example the collection interval); it does **not** enable the module. To enable the module, set `k8s_state: yes` in the `modules:` section of `go.d.conf`. Once the module is loaded, adding and configuring jobs from the dyncfg UI (Netdata Cloud node configuration or local dashboard) is the recommended path.
               config: |
                 jobs:
                   - name: k8s_state
@@ -100,7 +106,7 @@ modules:
               This collector is **disabled by default** and does not support auto-detection.
 
               **Remediation:**
-              1. Enable the module: add `k8s_state: yes` to the `modules:` section of `go.d.conf` (or enable it via the Helm chart / Netdata Cloud UI). The stock `go.d/k8s_state.conf` already defines the job, so you do not need to add it.
+              1. Enable the module: add `k8s_state: yes` to the `modules:` section of `go.d.conf`. The stock `go.d/k8s_state.conf` already defines the job, so you do not need to add it. The module cannot be enabled from the dyncfg UI — only loaded modules appear there.
               2. Ensure the pod's ServiceAccount has a ClusterRole granting `list` and `watch` on `nodes`, `pods`, `deployments`, `cronjobs`, and `jobs`.
               3. Restart the Netdata Agent so `go.d.conf` is re-read. Changes to `go.d.conf` are not applied by a live reload — a restart is required. This collector does not support auto-detection, so there is no retry cycle to wait for.
           - name: "can not create Kubernetes client: not inside a cluster"
