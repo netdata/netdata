@@ -31,23 +31,7 @@
                 ```
               
               - Update your container with `docker compose up -d`.
-            - **Gmail SMTP via msmtp**: To send alert emails through Gmail, configure msmtp to use Gmail's SMTP server. You need a Gmail [App Password](https://support.google.com/accounts/answer/185833) (not your regular account password). Create one in your Google Account under Security > App passwords.
-
-              Example `msmtprc` for Gmail:
-
-              ```text
-              account default
-              host smtp.gmail.com
-              port 587
-              auth on
-              tls on
-              tls_trust_file /etc/ssl/certs/ca-certificates.crt
-              user yourgmail@gmail.com
-              password your-app-password
-              from yourgmail@gmail.com
-              ```
-
-              Set `EMAIL_SENDER` in `health_alarm_notify.conf` to the same Gmail address used in the `msmtprc` `from` field.
+            - If you use Gmail as the SMTP relay and your mail client cannot use Google's OAuth-based sign-in flow, configure your `msmtprc` file with `smtp.gmail.com`, port `587`, TLS enabled, and a Gmail [App Password](https://support.google.com/accounts/answer/185833) instead of your regular account password. Set `EMAIL_SENDER` in `health_alarm_notify.conf` to the same Gmail address used in the `msmtprc` `from` field.
 
     configuration:
       file:
