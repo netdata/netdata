@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -62,19 +63,6 @@ var (
 	reProxmoxConfName    = regexp.MustCompile(`\s*name\s*:\s*(.*)?$`)
 	reProxmoxConfHost    = regexp.MustCompile(`\s*hostname\s*:\s*(.*)?$`)
 )
-
-// External helper commands are resolved from fixed system directories instead
-// of ambient PATH; cgroup-name may run with access to host/container metadata.
-var trustedCommandDirs = []string{
-	"/usr/local/sbin",
-	"/usr/local/bin",
-	"/usr/sbin",
-	"/usr/bin",
-	"/sbin",
-	"/bin",
-	"/snap/bin",
-	"/var/lib/snapd/snap/bin",
-}
 
 type callRecord struct {
 	label    string
@@ -163,55 +151,23 @@ func run(args []string, stdout io.Writer) int {
 	return r.exitCode
 }
 
+// setupEnvironment mirrors the long-standing shell helper: it appends the
+// standard system directories to the inherited PATH (rather than locking PATH
+// down), so docker/kubectl/podman/jq/ps are found wherever the host installed
+// them. The helper runs unprivileged (as the netdata user), like the shell
+// helper it replaces.
 func setupEnvironment() {
-	_ = os.Setenv("PATH", strings.Join(effectiveCommandDirs(), ":"))
+	path := os.Getenv("PATH") + ":/sbin:/usr/sbin:/usr/local/sbin"
+	if sbindirPost != "" {
+		path += ":" + sbindirPost
+	}
+	_ = os.Setenv("PATH", path)
 	_ = os.Setenv("LC_ALL", "C")
 }
 
-func effectiveCommandDirs() []string {
-	dirs := make([]string, 0, len(trustedCommandDirs)+1)
-	seen := make(map[string]bool, len(trustedCommandDirs)+1)
-	for _, dir := range trustedCommandDirs {
-		dir = filepath.Clean(dir)
-		if !filepath.IsAbs(dir) || seen[dir] {
-			continue
-		}
-		dirs = append(dirs, dir)
-		seen[dir] = true
-	}
-	if sbindirPost != "" {
-		dir := filepath.Clean(sbindirPost)
-		if filepath.IsAbs(dir) && !seen[dir] {
-			dirs = append(dirs, dir)
-		}
-	}
-	return dirs
-}
-
-func trustedCommandPath(name string) (string, bool) {
-	if name == "" || filepath.Base(name) != name {
-		return "", false
-	}
-	for _, dir := range effectiveCommandDirs() {
-		path := filepath.Join(dir, name)
-		if executableFile(path) {
-			return path, true
-		}
-	}
-	return "", false
-}
-
 func commandAvailable(name string) bool {
-	_, ok := trustedCommandPath(name)
-	return ok
-}
-
-func trustedCommandContext(ctx context.Context, name string, args ...string) (*exec.Cmd, bool) {
-	path, ok := trustedCommandPath(name)
-	if !ok {
-		return nil, false
-	}
-	return exec.CommandContext(ctx, path, args...), true // NOSONAR - path is resolved only from fixed absolute system directories.
+	_, err := exec.LookPath(name)
+	return err == nil
 }
 
 func newResolver(args []string, stdout io.Writer) *resolver {
@@ -439,11 +395,6 @@ func fileReadable(path string) bool {
 	return err == nil && !st.IsDir()
 }
 
-func executableFile(path string) bool {
-	st, err := os.Stat(path)
-	return err == nil && !st.IsDir() && st.Mode().Perm()&0o111 != 0
-}
-
 func firstConfigValue(path string, sedRE *regexp.Regexp, grepPrefix string) string {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -507,10 +458,7 @@ func (r *resolver) parseDockerLikeInspectOutput(output string) {
 func (r *resolver) dockerLikeGetNameCommand(ctx context.Context, command, id string) bool {
 	format := `{{range .Config.Env}}{{println .}}{{end}}{{range $key, $value := .Config.Labels}}LABEL_{{$key}}={{printf "%q" $value}}{{println}}{{end}}IMAGE_NAME={{.Config.Image}}{{println}}CONT_NAME={{.Name}}`
 	defer r.track(command+"-inspect", time.Now())
-	cmd, ok := trustedCommandContext(ctx, command, "inspect", "--format="+format, id)
-	if !ok {
-		return false
-	}
+	cmd := exec.CommandContext(ctx, command, "inspect", "--format="+format, id)
 	cmd.Stderr = os.Stderr
 	out, err := cmd.Output()
 	if err == nil && len(out) > 0 {
@@ -525,11 +473,6 @@ func (r *resolver) dockerLikeGetNameAPI(ctx context.Context, hostVar, containerI
 
 	if host == "" {
 		r.warning(fmt.Sprintf("No %s is set", hostVar))
-		return false
-	}
-
-	if !commandAvailable("jq") {
-		r.warning(fmt.Sprintf("Can't find jq command line tool. jq is required for netdata to retrieve container name using %s API, falling back to docker ps", host))
 		return false
 	}
 
@@ -656,6 +599,19 @@ const (
 	defaultBodyCap = 16 << 20
 	k8sPodsBodyCap = 64 << 20
 )
+
+// tlsHint returns an actionable operator hint when err is a TLS certificate
+// verification failure, pointing at the K8S_TLS_INSECURE escape hatch.
+func tlsHint(err error) string {
+	var ce *tls.CertificateVerificationError
+	var ua x509.UnknownAuthorityError
+	var ci x509.CertificateInvalidError
+	var he x509.HostnameError
+	if errors.As(err, &ce) || errors.As(err, &ua) || errors.As(err, &ci) || errors.As(err, &he) {
+		return " (certificate verification failed - set K8S_TLS_INSECURE=true to skip Kubernetes API-server verification)"
+	}
+	return ""
+}
 
 // httpGetOptions bundles the optional knobs of httpGetWithContext; the zero
 // value is a plain proxied GET capped at defaultBodyCap with no TLS override.
@@ -810,12 +766,11 @@ func rawJSONScalar(raw json.RawMessage) string {
 }
 
 func (r *resolver) snapHasDocker(ctx context.Context) bool {
-	cmd, ok := trustedCommandContext(ctx, "snap", "list", "docker")
-	if !ok {
+	if _, err := exec.LookPath("snap"); err != nil {
 		return false
 	}
 	defer r.track("snap-list-docker", time.Now())
-	return cmd.Run() == nil
+	return exec.CommandContext(ctx, "snap", "list", "docker").Run() == nil
 }
 
 func (r *resolver) dockerGetName(ctx context.Context, id string) {
@@ -995,10 +950,6 @@ func (r *resolver) k8sGetKubePodName(ctx context.Context, cgroupPath, id string)
 	}
 	if cntrID != "" && r.k8sIsPauseContainer(cgroupPath) {
 		return "", 3
-	}
-	if !commandAvailable("jq") {
-		r.warning(fmt.Sprintf("%s: 'jq' command not available.", fn))
-		return "", 1
 	}
 
 	tmpDir := os.Getenv("TMPDIR")
@@ -1240,7 +1191,7 @@ func (r *resolver) k8sFetchPods(ctx context.Context, fn, kubeSystemUID string) (
 			body, err := httpGetWithContext(ctx, url, httpGetOptions{headers: header, tlsConfig: r.k8sTLSConfig(tlsModeAPIServer), fail: true})
 			r.track("k8s-api-namespace", started)
 			if err != nil {
-				r.warning(fmt.Sprintf("%s: error on curl '%s': %s.", fn, url, err.Error()))
+				r.warning(fmt.Sprintf("%s: error on curl '%s': %s.%s", fn, url, err.Error(), tlsHint(err)))
 			} else {
 				kubeSystemNS = string(body)
 			}
@@ -1261,7 +1212,7 @@ func (r *resolver) k8sFetchPods(ctx context.Context, fn, kubeSystemUID string) (
 		body, err := httpGetWithContext(ctx, url, httpGetOptions{headers: header, tlsConfig: r.k8sTLSConfig(tlsMode), fail: true, maxBody: k8sPodsBodyCap})
 		r.track("k8s-pods", started)
 		if err != nil {
-			r.warning(fmt.Sprintf("%s: error on curl '%s': %s.", fn, url, err.Error()))
+			r.warning(fmt.Sprintf("%s: error on curl '%s': %s.%s", fn, url, err.Error(), tlsHint(err)))
 			return kubeSystemNS, "", 1
 		}
 		return kubeSystemNS, string(body), 0
@@ -1297,18 +1248,13 @@ func (r *resolver) k8sFetchPods(ctx context.Context, fn, kubeSystemUID string) (
 
 func (r *resolver) kubeletProcessRunning(ctx context.Context) bool {
 	defer r.track("ps-kubelet", time.Now())
-	cmd, ok := trustedCommandContext(ctx, "ps", "-C", "kubelet")
-	return ok && cmd.Run() == nil
+	return exec.CommandContext(ctx, "ps", "-C", "kubelet").Run() == nil
 }
 
 func (r *resolver) kubectlOutput(ctx context.Context, kubeConfig string, args ...string) ([]byte, error) {
 	defer r.track("kubectl", time.Now())
 	full := append([]string{"--kubeconfig=" + kubeConfig}, args...)
-	cmd, ok := trustedCommandContext(ctx, "kubectl", full...)
-	if !ok {
-		return nil, fmt.Errorf("kubectl command not available in trusted search path")
-	}
-	return cmd.CombinedOutput()
+	return exec.CommandContext(ctx, "kubectl", full...).CombinedOutput()
 }
 
 func jsonMetadataUID(raw string) (string, error) {
