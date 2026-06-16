@@ -241,10 +241,7 @@ impl Registry {
         // callers pass a temporary `Query` without binding it to a local.
         let q_min_ns = (q.time_range.start as u64) * 1_000_000_000;
         let q_max_ns = (q.time_range.end as u64) * 1_000_000_000;
-        let stream_hash = q
-            .stream
-            .as_ref()
-            .map(|s| file_registry::compute_ns_hash(Some(&s.namespace), Some(&s.name)));
+        let stream_hash = q.stream.as_ref().map(|s| s.ns_hash());
 
         self.files
             .values()
@@ -701,6 +698,66 @@ mod tests {
             stream: Some(ServiceStream::new("prod", "api")),
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![1, 3]);
+    }
+
+    #[test]
+    fn candidates_match_absent_namespace_stream() {
+        // Regression: the ingestor names an absent-namespace file with
+        // `compute_ns_hash(None, name)`, while the query carries a collapsed
+        // `ServiceStream` with an empty namespace. The filter must derive
+        // the same hash via `ServiceStream::ns_hash` (empty == absent) and
+        // match the file — previously it hashed `Some("")` and missed it.
+        let dir = tempfile::tempdir().unwrap();
+        let mut reg = Registry::new(dir.path());
+
+        let absent_ns_hash = file_registry::compute_ns_hash(None, Some("api"));
+        track(
+            &mut reg,
+            1,
+            absent_ns_hash,
+            100 * NS,
+            200 * NS,
+            FileStatus::Archived,
+        );
+
+        let q = Query {
+            time_range: 0..u32::MAX,
+            stream: Some(ServiceStream::new("", "api")),
+        };
+        assert_eq!(seqs(reg.candidates(&q)), vec![1]);
+    }
+
+    #[test]
+    fn candidates_miss_stale_literal_empty_namespace_file() {
+        // The accepted migration cost: a file named before this change with the
+        // *literal* empty-string namespace hash (`compute_ns_hash(Some(""), name)`)
+        // is no longer found by a stream-filtered query, because the query now
+        // derives `compute_ns_hash(None, name)`. The common absent-namespace file
+        // is unaffected (see `candidates_match_absent_namespace_stream`); only the
+        // rare literal-empty file re-partitions and would need re-indexing.
+        let old_literal_empty_hash = file_registry::compute_ns_hash(Some(""), Some("api"));
+        let new_empty_hash = ServiceStream::new("", "api").ns_hash();
+        assert_ne!(
+            old_literal_empty_hash, new_empty_hash,
+            "the hash change this migration accepts"
+        );
+
+        let dir = tempfile::tempdir().unwrap();
+        let mut reg = Registry::new(dir.path());
+        track(
+            &mut reg,
+            1,
+            old_literal_empty_hash,
+            100 * NS,
+            200 * NS,
+            FileStatus::Archived,
+        );
+
+        let q = Query {
+            time_range: 0..u32::MAX,
+            stream: Some(ServiceStream::new("", "api")),
+        };
+        assert!(reg.candidates(&q).next().is_none());
     }
 
     #[test]

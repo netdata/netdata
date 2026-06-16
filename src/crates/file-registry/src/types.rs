@@ -179,6 +179,12 @@ impl fmt::Display for ByteSize {
 ///   as `"service.namespace="` + value and/or `"service.name="` + value.
 /// - If the resulting hash is `0`, remap to `u64::MAX` so that the sentinel
 ///   remains unambiguous.
+///
+/// This is the low-level primitive. Identity-layer callers (the ingestor's
+/// file naming, the query planner's stream filter, the offline CLI) MUST go
+/// through [`ServiceStream::ns_hash`] instead, which applies the
+/// absent-equals-empty rule. Calling this directly with `Some("")` vs `None`
+/// is what produced the absent-vs-empty divergence this type guards against.
 pub fn compute_ns_hash(namespace: Option<&str>, name: Option<&str>) -> u64 {
     if namespace.is_none() && name.is_none() {
         return 0;
@@ -206,22 +212,26 @@ pub fn compute_ns_hash(namespace: Option<&str>, name: Option<&str>) -> u64 {
 
 /// `(namespace, name)` pair identifying a log stream.
 ///
-/// Each WAL/SFST file holds exactly one stream — the WAL writer
-/// partitions frames by `ns_hash = compute_ns_hash(namespace, name)`
-/// (see [`compute_ns_hash`]), and the indexer asserts that all data in a
-/// single WAL file resolves to one `(namespace, name)` pair. Hash
+/// Each WAL/SFST file holds exactly one stream — the WAL writer partitions
+/// frames by [`ns_hash`](ServiceStream::ns_hash), and the indexer asserts
+/// that all data in a single WAL file resolves to one stream. Hash
 /// collisions are detected at the ingestor; a colliding WAL file is
 /// permanently un-indexable until the operator removes it.
 ///
 /// This is the canonical stream identifier across the codebase — the
 /// registry, the catalog, the indexer, and the query planner all use it.
-/// Identity is the exact pair: the derived `PartialEq`/`Hash` compare
-/// both fields byte-for-byte, with no case-folding or trimming, so
-/// `("Prod", "api")` and `("prod", "api")` are distinct streams.
+///
+/// Absent equals empty: a missing attribute is stored as an empty string,
+/// so a stream that carries no `service.namespace` and one that carries an
+/// empty-string namespace are the *same* stream (OpenTelemetry treats a
+/// zero-length namespace as unspecified). The derived `PartialEq`/`Hash`
+/// then compare the stored strings byte-for-byte, with no case-folding or
+/// trimming, so `("Prod", "api")` and `("prod", "api")` remain distinct.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ServiceStream {
     /// The OTLP `service.namespace` resource attribute, stored verbatim;
-    /// empty string when the source carries no such attribute.
+    /// empty string when the source carries no such attribute (an empty
+    /// value and an absent one are equivalent — see [`ServiceStream::ns_hash`]).
     pub namespace: String,
     /// The OTLP `service.name` resource attribute, stored verbatim;
     /// empty string when the source carries no such attribute.
@@ -234,6 +244,34 @@ impl ServiceStream {
             namespace: namespace.into(),
             name: name.into(),
         }
+    }
+
+    /// Canonical identity-layer hash for this stream.
+    ///
+    /// An empty field is treated as absent before hashing, so a stream that
+    /// carries no `service.namespace` and one that carries an empty-string
+    /// namespace resolve to the *same* `ns_hash`. This matches the
+    /// OpenTelemetry rule that a zero-length namespace equals an unspecified
+    /// one, and keeps a single file partition per logical stream. An all-empty
+    /// stream therefore hashes to the `0` "no attribution" sentinel.
+    ///
+    /// The collapse is symmetric — both fields follow the empty→absent rule —
+    /// because `ServiceStream` stores absent and empty alike as `""` and cannot
+    /// tell them apart after extraction. OTel requires `service.name` to be
+    /// non-empty, so the name-side collapse only triggers for a non-conformant
+    /// sender; the namespace-side collapse is the one the spec mandates.
+    ///
+    /// This is the only correct way to derive an `ns_hash` from a
+    /// `ServiceStream`; [`compute_ns_hash`] is the underlying primitive and
+    /// must not be called with the absent/empty distinction at this layer.
+    ///
+    /// Note this is unrelated to the type's derived [`Hash`]: that hashes the
+    /// stored strings byte-for-byte for `HashMap` bucketing, whereas `ns_hash`
+    /// is the xxhash64 identity digest used for file naming and stream filters.
+    pub fn ns_hash(&self) -> u64 {
+        let ns = (!self.namespace.is_empty()).then_some(self.namespace.as_str());
+        let name = (!self.name.is_empty()).then_some(self.name.as_str());
+        compute_ns_hash(ns, name)
     }
 }
 
@@ -451,6 +489,35 @@ mod tests {
         assert_ne!(a, b);
         assert_ne!(a, c);
         assert_ne!(b, c);
+    }
+
+    #[test]
+    fn service_stream_ns_hash_collapses_absent_and_empty() {
+        // An empty-string field is treated as absent: a stream with an
+        // empty namespace hashes identically to one with no namespace.
+        assert_eq!(
+            ServiceStream::new("", "myapp").ns_hash(),
+            compute_ns_hash(None, Some("myapp")),
+        );
+        assert_eq!(
+            ServiceStream::new("prod", "").ns_hash(),
+            compute_ns_hash(Some("prod"), None),
+        );
+    }
+
+    #[test]
+    fn service_stream_ns_hash_all_empty_is_sentinel() {
+        // Empty -> absent on both fields collapses to the "no attribution"
+        // sentinel, matching `compute_ns_hash(None, None)`.
+        assert_eq!(ServiceStream::new("", "").ns_hash(), 0);
+    }
+
+    #[test]
+    fn service_stream_ns_hash_matches_primitive_when_present() {
+        assert_eq!(
+            ServiceStream::new("prod", "api").ns_hash(),
+            compute_ns_hash(Some("prod"), Some("api")),
+        );
     }
 }
 

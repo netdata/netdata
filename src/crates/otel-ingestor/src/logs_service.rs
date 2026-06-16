@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use bridge::config::AuthConfig;
-use file_registry::{MonotonicClock, TenantId};
+use file_registry::{MonotonicClock, ServiceStream, TenantId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
     logs_service_server::LogsService,
@@ -16,38 +16,21 @@ use tonic::{Request, Response, Status};
 use crate::arrow_bridge;
 use crate::ledger_sender::LedgerSender;
 
-/// The canonical `(namespace, name)` pair for a given `ns_hash`.
+/// Extract the `(service.namespace, service.name)` stream identity from a
+/// `ResourceLogs`.
 ///
-/// Stored as `Option<String>` to distinguish a missing attribute from an
-/// empty string — `compute_ns_hash(None, None)` and
-/// `compute_ns_hash(Some(""), Some(""))` yield different hashes, so the
-/// canonical pair must preserve that distinction.
-type CanonicalStream = (Option<String>, Option<String>);
-
-/// Extracted stream identity from a single `ResourceLogs`.
-#[derive(Debug, Clone)]
-struct Stream {
-    hash: u64,
-    namespace: Option<String>,
-    name: Option<String>,
-}
-
-/// Extract `service.namespace`, `service.name`, and the resulting `ns_hash`
-/// from a `ResourceLogs`.
-fn extract_stream(rl: &ResourceLogs) -> Stream {
+/// An absent attribute and an empty-string attribute collapse to the same
+/// empty-string field — they identify the same stream (see
+/// [`ServiceStream::ns_hash`]). The `ns_hash` is derived from the returned
+/// [`ServiceStream`] at the point it is needed, not stored alongside it.
+fn extract_stream(rl: &ResourceLogs) -> ServiceStream {
     let attrs = match rl.resource.as_ref() {
         Some(r) => &r.attributes,
-        None => {
-            return Stream {
-                hash: file_registry::compute_ns_hash(None, None),
-                namespace: None,
-                name: None,
-            };
-        }
+        None => return ServiceStream::new("", ""),
     };
 
-    let mut namespace: Option<&str> = None;
-    let mut name: Option<&str> = None;
+    let mut namespace: &str = "";
+    let mut name: &str = "";
 
     for kv in attrs {
         match kv.key.as_str() {
@@ -55,25 +38,21 @@ fn extract_stream(rl: &ResourceLogs) -> Stream {
                 if let Some(Value::StringValue(s)) =
                     kv.value.as_ref().and_then(|v| v.value.as_ref())
                 {
-                    namespace = Some(s.as_str());
+                    namespace = s.as_str();
                 }
             }
             "service.name" => {
                 if let Some(Value::StringValue(s)) =
                     kv.value.as_ref().and_then(|v| v.value.as_ref())
                 {
-                    name = Some(s.as_str());
+                    name = s.as_str();
                 }
             }
             _ => {}
         }
     }
 
-    Stream {
-        hash: file_registry::compute_ns_hash(namespace, name),
-        namespace: namespace.map(String::from),
-        name: name.map(String::from),
-    }
+    ServiceStream::new(namespace, name)
 }
 
 /// Total number of log records carried by a single `ResourceLogs`.
@@ -132,39 +111,35 @@ fn compute_log_ts_range(
     )
 }
 
-/// One collision: a request group whose `(namespace, name)` doesn't match
-/// the canonical pair already registered for its `ns_hash`.
+/// One collision: a request group whose stream identity doesn't match the
+/// canonical stream already registered for its `ns_hash`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Collision {
     hash: u64,
-    canonical: CanonicalStream,
-    rejected: CanonicalStream,
+    canonical: ServiceStream,
+    rejected: ServiceStream,
     rejected_log_records: usize,
 }
 
-/// One group of `ResourceLogs` that share an exact `(hash, namespace, name)`.
-/// The identifying fields live in the `HashMap` key in [`group_by_stream`].
+/// One group of `ResourceLogs` that share an exact [`ServiceStream`]. The
+/// identifying stream lives in the `HashMap` key in [`group_by_stream`].
 struct StreamGroup {
     log_record_count: usize,
     resource_logs: Vec<ResourceLogs>,
 }
 
-/// Group `ResourceLogs` by their full `(hash, namespace, name)` tuple.
+/// Group `ResourceLogs` by their [`ServiceStream`] identity.
 ///
 /// In normal operation, all `ResourceLogs` in a request from a single
-/// service share the same hash and the same `(namespace, name)`. If the
-/// same hash appears with two different `(namespace, name)` pairs in one
-/// request — an in-request `ns_hash` collision — both end up in distinct
-/// groups, and the canonical-table check below catches both correctly.
-fn group_by_stream(
-    resource_logs: Vec<ResourceLogs>,
-) -> HashMap<(u64, Option<String>, Option<String>), StreamGroup> {
-    let mut groups: HashMap<_, StreamGroup> = HashMap::new();
+/// service share the same stream. Streams whose `ns_hash` collides (a real
+/// xxhash64 collision, or a literal-empty vs absent field — the latter now
+/// collapses to one stream) are reconciled later by the canonical-table check.
+fn group_by_stream(resource_logs: Vec<ResourceLogs>) -> HashMap<ServiceStream, StreamGroup> {
+    let mut groups: HashMap<ServiceStream, StreamGroup> = HashMap::new();
     for rl in resource_logs {
-        let s = extract_stream(&rl);
+        let stream = extract_stream(&rl);
         let count = count_log_records(&rl);
-        let key = (s.hash, s.namespace, s.name);
-        let group = groups.entry(key).or_insert_with(|| StreamGroup {
+        let group = groups.entry(stream).or_insert_with(|| StreamGroup {
             log_record_count: 0,
             resource_logs: Vec::new(),
         });
@@ -183,9 +158,9 @@ struct CollisionCheck {
 /// Reconcile a request's groups against the canonical-stream table.
 ///
 /// For each group:
-/// - If the table has no entry for `ns_hash`, register the group's
-///   `(namespace, name)` as canonical and accept the group.
-/// - If the entry matches the group's pair, accept.
+/// - If the table has no entry for `ns_hash`, register the group's stream
+///   as canonical and accept the group.
+/// - If the entry matches the group's stream, accept.
 /// - If the entry mismatches, reject the group as a collision and record
 ///   it for the response's `partial_success`.
 ///
@@ -193,28 +168,29 @@ struct CollisionCheck {
 /// effect is mutating the canonical table. Extracted from `export` so it
 /// can be unit-tested without spinning up a writer or a tonic Request.
 fn check_collisions(
-    canonical: &mut HashMap<(TenantId, u64), CanonicalStream>,
+    canonical: &mut HashMap<(TenantId, u64), ServiceStream>,
     tenant_id: &TenantId,
-    groups: HashMap<(u64, Option<String>, Option<String>), StreamGroup>,
+    groups: HashMap<ServiceStream, StreamGroup>,
 ) -> CollisionCheck {
     let mut accepted = Vec::new();
     let mut collisions = Vec::new();
 
-    for ((hash, namespace, name), group) in groups {
+    for (stream, group) in groups {
+        let hash = stream.ns_hash();
         let key = (tenant_id.clone(), hash);
         match canonical.entry(key) {
             Entry::Vacant(e) => {
-                e.insert((namespace.clone(), name.clone()));
+                e.insert(stream.clone());
                 accepted.push((hash, group));
             }
-            Entry::Occupied(e) if *e.get() == (namespace.clone(), name.clone()) => {
+            Entry::Occupied(e) if *e.get() == stream => {
                 accepted.push((hash, group));
             }
             Entry::Occupied(e) => {
                 collisions.push(Collision {
                     hash,
                     canonical: e.get().clone(),
-                    rejected: (namespace, name),
+                    rejected: stream,
                     rejected_log_records: group.log_record_count,
                 });
             }
@@ -248,8 +224,8 @@ fn build_partial_success(collisions: &[Collision]) -> Option<ExportLogsPartialSu
 
 /// Format collision details for `ExportLogsPartialSuccess::error_message`.
 fn format_collision_error(collisions: &[Collision]) -> String {
-    fn show(opt: &Option<String>) -> &str {
-        opt.as_deref().unwrap_or("<missing>")
+    fn show(s: &str) -> &str {
+        if s.is_empty() { "<none>" } else { s }
     }
 
     let parts: Vec<String> = collisions
@@ -258,10 +234,10 @@ fn format_collision_error(collisions: &[Collision]) -> String {
             format!(
                 "ns_hash={:#x}: rejected ({}/{}) collides with canonical ({}/{}) ({} log records dropped)",
                 c.hash,
-                show(&c.rejected.0),
-                show(&c.rejected.1),
-                show(&c.canonical.0),
-                show(&c.canonical.1),
+                show(&c.rejected.namespace),
+                show(&c.rejected.name),
+                show(&c.canonical.namespace),
+                show(&c.canonical.name),
                 c.rejected_log_records,
             )
         })
@@ -294,12 +270,12 @@ fn extract_tenant_id(
 
 pub struct NetdataLogsService {
     writers: Mutex<HashMap<TenantId, wal::Writer>>,
-    /// Canonical `(namespace, name)` per `(tenant, ns_hash)`. First write
-    /// wins; subsequent writes whose `(namespace, name)` doesn't match are
-    /// rejected via `partial_success`. In-memory only — on restart the
-    /// table is empty and the first write of a tenant's stream re-establishes
-    /// the canonical pair.
-    canonical: Mutex<HashMap<(TenantId, u64), CanonicalStream>>,
+    /// Canonical [`ServiceStream`] per `(tenant, ns_hash)`. First write
+    /// wins; subsequent writes whose stream doesn't match are rejected via
+    /// `partial_success`. In-memory only — on restart the table is empty and
+    /// the first write of a tenant's stream re-establishes the canonical
+    /// stream.
+    canonical: Mutex<HashMap<(TenantId, u64), ServiceStream>>,
     /// Process-wide monotonic clock. Provides the per-frame `ingestion_ns`
     /// stamped on disk by the WAL writer and the same value the indexer
     /// will use as its tier-3 fallback for log rows missing both
@@ -633,10 +609,9 @@ mod tests {
     #[test]
     fn extract_stream_pulls_namespace_and_name_from_resource_attrs() {
         let s = extract_stream(&rl(Some("prod"), Some("api"), 0));
-        assert_eq!(s.namespace.as_deref(), Some("prod"));
-        assert_eq!(s.name.as_deref(), Some("api"));
+        assert_eq!(s, ServiceStream::new("prod", "api"));
         assert_eq!(
-            s.hash,
+            s.ns_hash(),
             file_registry::compute_ns_hash(Some("prod"), Some("api"))
         );
     }
@@ -644,20 +619,20 @@ mod tests {
     #[test]
     fn extract_stream_handles_missing_attrs() {
         let s = extract_stream(&rl(None, None, 0));
-        assert_eq!(s.namespace, None);
-        assert_eq!(s.name, None);
-        assert_eq!(s.hash, file_registry::compute_ns_hash(None, None));
+        assert_eq!(s, ServiceStream::new("", ""));
+        assert_eq!(s.ns_hash(), file_registry::compute_ns_hash(None, None));
     }
 
     #[test]
-    fn extract_stream_distinguishes_missing_from_empty() {
-        let none = extract_stream(&rl(None, None, 0));
+    fn extract_stream_merges_missing_and_empty() {
+        // Absent and empty-string attributes identify the same stream:
+        // both collapse to an empty-field ServiceStream and the same
+        // ns_hash, so the canonical table treats them as one.
+        let absent = extract_stream(&rl(None, None, 0));
         let empty = extract_stream(&rl(Some(""), Some(""), 0));
-        // Different inputs to compute_ns_hash → different hashes, so they
-        // must remain distinct in the canonical table.
-        assert_ne!(none.hash, empty.hash);
-        assert_eq!(empty.namespace.as_deref(), Some(""));
-        assert_eq!(empty.name.as_deref(), Some(""));
+        assert_eq!(absent, empty);
+        assert_eq!(absent, ServiceStream::new("", ""));
+        assert_eq!(absent.ns_hash(), empty.ns_hash());
     }
 
     #[test]
@@ -668,10 +643,7 @@ mod tests {
             rl(Some("prod"), Some("worker"), 1),
         ]);
         assert_eq!(groups.len(), 2);
-        let api_hash = file_registry::compute_ns_hash(Some("prod"), Some("api"));
-        let api = groups
-            .get(&(api_hash, Some("prod".to_string()), Some("api".to_string())))
-            .unwrap();
+        let api = groups.get(&ServiceStream::new("prod", "api")).unwrap();
         assert_eq!(api.log_record_count, 8);
         assert_eq!(api.resource_logs.len(), 2);
     }
@@ -683,8 +655,8 @@ mod tests {
         let r = check_collisions(&mut canonical, &tenant(), groups);
         assert_eq!(r.accepted.len(), 1);
         assert!(r.collisions.is_empty());
-        let pair = canonical.get(&(tenant(), r.accepted[0].0)).unwrap();
-        assert_eq!(pair, &(Some("prod".to_string()), Some("api".to_string())));
+        let stream = canonical.get(&(tenant(), r.accepted[0].0)).unwrap();
+        assert_eq!(stream, &ServiceStream::new("prod", "api"));
     }
 
     #[test]
@@ -708,29 +680,23 @@ mod tests {
 
     #[test]
     fn synthetic_collision_is_rejected() {
-        // Two genuinely different (namespace, name) pairs hashing to the
-        // same u64 is impossible to construct naturally for testing —
-        // u64 collisions on xxhash64 are vanishingly rare. We simulate by
-        // pre-seeding the canonical table with a fake hash, then submitting
-        // a group whose actual (ns, name) hashes to that same value via
-        // string surgery: we ignore the "real" hash and check the helper's
-        // logic directly with a hand-built group.
-
+        // Two genuinely different streams hashing to the same u64 is
+        // impossible to construct naturally — xxhash64 collisions are
+        // vanishingly rare. We simulate one by pre-seeding the canonical
+        // table at the *rejected* stream's own hash slot with a different
+        // canonical stream (deliberately not that slot's natural occupant),
+        // as if an earlier colliding stream had claimed it. The incoming
+        // group then hashes to the occupied slot with a mismatching identity
+        // and must be rejected — exercising the Occupied-mismatch arm.
         let mut canonical = HashMap::new();
-        let fake_hash = 0xdead_beefu64;
-        canonical.insert(
-            (tenant(), fake_hash),
-            (Some("prod".to_string()), Some("api".to_string())),
-        );
+        let rejected = ServiceStream::new("staging", "api");
+        let hash = rejected.ns_hash();
+        let canonical_stream = ServiceStream::new("prod", "api");
+        canonical.insert((tenant(), hash), canonical_stream.clone());
 
-        // Build a group keyed at fake_hash but with different (ns, name).
         let mut groups = HashMap::new();
         groups.insert(
-            (
-                fake_hash,
-                Some("staging".to_string()),
-                Some("api".to_string()),
-            ),
+            rejected.clone(),
             StreamGroup {
                 log_record_count: 12,
                 resource_logs: Vec::new(),
@@ -741,34 +707,23 @@ mod tests {
         assert!(r.accepted.is_empty());
         assert_eq!(r.collisions.len(), 1);
         let c = &r.collisions[0];
-        assert_eq!(c.hash, fake_hash);
-        assert_eq!(
-            c.canonical,
-            (Some("prod".to_string()), Some("api".to_string()))
-        );
-        assert_eq!(
-            c.rejected,
-            (Some("staging".to_string()), Some("api".to_string()))
-        );
+        assert_eq!(c.hash, hash);
+        assert_eq!(c.canonical, canonical_stream);
+        assert_eq!(c.rejected, rejected);
         assert_eq!(c.rejected_log_records, 12);
     }
 
     #[test]
     fn collision_does_not_overwrite_canonical_pair() {
         let mut canonical = HashMap::new();
-        let fake_hash = 0xdead_beefu64;
-        canonical.insert(
-            (tenant(), fake_hash),
-            (Some("prod".to_string()), Some("api".to_string())),
-        );
+        let rejected = ServiceStream::new("staging", "api");
+        let hash = rejected.ns_hash();
+        let canonical_stream = ServiceStream::new("prod", "api");
+        canonical.insert((tenant(), hash), canonical_stream.clone());
 
         let mut groups = HashMap::new();
         groups.insert(
-            (
-                fake_hash,
-                Some("staging".to_string()),
-                Some("api".to_string()),
-            ),
+            rejected,
             StreamGroup {
                 log_record_count: 1,
                 resource_logs: Vec::new(),
@@ -776,9 +731,11 @@ mod tests {
         );
 
         let _ = check_collisions(&mut canonical, &tenant(), groups);
-        let pair = canonical.get(&(tenant(), fake_hash)).unwrap();
-        // The original canonical pair must remain unchanged.
-        assert_eq!(pair, &(Some("prod".to_string()), Some("api".to_string())));
+        // The original canonical stream must remain unchanged.
+        assert_eq!(
+            canonical.get(&(tenant(), hash)).unwrap(),
+            &canonical_stream
+        );
     }
 
     #[test]
@@ -790,12 +747,14 @@ mod tests {
         let r1 = check_collisions(&mut canonical, &t1, groups_t1);
         assert!(r1.collisions.is_empty());
 
-        // Same hash, different (ns, name), but in a different tenant — must
-        // be accepted as fresh, not flagged as a collision.
-        let groups_t2 = group_by_stream(vec![rl(Some("staging"), Some("api"), 1)]);
+        // The same stream (hence the same ns_hash) in a different tenant
+        // must be accepted as fresh, not flagged as a collision — the
+        // tenant id is part of the canonical-table key.
+        let groups_t2 = group_by_stream(vec![rl(Some("prod"), Some("api"), 1)]);
         let r2 = check_collisions(&mut canonical, &t2, groups_t2);
         assert!(r2.collisions.is_empty());
         assert_eq!(r2.accepted.len(), 1);
+        assert_eq!(r1.accepted[0].0, r2.accepted[0].0);
     }
 
     /// Build a `NetdataLogsService` rooted at `wal_dir`. The
@@ -905,14 +864,14 @@ mod tests {
         let collisions = vec![
             Collision {
                 hash: 0x1,
-                canonical: (Some("prod".into()), Some("api".into())),
-                rejected: (Some("staging".into()), Some("api".into())),
+                canonical: ServiceStream::new("prod", "api"),
+                rejected: ServiceStream::new("staging", "api"),
                 rejected_log_records: 3,
             },
             Collision {
                 hash: 0x2,
-                canonical: (None, Some("worker".into())),
-                rejected: (Some("dev".into()), Some("worker".into())),
+                canonical: ServiceStream::new("", "worker"),
+                rejected: ServiceStream::new("dev", "worker"),
                 rejected_log_records: 1,
             },
         ];
@@ -920,7 +879,8 @@ mod tests {
         assert!(msg.contains("2 ns_hash collisions"));
         assert!(msg.contains("prod"));
         assert!(msg.contains("staging"));
-        assert!(msg.contains("<missing>"));
+        // An empty (absent) field renders as `<none>`.
+        assert!(msg.contains("<none>"));
         assert!(msg.contains("3 log records"));
     }
 }

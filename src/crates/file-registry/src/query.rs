@@ -20,8 +20,10 @@ pub struct Query {
     pub time_range: Range<u32>,
     /// Stream filter. `None` matches every stream; `Some(s)` requires
     /// exact equality with the file's stream identity (or, for sources
-    /// that only carry `ns_hash`, equality with
-    /// `compute_ns_hash(s.namespace, s.name)`).
+    /// that only carry `ns_hash`, equality with [`ServiceStream::ns_hash`]).
+    /// An empty field equals an absent one, so a query for an absent
+    /// `service.namespace` matches files written with an empty one and
+    /// vice versa.
     pub stream: Option<ServiceStream>,
 }
 
