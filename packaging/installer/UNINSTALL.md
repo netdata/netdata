@@ -118,14 +118,16 @@ chmod +x ./netdata-uninstaller.sh
 
 #### dpkg errors during package purge
 
-If you installed Netdata via native DEB packages (for example, `netdata`, `netdata-dashboard`, or `netdata-plugin-*`), the package's post-removal (postrm) script may fail during `purge` with output similar to the following:
+If you installed Netdata via the native DEB `netdata` package, its
+post-removal (`postrm`) script may fail during `purge` with output similar to
+the following:
 
 ```text
 dpkg-statoverride: warning: no override present
-dpkg: error processing package netdata-dashboard (--purge):
- installed netdata-dashboard package post-removal script subprocess returned error exit status 2
+dpkg: error processing package netdata (--purge):
+ installed netdata package post-removal script subprocess returned error exit status 2
 Errors were encountered while processing:
- netdata-dashboard
+ netdata
 E: Sub-process /usr/bin/dpkg returned an error code (1)
 ```
 
@@ -134,10 +136,11 @@ The postrm script references `dpkg-statoverride` entries or file paths that no l
 1. **Retry the purge** — the transient state may have resolved itself:
 
    ```bash
-   sudo apt-get purge netdata-dashboard
+   sudo apt-get purge netdata
    ```
 
-   Replace `netdata-dashboard` with whichever Netdata package is failing.
+   Replace `netdata` with the package name only if you have repository-specific
+   evidence that another shipped DEB package uses the same `postrm` cleanup.
 
 2. **Remove stale dpkg-statoverride entries** — check for leftover overrides tied to Netdata:
 
@@ -154,26 +157,28 @@ The postrm script references `dpkg-statoverride` entries or file paths that no l
    Then retry the purge:
 
    ```bash
-   sudo apt-get purge netdata-dashboard
+   sudo apt-get purge netdata
    ```
 
 3. **Remove the broken postrm script** — if the postrm script itself is the problem:
 
    ```bash
-   sudo rm /var/lib/dpkg/info/netdata-dashboard.postrm
+   sudo rm /var/lib/dpkg/info/netdata.postrm
    sudo dpkg --configure -a
-   sudo apt-get purge netdata-dashboard
+   sudo apt-get purge netdata
    ```
 
 4. **Force removal** — last resort when nothing else works:
 
    ```bash
-   sudo dpkg --remove --force-remove-reinstreq netdata-dashboard
+   sudo dpkg --remove --force-remove-reinstreq netdata
    ```
 
 :::note
 
-These steps apply to any Netdata DEB package (`netdata`, `netdata-dashboard`, `netdata-plugin-*`) that uses `dpkg-statoverride` in its post-removal script. This scenario only affects native package installs — if you are unsure how Netdata was installed, see the **Native Package Users** note above and the [installation type guidance](/packaging/installer/UPDATE.md).
+These steps apply to native DEB installs of the main `netdata` package. If you
+are unsure how Netdata was installed, see the **Native Package Users** note
+above and the [installation type guidance](/packaging/installer/UPDATE.md).
 
 :::
 
