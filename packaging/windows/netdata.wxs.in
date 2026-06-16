@@ -250,7 +250,7 @@
             </InstallExecuteSequence>
 
             <!-- Add new files (stream.conf and netdata.conf) -->
-            <CustomAction Id="NDCreateNewFiles" Directory="USRLIBEXECNETDATADIR" ExeCommand='powershell.exe -NoProfile -ExecutionPolicy Bypass -NonInteractive -File &quot;[USRLIBEXECNETDATADIR]\copy_files.ps1&quot;' Execute="deferred" Return="ignore" Impersonate="no"/>
+            <CustomAction Id="NDCreateNewFiles" Directory="USRLIBEXECNETDATADIR" ExeCommand='&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -NonInteractive -File &quot;[USRLIBEXECNETDATADIR]\copy_files.ps1&quot;' Execute="deferred" Return="ignore" Impersonate="no"/>
             <InstallExecuteSequence>
                 <Custom Action="NDCreateNewFiles" Before="InstallFinalize" />
             </InstallExecuteSequence>
