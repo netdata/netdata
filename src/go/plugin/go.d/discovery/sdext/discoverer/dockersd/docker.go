@@ -28,7 +28,7 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 		),
 		cfgSource: cfg.Source,
 		newDockerClient: func(addr string) (dockerClient, error) {
-			return docker.NewClientWithOpts(docker.WithHost(addr))
+			return docker.New(docker.WithHost(addr))
 		},
 		addr:           docker.DefaultDockerHost,
 		listInterval:   time.Second * 60,

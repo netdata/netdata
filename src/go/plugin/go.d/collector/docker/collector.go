@@ -48,7 +48,7 @@ func New() *Collector {
 
 		charts: summaryCharts.Copy(),
 		newClient: func(cfg Config) (dockerClient, error) {
-			return docker.NewClientWithOpts(docker.WithHost(cfg.Address))
+			return docker.New(docker.WithHost(cfg.Address))
 		},
 		cntrSr:     matcher.TRUE(),
 		containers: make(map[string]bool),

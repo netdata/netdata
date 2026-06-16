@@ -35,7 +35,7 @@ func Exec(ctx context.Context, container string, cmd string, args ...string) ([]
 		addr = v
 	}
 
-	cli, err := docker.NewClientWithOpts(docker.WithHost(addr))
+	cli, err := docker.New(docker.WithHost(addr))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create docker client: %w", err)
 	}
