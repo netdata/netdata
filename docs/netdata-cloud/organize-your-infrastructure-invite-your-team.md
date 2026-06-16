@@ -85,4 +85,4 @@ Rejoining a Room depends on your role:
 - **Admins** and **Managers** can rejoin any Room at any time on their own.
 - **Troubleshooters** and **Observers** cannot rejoin on their own and must be re-added to the Room by an Admin or Manager.
 
-For the full permission breakdown, see the [Room Management table in the RBAC reference](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md#room-management).
+For the full permission breakdown, see the [Room Management table in the RBAC reference](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
