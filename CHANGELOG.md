@@ -344,6 +344,16 @@
 - Update systemd journal SDK to v0.7.0 ([#22713](https://github.com/netdata/netdata/issues/22713))
 - SMB data and Network Viewer (Windows) ([#22608](https://github.com/netdata/netdata/issues/22608))
 - Fix(go.d/snmp_topology): clone device labels to fix snapshot data race ([#22714](https://github.com/netdata/netdata/issues/22714))
+- Docs: task class: improve_docs — add a faq entry to node-identities.md ([#22576](https://github.com/netdata/netdata/issues/22576))
+- Docs: add authentication and MFA guidance for Netdata Cloud sign-in ([#22609](https://github.com/netdata/netdata/issues/22609))
+- Docs: Windows installer page docs updates ([#22620](https://github.com/netdata/netdata/issues/22620))
+- Reduce NetFlow overhead ([#22719](https://github.com/netdata/netdata/issues/22719))
+- Regenerate integrations docs ([#22711](https://github.com/netdata/netdata/issues/22711))
+- Validate data loaded from SQLite to prevent crashes on corrupted databases ([#22679](https://github.com/netdata/netdata/issues/22679))
+- Fix namespace-relative cgroup lookup for topology ([#22727](https://github.com/netdata/netdata/issues/22727))
+- Update systemd journal SDK to v0.7.1 ([#22731](https://github.com/netdata/netdata/issues/22731))
+- Update vendored NetIPC library ([#22729](https://github.com/netdata/netdata/issues/22729))
+- Fix search for VS tooling to check for multiple versions. ([#22723](https://github.com/netdata/netdata/issues/22723))
 
 ## [2.10.0] - 2026-04-09
 
