@@ -16,8 +16,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/dockerhost"
 
-	typesContainer "github.com/docker/docker/api/types/container"
-	docker "github.com/docker/docker/client"
+	typesContainer "github.com/moby/moby/api/types/container"
+	docker "github.com/moby/moby/client"
 )
 
 func NewDiscoverer(cfg Config) (*Discoverer, error) {
@@ -77,8 +77,7 @@ type (
 		started chan struct{}
 	}
 	dockerClient interface {
-		NegotiateAPIVersion(context.Context)
-		ContainerList(context.Context, typesContainer.ListOptions) ([]typesContainer.Summary, error)
+		ContainerList(context.Context, docker.ContainerListOptions) (docker.ContainerListResult, error)
 		Close() error
 	}
 )
@@ -101,8 +100,6 @@ func (d *Discoverer) Discover(ctx context.Context, in chan<- []model.TargetGroup
 		}
 		d.dockerClient = client
 	}
-
-	d.dockerClient.NegotiateAPIVersion(ctx)
 
 	if err := d.listContainers(ctx, in); err != nil {
 		d.Error(err)
@@ -128,10 +125,11 @@ func (d *Discoverer) listContainers(ctx context.Context, in chan<- []model.Targe
 	listCtx, cancel := context.WithTimeout(ctx, d.timeout)
 	defer cancel()
 
-	containers, err := d.dockerClient.ContainerList(listCtx, typesContainer.ListOptions{})
+	result, err := d.dockerClient.ContainerList(listCtx, docker.ContainerListOptions{})
 	if err != nil {
 		return err
 	}
+	containers := result.Items
 
 	var tggs []model.TargetGroup
 	seen := make(map[string]bool)
@@ -171,8 +169,16 @@ func (d *Discoverer) buildTargetGroup(cntr typesContainer.Summary) model.TargetG
 	}
 
 	for netDriver, network := range cntr.NetworkSettings.Networks {
+		ipAddress := ""
+		if network.IPAddress.IsValid() {
+			ipAddress = network.IPAddress.String()
+		}
 		// container with network mode host will be discovered by local-listeners
 		for _, port := range cntr.Ports {
+			publicPortIP := ""
+			if port.IP.IsValid() {
+				publicPortIP = port.IP.String()
+			}
 			tgt := &target{
 				ID:            cntr.ID,
 				Name:          strings.TrimPrefix(cntr.Names[0], "/"),
@@ -181,11 +187,11 @@ func (d *Discoverer) buildTargetGroup(cntr typesContainer.Summary) model.TargetG
 				Labels:        model.MapAny(cntr.Labels),
 				PrivatePort:   strconv.Itoa(int(port.PrivatePort)),
 				PublicPort:    strconv.Itoa(int(port.PublicPort)),
-				PublicPortIP:  port.IP,
+				PublicPortIP:  publicPortIP,
 				PortProtocol:  port.Type,
 				NetworkMode:   cntr.HostConfig.NetworkMode,
 				NetworkDriver: netDriver,
-				IPAddress:     network.IPAddress,
+				IPAddress:     ipAddress,
 			}
 			tgt.Address = net.JoinHostPort(tgt.IPAddress, tgt.PrivatePort)
 
