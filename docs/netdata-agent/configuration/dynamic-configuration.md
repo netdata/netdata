@@ -4,7 +4,7 @@
 
 :::important
 
-Netdata Cloud paid plan is required.
+Netdata Cloud paid plan is required for creating, editing, testing, enabling, disabling, or removing configurations. On Community plans, you can still list configurable items.
 
 :::
 
@@ -293,8 +293,28 @@ In Netdata, HTTP 412 is used to indicate that an authorization bearer token was 
 
 For more information, see [Secure Your Netdata Agent with Bearer Token Protection](/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md).
 
+### Forbidden (HTTP 403) Error When Accessing Configuration Manager
+
+If you see **"forbidden"** (HTTP 403) when opening configuration details or creating, editing, testing, enabling, disabling, or removing configurations in the Configuration Manager, one of the following restrictions is blocking the action.
+
+:::important
+
+Only users with an **Admin** or **Manager** role on a **paid plan** can perform Dynamic Configuration actions beyond listing. Users without Dynamic Configuration permissions and all users on the Community plan will receive **"forbidden"** for those actions.
+
+:::
+
+**Common causes:**
+
+1. **Insufficient role** — Only Admin and Manager roles can perform Dynamic Configuration actions such as **View**, **Add**, **Update**, **Enable/Disable**, **Remove**, and **Test**. Troubleshooters, Observers, and Billing users can still use **List All**, but they will receive **"forbidden"** for actions beyond listing.
+2. **Community (free) plan limitation** — A paid plan is required for all Dynamic Configuration Manager actions except **List All**. Users on the Community plan will see **"forbidden"** when attempting any action beyond listing.
+
+**Resolution steps:**
+
+1. **Check your assigned role**: Go to **Space Settings → Users** and verify your role. If you are not an Admin or Manager, ask a Space Admin to upgrade your role. See the [Role-Based Access Model documentation](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) for the full permissions table.
+2. **Verify your subscription plan**: If you are on the Community plan, [upgrade to a paid plan](https://www.netdata.cloud/pricing/) or ask a Space Admin to do so. A paid plan is required for all Dynamic Configuration actions except **List All**.
+
 ---
 
 Experience the efficiency and power of the Dynamic Configuration Manager in Netdata today. Whether you're managing a handful of nodes or a vast infrastructure, this feature will make your monitoring and alerting tasks smoother and more intuitive.
 
-Developing with dynamic configuration? [Click here](https://learn.netdata.cloud/docs/developer-and-contributor-corner/dynamic-configuration/).
+[Read more](/docs/developer-and-contributor-corner/dyncfg.md) on developing with dynamic configuration.
