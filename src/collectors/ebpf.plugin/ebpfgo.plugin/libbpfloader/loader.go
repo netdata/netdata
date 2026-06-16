@@ -42,10 +42,16 @@ func IsFunctionInsideBTF(file *BTF, function string) (bool, error) {
 	return false, ErrDisabled
 }
 
-func NewCachestatRuntime(path string, useCore bool) (*CachestatRuntime, error) {
-	_ = path
-	_ = useCore
+// newDisabledRuntime is the single stub for all New*Runtime constructors in
+// the non-libbpf build.  The body is always the same regardless of type, so a
+// generic helper keeps each public constructor to a one-liner.
+func newDisabledRuntime[T any](path string, useCore bool) (*T, error) {
+	_, _ = path, useCore
 	return nil, ErrDisabled
+}
+
+func NewCachestatRuntime(path string, useCore bool) (*CachestatRuntime, error) {
+	return newDisabledRuntime[CachestatRuntime](path, useCore)
 }
 
 func (r *CachestatRuntime) Prepare(pidTableSize uint32, mapsPerCore bool, accountFunction string) error {
@@ -102,9 +108,7 @@ func PidIsAlive(pid uint32) bool {
 }
 
 func NewSocketRuntime(path string, useCore bool) (*SocketRuntime, error) {
-	_ = path
-	_ = useCore
-	return nil, ErrDisabled
+	return newDisabledRuntime[SocketRuntime](path, useCore)
 }
 
 func (r *SocketRuntime) Prepare(mapsPerCore bool) error {
@@ -138,9 +142,7 @@ func (r *SocketRuntime) Close() {
 type DNSRuntime struct{}
 
 func NewDNSRuntime(path string, useCore bool) (*DNSRuntime, error) {
-	_ = path
-	_ = useCore
-	return nil, ErrDisabled
+	return newDisabledRuntime[DNSRuntime](path, useCore)
 }
 
 func (r *DNSRuntime) Prepare() error {

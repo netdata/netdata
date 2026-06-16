@@ -150,7 +150,16 @@ if fileCfg.UpdateEvery != nil && *fileCfg.UpdateEvery > 0 {
 }
 
 func BuildCachestatLegacyPlan(cfg CachestatLegacyConfig) LoadPlan {
-	return buildKprobeLegacyPlan(cfg.PluginsDir, cfg.Kernels, cfg.IsRHF, cfg.KernelVersion, cfg.IsDebian, cfg.HasBTF, cfg.ObjectFlavor, "cachestat")
+	return buildKprobeLegacyPlan(kprobePlanRequest{
+		PluginsDir:    cfg.PluginsDir,
+		Kernels:       cfg.Kernels,
+		IsRHF:         cfg.IsRHF,
+		KernelVersion: cfg.KernelVersion,
+		IsDebian:      cfg.IsDebian,
+		HasBTF:        cfg.HasBTF,
+		ObjectFlavor:  cfg.ObjectFlavor,
+		Name:          "cachestat",
+	})
 }
 
 func kernelBTFSupported(btfPath string) bool {

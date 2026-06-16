@@ -487,19 +487,33 @@ func resolveKernelAndRH() (kver uint32, isRHF int, err error) {
 	return kver, isRHF, nil
 }
 
+// kprobePlanRequest carries the inputs shared by kprobe/trampoline-based
+// collectors.  It exists solely to keep buildKprobeLegacyPlan within the
+// parameter-count limit while preserving all field names at call sites.
+type kprobePlanRequest struct {
+	PluginsDir    string
+	Kernels       uint32
+	IsRHF         int
+	KernelVersion uint32
+	IsDebian      bool
+	HasBTF        bool
+	ObjectFlavor  string
+	Name          string
+}
+
 // buildKprobeLegacyPlan constructs the LoadPlan for kprobe/trampoline-based
 // collectors (cachestat, socket).  DNS uses a different load mode and is not
 // covered by this helper.
-func buildKprobeLegacyPlan(pluginsDir string, kernels uint32, isRHF int, kver uint32, isDebian bool, hasBTF bool, objectFlavor, name string) LoadPlan {
-	flavor := selectConfiguredObjectFlavor(objectFlavor, kver, isDebian)
-	loadMode := SelectLoadMode(hasBTF, LoadCore, kver, isRHF)
-	selector := SelectIndex(kernels, isRHF, kver)
+func buildKprobeLegacyPlan(req kprobePlanRequest) LoadPlan {
+	flavor := selectConfiguredObjectFlavor(req.ObjectFlavor, req.KernelVersion, req.IsDebian)
+	loadMode := SelectLoadMode(req.HasBTF, LoadCore, req.KernelVersion, req.IsRHF)
+	selector := SelectIndex(req.Kernels, req.IsRHF, req.KernelVersion)
 	return LoadPlan{
-		KernelVersion: kver,
-		IsRHF:         isRHF,
+		KernelVersion: req.KernelVersion,
+		IsRHF:         req.IsRHF,
 		Selector:      selector,
 		Flavor:        flavor,
-		ObjectPath:    BuildObjectPathWithFlavor(pluginsDir, selector, name, false, isRHF, flavor),
+		ObjectPath:    BuildObjectPathWithFlavor(req.PluginsDir, selector, req.Name, false, req.IsRHF, flavor),
 		LoadMode:      loadMode,
 		ProgramMode:   LoadTrampoline,
 	}

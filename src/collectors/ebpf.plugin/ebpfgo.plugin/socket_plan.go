@@ -93,6 +93,15 @@ func resolveSocketLegacyConfig() (SocketLegacyConfig, error) {
 }
 
 func BuildSocketLegacyPlan(cfg SocketLegacyConfig) LoadPlan {
-	return buildKprobeLegacyPlan(cfg.PluginsDir, cfg.Kernels, cfg.IsRHF, cfg.KernelVersion, cfg.IsDebian, cfg.HasBTF, cfg.ObjectFlavor, "socket")
+	return buildKprobeLegacyPlan(kprobePlanRequest{
+		PluginsDir:    cfg.PluginsDir,
+		Kernels:       cfg.Kernels,
+		IsRHF:         cfg.IsRHF,
+		KernelVersion: cfg.KernelVersion,
+		IsDebian:      cfg.IsDebian,
+		HasBTF:        cfg.HasBTF,
+		ObjectFlavor:  cfg.ObjectFlavor,
+		Name:          "socket",
+	})
 }
 
