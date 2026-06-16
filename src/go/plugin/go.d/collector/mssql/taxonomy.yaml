@@ -1,0 +1,116 @@
+taxonomy_version: 1
+plugin_name: go.d.plugin
+module_name: mssql
+placements:
+  - id: mssql
+    section_id: applications.mssql
+    title: Microsoft SQL Server
+    icon: mssql
+    families: true
+    items:
+      - type: group
+        id: instance
+        title: Instance
+        items:
+          - mssql.user_connections
+          - mssql.session_connections
+          - mssql.blocked_processes
+          - mssql.batch_requests
+          - mssql.compilations
+          - mssql.recompilations
+          - mssql.auto_param_attempts
+          - mssql.sql_errors
+          - mssql.buffer_cache_hit_ratio
+          - mssql.buffer_page_life_expectancy
+          - mssql.buffer_page_iops
+          - mssql.buffer_checkpoint_pages
+          - mssql.buffer_page_lookups
+          - mssql.buffer_lazy_writes
+          - mssql.memory_total
+          - mssql.memory_connection
+          - mssql.memory_pending_grants
+          - mssql.memory_external_benefit
+          - mssql.page_splits
+          - mssql.process_memory_resident
+          - mssql.process_memory_virtual
+          - mssql.process_memory_utilization
+          - mssql.process_page_faults
+          - mssql.os_memory
+          - mssql.os_pagefile
+      - type: group
+        id: databases
+        title: Databases
+        items:
+          - mssql.database_active_transactions
+          - mssql.database_transactions
+          - mssql.database_write_transactions
+          - mssql.database_log_flushes
+          - mssql.database_log_flushed
+          - mssql.database_log_growths
+          - mssql.database_log_file_size
+          - mssql.database_log_percent_used
+          - mssql.database_log_truncations_shrinks
+          - mssql.database_io_stall
+          - mssql.database_data_file_size
+          - mssql.database_backup_restore_throughput
+          - mssql.database_state
+          - mssql.database_read_only
+      - type: group
+        id: locks
+        title: Locks
+        items:
+          - mssql.lock_stats_deadlocks
+          - mssql.lock_stats_waits
+          - mssql.lock_stats_timeouts
+          - mssql.lock_stats_requests
+          - mssql.locks_by_resource
+      - type: group
+        id: waits
+        title: Waits
+        items:
+          - mssql.wait_total_time
+          - mssql.wait_resource_time
+          - mssql.wait_signal_time
+          - mssql.wait_max_time
+          - mssql.wait_count
+      - type: group
+        id: sql-agent
+        title: SQL Server Agent
+        items:
+          - mssql.job_status
+          - mssql.job_last_execution_status
+          - mssql.job_last_execution_duration
+          - mssql.job_last_execution_age
+          - mssql.job_current_execution_time
+      - type: group
+        id: replication
+        title: Replication
+        items:
+          - mssql.replication_status
+          - mssql.replication_warning
+          - mssql.replication_latency
+          - mssql.replication_subscriptions
+      - type: group
+        id: availability-groups
+        title: Availability Groups
+        items:
+          - mssql.ag_sync_health
+          - mssql.ag_recovery_health
+          - mssql.ag_threads
+          - mssql.ag_replica_role
+          - mssql.ag_replica_connected_state
+          - mssql.ag_replica_sync_health
+          - mssql.ag_db_sync_state
+          - mssql.ag_db_log_send_queue
+          - mssql.ag_db_log_send_rate
+          - mssql.ag_db_redo_queue
+          - mssql.ag_db_redo_rate
+          - mssql.ag_db_filestream_send_rate
+          - mssql.ag_db_secondary_lag
+          - mssql.ag_db_suspended
+          - mssql.ag_db_failover_readiness
+          - mssql.ag_db_joined_state
+          - mssql.ag_cluster_quorum_state
+          - mssql.ag_cluster_member_state
+          - mssql.ag_cluster_member_quorum_votes
+          - mssql.ag_page_repair

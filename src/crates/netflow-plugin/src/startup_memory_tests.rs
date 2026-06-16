@@ -411,12 +411,13 @@ impl ProfilePluginRuntime {
             &cfg.enrichment.geoip.geo_database,
         );
         let charts_shutdown = CancellationToken::new();
-        let charts_task = charts::NetflowCharts::new(&mut runtime).spawn_sampler(
+        let charts_task = charts::NetflowCharts::new(&mut runtime, &cfg.charts).spawn_sampler(
             metrics,
             open_tiers,
             tier_flow_indexes,
             facet_runtime,
             resident_mapping_paths,
+            cfg.charts.clone(),
             charts_shutdown.clone(),
         );
 

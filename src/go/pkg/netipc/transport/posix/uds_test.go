@@ -62,6 +62,22 @@ func defaultClientConfig() ClientConfig {
 	}
 }
 
+func TestListenerSetPayloadLimits(t *testing.T) {
+	runDir := testRunDir(t)
+	service := uniqueService(t)
+
+	listener := startListener(t, runDir, service, defaultServerConfig())
+	defer listener.Close()
+
+	listener.SetPayloadLimits(2048, 8192)
+	if listener.config.MaxRequestPayloadBytes != 2048 {
+		t.Fatalf("request payload limit = %d, want 2048", listener.config.MaxRequestPayloadBytes)
+	}
+	if listener.config.MaxResponsePayloadBytes != 8192 {
+		t.Fatalf("response payload limit = %d, want 8192", listener.config.MaxResponsePayloadBytes)
+	}
+}
+
 // serverResult holds the result of an Accept call.
 type serverResult struct {
 	session *Session
@@ -767,7 +783,7 @@ func TestDirectionalLimitNegotiation(t *testing.T) {
 	defer os.Remove(filepath.Join(runDir, service+".sock"))
 
 	sCfg := defaultServerConfig()
-	sCfg.MaxRequestPayloadBytes = 2048
+	sCfg.MaxRequestPayloadBytes = 4096
 	sCfg.MaxRequestBatchItems = 8
 	sCfg.MaxResponsePayloadBytes = 8192
 	sCfg.MaxResponseBatchItems = 32

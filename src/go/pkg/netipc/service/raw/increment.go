@@ -61,27 +61,7 @@ func (c *Client) CallIncrementBatchWithTimeout(values []uint64, timeoutMs uint32
 	}
 
 	err = c.callWithRetry(func() error {
-		dirBytes, err := checkedLookupMul(len(values), 8)
-		if err != nil {
-			return err
-		}
-		dirAligned, err := checkedLookupAlign8(dirBytes)
-		if err != nil {
-			return err
-		}
-		itemsBytes, err := checkedLookupMul(len(values), protocol.IncrementPayloadSize)
-		if err != nil {
-			return err
-		}
-		paddingBytes, err := checkedLookupMul(len(values), protocol.Alignment)
-		if err != nil {
-			return err
-		}
-		batchBufSize, err := checkedLookupAdd(dirAligned, itemsBytes)
-		if err != nil {
-			return err
-		}
-		batchBufSize, err = checkedLookupAdd(batchBufSize, paddingBytes)
+		batchBufSize, err := incrementBatchRequestSize(len(values))
 		if err != nil {
 			return err
 		}
@@ -163,6 +143,33 @@ func (c *Client) CallIncrementBatchWithTimeout(values []uint64, timeoutMs uint32
 		return nil
 	})
 	return results, err
+}
+
+func incrementBatchRequestSize(valueCount int) (int, error) {
+	if _, err := checkedLookupU32(valueCount); err != nil {
+		return 0, err
+	}
+	dirBytes, err := checkedLookupMul(valueCount, 8)
+	if err != nil {
+		return 0, err
+	}
+	dirAligned, err := checkedLookupAlign8(dirBytes)
+	if err != nil {
+		return 0, err
+	}
+	itemsBytes, err := checkedLookupMul(valueCount, protocol.IncrementPayloadSize)
+	if err != nil {
+		return 0, err
+	}
+	paddingBytes, err := checkedLookupMul(valueCount, protocol.Alignment)
+	if err != nil {
+		return 0, err
+	}
+	batchBufSize, err := checkedLookupAdd(dirAligned, itemsBytes)
+	if err != nil {
+		return 0, err
+	}
+	return checkedLookupAdd(batchBufSize, paddingBytes)
 }
 
 // IncrementDispatch adapts a typed increment handler to the raw dispatch shape.

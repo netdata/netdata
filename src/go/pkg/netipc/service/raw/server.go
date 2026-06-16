@@ -10,6 +10,13 @@ import (
 
 const defaultServerWorkerCount = 8
 
+func payloadGrowthCeiling(configuredPayloadBytes uint32) uint32 {
+	if configuredPayloadBytes != 0 {
+		return configuredPayloadBytes
+	}
+	return protocol.MaxPayloadCap
+}
+
 func (s *Server) initCommon(
 	runDir string,
 	serviceName string,
@@ -22,6 +29,8 @@ func (s *Server) initCommon(
 	if workerCount < 1 {
 		workerCount = 1
 	}
+	requestPayloadGrowthCeiling := payloadGrowthCeiling(maxRequestPayloadBytes)
+	responsePayloadGrowthCeiling := payloadGrowthCeiling(maxResponsePayloadBytes)
 	if maxRequestPayloadBytes == 0 {
 		maxRequestPayloadBytes = protocol.MaxPayloadDefault
 	}
@@ -34,6 +43,8 @@ func (s *Server) initCommon(
 	s.expectedMethodCode = expectedMethodCode
 	s.handler = handler
 	s.workerCount = workerCount
+	s.requestPayloadGrowthCeiling = requestPayloadGrowthCeiling
+	s.responsePayloadGrowthCeiling = responsePayloadGrowthCeiling
 	s.learnedRequestPayloadBytes.Store(maxRequestPayloadBytes)
 	s.learnedResponsePayloadBytes.Store(maxResponsePayloadBytes)
 }
@@ -88,8 +99,8 @@ func (s *Server) methodSupported(methodCode uint16) bool {
 	return s.handler != nil && methodCode == s.expectedMethodCode
 }
 
-func serverNotePayloadCapacity(target *atomic.Uint32, payloadLen uint32) {
-	grown := nextPowerOf2U32(payloadLen)
+func serverNotePayloadCapacity(target *atomic.Uint32, payloadLen uint32, ceiling uint32) {
+	grown := min(nextPowerOf2U32(payloadLen), ceiling)
 	for {
 		current := target.Load()
 		if grown <= current {
@@ -157,7 +168,11 @@ func (s *Server) handleServerRequest(
 	maxResponsePayloadBytes uint32,
 ) (protocol.Header, int, bool) {
 	if payloadLen, err := checkedLookupU32(len(payload)); err == nil {
-		serverNotePayloadCapacity(&s.learnedRequestPayloadBytes, payloadLen)
+		serverNotePayloadCapacity(
+			&s.learnedRequestPayloadBytes,
+			payloadLen,
+			s.requestPayloadGrowthCeiling,
+		)
 	}
 
 	if !s.methodSupported(hdr.Code) {
@@ -169,7 +184,11 @@ func (s *Server) handleServerRequest(
 
 	if dispatchErr == nil {
 		if responseLen32, err := checkedLookupU32(responseLen); err == nil {
-			serverNotePayloadCapacity(&s.learnedResponsePayloadBytes, responseLen32)
+			serverNotePayloadCapacity(
+				&s.learnedResponsePayloadBytes,
+				responseLen32,
+				s.responsePayloadGrowthCeiling,
+			)
 		}
 		respHdr.TransportStatus = protocol.StatusOK
 		if isBatch {
@@ -186,9 +205,17 @@ func (s *Server) handleServerRequest(
 	switch {
 	case errors.Is(dispatchErr, protocol.ErrOverflow):
 		if maxResponsePayloadBytes >= ^uint32(0)/2 {
-			serverNotePayloadCapacity(&s.learnedResponsePayloadBytes, ^uint32(0))
+			serverNotePayloadCapacity(
+				&s.learnedResponsePayloadBytes,
+				^uint32(0),
+				s.responsePayloadGrowthCeiling,
+			)
 		} else {
-			serverNotePayloadCapacity(&s.learnedResponsePayloadBytes, maxResponsePayloadBytes*2)
+			serverNotePayloadCapacity(
+				&s.learnedResponsePayloadBytes,
+				maxResponsePayloadBytes*2,
+				s.responsePayloadGrowthCeiling,
+			)
 		}
 		respHdr.TransportStatus = protocol.StatusLimitExceeded
 		return respHdr, responseLen, true

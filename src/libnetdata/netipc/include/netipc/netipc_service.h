@@ -29,8 +29,8 @@
 #include "netipc_win_shm.h"
 #include <windows.h>
 #else
-#include "netipc_uds.h"
 #include "netipc_shm.h"
+#include "netipc_uds.h"
 #include <pthread.h>
 #endif
 
@@ -40,6 +40,10 @@
 
 #define NIPC_CLIENT_CALL_TIMEOUT_DEFAULT_MS 30000u
 #define NIPC_CLIENT_ABORT_POLL_MS 100u
+#define NIPC_SERVICE_MIN_PAYLOAD_BUFFER_BYTES 1024u
+#define NIPC_LOGICAL_LOOKUP_ITEMS_DEFAULT 65536u
+#define NIPC_LOGICAL_LOOKUP_SUBCALLS_DEFAULT 4096u
+#define NIPC_LOGICAL_LOOKUP_RESPONSE_BYTES_DEFAULT (64u * 1024u * 1024u)
 
 #ifdef __cplusplus
 extern "C" {
@@ -50,13 +54,13 @@ extern "C" {
 /* ------------------------------------------------------------------ */
 
 typedef enum {
-    NIPC_CLIENT_DISCONNECTED = 0,
-    NIPC_CLIENT_CONNECTING,
-    NIPC_CLIENT_READY,
-    NIPC_CLIENT_NOT_FOUND,
-    NIPC_CLIENT_AUTH_FAILED,
-    NIPC_CLIENT_INCOMPATIBLE,
-    NIPC_CLIENT_BROKEN,
+  NIPC_CLIENT_DISCONNECTED = 0,
+  NIPC_CLIENT_CONNECTING,
+  NIPC_CLIENT_READY,
+  NIPC_CLIENT_NOT_FOUND,
+  NIPC_CLIENT_AUTH_FAILED,
+  NIPC_CLIENT_INCOMPATIBLE,
+  NIPC_CLIENT_BROKEN,
 } nipc_client_state_t;
 
 /* ------------------------------------------------------------------ */
@@ -64,11 +68,11 @@ typedef enum {
 /* ------------------------------------------------------------------ */
 
 typedef struct {
-    nipc_client_state_t state;
-    uint32_t connect_count;
-    uint32_t reconnect_count;
-    uint32_t call_count;
-    uint32_t error_count;
+  nipc_client_state_t state;
+  uint32_t connect_count;
+  uint32_t reconnect_count;
+  uint32_t call_count;
+  uint32_t error_count;
 } nipc_client_status_t;
 
 /* ------------------------------------------------------------------ */
@@ -84,12 +88,16 @@ typedef struct {
  * Zero-valued fields map to the normal library defaults.
  */
 typedef struct {
-    uint32_t supported_profiles;
-    uint32_t preferred_profiles;
-    uint32_t max_request_batch_items;
-    uint32_t max_response_payload_bytes;
-    uint64_t auth_token;
-    uint32_t call_timeout_ms;          /* 0 = use default (30000 ms) */
+  uint32_t supported_profiles;
+  uint32_t preferred_profiles;
+  uint32_t max_request_payload_bytes;
+  uint32_t max_request_batch_items;
+  uint32_t max_response_payload_bytes;
+  uint64_t auth_token;
+  uint32_t call_timeout_ms; /* 0 = use default (30000 ms) */
+  uint32_t max_logical_lookup_items;
+  uint32_t max_logical_lookup_subcalls;
+  uint32_t max_logical_lookup_response_bytes;
 } nipc_client_config_t;
 
 /*
@@ -101,11 +109,12 @@ typedef struct {
  * Zero-valued fields map to the normal library defaults.
  */
 typedef struct {
-    uint32_t supported_profiles;
-    uint32_t preferred_profiles;
-    uint32_t max_request_batch_items;
-    uint32_t max_response_payload_bytes;
-    uint64_t auth_token;
+  uint32_t supported_profiles;
+  uint32_t preferred_profiles;
+  uint32_t max_request_payload_bytes;
+  uint32_t max_request_batch_items;
+  uint32_t max_response_payload_bytes;
+  uint64_t auth_token;
 } nipc_server_config_t;
 
 /* ------------------------------------------------------------------ */
@@ -113,46 +122,49 @@ typedef struct {
 /* ------------------------------------------------------------------ */
 
 typedef struct {
-    /* State */
-    nipc_client_state_t state;
+  /* State */
+  nipc_client_state_t state;
 
-    /* Configuration (mutable learned sizing, updated across reconnects) */
-    char run_dir[256];
-    char service_name[128];
+  /* Configuration (mutable learned sizing, updated across reconnects) */
+  char run_dir[256];
+  char service_name[128];
 
 #if defined(_WIN32) || defined(__MSYS__)
-    nipc_np_client_config_t transport_config;
+  nipc_np_client_config_t transport_config;
 
-    /* Connection (managed internally) */
-    nipc_np_session_t session;
-    bool session_valid;
-    nipc_win_shm_ctx_t *shm;  /* non-NULL if SHM profile negotiated */
-    HANDLE abort_event;
+  /* Connection (managed internally) */
+  nipc_np_session_t session;
+  bool session_valid;
+  nipc_win_shm_ctx_t *shm; /* non-NULL if SHM profile negotiated */
+  HANDLE abort_event;
 #else
-    nipc_uds_client_config_t transport_config;
+  nipc_uds_client_config_t transport_config;
 
-    /* Connection (managed internally) */
-    nipc_uds_session_t session;
-    bool session_valid;
-    nipc_shm_ctx_t *shm;  /* non-NULL if SHM profile negotiated */
-    int abort_pipe[2];
-    bool abort_pipe_valid;
+  /* Connection (managed internally) */
+  nipc_uds_session_t session;
+  bool session_valid;
+  nipc_shm_ctx_t *shm; /* non-NULL if SHM profile negotiated */
+  int abort_pipe[2];
+  bool abort_pipe_valid;
 #endif
 
-    uint32_t call_timeout_ms;
-    uint32_t abort_requested;
+  uint32_t call_timeout_ms;
+  uint32_t max_logical_lookup_items;
+  uint32_t max_logical_lookup_subcalls;
+  uint32_t max_logical_lookup_response_bytes;
+  uint32_t abort_requested;
 
-    /* Stats */
-    uint32_t connect_count;
-    uint32_t reconnect_count;
-    uint32_t call_count;
-    uint32_t error_count;
+  /* Stats */
+  uint32_t connect_count;
+  uint32_t reconnect_count;
+  uint32_t call_count;
+  uint32_t error_count;
 
-    /* Internal reusable Level 2 scratch, allocated lazily from session sizes. */
-    uint8_t *response_buf;
-    size_t   response_buf_size;
-    uint8_t *send_buf;
-    size_t   send_buf_size;
+  /* Internal reusable Level 2 scratch, allocated lazily from session sizes. */
+  uint8_t *response_buf;
+  size_t response_buf_size;
+  uint8_t *send_buf;
+  size_t send_buf_size;
 } nipc_client_ctx_t;
 
 /* ------------------------------------------------------------------ */
@@ -163,8 +175,7 @@ typedef struct {
  * Initialize a client context. Does NOT connect. Does NOT require the
  * server to be running. State starts as DISCONNECTED.
  */
-void nipc_client_init(nipc_client_ctx_t *ctx,
-                      const char *run_dir,
+void nipc_client_init(nipc_client_ctx_t *ctx, const char *run_dir,
                       const char *service_name,
                       const nipc_client_config_t *config);
 
@@ -182,7 +193,7 @@ bool nipc_client_refresh(nipc_client_ctx_t *ctx);
  * Returns true only if state == READY.
  */
 static inline bool nipc_client_ready(const nipc_client_ctx_t *ctx) {
-    return ctx->state == NIPC_CLIENT_READY;
+  return ctx->state == NIPC_CLIENT_READY;
 }
 
 /*
@@ -199,8 +210,8 @@ void nipc_client_set_call_timeout(nipc_client_ctx_t *ctx, uint32_t timeout_ms);
 
 /*
  * Abort an in-flight synchronous client call from another thread. Abort is
- * sticky: future calls fail with NIPC_ERR_ABORTED until nipc_client_clear_abort()
- * or nipc_client_close() is called.
+ * sticky: future calls fail with NIPC_ERR_ABORTED until
+ * nipc_client_clear_abort() or nipc_client_close() is called.
  */
 void nipc_client_abort(nipc_client_ctx_t *ctx);
 
@@ -235,40 +246,31 @@ void nipc_client_close(nipc_client_ctx_t *ctx);
  *
  * Returns NIPC_OK on success, or an error code.
  */
-nipc_error_t nipc_client_call_cgroups_snapshot(
-    nipc_client_ctx_t *ctx,
-    nipc_cgroups_resp_view_t *view_out);
+nipc_error_t
+nipc_client_call_cgroups_snapshot(nipc_client_ctx_t *ctx,
+                                  nipc_cgroups_resp_view_t *view_out);
 
-nipc_error_t nipc_client_call_cgroups_snapshot_timeout(
-    nipc_client_ctx_t *ctx,
-    nipc_cgroups_resp_view_t *view_out,
-    uint32_t timeout_ms);
+nipc_error_t
+nipc_client_call_cgroups_snapshot_timeout(nipc_client_ctx_t *ctx,
+                                          nipc_cgroups_resp_view_t *view_out,
+                                          uint32_t timeout_ms);
 
 nipc_error_t nipc_client_call_cgroups_lookup(
-    nipc_client_ctx_t *ctx,
-    const nipc_str_view_t *paths,
-    uint32_t path_count,
+    nipc_client_ctx_t *ctx, const nipc_str_view_t *paths, uint32_t path_count,
     nipc_cgroups_lookup_resp_view_t *view_out);
 
 nipc_error_t nipc_client_call_cgroups_lookup_timeout(
-    nipc_client_ctx_t *ctx,
-    const nipc_str_view_t *paths,
-    uint32_t path_count,
-    nipc_cgroups_lookup_resp_view_t *view_out,
-    uint32_t timeout_ms);
+    nipc_client_ctx_t *ctx, const nipc_str_view_t *paths, uint32_t path_count,
+    nipc_cgroups_lookup_resp_view_t *view_out, uint32_t timeout_ms);
 
-nipc_error_t nipc_client_call_apps_lookup(
-    nipc_client_ctx_t *ctx,
-    const uint32_t *pids,
-    uint32_t pid_count,
-    nipc_apps_lookup_resp_view_t *view_out);
+nipc_error_t
+nipc_client_call_apps_lookup(nipc_client_ctx_t *ctx, const uint32_t *pids,
+                             uint32_t pid_count,
+                             nipc_apps_lookup_resp_view_t *view_out);
 
 nipc_error_t nipc_client_call_apps_lookup_timeout(
-    nipc_client_ctx_t *ctx,
-    const uint32_t *pids,
-    uint32_t pid_count,
-    nipc_apps_lookup_resp_view_t *view_out,
-    uint32_t timeout_ms);
+    nipc_client_ctx_t *ctx, const uint32_t *pids, uint32_t pid_count,
+    nipc_apps_lookup_resp_view_t *view_out, uint32_t timeout_ms);
 
 /* ------------------------------------------------------------------ */
 /*  Managed server                                                     */
@@ -276,107 +278,107 @@ nipc_error_t nipc_client_call_apps_lookup_timeout(
 
 /* Internal dispatch callback shape used by the managed-server loop. */
 typedef nipc_error_t (*nipc_server_handler_fn)(
-    void *user,
-    const nipc_header_t *request_hdr,
-    const uint8_t *request_payload, size_t request_len,
-    uint8_t *response_buf, size_t response_buf_size,
-    size_t *response_len_out);
+    void *user, const nipc_header_t *request_hdr,
+    const uint8_t *request_payload, size_t request_len, uint8_t *response_buf,
+    size_t response_buf_size, size_t *response_len_out);
 
 /* Typed managed-server callback surface for the cgroups-snapshot service. */
 typedef struct {
-    nipc_cgroups_handler_fn handle;
+  nipc_cgroups_handler_fn handle;
 
-    /* Optional explicit reservation hint for snapshot builders. When 0,
-     * the library derives a safe upper bound from negotiated response
-     * limits. */
-    uint32_t snapshot_max_items;
+  /* Optional explicit reservation hint for snapshot builders. When 0,
+   * the library derives a safe upper bound from negotiated response
+   * limits. */
+  uint32_t snapshot_max_items;
 
-    void *user;
+  void *user;
 } nipc_cgroups_service_handler_t;
 
 typedef struct {
-    nipc_cgroups_lookup_handler_fn handle;
-    void *user;
+  nipc_cgroups_lookup_handler_fn handle;
+  void *user;
 } nipc_cgroups_lookup_service_handler_t;
 
 typedef struct {
-    nipc_apps_lookup_handler_fn handle;
-    void *user;
+  nipc_apps_lookup_handler_fn handle;
+  void *user;
 } nipc_apps_lookup_service_handler_t;
 
 typedef union {
-    nipc_cgroups_service_handler_t cgroups_snapshot;
-    nipc_cgroups_lookup_service_handler_t cgroups_lookup;
-    nipc_apps_lookup_service_handler_t apps_lookup;
+  nipc_cgroups_service_handler_t cgroups_snapshot;
+  nipc_cgroups_lookup_service_handler_t cgroups_lookup;
+  nipc_apps_lookup_service_handler_t apps_lookup;
 } nipc_server_typed_handler_t;
 
 typedef struct nipc_managed_server nipc_managed_server_t;
 
 /* Per-session context for multi-client server */
 typedef struct nipc_session_ctx {
-    nipc_managed_server_t *server;   /* back-pointer */
+  nipc_managed_server_t *server; /* back-pointer */
 #if defined(_WIN32) || defined(__MSYS__)
-    nipc_np_session_t session;
-    nipc_win_shm_ctx_t *shm;        /* non-NULL if SHM negotiated */
-    HANDLE thread;
+  nipc_np_session_t session;
+  nipc_win_shm_ctx_t *shm; /* non-NULL if SHM negotiated */
+  HANDLE thread;
 #else
-    nipc_uds_session_t session;
-    nipc_shm_ctx_t *shm;            /* non-NULL if SHM negotiated */
-    pthread_t thread;
+  nipc_uds_session_t session;
+  nipc_shm_ctx_t *shm; /* non-NULL if SHM negotiated */
+  pthread_t thread;
 #endif
-    uint64_t id;
-    bool active;  /* use __atomic builtins for cross-thread access */
+  uint64_t id;
+  bool active; /* use __atomic builtins for cross-thread access */
 } nipc_session_ctx_t;
 
 struct nipc_managed_server {
-    /* Listener */
+  /* Listener */
 #if defined(_WIN32) || defined(__MSYS__)
-    nipc_np_listener_t listener;
-    nipc_np_server_config_t base_config;
+  nipc_np_listener_t listener;
+  nipc_np_server_config_t base_config;
 #else
-    nipc_uds_listener_t listener;
-    nipc_uds_server_config_t base_config;
+  nipc_uds_listener_t listener;
+  nipc_uds_server_config_t base_config;
 #endif
 
-    /* Concurrency control */
-    int worker_count;                /* max concurrent sessions */
+  /* Concurrency control */
+  int worker_count; /* max concurrent sessions */
 
-    /* Callback */
-    nipc_server_handler_fn handler;
-    void *handler_user;
-    nipc_server_typed_handler_t typed_handler;
-    uint16_t expected_method_code;
-    uint32_t learned_request_payload_bytes;
-    uint32_t learned_response_payload_bytes;
+  /* Callback */
+  nipc_server_handler_fn handler;
+  void *handler_user;
+  nipc_server_typed_handler_t typed_handler;
+  uint16_t expected_method_code;
+  uint32_t learned_request_payload_bytes;
+  uint32_t learned_response_payload_bytes;
+  uint32_t request_payload_growth_ceiling;
+  uint32_t response_payload_growth_ceiling;
 
-    /* State — use __atomic builtins (POSIX) or Interlocked* (Windows) */
+  /* State — use __atomic builtins (POSIX) or Interlocked* (Windows) */
 #if defined(_WIN32) || defined(__MSYS__)
-    volatile LONG running;
-    volatile LONG accept_loop_active;
+  volatile LONG running;
+  volatile LONG accept_loop_active;
 #else
-    bool running;
+  bool running;
 #endif
 
-    /* Session tracking */
-    nipc_session_ctx_t **sessions;   /* dynamic array of active sessions */
-    int session_count;               /* current active session count */
-    int session_capacity;            /* allocated slots */
-    uint64_t next_session_id;        /* monotonic session ID counter */
+  /* Session tracking */
+  nipc_session_ctx_t **sessions; /* dynamic array of active sessions */
+  int session_count;             /* current active session count */
+  int session_capacity;          /* allocated slots */
+  uint64_t next_session_id;      /* monotonic session ID counter */
 #if defined(_WIN32) || defined(__MSYS__)
-    CRITICAL_SECTION sessions_lock;  /* protects session array + count */
+  CRITICAL_SECTION sessions_lock; /* protects session array + count */
 #else
-    pthread_mutex_t sessions_lock;   /* protects session array + count */
-    pthread_t acceptor_thread;
-    bool acceptor_started;
+  pthread_mutex_t sessions_lock; /* protects session array + count */
+  pthread_t acceptor_thread;
+  bool acceptor_started;
 #endif
 
-    /* Configuration */
-    char run_dir[256];
-    char service_name[128];
+  /* Configuration */
+  char run_dir[256];
+  char service_name[128];
 
 #if defined(_WIN32) || defined(__MSYS__)
-    /* Auth token needed for SHM kernel object naming */
-    uint64_t auth_token;
+  /* Auth token needed for SHM kernel object naming */
+  uint64_t auth_token;
 #endif
 };
 
@@ -386,26 +388,21 @@ struct nipc_managed_server {
  * Does NOT start workers. Call nipc_server_run() to start the
  * acceptor+worker loop.
  */
-nipc_error_t nipc_server_init_typed(nipc_managed_server_t *server,
-                               const char *run_dir,
-                               const char *service_name,
-                               const nipc_server_config_t *config,
-                               int worker_count,
-                               const nipc_cgroups_service_handler_t *service_handler);
+nipc_error_t
+nipc_server_init_typed(nipc_managed_server_t *server, const char *run_dir,
+                       const char *service_name,
+                       const nipc_server_config_t *config, int worker_count,
+                       const nipc_cgroups_service_handler_t *service_handler);
 
 nipc_error_t nipc_server_init_cgroups_lookup(
-    nipc_managed_server_t *server,
-    const char *run_dir,
-    const char *service_name,
-    const nipc_server_config_t *config,
+    nipc_managed_server_t *server, const char *run_dir,
+    const char *service_name, const nipc_server_config_t *config,
     int worker_count,
     const nipc_cgroups_lookup_service_handler_t *service_handler);
 
 nipc_error_t nipc_server_init_apps_lookup(
-    nipc_managed_server_t *server,
-    const char *run_dir,
-    const char *service_name,
-    const nipc_server_config_t *config,
+    nipc_managed_server_t *server, const char *run_dir,
+    const char *service_name, const nipc_server_config_t *config,
     int worker_count,
     const nipc_apps_lookup_service_handler_t *service_handler);
 
@@ -415,54 +412,51 @@ nipc_error_t nipc_server_init_apps_lookup(
  * intentionally exercise raw dispatch or malformed response paths. Not part
  * of the public Level 2 contract.
  */
-nipc_error_t nipc_server_init_raw_for_tests(
-    nipc_managed_server_t *server,
-    const char *run_dir,
-    const char *service_name,
+nipc_error_t
+nipc_server_init_raw_for_tests(nipc_managed_server_t *server,
+                               const char *run_dir, const char *service_name,
 #if defined(_WIN32) || defined(__MSYS__)
-    const nipc_np_server_config_t *config,
+                               const nipc_np_server_config_t *config,
 #else
-    const nipc_uds_server_config_t *config,
+                               const nipc_uds_server_config_t *config,
 #endif
-    int worker_count,
-    uint16_t expected_method_code,
-    nipc_server_handler_fn handler,
-    void *user);
+                               int worker_count, uint16_t expected_method_code,
+                               nipc_server_handler_fn handler, void *user);
 
 #if defined(_WIN32) || defined(__MSYS__)
 typedef enum {
-    NIPC_WIN_SERVICE_TEST_FAULT_CLIENT_RESPONSE_BUF_REALLOC = 1,
-    NIPC_WIN_SERVICE_TEST_FAULT_CLIENT_SEND_BUF_REALLOC,
-    NIPC_WIN_SERVICE_TEST_FAULT_CLIENT_SHM_CTX_CALLOC,
-    NIPC_WIN_SERVICE_TEST_FAULT_SERVER_SHM_CTX_CALLOC,
-    NIPC_WIN_SERVICE_TEST_FAULT_SERVER_RECV_BUF_MALLOC,
-    NIPC_WIN_SERVICE_TEST_FAULT_SERVER_RESP_BUF_MALLOC,
-    NIPC_WIN_SERVICE_TEST_FAULT_SERVER_SESSIONS_CALLOC,
-    NIPC_WIN_SERVICE_TEST_FAULT_SERVER_SESSION_CTX_CALLOC,
-    NIPC_WIN_SERVICE_TEST_FAULT_SERVER_THREAD_CREATE,
-    NIPC_WIN_SERVICE_TEST_FAULT_CACHE_BUCKETS_CALLOC,
-    NIPC_WIN_SERVICE_TEST_FAULT_CACHE_ITEMS_CALLOC,
-    NIPC_WIN_SERVICE_TEST_FAULT_CACHE_ITEM_NAME_MALLOC,
-    NIPC_WIN_SERVICE_TEST_FAULT_CACHE_ITEM_PATH_MALLOC,
+  NIPC_WIN_SERVICE_TEST_FAULT_CLIENT_RESPONSE_BUF_REALLOC = 1,
+  NIPC_WIN_SERVICE_TEST_FAULT_CLIENT_SEND_BUF_REALLOC,
+  NIPC_WIN_SERVICE_TEST_FAULT_CLIENT_SHM_CTX_CALLOC,
+  NIPC_WIN_SERVICE_TEST_FAULT_SERVER_SHM_CTX_CALLOC,
+  NIPC_WIN_SERVICE_TEST_FAULT_SERVER_RECV_BUF_MALLOC,
+  NIPC_WIN_SERVICE_TEST_FAULT_SERVER_RESP_BUF_MALLOC,
+  NIPC_WIN_SERVICE_TEST_FAULT_SERVER_SESSIONS_CALLOC,
+  NIPC_WIN_SERVICE_TEST_FAULT_SERVER_SESSION_CTX_CALLOC,
+  NIPC_WIN_SERVICE_TEST_FAULT_SERVER_THREAD_CREATE,
+  NIPC_WIN_SERVICE_TEST_FAULT_CACHE_BUCKETS_CALLOC,
+  NIPC_WIN_SERVICE_TEST_FAULT_CACHE_ITEMS_CALLOC,
+  NIPC_WIN_SERVICE_TEST_FAULT_CACHE_ITEM_NAME_MALLOC,
+  NIPC_WIN_SERVICE_TEST_FAULT_CACHE_ITEM_PATH_MALLOC,
 } nipc_win_service_test_fault_site_t;
 
 void nipc_win_service_test_fault_set(int site, uint32_t skip_matches);
 void nipc_win_service_test_fault_clear(void);
 #else
 typedef enum {
-    NIPC_POSIX_SERVICE_TEST_FAULT_CLIENT_RESPONSE_BUF_REALLOC = 1,
-    NIPC_POSIX_SERVICE_TEST_FAULT_CLIENT_SEND_BUF_REALLOC,
-    NIPC_POSIX_SERVICE_TEST_FAULT_CLIENT_SHM_CTX_CALLOC,
-    NIPC_POSIX_SERVICE_TEST_FAULT_SERVER_SHM_CTX_CALLOC,
-    NIPC_POSIX_SERVICE_TEST_FAULT_SERVER_RECV_BUF_MALLOC,
-    NIPC_POSIX_SERVICE_TEST_FAULT_SERVER_RESP_BUF_MALLOC,
-    NIPC_POSIX_SERVICE_TEST_FAULT_SERVER_SESSIONS_CALLOC,
-    NIPC_POSIX_SERVICE_TEST_FAULT_SERVER_SESSION_CTX_CALLOC,
-    NIPC_POSIX_SERVICE_TEST_FAULT_SERVER_THREAD_CREATE,
-    NIPC_POSIX_SERVICE_TEST_FAULT_CACHE_BUCKETS_CALLOC,
-    NIPC_POSIX_SERVICE_TEST_FAULT_CACHE_ITEMS_CALLOC,
-    NIPC_POSIX_SERVICE_TEST_FAULT_CACHE_ITEM_NAME_MALLOC,
-    NIPC_POSIX_SERVICE_TEST_FAULT_CACHE_ITEM_PATH_MALLOC,
+  NIPC_POSIX_SERVICE_TEST_FAULT_CLIENT_RESPONSE_BUF_REALLOC = 1,
+  NIPC_POSIX_SERVICE_TEST_FAULT_CLIENT_SEND_BUF_REALLOC,
+  NIPC_POSIX_SERVICE_TEST_FAULT_CLIENT_SHM_CTX_CALLOC,
+  NIPC_POSIX_SERVICE_TEST_FAULT_SERVER_SHM_CTX_CALLOC,
+  NIPC_POSIX_SERVICE_TEST_FAULT_SERVER_RECV_BUF_MALLOC,
+  NIPC_POSIX_SERVICE_TEST_FAULT_SERVER_RESP_BUF_MALLOC,
+  NIPC_POSIX_SERVICE_TEST_FAULT_SERVER_SESSIONS_CALLOC,
+  NIPC_POSIX_SERVICE_TEST_FAULT_SERVER_SESSION_CTX_CALLOC,
+  NIPC_POSIX_SERVICE_TEST_FAULT_SERVER_THREAD_CREATE,
+  NIPC_POSIX_SERVICE_TEST_FAULT_CACHE_BUCKETS_CALLOC,
+  NIPC_POSIX_SERVICE_TEST_FAULT_CACHE_ITEMS_CALLOC,
+  NIPC_POSIX_SERVICE_TEST_FAULT_CACHE_ITEM_NAME_MALLOC,
+  NIPC_POSIX_SERVICE_TEST_FAULT_CACHE_ITEM_PATH_MALLOC,
 } nipc_posix_service_test_fault_site_t;
 
 void nipc_posix_service_test_fault_set(int site, uint32_t skip_matches);
@@ -514,25 +508,26 @@ void nipc_server_destroy(nipc_managed_server_t *server);
  * Built from ephemeral L2 views during cache construction.
  */
 typedef struct {
-    uint32_t hash;
-    uint32_t options;
-    uint32_t enabled;
-    char *name;     /* owned NUL-terminated copy */
-    char *path;     /* owned NUL-terminated copy */
+  uint32_t hash;
+  uint32_t options;
+  uint32_t enabled;
+  char *name; /* owned NUL-terminated copy */
+  char *path; /* owned NUL-terminated copy */
 } nipc_cgroups_cache_item_t;
 
 /*
  * L3 cache status snapshot (for diagnostics, not hot path).
  */
 typedef struct {
-    bool     populated;
-    uint32_t item_count;
-    uint32_t systemd_enabled;
-    uint64_t generation;
-    uint32_t refresh_success_count;
-    uint32_t refresh_failure_count;
-    nipc_client_state_t connection_state;  /* current L2 connection state */
-    uint64_t last_refresh_ts;  /* monotonic timestamp of last successful refresh (ms), 0 if never */
+  bool populated;
+  uint32_t item_count;
+  uint32_t systemd_enabled;
+  uint64_t generation;
+  uint32_t refresh_success_count;
+  uint32_t refresh_failure_count;
+  nipc_client_state_t connection_state; /* current L2 connection state */
+  uint64_t last_refresh_ts; /* monotonic timestamp of last successful refresh
+                               (ms), 0 if never */
 } nipc_cgroups_cache_status_t;
 
 /*
@@ -548,32 +543,32 @@ typedef struct {
 
 /* Hash table bucket for O(1) cache lookup */
 typedef struct {
-    uint32_t index;  /* index into items[] array */
-    bool     used;   /* true if this bucket is occupied */
+  uint32_t index; /* index into items[] array */
+  bool used;      /* true if this bucket is occupied */
 } nipc_cgroups_hash_bucket_t;
 
 typedef struct {
-    nipc_client_ctx_t client;
+  nipc_client_ctx_t client;
 
-    /* Cache data (owned) */
-    nipc_cgroups_cache_item_t *items;
-    uint32_t item_count;
-    uint32_t systemd_enabled;
-    uint64_t generation;
-    bool     populated;
+  /* Cache data (owned) */
+  nipc_cgroups_cache_item_t *items;
+  uint32_t item_count;
+  uint32_t systemd_enabled;
+  uint64_t generation;
+  bool populated;
 
-    /* Hash table for O(1) lookup (open addressing, rebuilt on refresh) */
-    nipc_cgroups_hash_bucket_t *buckets;
-    uint32_t bucket_count;  /* always a power of 2 */
+  /* Hash table for O(1) lookup (open addressing, rebuilt on refresh) */
+  nipc_cgroups_hash_bucket_t *buckets;
+  uint32_t bucket_count; /* always a power of 2 */
 
-    /* Counters */
-    uint32_t refresh_success_count;
-    uint32_t refresh_failure_count;
-    uint64_t last_refresh_ts;  /* monotonic ms of last successful refresh */
+  /* Counters */
+  uint32_t refresh_success_count;
+  uint32_t refresh_failure_count;
+  uint64_t last_refresh_ts; /* monotonic ms of last successful refresh */
 
-    /* Internal: response buffer for L2 calls */
-    uint8_t *response_buf;
-    size_t   response_buf_size;
+  /* Internal: response buffer for L2 calls */
+  uint8_t *response_buf;
+  size_t response_buf_size;
 } nipc_cgroups_cache_t;
 
 /*
@@ -581,10 +576,9 @@ typedef struct {
  * Does NOT connect. Does NOT require the server to be running.
  * Cache starts empty (populated == false).
  */
-void nipc_cgroups_cache_init(nipc_cgroups_cache_t *cache,
-                              const char *run_dir,
-                              const char *service_name,
-                              const nipc_client_config_t *config);
+void nipc_cgroups_cache_init(nipc_cgroups_cache_t *cache, const char *run_dir,
+                             const char *service_name,
+                             const nipc_client_config_t *config);
 
 /*
  * Refresh the cache. Drives the L2 client (connect/reconnect as
@@ -604,7 +598,7 @@ bool nipc_cgroups_cache_refresh(nipc_cgroups_cache_t *cache);
  * Note: ready means "has cached data", not "is connected."
  */
 static inline bool nipc_cgroups_cache_ready(const nipc_cgroups_cache_t *cache) {
-    return cache->populated;
+  return cache->populated;
 }
 
 /*
@@ -614,16 +608,15 @@ static inline bool nipc_cgroups_cache_ready(const nipc_cgroups_cache_t *cache) {
  * cache is empty. The returned pointer is valid until the next
  * successful refresh.
  */
-const nipc_cgroups_cache_item_t *nipc_cgroups_cache_lookup(
-    const nipc_cgroups_cache_t *cache,
-    uint32_t hash,
-    const char *name);
+const nipc_cgroups_cache_item_t *
+nipc_cgroups_cache_lookup(const nipc_cgroups_cache_t *cache, uint32_t hash,
+                          const char *name);
 
 /*
  * Fill a status snapshot for diagnostics.
  */
 void nipc_cgroups_cache_status(const nipc_cgroups_cache_t *cache,
-                                nipc_cgroups_cache_status_t *out);
+                               nipc_cgroups_cache_status_t *out);
 
 /*
  * Close the cache: free all cached items, close the L2 client.

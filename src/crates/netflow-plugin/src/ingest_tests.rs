@@ -3,6 +3,41 @@ use super::test_support::{
 };
 use super::*;
 use crate::plugin_config::DecapsulationMode as ConfigDecapsulationMode;
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+#[test]
+fn ingest_metrics_extend_snapshot_key_count_matches_inserted_stats() {
+    let metrics = IngestMetrics::default();
+    let mut stats = HashMap::new();
+
+    metrics.extend_snapshot(&mut stats);
+
+    assert_eq!(stats.len(), super::metrics::INGEST_STATS_SNAPSHOT_KEY_COUNT);
+}
+
+#[test]
+fn ingest_metrics_extend_snapshot_preserves_existing_query_stats_on_key_collision() {
+    let metrics = IngestMetrics::default();
+    metrics
+        .udp_packets_received
+        .store(12_345, Ordering::Relaxed);
+    metrics.parse_attempts.store(67, Ordering::Relaxed);
+    let mut stats = HashMap::from([
+        ("query_returned_rows".to_string(), 42),
+        ("udp_packets_received".to_string(), 999),
+    ]);
+
+    metrics.extend_snapshot(&mut stats);
+
+    assert_eq!(stats.get("query_returned_rows").copied(), Some(42));
+    assert_eq!(
+        stats.get("udp_packets_received").copied(),
+        Some(999),
+        "existing query stats must keep the old snapshot-then-query override behavior"
+    );
+    assert_eq!(stats.get("decoded_parse_attempts").copied(), Some(67));
+}
 
 #[test]
 fn ingest_service_with_decap_none_keeps_outer_header_view() {
@@ -258,3 +293,160 @@ fn ingest_service_preload_decoder_state_skips_oversized_namespace_file() {
     );
 }
 
+#[test]
+fn refresh_open_tier_state_publishes_complete_snapshots_under_concurrent_reads() {
+    const FLOW_COUNT: usize = 128;
+    let (_tmp, mut service) = new_test_ingest_service(ConfigDecapsulationMode::None);
+    let timestamp_usec = 90_000_000_u64;
+    let snapshot_usec = timestamp_usec + 10_000_000;
+
+    for i in 0..FLOW_COUNT {
+        let mut record = crate::flow::FlowRecord::default();
+        record.protocol = 6;
+        record.src_as = 64_000 + i as u32;
+        record.bytes = (i as u64) + 1;
+        record.packets = 1;
+        service.observe_tiers_record(timestamp_usec + i as u64, &record);
+    }
+
+    let generation = service
+        .tier_flow_indexes
+        .read()
+        .expect("read tier flow index generation")
+        .generation();
+    assert!(generation > 0);
+
+    let open_tiers = Arc::clone(&service.open_tiers);
+    let stop = Arc::new(AtomicBool::new(false));
+    let failure = Arc::new(std::sync::Mutex::new(None::<String>));
+
+    let reader_stop = Arc::clone(&stop);
+    let reader_failure = Arc::clone(&failure);
+    let reader = std::thread::spawn(move || {
+        while !reader_stop.load(Ordering::Relaxed) {
+            match open_tiers.try_read() {
+                Ok(state) => {
+                    let lens = (
+                        state.minute_1.len(),
+                        state.minute_5.len(),
+                        state.hour_1.len(),
+                    );
+                    let valid_empty = state.generation == 0 && lens == (0, 0, 0);
+                    let valid_complete = state.generation == generation
+                        && lens == (FLOW_COUNT, FLOW_COUNT, FLOW_COUNT);
+                    if !valid_empty && !valid_complete {
+                        *reader_failure.lock().expect("record reader failure") = Some(format!(
+                            "observed partial open-tier state: generation={}, lens={:?}",
+                            state.generation, lens
+                        ));
+                        reader_stop.store(true, Ordering::Relaxed);
+                        break;
+                    }
+                }
+                Err(std::sync::TryLockError::WouldBlock) => {}
+                Err(std::sync::TryLockError::Poisoned(_)) => {
+                    *reader_failure.lock().expect("record poison failure") =
+                        Some("open-tier lock was poisoned".to_string());
+                    reader_stop.store(true, Ordering::Relaxed);
+                    break;
+                }
+            }
+            std::thread::yield_now();
+        }
+    });
+
+    for _ in 0..64 {
+        service.refresh_open_tier_state(snapshot_usec);
+        if failure.lock().expect("read failure").is_some() {
+            break;
+        }
+    }
+
+    stop.store(true, Ordering::Relaxed);
+    reader.join().expect("join open-tier reader");
+
+    if let Some(message) = failure.lock().expect("read final failure").take() {
+        panic!("{message}");
+    }
+
+    let state = service.open_tiers.read().expect("read final open tiers");
+    assert_eq!(state.generation, generation);
+    assert_eq!(state.minute_1.len(), FLOW_COUNT);
+    assert_eq!(state.minute_5.len(), FLOW_COUNT);
+    assert_eq!(state.hour_1.len(), FLOW_COUNT);
+    assert!(
+        state
+            .minute_1
+            .iter()
+            .chain(state.minute_5.iter())
+            .chain(state.hour_1.iter())
+            .all(|row| row.timestamp_usec == snapshot_usec),
+        "published rows must all come from the same refresh"
+    );
+}
+
+#[test]
+fn prune_unused_tier_flow_indexes_removes_inactive_hours_and_keeps_open_hour() {
+    let (_tmp, mut service) = new_test_ingest_service(ConfigDecapsulationMode::None);
+    let hour = 3_600_000_000_u64;
+    let old_ts = hour + 1;
+    let open_ts = 2 * hour + 1;
+
+    let mut old_record = crate::flow::FlowRecord::default();
+    old_record.protocol = 6;
+    old_record.src_as = 64_001;
+    old_record.bytes = 100;
+    old_record.packets = 1;
+    service.observe_tiers_record(old_ts, &old_record);
+
+    let mut open_record = crate::flow::FlowRecord::default();
+    open_record.protocol = 17;
+    open_record.src_as = 64_002;
+    open_record.bytes = 200;
+    open_record.packets = 2;
+    service.observe_tiers_record(open_ts, &open_record);
+
+    let (old_ref, open_ref) = {
+        let mut store = service
+            .tier_flow_indexes
+            .write()
+            .expect("write tier flow indexes");
+        (
+            store
+                .get_or_insert_record_flow(old_ts, &old_record)
+                .expect("old flow ref"),
+            store
+                .get_or_insert_record_flow(open_ts, &open_record)
+                .expect("open flow ref"),
+        )
+    };
+
+    assert_eq!(
+        service
+            .tier_flow_indexes
+            .read()
+            .expect("read tier flow indexes")
+            .cardinality()
+            .hours,
+        2
+    );
+
+    service
+        .flush_closed_tiers(open_ts)
+        .expect("flush old tiers");
+    service.prune_unused_tier_flow_indexes();
+
+    let store = service
+        .tier_flow_indexes
+        .read()
+        .expect("read pruned tier flow indexes");
+    assert_eq!(store.cardinality().hours, 1);
+    assert!(
+        store.materialize_fields(old_ref).is_none(),
+        "inactive closed hour should be pruned"
+    );
+    assert!(
+        store.materialize_fields(open_ref).is_some(),
+        "open hour should remain materializable"
+    );
+}

@@ -369,6 +369,9 @@ static void cgroups_lookup_commit_staged(
     struct cgroups_lookup_staged_item *staged,
     uint64_t generation)
 {
+    // CGROUPS_LOOKUP may resolve a namespace-relative cgroup internally, but the
+    // response path remains the original request key so this cache can commit
+    // without normalizing paths in apps.plugin.
     struct cgroup_lookup_entry *entry =
         dictionary_get_advanced(cgroups_lookup_cache, item->path.ptr, item->path.len);
     if (!entry)

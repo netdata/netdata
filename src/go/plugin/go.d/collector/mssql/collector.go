@@ -55,7 +55,7 @@ func New() *Collector {
 		seenWaitTypes:        make(map[string]bool),
 		seenLockTypes:        make(map[string]bool),
 		seenLockStatsTypes:   make(map[string]bool),
-		seenJobs:             make(map[string]bool),
+		seenJobs:             make(map[string]string),
 		seenReplications:     make(map[string]bool),
 
 		seenAGs:                make(map[string]bool),
@@ -161,7 +161,7 @@ type Collector struct {
 	seenWaitTypes        map[string]bool
 	seenLockTypes        map[string]bool
 	seenLockStatsTypes   map[string]bool
-	seenJobs             map[string]bool
+	seenJobs             map[string]string
 	seenReplications     map[string]bool
 
 	hadrEnabled  bool // true if Always On AG is enabled on this instance

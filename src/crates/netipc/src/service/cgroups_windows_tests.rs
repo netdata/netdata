@@ -211,6 +211,24 @@ fn test_cache_round_trip_windows() {
 
     let item = cache.lookup(1001, "docker-abc123").expect("lookup");
     assert_eq!(item.path, "/sys/fs/cgroup/docker/abc123");
+
+    let status = cache.status();
+    assert!(status.populated);
+    assert_eq!(status.item_count, 3);
+    assert_eq!(status.systemd_enabled, 1);
+    assert_eq!(status.generation, 42);
+    assert_eq!(status.refresh_success_count, 1);
+    assert_eq!(status.refresh_failure_count, 0);
+    assert_eq!(status.connection_state, ClientState::Ready);
+
+    cache.set_call_timeout(500);
+    let abort = cache.abort_handle();
+    abort.abort();
+    cache.clear_abort();
+    abort.clear();
+    cache.close();
+    assert!(!cache.ready());
+    assert!(cache.lookup(1001, "docker-abc123").is_none());
 }
 
 #[test]
@@ -221,4 +239,86 @@ fn test_client_not_ready_returns_error_windows() {
         Err(NipcError::BadLayout) => {}
         other => panic!("unexpected result: {other:?}"),
     }
+}
+
+#[test]
+fn test_client_facade_controls_windows() {
+    ensure_run_dir();
+    let service = unique_service("client_controls");
+    let mut client = CgroupsClient::new(TEST_RUN_DIR, &service, client_config());
+
+    assert!(!client.ready());
+    let initial = client.status();
+    assert_eq!(initial.state, ClientState::Disconnected);
+    assert_eq!(initial.connect_count, 0);
+    assert_eq!(initial.reconnect_count, 0);
+    assert_eq!(initial.call_count, 0);
+    assert_eq!(initial.error_count, 0);
+
+    client.set_call_timeout(1);
+    let abort = client.abort_handle();
+    abort.abort();
+    match client.call_snapshot_with_timeout(1) {
+        Err(NipcError::BadLayout) => {}
+        other => panic!("unexpected result: {other:?}"),
+    }
+
+    client.abort();
+    client.clear_abort();
+    abort.clear();
+    client.close();
+
+    let closed = client.status();
+    assert_eq!(closed.state, ClientState::Disconnected);
+    assert!(!client.ready());
+}
+
+#[test]
+fn test_cache_facade_controls_windows() {
+    ensure_run_dir();
+    let service = unique_service("cache_controls");
+    let mut cache = CgroupsCache::new(TEST_RUN_DIR, &service, client_config());
+
+    assert!(!cache.ready());
+    assert!(cache.lookup(1001, "docker-abc123").is_none());
+    let initial = cache.status();
+    assert!(!initial.populated);
+    assert_eq!(initial.item_count, 0);
+    assert_eq!(initial.refresh_success_count, 0);
+    assert_eq!(initial.refresh_failure_count, 0);
+    assert_eq!(initial.connection_state, ClientState::Disconnected);
+
+    cache.set_call_timeout(1);
+    let abort = cache.abort_handle();
+    abort.abort();
+    assert!(!cache.refresh());
+
+    let failed = cache.status();
+    assert!(!failed.populated);
+    assert_eq!(failed.refresh_success_count, 0);
+    assert_eq!(failed.refresh_failure_count, 1);
+
+    cache.abort();
+    cache.clear_abort();
+    abort.clear();
+    cache.close();
+    assert!(!cache.ready());
+}
+
+#[test]
+fn test_managed_server_facade_controls_windows() {
+    ensure_run_dir();
+    let service = unique_service("server_controls");
+    let server = ManagedServer::with_workers(
+        TEST_RUN_DIR,
+        &service,
+        server_config(),
+        snapshot_handler(),
+        1,
+    );
+
+    let running = server.running_flag();
+    assert!(!running.load(Ordering::Acquire));
+    server.stop();
+    assert!(!running.load(Ordering::Acquire));
 }

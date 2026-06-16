@@ -50,7 +50,7 @@ const nipc_service_common_client_ops_t *nipc_service_win_client_ops(void)
         .try_connect = nipc_service_win_client_try_connect,
         .reconnect_for_call = nipc_service_win_client_reconnect_for_call,
         .sleep_ms = client_sleep_ms,
-        .reconnect_drain_ms = 0,
+        .reconnect_drain_ms = CLIENT_CALL_RECONNECT_DRAIN_MS,
         .reconnect_retry_interval_ms = CLIENT_CALL_RECONNECT_RETRY_INTERVAL_MS,
     };
     return &ops;
@@ -86,6 +86,7 @@ void nipc_client_init(nipc_client_ctx_t *ctx,
     ctx->call_timeout_ms = (config && config->call_timeout_ms != 0)
         ? config->call_timeout_ms
         : NIPC_CLIENT_CALL_TIMEOUT_DEFAULT_MS;
+    nipc_service_common_client_apply_logical_lookup_config(ctx, config);
     if (ctx->transport_config.max_request_payload_bytes == 0)
         ctx->transport_config.max_request_payload_bytes =
             nipc_service_common_request_payload_default();

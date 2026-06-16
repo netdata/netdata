@@ -27,8 +27,8 @@ static void server_handle_session(nipc_managed_server_t *server,
     if (!nipc_service_common_header_payload_len(
             session->max_request_payload_bytes, &recv_size))
         return;
-    if (recv_size < NIPC_HEADER_LEN + 1024u)
-        recv_size = NIPC_HEADER_LEN + 1024u;
+    if (recv_size < NIPC_HEADER_LEN + NIPC_SERVICE_MIN_PAYLOAD_BUFFER_BYTES)
+        recv_size = NIPC_HEADER_LEN + NIPC_SERVICE_MIN_PAYLOAD_BUFFER_BYTES;
     uint8_t *recv_buf = nipc_service_win_malloc(
         recv_size, NIPC_WIN_SERVICE_TEST_FAULT_SERVER_RECV_BUF_MALLOC_INTERNAL);
     if (!recv_buf)
@@ -131,13 +131,20 @@ static void server_handle_session(nipc_managed_server_t *server,
             nipc_service_common_server_note_request_capacity(
                 server, (uint32_t)payload_len);
 
+        /* Dispatch against the negotiated payload limit, not the larger
+         * scratch allocation, so codec builders can return item-level
+         * overflow statuses before transport-level resize fallback. */
+        size_t dispatch_resp_size = (size_t)session->max_response_payload_bytes;
+        if (dispatch_resp_size > resp_buf_size)
+            dispatch_resp_size = resp_buf_size;
+
         /* Dispatch: one request kind per service endpoint. */
         size_t response_len = 0;
         nipc_error_t dispatch_err = server->handler(
             server->handler_user,
             &hdr,
             (const uint8_t *)payload, payload_len,
-            resp_buf, resp_buf_size,
+            resp_buf, dispatch_resp_size,
             &response_len);
 
         /* Build response header */
@@ -145,7 +152,7 @@ static void server_handle_session(nipc_managed_server_t *server,
         bool close_after_response = false;
         nipc_service_common_prepare_response_header(&hdr, &resp_hdr);
         nipc_service_common_apply_dispatch_result(
-            server, dispatch_err, resp_buf_size,
+            server, dispatch_err, dispatch_resp_size,
             session->max_response_payload_bytes, true,
             &resp_hdr, &response_len, &close_after_response);
 
@@ -199,8 +206,8 @@ unsigned __stdcall nipc_service_win_session_handler_thread(void *arg)
     nipc_managed_server_t *server = sctx->server;
     /* Allocate a per-session response buffer */
     size_t resp_size = (size_t)sctx->session.max_response_payload_bytes;
-    if (resp_size < 1024u)
-        resp_size = 1024u;
+    if (resp_size < NIPC_SERVICE_MIN_PAYLOAD_BUFFER_BYTES)
+        resp_size = NIPC_SERVICE_MIN_PAYLOAD_BUFFER_BYTES;
     uint8_t *resp_buf = nipc_service_win_malloc(
         resp_size, NIPC_WIN_SERVICE_TEST_FAULT_SERVER_RESP_BUF_MALLOC_INTERNAL);
     if (resp_buf) {

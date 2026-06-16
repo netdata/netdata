@@ -169,3 +169,10 @@ nipc_error_t nipc_service_platform_call_with_retry(
     return nipc_service_common_call_with_retry(
         ctx, attempt, state, nipc_service_posix_client_ops());
 }
+
+nipc_error_t nipc_service_platform_ensure_request_capacity(
+    nipc_client_ctx_t *ctx, size_t required_payload_bytes)
+{
+    return nipc_service_common_client_ensure_request_capacity(
+        ctx, required_payload_bytes, nipc_service_posix_client_ops());
+}

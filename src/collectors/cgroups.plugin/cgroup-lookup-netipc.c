@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "cgroup-internals.h"
+#include "cgroup-lookup-resolver.h"
 #include "cgroup-netipc.h"
 #include "cgroup-snapshot-store.h"
+#include "collectors/common-cgroups/cgroup-path.h"
 #include "libnetdata/netipc/netipc_netdata.h"
 
 #if defined(OS_LINUX) && defined(ENABLE_CGROUPS_LOOKUP_SERVER)
@@ -195,11 +197,21 @@ static bool cgroups_lookup_handler(
         uint32_t name_len = 0;
         uint16_t label_count = 0;
 
-        if (generation == 0) {
+        char *pathz = mallocz((size_t)path_len + 1);
+        memcpy(pathz, path, path_len);
+        pathz[path_len] = '\0';
+        bool is_namespace_relative = cgroup_path_is_namespace_relative(pathz);
+
+        if (generation == 0 && is_namespace_relative) {
+            // no snapshot exists yet; do not signal discovery for a raw namespace-relative path
+        } else if (generation == 0) {
             // discovery has not published a snapshot yet
             should_signal_lookup_miss = true;
         } else {
             const CGROUP_SNAPSHOT_ENTRY *e = cgroup_snapshot_store_find(store, path, path_len);
+            if (!e && is_namespace_relative)
+                e = cgroup_lookup_resolver_resolve(store, generation, path, path_len);
+
             if (e) {
                 if (e->known) {
                     status = NIPC_CGROUP_LOOKUP_KNOWN;
@@ -221,6 +233,8 @@ static bool cgroups_lookup_handler(
                 }
                 // else: discovery knows the cgroup but has not resolved its name
                 // yet -- transient, retry without waking discovery (it is aware)
+            } else if (is_namespace_relative) {
+                // namespace-relative misses stay retry-later and never fall through to raw reachability
             } else if (cgroup_lookup_path_reachable(path, path_len)) {
                 // discovery could enumerate this path but has not seen it yet
                 should_signal_lookup_miss = true;
@@ -238,8 +252,11 @@ static bool cgroups_lookup_handler(
 
         if (err != NIPC_OK) {
             builder->error = err;
+            freez(pathz);
             break;
         }
+
+        freez(pathz);
     }
 
     cgroup_snapshot_store_release();
@@ -264,6 +281,8 @@ static void cgroup_netipc_lookup_server_thread(void *arg)
 
 static void cgroup_netipc_lookup_init_at(const char *run_dir, const char *service_name)
 {
+    cgroup_lookup_resolver_init();
+
     uint64_t auth = netipc_auth_token();
 
     nipc_server_config_t config = {
@@ -287,6 +306,7 @@ static void cgroup_netipc_lookup_init_at(const char *run_dir, const char *servic
 
     if (err != NIPC_OK) {
         collector_error("CGROUP: netipc lookup server init failed (error %u), lookup IPC disabled", (unsigned int)err);
+        cgroup_lookup_resolver_cleanup();
         return;
     }
 
@@ -299,6 +319,7 @@ static void cgroup_netipc_lookup_init_at(const char *run_dir, const char *servic
         collector_error("CGROUP: failed to create netipc lookup server thread");
         nipc_server_destroy(&cgroup_netipc_lookup_server);
         cgroup_netipc_lookup_server_initialized = false;
+        cgroup_lookup_resolver_cleanup();
         return;
     }
 
@@ -334,6 +355,8 @@ void cgroup_netipc_lookup_cleanup(void)
         errno_clear();
         collector_info("CGROUP: netipc lookup server stopped");
     }
+
+    cgroup_lookup_resolver_cleanup();
 }
 
 void cgroup_netipc_lookup_update_charts(int update_every)

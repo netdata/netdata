@@ -107,7 +107,7 @@ These are charts the plugin already exposes. Tune the alert thresholds to your e
 | `udp_received` rate dropped | `netflow.input_packets` | Sustained 0 during business hours indicates the listener is up but no exporter is sending. |
 | `parse_errors` rising | `netflow.input_packets` | Sustained > 5% of `udp_received` indicates the wire is producing malformed datagrams. |
 | `template_errors` rising | `netflow.input_packets` | Sustained > 1% of `udp_received` after the warm-up period indicates an exporter sends data records before templates. |
-| Memory growing (`unaccounted`) | `netflow.memory_accounted_bytes` | RSS climbs linearly without ingest growth -- possible leak. |
+| Memory/state growing | `netflow.facet_values`, `netflow.tier_index_entries`, `netflow.open_tiers`; optional `netflow.memory_accounted_bytes` | Default count charts show state-cardinality growth. If byte diagnostics are enabled and `unaccounted` climbs linearly without ingest growth, suspect unattributed allocation. |
 | `decoder_scopes` unbounded growth | `netflow.decoder_scopes` | An exporter is rotating template IDs; investigate per-router behaviour. |
 | Disk write errors | `netflow.raw_journal_ops` `write_errors` | Any non-zero indicates filesystem trouble. |
 | SNMP-flow gap | external | More than 30% on a steady-state link triggers the validation routine above. |

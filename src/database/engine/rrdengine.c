@@ -724,10 +724,10 @@ extent_flush_to_open(struct rrdengine_instance *ctx, struct extent_io_descriptor
             time_t new_last_time_s = (time_t)(max_end_time_ut / USEC_PER_SEC);
 
             // Atomically update to keep the maximum
-            spinlock_lock(&datafile->journalfile->data_spinlock);
+            spinlock_tracked_lock(&datafile->journalfile->data_spinlock);
             if (new_last_time_s > datafile->journalfile->v2.last_time_s)
                 datafile->journalfile->v2.last_time_s = new_last_time_s;
-            spinlock_unlock(&datafile->journalfile->data_spinlock);
+            spinlock_tracked_unlock(&datafile->journalfile->data_spinlock);
         }
     }
 

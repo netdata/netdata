@@ -1405,7 +1405,7 @@ fn test_directional_limit_negotiation() {
 
     let server_thread = thread::spawn(move || {
         let scfg = ServerConfig {
-            max_request_payload_bytes: 2048,
+            max_request_payload_bytes: 4096,
             max_request_batch_items: 8,
             max_response_payload_bytes: 8192,
             max_response_batch_items: 32,

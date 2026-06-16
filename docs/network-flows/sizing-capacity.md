@@ -104,7 +104,7 @@ Concrete guidance:
 
 - For the agent process itself, expect **a few hundred MB to ~1 GB of RSS** at typical loads across the envelope. Enrichment, classifiers, accumulators, and routing tries add to the base process footprint. BMP / BioRIS full-table feeds can add a few hundred MB per peer, depending on table count and prefix mix.
 - For the kernel page cache, aim to **leave at least the size of the recently-queried working set free** — practically, plan a few GB of free RAM on a busy agent so query I/O lands in cache instead of hitting NVMe each time.
-- Watch `netflow.memory_resident_bytes`, `netflow.memory_resident_mapping_bytes`, and `netflow.memory_accounted_bytes` for the agent's own footprint. Watch the system's overall free memory for the page-cache headroom.
+- Watch default lightweight state-cardinality charts such as `netflow.open_tiers`, `netflow.facet_values`, and `netflow.tier_index_entries` for the agent's internal growth drivers. Enable `charts.memory_diagnostics` only when you need byte-level process attribution. Watch the system's overall free memory for the page-cache headroom.
 
 The plugin does **not** preload the journal into RAM. Memory consumption is driven by active accumulators (during ingestion) and routing tries (when configured). Storage growth pressures memory only via the page cache, which the kernel manages.
 

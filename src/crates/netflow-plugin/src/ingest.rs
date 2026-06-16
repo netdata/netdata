@@ -1,7 +1,7 @@
 use crate::decoder::{
-    DecapsulationMode as DecoderDecapsulationMode, DecodeStats, DecoderScopeSnapshot,
-    DecoderStateNamespaceKey, FlowDecoders, TimestampSource as DecoderTimestampSource,
-    normalize_template_scope_source,
+    DecapsulationMode as DecoderDecapsulationMode, DecodeStats, DecoderPacketContext,
+    DecoderScopeSnapshot, DecoderStateNamespaceKey, FlowDecoders,
+    TimestampSource as DecoderTimestampSource,
 };
 use crate::enrichment::FlowEnricher;
 use crate::network_sources::NetworkSourcesRuntime;
@@ -17,7 +17,9 @@ use crate::tiering::{
 use anyhow::{Context, Result, anyhow};
 use journal_common::load_machine_id;
 use journal_index::Seconds;
-use journal_log_writer::{Compression, Config, EntryTimestamps, Log, RetentionPolicy, RotationPolicy};
+use journal_log_writer::{
+    Compression, Config, EntryTimestamps, Log, RetentionPolicy, RotationPolicy,
+};
 use journal_registry::{Monitor, Origin, Registry, Source};
 use std::collections::HashMap;
 use std::fs;
@@ -38,9 +40,9 @@ const DECODER_STATE_PERSIST_INTERVAL_USEC: u64 = 30 * 1_000_000;
 mod encode;
 mod metrics;
 mod persistence;
-mod tier_commit;
 mod rebuild;
 mod service;
+mod tier_commit;
 
 pub(crate) use metrics::IngestMetrics;
 pub(crate) use service::IngestService;

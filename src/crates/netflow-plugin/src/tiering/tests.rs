@@ -1,6 +1,7 @@
 use super::*;
 use crate::flow::{FlowDirection, FlowFields, FlowRecord};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+use std::mem::size_of;
 
 fn materialize_row_fields(store: &TierFlowIndexStore, row: &OpenTierRow) -> FlowFields {
     let mut fields = store
@@ -142,6 +143,35 @@ fn indexed_field_lookup_matches_rollup_materialization_semantics() {
 }
 
 #[test]
+fn tier_flow_index_store_cardinality_counts_hours_and_flows() {
+    let mut store = TierFlowIndexStore::default();
+
+    let mut tcp = FlowRecord::default();
+    tcp.protocol = 6;
+    tcp.src_port = 12345;
+    tcp.dst_port = 443;
+
+    let mut udp = FlowRecord::default();
+    udp.protocol = 17;
+    udp.src_port = 5353;
+    udp.dst_port = 5353;
+
+    store
+        .get_or_insert_record_flow(120_000_000, &tcp)
+        .expect("intern tcp flow");
+    store
+        .get_or_insert_record_flow(120_000_001, &udp)
+        .expect("intern udp flow");
+    store
+        .get_or_insert_record_flow(3_720_000_000, &tcp)
+        .expect("intern next-hour tcp flow");
+
+    let cardinality = store.cardinality();
+    assert_eq!(cardinality.hours, 2);
+    assert_eq!(cardinality.flows, 3);
+}
+
+#[test]
 fn same_dimensions_aggregate() {
     let mut acc = TierAccumulator::new(TierKind::Minute1);
     let mut store = TierFlowIndexStore::default();
@@ -239,7 +269,13 @@ fn take_closed_buckets_matches_flush_closed_rows() {
     let now = 4 * minute - 1;
 
     let row_key = |ts: u64, flow_ref: TierFlowRef, m: FlowMetrics| {
-        (ts, flow_ref.hour_start_usec, flow_ref.flow_id, m.bytes, m.packets)
+        (
+            ts,
+            flow_ref.hour_start_usec,
+            flow_ref.flow_id,
+            m.bytes,
+            m.packets,
+        )
     };
     let mut legacy_rows: Vec<_> = legacy
         .flush_closed_rows(now)
@@ -287,6 +323,164 @@ fn take_closed_buckets_closes_exactly_at_bucket_end() {
         vec![minute]
     );
     assert_eq!(acc.snapshot_open_rows(2 * minute).len(), 1);
+}
+
+#[test]
+fn snapshot_open_rows_into_clears_destination_and_reuses_capacity() {
+    let mut store = TierFlowIndexStore::default();
+    let mut acc = TierAccumulator::new(TierKind::Minute1);
+    let minute = 60_000_000_u64;
+    let now = minute + 10_000_000;
+
+    let mut tcp = FlowRecord::default();
+    tcp.protocol = 6;
+    tcp.bytes = 100;
+    let tcp_ref = store
+        .get_or_insert_record_flow(minute + 1, &tcp)
+        .expect("intern tcp flow");
+    acc.observe_flow(minute + 1, tcp_ref, FlowMetrics::from_record(&tcp));
+
+    let mut udp = FlowRecord::default();
+    udp.protocol = 17;
+    udp.bytes = 200;
+    let udp_ref = store
+        .get_or_insert_record_flow(minute + 2, &udp)
+        .expect("intern udp flow");
+    acc.observe_flow(minute + 2, udp_ref, FlowMetrics::from_record(&udp));
+
+    let mut rows = Vec::with_capacity(8);
+    rows.push(OpenTierRow {
+        timestamp_usec: 1,
+        flow_ref: tcp_ref,
+        metrics: FlowMetrics {
+            bytes: 999,
+            packets: 999,
+        },
+    });
+    let capacity = rows.capacity();
+
+    acc.snapshot_open_rows_into(now, &mut rows);
+
+    assert_eq!(rows.capacity(), capacity);
+    assert_eq!(rows.len(), 2);
+    assert!(
+        rows.iter().all(|row| row.timestamp_usec == now),
+        "stale destination rows must be cleared before open rows are appended"
+    );
+    assert_eq!(rows.iter().map(|row| row.metrics.bytes).sum::<u64>(), 300);
+}
+
+#[test]
+fn snapshot_open_rows_into_handles_empty_closed_and_zero_capacity_destinations() {
+    let mut store = TierFlowIndexStore::default();
+    let mut acc = TierAccumulator::new(TierKind::Minute1);
+    let minute = 60_000_000_u64;
+    let mut rows = Vec::new();
+
+    acc.snapshot_open_rows_into(minute + 1, &mut rows);
+    assert!(rows.is_empty());
+    assert_eq!(rows.capacity(), 0);
+
+    let mut closed = FlowRecord::default();
+    closed.protocol = 6;
+    closed.bytes = 100;
+    let closed_ref = store
+        .get_or_insert_record_flow(minute + 1, &closed)
+        .expect("intern closed flow");
+    acc.observe_flow(minute + 1, closed_ref, FlowMetrics::from_record(&closed));
+
+    acc.snapshot_open_rows_into(2 * minute, &mut rows);
+    assert!(rows.is_empty(), "closed buckets must not be snapshotted");
+
+    let mut open = FlowRecord::default();
+    open.protocol = 17;
+    open.bytes = 200;
+    let open_ref = store
+        .get_or_insert_record_flow(2 * minute + 1, &open)
+        .expect("intern open flow");
+    acc.observe_flow(2 * minute + 1, open_ref, FlowMetrics::from_record(&open));
+
+    acc.snapshot_open_rows_into(2 * minute + 1, &mut rows);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].flow_ref, open_ref);
+    assert!(rows.capacity() >= 1);
+}
+
+#[test]
+fn extend_active_hours_preserves_existing_hours_and_adds_accumulator_hours() {
+    let mut store = TierFlowIndexStore::default();
+    let mut acc = TierAccumulator::new(TierKind::Minute1);
+    let hour = 3_600_000_000_u64;
+    let existing_in_flight_hour = 42 * hour;
+    let first_hour = 100 * hour;
+    let second_hour = 101 * hour;
+
+    let mut hours = BTreeSet::from([existing_in_flight_hour]);
+    acc.extend_active_hours(&mut hours);
+    assert_eq!(hours, BTreeSet::from([existing_in_flight_hour]));
+
+    for (timestamp, protocol) in [(first_hour + 1, 6_u8), (second_hour + 1, 17_u8)] {
+        let mut rec = FlowRecord::default();
+        rec.protocol = protocol;
+        let flow_ref = store
+            .get_or_insert_record_flow(timestamp, &rec)
+            .expect("intern flow");
+        acc.observe_flow(timestamp, flow_ref, FlowMetrics::from_record(&rec));
+    }
+
+    acc.extend_active_hours(&mut hours);
+
+    assert_eq!(
+        hours,
+        BTreeSet::from([existing_in_flight_hour, first_hour, second_hour])
+    );
+}
+
+#[test]
+fn open_tier_state_clear_retain_capacity_keeps_row_buffers() {
+    let mut state = OpenTierState {
+        generation: 42,
+        minute_1: Vec::with_capacity(8),
+        minute_5: Vec::with_capacity(4),
+        hour_1: Vec::with_capacity(2),
+    };
+    state.minute_1.push(OpenTierRow {
+        timestamp_usec: 1,
+        flow_ref: TierFlowRef {
+            hour_start_usec: 0,
+            flow_id: 1,
+        },
+        metrics: FlowMetrics {
+            bytes: 1,
+            packets: 1,
+        },
+    });
+
+    let capacities = (
+        state.minute_1.capacity(),
+        state.minute_5.capacity(),
+        state.hour_1.capacity(),
+    );
+
+    state.clear_retain_capacity();
+
+    assert_eq!(state.generation, 0);
+    assert!(state.minute_1.is_empty());
+    assert!(state.minute_5.is_empty());
+    assert!(state.hour_1.is_empty());
+    assert_eq!(
+        state.estimated_heap_bytes(),
+        (capacities.0 + capacities.1 + capacities.2) * size_of::<OpenTierRow>(),
+        "retained row buffers must remain exactly visible to memory diagnostics"
+    );
+    assert_eq!(
+        (
+            state.minute_1.capacity(),
+            state.minute_5.capacity(),
+            state.hour_1.capacity()
+        ),
+        capacities
+    );
 }
 
 #[test]

@@ -116,6 +116,67 @@ static bool test_retry_later_generation_reset(void)
     return ok;
 }
 
+static bool test_retry_later_same_generation_not_requeued(void)
+{
+    bool ok = true;
+    bool queue_mutex_initialized = false;
+    bool queue_cond_initialized = false;
+
+    cgroups_lookup_cache_create();
+    cgroups_lookup_latest_generation = 7;
+
+    if (!expect_ok(netdata_mutex_init(&cgroups_lookup_queue_mutex) == 0, "queue mutex init failed"))
+        goto cleanup;
+    queue_mutex_initialized = true;
+
+    if (!expect_ok(netdata_cond_init(&cgroups_lookup_queue_cond) == 0, "queue cond init failed"))
+        goto cleanup;
+    queue_cond_initialized = true;
+
+    cgroups_lookup_queue_initialized = true;
+    cgroups_lookup_worker_thread = (ND_THREAD *)0x1;
+
+    test_pid = (struct pid_stat){ 0 };
+    test_pid.pid = 22345;
+    test_pid.cgroup_path = string_strdupz(
+        "/../../kubepods.slice/pod-a/cri-containerd-0123456789abcdef.scope");
+    test_pid.cgroup_cache = cgroups_lookup_cache_get_or_create(test_pid.cgroup_path);
+    test_pid.cgroup_cache->refcount = 1;
+    test_pid.cgroup_cache->cgroup_status = NIPC_CGROUP_LOOKUP_UNKNOWN_RETRY_LATER;
+    test_pid.cgroup_cache->generation = 7;
+    test_pid.cgroup_cache->pending = false;
+
+    apps_cgroups_lookup_scan_pids();
+    ok =
+        expect_ok(cgroups_lookup_queue_count == 0, "same-generation retry-later path was requeued") &&
+        expect_ok(!test_pid.cgroup_cache->pending, "same-generation retry-later entry was marked pending") &&
+        ok;
+
+    cgroups_lookup_latest_generation = 8;
+    apps_cgroups_lookup_scan_pids();
+    ok =
+        expect_ok(cgroups_lookup_queue_count == 1, "new-generation retry-later path was not requeued") &&
+        expect_ok(test_pid.cgroup_cache->pending, "new-generation retry-later entry was not marked pending") &&
+        ok;
+
+cleanup:
+    if (cgroups_lookup_queue_initialized)
+        cgroups_lookup_queue_drain();
+    cgroups_lookup_queue_initialized = false;
+    cgroups_lookup_worker_thread = NULL;
+    if (queue_cond_initialized)
+        netdata_cond_destroy(&cgroups_lookup_queue_cond);
+    if (queue_mutex_initialized)
+        netdata_mutex_destroy(&cgroups_lookup_queue_mutex);
+
+    test_pid.cgroup_cache = NULL;
+    string_freez(test_pid.cgroup_path);
+    test_pid.cgroup_path = NULL;
+    cgroups_lookup_latest_generation = 0;
+    cgroups_lookup_cache_destroy();
+    return ok;
+}
+
 static bool blocking_cgroups_lookup_handler(
     void *user __maybe_unused,
     const nipc_cgroups_lookup_req_view_t *request,
@@ -182,6 +243,10 @@ int main(void)
     if (!expect_ok(test_cache_allows_more_than_legacy_fixed_cap(), "active cgroup cache cardinality test failed"))
         goto cleanup_fixture;
     if (!expect_ok(test_retry_later_generation_reset(), "retry-later generation reset test failed"))
+        goto cleanup_fixture;
+    if (!expect_ok(
+            test_retry_later_same_generation_not_requeued(),
+            "retry-later same-generation requeue test failed"))
         goto cleanup_fixture;
 
     test_pid.pid = 12345;
