@@ -2033,6 +2033,8 @@ FUNCTION_RESULT_BEGIN 1-enable 200 application/json
 FUNCTION_RESULT_END
 
 CONFIG test:collector:withfuncs:test status running
+
+FUNCTION_DEL GLOBAL "withfuncs:test-method"
 `,
 				}
 			},
@@ -2065,6 +2067,8 @@ FUNCTION_RESULT_BEGIN 1-enable 200 application/json
 FUNCTION_RESULT_END
 
 CONFIG test:collector:funconly:test status running
+
+FUNCTION_DEL GLOBAL "funconly:test-method"
 `,
 				}
 			},
