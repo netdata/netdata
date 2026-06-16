@@ -167,9 +167,12 @@ CONF=$(grep "bind" netdata.cfg)
 MUSER=$(grep run netdata.cfg | cut -d= -f2|sed 's/^[ \t]*//')
 
 # SSL certs must be in a directory accessible by the netdata user
-# (the test directory may be inside a home directory with restricted permissions)
-SSL_DIR="/tmp/netdata-acl-test-ssl"
-mkdir -p "$SSL_DIR"
+# (the test directory may be inside a home directory with restricted permissions).
+# Use a unique directory so concurrent runs do not collide, and 755 so the
+# netdata user can traverse it and read the certificates.
+SSL_DIR=$(mktemp -d "/tmp/netdata-acl-test-ssl.XXXXXX") || { echo "Failed to create temporary SSL directory" >&2; exit 1; }
+chmod 755 "$SSL_DIR"
+trap 'rm -rf "$SSL_DIR"' EXIT
 openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -sha512 -subj "/C=US/ST=Denied/L=Somewhere/O=Dis/CN=www.example.com" -keyout "$SSL_DIR/key.pem" -out "$SSL_DIR/cert.pem"
 chown "$MUSER" "$SSL_DIR/key.pem" "$SSL_DIR/cert.pem"
 CWD=$(pwd)
