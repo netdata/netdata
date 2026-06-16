@@ -652,7 +652,7 @@ Alternatively, use the **host’s hostname** by mounting `/etc/hostname` in the 
 
 :::important
 
-You **cannot** configure email notifications using Docker environment variables such as `SEND_EMAIL`, `DEFAULT_RECIPIENT_EMAIL`, or `EMAIL_SENDER`. The alarm notification script sources `health_alarm_notify.conf` at runtime, which overwrites any environment variable values. You must edit `health_alarm_notify.conf` inside the container using [`edit-config`](#configure-agent-containers).
+You **cannot** configure email notifications using Docker environment variables such as `SEND_EMAIL`, `DEFAULT_RECIPIENT_EMAIL`, or `EMAIL_SENDER`. The alarm notification script sources `health_alarm_notify.conf` at runtime, which overwrites any environment variable values with the file's values (stock defaults: `SEND_EMAIL="AUTO"`, `DEFAULT_RECIPIENT_EMAIL="root"`, `EMAIL_SENDER=""`). You must edit `health_alarm_notify.conf` inside the container using [`edit-config`](#configure-agent-containers).
 
 :::
 
