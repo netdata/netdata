@@ -132,3 +132,33 @@ func (r *SocketRuntime) SnapshotPerPID() ([]SocketPIDEntry, error) {
 func (r *SocketRuntime) Close() {
 	// No-op in the disabled build because the runtime never acquired native resources.
 }
+
+// DNSRuntime disabled stubs — mirrored from dns_libbpf.go (netdata_ebpf_libbpf build).
+
+type DNSRuntime struct{}
+
+func NewDNSRuntime(path string, useCore bool) (*DNSRuntime, error) {
+	_ = path
+	_ = useCore
+	return nil, ErrDisabled
+}
+
+func (r *DNSRuntime) Prepare() error {
+	return ErrDisabled
+}
+
+func (r *DNSRuntime) Load() error {
+	return ErrDisabled
+}
+
+func (r *DNSRuntime) Attach() error {
+	return ErrDisabled
+}
+
+func (r *DNSRuntime) Snapshot() (DNSSnapshot, error) {
+	return DNSSnapshot{}, ErrDisabled
+}
+
+func (r *DNSRuntime) Close() {
+	// No-op in the disabled build because the runtime never acquired native resources.
+}

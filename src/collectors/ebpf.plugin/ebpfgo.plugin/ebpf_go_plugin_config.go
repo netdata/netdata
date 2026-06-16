@@ -18,6 +18,7 @@ const pluginPrimaryConfigFile = "ebpf.d.conf"
 type pluginConfigFile struct {
 	Cachestat       *bool   // [ebpf programs] cachestat key
 	Socket          *bool   // [ebpf programs] socket key
+	DNS             *bool   // [ebpf programs] dns key
 	UpdateEvery     *int
 	AppsEnabled     *bool
 	Cgroups         *bool
@@ -151,6 +152,13 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 				}
 				cfg.Socket = boolPtr(b)
 				found = true
+			case "dns":
+				b, ok := parseConfigBool(value)
+				if !ok {
+					return pluginConfigFile{}, false, fmt.Errorf("%s: invalid dns %q", path, value)
+				}
+				cfg.DNS = boolPtr(b)
+				found = true
 			}
 			continue
 		}
@@ -260,6 +268,9 @@ func (c *pluginConfigFile) apply(other pluginConfigFile) {
 	}
 	if other.Socket != nil {
 		c.Socket = other.Socket
+	}
+	if other.DNS != nil {
+		c.DNS = other.DNS
 	}
 	if other.UpdateEvery != nil {
 		c.UpdateEvery = other.UpdateEvery

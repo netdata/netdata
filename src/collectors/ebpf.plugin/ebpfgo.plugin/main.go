@@ -13,14 +13,14 @@ import (
 )
 
 func main() {
-	// Cap the Go scheduler to 4 OS threads: one per active collector goroutine
-	// (cachestat, socket), one for the signal handler, and one for the stdin
-	// dispatcher goroutine that blocks on os.Stdin reads.  The default
+	// Cap the Go scheduler to 5 OS threads: one per active collector goroutine
+	// (cachestat, socket, dns), one for the signal handler, and one for the
+	// stdin dispatcher goroutine that blocks on os.Stdin reads.  The default
 	// GOMAXPROCS = NumCPU allocates O(ncpus) scheduler threads, and CGO calls
 	// on blocked goroutines cause the runtime to create up to O(ncpus)
 	// additional threads — each carrying an 8 MB Linux stack.  On a 64-core
 	// host that is ~130 threads and ~1 GB of stack RSS for no benefit.
-	runtime.GOMAXPROCS(4)
+	runtime.GOMAXPROCS(5)
 
 	updateEvery := 0
 	if len(os.Args) > 1 {
@@ -41,7 +41,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	if !anyProgramEnabled(cachestatCfg, socketCfg) {
+	dnsCfg, err := resolveDNSLegacyConfig()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: dns config load failed: %v\n", err)
+		os.Exit(1)
+	}
+
+	if !anyProgramEnabled(cachestatCfg, socketCfg, dnsCfg) {
 		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: all eBPF programs disabled by configuration\n")
 		os.Exit(0)
 	}
@@ -73,6 +79,11 @@ func main() {
 	if needsStore {
 		store = NewCachestatSharedMemoryStore()
 	}
+
+	// The stdin dispatcher is always started so it can handle function calls
+	// from whichever subset of collectors is enabled.
+	var fnStore *socketFunctionStore
+	var dnsFnStore *dnsFunctionStore
 
 	// ---- cachestat ----
 	if cachestatCfg.Enabled {
@@ -108,7 +119,7 @@ func main() {
 		if herr != nil {
 			fmt.Fprintf(os.Stderr, "ebpf-go.plugin: socket load failed: %v\n", herr)
 		} else if handle != nil && handle.Runtime != nil {
-			fnStore := newSocketFunctionStore(ue)
+			fnStore = newSocketFunctionStore(ue)
 
 			pluginOutputMu.Lock()
 			api.FUNCTIONGLOBAL(netdataapi.FunctionGlobalOpts{
@@ -123,7 +134,6 @@ func main() {
 			pluginOutputMu.Unlock()
 
 			anyStarted = true
-			go runStdinDispatcher(api, fnStore, closeStop)
 
 			wg.Add(1)
 			go func() {
@@ -133,6 +143,44 @@ func main() {
 			}()
 		}
 	}
+
+	// ---- dns ----
+	if dnsCfg.Enabled {
+		ue := resolveUpdateEvery(updateEvery, dnsCfg.UpdateEvery, dnsDefaultUpdateEvery)
+		dnsCfg.UpdateEvery = ue
+
+		handle, herr := LoadDNSLegacy(dnsCfg)
+		if herr != nil {
+			fmt.Fprintf(os.Stderr, "ebpf-go.plugin: dns load failed: %v\n", herr)
+		} else if handle != nil && handle.Runtime != nil {
+			dnsFnStore = newDNSFunctionStore(ue)
+
+			pluginOutputMu.Lock()
+			api.FUNCTIONGLOBAL(netdataapi.FunctionGlobalOpts{
+				Name:     dnsFunctionName,
+				Timeout:  dnsFunctionTimeout,
+				Help:     dnsFunctionHelp,
+				Tags:     dnsFunctionTags,
+				Access:   dnsFunctionAccess,
+				Priority: dnsFunctionPriority,
+				Version:  dnsFunctionVersion,
+			})
+			pluginOutputMu.Unlock()
+
+			anyStarted = true
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				runDNSGlobalCollector(handle, stop, ue, dnsFnStore)
+				handle.Close()
+			}()
+		}
+	}
+
+	// Start stdin dispatcher after all function stores are initialised so the
+	// dispatcher sees consistent fnStore / dnsFnStore pointers.
+	go runStdinDispatcher(api, fnStore, dnsFnStore, closeStop)
 
 	if !anyStarted {
 		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: all enabled programs failed to load\n")
@@ -156,6 +204,6 @@ func resolveUpdateEvery(cliArg, cfgVal, fallback int) int {
 // anyProgramEnabled returns true when at least one eBPF program is enabled.
 // The plugin exits early only when every known program is disabled so that
 // adding a new program requires only a new field here, not a structural change.
-func anyProgramEnabled(cachestatCfg CachestatLegacyConfig, socketCfg SocketLegacyConfig) bool {
-	return cachestatCfg.Enabled || socketCfg.Enabled
+func anyProgramEnabled(cachestatCfg CachestatLegacyConfig, socketCfg SocketLegacyConfig, dnsCfg DNSLegacyConfig) bool {
+	return cachestatCfg.Enabled || socketCfg.Enabled || dnsCfg.Enabled
 }
