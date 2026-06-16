@@ -101,6 +101,12 @@ You can control what functionalities users can access in Netdata Cloud through t
 
 </details>
 
+:::note
+
+The **Groups** tab under **User Management** (used to configure SCIM group membership rules) only appears after [SCIM integration](/integrations/cloud-authentication/integrations/scim.md) is enabled — it is not shown by default, even on paid plans. Enabling SCIM requires a paid plan, a pre-configured [Enterprise SSO (OIDC/SSO) integration](/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md), and Space Administrator access. If you don't see the **Groups** tab, set up Enterprise SSO first, then activate SCIM.
+
+:::
+
 <details>
 <summary><strong>Room Management</strong></summary><br/>
 
