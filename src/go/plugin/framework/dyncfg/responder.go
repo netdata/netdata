@@ -144,7 +144,7 @@ func (r *Responder) FunctionGlobal(opts netdataapi.FunctionGlobalOpts) {
 	r.api.FUNCTIONGLOBAL(opts)
 }
 
-// FunctionRemove removes a function from Netdata (no-op until Netdata core supports it)
+// FunctionRemove removes a previously registered function from Netdata.
 func (r *Responder) FunctionRemove(name string) {
 	r.api.FUNCTIONREMOVE(name)
 }
