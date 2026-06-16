@@ -462,6 +462,63 @@ func BuildLoadPlan(req LoadPlanRequest) LoadPlan {
 	}
 }
 
+// resolveKernelAndRH detects the running kernel version and the RedHat-family
+// release number.  isRHF is -1 when the host is not RedHat-family.
+// Every resolve*LegacyConfig function needs this pair, so it lives here.
+func resolveKernelAndRH() (kver uint32, isRHF int, err error) {
+	kver, err = KernelVersion()
+	if err != nil {
+		return 0, -1, err
+	}
+	isRHF = -1
+	if rhf, rherr := RedHatRelease(); rherr == nil {
+		isRHF = rhf
+	}
+	return kver, isRHF, nil
+}
+
+// buildKprobeLegacyPlan constructs the LoadPlan for kprobe/trampoline-based
+// collectors (cachestat, socket).  DNS uses a different load mode and is not
+// covered by this helper.
+func buildKprobeLegacyPlan(pluginsDir string, kernels uint32, isRHF int, kver uint32, isDebian bool, hasBTF bool, objectFlavor, name string) LoadPlan {
+	flavor := selectConfiguredObjectFlavor(objectFlavor, kver, isDebian)
+	loadMode := SelectLoadMode(hasBTF, LoadCore, kver, isRHF)
+	selector := SelectIndex(kernels, isRHF, kver)
+	return LoadPlan{
+		KernelVersion: kver,
+		IsRHF:         isRHF,
+		Selector:      selector,
+		Flavor:        flavor,
+		ObjectPath:    BuildObjectPathWithFlavor(pluginsDir, selector, name, false, isRHF, flavor),
+		LoadMode:      loadMode,
+		ProgramMode:   LoadTrampoline,
+	}
+}
+
+// buildFallbackPlans returns plans in preference order: primary first, then
+// progressively less demanding flavors (arena → buffer → base).  Both the
+// socket and DNS loaders share this policy; callers pass the BPF object name
+// ("socket", "dns") and the two config fields that vary across collectors.
+func buildFallbackPlans(primary LoadPlan, pluginsDir string, isRHF int, name string) []LoadPlan {
+	plans := []LoadPlan{primary}
+
+	if primary.Flavor == ObjectFlavorArena {
+		fb := primary
+		fb.Flavor = ObjectFlavorBuffer
+		fb.ObjectPath = BuildObjectPathWithFlavor(pluginsDir, primary.Selector, name, false, isRHF, ObjectFlavorBuffer)
+		plans = append(plans, fb)
+	}
+
+	if primary.Flavor != ObjectFlavorBase {
+		fb := primary
+		fb.Flavor = ObjectFlavorBase
+		fb.ObjectPath = BuildObjectPathWithFlavor(pluginsDir, primary.Selector, name, false, isRHF, ObjectFlavorBase)
+		plans = append(plans, fb)
+	}
+
+	return plans
+}
+
 func readFirstExistingFile(paths ...string) (string, error) {
 	var lastErr error
 

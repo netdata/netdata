@@ -84,89 +84,7 @@ func handleDNSQueries(api *netdataapi.API, fnStore *dnsFunctionStore, uid string
 // buildDNSQueriesJSON produces the JSON table for the dns-queries network-viewer function.
 // Rows: one per (transport × IP version) combination = 4 rows.
 func buildDNSQueriesJSON(snap libbpfloader.DNSSnapshot, updateEvery int, expires int64) (string, error) {
-	type valueOptions struct {
-		Units         string  `json:"units,omitempty"`
-		Transform     string  `json:"transform"`
-		DecimalPoints int     `json:"decimal_points"`
-		DefaultValue  *string `json:"default_value"`
-	}
-	type columnDef struct {
-		Index                 int          `json:"index"`
-		UniqueKey             bool         `json:"unique_key"`
-		Name                  string       `json:"name"`
-		Visible               bool         `json:"visible"`
-		Type                  string       `json:"type"`
-		Units                 string       `json:"units,omitempty"`
-		Visualization         string       `json:"visualization"`
-		ValueOptions          valueOptions `json:"value_options"`
-		Sort                  string       `json:"sort"`
-		Sortable              bool         `json:"sortable"`
-		Sticky                bool         `json:"sticky"`
-		Summary               string       `json:"summary"`
-		Filter                string       `json:"filter"`
-		FullWidth             bool         `json:"full_width"`
-		Wrap                  bool         `json:"wrap"`
-		DefaultExpandedFilter bool         `json:"default_expanded_filter"`
-	}
-	type chartDef struct {
-		Name    string   `json:"name"`
-		Type    string   `json:"type"`
-		Columns []string `json:"columns"`
-	}
-	type groupByDef struct {
-		Name    string   `json:"name"`
-		Columns []string `json:"columns"`
-	}
-	type response struct {
-		Status            int                   `json:"status"`
-		Type              string                `json:"type"`
-		UpdateEvery       int                   `json:"update_every"`
-		HasHistory        bool                  `json:"has_history"`
-		Help              string                `json:"help"`
-		Data              [][]interface{}       `json:"data"`
-		Columns           map[string]columnDef  `json:"columns"`
-		DefaultSortColumn string                `json:"default_sort_column"`
-		Charts            map[string]chartDef   `json:"charts"`
-		DefaultCharts     [][]string            `json:"default_charts"`
-		GroupBy           map[string]groupByDef `json:"group_by"`
-		Expires           int64                 `json:"expires"`
-	}
-
-	strCol := func(idx int, name string, uniqueKey, sticky bool) columnDef {
-		return columnDef{
-			Index:         idx,
-			UniqueKey:     uniqueKey,
-			Name:          name,
-			Visible:       true,
-			Type:          "string",
-			Visualization: "value",
-			ValueOptions:  valueOptions{Transform: "none", DecimalPoints: 0},
-			Sort:          "ascending",
-			Sortable:      true,
-			Sticky:        sticky,
-			Summary:       "count",
-			Filter:        "multiselect",
-		}
-	}
-	intCol := func(idx int, name, units string) columnDef {
-		return columnDef{
-			Index:         idx,
-			UniqueKey:     false,
-			Name:          name,
-			Visible:       true,
-			Type:          "integer",
-			Units:         units,
-			Visualization: "value",
-			ValueOptions:  valueOptions{Units: units, Transform: "number", DecimalPoints: 0},
-			Sort:          "descending",
-			Sortable:      true,
-			Sticky:        false,
-			Summary:       "sum",
-			Filter:        "range",
-		}
-	}
-
-	resp := response{
+	resp := fnTableResponse{
 		Status:      200,
 		Type:        "table",
 		UpdateEvery: updateEvery,
@@ -178,14 +96,14 @@ func buildDNSQueriesJSON(snap libbpfloader.DNSSnapshot, updateEvery int, expires
 			{"TCP", "IPv4", snap.QueriesTCPv4, snap.ResponsesTCPv4},
 			{"TCP", "IPv6", snap.QueriesTCPv6, snap.ResponsesTCPv6},
 		},
-		Columns: map[string]columnDef{
-			"Transport": strCol(0, "Transport Protocol", true, true),
-			"IPFamily":  strCol(1, "IP Protocol Family", true, true),
-			"Queries":   intCol(2, "DNS Queries", "queries/s"),
-			"Responses": intCol(3, "DNS Responses", "responses/s"),
+		Columns: map[string]fnColumnDef{
+			"Transport": fnStrCol(0, "Transport Protocol", true, true),
+			"IPFamily":  fnStrCol(1, "IP Protocol Family", true, true),
+			"Queries":   fnIntCol(2, "DNS Queries", "queries/s"),
+			"Responses": fnIntCol(3, "DNS Responses", "responses/s"),
 		},
 		DefaultSortColumn: "Queries",
-		Charts: map[string]chartDef{
+		Charts: map[string]fnChartDef{
 			"Traffic": {
 				Name:    "Traffic",
 				Type:    "stacked-bar",
@@ -193,7 +111,7 @@ func buildDNSQueriesJSON(snap libbpfloader.DNSSnapshot, updateEvery int, expires
 			},
 		},
 		DefaultCharts: [][]string{{"Traffic", "Transport"}},
-		GroupBy: map[string]groupByDef{
+		GroupBy: map[string]fnGroupByDef{
 			"Transport": {
 				Name:    "Transport",
 				Columns: []string{"Transport"},

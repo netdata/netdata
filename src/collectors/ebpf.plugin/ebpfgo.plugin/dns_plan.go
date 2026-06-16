@@ -67,15 +67,12 @@ func resolveDNSLegacyConfig() (DNSLegacyConfig, error) {
 		cfg.ObjectFlavor = *fileCfg.ObjectFlavor
 	}
 
-	kver, err := KernelVersion()
+	kver, isRHF, err := resolveKernelAndRH()
 	if err != nil {
 		return DNSLegacyConfig{}, err
 	}
 	cfg.KernelVersion = kver
-
-	if rhf, err := RedHatRelease(); err == nil {
-		cfg.IsRHF = rhf
-	}
+	cfg.IsRHF = isRHF
 
 	return cfg, nil
 }

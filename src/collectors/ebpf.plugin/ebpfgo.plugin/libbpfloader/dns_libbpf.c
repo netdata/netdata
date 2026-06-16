@@ -116,6 +116,28 @@ struct netdata_dns_runtime {
 };
 
 /* -------------------------------------------------------------------------
+ * Shared counter accumulator
+ * ---------------------------------------------------------------------- */
+
+/* Increment the right per-direction / per-transport / per-family counter.
+ * Called from both the ring-buffer callback and the base socket drain loop. */
+static void dns_acc_event(struct netdata_dns_snapshot *a,
+                          int is_query, int is_udp, int is_ipv4)
+{
+    if (is_query) {
+        if      (is_udp &&  is_ipv4) a->queries_udp_ipv4++;
+        else if (is_udp && !is_ipv4) a->queries_udp_ipv6++;
+        else if (!is_udp &&  is_ipv4) a->queries_tcp_ipv4++;
+        else                          a->queries_tcp_ipv6++;
+    } else {
+        if      (is_udp &&  is_ipv4) a->responses_udp_ipv4++;
+        else if (is_udp && !is_ipv4) a->responses_udp_ipv6++;
+        else if (!is_udp &&  is_ipv4) a->responses_tcp_ipv4++;
+        else                          a->responses_tcp_ipv6++;
+    }
+}
+
+/* -------------------------------------------------------------------------
  * Ring buffer callback (buffer / arena variants only)
  * ---------------------------------------------------------------------- */
 
@@ -128,23 +150,10 @@ static int dns_rb_callback(void *ctx, void *data, size_t data_sz)
     struct netdata_dns_runtime *rt = ctx;
     const struct netdata_dns_event_t *ev = data;
 
-    int is_query = (ev->direction == DNS_DIRECTION_QUERY);
-    int is_udp   = (ev->protocol  == DNS_IPPROTO_UDP);
-    int is_ipv4  = (ev->ip_version == 4);
-
-    struct netdata_dns_snapshot *a = &rt->acc;
-    if (is_query) {
-        if      (is_udp &&  is_ipv4) a->queries_udp_ipv4++;
-        else if (is_udp && !is_ipv4) a->queries_udp_ipv6++;
-        else if (!is_udp &&  is_ipv4) a->queries_tcp_ipv4++;
-        else                          a->queries_tcp_ipv6++;
-    } else {
-        if      (is_udp &&  is_ipv4) a->responses_udp_ipv4++;
-        else if (is_udp && !is_ipv4) a->responses_udp_ipv6++;
-        else if (!is_udp &&  is_ipv4) a->responses_tcp_ipv4++;
-        else                          a->responses_tcp_ipv6++;
-    }
-
+    dns_acc_event(&rt->acc,
+                  ev->direction == DNS_DIRECTION_QUERY,
+                  ev->protocol  == DNS_IPPROTO_UDP,
+                  ev->ip_version == 4);
     return 0;
 }
 #endif /* DNS_HAS_RINGBUF */
@@ -231,21 +240,10 @@ static void dns_drain_socket(struct netdata_dns_runtime *rt)
         if (!is_query && !is_response)
             continue;
 
-        int is_udp  = (proto == DNS_IPPROTO_UDP);
-        int is_ipv4 = (ip_version == 4);
-
-        struct netdata_dns_snapshot *a = &rt->acc;
-        if (is_query) {
-            if      (is_udp &&  is_ipv4) a->queries_udp_ipv4++;
-            else if (is_udp && !is_ipv4) a->queries_udp_ipv6++;
-            else if (!is_udp &&  is_ipv4) a->queries_tcp_ipv4++;
-            else                          a->queries_tcp_ipv6++;
-        } else {
-            if      (is_udp &&  is_ipv4) a->responses_udp_ipv4++;
-            else if (is_udp && !is_ipv4) a->responses_udp_ipv6++;
-            else if (!is_udp &&  is_ipv4) a->responses_tcp_ipv4++;
-            else                          a->responses_tcp_ipv6++;
-        }
+        dns_acc_event(&rt->acc,
+                      is_query,
+                      proto      == DNS_IPPROTO_UDP,
+                      ip_version == 4);
 
     next_pkt:;
     }

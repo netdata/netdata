@@ -168,89 +168,7 @@ func buildNetworkProtocolsJSON(p socketGlobalPublish, updateEvery int, expires i
 	udpErrors := p.udpRecvErr + p.udpSendErr
 	udpConnPassive := p.inboundUDP
 
-	type valueOptions struct {
-		Units         string  `json:"units,omitempty"`
-		Transform     string  `json:"transform"`
-		DecimalPoints int     `json:"decimal_points"`
-		DefaultValue  *string `json:"default_value"`
-	}
-	type columnDef struct {
-		Index                 int          `json:"index"`
-		UniqueKey             bool         `json:"unique_key"`
-		Name                  string       `json:"name"`
-		Visible               bool         `json:"visible"`
-		Type                  string       `json:"type"`
-		Units                 string       `json:"units,omitempty"`
-		Visualization         string       `json:"visualization"`
-		ValueOptions          valueOptions `json:"value_options"`
-		Sort                  string       `json:"sort"`
-		Sortable              bool         `json:"sortable"`
-		Sticky                bool         `json:"sticky"`
-		Summary               string       `json:"summary"`
-		Filter                string       `json:"filter"`
-		FullWidth             bool         `json:"full_width"`
-		Wrap                  bool         `json:"wrap"`
-		DefaultExpandedFilter bool         `json:"default_expanded_filter"`
-	}
-	type chartDef struct {
-		Name    string   `json:"name"`
-		Type    string   `json:"type"`
-		Columns []string `json:"columns"`
-	}
-	type groupByDef struct {
-		Name    string   `json:"name"`
-		Columns []string `json:"columns"`
-	}
-	type response struct {
-		Status            int                    `json:"status"`
-		Type              string                 `json:"type"`
-		UpdateEvery       int                    `json:"update_every"`
-		HasHistory        bool                   `json:"has_history"`
-		Help              string                 `json:"help"`
-		Data              [][]interface{}        `json:"data"`
-		Columns           map[string]columnDef   `json:"columns"`
-		DefaultSortColumn string                 `json:"default_sort_column"`
-		Charts            map[string]chartDef    `json:"charts"`
-		DefaultCharts     [][]string             `json:"default_charts"`
-		GroupBy           map[string]groupByDef  `json:"group_by"`
-		Expires           int64                  `json:"expires"`
-	}
-
-	strCol := func(idx int, name string, uniqueKey, sticky bool) columnDef {
-		return columnDef{
-			Index:         idx,
-			UniqueKey:     uniqueKey,
-			Name:          name,
-			Visible:       true,
-			Type:          "string",
-			Visualization: "value",
-			ValueOptions:  valueOptions{Transform: "none", DecimalPoints: 0},
-			Sort:          "ascending",
-			Sortable:      true,
-			Sticky:        sticky,
-			Summary:       "count",
-			Filter:        "multiselect",
-		}
-	}
-	intCol := func(idx int, name, units string) columnDef {
-		return columnDef{
-			Index:         idx,
-			UniqueKey:     false,
-			Name:          name,
-			Visible:       true,
-			Type:          "integer",
-			Units:         units,
-			Visualization: "value",
-			ValueOptions:  valueOptions{Units: units, Transform: "number", DecimalPoints: 0},
-			Sort:          "descending",
-			Sortable:      true,
-			Sticky:        false,
-			Summary:       "sum",
-			Filter:        "range",
-		}
-	}
-
-	resp := response{
+	resp := fnTableResponse{
 		Status:      200,
 		Type:        "table",
 		UpdateEvery: updateEvery,
@@ -266,22 +184,22 @@ func buildNetworkProtocolsJSON(p socketGlobalPublish, updateEvery int, expires i
 				uint64(0), uint64(0), udpConnPassive, uint64(0),
 				uint64(0), uint64(0), uint64(0)},
 		},
-		Columns: map[string]columnDef{
-			"Transport":         strCol(0, "Transport Protocol", true, true),
-			"Family":            strCol(1, "IP Protocol Family", true, true),
-			"Received":          intCol(2, "Received (Segments/Datagrams)", "segments/datagrams/s"),
-			"Sent":              intCol(3, "Sent (Segments/Datagrams)", "segments/datagrams/s"),
-			"Errors":            intCol(4, "Errors (Failures/Rx Errors)", "errors"),
-			"ConnActive":        intCol(5, "Active Connections Opened", "opens"),
-			"ConnEstablished":   intCol(6, "Currently Established Connections", "connections"),
-			"ConnPassive":       intCol(7, "Passive Connections Opened", "opens"),
-			"ConnReset":         intCol(8, "Reset Connections", "resets"),
-			"SegsTotal":         intCol(9, "Total Segments", "segments/s"),
-			"SegsRetransmitted": intCol(10, "Retransmitted Segments", "segments/s"),
-			"DatagramsNoPort":   intCol(11, "Datagrams with No Port", "datagrams/s"),
+		Columns: map[string]fnColumnDef{
+			"Transport":         fnStrCol(0, "Transport Protocol", true, true),
+			"Family":            fnStrCol(1, "IP Protocol Family", true, true),
+			"Received":          fnIntCol(2, "Received (Segments/Datagrams)", "segments/datagrams/s"),
+			"Sent":              fnIntCol(3, "Sent (Segments/Datagrams)", "segments/datagrams/s"),
+			"Errors":            fnIntCol(4, "Errors (Failures/Rx Errors)", "errors"),
+			"ConnActive":        fnIntCol(5, "Active Connections Opened", "opens"),
+			"ConnEstablished":   fnIntCol(6, "Currently Established Connections", "connections"),
+			"ConnPassive":       fnIntCol(7, "Passive Connections Opened", "opens"),
+			"ConnReset":         fnIntCol(8, "Reset Connections", "resets"),
+			"SegsTotal":         fnIntCol(9, "Total Segments", "segments/s"),
+			"SegsRetransmitted": fnIntCol(10, "Retransmitted Segments", "segments/s"),
+			"DatagramsNoPort":   fnIntCol(11, "Datagrams with No Port", "datagrams/s"),
 		},
 		DefaultSortColumn: "Received",
-		Charts: map[string]chartDef{
+		Charts: map[string]fnChartDef{
 			"Traffic": {
 				Name:    "Traffic",
 				Type:    "stacked-bar",
@@ -289,7 +207,7 @@ func buildNetworkProtocolsJSON(p socketGlobalPublish, updateEvery int, expires i
 			},
 		},
 		DefaultCharts: [][]string{{"Traffic", "Transport"}},
-		GroupBy: map[string]groupByDef{
+		GroupBy: map[string]fnGroupByDef{
 			"Transport": {
 				Name:    "Transport",
 				Columns: []string{"Transport"},

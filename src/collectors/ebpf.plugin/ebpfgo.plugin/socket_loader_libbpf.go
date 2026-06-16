@@ -42,32 +42,6 @@ func tryLoadSocketPlan(cfg SocketLegacyConfig, plan LoadPlan) (*SocketLegacyHand
 	}, nil
 }
 
-// socketFallbackPlans returns plans in preference order: primary first, then
-// progressively less demanding flavors.  This implements the fallback promised
-// by ebpf.d.conf: "If the requested flavor is not available on this system,
-// the collector falls back to tracing."
-func socketFallbackPlans(primary LoadPlan, cfg SocketLegacyConfig) []LoadPlan {
-	plans := []LoadPlan{primary}
-
-	if primary.Flavor == ObjectFlavorArena {
-		// arena → buffer (same load mode, same kernel version selector)
-		fb := primary
-		fb.Flavor = ObjectFlavorBuffer
-		fb.ObjectPath = BuildObjectPathWithFlavor(cfg.PluginsDir, primary.Selector, "socket", false, cfg.IsRHF, ObjectFlavorBuffer)
-		plans = append(plans, fb)
-	}
-
-	if primary.Flavor != ObjectFlavorBase {
-		// → base / tracing
-		fb := primary
-		fb.Flavor = ObjectFlavorBase
-		fb.ObjectPath = BuildObjectPathWithFlavor(cfg.PluginsDir, primary.Selector, "socket", false, cfg.IsRHF, ObjectFlavorBase)
-		plans = append(plans, fb)
-	}
-
-	return plans
-}
-
 func LoadSocketLegacy(cfg SocketLegacyConfig) (*SocketLegacyHandle, error) {
 	plan := BuildSocketLegacyPlan(cfg)
 	coreSupported := libbpfloader.SupportsCore()
@@ -86,7 +60,7 @@ func LoadSocketLegacy(cfg SocketLegacyConfig) (*SocketLegacyHandle, error) {
 		return tryLoadSocketPlan(cfg, plan)
 	}
 
-	plans := socketFallbackPlans(plan, cfg)
+	plans := buildFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "socket")
 	var lastErr error
 	for i, fp := range plans {
 		handle, err := tryLoadSocketPlan(cfg, fp)

@@ -82,32 +82,17 @@ func resolveSocketLegacyConfig() (SocketLegacyConfig, error) {
 		cfg.ObjectFlavor = *fileCfg.ObjectFlavor
 	}
 
-	kver, err := KernelVersion()
+	kver, isRHF, err := resolveKernelAndRH()
 	if err != nil {
 		return SocketLegacyConfig{}, err
 	}
 	cfg.KernelVersion = kver
-
-	if rhf, err := RedHatRelease(); err == nil {
-		cfg.IsRHF = rhf
-	}
+	cfg.IsRHF = isRHF
 
 	return cfg, nil
 }
 
 func BuildSocketLegacyPlan(cfg SocketLegacyConfig) LoadPlan {
-	flavor := selectConfiguredObjectFlavor(cfg.ObjectFlavor, cfg.KernelVersion, cfg.IsDebian)
-	loadMode := SelectLoadMode(cfg.HasBTF, LoadCore, cfg.KernelVersion, cfg.IsRHF)
-
-	selector := SelectIndex(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion)
-	return LoadPlan{
-		KernelVersion: cfg.KernelVersion,
-		IsRHF:         cfg.IsRHF,
-		Selector:      selector,
-		Flavor:        flavor,
-		ObjectPath:    BuildObjectPathWithFlavor(cfg.PluginsDir, selector, "socket", false, cfg.IsRHF, flavor),
-		LoadMode:      loadMode,
-		ProgramMode:   LoadTrampoline,
-	}
+	return buildKprobeLegacyPlan(cfg.PluginsDir, cfg.Kernels, cfg.IsRHF, cfg.KernelVersion, cfg.IsDebian, cfg.HasBTF, cfg.ObjectFlavor, "socket")
 }
 
