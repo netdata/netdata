@@ -778,3 +778,70 @@ func TestLogfmtIsSingleLineAndQuoted(t *testing.T) {
 		t.Fatalf("quotes and newlines in the message must be escaped: %q", line)
 	}
 }
+
+// TestWritePrivateFileIsSymlinkSafe verifies the K8s cache writer never follows
+// a symlink planted at the destination in a world-writable TMPDIR: the victim
+// must stay intact and the destination must become a fresh 0600 regular file.
+func TestWritePrivateFileIsSymlinkSafe(t *testing.T) {
+	dir := t.TempDir()
+	victim := filepath.Join(dir, "victim")
+	if err := os.WriteFile(victim, []byte("original-secret\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dest := filepath.Join(dir, "netdata-cgroups-containers")
+	if err := os.Symlink(victim, dest); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := writePrivateFile(dest, []byte("cache-payload\n")); err != nil {
+		t.Fatalf("writePrivateFile: %v", err)
+	}
+
+	if got, _ := os.ReadFile(victim); string(got) != "original-secret\n" {
+		t.Fatalf("victim was clobbered through the symlink: %q", got)
+	}
+	st, err := os.Lstat(dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Mode()&os.ModeSymlink != 0 || !st.Mode().IsRegular() {
+		t.Fatalf("destination must be a regular file, got mode %v", st.Mode())
+	}
+	if perm := st.Mode().Perm(); perm != 0o600 {
+		t.Fatalf("destination mode = %v, want 0600", perm)
+	}
+	if got, _ := os.ReadFile(dest); string(got) != "cache-payload\n" {
+		t.Fatalf("destination content = %q", got)
+	}
+}
+
+// TestCacheReadHelpersRejectSymlinks verifies the cache readers refuse to
+// follow a symlink planted under a predictable cache name, so another local
+// user cannot leak an unrelated file's contents into a cgroup label.
+func TestCacheReadHelpersRejectSymlinks(t *testing.T) {
+	dir := t.TempDir()
+	secret := filepath.Join(dir, "secret")
+	if err := os.WriteFile(secret, []byte("leaked-line\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "cache-link")
+	if err := os.Symlink(secret, link); err != nil {
+		t.Fatal(err)
+	}
+
+	if isPrivateRegularFile(link) {
+		t.Fatal("isPrivateRegularFile must reject a symlink")
+	}
+	if !isPrivateRegularFile(secret) {
+		t.Fatal("isPrivateRegularFile must accept a regular file")
+	}
+	if got := firstLineFile(link); got != "" {
+		t.Fatalf("firstLineFile followed a symlink: %q", got)
+	}
+	if _, ok := grepFile(link, "leaked", 0); ok {
+		t.Fatal("grepFile followed a symlink")
+	}
+	if got := firstLineFile(secret); got != "leaked-line" {
+		t.Fatalf("firstLineFile on a regular file = %q", got)
+	}
+}
