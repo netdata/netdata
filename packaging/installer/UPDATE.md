@@ -163,6 +163,75 @@ This configuration file can be edited using our [`edit-config` script](/docs/net
 | `NETDATA_MAJOR_VERSION_UPDATES` | If set to a value other than 0, then new major versions will be installed without user confirmation. Must be set to a non-zero value for automated updates to install new major versions.                                                                                                        | 0               |
 | `NETDATA_NO_SYSTEMD_JOURNAL`    | If set to a value other than 0, skip attempting to install the `netdata-plugin-systemd-journal` package on supported systems on update. The updater will install this optional package by default on supported systems if this option is not set. It only affects systems using native packages. | 0               |
 
+### Disable automatic updates
+
+To disable automatic updates on an existing installation, run the updater script with the `--disable-auto-updates` option using root privileges:
+
+```bash
+sudo /usr/libexec/netdata/netdata-updater.sh --disable-auto-updates
+```
+
+This removes all auto-update scheduling mechanisms from your system, including the `netdata-updater.timer` systemd unit and any cron-based entries under `/etc/cron.daily/`, `/etc/periodic/daily/`, and `/etc/cron.d/`.
+
+You can check whether auto-updates are currently enabled, and which scheduling method is in use, with:
+
+```bash
+sudo /usr/libexec/netdata/netdata-updater.sh --auto-update-status
+```
+
+<details>
+<summary><strong>Disable manually (systemd or cron)</strong></summary><br/>
+
+If you prefer to disable auto-updates manually rather than using the updater script, the steps depend on your scheduling method.
+
+On systemd systems:
+
+```bash
+sudo systemctl disable netdata-updater.timer
+sudo systemctl stop netdata-updater.timer
+```
+
+On cron-based systems, remove the cron entry used by the updater. The file location depends on how auto-updates were originally configured:
+
+| Scheduling method            | File to remove                                                                    |
+|------------------------------|-----------------------------------------------------------------------------------|
+| Drop-in crontab (`cron.d`)   | `/etc/cron.d/netdata-updater-daily` or `/etc/cron.d/netdata-updater`              |
+| Periodic script (`cron.daily`) | `/etc/cron.daily/netdata-updater.sh` or `/etc/cron.daily/netdata-updater`       |
+| Periodic script (Alpine/BSD) | `/etc/periodic/daily/netdata-updater.sh` or `/etc/periodic/daily/netdata-updater` |
+
+For example:
+
+```bash
+sudo rm -f /etc/cron.d/netdata-updater-daily
+```
+
+<br/>
+</details>
+
+To re-enable automatic updates later, run:
+
+```bash
+sudo /usr/libexec/netdata/netdata-updater.sh --enable-auto-updates
+```
+
+This auto-detects the appropriate scheduling method for your system. You can optionally specify a method explicitly (`systemd`, `interval`, or `crontab`).
+
+:::note
+
+**Native package installations**
+
+If you installed Netdata using native packages (`binpkg-rpm` or `binpkg-deb`), control upgrades through your system's package manager by holding or pinning the installed version:
+
+```bash
+# DEB-based systems
+sudo apt-mark hold netdata
+
+# RPM-based systems (requires dnf-plugins-core)
+sudo dnf versionlock add netdata
+```
+
+:::
+
 ## Quick Reference
 
 ### Update Commands by Installation Type
