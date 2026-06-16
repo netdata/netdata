@@ -244,7 +244,7 @@ displayed as raw `cri-containerd-*.scope` systemd scope names.
 Fields that can vary across grouped processes, such as PID, UID, network namespace, command line,
 cgroup path, and detailed container metadata, are scalar columns in group_by:pid and merged actor
 labels in grouped views. Free-form labels are hidden by default and can be allowed per request with
-labels:<pattern>, where patterns are pipe-separated. Actor modals also expose producer-declared
+`labels:<pattern>`, where patterns are pipe-separated. Actor modals also expose producer-declared
 Processes and CGroups tables for the selected actor.
 
 
