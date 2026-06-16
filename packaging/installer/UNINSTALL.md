@@ -131,18 +131,11 @@ Errors were encountered while processing:
 E: Sub-process /usr/bin/dpkg returned an error code (1)
 ```
 
-The postrm script references `dpkg-statoverride` entries or file paths that no longer exist on the system, typically after a partial removal or manual cleanup. When this happens, the package is left in a half-configured state. The following steps resolve this, ordered from safest to most aggressive:
-
-1. **Retry the purge** — the transient state may have resolved itself:
-
-   ```bash
-   sudo apt-get purge netdata
-   ```
-
-   Replace `netdata` with the package name only if you have repository-specific
-   evidence that another shipped DEB package uses the same `postrm` cleanup.
-
-2. **Remove stale dpkg-statoverride entries** — check for leftover overrides tied to Netdata:
+The postrm script references `dpkg-statoverride` entries or file paths that no
+longer exist on the system, typically after a partial removal or manual
+cleanup. When this happens, the package is left in a half-configured state. To
+resolve this, remove any stale Netdata `dpkg-statoverride` entries and then
+retry the purge:
 
    ```bash
    dpkg-statoverride --list | grep netdata
@@ -154,25 +147,9 @@ The postrm script references `dpkg-statoverride` entries or file paths that no l
    sudo dpkg-statoverride --remove <path>
    ```
 
-   Then retry the purge:
-
-   ```bash
-   sudo apt-get purge netdata
-   ```
-
-3. **Remove the broken postrm script** — if the postrm script itself is the problem:
-
-   ```bash
-   sudo rm /var/lib/dpkg/info/netdata.postrm
-   sudo dpkg --configure -a
-   sudo apt-get purge netdata
-   ```
-
-4. **Force removal** — last resort when nothing else works:
-
-   ```bash
-   sudo dpkg --remove --force-remove-reinstreq netdata
-   ```
+```bash
+sudo apt-get purge netdata
+```
 
 :::note
 
