@@ -106,7 +106,6 @@ Renaming is configured with the following options:
 ```text
 [plugin:cgroups]
 	run script to rename cgroups matching =  *.scope  *docker*  *lxc*  *qemu*  !/  !*.mount  !*.partition  !*.service  !*.slice  !*.swap  !*.user  *
-	script to get cgroup names = /usr/libexec/netdata/plugins.d/cgroup-name
 ```
 
 The whole point for the additional pattern list, is to limit the number of
@@ -133,6 +132,24 @@ will have to adjust the configuration).
 or [CetusGuard](https://github.com/hectorm/cetusguard)
 can also be used to give Netdata restricted access to the socket. Note that `PODMAN_HOST` in Netdata's environment
 should be set to the proxy's URL in this case.
+
+#### Note on Kubernetes API access
+
+Inside a Kubernetes cluster, the `cgroup-name` helper resolves pod and container
+names by querying the kubelet and the Kubernetes API server, using the pod's
+mounted service-account token and CA certificate.
+
+By default the helper verifies the API server's TLS certificate against the
+mounted cluster CA (`/var/run/secrets/kubernetes.io/serviceaccount/ca.crt`),
+which is correct for standard in-cluster deployments. If your API endpoint
+presents a certificate that does not chain to that CA — for example a custom
+PKI, an intercepting proxy, or an external load balancer with its own
+certificate — the lookups fail and the affected pods keep a generic `k8s_<id>`
+name. In that case set the environment variable `K8S_TLS_INSECURE=true` for the
+Netdata service to skip API-server certificate verification (matching the
+behavior of the previous shell helper). The kubelet connection is always made
+without certificate verification, because kubelet serving certificates are
+commonly self-signed.
 
 ### Alerts
 
