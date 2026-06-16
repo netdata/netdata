@@ -395,7 +395,6 @@ PARSER_RC pluginsd_function_del(char **words, size_t num_words, PARSER *parser) 
     if(!host) return PARSER_RC_ERROR;
 
     RRDSET *st = (global) ? NULL : pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_FUNCTION_DEL, PLUGINSD_KEYWORD_CHART);
-    if(!st) global = true;
 
     if (unlikely(!name || !*name)) {
         netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a FUNCTION_DEL without a name. Ignoring it.",
