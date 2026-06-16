@@ -55,7 +55,11 @@ func (s *dnsFunctionStore) snapshot() (libbpfloader.DNSSnapshot, bool) {
 
 // handleDNSQueries builds and writes the dns-queries function response.
 func handleDNSQueries(api *netdataapi.API, fnStore *dnsFunctionStore, uid string) {
-	snap, _ := fnStore.snapshot()
+	snap, hasData := fnStore.snapshot()
+	if !hasData {
+		sendFunctionError(api, uid, 503, "dns-queries: data not yet available")
+		return
+	}
 
 	now := time.Now().Unix()
 	expires := now + int64(fnStore.updateEvery)

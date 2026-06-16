@@ -110,7 +110,11 @@ func parseMinimalFunctionLine(line string) (uid, name string) {
 
 // handleNetworkProtocols builds and writes the network-protocols function response.
 func handleNetworkProtocols(api *netdataapi.API, fnStore *socketFunctionStore, uid string) {
-	p, _ := fnStore.snapshot()
+	p, hasData := fnStore.snapshot()
+	if !hasData {
+		sendFunctionError(api, uid, 503, "network-protocols: data not yet available")
+		return
+	}
 
 	now := time.Now().Unix()
 	expires := now + int64(fnStore.updateEvery)
