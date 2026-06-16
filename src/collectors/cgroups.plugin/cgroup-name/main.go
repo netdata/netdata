@@ -57,6 +57,10 @@ var (
 	reK8sQOSAny          = regexp.MustCompile(`.+(besteffort|burstable)`)
 	reNullName           = regexp.MustCompile(`_null(_|$)`)
 	reHostScheme         = regexp.MustCompile(`^([a-z]+)://(.*)`)
+	reLibvirtQemu        = regexp.MustCompile(`machine_.*\.libvirt-qemu`)
+	reLxcPayload         = regexp.MustCompile(`lxc\.payload\.(.*)`)
+	reProxmoxConfName    = regexp.MustCompile(`\s*name\s*:\s*(.*)?$`)
+	reProxmoxConfHost    = regexp.MustCompile(`\s*hostname\s*:\s*(.*)?$`)
 )
 
 // External helper commands are resolved from fixed system directories instead
@@ -355,7 +359,7 @@ func (r *resolver) dispatchNonK8s(ctx context.Context, cgroup string) {
 		r.name = "lxc/" + lxcMachineName(cgroup)
 	case strings.Contains(cgroup, "machine.slice_machine") && strings.Contains(cgroup, "-qemu"):
 		r.name = "qemu_" + machineName(cgroup, "-qemu")
-	case regexp.MustCompile(`machine_.*\.libvirt-qemu`).MatchString(cgroup):
+	case reLibvirtQemu.MatchString(cgroup):
 		name := strings.TrimPrefix(cgroup, "machine_")
 		name = strings.TrimSuffix(name, ".libvirt-qemu")
 		name = strings.Replace(name, "-", "_", 1)
@@ -364,7 +368,7 @@ func (r *resolver) dispatchNonK8s(ctx context.Context, cgroup string) {
 		m := reProxmoxQemu.FindStringSubmatch(cgroup)
 		filename := hostPath("/etc/pve/qemu-server/" + m[1] + ".conf")
 		if fileReadable(filename) {
-			r.name = "qemu_" + firstConfigValue(filename, regexp.MustCompile(`\s*name\s*:\s*(.*)?$`), "^name: ")
+			r.name = "qemu_" + firstConfigValue(filename, reProxmoxConfName, "^name: ")
 		} else {
 			r.error(fmt.Sprintf("proxmox config file missing %s or netdata does not have read access.  Please ensure netdata is a member of www-data group.", filename))
 		}
@@ -372,12 +376,12 @@ func (r *resolver) dispatchNonK8s(ctx context.Context, cgroup string) {
 		m := reProxmoxLXC.FindStringSubmatch(cgroup)
 		filename := hostPath("/etc/pve/lxc/" + m[1] + ".conf")
 		if fileReadable(filename) {
-			r.name = firstConfigValue(filename, regexp.MustCompile(`\s*hostname\s*:\s*(.*)?$`), "^hostname: ")
+			r.name = firstConfigValue(filename, reProxmoxConfHost, "^hostname: ")
 		} else {
 			r.error(fmt.Sprintf("proxmox config file missing %s or netdata does not have read access.  Please ensure netdata is a member of www-data group.", filename))
 		}
 	case strings.Contains(cgroup, "lxc.payload"):
-		r.name = regexp.MustCompile(`lxc\.payload\.(.*)`).ReplaceAllString(cgroup, "$1")
+		r.name = reLxcPayload.ReplaceAllString(cgroup, "$1")
 	}
 }
 
@@ -391,7 +395,7 @@ func extractOrOriginal(re *regexp.Regexp, s string, idx int) string {
 
 func lxcMachineName(s string) string {
 	name := machineName(s, "-lxc")
-	name = regexp.MustCompile(`[\/_]x2d[[:digit:]]*`).ReplaceAllString(name, "")
+	name = reMachineIDSegment.ReplaceAllString(name, "")
 	name = strings.ReplaceAll(name, "/x2d", "")
 	name = strings.ReplaceAll(name, "_x2d", "")
 	name = strings.ReplaceAll(name, ".scope", "")
@@ -1009,7 +1013,7 @@ func (r *resolver) k8sGetKubePodName(ctx context.Context, cgroupPath, id string)
 	repairPrivateFileMode(tmpContainers)
 
 	var kubeClusterName, kubeSystemUID, labels, containers string
-	if cntrID != "" && fileExists(tmpCluster) && fileExists(tmpSystemUID) && fileExists(tmpContainers) {
+	if cntrID != "" && isPrivateRegularFile(tmpCluster) && isPrivateRegularFile(tmpSystemUID) && isPrivateRegularFile(tmpContainers) {
 		if matched, ok := grepFile(tmpContainers, cntrID, 0); ok {
 			labels = matched
 			kubeSystemUID = firstLineFile(tmpSystemUID)
@@ -1126,16 +1130,40 @@ func (r *resolver) k8sGetKubePodName(ctx context.Context, cgroupPath, id string)
 	return name, 1
 }
 
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
+// isPrivateRegularFile reports whether path is an existing regular file (not a
+// symlink, directory, or device). The Kubernetes cache files live in a
+// world-writable TMPDIR under predictable names, so before reading them we must
+// reject a symlink planted there by another local user instead of following it.
+func isPrivateRegularFile(path string) bool {
+	st, err := os.Lstat(path)
+	return err == nil && st.Mode().IsRegular()
 }
 
+// writePrivateFile writes data to path atomically with mode 0600. It creates a
+// fresh, unguessable temp file in the destination directory (os.CreateTemp uses
+// O_EXCL and mode 0600) and renames it over path. rename(2) replaces a symlink
+// planted at the destination instead of following it, so a hostile symlink in a
+// world-writable TMPDIR cannot redirect the write to another file.
 func writePrivateFile(path string, data []byte) error {
-	if err := os.WriteFile(path, data, 0o600); err != nil {
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".cgroup-name-cache-*")
+	if err != nil {
 		return err
 	}
-	return os.Chmod(path, 0o600)
+	tmpName := tmp.Name()
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpName)
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmpName)
+		return err
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		_ = os.Remove(tmpName)
+		return err
+	}
+	return nil
 }
 
 func repairPrivateFileMode(path string) {
@@ -1146,6 +1174,9 @@ func repairPrivateFileMode(path string) {
 }
 
 func firstLineFile(path string) string {
+	if !isPrivateRegularFile(path) {
+		return ""
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return ""
@@ -1161,6 +1192,9 @@ func firstLine(s string) string {
 }
 
 func grepFile(path, pattern string, max int) (string, bool) {
+	if !isPrivateRegularFile(path) {
+		return "", false
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", false

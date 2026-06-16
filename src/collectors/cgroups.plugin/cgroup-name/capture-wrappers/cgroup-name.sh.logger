@@ -155,7 +155,11 @@ fi
   printf '"diff_status":"%s",' "$diff_status"
   printf '"diff_detail":"%s"' "$(json_escape "$diff_detail")"
   printf '}\n'
-} >>"$capture_file"
+} >>"$capture_file" 2>/dev/null || true
 
-cat "$tmpdir/shell.out"
+# Capture is best-effort and must never change what the resolver returns:
+# relay the shell resolver's stderr and stdout verbatim, then exit with its
+# code, so this wrapper is a transparent stand-in for cgroup-name.sh.real.
+cat "$tmpdir/shell.err" >&2 || true
+cat "$tmpdir/shell.out" || true
 exit "$(cat "$tmpdir/shell.code")"
