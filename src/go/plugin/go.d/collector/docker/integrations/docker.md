@@ -176,6 +176,7 @@ The following alerts are available:
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
 | [ docker_container_unhealthy ](https://github.com/netdata/netdata/blob/master/src/health/health.d/docker.conf) | docker.container_health_status | ${label:container_name} docker container health status is unhealthy |
+| [ docker_container_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/docker.conf) | docker.container_state | Docker container ${label:container_name} is currently not running. This alert is disabled by default. To enable it, modify the chart labels filter in the stock health configuration (docker.conf) from container_name=!* to match your container names. |
 
 
 ## Metrics
