@@ -8,30 +8,39 @@ The Windows plugin primarily collects metrics from Microsoft Windows [Performanc
 
 ## Default Configuration
 
-By default, all collector threads are enabled except for `PerflibThermalZone` and `PerflibServices`. You can enable these disabled collectors or disable any of the currently active ones by modifying the `[plugin:windows]` section in your configuration file.
+By default, all collector threads are enabled except for `PerflibSMB` and `PerflibThermalZone`. You can enable these disabled collectors or disable any of the currently active ones by modifying the `[plugin:windows]` section in your configuration file.
 
 To change a setting, remove the comment symbol (`#`) from the beginning of the line and set the value to either `yes` or `no`.
+
+> **Note**
+>
+> The `[plugin:windows]` section is generated dynamically by the Agent and appears in `netdata.conf` **only on Windows hosts**, because `windows.plugin` runs exclusively on Microsoft Windows. On non-Windows systems (for example Linux) this section is not present in `netdata.conf` at all — its absence there is expected and is not an error. On Windows, the complete live configuration (including every `[plugin:windows]` key with its current default) is available at `http://localhost:19999/netdata.conf`; copy it from there or add the `[plugin:windows]` section manually to your `netdata.conf`. Every option listed below is a valid key.
 
 ```text
 [plugin:windows]
         # GetSystemUptime = yes
         # GetSystemRAM = yes
+        # GetPowerSupply = yes
+        # GetSensors = yes
+        # GetHardwareInfo = yes
+        # PerflibServices = yes
         # PerflibProcesses = yes
         # PerflibProcessor = yes
         # PerflibMemory = yes
         # PerflibStorage = yes
         # PerflibNetwork = yes
+        # PerflibSMB = no
         # PerflibObjects = yes
         # PerflibHyperV = yes
         # PerflibThermalZone = no
         # PerflibWebService = yes
-        # PerflibServices = no
         # PerflibNetFramework = yes
         # PerflibAD = yes
         # PerflibADCS = yes
         # PerflibADFS = yes
         # PerflibExchange = yes
         # PerflibNUMA = yes
+        # PerflibASP = yes
 ```
 
 ## Update Every per Thread
