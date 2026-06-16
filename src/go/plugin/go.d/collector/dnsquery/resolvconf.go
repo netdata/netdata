@@ -30,6 +30,8 @@ func resolvConfPath() string {
 	}
 	nameservers := parseResolvConfNameservers(bs)
 	if useSystemdResolvConf(nameservers) {
+		// Preserve Docker/Moby behavior: return the systemd-resolved path and let
+		// the subsequent read surface any missing-file or permission error.
 		return systemdResolvConfPath
 	}
 	return defaultResolvConfPath

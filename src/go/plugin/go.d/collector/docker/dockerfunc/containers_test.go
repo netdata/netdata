@@ -139,4 +139,12 @@ func TestFormatHelpers(t *testing.T) {
 		assert.Equal(t, "80/tcp, 0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp", formatPorts(ports))
 		assert.Equal(t, "", formatPorts(nil))
 	})
+
+	t.Run("formatPorts with invalid published IP", func(t *testing.T) {
+		ports := []typesContainer.PortSummary{
+			{IP: netip.MustParseAddr("0.0.0.0"), PrivatePort: 80, PublicPort: 8080, Type: "tcp"},
+			{PrivatePort: 80, PublicPort: 8080, Type: "tcp"},
+		}
+		assert.Equal(t, "8080->80/tcp, 0.0.0.0:8080->80/tcp", formatPorts(ports))
+	})
 }
