@@ -688,7 +688,7 @@ Docker containers use `msmtp` instead of `sendmail` for email delivery. You need
    DEFAULT_RECIPIENT_EMAIL="recipient@example.com"
    ```
 
-3. **Restart the container** to apply changes:
+3. **Apply the changes.** Configuration changes to `health_alarm_notify.conf` take effect on the next alert notification — no restart is required. To verify your setup immediately, you can restart the container:
 
    ```bash
    docker restart netdata
