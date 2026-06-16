@@ -216,7 +216,7 @@ static void njfv2idx_remove(struct rrdengine_datafile *datafile) {
 static struct journal_v2_header *journalfile_v2_mounted_data_get(struct rrdengine_journalfile *journalfile, size_t *data_size) {
     struct journal_v2_header *j2_header = NULL;
 
-    spinlock_lock(&journalfile->data_spinlock);
+    spinlock_tracked_lock(&journalfile->data_spinlock);
 
     if(!journalfile->mmap.data) {
         journalfile->mmap.data = nd_mmap(NULL, journalfile->mmap.size, PROT_READ, MAP_SHARED, journalfile->mmap.fd, 0);
@@ -259,7 +259,7 @@ static struct journal_v2_header *journalfile_v2_mounted_data_get(struct rrdengin
             *data_size = journalfile->mmap.size;
     }
 
-    spinlock_unlock(&journalfile->data_spinlock);
+    spinlock_tracked_unlock(&journalfile->data_spinlock);
 
     return j2_header;
 }
@@ -269,11 +269,11 @@ static bool journalfile_v2_mounted_data_unmount(struct rrdengine_journalfile *jo
 
     if(!have_locks) {
         if(!wait) {
-            if (!spinlock_trylock(&journalfile->data_spinlock))
+            if (!spinlock_tracked_trylock(&journalfile->data_spinlock))
                 return false;
         }
         else
-            spinlock_lock(&journalfile->data_spinlock);
+            spinlock_tracked_lock(&journalfile->data_spinlock);
     }
 
     if(!journalfile->v2.refcount) {
@@ -296,7 +296,7 @@ static bool journalfile_v2_mounted_data_unmount(struct rrdengine_journalfile *jo
     }
 
     if(!have_locks) {
-        spinlock_unlock(&journalfile->data_spinlock);
+        spinlock_tracked_unlock(&journalfile->data_spinlock);
     }
 
     return unmounted;
@@ -325,7 +325,7 @@ void journalfile_v2_data_unmount_cleanup(time_t now_s) {
 
             struct rrdengine_journalfile *journalfile = datafile->journalfile;
 
-            if(!spinlock_trylock(&journalfile->data_spinlock))
+            if(!spinlock_tracked_trylock(&journalfile->data_spinlock))
                 continue;
 
             bool unmount = false;
@@ -340,7 +340,7 @@ void journalfile_v2_data_unmount_cleanup(time_t now_s) {
                     // enough time has passed since we last needed this journal
                     unmount = true;
             }
-            spinlock_unlock(&journalfile->data_spinlock);
+            spinlock_tracked_unlock(&journalfile->data_spinlock);
 
             if (unmount)
                 journalfile_v2_mounted_data_unmount(journalfile, false, false);
@@ -352,7 +352,7 @@ void journalfile_v2_data_unmount_cleanup(time_t now_s) {
 ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire_with_hint(struct rrdengine_journalfile *journalfile,
     size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s, JOURNALFILE_V2_ACCESS_HINT hint)
 {
-    spinlock_lock(&journalfile->data_spinlock);
+    spinlock_tracked_lock(&journalfile->data_spinlock);
 
     bool has_data = (journalfile->v2.flags & JOURNALFILE_FLAG_IS_AVAILABLE);
     bool is_mounted = (journalfile->v2.flags & JOURNALFILE_FLAG_IS_MOUNTED);
@@ -390,7 +390,7 @@ ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire_with_hint(st
 
         }
     }
-    spinlock_unlock(&journalfile->data_spinlock);
+    spinlock_tracked_unlock(&journalfile->data_spinlock);
 
     if(do_we_need_it)
         return journalfile_v2_mounted_data_get(journalfile, data_size);
@@ -403,7 +403,7 @@ ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire(struct rrden
 }
 
 ALWAYS_INLINE void journalfile_v2_data_release(struct rrdengine_journalfile *journalfile) {
-    spinlock_lock(&journalfile->data_spinlock);
+    spinlock_tracked_lock(&journalfile->data_spinlock);
 
     internal_fatal(!journalfile->mmap.data, "trying to release a journalfile without data");
     internal_fatal(journalfile->v2.refcount < 1, "trying to release a non-acquired journalfile");
@@ -418,7 +418,7 @@ ALWAYS_INLINE void journalfile_v2_data_release(struct rrdengine_journalfile *jou
         if(journalfile->v2.flags & JOURNALFILE_FLAG_MOUNTED_FOR_RETENTION)
             unmount = true;
     }
-    spinlock_unlock(&journalfile->data_spinlock);
+    spinlock_tracked_unlock(&journalfile->data_spinlock);
 
     if(unmount)
         journalfile_v2_mounted_data_unmount(journalfile, false, true);
@@ -426,18 +426,18 @@ ALWAYS_INLINE void journalfile_v2_data_release(struct rrdengine_journalfile *jou
 
 bool journalfile_v2_data_available(struct rrdengine_journalfile *journalfile) {
 
-    spinlock_lock(&journalfile->data_spinlock);
+    spinlock_tracked_lock(&journalfile->data_spinlock);
     bool has_data = (journalfile->v2.flags & JOURNALFILE_FLAG_IS_AVAILABLE);
-    spinlock_unlock(&journalfile->data_spinlock);
+    spinlock_tracked_unlock(&journalfile->data_spinlock);
 
     return has_data;
 }
 
 size_t journalfile_v2_data_size_get(struct rrdengine_journalfile *journalfile) {
 
-    spinlock_lock(&journalfile->data_spinlock);
+    spinlock_tracked_lock(&journalfile->data_spinlock);
     size_t data_size = journalfile->mmap.size;
-    spinlock_unlock(&journalfile->data_spinlock);
+    spinlock_tracked_unlock(&journalfile->data_spinlock);
 
     return data_size;
 }
@@ -449,7 +449,7 @@ void journalfile_v2_data_set(struct rrdengine_journalfile *journalfile, int fd, 
     if(unlikely(!journalfile->datafile))
         fatal("DBENGINE: JOURNALFILE: trying to set journal data without a datafile");
 
-    spinlock_lock(&journalfile->data_spinlock);
+    spinlock_tracked_lock(&journalfile->data_spinlock);
 
     internal_fatal(journalfile->mmap.fd != -1, "DBENGINE JOURNALFILE: trying to re-set journal fd");
     internal_fatal(journalfile->mmap.data, "DBENGINE JOURNALFILE: trying to re-set journal_data");
@@ -468,7 +468,7 @@ void journalfile_v2_data_set(struct rrdengine_journalfile *journalfile, int fd, 
 
     journalfile_v2_mounted_data_unmount(journalfile, true, true);
 
-    spinlock_unlock(&journalfile->data_spinlock);
+    spinlock_tracked_unlock(&journalfile->data_spinlock);
 
     njfv2idx_add(journalfile->datafile);
 }
@@ -485,7 +485,7 @@ static void journalfile_v2_data_unmap_permanently(struct rrdengine_journalfile *
         if (has_references)
             sleep_usec(10 * USEC_PER_MS);
 
-        spinlock_lock(&journalfile->data_spinlock);
+        spinlock_tracked_lock(&journalfile->data_spinlock);
 
         if(journalfile_v2_mounted_data_unmount(journalfile, true, true)) {
             if(journalfile->mmap.fd != -1)
@@ -505,7 +505,7 @@ static void journalfile_v2_data_unmap_permanently(struct rrdengine_journalfile *
             nd_log_limit(&journalfile_erl, NDLS_DAEMON, NDLP_WARNING, "DBENGINE: journalfile \"%s\" is not available for unmap", path_v2);
         }
 
-        spinlock_unlock(&journalfile->data_spinlock);
+        spinlock_tracked_unlock(&journalfile->data_spinlock);
 
     } while(has_references);
 }
@@ -514,7 +514,7 @@ struct rrdengine_journalfile *journalfile_alloc_and_init(struct rrdengine_datafi
 {
     struct rrdengine_journalfile *journalfile = callocz(1, sizeof(struct rrdengine_journalfile));
     journalfile->datafile = datafile;
-    spinlock_init(&journalfile->data_spinlock);
+    spinlock_tracked_init(&journalfile->data_spinlock);
     spinlock_init(&journalfile->unsafe.spinlock);
     journalfile->mmap.fd = -1;
     datafile->journalfile = journalfile;
@@ -1195,9 +1195,9 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
         // IS_AVAILABLE and skip journalfile_v2_data_unmap_permanently(),
         // leaving a dangling njfv2idx entry, an unclosed fd, and an unmapped
         // region.
-        spinlock_lock(&journalfile->data_spinlock);
+        spinlock_tracked_lock(&journalfile->data_spinlock);
         journalfile->v2.flags &= ~JOURNALFILE_FLAG_IS_AVAILABLE;
-        spinlock_unlock(&journalfile->data_spinlock);
+        spinlock_tracked_unlock(&journalfile->data_spinlock);
     }
 
     journalfile_v2_data_release(journalfile);
