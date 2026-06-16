@@ -5,10 +5,9 @@ import (
 )
 
 const (
-	dnsKernelMask        uint32 = (1 << 12) - 1
-	dnsDefaultUpdateEvery        = 10
-	dnsDefaultBTFPath            = "/sys/kernel/btf"
-	dnsDefaultObjectFlavor       = "buffer"
+	dnsKernelMask          uint32 = (1 << 12) - 1
+	dnsDefaultUpdateEvery         = 10
+	dnsDefaultObjectFlavor        = "buffer"
 )
 
 type DNSLegacyConfig struct {
@@ -17,7 +16,6 @@ type DNSLegacyConfig struct {
 	IsRHF         int
 	KernelVersion uint32
 	IsDebian      bool
-	HasBTF        bool
 	ConfigFound   bool
 	Enabled       bool
 	UpdateEvery   int
@@ -46,7 +44,6 @@ func defaultDNSLegacyConfig() DNSLegacyConfig {
 		IsRHF:        -1,
 		IsDebian:     IsDebianFlavor(),
 		UpdateEvery:  dnsDefaultUpdateEvery,
-		HasBTF:       kernelBTFSupported(dnsDefaultBTFPath),
 		ObjectFlavor: dnsDefaultObjectFlavor,
 		Enabled:      false, // stock ebpf.d.conf: dns = no
 	}
@@ -65,9 +62,6 @@ func resolveDNSLegacyConfig() (DNSLegacyConfig, error) {
 	}
 	if fileCfg.UpdateEvery != nil && *fileCfg.UpdateEvery > 0 {
 		cfg.UpdateEvery = *fileCfg.UpdateEvery
-	}
-	if fileCfg.BTFPath != nil && *fileCfg.BTFPath != "" {
-		cfg.HasBTF = kernelBTFSupported(*fileCfg.BTFPath)
 	}
 	if fileCfg.ObjectFlavor != nil && *fileCfg.ObjectFlavor != "" {
 		cfg.ObjectFlavor = *fileCfg.ObjectFlavor
