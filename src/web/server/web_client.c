@@ -1333,24 +1333,6 @@ static bool web_server_log_transport(BUFFER *wb, void *ptr) {
     return true;
 }
 
-static inline bool web_client_targets_mcp_route(const struct web_client *w) {
-    const char *path = buffer_tostring(w->url_path_decoded);
-    if(!path)
-        return false;
-
-    while(*path == '/')
-        path++;
-
-    if(!*path)
-        return false;
-
-    if((strncmp(path, "mcp", 3) == 0 && (!path[3] || path[3] == '/' || path[3] == '?')) ||
-       (strncmp(path, "sse", 3) == 0 && (!path[3] || path[3] == '/' || path[3] == '?')))
-        return true;
-
-    return false;
-}
-
 void web_client_process_request_from_web_server(struct web_client *w) {
     // entry point for web server requests
 
@@ -1429,7 +1411,9 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                 case HTTP_REQUEST_MODE_OPTIONS: {
                     // Path-aware coarse pre-filter:
                     // MCP ACL is accepted only for MCP endpoints (/mcp, /sse), not as generic API access.
-                    bool mcp_route_requested = web_client_targets_mcp_route(w);
+                    // Reuse the canonical classification set at URL-decode time (see
+                    // WEB_CLIENT_FLAG_PATH_IS_MCP) so the prefilter cannot drift from the dispatcher.
+                    bool mcp_route_requested = web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_IS_MCP);
                     if(unlikely(
                             !http_can_access_dashboard(w) &&
                             !http_can_access_registry(w) &&
@@ -1455,7 +1439,9 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                 case HTTP_REQUEST_MODE_DELETE: {
                     // Path-aware coarse pre-filter:
                     // MCP ACL may open only MCP routes, while all other routes still require their own ACL surface.
-                    bool mcp_route_requested = web_client_targets_mcp_route(w);
+                    // Reuse the canonical classification set at URL-decode time (see
+                    // WEB_CLIENT_FLAG_PATH_IS_MCP) so the prefilter cannot drift from the dispatcher.
+                    bool mcp_route_requested = web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_IS_MCP);
                     if(unlikely(
                             !http_can_access_dashboard(w) &&
                             !http_can_access_registry(w) &&
