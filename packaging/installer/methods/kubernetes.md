@@ -150,7 +150,7 @@ For a standard in-cluster deployment you do **not** need to create an API key yo
 
 :::note
 
-The API key is not exposed as an individual Helm value. Because it is plain text inside the `stream.conf` blocks, there is no single `--set` flag to change it — you replace the whole configuration block for the parent and the children.
+The API key is not exposed as an individual Helm value. Because it is plain text inside the `stream.conf` blocks, there is no single `--set` flag to change it. `parent.configs.stream.data` and `child.configs.stream.data` replace the full `stream.conf` contents, so start from the chart's current defaults and modify only the required fields.
 
 :::
 
@@ -160,31 +160,11 @@ To use your own API key, generate a new UUID:
 uuidgen
 ```
 
-Then provide the full `stream.conf` blocks in your `override.yml`. The parent defines an `[API_KEY]` section that authorizes incoming streams; each child's `[stream]` section sends metrics using that same key. Use the **identical** API key on both sides.
+Then update only these fields in the chart's existing `stream.conf` defaults:
 
-```yaml
-parent:
-  configs:
-    stream:
-      data: |
-        # Replace with your own UUID (from: uuidgen)
-        [<your-api-key>]
-            type = api
-            enabled = yes
-            allow from = *
-            db = dbengine
-
-child:
-  configs:
-    stream:
-      data: |
-        [stream]
-            enabled = yes
-            # In-cluster parent service (default release name: netdata)
-            destination = netdata:19999
-            # Must match the parent's API key above
-            api key = <your-api-key>
-```
+- In `parent.configs.stream.data`, replace the default section header `[11111111-2222-3333-4444-555555555555]` with your new UUID.
+- In `child.configs.stream.data`, replace `api key = 11111111-2222-3333-4444-555555555555` with the same UUID.
+- Change `destination = netdata:19999` only if you want children to stream to a parent outside the cluster.
 
 Apply it:
 
