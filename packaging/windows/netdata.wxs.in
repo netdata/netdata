@@ -305,7 +305,7 @@
 
             <SetProperty
                 Id="InstallManifest"
-                Value="&quot;[System64Folder]wevtutil.exe&quot; im &quot;[System64Folder]wevt_netdata_manifest.xml&quot; &quot;/mf:[System64Folder]\wevt_netdata.dll&quot; &quot;/rf:[System64Folder]\wevt_netdata.dll&quot;"
+                Value="&quot;[System64Folder]wevtutil.exe&quot; im &quot;[System64Folder]wevt_netdata_manifest.xml&quot; &quot;/mf:[System64Folder]wevt_netdata.dll&quot; &quot;/rf:[System64Folder]wevt_netdata.dll&quot;"
                 Before="InstallManifest"
                 Sequence="execute"
             />
