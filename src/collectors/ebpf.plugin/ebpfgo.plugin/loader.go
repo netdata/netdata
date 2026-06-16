@@ -463,7 +463,11 @@ func BuildLoadPlan(req LoadPlanRequest) LoadPlan {
 }
 
 // resolveKernelAndRH detects the running kernel version and the RedHat-family
-// release number.  isRHF is -1 when the host is not RedHat-family.
+// release number.  isRHF is -1 in both "not RHEL" and "detection failed" cases.
+// That intentional ambiguity is safe: failing to read /etc/redhat-release is
+// almost always ENOENT (not RHEL), and on the rare EPERM case the caller will
+// attempt to load the non-.rhf objects which will fail fast; the error is
+// logged so the operator can investigate.
 // Every resolve*LegacyConfig function needs this pair, so it lives here.
 func resolveKernelAndRH() (kver uint32, isRHF int, err error) {
 	kver, err = KernelVersion()
@@ -473,6 +477,12 @@ func resolveKernelAndRH() (kver uint32, isRHF int, err error) {
 	isRHF = -1
 	if rhf, rherr := RedHatRelease(); rherr == nil {
 		isRHF = rhf
+	} else if !os.IsNotExist(rherr) {
+		// File present but unreadable — log once so the operator knows why
+		// RHEL-specific object paths and kernel indices will not be used.
+		fmt.Fprintf(os.Stderr,
+			"ebpf-go.plugin: warning: /etc/redhat-release unreadable (%v); treating host as non-RHEL\n",
+			rherr)
 	}
 	return kver, isRHF, nil
 }
