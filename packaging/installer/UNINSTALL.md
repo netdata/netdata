@@ -118,21 +118,18 @@ chmod +x ./netdata-uninstaller.sh
 
 #### dpkg errors during package purge
 
-If you installed Netdata via native DEB packages (for example, `netdata`, `netdata-dashboard`, or `netdata-plugin-*`), the package's post-removal (postrm) script may fail during `purge` with errors like these:
+If you installed Netdata via native DEB packages (for example, `netdata`, `netdata-dashboard`, or `netdata-plugin-*`), the package's post-removal (postrm) script may fail during `purge` with output similar to the following:
 
 ```text
 dpkg-statoverride: warning: no override present
-```
-
-```text
-installed netdata-dashboard script for package post-removal subprocess returned error code 2
-```
-
-```text
+dpkg: error processing package netdata-dashboard (--purge):
+ installed netdata-dashboard package post-removal script subprocess returned error exit status 2
+Errors were encountered while processing:
+ netdata-dashboard
 E: Sub-process /usr/bin/dpkg returned an error code (1)
 ```
 
-The postrm script references `dpkg-statoverride` entries or file paths that no longer exist on the system, typically after a partial removal or manual cleanup. The following steps resolve this, ordered from safest to most aggressive:
+The postrm script references `dpkg-statoverride` entries or file paths that no longer exist on the system, typically after a partial removal or manual cleanup. When this happens, the package is left in a half-configured state. The following steps resolve this, ordered from safest to most aggressive:
 
 1. **Retry the purge** — the transient state may have resolved itself:
 
@@ -176,7 +173,7 @@ The postrm script references `dpkg-statoverride` entries or file paths that no l
 
 :::note
 
-These steps apply to any Netdata DEB package (`netdata`, `netdata-dashboard`, `netdata-plugin-*`) that uses `dpkg-statoverride` in its post-removal script.
+These steps apply to any Netdata DEB package (`netdata`, `netdata-dashboard`, `netdata-plugin-*`) that uses `dpkg-statoverride` in its post-removal script. This scenario only affects native package installs — if you are unsure how Netdata was installed, see the **Native Package Users** note above and the [installation type guidance](/packaging/installer/UPDATE.md).
 
 :::
 
