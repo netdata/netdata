@@ -33,6 +33,7 @@ jobs:
             .github/workflows/go-tests.yml
             packaging/cmake/
             src/go/**
+            src/collectors/cgroups.plugin/cgroup-name/**
           files_ignore: |
             **/*.md
             src/go/**/metadata.yaml
