@@ -240,7 +240,62 @@ modules:
                   journal_dir: /var/log/netdata/otel-journals
     troubleshooting:
       problems:
-        list: []
+        list:
+          - name: 'Failed to write log entry: failed to create journal file'
+            description: |
+              When the plugin receives OTLP logs it stores them in journal files under the directory set by
+              `logs.journal_dir`. If that path is rejected, the Agent logs the following error for every
+              incoming log entry:
+
+              `Failed to write log entry: failed to create journal file: failed to create journal file in <journal_dir>/<machine_id>`
+
+              The trailing segment is the host's machine ID rendered as a 32-character hexadecimal string
+              with no hyphens (for example `0123456789abcdef0123456789abcdef`). The error repeats for each OTLP
+              log entry, so no logs are stored until the cause is resolved.
+
+              This message is produced when the journal file path is **not absolute**. The journal registry
+              only accepts paths that begin with `/`, so a **relative** `logs.journal_dir` — for example
+              `otel/v1` instead of `/var/log/netdata/otel/v1` — is rejected. A missing or unwritable directory
+              typically surfaces at startup (see the next entry) rather than as this message.
+
+              Set `logs.journal_dir` in `otel.yaml` to an absolute path, then make sure the directory exists
+              and is owned by the `netdata` user:
+
+              ```bash
+              sudo mkdir -p /var/log/netdata/otel/v1
+              sudo chown -R netdata:netdata /var/log/netdata/otel/v1
+              ```
+
+              Restart the Netdata Agent so it re-reads `otel.yaml`.
+          - name: 'Failed to create journal log for directory'
+            description: |
+              At startup the plugin opens the configured journal directory. If that fails the plugin does not
+              start, and the Agent logs:
+
+              `Failed to create journal log for directory: <journal_dir>`
+
+              Common causes:
+
+              - `logs.journal_dir` exists but is not a directory.
+              - The `netdata` user cannot create or read the directory (permission denied).
+              - The host machine ID cannot be read from `/etc/machine-id`.
+
+              Make sure `logs.journal_dir` in `otel.yaml` is an absolute path to a directory the `netdata`
+              user can create and write to:
+
+              ```bash
+              sudo mkdir -p /var/log/netdata/otel/v1
+              sudo chown -R netdata:netdata /var/log/netdata/otel/v1
+              ```
+
+              Confirm the machine ID is available:
+
+              ```bash
+              ls -l /etc/machine-id
+              ```
+
+              If `/etc/machine-id` is missing, recreate it following your distribution's documentation, then
+              restart the Netdata Agent.
     alerts: []
     metrics:
       folding:
