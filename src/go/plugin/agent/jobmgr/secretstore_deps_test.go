@@ -55,6 +55,19 @@ func TestExtractSecretStoreKeys(t *testing.T) {
 			},
 			want: []string{"vault:good_1"},
 		},
+		"store ref with urienc modifier is still tracked": {
+			cfg: map[string]any{
+				"dsn": "postgresql://u:${store+urienc:vault:vault_prod:secret/data/db#password}@host/db",
+			},
+			want: []string{"vault:vault_prod"},
+		},
+		"escaped and raw store refs dedup to the same key": {
+			cfg: map[string]any{
+				"a": "${store+urienc:aws-sm:aws_prod:db#pw}",
+				"b": "${store:aws-sm:aws_prod:db#user}",
+			},
+			want: []string{"aws-sm:aws_prod"},
+		},
 	}
 
 	for name, tc := range tests {

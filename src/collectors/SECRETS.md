@@ -6,7 +6,7 @@ Netdata lets you reference secret values in collector configs instead of storing
 
 ### Jump To
 
-[Resolver Quick Reference](#resolver-quick-reference) • [Choosing a Resolver](#choosing-a-resolver) • [Environment Variables](#environment-variables) • [Files](#files) • [Commands](#commands) • [Secretstores](#secretstores) • [Supported Secretstore Backends](#supported-secretstore-backends) • [How It Works](#how-it-works) • [Troubleshooting](#troubleshooting)
+[Resolver Quick Reference](#resolver-quick-reference) • [Choosing a Resolver](#choosing-a-resolver) • [Environment Variables](#environment-variables) • [Files](#files) • [Commands](#commands) • [Encoding Values for URIs](#encoding-values-for-uris) • [Secretstores](#secretstores) • [Supported Secretstore Backends](#supported-secretstore-backends) • [How It Works](#how-it-works) • [Troubleshooting](#troubleshooting)
 
 
 ## Resolver Quick Reference
@@ -24,6 +24,7 @@ Netdata lets you reference secret values in collector configs instead of storing
 - Use `${cmd:...}` when you need dynamic secret retrieval via a trusted local command, such as 1Password CLI or a custom script.
 - Use `${store:...}` when your organization manages secrets centrally in a cloud provider or Vault and you want Netdata to pull from that source directly.
 - You can use different resolver types across different collectors, different jobs within the same collector, or even within the same configuration value. See [Mixing resolver types](#mixing-resolver-types).
+- When you embed a secret inside a URI or DSN, append `+urienc` to the reference scheme to percent-encode the resolved value. See [Encoding values for URIs](#encoding-values-for-uris).
 
 ## Environment Variables
 
@@ -68,6 +69,20 @@ jobs:
 - Arguments are split on whitespace. Netdata does not interpret shell quoting, pipes, redirects, or variable expansion unless you explicitly run a shell such as `/bin/sh -c`.
 - Netdata uses a 10-second timeout for command resolvers.
 - Netdata trims leading and trailing whitespace from stdout and ignores stderr.
+
+## Encoding Values for URIs
+
+When a resolved secret is embedded inside a URI or DSN, characters such as `/`, `:`, `@`, or `+` can break parsing. Append `+urienc` to the reference scheme to percent-encode the resolved value so it is safe in any URI component. It works with every resolver: `${env+urienc:...}`, `${file+urienc:...}`, `${cmd+urienc:...}`, and `${store+urienc:...}`.
+
+```yaml
+jobs:
+  - name: postgres_remote
+    dsn: "postgresql://postgres:${store+urienc:vault:vault_prod:secret/data/netdata/pg#password}@db.example.com:5432/postgres"
+```
+
+- Encoding is opt-in. Without `+urienc`, the resolved value is used exactly as stored.
+- Every character outside the RFC 3986 unreserved set (`A-Za-z0-9` and `-` `.` `_` `~`) is percent-encoded.
+- Use `+urienc` only for a value that is a single URI component, such as a password. Applying it to a plain field, or to a value that is already a complete URL, leaves stray percent-encoded text.
 
 ## Secretstores
 
@@ -147,7 +162,7 @@ jobs:
     dsn: "${env:MYSQL_USER}:${store:vault:vault_prod:secret/data/netdata/mysql#password}@tcp(127.0.0.1:3306)/"
 ```
 
-Different jobs within the same collector config file can also use different resolver types.
+Different jobs within the same collector config file can also use different resolver types. When a secretstore value is embedded inside a URI or DSN, append `+urienc` to the scheme (`${store+urienc:<kind>:<name>:<operand>}`) to percent-encode it. See [Encoding values for URIs](#encoding-values-for-uris).
 
 ## Supported Secretstore Backends
 
@@ -191,3 +206,4 @@ Representative error patterns:
 - `${file:relative/path}`: file path must be absolute
 - `${cmd:echo hello}`: command path must be absolute
 - `${cmd:/path/to/slow-command}`: command timed out after 10s
+- `${env+foo:VAR_NAME}`: unknown modifier 'foo'
