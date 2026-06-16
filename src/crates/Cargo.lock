@@ -5175,6 +5175,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "sfsq-cli"
+version = "0.1.3"
+dependencies = [
+ "anyhow",
+ "clap",
+ "file-registry",
+ "humantime",
+ "opentelemetry-proto",
+ "otel-ingestor",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sfsq",
+ "sfst",
+ "sfst-indexer",
+ "tempfile",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+ "wal",
+]
+
+[[package]]
 name = "sfst"
 version = "0.1.3"
 dependencies = [

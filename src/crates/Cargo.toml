@@ -48,6 +48,7 @@ members = [
     # SFST build + query
     "sfst-indexer",
     "sfsq",
+    "sfsq-cli",
 
     # Netdata NetFlow workspace members
     "netflow-plugin",

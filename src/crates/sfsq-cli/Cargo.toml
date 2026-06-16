@@ -1,0 +1,43 @@
+[package]
+name = "sfsq-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Offline terminal inspector for OTel logs stored in WAL/SFST files"
+
+[lints]
+workspace = true
+
+[lib]
+name = "sfsq_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "sfsq-cli"
+path = "src/main.rs"
+
+[dependencies]
+sfsq = { workspace = true }
+sfst = { workspace = true }
+wal = { workspace = true }
+file-registry = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+anyhow = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_yaml = { workspace = true }
+serde_json = { workspace = true }
+tokio-util = { workspace = true }
+humantime = { workspace = true }
+# Warnings (corrupt SFST skipped, per-source degrade, unparseable filenames,
+# discovery skips) route through `tracing` and a stderr subscriber so they are
+# visible and `RUST_LOG`-filterable — essential for a forensic tool.
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+
+[dev-dependencies]
+# Fixture building mirrors the sfsq WAL-equivalence harness: real OTAP frames
+# through the production encoder, real WAL files, real SFST indexes.
+otel-ingestor = { workspace = true }
+sfst-indexer = { workspace = true }
+opentelemetry-proto = { workspace = true }
+tempfile = { workspace = true }
