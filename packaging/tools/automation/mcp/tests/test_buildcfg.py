@@ -2,15 +2,22 @@ from pathlib import Path
 
 import pytest
 
-from netdata_mcp import buildcfg
+from netdata_mcp import buildcfg, profiles
 
 
-def _configure_dir(tmp: Path, build_type: str, *, marker: bool = True) -> Path:
-    """Simulate a configured build dir with the given CMAKE_BUILD_TYPE."""
+def _configure_dir(
+    tmp: Path, build_type: str, *, marker: bool = True, install_prefix: str | None = None
+) -> Path:
+    """Simulate a configured build dir with the given CMAKE_BUILD_TYPE and
+    (canonical, unless overridden) CMAKE_INSTALL_PREFIX."""
     bdir = tmp / "build"
     bdir.mkdir(parents=True, exist_ok=True)
     (bdir / "build.ninja").write_text("")
-    (bdir / "CMakeCache.txt").write_text(f"CMAKE_BUILD_TYPE:STRING={build_type}\n")
+    prefix = install_prefix if install_prefix is not None else profiles.install_prefix(str(tmp))
+    (bdir / "CMakeCache.txt").write_text(
+        f"CMAKE_BUILD_TYPE:STRING={build_type}\n"
+        f"CMAKE_INSTALL_PREFIX:PATH={prefix}\n"
+    )
     if marker:
         (bdir / ".mcp-managed").write_text("managed\n")
     return bdir
@@ -48,6 +55,43 @@ def test_needs_configure_true_on_profile_switch(tmp_path):
     _configure_dir(tmp_path, "Debug")
     # optimized == RelWithDebInfo != Debug -> reconfigure
     assert buildcfg.needs_configure(str(tmp_path), "optimized") is True
+
+
+def test_needs_configure_true_on_stale_install_prefix(tmp_path):
+    # Right profile, but the cached install prefix is from an older layout.
+    # ninja install would write to the stale prefix while the run path launches
+    # from profiles.install_prefix -> reconfigure to keep them consistent.
+    _configure_dir(tmp_path, "Debug", install_prefix="/home/someone/opt/old-layout/netdata")
+    assert buildcfg.needs_configure(str(tmp_path), "debug") is True
+
+
+def test_needs_configure_true_when_prefix_missing_from_cache(tmp_path):
+    # A cache lacking CMAKE_INSTALL_PREFIX is treated as needing reconfigure.
+    bdir = tmp_path / "build"
+    bdir.mkdir(parents=True)
+    (bdir / "build.ninja").write_text("")
+    (bdir / "CMakeCache.txt").write_text("CMAKE_BUILD_TYPE:STRING=Debug\n")
+    assert buildcfg.needs_configure(str(tmp_path), "debug") is True
+
+
+def test_needs_configure_false_on_trailing_slash_prefix_variant(tmp_path):
+    # A cosmetic spelling difference (trailing slash) must NOT reconfigure —
+    # the comparison is path-normalized via Path.resolve().
+    canonical = profiles.install_prefix(str(tmp_path))
+    _configure_dir(tmp_path, "Debug", install_prefix=canonical + "/")
+    assert buildcfg.needs_configure(str(tmp_path), "debug") is False
+
+
+def test_needs_configure_handles_malformed_prefix_line(tmp_path):
+    # A CMAKE_INSTALL_PREFIX line without '=' must not raise; it is treated as
+    # absent → reconfigure.
+    bdir = tmp_path / "build"
+    bdir.mkdir(parents=True)
+    (bdir / "build.ninja").write_text("")
+    (bdir / "CMakeCache.txt").write_text(
+        "CMAKE_BUILD_TYPE:STRING=Debug\nCMAKE_INSTALL_PREFIX:PATH\n"
+    )
+    assert buildcfg.needs_configure(str(tmp_path), "debug") is True
 
 
 def test_needs_configure_rejects_unknown_profile(tmp_path):

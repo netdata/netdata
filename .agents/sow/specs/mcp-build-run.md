@@ -28,6 +28,13 @@ async plumbing) are intentionally not restated here.
   per worktree** and **one build type per worktree** at a time.
 - Switching a worktree's profile **reconfigures in place** (driven by
   `CMAKE_BUILD_TYPE` in `CMakeCache.txt`), it does not create a second build dir.
+- A (re)configure is also triggered when the cached `CMAKE_INSTALL_PREFIX`
+  (path-normalized) differs from the canonical `profiles.install_prefix(worktree)`
+  (or is absent). The run path always launches from `install_prefix`, but
+  `ninja install` writes to the cached prefix; without this check a stale cached
+  prefix (e.g. an older tool layout) would install fresh binaries to one tree
+  while the agent launches a stale binary from another. `needs_configure`
+  enforces both the build-type and install-prefix invariants.
 - To run two profiles in parallel, use **two worktrees** — this is the supported
   model, not a limitation to work around.
 - `clangd` finds `<worktree>/build/compile_commands.json` natively, so there is
@@ -115,13 +122,25 @@ reader cannot infer from the code:
 
 - **Run-time otel config (`netdata_agent_otel_config`).** Sets typed otel knobs
   (OTLP endpoint, WAL `max_file_size`/`max_log_entries`/`max_file_duration`,
-  CRC/compression, index `max_files`/`max_total_size`) on a declared agent;
-  applied on the next `netdata_run_start`. The runtime writes them to
-  `<run_dir>/etc/otel.yaml` and **pins `[directories] config` to `<run_dir>/etc`**
-  so the otel plugin reads exactly that file. Only set fields are emitted; the
-  rest take plugin defaults. The OTLP endpoint is an auto-assigned free loopback
-  port surfaced as `RunInfo.otlp_endpoint`. Purpose: force storage edge cases
-  (rotation/retention) with tiny thresholds + small data.
+  CRC/compression, index `max_files`/`max_total_size`, and `journal_dir`) on a
+  declared agent; applied on the next `netdata_run_start`. The runtime writes
+  them to `<run_dir>/etc/otel.yaml` and **pins `[directories] config` to
+  `<run_dir>/etc`** so the otel plugin reads exactly that file. Only set fields
+  are emitted; the rest take plugin defaults. The OTLP endpoint is an
+  auto-assigned free loopback port surfaced as `RunInfo.otlp_endpoint`. Purpose:
+  force storage edge cases (rotation/retention) with tiny thresholds + small
+  data.
+  - `journal_dir` is `logs.journal_dir` for the read-only `legacy-otel-logs`
+    viewer: the directory of journal files written by the **former** otel plugin.
+    Unlike WAL/index (always pinned under the run dir), it is a caller-supplied
+    path the plugin only **reads**. It is the one knob that lets the MCP point
+    the legacy viewer at a fixture for scripted verification.
+  - Coupling: emitting `journal_dir` as a sibling of `wal`/`index` under `logs`
+    relies on the otel plugin's override structs **not** using
+    `serde(deny_unknown_fields)` (it reads `journal_dir` via a separate permissive
+    probe). A future agent-side tightening that adds `deny_unknown_fields` to the
+    `logs` override would make every MCP-launched agent fail to parse its user
+    `otel.yaml`; keep the `logs` override permissive, or stop emitting this key.
 - **Synthetic push (`netdata_agent_otel_push` → `otel-streams` `synth`).**
   Generates a deterministic batch of OTLP `LogRecord`s (monotonic timestamps;
   cycled severity as low-card `level`; `host`/`code` over `--field-cardinality`
@@ -166,7 +185,7 @@ reader cannot infer from the code:
   param is exposed and the parsed response is returned for assertion;
   `info=true` probes the function descriptor.
 
-- **Access-gating constraint (durable; verified 2026-06-14).** The `otel-logs`
+- **Access-gating constraint (durable).** The `otel-logs`
   function declares `access = SIGNED_ID | SAME_SPACE | SENSITIVE_DATA`
   (`otel-ledger/src/ledger/rpc/handler.rs`). A **local, unclaimed, anonymous**
   caller gets at most `HTTP_ACCESS_ANONYMOUS_DATA`, so the function returns
@@ -180,7 +199,13 @@ reader cannot infer from the code:
   (OTLP/gRPC to the receiver, a separate endpoint) works on a plain local agent;
   **both `info` probing and live queries require a claimed agent + a Cloud-minted
   bearer**. The query tool's code is transport-correct regardless; the gate is
-  the agent's, not the request's.
+  the agent's, not the request's. (Every wrapped `netdata_agent_*` tool —
+  `execute_function` and the other vendored tools — now satisfies this gate by
+  minting+attaching a per-agent bearer on every forwarded `/mcp` call; see "Agent
+  MCP wrapper". The dedicated `otel_logs` tool stays separate for its typed
+  params; it is the one path that still permits an anonymous call (then 412s with
+  a hint) rather than hard-erroring — a deliberate divergence from the wrapper's
+  bearer-required invariant, not an oversight.)
 
 - **Bearer auth (`bearer.py`).** To satisfy that gate, when `NETDATA_CLOUD_TOKEN`
   is in the server env the `otel_logs` tool mints a per-agent bearer and sends it
@@ -206,9 +231,8 @@ reader cannot infer from the code:
   - **Cloudflare gotcha:** `app.netdata.cloud` is behind Cloudflare, whose WAF
     rejects the default `Python-urllib/*` User-Agent with `HTTP 403 "error code:
     1010"` (banned signature) before auth runs. The mint request therefore sends
-    a plain `User-Agent: netdata-build-mcp/1.0`. Validated end to end: a claimed,
-    cloud_connected agent + 25 pushed synth logs → `otel_logs` minted a bearer
-    and returned all 25 rows with correct facets.
+    a plain `User-Agent: netdata-build-mcp/1.0`, which passes the WAF and reaches
+    the auth layer.
 
 ## Agent MCP wrapper
 
@@ -224,7 +248,21 @@ reader cannot infer from the code:
   hard pin, so a breaking SDK upgrade fails CI rather than ships silently.
 - A call resolves `agent_id` → the ready run's port via `RunRegistry` (unknown /
   not-ready → a clear message, never a crash) and forwards opaquely to the agent's
-  `/mcp` per-call (stateless transport, no cached session, no auth on localhost).
+  `/mcp` per-call (stateless transport, no cached session).
+- **Bearer invariant (auth required, no anonymous path).** Every forwarded call
+  attaches a per-agent Cloud bearer (`bearer.py`, minted from the agent's
+  `/api/v3/info` identity) as `Authorization: Bearer` on the `/mcp` connection.
+  Agent functions are access-gated (e.g. `SIGNED_ID`) even on localhost once the
+  agent is claimed, so an anonymous `/mcp` call would 412. Therefore
+  `NETDATA_CLOUD_TOKEN` is **required** and the mint **must** succeed — both are
+  hard errors with a clear message (no best-effort anonymous fallback), even for
+  functions that don't need auth, so downstream code can assume a bearer is
+  present. Consequence: the wrapped `netdata_agent_*` tools require a configured
+  Cloud token and a claimed/cloud_connected agent; they do not work on a
+  no-cloud/unclaimed localhost run. (The bearer is attached via the SDK's
+  `create_mcp_http_client` factory — an httpx client preserving the MCP 30s/300s
+  timeout defaults — since the streamable-HTTP client's own `headers`/`auth`
+  kwargs are deprecated.)
 - Errors are forwarded verbatim: tool-execution failures arrive as content;
   protocol-level rejections (e.g. a missing required argument) are raised by the
   client as `McpError` and turned into text; an unreachable agent yields a clean

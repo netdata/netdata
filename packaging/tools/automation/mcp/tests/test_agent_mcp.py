@@ -70,16 +70,68 @@ async def test_forward_not_ready_agent(monkeypatch):
     assert "not ready" in out and "building" in out
 
 
-async def test_forward_ready_agent_calls_core(monkeypatch):
+async def test_forward_ready_agent_mints_and_calls_core(monkeypatch):
     monkeypatch.setattr(agent_mcp, "get_runs", lambda ctx: ctx._reg)
+    monkeypatch.setattr(agent_mcp.bearer, "cloud_token", lambda: "cloud-tok")
+
+    async def fake_resolve(port, *, timeout):
+        return "minted-bearer", None
+
+    monkeypatch.setattr(agent_mcp.bearer, "resolve_bearer", fake_resolve)
     seen = {}
 
-    async def fake_call(base_url, tool, arguments):
-        seen.update(base_url=base_url, tool=tool, arguments=arguments)
+    async def fake_call(base_url, tool, arguments, *, bearer):
+        seen.update(base_url=base_url, tool=tool, arguments=arguments, bearer=bearer)
         return '{"ok": true}'
 
     monkeypatch.setattr(agent_mcp.agentmcp, "call_agent_tool", fake_call)
     run = types.SimpleNamespace(state="ready", port=45999)
     out = await agent_mcp._forward_to_agent(_ctx_with(run), "a", "query_metrics", {"metric": "system.cpu"})
     assert out == '{"ok": true}'
-    assert seen == {"base_url": "http://127.0.0.1:45999", "tool": "query_metrics", "arguments": {"metric": "system.cpu"}}
+    assert seen == {
+        "base_url": "http://127.0.0.1:45999",
+        "tool": "query_metrics",
+        "arguments": {"metric": "system.cpu"},
+        "bearer": "minted-bearer",
+    }
+
+
+async def test_forward_hard_errors_without_cloud_token(monkeypatch):
+    # Bearer invariant: no NETDATA_CLOUD_TOKEN → hard error, never an anonymous call.
+    monkeypatch.setattr(agent_mcp, "get_runs", lambda ctx: ctx._reg)
+    monkeypatch.setattr(agent_mcp.bearer, "cloud_token", lambda: "")
+    called = False
+
+    async def fake_call(*args, **kwargs):
+        nonlocal called
+        called = True
+        return "x"
+
+    monkeypatch.setattr(agent_mcp.agentmcp, "call_agent_tool", fake_call)
+    run = types.SimpleNamespace(state="ready", port=45999)
+    out = await agent_mcp._forward_to_agent(_ctx_with(run), "a", "query_metrics", {})
+    assert "NETDATA_CLOUD_TOKEN is not set" in out
+    assert called is False  # no anonymous fallback
+
+
+async def test_forward_hard_errors_on_mint_failure(monkeypatch):
+    # Token present but the mint fails → hard error, still no anonymous call.
+    monkeypatch.setattr(agent_mcp, "get_runs", lambda ctx: ctx._reg)
+    monkeypatch.setattr(agent_mcp.bearer, "cloud_token", lambda: "cloud-tok")
+
+    async def fake_resolve(port, *, timeout):
+        return None, "cloud unreachable"
+
+    monkeypatch.setattr(agent_mcp.bearer, "resolve_bearer", fake_resolve)
+    called = False
+
+    async def fake_call(*args, **kwargs):
+        nonlocal called
+        called = True
+        return "x"
+
+    monkeypatch.setattr(agent_mcp.agentmcp, "call_agent_tool", fake_call)
+    run = types.SimpleNamespace(state="ready", port=45999)
+    out = await agent_mcp._forward_to_agent(_ctx_with(run), "a", "query_metrics", {})
+    assert "Could not obtain a Netdata Cloud bearer" in out and "cloud unreachable" in out
+    assert called is False

@@ -80,6 +80,31 @@ def test_generate_runtime_writes_otel_yaml_with_isolated_storage_and_endpoint(tm
     # unset knobs are omitted (plugin keeps its defaults)
     assert "rotation" not in doc["logs"]["wal"]
     assert "retention" not in doc["logs"]["index"]
+    # the legacy viewer's journal_dir is omitted unless set
+    assert "journal_dir" not in doc["logs"]
+
+
+def test_generate_runtime_otel_emits_journal_dir_when_set(tmp_path, monkeypatch):
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    # A unique sentinel (not the plugin's default journal dir) so the assertion
+    # can't be accidentally satisfied by a default.
+    sentinel = "/srv/legacy-otel-fixture/v1"
+    cfg = runtime.OtelConfig(journal_dir=sentinel)
+    rd, _conf, _otlp = runtime.generate_runtime("agent-j", otel=cfg)
+    doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
+    # journal_dir lands at logs.journal_dir for the read-only legacy viewer...
+    assert doc["logs"]["journal_dir"] == sentinel
+    # ...and wal/index stay pinned under the run dir (never the journal dir)
+    assert doc["logs"]["wal"]["dir"] == str(rd / "lib" / "otel" / "wal")
+    assert doc["logs"]["index"]["dir"] == str(rd / "lib" / "otel" / "index")
+
+
+def test_generate_runtime_otel_omits_empty_journal_dir(tmp_path, monkeypatch):
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    # An empty string is "not set": omitted, not emitted as logs.journal_dir: "".
+    rd, _conf, _otlp = runtime.generate_runtime("agent-e", otel=runtime.OtelConfig(journal_dir=""))
+    doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
+    assert "journal_dir" not in doc["logs"]
 
 
 def test_generate_runtime_otel_emits_only_set_knobs(tmp_path, monkeypatch):

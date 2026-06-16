@@ -35,24 +35,53 @@ def build_dir(worktree: str) -> Path:
     return Path(worktree) / "build"
 
 
-def _configured_build_type(worktree: str) -> str | None:
-    """The CMAKE_BUILD_TYPE recorded in the build dir's cache, or None."""
+def _cache_value(worktree: str, key: str) -> str | None:
+    """The value of a ``KEY:TYPE=value`` entry in the build dir's cache, or None."""
     cache = build_dir(worktree) / "CMakeCache.txt"
     if not cache.is_file():
         return None
+    prefix = f"{key}:"
     for line in cache.read_text(errors="replace").splitlines():
-        if line.startswith("CMAKE_BUILD_TYPE:"):
-            return line.split("=", 1)[1].strip() or None
+        if line.startswith(prefix):
+            parts = line.split("=", 1)
+            if len(parts) < 2:
+                return None  # malformed (KEY:TYPE with no =value) → treat as absent
+            return parts[1].strip() or None
     return None
 
 
+def _configured_build_type(worktree: str) -> str | None:
+    """The CMAKE_BUILD_TYPE recorded in the build dir's cache, or None."""
+    return _cache_value(worktree, "CMAKE_BUILD_TYPE")
+
+
+def _configured_install_prefix(worktree: str) -> str | None:
+    """The CMAKE_INSTALL_PREFIX recorded in the build dir's cache, or None."""
+    return _cache_value(worktree, "CMAKE_INSTALL_PREFIX")
+
+
 def needs_configure(worktree: str, profile: str) -> bool:
-    """True if the build dir isn't configured, or is configured for a different
-    profile (build-type switch) — both require a (re)configure."""
+    """True if the build dir isn't configured, is configured for a different
+    profile (build-type switch), or has a stale install prefix — each requires a
+    (re)configure.
+
+    The install-prefix check guards a state divergence: the run path always
+    launches from ``profiles.install_prefix(worktree)``, but ``ninja install``
+    writes to whatever ``CMAKE_INSTALL_PREFIX`` is baked into the cache. A stale
+    cached prefix (e.g. from an older tool layout) would install fresh binaries
+    to one tree while the agent launches a stale binary from another. cmake
+    reconfigures in place, re-baking the correct prefix on the next install.
+    """
     validate_profile(profile)
     if not (build_dir(worktree) / "build.ninja").is_file():
         return True
-    return _configured_build_type(worktree) != profiles.PROFILES[profile]["CMAKE_BUILD_TYPE"]
+    if _configured_build_type(worktree) != profiles.PROFILES[profile]["CMAKE_BUILD_TYPE"]:
+        return True
+    cached_prefix = _configured_install_prefix(worktree)
+    expected_prefix = profiles.install_prefix(worktree)
+    # Missing cache entry → reconfigure to be safe. Compare path-normalized to
+    # avoid spurious reconfigures from cosmetic spelling/trailing-slash diffs.
+    return cached_prefix is None or Path(cached_prefix).resolve() != Path(expected_prefix).resolve()
 
 
 def assert_ownable(worktree: str) -> None:

@@ -2,9 +2,14 @@
 build-MCP tools, each keyed by ``agent_id`` and forwarded to that agent's ``/mcp``.
 
 The agent's 13 tool schemas are vendored (``agent_tools.AGENT_TOOLS``); each is
-registered as ``netdata_agent_<name>`` with an injected ``agent_id`` (D1=A, baked).
+registered as ``netdata_agent_<name>`` with the ``agent_id`` baked into the tool.
 A call resolves the agent's port via ``RunRegistry`` (must be ``ready``) and
-forwards opaquely (D4). No auth needed on a localhost agent.
+forwards the call opaquely.
+
+Auth invariant: every forwarded call attaches a per-agent Netdata Cloud bearer
+(agent functions are access-gated even on localhost once the agent is claimed).
+``NETDATA_CLOUD_TOKEN`` is required and the mint must succeed — both are hard
+errors, with no anonymous fallback, so a bearer is always present downstream.
 """
 
 from __future__ import annotations
@@ -15,10 +20,18 @@ from typing import Any
 
 from mcp.server.fastmcp import Context, FastMCP
 
-from .. import agentmcp
+from .. import agentmcp, bearer
 from ..agent_tools import AGENT_TOOLS
 from ._common import get_runs
 from .vendored import register_forwarding_tool
+
+# Per-hop ceiling for bearer minting: applied to each of the two sequential
+# HTTP hops (loopback /api/v3/info, then the Cloud round-trip), so the worst-case
+# wall time before the forwarded call is <=2x this. Bounds per-call overhead.
+# Deliberately independent of tools/otel_logs.py's own _MINT_TIMEOUT: that tool
+# clamps the mint to its user-supplied function timeout, whereas the wrapper has
+# no such knob, so it caps the mint on its own.
+_MINT_TIMEOUT = 15
 
 _AGENT_ID_SCHEMA = {
     "type": "string",
@@ -68,7 +81,23 @@ async def _forward_to_agent(ctx: Context, agent_id: str, agent_tool: str, argume
             f"Agent {agent_id!r} is not ready (state: {run.state}). "
             "Start it and poll netdata_run_status until 'ready'."
         )
-    return await agentmcp.call_agent_tool(f"http://127.0.0.1:{run.port}", agent_tool, arguments)
+    # Bearer invariant: every wrapped /mcp call is authenticated. A missing
+    # NETDATA_CLOUD_TOKEN or a mint failure is a hard error — no anonymous path.
+    if not bearer.cloud_token():
+        return (
+            f"NETDATA_CLOUD_TOKEN is not set: the wrapped agent tools (here {agent_id!r}) "
+            "require a Netdata Cloud token to mint a per-agent bearer (agent functions are "
+            "access-gated). Set NETDATA_CLOUD_TOKEN in the MCP server environment."
+        )
+    token, mint_err = await bearer.resolve_bearer(run.port, timeout=_MINT_TIMEOUT)
+    if token is None:
+        return (
+            f"Could not obtain a Netdata Cloud bearer for {agent_id!r} ({mint_err}). "
+            "Ensure the agent is claimed and cloud_connected (netdata_run_status)."
+        )
+    return await agentmcp.call_agent_tool(
+        f"http://127.0.0.1:{run.port}", agent_tool, arguments, bearer=token
+    )
 
 
 def register(mcp: FastMCP) -> None:

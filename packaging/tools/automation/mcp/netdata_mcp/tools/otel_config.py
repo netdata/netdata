@@ -45,6 +45,10 @@ _CrcEnabled = Annotated[bool | None, Field(description="WAL: compute per-frame C
 _CompressionEnabled = Annotated[bool | None, Field(description="WAL: LZ4-compress frame payloads.")]
 _MaxFiles = Annotated[int | None, Field(description="Index retention: max number of SFST index files to keep. Small values force eviction.")]
 _MaxTotalSize = Annotated[str | None, Field(description="Index retention: max total size of all index files (e.g. '1GB', '500MB').")]
+_JournalDir = Annotated[
+    str | None,
+    Field(description="Read-only legacy viewer: directory of journal files written by the FORMER otel plugin, exposed via the 'legacy-otel-logs' function. The plugin only reads it (never writes/prunes). Unlike wal/index, it is NOT pinned under the run dir."),
+]
 
 
 def register(mcp: FastMCP) -> None:
@@ -71,6 +75,7 @@ def register(mcp: FastMCP) -> None:
         wal_compression_enabled: _CompressionEnabled = None,
         index_max_files: _MaxFiles = None,
         index_max_total_size: _MaxTotalSize = None,
+        journal_dir: _JournalDir = None,
     ) -> RunInfo:
         if get_agents(ctx).get(agent_id) is None:
             return unknown_agent(agent_id)
@@ -87,6 +92,7 @@ def register(mcp: FastMCP) -> None:
             wal_compression_enabled=wal_compression_enabled,
             index_max_files=index_max_files,
             index_max_total_size=index_max_total_size,
+            journal_dir=journal_dir,
         )
         spec = get_agents(ctx).set_otel(agent_id, cfg)
         live = get_runs(ctx).get(agent_id)

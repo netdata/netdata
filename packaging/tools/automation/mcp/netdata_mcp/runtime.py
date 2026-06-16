@@ -99,10 +99,12 @@ class OtelConfig:
 
     Every field is optional: ``None`` means "leave the plugin default" and the
     key is omitted from the generated otel.yaml (which the plugin partial-merges
-    over its own defaults). The storage dirs are not exposed — they are always
-    pinned under the run dir for per-agent isolation. The rotation/retention
-    knobs are the edge-case drivers (tiny thresholds force multi-file splits and
-    evictions over small, deterministic corpora).
+    over its own defaults). The storage dirs (wal/index) are not exposed — they
+    are always pinned under the run dir for per-agent isolation. The
+    rotation/retention knobs are the edge-case drivers (tiny thresholds force
+    multi-file splits and evictions over small, deterministic corpora).
+    ``journal_dir`` is the one exception: a caller-supplied, *not* run-dir-pinned
+    path the plugin only reads (the read-only legacy viewer's fixture).
     """
 
     otlp_endpoint: str | None = None          # endpoint.path; None → auto free loopback port
@@ -113,6 +115,7 @@ class OtelConfig:
     wal_compression_enabled: bool | None = None  # logs.wal.compression_enabled
     index_max_files: int | None = None         # logs.index.retention.default.max_files
     index_max_total_size: str | None = None    # logs.index.retention.default.max_total_size
+    journal_dir: str | None = None             # logs.journal_dir; former-plugin journal files for the read-only legacy-otel-logs viewer
 
 
 def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str) -> dict:
@@ -149,9 +152,15 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str) -> dict:
     }
     if retention:
         index["retention"] = {"default": retention}
+    logs: dict = {"wal": wal, "index": index}
+    # Read-only legacy viewer: point it at the former plugin's journal files.
+    # Distinct from wal/index (which stay pinned under the run dir); the plugin
+    # only reads this directory. Truthy check: omit when unset or empty.
+    if cfg.journal_dir:
+        logs["journal_dir"] = cfg.journal_dir
     return {
         "endpoint": {"path": otlp_endpoint},
-        "logs": {"wal": wal, "index": index},
+        "logs": logs,
     }
 
 
@@ -280,7 +289,7 @@ async def cloud_status(port: int, timeout: float = 2.0) -> tuple[bool | None, bo
 
     ``claimed`` is whether the agent has a claimed_id (set at startup);
     ``cloud_connected`` is whether ACLK is online (the node is live in the Cloud
-    UI). Best-effort and never raises — this is *reported, never waited on* (D6):
+    UI). Best-effort and never raises — this is *reported, never waited on*:
     a fresh poll typically shows ``claimed=True`` before ``cloud_connected`` flips
     true a few seconds later.
     """
