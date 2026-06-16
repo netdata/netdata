@@ -119,7 +119,7 @@ Netdata parses lines starting with:
 -    `CLABEL` - add a label to a chart
 -    `CLABEL_COMMIT` - commit added labels to the chart
 -    `FUNCTION` - define a function that can be called later to execute it
--    `FUNCTION_DEL` - unregister a function
+- `FUNCTION_DEL` - unregister a function
 -    `BEGIN` - initialize data collection for a chart
 -    `SET` - set the value of a dimension for the initialized chart
 -    `END` - complete data collection for the initialized chart
