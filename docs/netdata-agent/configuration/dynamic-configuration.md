@@ -312,7 +312,7 @@ Only users with an **Admin** or **Manager** role on a **paid plan** can perform 
 **Resolution steps:**
 
 1. **Check your assigned role**: Go to **Space Settings → Users** and verify your role. If you are not an Admin or Manager, ask a Space Admin to upgrade your role. See the [Role-Based Access Model documentation](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) for the full permissions table.
-2. **Verify your subscription plan**: If you are on the Community plan, upgrade to a paid plan or ask a Space Admin to do so. A paid plan is required for all Dynamic Configuration actions except "List All".
+2. **Verify your subscription plan**: If you are on the Community plan, [upgrade to a paid plan](https://www.netdata.cloud/pricing/) or ask a Space Admin to do so. A paid plan is required for all Dynamic Configuration actions except "List All".
 3. **Confirm your Room assignment**: Ensure you are a member of the Room that contains the nodes you are trying to configure. Users who are not members of a Room cannot interact with its nodes through the Configuration Manager.
 
 ---
