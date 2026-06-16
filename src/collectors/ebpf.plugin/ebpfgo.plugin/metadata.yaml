@@ -246,6 +246,109 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: "The DNS module does not publish standalone Netdata charts. It registers the `dns-queries` on-demand function (FUNCTIONGLOBAL) consumed by the network-viewer. The function returns a table with one row per transport-and-IP-family combination (UDP/IPv4, UDP/IPv6, TCP/IPv4, TCP/IPv6) and two columns per row: Queries and Responses per second."
+      description: "The DNS module does not publish standalone Netdata charts. It registers the `dns-queries` on-demand function (FUNCTIONGLOBAL) consumed by the network-viewer. The function returns a table with four rows (one per transport-and-IP-family combination) and the following columns: `Transport` (UDP or TCP), `IPFamily` (IPv4 or IPv6), `Queries` (DNS queries/s), `Responses` (DNS responses/s)."
+      availability: []
+      scopes: []
+  - meta:
+      plugin_name: ebpf-go.plugin
+      module_name: socket
+      monitored_instance:
+        name: eBPF Socket
+        link: "https://kernel.org/"
+        categories:
+          - data-collection.operating-systems
+        icon_filename: "ebpf.jpg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - TCP
+        - UDP
+        - Network monitoring
+        - eBPF
+    overview:
+      data_collection:
+        metrics_description: "Monitor TCP and UDP function calls, bandwidth, errors, and connection counts. Data is exposed through the on-demand `network-protocols` function consumed by the network-viewer."
+        method_description: "Attach kprobe or fentry/fexit trampolines to the kernel functions `tcp_sendmsg`, `tcp_cleanup_rbuf`, `tcp_connect` (IPv4 and IPv6), `tcp_close`, `udp_sendmsg`, and `udp_recvmsg`. Per-cycle deltas and byte counts are computed in userspace from the BPF map snapshots."
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: "The plugin needs setuid because it loads data inside the kernel. Netdata sets the necessary permissions during installation."
+      default_behavior:
+        auto_detection:
+          description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT), presence of BTF files, and the configured object flavor to decide which eBPF program will be attached."
+        limits:
+          description: ""
+        performance_impact:
+          description: "This thread adds overhead every time a monitored kernel TCP or UDP function is called. The estimated additional period of time is between 90-200ns per call on kernels that do not have BTF technology."
+    setup:
+      prerequisites:
+        list:
+          - title: Compile kernel
+            description: |
+              Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different according to the preferences of Linux distributions.
+              When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well defined pattern, but distributions can deliver their configuration files
+              with different names.
+
+              Now follow steps:
+              1. Copy the configuration file to /usr/src/linux/.config.
+              2. Select the necessary options: make oldconfig
+              3. Compile your kernel image: make bzImage
+              4. Compile your modules: make modules
+              5. Copy your new kernel image for boot loader directory
+              6. Install the new modules: make modules_install
+              7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+              8. Update your boot loader
+      configuration:
+        file:
+          name: "ebpf.d.conf"
+          description: "Primary configuration file for ebpf-go.plugin. Enable the socket module in the `[ebpf programs]` section. The module also accepts the legacy `ebpf.d/network.conf` overlay for per-module overrides."
+        options:
+          description: |
+            The `socket` option in section `[ebpf programs]` controls whether the module is loaded.
+            Per-module overrides (`update every`, `maps per core`, `btf path`, `ebpf object flavor`) belong in `ebpf.d/network.conf`.
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: socket
+              description: Enable (`yes`) or disable (`no`) the socket monitoring module.
+              default_value: "no"
+              required: false
+            - name: update every
+              description: Data collection frequency in seconds.
+              default_value: 10
+              required: false
+            - name: maps per core
+              description: When enabled (`yes`), the plugin allocates one BPF hash table per CPU core instead of a single shared table. Improves throughput on multi-core systems; ignored on kernels older than 4.15.
+              default_value: "yes"
+              required: false
+            - name: btf path
+              description: Path to the directory containing BTF files used for CO-RE (Compile Once, Run Everywhere) loading.
+              default_value: /sys/kernel/btf/
+              required: false
+            - name: ebpf object flavor
+              description: "Select the BPF object flavor. Available values are `buffer`, `arena`, and `tracing`. The collector falls back to the next available flavor when the requested one is not supported by the running kernel."
+              default_value: buffer
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: "The socket module does not publish standalone Netdata charts. It registers the `network-protocols` on-demand function (FUNCTIONGLOBAL) consumed by the network-viewer. The function returns a table with two rows (TCP and UDP) and the following columns: `Transport` (TCP or UDP), `Family` (IPv4+IPv6 combined), `Received` (segments or datagrams/s), `Sent` (segments or datagrams/s), `Errors` (send/receive errors), `ConnActive` (active connections opened), `ConnEstablished` (currently established connections), `ConnPassive` (passive connections opened), `ConnReset` (reset connections), `SegsTotal` (total segments/s), `SegsRetransmitted` (retransmitted segments/s), `DatagramsNoPort` (datagrams with no destination port/s)."
       availability: []
       scopes: []
