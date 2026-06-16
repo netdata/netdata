@@ -35,6 +35,7 @@ env:
     apps-cgroups-lookup-client-abort-test
     cgroup-lookup-netipc-test
     cgroup-orchestrator-test
+    cgroups-plugin-labels-test
     local-sockets-mnl-test
     network-viewer-apps-lookup-client-test
     network-viewer-topology-containers-test

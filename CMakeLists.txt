@@ -2075,6 +2075,7 @@ set(CGROUPS_PLUGIN_FILES
         src/collectors/cgroups.plugin/sys_fs_cgroup.h
         src/collectors/cgroups.plugin/cgroup-internals.h
         src/collectors/cgroups.plugin/cgroup-discovery.c
+        src/collectors/cgroups.plugin/cgroup-name-labels.c
         src/collectors/cgroups.plugin/cgroup-orchestrator.c
         src/collectors/common-cgroups/cgroup-path.c
         src/collectors/common-cgroups/cgroup-path.h
@@ -3085,6 +3086,19 @@ if(OS_LINUX)
             src/collectors/cgroups.plugin/cgroup-orchestrator.c)
     target_compile_definitions(cgroup-orchestrator-test PRIVATE NETDATA_INTERNAL_CHECKS=1)
     target_link_libraries(cgroup-orchestrator-test libnetdata)
+
+    # The label-parser test links the real src/database/rrdlabels.c against a
+    # small set of stubs (test_cgroups_plugin_stubs.c) so it stays self-contained
+    # while still validating production parsing behavior. Plain C, no test
+    # framework; the target is EXCLUDE_FROM_ALL so it is built only on demand.
+    add_executable(cgroups-plugin-labels-test EXCLUDE_FROM_ALL
+            src/collectors/cgroups.plugin/tests/test_cgroups_plugin.c
+            src/collectors/cgroups.plugin/tests/test_cgroups_plugin_stubs.c
+            src/collectors/cgroups.plugin/cgroup-name-labels.c
+            src/database/rrdlabels.c
+            src/database/rrdlabels-aggregated.c
+            src/database/pattern-array.c)
+    target_link_libraries(cgroups-plugin-labels-test libnetdata)
 
     add_executable(apps-cgroups-path-test EXCLUDE_FROM_ALL
             src/collectors/apps.plugin/tests/test_apps_cgroups_path.c
