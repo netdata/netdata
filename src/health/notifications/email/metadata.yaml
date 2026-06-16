@@ -50,6 +50,7 @@
                 SEND_EMAIL="YES"
                 DEFAULT_RECIPIENT_EMAIL="user@example.com"
                 ```
+            - If you use Gmail as the SMTP relay and your mail client cannot use Google's OAuth-based sign-in flow, configure your `msmtprc` file with `smtp.gmail.com`, port `587`, TLS enabled, and a Gmail [App Password](https://support.google.com/accounts/answer/185833) instead of your regular account password. Set `EMAIL_SENDER` in `health_alarm_notify.conf` to the same Gmail address used in the `msmtprc` `from` field.
 
     configuration:
       file:
