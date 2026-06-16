@@ -142,15 +142,57 @@ size of the persistent metrics volume on the parent node:
 helm upgrade --set parent.database.volumesize=4Gi netdata netdata/netdata
 ```
 
-### Streaming and API keys
+### API key and streaming
 
-The Helm chart deploys both a `parent` pod and `child` pods. Children stream their metrics to the parent pod within the cluster, using an API key for authentication. The Helm chart configures this API key automatically — for standard deployments, you do not need to generate or set one manually.
+The Helm chart deploys a `parent` pod and one `child` pod per node. Each child streams its metrics to the parent inside the cluster. This child-to-parent stream is authenticated with an **API key** — a UUID stored in each pod's `stream.conf`.
+
+For a standard in-cluster deployment you do **not** need to create an API key yourself. The chart ships with a hardcoded default (`11111111-2222-3333-4444-555555555555`) embedded in both the parent's and the children's `stream.conf`, so streaming works as soon as the chart is installed.
 
 :::note
 
-If you need to stream metrics to a parent node outside the Kubernetes cluster, you must provide a custom API key by overriding the `parent.configs.stream.data` and `child.configs.stream.data` values in your Helm chart configuration. See the [streaming documentation](/src/streaming/README.md) for details on generating and configuring API keys.
+The API key is not exposed as an individual Helm value. Because it is plain text inside the `stream.conf` blocks, there is no single `--set` flag to change it — you replace the whole configuration block for the parent and the children.
 
 :::
+
+To use your own API key, generate a new UUID:
+
+```bash
+uuidgen
+```
+
+Then provide the full `stream.conf` blocks in your `override.yml`. The parent defines an `[API_KEY]` section that authorizes incoming streams; each child's `[stream]` section sends metrics using that same key. Use the **identical** API key on both sides.
+
+```yaml
+parent:
+  configs:
+    stream:
+      data: |
+        # Replace with your own UUID (from: uuidgen)
+        [<your-api-key>]
+            type = api
+            enabled = yes
+            allow from = *
+            db = dbengine
+
+child:
+  configs:
+    stream:
+      data: |
+        [stream]
+            enabled = yes
+            # In-cluster parent service (default release name: netdata)
+            destination = netdata:19999
+            # Must match the parent's API key above
+            api key = <your-api-key>
+```
+
+Apply it:
+
+```bash
+helm upgrade -f override.yml netdata netdata/netdata
+```
+
+If you want children to stream to a parent **outside** the cluster instead, point `destination` at that external parent and make sure its `stream.conf` accepts the same API key. For the full set of `stream.conf` options (TLS, filtering, retention, replication), see the [streaming documentation](/src/streaming/README.md).
 
 ### Configure service discovery
 
