@@ -222,6 +222,14 @@ impl Registry {
             .filter(|f| f.status == FileStatus::Archived)
     }
 
+    /// Every tracked file (active and archived), ordered by sequence
+    /// number. Used by stream enumeration to list a tenant's streams from
+    /// the per-file `stream` recorded in the header — including streams
+    /// that exist only as an unsealed WAL with no SFST summary yet.
+    pub fn values(&self) -> impl Iterator<Item = &File> {
+        self.files.values()
+    }
+
     /// Files in the registry whose log-data range intersects `q`.
     ///
     /// Pure filter — does not open any WAL file. Both `Active` (currently
@@ -249,13 +257,15 @@ impl Registry {
         // callers pass a temporary `Query` without binding it to a local.
         let q_min_ns = (q.time_range.start as u64) * 1_000_000_000;
         let q_max_ns = (q.time_range.end as u64) * 1_000_000_000;
-        let stream_hash = q.stream.as_ref().map(|s| s.ns_hash());
+        let stream_hashes = q.stream_hashes.clone();
 
         self.files
             .values()
             .filter(|f| f.min_timestamp_ns != TimestampNs::ZERO)
             .filter(move |f| range_overlaps_ns(f, q_min_ns, q_max_ns))
-            .filter(move |f| stream_hash.is_none_or(|h| f.id.ns_hash == h))
+            .filter(move |f| {
+                stream_hashes.is_empty() || stream_hashes.contains(&f.id.ns_hash)
+            })
     }
 
     pub fn len(&self) -> usize {
@@ -643,7 +653,7 @@ mod tests {
 
         let q = Query {
             time_range: 50..250,
-            stream: None,
+            stream_hashes: Vec::new(),
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![1, 3]);
     }
@@ -663,7 +673,7 @@ mod tests {
         // - file 3: min=300, but query.end=300 (exclusive) → out
         let q = Query {
             time_range: 200..300,
-            stream: None,
+            stream_hashes: Vec::new(),
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![1, 2]);
     }
@@ -676,7 +686,7 @@ mod tests {
 
         let q = Query {
             time_range: 200..200,
-            stream: None,
+            stream_hashes: Vec::new(),
         };
         assert!(reg.candidates(&q).next().is_none());
     }
@@ -715,7 +725,7 @@ mod tests {
 
         let q = Query {
             time_range: 0..u32::MAX,
-            stream: Some(ServiceStream::new("prod", "api")),
+            stream_hashes: vec![ServiceStream::new("prod", "api").ns_hash()],
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![1, 3]);
     }
@@ -723,10 +733,11 @@ mod tests {
     #[test]
     fn candidates_match_absent_namespace_stream() {
         // Regression: the ingestor names an absent-namespace file with
-        // `compute_ns_hash(None, name)`, while the query carries a collapsed
-        // `ServiceStream` with an empty namespace. The filter must derive
-        // the same hash via `ServiceStream::ns_hash` (empty == absent) and
-        // match the file — previously it hashed `Some("")` and missed it.
+        // `compute_ns_hash(None, name)`, while the caller derives the query
+        // hash from a collapsed `ServiceStream` with an empty namespace via
+        // `ServiceStream::ns_hash` (empty == absent). The two must agree so
+        // the file matches — previously the query hashed `Some("")` and
+        // missed it.
         let dir = tempfile::tempdir().unwrap();
         let mut reg = Registry::new(dir.path());
 
@@ -742,7 +753,7 @@ mod tests {
 
         let q = Query {
             time_range: 0..u32::MAX,
-            stream: Some(ServiceStream::new("", "api")),
+            stream_hashes: vec![ServiceStream::new("", "api").ns_hash()],
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![1]);
     }
@@ -775,7 +786,7 @@ mod tests {
 
         let q = Query {
             time_range: 0..u32::MAX,
-            stream: Some(ServiceStream::new("", "api")),
+            stream_hashes: vec![ServiceStream::new("", "api").ns_hash()],
         };
         assert!(reg.candidates(&q).next().is_none());
     }
@@ -801,7 +812,7 @@ mod tests {
 
         let q = Query {
             time_range: 0..u32::MAX,
-            stream: None,
+            stream_hashes: Vec::new(),
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![2]);
     }
@@ -816,7 +827,7 @@ mod tests {
 
         let q = Query {
             time_range: 0..u32::MAX,
-            stream: None,
+            stream_hashes: Vec::new(),
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![1, 2]);
     }
@@ -827,7 +838,7 @@ mod tests {
         let reg = Registry::new(dir.path());
         let q = Query {
             time_range: 0..u32::MAX,
-            stream: None,
+            stream_hashes: Vec::new(),
         };
         assert!(reg.candidates(&q).next().is_none());
     }

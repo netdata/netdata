@@ -98,7 +98,7 @@ fn track_remote(reg: &mut Registry, seq: u64, min_s: u32, max_s: u32) {
 fn full_range_query() -> Query {
     Query {
         time_range: 0..u32::MAX,
-        stream: None,
+        stream_hashes: Vec::new(),
     }
 }
 
@@ -169,14 +169,14 @@ fn query_excludes_out_of_range_files() {
     // Window that misses both files.
     let q = Query {
         time_range: 500..600,
-        stream: None,
+        stream_hashes: Vec::new(),
     };
     assert!(reg.plan_candidates(&q).is_empty());
 
     // Window that hits only the SFST.
     let q = Query {
         time_range: 50..250,
-        stream: None,
+        stream_hashes: Vec::new(),
     };
     let plan = reg.plan_candidates(&q);
     assert_eq!(plan.len(), 1);
@@ -245,7 +245,7 @@ fn remote_excluded_by_time_range() {
 
     let q = Query {
         time_range: 0..500,
-        stream: None,
+        stream_hashes: Vec::new(),
     };
     assert!(reg.plan_candidates(&q).is_empty());
 }
@@ -260,7 +260,7 @@ fn stream_filter_applies_to_both_sources() {
 
     let q = Query {
         time_range: 0..u32::MAX,
-        stream: Some(ServiceStream::new("ns", "a")),
+        stream_hashes: vec![ServiceStream::new("ns", "a").ns_hash()],
     };
     let plan = reg.plan_candidates(&q);
     assert_eq!(plan.len(), 1);

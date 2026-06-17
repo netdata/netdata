@@ -174,20 +174,26 @@ impl Registry {
     /// the query's `time_range` is `[start, end)` (half-open). A file is
     /// included if any second is shared by both ranges.
     ///
-    /// Stream filter, when present, is exact equality on
-    /// `(namespace, name)` — there is no partial / prefix matching, by
-    /// design (each SFST holds exactly one stream; see [`crate::ServiceStream`]).
+    /// Stream filter, when non-empty, keeps files whose stream hashes to
+    /// one of [`Query::stream_hashes`] — there is no partial / prefix
+    /// matching, by design (each SFST holds exactly one stream; see
+    /// [`crate::ServiceStream`]). Matching by `ns_hash` rather than
+    /// `ServiceStream` equality is safe: the ingestor's per-tenant
+    /// collision table guarantees one stream per hash, and `ns_hash`
+    /// already collapses absent and empty `service.namespace`.
     pub fn candidates<'a>(&'a self, q: &Query) -> impl Iterator<Item = &'a File> + 'a {
         // Extract q's contents upfront so the filter closures don't borrow
         // q. This decouples the iterator's lifetime from q's, letting
         // callers pass a temporary `Query` without binding it to a local.
         let q_range = q.time_range.clone();
-        let q_stream = q.stream.clone();
+        let stream_hashes = q.stream_hashes.clone();
         self.inner
             .values()
             .filter(|f| !f.pending_deletion)
             .filter(move |f| range_overlaps(&f.summary, &q_range))
-            .filter(move |f| q_stream.as_ref().is_none_or(|s| &f.summary.stream == s))
+            .filter(move |f| {
+                stream_hashes.is_empty() || stream_hashes.contains(&f.summary.stream.ns_hash())
+            })
     }
 
     /// Number of tracked files (including pending-deletion entries).

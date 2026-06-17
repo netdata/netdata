@@ -816,7 +816,7 @@ mod tests {
 
         let q = Query {
             time_range: 50..250,
-            stream: None,
+            stream_hashes: Vec::new(),
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![1]);
     }
@@ -838,7 +838,7 @@ mod tests {
 
         let q = Query {
             time_range: 0..1000,
-            stream: None,
+            stream_hashes: Vec::new(),
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![1, 2]);
     }
@@ -858,7 +858,7 @@ mod tests {
 
         let q = Query {
             time_range: 0..1000,
-            stream: Some(ServiceStream::new("prod", "api")),
+            stream_hashes: vec![ServiceStream::new("prod", "api").ns_hash()],
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![1]);
     }
@@ -883,7 +883,7 @@ mod tests {
 
         let q = Query {
             time_range: 0..1000,
-            stream: None,
+            stream_hashes: Vec::new(),
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![1]);
     }
@@ -914,7 +914,7 @@ mod tests {
 
         let q = Query {
             time_range: 0..1000,
-            stream: None,
+            stream_hashes: Vec::new(),
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![1]);
     }
@@ -947,7 +947,7 @@ mod tests {
         // produce no warning (we don't read it).
         let q = Query {
             time_range: 0..500,
-            stream: None,
+            stream_hashes: Vec::new(),
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![1]);
     }
@@ -958,7 +958,7 @@ mod tests {
         let reg = Registry::new(tmp.path(), TenantId::from(TENANT));
         let q = Query {
             time_range: 0..u32::MAX,
-            stream: None,
+            stream_hashes: Vec::new(),
         };
         assert_eq!(reg.candidates(&q).count(), 0);
     }

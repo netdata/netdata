@@ -27,7 +27,7 @@ use tokio_util::sync::CancellationToken;
 
 use sfsq::logs::{LogSource, SfstCandidate, Source, WalTail, run};
 
-use super::adapter::{to_result, window_secs};
+use super::adapter::{stream_required_params, to_result, window_secs};
 use super::wire::{InfoResponse, LogsResult, OtelLogsRequest, OtelLogsResponse};
 use crate::chunk::ChunkCache;
 use wal::prefix::{chunk_boundaries, tail_start};
@@ -189,7 +189,7 @@ impl FunctionHandler for OtelLogsHandler {
     async fn on_call(
         &self,
         ctx: FunctionCallContext,
-        req: Self::Request,
+        mut req: Self::Request,
     ) -> netdata_plugin_error::Result<Self::Response> {
         if req.info {
             return Ok(OtelLogsResponse::Info(InfoResponse::default()));
@@ -201,6 +201,10 @@ impl FunctionHandler for OtelLogsHandler {
         // before any I/O.
         let last = req.last;
         let tenant = resolve_query_tenant(req.tenant.as_deref());
+        // Pull the reserved stream-selector picks out of `selections`
+        // before `into_query`, so the engine never row-filters on the
+        // synthetic `__streams` facet; they drive file pruning instead.
+        let stream_hashes = req.take_stream_hashes();
         // A malformed free-text `query` regex is a clean request error.
         let query = req.into_query().map_err(|e| {
             netdata_plugin_error::NetdataPluginError::FunctionHandler {
@@ -213,14 +217,17 @@ impl FunctionHandler for OtelLogsHandler {
         // the lock drops before any I/O. `valid_up_to` is captured here,
         // once — every chunk and tail derives from this single value, so
         // the whole query sees one consistent durable prefix even as
-        // ingestion advances it.
-        let (mut sfst_candidates, wal_descs) = {
+        // ingestion advances it. Under the same lock, enumerate the
+        // tenant's streams (window-independent) for the selector control.
+        let (mut sfst_candidates, wal_descs, required_params) = {
             let guard = self.registries.read().await;
             let q = file_registry::Query {
                 time_range: time_range.clone(),
-                stream: None,
+                stream_hashes,
             };
-            guard.query_snapshot(&tenant, &q)
+            let (sfsts, wals) = guard.query_snapshot(&tenant, &q);
+            let required_params = stream_required_params(guard.enumerate_streams(&tenant));
+            (sfsts, wals, required_params)
         };
 
         // Resolve each WAL into in-memory chunk SFSTs + a tail (off the
@@ -246,9 +253,11 @@ impl FunctionHandler for OtelLogsHandler {
 
         let (after, before) = (time_range.start, time_range.end);
         if sources.is_empty() {
-            return Ok(OtelLogsResponse::Logs(LogsResult::empty_stub(
-                after, before, last,
-            )));
+            // Still advertise the selector so the user can change the
+            // stream/time selection from an empty window.
+            let mut stub = LogsResult::empty_stub(after, before, last);
+            stub.required_params = required_params;
+            return Ok(OtelLogsResponse::Logs(stub));
         }
 
         // The query is synchronous and CPU/IO-bound (opens + decompresses
@@ -265,7 +274,7 @@ impl FunctionHandler for OtelLogsHandler {
         ctx.progress.set_total(sources.len());
         let cancel = ctx.cancellation.clone();
         let done = ctx.progress.done_counter();
-        let result = match tokio::task::spawn_blocking(move || {
+        let mut result = match tokio::task::spawn_blocking(move || {
             to_result(run(sources, query, cancel, done), last)
         })
         .await
@@ -276,6 +285,8 @@ impl FunctionHandler for OtelLogsHandler {
                 LogsResult::empty_stub(after, before, last)
             }
         };
+        // Advertise the stream selector on every data response.
+        result.required_params = required_params;
 
         Ok(OtelLogsResponse::Logs(result))
     }

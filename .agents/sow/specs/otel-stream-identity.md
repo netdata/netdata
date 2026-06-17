@@ -37,15 +37,25 @@ files, and filtered at query time across the WAL/SFST logs pipeline.
   `ServiceStream` (absent→""); file naming and the per-`(tenant, ns_hash)` canonical
   collision table key off `ServiceStream` / `ServiceStream::ns_hash`. A literal-empty
   and an absent field land in one partition.
-- **WAL registry** (`wal::Registry::candidates`): filters by
-  `q.stream.ns_hash()` against `FileId.ns_hash`.
-- **SFST registry** (`sfst::Registry::candidates`): filters by exact `ServiceStream`
-  equality against the file's `Summary.stream` (collapse-safe; no hash recomputation).
+- **Query filter** (`file_registry::Query`): the stream filter is a **set of
+  `ns_hash` values** — `stream_hashes: Vec<u64>`. An empty set matches every
+  stream; a non-empty set keeps files whose stream hashes to a member.
+  `Query::matches_stream(ns_hash)` is the single empty=all membership predicate
+  every source's `candidates` shares.
+- **WAL registry** (`wal::Registry::candidates`): membership of `FileId.ns_hash`
+  in `stream_hashes`.
+- **SFST registry** (`sfst::Registry::candidates`): membership of
+  `f.summary.stream.ns_hash()` in `stream_hashes`. Hash membership (not the prior
+  `ServiceStream` equality) is safe under the ingestor's per-`(tenant, ns_hash)`
+  collision invariant — one stream per hash within a tenant — and is collapse-safe
+  because `ns_hash` already maps absent and empty `service.namespace` together.
+- **Catalog** (`otel-catalog::Catalog::find` / `Registry::candidates`): membership
+  of `e.stream.ns_hash()`, identically.
 - **Indexer** (`sfst-indexer::row_index::service_stream`): resolves the file's single
   stream from interned `service.namespace=`/`service.name=` entries, defaulting a
   missing key to `""` — already collapsed.
-- These two filter mechanisms (WAL by hash, SFST by `==`) agree because both treat
-  absent and empty as one stream.
+- All three filter tiers (WAL, SFST, catalog) now match by `ns_hash` membership, so
+  they agree by construction; absent and empty collapse into one stream at the hash.
 
 ## Persisted formats
 
@@ -80,26 +90,47 @@ The two filter tiers treat a pre-existing literal-empty file differently:
   `compute_ns_hash(Some(""), name)` in its `FileId`, which the new query hash
   `compute_ns_hash(None, name)` misses. This window is bounded — it ends when the
   file is compacted into an SFST.
-- **SFST tier (equality-based):** once indexed, the file's `summary.stream`
+- **SFST tier (hash-membership):** once indexed, the file's `summary.stream`
   collapses to `ServiceStream("", name)` — the indexer resolves both a missing
-  key and a literal-empty `service.namespace=` interner value to `""` — and the
-  equality filter matches it normally.
+  key and a literal-empty `service.namespace=` interner value to `""` — so
+  `summary.stream.ns_hash()` is `compute_ns_hash(None, name)`, the same hash the
+  query derives, and membership matches it normally.
 
-This is accepted: OTel logs were always experimental, the literal-empty case is
-rare, and the production query path does not stream-filter today (see below).
-When the deferred stream-selector follow-up makes the filter non-dormant,
-re-evaluate this transient WAL-tier window.
+This is accepted: OTel logs were always experimental and the literal-empty case
+is rare. The stream selector (below) is now live, so this transient WAL-tier
+window can hide a stale literal-empty file from a stream-filtered query until it
+compacts into an SFST — still bounded and rare, not a correctness regression for
+the common absent-namespace file.
 
-## Stream filter is dormant in the live agent function
+## Stream selector in the live agent function
 
-The live `otel-logs` handler (`otel-ledger::ledger::rpc::handler`) builds its
-`file_registry::Query` with `stream: None`, so production reads scan all candidate
-files and never exercise the stream filter. A stream selector (request param →
-`LogsQuery` → `Query.stream`, plus a stream-enumeration API and UI) is deferred
-follow-up feature work. The reachable exercisers of the filter today are the
-registry candidate tests (`wal::Registry::candidates`, `sfst::Registry::candidates`,
-`otel-catalog::Catalog::find`, `otel-ledger::query`) and the `sfsq` query library
-(whose `LogsQuery` does not yet expose a stream field). An offline `sfsq-cli` that
-filters by stream is a separate, forthcoming tool (developed outside this branch);
-it will consume `ServiceStream::ns_hash` rather than recompute the hash. This
-contract makes the filter correct for when the selector and that CLI ship.
+The live `otel-logs` handler (`otel-ledger::ledger::rpc::handler`) exposes a
+**stream selector** modeled on the systemd-journal `__logs_sources` control:
+
+- **Advertise.** Every data response carries one `required_params` entry — a
+  `MultiSelection` with `id = "__streams"` (`STREAM_SELECTION_PARAM`), name
+  "Services" — whose options are the tenant's streams. Options are enumerated
+  **window-independent** from `TenantRegistries::enumerate_streams` (SFST
+  summaries + WAL `File.stream`, deduped by `ns_hash`, SFST-wins by seq), so a
+  stream that exists only as an unsealed WAL is listed too (this is why Stage A
+  records the stream in the WAL header). Each option: `id` = `ns_hash` as
+  16-digit hex, `name` = `namespace/name` (absent namespace shown as
+  `name • (no namespace)`), `pill` = total size (an active WAL uses
+  `valid_up_to` since `File.size` lands only on close), `info` = file count +
+  span, and `defaultSelected: true` on **every** option.
+- **Default = all.** The UI auto-selects only the first option when none sets
+  `defaultSelected`, and the control is mandatory (blocks the query until a
+  non-empty selection). Marking every option `defaultSelected` keeps the default
+  view spanning all streams (the prior no-selector behavior). A tenant with no
+  streams advertises no control (`required_params: []`).
+- **Honor.** The handler removes the reserved `__streams` key from
+  `selections` **before** building the engine `LogsQuery` (so the engine never
+  treats it as a row facet), decodes the picks (`hex → u64`, unparseable skipped)
+  into `file_registry::Query::stream_hashes`, and that set prunes which files the
+  query opens. Empty set = all streams.
+
+The offline `sfsq-cli` (`discover.rs`) applies the same `ns_hash` filter from its
+`--namespace`/`--name` flags (one-element `stream_hashes`); it consumes
+`ServiceStream::ns_hash` rather than recomputing the hash. The registry candidate
+tests (`wal`/`sfst`/`otel-catalog`/`otel-ledger::query`) and an `otel-ledger`
+adapter/registry test suite exercise the filter and the enumeration directly.

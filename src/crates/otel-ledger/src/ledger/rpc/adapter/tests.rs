@@ -290,6 +290,83 @@ fn build_row_cells_layout_join_severity_and_missing() {
 }
 
 #[test]
+fn take_stream_hashes_decodes_hex_skips_garbage_and_removes_key() {
+    let mut req: OtelLogsRequest = serde_json::from_slice(
+        br#"{"selections":{"__streams":["000000000000002a","ff","nothex"],"level":["error"]}}"#,
+    )
+    .unwrap();
+    let hashes = req.take_stream_hashes();
+    // 0x2a = 42, 0xff = 255; the non-hex entry is skipped, not fatal.
+    assert_eq!(hashes, vec![42, 255]);
+    // The reserved key is consumed so the engine never sees it as a facet;
+    // a genuine facet selection is left intact.
+    assert!(!req.selections.contains_key("__streams"));
+    assert_eq!(req.selections.get("level"), Some(&vec!["error".to_string()]));
+}
+
+#[test]
+fn take_stream_hashes_absent_selection_is_all() {
+    let mut req: OtelLogsRequest = serde_json::from_slice(br#"{}"#).unwrap();
+    // No selection → empty vec → Query reads it as "all streams".
+    assert!(req.take_stream_hashes().is_empty());
+}
+
+#[test]
+fn stream_required_params_builds_all_default_selected_selector() {
+    let stats = vec![
+        StreamStat {
+            ns_hash: 0x2a,
+            stream: ServiceStream::new("prod", "api"),
+            total_size: 2048,
+            file_count: 2,
+            min_timestamp_s: Some(100),
+            max_timestamp_s: Some(160),
+        },
+        StreamStat {
+            ns_hash: 0,
+            stream: ServiceStream::new("", ""),
+            total_size: 0,
+            file_count: 1,
+            min_timestamp_s: None,
+            max_timestamp_s: None,
+        },
+    ];
+    let rp = stream_required_params(stats);
+    assert_eq!(rp.len(), 1);
+    match &rp[0] {
+        RequiredParam::MultiSelection(ms) => {
+            assert_eq!(ms.id, "__streams");
+            assert_eq!(ms.type_, "multiselect");
+            assert_eq!(ms.options.len(), 2);
+            // Every option pre-selected so the default view spans all streams.
+            assert!(ms.options.iter().all(|o| o.default_selected));
+            // Option id is the ns_hash as 16-digit lowercase hex.
+            let api = ms.options.iter().find(|o| o.name == "prod/api").unwrap();
+            assert_eq!(api.id, "000000000000002a");
+            assert_eq!(api.pill, "2.0 KiB");
+            assert_eq!(api.info, "2 files · spans 1m");
+            // An all-empty stream renders explicitly, not as a blank label.
+            let empty = ms.options.iter().find(|o| o.id == "0000000000000000").unwrap();
+            assert_eq!(empty.name, "(unattributed)");
+            assert_eq!(empty.info, "1 file");
+        }
+    }
+}
+
+#[test]
+fn stream_required_params_empty_when_no_streams() {
+    assert!(stream_required_params(Vec::new()).is_empty());
+}
+
+#[test]
+fn humanize_bytes_uses_binary_units() {
+    assert_eq!(humanize_bytes(0), "0 B");
+    assert_eq!(humanize_bytes(512), "512 B");
+    assert_eq!(humanize_bytes(2048), "2.0 KiB");
+    assert_eq!(humanize_bytes(1024 * 1024 * 3 / 2), "1.5 MiB");
+}
+
+#[test]
 fn build_row_cells_single_value_is_bare_and_no_severity_is_null() {
     let cursor = dummy_cursor(0);
     let row = sfst::MaterializedRow {

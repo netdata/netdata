@@ -124,7 +124,7 @@ fn query_snapshot_is_scoped_to_one_tenant() {
 
     let q = file_registry::Query {
         time_range: 0..1000,
-        stream: None,
+        stream_hashes: Vec::new(),
     };
 
     // Each tenant sees exactly its own candidate — never the union.
@@ -144,4 +144,108 @@ fn query_snapshot_is_scoped_to_one_tenant() {
     let (sfsts, wals) = tr.query_snapshot(&TenantId::from("nope"), &q);
     assert!(sfsts.is_empty());
     assert!(wals.is_empty());
+}
+
+#[test]
+fn enumerate_streams_dedups_and_aggregates_sfst_and_unsealed_wal() {
+    use file_registry::{ServiceStream, TimestampNs};
+    use wal::FileEvent;
+    const NS: u64 = 1_000_000_000;
+
+    let wal_base = tempfile::tempdir().unwrap();
+    let index_base = tempfile::tempdir().unwrap();
+    let catalog_base = tempfile::tempdir().unwrap();
+    let mut tr = TenantRegistries::new(
+        wal_base.path().to_path_buf(),
+        index_base.path().to_path_buf(),
+        catalog_base.path().to_path_buf(),
+    );
+    let tenant = TenantId::from("t");
+    let mid = Uuid::from_u128(1);
+    let bid = Uuid::from_u128(2);
+    let api = ServiceStream::new("prod", "api");
+    let db = ServiceStream::new("", "db"); // absent namespace, unsealed-only
+
+    let sfst_sum = |min, max, stream: &ServiceStream| sfst::Summary {
+        min_timestamp_s: min,
+        max_timestamp_s: max,
+        total_logs: 1,
+        stream: stream.clone(),
+    };
+    {
+        let r = tr.get_or_create(&tenant);
+        // Two SFSTs on the same stream → aggregated into one entry.
+        r.sfst.track(
+            FileId::new(mid, bid, 1, api.ns_hash()),
+            ByteSize(1000),
+            sfst_sum(100, 200, &api),
+        );
+        r.sfst.track(
+            FileId::new(mid, bid, 2, api.ns_hash()),
+            ByteSize(500),
+            sfst_sum(200, 300, &api),
+        );
+        // An unsealed WAL-only stream — named from the header (the Stage A
+        // enabler), so it appears even with no SFST summary. Modeled as an
+        // active, synced WAL: `Synced` sets the durable byte count and the
+        // range but NOT `File.size` (that lands on close), so this also
+        // exercises the `valid_up_to` size proxy in `enumerate_streams`.
+        let db_id = FileId::new(mid, bid, 3, db.ns_hash());
+        r.wal
+            .apply_event(&FileEvent::Created {
+                file_id: db_id,
+                created_at_ns: TimestampNs(0),
+                stream: db.clone(),
+            })
+            .unwrap();
+        r.wal
+            .apply_event(&FileEvent::Synced {
+                file_id: db_id,
+                valid_up_to: ByteSize(200),
+                frame_count: 1,
+                entry_count: 20,
+                min_timestamp_ns: TimestampNs(400 * NS),
+                max_timestamp_ns: TimestampNs(460 * NS),
+            })
+            .unwrap();
+        // A WAL shadow of SFST seq=1 (post-index/pre-delete window). SFST
+        // wins by seq, so its huge size must NOT double-count.
+        let shadow = FileId::new(mid, bid, 1, api.ns_hash());
+        r.wal
+            .apply_event(&FileEvent::Created {
+                file_id: shadow,
+                created_at_ns: TimestampNs(0),
+                stream: api.clone(),
+            })
+            .unwrap();
+        r.wal
+            .apply_event(&FileEvent::Closed {
+                file_id: shadow,
+                frame_count: 1,
+                min_timestamp_ns: TimestampNs(100 * NS),
+                max_timestamp_ns: TimestampNs(200 * NS),
+                size: ByteSize(9999),
+            })
+            .unwrap();
+    }
+
+    let streams = tr.enumerate_streams(&tenant);
+    assert_eq!(streams.len(), 2);
+    // Sorted by (namespace, name): "" < "prod" → the absent-namespace
+    // db stream comes first.
+    assert_eq!(streams[0].stream, db);
+    assert_eq!(streams[0].file_count, 1);
+    assert_eq!(streams[0].total_size, 200);
+    assert_eq!(streams[0].min_timestamp_s, Some(400));
+    assert_eq!(streams[0].max_timestamp_s, Some(460));
+
+    assert_eq!(streams[1].stream, api);
+    // The WAL shadow of seq=1 is excluded; only the two SFSTs are counted.
+    assert_eq!(streams[1].file_count, 2);
+    assert_eq!(streams[1].total_size, 1500);
+    assert_eq!(streams[1].min_timestamp_s, Some(100));
+    assert_eq!(streams[1].max_timestamp_s, Some(300));
+
+    // Unknown tenant → empty list, never a panic.
+    assert!(tr.enumerate_streams(&TenantId::from("nope")).is_empty());
 }

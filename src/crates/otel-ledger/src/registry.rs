@@ -1,7 +1,7 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::PathBuf;
 
-use file_registry::{FileId, TenantId};
+use file_registry::{FileId, ServiceStream, TenantId};
 use sfsq::logs::SfstCandidate;
 
 /// An active (or sealed-but-unindexed) WAL file overlapping a query
@@ -14,6 +14,58 @@ pub struct WalDesc {
     pub seq: u64,
     pub path: PathBuf,
     pub valid_up_to: u64,
+}
+
+/// One stream's aggregate stats for the otel-logs stream selector.
+///
+/// Window-independent: every file the tenant currently holds for the
+/// stream contributes, so the selector can list a stream even when it has
+/// no data in the active query window — matching the systemd-journal
+/// "sources" model. An SFST and a WAL of the same `seq` (the post-index,
+/// pre-WAL-delete window) are counted once, SFST-wins, mirroring
+/// [`TenantRegistries::query_snapshot`].
+#[derive(Debug, Clone)]
+pub struct StreamStat {
+    /// Identity hash (the option id the selector echoes back).
+    pub ns_hash: u64,
+    /// `(service.namespace, service.name)` for display.
+    pub stream: ServiceStream,
+    /// Sum of file sizes for this stream (the size pill).
+    pub total_size: u64,
+    /// Number of files holding this stream.
+    pub file_count: u64,
+    /// Earliest known log second across the stream's files; `None` when no
+    /// file has a known range yet (e.g. only just-recovered WALs).
+    pub min_timestamp_s: Option<u32>,
+    /// Latest known log second across the stream's files.
+    pub max_timestamp_s: Option<u32>,
+}
+
+impl StreamStat {
+    fn new(stream: &ServiceStream) -> Self {
+        Self {
+            ns_hash: stream.ns_hash(),
+            stream: stream.clone(),
+            total_size: 0,
+            file_count: 0,
+            min_timestamp_s: None,
+            max_timestamp_s: None,
+        }
+    }
+
+    /// Fold one file's size and `[min, max]` second range into the stream.
+    /// A `0` bound means "unknown" (an empty SFST or a recovered WAL whose
+    /// range the format can't recover) and does not move the span.
+    fn add(&mut self, size: u64, min_s: u32, max_s: u32) {
+        self.total_size += size;
+        self.file_count += 1;
+        if min_s != 0 {
+            self.min_timestamp_s = Some(self.min_timestamp_s.map_or(min_s, |m| m.min(min_s)));
+        }
+        if max_s != 0 {
+            self.max_timestamp_s = Some(self.max_timestamp_s.map_or(max_s, |m| m.max(max_s)));
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -350,6 +402,56 @@ impl TenantRegistries {
             }
         }
         (sfsts, wals)
+    }
+
+    /// Every distinct stream `tenant` currently holds, with aggregate
+    /// stats, for the otel-logs stream selector. **Window-independent**:
+    /// it lists streams across all of the tenant's files regardless of
+    /// time range, so the UI can offer a stream even when it has no data
+    /// in the active window. Streams are deduplicated by `ns_hash`
+    /// (one stream per hash within a tenant, by the ingestor's collision
+    /// invariant); an SFST and the WAL of the same `seq` are counted once,
+    /// SFST-wins — the same dedup [`Self::query_snapshot`] applies. Sorted
+    /// by `(namespace, name)` for a stable selector order. An unknown
+    /// tenant yields an empty list.
+    pub fn enumerate_streams(&self, tenant: &TenantId) -> Vec<StreamStat> {
+        let Some(r) = self.tenants.get(tenant) else {
+            return Vec::new();
+        };
+
+        let mut by_hash: HashMap<u64, StreamStat> = HashMap::new();
+        let mut sfst_seqs: HashSet<u64> = HashSet::new();
+        for f in r.sfst.values() {
+            sfst_seqs.insert(f.id.seq);
+            by_hash
+                .entry(f.summary.stream.ns_hash())
+                .or_insert_with(|| StreamStat::new(&f.summary.stream))
+                .add(f.size.0, f.summary.min_timestamp_s, f.summary.max_timestamp_s);
+        }
+        for f in r.wal.values() {
+            if sfst_seqs.contains(&f.id.seq) {
+                continue;
+            }
+            // WAL ranges are nanoseconds; the selector works in seconds.
+            // `0` (unknown range) stays `0`, which `add` treats as "no span".
+            let to_s = |ns: u64| (ns / 1_000_000_000) as u32;
+            // `File.size` is set only on close, so an active (unsealed) WAL
+            // reports `0`. Use its durable byte count (`valid_up_to`) as the
+            // size proxy — for a closed WAL the two are equal, so `max` is
+            // correct either way and the pill is meaningful for the unsealed
+            // streams the selector exists to surface.
+            let size = f.size.0.max(f.valid_up_to.0);
+            by_hash
+                .entry(f.stream.ns_hash())
+                .or_insert_with(|| StreamStat::new(&f.stream))
+                .add(size, to_s(f.min_timestamp_ns.0), to_s(f.max_timestamp_ns.0));
+        }
+
+        let mut out: Vec<StreamStat> = by_hash.into_values().collect();
+        out.sort_by(|a, b| {
+            (&a.stream.namespace, &a.stream.name).cmp(&(&b.stream.namespace, &b.stream.name))
+        });
+        out
     }
 }
 

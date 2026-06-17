@@ -16,8 +16,11 @@ use sfsq::logs::{Anchor, Cursor, LogsData, LogsQuery, LogsQueryBuilder};
 use super::wire::{
     ACCEPTED_PARAMS, AnchorParam, AvailableHistogram, Chart, ChartDimensions, ChartPoint,
     ChartResult, ChartView, DataPoint, Facet, FacetOption, Histogram, Items, LogsResult,
-    OtelLogsRequest, Pagination, Version,
+    MultiSelection, MultiSelectionOption, OtelLogsRequest, Pagination, RequiredParam,
+    STREAM_SELECTION_PARAM, Version,
 };
+use crate::registry::StreamStat;
+use file_registry::ServiceStream;
 
 /// One nanosecond expressed as a millisecond fraction. Histogram bucket
 /// timestamps go on the wire in milliseconds (legacy chart contract).
@@ -110,6 +113,117 @@ impl OtelLogsRequest {
         }
         Ok(builder.build())
     }
+
+    /// Remove the reserved stream-selector key ([`STREAM_SELECTION_PARAM`])
+    /// from `selections` and decode each pick — a stream's `ns_hash` as
+    /// lowercase hex, the option id the response advertises — into a
+    /// `u64`. Done **before** [`Self::into_query`] so the engine never
+    /// treats `__streams` as a row facet. An unparseable pick is skipped
+    /// (a UI-supplied filter should degrade, not fail the whole query);
+    /// an absent or empty selection yields an empty vec, which
+    /// `file_registry::Query::stream_hashes` reads as "all streams".
+    pub fn take_stream_hashes(&mut self) -> Vec<u64> {
+        self.selections
+            .remove(STREAM_SELECTION_PARAM)
+            .unwrap_or_default()
+            .iter()
+            .filter_map(|s| u64::from_str_radix(s, 16).ok())
+            .collect()
+    }
+}
+
+/// Build the otel-logs `required_params` from a tenant's streams: a single
+/// [`MultiSelection`] (`__streams`, "Services") whose options are the
+/// streams, each pre-selected so the default view spans all of them. An
+/// empty `stats` yields `Vec::new()` — a tenant with no streams advertises
+/// no selector.
+pub fn stream_required_params(stats: Vec<StreamStat>) -> Vec<RequiredParam> {
+    if stats.is_empty() {
+        return Vec::new();
+    }
+    let options = stats
+        .into_iter()
+        .map(|s| MultiSelectionOption {
+            id: format!("{:016x}", s.ns_hash),
+            name: stream_display_name(&s.stream),
+            pill: humanize_bytes(s.total_size),
+            info: stream_info(&s),
+            default_selected: true,
+        })
+        .collect();
+    vec![RequiredParam::MultiSelection(MultiSelection {
+        id: STREAM_SELECTION_PARAM,
+        name: "Services".to_string(),
+        help: "Filter logs to specific OpenTelemetry service streams \
+               (service.namespace / service.name)."
+            .to_string(),
+        type_: "multiselect",
+        options,
+    })]
+}
+
+/// Human label for a stream option. An absent `service.namespace` (stored
+/// as empty) is shown explicitly so it is not confused with a real one.
+fn stream_display_name(s: &ServiceStream) -> String {
+    match (s.namespace.is_empty(), s.name.is_empty()) {
+        (false, _) => format!("{}/{}", s.namespace, s.name),
+        (true, false) => format!("{} • (no namespace)", s.name),
+        (true, true) => "(unattributed)".to_string(),
+    }
+}
+
+/// Secondary line for a stream option: file count and, when known, the
+/// log-data time span.
+fn stream_info(s: &StreamStat) -> String {
+    let files = format!(
+        "{} file{}",
+        s.file_count,
+        if s.file_count == 1 { "" } else { "s" }
+    );
+    match (s.min_timestamp_s, s.max_timestamp_s) {
+        (Some(min), Some(max)) if max >= min => {
+            format!("{files} · spans {}", humanize_span_s(max - min))
+        }
+        _ => files,
+    }
+}
+
+/// Human byte size for the option pill (e.g. `1.5 MiB`, `820 KiB`,
+/// `42 B`) — binary units, one decimal, dependency-free.
+fn humanize_bytes(bytes: u64) -> String {
+    const UNITS: [&str; 6] = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"];
+    if bytes < 1024 {
+        return format!("{bytes} B");
+    }
+    let mut value = bytes as f64;
+    let mut unit = 0;
+    while value >= 1024.0 && unit < UNITS.len() - 1 {
+        value /= 1024.0;
+        unit += 1;
+    }
+    format!("{value:.1} {}", UNITS[unit])
+}
+
+/// Coarse human duration for a span in seconds — dependency-free, two
+/// significant units (e.g. `2d 3h`, `5m 12s`, `<1s`).
+fn humanize_span_s(secs: u32) -> String {
+    if secs == 0 {
+        return "<1s".to_string();
+    }
+    let units = [("d", 86_400u32), ("h", 3_600), ("m", 60), ("s", 1)];
+    let mut rem = secs;
+    let mut parts = Vec::new();
+    for (label, size) in units {
+        let n = rem / size;
+        if n > 0 {
+            parts.push(format!("{n}{label}"));
+            rem %= size;
+        }
+        if parts.len() == 2 {
+            break;
+        }
+    }
+    parts.join(" ")
 }
 
 /// The `[after, before)` window (seconds) a [`sfst::Grid`] covers — the

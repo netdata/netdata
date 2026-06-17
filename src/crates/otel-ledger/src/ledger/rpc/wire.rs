@@ -356,21 +356,31 @@ impl Default for Pagination {
     }
 }
 
-// ── Required params (always empty) ──────────────────────────────────
+// ── Required params (the stream selector) ───────────────────────────
 
-/// `required_params` is `Vec::new()` in every response the otel-logs
-/// function emits — the legacy systemd-journal plugin established this
-/// and the UI tolerates it. The enum exists for wire-shape fidelity in
-/// case a future request mode needs to surface a required selector.
+/// Reserved `selections` key carrying the stream-selector picks. The
+/// handler removes it from `selections` before building the engine query
+/// (so the engine never treats it as a row facet) and decodes the picks
+/// into the file-pruning `file_registry::Query::stream_hashes`. Also the
+/// `id` of the advertised [`MultiSelection`] control, so the UI echoes
+/// picks back under this key. The `__` prefix follows the systemd-journal
+/// `__logs_sources` convention for plugin-reserved selection keys.
+pub const STREAM_SELECTION_PARAM: &str = "__streams";
+
+/// A `required_params` entry. The otel-logs function emits at most one —
+/// the [`MultiSelection`] stream selector — when the tenant has any
+/// stream; a tenant with no streams emits `Vec::new()`. Untagged, so the
+/// inner control serializes directly as the object the UI renders.
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
 pub enum RequiredParam {
-    // Type shape kept for wire-format parity; no response currently
-    // populates it (every emission uses `Vec::new()`).
-    #[allow(dead_code)]
     MultiSelection(MultiSelection),
 }
 
+/// A multiselect control the UI renders in the filter sidebar. The UI
+/// pre-selects every option marked `defaultSelected` (here: all of them,
+/// so the default view spans all streams) and returns the picked option
+/// `id`s under `selections[self.id]`.
 #[derive(Debug, Serialize)]
 pub struct MultiSelection {
     pub id: &'static str,
@@ -387,6 +397,11 @@ pub struct MultiSelectionOption {
     pub name: String,
     pub pill: String,
     pub info: String,
+    /// Whether the UI pre-selects this option. The UI auto-selects only
+    /// the first option when no option sets this, so every stream option
+    /// sets it `true` to keep "all streams" the default view.
+    #[serde(rename = "defaultSelected")]
+    pub default_selected: bool,
 }
 
 // ── Empty-stub constructor ──────────────────────────────────────────

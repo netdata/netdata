@@ -13,7 +13,8 @@
 //!
 //! Dedup mirrors the live planner: a WAL whose sequence is already sealed into
 //! an SFST is skipped (SFST wins). Stream filtering mirrors the live planner
-//! too: SFST by exact `ServiceStream`, WAL by `FileId.ns_hash`.
+//! too: both tiers match by `ns_hash` — the SFST `Query` carries the stream's
+//! hash, and the WAL is matched on its `FileId.ns_hash`.
 //!
 //! The dedup set is built from the *windowed* SFST candidates, so an SFST
 //! entirely outside the query window is not added and its WAL twin is scanned
@@ -63,7 +64,8 @@ pub fn discover(
     registry.recover();
     let query = Query {
         time_range: window,
-        stream: stream.cloned(),
+        // Single-stream CLI filter → a one-element hash set (empty = all).
+        stream_hashes: stream.map(|s| vec![s.ns_hash()]).unwrap_or_default(),
     };
     for file in registry.candidates(&query) {
         sfst_seqs.insert(file.id.seq);

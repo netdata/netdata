@@ -64,11 +64,13 @@ impl Catalog {
         // q. Decouples the iterator's lifetime from q's, letting callers
         // pass a temporary `Query`.
         let q_range = q.time_range.clone();
-        let q_stream = q.stream.clone();
+        let stream_hashes = q.stream_hashes.clone();
         self.entries
             .values()
             .filter(move |e| range_overlaps(e, &q_range))
-            .filter(move |e| q_stream.as_ref().is_none_or(|s| e.stream == *s))
+            .filter(move |e| {
+                stream_hashes.is_empty() || stream_hashes.contains(&e.stream.ns_hash())
+            })
     }
 
     /// Serialize to the on-disk container: magic `NCAT` + framing
@@ -244,7 +246,7 @@ mod tests {
         // min=150 is in range, file 2's min=300 is past the upper bound.
         let q = Query {
             time_range: 50..250,
-            stream: None,
+            stream_hashes: Vec::new(),
         };
         let hits: Vec<u64> = c.find(&q).map(|e| e.id.seq).collect();
         assert_eq!(hits, vec![1, 3]);
@@ -255,14 +257,14 @@ mod tests {
         //  - file 3: max=350 ≥ 200 ✓ and min=150 < 300 ✓ → in
         let q = Query {
             time_range: 200..300,
-            stream: None,
+            stream_hashes: Vec::new(),
         };
         let hits: Vec<u64> = c.find(&q).map(|e| e.id.seq).collect();
         assert_eq!(hits, vec![1, 3]);
 
         let q = Query {
             time_range: 500..600,
-            stream: None,
+            stream_hashes: Vec::new(),
         };
         assert_eq!(c.find(&q).count(), 0);
 
@@ -270,14 +272,14 @@ mod tests {
         // file 3 (min=150, max=350); file 2's min=300 is out.
         let q = Query {
             time_range: 200..201,
-            stream: None,
+            stream_hashes: Vec::new(),
         };
         let hits: Vec<u64> = c.find(&q).map(|e| e.id.seq).collect();
         assert_eq!(hits, vec![1, 3]);
     }
 
     #[test]
-    fn find_with_stream_filter_matches_by_exact_equality() {
+    fn find_with_stream_filter_matches_by_ns_hash() {
         let mut c = test_catalog();
         // Two entries on the "api" stream, one on "worker".
         c.add(entry_at(1, 100, 200, ServiceStream::new("prod", "api")));
@@ -286,21 +288,23 @@ mod tests {
 
         let q = Query {
             time_range: 0..1000,
-            stream: Some(ServiceStream::new("prod", "api")),
+            stream_hashes: vec![ServiceStream::new("prod", "api").ns_hash()],
         };
         let hits: Vec<u64> = c.find(&q).map(|e| e.id.seq).collect();
         assert_eq!(hits, vec![1, 3]);
     }
 
     #[test]
-    fn find_empty_string_stream_matches_only_empty_string_entry() {
+    fn find_empty_stream_matches_only_the_empty_entry_by_hash() {
         let mut c = test_catalog();
         c.add(entry_at(1, 100, 200, ServiceStream::new("", "")));
         c.add(entry_at(2, 100, 200, ServiceStream::new("prod", "api")));
 
+        // The all-empty stream hashes to the `0` no-attribution sentinel;
+        // only the empty entry shares it, so prod/api is excluded.
         let q = Query {
             time_range: 0..1000,
-            stream: Some(ServiceStream::new("", "")),
+            stream_hashes: vec![ServiceStream::new("", "").ns_hash()],
         };
         let hits: Vec<u64> = c.find(&q).map(|e| e.id.seq).collect();
         assert_eq!(hits, vec![1]);
@@ -314,7 +318,7 @@ mod tests {
         // start == end → empty window.
         let q = Query {
             time_range: 200..200,
-            stream: None,
+            stream_hashes: Vec::new(),
         };
         assert_eq!(c.find(&q).count(), 0);
     }
