@@ -59,8 +59,8 @@ func (s *socketFunctionStore) snapshot() (socketGlobalPublish, bool) {
 // runStdinDispatcher reads os.Stdin for FUNCTION calls and dispatches them.
 // It exits when stdin is closed or "QUIT" is received, and always calls
 // closeStop so collector goroutines shut down on both paths.
-// Either fnStore or dnsFnStore may be nil when the corresponding module is disabled.
-func runStdinDispatcher(api *netdataapi.API, fnStore *socketFunctionStore, dnsFnStore *dnsFunctionStore, closeStop func()) {
+// fnStore may be nil when the socket module is disabled.
+func runStdinDispatcher(api *netdataapi.API, fnStore *socketFunctionStore, closeStop func()) {
 	defer closeStop()
 	sc := bufio.NewScanner(os.Stdin)
 	for sc.Scan() {
@@ -79,12 +79,6 @@ func runStdinDispatcher(api *netdataapi.API, fnStore *socketFunctionStore, dnsFn
 					handleNetworkProtocols(api, fnStore, uid)
 				} else {
 					sendFunctionError(api, uid, 503, "network-protocols collector not running")
-				}
-			case dnsFunctionName:
-				if dnsFnStore != nil {
-					handleDNSQueries(api, dnsFnStore, uid)
-				} else {
-					sendFunctionError(api, uid, 503, "dns-queries collector not running")
 				}
 			default:
 				sendFunctionError(api, uid, 404, "unknown function: "+name)

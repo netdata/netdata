@@ -83,7 +83,6 @@ func main() {
 	// The stdin dispatcher is always started so it can handle function calls
 	// from whichever subset of collectors is enabled.
 	var fnStore *socketFunctionStore
-	var dnsFnStore *dnsFunctionStore
 
 	// ---- cachestat ----
 	if cachestatCfg.Enabled {
@@ -153,34 +152,30 @@ func main() {
 		if herr != nil {
 			fmt.Fprintf(os.Stderr, "ebpf-go.plugin: dns load failed: %v\n", herr)
 		} else if handle != nil && handle.Runtime != nil {
-			dnsFnStore = newDNSFunctionStore(ue)
-
-			pluginOutputMu.Lock()
-			api.FUNCTIONGLOBAL(netdataapi.FunctionGlobalOpts{
-				Name:     dnsFunctionName,
-				Timeout:  dnsFunctionTimeout,
-				Help:     dnsFunctionHelp,
-				Tags:     dnsFunctionTags,
-				Access:   dnsFunctionAccess,
-				Priority: dnsFunctionPriority,
-				Version:  dnsFunctionVersion,
-			})
-			pluginOutputMu.Unlock()
+			// dns-queries is served by network-viewer.plugin on Linux via SHM;
+			// ebpf-go.plugin only writes the aggregate counters to shared memory.
+			shmDns, shmErr := NewSharedDnsMemoryPublisher()
+			if shmErr != nil {
+				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: dns shm open failed: %v\n", shmErr)
+			}
 
 			anyStarted = true
 
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				runDNSGlobalCollector(handle, stop, ue, dnsFnStore)
+				runDNSGlobalCollector(handle, stop, ue, shmDns)
+				if shmDns != nil {
+					shmDns.Close()
+				}
 				handle.Close()
 			}()
 		}
 	}
 
 	// Start stdin dispatcher after all function stores are initialised so the
-	// dispatcher sees consistent fnStore / dnsFnStore pointers.
-	go runStdinDispatcher(api, fnStore, dnsFnStore, closeStop)
+	// dispatcher sees a consistent fnStore pointer.
+	go runStdinDispatcher(api, fnStore, closeStop)
 
 	if !anyStarted {
 		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: all enabled programs failed to load\n")

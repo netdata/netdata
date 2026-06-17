@@ -30,7 +30,7 @@ func dnsLogErr(site, what string, err error) {
 	dnsRateLimitedStderr(site, fmt.Sprintf("ebpf-go.plugin: dns %s failed: %v\n", what, err))
 }
 
-func runDNSGlobalCollector(handle *DNSLegacyHandle, stop <-chan struct{}, updateEvery int, fnStore *dnsFunctionStore) {
+func runDNSGlobalCollector(handle *DNSLegacyHandle, stop <-chan struct{}, updateEvery int, shm *SharedDnsMemoryPublisher) {
 	if handle == nil || handle.Runtime == nil {
 		return
 	}
@@ -45,7 +45,15 @@ func runDNSGlobalCollector(handle *DNSLegacyHandle, stop <-chan struct{}, update
 			dnsLogErr("dns.snapshot", "snapshot", err)
 			return
 		}
-		fnStore.update(snap)
+
+		flows, err := handle.Runtime.FlowSnapshot()
+		if err != nil {
+			// FlowSnapshot failure is non-fatal; publish aggregate only.
+			dnsLogErr("dns.flow_snapshot", "flow snapshot", err)
+			flows = nil
+		}
+
+		shm.Publish(snap, flows)
 	}
 
 	collectAndPublish()

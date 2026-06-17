@@ -161,6 +161,10 @@ func (r *DNSRuntime) Snapshot() (DNSSnapshot, error) {
 	return DNSSnapshot{}, ErrDisabled
 }
 
+func (r *DNSRuntime) FlowSnapshot() ([]DNSFlowRecord, error) {
+	return nil, ErrDisabled
+}
+
 func (r *DNSRuntime) Close() {
 	// No-op in the disabled build because the runtime never acquired native resources.
 }
