@@ -37,7 +37,7 @@ embedded quotes and newlines, so the line is always single-line and parseable.
 ## Timeout And Deadline
 
 `NETDATA_CGROUP_NAME_TIMEOUT_MS` carries the operator budget X (from the
-`[plugin:cgroups]` `cgroup-name timeout` option, default 15s). The helper sets
+`[plugin:cgroups]` `cgroup-name timeout` option, default 120s). The helper sets
 `expires_at = start + X` and shares one deadline `context.Context` across every
 external command and HTTP call, so each call gets the remaining budget and
 calls after expiry are not attempted. HTTP response bodies are capped (16 MiB
