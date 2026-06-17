@@ -70,6 +70,16 @@ class Run:
     def done(self) -> bool:
         return self.state in _TERMINAL
 
+    @property
+    def pid(self) -> int | None:
+        """netdata's PID while the launch is alive, else None.
+
+        Used to scope journal queries to this agent's worker processes (the
+        otel-plugin workers are descendants of this PID).
+        """
+        p = self._proc
+        return p.pid if (p is not None and p.returncode is None) else None
+
     def elapsed(self) -> float:
         return time.monotonic() - self.created_at
 

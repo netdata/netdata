@@ -185,6 +185,21 @@ reader cannot infer from the code:
   param is exposed and the parsed response is returned for assertion;
   `info=true` probes the function descriptor.
 
+- **Storage-file inventory (`netdata_agent_otel_files`).** A second mode of the
+  same `otel-logs` function: the request carries `files: true` (sibling of
+  `info`), and the handler returns a read-only snapshot of the ledger's
+  in-memory registries — per tenant, the tracked WAL / SFST / catalog files with
+  size, time range, record counts, and crucially the `rotated` / `uploaded` /
+  `remote_cataloged` / `pending_deletion` per-seq flags. Those flags are why this reports from the
+  **plugin**, not a filesystem scan: a locally-evicted SFST can still be
+  cataloged on the remote, and on-disk presence ≠ "the ledger is tracking it".
+  The MCP tool `netdata_agent_otel_files(agent_id)` forwards `{"files": true}`
+  and returns all tenants (no filter). Built in `otel-ledger`
+  (`rpc/wire.rs` `FilesResponse` + `rpc/handler.rs` `files` branch under a brief
+  read lock); the mode is additive — ordinary queries (`files` absent) are
+  unaffected. It is an **inventory**, not log content (that stays
+  `netdata_agent_otel_logs`).
+
 - **Access-gating constraint (durable).** The `otel-logs`
   function declares `access = SIGNED_ID | SAME_SPACE | SENSITIVE_DATA`
   (`otel-ledger/src/ledger/rpc/handler.rs`). A **local, unclaimed, anonymous**
@@ -195,7 +210,7 @@ reader cannot infer from the code:
   a minted token inherits only the caller's own access, so a `SIGNED_ID` bearer
   requires an already-SSO'd identity. The gate is enforced before the function
   handler runs, so it applies to **every** `/api/v3/function` call including
-  `info=true` — there is no info exemption. Consequence: only the **push side**
+  `info=true` and `files=true` — there is no info/files exemption. Consequence: only the **push side**
   (OTLP/gRPC to the receiver, a separate endpoint) works on a plain local agent;
   **both `info` probing and live queries require a claimed agent + a Cloud-minted
   bearer**. The query tool's code is transport-correct regardless; the gate is
@@ -219,10 +234,14 @@ reader cannot infer from the code:
   With no Cloud token the call stays anonymous (→ 412 with a hint). A mint
   failure is a hard error (an anonymous retry would just 412); it usually means
   the agent is not yet claimed/`cloud_connected`.
-  - **Token-safety (HARD):** `NETDATA_CLOUD_TOKEN` and minted bearers are
-    secrets — never logged, never returned in tool output, never on a command
-    line (header only); error strings are scrubbed of both. A no-leak unit test
-    drives a mint failure with a sentinel token and asserts it never surfaces.
+  - **Token-safety (HARD):** `NETDATA_CLOUD_TOKEN` (the Cloud account token) is a
+    secret — never logged, never returned in tool output, never on a command
+    line (header only); error strings are scrubbed. A no-leak unit test drives a
+    mint failure with a sentinel token and asserts it never surfaces. Minted
+    per-agent bearers are normally also kept out of tool output; the **one
+    deliberate exception** is `netdata_agent_mint_bearer` (below), which returns
+    the per-agent bearer for the localhost Playwright workflow. The Cloud token
+    is never exposed by that tool either.
   - **Provisioning:** `setup_mcp.py` requires a Cloud token (like the claim
     token) and injects `NETDATA_CLOUD_TOKEN` (+ optional `NETDATA_CLOUD_HOSTNAME`,
     default `app.netdata.cloud`) into the client per-server env, alongside the
@@ -233,6 +252,28 @@ reader cannot infer from the code:
     1010"` (banned signature) before auth runs. The mint request therefore sends
     a plain `User-Agent: netdata-build-mcp/1.0`, which passes the WAF and reaches
     the auth layer.
+
+- **Browser UI E2E (`netdata_agent_mint_bearer` + the Playwright MCP).** The
+  Agent dashboard renders SIGNED_ID-gated functions (otel-logs, otel-files,
+  systemd-journal) only when the browser's requests carry an
+  `Authorization: Bearer` with a signed identity; a headless browser hitting the
+  agent anonymously gets the same **412** as any anonymous caller. The
+  netdata-build MCP and the Playwright (browser) MCP cannot talk directly, so
+  `netdata_agent_mint_bearer(agent_id)` mints (via `bearer.py`) and **returns**
+  the per-agent bearer to the LLM, which injects it into the page. The canonical
+  workflow (also embedded verbatim in the tool's description so no session
+  re-derives it):
+  1. `netdata_agent_mint_bearer(agent_id)` → `bearer`.
+  2. Via the Playwright MCP's `browser_run_code_unsafe`, set the header on the
+     page: `async (page) => { await page.setExtraHTTPHeaders({ Authorization:
+     'Bearer ' + <bearer> }); }`. The header persists across the page's
+     navigations/reloads until the page closes.
+  3. Re-trigger the request (navigate within the dashboard or reload) so the
+     gated call re-fires with the header → 200 → renders.
+  This is the **one** tool that returns the per-agent bearer (the deliberate,
+  localhost-dev-only exception to the token-safety bullet above); the Cloud
+  account token is still never exposed. Verified live: anonymous `otel-logs` →
+  412; after injection → 200 and the Logs Explorer rendered the pushed corpus.
 
 ## Agent MCP wrapper
 
@@ -290,3 +331,46 @@ reader cannot infer from the code:
   session) so build descendants cannot survive holding the output pipe.
 - A run records `netdata`'s exit code as `returncode` once the launch ends;
   **negative means killed by a signal** (e.g. `-9` for SIGKILL).
+
+## Agent logging and diagnostics
+
+- Generated `netdata.conf` always sets `[logs] collector` and `daemon` so a
+  launched agent's logs are readable back by the harness, never left only in
+  on-disk `collector.log`/`daemon.log`. The method depends on the host:
+  - **journald present** → `collector = journal`, `daemon = journal`: logs go to
+    the **systemd journal**, queryable per-agent via `netdata_agent_logs`.
+  - **journald absent** → `collector = stderr`, `daemon = stderr`: logs go to
+    netdata's stderr, which the runner captures into the run buffer, so they
+    surface through `netdata_run_logs` (`netdata_agent_logs` is not registered on
+    such hosts — see the gate bullet below).
+- `collector` is load-bearing for plugins: netdata exports `NETDATA_LOG_METHOD`
+  (plus `NETDATA_LOG_FORMAT`/`LEVEL`) to the plugins it spawns from it. With
+  `journal` the otel-plugin (Rust, `tracing`) emits via its journald layer; with
+  `stderr` it writes to fd 2. netdata redirects a plugin's fd 2 to a file **only**
+  when the collector method is itself a file (`nd_log_collectors_fd`,
+  `nd_log-internals.c`), so `stderr` leaves fd 2 inherited up to netdata's own
+  stderr — captured by the runner. Single mechanism, no launch-env wiring.
+  `journal` is gated on a present journald socket because the otel-plugin's
+  `tracing-journald` layer *panics* if it can't connect; `stderr` is always safe.
+- SYSLOG_IDENTIFIERs: the netdata daemon → `netdata`; the otel-plugin supervisor
+  → `otel-plugin`; each worker → `otel-plugin/<worker>` (`ledger`, `ingestor`,
+  `legacy-logs`). The worker name equals both the identifier suffix and the
+  `worker <name>` spawn arg (otel-plugin `supervisor.rs`/`main.rs`).
+- `netdata_agent_logs(agent_id, component, lines, grep, priority)` is a
+  **read-only** `journalctl` wrapper returning structured output. It scopes a
+  query to one agent by `_PID`: `daemon` uses the tracked netdata PID;
+  `supervisor`/worker PIDs are resolved from `/proc` as descendants of that
+  netdata PID (workers are never restarted, so the PID is stable for the run).
+  `_PID` scoping is required for `daemon` because `SYSLOG_IDENTIFIER=netdata` is
+  shared host-wide. If the process can't be resolved (agent stopped, or its
+  process not yet/no-longer in `/proc`), the query falls back to identifier-only
+  and says so in `message`.
+- The wrapper never raises: a missing `journalctl`, a timeout
+  (`journal.READ_TIMEOUT`), or a non-zero exit are surfaced as text, matching the
+  structured-result contract of the other agent tools.
+- `netdata_agent_logs` is registered only when the journal is usable on the host
+  — `journalctl` on PATH **and** a running journald (`journal.usable()`). Off
+  systemd it isn't exposed at all (agents log to stderr/files there, so it would
+  have nothing to read), steering callers to `netdata_run_logs`.
+- `netdata_run_logs` remains the catch-all combined build+netdata stream
+  (unfiltered); `netdata_agent_logs` is the scoped, per-component journal view.

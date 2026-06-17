@@ -141,11 +141,47 @@ class RunInfo(BaseModel):
 
 class RunLogs(BaseModel):
     agent_id: str
-    state: str
-    text: str
-    next_offset: int
-    truncated: bool
-    message: str = ""
+    state: str = Field(description="Agent state at read time.")
+    text: str = Field(description="New output lines since `offset`, newline-joined.")
+    next_offset: int = Field(description="Pass this back as `offset` on the next call to continue.")
+    truncated: bool = Field(description="True if older lines were evicted before `offset` and skipped.")
+    message: str = Field(default="", description="Human-readable hint; empty on success.")
+
+
+class AgentLogs(BaseModel):
+    agent_id: str
+    component: str = Field(
+        description="Which part of the agent: daemon | supervisor | ledger | ingestor | legacy-logs."
+    )
+    syslog_identifier: str = Field(
+        description="systemd SYSLOG_IDENTIFIER the query was scoped to (e.g. 'netdata', 'otel-plugin', 'otel-plugin/ledger')."
+    )
+    pid: int | None = Field(
+        default=None,
+        description=(
+            "Process PID the journal query was scoped to (daemon/supervisor/worker). "
+            "None when the agent isn't running or the process couldn't be resolved; "
+            "results are then identifier-scoped and may span other agents."
+        ),
+    )
+    text: str = Field(
+        description="journalctl output, newline-joined; a bracketed status note (e.g. timeout, "
+        "journalctl missing) on a read failure; or empty when the agent isn't found (see message)."
+    )
+    message: str = Field(
+        default="", description="Human-readable scoping/resolution note; empty when the query was cleanly PID-scoped."
+    )
+
+
+def unknown_agent_logs(agent_id: str, component: str, identifier: str) -> AgentLogs:
+    return AgentLogs(
+        agent_id=agent_id,
+        component=component,
+        syslog_identifier=identifier,
+        pid=None,
+        text="",
+        message="No such agent (in-memory; does not survive a server restart).",
+    )
 
 
 def run_info(run: Run, *, message: str = "") -> RunInfo:

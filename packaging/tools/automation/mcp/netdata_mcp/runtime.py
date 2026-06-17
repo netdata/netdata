@@ -19,7 +19,7 @@ from pathlib import Path
 
 import yaml
 
-from . import profiles
+from . import journal, profiles
 
 # Cloud claim credentials, read from the environment and injected into a launched
 # agent's process env (never its command line). Only a non-empty token enables
@@ -78,7 +78,7 @@ def _default_conf(agent_id: str, rd: Path) -> dict[str, dict[str, str]]:
     same one. ``is ephemeral node`` lets Cloud auto-clean the node once it goes
     offline, so stopped dev agents don't accumulate.
     """
-    return {
+    conf: dict[str, dict[str, str]] = {
         "global": {
             "hostname": f"mcp-{agent_id}",
             "is ephemeral node": "yes",
@@ -91,6 +91,30 @@ def _default_conf(agent_id: str, rd: Path) -> dict[str, dict[str, str]]:
         },
         "web": {"bind to": "127.0.0.1"},
     }
+    # Route logs so the harness can read them back. On journald hosts use the
+    # journal (queryable per-agent via netdata_agent_logs); elsewhere use stderr
+    # so logs still surface through netdata_run_logs instead of vanishing into
+    # on-disk collector.log / daemon.log.
+    #
+    # `collector` is load-bearing for plugins: netdata exports NETDATA_LOG_METHOD
+    # (+ format/level) to the plugins it spawns from it. With `journal` the
+    # otel-plugin logs via tracing-journald (SYSLOG_IDENTIFIER=otel-plugin/<worker>);
+    # with `stderr` it writes to fd 2 — and netdata redirects a plugin's fd 2 to a
+    # file ONLY when the collector method itself is a file (nd_log_collectors_fd),
+    # so `stderr` leaves fd 2 inherited up to netdata's own stderr, which
+    # run_command captures into the run buffer. `daemon` does the same for
+    # netdata's own logs. Single mechanism — no launch-env wiring.
+    #
+    # stderr is always safe; only tracing-journald can panic if journald is
+    # unreachable, which is why journal is gated on the socket being present.
+    # Routing needs only the socket to *write*; reading the journal back via
+    # netdata_agent_logs additionally needs journalctl (journal.usable(),
+    # checked at tool registration).
+    if journal.journald_socket_present():
+        conf["logs"] = {"collector": "journal", "daemon": "journal"}
+    else:
+        conf["logs"] = {"collector": "stderr", "daemon": "stderr"}
+    return conf
 
 
 @dataclass
@@ -115,6 +139,9 @@ class OtelConfig:
     wal_compression_enabled: bool | None = None  # logs.wal.compression_enabled
     index_max_files: int | None = None         # logs.index.retention.default.max_files
     index_max_total_size: str | None = None    # logs.index.retention.default.max_total_size
+    catalog_rotation_count: int | None = None  # logs.catalog.rotation_count; entries per catalog before it rotates+uploads
+    storage_enabled: bool | None = None        # logs.storage.enabled; remote object-storage upload of SFST + catalog files
+    storage_uri: str | None = None             # logs.storage.uri; opendal URI (default: per-agent fs:// dir under the run dir)
     journal_dir: str | None = None             # logs.journal_dir; former-plugin journal files for the read-only legacy-otel-logs viewer
 
 
@@ -152,7 +179,29 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str) -> dict:
     }
     if retention:
         index["retention"] = {"default": retention}
-    logs: dict = {"wal": wal, "index": index}
+    # Pin the catalog dir under the run dir too (like wal/index) so an agent with
+    # remote storage enabled writes its catalog files in isolation rather than
+    # the stock /var/log path. Harmless when storage is disabled — no catalog
+    # files are produced then (catalogs only rotate on upload success).
+    catalog: dict = {"dir": str(rd / "lib" / "otel" / "catalog")}
+    if cfg.catalog_rotation_count is not None:
+        catalog["rotation_count"] = cfg.catalog_rotation_count
+    logs: dict = {"wal": wal, "index": index, "catalog": catalog}
+
+    # Remote object-storage upload of SFST + catalog files. When enabled without
+    # an explicit URI, default to a per-agent fs:// directory under the run dir
+    # (opendal fs = `fs://` + absolute path), isolated like the local dirs, so
+    # the upload path can be exercised end-to-end without external storage.
+    storage: dict = {}
+    if cfg.storage_enabled is not None:
+        storage["enabled"] = cfg.storage_enabled
+    if cfg.storage_uri is not None:
+        storage["uri"] = cfg.storage_uri
+    elif cfg.storage_enabled:
+        storage["uri"] = f"fs://{rd / 'lib' / 'otel' / 'remote'}"
+    if storage:
+        logs["storage"] = storage
+
     # Read-only legacy viewer: point it at the former plugin's journal files.
     # Distinct from wal/index (which stay pinned under the run dir); the plugin
     # only reads this directory. Truthy check: omit when unset or empty.

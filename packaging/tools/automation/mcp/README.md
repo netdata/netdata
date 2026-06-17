@@ -47,14 +47,17 @@ so multiple agents of one worktree coexist without clobbering.
 | `netdata_run_start(agent_id, restart=False)` | Build+install if needed, then launch netdata on an auto-assigned loopback port. Returns immediately; poll status until `ready`. First start for a profile can take minutes. Idempotent while live: a plain start does **not** rebuild a running agent. Pass `restart=true` after editing source — it stops, rebuilds (incremental), and relaunches. |
 | `netdata_run_status(agent_id)` | `building`/`starting`/`ready`/`stopped`/`failed` + the port and `url` (when ready), plus `claimed`/`cloud_connected` once ready. Long-polls ~8s while coming up. |
 | `netdata_run_logs(agent_id, offset)` | Combined build + netdata output, incremental. |
+| `netdata_agent_logs(agent_id, component, lines, grep, priority)` | Structured logs from the systemd journal for one part of the agent — `daemon` (netdata), `supervisor` (otel-plugin), or a worker (`ledger`/`ingestor`/`legacy-logs`) — scoped to that process by `_PID`. Read-only `journalctl` wrapper. Only registered where the journal is usable (`journalctl` on PATH and a running journald); elsewhere use `netdata_run_logs`. |
 | `netdata_run_stop(agent_id)` | Stop the agent (terminates its process group). |
 
 Each agent gets an isolated runtime dir **`~/opt/netdata-mcp/run/<agent-id>/`**
 (`etc`, `cache`, `lib`, `log`) and a generated `netdata.conf` (ram db, isolated
 `[directories]`, bind `127.0.0.1`); netdata launches as
 `<install>/usr/sbin/netdata -D -p <port> -c <conf>`. Readiness is probed via
-`/api/v1/info`. The run dir (incl. netdata's `log/daemon.log`) is **kept after
-stop** for inspection. Agents are in-memory and do not survive a server restart.
+`/api/v1/info`. The run dir is **kept after stop** for inspection; agent logs are
+not in the run dir — they're in the journal (`netdata_agent_logs`) on journald
+hosts, or in `netdata_run_logs` otherwise. Agents are in-memory and do not
+survive a server restart.
 
 Two agents of the **same** profile share one worktree's build/install (each gets
 its own run dir + port). For two **different** build types (e.g. an optimized
@@ -121,6 +124,8 @@ A dedicated surface for iterating on the OTel-logs path against a ready agent:
 | `netdata_agent_otel_push(agent_id, count, …)` | One-shot: send a deterministic synthetic OTLP corpus (`otel-streams synth`) to the agent. `service_name`/`service_namespace` set the resource identity (one stream per batch; query by literal `service.name`/`service.namespace`). `service_name` is always emitted (queryable even when `""`); an omitted `service_namespace` emits no token (not queryable — reachable via `service.name`), while `service_namespace=""` emits a queryable empty value. |
 | `netdata_agent_otel_stream_{start,status,stop,list}(…)` | Run a live source (`source=certstream\|jetstream\|github`) as a daemon; `list` enumerates all streams. |
 | `netdata_agent_otel_logs(agent_id, …)` | Query the `otel-logs` function (typed params; mints a Cloud bearer when `NETDATA_CLOUD_TOKEN` is set). |
+| `netdata_agent_otel_files(agent_id, …)` | List the storage files the otel-ledger is tracking (WAL / SFST / catalog) per tenant, with sizes, time ranges, record counts, and the `rotated`/`uploaded`/`remote_cataloged`/`pending_deletion` flags not visible on disk. Inventory, not content (use `netdata_agent_otel_logs` for rows). Same SIGNED_ID gate (mints a bearer). |
+| `netdata_agent_mint_bearer(agent_id, …)` | Mint and **return** a per-agent Cloud bearer for the **Playwright (browser) MCP**, so an LLM can view SIGNED_ID-gated functions (otel-logs, otel-files, systemd-journal) in the dashboard UI. The description embeds the `browser_run_code_unsafe` + `setExtraHTTPHeaders` injection recipe. Localhost-dev only (returns the bearer by design). |
 
 - **push/stream** shell out to `cargo run -p otel-streams --bin <name>` (built on
   demand from `<worktree>/src/crates`); they target the agent's local OTLP
@@ -292,6 +297,7 @@ netdata_mcp/
   bearer.py        # Cloud per-agent bearer minting/cache (otel-logs auth) ── core
   agentfn.py       # call a netdata function over HTTP (otel-logs) ── core
   streams.py       # Stream + StreamRegistry, synth/stream cargo runners ── core
+  journal.py       # /proc PID resolution + read-only journalctl wrapper ── core
   server.py        # FastMCP instance, lifespan-held registries
   tools/
     job_control.py # netdata_job_status / _logs / _cancel
@@ -299,8 +305,11 @@ netdata_mcp/
     build.py       # netdata_build_start
     agents.py      # netdata_agent_declare
     run.py         # netdata_run_start / _status / _logs / _stop
+    logs.py        # netdata_agent_logs (journalctl wrapper; journald hosts only)
+    mint_bearer.py # netdata_agent_mint_bearer (per-agent bearer for the Playwright MCP)
     otel_config.py # netdata_agent_otel_config
     otel_logs.py   # netdata_agent_otel_logs
+    otel_files.py  # netdata_agent_otel_files (storage-file inventory)
     otel_push.py   # netdata_agent_otel_push (one-shot synth)
     otel_stream.py # netdata_agent_otel_stream_{start,status,stop,list}
 ```

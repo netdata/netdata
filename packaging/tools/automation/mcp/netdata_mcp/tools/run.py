@@ -72,7 +72,14 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool(
         name="netdata_run_logs",
-        description="Fetch an agent's combined build + netdata output incrementally (pass back next_offset).",
+        description=(
+            "Fetch an agent's combined build + netdata stdout/stderr stream incrementally "
+            "(offset=0 first, then pass back next_offset). In-memory, keyed by agent_id — "
+            "empty if the agent never started or the server restarted. For structured "
+            "per-component systemd-journal entries with grep/priority filtering use "
+            "netdata_agent_logs (journald hosts only); for otel-log storage queries use "
+            "netdata_agent_otel_logs."
+        ),
     )
     async def netdata_run_logs(
         ctx: Context,

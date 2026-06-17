@@ -15,13 +15,16 @@ agent — the same flow as the ``query-netdata-agents`` skill:
   3. cache the returned bearer in-process until shortly before it expires.
 
 Token-safety contract (HARD requirement):
-  * ``NETDATA_CLOUD_TOKEN`` and every minted bearer are secrets. This module
-    NEVER logs them, NEVER returns them in user/tool output, and NEVER places
-    them on a command line — they travel only in an Authorization header and
-    the in-process cache.
-  * Error strings are scrubbed of both secrets before being returned.
-  * Callers receive a bearer only to hand to ``agentfn.call_function``; they
-    MUST NOT echo it into a tool result.
+  * ``NETDATA_CLOUD_TOKEN`` (the Cloud account token) is a secret. This module
+    NEVER logs it, NEVER returns it in user/tool output, and NEVER places it on
+    a command line — it travels only in an Authorization header.
+  * Error strings are scrubbed of secrets before being returned.
+  * The minted per-agent bearer is normally handed only to
+    ``agentfn.call_function`` and not echoed into a tool result. The one
+    deliberate exception is ``tools/mint_bearer.py``: a localhost-dev tool that
+    RETURNS the per-agent bearer so the LLM can inject it into the Playwright
+    (browser) MCP to view access-gated functions in the dashboard UI. That
+    exposes only the short-lived per-agent bearer, never the Cloud token.
 """
 
 from __future__ import annotations

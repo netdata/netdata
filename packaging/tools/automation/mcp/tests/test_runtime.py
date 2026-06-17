@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from netdata_mcp import runtime
+from netdata_mcp import journal, runtime
 
 
 def test_sanitize_accepts_valid_ids():
@@ -41,6 +41,7 @@ def test_launch_command_shape():
 
 def test_generate_runtime_writes_isolated_conf(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(journal, "journald_socket_present", lambda: True)
     rd, conf, _otlp = runtime.generate_runtime("agent-x")
     assert rd == tmp_path / "opt" / "netdata-mcp" / "run" / "agent-x"
     for sub in ("etc", "cache", "lib", "log"):
@@ -55,6 +56,30 @@ def test_generate_runtime_writes_isolated_conf(tmp_path, monkeypatch):
     assert "is ephemeral node = yes" in text
     # config dir pinned to the run dir's etc so the otel plugin finds otel.yaml
     assert f"config = {rd / 'etc'}" in text
+    # collector + daemon logs routed to the journal (journalctl-queryable)
+    assert "[logs]" in text
+    assert "collector = journal" in text
+    assert "daemon = journal" in text
+
+
+def test_generate_runtime_uses_stderr_logs_without_journald(tmp_path, monkeypatch):
+    # No journald socket -> route logs to stderr (never journal, whose plugin
+    # layer panics if it can't connect). stderr surfaces through netdata_run_logs
+    # rather than vanishing into on-disk collector.log/daemon.log.
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(journal, "journald_socket_present", lambda: False)
+    _, conf, _otlp = runtime.generate_runtime("agent-nj")
+    text = conf.read_text()
+    assert "[logs]" in text
+    assert "collector = stderr" in text
+    assert "daemon = stderr" in text
+    # the panic-prone method must not be forced here (scoped to the method
+    # assignments so an unrelated future conf value containing "journal" can't trip it)
+    assert "collector = journal" not in text
+    assert "daemon = journal" not in text
+    # the [logs] choice must not disturb the rest of the conf
+    assert "[db]" in text and "mode = ram" in text
+    assert "hostname = mcp-agent-nj" in text
 
 
 def test_generate_runtime_applies_overrides(tmp_path, monkeypatch):
@@ -125,6 +150,36 @@ def test_generate_runtime_otel_emits_only_set_knobs(tmp_path, monkeypatch):
     # untouched knobs stay out
     assert "max_file_size" not in doc["logs"]["wal"]["rotation"]["default"]
     assert "compression_enabled" not in doc["logs"]["wal"]
+
+
+def test_generate_runtime_otel_pins_catalog_and_omits_storage_by_default(tmp_path, monkeypatch):
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    rd, _conf, _otlp = runtime.generate_runtime("agent-cat")
+    doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
+    # catalog dir is pinned under the run dir like wal/index
+    assert doc["logs"]["catalog"]["dir"] == str(rd / "lib" / "otel" / "catalog")
+    assert "rotation_count" not in doc["logs"]["catalog"]
+    # remote storage is omitted (disabled) unless explicitly configured
+    assert "storage" not in doc["logs"]
+
+
+def test_generate_runtime_otel_enables_storage_with_default_fs_uri(tmp_path, monkeypatch):
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    cfg = runtime.OtelConfig(storage_enabled=True, catalog_rotation_count=2)
+    rd, _conf, _otlp = runtime.generate_runtime("agent-store", otel=cfg)
+    doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
+    assert doc["logs"]["storage"]["enabled"] is True
+    # an omitted uri defaults to an isolated per-agent fs:// dir under the run dir
+    assert doc["logs"]["storage"]["uri"] == f"fs://{rd / 'lib' / 'otel' / 'remote'}"
+    assert doc["logs"]["catalog"]["rotation_count"] == 2
+
+
+def test_generate_runtime_otel_honors_explicit_storage_uri(tmp_path, monkeypatch):
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    cfg = runtime.OtelConfig(storage_enabled=True, storage_uri="s3://bucket/prefix")
+    rd, _conf, _otlp = runtime.generate_runtime("agent-s3", otel=cfg)
+    doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
+    assert doc["logs"]["storage"] == {"enabled": True, "uri": "s3://bucket/prefix"}
 
 
 def test_claim_env_empty_without_token():

@@ -14,7 +14,9 @@ Surface (fire-and-poll; no synchronous tool):
     - netdata_run_start(agent_id, restart=False) -> build+install if needed, then launch
                                                     (restart=True: stop + rebuild + relaunch)
     - netdata_run_status(agent_id)               -> building|starting|ready|stopped|failed
-    - netdata_run_logs(agent_id, offset)
+    - netdata_run_logs(agent_id, offset)         -> combined build+netdata stream
+    - netdata_agent_logs(agent_id, component, …) -> per-component systemd-journal logs
+                                                    (registered only on journald hosts)
     - netdata_run_stop(agent_id)
 
 Localhost-only: there is no authentication and no path sandboxing — it will run
@@ -39,7 +41,10 @@ from .tools import (
     build,
     configure,
     job_control,
+    logs,
+    mint_bearer,
     otel_config,
+    otel_files,
     otel_logs,
     otel_push,
     otel_stream,
@@ -100,8 +105,11 @@ def build_server() -> FastMCP:
     build.register(mcp)
     agents.register(mcp)
     run.register(mcp)
+    logs.register(mcp)
+    mint_bearer.register(mcp)
     otel_config.register(mcp)
     otel_logs.register(mcp)
+    otel_files.register(mcp)
     otel_push.register(mcp)
     otel_stream.register(mcp)
     agent_mcp.register(mcp)
