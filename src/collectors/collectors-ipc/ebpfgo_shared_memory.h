@@ -13,8 +13,10 @@
 #include "../ebpf.plugin/ebpfgo.plugin/apps_ebpf_shared_pid_row.h"
 
 typedef struct netdata_ebpfgo_shared_pid_memory {
-    struct ebpf_pid_stat *shm;
+    void *mapping;                  /* raw mmap base (for munmap and header read) */
+    struct ebpf_pid_stat *shm;      /* = (char*)mapping + sizeof(ebpfgo_shm_header) */
     struct ebpf_pid_stat *snapshot;
+    uint32_t shm_flags;             /* EBPFGO_SHM_FLAG_* bits from last refresh */
     size_t shm_total;
     size_t snapshot_total;
     int shm_fd;
@@ -31,6 +33,8 @@ bool netdata_ebpfgo_shared_pid_memory_refresh(
 const struct ebpf_pid_stat *netdata_ebpfgo_shared_pid_memory_lookup(
     const netdata_ebpfgo_shared_pid_memory_t *ctx,
     pid_t pid);
+
+uint32_t netdata_ebpfgo_shared_pid_memory_flags(const netdata_ebpfgo_shared_pid_memory_t *ctx);
 
 void netdata_ebpfgo_shared_pid_memory_close(netdata_ebpfgo_shared_pid_memory_t *ctx);
 

@@ -16,6 +16,19 @@
 #define NETDATA_EBPFGO_INTEGRATION_NAME "/netdata_shm_integration_ebpfgo"
 #define NETDATA_EBPFGO_SHM_INTEGRATION_NAME "/netdata_sem_integration_ebpfgo"
 
+/* SHM header written at byte-offset 0; the ebpf_pid_stat[] array follows
+ * immediately.  sizeof == 8 so entries start on an 8-byte boundary, which
+ * satisfies the alignment of the uint64_t fields inside ebpf_pid_stat.
+ * Producers set flags before calling shared_pid_memory_publish(); consumers
+ * read the flags to determine which module contributed data this cycle. */
+struct ebpfgo_shm_header {
+    uint32_t flags; /* EBPFGO_SHM_FLAG_* bits set by the active publisher(s) */
+    uint32_t _pad;  /* pad to 8 bytes to keep entries[] on a uint64_t boundary */
+};
+
+#define EBPFGO_SHM_FLAG_CACHESTAT 0x01u /* cachestat per-PID fields are valid */
+#define EBPFGO_SHM_FLAG_SOCKET    0x02u /* socket per-PID fields are valid */
+
 struct ebpf_cachestat {
     uint32_t add_to_page_cache_lru;
     uint32_t mark_page_accessed;

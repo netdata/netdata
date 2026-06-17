@@ -540,7 +540,10 @@ void update_io_full_pressure_stall_time_chart(struct cgroup *cg);
 // Shared helper: find the best non-empty cgroup.procs file across mount points.
 procfile *cgroup_ebpfgo_open_nonempty_procs_file(char *path_buf, size_t path_buf_size, const char *cg_id);
 
+// Refreshes the ebpfgo SHM snapshot; returns true when valid data is present.
 bool cgroup_ebpfgo_cachestat_refresh(void);
+// Controls whether cachestat charts update this tick (set after reading SHM flags).
+void cgroup_ebpfgo_cachestat_set_snapshot_ready(bool ready);
 void cgroup_ebpfgo_cachestat_update_locked(void);
 void cgroup_ebpfgo_cachestat_update_charts(struct cgroup *cg);
 
@@ -549,6 +552,7 @@ void cgroup_ebpfgo_socket_update_locked(void);
 void cgroup_ebpfgo_socket_update_charts(struct cgroup *cg);
 #else
 static inline bool cgroup_ebpfgo_cachestat_refresh(void) { return false; }
+static inline void cgroup_ebpfgo_cachestat_set_snapshot_ready(bool ready) { (void)ready; }
 static inline void cgroup_ebpfgo_cachestat_update_locked(void) {}
 static inline void cgroup_ebpfgo_cachestat_update_charts(struct cgroup *cg) { (void)cg; }
 

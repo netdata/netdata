@@ -9,6 +9,9 @@ const (
 	socketDefaultUpdateEvery         = 10
 	socketDefaultBTFPath             = "/sys/kernel/btf"
 	socketDefaultObjectFlavor        = "buffer"
+	// socketDefaultPIDTableSize matches cachestatDefaultPIDTableSize so both
+	// modules produce an identically-sized SHM segment.
+	socketDefaultPIDTableSize uint32 = 32768
 )
 
 type SocketLegacyConfig struct {

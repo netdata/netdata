@@ -40,7 +40,7 @@ func NewSharedPidMemoryPublisher(total uint32) (*SharedPidMemoryPublisher, error
 	return &SharedPidMemoryPublisher{ptr: ctx}, nil
 }
 
-func (p *SharedPidMemoryPublisher) Publish(entries []ebpfPidStat) error {
+func (p *SharedPidMemoryPublisher) Publish(entries []ebpfPidStat, flags uint32) error {
 	if p == nil || p.ptr == nil {
 		return nil
 	}
@@ -50,7 +50,7 @@ func (p *SharedPidMemoryPublisher) Publish(entries []ebpfPidStat) error {
 		ptr = unsafe.Pointer(&entries[0])
 	}
 
-	if ret := C.shared_pid_memory_publish(p.ptr, (*C.struct_ebpf_pid_stat)(ptr), C.size_t(len(entries))); ret != 0 {
+	if ret := C.shared_pid_memory_publish(p.ptr, (*C.struct_ebpf_pid_stat)(ptr), C.size_t(len(entries)), C.uint32_t(flags)); ret != 0 {
 		return fmt.Errorf("publish shared pid memory failed: %d", int(ret))
 	}
 

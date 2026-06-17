@@ -128,7 +128,10 @@ func socketLogErr(site, what string, err error) {
 // runSocketGlobalCollector is the socket plugin collection loop.
 // It runs in its own goroutine alongside cachestat.
 // store may be nil when there are no apps/cgroups consumers for socket data.
-func runSocketGlobalCollector(handle *SocketLegacyHandle, stop <-chan struct{}, updateEvery int, store *cachestatSharedMemoryStore, fnStore *socketFunctionStore) {
+// shouldPublish must be true when cachestat is not publishing to SHM; in that
+// case the socket collector opens the shared segment and publishes each cycle
+// so that cgroup.plugin can read socket data independently of cachestat.
+func runSocketGlobalCollector(handle *SocketLegacyHandle, stop <-chan struct{}, updateEvery int, store *cachestatSharedMemoryStore, fnStore *socketFunctionStore, shouldPublish bool) {
 	if handle == nil || handle.Runtime == nil {
 		return
 	}
@@ -138,6 +141,19 @@ func runSocketGlobalCollector(handle *SocketLegacyHandle, stop <-chan struct{}, 
 	}
 
 	state := &socketGlobalState{}
+
+	// Lazily-opened SHM publisher, used only when socket is the designated
+	// publisher (cachestat is not running or has no apps/cgroups consumers).
+	var shmPublisher *SharedPidMemoryPublisher
+	if shouldPublish && store != nil {
+		p, perr := NewSharedPidMemoryPublisher(socketDefaultPIDTableSize)
+		if perr != nil {
+			socketLogErr("socket.shm_open", "shared memory open", perr)
+		} else {
+			shmPublisher = p
+			defer shmPublisher.Close()
+		}
+	}
 
 	collectAndPublish := func() {
 		snap, err := handle.Runtime.Snapshot(handle.MapsPerCore)
@@ -155,6 +171,11 @@ func runSocketGlobalCollector(handle *SocketLegacyHandle, stop <-chan struct{}, 
 				socketLogErr("socket.snapshot_per_pid", "per-PID snapshot", pidErr)
 			} else {
 				store.UpdateSocketApps(pidEntries)
+				if shmPublisher != nil {
+					if err := store.Publish(shmPublisher); err != nil {
+						socketLogErr("socket.publish", "shared memory publish", err)
+					}
+				}
 			}
 		}
 	}

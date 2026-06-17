@@ -84,6 +84,11 @@ func main() {
 	// from whichever subset of collectors is enabled.
 	var fnStore *socketFunctionStore
 
+	// Cachestat is the SHM publisher when it has apps/cgroups consumers.
+	// Socket becomes the fallback publisher when cachestat is not publishing,
+	// so cgroup.plugin can read socket data even without cachestat enabled.
+	var cachestatWillPublish bool
+
 	// ---- cachestat ----
 	if cachestatCfg.Enabled {
 		ue := resolveUpdateEvery(updateEvery, cachestatCfg.UpdateEvery, cachestatDefaultUpdateEvery)
@@ -98,6 +103,7 @@ func main() {
 			var cachestatStore *cachestatSharedMemoryStore
 			if handle.AppsEnabled || handle.CgroupsEnabled {
 				cachestatStore = store
+				cachestatWillPublish = true
 			}
 			anyStarted = true
 			wg.Add(1)
@@ -134,10 +140,14 @@ func main() {
 
 			anyStarted = true
 
+			// Socket owns the SHM publisher only when cachestat is not publishing;
+			// this lets socket cgroup charts work independently of cachestat.
+			socketShouldPublish := store != nil && !cachestatWillPublish
+
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				runSocketGlobalCollector(handle, stop, ue, store, fnStore)
+				runSocketGlobalCollector(handle, stop, ue, store, fnStore, socketShouldPublish)
 				handle.Close()
 			}()
 		}

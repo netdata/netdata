@@ -11,7 +11,9 @@
 #include <unistd.h>
 
 struct shared_pid_memory {
-    struct ebpf_pid_stat *entries;
+    void *mapping;                    /* raw mmap base (for munmap and header access) */
+    struct ebpfgo_shm_header *header; /* = mapping; holds per-module validity flags */
+    struct ebpf_pid_stat *entries;    /* = (char*)mapping + sizeof(*header) */
     size_t total;
     size_t prev_count; /* entries written in the previous publish cycle */
     int shm_fd;
@@ -20,7 +22,7 @@ struct shared_pid_memory {
 
 static inline size_t shared_pid_memory_nbytes(const struct shared_pid_memory *ctx)
 {
-    return ctx->total * sizeof(struct ebpf_pid_stat);
+    return sizeof(struct ebpfgo_shm_header) + ctx->total * sizeof(struct ebpf_pid_stat);
 }
 
 static void shared_pid_memory_unlink_all(void)
@@ -69,11 +71,13 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total)
     if (ftruncate(ctx->shm_fd, (off_t)length) != 0)
         goto fail;
 
-    ctx->entries = mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, ctx->shm_fd, 0);
-    if (ctx->entries == MAP_FAILED) {
-        ctx->entries = NULL;
+    ctx->mapping = mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, ctx->shm_fd, 0);
+    if (ctx->mapping == MAP_FAILED) {
+        ctx->mapping = NULL;
         goto fail;
     }
+    ctx->header  = (struct ebpfgo_shm_header *)ctx->mapping;
+    ctx->entries = (struct ebpf_pid_stat *)((char *)ctx->mapping + sizeof(*ctx->header));
 
     if (reused) {
         /* Reused SHM: the previous run may have written rows beyond
@@ -82,7 +86,7 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total)
          * which starts at 0).  Zero the segment so the consumer's
          * binary search does not return stale PIDs from the prior
          * run.  This is a one-time cost on restart, not per cycle. */
-        memset(ctx->entries, 0, length);
+        memset(ctx->mapping, 0, length);
     }
 
     ctx->sem = sem_open(NETDATA_EBPFGO_SHM_INTEGRATION_NAME, O_CREAT, 0660, 1);
@@ -99,9 +103,9 @@ fail:
     return NULL;
 }
 
-int shared_pid_memory_publish(struct shared_pid_memory *ctx, const struct ebpf_pid_stat *entries, size_t count)
+int shared_pid_memory_publish(struct shared_pid_memory *ctx, const struct ebpf_pid_stat *entries, size_t count, uint32_t flags)
 {
-    if (!ctx || !ctx->entries)
+    if (!ctx || !ctx->mapping)
         return -1;
 
     if (count > ctx->total)
@@ -113,6 +117,11 @@ int shared_pid_memory_publish(struct shared_pid_memory *ctx, const struct ebpf_p
             return -1;
         locked = true;
     }
+
+    /* OR the caller's module flags into the header so multiple publishers
+     * (cachestat and socket running concurrently) each stamp their own bit
+     * without clearing the other's. */
+    ctx->header->flags |= flags;
 
     if (entries && count)
         memcpy(ctx->entries, entries, count * sizeof(struct ebpf_pid_stat));
@@ -140,8 +149,8 @@ void shared_pid_memory_close(struct shared_pid_memory *ctx)
     if (ctx->sem != SEM_FAILED)
         sem_close(ctx->sem);
 
-    if (ctx->entries)
-        munmap(ctx->entries, shared_pid_memory_nbytes(ctx));
+    if (ctx->mapping)
+        munmap(ctx->mapping, shared_pid_memory_nbytes(ctx));
 
     if (ctx->shm_fd >= 0)
         close(ctx->shm_fd);

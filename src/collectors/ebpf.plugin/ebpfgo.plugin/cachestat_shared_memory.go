@@ -14,17 +14,18 @@ import (
 const cachestatStaleCycles = 3
 
 type cachestatSharedMemoryStore struct {
-	mu          sync.RWMutex
-	entries     []ebpfPidStat
-	nextEntries []ebpfPidStat
-	prev        map[uint32]netdataCachestat
-	prevCt      map[uint32]uint64 // last observed BPF timestamp per PID
-	missCount   map[uint32]int    // consecutive cycles where ct did not advance
-	nextPrev    map[uint32]netdataCachestat
-	nextPrevCt  map[uint32]uint64
-	nextMiss    map[uint32]int
-	stalePIDs   []uint32
-	socketData  map[uint32]ebpfSocketPublishApps // latest per-PID socket snapshot from tbl_nd_socket
+	mu            sync.RWMutex
+	entries       []ebpfPidStat
+	nextEntries   []ebpfPidStat
+	prev          map[uint32]netdataCachestat
+	prevCt        map[uint32]uint64 // last observed BPF timestamp per PID
+	missCount     map[uint32]int    // consecutive cycles where ct did not advance
+	nextPrev      map[uint32]netdataCachestat
+	nextPrevCt    map[uint32]uint64
+	nextMiss      map[uint32]int
+	stalePIDs     []uint32
+	socketData    map[uint32]ebpfSocketPublishApps // latest per-PID socket snapshot from tbl_nd_socket
+	activeModules uint32                            // EBPFGO_SHM_FLAG_* bits set when a module writes data
 }
 
 func NewCachestatSharedMemoryStore() *cachestatSharedMemoryStore {
@@ -51,6 +52,17 @@ func (s *cachestatSharedMemoryStore) Snapshot() []ebpfPidStat {
 	return copied
 }
 
+// ebpfgoSHM* mirrors the EBPFGO_SHM_FLAG_* C constants so Go callers
+// do not need to import "C" just to set a flag value.
+const (
+	ebpfgoSHMFlagCachestat uint32 = 0x01
+	ebpfgoSHMFlagSocket    uint32 = 0x02
+)
+
+// Publish writes the current entries to the shared-memory segment and stamps
+// the per-module validity flags accumulated since the store was created.
+// The flags reflect which modules have ever written data to the store;
+// they are set by UpdateApps (cachestat) and UpdateSocketApps (socket).
 func (s *cachestatSharedMemoryStore) Publish(publisher *SharedPidMemoryPublisher) error {
 	if publisher == nil {
 		return nil
@@ -59,7 +71,7 @@ func (s *cachestatSharedMemoryStore) Publish(publisher *SharedPidMemoryPublisher
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return publisher.Publish(s.entries)
+	return publisher.Publish(s.entries, s.activeModules)
 }
 
 func buildCachestatPublish(current, previous netdataCachestat, ct uint64, hasPrevious bool) netdataPublishCachestat {
@@ -197,6 +209,7 @@ func (s *cachestatSharedMemoryStore) UpdateApps(apps []libbpfloader.CachestatApp
 	s.prevCt, s.nextPrevCt = s.nextPrevCt, s.prevCt
 	s.missCount, s.nextMiss = s.nextMiss, s.missCount
 	s.stalePIDs = stalePIDs
+	s.activeModules |= ebpfgoSHMFlagCachestat // mark cachestat as an active producer
 	s.applySocketDataLocked()
 	return stalePIDs
 }
@@ -238,5 +251,6 @@ func (s *cachestatSharedMemoryStore) UpdateSocketApps(entries []libbpfloader.Soc
 			CallTCPV6Connection: e.CallTCPV6Connection,
 		}
 	}
+	s.activeModules |= ebpfgoSHMFlagSocket // mark socket as an active producer
 	s.applySocketDataLocked()
 }
