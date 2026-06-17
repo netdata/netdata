@@ -13,7 +13,7 @@ static bool cgroup_ebpfgo_cachestat_snapshot_ready = false;
 
 static procfile *cgroup_ebpfgo_open_procfile_fd(const char *path);
 
-static procfile *cgroup_ebpfgo_open_nonempty_procs_file(char *path_buf, size_t path_buf_size, const char *cg_id)
+procfile *cgroup_ebpfgo_open_nonempty_procs_file(char *path_buf, size_t path_buf_size, const char *cg_id)
 {
     struct stat buf;
     const char *bases[] = {

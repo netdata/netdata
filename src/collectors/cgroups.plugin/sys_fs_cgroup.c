@@ -1065,6 +1065,7 @@ static void cgroup_update_io_pids_charts(struct cgroup *cg) {
     if (likely(cg->pids_current.updated))
         update_pids_current_chart(cg);
     cgroup_ebpfgo_cachestat_update_charts(cg);
+    cgroup_ebpfgo_socket_update_charts(cg);
 }
 
 void update_cgroup_systemd_services_charts() {
@@ -1401,6 +1402,9 @@ void cgroups_main(void *ptr) {
         }
 
         bool ebpf_cachestat_ready = cgroup_ebpfgo_cachestat_refresh();
+        // Share the single SHM refresh result with the socket module to avoid
+        // a second semaphore acquisition and snapshot copy per tick.
+        cgroup_ebpfgo_socket_set_snapshot_ready(ebpf_cachestat_ready);
 
         worker_is_busy(WORKER_CGROUPS_LOCK);
         netdata_mutex_lock(&cgroup_root_mutex);
@@ -1415,6 +1419,7 @@ void cgroups_main(void *ptr) {
 
         if (likely(ebpf_cachestat_ready)) {
             cgroup_ebpfgo_cachestat_update_locked();
+            cgroup_ebpfgo_socket_update_locked();
         }
 
         worker_is_busy(WORKER_CGROUPS_CHART);

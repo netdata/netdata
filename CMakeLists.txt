@@ -2072,6 +2072,7 @@ set(CGROUPS_PLUGIN_FILES
         src/collectors/cgroups.plugin/cgroup-snapshot-store.c
         src/collectors/cgroups.plugin/cgroup-snapshot-store.h
         src/collectors/cgroups.plugin/cgroup_ebpfgo_cachestat.c
+        src/collectors/cgroups.plugin/cgroup_ebpfgo_socket.c
         src/collectors/collectors-ipc/ebpfgo_shared_memory.c
         src/collectors/collectors-ipc/ebpfgo_shared_memory.h
         src/collectors/cgroups.plugin/cgroup_ebpfgo_shared_memory.c

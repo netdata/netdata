@@ -49,6 +49,24 @@ typedef struct cgroup_ebpfgo_publish_cachestat {
     cgroup_ebpfgo_cachestat_t current;
     cgroup_ebpfgo_cachestat_t prev;
 } cgroup_ebpfgo_publish_cachestat_t;
+
+typedef struct cgroup_ebpfgo_socket {
+    uint64_t bytes_sent;
+    uint64_t bytes_received;
+    uint64_t call_tcp_sent;
+    uint64_t call_tcp_received;
+    uint64_t retransmit;
+    uint64_t call_udp_sent;
+    uint64_t call_udp_received;
+    uint64_t call_close;
+    uint64_t call_tcp_v4_connection;
+    uint64_t call_tcp_v6_connection;
+} cgroup_ebpfgo_socket_t;
+
+typedef struct cgroup_ebpfgo_publish_socket {
+    cgroup_ebpfgo_socket_t current;
+    cgroup_ebpfgo_socket_t prev;
+} cgroup_ebpfgo_publish_socket_t;
 #endif
 
 // https://www.kernel.org/doc/Documentation/cgroup-v1/memory.txt
@@ -231,6 +249,20 @@ struct cgroup {
     RRDSET *st_cachestat_dirties;
     RRDSET *st_cachestat_hits;
     RRDSET *st_cachestat_misses;
+
+    // eBPF socket snapshot from ebpfgo.plugin SHM.
+    cgroup_ebpfgo_publish_socket_t net;
+
+    RRDSET *st_net_conn_ipv4;
+    RRDSET *st_net_conn_ipv6;
+    RRDSET *st_net_total_bandwidth;
+    RRDDIM *st_net_bw_rd_received;
+    RRDDIM *st_net_bw_rd_sent;
+    RRDSET *st_net_tcp_recv;
+    RRDSET *st_net_tcp_send;
+    RRDSET *st_net_retransmit;
+    RRDSET *st_net_udp_send;
+    RRDSET *st_net_udp_recv;
 #endif
 
     struct cgroup_network_interface *interfaces;
@@ -505,13 +537,24 @@ void update_io_full_pressure_chart(struct cgroup *cg);
 void update_io_full_pressure_stall_time_chart(struct cgroup *cg);
 
 #if defined(OS_LINUX)
+// Shared helper: find the best non-empty cgroup.procs file across mount points.
+procfile *cgroup_ebpfgo_open_nonempty_procs_file(char *path_buf, size_t path_buf_size, const char *cg_id);
+
 bool cgroup_ebpfgo_cachestat_refresh(void);
 void cgroup_ebpfgo_cachestat_update_locked(void);
 void cgroup_ebpfgo_cachestat_update_charts(struct cgroup *cg);
+
+void cgroup_ebpfgo_socket_set_snapshot_ready(bool ready);
+void cgroup_ebpfgo_socket_update_locked(void);
+void cgroup_ebpfgo_socket_update_charts(struct cgroup *cg);
 #else
 static inline bool cgroup_ebpfgo_cachestat_refresh(void) { return false; }
 static inline void cgroup_ebpfgo_cachestat_update_locked(void) {}
 static inline void cgroup_ebpfgo_cachestat_update_charts(struct cgroup *cg) { (void)cg; }
+
+static inline void cgroup_ebpfgo_socket_set_snapshot_ready(bool ready) { (void)ready; }
+static inline void cgroup_ebpfgo_socket_update_locked(void) {}
+static inline void cgroup_ebpfgo_socket_update_charts(struct cgroup *cg) { (void)cg; }
 #endif
 
 #endif // NETDATA_CGROUP_INTERNALS_H

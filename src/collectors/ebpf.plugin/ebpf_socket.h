@@ -101,8 +101,6 @@ typedef enum ebpf_socket_idx {
 
 #define NETDATA_SOCKET_KERNEL_FUNCTIONS "kernel"
 #define NETDATA_SOCKET_CHART_ORDER_BASE 21070
-#define NETDATA_SOCKET_CGROUP_ORDER_BASE 5300
-#define NETDATA_SOCKET_SYSTEMD_ORDER_BASE 20080
 #define TCP_V6_CONNECT_TYPE 'T'
 #define NETDATA_CGROUP_NET_GROUP "network"
 
@@ -137,25 +135,6 @@ typedef enum ebpf_socket_idx {
 
 #define NETDATA_MINIMUM_IPV4_CIDR 0
 #define NETDATA_MAXIMUM_IPV4_CIDR 32
-
-// Contexts
-#define NETDATA_CGROUP_TCP_V4_CONN_CONTEXT "cgroup.net_conn_ipv4"
-#define NETDATA_CGROUP_TCP_V6_CONN_CONTEXT "cgroup.net_conn_ipv6"
-#define NETDATA_CGROUP_SOCKET_TCP_BANDWIDTH_CONTEXT "cgroup.net_total_bandwidth"
-#define NETDATA_CGROUP_SOCKET_TCP_RECV_CONTEXT "cgroup.net_tcp_recv"
-#define NETDATA_CGROUP_SOCKET_TCP_SEND_CONTEXT "cgroup.net_tcp_send"
-#define NETDATA_CGROUP_SOCKET_TCP_RETRANSMIT_CONTEXT "cgroup.net_retransmit"
-#define NETDATA_CGROUP_SOCKET_UDP_RECV_CONTEXT "cgroup.net_udp_recv"
-#define NETDATA_CGROUP_SOCKET_UDP_SEND_CONTEXT "cgroup.net_udp_send"
-
-#define NETDATA_SERVICES_SOCKET_TCP_V4_CONN_CONTEXT "systemd.service.net_conn_ipv4"
-#define NETDATA_SERVICES_SOCKET_TCP_V6_CONN_CONTEXT "systemd.service.net_conn_ipv6"
-#define NETDATA_SERVICES_SOCKET_TCP_BANDWIDTH_CONTEXT "systemd.service.net_total_bandwidth"
-#define NETDATA_SERVICES_SOCKET_TCP_RECV_CONTEXT "systemd.service.net_tcp_recv"
-#define NETDATA_SERVICES_SOCKET_TCP_SEND_CONTEXT "systemd.service.net_tcp_send"
-#define NETDATA_SERVICES_SOCKET_TCP_RETRANSMIT_CONTEXT "systemd.service.net_retransmit"
-#define NETDATA_SERVICES_SOCKET_UDP_RECV_CONTEXT "systemd.service.net_udp_recv"
-#define NETDATA_SERVICES_SOCKET_UDP_SEND_CONTEXT "systemd.service.net_udp_send"
 
 // ARAL name
 #define NETDATA_EBPF_SOCKET_ARAL_NAME "ebpf_socket"
