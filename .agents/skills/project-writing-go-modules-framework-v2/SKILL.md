@@ -50,6 +50,8 @@ source files for evidence.
   embedded `charts.yaml` is RECOMMENDED.
 - `Collect(ctx)` MUST return `error` and write metrics to `metrix`; it MUST NOT
   return a V1 `map[string]int64`.
+- Collector `Cleanup(ctx)` MUST be idempotent. The framework may call it more
+  than once, including after partial `Init` / `Check` setup.
 - Files SHOULD stay boring: public lifecycle methods in `collector.go`, setup
   helpers in `init.go` when needed, orchestration in `collect.go`, distinct
   upstream operations in `collect_<operation>.go`, metrics in `metrix.go` /
@@ -60,6 +62,17 @@ source files for evidence.
 - If Functions exist, isolate them in a `<name>func/` subpackage with a narrow
   `Deps` interface declared there. The Function package MUST NOT import the
   collector package or hold `*Collector`.
+- `collectorapi.Creator.InstancePolicy` defaults to
+  `InstancePolicyPerJob`. Use `InstancePolicySingle` only for collectors that
+  are intentionally one canonical job per agent. Single-instance configs MUST
+  use `name == module` after defaults are applied. DynCfg exposes opted-in
+  single-instance configs as `single` objects with the module-level collector
+  config ID, no collector template, and no `add`/`remove`; updates target that
+  single object.
+- Before opting in a production collector to `InstancePolicySingle`, decide how
+  its initial `single` object appears in DynCfg. The framework exposes a single
+  object only after a config exists; it does not publish a template placeholder,
+  and plain stock enable failures can remove the stock object.
 - Public config options SHOULD stay small and justified. A proposed config
   option MUST name the concrete operator decision it enables; "operators may
   want to tune it" is not enough. Internal tuning SHOULD use constants unless

@@ -38,6 +38,7 @@ type mockCallbacks struct {
 	stopFn             func(cfg testConfig)
 	onStatusChangeFn   func(entry *Entry[testConfig], oldStatus Status, fn Function)
 	configIDFn         func(cfg testConfig) string
+	configTypeFn       func(cfg testConfig) ConfigType
 
 	startCalls  []testConfig
 	updateCalls []updateCall
@@ -73,7 +74,7 @@ func (m *mockCallbacks) ParseAndValidate(fn Function, name string) (testConfig, 
 	return testConfig{uid: "dyncfg:" + name, key: name, sourceType: "dyncfg", source: "test"}, nil
 }
 
-func (m *mockCallbacks) ValidateJobName(name string) error {
+func (m *mockCallbacks) ValidateConfigName(name string) error {
 	return JobNameRuleStrict(name)
 }
 
@@ -114,6 +115,13 @@ func (m *mockCallbacks) ConfigID(cfg testConfig) string {
 	return "test:" + cfg.ExposedKey()
 }
 
+func (m *mockCallbacks) ConfigType(cfg testConfig) ConfigType {
+	if m.configTypeFn != nil {
+		return m.configTypeFn(cfg)
+	}
+	return ConfigTypeJob
+}
+
 func newTestHandler(cb *mockCallbacks) *Handler[testConfig] {
 	return newTestHandlerWithWaitTimeout(cb, 5*time.Second)
 }
@@ -140,7 +148,7 @@ func newTestHandlerWithOutput(cb *mockCallbacks, waitTimeout time.Duration) (*Ha
 		Path:                    "/test/path",
 		EnableFailCode:          200,
 		RemoveStockOnEnableFail: true,
-		JobCommands: []Command{
+		ConfigCommands: []Command{
 			CommandSchema,
 			CommandGet,
 			CommandEnable,
@@ -509,7 +517,7 @@ func TestCmdAdd_NoPayload(t *testing.T) {
 	assert.Equal(t, 0, h.exposed.Count())
 }
 
-func TestCmdAdd_InvalidJobName(t *testing.T) {
+func TestCmdAdd_InvalidConfigName(t *testing.T) {
 	cb := &mockCallbacks{}
 	h := newTestHandler(cb)
 
@@ -521,6 +529,21 @@ func TestCmdAdd_InvalidJobName(t *testing.T) {
 	h.CmdAdd(fn)
 
 	assert.Equal(t, 0, h.exposed.Count())
+}
+
+func TestCmdAdd_NonJobConfigTypeRejected(t *testing.T) {
+	cb := &mockCallbacks{
+		configTypeFn: func(testConfig) ConfigType { return ConfigTypeSingle },
+	}
+	h, out := newTestHandlerWithOutput(cb, 5*time.Second)
+
+	fn := newTestFn("test:job1", "add", "job1", []byte(`{}`))
+	h.CmdAdd(fn)
+
+	assert.Equal(t, 0, h.seen.Count())
+	assert.Equal(t, 0, h.exposed.Count())
+	assert.Contains(t, out.String(), "405")
+	assert.Contains(t, out.String(), "adding configurations of type 'single' is not supported, only 'job' configurations can be added.")
 }
 
 func TestCmdAdd_ParseError(t *testing.T) {
@@ -761,6 +784,27 @@ func TestCmdRemove_NonDyncfg_Rejected(t *testing.T) {
 	// Should still be in cache — removal rejected.
 	_, ok := h.exposed.LookupByKey("job1")
 	assert.True(t, ok, "non-dyncfg config should not be removed")
+	assert.Len(t, cb.stopCalls, 0)
+}
+
+func TestCmdRemove_DyncfgSingleRejected(t *testing.T) {
+	cb := &mockCallbacks{
+		configTypeFn: func(testConfig) ConfigType { return ConfigTypeSingle },
+	}
+	h := newTestHandler(cb)
+
+	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
+	h.seen.Add(cfg)
+	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusRunning})
+
+	fn := newTestFn("test:job1", "remove", "", nil)
+	h.CmdRemove(fn)
+
+	_, ok := h.seen.LookupByUID("dyncfg:job1")
+	assert.True(t, ok, "dyncfg single should not be removed")
+
+	_, ok = h.exposed.LookupByKey("job1")
+	assert.True(t, ok, "dyncfg single should remain exposed")
 	assert.Len(t, cb.stopCalls, 0)
 }
 
@@ -1215,26 +1259,31 @@ func TestCmdRestart_StartFails_CodedError(t *testing.T) {
 
 // --- Notify Tests ---
 
-func TestNotifyJobCreate_SupportedCommands(t *testing.T) {
+func TestNotifyConfigCreate_SupportedCommands(t *testing.T) {
 	tests := []struct {
 		name       string
 		commands   []Command
 		sourceType string
+		configType ConfigType
 		wantRemove bool
 	}{
-		{"dyncfg with restart", []Command{CommandSchema, CommandGet, CommandRestart}, "dyncfg", true},
-		{"dyncfg no restart", []Command{CommandSchema, CommandGet}, "dyncfg", true},
-		{"stock with restart", []Command{CommandSchema, CommandGet, CommandRestart}, "stock", false},
-		{"stock no restart", []Command{CommandSchema, CommandGet}, "stock", false},
+		{"dyncfg job with restart", []Command{CommandSchema, CommandGet, CommandRestart}, "dyncfg", ConfigTypeJob, true},
+		{"dyncfg job no restart", []Command{CommandSchema, CommandGet}, "dyncfg", ConfigTypeJob, true},
+		{"stock job with restart", []Command{CommandSchema, CommandGet, CommandRestart}, "stock", ConfigTypeJob, false},
+		{"stock job no restart", []Command{CommandSchema, CommandGet}, "stock", ConfigTypeJob, false},
+		{"dyncfg single no remove", []Command{CommandSchema, CommandGet, CommandUpdate}, "dyncfg", ConfigTypeSingle, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cb := &mockCallbacks{}
+			cb := &mockCallbacks{
+				configTypeFn: func(testConfig) ConfigType { return tt.configType },
+			}
 			h := newTestHandler(cb)
-			h.jobCommands = tt.commands
+			h.configCommands = tt.commands
 
-			cmds := h.jobSupportedCommands(tt.sourceType == "dyncfg")
+			cfg := testConfig{sourceType: tt.sourceType}
+			cmds := h.configSupportedCommands(cfg, tt.sourceType == "dyncfg")
 
 			// Base commands should always be present.
 			for _, cmd := range tt.commands {

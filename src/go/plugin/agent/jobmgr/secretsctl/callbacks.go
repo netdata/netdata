@@ -132,7 +132,7 @@ func (cb *secretStoreCallbacks) ExtractKey(fn dyncfg.Function) (key, name string
 	return key, name, true
 }
 
-func (cb *secretStoreCallbacks) ValidateJobName(name string) error {
+func (cb *secretStoreCallbacks) ValidateConfigName(name string) error {
 	return dyncfg.JobNameRuleAllowDots(name)
 }
 
@@ -231,4 +231,8 @@ func (cb *secretStoreCallbacks) TakeCommandMessage() string {
 
 func (cb *secretStoreCallbacks) ConfigID(cfg secretstore.Config) string {
 	return cb.deps.dyncfgSecretStoreID(cfg.ExposedKey())
+}
+
+func (cb *secretStoreCallbacks) ConfigType(secretstore.Config) dyncfg.ConfigType {
+	return dyncfg.ConfigTypeJob
 }

@@ -40,16 +40,36 @@ func (cb *collectorCallbacks) ExtractKey(fn dyncfg.Function) (key, name string, 
 		if !ok {
 			return "", "", false
 		}
+		if cb.mgr.isSingleInstanceCollector(mn) {
+			cb.mgr.Warningf("dyncfg: %s: single-instance collector %s does not support add", fn.Command(), mn)
+			return "", "", false
+		}
 		jn = fn.JobName()
 		if jn == "" {
 			return "", "", false
 		}
 	} else {
-		// For other commands: ID contains module:job.
-		mn, jn, ok = cb.mgr.extractModuleJobName(fn.ID())
+		mn, ok = cb.mgr.extractModuleName(fn.ID())
 		if !ok {
 			return "", "", false
 		}
+		if cb.mgr.isSingleInstanceCollector(mn) {
+			if fn.ID() != cb.mgr.dyncfgModID(mn) {
+				cb.mgr.Warningf("dyncfg: %s: single-instance collector %s must use config ID %s", fn.Command(), mn, cb.mgr.dyncfgModID(mn))
+				return "", "", false
+			}
+			jn = mn
+		} else {
+			// For per-job commands: ID contains module:job.
+			mn, jn, ok = cb.mgr.extractModuleJobName(fn.ID())
+			if !ok {
+				return "", "", false
+			}
+		}
+	}
+	if err := cb.mgr.validateDyncfgCollectorIdentity(mn, jn); err != nil {
+		cb.mgr.Warningf("dyncfg: %s: %v", fn.Command(), err)
+		return "", "", false
 	}
 
 	key = mn + "_" + jn
@@ -59,7 +79,7 @@ func (cb *collectorCallbacks) ExtractKey(fn dyncfg.Function) (key, name string, 
 	return key, jn, true
 }
 
-func (cb *collectorCallbacks) ValidateJobName(name string) error {
+func (cb *collectorCallbacks) ValidateConfigName(name string) error {
 	return dyncfg.JobNameRuleStrict(name)
 }
 
@@ -156,7 +176,14 @@ func (cb *collectorCallbacks) OnStatusChange(entry *dyncfg.Entry[confgroup.Confi
 }
 
 func (cb *collectorCallbacks) ConfigID(cfg confgroup.Config) string {
-	return cb.mgr.dyncfgJobID(cfg)
+	return cb.mgr.dyncfgConfigID(cfg)
+}
+
+func (cb *collectorCallbacks) ConfigType(cfg confgroup.Config) dyncfg.ConfigType {
+	if cb.mgr.isSingleInstanceCollector(cfg.Module()) {
+		return dyncfg.ConfigTypeSingle
+	}
+	return dyncfg.ConfigTypeJob
 }
 
 // codedError wraps an error with an HTTP status code for the handler.
