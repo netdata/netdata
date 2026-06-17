@@ -76,7 +76,7 @@ char *cgroup_parse_name_and_labels(RRDLABELS *labels, char *data, bool *ignored)
             if(strncmp(key, CGROUP_RENAME_LABEL, sizeof(CGROUP_RENAME_LABEL) - 1) == 0) {
                 char *n = &key[sizeof(CGROUP_RENAME_LABEL) - 1];
                 size_t len = strlen(n);
-                if(n[0] == '"' && n[len - 1] == '"') {
+                if(len > 0 && n[0] == '"' && n[len - 1] == '"') {
                     n[len - 1] = '\0';
                     n++;
                 }

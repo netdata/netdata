@@ -78,8 +78,6 @@ type resolver struct {
 	name        string
 	labels      string
 	exitCode    int
-	dockerHost  string
-	podmanHost  string
 
 	// expiresAt is the whole-invocation deadline; budgetExpired() reports when
 	// it has passed so an unresolved name triggers the parent's retry ladder.
@@ -101,8 +99,10 @@ func run(args []string, stdout io.Writer) int {
 	ctx, cancel := r.setupDeadline()
 	defer cancel()
 
-	r.dockerHost = defaultEnv("DOCKER_HOST", "unix:///var/run/docker.sock")
-	r.podmanHost = defaultEnv("PODMAN_HOST", "unix:///run/podman/podman.sock")
+	// set the default docker/podman socket env vars when unset; the API paths
+	// read them back via os.Getenv. The return value is intentionally unused.
+	_ = defaultEnv("DOCKER_HOST", "unix:///var/run/docker.sock")
+	_ = defaultEnv("PODMAN_HOST", "unix:///run/podman/podman.sock")
 
 	var cgroupPath string
 	if len(args) > 1 {
@@ -965,7 +965,7 @@ func (r *resolver) k8sGetKubePodName(ctx context.Context, cgroupPath, id string)
 
 	var kubeClusterName, kubeSystemUID, labels, containers string
 	if cntrID != "" && isPrivateRegularFile(tmpCluster) && isPrivateRegularFile(tmpSystemUID) && isPrivateRegularFile(tmpContainers) {
-		if matched, ok := grepFile(tmpContainers, cntrID, 0); ok {
+		if matched, ok := grepFile(tmpContainers, cntrID, 1); ok {
 			labels = matched
 			kubeSystemUID = firstLineFile(tmpSystemUID)
 			kubeClusterName = firstLineFile(tmpCluster)
@@ -1018,7 +1018,7 @@ func (r *resolver) k8sGetKubePodName(ctx context.Context, cgroupPath, id string)
 	if cntrID != "" {
 		if labels == "" {
 			var ok bool
-			labels, ok = grepString(containers, cntrID, 0)
+			labels, ok = grepString(containers, cntrID, 1)
 			if !ok {
 				return "", 2
 			}

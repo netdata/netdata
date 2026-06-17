@@ -6,8 +6,10 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -476,6 +478,128 @@ func TestMirroredK8sPodListFixtureViaKubelet(t *testing.T) {
 		if !strings.Contains(string(cache), want) {
 			t.Fatalf("cache missing %q:\n%s", want, string(cache))
 		}
+	}
+	for _, name := range []string{
+		"netdata-cgroups-k8s-cluster-name",
+		"netdata-cgroups-kubesystem-uid",
+		"netdata-cgroups-containers",
+	} {
+		st, err := os.Stat(filepath.Join(tmp, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := st.Mode().Perm(); got != 0o600 {
+			t.Fatalf("%s permissions = %o, want 600", name, got)
+		}
+	}
+}
+
+func TestMirroredK8sPodListFixtureViaAPIServer(t *testing.T) {
+	// Same sanitized pod-list payload as the kubelet test, but driven through the
+	// in-cluster API-server path: the helper fetches the kube-system namespace
+	// object (its metadata.uid becomes the cluster id) and then /api/v1/pods.
+	// The API-server and kubelet paths must resolve to identical names/labels.
+	tmp := t.TempDir()
+	t.Setenv("PATH", tmp)
+	if err := os.WriteFile(filepath.Join(tmp, "jq"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", tmp)
+	t.Setenv("TMPDIR", tmp)
+	t.Setenv("NETDATA_LOG_LEVEL", "emerg")
+	t.Setenv("NETDATA_HOST_PREFIX", tmp)
+	// Insecure mode: the API server is verified against the mounted CA otherwise,
+	// which a test cannot provide; this exercises the same request/parse flow
+	// against the self-signed httptest certificate.
+	t.Setenv("K8S_TLS_INSECURE", "true")
+	// Make sure the kubelet branch is not taken.
+	t.Setenv("USE_KUBELET_FOR_PODS_METADATA", "")
+	t.Setenv("MY_NODE_NAME", "")
+
+	// Pre-seed the cluster-name cache so the resolver does not probe GCP
+	// metadata; the kube-system UID is intentionally left unseeded so the
+	// namespace fetch + metadata.uid parse path is exercised.
+	if err := os.WriteFile(filepath.Join(tmp, "netdata-cgroups-k8s-cluster-name"), []byte("fixture-cluster\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	containerdID := strings.Repeat("1", 64)
+	dockerID := strings.Repeat("2", 64)
+	crioID := strings.Repeat("3", 64)
+	kubeSystemNS := `{"metadata":{"name":"kube-system","uid":"fixture-system-uid"}}`
+	pods := `{"items":[` +
+		`{"metadata":{"namespace":"default","name":"api-123","uid":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee","annotations":{"checksum/config":"ignored","netdata.cloud/service":"payments"},"ownerReferences":[{"controller":true,"kind":"ReplicaSet","name":"api-123"}]},"spec":{"nodeName":"node-a"},"status":{"containerStatuses":[{"name":"app","containerID":"containerd://` + containerdID + `"},{"name":"sidecar","containerID":"docker://` + dockerID + `"}]}},` +
+		`{"metadata":{"namespace":"openshift-monitoring","name":"collector-0","uid":"bbbbbbbb-cccc-dddd-eeee-ffffffffffff","ownerReferences":[{"controller":true,"kind":"DaemonSet","name":"collector"}]},"spec":{"nodeName":"node-b"},"status":{"containerStatuses":[{"name":"collector","containerID":"cri-o://` + crioID + `"}]}}` +
+		`]}`
+
+	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/namespaces/kube-system":
+			_, _ = w.Write([]byte(kubeSystemNS))
+		case "/api/v1/pods":
+			_, _ = w.Write([]byte(pods))
+		default:
+			t.Errorf("unexpected API-server path %s", r.URL.Path)
+			http.Error(w, "unexpected path", http.StatusNotFound)
+		}
+	}))
+	defer ts.Close()
+
+	u, err := url.Parse(ts.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	host, port, err := net.SplitHostPort(u.Host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("KUBERNETES_SERVICE_HOST", host)
+	t.Setenv("KUBERNETES_PORT_443_TCP_PORT", port)
+
+	cgroup := "kubepods.slice/kubepods-burstable.slice/kubepods-burstable-podaaaaaaaa_bbbb_cccc_dddd_eeeeeeeeeeee.slice/cri-containerd-" + containerdID + ".scope"
+	var out bytes.Buffer
+	code := run([]string{"cgroup-name", cgroup, cgroup}, &out)
+	if code != exitSuccess {
+		t.Fatalf("exit code: want %d got %d", exitSuccess, code)
+	}
+	got := strings.TrimSpace(out.String())
+	for _, want := range []string{
+		`k8s_cntr_default_api-123_app `,
+		`k8s_namespace="default"`,
+		`k8s_pod_name="api-123"`,
+		`k8s_netdata.cloud/service="payments"`,
+		`k8s_controller_kind="ReplicaSet"`,
+		`k8s_controller_name="api-123"`,
+		`k8s_node_name="node-a"`,
+		`k8s_container_name="app"`,
+		`k8s_kind="container"`,
+		`k8s_qos_class="burstable"`,
+		`k8s_cluster_id="fixture-system-uid"`,
+		`k8s_cluster_name="fixture-cluster"`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("output missing %q:\n%s", want, got)
+		}
+	}
+
+	cache, err := os.ReadFile(filepath.Join(tmp, "netdata-cgroups-containers"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		`container_id="` + containerdID + `"`,
+		`container_id="` + dockerID + `"`,
+		`container_id="` + crioID + `"`,
+	} {
+		if !strings.Contains(string(cache), want) {
+			t.Fatalf("cache missing %q:\n%s", want, string(cache))
+		}
+	}
+	// The kube-system UID parsed from the namespace object must be cached.
+	if uid, err := os.ReadFile(filepath.Join(tmp, "netdata-cgroups-kubesystem-uid")); err != nil {
+		t.Fatal(err)
+	} else if strings.TrimSpace(string(uid)) != "fixture-system-uid" {
+		t.Fatalf("cached kube-system uid = %q, want fixture-system-uid", strings.TrimSpace(string(uid)))
 	}
 	for _, name := range []string{
 		"netdata-cgroups-k8s-cluster-name",
