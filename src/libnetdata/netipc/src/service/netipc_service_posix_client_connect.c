@@ -20,8 +20,8 @@ static bool client_prepare_session_buffers(nipc_client_ctx_t *ctx)
     if (!nipc_service_common_header_payload_len(
             ctx->session.max_response_payload_bytes, &response_need))
         return false;
-    if (response_need < NIPC_HEADER_LEN + 1024u)
-        response_need = NIPC_HEADER_LEN + 1024u;
+    if (response_need < NIPC_HEADER_LEN + NIPC_SERVICE_MIN_PAYLOAD_BUFFER_BYTES)
+        response_need = NIPC_HEADER_LEN + NIPC_SERVICE_MIN_PAYLOAD_BUFFER_BYTES;
 
     if (!nipc_service_posix_ensure_buffer(&ctx->response_buf, &ctx->response_buf_size, response_need,
                        NIPC_POSIX_SERVICE_TEST_FAULT_CLIENT_RESPONSE_BUF_REALLOC_INTERNAL))

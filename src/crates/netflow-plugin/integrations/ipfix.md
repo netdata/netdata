@@ -53,11 +53,11 @@ The plugin starts when enabled in netflow.yaml and listens on the configured UDP
 
 #### Limits
 
-Operational limits are driven by sustained flows/s, template churn, cardinality, retention, storage speed, and enrichment. Plan around 30k-100k sustained flows/s per well-provisioned agent for the full raw + rollup pipeline, depending on flow cardinality and disk I/O; use distributed agents for larger deployments.
+Operational limits are driven by sustained flow records/s, exporter batching, template churn, cardinality, retention, storage speed, and enrichment. On modern hardware with fast storage, plan around 50k-100k sustained flow records/s per well-provisioned agent for the full raw + rollup pipeline, provided the underlying disks can sustain the required journal write activity; use distributed agents for larger deployments.
 
 #### Performance Impact
 
-Disabled until exporters send traffic. Once active, CPU and disk I/O scale with flow rate, template volume, and cardinality; size retention and storage from observed flows/s.
+Disabled until exporters send traffic. Once active, CPU and disk I/O scale with flow-record rate, template volume, and cardinality; size retention and storage from observed flow records/s.
 
 ## Setup
 

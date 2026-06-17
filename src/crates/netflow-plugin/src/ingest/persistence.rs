@@ -90,32 +90,42 @@ impl IngestService {
         &mut self,
         source: std::net::SocketAddr,
         payload: &[u8],
-    ) {
-        let parser_source = normalize_template_scope_source(source);
-        let Some(key) = FlowDecoders::decoder_state_namespace_key(source, payload) else {
-            return;
+    ) -> Option<DecoderPacketContext> {
+        let Some(context) = FlowDecoders::decoder_packet_context(source, payload) else {
+            return None;
         };
 
-        if !self.decoders.is_decoder_state_namespace_loaded(&key) {
+        if !self
+            .decoders
+            .is_decoder_state_namespace_loaded(&context.key)
+        {
             self.decoders
-                .mark_decoder_state_namespace_absent(key, parser_source);
-            return;
+                .mark_decoder_state_namespace_absent_for_normalized_source(
+                    context.key.clone(),
+                    context.parser_source,
+                );
+            return Some(context);
         }
 
         if self
             .decoders
-            .decoder_state_source_needs_hydration(&key, parser_source)
+            .decoder_state_normalized_source_needs_hydration(&context.key, context.parser_source)
             && let Err(err) = self
                 .decoders
-                .hydrate_loaded_decoder_state_namespace(&key, parser_source)
+                .hydrate_loaded_decoder_state_namespace_for_normalized_source(
+                    &context.key,
+                    context.parser_source,
+                )
         {
             tracing::warn!(
                 "failed to hydrate netflow decoder state namespace {} for {}: {}",
-                self.decoder_state_namespace_path(&key).display(),
+                self.decoder_state_namespace_path(&context.key).display(),
                 source,
                 err
             );
         }
+
+        Some(context)
     }
 
     pub(super) fn preload_decoder_state_namespaces(

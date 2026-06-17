@@ -527,7 +527,7 @@ func TestUnixShmBatchHandlerFailureNeedsRefresh(t *testing.T) {
 	}
 }
 
-func TestUnixShmBatchResponseOverflowRetriesAndRecovers(t *testing.T) {
+func TestUnixShmBatchResponseOverflowRespectsConfiguredCeiling(t *testing.T) {
 	svc := uniqueUnixService("go_unix_shm_batch_overflow")
 
 	scfg := testUnixShmServerConfig()
@@ -554,24 +554,16 @@ func TestUnixShmBatchResponseOverflowRetriesAndRecovers(t *testing.T) {
 	refreshUnixClientReady(t, client)
 
 	gotBatch, err := client.CallIncrementBatch([]uint64{1, 2})
-	if err != nil {
-		t.Fatalf("CallIncrementBatch after SHM overflow failed: %v", err)
+	if !errors.Is(err, protocol.ErrOverflow) {
+		t.Fatalf("CallIncrementBatch with capped SHM response = %v, want ErrOverflow", err)
 	}
-	if len(gotBatch) != 2 || gotBatch[0] != 2 || gotBatch[1] != 3 {
-		t.Fatalf("CallIncrementBatch after SHM overflow = %v, want [2 3]", gotBatch)
+	if gotBatch != nil {
+		t.Fatalf("CallIncrementBatch with capped SHM response returned %v, want nil", gotBatch)
 	}
-	if client.state != StateReady {
-		t.Fatalf("client state after batch overflow recovery = %d, want READY", client.state)
+	if client.state != StateBroken {
+		t.Fatalf("client state after capped batch overflow = %d, want BROKEN", client.state)
 	}
 	if client.reconnectCount < 1 {
-		t.Fatalf("expected reconnect_count >= 1 after SHM batch overflow, got %d", client.reconnectCount)
-	}
-
-	got, err := client.CallIncrement(8)
-	if err != nil {
-		t.Fatalf("CallIncrement after SHM overflow recovery failed: %v", err)
-	}
-	if got != 9 {
-		t.Fatalf("CallIncrement after SHM overflow recovery = %d, want 9", got)
+		t.Fatalf("expected reconnect_count >= 1 after capped SHM batch overflow, got %d", client.reconnectCount)
 	}
 }

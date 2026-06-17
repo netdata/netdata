@@ -14,7 +14,8 @@ The netflow plugin publishes its own operational charts under the `netdata.netfl
 
 This is also where you look first when something seems wrong — long before opening the Network Flows view.
 
-All charts update every 1 second.
+Default production-health charts update every 1 second. Optional memory
+diagnostics charts update on `charts.memory_diagnostics.interval` when enabled.
 
 ## The charts
 
@@ -30,11 +31,14 @@ All charts update every 1 second.
 | `netflow.journal_io_ops` | line, ops/s | Decoder-state persist operations and errors |
 | `netflow.journal_io_bytes` | line, bytes/s | Decoder-state persist byte rate |
 | `netflow.decoder_scopes` | line, scopes | Distinct (exporter, observation domain) scopes the decoder tracks |
-| `netflow.memory_resident_bytes` | line, bytes | Process RSS, peak RSS, breakdown |
-| `netflow.memory_resident_mapping_bytes` | stacked, bytes | RSS broken down by what's in it |
-| `netflow.memory_allocator_bytes` | line, bytes | Allocator-internal stats |
-| `netflow.memory_accounted_bytes` | stacked, bytes | RSS attributed to known components, plus `unaccounted` |
-| `netflow.memory_tier_index_bytes` | stacked, bytes | Tier-index memory drilldown |
+| `netflow.facet_values` | line, values | Published facet value cardinality |
+| `netflow.facet_fields` | line, fields | Populated and autocomplete-backed facet fields |
+| `netflow.tier_index_entries` | line, entries | Tier-index hours and rollup-flow entries |
+| `netflow.memory_resident_bytes` | line, bytes | Optional diagnostics: process RSS, peak RSS, breakdown |
+| `netflow.memory_resident_mapping_bytes` | stacked, bytes | Optional diagnostics: RSS broken down by mapping type |
+| `netflow.memory_allocator_bytes` | line, bytes | Optional diagnostics: allocator-internal stats |
+| `netflow.memory_accounted_bytes` | stacked, bytes | Optional diagnostics: RSS attributed to known components, plus `unaccounted` |
+| `netflow.memory_tier_index_bytes` | stacked, bytes | Optional diagnostics: tier-index memory drilldown |
 
 ## Reading the most useful charts
 
@@ -52,11 +56,17 @@ The single most important chart. Five families of dimensions:
 
 Cardinality of decoder state. Reports how many distinct `(exporter, observation domain)` template caches the plugin currently holds. Watch for unbounded growth — an exporter that frequently rotates template IDs (rare but real) will inflate this without bound.
 
+### `netflow.facet_*`, `netflow.tier_index_entries`, and `netflow.open_tiers`
+
+Default lightweight production signals. Use them to see whether memory pressure is likely coming from growing facet vocabulary, rollup-index cardinality, or open rollup rows without enabling expensive byte-level diagnostics.
+
 ### `netflow.materialized_tier_*`
 
 Show the rollup pipeline working. `*_rows` should track ingest. `flushes` should tick steadily; if it stops, tiering is stalled.
 
 ### `netflow.memory_resident_bytes` and `netflow.memory_accounted_bytes`
+
+These charts exist only when `charts.memory_diagnostics.enabled: true` is set in `netflow.yaml`.
 
 If RSS climbs over time:
 
@@ -88,7 +98,7 @@ These charts do not include:
 | Sudden drop in flows | per-protocol dimensions | Identifies which protocol stopped (helps narrow whether it's a router, a router class, or all routers). |
 | Templates failing | `template_errors` rising | Exporter not sending templates often enough; collector lost cache; cache mismatch after firmware update. |
 | Cache growing without bound | `decoder_scopes` rising over hours | Exporter churn or unstable template IDs. Investigate per-router behaviour. |
-| Memory pressure | `netflow.memory_resident_bytes`, `netflow.memory_accounted_bytes` | If `rss` climbs and `unaccounted` is the dimension growing → unattributed allocation, possibly a leak. If `tier_indexes` or `open_tiers` climbs → ingest backpressure, flushing stalled. |
+| Memory pressure | `netflow.facet_values`, `netflow.tier_index_entries`, `netflow.open_tiers`; optional `netflow.memory_*` diagnostics | Default count charts show where state cardinality grows. If byte diagnostics are enabled and `unaccounted` grows → unattributed allocation, possibly a leak. |
 | Disk write stalls | `netflow.raw_journal_ops` `write_errors`, `sync_errors` | Disk full, permission denied, fs error. |
 | Decoder state not persisting | `netflow.journal_io_ops` | `decoder_state_persist_calls` should tick periodically. `*_errors` should be 0. |
 

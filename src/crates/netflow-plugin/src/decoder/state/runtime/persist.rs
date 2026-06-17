@@ -1,12 +1,21 @@
 use super::*;
 
 impl FlowDecoders {
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn hydrate_loaded_decoder_state_namespace(
         &mut self,
         key: &DecoderStateNamespaceKey,
         source: SocketAddr,
     ) -> Result<(), String> {
         let source = normalize_template_scope_source(source);
+        self.hydrate_loaded_decoder_state_namespace_for_normalized_source(key, source)
+    }
+
+    pub(crate) fn hydrate_loaded_decoder_state_namespace_for_normalized_source(
+        &mut self,
+        key: &DecoderStateNamespaceKey,
+        source: SocketAddr,
+    ) -> Result<(), String> {
         let Some(namespace) = self.decoder_state_namespaces.get(key).cloned() else {
             self.hydrated_namespace_sources
                 .entry(key.clone())

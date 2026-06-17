@@ -99,6 +99,15 @@ void cgroup_snapshot_entry_add_label(CGROUP_SNAPSHOT_ENTRY *entry, const char *k
     entry->label_count++;
 }
 
+void cgroup_snapshot_entry_set_dir_identity(CGROUP_SNAPSHOT_ENTRY *entry, const struct stat *st) {
+    if (!entry || !st)
+        return;
+
+    entry->dir_identity_available = true;
+    entry->dir_dev = st->st_dev;
+    entry->dir_ino = st->st_ino;
+}
+
 CGROUP_SNAPSHOT_STORE *cgroup_snapshot_builder_finalize(CGROUP_SNAPSHOT_BUILDER *builder) {
     if (!builder)
         return NULL;
@@ -160,6 +169,68 @@ const CGROUP_SNAPSHOT_ENTRY *cgroup_snapshot_store_find(
     if (!store || !path)
         return NULL;
     return dictionary_get_advanced(store->by_path, path, (ssize_t)path_len);
+}
+
+const CGROUP_SNAPSHOT_ENTRY *cgroup_snapshot_store_find_unique_identity(
+    const CGROUP_SNAPSHOT_STORE *store, dev_t dev, ino_t ino) {
+    if (!store)
+        return NULL;
+
+    const CGROUP_SNAPSHOT_ENTRY *match = NULL;
+    for (size_t i = 0; i < store->count; i++) {
+        const CGROUP_SNAPSHOT_ENTRY *entry = &store->entries[i];
+        if (!entry->dir_identity_available || entry->dir_dev != dev || entry->dir_ino != ino)
+            continue;
+
+        if (match)
+            return NULL;
+
+        match = entry;
+    }
+
+    return match;
+}
+
+static bool cgroup_snapshot_entry_has_suffix(const CGROUP_SNAPSHOT_ENTRY *entry, const char *suffix, size_t suffix_len) {
+    if (!entry || !entry->id || !suffix || !suffix_len)
+        return false;
+
+    const char *id = string2str(entry->id);
+    size_t id_len = string_strlen(entry->id);
+    if (id_len < suffix_len)
+        return false;
+
+    const char *tail = id + id_len - suffix_len;
+    if (memcmp(tail, suffix, suffix_len) != 0)
+        return false;
+
+    return id_len == suffix_len || tail == id || tail[-1] == '/';
+}
+
+const CGROUP_SNAPSHOT_ENTRY *cgroup_snapshot_store_find_unique_suffix(
+    const CGROUP_SNAPSHOT_STORE *store, const char *suffix, size_t suffix_len, bool *duplicate) {
+    if (duplicate)
+        *duplicate = false;
+
+    if (!store || !suffix || !suffix_len)
+        return NULL;
+
+    const CGROUP_SNAPSHOT_ENTRY *match = NULL;
+    for (size_t i = 0; i < store->count; i++) {
+        const CGROUP_SNAPSHOT_ENTRY *entry = &store->entries[i];
+        if (!cgroup_snapshot_entry_has_suffix(entry, suffix, suffix_len))
+            continue;
+
+        if (match) {
+            if (duplicate)
+                *duplicate = true;
+            return NULL;
+        }
+
+        match = entry;
+    }
+
+    return match;
 }
 
 // ---------------------------------------------------------------------------

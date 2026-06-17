@@ -1,4 +1,5 @@
 use super::common::next_power_of_2_u32;
+use crate::protocol::NipcError;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
@@ -11,6 +12,14 @@ pub enum DispatchError {
 
 pub type DispatchHandler =
     Arc<dyn Fn(&[u8], &mut [u8]) -> Result<usize, DispatchError> + Send + Sync>;
+
+pub(super) fn dispatch_error_from_protocol(err: NipcError) -> DispatchError {
+    match err {
+        NipcError::Overflow => DispatchError::Overflow,
+        NipcError::HandlerFailed => DispatchError::HandlerFailed,
+        _ => DispatchError::BadEnvelope,
+    }
+}
 
 pub(super) fn dispatch_single_internal(
     expected_method_code: u16,
@@ -59,8 +68,8 @@ pub(super) fn method_supported_internal(
     handler.is_some() && method_code == expected_method_code
 }
 
-pub(super) fn server_note_payload_capacity(target: &AtomicU32, payload_len: u32) {
-    let grown = next_power_of_2_u32(payload_len);
+pub(super) fn server_note_payload_capacity(target: &AtomicU32, payload_len: u32, ceiling: u32) {
+    let grown = next_power_of_2_u32(payload_len).min(ceiling);
     let mut current = target.load(Ordering::Relaxed);
     while grown > current {
         match target.compare_exchange_weak(current, grown, Ordering::Release, Ordering::Relaxed) {

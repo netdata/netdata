@@ -1,17 +1,20 @@
 use super::*;
 use crate::protocol::{
-    increment_encode, AppsLookupBuilder, BatchBuilder, CgroupsBuilder, CgroupsLookupBuilder,
-    CgroupsRequest, Header, HelloAck, NipcError, APPS_CGROUP_HOST_ROOT, APPS_CGROUP_KNOWN,
-    CGROUP_LOOKUP_KNOWN, CGROUP_LOOKUP_UNKNOWN_RETRY_LATER, CODE_HELLO_ACK, FLAG_BATCH,
-    HEADER_SIZE, INCREMENT_PAYLOAD_SIZE, KIND_CONTROL, KIND_REQUEST, KIND_RESPONSE,
+    increment_encode, AppsLookupBuilder, AppsLookupRequestView, AppsLookupResponseView,
+    BatchBuilder, CgroupsBuilder, CgroupsLookupBuilder, CgroupsLookupRequestView,
+    CgroupsLookupResponseView, CgroupsRequest, Header, HelloAck, NipcError, APPS_CGROUP_HOST_ROOT,
+    APPS_CGROUP_KNOWN, APPS_LOOKUP_RESP_HDR_SIZE, CGROUPS_LOOKUP_RESP_HDR_SIZE,
+    CGROUP_LOOKUP_KNOWN, CGROUP_LOOKUP_OVERSIZED_ITEM, CGROUP_LOOKUP_PAYLOAD_EXCEEDED,
+    CGROUP_LOOKUP_UNKNOWN_RETRY_LATER, CODE_HELLO_ACK, FLAG_BATCH, HEADER_SIZE,
+    INCREMENT_PAYLOAD_SIZE, KIND_CONTROL, KIND_REQUEST, KIND_RESPONSE, MAX_PAYLOAD_CAP,
     METHOD_APPS_LOOKUP, METHOD_CGROUPS_LOOKUP, METHOD_CGROUPS_SNAPSHOT, METHOD_INCREMENT,
     METHOD_STRING_REVERSE, NIPC_UID_UNSET, ORCHESTRATOR_DOCKER, ORCHESTRATOR_K8S, PID_LOOKUP_KNOWN,
-    PID_LOOKUP_UNKNOWN, PROFILE_BASELINE, PROFILE_SHM_HYBRID, STATUS_INTERNAL_ERROR, STATUS_OK,
-    VERSION,
+    PID_LOOKUP_OVERSIZED_ITEM, PID_LOOKUP_PAYLOAD_EXCEEDED, PID_LOOKUP_UNKNOWN, PROFILE_BASELINE,
+    PROFILE_SHM_HYBRID, STATUS_INTERNAL_ERROR, STATUS_LIMIT_EXCEEDED, STATUS_OK, VERSION,
 };
 use crate::transport::windows::build_pipe_name;
 use std::ptr;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::thread;
@@ -20,6 +23,15 @@ use std::time::{Duration, Instant};
 const TEST_RUN_DIR: &str = r"C:\Temp\nipc_svc_rust_test";
 const AUTH_TOKEN: u64 = 0xDEADBEEFCAFEBABE;
 const RESPONSE_BUF_SIZE: usize = 65536;
+const LOOKUP_TOPOLOGY_SCALE_ITEMS: usize = 8192;
+const LOOKUP_HPC_SCALE_ITEMS: usize = 32768;
+const LOOKUP_SCALE_REQUEST_PAYLOAD_BYTES: u32 = 8192;
+const LOOKUP_SCALE_CALL_TIMEOUT_MS: u32 = 120_000;
+const LOOKUP_RESPONSE_SPLIT_SCALE_ITEMS: usize = 512;
+const LOOKUP_RESPONSE_SPLIT_REQUEST_PAYLOAD_BYTES: u32 = 65_536;
+const LOOKUP_RESPONSE_SPLIT_PAYLOAD_BYTES: u32 = 98_304;
+const LOOKUP_RESPONSE_SPLIT_MIN_CALLS: u32 = 2;
+const LOOKUP_RESPONSE_SPLIT_LABEL_BYTES: usize = 512;
 static WIN_SERVICE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 fn ensure_run_dir() {
@@ -692,6 +704,53 @@ impl RawSessionServer {
     }
 }
 
+fn start_raw_overflow_no_growth_server(service: &str, cfg: ServerConfig) -> RawSessionServer {
+    ensure_run_dir();
+    cleanup_all(service);
+
+    let svc = service.to_string();
+    let thread = thread::spawn(move || {
+        let mut listener =
+            NpListener::bind(TEST_RUN_DIR, &svc, cfg).map_err(|e| format!("bind: {e}"))?;
+
+        let mut first = listener
+            .accept()
+            .map_err(|e| format!("first accept: {e}"))?;
+        let req_hdr = {
+            let mut recv_buf = vec![0u8; RESPONSE_BUF_SIZE];
+            let (hdr, _) = first
+                .receive(&mut recv_buf)
+                .map_err(|e| format!("first receive: {e}"))?;
+            hdr
+        };
+
+        let mut resp_hdr = Header {
+            kind: KIND_RESPONSE,
+            code: req_hdr.code,
+            flags: 0,
+            item_count: 1,
+            message_id: req_hdr.message_id,
+            transport_status: STATUS_LIMIT_EXCEEDED,
+            ..Header::default()
+        };
+        first
+            .send(&mut resp_hdr, &[])
+            .map_err(|e| format!("first send: {e}"))?;
+        drop(first);
+
+        let second = listener
+            .accept()
+            .map_err(|e| format!("second accept: {e}"))?;
+        drop(second);
+        Ok(())
+    });
+
+    thread::sleep(Duration::from_millis(200));
+    RawSessionServer {
+        thread: Some(thread),
+    }
+}
+
 #[test]
 fn test_client_lifecycle_windows() {
     let svc = "rs_win_svc_lifecycle";
@@ -839,6 +898,2036 @@ fn test_apps_lookup_call_windows_baseline() {
 
     client.close();
     server.stop();
+}
+
+#[test]
+fn test_lookup_zero_item_calls_windows() {
+    let apps_svc = unique_service("rs_win_apps_lookup_zero");
+    let mut apps_server = TestServer::start(
+        &apps_svc,
+        METHOD_APPS_LOOKUP,
+        apps_lookup_dispatch_handler(),
+    );
+    let mut apps_client = apps_lookup_client(&apps_svc, client_config());
+    connect_ready(&mut apps_client);
+
+    let apps_view = apps_client
+        .call_apps_lookup(&[])
+        .expect("zero-item apps lookup");
+    assert_eq!(apps_view.item_count, 0);
+    assert_eq!(apps_view.generation, 77);
+    assert_eq!(apps_client.status().call_count, 1);
+    apps_client.close();
+    apps_server.stop();
+
+    let cgroups_svc = unique_service("rs_win_cgroups_lookup_zero");
+    let mut cgroups_server = TestServer::start(
+        &cgroups_svc,
+        METHOD_CGROUPS_LOOKUP,
+        cgroups_lookup_dispatch_handler(),
+    );
+    let mut cgroups_client = cgroups_lookup_client(&cgroups_svc, client_config());
+    connect_ready(&mut cgroups_client);
+
+    let cgroups_view = cgroups_client
+        .call_cgroups_lookup(&[])
+        .expect("zero-item cgroups lookup");
+    assert_eq!(cgroups_view.item_count, 0);
+    assert_eq!(cgroups_view.generation, 55);
+    assert_eq!(cgroups_client.status().call_count, 1);
+    cgroups_client.close();
+    cgroups_server.stop();
+}
+
+#[test]
+fn test_cgroups_lookup_transparent_payload_exceeded_retry_windows() {
+    let svc = unique_service("rs_win_cgroups_lookup_scale");
+    let mut cfg = server_config();
+    cfg.max_response_payload_bytes = 256;
+    let calls = Arc::new(AtomicU32::new(0));
+    let handler_calls = calls.clone();
+    let handler = cgroups_lookup_dispatch(Arc::new(move |req, builder| {
+        handler_calls.fetch_add(1, Ordering::SeqCst);
+        builder.set_generation(7);
+        for i in 0..req.item_count {
+            let item = match req.item(i) {
+                Ok(item) => item,
+                Err(_) => return false,
+            };
+            let name;
+            let name_ref: &[u8] = if item.as_bytes() == b"/huge" {
+                name = vec![b'x'; 512];
+                &name
+            } else {
+                b"ok"
+            };
+            let label_value;
+            let labels;
+            let labels_ref: &[(&[u8], &[u8])] = if item.as_bytes() == b"/huge-label" {
+                label_value = vec![b'l'; 512];
+                labels = [(b"huge".as_slice(), label_value.as_slice())];
+                &labels
+            } else {
+                &[]
+            };
+            if builder
+                .add(
+                    CGROUP_LOOKUP_KNOWN,
+                    ORCHESTRATOR_K8S,
+                    item.as_bytes(),
+                    name_ref,
+                    labels_ref,
+                )
+                .is_err()
+            {
+                return false;
+            }
+        }
+        true
+    }));
+
+    let mut server = TestServer::start_with(
+        &svc,
+        cfg,
+        client_config(),
+        METHOD_CGROUPS_LOOKUP,
+        handler,
+        8,
+    );
+    let mut client = cgroups_lookup_client(&svc, client_config());
+    connect_ready(&mut client);
+
+    let view = client
+        .call_cgroups_lookup(&[
+            b"/a".as_slice(),
+            b"/huge".as_slice(),
+            b"/huge-label".as_slice(),
+            b"/b".as_slice(),
+        ])
+        .expect("cgroups lookup scale call");
+    assert!(
+        calls.load(Ordering::SeqCst) >= 2,
+        "handler should be called for at least two subrequests"
+    );
+    assert_eq!(view.item_count, 4);
+    assert_eq!(view.generation, 7);
+    let item0 = view.item(0).expect("item 0");
+    assert_eq!(item0.status, CGROUP_LOOKUP_KNOWN);
+    assert_eq!(item0.path.as_bytes(), b"/a");
+    let item1 = view.item(1).expect("item 1");
+    assert_eq!(item1.status, CGROUP_LOOKUP_OVERSIZED_ITEM);
+    assert_eq!(item1.path.as_bytes(), b"/huge");
+    let item2 = view.item(2).expect("item 2");
+    assert_eq!(item2.status, CGROUP_LOOKUP_OVERSIZED_ITEM);
+    assert_eq!(item2.path.as_bytes(), b"/huge-label");
+    let item3 = view.item(3).expect("item 3");
+    assert_eq!(item3.status, CGROUP_LOOKUP_KNOWN);
+    assert_eq!(item3.path.as_bytes(), b"/b");
+    assert_eq!(item3.name.as_bytes(), b"ok");
+
+    client.close();
+    server.stop();
+}
+
+#[test]
+fn test_apps_lookup_transparent_payload_exceeded_retry_windows() {
+    let svc = unique_service("rs_win_apps_lookup_scale");
+    let mut cfg = server_config();
+    cfg.max_response_payload_bytes = 320;
+    let calls = Arc::new(AtomicU32::new(0));
+    let handler_calls = calls.clone();
+    let handler = apps_lookup_dispatch(Arc::new(move |req, builder| {
+        handler_calls.fetch_add(1, Ordering::SeqCst);
+        builder.set_generation(9);
+        for i in 0..req.item_count {
+            let pid = match req.item(i) {
+                Ok(pid) => pid,
+                Err(_) => return false,
+            };
+            let cgroup_path;
+            let cgroup_path_ref: &[u8] = if pid == 22 {
+                cgroup_path = [b"/".as_slice(), &vec![b'x'; 1024]].concat();
+                &cgroup_path
+            } else {
+                b"/ok"
+            };
+            let label_value;
+            let labels;
+            let labels_ref: &[(&[u8], &[u8])] = if pid == 44 {
+                label_value = vec![b'l'; 512];
+                labels = [(b"huge".as_slice(), label_value.as_slice())];
+                &labels
+            } else {
+                &[]
+            };
+            if builder
+                .add(
+                    PID_LOOKUP_KNOWN,
+                    APPS_CGROUP_KNOWN,
+                    0,
+                    pid,
+                    0,
+                    0,
+                    1,
+                    b"ok",
+                    cgroup_path_ref,
+                    b"name",
+                    labels_ref,
+                )
+                .is_err()
+            {
+                return false;
+            }
+        }
+        true
+    }));
+
+    let mut server =
+        TestServer::start_with(&svc, cfg, client_config(), METHOD_APPS_LOOKUP, handler, 8);
+    let mut client = apps_lookup_client(&svc, client_config());
+    connect_ready(&mut client);
+
+    let view = client
+        .call_apps_lookup(&[11, 22, 44, 33])
+        .expect("apps lookup scale call");
+    assert!(
+        calls.load(Ordering::SeqCst) >= 2,
+        "handler should be called for at least two subrequests"
+    );
+    assert_eq!(view.item_count, 4);
+    assert_eq!(view.generation, 9);
+    let item0 = view.item(0).expect("item 0");
+    assert_eq!(item0.status, PID_LOOKUP_KNOWN);
+    assert_eq!(item0.pid, 11);
+    assert_eq!(item0.comm.as_bytes(), b"ok");
+    let item1 = view.item(1).expect("item 1");
+    assert_eq!(item1.status, PID_LOOKUP_OVERSIZED_ITEM);
+    assert_eq!(item1.pid, 22);
+    let item2 = view.item(2).expect("item 2");
+    assert_eq!(item2.status, PID_LOOKUP_OVERSIZED_ITEM);
+    assert_eq!(item2.pid, 44);
+    let item3 = view.item(3).expect("item 3");
+    assert_eq!(item3.status, PID_LOOKUP_KNOWN);
+    assert_eq!(item3.pid, 33);
+    assert_eq!(item3.comm.as_bytes(), b"ok");
+
+    client.close();
+    server.stop();
+}
+
+fn run_apps_lookup_request_boundary_case_windows(
+    request_cap: u32,
+    expected_max_items: u32,
+    min_calls: u32,
+    label: &str,
+) {
+    let svc = unique_service(&format!("rs_win_apps_lookup_request_split_{label}"));
+    let mut cfg = server_config();
+    cfg.max_request_payload_bytes = request_cap;
+    cfg.max_response_payload_bytes = 4096;
+    let calls = Arc::new(AtomicU32::new(0));
+    let max_seen = Arc::new(AtomicU32::new(0));
+    let handler_calls = calls.clone();
+    let handler_max = max_seen.clone();
+    let handler = apps_lookup_dispatch(Arc::new(move |req, builder| {
+        handler_calls.fetch_add(1, Ordering::SeqCst);
+        handler_max.fetch_max(req.item_count, Ordering::SeqCst);
+        builder.set_generation(11);
+        for i in 0..req.item_count {
+            let pid = match req.item(i) {
+                Ok(pid) => pid,
+                Err(_) => return false,
+            };
+            if builder
+                .add(
+                    PID_LOOKUP_UNKNOWN,
+                    0,
+                    0,
+                    pid,
+                    0,
+                    NIPC_UID_UNSET,
+                    0,
+                    b"",
+                    b"",
+                    b"",
+                    &[],
+                )
+                .is_err()
+            {
+                return false;
+            }
+        }
+        true
+    }));
+
+    let mut ccfg = client_config();
+    ccfg.max_request_payload_bytes = request_cap;
+    let mut server =
+        TestServer::start_with(&svc, cfg, ccfg.clone(), METHOD_APPS_LOOKUP, handler, 8);
+    let mut client = apps_lookup_client(&svc, ccfg);
+    connect_ready(&mut client);
+
+    let pids = [4, 1, 4, 7, 1, 9, 7];
+    let view = client
+        .call_apps_lookup(&pids)
+        .expect("apps request split call");
+    assert_eq!(view.item_count, 7);
+    assert_eq!(view.generation, 11);
+    for (i, want) in pids.iter().enumerate() {
+        let item = view.item(i as u32).expect("apps split item");
+        assert_eq!(item.status, PID_LOOKUP_UNKNOWN);
+        assert_eq!(item.pid, *want);
+    }
+    assert!(
+        calls.load(Ordering::SeqCst) >= min_calls,
+        "apps {label} handler should see split requests"
+    );
+    assert!(
+        max_seen.load(Ordering::SeqCst) == expected_max_items,
+        "apps {label} request fragment should hit expected boundary"
+    );
+
+    client.close();
+    server.stop();
+}
+
+fn run_cgroups_lookup_request_boundary_case_windows(
+    request_cap: u32,
+    expected_max_items: u32,
+    min_calls: u32,
+    label: &str,
+) {
+    let svc = unique_service(&format!("rs_win_cgroups_lookup_request_split_{label}"));
+    let mut cfg = server_config();
+    cfg.max_request_payload_bytes = request_cap;
+    cfg.max_response_payload_bytes = 4096;
+    let calls = Arc::new(AtomicU32::new(0));
+    let max_seen = Arc::new(AtomicU32::new(0));
+    let handler_calls = calls.clone();
+    let handler_max = max_seen.clone();
+    let handler = cgroups_lookup_dispatch(Arc::new(move |req, builder| {
+        handler_calls.fetch_add(1, Ordering::SeqCst);
+        handler_max.fetch_max(req.item_count, Ordering::SeqCst);
+        builder.set_generation(12);
+        for i in 0..req.item_count {
+            let item = match req.item(i) {
+                Ok(item) => item,
+                Err(_) => return false,
+            };
+            if builder
+                .add(
+                    CGROUP_LOOKUP_KNOWN,
+                    ORCHESTRATOR_K8S,
+                    item.as_bytes(),
+                    b"ok",
+                    &[],
+                )
+                .is_err()
+            {
+                return false;
+            }
+        }
+        true
+    }));
+
+    let mut ccfg = client_config();
+    ccfg.max_request_payload_bytes = request_cap;
+    let mut server =
+        TestServer::start_with(&svc, cfg, ccfg.clone(), METHOD_CGROUPS_LOOKUP, handler, 8);
+    let mut client = cgroups_lookup_client(&svc, ccfg);
+    connect_ready(&mut client);
+
+    let paths: [&[u8]; 5] = [b"/bbbbbb", b"/aaaaaa", b"/bbbbbb", b"/cccccc", b"/aaaaaa"];
+    let view = client
+        .call_cgroups_lookup(&paths)
+        .expect("cgroups request split call");
+    assert_eq!(view.item_count, 5);
+    assert_eq!(view.generation, 12);
+    for (i, want) in paths.iter().enumerate() {
+        let item = view.item(i as u32).expect("cgroups split item");
+        assert_eq!(item.status, CGROUP_LOOKUP_KNOWN);
+        assert_eq!(item.path.as_bytes(), *want);
+    }
+    assert!(
+        calls.load(Ordering::SeqCst) >= min_calls,
+        "cgroups {label} handler should see split requests"
+    );
+    assert!(
+        max_seen.load(Ordering::SeqCst) == expected_max_items,
+        "cgroups {label} request fragment should hit expected boundary"
+    );
+
+    client.close();
+    server.stop();
+}
+
+#[test]
+fn test_lookup_proactive_request_split_windows() {
+    run_apps_lookup_request_boundary_case_windows(63, 2, 4, "cap_minus_1");
+    run_apps_lookup_request_boundary_case_windows(64, 3, 3, "cap_exact");
+    run_apps_lookup_request_boundary_case_windows(65, 3, 3, "cap_plus_1");
+
+    run_cgroups_lookup_request_boundary_case_windows(47, 1, 5, "cap_minus_1");
+    run_cgroups_lookup_request_boundary_case_windows(48, 2, 3, "cap_exact");
+    run_cgroups_lookup_request_boundary_case_windows(49, 2, 3, "cap_plus_1");
+}
+
+#[test]
+fn test_cgroups_lookup_oversized_request_key_windows() {
+    let svc = unique_service("rs_win_cgroups_lookup_oversized_request_key");
+    let mut cfg = server_config();
+    cfg.max_request_payload_bytes = 48;
+    cfg.max_response_payload_bytes = 4096;
+    let calls = Arc::new(AtomicU32::new(0));
+    let max_seen = Arc::new(AtomicU32::new(0));
+    let handler_calls = calls.clone();
+    let handler_max = max_seen.clone();
+    let handler = cgroups_lookup_dispatch(Arc::new(move |req, builder| {
+        handler_calls.fetch_add(1, Ordering::SeqCst);
+        handler_max.fetch_max(req.item_count, Ordering::SeqCst);
+        builder.set_generation(12);
+        for i in 0..req.item_count {
+            let item = match req.item(i) {
+                Ok(item) => item,
+                Err(_) => return false,
+            };
+            if builder
+                .add(
+                    CGROUP_LOOKUP_KNOWN,
+                    ORCHESTRATOR_K8S,
+                    item.as_bytes(),
+                    b"ok",
+                    &[],
+                )
+                .is_err()
+            {
+                return false;
+            }
+        }
+        true
+    }));
+
+    let mut ccfg = client_config();
+    ccfg.max_request_payload_bytes = 48;
+    let mut server =
+        TestServer::start_with(&svc, cfg, ccfg.clone(), METHOD_CGROUPS_LOOKUP, handler, 8);
+    let mut client = cgroups_lookup_client(&svc, ccfg);
+    connect_ready(&mut client);
+
+    let paths: [&[u8]; 2] = [b"/request-key-too-large-for-configured-cap", b"/ok"];
+    let view = client
+        .call_cgroups_lookup(&paths)
+        .expect("cgroups oversized request-key call");
+    assert_eq!(view.item_count, 2);
+    assert_eq!(view.generation, 12);
+    let item0 = view.item(0).expect("item 0");
+    assert_eq!(item0.status, CGROUP_LOOKUP_OVERSIZED_ITEM);
+    assert_eq!(item0.path.as_bytes(), paths[0]);
+    let item1 = view.item(1).expect("item 1");
+    assert_eq!(item1.status, CGROUP_LOOKUP_KNOWN);
+    assert_eq!(item1.path.as_bytes(), b"/ok");
+    assert_eq!(item1.name.as_bytes(), b"ok");
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    assert_eq!(max_seen.load(Ordering::SeqCst), 1);
+
+    client.close();
+    server.stop();
+}
+
+#[test]
+fn test_lookup_request_capacity_reconnects_windows() {
+    let svc = unique_service("rs_win_apps_lookup_request_capacity");
+    let mut cfg = server_config();
+    cfg.max_request_payload_bytes = 256;
+    let mut wake_cfg = client_config();
+    wake_cfg.max_request_payload_bytes = 256;
+    let mut server = TestServer::start_with(
+        &svc,
+        cfg,
+        wake_cfg,
+        METHOD_APPS_LOOKUP,
+        apps_lookup_dispatch_handler(),
+        8,
+    );
+    let mut ccfg = client_config();
+    ccfg.max_request_payload_bytes = 256;
+    let mut client = apps_lookup_client(&svc, ccfg);
+    connect_ready(&mut client);
+    client
+        .session
+        .as_mut()
+        .expect("apps session")
+        .max_request_payload_bytes = 8;
+
+    let view = client
+        .call_apps_lookup(&[1234])
+        .expect("apps lookup capacity reconnect");
+    assert_eq!(view.item_count, 1);
+    assert!(client.status().reconnect_count >= 1);
+
+    client.close();
+    server.stop();
+
+    let svc = unique_service("rs_win_cgroups_lookup_request_capacity");
+    let mut cfg = server_config();
+    cfg.max_request_payload_bytes = 256;
+    let mut wake_cfg = client_config();
+    wake_cfg.max_request_payload_bytes = 256;
+    let mut server = TestServer::start_with(
+        &svc,
+        cfg,
+        wake_cfg,
+        METHOD_CGROUPS_LOOKUP,
+        cgroups_lookup_dispatch_handler(),
+        8,
+    );
+    let mut ccfg = client_config();
+    ccfg.max_request_payload_bytes = 256;
+    let mut client = cgroups_lookup_client(&svc, ccfg);
+    connect_ready(&mut client);
+    client
+        .session
+        .as_mut()
+        .expect("cgroups session")
+        .max_request_payload_bytes = 8;
+
+    let view = client
+        .call_cgroups_lookup(&[b"/known".as_slice()])
+        .expect("cgroups lookup capacity reconnect");
+    assert_eq!(view.item_count, 1);
+    assert!(client.status().reconnect_count >= 1);
+
+    client.close();
+    server.stop();
+}
+
+#[test]
+fn test_raw_call_overflow_no_growth_stops_bounded_windows() {
+    let svc = unique_service("rs_win_overflow_no_growth");
+    let mut scfg = server_config();
+    scfg.max_response_payload_bytes = MAX_PAYLOAD_CAP;
+    let mut server = start_raw_overflow_no_growth_server(&svc, scfg);
+
+    let mut ccfg = client_config();
+    ccfg.max_response_payload_bytes = MAX_PAYLOAD_CAP;
+    let mut client = increment_client(&svc, ccfg);
+    connect_ready(&mut client);
+
+    let err = client
+        .call_increment(41)
+        .expect_err("overflow with no capacity growth should stop");
+    assert_eq!(err, NipcError::Overflow);
+
+    let status = client.status();
+    assert_eq!(status.state, ClientState::Broken);
+    assert_eq!(status.reconnect_count, 1);
+    assert_eq!(status.error_count, 1);
+
+    client.close();
+    server.wait();
+}
+
+#[test]
+fn test_lookup_timeout_during_followup_subcall_windows() {
+    let svc = unique_service("rs_win_apps_lookup_followup_timeout");
+    let mut cfg = server_config();
+    cfg.max_response_payload_bytes = 320;
+    let calls = Arc::new(AtomicU32::new(0));
+    let handler_calls = calls.clone();
+    let handler = apps_lookup_dispatch(Arc::new(move |req, builder| {
+        if handler_calls.fetch_add(1, Ordering::SeqCst) + 1 == 2 {
+            thread::sleep(Duration::from_millis(150));
+        }
+        builder.set_generation(9);
+        for i in 0..req.item_count {
+            let pid = match req.item(i) {
+                Ok(pid) => pid,
+                Err(_) => return false,
+            };
+            let cgroup_path;
+            let cgroup_path_ref: &[u8] = if pid == 22 {
+                cgroup_path = [b"/".as_slice(), &vec![b'x'; 1024]].concat();
+                &cgroup_path
+            } else {
+                b"/ok"
+            };
+            if builder
+                .add(
+                    PID_LOOKUP_KNOWN,
+                    APPS_CGROUP_KNOWN,
+                    0,
+                    pid,
+                    0,
+                    0,
+                    1,
+                    b"ok",
+                    cgroup_path_ref,
+                    b"name",
+                    &[],
+                )
+                .is_err()
+            {
+                return false;
+            }
+        }
+        true
+    }));
+    let mut server =
+        TestServer::start_with(&svc, cfg, client_config(), METHOD_APPS_LOOKUP, handler, 8);
+    let mut client = apps_lookup_client(&svc, client_config());
+    connect_ready(&mut client);
+    let err = match client.call_apps_lookup_with_timeout(&[11, 22, 33], 30) {
+        Ok(_) => panic!("apps follow-up timeout should fail"),
+        Err(err) => err,
+    };
+    assert_eq!(err, NipcError::Timeout);
+    assert!(calls.load(Ordering::SeqCst) >= 2);
+    client.close();
+    server.stop();
+
+    let svc = unique_service("rs_win_cgroups_lookup_followup_timeout");
+    let mut cfg = server_config();
+    cfg.max_response_payload_bytes = 160;
+    let calls = Arc::new(AtomicU32::new(0));
+    let handler_calls = calls.clone();
+    let handler = cgroups_lookup_dispatch(Arc::new(move |req, builder| {
+        if handler_calls.fetch_add(1, Ordering::SeqCst) + 1 == 2 {
+            thread::sleep(Duration::from_millis(150));
+        }
+        builder.set_generation(7);
+        for i in 0..req.item_count {
+            let item = match req.item(i) {
+                Ok(item) => item,
+                Err(_) => return false,
+            };
+            let name;
+            let name_ref: &[u8] = if item.as_bytes() == b"/huge" {
+                name = vec![b'x'; 512];
+                &name
+            } else {
+                b"ok"
+            };
+            if builder
+                .add(
+                    CGROUP_LOOKUP_KNOWN,
+                    ORCHESTRATOR_K8S,
+                    item.as_bytes(),
+                    name_ref,
+                    &[],
+                )
+                .is_err()
+            {
+                return false;
+            }
+        }
+        true
+    }));
+    let mut server = TestServer::start_with(
+        &svc,
+        cfg,
+        client_config(),
+        METHOD_CGROUPS_LOOKUP,
+        handler,
+        8,
+    );
+    let mut client = cgroups_lookup_client(&svc, client_config());
+    connect_ready(&mut client);
+    let paths: [&[u8]; 3] = [b"/a".as_slice(), b"/huge".as_slice(), b"/b".as_slice()];
+    let err = match client.call_cgroups_lookup_with_timeout(&paths, 30) {
+        Ok(_) => panic!("cgroups follow-up timeout should fail"),
+        Err(err) => err,
+    };
+    assert_eq!(err, NipcError::Timeout);
+    assert!(calls.load(Ordering::SeqCst) >= 2);
+    client.close();
+    server.stop();
+}
+
+#[test]
+fn test_lookup_abort_during_followup_subcall_windows() {
+    let svc = unique_service("rs_win_apps_lookup_followup_abort");
+    let mut cfg = server_config();
+    cfg.max_response_payload_bytes = 320;
+    let calls = Arc::new(AtomicU32::new(0));
+    let handler_calls = calls.clone();
+    let (second_tx, second_rx) = mpsc::channel();
+    let handler = apps_lookup_dispatch(Arc::new(move |req, builder| {
+        if handler_calls.fetch_add(1, Ordering::SeqCst) + 1 == 2 {
+            let _ = second_tx.send(());
+            thread::sleep(Duration::from_millis(250));
+        }
+        builder.set_generation(9);
+        for i in 0..req.item_count {
+            let pid = match req.item(i) {
+                Ok(pid) => pid,
+                Err(_) => return false,
+            };
+            let cgroup_path;
+            let cgroup_path_ref: &[u8] = if pid == 22 {
+                cgroup_path = [b"/".as_slice(), &vec![b'x'; 1024]].concat();
+                &cgroup_path
+            } else {
+                b"/ok"
+            };
+            if builder
+                .add(
+                    PID_LOOKUP_KNOWN,
+                    APPS_CGROUP_KNOWN,
+                    0,
+                    pid,
+                    0,
+                    0,
+                    1,
+                    b"ok",
+                    cgroup_path_ref,
+                    b"name",
+                    &[],
+                )
+                .is_err()
+            {
+                return false;
+            }
+        }
+        true
+    }));
+    let mut server =
+        TestServer::start_with(&svc, cfg, client_config(), METHOD_APPS_LOOKUP, handler, 8);
+    let mut client = apps_lookup_client(&svc, client_config());
+    connect_ready(&mut client);
+    let abort = client.abort_handle();
+    let (result_tx, result_rx) = mpsc::channel();
+    thread::spawn(move || {
+        let result = client.call_apps_lookup_with_timeout(&[11, 22, 33], 5_000);
+        let _ = result_tx.send(result.map(|view| view.item_count));
+        client.close();
+    });
+    second_rx
+        .recv_timeout(Duration::from_secs(2))
+        .expect("apps follow-up subcall should start");
+    abort.abort();
+    assert_eq!(
+        result_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("apps abort result"),
+        Err(NipcError::Aborted)
+    );
+    server.stop();
+
+    let svc = unique_service("rs_win_cgroups_lookup_followup_abort");
+    let mut cfg = server_config();
+    cfg.max_response_payload_bytes = 160;
+    let calls = Arc::new(AtomicU32::new(0));
+    let handler_calls = calls.clone();
+    let (second_tx, second_rx) = mpsc::channel();
+    let handler = cgroups_lookup_dispatch(Arc::new(move |req, builder| {
+        if handler_calls.fetch_add(1, Ordering::SeqCst) + 1 == 2 {
+            let _ = second_tx.send(());
+            thread::sleep(Duration::from_millis(250));
+        }
+        builder.set_generation(7);
+        for i in 0..req.item_count {
+            let item = match req.item(i) {
+                Ok(item) => item,
+                Err(_) => return false,
+            };
+            let name;
+            let name_ref: &[u8] = if item.as_bytes() == b"/huge" {
+                name = vec![b'x'; 512];
+                &name
+            } else {
+                b"ok"
+            };
+            if builder
+                .add(
+                    CGROUP_LOOKUP_KNOWN,
+                    ORCHESTRATOR_K8S,
+                    item.as_bytes(),
+                    name_ref,
+                    &[],
+                )
+                .is_err()
+            {
+                return false;
+            }
+        }
+        true
+    }));
+    let mut server = TestServer::start_with(
+        &svc,
+        cfg,
+        client_config(),
+        METHOD_CGROUPS_LOOKUP,
+        handler,
+        8,
+    );
+    let mut client = cgroups_lookup_client(&svc, client_config());
+    connect_ready(&mut client);
+    let abort = client.abort_handle();
+    let (result_tx, result_rx) = mpsc::channel();
+    thread::spawn(move || {
+        let paths: [&[u8]; 3] = [b"/a".as_slice(), b"/huge".as_slice(), b"/b".as_slice()];
+        let result = client.call_cgroups_lookup_with_timeout(&paths, 5_000);
+        let _ = result_tx.send(result.map(|view| view.item_count));
+        client.close();
+    });
+    second_rx
+        .recv_timeout(Duration::from_secs(2))
+        .expect("cgroups follow-up subcall should start");
+    abort.abort();
+    assert_eq!(
+        result_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("cgroups abort result"),
+        Err(NipcError::Aborted)
+    );
+    server.stop();
+}
+
+fn large_lookup_pids(item_count: usize) -> Vec<u32> {
+    (0..item_count).map(|i| 100000u32 + i as u32).collect()
+}
+
+fn large_lookup_paths(item_count: usize) -> Vec<Vec<u8>> {
+    (0..item_count)
+        .map(|i| format!("/cg/{i:05}").into_bytes())
+        .collect()
+}
+
+fn verify_large_apps_lookup(view: &AppsLookupResponseView<'_>, pids: &[u32]) {
+    assert_eq!(view.item_count, pids.len() as u32);
+    assert_eq!(view.generation, 9);
+    for (i, expected) in pids.iter().enumerate() {
+        let item = view.item(i as u32).expect("apps large item");
+        assert_eq!(item.status, PID_LOOKUP_KNOWN);
+        assert_eq!(item.pid, *expected);
+        assert_eq!(item.comm.as_bytes(), b"ok");
+        assert_eq!(item.cgroup_path.as_bytes(), b"/ok");
+    }
+}
+
+fn verify_large_cgroups_lookup(view: &CgroupsLookupResponseView<'_>, paths: &[Vec<u8>]) {
+    assert_eq!(view.item_count, paths.len() as u32);
+    assert_eq!(view.generation, 7);
+    for (i, expected) in paths.iter().enumerate() {
+        let item = view.item(i as u32).expect("cgroups large item");
+        assert_eq!(item.status, CGROUP_LOOKUP_KNOWN);
+        assert_eq!(item.path.as_bytes(), expected.as_slice());
+        assert_eq!(item.name.as_bytes(), b"ok");
+    }
+}
+
+fn verify_response_split_apps_lookup(view: &AppsLookupResponseView<'_>, pids: &[u32]) {
+    let label_value = vec![b'l'; LOOKUP_RESPONSE_SPLIT_LABEL_BYTES];
+    assert_eq!(view.item_count, pids.len() as u32);
+    assert_eq!(view.generation, 9);
+    for (i, expected) in pids.iter().enumerate() {
+        let item = view.item(i as u32).expect("apps response-split item");
+        assert_eq!(item.status, PID_LOOKUP_KNOWN);
+        assert_eq!(item.pid, *expected);
+        assert_eq!(item.comm.as_bytes(), b"ok");
+        assert_eq!(item.cgroup_path.as_bytes(), b"/ok");
+        assert_eq!(item.label_count, 1);
+        let label = item.label(0).expect("apps response-split label");
+        assert_eq!(label.key.as_bytes(), b"scale");
+        assert_eq!(label.value.as_bytes(), label_value.as_slice());
+    }
+}
+
+fn verify_response_split_cgroups_lookup(view: &CgroupsLookupResponseView<'_>, paths: &[Vec<u8>]) {
+    let label_value = vec![b'l'; LOOKUP_RESPONSE_SPLIT_LABEL_BYTES];
+    assert_eq!(view.item_count, paths.len() as u32);
+    assert_eq!(view.generation, 7);
+    for (i, expected) in paths.iter().enumerate() {
+        let item = view.item(i as u32).expect("cgroups response-split item");
+        assert_eq!(item.status, CGROUP_LOOKUP_KNOWN);
+        assert_eq!(item.path.as_bytes(), expected.as_slice());
+        assert_eq!(item.name.as_bytes(), b"ok");
+        assert_eq!(item.label_count, 1);
+        let label = item.label(0).expect("cgroups response-split label");
+        assert_eq!(label.key.as_bytes(), b"scale");
+        assert_eq!(label.value.as_bytes(), label_value.as_slice());
+    }
+}
+
+fn patch_lookup_item_u16(
+    payload: &mut [u8],
+    hdr_size: usize,
+    item_count: usize,
+    index: usize,
+    item_offset: usize,
+    value: u16,
+) {
+    let packed_start = hdr_size + item_count * 8;
+    let dir = hdr_size + index * 8;
+    let off = u32::from_ne_bytes(payload[dir..dir + 4].try_into().unwrap()) as usize;
+    let item_field = packed_start + off + item_offset;
+    payload[item_field..item_field + 2].copy_from_slice(&value.to_ne_bytes());
+}
+
+fn patch_lookup_item_status(
+    payload: &mut [u8],
+    hdr_size: usize,
+    item_count: usize,
+    index: usize,
+    status: u16,
+) {
+    patch_lookup_item_u16(payload, hdr_size, item_count, index, 2, status);
+}
+
+fn apps_lookup_response_payload_unknown(pid: u32) -> Vec<u8> {
+    apps_lookup_response_payload_unknowns(&[pid])
+}
+
+fn apps_lookup_response_payload_unknowns(pids: &[u32]) -> Vec<u8> {
+    let mut buf = vec![0u8; 256];
+    let mut builder = AppsLookupBuilder::new(&mut buf, pids.len() as u32, 1);
+    for pid in pids {
+        builder
+            .add(
+                PID_LOOKUP_UNKNOWN,
+                0,
+                0,
+                *pid,
+                0,
+                NIPC_UID_UNSET,
+                0,
+                b"",
+                b"",
+                b"",
+                &[],
+            )
+            .unwrap();
+    }
+    let n = builder.finish().unwrap();
+    buf.truncate(n);
+    buf
+}
+
+fn apps_lookup_response_payload_known_with_label(pid: u32) -> Vec<u8> {
+    let mut buf = vec![0u8; 512];
+    let mut builder = AppsLookupBuilder::new(&mut buf, 1, 1);
+    builder
+        .add(
+            PID_LOOKUP_KNOWN,
+            APPS_CGROUP_KNOWN,
+            ORCHESTRATOR_DOCKER,
+            pid,
+            1,
+            1000,
+            42,
+            b"comm",
+            b"/cg",
+            b"name",
+            &[(b"role".as_slice(), b"api".as_slice())],
+        )
+        .unwrap();
+    let n = builder.finish().unwrap();
+    buf.truncate(n);
+    buf
+}
+
+fn apps_lookup_response_payload_count_zero() -> Vec<u8> {
+    let mut buf = vec![0u8; 64];
+    let builder = AppsLookupBuilder::new(&mut buf, 0, 1);
+    let n = builder.finish().unwrap();
+    buf.truncate(n);
+    buf
+}
+
+fn apps_lookup_response_payload_exceeded_suffix(pids: &[u32], malformed: bool) -> Vec<u8> {
+    let mut buf = vec![0u8; 512];
+    let mut builder = AppsLookupBuilder::new(&mut buf, pids.len() as u32, 1);
+    for pid in pids {
+        builder
+            .add(
+                PID_LOOKUP_PAYLOAD_EXCEEDED,
+                0,
+                0,
+                *pid,
+                0,
+                NIPC_UID_UNSET,
+                0,
+                b"",
+                b"",
+                b"",
+                &[],
+            )
+            .unwrap();
+    }
+    let n = builder.finish().unwrap();
+    buf.truncate(n);
+    if malformed {
+        patch_lookup_item_status(
+            &mut buf,
+            APPS_LOOKUP_RESP_HDR_SIZE,
+            pids.len(),
+            1,
+            PID_LOOKUP_UNKNOWN,
+        );
+    }
+    buf
+}
+
+fn cgroups_lookup_response_payload_unknown(path: &[u8]) -> Vec<u8> {
+    cgroups_lookup_response_payload_unknowns(&[path])
+}
+
+fn cgroups_lookup_response_payload_unknowns(paths: &[&[u8]]) -> Vec<u8> {
+    let mut buf = vec![0u8; 256];
+    let mut builder = CgroupsLookupBuilder::new(&mut buf, paths.len() as u32, 1);
+    for path in paths {
+        builder
+            .add(CGROUP_LOOKUP_UNKNOWN_RETRY_LATER, 0, path, b"", &[])
+            .unwrap();
+    }
+    let n = builder.finish().unwrap();
+    buf.truncate(n);
+    buf
+}
+
+fn cgroups_lookup_response_payload_known_with_label(path: &[u8]) -> Vec<u8> {
+    let mut buf = vec![0u8; 512];
+    let mut builder = CgroupsLookupBuilder::new(&mut buf, 1, 1);
+    builder
+        .add(
+            CGROUP_LOOKUP_KNOWN,
+            ORCHESTRATOR_K8S,
+            path,
+            b"name",
+            &[(b"role".as_slice(), b"db".as_slice())],
+        )
+        .unwrap();
+    let n = builder.finish().unwrap();
+    buf.truncate(n);
+    buf
+}
+
+fn cgroups_lookup_response_payload_count_zero() -> Vec<u8> {
+    let mut buf = vec![0u8; 64];
+    let builder = CgroupsLookupBuilder::new(&mut buf, 0, 1);
+    let n = builder.finish().unwrap();
+    buf.truncate(n);
+    buf
+}
+
+fn cgroups_lookup_response_payload_exceeded_suffix(paths: &[&[u8]], malformed: bool) -> Vec<u8> {
+    let mut buf = vec![0u8; 512];
+    let mut builder = CgroupsLookupBuilder::new(&mut buf, paths.len() as u32, 1);
+    for path in paths {
+        builder
+            .add(CGROUP_LOOKUP_PAYLOAD_EXCEEDED, 0, path, b"", &[])
+            .unwrap();
+    }
+    let n = builder.finish().unwrap();
+    buf.truncate(n);
+    if malformed {
+        patch_lookup_item_status(
+            &mut buf,
+            CGROUPS_LOOKUP_RESP_HDR_SIZE,
+            paths.len(),
+            1,
+            CGROUP_LOOKUP_UNKNOWN_RETRY_LATER,
+        );
+    }
+    buf
+}
+
+fn assert_apps_lookup_bad_response_windows(
+    name: &str,
+    pids: &[u32],
+    payload: Vec<u8>,
+    want: NipcError,
+) {
+    let svc = unique_service(&format!("rs_win_apps_lookup_bad_{name}"));
+    let mut server = start_raw_session_server(&svc, server_config(), move |session, req_hdr, _| {
+        let mut resp_hdr = Header {
+            kind: KIND_RESPONSE,
+            code: METHOD_APPS_LOOKUP,
+            flags: 0,
+            item_count: 1,
+            message_id: req_hdr.message_id,
+            transport_status: STATUS_OK,
+            ..Header::default()
+        };
+        session
+            .send(&mut resp_hdr, &payload)
+            .map_err(|e| format!("send: {e}"))
+    });
+
+    let mut client = apps_lookup_client(&svc, client_config());
+    connect_ready(&mut client);
+    let err = client.call_apps_lookup(pids).expect_err(name);
+    assert_eq!(err, want, "{name}");
+
+    client.close();
+    server.wait();
+}
+
+fn assert_cgroups_lookup_bad_response_windows(
+    name: &str,
+    paths: &[&[u8]],
+    payload: Vec<u8>,
+    want: NipcError,
+) {
+    let svc = unique_service(&format!("rs_win_cgroups_lookup_bad_{name}"));
+    let mut server = start_raw_session_server(&svc, server_config(), move |session, req_hdr, _| {
+        let mut resp_hdr = Header {
+            kind: KIND_RESPONSE,
+            code: METHOD_CGROUPS_LOOKUP,
+            flags: 0,
+            item_count: 1,
+            message_id: req_hdr.message_id,
+            transport_status: STATUS_OK,
+            ..Header::default()
+        };
+        session
+            .send(&mut resp_hdr, &payload)
+            .map_err(|e| format!("send: {e}"))
+    });
+
+    let mut client = cgroups_lookup_client(&svc, client_config());
+    connect_ready(&mut client);
+    let err = client.call_cgroups_lookup(paths).expect_err(name);
+    assert_eq!(err, want, "{name}");
+
+    client.close();
+    server.wait();
+}
+
+fn run_large_apps_lookup_windows(prefix: &str, item_count: usize) {
+    let svc = unique_service(prefix);
+    let pids = large_lookup_pids(item_count);
+    let mut cfg = server_config();
+    cfg.max_request_payload_bytes = LOOKUP_SCALE_REQUEST_PAYLOAD_BYTES;
+    cfg.max_response_payload_bytes = RESPONSE_BUF_SIZE as u32;
+    let mut wake_cfg = client_config();
+    wake_cfg.max_request_payload_bytes = LOOKUP_SCALE_REQUEST_PAYLOAD_BYTES;
+    let calls = Arc::new(AtomicU32::new(0));
+    let max_seen = Arc::new(AtomicU32::new(0));
+    let handler_calls = calls.clone();
+    let handler_max = max_seen.clone();
+    let handler = apps_lookup_dispatch(Arc::new(move |req, builder| {
+        handler_calls.fetch_add(1, Ordering::SeqCst);
+        handler_max.fetch_max(req.item_count, Ordering::SeqCst);
+        builder.set_generation(9);
+        for i in 0..req.item_count {
+            let pid = match req.item(i) {
+                Ok(pid) => pid,
+                Err(_) => return false,
+            };
+            if builder
+                .add(
+                    PID_LOOKUP_KNOWN,
+                    APPS_CGROUP_KNOWN,
+                    ORCHESTRATOR_DOCKER,
+                    pid,
+                    1,
+                    1000,
+                    42,
+                    b"ok",
+                    b"/ok",
+                    b"name",
+                    &[],
+                )
+                .is_err()
+            {
+                return false;
+            }
+        }
+        true
+    }));
+
+    let mut server = TestServer::start_with(&svc, cfg, wake_cfg, METHOD_APPS_LOOKUP, handler, 8);
+    let mut ccfg = client_config();
+    ccfg.max_request_payload_bytes = LOOKUP_SCALE_REQUEST_PAYLOAD_BYTES;
+    let mut client = apps_lookup_client(&svc, ccfg);
+    client.set_call_timeout(LOOKUP_SCALE_CALL_TIMEOUT_MS);
+    connect_ready(&mut client);
+
+    let view = client.call_apps_lookup(&pids).expect("apps large lookup");
+    verify_large_apps_lookup(&view, &pids);
+    assert!(calls.load(Ordering::SeqCst) > 1);
+    assert!(max_seen.load(Ordering::SeqCst) < item_count as u32);
+
+    client.close();
+    server.stop();
+}
+
+fn run_large_cgroups_lookup_windows(prefix: &str, item_count: usize) {
+    let svc = unique_service(prefix);
+    let paths = large_lookup_paths(item_count);
+    let path_refs: Vec<&[u8]> = paths.iter().map(Vec::as_slice).collect();
+    let mut cfg = server_config();
+    cfg.max_request_payload_bytes = LOOKUP_SCALE_REQUEST_PAYLOAD_BYTES;
+    cfg.max_response_payload_bytes = RESPONSE_BUF_SIZE as u32;
+    let mut wake_cfg = client_config();
+    wake_cfg.max_request_payload_bytes = LOOKUP_SCALE_REQUEST_PAYLOAD_BYTES;
+    let calls = Arc::new(AtomicU32::new(0));
+    let max_seen = Arc::new(AtomicU32::new(0));
+    let handler_calls = calls.clone();
+    let handler_max = max_seen.clone();
+    let handler = cgroups_lookup_dispatch(Arc::new(move |req, builder| {
+        handler_calls.fetch_add(1, Ordering::SeqCst);
+        handler_max.fetch_max(req.item_count, Ordering::SeqCst);
+        builder.set_generation(7);
+        for i in 0..req.item_count {
+            let path = match req.item(i) {
+                Ok(path) => path,
+                Err(_) => return false,
+            };
+            if builder
+                .add(
+                    CGROUP_LOOKUP_KNOWN,
+                    ORCHESTRATOR_K8S,
+                    path.as_bytes(),
+                    b"ok",
+                    &[],
+                )
+                .is_err()
+            {
+                return false;
+            }
+        }
+        true
+    }));
+
+    let mut server = TestServer::start_with(&svc, cfg, wake_cfg, METHOD_CGROUPS_LOOKUP, handler, 8);
+    let mut ccfg = client_config();
+    ccfg.max_request_payload_bytes = LOOKUP_SCALE_REQUEST_PAYLOAD_BYTES;
+    let mut client = cgroups_lookup_client(&svc, ccfg);
+    client.set_call_timeout(LOOKUP_SCALE_CALL_TIMEOUT_MS);
+    connect_ready(&mut client);
+
+    let view = client
+        .call_cgroups_lookup(&path_refs)
+        .expect("cgroups large lookup");
+    verify_large_cgroups_lookup(&view, &paths);
+    assert!(calls.load(Ordering::SeqCst) > 1);
+    assert!(max_seen.load(Ordering::SeqCst) < item_count as u32);
+
+    client.close();
+    server.stop();
+}
+
+#[test]
+fn test_lookup_large_logical_calls_windows() {
+    run_large_apps_lookup_windows("rs_win_apps_lookup_large_8192", LOOKUP_TOPOLOGY_SCALE_ITEMS);
+    run_large_apps_lookup_windows("rs_win_apps_lookup_large_32768", LOOKUP_HPC_SCALE_ITEMS);
+    run_large_cgroups_lookup_windows(
+        "rs_win_cgroups_lookup_large_8192",
+        LOOKUP_TOPOLOGY_SCALE_ITEMS,
+    );
+    run_large_cgroups_lookup_windows("rs_win_cgroups_lookup_large_32768", LOOKUP_HPC_SCALE_ITEMS);
+}
+
+fn run_large_apps_response_split_windows(prefix: &str) {
+    let svc = unique_service(prefix);
+    let pids = large_lookup_pids(LOOKUP_RESPONSE_SPLIT_SCALE_ITEMS);
+    let mut cfg = server_config();
+    cfg.max_request_payload_bytes = LOOKUP_RESPONSE_SPLIT_REQUEST_PAYLOAD_BYTES;
+    cfg.max_response_payload_bytes = LOOKUP_RESPONSE_SPLIT_PAYLOAD_BYTES;
+    let mut wake_cfg = client_config();
+    wake_cfg.max_request_payload_bytes = LOOKUP_RESPONSE_SPLIT_REQUEST_PAYLOAD_BYTES;
+    wake_cfg.max_response_payload_bytes = LOOKUP_RESPONSE_SPLIT_PAYLOAD_BYTES;
+    let calls = Arc::new(AtomicU32::new(0));
+    let max_seen = Arc::new(AtomicU32::new(0));
+    let handler_calls = calls.clone();
+    let handler_max = max_seen.clone();
+    let label_value = vec![b'l'; LOOKUP_RESPONSE_SPLIT_LABEL_BYTES];
+    let handler = apps_lookup_dispatch(Arc::new(move |req, builder| {
+        handler_calls.fetch_add(1, Ordering::SeqCst);
+        handler_max.fetch_max(req.item_count, Ordering::SeqCst);
+        builder.set_generation(9);
+        for i in 0..req.item_count {
+            let pid = match req.item(i) {
+                Ok(pid) => pid,
+                Err(_) => return false,
+            };
+            let labels = [(b"scale".as_slice(), label_value.as_slice())];
+            if builder
+                .add(
+                    PID_LOOKUP_KNOWN,
+                    APPS_CGROUP_KNOWN,
+                    ORCHESTRATOR_DOCKER,
+                    pid,
+                    1,
+                    1000,
+                    42,
+                    b"ok",
+                    b"/ok",
+                    b"name",
+                    &labels,
+                )
+                .is_err()
+            {
+                return false;
+            }
+        }
+        true
+    }));
+
+    let mut server = TestServer::start_with(&svc, cfg, wake_cfg, METHOD_APPS_LOOKUP, handler, 8);
+    let mut ccfg = client_config();
+    ccfg.max_request_payload_bytes = LOOKUP_RESPONSE_SPLIT_REQUEST_PAYLOAD_BYTES;
+    ccfg.max_response_payload_bytes = LOOKUP_RESPONSE_SPLIT_PAYLOAD_BYTES;
+    let mut client = apps_lookup_client(&svc, ccfg);
+    client.set_call_timeout(LOOKUP_SCALE_CALL_TIMEOUT_MS);
+    connect_ready(&mut client);
+
+    let view = client
+        .call_apps_lookup(&pids)
+        .expect("apps response-split lookup");
+    verify_response_split_apps_lookup(&view, &pids);
+    assert!(calls.load(Ordering::SeqCst) > LOOKUP_RESPONSE_SPLIT_MIN_CALLS);
+    assert_eq!(
+        max_seen.load(Ordering::SeqCst),
+        LOOKUP_RESPONSE_SPLIT_SCALE_ITEMS as u32
+    );
+
+    client.close();
+    server.stop();
+}
+
+fn run_large_cgroups_response_split_windows(prefix: &str) {
+    let svc = unique_service(prefix);
+    let paths = large_lookup_paths(LOOKUP_RESPONSE_SPLIT_SCALE_ITEMS);
+    let path_refs: Vec<&[u8]> = paths.iter().map(Vec::as_slice).collect();
+    let mut cfg = server_config();
+    cfg.max_request_payload_bytes = LOOKUP_RESPONSE_SPLIT_REQUEST_PAYLOAD_BYTES;
+    cfg.max_response_payload_bytes = LOOKUP_RESPONSE_SPLIT_PAYLOAD_BYTES;
+    let mut wake_cfg = client_config();
+    wake_cfg.max_request_payload_bytes = LOOKUP_RESPONSE_SPLIT_REQUEST_PAYLOAD_BYTES;
+    wake_cfg.max_response_payload_bytes = LOOKUP_RESPONSE_SPLIT_PAYLOAD_BYTES;
+    let calls = Arc::new(AtomicU32::new(0));
+    let max_seen = Arc::new(AtomicU32::new(0));
+    let handler_calls = calls.clone();
+    let handler_max = max_seen.clone();
+    let label_value = vec![b'l'; LOOKUP_RESPONSE_SPLIT_LABEL_BYTES];
+    let handler = cgroups_lookup_dispatch(Arc::new(move |req, builder| {
+        handler_calls.fetch_add(1, Ordering::SeqCst);
+        handler_max.fetch_max(req.item_count, Ordering::SeqCst);
+        builder.set_generation(7);
+        for i in 0..req.item_count {
+            let path = match req.item(i) {
+                Ok(path) => path,
+                Err(_) => return false,
+            };
+            let labels = [(b"scale".as_slice(), label_value.as_slice())];
+            if builder
+                .add(
+                    CGROUP_LOOKUP_KNOWN,
+                    ORCHESTRATOR_K8S,
+                    path.as_bytes(),
+                    b"ok",
+                    &labels,
+                )
+                .is_err()
+            {
+                return false;
+            }
+        }
+        true
+    }));
+
+    let mut server = TestServer::start_with(&svc, cfg, wake_cfg, METHOD_CGROUPS_LOOKUP, handler, 8);
+    let mut ccfg = client_config();
+    ccfg.max_request_payload_bytes = LOOKUP_RESPONSE_SPLIT_REQUEST_PAYLOAD_BYTES;
+    ccfg.max_response_payload_bytes = LOOKUP_RESPONSE_SPLIT_PAYLOAD_BYTES;
+    let mut client = cgroups_lookup_client(&svc, ccfg);
+    client.set_call_timeout(LOOKUP_SCALE_CALL_TIMEOUT_MS);
+    connect_ready(&mut client);
+
+    let view = client
+        .call_cgroups_lookup(&path_refs)
+        .expect("cgroups response-split lookup");
+    verify_response_split_cgroups_lookup(&view, &paths);
+    assert!(calls.load(Ordering::SeqCst) > LOOKUP_RESPONSE_SPLIT_MIN_CALLS);
+    assert_eq!(
+        max_seen.load(Ordering::SeqCst),
+        LOOKUP_RESPONSE_SPLIT_SCALE_ITEMS as u32
+    );
+
+    client.close();
+    server.stop();
+}
+
+#[test]
+fn test_lookup_large_response_split_calls_windows() {
+    run_large_apps_response_split_windows("rs_win_apps_lookup_large_response_split");
+    run_large_cgroups_response_split_windows("rs_win_cgroups_lookup_large_response_split");
+}
+
+#[test]
+fn test_lookup_logical_limits_windows() {
+    let mut client = apps_lookup_client("unused", client_config());
+    client.set_lookup_logical_config(LookupLogicalConfig {
+        max_items: 2,
+        max_subcalls: 0,
+        max_response_bytes: 0,
+    });
+    assert!(client.call_apps_lookup(&[1, 2, 3]).is_err());
+
+    let mut client = cgroups_lookup_client("unused", client_config());
+    client.set_lookup_logical_config(LookupLogicalConfig {
+        max_items: 1,
+        max_subcalls: 0,
+        max_response_bytes: 0,
+    });
+    assert!(client
+        .call_cgroups_lookup(&[b"/a".as_slice(), b"/b".as_slice()])
+        .is_err());
+
+    let svc = unique_service("rs_win_apps_lookup_response_limit");
+    let mut server = TestServer::start(&svc, METHOD_APPS_LOOKUP, apps_lookup_dispatch_handler());
+    let mut client = apps_lookup_client(&svc, client_config());
+    connect_ready(&mut client);
+    client.set_lookup_logical_config(LookupLogicalConfig {
+        max_items: 0,
+        max_subcalls: 0,
+        max_response_bytes: 1,
+    });
+    assert_eq!(
+        client.call_apps_lookup(&[123]).unwrap_err(),
+        NipcError::Overflow
+    );
+    client.close();
+    server.stop();
+
+    let svc = unique_service("rs_win_cgroups_lookup_response_limit");
+    let mut server = TestServer::start(
+        &svc,
+        METHOD_CGROUPS_LOOKUP,
+        cgroups_lookup_dispatch_handler(),
+    );
+    let mut client = cgroups_lookup_client(&svc, client_config());
+    connect_ready(&mut client);
+    client.set_lookup_logical_config(LookupLogicalConfig {
+        max_items: 0,
+        max_subcalls: 0,
+        max_response_bytes: 1,
+    });
+    assert_eq!(
+        client
+            .call_cgroups_lookup(&[b"/docker/abc".as_slice()])
+            .unwrap_err(),
+        NipcError::Overflow
+    );
+    client.close();
+    server.stop();
+
+    let svc = unique_service("rs_win_apps_lookup_logical_subcall_limit");
+    let mut cfg = server_config();
+    cfg.max_request_payload_bytes = 48;
+    let mut wake_cfg = client_config();
+    wake_cfg.max_request_payload_bytes = 48;
+    let mut server = TestServer::start_with(
+        &svc,
+        cfg,
+        wake_cfg,
+        METHOD_APPS_LOOKUP,
+        apps_lookup_dispatch_handler(),
+        8,
+    );
+    let mut ccfg = client_config();
+    ccfg.max_request_payload_bytes = 48;
+    let mut client = apps_lookup_client(&svc, ccfg);
+    connect_ready(&mut client);
+    client.set_lookup_logical_config(LookupLogicalConfig {
+        max_items: 0,
+        max_subcalls: 1,
+        max_response_bytes: 0,
+    });
+    assert_eq!(
+        client.call_apps_lookup(&[1, 2, 3]).unwrap_err(),
+        NipcError::Overflow
+    );
+    assert_eq!(client.status().reconnect_count, 0);
+    client.close();
+    server.stop();
+
+    let mut ccfg = client_config();
+    ccfg.max_request_payload_bytes = 48;
+    let mut client = cgroups_lookup_client("unused", ccfg);
+    assert_eq!(
+        client
+            .call_cgroups_lookup(&[b"/request-key-too-large-for-configured-cap".as_slice()])
+            .unwrap_err(),
+        NipcError::BadLayout
+    );
+}
+
+#[test]
+fn test_cgroups_lookup_rejects_mixed_generation_retry_windows() {
+    let svc = unique_service("rs_win_cgroups_lookup_generation");
+    let mut cfg = server_config();
+    cfg.max_response_payload_bytes = 160;
+    let calls = Arc::new(AtomicU32::new(0));
+    let handler_calls = calls.clone();
+    let handler = cgroups_lookup_dispatch(Arc::new(move |req, builder| {
+        let generation = handler_calls.fetch_add(1, Ordering::SeqCst) as u64 + 1;
+        builder.set_generation(generation);
+        for i in 0..req.item_count {
+            let item = match req.item(i) {
+                Ok(item) => item,
+                Err(_) => return false,
+            };
+            let name;
+            let name_ref: &[u8] = if item.as_bytes() == b"/huge" {
+                name = vec![b'x'; 512];
+                &name
+            } else {
+                b"ok"
+            };
+            if builder
+                .add(
+                    CGROUP_LOOKUP_KNOWN,
+                    ORCHESTRATOR_K8S,
+                    item.as_bytes(),
+                    name_ref,
+                    &[],
+                )
+                .is_err()
+            {
+                return false;
+            }
+        }
+        true
+    }));
+
+    let mut server = TestServer::start_with(
+        &svc,
+        cfg,
+        client_config(),
+        METHOD_CGROUPS_LOOKUP,
+        handler,
+        8,
+    );
+    let mut client = cgroups_lookup_client(&svc, client_config());
+    connect_ready(&mut client);
+
+    assert!(client
+        .call_cgroups_lookup(&[b"/a".as_slice(), b"/huge".as_slice(), b"/b".as_slice()])
+        .is_err());
+    assert!(
+        calls.load(Ordering::SeqCst) >= 2,
+        "handler should be called for at least two subrequests"
+    );
+
+    client.close();
+    server.stop();
+}
+
+#[test]
+fn test_apps_lookup_rejects_mixed_generation_retry_windows() {
+    let svc = unique_service("rs_win_apps_lookup_generation");
+    let mut cfg = server_config();
+    cfg.max_response_payload_bytes = 320;
+    let calls = Arc::new(AtomicU32::new(0));
+    let handler_calls = calls.clone();
+    let handler = apps_lookup_dispatch(Arc::new(move |req, builder| {
+        let generation = handler_calls.fetch_add(1, Ordering::SeqCst) as u64 + 1;
+        builder.set_generation(generation);
+        for i in 0..req.item_count {
+            let pid = match req.item(i) {
+                Ok(pid) => pid,
+                Err(_) => return false,
+            };
+            let cgroup_path;
+            let cgroup_path_ref: &[u8] = if pid == 22 {
+                cgroup_path = [b"/".as_slice(), &vec![b'x'; 1024]].concat();
+                &cgroup_path
+            } else {
+                b"/ok"
+            };
+            if builder
+                .add(
+                    PID_LOOKUP_KNOWN,
+                    APPS_CGROUP_KNOWN,
+                    0,
+                    pid,
+                    0,
+                    0,
+                    1,
+                    b"ok",
+                    cgroup_path_ref,
+                    b"name",
+                    &[],
+                )
+                .is_err()
+            {
+                return false;
+            }
+        }
+        true
+    }));
+
+    let mut server =
+        TestServer::start_with(&svc, cfg, client_config(), METHOD_APPS_LOOKUP, handler, 8);
+    let mut client = apps_lookup_client(&svc, client_config());
+    connect_ready(&mut client);
+
+    assert!(client.call_apps_lookup(&[11, 22, 33]).is_err());
+    assert!(
+        calls.load(Ordering::SeqCst) >= 2,
+        "handler should be called for at least two subrequests"
+    );
+
+    client.close();
+    server.stop();
+}
+
+#[test]
+fn test_lookup_rejects_malformed_followup_response_windows() {
+    let svc = unique_service("rs_win_apps_lookup_bad_followup");
+    let calls = Arc::new(AtomicU32::new(0));
+    let handler_calls = calls.clone();
+    let handler = apps_lookup_dispatch(Arc::new(move |req, builder| {
+        let call = handler_calls.fetch_add(1, Ordering::SeqCst) + 1;
+        builder.set_generation(88);
+        for i in 0..req.item_count {
+            let pid = match req.item(i) {
+                Ok(pid) => pid,
+                Err(_) => return false,
+            };
+            if call == 1 && i > 0 {
+                if builder
+                    .add(
+                        PID_LOOKUP_PAYLOAD_EXCEEDED,
+                        0,
+                        0,
+                        pid,
+                        0,
+                        NIPC_UID_UNSET,
+                        0,
+                        b"",
+                        b"",
+                        b"",
+                        &[],
+                    )
+                    .is_err()
+                {
+                    return false;
+                }
+                continue;
+            }
+
+            let mut echo_pid = pid;
+            if call > 1 && i == 0 {
+                echo_pid = if pid == 0 { 1 } else { 0 };
+            }
+            if builder
+                .add(
+                    PID_LOOKUP_UNKNOWN,
+                    0,
+                    0,
+                    echo_pid,
+                    0,
+                    NIPC_UID_UNSET,
+                    0,
+                    b"",
+                    b"",
+                    b"",
+                    &[],
+                )
+                .is_err()
+            {
+                return false;
+            }
+        }
+        true
+    }));
+    let mut server = TestServer::start_with(
+        &svc,
+        server_config(),
+        client_config(),
+        METHOD_APPS_LOOKUP,
+        handler,
+        8,
+    );
+    let mut client = apps_lookup_client(&svc, client_config());
+    connect_ready(&mut client);
+
+    let err = client
+        .call_apps_lookup(&[11, 22, 33])
+        .expect_err("apps malformed follow-up");
+    assert_eq!(err, NipcError::BadLayout);
+    assert!(
+        calls.load(Ordering::SeqCst) >= 2,
+        "handler should be called for at least two subrequests"
+    );
+    client.close();
+    server.stop();
+
+    let svc = unique_service("rs_win_cgroups_lookup_bad_followup");
+    let calls = Arc::new(AtomicU32::new(0));
+    let handler_calls = calls.clone();
+    let handler = cgroups_lookup_dispatch(Arc::new(move |req, builder| {
+        let call = handler_calls.fetch_add(1, Ordering::SeqCst) + 1;
+        builder.set_generation(77);
+        for i in 0..req.item_count {
+            let item = match req.item(i) {
+                Ok(item) => item,
+                Err(_) => return false,
+            };
+            if call == 1 && i > 0 {
+                if builder
+                    .add(CGROUP_LOOKUP_PAYLOAD_EXCEEDED, 0, item.as_bytes(), b"", &[])
+                    .is_err()
+                {
+                    return false;
+                }
+                continue;
+            }
+
+            let echo_path = if call > 1 && i == 0 {
+                b"/wrong".as_slice()
+            } else {
+                item.as_bytes()
+            };
+            if builder
+                .add(CGROUP_LOOKUP_UNKNOWN_RETRY_LATER, 0, echo_path, b"", &[])
+                .is_err()
+            {
+                return false;
+            }
+        }
+        true
+    }));
+    let mut server = TestServer::start_with(
+        &svc,
+        server_config(),
+        client_config(),
+        METHOD_CGROUPS_LOOKUP,
+        handler,
+        8,
+    );
+    let mut client = cgroups_lookup_client(&svc, client_config());
+    connect_ready(&mut client);
+
+    let err = client
+        .call_cgroups_lookup(&[b"/a".as_slice(), b"/b".as_slice(), b"/c".as_slice()])
+        .expect_err("cgroups malformed follow-up");
+    assert_eq!(err, NipcError::BadLayout);
+    assert!(
+        calls.load(Ordering::SeqCst) >= 2,
+        "handler should be called for at least two subrequests"
+    );
+    client.close();
+    server.stop();
+}
+
+fn apps_lookup_partial_response(payload: &[u8]) -> Result<(Vec<u8>, u32), String> {
+    let request =
+        AppsLookupRequestView::decode(payload).map_err(|e| format!("apps request decode: {e}"))?;
+    let mut response = vec![0u8; 1024];
+    let response_len = {
+        let mut builder = AppsLookupBuilder::new(&mut response, request.item_count, 88);
+        for i in 0..request.item_count {
+            let pid = request.item(i).map_err(|e| format!("apps item {i}: {e}"))?;
+            let status = if i == 0 {
+                PID_LOOKUP_UNKNOWN
+            } else {
+                PID_LOOKUP_PAYLOAD_EXCEEDED
+            };
+            builder
+                .add(status, 0, 0, pid, 0, NIPC_UID_UNSET, 0, b"", b"", b"", &[])
+                .map_err(|e| format!("apps response item {i}: {e}"))?;
+        }
+        builder
+            .finish()
+            .map_err(|e| format!("apps response finish: {e}"))?
+    };
+    response.truncate(response_len);
+    Ok((response, request.item_count))
+}
+
+fn cgroups_lookup_partial_response(payload: &[u8]) -> Result<(Vec<u8>, u32), String> {
+    let request = CgroupsLookupRequestView::decode(payload)
+        .map_err(|e| format!("cgroups request decode: {e}"))?;
+    let mut response = vec![0u8; 1024];
+    let response_len = {
+        let mut builder = CgroupsLookupBuilder::new(&mut response, request.item_count, 77);
+        for i in 0..request.item_count {
+            let path = request
+                .item(i)
+                .map_err(|e| format!("cgroups item {i}: {e}"))?;
+            let (status, orchestrator, name): (u16, u16, &[u8]) = if i == 0 {
+                (CGROUP_LOOKUP_KNOWN, ORCHESTRATOR_K8S, b"ok")
+            } else {
+                (CGROUP_LOOKUP_PAYLOAD_EXCEEDED, 0, b"")
+            };
+            builder
+                .add(status, orchestrator, path.as_bytes(), name, &[])
+                .map_err(|e| format!("cgroups response item {i}: {e}"))?;
+        }
+        builder
+            .finish()
+            .map_err(|e| format!("cgroups response finish: {e}"))?
+    };
+    response.truncate(response_len);
+    Ok((response, request.item_count))
+}
+
+#[test]
+fn test_lookup_endpoint_gone_after_partial_progress_windows() {
+    let svc = unique_service("rs_win_apps_lookup_partial_disconnect");
+    let mut server = start_raw_session_server(&svc, server_config(), |session, hdr, payload| {
+        if hdr.code != METHOD_APPS_LOOKUP {
+            return Err(format!("unexpected apps request header: {hdr:?}"));
+        }
+        let (response_payload, _item_count) = apps_lookup_partial_response(payload)?;
+        let mut resp_hdr = Header {
+            kind: KIND_RESPONSE,
+            code: METHOD_APPS_LOOKUP,
+            flags: 0,
+            item_count: 1,
+            message_id: hdr.message_id,
+            transport_status: STATUS_OK,
+            ..Header::default()
+        };
+        session
+            .send(&mut resp_hdr, &response_payload)
+            .map_err(|e| format!("apps response send: {e}"))
+    });
+    let mut client = apps_lookup_client(&svc, client_config());
+    connect_ready(&mut client);
+    assert!(client
+        .call_apps_lookup_with_timeout(&[11, 22, 33], 1_000)
+        .is_err());
+    client.close();
+    server.wait();
+
+    let svc = unique_service("rs_win_cgroups_lookup_partial_disconnect");
+    let mut server = start_raw_session_server(&svc, server_config(), |session, hdr, payload| {
+        if hdr.code != METHOD_CGROUPS_LOOKUP {
+            return Err(format!("unexpected cgroups request header: {hdr:?}"));
+        }
+        let (response_payload, _item_count) = cgroups_lookup_partial_response(payload)?;
+        let mut resp_hdr = Header {
+            kind: KIND_RESPONSE,
+            code: METHOD_CGROUPS_LOOKUP,
+            flags: 0,
+            item_count: 1,
+            message_id: hdr.message_id,
+            transport_status: STATUS_OK,
+            ..Header::default()
+        };
+        session
+            .send(&mut resp_hdr, &response_payload)
+            .map_err(|e| format!("cgroups response send: {e}"))
+    });
+    let mut client = cgroups_lookup_client(&svc, client_config());
+    connect_ready(&mut client);
+    assert!(client
+        .call_cgroups_lookup_with_timeout(
+            &[b"/a".as_slice(), b"/b".as_slice(), b"/c".as_slice()],
+            1_000,
+        )
+        .is_err());
+    client.close();
+    server.wait();
+}
+
+#[test]
+fn test_lookup_endpoint_gone_before_first_subcall_windows() {
+    let svc = unique_service("rs_win_apps_lookup_gone_before_call");
+    let mut server = TestServer::start(&svc, METHOD_APPS_LOOKUP, apps_lookup_dispatch_handler());
+    let mut client = apps_lookup_client(&svc, client_config());
+    connect_ready(&mut client);
+    server.stop();
+    assert!(client
+        .call_apps_lookup_with_timeout(&[11, 22], 1_000)
+        .is_err());
+    client.close();
+
+    let svc = unique_service("rs_win_cgroups_lookup_gone_before_call");
+    let mut server = TestServer::start(
+        &svc,
+        METHOD_CGROUPS_LOOKUP,
+        cgroups_lookup_dispatch_handler(),
+    );
+    let mut client = cgroups_lookup_client(&svc, client_config());
+    connect_ready(&mut client);
+    server.stop();
+    assert!(client
+        .call_cgroups_lookup_with_timeout(&[b"/a".as_slice(), b"/b".as_slice()], 1_000)
+        .is_err());
+    client.close();
+}
+
+#[test]
+fn test_lookup_endpoint_absent_before_call_windows() {
+    let svc = unique_service("rs_win_apps_lookup_absent");
+    let mut client = apps_lookup_client(&svc, client_config());
+    assert!(client.refresh(), "apps absent refresh should change state");
+    assert_eq!(client.state, ClientState::NotFound);
+    let err = client
+        .call_apps_lookup_with_timeout(&[11, 22], 1_000)
+        .expect_err("apps absent lookup should fail");
+    assert_eq!(err, NipcError::BadLayout);
+    client.close();
+
+    let svc = unique_service("rs_win_cgroups_lookup_absent");
+    let mut client = cgroups_lookup_client(&svc, client_config());
+    assert!(
+        client.refresh(),
+        "cgroups absent refresh should change state"
+    );
+    assert_eq!(client.state, ClientState::NotFound);
+    let err = client
+        .call_cgroups_lookup_with_timeout(&[b"/a".as_slice(), b"/b".as_slice()], 1_000)
+        .expect_err("cgroups absent lookup should fail");
+    assert_eq!(err, NipcError::BadLayout);
+    client.close();
+}
+
+#[test]
+fn test_lookup_rejects_malformed_typed_responses_windows() {
+    assert_apps_lookup_bad_response_windows(
+        "truncated",
+        &[1234],
+        vec![1, 2, 3],
+        NipcError::Truncated,
+    );
+    assert_apps_lookup_bad_response_windows(
+        "count",
+        &[1234],
+        apps_lookup_response_payload_count_zero(),
+        NipcError::BadItemCount,
+    );
+    assert_apps_lookup_bad_response_windows(
+        "pid",
+        &[1234],
+        apps_lookup_response_payload_unknown(9999),
+        NipcError::BadLayout,
+    );
+    assert_apps_lookup_bad_response_windows(
+        "reordered",
+        &[1, 2],
+        apps_lookup_response_payload_unknowns(&[2, 1]),
+        NipcError::BadLayout,
+    );
+    assert_apps_lookup_bad_response_windows(
+        "duplicate",
+        &[1, 2],
+        apps_lookup_response_payload_unknowns(&[1, 1]),
+        NipcError::BadLayout,
+    );
+    let mut payload = apps_lookup_response_payload_known_with_label(1234);
+    patch_lookup_item_status(&mut payload, APPS_LOOKUP_RESP_HDR_SIZE, 1, 0, 0xffff);
+    assert_apps_lookup_bad_response_windows(
+        "invalid_status",
+        &[1234],
+        payload,
+        NipcError::BadLayout,
+    );
+    let mut payload = apps_lookup_response_payload_known_with_label(1234);
+    patch_lookup_item_status(
+        &mut payload,
+        APPS_LOOKUP_RESP_HDR_SIZE,
+        1,
+        0,
+        PID_LOOKUP_UNKNOWN,
+    );
+    assert_apps_lookup_bad_response_windows(
+        "invalid_status_fields",
+        &[1234],
+        payload,
+        NipcError::BadLayout,
+    );
+    let mut payload = apps_lookup_response_payload_known_with_label(1234);
+    patch_lookup_item_u16(&mut payload, APPS_LOOKUP_RESP_HDR_SIZE, 1, 0, 56, 2);
+    assert_apps_lookup_bad_response_windows(
+        "invalid_label_table",
+        &[1234],
+        payload,
+        NipcError::OutOfBounds,
+    );
+    assert_apps_lookup_bad_response_windows(
+        "first_payload_exceeded",
+        &[1, 2],
+        apps_lookup_response_payload_exceeded_suffix(&[1, 2], false),
+        NipcError::Overflow,
+    );
+    assert_apps_lookup_bad_response_windows(
+        "bad_payload_exceeded_suffix",
+        &[1, 2],
+        apps_lookup_response_payload_exceeded_suffix(&[1, 2], true),
+        NipcError::BadLayout,
+    );
+
+    assert_cgroups_lookup_bad_response_windows(
+        "truncated",
+        &[b"/a"],
+        vec![1, 2, 3],
+        NipcError::Truncated,
+    );
+    assert_cgroups_lookup_bad_response_windows(
+        "count",
+        &[b"/a"],
+        cgroups_lookup_response_payload_count_zero(),
+        NipcError::BadItemCount,
+    );
+    assert_cgroups_lookup_bad_response_windows(
+        "path",
+        &[b"/a"],
+        cgroups_lookup_response_payload_unknown(b"/other"),
+        NipcError::BadLayout,
+    );
+    assert_cgroups_lookup_bad_response_windows(
+        "reordered",
+        &[b"/a", b"/b"],
+        cgroups_lookup_response_payload_unknowns(&[b"/b", b"/a"]),
+        NipcError::BadLayout,
+    );
+    assert_cgroups_lookup_bad_response_windows(
+        "duplicate",
+        &[b"/a", b"/b"],
+        cgroups_lookup_response_payload_unknowns(&[b"/a", b"/a"]),
+        NipcError::BadLayout,
+    );
+    let mut payload = cgroups_lookup_response_payload_known_with_label(b"/a");
+    patch_lookup_item_status(&mut payload, CGROUPS_LOOKUP_RESP_HDR_SIZE, 1, 0, 0xffff);
+    assert_cgroups_lookup_bad_response_windows(
+        "invalid_status",
+        &[b"/a"],
+        payload,
+        NipcError::BadLayout,
+    );
+    let mut payload = cgroups_lookup_response_payload_known_with_label(b"/a");
+    patch_lookup_item_status(
+        &mut payload,
+        CGROUPS_LOOKUP_RESP_HDR_SIZE,
+        1,
+        0,
+        CGROUP_LOOKUP_UNKNOWN_RETRY_LATER,
+    );
+    assert_cgroups_lookup_bad_response_windows(
+        "invalid_status_fields",
+        &[b"/a"],
+        payload,
+        NipcError::BadLayout,
+    );
+    let mut payload = cgroups_lookup_response_payload_known_with_label(b"/a");
+    patch_lookup_item_u16(&mut payload, CGROUPS_LOOKUP_RESP_HDR_SIZE, 1, 0, 24, 2);
+    assert_cgroups_lookup_bad_response_windows(
+        "invalid_label_table",
+        &[b"/a"],
+        payload,
+        NipcError::OutOfBounds,
+    );
+    assert_cgroups_lookup_bad_response_windows(
+        "first_payload_exceeded",
+        &[b"/a", b"/b"],
+        cgroups_lookup_response_payload_exceeded_suffix(&[b"/a", b"/b"], false),
+        NipcError::Overflow,
+    );
+    assert_cgroups_lookup_bad_response_windows(
+        "bad_payload_exceeded_suffix",
+        &[b"/a", b"/b"],
+        cgroups_lookup_response_payload_exceeded_suffix(&[b"/a", b"/b"], true),
+        NipcError::BadLayout,
+    );
 }
 
 #[test]
@@ -1204,7 +3293,7 @@ fn test_transport_without_session_windows() {
         Err(NipcError::Truncated)
     );
     assert!(matches!(
-        client.transport_receive(),
+        client.transport_receive(0),
         Err(NipcError::Truncated)
     ));
     client.close();

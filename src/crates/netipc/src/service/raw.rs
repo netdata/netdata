@@ -33,6 +33,7 @@ pub use cgroups_cache::{CgroupsCache, CgroupsCacheItem, CgroupsCacheStatus};
 pub use cgroups_lookup::{cgroups_lookup_dispatch, CgroupsLookupHandler};
 pub use cgroups_snapshot::{snapshot_dispatch, snapshot_max_items, SnapshotHandler};
 pub use client::{ClientAbortHandle, ClientState, ClientStatus, RawClient};
+pub use common::LookupLogicalConfig;
 pub use dispatch::{DispatchError, DispatchHandler};
 pub use increment::{increment_dispatch, IncrementHandler};
 pub use server::ManagedServer;
@@ -42,8 +43,8 @@ pub use string_reverse::{string_reverse_dispatch, StringReverseHandler};
 use crate::protocol::{
     self, batch_item_get, increment_decode, string_reverse_decode, string_reverse_encode,
     CgroupsRequest, Header, NipcError, FLAG_BATCH, HEADER_SIZE, INCREMENT_PAYLOAD_SIZE,
-    KIND_REQUEST, KIND_RESPONSE, MAGIC_MSG, METHOD_CGROUPS_SNAPSHOT, METHOD_INCREMENT,
-    METHOD_STRING_REVERSE, STATUS_BAD_ENVELOPE, STATUS_INTERNAL_ERROR, STATUS_OK, VERSION,
+    KIND_REQUEST, MAGIC_MSG, METHOD_CGROUPS_SNAPSHOT, METHOD_INCREMENT, METHOD_STRING_REVERSE,
+    STATUS_BAD_ENVELOPE, STATUS_INTERNAL_ERROR, VERSION,
 };
 #[cfg(all(test, unix))]
 use crate::transport::posix::{ClientConfig, ServerConfig, UdsListener, UdsSession};
@@ -68,6 +69,10 @@ use server_session_unix::poll_fd;
 #[cfg(all(test, unix))]
 #[path = "raw_unix_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "raw_lookup_dispatch_tests.rs"]
+mod lookup_dispatch_tests;
 
 #[cfg(all(test, windows))]
 #[path = "raw_windows_tests.rs"]

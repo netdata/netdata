@@ -25,6 +25,7 @@ type HelloConfig struct {
 
 type ServerHelloConfig struct {
 	PacketSize              uint32
+	MaxRequestPayloadBytes  uint32
 	MaxResponsePayloadBytes uint32
 	SupportedProfiles       uint32
 	PreferredProfiles       uint32
@@ -191,9 +192,7 @@ func NegotiateHello(hello protocol.Hello, config ServerHelloConfig) (protocol.He
 	if hello.AuthToken != config.AuthToken {
 		return protocol.HelloAck{}, protocol.StatusAuthFailed, false
 	}
-	// Level 1 keeps request payload limits client-proposed: the server rejects
-	// values over the wire cap and echoes accepted values unchanged.
-	if hello.MaxRequestPayloadBytes > protocol.MaxPayloadCap {
+	if hello.MaxRequestPayloadBytes > config.MaxRequestPayloadBytes {
 		return protocol.HelloAck{}, protocol.StatusLimitExceeded, false
 	}
 

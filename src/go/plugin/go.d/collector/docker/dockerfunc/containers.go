@@ -6,13 +6,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	typesContainer "github.com/docker/docker/api/types/container"
 	"github.com/docker/go-units"
+	typesContainer "github.com/moby/moby/api/types/container"
+	docker "github.com/moby/moby/client"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 )
 
@@ -84,13 +86,14 @@ func (f *funcContainers) Handle(ctx context.Context, method string, params funca
 		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
 
-	containers, err := client.ContainerList(ctx, typesContainer.ListOptions{All: true})
+	result, err := client.ContainerList(ctx, docker.ContainerListOptions{All: true})
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			return funcapi.ErrorResponse(504, "query timed out")
 		}
 		return funcapi.ErrorResponse(500, "failed to list containers: %v", err)
 	}
+	containers := result.Items
 
 	sortContainers(containers)
 
@@ -127,7 +130,7 @@ func buildContainerRow(cntr typesContainer.Summary, now time.Time) []any {
 	row[colCommand] = strings.TrimSpace(cntr.Command)
 	row[colCreated] = formatCreated(cntr.Created, now)
 	row[colStatus] = formatStatus(cntr)
-	row[colState] = strings.TrimSpace(cntr.State)
+	row[colState] = strings.TrimSpace(string(cntr.State))
 	row[colPorts] = formatPorts(cntr.Ports)
 	row[colNames] = formatContainerNames(cntr.Names)
 	row[colContainerIDFull] = cntr.ID
@@ -321,16 +324,16 @@ func formatStatus(cntr typesContainer.Summary) string {
 	case "created":
 		return "Created"
 	default:
-		return cntr.State
+		return string(cntr.State)
 	}
 }
 
-func formatPorts(ports []typesContainer.Port) string {
+func formatPorts(ports []typesContainer.PortSummary) string {
 	if len(ports) == 0 {
 		return ""
 	}
 
-	clone := append([]types.Port(nil), ports...)
+	clone := append([]typesContainer.PortSummary(nil), ports...)
 	sort.Slice(clone, func(i, j int) bool {
 		if clone[i].PrivatePort != clone[j].PrivatePort {
 			return clone[i].PrivatePort < clone[j].PrivatePort
@@ -338,8 +341,8 @@ func formatPorts(ports []typesContainer.Port) string {
 		if clone[i].PublicPort != clone[j].PublicPort {
 			return clone[i].PublicPort < clone[j].PublicPort
 		}
-		if clone[i].IP != clone[j].IP {
-			return clone[i].IP < clone[j].IP
+		if cmp := clone[i].IP.Compare(clone[j].IP); cmp != 0 {
+			return cmp < 0
 		}
 		return clone[i].Type < clone[j].Type
 	})
@@ -354,15 +357,19 @@ func formatPorts(ports []typesContainer.Port) string {
 	return strings.Join(out, ", ")
 }
 
-func formatPort(p typesContainer.Port) string {
+func formatPort(p typesContainer.PortSummary) string {
 	proto := p.Type
 	if proto == "" {
 		proto = "tcp"
 	}
+	ip := ""
+	if p.IP.IsValid() {
+		ip = p.IP.String()
+	}
 
 	switch {
-	case p.PublicPort > 0 && p.IP != "":
-		return fmt.Sprintf("%s:%d->%d/%s", p.IP, p.PublicPort, p.PrivatePort, proto)
+	case p.PublicPort > 0 && ip != "":
+		return fmt.Sprintf("%s->%d/%s", net.JoinHostPort(ip, strconv.Itoa(int(p.PublicPort))), p.PrivatePort, proto)
 	case p.PublicPort > 0:
 		return fmt.Sprintf("%d->%d/%s", p.PublicPort, p.PrivatePort, proto)
 	case p.PrivatePort > 0:

@@ -122,14 +122,40 @@ impl SamplingState {
             .cloned()
     }
 
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn has_any_v9_datalink_templates(&self) -> bool {
-        self.v9_datalink_templates.values().any(|m| !m.is_empty())
+        self.v9_datalink_templates
+            .values()
+            .any(|domains| domains.values().any(|templates| !templates.is_empty()))
     }
 
+    pub(crate) fn has_v9_datalink_templates(
+        &self,
+        exporter_ip: IpAddr,
+        observation_domain_id: u32,
+    ) -> bool {
+        self.v9_datalink_templates
+            .get(&exporter_ip)
+            .and_then(|domains| domains.get(&observation_domain_id))
+            .is_some_and(|templates| !templates.is_empty())
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn has_any_ipfix_datalink_templates(&self) -> bool {
         self.ipfix_datalink_templates
             .values()
-            .any(|m| !m.is_empty())
+            .any(|domains| domains.values().any(|templates| !templates.is_empty()))
+    }
+
+    pub(crate) fn has_ipfix_datalink_templates(
+        &self,
+        exporter_ip: IpAddr,
+        observation_domain_id: u32,
+    ) -> bool {
+        self.ipfix_datalink_templates
+            .get(&exporter_ip)
+            .and_then(|domains| domains.get(&observation_domain_id))
+            .is_some_and(|templates| !templates.is_empty())
     }
 }
 
@@ -222,5 +248,43 @@ mod tests {
                 .get_ipfix_datalink_template(exporter_ip, 400, 512)
                 .is_none()
         );
+    }
+
+    #[test]
+    fn datalink_template_presence_is_scoped_by_exporter_and_observation_domain() {
+        let mut state = SamplingState::default();
+        let v9_exporter_ip = "10.0.0.1".parse().unwrap();
+        let ipfix_exporter_ip = "10.0.0.2".parse().unwrap();
+        let other_exporter_ip = "10.0.0.3".parse().unwrap();
+
+        state.set_v9_datalink_template(
+            v9_exporter_ip,
+            100,
+            257,
+            vec![V9TemplateField {
+                field_type: V9_FIELD_LAYER2_PACKET_SECTION_DATA,
+                field_length: 32,
+            }],
+        );
+        state.set_ipfix_datalink_template(
+            ipfix_exporter_ip,
+            400,
+            512,
+            vec![IPFixTemplateField {
+                field_type: IPFIX_FIELD_DATALINK_FRAME_SECTION,
+                field_length: 64,
+                enterprise_number: None,
+            }],
+        );
+
+        assert!(state.has_any_v9_datalink_templates());
+        assert!(state.has_v9_datalink_templates(v9_exporter_ip, 100));
+        assert!(!state.has_v9_datalink_templates(v9_exporter_ip, 101));
+        assert!(!state.has_v9_datalink_templates(other_exporter_ip, 100));
+
+        assert!(state.has_any_ipfix_datalink_templates());
+        assert!(state.has_ipfix_datalink_templates(ipfix_exporter_ip, 400));
+        assert!(!state.has_ipfix_datalink_templates(ipfix_exporter_ip, 401));
+        assert!(!state.has_ipfix_datalink_templates(other_exporter_ip, 400));
     }
 }

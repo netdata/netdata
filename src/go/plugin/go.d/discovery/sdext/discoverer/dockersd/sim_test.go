@@ -11,14 +11,14 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
 
-	"github.com/docker/docker/api/types"
-	typesContainer "github.com/docker/docker/api/types/container"
+	typesContainer "github.com/moby/moby/api/types/container"
+	docker "github.com/moby/moby/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type dockerCli interface {
-	addContainer(cntr types.Container)
+	addContainer(cntr typesContainer.Summary)
 	removeContainer(id string)
 }
 
@@ -97,24 +97,22 @@ func (sim *discoverySim) run(t *testing.T) {
 	assert.Equalf(t, wantLen, gotLen, "different len (want %d got %d)", wantLen, gotLen)
 	assert.Equal(t, sim.wantGroups, tggs)
 
-	assert.True(t, mock.negApiVerCalled, "NegotiateAPIVersion called")
 	assert.True(t, mock.closeCalled, "Close called")
 }
 
 func newMockDockerd() *mockDockerd {
 	return &mockDockerd{
-		containers: make(map[string]types.Container),
+		containers: make(map[string]typesContainer.Summary),
 	}
 }
 
 type mockDockerd struct {
-	negApiVerCalled bool
-	closeCalled     bool
-	mux             sync.Mutex
-	containers      map[string]types.Container
+	closeCalled bool
+	mux         sync.Mutex
+	containers  map[string]typesContainer.Summary
 }
 
-func (m *mockDockerd) addContainer(cntr types.Container) {
+func (m *mockDockerd) addContainer(cntr typesContainer.Summary) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 
@@ -128,20 +126,16 @@ func (m *mockDockerd) removeContainer(id string) {
 	delete(m.containers, id)
 }
 
-func (m *mockDockerd) ContainerList(_ context.Context, _ typesContainer.ListOptions) ([]types.Container, error) {
+func (m *mockDockerd) ContainerList(_ context.Context, _ docker.ContainerListOptions) (docker.ContainerListResult, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 
-	var cntrs []types.Container
+	var cntrs []typesContainer.Summary
 	for _, cntr := range m.containers {
 		cntrs = append(cntrs, cntr)
 	}
 
-	return cntrs, nil
-}
-
-func (m *mockDockerd) NegotiateAPIVersion(_ context.Context) {
-	m.negApiVerCalled = true
+	return docker.ContainerListResult{Items: cntrs}, nil
 }
 
 func (m *mockDockerd) Close() error {

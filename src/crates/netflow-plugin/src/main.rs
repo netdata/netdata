@@ -187,12 +187,13 @@ async fn async_main() -> i32 {
         &config.enrichment.geoip.asn_database,
         &config.enrichment.geoip.geo_database,
     );
-    let _charts_task = charts::NetflowCharts::new(&mut runtime).spawn_sampler(
+    let _charts_task = charts::NetflowCharts::new(&mut runtime, &config.charts).spawn_sampler(
         Arc::clone(&metrics),
         Arc::clone(&open_tiers),
         Arc::clone(&tier_flow_indexes),
         Arc::clone(&facet_runtime),
         resident_mapping_paths,
+        config.charts.clone(),
         shutdown.clone(),
     );
 

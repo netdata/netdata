@@ -82,10 +82,12 @@ func helloAckStatusError(status uint16) error {
 func serverHandshake(handle syscall.Handle, config *ServerConfig, sessionID uint64) (*Session, error) {
 	serverPktSize := applyDefault(config.PacketSize, defaultPacketSize)
 	sRespPay := applyDefault(config.MaxResponsePayloadBytes, protocol.MaxPayloadDefault)
+	sReqPay := applyDefault(config.MaxRequestPayloadBytes, protocol.MaxPayloadDefault)
 
 	ack, err := framing.ServerHandshake(framing.ServerHandshakeConfig{
 		ServerHelloConfig: framing.ServerHelloConfig{
 			PacketSize:              serverPktSize,
+			MaxRequestPayloadBytes:  sReqPay,
 			MaxResponsePayloadBytes: sRespPay,
 			SupportedProfiles:       config.SupportedProfiles,
 			PreferredProfiles:       config.PreferredProfiles,
@@ -116,10 +118,6 @@ func serverHandshake(handle syscall.Handle, config *ServerConfig, sessionID uint
 		SessionID:               sessionID,
 		inflightIDs:             make(map[uint64]struct{}),
 	}, nil
-}
-
-func sendRejection(handle syscall.Handle, status uint16) {
-	_ = sendHelloAck(handle, status, protocol.HelloAck{LayoutVersion: 1})
 }
 
 func sendHelloAck(handle syscall.Handle, status uint16, ack protocol.HelloAck) error {

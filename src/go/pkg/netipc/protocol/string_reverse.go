@@ -17,7 +17,10 @@ type StringReverseView struct {
 // StringReverseEncode writes a STRING_REVERSE payload into buf.
 // Returns total bytes written, or 0 if buf is too small.
 func StringReverseEncode(s string, buf []byte) int {
-	total := StringReverseHdrSize + len(s) + 1
+	total, ok := stringReverseEncodedLen(len(s))
+	if !ok {
+		return 0
+	}
 	if len(buf) < total {
 		return 0
 	}
@@ -32,6 +35,17 @@ func StringReverseEncode(s string, buf []byte) int {
 	}
 	buf[8+len(s)] = 0 // NUL terminator
 	return total
+}
+
+func stringReverseEncodedLen(strLen int) (int, bool) {
+	if _, ok := checkedU32Int(strLen); !ok {
+		return 0, false
+	}
+	total, ok := checkedAddInt(StringReverseHdrSize, strLen)
+	if ok {
+		total, ok = checkedAddInt(total, 1)
+	}
+	return total, ok
 }
 
 // StringReverseDecode decodes a STRING_REVERSE payload from buf.

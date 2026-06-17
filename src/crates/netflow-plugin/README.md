@@ -283,8 +283,42 @@ Journal rotation size is not user-configured. The plugin derives it per tier:
   uses a fixed internal rotation size of `100MB`
 - the internal time-based rotation cadence remains `1h`
 
-The plugin also exposes internal memory charts to help diagnose resident growth
-in production:
+The plugin exposes lightweight production health charts by default:
+
+- `netflow.open_tiers`
+  - currently open rollup rows by tier
+- `netflow.decoder_scopes`
+  - NetFlow v9 parser scopes
+  - IPFIX parser scopes
+  - legacy parser scopes
+  - persisted decoder namespaces
+  - hydrated namespace-source mappings
+- `netflow.facet_values`
+  - total published facet values
+  - exposed facet values
+- `netflow.facet_fields`
+  - populated facet fields
+  - autocomplete-backed facet fields
+- `netflow.tier_index_entries`
+  - indexed hours
+  - indexed rollup flows
+
+Absolute byte-level memory diagnostics are disabled by default because they read
+process memory maps and estimate in-memory structures. Enable them only when
+debugging memory growth:
+
+```yaml
+charts:
+  memory_diagnostics:
+    enabled: true
+    interval: 10s
+```
+
+These charts refresh on the configured interval. With the default `10s`
+interval, short-lived memory spikes may be missed or appear stale between
+samples.
+
+When enabled, the plugin also exposes:
 
 - `netflow.memory_resident_bytes`
   - `rss`, `hwm`
@@ -315,12 +349,6 @@ in production:
   - tier field dictionaries
   - tier lookup tables
   - tier schema/index metadata
-- `netflow.decoder_scopes`
-  - NetFlow v9 parser scopes
-  - IPFIX parser scopes
-  - legacy parser scopes
-  - persisted decoder namespaces
-  - hydrated namespace-source mappings
 
 These charts are intended for debugging memory explosions under high-cardinality
 traffic, not for billing or hard enforcement decisions.
@@ -350,7 +378,9 @@ The plugin ships two complementary benchmarks:
   paced post-decode resource envelope at a configurable rate, controlled via
   env vars: `NETFLOW_RESOURCE_BENCH_PROTOCOL`, `NETFLOW_RESOURCE_BENCH_PROFILE`,
   `NETFLOW_RESOURCE_BENCH_LAYER`, `NETFLOW_RESOURCE_BENCH_FLOWS_PER_SEC`,
-  `NETFLOW_RESOURCE_BENCH_WARMUP_SECS`, `NETFLOW_RESOURCE_BENCH_MEASURE_SECS`
+  `NETFLOW_RESOURCE_BENCH_WARMUP_SECS`, `NETFLOW_RESOURCE_BENCH_MEASURE_SECS`,
+  `NETFLOW_RESOURCE_BENCH_SYNC_EVERY_ENTRIES`,
+  `NETFLOW_RESOURCE_BENCH_SYNC_INTERVAL_MILLIS`
 
 The resource-envelope benchmark scope:
 
@@ -363,6 +393,10 @@ The resource-envelope benchmark scope:
   no static networks); cardinality fields are pre-populated by the harness
 - reports achieved flows/s, CPU% of one core, peak/final RSS, real disk read
   and write bytes/s from `/proc/self/io`
+- `NETFLOW_RESOURCE_BENCH_LAYER=production-shaped` keeps production listener
+  sync defaults, runs tier commits on worker threads, includes low-rate cases,
+  and reports fixed overhead buckets for sync ticks, chart sampling, raw/tier
+  syncs, tier flushes, and decoder-state persistence
 
 `cpu_percent_of_one_core` is the sum of user+system ticks across all threads
 of the test process during the measurement window, divided by wall time, as a

@@ -69,6 +69,14 @@ journal:
   # group-by combinations exhausting memory.
   query_max_groups: 50000
 
+charts:
+  # Expensive absolute memory diagnostics. Disabled by default because these
+  # charts read process memory maps and estimate in-memory structures. The
+  # default production charts still expose lightweight counts/cardinality.
+  memory_diagnostics:
+    enabled: false
+    interval: 10s
+
 # Optional advanced enrichment modules.
 # Keep disabled unless explicitly configured.
 enrichment:

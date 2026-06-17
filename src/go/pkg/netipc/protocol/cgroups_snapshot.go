@@ -414,19 +414,7 @@ func (b *CgroupsBuilder) Add(hash, options, enabled uint32, name, path []byte) e
 		return ErrOverflow
 	}
 
-	nameSize, ok := checkedAddInt(len(name), 1)
-	if !ok {
-		return ErrOverflow
-	}
-	pathSize, ok := checkedAddInt(len(path), 1)
-	if !ok {
-		return ErrOverflow
-	}
-	itemSize, ok := checkedAddInt(cgroupsItemHdr, nameSize)
-	if !ok {
-		return ErrOverflow
-	}
-	itemSize, ok = checkedAddInt(itemSize, pathSize)
+	_, pathOffset, itemSize, ok := cgroupsItemLayoutForLengths(len(name), len(path))
 	if !ok {
 		return ErrOverflow
 	}
@@ -450,10 +438,6 @@ func (b *CgroupsBuilder) Add(hash, options, enabled uint32, name, path []byte) e
 		return ErrOverflow
 	}
 	nameOffset32 := uint32(cgroupsItemHdr)
-	pathOffset, ok := checkedAddInt(cgroupsItemHdr, nameSize)
-	if !ok {
-		return ErrOverflow
-	}
 	pathOffset32, ok := checkedU32Int(pathOffset)
 	if !ok {
 		return ErrOverflow
@@ -503,6 +487,38 @@ func (b *CgroupsBuilder) Add(hash, options, enabled uint32, name, path []byte) e
 	b.dataOffset = itemEnd
 	b.itemCount++
 	return nil
+}
+
+func cgroupsItemLayoutForLengths(nameLen, pathLen int) (nameSize, pathOffset, itemSize int, ok bool) {
+	if _, ok = checkedU32Int(nameLen); !ok {
+		return 0, 0, 0, false
+	}
+	if _, ok = checkedU32Int(pathLen); !ok {
+		return 0, 0, 0, false
+	}
+	nameSize, ok = checkedAddInt(nameLen, 1)
+	if !ok {
+		return 0, 0, 0, false
+	}
+	pathSize, ok := checkedAddInt(pathLen, 1)
+	if !ok {
+		return 0, 0, 0, false
+	}
+	pathOffset, ok = checkedAddInt(cgroupsItemHdr, nameSize)
+	if !ok {
+		return 0, 0, 0, false
+	}
+	itemSize, ok = checkedAddInt(pathOffset, pathSize)
+	if !ok {
+		return 0, 0, 0, false
+	}
+	if _, ok = checkedU32Int(pathOffset); !ok {
+		return 0, 0, 0, false
+	}
+	if _, ok = checkedU32Int(itemSize); !ok {
+		return 0, 0, 0, false
+	}
+	return nameSize, pathOffset, itemSize, true
 }
 
 // Finish finalizes the builder. Returns the total payload size. The buffer

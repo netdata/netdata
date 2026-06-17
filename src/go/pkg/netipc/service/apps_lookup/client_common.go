@@ -11,8 +11,14 @@ type Client struct {
 }
 
 func NewClient(runDir, serviceName string, config ClientConfig) *Client {
+	typedConfig := transportconfig.TypedConfig(config)
 	inner := raw.NewAppsLookupClient(runDir, serviceName, clientConfigToTransport(config))
-	inner.SetCallTimeout(transportconfig.TypedConfig(config).CallTimeoutMs)
+	inner.SetCallTimeout(typedConfig.CallTimeoutMs)
+	inner.SetLookupLogicalConfig(raw.LookupLogicalConfig{
+		MaxItems:         typedConfig.MaxLogicalLookupItems,
+		MaxSubcalls:      typedConfig.MaxLogicalLookupSubcalls,
+		MaxResponseBytes: typedConfig.MaxLogicalLookupResponseBytes,
+	})
 	return &Client{inner: inner}
 }
 

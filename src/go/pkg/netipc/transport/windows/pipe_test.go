@@ -244,3 +244,44 @@ func TestWaitReadableClosedSession(t *testing.T) {
 		t.Fatalf("WaitReadable on closed session = %v, want ErrBadParam", err)
 	}
 }
+
+func TestSessionRoleAccessors(t *testing.T) {
+	session := &Session{role: RoleServer}
+	if session.Role() != RoleServer {
+		t.Fatalf("Role() = %v, want RoleServer", session.Role())
+	}
+	if session.GetRole() != RoleServer {
+		t.Fatalf("GetRole() = %v, want RoleServer", session.GetRole())
+	}
+}
+
+func TestClosedListenerAcceptAndClose(t *testing.T) {
+	listener := &Listener{handle: syscall.InvalidHandle}
+	if got := listener.Handle(); got != syscall.InvalidHandle {
+		t.Fatalf("closed listener handle = %v, want InvalidHandle", got)
+	}
+	listener.Close()
+	if _, err := listener.AcceptWithConfig(1, ServerConfig{}); !errors.Is(err, ErrAccept) {
+		t.Fatalf("closed listener AcceptWithConfig = %v, want ErrAccept", err)
+	}
+}
+
+func TestListenerAcceptRejectsInvalidOpenHandle(t *testing.T) {
+	listener := &Listener{handle: 0}
+	if _, err := listener.AcceptWithConfig(1, ServerConfig{}); !errors.Is(err, ErrAccept) {
+		t.Fatalf("invalid listener handle AcceptWithConfig = %v, want ErrAccept", err)
+	}
+	if listener.accepting {
+		t.Fatalf("listener accepting flag should be cleared after failed accept")
+	}
+}
+
+func TestCreatePipeInstanceRejectsInvalidPipeName(t *testing.T) {
+	handle, err := createPipeInstance([]uint16{0}, defaultPipeBufSize, false)
+	if !errors.Is(err, ErrCreatePipe) {
+		t.Fatalf("createPipeInstance(empty name) = handle %v err %v, want ErrCreatePipe", handle, err)
+	}
+	if handle != syscall.InvalidHandle {
+		t.Fatalf("createPipeInstance(empty name) handle = %v, want InvalidHandle", handle)
+	}
+}

@@ -1,25 +1,30 @@
 use super::*;
 
 impl FlowDecoders {
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn observe_decoder_state_from_payload(
         &mut self,
         source: SocketAddr,
         payload: &[u8],
     ) -> Option<DecoderStateNamespaceKey> {
-        if payload.len() < 2 {
-            return None;
-        }
+        let context = Self::decoder_packet_context(source, payload)?;
+        self.observe_decoder_state_from_context(source, payload, &context)
+            .then_some(context.key)
+    }
 
-        let Some(key) = Self::decoder_state_namespace_key(source, payload) else {
-            return None;
-        };
-        self.loaded_decoder_namespaces.insert(key.clone());
+    pub(crate) fn observe_decoder_state_from_context(
+        &mut self,
+        source: SocketAddr,
+        payload: &[u8],
+        context: &DecoderPacketContext,
+    ) -> bool {
+        self.loaded_decoder_namespaces.insert(context.key.clone());
         let namespace = self
             .decoder_state_namespaces
-            .entry(key.clone())
+            .entry(context.key.clone())
             .or_default();
 
-        let observation = match u16::from_be_bytes([payload[0], payload[1]]) {
+        let observation = match context.version {
             9 => observe_v9_decoder_state_from_raw_payload(
                 source,
                 payload,
@@ -39,10 +44,10 @@ impl FlowDecoders {
         };
 
         if observation.namespace_state_changed {
-            self.dirty_decoder_namespaces.insert(key.clone());
+            self.dirty_decoder_namespaces.insert(context.key.clone());
         }
 
-        observation.template_state_changed.then_some(key)
+        observation.template_state_changed
     }
 }
 
