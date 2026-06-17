@@ -289,6 +289,11 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NET
       # during codegen ("rustc-LLVM ERROR: out of memory"). Override Cargo's
       # release profile so the otel-plugin build stays within budget.
       if(CMAKE_SIZEOF_VOID_P EQUAL 4 AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        # We depend (transitively) on the `io-uring` crate which doesn't provide
+        # prebuilt bindings for 32-bit arches. Considering this is a compile-time
+        # and not a runtime dependency (because we don't use foyer's io-uring
+        # engine), we can simply skip the check.
+        corrosion_add_target_rustflags(otel-plugin --cfg=io_uring_skip_arch_check)
         corrosion_set_env_vars(
                 otel-plugin
                 "CARGO_PROFILE_RELEASE_DEBUG=0"
