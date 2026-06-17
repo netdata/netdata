@@ -1223,7 +1223,7 @@ func TestCmdRestart_NotFound(t *testing.T) {
 func TestCmdRestart_StartFails(t *testing.T) {
 	cb := &mockCallbacks{}
 	cb.startFn = func(_ testConfig) error { return errors.New("restart failed") }
-	h := newTestHandler(cb)
+	h, out := newTestHandlerWithOutput(cb, 5*time.Second)
 
 	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
 	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusRunning})
@@ -1236,6 +1236,8 @@ func TestCmdRestart_StartFails(t *testing.T) {
 
 	entry, _ := h.exposed.LookupByKey("job1")
 	assert.Equal(t, StatusFailed, entry.Status)
+	assert.Contains(t, out.String(), `"status":422`)
+	assert.Contains(t, out.String(), "config restart failed: restart failed")
 	require.Len(t, cb.statusCalls, 1)
 	assert.Equal(t, StatusRunning, cb.statusCalls[0].oldStatus)
 }
@@ -1245,7 +1247,7 @@ func TestCmdRestart_StartFails_CodedError(t *testing.T) {
 	cb.startFn = func(_ testConfig) error {
 		return &codedErr{err: errors.New("bad config"), code: 400}
 	}
-	h := newTestHandler(cb)
+	h, out := newTestHandlerWithOutput(cb, 5*time.Second)
 
 	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
 	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusRunning})
@@ -1255,6 +1257,8 @@ func TestCmdRestart_StartFails_CodedError(t *testing.T) {
 
 	entry, _ := h.exposed.LookupByKey("job1")
 	assert.Equal(t, StatusFailed, entry.Status)
+	assert.Contains(t, out.String(), `"status":400`)
+	assert.Contains(t, out.String(), "config restart failed: bad config")
 }
 
 // --- Notify Tests ---

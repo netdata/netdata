@@ -772,7 +772,7 @@ func (h *Handler[C]) CmdRestart(fn Function) {
 		if errors.As(err, &ce) {
 			code = ce.DyncfgCode()
 		}
-		h.api.SendCodef(fn, code, "job restart failed: %v", err)
+		h.api.SendCodef(fn, code, "config restart failed: %v", err)
 		h.NotifyConfigStatus(entry.Cfg, StatusFailed)
 		h.cb.OnStatusChange(entry, oldStatus, fn)
 		return
