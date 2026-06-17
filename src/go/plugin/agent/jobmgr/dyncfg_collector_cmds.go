@@ -69,18 +69,61 @@ func (m *Manager) requireModuleJob(fn dyncfg.Function) (string, string, collecto
 		m.dyncfgResponder.SendCodef(fn, 404, "The specified module '%s' is not registered.", moduleName)
 		return "", "", collectorapi.Creator{}, false
 	}
+	if err := validateCollectorInstanceIdentity(moduleName, jobName, creator.InstancePolicy); err != nil {
+		m.Warningf("dyncfg: %s: %v", cmd, err)
+		m.dyncfgResponder.SendCodef(fn, 400, "%v.", err)
+		return "", "", collectorapi.Creator{}, false
+	}
 
 	return moduleName, jobName, creator, true
 }
 
+func (m *Manager) requireSingleConfigID(fn dyncfg.Function, moduleName string, creator collectorapi.Creator) bool {
+	if creator.InstancePolicy != collectorapi.InstancePolicySingle {
+		return true
+	}
+	if fn.ID() == m.dyncfgModID(moduleName) {
+		return true
+	}
+	m.Warningf("dyncfg: %s: single-instance collector %s must use config ID %s", fn.Command(), moduleName, m.dyncfgModID(moduleName))
+	m.dyncfgResponder.SendCodef(fn, 400, "Single-instance collector %s must use config ID %s.", moduleName, m.dyncfgModID(moduleName))
+	return false
+}
+
+func (m *Manager) requireConfigModuleJob(fn dyncfg.Function) (string, string, collectorapi.Creator, bool) {
+	moduleName, creator, ok := m.requireModule(fn)
+	if !ok {
+		return "", "", collectorapi.Creator{}, false
+	}
+	if creator.InstancePolicy == collectorapi.InstancePolicySingle {
+		if !m.requireSingleConfigID(fn, moduleName, creator) {
+			return "", "", collectorapi.Creator{}, false
+		}
+		return moduleName, moduleName, creator, true
+	}
+	return m.requireModuleJob(fn)
+}
+
 func (m *Manager) dyncfgCmdUserconfig(fn dyncfg.Function) {
 	jn := fn.JobName()
-	if jn == "" {
-		jn = "test"
-	}
 
 	mn, creator, ok := m.requireTemplateModule(fn)
 	if !ok {
+		return
+	}
+	if !m.requireSingleConfigID(fn, mn, creator) {
+		return
+	}
+	if jn == "" {
+		if creator.InstancePolicy == collectorapi.InstancePolicySingle {
+			jn = mn
+		} else {
+			jn = "test"
+		}
+	}
+	if err := validateCollectorInstanceIdentity(mn, jn, creator.InstancePolicy); err != nil {
+		m.Warningf("dyncfg: %s: %v", fn.Command(), err)
+		m.dyncfgResponder.SendCodef(fn, 400, "%v.", err)
 		return
 	}
 
@@ -107,10 +150,17 @@ func (m *Manager) dyncfgCmdTest(fn dyncfg.Function) {
 	if !ok {
 		return
 	}
+	if !m.requireSingleConfigID(fn, mn, creator) {
+		return
+	}
 
 	jn := fn.JobName()
 	if jn == "" {
-		jn = "test"
+		if creator.InstancePolicy == collectorapi.InstancePolicySingle {
+			jn = mn
+		} else {
+			jn = "test"
+		}
 	}
 
 	m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, fn.User())
@@ -118,6 +168,11 @@ func (m *Manager) dyncfgCmdTest(fn dyncfg.Function) {
 	if err := dyncfg.JobNameRuleStrict(jn); err != nil {
 		m.Warningf("dyncfg: %s: module %s: unacceptable job name '%s': %v", cmd, mn, jn, err)
 		m.dyncfgResponder.SendCodef(fn, 400, "Unacceptable job name '%s': %v.", jn, err)
+		return
+	}
+	if err := validateCollectorInstanceIdentity(mn, jn, creator.InstancePolicy); err != nil {
+		m.Warningf("dyncfg: %s: %v", cmd, err)
+		m.dyncfgResponder.SendCodef(fn, 400, "%v.", err)
 		return
 	}
 	if !fn.HasPayload() {
@@ -234,6 +289,9 @@ func (m *Manager) dyncfgCmdSchema(fn dyncfg.Function) {
 	if !ok {
 		return
 	}
+	if !m.requireSingleConfigID(fn, mn, mod) {
+		return
+	}
 
 	m.Infof("dyncfg: %s: %s module by user '%s'", fn.Command(), mn, fn.User())
 
@@ -249,7 +307,7 @@ func (m *Manager) dyncfgCmdSchema(fn dyncfg.Function) {
 func (m *Manager) dyncfgCmdGet(fn dyncfg.Function) {
 	cmd := fn.Command()
 
-	mn, jn, creator, ok := m.requireModuleJob(fn)
+	mn, jn, creator, ok := m.requireConfigModuleJob(fn)
 	if !ok {
 		return
 	}

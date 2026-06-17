@@ -91,6 +91,9 @@ func (f *jobFactory) create(cfg confgroup.Config) (runtimeJob, error) {
 	if !ok {
 		return nil, fmt.Errorf("can not find %s module", cfg.Module())
 	}
+	if err := validateCollectorConfigIdentity(cfg, creator); err != nil {
+		return nil, err
+	}
 
 	functionOnly := creator.FunctionOnly || cfg.FunctionOnly()
 	if cfg.FunctionOnly() && creator.Methods == nil && creator.JobMethods == nil {

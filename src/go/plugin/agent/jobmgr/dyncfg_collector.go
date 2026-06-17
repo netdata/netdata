@@ -27,6 +27,13 @@ func (m *Manager) dyncfgJobID(cfg confgroup.Config) string {
 	return fmt.Sprintf("%s%s:%s", m.dyncfgCollectorPrefixValue(), cfg.Module(), cfg.Name())
 }
 
+func (m *Manager) dyncfgConfigID(cfg confgroup.Config) string {
+	if m.isSingleInstanceCollector(cfg.Module()) {
+		return m.dyncfgModID(cfg.Module())
+	}
+	return m.dyncfgJobID(cfg)
+}
+
 func dyncfgCollectorModCmds() string {
 	return dyncfg.JoinCommands(
 		dyncfg.CommandAdd,
@@ -35,6 +42,19 @@ func dyncfgCollectorModCmds() string {
 		dyncfg.CommandDisable,
 		dyncfg.CommandTest,
 		dyncfg.CommandUserconfig)
+}
+
+func dyncfgCollectorConfigCmds() []dyncfg.Command {
+	return []dyncfg.Command{
+		dyncfg.CommandSchema,
+		dyncfg.CommandGet,
+		dyncfg.CommandEnable,
+		dyncfg.CommandDisable,
+		dyncfg.CommandUpdate,
+		dyncfg.CommandRestart,
+		dyncfg.CommandTest,
+		dyncfg.CommandUserconfig,
+	}
 }
 
 func (m *Manager) dyncfgCollectorModuleCreate(name string) {

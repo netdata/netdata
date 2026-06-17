@@ -83,7 +83,7 @@ func (cb *sdCallbacks) ExtractKey(fn dyncfg.Function) (key, name string, ok bool
 	return dt + ":" + name, name, true
 }
 
-func (cb *sdCallbacks) ValidateJobName(name string) error {
+func (cb *sdCallbacks) ValidateConfigName(name string) error {
 	return dyncfg.JobNameRuleAllowDots(name)
 }
 
@@ -125,6 +125,10 @@ func (cb *sdCallbacks) OnStatusChange(_ *dyncfg.Entry[sdConfig], _ dyncfg.Status
 
 func (cb *sdCallbacks) ConfigID(cfg sdConfig) string {
 	return cb.sd.dyncfgJobID(cfg.DiscovererType(), cfg.Name())
+}
+
+func (cb *sdCallbacks) ConfigType(sdConfig) dyncfg.ConfigType {
+	return dyncfg.ConfigTypeJob
 }
 
 // dyncfgConfig is the handler for dyncfg config commands.

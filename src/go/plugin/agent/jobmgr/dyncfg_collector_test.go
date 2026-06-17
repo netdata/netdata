@@ -210,6 +210,209 @@ func TestDyncfgCmdTest_PassesJobNameToV2Collector(t *testing.T) {
 	assert.Equal(t, float64(200), resp["status"])
 }
 
+func TestDyncfgCmdTest_SingleInstancePolicyUsesCanonicalName(t *testing.T) {
+	var buf bytes.Buffer
+	mod := &namedTestV1Module{}
+
+	mgr := newCollectorTestManager()
+	mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))))
+	mgr.modules.Register("singletest", collectorapi.Creator{
+		InstancePolicy: collectorapi.InstancePolicySingle,
+		Create: func() collectorapi.CollectorV1 {
+			return mod
+		},
+	})
+
+	fn := dyncfg.NewFunction(functions.Function{
+		UID:         "single-test-default-name",
+		ContentType: "application/json",
+		Payload:     mustMarshalCollectorConfigPayload(t, prepareDyncfgCfg("singletest", "payload-name")),
+		Args:        collectorTestArgs(mgr, "singletest", string(dyncfg.CommandTest)),
+	})
+
+	mgr.dyncfgCmdTest(fn)
+	mgr.cmdTestWG.Wait()
+
+	var resp map[string]any
+	mustDecodeFunctionPayload(t, buf.String(), "single-test-default-name", &resp)
+	assert.Equal(t, float64(200), resp["status"])
+	assert.Equal(t, "singletest", mod.jobName)
+}
+
+func TestDyncfgCmdTest_SingleInstancePolicyRejectsNonCanonicalName(t *testing.T) {
+	var buf bytes.Buffer
+	created := false
+
+	mgr := newCollectorTestManager()
+	mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))))
+	mgr.modules.Register("singletest", collectorapi.Creator{
+		InstancePolicy: collectorapi.InstancePolicySingle,
+		Create: func() collectorapi.CollectorV1 {
+			created = true
+			return &testV1Module{}
+		},
+	})
+
+	fn := dyncfg.NewFunction(functions.Function{
+		UID:         "single-test-custom-name",
+		ContentType: "application/json",
+		Payload:     mustMarshalCollectorConfigPayload(t, prepareDyncfgCfg("singletest", "payload-name")),
+		Args:        collectorTestArgs(mgr, "singletest", string(dyncfg.CommandTest), "custom"),
+	})
+
+	mgr.dyncfgCmdTest(fn)
+
+	out := buf.String()
+	assert.Equal(t, 1, strings.Count(out, "FUNCTION_RESULT_BEGIN single-test-custom-name"))
+	assert.Contains(t, out, "\"status\":400")
+	assert.Contains(t, out, "single-instance collector singletest")
+	assert.False(t, created)
+}
+
+func TestDyncfgCmdUserconfig_SingleInstancePolicyUsesCanonicalName(t *testing.T) {
+	var buf bytes.Buffer
+
+	mgr := newCollectorTestManager()
+	mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))))
+	mgr.modules.Register("singleuserconfig", collectorapi.Creator{
+		InstancePolicy: collectorapi.InstancePolicySingle,
+		Create:         func() collectorapi.CollectorV1 { return &testV1Module{} },
+		Config:         func() any { return &collectorapi.MockConfiguration{} },
+	})
+
+	fn := dyncfg.NewFunction(functions.Function{
+		UID:     "single-userconfig-default-name",
+		Payload: []byte(`{}`),
+		Args:    collectorTestArgs(mgr, "singleuserconfig", string(dyncfg.CommandUserconfig)),
+	})
+
+	mgr.dyncfgCmdUserconfig(fn)
+
+	out := buf.String()
+	assert.Equal(t, 1, strings.Count(out, "FUNCTION_RESULT_BEGIN single-userconfig-default-name"))
+	assert.Contains(t, out, "name: singleuserconfig")
+}
+
+func TestDyncfgCmdUserconfig_SingleInstancePolicyRejectsNonCanonicalName(t *testing.T) {
+	var buf bytes.Buffer
+
+	mgr := newCollectorTestManager()
+	mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))))
+	mgr.modules.Register("singleuserconfig", collectorapi.Creator{
+		InstancePolicy: collectorapi.InstancePolicySingle,
+		Create:         func() collectorapi.CollectorV1 { return &testV1Module{} },
+		Config:         func() any { return &collectorapi.MockConfiguration{} },
+	})
+
+	fn := dyncfg.NewFunction(functions.Function{
+		UID:     "single-userconfig-custom-name",
+		Payload: []byte(`{}`),
+		Args:    collectorTestArgs(mgr, "singleuserconfig", string(dyncfg.CommandUserconfig), "custom"),
+	})
+
+	mgr.dyncfgCmdUserconfig(fn)
+
+	out := buf.String()
+	assert.Equal(t, 1, strings.Count(out, "FUNCTION_RESULT_BEGIN single-userconfig-custom-name"))
+	assert.Contains(t, out, "\"status\":400")
+	assert.Contains(t, out, "single-instance collector singleuserconfig")
+}
+
+func TestDyncfgCmdGet_SingleInstancePolicyUsesSingleConfigID(t *testing.T) {
+	var buf bytes.Buffer
+
+	mgr := newCollectorTestManager()
+	mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))))
+	mgr.modules.Register("singleget", collectorapi.Creator{
+		InstancePolicy: collectorapi.InstancePolicySingle,
+		Create:         func() collectorapi.CollectorV1 { return &collectorapi.MockCollectorV1{} },
+	})
+
+	cfg := prepareDyncfgCfg("singleget", "singleget").
+		Set("option_str", "one").
+		Set("option_int", 2)
+	seedCollectorEntry(mgr, cfg, dyncfg.StatusDisabled)
+
+	fn := dyncfg.NewFunction(functions.Function{
+		UID:  "single-get",
+		Args: collectorTestArgs(mgr, "singleget", string(dyncfg.CommandGet)),
+	})
+
+	mgr.dyncfgCmdGet(fn)
+
+	var resp map[string]any
+	mustDecodeFunctionPayload(t, buf.String(), "single-get", &resp)
+	assert.Equal(t, "one", resp["option_str"])
+	assert.Equal(t, float64(2), resp["option_int"])
+}
+
+func TestDyncfgCmdLifecycle_SingleInstancePolicyUsesSingleConfigID(t *testing.T) {
+	var buf bytes.Buffer
+
+	mgr := newCollectorTestManager()
+	mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))))
+	mgr.modules.Register("singlelife", collectorapi.Creator{
+		InstancePolicy: collectorapi.InstancePolicySingle,
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
+				ChartsFunc: func() *collectorapi.Charts {
+					return &collectorapi.Charts{
+						&collectorapi.Chart{
+							ID:    "id",
+							Title: "title",
+							Units: "units",
+							Dims:  collectorapi.Dims{{ID: "id1"}},
+						},
+					}
+				},
+				CollectFunc: func(context.Context) map[string]int64 {
+					return map[string]int64{"id1": 1}
+				},
+			}
+		},
+	})
+
+	cfg := prepareDyncfgCfg("singlelife", "singlelife")
+	seedCollectorEntry(mgr, cfg, dyncfg.StatusAccepted)
+
+	mgr.dyncfgCollectorSeqExec(dyncfg.NewFunction(functions.Function{
+		UID:  "single-enable",
+		Args: collectorTestArgs(mgr, "singlelife", string(dyncfg.CommandEnable)),
+	}))
+	entry, ok := mgr.collectorExposed.LookupByKey("singlelife")
+	require.True(t, ok)
+	assert.Equal(t, dyncfg.StatusRunning, entry.Status)
+	_, running := mgr.runningJobs.lookup("singlelife")
+	assert.True(t, running)
+
+	mgr.dyncfgCollectorSeqExec(dyncfg.NewFunction(functions.Function{
+		UID:  "single-restart",
+		Args: collectorTestArgs(mgr, "singlelife", string(dyncfg.CommandRestart)),
+	}))
+	entry, ok = mgr.collectorExposed.LookupByKey("singlelife")
+	require.True(t, ok)
+	assert.Equal(t, dyncfg.StatusRunning, entry.Status)
+	_, running = mgr.runningJobs.lookup("singlelife")
+	assert.True(t, running)
+
+	mgr.dyncfgCollectorSeqExec(dyncfg.NewFunction(functions.Function{
+		UID:  "single-disable",
+		Args: collectorTestArgs(mgr, "singlelife", string(dyncfg.CommandDisable)),
+	}))
+	entry, ok = mgr.collectorExposed.LookupByKey("singlelife")
+	require.True(t, ok)
+	assert.Equal(t, dyncfg.StatusDisabled, entry.Status)
+	_, running = mgr.runningJobs.lookup("singlelife")
+	assert.False(t, running)
+
+	out := buf.String()
+	assert.Equal(t, 1, strings.Count(out, "FUNCTION_RESULT_BEGIN single-enable"))
+	assert.Equal(t, 1, strings.Count(out, "FUNCTION_RESULT_BEGIN single-restart"))
+	assert.Equal(t, 1, strings.Count(out, "FUNCTION_RESULT_BEGIN single-disable"))
+	assert.Contains(t, out, "CONFIG test:collector:singlelife status running")
+	assert.Contains(t, out, "CONFIG test:collector:singlelife status disabled")
+}
+
 func TestDyncfgCmdTest_CodedInitAndCheckErrorsPreserveCode(t *testing.T) {
 	tests := map[string]struct {
 		register   func(*Manager, string)
@@ -357,6 +560,158 @@ func TestDyncfgCollectorSeqExec_SyncsSecretStoreDepsForMutatingCommands(t *testi
 	}
 }
 
+func TestDyncfgCollectorSeqExec_SingleInstancePolicySyncsSecretStoreDepsByModuleKey(t *testing.T) {
+	mgr := newCollectorTestManager()
+	mgr.modules.Register("singledeps", collectorapi.Creator{
+		InstancePolicy: collectorapi.InstancePolicySingle,
+		Create:         func() collectorapi.CollectorV1 { return &testV1Module{} },
+	})
+
+	oldCfg := prepareUserCfg("singledeps", "singledeps").
+		Set("password", "${store:vault:vault_old:secret/data/mysql#password}")
+	newCfg := prepareDyncfgCfg("singledeps", "singledeps").
+		Set("password", "${store:vault:vault_new:secret/data/mysql#password}")
+
+	cb := &collectorSeqTestCallbacks{
+		mgr:    mgr,
+		parsed: map[dyncfg.Command]confgroup.Config{dyncfg.CommandUpdate: newCfg},
+	}
+	mgr.collectorHandler = newCollectorTestHandler(mgr, cb)
+
+	seedCollectorEntry(mgr, oldCfg, dyncfg.StatusDisabled)
+	mgr.syncSecretStoreDepsForConfig(oldCfg)
+
+	beforeExposed, beforeRunning := mgr.secretStoreDeps.Impacted("vault:vault_old")
+	require.Len(t, beforeExposed, 1)
+	assert.Equal(t, "singledeps", beforeExposed[0].ID)
+	assert.Equal(t, "singledeps:singledeps", beforeExposed[0].Display)
+	assert.Empty(t, beforeRunning)
+
+	fn := dyncfg.NewFunction(functions.Function{
+		UID:         "single-deps-update",
+		ContentType: "application/json",
+		Payload:     mustMarshalCollectorConfigPayload(t, newCfg),
+		Args:        collectorTestArgs(mgr, "singledeps", string(dyncfg.CommandUpdate)),
+	})
+
+	mgr.dyncfgCollectorSeqExec(fn)
+
+	oldExposed, oldRunning := mgr.secretStoreDeps.Impacted("vault:vault_old")
+	assert.Empty(t, oldExposed)
+	assert.Empty(t, oldRunning)
+
+	newExposed, newRunning := mgr.secretStoreDeps.Impacted("vault:vault_new")
+	require.Len(t, newExposed, 1)
+	assert.Equal(t, "singledeps", newExposed[0].ID)
+	assert.Equal(t, "singledeps:singledeps", newExposed[0].Display)
+	assert.Empty(t, newRunning)
+}
+
+func TestDyncfgCmdUpdate_SingleInstancePolicyReplacesLowerPriorityWithoutStarting(t *testing.T) {
+	var buf bytes.Buffer
+
+	mgr := newCollectorTestManager()
+	mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))))
+	mgr.modules.Register("singleupdate", collectorapi.Creator{
+		InstancePolicy: collectorapi.InstancePolicySingle,
+		Create:         func() collectorapi.CollectorV1 { return &testV1Module{} },
+	})
+
+	userCfg := prepareUserCfg("singleupdate", "singleupdate")
+	seedCollectorEntry(mgr, userCfg, dyncfg.StatusDisabled)
+
+	newCfg := prepareDyncfgCfg("singleupdate", "singleupdate")
+	fn := dyncfg.NewFunction(functions.Function{
+		UID:         "single-update",
+		ContentType: "application/json",
+		Payload:     mustMarshalCollectorConfigPayload(t, newCfg),
+		Args:        collectorTestArgs(mgr, "singleupdate", string(dyncfg.CommandUpdate)),
+	})
+
+	mgr.collectorHandler.CmdUpdate(fn)
+
+	out := buf.String()
+	assert.Equal(t, 1, strings.Count(out, "FUNCTION_RESULT_BEGIN single-update"))
+	assert.Contains(t, out, "\"status\":200")
+	assert.Contains(t, out, "CONFIG test:collector:singleupdate create disabled single /collectors/test/Jobs dyncfg")
+	assert.Contains(t, out, "'schema get enable disable update restart test userconfig'")
+	assert.NotContains(t, out, "remove")
+
+	entry, ok := mgr.collectorExposed.LookupByKey("singleupdate")
+	require.True(t, ok)
+	assert.Equal(t, confgroup.TypeDyncfg, entry.Cfg.SourceType())
+	assert.Equal(t, dyncfg.StatusDisabled, entry.Status)
+
+	_, running := mgr.runningJobs.lookup("singleupdate")
+	assert.False(t, running)
+}
+
+func TestDyncfgCmdUpdate_SingleInstancePolicyReplacesRunningLowerPriority(t *testing.T) {
+	var buf bytes.Buffer
+
+	mgr := newCollectorTestManager()
+	mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))))
+	mgr.modules.Register("singleupdate", collectorapi.Creator{
+		InstancePolicy: collectorapi.InstancePolicySingle,
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
+				ChartsFunc: func() *collectorapi.Charts {
+					return &collectorapi.Charts{
+						&collectorapi.Chart{
+							ID:    "id",
+							Title: "title",
+							Units: "units",
+							Dims:  collectorapi.Dims{{ID: "id1"}},
+						},
+					}
+				},
+				CollectFunc: func(context.Context) map[string]int64 {
+					return map[string]int64{"id1": 1}
+				},
+			}
+		},
+	})
+
+	userCfg := prepareUserCfg("singleupdate", "singleupdate")
+	seedCollectorEntry(mgr, userCfg, dyncfg.StatusRunning)
+	oldJob := &collectorProbeJob{
+		fullName:   "singleupdate",
+		moduleName: "singleupdate",
+		name:       "singleupdate",
+	}
+	mgr.runningJobs.lock()
+	mgr.runningJobs.add(oldJob.FullName(), oldJob)
+	mgr.runningJobs.unlock()
+	t.Cleanup(func() { mgr.stopRunningJob("singleupdate") })
+
+	newCfg := prepareDyncfgCfg("singleupdate", "singleupdate")
+	fn := dyncfg.NewFunction(functions.Function{
+		UID:         "single-update-running",
+		ContentType: "application/json",
+		Payload:     mustMarshalCollectorConfigPayload(t, newCfg),
+		Args:        collectorTestArgs(mgr, "singleupdate", string(dyncfg.CommandUpdate)),
+	})
+
+	mgr.collectorHandler.CmdUpdate(fn)
+
+	out := buf.String()
+	assert.Equal(t, 1, strings.Count(out, "FUNCTION_RESULT_BEGIN single-update-running"))
+	assert.Contains(t, out, "\"status\":200")
+	assert.Contains(t, out, "CONFIG test:collector:singleupdate create running single /collectors/test/Jobs dyncfg")
+	assert.Contains(t, out, "CONFIG test:collector:singleupdate status running")
+	assert.NotContains(t, out, "remove")
+
+	entry, ok := mgr.collectorExposed.LookupByKey("singleupdate")
+	require.True(t, ok)
+	assert.Equal(t, confgroup.TypeDyncfg, entry.Cfg.SourceType())
+	assert.Equal(t, dyncfg.StatusRunning, entry.Status)
+	assert.True(t, oldJob.stopped)
+
+	runningJob, running := mgr.runningJobs.lookup("singleupdate")
+	require.True(t, running)
+	assert.NotSame(t, oldJob, runningJob)
+}
+
 func TestDyncfgCollectorSeqExec_DoesNotSyncSecretStoreDepsForNonMutatingCommands(t *testing.T) {
 	tests := map[string]struct {
 		command dyncfg.Command
@@ -479,6 +834,48 @@ func TestCollectorCallbacks_ParseAndValidate(t *testing.T) {
 			assert.Equal(t, tc.wantName, cfg.Name())
 			assert.Equal(t, tc.wantProvider, cfg.Provider())
 			assert.Equal(t, tc.wantSourceTyp, cfg.SourceType())
+		})
+	}
+}
+
+func TestCollectorCallbacks_ExtractKeySingleInstancePolicy(t *testing.T) {
+	tests := map[string]struct {
+		args     []string
+		wantKey  string
+		wantName string
+		wantOK   bool
+	}{
+		"add is rejected": {
+			args: []string{"single", string(dyncfg.CommandAdd), "single"},
+		},
+		"canonical enable uses module key": {
+			args:     []string{"single", string(dyncfg.CommandEnable)},
+			wantKey:  "single",
+			wantName: "single",
+			wantOK:   true,
+		},
+		"job-style enable is rejected": {
+			args: []string{"single:single", string(dyncfg.CommandEnable)},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			mgr := newCollectorTestManager()
+			mgr.modules.Register("single", collectorapi.Creator{
+				InstancePolicy: collectorapi.InstancePolicySingle,
+				Create:         func() collectorapi.CollectorV1 { return &testV1Module{} },
+			})
+			cb := &collectorCallbacks{mgr: mgr}
+			fn := dyncfg.NewFunction(functions.Function{
+				UID:  name,
+				Args: collectorTestArgs(mgr, tc.args...),
+			})
+
+			key, gotName, ok := cb.ExtractKey(fn)
+			assert.Equal(t, tc.wantOK, ok)
+			assert.Equal(t, tc.wantKey, key)
+			assert.Equal(t, tc.wantName, gotName)
 		})
 	}
 }
@@ -1242,7 +1639,7 @@ func newCollectorTestHandler(mgr *Manager, cb dyncfg.Callbacks[confgroup.Config]
 		Path:                    "/collectors/test/Jobs",
 		EnableFailCode:          200,
 		RemoveStockOnEnableFail: true,
-		JobCommands: []dyncfg.Command{
+		ConfigCommands: []dyncfg.Command{
 			dyncfg.CommandSchema,
 			dyncfg.CommandGet,
 			dyncfg.CommandEnable,
@@ -1297,7 +1694,7 @@ func (cb *collectorSeqTestCallbacks) ExtractKey(fn dyncfg.Function) (key, name s
 	return cb.mgr.collectorCallbacks.ExtractKey(fn)
 }
 
-func (cb *collectorSeqTestCallbacks) ValidateJobName(name string) error {
+func (cb *collectorSeqTestCallbacks) ValidateConfigName(name string) error {
 	return dyncfg.JobNameRuleStrict(name)
 }
 
@@ -1319,7 +1716,11 @@ func (cb *collectorSeqTestCallbacks) OnStatusChange(*dyncfg.Entry[confgroup.Conf
 }
 
 func (cb *collectorSeqTestCallbacks) ConfigID(cfg confgroup.Config) string {
-	return cb.mgr.dyncfgJobID(cfg)
+	return cb.mgr.dyncfgConfigID(cfg)
+}
+
+func (cb *collectorSeqTestCallbacks) ConfigType(cfg confgroup.Config) dyncfg.ConfigType {
+	return cb.mgr.collectorCallbacks.ConfigType(cfg)
 }
 
 type collectorProbeJob struct {
