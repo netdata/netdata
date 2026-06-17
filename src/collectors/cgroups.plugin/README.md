@@ -105,10 +105,18 @@ Renaming is configured with the following options:
 ```text
 [plugin:cgroups]
  run script to rename cgroups matching =  !/  !*.mount  !*.socket  !*.partition  /machine.slice/*.service  !*.service  !*.slice  !*.swap  !*.user  !init.scope  !*.scope/vcpu*  !*.scope/emulator  *.scope  *docker*  *lxc*  *qemu*  */kubepods/pod*/*  */kubepods/*/pod*/*  */*-kubepods-pod*/*  */*-kubepods-*-pod*/*  !*kubepods*  !*kubelet*  *.libvirt-qemu  *
+ cgroup-name timeout = 120
 ```
 
 The additional pattern list serves to limit the number of times the resolver will be called. Without it, the resolver
 might be called thousands of times, depending on the number of cgroups available in the system.
+
+The `cgroup-name timeout` option (default `120` seconds; `0` disables the
+timeout) bounds how long Netdata waits for the helper to resolve a single
+cgroup. If the helper exceeds it, Netdata stops waiting for that cgroup; if a
+helper call simply cannot resolve a name yet (for example, while the Kubernetes
+API is still populating a new pod's metadata), it is retried on a later
+discovery cycle.
 
 The above pattern list is matched against the path of the cgroup. For matched
 cgroups, Netdata calls the `cgroup-name` helper to get its name. This helper
