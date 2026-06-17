@@ -92,7 +92,7 @@ ebpf_module_t ebpf_modules[] = {
     {.info = {.thread_name = "socket", .config_name = "socket", .thread_description = NETDATA_EBPF_SOCKET_MODULE_DESC},
      .functions =
          {.start_routine = ebpf_socket_thread,
-          .apps_routine = ebpf_socket_create_apps_charts,
+          .apps_routine = NULL,
           .bpf_unload = ebpf_socket_unload_bpf},
      .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
      .update_every = EBPF_DEFAULT_UPDATE_EVERY,
