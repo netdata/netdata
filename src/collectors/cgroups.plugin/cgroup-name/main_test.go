@@ -399,47 +399,27 @@ func TestMirroredK8sContainerPathFixturesFromCache(t *testing.T) {
 	}
 }
 
-func TestMirroredK8sPodListFixtureViaKubelet(t *testing.T) {
-	// This small pod-list payload preserves shapes found in Datadog/New Relic/
-	// OpenTelemetry kubelet fixtures: owner references, annotations, node names,
-	// Docker IDs, containerd IDs, and CRI-O IDs.
-	tmp := t.TempDir()
-	t.Setenv("PATH", tmp)
-	if err := os.WriteFile(filepath.Join(tmp, "jq"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("PATH", tmp)
-	t.Setenv("TMPDIR", tmp)
-	t.Setenv("NETDATA_LOG_LEVEL", "emerg")
-	t.Setenv("NETDATA_HOST_PREFIX", tmp)
-	t.Setenv("KUBERNETES_SERVICE_HOST", "127.0.0.1")
-	t.Setenv("KUBERNETES_PORT_443_TCP_PORT", "443")
-	t.Setenv("USE_KUBELET_FOR_PODS_METADATA", "1")
-
-	if err := os.WriteFile(filepath.Join(tmp, "netdata-cgroups-k8s-cluster-name"), []byte("fixture-cluster\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(tmp, "netdata-cgroups-kubesystem-uid"), []byte("fixture-system-uid\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	containerdID := strings.Repeat("1", 64)
-	dockerID := strings.Repeat("2", 64)
-	crioID := strings.Repeat("3", 64)
-	pods := `{"items":[` +
+// k8sPodFixture returns the shared sanitized pod-list payload used by both
+// Kubernetes metadata-path tests, plus the three container ids it embeds. The
+// shapes mirror Datadog/New Relic/OpenTelemetry kubelet fixtures: owner
+// references, annotations, node names, and Docker/containerd/CRI-O ids.
+func k8sPodFixture() (containerdID, dockerID, crioID, pods string) {
+	containerdID = strings.Repeat("1", 64)
+	dockerID = strings.Repeat("2", 64)
+	crioID = strings.Repeat("3", 64)
+	pods = `{"items":[` +
 		`{"metadata":{"namespace":"default","name":"api-123","uid":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee","annotations":{"checksum/config":"ignored","netdata.cloud/service":"payments"},"ownerReferences":[{"controller":true,"kind":"ReplicaSet","name":"api-123"}]},"spec":{"nodeName":"node-a"},"status":{"containerStatuses":[{"name":"app","containerID":"containerd://` + containerdID + `"},{"name":"sidecar","containerID":"docker://` + dockerID + `"}]}},` +
 		`{"metadata":{"namespace":"openshift-monitoring","name":"collector-0","uid":"bbbbbbbb-cccc-dddd-eeee-ffffffffffff","ownerReferences":[{"controller":true,"kind":"DaemonSet","name":"collector"}]},"spec":{"nodeName":"node-b"},"status":{"containerStatuses":[{"name":"collector","containerID":"cri-o://` + crioID + `"}]}}` +
 		`]}`
+	return
+}
 
-	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/pods" {
-			t.Fatalf("unexpected kubelet path %s", r.URL.Path)
-		}
-		_, _ = w.Write([]byte(pods))
-	}))
-	defer ts.Close()
-	t.Setenv("KUBELET_URL", ts.URL)
-
+// assertK8sBurstableContainerResolved runs the resolver for the shared burstable
+// container cgroup and asserts the resolved chart name, labels, the cached
+// container lines, and 0600 cache-file permissions. Both Kubernetes
+// metadata-path tests call it after wiring their transport-specific env.
+func assertK8sBurstableContainerResolved(t *testing.T, tmp, containerdID, dockerID, crioID string) {
+	t.Helper()
 	cgroup := "kubepods.slice/kubepods-burstable.slice/kubepods-burstable-podaaaaaaaa_bbbb_cccc_dddd_eeeeeeeeeeee.slice/cri-containerd-" + containerdID + ".scope"
 	var out bytes.Buffer
 	code := run([]string{"cgroup-name", cgroup, cgroup}, &out)
@@ -465,7 +445,6 @@ func TestMirroredK8sPodListFixtureViaKubelet(t *testing.T) {
 			t.Fatalf("output missing %q:\n%s", want, got)
 		}
 	}
-
 	cache, err := os.ReadFile(filepath.Join(tmp, "netdata-cgroups-containers"))
 	if err != nil {
 		t.Fatal(err)
@@ -494,13 +473,51 @@ func TestMirroredK8sPodListFixtureViaKubelet(t *testing.T) {
 	}
 }
 
+func TestMirroredK8sPodListFixtureViaKubelet(t *testing.T) {
+	// This small pod-list payload preserves shapes found in Datadog/New Relic/
+	// OpenTelemetry kubelet fixtures: owner references, annotations, node names,
+	// Docker IDs, containerd IDs, and CRI-O IDs.
+	tmp := t.TempDir()
+	t.Setenv("PATH", tmp)
+	if err := os.WriteFile(filepath.Join(tmp, "jq"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TMPDIR", tmp)
+	t.Setenv("NETDATA_LOG_LEVEL", "emerg")
+	t.Setenv("NETDATA_HOST_PREFIX", tmp)
+	t.Setenv("KUBERNETES_SERVICE_HOST", "127.0.0.1")
+	t.Setenv("KUBERNETES_PORT_443_TCP_PORT", "443")
+	t.Setenv("USE_KUBELET_FOR_PODS_METADATA", "1")
+
+	if err := os.WriteFile(filepath.Join(tmp, "netdata-cgroups-k8s-cluster-name"), []byte("fixture-cluster\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmp, "netdata-cgroups-kubesystem-uid"), []byte("fixture-system-uid\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	containerdID, dockerID, crioID, pods := k8sPodFixture()
+
+	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/pods" {
+			t.Errorf("unexpected kubelet path %s", r.URL.Path)
+			http.Error(w, "unexpected path", http.StatusNotFound)
+			return
+		}
+		_, _ = w.Write([]byte(pods))
+	}))
+	defer ts.Close()
+	t.Setenv("KUBELET_URL", ts.URL)
+
+	assertK8sBurstableContainerResolved(t, tmp, containerdID, dockerID, crioID)
+}
+
 func TestMirroredK8sPodListFixtureViaAPIServer(t *testing.T) {
 	// Same sanitized pod-list payload as the kubelet test, but driven through the
 	// in-cluster API-server path: the helper fetches the kube-system namespace
 	// object (its metadata.uid becomes the cluster id) and then /api/v1/pods.
 	// The API-server and kubelet paths must resolve to identical names/labels.
 	tmp := t.TempDir()
-	t.Setenv("PATH", tmp)
 	if err := os.WriteFile(filepath.Join(tmp, "jq"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -523,14 +540,8 @@ func TestMirroredK8sPodListFixtureViaAPIServer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	containerdID := strings.Repeat("1", 64)
-	dockerID := strings.Repeat("2", 64)
-	crioID := strings.Repeat("3", 64)
+	containerdID, dockerID, crioID, pods := k8sPodFixture()
 	kubeSystemNS := `{"metadata":{"name":"kube-system","uid":"fixture-system-uid"}}`
-	pods := `{"items":[` +
-		`{"metadata":{"namespace":"default","name":"api-123","uid":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee","annotations":{"checksum/config":"ignored","netdata.cloud/service":"payments"},"ownerReferences":[{"controller":true,"kind":"ReplicaSet","name":"api-123"}]},"spec":{"nodeName":"node-a"},"status":{"containerStatuses":[{"name":"app","containerID":"containerd://` + containerdID + `"},{"name":"sidecar","containerID":"docker://` + dockerID + `"}]}},` +
-		`{"metadata":{"namespace":"openshift-monitoring","name":"collector-0","uid":"bbbbbbbb-cccc-dddd-eeee-ffffffffffff","ownerReferences":[{"controller":true,"kind":"DaemonSet","name":"collector"}]},"spec":{"nodeName":"node-b"},"status":{"containerStatuses":[{"name":"collector","containerID":"cri-o://` + crioID + `"}]}}` +
-		`]}`
 
 	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -556,63 +567,13 @@ func TestMirroredK8sPodListFixtureViaAPIServer(t *testing.T) {
 	t.Setenv("KUBERNETES_SERVICE_HOST", host)
 	t.Setenv("KUBERNETES_PORT_443_TCP_PORT", port)
 
-	cgroup := "kubepods.slice/kubepods-burstable.slice/kubepods-burstable-podaaaaaaaa_bbbb_cccc_dddd_eeeeeeeeeeee.slice/cri-containerd-" + containerdID + ".scope"
-	var out bytes.Buffer
-	code := run([]string{"cgroup-name", cgroup, cgroup}, &out)
-	if code != exitSuccess {
-		t.Fatalf("exit code: want %d got %d", exitSuccess, code)
-	}
-	got := strings.TrimSpace(out.String())
-	for _, want := range []string{
-		`k8s_cntr_default_api-123_app `,
-		`k8s_namespace="default"`,
-		`k8s_pod_name="api-123"`,
-		`k8s_netdata.cloud/service="payments"`,
-		`k8s_controller_kind="ReplicaSet"`,
-		`k8s_controller_name="api-123"`,
-		`k8s_node_name="node-a"`,
-		`k8s_container_name="app"`,
-		`k8s_kind="container"`,
-		`k8s_qos_class="burstable"`,
-		`k8s_cluster_id="fixture-system-uid"`,
-		`k8s_cluster_name="fixture-cluster"`,
-	} {
-		if !strings.Contains(got, want) {
-			t.Fatalf("output missing %q:\n%s", want, got)
-		}
-	}
+	assertK8sBurstableContainerResolved(t, tmp, containerdID, dockerID, crioID)
 
-	cache, err := os.ReadFile(filepath.Join(tmp, "netdata-cgroups-containers"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, want := range []string{
-		`container_id="` + containerdID + `"`,
-		`container_id="` + dockerID + `"`,
-		`container_id="` + crioID + `"`,
-	} {
-		if !strings.Contains(string(cache), want) {
-			t.Fatalf("cache missing %q:\n%s", want, string(cache))
-		}
-	}
 	// The kube-system UID parsed from the namespace object must be cached.
 	if uid, err := os.ReadFile(filepath.Join(tmp, "netdata-cgroups-kubesystem-uid")); err != nil {
 		t.Fatal(err)
 	} else if strings.TrimSpace(string(uid)) != "fixture-system-uid" {
 		t.Fatalf("cached kube-system uid = %q, want fixture-system-uid", strings.TrimSpace(string(uid)))
-	}
-	for _, name := range []string{
-		"netdata-cgroups-k8s-cluster-name",
-		"netdata-cgroups-kubesystem-uid",
-		"netdata-cgroups-containers",
-	} {
-		st, err := os.Stat(filepath.Join(tmp, name))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got := st.Mode().Perm(); got != 0o600 {
-			t.Fatalf("%s permissions = %o, want 600", name, got)
-		}
 	}
 }
 
