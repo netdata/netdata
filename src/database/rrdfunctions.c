@@ -52,8 +52,8 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
 
     bool changed = false;
 
-    if(__atomic_load_n(&rdcf->unregistered, __ATOMIC_RELAXED)) {
-        __atomic_store_n(&rdcf->unregistered, false, __ATOMIC_RELAXED);
+    if(__atomic_load_n(&rdcf->unregistered, __ATOMIC_ACQUIRE)) {
+        __atomic_store_n(&rdcf->unregistered, false, __ATOMIC_RELEASE);
         changed = true;
     }
 
@@ -286,12 +286,17 @@ bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_str
         }
     }
 
+    // dyncfg config functions are intentionally never streamed to parents
+    // (stream_sender_send_global_rrdhost_functions skips RRD_FUNCTION_DYNCFG),
+    // so their removals must not be streamed either. Capture this before releasing.
+    bool is_dyncfg = (rdcf->options & RRD_FUNCTION_DYNCFG);
+
     // Mark the function unregistered before removing it from the dictionary.
     // The flag makes the function unavailable to any thread that already holds
     // an acquired reference during the delete window (it cannot be freed until
     // that reference is released), and lets rrd_functions_find_by_name() report
     // a specific "unregistered by the plugin" error in that window.
-    __atomic_store_n(&rdcf->unregistered, true, __ATOMIC_RELAXED);
+    __atomic_store_n(&rdcf->unregistered, true, __ATOMIC_RELEASE);
     dictionary_acquired_item_release(host->functions, item);
 
     if(st && st->functions_view)
@@ -299,7 +304,7 @@ bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_str
 
     dictionary_del(host->functions, key);
 
-    if(!st)
+    if(!st && !is_dyncfg)
         stream_send_function_del(host, key);
 
     if(!st)
@@ -311,7 +316,7 @@ bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_str
 }
 
 bool rrd_function_is_available(struct rrd_host_function *rdcf, RRDHOST *host) {
-    if(__atomic_load_n(&rdcf->unregistered, __ATOMIC_RELAXED))
+    if(__atomic_load_n(&rdcf->unregistered, __ATOMIC_ACQUIRE))
         return false;
 
     if(!rrd_collector_running(rdcf->collector))
@@ -356,7 +361,7 @@ int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size
                            rrdhost_ingestion_hops(host)
                            );
 
-                    was_unregistered = __atomic_load_n(&rdcf->unregistered, __ATOMIC_RELAXED);
+                    was_unregistered = __atomic_load_n(&rdcf->unregistered, __ATOMIC_ACQUIRE);
                     dictionary_acquired_item_release(host->functions, *item);
                     *item = NULL;
                 }
