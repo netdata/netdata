@@ -5974,7 +5974,8 @@ static BUFFER *network_viewer_result(char *function) {
     network_viewer_ebpf_shared_memory_refresh();
 #endif
 
-    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    // Ownership of wb is transferred to the caller; do not use CLEAN_BUFFER here.
+    BUFFER *wb = buffer_create(0, NULL);
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
