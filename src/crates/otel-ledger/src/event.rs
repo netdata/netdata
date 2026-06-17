@@ -20,4 +20,7 @@ pub enum LedgerEvent {
     /// needs to be forwarded to the supervisor. The run-loop owns
     /// `self.supervisor`, so handlers funnel through this arm.
     OutboundResp(LedgerResponse),
+    /// The upload-retry timer fired; re-issue any failed uploads whose
+    /// backoff has elapsed.
+    RetryTick,
 }

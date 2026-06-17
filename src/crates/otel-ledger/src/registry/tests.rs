@@ -58,12 +58,14 @@ fn evict_seq_clears_all_per_seq_state() {
     reg.sfst.track(id, ByteSize(1), empty_summary());
     reg.mark_uploaded(42);
     reg.mark_rotated(42);
+    reg.mark_remote_cataloged([42]);
 
     reg.evict_seq(42);
 
     assert!(reg.sfst.get(42).is_none());
     assert!(!reg.is_uploaded(42));
     assert!(!reg.is_rotated(42));
+    assert!(!reg.is_remote_cataloged(42));
 }
 
 #[test]

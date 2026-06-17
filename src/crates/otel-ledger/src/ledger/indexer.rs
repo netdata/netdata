@@ -1,96 +1,166 @@
 //! Indexer response handling.
 
+use std::path::PathBuf;
+
 use file_registry::{FileId, TenantId};
 
 use crate::ipc::{CleanerRequest, IndexerResponse, UploaderRequest};
 
 use super::Ledger;
-use super::date_from_summary;
+
+/// What `handle_indexer_resp` decided to do with a freshly-indexed file —
+/// computed under the registry write lock and acted on after it is released.
+enum Indexed {
+    /// Empty SFST (zero log rows): track nothing and delete both the WAL and
+    /// the empty index file so it is neither uploaded/cataloged nor
+    /// re-discovered on restart. An empty file carries no queryable data and
+    /// would otherwise propagate a `(0, 0)` timestamp range through the
+    /// catalog. A frame-less WAL can be sealed by a crash/rotation (see
+    /// `recover_unindexed`).
+    Empty {
+        tenant_id: TenantId,
+        file_id: FileId,
+        wal_path: PathBuf,
+        sfst_path: PathBuf,
+    },
+    /// Real SFST: tracked in the registry. Delete the WAL, optionally upload,
+    /// then run retention for the tenant.
+    Tracked {
+        tenant_id: TenantId,
+        file_id: FileId,
+        wal_path: PathBuf,
+        upload: Option<UploaderRequest>,
+    },
+}
 
 impl Ledger {
     #[tracing::instrument(skip_all)]
     pub(super) async fn handle_indexer_resp(&mut self, resp: IndexerResponse) {
-        match resp {
+        let (seq, summary, size) = match resp {
             IndexerResponse::IndexFailed { path, error } => {
                 tracing::error!(path = %path.display(), "indexing failed: {error}");
+                return;
             }
             IndexerResponse::Indexed {
                 seq, summary, size, ..
-            } => {
-                tracing::info!(seq, "indexed");
+            } => (seq, summary, size),
+        };
 
-                let Some((tenant_id, file_id, wal_path)) = ({
-                    let mut registries = self.registries.write().await;
-                    let Some((tenant_id, registry)) = registries.for_seq_mut(seq) else {
-                        tracing::error!(seq, "indexed unknown seq; no tenant mapping");
-                        return;
-                    };
-                    let Some(wal_file) = registry.wal.get(seq) else {
-                        tracing::error!(seq, "indexed unknown WAL");
-                        return;
-                    };
-                    let file_id = wal_file.id;
-                    let wal_path = registry.wal.file_path(file_id);
+        tracing::info!(seq, total_logs = summary.total_logs, "indexed");
 
-                    // Track SFST file in registry. Summary fields
-                    // (timestamps, total logs, stream) live on the
-                    // registry entry; the uploader response handler
-                    // reads them back from there.
-                    registry.sfst.track(file_id, size, summary);
+        // Decide everything under the registry write lock — including building
+        // the upload request — then act after the guard is dropped. Building
+        // the request here (rather than re-acquiring the lock in a helper)
+        // removes the second lookup that previously needed an `.expect` on the
+        // tenant still being present.
+        let outcome = {
+            let mut registries = self.registries.write().await;
+            let Some((tenant_id, registry)) = registries.for_seq_mut(seq) else {
+                tracing::error!(seq, "indexed unknown seq; no tenant mapping");
+                return;
+            };
+            let Some(wal_file) = registry.wal.get(seq) else {
+                tracing::error!(seq, "indexed unknown WAL");
+                return;
+            };
+            let file_id = wal_file.id;
+            let wal_path = registry.wal.file_path(file_id);
 
-                    Some((tenant_id, file_id, wal_path))
-                }) else {
-                    return;
+            if summary.total_logs == 0 {
+                Indexed::Empty {
+                    tenant_id,
+                    file_id,
+                    wal_path,
+                    sfst_path: registry.sfst.file_path(file_id),
+                }
+            } else {
+                // Summary fields (timestamps, total logs, stream) live on the
+                // registry entry; the uploader response handler reads them back.
+                registry.sfst.track(file_id, size, summary);
+
+                let upload = if self.logs_config.storage.enabled {
+                    super::sfst_upload_request(registry, &tenant_id, file_id)
+                } else {
+                    None
                 };
 
-                // Drop the WAL's query-time chunks: its authoritative
-                // SFST is now registered (above) and supersedes them. The
-                // SFST is visible before the WAL is deleted, so a query
-                // racing this resolves the seq to the SFST, never a gap.
+                Indexed::Tracked {
+                    tenant_id,
+                    file_id,
+                    wal_path,
+                    upload,
+                }
+            }
+        };
+
+        match outcome {
+            Indexed::Empty {
+                tenant_id,
+                file_id,
+                wal_path,
+                sfst_path,
+            } => {
+                tracing::warn!(
+                    seq = file_id.seq,
+                    "indexed an empty WAL (0 log rows); deleting WAL + empty index, not uploading",
+                );
+                // A query may have built a chunk for this seq against the
+                // active WAL; drop it.
                 self.chunk_cache.drop_seq(file_id.seq).await;
 
-                // Delete WAL file
-                let req = CleanerRequest::DeleteWalFile {
+                if let Err(e) = self.cleaner.send(CleanerRequest::DeleteWalFile {
                     sequence: file_id.seq,
                     path: wal_path,
-                };
-                if let Err(e) = self.cleaner.send(req) {
+                }) {
+                    tracing::error!(seq = file_id.seq, "failed to send WAL delete request: {e}");
+                }
+                if let Err(e) = self.cleaner.send(CleanerRequest::DeleteIndexFile {
+                    sequence: file_id.seq,
+                    path: sfst_path,
+                }) {
+                    tracing::error!(
+                        seq = file_id.seq,
+                        "failed to send empty-index delete request: {e}"
+                    );
+                }
+
+                // No new SFST was tracked, but keep retention on the same
+                // per-response cadence (e.g. age-based eviction while a stream
+                // is idle and only producing empty WAL rotations).
+                self.evaluate_retention(&tenant_id).await;
+            }
+            Indexed::Tracked {
+                tenant_id,
+                file_id,
+                wal_path,
+                upload,
+            } => {
+                // The authoritative SFST is registered; its query-time chunks
+                // are superseded. The SFST is visible before the WAL is
+                // deleted, so a racing query resolves the seq to the SFST,
+                // never a gap.
+                self.chunk_cache.drop_seq(file_id.seq).await;
+
+                if let Err(e) = self.cleaner.send(CleanerRequest::DeleteWalFile {
+                    sequence: file_id.seq,
+                    path: wal_path,
+                }) {
                     tracing::error!(seq = file_id.seq, "failed to send WAL delete request: {e}");
                 }
 
-                // Upload it to remote storage
-                self.request_upload(file_id, &tenant_id).await;
+                if let Some(req) = upload {
+                    if let Some(uploader) = self.uploader.as_mut() {
+                        if let Err(e) = uploader.send(req) {
+                            tracing::error!(
+                                seq = file_id.seq,
+                                "failed to send upload request: {e}"
+                            );
+                        }
+                    }
+                }
 
-                // Run retention for the tenant
                 self.evaluate_retention(&tenant_id).await;
             }
-        }
-    }
-
-    async fn request_upload(&mut self, id: FileId, tenant_id: &TenantId) {
-        if !self.logs_config.storage.enabled {
-            return;
-        }
-        let req = {
-            let registries = self.registries.read().await;
-            let registry = registries
-                .get(tenant_id)
-                .expect("tenant present after for_seq_mut");
-            let local_path = registry.sfst.file_path(id);
-            let date = registry
-                .sfst
-                .get(id.seq)
-                .and_then(|f| date_from_summary(&f.summary))
-                .unwrap_or_else(|| chrono::Utc::now().date_naive());
-            let remote_key = crate::remote_keys::sfst(tenant_id, date, id);
-            UploaderRequest::Upload {
-                seq: id.seq,
-                local_path,
-                remote_key,
-            }
-        };
-        if let Err(e) = self.uploader.send(req) {
-            tracing::error!(seq = id.seq, "failed to send upload request: {e}");
         }
     }
 }

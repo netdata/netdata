@@ -170,6 +170,7 @@ mod tests {
             stream,
             size: ByteSize(1024),
             uploaded_at_ns: TimestampNs(2_000_000_000),
+            remote_etag: None,
         }
     }
 

@@ -82,8 +82,20 @@ pub struct Registry {
     uploaded_seqs: BTreeSet<u64>,
     /// SFST sequence numbers whose catalog entry has been written to a
     /// closed on-disk catalog file. Retention defers SFST eviction until
-    /// this set contains the seq. Gated access via [`Registry::mark_rotated`] etc.
+    /// this set contains the seq. NOTE: as of the remote-confirmed-eviction
+    /// change this set no longer gates eviction (a local catalog file is not a
+    /// durable remote one) — see `remote_cataloged_seqs`; it now only tracks
+    /// local-catalog membership so reconciliation can skip re-`AddEntry`ing
+    /// already-cataloged seqs. Gated access via [`Registry::mark_rotated`] etc.
     rotated_seqs: BTreeSet<u64>,
+    /// SFST sequence numbers whose catalog entry is confirmed present in remote
+    /// object storage. When storage is enabled, eviction is deferred until this
+    /// set contains the seq, so a local SFST is never deleted before its
+    /// catalog is durably on the remote — otherwise a failed catalog upload
+    /// could leave the remote SFST orphaned (referenced by no catalog). Implies
+    /// `rotated_seqs` membership (a catalog is rotated locally before it can be
+    /// uploaded). Gated access via [`Registry::mark_remote_cataloged`] etc.
+    remote_cataloged_seqs: BTreeSet<u64>,
 }
 
 impl Registry {
@@ -98,6 +110,7 @@ impl Registry {
             catalog_files,
             uploaded_seqs: BTreeSet::new(),
             rotated_seqs: BTreeSet::new(),
+            remote_cataloged_seqs: BTreeSet::new(),
         }
     }
 
@@ -166,8 +179,9 @@ impl Registry {
         self.uploaded_seqs.contains(&seq)
     }
 
-    /// Mark this SFST sequence as written into a closed, on-disk catalog file.
-    /// Retention consults this set before evicting local SFSTs.
+    /// Mark this SFST sequence as written into a closed, on-disk catalog file
+    /// (local rotation). Eviction is gated on `remote_cataloged_seqs`, not this
+    /// set; this tracks local-catalog membership for reconciliation dedup.
     pub fn mark_rotated(&mut self, seq: u64) {
         self.rotated_seqs.insert(seq);
     }
@@ -182,12 +196,26 @@ impl Registry {
         self.rotated_seqs.contains(&seq)
     }
 
+    /// Mark these SFST sequences as confirmed present in a remote catalog.
+    /// Called when a catalog upload completes (or its remote presence is
+    /// confirmed at recovery).
+    pub fn mark_remote_cataloged(&mut self, seqs: impl IntoIterator<Item = u64>) {
+        self.remote_cataloged_seqs.extend(seqs);
+    }
+
+    /// Whether this SFST sequence's catalog entry is confirmed in remote
+    /// storage. The eviction guard consults this before deleting a local SFST.
+    pub fn is_remote_cataloged(&self, seq: u64) -> bool {
+        self.remote_cataloged_seqs.contains(&seq)
+    }
+
     /// Drop all per-seq state for this sequence. Any new per-seq state
     /// added in the future must also be cleaned up here.
     pub fn evict_seq(&mut self, seq: u64) {
         self.sfst.remove(seq);
         self.uploaded_seqs.remove(&seq);
         self.rotated_seqs.remove(&seq);
+        self.remote_cataloged_seqs.remove(&seq);
     }
 }
 

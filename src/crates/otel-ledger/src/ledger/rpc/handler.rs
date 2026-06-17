@@ -28,10 +28,101 @@ use tokio_util::sync::CancellationToken;
 use sfsq::logs::{LogSource, SfstCandidate, Source, WalTail, run};
 
 use super::adapter::{stream_required_params, to_result, window_secs};
-use super::wire::{InfoResponse, LogsResult, OtelLogsRequest, OtelLogsResponse};
+use super::wire::{
+    CatalogFileEntry, FilesResponse, InfoResponse, LogsResult, OtelLogsRequest, OtelLogsResponse,
+    SfstFileEntry, StreamId, TenantFiles, WalFileEntry,
+};
 use crate::chunk::ChunkCache;
 use wal::prefix::{chunk_boundaries, tail_start};
+use wal::registry::FileStatus;
 use crate::registry::{TenantRegistries, WalDesc};
+
+/// Build the `files: true` inventory snapshot from a read-locked registry set.
+/// Read-only; tenants and per-kind files are sorted for stable output (the
+/// registries are HashMap-backed, so iteration order is otherwise arbitrary).
+fn build_files_response(tr: &TenantRegistries) -> FilesResponse {
+    let mut tenants: Vec<TenantFiles> = tr
+        .tenants
+        .iter()
+        .map(|(tid, reg)| {
+            let mut wal: Vec<WalFileEntry> = reg
+                .wal
+                .values()
+                .map(|f| WalFileEntry {
+                    seq: f.id.seq,
+                    ns_hash: format!("{:016x}", f.id.ns_hash),
+                    stream: StreamId {
+                        namespace: f.stream.namespace.clone(),
+                        name: f.stream.name.clone(),
+                    },
+                    status: match f.status {
+                        FileStatus::Active => "active",
+                        FileStatus::Archived => "archived",
+                    },
+                    size: f.size.as_u64(),
+                    entry_count: f.entry_count,
+                    min_ts_ns: f.min_timestamp_ns.as_u64(),
+                    max_ts_ns: f.max_timestamp_ns.as_u64(),
+                })
+                .collect();
+            wal.sort_by_key(|e| e.seq);
+
+            let mut sfst: Vec<SfstFileEntry> = reg
+                .sfst
+                .values()
+                .map(|f| SfstFileEntry {
+                    seq: f.id.seq,
+                    ns_hash: format!("{:016x}", f.id.ns_hash),
+                    stream: StreamId {
+                        namespace: f.summary.stream.namespace.clone(),
+                        name: f.summary.stream.name.clone(),
+                    },
+                    size: f.size.as_u64(),
+                    total_logs: f.summary.total_logs,
+                    min_ts_s: f.summary.min_timestamp_s,
+                    max_ts_s: f.summary.max_timestamp_s,
+                    rotated: reg.is_rotated(f.id.seq),
+                    uploaded: reg.is_uploaded(f.id.seq),
+                    remote_cataloged: reg.is_remote_cataloged(f.id.seq),
+                    pending_deletion: f.is_pending_deletion(),
+                })
+                .collect();
+            sfst.sort_by_key(|e| e.seq);
+
+            let mut catalog: Vec<CatalogFileEntry> = reg
+                .catalog_files
+                .iter()
+                .map(|(path, f)| CatalogFileEntry {
+                    file: path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or_default()
+                        .to_string(),
+                    date: f.date.to_string(),
+                    max_seq: f.max_seq,
+                    size: f.size.as_u64(),
+                    min_ts_s: f.min_timestamp_s,
+                    max_ts_s: f.max_timestamp_s,
+                    pending_deletion: f.is_pending_deletion(),
+                })
+                .collect();
+            catalog.sort_by(|a, b| a.file.cmp(&b.file));
+
+            TenantFiles {
+                tenant: tid.as_str().to_string(),
+                wal,
+                sfst,
+                catalog,
+            }
+        })
+        .collect();
+    tenants.sort_by(|a, b| a.tenant.cmp(&b.tenant));
+    FilesResponse {
+        version: 1,
+        status: 200,
+        tenants,
+    }
+}
 
 pub(crate) struct OtelLogsHandler {
     registries: Arc<RwLock<TenantRegistries>>,
@@ -195,6 +286,13 @@ impl FunctionHandler for OtelLogsHandler {
             return Ok(OtelLogsResponse::Info(InfoResponse::default()));
         }
 
+        // Inventory snapshot of the tracked storage files (read-only): a brief
+        // read lock, build the response, drop it before returning. No query.
+        if req.files {
+            let guard = self.registries.read().await;
+            return Ok(OtelLogsResponse::Files(build_files_response(&guard)));
+        }
+
         // Canonicalize the wire request into the neutral query (defaulting
         // + bucket alignment + grid), then enumerate the SFST candidates
         // overlapping the grid's window under a brief read lock — dropped
@@ -266,7 +364,7 @@ impl FunctionHandler for OtelLogsHandler {
         //
         // Progress: total = number of query sources; the engine bumps the
         // done counter as each source's stats shard completes and the
-        // bridge's 1 Hz ticker emits FUNCTION_PROGRESS lines from it.
+        // bridge's 250ms ticker emits FUNCTION_PROGRESS lines from it.
         // Cancellation is cooperative — a `spawn_blocking` closure cannot
         // be aborted, so the engine polls the token per source and bails
         // early; the bridge's cancel `select!` already returns the 499 to

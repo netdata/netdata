@@ -16,6 +16,13 @@ pub struct CatalogEntry {
     pub stream: ServiceStream,
     pub size: ByteSize,
     pub uploaded_at_ns: TimestampNs,
+    /// Remote object validator (the S3 ETag, when the backend returns one)
+    /// captured at upload time. An opaque token for later integrity/scrub
+    /// checks; `None` for entries reconstructed from a remote LIST or read from
+    /// pre-existing catalogs. `#[serde(default)]` keeps older catalog files —
+    /// written before this field existed — readable.
+    #[serde(default)]
+    pub remote_etag: Option<String>,
 }
 
 #[cfg(test)]
@@ -50,6 +57,7 @@ mod tests {
             stream: ServiceStream::new("prod", "api"),
             size: ByteSize(9876),
             uploaded_at_ns: TimestampNs(1_700_003_700_000_000_000),
+            remote_etag: Some("\"d41d8cd98f00b204e9800998ecf8427e\"".into()),
         };
         let json = serde_json::to_vec(&entry).unwrap();
         let parsed: CatalogEntry = serde_json::from_slice(&json).unwrap();

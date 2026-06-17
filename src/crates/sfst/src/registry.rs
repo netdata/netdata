@@ -49,6 +49,14 @@ pub struct File {
     pending_deletion: bool,
 }
 
+impl File {
+    /// Whether this file is queued for retention eviction (excluded from
+    /// `candidates`/`evaluate_retention`, but still tracked until removed).
+    pub fn is_pending_deletion(&self) -> bool {
+        self.pending_deletion
+    }
+}
+
 /// The set of `.sfst` files in one directory, keyed by their sequence
 /// number (a [`FileId::seq`] is unique within a directory — see the
 /// seq-allocation rules in `wal`).

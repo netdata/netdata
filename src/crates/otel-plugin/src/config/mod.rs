@@ -396,6 +396,26 @@ logs:
     }
 
     #[test]
+    fn override_logs_catalog_fields() {
+        let mut config = stock_config();
+        let o: ConfigOverride = serde_yaml::from_str(
+            r#"
+logs:
+  catalog:
+    dir: /custom/catalog
+    rotation_count: 2
+"#,
+        )
+        .unwrap();
+        apply_overrides(&mut config, &o);
+        assert_eq!(config.logs.catalog.rotation_count, 2);
+        assert_eq!(
+            config.logs.catalog.dir,
+            std::path::Path::new("/custom/catalog")
+        );
+    }
+
+    #[test]
     fn override_logs_bytesize() {
         let mut config = stock_config();
         let o: ConfigOverride = serde_yaml::from_str(

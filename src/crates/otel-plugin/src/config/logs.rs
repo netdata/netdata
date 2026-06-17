@@ -11,6 +11,8 @@ pub(super) struct LogsOverride {
     #[serde(default)]
     pub(super) index: Option<IndexOverride>,
     #[serde(default)]
+    pub(super) catalog: Option<CatalogOverride>,
+    #[serde(default)]
     pub(super) storage: Option<StorageOverride>,
     #[serde(default)]
     pub(super) auth: Option<AuthOverride>,
@@ -22,6 +24,14 @@ pub(super) struct IndexOverride {
     pub(super) dir: Option<PathBuf>,
     #[serde(default)]
     pub(super) retention: Option<HashMap<String, RetentionEntry>>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub(super) struct CatalogOverride {
+    #[serde(default)]
+    pub(super) dir: Option<PathBuf>,
+    #[serde(default)]
+    pub(super) rotation_count: Option<usize>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -60,6 +70,7 @@ impl LogsOverride {
     pub(super) fn has_any(&self) -> bool {
         self.wal.as_ref().is_some_and(|w| w.has_any())
             || self.index.as_ref().is_some_and(|i| i.has_any())
+            || self.catalog.as_ref().is_some_and(|c| c.has_any())
             || self.storage.as_ref().is_some_and(|s| s.has_any())
             || self.auth.as_ref().is_some_and(|a| a.has_any())
     }
@@ -74,6 +85,12 @@ impl StorageOverride {
 impl IndexOverride {
     pub(super) fn has_any(&self) -> bool {
         self.dir.is_some() || self.retention.is_some()
+    }
+}
+
+impl CatalogOverride {
+    pub(super) fn has_any(&self) -> bool {
+        self.dir.is_some() || self.rotation_count.is_some()
     }
 }
 
@@ -130,6 +147,14 @@ pub(super) fn apply(config: &mut LogsConfig, o: &LogsOverride) {
                     target.max_age = Some(v);
                 }
             }
+        }
+    }
+    if let Some(c) = &o.catalog {
+        if let Some(v) = &c.dir {
+            config.catalog.dir = v.clone();
+        }
+        if let Some(v) = c.rotation_count {
+            config.catalog.rotation_count = v;
         }
     }
     if let Some(s) = &o.storage {

@@ -68,6 +68,14 @@ pub struct OtelLogsRequest {
     /// token in the URL args (translated by the rt-level shim).
     #[serde(default)]
     pub info: bool,
+    /// `files: true` requests a snapshot of the storage files the ledger
+    /// is tracking (WAL / SFST / catalog) instead of a log query — see
+    /// [`FilesResponse`]. Like `info`, defaults to `false` so ordinary
+    /// data requests reach the query path. `info` takes precedence when both
+    /// are set. POST-body only: unlike `info`, it is not synthesized from a
+    /// URL-arg token (it is an MCP/operator mode, absent from ACCEPTED_PARAMS).
+    #[serde(default)]
+    pub files: bool,
     #[serde(default)]
     pub after: u32,
     #[serde(default)]
@@ -132,6 +140,7 @@ pub enum AnchorParam {
 pub enum OtelLogsResponse {
     Info(InfoResponse),
     Logs(LogsResult),
+    Files(FilesResponse),
 }
 
 #[derive(Debug, Serialize)]
@@ -153,6 +162,82 @@ impl Default for InfoResponse {
             help: "Query and visualize OpenTelemetry logs.",
         }
     }
+}
+
+// ── Files inventory (the `files: true` mode) ─────────────────────────
+
+/// Snapshot of the storage files the ledger is tracking, per tenant.
+/// Reports the in-memory registry state — including the `rotated` /
+/// `uploaded` / `remote_cataloged` flags that have no on-disk equivalent
+/// (a locally-evicted SFST can still be cataloged on the remote).
+#[derive(Debug, Serialize)]
+pub struct FilesResponse {
+    pub version: u32,
+    pub status: u32,
+    pub tenants: Vec<TenantFiles>,
+}
+
+/// The `(namespace, name)` OpenTelemetry stream a file belongs to.
+#[derive(Debug, Serialize)]
+pub struct StreamId {
+    pub namespace: String,
+    pub name: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TenantFiles {
+    pub tenant: String,
+    pub wal: Vec<WalFileEntry>,
+    pub sfst: Vec<SfstFileEntry>,
+    pub catalog: Vec<CatalogFileEntry>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct WalFileEntry {
+    pub seq: u64,
+    /// Stream-identity hash, 16-hex (matches the `{ns_hash:016x}` in the filename).
+    pub ns_hash: String,
+    pub stream: StreamId,
+    /// `active` (being written) or `archived` (sealed, awaiting indexing).
+    pub status: &'static str,
+    pub size: u64,
+    pub entry_count: u64,
+    /// Log-data time range in unix **nanoseconds**. Both 0 for a WAL recovered
+    /// from disk (the WAL format has no footer; only live files carry it).
+    pub min_ts_ns: u64,
+    pub max_ts_ns: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SfstFileEntry {
+    pub seq: u64,
+    pub ns_hash: String,
+    pub stream: StreamId,
+    pub size: u64,
+    pub total_logs: u32,
+    /// Log-data time range in unix **seconds** (from the SFST summary).
+    pub min_ts_s: u32,
+    pub max_ts_s: u32,
+    /// Written to a closed local catalog file.
+    pub rotated: bool,
+    /// Confirmed uploaded to remote object storage.
+    pub uploaded: bool,
+    /// Confirmed present in the remote catalog (gates local eviction).
+    pub remote_cataloged: bool,
+    /// Queued for retention eviction (still tracked until removed).
+    pub pending_deletion: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CatalogFileEntry {
+    pub file: String,
+    pub date: String,
+    pub max_seq: u64,
+    pub size: u64,
+    /// Union time range of the file's entries, unix **seconds**.
+    pub min_ts_s: u32,
+    pub max_ts_s: u32,
+    pub pending_deletion: bool,
 }
 
 // ── Top-level envelope ───────────────────────────────────────────────

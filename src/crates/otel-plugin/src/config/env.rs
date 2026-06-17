@@ -6,7 +6,9 @@ use bytesize::ByteSize;
 
 use super::ConfigOverride;
 use super::endpoint::EndpointOverride;
-use super::logs::{AuthOverride, IndexOverride, LogsOverride, StorageOverride, WalOverride};
+use super::logs::{
+    AuthOverride, CatalogOverride, IndexOverride, LogsOverride, StorageOverride, WalOverride,
+};
 use super::metrics::MetricsOverride;
 
 fn read_env(name: &str) -> Result<Option<String>> {
@@ -157,6 +159,10 @@ impl LogsOverride {
                 None
             },
         };
+        let catalog = CatalogOverride {
+            dir: env_var("NETDATA_OTEL_LOGS_CATALOG_DIR")?.map(PathBuf::from),
+            rotation_count: parse_env_var("NETDATA_OTEL_LOGS_CATALOG_ROTATION_COUNT")?,
+        };
         let storage = StorageOverride {
             enabled: parse_env_bool("NETDATA_OTEL_LOGS_STORAGE_ENABLED")?,
             uri: env_var("NETDATA_OTEL_LOGS_STORAGE_URI")?,
@@ -167,6 +173,7 @@ impl LogsOverride {
         Ok(Self {
             wal: if wal.has_any() { Some(wal) } else { None },
             index: if index.has_any() { Some(index) } else { None },
+            catalog: if catalog.has_any() { Some(catalog) } else { None },
             storage: if storage.has_any() {
                 Some(storage)
             } else {

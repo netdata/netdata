@@ -85,6 +85,11 @@ pub enum UploaderRequest {
     UploadCatalog {
         local_path: PathBuf,
         remote_key: String,
+        /// SFST sequence numbers contained in this catalog. Carried through to
+        /// the response so the ledger can mark them remotely-cataloged (which
+        /// gates their local eviction) only once the catalog is durably on the
+        /// remote.
+        seqs: Vec<u64>,
     },
 }
 
@@ -92,18 +97,35 @@ pub enum UploaderRequest {
 #[derive(Debug, Clone)]
 pub enum UploaderResponse {
     /// An SFST file has been uploaded successfully.
-    Uploaded { seq: u64, remote_key: String },
-    /// Failed to upload an SFST file.
-    UploadFailed { seq: u64, error: String },
-    /// A catalog file has been uploaded successfully.
+    Uploaded {
+        seq: u64,
+        remote_key: String,
+        /// Remote object validator (S3 ETag) returned by the write, if the
+        /// backend supplied one. Recorded on the catalog entry for later
+        /// integrity/scrub checks.
+        etag: Option<String>,
+    },
+    /// Failed to upload an SFST file. `local_path`/`remote_key` are carried so
+    /// the retry queue can re-issue the upload without rebuilding them.
+    UploadFailed {
+        seq: u64,
+        local_path: PathBuf,
+        remote_key: String,
+        error: String,
+    },
+    /// A catalog file has been uploaded successfully. `seqs` are the SFSTs it
+    /// covers; they become eligible for local eviction once this lands.
     CatalogUploaded {
         local_path: PathBuf,
         remote_key: String,
+        seqs: Vec<u64>,
     },
-    /// Failed to upload a catalog file.
+    /// Failed to upload a catalog file. `seqs` are carried so a retry can be
+    /// re-issued without re-reading the catalog.
     CatalogUploadFailed {
         local_path: PathBuf,
         remote_key: String,
+        seqs: Vec<u64>,
         error: String,
     },
 }

@@ -12,10 +12,11 @@ mod indexer;
 mod ingestor;
 mod retention;
 mod rpc;
+mod upload_retry;
 mod uploader;
 
 pub(crate) use helpers::{
-    build_catalog_entry, catalog_retention_days, date_from_summary, sfst_retention_policy,
+    build_catalog_entry, catalog_retention_days, sfst_retention_policy, sfst_upload_request,
 };
 pub(crate) use rpc::OtelLogsHandler;
 
@@ -46,7 +47,8 @@ use crate::recovery::{
     recover_unuploaded,
 };
 use crate::registry::TenantRegistries;
-use crate::uploader::Uploader;
+use crate::storage::OpendalStorage;
+use crate::uploader::{Uploader, UploaderArgs};
 
 /// Minimum records per chunk when indexing an active WAL's prefix at
 /// query time. A fixed default for now; made configurable with the rest
@@ -54,14 +56,37 @@ use crate::uploader::Uploader;
 const CHUNK_MIN_ENTRIES: u64 = 16_384;
 /// Byte budget for the query-time chunk cache (LRU eviction above it).
 const CHUNK_CACHE_BYTES: u64 = 256 * 1024 * 1024;
+/// Maximum uploads in flight at once. Bounds the recovery fan-out — which
+/// enqueues the whole un-uploaded backlog at once — so it can't spawn thousands
+/// of simultaneous file reads + PUTs (S3-503 storms, socket/memory spikes). A
+/// fixed default for now; promote to config with the rest of upload governance
+/// if tuning proves necessary.
+const UPLOAD_CONCURRENCY: usize = 8;
+/// Maximum time startup waits on remote object storage (LIST/stat
+/// reconciliation) per tenant before proceeding to Ready. A slow/unreachable
+/// remote must not delay ingestion — on timeout the remote reconcile is skipped
+/// (local upload recovery still runs fire-and-forget, and eviction stays
+/// deferred until a later reconcile confirms the remote, so nothing is at risk).
+const STARTUP_REMOTE_BUDGET: std::time::Duration = std::time::Duration::from_secs(10);
 
 pub struct Ledger {
     supervisor: Connection<LedgerResponse, LedgerRequest>,
     ingestor: Connection<(), wal::Message>,
     indexer: ComponentHandle<IndexerRequest, IndexerResponse>,
     cleaner: ComponentHandle<CleanerRequest, CleanerResponse>,
-    uploader: ComponentHandle<UploaderRequest, UploaderResponse>,
+    /// `None` when remote storage is disabled (`storage.enabled = false`): the
+    /// storage client and uploader are not constructed, so a malformed
+    /// `storage.uri` cannot abort startup for a local-only deployment. Every send site is
+    /// already gated on `storage.enabled`, so a `None` uploader is never asked
+    /// to upload.
+    uploader: Option<ComponentHandle<UploaderRequest, UploaderResponse>>,
     catalog_builder: ComponentHandle<CatalogBuilderRequest, CatalogBuilderResponse>,
+    /// Re-issue queue for failed uploads, drained by `retry_timer`. Lets
+    /// uploads resume automatically when the remote recovers, instead of
+    /// waiting for the next process restart.
+    upload_retry: upload_retry::UploadRetry,
+    /// Fires periodically to re-drive `upload_retry`.
+    retry_timer: tokio::time::Interval,
     registries: Arc<RwLock<TenantRegistries>>,
     /// Query-time chunk SFSTs of active WALs; the ledger drops a WAL's
     /// chunks here when its authoritative SFST is registered.
@@ -124,25 +149,27 @@ impl Ledger {
         let mut cleaner = ComponentHandle::spawn::<Cleaner>((), cancel.child_token());
         tracing::info!("cleaner spawned");
 
-        let retry_layer = opendal::layers::RetryLayer::new()
-            .with_min_delay(std::time::Duration::from_secs(1))
-            .with_max_delay(std::time::Duration::from_secs(30))
-            .with_max_times(10)
-            .with_factor(2.0)
-            .with_jitter()
-            .with_notify(|err: &opendal::Error, dur: std::time::Duration| {
-                tracing::warn!(
-                    "remote storage operation failed, retrying in {:.1}s: {err}",
-                    dur.as_secs_f64(),
-                );
-            });
-        let operator = opendal::Operator::from_uri(logs_config.storage.uri.as_str())
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?
-            .layer(retry_layer);
+        // Build the remote-storage client and uploader ONLY when storage is
+        // enabled. `OpendalStorage::new` parses `storage.uri` (and applies the
+        // retry layer); deferring it behind the flag means a malformed URI
+        // cannot abort startup for a local-only (storage.enabled = false)
+        // deployment.
+        let (storage, mut uploader) = if logs_config.storage.enabled {
+            let storage = OpendalStorage::new(logs_config.storage.uri.as_str())?;
 
-        let mut uploader =
-            ComponentHandle::spawn::<Uploader>(operator.clone(), cancel.child_token());
-        tracing::info!("uploader spawned");
+            let uploader = ComponentHandle::spawn::<Uploader<OpendalStorage>>(
+                UploaderArgs {
+                    storage: storage.clone(),
+                    max_concurrent: UPLOAD_CONCURRENCY,
+                },
+                cancel.child_token(),
+            );
+            tracing::info!(max_concurrent = UPLOAD_CONCURRENCY, "uploader spawned");
+            (Some(storage), Some(uploader))
+        } else {
+            tracing::info!("remote storage disabled; storage client and uploader not constructed");
+            (None, None)
+        };
 
         let mut catalog_builder = ComponentHandle::spawn::<CatalogBuilder>(
             CatalogBuilderArgs {
@@ -178,48 +205,88 @@ impl Ledger {
 
             crate::recovery::seed_from_catalog_files(registry);
 
-            if logs_config.storage.enabled {
+            // Remote-storage recovery runs only when storage is enabled (the
+            // storage client + uploader exist). The remote LIST reconcile can fail if
+            // the remote is unreachable; when it does we still drain the local
+            // un-uploaded backlog, because `recover_unuploaded` needs no remote
+            // LIST — it scans locally-tracked SFSTs and its upload closure only
+            // logs failures (the retention guard keeps the local files). Only
+            // the LIST-dependent reconciles are skipped on an unreachable remote.
+            if let (Some(storage), Some(uploader)) = (storage.as_ref(), uploader.as_mut()) {
                 let retention = bridge::config::RetentionConfig::resolve(
                     &logs_config.index.retention,
                     tenant_id.as_str(),
                 );
-                match crate::recovery::reconcile_remote_uploads(
-                    registry,
-                    &mut catalog_builder,
-                    &operator,
-                    tenant_id,
-                    &retention,
+                // Bound the remote reconciliation so a slow/unreachable remote
+                // can't delay startup (Ready) by the full opendal retry budget.
+                // On timeout/error we proceed without it: local upload recovery
+                // still runs (below) and eviction stays deferred until a later
+                // reconcile confirms the remote — nothing is at risk.
+                let remote_ok = match tokio::time::timeout(
+                    STARTUP_REMOTE_BUDGET,
+                    crate::recovery::reconcile_remote_uploads(
+                        registry,
+                        &mut catalog_builder,
+                        storage,
+                        tenant_id,
+                        &retention,
+                    ),
                 )
                 .await
                 {
-                    Ok(()) => {
-                        recover_unuploaded(
+                    Ok(Ok(())) => true,
+                    Ok(Err(e)) => {
+                        tracing::warn!(
+                            tenant = tenant_id.as_str(),
+                            "remote storage unreachable, skipping remote reconciliation: {e}"
+                        );
+                        false
+                    }
+                    Err(_) => {
+                        tracing::warn!(
+                            tenant = tenant_id.as_str(),
+                            "remote reconciliation exceeded {}s startup budget; skipping (uploads retry in steady state)",
+                            STARTUP_REMOTE_BUDGET.as_secs(),
+                        );
+                        false
+                    }
+                };
+
+                // Queue the local un-uploaded backlog regardless of remote
+                // reachability — fire-and-forget, so it never blocks startup;
+                // responses (and any failures → the retry queue) are handled
+                // once the run loop starts.
+                recover_unuploaded(registry, uploader, tenant_id);
+
+                // Catalog re-upload probes the remote per file (`stat`), so it
+                // only makes sense when the remote is reachable.
+                if remote_ok {
+                    match tokio::time::timeout(
+                        STARTUP_REMOTE_BUDGET,
+                        crate::recovery::reconcile_local_catalog_uploads(
                             registry,
-                            &mut uploader,
-                            &mut catalog_builder,
-                            tenant_id,
-                        )
-                        .await?;
-                        if let Err(e) = crate::recovery::reconcile_local_catalog_uploads(
-                            registry,
-                            &mut uploader,
-                            &operator,
+                            uploader,
+                            storage,
                             tenant_id,
                             &retention,
-                        )
-                        .await
-                        {
+                        ),
+                    )
+                    .await
+                    {
+                        Ok(Ok(())) => {}
+                        Ok(Err(e)) => {
                             tracing::warn!(
                                 tenant = tenant_id.as_str(),
                                 "catalog upload reconciliation failed: {e}"
                             );
                         }
-                    }
-                    Err(e) => {
-                        tracing::warn!(
-                            tenant = tenant_id.as_str(),
-                            "remote storage unreachable, skipping upload recovery: {e}"
-                        );
+                        Err(_) => {
+                            tracing::warn!(
+                                tenant = tenant_id.as_str(),
+                                "catalog reconciliation exceeded {}s startup budget; skipping",
+                                STARTUP_REMOTE_BUDGET.as_secs(),
+                            );
+                        }
                     }
                 }
             }
@@ -257,6 +324,12 @@ impl Ledger {
         // now; tuning is deferred with the rest of cache governance.
         let chunk_cache = Arc::new(ChunkCache::new(CHUNK_CACHE_BYTES));
 
+        // Drives the upload-retry queue. Skip missed ticks (don't fire a burst
+        // of catch-up ticks after a slow run-loop turn); one drain per period is
+        // enough since each due item carries its own backoff.
+        let mut retry_timer = tokio::time::interval(std::time::Duration::from_secs(30));
+        retry_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
         let otel_handler =
             OtelLogsHandler::new(registries.clone(), chunk_cache.clone(), CHUNK_MIN_ENTRIES);
 
@@ -280,6 +353,8 @@ impl Ledger {
             cleaner,
             uploader,
             catalog_builder,
+            upload_retry: upload_retry::UploadRetry::default(),
+            retry_timer,
             registries,
             chunk_cache,
             logs_config: logs_config.clone(),
@@ -317,7 +392,14 @@ impl Ledger {
                         break Ok(());
                     }
                 },
-                resp = self.uploader.recv() => match resp {
+                // When storage is disabled the uploader is absent; make this arm
+                // inert (never ready) rather than special-casing the whole loop.
+                resp = async {
+                    match self.uploader.as_mut() {
+                        Some(u) => u.recv().await,
+                        None => std::future::pending().await,
+                    }
+                } => match resp {
                     Some(r) => LedgerEvent::UploaderResp(r),
                     None => {
                         tracing::error!("uploader channel closed unexpectedly, exiting event loop");
@@ -337,6 +419,7 @@ impl Ledger {
                     |e| tracing::error!("supervisor recv failed: {e}"),
                 )?),
                 Some(out) = self.outbound_rx.recv() => LedgerEvent::OutboundResp(out),
+                _ = self.retry_timer.tick() => LedgerEvent::RetryTick,
             };
 
             match event {
@@ -360,6 +443,7 @@ impl Ledger {
                         tracing::error!("failed to forward response to supervisor: {e}")
                     })?;
                 }
+                LedgerEvent::RetryTick => self.handle_retry_tick().await,
             }
         }
     }

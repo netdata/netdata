@@ -313,12 +313,12 @@ fn file_overlaps(f: &File, q: &Query) -> bool {
     if q.time_range.start >= q.time_range.end {
         return false;
     }
-    // All-zero bounds means "no time info" — fall through and let the
-    // body parse decide. (Shouldn't happen at rotation today, but
-    // defensive.)
-    if f.min_timestamp_s == 0 && f.max_timestamp_s == 0 {
-        return true;
-    }
+    // A catalog file with all-zero bounds could only arise from a catalog of
+    // entirely empty SFSTs, and those are now suppressed before cataloging (see
+    // the ledger's `handle_indexer_resp`), so such a file is no longer produced.
+    // If a legacy one exists it holds no queryable data, so the normal overlap
+    // check — which excludes a `[0, 0]` range from any present-day query —
+    // correctly skips it instead of opening every catalog on every query.
     q.overlaps(f.min_timestamp_s, f.max_timestamp_s)
 }
 
@@ -792,6 +792,7 @@ mod tests {
             stream,
             size: ByteSize(1),
             uploaded_at_ns: file_registry::TimestampNs(0),
+            remote_etag: None,
         }
     }
 

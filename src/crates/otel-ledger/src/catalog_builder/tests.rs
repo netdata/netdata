@@ -25,6 +25,7 @@ fn entry_for(seq: u64) -> CatalogEntry {
         stream: ServiceStream::new("prod", "api"),
         size: ByteSize(1024),
         uploaded_at_ns: file_registry::TimestampNs(2_000_000_000),
+        remote_etag: None,
     }
 }
 

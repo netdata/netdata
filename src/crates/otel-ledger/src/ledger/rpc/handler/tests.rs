@@ -1,5 +1,5 @@
 use super::*;
-use file_registry::{ByteSize, FileId, ServiceStream, TenantId};
+use file_registry::{ByteSize, FileId, ServiceStream, TenantId, TimestampNs};
 use fst_index::FstIndex;
 use serde_json::Value;
 use sfst::BitmapValue;
@@ -322,6 +322,148 @@ async fn same_timestamp_rows_paginate_without_dup_or_skip() {
     // Every position exactly once, newest-first — no duplicate, no skip,
     // despite all five rows sharing a timestamp.
     assert_eq!(seen, vec![4, 3, 2, 1, 0]);
+}
+
+#[tokio::test]
+async fn files_request_returns_inventory_with_upload_state() {
+    let mut tr = make_tenant_registries();
+    install_sfst(&mut tr, "default", 1, 1_700_000_000);
+    install_sfst(&mut tr, "default", 2, 1_700_000_100);
+    // Mark seq 1's upload lifecycle so the response surfaces the registry's
+    // per-seq flags (the reason this goes to the plugin, not the filesystem).
+    {
+        let reg = tr.get_or_create(&TenantId::from("default"));
+        reg.mark_rotated(1);
+        reg.mark_uploaded(1);
+        reg.mark_remote_cataloged([1]);
+        reg.sfst.mark_pending_deletion(2); // seq 2 queued for eviction (still tracked)
+    }
+
+    let h = make_handler(tr);
+    let req: OtelLogsRequest = serde_json::from_slice(br#"{"files": true}"#).unwrap();
+    let v = serde_json::to_value(&h.on_call(make_ctx("t1"), req).await.unwrap()).unwrap();
+
+    assert_eq!(v["status"], 200);
+    let tenants = v["tenants"].as_array().unwrap();
+    assert_eq!(tenants.len(), 1);
+    assert_eq!(tenants[0]["tenant"], "default");
+    assert!(tenants[0]["wal"].as_array().unwrap().is_empty());
+    assert!(tenants[0]["catalog"].as_array().unwrap().is_empty());
+
+    let sfst = tenants[0]["sfst"].as_array().unwrap();
+    assert_eq!(sfst.len(), 2);
+    // sorted by seq
+    assert_eq!(sfst[0]["seq"], 1);
+    assert_eq!(sfst[1]["seq"], 2);
+    // summary + stream fields lifted from the SFST
+    assert_eq!(sfst[0]["total_logs"], 6);
+    assert_eq!(sfst[0]["min_ts_s"], 1_700_000_000u64);
+    assert_eq!(sfst[0]["stream"]["namespace"], "ns");
+    assert_eq!(sfst[0]["stream"]["name"], "svc");
+    assert_eq!(sfst[0]["ns_hash"], "0000000000000007"); // FileId ns_hash = 7
+    // seq 1 went through the upload lifecycle; seq 2 did not
+    assert_eq!(sfst[0]["rotated"], true);
+    assert_eq!(sfst[0]["uploaded"], true);
+    assert_eq!(sfst[0]["remote_cataloged"], true);
+    assert_eq!(sfst[1]["rotated"], false);
+    assert_eq!(sfst[1]["uploaded"], false);
+    assert_eq!(sfst[1]["remote_cataloged"], false);
+    // pending_deletion surfaced from the sfst registry (seq 2 marked above)
+    assert_eq!(sfst[0]["pending_deletion"], false);
+    assert_eq!(sfst[1]["pending_deletion"], true);
+}
+
+#[tokio::test]
+async fn files_request_includes_wal_and_catalog_entries() {
+    use chrono::NaiveDate;
+
+    let mut tr = make_tenant_registries();
+    let machine = Uuid::from_u128(0xa1);
+    let boot = Uuid::from_u128(0xb2);
+    let stream = ServiceStream::new("walns", "walsvc");
+    {
+        let reg = tr.get_or_create(&TenantId::from("default"));
+        // An active WAL: Created, then Synced sets entry_count + time range.
+        let active = FileId::new(machine, boot, 10, 0xab);
+        reg.wal
+            .apply_event(&wal::FileEvent::Created {
+                file_id: active,
+                created_at_ns: TimestampNs(1_000),
+                stream: stream.clone(),
+            })
+            .unwrap();
+        reg.wal
+            .apply_event(&wal::FileEvent::Synced {
+                file_id: active,
+                valid_up_to: ByteSize(512),
+                frame_count: 1,
+                entry_count: 5,
+                min_timestamp_ns: TimestampNs(100),
+                max_timestamp_ns: TimestampNs(200),
+            })
+            .unwrap();
+        // An archived WAL: Created, then Closed seals it + sets size.
+        let archived = FileId::new(machine, boot, 11, 0xcd);
+        reg.wal
+            .apply_event(&wal::FileEvent::Created {
+                file_id: archived,
+                created_at_ns: TimestampNs(2_000),
+                stream: stream.clone(),
+            })
+            .unwrap();
+        reg.wal
+            .apply_event(&wal::FileEvent::Closed {
+                file_id: archived,
+                frame_count: 3,
+                min_timestamp_ns: TimestampNs(300),
+                max_timestamp_ns: TimestampNs(400),
+                size: ByteSize(1234),
+            })
+            .unwrap();
+        // A tracked catalog file.
+        let cat = otel_catalog::File::new(
+            NaiveDate::from_ymd_opt(2026, 6, 19).unwrap(),
+            machine,
+            boot,
+            7,   // max_seq
+            100, // min_ts_s
+            200, // max_ts_s
+            ByteSize(64),
+        );
+        reg.catalog_files.track(
+            cat,
+            std::path::PathBuf::from("/x/2026-06-19/default/cat-0000000007.catalog"),
+        );
+    }
+
+    let h = make_handler(tr);
+    let req: OtelLogsRequest = serde_json::from_slice(br#"{"files": true}"#).unwrap();
+    let v = serde_json::to_value(&h.on_call(make_ctx("t1"), req).await.unwrap()).unwrap();
+
+    let t = &v["tenants"][0];
+    assert_eq!(t["tenant"], "default");
+    assert!(t["sfst"].as_array().unwrap().is_empty());
+
+    // WAL: 2 entries, sorted by seq; active vs archived status surfaced.
+    let wal = t["wal"].as_array().unwrap();
+    assert_eq!(wal.len(), 2);
+    assert_eq!(wal[0]["seq"], 10);
+    assert_eq!(wal[0]["status"], "active");
+    assert_eq!(wal[0]["entry_count"], 5);
+    assert_eq!(wal[0]["max_ts_ns"], 200u64);
+    assert_eq!(wal[0]["stream"]["name"], "walsvc");
+    assert_eq!(wal[1]["seq"], 11);
+    assert_eq!(wal[1]["status"], "archived");
+    assert_eq!(wal[1]["size"], 1234u64);
+
+    // Catalog: basename + ISO date + max_seq + pending_deletion.
+    let catalog = t["catalog"].as_array().unwrap();
+    assert_eq!(catalog.len(), 1);
+    assert_eq!(catalog[0]["file"], "cat-0000000007.catalog");
+    assert_eq!(catalog[0]["date"], "2026-06-19");
+    assert_eq!(catalog[0]["max_seq"], 7);
+    assert_eq!(catalog[0]["min_ts_s"], 100);
+    assert_eq!(catalog[0]["pending_deletion"], false);
 }
 
 #[tokio::test]

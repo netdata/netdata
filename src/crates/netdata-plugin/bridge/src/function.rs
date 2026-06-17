@@ -29,10 +29,52 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
 
+/// How often the runtime emits `FUNCTION_PROGRESS`. Same 250ms cadence as the
+/// `systemd-journal.plugin` reference (`ND_SD_JOURNAL_PROGRESS_EVERY_UT`; that
+/// one is an accumulated-work threshold, this is a wall-clock interval) and
+/// stays well under the UI's 1s staleness threshold so the "taking longer"
+/// modal doesn't flicker.
+const PROGRESS_INTERVAL: Duration = Duration::from_millis(250);
+
+/// Fixed denominator we put on the wire: progress is always emitted as
+/// `FUNCTION_PROGRESS … <pct> 100`, so the agent reports `pct` directly as the
+/// percentage. We never send a real work-unit total.
+const PROGRESS_DENOMINATOR: usize = 100;
+
+/// The progress percent to put on the wire, always in `[1, 99]`.
+///
+/// We report a self-computed percent rather than raw work units, and bound it to
+/// `[1, 99]` for two reasons:
+/// - **Never 0 and never absent.** The UI reads a missing or zero progress as
+///   100% complete (it does `progress || 100`, and `0` is falsy) and stops
+///   polling. Emitting a truthy percent with a fixed denominator of 100 means
+///   the agent always returns a real `progress` field, so the UI keeps polling
+///   while we run. (This also avoids the agent's ignore-zero quirk in
+///   `query_progress_functions_update`, since neither field is ever 0.)
+/// - **Never 100 while running.** An in-flight call must not read as complete;
+///   completion is signaled by the function RESULT, not by progress reaching
+///   100. So a finished-looking `done == total` is capped at 99.
+///
+/// During the indeterminate phase (`total == 0`, before the handler calls
+/// `set_total`) we report 1%: we can't compute a real percent yet, and an early
+/// or torn-read `done` must not surface as a premature 100%.
+///
+/// `done`/`total` are expected monotonic non-decreasing — the agent's functions
+/// path does an unconditional set (`query_progress_functions_update`), so the
+/// producer is the only guardrail against a backwards or >100 reading. The
+/// `saturating_mul` guards `done * 100` against overflow on byte-scale totals.
+fn progress_percent(done: usize, total: usize) -> usize {
+    if total == 0 {
+        return 1;
+    }
+    (done.saturating_mul(100) / total).clamp(1, 99)
+}
+
 /// Atomic progress state shared between handlers and the runtime ticker.
 ///
 /// Handlers write counters from any context (async, `spawn_blocking`,
-/// rayon), and the runtime sends progress to the agent once per second.
+/// rayon), and the runtime sends progress to the agent every `PROGRESS_INTERVAL`
+/// (250ms).
 ///
 /// # Example
 ///
@@ -103,8 +145,8 @@ impl Default for ProgressState {
 pub struct FunctionCallContext {
     /// Unique identifier for this function call.
     transaction: String,
-    /// Atomic progress state. The runtime reads these counters once per
-    /// second and sends progress to the agent automatically.
+    /// Atomic progress state. The runtime reads these counters every
+    /// `PROGRESS_INTERVAL` (250ms) and sends progress to the agent automatically.
     pub progress: ProgressState,
     /// Token that signals when the function should stop.
     /// Check `is_cancelled()` in sync code, or `await cancelled()` in async code.
@@ -190,7 +232,7 @@ pub trait RawFunctionHandler: Send + Sync {
 /// Adapter that bridges typed handlers with the raw protocol.
 ///
 /// Provides automatic JSON serialization/deserialization for the request
-/// and response payloads, plus a once-per-second progress ticker.
+/// and response payloads, plus a 250ms progress ticker.
 pub struct HandlerAdapter<H: FunctionHandler> {
     pub handler: Arc<H>,
 }
@@ -247,38 +289,41 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
             cancellation: ctx.cancellation_token.clone(),
         };
 
-        // Background ticker: reads the atomic progress counters once
-        // per second and sends FunctionProgressResponse to the agent.
+        // Clone the progress handle + outbound channel for the background ticker.
         let progress = call_ctx.progress.clone();
         let ticker_tx = ctx.outbound_tx.clone();
         let ticker_transaction = transaction.clone();
 
+        // Emit FUNCTION_PROGRESS every 250ms (the same cadence as the
+        // systemd-journal reference, well under the UI's 1s staleness threshold).
+        // We emit on every tick — even before the handler knows the total — so a
+        // slow pre-`set_total` phase (e.g. WAL/source resolution) still keeps the
+        // UI polling and the call from looking stalled. We report a self-computed
+        // percent as `(pct, 100)` with `pct` in `[1, 99]` (see `progress_percent`):
+        // never 0/absent (the UI would read that as 100% complete) and never 100
+        // (completion is the RESULT, not progress). The first tick is delayed by
+        // one interval so sub-250ms calls (the ticker is aborted on completion)
+        // emit no spurious progress.
+        let first = tokio::time::Instant::now() + PROGRESS_INTERVAL;
         let ticker = tokio::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(1));
+            let mut interval = tokio::time::interval_at(first, PROGRESS_INTERVAL);
             interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
             loop {
                 interval.tick().await;
                 let (done, total) = progress.load();
-                if total > 0 {
-                    let msg =
-                        Message::FunctionProgressResponse(Box::new(FunctionProgressResponse {
-                            transaction: ticker_transaction.clone(),
-                            done,
-                            all: total,
-                        }));
-                    tracing::trace!(
-                        "[{}] progress {}/{}",
-                        ticker_transaction.clone(),
-                        done,
-                        total
+                let pct = progress_percent(done, total);
+                let msg = Message::FunctionProgressResponse(Box::new(FunctionProgressResponse {
+                    transaction: ticker_transaction.clone(),
+                    done: pct,
+                    all: PROGRESS_DENOMINATOR,
+                }));
+                tracing::trace!("[{}] progress {}%", ticker_transaction, pct);
+                if ticker_tx.send(msg).is_err() {
+                    tracing::error!(
+                        "[{}] outbound channel closed, stopping progress ticker",
+                        ticker_transaction
                     );
-                    if ticker_tx.send(msg).is_err() {
-                        tracing::error!(
-                            "[{}] outbound channel closed, stopping progress ticker",
-                            ticker_transaction
-                        );
-                        break;
-                    }
+                    break;
                 }
             }
         });
@@ -353,5 +398,111 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
 
     fn declaration(&self) -> FunctionDeclaration {
         self.handler.declaration()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn progress_percent_indeterminate_is_one() {
+        // total==0 (pre-set_total): always 1%. Never 0 (the UI reads 0/absent as
+        // 100% complete and stops polling), and a premature/torn `done` must not
+        // surface as near-complete.
+        assert_eq!(progress_percent(0, 0), 1);
+        assert_eq!(progress_percent(5, 0), 1);
+    }
+
+    #[test]
+    fn progress_percent_floors_at_one_and_caps_at_99() {
+        // Floor: a tiny real fraction still reports 1%, never 0%.
+        assert_eq!(progress_percent(1, 1000), 1);
+        assert_eq!(progress_percent(0, 50), 1);
+        // Cap: done==total (or a torn done>total) reads as 99%, never 100% —
+        // completion is signaled by the RESULT, not by progress.
+        assert_eq!(progress_percent(50, 50), 99);
+        assert_eq!(progress_percent(80, 50), 99);
+    }
+
+    #[test]
+    fn progress_percent_passes_through_mid_range() {
+        assert_eq!(progress_percent(3, 50), 6);
+        assert_eq!(progress_percent(30, 100), 30);
+    }
+
+    #[test]
+    fn progress_percent_does_not_overflow() {
+        // done * 100 saturates instead of wrapping on byte-scale totals.
+        assert_eq!(progress_percent(usize::MAX, 1000), 99);
+    }
+
+    // A handler that stays in the indeterminate phase (never calls set_total)
+    // long enough for the 250ms ticker to fire at least once before it returns.
+    struct SlowIndeterminateHandler;
+
+    #[async_trait]
+    impl FunctionHandler for SlowIndeterminateHandler {
+        type Request = serde_json::Value;
+        type Response = serde_json::Value;
+
+        async fn on_call(
+            &self,
+            _ctx: FunctionCallContext,
+            _request: Self::Request,
+        ) -> Result<Self::Response> {
+            tokio::time::sleep(Duration::from_millis(800)).await;
+            Ok(serde_json::json!({ "ok": true }))
+        }
+
+        fn declaration(&self) -> FunctionDeclaration {
+            FunctionDeclaration::new("test-slow", "test slow indeterminate handler")
+        }
+    }
+
+    // The ticker must emit during the indeterminate (pre-set_total) phase, and
+    // report 1/100 (1%) — never all==0 and never done==0 (the UI reads either as
+    // 100% complete and stops polling). Regression guard for the percent model.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn ticker_emits_indeterminate_progress_before_set_total() {
+        let adapter = HandlerAdapter::new(SlowIndeterminateHandler);
+        let (outbound_tx, mut outbound_rx) = mpsc::unbounded_channel();
+        let ctx = Arc::new(FunctionContext {
+            function_call: Box::new(FunctionCall {
+                transaction: "tx-slow".to_string(),
+                timeout: 60,
+                name: "test-slow".to_string(),
+                args: Vec::new(),
+                access: None,
+                source: None,
+                payload: None,
+            }),
+            cancellation_token: CancellationToken::new(),
+            outbound_tx,
+        });
+
+        let task = tokio::spawn({
+            let ctx = Arc::clone(&ctx);
+            async move { adapter.handle_raw(ctx).await }
+        });
+
+        let progress = tokio::time::timeout(Duration::from_secs(3), async {
+            loop {
+                match outbound_rx.recv().await {
+                    Some(Message::FunctionProgressResponse(p)) => break p,
+                    Some(_) => continue,
+                    None => panic!("outbound channel closed before progress"),
+                }
+            }
+        })
+        .await
+        .expect("timed out waiting for indeterminate progress");
+
+        assert_eq!(progress.transaction, "tx-slow");
+        assert_eq!(progress.done, 1); // 1%, not 0 (0 would read as complete)
+        assert_eq!(progress.all, 100);
+
+        let result = task.await.expect("handler task panicked");
+        assert_eq!(result.status, 200);
     }
 }

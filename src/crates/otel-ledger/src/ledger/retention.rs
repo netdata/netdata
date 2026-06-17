@@ -42,15 +42,15 @@ impl Ledger {
                 .evaluate_retention(&sfst_retention_policy(&retention), now_ns());
             let mut reqs = Vec::with_capacity(to_evict.len());
             for seq in to_evict {
-                // Don't evict the local SFST unless its entry is already
-                // in a closed, on-disk catalog file. This covers both
-                // "not yet uploaded" and "uploaded but catalog rotation
-                // hasn't happened yet." Recovery can't reconstruct an
-                // in-flight accumulator entry after the local SFST is
-                // gone.
-                if storage_enabled && !registry.is_rotated(seq) {
+                // Don't evict the local SFST until its catalog entry is
+                // confirmed present on the remote. This covers "not yet
+                // uploaded", "uploaded but not yet cataloged", and "cataloged
+                // locally but the catalog upload hasn't landed" — in all of
+                // them the remote SFST would be orphaned (referenced by no
+                // remote catalog) if we deleted the local copy now.
+                if storage_enabled && !registry.is_remote_cataloged(seq) {
                     tracing::warn!(
-                        "retention: deferring eviction of seq={seq} (upload or catalog pending)"
+                        "retention: deferring eviction of seq={seq} (catalog not yet confirmed on remote)"
                     );
                     continue;
                 }

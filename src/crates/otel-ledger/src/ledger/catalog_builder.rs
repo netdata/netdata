@@ -61,12 +61,13 @@ impl Ledger {
                     }
                 }
 
-                if self.logs_config.storage.enabled {
+                if let Some(uploader) = self.uploader.as_mut() {
                     let req = UploaderRequest::UploadCatalog {
                         local_path: path,
                         remote_key,
+                        seqs,
                     };
-                    if let Err(e) = self.uploader.send(req) {
+                    if let Err(e) = uploader.send(req) {
                         tracing::error!("failed to send catalog upload request: {e}");
                     }
                 }

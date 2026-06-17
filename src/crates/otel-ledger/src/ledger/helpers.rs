@@ -1,6 +1,9 @@
 //! Shared helpers.
 
-use file_registry::TimestampNs;
+use file_registry::{FileId, TenantId, TimestampNs};
+
+use crate::ipc::UploaderRequest;
+use crate::registry::Registry;
 
 /// Convert a summary's `min_timestamp_s` to the calendar date used for
 /// catalog partitioning.
@@ -51,6 +54,7 @@ pub(crate) fn build_catalog_entry(
     sfst_file: &sfst::File,
     remote_key: String,
     uploaded_at_ns: TimestampNs,
+    remote_etag: Option<String>,
 ) -> otel_catalog::CatalogEntry {
     let summary = &sfst_file.summary;
     otel_catalog::CatalogEntry {
@@ -62,7 +66,26 @@ pub(crate) fn build_catalog_entry(
         stream: summary.stream.clone(),
         size: sfst_file.size,
         uploaded_at_ns,
+        remote_etag,
     }
+}
+
+/// Build the SFST upload request for a tracked file, or `None` if the registry
+/// no longer has it. Shared by the indexer-response path and recovery so the
+/// date → remote-key derivation lives in one place.
+pub(crate) fn sfst_upload_request(
+    registry: &Registry,
+    tenant_id: &TenantId,
+    id: FileId,
+) -> Option<UploaderRequest> {
+    let sfst_file = registry.sfst.get(id.seq)?;
+    let date =
+        date_from_summary(&sfst_file.summary).unwrap_or_else(|| chrono::Utc::now().date_naive());
+    Some(UploaderRequest::Upload {
+        seq: id.seq,
+        local_path: registry.sfst.file_path(id),
+        remote_key: crate::remote_keys::sfst(tenant_id, date, id),
+    })
 }
 
 #[cfg(test)]

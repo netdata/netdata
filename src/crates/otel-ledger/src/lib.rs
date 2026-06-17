@@ -10,6 +10,7 @@ pub mod query;
 mod recovery;
 pub mod registry;
 pub mod remote_keys;
+mod storage;
 #[cfg(test)]
 pub(crate) mod test_helpers;
 pub mod uploader;

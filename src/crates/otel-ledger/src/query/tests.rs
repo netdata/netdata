@@ -77,6 +77,7 @@ fn track_remote(reg: &mut Registry, seq: u64, min_s: u32, max_s: u32) {
         stream: ServiceStream::new("ns", "a"),
         size: ByteSize(1),
         uploaded_at_ns: TimestampNs(0),
+        remote_etag: None,
     };
 
     let mut catalog =
