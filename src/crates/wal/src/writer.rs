@@ -11,7 +11,7 @@ use uuid::Uuid;
 use crate::Result;
 use crate::config::Config;
 use crate::seq::SeqAllocator;
-use file_registry::{ByteSize, FileId, TimestampNs};
+use file_registry::{ByteSize, FileId, ServiceStream, TimestampNs};
 
 use crate::format::{
     COMPRESSION_NONE, FLAG_CRC_ENABLED, FORMAT_VERSION, FRAME_ALIGNMENT, FRAME_HEADER_SIZE,
@@ -58,7 +58,11 @@ struct Stream {
     config: Config,
     active: Option<ActiveFile>,
     seq: SeqCounter,
+    /// The stream this writer serves. `ns_hash` is its cached
+    /// [`ServiceStream::ns_hash`] (the file-naming/partition key); `stream`
+    /// is the textual pair recorded in each file's header.
     ns_hash: u64,
+    stream: ServiceStream,
     pending_events: Vec<FileEvent>,
 }
 
@@ -69,7 +73,7 @@ impl Stream {
         boot_id: Uuid,
         config: Config,
         seq: SeqCounter,
-        ns_hash: u64,
+        stream: ServiceStream,
     ) -> Self {
         Self {
             dir,
@@ -78,7 +82,8 @@ impl Stream {
             config,
             active: None,
             seq,
-            ns_hash,
+            ns_hash: stream.ns_hash(),
+            stream,
             pending_events: Vec::new(),
         }
     }
@@ -232,6 +237,7 @@ impl Stream {
             version: FORMAT_VERSION,
             flags,
             created_at: created_at_ns.0,
+            stream: self.stream.clone(),
         };
         writer.write_all(&header.to_bytes())?;
         writer.flush()?;
@@ -241,6 +247,7 @@ impl Stream {
         self.pending_events.push(FileEvent::Created {
             file_id,
             created_at_ns,
+            stream: self.stream.clone(),
         });
 
         self.active = Some(ActiveFile {
@@ -343,9 +350,11 @@ impl Writer {
         })
     }
 
-    /// Write a frame to the stream for the given `ns_hash`.
+    /// Write a frame to the writer for the given `stream`.
     ///
-    /// Lazily creates a new stream if one doesn't exist for this `ns_hash`.
+    /// Lazily creates a new per-stream writer (keyed by the stream's
+    /// `ns_hash`) if one doesn't exist yet; the stream's `(namespace, name)`
+    /// is recorded in each file's header.
     ///
     /// `ingestion_ns` is the caller's monotonic timestamp for this frame
     /// — stamped into the frame header on disk and used by the indexer
@@ -362,14 +371,14 @@ impl Writer {
     /// the writer's per-file accumulator is then left unchanged.
     pub fn write_frame(
         &mut self,
-        ns_hash: u64,
+        stream: &ServiceStream,
         data: &[u8],
         log_entry_count: usize,
         ingestion_ns: TimestampNs,
         log_min_ts_ns: TimestampNs,
         log_max_ts_ns: TimestampNs,
     ) -> Result<u64> {
-        self.get_or_create(ns_hash).write_frame(
+        self.get_or_create(stream).write_frame(
             data,
             log_entry_count,
             ingestion_ns,
@@ -378,16 +387,16 @@ impl Writer {
         )
     }
 
-    /// Get or lazily create a stream for the given `ns_hash`.
-    fn get_or_create(&mut self, ns_hash: u64) -> &mut Stream {
-        self.streams.entry(ns_hash).or_insert_with(|| {
+    /// Get or lazily create the writer for `stream` (keyed by its `ns_hash`).
+    fn get_or_create(&mut self, stream: &ServiceStream) -> &mut Stream {
+        self.streams.entry(stream.ns_hash()).or_insert_with(|| {
             Stream::new(
                 Arc::clone(&self.dir),
                 self.machine_id,
                 self.boot_id,
                 self.config.clone(),
                 SeqCounter(Arc::clone(&self.seq)),
-                ns_hash,
+                stream.clone(),
             )
         })
     }
@@ -429,6 +438,12 @@ mod tests {
         Writer::new(tmp, Config::default(), seq).unwrap()
     }
 
+    /// A distinct stream per label — distinct labels give distinct `ns_hash`es,
+    /// so a test can partition by stream without hand-picking hashes.
+    fn s(label: u64) -> ServiceStream {
+        ServiceStream::new("ns", format!("svc{label}"))
+    }
+
     #[test]
     fn creates_separate_files_per_ns_hash() {
         let tmp = tempfile::tempdir().unwrap();
@@ -437,39 +452,18 @@ mod tests {
         let data = b"test payload";
 
         writer
-            .write_frame(
-                1,
-                data,
-                1,
-                TimestampNs(1),
-                TimestampNs::ZERO,
-                TimestampNs::ZERO,
-            )
+            .write_frame(&s(1), data, 1, TimestampNs(1), TimestampNs::ZERO, TimestampNs::ZERO)
             .unwrap();
         writer
-            .write_frame(
-                2,
-                data,
-                1,
-                TimestampNs(2),
-                TimestampNs::ZERO,
-                TimestampNs::ZERO,
-            )
+            .write_frame(&s(2), data, 1, TimestampNs(2), TimestampNs::ZERO, TimestampNs::ZERO)
             .unwrap();
         writer
-            .write_frame(
-                1,
-                data,
-                1,
-                TimestampNs(3),
-                TimestampNs::ZERO,
-                TimestampNs::ZERO,
-            )
+            .write_frame(&s(1), data, 1, TimestampNs(3), TimestampNs::ZERO, TimestampNs::ZERO)
             .unwrap();
 
         writer.sync_all().unwrap();
 
-        // Two distinct ns_hash values → two WAL files.
+        // Two distinct streams → two WAL files.
         let wal_files: Vec<_> = std::fs::read_dir(tmp.path())
             .unwrap()
             .filter_map(|e| e.ok())
@@ -477,13 +471,15 @@ mod tests {
             .collect();
         assert_eq!(wal_files.len(), 2);
 
-        // Verify filenames carry distinct ns_hash suffixes.
+        // Filenames carry each stream's distinct ns_hash.
         let mut hashes: Vec<u64> = wal_files
             .iter()
             .map(|e| FileId::parse(&e.path()).unwrap().ns_hash)
             .collect();
         hashes.sort();
-        assert_eq!(hashes, vec![1, 2]);
+        let mut expected = vec![s(1).ns_hash(), s(2).ns_hash()];
+        expected.sort();
+        assert_eq!(hashes, expected);
     }
 
     #[test]
@@ -494,34 +490,13 @@ mod tests {
 
         // Three frames with growing & overlapping ranges.
         writer
-            .write_frame(
-                1,
-                data,
-                1,
-                TimestampNs(1),
-                TimestampNs(200),
-                TimestampNs(300),
-            )
+            .write_frame(&s(1), data, 1, TimestampNs(1), TimestampNs(200), TimestampNs(300))
             .unwrap();
         writer
-            .write_frame(
-                1,
-                data,
-                1,
-                TimestampNs(2),
-                TimestampNs(150),
-                TimestampNs(250),
-            )
+            .write_frame(&s(1), data, 1, TimestampNs(2), TimestampNs(150), TimestampNs(250))
             .unwrap();
         writer
-            .write_frame(
-                1,
-                data,
-                1,
-                TimestampNs(3),
-                TimestampNs(180),
-                TimestampNs(400),
-            )
+            .write_frame(&s(1), data, 1, TimestampNs(3), TimestampNs(180), TimestampNs(400))
             .unwrap();
 
         writer.sync_all().unwrap();
@@ -562,28 +537,14 @@ mod tests {
         let data = b"x";
 
         writer
-            .write_frame(
-                1,
-                data,
-                1,
-                TimestampNs(1),
-                TimestampNs(500),
-                TimestampNs(600),
-            )
+            .write_frame(&s(1), data, 1, TimestampNs(1), TimestampNs(500), TimestampNs(600))
             .unwrap();
         // Frame whose logs all lacked time/observed timestamps — must
         // not regress the accumulator. (In production the ingestor would
         // synthesize a fallback range; this test exercises the defense-
         // in-depth ZERO/ZERO skip.)
         writer
-            .write_frame(
-                1,
-                data,
-                1,
-                TimestampNs(2),
-                TimestampNs::ZERO,
-                TimestampNs::ZERO,
-            )
+            .write_frame(&s(1), data, 1, TimestampNs(2), TimestampNs::ZERO, TimestampNs::ZERO)
             .unwrap();
 
         writer.sync_all().unwrap();
@@ -609,24 +570,10 @@ mod tests {
 
         let data = b"test payload";
         writer
-            .write_frame(
-                10,
-                data,
-                1,
-                TimestampNs(1),
-                TimestampNs::ZERO,
-                TimestampNs::ZERO,
-            )
+            .write_frame(&s(10), data, 1, TimestampNs(1), TimestampNs::ZERO, TimestampNs::ZERO)
             .unwrap();
         writer
-            .write_frame(
-                20,
-                data,
-                1,
-                TimestampNs(2),
-                TimestampNs::ZERO,
-                TimestampNs::ZERO,
-            )
+            .write_frame(&s(20), data, 1, TimestampNs(2), TimestampNs::ZERO, TimestampNs::ZERO)
             .unwrap();
 
         writer.sync_all().unwrap();

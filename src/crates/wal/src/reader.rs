@@ -396,7 +396,7 @@ mod tests {
         for (i, payload) in payloads.iter().enumerate() {
             writer
                 .write_frame(
-                    0,
+                    &file_registry::ServiceStream::new("ns", "svc"),
                     payload,
                     1,
                     TimestampNs(i as u64 + 1),
@@ -580,7 +580,7 @@ mod tests {
         for (i, &count) in counts.iter().enumerate() {
             writer
                 .write_frame(
-                    0,
+                    &file_registry::ServiceStream::new("ns", "svc"),
                     b"payload",
                     count,
                     TimestampNs(i as u64 + 1),

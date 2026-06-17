@@ -47,13 +47,25 @@ files, and filtered at query time across the WAL/SFST logs pipeline.
 - These two filter mechanisms (WAL by hash, SFST by `==`) agree because both treat
   absent and empty as one stream.
 
-## Persisted formats (unchanged)
+## Persisted formats
 
-This contract changes no on-disk or wire format. `ServiceStream` is stored as String
-pairs everywhere it is persisted — SFST `SUMR` (`sfst` `VERSION = 5`), catalog
-(`otel-catalog` `FORMAT_VERSION`), remote object keys (`otel-ledger`
-`SCHEMA_VERSION = "v1"`). Ferryboat IPC carries `FileId` only, not stream identity.
-No version bump is required.
+`ServiceStream` is stored as String pairs in the SFST `SUMR` (`sfst` `VERSION = 5`),
+the catalog (`otel-catalog` `FORMAT_VERSION`), and remote object keys (`otel-ledger`
+`SCHEMA_VERSION = "v1"`) — none of those changed.
+
+The **WAL header records the stream** (so an unsealed WAL can be named without
+decoding frames — see the stream selector). This bumped `wal` `FORMAT_VERSION` 1→2:
+the header carries the `(namespace, name)` as two length-prefixed UTF-8 fields, each
+capped at `MAX_STREAM_FIELD_BYTES = 256` and truncated on a char boundary for display
+only (the `ns_hash` partition key is unaffected). There is **no v1 back-compat** —
+`FileHeader::from_bytes` hard-rejects v1, so an unsealed v1 WAL is lost on upgrade
+(accepted: the feature is experimental and WAL files are short-lived). `recover()`
+reads the stream from the header on restart; `wal::Registry::File` carries it.
+
+The writer→ledger **ferryboat IPC** also carries the stream: `FileEvent::Created`
+gained a `ServiceStream` field. Ferryboat has no version field, but the writer and
+ledger are separate worker processes of the **same `self_exe`**, so they never skew
+— no wire-compat constraint.
 
 ## Compatibility note
 

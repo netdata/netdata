@@ -33,6 +33,7 @@ fn track_wal(reg: &mut Registry, seq: u64, ns_hash: u64, min_s: u32, max_s: u32)
         .apply_event(&FileEvent::Created {
             file_id: id,
             created_at_ns: TimestampNs(0),
+            stream: file_registry::ServiceStream::new("ns", "svc"),
         })
         .unwrap();
     reg.wal

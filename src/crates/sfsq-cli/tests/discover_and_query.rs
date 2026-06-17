@@ -28,7 +28,29 @@ use sfsq_cli::run_query;
 
 const BASE_S: u64 = 1_000_000;
 const NS: u64 = 1_000_000_000;
-const NS_HASH: u64 = 7; // arbitrary, consistent stream identity for the writer
+/// The single stream a test `ResourceLogs` carries (`service.namespace`/`name`,
+/// each empty when absent) — so the WAL file's `ns_hash` matches its data.
+/// Mirrors `otel_ingestor::extract_stream` (private there); the
+/// filename-hash assertions below would catch any drift between the two.
+fn stream_of(rl: &ResourceLogs) -> ServiceStream {
+    let mut namespace = "";
+    let mut name = "";
+    if let Some(res) = &rl.resource {
+        for kv in &res.attributes {
+            if let Some(AnyValue {
+                value: Some(Value::StringValue(s)),
+            }) = &kv.value
+            {
+                match kv.key.as_str() {
+                    "service.namespace" => namespace = s,
+                    "service.name" => name = s,
+                    _ => {}
+                }
+            }
+        }
+    }
+    ServiceStream::new(namespace, name)
+}
 
 fn sv(v: &str) -> AnyValue {
     AnyValue {
@@ -102,7 +124,7 @@ fn write_wal_seq(wal_tenant_dir: &Path, batches: &[Vec<ResourceLogs>], seq_start
         let ingestion = TimestampNs((BASE_S + 500 + i as u64) * NS);
         writer
             .write_frame(
-                NS_HASH,
+                &stream_of(&b[0]),
                 &data,
                 count,
                 ingestion,
@@ -234,16 +256,16 @@ fn wal_stream_filter_matches_absent_namespace() {
     let wal_dir = dirs.wal.join("default");
     std::fs::create_dir_all(&wal_dir).unwrap();
 
-    // Name the WAL file with the absent-namespace hash, exactly as the ingestor
-    // would for a stream carrying service.name but no service.namespace.
-    let ns_hash = compute_ns_hash(None, Some("api"));
+    // The writer names the file by the stream's ns_hash; for a service.name
+    // with no service.namespace that is compute_ns_hash(None, name), exactly as
+    // the ingestor.
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
     let mut writer = wal::Writer::new(&wal_dir, wal::Config::default(), seq).expect("writer");
     let (data, count) =
         otel_ingestor::arrow_bridge::encode(batch_for(records(0..10), "", "api")).expect("encode");
     writer
         .write_frame(
-            ns_hash,
+            &ServiceStream::new("", "api"),
             &data,
             count,
             TimestampNs((BASE_S + 500) * NS),
@@ -252,6 +274,18 @@ fn wal_stream_filter_matches_absent_namespace() {
         )
         .expect("write_frame");
     writer.shutdown_all().expect("shutdown");
+
+    // The file carries the absent-namespace hash (empty namespace collapses).
+    let wal_path = std::fs::read_dir(&wal_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .find(|p| p.extension().is_some_and(|x| x == "wal"))
+        .unwrap();
+    assert_eq!(
+        FileId::parse(&wal_path).unwrap().ns_hash,
+        compute_ns_hash(None, Some("api")),
+    );
 
     // An empty-namespace stream filter must match the absent-namespace file.
     let stream = ServiceStream::new("", "api");

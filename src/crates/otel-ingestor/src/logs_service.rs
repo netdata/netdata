@@ -151,7 +151,7 @@ fn group_by_stream(resource_logs: Vec<ResourceLogs>) -> HashMap<ServiceStream, S
 
 /// Result of running the collision check across a request's groups.
 struct CollisionCheck {
-    accepted: Vec<(u64, StreamGroup)>,
+    accepted: Vec<(ServiceStream, StreamGroup)>,
     collisions: Vec<Collision>,
 }
 
@@ -181,10 +181,10 @@ fn check_collisions(
         match canonical.entry(key) {
             Entry::Vacant(e) => {
                 e.insert(stream.clone());
-                accepted.push((hash, group));
+                accepted.push((stream, group));
             }
             Entry::Occupied(e) if *e.get() == stream => {
-                accepted.push((hash, group));
+                accepted.push((stream, group));
             }
             Entry::Occupied(e) => {
                 collisions.push(Collision {
@@ -388,7 +388,7 @@ impl LogsService for NetdataLogsService {
             writers.entry(tenant_id.clone()).or_insert(w)
         };
 
-        for (ns_hash, group) in accepted {
+        for (stream, group) in accepted {
             // One clock tick per frame. The same value flows into the
             // WAL frame header (`ingestion_ns`), into the indexer's
             // tier-3 fallback during indexing, and into
@@ -402,7 +402,7 @@ impl LogsService for NetdataLogsService {
             })?;
 
             writer
-                .write_frame(ns_hash, &data, count, ingestion_ns, log_min_ts, log_max_ts)
+                .write_frame(&stream, &data, count, ingestion_ns, log_min_ts, log_max_ts)
                 .map_err(|e| {
                     tracing::error!(%e, "failed to write WAL entry");
                     Status::internal("WAL write error")
@@ -655,7 +655,9 @@ mod tests {
         let r = check_collisions(&mut canonical, &tenant(), groups);
         assert_eq!(r.accepted.len(), 1);
         assert!(r.collisions.is_empty());
-        let stream = canonical.get(&(tenant(), r.accepted[0].0)).unwrap();
+        let stream = canonical
+            .get(&(tenant(), r.accepted[0].0.ns_hash()))
+            .unwrap();
         assert_eq!(stream, &ServiceStream::new("prod", "api"));
     }
 

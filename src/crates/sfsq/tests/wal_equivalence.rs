@@ -286,7 +286,7 @@ fn write_wal(dir: &Path, corpus: &Corpus) -> PathBuf {
         let ingestion = TimestampNs((BASE_S + 500 + i as u64) * NS);
         writer
             .write_frame(
-                7,
+                &file_registry::ServiceStream::new("ns", "svc"),
                 &data,
                 count,
                 ingestion,
