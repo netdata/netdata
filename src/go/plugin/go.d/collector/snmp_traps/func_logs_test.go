@@ -275,7 +275,6 @@ func funcapiRawRequest(method string, info bool, payload []byte) funcapi.RawMeth
 type snmpTrapsTestFunctionRegistry struct {
 	handlers        map[string]func(functions.Function)
 	contextHandlers map[string]functions.Handler
-	registered      []string
 }
 
 func newSNMPTrapsTestFunctionRegistry() *snmpTrapsTestFunctionRegistry {
@@ -287,7 +286,6 @@ func newSNMPTrapsTestFunctionRegistry() *snmpTrapsTestFunctionRegistry {
 
 func (r *snmpTrapsTestFunctionRegistry) Register(name string, fn func(functions.Function)) {
 	r.handlers[name] = fn
-	r.registered = append(r.registered, name)
 }
 
 func (r *snmpTrapsTestFunctionRegistry) RegisterWithContext(name string, fn functions.Handler) {
@@ -295,7 +293,6 @@ func (r *snmpTrapsTestFunctionRegistry) RegisterWithContext(name string, fn func
 		fn(context.Background(), f)
 	}
 	r.contextHandlers[name] = fn
-	r.registered = append(r.registered, name)
 }
 
 func (r *snmpTrapsTestFunctionRegistry) Unregister(name string) {
@@ -317,8 +314,10 @@ func (r *snmpTrapsTestFunctionRegistry) call(name string, ctx context.Context, f
 }
 
 func (r *snmpTrapsTestFunctionRegistry) registeredNames() []string {
-	out := make([]string, len(r.registered))
-	copy(out, r.registered)
+	out := make([]string, 0, len(r.handlers))
+	for name := range r.handlers {
+		out = append(out, name)
+	}
 	return out
 }
 
