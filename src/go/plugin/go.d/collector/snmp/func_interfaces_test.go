@@ -23,7 +23,9 @@ func TestSnmpMethods(t *testing.T) {
 	var ifacesMethod *funcapi.MethodConfig
 	var licensesMethod *funcapi.MethodConfig
 	var bgpMethod *funcapi.MethodConfig
+	methodIDs := make(map[string]bool, len(methods))
 	for i := range methods {
+		methodIDs[methods[i].ID] = true
 		switch methods[i].ID {
 		case "interfaces":
 			ifacesMethod = &methods[i]
@@ -44,6 +46,7 @@ func TestSnmpMethods(t *testing.T) {
 	require.NotNil(t, bgpMethod)
 	assert.Equal(t, "BGP Peers", bgpMethod.Name)
 	require.NotEmpty(t, bgpMethod.RequiredParams)
+	assert.False(t, methodIDs["topology:snmp"], "snmp_topology owns the topology Function")
 
 	// Verify type group param exists
 	var typeGroupParam *funcapi.ParamConfig

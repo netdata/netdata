@@ -203,6 +203,116 @@ func TestExecuteFunction_ModuleMethodPublicFunctionName(t *testing.T) {
 	assert.Equal(t, "logs", gotMethod)
 }
 
+func TestExecuteFunction_AgentWideModuleMethodDoesNotRequireRunningJob(t *testing.T) {
+	tests := map[string]struct {
+		functionName string
+	}{
+		"public function name": {
+			functionName: "snmp:topology:snmp",
+		},
+		"alias": {
+			functionName: "topology:snmp",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			writer := &jsonWriteCapture{}
+			var gotMethod string
+			var gotJob collectorapi.RuntimeJob
+
+			mgr := New(Config{
+				PluginName:         testPluginName,
+				FunctionJSONWriter: writer.write,
+			})
+			mgr.modules = collectorapi.Registry{
+				"snmp_topology": collectorapi.Creator{
+					Methods: func() []funcapi.MethodConfig {
+						return []funcapi.MethodConfig{{
+							ID:           "topology:snmp",
+							FunctionName: "snmp:topology:snmp",
+							Aliases:      []string{"topology:snmp"},
+							AgentWide:    true,
+							RequiredParams: []funcapi.ParamConfig{{
+								ID:        "scope",
+								Name:      "Scope",
+								Selection: funcapi.ParamSelect,
+								Options:   []funcapi.ParamOption{{ID: "all", Name: "All"}},
+							}},
+						}}
+					},
+					MethodHandler: func(job collectorapi.RuntimeJob) funcapi.MethodHandler {
+						gotJob = job
+						return &mockMethodHandler{
+							handleFunc: func(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+								gotMethod = method
+								assert.Equal(t, "all", params.GetOne("scope"))
+								assert.Empty(t, params.GetOne("__job"))
+								return &funcapi.FunctionResponse{Status: 200, Help: "topology"}
+							},
+						}
+					},
+				},
+			}
+			mgr.funcCtl.RegisterModules(mgr.modules)
+
+			mgr.ExecuteFunction(tc.functionName, functions.Function{
+				UID:     "agent-wide-public-name",
+				Timeout: time.Second,
+				Args:    []string{"scope:all"},
+			})
+
+			resp := writer.requireResponse(t)
+			assert.Equal(t, float64(200), resp["status"])
+			assert.Equal(t, "topology", resp["help"])
+			assert.Equal(t, "topology:snmp", gotMethod)
+			assert.Nil(t, gotJob)
+		})
+	}
+}
+
+func TestExecuteFunction_AgentWideModuleMethodValidationErrorOmitsJob(t *testing.T) {
+	writer := &jsonWriteCapture{}
+
+	mgr := New(Config{
+		PluginName:         testPluginName,
+		FunctionJSONWriter: writer.write,
+	})
+	mgr.modules = collectorapi.Registry{
+		"mod": collectorapi.Creator{
+			Methods: func() []funcapi.MethodConfig {
+				return []funcapi.MethodConfig{{
+					ID:        "logs",
+					AgentWide: true,
+					RequiredParams: []funcapi.ParamConfig{{
+						ID:        "scope",
+						Name:      "Scope",
+						Selection: funcapi.ParamSelect,
+						Options: []funcapi.ParamOption{
+							{ID: "a", Name: "A"},
+							{ID: "b", Name: "B"},
+						},
+					}},
+				}}
+			},
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+				return &mockMethodHandler{}
+			},
+		},
+	}
+	mgr.funcCtl.RegisterModules(mgr.modules)
+
+	mgr.ExecuteFunction("mod:logs", functions.Function{
+		UID:     "agent-wide-validation",
+		Timeout: time.Second,
+		Args:    []string{"scope:a,b"},
+	})
+
+	resp := writer.requireResponse(t)
+	assert.Equal(t, float64(400), resp["status"])
+	assert.Contains(t, resp["errorMessage"], "parameter 'scope' expects a single value")
+}
+
 func TestExecuteFunction_ContextBehavior(t *testing.T) {
 	tests := map[string]struct {
 		managerCtx      context.Context

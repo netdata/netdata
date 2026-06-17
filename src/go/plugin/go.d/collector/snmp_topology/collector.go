@@ -28,15 +28,11 @@ func init() {
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 60,
 		},
-		Create: func() collectorapi.CollectorV1 { return New() },
-		Config: func() any { return &Config{} },
+		Create:        func() collectorapi.CollectorV1 { return New() },
+		Config:        func() any { return &Config{} },
+		Methods:       topologyMethods,
+		MethodHandler: topologyFunctionHandler,
 	})
-
-	// Register the topology function handler and method config so the snmp module
-	// can serve topology:snmp requests under the snmp:topology:snmp function name.
-	ddsnmp.TopologyHandler = &funcTopology{}
-	cfg := topologyMethodConfig()
-	ddsnmp.TopologyMethodConfig = &cfg
 }
 
 func New() *Collector {

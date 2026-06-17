@@ -40,7 +40,6 @@ func newFuncRouter(ifaceCache *ifaceCache, extraHandlers ...registeredSNMPFuncti
 			r.registerHandler(h.methodID, h.handler)
 		}
 	}
-	addTopologyFunctionHandler(r.handlers)
 	return r
 }
 
@@ -100,7 +99,7 @@ func snmpBaseMethods() []funcapi.MethodConfig {
 		ifacesMethodConfig(),
 	}
 	methods = append(methods, collectorSpecificMethodConfigs()...)
-	return appendTopologyMethodConfig(methods)
+	return methods
 }
 
 func snmpFunctionHandler(job collectorapi.RuntimeJob) funcapi.MethodHandler {

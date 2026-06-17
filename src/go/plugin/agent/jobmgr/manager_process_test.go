@@ -203,7 +203,7 @@ func TestManagerAddConfigSingleInstancePolicyPublishesDyncfgSingle(t *testing.T)
 	assert.NotContains(t, out, " remove")
 }
 
-func TestRun_DoesNotRegisterModuleMethodsBeforeAnyJobStarts(t *testing.T) {
+func TestRun_DoesNotRegisterJobBoundModuleMethodsBeforeAnyJobStarts(t *testing.T) {
 	fnReg := &recordingFunctionRegistry{}
 	mgr := New(Config{PluginName: testPluginName, FnReg: fnReg})
 
@@ -239,6 +239,44 @@ func TestRun_DoesNotRegisterModuleMethodsBeforeAnyJobStarts(t *testing.T) {
 	}
 
 	assert.Empty(t, fnReg.registeredNames(), "static methods must not be registered before first started job")
+}
+
+func TestRun_RegistersAgentWideModuleMethodsBeforeAnyJobStarts(t *testing.T) {
+	fnReg := &recordingFunctionRegistry{}
+	mgr := New(Config{PluginName: testPluginName, FnReg: fnReg})
+
+	mgr.modules = collectorapi.Registry{
+		"mod": collectorapi.Creator{
+			Methods: func() []funcapi.MethodConfig {
+				return []funcapi.MethodConfig{{ID: "a", AgentWide: true}}
+			},
+		},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	in := make(chan []*confgroup.Group)
+	done := make(chan struct{})
+	go func() {
+		mgr.Run(ctx, in)
+		close(done)
+	}()
+
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second)
+	defer waitCancel()
+	require.True(t, mgr.WaitStarted(waitCtx), "manager did not report started")
+
+	cancel()
+	close(in)
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("manager did not stop after cancel")
+	}
+
+	assert.Equal(t, []string{"mod:a"}, fnReg.registeredNames())
 }
 
 func TestStartRunningJob_RegistersModuleMethodsOnFirstStartedJob(t *testing.T) {
