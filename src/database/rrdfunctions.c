@@ -291,18 +291,33 @@ bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_str
     // so their removals must not be streamed either. Capture this before releasing.
     bool is_dyncfg = (rdcf->options & RRD_FUNCTION_DYNCFG);
 
+    // The FUNCTION_DEL protocol command (from external plugins or streaming
+    // children) must never remove dyncfg config functions; those are owned and
+    // removed exclusively by the dyncfg subsystem (internal deletes).
+    if(!internal && is_dyncfg) {
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "FUNCTIONS: refusing to unregister dyncfg function '%s' via FUNCTION_DEL", name);
+        dictionary_acquired_item_release(host->functions, item);
+        return false;
+    }
+
     // Mark the function unregistered before removing it from the dictionary.
     // The flag makes the function unavailable to any thread that already holds
     // an acquired reference during the delete window (it cannot be freed until
     // that reference is released), and lets rrd_functions_find_by_name() report
     // a specific "unregistered by the plugin" error in that window.
     __atomic_store_n(&rdcf->unregistered, true, __ATOMIC_RELEASE);
-    dictionary_acquired_item_release(host->functions, item);
 
     if(st && st->functions_view)
         dictionary_del(st->functions_view, key);
 
+    // Delete from the index while still holding our acquired reference, then
+    // release: this unlinks the item before any concurrent re-registration could
+    // resurrect it through the conflict callback (a re-add now allocates a fresh
+    // item). The value is freed once the last reference - this one plus any
+    // in-flight execution - is released.
     dictionary_del(host->functions, key);
+    dictionary_acquired_item_release(host->functions, item);
 
     if(!st && !is_dyncfg)
         stream_send_function_del(host, key);
