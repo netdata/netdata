@@ -4,6 +4,7 @@ package snmptopology
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -359,6 +360,42 @@ func TestCollector_RefreshKeepsPublishedSnapshotWhileCollectionRuns(t *testing.T
 	<-done
 }
 
+func TestCollector_RefreshFailureKeepsPublishedSnapshot(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	dev := ddsnmp.DeviceConnectionInfo{
+		Hostname:    "10.0.0.10",
+		Port:        161,
+		SysObjectID: "1.3.6.1.4.1.9.1.1",
+	}
+	mockHandler := snmpmock.NewMockHandler(ctrl)
+	expectTopologyRefreshSNMPClientConnect(mockHandler, dev)
+	mockHandler.EXPECT().Close().Return(nil)
+
+	key := "10.0.0.10:161"
+	published := newTopologyCache()
+	seedPublishedEndpointSnapshot(published)
+
+	coll := newTestSNMPTopologyCollector()
+	coll.deviceCaches[key] = published
+	coll.topologyRegistry.register(published)
+	coll.newSnmpClient = func() gosnmp.Handler { return mockHandler }
+	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
+		return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) {
+			return nil, errors.New("collection failed")
+		})
+	}
+
+	require.False(t, coll.refreshDeviceTopology(context.Background(), key, dev))
+
+	snapshot, ok := published.snapshotEngineObservations()
+	require.True(t, ok)
+	require.Len(t, snapshot.l2Observations, 1)
+	require.Len(t, snapshot.l2Observations[0].FDBEntries, 1)
+	require.Len(t, snapshot.l2Observations[0].ARPNDEntries, 1)
+}
+
 type blockingTopologyCollector struct {
 	started chan<- struct{}
 	release <-chan struct{}
@@ -376,15 +413,7 @@ func (c *blockingTopologyCollector) Collect() ([]*ddsnmp.ProfileMetrics, error) 
 }
 
 func expectTopologyRefreshSNMPClient(mockHandler *snmpmock.MockHandler, dev ddsnmp.DeviceConnectionInfo) {
-	mockHandler.EXPECT().SetTarget(dev.Hostname)
-	mockHandler.EXPECT().SetPort(uint16(dev.Port))
-	mockHandler.EXPECT().SetRetries(dev.Retries)
-	mockHandler.EXPECT().SetTimeout(time.Duration(dev.Timeout) * time.Second)
-	mockHandler.EXPECT().SetMaxOids(dev.MaxOIDs)
-	mockHandler.EXPECT().SetMaxRepetitions(uint32(dev.MaxRepetitions))
-	mockHandler.EXPECT().SetCommunity(dev.Community)
-	mockHandler.EXPECT().SetVersion(gosnmp.Version2c)
-	mockHandler.EXPECT().Connect().Return(nil)
+	expectTopologyRefreshSNMPClientConnect(mockHandler, dev)
 	mockHandler.EXPECT().Get(gomock.InAnyOrder([]string{
 		snmputils.OidSnmpEngineTime,
 		snmputils.OidHrSystemUptime,
@@ -395,6 +424,18 @@ func expectTopologyRefreshSNMPClient(mockHandler *snmpmock.MockHandler, dev ddsn
 		},
 	}, nil)
 	mockHandler.EXPECT().Close().Return(nil)
+}
+
+func expectTopologyRefreshSNMPClientConnect(mockHandler *snmpmock.MockHandler, dev ddsnmp.DeviceConnectionInfo) {
+	mockHandler.EXPECT().SetTarget(dev.Hostname)
+	mockHandler.EXPECT().SetPort(uint16(dev.Port))
+	mockHandler.EXPECT().SetRetries(dev.Retries)
+	mockHandler.EXPECT().SetTimeout(time.Duration(dev.Timeout) * time.Second)
+	mockHandler.EXPECT().SetMaxOids(dev.MaxOIDs)
+	mockHandler.EXPECT().SetMaxRepetitions(uint32(dev.MaxRepetitions))
+	mockHandler.EXPECT().SetCommunity(dev.Community)
+	mockHandler.EXPECT().SetVersion(gosnmp.Version2c)
+	mockHandler.EXPECT().Connect().Return(nil)
 }
 
 func seedPublishedEndpointSnapshot(cache *topologyCache) {

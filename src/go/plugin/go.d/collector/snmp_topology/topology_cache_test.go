@@ -15,15 +15,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newTestCollector(dev ddsnmp.DeviceConnectionInfo) *Collector {
+func newTestTopologyCache(dev ddsnmp.DeviceConnectionInfo) *topologyCache {
 	cache := newTopologyCache()
 	cache.localDevice = buildLocalTopologyDevice(dev)
 	cache.agentID = dev.Hostname
 	cache.updateTime = time.Now()
-	return &Collector{
-		topologyCache: cache,
-		deviceCaches:  map[string]*topologyCache{dev.Hostname: cache},
-	}
+	return cache
 }
 
 func TestTopologyMetricHandlersRegisteredForRowKinds(t *testing.T) {
@@ -58,7 +55,7 @@ func TestTopologyMetricHandlersRegisteredForRowKinds(t *testing.T) {
 }
 
 func TestTopologyCache_LldpSnapshot(t *testing.T) {
-	coll := newTestCollector(ddsnmp.DeviceConnectionInfo{
+	cache := newTestTopologyCache(ddsnmp.DeviceConnectionInfo{
 		Hostname: "10.0.0.1", SysObjectID: "1.3.6.1.4.1.9.1.1", SysName: "sw1", SysDescr: "Switch 1", SysLocation: "dc1",
 	})
 
@@ -68,9 +65,9 @@ func TestTopologyCache_LldpSnapshot(t *testing.T) {
 			tagLldpLocChassisIDSubtype: {Value: "4"},
 		},
 	}}
-	coll.updateTopologyProfileTags(pms)
+	cache.updateTopologyProfileTags(pms)
 
-	coll.updateTopologyCacheEntry(ddsnmp.Metric{
+	cache.updateTopologyCacheEntry(ddsnmp.Metric{
 		TopologyKind: ddsnmp.KindLldpLocPort,
 		Tags: map[string]string{
 			tagLldpLocPortNum:       "1",
@@ -79,7 +76,7 @@ func TestTopologyCache_LldpSnapshot(t *testing.T) {
 			tagLldpLocPortDesc:      "uplink",
 		},
 	})
-	coll.updateTopologyCacheEntry(ddsnmp.Metric{
+	cache.updateTopologyCacheEntry(ddsnmp.Metric{
 		TopologyKind: ddsnmp.KindLldpRem,
 		Tags: map[string]string{
 			tagLldpLocPortNum:          "1",
@@ -94,9 +91,9 @@ func TestTopologyCache_LldpSnapshot(t *testing.T) {
 		},
 	})
 
-	coll.finalizeTopologyCache()
+	cache.finalizeTopologyCache()
 
-	data, ok := snapshotTopologyCacheForTest(coll.topologyCache)
+	data, ok := snapshotTopologyCacheForTest(cache)
 
 	require.True(t, ok)
 	require.Len(t, data.Actors, 2)
@@ -141,19 +138,19 @@ func TestTopologyCache_CdpSnapshot(t *testing.T) {
 }
 
 func TestTopologyCache_UpdateTopologyProfileTags_STPBridgeAddressSetsSNMPIdentity(t *testing.T) {
-	coll := newTestCollector(ddsnmp.DeviceConnectionInfo{Hostname: "10.20.4.2"})
-	coll.topologyCache.localDevice.ChassisID = "10.20.4.2"
-	coll.topologyCache.localDevice.ChassisIDType = "management_ip"
+	cache := newTestTopologyCache(ddsnmp.DeviceConnectionInfo{Hostname: "10.20.4.2"})
+	cache.localDevice.ChassisID = "10.20.4.2"
+	cache.localDevice.ChassisIDType = "management_ip"
 
-	coll.updateTopologyProfileTags([]*ddsnmp.ProfileMetrics{{
+	cache.updateTopologyProfileTags([]*ddsnmp.ProfileMetrics{{
 		DeviceMetadata: map[string]ddsnmp.MetaTag{
 			tagBridgeBaseAddress: {Value: "\"18 FD 74 33 1A 9C \""},
 		},
 	}})
 
-	require.Equal(t, "18:fd:74:33:1a:9c", coll.topologyCache.stpBaseBridgeAddress)
-	require.Equal(t, "18:fd:74:33:1a:9c", coll.topologyCache.localDevice.ChassisID)
-	require.Equal(t, "macAddress", coll.topologyCache.localDevice.ChassisIDType)
+	require.Equal(t, "18:fd:74:33:1a:9c", cache.stpBaseBridgeAddress)
+	require.Equal(t, "18:fd:74:33:1a:9c", cache.localDevice.ChassisID)
+	require.Equal(t, "macAddress", cache.localDevice.ChassisIDType)
 }
 
 func TestTopologyCache_UpdateFdbEntry_STPBridgeAddressTagSetsSNMPIdentity(t *testing.T) {
@@ -249,12 +246,12 @@ func TestTopologyCache_UpdateIfIndexByIP_CollectsAllSNMPDeviceIPs(t *testing.T) 
 }
 
 func TestTopologyCache_UpdateTopologyProfileTags_LLDPDoesNotOverrideExistingSNMPIdentity(t *testing.T) {
-	coll := newTestCollector(ddsnmp.DeviceConnectionInfo{Hostname: "10.20.4.2"})
-	coll.topologyCache.localDevice.ChassisID = "18:fd:74:33:1a:9c"
-	coll.topologyCache.localDevice.ChassisIDType = "macAddress"
-	coll.topologyCache.localDevice.SysName = "MikroTik-Switch"
+	cache := newTestTopologyCache(ddsnmp.DeviceConnectionInfo{Hostname: "10.20.4.2"})
+	cache.localDevice.ChassisID = "18:fd:74:33:1a:9c"
+	cache.localDevice.ChassisIDType = "macAddress"
+	cache.localDevice.SysName = "MikroTik-Switch"
 
-	coll.updateTopologyProfileTags([]*ddsnmp.ProfileMetrics{{
+	cache.updateTopologyProfileTags([]*ddsnmp.ProfileMetrics{{
 		DeviceMetadata: map[string]ddsnmp.MetaTag{
 			tagLldpLocChassisID:        {Value: "00:11:22:33:44:55"},
 			tagLldpLocChassisIDSubtype: {Value: "4"},
@@ -262,9 +259,9 @@ func TestTopologyCache_UpdateTopologyProfileTags_LLDPDoesNotOverrideExistingSNMP
 		},
 	}})
 
-	require.Equal(t, "18:fd:74:33:1a:9c", coll.topologyCache.localDevice.ChassisID)
-	require.Equal(t, "macAddress", coll.topologyCache.localDevice.ChassisIDType)
-	require.Equal(t, "MikroTik-Switch", coll.topologyCache.localDevice.SysName)
+	require.Equal(t, "18:fd:74:33:1a:9c", cache.localDevice.ChassisID)
+	require.Equal(t, "macAddress", cache.localDevice.ChassisIDType)
+	require.Equal(t, "MikroTik-Switch", cache.localDevice.SysName)
 }
 
 func TestTopologyCache_CdpSnapshotHexAddress(t *testing.T) {
@@ -473,10 +470,10 @@ func TestTopologyCache_SnapshotMergesRemoteIdentityAcrossProtocols(t *testing.T)
 }
 
 func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
-	coll := newTestCollector(ddsnmp.DeviceConnectionInfo{
+	cache := newTestTopologyCache(ddsnmp.DeviceConnectionInfo{
 		Hostname: "10.0.0.1", SysObjectID: "1.3.6.1.4.1.9.1.1", SysName: "sw1", SysDescr: "Switch 1",
 	})
-	coll.updateTopologyProfileTags([]*ddsnmp.ProfileMetrics{{
+	cache.updateTopologyProfileTags([]*ddsnmp.ProfileMetrics{{
 		DeviceMetadata: map[string]ddsnmp.MetaTag{
 			tagLldpLocChassisID:        {Value: "00:11:22:33:44:55"},
 			tagLldpLocChassisIDSubtype: {Value: "4"},
@@ -485,7 +482,7 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 		},
 	}})
 
-	coll.updateTopologyCacheEntry(ddsnmp.Metric{
+	cache.updateTopologyCacheEntry(ddsnmp.Metric{
 		TopologyKind: ddsnmp.KindLldpLocManAddr,
 		Tags: map[string]string{
 			tagLldpLocMgmtAddrSubtype: "2",
@@ -493,7 +490,7 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 			tagLldpLocMgmtAddrIfID:    "1",
 		},
 	})
-	coll.updateTopologyCacheEntry(ddsnmp.Metric{
+	cache.updateTopologyCacheEntry(ddsnmp.Metric{
 		TopologyKind: ddsnmp.KindLldpRemManAddr,
 		Tags: map[string]string{
 			tagLldpLocPortNum:         "1",
@@ -502,7 +499,7 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 			tagLldpRemMgmtAddr:        "0a000002",
 		},
 	})
-	coll.updateTopologyCacheEntry(ddsnmp.Metric{
+	cache.updateTopologyCacheEntry(ddsnmp.Metric{
 		TopologyKind: ddsnmp.KindLldpRemManAddr,
 		Tags: map[string]string{
 			tagLldpLocPortNum:         "1",
@@ -511,7 +508,7 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 			tagLldpRemMgmtAddr:        "31302e32302e342e3834", // "10.20.4.84" ASCII-hex
 		},
 	})
-	coll.updateTopologyCacheEntry(ddsnmp.Metric{
+	cache.updateTopologyCacheEntry(ddsnmp.Metric{
 		TopologyKind: ddsnmp.KindLldpRemManAddr,
 		Tags: map[string]string{
 			tagLldpLocPortNum:         "1",
@@ -520,7 +517,7 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 			tagLldpRemMgmtAddr:        "666330303a663835333a6363643a653739333a3a31", // "fc00:f853:ccd:e793::1" ASCII-hex
 		},
 	})
-	coll.updateTopologyCacheEntry(ddsnmp.Metric{
+	cache.updateTopologyCacheEntry(ddsnmp.Metric{
 		TopologyKind: ddsnmp.KindLldpRemManAddr,
 		Tags: map[string]string{
 			tagLldpLocPortNum:                 "1",
@@ -533,7 +530,7 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 			tagLldpRemMgmtAddrOctetPref + "4": "21",
 		},
 	})
-	coll.updateTopologyCacheEntry(ddsnmp.Metric{
+	cache.updateTopologyCacheEntry(ddsnmp.Metric{
 		TopologyKind: ddsnmp.KindLldpRem,
 		Tags: map[string]string{
 			tagLldpLocPortNum:          "1",
@@ -545,9 +542,9 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 		},
 	})
 
-	coll.finalizeTopologyCache()
+	cache.finalizeTopologyCache()
 
-	data, ok := snapshotTopologyCacheForTest(coll.topologyCache)
+	data, ok := snapshotTopologyCacheForTest(cache)
 
 	require.True(t, ok)
 	require.Greater(t, len(data.Actors), 1)
@@ -1289,24 +1286,20 @@ func TestBuildLocalTopologyDevice_IncludesSysContactVendorAndModel(t *testing.T)
 	require.Equal(t, topologyProfileChartContextPrefix, device.ChartContextPrefix)
 }
 
-func TestCollector_UpdateTopologySysUptime_StoresSysUptime(t *testing.T) {
-	coll := &Collector{
-		topologyCache: newTopologyCache(),
-	}
-	coll.topologyCache.localDevice = topologyDevice{}
+func TestTopologyCache_UpdateTopologySysUptime_StoresSysUptime(t *testing.T) {
+	cache := newTopologyCache()
+	cache.localDevice = topologyDevice{}
 
-	coll.updateTopologySysUptime(4321)
+	cache.updateTopologySysUptime(4321)
 
-	require.EqualValues(t, 4321, coll.topologyCache.localDevice.SysUptime)
-	require.Equal(t, "4321", coll.topologyCache.localDevice.Labels["sys_uptime"])
+	require.EqualValues(t, 4321, cache.localDevice.SysUptime)
+	require.Equal(t, "4321", cache.localDevice.Labels["sys_uptime"])
 }
 
-func TestCollector_IngestTopologyProfileMetrics_IncludesTopologyMetrics(t *testing.T) {
-	coll := &Collector{
-		topologyCache: newTopologyCache(),
-	}
+func TestTopologyCache_IngestTopologyProfileMetrics_IncludesTopologyMetrics(t *testing.T) {
+	cache := newTopologyCache()
 
-	coll.ingestTopologyProfileMetrics([]*ddsnmp.ProfileMetrics{
+	cache.ingestTopologyProfileMetrics([]*ddsnmp.ProfileMetrics{
 		{
 			TopologyMetrics: []ddsnmp.Metric{
 				{
@@ -1337,10 +1330,10 @@ func TestCollector_IngestTopologyProfileMetrics_IncludesTopologyMetrics(t *testi
 		},
 	})
 
-	require.Contains(t, coll.topologyCache.lldpLocPorts, "7")
-	require.Contains(t, coll.topologyCache.lldpRemotes, "7:1")
-	require.Zero(t, coll.topologyCache.localDevice.SysUptime)
-	require.Empty(t, coll.topologyCache.localDevice.Labels["sys_uptime"])
+	require.Contains(t, cache.lldpLocPorts, "7")
+	require.Contains(t, cache.lldpRemotes, "7:1")
+	require.Zero(t, cache.localDevice.SysUptime)
+	require.Empty(t, cache.localDevice.Labels["sys_uptime"])
 }
 
 func TestBuildLocalTopologyDevice_MapsVersionToSoftwareOnly(t *testing.T) {
@@ -1445,73 +1438,6 @@ func TestAugmentLocalActorFromCache_InjectsIdentityFields(t *testing.T) {
 	require.Equal(t, "swp07", statuses[0]["chart_id_suffix"])
 	require.Equal(t, []string{"ifErrors", "ifTraffic"}, statuses[0]["available_metrics"])
 }
-
-/* Chart cross-linking test removed — feature dropped during split.
-func TestCollector_SyncTopologyChartReferences(t *testing.T) {
-	charts := &collectorapi.Charts{}
-	require.NoError(t, charts.Add(
-		&collectorapi.Chart{
-			ID:    "snmp_device_prof_sysUpTime",
-			Title: "System Uptime",
-			Units: "1",
-			Fam:   "sys",
-			Ctx:   "snmp.device_prof_sysUpTime",
-			Dims: collectorapi.Dims{
-				{ID: "snmp_device_prof_sysUpTime", Name: "sysUpTime"},
-			},
-		},
-		&collectorapi.Chart{
-			ID:    "snmp_device_prof_ifTraffic_swp07",
-			Title: "Traffic swp07",
-			Units: "bit/s",
-			Fam:   "ifTraffic",
-			Ctx:   "snmp.device_prof_ifTraffic",
-			Dims: collectorapi.Dims{
-				{ID: "snmp_device_prof_ifTraffic_swp07_in", Name: "in"},
-			},
-		},
-		&collectorapi.Chart{
-			ID:    "ping_rtt",
-			Title: "Ping round-trip time",
-			Units: "milliseconds",
-			Fam:   "Ping/RTT",
-			Ctx:   "snmp.device_ping_rtt",
-			Dims: collectorapi.Dims{
-				{ID: "ping_rtt_avg", Name: "avg"},
-			},
-		},
-	))
-
-	coll := &Collector{
-		charts:            charts,
-		seenScalarMetrics: map[string]bool{"sysUpTime": true},
-		ifaceCache:        newIfaceCache(),
-		topologyCache:     newTopologyCache(),
-		vnode:             &vnodes.VirtualNode{GUID: "11111111-1111-1111-1111-111111111111"},
-	}
-
-	coll.ifaceCache.interfaces["swp07"] = &ifaceEntry{
-		name: "swp07",
-		availableMetrics: map[string]struct{}{
-			"ifTraffic": {},
-			"ifErrors":  {},
-		},
-		updated: true,
-	}
-
-	coll.syncTopologyChartReferences()
-
-	local := coll.topologyCache.localDevice
-	require.Equal(t, "11111111-1111-1111-1111-111111111111", local.NetdataHostID)
-	require.Equal(t, topologyProfileChartIDPrefix, local.ChartIDPrefix)
-	require.Equal(t, topologyProfileChartContextPrefix, local.ChartContextPrefix)
-	require.Equal(t, "snmp_device_prof_sysUpTime", local.DeviceCharts["sysUpTime"])
-	require.Equal(t, "ping_rtt", local.DeviceCharts["ping_rtt"])
-	require.Contains(t, local.InterfaceCharts, "swp07")
-	require.Equal(t, "swp07", local.InterfaceCharts["swp07"].ChartIDSuffix)
-	require.Equal(t, []string{"ifTraffic"}, local.InterfaceCharts["swp07"].AvailableMetrics)
-}
-*/
 
 func actorHasAttributeList(snapshot topologyData, key string) bool {
 	for _, actor := range snapshot.Actors {
