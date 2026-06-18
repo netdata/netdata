@@ -76,7 +76,7 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 
 		Path:           fmt.Sprintf(dyncfgSDPath, cfg.PluginName),
 		EnableFailCode: 422,
-		JobCommands: []dyncfg.Command{
+		ConfigCommands: []dyncfg.Command{
 			dyncfg.CommandSchema,
 			dyncfg.CommandGet,
 			dyncfg.CommandEnable,
@@ -229,7 +229,7 @@ func (d *ServiceDiscovery) removePipeline(conf confFile) {
 			d.mgr.Stop(scfg.PipelineKey())
 		}
 
-		d.handler.NotifyJobRemove(scfg)
+		d.handler.NotifyConfigRemove(scfg)
 	}
 }
 
@@ -288,7 +288,7 @@ func (d *ServiceDiscovery) addConfig(ctx context.Context, scfg sdConfig) {
 		// No existing config - expose this one
 		d.handler.AddDiscoveredConfig(scfg, dyncfg.StatusAccepted)
 
-		d.handler.NotifyJobCreate(scfg, dyncfg.StatusAccepted)
+		d.handler.NotifyConfigCreate(scfg, dyncfg.StatusAccepted)
 		if d.runModePolicy.AutoEnableDiscovered || d.fnReg == nil || d.dyncfgCh == nil {
 			// Auto-enable in terminal mode and tests.
 			// Also auto-enable when no function registry is attached, because
@@ -322,8 +322,8 @@ func (d *ServiceDiscovery) addConfig(ctx context.Context, scfg sdConfig) {
 	d.handler.AddDiscoveredConfig(scfg, dyncfg.StatusAccepted)
 
 	// Update dyncfg (remove old, create new with new source)
-	d.handler.NotifyJobRemove(entry.Cfg)
-	d.handler.NotifyJobCreate(scfg, dyncfg.StatusAccepted)
+	d.handler.NotifyConfigRemove(entry.Cfg)
+	d.handler.NotifyConfigCreate(scfg, dyncfg.StatusAccepted)
 
 	if d.runModePolicy.AutoEnableDiscovered || d.fnReg == nil || d.dyncfgCh == nil {
 		d.autoEnableConfig(scfg)
@@ -356,7 +356,7 @@ func (d *ServiceDiscovery) removeOldConfigsFromSource(source, newKey string) {
 		// If it was exposed, remove from exposed cache and dyncfg.
 		// But DON'T stop the pipeline - let the new config's enable handle that
 		if _, ok := d.handler.RemoveDiscoveredConfig(oldCfg); ok {
-			d.handler.NotifyJobRemove(oldCfg)
+			d.handler.NotifyConfigRemove(oldCfg)
 		}
 	}
 }

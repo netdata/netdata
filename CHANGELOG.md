@@ -374,6 +374,8 @@
 - Check privilege escalation in ndsudo and JSON conversion status in proto_2_json ([#22667](https://github.com/netdata/netdata/issues/22667))
 - Docs: Add a troubleshooting entry for the 'forbidden' (HTTP 403) error in ([#22657](https://github.com/netdata/netdata/issues/22657))
 - Feat(go.d): add opt-in urienc modifier to percent-encode secret references ([#22750](https://github.com/netdata/netdata/issues/22750))
+- Feat(go.d): add single-instance collector framework support ([#22752](https://github.com/netdata/netdata/issues/22752))
+- Fix MSI issues ([#22751](https://github.com/netdata/netdata/issues/22751))
 
 ## [2.10.0] - 2026-04-09
 

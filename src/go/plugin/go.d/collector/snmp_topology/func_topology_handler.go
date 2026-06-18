@@ -18,7 +18,7 @@ func (f *funcTopology) MethodParams(_ context.Context, method string) ([]funcapi
 		topologyNodesIdentityParamConfig(),
 		topologyMapTypeParamConfig(),
 		topologyInferenceStrategyParamConfig(),
-		topologyManagedFocusParamConfig(topologyManagedFocusParamOptions()),
+		topologyManagedFocusParamConfig(topologyManagedFocusParamOptions(f.registry)),
 		topologyDepthParamConfig(),
 	}, nil
 }
@@ -30,13 +30,13 @@ func (f *funcTopology) Handle(_ context.Context, method string, params funcapi.R
 		return funcapi.NotFoundResponse(method)
 	}
 
-	if snmpTopologyRegistry == nil {
+	if f.registry == nil {
 		return funcapi.UnavailableResponse("topology data not available yet, please retry after topology refresh")
 	}
 
 	options := resolveTopologyQueryOptions(params)
 	options.ResolveDNSName = resolveTopologyReverseDNSNameCached // never block on network I/O
-	data, ok := snmpTopologyRegistry.snapshotWithOptions(options)
+	data, ok := f.registry.snapshotWithOptions(options)
 	if !ok {
 		return funcapi.UnavailableResponse("topology data not available yet, please retry after topology refresh")
 	}
@@ -53,13 +53,13 @@ func (f *funcTopology) Handle(_ context.Context, method string, params funcapi.R
 	}
 }
 
-func topologyManagedFocusParamOptions() []funcapi.ParamOption {
-	if snmpTopologyRegistry == nil {
+func topologyManagedFocusParamOptions(registry *topologyRegistry) []funcapi.ParamOption {
+	if registry == nil {
 		return nil
 	}
 
 	options := make([]funcapi.ParamOption, 0)
-	for _, target := range snmpTopologyRegistry.managedDeviceFocusTargets() {
+	for _, target := range registry.managedDeviceFocusTargets() {
 		if strings.TrimSpace(target.Value) == "" {
 			continue
 		}

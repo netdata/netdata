@@ -427,6 +427,27 @@ func TestJob_AutoDetection_FunctionOnly_NilCharts(t *testing.T) {
 	assert.NoError(t, job.AutoDetection())
 }
 
+func TestJob_AutoDetection_FunctionOnlyFailCheckCleansUp(t *testing.T) {
+	job := newTestFunctionOnlyJob()
+	cleanupCalls := 0
+	m := &collectorapi.MockCollectorV1{
+		InitFunc: func(context.Context) error {
+			return nil
+		},
+		CheckFunc: func(context.Context) error {
+			return errors.New("check error")
+		},
+		CleanupFunc: func(context.Context) {
+			cleanupCalls++
+		},
+	}
+	job.module = m
+
+	assert.Error(t, job.AutoDetection())
+	assert.True(t, m.CleanupDone)
+	assert.Equal(t, 1, cleanupCalls)
+}
+
 func TestJob_Start_FunctionOnly(t *testing.T) {
 	collectCalled := false
 	m := &collectorapi.MockCollectorV1{

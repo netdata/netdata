@@ -7,6 +7,7 @@ import "github.com/netdata/netdata/go/plugins/pkg/funcapi"
 func topologyMethodConfig() funcapi.MethodConfig {
 	return funcapi.MethodConfig{
 		ID:           topologyMethodID,
+		FunctionName: topologyFunctionName,
 		Aliases:      []string{topologyMethodID},
 		Name:         "Topology (SNMP)",
 		UpdateEvery:  10,

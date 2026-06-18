@@ -32,8 +32,6 @@ func newTopologyRegistry() *topologyRegistry {
 	}
 }
 
-var snmpTopologyRegistry = newTopologyRegistry()
-
 func (r *topologyRegistry) register(cache *topologyCache) {
 	if r == nil || cache == nil {
 		return
@@ -50,18 +48,6 @@ func (r *topologyRegistry) unregister(cache *topologyCache) {
 	r.mu.Lock()
 	delete(r.caches, cache)
 	r.mu.Unlock()
-}
-
-func (r *topologyRegistry) snapshot() (topologyData, bool) {
-	return r.snapshotWithOptions(topologyQueryOptions{
-		CollapseActorsByIP:     true,
-		EliminateNonIPInferred: true,
-		MapType:                topologyMapTypeLLDPCDPManaged,
-		InferenceStrategy:      topologyInferenceStrategyFDBMinimumKnowledge,
-		ManagedDeviceFocus:     topologyManagedFocusAllDevices,
-		Depth:                  topologyDepthAllInternal,
-		ResolveDNSName:         resolveTopologyReverseDNSName, // live resolver — warms the cache
-	})
 }
 
 func (r *topologyRegistry) snapshotWithOptions(options topologyQueryOptions) (topologyData, bool) {

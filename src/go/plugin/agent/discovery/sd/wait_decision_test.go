@@ -152,7 +152,7 @@ func newWaitTestServiceDiscovery(t *testing.T) (*ServiceDiscovery, chan confFile
 
 		Path:           fmt.Sprintf(dyncfgSDPath, testPluginName),
 		EnableFailCode: 422,
-		JobCommands: []dyncfg.Command{
+		ConfigCommands: []dyncfg.Command{
 			dyncfg.CommandSchema,
 			dyncfg.CommandGet,
 			dyncfg.CommandEnable,

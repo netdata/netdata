@@ -161,6 +161,16 @@ Public lifecycle and framework-contract methods MUST stay in `collector.go`:
 - `MetricStore() metrix.CollectorStore`
 - `ChartTemplateYAML() string`
 
+Collectors that need a long-running side-effect loop MAY additionally implement
+`collectorapi.CollectorV2Runner` with `Run(context.Context) error`. Use this
+only when work must start with the running job lifecycle but must not wait for
+the next globally aligned `Collect()` tick, such as an agent-wide Function state
+refresh. The runtime starts `Run()` only after the job starts, never during
+autodetection or DynCfg `test`, cancels it on stop, and waits for it before
+`Cleanup()`. The implementation MUST return promptly after `ctx.Done()` and
+SHOULD make in-flight I/O cancellation-aware where the underlying library allows
+it.
+
 `Init()` validates config, prepares matchers/clients, and initializes persistent
 state. Explicit setup details SHOULD live in helper methods, preferably in
 `init.go`, so the public method reads as the lifecycle sequence. `Check()` MUST
@@ -414,6 +424,8 @@ exactly what was run.
 
 - New collector using `Collect() map[string]int64`.
 - Full live collection from `Check()`.
+- Starting operational background polling from `Check()` or `Init()`; use the
+  optional V2 runner hook when polling must be tied to the running job lifecycle.
 - Public config knobs for internal implementation details.
 - Custom selector or retry framework when existing package/framework behavior is
   enough.

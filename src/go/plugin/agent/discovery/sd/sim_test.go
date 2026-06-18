@@ -74,7 +74,7 @@ func (sim *discoverySimExt) run(t *testing.T) {
 
 		Path:           fmt.Sprintf(dyncfgSDPath, testPluginName),
 		EnableFailCode: 422,
-		JobCommands: []dyncfg.Command{
+		ConfigCommands: []dyncfg.Command{
 			dyncfg.CommandSchema,
 			dyncfg.CommandGet,
 			dyncfg.CommandEnable,
@@ -151,7 +151,7 @@ func (sim *discoverySim) run(t *testing.T) {
 
 		Path:           fmt.Sprintf(dyncfgSDPath, testPluginName),
 		EnableFailCode: 422,
-		JobCommands: []dyncfg.Command{
+		ConfigCommands: []dyncfg.Command{
 			dyncfg.CommandSchema,
 			dyncfg.CommandGet,
 			dyncfg.CommandEnable,

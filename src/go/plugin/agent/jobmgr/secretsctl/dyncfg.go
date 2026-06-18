@@ -49,7 +49,7 @@ func (c *Controller) dyncfgCmdAdd(fn dyncfg.Function) {
 
 	key, name, ok := c.cb.ExtractKey(fn)
 	if !ok {
-		c.api.SendCodef(fn, 400, "invalid job ID format.")
+		c.api.SendCodef(fn, 400, "invalid config ID format.")
 		return
 	}
 	if _, exists := c.lookup(key); exists {
@@ -61,7 +61,7 @@ func (c *Controller) dyncfgCmdAdd(fn dyncfg.Function) {
 		return
 	}
 	if err := dyncfg.JobNameRuleAllowDots(name); err != nil {
-		c.api.SendCodef(fn, 400, "invalid job name '%s': %v.", name, err)
+		c.api.SendCodef(fn, 400, "invalid config name '%s': %v.", name, err)
 		return
 	}
 
@@ -102,7 +102,7 @@ func (c *Controller) dyncfgCmdAdd(fn dyncfg.Function) {
 	}
 
 	c.api.SendCodef(fn, code, "%s", msg)
-	c.handler.NotifyJobCreate(cfg, entry.Status)
+	c.handler.NotifyConfigCreate(cfg, entry.Status)
 }
 
 func (c *Controller) dyncfgCmdSchema(fn dyncfg.Function) {

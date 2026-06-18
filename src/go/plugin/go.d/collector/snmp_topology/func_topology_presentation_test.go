@@ -5,6 +5,7 @@ package snmptopology
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/stretchr/testify/require"
 )
 
@@ -12,6 +13,42 @@ func TestSNMPTopologyMethodConfigDoesNotUseLegacyPresentation(t *testing.T) {
 	method := topologyMethodConfig()
 
 	require.Equal(t, topologyMethodID, method.ID)
+	require.Equal(t, topologyFunctionName, method.FunctionName)
+	require.Equal(t, []string{topologyMethodID}, method.Aliases)
 	require.Equal(t, "topology", method.ResponseType)
 	require.Nil(t, method.Presentation())
 }
+
+func TestSNMPTopologyCreatorOwnsTopologyFunction(t *testing.T) {
+	creator, ok := collectorapi.DefaultRegistry.Lookup("snmp_topology")
+	require.True(t, ok)
+	require.Nil(t, creator.Create)
+	require.NotNil(t, creator.CreateV2)
+	require.Equal(t, collectorapi.InstancePolicySingle, creator.InstancePolicy)
+	require.False(t, creator.FunctionOnly)
+	require.NotNil(t, creator.Methods)
+	require.NotNil(t, creator.MethodHandler)
+	require.Implements(t, (*collectorapi.CollectorV2Runner)(nil), creator.CreateV2())
+
+	methods := creator.Methods()
+	require.Len(t, methods, 1)
+	require.Equal(t, topologyMethodID, methods[0].ID)
+	require.Equal(t, topologyFunctionName, methods[0].FunctionName)
+	require.True(t, methods[0].AgentWide)
+
+	coll := New()
+	handler := creator.MethodHandler(&topologyRuntimeJobForTest{collector: coll})
+	require.IsType(t, &funcTopology{}, handler)
+	require.Same(t, coll.topologyRegistry, handler.(*funcTopology).registry)
+	require.Nil(t, creator.MethodHandler(nil))
+}
+
+type topologyRuntimeJobForTest struct {
+	collector *Collector
+}
+
+func (j *topologyRuntimeJobForTest) FullName() string   { return "snmp_topology" }
+func (j *topologyRuntimeJobForTest) ModuleName() string { return "snmp_topology" }
+func (j *topologyRuntimeJobForTest) Name() string       { return "snmp_topology" }
+func (j *topologyRuntimeJobForTest) IsRunning() bool    { return true }
+func (j *topologyRuntimeJobForTest) Collector() any     { return j.collector }

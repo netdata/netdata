@@ -75,3 +75,41 @@ func TestRegisterPanicOnMethodsAndJobMethodsConflict(t *testing.T) {
 		})
 	}
 }
+
+func TestRegister_InstancePolicy(t *testing.T) {
+	tests := map[string]struct {
+		creator    Creator
+		wantPolicy InstancePolicy
+		wantPanic  string
+	}{
+		"default is per-job": {
+			creator:    Creator{},
+			wantPolicy: InstancePolicyPerJob,
+		},
+		"single-instance is accepted": {
+			creator:    Creator{InstancePolicy: InstancePolicySingle},
+			wantPolicy: InstancePolicySingle,
+		},
+		"unknown policy panics": {
+			creator:   Creator{InstancePolicy: InstancePolicy(99)},
+			wantPanic: "invalid has invalid InstancePolicy 99",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			registry := make(Registry)
+			if tc.wantPanic != "" {
+				assert.PanicsWithValue(t, tc.wantPanic, func() {
+					registry.Register("invalid", tc.creator)
+				})
+				return
+			}
+
+			registry.Register("mod", tc.creator)
+			got, ok := registry.Lookup("mod")
+			require.True(t, ok)
+			assert.Equal(t, tc.wantPolicy, got.InstancePolicy)
+		})
+	}
+}

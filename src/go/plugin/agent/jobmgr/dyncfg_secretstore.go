@@ -44,13 +44,13 @@ func (m *Manager) restartDependentCollectorJob(fullName string) error {
 
 	if err := m.collectorCallbacks.Start(entry.Cfg); err != nil {
 		entry.Status = dyncfg.StatusFailed
-		m.collectorHandler.NotifyJobStatus(entry.Cfg, dyncfg.StatusFailed)
+		m.collectorHandler.NotifyConfigStatus(entry.Cfg, dyncfg.StatusFailed)
 		m.collectorCallbacks.OnStatusChange(entry, oldStatus, dyncfg.NewFunction(functions.Function{}))
 		return fmt.Errorf("job '%s' restart failed: %w", fullName, err)
 	}
 
 	entry.Status = dyncfg.StatusRunning
-	m.collectorHandler.NotifyJobStatus(entry.Cfg, dyncfg.StatusRunning)
+	m.collectorHandler.NotifyConfigStatus(entry.Cfg, dyncfg.StatusRunning)
 	m.collectorCallbacks.OnStatusChange(entry, oldStatus, dyncfg.NewFunction(functions.Function{}))
 	return nil
 }

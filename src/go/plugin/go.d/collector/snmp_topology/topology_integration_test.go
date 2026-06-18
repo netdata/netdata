@@ -97,12 +97,12 @@ func collectTopologySnapshotFromDevice(t *testing.T, dev ddsnmp.DeviceConnection
 	defer ddsnmp.DeviceRegistry.Unregister(deviceKey)
 
 	coll := New()
-	coll.Config = Config{UpdateEvery: 1}
+	coll.Config = Config{UpdateEvery: 3600}
 	require.NoError(t, coll.Init(context.Background()))
 	defer coll.Cleanup(context.Background())
 
 	require.NoError(t, coll.Check(context.Background()))
-	_ = coll.Collect(context.Background())
+	coll.refreshTopology(context.Background())
 
 	var snapshot topologyData
 	cacheKey := dev.Hostname + ":" + strconv.Itoa(dev.Port)
