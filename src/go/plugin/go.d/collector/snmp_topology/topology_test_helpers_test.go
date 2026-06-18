@@ -30,7 +30,7 @@ func snapshotTopologyRegistryForTest(registry *topologyRegistry) (topologyData, 
 
 func snapshotTopologyRegistryForTestWithOptions(registry *topologyRegistry, options topologyQueryOptions) (topologyData, bool) {
 	if options.ResolveDNSName == nil {
-		options.ResolveDNSName = resolveTopologyReverseDNSNameCached
+		options.ResolveDNSName = resolveTopologyReverseDNSNameNoop
 	}
 	return registry.snapshotWithOptions(options)
 }
@@ -53,7 +53,6 @@ func defaultTopologyQueryOptionsForTest() topologyQueryOptions {
 		InferenceStrategy:      topologyInferenceStrategyFDBMinimumKnowledge,
 		ManagedDeviceFocus:     topologyManagedFocusAllDevices,
 		Depth:                  topologyDepthAllInternal,
-		ResolveDNSName:         resolveTopologyReverseDNSNameCached,
 	}
 }
 
