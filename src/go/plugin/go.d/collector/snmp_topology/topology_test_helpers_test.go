@@ -25,15 +25,36 @@ func registerTestDeviceState(store *ddsnmp.DeviceStore, devices ...ddsnmp.Device
 }
 
 func snapshotTopologyRegistryForTest(registry *topologyRegistry) (topologyData, bool) {
-	return registry.snapshotWithOptions(topologyQueryOptions{
+	return snapshotTopologyRegistryForTestWithOptions(registry, defaultTopologyQueryOptionsForTest())
+}
+
+func snapshotTopologyRegistryForTestWithOptions(registry *topologyRegistry, options topologyQueryOptions) (topologyData, bool) {
+	if options.ResolveDNSName == nil {
+		options.ResolveDNSName = resolveTopologyReverseDNSNameCached
+	}
+	return registry.snapshotWithOptions(options)
+}
+
+func snapshotTopologyCacheForTest(cache *topologyCache) (topologyData, bool) {
+	return snapshotTopologyCacheForTestWithOptions(cache, defaultTopologyQueryOptionsForTest())
+}
+
+func snapshotTopologyCacheForTestWithOptions(cache *topologyCache, options topologyQueryOptions) (topologyData, bool) {
+	registry := newTopologyRegistry()
+	registry.register(cache)
+	return snapshotTopologyRegistryForTestWithOptions(registry, options)
+}
+
+func defaultTopologyQueryOptionsForTest() topologyQueryOptions {
+	return topologyQueryOptions{
 		CollapseActorsByIP:     true,
 		EliminateNonIPInferred: true,
 		MapType:                topologyMapTypeLLDPCDPManaged,
 		InferenceStrategy:      topologyInferenceStrategyFDBMinimumKnowledge,
 		ManagedDeviceFocus:     topologyManagedFocusAllDevices,
 		Depth:                  topologyDepthAllInternal,
-		ResolveDNSName:         resolveTopologyReverseDNSName,
-	})
+		ResolveDNSName:         resolveTopologyReverseDNSNameCached,
+	}
 }
 
 func containsMgmtAddr(snapshot topologyData, addrs map[string]struct{}) bool {

@@ -90,14 +90,13 @@ func TestTopologyCache_LldpSnapshot(t *testing.T) {
 			tagLldpRemPortIDSubtype:    "5",
 			tagLldpRemPortDesc:         "downlink",
 			tagLldpRemSysName:          "sw2",
+			tagLldpRemMgmtAddr:         "10.0.0.2",
 		},
 	})
 
 	coll.finalizeTopologyCache()
 
-	coll.topologyCache.mu.RLock()
-	data, ok := coll.topologyCache.snapshot()
-	coll.topologyCache.mu.RUnlock()
+	data, ok := snapshotTopologyCacheForTest(coll.topologyCache)
 
 	require.True(t, ok)
 	require.Len(t, data.Actors, 2)
@@ -105,7 +104,7 @@ func TestTopologyCache_LldpSnapshot(t *testing.T) {
 
 	link := data.Links[0]
 	assert.Equal(t, "lldp", link.Protocol)
-	assert.Equal(t, "bidirectional", link.Direction)
+	assert.Equal(t, "unidirectional", link.Direction)
 	assert.Equal(t, "Gi0/1", link.Src.Attributes["port_id"])
 	assert.Equal(t, "Gi0/2", link.Dst.Attributes["port_id"])
 	assert.Equal(t, "sw2", link.Dst.Attributes["sys_name"])
@@ -130,15 +129,13 @@ func TestTopologyCache_CdpSnapshot(t *testing.T) {
 		address:    "10.0.0.3",
 	}
 
-	cache.mu.RLock()
-	data, ok := cache.snapshot()
-	cache.mu.RUnlock()
+	data, ok := snapshotTopologyCacheForTest(cache)
 
 	require.True(t, ok)
 	require.Len(t, data.Actors, 2)
 	require.Len(t, data.Links, 1)
 	assert.Equal(t, "cdp", data.Links[0].Protocol)
-	assert.Equal(t, "bidirectional", data.Links[0].Direction)
+	assert.Equal(t, "unidirectional", data.Links[0].Direction)
 	assert.Equal(t, "Gi0/2", data.Links[0].Src.Attributes["if_name"])
 	assert.Equal(t, "Gi0/3", data.Links[0].Dst.Attributes["port_id"])
 }
@@ -291,14 +288,12 @@ func TestTopologyCache_CdpSnapshotHexAddress(t *testing.T) {
 		address:    "0a000003",
 	}
 
-	cache.mu.RLock()
-	data, ok := cache.snapshot()
-	cache.mu.RUnlock()
+	data, ok := snapshotTopologyCacheForTest(cache)
 
 	require.True(t, ok)
 	require.Len(t, data.Links, 1)
 	assert.Equal(t, "cdp", data.Links[0].Protocol)
-	assert.Equal(t, "bidirectional", data.Links[0].Direction)
+	assert.Equal(t, "unidirectional", data.Links[0].Direction)
 	assert.True(t, linkHasRawAddressMetric(data.Links[0], "0a000003"))
 
 	remote := findDeviceActorBySysName(data, "sw3")
@@ -338,14 +333,14 @@ func TestTopologyCache_CdpSnapshotRawAddressWithoutIP(t *testing.T) {
 		address:    "edge-sw3.mgmt.local",
 	}
 
-	cache.mu.RLock()
-	data, ok := cache.snapshot()
-	cache.mu.RUnlock()
+	options := defaultTopologyQueryOptionsForTest()
+	options.EliminateNonIPInferred = false
+	data, ok := snapshotTopologyCacheForTestWithOptions(cache, options)
 
 	require.True(t, ok)
 	require.Len(t, data.Links, 1)
 	assert.Equal(t, "cdp", data.Links[0].Protocol)
-	assert.Equal(t, "bidirectional", data.Links[0].Direction)
+	assert.Equal(t, "unidirectional", data.Links[0].Direction)
 	assert.True(t, linkHasRawAddressMetric(data.Links[0], "edge-sw3.mgmt.local"))
 }
 
@@ -378,9 +373,38 @@ func TestTopologyCache_SnapshotBidirectionalPairMetadata(t *testing.T) {
 		managementAddr:   "10.0.0.2",
 	}
 
-	cache.mu.RLock()
-	data, ok := cache.snapshot()
-	cache.mu.RUnlock()
+	remoteCache := newTopologyCache()
+	remoteCache.updateTime = cache.updateTime
+	remoteCache.lastUpdate = cache.lastUpdate
+	remoteCache.agentID = "agent2"
+	remoteCache.localDevice = topologyDevice{
+		ChassisID:     "aa:bb:cc:dd:ee:ff",
+		ChassisIDType: "macAddress",
+		SysName:       "sw2",
+		ManagementIP:  "10.0.0.2",
+	}
+	remoteCache.lldpLocPorts["2"] = &lldpLocPort{
+		portNum:       "2",
+		portID:        "Gi0/2",
+		portIDSubtype: "interfaceName",
+		portDesc:      "downlink",
+	}
+	remoteCache.lldpRemotes["2:1"] = &lldpRemote{
+		localPortNum:     "2",
+		remIndex:         "1",
+		chassisID:        "00:11:22:33:44:55",
+		chassisIDSubtype: "macAddress",
+		portID:           "Gi0/1",
+		portIDSubtype:    "interfaceName",
+		portDesc:         "uplink",
+		sysName:          "sw1",
+		managementAddr:   "10.0.0.1",
+	}
+
+	registry := newTopologyRegistry()
+	registry.register(cache)
+	registry.register(remoteCache)
+	data, ok := snapshotTopologyRegistryForTest(registry)
 
 	require.True(t, ok)
 	require.Len(t, data.Links, 1)
@@ -427,9 +451,7 @@ func TestTopologyCache_SnapshotMergesRemoteIdentityAcrossProtocols(t *testing.T)
 		address:    "10.0.0.2",
 	}
 
-	cache.mu.RLock()
-	data, ok := cache.snapshot()
-	cache.mu.RUnlock()
+	data, ok := snapshotTopologyCacheForTest(cache)
 
 	require.True(t, ok)
 	require.Equal(t, 2, countDeviceActors(data))
@@ -525,9 +547,7 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 
 	coll.finalizeTopologyCache()
 
-	coll.topologyCache.mu.RLock()
-	data, ok := coll.topologyCache.snapshot()
-	coll.topologyCache.mu.RUnlock()
+	data, ok := snapshotTopologyCacheForTest(coll.topologyCache)
 
 	require.True(t, ok)
 	require.Greater(t, len(data.Actors), 1)
@@ -562,9 +582,7 @@ func TestTopologyCache_CDPManagementAddresses(t *testing.T) {
 		tagCdpSecondaryMgmtAddr:     "0a000004",
 	})
 
-	cache.mu.RLock()
-	data, ok := cache.snapshot()
-	cache.mu.RUnlock()
+	data, ok := snapshotTopologyCacheForTest(cache)
 
 	require.True(t, ok)
 	require.True(t, containsMgmtAddr(data, map[string]struct{}{"10.0.0.3": {}, "10.0.0.4": {}}))
@@ -602,9 +620,9 @@ func TestTopologyCache_FDBAndARPEnrichment(t *testing.T) {
 		tagArpState:   "reachable",
 	})
 
-	cache.mu.RLock()
-	data, ok := cache.snapshot()
-	cache.mu.RUnlock()
+	options := defaultTopologyQueryOptionsForTest()
+	options.MapType = topologyMapTypeAllDevicesLowConfidence
+	data, ok := snapshotTopologyCacheForTestWithOptions(cache, options)
 
 	require.True(t, ok)
 	require.GreaterOrEqual(t, len(data.Actors), 2)
@@ -1034,9 +1052,9 @@ func TestTopologyCache_SnapshotDeterministicEndpointIPSelection(t *testing.T) {
 
 	expectedIPs := []string{"10.20.4.205", "10.20.4.60"}
 	for range 25 {
-		cache.mu.RLock()
-		data, ok := cache.snapshot()
-		cache.mu.RUnlock()
+		options := defaultTopologyQueryOptionsForTest()
+		options.MapType = topologyMapTypeAllDevicesLowConfidence
+		data, ok := snapshotTopologyCacheForTestWithOptions(cache, options)
 
 		require.True(t, ok)
 		ep := findActorByMAC(data, "d8:5e:d3:0e:c5:e6")
@@ -1079,9 +1097,7 @@ func TestTopologyCache_SnapshotDeterministicOrdering(t *testing.T) {
 		address:    "10.0.0.3",
 	}
 
-	cache.mu.RLock()
-	data, ok := cache.snapshot()
-	cache.mu.RUnlock()
+	data, ok := snapshotTopologyCacheForTest(cache)
 
 	require.True(t, ok)
 	require.NotEmpty(t, data.Actors)
@@ -1102,69 +1118,6 @@ func TestTopologyCache_SnapshotDeterministicOrdering(t *testing.T) {
 	expectedLinkOrder := append([]string(nil), linkOrder...)
 	sort.Strings(expectedLinkOrder)
 	assert.Equal(t, expectedLinkOrder, linkOrder)
-}
-
-func TestTopologyCache_BuildEngineObservations_SeparatesProtocolSpecificRemoteObservations(t *testing.T) {
-	cache := newTopologyCache()
-	cache.localDevice = topologyDevice{
-		ChassisID:     "00:11:22:33:44:55",
-		ChassisIDType: "macAddress",
-		SysName:       "sw-a",
-		ManagementIP:  "10.0.0.1",
-	}
-	cache.lldpLocPorts["1"] = &lldpLocPort{
-		portNum:       "1",
-		portID:        "Gi0/1",
-		portIDSubtype: "interfaceName",
-		portDesc:      "uplink",
-	}
-	cache.lldpRemotes["1:1"] = &lldpRemote{
-		localPortNum:     "1",
-		remIndex:         "1",
-		chassisID:        "aa:bb:cc:dd:ee:ff",
-		chassisIDSubtype: "macAddress",
-		portID:           "Gi0/2",
-		portIDSubtype:    "interfaceName",
-		portDesc:         "downlink",
-		sysName:          "sw-b",
-		managementAddr:   "10.0.0.2",
-	}
-	cache.cdpRemotes["1:1"] = &cdpRemote{
-		ifIndex:    "1",
-		ifName:     "Gi0/1",
-		deviceID:   "sw-b",
-		sysName:    "switch-b",
-		devicePort: "Gi0/2",
-		address:    "10.0.0.2",
-	}
-
-	observations, localDeviceID := cache.buildEngineObservations(cache.localDevice)
-	require.Equal(t, "macAddress:00:11:22:33:44:55", localDeviceID)
-	require.Len(t, observations, 3)
-	require.Equal(t, localDeviceID, observations[0].DeviceID)
-
-	var lldpObservation *topologyengine.L2Observation
-	var cdpObservation *topologyengine.L2Observation
-	for i := 1; i < len(observations); i++ {
-		observation := &observations[i]
-		switch {
-		case len(observation.LLDPRemotes) > 0:
-			lldpObservation = observation
-		case len(observation.CDPRemotes) > 0:
-			cdpObservation = observation
-		}
-	}
-
-	require.NotNil(t, lldpObservation)
-	require.NotNil(t, cdpObservation)
-	require.Equal(t, lldpObservation.DeviceID, cdpObservation.DeviceID)
-	require.Equal(t, "macAddress:aa:bb:cc:dd:ee:ff", lldpObservation.DeviceID)
-	require.Equal(t, "10.0.0.2", lldpObservation.ManagementIP)
-	require.Equal(t, "10.0.0.2", cdpObservation.ManagementIP)
-	require.Equal(t, "sw-b", lldpObservation.Hostname)
-	require.Equal(t, "switch-b", cdpObservation.Hostname)
-	require.Len(t, lldpObservation.LLDPRemotes, 1)
-	require.Len(t, cdpObservation.CDPRemotes, 1)
 }
 
 func TestTopologyObservationIdentityResolver_ReusesStableRemoteIdentityAcrossSignals(t *testing.T) {
@@ -1625,6 +1578,9 @@ func linkHasRawAddressMetric(link topologyLink, raw string) bool {
 	raw = strings.TrimSpace(raw)
 	if raw == "" || len(link.Metrics) == 0 {
 		return false
+	}
+	if value, ok := link.Metrics["remote_address_raw"].(string); ok && value == raw {
+		return true
 	}
 	srcRaw, srcOK := link.Metrics["src_remote_address_raw"].(string)
 	dstRaw, dstOK := link.Metrics["dst_remote_address_raw"].(string)
