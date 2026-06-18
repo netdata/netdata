@@ -35,7 +35,7 @@ func (f *funcTopology) Handle(_ context.Context, method string, params funcapi.R
 	}
 
 	options := resolveTopologyQueryOptions(params)
-	options.ResolveDNSName = resolveTopologyReverseDNSNameCached // never block on network I/O
+	options.ResolveDNSName = resolveTopologyReverseDNSNameNoop // never block on network I/O
 	data, ok := f.registry.snapshotWithOptions(options)
 	if !ok {
 		return funcapi.UnavailableResponse("topology data not available yet, please retry after topology refresh")

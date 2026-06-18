@@ -67,9 +67,10 @@ func TestTopologyCache_RealSnmprecFixtures(t *testing.T) {
 			}
 			coll.finalizeTopologyCache()
 
-			coll.topologyCache.mu.RLock()
-			snapshot, ok := coll.topologyCache.snapshot()
-			coll.topologyCache.mu.RUnlock()
+			options := defaultTopologyQueryOptionsForTest()
+			options.CollapseActorsByIP = false
+			options.EliminateNonIPInferred = false
+			snapshot, ok := snapshotTopologyCacheForTestWithOptions(coll.topologyCache, options)
 
 			require.True(t, ok)
 			require.GreaterOrEqual(t, len(snapshot.Actors), 1)
