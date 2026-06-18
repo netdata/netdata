@@ -500,7 +500,7 @@ When you send metrics like `myapp.metric1:10|g` and `myapp.metric2:20|g`, you'll
 
 :::note
 
-**Synthetic chart appears empty or is missing?** This happens when the metric names you send don't match the `metrics` pattern in your `[app]` section. StatsD matches incoming metric names against the `metrics` pattern using Netdata's [simple pattern](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md) syntax — if a metric name doesn't match, it is never linked to the app's synthetic charts. For example, with `metrics = myapp.*`, sending bare names like `foo:10|g` creates a private chart for `foo` but never feeds the synthetic chart. To fix this, send metric names that include the prefix matching the pattern (e.g., `myapp.foo:10|g`).
+**Synthetic chart appears empty or is missing?** This happens when the metric names you send don't match the `metrics` pattern in your `[app]` section. StatsD matches incoming metric names against the `metrics` pattern using Netdata's [simple pattern](/src/libnetdata/simple_pattern/README.md) syntax — if a metric name doesn't match, it is never linked to the app's synthetic charts. For example, with `metrics = myapp.*`, sending bare names like `foo:10|g` creates a private chart for `foo` but never feeds the synthetic chart. To fix this, send metric names that include the prefix matching the pattern (e.g., `myapp.foo:10|g`).
 
 :::
 
