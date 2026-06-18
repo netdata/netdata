@@ -25,17 +25,21 @@
 
 #ifdef ML_HAVE_MALLOC_USABLE_SIZE
 // Return the allocator's view of the block size for ptr. When
-// NETDATA_TRACE_ALLOCATIONS is on, nd-mallocz.c overrides the
-// malloc_usable_size symbol with a shim that reads the Netdata header;
-// we use that on every platform so size reporting stays consistent with
-// the matching malloc() (which is also overridden in that mode). When
-// NETDATA_TRACE_ALLOCATIONS is off, we call the platform-native function
-// directly: malloc_usable_size on Linux/FreeBSD, malloc_size on macOS
-// (Apple does not expose malloc_usable_size).
+// NETDATA_TRACE_ALLOCATIONS is on, we route through nd-mallocz's
+// mallocz_usable_size(), which reads the Netdata allocation header so
+// size reporting stays consistent with the matching malloc() (also
+// overridden in that mode). We call the declared wrapper rather than the
+// libc-override symbol malloc_usable_size: the override is defined in
+// nd-mallocz.c but never declared in a header, and on macOS
+// <malloc/malloc.h> exposes only malloc_size(), so calling
+// malloc_usable_size() here would not compile in C++ under trace mode.
+// When NETDATA_TRACE_ALLOCATIONS is off, we call the platform-native
+// function directly: malloc_usable_size on Linux/FreeBSD, malloc_size on
+// macOS (Apple does not expose malloc_usable_size).
 static inline size_t ml_usable_size(void *ptr) noexcept
 {
 #if defined(NETDATA_TRACE_ALLOCATIONS)
-    return malloc_usable_size(ptr);
+    return mallocz_usable_size(ptr);
 #elif defined(__APPLE__)
     return malloc_size(ptr);
 #else
