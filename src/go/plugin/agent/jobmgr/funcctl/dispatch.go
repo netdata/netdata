@@ -164,12 +164,20 @@ func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) function
 		includeJobParam := methodRequiresJobParam(methodCfg)
 
 		if !includeJobParam {
+			job, jobName, jobGen, ok := c.resolveAgentWideMethodJob(fn, moduleName)
+			if !ok {
+				return
+			}
+
 			c.executeMethodRequest(ctx, methodExecutionInput{
 				fn:         fn,
 				moduleName: moduleName,
+				jobName:    jobName,
 				jobLabel:   moduleName,
 				methodID:   methodID,
 				methodCfg:  methodCfg,
+				job:        job,
+				jobGen:     jobGen,
 				info:       info,
 				payload:    payload,
 				argValues:  argValues,
@@ -237,6 +245,22 @@ func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) function
 			},
 		})
 	}
+}
+
+func (c *Controller) resolveAgentWideMethodJob(fn functions.Function, moduleName string) (collectorapi.RuntimeJob, string, uint64, bool) {
+	creator, ok := c.registry.getCreator(moduleName)
+	if !ok || creator.InstancePolicy != collectorapi.InstancePolicySingle {
+		return nil, "", 0, true
+	}
+
+	jobName := moduleName
+	job, jobGen := c.registry.getJobWithGeneration(moduleName, jobName)
+	if job == nil {
+		c.respondError(fn, 503, "module '%s' is not running", moduleName)
+		return nil, "", 0, false
+	}
+
+	return job, jobName, jobGen, true
 }
 
 func (c *Controller) handleMethodFuncInfo(moduleName, methodID string, fn functions.Function) {

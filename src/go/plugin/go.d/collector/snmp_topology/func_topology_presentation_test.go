@@ -35,5 +35,20 @@ func TestSNMPTopologyCreatorOwnsTopologyFunction(t *testing.T) {
 	require.Equal(t, topologyMethodID, methods[0].ID)
 	require.Equal(t, topologyFunctionName, methods[0].FunctionName)
 	require.True(t, methods[0].AgentWide)
-	require.IsType(t, &funcTopology{}, creator.MethodHandler(nil))
+
+	coll := New()
+	handler := creator.MethodHandler(&topologyRuntimeJobForTest{collector: coll})
+	require.IsType(t, &funcTopology{}, handler)
+	require.Same(t, coll.topologyRegistry, handler.(*funcTopology).registry)
+	require.Nil(t, creator.MethodHandler(nil))
 }
+
+type topologyRuntimeJobForTest struct {
+	collector *Collector
+}
+
+func (j *topologyRuntimeJobForTest) FullName() string   { return "snmp_topology" }
+func (j *topologyRuntimeJobForTest) ModuleName() string { return "snmp_topology" }
+func (j *topologyRuntimeJobForTest) Name() string       { return "snmp_topology" }
+func (j *topologyRuntimeJobForTest) IsRunning() bool    { return true }
+func (j *topologyRuntimeJobForTest) Collector() any     { return j.collector }

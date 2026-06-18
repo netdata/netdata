@@ -32,8 +32,6 @@ func newTopologyRegistry() *topologyRegistry {
 	}
 }
 
-var snmpTopologyRegistry = newTopologyRegistry()
-
 func (r *topologyRegistry) register(cache *topologyCache) {
 	if r == nil || cache == nil {
 		return

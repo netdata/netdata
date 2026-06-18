@@ -5,6 +5,7 @@ package snmptopology
 import (
 	"sort"
 	"strings"
+	"sync/atomic"
 )
 
 type TrapTopologyEnrichment struct {
@@ -22,27 +23,45 @@ type TrapTopologyEnrichment struct {
 	Neighbors       []string
 }
 
-// TrapEnrichmentForIP returns source-device topology enrichment for a trap
-// received from the given source IP. It intentionally does not infer a trap
-// interface from the source IP.
-func TrapEnrichmentForIP(ip string) *TrapTopologyEnrichment {
-	return TrapEnrichmentForSource(ip, "")
+var activeTrapTopologyRegistry atomic.Pointer[topologyRegistry]
+
+func (c *Collector) publishTrapTopologyEnrichment() {
+	if c.topologyRegistry != nil {
+		activeTrapTopologyRegistry.Store(c.topologyRegistry)
+	}
+}
+
+func (c *Collector) unpublishTrapTopologyEnrichment() {
+	if c.topologyRegistry != nil {
+		activeTrapTopologyRegistry.CompareAndSwap(c.topologyRegistry, nil)
+	}
 }
 
 // TrapEnrichmentForSource returns topology enrichment data for a trap received
 // from the given source IP and, when available, the trap subject ifIndex.
 // Interface and neighbor enrichment only use the trap ifIndex after the source
 // IP matches exactly one local topology cache.
-//
-// It copies active cache pointers under the registry lock, reads each cache
-// under its own lock, and never blocks on I/O.
 func TrapEnrichmentForSource(ip, trapIfIndex string) *TrapTopologyEnrichment {
+	registry := activeTrapTopologyRegistry.Load()
+	if registry == nil {
+		return nil
+	}
+	return registry.trapEnrichmentForSource(ip, trapIfIndex)
+}
+
+// trapEnrichmentForSource copies active cache pointers under the registry lock,
+// reads each cache under its own lock, and never blocks on I/O.
+func (r *topologyRegistry) trapEnrichmentForSource(ip, trapIfIndex string) *TrapTopologyEnrichment {
+	if r == nil {
+		return nil
+	}
+
 	ip = normalizeIPAddress(ip)
 	if ip == "" {
 		return nil
 	}
 
-	caches := snmpTopologyRegistry.activeCaches()
+	caches := r.activeCaches()
 	if len(caches) == 0 {
 		return nil
 	}
