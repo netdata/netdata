@@ -219,7 +219,6 @@ static int api_claim(uint8_t version, struct web_client *w, char *url) {
 
         if(claim_agent(base_url, token, rooms, cloud_config_proxy_get(), cloud_config_insecure_get())) {
             msg = "ok";
-            can_be_claimed = false;
             claim_reload_and_wait_online();
             response = CLAIM_RESP_ACTION_OK;
         }

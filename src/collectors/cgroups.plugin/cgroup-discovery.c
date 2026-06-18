@@ -794,7 +794,7 @@ static inline void discovery_update_filenames_all_cgroups() {
 static inline void discovery_cleanup_all_cgroups() {
     struct cgroup *cg = discovered_cgroup_root, *last = NULL;
 
-    for(; cg ;) {
+    while(cg) {
         if(!cg->available) {
             // enable the first duplicate cgroup
             {
