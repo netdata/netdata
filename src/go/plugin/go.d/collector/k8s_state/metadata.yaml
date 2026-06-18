@@ -44,7 +44,7 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            This collector does not support auto-detection. It is disabled by default and requires manual configuration — enable the `k8s_state` module in the `modules:` section of `go.d.conf` (or via the Helm chart) before it runs. The stock `go.d/k8s_state.conf` already defines the job; adding the job alone does not enable the module.
+            This collector does not support auto-detection. It is disabled by default and requires manual configuration — enable the `k8s_state` module in the `modules:` section of `go.d.conf` (or by setting `k8sState.enabled: true` in Helm values) before it runs. The stock `go.d/k8s_state.conf` already defines the job; adding the job alone does not enable the module.
         limits:
           description: ""
         performance_impact:
