@@ -26,6 +26,23 @@ func TestBuildSNMPTopologyV1DynamicTable_TrimsColumnKeysBeforeLookup(t *testing.
 	assert.Equal(t, []any{uint64(1000)}, topologyV1TestColumnValues(t, table, "speed"))
 }
 
+func TestBuildSNMPTopologyV1DynamicTable_PrefersExactKeyOnTrimCollision(t *testing.T) {
+	dict := topologyv1.NewStringDictionary("")
+
+	table, err := buildSNMPTopologyV1DynamicTable([]topologyV1DynamicRow{
+		{
+			actorRef: 0,
+			values: map[string]any{
+				" speed ": uint64(1000),
+				"speed":   uint64(2000),
+			},
+		},
+	}, dict)
+
+	require.NoError(t, err)
+	assert.Equal(t, []any{uint64(2000)}, topologyV1TestColumnValues(t, table, "speed"))
+}
+
 func TestAnyStringSlice_DropsNilAndNonScalarItems(t *testing.T) {
 	require.Nil(t, anyStringSlice(nil))
 	assert.Equal(t, []string{"up", "42", "false"}, anyStringSlice([]any{
@@ -51,6 +68,24 @@ func TestBuildSNMPTopologyV1Actors_UsesStableFallbackActorID(t *testing.T) {
 	require.Contains(t, actorIndex, "generated:device:ip:x_10.0.0.2")
 	require.Contains(t, reorderedActorIndex, "generated:device:ip:x_10.0.0.1")
 	require.Contains(t, reorderedActorIndex, "generated:device:ip:x_10.0.0.2")
+}
+
+func TestBuildSNMPTopologyV1Actors_FallbackDoesNotCollideWithExplicitActorID(t *testing.T) {
+	_, actorIndex := buildSNMPTopologyV1Actors([]topologyActor{
+		{
+			ActorType: "device",
+			Match:     topologyMatch{IPAddresses: []string{"10.0.0.1"}},
+		},
+		{
+			ActorID:   "generated:device:ip:x_10.0.0.1",
+			ActorType: "device",
+		},
+	}, topologyv1.NewStringDictionary(""))
+
+	assert.Equal(t, map[string]int{
+		"generated:device:ip:x_10.0.0.1_2": 0,
+		"generated:device:ip:x_10.0.0.1":   1,
+	}, actorIndex)
 }
 
 func TestBuildSNMPTopologyV1PortNeighborSummaries_NormalizesRemotePortName(t *testing.T) {

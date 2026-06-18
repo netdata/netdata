@@ -61,14 +61,36 @@ func buildSNMPTopologyV1DynamicTable(rows []topologyV1DynamicRow, stringsDict *t
 }
 
 func normalizeTopologyV1DynamicRowValues(values map[string]any) map[string]any {
-	normalized := make(map[string]any, len(values))
-	for key, value := range values {
-		key = strings.TrimSpace(key)
+	type candidate struct {
+		raw   string
+		value any
+	}
+
+	candidates := make(map[string]candidate, len(values))
+	for rawKey, value := range values {
+		key := strings.TrimSpace(rawKey)
 		if key != "" {
-			normalized[key] = value
+			existing, exists := candidates[key]
+			if !exists || topologyV1DynamicRowKeyCandidateLess(rawKey, existing.raw, key) {
+				candidates[key] = candidate{raw: rawKey, value: value}
+			}
 		}
 	}
+
+	normalized := make(map[string]any, len(candidates))
+	for key, candidate := range candidates {
+		normalized[key] = candidate.value
+	}
 	return normalized
+}
+
+func topologyV1DynamicRowKeyCandidateLess(rawKey, existingRawKey, normalizedKey string) bool {
+	rawKeyExact := rawKey == normalizedKey
+	existingRawKeyExact := existingRawKey == normalizedKey
+	if rawKeyExact != existingRawKeyExact {
+		return rawKeyExact
+	}
+	return rawKey < existingRawKey
 }
 
 func inferTopologyV1ColumnType(values []any) string {

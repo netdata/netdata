@@ -11,7 +11,12 @@ import (
 
 func buildSNMPTopologyV1Actors(actors []topologyActor, stringsDict *topologyv1.StringDictionary) (topologyv1.Table, map[string]int) {
 	actorIndex := make(map[string]int, len(actors))
-	usedFallbackActorIDs := make(map[string]struct{})
+	usedActorIDs := make(map[string]struct{}, len(actors))
+	for _, actor := range actors {
+		if actorID := strings.TrimSpace(actor.ActorID); actorID != "" {
+			usedActorIDs[actorID] = struct{}{}
+		}
+	}
 	ids := make([]any, len(actors))
 	types := make([]any, len(actors))
 	layers := make([]any, len(actors))
@@ -45,7 +50,7 @@ func buildSNMPTopologyV1Actors(actors []topologyActor, stringsDict *topologyv1.S
 	for i, actor := range actors {
 		actorID := strings.TrimSpace(actor.ActorID)
 		if actorID == "" {
-			actorID = snmpTopologyV1FallbackActorID(actor, i, usedFallbackActorIDs)
+			actorID = snmpTopologyV1FallbackActorID(actor, i, usedActorIDs)
 		}
 		actorIndex[actorID] = i
 		ids[i] = stringsDict.Ref(actorID)
