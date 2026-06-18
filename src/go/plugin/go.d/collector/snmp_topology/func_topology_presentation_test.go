@@ -22,8 +22,13 @@ func TestSNMPTopologyMethodConfigDoesNotUseLegacyPresentation(t *testing.T) {
 func TestSNMPTopologyCreatorOwnsTopologyFunction(t *testing.T) {
 	creator, ok := collectorapi.DefaultRegistry.Lookup("snmp_topology")
 	require.True(t, ok)
+	require.Nil(t, creator.Create)
+	require.NotNil(t, creator.CreateV2)
+	require.Equal(t, collectorapi.InstancePolicySingle, creator.InstancePolicy)
+	require.False(t, creator.FunctionOnly)
 	require.NotNil(t, creator.Methods)
 	require.NotNil(t, creator.MethodHandler)
+	require.Implements(t, (*collectorapi.CollectorV2Runner)(nil), creator.CreateV2())
 
 	methods := creator.Methods()
 	require.Len(t, methods, 1)

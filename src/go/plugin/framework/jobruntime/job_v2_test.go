@@ -39,6 +39,11 @@ type mockModuleV2 struct {
 	vnode         *vnodes.VirtualNode
 }
 
+type mockRunnerModuleV2 struct {
+	*mockModuleV2
+	runFunc func(context.Context) error
+}
+
 type mockRuntimeComponentService struct {
 	registerErr  error
 	registered   []runtimecomp.ComponentConfig
@@ -103,6 +108,13 @@ func (m *mockModuleV2) MetricStore() metrix.CollectorStore { return m.store }
 func (m *mockModuleV2) ChartTemplateYAML() string {
 	m.templateCalls++
 	return m.template
+}
+
+func (m *mockRunnerModuleV2) Run(ctx context.Context) error {
+	if m.runFunc == nil {
+		return nil
+	}
+	return m.runFunc(ctx)
 }
 
 func newTestJobV2(mod collectorapi.CollectorV2, out *bytes.Buffer) *JobV2 {
@@ -228,6 +240,175 @@ groups:
           - selector: windows_net_bytes_sent_total
             name: sent
 `
+}
+
+func TestJobV2RunnerDoesNotRunDuringAutoDetection(t *testing.T) {
+	started := make(chan struct{})
+	mod := &mockRunnerModuleV2{
+		mockModuleV2: &mockModuleV2{
+			store:    metrix.NewCollectorStore(),
+			template: chartTemplateV2(),
+		},
+		runFunc: func(context.Context) error {
+			close(started)
+			return nil
+		},
+	}
+	job := newTestJobV2(mod, &bytes.Buffer{})
+
+	require.NoError(t, job.AutoDetection())
+
+	require.Never(t, func() bool {
+		select {
+		case <-started:
+			return true
+		default:
+			return false
+		}
+	}, 100*time.Millisecond, 10*time.Millisecond, "runner started during autodetection")
+}
+
+func TestJobV2RunnerDoesNotStartAfterPreStartStop(t *testing.T) {
+	started := make(chan struct{})
+	stopped := make(chan struct{})
+	mod := &mockRunnerModuleV2{
+		mockModuleV2: &mockModuleV2{
+			store:    metrix.NewCollectorStore(),
+			template: chartTemplateV2(),
+		},
+		runFunc: func(context.Context) error {
+			close(started)
+			return nil
+		},
+	}
+	job := newTestJobV2(mod, &bytes.Buffer{})
+	require.NoError(t, job.AutoDetection())
+
+	job.Stop()
+	go func() {
+		job.Start()
+		close(stopped)
+	}()
+
+	select {
+	case <-stopped:
+	case <-time.After(time.Second):
+		t.Fatal("pre-stopped job did not exit")
+	}
+	select {
+	case <-started:
+		t.Fatal("runner started after pre-start stop")
+	default:
+	}
+}
+
+func TestJobV2RunnerStopWaitsBeforeCleanup(t *testing.T) {
+	started := make(chan struct{})
+	ctxCanceled := make(chan struct{})
+	releaseRunner := make(chan struct{})
+	cleanupCalled := make(chan struct{})
+	stopped := make(chan struct{})
+
+	mod := &mockRunnerModuleV2{
+		mockModuleV2: &mockModuleV2{
+			store:    metrix.NewCollectorStore(),
+			template: chartTemplateV2(),
+			cleanupFunc: func(context.Context) {
+				close(cleanupCalled)
+			},
+		},
+		runFunc: func(ctx context.Context) error {
+			close(started)
+			<-ctx.Done()
+			close(ctxCanceled)
+			<-releaseRunner
+			return nil
+		},
+	}
+	job := newTestJobV2(mod, &bytes.Buffer{})
+	require.NoError(t, job.AutoDetection())
+
+	go job.Start()
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("runner did not start")
+	}
+
+	go func() {
+		job.Stop()
+		close(stopped)
+	}()
+
+	select {
+	case <-ctxCanceled:
+	case <-time.After(time.Second):
+		t.Fatal("runner context was not canceled")
+	}
+
+	select {
+	case <-cleanupCalled:
+		t.Fatal("cleanup ran before runner returned")
+	default:
+	}
+	select {
+	case <-stopped:
+		t.Fatal("Stop returned before runner returned")
+	default:
+	}
+
+	close(releaseRunner)
+	require.Eventually(t, func() bool {
+		select {
+		case <-cleanupCalled:
+			return true
+		default:
+			return false
+		}
+	}, time.Second, 10*time.Millisecond)
+	require.Eventually(t, func() bool {
+		select {
+		case <-stopped:
+			return true
+		default:
+			return false
+		}
+	}, time.Second, 10*time.Millisecond)
+}
+
+func TestJobV2RunnerPanicRecovered(t *testing.T) {
+	started := make(chan struct{})
+	stopped := make(chan struct{})
+	mod := &mockRunnerModuleV2{
+		mockModuleV2: &mockModuleV2{
+			store:    metrix.NewCollectorStore(),
+			template: chartTemplateV2(),
+		},
+		runFunc: func(context.Context) error {
+			close(started)
+			panic("runner boom")
+		},
+	}
+	job := newTestJobV2(mod, &bytes.Buffer{})
+	require.NoError(t, job.AutoDetection())
+
+	go func() {
+		job.Start()
+		close(stopped)
+	}()
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("runner did not start")
+	}
+	require.Eventually(t, job.Panicked, time.Second, 10*time.Millisecond)
+
+	job.Stop()
+	select {
+	case <-stopped:
+	case <-time.After(time.Second):
+		t.Fatal("job did not stop")
+	}
 }
 
 func TestJobV2Scenarios(t *testing.T) {

@@ -2,6 +2,18 @@
 
 package snmptopology
 
+func snapshotTopologyRegistryForTest(registry *topologyRegistry) (topologyData, bool) {
+	return registry.snapshotWithOptions(topologyQueryOptions{
+		CollapseActorsByIP:     true,
+		EliminateNonIPInferred: true,
+		MapType:                topologyMapTypeLLDPCDPManaged,
+		InferenceStrategy:      topologyInferenceStrategyFDBMinimumKnowledge,
+		ManagedDeviceFocus:     topologyManagedFocusAllDevices,
+		Depth:                  topologyDepthAllInternal,
+		ResolveDNSName:         resolveTopologyReverseDNSName,
+	})
+}
+
 func containsMgmtAddr(snapshot topologyData, addrs map[string]struct{}) bool {
 	for _, actor := range snapshot.Actors {
 		for _, ip := range actor.Match.IPAddresses {
