@@ -297,5 +297,6 @@ tool_timeout_sec = 180     # Time limit for individual tool calls
 - [OpenAI Codex CLI GitHub Repository](https://github.com/openai/codex)
 - [Codex CLI Configuration Documentation](https://github.com/openai/codex/blob/main/docs/config.md)
 - [Codex CLI Installation Guide](https://github.com/openai/codex#installation)
+- 
 - [Netdata MCP Setup](/docs/netdata-ai/mcp/README.md)
 - [AI DevOps Best Practices](/docs/netdata-ai/mcp/mcp-clients/ai-devops-copilot.md)
