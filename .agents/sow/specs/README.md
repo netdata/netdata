@@ -16,6 +16,8 @@ research cannot be mistaken for product specification.
 | Spec | Scope | Main consumers |
 |---|---|---|
 | [go-v2-host-scope.md](go-v2-host-scope.md) | Go framework V2 host-scope and vnode metric routing contract. | Go V2 collector work, `metrix`, `jobruntime`, `chartengine`, go.d collector docs and skills. |
+| [project-skills-index.md](project-skills-index.md) | Full catalog of runtime input skills, public skills, and output/reference skills — triggers and descriptions. | Any agent doing Required First Checks to find matching skills for non-trivial work. |
+| [sow-principles-flow-diagrams.md](sow-principles-flow-diagrams.md) | Non-normative flow diagrams for the three Mandatory Development Principles (clean end state, plan first, scope discipline). | Human readers and agents reviewing the principles; must be kept in sync with AGENTS.md bullets. |
 | [netflow-tier-commit-workers.md](netflow-tier-commit-workers.md) | NetFlow rollup-tier commit worker contract: ownership, doorbell protocol, shutdown order, stretch semantics, lock discipline, telemetry. | netflow-plugin ingest/tiering work, tier benchmark and soak/crash tests, network-flows operator docs. |
 | [prometheus-profiles.md](prometheus-profiles.md) | go.d prometheus chart-profile format, selection modes, app-segment resolution, and chart-context assembly. | prometheus collector profile work, chart-context/UI app-section contract, profile authoring. |
 | [query-planner-tier-selection.md](query-planner-tier-selection.md) | Automatic storage-tier selection for metric query planning. | Query planner code, API data paths, MCP metric query behavior. |

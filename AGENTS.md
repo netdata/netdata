@@ -247,100 +247,8 @@ and edge cases):**
      non-trivial work); this principle does not restate them.
 
 **Flow diagrams (human reading aid, non-normative):** the bullets above are
-authoritative; the diagrams below summarize the flow for human readers and MUST
-be kept in sync when the principles change.
-
-<details>
-<summary>Show per-principle flow diagrams</summary>
-
-How the three principles connect (lifecycle order):
-
-```mermaid
-flowchart LR
-    A("1. Clean end state<br/>defines the target (what 'done' means)")
-    B("2. Plan before non-trivial work<br/>establish the target + steps; user approves real forks")
-    C("3. Scope discipline<br/>stay on the target while executing each step")
-    A --> B --> C
-    C -->|re-evaluate vs target| A
-```
-
-1. Clean end state over less churn:
-
-```mermaid
-flowchart TD
-    A("Approved scope = issue + SOW Purpose/Acceptance + implied surface")
-    B("Define the clean end state, incl. removing what the change makes redundant")
-    C("Record target in SOW: exclusions list + reference search if a path/contract is replaced")
-    D{"Matches recorded target?"}
-    E("Deliver the clean end state")
-    F{"Allowed exception?"}
-    Fx("Only: a) impossible, b) evidenced safety risk, c) out of scope, d) user-accepted partial")
-    G("NOT allowed: risk reduction, smaller diff, or staging")
-    H("Mandatory pause: present evidence, STOP")
-    I{"Explicit approval?"}
-    Ix("Approval bar: a bare 'ok' is not approval")
-    J("Proceed; track remainder per Followup Discipline")
-    K("Re-evaluate vs target: each step, before a PR, before complete")
-    A --> B --> C --> D
-    D -->|yes| E
-    D -->|no| F
-    F -->|no| G --> B
-    F -->|yes| H --> I
-    I -->|no| B
-    I -->|yes| J
-    F -.- Fx
-    I -.- Ix
-    E --> K
-    J --> K
-```
-
-2. Plan before non-trivial work:
-
-```mermaid
-flowchart TD
-    A("Task")
-    B{"Trivial?"}
-    C("Exempt: just do it (clean-end-state preference still applies)")
-    D("Establish the desired end state + acceptance criteria FIRST; keep investigating until you can")
-    E("Decompose into ordered steps, each with its own clean end state + criteria; move current toward desired")
-    F{"End state a user-owned fork?"}
-    Fk("Fork = competing designs, public-contract/destructive change, or unclear scope")
-    G("Fixed by request/skill/pattern: the request IS the approval (recorded plan + gate, no separate round)")
-    H("Goal-approval round: explicit user approval of the whole plan (Approval bar)")
-    I("Status: ready, implement")
-    J("Pause for a user decision (not a silent partial)")
-    A --> B
-    B -->|yes| C
-    B -->|no| D
-    D --> E --> F
-    F -->|no| G
-    F -->|yes| H
-    F -.- Fk
-    G --> I
-    H --> I
-    D -->|goal unreachable| J
-```
-
-3. Scope discipline at every step:
-
-```mermaid
-flowchart TD
-    A("At each Re-evaluation checkpoint")
-    B{"Drifted outside approved scope?"}
-    C("Continue")
-    D{"Genuinely independent?"}
-    Dx("Independent only if ALL: end state complete without it; not a coupled item/reference; separable acceptance criteria")
-    E("Treat as COUPLED: handle under Clean end state (do the low-risk part + disclose); pause only for a genuine fork")
-    F("Do NOT bundle silently: separate PR + rebase, or track as a GitHub issue; never fold into this SOW's steps")
-    A --> B
-    B -->|no| C
-    B -->|new work| D
-    D -->|no or unsure| E
-    D -->|yes| F
-    D -.- Dx
-```
-
-</details>
+authoritative; diagrams are in `.agents/sow/specs/sow-principles-flow-diagrams.md`
+and MUST be kept in sync when the principles change.
 
 USER COMMUNICATION:
 
@@ -775,92 +683,11 @@ The existing private skills (`coverity-audit`, `sonarqube-audit`, `graphql-audit
 
 ### Project Skills Index
 
-Runtime input skills:
+Full skill catalog with triggers and descriptions: `.agents/sow/specs/project-skills-index.md`.
 
-- `.agents/skills/project-snmp-profiles-authoring/`
-  Trigger: editing SNMP profile YAMLs, topology SNMP profiles, ddsnmp profile parsing, or SNMP profile-format documentation.
-  Purpose: require MIB `MAX-ACCESS` checks and index-derived extraction for `not-accessible` INDEX objects.
-
-- `.agents/skills/project-snmp-trap-profiles-authoring/`
-  Trigger: editing SNMP trap profile YAMLs under `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/`, the trap profile-format documentation, the `src/go/cmd/snmptrapprofilegen/` Go helper, or running a regeneration of the OOB trap profile pack.
-  Purpose: enforce the closed 8-category / 8-severity taxonomy, the file-scoped `varbinds:` table pattern, cardinality discipline on `labels:`, and stock/operator separation. Documents the regeneration recipe.
-
-- `.agents/skills/project-writing-collectors/`
-  Trigger: authoring or modifying any Netdata data-collection plugin or module (Go go.d / ibm.d, Rust crates, internal C plugins, external plugins via PLUGINSD). Read before adding a new collector, modifying an existing one, working on NetFlow/sFlow/IPFIX, OTEL ingestion, topology, SNMP profiles, or interactive Functions.
-  Status: live. Updates that close gaps or fix outdated pointers must ship in the same PR that exposed the issue.
-
-- `.agents/skills/project-create-topology/`
-  Trigger: creating or updating Netdata topology producers, topology Function payloads, topology schema fixtures, graph presentation, correlation rules, direction semantics, topology drilldowns, telemetry overlays, or Cloud topology aggregation fixtures.
-  Status: live. Developer-facing topology authoring workflow. End-user/operator-facing AI skills belong under `docs/netdata-ai/skills/`; this project skill is the runtime guidance for repository work.
-
-- `.agents/skills/project-writing-go-modules-framework-v2/`
-  Trigger: creating or migrating a Go go.d collector to framework V2; touching `CollectorV2`, `metrix.CollectorStore`, `ChartTemplateYAML` / `charts.yaml`, `charttpl`, `chartengine`, V2 host scopes, or V2 collector tests.
-  Purpose: mirror maintainer-preferred framework V2 patterns from accepted collectors so new or migrated modules blend with repository style.
-
-- `.agents/skills/integrations-lifecycle/`
-  Trigger: editing any `metadata.yaml` or collector `taxonomy.yaml`; modifying `integrations/` generators, schemas, taxonomy registries, or templates; debugging generated gitignored integration outputs (`integrations.js`, `integrations.json`, `integrations/taxonomy.json`); working with committed per-integration `.md` files / `COLLECTORS.md` / `SECRETS.md` / `SERVICE-DISCOVERY.md`; ibm.d module generation (`contexts.yaml` -> `metadata.yaml`); CI workflows `generate-integrations.yml` and `check-markdown.yml`; the collector-consistency rule.
-  Status: live. SKILL.md plus per-domain guides (`pipeline.md`, `schema-reference.md`, `per-type-matrix.md`, `artifacts-and-banners.md`, `ibm-d.md`, `consistency.md`, `in-app-contract.md`, `gotchas.md`) and `recipes/`, `how-tos/` directories.
-
-- `.agents/skills/learn-site-structure/`
-  Trigger: adding/moving/renaming/deleting any docs page that should appear on `learn.netdata.cloud`; editing `<repo>/docs/.map/map.yaml`; investigating why a Learn page looks the way it does; reading the live `ingest/ingest.py` orchestrator or the legacy `ingest.js` / `ingest.md` (which are stale); MDX escape rules; redirects; the Netlify deploy contract.
-  Status: live. SKILL.md plus per-domain guides (`mapping.md`, `pipeline.md`, `sidebars.md`, `mdx-rules.md`, `redirects.md`, `pitfalls-and-gotchas.md`, `authoring-boundary.md`) and `recipes/`, `how-tos/` directories.
-- `.agents/skills/learn-pr-preview/`
-  Trigger: only when the user explicitly asks to build, run, preview, inspect, or validate `learn.netdata.cloud` locally using the contents of a PR or documentation branch before merge.
-  Status: live. SKILL.md with an isolated preview workflow that copies PR source content, runs Learn ingest with `--local-repo`, builds Docusaurus with the Netlify-pinned runtime, and inspects representative pages without dirtying the real Learn checkout.
-- `.agents/skills/query-agent-events/`
-  Trigger: investigating crashes, panics, or fatals across the Netdata fleet; downloading events from the agent-events ingestion namespace; analyzing AE_* fields and their enums; understanding the 23h client-side dedup or the after-the-fact event timing; using the systemd-journal Function multi-value `selections` filter for index-friendly queries.
-  Status: live. SKILL.md plus per-domain guides (`AE_FIELDS.md`, `transports.md`, `update-cadence.md`, `query-discipline.md`, `finding-crashes.md`, `finding-fatals.md`), scripts (`scripts/_lib.sh`, `get-events.sh`, `analyze-events.sh`, `redact-events.sh`) and `recipes/`, `how-tos/` directories. Bug-investigation tool, NOT a generic logs query skill -- consumes `query-netdata-{cloud,agents}` for transport.
-
-- `.agents/skills/mirror-netdata-repos/`
-  Trigger: setting up or updating a local mirror of Netdata-org source repositories at `${NETDATA_REPOS_DIR}` for cross-repo grep / code review without GitHub API calls; running the vendored sync script; questions about the reset-to-default-branch safety mechanism or the `--repo NAME` scoping flag.
-  Status: live. SKILL.md (single-file overview) plus the vendored `scripts/sync-netdata-repos.sh` (env-driven, sanitized, `--repo` scoping, `gh` optional for Phase 2) and `how-tos/` catalog. Independent from any other repo mirrors this workstation may have.
-
-- `.agents/skills/coverity-audit/`
-  Trigger: Coverity Scan defect triage for this repository.
-  Status: live.
-
-- `.agents/skills/sonarqube-audit/`
-  Trigger: SonarCloud findings triage for this repository.
-  Status: live.
-
-- `.agents/skills/graphql-audit/`
-  Trigger: GitHub Code Scanning/CodeQL triage for this repository.
-  Status: live.
-
-- `.agents/skills/pr-reviews/`
-  Trigger: PR comment and review iteration work for this repository.
-  Status: live.
-
-- `.agents/skills/codacy-audit/`
-  Trigger: Codacy Cloud workflow for this repository -- pre-push local analysis (`codacy-analysis-cli` via docker or local binary) and read-only PR-issue fetching via the v3 API.
-  Status: live. SKILL.md plus `scripts/_lib.sh` (token-safe wrappers + sentinel no-leak self-test), `scripts/analyze-local.sh`, `scripts/pr-issues.sh`, and a live `how-tos/INDEX.md` catalog. Read-only by design; write actions require a GitHub issue or branch-local SOW.
-
-Public skills (canonical under `docs/netdata-ai/skills/<name>/`; relative symlinks at `.agents/skills/<name>`):
-
-- `docs/netdata-ai/skills/query-netdata-cloud/`
-  Trigger: querying Netdata Cloud REST API -- metrics, logs (systemd-journal), alerts, generic Function calls on a node.
-  Symlink: `.agents/skills/query-netdata-cloud` -> `../../docs/netdata-ai/skills/query-netdata-cloud`.
-  Status: live. SKILL.md plus per-domain guides (`query-metrics.md`, `query-logs.md`, `query-alerts.md`, `query-functions.md`).
-
-- `docs/netdata-ai/skills/query-netdata-agents/`
-  Trigger: querying Netdata Agents directly on port 19999, including auto-mint of per-agent bearer tokens from a Cloud token.
-  Symlink: `.agents/skills/query-netdata-agents` -> `../../docs/netdata-ai/skills/query-netdata-agents`.
-  Status: live. SKILL.md plus `scripts/_lib.sh` helpers (`agents_resolve_bearer`, `agents_call_function`, `agents_netdata_prefix`).
-
-- `docs/netdata-ai/skills/query-snmp-traps/`
-  Trigger: querying SNMP trap logs through Netdata Cloud or directly from a Netdata Agent; use for trap journal entries, severities, categories, senders, deduplication summaries, `TRAP_*` fields, and `TRAP_JSON` varbind searches.
-  Symlink: `.agents/skills/query-snmp-traps` -> `../../docs/netdata-ai/skills/query-snmp-traps`.
-  Status: live. SKILL.md plus `how-tos/INDEX.md` and seeded operator how-tos.
-
-Output/reference skills:
-
-- `docs/netdata-ai/skills/`
-  Consumer: downstream assistants and users of Netdata AI skill artifacts.
-  Update when: public/operator AI skill docs, examples, commands, schemas, or workflows change.
-
-- `src/ai-skills/`
-  Consumer: downstream assistants and users of generated or source AI skill artifacts when this tree is present in the working copy.
-  Update when: generated/source AI skill behavior, tests, examples, commands, schemas, or workflows change.
+Before non-trivial work, scan `.agents/skills/*/SKILL.md` (per Required First Checks) to
+discover and load matching skills — the spec is a reference catalog, not a substitute for
+loading the actual skill file.
 
 ### Project-specific commands
 
