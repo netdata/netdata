@@ -4,7 +4,7 @@ package snmptopology
 
 import "sort"
 
-func applySNMPTopologyOutputPolicies(data *topologyData, options topologyQueryOptions) {
+func applySNMPTopologyShapePolicies(data *topologyData, options topologyQueryOptions) {
 	if data == nil {
 		return
 	}

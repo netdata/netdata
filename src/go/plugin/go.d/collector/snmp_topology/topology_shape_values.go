@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
 func normalizedMatchIPs(match topologyMatch) []string {
@@ -41,6 +43,16 @@ func topologyActorIsInferred(actor topologyActor) bool {
 		return true
 	}
 	return false
+}
+
+func isManagedSNMPDeviceActor(actor topologyActor) bool {
+	if !topologyengine.IsDeviceActorType(actor.ActorType) {
+		return false
+	}
+	if strings.ToLower(strings.TrimSpace(actor.Source)) != "snmp" {
+		return false
+	}
+	return !topologyActorIsInferred(actor)
 }
 
 func boolStatValue(value any) bool {

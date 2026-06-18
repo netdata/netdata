@@ -429,7 +429,7 @@ func TestCanonicalMatchKey_NormalizesEquivalentMACRepresentations(t *testing.T) 
 	require.Contains(t, topologyMatchIdentityKeys(colon), "hw:70:49:a2:65:72:cd")
 }
 
-func TestApplySNMPTopologyOutputPolicies_CollapsesActorsByIP(t *testing.T) {
+func TestApplySNMPTopologyShapePolicies_CollapsesActorsByIP(t *testing.T) {
 	data := topologyData{
 		Actors: []topologyActor{
 			{
@@ -461,7 +461,7 @@ func TestApplySNMPTopologyOutputPolicies_CollapsesActorsByIP(t *testing.T) {
 		Stats: map[string]any{},
 	}
 
-	applySNMPTopologyOutputPolicies(&data, topologyQueryOptions{
+	applySNMPTopologyShapePolicies(&data, topologyQueryOptions{
 		CollapseActorsByIP: true,
 		MapType:            topologyMapTypeHighConfidenceInferred,
 	})
@@ -471,7 +471,7 @@ func TestApplySNMPTopologyOutputPolicies_CollapsesActorsByIP(t *testing.T) {
 	require.Equal(t, 1, data.Stats["actors_collapsed_by_ip"])
 }
 
-func TestApplySNMPTopologyOutputPolicies_EliminatesNonIPInferredActorsAndSparseSegments(t *testing.T) {
+func TestApplySNMPTopologyShapePolicies_EliminatesNonIPInferredActorsAndSparseSegments(t *testing.T) {
 	data := topologyData{
 		Actors: []topologyActor{
 			{
@@ -500,7 +500,7 @@ func TestApplySNMPTopologyOutputPolicies_EliminatesNonIPInferredActorsAndSparseS
 		Stats: map[string]any{},
 	}
 
-	applySNMPTopologyOutputPolicies(&data, topologyQueryOptions{
+	applySNMPTopologyShapePolicies(&data, topologyQueryOptions{
 		EliminateNonIPInferred: true,
 		MapType:                topologyMapTypeHighConfidenceInferred,
 	})
@@ -511,7 +511,7 @@ func TestApplySNMPTopologyOutputPolicies_EliminatesNonIPInferredActorsAndSparseS
 	require.Equal(t, 1, data.Stats["segments_sparse_suppressed"])
 }
 
-func TestApplySNMPTopologyOutputPolicies_HighConfidenceSuppressesUnlinkedInferredEndpoints(t *testing.T) {
+func TestApplySNMPTopologyShapePolicies_HighConfidenceSuppressesUnlinkedInferredEndpoints(t *testing.T) {
 	data := topologyData{
 		Actors: []topologyActor{
 			{
@@ -544,7 +544,7 @@ func TestApplySNMPTopologyOutputPolicies_HighConfidenceSuppressesUnlinkedInferre
 		Stats: map[string]any{},
 	}
 
-	applySNMPTopologyOutputPolicies(&data, topologyQueryOptions{
+	applySNMPTopologyShapePolicies(&data, topologyQueryOptions{
 		MapType: topologyMapTypeHighConfidenceInferred,
 	})
 
@@ -555,7 +555,7 @@ func TestApplySNMPTopologyOutputPolicies_HighConfidenceSuppressesUnlinkedInferre
 	}
 }
 
-func TestApplySNMPTopologyOutputPolicies_LLDPManagedMapKeepsOnlyLLDPCDPAndManagedDevices(t *testing.T) {
+func TestApplySNMPTopologyShapePolicies_LLDPManagedMapKeepsOnlyLLDPCDPAndManagedDevices(t *testing.T) {
 	data := topologyData{
 		Actors: []topologyActor{
 			{
@@ -594,7 +594,7 @@ func TestApplySNMPTopologyOutputPolicies_LLDPManagedMapKeepsOnlyLLDPCDPAndManage
 		Stats: map[string]any{},
 	}
 
-	applySNMPTopologyOutputPolicies(&data, topologyQueryOptions{
+	applySNMPTopologyShapePolicies(&data, topologyQueryOptions{
 		MapType: topologyMapTypeLLDPCDPManaged,
 	})
 
