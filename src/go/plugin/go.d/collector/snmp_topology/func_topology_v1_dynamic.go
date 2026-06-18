@@ -16,12 +16,11 @@ type topologyV1DynamicRow struct {
 
 func buildSNMPTopologyV1DynamicTable(rows []topologyV1DynamicRow, stringsDict *topologyv1.StringDictionary) (topologyv1.Table, error) {
 	keysSet := make(map[string]struct{})
-	for _, row := range rows {
-		for key := range row.values {
-			key = strings.TrimSpace(key)
-			if key != "" {
-				keysSet[key] = struct{}{}
-			}
+	normalizedRows := make([]map[string]any, len(rows))
+	for i, row := range rows {
+		normalizedRows[i] = normalizeTopologyV1DynamicRowValues(row.values)
+		for key := range normalizedRows[i] {
+			keysSet[key] = struct{}{}
 		}
 	}
 	keys := sortedMapKeys(keysSet)
@@ -37,8 +36,8 @@ func buildSNMPTopologyV1DynamicTable(rows []topologyV1DynamicRow, stringsDict *t
 
 	for _, key := range keys {
 		columnValues := make([]any, len(rows))
-		for i, row := range rows {
-			if value, ok := row.values[key]; ok {
+		for i, values := range normalizedRows {
+			if value, ok := values[key]; ok {
 				columnValues[i] = value
 			}
 		}
@@ -59,6 +58,17 @@ func buildSNMPTopologyV1DynamicTable(rows []topologyV1DynamicRow, stringsDict *t
 	}
 
 	return topologyv1.NewTable(len(rows), columns, values)
+}
+
+func normalizeTopologyV1DynamicRowValues(values map[string]any) map[string]any {
+	normalized := make(map[string]any, len(values))
+	for key, value := range values {
+		key = strings.TrimSpace(key)
+		if key != "" {
+			normalized[key] = value
+		}
+	}
+	return normalized
 }
 
 func inferTopologyV1ColumnType(values []any) string {

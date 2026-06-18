@@ -11,6 +11,7 @@ import (
 
 func buildSNMPTopologyV1Actors(actors []topologyActor, stringsDict *topologyv1.StringDictionary) (topologyv1.Table, map[string]int) {
 	actorIndex := make(map[string]int, len(actors))
+	usedFallbackActorIDs := make(map[string]struct{})
 	ids := make([]any, len(actors))
 	types := make([]any, len(actors))
 	layers := make([]any, len(actors))
@@ -44,7 +45,7 @@ func buildSNMPTopologyV1Actors(actors []topologyActor, stringsDict *topologyv1.S
 	for i, actor := range actors {
 		actorID := strings.TrimSpace(actor.ActorID)
 		if actorID == "" {
-			actorID = fmt.Sprintf("generated:%d", i)
+			actorID = snmpTopologyV1FallbackActorID(actor, i, usedFallbackActorIDs)
 		}
 		actorIndex[actorID] = i
 		ids[i] = stringsDict.Ref(actorID)
@@ -152,6 +153,48 @@ func buildSNMPTopologyV1Actors(actors []topologyActor, stringsDict *topologyv1.S
 			topologyv1.Values(netdataHostIDs...),
 		},
 	), actorIndex
+}
+
+func snmpTopologyV1FallbackActorID(actor topologyActor, index int, used map[string]struct{}) string {
+	for _, candidate := range []struct {
+		kind  string
+		value string
+	}{
+		{kind: "netdata_node", value: actor.Match.NetdataNodeID},
+		{kind: "machine", value: actor.Match.NetdataMachineGUID},
+		{kind: "cloud_instance", value: actor.Match.CloudInstanceID},
+		{kind: "chassis", value: firstString(actor.Match.ChassisIDs)},
+		{kind: "mac", value: firstString(actor.Match.MacAddresses)},
+		{kind: "ip", value: firstString(actor.Match.IPAddresses)},
+		{kind: "sys_name", value: actor.Match.SysName},
+		{kind: "hostname", value: firstString(actor.Match.Hostnames)},
+		{kind: "dns", value: firstString(actor.Match.DNSNames)},
+		{kind: "sys_object_id", value: actor.Match.SysObjectID},
+		{kind: "display_name", value: snmpTopologyV1DisplayName(actor)},
+	} {
+		if value := strings.TrimSpace(candidate.value); value != "" {
+			return snmpTopologyV1UniqueFallbackActorID(
+				fmt.Sprintf("generated:%s:%s:%s", snmpTopologyV1ActorType(actor.ActorType), candidate.kind, topologyID(value, "actor")),
+				used,
+			)
+		}
+	}
+
+	return snmpTopologyV1UniqueFallbackActorID(fmt.Sprintf("generated:%d", index), used)
+}
+
+func snmpTopologyV1UniqueFallbackActorID(actorID string, used map[string]struct{}) string {
+	if _, ok := used[actorID]; !ok {
+		used[actorID] = struct{}{}
+		return actorID
+	}
+	for suffix := 2; ; suffix++ {
+		candidate := fmt.Sprintf("%s_%d", actorID, suffix)
+		if _, ok := used[candidate]; !ok {
+			used[candidate] = struct{}{}
+			return candidate
+		}
+	}
 }
 
 func snmpTopologyV1ActorType(actorType string) string {

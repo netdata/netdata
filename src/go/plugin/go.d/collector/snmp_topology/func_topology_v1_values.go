@@ -189,13 +189,16 @@ func isEmptyArrayCell(value any) bool {
 }
 
 func anyStringSlice(value any) []string {
+	if value == nil {
+		return nil
+	}
 	switch typed := value.(type) {
 	case []string:
 		return typed
 	case []any:
 		out := make([]string, 0, len(typed))
 		for _, item := range typed {
-			if s := strings.TrimSpace(fmt.Sprint(item)); s != "" {
+			if s := topologyV1ScalarLabelValue(item); s != "" {
 				out = append(out, s)
 			}
 		}

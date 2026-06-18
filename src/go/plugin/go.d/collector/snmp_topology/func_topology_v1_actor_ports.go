@@ -50,16 +50,20 @@ func buildSNMPTopologyV1PortNeighborSummaries(
 		if key.actorRef < 0 {
 			return
 		}
+		remotePortName := topologyV1EndpointPortName(remoteEndpoint)
 		if existing, exists := summaries[key]; exists {
-			if existing.remoteActor != remoteActorRef || strings.TrimSpace(existing.remotePortName) != strings.TrimSpace(topologyV1EndpointPortName(remoteEndpoint)) {
+			if existing.remoteActor != remoteActorRef || !snmpTopologyV1SameRemotePortName(existing.remotePortName, remotePortName) {
 				existing.ambiguous = true
+				summaries[key] = existing
+			} else if strings.TrimSpace(existing.remotePortName) == "" && strings.TrimSpace(remotePortName) != "" {
+				existing.remotePortName = remotePortName
 				summaries[key] = existing
 			}
 			return
 		}
 		summaries[key] = snmpTopologyV1PortNeighborSummary{
 			remoteActor:    remoteActorRef,
-			remotePortName: topologyV1EndpointPortName(remoteEndpoint),
+			remotePortName: remotePortName,
 		}
 	}
 
@@ -68,6 +72,15 @@ func buildSNMPTopologyV1PortNeighborSummaries(
 		appendSide(link.DstActorID, link.SrcActorID, link.Dst, link.Src)
 	}
 	return summaries
+}
+
+func snmpTopologyV1SameRemotePortName(left, right string) bool {
+	left = strings.TrimSpace(left)
+	right = strings.TrimSpace(right)
+	if left == "" || right == "" {
+		return true
+	}
+	return strings.EqualFold(left, right)
 }
 
 func snmpTopologyV1PortNeighborSummaryFor(
