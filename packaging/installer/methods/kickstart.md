@@ -89,7 +89,7 @@ Use these flags to customize your installation.
 
 ## Managing Auto-Updates After Installation
 
-`kickstart.sh` enables daily auto-updates by default (unless you pass `--no-updates` when installing). The schedule runs once per day: on systemd systems it is driven by the `netdata-updater.timer` unit (`OnCalendar=daily`), and on non-systemd systems by a cron entry under `/etc/cron.daily`, `/etc/periodic/daily`, or `/etc/cron.d`.
+`kickstart.sh` enables daily auto-updates by default (unless you pass `--no-updates` when installing). The schedule runs once per day. The installer auto-detects the scheduling method, which may be a cron entry under `/etc/cron.daily` or `/etc/periodic/daily`, the `netdata-updater.timer` systemd unit (`OnCalendar=daily`), or a crontab under `/etc/cron.d`. Use `--auto-update-status` (below) to see which method is active on your system.
 
 ### Disable auto-updates
 
