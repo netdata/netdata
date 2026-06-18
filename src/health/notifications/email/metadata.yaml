@@ -33,6 +33,7 @@
               - Update your container with `docker compose up -d`.
               - Setting `SEND_EMAIL`, `DEFAULT_RECIPIENT_EMAIL`, or `EMAIL_SENDER` as Docker environment variables will **not** work. The alarm notification script sources `health_alarm_notify.conf` at runtime, which overwrites those variables with the values defined in the configuration file.
               - To configure email alerts in a Docker container, modify `health_alarm_notify.conf` directly. Either mount a custom file into the container at `/etc/netdata/health_alarm_notify.conf`, or run `edit-config health_alarm_notify.conf` from the `/etc/netdata` directory inside the container.
+              - For the full Netdata container setup and configuration workflow, see the [Docker installation guide](/packaging/docker/README.md#configure-email-notifications).
               - A complete Docker Compose example mounting both `msmtprc` (for SMTP transport) and a custom `health_alarm_notify.conf` (for alert routing, sender, and recipients):
 
                 ```yaml
