@@ -4313,7 +4313,7 @@ dependencies = [
  "notify",
  "num-bigint",
  "parking_lot",
- "rand 0.9.2",
+ "rand 0.9.4",
  "regex",
  "rustc-hash",
  "ruzstd",
