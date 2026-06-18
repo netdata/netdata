@@ -14,7 +14,6 @@ import (
 	"github.com/gosnmp/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -449,21 +448,4 @@ func newSNMPClientFromDeviceInfo(newClient func() gosnmp.Handler, dev ddsnmp.Dev
 	}
 
 	return client, nil
-}
-
-func topologyMethods() []funcapi.MethodConfig {
-	return []funcapi.MethodConfig{
-		topologyMethodConfig(),
-	}
-}
-
-func topologyFunctionHandler(job collectorapi.RuntimeJob) funcapi.MethodHandler {
-	if job == nil {
-		return nil
-	}
-	coll, ok := job.Collector().(*Collector)
-	if !ok || coll == nil {
-		return nil
-	}
-	return &funcTopology{registry: coll.topologyRegistry}
 }
