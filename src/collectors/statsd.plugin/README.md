@@ -515,7 +515,7 @@ The `[app]` section defines the application and has these options:
 
 The `[app]` section is a **namespace/container** — it groups metrics and sets defaults, but does **not** create any dashboard charts by itself. To see synthetic charts on the dashboard, you **must** add one or more chart definition sections (e.g., `[mychart]`) below the `[app]` section. If you only define an `[app]` section without chart definitions, the only visible charts will be private charts for individual metrics (if `private charts = yes` or the global default is enabled).
 
-Settings like `private charts`, `gaps when not collected`, `memory mode`, and `history` configure how the app's metrics and charts behave — they are not chart-level settings. See [Chart Definitions](#chart-definitions) below for how to create charts.
+Settings like `private charts`, `gaps when not collected`, and `history` configure how the app's metrics and charts behave — they are not chart-level settings. The `memory mode` setting under `[app]` is currently ignored. See [Chart Definitions](#chart-definitions) below for how to create charts.
 
 :::
 
@@ -525,8 +525,8 @@ Settings like `private charts`, `gaps when not collected`, `memory mode`, and `h
 - **metrics** - [Simple pattern](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md) matching all metrics for this app
 - **private charts** - Enable/disable private charts for matched metrics (yes|no)
 - **gaps when not collected** - Show gaps when no metrics are collected (yes|no)
-- **memory mode** - Sets memory mode for application charts (optional, default is global Netdata setting)
-- **history** - Size of round-robin database (optional, only relevant with `memory mode = save`)
+- **memory mode** - Ignored in the `[app]` section; application charts use the host's default memory mode
+- **history** - Size of round-robin database for application charts (optional, minimum 5)
 
 :::
 
@@ -921,7 +921,6 @@ Start with this basic configuration:
     metrics = k6*
     private charts = yes
     gaps when not collected = no
-    memory mode = dbengine
 ```
 
 </details>
@@ -959,7 +958,6 @@ Here's a complete configuration for k6:
     metrics = k6*
     private charts = yes
     gaps when not collected = no
-    memory mode = dbengine
 
 [dictionary]
     http_req_blocked = Blocked HTTP Requests 
