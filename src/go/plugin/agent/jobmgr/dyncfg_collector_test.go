@@ -9,6 +9,7 @@ import (
 	"errors"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -53,6 +54,11 @@ type jobNameRequiredV2Collector struct {
 	store   metrix.CollectorStore
 }
 
+type runnerProbeV2Collector struct {
+	*jobNameRequiredV2Collector
+	runCalled atomic.Bool
+}
+
 func newJobNameRequiredV2Collector() *jobNameRequiredV2Collector {
 	return &jobNameRequiredV2Collector{
 		store: metrix.NewCollectorStore(),
@@ -78,6 +84,11 @@ func (c *jobNameRequiredV2Collector) MetricStore() metrix.CollectorStore {
 	return c.store
 }
 func (c *jobNameRequiredV2Collector) ChartTemplateYAML() string { return "" }
+
+func (c *runnerProbeV2Collector) Run(context.Context) error {
+	c.runCalled.Store(true)
+	return nil
+}
 
 func TestDyncfgConfigUserconfig_InvalidPayload_Returns400Only(t *testing.T) {
 	tests := map[string]struct {
@@ -208,6 +219,64 @@ func TestDyncfgCmdTest_PassesJobNameToV2Collector(t *testing.T) {
 	var resp map[string]any
 	mustDecodeFunctionPayload(t, buf.String(), "test-v2-job-name", &resp)
 	assert.Equal(t, float64(200), resp["status"])
+}
+
+func TestDyncfgCmdTest_DoesNotRunV2CollectorRunner(t *testing.T) {
+	var buf bytes.Buffer
+	probe := &runnerProbeV2Collector{jobNameRequiredV2Collector: newJobNameRequiredV2Collector()}
+
+	mgr := newCollectorTestManager()
+	mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))))
+	mgr.modules.Register("runnerprobe", collectorapi.Creator{
+		CreateV2: func() collectorapi.CollectorV2 {
+			return probe
+		},
+	})
+
+	fn := dyncfg.NewFunction(functions.Function{
+		UID:         "test-v2-runner",
+		ContentType: "application/json",
+		Payload:     mustMarshalCollectorConfigPayload(t, prepareDyncfgCfg("runnerprobe", "payload-name")),
+		Args:        []string{mgr.dyncfgModID("runnerprobe"), string(dyncfg.CommandTest), "tested-job"},
+	})
+
+	mgr.dyncfgCmdTest(fn)
+	mgr.cmdTestWG.Wait()
+
+	var resp map[string]any
+	mustDecodeFunctionPayload(t, buf.String(), "test-v2-runner", &resp)
+	assert.Equal(t, float64(200), resp["status"])
+	require.Never(t, probe.runCalled.Load, 100*time.Millisecond, 10*time.Millisecond, "runner started during dyncfg test")
+}
+
+func TestDyncfgCmdTest_SingleInstanceV2RunnerUsesCanonicalName(t *testing.T) {
+	var buf bytes.Buffer
+	probe := &runnerProbeV2Collector{jobNameRequiredV2Collector: newJobNameRequiredV2Collector()}
+
+	mgr := newCollectorTestManager()
+	mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))))
+	mgr.modules.Register("singlev2runner", collectorapi.Creator{
+		InstancePolicy: collectorapi.InstancePolicySingle,
+		CreateV2: func() collectorapi.CollectorV2 {
+			return probe
+		},
+	})
+
+	fn := dyncfg.NewFunction(functions.Function{
+		UID:         "single-v2-runner-test",
+		ContentType: "application/json",
+		Payload:     mustMarshalCollectorConfigPayload(t, prepareDyncfgCfg("singlev2runner", "payload-name")),
+		Args:        collectorTestArgs(mgr, "singlev2runner", string(dyncfg.CommandTest)),
+	})
+
+	mgr.dyncfgCmdTest(fn)
+	mgr.cmdTestWG.Wait()
+
+	var resp map[string]any
+	mustDecodeFunctionPayload(t, buf.String(), "single-v2-runner-test", &resp)
+	assert.Equal(t, float64(200), resp["status"])
+	assert.Equal(t, "singlev2runner", probe.jobName)
+	require.Never(t, probe.runCalled.Load, 100*time.Millisecond, 10*time.Millisecond, "runner started during single-instance dyncfg test")
 }
 
 func TestDyncfgCmdTest_SingleInstancePolicyUsesCanonicalName(t *testing.T) {

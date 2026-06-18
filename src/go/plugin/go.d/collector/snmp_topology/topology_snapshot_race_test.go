@@ -12,8 +12,7 @@ import (
 // concurrent-map-write crash where the snapshot read path mutated a cache-shared
 // map. snapshotEngineObservations holds only an RLock and passes c.localDevice
 // (by value, so Labels still aliases the cache map) to normalizeTopologyDevice,
-// which writes Labels. Two concurrent readers (Collect's snapshot() and a
-// Function's snapshotWithOptions()) then write the same map.
+// which writes Labels. Two concurrent snapshot readers then write the same map.
 //
 // Run with -race. Before the fix this reports a data race / fatal concurrent map
 // writes; after the fix (normalizeTopologyDevice clones Labels) it passes.
@@ -50,13 +49,12 @@ func TestTopologyRegistry_ConcurrentSnapshotsDoNotRaceOnDeviceLabels(t *testing.
 	var wg sync.WaitGroup
 	wg.Add(goroutines)
 	for i := range goroutines {
-		// Alternate the two production read paths: Collect (snapshot) and the
-		// Function handler (snapshotWithOptions).
+		// Alternate the default and option-aware registry read paths.
 		collectPath := i%2 == 0
 		go func() {
 			defer wg.Done()
 			if collectPath {
-				_, _ = registry.snapshot()
+				_, _ = snapshotTopologyRegistryForTest(registry)
 			} else {
 				_, _ = registry.snapshotWithOptions(topologyQueryOptions{})
 			}

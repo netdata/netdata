@@ -128,7 +128,7 @@ func topologyNormalizeReverseDNSName(names []string) string {
 var defaultTopologyReverseDNSResolver = newTopologyReverseDNSResolver(topologyReverseDNSTimeout, topologyReverseDNSCacheTTL)
 
 // resolveTopologyReverseDNSName performs a live DNS lookup (with cache).
-// Used during the collector's Collect() cycle to warm the cache.
+// Used while building topology snapshots to warm the cache.
 func resolveTopologyReverseDNSName(ip string) string {
 	return defaultTopologyReverseDNSResolver.lookup(ip)
 }

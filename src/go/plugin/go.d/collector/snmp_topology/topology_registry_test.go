@@ -68,7 +68,7 @@ func TestTopologyRegistry_SnapshotAggregatesAcrossCaches(t *testing.T) {
 	registry.register(cacheA)
 	registry.register(cacheB)
 
-	data, ok := registry.snapshot()
+	data, ok := snapshotTopologyRegistryForTest(registry)
 	require.True(t, ok)
 	require.Equal(t, "2", data.Layer)
 	require.Equal(t, "snmp", data.Source)
@@ -110,7 +110,7 @@ func TestTopologyRegistry_SnapshotSingleCacheKeepsLLDPUnidirectional(t *testing.
 
 	registry.register(cache)
 
-	data, ok := registry.snapshot()
+	data, ok := snapshotTopologyRegistryForTest(registry)
 	require.True(t, ok)
 	require.Len(t, data.Links, 1)
 	require.Equal(t, "lldp", data.Links[0].Protocol)
@@ -298,7 +298,7 @@ func TestTopologyRegistry_SnapshotReturnsFalseWithoutCollectedCaches(t *testing.
 	cache := newTopologyCache()
 	registry.register(cache)
 
-	_, ok := registry.snapshot()
+	_, ok := snapshotTopologyRegistryForTest(registry)
 	require.False(t, ok)
 }
 
@@ -360,13 +360,13 @@ func TestTopologyRegistry_SnapshotDeterministicAcrossRepeatedCalls(t *testing.T)
 	registry.register(cacheA)
 	registry.register(cacheB)
 
-	baseline, ok := registry.snapshot()
+	baseline, ok := snapshotTopologyRegistryForTest(registry)
 	require.True(t, ok)
 	require.NotEmpty(t, baseline.Actors)
 	require.NotEmpty(t, baseline.Links)
 
 	for range 10 {
-		next, ok := registry.snapshot()
+		next, ok := snapshotTopologyRegistryForTest(registry)
 		require.True(t, ok)
 		require.Equal(t, baseline, next)
 	}
@@ -412,7 +412,7 @@ func TestTopologyRegistry_SnapshotDeduplicatesDuplicateDeviceObservations(t *tes
 	registry.register(cacheA)
 	registry.register(cacheB)
 
-	data, ok := registry.snapshot()
+	data, ok := snapshotTopologyRegistryForTest(registry)
 	require.True(t, ok)
 
 	require.Len(t, data.Links, 1)

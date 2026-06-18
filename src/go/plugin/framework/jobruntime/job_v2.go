@@ -295,6 +295,10 @@ func (j *JobV2) Start() {
 	j.running.Store(true)
 	runCtx, cancel := context.WithCancel(context.Background())
 	j.setRunContext(runCtx, cancel)
+	var runnerDone <-chan error
+	if !j.stopCtrl.stopRequested() {
+		runnerDone = j.startCollectorRunner(runCtx)
+	}
 	if j.functionOnly {
 		j.Info("started in function-only mode")
 	} else {
@@ -312,6 +316,9 @@ LOOP:
 		select {
 		case <-j.stopCtrl.stopCh:
 			break LOOP
+		case err := <-runnerDone:
+			runnerDone = nil
+			j.handleCollectorRunnerExit(runCtx, err)
 		case t := <-j.tick:
 			if !j.functionOnly && j.shouldCollect(t) {
 				markRunStartWithResumeLog(&j.skipTracker, j.Logger)
@@ -320,10 +327,60 @@ LOOP:
 			}
 		}
 	}
+	cancel()
+	j.waitCollectorRunner(runCtx, runnerDone)
 	// Mark not-running before cleanup so external function dispatch can reject requests
 	// while module resources are being torn down.
 	j.running.Store(false)
 	j.Cleanup()
+}
+
+func (j *JobV2) startCollectorRunner(ctx context.Context) <-chan error {
+	runner, ok := j.module.(collectorapi.CollectorV2Runner)
+	if !ok {
+		return nil
+	}
+	done := make(chan error, 1)
+	go func() {
+		done <- j.runCollectorRunner(ctx, runner)
+	}()
+	return done
+}
+
+func (j *JobV2) runCollectorRunner(ctx context.Context, runner collectorapi.CollectorV2Runner) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			j.panicked.Store(true)
+			err = fmt.Errorf("panic %v", r)
+			j.Errorf("PANIC: %v", r)
+			if logger.Level.Enabled(slog.LevelDebug) {
+				j.Errorf("STACK: %s", debug.Stack())
+			}
+		}
+	}()
+
+	err = runner.Run(ctx)
+	if err != nil && ctx.Err() != nil && errors.Is(err, ctx.Err()) {
+		return nil
+	}
+	return err
+}
+
+func (j *JobV2) waitCollectorRunner(ctx context.Context, done <-chan error) {
+	if done == nil {
+		return
+	}
+	j.handleCollectorRunnerExit(ctx, <-done)
+}
+
+func (j *JobV2) handleCollectorRunnerExit(ctx context.Context, err error) {
+	if err != nil {
+		j.Errorf("collector runner failed: %v", err)
+		return
+	}
+	if ctx.Err() == nil {
+		j.Warningf("collector runner stopped before job stop")
+	}
 }
 
 func (j *JobV2) Stop() {
