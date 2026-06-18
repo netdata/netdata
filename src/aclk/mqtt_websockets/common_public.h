@@ -27,6 +27,8 @@ struct mqtt_ng_stats {
     int tx_messages_sent;
     int rx_messages_rcvd;
     int packets_waiting_puback;
+    // MQTT 5.0 server Receive Maximum from CONNACK (max concurrent unacked QoS1/2); 65535 if unset
+    uint16_t rx_maximum;
     size_t tx_buffer_used;
     size_t tx_buffer_free;
     size_t tx_buffer_size;
