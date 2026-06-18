@@ -377,8 +377,7 @@ static bool dns_parse_payload(const char *buf, int dns_off, int n,
         return false;
 
     *tx_id_out       = tx_id;
-    strncpy(domain_out, domain, (size_t)(domain_max - 1));
-    domain_out[domain_max - 1] = '\0';
+    snprintf(domain_out, (size_t)domain_max, "%s", domain);
     *query_type_out  = query_type;
     *is_response_out = (flags & 0x8000u) ? 1 : 0;
     *rcode_out       = flags & 0x000Fu;
@@ -451,7 +450,7 @@ static void dns_expire_pending(struct netdata_dns_runtime *rt, uint64_t now_us)
         r->latency_us   = 0;
         memcpy(r->server_ip, p->server_ip, sizeof(r->server_ip));
         memcpy(r->client_ip, p->client_ip, sizeof(r->client_ip));
-        strncpy(r->domain, p->domain, DNS_DOMAIN_MAX - 1);
+        snprintf(r->domain, sizeof(r->domain), "%s", p->domain);
         r->client_port = p->client_port;
         r->query_type  = p->query_type;
         r->rcode       = 0;
@@ -495,8 +494,7 @@ static void dns_process_packet(
         p->timestamp_us = now_us;
         memcpy(p->server_ip, server_ip, sizeof(p->server_ip));
         memcpy(p->client_ip, client_ip, sizeof(p->client_ip));
-        strncpy(p->domain, domain, DNS_DOMAIN_MAX - 1);
-        p->domain[DNS_DOMAIN_MAX - 1] = '\0';
+        snprintf(p->domain, sizeof(p->domain), "%s", domain);
         p->tx_id       = tx_id;
         p->query_type  = query_type;
         p->client_port = client_port;
@@ -523,8 +521,7 @@ static void dns_process_packet(
     r->latency_us   = latency_us;
     memcpy(r->server_ip, p->server_ip, sizeof(r->server_ip));
     memcpy(r->client_ip, p->client_ip, sizeof(r->client_ip));
-    strncpy(r->domain, p->domain, DNS_DOMAIN_MAX - 1);
-    r->domain[DNS_DOMAIN_MAX - 1] = '\0';
+    snprintf(r->domain, sizeof(r->domain), "%s", p->domain);
     r->client_port = p->client_port;
     r->query_type  = p->query_type;
     r->rcode       = rcode;
