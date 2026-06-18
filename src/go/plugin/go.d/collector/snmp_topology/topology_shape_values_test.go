@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTopologyOutputStatHelpers_ClassifyActorsAndValues(t *testing.T) {
+func TestTopologyShapeValues_ClassifyActorsAndValues(t *testing.T) {
 	require.True(t, topologyActorIsInferred(topologyActor{ActorType: "endpoint"}))
 	require.True(t, topologyActorIsInferred(topologyActor{Labels: map[string]string{"inferred": "yes"}}))
 	require.True(t, topologyActorIsInferred(topologyActor{Attributes: map[string]any{"inferred": true}}))

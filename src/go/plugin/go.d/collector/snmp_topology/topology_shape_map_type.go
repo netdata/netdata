@@ -4,8 +4,6 @@ package snmptopology
 
 import (
 	"strings"
-
-	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
 func applyMapTypePolicy(data *topologyData, mapType string) int {
@@ -118,14 +116,4 @@ func suppressUnlinkedInferredEndpoints(data *topologyData) int {
 	}
 	data.Links = filtered
 	return removed
-}
-
-func isManagedSNMPDeviceActor(actor topologyActor) bool {
-	if !topologyengine.IsDeviceActorType(actor.ActorType) {
-		return false
-	}
-	if strings.ToLower(strings.TrimSpace(actor.Source)) != "snmp" {
-		return false
-	}
-	return !topologyActorIsInferred(actor)
 }

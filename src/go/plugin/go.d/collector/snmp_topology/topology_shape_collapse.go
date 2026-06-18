@@ -4,6 +4,8 @@ package snmptopology
 
 import (
 	"strings"
+
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
 func collapseActorsByIP(data *topologyData) int {
@@ -142,4 +144,28 @@ func collapseActorsByIP(data *topologyData) int {
 	}
 	data.Links = links
 	return collapsed
+}
+
+func compareCollapseActorPriority(left, right topologyActor) int {
+	if leftDevice, rightDevice := topologyengine.IsDeviceActorType(left.ActorType), topologyengine.IsDeviceActorType(right.ActorType); leftDevice != rightDevice {
+		if leftDevice {
+			return -1
+		}
+		return 1
+	}
+	if leftInferred, rightInferred := topologyActorIsInferred(left), topologyActorIsInferred(right); leftInferred != rightInferred {
+		if !leftInferred {
+			return -1
+		}
+		return 1
+	}
+	leftID := strings.ToLower(strings.TrimSpace(left.ActorID))
+	rightID := strings.ToLower(strings.TrimSpace(right.ActorID))
+	if (leftID == "") != (rightID == "") {
+		if leftID != "" {
+			return -1
+		}
+		return 1
+	}
+	return strings.Compare(leftID, rightID)
 }
