@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,8 +21,7 @@ func TestSNMPTopologyMethodConfigDoesNotUseLegacyPresentation(t *testing.T) {
 }
 
 func TestSNMPTopologyCreatorOwnsTopologyFunction(t *testing.T) {
-	creator, ok := collectorapi.DefaultRegistry.Lookup("snmp_topology")
-	require.True(t, ok)
+	creator := newCreator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle())
 	require.Nil(t, creator.Create)
 	require.NotNil(t, creator.CreateV2)
 	require.Equal(t, collectorapi.InstancePolicySingle, creator.InstancePolicy)
@@ -36,11 +36,29 @@ func TestSNMPTopologyCreatorOwnsTopologyFunction(t *testing.T) {
 	require.Equal(t, topologyFunctionName, methods[0].FunctionName)
 	require.True(t, methods[0].AgentWide)
 
-	coll := New()
+	coll := newTestSNMPTopologyCollector()
 	handler := creator.MethodHandler(&topologyRuntimeJobForTest{collector: coll})
 	require.IsType(t, &funcTopology{}, handler)
 	require.Same(t, coll.topologyRegistry, handler.(*funcTopology).registry)
 	require.Nil(t, creator.MethodHandler(nil))
+}
+
+func TestSNMPTopologyCreatorRequiresSharedDependencies(t *testing.T) {
+	require.PanicsWithValue(t, "snmp_topology Register requires a non-nil device store", func() {
+		_ = newCreator(nil, NewTrapEnrichmentHandle())
+	})
+	require.PanicsWithValue(t, "snmp_topology Register requires a non-nil trap enrichment handle", func() {
+		_ = newCreator(ddsnmp.NewDeviceStore(), nil)
+	})
+}
+
+func TestSNMPTopologyNewRequiresSharedDependencies(t *testing.T) {
+	require.PanicsWithValue(t, "snmp_topology New requires a non-nil device store", func() {
+		_ = New(nil, NewTrapEnrichmentHandle())
+	})
+	require.PanicsWithValue(t, "snmp_topology New requires a non-nil trap enrichment handle", func() {
+		_ = New(ddsnmp.NewDeviceStore(), nil)
+	})
 }
 
 type topologyRuntimeJobForTest struct {

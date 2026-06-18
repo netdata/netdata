@@ -92,11 +92,11 @@ func TestTopologyIntegrationWithSnmpsimV3(t *testing.T) {
 func collectTopologySnapshotFromDevice(t *testing.T, dev ddsnmp.DeviceConnectionInfo) topologyData {
 	t.Helper()
 
+	deviceStore := ddsnmp.NewDeviceStore()
 	deviceKey := "integration:" + dev.SNMPVersion + ":" + dev.SysName
-	ddsnmp.DeviceRegistry.Register(deviceKey, dev)
-	defer ddsnmp.DeviceRegistry.Unregister(deviceKey)
+	deviceStore.Register(deviceKey, dev)
 
-	coll := New()
+	coll := New(deviceStore, NewTrapEnrichmentHandle())
 	coll.Config = Config{UpdateEvery: 3600}
 	require.NoError(t, coll.Init(context.Background()))
 	defer coll.Cleanup(context.Background())

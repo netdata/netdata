@@ -10,6 +10,8 @@ import (
 
 	"github.com/gosnmp/gosnmp"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 )
 
 func readSinglePcapUDPPacket(t *testing.T, fixture string) pcapUDPPacket {
@@ -53,6 +55,24 @@ func newTestV2Collector(jobName string, writer TrapWriter, prefixes []netip.Pref
 
 func newDefaultTestV2Collector(writer TrapWriter) *Collector {
 	return newTestV2Collector("test", writer, nil, []string{"public"})
+}
+
+func newTestSNMPTrapsCollector() *Collector {
+	return New(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle())
+}
+
+type testTrapTopologyEnricher func(ip, trapIfIndex string) *snmptopology.TrapTopologyEnrichment
+
+func (f testTrapTopologyEnricher) EnrichmentForSource(ip, trapIfIndex string) *snmptopology.TrapTopologyEnrichment {
+	return f(ip, trapIfIndex)
+}
+
+func newTestTrapEnrichmentCollector(topologyEnricher trapTopologyEnricher) (*Collector, *ddsnmp.DeviceStore) {
+	store := ddsnmp.NewDeviceStore()
+	return &Collector{
+		deviceLookup:     store,
+		topologyEnricher: topologyEnricher,
+	}, store
 }
 
 func withCleanJobMetrics(t *testing.T, jobName string) *perJobMetrics {

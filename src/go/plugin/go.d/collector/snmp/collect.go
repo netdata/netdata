@@ -140,7 +140,7 @@ func (c *Collector) ensureInitialized() error {
 		c.addPingCharts()
 	}
 
-	c.registerDeviceForTopology(si)
+	c.registerDeviceState(si)
 
 	return nil
 }
