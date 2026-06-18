@@ -23,9 +23,8 @@ type MethodConfig struct {
 	// RawRequest routes the complete Function request to a RawMethodHandler.
 	// Use this for Function APIs that need raw payloads, args, or full response envelopes.
 	RawRequest bool
-	// FIXME: AgentWide currently removes __job from the public API, but funcctl still
-	// dispatches through the first running job for the module instead of a true
-	// agent-level execution path.
+	// AgentWide marks a module/static method as agent-level: funcctl omits
+	// __job from the public API and dispatches the method without a RuntimeJob.
 	AgentWide      bool          // Method is agent-wide (does not require __job selector)
 	RequiredParams []ParamConfig // Required parameters for this method (including __sort if used)
 	// FIXME: Presentation is intentionally untyped here, while the shared UI schema
