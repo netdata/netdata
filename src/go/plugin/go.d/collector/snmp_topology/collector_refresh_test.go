@@ -203,6 +203,9 @@ func TestCollectorRunCancelsInFlightRefresh(t *testing.T) {
 		return []ddsnmp.DeviceConnectionInfo{dev}
 	}
 	coll.newSnmpClient = func() gosnmp.Handler { return mockHandler }
+	coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile {
+		return []*ddsnmp.Profile{{}}
+	}
 	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
 		return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) {
 			return replacementEndpointProfileMetrics(), nil

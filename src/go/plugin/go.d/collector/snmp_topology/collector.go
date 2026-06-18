@@ -71,6 +71,7 @@ type (
 		metrics *collectorMetrics
 
 		registeredDevices func() []ddsnmp.DeviceConnectionInfo
+		topologyProfiles  func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile
 		newSnmpClient     func() gosnmp.Handler
 		newDdSnmpColl     func(ddsnmpcollector.Config) ddCollector
 	}
@@ -249,7 +250,7 @@ func (c *Collector) refreshDeviceTopology(ctx context.Context, key string, dev d
 		return false
 	}
 
-	profiles := c.findTopologyProfiles(dev)
+	profiles := c.getTopologyProfiles(dev)
 	if len(profiles) == 0 {
 		return true
 	}
@@ -358,6 +359,13 @@ func (c *Collector) findTopologyProfiles(dev ddsnmp.DeviceConnectionInfo) []*dds
 		ManualProfiles: dev.ManualProfiles,
 		ManualPolicy:   ddsnmp.ManualProfileAugment,
 	}).Project(ddsnmp.ConsumerTopology).Profiles()
+}
+
+func (c *Collector) getTopologyProfiles(dev ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile {
+	if c.topologyProfiles != nil {
+		return c.topologyProfiles(dev)
+	}
+	return c.findTopologyProfiles(dev)
 }
 
 func (c *Collector) ingestTopologyProfileMetrics(pms []*ddsnmp.ProfileMetrics) {
