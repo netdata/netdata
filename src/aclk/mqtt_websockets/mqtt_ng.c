@@ -250,6 +250,9 @@ struct mqtt_ng_client {
     c_rhash rx_aliases;
 
     size_t max_msg_size;
+
+    // MQTT 5.0 server Receive Maximum (CONNACK prop 0x21); absent => 65535 default [MQTT-3.2.2.3.3]
+    uint16_t rx_maximum;
 };
 
 usec_t publish_latency;
@@ -629,6 +632,9 @@ struct mqtt_ng_client *mqtt_ng_init(struct mqtt_ng_init *settings)
 
     client->tx_topic_aliases.stoi_dict = TX_ALIASES_INITIALIZE();
     client->tx_topic_aliases.idx_max = UINT16_MAX;
+
+    // MQTT 5.0 default Receive Maximum when the server omits the property [MQTT-3.2.2.3.3]
+    client->rx_maximum = UINT16_MAX;
 
     // TODO just embed the struct into mqtt_ng_client
     client->parser.received_data = settings->data_in;
@@ -2144,6 +2150,11 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
                 client->max_msg_size = prop->data.uint32;
             }
 
+            if ((prop = get_property_by_id(client->parser.properties_parser.head, MQTT_PROP_RECEIVE_MAX)) != NULL) {
+                nd_log(NDLS_DAEMON, NDLP_INFO, "ACLK: MQTT server receive maximum is %" PRIu16, prop->data.uint16);
+                client->rx_maximum = prop->data.uint16;
+            }
+
             if (client->connack_callback)
                 client->connack_callback(client->user_ctx, client->parser.mqtt_packet.connack.reason_code);
             if (!client->parser.mqtt_packet.connack.reason_code) {
@@ -2300,6 +2311,7 @@ void mqtt_ng_get_stats(struct mqtt_ng_client *client, struct mqtt_ng_stats *stat
     stats->tx_messages_sent = __atomic_load_n(&client->stats.tx_messages_sent, __ATOMIC_RELAXED);
     stats->rx_messages_rcvd = __atomic_load_n(&client->stats.rx_messages_rcvd, __ATOMIC_RELAXED);
     stats->packets_waiting_puback = __atomic_load_n(&client->stats.packets_waiting_puback, __ATOMIC_RELAXED);
+    stats->rx_maximum = client->rx_maximum;
 
     stats->tx_bytes_queued = 0;
     stats->tx_buffer_reclaimable = 0;
