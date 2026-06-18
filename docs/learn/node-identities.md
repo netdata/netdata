@@ -164,6 +164,46 @@ Each virtual node GUID must be unique across your entire infrastructure. Using t
 
 :::
 
+### Creating Virtual Nodes via the GUI (Dynamic Configuration)
+
+In addition to the YAML file method, you can create, edit, test, and remove virtual nodes directly from the Netdata UI using [dynamic configuration (dyncfg)](/docs/netdata-agent/configuration/dynamic-configuration.md). The two methods are equivalent — both produce a vnode that collectors can attach metrics to — so choose whichever fits your workflow. The GUI path is available for collectors that support dynamic configuration.
+
+:::note
+
+**Where to find it in the GUI**
+
+The vnode dynamic configuration is exposed per plugin under the path `/collectors/{plugin}/Vnodes`. For collectors running under the **go.d** plugin this is `/collectors/go.d/Vnodes`. In the Netdata UI, open the node's dynamic configuration view and look for the **Vnodes** entry under the collector plugin. From there you can add a new vnode, edit an existing one, or test a configuration before applying it.
+
+:::
+
+The GUI form uses the same fields as the YAML configuration — `hostname`, `guid`, and `labels`:
+
+| Field | Required in the GUI | Description |
+|-------|---------------------|-------------|
+| `guid` | Yes | UUID that uniquely identifies this virtual node. Must be a valid UUID. |
+| `hostname` | No | Display name shown in dashboards and Cloud. If left blank, the job name you assign when creating the vnode is used as the hostname. |
+| `labels` | No | Key-value pairs for filtering and organization. |
+
+Generate a `guid` with `uuidgen` on Linux/macOS, or `[guid]::NewGuid()` in PowerShell. Each `guid` must be unique across your infrastructure, as described in the GUID Uniqueness warning above. See [Does renaming a virtual node change its identity?](#does-renaming-a-virtual-node-change-its-identity) for how each field affects the vnode.
+
+:::info
+
+**Changes apply without an Agent restart**
+
+When you add or edit a vnode through the GUI, the change is applied to running collector jobs that reference that vnode immediately — you do not need to restart the Agent for the new or updated vnode to take effect.
+
+:::
+
+:::warning
+
+**Removing vnodes depends on how they were created**
+
+Virtual nodes you create through the GUI are stored with the `dyncfg` source type and can be removed from the GUI. Virtual nodes defined in YAML files under `/etc/netdata/vnodes/` have a `stock` or `user` source type and **cannot** be removed through dynamic configuration — the GUI does not expose a remove action for them, and removing a file-based vnode is rejected with an error stating that only `dyncfg` vnodes can be removed. To remove a file-based vnode, delete or edit its YAML file and reload the collector.
+
+A vnode that is currently referenced by one or more collector jobs cannot be removed until those references are cleared; the remove action is blocked in that case.
+
+:::
+
 ### How Virtual Nodes Work
 
 1. Go collector reads vnode configuration
