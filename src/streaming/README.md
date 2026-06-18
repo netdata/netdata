@@ -389,6 +389,20 @@ Manage database settings for data storage and retention.
 - **retention**: Set how long to keep historical data.
 - **update every**: The data collection frequency in seconds.
 
+:::note
+
+#### Parent and Child `update every` do not need to match
+
+The `update every` setting controls the collection granularity of the metrics **this node collects locally** (its tier-0 resolution). In a Parent-Child streaming setup, the Parent's `[db] update every` and a Child's `update every` are independent — they do **not** need to match:
+
+- The Parent's `update every` governs only the metrics the Parent collects from its **own** host (the Parent's localhost tier-0 data).
+- A Child sends its own `update every` to the Parent over the streaming protocol — once as a host-level value when the connection is established, and then attached to **each chart** it streams (in every chart definition and in each data update). The Parent stores each Child's metrics at the Child's own collection frequency, regardless of the Parent's `update every`.
+- Each streaming Child is a separate host on the Parent, each keeping its own `update every`.
+
+Configuring both nodes with the same value is neither required nor beneficial — if they happen to be equal, it is coincidental and has no effect on correctness. Set each node's `update every` based on the collection granularity you want for that node's own data.
+
+:::
+
 ## Complete Configuration Examples
 
 ### Basic Parent-Child Setup
