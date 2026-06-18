@@ -52,6 +52,12 @@ func TestCollectorCreatorRequiresDeviceStore(t *testing.T) {
 	})
 }
 
+func TestCollectorNewRequiresDeviceStore(t *testing.T) {
+	require.PanicsWithValue(t, "snmp New requires a non-nil device store", func() {
+		_ = New(nil)
+	})
+}
+
 func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		prepareSNMP func() *Collector

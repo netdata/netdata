@@ -44,10 +44,10 @@ func newCreator(store *ddsnmp.DeviceStore) collectorapi.Creator {
 	}
 }
 
-// New returns an SNMP collector. A nil store creates an isolated store for direct use.
+// New returns an SNMP collector using the provided SNMP-family device store.
 func New(store *ddsnmp.DeviceStore) *Collector {
 	if store == nil {
-		store = ddsnmp.NewDeviceStore()
+		panic("snmp New requires a non-nil device store")
 	}
 	c := &Collector{
 		Config: Config{

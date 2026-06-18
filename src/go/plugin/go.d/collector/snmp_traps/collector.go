@@ -66,13 +66,13 @@ func newCreator(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.
 	}
 }
 
-// New returns an SNMP traps collector. Nil dependencies create isolated state for direct use.
+// New returns an SNMP traps collector using the provided SNMP-family enrichment state.
 func New(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnrichmentHandle) *Collector {
 	if deviceStore == nil {
-		deviceStore = ddsnmp.NewDeviceStore()
+		panic("snmp_traps New requires a non-nil device store")
 	}
 	if topologyEnricher == nil {
-		topologyEnricher = snmptopology.NewTrapEnrichmentHandle()
+		panic("snmp_traps New requires a non-nil trap enrichment handle")
 	}
 	store := metrix.NewCollectorStore()
 

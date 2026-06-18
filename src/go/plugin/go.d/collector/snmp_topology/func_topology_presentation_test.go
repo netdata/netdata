@@ -52,6 +52,15 @@ func TestSNMPTopologyCreatorRequiresSharedDependencies(t *testing.T) {
 	})
 }
 
+func TestSNMPTopologyNewRequiresSharedDependencies(t *testing.T) {
+	require.PanicsWithValue(t, "snmp_topology New requires a non-nil device store", func() {
+		_ = New(nil, NewTrapEnrichmentHandle())
+	})
+	require.PanicsWithValue(t, "snmp_topology New requires a non-nil trap enrichment handle", func() {
+		_ = New(ddsnmp.NewDeviceStore(), nil)
+	})
+}
+
 type topologyRuntimeJobForTest struct {
 	collector *Collector
 }

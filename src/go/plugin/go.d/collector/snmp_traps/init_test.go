@@ -105,6 +105,15 @@ func TestCollectorCreatorRequiresSharedDependencies(t *testing.T) {
 	})
 }
 
+func TestCollectorNewRequiresSharedDependencies(t *testing.T) {
+	require.PanicsWithValue(t, "snmp_traps New requires a non-nil device store", func() {
+		_ = New(nil, snmptopology.NewTrapEnrichmentHandle())
+	})
+	require.PanicsWithValue(t, "snmp_traps New requires a non-nil trap enrichment handle", func() {
+		_ = New(ddsnmp.NewDeviceStore(), nil)
+	})
+}
+
 func chartTemplatesByIDFromYAML(t *testing.T, raw string) map[string]charttpl.Chart {
 	t.Helper()
 
