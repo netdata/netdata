@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDeviceRegistryDeviceByHostname(t *testing.T) {
-	reg := &deviceRegistry{devices: make(map[string]DeviceConnectionInfo)}
+func TestDeviceStoreDevicesByHostname(t *testing.T) {
+	reg := NewDeviceStore()
 	reg.Register("switch-a", DeviceConnectionInfo{
 		Hostname:       "192.0.2.10",
 		SysName:        "switch-a",
@@ -17,58 +17,57 @@ func TestDeviceRegistryDeviceByHostname(t *testing.T) {
 		VnodeLabels:    map[string]string{"site": "lab"},
 	})
 
-	dev, ok := reg.DeviceByHostname("::ffff:192.0.2.10")
-	require.True(t, ok)
+	devices := reg.DevicesByHostname("::ffff:192.0.2.10")
+	require.Len(t, devices, 1)
+	dev := devices[0]
 	require.Equal(t, "switch-a", dev.SysName)
 
 	dev.ManualProfiles[0] = "changed"
 	dev.VnodeLabels["site"] = "changed"
 
-	again, ok := reg.DeviceByHostname("192.0.2.10")
-	require.True(t, ok)
-	require.Equal(t, []string{"profile-a"}, again.ManualProfiles)
-	require.Equal(t, "lab", again.VnodeLabels["site"])
+	again := reg.DevicesByHostname("192.0.2.10")
+	require.Len(t, again, 1)
+	require.Equal(t, []string{"profile-a"}, again[0].ManualProfiles)
+	require.Equal(t, "lab", again[0].VnodeLabels["site"])
 }
 
-func TestDeviceRegistryDeviceByHostnameNoMatch(t *testing.T) {
-	reg := &deviceRegistry{devices: make(map[string]DeviceConnectionInfo)}
+func TestDeviceStoreDevicesByHostnameNoMatch(t *testing.T) {
+	reg := NewDeviceStore()
 	reg.Register("switch-a", DeviceConnectionInfo{Hostname: "switch-a.example.com"})
 
-	_, ok := reg.DeviceByHostname("switch-b.example.com")
-	require.False(t, ok)
+	require.Empty(t, reg.DevicesByHostname("switch-b.example.com"))
 }
 
-func TestDeviceRegistryDeviceByHostnameMatchesDNSCaseInsensitive(t *testing.T) {
-	reg := &deviceRegistry{devices: make(map[string]DeviceConnectionInfo)}
+func TestDeviceStoreDevicesByHostnameMatchesDNSCaseInsensitive(t *testing.T) {
+	reg := NewDeviceStore()
 	reg.Register("switch-a", DeviceConnectionInfo{Hostname: "Switch-A.Example.COM"})
 
-	_, ok := reg.DeviceByHostname("switch-a.example.com")
-	require.True(t, ok)
+	require.Len(t, reg.DevicesByHostname("switch-a.example.com"), 1)
 }
 
-func TestDeviceRegistryDeviceByHostnameIndexUpdatesOnRegisterAndUnregister(t *testing.T) {
-	reg := &deviceRegistry{devices: make(map[string]DeviceConnectionInfo)}
+func TestDeviceStoreDevicesByHostnameIndexUpdatesOnRegisterAndUnregister(t *testing.T) {
+	reg := NewDeviceStore()
 	reg.Register("switch-a", DeviceConnectionInfo{Hostname: "192.0.2.10", SysName: "switch-a"})
 
-	dev, ok := reg.DeviceByHostname("192.0.2.10")
-	require.True(t, ok)
+	devices := reg.DevicesByHostname("192.0.2.10")
+	require.Len(t, devices, 1)
+	dev := devices[0]
 	require.Equal(t, "switch-a", dev.SysName)
 
 	reg.Register("switch-a", DeviceConnectionInfo{Hostname: "192.0.2.11", SysName: "switch-a-renumbered"})
 
-	_, ok = reg.DeviceByHostname("192.0.2.10")
-	require.False(t, ok)
-	dev, ok = reg.DeviceByHostname("192.0.2.11")
-	require.True(t, ok)
+	require.Empty(t, reg.DevicesByHostname("192.0.2.10"))
+	devices = reg.DevicesByHostname("192.0.2.11")
+	require.Len(t, devices, 1)
+	dev = devices[0]
 	require.Equal(t, "switch-a-renumbered", dev.SysName)
 
 	reg.Unregister("switch-a")
-	_, ok = reg.DeviceByHostname("192.0.2.11")
-	require.False(t, ok)
+	require.Empty(t, reg.DevicesByHostname("192.0.2.11"))
 }
 
-func TestDeviceRegistryDevicesByHostnameReturnsAllMatches(t *testing.T) {
-	reg := &deviceRegistry{devices: make(map[string]DeviceConnectionInfo)}
+func TestDeviceStoreDevicesByHostnameReturnsAllMatches(t *testing.T) {
+	reg := NewDeviceStore()
 	reg.Register("switch-b", DeviceConnectionInfo{Hostname: "192.0.2.10", SysName: "switch-b"})
 	reg.Register("switch-a", DeviceConnectionInfo{Hostname: "::ffff:192.0.2.10", SysName: "switch-a"})
 

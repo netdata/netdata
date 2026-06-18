@@ -25,33 +25,52 @@ import (
 //go:embed "config_schema.json"
 var configSchema string
 
-func init() {
-	collectorapi.Register("snmp_topology", collectorapi.Creator{
+// Register registers the SNMP topology collector with shared SNMP-family state.
+func Register(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentHandle) {
+	collectorapi.Register("snmp_topology", newCreator(deviceStore, trapEnrichment))
+}
+
+func newCreator(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentHandle) collectorapi.Creator {
+	if deviceStore == nil {
+		panic("snmp_topology Register requires a non-nil device store")
+	}
+	if trapEnrichment == nil {
+		panic("snmp_topology Register requires a non-nil trap enrichment handle")
+	}
+	return collectorapi.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 60,
 		},
-		CreateV2:       func() collectorapi.CollectorV2 { return New() },
+		CreateV2:       func() collectorapi.CollectorV2 { return New(deviceStore, trapEnrichment) },
 		Config:         func() any { return &Config{} },
 		InstancePolicy: collectorapi.InstancePolicySingle,
 		Methods:        topologyMethods,
 		MethodHandler:  topologyFunctionHandler,
-	})
+	}
 }
 
-func New() *Collector {
-	store := metrix.NewCollectorStore()
+// New returns an SNMP topology collector. Nil dependencies create isolated state for direct use.
+func New(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentHandle) *Collector {
+	if deviceStore == nil {
+		deviceStore = ddsnmp.NewDeviceStore()
+	}
+	if trapEnrichment == nil {
+		trapEnrichment = NewTrapEnrichmentHandle()
+	}
+	metricStore := metrix.NewCollectorStore()
 	return &Collector{
 		deviceCaches:        make(map[string]*topologyCache),
 		deviceLastCollected: make(map[string]time.Time),
 		topologyRegistry:    newTopologyRegistry(),
-		registeredDevices:   ddsnmp.DeviceRegistry.Devices,
+		deviceSource:        deviceStore,
+		trapEnrichment:      trapEnrichment,
 		newSnmpClient:       gosnmp.NewHandler,
 		newDdSnmpColl: func(cfg ddsnmpcollector.Config) ddCollector {
 			return ddsnmpcollector.New(cfg)
 		},
-		store:   store,
-		metrics: newCollectorMetrics(store),
+		store:   metricStore,
+		metrics: newCollectorMetrics(metricStore),
 	}
 }
 
@@ -64,6 +83,8 @@ type (
 		deviceLastCollected map[string]time.Time      // last collection time per device
 		topologyCache       *topologyCache            // current device cache (set during refreshDeviceTopology)
 		topologyRegistry    *topologyRegistry
+		deviceSource        deviceSource
+		trapEnrichment      *TrapEnrichmentHandle
 
 		refreshMu sync.Mutex
 		statsMu   sync.RWMutex
@@ -72,10 +93,12 @@ type (
 		store   metrix.CollectorStore
 		metrics *collectorMetrics
 
-		registeredDevices func() []ddsnmp.DeviceConnectionInfo
-		topologyProfiles  func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile
-		newSnmpClient     func() gosnmp.Handler
-		newDdSnmpColl     func(ddsnmpcollector.Config) ddCollector
+		topologyProfiles func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile
+		newSnmpClient    func() gosnmp.Handler
+		newDdSnmpColl    func(ddsnmpcollector.Config) ddCollector
+	}
+	deviceSource interface {
+		Devices() []ddsnmp.DeviceConnectionInfo
 	}
 	ddCollector interface {
 		Collect() ([]*ddsnmp.ProfileMetrics, error)
@@ -203,10 +226,10 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 }
 
 func (c *Collector) getRegisteredDevices() []ddsnmp.DeviceConnectionInfo {
-	if c.registeredDevices == nil {
+	if c.deviceSource == nil {
 		return nil
 	}
-	return c.registeredDevices()
+	return c.deviceSource.Devices()
 }
 
 func (c *Collector) refreshTopologyRecovering(ctx context.Context) {

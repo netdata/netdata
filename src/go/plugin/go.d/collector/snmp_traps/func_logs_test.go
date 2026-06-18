@@ -14,6 +14,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/funcctl"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/snmptrapsfunc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -147,8 +149,7 @@ func TestSNMPTrapsLogsDispatchDoesNotRequireRunningJob(t *testing.T) {
 	t.Cleanup(func() { activeDirectJournalJobs.Store(startJournalJobs) })
 	t.Setenv(netdataLogDirEnv, filepath.Join(t.TempDir(), "logs"))
 
-	creator, ok := collectorapi.DefaultRegistry.Lookup("snmp_traps")
-	require.True(t, ok)
+	creator := newCreator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle())
 
 	reg := newSNMPTrapsTestFunctionRegistry()
 	var gotCode int

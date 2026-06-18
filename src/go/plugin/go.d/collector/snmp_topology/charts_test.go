@@ -13,7 +13,7 @@ import (
 )
 
 func TestCollector_ChartTemplateYAML(t *testing.T) {
-	raw := New().ChartTemplateYAML()
+	raw := newTestSNMPTopologyCollector().ChartTemplateYAML()
 	collecttest.AssertChartTemplateSchema(t, raw)
 
 	spec, err := charttpl.DecodeYAML([]byte(raw))

@@ -46,6 +46,12 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
+func TestCollectorCreatorRequiresDeviceStore(t *testing.T) {
+	require.PanicsWithValue(t, "snmp Register requires a non-nil device store", func() {
+		_ = newCreator(nil)
+	})
+}
+
 func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		prepareSNMP func() *Collector
@@ -54,13 +60,13 @@ func TestCollector_Init(t *testing.T) {
 		"fail with default config": {
 			wantFail: true,
 			prepareSNMP: func() *Collector {
-				return New()
+				return newTestSNMPCollector()
 			},
 		},
 		"fail when using SNMPv3 but 'user.name' not set": {
 			wantFail: true,
 			prepareSNMP: func() *Collector {
-				collr := New()
+				collr := newTestSNMPCollector()
 				collr.Config = prepareV3Config()
 				collr.User.Name = ""
 				return collr
@@ -69,7 +75,7 @@ func TestCollector_Init(t *testing.T) {
 		"success when using SNMPv1 with valid config": {
 			wantFail: false,
 			prepareSNMP: func() *Collector {
-				collr := New()
+				collr := newTestSNMPCollector()
 				collr.Config = prepareV1Config()
 				return collr
 			},
@@ -77,7 +83,7 @@ func TestCollector_Init(t *testing.T) {
 		"success when using SNMPv2 with valid config": {
 			wantFail: false,
 			prepareSNMP: func() *Collector {
-				collr := New()
+				collr := newTestSNMPCollector()
 				collr.Config = prepareV2Config()
 				return collr
 			},
@@ -85,7 +91,7 @@ func TestCollector_Init(t *testing.T) {
 		"success when using SNMPv3 with valid config": {
 			wantFail: false,
 			prepareSNMP: func() *Collector {
-				collr := New()
+				collr := newTestSNMPCollector()
 				collr.Config = prepareV3Config()
 				return collr
 			},
@@ -108,7 +114,7 @@ func TestCollector_Init(t *testing.T) {
 func TestCollector_InitPassesSharedPingerConfig(t *testing.T) {
 	var gotCfg pinger.Config
 
-	collr := New()
+	collr := newTestSNMPCollector()
 	collr.Config = prepareV2Config()
 	collr.PingOnly = true
 	collr.Ping.Network = "ip6"
@@ -139,9 +145,14 @@ func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
 		prepareSNMP func(t *testing.T, m *snmpmock.MockHandler) *Collector
 	}{
+		"cleanup call does not panic on zero value collector": {
+			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *Collector {
+				return &Collector{}
+			},
+		},
 		"cleanup call does not panic if snmpClient not initialized": {
 			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *Collector {
-				collr := New()
+				collr := newTestSNMPCollector()
 				collr.Config = prepareV2Config()
 				collr.newSnmpClient = func() gosnmp.Handler { return m }
 				setMockClientInitExpect(m)
@@ -167,6 +178,46 @@ func TestCollector_Cleanup(t *testing.T) {
 	}
 }
 
+func TestCollector_CollectRegistersAndCleanupUnregistersDevice(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockSNMP := snmpmock.NewMockHandler(ctrl)
+	setMockClientInitExpect(mockSNMP)
+	setMockClientSysInfoExpect(mockSNMP)
+	mockSNMP.EXPECT().Close().Return(nil).AnyTimes()
+
+	deviceStore := ddsnmp.NewDeviceStore()
+	collr := New(deviceStore)
+	collr.Config = prepareV2Config()
+	collr.CreateVnode = false
+	collr.Ping.Enabled = false
+	collr.snmpProfiles = []*ddsnmp.Profile{{}}
+	collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+	collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
+		return &mockDdSnmpCollector{}
+	}
+
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+	require.Empty(t, deviceStore.Devices())
+
+	_ = collr.Collect(context.Background())
+
+	devices := deviceStore.Devices()
+	require.Len(t, devices, 1)
+	assert.Equal(t, "192.0.2.1", devices[0].Hostname)
+	assert.Equal(t, 161, devices[0].Port)
+	assert.Equal(t, gosnmp.Version2c.String(), devices[0].SNMPVersion)
+	assert.Equal(t, "mock sysName", devices[0].SysName)
+	assert.Equal(t, "mock sysDescr", devices[0].SysDescr)
+	assert.Equal(t, "mock sysContact", devices[0].SysContact)
+	assert.Equal(t, "mock sysLocation", devices[0].SysLocation)
+
+	collr.Cleanup(context.Background())
+	require.Empty(t, deviceStore.Devices())
+}
+
 func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepare func(m *snmpmock.MockHandler) *Collector
@@ -178,7 +229,7 @@ func TestCollector_Check(t *testing.T) {
 				setMockClientInitExpect(m)
 				setMockClientSysInfoExpect(m)
 
-				c := New()
+				c := newTestSNMPCollector()
 				c.Config = prepareV2Config()
 				c.CreateVnode = false
 				c.Ping.Enabled = false
@@ -193,7 +244,7 @@ func TestCollector_Check(t *testing.T) {
 				setMockClientSetterExpect(m)
 				m.EXPECT().Connect().Return(errors.New("connect failed")).AnyTimes()
 
-				c := New()
+				c := newTestSNMPCollector()
 				c.Config = prepareV2Config()
 				c.CreateVnode = false
 				c.Ping.Enabled = false
@@ -214,7 +265,7 @@ func TestCollector_Check(t *testing.T) {
 					WalkAll(gomock.Any()).
 					Return(nil, errors.New("walk failed"))
 
-				c := New()
+				c := newTestSNMPCollector()
 				c.Config = prepareV2Config()
 				c.CreateVnode = false
 				c.Ping.Enabled = false
@@ -229,7 +280,7 @@ func TestCollector_Check(t *testing.T) {
 				setMockClientInitExpect(m)
 				setMockClientSysInfoExpect(m)
 
-				c := New()
+				c := newTestSNMPCollector()
 				c.Config = prepareV2Config()
 				c.PingOnly = true
 				c.CreateVnode = false
@@ -247,7 +298,7 @@ func TestCollector_Check(t *testing.T) {
 				setMockClientInitExpect(m)
 				setMockClientSysInfoExpect(m)
 
-				c := New()
+				c := newTestSNMPCollector()
 				c.Config = prepareV2Config()
 				c.PingOnly = true
 				c.CreateVnode = false
@@ -265,7 +316,7 @@ func TestCollector_Check(t *testing.T) {
 				setMockClientInitExpect(m)
 				setMockClientSysInfoExpect(m)
 
-				c := New()
+				c := newTestSNMPCollector()
 				c.Config = prepareV2Config()
 				c.PingOnly = true
 				c.CreateVnode = false
@@ -310,7 +361,7 @@ func TestCollector_CheckPingOnlyUsesReadOnlyProbing(t *testing.T) {
 
 	pingClient := &mockPingClient{sample: pingSuccessSample("192.0.2.1")}
 
-	collr := New()
+	collr := newTestSNMPCollector()
 	collr.Config = prepareV2Config()
 	collr.PingOnly = true
 	collr.CreateVnode = false
@@ -340,7 +391,7 @@ func TestCollector_Collect(t *testing.T) {
 				setMockClientInitExpect(m)
 				setMockClientSysInfoExpect(m)
 
-				collr := New()
+				collr := newTestSNMPCollector()
 				collr.Config = prepareV2Config()
 				collr.CreateVnode = false
 				collr.Ping.Enabled = false
@@ -400,7 +451,7 @@ func TestCollector_Collect(t *testing.T) {
 				setMockClientInitExpect(m)
 				setMockClientSysInfoExpect(m)
 
-				collr := New()
+				collr := newTestSNMPCollector()
 				collr.Config = prepareV2Config()
 				collr.CreateVnode = false
 				collr.Ping.Enabled = false
@@ -469,7 +520,7 @@ func TestCollector_Collect(t *testing.T) {
 			setMockClientInitExpect(m)
 			setMockClientSysInfoExpect(m)
 
-			collr := New()
+			collr := newTestSNMPCollector()
 			collr.Config = prepareV2Config()
 			collr.PingOnly = true
 			collr.CreateVnode = false
@@ -495,7 +546,7 @@ func TestCollector_Collect(t *testing.T) {
 			setMockClientInitExpect(m)
 			setMockClientSysInfoExpect(m)
 
-			collr := New()
+			collr := newTestSNMPCollector()
 			collr.Config = prepareV2Config()
 			collr.PingOnly = true
 			collr.CreateVnode = false
@@ -537,7 +588,7 @@ func TestCollector_CollectPingOnlyUsesTrackingProbing(t *testing.T) {
 
 	pingClient := &mockPingClient{sample: pingSuccessSample("192.0.2.1")}
 
-	collr := New()
+	collr := newTestSNMPCollector()
 	collr.Config = prepareV2Config()
 	collr.PingOnly = true
 	collr.CreateVnode = false
@@ -579,7 +630,7 @@ func TestCollector_CollectMixedModeCollectsSNMPAndPingMetrics(t *testing.T) {
 
 	pingClient := &mockPingClient{sample: pingSuccessSample("192.0.2.1")}
 
-	collr := New()
+	collr := newTestSNMPCollector()
 	collr.Config = prepareV2Config()
 	collr.CreateVnode = false
 	collr.Ping.Enabled = true
@@ -896,7 +947,7 @@ func TestCollector_Collect_LicensingAggregation(t *testing.T) {
 			setMockClientSysInfoExpect(mockSNMP)
 
 			now := time.Now().UTC()
-			collr := New()
+			collr := newTestSNMPCollector()
 			collr.Config = prepareV2Config()
 			collr.CreateVnode = false
 			collr.Ping.Enabled = false
