@@ -3320,6 +3320,7 @@ Summary: The Open Telemetry plugin for the Netdata Agent
 Group: Applications/System
 Requires: %{name} >= %{version}
 Conflicts: %{name} < %{version}
+Obsoletes: %{name}-plugin-otel-signal-viewer
 %if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
 %endif
