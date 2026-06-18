@@ -870,13 +870,9 @@ static bool topology_read_proc_ppid(uint64_t pid, uint64_t *ppid) {
     return true;
 }
 
-static bool topology_read_proc_starttime(uint64_t pid __maybe_unused, uint64_t *starttime) {
-    if(starttime)
-        *starttime = 0;
+#endif
 
-    return false;
-}
-#else
+#if !defined(OS_LINUX)
 static bool topology_read_proc_starttime(uint64_t pid __maybe_unused, uint64_t *starttime) {
     if(starttime)
         *starttime = 0;
