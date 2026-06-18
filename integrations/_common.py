@@ -25,6 +25,7 @@ COLLECTOR_SOURCES = [
     (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'ibm.d' / 'modules', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'ibm.d' / 'modules' / 'websphere', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'crates' / 'otel-plugin' / 'metadata.yaml', False),
+    (AGENT_REPO, REPO_PATH / 'src' / 'crates' / 'otel-plugin' / 'taxonomy.yaml', False),
 ]
 
 GITHUB_ACTIONS = os.environ.get('GITHUB_ACTIONS', False)
