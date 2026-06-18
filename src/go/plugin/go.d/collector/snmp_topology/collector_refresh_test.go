@@ -125,23 +125,18 @@ func TestCollectorRunDoesNotPollWhenContextAlreadyCanceled(t *testing.T) {
 }
 
 func TestCollectorPruneStaleDeviceCachesRemovesLastDeviceCache(t *testing.T) {
-	previousRegistry := snmpTopologyRegistry
-	registry := newTopologyRegistry()
-	snmpTopologyRegistry = registry
-	t.Cleanup(func() { snmpTopologyRegistry = previousRegistry })
-
 	coll := New()
 	cache := newTopologyCache()
 	coll.deviceCaches["gone:161"] = cache
 	coll.deviceLastCollected["gone:161"] = time.Now()
-	registry.register(cache)
+	coll.topologyRegistry.register(cache)
 
 	coll.registeredDevices = func() []ddsnmp.DeviceConnectionInfo { return nil }
 	coll.refreshTopology(context.Background())
 
 	require.Empty(t, coll.deviceCaches)
 	require.Empty(t, coll.deviceLastCollected)
-	require.False(t, topologyRegistryHasCache(registry, cache))
+	require.False(t, topologyRegistryHasCache(coll.topologyRegistry, cache))
 }
 
 func TestCollectorRefreshTopologyRecoveringHandlesPanic(t *testing.T) {
@@ -305,11 +300,6 @@ func TestCollectorNewDeviceCollectionCacheUsesEffectiveDeviceCheckEvery(t *testi
 }
 
 func TestCollector_RefreshKeepsPublishedSnapshotWhileCollectionRuns(t *testing.T) {
-	previousRegistry := snmpTopologyRegistry
-	registry := newTopologyRegistry()
-	snmpTopologyRegistry = registry
-	t.Cleanup(func() { snmpTopologyRegistry = previousRegistry })
-
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -324,7 +314,6 @@ func TestCollector_RefreshKeepsPublishedSnapshotWhileCollectionRuns(t *testing.T
 	key := "10.0.0.10:161"
 	published := newTopologyCache()
 	seedPublishedEndpointSnapshot(published)
-	registry.register(published)
 
 	started := make(chan struct{})
 	release := make(chan struct{})
@@ -332,6 +321,7 @@ func TestCollector_RefreshKeepsPublishedSnapshotWhileCollectionRuns(t *testing.T
 
 	coll := New()
 	coll.deviceCaches[key] = published
+	coll.topologyRegistry.register(published)
 	coll.newSnmpClient = func() gosnmp.Handler { return mockHandler }
 	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
 		return &blockingTopologyCollector{

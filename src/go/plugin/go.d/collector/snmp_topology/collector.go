@@ -44,6 +44,7 @@ func New() *Collector {
 	return &Collector{
 		deviceCaches:        make(map[string]*topologyCache),
 		deviceLastCollected: make(map[string]time.Time),
+		topologyRegistry:    newTopologyRegistry(),
 		registeredDevices:   ddsnmp.DeviceRegistry.Devices,
 		newSnmpClient:       gosnmp.NewHandler,
 		newDdSnmpColl: func(cfg ddsnmpcollector.Config) ddCollector {
@@ -62,6 +63,7 @@ type (
 		deviceCaches        map[string]*topologyCache // one cache per SNMP device
 		deviceLastCollected map[string]time.Time      // last collection time per device
 		topologyCache       *topologyCache            // current device cache (set during refreshDeviceTopology)
+		topologyRegistry    *topologyRegistry
 
 		refreshMu sync.Mutex
 		statsMu   sync.RWMutex
@@ -103,6 +105,9 @@ func (c *Collector) Run(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return nil
 	}
+	c.publishTrapTopologyEnrichment()
+	defer c.unpublishTrapTopologyEnrichment()
+
 	c.refreshTopologyRecovering(ctx)
 
 	ticker := time.NewTicker(c.deviceCheckEvery())
@@ -138,11 +143,13 @@ func (c *Collector) refreshEvery() time.Duration {
 }
 
 func (c *Collector) Cleanup(context.Context) {
+	c.unpublishTrapTopologyEnrichment()
+
 	c.refreshMu.Lock()
 	defer c.refreshMu.Unlock()
 
 	for key, cache := range c.deviceCaches {
-		snmpTopologyRegistry.unregister(cache)
+		c.topologyRegistry.unregister(cache)
 		delete(c.deviceCaches, key)
 		delete(c.deviceLastCollected, key)
 	}
@@ -328,7 +335,7 @@ func (c *Collector) getOrCreateDeviceCache(key string) *topologyCache {
 	if !ok {
 		cache = newTopologyCache()
 		c.deviceCaches[key] = cache
-		snmpTopologyRegistry.register(cache)
+		c.topologyRegistry.register(cache)
 	}
 	return cache
 }
@@ -345,7 +352,7 @@ func (c *Collector) newDeviceCollectionCache(dev ddsnmp.DeviceConnectionInfo) *t
 func (c *Collector) pruneStaleDeviceCaches(seen map[string]bool) {
 	for key, cache := range c.deviceCaches {
 		if !seen[key] {
-			snmpTopologyRegistry.unregister(cache)
+			c.topologyRegistry.unregister(cache)
 			delete(c.deviceCaches, key)
 			delete(c.deviceLastCollected, key)
 		}
@@ -428,5 +435,12 @@ func topologyMethods() []funcapi.MethodConfig {
 }
 
 func topologyFunctionHandler(job collectorapi.RuntimeJob) funcapi.MethodHandler {
-	return &funcTopology{}
+	if job == nil {
+		return nil
+	}
+	coll, ok := job.Collector().(*Collector)
+	if !ok || coll == nil {
+		return nil
+	}
+	return &funcTopology{registry: coll.topologyRegistry}
 }

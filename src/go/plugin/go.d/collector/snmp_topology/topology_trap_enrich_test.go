@@ -3,7 +3,10 @@
 package snmptopology
 
 import (
+	"context"
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -86,14 +89,16 @@ func TestTopologyCacheTrapEnrichmentForSourceIncludesLocalDeviceIdentity(t *test
 	require.Equal(t, "vnode-node-id", enrich.SourceVnodeID)
 }
 
-func TestTrapEnrichmentForSourceUsesGlobalRegistry(t *testing.T) {
+func TestTrapEnrichmentForSourceUsesActiveRegistry(t *testing.T) {
+	registry := newTopologyRegistry()
+	publishTrapTopologyRegistryForTest(t, registry)
+
 	cache := newTopologyCache()
 	cache.localDevice.ManagementIP = "192.0.2.20"
 	cache.ifNamesByIndex["11"] = "Gi0/11"
 	cache.lldpRemotes["11:1"] = &lldpRemote{sysName: "dist-c"}
 
-	snmpTopologyRegistry.register(cache)
-	defer snmpTopologyRegistry.unregister(cache)
+	registry.register(cache)
 
 	enrich := TrapEnrichmentForSource("192.0.2.20", "11")
 	require.NotNil(t, enrich)
@@ -106,7 +111,10 @@ func TestTrapEnrichmentForSourceUsesGlobalRegistry(t *testing.T) {
 	require.Equal(t, "Gi0/11", mapped.Interface)
 }
 
-func TestTrapEnrichmentForSourceAmbiguousGlobalRegistryMatchDoesNotEnrich(t *testing.T) {
+func TestTrapEnrichmentForSourceAmbiguousActiveRegistryMatchDoesNotEnrich(t *testing.T) {
+	registry := newTopologyRegistry()
+	publishTrapTopologyRegistryForTest(t, registry)
+
 	cacheA := newTopologyCache()
 	cacheA.localDevice.ManagementIP = "192.0.2.20"
 	cacheA.ifNamesByIndex["11"] = "Gi0/11"
@@ -114,10 +122,8 @@ func TestTrapEnrichmentForSourceAmbiguousGlobalRegistryMatchDoesNotEnrich(t *tes
 	cacheB.localDevice.ManagementIP = "192.0.2.20"
 	cacheB.ifNamesByIndex["11"] = "Gi0/11"
 
-	snmpTopologyRegistry.register(cacheA)
-	snmpTopologyRegistry.register(cacheB)
-	defer snmpTopologyRegistry.unregister(cacheA)
-	defer snmpTopologyRegistry.unregister(cacheB)
+	registry.register(cacheA)
+	registry.register(cacheB)
 
 	enrich := TrapEnrichmentForSource("192.0.2.20", "11")
 	require.NotNil(t, enrich)
@@ -125,4 +131,66 @@ func TestTrapEnrichmentForSourceAmbiguousGlobalRegistryMatchDoesNotEnrich(t *tes
 	require.Equal(t, 2, enrich.DeviceMatches)
 	require.Empty(t, enrich.Interface)
 	require.Empty(t, enrich.Neighbors)
+}
+
+func TestCollectorRunPublishesAndClearsTrapTopologyRegistry(t *testing.T) {
+	previous := activeTrapTopologyRegistry.Swap(nil)
+	t.Cleanup(func() { activeTrapTopologyRegistry.Store(previous) })
+
+	coll := New()
+	coll.UpdateEvery = 3600
+	coll.registeredDevices = nil
+
+	ctx, cancel := context.WithCancel(context.Background())
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- coll.Run(ctx)
+	}()
+
+	stopped := false
+	stopRunner := func() error {
+		if stopped {
+			return nil
+		}
+		stopped = true
+		cancel()
+		select {
+		case err := <-errCh:
+			return err
+		case <-time.After(time.Second):
+			return errors.New("runner did not stop")
+		}
+	}
+	defer func() {
+		require.NoError(t, stopRunner())
+	}()
+
+	require.Eventually(t, func() bool {
+		return activeTrapTopologyRegistry.Load() == coll.topologyRegistry
+	}, time.Second, 10*time.Millisecond)
+
+	require.NoError(t, stopRunner())
+	require.Nil(t, activeTrapTopologyRegistry.Load())
+}
+
+func TestCollectorCleanupDoesNotClearNewerTrapTopologyRegistry(t *testing.T) {
+	previous := activeTrapTopologyRegistry.Swap(nil)
+	t.Cleanup(func() { activeTrapTopologyRegistry.Store(previous) })
+
+	oldColl := New()
+	newColl := New()
+	activeTrapTopologyRegistry.Store(newColl.topologyRegistry)
+
+	oldColl.Cleanup(context.Background())
+
+	require.Same(t, newColl.topologyRegistry, activeTrapTopologyRegistry.Load())
+}
+
+func publishTrapTopologyRegistryForTest(t *testing.T, registry *topologyRegistry) {
+	t.Helper()
+
+	previous := activeTrapTopologyRegistry.Swap(registry)
+	t.Cleanup(func() {
+		activeTrapTopologyRegistry.CompareAndSwap(registry, previous)
+	})
 }
