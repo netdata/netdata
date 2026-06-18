@@ -734,7 +734,7 @@ volumes:
 
 After starting the container, edit `health_alarm_notify.conf` as described in step 2 above.
 
-For more details on email notification configuration, see the [email notification documentation](https://github.com/netdata/netdata/blob/master/src/health/notifications/email/README.md).
+For more details on email notification configuration, see the [email notification documentation](/src/health/notifications/email/README.md).
 
 ## Adding extra packages at runtime
 
