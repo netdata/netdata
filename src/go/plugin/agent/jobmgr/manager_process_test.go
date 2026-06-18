@@ -121,6 +121,88 @@ func TestRunNotifyRunningJobs_TickOutsideLock(t *testing.T) {
 	}
 }
 
+func TestManagerAddConfigSingleInstancePolicy(t *testing.T) {
+	tests := map[string]struct {
+		run func(t *testing.T, mgr *Manager)
+	}{
+		"non-canonical config is rejected before exposure": {
+			run: func(t *testing.T, mgr *Manager) {
+				cfg := prepareUserCfg("single", "custom")
+
+				mgr.addConfig(cfg)
+
+				assert.Equal(t, 0, mgr.collectorSeen.Count())
+				_, exposed := mgr.collectorExposed.LookupByKey(cfg.FullName())
+				assert.False(t, exposed)
+			},
+		},
+		"defaulted empty name is accepted as canonical": {
+			run: func(t *testing.T, mgr *Manager) {
+				cfg := prepareUserCfg("single", "")
+				cfg.ApplyDefaults(confgroup.Default{})
+
+				mgr.addConfig(cfg)
+
+				entry, ok := mgr.collectorExposed.LookupByKey("single")
+				require.True(t, ok)
+				assert.Equal(t, "single", entry.Cfg.Name())
+			},
+		},
+		"canonical higher-priority config replaces lower-priority config": {
+			run: func(t *testing.T, mgr *Manager) {
+				stockCfg := prepareStockCfg("single", "single")
+				userCfg := prepareUserCfg("single", "single")
+
+				mgr.addConfig(stockCfg)
+				entry, ok := mgr.collectorExposed.LookupByKey("single")
+				require.True(t, ok)
+				assert.Equal(t, confgroup.TypeStock, entry.Cfg.SourceType())
+
+				mgr.addConfig(userCfg)
+				entry, ok = mgr.collectorExposed.LookupByKey("single")
+				require.True(t, ok)
+				assert.Equal(t, confgroup.TypeUser, entry.Cfg.SourceType())
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			mgr := New(Config{PluginName: testPluginName})
+			mgr.modules = collectorapi.Registry{
+				"single": {
+					InstancePolicy: collectorapi.InstancePolicySingle,
+					Create:         func() collectorapi.CollectorV1 { return &collectorapi.MockCollectorV1{} },
+				},
+			}
+
+			tc.run(t, mgr)
+		})
+	}
+}
+
+func TestManagerAddConfigSingleInstancePolicyPublishesDyncfgSingle(t *testing.T) {
+	var buf bytes.Buffer
+	mgr := New(Config{
+		PluginName: testPluginName,
+		Out:        &buf,
+		Modules: collectorapi.Registry{
+			"single": {
+				InstancePolicy: collectorapi.InstancePolicySingle,
+				Create:         func() collectorapi.CollectorV1 { return &collectorapi.MockCollectorV1{} },
+			},
+		},
+	})
+
+	cfg := prepareUserCfg("single", "single")
+	mgr.addConfig(cfg)
+
+	out := buf.String()
+	assert.Contains(t, out, "CONFIG "+mgr.dyncfgModID("single")+" create accepted single /collectors/"+testPluginName+"/Jobs")
+	assert.Contains(t, out, "'schema get enable disable update restart test userconfig'")
+	assert.NotContains(t, out, " remove")
+}
+
 func TestRun_DoesNotRegisterModuleMethodsBeforeAnyJobStarts(t *testing.T) {
 	fnReg := &recordingFunctionRegistry{}
 	mgr := New(Config{PluginName: testPluginName, FnReg: fnReg})
@@ -279,6 +361,48 @@ func TestRun_PublishesVnodesAndSecretstoresBeforeCollectorTemplates(t *testing.T
 	require.NotEqual(t, -1, collectorIdx, "collector template publication not found")
 	assert.Less(t, vnodeIdx, collectorIdx, "vnode publication must happen before collector template publication")
 	assert.Less(t, secretIdx, collectorIdx, "secretstore publication must happen before collector template publication")
+}
+
+func TestRun_DoesNotPublishCollectorTemplateForSingleInstanceModules(t *testing.T) {
+	var buf bytes.Buffer
+
+	mgr := New(Config{
+		PluginName: testPluginName,
+		Out:        &buf,
+		Modules: collectorapi.Registry{
+			"single": collectorapi.Creator{
+				InstancePolicy: collectorapi.InstancePolicySingle,
+			},
+			"perjob": collectorapi.Creator{},
+		},
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	in := make(chan []*confgroup.Group)
+	done := make(chan struct{})
+	go func() {
+		mgr.Run(ctx, in)
+		close(done)
+	}()
+
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second)
+	defer waitCancel()
+	require.True(t, mgr.WaitStarted(waitCtx), "manager did not report started")
+
+	cancel()
+	close(in)
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("manager did not stop after cancel")
+	}
+
+	output := buf.String()
+	assert.Contains(t, output, "CONFIG "+mgr.dyncfgModID("perjob")+" create accepted template /collectors/"+testPluginName+"/Jobs")
+	assert.NotContains(t, output, "CONFIG "+mgr.dyncfgModID("single")+" create accepted template /collectors/"+testPluginName+"/Jobs")
 }
 
 type lockProbeJob struct {

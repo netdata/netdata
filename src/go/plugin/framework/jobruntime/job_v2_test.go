@@ -775,11 +775,63 @@ END`, chartengine.Priority, chartengine.Priority))
 				assert.Equal(t, 0, collectCalls)
 			},
 		},
+		"function-only autodetection check failure cleans up": {
+			run: func(t *testing.T) {
+				cleanupCalls := 0
+				mod := &mockModuleV2{
+					checkFunc: func(context.Context) error {
+						return errors.New("check failed")
+					},
+					cleanupFunc: func(context.Context) {
+						cleanupCalls++
+					},
+				}
+				job := NewJobV2(JobV2Config{
+					PluginName:      pluginName,
+					Name:            jobName,
+					ModuleName:      modName,
+					FullName:        modName + "_" + jobName,
+					Module:          mod,
+					Out:             &bytes.Buffer{},
+					UpdateEvery:     1,
+					AutoDetectEvery: 1,
+					FunctionOnly:    true,
+				})
+
+				require.Error(t, job.AutoDetection())
+				assert.True(t, mod.cleaned)
+				assert.Equal(t, 1, cleanupCalls)
+			},
+		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, tc.run)
 	}
+}
+
+func TestJobV2_CleanupCanBeCalledRepeatedly(t *testing.T) {
+	cleanupCalls := 0
+	mod := &mockModuleV2{
+		cleanupFunc: func(context.Context) {
+			cleanupCalls++
+		},
+	}
+	job := NewJobV2(JobV2Config{
+		PluginName: pluginName,
+		Name:       jobName,
+		ModuleName: modName,
+		FullName:   modName + "_" + jobName,
+		Module:     mod,
+		Out:        &bytes.Buffer{},
+	})
+
+	assert.NotPanics(t, func() {
+		job.Cleanup()
+		job.Cleanup()
+	})
+	assert.Equal(t, 2, cleanupCalls)
+	assert.True(t, mod.cleaned)
 }
 
 func TestJobV2_StartMarksNotRunningBeforeCleanup(t *testing.T) {

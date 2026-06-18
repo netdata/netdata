@@ -146,16 +146,7 @@ func New(cfg Config) *Manager {
 		Path:                    fmt.Sprintf(dyncfgCollectorPath, cfg.PluginName),
 		EnableFailCode:          200,
 		RemoveStockOnEnableFail: true,
-		JobCommands: []dyncfg.Command{
-			dyncfg.CommandSchema,
-			dyncfg.CommandGet,
-			dyncfg.CommandEnable,
-			dyncfg.CommandDisable,
-			dyncfg.CommandUpdate,
-			dyncfg.CommandRestart,
-			dyncfg.CommandTest,
-			dyncfg.CommandUserconfig,
-		},
+		ConfigCommands:          dyncfgCollectorConfigCmds(),
 	})
 	mgr.vnodesCtl = vnodectl.New(vnodectl.Options{
 		Logger:           mgr.Logger,
@@ -262,7 +253,10 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 	m.secretsCtl.PublishExisting()
 
 	m.fnReg.RegisterPrefix("config", m.dyncfgCollectorPrefixValue(), dyncfg.WrapHandler(m.dyncfgConfig))
-	for name := range m.modules {
+	for name, creator := range m.modules {
+		if creator.InstancePolicy == collectorapi.InstancePolicySingle {
+			continue
+		}
 		m.dyncfgCollectorModuleCreate(name)
 	}
 	m.funcCtl.RegisterModules(m.modules)
@@ -356,7 +350,12 @@ func (m *Manager) run() {
 }
 
 func (m *Manager) addConfig(cfg confgroup.Config) {
-	if _, ok := m.modules.Lookup(cfg.Module()); !ok {
+	creator, ok := m.modules.Lookup(cfg.Module())
+	if !ok {
+		return
+	}
+	if err := validateCollectorConfigIdentity(cfg, creator); err != nil {
+		m.Warningf("ignoring %s[%s] config: %v", cfg.Module(), cfg.Name(), err)
 		return
 	}
 
@@ -380,10 +379,10 @@ func (m *Manager) addConfig(cfg confgroup.Config) {
 	}
 
 	m.syncSecretStoreDepsForConfig(entry.Cfg)
-	m.collectorHandler.NotifyJobCreate(entry.Cfg, entry.Status)
+	m.collectorHandler.NotifyConfigCreate(entry.Cfg, entry.Status)
 
 	if m.runModePolicy.AutoEnableDiscovered {
-		m.collectorHandler.CmdEnable(dyncfg.NewFunction(functions.Function{Args: []string{m.dyncfgJobID(entry.Cfg), "enable"}}))
+		m.collectorHandler.CmdEnable(dyncfg.NewFunction(functions.Function{Args: []string{m.dyncfgConfigID(entry.Cfg), "enable"}}))
 	} else {
 		m.collectorHandler.WaitForDecision(entry.Cfg)
 	}
@@ -402,7 +401,7 @@ func (m *Manager) removeConfig(cfg confgroup.Config) {
 	m.fileStatus.remove(cfg)
 
 	if !isStock(cfg) || entry.Status == dyncfg.StatusRunning {
-		m.collectorHandler.NotifyJobRemove(cfg)
+		m.collectorHandler.NotifyConfigRemove(cfg)
 	}
 }
 
