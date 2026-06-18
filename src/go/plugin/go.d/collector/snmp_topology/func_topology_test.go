@@ -70,13 +70,7 @@ func TestTopologyMethodConfigIncludesSelectors(t *testing.T) {
 }
 
 func TestFuncTopology_MethodParams(t *testing.T) {
-	prev := snmpTopologyRegistry
-	t.Cleanup(func() {
-		snmpTopologyRegistry = prev
-	})
-
 	registry := newTopologyRegistry()
-	snmpTopologyRegistry = registry
 	registry.register(newTestTopologyCacheLLDP(
 		"agent-test",
 		time.Now().UTC(),
@@ -90,7 +84,7 @@ func TestFuncTopology_MethodParams(t *testing.T) {
 		"Gi0/2",
 	))
 
-	f := &funcTopology{}
+	f := &funcTopology{registry: registry}
 
 	params, err := f.MethodParams(context.Background(), topologyMethodID)
 	require.NoError(t, err)
@@ -110,13 +104,7 @@ func TestFuncTopology_MethodParams(t *testing.T) {
 }
 
 func TestFuncTopology_Handle_DefaultStrictL2(t *testing.T) {
-	prev := snmpTopologyRegistry
-	t.Cleanup(func() {
-		snmpTopologyRegistry = prev
-	})
-
 	registry := newTopologyRegistry()
-	snmpTopologyRegistry = registry
 	registry.register(newTestTopologyCacheLLDP(
 		"agent-test",
 		time.Now().UTC(),
@@ -130,7 +118,7 @@ func TestFuncTopology_Handle_DefaultStrictL2(t *testing.T) {
 		"Gi0/2",
 	))
 
-	f := &funcTopology{}
+	f := &funcTopology{registry: registry}
 	resp := f.Handle(context.Background(), topologyMethodID, nil)
 	require.NotNil(t, resp)
 	assert.Equal(t, 200, resp.Status)
@@ -150,13 +138,7 @@ func TestFuncTopology_Handle_DefaultStrictL2(t *testing.T) {
 }
 
 func TestFuncTopology_Handle_AcceptsSelectorParams(t *testing.T) {
-	prev := snmpTopologyRegistry
-	t.Cleanup(func() {
-		snmpTopologyRegistry = prev
-	})
-
 	registry := newTopologyRegistry()
-	snmpTopologyRegistry = registry
 	registry.register(newTestTopologyCacheLLDP(
 		"agent-test",
 		time.Now().UTC(),
@@ -170,7 +152,7 @@ func TestFuncTopology_Handle_AcceptsSelectorParams(t *testing.T) {
 		"Gi0/2",
 	))
 
-	f := &funcTopology{}
+	f := &funcTopology{registry: registry}
 	cfg := []funcapi.ParamConfig{
 		topologyNodesIdentityParamConfig(),
 		topologyMapTypeParamConfig(),
@@ -197,13 +179,7 @@ func TestFuncTopology_Handle_AcceptsSelectorParams(t *testing.T) {
 }
 
 func TestFuncTopology_Handle_UnknownSelectorsFallbackToDefaults(t *testing.T) {
-	prev := snmpTopologyRegistry
-	t.Cleanup(func() {
-		snmpTopologyRegistry = prev
-	})
-
 	registry := newTopologyRegistry()
-	snmpTopologyRegistry = registry
 	registry.register(newTestTopologyCacheLLDP(
 		"agent-test",
 		time.Now().UTC(),
@@ -217,7 +193,7 @@ func TestFuncTopology_Handle_UnknownSelectorsFallbackToDefaults(t *testing.T) {
 		"Gi0/2",
 	))
 
-	f := &funcTopology{}
+	f := &funcTopology{registry: registry}
 	cfg := []funcapi.ParamConfig{
 		topologyNodesIdentityParamConfig(),
 		topologyMapTypeParamConfig(),

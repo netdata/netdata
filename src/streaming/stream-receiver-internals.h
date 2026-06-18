@@ -74,6 +74,7 @@ struct receiver_state {
 
         nd_poll_event_t wanted;
         usec_t last_traffic_ut;
+        size_t bytes_received;          // raw socket bytes received on this connection (diagnostics)
         struct pollfd_meta meta;
     } thread;
 

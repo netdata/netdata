@@ -278,10 +278,19 @@ type deviceEnrichment struct {
 	matches        int
 }
 
-var trapTopologyEnrichmentForSource = snmptopology.TrapEnrichmentForSource
+type deviceLookup interface {
+	DevicesByHostname(hostname string) []ddsnmp.DeviceConnectionInfo
+}
 
-func resolveDeviceEnrichment(sourceIP string) deviceEnrichment {
-	devices := ddsnmp.DeviceRegistry.DevicesByHostname(sourceIP)
+type trapTopologyEnricher interface {
+	EnrichmentForSource(ip, trapIfIndex string) *snmptopology.TrapTopologyEnrichment
+}
+
+func (c *Collector) resolveDeviceEnrichment(sourceIP string) deviceEnrichment {
+	if c == nil || c.deviceLookup == nil {
+		return deviceEnrichment{}
+	}
+	devices := c.deviceLookup.DevicesByHostname(sourceIP)
 	enrich := deviceEnrichment{matches: len(devices)}
 	if len(devices) != 1 {
 		return enrich
@@ -305,7 +314,7 @@ func resolveDeviceEnrichment(sourceIP string) deviceEnrichment {
 	return enrich
 }
 
-func enrichTrapEntry(entry *TrapEntry, useReverseDNS bool, dns *reverseDNSResolver) {
+func (c *Collector) enrichTrapEntry(entry *TrapEntry, useReverseDNS bool, dns *reverseDNSResolver) {
 	if entry == nil {
 		return
 	}
@@ -324,7 +333,7 @@ func enrichTrapEntry(entry *TrapEntry, useReverseDNS bool, dns *reverseDNSResolv
 		audit.Source = &TrapSourceAudit{Selected: sourceIP, Method: "entry_source"}
 	}
 
-	enrich := resolveDeviceEnrichment(sourceIP)
+	enrich := c.resolveDeviceEnrichment(sourceIP)
 	audit.Registry = &TrapEnrichmentLookup{
 		Key:     sourceIP,
 		Status:  lookupStatus(enrich.matches),
@@ -364,7 +373,10 @@ func enrichTrapEntry(entry *TrapEntry, useReverseDNS bool, dns *reverseDNSResolv
 		addTrapEnrichmentApplied(audit, "TRAP_INTERFACE", iface)
 	}
 
-	topo := trapTopologyEnrichmentForSource(sourceIP, trapIfIndex)
+	var topo *snmptopology.TrapTopologyEnrichment
+	if c != nil && c.topologyEnricher != nil {
+		topo = c.topologyEnricher.EnrichmentForSource(sourceIP, trapIfIndex)
+	}
 	topologyTrusted := topo != nil && topo.DeviceStatus == "matched"
 	if topo != nil {
 		audit.Topology = &TrapEnrichmentLookup{

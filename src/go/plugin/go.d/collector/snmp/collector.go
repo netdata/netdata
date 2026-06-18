@@ -23,20 +23,32 @@ import (
 //go:embed "config_schema.json"
 var configSchema string
 
-func init() {
-	collectorapi.Register("snmp", collectorapi.Creator{
+// Register registers the SNMP collector with its shared SNMP-family device store.
+func Register(store *ddsnmp.DeviceStore) {
+	collectorapi.Register("snmp", newCreator(store))
+}
+
+func newCreator(store *ddsnmp.DeviceStore) collectorapi.Creator {
+	if store == nil {
+		panic("snmp Register requires a non-nil device store")
+	}
+	return collectorapi.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 10,
 		},
-		Create:        func() collectorapi.CollectorV1 { return New() },
+		Create:        func() collectorapi.CollectorV1 { return New(store) },
 		Config:        func() any { return &Config{} },
 		Methods:       snmpMethods,
 		MethodHandler: snmpFunctionHandler,
-	})
+	}
 }
 
-func New() *Collector {
+// New returns an SNMP collector using the provided SNMP-family device store.
+func New(store *ddsnmp.DeviceStore) *Collector {
+	if store == nil {
+		panic("snmp New requires a non-nil device store")
+	}
 	c := &Collector{
 		Config: Config{
 			CreateVnode:              true,
@@ -70,6 +82,7 @@ func New() *Collector {
 		seenScalarMetrics: make(map[string]bool),
 		seenTableMetrics:  make(map[string]bool),
 		seenProfiles:      make(map[string]bool),
+		deviceStore:       store,
 
 		ifaceCache: newIfaceCache(),
 		licensing:  newLicensingIntegration(),
@@ -98,6 +111,7 @@ type (
 		seenScalarMetrics map[string]bool
 		seenTableMetrics  map[string]bool
 		seenProfiles      map[string]bool
+		deviceStore       *ddsnmp.DeviceStore
 
 		ifaceCache *ifaceCache // interface metrics cache for functions
 		licensing  *licensingIntegration
@@ -193,7 +207,9 @@ func (c *Collector) Cleanup(ctx context.Context) {
 	if c.funcRouter != nil {
 		c.funcRouter.Cleanup(ctx)
 	}
-	ddsnmp.DeviceRegistry.Unregister(c.deviceRegistryKey())
+	if c.deviceStore != nil {
+		c.deviceStore.Unregister(c.deviceStoreKey())
+	}
 	if c.snmpClient != nil {
 		_ = c.snmpClient.Close()
 	}

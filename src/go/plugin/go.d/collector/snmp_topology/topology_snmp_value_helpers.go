@@ -29,10 +29,3 @@ func parseIndex(value string) int {
 	}
 	return v
 }
-
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}

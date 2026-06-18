@@ -42,14 +42,17 @@ func (c *Collector) vnodeLabels() map[string]string {
 	return nil
 }
 
-func (c *Collector) deviceRegistryKey() string {
+func (c *Collector) deviceStoreKey() string {
 	return fmt.Sprintf("%p:%s:%d", c, c.Hostname, c.Options.Port)
 }
 
-// registerDeviceForTopology exposes the already-configured SNMP job to the
-// snmp_topology collector without duplicating job configuration.
-func (c *Collector) registerDeviceForTopology(si *snmputils.SysInfo) {
-	ddsnmp.DeviceRegistry.Register(c.deviceRegistryKey(), ddsnmp.DeviceConnectionInfo{
+// registerDeviceState exposes the already-configured SNMP job to SNMP-family
+// consumers without duplicating job configuration.
+func (c *Collector) registerDeviceState(si *snmputils.SysInfo) {
+	if c.deviceStore == nil {
+		return
+	}
+	c.deviceStore.Register(c.deviceStoreKey(), ddsnmp.DeviceConnectionInfo{
 		Hostname:        c.Hostname,
 		Port:            c.Options.Port,
 		SNMPVersion:     c.Options.Version,

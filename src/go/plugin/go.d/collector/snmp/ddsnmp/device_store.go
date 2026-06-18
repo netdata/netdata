@@ -11,7 +11,7 @@ import (
 )
 
 // DeviceConnectionInfo holds SNMP connection parameters for a device.
-// Registered by SNMP collector jobs, consumed by the topology collector.
+// Registered by SNMP collector jobs, consumed by SNMP-family modules.
 type DeviceConnectionInfo struct {
 	Hostname        string
 	Port            int
@@ -45,79 +45,70 @@ type DeviceConnectionInfo struct {
 	VnodeLabels   map[string]string
 }
 
-// DeviceRegistry is a global registry where SNMP jobs register their connection
-// info so the topology collector can discover which devices to poll.
-var DeviceRegistry = &deviceRegistry{
-	devices:    make(map[string]DeviceConnectionInfo),
-	byHostname: make(map[string]map[string]struct{}),
+// NewDeviceStore returns an empty SNMP device connection-state store.
+func NewDeviceStore() *DeviceStore {
+	return &DeviceStore{
+		devices:    make(map[string]DeviceConnectionInfo),
+		byHostname: make(map[string]map[string]struct{}),
+	}
 }
 
-type deviceRegistry struct {
+// DeviceStore holds SNMP device connection state shared between SNMP-family modules.
+type DeviceStore struct {
 	mu         sync.RWMutex
 	devices    map[string]DeviceConnectionInfo
 	byHostname map[string]map[string]struct{}
 }
 
-// Register adds or updates a device in the registry.
+// Register adds or updates a device in the store.
 // Reference types are deep-copied to prevent data races with the caller.
-func (r *deviceRegistry) Register(key string, info DeviceConnectionInfo) {
-	r.mu.Lock()
-	r.ensureMapsLocked()
-	if old, ok := r.devices[key]; ok {
-		r.removeHostnameIndexLocked(key, old.Hostname)
+func (s *DeviceStore) Register(key string, info DeviceConnectionInfo) {
+	s.mu.Lock()
+	s.ensureMapsLocked()
+	if old, ok := s.devices[key]; ok {
+		s.removeHostnameIndexLocked(key, old.Hostname)
 	}
-	r.devices[key] = cloneDeviceConnectionInfo(info)
-	r.addHostnameIndexLocked(key, info.Hostname)
-	r.mu.Unlock()
+	s.devices[key] = cloneDeviceConnectionInfo(info)
+	s.addHostnameIndexLocked(key, info.Hostname)
+	s.mu.Unlock()
 }
 
-// Unregister removes a device from the registry.
-func (r *deviceRegistry) Unregister(key string) {
-	r.mu.Lock()
-	if old, ok := r.devices[key]; ok {
-		r.removeHostnameIndexLocked(key, old.Hostname)
+// Unregister removes a device from the store.
+func (s *DeviceStore) Unregister(key string) {
+	s.mu.Lock()
+	if old, ok := s.devices[key]; ok {
+		s.removeHostnameIndexLocked(key, old.Hostname)
 	}
-	delete(r.devices, key)
-	r.mu.Unlock()
+	delete(s.devices, key)
+	s.mu.Unlock()
 }
 
 // Devices returns a deep-copied snapshot of all registered devices.
-func (r *deviceRegistry) Devices() []DeviceConnectionInfo {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+func (s *DeviceStore) Devices() []DeviceConnectionInfo {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
-	devices := make([]DeviceConnectionInfo, 0, len(r.devices))
-	for _, info := range r.devices {
+	devices := make([]DeviceConnectionInfo, 0, len(s.devices))
+	for _, info := range s.devices {
 		devices = append(devices, cloneDeviceConnectionInfo(info))
 	}
 	return devices
 }
 
-// DeviceByHostname returns a deep-copied registered device whose configured
-// hostname matches the provided value. IP literals are normalized before
-// comparison; DNS names are matched case-insensitively.
-func (r *deviceRegistry) DeviceByHostname(hostname string) (DeviceConnectionInfo, bool) {
-	devices := r.DevicesByHostname(hostname)
-	if len(devices) == 0 {
-		return DeviceConnectionInfo{}, false
-	}
-	return devices[0], true
-}
-
 // DevicesByHostname returns all deep-copied registered devices whose configured
 // hostname matches the provided value. IP literals are normalized before
 // comparison; DNS names are matched case-insensitively.
-func (r *deviceRegistry) DevicesByHostname(hostname string) []DeviceConnectionInfo {
+func (s *DeviceStore) DevicesByHostname(hostname string) []DeviceConnectionInfo {
 	hostnameKey := deviceHostnameIndexKey(hostname)
 	if hostnameKey == "" {
 		return nil
 	}
 
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
-	if r.byHostname != nil {
-		keySet := r.byHostname[hostnameKey]
+	if s.byHostname != nil {
+		keySet := s.byHostname[hostnameKey]
 		if len(keySet) == 0 {
 			return nil
 		}
@@ -129,7 +120,7 @@ func (r *deviceRegistry) DevicesByHostname(hostname string) []DeviceConnectionIn
 
 		devices := make([]DeviceConnectionInfo, 0, len(keys))
 		for _, key := range keys {
-			info, ok := r.devices[key]
+			info, ok := s.devices[key]
 			if ok {
 				devices = append(devices, cloneDeviceConnectionInfo(info))
 			}
@@ -138,19 +129,12 @@ func (r *deviceRegistry) DevicesByHostname(hostname string) []DeviceConnectionIn
 	}
 
 	devices := make([]DeviceConnectionInfo, 0, 1)
-	for _, info := range r.devices {
+	for _, info := range s.devices {
 		if deviceHostnameIndexKey(info.Hostname) == hostnameKey {
 			devices = append(devices, cloneDeviceConnectionInfo(info))
 		}
 	}
 	return devices
-}
-
-// Len returns the number of registered devices.
-func (r *deviceRegistry) Len() int {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	return len(r.devices)
 }
 
 func cloneDeviceConnectionInfo(info DeviceConnectionInfo) DeviceConnectionInfo {
@@ -166,46 +150,46 @@ func cloneDeviceConnectionInfo(info DeviceConnectionInfo) DeviceConnectionInfo {
 	return dev
 }
 
-func (r *deviceRegistry) ensureMapsLocked() {
-	if r.devices == nil {
-		r.devices = make(map[string]DeviceConnectionInfo)
+func (s *DeviceStore) ensureMapsLocked() {
+	if s.devices == nil {
+		s.devices = make(map[string]DeviceConnectionInfo)
 	}
-	if r.byHostname == nil {
-		r.byHostname = make(map[string]map[string]struct{})
-		for key, info := range r.devices {
-			r.addHostnameIndexLocked(key, info.Hostname)
+	if s.byHostname == nil {
+		s.byHostname = make(map[string]map[string]struct{})
+		for key, info := range s.devices {
+			s.addHostnameIndexLocked(key, info.Hostname)
 		}
 	}
 }
 
-func (r *deviceRegistry) addHostnameIndexLocked(key, hostname string) {
+func (s *DeviceStore) addHostnameIndexLocked(key, hostname string) {
 	hostnameKey := deviceHostnameIndexKey(hostname)
 	if hostnameKey == "" {
 		return
 	}
-	if r.byHostname == nil {
-		r.byHostname = make(map[string]map[string]struct{})
+	if s.byHostname == nil {
+		s.byHostname = make(map[string]map[string]struct{})
 	}
-	keySet := r.byHostname[hostnameKey]
+	keySet := s.byHostname[hostnameKey]
 	if keySet == nil {
 		keySet = make(map[string]struct{})
-		r.byHostname[hostnameKey] = keySet
+		s.byHostname[hostnameKey] = keySet
 	}
 	keySet[key] = struct{}{}
 }
 
-func (r *deviceRegistry) removeHostnameIndexLocked(key, hostname string) {
+func (s *DeviceStore) removeHostnameIndexLocked(key, hostname string) {
 	hostnameKey := deviceHostnameIndexKey(hostname)
-	if hostnameKey == "" || r.byHostname == nil {
+	if hostnameKey == "" || s.byHostname == nil {
 		return
 	}
-	keySet := r.byHostname[hostnameKey]
+	keySet := s.byHostname[hostnameKey]
 	if keySet == nil {
 		return
 	}
 	delete(keySet, key)
 	if len(keySet) == 0 {
-		delete(r.byHostname, hostnameKey)
+		delete(s.byHostname, hostnameKey)
 	}
 }
 

@@ -66,7 +66,13 @@ type (
 		// If Methods is non-nil, this module provides functions
 		Methods func() []funcapi.MethodConfig
 
-		// Optional: MethodHandler returns a handler for method requests on a specific job.
+		// Optional: MethodHandler returns a handler for method requests.
+		// AgentWide module methods are dispatched with nil job, except that
+		// single-instance collectors receive their running canonical job.
+		// Job-bound module methods and JobMethods are dispatched with the
+		// selected running job.
+		// When the canonical single-instance job is not running, dispatch returns
+		// unavailable before calling MethodHandler.
 		// The handler implements funcapi.MethodHandler interface with:
 		// - MethodParams(ctx, method) for dynamic params
 		// - Handle(ctx, method, params) for request handling

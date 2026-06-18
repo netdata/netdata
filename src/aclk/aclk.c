@@ -1128,8 +1128,9 @@ char *aclk_state(void)
     }
 
     if (aclk_is_online) {
-        buffer_sprintf(wb, "Received Cloud MQTT Messages: %d\nMQTT Messages Confirmed by Remote Broker (PUBACKs): %d\nPending PUBACKS: %d\n",
-                       aclk_rcvd_cloud_msgs, aclk_pubacks_per_conn, aclk_stats.mqtt.packets_waiting_puback);
+        buffer_sprintf(wb, "Received Cloud MQTT Messages: %d\nMQTT Messages Confirmed by Remote Broker (PUBACKs): %d\nPending PUBACKS: %d\nServer Receive Maximum: %u\n",
+                       aclk_rcvd_cloud_msgs, aclk_pubacks_per_conn, aclk_stats.mqtt.packets_waiting_puback,
+                       (unsigned)aclk_stats.mqtt.rx_maximum);
 
         RRDHOST *host;
         rrd_rdlock();
@@ -1268,6 +1269,9 @@ char *aclk_state_json(void)
 
     tmp = json_object_new_int((int32_t) aclk_stats.mqtt.packets_waiting_puback);
     json_object_object_add(msg, "pending-mqtt-pubacks", tmp);
+
+    tmp = json_object_new_int((int32_t) aclk_stats.mqtt.rx_maximum);
+    json_object_object_add(msg, "server-receive-maximum", tmp);
 
     tmp = json_object_new_int(aclk_connection_counter > 0 ? (aclk_connection_counter - 1) : 0);
     json_object_object_add(msg, "reconnect-count", tmp);

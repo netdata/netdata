@@ -7,9 +7,14 @@ import "github.com/netdata/netdata/go/plugins/pkg/funcapi"
 // Compile-time interface check.
 var _ funcapi.MethodHandler = (*funcTopology)(nil)
 
-type funcTopology struct{}
+type funcTopology struct {
+	registry *topologyRegistry
+}
 
-const topologyMethodID = "topology:snmp"
+const (
+	topologyFunctionName = "snmp:topology:snmp"
+	topologyMethodID     = "topology:snmp"
+)
 
 const (
 	topologyParamNodesIdentity      = "nodes_identity"

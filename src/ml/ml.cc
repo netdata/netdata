@@ -346,7 +346,7 @@ const char *db_models_delete =
 
 const char *db_models_prune =
     "DELETE FROM models "
-    "WHERE after < @after LIMIT @n;";
+    "WHERE rowid IN (SELECT rowid FROM models WHERE after < @after LIMIT @n);";
 
 static int
 ml_dimension_add_model(const nd_uuid_t *metric_uuid, const ml_kmeans_inlined_t *inlined_km)

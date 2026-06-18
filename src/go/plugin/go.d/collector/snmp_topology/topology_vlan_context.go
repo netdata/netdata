@@ -3,11 +3,16 @@
 package snmptopology
 
 import (
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
 
-func (c *Collector) collectTopologyVTPVLANContexts(dev ddsnmp.DeviceConnectionInfo) {
+func (c *Collector) collectTopologyVTPVLANContexts(ctx context.Context, dev ddsnmp.DeviceConnectionInfo) {
 	if c.topologyCache == nil {
+		return
+	}
+	if ctx.Err() != nil {
 		return
 	}
 
@@ -23,8 +28,15 @@ func (c *Collector) collectTopologyVTPVLANContexts(dev ddsnmp.DeviceConnectionIn
 	}
 
 	for _, context := range contexts {
-		pms, err := collectTopologyVLANContext(c, dev, context.vlanID, profiles)
+		if ctx.Err() != nil {
+			return
+		}
+
+		pms, err := collectTopologyVLANContext(ctx, c, dev, context.vlanID, profiles)
 		if err != nil {
+			if ctx.Err() != nil {
+				return
+			}
 			c.Warningf("device '%s': topology vlan-context polling failed for vlan %s: %v", dev.Hostname, context.vlanID, err)
 			continue
 		}
