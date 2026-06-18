@@ -26,7 +26,7 @@ We recommend **Windows 7 / Server 2008 R2 or newer (64-bit)** as the practical m
 
 Windows Server 2008 (pre-R2) shares the **Windows Vista / NT 6.0** kernel, which is the lowest baseline the manifest targets, so the Agent **may run** on it. It is **not a tested or supported target**:
 
-- Microsoft ended extended support for Windows Server 2008 and 2008 R2 (extended support ended January 14, 2020; Extended Security Updates ended January 9, 2024).
+- Microsoft ended extended support for Windows Server 2008 and 2008 R2 on January 14, 2020; Extended Security Updates (ESU) ended January 2023 for on-premises deployments (extended through January 9, 2024 only for Azure-hosted instances).
 - On Windows Server versions earlier than 2019, the automated MSI-download commands in this guide can fail due to TLS compatibility — use the [Graphical Installation (GUI)](#graphical-installation-gui) or a [pre-downloaded MSI](#offline-air-gapped-installation) instead (see also [Silent Installation](#silent-installation-command-line)).
 
 For the best experience, use **Windows Server 2008 R2 or newer**.
