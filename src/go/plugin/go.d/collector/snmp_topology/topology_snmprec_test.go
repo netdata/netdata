@@ -43,34 +43,34 @@ func TestTopologyCache_RealSnmprecFixtures(t *testing.T) {
 				t.Skip("no LLDP/CDP data detected")
 			}
 
-			coll := newTestCollector(ddsnmp.DeviceConnectionInfo{
+			cache := newTestTopologyCache(ddsnmp.DeviceConnectionInfo{
 				Hostname: "192.0.2.10", SysObjectID: "1.3.6.1.4.1.9.1.1", SysName: filepath.Base(path),
 			})
 
 			if len(data.lldpLocalMeta) > 0 {
-				coll.updateTopologyProfileTags([]*ddsnmp.ProfileMetrics{{DeviceMetadata: data.lldpLocalMeta}})
+				cache.updateTopologyProfileTags([]*ddsnmp.ProfileMetrics{{DeviceMetadata: data.lldpLocalMeta}})
 			}
 			for _, tags := range data.lldpLocPorts {
-				coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindLldpLocPort, Tags: tags})
+				cache.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindLldpLocPort, Tags: tags})
 			}
 			for _, tags := range data.lldpLocManAddrs {
-				coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindLldpLocManAddr, Tags: tags})
+				cache.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindLldpLocManAddr, Tags: tags})
 			}
 			for _, tags := range data.lldpRemotes {
-				coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindLldpRem, Tags: tags})
+				cache.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindLldpRem, Tags: tags})
 			}
 			for _, tags := range data.lldpRemManAddrs {
-				coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindLldpRemManAddr, Tags: tags})
+				cache.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindLldpRemManAddr, Tags: tags})
 			}
 			for _, tags := range data.cdpRemotes {
-				coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindCdpCache, Tags: tags})
+				cache.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindCdpCache, Tags: tags})
 			}
-			coll.finalizeTopologyCache()
+			cache.finalizeTopologyCache()
 
 			options := defaultTopologyQueryOptionsForTest()
 			options.CollapseActorsByIP = false
 			options.EliminateNonIPInferred = false
-			snapshot, ok := snapshotTopologyCacheForTestWithOptions(coll.topologyCache, options)
+			snapshot, ok := snapshotTopologyCacheForTestWithOptions(cache, options)
 
 			require.True(t, ok)
 			require.GreaterOrEqual(t, len(snapshot.Actors), 1)

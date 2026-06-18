@@ -65,26 +65,43 @@ func (c *topologyCache) hasFreshSnapshotAt(now time.Time) bool {
 	return true
 }
 
-func (c *Collector) finalizeTopologyCache() {
-	cache := c.topologyCache
+func (c *Collector) finalizeTopologyCache(cache *topologyCache) {
 	if cache == nil {
 		return
 	}
 
-	cache.mu.Lock()
-	cache.updateFDBDiagnostics()
-	droppedNoMAC := cache.fdbRowsDroppedNoMAC
-	unmappedPort := cache.fdbRowsUnmappedPort
-	agentID := cache.agentID
-	cache.lastUpdate = cache.updateTime
-	cache.mu.Unlock()
+	stats := cache.finalizeTopologyCache()
 
-	if droppedNoMAC > 0 {
-		c.Warningf("device '%s': dropped %d topology FDB row(s) with empty MAC", agentID, droppedNoMAC)
+	if stats.droppedNoMAC > 0 {
+		c.Warningf("device '%s': dropped %d topology FDB row(s) with empty MAC", stats.agentID, stats.droppedNoMAC)
 	}
-	if unmappedPort > 0 {
-		c.Warningf("device '%s': observed %d topology FDB row(s) with bridge ports missing ifIndex mapping", agentID, unmappedPort)
+	if stats.unmappedPort > 0 {
+		c.Warningf("device '%s': observed %d topology FDB row(s) with bridge ports missing ifIndex mapping", stats.agentID, stats.unmappedPort)
 	}
+}
+
+type topologyCacheFinalizeStats struct {
+	agentID      string
+	droppedNoMAC int
+	unmappedPort int
+}
+
+func (c *topologyCache) finalizeTopologyCache() topologyCacheFinalizeStats {
+	if c == nil {
+		return topologyCacheFinalizeStats{}
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.updateFDBDiagnostics()
+	stats := topologyCacheFinalizeStats{
+		agentID:      c.agentID,
+		droppedNoMAC: c.fdbRowsDroppedNoMAC,
+		unmappedPort: c.fdbRowsUnmappedPort,
+	}
+	c.lastUpdate = c.updateTime
+	return stats
 }
 
 func (c *topologyCache) updateFDBDiagnostics() {

@@ -80,7 +80,6 @@ type (
 
 		deviceCaches        map[string]*topologyCache // one cache per SNMP device
 		deviceLastCollected map[string]time.Time      // last collection time per device
-		topologyCache       *topologyCache            // current device cache (set during refreshDeviceTopology)
 		topologyRegistry    *topologyRegistry
 		deviceSource        deviceSource
 		trapEnrichment      *TrapEnrichmentHandle
@@ -321,17 +320,15 @@ func (c *Collector) refreshDeviceTopology(ctx context.Context, key string, dev d
 	// Build the next snapshot off-registry. Function readers keep seeing the
 	// previous complete snapshot until this collection is fully ingested.
 	next := c.newDeviceCollectionCache(dev)
-	c.topologyCache = next
-	defer func() { c.topologyCache = nil }()
 
-	c.updateTopologySysUptime(sysUptime)
-	c.updateTopologyProfileTags(pms)
-	c.ingestTopologyProfileMetrics(pms)
-	c.collectTopologyVTPVLANContexts(ctx, dev)
+	next.updateTopologySysUptime(sysUptime)
+	next.updateTopologyProfileTags(pms)
+	next.ingestTopologyProfileMetrics(pms)
+	c.collectTopologyVTPVLANContexts(ctx, next, dev)
 	if ctx.Err() != nil {
 		return false
 	}
-	c.finalizeTopologyCache()
+	c.finalizeTopologyCache(next)
 
 	cache := c.getOrCreateDeviceCache(key)
 	cache.mu.Lock()
@@ -395,18 +392,6 @@ func (c *Collector) getTopologyProfiles(dev ddsnmp.DeviceConnectionInfo) []*ddsn
 		return c.topologyProfiles(dev)
 	}
 	return c.findTopologyProfiles(dev)
-}
-
-func (c *Collector) ingestTopologyProfileMetrics(pms []*ddsnmp.ProfileMetrics) {
-	for _, pm := range pms {
-		c.ingestTopologyMetricSet(pm.TopologyMetrics)
-	}
-}
-
-func (c *Collector) ingestTopologyMetricSet(metrics []ddsnmp.Metric) {
-	for _, metric := range metrics {
-		c.updateTopologyCacheEntry(metric)
-	}
 }
 
 func newSNMPClientFromDeviceInfo(newClient func() gosnmp.Handler, dev ddsnmp.DeviceConnectionInfo) (gosnmp.Handler, error) {

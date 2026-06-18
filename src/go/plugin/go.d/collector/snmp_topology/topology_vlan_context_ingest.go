@@ -9,7 +9,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
 
-func (c *Collector) ingestTopologyVLANContextMetrics(vlanID, vlanName string, pms []*ddsnmp.ProfileMetrics) {
+func (c *topologyCache) ingestTopologyVLANContextMetrics(vlanID, vlanName string, pms []*ddsnmp.ProfileMetrics) {
+	if c == nil {
+		return
+	}
+
 	c.updateTopologyProfileTags(pms)
 
 	for _, pm := range pms {
