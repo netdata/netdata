@@ -9,11 +9,27 @@ import (
 )
 
 func TestEnsureTopologyObservationDeviceID_PrefersAgentScopedFallbacks(t *testing.T) {
-	require.Equal(t, "agent_job:job-1", ensureTopologyObservationDeviceID(topologyDevice{AgentJobID: "Job-1"}, ""))
-	require.Equal(t, "agent:11111111-1111-1111-1111-111111111111", ensureTopologyObservationDeviceID(topologyDevice{
-		NetdataHostID: "11111111-1111-1111-1111-111111111111",
-	}, ""))
-	require.Equal(t, "agent:22222222-2222-2222-2222-222222222222", ensureTopologyObservationDeviceID(topologyDevice{
-		AgentID: "22222222-2222-2222-2222-222222222222",
-	}, ""))
+	tests := map[string]struct {
+		device topologyDevice
+		want   string
+	}{
+		"agent-job-id": {
+			device: topologyDevice{AgentJobID: "Job-1"},
+			want:   "agent_job:job-1",
+		},
+		"netdata-host-id": {
+			device: topologyDevice{NetdataHostID: "11111111-1111-1111-1111-111111111111"},
+			want:   "agent:11111111-1111-1111-1111-111111111111",
+		},
+		"agent-id": {
+			device: topologyDevice{AgentID: "22222222-2222-2222-2222-222222222222"},
+			want:   "agent:22222222-2222-2222-2222-222222222222",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.want, ensureTopologyObservationDeviceID(tc.device, ""))
+		})
+	}
 }

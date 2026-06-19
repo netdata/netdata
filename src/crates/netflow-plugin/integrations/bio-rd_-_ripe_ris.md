@@ -88,9 +88,7 @@ rollup tiers do not carry them. Queries that need AS path or community data
 must run against a window that the raw retention still covers.
 
 
-This integration is only supported on the following platforms:
-
-- Linux
+This integration is supported on all platforms.
 
 This integration runs as a single instance per Netdata Agent.
 

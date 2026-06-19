@@ -14,7 +14,6 @@ import (
 	"github.com/gosnmp/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -25,33 +24,52 @@ import (
 //go:embed "config_schema.json"
 var configSchema string
 
-func init() {
-	collectorapi.Register("snmp_topology", collectorapi.Creator{
+// Register registers the SNMP topology collector with shared SNMP-family state.
+func Register(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentHandle) {
+	collectorapi.Register("snmp_topology", newCreator(deviceStore, trapEnrichment))
+}
+
+func newCreator(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentHandle) collectorapi.Creator {
+	if deviceStore == nil {
+		panic("snmp_topology Register requires a non-nil device store")
+	}
+	if trapEnrichment == nil {
+		panic("snmp_topology Register requires a non-nil trap enrichment handle")
+	}
+	return collectorapi.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 60,
 		},
-		CreateV2:       func() collectorapi.CollectorV2 { return New() },
+		CreateV2:       func() collectorapi.CollectorV2 { return New(deviceStore, trapEnrichment) },
 		Config:         func() any { return &Config{} },
 		InstancePolicy: collectorapi.InstancePolicySingle,
 		Methods:        topologyMethods,
 		MethodHandler:  topologyFunctionHandler,
-	})
+	}
 }
 
-func New() *Collector {
-	store := metrix.NewCollectorStore()
+// New returns an SNMP topology collector using the provided SNMP-family state.
+func New(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentHandle) *Collector {
+	if deviceStore == nil {
+		panic("snmp_topology New requires a non-nil device store")
+	}
+	if trapEnrichment == nil {
+		panic("snmp_topology New requires a non-nil trap enrichment handle")
+	}
+	metricStore := metrix.NewCollectorStore()
 	return &Collector{
 		deviceCaches:        make(map[string]*topologyCache),
 		deviceLastCollected: make(map[string]time.Time),
 		topologyRegistry:    newTopologyRegistry(),
-		registeredDevices:   ddsnmp.DeviceRegistry.Devices,
+		deviceSource:        deviceStore,
+		trapEnrichment:      trapEnrichment,
 		newSnmpClient:       gosnmp.NewHandler,
 		newDdSnmpColl: func(cfg ddsnmpcollector.Config) ddCollector {
 			return ddsnmpcollector.New(cfg)
 		},
-		store:   store,
-		metrics: newCollectorMetrics(store),
+		store:   metricStore,
+		metrics: newCollectorMetrics(metricStore),
 	}
 }
 
@@ -62,8 +80,9 @@ type (
 
 		deviceCaches        map[string]*topologyCache // one cache per SNMP device
 		deviceLastCollected map[string]time.Time      // last collection time per device
-		topologyCache       *topologyCache            // current device cache (set during refreshDeviceTopology)
 		topologyRegistry    *topologyRegistry
+		deviceSource        deviceSource
+		trapEnrichment      *TrapEnrichmentHandle
 
 		refreshMu sync.Mutex
 		statsMu   sync.RWMutex
@@ -72,10 +91,12 @@ type (
 		store   metrix.CollectorStore
 		metrics *collectorMetrics
 
-		registeredDevices func() []ddsnmp.DeviceConnectionInfo
-		topologyProfiles  func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile
-		newSnmpClient     func() gosnmp.Handler
-		newDdSnmpColl     func(ddsnmpcollector.Config) ddCollector
+		topologyProfiles func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile
+		newSnmpClient    func() gosnmp.Handler
+		newDdSnmpColl    func(ddsnmpcollector.Config) ddCollector
+	}
+	deviceSource interface {
+		Devices() []ddsnmp.DeviceConnectionInfo
 	}
 	ddCollector interface {
 		Collect() ([]*ddsnmp.ProfileMetrics, error)
@@ -203,10 +224,10 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 }
 
 func (c *Collector) getRegisteredDevices() []ddsnmp.DeviceConnectionInfo {
-	if c.registeredDevices == nil {
+	if c.deviceSource == nil {
 		return nil
 	}
-	return c.registeredDevices()
+	return c.deviceSource.Devices()
 }
 
 func (c *Collector) refreshTopologyRecovering(ctx context.Context) {
@@ -299,17 +320,15 @@ func (c *Collector) refreshDeviceTopology(ctx context.Context, key string, dev d
 	// Build the next snapshot off-registry. Function readers keep seeing the
 	// previous complete snapshot until this collection is fully ingested.
 	next := c.newDeviceCollectionCache(dev)
-	c.topologyCache = next
-	defer func() { c.topologyCache = nil }()
 
-	c.updateTopologySysUptime(sysUptime)
-	c.updateTopologyProfileTags(pms)
-	c.ingestTopologyProfileMetrics(pms)
-	c.collectTopologyVTPVLANContexts(ctx, dev)
+	next.updateTopologySysUptime(sysUptime)
+	next.updateTopologyProfileTags(pms)
+	next.ingestTopologyProfileMetrics(pms)
+	c.collectTopologyVTPVLANContexts(ctx, next, dev)
 	if ctx.Err() != nil {
 		return false
 	}
-	c.finalizeTopologyCache()
+	c.finalizeTopologyCache(next)
 
 	cache := c.getOrCreateDeviceCache(key)
 	cache.mu.Lock()
@@ -375,18 +394,6 @@ func (c *Collector) getTopologyProfiles(dev ddsnmp.DeviceConnectionInfo) []*ddsn
 	return c.findTopologyProfiles(dev)
 }
 
-func (c *Collector) ingestTopologyProfileMetrics(pms []*ddsnmp.ProfileMetrics) {
-	for _, pm := range pms {
-		c.ingestTopologyMetricSet(pm.TopologyMetrics)
-	}
-}
-
-func (c *Collector) ingestTopologyMetricSet(metrics []ddsnmp.Metric) {
-	for _, metric := range metrics {
-		c.updateTopologyCacheEntry(metric)
-	}
-}
-
 func newSNMPClientFromDeviceInfo(newClient func() gosnmp.Handler, dev ddsnmp.DeviceConnectionInfo) (gosnmp.Handler, error) {
 	client := newClient()
 
@@ -426,21 +433,4 @@ func newSNMPClientFromDeviceInfo(newClient func() gosnmp.Handler, dev ddsnmp.Dev
 	}
 
 	return client, nil
-}
-
-func topologyMethods() []funcapi.MethodConfig {
-	return []funcapi.MethodConfig{
-		topologyMethodConfig(),
-	}
-}
-
-func topologyFunctionHandler(job collectorapi.RuntimeJob) funcapi.MethodHandler {
-	if job == nil {
-		return nil
-	}
-	coll, ok := job.Collector().(*Collector)
-	if !ok || coll == nil {
-		return nil
-	}
-	return &funcTopology{registry: coll.topologyRegistry}
 }

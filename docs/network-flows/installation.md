@@ -20,7 +20,7 @@ The static install (the kickstart `--static-only` path) bundles the plugin autom
 
 - A working Netdata Agent on the host that will receive flow data.
 - That host must be reachable on UDP from your routers and switches (default port `2055`).
-- Linux. The plugin is Linux-only.
+- A Netdata installation that includes `netdata-plugin-netflow`. Native Linux packages install it as a separate package; static installs bundle it automatically; source builds need a Rust toolchain.
 
 ## Install on Debian / Ubuntu / Mint
 

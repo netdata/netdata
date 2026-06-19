@@ -784,7 +784,7 @@ _HOSTNAME=<the source device hostname from enrichment, or source IP when enrichm
 
 `_HOSTNAME` is normally a systemd "trusted field" set by journald; the trap plugin's journal writer writes directly to journal files through the Go-compatible backend selected in SOW-0035 M1 (bypassing journald) and controls every field, including `_HOSTNAME`. The hostname resolution priority is:
 
-1. **Vnode hostname** — when the SNMP polling job has an explicit `vnode.hostname` configured for the source device (available in the in-process `DeviceRegistry` as `VnodeHostname`).
+1. **Vnode hostname** — when the SNMP polling job has an explicit `vnode.hostname` configured for the source device (available from the injected SNMP device store as `VnodeHostname`).
 2. **SNMP sysName** — the device's self-reported `sysName` from polling state, unless empty or equal to literal `"unknown"` (case-insensitive).
 3. **SNMP/topology sysName** — the source device `sysName` from the topology cache when the trap source IP matches topology-managed IP state and the direct SNMP registry lookup missed, for example when the SNMP collector target was configured by DNS name but traps arrive from an IP.
 4. **Source IP** — the string form of the validated trap source IP. `_HOSTNAME` is always emitted; the source IP is the mandatory fallback when no enrichment identity exists.

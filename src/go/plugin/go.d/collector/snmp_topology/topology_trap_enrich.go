@@ -23,26 +23,37 @@ type TrapTopologyEnrichment struct {
 	Neighbors       []string
 }
 
-var activeTrapTopologyRegistry atomic.Pointer[topologyRegistry]
+// TrapEnrichmentHandle exposes the currently running topology registry to trap enrichment consumers.
+type TrapEnrichmentHandle struct {
+	registry atomic.Pointer[topologyRegistry]
+}
+
+// NewTrapEnrichmentHandle returns an empty process-local trap enrichment handle.
+func NewTrapEnrichmentHandle() *TrapEnrichmentHandle {
+	return &TrapEnrichmentHandle{}
+}
 
 func (c *Collector) publishTrapTopologyEnrichment() {
-	if c.topologyRegistry != nil {
-		activeTrapTopologyRegistry.Store(c.topologyRegistry)
+	if c.trapEnrichment != nil && c.topologyRegistry != nil {
+		c.trapEnrichment.registry.Store(c.topologyRegistry)
 	}
 }
 
 func (c *Collector) unpublishTrapTopologyEnrichment() {
-	if c.topologyRegistry != nil {
-		activeTrapTopologyRegistry.CompareAndSwap(c.topologyRegistry, nil)
+	if c.trapEnrichment != nil && c.topologyRegistry != nil {
+		c.trapEnrichment.registry.CompareAndSwap(c.topologyRegistry, nil)
 	}
 }
 
-// TrapEnrichmentForSource returns topology enrichment data for a trap received
+// EnrichmentForSource returns topology enrichment data for a trap received
 // from the given source IP and, when available, the trap subject ifIndex.
 // Interface and neighbor enrichment only use the trap ifIndex after the source
 // IP matches exactly one local topology cache.
-func TrapEnrichmentForSource(ip, trapIfIndex string) *TrapTopologyEnrichment {
-	registry := activeTrapTopologyRegistry.Load()
+func (h *TrapEnrichmentHandle) EnrichmentForSource(ip, trapIfIndex string) *TrapTopologyEnrichment {
+	if h == nil {
+		return nil
+	}
+	registry := h.registry.Load()
 	if registry == nil {
 		return nil
 	}

@@ -31,7 +31,7 @@ This collector listens for incoming SNMP Trap and INFORM notifications from netw
 - **Deduplication**: Optional configurable per-job dedup that suppresses repeated identical traps within a window. The first matching trap is journaled immediately; subsequent matches increment a summary counter and a periodic summary entry is written.
 - **Per-OID overrides**: Operators can override the profile-assigned category, severity, and labels for specific OIDs without editing profiles.
 - **Profile-defined trap metrics**: Operators can define trap-to-metric rules in custom trap profiles, then enable selected rules per listener job with `profile_metrics`. Profile metrics are emitted per source device, using vnode host scope when enrichment finds an unambiguous vnode and bounded source labels for chart identity and fallback attribution.
-- **Direct journal storage**: Enabled by default for explicit jobs. Stores traps under the configured Netdata log directory (`/var/log/netdata/traps/<job>/` by default) and exposes the embedded `snmp:traps` Function. Direct-journal jobs appear as `__logs_sources` options.
+- **Direct journal storage**: Enabled by default for explicit jobs. Stores traps under the configured Netdata log directory (`${NETDATA_LOG_DIR}/traps/<job>/`; package installs usually use `/var/log/netdata`, and static installs commonly use `/opt/netdata/var/log/netdata`) and exposes the embedded `snmp:traps` Function. Direct-journal jobs appear as `__logs_sources` options.
 - **OTLP/gRPC export**: Optional backend that exports traps as OTLP LogRecords. When `otlp.enabled` is `true`, traps are exported through OTLP regardless of `journal.enabled`; if direct journal storage is also enabled, both backends receive traps.
 - **Self-metrics**: Per-job pipeline counters, trap events (by category and severity), processing errors (by type), dedup suppression (when enabled), bounded per-source receiver health, and profile-metric diagnostics.
 
@@ -97,14 +97,12 @@ Example conversion for a MIB module not shipped in the OOB pack:
 ```
 
 
-This collector is only supported on the following platforms:
-
-- linux
+This collector is supported on all platforms.
 
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 
-Binding to the standard SNMP trap port (UDP/162) requires `CAP_NET_BIND_SERVICE` or root.
-Netdata packages grant this capability to `go.d.plugin` and allow it in `netdata.service`.
+Binding to the standard SNMP trap port (UDP/162) requires elevated bind privileges on many platforms.
+On Linux, this means `CAP_NET_BIND_SERVICE` or root. Netdata packages grant this capability to `go.d.plugin` and allow it in `netdata.service`.
 
 
 ### Default Behavior
@@ -157,7 +155,7 @@ Configure the network devices sending traps:
 
 #### Verify Netdata log directory access
 
-Direct-journal jobs write under the configured Netdata log directory (`/var/log/netdata/traps/` by default, or `${NETDATA_LOG_DIR}/traps/` at runtime).
+Direct-journal jobs write under the configured Netdata log directory (`${NETDATA_LOG_DIR}/traps/`). Package installs usually use `/var/log/netdata`; static installs commonly use `/opt/netdata/var/log/netdata`.
 Job creation fails if the configured Netdata log directory is missing or unusable. For OTLP-only jobs, set `journal.enabled: false` and `otlp.enabled: true`.
 
 
@@ -257,7 +255,7 @@ Each user has:
 <a id="option-direct-journal-journal"></a>
 ##### journal
 
-- `enabled`: Write traps to local direct journal files under the configured Netdata log directory (`/var/log/netdata/traps/<job>/` by default, or `${NETDATA_LOG_DIR}/traps/<job>/` at runtime) and expose the job as a `__logs_sources` option in the embedded `snmp:traps` Function.
+- `enabled`: Write traps to local direct journal files under the configured Netdata log directory (`${NETDATA_LOG_DIR}/traps/<job>/`) and expose the job as a `__logs_sources` option in the embedded `snmp:traps` Function. Package installs usually use `/var/log/netdata`; static installs commonly use `/opt/netdata/var/log/netdata`.
 - Set `enabled: false` only when another output backend, such as OTLP, is enabled.
 
 
@@ -607,7 +605,7 @@ Metrics:
 | snmp.trap.pipeline | received, decoded, accepted, committed, dedup_suppressed, dropped, write_failed | events/s |
 | snmp.trap.events | state_change, config_change, security, auth, license, mobility, diagnostic, unknown | events/s |
 | snmp.trap.severity | emerg, alert, crit, err, warning, notice, info, debug | events/s |
-| snmp.trap.errors | unknown_oid, decode_failed, template_unresolved, malformed_pdu, dropped_allowlist, rate_limited, auth_failures, usm_failures, unknown_engine_id, inform_response_failed, binary_encoded, profile_load_failed, journal_write_failed, otlp_export_failed, listener_read_failed | errors/s |
+| snmp.trap.errors | unknown_oid, decode_failed, template_unresolved, malformed_pdu, dropped_allowlist, rate_limited, auth_failures, usm_failures, unknown_engine_id, inform_response_failed, binary_encoded, profile_load_failed, journal_write_failed, otlp_export_failed, listener_read_failed, listener_buffer_degraded | errors/s |
 | snmp.trap.dedup_suppressed | suppressed | events/s |
 | snmp.trap.sources | active | sources |
 | snmp.trap.source_attribution | vnode, fallback, ambiguous, failed, overflow_dropped, source_transitions | events/s |

@@ -15,7 +15,7 @@ import (
 )
 
 func TestCollector_WriteInternalMetrics(t *testing.T) {
-	coll := New()
+	coll := newTestSNMPTopologyCollector()
 	now := time.Unix(100, 0)
 	coll.recordRefreshStats(refreshStats{
 		hasDeviceCounts:   true,
@@ -42,11 +42,8 @@ func TestCollector_WriteInternalMetrics(t *testing.T) {
 }
 
 func TestCollectorCollectWritesInternalMetrics(t *testing.T) {
-	coll := New()
-	coll.registeredDevices = func() []ddsnmp.DeviceConnectionInfo {
-		t.Fatal("Collect must not poll SNMP devices")
-		return nil
-	}
+	coll := newTestSNMPTopologyCollector()
+	coll.deviceSource = fatalDeviceSource{t: t}
 	coll.recordRefreshStats(refreshStats{
 		hasDeviceCounts:   true,
 		registeredDevices: 1,
@@ -78,4 +75,14 @@ func requireMetricValue(t *testing.T, reader metrix.Reader, name string, want me
 	got, ok := reader.Value(name, nil)
 	require.True(t, ok, "metric %s not found", name)
 	require.Equal(t, want, got)
+}
+
+type fatalDeviceSource struct {
+	t *testing.T
+}
+
+func (s fatalDeviceSource) Devices() []ddsnmp.DeviceConnectionInfo {
+	s.t.Helper()
+	s.t.Fatal("Collect must not poll SNMP devices")
+	return nil
 }

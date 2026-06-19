@@ -25,12 +25,13 @@ clap = { workspace = true, features = ["derive"] }
 # crates). Aliased to the historical names so call sites keep `use journal_*`.
 # Scope: netflow-plugin only; log-viewer/otel still use the vendored workspace
 # crates (tracked as a follow-up). One source of journal-core in this binary.
-journal-common = { package = "systemd-journal-sdk-common", version = "0.7.1" }
-journal-core = { package = "systemd-journal-sdk-core", version = "0.7.1" }
-journal-engine = { package = "systemd-journal-sdk-engine", version = "0.7.1" }
-journal-index = { package = "systemd-journal-sdk-index", version = "0.7.1" }
-journal-log-writer = { package = "systemd-journal-sdk-log-writer", version = "0.7.1" }
-journal-registry = { package = "systemd-journal-sdk-registry", version = "0.7.1" }
+journal-common = { package = "systemd-journal-sdk-common", version = "0.7.4" }
+journal-core = { package = "systemd-journal-sdk-core", version = "0.7.4" }
+journal-engine = { package = "systemd-journal-sdk-engine", version = "0.7.4" }
+journal-host = { package = "systemd-journal-sdk-host", version = "0.7.4" }
+journal-index = { package = "systemd-journal-sdk-index", version = "0.7.4" }
+journal-log-writer = { package = "systemd-journal-sdk-log-writer", version = "0.7.4" }
+journal-registry = { package = "systemd-journal-sdk-registry", version = "0.7.4" }
 humantime = { workspace = true }
 humantime-serde = { workspace = true }
 hashbrown = { workspace = true }

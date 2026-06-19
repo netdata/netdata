@@ -44,13 +44,13 @@ func (c *Collector) writeDecodeErrorEntry(rec decodeErrorRecord) {
 		}
 	}
 
-	entry := newDecodeErrorEntry(c.jobName, rec)
+	entry := newDecodeErrorEntry(c.jobName, rec, c.monotonicUsec())
 	if err := c.trapWriter.Write(entry); err != nil {
 		c.incTrapError(c.trapWriteFailureDim())
 	}
 }
 
-func newDecodeErrorEntry(jobName string, rec decodeErrorRecord) *TrapEntry {
+func newDecodeErrorEntry(jobName string, rec decodeErrorRecord, monotonicUsec int64) *TrapEntry {
 	now := time.Now().UnixMicro()
 	sourceIP, sourcePeer, sourcePort := decodeErrorSource(rec.peerIP, rec.peer)
 	listener := decodeErrorListener(rec.conn)
@@ -85,7 +85,7 @@ func newDecodeErrorEntry(jobName string, rec decodeErrorRecord) *TrapEntry {
 		JobName:               jobName,
 		ReportType:            ReportTypeDecodeError,
 		ReceivedRealtimeUsec:  now,
-		ReceivedMonotonicUsec: monotonicUsec(),
+		ReceivedMonotonicUsec: monotonicUsec,
 		Category:              decodeErrorCategory(rec.kind),
 		Severity:              "warning",
 		Message:               message,

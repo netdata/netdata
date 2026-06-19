@@ -16,6 +16,7 @@ research cannot be mistaken for product specification.
 | Spec | Scope | Main consumers |
 |---|---|---|
 | [go-v2-host-scope.md](go-v2-host-scope.md) | Go framework V2 host-scope and vnode metric routing contract. | Go V2 collector work, `metrix`, `jobruntime`, `chartengine`, go.d collector docs and skills. |
+| [journal-log-writer-directory-contract.md](journal-log-writer-directory-contract.md) | `Log::new` requires an absolute journal directory (rejected early otherwise); consumers must resolve relative config against a stable base. | journal-log-writer consumers: otel-plugin logs, netflow-plugin tiers. |
 | [mcp-build-run.md](mcp-build-run.md) | MCP build/run tool contracts: two-profile model, single build dir per worktree, dedicated-tree ownership, install-path/lock conventions, job/run lifecycle. | `packaging/tools/automation/mcp/` server work. |
 | [netflow-tier-commit-workers.md](netflow-tier-commit-workers.md) | NetFlow rollup-tier commit worker contract: ownership, doorbell protocol, shutdown order, stretch semantics, lock discipline, telemetry. | netflow-plugin ingest/tiering work, tier benchmark and soak/crash tests, network-flows operator docs. |
 | [otel-legacy-logs-viewer.md](otel-legacy-logs-viewer.md) | Read-only `legacy-otel-logs` viewer for former-otel-plugin journal logs, plus the obsolete-plugin deny for upgrade safety. | otel-plugin supervisor/worker work, `otel-legacy-logs`, `journal-function`, `plugins.d` obsolete-plugin handling. |

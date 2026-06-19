@@ -52,6 +52,7 @@ type topologyDevice struct {
 	InterfaceCharts       map[string]topologyInterfaceChartRef `json:"interface_charts,omitempty"`
 	Vendor                string                               `json:"vendor,omitempty"`
 	Model                 string                               `json:"model,omitempty"`
+	OSPFRouterID          string                               `json:"ospf_router_id,omitempty"`
 	Capabilities          []string                             `json:"capabilities,omitempty"`
 	CapabilitiesSupported []string                             `json:"capabilities_supported,omitempty"`
 	CapabilitiesEnabled   []string                             `json:"capabilities_enabled,omitempty"`

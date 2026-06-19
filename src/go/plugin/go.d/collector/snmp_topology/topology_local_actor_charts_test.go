@@ -36,13 +36,24 @@ func TestEnrichLocalActorChartReferencesAddsStatusAndPortRows(t *testing.T) {
 
 	statuses, ok := actor.Attributes["if_statuses"].([]map[string]any)
 	require.True(t, ok)
-	require.Equal(t, "gi0_1", statuses[0]["chart_id_suffix"])
-	require.Equal(t, []string{"errors", "traffic"}, statuses[0]["available_metrics"])
-	require.Equal(t, "gi0/2", statuses[1]["chart_id_suffix"])
-	require.Equal(t, []string{"drops"}, statuses[1]["available_metrics"])
 
-	require.Equal(t, "gi0_1", actor.Tables["ports"][0]["chart_id_suffix"])
-	require.Equal(t, []string{"errors", "traffic"}, actor.Tables["ports"][0]["available_metrics"])
+	tests := map[string]struct {
+		row         map[string]any
+		wantSuffix  string
+		wantMetrics []string
+	}{
+		"port-exact":        {row: actor.Tables["ports"][0], wantSuffix: "gi0_1", wantMetrics: []string{"errors", "traffic"}},
+		"status-exact":      {row: statuses[0], wantSuffix: "gi0_1", wantMetrics: []string{"errors", "traffic"}},
+		"status-normalized": {row: statuses[1], wantSuffix: "gi0/2", wantMetrics: []string{"drops"}},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.wantSuffix, tc.row["chart_id_suffix"])
+			require.Equal(t, tc.wantMetrics, tc.row["available_metrics"])
+		})
+	}
+
 	require.NotContains(t, actor.Tables["ports"][1], "chart_id_suffix")
 }
 

@@ -194,6 +194,7 @@ pub(super) struct TierWorker {
     pub(super) tier_flow_indexes: Arc<RwLock<TierFlowIndexStore>>,
     pub(super) facet_runtime: Arc<crate::facet_runtime::FacetRuntime>,
     pub(super) metrics: Arc<IngestMetrics>,
+    pub(super) journal_host: Arc<LocalJournalProvider>,
     pub(super) consecutive_sync_failures: u32,
 }
 
@@ -335,6 +336,7 @@ fn commit_and_return(
         encode_buf,
         &worker.facet_runtime,
         &worker.metrics,
+        &worker.journal_host,
     );
     sync_with_failure_policy(worker);
     let duration_usec = started.elapsed().as_micros() as u64;
@@ -417,6 +419,7 @@ fn drain_and_exit(
             encode_buf,
             &worker.facet_runtime,
             &worker.metrics,
+            &worker.journal_host,
         );
     }
     worker
@@ -482,6 +485,7 @@ pub(super) fn commit_batch(
     encode_buf: &mut JournalEncodeBuffer,
     facet_runtime: &crate::facet_runtime::FacetRuntime,
     metrics: &IngestMetrics,
+    journal_host: &LocalJournalProvider,
 ) {
     for (bucket_start, bucket) in batch {
         let row_timestamp_usec = bucket_start.saturating_add(bucket_usec).saturating_sub(1);
@@ -502,9 +506,18 @@ pub(super) fn commit_batch(
                 continue;
             };
             let logical_bytes = encode_buf.encoded_len();
+            let entry_monotonic_usec = match journal_host.monotonic_usec() {
+                Ok(value) => value,
+                Err(err) => {
+                    metrics.tier_write_errors.fetch_add(1, Ordering::Relaxed);
+                    tracing::warn!("tier writer {:?} monotonic timestamp failed: {}", tier, err);
+                    continue;
+                }
+            };
             let timestamps = EntryTimestamps::default()
                 .with_source_realtime_usec(row_timestamp_usec)
-                .with_entry_realtime_usec(row_timestamp_usec);
+                .with_entry_realtime_usec(row_timestamp_usec)
+                .with_entry_monotonic_usec(entry_monotonic_usec);
             if let Err(err) = encode_buf.write_encoded(writer, timestamps) {
                 metrics.tier_write_errors.fetch_add(1, Ordering::Relaxed);
                 tracing::warn!("tier writer {:?} write failed: {}", tier, err);
@@ -624,8 +637,12 @@ mod tests {
     #[test]
     fn commit_batch_releases_flow_index_read_lock_between_rows() {
         let tmp = tempfile::tempdir().expect("tempdir");
+        let mut cfg = PluginConfig::default();
+        cfg._netdata_env.lib_dir = Some(tmp.path().join("varlib"));
+        let journal_host = crate::local_journal_host::load_local_journal_provider(&cfg)
+            .expect("load local journal host for tier writer test");
         let origin = Origin {
-            machine_id: None,
+            machine_id: Some(journal_host.machine_id()),
             namespace: None,
             source: Source::System,
         };
@@ -636,6 +653,7 @@ mod tests {
             Config::new(origin, rotation, retention)
                 .with_compact(true)
                 .with_compression(Compression::None)
+                .with_boot_id(journal_host.boot_id())
                 .with_live_publish_every_entries(0),
         )
         .expect("create tier writer");
@@ -685,6 +703,7 @@ mod tests {
             &mut encode_buf,
             &facet_runtime,
             &metrics,
+            &journal_host,
         );
 
         assert_eq!(

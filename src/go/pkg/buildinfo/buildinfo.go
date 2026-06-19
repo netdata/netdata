@@ -31,6 +31,13 @@ var NetdataBinDir = "/usr/sbin"
 // CacheDir is the path to the Netdata cache directory.
 var CacheDir = "/var/cache/netdata"
 
+// DefaultVarLibDir is the fallback Netdata persistent state directory when
+// builds or runtime environment do not provide a configured value.
+const DefaultVarLibDir = "/var/lib/netdata"
+
+// VarLibDir is the path to the Netdata persistent state directory.
+var VarLibDir = DefaultVarLibDir
+
 // LogDir is the path to the Netdata log directory.
 var LogDir = "/var/log/netdata"
 
@@ -43,7 +50,7 @@ var LogDir = "/var/log/netdata"
 // remain forward-compatible.
 func Info() string {
 	return fmt.Sprintf(
-		"version=%s go_version=%s user_config_dir=%s stock_config_dir=%s plugins_dir=%s netdata_bin_dir=%s cache_dir=%s log_dir=%s",
+		"version=%s go_version=%s user_config_dir=%s stock_config_dir=%s plugins_dir=%s netdata_bin_dir=%s cache_dir=%s var_lib_dir=%s log_dir=%s",
 		Version,
 		runtime.Version(),
 		UserConfigDir,
@@ -51,6 +58,7 @@ func Info() string {
 		PluginsDir,
 		NetdataBinDir,
 		CacheDir,
+		VarLibDir,
 		LogDir,
 	)
 }
@@ -152,5 +160,6 @@ func init() {
 	PluginsDir = rebuild(PluginsDir)
 	NetdataBinDir = rebuild(NetdataBinDir)
 	CacheDir = rebuild(CacheDir)
+	VarLibDir = rebuild(VarLibDir)
 	LogDir = rebuild(LogDir)
 }

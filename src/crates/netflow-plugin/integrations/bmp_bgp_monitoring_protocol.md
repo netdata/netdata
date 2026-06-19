@@ -70,9 +70,7 @@ withdrawal (`MP_UNREACH` or `withdraw_routes`), PeerDown, or session disconnect
 followed by the `keep` interval expiring (default 5 minutes).
 
 
-This integration is only supported on the following platforms:
-
-- Linux
+This integration is supported on all platforms.
 
 This integration runs as a single instance per Netdata Agent.
 

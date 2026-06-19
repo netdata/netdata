@@ -90,7 +90,7 @@ func TestCollectorInitAcquiresProfileCache(t *testing.T) {
 
 	port := freeUDPPort(t)
 
-	c := New()
+	c := newTestSNMPTrapsCollector()
 	c.SetJobName("local")
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: port}}
 
@@ -109,11 +109,11 @@ func TestMultipleCollectorsShareSameCache(t *testing.T) {
 	port1 := freeUDPPort(t)
 	port2 := freeUDPPort(t)
 
-	c1 := New()
+	c1 := newTestSNMPTrapsCollector()
 	c1.SetJobName("job1")
 	c1.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: port1}}
 
-	c2 := New()
+	c2 := newTestSNMPTrapsCollector()
 	c2.SetJobName("job2")
 	c2.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: port2}}
 
@@ -142,7 +142,7 @@ func TestInitBindFailureReleasesProfileRef(t *testing.T) {
 	require.NoError(t, err)
 	defer conn.Close()
 
-	c := New()
+	c := newTestSNMPTrapsCollector()
 	c.SetJobName("local")
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: conn.LocalAddr().(*net.UDPAddr).Port}}
 
@@ -163,8 +163,8 @@ func TestInitBindFailureReleasesProfileRef(t *testing.T) {
 // =============================================================================
 
 func TestProfileDirPathBuilders(t *testing.T) {
-	assert.Equal(t, "/etc/netdata/go.d/snmp.trap-profiles", trapProfilesUserDir("/etc/netdata/go.d"))
-	assert.Equal(t, "/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default", trapProfilesStockDir("/usr/lib/netdata/conf.d/go.d"))
+	assert.Equal(t, filepath.Join("/etc/netdata/go.d", "snmp.trap-profiles"), trapProfilesUserDir("/etc/netdata/go.d"))
+	assert.Equal(t, filepath.Join("/usr/lib/netdata/conf.d/go.d", "snmp.trap-profiles", "default"), trapProfilesStockDir("/usr/lib/netdata/conf.d/go.d"))
 }
 
 func setTestDirs(t *testing.T, dirs ...string) {
@@ -444,7 +444,7 @@ traps:
 	require.Equal(t, "diagnostic", td.Category)
 	require.Equal(t, "warning", td.Severity)
 
-	c := New()
+	c := newTestSNMPTrapsCollector()
 	c.overrides = buildOverrideMap([]OverrideConfig{
 		{
 			OID:      oid,

@@ -4,6 +4,7 @@ package snmptopology
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -18,15 +19,35 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
+func TestCollectorGetRegisteredDevicesUsesInjectedDeviceStore(t *testing.T) {
+	coll, store := newTestSNMPTopologyCollectorWithStore()
+	registerTestDeviceState(store, ddsnmp.DeviceConnectionInfo{
+		Hostname:       "192.0.2.10",
+		Port:           161,
+		ManualProfiles: []string{"profile-a"},
+		VnodeLabels:    map[string]string{"site": "lab"},
+	})
+
+	devices := coll.getRegisteredDevices()
+	require.Len(t, devices, 1)
+	require.Equal(t, "192.0.2.10", devices[0].Hostname)
+
+	devices[0].ManualProfiles[0] = "changed"
+	devices[0].VnodeLabels["site"] = "changed"
+
+	again := coll.getRegisteredDevices()
+	require.Len(t, again, 1)
+	require.Equal(t, []string{"profile-a"}, again[0].ManualProfiles)
+	require.Equal(t, "lab", again[0].VnodeLabels["site"])
+}
+
 func TestCollectorValidationLifecycleDoesNotStartPolling(t *testing.T) {
-	coll := New()
+	coll, store := newTestSNMPTopologyCollectorWithStore()
 	coll.UpdateEvery = 3600
-	coll.registeredDevices = func() []ddsnmp.DeviceConnectionInfo {
-		return []ddsnmp.DeviceConnectionInfo{{
-			Hostname: "192.0.2.10",
-			Port:     161,
-		}}
-	}
+	registerTestDeviceState(store, ddsnmp.DeviceConnectionInfo{
+		Hostname: "192.0.2.10",
+		Port:     161,
+	})
 	coll.newSnmpClient = func() gosnmp.Handler {
 		t.Fatal("validation lifecycle must not start topology polling")
 		return nil
@@ -39,14 +60,12 @@ func TestCollectorValidationLifecycleDoesNotStartPolling(t *testing.T) {
 }
 
 func TestCollectorRunRefreshesImmediatelyBeforeUpdateEvery(t *testing.T) {
-	coll := New()
+	coll, store := newTestSNMPTopologyCollectorWithStore()
 	coll.UpdateEvery = 3600
-	coll.registeredDevices = func() []ddsnmp.DeviceConnectionInfo {
-		return []ddsnmp.DeviceConnectionInfo{{
-			Hostname: "192.0.2.10",
-			Port:     161,
-		}}
-	}
+	registerTestDeviceState(store, ddsnmp.DeviceConnectionInfo{
+		Hostname: "192.0.2.10",
+		Port:     161,
+	})
 
 	refreshed := make(chan struct{}, 1)
 	coll.newSnmpClient = func() gosnmp.Handler {
@@ -87,7 +106,7 @@ func TestCollectorRunRefreshesImmediatelyBeforeUpdateEvery(t *testing.T) {
 }
 
 func TestCollectorRunStopsOnContextCancel(t *testing.T) {
-	coll := New()
+	coll := newTestSNMPTopologyCollector()
 	coll.UpdateEvery = 3600
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -106,13 +125,11 @@ func TestCollectorRunStopsOnContextCancel(t *testing.T) {
 }
 
 func TestCollectorRunDoesNotPollWhenContextAlreadyCanceled(t *testing.T) {
-	coll := New()
-	coll.registeredDevices = func() []ddsnmp.DeviceConnectionInfo {
-		return []ddsnmp.DeviceConnectionInfo{{
-			Hostname: "192.0.2.10",
-			Port:     161,
-		}}
-	}
+	coll, store := newTestSNMPTopologyCollectorWithStore()
+	registerTestDeviceState(store, ddsnmp.DeviceConnectionInfo{
+		Hostname: "192.0.2.10",
+		Port:     161,
+	})
 	coll.newSnmpClient = func() gosnmp.Handler {
 		t.Fatal("Run must not poll with an already canceled context")
 		return nil
@@ -125,13 +142,12 @@ func TestCollectorRunDoesNotPollWhenContextAlreadyCanceled(t *testing.T) {
 }
 
 func TestCollectorPruneStaleDeviceCachesRemovesLastDeviceCache(t *testing.T) {
-	coll := New()
+	coll := newTestSNMPTopologyCollector()
 	cache := newTopologyCache()
 	coll.deviceCaches["gone:161"] = cache
 	coll.deviceLastCollected["gone:161"] = time.Now()
 	coll.topologyRegistry.register(cache)
 
-	coll.registeredDevices = func() []ddsnmp.DeviceConnectionInfo { return nil }
 	coll.refreshTopology(context.Background())
 
 	require.Empty(t, coll.deviceCaches)
@@ -140,13 +156,11 @@ func TestCollectorPruneStaleDeviceCachesRemovesLastDeviceCache(t *testing.T) {
 }
 
 func TestCollectorRefreshTopologyRecoveringHandlesPanic(t *testing.T) {
-	coll := New()
-	coll.registeredDevices = func() []ddsnmp.DeviceConnectionInfo {
-		return []ddsnmp.DeviceConnectionInfo{{
-			Hostname: "192.0.2.10",
-			Port:     161,
-		}}
-	}
+	coll, store := newTestSNMPTopologyCollectorWithStore()
+	registerTestDeviceState(store, ddsnmp.DeviceConnectionInfo{
+		Hostname: "192.0.2.10",
+		Port:     161,
+	})
 	coll.newSnmpClient = func() gosnmp.Handler {
 		panic("boom")
 	}
@@ -192,11 +206,9 @@ func TestCollectorRunCancelsInFlightRefresh(t *testing.T) {
 		return nil
 	}).AnyTimes()
 
-	coll := New()
+	coll, store := newTestSNMPTopologyCollectorWithStore()
 	coll.UpdateEvery = 3600
-	coll.registeredDevices = func() []ddsnmp.DeviceConnectionInfo {
-		return []ddsnmp.DeviceConnectionInfo{dev}
-	}
+	registerTestDeviceState(store, dev)
 	coll.newSnmpClient = func() gosnmp.Handler { return mockHandler }
 	coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile {
 		return []*ddsnmp.Profile{{}}
@@ -258,7 +270,7 @@ func TestCollectorCancelsInFlightVLANContextRefresh(t *testing.T) {
 		return nil
 	}).AnyTimes()
 
-	coll := New()
+	coll := newTestSNMPTopologyCollector()
 	coll.newSnmpClient = func() gosnmp.Handler { return mockHandler }
 	collectStarted := make(chan struct{})
 	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
@@ -292,7 +304,7 @@ func TestCollectorCancelsInFlightVLANContextRefresh(t *testing.T) {
 }
 
 func TestCollectorNewDeviceCollectionCacheUsesEffectiveDeviceCheckEvery(t *testing.T) {
-	coll := New()
+	coll := newTestSNMPTopologyCollector()
 
 	cache := coll.newDeviceCollectionCache(ddsnmp.DeviceConnectionInfo{Hostname: "switch-a"})
 
@@ -319,7 +331,7 @@ func TestCollector_RefreshKeepsPublishedSnapshotWhileCollectionRuns(t *testing.T
 	release := make(chan struct{})
 	done := make(chan struct{})
 
-	coll := New()
+	coll := newTestSNMPTopologyCollector()
 	coll.deviceCaches[key] = published
 	coll.topologyRegistry.register(published)
 	coll.newSnmpClient = func() gosnmp.Handler { return mockHandler }
@@ -348,6 +360,42 @@ func TestCollector_RefreshKeepsPublishedSnapshotWhileCollectionRuns(t *testing.T
 	<-done
 }
 
+func TestCollector_RefreshFailureKeepsPublishedSnapshot(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	dev := ddsnmp.DeviceConnectionInfo{
+		Hostname:    "10.0.0.10",
+		Port:        161,
+		SysObjectID: "1.3.6.1.4.1.9.1.1",
+	}
+	mockHandler := snmpmock.NewMockHandler(ctrl)
+	expectTopologyRefreshSNMPClientConnect(mockHandler, dev)
+	mockHandler.EXPECT().Close().Return(nil)
+
+	key := "10.0.0.10:161"
+	published := newTopologyCache()
+	seedPublishedEndpointSnapshot(published)
+
+	coll := newTestSNMPTopologyCollector()
+	coll.deviceCaches[key] = published
+	coll.topologyRegistry.register(published)
+	coll.newSnmpClient = func() gosnmp.Handler { return mockHandler }
+	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
+		return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) {
+			return nil, errors.New("collection failed")
+		})
+	}
+
+	require.False(t, coll.refreshDeviceTopology(context.Background(), key, dev))
+
+	snapshot, ok := published.snapshotEngineObservations()
+	require.True(t, ok)
+	require.Len(t, snapshot.l2Observations, 1)
+	require.Len(t, snapshot.l2Observations[0].FDBEntries, 1)
+	require.Len(t, snapshot.l2Observations[0].ARPNDEntries, 1)
+}
+
 type blockingTopologyCollector struct {
 	started chan<- struct{}
 	release <-chan struct{}
@@ -365,15 +413,7 @@ func (c *blockingTopologyCollector) Collect() ([]*ddsnmp.ProfileMetrics, error) 
 }
 
 func expectTopologyRefreshSNMPClient(mockHandler *snmpmock.MockHandler, dev ddsnmp.DeviceConnectionInfo) {
-	mockHandler.EXPECT().SetTarget(dev.Hostname)
-	mockHandler.EXPECT().SetPort(uint16(dev.Port))
-	mockHandler.EXPECT().SetRetries(dev.Retries)
-	mockHandler.EXPECT().SetTimeout(time.Duration(dev.Timeout) * time.Second)
-	mockHandler.EXPECT().SetMaxOids(dev.MaxOIDs)
-	mockHandler.EXPECT().SetMaxRepetitions(uint32(dev.MaxRepetitions))
-	mockHandler.EXPECT().SetCommunity(dev.Community)
-	mockHandler.EXPECT().SetVersion(gosnmp.Version2c)
-	mockHandler.EXPECT().Connect().Return(nil)
+	expectTopologyRefreshSNMPClientConnect(mockHandler, dev)
 	mockHandler.EXPECT().Get(gomock.InAnyOrder([]string{
 		snmputils.OidSnmpEngineTime,
 		snmputils.OidHrSystemUptime,
@@ -384,6 +424,18 @@ func expectTopologyRefreshSNMPClient(mockHandler *snmpmock.MockHandler, dev ddsn
 		},
 	}, nil)
 	mockHandler.EXPECT().Close().Return(nil)
+}
+
+func expectTopologyRefreshSNMPClientConnect(mockHandler *snmpmock.MockHandler, dev ddsnmp.DeviceConnectionInfo) {
+	mockHandler.EXPECT().SetTarget(dev.Hostname)
+	mockHandler.EXPECT().SetPort(uint16(dev.Port))
+	mockHandler.EXPECT().SetRetries(dev.Retries)
+	mockHandler.EXPECT().SetTimeout(time.Duration(dev.Timeout) * time.Second)
+	mockHandler.EXPECT().SetMaxOids(dev.MaxOIDs)
+	mockHandler.EXPECT().SetMaxRepetitions(uint32(dev.MaxRepetitions))
+	mockHandler.EXPECT().SetCommunity(dev.Community)
+	mockHandler.EXPECT().SetVersion(gosnmp.Version2c)
+	mockHandler.EXPECT().Connect().Return(nil)
 }
 
 func seedPublishedEndpointSnapshot(cache *topologyCache) {

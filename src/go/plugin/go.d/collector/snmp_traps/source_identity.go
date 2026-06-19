@@ -5,7 +5,6 @@ package snmp_traps
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"os"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -133,18 +132,8 @@ func fallbackTrapSourceKind(method string) string {
 }
 
 func profileMetricSourceHashSalt() string {
-	for _, path := range []string{"/etc/machine-id", "/var/lib/dbus/machine-id"} {
-		content, err := os.ReadFile(path)
-		if err == nil {
-			if value := strings.TrimSpace(string(content)); value != "" {
-				return "machine-id:" + value
-			}
-		}
-	}
-	if hostname, err := os.Hostname(); err == nil {
-		if value := strings.TrimSpace(hostname); value != "" {
-			return "hostname:" + value
-		}
+	if provider, err := defaultJournalHostProvider(); err == nil {
+		return "machine-id:" + provider.MachineID().String()
 	}
 	return "netdata-agent"
 }

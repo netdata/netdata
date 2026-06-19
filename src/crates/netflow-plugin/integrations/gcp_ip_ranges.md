@@ -63,9 +63,7 @@ per cycle is the whole dataset. Each contains a `syncToken` and a
 The plugin fetches the full document on each refresh cycle.
 
 
-This integration is only supported on the following platforms:
-
-- Linux
+This integration is supported on all platforms.
 
 This integration supports multiple instances configured side-by-side.
 

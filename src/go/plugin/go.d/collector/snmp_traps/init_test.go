@@ -13,18 +13,19 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCollectorChartTemplateYAML(t *testing.T) {
-	collecttest.AssertChartTemplateSchema(t, New().ChartTemplateYAML())
+	collecttest.AssertChartTemplateSchema(t, newTestSNMPTrapsCollector().ChartTemplateYAML())
 }
 
 func TestCollectorChartTemplateYAMLChartsDeclareAlgorithms(t *testing.T) {
-	charts := chartTemplatesByIDFromYAML(t, New().ChartTemplateYAML())
+	charts := chartTemplatesByIDFromYAML(t, newTestSNMPTrapsCollector().ChartTemplateYAML())
 	assertAllChartTemplatesDeclareAlgorithm(t, charts)
 
 	for _, id := range []string{
@@ -68,7 +69,7 @@ func TestCollectorChartTemplateYAMLIncludesProfileMetricCharts(t *testing.T) {
 	require.NotNil(t, rt)
 	require.NotEmpty(t, tmpl)
 
-	c := New()
+	c := newTestSNMPTrapsCollector()
 	c.profileMetrics = rt
 	c.dynamicChartYAML = tmpl
 
@@ -90,10 +91,27 @@ func TestCollectorChartTemplateYAMLIncludesProfileMetricCharts(t *testing.T) {
 	assert.Contains(t, contexts, "snmp.trap.cisco.config.changes")
 }
 
-func TestCollectorRegistrationAvailableByDefault(t *testing.T) {
-	creator, ok := collectorapi.DefaultRegistry.Lookup("snmp_traps")
-	require.True(t, ok)
+func TestCollectorCreatorDefaults(t *testing.T) {
+	creator := newCreator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle())
 	assert.False(t, creator.Defaults.Disabled)
+}
+
+func TestCollectorCreatorRequiresSharedDependencies(t *testing.T) {
+	require.PanicsWithValue(t, "snmp_traps Register requires a non-nil device store", func() {
+		_ = newCreator(nil, snmptopology.NewTrapEnrichmentHandle())
+	})
+	require.PanicsWithValue(t, "snmp_traps Register requires a non-nil trap enrichment handle", func() {
+		_ = newCreator(ddsnmp.NewDeviceStore(), nil)
+	})
+}
+
+func TestCollectorNewRequiresSharedDependencies(t *testing.T) {
+	require.PanicsWithValue(t, "snmp_traps New requires a non-nil device store", func() {
+		_ = New(nil, snmptopology.NewTrapEnrichmentHandle())
+	})
+	require.PanicsWithValue(t, "snmp_traps New requires a non-nil trap enrichment handle", func() {
+		_ = New(ddsnmp.NewDeviceStore(), nil)
+	})
 }
 
 func chartTemplatesByIDFromYAML(t *testing.T, raw string) map[string]charttpl.Chart {
@@ -215,7 +233,7 @@ func TestConfigSchemaDynCfgRetentionDefaultDisablesTimeRotation(t *testing.T) {
 }
 
 func TestCollectorDefaultListenReceiveBuffer(t *testing.T) {
-	assert.Equal(t, defaultListenerReceiveBuffer, New().Listen.ReceiveBuffer)
+	assert.Equal(t, defaultListenerReceiveBuffer, newTestSNMPTrapsCollector().Listen.ReceiveBuffer)
 }
 
 func TestConfigSchemaDynCfgTabsRenderAllTopLevelFieldsOnce(t *testing.T) {
@@ -469,7 +487,7 @@ func TestCollectorInit_BindsEndpointsAndCheckIsNoop(t *testing.T) {
 	withTestCacheDir(t)
 	port := freeUDPPort(t)
 
-	c := New()
+	c := newTestSNMPTrapsCollector()
 	c.SetJobName("local")
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: port}}
 
@@ -493,7 +511,7 @@ func TestCollectorInit_IdempotentDoubleInit(t *testing.T) {
 	withTestCacheDir(t)
 	port := freeUDPPort(t)
 
-	c := New()
+	c := newTestSNMPTrapsCollector()
 	c.SetJobName("local")
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: port}}
 
@@ -510,7 +528,7 @@ func TestCollectorInit_IdempotentDoubleInit(t *testing.T) {
 func TestCollectorInit_InvalidJobNameIsCodedError(t *testing.T) {
 	withTestCacheDir(t)
 
-	c := New()
+	c := newTestSNMPTrapsCollector()
 	c.SetJobName("../bad")
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: 162}}
 
@@ -528,7 +546,7 @@ func TestCollectorInit_InvalidJobNameIsCodedError(t *testing.T) {
 func TestCollectorInit_InvalidEndpointsIsCodedError(t *testing.T) {
 	withTestCacheDir(t)
 
-	c := New()
+	c := newTestSNMPTrapsCollector()
 	c.SetJobName("local")
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "tcp", Address: "127.0.0.1", Port: 162}}
 
@@ -543,7 +561,7 @@ func TestCollectorInit_InvalidEndpointsIsCodedError(t *testing.T) {
 func TestCollectorInit_InvalidReceiveBufferIsCodedError(t *testing.T) {
 	withTestCacheDir(t)
 
-	c := New()
+	c := newTestSNMPTrapsCollector()
 	c.SetJobName("local")
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
 	c.Listen.ReceiveBuffer = -1
@@ -560,7 +578,7 @@ func TestCollectorInit_InvalidReceiveBufferIsCodedError(t *testing.T) {
 func TestCollectorInit_TooLargeReceiveBufferIsCodedError(t *testing.T) {
 	withTestCacheDir(t)
 
-	c := New()
+	c := newTestSNMPTrapsCollector()
 	c.SetJobName("local")
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
 	c.Listen.ReceiveBuffer = maxListenerReceiveBuffer + 1
@@ -576,7 +594,7 @@ func TestCollectorInit_TooLargeReceiveBufferIsCodedError(t *testing.T) {
 
 func TestCollectorInit_NoOutputBackendIsCodedError(t *testing.T) {
 	disabled := false
-	c := New()
+	c := newTestSNMPTrapsCollector()
 	c.SetJobName("local")
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
 	c.Journal.Enabled = &disabled
@@ -595,7 +613,7 @@ func TestCollectorInit_MissingNetdataLogRootIsRetryableCodedError(t *testing.T) 
 	root := filepath.Join(t.TempDir(), "missing")
 	withNetdataLogDir(t, root)
 
-	c := New()
+	c := newTestSNMPTrapsCollector()
 	c.SetJobName("local")
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
 
@@ -623,7 +641,7 @@ func TestCollectorInit_OTELOnlySkipsJournalCreation(t *testing.T) {
 	srv := startOTLPFixture(t, nil)
 
 	const jobName = "otel-only"
-	c := New()
+	c := newTestSNMPTrapsCollector()
 	c.SetJobName(jobName)
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
 	c.Journal.Enabled = &disabled
@@ -657,7 +675,7 @@ func TestCollectorInit_OTLPPreflightFailureIsRetryableCodedError(t *testing.T) {
 	endpoint := "http://" + ln.Addr().String()
 	require.NoError(t, ln.Close())
 
-	c := New()
+	c := newTestSNMPTrapsCollector()
 	c.SetJobName("otlp-preflight")
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
 	c.Journal.Enabled = &disabled
@@ -685,7 +703,7 @@ func TestCollectorInit_BindsMultipleEndpoints(t *testing.T) {
 	firstPort := freeUDPPort(t)
 	secondPort := freeUDPPort(t)
 
-	c := New()
+	c := newTestSNMPTrapsCollector()
 	c.SetJobName("local")
 	c.Listen.Endpoints = []EndpointConfig{
 		{Protocol: "udp", Address: "127.0.0.1", Port: firstPort},
@@ -717,7 +735,7 @@ func TestCollectorInit_BindFailureIsRetryableCodedError(t *testing.T) {
 
 	port := conn.LocalAddr().(*net.UDPAddr).Port
 
-	c := New()
+	c := newTestSNMPTrapsCollector()
 	c.SetJobName("local")
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: port}}
 
@@ -742,9 +760,10 @@ func TestCollectorInit_ReceiveBufferFailureIsRetryableCodedError(t *testing.T) {
 		return errors.New("set buffer failed")
 	}
 
-	c := New()
+	c := newTestSNMPTrapsCollector()
 	c.SetJobName("local")
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
+	c.Listen.ReceiveBuffer = defaultListenerReceiveBuffer + 1
 
 	err := c.Init(context.Background())
 	require.Error(t, err)
@@ -761,7 +780,7 @@ func TestCollectorInit_ReceiveBufferFailureIsRetryableCodedError(t *testing.T) {
 func TestCollectorInit_InvalidVersionIsCodedError(t *testing.T) {
 	withTestCacheDir(t)
 
-	c := New()
+	c := newTestSNMPTrapsCollector()
 	c.SetJobName("local")
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: 162}}
 	c.Versions = []string{"v5"}
@@ -779,7 +798,7 @@ func TestCollectorInit_ProfileLoadFailureIsCodedError(t *testing.T) {
 	resetProfileCacheForTest()
 	withTestCacheDir(t)
 
-	c := New()
+	c := newTestSNMPTrapsCollector()
 	c.SetJobName("local")
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
 	c.Versions = []string{" V1 ", "V2C"}
@@ -802,7 +821,7 @@ func TestCollectorInit_PartialBindFailureClosesPriorSockets(t *testing.T) {
 	defer secondConn.Close()
 	secondPort := secondConn.LocalAddr().(*net.UDPAddr).Port
 
-	c := New()
+	c := newTestSNMPTrapsCollector()
 	c.SetJobName("local")
 	c.Listen.Endpoints = []EndpointConfig{
 		{Protocol: "udp", Address: "127.0.0.1", Port: firstPort},
@@ -836,7 +855,7 @@ func TestCollectorInit_EngineStateStatErrorIsRetryableCodedError(t *testing.T) {
 	const jobName = "engine-state-stat-error"
 	require.NoError(t, os.WriteFile(engineBootsDir(jobName), []byte("not a directory"), 0644))
 
-	c := New()
+	c := newTestSNMPTrapsCollector()
 	c.SetJobName(jobName)
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
 	c.Versions = []string{"v3"}
@@ -870,7 +889,7 @@ func TestCollectorInit_CleansCreatedV3StateOnEngineBootsFailure(t *testing.T) {
 	const jobName = "cleanup-v3-state"
 	require.NoError(t, os.MkdirAll(engineBootsPath(jobName), 0750))
 
-	c := New()
+	c := newTestSNMPTrapsCollector()
 	c.SetJobName(jobName)
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
 	c.Versions = []string{"v3"}
@@ -896,7 +915,7 @@ func TestCollectorCleanupIsIdempotent(t *testing.T) {
 	withTestCacheDir(t)
 	port := freeUDPPort(t)
 
-	c := New()
+	c := newTestSNMPTrapsCollector()
 	c.SetJobName("local")
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: port}}
 
@@ -909,7 +928,7 @@ func TestCollectorCleanupIsIdempotent(t *testing.T) {
 }
 
 func TestCollectorCollectRequiresStartedListener(t *testing.T) {
-	c := New()
+	c := newTestSNMPTrapsCollector()
 	err := c.Collect(context.Background())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "listener not started")

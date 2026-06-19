@@ -70,9 +70,7 @@ successful `geoipupdate` run causes the plugin to swap readers within ~30s, no
 restart needed.
 
 
-This integration is only supported on the following platforms:
-
-- Linux
+This integration is supported on all platforms.
 
 This integration runs as a single instance per Netdata Agent.
 

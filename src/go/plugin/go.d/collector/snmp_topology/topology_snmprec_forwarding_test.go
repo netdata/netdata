@@ -35,28 +35,24 @@ type snmprecForwardingFixture struct {
 }
 
 func TestTopologyCache_RealSnmprecForwardingFixtures(t *testing.T) {
-	tests := []struct {
-		name           string
+	tests := map[string]struct {
 		fixture        string
 		wantARP        bool
 		wantSTP        bool
 		wantDot1qFDB   bool
 		wantVTPVLANMap bool
 	}{
-		{
-			name:    "ArubaCX",
+		"ArubaCX": {
 			fixture: "arubaos-cx_10.10.snmprec",
 			wantARP: true,
 			wantSTP: true,
 		},
-		{
-			name:         "CiscoSmallBusiness",
+		"CiscoSmallBusiness": {
 			fixture:      "ciscosb_sg350x-24p.snmprec",
 			wantDot1qFDB: true,
 			wantSTP:      true,
 		},
-		{
-			name:           "IOSXE",
+		"IOSXE": {
 			fixture:        "iosxe_ie32008t2s-ios17-12.snmprec",
 			wantARP:        true,
 			wantSTP:        true,
@@ -64,17 +60,16 @@ func TestTopologyCache_RealSnmprecForwardingFixtures(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
 			data := parseSnmprecForwardingFixture(t, filepath.Join("../../../../testdata/snmp/snmprec", tt.fixture))
 
 			require.NotEmpty(t, data.ifNameEntries, "fixture %q should expose ifName data", tt.fixture)
 			require.NotEmpty(t, data.bridgePorts, "fixture %q should expose bridge port mappings", tt.fixture)
 			require.True(t, len(data.fdbEntries) > 0 || len(data.qBridgeFdb) > 0, "fixture %q should expose FDB data", tt.fixture)
 
-			coll := replaySnmprecForwardingFixture(t, tt.fixture, data)
-			obs := coll.topologyCache.buildEngineObservation(coll.topologyCache.localDevice)
+			cache := replaySnmprecForwardingFixture(t, tt.fixture, data)
+			obs := cache.buildEngineObservation(cache.localDevice)
 
 			require.NotEmpty(t, obs.Interfaces, "expected observed interfaces from fixture %q", tt.fixture)
 			require.NotEmpty(t, obs.BridgePorts, "expected observed bridge ports from fixture %q", tt.fixture)
@@ -93,56 +88,56 @@ func TestTopologyCache_RealSnmprecForwardingFixtures(t *testing.T) {
 			}
 			if tt.wantVTPVLANMap {
 				require.NotEmpty(t, data.vtpVLANs, "fixture %q should expose VTP VLAN data", tt.fixture)
-				require.True(t, cacheContainsAnyVLANName(coll.topologyCache.vlanIDToName, data.vtpVLANNames), "expected VTP VLAN names from fixture %q", tt.fixture)
+				require.True(t, cacheContainsAnyVLANName(cache.vlanIDToName, data.vtpVLANNames), "expected VTP VLAN names from fixture %q", tt.fixture)
 			}
 		})
 	}
 }
 
-func replaySnmprecForwardingFixture(t *testing.T, fixture string, data snmprecForwardingFixture) *Collector {
+func replaySnmprecForwardingFixture(t *testing.T, fixture string, data snmprecForwardingFixture) *topologyCache {
 	t.Helper()
 
-	coll := newTestCollector(ddsnmp.DeviceConnectionInfo{
+	cache := newTestTopologyCache(ddsnmp.DeviceConnectionInfo{
 		Hostname:    "192.0.2.10",
 		SysObjectID: "1.3.6.1.4.1.9.1.1",
 		SysName:     fixture,
 	})
 
 	if len(data.bridgeMetadata) > 0 {
-		coll.updateTopologyProfileTags([]*ddsnmp.ProfileMetrics{{DeviceMetadata: data.bridgeMetadata}})
+		cache.updateTopologyProfileTags([]*ddsnmp.ProfileMetrics{{DeviceMetadata: data.bridgeMetadata}})
 	}
 	for _, tags := range data.ifNameEntries {
-		coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindIfName, Tags: tags})
+		cache.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindIfName, Tags: tags})
 	}
 	for _, tags := range data.ifStatusEntries {
-		coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindIfStatus, Tags: tags})
+		cache.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindIfStatus, Tags: tags})
 	}
 	for _, tags := range data.ipIfEntries {
-		coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindIpIfIndex, Tags: tags})
+		cache.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindIpIfIndex, Tags: tags})
 	}
 	for _, tags := range data.bridgePorts {
-		coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindBridgePortIfIndex, Tags: tags})
+		cache.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindBridgePortIfIndex, Tags: tags})
 	}
 	for _, tags := range data.qBridgeVLANs {
-		coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindQbridgeVlanEntry, Tags: tags})
+		cache.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindQbridgeVlanEntry, Tags: tags})
 	}
 	for _, tags := range data.vtpVLANs {
-		coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindVtpVlan, Tags: tags})
+		cache.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindVtpVlan, Tags: tags})
 	}
 	for _, tags := range data.fdbEntries {
-		coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindFdbEntry, Tags: tags})
+		cache.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindFdbEntry, Tags: tags})
 	}
 	for _, tags := range data.qBridgeFdb {
-		coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindQbridgeFdbEntry, Tags: tags})
+		cache.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindQbridgeFdbEntry, Tags: tags})
 	}
 	for _, tags := range data.stpPorts {
-		coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindStpPort, Tags: tags})
+		cache.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindStpPort, Tags: tags})
 	}
 	for _, tags := range data.arpEntries {
-		coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindArpEntry, Tags: tags})
+		cache.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindArpEntry, Tags: tags})
 	}
 
-	return coll
+	return cache
 }
 
 func parseSnmprecForwardingFixture(t *testing.T, path string) snmprecForwardingFixture {

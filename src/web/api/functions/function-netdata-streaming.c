@@ -309,6 +309,16 @@ int function_netdata_streaming(BUFFER *wb, const char *function __maybe_unused, 
                 buffer_json_add_array_item_string(wb, NULL); // MlSilenced
             }
 
+            // MachineGUID + NodeID — hidden columns, to join streaming rows to the node inventory
+            buffer_json_add_array_item_string(wb, host->machine_guid); // MachineGUID
+            if(!UUIDiszero(host->node_id)) {
+                char node_id_str[UUID_STR_LEN];
+                uuid_unparse_lower(host->node_id.uuid, node_id_str);
+                buffer_json_add_array_item_string(wb, node_id_str); // NodeID
+            }
+            else
+                buffer_json_add_array_item_string(wb, NULL); // NodeID
+
             // close
             buffer_json_array_close(wb);
         }
@@ -878,6 +888,19 @@ int function_netdata_streaming(BUFFER *wb, const char *function __maybe_unused, 
                                     (double)max_ml_silenced,
                                     RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+
+        // MachineGUID + NodeID — hidden, used to join streaming rows to the node inventory
+        buffer_rrdf_table_add_field(wb, field_id++, "MachineGUID", "Machine GUID",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "NodeID", "Cloud Node ID",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_NONE, NULL);
     }
     buffer_json_object_close(wb); // columns

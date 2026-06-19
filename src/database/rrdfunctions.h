@@ -64,6 +64,8 @@ typedef int (*rrd_function_execute_cb_t)(struct rrd_function_execute *rfe, void 
 
 #include "rrd.h"
 
+struct rrd_host_function;
+
 void rrd_functions_host_init(RRDHOST *host);
 void rrd_functions_host_destroy(RRDHOST *host);
 
@@ -72,7 +74,7 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
                       HTTP_ACCESS access, bool sync, rrd_function_execute_cb_t execute_cb,
                       void *execute_cb_data);
 
-void rrd_function_del(RRDHOST *host, RRDSET *st, const char *name);
+bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_streaming, bool internal);
 
 // call a function, to be run from anywhere
 int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
@@ -84,6 +86,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
                      BUFFER *payload, const char *source, bool allow_restricted);
 
 bool rrd_function_available(RRDHOST *host, const char *function);
+bool rrd_function_is_available(struct rrd_host_function *rdcf, RRDHOST *host);
 
 bool rrd_function_has_this_original_result_callback(nd_uuid_t *transaction, rrd_function_result_callback_t cb);
 

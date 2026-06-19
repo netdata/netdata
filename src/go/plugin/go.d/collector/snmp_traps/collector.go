@@ -9,7 +9,6 @@ import (
 	"maps"
 	"net"
 	"net/netip"
-	"runtime"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -18,6 +17,8 @@ import (
 	"github.com/gosnmp/gosnmp"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 )
 
 //go:embed "config_schema.json"
@@ -32,6 +33,7 @@ const (
 
 	listenerReadErrorLogEvery     = time.Hour
 	listenerReadErrorLogKeyPrefix = "snmp_traps:listener_read_failed:"
+	listenerBufferDegradedMetric  = "listener_buffer_degraded"
 )
 
 var activeDirectJournalJobs atomic.Int64
@@ -40,20 +42,38 @@ func directJournalLogsAvailable() bool {
 	return activeDirectJournalJobs.Load() > 0
 }
 
-func init() {
-	collectorapi.Register("snmp_traps", collectorapi.Creator{
+// Register registers the SNMP traps collector with shared SNMP-family enrichment state.
+func Register(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnrichmentHandle) {
+	collectorapi.Register("snmp_traps", newCreator(deviceStore, topologyEnricher))
+}
+
+func newCreator(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnrichmentHandle) collectorapi.Creator {
+	if deviceStore == nil {
+		panic("snmp_traps Register requires a non-nil device store")
+	}
+	if topologyEnricher == nil {
+		panic("snmp_traps Register requires a non-nil trap enrichment handle")
+	}
+	return collectorapi.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 1,
 		},
-		CreateV2:      func() collectorapi.CollectorV2 { return New() },
+		CreateV2:      func() collectorapi.CollectorV2 { return New(deviceStore, topologyEnricher) },
 		Config:        func() any { return &Config{} },
 		Methods:       snmpTrapsMethods,
 		MethodHandler: snmpTrapsMethodHandler,
-	})
+	}
 }
 
-func New() *Collector {
+// New returns an SNMP traps collector using the provided SNMP-family enrichment state.
+func New(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnrichmentHandle) *Collector {
+	if deviceStore == nil {
+		panic("snmp_traps New requires a non-nil device store")
+	}
+	if topologyEnricher == nil {
+		panic("snmp_traps New requires a non-nil trap enrichment handle")
+	}
 	store := metrix.NewCollectorStore()
 
 	return &Collector{
@@ -63,7 +83,9 @@ func New() *Collector {
 				ReceiveBuffer: defaultListenerReceiveBuffer,
 			},
 		},
-		store: store,
+		store:            store,
+		deviceLookup:     deviceStore,
+		topologyEnricher: topologyEnricher,
 	}
 }
 
@@ -73,8 +95,11 @@ type Collector struct {
 
 	listener           *Listener
 	trapWriter         TrapWriter
+	journalHost        journalHostProvider
 	journalDir         string
 	store              metrix.CollectorStore
+	deviceLookup       deviceLookup
+	topologyEnricher   trapTopologyEnricher
 	jobName            string
 	vnode              string
 	versions           map[SnmpVersion]struct{}
@@ -158,9 +183,6 @@ func (c *Collector) Init(ctx context.Context) error {
 	journalEnabled := c.Journal.enabled()
 	if !journalEnabled && !c.OTLP.Enabled {
 		return dyncfgConfigError(errors.New("at least one SNMP trap output backend must be enabled: journal.enabled or otlp.enabled"))
-	}
-	if journalEnabled && runtime.GOOS != "linux" {
-		return dyncfgConfigError(errors.New("SNMP trap journal backend requires Linux"))
 	}
 
 	if err := validateOverrides(c.Overrides); err != nil {
@@ -320,6 +342,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	metrics := getJobMetrics(c.jobName)
 	listener.metrics = metrics
 	listener.onReadError = c.logListenerReadError
+	c.reportListenerReceiveBufferWarnings(listener.receiveBufferWarnings)
 	var secondaryWriter TrapWriter
 	if c.OTLP.Enabled {
 		c.warnPlaintextOTLP(otlpRuntime)
@@ -343,10 +366,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		writeFailureDim = trapWriteFailureOTLP
 	}
 	metrics.setDedupEnabled(c.Dedup.Enabled)
-	deduper := newTrapDeduper(c.jobName, c.Dedup, trapWriter, metrics, writeFailureDim)
-	if deduper != nil {
-		deduper.start()
-	}
+	deduper := newTrapDeduper(c.jobName, c.Dedup, trapWriter, metrics, writeFailureDim, c.monotonicUsec)
 
 	c.Versions = versions
 	c.vnode = c.Vnode
@@ -380,8 +400,10 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.metrics = metrics
 	c.listener = listener
 	c.trapWriter = trapWriter
+	c.journalHost = nil
 	c.journalDir = ""
 	if journalWriter != nil {
+		c.journalHost = journalWriter.host
 		c.journalDir = journalWriter.JournalDirectory()
 		activeDirectJournalJobs.Add(1)
 	}
@@ -392,6 +414,10 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.reverseDNSEnabled = c.ReverseDNS.Enabled
 	if c.reverseDNSEnabled {
 		c.reverseDNS = newReverseDNSResolver()
+	}
+
+	if deduper != nil {
+		deduper.start()
 	}
 
 	c.listener.start(c.handlePacket)
@@ -420,6 +446,7 @@ func (c *Collector) Cleanup(ctx context.Context) {
 		c.trapWriter.Close()
 		c.trapWriter = nil
 	}
+	c.journalHost = nil
 	if c.reverseDNS != nil {
 		c.reverseDNS.Close()
 		c.reverseDNS = nil
@@ -634,9 +661,9 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 		td = c.applyOverrides(td)
 	}
 
-	entry := trapEntryFromPDU(c.jobName, pdu, td, time.Now().UnixMicro(), monotonicUsec())
+	entry := trapEntryFromPDU(c.jobName, pdu, td, time.Now().UnixMicro(), c.monotonicUsec())
 	entry.PacketSequence = packetSequence
-	enrichTrapEntry(entry, c.reverseDNSEnabled, c.reverseDNS)
+	c.enrichTrapEntry(entry, c.reverseDNSEnabled, c.reverseDNS)
 	renderTrapEntryTemplates(entry, td)
 	if unknownOID {
 		c.incTrapError("unknown_oid")
@@ -781,6 +808,26 @@ func (c *Collector) logListenerReadError(ep EndpointConfig, err error) {
 	endpoint := listenerEndpointLogName(ep)
 	c.Limit(listenerReadErrorLogKeyPrefix+endpoint, 1, listenerReadErrorLogEvery).
 		Warningf("SNMP trap listener read failed (endpoint=%s): %v", endpoint, err)
+}
+
+func (c *Collector) reportListenerReceiveBufferWarnings(warnings []listenerReceiveBufferWarning) {
+	for _, warning := range warnings {
+		c.incTrapError(listenerBufferDegradedMetric)
+		c.logListenerReceiveBufferWarning(warning)
+	}
+}
+
+func (c *Collector) logListenerReceiveBufferWarning(warning listenerReceiveBufferWarning) {
+	if c.Logger == nil {
+		return
+	}
+	endpoint := listenerEndpointLogName(warning.endpoint)
+	c.warnf(
+		"SNMP trap listener receive buffer request degraded (endpoint=%s, requested=%d bytes): %v; continuing with the OS socket buffer, high trap bursts may be dropped",
+		endpoint,
+		warning.requested,
+		warning.err,
+	)
 }
 
 func (c *Collector) applyOverrides(td *TrapDef) *TrapDef {
