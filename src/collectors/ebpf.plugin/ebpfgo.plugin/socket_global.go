@@ -132,6 +132,14 @@ func runSocketGlobalCollector(handle *SocketLegacyHandle, stop <-chan struct{}, 
 	}
 
 	collectAndPublish := func() {
+		// Mark the socket module active before any early return so the SOCKET
+		// SHM flag is set even when Snapshot or SnapshotPerPID fails.  Without
+		// this, a transient BPF error prevents socket_ok from becoming true and
+		// cgroup charts are never created for the cycle.
+		if store != nil {
+			store.MarkSocketActive()
+		}
+
 		snap, err := handle.Runtime.Snapshot(handle.MapsPerCore)
 		if err != nil {
 			logPluginErr("socket.snapshot", "socket", "snapshot", err)

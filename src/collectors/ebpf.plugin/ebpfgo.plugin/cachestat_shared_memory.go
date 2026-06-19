@@ -226,6 +226,10 @@ func (s *cachestatSharedMemoryStore) UpdateApps(apps []libbpfloader.CachestatApp
 }
 
 // applySocketDataLocked merges the latest socket snapshot into s.entries.
+// Existing entries' socket field is updated from s.socketData.  PIDs present
+// in s.socketData but absent from s.entries are appended and the slice is
+// re-sorted, so that services with socket activity but no page-cache activity
+// (absent from the cachestat snapshot) are still visible to the C consumer.
 // Must be called with s.mu held for writing.
 func (s *cachestatSharedMemoryStore) applySocketDataLocked() {
 	for i := range s.entries {
@@ -237,6 +241,52 @@ func (s *cachestatSharedMemoryStore) applySocketDataLocked() {
 			s.entries[i].socket = ebpfSocketPublishApps{}
 		}
 	}
+
+	if len(s.socketData) == 0 {
+		return
+	}
+
+	// Append socket-only PIDs not already covered by a cachestat entry.
+	// s.entries is sorted ascending so binary search is O(log n) per PID.
+	prevLen := len(s.entries)
+	for pid, data := range s.socketData {
+		if !sortedEntriesContainPID(s.entries[:prevLen], pid) {
+			s.entries = append(s.entries, ebpfPidStat{pid: pid, socket: data})
+		}
+	}
+
+	if len(s.entries) > prevLen {
+		sort.Slice(s.entries, func(i, j int) bool {
+			return s.entries[i].pid < s.entries[j].pid
+		})
+	}
+}
+
+// sortedEntriesContainPID reports whether the sorted entries slice contains pid.
+func sortedEntriesContainPID(entries []ebpfPidStat, pid uint32) bool {
+	lo, hi := 0, len(entries)
+	for lo < hi {
+		mid := int(uint(lo+hi) >> 1)
+		if entries[mid].pid < pid {
+			lo = mid + 1
+		} else if entries[mid].pid > pid {
+			hi = mid
+		} else {
+			return true
+		}
+	}
+	return false
+}
+
+// MarkSocketActive records that the socket module is running this cycle so the
+// SOCKET SHM flag is set even when a per-PID or global snapshot call fails.
+// Without this, a transient BPF error causes the cgroup consumer to see no
+// SOCKET flag, socket_ok = false, and no charts created for the cycle.
+// Must be called each collection cycle when the socket goroutine is alive.
+func (s *cachestatSharedMemoryStore) MarkSocketActive() {
+	s.mu.Lock()
+	s.activeModules |= ebpfgoSHMFlagSocket
+	s.mu.Unlock()
 }
 
 // UpdateSocketApps stores the latest per-PID socket snapshot and applies it to
