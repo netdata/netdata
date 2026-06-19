@@ -519,6 +519,7 @@ endif()
 include(NetdataJSONC)
 include(NetdataYAML)
 include(NetdataBacktrace)
+include(NetdataSQLite)
 include(NetdataDlib)
 
 if(ENABLE_LEGACY_EBPF_PROGRAMS)
@@ -638,6 +639,8 @@ endif()
 if(ENABLE_LIBBACKTRACE)
     netdata_bundle_libbacktrace()
 endif()
+
+netdata_bundle_sqlite3()
 
 #
 # check source compilation
@@ -1747,11 +1750,6 @@ set(RRD_PLUGIN_FILES
         src/database/sqlite/sqlite_aclk_node.h
         src/database/sqlite/sqlite_aclk_alert.c
         src/database/sqlite/sqlite_aclk_alert.h
-        src/database/sqlite/vendored/sqlite3.c
-        src/database/sqlite/vendored/sqlite3.h
-        src/database/sqlite/vendored/sqlite3recover.c
-        src/database/sqlite/vendored/sqlite3recover.h
-        src/database/sqlite/vendored/dbdata.c
         src/web/api/queries/KolmogorovSmirnovDist.c
         src/web/api/queries/KolmogorovSmirnovDist.h
         src/database/rrdfunctions-inflight.c
@@ -2492,6 +2490,8 @@ endif()
 if(HAVE_LIBBACKTRACE)
     netdata_add_libbacktrace_to_target(libnetdata)
 endif()
+
+netdata_add_sqlite3_to_target(libnetdata)
 
 if(OS_WINDOWS)
         set(HAVE_ETW True)
