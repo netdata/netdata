@@ -52,7 +52,9 @@ func snmpTopologyToV1(data topologyData) (topologyv1.Data, error) {
 		tableTypes["actor_ports"] = snmpTopologyV1ActorPortsTableType()
 	}
 	tableTypes["actor_port_links"] = snmpTopologyV1ActorPortLinksTableType()
-	tableTypes["actor_ospf_neighbors"] = snmpTopologyV1OSPFNeighborsTableType()
+	if _, ok := tableTypes["actor_ospf_neighbors"]; !ok {
+		tableTypes["actor_ospf_neighbors"] = snmpTopologyV1OSPFNeighborsTableType()
+	}
 	portLinksTable, err := buildSNMPTopologyV1ActorPortLinksTable(data.Links, actorIndex, stringsDict)
 	if err != nil {
 		return topologyv1.Data{}, err
