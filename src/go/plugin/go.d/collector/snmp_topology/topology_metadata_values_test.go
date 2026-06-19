@@ -15,9 +15,20 @@ func TestTopologyMetadataValue_CanonicalizesAliasKeys(t *testing.T) {
 		"sys-location":     "dc1",
 	}
 
-	require.Equal(t, "SN-123", topologyMetadataValue(labels, []string{"serial_number"}))
-	require.Equal(t, "17.9.4", topologyMetadataValue(labels, []string{"software_version"}))
-	require.Equal(t, "dc1", topologyMetadataValue(labels, []string{"sys_location"}))
+	tests := map[string]struct {
+		keys []string
+		want string
+	}{
+		"serial-number":    {keys: []string{"serial_number"}, want: "SN-123"},
+		"software-version": {keys: []string{"software_version"}, want: "17.9.4"},
+		"sys-location":     {keys: []string{"sys_location"}, want: "dc1"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.want, topologyMetadataValue(labels, tc.keys))
+		})
+	}
 }
 
 func TestSetTopologyMetadataLabelIfMissing_PreservesExistingValue(t *testing.T) {
@@ -31,15 +42,26 @@ func TestSetTopologyMetadataLabelIfMissing_PreservesExistingValue(t *testing.T) 
 }
 
 func TestTopologyMetadataValue_DeterministicAcrossCanonicalKeyCollisions(t *testing.T) {
-	first := map[string]string{
-		"serial_number": "SN-200",
-		"serial-number": "SN-100",
-	}
-	second := map[string]string{
-		"serial-number": "SN-100",
-		"serial_number": "SN-200",
+	tests := map[string]struct {
+		labels map[string]string
+	}{
+		"underscore-first": {
+			labels: map[string]string{
+				"serial_number": "SN-200",
+				"serial-number": "SN-100",
+			},
+		},
+		"dash-first": {
+			labels: map[string]string{
+				"serial-number": "SN-100",
+				"serial_number": "SN-200",
+			},
+		},
 	}
 
-	require.Equal(t, "SN-100", topologyMetadataValue(first, []string{"serial_number"}))
-	require.Equal(t, "SN-100", topologyMetadataValue(second, []string{"serial_number"}))
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, "SN-100", topologyMetadataValue(tc.labels, []string{"serial_number"}))
+		})
+	}
 }

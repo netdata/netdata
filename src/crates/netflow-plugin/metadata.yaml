@@ -43,8 +43,7 @@ modules:
           dynamic templates cached from the exporter. Decoded records are enriched in-memory
           and appended to disk-backed journal tiers (raw, 1-minute, 5-minute, 1-hour rollups).
       supported_platforms:
-        include:
-          - Linux
+        include: []
         exclude: []
       multi_instance: false
       additional_permissions:
@@ -203,8 +202,7 @@ modules:
           version number 10 and decoded using cached templates. Decoded records are enriched and
           appended to disk-backed journal tiers.
       supported_platforms:
-        include:
-          - Linux
+        include: []
         exclude: []
       multi_instance: false
       additional_permissions:
@@ -340,8 +338,7 @@ modules:
           their distinct header format and decoded per the sFlow v5 specification. Decoded records
           are enriched and appended to disk-backed journal tiers.
       supported_platforms:
-        include:
-          - Linux
+        include: []
         exclude: []
       multi_instance: false
       additional_permissions:
@@ -519,8 +516,7 @@ modules:
           `/usr/share/netdata/topology-ip-intel/`). When databases are auto-detected they are
           treated as optional, so a missing or unreadable file does not abort plugin startup.
       supported_platforms:
-        include:
-          - Linux
+        include: []
         exclude: []
       multi_instance: false
       additional_permissions:
@@ -728,8 +724,7 @@ modules:
           successful `geoipupdate` run causes the plugin to swap readers within ~30s, no
           restart needed.
       supported_platforms:
-        include:
-          - Linux
+        include: []
         exclude: []
       multi_instance: false
       additional_permissions:
@@ -988,8 +983,7 @@ modules:
           `autonomous_system_number`, and `autonomous_system_organization` fields
           will also work with the Custom MMDB integration.
       supported_platforms:
-        include:
-          - Linux
+        include: []
         exclude: []
       multi_instance: false
       additional_permissions:
@@ -1202,8 +1196,7 @@ modules:
           standard auto-detected cache directory. The plugin reloads the generated MMDB
           automatically when the file changes.
       supported_platforms:
-        include:
-          - Linux
+        include: []
         exclude: []
       multi_instance: false
       additional_permissions:
@@ -1369,8 +1362,7 @@ modules:
           auto-detected cache directory. The plugin reloads the generated MMDB
           automatically when the file changes.
       supported_platforms:
-        include:
-          - Linux
+        include: []
         exclude: []
       multi_instance: false
       additional_permissions:
@@ -1536,8 +1528,7 @@ modules:
           standard auto-detected cache directory. The plugin reloads the generated MMDB
           automatically when the file changes.
       supported_platforms:
-        include:
-          - Linux
+        include: []
         exclude: []
       multi_instance: false
       additional_permissions:
@@ -1700,8 +1691,7 @@ modules:
           auto-detected cache directory. The plugin reloads the generated MMDB
           automatically when the file changes.
       supported_platforms:
-        include:
-          - Linux
+        include: []
         exclude: []
       multi_instance: false
       additional_permissions:
@@ -1880,8 +1870,7 @@ modules:
           `enrichment.geoip.geo_database` at it in `netflow.yaml`. The plugin reloads on
           file change automatically (mechanism documented on the IP Intelligence page).
       supported_platforms:
-        include:
-          - Linux
+        include: []
         exclude: []
       multi_instance: false
       additional_permissions:
@@ -2097,8 +2086,7 @@ modules:
           withdrawal (`MP_UNREACH` or `withdraw_routes`), PeerDown, or session disconnect
           followed by the `keep` interval expiring (default 5 minutes).
       supported_platforms:
-        include:
-          - Linux
+        include: []
         exclude: []
       multi_instance: false
       additional_permissions:
@@ -2485,8 +2473,7 @@ modules:
           rollup tiers do not carry them. Queries that need AS path or community data
           must run against a window that the raw retention still covers.
       supported_platforms:
-        include:
-          - Linux
+        include: []
         exclude: []
       multi_instance: false
       additional_permissions:
@@ -2777,8 +2764,7 @@ modules:
           than the file actually changes; daily is enough for most flow-attribution use
           cases. The plugin floors the configured `interval` at 60s.
       supported_platforms:
-        include:
-          - Linux
+        include: []
         exclude: []
       multi_instance: true
       additional_permissions:
@@ -3047,8 +3033,7 @@ modules:
           `creationTime` you can inspect to see when Google last regenerated them.
           The plugin fetches the full document on each refresh cycle.
       supported_platforms:
-        include:
-          - Linux
+        include: []
         exclude: []
       multi_instance: true
       additional_permissions:
@@ -3327,8 +3312,7 @@ modules:
           trie. Same mechanism as AWS / GCP IP Ranges -- different URL and JSON shape,
           plus one important operational caveat documented below.
       supported_platforms:
-        include:
-          - Linux
+        include: []
         exclude: []
       multi_instance: true
       additional_permissions:
@@ -3633,8 +3617,7 @@ modules:
           allows) or an explicit `?limit=N` greater than your prefix count, or expose a
           server-side aggregator that returns the full list at one URL.
       supported_platforms:
-        include:
-          - Linux
+        include: []
         exclude: []
       multi_instance: true
       additional_permissions:
@@ -3934,8 +3917,7 @@ modules:
           The same flow applies to every JSON-over-HTTP source; the integration-specific
           part is the URL and the `transform` expression.
       supported_platforms:
-        include:
-          - Linux
+        include: []
         exclude: []
       multi_instance: true
       additional_permissions:
@@ -4316,8 +4298,7 @@ modules:
           from. There is no network access, no file watching, and no hot reload --
           changes take effect on the next plugin startup.
       supported_platforms:
-        include:
-          - Linux
+        include: []
         exclude: []
       multi_instance: false
       additional_permissions:
@@ -4734,8 +4715,7 @@ modules:
           cache TTL is `enrichment.classifier_cache_duration` (default 5 minutes). It is
           a last-access TTL so entries live as long as they're queried.
       supported_platforms:
-        include:
-          - Linux
+        include: []
         exclude: []
       multi_instance: false
       additional_permissions:
@@ -5113,8 +5093,7 @@ modules:
           stream where only a subset of exporters ship the frame bytes. Enabling decap is
           half the work; the exporter must also be configured to ship the inner frame.
       supported_platforms:
-        include:
-          - Linux
+        include: []
         exclude: []
       multi_instance: false
       additional_permissions:

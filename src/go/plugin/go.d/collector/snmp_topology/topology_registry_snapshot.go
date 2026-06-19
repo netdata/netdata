@@ -11,6 +11,8 @@ import (
 
 type topologyObservationSnapshot struct {
 	l2Observations []topologyengine.L2Observation
+	l3Interfaces   []topologyL3Interface
+	ospfNeighbors  []topologyOSPFNeighbor
 	localDevice    topologyDevice
 	localDeviceID  string
 	agentID        string
@@ -20,6 +22,8 @@ type topologyObservationSnapshot struct {
 type topologyObservationAggregate struct {
 	snapshots      []topologyObservationSnapshot
 	l2Observations []topologyengine.L2Observation
+	l3Interfaces   []topologyL3Interface
+	ospfNeighbors  []topologyOSPFNeighbor
 	localDeviceID  string
 	agentID        string
 	collectedAt    time.Time
@@ -52,6 +56,8 @@ func (c *topologyCache) snapshotEngineObservations() (topologyObservationSnapsho
 
 	return topologyObservationSnapshot{
 		l2Observations: []topologyengine.L2Observation{localObservation},
+		l3Interfaces:   c.snapshotL3Interfaces(localObservation.DeviceID),
+		ospfNeighbors:  c.snapshotOSPFNeighbors(localObservation.DeviceID),
 		localDevice:    local,
 		localDeviceID:  localObservation.DeviceID,
 		agentID:        strings.TrimSpace(c.agentID),

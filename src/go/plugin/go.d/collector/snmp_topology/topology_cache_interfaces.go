@@ -94,6 +94,11 @@ func (c *topologyCache) updateIfIndexByIP(tags map[string]string) {
 	})
 	if mask := normalizeIPAddress(tags[tagTopoIPMask]); mask != "" {
 		c.ifNetmaskByIP[ip] = mask
+		c.l3InterfacesByIP[ip] = topologyL3Interface{
+			IP:      ip,
+			Netmask: mask,
+			IfIndex: ifIndex,
+		}
 	}
 }
 

@@ -119,18 +119,19 @@ func TestCollectorHandlePacketRecoversFromPanic(t *testing.T) {
 
 func TestCollectorHandlePacketRendersTemplatesAfterEnrichment(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
+	deviceStore := ddsnmp.NewDeviceStore()
 	regKey := "test:198.51.100.10:162"
-	ddsnmp.DeviceRegistry.Register(regKey, ddsnmp.DeviceConnectionInfo{
+	deviceStore.Register(regKey, ddsnmp.DeviceConnectionInfo{
 		Hostname: "198.51.100.10",
 		SysName:  "core-sw-01",
 		Vendor:   "cisco",
 	})
-	defer ddsnmp.DeviceRegistry.Unregister(regKey)
 
 	trap := testColdStartTrap("security", "warning", "security coldStart on {_HOSTNAME} from {TRAP_DEVICE_VENDOR}")
 	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
 	c := newDefaultTestV2Collector(writer)
+	c.deviceLookup = deviceStore
 
 	c.handlePacket(packet.payload, packet.peer, nil, nil)
 
@@ -162,8 +163,7 @@ func TestCollectorHandlePacketDoesNotUseListenerVnodeAsSourceNode(t *testing.T) 
 
 func TestCollectorHandlePacketRendersTopologyEnrichmentBeforeReverseDNS(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
-	prev := trapTopologyEnrichmentForSource
-	trapTopologyEnrichmentForSource = func(ip, ifIndex string) *snmptopology.TrapTopologyEnrichment {
+	topologyEnricher := testTrapTopologyEnricher(func(ip, ifIndex string) *snmptopology.TrapTopologyEnrichment {
 		if ip != "198.51.100.10" {
 			t.Fatalf("topology enrichment looked up IP %q, want 198.51.100.10", ip)
 		}
@@ -180,8 +180,7 @@ func TestCollectorHandlePacketRendersTopologyEnrichmentBeforeReverseDNS(t *testi
 			InterfaceStatus: "skipped",
 			NeighborStatus:  "skipped",
 		}
-	}
-	t.Cleanup(func() { trapTopologyEnrichmentForSource = prev })
+	})
 
 	dns := newReverseDNSResolver()
 	dns.cache["198.51.100.10"] = reverseDNSCacheEntry{
@@ -198,6 +197,7 @@ func TestCollectorHandlePacketRendersTopologyEnrichmentBeforeReverseDNS(t *testi
 	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
 	c := newDefaultTestV2Collector(writer)
+	c.topologyEnricher = topologyEnricher
 	c.reverseDNSEnabled = true
 	c.reverseDNS = dns
 
@@ -980,6 +980,7 @@ func TestCollectMetricsEmitsCounters(t *testing.T) {
 	incTrapError(jobName, "decode_failed")
 	getJobMetrics(jobName).addError("otlp_export_failed", 3)
 	getJobMetrics(jobName).addError("listener_read_failed", 2)
+	getJobMetrics(jobName).addError("listener_buffer_degraded", 1)
 
 	store := metrix.NewCollectorStore()
 	managed, ok := metrix.AsCycleManagedStore(store)
@@ -1005,6 +1006,9 @@ func TestCollectMetricsEmitsCounters(t *testing.T) {
 	}
 	if v, ok := store.Read().Value("snmp_trap_errors_listener_read_failed", labels); !ok || v != 2 {
 		t.Fatalf("errors listener_read_failed value = %v/%v, want 2/true", v, ok)
+	}
+	if v, ok := store.Read().Value("snmp_trap_errors_listener_buffer_degraded", labels); !ok || v != 1 {
+		t.Fatalf("errors listener_buffer_degraded value = %v/%v, want 1/true", v, ok)
 	}
 }
 

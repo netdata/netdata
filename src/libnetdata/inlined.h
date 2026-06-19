@@ -108,9 +108,9 @@ static inline uint32_t murmur32(uint32_t k) {
 static uint64_t murmur64(uint64_t k) __attribute__((const));
 static inline uint64_t murmur64(uint64_t k) {
     k ^= k >> 33;
-    k *= 0xff51afd7ed558ccdUL;
+    k *= 0xff51afd7ed558ccdULL;
     k ^= k >> 33;
-    k *= 0xc4ceb9fe1a85ec53UL;
+    k *= 0xc4ceb9fe1a85ec53ULL;
     k ^= k >> 33;
 
     return k;

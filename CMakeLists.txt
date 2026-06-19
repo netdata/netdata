@@ -308,6 +308,10 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTE
 
     if(ENABLE_PLUGIN_NETFLOW)
       set(NETFLOW_PLUGIN_RUSTFLAGS "")
+      set(NETFLOW_PLUGIN_ENV_VARS
+              "NETDATA_BUILD_CACHE_DIR=${CACHE_DIR}"
+              "NETDATA_BUILD_LIB_DIR=${VARLIB_DIR}"
+              "NETDATA_BUILD_STOCK_DATA_DIR=${STOCK_DATA_DIR}")
 
       # We depend (transitively) on the `io-uring` crate which doesn't provide
       # prebuilt bindings for 32-bit arches. Considering this is a compile-time
@@ -318,8 +322,7 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTE
         # The workspace release profile still propagates fat LTO, single-codegen-unit,
         # and debuginfo settings through Rust dependencies on 32-bit builds. Override
         # Cargo's release profile too so the entire dependency graph stays linkable.
-        corrosion_set_env_vars(
-                netflow-plugin
+        list(APPEND NETFLOW_PLUGIN_ENV_VARS
                 "CARGO_PROFILE_RELEASE_DEBUG=0"
                 "CARGO_PROFILE_RELEASE_LTO=off"
                 "CARGO_PROFILE_RELEASE_CODEGEN_UNITS=8")
@@ -332,6 +335,8 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTE
       if(NETFLOW_PLUGIN_RUSTFLAGS)
         corrosion_add_target_rustflags(netflow-plugin ${NETFLOW_PLUGIN_RUSTFLAGS})
       endif()
+
+      corrosion_set_env_vars(netflow-plugin ${NETFLOW_PLUGIN_ENV_VARS})
     endif()
 endif()
 
@@ -519,6 +524,7 @@ endif()
 include(NetdataJSONC)
 include(NetdataYAML)
 include(NetdataBacktrace)
+include(NetdataSQLite)
 include(NetdataDlib)
 
 if(ENABLE_LEGACY_EBPF_PROGRAMS)
@@ -638,6 +644,8 @@ endif()
 if(ENABLE_LIBBACKTRACE)
     netdata_bundle_libbacktrace()
 endif()
+
+netdata_bundle_sqlite3()
 
 #
 # check source compilation
@@ -1747,11 +1755,6 @@ set(RRD_PLUGIN_FILES
         src/database/sqlite/sqlite_aclk_node.h
         src/database/sqlite/sqlite_aclk_alert.c
         src/database/sqlite/sqlite_aclk_alert.h
-        src/database/sqlite/vendored/sqlite3.c
-        src/database/sqlite/vendored/sqlite3.h
-        src/database/sqlite/vendored/sqlite3recover.c
-        src/database/sqlite/vendored/sqlite3recover.h
-        src/database/sqlite/vendored/dbdata.c
         src/web/api/queries/KolmogorovSmirnovDist.c
         src/web/api/queries/KolmogorovSmirnovDist.h
         src/database/rrdfunctions-inflight.c
@@ -1904,6 +1907,7 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-parents.c
         src/streaming/stream-handshake.c
         src/streaming/protocol/command-function.c
+        src/streaming/protocol/command-function-del.c
         src/streaming/protocol/command-host-labels.c
         src/streaming/protocol/command-chart-definition.c
         src/streaming/protocol/command-begin-set-end-v2.c
@@ -2493,6 +2497,8 @@ endif()
 if(HAVE_LIBBACKTRACE)
     netdata_add_libbacktrace_to_target(libnetdata)
 endif()
+
+netdata_add_sqlite3_to_target(libnetdata)
 
 if(OS_WINDOWS)
         set(HAVE_ETW True)

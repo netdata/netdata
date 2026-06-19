@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -246,6 +247,9 @@ traps:
 	require.NoError(t, err)
 	assert.NotEqual(t, before, afterUserBaseChange)
 
+	if runtime.GOOS == "windows" {
+		return
+	}
 	require.NoError(t, os.Chmod(filepath.Join(userDir, "user.yaml"), 0600))
 	afterUserModeChange, err := fingerprintUserProfileFiles([]string{userDir})
 	require.NoError(t, err)

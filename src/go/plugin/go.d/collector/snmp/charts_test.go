@@ -14,7 +14,7 @@ import (
 )
 
 func TestCollector_AddProfileScalarMetricChart_LabelsIncludeMetricTags(t *testing.T) {
-	collr := New()
+	collr := newTestSNMPCollector()
 	collr.Hostname = "192.0.2.1"
 	collr.sysInfo = &snmputils.SysInfo{
 		Name:   "test-device",
@@ -132,7 +132,7 @@ func TestCollector_AddLicenseCharts_LazyBySignalClass(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			collr := New()
+			collr := newTestSNMPCollector()
 			collr.sysInfo = &snmputils.SysInfo{}
 			collr.addLicenseCharts(tc.agg)
 			collr.addLicenseCharts(tc.agg)

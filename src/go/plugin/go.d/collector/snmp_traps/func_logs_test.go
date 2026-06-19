@@ -11,6 +11,11 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/funcctl"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/snmptrapsfunc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -138,6 +143,43 @@ func TestSNMPTrapsLogsFunctionUnavailableWithoutJournal(t *testing.T) {
 	assert.Contains(t, resp.Message, "direct journal output has no sources")
 }
 
+func TestSNMPTrapsLogsDispatchDoesNotRequireRunningJob(t *testing.T) {
+	startJournalJobs := activeDirectJournalJobs.Load()
+	activeDirectJournalJobs.Store(1)
+	t.Cleanup(func() { activeDirectJournalJobs.Store(startJournalJobs) })
+	t.Setenv(netdataLogDirEnv, filepath.Join(t.TempDir(), "logs"))
+
+	creator := newCreator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle())
+
+	reg := newSNMPTrapsTestFunctionRegistry()
+	var gotCode int
+	var gotResp map[string]any
+	controller := funcctl.New(funcctl.Options{
+		FnReg: reg,
+		JSONWriter: func(data []byte, code int) {
+			gotCode = code
+			require.NoError(t, json.Unmarshal(data, &gotResp))
+		},
+	})
+	controller.RegisterModules(collectorapi.Registry{"snmp_traps": creator})
+
+	require.Contains(t, reg.registeredNames(), snmpTrapsFunctionName)
+
+	reg.call(snmpTrapsFunctionName, context.Background(), functions.Function{
+		UID:     "snmp-traps-jobless-dispatch",
+		Timeout: time.Second,
+		Payload: []byte(`{}`),
+	})
+
+	require.NotNil(t, gotResp)
+	assert.Equal(t, 503, gotCode)
+	assert.Equal(t, float64(503), gotResp["status"])
+	errorMessage := fmt.Sprint(gotResp["errorMessage"])
+	assert.Contains(t, errorMessage, "direct journal output has no sources")
+	assert.NotContains(t, errorMessage, "unknown job")
+	assert.NotContains(t, errorMessage, "requires raw request handling")
+}
+
 func TestSNMPTrapsLogsFunctionRejectsUnknownMethod(t *testing.T) {
 	handler := snmptrapsfunc.NewHandler(t.TempDir())
 
@@ -158,7 +200,7 @@ func TestSNMPTrapsLogsFunctionRejectsInvalidJSON(t *testing.T) {
 func writeTestTrapJournal(t *testing.T, root, jobName, message, category string) string {
 	t.Helper()
 
-	w, err := NewJournalWriter(filepath.Join(root, jobName), RetentionConfig{}.makeJournalConfig())
+	w, err := newTestJournalWriter(filepath.Join(root, jobName), RetentionConfig{}.makeJournalConfig())
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, w.Close()) })
 
@@ -178,7 +220,7 @@ func writeTestTrapJournal(t *testing.T, root, jobName, message, category string)
 		{Name: "TRAP_SOURCE_IP", Value: []byte("192.0.2.1")},
 		{Name: "TRAP_DEVICE_VENDOR", Value: []byte("test-vendor")},
 		{Name: "TRAP_JSON", Value: []byte(`{"trap_oid":"1.3.6.1.6.3.1.1.5.1"}`)},
-	}, now, monotonicUsec()))
+	}, now, 1000))
 	require.NoError(t, w.Sync())
 	return w.JournalDirectory()
 }
@@ -186,7 +228,7 @@ func writeTestTrapJournal(t *testing.T, root, jobName, message, category string)
 func writeHighVarbindTrapJournal(t *testing.T, root, jobName string, varbinds int) string {
 	t.Helper()
 
-	w, err := NewJournalWriter(filepath.Join(root, jobName), RetentionConfig{}.makeJournalConfig())
+	w, err := newTestJournalWriter(filepath.Join(root, jobName), RetentionConfig{}.makeJournalConfig())
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, w.Close()) })
 
@@ -217,7 +259,7 @@ func writeHighVarbindTrapJournal(t *testing.T, root, jobName string, varbinds in
 	})
 
 	now := time.Now().UnixMicro()
-	require.NoError(t, w.WriteEntry(fields, now, monotonicUsec()))
+	require.NoError(t, w.WriteEntry(fields, now, 1000))
 	require.NoError(t, w.Sync())
 	return w.JournalDirectory()
 }
@@ -229,6 +271,55 @@ func funcapiRawRequest(method string, info bool, payload []byte) funcapi.RawMeth
 		Payload: payload,
 		Timeout: time.Second,
 	}
+}
+
+type snmpTrapsTestFunctionRegistry struct {
+	handlers        map[string]func(functions.Function)
+	contextHandlers map[string]functions.Handler
+}
+
+func newSNMPTrapsTestFunctionRegistry() *snmpTrapsTestFunctionRegistry {
+	return &snmpTrapsTestFunctionRegistry{
+		handlers:        make(map[string]func(functions.Function)),
+		contextHandlers: make(map[string]functions.Handler),
+	}
+}
+
+func (r *snmpTrapsTestFunctionRegistry) Register(name string, fn func(functions.Function)) {
+	r.handlers[name] = fn
+}
+
+func (r *snmpTrapsTestFunctionRegistry) RegisterWithContext(name string, fn functions.Handler) {
+	r.handlers[name] = func(f functions.Function) {
+		fn(context.Background(), f)
+	}
+	r.contextHandlers[name] = fn
+}
+
+func (r *snmpTrapsTestFunctionRegistry) Unregister(name string) {
+	delete(r.handlers, name)
+	delete(r.contextHandlers, name)
+}
+
+func (r *snmpTrapsTestFunctionRegistry) RegisterPrefix(string, string, func(functions.Function)) {}
+func (r *snmpTrapsTestFunctionRegistry) UnregisterPrefix(string, string)                         {}
+func (r *snmpTrapsTestFunctionRegistry) RegisterPrefixWithContext(string, string, functions.Handler) {
+}
+
+func (r *snmpTrapsTestFunctionRegistry) call(name string, ctx context.Context, fn functions.Function) {
+	if handler := r.contextHandlers[name]; handler != nil {
+		handler(ctx, fn)
+		return
+	}
+	r.handlers[name](fn)
+}
+
+func (r *snmpTrapsTestFunctionRegistry) registeredNames() []string {
+	out := make([]string, 0, len(r.handlers))
+	for name := range r.handlers {
+		out = append(out, name)
+	}
+	return out
 }
 
 func assertResponseHistogramID(t *testing.T, response map[string]any, want string) {

@@ -8,13 +8,13 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
 
-func (c *Collector) updateTopologyProfileTags(pms []*ddsnmp.ProfileMetrics) {
-	if c.topologyCache == nil {
+func (c *topologyCache) updateTopologyProfileTags(pms []*ddsnmp.ProfileMetrics) {
+	if c == nil {
 		return
 	}
 
-	c.topologyCache.mu.Lock()
-	defer c.topologyCache.mu.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	for _, pm := range pms {
 		tags := topologyMetadataValues(pm.DeviceMetadata)
@@ -30,41 +30,54 @@ func (c *Collector) updateTopologyProfileTags(pms []*ddsnmp.ProfileMetrics) {
 		}
 
 		if len(tags) > 0 {
-			c.topologyCache.applyLLDPLocalDeviceProfileTags(tags)
-			c.topologyCache.updateLocalBridgeIdentityFromTags(tags)
-			c.topologyCache.applySTPProfileTags(tags)
-			c.topologyCache.applyVTPProfileTags(tags)
+			c.applyLLDPLocalDeviceProfileTags(tags)
+			c.updateLocalBridgeIdentityFromTags(tags)
+			c.applySTPProfileTags(tags)
+			c.applyVTPProfileTags(tags)
+			c.applyOSPFProfileTags(tags)
 		}
 	}
 }
 
-func (c *Collector) updateTopologyCacheEntry(m ddsnmp.Metric) {
-	if c.topologyCache == nil {
+func (c *topologyCache) updateTopologyCacheEntry(m ddsnmp.Metric) {
+	if c == nil {
 		return
 	}
 
-	c.topologyCache.mu.Lock()
-	defer c.topologyCache.mu.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	c.topologyCache.ingestMetric(m.TopologyKind, m.Tags)
+	c.ingestMetric(m.TopologyKind, m.Tags)
 }
 
-func (c *Collector) updateTopologySysUptime(value int64) {
-	if c == nil || c.topologyCache == nil {
+func (c *topologyCache) updateTopologySysUptime(value int64) {
+	if c == nil {
 		return
 	}
 	if value <= 0 {
 		return
 	}
 
-	c.topologyCache.mu.Lock()
-	defer c.topologyCache.mu.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	local := c.topologyCache.localDevice
+	local := c.localDevice
 	local.SysUptime = value
 	local.Labels = ensureLabels(local.Labels)
 	setTopologyMetadataLabelIfMissing(local.Labels, "sys_uptime", strconv.FormatInt(value, 10))
-	c.topologyCache.localDevice = local
+	c.localDevice = local
+}
+
+func (c *topologyCache) ingestTopologyProfileMetrics(pms []*ddsnmp.ProfileMetrics) {
+	for _, pm := range pms {
+		c.ingestTopologyMetricSet(pm.TopologyMetrics)
+	}
+}
+
+func (c *topologyCache) ingestTopologyMetricSet(metrics []ddsnmp.Metric) {
+	for _, metric := range metrics {
+		c.updateTopologyCacheEntry(metric)
+	}
 }
 
 func topologyMetadataValues(meta map[string]ddsnmp.MetaTag) map[string]string {

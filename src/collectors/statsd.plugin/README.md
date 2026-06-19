@@ -496,7 +496,13 @@ For example, to monitor the application `myapp` using StatsD and Netdata, create
 
 Using this configuration, `myapp` gets its own dashboard section with one chart containing two [dimensions](https://learn.netdata.cloud/docs/developer-and-contributor-corner/glossary#d).
 
-When you send metrics like `foo:10|g` and `bar:20|g`, you'll see both private charts and your synthetic chart.
+When you send metrics like `myapp.metric1:10|g` and `myapp.metric2:20|g`, you'll see both private charts and your synthetic chart. These metric names must match the pattern defined in the `[app]` section (e.g., `myapp.*`) for them to appear in your synthetic charts.
+
+:::note
+
+**Synthetic chart appears empty or is missing?** This happens when the metric names you send don't match the `metrics` pattern in your `[app]` section. StatsD matches incoming metric names against the `metrics` pattern using Netdata's [simple pattern](/src/libnetdata/simple_pattern/README.md) syntax — if a metric name doesn't match, it is never linked to the app's synthetic charts. For example, with `metrics = myapp.*`, sending bare names like `foo:10|g` creates a private chart for `foo` but never feeds the synthetic chart. To fix this, send metric names that include the prefix matching the pattern (e.g., `myapp.foo:10|g`).
+
+:::
 
 <details>
 <summary><strong>Synthetic Chart Example</strong></summary>
@@ -511,14 +517,22 @@ Example of a synthetic chart combining multiple metrics:
 
 The `[app]` section defines the application and has these options:
 
+:::warning
+
+The `[app]` section is a **namespace/container** — it groups metrics and sets defaults, but does **not** create any dashboard charts by itself. To see synthetic charts on the dashboard, you **must** add one or more chart definition sections (e.g., `[mychart]`) below the `[app]` section. If you only define an `[app]` section without chart definitions, the only visible charts will be private charts for individual metrics (if `private charts = yes` or the global default is enabled).
+
+Settings like `private charts`, `gaps when not collected`, and `history` configure how the app's metrics and charts behave — they are not chart-level settings. The `memory mode` setting under `[app]` is currently ignored. See [Chart Definitions](#chart-definitions) below for how to create charts.
+
+:::
+
 :::note
 
 - **name** - Defines the application name
 - **metrics** - [Simple pattern](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md) matching all metrics for this app
 - **private charts** - Enable/disable private charts for matched metrics (yes|no)
 - **gaps when not collected** - Show gaps when no metrics are collected (yes|no)
-- **memory mode** - Sets memory mode for application charts (optional, default is global Netdata setting)
-- **history** - Size of round-robin database (optional, only relevant with `memory mode = save`)
+- **memory mode** - Ignored in the `[app]` section; application charts use the host's default memory mode
+- **history** - Size of round-robin database for application charts (optional, minimum 5)
 
 :::
 
@@ -677,6 +691,14 @@ To rename methods automatically:
 
 This adds dimensions named `GET`, `ADD`, and `DELETE`.
 </details>
+
+### Scope of StatsD Chart Configuration
+
+All chart and dimension configuration directives in `/etc/netdata/statsd.d/*.conf` control **local agent behavior only** — they define how the local Netdata agent processes, names, and visualizes statsd metrics it receives.
+
+The dimension `TYPE` field (see [Dimension Format](#dimension-format) above) selects which computed value of a metric a single agent displays. It does **not** control how that metric is combined across multiple Netdata instances.
+
+Cross-node aggregation — how metrics from multiple agents are combined in Netdata Cloud dashboards — is governed by the Cloud query engine, not by statsd configuration files. To choose Sum, Average, or another aggregation for a chart in Netdata Cloud, use the [aggregate function](../../../docs/dashboards-and-charts/netdata-charts.md#aggregate-functions-dropdown) on that chart. There is no `aggregation = SUM` or `aggregation = AVG` directive in statsd.d configuration.
 
 ## Using StatsD with Different Languages
 
@@ -913,7 +935,6 @@ Start with this basic configuration:
     metrics = k6*
     private charts = yes
     gaps when not collected = no
-    memory mode = dbengine
 ```
 
 </details>
@@ -951,7 +972,6 @@ Here's a complete configuration for k6:
     metrics = k6*
     private charts = yes
     gaps when not collected = no
-    memory mode = dbengine
 
 [dictionary]
     http_req_blocked = Blocked HTTP Requests 

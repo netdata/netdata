@@ -16,6 +16,7 @@ research cannot be mistaken for product specification.
 | Spec | Scope | Main consumers |
 |---|---|---|
 | [go-v2-host-scope.md](go-v2-host-scope.md) | Go framework V2 host-scope and vnode metric routing contract. | Go V2 collector work, `metrix`, `jobruntime`, `chartengine`, go.d collector docs and skills. |
+| [journal-log-writer-directory-contract.md](journal-log-writer-directory-contract.md) | `Log::new` requires an absolute journal directory (rejected early otherwise); consumers must resolve relative config against a stable base. | journal-log-writer consumers: otel-plugin logs, netflow-plugin tiers. |
 | [netflow-tier-commit-workers.md](netflow-tier-commit-workers.md) | NetFlow rollup-tier commit worker contract: ownership, doorbell protocol, shutdown order, stretch semantics, lock discipline, telemetry. | netflow-plugin ingest/tiering work, tier benchmark and soak/crash tests, network-flows operator docs. |
 | [prometheus-profiles.md](prometheus-profiles.md) | go.d prometheus chart-profile format, selection modes, app-segment resolution, and chart-context assembly. | prometheus collector profile work, chart-context/UI app-section contract, profile authoring. |
 | [query-planner-tier-selection.md](query-planner-tier-selection.md) | Automatic storage-tier selection for metric query planning. | Query planner code, API data paths, MCP metric query behavior. |

@@ -3,75 +3,112 @@
 package snmptopology
 
 import (
+	"context"
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
 
-func TestTopologyCacheTrapEnrichmentForSourceUsesTrapIfIndex(t *testing.T) {
-	cache := newTopologyCache()
-	cache.localDevice.ManagementIP = "192.0.2.30"
-	cache.ifIndexByIP["192.0.2.10"] = "99"
-	cache.ifNamesByIndex["7"] = "Gi0/7"
-	cache.ifNamesByIndex["99"] = "Gi0/99"
-	cache.lldpRemotes["7:2"] = &lldpRemote{localPortNum: "7", sysName: "dist-b"}
-	cache.lldpRemotes["7:1"] = &lldpRemote{localPortNum: "7", sysName: "dist-a"}
-	cache.lldpRemotes["99:1"] = &lldpRemote{localPortNum: "99", sysName: "wrong-source-ip-interface"}
-	cache.cdpRemotes["7:1"] = &cdpRemote{ifIndex: "7", sysName: "dist-a"}
-	cache.cdpRemotes["9:1"] = &cdpRemote{ifIndex: "9", sysName: "dist-d"}
+func TestTopologyCacheTrapEnrichment(t *testing.T) {
+	tests := map[string]struct {
+		setup               func(*topologyCache)
+		source              string
+		ifIndex             string
+		wantDeviceStatus    string
+		wantDeviceMethod    string
+		wantInterface       string
+		wantInterfaceStatus string
+		wantNeighborStatus  string
+		wantNeighbors       []string
+	}{
+		"uses-trap-if-index": {
+			setup: func(cache *topologyCache) {
+				cache.localDevice.ManagementIP = "192.0.2.30"
+				cache.ifIndexByIP["192.0.2.10"] = "99"
+				cache.ifNamesByIndex["7"] = "Gi0/7"
+				cache.ifNamesByIndex["99"] = "Gi0/99"
+				cache.lldpRemotes["7:2"] = &lldpRemote{localPortNum: "7", sysName: "dist-b"}
+				cache.lldpRemotes["7:1"] = &lldpRemote{localPortNum: "7", sysName: "dist-a"}
+				cache.lldpRemotes["99:1"] = &lldpRemote{localPortNum: "99", sysName: "wrong-source-ip-interface"}
+				cache.cdpRemotes["7:1"] = &cdpRemote{ifIndex: "7", sysName: "dist-a"}
+				cache.cdpRemotes["9:1"] = &cdpRemote{ifIndex: "9", sysName: "dist-d"}
+			},
+			source:              "192.0.2.30",
+			ifIndex:             "7",
+			wantDeviceStatus:    "matched",
+			wantDeviceMethod:    "management_ip",
+			wantInterface:       "Gi0/7",
+			wantInterfaceStatus: "matched",
+			wantNeighbors:       []string{"dist-a", "dist-b"},
+		},
+		"remote-map-key-fallback": {
+			setup: func(cache *topologyCache) {
+				cache.localDevice.ManagementIP = "192.0.2.30"
+				cache.lldpRemotes["7:2"] = &lldpRemote{sysName: "dist-b"}
+				cache.lldpRemotes["8:1"] = &lldpRemote{sysName: "dist-c"}
+				cache.cdpRemotes["7:1"] = &cdpRemote{sysName: "dist-a"}
+				cache.cdpRemotes["9:1"] = &cdpRemote{sysName: "dist-d"}
+			},
+			source:        "192.0.2.30",
+			ifIndex:       "7",
+			wantNeighbors: []string{"dist-a", "dist-b"},
+		},
+		"does-not-infer-interface-from-source-ip": {
+			setup: func(cache *topologyCache) {
+				cache.ifIndexByIP["192.0.2.10"] = "7"
+				cache.ifNamesByIndex["7"] = "Gi0/7"
+				cache.lldpRemotes["7:1"] = &lldpRemote{sysName: "dist-a"}
+			},
+			source:              "192.0.2.10",
+			wantDeviceStatus:    "matched",
+			wantDeviceMethod:    "local_interface_ip",
+			wantInterfaceStatus: "skipped",
+			wantNeighborStatus:  "skipped",
+		},
+		"no-interface-match": {
+			setup: func(cache *topologyCache) {
+				cache.localDevice.ManagementIP = "192.0.2.30"
+				cache.lldpRemotes["7:1"] = &lldpRemote{sysName: "dist-a"}
+			},
+			source:              "192.0.2.30",
+			ifIndex:             "9",
+			wantInterfaceStatus: "no_match",
+			wantNeighborStatus:  "no_match",
+		},
+	}
 
-	enrich := cache.trapEnrichmentForSource("192.0.2.30", "7")
-	require.NotNil(t, enrich)
-	require.Equal(t, "matched", enrich.DeviceStatus)
-	require.Equal(t, "management_ip", enrich.DeviceMethod)
-	require.Equal(t, "Gi0/7", enrich.Interface)
-	require.Equal(t, "matched", enrich.InterfaceStatus)
-	require.Equal(t, []string{"dist-a", "dist-b"}, enrich.Neighbors)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cache := newTopologyCache()
+			tc.setup(cache)
+
+			enrich := cache.trapEnrichmentForSource(tc.source, tc.ifIndex)
+			require.NotNil(t, enrich)
+			if tc.wantDeviceStatus != "" {
+				require.Equal(t, tc.wantDeviceStatus, enrich.DeviceStatus)
+			}
+			if tc.wantDeviceMethod != "" {
+				require.Equal(t, tc.wantDeviceMethod, enrich.DeviceMethod)
+			}
+			require.Equal(t, tc.wantInterface, enrich.Interface)
+			if tc.wantInterfaceStatus != "" {
+				require.Equal(t, tc.wantInterfaceStatus, enrich.InterfaceStatus)
+			}
+			if tc.wantNeighborStatus != "" {
+				require.Equal(t, tc.wantNeighborStatus, enrich.NeighborStatus)
+			}
+			if tc.wantNeighbors == nil {
+				require.Empty(t, enrich.Neighbors)
+			} else {
+				require.Equal(t, tc.wantNeighbors, enrich.Neighbors)
+			}
+		})
+	}
 }
 
-func TestTopologyCacheTrapEnrichmentForSourceFallsBackToRemoteMapKeys(t *testing.T) {
-	cache := newTopologyCache()
-	cache.localDevice.ManagementIP = "192.0.2.30"
-	cache.lldpRemotes["7:2"] = &lldpRemote{sysName: "dist-b"}
-	cache.lldpRemotes["8:1"] = &lldpRemote{sysName: "dist-c"}
-	cache.cdpRemotes["7:1"] = &cdpRemote{sysName: "dist-a"}
-	cache.cdpRemotes["9:1"] = &cdpRemote{sysName: "dist-d"}
-
-	enrich := cache.trapEnrichmentForSource("192.0.2.30", "7")
-	require.NotNil(t, enrich)
-	require.Equal(t, []string{"dist-a", "dist-b"}, enrich.Neighbors)
-}
-
-func TestTopologyCacheTrapEnrichmentForSourceDoesNotInferInterfaceFromSourceIP(t *testing.T) {
-	cache := newTopologyCache()
-	cache.ifIndexByIP["192.0.2.10"] = "7"
-	cache.ifNamesByIndex["7"] = "Gi0/7"
-	cache.lldpRemotes["7:1"] = &lldpRemote{sysName: "dist-a"}
-
-	enrich := cache.trapEnrichmentForSource("192.0.2.10", "")
-	require.NotNil(t, enrich)
-	require.Equal(t, "matched", enrich.DeviceStatus)
-	require.Equal(t, "local_interface_ip", enrich.DeviceMethod)
-	require.Empty(t, enrich.Interface)
-	require.Empty(t, enrich.Neighbors)
-	require.Equal(t, "skipped", enrich.InterfaceStatus)
-	require.Equal(t, "skipped", enrich.NeighborStatus)
-}
-
-func TestTopologyCacheTrapEnrichmentForSourceNoInterfaceMatch(t *testing.T) {
-	cache := newTopologyCache()
-	cache.localDevice.ManagementIP = "192.0.2.30"
-	cache.lldpRemotes["7:1"] = &lldpRemote{sysName: "dist-a"}
-
-	enrich := cache.trapEnrichmentForSource("192.0.2.30", "9")
-	require.NotNil(t, enrich)
-	require.Equal(t, "no_match", enrich.InterfaceStatus)
-	require.Empty(t, enrich.Interface)
-	require.Equal(t, "no_match", enrich.NeighborStatus)
-	require.Empty(t, enrich.Neighbors)
-}
-
-func TestTopologyCacheTrapEnrichmentForSourceIncludesLocalDeviceIdentity(t *testing.T) {
+func TestTopologyCacheTrapEnrichmentIncludesLocalDeviceIdentity(t *testing.T) {
 	cache := newTopologyCache()
 	cache.localDevice.ManagementIP = "192.0.2.30"
 	cache.localDevice.SysName = "core-sw-01"
@@ -86,27 +123,32 @@ func TestTopologyCacheTrapEnrichmentForSourceIncludesLocalDeviceIdentity(t *test
 	require.Equal(t, "vnode-node-id", enrich.SourceVnodeID)
 }
 
-func TestTrapEnrichmentForSourceUsesGlobalRegistry(t *testing.T) {
+func TestTrapEnrichmentHandleForSourceUsesPublishedRegistry(t *testing.T) {
+	registry := newTopologyRegistry()
+	handle := publishTrapTopologyRegistryForTest(registry)
+
 	cache := newTopologyCache()
 	cache.localDevice.ManagementIP = "192.0.2.20"
 	cache.ifNamesByIndex["11"] = "Gi0/11"
 	cache.lldpRemotes["11:1"] = &lldpRemote{sysName: "dist-c"}
 
-	snmpTopologyRegistry.register(cache)
-	defer snmpTopologyRegistry.unregister(cache)
+	registry.register(cache)
 
-	enrich := TrapEnrichmentForSource("192.0.2.20", "11")
+	enrich := handle.EnrichmentForSource("192.0.2.20", "11")
 	require.NotNil(t, enrich)
 	require.Equal(t, "matched", enrich.DeviceStatus)
 	require.Equal(t, "Gi0/11", enrich.Interface)
 	require.Equal(t, []string{"dist-c"}, enrich.Neighbors)
 
-	mapped := TrapEnrichmentForSource("::ffff:192.0.2.20", "11")
+	mapped := handle.EnrichmentForSource("::ffff:192.0.2.20", "11")
 	require.NotNil(t, mapped)
 	require.Equal(t, "Gi0/11", mapped.Interface)
 }
 
-func TestTrapEnrichmentForSourceAmbiguousGlobalRegistryMatchDoesNotEnrich(t *testing.T) {
+func TestTrapEnrichmentHandleForSourceAmbiguousRegistryMatchDoesNotEnrich(t *testing.T) {
+	registry := newTopologyRegistry()
+	handle := publishTrapTopologyRegistryForTest(registry)
+
 	cacheA := newTopologyCache()
 	cacheA.localDevice.ManagementIP = "192.0.2.20"
 	cacheA.ifNamesByIndex["11"] = "Gi0/11"
@@ -114,15 +156,68 @@ func TestTrapEnrichmentForSourceAmbiguousGlobalRegistryMatchDoesNotEnrich(t *tes
 	cacheB.localDevice.ManagementIP = "192.0.2.20"
 	cacheB.ifNamesByIndex["11"] = "Gi0/11"
 
-	snmpTopologyRegistry.register(cacheA)
-	snmpTopologyRegistry.register(cacheB)
-	defer snmpTopologyRegistry.unregister(cacheA)
-	defer snmpTopologyRegistry.unregister(cacheB)
+	registry.register(cacheA)
+	registry.register(cacheB)
 
-	enrich := TrapEnrichmentForSource("192.0.2.20", "11")
+	enrich := handle.EnrichmentForSource("192.0.2.20", "11")
 	require.NotNil(t, enrich)
 	require.Equal(t, "ambiguous", enrich.DeviceStatus)
 	require.Equal(t, 2, enrich.DeviceMatches)
 	require.Empty(t, enrich.Interface)
 	require.Empty(t, enrich.Neighbors)
+}
+
+func TestCollectorRunPublishesAndClearsTrapTopologyRegistry(t *testing.T) {
+	coll := newTestSNMPTopologyCollector()
+	coll.UpdateEvery = 3600
+
+	ctx, cancel := context.WithCancel(context.Background())
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- coll.Run(ctx)
+	}()
+
+	stopped := false
+	stopRunner := func() error {
+		if stopped {
+			return nil
+		}
+		stopped = true
+		cancel()
+		select {
+		case err := <-errCh:
+			return err
+		case <-time.After(time.Second):
+			return errors.New("runner did not stop")
+		}
+	}
+	defer func() {
+		require.NoError(t, stopRunner())
+	}()
+
+	require.Eventually(t, func() bool {
+		return coll.trapEnrichment.registry.Load() == coll.topologyRegistry
+	}, time.Second, 10*time.Millisecond)
+
+	require.NoError(t, stopRunner())
+	require.Nil(t, coll.trapEnrichment.registry.Load())
+}
+
+func TestCollectorCleanupDoesNotClearNewerTrapTopologyRegistry(t *testing.T) {
+	trapEnrichment := NewTrapEnrichmentHandle()
+	oldColl := newTestSNMPTopologyCollector()
+	newColl := newTestSNMPTopologyCollector()
+	oldColl.trapEnrichment = trapEnrichment
+	newColl.trapEnrichment = trapEnrichment
+	trapEnrichment.registry.Store(newColl.topologyRegistry)
+
+	oldColl.Cleanup(context.Background())
+
+	require.Same(t, newColl.topologyRegistry, trapEnrichment.registry.Load())
+}
+
+func publishTrapTopologyRegistryForTest(registry *topologyRegistry) *TrapEnrichmentHandle {
+	handle := NewTrapEnrichmentHandle()
+	handle.registry.Store(registry)
+	return handle
 }

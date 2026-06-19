@@ -10,6 +10,8 @@ import (
 
 	"github.com/gosnmp/gosnmp"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 )
 
 func readSinglePcapUDPPacket(t *testing.T, fixture string) pcapUDPPacket {
@@ -44,15 +46,34 @@ func setSingleTestTrap(t *testing.T, trap *TrapDef) {
 
 func newTestV2Collector(jobName string, writer TrapWriter, prefixes []netip.Prefix, communities []string) *Collector {
 	return &Collector{
-		jobName:    jobName,
-		trapWriter: writer,
-		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:  NewAllowlist(prefixes, communities),
+		jobName:     jobName,
+		trapWriter:  writer,
+		journalHost: newTestJournalHostProvider(),
+		versions:    map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
+		allowlist:   NewAllowlist(prefixes, communities),
 	}
 }
 
 func newDefaultTestV2Collector(writer TrapWriter) *Collector {
 	return newTestV2Collector("test", writer, nil, []string{"public"})
+}
+
+func newTestSNMPTrapsCollector() *Collector {
+	return New(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle())
+}
+
+type testTrapTopologyEnricher func(ip, trapIfIndex string) *snmptopology.TrapTopologyEnrichment
+
+func (f testTrapTopologyEnricher) EnrichmentForSource(ip, trapIfIndex string) *snmptopology.TrapTopologyEnrichment {
+	return f(ip, trapIfIndex)
+}
+
+func newTestTrapEnrichmentCollector(topologyEnricher trapTopologyEnricher) (*Collector, *ddsnmp.DeviceStore) {
+	store := ddsnmp.NewDeviceStore()
+	return &Collector{
+		deviceLookup:     store,
+		topologyEnricher: topologyEnricher,
+	}, store
 }
 
 func withCleanJobMetrics(t *testing.T, jobName string) *perJobMetrics {
@@ -96,7 +117,7 @@ func newDedupTestV2Collector(t *testing.T, jobName string, writer TrapWriter) (*
 	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
 	c.Config = Config{Dedup: DedupConfig{Enabled: true}}
 	c.metrics = metrics
-	c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics, "")
+	c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics, "", c.monotonicUsec)
 	return c, metrics
 }
 
@@ -143,12 +164,13 @@ func newTestV3Collector(
 	engineIDs map[string]struct{},
 ) *Collector {
 	return &Collector{
-		jobName:    jobName,
-		trapWriter: writer,
-		versions:   map[SnmpVersion]struct{}{SnmpVersionV3: {}},
-		allowlist:  NewAllowlist(nil, nil),
-		v3SecTable: secTable,
-		engineIDs:  engineIDs,
+		jobName:     jobName,
+		trapWriter:  writer,
+		journalHost: newTestJournalHostProvider(),
+		versions:    map[SnmpVersion]struct{}{SnmpVersionV3: {}},
+		allowlist:   NewAllowlist(nil, nil),
+		v3SecTable:  secTable,
+		engineIDs:   engineIDs,
 	}
 }
 

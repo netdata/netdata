@@ -39,9 +39,7 @@ their distinct header format and decoded per the sFlow v5 specification. Decoded
 are enriched and appended to disk-backed journal tiers.
 
 
-This integration is only supported on the following platforms:
-
-- Linux
+This integration is supported on all platforms.
 
 This integration runs as a single instance per Netdata Agent.
 

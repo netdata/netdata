@@ -574,9 +574,6 @@ int do_hw_intcnt(int update_every, usec_t dt) {
             for (i = 0; i < nintr; i++)
                 totalintr += intrcnt[i];
 
-            static RRDSET *st_intr = NULL;
-            static RRDDIM *rd_intr = NULL;
-
             common_interrupts(totalintr, update_every, "hw.intrcnt");
 
             size_t size;

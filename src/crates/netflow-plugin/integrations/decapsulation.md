@@ -77,9 +77,7 @@ stream where only a subset of exporters ship the frame bytes. Enabling decap is
 half the work; the exporter must also be configured to ship the inner frame.
 
 
-This integration is only supported on the following platforms:
-
-- Linux
+This integration is supported on all platforms.
 
 This integration runs as a single instance per Netdata Agent.
 

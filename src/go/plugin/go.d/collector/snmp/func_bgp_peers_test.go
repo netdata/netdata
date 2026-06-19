@@ -428,7 +428,7 @@ func TestCollector_BGPFunctionHandlerIsAlwaysRegistered(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			collr := New()
+			collr := newTestSNMPCollector()
 			if tc.prepare != nil {
 				tc.prepare(collr)
 			}
@@ -453,7 +453,7 @@ func TestCollectSNMP_HidesBGPDiagnosticsButKeepsFunctionCache(t *testing.T) {
 	setMockClientInitExpect(mockSNMP)
 	setMockClientSysInfoExpect(mockSNMP)
 
-	collr := New()
+	collr := newTestSNMPCollector()
 	collr.Config = prepareV2Config()
 	collr.CreateVnode = false
 	collr.Ping.Enabled = false

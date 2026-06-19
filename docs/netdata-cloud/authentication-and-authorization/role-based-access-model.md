@@ -26,6 +26,10 @@ You can control what functionalities users can access in Netdata Cloud through t
 | **View-only access** - monitor specific systems without making changes                           | **Observer**         |
 | **Billing management** - handle invoices and payments without system access                      | **Billing**          |
 
+## Role Change Propagation
+
+Role changes take effect immediately. When an Admin or Manager changes a user's role, the updated permissions are applied right away by the Netdata Cloud backend.
+
 ## Quick Reference
 
 <details>

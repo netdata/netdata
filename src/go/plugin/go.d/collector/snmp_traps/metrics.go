@@ -17,21 +17,22 @@ const (
 )
 
 type trapErrors struct {
-	unknownOID         atomic.Uint64
-	decodeFailed       atomic.Uint64
-	templateUnresolved atomic.Uint64
-	malformedPDU       atomic.Uint64
-	droppedAllowlist   atomic.Uint64
-	rateLimited        atomic.Uint64
-	authFailures       atomic.Uint64
-	usmFailures        atomic.Uint64
-	unknownEngineID    atomic.Uint64
-	informResponseFail atomic.Uint64
-	binaryEncoded      atomic.Uint64
-	profileLoadFailed  atomic.Uint64
-	journalWriteFailed atomic.Uint64
-	otlpExportFailed   atomic.Uint64
-	listenerReadFailed atomic.Uint64
+	unknownOID             atomic.Uint64
+	decodeFailed           atomic.Uint64
+	templateUnresolved     atomic.Uint64
+	malformedPDU           atomic.Uint64
+	droppedAllowlist       atomic.Uint64
+	rateLimited            atomic.Uint64
+	authFailures           atomic.Uint64
+	usmFailures            atomic.Uint64
+	unknownEngineID        atomic.Uint64
+	informResponseFail     atomic.Uint64
+	binaryEncoded          atomic.Uint64
+	profileLoadFailed      atomic.Uint64
+	journalWriteFailed     atomic.Uint64
+	otlpExportFailed       atomic.Uint64
+	listenerReadFailed     atomic.Uint64
+	listenerBufferDegraded atomic.Uint64
 }
 
 type trapEvents struct {
@@ -275,6 +276,8 @@ func (m *perJobMetrics) addError(dim string, n uint64) {
 		m.errors.otlpExportFailed.Add(n)
 	case "listener_read_failed":
 		m.errors.listenerReadFailed.Add(n)
+	case "listener_buffer_degraded":
+		m.errors.listenerBufferDegraded.Add(n)
 	}
 }
 
@@ -603,6 +606,7 @@ func collectErrors(store metrix.CollectorStore, jobName string, m *perJobMetrics
 	meter.Counter("snmp_trap_errors_journal_write_failed").ObserveTotal(float64(m.errors.journalWriteFailed.Load()))
 	meter.Counter("snmp_trap_errors_otlp_export_failed").ObserveTotal(float64(m.errors.otlpExportFailed.Load()))
 	meter.Counter("snmp_trap_errors_listener_read_failed").ObserveTotal(float64(m.errors.listenerReadFailed.Load()))
+	meter.Counter("snmp_trap_errors_listener_buffer_degraded").ObserveTotal(float64(m.errors.listenerBufferDegraded.Load()))
 }
 
 func collectDedup(store metrix.CollectorStore, jobName string, m *perJobMetrics) {

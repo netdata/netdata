@@ -271,14 +271,14 @@ Identity behavior:
 - `identity.device: listener` is only for listener-owned rules that should merge
   all source devices.
 - `source_id_privacy: hash` hides raw source values behind a stable local hash
-  derived from the selected source value, job name, and local Agent identity.
+  derived from the selected source value, job name, and SDK local Agent identity.
   Use `raw` only when source labels are acceptable in your environment.
   Treat hashed `source_id` values as local listener identifiers, not portable
   join keys across Agents, listeners, or reinstalls.
-  The local salt is read from `/etc/machine-id`, then
-  `/var/lib/dbus/machine-id`, then hostname, with a fixed last-resort fallback
-  only when no stable local identity is available. The emitted `source_id` is
-  truncated to 16 hex characters.
+  The local salt comes from the systemd journal SDK host identity helper. On
+  platforms without a native machine ID, the helper uses its configured Netdata
+  state directory for synthesized stable local identity. The emitted `source_id`
+  is truncated to 16 hex characters.
 - `source_kind` is a closed label set: `vnode`, `listener`,
   `trusted_trap_address`, `udp_peer`, `entry_source`, `hostname_or_ip`,
   `trap_varbind`, `topology_ifindex`, `source`, or `other`.

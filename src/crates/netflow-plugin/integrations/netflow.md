@@ -38,9 +38,7 @@ dynamic templates cached from the exporter. Decoded records are enriched in-memo
 and appended to disk-backed journal tiers (raw, 1-minute, 5-minute, 1-hour rollups).
 
 
-This integration is only supported on the following platforms:
-
-- Linux
+This integration is supported on all platforms.
 
 This integration runs as a single instance per Netdata Agent.
 

@@ -86,6 +86,7 @@ func (c *Controller) RegisterModules(modules collectorapi.Registry) {
 			continue
 		}
 		c.registry.registerModuleWithMethods(name, creator, methods)
+		c.registerAvailableModuleMethods(name, methods, true)
 	}
 }
 
@@ -167,7 +168,14 @@ func (c *Controller) registerModuleMethodsOnJobStart(moduleName string) {
 		return
 	}
 
-	for _, method := range creator.Methods() {
+	c.registerAvailableModuleMethods(moduleName, creator.Methods(), false)
+}
+
+func (c *Controller) registerAvailableModuleMethods(moduleName string, methods []funcapi.MethodConfig, agentWideOnly bool) {
+	for _, method := range methods {
+		if agentWideOnly && !method.AgentWide {
+			continue
+		}
 		if !methodAvailable(method) {
 			continue
 		}

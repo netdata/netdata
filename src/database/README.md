@@ -36,7 +36,14 @@ These limits are fully configurable. See [Changing how long Netdata stores metri
 
 ### Monitoring Retention Utilization
 
-Netdata provides a visual representation of storage utilization for both the time and space limits across all Tiers under "Netdata" -> "dbengine retention" on the dashboard. This chart shows exactly how your storage space (disk space limits) and time (time limits) are used for metric retention.
+Netdata provides a visual representation of storage utilization for both the time and space limits across all Tiers. In the dashboard, these are the **dbengine space and time retention** charts, found under the **Netdata** section → **dbengine retention** family — there is one chart per database tier. Each chart shows exactly how your storage space (disk space limits) and time (time limits) are used for metric retention.
+
+Each tier has its own independent **space** and **time** lines on the chart:
+
+- **Space (disk utilization %)**: the percentage of the tier's allocated disk space that is currently occupied, calculated as `disk_used / disk_max × 100`. When a size limit is configured for the tier, `disk_max` is that limit. When no size limit is configured (set to 0), `disk_max` is the total available disk space at the tier's data directory (free space plus already-used space). For example, a space value of 89% means 89% of the tier's allocated or available disk space is occupied by datafiles.
+- **Time (retention time utilization %)**: the percentage of the configured retention time period that has been filled with data, calculated as `current_retention_duration / configured_time_limit × 100`. When no time limit is configured (set to 0), this dimension shows 0% and no time-based retention is enforced. For example, a time value of 61% means 61% of the configured time retention period has elapsed since the oldest sample. This value is capped at 100%.
+
+Different tiers naturally show different percentages because they have different write volumes, compression ratios, and configured limits. When either the space or time dimension reaches 100%, the oldest datafiles are rotated out as described in the [Retention Size Enforcement](#retention-size-enforcement) section below.
 
 ### Retention Size Enforcement
 

@@ -1,7 +1,18 @@
 use super::*;
 
-pub(super) const DEFAULT_NETDATA_CACHE_DIR: &str = "/var/cache/netdata";
-pub(super) const DEFAULT_NETDATA_STOCK_DATA_DIR: &str = "/usr/share/netdata";
+pub(super) const DEFAULT_NETDATA_CACHE_DIR: &str = match option_env!("NETDATA_BUILD_CACHE_DIR") {
+    Some(value) => value,
+    None => "/var/cache/netdata",
+};
+pub(super) const DEFAULT_NETDATA_LIB_DIR: &str = match option_env!("NETDATA_BUILD_LIB_DIR") {
+    Some(value) => value,
+    None => "/var/lib/netdata",
+};
+pub(super) const DEFAULT_NETDATA_STOCK_DATA_DIR: &str =
+    match option_env!("NETDATA_BUILD_STOCK_DATA_DIR") {
+        Some(value) => value,
+        None => "/usr/share/netdata",
+    };
 pub(super) const TOPOLOGY_IP_INTEL_DIR: &str = "topology-ip-intel";
 pub(super) const TOPOLOGY_IP_ASN_MMDB: &str = "topology-ip-asn.mmdb";
 pub(super) const TOPOLOGY_IP_GEO_MMDB: &str = "topology-ip-geo.mmdb";
