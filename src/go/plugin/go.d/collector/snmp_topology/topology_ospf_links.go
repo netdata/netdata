@@ -107,10 +107,12 @@ func topologyOSPFAdjacencyLink(row topologyOSPFNeighbor, srcRef, dstRef topology
 
 func topologyOSPFEndpointAttributes(routerID, ip string, row topologyOSPFNeighbor) map[string]any {
 	attrs := map[string]any{
-		"router_id": normalizeOSPFRouterID(routerID),
-		"source":    "ospf_mib",
+		"source": "ospf_mib",
 	}
-	if normalizedIP := normalizeIPAddress(ip); normalizedIP != "" && normalizedIP != "0.0.0.0" {
+	if normalizedRouterID := normalizeOSPFRouterID(routerID); normalizedRouterID != "" {
+		attrs["router_id"] = normalizedRouterID
+	}
+	if normalizedIP := normalizeNonUnspecifiedIPAddress(ip); normalizedIP != "" {
 		attrs["ip"] = normalizedIP
 	}
 	if _, subnet, prefix, ok := topologyOSPFSubnetMatch(row); ok {
@@ -122,17 +124,21 @@ func topologyOSPFEndpointAttributes(routerID, ip string, row topologyOSPFNeighbo
 
 func topologyOSPFLinkMetrics(row topologyOSPFNeighbor) map[string]any {
 	metrics := map[string]any{
-		"source":             "ospf_mib",
-		"inference":          "ospf_full_adjacency",
-		"attachment_mode":    "logical_l3_ospf",
-		"state":              "full",
-		"local_router_id":    normalizeOSPFRouterID(row.LocalRouterID),
-		"neighbor_router_id": normalizeOSPFRouterID(row.NeighborRouterID),
+		"source":          "ospf_mib",
+		"inference":       "ospf_full_adjacency",
+		"attachment_mode": "logical_l3_ospf",
+		"state":           "full",
 	}
-	if ip := normalizeIPAddress(row.LocalIP); ip != "" {
+	if routerID := normalizeOSPFRouterID(row.LocalRouterID); routerID != "" {
+		metrics["local_router_id"] = routerID
+	}
+	if routerID := normalizeOSPFRouterID(row.NeighborRouterID); routerID != "" {
+		metrics["neighbor_router_id"] = routerID
+	}
+	if ip := normalizeNonUnspecifiedIPAddress(row.LocalIP); ip != "" {
 		metrics["local_ip"] = ip
 	}
-	if ip := normalizeIPAddress(row.NeighborIP); ip != "" {
+	if ip := normalizeNonUnspecifiedIPAddress(row.NeighborIP); ip != "" {
 		metrics["neighbor_ip"] = ip
 	}
 	if row.AddresslessIndex != "" {
@@ -149,15 +155,19 @@ func topologyOSPFLinkMetrics(row topologyOSPFNeighbor) map[string]any {
 
 func topologyOSPFNeighborActorRow(row topologyOSPFNeighbor) map[string]any {
 	out := map[string]any{
-		"local_router_id":    normalizeOSPFRouterID(row.LocalRouterID),
-		"neighbor_router_id": normalizeOSPFRouterID(row.NeighborRouterID),
-		"state":              normalizeOSPFNeighborState(row.State),
-		"source":             "ospf_mib",
+		"state":  normalizeOSPFNeighborState(row.State),
+		"source": "ospf_mib",
 	}
-	if ip := normalizeIPAddress(row.NeighborIP); ip != "" {
+	if routerID := normalizeOSPFRouterID(row.LocalRouterID); routerID != "" {
+		out["local_router_id"] = routerID
+	}
+	if routerID := normalizeOSPFRouterID(row.NeighborRouterID); routerID != "" {
+		out["neighbor_router_id"] = routerID
+	}
+	if ip := normalizeNonUnspecifiedIPAddress(row.NeighborIP); ip != "" {
 		out["neighbor_ip"] = ip
 	}
-	if ip := normalizeIPAddress(row.LocalIP); ip != "" {
+	if ip := normalizeNonUnspecifiedIPAddress(row.LocalIP); ip != "" {
 		out["local_ip"] = ip
 	}
 	if row.AddresslessIndex != "" {
@@ -192,7 +202,7 @@ func attachTopologyOSPFNeighborRows(data *topologyData, rowsByActor map[string][
 func topologyOSPFNeighborActorRowSortKey(row map[string]any) string {
 	return strings.Join([]string{
 		anyStringValue(row["neighbor_router_id"]),
-		normalizeIPAddress(anyStringValue(row["neighbor_ip"])),
+		normalizeNonUnspecifiedIPAddress(anyStringValue(row["neighbor_ip"])),
 		anyStringValue(row["addressless_index"]),
 		anyStringValue(row["state"]),
 	}, "\x00")
@@ -263,8 +273,8 @@ func sameTopologyActorPair(a, b topologyLink) bool {
 }
 
 func sameTopologyEndpointIPPair(aSrc, aDst, bSrc, bDst string) bool {
-	aSrc, aDst = normalizeIPAddress(aSrc), normalizeIPAddress(aDst)
-	bSrc, bDst = normalizeIPAddress(bSrc), normalizeIPAddress(bDst)
+	aSrc, aDst = normalizeNonUnspecifiedIPAddress(aSrc), normalizeNonUnspecifiedIPAddress(aDst)
+	bSrc, bDst = normalizeNonUnspecifiedIPAddress(bSrc), normalizeNonUnspecifiedIPAddress(bDst)
 	if aSrc == "" || aDst == "" || bSrc == "" || bDst == "" {
 		return false
 	}

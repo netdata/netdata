@@ -174,6 +174,8 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentResolvesUnnumberedNeighborByRouterI
 	require.Equal(t, topologyOSPFAdjacencyLinkType, data.Links[0].LinkType)
 	require.Equal(t, "2.2.2.2", data.Links[0].Dst.Attributes["router_id"])
 	require.NotContains(t, data.Links[0].Dst.Attributes, "ip")
+	require.NotContains(t, data.Links[0].Metrics, "neighbor_ip")
+	require.NotContains(t, data.Actors[0].Tables["ospf_neighbors"][0], "neighbor_ip")
 }
 
 func TestApplyTopologyOSPFAdjacencyEnrichmentDeduplicatesBidirectionalUnnumberedObservations(t *testing.T) {

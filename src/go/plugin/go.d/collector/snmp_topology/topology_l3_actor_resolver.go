@@ -103,7 +103,7 @@ func (r topologyL3ActorResolver) resolveOSPFNeighbor(row topologyOSPFNeighbor) (
 	if ref, ok := r.byRouterID[normalizeOSPFRouterID(row.NeighborRouterID)]; ok && ref.actorID != "" {
 		return ref, true
 	}
-	if ref, ok := r.byIP[normalizeIPAddress(row.NeighborIP)]; ok && ref.actorID != "" {
+	if ref, ok := r.byIP[normalizeNonUnspecifiedIPAddress(row.NeighborIP)]; ok && ref.actorID != "" {
 		return ref, true
 	}
 	return topologyL3ActorRef{}, false

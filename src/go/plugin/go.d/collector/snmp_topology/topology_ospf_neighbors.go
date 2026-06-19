@@ -17,7 +17,7 @@ func init() {
 
 func (c *topologyCache) updateOSPFNeighbor(tags map[string]string) {
 	neighborRouterID := normalizeOSPFRouterID(tags[tagOSPFNeighborRouterID])
-	neighborIP := normalizeIPAddress(tags[tagOSPFNeighborIP])
+	neighborIP := normalizeNonUnspecifiedIPAddress(tags[tagOSPFNeighborIP])
 	if neighborRouterID == "" && neighborIP == "" {
 		return
 	}
@@ -116,7 +116,7 @@ func (c *topologyCache) matchOSPFNeighborLocalInterface(neighborIP string) (topo
 func topologyOSPFNeighborCacheKey(row topologyOSPFNeighbor) string {
 	return topologyL3SubnetLinkKeyParts(
 		normalizeOSPFRouterID(row.NeighborRouterID),
-		normalizeIPAddress(row.NeighborIP),
+		normalizeNonUnspecifiedIPAddress(row.NeighborIP),
 		strings.TrimSpace(row.AddresslessIndex),
 	)
 }
@@ -127,7 +127,7 @@ func normalizeOSPFRouterID(value string) string {
 		return ""
 	}
 	if ip := normalizeIPAddress(value); ip != "" {
-		return ip
+		return normalizeNonUnspecifiedIPAddress(ip)
 	}
 	return value
 }
@@ -203,15 +203,7 @@ func topologyOSPFAdjacencyDiscriminator(row topologyOSPFNeighbor) string {
 }
 
 func topologyOSPFDedupIP(value string) string {
-	ip := normalizeIPAddress(value)
-	if ip == "" {
-		return ""
-	}
-	addr, err := netip.ParseAddr(ip)
-	if err != nil || addr.IsUnspecified() {
-		return ""
-	}
-	return ip
+	return normalizeNonUnspecifiedIPAddress(value)
 }
 
 func topologyOSPFSubnetMatch(row topologyOSPFNeighbor) (network, subnet string, prefix int, ok bool) {

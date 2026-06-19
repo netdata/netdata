@@ -4,6 +4,7 @@ package snmptopology
 
 import (
 	"net"
+	"net/netip"
 	"strings"
 )
 
@@ -23,6 +24,18 @@ func normalizeIPAddress(value string) string {
 	}
 
 	return ""
+}
+
+func normalizeNonUnspecifiedIPAddress(value string) string {
+	ip := normalizeIPAddress(value)
+	if ip == "" {
+		return ""
+	}
+	addr, err := netip.ParseAddr(ip)
+	if err != nil || addr.IsUnspecified() {
+		return ""
+	}
+	return ip
 }
 
 func parseIPFromDecodedBytes(bs []byte) net.IP {
