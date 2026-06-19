@@ -682,9 +682,9 @@ This adds dimensions named `GET`, `ADD`, and `DELETE`.
 
 All chart and dimension configuration directives in `/etc/netdata/statsd.d/*.conf` control **local agent behavior only** — they define how the local Netdata agent processes, names, and visualizes statsd metrics it receives.
 
-The dimension `TYPE` options (`events`, `last`, `min`, `max`, `sum`, `average`, `percentile`, `median`, `stddev`) select which computed value of a metric is used on the local agent. They do **not** control how metrics are aggregated across multiple Netdata instances.
+The dimension `TYPE` field (see [Dimension Format](#dimension-format) above) selects which computed value of a metric a single agent displays. It does **not** control how that metric is combined across multiple Netdata instances.
 
-Cross-node aggregation — how metrics from multiple agents are combined when viewed in Netdata Cloud dashboards — is handled by Netdata Cloud's query engine, not by statsd configuration files. There is no `aggregation = SUM` or `aggregation = AVG` directive available in statsd.d configuration.
+Cross-node aggregation — how metrics from multiple agents are combined in Netdata Cloud dashboards — is governed by the metric's algorithm and the Cloud query engine, not by statsd configuration files. To choose Sum, Average, or another aggregation for a chart in Netdata Cloud, use the [aggregate function](https://learn.netdata.cloud/docs/dashboards-and-charts/netdata-charts#aggregate-functions-dropdown) on that chart. There is no `aggregation = SUM` or `aggregation = AVG` directive in statsd.d configuration.
 
 ## Using StatsD with Different Languages
 
