@@ -77,18 +77,20 @@ Both have the **same name** (`disk_space_usage`), so precedence applies:
 
 Netdata loads alert configurations from two directories:
 
-1. **User config** (loaded first): `/etc/netdata/health.d/` (default)
-2. **Stock config** (loaded second): `/usr/lib/netdata/conf.d/health.d/` (default)
+1. **User config** (loaded first): `/etc/netdata/health.d/`
+2. **Stock config** (loaded second): `/usr/lib/netdata/conf.d/health.d/`
 
-These paths can vary by installation. Check the `[directories]` section of your `netdata.conf` (keys `health config` and `stock health config`) for exact paths, or use `sudo ./edit-config health.d/<file>` which resolves the correct user config directory automatically.
+:::note
+These paths are installation defaults and may differ on your system depending on install prefix. Check the `[directories]` section of your `netdata.conf` (keys `health config` and `stock health config`) for exact paths, or use `sudo ./edit-config health.d/<file>`, which resolves the correct user config directory automatically.
+:::
 
 ### File Shadowing
 
 If a file with the **same name** exists in both directories, only the user file is loaded. The stock file is completely ignored.
 
 **Example:**
-- Stock: `/usr/lib/netdata/conf.d/health.d/cpu.conf` (default)
-- User: `/etc/netdata/health.d/cpu.conf` (default)
+- Stock: `cpu.conf` in the stock config directory
+- User: `cpu.conf` in your user config directory
 - Result: Only the user file is loaded
 
 This means if you copy a stock file to override it, you must include **all** alerts you want from that file, not just the ones you're modifying.

@@ -78,11 +78,13 @@ Each level operates independently while Netdata Cloud provides a coherent, dedup
 
 You configure Netdata alerts in 3 layers:
 
-1. **Stock Alerts**: Netdata provides hundreds of alert definitions in `/usr/lib/netdata/conf.d/health.d` (default) to detect common issues. Don't edit these directly - updates will overwrite your changes.
-2. **Your Custom Alerts**: Create your own definitions in `/etc/netdata/health.d` (default).
+1. **Stock Alerts**: Netdata provides hundreds of alert definitions in `/usr/lib/netdata/conf.d/health.d` to detect common issues. Don't edit these directly - updates will overwrite your changes.
+2. **Your Custom Alerts**: Create your own definitions in `/etc/netdata/health.d`.
 3. **Dynamic UI Configuration**: Use Netdata dashboards to edit, add, enable, or disable alerts on any node through the streaming transport.
 
-These are default locations. On systems with a non-standard install prefix they differ — check the `[directories]` section of your `netdata.conf` (keys `health config` and `stock health config`), or use `sudo ./edit-config health.d/<file>` which resolves the user config directory automatically.
+:::note
+The directories shown above are installation defaults. On systems with a non-standard install prefix they differ — check the `[directories]` section of your `netdata.conf` (keys `health config` and `stock health config`), or use `sudo ./edit-config health.d/<file>`, which resolves the user config directory automatically.
+:::
 
 ## Managing Notification Configuration
 
@@ -501,16 +503,16 @@ sudo systemctl restart netdata
 
 #### 3. File shadowing
 
-If a file in `/etc/netdata/health.d/` (default) has the same filename as a stock file (e.g., both contain `cpu.conf`), the stock file is **completely ignored** — only the user copy is loaded. If the user copy contains only a subset of the original alerts, the rest are missing.
+If a file in your user config directory has the same filename as a stock file (e.g., both contain `cpu.conf`), the stock file is **completely ignored** — only the user copy is loaded. If the user copy contains only a subset of the original alerts, the rest are missing.
 
 This is different from overriding individual alerts by name. With file shadowing, you must include **all** alerts you want from that file. See [Alert Configuration Ordering](/src/health/alert-configuration-ordering.md) for the conceptual explanation.
 
-Check — compare filenames between user and stock directories (default paths shown; adjust if your install prefix differs):
+Check — compare filenames between your user and stock directories:
 ```bash
 comm -12 <(ls /etc/netdata/health.d/ | sort) <(ls /usr/lib/netdata/conf.d/health.d/ | sort)
 ```
 
-Restore: if the user copy is no longer needed, remove it from your user health config directory (default `/etc/netdata/health.d/`):
+Restore: if the user copy is no longer needed, remove it from your user health config directory:
 ```bash
 sudo rm /etc/netdata/health.d/<filename>.conf
 sudo netdatacli reload-health
