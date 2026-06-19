@@ -25,7 +25,7 @@ type cachestatSharedMemoryStore struct {
 	nextMiss      map[uint32]int
 	stalePIDs     []uint32
 	socketData    map[uint32]ebpfSocketPublishApps // latest per-PID socket snapshot from tbl_nd_socket
-	activeModules uint32                            // EBPFGO_SHM_FLAG_* bits set when a module writes data
+	activeModules uint32                           // EBPFGO_SHM_FLAG_* bits set when a module writes data
 }
 
 func NewCachestatSharedMemoryStore() *cachestatSharedMemoryStore {
@@ -60,18 +60,29 @@ const (
 )
 
 // Publish writes the current entries to the shared-memory segment and stamps
-// the per-module validity flags accumulated since the store was created.
-// The flags reflect which modules have ever written data to the store;
-// they are set by UpdateApps (cachestat) and UpdateSocketApps (socket).
+// the per-module validity flags accumulated since the previous Publish call.
+// The flags reflect which modules wrote data during the current cycle:
+// activeModules is reset to 0 at the start of each Publish and re-OR'd by
+// the subsequent UpdateApps/UpdateSocketApps before the next cycle, so a
+// module that stops publishing has its bit cleared on the consumer's next
+// read.  This matches the C-side reset/OR in shared_pid_memory_publish.
+//
+// The lock is held for the duration of the C memcpy because
+// applySocketDataLocked writes s.entries[i].socket in place on the same
+// backing array that the C side reads; releasing the lock would expose a
+// data race where socket's goroutine could mutate the entries slice while
+// publisher.Publish is still reading it.
 func (s *cachestatSharedMemoryStore) Publish(publisher *SharedPidMemoryPublisher) error {
 	if publisher == nil {
 		return nil
 	}
 
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	return publisher.Publish(s.entries, s.activeModules)
+	flags := s.activeModules
+	s.activeModules = 0
+	return publisher.Publish(s.entries, flags)
 }
 
 func buildCachestatPublish(current, previous netdataCachestat, ct uint64, hasPrevious bool) netdataPublishCachestat {

@@ -107,4 +107,3 @@ func BuildSocketLegacyPlan(cfg SocketLegacyConfig) LoadPlan {
 		Name:          "socket",
 	})
 }
-

@@ -15,10 +15,10 @@ import (
 )
 
 const (
-	socketFunctionName        = "network-protocols"
-	socketFunctionHelp        = "Linux eBPF TCP and UDP statistics (IPv4 and IPv6 combined)"
-	socketFunctionTimeout     = 10
-	socketFunctionTags        = "top"
+	socketFunctionName    = "network-protocols"
+	socketFunctionHelp    = "Linux eBPF TCP and UDP statistics (IPv4 and IPv6 combined)"
+	socketFunctionTimeout = 10
+	socketFunctionTags    = "top"
 	// HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE = (1<<0)|(1<<1) = 3
 	socketFunctionAccess      = "0x00000003"
 	socketFunctionPriority    = 100

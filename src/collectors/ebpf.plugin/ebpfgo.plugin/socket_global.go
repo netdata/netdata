@@ -1,9 +1,6 @@
 package main
 
 import (
-	"fmt"
-	"os"
-	"sync"
 	"time"
 
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
@@ -77,51 +74,30 @@ func (s *socketGlobalState) Update(snap libbpfloader.SocketSnapshot) (socketGlob
 
 	// Cross-map: "tcp_cleanup_rbuf" dim ← sendmsg data; "tcp_sendmsg" dim ← cleanup_rbuf data.
 	return socketGlobalPublish{
-		tcpDimCleanupCalls: socketDelta(snap.CallsTCPSendmsg,     prev.CallsTCPSendmsg),
-		tcpDimCleanupKbits: -kbDelta(snap.BytesTCPSendmsg,        prev.BytesTCPSendmsg),
-		tcpDimCleanupErr:   socketDelta(snap.ErrorTCPSendmsg,      prev.ErrorTCPSendmsg),
-		tcpDimSendmsgCalls: socketDelta(snap.CallsTCPCleanupRbuf,  prev.CallsTCPCleanupRbuf),
-		tcpDimSendmsgKbits: kbDelta(snap.BytesTCPCleanupRbuf,     prev.BytesTCPCleanupRbuf),
-		tcpDimSendmsgErr:   socketDelta(snap.ErrorTCPCleanupRbuf,  prev.ErrorTCPCleanupRbuf),
-		tcpCloseCalls:      socketDelta(snap.CallsTCPClose,         prev.CallsTCPClose),
-		tcpRetransmit:      socketDelta(snap.TCPRetransmit,          prev.TCPRetransmit),
-		tcpV4Conn:          socketDelta(snap.CallsTCPConnectIPv4,   prev.CallsTCPConnectIPv4),
-		tcpV6Conn:          socketDelta(snap.CallsTCPConnectIPv6,   prev.CallsTCPConnectIPv6),
-		udpRecvCalls:       socketDelta(snap.CallsUDPRecvmsg,        prev.CallsUDPRecvmsg),
-		udpSendCalls:       socketDelta(snap.CallsUDPSendmsg,        prev.CallsUDPSendmsg),
-		udpRecvKbits:       kbDelta(snap.BytesUDPRecvmsg,           prev.BytesUDPRecvmsg),
-		udpSendKbits:       -kbDelta(snap.BytesUDPSendmsg,          prev.BytesUDPSendmsg),
-		udpRecvErr:         socketDelta(snap.ErrorUDPRecvmsg,        prev.ErrorUDPRecvmsg),
-		udpSendErr:         socketDelta(snap.ErrorUDPSendmsg,        prev.ErrorUDPSendmsg),
-		inboundTCP:         socketDelta(snap.InboundConnTCP,         prev.InboundConnTCP),
-		inboundUDP:         socketDelta(snap.InboundConnUDP,         prev.InboundConnUDP),
+		tcpDimCleanupCalls: socketDelta(snap.CallsTCPSendmsg, prev.CallsTCPSendmsg),
+		tcpDimCleanupKbits: -kbDelta(snap.BytesTCPSendmsg, prev.BytesTCPSendmsg),
+		tcpDimCleanupErr:   socketDelta(snap.ErrorTCPSendmsg, prev.ErrorTCPSendmsg),
+		tcpDimSendmsgCalls: socketDelta(snap.CallsTCPCleanupRbuf, prev.CallsTCPCleanupRbuf),
+		tcpDimSendmsgKbits: kbDelta(snap.BytesTCPCleanupRbuf, prev.BytesTCPCleanupRbuf),
+		tcpDimSendmsgErr:   socketDelta(snap.ErrorTCPCleanupRbuf, prev.ErrorTCPCleanupRbuf),
+		tcpCloseCalls:      socketDelta(snap.CallsTCPClose, prev.CallsTCPClose),
+		tcpRetransmit:      socketDelta(snap.TCPRetransmit, prev.TCPRetransmit),
+		tcpV4Conn:          socketDelta(snap.CallsTCPConnectIPv4, prev.CallsTCPConnectIPv4),
+		tcpV6Conn:          socketDelta(snap.CallsTCPConnectIPv6, prev.CallsTCPConnectIPv6),
+		udpRecvCalls:       socketDelta(snap.CallsUDPRecvmsg, prev.CallsUDPRecvmsg),
+		udpSendCalls:       socketDelta(snap.CallsUDPSendmsg, prev.CallsUDPSendmsg),
+		udpRecvKbits:       kbDelta(snap.BytesUDPRecvmsg, prev.BytesUDPRecvmsg),
+		udpSendKbits:       -kbDelta(snap.BytesUDPSendmsg, prev.BytesUDPSendmsg),
+		udpRecvErr:         socketDelta(snap.ErrorUDPRecvmsg, prev.ErrorUDPRecvmsg),
+		udpSendErr:         socketDelta(snap.ErrorUDPSendmsg, prev.ErrorUDPSendmsg),
+		inboundTCP:         socketDelta(snap.InboundConnTCP, prev.InboundConnTCP),
+		inboundUDP:         socketDelta(snap.InboundConnUDP, prev.InboundConnUDP),
 	}, true
 }
 
 // ---- rate-limited stderr ---------------------------------------------------
-
-const socketErrorLogInterval = 60 * time.Second
-
-var (
-	socketErrorMu      sync.Mutex
-	socketErrorLastLog = map[string]time.Time{}
-)
-
-func socketRateLimitedStderr(site, msg string) {
-	now := time.Now()
-	socketErrorMu.Lock()
-	if last, ok := socketErrorLastLog[site]; ok && now.Sub(last) < socketErrorLogInterval {
-		socketErrorMu.Unlock()
-		return
-	}
-	socketErrorLastLog[site] = now
-	socketErrorMu.Unlock()
-	fmt.Fprint(os.Stderr, msg)
-}
-
-func socketLogErr(site, what string, err error) {
-	socketRateLimitedStderr(site, fmt.Sprintf("ebpf-go.plugin: socket %s failed: %v\n", what, err))
-}
+// (rateLimitedStderr and logPluginErr live in error_log.go; both socket and
+// dns collectors use them to throttle stderr noise from persistent failures.)
 
 // ---- collection loop -------------------------------------------------------
 
@@ -148,7 +124,7 @@ func runSocketGlobalCollector(handle *SocketLegacyHandle, stop <-chan struct{}, 
 	if shouldPublish && store != nil {
 		p, perr := NewSharedPidMemoryPublisher(socketDefaultPIDTableSize)
 		if perr != nil {
-			socketLogErr("socket.shm_open", "shared memory open", perr)
+			logPluginErr("socket.shm_open", "socket", "shared memory open", perr)
 		} else {
 			shmPublisher = p
 			defer shmPublisher.Close()
@@ -158,7 +134,7 @@ func runSocketGlobalCollector(handle *SocketLegacyHandle, stop <-chan struct{}, 
 	collectAndPublish := func() {
 		snap, err := handle.Runtime.Snapshot(handle.MapsPerCore)
 		if err != nil {
-			socketLogErr("socket.snapshot", "snapshot", err)
+			logPluginErr("socket.snapshot", "socket", "snapshot", err)
 			return
 		}
 		if publish, ok := state.Update(snap); ok {
@@ -168,12 +144,12 @@ func runSocketGlobalCollector(handle *SocketLegacyHandle, stop <-chan struct{}, 
 		if store != nil {
 			pidEntries, pidErr := handle.Runtime.SnapshotPerPID()
 			if pidErr != nil {
-				socketLogErr("socket.snapshot_per_pid", "per-PID snapshot", pidErr)
+				logPluginErr("socket.snapshot_per_pid", "socket", "per-PID snapshot", pidErr)
 			} else {
 				store.UpdateSocketApps(pidEntries)
 				if shmPublisher != nil {
 					if err := store.Publish(shmPublisher); err != nil {
-						socketLogErr("socket.publish", "shared memory publish", err)
+						logPluginErr("socket.publish", "socket", "shared memory publish", err)
 					}
 				}
 			}

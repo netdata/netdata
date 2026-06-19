@@ -6569,12 +6569,18 @@ static BUFFER *network_viewer_dns_result(void)
         for (uint32_t i = 0; i < flow_count; i++) {
             const struct ebpfgo_dns_flow_record *r = &flows[i];
 
-            /* Format server IP */
+            /* Format server IP.  inet_ntop returns NULL on malformed input
+             * (e.g. ip_version lies about the family); fall back to a safe
+             * placeholder so ip_buf is never passed uninitialised to the
+             * JSON writer. */
+            const char *ip_str;
             if (r->ip_version == 4) {
-                inet_ntop(AF_INET, &r->server_ip[0], ip_buf, sizeof(ip_buf));
+                ip_str = inet_ntop(AF_INET, &r->server_ip[0], ip_buf, sizeof(ip_buf));
             } else {
-                inet_ntop(AF_INET6, r->server_ip, ip_buf, sizeof(ip_buf));
+                ip_str = inet_ntop(AF_INET6, r->server_ip, ip_buf, sizeof(ip_buf));
             }
+            if (!ip_str)
+                ip_str = "(invalid)";
 
             /* Format query type */
             const char *qtype_name = nv_dns_qtype_name(r->query_type);
@@ -6596,7 +6602,7 @@ static BUFFER *network_viewer_dns_result(void)
             buffer_json_add_array_item_string(wb, qtype_name);
             buffer_json_add_array_item_string(wb, (r->protocol == 17) ? "UDP" : "TCP");
             buffer_json_add_array_item_string(wb, (r->ip_version == 4) ? "IPv4" : "IPv6");
-            buffer_json_add_array_item_string(wb, ip_buf);
+            buffer_json_add_array_item_string(wb, ip_str);
             buffer_json_add_array_item_double(wb, (double)r->latency_us / 1e6);
             buffer_json_add_array_item_string(wb, r->timed_out ? "Timeout" : "OK");
             buffer_json_add_array_item_string(wb, rcode_name);

@@ -2,17 +2,20 @@
 
 package main
 
-import "github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
+import (
+	"fmt"
+	"os"
+	"path/filepath"
 
-func LoadCachestatLegacy(cfg CachestatLegacyConfig) (*CachestatLegacyHandle, error) {
-	plan := BuildCachestatLegacyPlan(cfg)
+	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
+)
+
+// tryLoadCachestatPlan opens, prepares, loads, attaches, and configures a
+// single plan.  On any failure the partially-initialised runtime is closed
+// before returning.  Matches the pattern used by tryLoadSocketPlan /
+// tryLoadDNSPlan.
+func tryLoadCachestatPlan(cfg CachestatLegacyConfig, plan LoadPlan) (*CachestatLegacyHandle, error) {
 	coreSupported := libbpfloader.SupportsCore()
-	if !coreSupported {
-		selector := SelectIndex(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion)
-		plan.ObjectPath = BuildObjectPathWithFlavor(cfg.PluginsDir, selector, "cachestat", false, cfg.IsRHF, ObjectFlavorBase)
-		plan.LoadMode = LoadLegacy
-	}
-
 	rt, err := libbpfloader.NewCachestatRuntime(plan.ObjectPath, plan.LoadMode == LoadCore && coreSupported)
 	if err != nil {
 		return nil, err
@@ -39,9 +42,9 @@ func LoadCachestatLegacy(cfg CachestatLegacyConfig) (*CachestatLegacyHandle, err
 	}
 
 	// The shared memory publisher is opened lazily on the first publish call
-	// (see runCachestatPlugin).  Opening here unconditionally would reserve
-	// ~17.5 MB of VMA and RSS for hosts that have neither apps nor cgroups
-	// integration enabled (the default), even though the SHM is never
+	// (see runCachestatGlobalCollector).  Opening here unconditionally would
+	// reserve ~17.5 MB of VMA and RSS for hosts that have neither apps nor
+	// cgroups integration enabled (the default), even though the SHM is never
 	// written or read.  The handle exposes the PidTableSize to the lazy
 	// open path.
 
@@ -57,6 +60,34 @@ func LoadCachestatLegacy(cfg CachestatLegacyConfig) (*CachestatLegacyHandle, err
 		CgroupsEnabled: cfg.CgroupsEnabled,
 		AppsLevel:      cfg.AppsLevel,
 	}, nil
+}
+
+func LoadCachestatLegacy(cfg CachestatLegacyConfig) (*CachestatLegacyHandle, error) {
+	plan := BuildCachestatLegacyPlan(cfg)
+	coreSupported := libbpfloader.SupportsCore()
+	if !coreSupported {
+		selector := SelectIndex(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion)
+		plan.ObjectPath = BuildObjectPathWithFlavor(cfg.PluginsDir, selector, "cachestat", false, cfg.IsRHF, ObjectFlavorBase)
+		plan.LoadMode = LoadLegacy
+		// No fallback in legacy mode: there is only one object.
+		return tryLoadCachestatPlan(cfg, plan)
+	}
+
+	plans := buildFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "cachestat")
+	var lastErr error
+	for i, fp := range plans {
+		handle, err := tryLoadCachestatPlan(cfg, fp)
+		if err == nil {
+			return handle, nil
+		}
+		lastErr = err
+		if i < len(plans)-1 {
+			fmt.Fprintf(os.Stderr,
+				"ebpf-go.plugin: cachestat %s unavailable (%v), trying fallback\n",
+				filepath.Base(fp.ObjectPath), err)
+		}
+	}
+	return nil, lastErr
 }
 
 func LoadCachestatLegacyFromSystem() (*CachestatLegacyHandle, error) {

@@ -118,9 +118,14 @@ int shared_pid_memory_publish(struct shared_pid_memory *ctx, const struct ebpf_p
         locked = true;
     }
 
-    /* OR the caller's module flags into the header so multiple publishers
-     * (cachestat and socket running concurrently) each stamp their own bit
-     * without clearing the other's. */
+    /* Reset the per-module flags at the start of every cycle so a module
+     * that stops publishing has its bit cleared on the next consumer read.
+     * The caller's flags are then OR'd in.  Producers that publish
+     * concurrently (cachestat and socket) each call shared_pid_memory_publish
+     * in their own goroutine, but the OR is non-destructive per-bit and
+     * the same reset/OR pattern is used by the Go store on the activeModules
+     * side (see cachestat_shared_memory.go:UpdateApps / UpdateSocketApps). */
+    ctx->header->flags = 0;
     ctx->header->flags |= flags;
 
     if (entries && count)

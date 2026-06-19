@@ -41,18 +41,18 @@ type fnGroupByDef struct {
 }
 
 type fnTableResponse struct {
-	Status            int                      `json:"status"`
-	Type              string                   `json:"type"`
-	UpdateEvery       int                      `json:"update_every"`
-	HasHistory        bool                     `json:"has_history"`
-	Help              string                   `json:"help"`
-	Data              [][]interface{}          `json:"data"`
-	Columns           map[string]fnColumnDef   `json:"columns"`
-	DefaultSortColumn string                   `json:"default_sort_column"`
-	Charts            map[string]fnChartDef    `json:"charts"`
-	DefaultCharts     [][]string               `json:"default_charts"`
-	GroupBy           map[string]fnGroupByDef  `json:"group_by"`
-	Expires           int64                    `json:"expires"`
+	Status            int                     `json:"status"`
+	Type              string                  `json:"type"`
+	UpdateEvery       int                     `json:"update_every"`
+	HasHistory        bool                    `json:"has_history"`
+	Help              string                  `json:"help"`
+	Data              [][]interface{}         `json:"data"`
+	Columns           map[string]fnColumnDef  `json:"columns"`
+	DefaultSortColumn string                  `json:"default_sort_column"`
+	Charts            map[string]fnChartDef   `json:"charts"`
+	DefaultCharts     [][]string              `json:"default_charts"`
+	GroupBy           map[string]fnGroupByDef `json:"group_by"`
+	Expires           int64                   `json:"expires"`
 }
 
 func fnStrCol(idx int, name string, uniqueKey, sticky bool) fnColumnDef {

@@ -102,7 +102,7 @@ func resolveCachestatLegacyConfig() (CachestatLegacyConfig, error) {
 	if fileCfg.Cachestat != nil {
 		cfg.Enabled = *fileCfg.Cachestat
 	}
-if fileCfg.UpdateEvery != nil && *fileCfg.UpdateEvery > 0 {
+	if fileCfg.UpdateEvery != nil && *fileCfg.UpdateEvery > 0 {
 		cfg.UpdateEvery = *fileCfg.UpdateEvery
 	}
 	if fileCfg.AppsEnabled != nil {

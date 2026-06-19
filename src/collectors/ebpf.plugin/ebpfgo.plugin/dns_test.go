@@ -18,7 +18,7 @@ func TestBuildDNSLegacyPlan(t *testing.T) {
 				IsRHF:         -1,
 				KernelVersion: 328704, // 5.4
 				IsDebian:      false,
-					ObjectFlavor:  "buffer",
+				ObjectFlavor:  "buffer",
 			},
 			want:     "pnetdata_ebpf_dns.5.4.o",
 			wantMode: LoadCore,
@@ -31,7 +31,7 @@ func TestBuildDNSLegacyPlan(t *testing.T) {
 				IsRHF:         -1,
 				KernelVersion: 330240, // 5.10 = 5*65536 + 10*256
 				IsDebian:      false,
-					ObjectFlavor:  "buffer",
+				ObjectFlavor:  "buffer",
 			},
 			want:     "pnetdata_ebpf_dns_buffer.5.11.o",
 			wantMode: LoadCore,
@@ -43,7 +43,7 @@ func TestBuildDNSLegacyPlan(t *testing.T) {
 				IsRHF:         -1,
 				KernelVersion: 396288, // 6.12
 				IsDebian:      false,
-					ObjectFlavor:  "arena",
+				ObjectFlavor:  "arena",
 			},
 			want:     "pnetdata_ebpf_dns_arena.6.12.o",
 			wantMode: LoadCore,
@@ -57,7 +57,7 @@ func TestBuildDNSLegacyPlan(t *testing.T) {
 				IsRHF:         -1,
 				KernelVersion: 396288, // 6.12
 				IsDebian:      true,
-					ObjectFlavor:  "arena",
+				ObjectFlavor:  "arena",
 			},
 			want:     "pnetdata_ebpf_dns.6.12.o",
 			wantMode: LoadCore,
@@ -69,7 +69,7 @@ func TestBuildDNSLegacyPlan(t *testing.T) {
 				IsRHF:         -1,
 				KernelVersion: 396288, // 6.12
 				IsDebian:      true,
-					ObjectFlavor:  "buffer",
+				ObjectFlavor:  "buffer",
 			},
 			want:     "pnetdata_ebpf_dns_buffer.6.12.o",
 			wantMode: LoadCore,
@@ -81,7 +81,7 @@ func TestBuildDNSLegacyPlan(t *testing.T) {
 				IsRHF:         -1,
 				KernelVersion: 328704, // 5.4 — below minimumKernelVersionBuffer (5.10)
 				IsDebian:      false,
-					ObjectFlavor:  "buffer",
+				ObjectFlavor:  "buffer",
 			},
 			want:     "pnetdata_ebpf_dns.5.4.o",
 			wantMode: LoadCore,

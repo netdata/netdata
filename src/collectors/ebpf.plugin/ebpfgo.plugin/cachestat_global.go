@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
@@ -95,32 +94,6 @@ var cachestatGlobalChartsOnce sync.Once
 // function handler's FUNCRESULT writes share a single api; without
 // this lock they can interleave and corrupt the protocol stream.
 var pluginOutputMu sync.Mutex
-
-// cachestatErrorLogInterval is the minimum gap between repeated stderr
-// messages from a single error site.  A persistent failure (e.g. unhealthy
-// BPF map) would otherwise emit one line per collection cycle, flooding
-// the operator log; 60 s strikes a balance between visibility and noise.
-const cachestatErrorLogInterval = 60 * time.Second
-
-var (
-	cachestatErrorMu      sync.Mutex
-	cachestatErrorLastLog = map[string]time.Time{}
-)
-
-// rateLimitedStderr writes msg to stderr the first time and at most once per
-// cachestatErrorLogInterval.  The site key identifies the error site; use a
-// short stable string per call site.
-func rateLimitedStderr(site, msg string) {
-	cachestatErrorMu.Lock()
-	defer cachestatErrorMu.Unlock()
-
-	now := time.Now()
-	if last, ok := cachestatErrorLastLog[site]; ok && now.Sub(last) < cachestatErrorLogInterval {
-		return
-	}
-	cachestatErrorLastLog[site] = now
-	fmt.Fprint(os.Stderr, msg)
-}
 
 func (s *cachestatGlobalState) Update(current cachestatGlobalCounters) (cachestatGlobalPublish, bool) {
 	mpa := diffCounters(current.MarkPageAccessed, s.prev.MarkPageAccessed)
@@ -259,8 +232,7 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 		// Global snapshot — one CGO call.
 		snapshot, err := handle.Runtime.Snapshot(handle.MapsPerCore)
 		if err != nil {
-			rateLimitedStderr("cachestat.snapshot",
-				fmt.Sprintf("ebpf-go.plugin: cachestat snapshot failed: %v\n", err))
+			logPluginErr("cachestat.snapshot", "cachestat", "snapshot", err)
 		} else {
 			publish, ok := state.Update(cachestatGlobalCounters{
 				MarkPageAccessed:   snapshot.MarkPageAccessed,
@@ -307,16 +279,14 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 				if handle.SharedMemory == nil {
 					publisher, perr := NewSharedPidMemoryPublisher(handle.PidTableSize)
 					if perr != nil {
-						rateLimitedStderr("cachestat.shm_open",
-							fmt.Sprintf("ebpf-go.plugin: cachestat shared memory open failed: %v\n", perr))
+						logPluginErr("cachestat.shm_open", "cachestat", "shared memory open", perr)
 					} else {
 						handle.SharedMemory = publisher
 					}
 				}
 				if handle.SharedMemory != nil {
 					if err := store.Publish(handle.SharedMemory); err != nil {
-						rateLimitedStderr("cachestat.publish",
-							fmt.Sprintf("ebpf-go.plugin: cachestat shared memory publish failed: %v\n", err))
+						logPluginErr("cachestat.publish", "cachestat", "shared memory publish", err)
 					}
 				}
 			}
@@ -345,4 +315,3 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 		collectAndPublish(usecSince)
 	}
 }
-

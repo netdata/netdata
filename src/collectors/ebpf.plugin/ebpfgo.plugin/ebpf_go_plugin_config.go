@@ -16,9 +16,9 @@ const pluginPrimaryConfigFile = "ebpf.d.conf"
 // pointers so that an absent key is distinguishable from an explicit value;
 // apply() merges a later file on top of an earlier one.
 type pluginConfigFile struct {
-	Cachestat       *bool   // [ebpf programs] cachestat key
-	Socket          *bool   // [ebpf programs] socket key
-	DNS             *bool   // [ebpf programs] dns key
+	Cachestat       *bool // [ebpf programs] cachestat key
+	Socket          *bool // [ebpf programs] socket key
+	DNS             *bool // [ebpf programs] dns key
 	UpdateEvery     *int
 	AppsEnabled     *bool
 	Cgroups         *bool

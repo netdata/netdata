@@ -1,34 +1,11 @@
 package main
 
 import (
-	"fmt"
-	"os"
-	"sync"
 	"time"
 )
 
-const dnsErrorLogInterval = 60 * time.Second
-
-var (
-	dnsErrorMu      sync.Mutex
-	dnsErrorLastLog = map[string]time.Time{}
-)
-
-func dnsRateLimitedStderr(site, msg string) {
-	now := time.Now()
-	dnsErrorMu.Lock()
-	if last, ok := dnsErrorLastLog[site]; ok && now.Sub(last) < dnsErrorLogInterval {
-		dnsErrorMu.Unlock()
-		return
-	}
-	dnsErrorLastLog[site] = now
-	dnsErrorMu.Unlock()
-	fmt.Fprint(os.Stderr, msg)
-}
-
-func dnsLogErr(site, what string, err error) {
-	dnsRateLimitedStderr(site, fmt.Sprintf("ebpf-go.plugin: dns %s failed: %v\n", what, err))
-}
+// error logging reuses the shared rateLimitedStderr / logPluginErr helpers
+// from error_log.go; this file only owns the collector loop.
 
 func runDNSGlobalCollector(handle *DNSLegacyHandle, stop <-chan struct{}, updateEvery int, shm *SharedDnsMemoryPublisher) {
 	if handle == nil || handle.Runtime == nil {
@@ -42,14 +19,14 @@ func runDNSGlobalCollector(handle *DNSLegacyHandle, stop <-chan struct{}, update
 	collectAndPublish := func() {
 		snap, err := handle.Runtime.Snapshot()
 		if err != nil {
-			dnsLogErr("dns.snapshot", "snapshot", err)
+			logPluginErr("dns.snapshot", "dns", "snapshot", err)
 			return
 		}
 
 		flows, err := handle.Runtime.FlowSnapshot()
 		if err != nil {
 			// FlowSnapshot failure is non-fatal; publish aggregate only.
-			dnsLogErr("dns.flow_snapshot", "flow snapshot", err)
+			logPluginErr("dns.flow_snapshot", "dns", "flow snapshot", err)
 			flows = nil
 		}
 
