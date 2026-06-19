@@ -697,6 +697,7 @@ func TestSNMPTopologyToV1_PreservesOSPFAdjacencyPresentationEvidenceAndNeighborR
 	assert.Equal(t, []string{"192.0.2.0/30"}, topologyV1StringColumnValues(t, payload, evidenceTable, "subnet"))
 
 	require.NotNil(t, payload.Tables)
+	assert.NotContains(t, payload.Tables.Actor, "actor_port_links")
 	require.Contains(t, payload.Tables.Actor, "actor_ospf_neighbors")
 	neighborsTable := payload.Tables.Actor["actor_ospf_neighbors"].Table
 	assert.Equal(t, 1, neighborsTable.Rows)

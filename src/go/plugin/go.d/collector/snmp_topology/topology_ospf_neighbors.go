@@ -32,14 +32,6 @@ func (c *topologyCache) updateOSPFNeighbor(tags map[string]string) {
 	if row.State == "" {
 		row.State = strings.TrimSpace(tags[tagOSPFNeighborState])
 	}
-	iface, ok := c.matchOSPFNeighborLocalInterface(neighborIP)
-	if ok {
-		row.LocalIP = iface.IP
-		row.Network = iface.Network
-		row.Netmask = iface.Netmask
-		row.Subnet = iface.Subnet
-		row.Prefix = iface.Prefix
-	}
 
 	if c.ospfNeighborsByKey == nil {
 		c.ospfNeighborsByKey = make(map[string]topologyOSPFNeighbor)
@@ -59,6 +51,13 @@ func (c *topologyCache) snapshotOSPFNeighbors(localDeviceID string) []topologyOS
 		row.DeviceID = strings.TrimSpace(localDeviceID)
 		if row.LocalRouterID == "" {
 			row.LocalRouterID = normalizeOSPFRouterID(c.localDevice.OSPFRouterID)
+		}
+		if iface, ok := c.matchOSPFNeighborLocalInterface(row.NeighborIP); ok {
+			row.LocalIP = iface.IP
+			row.Network = iface.Network
+			row.Netmask = iface.Netmask
+			row.Subnet = iface.Subnet
+			row.Prefix = iface.Prefix
 		}
 		if row.DeviceID == "" || (row.NeighborRouterID == "" && row.NeighborIP == "") {
 			continue
@@ -171,20 +170,48 @@ func topologyOSPFNeighborLinkKeyParts(row topologyOSPFNeighbor, srcActorID, dstA
 		srcActorID, dstActorID = dstActorID, srcActorID
 	}
 
-	leftEndpoint := firstNonEmptyString(normalizeIPAddress(row.LocalIP), normalizeOSPFRouterID(row.LocalRouterID))
-	rightEndpoint := firstNonEmptyString(normalizeIPAddress(row.NeighborIP), normalizeOSPFRouterID(row.NeighborRouterID))
-	if leftEndpoint > rightEndpoint {
-		leftEndpoint, rightEndpoint = rightEndpoint, leftEndpoint
+	localRouterID := normalizeOSPFRouterID(row.LocalRouterID)
+	neighborRouterID := normalizeOSPFRouterID(row.NeighborRouterID)
+	if localRouterID > neighborRouterID {
+		localRouterID, neighborRouterID = neighborRouterID, localRouterID
 	}
 
 	return topologyL3SubnetLinkKeyParts(
 		srcActorID,
 		dstActorID,
-		leftEndpoint,
-		rightEndpoint,
-		strconv.Itoa(row.Prefix),
-		strings.TrimSpace(row.AddresslessIndex),
+		localRouterID,
+		neighborRouterID,
+		topologyOSPFAdjacencyDiscriminator(row),
 	)
+}
+
+func topologyOSPFAdjacencyDiscriminator(row topologyOSPFNeighbor) string {
+	if _, subnet, prefix, ok := topologyOSPFSubnetMatch(row); ok {
+		return topologyL3SubnetLinkKeyParts("subnet", subnet, strconv.Itoa(prefix))
+	}
+
+	localIP := topologyOSPFDedupIP(row.LocalIP)
+	neighborIP := topologyOSPFDedupIP(row.NeighborIP)
+	if localIP != "" && neighborIP != "" {
+		if localIP > neighborIP {
+			localIP, neighborIP = neighborIP, localIP
+		}
+		return topologyL3SubnetLinkKeyParts("ip_pair", localIP, neighborIP)
+	}
+
+	return "router_id"
+}
+
+func topologyOSPFDedupIP(value string) string {
+	ip := normalizeIPAddress(value)
+	if ip == "" {
+		return ""
+	}
+	addr, err := netip.ParseAddr(ip)
+	if err != nil || addr.IsUnspecified() {
+		return ""
+	}
+	return ip
 }
 
 func topologyOSPFSubnetMatch(row topologyOSPFNeighbor) (network, subnet string, prefix int, ok bool) {

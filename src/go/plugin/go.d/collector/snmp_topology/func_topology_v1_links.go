@@ -307,6 +307,15 @@ func snmpTopologyV1LinkIsL3Subnet(link topologyLink) bool {
 	return snmpTopologyV1LinkType(link) == snmpTopologyV1LinkL3Subnet
 }
 
+func snmpTopologyV1LinkIsLogicalL3(link topologyLink) bool {
+	switch snmpTopologyV1LinkType(link) {
+	case snmpTopologyV1LinkL3Subnet, snmpTopologyV1LinkOSPF:
+		return true
+	default:
+		return false
+	}
+}
+
 func snmpTopologyV1LinkIsProbable(link topologyLink) bool {
 	if strings.EqualFold(strings.TrimSpace(link.State), snmpTopologyV1LinkProbable) {
 		return true

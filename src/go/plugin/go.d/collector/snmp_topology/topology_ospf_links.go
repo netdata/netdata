@@ -208,6 +208,7 @@ func existingTopologyOSPFLinkKeys(links []topologyLink) map[string]struct{} {
 				LocalIP:          topologyV1EndpointString(link.Src, "ip"),
 				NeighborIP:       topologyV1EndpointString(link.Dst, "ip"),
 				AddresslessIndex: topologyMetricValueString(link.Metrics, "addressless_index"),
+				Subnet:           topologyMetricValueString(link.Metrics, "subnet"),
 			}
 			if prefix, ok := uintValue(link.Metrics["prefix"]); ok {
 				row.Prefix = int(prefix)

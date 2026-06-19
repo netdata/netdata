@@ -176,6 +176,44 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentResolvesUnnumberedNeighborByRouterI
 	require.NotContains(t, data.Links[0].Dst.Attributes, "ip")
 }
 
+func TestApplyTopologyOSPFAdjacencyEnrichmentDeduplicatesBidirectionalUnnumberedObservations(t *testing.T) {
+	data := topologyData{
+		Actors: []topologyActor{
+			topologyOSPFManagedActorForTest("router-a", "device-a", "1.1.1.1", "198.51.100.1"),
+			topologyOSPFManagedActorForTest("router-b", "device-b", "2.2.2.2", "198.51.100.2"),
+		},
+	}
+	aggregate := topologyObservationAggregate{
+		ospfNeighbors: []topologyOSPFNeighbor{
+			{
+				DeviceID:         "device-a",
+				LocalRouterID:    "1.1.1.1",
+				NeighborRouterID: "2.2.2.2",
+				NeighborIP:       "0.0.0.0",
+				AddresslessIndex: "7",
+				State:            "full",
+			},
+			{
+				DeviceID:         "device-b",
+				LocalRouterID:    "2.2.2.2",
+				NeighborRouterID: "1.1.1.1",
+				NeighborIP:       "0.0.0.0",
+				AddresslessIndex: "9",
+				State:            "full",
+			},
+		},
+	}
+
+	stats := applyTopologyOSPFAdjacencyEnrichment(&data, aggregate)
+
+	require.Equal(t, 1, stats.emittedLinks)
+	require.Equal(t, 1, stats.suppressedDuplicateLink)
+	require.Len(t, data.Links, 1)
+	require.Equal(t, topologyOSPFAdjacencyLinkType, data.Links[0].LinkType)
+	require.Len(t, data.Actors[0].Tables["ospf_neighbors"], 1)
+	require.Len(t, data.Actors[1].Tables["ospf_neighbors"], 1)
+}
+
 func topologyOSPFManagedActorForTest(actorID, deviceID, routerID string, ips ...string) topologyActor {
 	attrs := map[string]any{
 		"device_id":     deviceID,
