@@ -154,6 +154,8 @@ static ssize_t receiver_read_uncompressed(struct receiver_state *r) {
         r->thread.uncompressed.read_len += bytes;
         r->thread.uncompressed.read_buffer[r->thread.uncompressed.read_len] = '\0';
         r->thread.bytes_received += bytes;
+        if(likely(r->host))
+            single_writer_atomic_add(&r->host->stream.rcv.status.bytes_in, (uint64_t)bytes);
         pulse_stream_received_bytes(bytes);
     }
 
@@ -273,6 +275,8 @@ static ssize_t receiver_read_compressed(struct receiver_state *r) {
     if(bytes > 0) {
         r->thread.compressed.used += bytes;
         r->thread.bytes_received += bytes;
+        if(likely(r->host))
+            single_writer_atomic_add(&r->host->stream.rcv.status.bytes_in, (uint64_t)bytes);
         worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, (NETDATA_DOUBLE)bytes);
         pulse_stream_received_bytes(bytes);
     }
@@ -725,6 +729,8 @@ bool stream_receiver_send_data(struct stream_thread *sth, struct receiver_state 
             pulse_stream_sent_bytes(rc);
             rpt->thread.last_traffic_ut = now_ut;
             stream_circular_buffer_del_unsafe(scb, rc, now_ut);
+            if(likely(rpt->host))
+                single_writer_atomic_add(&rpt->host->stream.rcv.status.bytes_out, (uint64_t)rc);
             if (!stats->bytes_outstanding) {
                 rpt->thread.wanted = ND_POLL_READ;
                 if (!nd_poll_upd(sth->run.ndpl, rpt->sock.fd, rpt->thread.wanted))
@@ -1180,7 +1186,9 @@ RRDHOST_SET_RECEIVER_RESULT rrdhost_set_receiver(RRDHOST *host, struct receiver_
         rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
         rrdhost_set_health_evloop_iteration(host);
 
-        host->stream.rcv.status.connections++;
+        // atomic: read lock-free by the pulse traversal (this write is under receiver_lock, but the
+        // read side has no lock; the connect path is rare so the atomic RMW cost is irrelevant)
+        __atomic_add_fetch(&host->stream.rcv.status.connections, 1, __ATOMIC_RELAXED);
         streaming_receiver_connected();
 
         host->receiver = rpt;

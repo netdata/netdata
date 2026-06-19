@@ -252,8 +252,19 @@ struct rrdhost {
                     uint32_t charts;                // the number of charts currently being replicated from a child
                     NETDATA_DOUBLE percent;         // the % of replication completion
                 } replication;
+
+                // single-writer (the receiver thread), relaxed-atomic; read lock-free by the
+                // pulse traversal. Cumulative over the host's lifetime, never reset.
+                uint64_t bytes_in;                  // raw socket bytes received from this child (all connections)
+                uint64_t bytes_out;                 // raw socket bytes sent to this child (all connections)
             } status;
         } rcv;
+
+        // resolved combined PULSE_HOST_STATUS (basic|receiver|sender|ephemerality), maintained by
+        // pulse_host_status() lock-free (CAS) and read by the pulse traversal, which computes the
+        // streaming_inbound (basic|receiver bits) and streaming_outbound (sender bits) aggregates.
+        // Replaces the former global PHOST Judy + spinlock.
+        uint32_t pulse_state;
 
         // --- configuration ---
 

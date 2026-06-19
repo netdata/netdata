@@ -141,6 +141,59 @@ static void stream_sender_on_connect_and_disconnect(struct sender_state *s) {
     stream_sender_unlock(s);
 }
 
+// Record the interface the stream actually egresses on as the host's
+// _net_default_iface label, so the parent sees the real uplink. We match the
+// socket's local address to a local interface address - this is correct under
+// policy routing / multi-WAN, where the main routing table's default route can
+// point at a different interface than the stream uses. Runs once per (re)connect
+// and rides out with the first host-labels push in on_ready_to_dispatch(); on
+// failover the connection breaks and reconnects over the new interface, so it
+// re-evaluates automatically.
+#if defined(HAVE_NET_IF_H) && !defined(OS_WINDOWS)
+#include <ifaddrs.h>
+
+static void stream_sender_update_egress_iface_label(struct sender_state *s) {
+    int fd = s->sock.fd;
+    if (fd < 0)
+        return;
+
+    struct sockaddr_storage local;
+    socklen_t local_len = sizeof(local);
+    if (getsockname(fd, (struct sockaddr *)&local, &local_len) != 0)
+        return;
+
+    struct ifaddrs *ifaddr;
+    if (getifaddrs(&ifaddr) != 0)
+        return;
+
+    char iface[IF_NAMESIZE] = "";
+    for (struct ifaddrs *ifa = ifaddr; ifa; ifa = ifa->ifa_next) {
+        if (!ifa->ifa_addr || ifa->ifa_addr->sa_family != local.ss_family)
+            continue;
+
+        bool match = false;
+        if (local.ss_family == AF_INET)
+            match = ((const struct sockaddr_in *)&local)->sin_addr.s_addr ==
+                    ((const struct sockaddr_in *)(void *)ifa->ifa_addr)->sin_addr.s_addr;
+        else if (local.ss_family == AF_INET6)
+            match = memcmp(&((const struct sockaddr_in6 *)&local)->sin6_addr,
+                           &((const struct sockaddr_in6 *)(void *)ifa->ifa_addr)->sin6_addr,
+                           sizeof(struct in6_addr)) == 0;
+
+        if (match) {
+            strncpyz(iface, ifa->ifa_name, sizeof(iface) - 1);
+            break;
+        }
+    }
+    freeifaddrs(ifaddr);
+
+    if (iface[0])
+        rrdlabels_add(s->host->rrdlabels, "_net_default_iface", iface, RRDLABEL_SRC_AUTO);
+}
+#else
+static inline void stream_sender_update_egress_iface_label(struct sender_state *s __maybe_unused) { ; }
+#endif
+
 void stream_sender_on_connect(struct sender_state *s) {
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "STREAM SND [%s]: running on-connect hooks...",
@@ -151,6 +204,9 @@ void stream_sender_on_connect(struct sender_state *s) {
     stream_sender_on_connect_and_disconnect(s);
 
     s->thread.last_traffic_ut = now_monotonic_usec();
+
+    // record the real uplink interface before the first host-labels push
+    stream_sender_update_egress_iface_label(s);
 
     freez(s->thread.rbuf.b);
     s->thread.rbuf.size = PLUGINSD_LINE_MAX + 1;

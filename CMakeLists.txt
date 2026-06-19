@@ -1214,6 +1214,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/locks/rw-spinlock-unittest.c
         src/libnetdata/atomics/atomic_flags.h
         src/libnetdata/atomics/atomics.h
+        src/libnetdata/atomics/single_writer.h
         src/libnetdata/locks/waitq.c
         src/libnetdata/locks/waitq.h
         src/libnetdata/object-state/object-state.c
