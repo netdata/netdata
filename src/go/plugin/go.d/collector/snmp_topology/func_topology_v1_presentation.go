@@ -519,6 +519,7 @@ func snmpTopologyV1Presentation() *topologyv1.Presentation {
 				{Type: snmpTopologyV1LinkSNMP, Label: "SNMP"},
 				{Type: snmpTopologyV1LinkBridge, Label: "Bridge"},
 				{Type: snmpTopologyV1LinkL3Subnet, Label: "L3 subnet"},
+				{Type: snmpTopologyV1LinkOSPF, Label: "OSPF adjacency"},
 				{Type: snmpTopologyV1LinkProbable, Label: "Probable"},
 			},
 			Ports: []topologyv1.LegendEntry{
