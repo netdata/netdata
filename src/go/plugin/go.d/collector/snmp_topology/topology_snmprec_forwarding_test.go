@@ -35,28 +35,24 @@ type snmprecForwardingFixture struct {
 }
 
 func TestTopologyCache_RealSnmprecForwardingFixtures(t *testing.T) {
-	tests := []struct {
-		name           string
+	tests := map[string]struct {
 		fixture        string
 		wantARP        bool
 		wantSTP        bool
 		wantDot1qFDB   bool
 		wantVTPVLANMap bool
 	}{
-		{
-			name:    "ArubaCX",
+		"ArubaCX": {
 			fixture: "arubaos-cx_10.10.snmprec",
 			wantARP: true,
 			wantSTP: true,
 		},
-		{
-			name:         "CiscoSmallBusiness",
+		"CiscoSmallBusiness": {
 			fixture:      "ciscosb_sg350x-24p.snmprec",
 			wantDot1qFDB: true,
 			wantSTP:      true,
 		},
-		{
-			name:           "IOSXE",
+		"IOSXE": {
 			fixture:        "iosxe_ie32008t2s-ios17-12.snmprec",
 			wantARP:        true,
 			wantSTP:        true,
@@ -64,9 +60,8 @@ func TestTopologyCache_RealSnmprecForwardingFixtures(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
 			data := parseSnmprecForwardingFixture(t, filepath.Join("../../../../testdata/snmp/snmprec", tt.fixture))
 
 			require.NotEmpty(t, data.ifNameEntries, "fixture %q should expose ifName data", tt.fixture)

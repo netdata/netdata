@@ -8,21 +8,60 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTopologyShapeValues_ClassifyActorsAndValues(t *testing.T) {
-	require.True(t, topologyActorIsInferred(topologyActor{ActorType: "endpoint"}))
-	require.True(t, topologyActorIsInferred(topologyActor{Labels: map[string]string{"inferred": "yes"}}))
-	require.True(t, topologyActorIsInferred(topologyActor{Attributes: map[string]any{"inferred": true}}))
-	require.False(t, topologyActorIsInferred(topologyActor{ActorType: "device"}))
+func TestTopologyActorIsInferred(t *testing.T) {
+	tests := map[string]struct {
+		actor topologyActor
+		want  bool
+	}{
+		"endpoint-type":      {actor: topologyActor{ActorType: "endpoint"}, want: true},
+		"inferred-label":     {actor: topologyActor{Labels: map[string]string{"inferred": "yes"}}, want: true},
+		"inferred-attribute": {actor: topologyActor{Attributes: map[string]any{"inferred": true}}, want: true},
+		"device-type":        {actor: topologyActor{ActorType: "device"}},
+	}
 
-	require.True(t, boolStatValue("true"))
-	require.True(t, boolStatValue(" yes "))
-	require.False(t, boolStatValue("0"))
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.want, topologyActorIsInferred(tc.actor))
+		})
+	}
+}
 
-	require.Equal(t, 7, intStatValue("7"))
-	require.Equal(t, 6, intStatValue(uint(6)))
-	require.Equal(t, 5, intStatValue(int64(5)))
-	require.Equal(t, 30, intStatValue(uint64(30)))
-	require.Equal(t, 0, intStatValue("nan"))
+func TestBoolStatValue(t *testing.T) {
+	tests := map[string]struct {
+		in   any
+		want bool
+	}{
+		"true":        {in: "true", want: true},
+		"yes-trimmed": {in: " yes ", want: true},
+		"zero":        {in: "0"},
+	}
 
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.want, boolStatValue(tc.in))
+		})
+	}
+}
+
+func TestIntStatValue(t *testing.T) {
+	tests := map[string]struct {
+		in   any
+		want int
+	}{
+		"string": {in: "7", want: 7},
+		"uint":   {in: uint(6), want: 6},
+		"int64":  {in: int64(5), want: 5},
+		"uint64": {in: uint64(30), want: 30},
+		"nan":    {in: "nan"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.want, intStatValue(tc.in))
+		})
+	}
+}
+
+func TestTopologyMetricValueString(t *testing.T) {
 	require.Equal(t, "value", topologyMetricValueString(map[string]any{"key": " value "}, "key"))
 }

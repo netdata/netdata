@@ -36,21 +36,57 @@ func TestSNMPTopologyCreatorOwnsTopologyFunction(t *testing.T) {
 }
 
 func TestSNMPTopologyCreatorRequiresSharedDependencies(t *testing.T) {
-	require.PanicsWithValue(t, "snmp_topology Register requires a non-nil device store", func() {
-		_ = newCreator(nil, NewTrapEnrichmentHandle())
-	})
-	require.PanicsWithValue(t, "snmp_topology Register requires a non-nil trap enrichment handle", func() {
-		_ = newCreator(ddsnmp.NewDeviceStore(), nil)
-	})
+	tests := map[string]struct {
+		store     *ddsnmp.DeviceStore
+		traps     *TrapEnrichmentHandle
+		wantPanic string
+	}{
+		"nil-device-store": {
+			store:     nil,
+			traps:     NewTrapEnrichmentHandle(),
+			wantPanic: "snmp_topology Register requires a non-nil device store",
+		},
+		"nil-trap-handle": {
+			store:     ddsnmp.NewDeviceStore(),
+			traps:     nil,
+			wantPanic: "snmp_topology Register requires a non-nil trap enrichment handle",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.PanicsWithValue(t, tc.wantPanic, func() {
+				_ = newCreator(tc.store, tc.traps)
+			})
+		})
+	}
 }
 
 func TestSNMPTopologyNewRequiresSharedDependencies(t *testing.T) {
-	require.PanicsWithValue(t, "snmp_topology New requires a non-nil device store", func() {
-		_ = New(nil, NewTrapEnrichmentHandle())
-	})
-	require.PanicsWithValue(t, "snmp_topology New requires a non-nil trap enrichment handle", func() {
-		_ = New(ddsnmp.NewDeviceStore(), nil)
-	})
+	tests := map[string]struct {
+		store     *ddsnmp.DeviceStore
+		traps     *TrapEnrichmentHandle
+		wantPanic string
+	}{
+		"nil-device-store": {
+			store:     nil,
+			traps:     NewTrapEnrichmentHandle(),
+			wantPanic: "snmp_topology New requires a non-nil device store",
+		},
+		"nil-trap-handle": {
+			store:     ddsnmp.NewDeviceStore(),
+			traps:     nil,
+			wantPanic: "snmp_topology New requires a non-nil trap enrichment handle",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.PanicsWithValue(t, tc.wantPanic, func() {
+				_ = New(tc.store, tc.traps)
+			})
+		})
+	}
 }
 
 type topologyRuntimeJobForTest struct {

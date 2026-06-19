@@ -889,58 +889,50 @@ func TestTopologyCache_InterfaceStatusObservation_FallsBackToIfIndexWhenIfNameMi
 }
 
 func TestStpBridgeAddressToMAC_ParsesAndRejectsSentinels(t *testing.T) {
-	tests := []struct {
-		name   string
+	tests := map[string]struct {
 		in     string
 		status stpBridgeIDStatus
 		mac    string
 	}{
-		{
-			name:   "bridge-id-hex",
+		"bridge-id-hex": {
 			in:     "800066778899aabb",
 			status: stpBridgeIDValid,
 			mac:    "66:77:88:99:aa:bb",
 		},
-		{
-			name:   "priority-bridge-id",
+		"priority-bridge-id": {
 			in:     "32768-66.77.88.99.aa.bb",
 			status: stpBridgeIDValid,
 			mac:    "66:77:88:99:aa:bb",
 		},
-		{
-			name:   "quoted-hex-string",
+		"quoted-hex-string": {
 			in:     "\"18 FD 74 33 1A 9C \"",
 			status: stpBridgeIDValid,
 			mac:    "18:fd:74:33:1a:9c",
 		},
-		{
-			name:   "hex-string-prefix",
+		"hex-string-prefix": {
 			in:     "Hex-STRING: 18 FD 74 33 1A 9C",
 			status: stpBridgeIDValid,
 			mac:    "18:fd:74:33:1a:9c",
 		},
-		{
-			name:   "sentinel-text-empty",
+		"sentinel-text-empty": {
 			in:     "0-00.00.00.00.00.00",
 			status: stpBridgeIDEmpty,
 			mac:    "",
 		},
-		{
-			name:   "sentinel-hex-empty",
+		"sentinel-hex-empty": {
 			in:     "302d30302e30302e30302e30302e30302e3030",
 			status: stpBridgeIDEmpty,
 			mac:    "",
 		},
-		{
-			name:   "invalid",
+		"invalid": {
 			in:     "not-a-bridge-id",
 			status: stpBridgeIDInvalid,
 			mac:    "",
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
 			mac, status := parseSTPBridgeID(tt.in, 0)
 			require.Equal(t, tt.status, status)
 			require.Equal(t, tt.mac, mac)
@@ -1166,58 +1158,64 @@ func TestDecodePrintableASCII_HexValueIsNotNumeric(t *testing.T) {
 }
 
 func TestNormalizeInterfaceAdminStatusAcceptsEnumStrings(t *testing.T) {
-	tests := []struct {
+	tests := map[string]struct {
 		in   string
 		want string
 	}{
-		{in: "up(1)", want: "up"},
-		{in: "down(2)", want: "down"},
-		{in: "testing(3)", want: "testing"},
-		{in: "UP (1)", want: "up"},
-		{in: "invalid(9)", want: ""},
+		"up":      {in: "up(1)", want: "up"},
+		"down":    {in: "down(2)", want: "down"},
+		"testing": {in: "testing(3)", want: "testing"},
+		"case":    {in: "UP (1)", want: "up"},
+		"invalid": {in: "invalid(9)", want: ""},
 	}
 
-	for _, tc := range tests {
-		assert.Equal(t, tc.want, normalizeInterfaceAdminStatus(tc.in), tc.in)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, normalizeInterfaceAdminStatus(tc.in), tc.in)
+		})
 	}
 }
 
 func TestNormalizeInterfaceOperStatusAcceptsEnumStrings(t *testing.T) {
-	tests := []struct {
+	tests := map[string]struct {
 		in   string
 		want string
 	}{
-		{in: "up(1)", want: "up"},
-		{in: "down(2)", want: "down"},
-		{in: "testing(3)", want: "testing"},
-		{in: "unknown(4)", want: "unknown"},
-		{in: "dormant(5)", want: "dormant"},
-		{in: "notPresent(6)", want: "notPresent"},
-		{in: "lowerLayerDown(7)", want: "lowerLayerDown"},
-		{in: "LOWERLAYERDOWN (7)", want: "lowerLayerDown"},
-		{in: "invalid(9)", want: ""},
+		"up":                 {in: "up(1)", want: "up"},
+		"down":               {in: "down(2)", want: "down"},
+		"testing":            {in: "testing(3)", want: "testing"},
+		"unknown":            {in: "unknown(4)", want: "unknown"},
+		"dormant":            {in: "dormant(5)", want: "dormant"},
+		"not-present":        {in: "notPresent(6)", want: "notPresent"},
+		"lower-layer-down":   {in: "lowerLayerDown(7)", want: "lowerLayerDown"},
+		"case-normalization": {in: "LOWERLAYERDOWN (7)", want: "lowerLayerDown"},
+		"invalid":            {in: "invalid(9)", want: ""},
 	}
 
-	for _, tc := range tests {
-		assert.Equal(t, tc.want, normalizeInterfaceOperStatus(tc.in), tc.in)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, normalizeInterfaceOperStatus(tc.in), tc.in)
+		})
 	}
 }
 
 func TestNormalizeInterfaceTypeAcceptsEnumStrings(t *testing.T) {
-	tests := []struct {
+	tests := map[string]struct {
 		in   string
 		want string
 	}{
-		{in: "ethernetCsmacd(6)", want: "ethernetcsmacd"},
-		{in: "6", want: "ethernetcsmacd"},
-		{in: "ieee8023adLag(161)", want: "ieee8023adlag"},
-		{in: "161", want: "ieee8023adlag"},
-		{in: "l2vlan(135)", want: "l2vlan"},
-		{in: "", want: ""},
+		"ethernet-enum": {in: "ethernetCsmacd(6)", want: "ethernetcsmacd"},
+		"ethernet-id":   {in: "6", want: "ethernetcsmacd"},
+		"lag-enum":      {in: "ieee8023adLag(161)", want: "ieee8023adlag"},
+		"lag-id":        {in: "161", want: "ieee8023adlag"},
+		"vlan-enum":     {in: "l2vlan(135)", want: "l2vlan"},
+		"empty":         {in: "", want: ""},
 	}
 
-	for _, tc := range tests {
-		assert.Equal(t, tc.want, normalizeInterfaceType(tc.in), tc.in)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, normalizeInterfaceType(tc.in), tc.in)
+		})
 	}
 }
 

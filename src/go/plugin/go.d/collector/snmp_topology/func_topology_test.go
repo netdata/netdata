@@ -829,45 +829,48 @@ func TestSNMPTopologyToV1_PreservesLinkPresentationTypes(t *testing.T) {
 }
 
 func TestNormalizeTopologyInferenceStrategy(t *testing.T) {
-	assert.Equal(t, topologyInferenceStrategyFDBMinimumKnowledge, normalizeTopologyInferenceStrategy(""))
-	assert.Equal(t, topologyInferenceStrategyFDBMinimumKnowledge, normalizeTopologyInferenceStrategy(topologyInferenceStrategyFDBMinimumKnowledge))
-	assert.Equal(t, topologyInferenceStrategySTPParentTree, normalizeTopologyInferenceStrategy(topologyInferenceStrategySTPParentTree))
-	assert.Equal(t, topologyInferenceStrategyFDBPairwise, normalizeTopologyInferenceStrategy(topologyInferenceStrategyFDBPairwise))
-	assert.Equal(t, topologyInferenceStrategySTPFDBCorrelated, normalizeTopologyInferenceStrategy(topologyInferenceStrategySTPFDBCorrelated))
-	assert.Equal(t, topologyInferenceStrategyCDPFDBHybrid, normalizeTopologyInferenceStrategy(topologyInferenceStrategyCDPFDBHybrid))
-	assert.Equal(t, "", normalizeTopologyInferenceStrategy("invalid"))
+	tests := map[string]struct {
+		in   string
+		want string
+	}{
+		"default-empty":         {in: "", want: topologyInferenceStrategyFDBMinimumKnowledge},
+		"fdb-minimum-knowledge": {in: topologyInferenceStrategyFDBMinimumKnowledge, want: topologyInferenceStrategyFDBMinimumKnowledge},
+		"stp-parent-tree":       {in: topologyInferenceStrategySTPParentTree, want: topologyInferenceStrategySTPParentTree},
+		"fdb-pairwise":          {in: topologyInferenceStrategyFDBPairwise, want: topologyInferenceStrategyFDBPairwise},
+		"stp-fdb-correlated":    {in: topologyInferenceStrategySTPFDBCorrelated, want: topologyInferenceStrategySTPFDBCorrelated},
+		"cdp-fdb-hybrid":        {in: topologyInferenceStrategyCDPFDBHybrid, want: topologyInferenceStrategyCDPFDBHybrid},
+		"invalid":               {in: "invalid", want: ""},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, normalizeTopologyInferenceStrategy(tc.in))
+		})
+	}
 }
 
 func TestNormalizeTopologyManagedFocuses(t *testing.T) {
-	assert.Equal(t, []string{topologyManagedFocusAllDevices}, normalizeTopologyManagedFocuses(nil))
-	assert.Equal(t, []string{topologyManagedFocusAllDevices}, normalizeTopologyManagedFocuses([]string{}))
-	assert.Equal(t, []string{topologyManagedFocusAllDevices}, normalizeTopologyManagedFocuses([]string{""}))
-	assert.Equal(t, []string{topologyManagedFocusAllDevices}, normalizeTopologyManagedFocuses([]string{" , , "}))
-	assert.Equal(
-		t,
-		[]string{topologyManagedFocusAllDevices},
-		normalizeTopologyManagedFocuses([]string{"invalid"}),
-	)
-	assert.Equal(
-		t,
-		[]string{"ip:10.0.0.1", "ip:10.0.0.2"},
-		normalizeTopologyManagedFocuses([]string{"ip:10.0.0.2", "ip:10.0.0.1", "ip:10.0.0.2"}),
-	)
-	assert.Equal(
-		t,
-		[]string{"ip:10.0.0.1", "ip:10.0.0.2"},
-		normalizeTopologyManagedFocuses([]string{" ip:10.0.0.2 , ip:10.0.0.1 "}),
-	)
-	assert.Equal(
-		t,
-		[]string{topologyManagedFocusAllDevices},
-		normalizeTopologyManagedFocuses([]string{"ip:10.0.0.1", topologyManagedFocusAllDevices}),
-	)
-	assert.Equal(
-		t,
-		[]string{topologyManagedFocusAllDevices},
-		normalizeTopologyManagedFocuses([]string{"ip:10.0.0.1,all_devices"}),
-	)
+	tests := map[string]struct {
+		in   []string
+		want []string
+	}{
+		"nil":                 {in: nil, want: []string{topologyManagedFocusAllDevices}},
+		"empty":               {in: []string{}, want: []string{topologyManagedFocusAllDevices}},
+		"blank":               {in: []string{""}, want: []string{topologyManagedFocusAllDevices}},
+		"comma-blanks":        {in: []string{" , , "}, want: []string{topologyManagedFocusAllDevices}},
+		"invalid":             {in: []string{"invalid"}, want: []string{topologyManagedFocusAllDevices}},
+		"deduplicated-ips":    {in: []string{"ip:10.0.0.2", "ip:10.0.0.1", "ip:10.0.0.2"}, want: []string{"ip:10.0.0.1", "ip:10.0.0.2"}},
+		"comma-separated-ips": {in: []string{" ip:10.0.0.2 , ip:10.0.0.1 "}, want: []string{"ip:10.0.0.1", "ip:10.0.0.2"}},
+		"all-devices-token":   {in: []string{"ip:10.0.0.1", topologyManagedFocusAllDevices}, want: []string{topologyManagedFocusAllDevices}},
+		"all-devices-comma":   {in: []string{"ip:10.0.0.1,all_devices"}, want: []string{topologyManagedFocusAllDevices}},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, normalizeTopologyManagedFocuses(tc.in))
+		})
+	}
+
 	assert.Equal(
 		t,
 		"ip:10.0.0.1,ip:10.0.0.2",

@@ -182,32 +182,46 @@ func TestTopologyHandlerHandleUnknownSelectorsFallbackToDefaults(t *testing.T) {
 }
 
 func TestTopologyHandlerUnavailableAndErrors(t *testing.T) {
-	t.Run("unknown method", func(t *testing.T) {
-		resp := NewHandler(&fakeDeps{}).Handle(context.Background(), "unknown", nil)
-		require.NotNil(t, resp)
-		assert.Equal(t, 404, resp.Status)
-	})
+	tests := map[string]struct {
+		deps        Deps
+		method      string
+		wantStatus  int
+		wantMessage string
+	}{
+		"unknown-method": {
+			deps:       &fakeDeps{},
+			method:     "unknown",
+			wantStatus: 404,
+		},
+		"nil-deps": {
+			method:      MethodID,
+			wantStatus:  503,
+			wantMessage: "topology data not available",
+		},
+		"snapshot-unavailable": {
+			deps:        &fakeDeps{},
+			method:      MethodID,
+			wantStatus:  503,
+			wantMessage: "topology data not available",
+		},
+		"snapshot-error": {
+			deps:        &fakeDeps{err: errors.New("boom")},
+			method:      MethodID,
+			wantStatus:  500,
+			wantMessage: "failed to build topology response",
+		},
+	}
 
-	t.Run("nil deps", func(t *testing.T) {
-		resp := NewHandler(nil).Handle(context.Background(), MethodID, nil)
-		require.NotNil(t, resp)
-		assert.Equal(t, 503, resp.Status)
-		assert.Contains(t, resp.Message, "topology data not available")
-	})
-
-	t.Run("snapshot unavailable", func(t *testing.T) {
-		resp := NewHandler(&fakeDeps{}).Handle(context.Background(), MethodID, nil)
-		require.NotNil(t, resp)
-		assert.Equal(t, 503, resp.Status)
-		assert.Contains(t, resp.Message, "topology data not available")
-	})
-
-	t.Run("snapshot error", func(t *testing.T) {
-		resp := NewHandler(&fakeDeps{err: errors.New("boom")}).Handle(context.Background(), MethodID, nil)
-		require.NotNil(t, resp)
-		assert.Equal(t, 500, resp.Status)
-		assert.Contains(t, resp.Message, "failed to build topology response")
-	})
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			resp := NewHandler(tc.deps).Handle(context.Background(), tc.method, nil)
+			require.NotNil(t, resp)
+			assert.Equal(t, tc.wantStatus, resp.Status)
+			if tc.wantMessage != "" {
+				assert.Contains(t, resp.Message, tc.wantMessage)
+			}
+		})
+	}
 }
 
 type fakeDeps struct {

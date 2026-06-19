@@ -10,48 +10,66 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBuildSNMPTopologyV1DynamicTable_TrimsColumnKeysBeforeLookup(t *testing.T) {
-	dict := topologyv1.NewStringDictionary("")
-
-	table, err := buildSNMPTopologyV1DynamicTable([]topologyV1DynamicRow{
-		{
-			actorRef: 0,
+func TestBuildSNMPTopologyV1DynamicTable_KeyNormalization(t *testing.T) {
+	tests := map[string]struct {
+		values map[string]any
+		want   []any
+	}{
+		"trimmed-key-lookup": {
 			values: map[string]any{
 				" speed ": uint64(1000),
 			},
+			want: []any{uint64(1000)},
 		},
-	}, dict)
-
-	require.NoError(t, err)
-	assert.Equal(t, []any{uint64(1000)}, topologyV1TestColumnValues(t, table, "speed"))
-}
-
-func TestBuildSNMPTopologyV1DynamicTable_PrefersExactKeyOnTrimCollision(t *testing.T) {
-	dict := topologyv1.NewStringDictionary("")
-
-	table, err := buildSNMPTopologyV1DynamicTable([]topologyV1DynamicRow{
-		{
-			actorRef: 0,
+		"exact-key-on-trim-collision": {
 			values: map[string]any{
 				" speed ": uint64(1000),
 				"speed":   uint64(2000),
 			},
+			want: []any{uint64(2000)},
 		},
-	}, dict)
+	}
 
-	require.NoError(t, err)
-	assert.Equal(t, []any{uint64(2000)}, topologyV1TestColumnValues(t, table, "speed"))
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			table, err := buildSNMPTopologyV1DynamicTable([]topologyV1DynamicRow{
+				{
+					actorRef: 0,
+					values:   tc.values,
+				},
+			}, topologyv1.NewStringDictionary(""))
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, topologyV1TestColumnValues(t, table, "speed"))
+		})
+	}
 }
 
 func TestAnyStringSlice_DropsNilAndNonScalarItems(t *testing.T) {
-	require.Nil(t, anyStringSlice(nil))
-	assert.Equal(t, []string{"up", "42", "false"}, anyStringSlice([]any{
-		nil,
-		" up ",
-		42,
-		false,
-		map[string]any{"not": "scalar"},
-	}))
+	tests := map[string]struct {
+		in   any
+		want []string
+	}{
+		"nil": {
+			in: nil,
+		},
+		"mixed-values": {
+			in: []any{
+				nil,
+				" up ",
+				42,
+				false,
+				map[string]any{"not": "scalar"},
+			},
+			want: []string{"up", "42", "false"},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, anyStringSlice(tc.in))
+		})
+	}
 }
 
 func TestBuildSNMPTopologyV1Actors_UsesStableFallbackActorID(t *testing.T) {
@@ -88,64 +106,54 @@ func TestBuildSNMPTopologyV1Actors_FallbackDoesNotCollideWithExplicitActorID(t *
 	}, actorIndex)
 }
 
-func TestBuildSNMPTopologyV1PortNeighborSummaries_NormalizesRemotePortName(t *testing.T) {
-	summaries := buildSNMPTopologyV1PortNeighborSummaries([]topologyLink{
-		{
-			SrcActorID: "device-a",
-			DstActorID: "device-b",
-			Src: topologyLinkEndpoint{Attributes: map[string]any{
-				"if_index":  uint64(1),
-				"port_name": "Gi0/1",
-			}},
-			Dst: topologyLinkEndpoint{Attributes: map[string]any{
-				"port_name": " Gi0/2 ",
-			}},
+func TestBuildSNMPTopologyV1PortNeighborSummaries_RemotePortName(t *testing.T) {
+	tests := map[string]struct {
+		links              []topologyLink
+		wantRemotePortName string
+	}{
+		"normalizes-before-ambiguity-check": {
+			links: []topologyLink{
+				topologyV1PortNeighborSummaryLinkForTest(" Gi0/2 "),
+				topologyV1PortNeighborSummaryLinkForTest("gi0/2"),
+			},
+			wantRemotePortName: "Gi0/2",
 		},
-		{
-			SrcActorID: "device-a",
-			DstActorID: "device-b",
-			Src: topologyLinkEndpoint{Attributes: map[string]any{
-				"if_index":  uint64(1),
-				"port_name": "Gi0/1",
-			}},
-			Dst: topologyLinkEndpoint{Attributes: map[string]any{
-				"port_name": "gi0/2",
-			}},
+		"fills-missing-remote-port-name": {
+			links: []topologyLink{
+				topologyV1PortNeighborSummaryLinkForTest(""),
+				topologyV1PortNeighborSummaryLinkForTest("Gi0/2"),
+			},
+			wantRemotePortName: "Gi0/2",
 		},
-	}, map[string]int{"device-a": 0, "device-b": 1})
+	}
 
-	summary, ok := summaries[snmpTopologyV1PortNeighborKey{actorRef: 0, ifIndex: 1}]
-	require.True(t, ok)
-	assert.False(t, summary.ambiguous)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			summaries := buildSNMPTopologyV1PortNeighborSummaries(tc.links, map[string]int{"device-a": 0, "device-b": 1})
+
+			summary, ok := summaries[snmpTopologyV1PortNeighborKey{actorRef: 0, ifIndex: 1}]
+			require.True(t, ok)
+			assert.False(t, summary.ambiguous)
+			assert.Equal(t, tc.wantRemotePortName, summary.remotePortName)
+		})
+	}
 }
 
-func TestBuildSNMPTopologyV1PortNeighborSummaries_FillsMissingRemotePortName(t *testing.T) {
-	summaries := buildSNMPTopologyV1PortNeighborSummaries([]topologyLink{
-		{
-			SrcActorID: "device-a",
-			DstActorID: "device-b",
-			Src: topologyLinkEndpoint{Attributes: map[string]any{
-				"if_index":  uint64(1),
-				"port_name": "Gi0/1",
-			}},
-		},
-		{
-			SrcActorID: "device-a",
-			DstActorID: "device-b",
-			Src: topologyLinkEndpoint{Attributes: map[string]any{
-				"if_index":  uint64(1),
-				"port_name": "Gi0/1",
-			}},
-			Dst: topologyLinkEndpoint{Attributes: map[string]any{
-				"port_name": "Gi0/2",
-			}},
-		},
-	}, map[string]int{"device-a": 0, "device-b": 1})
-
-	summary, ok := summaries[snmpTopologyV1PortNeighborKey{actorRef: 0, ifIndex: 1}]
-	require.True(t, ok)
-	assert.False(t, summary.ambiguous)
-	assert.Equal(t, "Gi0/2", summary.remotePortName)
+func topologyV1PortNeighborSummaryLinkForTest(remotePortName string) topologyLink {
+	link := topologyLink{
+		SrcActorID: "device-a",
+		DstActorID: "device-b",
+		Src: topologyLinkEndpoint{Attributes: map[string]any{
+			"if_index":  uint64(1),
+			"port_name": "Gi0/1",
+		}},
+	}
+	if remotePortName != "" {
+		link.Dst = topologyLinkEndpoint{Attributes: map[string]any{
+			"port_name": remotePortName,
+		}}
+	}
+	return link
 }
 
 func topologyV1TestColumnValues(t *testing.T, table topologyv1.Table, columnID string) []any {
