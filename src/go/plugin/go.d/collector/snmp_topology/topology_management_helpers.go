@@ -60,6 +60,13 @@ func normalizeTopologyDevice(dev topologyDevice) topologyDevice {
 	if value := topologyMetadataValue(dev.Labels, topologyMetadataAliasModel); value != "" && dev.Model == "" {
 		dev.Model = value
 	}
+	if value := normalizeOSPFRouterID(dev.Labels[tagOSPFRouterID]); value != "" && dev.OSPFRouterID == "" {
+		dev.OSPFRouterID = value
+	}
+	if value := normalizeOSPFRouterID(dev.OSPFRouterID); value != "" {
+		dev.OSPFRouterID = value
+		setTopologyMetadataLabelIfMissing(dev.Labels, tagOSPFRouterID, value)
+	}
 	if dev.SysUptime <= 0 {
 		if value := topologyMetadataValue(dev.Labels, topologyMetadataAliasSysUptime); value != "" {
 			dev.SysUptime = parsePositiveInt64(value)

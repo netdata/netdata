@@ -13,7 +13,8 @@ func snmpTopologyV1ActorTypes() map[string]topologyv1.ActorType {
 			MergeIdentity:     []string{"chassis_ids", "mac_addresses", "ip_addresses", "sys_name"},
 			AggregationScopes: []string{"device", "network"},
 			Search: &topologyv1.ActorSearchPolicy{
-				Columns: []string{"display_name", "sys_name", "management_ip", "vendor", "model"},
+				Columns:   []string{"display_name", "sys_name", "management_ip", "vendor", "model"},
+				LabelKeys: []string{tagOSPFRouterID},
 			},
 			Presentation: &topologyv1.ActorPresentation{
 				Label:     label,
@@ -154,6 +155,7 @@ func snmpTopologyV1DeviceModal() *topologyv1.ModalPresentation {
 			},
 			snmpTopologyV1PortLinksSection(2),
 			snmpTopologyV1L3SubnetSection(3),
+			snmpTopologyV1OSPFNeighborsSection(4),
 		},
 	}
 }
@@ -175,6 +177,7 @@ func snmpTopologyV1DeviceModalLabels() *topologyv1.ModalLabelsPresentation {
 				{Key: "management_ip", Label: "Management IP", MaxValues: 1},
 				{Key: "vendor", Label: "Vendor", MaxValues: 1},
 				{Key: "model", Label: "Model", MaxValues: 1},
+				{Key: tagOSPFRouterID, Label: "OSPF Router ID", MaxValues: 1},
 				{Key: "ports_total", Label: "Ports", MaxValues: 1},
 				{Key: "lldp_neighbor_count", Label: "LLDP", MaxValues: 1},
 				{Key: "cdp_neighbor_count", Label: "CDP", MaxValues: 1},
@@ -291,6 +294,25 @@ func snmpTopologyV1L3SubnetSection(order int) topologyv1.ModalSection {
 	}
 }
 
+func snmpTopologyV1OSPFNeighborsSection(order int) topologyv1.ModalSection {
+	return topologyv1.ModalSection{
+		ID:    "ospf_neighbors",
+		Label: "OSPF Neighbors",
+		Order: order,
+		Source: topologyv1.ModalSource{
+			Kind:  "actor_table",
+			Table: "actor_ospf_neighbors",
+		},
+		OwnerFilter: &topologyv1.ModalOwnerFilter{
+			Mode:        "actor_column",
+			ActorColumn: "actor",
+		},
+		Columns:    snmpTopologyV1OSPFNeighborModalColumns(),
+		Sort:       &topologyv1.ModalSort{Column: "neighbor_router_id", Direction: "asc"},
+		EmptyLabel: "No OSPF neighbors",
+	}
+}
+
 func modalSelectedSidePortColumn(id, label, selectedSrcPortColumn, selectedDstPortColumn string) topologyv1.ModalColumn {
 	return topologyv1.ModalColumn{
 		ID:    id,
@@ -388,6 +410,7 @@ func snmpTopologyV1LinkTypeSpecs() []snmpTopologyV1LinkTypeSpec {
 		{id: snmpTopologyV1LinkSTP, label: "STP", colorSlot: "muted", lineStyle: "solid", width: "normal", semanticRole: "normal"},
 		{id: snmpTopologyV1LinkARP, label: "ARP", colorSlot: "muted", lineStyle: "solid", width: "normal", semanticRole: "normal"},
 		{id: snmpTopologyV1LinkL3Subnet, label: "L3 subnet", colorSlot: "info", lineStyle: "dashed", width: "normal", semanticRole: "normal"},
+		{id: snmpTopologyV1LinkOSPF, label: "OSPF adjacency", colorSlot: "success", lineStyle: "solid", width: "normal", semanticRole: "control"},
 		{id: snmpTopologyV1LinkSNMP, label: "SNMP", colorSlot: "primary", lineStyle: "solid", width: "normal", semanticRole: "normal"},
 		{id: snmpTopologyV1LinkProbable, label: "Probable", colorSlot: "dim", lineStyle: "solid", width: "normal", semanticRole: "normal"},
 		{id: snmpTopologyV1LinkObservation, label: "L2 observation", colorSlot: "neutral", lineStyle: "solid", width: "normal", semanticRole: "normal"},
@@ -443,6 +466,16 @@ func snmpTopologyV1EvidenceMatchColumnsForType(linkType string) []string {
 			"src_actor",
 			"dst_actor",
 			"subnet",
+			"src_ip",
+			"dst_ip",
+		}
+	}
+	if linkType == snmpTopologyV1LinkOSPF {
+		return []string{
+			"src_actor",
+			"dst_actor",
+			"src_router_id",
+			"dst_router_id",
 			"src_ip",
 			"dst_ip",
 		}

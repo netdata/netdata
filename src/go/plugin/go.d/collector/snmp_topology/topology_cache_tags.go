@@ -121,6 +121,12 @@ const (
 	tagArpState    = "arp_state"
 	tagArpAddrType = "arp_addr_type"
 
+	tagOSPFRouterID                 = "ospf_router_id"
+	tagOSPFNeighborIP               = "ospf_neighbor_ip"
+	tagOSPFNeighborAddresslessIndex = "ospf_neighbor_addressless_index"
+	tagOSPFNeighborRouterID         = "ospf_neighbor_router_id"
+	tagOSPFNeighborState            = "ospf_neighbor_state"
+
 	// Internal collector tags used when ingesting additional VLAN-context snapshots.
 	tagTopologyContextVLANID   = "_topology_context_vlan_id"
 	tagTopologyContextVLANName = "_topology_context_vlan_name"

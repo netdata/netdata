@@ -34,6 +34,7 @@ func (c *topologyCache) updateTopologyProfileTags(pms []*ddsnmp.ProfileMetrics) 
 			c.updateLocalBridgeIdentityFromTags(tags)
 			c.applySTPProfileTags(tags)
 			c.applyVTPProfileTags(tags)
+			c.applyOSPFProfileTags(tags)
 		}
 	}
 }

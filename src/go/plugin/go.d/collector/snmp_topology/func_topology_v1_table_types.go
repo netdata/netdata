@@ -107,6 +107,34 @@ func snmpTopologyV1ActorLabelsTableType() topologyv1.TableType {
 	}
 }
 
+func snmpTopologyV1OSPFNeighborsTableType() topologyv1.TableType {
+	return topologyv1.TableType{
+		Role:        "actor_detail",
+		Owner:       "actor",
+		Aggregation: "append",
+		Columns:     snmpTopologyV1OSPFNeighborsColumns(),
+		Presentation: &topologyv1.TableTypePresentation{
+			Label:   "OSPF Neighbors",
+			Order:   4,
+			Columns: snmpTopologyV1OSPFNeighborModalColumns(),
+		},
+	}
+}
+
+func snmpTopologyV1OSPFNeighborModalColumns() []topologyv1.ModalColumn {
+	return []topologyv1.ModalColumn{
+		modalDirectColumn("neighbor_router_id", "Neighbor Router ID", "neighbor_router_id", "text"),
+		modalDirectColumn("neighbor_ip", "Neighbor IP", "neighbor_ip", "text"),
+		modalDirectColumn("state", "State", "state", "badge"),
+		modalActorRefColumnWithVisibility("remote_actor", "Remote Actor", "remote_actor", "expanded"),
+		modalDirectColumnWithVisibility("local_router_id", "Local Router ID", "local_router_id", "text", "expanded"),
+		modalDirectColumnWithVisibility("local_ip", "Local IP", "local_ip", "text", "expanded"),
+		modalDirectColumnWithVisibility("subnet", "Subnet", "subnet", "text", "expanded"),
+		modalDirectColumnWithVisibility("addressless_index", "Addressless Index", "addressless_index", "text", "expanded"),
+		modalDirectColumnWithVisibility("source", "Source", "source", "badge", "expanded"),
+	}
+}
+
 func snmpTopologyV1ActorPortsColumns() []topologyv1.Column {
 	return []topologyv1.Column{
 		topologyv1.NewColumn("actor", "actor_ref", topologyv1.WithRole("reference")),
@@ -156,5 +184,20 @@ func snmpTopologyV1ActorPortLinksColumns() []topologyv1.Column {
 		topologyv1.NewColumn("attachment_mode", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
 		topologyv1.NewColumn("discovered_at", "timestamp", topologyv1.WithNullable(), topologyv1.WithRole("timestamp")),
 		topologyv1.NewColumn("last_seen", "timestamp", topologyv1.WithNullable(), topologyv1.WithRole("timestamp")),
+	}
+}
+
+func snmpTopologyV1OSPFNeighborsColumns() []topologyv1.Column {
+	return []topologyv1.Column{
+		topologyv1.NewColumn("actor", "actor_ref", topologyv1.WithRole("reference")),
+		topologyv1.NewColumn("remote_actor", "actor_ref", topologyv1.WithNullable(), topologyv1.WithRole("reference")),
+		topologyv1.NewColumn("local_router_id", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("neighbor_router_id", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("neighbor_ip", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("state", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("local_ip", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("subnet", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("addressless_index", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("source", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
 	}
 }

@@ -60,6 +60,17 @@ func (c *topologyCache) applyVTPProfileTags(tags map[string]string) {
 	}
 }
 
+func (c *topologyCache) applyOSPFProfileTags(tags map[string]string) {
+	if c == nil || len(tags) == 0 {
+		return
+	}
+	if v := normalizeOSPFRouterID(tags[tagOSPFRouterID]); v != "" {
+		c.localDevice.OSPFRouterID = v
+		c.localDevice.Labels = ensureLabels(c.localDevice.Labels)
+		c.localDevice.Labels[tagOSPFRouterID] = v
+	}
+}
+
 func (c *topologyCache) applyAuthoritativeBridgeIdentity(mac string) {
 	mac = normalizeMAC(mac)
 	if mac == "" || mac == "00:00:00:00:00:00" {

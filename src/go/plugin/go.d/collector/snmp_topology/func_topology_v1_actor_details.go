@@ -10,6 +10,7 @@ import (
 
 func buildSNMPTopologyV1ActorDetails(
 	actors []topologyActor,
+	actorIndex map[string]int,
 	stringsDict *topologyv1.StringDictionary,
 	portNeighborSummaries map[snmpTopologyV1PortNeighborKey]snmpTopologyV1PortNeighborSummary,
 ) (map[string]topologyv1.DetailTable, map[string]topologyv1.TableType, error) {
@@ -64,6 +65,8 @@ func buildSNMPTopologyV1ActorDetails(
 		var err error
 		if tableID == "actor_ports" {
 			table = buildSNMPTopologyV1ActorPortsTable(rows, stringsDict, portNeighborSummaries)
+		} else if tableID == "actor_ospf_neighbors" {
+			table = buildSNMPTopologyV1OSPFNeighborsTable(rows, actorIndex, stringsDict)
 		} else {
 			table, err = buildSNMPTopologyV1DynamicTable(rows, stringsDict)
 		}
@@ -76,6 +79,8 @@ func buildSNMPTopologyV1ActorDetails(
 		}
 		if tableID == "actor_ports" {
 			tableTypes[tableID] = snmpTopologyV1ActorPortsTableType()
+		} else if tableID == "actor_ospf_neighbors" {
+			tableTypes[tableID] = snmpTopologyV1OSPFNeighborsTableType()
 		} else {
 			tableTypes[tableID] = topologyv1.TableType{
 				Role:        "actor_detail",
@@ -198,7 +203,7 @@ func buildSNMPTopologyV1ActorLabelsTable(
 
 	scalarAttributeKeys := []string{
 		"vendor", "vendor_derived", "model", "sys_descr", "sys_location", "sys_contact",
-		"management_ip", "display_name", "display_source", "chart_id_prefix", "chart_context_prefix",
+		"management_ip", tagOSPFRouterID, "display_name", "display_source", "chart_id_prefix", "chart_context_prefix",
 		"netdata_host_id", "ports_total", "ports_up", "ports_down", "vlan_count", "fdb_total_macs",
 		"lldp_neighbor_count", "cdp_neighbor_count", "endpoints_total", "if_admin_status_counts",
 		"if_oper_status_counts", "if_link_mode_counts", "if_topology_role_counts",
