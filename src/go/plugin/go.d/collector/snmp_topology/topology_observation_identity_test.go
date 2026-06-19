@@ -10,12 +10,24 @@ import (
 )
 
 func TestTopologyObservationIdentityCanonicalHelpers(t *testing.T) {
-	require.Equal(t, "edge-a", canonicalObservationHost(" Edge-A "))
-	require.Equal(t, "00:11:22:33:44:55", canonicalObservationChassis("001122334455"))
-	require.Equal(t, "chassis-a", canonicalObservationChassis("Chassis-A"))
-	require.Equal(t, "00:11:22:33:44:55", canonicalObservationMAC("00-11-22-33-44-55"))
-	require.Equal(t, "10.20.4.60", canonicalObservationIP("0A14043C"))
-	require.Equal(t, "", canonicalObservationIP(""))
+	tests := map[string]struct {
+		normalize func(string) string
+		in        string
+		want      string
+	}{
+		"host":              {normalize: canonicalObservationHost, in: " Edge-A ", want: "edge-a"},
+		"chassis-mac":       {normalize: canonicalObservationChassis, in: "001122334455", want: "00:11:22:33:44:55"},
+		"chassis-text":      {normalize: canonicalObservationChassis, in: "Chassis-A", want: "chassis-a"},
+		"mac":               {normalize: canonicalObservationMAC, in: "00-11-22-33-44-55", want: "00:11:22:33:44:55"},
+		"ip-hex":            {normalize: canonicalObservationIP, in: "0A14043C", want: "10.20.4.60"},
+		"ip-empty-rejected": {normalize: canonicalObservationIP, in: "", want: ""},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.want, tc.normalize(tc.in))
+		})
+	}
 }
 
 func TestTopologyObservationIdentityResolver_AssignsDeterministicFallbackIDs(t *testing.T) {

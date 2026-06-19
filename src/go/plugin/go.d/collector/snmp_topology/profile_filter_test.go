@@ -46,11 +46,27 @@ func TestFindTopologyProfiles_UsesDeclarativeProfileExtensions(t *testing.T) {
 		}
 	}
 
-	assert.Contains(t, metricNames, "lldp_rem")
-	assert.Contains(t, metricNames, "cdp_cache")
-	assert.Contains(t, metricNames, "fdb_entry")
-	assert.Contains(t, metricNames, "stp_port")
-	assert.Contains(t, metricNames, "vtp_vlan")
-	assert.Contains(t, metadataFields, "lldp_loc_sys_name")
-	assert.Contains(t, metadataFields, "vtp_version")
+	for name, tc := range map[string]struct {
+		metric string
+	}{
+		"lldp": {metric: "lldp_rem"},
+		"cdp":  {metric: "cdp_cache"},
+		"fdb":  {metric: "fdb_entry"},
+		"stp":  {metric: "stp_port"},
+		"vtp":  {metric: "vtp_vlan"},
+	} {
+		t.Run("metric/"+name, func(t *testing.T) {
+			assert.Contains(t, metricNames, tc.metric)
+		})
+	}
+	for name, tc := range map[string]struct {
+		field string
+	}{
+		"lldp-system-name": {field: "lldp_loc_sys_name"},
+		"vtp-version":      {field: "vtp_version"},
+	} {
+		t.Run("metadata/"+name, func(t *testing.T) {
+			assert.Contains(t, metadataFields, tc.field)
+		})
+	}
 }
