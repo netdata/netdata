@@ -608,7 +608,8 @@ SNMP `ospf_adjacency` links are logical OSPF control-plane adjacency, not
 physical, L2, discovery, or port-neighbor evidence. They use
 `orientation: observed_bidirectional`, `direction_role: observation`, and
 `semantic_role: control`. Their graph presentation should use a dashed line
-style so operators do not read them as physical cabling. The producer emits
+style and `purple` color slot so operators do not read them as physical cabling
+or generic success/health state. The producer emits
 graph links only for full OSPF neighbors between resolved managed SNMP device
 actors. Non-full or unresolved OSPF neighbor rows remain diagnostic actor-owned
 detail rows and must not create loose router/IP graph actors.
