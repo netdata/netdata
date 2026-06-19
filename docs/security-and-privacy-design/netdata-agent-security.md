@@ -98,7 +98,7 @@ Understanding each path, its default state, and how to disable it is essential w
 
 By default, Netdata collects anonymous usage information through two channels:
 
-- **Agent backend**: On start, clean stop, and fatal crash, the `netdata` daemon executes the `anonymous-statistics.sh` script, which sends anonymized system and version information to a Netdata telemetry cloud function hosted in GCP over HTTP.
+- **Agent backend**: On start, clean stop, and fatal crash, the `netdata` daemon executes the `anonymous-statistics.sh` script, which sends anonymized system and version information to a Netdata telemetry cloud function hosted in GCP over HTTPS.
 - **Agent dashboard**: When you view the local dashboard (`http://NODE:19999`), PostHog JavaScript sends anonymized page-view events. Sensitive attributes (such as IP and hostname) are overwritten with constant values before any event is sent.
 
 Telemetry is **on by default** and carries only anonymized metadata — never raw metrics. See [Anonymous telemetry events](/docs/netdata-agent/configuration/anonymous-telemetry-events.md) for exactly what is collected and the opt-out methods.
@@ -138,7 +138,7 @@ In this state the Agent continues to collect, store, and serve metrics locally. 
 
 | **Communication Path**            | **Default State**     | **Trigger**                              | **Destination**                                                            | **How to Disable**                                                                                                            |
 |:----------------------------------|:----------------------|:-----------------------------------------|:---------------------------------------------------------------------------|:------------------------------------------------------------------------------------------------------------------------------|
-| Anonymous telemetry (backend)     | On                    | Agent start, stop, or fatal crash        | Netdata telemetry cloud function (GCP) over HTTP                           | Create `.opt-out-from-anonymous-statistics`, set `DISABLE_TELEMETRY=1`/`DO_NOT_TRACK=1`, or install with `--disable-telemetry` |
+| Anonymous telemetry (backend)     | On                    | Agent start, stop, or fatal crash        | Netdata telemetry cloud function (GCP) over HTTPS                          | Create `.opt-out-from-anonymous-statistics`, set `DISABLE_TELEMETRY=1`/`DO_NOT_TRACK=1`, or install with `--disable-telemetry` |
 | Anonymous telemetry (dashboard)   | On                    | Viewing the local Agent dashboard        | PostHog (anonymized page-view events)                                      | Same opt-out mechanism as backend telemetry                                                                                   |
 | Agent-Cloud Link (ACLK)           | Off until claimed     | Claiming/connecting a node to a Space    | `app.netdata.cloud`, `api.netdata.cloud`, `mqtt.netdata.cloud` (WSS, 443)  | Do not claim the Agent to Netdata Cloud                                                                                       |
 | Installer script download         | n/a (install time)    | Running `kickstart.sh`                   | `get.netdata.cloud`                                                        | Pre-download the script for an offline install                                                                                |
