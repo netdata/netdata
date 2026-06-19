@@ -9,7 +9,6 @@ import (
 	"maps"
 	"net"
 	"net/netip"
-	"runtime"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -34,6 +33,7 @@ const (
 
 	listenerReadErrorLogEvery     = time.Hour
 	listenerReadErrorLogKeyPrefix = "snmp_traps:listener_read_failed:"
+	listenerBufferDegradedMetric  = "listener_buffer_degraded"
 )
 
 var activeDirectJournalJobs atomic.Int64
@@ -95,6 +95,7 @@ type Collector struct {
 
 	listener           *Listener
 	trapWriter         TrapWriter
+	journalHost        journalHostProvider
 	journalDir         string
 	store              metrix.CollectorStore
 	deviceLookup       deviceLookup
@@ -182,9 +183,6 @@ func (c *Collector) Init(ctx context.Context) error {
 	journalEnabled := c.Journal.enabled()
 	if !journalEnabled && !c.OTLP.Enabled {
 		return dyncfgConfigError(errors.New("at least one SNMP trap output backend must be enabled: journal.enabled or otlp.enabled"))
-	}
-	if journalEnabled && runtime.GOOS != "linux" {
-		return dyncfgConfigError(errors.New("SNMP trap journal backend requires Linux"))
 	}
 
 	if err := validateOverrides(c.Overrides); err != nil {
@@ -344,6 +342,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	metrics := getJobMetrics(c.jobName)
 	listener.metrics = metrics
 	listener.onReadError = c.logListenerReadError
+	c.reportListenerReceiveBufferWarnings(listener.receiveBufferWarnings)
 	var secondaryWriter TrapWriter
 	if c.OTLP.Enabled {
 		c.warnPlaintextOTLP(otlpRuntime)
@@ -367,10 +366,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		writeFailureDim = trapWriteFailureOTLP
 	}
 	metrics.setDedupEnabled(c.Dedup.Enabled)
-	deduper := newTrapDeduper(c.jobName, c.Dedup, trapWriter, metrics, writeFailureDim)
-	if deduper != nil {
-		deduper.start()
-	}
+	deduper := newTrapDeduper(c.jobName, c.Dedup, trapWriter, metrics, writeFailureDim, c.monotonicUsec)
 
 	c.Versions = versions
 	c.vnode = c.Vnode
@@ -404,8 +400,10 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.metrics = metrics
 	c.listener = listener
 	c.trapWriter = trapWriter
+	c.journalHost = nil
 	c.journalDir = ""
 	if journalWriter != nil {
+		c.journalHost = journalWriter.host
 		c.journalDir = journalWriter.JournalDirectory()
 		activeDirectJournalJobs.Add(1)
 	}
@@ -416,6 +414,10 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.reverseDNSEnabled = c.ReverseDNS.Enabled
 	if c.reverseDNSEnabled {
 		c.reverseDNS = newReverseDNSResolver()
+	}
+
+	if deduper != nil {
+		deduper.start()
 	}
 
 	c.listener.start(c.handlePacket)
@@ -444,6 +446,7 @@ func (c *Collector) Cleanup(ctx context.Context) {
 		c.trapWriter.Close()
 		c.trapWriter = nil
 	}
+	c.journalHost = nil
 	if c.reverseDNS != nil {
 		c.reverseDNS.Close()
 		c.reverseDNS = nil
@@ -658,7 +661,7 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 		td = c.applyOverrides(td)
 	}
 
-	entry := trapEntryFromPDU(c.jobName, pdu, td, time.Now().UnixMicro(), monotonicUsec())
+	entry := trapEntryFromPDU(c.jobName, pdu, td, time.Now().UnixMicro(), c.monotonicUsec())
 	entry.PacketSequence = packetSequence
 	c.enrichTrapEntry(entry, c.reverseDNSEnabled, c.reverseDNS)
 	renderTrapEntryTemplates(entry, td)
@@ -805,6 +808,26 @@ func (c *Collector) logListenerReadError(ep EndpointConfig, err error) {
 	endpoint := listenerEndpointLogName(ep)
 	c.Limit(listenerReadErrorLogKeyPrefix+endpoint, 1, listenerReadErrorLogEvery).
 		Warningf("SNMP trap listener read failed (endpoint=%s): %v", endpoint, err)
+}
+
+func (c *Collector) reportListenerReceiveBufferWarnings(warnings []listenerReceiveBufferWarning) {
+	for _, warning := range warnings {
+		c.incTrapError(listenerBufferDegradedMetric)
+		c.logListenerReceiveBufferWarning(warning)
+	}
+}
+
+func (c *Collector) logListenerReceiveBufferWarning(warning listenerReceiveBufferWarning) {
+	if c.Logger == nil {
+		return
+	}
+	endpoint := listenerEndpointLogName(warning.endpoint)
+	c.warnf(
+		"SNMP trap listener receive buffer request degraded (endpoint=%s, requested=%d bytes): %v; continuing with the OS socket buffer, high trap bursts may be dropped",
+		endpoint,
+		warning.requested,
+		warning.err,
+	)
 }
 
 func (c *Collector) applyOverrides(td *TrapDef) *TrapDef {

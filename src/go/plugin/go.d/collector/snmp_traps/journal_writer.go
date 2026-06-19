@@ -18,15 +18,12 @@ import (
 )
 
 var (
-	errInvalidBootID     = errors.New("invalid boot ID")
-	errInvalidMachineID  = errors.New("invalid machine ID")
-	errMissingBootID     = errors.New("missing boot ID")
-	errMissingMachineID  = errors.New("missing machine ID")
-	errNilEntry          = errors.New("nil TrapEntry")
-	errMissingJobName    = errors.New("missing job name")
-	errMissingSourceIP   = errors.New("missing source IP")
-	errNegativeTimestamp = errors.New("negative timestamp")
-	errMissingTrapOID    = errors.New("missing trap OID for trap report")
+	errMissingJournalHost = errors.New("missing journal host provider")
+	errNilEntry           = errors.New("nil TrapEntry")
+	errMissingJobName     = errors.New("missing job name")
+	errMissingSourceIP    = errors.New("missing source IP")
+	errNegativeTimestamp  = errors.New("negative timestamp")
+	errMissingTrapOID     = errors.New("missing trap OID for trap report")
 )
 
 const (
@@ -47,6 +44,7 @@ type JournalWriter struct {
 	mu                  sync.Mutex
 	log                 *sdkjournal.Log
 	cfg                 JournalConfig
+	host                journalHostProvider
 	journalDir          string
 	activePath          string
 	binaryEncodedFields atomic.Uint64
@@ -87,20 +85,23 @@ func validateNetdataLogRoot() error {
 }
 
 func NewJournalWriter(dir string, cfg JournalConfig) (*JournalWriter, error) {
-	machineID, err := loadJournalUUID("/etc/machine-id", errMissingMachineID, errInvalidMachineID)
+	host, err := loadJournalHostProvider()
 	if err != nil {
-		return nil, fmt.Errorf("machine ID: %w", err)
+		return nil, err
 	}
-	bootID, err := loadJournalUUID("/proc/sys/kernel/random/boot_id", errMissingBootID, errInvalidBootID)
-	if err != nil {
-		return nil, fmt.Errorf("boot ID: %w", err)
+	return newJournalWriterWithHostProvider(dir, cfg, host)
+}
+
+func newJournalWriterWithHostProvider(dir string, cfg JournalConfig, host journalHostProvider) (*JournalWriter, error) {
+	if host == nil {
+		return nil, errMissingJournalHost
 	}
 
 	logCfg := sdkjournal.LogConfig{
 		Source: "snmp-traps",
 		Options: sdkjournal.Options{
-			MachineID:   machineID,
-			BootID:      bootID,
+			MachineID:   host.MachineID(),
+			BootID:      host.BootID(),
 			Compact:     true,
 			Compression: sdkjournal.CompressionNone,
 			Seal:        nil,
@@ -119,28 +120,10 @@ func NewJournalWriter(dir string, cfg JournalConfig) (*JournalWriter, error) {
 	return &JournalWriter{
 		log:        log,
 		cfg:        cfg,
+		host:       host,
 		journalDir: log.JournalDirectory(),
 		activePath: log.ActivePath(),
 	}, nil
-}
-
-func loadJournalUUID(path string, missingErr, invalidErr error) (sdkjournal.UUID, error) {
-	content, err := os.ReadFile(path)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return sdkjournal.UUID{}, missingErr
-		}
-		return sdkjournal.UUID{}, fmt.Errorf("%w: %v", missingErr, err)
-	}
-	value := strings.TrimSpace(string(content))
-	if value == "" {
-		return sdkjournal.UUID{}, missingErr
-	}
-	id, err := sdkjournal.ParseUUID(value)
-	if err != nil {
-		return sdkjournal.UUID{}, fmt.Errorf("%w: %v", invalidErr, err)
-	}
-	return id, nil
 }
 
 func rotationPolicyFromConfig(cfg JournalConfig) sdkjournal.RotationPolicy {
@@ -180,8 +163,11 @@ func (w *JournalWriter) WriteEntry(fields []JournalField, realtimeUsec, monotoni
 	// inject fields, but we count them for the self-metrics surface.
 	count := binaryEncodedFieldCount(fields)
 	err := w.log.Append(fields, sdkjournal.EntryOptions{
-		RealtimeUsec:  uint64(realtimeUsec),
-		MonotonicUsec: uint64(monotonicUsec),
+		RealtimeUsec:     uint64(realtimeUsec),
+		RealtimeUsecSet:  true,
+		MonotonicUsec:    uint64(monotonicUsec),
+		MonotonicUsecSet: true,
+		BootID:           w.host.BootID(),
 	})
 	if err != nil {
 		return err
@@ -207,8 +193,11 @@ func (w *JournalWriter) WriteRawEntry(payloads [][]byte, binaryEncodedFields int
 		return sdkjournal.ErrWriterClosed
 	}
 	err := w.log.AppendRaw(payloads, sdkjournal.EntryOptions{
-		RealtimeUsec:  uint64(realtimeUsec),
-		MonotonicUsec: uint64(monotonicUsec),
+		RealtimeUsec:     uint64(realtimeUsec),
+		RealtimeUsecSet:  true,
+		MonotonicUsec:    uint64(monotonicUsec),
+		MonotonicUsecSet: true,
+		BootID:           w.host.BootID(),
 	})
 	if err != nil {
 		return err

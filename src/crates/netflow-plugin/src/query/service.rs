@@ -1,4 +1,5 @@
 use super::*;
+use crate::local_journal_host::load_local_journal_provider;
 use crate::memory_allocator::trim_allocator_if_worthwhile;
 
 pub(crate) struct FlowQueryService {
@@ -46,9 +47,9 @@ impl FlowQueryService {
             })?;
         }
 
-        let agent_id = load_machine_id()
-            .map(|id| id.as_simple().to_string())
-            .context("failed to load machine id")?;
+        let agent_id = load_local_journal_provider(cfg)
+            .map(|host| host.machine_id().as_simple().to_string())
+            .context("failed to load local journal host identity")?;
         let max_groups = cfg.journal.query_max_groups;
 
         Ok((

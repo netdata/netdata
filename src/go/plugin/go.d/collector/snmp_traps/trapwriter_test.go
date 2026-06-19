@@ -309,7 +309,7 @@ func TestJournalTrapWriterTickerFlushesWithoutCountTrigger(t *testing.T) {
 	requireJournalctl(t)
 
 	dir := t.TempDir()
-	w, err := NewJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
+	w, err := newTestJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
 	require.NoError(t, err)
 
 	tw := newJournalTrapWriterWithInterval(w, 1<<10, 100*time.Millisecond)

@@ -146,6 +146,58 @@ func TestNewListenerSkipsReceiveBufferWhenZero(t *testing.T) {
 	assert.False(t, called)
 }
 
+func TestNewListenerAllowsDefaultReceiveBufferFailure(t *testing.T) {
+	oldSetUDPReadBuffer := setUDPReadBuffer
+	t.Cleanup(func() { setUDPReadBuffer = oldSetUDPReadBuffer })
+
+	setUDPReadBuffer = func(_ *net.UDPConn, _ int) error {
+		return errors.New("boom")
+	}
+
+	l, err := newListener("listener-default-buffer-error", ListenConfig{
+		Endpoints: []EndpointConfig{{
+			Protocol: "udp4",
+			Address:  "127.0.0.1",
+			Port:     0,
+		}},
+		ReceiveBuffer: defaultListenerReceiveBuffer,
+	})
+	require.NoError(t, err)
+	t.Cleanup(l.close)
+	require.Len(t, l.endpoints, 1)
+	require.Len(t, l.receiveBufferWarnings, 1)
+	assert.Equal(t, "udp4", l.receiveBufferWarnings[0].endpoint.Protocol)
+	assert.Equal(t, defaultListenerReceiveBuffer, l.receiveBufferWarnings[0].requested)
+	assert.ErrorContains(t, l.receiveBufferWarnings[0].err, "boom")
+}
+
+func TestCollectorReportsListenerReceiveBufferWarnings(t *testing.T) {
+	const jobName = "test-listener-buffer-degraded"
+	metrics := withCleanJobMetrics(t, jobName)
+	c := newTestSNMPTrapsCollector()
+	c.jobName = jobName
+	c.metrics = metrics
+	var buf bytes.Buffer
+	c.Logger = logger.NewWithWriter(&buf)
+
+	c.reportListenerReceiveBufferWarnings([]listenerReceiveBufferWarning{{
+		endpoint: EndpointConfig{
+			Protocol: "udp4",
+			Address:  "127.0.0.1",
+			Port:     9162,
+		},
+		requested: defaultListenerReceiveBuffer,
+		err:       errors.New("boom"),
+	}})
+
+	assert.Equal(t, uint64(1), metrics.errors.listenerBufferDegraded.Load())
+	out := buf.String()
+	assert.Contains(t, out, "SNMP trap listener receive buffer request degraded")
+	assert.Contains(t, out, "endpoint=udp4://127.0.0.1:9162")
+	assert.Contains(t, out, "requested=4194304 bytes")
+	assert.Contains(t, out, "boom")
+}
+
 func TestNewListenerFailsWhenReceiveBufferCannotBeSet(t *testing.T) {
 	oldSetUDPReadBuffer := setUDPReadBuffer
 	t.Cleanup(func() { setUDPReadBuffer = oldSetUDPReadBuffer })
