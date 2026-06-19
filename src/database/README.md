@@ -36,7 +36,7 @@ These limits are fully configurable. See [Changing how long Netdata stores metri
 
 ### Monitoring Retention Utilization
 
-Netdata provides a visual representation of storage utilization for both the time and space limits across all Tiers under "Netdata" -> "dbengine retention" on the dashboard. This chart shows exactly how your storage space (disk space limits) and time (time limits) are used for metric retention.
+Netdata provides a visual representation of storage utilization for both the time and space limits across all Tiers. In the dashboard, these are the **dbengine space and time retention** charts, found under the **Netdata** section → **dbengine retention** family — there is one chart per database tier. Each chart shows exactly how your storage space (disk space limits) and time (time limits) are used for metric retention.
 
 Each tier has its own independent **space** and **time** lines on the chart:
 
