@@ -63,13 +63,19 @@ func TestApplySNMPTopologyShapePolicies_EmitsStatsContractKeys(t *testing.T) {
 	}
 }
 
-func TestRecomputeTopologyLinkStatsRefreshesExistingL3VisibleCount(t *testing.T) {
+func TestRecomputeTopologyLinkStatsRefreshesExistingLogicalL3VisibleCounts(t *testing.T) {
 	data := &topologyData{
 		Stats: map[string]any{
-			"l3_subnet_emitted_links": 2,
+			"l3_subnet_emitted_links":      2,
+			"ospf_adjacency_emitted_links": 1,
+			"bgp_adjacency_emitted_links":  1,
+			"l3_subnet_visible_links":      2,
+			"ospf_adjacency_visible_links": 1,
+			"bgp_adjacency_visible_links":  1,
 		},
 		Links: []topologyLink{
 			{Protocol: topologyL3SubnetLinkType, LinkType: topologyL3SubnetLinkType},
+			{Protocol: topologyBGPAdjacencyLinkType, LinkType: topologyBGPAdjacencyLinkType},
 			{Protocol: "lldp", LinkType: "lldp"},
 		},
 	}
@@ -81,8 +87,12 @@ func TestRecomputeTopologyLinkStatsRefreshesExistingL3VisibleCount(t *testing.T)
 		want any
 	}{
 		"emitted-l3-subnet-links": {key: "l3_subnet_emitted_links", want: 2},
-		"links-total":             {key: "links_total", want: 2},
+		"emitted-ospf-links":      {key: "ospf_adjacency_emitted_links", want: 1},
+		"emitted-bgp-links":       {key: "bgp_adjacency_emitted_links", want: 1},
+		"links-total":             {key: "links_total", want: 3},
 		"visible-l3-subnet-links": {key: "l3_subnet_visible_links", want: 1},
+		"visible-ospf-links":      {key: "ospf_adjacency_visible_links", want: 0},
+		"visible-bgp-links":       {key: "bgp_adjacency_visible_links", want: 1},
 	}
 	for name, tc := range expectedStats {
 		t.Run("stat/"+name, func(t *testing.T) {

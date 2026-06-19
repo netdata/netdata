@@ -156,6 +156,7 @@ func snmpTopologyV1DeviceModal() *topologyv1.ModalPresentation {
 			snmpTopologyV1PortLinksSection(2),
 			snmpTopologyV1L3SubnetSection(3),
 			snmpTopologyV1OSPFNeighborsSection(4),
+			snmpTopologyV1BGPPeersSection(5),
 		},
 	}
 }
@@ -313,6 +314,25 @@ func snmpTopologyV1OSPFNeighborsSection(order int) topologyv1.ModalSection {
 	}
 }
 
+func snmpTopologyV1BGPPeersSection(order int) topologyv1.ModalSection {
+	return topologyv1.ModalSection{
+		ID:    "bgp_peers",
+		Label: "BGP Peers",
+		Order: order,
+		Source: topologyv1.ModalSource{
+			Kind:  "actor_table",
+			Table: "actor_bgp_peers",
+		},
+		OwnerFilter: &topologyv1.ModalOwnerFilter{
+			Mode:        "actor_column",
+			ActorColumn: "actor",
+		},
+		Columns:    snmpTopologyV1BGPPeerModalColumns(),
+		Sort:       &topologyv1.ModalSort{Column: "neighbor_ip", Direction: "asc"},
+		EmptyLabel: "No BGP peers",
+	}
+}
+
 func modalSelectedSidePortColumn(id, label, selectedSrcPortColumn, selectedDstPortColumn string) topologyv1.ModalColumn {
 	return topologyv1.ModalColumn{
 		ID:    id,
@@ -411,6 +431,7 @@ func snmpTopologyV1LinkTypeSpecs() []snmpTopologyV1LinkTypeSpec {
 		{id: snmpTopologyV1LinkARP, label: "ARP", colorSlot: "muted", lineStyle: "solid", width: "normal", semanticRole: "normal"},
 		{id: snmpTopologyV1LinkL3Subnet, label: "L3 subnet", colorSlot: "info", lineStyle: "dashed", width: "normal", semanticRole: "normal"},
 		{id: snmpTopologyV1LinkOSPF, label: "OSPF adjacency", colorSlot: "purple", lineStyle: "dashed", width: "normal", semanticRole: "control"},
+		{id: snmpTopologyV1LinkBGP, label: "BGP adjacency", colorSlot: "accent", lineStyle: "dashed", width: "normal", semanticRole: "control"},
 		{id: snmpTopologyV1LinkSNMP, label: "SNMP", colorSlot: "primary", lineStyle: "solid", width: "normal", semanticRole: "normal"},
 		{id: snmpTopologyV1LinkProbable, label: "Probable", colorSlot: "dim", lineStyle: "solid", width: "normal", semanticRole: "normal"},
 		{id: snmpTopologyV1LinkObservation, label: "L2 observation", colorSlot: "neutral", lineStyle: "solid", width: "normal", semanticRole: "normal"},
@@ -480,6 +501,13 @@ func snmpTopologyV1EvidenceMatchColumnsForType(linkType string) []string {
 			"dst_ip",
 		}
 	}
+	if linkType == snmpTopologyV1LinkBGP {
+		return []string{
+			"src_actor",
+			"dst_actor",
+			"routing_instance",
+		}
+	}
 	return []string{
 		"src_actor",
 		"dst_actor",
@@ -520,6 +548,7 @@ func snmpTopologyV1Presentation() *topologyv1.Presentation {
 				{Type: snmpTopologyV1LinkBridge, Label: "Bridge"},
 				{Type: snmpTopologyV1LinkL3Subnet, Label: "L3 subnet"},
 				{Type: snmpTopologyV1LinkOSPF, Label: "OSPF adjacency"},
+				{Type: snmpTopologyV1LinkBGP, Label: "BGP adjacency"},
 				{Type: snmpTopologyV1LinkProbable, Label: "Probable"},
 			},
 			Ports: []topologyv1.LegendEntry{

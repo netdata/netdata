@@ -37,6 +37,7 @@ type topologyCache struct {
 	stpPorts             map[string]*stpPortEntry
 	arpEntries           map[string]*arpEntry
 	ospfNeighborsByKey   map[string]topologyOSPFNeighbor
+	bgpPeersByKey        map[string]topologyBGPPeer
 }
 
 type ifStatus struct {
@@ -152,4 +153,23 @@ type topologyOSPFNeighbor struct {
 	Subnet           string
 	Prefix           int
 	RemoteActorID    string
+}
+
+type topologyBGPPeer struct {
+	DeviceID              string
+	RoutingInstance       string
+	NeighborIP            string
+	RemoteAS              string
+	LocalIP               string
+	LocalAS               string
+	LocalIdentifier       string
+	PeerIdentifier        string
+	PeerType              string
+	BGPVersion            string
+	Description           string
+	AdminStatus           string
+	State                 string
+	EstablishedUptime     *int64
+	LastReceivedUpdateAge *int64
+	RemoteActorID         string
 }

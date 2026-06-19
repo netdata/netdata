@@ -24,6 +24,7 @@ func newTopologyCache() *topologyCache {
 		stpPorts:           make(map[string]*stpPortEntry),
 		arpEntries:         make(map[string]*arpEntry),
 		ospfNeighborsByKey: make(map[string]topologyOSPFNeighbor),
+		bgpPeersByKey:      make(map[string]topologyBGPPeer),
 	}
 }
 
@@ -57,6 +58,7 @@ func (c *topologyCache) replaceWith(src *topologyCache) {
 	c.stpPorts = src.stpPorts
 	c.arpEntries = src.arpEntries
 	c.ospfNeighborsByKey = src.ospfNeighborsByKey
+	c.bgpPeersByKey = src.bgpPeersByKey
 }
 
 func (c *topologyCache) hasFreshSnapshotAt(now time.Time) bool {

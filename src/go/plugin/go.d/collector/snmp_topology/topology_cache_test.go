@@ -11,6 +11,7 @@ import (
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -1347,6 +1348,72 @@ func TestTopologyCache_IngestTopologyProfileMetrics_IncludesTopologyMetrics(t *t
 	require.Contains(t, cache.lldpRemotes, "7:1")
 	require.Zero(t, cache.localDevice.SysUptime)
 	require.Empty(t, cache.localDevice.Labels["sys_uptime"])
+}
+
+func TestTopologyCache_IngestTopologyBGPPeers_IncludesOnlyPeerRows(t *testing.T) {
+	established := int64(300)
+	cache := newTopologyCache()
+
+	cache.ingestTopologyBGPPeers([]*ddsnmp.ProfileMetrics{
+		{
+			BGPRows: []ddsnmp.BGPRow{
+				{
+					Kind:         ddprofiledefinition.BGPRowKindPeer,
+					StructuralID: "peer-1",
+					Identity: ddsnmp.BGPIdentity{
+						RoutingInstance: "blue",
+						Neighbor:        "192.0.2.2",
+						RemoteAS:        "65002",
+					},
+					Descriptors: ddsnmp.BGPDescriptors{
+						LocalAddress:    "192.0.2.1",
+						LocalAS:         "65001",
+						LocalIdentifier: "1.1.1.1",
+						PeerIdentifier:  "2.2.2.2",
+						PeerType:        "external",
+						BGPVersion:      "4",
+						Description:     "edge-peer",
+					},
+					Admin: ddsnmp.BGPAdmin{
+						Enabled: ddsnmp.BGPBool{Has: true, Value: true},
+					},
+					State: ddsnmp.BGPState{
+						Has:   true,
+						State: ddprofiledefinition.BGPPeerStateEstablished,
+					},
+					Connection: ddsnmp.BGPConnection{
+						EstablishedUptime: ddsnmp.BGPInt64{Has: true, Value: established},
+					},
+				},
+				{
+					Kind: ddprofiledefinition.BGPRowKindPeerFamily,
+					Identity: ddsnmp.BGPIdentity{
+						Neighbor:                "192.0.2.2",
+						RemoteAS:                "65002",
+						AddressFamily:           ddprofiledefinition.BGPAddressFamilyIPv4,
+						SubsequentAddressFamily: ddprofiledefinition.BGPSubsequentAddressFamilyUnicast,
+					},
+				},
+			},
+		},
+	})
+
+	require.Len(t, cache.bgpPeersByKey, 1)
+	peer := cache.bgpPeersByKey["peer-1"]
+	require.Equal(t, "blue", peer.RoutingInstance)
+	require.Equal(t, "192.0.2.2", peer.NeighborIP)
+	require.Equal(t, "65002", peer.RemoteAS)
+	require.Equal(t, "192.0.2.1", peer.LocalIP)
+	require.Equal(t, "65001", peer.LocalAS)
+	require.Equal(t, "1.1.1.1", peer.LocalIdentifier)
+	require.Equal(t, "2.2.2.2", peer.PeerIdentifier)
+	require.Equal(t, "external", peer.PeerType)
+	require.Equal(t, "4", peer.BGPVersion)
+	require.Equal(t, "edge-peer", peer.Description)
+	require.Equal(t, "enabled", peer.AdminStatus)
+	require.Equal(t, "established", peer.State)
+	require.NotNil(t, peer.EstablishedUptime)
+	require.Equal(t, established, *peer.EstablishedUptime)
 }
 
 func TestBuildLocalTopologyDevice_MapsVersionToSoftwareOnly(t *testing.T) {

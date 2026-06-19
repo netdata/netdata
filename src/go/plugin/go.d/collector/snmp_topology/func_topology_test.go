@@ -341,7 +341,7 @@ func TestSNMPTopologyToV1_PreservesActorCustomTables(t *testing.T) {
 	require.NotNil(t, deviceType.Presentation.Modal.Labels)
 	require.NotNil(t, deviceType.Presentation.Modal.Labels.Identification)
 	assert.Equal(t, "management_ip", deviceType.Presentation.Modal.Labels.Identification.Fields[1].Key)
-	require.Len(t, deviceType.Presentation.Modal.Sections, 4)
+	require.Len(t, deviceType.Presentation.Modal.Sections, 5)
 	assert.Equal(t, "ports", deviceType.Presentation.Modal.Sections[0].ID)
 	assert.Equal(t, "if_index", deviceType.Presentation.Modal.Sections[0].Columns[0].ID)
 	assert.Equal(t, "Port ID", deviceType.Presentation.Modal.Sections[0].Columns[0].Label)
@@ -357,6 +357,9 @@ func TestSNMPTopologyToV1_PreservesActorCustomTables(t *testing.T) {
 	assert.Equal(t, "ospf_neighbors", deviceType.Presentation.Modal.Sections[3].ID)
 	assert.Equal(t, "actor_table", deviceType.Presentation.Modal.Sections[3].Source.Kind)
 	assert.Equal(t, "actor_ospf_neighbors", deviceType.Presentation.Modal.Sections[3].Source.Table)
+	assert.Equal(t, "bgp_peers", deviceType.Presentation.Modal.Sections[4].ID)
+	assert.Equal(t, "actor_table", deviceType.Presentation.Modal.Sections[4].Source.Kind)
+	assert.Equal(t, "actor_bgp_peers", deviceType.Presentation.Modal.Sections[4].Source.Table)
 
 	endpointType := payload.Types.ActorTypes["endpoint"]
 	require.NotNil(t, endpointType.Presentation)
@@ -722,6 +725,146 @@ func TestSNMPTopologyToV1_PreservesOSPFAdjacencyPresentationEvidenceAndNeighborR
 	assert.Equal(t, "remote_actor", ospfSection.Columns[3].ID)
 	assert.Equal(t, "actor_link", ospfSection.Columns[3].Cell)
 	assert.Empty(t, ospfSection.Columns[3].Visibility)
+}
+
+func TestSNMPTopologyToV1_PreservesBGPAdjacencyPresentationEvidenceAndPeerRows(t *testing.T) {
+	data := topologyData{
+		AgentID: "agent-test",
+		View:    "summary",
+		Actors: []topologyActor{
+			{
+				ActorID:   "router-a",
+				ActorType: "router",
+				Source:    "snmp",
+				Tables: map[string][]map[string]any{
+					"bgp_peers": {
+						{
+							"routing_instance":         "default",
+							"neighbor_ip":              "192.0.2.2",
+							"remote_as":                "65002",
+							"state":                    "established",
+							"admin_status":             "enabled",
+							"local_ip":                 "192.0.2.1",
+							"local_as":                 "65001",
+							"local_identifier":         "1.1.1.1",
+							"peer_identifier":          "2.2.2.2",
+							"peer_type":                "external",
+							"bgp_version":              "4",
+							"description":              "edge-peer",
+							"established_uptime":       int64(300),
+							"last_received_update_age": int64(12),
+							"remote_actor_id":          "router-b",
+						},
+					},
+				},
+			},
+			{
+				ActorID:   "router-b",
+				ActorType: "router",
+				Source:    "snmp",
+			},
+		},
+		Links: []topologyLink{
+			{
+				Protocol:   topologyBGPAdjacencyLinkType,
+				LinkType:   topologyBGPAdjacencyLinkType,
+				Direction:  "observed",
+				State:      "established",
+				SrcActorID: "router-a",
+				DstActorID: "router-b",
+				Src: topologyLinkEndpoint{
+					Attributes: map[string]any{
+						"bgp_identifier": "1.1.1.1",
+						"ip":             "192.0.2.1",
+						"as":             "65001",
+					},
+				},
+				Dst: topologyLinkEndpoint{
+					Attributes: map[string]any{
+						"bgp_identifier": "2.2.2.2",
+						"ip":             "192.0.2.2",
+						"as":             "65002",
+					},
+				},
+				Metrics: map[string]any{
+					"source":           "bgp_mib",
+					"inference":        "bgp_established_adjacency",
+					"attachment_mode":  "logical_l3_bgp",
+					"routing_instance": "default",
+					"local_identifier": "1.1.1.1",
+					"peer_identifier":  "2.2.2.2",
+					"local_ip":         "192.0.2.1",
+					"neighbor_ip":      "192.0.2.2",
+					"local_as":         "65001",
+					"remote_as":        "65002",
+				},
+			},
+		},
+	}
+
+	payload, err := snmpTopologyToV1(data)
+	require.NoError(t, err)
+	require.NoError(t, validateTopologyV1Data(payload))
+
+	assert.Contains(t, payload.Producer.Capabilities, "bgp")
+	require.Contains(t, payload.Types.LinkTypes, snmpTopologyV1LinkBGP)
+	linkType := payload.Types.LinkTypes[snmpTopologyV1LinkBGP]
+	assert.Equal(t, "observed_bidirectional", linkType.Orientation)
+	assert.Equal(t, "observation", linkType.DirectionRole)
+	assert.Equal(t, "control", linkType.SemanticRole)
+	require.NotNil(t, linkType.Presentation)
+	assert.Equal(t, "BGP adjacency", linkType.Presentation.Label)
+	assert.Equal(t, "accent", linkType.Presentation.ColorSlot)
+	assert.Equal(t, "dashed", linkType.Presentation.LineStyle)
+	assert.Contains(t, topologyV1LegendLinkTypes(payload), snmpTopologyV1LinkBGP)
+
+	require.Contains(t, payload.Types.EvidenceTypes, snmpTopologyV1LinkBGP)
+	evidenceType := payload.Types.EvidenceTypes[snmpTopologyV1LinkBGP]
+	assert.Equal(t, snmpTopologyV1LinkBGP, evidenceType.LinkType)
+	assert.Equal(t, []string{"src_actor", "dst_actor", "routing_instance"}, evidenceType.MatchColumns)
+
+	require.Contains(t, payload.Evidence, snmpTopologyV1LinkBGP)
+	evidenceTable := payload.Evidence[snmpTopologyV1LinkBGP].Table
+	assert.Equal(t, 1, evidenceTable.Rows)
+	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "routing_instance"))
+	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "local_identifier"))
+	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "peer_identifier"))
+	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "local_ip"))
+	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "neighbor_ip"))
+	assert.Equal(t, []string{"default"}, topologyV1StringColumnValues(t, payload, evidenceTable, "routing_instance"))
+	assert.Equal(t, []string{"1.1.1.1"}, topologyV1StringColumnValues(t, payload, evidenceTable, "local_identifier"))
+	assert.Equal(t, []string{"2.2.2.2"}, topologyV1StringColumnValues(t, payload, evidenceTable, "peer_identifier"))
+	assert.Equal(t, []string{"192.0.2.1"}, topologyV1StringColumnValues(t, payload, evidenceTable, "local_ip"))
+	assert.Equal(t, []string{"192.0.2.2"}, topologyV1StringColumnValues(t, payload, evidenceTable, "neighbor_ip"))
+	assert.Equal(t, []string{"65001"}, topologyV1StringColumnValues(t, payload, evidenceTable, "local_as"))
+	assert.Equal(t, []string{"65002"}, topologyV1StringColumnValues(t, payload, evidenceTable, "remote_as"))
+
+	require.NotNil(t, payload.Tables)
+	require.Contains(t, payload.Tables.Actor, "actor_bgp_peers")
+	peersTable := payload.Tables.Actor["actor_bgp_peers"].Table
+	assert.Equal(t, 1, peersTable.Rows)
+	assert.Equal(t, "actor_ref", topologyV1ColumnType(peersTable, "remote_actor"))
+	assert.Equal(t, []any{0}, topologyV1ColumnValues(t, peersTable, "actor"))
+	assert.Equal(t, []any{1}, topologyV1ColumnValues(t, peersTable, "remote_actor"))
+	assert.Equal(t, []string{"default"}, topologyV1StringColumnValues(t, payload, peersTable, "routing_instance"))
+	assert.Equal(t, []string{"192.0.2.2"}, topologyV1StringColumnValues(t, payload, peersTable, "neighbor_ip"))
+	assert.Equal(t, []string{"65002"}, topologyV1StringColumnValues(t, payload, peersTable, "remote_as"))
+	assert.Equal(t, []string{"established"}, topologyV1StringColumnValues(t, payload, peersTable, "state"))
+	assert.Equal(t, []any{uint64(300)}, topologyV1ColumnValues(t, peersTable, "established_uptime"))
+
+	deviceType := payload.Types.ActorTypes["router"]
+	require.NotNil(t, deviceType.Presentation)
+	require.NotNil(t, deviceType.Presentation.Modal)
+	bgpSection := requireTopologyV1ModalSection(t, deviceType.Presentation.Modal.Sections, "bgp_peers")
+	assert.Equal(t, "actor_table", bgpSection.Source.Kind)
+	assert.Equal(t, "actor_bgp_peers", bgpSection.Source.Table)
+	require.NotNil(t, bgpSection.OwnerFilter)
+	assert.Equal(t, "actor_column", bgpSection.OwnerFilter.Mode)
+	assert.Equal(t, "actor", bgpSection.OwnerFilter.ActorColumn)
+	require.Len(t, bgpSection.Columns, 16)
+	assert.Equal(t, "remote_actor", bgpSection.Columns[3].ID)
+	assert.Equal(t, "actor_link", bgpSection.Columns[3].Cell)
+	assert.Empty(t, bgpSection.Columns[3].Visibility)
 }
 
 func TestSNMPTopologyToV1_ReturnsErrorForL3SubnetWithoutSubnet(t *testing.T) {
