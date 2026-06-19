@@ -489,7 +489,7 @@ Constraints:
 
 ### Netdata Assistant
 
-The [Netdata Assistant](https://learn.netdata.cloud/docs/machine-learning-and-anomaly-detection/ai-powered-troubleshooting-assistant) provides AI-powered troubleshooting when alerts trigger:
+The [Netdata Assistant](/docs/troubleshooting/troubleshoot.md) provides AI-powered troubleshooting when alerts trigger:
 
 1. Click the alert in your dashboard
 2. Press the Assistant button
