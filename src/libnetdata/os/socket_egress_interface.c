@@ -30,10 +30,15 @@ static bool match_egress_interface(const struct sockaddr_storage *local,
                 match = mapped4.s_addr ==
                         ((const struct sockaddr_in *)(void *)ifa->ifa_addr)->sin_addr.s_addr;
             }
-            else if (ifa->ifa_addr->sa_family == AF_INET6)
-                match = memcmp(&local6->sin6_addr,
-                               &((const struct sockaddr_in6 *)(void *)ifa->ifa_addr)->sin6_addr,
-                               sizeof(struct in6_addr)) == 0;
+            else if (ifa->ifa_addr->sa_family == AF_INET6) {
+                const struct sockaddr_in6 *ifa6 = (const struct sockaddr_in6 *)(void *)ifa->ifa_addr;
+                match = memcmp(&local6->sin6_addr, &ifa6->sin6_addr, sizeof(struct in6_addr)) == 0;
+                // a link-local address (fe80::/10) is unique only per interface; the same address can
+                // exist on several NICs, so disambiguate by scope id (the interface index) or we could
+                // match the wrong interface
+                if (match && IN6_IS_ADDR_LINKLOCAL(&local6->sin6_addr))
+                    match = local6->sin6_scope_id == ifa6->sin6_scope_id;
+            }
         }
 
         if (match) {
@@ -74,22 +79,35 @@ int os_socket_egress_interface_unittest(void) {
     struct sockaddr_in6 eth1_6 = { .sin6_family = AF_INET6 };
     inet_pton(AF_INET6, "2001:db8::5", &eth1_6.sin6_addr);
 
-    struct ifaddrs if_eth1 = { .ifa_next = NULL,     .ifa_name = (char *)"eth1", .ifa_addr = (struct sockaddr *)&eth1_6 };
-    struct ifaddrs if_eth0 = { .ifa_next = &if_eth1, .ifa_name = (char *)"eth0", .ifa_addr = (struct sockaddr *)&eth0_4 };
-    struct ifaddrs if_lo   = { .ifa_next = &if_eth0, .ifa_name = (char *)"lo",   .ifa_addr = (struct sockaddr *)&lo4   };
+    // the SAME link-local address on two interfaces, distinguished only by scope id (interface index)
+    struct sockaddr_in6 eth0_ll = { .sin6_family = AF_INET6, .sin6_scope_id = 2 };
+    inet_pton(AF_INET6, "fe80::1", &eth0_ll.sin6_addr);
+    struct sockaddr_in6 eth1_ll = { .sin6_family = AF_INET6, .sin6_scope_id = 3 };
+    inet_pton(AF_INET6, "fe80::1", &eth1_ll.sin6_addr);
+
+    // list order puts eth0's link-local (scope 2) BEFORE eth1's (scope 3), so a pure address match
+    // would wrongly pick eth0 for an eth1-scoped local - the scope id must decide
+    struct ifaddrs if_eth1ll = { .ifa_next = NULL,       .ifa_name = (char *)"eth1", .ifa_addr = (struct sockaddr *)&eth1_ll };
+    struct ifaddrs if_eth0ll = { .ifa_next = &if_eth1ll, .ifa_name = (char *)"eth0", .ifa_addr = (struct sockaddr *)&eth0_ll };
+    struct ifaddrs if_eth1   = { .ifa_next = &if_eth0ll, .ifa_name = (char *)"eth1", .ifa_addr = (struct sockaddr *)&eth1_6  };
+    struct ifaddrs if_eth0   = { .ifa_next = &if_eth1,   .ifa_name = (char *)"eth0", .ifa_addr = (struct sockaddr *)&eth0_4  };
+    struct ifaddrs if_lo     = { .ifa_next = &if_eth0,   .ifa_name = (char *)"lo",   .ifa_addr = (struct sockaddr *)&lo4     };
 
     static const struct {
         const char *name;
         int family;
         const char *addr;    // an IPv4 string when mapped==true
         bool mapped;         // build ::ffff:addr (a dual-stack local)
+        uint32_t scope;      // sin6_scope_id for link-local IPv6 locals
         const char *expect;  // NULL = expect no match
     } cases[] = {
-        { "ipv4 direct",      AF_INET,  "10.20.4.5",    false, "eth0" },
-        { "ipv6 native",      AF_INET6, "2001:db8::5",  false, "eth1" },
-        { "ipv4-mapped ipv6", AF_INET6, "10.20.4.5",    true,  "eth0" },
-        { "no match ipv4",    AF_INET,  "192.0.2.1",    false, NULL   },
-        { "no match ipv6",    AF_INET6, "2001:db8::99", false, NULL   },
+        { "ipv4 direct",       AF_INET,  "10.20.4.5",    false, 0, "eth0" },
+        { "ipv6 native",       AF_INET6, "2001:db8::5",  false, 0, "eth1" },
+        { "ipv4-mapped ipv6",  AF_INET6, "10.20.4.5",    true,  0, "eth0" },
+        { "link-local scope2", AF_INET6, "fe80::1",      false, 2, "eth0" },
+        { "link-local scope3", AF_INET6, "fe80::1",      false, 3, "eth1" },
+        { "no match ipv4",     AF_INET,  "192.0.2.1",    false, 0, NULL   },
+        { "no match ipv6",     AF_INET6, "2001:db8::99", false, 0, NULL   },
     };
 
     int errors = 0;
@@ -112,8 +130,10 @@ int os_socket_egress_interface_unittest(void) {
                 l->sin6_addr.s6_addr[11] = 0xff;
                 memcpy(&l->sin6_addr.s6_addr[12], &v4, sizeof(v4));
             }
-            else
+            else {
                 inet_pton(AF_INET6, cases[i].addr, &l->sin6_addr);
+                l->sin6_scope_id = cases[i].scope;
+            }
         }
 
         char iface[OS_IFNAME_MAX] = "";
