@@ -521,6 +521,9 @@ not physical, L2, discovery, or port-neighbor evidence. The producer emits graph
 links only for full OSPF neighbors with resolved managed endpoints. Non-full or
 unresolved OSPF neighbor rows remain diagnostic actor-owned detail rows and
 must not create loose router/IP graph actors.
+Current SNMP OSPF topology scope is OSPFv2 non-virtual neighbors from
+`ospfNbrTable`; OSPFv3 and OSPF virtual-neighbor tables are future scope unless
+a later topology feature explicitly adds their distinct semantics.
 
 When `ospf_adjacency` and `l3_subnet` describe the same resolved actor pair and
 endpoint/subnet relationship, OSPF is the stronger protocol-specific signal for

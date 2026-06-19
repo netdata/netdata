@@ -149,6 +149,15 @@ func TestTopologyProfile_OSPFNeighborUsesNeighborTags(t *testing.T) {
 	}, actual)
 }
 
+func TestTopologyProfile_OSPFTopologyExcludesVirtualNeighborTable(t *testing.T) {
+	profile, err := ddsnmp.LoadProfileByName("_std-ospf-mib")
+	require.NoError(t, err)
+	require.NotNil(t, profile.Definition)
+	require.Len(t, profile.Definition.Topology, 1)
+	require.Equal(t, ddsnmp.KindOSPFNeighbor, profile.Definition.Topology[0].Kind)
+	require.Equal(t, "ospfNbrTable", profile.Definition.Topology[0].Table.Name)
+}
+
 func collectTopologyProfileTables(t *testing.T, mockHandler gosnmp.Handler, profileName string) []ddsnmp.Metric {
 	t.Helper()
 
