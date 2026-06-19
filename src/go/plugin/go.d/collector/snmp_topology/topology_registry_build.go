@@ -35,6 +35,7 @@ func buildSingleMapTopologySnapshot(aggregate topologyObservationAggregate, opti
 	applySNMPTopologyShapePolicies(&data, options)
 	applyTopologyL3SubnetEnrichment(&data, aggregate)
 	applyTopologyOSPFAdjacencyEnrichment(&data, aggregate)
+	applyTopologyBGPAdjacencyEnrichment(&data, aggregate)
 	applyTopologyDepthFocusFilter(&data, options)
 	return data, true
 }
@@ -72,6 +73,7 @@ func buildProbableTopologySnapshot(aggregate topologyObservationAggregate, optio
 	markProbableDeltaLinks(&strictData, &probableData)
 	applyTopologyL3SubnetEnrichment(&probableData, aggregate)
 	applyTopologyOSPFAdjacencyEnrichment(&probableData, aggregate)
+	applyTopologyBGPAdjacencyEnrichment(&probableData, aggregate)
 	applyTopologyDepthFocusFilter(&probableData, options)
 	return probableData, true
 }

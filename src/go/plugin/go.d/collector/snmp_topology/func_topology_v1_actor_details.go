@@ -67,6 +67,8 @@ func buildSNMPTopologyV1ActorDetails(
 			table = buildSNMPTopologyV1ActorPortsTable(rows, stringsDict, portNeighborSummaries)
 		} else if tableID == "actor_ospf_neighbors" {
 			table = buildSNMPTopologyV1OSPFNeighborsTable(rows, actorIndex, stringsDict)
+		} else if tableID == "actor_bgp_peers" {
+			table = buildSNMPTopologyV1BGPPeersTable(rows, actorIndex, stringsDict)
 		} else {
 			table, err = buildSNMPTopologyV1DynamicTable(rows, stringsDict)
 		}
@@ -81,6 +83,8 @@ func buildSNMPTopologyV1ActorDetails(
 			tableTypes[tableID] = snmpTopologyV1ActorPortsTableType()
 		} else if tableID == "actor_ospf_neighbors" {
 			tableTypes[tableID] = snmpTopologyV1OSPFNeighborsTableType()
+		} else if tableID == "actor_bgp_peers" {
+			tableTypes[tableID] = snmpTopologyV1BGPPeersTableType()
 		} else {
 			tableTypes[tableID] = topologyv1.TableType{
 				Role:        "actor_detail",

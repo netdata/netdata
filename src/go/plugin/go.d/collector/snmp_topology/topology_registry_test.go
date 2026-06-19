@@ -262,6 +262,139 @@ func TestTopologyRegistry_OSPFSnapshotEnrichesSubnetAfterNeighborIngest(t *testi
 	require.Equal(t, 1, data.Stats["ospf_adjacency_visible_links"])
 }
 
+func TestTopologyRegistry_BGPAdjacencyEmitsEstablishedManagedPeerLinkAndDetailRows(t *testing.T) {
+	registry := newTopologyRegistry()
+
+	cacheA := newTopologyCache()
+	cacheA.updateTime = time.Now()
+	cacheA.lastUpdate = cacheA.updateTime
+	cacheA.agentID = "agent-test"
+	cacheA.localDevice = topologyDevice{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		SysName:       "router-a",
+		ManagementIP:  "10.0.0.1",
+	}
+	cacheA.bgpPeersByKey["a"] = topologyBGPPeer{
+		RoutingInstance: "default",
+		NeighborIP:      "198.51.100.2",
+		RemoteAS:        "65002",
+		LocalIP:         "198.51.100.1",
+		LocalAS:         "65001",
+		LocalIdentifier: "1.1.1.1",
+		PeerIdentifier:  "2.2.2.2",
+		State:           "established",
+	}
+
+	cacheB := newTopologyCache()
+	cacheB.updateTime = time.Now().Add(time.Second)
+	cacheB.lastUpdate = cacheB.updateTime
+	cacheB.agentID = "agent-test"
+	cacheB.localDevice = topologyDevice{
+		ChassisID:     "aa:bb:cc:dd:ee:ff",
+		ChassisIDType: "macAddress",
+		SysName:       "router-b",
+		ManagementIP:  "10.0.0.2",
+	}
+	cacheB.bgpPeersByKey["b"] = topologyBGPPeer{
+		RoutingInstance: "default",
+		NeighborIP:      "198.51.100.1",
+		RemoteAS:        "65001",
+		LocalIP:         "198.51.100.2",
+		LocalAS:         "65002",
+		LocalIdentifier: "2.2.2.2",
+		PeerIdentifier:  "1.1.1.1",
+		State:           "established",
+	}
+
+	registry.register(cacheA)
+	registry.register(cacheB)
+
+	data, ok := snapshotTopologyRegistryForTest(registry)
+
+	require.True(t, ok)
+	require.Len(t, data.Links, 1)
+	link := data.Links[0]
+	require.Equal(t, "3", link.Layer)
+	require.Equal(t, topologyBGPAdjacencyLinkType, link.Protocol)
+	require.Equal(t, topologyBGPAdjacencyLinkType, link.LinkType)
+	require.Equal(t, "observed", link.Direction)
+	require.Equal(t, "established", link.State)
+	require.Equal(t, "bgp_established_adjacency", link.Metrics["inference"])
+	require.Equal(t, "logical_l3_bgp", link.Metrics["attachment_mode"])
+	require.Equal(t, "default", link.Metrics["routing_instance"])
+	require.Equal(t, "65001", link.Src.Attributes["as"])
+	require.Equal(t, "65002", link.Dst.Attributes["as"])
+	require.Equal(t, 2, data.Stats["bgp_peer_rows"])
+	require.Equal(t, 2, data.Stats["bgp_peer_detail_rows"])
+	require.Equal(t, 1, data.Stats["bgp_adjacency_emitted_links"])
+	require.Equal(t, 1, data.Stats["bgp_adjacency_suppressed_duplicate_link"])
+	require.Equal(t, 1, data.Stats["bgp_adjacency_visible_links"])
+
+	routerA := findDeviceActorBySysName(data, "router-a")
+	require.NotNil(t, routerA)
+	routerB := findDeviceActorBySysName(data, "router-b")
+	require.NotNil(t, routerB)
+	require.Contains(t, routerA.Tables, "bgp_peers")
+	require.Len(t, routerA.Tables["bgp_peers"], 1)
+	require.Equal(t, routerB.ActorID, routerA.Tables["bgp_peers"][0]["remote_actor_id"])
+}
+
+func TestTopologyRegistry_BGPAdjacencyKeepsUnresolvedAndNonEstablishedPeersAsDetails(t *testing.T) {
+	registry := newTopologyRegistry()
+
+	cache := newTopologyCache()
+	cache.updateTime = time.Now()
+	cache.lastUpdate = cache.updateTime
+	cache.agentID = "agent-test"
+	cache.localDevice = topologyDevice{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		SysName:       "router-a",
+		ManagementIP:  "10.0.0.1",
+	}
+	cache.bgpPeersByKey["unresolved"] = topologyBGPPeer{
+		RoutingInstance: "default",
+		NeighborIP:      "203.0.113.2",
+		RemoteAS:        "65002",
+		LocalIP:         "198.51.100.1",
+		LocalAS:         "65001",
+		LocalIdentifier: "1.1.1.1",
+		PeerIdentifier:  "2.2.2.2",
+		State:           "established",
+	}
+	cache.bgpPeersByKey["idle"] = topologyBGPPeer{
+		RoutingInstance: "default",
+		NeighborIP:      "203.0.113.3",
+		RemoteAS:        "65003",
+		LocalIP:         "198.51.100.1",
+		LocalAS:         "65001",
+		LocalIdentifier: "1.1.1.1",
+		PeerIdentifier:  "3.3.3.3",
+		State:           "idle",
+	}
+
+	registry.register(cache)
+
+	data, ok := snapshotTopologyRegistryForTest(registry)
+
+	require.True(t, ok)
+	require.Empty(t, data.Links)
+	require.Equal(t, 2, data.Stats["bgp_peer_rows"])
+	require.Equal(t, 2, data.Stats["bgp_peer_detail_rows"])
+	require.Equal(t, 1, data.Stats["bgp_adjacency_suppressed_unresolved_neighbor"])
+	require.Equal(t, 1, data.Stats["bgp_adjacency_suppressed_non_established_state"])
+	require.Equal(t, 0, data.Stats["bgp_adjacency_visible_links"])
+
+	routerA := findDeviceActorBySysName(data, "router-a")
+	require.NotNil(t, routerA)
+	require.Contains(t, routerA.Tables, "bgp_peers")
+	require.Len(t, routerA.Tables["bgp_peers"], 2)
+	for _, row := range routerA.Tables["bgp_peers"] {
+		require.NotContains(t, row, "remote_actor_id")
+	}
+}
+
 func TestCompareCollapseActorPriorityPrefersNonEmptyActorID(t *testing.T) {
 	left := topologyActor{
 		ActorID:   "",

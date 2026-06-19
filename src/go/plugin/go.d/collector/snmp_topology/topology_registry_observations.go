@@ -76,10 +76,12 @@ func aggregateTopologyObservationSnapshots(snapshots []topologyObservationSnapsh
 	totalObservations := 0
 	totalL3Interfaces := 0
 	totalOSPFNeighbors := 0
+	totalBGPPeers := 0
 	for _, snapshot := range snapshots {
 		totalObservations += len(snapshot.l2Observations)
 		totalL3Interfaces += len(snapshot.l3Interfaces)
 		totalOSPFNeighbors += len(snapshot.ospfNeighbors)
+		totalBGPPeers += len(snapshot.bgpPeers)
 	}
 
 	aggregate := topologyObservationAggregate{
@@ -87,11 +89,13 @@ func aggregateTopologyObservationSnapshots(snapshots []topologyObservationSnapsh
 		l2Observations: make([]topologyengine.L2Observation, 0, totalObservations),
 		l3Interfaces:   make([]topologyL3Interface, 0, totalL3Interfaces),
 		ospfNeighbors:  make([]topologyOSPFNeighbor, 0, totalOSPFNeighbors),
+		bgpPeers:       make([]topologyBGPPeer, 0, totalBGPPeers),
 	}
 	for _, snapshot := range snapshots {
 		aggregate.l2Observations = append(aggregate.l2Observations, snapshot.l2Observations...)
 		aggregate.l3Interfaces = append(aggregate.l3Interfaces, snapshot.l3Interfaces...)
 		aggregate.ospfNeighbors = append(aggregate.ospfNeighbors, snapshot.ospfNeighbors...)
+		aggregate.bgpPeers = append(aggregate.bgpPeers, snapshot.bgpPeers...)
 		if aggregate.localDeviceID == "" {
 			aggregate.localDeviceID = snapshot.localDeviceID
 		}

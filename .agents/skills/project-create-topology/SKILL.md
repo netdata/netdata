@@ -430,9 +430,21 @@ For SNMP managed device actor modals:
   logical adjacency. It must not be presented as discovery, physical, L2, or
   port-neighbor evidence.
 - Preserve protocol-neighbor diagnostics that do not become graph links in
-  actor-owned detail tables, such as `actor_ospf_neighbors`. Non-full or
-  unresolved OSPF neighbors should remain visible there without creating loose
-  router/IP actors.
+  actor-owned detail tables, such as `actor_ospf_neighbors` and
+  `actor_bgp_peers`. Non-full, non-established, or unresolved protocol
+  neighbors should remain visible there without creating loose router/IP
+  actors.
+- `bgp_adjacency` links represent established BGP control-plane adjacency
+  between resolved managed SNMP device actors. They must use explicit BGP
+  link/evidence types, carry `semantic_role: control`, and must not be
+  presented as discovery, physical, L2, or port-neighbor links.
+- Deduplicate BGP adjacency by managed actor pair plus routing instance. Keep
+  BGP identifiers, ASNs, and endpoint IPs as evidence/display fields, but do not
+  make them the primary graph identity because vendor profiles expose those
+  fields asymmetrically. Parallel sessions between the same managed actor pair
+  in the same routing instance should remain actor-owned peer detail rows under
+  one compact graph relationship unless a future producer contract explicitly
+  adds a more detailed BGP graph mode.
 - Keep generic graph-link `Links` sections only for endpoint, segment, or
   custom actors that do not own port inventory.
 - Build link endpoint port labels only from real port fields: `port_name`,

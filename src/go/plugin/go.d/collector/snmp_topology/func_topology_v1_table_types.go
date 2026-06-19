@@ -121,6 +121,41 @@ func snmpTopologyV1OSPFNeighborsTableType() topologyv1.TableType {
 	}
 }
 
+func snmpTopologyV1BGPPeersTableType() topologyv1.TableType {
+	return topologyv1.TableType{
+		Role:        "actor_detail",
+		Owner:       "actor",
+		Aggregation: "append",
+		Columns:     snmpTopologyV1BGPPeersColumns(),
+		Presentation: &topologyv1.TableTypePresentation{
+			Label:   "BGP Peers",
+			Order:   5,
+			Columns: snmpTopologyV1BGPPeerModalColumns(),
+		},
+	}
+}
+
+func snmpTopologyV1BGPPeerModalColumns() []topologyv1.ModalColumn {
+	return []topologyv1.ModalColumn{
+		modalDirectColumn("neighbor_ip", "Neighbor IP", "neighbor_ip", "text"),
+		modalDirectColumn("remote_as", "Remote AS", "remote_as", "text"),
+		modalDirectColumn("state", "State", "state", "badge"),
+		modalActorRefColumn("remote_actor", "Remote Actor", "remote_actor"),
+		modalDirectColumnWithVisibility("routing_instance", "Routing Instance", "routing_instance", "text", "expanded"),
+		modalDirectColumnWithVisibility("admin_status", "Admin", "admin_status", "badge", "expanded"),
+		modalDirectColumnWithVisibility("local_ip", "Local IP", "local_ip", "text", "expanded"),
+		modalDirectColumnWithVisibility("local_as", "Local AS", "local_as", "text", "expanded"),
+		modalDirectColumnWithVisibility("local_identifier", "Local Identifier", "local_identifier", "text", "expanded"),
+		modalDirectColumnWithVisibility("peer_identifier", "Peer Identifier", "peer_identifier", "text", "expanded"),
+		modalDirectColumnWithVisibility("peer_type", "Peer Type", "peer_type", "badge", "expanded"),
+		modalDirectColumnWithVisibility("bgp_version", "BGP Version", "bgp_version", "text", "expanded"),
+		modalDirectColumnWithVisibility("established_uptime", "Established Uptime", "established_uptime", "duration", "expanded"),
+		modalDirectColumnWithVisibility("last_received_update_age", "Last Update Age", "last_received_update_age", "duration", "expanded"),
+		modalDirectColumnWithVisibility("description", "Description", "description", "text", "expanded"),
+		modalDirectColumnWithVisibility("source", "Source", "source", "badge", "expanded"),
+	}
+}
+
 func snmpTopologyV1OSPFNeighborModalColumns() []topologyv1.ModalColumn {
 	return []topologyv1.ModalColumn{
 		modalDirectColumn("neighbor_router_id", "Neighbor Router ID", "neighbor_router_id", "text"),
@@ -198,6 +233,28 @@ func snmpTopologyV1OSPFNeighborsColumns() []topologyv1.Column {
 		topologyv1.NewColumn("local_ip", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
 		topologyv1.NewColumn("subnet", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
 		topologyv1.NewColumn("addressless_index", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("source", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+	}
+}
+
+func snmpTopologyV1BGPPeersColumns() []topologyv1.Column {
+	return []topologyv1.Column{
+		topologyv1.NewColumn("actor", "actor_ref", topologyv1.WithRole("reference")),
+		topologyv1.NewColumn("remote_actor", "actor_ref", topologyv1.WithNullable(), topologyv1.WithRole("reference")),
+		topologyv1.NewColumn("routing_instance", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("neighbor_ip", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("remote_as", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("state", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("admin_status", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("local_ip", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("local_as", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("local_identifier", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("peer_identifier", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("peer_type", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("bgp_version", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("description", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("established_uptime", "uint", topologyv1.WithNullable()),
+		topologyv1.NewColumn("last_received_update_age", "uint", topologyv1.WithNullable()),
 		topologyv1.NewColumn("source", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
 	}
 }

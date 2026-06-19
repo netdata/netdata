@@ -28,6 +28,7 @@ func recomputeTopologyLinkStats(data *topologyData) {
 	data.Stats["links_probable"] = probable
 	recomputeTopologyL3VisibleLinkStats(data)
 	recomputeTopologyOSPFVisibleLinkStats(data)
+	recomputeTopologyBGPVisibleLinkStats(data)
 }
 
 func recomputeTopologyL3VisibleLinkStats(data *topologyData) {
