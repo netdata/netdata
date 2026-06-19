@@ -718,6 +718,10 @@ func TestSNMPTopologyToV1_PreservesOSPFAdjacencyPresentationEvidenceAndNeighborR
 	require.NotNil(t, ospfSection.OwnerFilter)
 	assert.Equal(t, "actor_column", ospfSection.OwnerFilter.Mode)
 	assert.Equal(t, "actor", ospfSection.OwnerFilter.ActorColumn)
+	require.Len(t, ospfSection.Columns, 9)
+	assert.Equal(t, "remote_actor", ospfSection.Columns[3].ID)
+	assert.Equal(t, "actor_link", ospfSection.Columns[3].Cell)
+	assert.Empty(t, ospfSection.Columns[3].Visibility)
 }
 
 func TestSNMPTopologyToV1_ReturnsErrorForL3SubnetWithoutSubnet(t *testing.T) {

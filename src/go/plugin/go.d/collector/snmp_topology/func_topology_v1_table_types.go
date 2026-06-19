@@ -126,7 +126,7 @@ func snmpTopologyV1OSPFNeighborModalColumns() []topologyv1.ModalColumn {
 		modalDirectColumn("neighbor_router_id", "Neighbor Router ID", "neighbor_router_id", "text"),
 		modalDirectColumn("neighbor_ip", "Neighbor IP", "neighbor_ip", "text"),
 		modalDirectColumn("state", "State", "state", "badge"),
-		modalActorRefColumnWithVisibility("remote_actor", "Remote Actor", "remote_actor", "expanded"),
+		modalActorRefColumn("remote_actor", "Remote Actor", "remote_actor"),
 		modalDirectColumnWithVisibility("local_router_id", "Local Router ID", "local_router_id", "text", "expanded"),
 		modalDirectColumnWithVisibility("local_ip", "Local IP", "local_ip", "text", "expanded"),
 		modalDirectColumnWithVisibility("subnet", "Subnet", "subnet", "text", "expanded"),
