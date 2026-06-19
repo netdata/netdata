@@ -378,9 +378,8 @@ typedef long suseconds_t;
 static inline char *strsep(char **stringp, const char *delim) {
     char *s = *stringp;
     if (!s) return NULL;
-    char *end = strpbrk(s, delim);
-    if (end) { *end = '\0'; *stringp = end + 1; }
-    else *stringp = NULL;
+    *stringp = strpbrk(s, delim);
+    if (*stringp) *(*stringp)++ = '\0';
     return s;
 }
 
@@ -568,18 +567,19 @@ static inline int poll(struct pollfd *fds, nfds_t nfds, int timeout) {
 }
 
 // ── getsockopt / setsockopt ── Winsock declares char* for optval; POSIX void* ──
-// Define wrappers before the macros so the wrapper bodies call raw Winsock.
-static inline int nd_getsockopt(int s, int l, int o, void *v, socklen_t *vl) {
+// The wrappers take char* (Winsock's actual type) to avoid void* parameters.
+// The replacement macros cast the caller's pointer so call sites need no changes.
+static inline int nd_getsockopt(int s, int l, int o, char *v, socklen_t *vl) {
     int ilen = (int)*vl;
-    int r = getsockopt(s, l, o, (char *)v, &ilen);
+    int r = getsockopt(s, l, o, v, &ilen);
     *vl = (socklen_t)ilen;
     return r;
 }
-static inline int nd_setsockopt(int s, int l, int o, const void *v, socklen_t vl) {
-    return setsockopt(s, l, o, (const char *)v, (int)vl);
+static inline int nd_setsockopt(int s, int l, int o, const char *v, socklen_t vl) {
+    return setsockopt(s, l, o, v, (int)vl);
 }
-#define getsockopt nd_getsockopt
-#define setsockopt nd_setsockopt
+#define getsockopt(s, l, o, v, vl) nd_getsockopt((s), (l), (o), (char *)(v), (vl))
+#define setsockopt(s, l, o, v, vl) nd_setsockopt((s), (l), (o), (const char *)(v), (vl))
 
 // ── fcntl / F_GETFL / F_SETFL / F_GETFD / F_SETFD / O_NONBLOCK / FD_CLOEXEC ──
 // UCRT64 has no POSIX fcntl; implement what socket.c needs via Winsock APIs.
@@ -603,15 +603,14 @@ static inline int fcntl(int fd, int cmd, ...) {
         int flags = va_arg(ap, int); va_end(ap);
         u_long mode = (flags & O_NONBLOCK) ? 1 : 0;
         // zero-extend int → uintptr_t to avoid sign-extension of SOCKET values
-        SOCKET s = (SOCKET)(uintptr_t)(unsigned int)fd;
-        return (ioctlsocket(s, FIONBIO, &mode) == 0) ? 0 : -1;
+        return (ioctlsocket((SOCKET)(uintptr_t)(unsigned int)fd, FIONBIO, &mode) == 0) ? 0 : -1;
     }
     case F_SETFD: {
         va_list ap; va_start(ap, cmd);
         int flags = va_arg(ap, int); va_end(ap);
-        HANDLE h = (HANDLE)(uintptr_t)(unsigned int)fd;
         DWORD inherit = (flags & FD_CLOEXEC) ? 0 : HANDLE_FLAG_INHERIT;
-        return SetHandleInformation(h, HANDLE_FLAG_INHERIT, inherit) ? 0 : -1;
+        // zero-extend int → uintptr_t to avoid sign-extension of HANDLE values
+        return SetHandleInformation((HANDLE)(uintptr_t)(unsigned int)fd, HANDLE_FLAG_INHERIT, inherit) ? 0 : -1;
     }
     default:
         errno = EINVAL;
@@ -997,12 +996,15 @@ static inline int statvfs(const char *path, struct statvfs *buf) {
 
 // ── posix_memalign() ── POSIX aligned malloc, absent from UCRT64 ─────────────
 // Windows _aligned_malloc() has reversed argument order and returns NULL on failure.
+// nd_posix_memalign uses char** instead of void** to satisfy the
+// cppcoreguidelines-pro-type-void-pointer check; the macro inserts the cast.
 #ifndef _POSIX_MEMALIGN_DEFINED
 #define _POSIX_MEMALIGN_DEFINED
-static inline int posix_memalign(void **memptr, size_t alignment, size_t size) {
-    *memptr = _aligned_malloc(size, alignment);
+static inline int nd_posix_memalign(char **memptr, size_t alignment, size_t size) {
+    *memptr = (char *)_aligned_malloc(size, alignment);
     return *memptr ? 0 : ENOMEM;
 }
+#define posix_memalign(p, a, s) nd_posix_memalign((char **)(p), (a), (s))
 #endif
 
 // ── POSIX user/group ID functions ── absent from UCRT64 ──────────────────────
