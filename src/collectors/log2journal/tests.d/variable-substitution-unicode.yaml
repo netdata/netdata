@@ -1,0 +1,32 @@
+---
+# Variable substitution with unicode test
+# Tests ${VAR} substitution with non-ASCII content
+
+pattern: "(?P<type>\\w+): (?P<data>.*)"
+
+inject:
+  - key: BASE_UNICODE
+    value: "Başlık: Türkçe içerik"
+  - key: EMOJI_VAR
+    value: "Status: ✅ Success 🎉"
+  - key: CHINESE_VAR
+    value: "测试数据: 中文内容"
+
+filename:
+  key: FILENAME
+
+rewrite:
+  - key: MESSAGE
+    match: 'user'
+    value: 'User=${data} with unicode: ${BASE_UNICODE}'
+    inject: yes
+    
+  - key: MESSAGE  
+    match: 'status'
+    value: '${EMOJI_VAR} - Final status: ${data}'
+    inject: yes
+    
+  - key: MESSAGE
+    match: 'test'  
+    value: '${CHINESE_VAR} - Test data: ${data}'
+    inject: yes

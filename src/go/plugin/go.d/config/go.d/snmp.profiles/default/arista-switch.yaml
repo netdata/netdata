@@ -1,8 +1,8 @@
 extends:
   - _arista.yaml
+  - _arista-bgp4-v2.yaml
   - _arista-queue.yaml
   - _system-base.yaml
-  - _std-bgp4-mib.yaml
   - _std-entity-sensor-mib.yaml
   - _std-if-mib.yaml
   - _std-ospf-mib.yaml
@@ -165,75 +165,7 @@ selector:
         - 1.3.6.1.4.1.30065.1.3011.7280.877.48
         - 1.3.6.1.4.1.30065.1.3011.7280.877.48.972
 
-metrics:
-  - MIB: ARISTA-BGP4V2-MIB
-    table:
-      name: aristaBgp4V2PeerTable
-      OID: 1.3.6.1.4.1.30065.4.1.1.2
-    symbols:
-      - OID: 1.3.6.1.4.1.30065.4.1.1.2.1.12
-        name: aristaBgp4V2PeerAdminStatus
-        chart_meta:
-          description: BGP FSM Status
-          family: 'Network/Routing/BGP/Peer/Admin/Status'
-          unit: "{status}"
-        mapping:
-          1: halted
-          2: running
-      - OID: 1.3.6.1.4.1.30065.4.1.1.2.1.13
-        name: aristaBgp4V2PeerState
-        chart_meta:
-          description: BGP peer connection state
-          family: 'Network/Routing/BGP/Peer/Status'
-          unit: "{status}"
-        mapping:
-          1: idle
-          2: connect
-          3: active
-          4: opensent
-          5: openconfirm
-          6: established
-    metric_tags:
-      - tag: arista_bgp4_v2_peer_local_as
-        symbol:
-          name: aristaBgp4V2PeerLocalAs
-          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.7
-      - tag: arista_bgp4_v2_peer_remote_as
-        symbol:
-          name: aristaBgp4V2PeerRemoteAs
-          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.10
-      - tag: arista_bgp4_v2_peer_local_identifier
-        symbol:
-          name: aristaBgp4V2PeerLocalIdentifier
-          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.8
-          format: ip_address
-      - tag: arista_bgp4_v2_peer_remote_identifier
-        symbol:
-          name: aristaBgp4V2PeerRemoteIdentifier
-          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.11
-          format: ip_address
-      - tag: arista_bgp4_v2_peer_local_addr_type
-        symbol:
-          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.2
-          name: aristaBgp4V2PeerLocalAddrType
-        mapping:
-          0: unknown
-          1: ipv4
-          2: ipv6
-          3: ipv4z
-          4: ipv6z
-          16: dns
-  #      - tag: _arista_bgp4_v2_peer_description
-  #        symbol:
-  #          name: aristaBgp4V2PeerDescription
-  #          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.14
-  #      - tag: _arista_bgp4_v2_peer_local_addr
-  #        symbol:
-  #          name: aristaBgp4V2PeerLocalAddr
-  #          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.3
-  #          format: ip_address
-
-  # - MIB: ARISTA-IF-MIB
+# - MIB: ARISTA-IF-MIB
   #   table:
   #     name: aristaIfTable
   #     OID: 1.3.6.1.4.1.30065.3.15.1.1

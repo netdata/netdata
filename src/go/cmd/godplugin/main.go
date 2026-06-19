@@ -10,10 +10,20 @@ import (
 	"log/slog"
 	"os"
 	"os/user"
+	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/cmd/internal/agenthost"
+	"github.com/netdata/netdata/go/plugins/cmd/internal/discoveryproviders"
+	"github.com/netdata/netdata/go/plugins/plugin/agent"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/dummy"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/file"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/http/httpproxy"
 
@@ -21,18 +31,18 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/cli"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/pkg/hostinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/dummy"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/file"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/dyncfg"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/jobmgr"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/pkg/terminal"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext"
 )
 
 func init() {
@@ -43,7 +53,7 @@ func init() {
 }
 
 func main() {
-	_, _ = maxprocs.Set(maxprocs.Logger(func(s string, args ...interface{}) {}))
+	_, _ = maxprocs.Set(maxprocs.Logger(func(s string, args ...any) {}))
 
 	opts := parseCLI()
 
@@ -52,7 +62,10 @@ func main() {
 		return
 	}
 
-	pluginconfig.MustInit(opts)
+	pluginconfig.MustInit(pluginconfig.InitInput{
+		ConfDir:   opts.ConfDir,
+		WatchPath: opts.WatchPath,
+	})
 
 	if opts.Function != "" {
 		os.Exit(runFunctionCLI(opts))
@@ -64,6 +77,11 @@ func main() {
 	if opts.Debug {
 		logger.Level.Set(slog.LevelDebug)
 	}
+	isTerminal := terminal.IsTerminal()
+	isInsideK8s := hostinfo.IsInsideK8sCluster()
+	moduleRegistry := moduleRegistryWithSystemdPolicy(collectorapi.DefaultRegistry, hostinfo.SystemdVersion)
+
+	runModePolicy := policy.Agent(isTerminal)
 
 	a := agent.New(agent.Config{
 		Name:                      executable.Name,
@@ -72,10 +90,17 @@ func main() {
 		ServiceDiscoveryConfigDir: pluginconfig.ServiceDiscoveryDir(),
 		CollectorsConfigWatchPath: pluginconfig.CollectorsConfigWatchPaths(),
 		VarLibDir:                 pluginconfig.VarLibDir(),
-		RunModule:                 opts.Module,
-		RunJob:                    opts.Job,
-		MinUpdateEvery:            opts.UpdateEvery,
-		DumpSummary:               opts.DumpSummary,
+		ModuleRegistry:            moduleRegistry,
+		IsInsideK8s:               isInsideK8s,
+		RunModePolicy:             runModePolicy,
+		DiscoveryProviders: []discovery.ProviderFactory{
+			discoveryproviders.File(),
+			discoveryproviders.Dummy(),
+			discoveryproviders.SD(sdext.Registry(!isInsideK8s)),
+		},
+		RunModule:      opts.Module,
+		RunJob:         opts.Job,
+		MinUpdateEvery: opts.UpdateEvery,
 	})
 
 	a.Infof("plugin: name=%s, %s", a.Name, buildinfo.Info())
@@ -89,7 +114,7 @@ func main() {
 	a.Infof("directories → config: %s | collectors: %s | sd: %s | varlib: %s",
 		a.ConfigDir, a.CollectorsConfDir, a.ServiceDiscoveryConfigDir, a.VarLibDir)
 
-	a.Run()
+	agenthost.Run(a)
 }
 
 func parseCLI() *cli.Option {
@@ -104,6 +129,19 @@ func parseCLI() *cli.Option {
 	return opt
 }
 
+func moduleRegistryWithSystemdPolicy(base collectorapi.Registry, systemdVersion int) collectorapi.Registry {
+	registry := make(collectorapi.Registry, len(base))
+	for name, creator := range base {
+		if name == "logind" && systemdVersion == 239 {
+			// Known issue: go.d/logind high CPU usage on Alma Linux8.
+			// Keep policy in cmd wiring, not inside generic agent package.
+			creator.Disabled = true
+		}
+		registry[name] = creator
+	}
+	return registry
+}
+
 func runFunctionCLI(opts *cli.Option) int {
 	functionName := strings.TrimSpace(opts.Function)
 	if functionName == "" {
@@ -111,23 +149,9 @@ func runFunctionCLI(opts *cli.Option) int {
 		return 1
 	}
 
-	moduleName, methodID, err := functions.SplitFunctionName(functionName)
+	moduleName, _, creator, err := resolveFunctionCLIRequest(functionName, collectorapi.DefaultRegistry)
 	if err != nil {
-		writeFunctionError(400, "%v", err)
-		return 1
-	}
-
-	creator, ok := module.DefaultRegistry.Lookup(moduleName)
-	if !ok {
-		writeFunctionError(404, "unknown module '%s'", moduleName)
-		return 1
-	}
-	if creator.Methods == nil {
-		writeFunctionError(404, "module '%s' does not expose functions", moduleName)
-		return 1
-	}
-	if methodID == "" {
-		writeFunctionError(400, "missing method name in function '%s'", functionName)
+		writeFunctionError(functionCLIResolutionStatus(err), "%v", err)
 		return 1
 	}
 
@@ -164,18 +188,19 @@ func runFunctionCLI(opts *cli.Option) int {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	jobMgr := jobmgr.New()
-	// Force-enable configs in function CLI runs (non-TTY by default).
-	jobMgr.PluginName = "nodyncfg"
-	jobMgr.Out = io.Discard
-	jobMgr.VarLibDir = pluginconfig.VarLibDir()
-	jobMgr.Modules = module.Registry{moduleName: creator}
-	jobMgr.ConfigDefaults = reg
-	jobMgr.FnReg = functions.NewManager()
-	jobMgr.FunctionJSONWriter = func(payload []byte, _ int) {
-		_, _ = os.Stdout.Write(payload)
-		_, _ = os.Stdout.Write([]byte("\n"))
-	}
+	jobMgr := jobmgr.New(jobmgr.Config{
+		PluginName:     executable.Name,
+		Out:            io.Discard,
+		RunModePolicy:  policy.FunctionCLI(),
+		VarLibDir:      pluginconfig.VarLibDir(),
+		Modules:        collectorapi.Registry{moduleName: creator},
+		ConfigDefaults: reg,
+		FnReg:          functions.NewManager(),
+		FunctionJSONWriter: func(payload []byte, _ int) {
+			_, _ = os.Stdout.Write(payload)
+			_, _ = os.Stdout.Write([]byte("\n"))
+		},
+	})
 	jobMgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(io.Discard)))
 
 	in := make(chan []*confgroup.Group, 1)
@@ -207,6 +232,78 @@ func runFunctionCLI(opts *cli.Option) int {
 	return 0
 }
 
+type functionCLIResolutionError struct {
+	status int
+	err    error
+}
+
+func (e functionCLIResolutionError) Error() string {
+	return e.err.Error()
+}
+
+func functionCLIResolutionStatus(err error) int {
+	if e, ok := err.(functionCLIResolutionError); ok {
+		return e.status
+	}
+	return 500
+}
+
+func resolveFunctionCLIRequest(functionName string, registry collectorapi.Registry) (string, string, collectorapi.Creator, error) {
+	splitModuleName, splitMethodID, err := functions.SplitFunctionName(functionName)
+	if err != nil {
+		return "", "", collectorapi.Creator{}, functionCLIResolutionError{status: 400, err: err}
+	}
+	if splitMethodID == "" {
+		return "", "", collectorapi.Creator{}, functionCLIResolutionError{
+			status: 400,
+			err:    fmt.Errorf("missing method name in function '%s'", functionName),
+		}
+	}
+
+	if moduleName, methodID, creator, ok := resolveFunctionCLIRequestByPublicName(functionName, registry); ok {
+		return moduleName, methodID, creator, nil
+	}
+
+	creator, ok := registry.Lookup(splitModuleName)
+	if !ok {
+		return "", "", collectorapi.Creator{}, functionCLIResolutionError{
+			status: 404,
+			err:    fmt.Errorf("unknown module '%s'", splitModuleName),
+		}
+	}
+	if creator.Methods == nil {
+		return "", "", collectorapi.Creator{}, functionCLIResolutionError{
+			status: 404,
+			err:    fmt.Errorf("module '%s' does not expose functions", splitModuleName),
+		}
+	}
+	return splitModuleName, splitMethodID, creator, nil
+}
+
+func resolveFunctionCLIRequestByPublicName(functionName string, registry collectorapi.Registry) (string, string, collectorapi.Creator, bool) {
+	moduleNames := make([]string, 0, len(registry))
+	for moduleName := range registry {
+		moduleNames = append(moduleNames, moduleName)
+	}
+	sort.Strings(moduleNames)
+
+	for _, moduleName := range moduleNames {
+		creator := registry[moduleName]
+		if creator.Methods == nil {
+			continue
+		}
+		for _, method := range creator.Methods() {
+			if method.ID == "" {
+				continue
+			}
+			if slices.Contains(funcapi.MethodFunctionNames(moduleName, method), functionName) {
+				return moduleName, method.ID, creator, true
+			}
+		}
+	}
+	return "", "", collectorapi.Creator{}, false
+}
+
 func readFunctionPayload(raw string) ([]byte, time.Duration, error) {
 	if raw == "" {
 		return nil, 0, nil
@@ -214,8 +311,8 @@ func readFunctionPayload(raw string) ([]byte, time.Duration, error) {
 
 	var data []byte
 	var err error
-	if strings.HasPrefix(raw, "@") {
-		data, err = os.ReadFile(strings.TrimPrefix(raw, "@"))
+	if after, ok := strings.CutPrefix(raw, "@"); ok {
+		data, err = os.ReadFile(after)
 	} else {
 		data = []byte(raw)
 	}

@@ -53,7 +53,7 @@ static inline bool logftm_parse_value(LOGFMT_STATE *lfs) {
 
     char quote = '\0';
     const char *s = logfmt_current_pos(lfs);
-    if(*s == '\"' || *s == '\'') {
+    if(*s == '"' || *s == '\'') {
         quote = *s;
         logfmt_consume_char(lfs);
     }
@@ -70,27 +70,31 @@ static inline bool logftm_parse_value(LOGFMT_STATE *lfs) {
         if (*s == '\\') {
             s++;
 
-            switch (*s) {
-                case 'n':
-                    copy_newline(lfs, &d, &remaining);
-                    s++;
-                    continue;
+            if(!*s)
+                c = '\\';
+            else {
+                switch (*s) {
+                    case 'n':
+                        copy_newline(lfs, &d, &remaining);
+                        s++;
+                        continue;
 
-                case 't':
-                    copy_tab(lfs, &d, &remaining);
-                    s++;
-                    continue;
+                    case 't':
+                        copy_tab(lfs, &d, &remaining);
+                        s++;
+                        continue;
 
-                case 'f':
-                case 'b':
-                case 'r':
-                    c = ' ';
-                    s++;
-                    break;
+                    case 'f':
+                    case 'b':
+                    case 'r':
+                        c = ' ';
+                        s++;
+                        break;
 
-                default:
-                    c = *s++;
-                    break;
+                    default:
+                        c = *s++;
+                        break;
+                }
             }
         }
         else
@@ -140,10 +144,16 @@ static inline bool logfmt_parse_key(LOGFMT_STATE *lfs) {
     while(*s && *s != '=') {
         char c;
 
-        if (*s == '\\')
+        if (*s == '\\') {
             s++;
 
-        c = journal_key_characters_map[(unsigned char)*s++];
+            if(!*s)
+                c = journal_key_characters_map[(unsigned char)'\\'];
+            else
+                c = journal_key_characters_map[(unsigned char)*s++];
+        }
+        else
+            c = journal_key_characters_map[(unsigned char)*s++];
 
         if(c == '_' && last_c == '_')
             continue;
@@ -217,10 +227,13 @@ bool logfmt_parse_document(LOGFMT_STATE *lfs, const char *txt) {
 
 
 void logfmt_test(void) {
-    LOG_JOB jb = { .prefix = "NIGNX_" };
+    LOG_JOB jb = { 0 };
+    log_job_init(&jb);
+    log_job_key_prefix_set(&jb, "NGINX_", 6);
     LOGFMT_STATE *logfmt = logfmt_parser_create(&jb);
 
     logfmt_parse_document(logfmt, "x=1 y=2 z=\"3 \\ 4\" 5  ");
 
     logfmt_parser_destroy(logfmt);
+    log_job_cleanup(&jb);
 }

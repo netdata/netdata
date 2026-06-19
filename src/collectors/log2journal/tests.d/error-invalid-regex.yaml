@@ -1,0 +1,18 @@
+pattern: "[Invalid(?P<name>regex"  # Missing closing bracket and parenthesis
+
+rewrite:
+  - key: TEST_KEY
+    match: "[a-z"  # Missing closing bracket
+    value: "replacement"
+    
+  - key: ANOTHER_KEY
+    match: "(?P<invalid group name>test)"  # Invalid group name with spaces
+    value: "test"
+    
+  - key: YET_ANOTHER
+    match: "(?P<>empty)"  # Empty group name
+    value: "test"
+
+filter:
+  include: "*invalid*glob["  # Invalid glob/regex pattern
+  exclude: "(?P<123>numbered)"  # Group name starting with number

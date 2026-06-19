@@ -60,7 +60,7 @@ When connected to a Netdata Parent (the agent is in `child` mode), these require
 | standalone | 3k - 10k | 4% - 20% of single core | 150 - 500 MiB | none | varies based on retention |
 | child      | 3k - 10k | 2% - 10% of single core | 100 - 300 MiB | \<1 Mbps | none |
 
-For more information and ways to further reduce Agent resource utilization, see [Agent Resource Utilization](hhttps://github.com/netdata/netdata/blob/master/docs/netdata-agent/sizing-netdata-agents/README.md).
+For more information and ways to further reduce Agent resource utilization, see [Agent Resource Utilization](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/sizing-netdata-agents/README.md).
 
 ### Parent Node Requirements (Centralization Points)
 
@@ -179,7 +179,7 @@ For logs, standard systemd-journal practices apply.
 
 For alert notifications, Netdata supports PagerDuty, Slack, Teams, email (SMTP), Discord, Telegram, Jira, ServiceNow, and custom webhooks.
 
-For AI and Large Language Models, Netdata supports Model Context Protocol (MCP) — available via Netdata Cloud for infrastructure-wide access (Business/Homelab plan) and on every Agent/Parent for direct local access (free, open-source). Netdata supports AI DevOps/SRE Copilots like Claude Code and Gemini CLI, and provides an AI Chat application (access to Google, OpenAI, Anthropic LLMs is required).
+For AI and Large Language Models, Netdata supports Model Context Protocol (MCP) — available via Netdata Cloud for infrastructure-wide access (Paid plan) and on every Agent/Parent for direct local access (free, open-source). Netdata supports AI DevOps/SRE Copilots like Claude Code and Gemini CLI, and provides an AI Chat application (access to Google, OpenAI, Anthropic LLMs is required).
 
 ## Compliance and Security
 

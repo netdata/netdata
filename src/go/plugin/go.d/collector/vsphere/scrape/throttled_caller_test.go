@@ -20,7 +20,7 @@ func Test_throttledCaller(t *testing.T) {
 	n := 10000
 	tc := newThrottledCaller(limit)
 
-	for i := 0; i < n; i++ {
+	for range n {
 		job := func() {
 			atomic.AddInt64(&total, 1)
 			atomic.AddInt64(&current, 1)

@@ -2,19 +2,19 @@
 
 package dnsdist
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
-var charts = module.Charts{
+var charts = collectorapi.Charts{
 	{
 		ID:    "queries",
 		Title: "Client queries received",
 		Units: "queries/s",
 		Fam:   "queries",
 		Ctx:   "dnsdist.queries",
-		Dims: module.Dims{
-			{ID: "queries", Name: "all", Algo: module.Incremental},
-			{ID: "rdqueries", Name: "recursive", Algo: module.Incremental},
-			{ID: "empty-queries", Name: "empty", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "queries", Name: "all", Algo: collectorapi.Incremental},
+			{ID: "rdqueries", Name: "recursive", Algo: collectorapi.Incremental},
+			{ID: "empty-queries", Name: "empty", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -23,11 +23,11 @@ var charts = module.Charts{
 		Units: "queries/s",
 		Fam:   "queries",
 		Ctx:   "dnsdist.queries_dropped",
-		Dims: module.Dims{
-			{ID: "rule-drop", Name: "rule drop", Algo: module.Incremental},
-			{ID: "dyn-blocked", Name: "dynamic blocked", Algo: module.Incremental},
-			{ID: "no-policy", Name: "no policy", Algo: module.Incremental},
-			{ID: "noncompliant-queries", Name: "non queries", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "rule-drop", Name: "rule drop", Algo: collectorapi.Incremental},
+			{ID: "dyn-blocked", Name: "dynamic blocked", Algo: collectorapi.Incremental},
+			{ID: "no-policy", Name: "no policy", Algo: collectorapi.Incremental},
+			{ID: "noncompliant-queries", Name: "non queries", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -36,8 +36,8 @@ var charts = module.Charts{
 		Units: "packets/s",
 		Fam:   "packets",
 		Ctx:   "dnsdist.packets_dropped",
-		Dims: module.Dims{
-			{ID: "acl-drops", Name: "acl", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "acl-drops", Name: "acl", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -46,11 +46,11 @@ var charts = module.Charts{
 		Units: "answers/s",
 		Fam:   "answers",
 		Ctx:   "dnsdist.answers",
-		Dims: module.Dims{
-			{ID: "self-answered", Name: "self answered", Algo: module.Incremental},
-			{ID: "rule-nxdomain", Name: "nxdomain", Algo: module.Incremental, Mul: -1},
-			{ID: "rule-refused", Name: "refused", Algo: module.Incremental, Mul: -1},
-			{ID: "trunc-failures", Name: "trunc failures", Algo: module.Incremental, Mul: -1},
+		Dims: collectorapi.Dims{
+			{ID: "self-answered", Name: "self answered", Algo: collectorapi.Incremental},
+			{ID: "rule-nxdomain", Name: "nxdomain", Algo: collectorapi.Incremental, Mul: -1},
+			{ID: "rule-refused", Name: "refused", Algo: collectorapi.Incremental, Mul: -1},
+			{ID: "trunc-failures", Name: "trunc failures", Algo: collectorapi.Incremental, Mul: -1},
 		},
 	},
 	{
@@ -59,8 +59,8 @@ var charts = module.Charts{
 		Units: "responses/s",
 		Fam:   "backends",
 		Ctx:   "dnsdist.backend_responses",
-		Dims: module.Dims{
-			{ID: "responses", Name: "responses", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "responses", Name: "responses", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -69,8 +69,8 @@ var charts = module.Charts{
 		Units: "errors/s",
 		Fam:   "backends",
 		Ctx:   "dnsdist.backend_commerrors",
-		Dims: module.Dims{
-			{ID: "downstream-send-errors", Name: "send errors", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "downstream-send-errors", Name: "send errors", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -79,10 +79,10 @@ var charts = module.Charts{
 		Units: "responses/s",
 		Fam:   "backends",
 		Ctx:   "dnsdist.backend_errors",
-		Dims: module.Dims{
-			{ID: "downstream-timeouts", Name: "timeouts", Algo: module.Incremental},
-			{ID: "servfail-responses", Name: "servfail", Algo: module.Incremental},
-			{ID: "noncompliant-responses", Name: "non compliant", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "downstream-timeouts", Name: "timeouts", Algo: collectorapi.Incremental},
+			{ID: "servfail-responses", Name: "servfail", Algo: collectorapi.Incremental},
+			{ID: "noncompliant-responses", Name: "non compliant", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -91,9 +91,9 @@ var charts = module.Charts{
 		Units: "answers/s",
 		Fam:   "cache",
 		Ctx:   "dnsdist.cache",
-		Dims: module.Dims{
-			{ID: "cache-hits", Name: "hits", Algo: module.Incremental},
-			{ID: "cache-misses", Name: "misses", Algo: module.Incremental, Mul: -1},
+		Dims: collectorapi.Dims{
+			{ID: "cache-hits", Name: "hits", Algo: collectorapi.Incremental},
+			{ID: "cache-misses", Name: "misses", Algo: collectorapi.Incremental, Mul: -1},
 		},
 	},
 	{
@@ -102,10 +102,10 @@ var charts = module.Charts{
 		Units: "ms/s",
 		Fam:   "server",
 		Ctx:   "dnsdist.servercpu",
-		Type:  module.Stacked,
-		Dims: module.Dims{
-			{ID: "cpu-sys-msec", Name: "system state", Algo: module.Incremental},
-			{ID: "cpu-user-msec", Name: "user state", Algo: module.Incremental},
+		Type:  collectorapi.Stacked,
+		Dims: collectorapi.Dims{
+			{ID: "cpu-sys-msec", Name: "system state", Algo: collectorapi.Incremental},
+			{ID: "cpu-user-msec", Name: "user state", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -114,8 +114,8 @@ var charts = module.Charts{
 		Units: "MiB",
 		Fam:   "server",
 		Ctx:   "dnsdist.servermem",
-		Type:  module.Area,
-		Dims: module.Dims{
+		Type:  collectorapi.Area,
+		Dims: collectorapi.Dims{
 			{ID: "real-memory-usage", Name: "memory usage", Div: 1 << 20},
 		},
 	},
@@ -125,14 +125,14 @@ var charts = module.Charts{
 		Units: "queries/s",
 		Fam:   "latency",
 		Ctx:   "dnsdist.query_latency",
-		Type:  module.Stacked,
-		Dims: module.Dims{
-			{ID: "latency0-1", Name: "1ms", Algo: module.Incremental},
-			{ID: "latency1-10", Name: "10ms", Algo: module.Incremental},
-			{ID: "latency10-50", Name: "50ms", Algo: module.Incremental},
-			{ID: "latency50-100", Name: "100ms", Algo: module.Incremental},
-			{ID: "latency100-1000", Name: "1sec", Algo: module.Incremental},
-			{ID: "latency-slow", Name: "slow", Algo: module.Incremental},
+		Type:  collectorapi.Stacked,
+		Dims: collectorapi.Dims{
+			{ID: "latency0-1", Name: "1ms", Algo: collectorapi.Incremental},
+			{ID: "latency1-10", Name: "10ms", Algo: collectorapi.Incremental},
+			{ID: "latency10-50", Name: "50ms", Algo: collectorapi.Incremental},
+			{ID: "latency50-100", Name: "100ms", Algo: collectorapi.Incremental},
+			{ID: "latency100-1000", Name: "1sec", Algo: collectorapi.Incremental},
+			{ID: "latency-slow", Name: "slow", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -141,7 +141,7 @@ var charts = module.Charts{
 		Units: "microseconds",
 		Fam:   "latency",
 		Ctx:   "dnsdist.query_latency_avg",
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "latency-avg100", Name: "100"},
 			{ID: "latency-avg1000", Name: "1k"},
 			{ID: "latency-avg10000", Name: "10k"},

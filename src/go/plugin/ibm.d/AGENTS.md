@@ -1,5 +1,7 @@
 # IBM.d Plugin Developer Guide
 
+CRITICAL: Never write raw sensitive data to durable artifacts. This includes passwords, API keys, bearer tokens, SNMP communities, private keys, connection strings with embedded credentials, session cookies, community member names, customer names, customer identifiers, personal data, non-private IP addresses that can identify customers, private endpoints, account IDs, and proprietary incident details.
+
 This guide is for developers contributing to the IBM.d plugin. For end-user documentation, see [README.md](./README.md).
 
 ## Architecture Overview
@@ -130,7 +132,7 @@ The flag implicitly enables dump mode and exits once every job has produced at l
 ## Contributing Guidelines
 
 1. Review [`framework/README.md`](framework/README.md) for IBM.D framework details.
-2. Follow [General collector best practices](../BEST-PRACTICES.md).
+2. Follow the Go-area rules in [`../../AGENTS.md`](../../AGENTS.md).
 3. **Never edit auto-generated files** – see [Auto-Generated Files](#auto-generated-files) section.
 4. Always regenerate code after modifying `contexts.yaml`, `config.go`, or `module.yaml`.
 5. Run `gofmt` on generated Go files before committing.

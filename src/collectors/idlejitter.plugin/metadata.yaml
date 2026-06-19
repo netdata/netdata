@@ -17,7 +17,6 @@ modules:
       keywords:
         - latency
         - jitter
-      most_popular: false
     overview:
       data_collection:
         metrics_description: >

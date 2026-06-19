@@ -6,13 +6,13 @@ import (
 	"context"
 	"errors"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 var configSchema string
 
 // Collector stub for non-CGO builds.
-type Collector struct{ module.Base }
+type Collector struct{ collectorapi.Base }
 
 func New() *Collector { return &Collector{} }
 
@@ -26,16 +26,16 @@ func (c *Collector) Check(context.Context) error {
 	return errors.New("websphere_mp collector requires CGO support")
 }
 
-func (c *Collector) Charts() *module.Charts { return nil }
+func (c *Collector) Charts() *collectorapi.Charts { return nil }
 
 func (c *Collector) Collect(context.Context) map[string]int64 { return nil }
 
 func (c *Collector) Cleanup(context.Context) {}
 
 func init() {
-	module.Register("websphere_mp", module.Creator{
+	collectorapi.Register("websphere_mp", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Create:          func() module.Module { return New() },
+		Create:          func() collectorapi.CollectorV1 { return New() },
 		Config:          func() any { return nil },
 	})
 }

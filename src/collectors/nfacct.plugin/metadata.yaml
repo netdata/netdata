@@ -15,7 +15,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: 'Monitor Netfilter metrics for optimal packet filtering and manipulation. Keep tabs on packet counts, dropped packets, and error rates to secure network operations.'

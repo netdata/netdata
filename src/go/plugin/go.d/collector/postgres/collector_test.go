@@ -14,7 +14,8 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
@@ -97,7 +98,7 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -113,6 +114,23 @@ func TestCollector_Init(t *testing.T) {
 			wantFail: true,
 			config:   Config{DSN: ""},
 		},
+		"Fail on invalid Azure AD configuration": {
+			wantFail: true,
+			config: Config{
+				DSN: "postgresql://netdata@127.0.0.1:5432/postgres",
+				CloudAuth: cloudauth.Config{
+					Provider: cloudauth.ProviderAzureAD,
+					AzureAD: &cloudauth.AzureADAuthConfig{
+						Mode: "service_principal",
+						ModeServicePrincipal: &cloudauth.AzureADModeServicePrincipalConfig{
+							TenantID: "tenant-id",
+							ClientID: "client-id",
+							// Missing client_secret.
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for name, test := range tests {
@@ -127,6 +145,24 @@ func TestCollector_Init(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCollector_Init_AzureADInitializesTokenProvider(t *testing.T) {
+	c := New()
+	c.CloudAuth = cloudauth.Config{
+		Provider: cloudauth.ProviderAzureAD,
+		AzureAD: &cloudauth.AzureADAuthConfig{
+			Mode: cloudauth.AzureADAuthModeServicePrincipal,
+			ModeServicePrincipal: &cloudauth.AzureADModeServicePrincipalConfig{
+				TenantID:     "tenant-id",
+				ClientID:     "client-id",
+				ClientSecret: "client-secret",
+			},
+		},
+	}
+
+	require.NoError(t, c.Init(context.Background()))
+	assert.NotNil(t, c.azureTokenProvider)
 }
 
 func TestCollector_Cleanup(t *testing.T) {
@@ -149,6 +185,7 @@ func TestCollector_Check(t *testing.T) {
 
 				mockExpect(t, m, queryServerVersion(), dataVer140004ServerVersionNum)
 				mockExpect(t, m, queryIsSuperUser(), dataVer140004IsSuperUserTrue)
+				mockExpect(t, m, queryCanExecutePgLsDir(), dataVer140004IsSuperUserTrue)
 				mockExpect(t, m, queryPGIsInRecovery(), dataVer140004PGIsInRecoveryTrue)
 
 				mockExpect(t, m, querySettingsMaxConnections(), dataVer140004SettingsMaxConnections)
@@ -189,6 +226,7 @@ func TestCollector_Check(t *testing.T) {
 			prepareMock: func(t *testing.T, collr *Collector, m sqlmock.Sqlmock) {
 				mockExpect(t, m, queryServerVersion(), dataVer140004ServerVersionNum)
 				mockExpect(t, m, queryIsSuperUser(), dataVer140004IsSuperUserTrue)
+				mockExpect(t, m, queryCanExecutePgLsDir(), dataVer140004IsSuperUserTrue)
 				mockExpect(t, m, queryPGIsInRecovery(), dataVer140004PGIsInRecoveryTrue)
 
 				mockExpect(t, m, querySettingsMaxConnections(), dataVer140004ServerVersionNum)
@@ -209,6 +247,7 @@ func TestCollector_Check(t *testing.T) {
 			prepareMock: func(t *testing.T, collr *Collector, m sqlmock.Sqlmock) {
 				mockExpect(t, m, queryServerVersion(), dataVer140004ServerVersionNum)
 				mockExpect(t, m, queryIsSuperUser(), dataVer140004IsSuperUserTrue)
+				mockExpect(t, m, queryCanExecutePgLsDir(), dataVer140004IsSuperUserTrue)
 				mockExpect(t, m, queryPGIsInRecovery(), dataVer140004PGIsInRecoveryTrue)
 
 				mockExpectErr(m, querySettingsMaxConnections())
@@ -253,6 +292,7 @@ func TestCollector_Collect(t *testing.T) {
 					collr.dbSr = matcher.TRUE()
 					mockExpect(t, m, queryServerVersion(), dataVer140004ServerVersionNum)
 					mockExpect(t, m, queryIsSuperUser(), dataVer140004IsSuperUserTrue)
+					mockExpect(t, m, queryCanExecutePgLsDir(), dataVer140004IsSuperUserTrue)
 					mockExpect(t, m, queryPGIsInRecovery(), dataVer140004PGIsInRecoveryTrue)
 
 					mockExpect(t, m, querySettingsMaxConnections(), dataVer140004SettingsMaxConnections)
@@ -621,6 +661,7 @@ func TestCollector_Collect(t *testing.T) {
 				prepareMock: func(t *testing.T, collr *Collector, m sqlmock.Sqlmock) {
 					mockExpect(t, m, queryServerVersion(), dataVer140004ServerVersionNum)
 					mockExpect(t, m, queryIsSuperUser(), dataVer140004IsSuperUserTrue)
+					mockExpect(t, m, queryCanExecutePgLsDir(), dataVer140004IsSuperUserTrue)
 					mockExpect(t, m, queryPGIsInRecovery(), dataVer140004PGIsInRecoveryTrue)
 
 					mockExpectErr(m, querySettingsMaxConnections())
@@ -637,6 +678,7 @@ func TestCollector_Collect(t *testing.T) {
 				prepareMock: func(t *testing.T, collr *Collector, m sqlmock.Sqlmock) {
 					mockExpect(t, m, queryServerVersion(), dataVer140004ServerVersionNum)
 					mockExpect(t, m, queryIsSuperUser(), dataVer140004IsSuperUserTrue)
+					mockExpect(t, m, queryCanExecutePgLsDir(), dataVer140004IsSuperUserTrue)
 					mockExpect(t, m, queryPGIsInRecovery(), dataVer140004PGIsInRecoveryTrue)
 
 					mockExpect(t, m, querySettingsMaxConnections(), dataVer140004SettingsMaxConnections)
@@ -672,6 +714,57 @@ func TestCollector_Collect(t *testing.T) {
 					step.check(t, collr)
 				})
 			}
+			assert.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestCollector_doQueryReplicationMetrics_replSlotFilesGate(t *testing.T) {
+	boolPtr := func(v bool) *bool { return &v }
+
+	tests := map[string]struct {
+		superUser           *bool
+		canExecutePgLsDir   *bool
+		expectSlotFilesCall bool
+	}{
+		"superuser collects slot files even without pg_ls_dir privilege": {
+			superUser:           boolPtr(true),
+			canExecutePgLsDir:   boolPtr(false),
+			expectSlotFilesCall: true,
+		},
+		"non-superuser with pg_ls_dir privilege collects slot files": {
+			superUser:           boolPtr(false),
+			canExecutePgLsDir:   boolPtr(true),
+			expectSlotFilesCall: true,
+		},
+		"non-superuser without pg_ls_dir privilege skips slot files": {
+			superUser:           boolPtr(false),
+			canExecutePgLsDir:   boolPtr(false),
+			expectSlotFilesCall: false,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			require.NoError(t, err)
+			defer func() { _ = db.Close() }()
+
+			collr := New()
+			collr.db = db
+			require.NoError(t, collr.Init(context.Background()))
+
+			collr.pgVersion = 140004
+			collr.superUser = test.superUser
+			collr.canExecutePgLsDir = test.canExecutePgLsDir
+
+			mockExpect(t, mock, queryReplicationStandbyAppDelta(collr.pgVersion), dataVer140004ReplStandbyAppDelta)
+			mockExpect(t, mock, queryReplicationStandbyAppLag(), dataVer140004ReplStandbyAppLag)
+			if test.expectSlotFilesCall {
+				mockExpect(t, mock, queryReplicationSlotFiles(collr.pgVersion), dataVer140004ReplSlotFiles)
+			}
+
+			assert.NoError(t, collr.doQueryReplicationMetrics())
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
 	}

@@ -98,6 +98,7 @@ struct replication_query {
     STORAGE_ENGINE_BACKEND backend;
     struct replication_request *rq;
 
+    size_t alloc_size;              // bytes accounted in replication_buffers_allocated for this query
     size_t dimensions;
     struct replication_dimension data[];
 };
@@ -118,9 +119,11 @@ static struct replication_query *replication_query_prepare(
         bool synchronous
 ) {
     size_t dimensions = rrdset_number_of_dimensions(st);
-    struct replication_query *q = callocz(1, sizeof(struct replication_query) + dimensions * sizeof(struct replication_dimension));
-    __atomic_add_fetch(&replication_buffers_allocated, sizeof(struct replication_query) + dimensions * sizeof(struct replication_dimension), __ATOMIC_RELAXED);
+    size_t alloc_size = sizeof(struct replication_query) + dimensions * sizeof(struct replication_dimension);
+    struct replication_query *q = callocz(1, alloc_size);
+    __atomic_add_fetch(&replication_buffers_allocated, alloc_size, __ATOMIC_RELAXED);
 
+    q->alloc_size = alloc_size;
     q->dimensions = dimensions;
     q->st = st;
 
@@ -236,7 +239,13 @@ static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st, STRE
         buffer_print_uint64_encoded(wb, integer_encoding, (usec_t) rd->collector.last_collected_time.tv_sec * USEC_PER_SEC +
                                                           (usec_t) rd->collector.last_collected_time.tv_usec);
         buffer_fast_strcat(wb, " ", 1);
-        buffer_print_int64_encoded(wb, integer_encoding, rd->collector.last_collected_value);
+
+        bool send_double_baseline = rrddim_is_float(rd) && (capabilities & STREAM_CAP_FLOAT_BASELINE);
+        if(send_double_baseline)
+            buffer_print_netdata_double_encoded(wb, integer_encoding, rrddim_last_collected_as_double(rd));
+        else
+            buffer_print_int64_encoded(wb, integer_encoding, rrddim_last_collected_raw_int(rd));
+
         buffer_fast_strcat(wb, " ", 1);
         buffer_print_netdata_double_encoded(wb, integer_encoding, rd->collector.last_calculated_value);
         buffer_fast_strcat(wb, " ", 1);
@@ -295,7 +304,7 @@ static void replication_query_finalize(BUFFER *wb, struct replication_query *q, 
         spinlock_unlock(&replication_queries.spinlock);
     }
 
-    __atomic_sub_fetch(&replication_buffers_allocated, sizeof(struct replication_query) + dimensions * sizeof(struct replication_dimension), __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&replication_buffers_allocated, q->alloc_size, __ATOMIC_RELAXED);
     freez(q);
 }
 
@@ -1568,6 +1577,7 @@ static void replication_pipeline_cancel_and_cleanup(void) {
 
     internal_error(true, "REPLICATION: cancelled %zu inflight queries", cancelled);
 
+    __atomic_sub_fetch(&replication_buffers_allocated, rtp.max_requests_ahead * sizeof(struct replication_request), __ATOMIC_RELAXED);
     freez(rtp.rqs);
     rtp.rqs = NULL;
     rtp.max_requests_ahead = 0;

@@ -103,7 +103,7 @@ int json_callback_print(JSON_ENTRY *e)
 
         case JSON_ARRAY:
             e->callback_function = json_callback_print;
-            sprintf(txt,"ARRAY[%lu]", (long unsigned int) e->data.items);
+            snprintfz(txt, sizeof(txt), "ARRAY[%lu]", (long unsigned int) e->data.items);
             buffer_strcat(wb, txt);
             break;
 
@@ -112,9 +112,7 @@ int json_callback_print(JSON_ENTRY *e)
             break;
 
         case JSON_NUMBER:
-            sprintf(txt, NETDATA_DOUBLE_FORMAT_AUTO, e->data.number);
-            buffer_strcat(wb,txt);
-
+            buffer_print_netdata_double(wb, e->data.number);
             break;
 
         case JSON_BOOLEAN:
@@ -443,8 +441,10 @@ size_t json_walk_object(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_
  */
 #ifdef ENABLE_JSONC
 size_t json_walk(json_object *t, void *callback_data, int (*callback_function)(struct json_entry *)) {
-    JSON_ENTRY e;
+    if (!t || json_object_get_type(t) != json_type_object)
+        return 0;
 
+    JSON_ENTRY e = { 0 };
     e.callback_data = callback_data;
     enum json_type type;
     json_object_object_foreach(t, key, val) {

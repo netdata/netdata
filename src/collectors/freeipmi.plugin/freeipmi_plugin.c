@@ -16,7 +16,6 @@
 
 // #define NETDATA_TIMING_REPORT 1
 #include "libnetdata/libnetdata.h"
-#include "libnetdata/required_dummies.h"
 
 #define FREEIPMI_GLOBAL_FUNCTION_SENSORS() do { \
         fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"ipmi-sensors\" %d \"%s\" \"top\" "HTTP_ACCESS_FORMAT" %d\n", \
@@ -1488,8 +1487,7 @@ static void freeimi_function_sensors(const char *transaction, char *function __m
     buffer_json_member_add_boolean(wb, "has_history", false);
     buffer_json_member_add_string(wb, "help", "View IPMI sensor readings and its state");
 
-    char function_copy[strlen(function) + 1];
-    memcpy(function_copy, function, sizeof(function_copy));
+    char *function_copy = strdupz(function);
     char *words[1024];
     size_t num_words = quoted_strings_splitter_whitespace(function_copy, words, 1024);
     for(size_t i = 1; i < num_words ;i++) {
@@ -1499,9 +1497,12 @@ static void freeimi_function_sensors(const char *transaction, char *function __m
             buffer_json_array_close(wb); // accepted_params
             buffer_json_member_add_array(wb, "required_params");
             buffer_json_array_close(wb); // required_params
+            freez(function_copy);
             goto close_and_send;
         }
     }
+
+    freez(function_copy);
 
     buffer_json_member_add_array(wb, "data");
 
@@ -2026,7 +2027,7 @@ int main (int argc, char **argv) {
 
         switch(state.sensors.status) {
             case ICS_RUNNING:
-                if(state.sensors.last_iteration_ut < now_monotonic_usec() - IPMI_RESTART_IF_SENSORS_DONT_ITERATE_EVERY_SECONDS * USEC_PER_SEC) {
+                if(now_monotonic_usec() > state.sensors.last_iteration_ut + IPMI_RESTART_IF_SENSORS_DONT_ITERATE_EVERY_SECONDS * USEC_PER_SEC) {
                     collector_error("%s(): sensors have not be collected for %zu seconds. Exiting to restart.",
                                     __FUNCTION__, (size_t)((now_monotonic_usec() - state.sensors.last_iteration_ut) / USEC_PER_SEC));
 

@@ -117,7 +117,7 @@
             "description": "The maximum number of OIDs allowed in a single GET request.",
             "type": "integer",
             "minimum": 1,
-            "default": 60
+            "default": 20
           }
         },
         "required": [
@@ -186,6 +186,12 @@
           "priv_key": {
             "title": "Privacy passphrase",
             "type": "string"
+          },
+          "context_name": {
+            "title": "Context name",
+            "description": "SNMPv3 context name used to address a specific MIB view on multi-context agents (e.g. virtual routers, logical partitions, snmpsim-simulated devices). Leave empty to use the default context.",
+            "type": "string",
+            "default": ""
           }
         }
       },
@@ -201,6 +207,12 @@
           "type": "string"
         },
         "uniqueItems": true
+      },
+      "ping_only": {
+        "title": "Ping only",
+        "description": "Collect only ICMP round-trip time and skip SNMP profile metrics. Implies ping is enabled regardless of the ping.enabled setting.",
+        "type": "boolean",
+        "default": false
       },
       "ping": {
         "title": "Ping",
@@ -310,7 +322,13 @@
       },
       "priv_key": {
         "ui:widget": "password"
+      },
+      "context_name": {
+        "ui:help": "Advanced. Usually left empty. Required when targeting a specific context on multi-context agents or when driving snmpsim virtual devices."
       }
+    },
+    "ping_only": {
+      "ui:help": "A minimal SNMP sysInfo query still runs at startup for device identification, profile matching, and metadata."
     },
     "ping": {
       "interface": {
@@ -335,6 +353,7 @@
         {
           "title": "Ping",
           "fields": [
+            "ping_only",
             "ping"
           ]
         },

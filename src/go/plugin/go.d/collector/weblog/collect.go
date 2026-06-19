@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/logs"
 )
 
@@ -376,7 +376,7 @@ func (c *Collector) addDimToVhostChart(vhost string) {
 	dim := &Dim{
 		ID:   "req_vhost_" + vhost,
 		Name: vhost,
-		Algo: module.Incremental,
+		Algo: collectorapi.Incremental,
 	}
 	if err := chart.AddDim(dim); err != nil {
 		c.Warning(err)
@@ -394,7 +394,7 @@ func (c *Collector) addDimToPortChart(port string) {
 	dim := &Dim{
 		ID:   "req_port_" + port,
 		Name: port,
-		Algo: module.Incremental,
+		Algo: collectorapi.Incremental,
 	}
 	if err := chart.AddDim(dim); err != nil {
 		c.Warning(err)
@@ -412,7 +412,7 @@ func (c *Collector) addDimToReqMethodChart(method string) {
 	dim := &Dim{
 		ID:   "req_method_" + method,
 		Name: method,
-		Algo: module.Incremental,
+		Algo: collectorapi.Incremental,
 	}
 	if err := chart.AddDim(dim); err != nil {
 		c.Warning(err)
@@ -430,7 +430,7 @@ func (c *Collector) addDimToReqVersionChart(version string) {
 	dim := &Dim{
 		ID:   "req_version_" + version,
 		Name: version,
-		Algo: module.Incremental,
+		Algo: collectorapi.Incremental,
 	}
 	if err := chart.AddDim(dim); err != nil {
 		c.Warning(err)
@@ -451,7 +451,7 @@ func (c *Collector) addDimToSSLProtoChart(proto string) {
 	dim := &Dim{
 		ID:   "req_ssl_proto_" + proto,
 		Name: proto,
-		Algo: module.Incremental,
+		Algo: collectorapi.Incremental,
 	}
 	if err := chart.AddDim(dim); err != nil {
 		c.Warning(err)
@@ -472,7 +472,7 @@ func (c *Collector) addDimToSSLCipherSuiteChart(cipher string) {
 	dim := &Dim{
 		ID:   "req_ssl_cipher_suite_" + cipher,
 		Name: cipher,
-		Algo: module.Incremental,
+		Algo: collectorapi.Incremental,
 	}
 	if err := chart.AddDim(dim); err != nil {
 		c.Warning(err)
@@ -490,7 +490,7 @@ func (c *Collector) addDimToRespCodesChart(code string) {
 	dim := &Dim{
 		ID:   "resp_code_" + code,
 		Name: code,
-		Algo: module.Incremental,
+		Algo: collectorapi.Incremental,
 	}
 	if err := chart.AddDim(dim); err != nil {
 		c.Warning(err)
@@ -509,7 +509,7 @@ func (c *Collector) addDimToURLPatternRespCodesChart(name, code string) {
 	dim := &Dim{
 		ID:   fmt.Sprintf("url_ptn_%s_resp_code_%s", name, code),
 		Name: code,
-		Algo: module.Incremental,
+		Algo: collectorapi.Incremental,
 	}
 
 	if err := chart.AddDim(dim); err != nil {
@@ -529,7 +529,7 @@ func (c *Collector) addDimToURLPatternReqMethodsChart(name, method string) {
 	dim := &Dim{
 		ID:   fmt.Sprintf("url_ptn_%s_req_method_%s", name, method),
 		Name: method,
-		Algo: module.Incremental,
+		Algo: collectorapi.Incremental,
 	}
 
 	if err := chart.AddDim(dim); err != nil {

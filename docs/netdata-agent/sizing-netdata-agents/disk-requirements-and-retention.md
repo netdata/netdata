@@ -33,6 +33,35 @@ gantt
 | `tier1` | 60 iterations of `tier0`, so when metrics are collected per-second, this tier is per-minute. |         16 bytes         |     6 bytes     |
 | `tier2` |  60 iterations of `tier1`, so when metrics are collected per second, this tier is per-hour.  |         16 bytes         |    18 bytes     |
 
+### Default Disk Footprint
+
+Netdata Agent metrics storage is limited to 3 GiB by default (configurable), using 1 GiB per tier × 3 tiers. In total, with SQLite databases, alert transitions, and other metadata, expect about 4 GiB of disk usage under normal conditions. The default retention limits are:
+
+|  Tier   | Resolution | Size Limit | Time Limit |
+|:-------:|:----------:|:----------:|:----------:|
+| `tier0` | per-second |   1 GiB    |  14 days   |
+| `tier1` | per-minute |   1 GiB    |  3 months  |
+| `tier2` |  per-hour  |   1 GiB    |  2 years   |
+
+Data is deleted when retention enforcement detects that **either** the size limit or the time limit has been reached, whichever comes first. Actual disk usage may temporarily exceed the configured size limit because retention size is a soft target, not a hard cap. For the detailed enforcement behavior, see [Retention Size Enforcement](/src/database/README.md#retention-size-enforcement).
+
+In practice, with default settings and an ingestion rate of about 4,000 metrics per second, Netdata provides about 14 days of high resolution (per-second) data, 3 months of medium resolution (per-minute) data, and more than 1 year of low resolution (per-hour) data.
+
+These limits are fully configurable. See [Changing how long Netdata stores metrics](/src/database/CONFIGURATION.md#tiers).
+
+### Parent Retention Sizing
+
+On Netdata Parents, retention size is enforced per tier for all metrics stored by that Parent, not per Child. All streaming Children share the Parent's tier quota, so there is no per-Child disk space limit.
+
+When sizing a Parent, account for the total metric count across all Children and leave room for dbengine datafiles plus journal/index overhead (`.ndf`, `.njf`, and `.njfv2` files). Parent nodes with many Children can have higher aggregate metric cardinality, which can increase journal/index overhead compared to a standalone Agent.
+
+For details about how dbengine enforces retention size limits, see [Retention Size Enforcement](/src/database/README.md#retention-size-enforcement).
+
+Child and Parent storage are independent:
+
+- **On the Child (local):** Controlled by the Child's `[db].mode`.
+- **On the Parent (received stream):** Controlled by the Parent's settings. Metrics streamed from Children can be persisted on the Parent and count against the Parent's per-tier retention limits.
+
 **Configuring dbengine mode and retention**:
 
 - Enable dbengine mode: The dbengine mode is already the default, so no configuration change is necessary. For reference, the dbengine mode can be configured by setting `[db].mode` to `dbengine` in `netdata.conf`.

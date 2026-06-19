@@ -5,6 +5,8 @@
 
 #include "ml_features.h"
 
+#include <ctime>
+
 typedef struct web_buffer BUFFER;
 
 struct ml_kmeans_inlined_t;
@@ -13,8 +15,8 @@ struct ml_kmeans_t {
     std::vector<DSample> cluster_centers;
     calculated_number_t min_dist;
     calculated_number_t max_dist;
-    uint32_t after;
-    uint32_t before;
+    time_t after;
+    time_t before;
 
     ml_kmeans_t() : min_dist(0), max_dist(0), after(0), before(0)
     {
@@ -28,24 +30,25 @@ struct ml_kmeans_inlined_t {
     std::array<DSample, 2> cluster_centers;
     calculated_number_t min_dist;
     calculated_number_t max_dist;
-    uint32_t after;
-    uint32_t before;
+    time_t after;
+    time_t before;
 
     ml_kmeans_inlined_t() : min_dist(0), max_dist(0), after(0), before(0)
     {
+        cluster_centers[0] = 0;
+        cluster_centers[1] = 0;
     }
 
-    explicit ml_kmeans_inlined_t(const ml_kmeans_t &km)
+    explicit ml_kmeans_inlined_t(const ml_kmeans_t &km) : min_dist(km.min_dist), max_dist(km.max_dist), after(km.after), before(km.before)
     {
         if (km.cluster_centers.size() == 2) {
             cluster_centers[0] = km.cluster_centers[0];
             cluster_centers[1] = km.cluster_centers[1];
         }
-
-        min_dist = km.min_dist;
-        max_dist = km.max_dist;
-        after = km.after;
-        before = km.before;
+        else {
+            cluster_centers[0] = 0;
+            cluster_centers[1] = 0;
+        }
     }
 
     ml_kmeans_inlined_t &operator=(const ml_kmeans_t &km)
@@ -53,6 +56,10 @@ struct ml_kmeans_inlined_t {
         if (km.cluster_centers.size() == 2) {
             cluster_centers[0] = km.cluster_centers[0];
             cluster_centers[1] = km.cluster_centers[1];
+        }
+        else {
+            cluster_centers[0] = 0;
+            cluster_centers[1] = 0;
         }
         min_dist = km.min_dist;
         max_dist = km.max_dist;
@@ -92,7 +99,7 @@ inline ml_kmeans_t &ml_kmeans_t::operator=(const ml_kmeans_inlined_t &inlined_km
 
 void ml_kmeans_init(ml_kmeans_t *kmeans);
 
-void ml_kmeans_train(ml_kmeans_t *kmeans, const ml_features_t *features, unsigned max_iters, time_t after, time_t before);
+void ml_kmeans_train(ml_kmeans_t *kmeans, const std::vector<DSample> &preprocessed_features, unsigned max_iters, time_t after, time_t before);
 
 calculated_number_t ml_kmeans_anomaly_score(const ml_kmeans_inlined_t *kmeans, const DSample &DS);
 

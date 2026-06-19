@@ -19,7 +19,6 @@ modules:
           list: [ ]
       info_provided_to_referring_integrations:
         description: ""
-      most_popular: true
     overview: &overview
       data_collection:
         metrics_description: |
@@ -74,6 +73,17 @@ modules:
               default_value: 10
               required: false
               group: Target
+            - name: expected_prefix
+              description: If set, the job's check passes only when at least one scraped metric name starts with this prefix. Guards against scraping an unexpected endpoint.
+              default_value: ""
+              required: false
+              group: Target
+
+            - name: app
+              description: Application name used as the app segment of chart contexts (`prometheus.<app>.<metric>`). When unset, it is taken from a matched profile, otherwise it falls back to the job name.
+              default_value: ""
+              required: false
+              group: Customization
 
             - name: selector
               description: Time series selector (filter).
@@ -130,11 +140,60 @@ modules:
                     - metric_name_pattern4
                 ```
 
-            - name: label_prefix
-              description: "Optional prefix added to all labels of all charts. Labels will be formatted as `prefix_name`."
+            - name: relabeling
+              description: Prometheus-compatible metric relabeling, applied before charts are built.
               default_value: ""
               required: false
               group: Customization
+              detailed_description: |
+                A list of relabeling blocks. Each block applies a list of Prometheus
+                `metric_relabel_configs` rules to the metrics whose name matches `match`. See the
+                [relabeling reference](/src/go/plugin/go.d/collector/prometheus/relabel/README.md)
+                for the full action set and more examples.
+
+                - `match`: Netdata simple patterns matched against the full metric name — including
+                  any `_bucket`/`_sum`/`_count` suffix, so prefer globs like `app_lat*` over an exact
+                  `app_lat` (space-separated; `*` matches any sequence, `?` any character, a leading
+                  `!` negates). Use `*` to target every metric. Required.
+                - `metric_relabel_configs`: Prometheus relabel rules (`source_labels`, `separator`,
+                  `regex`, `modulus`, `target_label`, `replacement`, `action`), applied in order to
+                  the scraped samples before charts are built.
+
+                Relabeling that would corrupt a histogram or summary — splitting it, dropping a
+                component, mutating the `le`/`quantile` label, or merging two families — is rejected.
+
+                ```yaml
+                relabeling:
+                  - match: 'http_*'
+                    metric_relabel_configs:
+                      - source_labels: [code]
+                        regex: '(\d)\d\d'
+                        target_label: code_class
+                        replacement: '${1}xx'
+                ```
+
+            - name: profiles
+              description: Curated, exporter-specific chart profiles. Disable with mode `none`.
+              default_value: auto
+              required: false
+              group: Customization
+              detailed_description: |
+                Profiles ship curated charts for recognized exporters. `profiles.mode` selects them:
+
+                - `auto` (default): every profile whose `match` hits at least one scraped metric.
+                - `exact`: only the profiles named in `mode_exact.entries` (each must match, or the job fails its check).
+                - `combined`: `auto` plus the profiles named in `mode_combined.entries`.
+                - `none`: no profiles — generic autogen charts only (the pre-profile behavior).
+
+                Only the block matching the selected mode (`mode_exact` or `mode_combined`) is read; entries under the other block are ignored. Metrics not covered by a selected profile keep their generic autogen charts.
+
+                ```yaml
+                profiles:
+                  mode: exact
+                  mode_exact:
+                    entries:
+                      - name: haproxy
+                ```
 
             - name: username
               description: Username for Basic HTTP authentication.
@@ -274,12 +333,46 @@ modules:
                 jobs:
                   - name: local
                     url: http://127.0.0.1:9090/metrics
-                
+
                   - name: remote
                     url: http://192.0.2.1:9090/metrics
+            - name: Metric relabeling
+              description: Derive a `code_class` label (2xx, 4xx, ...) on metrics named `http_*`.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:9090/metrics
+                    relabeling:
+                      - match: 'http_*'
+                        metric_relabel_configs:
+                          - source_labels: [code]
+                            regex: '(\d)\d\d'
+                            target_label: code_class
+                            replacement: '${1}xx'
+            - name: Rename labels that collide with Netdata's reserved labels
+              description: |
+                When these metrics are re-exported in Prometheus format, Netdata adds its own `instance`,
+                `family`, `chart`, and `dimension` labels. If the scraped endpoint already uses one of those
+                names, the re-export emits a duplicate label and a downstream Prometheus rejects the scrape.
+                Rename the colliding labels to avoid it (the use case the former `label_prefix` option served).
+              config: |
+                jobs:
+                  - name: coredns
+                    url: http://127.0.0.1:9153/metrics
+                    relabeling:
+                      - match: '*'
+                        metric_relabel_configs:
+                          - regex: '(instance|family)'
+                            action: labelmap
+                            replacement: 'coredns_$1'
+                          - regex: '(instance|family)'
+                            action: labeldrop
     troubleshooting:
       problems:
-        list: [ ]
+        list:
+          - name: "Disappearing or sparse metrics not clearing alerts"
+            description: |
+              When a metric disappears from the Prometheus endpoint response (for example, a gauge that is only exposed when its value is greater than 0), Netdata does not require any special value to stop tracking it. The Prometheus collector automatically detects metrics that are no longer present in the scrape response. After 10 consecutive collection cycles where the metric is absent, the associated chart is automatically removed and any alerts on that chart will clear. You do not need to send a special value (such as 0, NaN, or StaleNaN) — simply omitting the metric from the response is sufficient. Note that during the 10-cycle grace period, the last known value remains and alerts may not clear immediately.
     alerts: [ ]
     metrics:
       folding:
@@ -311,7 +404,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-aws_ec2
-      most_popular: false
       community: true
       monitored_instance:
         name: AWS EC2 Compute instances
@@ -341,7 +433,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-blackbox
-      most_popular: false
       community: true
       monitored_instance:
         name: Blackbox
@@ -369,7 +460,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-cilium_agent
-      most_popular: false
       community: true
       monitored_instance:
         name: Cilium Agent
@@ -396,7 +486,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-cilium_operator
-      most_popular: false
       community: true
       monitored_instance:
         name: Cilium Operator
@@ -423,7 +512,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-cilium_proxy
-      most_popular: false
       community: true
       monitored_instance:
         name: Cilium Proxy
@@ -450,7 +538,6 @@ modules:
     meta:
       id: collector-go.d.plugin-prometheus-aws_cloudwatch
       <<: *meta
-      most_popular: false
       community: true
       monitored_instance:
         name: CloudWatch
@@ -480,7 +567,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-concourse
-      most_popular: false
       community: true
       monitored_instance:
         name: Concourse
@@ -507,7 +593,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-scylladb
-      most_popular: false
       community: true
       monitored_instance:
         name: ScyllaDB
@@ -527,7 +612,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-crowdsec
-      most_popular: false
       community: true
       monitored_instance:
         name: Crowdsec
@@ -554,7 +638,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-discourse
-      most_popular: false
       community: true
       monitored_instance:
         name: Discourse
@@ -581,7 +664,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-dynatrace
-      most_popular: false
       community: true
       monitored_instance:
         name: Dynatrace
@@ -608,7 +690,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-eos_web
-      most_popular: false
       community: true
       monitored_instance:
         name: EOS
@@ -635,7 +716,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-etcd
-      most_popular: false
       community: true
       monitored_instance:
         name: etcd
@@ -655,7 +735,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-freebsd_nfs
-      most_popular: false
       community: true
       monitored_instance:
         name: FreeBSD NFS
@@ -682,7 +761,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-freebsd_rctl
-      most_popular: false
       community: true
       monitored_instance:
         name: FreeBSD RCTL-RACCT
@@ -709,7 +787,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-gcp_gce
-      most_popular: false
       community: true
       monitored_instance:
         name: GCP GCE
@@ -736,7 +813,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-github_repo
-      most_popular: false
       community: true
       monitored_instance:
         name: GitHub repository
@@ -763,7 +839,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-gitlab_runner
-      most_popular: false
       community: true
       monitored_instance:
         name: GitLab Runner
@@ -790,7 +865,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-gobetween
-      most_popular: false
       community: true
       monitored_instance:
         name: Gobetween
@@ -810,7 +884,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-gcp
-      most_popular: false
       community: true
       monitored_instance:
         name: Google Cloud Platform
@@ -840,7 +913,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-gcp_stackdriver
-      most_popular: false
       community: true
       monitored_instance:
         name: Google Stackdriver
@@ -870,7 +942,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-grafana
-      most_popular: false
       community: true
       monitored_instance:
         name: Grafana
@@ -890,7 +961,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-graylog
-      most_popular: false
       community: true
       monitored_instance:
         name: Graylog Server
@@ -918,7 +988,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-hana
-      most_popular: false
       community: true
       monitored_instance:
         name: HANA
@@ -945,7 +1014,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-honeypot
-      most_popular: false
       community: true
       monitored_instance:
         name: Honeypot
@@ -972,7 +1040,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-hubble
-      most_popular: false
       community: true
       monitored_instance:
         name: Hubble
@@ -999,7 +1066,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-ibm_spectrum
-      most_popular: false
       community: true
       monitored_instance:
         name: IBM Spectrum
@@ -1026,7 +1092,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-influxdb
-      most_popular: false
       community: true
       monitored_instance:
         name: InfluxDB
@@ -1056,7 +1121,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-jenkins
-      most_popular: false
       community: true
       monitored_instance:
         name: Jenkins
@@ -1083,7 +1147,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-jmx
-      most_popular: false
       community: true
       monitored_instance:
         name: JMX
@@ -1110,7 +1173,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-kafka_consumer_lag
-      most_popular: false
       community: true
       monitored_instance:
         name: Kafka Consumer Lag
@@ -1140,7 +1202,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-kafka
-      most_popular: false
       community: true
       monitored_instance:
         name: Kafka
@@ -1170,7 +1231,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-kafka_zookeeper
-      most_popular: false
       community: true
       monitored_instance:
         name: Kafka ZooKeeper
@@ -1200,7 +1260,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-linode
-      most_popular: false
       community: true
       monitored_instance:
         name: Linode
@@ -1227,7 +1286,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-loki
-      most_popular: false
       community: true
       monitored_instance:
         name: loki
@@ -1254,7 +1312,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-minecraft
-      most_popular: false
       community: true
       monitored_instance:
         name: Minecraft
@@ -1281,7 +1338,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-mosquitto
-      most_popular: false
       community: true
       monitored_instance:
         name: mosquitto
@@ -1308,7 +1364,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-ibm_mq
-      most_popular: false
       community: true
       monitored_instance:
         name: IBM MQ
@@ -1335,7 +1390,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-mqtt_blackbox
-      most_popular: false
       community: true
       monitored_instance:
         name: MQTT Blackbox
@@ -1362,7 +1416,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-netapp_ontap
-      most_popular: false
       community: true
       monitored_instance:
         name: Netapp ONTAP API
@@ -1392,7 +1445,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-netapp_solidfire
-      most_popular: false
       community: true
       monitored_instance:
         name: NetApp Solidfire
@@ -1422,7 +1474,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-openvswitch
-      most_popular: false
       community: true
       monitored_instance:
         name: Open vSwitch
@@ -1449,7 +1500,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-google_pagespeed
-      most_popular: false
       community: true
       monitored_instance:
         name: Google Pagespeed
@@ -1479,7 +1529,6 @@ modules:
     meta:
       id: collector-go.d.plugin-prometheus-philips_hue
       <<: *meta
-      most_popular: false
       community: true
       monitored_instance:
         name: Philips Hue
@@ -1506,7 +1555,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-podman
-      most_popular: false
       community: true
       monitored_instance:
         name: Podman
@@ -1533,7 +1581,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-proxmox
-      most_popular: false
       community: true
       monitored_instance:
         name: Proxmox VE
@@ -1560,7 +1607,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-radius
-      most_popular: false
       community: true
       monitored_instance:
         name: RADIUS
@@ -1587,7 +1633,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-aws_rds
-      most_popular: false
       community: true
       monitored_instance:
         name: AWS RDS
@@ -1617,7 +1662,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-ripe_atlas
-      most_popular: false
       community: true
       monitored_instance:
         name: RIPE Atlas
@@ -1644,7 +1688,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-slurm
-      most_popular: false
       community: true
       monitored_instance:
         name: Slurm
@@ -1671,7 +1714,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-spacelift
-      most_popular: false
       community: true
       monitored_instance:
         name: Spacelift
@@ -1698,7 +1740,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-starlink
-      most_popular: false
       community: true
       monitored_instance:
         name: Starlink (SpaceX)
@@ -1725,7 +1766,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-statuspage
-      most_popular: false
       community: true
       monitored_instance:
         name: StatusPage
@@ -1752,7 +1792,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-tacas
-      most_popular: false
       community: true
       monitored_instance:
         name: TACACS
@@ -1779,7 +1818,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-tesla_vehicle
-      most_popular: false
       community: true
       monitored_instance:
         name: Tesla vehicle
@@ -1806,7 +1844,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-twitch
-      most_popular: false
       community: true
       monitored_instance:
         name: Twitch
@@ -1833,7 +1870,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-ubiquity_ufiber
-      most_popular: false
       community: true
       monitored_instance:
         name: Ubiquiti UFiber OLT
@@ -1860,7 +1896,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-uptimerobot
-      most_popular: false
       community: true
       monitored_instance:
         name: Uptimerobot
@@ -1887,7 +1922,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-vault_pki
-      most_popular: false
       community: true
       monitored_instance:
         name: Vault PKI
@@ -1914,7 +1948,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-vertica
-      most_popular: false
       community: true
       monitored_instance:
         name: Vertica
@@ -1941,7 +1974,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-vscode
-      most_popular: false
       community: true
       monitored_instance:
         name: VSCode
@@ -1968,7 +2000,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-4d_server
-      most_popular: false
       community: true
       monitored_instance:
         name: 4D Server
@@ -1995,7 +2026,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-8430ft-modem
-      most_popular: false
       community: true
       monitored_instance:
         name: 8430FT modem
@@ -2022,7 +2052,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-steam_a2s
-      most_popular: false
       community: true
       monitored_instance:
         name: Steam
@@ -2049,7 +2078,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-alamos_fe2
-      most_popular: false
       community: true
       monitored_instance:
         name: Alamos FE2 server
@@ -2076,7 +2104,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-amd_smi
-      most_popular: false
       community: true
       monitored_instance:
         name: AMD CPU & GPU
@@ -2103,7 +2130,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-apicast
-      most_popular: false
       community: true
       monitored_instance:
         name: APIcast
@@ -2130,7 +2156,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-authlog
-      most_popular: false
       community: true
       monitored_instance:
         name: AuthLog
@@ -2157,7 +2182,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-aws_quota
-      most_popular: false
       community: true
       monitored_instance:
         name: AWS Quota
@@ -2187,7 +2211,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-bosh
-      most_popular: false
       community: true
       monitored_instance:
         name: BOSH
@@ -2214,7 +2237,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-bungeecord
-      most_popular: false
       community: true
       monitored_instance:
         name: BungeeCord
@@ -2241,7 +2263,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-celery
-      most_popular: false
       community: true
       monitored_instance:
         name: Celery
@@ -2268,7 +2289,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-chia
-      most_popular: false
       community: true
       monitored_instance:
         name: Chia
@@ -2295,7 +2315,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-clm5ip
-      most_popular: false
       community: true
       monitored_instance:
         name: Christ Elektronik CLM5IP power panel
@@ -2322,7 +2341,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-clamd
-      most_popular: false
       community: true
       monitored_instance:
         name: ClamAV daemon
@@ -2349,7 +2367,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-clamscan
-      most_popular: false
       community: true
       monitored_instance:
         name: Clamscan results
@@ -2376,7 +2393,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-clash
-      most_popular: false
       community: true
       monitored_instance:
         name: Clash
@@ -2403,7 +2419,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-cloud_foundry
-      most_popular: false
       community: true
       monitored_instance:
         name: Cloud Foundry
@@ -2433,7 +2448,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-cloud_foundry_firebase
-      most_popular: false
       community: true
       monitored_instance:
         name: Cloud Foundry Firehose
@@ -2463,7 +2477,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-lustre
-      most_popular: false
       community: true
       monitored_instance:
         name: Lustre metadata
@@ -2490,7 +2503,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-cmon
-      most_popular: false
       community: true
       monitored_instance:
         name: ClusterControl CMON
@@ -2517,7 +2529,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-collectd
-      most_popular: false
       community: true
       monitored_instance:
         name: Collectd
@@ -2544,7 +2555,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-ftbeerpi
-      most_popular: false
       community: true
       monitored_instance:
         name: CraftBeerPi
@@ -2571,7 +2581,6 @@ modules:
     meta:
       id: collector-go.d.plugin-prometheus-cryptowatch
       <<: *meta
-      most_popular: false
       community: true
       monitored_instance:
         name: Cryptowatch
@@ -2598,7 +2607,6 @@ modules:
     meta:
       id: collector-go.d.plugin-prometheus-dmarc
       <<: *meta
-      most_popular: false
       community: true
       monitored_instance:
         name: DMARC
@@ -2628,7 +2636,6 @@ modules:
     meta:
       id: collector-go.d.plugin-prometheus-dnsbl
       <<: *meta
-      most_popular: false
       community: true
       monitored_instance:
         name: DNSBL
@@ -2657,7 +2664,6 @@ modules:
     meta:
       id: collector-go.d.plugin-prometheus-bird
       <<: *meta
-      most_popular: false
       community: true
       monitored_instance:
         name: Bird Routing Daemon
@@ -2684,7 +2690,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-elgato_keylight
-      most_popular: false
       community: true
       monitored_instance:
         name: Elgato Key Light devices.
@@ -2711,7 +2716,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-energomera
-      most_popular: false
       community: true
       monitored_instance:
         name: Energomera smart power meters
@@ -2738,7 +2742,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-fastd
-      most_popular: false
       community: true
       monitored_instance:
         name: Fastd
@@ -2765,7 +2768,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-freifunk
-      most_popular: false
       community: true
       monitored_instance:
         name: Freifunk network
@@ -2792,7 +2794,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-frrouting
-      most_popular: false
       community: true
       monitored_instance:
         name: FRRouting
@@ -2819,7 +2820,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-github_ratelimit
-      most_popular: false
       community: true
       monitored_instance:
         name: GitHub API rate limit
@@ -2847,7 +2847,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-gpsd
-      most_popular: false
       community: true
       monitored_instance:
         name: gpsd
@@ -2874,7 +2873,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-halon
-      most_popular: false
       community: true
       monitored_instance:
         name: Halon
@@ -2901,7 +2899,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-hitron_coda
-      most_popular: false
       community: true
       monitored_instance:
         name: Hitron CODA Cable Modem
@@ -2928,7 +2925,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-homebridge
-      most_popular: false
       community: true
       monitored_instance:
         name: Homebridge
@@ -2955,7 +2951,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-homey
-      most_popular: false
       community: true
       monitored_instance:
         name: Homey
@@ -2982,7 +2977,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-ibm_cex
-      most_popular: false
       community: true
       monitored_instance:
         name: IBM CryptoExpress (CEX) cards
@@ -3009,7 +3003,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-ibm_zhmc
-      most_popular: false
       community: true
       monitored_instance:
         name: IBM Z Hardware Management Console
@@ -3036,7 +3029,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-jarvis
-      most_popular: false
       community: true
       monitored_instance:
         name: Jarvis Standing Desk
@@ -3064,7 +3056,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-enclosure
-      most_popular: false
       community: true
       monitored_instance:
         name: Generic storage enclosure tool
@@ -3091,7 +3082,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-journald
-      most_popular: false
       community: true
       monitored_instance:
         name: journald
@@ -3118,7 +3108,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-kannel
-      most_popular: false
       community: true
       monitored_instance:
         name: Kannel
@@ -3145,7 +3134,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-keepalived
-      most_popular: false
       community: true
       monitored_instance:
         name: Keepalived
@@ -3172,7 +3160,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-lynis
-      most_popular: false
       community: true
       monitored_instance:
         name: Lynis audit reports
@@ -3199,7 +3186,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-meilisearch
-      most_popular: false
       community: true
       monitored_instance:
         name: Meilisearch
@@ -3226,7 +3212,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-mesos
-      most_popular: false
       community: true
       monitored_instance:
         name: Mesos
@@ -3253,7 +3238,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-xiaomi_mi_flora
-      most_popular: false
       community: true
       monitored_instance:
         name: Xiaomi Mi Flora
@@ -3280,7 +3264,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-modbus_rtu
-      most_popular: false
       community: true
       monitored_instance:
         name: Modbus protocol
@@ -3310,7 +3293,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-mogilefs
-      most_popular: false
       community: true
       monitored_instance:
         name: MogileFS
@@ -3337,7 +3319,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-mtail
-      most_popular: false
       community: true
       monitored_instance:
         name: mtail
@@ -3363,36 +3344,7 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-nagios
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Nagios
-        link: https://github.com/wbollock/nagios_exporter
-        icon_filename: nagios.png
-        categories:
-          - data-collection.applications
-      keywords: [ ]
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Keep tabs on Nagios network monitoring metrics for efficient
-          IT infrastructure management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Nagios exporter](https://github.com/wbollock/nagios_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Nagios exporter](https://github.com/wbollock/nagios_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-nature_remo
-      most_popular: false
       community: true
       monitored_instance:
         name: Nature Remo E lite devices
@@ -3419,7 +3371,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-netatmo
-      most_popular: false
       community: true
       monitored_instance:
         name: Netatmo sensors
@@ -3449,7 +3400,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-nextcloud
-      most_popular: false
       community: true
       monitored_instance:
         name: Nextcloud servers
@@ -3479,7 +3429,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-nextdns
-      most_popular: false
       community: true
       monitored_instance:
         name: NextDNS
@@ -3506,7 +3455,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-ibm_aix_njmon
-      most_popular: false
       community: true
       monitored_instance:
         name: IBM AIX systems Njmon
@@ -3533,7 +3481,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-nrpe
-      most_popular: false
       community: true
       monitored_instance:
         name: NRPE daemon
@@ -3560,7 +3507,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-obs_studio
-      most_popular: false
       community: true
       monitored_instance:
         name: OBS Studio
@@ -3587,7 +3533,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-openrc
-      most_popular: false
       community: true
       monitored_instance:
         name: OpenRC
@@ -3614,7 +3559,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-openroadm
-      most_popular: false
       community: true
       monitored_instance:
         name: OpenROADM devices
@@ -3644,7 +3588,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-openweathermap
-      most_popular: false
       community: true
       monitored_instance:
         name: OpenWeatherMap
@@ -3671,7 +3614,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-dutch_electricity_smart_meter
-      most_popular: false
       community: true
       monitored_instance:
         name: Dutch Electricity Smart Meter
@@ -3699,7 +3641,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-patroni
-      most_popular: false
       community: true
       monitored_instance:
         name: Patroni
@@ -3726,7 +3667,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-pws
-      most_popular: false
       community: true
       monitored_instance:
         name: Personal Weather Station
@@ -3753,7 +3693,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-pgbackrest
-      most_popular: false
       community: true
       monitored_instance:
         name: pgBackRest
@@ -3780,7 +3719,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-pgpool2
-      most_popular: false
       community: true
       monitored_instance:
         name: Pgpool-II
@@ -3807,7 +3745,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-pimoroni_enviro_plus
-      most_popular: false
       community: true
       monitored_instance:
         name: Pimoroni Enviro+
@@ -3834,7 +3771,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-powerpal
-      most_popular: false
       community: true
       monitored_instance:
         name: Powerpal devices
@@ -3861,7 +3797,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-proftpd
-      most_popular: false
       community: true
       monitored_instance:
         name: ProFTPD
@@ -3888,7 +3823,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-redis_queue
-      most_popular: false
       community: true
       monitored_instance:
         name: Redis Queue
@@ -3915,7 +3849,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-radio_thermostat
-      most_popular: false
       community: true
       monitored_instance:
         name: Radio Thermostat
@@ -3942,7 +3875,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-raritan_pdu
-      most_popular: false
       community: true
       monitored_instance:
         name: Raritan PDU
@@ -3969,7 +3901,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-sabnzbd
-      most_popular: false
       community: true
       monitored_instance:
         name: SABnzbd
@@ -3996,7 +3927,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-salicru_eqx
-      most_popular: false
       community: true
       monitored_instance:
         name: Salicru EQX inverter
@@ -4023,7 +3953,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-sense_energy
-      most_popular: false
       community: true
       monitored_instance:
         name: Sense Energy
@@ -4050,7 +3979,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-shelly
-      most_popular: false
       community: true
       monitored_instance:
         name: Shelly humidity sensor
@@ -4077,7 +4005,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-s7_plc
-      most_popular: false
       community: true
       monitored_instance:
         name: Siemens S7 PLC
@@ -4104,7 +4031,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-site24x7
-      most_popular: false
       community: true
       monitored_instance:
         name: Site 24x7
@@ -4131,7 +4057,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-sma_inverter
-      most_popular: false
       community: true
       monitored_instance:
         name: SMA Inverters
@@ -4158,7 +4083,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-sml
-      most_popular: false
       community: true
       monitored_instance:
         name: Smart meters SML
@@ -4185,7 +4109,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-softether
-      most_popular: false
       community: true
       monitored_instance:
         name: SoftEther VPN Server
@@ -4212,7 +4135,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-lsx
-      most_popular: false
       community: true
       monitored_instance:
         name: Solar logging stick
@@ -4239,7 +4161,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-solis
-      most_popular: false
       community: true
       monitored_instance:
         name: Solis Ginlong 5G inverters
@@ -4266,7 +4187,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-sonic
-      most_popular: false
       community: true
       monitored_instance:
         name: SONiC NOS
@@ -4293,7 +4213,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-ibm_spectrum_virtualize
-      most_popular: false
       community: true
       monitored_instance:
         name: IBM Spectrum Virtualize
@@ -4320,7 +4239,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-sphinx
-      most_popular: false
       community: true
       monitored_instance:
         name: Sphinx
@@ -4347,7 +4265,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-storidge
-      most_popular: false
       community: true
       monitored_instance:
         name: Storidge
@@ -4374,7 +4291,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-strongswan
-      most_popular: false
       community: true
       monitored_instance:
         name: strongSwan
@@ -4401,7 +4317,6 @@ modules:
     meta:
       id: collector-go.d.plugin-prometheus-sunspec
       <<: *meta
-      most_popular: false
       community: true
       monitored_instance:
         name: Sunspec Solar Energy
@@ -4428,7 +4343,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-suricata
-      most_popular: false
       community: true
       monitored_instance:
         name: Suricata
@@ -4457,7 +4371,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-synology_activebackup
-      most_popular: false
       community: true
       monitored_instance:
         name: Synology ActiveBackup
@@ -4484,7 +4397,6 @@ modules:
     meta:
       id: collector-go.d.plugin-prometheus-sysload
       <<: *meta
-      most_popular: false
       community: true
       monitored_instance:
         name: Sysload
@@ -4511,7 +4423,6 @@ modules:
     meta:
       id: collector-go.d.plugin-prometheus-tado
       <<: *meta
-      most_popular: false
       community: true
       monitored_instance:
         name: Tado smart heating solution
@@ -4539,7 +4450,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-tankerkoenig
-      most_popular: false
       community: true
       monitored_instance:
         name: Tankerkoenig API
@@ -4566,7 +4476,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-tesla_wall_connector
-      most_popular: false
       community: true
       monitored_instance:
         name: Tesla Wall Connector
@@ -4593,7 +4502,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-warp10
-      most_popular: false
       community: true
       monitored_instance:
         name: Warp10
@@ -4621,7 +4529,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-yourls
-      most_popular: false
       community: true
       monitored_instance:
         name: YOURLS URL Shortener
@@ -4648,7 +4555,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-zerto
-      most_popular: false
       community: true
       monitored_instance:
         name: Zerto

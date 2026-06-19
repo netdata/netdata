@@ -2,13 +2,13 @@
 
 package openvpn
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 type (
-	// Charts is an alias for module.Charts
-	Charts = module.Charts
-	// Dims is an alias for module.Dims
-	Dims = module.Dims
+	// Charts is an alias for collectorapi.Charts
+	Charts = collectorapi.Charts
+	// Dims is an alias for collectorapi.Dims
+	Dims = collectorapi.Dims
 )
 
 var charts = Charts{
@@ -28,10 +28,10 @@ var charts = Charts{
 		Units: "kilobits/s",
 		Fam:   "traffic",
 		Ctx:   "openvpn.total_traffic",
-		Type:  module.Area,
+		Type:  collectorapi.Area,
 		Dims: Dims{
-			{ID: "bytes_in", Name: "in", Algo: module.Incremental, Mul: 8, Div: 1000},
-			{ID: "bytes_out", Name: "out", Algo: module.Incremental, Mul: 8, Div: -1000},
+			{ID: "bytes_in", Name: "in", Algo: collectorapi.Incremental, Mul: 8, Div: 1000},
+			{ID: "bytes_out", Name: "out", Algo: collectorapi.Incremental, Mul: 8, Div: -1000},
 		},
 	},
 }
@@ -43,10 +43,10 @@ var userCharts = Charts{
 		Units: "kilobits/s",
 		Fam:   "user %s",
 		Ctx:   "openvpn.user_traffic",
-		Type:  module.Area,
+		Type:  collectorapi.Area,
 		Dims: Dims{
-			{ID: "%s_bytes_received", Name: "received", Algo: module.Incremental, Mul: 8, Div: 1000},
-			{ID: "%s_bytes_sent", Name: "sent", Algo: module.Incremental, Mul: 8, Div: -1000},
+			{ID: "%s_bytes_received", Name: "received", Algo: collectorapi.Incremental, Mul: 8, Div: 1000},
+			{ID: "%s_bytes_sent", Name: "sent", Algo: collectorapi.Incremental, Mul: 8, Div: -1000},
 		},
 	},
 	{

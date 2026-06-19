@@ -27,7 +27,6 @@ modules:
         - "mssql"
         - "sql server"
         - "microsoft"
-      most_popular: false
     overview:
       multi_instance: true
       data_collection:
@@ -38,7 +37,8 @@ modules:
           - Performance counters (buffer manager, memory manager, SQL statistics)
           - Dynamic management views (DMVs) for wait statistics, locks, and sessions
           - Per-database transaction and lock statistics
-          - SQL Server Agent job status
+          - SQL Server Agent job status and execution history
+          - Always On Availability Group health, replica states, and per-database synchronization metrics
         method_description: |
           It connects to the SQL Server instance via TCP using the go-mssqldb driver and executes queries against:
 
@@ -51,6 +51,15 @@ modules:
           - `sys.dm_os_sys_memory` - OS physical memory and page file
           - `sys.master_files` - Database file sizes
           - `msdb.dbo.sysjobs` - SQL Agent job status
+          - `msdb.dbo.sysjobhistory` - SQL Agent completed job execution history
+          - `msdb.dbo.sysjobactivity` - SQL Agent current job activity
+          - `sys.dm_hadr_availability_group_states` - AG health rollup
+          - `sys.dm_hadr_availability_replica_states` - Replica operational state
+          - `sys.dm_hadr_database_replica_states` - Database sync queues and rates
+          - `sys.dm_hadr_cluster` / `sys.dm_hadr_cluster_members` - WSFC cluster health
+          - `sys.dm_hadr_database_replica_cluster_states` - Failover readiness
+          - `sys.dm_hadr_auto_page_repair` - Automatic page repair events
+          - `sys.dm_hadr_ag_threads` - AG thread usage (SQL Server 2019+)
       default_behavior:
         auto_detection:
           description: |
@@ -65,8 +74,20 @@ modules:
       additional_permissions:
         description: |
           The monitoring user requires the VIEW SERVER STATE permission to access DMVs.
-          SQL Agent job monitoring is part of collector startup, so access to
-          `msdb.dbo.sysjobs` is required.
+
+          SQL Agent job metrics require access to `msdb.dbo.sysjobs`.
+
+          SQL Agent job execution metrics additionally require access to `msdb.dbo.sysjobhistory` and `msdb.dbo.sysjobactivity`.
+          If those optional `msdb` grants are missing, the collector continues collecting other SQL Server metrics and omits only the affected SQL Agent job metrics.
+
+          Current job execution time is based on the latest visible SQL Server Agent activity session.
+          If SQL Server Agent stops or crashes while a job is recorded as running, `sysjobactivity` can report that job as running until Agent creates a newer session or activity/history state changes.
+
+          Last execution warning detection checks failed step history between the previous and latest completed job summary rows.
+          If SQL Server Agent step history is suppressed or purged before collection, a job that completed successfully with failed intermediate steps can be reported as `ok` instead of `warning`.
+
+          Always On AG monitoring requires VIEW ANY DEFINITION for access to availability group catalog views.
+          On SQL Server 2022+, HADR DMVs may additionally require VIEW SERVER PERFORMANCE STATE.
       supported_platforms:
         include: []
         exclude: []
@@ -84,10 +105,18 @@ modules:
               -- Grant VIEW SERVER STATE (required for DMVs)
               GRANT VIEW SERVER STATE TO netdata_user;
 
-              -- Grant access to msdb for SQL Agent job monitoring (required)
+              -- Grant VIEW ANY DEFINITION (required for Always On AG monitoring)
+              GRANT VIEW ANY DEFINITION TO netdata_user;
+
+              -- Grant VIEW SERVER PERFORMANCE STATE (required for HADR DMVs on SQL Server 2022+)
+              -- GRANT VIEW SERVER PERFORMANCE STATE TO netdata_user;
+
+              -- Grant access to msdb for SQL Agent job monitoring
               USE msdb;
               CREATE USER netdata_user FOR LOGIN netdata_user;
               GRANT SELECT ON dbo.sysjobs TO netdata_user;
+              GRANT SELECT ON dbo.sysjobhistory TO netdata_user;
+              GRANT SELECT ON dbo.sysjobactivity TO netdata_user;
 
               -- Optional: Grant access to distribution database for replication monitoring
               -- (only if replication is configured)
@@ -100,12 +129,64 @@ modules:
 
               **Required permissions:**
               - `VIEW SERVER STATE` - Access to dynamic management views
-              - `SELECT on msdb.dbo.sysjobs` - SQL Agent job status monitoring
 
               **Optional permissions:**
+              - `SELECT on msdb.dbo.sysjobs` - SQL Agent job status monitoring
+              - `SELECT on msdb.dbo.sysjobhistory` - SQL Agent completed job execution history
+              - `SELECT on msdb.dbo.sysjobactivity` - SQL Agent current job activity
+              - `VIEW ANY DEFINITION` - Always On Availability Group monitoring
+              - `VIEW SERVER PERFORMANCE STATE` - HADR DMVs on SQL Server 2022+
               - `SELECT on distribution.dbo.MSreplication_monitordata` - Replication monitoring
               - `SELECT on distribution.dbo.MSpublications` - Publication information
               - `SELECT on distribution.dbo.MSsubscriptions` - Subscription counts
+          - title: Grant Windows Authentication access (optional)
+            description: |
+              If you prefer Windows integrated authentication instead of SQL authentication, grant the
+              Netdata service account access to SQL Server.
+
+              By default, the Netdata service runs as `Local System`. The identity it presents to
+              SQL Server depends on whether the connection is local or remote:
+
+              **Local connection (Netdata and SQL Server on the same machine):**
+
+              `Local System` always authenticates as `NT AUTHORITY\SYSTEM`, regardless of whether
+              the machine is domain-joined or in a workgroup.
+
+              ```sql
+              CREATE LOGIN [NT AUTHORITY\SYSTEM] FROM WINDOWS;
+              GRANT VIEW SERVER STATE TO [NT AUTHORITY\SYSTEM];
+              GRANT VIEW ANY DEFINITION TO [NT AUTHORITY\SYSTEM];
+              USE msdb;
+              CREATE USER [NT AUTHORITY\SYSTEM] FOR LOGIN [NT AUTHORITY\SYSTEM];
+              GRANT SELECT ON dbo.sysjobs TO [NT AUTHORITY\SYSTEM];
+              GRANT SELECT ON dbo.sysjobhistory TO [NT AUTHORITY\SYSTEM];
+              GRANT SELECT ON dbo.sysjobactivity TO [NT AUTHORITY\SYSTEM];
+              ```
+
+              **Remote connection (Netdata connects to SQL Server on another machine):**
+
+              On a domain-joined machine, `Local System` authenticates over the network as the
+              computer account (`DOMAIN\COMPUTERNAME$`). Replace with your actual values
+              (e.g., `MYDOM\SQLBOX01$`).
+
+              ```sql
+              CREATE LOGIN [DOMAIN\COMPUTERNAME$] FROM WINDOWS;
+              GRANT VIEW SERVER STATE TO [DOMAIN\COMPUTERNAME$];
+              GRANT VIEW ANY DEFINITION TO [DOMAIN\COMPUTERNAME$];
+              USE msdb;
+              CREATE USER [DOMAIN\COMPUTERNAME$] FOR LOGIN [DOMAIN\COMPUTERNAME$];
+              GRANT SELECT ON dbo.sysjobs TO [DOMAIN\COMPUTERNAME$];
+              GRANT SELECT ON dbo.sysjobhistory TO [DOMAIN\COMPUTERNAME$];
+              GRANT SELECT ON dbo.sysjobactivity TO [DOMAIN\COMPUTERNAME$];
+              ```
+
+              For the default `Local System` service account, remote Windows Authentication works
+              only on domain-joined machines, where it can authenticate as the computer account.
+              In workgroups, use a different Windows service account if you need remote Windows
+              Authentication.
+
+              > **Note**: To verify which account SQL Server sees, connect with Windows Authentication
+              > and run `SELECT SYSTEM_USER`.
       configuration:
         file:
           name: go.d/mssql.conf
@@ -128,10 +209,40 @@ modules:
               group: Collection
 
             - name: dsn
-              description: "SQL Server DSN (Data Source Name). See [DSN syntax](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn)."
+              description: "SQL Server DSN (Data Source Name). See [DSN syntax](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn). When `cloud_auth.provider` is `azure_ad`, use URL format with `sqlserver://` scheme."
               default_value: "sqlserver://localhost:1433"
               required: true
               group: Target
+            - name: cloud_auth.provider
+              description: Cloud auth provider (`none` or `azure_ad`).
+              default_value: none
+              required: false
+              group: Cloud Auth
+            - name: cloud_auth.azure_ad.mode
+              description: Azure AD credential mode (`service_principal`, `managed_identity`, or `default`). Required when `cloud_auth.provider` is `azure_ad`.
+              default_value: ""
+              required: true
+              group: Cloud Auth/Azure
+            - name: cloud_auth.azure_ad.mode_service_principal.tenant_id
+              description: Azure tenant ID. Required for `service_principal` mode.
+              default_value: ""
+              required: false
+              group: Cloud Auth/Azure
+            - name: cloud_auth.azure_ad.mode_service_principal.client_id
+              description: Azure client ID. Required for `service_principal` mode.
+              default_value: ""
+              required: false
+              group: Cloud Auth/Azure
+            - name: cloud_auth.azure_ad.mode_service_principal.client_secret
+              description: Azure client secret for `service_principal` mode.
+              default_value: ""
+              required: false
+              group: Cloud Auth/Azure
+            - name: cloud_auth.azure_ad.mode_managed_identity.client_id
+              description: Optional client ID of a user-assigned managed identity (`managed_identity` mode).
+              default_value: ""
+              required: false
+              group: Cloud Auth/Azure
             - name: timeout
               description: Query timeout (seconds).
               default_value: 5
@@ -215,11 +326,19 @@ modules:
                   - name: local
                     dsn: "sqlserver://netdata_user:password@localhost:1433"
             - name: Windows Authentication
-              description: Connect using Windows integrated authentication.
+              description: |
+                Connect using Windows integrated authentication (Windows only).
+
+                When no username/password is provided in the DSN, the driver uses the Netdata service account's
+                Windows credentials. By default, the Netdata service runs as `Local System`, which authenticates
+                to a local SQL Server as `NT AUTHORITY\SYSTEM`.
+
+                See the [Grant Windows Authentication access](#grant-windows-authentication-access-optional) prerequisite
+                to configure SQL Server for this.
               config: |
                 jobs:
                   - name: local
-                    dsn: "sqlserver://localhost:1433?trusted_connection=yes"
+                    dsn: "sqlserver://localhost:1433"
             - name: Named instance
               description: Connect to a named SQL Server instance.
               config: |
@@ -232,6 +351,30 @@ modules:
                 jobs:
                   - name: remote
                     dsn: "sqlserver://netdata_user:password@192.168.1.100:1433"
+            - name: Azure SQL with service principal
+              description: Use Microsoft Entra service principal authentication for Azure SQL.
+              config: |
+                jobs:
+                  - name: azure_sql_sp
+                    dsn: "sqlserver://my-server.database.windows.net:1433?database=mydb"
+                    cloud_auth:
+                      provider: azure_ad
+                      azure_ad:
+                        mode: service_principal
+                        mode_service_principal:
+                          tenant_id: "00000000-0000-0000-0000-000000000000"
+                          client_id: "11111111-1111-1111-1111-111111111111"
+                          client_secret: "super-secret-value"
+            - name: Azure SQL with managed identity
+              description: Use managed identity authentication (system-assigned by default).
+              config: |
+                jobs:
+                  - name: azure_sql_mi
+                    dsn: "sqlserver://my-server.database.windows.net:1433?database=mydb"
+                    cloud_auth:
+                      provider: azure_ad
+                      azure_ad:
+                        mode: managed_identity
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
@@ -277,10 +420,22 @@ modules:
             description: |
               The monitoring user needs VIEW SERVER STATE permission.
               Grant it with: `GRANT VIEW SERVER STATE TO netdata_user;`
-    alerts: []
+    alerts:
+      - name: mssql_database_log_percent_used
+        metric: mssql.database_log_percent_used
+        info: SQL Server transaction log percent used has been above 90% for the last 15 minutes
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mssql.conf
+      - name: mssql_sql_agent_job_last_execution_warning
+        metric: mssql.job_last_execution_status
+        info: SQL Server Agent job succeeded but at least one step failed in the last completed execution
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mssql.conf
+      - name: mssql_sql_agent_job_last_execution_failed
+        metric: mssql.job_last_execution_status
+        info: SQL Server Agent job failed in the last completed execution
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mssql.conf
     functions:
       description: |
-        This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+        This collector exposes real-time functions for interactive troubleshooting in the Live tab.
       list:
         - id: top-queries
           name: Top Queries
@@ -827,7 +982,7 @@ modules:
         enabled: false
       description: ""
       availability:
-        - SQL Server 2016+
+        - SQL Server
         - Azure SQL Database
       scopes:
         - name: global
@@ -1032,6 +1187,26 @@ modules:
               chart_type: line
               dimensions:
                 - name: growths
+            - name: mssql.database_log_file_size
+              description: Transaction Log File Size
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: free
+            - name: mssql.database_log_percent_used
+              description: Transaction Log Space Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: mssql.database_log_truncations_shrinks
+              description: Transaction Log Truncations and Shrinks
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: truncations
+                - name: shrinks
             - name: mssql.database_io_stall
               description: I/O Stall Time
               unit: ms
@@ -1158,11 +1333,49 @@ modules:
           metrics:
             - name: mssql.job_status
               description: Job Status
+              availability:
+                - SQL Server
               unit: status
               chart_type: line
               dimensions:
                 - name: enabled
                 - name: disabled
+            - name: mssql.job_last_execution_status
+              description: Job Last Execution Status
+              availability:
+                - SQL Server
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: unknown
+                - name: ok
+                - name: warning
+                - name: error
+                - name: canceled
+            - name: mssql.job_last_execution_duration
+              description: Job Last Execution Duration
+              availability:
+                - SQL Server
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: duration
+            - name: mssql.job_last_execution_age
+              description: Job Last Execution Age
+              availability:
+                - SQL Server
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: age
+            - name: mssql.job_current_execution_time
+              description: Job Current Execution Time
+              availability:
+                - SQL Server
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: duration
         - name: replication
           description: These metrics refer to SQL Server replication publications.
           labels:
@@ -1209,3 +1422,194 @@ modules:
               dimensions:
                 - name: total
                 - name: agents_running
+        - name: availability group
+          description: These metrics refer to Always On Availability Groups. Auto-detected when HADR is enabled.
+          labels:
+            - name: ag_name
+              description: Availability group name
+          metrics:
+            - name: mssql.ag_sync_health
+              description: Availability Group Synchronization Health
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: not_healthy
+                - name: partially_healthy
+                - name: healthy
+            - name: mssql.ag_recovery_health
+              description: Availability Group Recovery Health
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: primary_online
+                - name: primary_in_progress
+                - name: secondary_online
+                - name: secondary_in_progress
+            - name: mssql.ag_threads
+              description: Availability Group Threads (SQL Server 2019+)
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: capture
+                - name: redo
+                - name: parallel_redo
+        - name: availability group replica
+          description: >-
+            These metrics refer to per-replica state within an Availability Group.
+            Note: on secondary replicas, the replica states DMV returns only local information.
+          labels:
+            - name: ag_name
+              description: Availability group name
+            - name: replica_server
+              description: Replica server name
+            - name: availability_mode
+              description: Availability mode (synchronous_commit or asynchronous_commit)
+            - name: failover_mode
+              description: Failover mode (automatic or manual)
+          metrics:
+            - name: mssql.ag_replica_role
+              description: Availability Group Replica Role
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: primary
+                - name: secondary
+                - name: resolving
+                - name: unknown
+            - name: mssql.ag_replica_connected_state
+              description: Availability Group Replica Connected State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: connected
+                - name: disconnected
+                - name: unknown
+            - name: mssql.ag_replica_sync_health
+              description: Availability Group Replica Synchronization Health
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: not_healthy
+                - name: partially_healthy
+                - name: healthy
+        - name: availability group database replica
+          description: These metrics refer to per-database synchronization within an Availability Group.
+          labels:
+            - name: ag_name
+              description: Availability group name
+            - name: replica_server
+              description: Replica server name
+            - name: database
+              description: Database name
+          metrics:
+            - name: mssql.ag_db_sync_state
+              description: AG Database Synchronization State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: not_synchronizing
+                - name: synchronizing
+                - name: synchronized
+                - name: reverting
+                - name: initializing
+            - name: mssql.ag_db_log_send_queue
+              description: AG Database Log Send Queue Size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: queue_size
+            - name: mssql.ag_db_log_send_rate
+              description: AG Database Log Send Rate
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: send_rate
+            - name: mssql.ag_db_redo_queue
+              description: AG Database Redo Queue Size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: queue_size
+            - name: mssql.ag_db_redo_rate
+              description: AG Database Redo Rate (averaged over active redo time since startup)
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: redo_rate
+            - name: mssql.ag_db_filestream_send_rate
+              description: AG Database Filestream Send Rate
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: send_rate
+            - name: mssql.ag_db_secondary_lag
+              description: AG Database Secondary Lag (SQL Server 2016+)
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: lag
+            - name: mssql.ag_db_suspended
+              description: AG Database Data Movement Suspended State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: suspended
+            - name: mssql.ag_db_failover_readiness
+              description: AG Database Failover Readiness
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: ready
+                - name: not_ready
+            - name: mssql.ag_db_joined_state
+              description: AG Database Joined State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: joined
+                - name: not_joined
+        - name: WSFC cluster
+          description: These metrics refer to the Windows Server Failover Clustering quorum state.
+          labels: []
+          metrics:
+            - name: mssql.ag_cluster_quorum_state
+              description: WSFC Cluster Quorum State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: normal
+                - name: forced
+                - name: unknown
+        - name: WSFC cluster member
+          description: These metrics refer to individual WSFC cluster members.
+          labels:
+            - name: cluster_member
+              description: Cluster member name
+          metrics:
+            - name: mssql.ag_cluster_member_state
+              description: WSFC Cluster Member State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: up
+                - name: down
+            - name: mssql.ag_cluster_member_quorum_votes
+              description: WSFC Cluster Member Quorum Votes
+              unit: votes
+              chart_type: line
+              dimensions:
+                - name: votes
+        - name: AG page repair
+          description: These metrics refer to automatic page repair events per database in an Availability Group.
+          labels:
+            - name: database
+              description: Database name
+          metrics:
+            - name: mssql.ag_page_repair
+              description: AG Automatic Page Repair Events
+              unit: repairs
+              chart_type: line
+              dimensions:
+                - name: successful
+                - name: failed

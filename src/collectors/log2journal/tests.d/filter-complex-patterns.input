@@ -1,0 +1,1 @@
+{"user_id": 123, "user_name": "john", "admin_token": "secret123", "session_id": "sess_456", "public_data": "visible", "private_key": "hidden789"}

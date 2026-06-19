@@ -27,11 +27,17 @@ int gap_when_lost_iterations_above = 1;
 STRING *rrd_string_strdupz(const char *s) {
     if(unlikely(!s || !*s)) return string_strdupz(s);
 
-    char *tmp = strdupz(s);
-    json_fix_string(tmp);
-    STRING *ret = string_strdupz(tmp);
-    freez(tmp);
-    return ret;
+    size_t len = strlen(s);
+    size_t dst_size = (len * 2) + 1;
+    char *buf = mallocz(dst_size);
+
+    // Sanitize the string, preserving valid UTF-8
+    text_sanitize((unsigned char *)buf, (const unsigned char *)s, dst_size,
+                  rrd_string_allowed_chars, true, "", NULL);
+
+    STRING *result = string_strdupz(buf);
+    freez(buf);
+    return result;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -64,7 +70,19 @@ inline long align_entries_to_pagesize(RRD_DB_MODE mode, long entries) {
 
 void api_v1_management_init(void);
 
+// Thread-exit cleanup callbacks. Registered with libnetdata below;
+// called once per thread at exit time, in registration order. All
+// callbacks except rrdset_thread_rda_free are declared in their
+// owning headers (included via rrd.h); rrdset_thread_rda_free has no
+// public header so it is declared locally here.
+void rrdset_thread_rda_free(void);
+
 int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool unittest) {
+    nd_thread_register_cleanup(rrd_collector_finished);
+    nd_thread_register_cleanup(sender_thread_buffer_free);
+    nd_thread_register_cleanup(rrdset_thread_rda_free);
+    nd_thread_register_cleanup(query_target_free);
+
     rrdhost_init();
 
     if (unlikely(sql_init_meta_database(DB_CHECK_NONE, system_info ? 0 : 1))) {
@@ -118,14 +136,15 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
         health_load_config_defaults();
     }
 
+    SYSTEM_TZ tz = system_tz_get();
     localhost = rrdhost_create(
         hostname
         , registry_get_this_machine_hostname()
         , machine_guid_get_txt()
         , os_type
-        , netdata_configured_timezone
-        , netdata_configured_abbrev_timezone
-        , netdata_configured_utc_offset
+        , tz.timezone
+        , tz.abbrev_timezone
+        , tz.utc_offset
         , program_name
         , NETDATA_VERSION
         , nd_profile.update_every, default_rrd_history_entries
@@ -142,6 +161,7 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
         , 1
         , 0
     );
+    system_tz_free(&tz);
     rrdhost_system_info_free(system_info);
 
     if (unlikely(!localhost))

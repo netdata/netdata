@@ -72,8 +72,62 @@ static void pulse_daemon_uptime_do(bool extended __maybe_unused) {
     }
 }
 
+// Called from a single pulse daemon thread, so last_refresh_ut needs no synchronization.
+static void pulse_daemon_timezone_do(bool extended __maybe_unused) {
+    static usec_t last_refresh_ut = 0;
+
+    usec_t now_ut = now_monotonic_usec();
+
+    // refresh every 30 minutes to pick up DST changes
+    if (now_ut - last_refresh_ut >= 30 * 60 * USEC_PER_SEC) {
+        if (system_timezone_is_user_configured()) {
+            // User explicitly configured a timezone in netdata.conf — respect it,
+            // just refresh the abbreviation and offset (handles DST transitions).
+            static bool mismatch_logged = false;
+            if (!mismatch_logged) {
+                mismatch_logged = true;
+                char sys_buf[FILENAME_MAX + 1];
+                const char *sys_tz = detect_system_timezone_name(sys_buf, sizeof(sys_buf));
+                SYSTEM_TZ tz = system_tz_get();
+                if (sys_tz && tz.timezone && strcmp(sys_tz, tz.timezone) != 0)
+                    nd_log(NDLS_DAEMON, NDLP_NOTICE,
+                           "TIMEZONE: configured '%s' differs from system '%s'",
+                           tz.timezone, sys_tz);
+                system_tz_free(&tz);
+            }
+            SYSTEM_TZ tz = system_tz_get();
+            refresh_system_timezone(tz.timezone, true);
+            system_tz_free(&tz);
+        } else {
+            // Auto-detected timezone — re-detect to pick up system changes.
+            char buf[FILENAME_MAX + 1];
+            const char *detected = detect_system_timezone_name(buf, sizeof(buf));
+            if (detected && timezone_name_is_safe_tzdb_path(detected)) {
+                refresh_system_timezone(detected, true);
+            } else {
+                if (detected)
+                    // Detected a timezone that failed the safe-path check; skip it.
+                    netdata_log_error("TIMEZONE: detected unsafe timezone name '%s', ignoring", detected);
+
+                // Detection failed or was rejected — re-use the stored name with its original tzdb flag.
+                // Validate the stored name before reusing it: a previously persisted unsafe tzdb path
+                // must not reach refresh_system_timezone() and propagate to labels or ACLK.
+                SYSTEM_TZ tz = system_tz_get();
+                bool is_tzdb = system_timezone_is_tzdb_name();
+                if (!is_tzdb || timezone_name_is_safe_tzdb_path(tz.timezone))
+                    refresh_system_timezone(tz.timezone, is_tzdb);
+                else
+                    netdata_log_error("TIMEZONE: stored unsafe tzdb timezone name '%s', ignoring", tz.timezone ? tz.timezone : "(null)");
+                system_tz_free(&tz);
+            }
+        }
+        last_refresh_ut = now_ut;
+    }
+}
+
 void pulse_daemon_do(bool extended) {
     pulse_daemon_cpu_usage_do(extended);
     pulse_daemon_uptime_do(extended);
     pulse_daemon_memory_do(extended);
+    pulse_daemon_timezone_do(extended);
 }

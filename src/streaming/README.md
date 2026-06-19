@@ -75,6 +75,15 @@ flowchart TB
 - **Scalability**: Add more Child nodes or additional Parent nodes as your infrastructure grows
 - **Flexibility**: Configure retention, alerts, and dashboards according to your specific needs
 
+### Protocol Architecture
+
+Netdata streaming uses a **custom binary protocol over TCP**, not HTTP/HTTPS. This is an important distinction:
+
+- **Custom binary protocol**: Streaming uses Netdata's own protocol designed for efficient metrics transfer, not HTTP
+- **TLS encryption**: When you enable `:SSL` in the destination, it adds TLS encryption as a security layer on top of the custom streaming protocol (this is not HTTPS)
+- **Port multiplexing**: The same port (19999 by default) handles both web API requests and streaming connections—the server automatically detects which protocol is being used based on the initial handshake
+- **Destination requirement**: This is why streaming requires a Netdata server at the destination, not just any HTTP server
+
 ## Quick Reference
 
 | Task                                     | Configuration                             | Example                                                        |
@@ -362,7 +371,6 @@ The `netdata.conf` file is the primary configuration file for the Netdata agent.
 This section defines global settings for the Netdata agent.
 
 - **hostname**: The hostname used by the agent.
-- **memory mode**: Choose the memory mode for data collection (e.g., `ram` or `swap`).
 - **error log file**: Path to the file where error logs are saved.
 
 ### [web]
@@ -373,13 +381,13 @@ Configure the web interface settings here.
 - **port**: Set the port for the web interface (default: 19999).
 - **disable SSL**: Set to `yes` to disable SSL support.
 
-### [database]
+### [db]
 
 Manage database settings for data storage and retention.
 
-- **memory mode**: Choose between in-memory or disk-based storage.
-- **data retention**: Set how long to keep historical data.
-- **compression**: Enable or disable data compression.
+- **db** (formerly `memory mode`): Choose between in-memory or disk-based storage (e.g., `dbengine`, `ram`, `none`).
+- **retention**: Set how long to keep historical data.
+- **update every**: The data collection frequency in seconds.
 
 ## Complete Configuration Examples
 

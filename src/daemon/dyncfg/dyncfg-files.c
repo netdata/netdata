@@ -194,6 +194,12 @@ void dyncfg_file_load(const char *d_name) {
 
     dyncfg_set_current_from_dyncfg(&tmp);
 
+    // Heal cmds on load: files written by older binaries can carry a stale
+    // mask (e.g. an overridden stock job persisted without REMOVE pre-fix).
+    // The invariant elsewhere is cmds := f(type, source_type, cmds); enforce
+    // it here too so the conflict_cb SWAP cannot reintroduce a stale mask.
+    tmp.cmds = dyncfg_sanitize_cmds(tmp.type, tmp.current.source_type, tmp.cmds);
+
     dictionary_set(dyncfg_globals.nodes, id, &tmp, sizeof(tmp));
 
     // check if we need to rename the file

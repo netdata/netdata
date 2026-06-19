@@ -215,14 +215,14 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 									Symbol: ddprofiledefinition.SymbolConfig{
 										OID:  "1.3.6.1.4.1.674.10892.5.2.1.0",
 										Name: "globalSystemStatus",
-										Mapping: map[string]string{
+										Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 											"1": "other",
 											"2": "unknown",
 											"3": "ok",
 											"4": "nonCritical",
 											"5": "critical",
 											"6": "nonRecoverable",
-										},
+										}),
 									},
 								},
 							},
@@ -274,7 +274,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				)
 			},
 			expectedResult: map[string]ddsnmp.MetaTag{
-				"mac_address": {Value: "00:50:56:AB:CD:EF", IsExactMatch: false},
+				"mac_address": {Value: "00:50:56:ab:cd:ef", IsExactMatch: false},
 			},
 			expectedError: false,
 		},

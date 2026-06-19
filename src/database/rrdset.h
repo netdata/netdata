@@ -18,6 +18,7 @@ typedef struct ml_chart rrd_ml_chart_t;
 struct rrdhost;
 struct rrdcalc;
 struct pluginsd_rrddim;
+struct pluginsd_rrddim_array;  // Reference-counted array for pluginsd dimension caching
 struct rrdinstance_acquired;
 struct rrdcontext_acquired;
 struct storage_alignment;
@@ -62,6 +63,10 @@ typedef enum __attribute__ ((__packed__)) rrdset_flags {
     RRDSET_FLAG_COLLECTION_FINISHED              = (1 << 25), // when set, data collection is not available for this chart
 
     RRDSET_FLAG_HAS_RRDCALC_LINKED               = (1 << 26), // this chart has at least one rrdcal linked
+
+    RRDSET_FLAG_PENDING_LABEL_RECHECK            = (1 << 27), // chart labels changed since the last health
+                                                              // prototype evaluation; the health thread must
+                                                              // detach + reattach alerts for this chart.
 } RRDSET_FLAGS;
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -171,6 +176,8 @@ struct rrdset {
         struct {
 #ifdef REPLICATION_TRACKING
             REPLAY_WHO who;
+#else
+            uint8_t unused;
 #endif
         } rcv;
     } stream;
@@ -209,14 +216,13 @@ struct rrdset {
     } alerts;
 
     struct {
-        SPINLOCK spinlock; // used only for cleanup
+        SPINLOCK spinlock; // coordinates PRD_ARRAY grow/transfer and unslot/cleanup serialization
         pid_t collector_tid;
         bool dims_with_slots;
         bool set;
         uint32_t pos;
         int32_t last_slot;
-        uint32_t size;
-        struct pluginsd_rrddim *prd_array;
+        struct pluginsd_rrddim_array *prd_array;  // Reference-counted array (use prd_array_* functions)
     } pluginsd;
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS

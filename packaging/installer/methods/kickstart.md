@@ -55,7 +55,7 @@ To install and connect to Netdata Cloud in a single step from your terminal:
 
 :::tip
 
-Pick **Stable** or **Nightly**: Check the [guide](/docs/netdata-agent/versions-and-platforms.md) for differences.
+Pick **Stable** or **Nightly**: Check the [guide](/packaging/PLATFORM_SUPPORT.md) for differences.
 
 :::
 
@@ -123,6 +123,6 @@ If the script is valid, this command will return `OK, VALID`. We recommend verif
 ## Related Docs
 
 - [Connect to Netdata Cloud](/src/claim/README.md)
-- [Release Channels & Versions](/docs/netdata-agent/versions-and-platforms.md)
+- [Release Channels & Versions](/packaging/PLATFORM_SUPPORT.md)
 - [Uninstall Guide](/packaging/installer/UNINSTALL.md)
 - [Offline Installation Guide](/packaging/installer/methods/offline.md)

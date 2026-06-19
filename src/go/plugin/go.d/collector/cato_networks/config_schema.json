@@ -1,0 +1,81 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "title": "Cato Networks collector configuration.",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, in seconds.",
+        "type": "integer",
+        "minimum": 60,
+        "default": 60
+      },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "Recheck interval in seconds. Zero disables retries.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
+      "url": {
+        "title": "Cato API URL",
+        "description": "Cato GraphQL API endpoint. Production endpoints must use HTTPS; HTTP is accepted only for loopback test endpoints.",
+        "type": "string",
+        "format": "uri",
+        "default": "https://api.catonetworks.com/api/v1/graphql2"
+      },
+      "account_id": {
+        "title": "Account ID",
+        "description": "Cato account ID.",
+        "type": "string",
+        "minLength": 1
+      },
+      "api_key": {
+        "title": "API key",
+        "description": "Cato API key.",
+        "type": "string",
+        "sensitive": true,
+        "minLength": 1
+      },
+      "site_selector": {
+        "title": "Site selector",
+        "description": "Space-separated simple patterns matched against the Cato site name when present, otherwise the site ID. Patterns use first-match ordering; put exclusions before broad includes, for example '!lab-* *'.",
+        "type": "string",
+        "default": "*"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "HTTP request timeout.",
+        "type": "number",
+        "minimum": 0,
+        "default": 30
+      },
+      "proxy_url": {
+        "title": "Proxy URL",
+        "description": "HTTP proxy URL. Empty value uses environment proxy variables.",
+        "type": "string"
+      },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this data collection job with a Virtual Node.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "account_id",
+      "api_key"
+    ]
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "api_key": {
+      "ui:widget": "password"
+    },
+    "vnode": {
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
+    }
+  }
+}

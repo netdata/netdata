@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 // https://github.com/Qihoo360/pika/blob/master/src/pika_admin.cc
@@ -104,81 +104,81 @@ func (c *Collector) collectInfoCommandExecCountProperty(ms map[string]int64, fie
 }
 
 func (c *Collector) addCmdToCommandsCharts(cmd string) {
-	c.addDimToChart(chartCommandsCalls.ID, &module.Dim{
+	c.addDimToChart(chartCommandsCalls.ID, &collectorapi.Dim{
 		ID:   "cmd_" + cmd + "_calls",
 		Name: cmd,
-		Algo: module.Incremental,
+		Algo: collectorapi.Incremental,
 	})
 }
 
 func (c *Collector) addDbToKeyspaceCharts(db string) {
-	c.addDimToChart(chartDbStringsKeys.ID, &module.Dim{
+	c.addDimToChart(chartDbStringsKeys.ID, &collectorapi.Dim{
 		ID:   db + "_strings_keys",
 		Name: db,
 	})
-	c.addDimToChart(chartDbStringsExpiresKeys.ID, &module.Dim{
+	c.addDimToChart(chartDbStringsExpiresKeys.ID, &collectorapi.Dim{
 		ID:   db + "_strings_expires_keys",
 		Name: db,
 	})
-	c.addDimToChart(chartDbStringsInvalidKeys.ID, &module.Dim{
+	c.addDimToChart(chartDbStringsInvalidKeys.ID, &collectorapi.Dim{
 		ID:   db + "_strings_invalid_keys",
 		Name: db,
 	})
 
-	c.addDimToChart(chartDbHashesKeys.ID, &module.Dim{
+	c.addDimToChart(chartDbHashesKeys.ID, &collectorapi.Dim{
 		ID:   db + "_hashes_keys",
 		Name: db,
 	})
-	c.addDimToChart(chartDbHashesExpiresKeys.ID, &module.Dim{
+	c.addDimToChart(chartDbHashesExpiresKeys.ID, &collectorapi.Dim{
 		ID:   db + "_hashes_expires_keys",
 		Name: db,
 	})
-	c.addDimToChart(chartDbHashesInvalidKeys.ID, &module.Dim{
+	c.addDimToChart(chartDbHashesInvalidKeys.ID, &collectorapi.Dim{
 		ID:   db + "_hashes_invalid_keys",
 		Name: db,
 	})
 
-	c.addDimToChart(chartDbListsKeys.ID, &module.Dim{
+	c.addDimToChart(chartDbListsKeys.ID, &collectorapi.Dim{
 		ID:   db + "_lists_keys",
 		Name: db,
 	})
-	c.addDimToChart(chartDbListsExpiresKeys.ID, &module.Dim{
+	c.addDimToChart(chartDbListsExpiresKeys.ID, &collectorapi.Dim{
 		ID:   db + "_lists_expires_keys",
 		Name: db,
 	})
-	c.addDimToChart(chartDbListsInvalidKeys.ID, &module.Dim{
+	c.addDimToChart(chartDbListsInvalidKeys.ID, &collectorapi.Dim{
 		ID:   db + "_lists_invalid_keys",
 		Name: db,
 	})
 
-	c.addDimToChart(chartDbZsetsKeys.ID, &module.Dim{
+	c.addDimToChart(chartDbZsetsKeys.ID, &collectorapi.Dim{
 		ID:   db + "_zsets_keys",
 		Name: db,
 	})
-	c.addDimToChart(chartDbZsetsExpiresKeys.ID, &module.Dim{
+	c.addDimToChart(chartDbZsetsExpiresKeys.ID, &collectorapi.Dim{
 		ID:   db + "_zsets_expires_keys",
 		Name: db,
 	})
-	c.addDimToChart(chartDbZsetsInvalidKeys.ID, &module.Dim{
+	c.addDimToChart(chartDbZsetsInvalidKeys.ID, &collectorapi.Dim{
 		ID:   db + "_zsets_invalid_keys",
 		Name: db,
 	})
 
-	c.addDimToChart(chartDbSetsKeys.ID, &module.Dim{
+	c.addDimToChart(chartDbSetsKeys.ID, &collectorapi.Dim{
 		ID:   db + "_sets_keys",
 		Name: db,
 	})
-	c.addDimToChart(chartDbSetsExpiresKeys.ID, &module.Dim{
+	c.addDimToChart(chartDbSetsExpiresKeys.ID, &collectorapi.Dim{
 		ID:   db + "_sets_expires_keys",
 		Name: db,
 	})
-	c.addDimToChart(chartDbSetsInvalidKeys.ID, &module.Dim{
+	c.addDimToChart(chartDbSetsInvalidKeys.ID, &collectorapi.Dim{
 		ID:   db + "_sets_invalid_keys",
 		Name: db,
 	})
 }
 
-func (c *Collector) addDimToChart(chartID string, dim *module.Dim) {
+func (c *Collector) addDimToChart(chartID string, dim *collectorapi.Dim) {
 	chart := c.Charts().Get(chartID)
 	if chart == nil {
 		c.Warningf("error on adding '%s' dimension: can not find '%s' chart", dim.ID, chartID)

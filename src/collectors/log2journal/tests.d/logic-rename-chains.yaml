@@ -1,0 +1,25 @@
+# Test rename logic - order matters, first match wins
+pattern: "(?P<old_name>\\w+)\\s+(?P<another_old>\\w+)"
+
+rename:
+  # Test first match wins
+  - old_key: OLD_NAME
+    new_key: FIRST_RENAME
+    
+  - old_key: OLD_NAME
+    new_key: SECOND_RENAME  # Should not apply
+    
+  # Test chaining (rename result gets renamed again)
+  - old_key: ANOTHER_OLD
+    new_key: INTERMEDIATE_NAME
+    
+  - old_key: INTERMEDIATE_NAME
+    new_key: FINAL_NAME
+
+inject:
+  # Test that renames affect injected variables
+  - key: RENAMED_REF
+    value: "${FIRST_RENAME}"  # Should reference renamed key
+    
+  - key: CHAINED_REF
+    value: "${FINAL_NAME}"    # Should reference final renamed key

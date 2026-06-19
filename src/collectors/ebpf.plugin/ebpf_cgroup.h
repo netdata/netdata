@@ -3,9 +3,6 @@
 #ifndef NETDATA_EBPF_CGROUP_H
 #define NETDATA_EBPF_CGROUP_H 1
 
-#define NETDATA_EBPF_CGROUP_MAX_TRIES 3
-#define NETDATA_EBPF_CGROUP_NEXT_TRY_SEC 30
-
 #include "ebpf.h"
 #include "ebpf_apps.h"
 
@@ -20,7 +17,6 @@ struct pid_on_target2 {
     netdata_dcstat_pid_t dc;
     netdata_publish_shm_t shm;
     netdata_socket_t socket;
-    netdata_publish_cachestat_t cachestat;
 
     struct pid_on_target2 *next;
 };
@@ -32,7 +28,6 @@ enum ebpf_cgroup_flags {
     NETDATA_EBPF_CGROUP_HAS_FD_CHART = 1 << 4,
     NETDATA_EBPF_CGROUP_HAS_VFS_CHART = 1 << 5,
     NETDATA_EBPF_CGROUP_HAS_OOMKILL_CHART = 1 << 6,
-    NETDATA_EBPF_CGROUP_HAS_CACHESTAT_CHART = 1 << 7,
     NETDATA_EBPF_CGROUP_HAS_DC_CHART = 1 << 8,
     NETDATA_EBPF_CGROUP_HAS_SHM_CHART = 1 << 9,
 
@@ -42,7 +37,6 @@ enum ebpf_cgroup_flags {
     NETDATA_EBPF_SERVICES_HAS_FD_CHART = 1 << 19,
     NETDATA_EBPF_SERVICES_HAS_VFS_CHART = 1 << 20,
     NETDATA_EBPF_SERVICES_HAS_OOMKILL_CHART = 1 << 21,
-    NETDATA_EBPF_SERVICES_HAS_CACHESTAT_CHART = 1 << 22,
     NETDATA_EBPF_SERVICES_HAS_DC_CHART = 1 << 23,
     NETDATA_EBPF_SERVICES_HAS_SHM_CHART = 1 << 24
 };
@@ -62,7 +56,6 @@ typedef struct ebpf_cgroup_target {
     int oomkill;
     netdata_publish_shm_t publish_shm;
     ebpf_socket_publish_apps_t publish_socket;
-    netdata_publish_cachestat_t publish_cachestat;
 
     struct pid_on_target2 *pids;
     struct ebpf_cgroup_target *next;
@@ -83,11 +76,10 @@ typedef struct ebpf_systemd_args {
     char *dimension;
 } ebpf_systemd_args_t;
 
-void ebpf_map_cgroup_shared_memory();
-void ebpf_parse_cgroup_shm_data();
 void ebpf_create_charts_on_systemd(ebpf_systemd_args_t *chart);
 void ebpf_cgroup_integration(void *ptr);
-void ebpf_unmap_cgroup_shared_memory();
-extern int send_cgroup_chart;
+void ebpf_cgroup_cache_abort(void);
+void ebpf_cgroup_cache_cleanup(void);
+extern _Atomic int send_cgroup_chart;
 
 #endif /* NETDATA_EBPF_CGROUP_H */

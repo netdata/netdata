@@ -7,7 +7,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 func (c *Collector) collectVhosts(mx map[string]int64) error {
@@ -33,7 +33,7 @@ func (c *Collector) collectVhosts(mx map[string]int64) error {
 
 		st := getVhostStatus(vhost)
 		for _, v := range []string{"running", "stopped", "partial"} {
-			mx[px+"status_"+v] = metrix.Bool(v == st)
+			mx[px+"status_"+v] = oldmetrix.Bool(v == st)
 		}
 	}
 

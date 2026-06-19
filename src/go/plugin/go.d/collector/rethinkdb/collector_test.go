@@ -11,7 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,7 +37,7 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -155,12 +156,12 @@ func TestCollector_Collect(t *testing.T) {
 		prepare     func() *Collector
 		wantMetrics map[string]int64
 		wantCharts  int
-		skipChart   func(chart *module.Chart, dim *module.Dim) bool
+		skipChart   func(chart *collectorapi.Chart, dim *collectorapi.Dim) bool
 	}{
 		"success on valid response": {
 			prepare:    prepareCaseOk,
 			wantCharts: len(clusterCharts) + len(serverChartsTmpl)*3,
-			skipChart: func(chart *module.Chart, dim *module.Dim) bool {
+			skipChart: func(chart *collectorapi.Chart, dim *collectorapi.Dim) bool {
 				return strings.HasPrefix(chart.ID, "server_0f74c641-af5f-48d6-a005-35b8983c576a") &&
 					!strings.Contains(chart.ID, "stats_request_status")
 			},
@@ -213,7 +214,7 @@ func TestCollector_Collect(t *testing.T) {
 			assert.Equal(t, test.wantCharts, len(*collr.Charts()))
 
 			if len(test.wantMetrics) > 0 {
-				module.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, test.skipChart)
+				collecttest.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, test.skipChart)
 			}
 
 			if m, ok := collr.rdb.(*mockRethinkdbConn); ok {

@@ -88,6 +88,7 @@ struct health_plugin_globals {
 
         int32_t run_at_least_every_seconds;
         int32_t postpone_alarms_during_hibernation_for_seconds;
+        int32_t notification_execution_timeout_seconds; // kill notification commands running longer than this (0 = wait forever)
     } config;
 
     struct {

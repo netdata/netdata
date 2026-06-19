@@ -2,17 +2,17 @@
 
 package k8s_kubelet
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 type (
-	// Charts is an alias for module.Charts
-	Charts = module.Charts
-	// Chart is an alias for module.Chart
-	Chart = module.Chart
-	// Dims is an alias for module.Dims
-	Dims = module.Dims
-	// Dim is an alias for module.Dim
-	Dim = module.Dim
+	// Charts is an alias for collectorapi.Charts
+	Charts = collectorapi.Charts
+	// Chart is an alias for collectorapi.Chart
+	Chart = collectorapi.Chart
+	// Dims is an alias for collectorapi.Dims
+	Dims = collectorapi.Dims
+	// Dim is an alias for collectorapi.Dim
+	Dim = collectorapi.Dim
 )
 
 var charts = Charts{
@@ -23,7 +23,7 @@ var charts = Charts{
 		Fam:   "api server",
 		Ctx:   "k8s_kubelet.apiserver_audit_requests_rejected",
 		Dims: Dims{
-			{ID: "apiserver_audit_requests_rejected_total", Name: "rejected", Algo: module.Incremental},
+			{ID: "apiserver_audit_requests_rejected_total", Name: "rejected", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -33,7 +33,7 @@ var charts = Charts{
 		Fam:   "api server",
 		Ctx:   "k8s_kubelet.apiserver_storage_data_key_generation_failures",
 		Dims: Dims{
-			{ID: "apiserver_storage_data_key_generation_failures_total", Name: "failures", Algo: module.Incremental},
+			{ID: "apiserver_storage_data_key_generation_failures_total", Name: "failures", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -42,23 +42,23 @@ var charts = Charts{
 		Units: "observes/s",
 		Fam:   "api server",
 		Ctx:   "k8s_kubelet.apiserver_storage_data_key_generation_latencies",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: "apiserver_storage_data_key_generation_bucket_5", Name: "5 µs", Algo: module.Incremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_10", Name: "10 µs", Algo: module.Incremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_20", Name: "20 µs", Algo: module.Incremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_40", Name: "40 µs", Algo: module.Incremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_80", Name: "80 µs", Algo: module.Incremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_160", Name: "160 µs", Algo: module.Incremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_320", Name: "320 µs", Algo: module.Incremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_640", Name: "640 µs", Algo: module.Incremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_1280", Name: "1280 µs", Algo: module.Incremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_2560", Name: "2560 µs", Algo: module.Incremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_5120", Name: "5120 µs", Algo: module.Incremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_10240", Name: "10240 µs", Algo: module.Incremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_20480", Name: "20480 µs", Algo: module.Incremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_40960", Name: "40960 µs", Algo: module.Incremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_+Inf", Name: "+Inf", Algo: module.Incremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_5", Name: "5 µs", Algo: collectorapi.Incremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_10", Name: "10 µs", Algo: collectorapi.Incremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_20", Name: "20 µs", Algo: collectorapi.Incremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_40", Name: "40 µs", Algo: collectorapi.Incremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_80", Name: "80 µs", Algo: collectorapi.Incremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_160", Name: "160 µs", Algo: collectorapi.Incremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_320", Name: "320 µs", Algo: collectorapi.Incremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_640", Name: "640 µs", Algo: collectorapi.Incremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_1280", Name: "1280 µs", Algo: collectorapi.Incremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_2560", Name: "2560 µs", Algo: collectorapi.Incremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_5120", Name: "5120 µs", Algo: collectorapi.Incremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_10240", Name: "10240 µs", Algo: collectorapi.Incremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_20480", Name: "20480 µs", Algo: collectorapi.Incremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_40960", Name: "40960 µs", Algo: collectorapi.Incremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_+Inf", Name: "+Inf", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -67,23 +67,23 @@ var charts = Charts{
 		Units: "%",
 		Fam:   "api server",
 		Ctx:   "k8s_kubelet.apiserver_storage_data_key_generation_latencies_percent",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: "apiserver_storage_data_key_generation_bucket_5", Name: "5 µs", Algo: module.PercentOfIncremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_10", Name: "10 µs", Algo: module.PercentOfIncremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_20", Name: "20 µs", Algo: module.PercentOfIncremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_40", Name: "40 µs", Algo: module.PercentOfIncremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_80", Name: "80 µs", Algo: module.PercentOfIncremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_160", Name: "160 µs", Algo: module.PercentOfIncremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_320", Name: "320 µs", Algo: module.PercentOfIncremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_640", Name: "640 µs", Algo: module.PercentOfIncremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_1280", Name: "1280 µs", Algo: module.PercentOfIncremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_2560", Name: "2560 µs", Algo: module.PercentOfIncremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_5120", Name: "5120 µs", Algo: module.PercentOfIncremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_10240", Name: "10240 µs", Algo: module.PercentOfIncremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_20480", Name: "20480 µs", Algo: module.PercentOfIncremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_40960", Name: "40960 µs", Algo: module.PercentOfIncremental},
-			{ID: "apiserver_storage_data_key_generation_bucket_+Inf", Name: "+Inf", Algo: module.PercentOfIncremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_5", Name: "5 µs", Algo: collectorapi.PercentOfIncremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_10", Name: "10 µs", Algo: collectorapi.PercentOfIncremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_20", Name: "20 µs", Algo: collectorapi.PercentOfIncremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_40", Name: "40 µs", Algo: collectorapi.PercentOfIncremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_80", Name: "80 µs", Algo: collectorapi.PercentOfIncremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_160", Name: "160 µs", Algo: collectorapi.PercentOfIncremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_320", Name: "320 µs", Algo: collectorapi.PercentOfIncremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_640", Name: "640 µs", Algo: collectorapi.PercentOfIncremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_1280", Name: "1280 µs", Algo: collectorapi.PercentOfIncremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_2560", Name: "2560 µs", Algo: collectorapi.PercentOfIncremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_5120", Name: "5120 µs", Algo: collectorapi.PercentOfIncremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_10240", Name: "10240 µs", Algo: collectorapi.PercentOfIncremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_20480", Name: "20480 µs", Algo: collectorapi.PercentOfIncremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_40960", Name: "40960 µs", Algo: collectorapi.PercentOfIncremental},
+			{ID: "apiserver_storage_data_key_generation_bucket_+Inf", Name: "+Inf", Algo: collectorapi.PercentOfIncremental},
 		},
 	},
 	{
@@ -93,7 +93,7 @@ var charts = Charts{
 		Fam:   "api server",
 		Ctx:   "k8s_kubelet.apiserver_storage_envelope_transformation_cache_misses",
 		Dims: Dims{
-			{ID: "apiserver_storage_envelope_transformation_cache_misses_total", Name: "cache misses", Algo: module.Incremental},
+			{ID: "apiserver_storage_envelope_transformation_cache_misses_total", Name: "cache misses", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -122,7 +122,7 @@ var charts = Charts{
 		Units: "B",
 		Fam:   "pods",
 		Ctx:   "k8s_kubelet.kubelet_pods_log_filesystem_used_bytes",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 	},
 	{
 		ID:    "kubelet_runtime_operations",
@@ -130,7 +130,7 @@ var charts = Charts{
 		Units: "operations/s",
 		Fam:   "operations",
 		Ctx:   "k8s_kubelet.kubelet_runtime_operations",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 	},
 	{
 		ID:    "kubelet_runtime_operations_errors",
@@ -138,7 +138,7 @@ var charts = Charts{
 		Units: "errors/s",
 		Fam:   "operations",
 		Ctx:   "k8s_kubelet.kubelet_runtime_operations_errors",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 	},
 	{
 		ID:    "kubelet_docker_operations",
@@ -146,7 +146,7 @@ var charts = Charts{
 		Units: "operations/s",
 		Fam:   "operations",
 		Ctx:   "k8s_kubelet.kubelet_docker_operations",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 	},
 	{
 		ID:    "kubelet_docker_operations_errors",
@@ -154,7 +154,7 @@ var charts = Charts{
 		Units: "errors/s",
 		Fam:   "operations",
 		Ctx:   "k8s_kubelet.kubelet_docker_operations_errors",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 	},
 	{
 		ID:    "kubelet_node_config_error",
@@ -172,7 +172,7 @@ var charts = Charts{
 		Units: "microseconds",
 		Fam:   "pleg relisting",
 		Ctx:   "k8s_kubelet.kubelet_pleg_relist_interval_microseconds",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: "kubelet_pleg_relist_interval_05", Name: "0.5"},
 			{ID: "kubelet_pleg_relist_interval_09", Name: "0.9"},
@@ -185,7 +185,7 @@ var charts = Charts{
 		Units: "microseconds",
 		Fam:   "pleg relisting",
 		Ctx:   "k8s_kubelet.kubelet_pleg_relist_latency_microseconds",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: "kubelet_pleg_relist_latency_05", Name: "0.5"},
 			{ID: "kubelet_pleg_relist_latency_09", Name: "0.9"},
@@ -199,8 +199,8 @@ var charts = Charts{
 		Fam:   "token",
 		Ctx:   "k8s_kubelet.kubelet_token_requests",
 		Dims: Dims{
-			{ID: "token_count", Name: "total", Algo: module.Incremental},
-			{ID: "token_fail_count", Name: "failed", Algo: module.Incremental},
+			{ID: "token_count", Name: "total", Algo: collectorapi.Incremental},
+			{ID: "token_fail_count", Name: "failed", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -209,7 +209,7 @@ var charts = Charts{
 		Units: "requests/s",
 		Fam:   "rest client",
 		Ctx:   "k8s_kubelet.rest_client_requests_by_code",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 	},
 	{
 		ID:    "rest_client_requests_by_method",
@@ -217,7 +217,7 @@ var charts = Charts{
 		Units: "requests/s",
 		Fam:   "rest client",
 		Ctx:   "k8s_kubelet.rest_client_requests_by_method",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 	},
 }
 

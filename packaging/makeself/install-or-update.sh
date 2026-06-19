@@ -2,7 +2,7 @@
 
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# shellcheck source=./packaging/makeself/functions.sh
+# shellcheck source=/dev/null
 . "$(dirname "${0}")"/functions.sh
 
 export LC_ALL=C
@@ -13,6 +13,9 @@ renice 19 $$ >/dev/null 2>/dev/null
 
 NETDATA_PREFIX="/opt/netdata"
 NETDATA_USER_CONFIG_DIR="${NETDATA_PREFIX}/etc/netdata"
+NETDATA_LIB_DIR="${NETDATA_PREFIX}/var/lib/netdata"
+NETDATA_CACHE_DIR="${NETDATA_PREFIX}/var/cache/netdata"
+NETDATA_LOG_DIR="${NETDATA_PREFIX}/var/log/netdata"
 
 # -----------------------------------------------------------------------------
 if [ -d /opt/netdata/etc/netdata.old ]; then
@@ -91,9 +94,13 @@ fi
 # -----------------------------------------------------------------------------
 progress "Attempt to create user/group netdata/netadata"
 
+# These variables are consumed by helper functions from functions.sh.
+# shellcheck disable=SC2034
 NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C"
+# shellcheck disable=SC2034
 NETDATA_ADDED_TO_GROUPS=""
 # Default user/group
+# shellcheck disable=SC2034
 NETDATA_USER="netdata"
 NETDATA_GROUP="netdata"
 
@@ -180,7 +187,7 @@ fi
 
 progress "changing plugins ownership and permissions"
 
-for x in ndsudo apps.plugin perf.plugin slabinfo.plugin debugfs.plugin freeipmi.plugin ioping cgroup-network local-listeners network-viewer.plugin ebpf.plugin nfacct.plugin xenstat.plugin python.d.plugin charts.d.plugin go.d.plugin ioping.plugin cgroup-network-helper.sh otel-plugin otel-signal-viewer-plugin; do
+for x in ndsudo apps.plugin perf.plugin slabinfo.plugin debugfs.plugin freeipmi.plugin ioping cgroup-network local-listeners network-viewer.plugin ebpf.plugin ebpf-go.plugin nfacct.plugin xenstat.plugin python.d.plugin charts.d.plugin go.d.plugin snmp-trap-profile-gen ioping.plugin cgroup-network-helper.sh otel-plugin otel-signal-viewer-plugin systemd-journal.plugin netflow-plugin; do
   f="usr/libexec/netdata/plugins.d/${x}"
   if [ -f "${f}" ]; then
     run chown root:${NETDATA_GROUP} "${f}"
@@ -194,10 +201,10 @@ if command -v setcap >/dev/null 2>&1; then
   if ! run setcap "cap_dac_read_search=ep" "usr/libexec/netdata/plugins.d/slabinfo.plugin"; then
     run chmod 4750 "usr/libexec/netdata/plugins.d/slabinfo.plugin"
   fi
-  if ! run setcap "cap_dac_read_search=ep" "usr/libexec/netdata/plugins.d/debugfs.plugin"; then
+  if ! run setcap "cap_dac_read_search,cap_audit_control=ep" "usr/libexec/netdata/plugins.d/debugfs.plugin"; then
     run chmod 4750 "usr/libexec/netdata/plugins.d/debugfs.plugin"
   fi
-  if ! run setcap "cap_dac_read_search+epi cap_net_admin+epi cap_net_raw=eip" "usr/libexec/netdata/plugins.d/go.d.plugin"; then
+  if ! run setcap "cap_dac_read_search+epi cap_net_admin+epi cap_net_raw=eip cap_net_bind_service=eip" "usr/libexec/netdata/plugins.d/go.d.plugin"; then
     run chmod 4750 "usr/libexec/netdata/plugins.d/go.d.plugin"
   fi
 
@@ -214,6 +221,11 @@ if command -v setcap >/dev/null 2>&1; then
       run chmod 4750 "usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin"
     fi
   fi
+  if [ -f "usr/libexec/netdata/plugins.d/systemd-journal.plugin" ]; then
+    if ! run setcap "cap_dac_read_search=eip" "usr/libexec/netdata/plugins.d/systemd-journal.plugin"; then
+      run chmod 4750 "usr/libexec/netdata/plugins.d/systemd-journal.plugin"
+    fi
+  fi
 else
   for x in apps.plugin perf.plugin slabinfo.plugin debugfs.plugin; do
     f="usr/libexec/netdata/plugins.d/${x}"
@@ -222,13 +234,23 @@ else
   if [ -f "usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin" ]; then
     run chmod 4750 "usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin"
   fi
+  if [ -f "usr/libexec/netdata/plugins.d/systemd-journal.plugin" ]; then
+    run chmod 4750 "usr/libexec/netdata/plugins.d/systemd-journal.plugin"
+  fi
 fi
 
-for x in ndsudo freeipmi.plugin ioping cgroup-network local-listeners network-viewer.plugin ebpf.plugin nfacct.plugin xenstat.plugin; do
+for x in ndsudo freeipmi.plugin ioping cgroup-network local-listeners network-viewer.plugin ebpf.plugin ebpf-go.plugin nfacct.plugin xenstat.plugin; do
   f="usr/libexec/netdata/plugins.d/${x}"
 
   if [ -f "${f}" ]; then
     run chmod 4750 "${f}"
+  fi
+done
+
+for x in otel-plugin netflow-plugin snmp-trap-profile-gen; do
+  f="usr/libexec/netdata/plugins.d/${x}"
+  if [ -f "${f}" ]; then
+    run chmod 0750 "${f}"
   fi
 done
 

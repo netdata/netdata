@@ -46,7 +46,8 @@ int do_ipfw(int update_every, usec_t dt) {
     struct ip_fw_bcounter *cntr;
     int c = 0;
 
-    char rule_num_str[12];
+    // holds "<rulenum>_<id>" where each is a uint32 (MAX_INT_DIGITS) plus separator and NUL
+    char rule_num_str[(MAX_INT_DIGITS * 2) + 2];
 
     // variables for dynamic rules handling
 
@@ -225,7 +226,7 @@ int do_ipfw(int update_every, usec_t dt) {
                     break;
 
                 if (likely(do_static)) {
-                    sprintf(rule_num_str, "%"PRIu32"_%"PRIu32"", (uint32_t)rule->rulenum, (uint32_t)rule->id);
+                    snprintfz(rule_num_str, sizeof(rule_num_str), "%"PRIu32"_%"PRIu32"", (uint32_t)rule->rulenum, (uint32_t)rule->id);
 
                     rd_packets = rrddim_find_active(st_packets, rule_num_str);
                     if (unlikely(!rd_packets))
@@ -272,7 +273,11 @@ int do_ipfw(int update_every, usec_t dt) {
                     break;
 
                 dyn_rule = (ipfw_dyn_rule *) (tlv + 1);
+#if __FreeBSD__ >= 15
+                rulenum = (uint16_t)dyn_rule->rulenum;
+#else
                 bcopy(&dyn_rule->rule, &rulenum, sizeof(rulenum));
+#endif
 
                 for (srn = 0; srn < (static_rules_num - 1); srn++) {
                     if (dyn_rule->expire > 0)
@@ -331,7 +336,7 @@ int do_ipfw(int update_every, usec_t dt) {
             }
 
             for (srn = 0; (srn < (static_rules_num - 1)) && (dyn_rules_num[srn].rule_num != IPFW_DEFAULT_RULE); srn++) {
-                sprintf(rule_num_str, "%d", dyn_rules_num[srn].rule_num);
+                snprintfz(rule_num_str, sizeof(rule_num_str), "%d", dyn_rules_num[srn].rule_num);
 
                 rd_active = rrddim_find_active(st_active, rule_num_str);
                 if (unlikely(!rd_active))

@@ -90,7 +90,7 @@ func AutoBoolFromBool(value bool) AutoBool {
 }
 
 // MarshalYAML ensures we always emit the canonical lower-case string.
-func (a AutoBool) MarshalYAML() (interface{}, error) {
+func (a AutoBool) MarshalYAML() (any, error) {
 	return a.String(), nil
 }
 
@@ -98,13 +98,13 @@ func (a AutoBool) MarshalYAML() (interface{}, error) {
 // defaults to auto when empty. Any other value results in an error to ensure
 // early feedback. The signature matches the yaml.v2 marshaler interface so the
 // same implementation works for both yaml.v2 and yaml.v3 consumers.
-func (a *AutoBool) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (a *AutoBool) UnmarshalYAML(unmarshal func(any) error) error {
 	if unmarshal == nil {
 		*a = AutoBoolAuto
 		return nil
 	}
 
-	var raw interface{}
+	var raw any
 	if err := unmarshal(&raw); err != nil {
 		return err
 	}

@@ -3,56 +3,56 @@
 package spigotmc
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioPlayers = module.Priority + iota
+	prioPlayers = collectorapi.Priority + iota
 	prioTps
 	prioMemory
 )
 
-var charts = module.Charts{
+var charts = collectorapi.Charts{
 	playersChart.Copy(),
 	tpsChart.Copy(),
 	memoryChart.Copy(),
 }
 
-var playersChart = module.Chart{
+var playersChart = collectorapi.Chart{
 	ID:       "players",
 	Title:    "Active Players",
 	Units:    "players",
 	Fam:      "players",
 	Ctx:      "spigotmc.players",
 	Priority: prioPlayers,
-	Dims: module.Dims{
+	Dims: collectorapi.Dims{
 		{ID: "players", Name: "players"},
 	},
 }
 
-var tpsChart = module.Chart{
+var tpsChart = collectorapi.Chart{
 	ID:       "avg_tps",
 	Title:    "Average Ticks Per Second",
 	Units:    "ticks",
 	Fam:      "ticks",
 	Ctx:      "spigotmc.avg_tps",
 	Priority: prioTps,
-	Dims: module.Dims{
+	Dims: collectorapi.Dims{
 		{ID: "tps_1min", Name: "1min", Div: precision},
 		{ID: "tps_5min", Name: "5min", Div: precision},
 		{ID: "tps_15min", Name: "15min", Div: precision},
 	},
 }
 
-var memoryChart = module.Chart{
+var memoryChart = collectorapi.Chart{
 	ID:       "memory",
 	Title:    "Memory Usage",
 	Units:    "bytes",
 	Fam:      "mem",
 	Ctx:      "spigotmc.memory",
 	Priority: prioMemory,
-	Type:     module.Area,
-	Dims: module.Dims{
+	Type:     collectorapi.Area,
+	Dims: collectorapi.Dims{
 		{ID: "mem_used", Name: "used"},
 		{ID: "mem_alloc", Name: "alloc"},
 	},

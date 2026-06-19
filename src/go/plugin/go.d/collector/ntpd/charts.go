@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioSystemOffset = module.Priority + iota
+	prioSystemOffset = collectorapi.Priority + iota
 	prioSystemJitter
 	prioSystemFrequency
 	prioSystemWander
@@ -36,7 +36,7 @@ const (
 )
 
 var (
-	systemCharts = module.Charts{
+	systemCharts = collectorapi.Charts{
 		systemOffsetChart.Copy(),
 		systemJitterChart.Copy(),
 		systemFrequencyChart.Copy(),
@@ -47,116 +47,116 @@ var (
 		systemTimeConstantChart.Copy(),
 		systemPrecisionChart.Copy(),
 	}
-	systemOffsetChart = module.Chart{
+	systemOffsetChart = collectorapi.Chart{
 		ID:       "sys_offset",
 		Title:    "Combined offset of server relative to this host",
 		Units:    "milliseconds",
 		Fam:      "system",
 		Ctx:      "ntpd.sys_offset",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioSystemOffset,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "offset", Name: "offset", Div: precision},
 		},
 	}
-	systemJitterChart = module.Chart{
+	systemJitterChart = collectorapi.Chart{
 		ID:       "sys_jitter",
 		Title:    "Combined system jitter and clock jitter",
 		Units:    "milliseconds",
 		Fam:      "system",
 		Ctx:      "ntpd.sys_jitter",
 		Priority: prioSystemJitter,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "sys_jitter", Name: "system", Div: precision},
 			{ID: "clk_jitter", Name: "clock", Div: precision},
 		},
 	}
-	systemFrequencyChart = module.Chart{
+	systemFrequencyChart = collectorapi.Chart{
 		ID:       "sys_frequency",
 		Title:    "Frequency offset relative to hardware clock",
 		Units:    "ppm",
 		Fam:      "system",
 		Ctx:      "ntpd.sys_frequency",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioSystemFrequency,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "frequency", Name: "frequency", Div: precision},
 		},
 	}
-	systemWanderChart = module.Chart{
+	systemWanderChart = collectorapi.Chart{
 		ID:       "sys_wander",
 		Title:    "Clock frequency wander",
 		Units:    "ppm",
 		Fam:      "system",
 		Ctx:      "ntpd.sys_wander",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioSystemWander,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "clk_wander", Name: "clock", Div: precision},
 		},
 	}
-	systemRootDelayChart = module.Chart{
+	systemRootDelayChart = collectorapi.Chart{
 		ID:       "sys_rootdelay",
 		Title:    "Total roundtrip delay to the primary reference clock",
 		Units:    "milliseconds",
 		Fam:      "system",
 		Ctx:      "ntpd.sys_rootdelay",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioSystemRootDelay,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "rootdelay", Name: "delay", Div: precision},
 		},
 	}
-	systemRootDispersionChart = module.Chart{
+	systemRootDispersionChart = collectorapi.Chart{
 		ID:       "sys_rootdisp",
 		Title:    "Total root dispersion to the primary reference clock",
 		Units:    "milliseconds",
 		Fam:      "system",
 		Ctx:      "ntpd.sys_rootdisp",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioSystemRootDispersion,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "rootdisp", Name: "dispersion", Div: precision},
 		},
 	}
-	systemStratumChart = module.Chart{
+	systemStratumChart = collectorapi.Chart{
 		ID:       "sys_stratum",
 		Title:    "Stratum",
 		Units:    "stratum",
 		Fam:      "system",
 		Ctx:      "ntpd.sys_stratum",
 		Priority: prioSystemStratum,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "stratum", Name: "stratum", Div: precision},
 		},
 	}
-	systemTimeConstantChart = module.Chart{
+	systemTimeConstantChart = collectorapi.Chart{
 		ID:       "sys_tc",
 		Title:    "Time constant and poll exponent",
 		Units:    "log2",
 		Fam:      "system",
 		Ctx:      "ntpd.sys_tc",
 		Priority: prioSystemTimeConstant,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "tc", Name: "current", Div: precision},
 			{ID: "mintc", Name: "minimum", Div: precision},
 		},
 	}
-	systemPrecisionChart = module.Chart{
+	systemPrecisionChart = collectorapi.Chart{
 		ID:       "sys_precision",
 		Title:    "Precision",
 		Units:    "log2",
 		Fam:      "system",
 		Ctx:      "ntpd.sys_precision",
 		Priority: prioSystemPrecision,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "precision", Name: "precision", Div: precision},
 		},
 	}
 )
 
 var (
-	peerChartsTmpl = module.Charts{
+	peerChartsTmpl = collectorapi.Charts{
 		peerOffsetChartTmpl.Copy(),
 		peerDelayChartTmpl.Copy(),
 		peerDispersionChartTmpl.Copy(),
@@ -171,146 +171,146 @@ var (
 		peerPeerPollChartTmpl.Copy(),
 		peerPrecisionChartTmpl.Copy(),
 	}
-	peerOffsetChartTmpl = module.Chart{
+	peerOffsetChartTmpl = collectorapi.Chart{
 		ID:       "peer_%s_offset",
 		Title:    "Peer offset",
 		Units:    "milliseconds",
 		Fam:      "peers",
 		Ctx:      "ntpd.peer_offset",
 		Priority: prioPeerOffset,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "peer_%s_offset", Name: "offset", Div: precision},
 		},
 	}
-	peerDelayChartTmpl = module.Chart{
+	peerDelayChartTmpl = collectorapi.Chart{
 		ID:       "peer_%s_delay",
 		Title:    "Peer delay",
 		Units:    "milliseconds",
 		Fam:      "peers",
 		Ctx:      "ntpd.peer_delay",
 		Priority: prioPeerDelay,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "peer_%s_delay", Name: "delay", Div: precision},
 		},
 	}
-	peerDispersionChartTmpl = module.Chart{
+	peerDispersionChartTmpl = collectorapi.Chart{
 		ID:       "peer_%s_dispersion",
 		Title:    "Peer dispersion",
 		Units:    "milliseconds",
 		Fam:      "peers",
 		Ctx:      "ntpd.peer_dispersion",
 		Priority: prioPeerDispersion,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "peer_%s_dispersion", Name: "dispersion", Div: precision},
 		},
 	}
-	peerJitterChartTmpl = module.Chart{
+	peerJitterChartTmpl = collectorapi.Chart{
 		ID:       "peer_%s_jitter",
 		Title:    "Peer jitter",
 		Units:    "milliseconds",
 		Fam:      "peers",
 		Ctx:      "ntpd.peer_jitter",
 		Priority: prioPeerJitter,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "peer_%s_jitter", Name: "jitter", Div: precision},
 		},
 	}
-	peerXleaveChartTmpl = module.Chart{
+	peerXleaveChartTmpl = collectorapi.Chart{
 		ID:       "peer_%s_xleave",
 		Title:    "Peer interleave delay",
 		Units:    "milliseconds",
 		Fam:      "peers",
 		Ctx:      "ntpd.peer_xleave",
 		Priority: prioPeerXleave,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "peer_%s_xleave", Name: "xleave", Div: precision},
 		},
 	}
-	peerRootDelayChartTmpl = module.Chart{
+	peerRootDelayChartTmpl = collectorapi.Chart{
 		ID:       "peer_%s_rootdelay",
 		Title:    "Peer roundtrip delay to the primary reference clock",
 		Units:    "milliseconds",
 		Fam:      "peers",
 		Ctx:      "ntpd.peer_rootdelay",
 		Priority: prioPeerRootDelay,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "peer_%s_rootdelay", Name: "rootdelay", Div: precision},
 		},
 	}
-	peerRootDispersionChartTmpl = module.Chart{
+	peerRootDispersionChartTmpl = collectorapi.Chart{
 		ID:       "peer_%s_rootdisp",
 		Title:    "Peer root dispersion to the primary reference clock",
 		Units:    "milliseconds",
 		Fam:      "peers",
 		Ctx:      "ntpd.peer_rootdisp",
 		Priority: prioPeerRootDispersion,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "peer_%s_rootdisp", Name: "dispersion", Div: precision},
 		},
 	}
-	peerStratumChartTmpl = module.Chart{
+	peerStratumChartTmpl = collectorapi.Chart{
 		ID:       "peer_%s_stratum",
 		Title:    "Peer stratum",
 		Units:    "stratum",
 		Fam:      "peers",
 		Ctx:      "ntpd.peer_stratum",
 		Priority: prioPeerStratum,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "peer_%s_stratum", Name: "stratum", Div: precision},
 		},
 	}
-	peerHostModeChartTmpl = module.Chart{
+	peerHostModeChartTmpl = collectorapi.Chart{
 		ID:       "peer_%s_hmode",
 		Title:    "Peer host mode",
 		Units:    "hmode",
 		Fam:      "peers",
 		Ctx:      "ntpd.peer_hmode",
 		Priority: prioPeerHostMode,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "peer_%s_hmode", Name: "hmode", Div: precision},
 		},
 	}
-	peerPeerModeChartTmpl = module.Chart{
+	peerPeerModeChartTmpl = collectorapi.Chart{
 		ID:       "peer_%s_pmode",
 		Title:    "Peer mode",
 		Units:    "pmode",
 		Fam:      "peers",
 		Ctx:      "ntpd.peer_pmode",
 		Priority: prioPeerPeerMode,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "peer_%s_pmode", Name: "pmode", Div: precision},
 		},
 	}
-	peerHostPollChartTmpl = module.Chart{
+	peerHostPollChartTmpl = collectorapi.Chart{
 		ID:       "peer_%s_hpoll",
 		Title:    "Peer host poll exponent",
 		Units:    "log2",
 		Fam:      "peers",
 		Ctx:      "ntpd.peer_hpoll",
 		Priority: prioPeerHostPoll,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "peer_%s_hpoll", Name: "hpoll", Div: precision},
 		},
 	}
-	peerPeerPollChartTmpl = module.Chart{
+	peerPeerPollChartTmpl = collectorapi.Chart{
 		ID:       "peer_%s_ppoll",
 		Title:    "Peer poll exponent",
 		Units:    "log2",
 		Fam:      "peers",
 		Ctx:      "ntpd.peer_ppoll",
 		Priority: prioPeerPeerPoll,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "peer_%s_ppoll", Name: "hpoll", Div: precision},
 		},
 	}
-	peerPrecisionChartTmpl = module.Chart{
+	peerPrecisionChartTmpl = collectorapi.Chart{
 		ID:       "peer_%s_precision",
 		Title:    "Peer precision",
 		Units:    "log2",
 		Fam:      "peers",
 		Ctx:      "ntpd.peer_precision",
 		Priority: prioPeerPrecision,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "peer_%s_precision", Name: "precision", Div: precision},
 		},
 	}
@@ -321,7 +321,7 @@ func (c *Collector) addPeerCharts(addr string) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, strings.ReplaceAll(addr, ".", "_"))
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "peer_address", Value: addr},
 		}
 		for _, dim := range chart.Dims {

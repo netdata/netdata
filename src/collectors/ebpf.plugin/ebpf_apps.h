@@ -22,7 +22,6 @@
 #include "ebpf_filesystem.h"
 #include "ebpf_functions.h"
 #include "ebpf_hardirq.h"
-#include "ebpf_cachestat.h"
 #include "ebpf_mdflush.h"
 #include "ebpf_mount.h"
 #include "ebpf_oomkill.h"
@@ -40,12 +39,9 @@
 
 #define EBPF_CLEANUP_FACTOR 2
 
-extern int pids_fd[NETDATA_EBPF_PIDS_END_IDX];
-
 enum ebpf_main_index {
     EBPF_MODULE_PROCESS_IDX,
     EBPF_MODULE_SOCKET_IDX,
-    EBPF_MODULE_CACHESTAT_IDX,
     EBPF_MODULE_SYNC_IDX,
     EBPF_MODULE_DCSTAT_IDX,
     EBPF_MODULE_SWAP_IDX,
@@ -87,7 +83,6 @@ struct ebpf_target {
     char clean_name[EBPF_MAX_NAME + 1]; // sanitized name used in chart id (need to replace at least dots)
 
     // Changes made to simplify integration between apps and eBPF.
-    netdata_publish_cachestat_t cachestat;
     netdata_publish_dcstat_t dcstat;
     netdata_publish_swap_t swap;
     netdata_publish_vfs_t vfs;
@@ -118,6 +113,10 @@ extern struct ebpf_target *users_root_target;
 extern struct ebpf_target *groups_root_target;
 extern uint64_t collect_pids;
 
+void ebpf_reset_pid_map_fds(void);
+void ebpf_set_pid_map_fd(int idx, int fd);
+int ebpf_get_pid_map_fd(int idx);
+
 // ebpf_pid_data
 typedef struct __attribute__((packed)) ebpf_pid_data {
     uint32_t pid;
@@ -140,16 +139,14 @@ typedef struct __attribute__((packed)) ebpf_pid_data {
 
     netdata_publish_fd_stat_t *fd;
     netdata_publish_swap_t *swap;
-    netdata_publish_shm_t *shm; // this has a leak issue
+    netdata_publish_shm_t *shm;
     netdata_publish_dcstat_t *dc;
     netdata_publish_vfs_t *vfs;
-    netdata_publish_cachestat_t *cachestat;
     ebpf_publish_process_t *process;
     ebpf_socket_publish_apps_t *socket;
 
 } ebpf_pid_data_t;
 
-//extern ebpf_pid_data_t *ebpf_pids;
 extern ebpf_pid_data_t *ebpf_pids_link_list;
 extern size_t ebpf_all_pids_count;
 extern size_t ebpf_hash_table_pids_count;
@@ -159,7 +156,6 @@ ebpf_pid_data_t *ebpf_find_or_create_pid_data(pid_t pid);
 
 static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, char *name, uint32_t idx)
 {
-    //    ebpf_pid_data_t *ptr = &ebpf_pids[pid];
     ebpf_pid_data_t *ptr = ebpf_find_or_create_pid_data(pid);
     ptr->thread_collecting |= 1 << idx;
     // The caller is getting data to work.
@@ -188,65 +184,15 @@ static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, ch
     return ptr;
 }
 
-static inline void ebpf_release_pid_data(ebpf_pid_data_t *eps, int fd, uint32_t key, uint32_t idx)
-{
-    if (fd) {
-        bpf_map_delete_elem(fd, &key);
-    }
-    eps->thread_collecting &= ~(1 << idx);
-    if (!eps->thread_collecting && !eps->has_proc_file) {
-        ebpf_del_pid_entry((pid_t)key);
-    }
-}
-
+// The only caller of ebpf_get_pid_data() passes NETDATA_EBPF_PIDS_PROC_FILE,
+// so `thread_collecting` in an ebpf_pid_data_t only ever has that single high
+// bit set. The per-module (idx < PROC_FILE) branch in the old
+// ebpf_reset_specific_pid_data() was therefore unreachable. Collapse the
+// function to its effective behaviour so a future reader is not confused by
+// dead BPF/freez housekeeping that never ran.
 static inline void ebpf_reset_specific_pid_data(ebpf_pid_data_t *ptr)
 {
-    int idx;
-    uint32_t pid = ptr->pid;
-    for (idx = NETDATA_EBPF_PIDS_PROCESS_IDX; idx < NETDATA_EBPF_PIDS_PROC_FILE; idx++) {
-        if (!(ptr->thread_collecting & (1 << idx))) {
-            continue;
-        }
-        // Check if we still have the map loaded
-        int fd = pids_fd[idx];
-        if (fd <= STDERR_FILENO)
-            continue;
-
-        bpf_map_delete_elem(fd, &pid);
-        ebpf_hash_table_pids_count--;
-        void *clean;
-        switch (idx) {
-            case NETDATA_EBPF_PIDS_PROCESS_IDX:
-                clean = ptr->process;
-                break;
-            case NETDATA_EBPF_PIDS_SOCKET_IDX:
-                clean = ptr->socket;
-                break;
-            case NETDATA_EBPF_PIDS_CACHESTAT_IDX:
-                clean = ptr->cachestat;
-                break;
-            case NETDATA_EBPF_PIDS_DCSTAT_IDX:
-                clean = ptr->dc;
-                break;
-            case NETDATA_EBPF_PIDS_SWAP_IDX:
-                clean = ptr->swap;
-                break;
-            case NETDATA_EBPF_PIDS_VFS_IDX:
-                clean = ptr->vfs;
-                break;
-            case NETDATA_EBPF_PIDS_FD_IDX:
-                clean = ptr->fd;
-                break;
-            case NETDATA_EBPF_PIDS_SHM_IDX:
-                clean = ptr->shm;
-                break;
-            default:
-                clean = NULL;
-        }
-        freez(clean);
-    }
-
-    ebpf_del_pid_entry(pid);
+    ebpf_del_pid_entry(ptr->pid);
 }
 
 typedef struct ebpf_pid_stat {
@@ -257,7 +203,6 @@ typedef struct ebpf_pid_stat {
 
     uint32_t log_thrown;
 
-    // char state;
     uint32_t ppid;
 
     int children_count;              // number of processes directly referencing this
@@ -271,7 +216,6 @@ typedef struct ebpf_pid_stat {
     int sortlist; // higher numbers = top on the process tree
 
     // each process gets a unique number
-    netdata_publish_cachestat_t cachestat;
     netdata_publish_dcstat_t dc;
     netdata_fd_stat_t fd;
     ebpf_process_stat_t process;
@@ -288,8 +232,6 @@ typedef struct ebpf_pid_stat {
 
     usec_t stat_collected_usec;
     usec_t last_stat_collected_usec;
-
-    netdata_publish_cachestat_t cache;
 
     char *stat_filename;
     char *status_filename;
@@ -378,7 +320,6 @@ void ebpf_parse_proc_files();
 
 // ARAL Section end
 
-// Threads integrated with apps
 // Threads integrated with apps
 
 #include "libnetdata/threads/threads.h"

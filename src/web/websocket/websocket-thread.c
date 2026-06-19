@@ -105,6 +105,29 @@ struct pipe_header {
     };
 };
 
+static ssize_t write_pipe_block(int fd, const void *buffer, size_t size) {
+    const char *buf = buffer;
+    ssize_t total_written = 0;
+
+    while (total_written < (ssize_t) size) {
+        ssize_t bytes = write(fd, buf + total_written, size - total_written);
+
+        if (bytes < 0) {
+            if (errno == EINTR)
+                continue;
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+                return total_written;
+            return -1;
+        }
+        else if (bytes == 0)
+            return total_written;
+
+        total_written += bytes;
+    }
+
+    return total_written;
+}
+
 // Send command to a thread
 bool websocket_thread_send_command(WEBSOCKET_THREAD *wth, uint8_t cmd, uint32_t id) {
     if(!wth || wth->cmd.pipe[PIPE_WRITE] == -1) {
@@ -122,8 +145,8 @@ bool websocket_thread_send_command(WEBSOCKET_THREAD *wth, uint8_t cmd, uint32_t 
     spinlock_lock(&wth->spinlock);
 
     // Write command header
-    ssize_t bytes = write(wth->cmd.pipe[PIPE_WRITE], &header, sizeof(header));
-    if(bytes != sizeof(header)) {
+    ssize_t bytes = write_pipe_block(wth->cmd.pipe[PIPE_WRITE], &header, sizeof(header));
+    if(bytes != (ssize_t)sizeof(header)) {
         netdata_log_error("WEBSOCKET[%zu]: Failed to write command header to pipe", wth->id);
         spinlock_unlock(&wth->spinlock);
         return false;
@@ -136,12 +159,17 @@ bool websocket_thread_send_command(WEBSOCKET_THREAD *wth, uint8_t cmd, uint32_t 
 }
 
 bool websocket_thread_send_broadcast(WEBSOCKET_THREAD *wth, WEBSOCKET_OPCODE opcode, const char *message) {
-    if(!wth || wth->cmd.pipe[PIPE_WRITE] == -1) {
+    if(!wth || !message || wth->cmd.pipe[PIPE_WRITE] == -1) {
         netdata_log_error("WEBSOCKET[%zu]: Failed to send command - pipe is not initialized", wth ? wth->id : 0);
         return false;
     }
 
-    uint32_t message_len = strlen(message);
+    size_t message_len_sz = strlen(message);
+    if(message_len_sz > UINT32_MAX || message_len_sz > WS_MAX_OUTGOING_FRAME_SIZE) {
+        netdata_log_error("WEBSOCKET[%zu]: Broadcast message too large: %zu bytes", wth ? wth->id : 0, message_len_sz);
+        return false;
+    }
+    uint32_t message_len = (uint32_t)message_len_sz;
 
     // Prepare command
     struct pipe_header header = {
@@ -153,24 +181,24 @@ bool websocket_thread_send_broadcast(WEBSOCKET_THREAD *wth, WEBSOCKET_OPCODE opc
     spinlock_lock(&wth->spinlock);
 
     // Write command header
-    ssize_t bytes = write(wth->cmd.pipe[PIPE_WRITE], &header, sizeof(header.cmd));
-    if(bytes != sizeof(header.cmd)) {
+    ssize_t bytes = write_pipe_block(wth->cmd.pipe[PIPE_WRITE], &header, sizeof(header));
+    if(bytes != (ssize_t)sizeof(header)) {
         netdata_log_error("WEBSOCKET[%zu]: Failed to write command header to pipe", wth->id);
         spinlock_unlock(&wth->spinlock);
         return false;
     }
 
     // Write the opcode
-    bytes = write(wth->cmd.pipe[PIPE_WRITE], &opcode, sizeof(opcode));
-    if(bytes != sizeof(opcode)) {
+    bytes = write_pipe_block(wth->cmd.pipe[PIPE_WRITE], &opcode, sizeof(opcode));
+    if(bytes != (ssize_t)sizeof(opcode)) {
         netdata_log_error("WEBSOCKET[%zu]: Failed to write broadcast opcode to pipe", wth->id);
         spinlock_unlock(&wth->spinlock);
         return false;
     }
 
     // Write the message
-    bytes = write(wth->cmd.pipe[PIPE_WRITE], message, message_len);;
-    if(bytes != message_len) {
+    bytes = write_pipe_block(wth->cmd.pipe[PIPE_WRITE], message, message_len);
+    if(bytes != (ssize_t)message_len) {
         netdata_log_error("WEBSOCKET[%zu]: Failed to write broadcast message to pipe", wth->id);
         spinlock_unlock(&wth->spinlock);
         return false;
@@ -281,19 +309,50 @@ static void websocket_thread_process_commands(WEBSOCKET_THREAD *wth) {
                     continue;
                 }
 
+                if(header.len < sizeof(opcode)) {
+                    netdata_log_error("WEBSOCKET[%zu]: Broadcast command header.len %u is too small", wth->id, header.len);
+                    continue;
+                }
                 uint32_t message_len = header.len - sizeof(opcode);
-                char message[message_len + 1];
+                if(message_len > WS_MAX_OUTGOING_FRAME_SIZE) {
+                    netdata_log_error("WEBSOCKET[%zu]: Broadcast message too large: %u bytes", wth->id, message_len);
+                    // Drain the payload to keep the pipe synchronized for subsequent commands.
+                    char drain_buf[4096];
+                    uint32_t remaining = message_len;
+                    while(remaining > 0) {
+                        size_t chunk = (remaining < sizeof(drain_buf)) ? remaining : sizeof(drain_buf);
+                        ssize_t drained = read_pipe_block(wth->cmd.pipe[PIPE_READ], drain_buf, chunk);
+                        if(drained <= 0) {
+                            // Cannot complete drain: close both pipe ends so the next poll cycle does not
+                            // try to parse the leftover payload bytes as a new pipe_header, and so that
+                            // future write attempts fail the FD guard rather than hitting EPIPE.
+                            netdata_log_error("WEBSOCKET[%zu]: Failed to fully drain oversized broadcast payload, closing command pipe to avoid desynchronization", wth->id);
+                            if(wth->cmd.pipe[PIPE_READ] != -1) {
+                                close(wth->cmd.pipe[PIPE_READ]);
+                                wth->cmd.pipe[PIPE_READ] = -1;
+                            }
+                            if(wth->cmd.pipe[PIPE_WRITE] != -1) {
+                                close(wth->cmd.pipe[PIPE_WRITE]);
+                                wth->cmd.pipe[PIPE_WRITE] = -1;
+                            }
+                            return;
+                        }
+                        remaining -= (uint32_t)drained;
+                    }
+                    continue;
+                }
+                if(message_len + 1 > wth->cmd.buffer_size) {
+                    wth->cmd.buffer = reallocz(wth->cmd.buffer, message_len + 1);
+                    wth->cmd.buffer_size = message_len + 1;
+                }
+
+                char *message = wth->cmd.buffer;
                 bytes = read_pipe_block(wth->cmd.pipe[PIPE_READ], message, message_len);
                 if(bytes != message_len) {
                     netdata_log_error("WEBSOCKET[%zu]: Failed to read broadcast message from pipe", wth->id);
                     continue;
                 }
-
-                // Ensure we have the complete message
-                if(header.len != sizeof(WEBSOCKET_OPCODE) + message_len) {
-                    netdata_log_error("WEBSOCKET[%zu]: Broadcast command size mismatch", wth->id);
-                    continue;
-                }
+                message[message_len] = '\0';
                 
                 // Send to all clients in this thread
                 spinlock_lock(&wth->clients_spinlock);
@@ -567,6 +626,10 @@ void websocket_thread(void *ptr) {
         close(wth->cmd.pipe[PIPE_WRITE]);
         wth->cmd.pipe[PIPE_WRITE] = -1;
     }
+
+    freez(wth->cmd.buffer);
+    wth->cmd.buffer = NULL;
+    wth->cmd.buffer_size = 0;
 
     // Mark thread as not running
     spinlock_lock(&wth->spinlock);

@@ -250,6 +250,9 @@ struct mqtt_ng_client {
     c_rhash rx_aliases;
 
     size_t max_msg_size;
+
+    // MQTT 5.0 server Receive Maximum (CONNACK prop 0x21); absent => 65535 default [MQTT-3.2.2.3.3]
+    uint16_t rx_maximum;
 };
 
 usec_t publish_latency;
@@ -629,6 +632,9 @@ struct mqtt_ng_client *mqtt_ng_init(struct mqtt_ng_init *settings)
 
     client->tx_topic_aliases.stoi_dict = TX_ALIASES_INITIALIZE();
     client->tx_topic_aliases.idx_max = UINT16_MAX;
+
+    // MQTT 5.0 default Receive Maximum when the server omits the property [MQTT-3.2.2.3.3]
+    __atomic_store_n(&client->rx_maximum, UINT16_MAX, __ATOMIC_RELAXED);
 
     // TODO just embed the struct into mqtt_ng_client
     client->parser.received_data = settings->data_in;
@@ -1300,13 +1306,16 @@ int mqtt_ng_publish(struct mqtt_ng_client *client,
 
     if (client->max_msg_size && PUBLISH_SP_SIZE + mqtt_ng_publish_size(topic, msg_len, topic_id) > client->max_msg_size) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Message too big for server: %zu", msg_len);
-        if (msg_free)
-            msg_free(msg);
         return MQTT_NG_MSGGEN_MSG_TOO_BIG;
     }
 
+    // Ownership contract on failure: do NOT free msg or clear *packet_id here.
+    // The sole caller (mqtt_wss_publish5) owns cleanup on every non-OK return.
+    // On MQTT_NG_MSGGEN_OK, msg is attached to a buffer fragment and freed by
+    // the transaction-buffer GC after ack; *packet_id has been written by the
+    // generator. See the long comment in mqtt_wss_publish5 for the invariant.
     int rc = TRY_GENERATE_MESSAGE(mqtt_ng_generate_publish, topic, topic_free, msg, msg_free, msg_len, publish_flags, packet_id, topic_id);
-    if (rc == MQTT_NG_MSGGEN_OK)
+    if (rc == MQTT_NG_MSGGEN_OK && packet_id)
         add_packet_to_timeout_monitor_list(client, *packet_id);
     return rc;
 }
@@ -2141,6 +2150,11 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
                 client->max_msg_size = prop->data.uint32;
             }
 
+            if ((prop = get_property_by_id(client->parser.properties_parser.head, MQTT_PROP_RECEIVE_MAX)) != NULL) {
+                nd_log(NDLS_DAEMON, NDLP_INFO, "ACLK: MQTT server receive maximum is %" PRIu16, prop->data.uint16);
+                __atomic_store_n(&client->rx_maximum, prop->data.uint16, __ATOMIC_RELAXED);
+            }
+
             if (client->connack_callback)
                 client->connack_callback(client->user_ctx, client->parser.mqtt_packet.connack.reason_code);
             if (!client->parser.mqtt_packet.connack.reason_code) {
@@ -2297,6 +2311,7 @@ void mqtt_ng_get_stats(struct mqtt_ng_client *client, struct mqtt_ng_stats *stat
     stats->tx_messages_sent = __atomic_load_n(&client->stats.tx_messages_sent, __ATOMIC_RELAXED);
     stats->rx_messages_rcvd = __atomic_load_n(&client->stats.rx_messages_rcvd, __ATOMIC_RELAXED);
     stats->packets_waiting_puback = __atomic_load_n(&client->stats.packets_waiting_puback, __ATOMIC_RELAXED);
+    stats->rx_maximum = __atomic_load_n(&client->rx_maximum, __ATOMIC_RELAXED);
 
     stats->tx_bytes_queued = 0;
     stats->tx_buffer_reclaimable = 0;

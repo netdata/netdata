@@ -1405,13 +1405,17 @@ static double ks_2samp(
 }
 
 static double kstwo(
+    ONEWAYALLOC *owa,
     NETDATA_DOUBLE baseline[], int baseline_points,
     NETDATA_DOUBLE highlight[], int highlight_points,
     uint32_t base_shifts) {
 
+    if(unlikely(baseline_points <= 1 || highlight_points <= 1))
+        return NAN;
+
     // -1 in size, since the calculate_pairs_diffs() returns one less point
-    DIFFS_NUMBERS baseline_diffs[baseline_points - 1];
-    DIFFS_NUMBERS highlight_diffs[highlight_points - 1];
+    DIFFS_NUMBERS *baseline_diffs = onewayalloc_mallocz(owa, (size_t)(baseline_points - 1) * sizeof(*baseline_diffs));
+    DIFFS_NUMBERS *highlight_diffs = onewayalloc_mallocz(owa, (size_t)(highlight_points - 1) * sizeof(*highlight_diffs));
 
     int base_size = (int)calculate_pairs_diff(baseline_diffs, baseline, baseline_points);
     int high_size = (int)calculate_pairs_diff(highlight_diffs, highlight, highlight_points);
@@ -1549,7 +1553,7 @@ static void rrdset_metric_correlations_ks2(
 
     stats->binary_searches += 2 * (base_points - 1) + 2 * (high_points - 1);
 
-    double prob = kstwo(baseline, (int)base_points, highlight, (int)high_points, shifts);
+    double prob = kstwo(owa, baseline, (int)base_points, highlight, (int)high_points, shifts);
     if(!isnan(prob) && !isinf(prob)) {
 
         // these conditions should never happen, but still let's check
@@ -1805,7 +1809,7 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
         stats->max_base_high_ratio = 1.0;
 
     // create an array of the right size and copy all the values in it
-    NETDATA_DOUBLE slots[dimensions];
+    NETDATA_DOUBLE *slots = mallocz(dimensions * sizeof(*slots));
     dimensions = 0;
     dfe_start_read(results, t) {
         if(t->flags & RESULT_IS_PERCENTAGE_OF_TIME)
@@ -1815,7 +1819,10 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
     }
     dfe_done(t);
 
-    if(!dimensions) return 0;   // Coverity fix
+    if(!dimensions) {
+        freez(slots);
+        return 0;   // Coverity fix
+    }
 
     // sort the array with the values of all dimensions
     qsort(slots, dimensions, sizeof(NETDATA_DOUBLE), compare_netdata_doubles);
@@ -1844,6 +1851,7 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
     }
     dfe_done(t);
 
+    freez(slots);
     return dimensions;
 }
 
@@ -2691,4 +2699,3 @@ int mc_unittest(void) {
 
     return errors;
 }
-

@@ -47,9 +47,10 @@ The following options can be defined for this notification
 |:-----|:------------|:--------|:---------:|
 | SEND_MATRIX | Set `SEND_MATRIX` to YES | YES | yes |
 | MATRIX_HOMESERVER | set `MATRIX_HOMESERVER` to the URL of the Matrix homeserver. |  | yes |
-| MATRIX_ACCESSTOKEN | Set `MATRIX_ACCESSTOKEN` to the access token from your Matrix account. |  | yes |
-| DEFAULT_RECIPIENT_MATRIX | Set `DEFAULT_RECIPIENT_MATRIX`  to the Rooms you want the alert notifications to be sent to. The format is `!roomid:homeservername`. |  | yes |
+| [MATRIX_ACCESSTOKEN](#option-matrix-accesstoken) | Set `MATRIX_ACCESSTOKEN` to the access token from your Matrix account. |  | yes |
+| [DEFAULT_RECIPIENT_MATRIX](#option-default-recipient-matrix) | Set `DEFAULT_RECIPIENT_MATRIX`  to the Rooms you want the alert notifications to be sent to. The format is `!roomid:homeservername`. |  | yes |
 
+<a id="option-matrix-accesstoken"></a>
 ##### MATRIX_ACCESSTOKEN
 
 To obtain the access token, you can use the following curl command:
@@ -58,6 +59,7 @@ curl -XPOST -d '{"type":"m.login.password", "user":"example", "password":"wordpa
 ```
 
 
+<a id="option-default-recipient-matrix"></a>
 ##### DEFAULT_RECIPIENT_MATRIX
 
 The Room ids are unique identifiers and can be obtained from the Room settings in a Matrix client (e.g. Riot).

@@ -20,7 +20,6 @@ modules:
         - processes
         - os
         - host monitoring
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor Applications for optimal software performance and resource usage."
@@ -124,6 +123,30 @@ modules:
               dimensions:
                 - name: minor
                 - name: major
+            - name: app.ebpf_cachestat_hit_ratio
+              description: Hit ratio
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: ratio
+            - name: app.ebpf_cachestat_dirty_pages
+              description: Number of dirty pages
+              unit: "page/s"
+              chart_type: stacked
+              dimensions:
+                - name: pages
+            - name: app.ebpf_cachestat_access
+              description: Number of accessed files
+              unit: "hits/s"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+            - name: app.ebpf_cachestat_misses
+              description: Files out of page cache
+              unit: "misses/s"
+              chart_type: stacked
+              dimensions:
+                - name: misses
             - name: app.swap_usage
               description: Apps swap usage
               unit: MiB
@@ -190,6 +213,74 @@ modules:
                 - name: min
                 - name: avg
                 - name: max
+        - name: apps plugin IPC
+          description: apps.plugin netipc lookup-client and lookup-server health and latency.
+          labels: []
+          metrics:
+            - name: netdata.collector.ipc.cgroups_lookup.client.requests
+              description: CGROUPS_LOOKUP client request outcomes
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: requests_sent
+                - name: requests_responded
+                - name: requests_timeout
+                - name: requests_error
+            - name: netdata.collector.ipc.cgroups_lookup.client.cache
+              description: CGROUPS_LOOKUP client cache outcomes
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: cache_hits
+                - name: cache_misses_retry
+                - name: cache_misses_permanent
+                - name: cache_evictions
+            - name: netdata.collector.ipc.cgroups_lookup.client.peer
+              description: CGROUPS_LOOKUP client peer connection events
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: peer_connect_attempts
+                - name: peer_disconnects
+            - name: netdata.collector.ipc.cgroups_lookup.client.request_duration_ms
+              description: CGROUPS_LOOKUP client request duration buckets
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: le_1ms
+                - name: le_5ms
+                - name: le_10ms
+                - name: le_50ms
+                - name: le_100ms
+                - name: le_500ms
+                - name: le_1000ms
+                - name: gt_1000ms
+            - name: netdata.collector.ipc.cgroups_lookup.client.queue_depth
+              description: CGROUPS_LOOKUP client queued cgroup paths
+              unit: "paths"
+              chart_type: line
+              dimensions:
+                - name: queue_depth
+            - name: netdata.collector.ipc.apps_lookup.server.requests
+              description: APPS_LOOKUP server request outcomes
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: requests_responded
+                - name: requests_error
+            - name: netdata.collector.ipc.apps_lookup.server.request_duration_ms
+              description: APPS_LOOKUP server request duration buckets
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: le_1ms
+                - name: le_5ms
+                - name: le_10ms
+                - name: le_50ms
+                - name: le_100ms
+                - name: le_500ms
+                - name: le_1000ms
+                - name: gt_1000ms
   - meta:
       plugin_name: apps.plugin
       module_name: groups
@@ -211,7 +302,6 @@ modules:
         - authorization
         - os
         - host monitoring
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This integration monitors resource utilization on a user groups context."
@@ -400,7 +490,6 @@ modules:
         - processes
         - os
         - host monitoring
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This integration monitors resource utilization on a user context."
@@ -564,6 +653,150 @@ modules:
                 - name: uptime
             - name: user.uptime_summary
               description: User uptime summary
+              unit: seconds
+              chart_type: area
+              dimensions:
+                - name: min
+                - name: avg
+                - name: max
+  - meta:
+      plugin_name: apps.plugin
+      module_name: services
+      monitored_instance:
+        name: Windows Services
+        link: ""
+        categories:
+          - data-collection.operating-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - services
+        - processes
+        - os
+        - host monitoring
+    overview:
+      data_collection:
+        metrics_description: "This integration monitors resource utilization grouped by Windows Service."
+        method_description: "It auto-discovers running Windows services via the Service Control Manager and groups each service's process tree to aggregate CPU, memory, I/O, and other metrics per service. Processes not belonging to any service are grouped under 'not-services'."
+      supported_platforms:
+        include:
+          - windows
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: "All running Windows services are automatically discovered. No configuration is needed."
+        limits:
+          description: ""
+        performance_impact:
+          description: "No additional SCM query overhead. The service list is already queried by apps.plugin for process naming. Per-iteration work involves walking parent chains to assign service names."
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: "Service charts are enabled by default. Use the `without-services` (or `no-services`) command line option to disable them."
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability:
+        - windows
+      scopes:
+        - name: windows service
+          description: These metrics refer to the Windows Service.
+          labels:
+            - name: service
+              description: The display name of the Windows service.
+          metrics:
+            - name: service.cpu_utilization
+              description: Windows Service CPU utilization (100% = 1 core)
+              unit: percentage
+              chart_type: stacked
+              dimensions:
+                - name: user
+                - name: system
+            - name: service.mem_usage
+              description: Windows Service memory RSS usage
+              unit: MiB
+              chart_type: area
+              dimensions:
+                - name: rss
+            - name: service.vmem_usage
+              description: Windows Service virtual memory size
+              unit: MiB
+              chart_type: line
+              dimensions:
+                - name: vmem
+            - name: service.mem_page_faults
+              description: Windows Service memory page faults
+              unit: pgfaults/s
+              chart_type: stacked
+              dimensions:
+                - name: minor
+            - name: service.swap_usage
+              description: Windows Service swap usage
+              unit: MiB
+              chart_type: area
+              dimensions:
+                - name: swap
+            - name: service.disk_logical_io
+              description: Windows Service disk logical IO
+              unit: KiB/s
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: service.fds_open
+              description: Windows Service open handles
+              unit: fds
+              chart_type: stacked
+              dimensions:
+                - name: handles
+            - name: service.processes
+              description: Windows Service processes
+              unit: processes
+              chart_type: line
+              dimensions:
+                - name: processes
+            - name: service.threads
+              description: Windows Service threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: threads
+            - name: service.uptime
+              description: Windows Service uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+            - name: service.uptime_summary
+              description: Windows Service uptime summary
               unit: seconds
               chart_type: area
               dimensions:

@@ -1560,8 +1560,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         if (d->do_io == CONFIG_BOOLEAN_YES || d->do_io == CONFIG_BOOLEAN_AUTO) {
             d->do_io = CONFIG_BOOLEAN_YES;
 
-            last_readsectors = d->disk_io.rd_io_reads ? d->disk_io.rd_io_reads->collector.last_collected_value / SECTOR_SIZE : 0;
-            last_writesectors = d->disk_io.rd_io_writes ? d->disk_io.rd_io_writes->collector.last_collected_value / SECTOR_SIZE : 0;
+            last_readsectors = d->disk_io.rd_io_reads ? rrddim_last_collected_raw_int(d->disk_io.rd_io_reads) / SECTOR_SIZE : 0;
+            last_writesectors = d->disk_io.rd_io_writes ? rrddim_last_collected_raw_int(d->disk_io.rd_io_writes) / SECTOR_SIZE : 0;
 
             common_disk_io(&d->disk_io,
                            d->chart_id,
@@ -1602,8 +1602,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         if (d->do_ops == CONFIG_BOOLEAN_YES || d->do_ops == CONFIG_BOOLEAN_AUTO) {
             d->do_ops = CONFIG_BOOLEAN_YES;
 
-            last_rd_ios = d->disk_ops.rd_ops_reads ? d->disk_ops.rd_ops_reads->collector.last_collected_value : 0;
-            last_wr_ios = d->disk_ops.rd_ops_writes ? d->disk_ops.rd_ops_writes->collector.last_collected_value : 0;
+            last_rd_ios = d->disk_ops.rd_ops_reads ? rrddim_last_collected_raw_int(d->disk_ops.rd_ops_reads) : 0;
+            last_wr_ios = d->disk_ops.rd_ops_writes ? rrddim_last_collected_raw_int(d->disk_ops.rd_ops_writes) : 0;
 
             common_disk_ops(&d->disk_ops,
                            d->chart_id,
@@ -1687,7 +1687,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         if (d->do_util == CONFIG_BOOLEAN_YES || d->do_util == CONFIG_BOOLEAN_AUTO) {
             d->do_util = CONFIG_BOOLEAN_YES;
 
-            last_busy_ms = d->disk_busy.rd_busy ? d->disk_busy.rd_busy->collector.last_collected_value : 0;
+            last_busy_ms = d->disk_busy.rd_busy ? rrddim_last_collected_raw_int(d->disk_busy.rd_busy) : 0;
 
             common_disk_busy(&d->disk_busy,
                              d->chart_id,
@@ -1772,8 +1772,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         if (d->do_iotime == CONFIG_BOOLEAN_YES || d->do_iotime == CONFIG_BOOLEAN_AUTO) {
             d->do_iotime = CONFIG_BOOLEAN_YES;
 
-            last_readms  = d->disk_iotime.rd_reads_ms ? d->disk_iotime.rd_reads_ms->collector.last_collected_value : 0;
-            last_writems = d->disk_iotime.rd_writes_ms ? d->disk_iotime.rd_writes_ms->collector.last_collected_value : 0;
+            last_readms  = d->disk_iotime.rd_reads_ms ? rrddim_last_collected_raw_int(d->disk_iotime.rd_reads_ms) : 0;
+            last_writems = d->disk_iotime.rd_writes_ms ? rrddim_last_collected_raw_int(d->disk_iotime.rd_writes_ms) : 0;
 
             common_disk_iotime(
                     &d->disk_iotime,

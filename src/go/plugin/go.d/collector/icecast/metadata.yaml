@@ -18,7 +18,6 @@ modules:
         - icecast
         - streaming
         - media
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This collector monitors Icecast listener counts."

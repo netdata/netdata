@@ -327,17 +327,19 @@ DEFINE_JUDYL_TYPED(STACKTRACE, size_t);
 #endif
 
 static void dictionary_queue_for_destruction(DICTIONARY *dict) {
-    if(is_dictionary_destroyed(dict))
-        return;
+    netdata_mutex_lock(&dictionaries_waiting_to_be_destroyed_mutex);
+
+    if(dict_flag_check(dict, DICT_FLAG_QUEUED_FOR_DESTRUCTION))
+        goto cleanup;
 
     DICTIONARY_STATS_DICT_DESTROY_QUEUED_PLUS1(dict);
     dict_flag_set(dict, DICT_FLAG_DESTROYED);
-
-    netdata_mutex_lock(&dictionaries_waiting_to_be_destroyed_mutex);
+    dict_flag_set(dict, DICT_FLAG_QUEUED_FOR_DESTRUCTION);
 
     dict->next = dictionaries_waiting_to_be_destroyed;
     dictionaries_waiting_to_be_destroyed = dict;
 
+cleanup:
     netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
 }
 
@@ -661,7 +663,8 @@ void dictionary_flush(DICTIONARY *dict) {
 size_t dictionary_destroy(DICTIONARY *dict) {
     cleanup_destroyed_dictionaries(false);
 
-    if(!dict) return 0;
+    if(!dict || unlikely(is_dictionary_destroyed(dict)))
+        return 0;
 
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
 
@@ -676,6 +679,31 @@ size_t dictionary_destroy(DICTIONARY *dict) {
             true, dict,
             "DICTIONARY: delaying destruction of dictionary, because it has %d referenced items in it (%d total).",
             dict->referenced_items, dict->entries);
+
+        ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
+        return 0;
+    }
+
+    dict_flag_set(dict, DICT_FLAG_DESTROYED);
+
+    // Destroy the index while holding the items write lock.
+    // This prevents a TOCTOU race: without this, a reader could pass the
+    // is_dictionary_destroyed() check, then acquire an item via the index,
+    // after we've decided to force-free all items.
+    // By destroying the index here, any concurrent dictionary_get_and_acquire_item()
+    // that acquires the index lock after this point will find an empty index.
+    // This uses hashtable_destroy_unsafe(); the later cleanup path in
+    // dictionary_free_all_resources() may invoke the same index teardown
+    // again, so this relies on that full destruction flow being safe to repeat.
+    dictionary_index_lock_wrlock(dict);
+    hashtable_destroy_unsafe(dict);
+    dictionary_index_wrlock_unlock(dict);
+
+    // Re-check: a reader that held the index read lock during the destroy
+    // above may have acquired an item before we got the index write lock.
+    // If so, fall back to the deferred destruction path.
+    if(dictionary_referenced_items(dict)) {
+        dictionary_queue_for_destruction(dict);
 
         ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
         return 0;

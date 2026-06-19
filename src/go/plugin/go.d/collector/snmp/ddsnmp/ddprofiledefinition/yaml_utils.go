@@ -11,7 +11,7 @@ package ddprofiledefinition
 type StringArray []string
 
 // UnmarshalYAML unmarshalls StringArray
-func (a *StringArray) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (a *StringArray) UnmarshalYAML(unmarshal func(any) error) error {
 	var multi []string
 	err := unmarshal(&multi)
 	if err != nil {
@@ -28,7 +28,7 @@ func (a *StringArray) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 // UnmarshalYAML unmarshalls SymbolConfig
-func (a *SymbolConfigCompat) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (a *SymbolConfigCompat) UnmarshalYAML(unmarshal func(any) error) error {
 	var symbol SymbolConfig
 	err := unmarshal(&symbol)
 	if err != nil {
@@ -45,7 +45,7 @@ func (a *SymbolConfigCompat) UnmarshalYAML(unmarshal func(interface{}) error) er
 }
 
 // UnmarshalYAML unmarshalls MetricTagConfigList
-func (mtcl *MetricTagConfigList) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (mtcl *MetricTagConfigList) UnmarshalYAML(unmarshal func(any) error) error {
 	var multi []MetricTagConfig
 	err := unmarshal(&multi)
 	if err != nil {

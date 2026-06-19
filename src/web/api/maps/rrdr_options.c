@@ -74,17 +74,57 @@ RRDR_OPTIONS rrdr_options_parse_one(const char *o) {
     return ret;
 }
 
-RRDR_OPTIONS rrdr_options_parse(const char *options_str) {
-    char src[strlen(options_str) + 1];
-    strcatz(src, 0, options_str, sizeof(src));
-    char *o = src;
+static inline bool rrdr_options_is_separator(char c) {
+    return c == ',' || c == ' ' || c == '|';
+}
 
+static inline bool rrdr_option_token_matches(const char *token, size_t len, const char *name) {
+    if(!name)
+        return false;
+
+    for(size_t i = 0; i < len; i++) {
+        if(!name[i] || token[i] != name[i])
+            return false;
+    }
+
+    return name[len] == '\0';
+}
+
+static RRDR_OPTIONS rrdr_options_parse_one_n(const char *o, size_t len) {
     RRDR_OPTIONS ret = 0;
-    char *tok;
 
-    while(o && *o && (tok = strsep_skip_consecutive_separators(&o, ", |"))) {
-        if(!*tok) continue;
-        ret |= rrdr_options_parse_one(tok);
+    if(!o || !len) return ret;
+
+    for(int i = 0; ; i++) {
+        const char *name = rrdr_options[i].name;
+        if(!name)
+            break;
+
+        if (rrdr_option_token_matches(o, len, name)) {
+            ret |= rrdr_options[i].value;
+            break;
+        }
+    }
+
+    return ret;
+}
+
+RRDR_OPTIONS rrdr_options_parse(const char *options_str) {
+    RRDR_OPTIONS ret = 0;
+
+    if(!options_str || !*options_str)
+        return ret;
+
+    const char *s = options_str;
+    while(*s) {
+        while(*s && rrdr_options_is_separator(*s))
+            s++;
+
+        const char *tok = s;
+        while(*s && !rrdr_options_is_separator(*s))
+            s++;
+
+        ret |= rrdr_options_parse_one_n(tok, (size_t)(s - tok));
     }
 
     return ret;

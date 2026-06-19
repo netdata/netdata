@@ -3,10 +3,12 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <errno.h>
 
 #define MAX_SEARCH 3
 #define MAX_PARAMETERS 128
 #define ERROR_BUFFER_SIZE 1024
+#define FAIL2BAN_SOCKET_PATH_IN_DOCKER "/host/var/run/fail2ban/fail2ban.sock"
 
 struct command {
     const char *name;
@@ -133,7 +135,7 @@ struct command {
     },
     {
         .name = "fail2ban-client-status-socket",
-        .params = "-s {{socket_path}} status",
+        .params = "-s " FAIL2BAN_SOCKET_PATH_IN_DOCKER " status",
         .search = {
             [0] = "fail2ban-client",
             [1] = NULL,
@@ -149,7 +151,7 @@ struct command {
     },
     {
         .name = "fail2ban-client-status-jail-socket",
-        .params = "-s {{socket_path}} status {{jail}}",
+        .params = "-s " FAIL2BAN_SOCKET_PATH_IN_DOCKER " status {{jail}}",
         .search = {
             [0] = "fail2ban-client",
             [1] = NULL,
@@ -456,9 +458,23 @@ int main(int argc, char *argv[]) {
     char new_path[] = "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin";
     putenv(new_path);
 
-    setuid(0);
-    setgid(0);
-    setegid(0);
+    // Escalate to root before searching PATH and running the whitelisted
+    // command. This binary is installed setuid-root; if escalation fails
+    // (e.g. the setuid bit was lost, or a restrictive seccomp/no_new_privs
+    // policy is in effect) a real execution would run the command without
+    // the privileges it needs and misbehave, so we refuse to continue.
+    // --test never runs the privileged command (it only prints the command
+    // line), so a failed escalation is tolerated there -- e.g. inspecting a
+    // non-setuid build -- but it is reported so the output makes clear that a
+    // real run would fail. The escalation is still attempted pre-search in
+    // both modes to preserve the behaviour of installed setuid executions.
+    bool privileges_ok = (setuid(0) == 0 && setgid(0) == 0 && setegid(0) == 0);
+    int privileges_errno = privileges_ok ? 0 : errno; // capture before later syscalls clobber errno
+    if (!privileges_ok && !test) {
+        fprintf(stderr, "ndsudo: failed to acquire root privileges (is the binary setuid-root?): %s\n",
+                strerror(privileges_errno));
+        return 7;
+    }
 
     bool found = false;
     char filename[FILENAME_MAX];
@@ -493,6 +509,11 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "'%s' ", params[i]);
 
         fprintf(stderr, "\n");
+
+        if(!privileges_ok)
+            fprintf(stderr,
+                    "WARNING: a real run would FAIL before executing this: could not acquire root "
+                    "privileges (is the binary setuid-root?): %s\n", strerror(privileges_errno));
 
         exit(0);
     }

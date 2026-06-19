@@ -197,6 +197,7 @@ static struct {
         , { "bmp"  , 0    , CT_IMAGE_BMP }
         , { "ico"  , 0    , CT_IMAGE_XICON }
         , { "icns" , 0    , CT_IMAGE_ICNS }
+        , { "wasm" , 0    , CT_APPLICATION_WASM }
 
         // terminator
         , { NULL   , 0    , 0 }

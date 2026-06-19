@@ -8,12 +8,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
-	"github.com/docker/docker/api/types"
-	typesContainer "github.com/docker/docker/api/types/container"
-	typesImage "github.com/docker/docker/api/types/image"
-	typesSystem "github.com/docker/docker/api/types/system"
+	typesContainer "github.com/moby/moby/api/types/container"
+	typesImage "github.com/moby/moby/api/types/image"
+	typesSystem "github.com/moby/moby/api/types/system"
+	docker "github.com/moby/moby/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -33,7 +33,7 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -684,12 +684,6 @@ func TestCollector_Collect(t *testing.T) {
 
 			require.Equal(t, test.expected, mx)
 
-			if collr.client != nil {
-				m, ok := collr.client.(*mockClient)
-				require.True(t, ok)
-				require.True(t, m.negotiateAPIVersionCalled)
-			}
-
 		})
 	}
 }
@@ -740,47 +734,52 @@ func prepareNewClientFunc(m *mockClient) func(_ Config) (dockerClient, error) {
 }
 
 type mockClient struct {
-	errOnInfo                 bool
-	errOnImageList            bool
-	errOnContainerList        bool
-	negotiateAPIVersionCalled bool
-	closeCalled               bool
+	errOnInfo          bool
+	errOnImageList     bool
+	errOnContainerList bool
+	closeCalled        bool
 }
 
-func (m *mockClient) Info(_ context.Context) (typesSystem.Info, error) {
+func (m *mockClient) Info(_ context.Context, _ docker.InfoOptions) (docker.SystemInfoResult, error) {
 	if m.errOnInfo {
-		return typesSystem.Info{}, errors.New("mockClient.Info() error")
+		return docker.SystemInfoResult{}, errors.New("mockClient.Info() error")
 	}
 
-	return typesSystem.Info{
-		ContainersRunning: 4,
-		ContainersPaused:  5,
-		ContainersStopped: 6,
+	return docker.SystemInfoResult{
+		Info: typesSystem.Info{
+			ContainersRunning: 4,
+			ContainersPaused:  5,
+			ContainersStopped: 6,
+		},
 	}, nil
 }
 
-func (m *mockClient) ContainerList(_ context.Context, opts typesContainer.ListOptions) ([]types.Container, error) {
+func (m *mockClient) ContainerList(_ context.Context, opts docker.ContainerListOptions) (docker.ContainerListResult, error) {
 	if m.errOnContainerList {
-		return nil, errors.New("mockClient.ContainerList() error")
+		return docker.ContainerListResult{}, errors.New("mockClient.ContainerList() error")
 	}
 
-	v := opts.Filters.Get("health")
-
-	if len(v) == 0 {
-		return nil, errors.New("mockClient.ContainerList() error (expect 'health' filter)")
+	values := opts.Filters["health"]
+	if len(values) == 0 {
+		return docker.ContainerListResult{}, errors.New("mockClient.ContainerList() error (expect 'health' filter)")
+	}
+	var status string
+	for v := range values {
+		status = v
+		break
 	}
 
-	var containers []types.Container
+	var containers []typesContainer.Summary
 
-	switch v[0] {
-	case types.Healthy:
-		containers = []types.Container{
+	switch typesContainer.HealthStatus(status) {
+	case typesContainer.Healthy:
+		containers = []typesContainer.Summary{
 			{Names: []string{"container1"}, State: "created", Image: "example/example:v1"},
 			{Names: []string{"container2"}, State: "running", Image: "example/example:v1"},
 			{Names: []string{"container3"}, State: "running", Image: "example/example:v1"},
 		}
-	case types.Unhealthy:
-		containers = []types.Container{
+	case typesContainer.Unhealthy:
+		containers = []typesContainer.Summary{
 			{Names: []string{"container4"}, State: "created", Image: "example/example:v2"},
 			{Names: []string{"container5"}, State: "running", Image: "example/example:v2"},
 			{Names: []string{"container6"}, State: "paused", Image: "example/example:v2"},
@@ -789,14 +788,14 @@ func (m *mockClient) ContainerList(_ context.Context, opts typesContainer.ListOp
 			{Names: []string{"container9"}, State: "exited", Image: "example/example:v2"},
 			{Names: []string{"container10"}, State: "dead", Image: "example/example:v2"},
 		}
-	case types.Starting:
-		containers = []types.Container{
+	case typesContainer.Starting:
+		containers = []typesContainer.Summary{
 			{Names: []string{"container11"}, State: "removing", Image: "example/example:v3"},
 			{Names: []string{"container12"}, State: "exited", Image: "example/example:v3"},
 			{Names: []string{"container13"}, State: "exited", Image: "example/example:v3"},
 		}
-	case types.NoHealthcheck:
-		containers = []types.Container{
+	case typesContainer.NoHealthcheck:
+		containers = []typesContainer.Summary{
 			{Names: []string{"container14"}, State: "dead", Image: "example/example:v4"},
 			{Names: []string{"container15"}, State: "dead", Image: "example/example:v4"},
 			{Names: []string{"container16"}, State: "dead", Image: "example/example:v4"},
@@ -813,28 +812,18 @@ func (m *mockClient) ContainerList(_ context.Context, opts typesContainer.ListOp
 		}
 	}
 
-	return containers, nil
+	return docker.ContainerListResult{Items: containers}, nil
 }
 
-func (m *mockClient) ImageList(_ context.Context, _ typesImage.ListOptions) ([]typesImage.Summary, error) {
+func (m *mockClient) ImageList(_ context.Context, _ docker.ImageListOptions) (docker.ImageListResult, error) {
 	if m.errOnImageList {
-		return nil, errors.New("mockClient.ImageList() error")
+		return docker.ImageListResult{}, errors.New("mockClient.ImageList() error")
 	}
 
-	return []typesImage.Summary{
-		{
-			Containers: 0,
-			Size:       100,
-		},
-		{
-			Containers: 1,
-			Size:       200,
-		},
-	}, nil
-}
-
-func (m *mockClient) NegotiateAPIVersion(_ context.Context) {
-	m.negotiateAPIVersionCalled = true
+	return docker.ImageListResult{Items: []typesImage.Summary{
+		{Containers: 0, Size: 100},
+		{Containers: 1, Size: 200},
+	}}, nil
 }
 
 func (m *mockClient) Close() error {

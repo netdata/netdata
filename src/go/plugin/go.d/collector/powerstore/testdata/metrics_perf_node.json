@@ -1,0 +1,1 @@
+[{"node_id":"N1","appliance_id":"A1","read_iops":750.0,"write_iops":400.0,"total_iops":1150.0,"read_bandwidth":78643200,"write_bandwidth":41943040,"total_bandwidth":120586240,"avg_read_latency":230.0,"avg_write_latency":320.0,"avg_latency":270.0,"current_logins":5}]

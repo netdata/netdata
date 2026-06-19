@@ -1,4 +1,7 @@
+queries:
+  - uses: security-extended
+
 paths-ignore:
-  - build/*
-  - httpd/h2o
-  - src/collectors/debugfs.plugin/libsensors/vendored
+  - build/**
+  - externaldeps/**
+  - "**/vendored/**"

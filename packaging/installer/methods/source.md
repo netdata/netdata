@@ -13,10 +13,13 @@ to build and run successfully:
 - libuuid
 - libuv version 1.0 or newer
 - zlib
-- CMake 3.13 or newer
+- CMake 3.16.0 or newer
 - GCC or Xcode (Clang is known to have issues in certain configurations, see [Using Clang](#using-clang))
 - Ninja or Make (Ninja is preferred as it results in significantly faster builds)
 - Git (we use git in the build system to generate version info, you don't need a full install, just a working `git show` command)
+- OpenSSL 1.0.2 or newer, or LibreSSL 3.0.0 or newer
+- liblz4 r129 or newer
+- libcurl 7.21 or newer
 
 The following additional dependencies are also needed, but will be prepared automatically by CMake if they are not available on the build system.
 
@@ -25,18 +28,12 @@ The following additional dependencies are also needed, but will be prepared auto
 
 Additionally, the following build time features require additional dependencies:
 
-- TLS support for the web GUI:
-  - OpenSSL 1.0.2 or newer _or_ LibreSSL 3.0.0 or newer.
-- dbengine metric storage:
-  - liblz4 r129 or newer
-  - OpenSSL 1.0 or newer (LibreSSL _amy_ work, but is largely untested).
 - Netdata Cloud support:
   - A working internet connection
-  - OpenSSL 1.0.2 or newer _or_ LibreSSL 3.0.0 or newer.
   - protobuf (Google Protocol Buffers) and protoc compiler. If protobuf is not available on the system,
         CMake can be instructed to fetch and build a usable version for Netdata.
 - Netdata Go collectors:
-  - Go 1.21 or newer
+  - Go (the minimum required version is determined by the `go` directive in `src/go/go.mod`)
 
 ## Preparing the source tree
 
@@ -44,8 +41,6 @@ Netdata uses Git submodules for some of it’s components, which must be fetched
 are using a source tarball published by the Netdata project, then these are included. If you are using a checkout
 of the Git repository, you may need to explicitly fetch and update the submodules using `git submodule update
 --init --recursive`.
-
-### Netdata Cloud
 
 ## Building Netdata
 

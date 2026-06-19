@@ -7,5 +7,6 @@
 
 void reload_host_labels(void);
 void rrdhost_set_is_parent_label(void);
+int rrdhost_labels_unittest(void);
 
 #endif //NETDATA_RRDHOST_LABELS_H

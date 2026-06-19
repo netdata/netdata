@@ -45,7 +45,14 @@ rm -rf /opt/netdata/msys64/
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 ${GITHUB_ACTIONS+echo "::group::Configure Editor"}
-if [ -f /opt/netdata/etc/profile ]; then
+if [ -f "/opt/netdata/etc/profile" ]; then
     echo 'EDITOR="/usr/bin/nano.exe"' >> /opt/netdata/etc/profile
 fi
 ${GITHUB_ACTIONS+echo "::endgroup::"}
+
+# TODO: We will have a PR to adjust CAB file creation and sign. This is only adding necessary structure
+#${GITHUB_ACTIONS+echo "::group::CAB file"}
+#mkdir "${build}/driver"
+#cp "${build}/usr/bin/netdata_driver.*" "${build}/driver"
+#powershell.exe -ExecutionPolicy Bypass -File "${repo_root}/packaging/windows/generate-driver-catalog.ps1"
+#${GITHUB_ACTIONS+echo "::endgroup::"}

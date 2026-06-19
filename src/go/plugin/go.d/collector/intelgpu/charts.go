@@ -6,56 +6,56 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioGPUFrequency = module.Priority + iota
+	prioGPUFrequency = collectorapi.Priority + iota
 	prioGPUPower
 	prioGPUEngineBusy
 )
 
-var charts = module.Charts{
+var charts = collectorapi.Charts{
 	intelGPUFrequencyChart.Copy(),
 	intelGPUPowerGPUChart.Copy(),
 }
 
-var intelGPUFrequencyChart = module.Chart{
+var intelGPUFrequencyChart = collectorapi.Chart{
 	ID:       "igpu_frequency",
 	Title:    "Intel GPU frequency",
 	Units:    "MHz",
 	Fam:      "frequency",
 	Ctx:      "intelgpu.frequency",
-	Type:     module.Line,
+	Type:     collectorapi.Line,
 	Priority: prioGPUFrequency,
-	Dims: module.Dims{
+	Dims: collectorapi.Dims{
 		{ID: "frequency_actual", Name: "frequency", Div: precision},
 	},
 }
 
-var intelGPUPowerGPUChart = module.Chart{
+var intelGPUPowerGPUChart = collectorapi.Chart{
 	ID:       "igpu_power_gpu",
 	Title:    "Intel GPU power",
 	Units:    "Watts",
 	Fam:      "power",
 	Ctx:      "intelgpu.power",
-	Type:     module.Line,
+	Type:     collectorapi.Line,
 	Priority: prioGPUPower,
-	Dims: module.Dims{
+	Dims: collectorapi.Dims{
 		{ID: "power_gpu", Name: "gpu", Div: precision},
 		{ID: "power_package", Name: "package", Div: precision},
 	},
 }
 
-var intelGPUEngineBusyPercChartTmpl = module.Chart{
+var intelGPUEngineBusyPercChartTmpl = collectorapi.Chart{
 	ID:       "igpu_engine_%s_busy_percentage",
 	Title:    "Intel GPU engine busy time percentage",
 	Units:    "percentage",
 	Fam:      "engines",
 	Ctx:      "intelgpu.engine_busy_perc",
-	Type:     module.Line,
+	Type:     collectorapi.Line,
 	Priority: prioGPUEngineBusy,
-	Dims: module.Dims{
+	Dims: collectorapi.Dims{
 		{ID: "engine_%s_busy", Name: "busy", Div: precision},
 	},
 }
@@ -67,7 +67,7 @@ func (c *Collector) addEngineCharts(engine string) {
 	s = strings.ReplaceAll(s, "/", "_")
 
 	chart.ID = fmt.Sprintf(chart.ID, s)
-	chart.Labels = []module.Label{
+	chart.Labels = []collectorapi.Label{
 		{Key: "engine_class", Value: engineClassName(engine)},
 		{Key: "engine_instance", Value: engine},
 	}

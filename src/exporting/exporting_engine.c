@@ -182,7 +182,6 @@ static void exporting_main_cleanup(void *pptr)
  *
  * @param ptr a pointer to netdata_static_structure.
  *
- * @return It always returns NULL.
  */
 void exporting_main(void *ptr)
 {
@@ -217,7 +216,7 @@ void exporting_main(void *ptr)
         send_main_rusage(st_main_rusage, rd_main_user, rd_main_system);
 
 #ifdef UNIT_TESTING
-        return NULL;
+        break;
 #endif
     }
     service_exits();

@@ -1,0 +1,5 @@
+pattern: json
+
+filter:
+  include: 'USER_.*|PUBLIC_.*|SESSION_.*'
+  exclude: '.*TOKEN.*|.*KEY.*'

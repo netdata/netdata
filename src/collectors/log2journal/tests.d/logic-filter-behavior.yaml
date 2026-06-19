@@ -1,0 +1,23 @@
+# Test filter include/exclude logic
+pattern: "(?P<level>\\w+)\\s+(?P<module>\\w+)\\s+(?P<message>.*)"
+
+inject:
+  - key: ALWAYS_PRESENT
+    value: "should appear"
+    
+  - key: SECRET_DATA
+    value: "password=secret123"
+    
+  - key: DEBUG_INFO
+    value: "debug trace information"
+    
+  - key: ERROR_CODE
+    value: "E001"
+
+filter:
+  include: "LEVEL|MODULE|MESSAGE|ALWAYS_PRESENT|ERROR_CODE"
+  exclude: "SECRET_DATA|DEBUG_INFO"
+
+# Expected result: 
+# - LEVEL, MODULE, MESSAGE, ALWAYS_PRESENT, ERROR_CODE should appear
+# - SECRET_DATA, DEBUG_INFO should be filtered out

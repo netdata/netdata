@@ -3,11 +3,11 @@
 package memcached
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioCache = module.Priority + iota
+	prioCache = collectorapi.Priority + iota
 	prioNet
 	prioConnections
 	prioItems
@@ -23,7 +23,7 @@ const (
 	prioTouchRate
 )
 
-var charts = module.Charts{
+var charts = collectorapi.Charts{
 	cacheChart.Copy(),
 	netChart.Copy(),
 	connectionsChart.Copy(),
@@ -45,185 +45,185 @@ const (
 )
 
 var (
-	cacheChart = module.Chart{
+	cacheChart = collectorapi.Chart{
 		ID:       "cache",
 		Title:    "Cache Size",
 		Units:    "MiB",
 		Fam:      "cache",
 		Ctx:      "memcached.cache",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioCache,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "avail", Div: byteToMiB},
 			{ID: "bytes", Name: "used", Div: byteToMiB},
 		},
 	}
-	netChart = module.Chart{
+	netChart = collectorapi.Chart{
 		ID:       "net",
 		Title:    "Network",
 		Units:    "kilobits/s",
 		Fam:      "network",
 		Ctx:      "memcached.net",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioNet,
-		Dims: module.Dims{
-			{ID: "bytes_read", Name: "in", Mul: 8, Div: 1000, Algo: module.Incremental},
-			{ID: "bytes_written", Name: "out", Mul: -8, Div: 1000, Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "bytes_read", Name: "in", Mul: 8, Div: 1000, Algo: collectorapi.Incremental},
+			{ID: "bytes_written", Name: "out", Mul: -8, Div: 1000, Algo: collectorapi.Incremental},
 		},
 	}
-	connectionsChart = module.Chart{
+	connectionsChart = collectorapi.Chart{
 		ID:       "connections",
 		Title:    "Connections",
 		Units:    "connections/s",
 		Fam:      "connections",
 		Ctx:      "memcached.connections",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioConnections,
-		Dims: module.Dims{
-			{ID: "curr_connections", Name: "current", Algo: module.Incremental},
-			{ID: "rejected_connections", Name: "rejected", Algo: module.Incremental},
-			{ID: "total_connections", Name: "total", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "curr_connections", Name: "current", Algo: collectorapi.Incremental},
+			{ID: "rejected_connections", Name: "rejected", Algo: collectorapi.Incremental},
+			{ID: "total_connections", Name: "total", Algo: collectorapi.Incremental},
 		},
 	}
-	itemsChart = module.Chart{
+	itemsChart = collectorapi.Chart{
 		ID:       "items",
 		Title:    "Items",
 		Units:    "items",
 		Fam:      "items",
 		Ctx:      "memcached.items",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioItems,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "curr_items", Name: "current"},
 			{ID: "total_items", Name: "total"},
 		},
 	}
-	EvictedReclaimedChart = module.Chart{
+	EvictedReclaimedChart = collectorapi.Chart{
 		ID:       "evicted_reclaimed",
 		Title:    "Evicted and Reclaimed Items",
 		Units:    "items",
 		Fam:      "items",
 		Ctx:      "memcached.evicted_reclaimed",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioEvictedReclaimed,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "reclaimed"},
 			{ID: "evictions", Name: "evicted"},
 		},
 	}
-	getChart = module.Chart{
+	getChart = collectorapi.Chart{
 		ID:       "get",
 		Title:    "Get Requests",
 		Units:    "requests",
 		Fam:      "get ops",
 		Ctx:      "memcached.get",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioGet,
-		Dims: module.Dims{
-			{ID: "get_hits", Name: "hits", Algo: module.PercentOfAbsolute},
-			{ID: "get_misses", Name: "misses", Algo: module.PercentOfAbsolute},
+		Dims: collectorapi.Dims{
+			{ID: "get_hits", Name: "hits", Algo: collectorapi.PercentOfAbsolute},
+			{ID: "get_misses", Name: "misses", Algo: collectorapi.PercentOfAbsolute},
 		},
 	}
-	getRateChart = module.Chart{
+	getRateChart = collectorapi.Chart{
 		ID:       "get_rate",
 		Title:    "Get Request Rate",
 		Units:    "requests/s",
 		Fam:      "get ops",
 		Ctx:      "memcached.get_rate",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioGetRate,
-		Dims: module.Dims{
-			{ID: "cmd_get", Name: "rate", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "cmd_get", Name: "rate", Algo: collectorapi.Incremental},
 		},
 	}
-	setRateChart = module.Chart{
+	setRateChart = collectorapi.Chart{
 		ID:       "set_rate",
 		Title:    "Set Request Rate",
 		Units:    "requests/s",
 		Fam:      "set ops",
 		Ctx:      "memcached.set_rate",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioSetRate,
-		Dims: module.Dims{
-			{ID: "cmd_set", Name: "rate", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "cmd_set", Name: "rate", Algo: collectorapi.Incremental},
 		},
 	}
-	deleteChart = module.Chart{
+	deleteChart = collectorapi.Chart{
 		ID:       "delete",
 		Title:    "Delete Requests",
 		Units:    "requests",
 		Fam:      "delete ops",
 		Ctx:      "memcached.delete",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioDelete,
-		Dims: module.Dims{
-			{ID: "delete_hits", Name: "hits", Algo: module.PercentOfAbsolute},
-			{ID: "delete_misses", Name: "misses", Algo: module.PercentOfAbsolute},
+		Dims: collectorapi.Dims{
+			{ID: "delete_hits", Name: "hits", Algo: collectorapi.PercentOfAbsolute},
+			{ID: "delete_misses", Name: "misses", Algo: collectorapi.PercentOfAbsolute},
 		},
 	}
-	casChart = module.Chart{
+	casChart = collectorapi.Chart{
 		ID:       "cas",
 		Title:    "Check and Set Requests",
 		Units:    "requests",
 		Fam:      "check and set ops",
 		Ctx:      "memcached.cas",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioCas,
-		Dims: module.Dims{
-			{ID: "cas_hits", Name: "hits", Algo: module.PercentOfAbsolute},
-			{ID: "cas_misses", Name: "misses", Algo: module.PercentOfAbsolute},
-			{ID: "cas_badval", Name: "bad value", Algo: module.PercentOfAbsolute},
+		Dims: collectorapi.Dims{
+			{ID: "cas_hits", Name: "hits", Algo: collectorapi.PercentOfAbsolute},
+			{ID: "cas_misses", Name: "misses", Algo: collectorapi.PercentOfAbsolute},
+			{ID: "cas_badval", Name: "bad value", Algo: collectorapi.PercentOfAbsolute},
 		},
 	}
-	incrementChart = module.Chart{
+	incrementChart = collectorapi.Chart{
 		ID:       "increment",
 		Title:    "Increment Requests",
 		Units:    "requests",
 		Fam:      "increment ops",
 		Ctx:      "memcached.increment",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioIncrement,
-		Dims: module.Dims{
-			{ID: "incr_hits", Name: "hits", Algo: module.PercentOfAbsolute},
-			{ID: "incr_misses", Name: "misses", Algo: module.PercentOfAbsolute},
+		Dims: collectorapi.Dims{
+			{ID: "incr_hits", Name: "hits", Algo: collectorapi.PercentOfAbsolute},
+			{ID: "incr_misses", Name: "misses", Algo: collectorapi.PercentOfAbsolute},
 		},
 	}
-	decrementChart = module.Chart{
+	decrementChart = collectorapi.Chart{
 		ID:       "decrement",
 		Title:    "Decrement Requests",
 		Units:    "requests",
 		Fam:      "decrement ops",
 		Ctx:      "memcached.decrement",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioDecrement,
-		Dims: module.Dims{
-			{ID: "decr_hits", Name: "hits", Algo: module.PercentOfAbsolute},
-			{ID: "decr_misses", Name: "misses", Algo: module.PercentOfAbsolute},
+		Dims: collectorapi.Dims{
+			{ID: "decr_hits", Name: "hits", Algo: collectorapi.PercentOfAbsolute},
+			{ID: "decr_misses", Name: "misses", Algo: collectorapi.PercentOfAbsolute},
 		},
 	}
-	touchChart = module.Chart{
+	touchChart = collectorapi.Chart{
 		ID:       "touch",
 		Title:    "Touch Requests",
 		Units:    "requests",
 		Fam:      "touch ops",
 		Ctx:      "memcached.touch",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioTouch,
-		Dims: module.Dims{
-			{ID: "touch_hits", Name: "hits", Algo: module.PercentOfAbsolute},
-			{ID: "touch_misses", Name: "misses", Algo: module.PercentOfAbsolute},
+		Dims: collectorapi.Dims{
+			{ID: "touch_hits", Name: "hits", Algo: collectorapi.PercentOfAbsolute},
+			{ID: "touch_misses", Name: "misses", Algo: collectorapi.PercentOfAbsolute},
 		},
 	}
-	touchRateChart = module.Chart{
+	touchRateChart = collectorapi.Chart{
 		ID:       "touch_rate",
 		Title:    "Touch Requests Rate",
 		Units:    "requests/s",
 		Fam:      "touch ops",
 		Ctx:      "memcached.touch_rate",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioTouchRate,
-		Dims: module.Dims{
-			{ID: "cmd_touch", Name: "rate", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "cmd_touch", Name: "rate", Algo: collectorapi.Incremental},
 		},
 	}
 )

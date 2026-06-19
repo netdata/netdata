@@ -3,6 +3,8 @@
 #ifndef NETDATA_CGROUP_INTERNALS_H
 #define NETDATA_CGROUP_INTERNALS_H 1
 
+#include "netipc/netipc_protocol.h"
+
 #ifdef NETDATA_INTERNAL_CHECKS
 #define CGROUP_PROCFILE_FLAG PROCFILE_FLAG_DEFAULT
 #else
@@ -27,6 +29,27 @@ struct pids {
 
     unsigned long long pids_current;
 };
+
+#if defined(OS_LINUX)
+typedef struct cgroup_ebpfgo_cachestat {
+    uint64_t add_to_page_cache_lru;
+    uint64_t mark_page_accessed;
+    uint64_t account_page_dirtied;
+    uint64_t mark_buffer_dirty;
+} cgroup_ebpfgo_cachestat_t;
+
+typedef struct cgroup_ebpfgo_publish_cachestat {
+    uint64_t ct;
+
+    long long ratio;
+    long long dirty;
+    long long hit;
+    long long miss;
+
+    cgroup_ebpfgo_cachestat_t current;
+    cgroup_ebpfgo_cachestat_t prev;
+} cgroup_ebpfgo_publish_cachestat_t;
+#endif
 
 // https://www.kernel.org/doc/Documentation/cgroup-v1/memory.txt
 struct memory {
@@ -131,10 +154,24 @@ struct cgroup_network_interface {
 };
 
 enum cgroups_container_orchestrator {
-    CGROUPS_ORCHESTRATOR_UNSET,
-    CGROUPS_ORCHESTRATOR_UNKNOWN,
-    CGROUPS_ORCHESTRATOR_K8S
+    CGROUPS_ORCHESTRATOR_UNKNOWN = 0,
+    CGROUPS_ORCHESTRATOR_SYSTEMD = 1,
+    CGROUPS_ORCHESTRATOR_DOCKER  = 2,
+    CGROUPS_ORCHESTRATOR_K8S     = 3,
+    CGROUPS_ORCHESTRATOR_KVM     = 4,
+    CGROUPS_ORCHESTRATOR_LXC     = 5,
+    CGROUPS_ORCHESTRATOR_PODMAN  = 6,
+    CGROUPS_ORCHESTRATOR_NSPAWN  = 7,
 };
+
+_Static_assert((int)CGROUPS_ORCHESTRATOR_UNKNOWN == (int)NIPC_ORCHESTRATOR_UNKNOWN, "cgroups UNKNOWN enum must match netipc");
+_Static_assert((int)CGROUPS_ORCHESTRATOR_SYSTEMD == (int)NIPC_ORCHESTRATOR_SYSTEMD, "cgroups SYSTEMD enum must match netipc");
+_Static_assert((int)CGROUPS_ORCHESTRATOR_DOCKER == (int)NIPC_ORCHESTRATOR_DOCKER, "cgroups DOCKER enum must match netipc");
+_Static_assert((int)CGROUPS_ORCHESTRATOR_K8S == (int)NIPC_ORCHESTRATOR_K8S, "cgroups K8S enum must match netipc");
+_Static_assert((int)CGROUPS_ORCHESTRATOR_KVM == (int)NIPC_ORCHESTRATOR_KVM, "cgroups KVM enum must match netipc");
+_Static_assert((int)CGROUPS_ORCHESTRATOR_LXC == (int)NIPC_ORCHESTRATOR_LXC, "cgroups LXC enum must match netipc");
+_Static_assert((int)CGROUPS_ORCHESTRATOR_PODMAN == (int)NIPC_ORCHESTRATOR_PODMAN, "cgroups PODMAN enum must match netipc");
+_Static_assert((int)CGROUPS_ORCHESTRATOR_NSPAWN == (int)NIPC_ORCHESTRATOR_NSPAWN, "cgroups NSPAWN enum must match netipc");
 
 
 // *** WARNING *** The fields are not thread safe. Take care of safe usage.
@@ -150,6 +187,7 @@ struct cgroup {
     bool function_ready; // true after the first iteration of chart creation/update
 
     char pending_renames;
+    bool container_orchestrator_resolved;
 
     char *id;
     uint32_t hash;
@@ -184,6 +222,16 @@ struct cgroup {
     struct blkio io_queued;                     // operations
 
     struct pids pids_current;
+
+#if defined(OS_LINUX)
+    // eBPF cachestat snapshot mirrored from the legacy ebpf.plugin cgroup path.
+    cgroup_ebpfgo_publish_cachestat_t cachestat;
+
+    RRDSET *st_cachestat_ratio;
+    RRDSET *st_cachestat_dirties;
+    RRDSET *st_cachestat_hits;
+    RRDSET *st_cachestat_misses;
+#endif
 
     struct cgroup_network_interface *interfaces;
 
@@ -275,6 +323,8 @@ extern char services_chart_id_prefix[];
 extern netdata_mutex_t cgroup_root_mutex;
 
 void cgroup_discovery_worker(void *ptr);
+void cgroup_discovery_update_charts(int update_every);
+bool cgroup_discovery_signal_if_unknown(void);
 
 extern bool is_inside_k8s;
 extern long system_page_size;
@@ -301,6 +351,10 @@ extern char *cgroup_unified_base;
 extern int cgroup_root_count;
 extern int cgroup_root_max;
 extern int cgroup_max_depth;
+extern bool discovery_signal_pending;
+extern uint64_t cgroup_discovery_generation;
+extern uint64_t cgroup_discovery_scans_natural;
+extern uint64_t cgroup_discovery_scans_opportunistic;
 
 extern SIMPLE_PATTERN *enabled_cgroup_paths;
 extern SIMPLE_PATTERN *enabled_cgroup_names;
@@ -325,6 +379,12 @@ extern uint32_t throttled_time_hash;
 extern uint32_t throttled_usec_hash;
 
 extern struct cgroup *cgroup_root;
+
+void discovery_classify_orchestrator(struct cgroup *cg);
+void discovery_orchestrator_begin_cycle(void);
+#ifdef NETDATA_INTERNAL_CHECKS
+void discovery_orchestrator_set_proxmox_pve_present_for_testing(bool present);
+#endif
 
 enum cgroups_type { CGROUPS_AUTODETECT_FAIL, CGROUPS_V1, CGROUPS_V2 };
 
@@ -367,7 +427,7 @@ static inline int matches_entrypoint_parent_process_comm(const char *comm) {
 }
 
 static inline int is_cgroup_systemd_service(struct cgroup *cg) {
-    return (int)(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE);
+    return (int)(cg && (cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE));
 }
 
 static inline int k8s_is_kubepod(struct cgroup *cg) {
@@ -443,5 +503,15 @@ void update_io_some_pressure_chart(struct cgroup *cg);
 void update_io_some_pressure_stall_time_chart(struct cgroup *cg);
 void update_io_full_pressure_chart(struct cgroup *cg);
 void update_io_full_pressure_stall_time_chart(struct cgroup *cg);
+
+#if defined(OS_LINUX)
+bool cgroup_ebpfgo_cachestat_refresh(void);
+void cgroup_ebpfgo_cachestat_update_locked(void);
+void cgroup_ebpfgo_cachestat_update_charts(struct cgroup *cg);
+#else
+static inline bool cgroup_ebpfgo_cachestat_refresh(void) { return false; }
+static inline void cgroup_ebpfgo_cachestat_update_locked(void) {}
+static inline void cgroup_ebpfgo_cachestat_update_charts(struct cgroup *cg) { (void)cg; }
+#endif
 
 #endif // NETDATA_CGROUP_INTERNALS_H

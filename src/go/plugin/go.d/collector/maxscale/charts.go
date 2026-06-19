@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioPollEvents = module.Priority + iota
+	prioPollEvents = collectorapi.Priority + iota
 
 	prioSessions
 	prioZombies
@@ -28,7 +28,7 @@ const (
 	prioUptime
 )
 
-var charts = module.Charts{
+var charts = collectorapi.Charts{
 	pollEventsChart.Copy(),
 	currentSessionsChart.Copy(),
 	currentZombieConnectionsChart.Copy(),
@@ -40,57 +40,57 @@ var charts = module.Charts{
 }
 
 var (
-	pollEventsChart = module.Chart{
+	pollEventsChart = collectorapi.Chart{
 		ID:       "poll_events",
 		Title:    "Poll Events",
 		Units:    "events/s",
 		Fam:      "poll events",
 		Ctx:      "maxscale.poll_events",
 		Priority: prioPollEvents,
-		Dims: module.Dims{
-			{ID: "threads_reads", Name: "reads", Algo: module.Incremental},
-			{ID: "threads_writes", Name: "writes", Algo: module.Incremental},
-			{ID: "threads_accepts", Name: "accepts", Algo: module.Incremental},
-			{ID: "threads_errors", Name: "errors", Algo: module.Incremental},
-			{ID: "threads_hangups", Name: "hangups", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "threads_reads", Name: "reads", Algo: collectorapi.Incremental},
+			{ID: "threads_writes", Name: "writes", Algo: collectorapi.Incremental},
+			{ID: "threads_accepts", Name: "accepts", Algo: collectorapi.Incremental},
+			{ID: "threads_errors", Name: "errors", Algo: collectorapi.Incremental},
+			{ID: "threads_hangups", Name: "hangups", Algo: collectorapi.Incremental},
 		},
 	}
 
-	currentSessionsChart = module.Chart{
+	currentSessionsChart = collectorapi.Chart{
 		ID:       "current_sessions",
 		Title:    "Curren Sessions",
 		Units:    "sessions",
 		Fam:      "sessions",
 		Ctx:      "maxscale.current_sessions",
 		Priority: prioSessions,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "threads_sessions", Name: "sessions"},
 		},
 	}
-	currentZombieConnectionsChart = module.Chart{
+	currentZombieConnectionsChart = collectorapi.Chart{
 		ID:       "current_zombie_connections",
 		Title:    "Current Zombie Connections",
 		Units:    "connections",
 		Fam:      "sessions",
 		Ctx:      "maxscale.current_zombie_connections",
 		Priority: prioZombies,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "threads_zombies", Name: "zombie"},
 		},
 	}
 
-	threadsByStateChart = func() module.Chart {
-		chart := module.Chart{
+	threadsByStateChart = func() collectorapi.Chart {
+		chart := collectorapi.Chart{
 			ID:       "threads_by_state",
 			Title:    "Threads Count by State",
 			Units:    "threads",
 			Fam:      "threads",
 			Ctx:      "maxscale.threads_by_state",
 			Priority: prioThreadsByState,
-			Type:     module.Stacked,
+			Type:     collectorapi.Stacked,
 		}
 		for _, v := range threadStates {
-			chart.Dims = append(chart.Dims, &module.Dim{
+			chart.Dims = append(chart.Dims, &collectorapi.Dim{
 				ID:   "threads_state_" + v,
 				Name: strings.ToLower(v),
 			})
@@ -98,66 +98,66 @@ var (
 		return chart
 	}()
 
-	currentFDsChart = module.Chart{
+	currentFDsChart = collectorapi.Chart{
 		ID:       "current_file_descriptors",
 		Title:    "Current Managed File Descriptors",
 		Units:    "fds",
 		Fam:      "fds",
 		Ctx:      "maxscale.current_fds",
 		Priority: prioCurrentFDs,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "threads_current_fds", Name: "managed"},
 		},
 	}
 
-	qcCacheEfficiencyChart = module.Chart{
+	qcCacheEfficiencyChart = collectorapi.Chart{
 		ID:       "qc_cache_efficiency",
 		Title:    "QC Cache Efficiency",
 		Units:    "requests/s",
 		Fam:      "qc cache",
 		Ctx:      "maxscale.qc_cache_efficiency",
 		Priority: prioQCCacheEfficiency,
-		Type:     module.Stacked,
-		Dims: module.Dims{
-			{ID: "threads_qc_cache_hits", Name: "hits", Algo: module.Incremental},
-			{ID: "threads_qc_cache_misses", Name: "misses", Algo: module.Incremental},
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
+			{ID: "threads_qc_cache_hits", Name: "hits", Algo: collectorapi.Incremental},
+			{ID: "threads_qc_cache_misses", Name: "misses", Algo: collectorapi.Incremental},
 		},
 	}
-	qcCacheOperationsChart = module.Chart{
+	qcCacheOperationsChart = collectorapi.Chart{
 		ID:       "qc_cache_operations",
 		Title:    "QC Cache Operations",
 		Units:    "operations/s",
 		Fam:      "qc cache",
 		Ctx:      "maxscale.qc_cache_operations",
 		Priority: prioQCCacheOperations,
-		Type:     module.Stacked,
-		Dims: module.Dims{
-			{ID: "threads_qc_cache_inserts", Name: "inserts", Algo: module.Incremental},
-			{ID: "threads_qc_cache_evictions", Name: "evictions", Algo: module.Incremental},
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
+			{ID: "threads_qc_cache_inserts", Name: "inserts", Algo: collectorapi.Incremental},
+			{ID: "threads_qc_cache_evictions", Name: "evictions", Algo: collectorapi.Incremental},
 		},
 	}
 
-	uptimeChart = module.Chart{
+	uptimeChart = collectorapi.Chart{
 		ID:       "uptime",
 		Title:    "Uptime",
 		Units:    "seconds",
 		Fam:      "uptime",
 		Ctx:      "maxscale.uptime",
 		Priority: prioUptime,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "uptime"},
 		},
 	}
 )
 
-var serverChartsTmpl = module.Charts{
+var serverChartsTmpl = collectorapi.Charts{
 	serverStateChartTmpl.Copy(),
 	serverCurrentConnectionsChartTmpl.Copy(),
 }
 
 var (
-	serverStateChartTmpl = func() module.Chart {
-		chart := module.Chart{
+	serverStateChartTmpl = func() collectorapi.Chart {
+		chart := collectorapi.Chart{
 			ID:       "server_%s_state",
 			Title:    "Server State",
 			Units:    "state",
@@ -166,21 +166,21 @@ var (
 			Priority: prioServerState,
 		}
 		for _, v := range serverStates {
-			chart.Dims = append(chart.Dims, &module.Dim{
+			chart.Dims = append(chart.Dims, &collectorapi.Dim{
 				ID:   "server_%s_state_" + v,
 				Name: strings.ToLower(cleanChartID(v)),
 			})
 		}
 		return chart
 	}()
-	serverCurrentConnectionsChartTmpl = module.Chart{
+	serverCurrentConnectionsChartTmpl = collectorapi.Chart{
 		ID:       "server_%s_current_connections",
 		Title:    "Server Current Connections",
 		Units:    "connections",
 		Fam:      "servers",
 		Ctx:      "maxscale.server_current_connections",
 		Priority: prioServerConnections,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "server_%s_connections", Name: "connections"},
 		},
 	}
@@ -192,7 +192,7 @@ func (c *Collector) addServerCharts(id, addr string) {
 	for _, chart := range *srvCharts {
 		chart.ID = fmt.Sprintf(chart.ID, id)
 		chart.ID = cleanChartID(chart.ID)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "server", Value: id},
 			{Key: "address", Value: addr},
 		}

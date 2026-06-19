@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"math"
 	"net/http"
 	"strings"
@@ -61,9 +62,7 @@ func (c *Collector) collectSystemStats(collected map[string]int64, ms *cdbMetric
 		return
 	}
 
-	for metric, value := range stm.ToMap(ms.NodeSystem) {
-		collected[metric] = value
-	}
+	maps.Copy(collected, stm.ToMap(ms.NodeSystem))
 
 	collected["peak_msg_queue"] = findMaxMQSize(ms.NodeSystem.MessageQueues)
 }
@@ -101,18 +100,14 @@ func (c *Collector) scrapeCouchDB() *cdbMetrics {
 	ms := &cdbMetrics{}
 	wg := &sync.WaitGroup{}
 
-	wg.Add(1)
-	go func() { defer wg.Done(); c.scrapeNodeStats(ms) }()
+	wg.Go(func() { c.scrapeNodeStats(ms) })
 
-	wg.Add(1)
-	go func() { defer wg.Done(); c.scrapeSystemStats(ms) }()
+	wg.Go(func() { c.scrapeSystemStats(ms) })
 
-	wg.Add(1)
-	go func() { defer wg.Done(); c.scrapeActiveTasks(ms) }()
+	wg.Go(func() { c.scrapeActiveTasks(ms) })
 
 	if len(c.databases) > 0 {
-		wg.Add(1)
-		go func() { defer wg.Done(); c.scrapeDBStats(ms) }()
+		wg.Go(func() { c.scrapeDBStats(ms) })
 	}
 
 	wg.Wait()

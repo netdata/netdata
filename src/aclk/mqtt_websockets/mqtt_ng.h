@@ -44,6 +44,23 @@ int mqtt_ng_connect(struct mqtt_ng_client *client,
                     struct mqtt_lwt_properties *lwt,
                     uint16_t keep_alive);
 
+/* Publish an MQTT message.
+ *
+ * Ownership and cleanup on return:
+ *  - MQTT_NG_MSGGEN_OK: msg is attached to the transaction buffer and freed
+ *    via msg_free after the packet is ack'd; *packet_id is set to the queued
+ *    packet id. The caller must not free msg.
+ *  - Any non-OK return (MQTT_NG_MSGGEN_MSG_TOO_BIG, MQTT_NG_MSGGEN_BUFFER_OOM,
+ *    ...): msg is NOT consumed -- ownership stays with the caller, who must
+ *    invoke msg_free. *packet_id must be treated as undefined: the generator
+ *    may have written a transient value before rolling back, so callers that
+ *    care should reset it to a sentinel (e.g. 0) on the failure path.
+ *
+ * topic_free: ownership of topic is handled internally by the transaction
+ *  buffer on the success path. On failure the topic may or may not have been
+ *  attached depending on where generation failed; current callers must pass
+ *  topic_free=NULL until the rollback path is made symmetric.
+ */
 int mqtt_ng_publish(struct mqtt_ng_client *client,
                     char *topic,
                     free_fnc_t topic_free,

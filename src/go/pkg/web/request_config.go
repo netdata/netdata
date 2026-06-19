@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"os"
@@ -59,9 +60,7 @@ func (r RequestConfig) Copy() RequestConfig {
 	}
 
 	headers := make(map[string]string, len(r.Headers))
-	for k, v := range r.Headers {
-		headers[k] = v
-	}
+	maps.Copy(headers, r.Headers)
 	r.Headers = headers
 	return r
 }

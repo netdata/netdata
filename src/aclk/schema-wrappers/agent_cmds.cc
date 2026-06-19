@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "proto/agent/v1/cmds.pb.h"
+#include "agent/v1/cmds.pb.h"
 
 #include "agent_cmds.h"
 

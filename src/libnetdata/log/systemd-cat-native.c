@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "systemd-cat-native.h"
-#include "../required_dummies.h"
 
 #ifdef __FreeBSD__
 #include <sys/endian.h>
@@ -85,7 +84,6 @@ static inline size_t copy_replacing_newlines(char *dst, size_t dst_len, const ch
 
         memcpy(current_dst, current_src, copy_len);
         current_dst += copy_len;
-        remaining_dst_len -= copy_len;
         bytes_copied += copy_len;
         break;
     }

@@ -9,7 +9,7 @@ import (
 	_ "embed"
 	"errors"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/sensors/lmsensors"
 )
 
@@ -17,13 +17,13 @@ import (
 var configSchema string
 
 func init() {
-	module.Register("sensors", module.Creator{
+	collectorapi.Register("sensors", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Defaults: module.Defaults{
+		Defaults: collectorapi.Defaults{
 			UpdateEvery: 10,
 			Disabled:    true,
 		},
-		Create: func() module.Module { return New() },
+		Create: func() collectorapi.CollectorV1 { return New() },
 		Config: func() any { return &Config{} },
 	})
 }
@@ -31,7 +31,7 @@ func init() {
 func New() *Collector {
 	return &Collector{
 		Config:      Config{},
-		charts:      &module.Charts{},
+		charts:      &collectorapi.Charts{},
 		seenSensors: make(map[string]bool),
 	}
 }
@@ -49,10 +49,10 @@ type Config struct {
 
 type (
 	Collector struct {
-		module.Base
+		collectorapi.Base
 		Config `yaml:",inline" json:""`
 
-		charts *module.Charts
+		charts *collectorapi.Charts
 
 		sc sysfsScanner
 
@@ -88,7 +88,7 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Charts() *module.Charts {
+func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 

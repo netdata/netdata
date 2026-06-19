@@ -143,31 +143,11 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
             netdata_log_error("Failed to initialize data collection for all db tiers for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
     }
 
-    if(rrdset_number_of_dimensions(st) != 0) {
-        RRDDIM *td;
-        dfe_start_write(st->rrddim_root_index, td) {
-            if(td) break;
-        }
-        dfe_done(td);
-
-        if(td && (td->algorithm != rd->algorithm || ABS(td->multiplier) != ABS(rd->multiplier) || ABS(td->divisor) != ABS(rd->divisor))) {
-            if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
-#ifdef NETDATA_INTERNAL_CHECKS
-                netdata_log_info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already "
-                     "present (algorithm is '%s' vs '%s', multiplier is %d vs %d, "
-                     "divisor is %d vs %d).",
-                     rrddim_name(rd),
-                     rrdset_name(st),
-                     rrdhost_hostname(host),
-                     rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(td->algorithm),
-                     rd->multiplier, td->multiplier,
-                     rd->divisor, td->divisor
-                );
-#endif
-                rrdset_flag_set(st, RRDSET_FLAG_HETEROGENEOUS);
-            }
-        }
-    }
+    // NOTE: the heterogeneity check has moved to rrddim_react_callback().
+    // Running it here calls dfe_start_*() on st->rrddim_root_index while the
+    // index write-lock of that dict is still held by the inserter — AB-BA
+    // against svc_rrdset_archive_obsolete_dimensions() which holds items-write
+    // and then calls dictionary_del() that wants index-write.
 
     // let the chart resync
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
@@ -298,6 +278,40 @@ static void rrddim_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     if(ctr->react_action == RRDDIM_REACT_UPDATED) {
         // the chart needs to be updated to the parent
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
+    }
+
+    if(ctr->react_action & RRDDIM_REACT_NEW) {
+        // heterogeneity check (in react not insert: insert still holds index-write).
+        // compare and flag-set inside the loop body so td stays referenced via the
+        // dfe iterator (no UAF after dfe_done). rd is in the items list by react
+        // time, so skip td == rd.
+        RRDDIM *td;
+        dfe_start_read(st->rrddim_root_index, td) {
+            if(td == rd)
+                continue;
+
+            if(td->algorithm != rd->algorithm
+               || ABS(td->multiplier) != ABS(rd->multiplier)
+               || ABS(td->divisor)    != ABS(rd->divisor)) {
+                if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
+#ifdef NETDATA_INTERNAL_CHECKS
+                    netdata_log_info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already "
+                         "present (algorithm is '%s' vs '%s', multiplier is %d vs %d, "
+                         "divisor is %d vs %d).",
+                         rrddim_name(rd),
+                         rrdset_name(st),
+                         rrdhost_hostname(st->rrdhost),
+                         rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(td->algorithm),
+                         rd->multiplier, td->multiplier,
+                         rd->divisor, td->divisor
+                    );
+#endif
+                    rrdset_flag_set(st, RRDSET_FLAG_HETEROGENEOUS);
+                }
+            }
+            break;
+        }
+        dfe_done(td);
     }
 
     rrddim_metadata_updated(rd);
@@ -611,11 +625,37 @@ inline collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_
     return rrddim_timed_set_by_pointer(st, rd, now, value);
 }
 
+// Sets the collected value for this dimension.
+// Returns the *previous* cycle's collected value (last_collected_value), not the current one.
+NETDATA_DOUBLE rrddim_set_by_pointer_double(RRDSET *st, RRDDIM *rd, NETDATA_DOUBLE value) {
+    struct timeval now;
+    now_realtime_timeval(&now);
+
+    // For float dims, store exact; for int dims, keep int semantics
+    if(rrddim_is_float(rd)) {
+        rd->collector.last_collected_time = now;
+        rrddim_set_collected_float(rd, value);
+        rrddim_set_updated(rd);
+        rd->collector.counter++;
+
+        NETDATA_DOUBLE v = value >= 0 ? value : -value;
+        if(unlikely(v > rrddim_collected_max_as_double(rd)))
+            rrddim_set_collected_max_float(rd, v);
+
+        return rrddim_last_collected_as_double(rd);
+    }
+
+    return (NETDATA_DOUBLE)rrddim_timed_set_by_pointer(st, rd, now, (collected_number)value);
+}
+
 collected_number rrddim_timed_set_by_pointer(RRDSET *st __maybe_unused, RRDDIM *rd, struct timeval collected_time, collected_number value) {
     netdata_log_debug(D_RRD_CALLS, "rrddim_set_by_pointer() for chart %s, dimension %s, value " COLLECTED_NUMBER_FORMAT, rrdset_name(st), rrddim_name(rd), value);
 
     rd->collector.last_collected_time = collected_time;
-    rd->collector.collected_value = value;
+    if(rrddim_is_float(rd))
+        rrddim_set_collected_float(rd, (NETDATA_DOUBLE)value);
+    else
+        rrddim_set_collected_int(rd, value);
     rrddim_set_updated(rd);
     rd->collector.counter++;
 
@@ -625,11 +665,17 @@ collected_number rrddim_timed_set_by_pointer(RRDSET *st __maybe_unused, RRDDIM *
 //        *((int64_t *)Pvalue) = *((int64_t *)Pvalue) + 1;
 //    spinlock_unlock(&st->rrdhost->accounting.spinlock);
 
-    collected_number v = (value >= 0) ? value : -value;
-    if (unlikely(v > rd->collector.collected_value_max))
-        rd->collector.collected_value_max = v;
-
-    return rd->collector.last_collected_value;
+    NETDATA_DOUBLE v = value >= 0 ? (NETDATA_DOUBLE)value : (NETDATA_DOUBLE)(-value);
+    if (unlikely(v > rrddim_collected_max_as_double(rd))) {
+        if(rrddim_is_float(rd))
+            rrddim_set_collected_max_float(rd, v);
+        else
+            rrddim_set_collected_max_int(rd, (int64_t)v);
+    }
+    // For int dims return the last collected int; for float dims the integer return is meaningless, so return 0 to avoid truncation misuse.
+    if(rrddim_is_float(rd))
+        return 0;
+    return rd->collector.collected.i.last_collected_value;
 }
 
 

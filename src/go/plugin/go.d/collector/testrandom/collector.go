@@ -8,21 +8,21 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 //go:embed "config_schema.json"
 var configSchema string
 
 func init() {
-	module.Register("testrandom", module.Creator{
+	collectorapi.Register("testrandom", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Defaults: module.Defaults{
-			UpdateEvery: module.UpdateEvery,
-			Priority:    module.Priority,
+		Defaults: collectorapi.Defaults{
+			UpdateEvery: collectorapi.UpdateEvery,
+			Priority:    collectorapi.Priority,
 			Disabled:    true,
 		},
-		Create: func() module.Module { return New() },
+		Create: func() collectorapi.CollectorV1 { return New() },
 		Config: func() any { return &Config{} },
 	})
 }
@@ -61,11 +61,11 @@ type (
 )
 
 type Collector struct {
-	module.Base // should be embedded by every module
-	Config      `yaml:",inline"`
+	collectorapi.Base // should be embedded by every module
+	Config            `yaml:",inline"`
 
 	randInt       func() int64
-	charts        *module.Charts
+	charts        *collectorapi.Charts
 	collectedDims map[string]bool
 }
 
@@ -91,7 +91,7 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Charts() *module.Charts {
+func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 

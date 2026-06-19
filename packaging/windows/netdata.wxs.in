@@ -171,7 +171,18 @@
     </Package>
 
     <Fragment>
+            <UI>
+                <ProgressText Action="NDKillProcess" Message="Stopping Netdata service before update..." />
+                <ProgressText Action="NDStopDriverSrv" Message="Stopping Netdata driver service..." />
+                <ProgressText Action="NDRemoveDriverSrv" Message="Removing Netdata driver service..." />
+            </UI>
+
             <StandardDirectory Id="System64Folder">
+                <Directory Id="DRIVERDIR" Name="drivers" />
+            </StandardDirectory>
+
+            <StandardDirectory Id="WindowsFolder">
+                <Directory Id="INFDIR" Name="INF" />
             </StandardDirectory>
 
             <!-- All the files except for the ones we need to handle specially -->
@@ -181,6 +192,7 @@
                     <Exclude Files="C:\msys64\opt\netdata\usr\bin\wevt_netdata_manifest.xml" />
                     <Exclude Files="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll" />
                     <Exclude Files="C:\msys64\opt\netdata\usr\bin\netdata_driver.sys" />
+                    <Exclude Files="C:\msys64\opt\netdata\usr\bin\netdata_driver.inf" />
                 </Files>
             </ComponentGroup>
 
@@ -238,7 +250,20 @@
             </InstallExecuteSequence>
 
             <!-- Add new files (stream.conf and netdata.conf) -->
-            <CustomAction Id="NDCreateNewFiles" Directory="USRLIBEXECNETDATADIR" ExeCommand='powershell.exe -NoProfile -ExecutionPolicy Bypass -NonInteractive -File &quot;[USRLIBEXECNETDATADIR]\copy_files.ps1&quot;' Execute="deferred" Return="ignore" Impersonate="no"/>
+            <SetProperty
+                Id="NDCreateNewFiles"
+                Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -NonInteractive -File &quot;[USRLIBEXECNETDATADIR]\copy_files.ps1&quot;"
+                Before="NDCreateNewFiles"
+                Sequence="execute"
+            />
+            <CustomAction
+                Id="NDCreateNewFiles"
+                BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+                DllEntry="WixQuietExec"
+                Execute="deferred"
+                Return="ignore"
+                Impersonate="no"
+            />
             <InstallExecuteSequence>
                 <Custom Action="NDCreateNewFiles" Before="InstallFinalize" />
             </InstallExecuteSequence>
@@ -254,16 +279,44 @@
 
             <!-- Install netdata driver file -->
             <FeatureGroup Id="NetdataDriver">
-                <File Id="NetdataDrv" Name="netdata_driver.sys" Directory="System64Folder" Source="C:\msys64\opt\netdata\usr\bin\netdata_driver.sys" Condition="NDDRVINST=1">
+                <File Id="NetdataDrv" Name="netdata_driver.sys" Directory="DRIVERDIR" Source="C:\msys64\opt\netdata\usr\bin\netdata_driver.sys" Condition="NDDRVINST=1">
+                </File>
+                <File Id="NetdataDrvInf" Name="netdata_driver.inf" Directory="INFDIR" Source="C:\msys64\opt\netdata\usr\bin\netdata_driver.inf" Condition="NDDRVINST=1">
                 </File>
             </FeatureGroup>
 
-            <CustomAction Id="DllPermission" Directory="System64Folder" ExeCommand='[System64Folder]icacls.exe &quot;[System64Folder]wevt_netdata.dll&quot; /grant &quot;NT SERVICE\EventLog&quot;:R' Execute="deferred" Return="ignore" Impersonate="no"/>
+            <SetProperty
+                Id="DllPermission"
+                Value="&quot;[System64Folder]icacls.exe&quot; &quot;[System64Folder]wevt_netdata.dll&quot; /grant &quot;NT SERVICE\EventLog&quot;:R"
+                Before="DllPermission"
+                Sequence="execute"
+            />
+            <CustomAction
+                Id="DllPermission"
+                BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+                DllEntry="WixQuietExec"
+                Execute="deferred"
+                Return="ignore"
+                Impersonate="no"
+            />
             <InstallExecuteSequence>
                 <Custom Action="DllPermission" After="InstallFiles" />
             </InstallExecuteSequence>
 
-            <CustomAction Id="InstallManifest" Directory="System64Folder" ExeCommand='[System64Folder]wevtutil.exe im &quot;[System64Folder]wevt_netdata_manifest.xml&quot; &quot;/mf:[System64Folder]\wevt_netdata.dll&quot; &quot;/rf:[System64Folder]\wevt_netdata.dll&quot;' Execute="deferred" Return="ignore" Impersonate="no"/>
+            <SetProperty
+                Id="InstallManifest"
+                Value="&quot;[System64Folder]wevtutil.exe&quot; im &quot;[System64Folder]wevt_netdata_manifest.xml&quot; &quot;/mf:[System64Folder]wevt_netdata.dll&quot; &quot;/rf:[System64Folder]wevt_netdata.dll&quot;"
+                Before="InstallManifest"
+                Sequence="execute"
+            />
+            <CustomAction
+                Id="InstallManifest"
+                BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+                DllEntry="WixQuietExec"
+                Execute="deferred"
+                Return="ignore"
+                Impersonate="no"
+            />
             <InstallExecuteSequence>
                 <Custom Action="InstallManifest" After="InstallFiles" />
             </InstallExecuteSequence>

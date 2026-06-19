@@ -19,7 +19,7 @@ modules:
       keywords:
         - service networking platform
         - hashicorp
-      most_popular: true
+        - autopilot
     overview:
       data_collection:
         metrics_description: |

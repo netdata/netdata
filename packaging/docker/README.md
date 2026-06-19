@@ -535,6 +535,69 @@ The official `netdata/netdata` Docker image provides the following named tags:
 
 Minor and major version tags update with each matching release. For example, if `v1.40.1` is published, the `v1.40` tag moves from `v1.40.0` to `v1.40.1`.
 
+## Update your Netdata Docker container
+
+Docker containers do not auto-update. To update, you pull a new image and recreate the container.
+
+:::important
+
+Persistent volumes (`netdataconfig`, `netdatalib`, `netdatacache`) preserve your configuration and metrics across container recreation. If you followed the recommended installation, these volumes are already set up.
+
+:::
+
+<Tabs>
+<TabItem value="docker_run" label="docker run">
+
+1. Pull the latest image:
+
+   ```bash
+   docker pull netdata/netdata:stable
+   ```
+
+2. Stop and remove the existing container:
+
+   ```bash
+   docker stop netdata && docker rm netdata
+   ```
+
+3. Recreate the container using the same `docker run` command you originally used (see [Create a new Netdata Agent container](#create-a-new-netdata-agent-container) above).
+
+</TabItem>
+<TabItem value="docker_compose" label="docker-compose">
+
+```bash
+docker-compose pull && docker-compose up -d
+```
+
+The `docker-compose.yml` file preserves all configuration options.
+
+</TabItem>
+</Tabs>
+
+Check the running Agent version:
+
+```bash
+docker exec netdata netdata -W buildinfo
+```
+
+:::tip
+
+Use the `stable` tag to pull only stable releases. The `latest` tag (the default) may include nightly builds. See [Docker tags](#docker-tags) for all available tags.
+
+:::
+
+:::note
+
+If Netdata Cloud shows a **Critical update** notification, your Agent version is below the minimum required version for optimal Cloud functionality. Nightly builds may trigger this notification even when up to date. Switching to the `stable` tag resolves this.
+
+:::
+
+:::note
+
+If you manage containers through a third-party platform (such as CasaOS, Portainer, or ZimaBoard), use that platform's update interface. The Netdata image must use our official image tags to receive updates.
+
+:::
+
 ## Configure Agent Containers
 
 If you started an Agent container using one of the [recommended methods](#create-a-new-netdata-agent-container) and need to edit its configuration, first attach to the container with `docker exec`, replacing `netdata` with your container’s name.

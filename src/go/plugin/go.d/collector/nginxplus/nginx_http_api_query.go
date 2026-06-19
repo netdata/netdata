@@ -152,10 +152,8 @@ func (c *Collector) queryMetrics() *nginxMetrics {
 		{do: c.endpoints.streamUpstreams, fn: c.queryStreamUpstreams},
 		{do: c.endpoints.resolvers, fn: c.queryResolvers},
 	} {
-		task := task
 		if task.do {
-			wg.Add(1)
-			go func() { task.fn(ms); wg.Done() }()
+			wg.Go(func() { task.fn(ms) })
 		}
 	}
 

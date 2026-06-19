@@ -14,7 +14,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
 var (
@@ -35,7 +36,7 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -174,7 +175,7 @@ func TestCollector_Collect(t *testing.T) {
 
 			assert.Equal(t, test.wantCollected, mx)
 			if test.checkCharts {
-				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+				collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
@@ -242,7 +243,7 @@ func prepareNginxVTSEndpoint() *httptest.Server {
 		}))
 }
 
-func numOfCharts(charts ...module.Charts) (num int) {
+func numOfCharts(charts ...collectorapi.Charts) (num int) {
 	for _, v := range charts {
 		num += len(v)
 	}

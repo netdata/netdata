@@ -126,42 +126,10 @@ typedef struct netdata_socket {
     } udp;
 } netdata_socket_t;
 
-typedef struct netdata_cachestat_pid {
-    uint64_t ct;
-    uint32_t tgid;
-    uint32_t uid;
-    uint32_t gid;
-    char name[TASK_COMM_LEN];
-
-    uint32_t add_to_page_cache_lru;
-    uint32_t mark_page_accessed;
-    uint32_t account_page_dirtied;
-    uint32_t mark_buffer_dirty;
-} netdata_cachestat_pid_t;
-
-typedef struct netdata_cachestat {
-    uint32_t add_to_page_cache_lru;
-    uint32_t mark_page_accessed;
-    uint32_t account_page_dirtied;
-    uint32_t mark_buffer_dirty;
-} netdata_cachestat_t;
-
-typedef struct netdata_publish_cachestat {
-    uint64_t ct;
-
-    long long ratio;
-    long long dirty;
-    long long hit;
-    long long miss;
-
-    netdata_cachestat_t current;
-    netdata_cachestat_t prev;
-} netdata_publish_cachestat_t;
-
 typedef struct netdata_publish_dcstat_pid {
     uint64_t cache_access;
-    uint32_t file_system;
-    uint32_t not_found;
+    uint64_t file_system;
+    uint64_t not_found;
 } netdata_publish_dcstat_pid_t;
 
 typedef struct netdata_publish_dcstat {
@@ -181,9 +149,9 @@ typedef struct netdata_dcstat_pid {
     uint32_t gid;
     char name[TASK_COMM_LEN];
 
-    uint32_t cache_access;
-    uint32_t file_system;
-    uint32_t not_found;
+    uint64_t cache_access;
+    uint64_t file_system;
+    uint64_t not_found;
 } netdata_dcstat_pid_t;
 
 typedef struct __attribute__((packed)) netdata_publish_swap {
@@ -322,7 +290,6 @@ typedef struct netdata_ebpf_pid_stats {
 
     ebpf_publish_process_t process;
     ebpf_socket_publish_apps_t socket;
-    netdata_publish_cachestat_t cachestat;
     netdata_publish_dcstat_t directory_cache;
     netdata_publish_swap_t swap;
     netdata_publish_vfs_t vfs;
@@ -339,7 +306,9 @@ typedef struct netdata_ebpf_pid_stats {
 int netdata_integration_initialize_shm(size_t pids);
 void netdata_integration_cleanup_shm();
 netdata_ebpf_pid_stats_t *netdata_ebpf_get_shm_pointer_unsafe(uint32_t pid, enum ebpf_pids_index idx);
+netdata_ebpf_pid_stats_t *netdata_ebpf_lookup_shm_pointer_unsafe(uint32_t pid);
 bool netdata_ebpf_reset_shm_pointer_unsafe(int fd, uint32_t pid, enum ebpf_pids_index idx);
+void netdata_ebpf_sweep_shm_for_module_unsafe(enum ebpf_pids_index idx);
 void netdata_integration_current_ipc_data(ebpf_user_mem_stat_t *values);
 
 extern sem_t *shm_mutex_ebpf_integration;

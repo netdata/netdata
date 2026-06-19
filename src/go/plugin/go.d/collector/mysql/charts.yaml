@@ -1,0 +1,1146 @@
+version: v1
+context_namespace: mysql
+groups:
+  - family: Queries
+    groups:
+      - family: Statistics
+        metrics:
+          - com_delete
+          - com_insert
+          - com_replace
+          - com_select
+          - com_update
+          - process_list_fetch_query_duration
+          - process_list_longest_query_duration
+          - process_list_queries_count_system
+          - process_list_queries_count_user
+          - queries
+          - questions
+          - slow_queries
+        # MySQL-specific process list metrics (requires Performance Schema; not collected on MariaDB).
+        charts:
+          - id: queries
+            title: Queries
+            context: queries
+            units: queries/s
+            algorithm: incremental
+            dimensions:
+              - selector: queries
+                name: queries
+              - selector: questions
+                name: questions
+              - selector: slow_queries
+                name: slow_queries
+          - id: queries_type
+            title: Queries By Type
+            context: queries_type
+            units: queries/s
+            type: stacked
+            algorithm: incremental
+            dimensions:
+              - selector: com_delete
+                name: delete
+              - selector: com_insert
+                name: insert
+              - selector: com_replace
+                name: replace
+              - selector: com_select
+                name: select
+              - selector: com_update
+                name: update
+          - id: process_list_fetch_duration
+            title: Process List Fetch Duration
+            context: process_list_fetch_query_duration
+            units: milliseconds
+            algorithm: absolute
+            dimensions:
+              - selector: process_list_fetch_query_duration
+                name: duration
+          - id: process_list_queries_count
+            title: Queries Count
+            context: process_list_queries_count
+            units: queries
+            type: stacked
+            algorithm: absolute
+            dimensions:
+              - selector: process_list_queries_count_system
+                name: system
+              - selector: process_list_queries_count_user
+                name: user
+          - id: process_list_longest_query_duration
+            title: Longest Query Duration
+            context: process_list_longest_query_duration
+            units: seconds
+            algorithm: absolute
+            dimensions:
+              - selector: process_list_longest_query_duration
+                name: duration
+      - family: Cache
+        metrics:
+          - qcache_free_blocks
+          - qcache_free_memory
+          - qcache_hits
+          - qcache_inserts
+          - qcache_lowmem_prunes
+          - qcache_not_cached
+          - qcache_queries_in_cache
+          - qcache_total_blocks
+        charts:
+          - id: qcache_ops
+            title: QCache Operations
+            context: qcache_ops
+            units: queries/s
+            algorithm: incremental
+            dimensions:
+              - selector: qcache_hits
+                name: hits
+              - selector: qcache_inserts
+                name: inserts
+              - selector: qcache_lowmem_prunes
+                name: lowmem prunes
+                options:
+                  multiplier: -1
+              - selector: qcache_not_cached
+                name: not cached
+                options:
+                  multiplier: -1
+          - id: qcache
+            title: QCache Queries in Cache
+            context: qcache
+            units: queries
+            algorithm: absolute
+            dimensions:
+              - selector: qcache_queries_in_cache
+                name: queries
+          - id: qcache_freemem
+            title: QCache Free Memory
+            context: qcache_freemem
+            units: MiB
+            type: area
+            algorithm: absolute
+            dimensions:
+              - selector: qcache_free_memory
+                name: free
+          - id: qcache_memblocks
+            title: QCache Memory Blocks
+            context: qcache_memblocks
+            units: blocks
+            algorithm: absolute
+            dimensions:
+              - selector: qcache_free_blocks
+                name: free
+              - selector: qcache_total_blocks
+                name: total
+      - family: Issues
+        metrics:
+          - created_tmp_disk_tables
+          - created_tmp_files
+          - created_tmp_tables
+          - select_full_join
+          - select_full_range_join
+          - select_range
+          - select_range_check
+          - select_scan
+          - sort_merge_passes
+          - sort_range
+          - sort_scan
+        charts:
+          - id: join_issues
+            title: Table Select Join Issues
+            context: join_issues
+            units: joins/s
+            algorithm: incremental
+            dimensions:
+              - selector: select_full_join
+                name: full join
+              - selector: select_full_range_join
+                name: full range join
+              - selector: select_range
+                name: range
+              - selector: select_range_check
+                name: range check
+              - selector: select_scan
+                name: scan
+          - id: sort_issues
+            title: Table Sort Issues
+            context: sort_issues
+            units: issues/s
+            algorithm: incremental
+            dimensions:
+              - selector: sort_merge_passes
+                name: merge passes
+              - selector: sort_range
+                name: range
+              - selector: sort_scan
+                name: scan
+          - id: tmp
+            title: Tmp Operations
+            context: tmp
+            units: events/s
+            algorithm: incremental
+            dimensions:
+              - selector: created_tmp_disk_tables
+                name: disk tables
+              - selector: created_tmp_files
+                name: files
+              - selector: created_tmp_tables
+                name: tables
+
+  - family: Resources
+    groups:
+      - family: Handlers
+        metrics:
+          - handler_commit
+          - handler_delete
+          - handler_prepare
+          - handler_read_first
+          - handler_read_key
+          - handler_read_next
+          - handler_read_prev
+          - handler_read_rnd
+          - handler_read_rnd_next
+          - handler_rollback
+          - handler_savepoint
+          - handler_savepoint_rollback
+          - handler_update
+          - handler_write
+        charts:
+          - id: handlers
+            title: Handlers
+            context: handlers
+            units: handlers/s
+            algorithm: incremental
+            dimensions:
+              - selector: handler_commit
+                name: commit
+              - selector: handler_delete
+                name: delete
+              - selector: handler_prepare
+                name: prepare
+              - selector: handler_read_first
+                name: read first
+              - selector: handler_read_key
+                name: read key
+              - selector: handler_read_next
+                name: read next
+              - selector: handler_read_prev
+                name: read prev
+              - selector: handler_read_rnd
+                name: read rnd
+              - selector: handler_read_rnd_next
+                name: read rnd next
+              - selector: handler_rollback
+                name: rollback
+              - selector: handler_savepoint
+                name: savepoint
+              - selector: handler_savepoint_rollback
+                name: savepointrollback
+              - selector: handler_update
+                name: update
+              - selector: handler_write
+                name: write
+      - family: Connections & Threads
+        metrics:
+          - aborted_connects
+          - connection_errors_accept
+          - connection_errors_internal
+          - connection_errors_max_connections
+          - connection_errors_peer_address
+          - connection_errors_select
+          - connection_errors_tcpwrap
+          - connections
+          - max_connections
+          - max_used_connections
+          - thread_cache_misses
+          - threads_cached
+          - threads_connected
+          - threads_created
+          - threads_running
+        charts:
+          - id: connections
+            title: Connections
+            context: connections
+            units: connections/s
+            algorithm: incremental
+            dimensions:
+              - selector: aborted_connects
+                name: aborted
+              - selector: connections
+                name: all
+          - id: connections_active
+            title: Active Connections
+            context: connections_active
+            units: connections
+            algorithm: absolute
+            dimensions:
+              - selector: max_connections
+                name: limit
+              - selector: max_used_connections
+                name: max active
+              - selector: threads_connected
+                name: active
+          - id: threads
+            title: Threads
+            context: threads
+            units: threads
+            algorithm: absolute
+            dimensions:
+              - selector: threads_cached
+                name: cached
+                options:
+                  multiplier: -1
+              - selector: threads_connected
+                name: connected
+              - selector: threads_running
+                name: running
+          - id: threads_creation_rate
+            title: Threads Creation Rate
+            context: threads_created
+            units: threads/s
+            algorithm: incremental
+            dimensions:
+              - selector: threads_created
+                name: created
+          - id: thread_cache_misses
+            title: Threads Cache Misses
+            context: thread_cache_misses
+            units: misses
+            type: area
+            algorithm: absolute
+            dimensions:
+              - selector: thread_cache_misses
+                name: misses
+                options:
+                  divisor: 100
+          - id: connection_errors
+            title: Connection Errors
+            context: connection_errors
+            units: errors/s
+            algorithm: incremental
+            dimensions:
+              - selector: connection_errors_accept
+                name: accept
+              - selector: connection_errors_internal
+                name: internal
+              - selector: connection_errors_max_connections
+                name: max
+              - selector: connection_errors_peer_address
+                name: peer addr
+              - selector: connection_errors_select
+                name: select
+              - selector: connection_errors_tcpwrap
+                name: tcpwrap
+      - family: Network
+        metrics:
+          - bytes_received
+          - bytes_sent
+        charts:
+          - id: net
+            title: Bandwidth
+            context: net
+            units: kilobits/s
+            type: area
+            algorithm: incremental
+            dimensions:
+              - selector: bytes_received
+                name: in
+                options:
+                  multiplier: 8
+                  divisor: 1000
+              - selector: bytes_sent
+                name: out
+                options:
+                  multiplier: -8
+                  divisor: 1000
+      - family: Files & Tables
+        metrics:
+          - open_files
+          - open_tables
+          - opened_files
+          - opened_tables
+          - table_locks_immediate
+          - table_locks_waited
+          - table_open_cache
+          - table_open_cache_overflows
+        charts:
+          - id: table_open_cache_overflows
+            title: Table open cache overflows
+            context: table_open_cache_overflows
+            units: overflows/s
+            algorithm: incremental
+            dimensions:
+              - selector: table_open_cache_overflows
+                name: open_cache
+          - id: table_locks
+            title: Table Locks
+            context: table_locks
+            units: locks/s
+            algorithm: incremental
+            dimensions:
+              - selector: table_locks_immediate
+                name: immediate
+              - selector: table_locks_waited
+                name: waited
+                options:
+                  multiplier: -1
+          - id: files
+            title: Open Files
+            context: files
+            units: files
+            algorithm: absolute
+            dimensions:
+              - selector: open_files
+                name: files
+          - id: files_rate
+            title: Opened Files Rate
+            context: files_rate
+            units: files/s
+            algorithm: incremental
+            dimensions:
+              - selector: opened_files
+                name: files
+          - id: opened_tables
+            title: Opened Tables
+            context: opened_tables
+            units: tables/s
+            algorithm: incremental
+            dimensions:
+              - selector: opened_tables
+                name: tables
+          - id: open_tables
+            title: Open Tables
+            context: open_tables
+            units: tables
+            type: area
+            algorithm: absolute
+            dimensions:
+              - selector: open_tables
+                name: tables
+              - selector: table_open_cache
+                name: cache
+
+  - family: Storage Engine
+    groups:
+      - family: InnoDB
+        groups:
+          - family: Buffer Pool
+            metrics:
+              - innodb_buffer_pool_bytes_data
+              - innodb_buffer_pool_bytes_dirty
+              - innodb_buffer_pool_pages_data
+              - innodb_buffer_pool_pages_dirty
+              - innodb_buffer_pool_pages_flushed
+              - innodb_buffer_pool_pages_free
+              - innodb_buffer_pool_pages_misc
+              - innodb_buffer_pool_pages_total
+              - innodb_buffer_pool_read_ahead
+              - innodb_buffer_pool_read_ahead_evicted
+              - innodb_buffer_pool_read_ahead_rnd
+              - innodb_buffer_pool_reads
+              - innodb_buffer_pool_wait_free
+            charts:
+              - id: innodb_buffer_pool_pages
+                title: InnoDB Buffer Pool Pages
+                context: innodb_buffer_pool_pages
+                units: pages
+                algorithm: absolute
+                dimensions:
+                  - selector: innodb_buffer_pool_pages_data
+                    name: data
+                  - selector: innodb_buffer_pool_pages_dirty
+                    name: dirty
+                    options:
+                      multiplier: -1
+                  - selector: innodb_buffer_pool_pages_free
+                    name: free
+                  - selector: innodb_buffer_pool_pages_misc
+                    name: misc
+                    options:
+                      multiplier: -1
+                  - selector: innodb_buffer_pool_pages_total
+                    name: total
+              - id: innodb_buffer_pool_flush_pages_requests
+                title: InnoDB Buffer Pool Flush Pages Requests
+                context: innodb_buffer_pool_pages_flushed
+                units: requests/s
+                algorithm: incremental
+                dimensions:
+                  - selector: innodb_buffer_pool_pages_flushed
+                    name: flush pages
+              - id: innodb_buffer_pool_bytes
+                title: InnoDB Buffer Pool Bytes
+                context: innodb_buffer_pool_bytes
+                units: MiB
+                type: area
+                algorithm: absolute
+                dimensions:
+                  - selector: innodb_buffer_pool_bytes_data
+                    name: data
+                  - selector: innodb_buffer_pool_bytes_dirty
+                    name: dirty
+                    options:
+                      multiplier: -1
+              - id: innodb_buffer_pool_read_ahead
+                title: InnoDB Buffer Pool Read Pages
+                context: innodb_buffer_pool_read_ahead
+                units: pages/s
+                type: area
+                algorithm: incremental
+                dimensions:
+                  - selector: innodb_buffer_pool_read_ahead
+                    name: all
+                  - selector: innodb_buffer_pool_read_ahead_evicted
+                    name: evicted
+                    options:
+                      multiplier: -1
+              - id: innodb_buffer_pool_read_ahead_rnd
+                title: InnoDB Buffer Pool Random Read-Aheads
+                context: innodb_buffer_pool_read_ahead_rnd
+                units: operations/s
+                algorithm: incremental
+                dimensions:
+                  - selector: innodb_buffer_pool_read_ahead_rnd
+                    name: read-ahead
+              - id: innodb_buffer_pool_ops
+                title: InnoDB Buffer Pool Operations
+                context: innodb_buffer_pool_ops
+                units: operations/s
+                type: area
+                algorithm: incremental
+                dimensions:
+                  - selector: innodb_buffer_pool_reads
+                    name: disk reads
+                  - selector: innodb_buffer_pool_wait_free
+                    name: wait free
+                    options:
+                      multiplier: -1
+          - family: I/O
+            metrics:
+              - innodb_data_fsyncs
+              - innodb_data_pending_fsyncs
+              - innodb_data_pending_reads
+              - innodb_data_pending_writes
+              - innodb_data_read
+              - innodb_data_reads
+              - innodb_data_writes
+              - innodb_data_written
+            charts:
+              - id: innodb_io
+                title: InnoDB I/O Bandwidth
+                context: innodb_io
+                units: KiB/s
+                type: area
+                algorithm: incremental
+                dimensions:
+                  - selector: innodb_data_read
+                    name: read
+                    options:
+                      divisor: 1024
+                  - selector: innodb_data_written
+                    name: write
+                    options:
+                      divisor: 1024
+              - id: innodb_io_ops
+                title: InnoDB I/O Operations
+                context: innodb_io_ops
+                units: operations/s
+                algorithm: incremental
+                dimensions:
+                  - selector: innodb_data_fsyncs
+                    name: fsyncs
+                  - selector: innodb_data_reads
+                    name: reads
+                  - selector: innodb_data_writes
+                    name: writes
+                    options:
+                      multiplier: -1
+              - id: innodb_io_pending_ops
+                title: InnoDB Pending I/O Operations
+                context: innodb_io_pending_ops
+                units: operations
+                algorithm: absolute
+                dimensions:
+                  - selector: innodb_data_pending_fsyncs
+                    name: fsyncs
+                  - selector: innodb_data_pending_reads
+                    name: reads
+                  - selector: innodb_data_pending_writes
+                    name: writes
+                    options:
+                      multiplier: -1
+          - family: Transactions & Locks
+            metrics:
+              - innodb_deadlocks
+              - innodb_row_lock_current_waits
+              - innodb_rows_deleted
+              - innodb_rows_inserted
+              - innodb_rows_read
+              - innodb_rows_updated
+            charts:
+              - id: innodb_cur_row_lock
+                title: InnoDB Current Row Locks
+                context: innodb_cur_row_lock
+                units: operations
+                type: area
+                algorithm: absolute
+                dimensions:
+                  - selector: innodb_row_lock_current_waits
+                    name: current waits
+              - id: innodb_rows
+                title: InnoDB Row Operations
+                context: innodb_rows
+                units: operations/s
+                type: area
+                algorithm: incremental
+                dimensions:
+                  - selector: innodb_rows_deleted
+                    name: deleted
+                    options:
+                      multiplier: -1
+                  - selector: innodb_rows_inserted
+                    name: inserted
+                  - selector: innodb_rows_read
+                    name: read
+                  - selector: innodb_rows_updated
+                    name: updated
+              - id: innodb_deadlocks
+                title: InnoDB Deadlocks
+                context: innodb_deadlocks
+                units: operations/s
+                type: area
+                algorithm: incremental
+                dimensions:
+                  - selector: innodb_deadlocks
+                    name: deadlocks
+          - family: Logging
+            metrics:
+              - innodb_checkpoint_age
+              - innodb_last_checkpoint_at
+              - innodb_log_occupancy
+              - innodb_log_sequence_number
+              - innodb_log_waits
+              - innodb_log_write_requests
+              - innodb_log_writes
+              - innodb_os_log_fsyncs
+              - innodb_os_log_pending_fsyncs
+              - innodb_os_log_pending_writes
+              - innodb_os_log_written
+            charts:
+              - id: innodb_log
+                title: InnoDB Log Operations
+                context: innodb_log
+                units: operations/s
+                algorithm: incremental
+                dimensions:
+                  - selector: innodb_log_waits
+                    name: waits
+                  - selector: innodb_log_write_requests
+                    name: write requests
+                    options:
+                      multiplier: -1
+                  - selector: innodb_log_writes
+                    name: writes
+                    options:
+                      multiplier: -1
+              - id: innodb_redo_log_activity
+                title: InnoDB Redo Log Activity
+                context: innodb_redo_log_activity
+                units: B/s
+                algorithm: incremental
+                dimensions:
+                  - selector: innodb_last_checkpoint_at
+                    name: checkpointed
+                  - selector: innodb_log_sequence_number
+                    name: redo_written
+              - id: innodb_redo_log_checkpoint_age
+                title: InnoDB Redo Log Checkpoint Age
+                context: innodb_redo_log_checkpoint_age
+                units: B
+                algorithm: absolute
+                dimensions:
+                  - selector: innodb_checkpoint_age
+                    name: age
+              - id: innodb_redo_log_occupancy
+                title: InnoDB Redo Log Occupancy
+                context: innodb_redo_log_occupancy
+                units: percentage
+                type: area
+                algorithm: absolute
+                dimensions:
+                  - selector: innodb_log_occupancy
+                    name: occupancy
+                    options:
+                      divisor: 1000
+              - id: innodb_os_log
+                title: InnoDB OS Log Pending Operations
+                context: innodb_os_log
+                units: operations
+                algorithm: absolute
+                dimensions:
+                  - selector: innodb_os_log_pending_fsyncs
+                    name: fsyncs
+                  - selector: innodb_os_log_pending_writes
+                    name: writes
+                    options:
+                      multiplier: -1
+              - id: innodb_os_log_fsync_writes
+                title: InnoDB OS Log Operations
+                context: innodb_os_log_fsync_writes
+                units: operations/s
+                algorithm: incremental
+                dimensions:
+                  - selector: innodb_os_log_fsyncs
+                    name: fsyncs
+              - id: innodb_os_log_io
+                title: InnoDB OS Log Bandwidth
+                context: innodb_os_log_io
+                units: KiB/s
+                type: area
+                algorithm: incremental
+                dimensions:
+                  - selector: innodb_os_log_written
+                    name: write
+                    options:
+                      multiplier: -1
+                      divisor: 1024
+      - family: MyISAM
+        # Present only when MyISAM is enabled (disabled_storage_engines does not include MyISAM).
+        metrics:
+          - key_blocks_not_flushed
+          - key_blocks_unused
+          - key_blocks_used
+          - key_read_requests
+          - key_reads
+          - key_write_requests
+          - key_writes
+        charts:
+          - id: key_blocks
+            title: MyISAM Key Cache Blocks
+            context: key_blocks
+            units: blocks
+            algorithm: absolute
+            dimensions:
+              - selector: key_blocks_not_flushed
+                name: not flushed
+              - selector: key_blocks_unused
+                name: unused
+              - selector: key_blocks_used
+                name: used
+                options:
+                  multiplier: -1
+          - id: key_requests
+            title: MyISAM Key Cache Requests
+            context: key_requests
+            units: requests/s
+            type: area
+            algorithm: incremental
+            dimensions:
+              - selector: key_read_requests
+                name: reads
+              - selector: key_write_requests
+                name: writes
+                options:
+                  multiplier: -1
+          - id: key_disk_ops
+            title: MyISAM Key Cache Disk Operations
+            context: key_disk_ops
+            units: operations/s
+            type: area
+            algorithm: incremental
+            dimensions:
+              - selector: key_reads
+                name: reads
+              - selector: key_writes
+                name: writes
+                options:
+                  multiplier: -1
+
+  - family: Replication
+    groups:
+      - family: Slave Status
+        # Replication status is instance/version-specific:
+        # MariaDB >= 10.2.0 uses SHOW ALL SLAVES STATUS;
+        # MySQL >= 8.0.22 uses SHOW REPLICA STATUS; otherwise SHOW SLAVE STATUS.
+        metrics:
+          - seconds_behind_master
+          - slave_io_running
+          - slave_sql_running
+        charts:
+          - id: slave_behind
+            title: Slave Behind Seconds
+            context: slave_behind
+            units: seconds
+            algorithm: absolute
+            instances:
+              by_labels:
+                - connection
+            dimensions:
+              - selector: seconds_behind_master
+                name: seconds
+          - id: slave_thread_running
+            title: I/O / SQL Thread Running State
+            context: slave_status
+            units: boolean
+            algorithm: absolute
+            instances:
+              by_labels:
+                - connection
+            dimensions:
+              - selector: slave_io_running
+                name: io_running
+              - selector: slave_sql_running
+                name: sql_running
+      - family: Binary Logging
+        # Created only when binary logging is enabled (log_bin != OFF).
+        metrics:
+          - binlog_cache_disk_use
+          - binlog_cache_use
+          - binlog_stmt_cache_disk_use
+          - binlog_stmt_cache_use
+        charts:
+          - id: binlog_cache
+            title: Binlog Cache
+            context: binlog_cache
+            units: transactions/s
+            algorithm: incremental
+            dimensions:
+              - selector: binlog_cache_disk_use
+                name: disk
+              - selector: binlog_cache_use
+                name: all
+          - id: binlog_stmt_cache
+            title: Binlog Statement Cache
+            context: binlog_stmt_cache
+            units: statements/s
+            algorithm: incremental
+            dimensions:
+              - selector: binlog_stmt_cache_disk_use
+                name: disk
+              - selector: binlog_stmt_cache_use
+                name: all
+
+  - family: Galera Cluster
+    # Galera metrics are available only on Galera-enabled instances (typically MariaDB/Percona variants).
+    groups:
+      - family: Cluster Status
+        metrics:
+          - wsrep_cluster_size
+          - wsrep_cluster_status
+          - wsrep_cluster_weight
+          - wsrep_connected
+          - wsrep_local_state
+          - wsrep_ready
+        charts:
+          - id: galera_cluster_status
+            title: Cluster Component Status
+            context: galera_cluster_status
+            units: status
+            algorithm: absolute
+            dimensions:
+              - selector: wsrep_cluster_status
+          - id: galera_cluster_state
+            title: Cluster Component State
+            context: galera_cluster_state
+            units: state
+            algorithm: absolute
+            dimensions:
+              - selector: wsrep_local_state
+          - id: galera_cluster_size
+            title: Number of Nodes in the Cluster
+            context: galera_cluster_size
+            units: nodes
+            algorithm: absolute
+            dimensions:
+              - selector: wsrep_cluster_size
+                name: nodes
+          - id: galera_cluster_weight
+            title: The Total Weight of the Current Members in the Cluster
+            context: galera_cluster_weight
+            units: weight
+            algorithm: absolute
+            dimensions:
+              - selector: wsrep_cluster_weight
+                name: weight
+          - id: galera_connected
+            title: Cluster Connection Status
+            context: galera_connected
+            units: boolean
+            algorithm: absolute
+            dimensions:
+              - selector: wsrep_connected
+                name: connected
+          - id: galera_ready
+            title: Accept Queries Readiness Status
+            context: galera_ready
+            units: boolean
+            algorithm: absolute
+            dimensions:
+              - selector: wsrep_ready
+                name: ready
+      - family: Replication
+        metrics:
+          - wsrep_local_recv_queue
+          - wsrep_local_send_queue
+          - wsrep_received
+          - wsrep_received_bytes
+          - wsrep_replicated
+          - wsrep_replicated_bytes
+        charts:
+          - id: galera_writesets
+            title: Replicated Writesets
+            context: galera_writesets
+            units: writesets/s
+            algorithm: incremental
+            dimensions:
+              - selector: wsrep_received
+                name: rx
+              - selector: wsrep_replicated
+                name: tx
+                options:
+                  multiplier: -1
+          - id: galera_bytes
+            title: Replicated Bytes
+            context: galera_bytes
+            units: KiB/s
+            type: area
+            algorithm: incremental
+            dimensions:
+              - selector: wsrep_received_bytes
+                name: rx
+                options:
+                  divisor: 1024
+              - selector: wsrep_replicated_bytes
+                name: tx
+                options:
+                  multiplier: -1
+                  divisor: 1024
+          - id: galera_queue
+            title: Galera Queue
+            context: galera_queue
+            units: writesets
+            algorithm: absolute
+            dimensions:
+              - selector: wsrep_local_recv_queue
+                name: rx
+              - selector: wsrep_local_send_queue
+                name: tx
+                options:
+                  multiplier: -1
+      - family: Conflicts & Flow Control
+        metrics:
+          - wsrep_flow_control_paused_ns
+          - wsrep_local_bf_aborts
+          - wsrep_local_cert_failures
+        charts:
+          - id: galera_conflicts
+            title: Replication Conflicts
+            context: galera_conflicts
+            units: transactions
+            type: area
+            algorithm: incremental
+            dimensions:
+              - selector: wsrep_local_bf_aborts
+                name: bf aborts
+              - selector: wsrep_local_cert_failures
+                name: cert fails
+                options:
+                  multiplier: -1
+          - id: galera_flow_control
+            title: Flow Control
+            context: galera_flow_control
+            units: ms
+            type: area
+            algorithm: incremental
+            dimensions:
+              - selector: wsrep_flow_control_paused_ns
+                name: paused
+                options:
+                  divisor: 1000000
+      - family: Resources
+        metrics:
+          - wsrep_open_transactions
+          - wsrep_thread_count
+        charts:
+          - id: galera_open_transactions
+            title: Open Transactions
+            context: galera_open_transactions
+            units: transactions
+            algorithm: absolute
+            dimensions:
+              - selector: wsrep_open_transactions
+                name: open
+          - id: galera_thread_count
+            title: Total Number of WSRep (applier/rollbacker) Threads
+            context: galera_thread_count
+            units: threads
+            algorithm: absolute
+            dimensions:
+              - selector: wsrep_thread_count
+                name: threads
+
+  - family: User Statistics
+    # User statistics are available on Percona and on MariaDB >= 10.1.1.
+    groups:
+      - family: Resource Usage
+        metrics:
+          - userstats_cpu_time
+          - userstats_rows_deleted
+          - userstats_rows_fetched
+          - userstats_rows_inserted
+          - userstats_rows_read
+          - userstats_rows_sent
+          - userstats_rows_updated
+        # rows_fetched is emitted by Percona; other row counters cover MariaDB variants.
+        charts:
+          - id: userstats_cpu
+            title: User CPU Time
+            context: userstats_cpu
+            units: percentage
+            algorithm: incremental
+            instances:
+              by_labels:
+                - user
+            dimensions:
+              - selector: userstats_cpu_time
+                name: used
+                options:
+                  multiplier: 100
+                  divisor: 1000
+          - id: userstats_rows
+            title: User Rows Operations
+            context: userstats_rows
+            units: operations/s
+            type: stacked
+            algorithm: incremental
+            instances:
+              by_labels:
+                - user
+            dimensions:
+              - selector: userstats_rows_deleted
+                name: deleted
+              - selector: userstats_rows_fetched
+                name: fetched
+              - selector: userstats_rows_inserted
+                name: inserted
+              - selector: userstats_rows_read
+                name: read
+              - selector: userstats_rows_sent
+                name: sent
+              - selector: userstats_rows_updated
+                name: updated
+      - family: Commands
+        metrics:
+          - userstats_access_denied
+          - userstats_other_commands
+          - userstats_select_commands
+          - userstats_update_commands
+        charts:
+          - id: userstats_commands
+            title: User Commands
+            context: userstats_commands
+            units: commands/s
+            type: stacked
+            algorithm: incremental
+            instances:
+              by_labels:
+                - user
+            dimensions:
+              - selector: userstats_other_commands
+                name: other
+              - selector: userstats_select_commands
+                name: select
+              - selector: userstats_update_commands
+                name: update
+          - id: userstats_denied_commands
+            title: User Denied Commands
+            context: userstats_denied_commands
+            units: commands/s
+            algorithm: incremental
+            instances:
+              by_labels:
+                - user
+            dimensions:
+              - selector: userstats_access_denied
+                name: denied
+      - family: Connections
+        metrics:
+          - userstats_denied_connections
+          - userstats_lost_connections
+          - userstats_total_connections
+        charts:
+          - id: userstats_connections
+            title: User Created Connections
+            context: userstats_connections
+            units: connections/s
+            algorithm: incremental
+            instances:
+              by_labels:
+                - user
+            dimensions:
+              - selector: userstats_total_connections
+                name: created
+          - id: userstats_lost_connections
+            title: User Lost Connections
+            context: userstats_lost_connections
+            units: connections/s
+            algorithm: incremental
+            instances:
+              by_labels:
+                - user
+            dimensions:
+              - selector: userstats_lost_connections
+                name: lost
+          - id: userstats_denied_connections
+            title: User Denied Connections
+            context: userstats_denied_connections
+            units: connections/s
+            algorithm: incremental
+            instances:
+              by_labels:
+                - user
+            dimensions:
+              - selector: userstats_denied_connections
+                name: denied
+      - family: Transactions
+        metrics:
+          - userstats_binlog_bytes_written
+          - userstats_commit_transactions
+          - userstats_empty_queries
+          - userstats_rollback_transactions
+        charts:
+          - id: userstats_transactions
+            title: User Transactions
+            context: userstats_created_transactions
+            units: transactions/s
+            type: area
+            algorithm: incremental
+            instances:
+              by_labels:
+                - user
+            dimensions:
+              - selector: userstats_commit_transactions
+                name: commit
+              - selector: userstats_rollback_transactions
+                name: rollback
+          - id: userstats_binlog_written
+            title: User Binlog Written
+            context: userstats_binlog_written
+            units: B/s
+            algorithm: incremental
+            instances:
+              by_labels:
+                - user
+            dimensions:
+              - selector: userstats_binlog_bytes_written
+                name: written
+          - id: userstats_empty_queries
+            title: User Empty Queries
+            context: userstats_empty_queries
+            units: queries/s
+            algorithm: incremental
+            instances:
+              by_labels:
+                - user
+            dimensions:
+              - selector: userstats_empty_queries
+                name: empty

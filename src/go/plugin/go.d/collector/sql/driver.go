@@ -6,10 +6,12 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/microsoft/go-mssqldb"
+	_ "github.com/microsoft/go-mssqldb/azuread"
 	_ "github.com/sijms/go-ora/v2"
 )
 
 var supportedDrivers = map[string]bool{
+	"azuresql":  true,
 	"mysql":     true,
 	"oracle":    true,
 	"pgx":       true,

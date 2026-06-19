@@ -216,6 +216,14 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     service_wait_exit(SERVICE_EXPORTERS | SERVICE_HEALTH | SERVICE_WEB_SERVER | SERVICE_HTTPD, 3 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_EXPORTERS_HEALTH_AND_WEB_SERVERS_THREADS);
 
+    // Drain websocket threads while data substrates are still alive. Websocket
+    // message dispatch (e.g. MCP) is synchronous on the websocket thread; an
+    // in-flight handler will not let the loop observe its cancel flag until it
+    // returns. If we wait until after dbengine/metasync/workers are gone, an
+    // MCP request that needs them never returns and the watchdog aborts.
+    websocket_threads_join();
+    watcher_step_complete(WATCHER_STEP_ID_STOP_WEBSOCKET_THREADS);
+
     stream_threads_cancel();
     service_wait_exit(SERVICE_COLLECTORS | SERVICE_STREAMING, 20 * USEC_PER_SEC);
     service_signal_exit(SERVICE_STREAMING_CONNECTOR);
@@ -231,7 +239,11 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     watcher_step_complete(WATCHER_STEP_ID_STOP_REPLICATION_THREADS);
 
     ml_stop_threads();
-    ml_fini();
+    // ml_fini() (which closes ml_db) is deferred until after
+    // metadata_sync_shutdown() drains the metasync workers below. Those
+    // workers call ml_dimension_load_models() which uses ml_db; closing it
+    // here exposes the metasync worker to a use-after-free on the SQLite
+    // handle and triggers SIGSEGV inside sqlite3_prepare_v2 -> findElementWithHash.
     watcher_step_complete(WATCHER_STEP_ID_DISABLE_ML_DETEC_AND_TRAIN_THREADS);
 
     service_wait_exit(SERVICE_CONTEXT, 5 * USEC_PER_SEC);
@@ -272,7 +284,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
             rrdeng_flush_everything_and_wait(true, true, false);
             watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
 
-            ND_THREAD *th[nd_profile.storage_tiers];
+            ND_THREAD **th = callocz(nd_profile.storage_tiers, sizeof(*th));
             for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
                 th[tier] = nd_thread_create("rrdeng-exit", NETDATA_THREAD_OPTION_DEFAULT, rrdeng_exit_background, multidb_ctx[tier]);
 
@@ -281,6 +293,8 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
             for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
                 nd_thread_join(th[tier]);
+
+            freez(th);
 
             dbengine_shutdown();
             watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
@@ -297,15 +311,13 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 #endif
 
         metadata_sync_shutdown();
+        ml_fini();
         watcher_step_complete(WATCHER_STEP_ID_STOP_METASYNC_THREADS);
     }
 
     // Don't register a shutdown event if we crashed
     if (!abnormal)
         add_agent_event(EVENT_AGENT_SHUTDOWN_TIME, (int64_t)(now_monotonic_usec() - shutdown_start_time));
-
-    websocket_threads_join();
-    watcher_step_complete(WATCHER_STEP_ID_STOP_WEBSOCKET_THREADS);
 
     nd_thread_join_threads();
     watcher_step_complete(WATCHER_STEP_ID_JOIN_STATIC_THREADS);
@@ -319,8 +331,12 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         netdata_log_error("EXIT: cannot unlink pidfile '%s'.", pidfile);
 
     // unlink the pipe
+    // During the commands_exit() signal-handler path, libuv may already
+    // have unlinked the pipe on close. For other exit paths the command
+    // thread keeps running and we must clean it up here. ENOENT just means
+    // libuv beat us to removing it.
     const char *pipe = daemon_pipename();
-    if(pipe && *pipe && unlink(pipe) != 0)
+    if(pipe && *pipe && unlink(pipe) != 0 && errno != ENOENT)
         netdata_log_error("EXIT: cannot unlink netdatacli socket file '%s'.", pipe);
 
     watcher_step_complete(WATCHER_STEP_ID_REMOVE_PID_FILE);

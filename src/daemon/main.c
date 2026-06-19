@@ -9,6 +9,7 @@
 #include "web/mcp/mcp.h"
 
 #include "database/engine/page_test.h"
+#include "database/rrdset-slots.h"
 #include <curl/curl.h>
 
 #ifdef OS_WINDOWS
@@ -154,6 +155,7 @@ int help(int exitcode) {
             "                           size of E MiB, an optional disk space limit\n"
             "                           of F MiB, G libuv workers (default 16) and exit.\n\n"
 #endif
+            "  -W prd-array-stress      Run PRD_ARRAY refcount stress test and exit.\n\n"
             "  -W set section option value\n"
             "                           set netdata.conf option from the command line.\n\n"
             "  -W buildinfo             Print the version, the configure options,\n"
@@ -219,7 +221,15 @@ int progress_unittest(void);
 int dyncfg_unittest(void);
 int eval_unittest(void);
 int duration_unittest(void);
+int statistical_unittest(void);
 int health_config_unittest(void);
+int utf8_sanitizer_unittest(void);
+int yaml_unittest(void);
+int json_c_parser_unittest(void);
+int query_plan_unittest(void);
+#ifdef ENABLE_ML
+int ml_unittest(void);
+#endif
 bool netdata_random_session_id_generate(void);
 
 #ifdef OS_WINDOWS
@@ -252,6 +262,14 @@ int netdata_main(int argc, char **argv) {
     libjudy_malloc_init();
     string_init();
     analytics_init();
+    nd_log_initialize_mutexes();
+
+    // Register the daemon's per-thread cleanup callback. Each subsystem
+    // should own the registration of its own cleanups; this one lives in
+    // the daemon because service_exits is a daemon-layer concern. The
+    // rest are currently registered together in rrd_init() and should be
+    // moved to their respective subsystems in a follow-up.
+    nd_thread_register_cleanup(service_exits);
 
     netdata_start_time = now_realtime_sec();
     usec_t started_ut = now_monotonic_usec();
@@ -271,7 +289,7 @@ int netdata_main(int argc, char **argv) {
 
     static_threads = static_threads_get();
 
-    netdata_ready = false;
+    netdata_ready_store(false);
     // set the name for logging
     program_name = "netdata";
 
@@ -280,7 +298,7 @@ int netdata_main(int argc, char **argv) {
     // parse options
     {
         int num_opts = sizeof(option_definitions) / sizeof(struct option_def);
-        char optstring[(num_opts * 2) + 1];
+        char optstring[(sizeof(option_definitions) / sizeof(option_definitions[0]) * 2) + 1];
 
         int string_i = 0;
         for( i = 0; i < num_opts; i++ ) {
@@ -372,6 +390,32 @@ int netdata_main(int argc, char **argv) {
                             return 0;
                         }
 
+                        if(strcmp(optarg, "jsonctest") == 0) {
+                            unittest_running = true;
+                            if (json_c_parser_unittest()) return 1;
+                            fprintf(stderr, "\n\nJSON-C PARSER TESTS PASSED\n\n");
+                            return 0;
+                        }
+
+                        if(strcmp(optarg, "yamltest") == 0) {
+                            unittest_running = true;
+                            if (yaml_unittest()) return 1;
+                            fprintf(stderr, "\n\nYAML TESTS PASSED\n\n");
+                            return 0;
+                        }
+
+                        if(strcmp(optarg, "mltest") == 0) {
+#ifdef ENABLE_ML
+                            unittest_running = true;
+                            if (ml_unittest()) return 1;
+                            fprintf(stderr, "\n\nML TESTS PASSED\n\n");
+                            return 0;
+#else
+                            fprintf(stderr, "ML support is disabled in this build.\n");
+                            return 1;
+#endif
+                        }
+
                         if(strcmp(optarg, "unittest") == 0) {
                             unittest_running = true;
 
@@ -403,13 +447,20 @@ int netdata_main(int argc, char **argv) {
                             if (dictionary_unittest(10000)) return 1;
                             if (aral_unittest(10000)) return 1;
                             if (rrdlabels_unittest()) return 1;
+                            if (rrdhost_labels_unittest()) return 1;
                             if (ctx_unittest()) return 1;
+                            if (query_plan_unittest()) return 1;
                             if (uuid_unittest()) return 1;
                             if (dyncfg_unittest()) return 1;
                             if (eval_unittest()) return 1;
                             if (duration_unittest()) return 1;
+                            if (statistical_unittest()) return 1;
+                            if (utf8_sanitizer_unittest()) return 1;
                             if (health_config_unittest()) return 1;
+                            if (yaml_unittest()) return 1;
+                            if (json_c_parser_unittest()) return 1;
                             if (unittest_waiting_queue()) return 1;
+                            if (rw_spinlock_unittest()) return 1;
                             if (uuidmap_unittest()) return 1;
 #ifdef HAVE_LIBBACKTRACE
                             if (stacktrace_unittest()) return 1;
@@ -430,9 +481,22 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return dictionary_unittest(10000);
                         }
+                        else if(strcmp(optarg, "dicttest-benchmark") == 0) {
+                            unittest_running = true;
+                            return dictionary_unittest_benchmark();
+                        }
                         else if(strcmp(optarg, "araltest") == 0) {
                             unittest_running = true;
                             return aral_unittest(10000);
+                        }
+                        else if(strcmp(optarg, "aralconcurrency") == 0) {
+                            unittest_running = true;
+#ifdef NETDATA_INTERNAL_CHECKS
+                            return aral_unittest_concurrency();
+#else
+                            fprintf(stderr, "aralconcurrency requires NETDATA_INTERNAL_CHECKS\n");
+                            return 1;
+#endif
                         }
                         else if(strcmp(optarg, "waitqtest") == 0) {
                             unittest_running = true;
@@ -449,6 +513,14 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "rwlockstest") == 0) {
                             unittest_running = true;
                             return rwlocks_stress_test();
+                        }
+                        else if(strcmp(optarg, "rwspinlocktest") == 0) {
+                            unittest_running = true;
+                            return rw_spinlock_unittest();
+                        }
+                        else if(strcmp(optarg, "prd-array-stress") == 0) {
+                            unittest_running = true;
+                            return prd_array_stress_test();
                         }
                         else if(strcmp(optarg, "stringtest") == 0)  {
                             unittest_running = true;
@@ -488,6 +560,14 @@ int netdata_main(int argc, char **argv) {
                             return perflibnamestest_main();
                         }
 #endif
+                        else if(strcmp(optarg, "utf8sanitizertest") == 0) {
+                            unittest_running = true;
+                            return utf8_sanitizer_unittest();
+                        }
+                        else if(strcmp(optarg, "queryplantest") == 0) {
+                            unittest_running = true;
+                            return query_plan_unittest();
+                        }
 #ifdef ENABLE_DBENGINE
                         else if(strcmp(optarg, "mctest") == 0) {
                             unittest_running = true;
@@ -508,6 +588,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "mrgtest") == 0) {
                             unittest_running = true;
                             return mrg_unittest();
+                        }
+                        else if(strcmp(optarg, "mrgretentionbench") == 0) {
+                            unittest_running = true;
+                            return mrg_retention_benchmark();
                         }
                         else if(strcmp(optarg, "parsertest") == 0) {
                             unittest_running = true;
@@ -535,9 +619,18 @@ int netdata_main(int argc, char **argv) {
                         }
                         else if(strcmp(optarg, "dyncfgtest") == 0) {
                             unittest_running = true;
-                            if(unittest_prepare_rrd(&user))
+                            if(sqlite_library_init())
                                 return 1;
-                            return dyncfg_unittest();
+                            rrdlabels_aral_init(false);
+
+                            int rc = unittest_prepare_rrd(&user);
+                            if (!rc)
+                                rc = dyncfg_unittest();
+
+                            sqlite_close_databases();
+                            sqlite_library_shutdown();
+                            rrdlabels_aral_destroy(false);
+                            return rc;
                         }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
@@ -612,7 +705,7 @@ int netdata_main(int argc, char **argv) {
                             const char *haystack = argv[optind];
                             const char *needle = argv[optind + 1];
                             size_t len = strlen(needle) + 1;
-                            char wildcarded[len];
+                            CLEAN_CHAR_P *wildcarded = mallocz(len);
 
                             SIMPLE_PATTERN *p = simple_pattern_create(haystack, NULL, SIMPLE_PATTERN_EXACT, true);
                             SIMPLE_PATTERN_RESULT ret = simple_pattern_matches_extract(p, needle, wildcarded, len);
@@ -1020,10 +1113,10 @@ int netdata_main(int argc, char **argv) {
     // The "HOME" env var points to the root's home dir because Netdata starts as root. Can't use "HOME".
     struct passwd *pw = getpwuid(getuid());
     if (inicfg_exists(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home") || !pw || !pw->pw_dir) {
-        netdata_configured_home_dir = inicfg_get(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home", netdata_configured_home_dir);
+        netdata_configured_home_dir = inicfg_get_path(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home", netdata_configured_home_dir);
     }
     else
-        netdata_configured_home_dir = inicfg_get(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home", pw->pw_dir);
+        netdata_configured_home_dir = inicfg_get_path(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home", pw->pw_dir);
 
     nd_setenv("HOME", netdata_configured_home_dir, 1);
 
@@ -1119,12 +1212,13 @@ int netdata_main(int argc, char **argv) {
     add_agent_event(EVENT_AGENT_START_TIME, (int64_t ) (ready_ut - started_ut));
     usec_t median_start_time = get_agent_event_time_median(EVENT_AGENT_START_TIME);
     netdata_log_info(
-        "NETDATA STARTUP: completed in %llu ms (median start up time is %llu ms). "
+        "NETDATA STARTUP: version '%s', sqlite '%s', completed in %llu ms (median start up time is %llu ms). "
         "Enjoy X-Ray Vision for your infrastructure!",
+        NETDATA_VERSION, sqlite3_libversion(),
         (ready_ut - started_ut) / USEC_PER_MS, median_start_time / USEC_PER_MS);
 
     cleanup_agent_event_log();
-    netdata_ready = true;
+    netdata_ready_store(true);
 
     // ----------------------------------------------------------------------------------------------------------------
 

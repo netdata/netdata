@@ -4,7 +4,7 @@
 package contexts
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	module "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 	"strings"
 )

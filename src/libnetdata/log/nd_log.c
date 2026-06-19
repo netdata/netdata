@@ -25,12 +25,15 @@ ALWAYS_INLINE void errno_clear(void) {
 // --------------------------------------------------------------------------------------------------------------------
 // logger router
 
-static ND_LOG_METHOD nd_logger_select_output(ND_LOG_SOURCES source, FILE **fpp, SPINLOCK **spinlock) {
-    *spinlock = NULL;
+static ND_LOG_METHOD nd_logger_select_output(ND_LOG_SOURCES source, FILE **fpp, int *fdp, netdata_mutex_t **mutexp) {
+    bool mutexes_initialized = __atomic_load_n(&nd_log.mutexes_initialized, __ATOMIC_ACQUIRE);
+
+    *fdp = -1;
+    *mutexp = NULL;
 
     if(source >= _NDLS_MAX)
         source = NDLS_DAEMON;
-    
+
     ND_LOG_METHOD output = nd_log.sources[source].method;
 
     switch(output) {
@@ -38,11 +41,11 @@ static ND_LOG_METHOD nd_logger_select_output(ND_LOG_SOURCES source, FILE **fpp, 
             if(unlikely(!nd_log.journal_direct.initialized && !nd_log.journal.initialized)) {
                 output = NDLM_FILE;
                 *fpp = stderr;
-                *spinlock = &nd_log.std_error.spinlock;
+                *fdp = STDERR_FILENO;
+                *mutexp = &nd_log.std_error.mutex;
             }
             else {
                 *fpp = NULL;
-                *spinlock = NULL;
             }
             break;
 
@@ -56,11 +59,11 @@ static ND_LOG_METHOD nd_logger_select_output(ND_LOG_SOURCES source, FILE **fpp, 
             if(unlikely(!nd_log.eventlog.initialized)) {
                 output = NDLM_FILE;
                 *fpp = stderr;
-                *spinlock = &nd_log.std_error.spinlock;
+                *fdp = STDERR_FILENO;
+                *mutexp = &nd_log.std_error.mutex;
             }
             else {
                 *fpp = NULL;
-                *spinlock = NULL;
             }
             break;
 #endif
@@ -68,11 +71,11 @@ static ND_LOG_METHOD nd_logger_select_output(ND_LOG_SOURCES source, FILE **fpp, 
         case NDLM_SYSLOG:
             if(unlikely(!nd_log.syslog.initialized)) {
                 output = NDLM_FILE;
-                *spinlock = &nd_log.std_error.spinlock;
                 *fpp = stderr;
+                *fdp = STDERR_FILENO;
+                *mutexp = &nd_log.std_error.mutex;
             }
             else {
-                *spinlock = NULL;
                 *fpp = NULL;
             }
             break;
@@ -80,18 +83,21 @@ static ND_LOG_METHOD nd_logger_select_output(ND_LOG_SOURCES source, FILE **fpp, 
         case NDLM_FILE:
             if(!nd_log.sources[source].fp) {
                 *fpp = stderr;
-                *spinlock = &nd_log.std_error.spinlock;
+                *fdp = STDERR_FILENO;
+                *mutexp = &nd_log.std_error.mutex;
             }
             else {
                 *fpp = nd_log.sources[source].fp;
-                *spinlock = &nd_log.sources[source].spinlock;
+                *fdp = nd_log.sources[source].fd;
+                *mutexp = &nd_log.sources[source].mutex;
             }
             break;
 
         case NDLM_STDOUT:
             output = NDLM_FILE;
             *fpp = stdout;
-            *spinlock = &nd_log.std_output.spinlock;
+            *fdp = STDOUT_FILENO;
+            *mutexp = &nd_log.std_output.mutex;
             break;
 
         default:
@@ -99,18 +105,39 @@ static ND_LOG_METHOD nd_logger_select_output(ND_LOG_SOURCES source, FILE **fpp, 
         case NDLM_STDERR:
             output = NDLM_FILE;
             *fpp = stderr;
-            *spinlock = &nd_log.std_error.spinlock;
+            *fdp = STDERR_FILENO;
+            *mutexp = &nd_log.std_error.mutex;
             break;
 
         case NDLM_DISABLED:
         case NDLM_DEVNULL:
             output = NDLM_DISABLED;
             *fpp = NULL;
-            *spinlock = NULL;
             break;
     }
 
+    if(output == NDLM_FILE && *fpp && *fdp < 0) {
+        *fpp = stderr;
+        *fdp = STDERR_FILENO;
+        *mutexp = &nd_log.std_error.mutex;
+    }
+
+    // Constructor-time logging can happen before the explicit startup init
+    // path runs. Until then, bypass write serialization and log unlocked.
+    if(nd_log.single_threaded_child || !mutexes_initialized)
+        *mutexp = NULL;
+
     return output;
+}
+
+static inline netdata_mutex_t *nd_logger_stderr_mutex(void) {
+    if(nd_log.single_threaded_child)
+        return NULL;
+
+    if(!__atomic_load_n(&nd_log.mutexes_initialized, __ATOMIC_ACQUIRE))
+        return NULL;
+
+    return &nd_log.std_error.mutex;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -149,30 +176,27 @@ void nd_log_register_fatal_final_cb(fatal_event_t cb) {
 // --------------------------------------------------------------------------------------------------------------------
 // high level logger
 
-static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LOG_FIELD_PRIORITY priority,
+// Write serialization uses a netdata_mutex_t (sleeping mutex) per output
+// destination, passed through from nd_logger_select_output(). Post-fork nofork
+// spawn-server children stay single-threaded in-tree, so they bypass logger
+// locking instead of trying to reuse inherited lock state.
+static void nd_logger_log_fields(FILE *fp, int fd, netdata_mutex_t *mutex, bool limit,
+                                 ND_LOG_FIELD_PRIORITY priority,
                                  ND_LOG_METHOD output, struct nd_log_source *source,
                                  struct log_field *fields, size_t fields_max) {
     nd_log_fatal_hook(fields, fields_max);
 
-    if(spinlock)
-        spinlock_lock(spinlock);
-
-    // check the limits
+    // check the limits (uses its own source->limits.spinlock internally)
     if(limit && nd_log_limit_reached(source))
-        goto cleanup;
+        return;
 
     if(output == NDLM_JOURNAL) {
         if(!nd_logger_journal_direct(fields, fields_max) && !nd_logger_journal_libsystemd(fields, fields_max)) {
             // we can't log to journal, let's log to stderr
-            if(spinlock)
-                spinlock_unlock(spinlock);
-
             output = NDLM_FILE;
-            spinlock = &nd_log.std_error.spinlock;
             fp = stderr;
-
-            if(spinlock)
-                spinlock_lock(spinlock);
+            fd = STDERR_FILENO;
+            mutex = nd_logger_stderr_mutex();
         }
     }
 
@@ -181,15 +205,10 @@ static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LO
     if(output == NDLM_ETW) {
         if(!nd_logger_etw(source, fields, fields_max)) {
             // we can't log to windows events, let's log to stderr
-            if(spinlock)
-                spinlock_unlock(spinlock);
-
             output = NDLM_FILE;
-            spinlock = &nd_log.std_error.spinlock;
             fp = stderr;
-
-            if(spinlock)
-                spinlock_lock(spinlock);
+            fd = STDERR_FILENO;
+            mutex = nd_logger_stderr_mutex();
         }
     }
 #endif
@@ -197,15 +216,10 @@ static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LO
     if(output == NDLM_WEL) {
         if(!nd_logger_wel(source, fields, fields_max)) {
             // we can't log to windows events, let's log to stderr
-            if(spinlock)
-                spinlock_unlock(spinlock);
-
             output = NDLM_FILE;
-            spinlock = &nd_log.std_error.spinlock;
             fp = stderr;
-
-            if(spinlock)
-                spinlock_lock(spinlock);
+            fd = STDERR_FILENO;
+            mutex = nd_logger_stderr_mutex();
         }
     }
 #endif
@@ -215,12 +229,7 @@ static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LO
         nd_logger_syslog(priority, source->format, fields, fields_max);
 
     if(output == NDLM_FILE)
-        nd_logger_file(fp, source->format, fields, fields_max);
-
-
-cleanup:
-    if(spinlock)
-        spinlock_unlock(spinlock);
+        nd_logger_file(fd, fp, mutex, source->format, fields, fields_max);
 }
 
 static void nd_logger_unset_all_thread_fields(void) {
@@ -258,9 +267,10 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
                ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, bool limit,
                int saved_errno, size_t saved_winerror __maybe_unused, const char *fmt, va_list ap) {
 
-    SPINLOCK *spinlock;
     FILE *fp;
-    ND_LOG_METHOD output = nd_logger_select_output(source, &fp, &spinlock);
+    int fd;
+    netdata_mutex_t *mutex;
+    ND_LOG_METHOD output = nd_logger_select_output(source, &fp, &fd, &mutex);
     if(!IS_FINAL_LOG_METHOD(output))
         return;
 
@@ -293,7 +303,7 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
 
         if(src != source && src < _NDLS_MAX) {
             source = src;
-            output = nd_logger_select_output(source, &fp, &spinlock);
+            output = nd_logger_select_output(source, &fp, &fd, &mutex);
             if(output != NDLM_FILE && output != NDLM_JOURNAL && output != NDLM_SYSLOG)
                 return;
         }
@@ -340,7 +350,7 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
         thread_log_fields[NDF_MESSAGE].entry = ND_LOG_FIELD_TXT(NDF_MESSAGE, buffer_tostring(wb));
     }
 
-    nd_logger_log_fields(spinlock, fp, limit, priority, output, &nd_log.sources[source],
+    nd_logger_log_fields(fp, fd, mutex, limit, priority, output, &nd_log.sources[source],
                          thread_log_fields, THREAD_FIELDS_MAX);
 
     if(nd_log.sources[source].pending_msg && spinlock_trylock(&nd_log.sources[source].limits.spinlock)) {
@@ -388,7 +398,7 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
         spinlock_unlock(&nd_log.sources[source].limits.spinlock);
 
         if(pending_msg)
-            nd_logger_log_fields(spinlock, fp, false, priority, output, &nd_log.sources[source],
+            nd_logger_log_fields(fp, fd, mutex, false, priority, output, &nd_log.sources[source],
                                  thread_log_fields, THREAD_FIELDS_MAX);
 
         freez((void *)pending_msg);
@@ -450,16 +460,19 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
     if(erl->sleep_ut)
         sleep_usec(erl->sleep_ut);
 
-    spinlock_lock(&erl->spinlock);
+    if(!nd_log.single_threaded_child)
+        spinlock_lock(&erl->spinlock);
 
     erl->count++;
     time_t now = now_boottime_sec();
     if(now - erl->last_logged < erl->log_every) {
-        spinlock_unlock(&erl->spinlock);
+        if(!nd_log.single_threaded_child)
+            spinlock_unlock(&erl->spinlock);
         return;
     }
 
-    spinlock_unlock(&erl->spinlock);
+    if(!nd_log.single_threaded_child)
+        spinlock_unlock(&erl->spinlock);
 
     va_list args;
     va_start(args, fmt);
@@ -491,16 +504,51 @@ static void fatal_abort_internal_checks(void) {
 
 NEVER_INLINE
 void netdata_logger_fatal(const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
-    static size_t already_in_fatal = 0;
+    // Per-thread re-entrancy flag and a process-wide "a fatal is in progress" counter. These detect two different
+    // situations that the previous single
+    // global counter could not tell apart:
+    //  1. Same-thread re-entrancy: this thread called fatal() while already
+    //     handling its own fatal (e.g. an allocation in the logging path below
+    //     failed and re-entered fatal). That is a real bug in the fatal path
+    //     itself; abort with the recursive marker so it is visible.
+    //  2. Concurrency: a DIFFERENT thread is already handling a fatal. This is
+    //     common when a deadlock makes several threads time out and call fatal()
+    //     at once. The first thread owns the fatal record; this one must not
+    //     interleave its output or re-run cleanup, and it must NOT abort via
+    //     recursive_fatal_abort() -- that would surface as a separate crash and
+    //     mask the first (real) fatal. It waits a bounded time for the first to
+    //     finish writing, then exits quietly.
+    static __thread bool this_thread_in_fatal = false;
+    static size_t threads_in_fatal = 0;
 
-    size_t recursion = __atomic_add_fetch(&already_in_fatal, 1, __ATOMIC_SEQ_CST);
-    if(recursion > 1) {
-        // exit immediately, nothing more to be done
-        sleep(2); // give the first fatal the chance to be written
-        fprintf(stderr, "\nRECURSIVE FATAL STATEMENTS, latest from %s() of %lu@%s, EXITING NOW! 23e93dfccbf64e11aac858b9410d8a82\n",
+    // NOTE: the two exit paths below must NOT use stdio (fprintf/fflush). The
+    // first fatal thread is likely holding stderr's stdio lock mid-write, and a
+    // second fprintf(stderr) would block on that lock indefinitely -- defeating
+    // the bounded exit these paths are meant to guarantee. Use a raw write(),
+    // which takes no lock.
+    char msg[512];
+
+    if(this_thread_in_fatal) {
+        // (1) same thread re-entered fatal: the outer fatal is suspended below
+        // us on this stack and cannot make progress, so do not wait for it.
+        int n = snprintf(msg, sizeof(msg),
+                "\nRECURSIVE FATAL STATEMENTS, latest from %s() of %lu@%s, EXITING NOW! 23e93dfccbf64e11aac858b9410d8a82\n",
                 function, line, file);
-        fflush(stderr);
+        if(n > 0 && write(STDERR_FILENO, msg, (size_t)((n < (int)sizeof(msg)) ? n : (int)sizeof(msg) - 1)) < 0) { /* best effort */ }
         recursive_fatal_abort();
+    }
+    this_thread_in_fatal = true;
+
+    if(__atomic_add_fetch(&threads_in_fatal, 1, __ATOMIC_SEQ_CST) > 1) {
+        // (2) another thread is already writing a fatal. Give it a bounded
+        // chance to finish, then exit quietly (not via recursive_fatal_abort,
+        // which would mask the first fatal as a crash of its own).
+        int n = snprintf(msg, sizeof(msg),
+                "\nCONCURRENT FATAL from %s() of %lu@%s, deferring to the first fatal and exiting.\n",
+                function, line, file);
+        if(n > 0 && write(STDERR_FILENO, msg, (size_t)((n < (int)sizeof(msg)) ? n : (int)sizeof(msg) - 1)) < 0) { /* best effort */ }
+        sleep(2); // give the first fatal the chance to be written
+        _exit(1);
     }
 
     // send this event to deamon_status_file

@@ -8,23 +8,23 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioTemperature = module.Priority + iota
+	prioTemperature = collectorapi.Priority + iota
 )
 
 var (
-	sensorChartTmpl = module.Chart{
+	sensorChartTmpl = collectorapi.Chart{
 		ID:       "w1sensor_%s_temperature",
 		Title:    "1-Wire Temperature Sensor",
 		Units:    "Celsius",
 		Fam:      "Temperature",
 		Ctx:      "w1sensor.temperature",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioTemperature,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "w1sensor_%s_temperature", Div: precision},
 		},
 	}
@@ -34,7 +34,7 @@ func (c *Collector) addSensorChart(id string) {
 	chart := sensorChartTmpl.Copy()
 
 	chart.ID = fmt.Sprintf(chart.ID, id)
-	chart.Labels = []module.Label{
+	chart.Labels = []collectorapi.Label{
 		{Key: "sensor_id", Value: id},
 	}
 

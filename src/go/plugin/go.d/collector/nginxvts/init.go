@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 func (c *Collector) validateConfig() error {
@@ -25,8 +25,8 @@ func (c *Collector) initHTTPClient() (*http.Client, error) {
 	return web.NewHTTPClient(c.ClientConfig)
 }
 
-func (c *Collector) initCharts() (*module.Charts, error) {
-	charts := module.Charts{}
+func (c *Collector) initCharts() (*collectorapi.Charts, error) {
+	charts := collectorapi.Charts{}
 
 	if err := charts.Add(*mainCharts.Copy()...); err != nil {
 		return nil, err

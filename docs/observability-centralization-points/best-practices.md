@@ -60,6 +60,7 @@ Netdata supports three retention strategies. Choose the one that best fits your 
 1. **Time-based retention** (recommended for predictable retention periods):
 
    Guarantees data is kept for a fixed time, regardless of disk usage (assuming you have enough disk space)
+
    ```ini
    [db]
    dbengine tier 0 retention time = 30d
@@ -72,7 +73,8 @@ Netdata supports three retention strategies. Choose the one that best fits your 
 
 2. **Space-based retention** (recommended for predictable disk usage):
 
-   Guarantees storage usage stays within defined limits, at the cost of variable retention duration.
+   Targets keeping storage usage within defined limits, at the cost of variable retention duration.
+
    ```ini
    [db]
    dbengine tier 0 retention size = 500GB
@@ -86,6 +88,7 @@ Netdata supports three retention strategies. Choose the one that best fits your 
 3. **Combined retention** (use with caution):
 
    Uses both time and space limits. Data is dropped as soon as either limit is reached.
+
    ```ini
    [db]
    dbengine tier 0 retention time = 30d
@@ -95,6 +98,12 @@ Netdata supports three retention strategies. Choose the one that best fits your 
    dbengine tier 2 retention time = 5y
    dbengine tier 2 retention size = 100GB  # Must be large enough to hold 5 years of data!
    ```
+
+:::warning
+
+Retention size limits are soft targets, not hard caps. Actual disk usage can exceed the configured limit, especially on tier 0 with high metric volumes from streaming Children. Always provision more disk space than your configured limit to avoid unexpected disk-full conditions. For the detailed enforcement behavior, see [Retention Size Enforcement](/src/database/README.md#retention-size-enforcement).
+
+:::
 
 :::tip
 
@@ -118,9 +127,9 @@ Parent nodes are the central long-term storage layer in a Netdata infrastructure
 
 Assume a Parent configured with:
 
-* **Tier 0:** 30 days retention (per-second resolution)
-* **Tier 1:** 6 months retention (per-minute resolution)
-* **Tier 2:** 5 years retention (per-hour resolution)
+- **Tier 0:** 30 days retention (per-second resolution)
+- **Tier 1:** 6 months retention (per-minute resolution)
+- **Tier 2:** 5 years retention (per-hour resolution)
 
 One metric would consume approximately **3.7 MB** across tiers.
 For **1,000,000 metrics streamed to the Parent**, this equals **≈ 3.7 TB**.
@@ -203,7 +212,7 @@ Netdata provides several benefits over other observability solutions:
 | **Resilience & Reliability**      | Built-in replication                       | Observability continues even if a Parent fails                        |
 | **Optimized Cost & Performance**  | Distributed workloads                      | Prevents bottlenecks and improves resource efficiency                 |
 | **Ease of Use**                   | Minimal setup and maintenance              | Reduces complexity and operational overhead                           |
-| **On-Prem Control**               | Data remains within your infrastructure    | Enhanced security and compliance, even when using Netdata Cloud       |
+| **On-Prem Control**               | Data remains within your infrastructure    | Enhanced security and compliance, even when using Netdata Cloud. For a fully self-hosted control plane, see [Netdata Cloud On-Prem](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/README.md)       |
 | **Comprehensive Observability**   | Segmented infrastructure with unified view | Deep visibility with tailored retention, alerts, and machine learning |
 | **Predictable Capacity Planning** | Published per-metric storage cost          | Allows accurate disk and hardware sizing for Parents                  |
 

@@ -136,15 +136,7 @@ void libuv_initialize(void) {
 void netdata_conf_section_global_hostname(void) {
     FUNCTION_RUN_ONCE();
 
-    netdata_configured_host_prefix = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "host access prefix", "");
-    (void) verify_netdata_host_prefix(true);
-
-    char buf[HOST_NAME_MAX * 4 + 1];
-    if (!os_hostname(buf, sizeof(buf), netdata_configured_host_prefix))
-        netdata_log_error("Cannot get machine hostname.");
-
-    netdata_configured_hostname = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "hostname", buf);
-    netdata_log_debug(D_OPTIONS, "hostname set to '%s'", netdata_configured_hostname);
+    nd_runtime_paths_load_hostname_from_inicfg();
 }
 
 void netdata_conf_section_global(void) {

@@ -24,7 +24,6 @@ modules:
       keywords:
         - redis
         - databases
-      most_popular: true
     overview:
       data_collection:
         metrics_description: |
@@ -203,7 +202,7 @@ modules:
         info: time elapsed since the link between master and slave is down
     functions:
       description: |
-        This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+        This collector exposes real-time functions for interactive troubleshooting in the Live tab.
       list:
         - id: top-queries
           name: Top Queries

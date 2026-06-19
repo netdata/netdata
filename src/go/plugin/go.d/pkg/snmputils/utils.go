@@ -85,6 +85,9 @@ func SnmpClientConnInfo(c gosnmp.Handler) string {
 		info.WriteString(fmt.Sprintf(",community='%s'", c.Community()))
 	case gosnmp.Version3:
 		info.WriteString(fmt.Sprintf(",security_level='%d,%s'", c.MsgFlags(), c.SecurityParameters().Description()))
+		if ctx := c.ContextName(); ctx != "" {
+			info.WriteString(fmt.Sprintf(",context_name='%s'", ctx))
+		}
 	}
 	return info.String()
 }

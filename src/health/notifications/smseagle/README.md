@@ -50,13 +50,14 @@ The following options can be defined for this notification
 
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
-| DEFAULT_RECIPIENT_SMSEAGLE | If a role's recipients are not configured, a notification will be sent to this SMS recipient (empty = do not send a notification for unconfigured roles). Multiple recipients can be given like this: "PHONE1,PHONE2..." |  | yes |
-| SMSEAGLE_API_URL |  |  | yes |
-| SMSEAGLE_API_ACCESSTOKEN |  |  | yes |
-| SMSEAGLE_MSG_TYPE |  | sms | yes |
-| SMSEAGLE_CALL_DURATION |  | 10 | yes |
-| SMSEAGLE_VOICE_ID |  | 10 | yes |
+| [DEFAULT_RECIPIENT_SMSEAGLE](#option-default-recipient-smseagle) | If a role's recipients are not configured, a notification will be sent to this SMS recipient (empty = do not send a notification for unconfigured roles). Multiple recipients can be given like this: "PHONE1,PHONE2..." |  | yes |
+| [SMSEAGLE_API_URL](#option-smseagle-api-url) |  |  | yes |
+| [SMSEAGLE_API_ACCESSTOKEN](#option-smseagle-api-accesstoken) |  |  | yes |
+| [SMSEAGLE_MSG_TYPE](#option-smseagle-msg-type) |  | sms | yes |
+| [SMSEAGLE_CALL_DURATION](#option-smseagle-call-duration) |  | 10 | yes |
+| [SMSEAGLE_VOICE_ID](#option-smseagle-voice-id) |  | 10 | yes |
 
+<a id="option-default-recipient-smseagle"></a>
 ##### DEFAULT_RECIPIENT_SMSEAGLE
 
 All roles will default to this variable if left unconfigured.
@@ -72,26 +73,31 @@ role_recipients_smseagle[sitemgr]="+11222333449"
 ```
 
 
+<a id="option-smseagle-api-url"></a>
 ##### SMSEAGLE_API_URL
 
 The url of the SMSEagle device accessible from NetData, e.g https://192.168.0.101
 
 
+<a id="option-smseagle-api-accesstoken"></a>
 ##### SMSEAGLE_API_ACCESSTOKEN
 
 An access token for the user created at SMSEagle device
 
 
+<a id="option-smseagle-msg-type"></a>
 ##### SMSEAGLE_MSG_TYPE
 
 Choose a type of message/call. Available types: sms, mms, ring (wake-up call), tts (text-to-speech call), tts_advanced (multilanguage text-to-speech call). Be aware that some types require additional parameters to be set.
 
 
+<a id="option-smseagle-call-duration"></a>
 ##### SMSEAGLE_CALL_DURATION
 
 Call duration, parameter required for Ring, TTS and TTS Advanced.
 
 
+<a id="option-smseagle-voice-id"></a>
 ##### SMSEAGLE_VOICE_ID
 
 ID of the voice model, required for TTS Advanced.

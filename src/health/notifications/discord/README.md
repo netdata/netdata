@@ -46,8 +46,9 @@ The following options can be defined for this notification
 |:-----|:------------|:--------|:---------:|
 | SEND_DISCORD | Set `SEND_DISCORD` to YES | YES | yes |
 | DISCORD_WEBHOOK_URL | set `DISCORD_WEBHOOK_URL` to your webhook URL. |  | yes |
-| DEFAULT_RECIPIENT_DISCORD | Set `DEFAULT_RECIPIENT_DISCORD` to the channel you want the alert notifications to be sent to. You can define multiple channels like this: `alerts` `systems`. |  | yes |
+| [DEFAULT_RECIPIENT_DISCORD](#option-default-recipient-discord) | Set `DEFAULT_RECIPIENT_DISCORD` to the channel you want the alert notifications to be sent to. You can define multiple channels like this: `alerts` `systems`. |  | yes |
 
+<a id="option-default-recipient-discord"></a>
 ##### DEFAULT_RECIPIENT_DISCORD
 
 All roles will default to this variable if left unconfigured.

@@ -69,7 +69,7 @@ Once logged into Netdata Cloud, you'll see connection instructions. There are th
 <details>
 <summary><strong>Method 1: Through the Cloud Interface</strong></summary><br/>
 
-1. Navigate to **Space Settings** (cogwheel icon)
+1. Navigate to **Space Settings** (⚙️) on the left sidebar below the spaces list
 2. Select **Nodes** tab
 3. Click the **"+"** button to add a new node
 4. Copy and run the generated connection command
@@ -100,7 +100,7 @@ Once logged into Netdata Cloud, you'll see connection instructions. There are th
 All methods will show you a command like this:
 
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --claim-token YOUR_TOKEN --claim-rooms YOUR_ROOMS --claim-url https://app.netdata.cloud
+bash <(curl -Ss https://get.netdata.cloud/kickstart.sh) --claim-token YOUR_TOKEN --claim-rooms YOUR_ROOMS --claim-url https://app.netdata.cloud
 ```
 
 :::
@@ -191,7 +191,7 @@ Configure alerts to reach you through:
 **Quick Silence Options:**
 
 - **Individual alerts** - Change `to: silent` in alert configuration
-- **Specific alerts** - Edit `netdata.conf` with `enabled alarms = !alert_name *`
+- **Specific alerts** - Edit `netdata.conf` with `enabled alarms = !alert_name *` (single) or `enabled alarms = !alert1 !alert2 *` (multiple — all exclusions before the wildcard), then restart the Agent
 - **All alerts** - Set `enabled = no` in `[health]` section
 
 **Temporary Control:** Use the Health Management API for dynamic control without config changes - perfect for maintenance windows.
@@ -221,14 +221,14 @@ Click "Invite Users" in your Space sidebar to add team members. Set appropriate 
 
 :::tip
 
-**Role-Based Access Control (RBAC):** Business plan subscribers get fine-grained control over who can access what data, execute functions, and modify configurations - perfect for teams with different responsibilities.
+**Role-Based Access Control (RBAC):** Paid plan subscribers get fine-grained control over who can access what data, execute functions, and modify configurations - perfect for teams with different responsibilities.
 
 :::
 
 **Organize by Your Needs:**
 
 | **Category**       | **Examples**                         |
-|--------------------|--------------------------------------|
+| ------------------ | ------------------------------------ |
 | **By Service**     | Web servers, databases, applications |
 | **By Location**    | Data centers, cloud regions          |
 | **By Team**        | DevOps, SRE, development teams       |
@@ -236,19 +236,19 @@ Click "Invite Users" in your Space sidebar to add team members. Set appropriate 
 
 ## What's the Value for You
 
-### Experience the Difference with Business Plan
+### Experience the Difference with a Paid Plan
 
-**[Start Your Free Business Trial](https://netdata.cloud/pricing):** Experience the full power of Netdata Business with our free trial:
+**[Start Your Free Trial](https://netdata.cloud/pricing):** Experience the full power of Netdata with our free trial:
 
 - **No credit card required** - Start immediately
 - **Full access to all features** - Nothing held back
 - **Cancel anytime** - No commitments
 - **[Expert support](https://www.netdata.cloud/support/)** - Get help when you need it
 
-### Traditional Monitoring vs Netdata Business
+### Traditional Monitoring vs Netdata
 
-| **Traditional Monitoring**                       |        | **Netdata Business**                               |
-|--------------------------------------------------|:------:|----------------------------------------------------|
+| **Traditional Monitoring**                       |        | **Netdata**                                        |
+| ------------------------------------------------ | :----: | -------------------------------------------------- |
 | **Navigate complex interfaces** during incidents |        | **Get instant analysis** with natural language     |
 | **Build dashboards** during incidents            | **VS** | **Automatic dashboards** with zero configuration   |
 | **Manually correlate data** across systems       |        | **AI-powered correlation** and root cause analysis |
@@ -262,10 +262,10 @@ Experience the future of infrastructure monitoring with AI that actually works. 
 **AI Features Overview:**
 
 | **Capability**           | **What It Does**                    | **Access**                           |
-|--------------------------|-------------------------------------|--------------------------------------|
+| ------------------------ | ----------------------------------- | ------------------------------------ |
 | **AI Chat with Netdata** | Ask questions in natural language   | Available now for all deployments    |
 | **AI DevOps Copilot**    | CLI-based AI automation             | Available now with MCP tools         |
-| **AI Insights**          | Professional reports in 2-3 minutes | Business plans get unlimited reports |
+| **AI Insights**          | Professional reports in 2-3 minutes | Paid plans get unlimited reports |
 | **Anomaly Advisor**      | Find root causes in minutes         | Available to all users               |
 | **ML Anomaly Detection** | Continuous anomaly detection        | Free for everyone                    |
 
@@ -285,7 +285,7 @@ Transform troubleshooting from complex queries to natural conversation. Ask ques
 <details>
 <summary><strong>Model Context Protocol (MCP) Integration</strong></summary><br/>
 
-MCP is available via Netdata Cloud for infrastructure-wide access (Business/Homelab plan) and on every Agent/Parent for direct local access (free, open-source), enabling seamless integration with AI assistants for natural language queries and automated analysis.
+MCP is available via Netdata Cloud for infrastructure-wide access (Paid plan) and on every Agent/Parent for direct local access (free, open-source), enabling seamless integration with AI assistants for natural language queries and automated analysis.
 
 **Why this matters:** Use your existing AI tools or our standalone web chat with choice of AI providers. Query live metrics, logs, processes, network connections, and system state securely.
 
@@ -322,7 +322,7 @@ Generate comprehensive reports in 2-3 minutes that explain what happened, why it
 - **Performance Optimization** - Bottleneck identification and tuning suggestions
 - **Anomaly Analysis** - Deep dive into unusual patterns and their impacts
 
-**Access:** Business subscriptions get unlimited reports, free trial users get full access during trial, Community users get 10 free reports.
+**Access:** Paid plans get unlimited reports, free trial users get full access during trial, Community users get 10 free reports.
 
 </details>
 
@@ -365,6 +365,6 @@ The foundation of Netdata's AI capabilities. Machine learning models run locally
 
 **Transform your infrastructure monitoring today. Your future self and your team will thank you.**
 
-**[Start Free Business Trial](https://netdata.cloud/pricing)**
+**[Start Free Trial](https://netdata.cloud/pricing)**
 
 :::

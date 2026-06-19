@@ -3,7 +3,8 @@
 #ifndef NETDATA_EBPF_DCSTAT_H
 #define NETDATA_EBPF_DCSTAT_H 1
 
-#include "ebpf.h"
+#include "libbpf_api/ebpf.h"
+#include "collectors/collectors-ipc/ebpf-ipc.h"
 
 // Module name & description
 #define NETDATA_EBPF_MODULE_NAME_DCSTAT "dcstat"
@@ -38,7 +39,7 @@
 // ARAL name
 #define NETDATA_EBPF_DCSTAT_ARAL_NAME "ebpf_dcstat"
 
-// Unity
+// Unit
 #define EBPF_COMMON_UNITS_FILES "files"
 
 enum directory_cache_indexes {
@@ -67,7 +68,6 @@ enum directory_cache_targets { NETDATA_DC_TARGET_LOOKUP_FAST, NETDATA_DC_TARGET_
 
 void ebpf_dcstat_thread(void *ptr);
 void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr);
-void ebpf_dcstat_release(netdata_publish_dcstat_t *stat);
 extern struct config dcstat_config;
 extern netdata_ebpf_targets_t dc_targets[];
 extern ebpf_local_maps_t dcstat_maps[];

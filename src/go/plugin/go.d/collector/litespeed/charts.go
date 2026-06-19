@@ -4,10 +4,10 @@
 
 package litespeed
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 const (
-	prioRequests = module.Priority + iota
+	prioRequests = collectorapi.Priority + iota
 	prioRequestsProcessing
 	prioNetThroughputHttp
 	prioNetThroughputHttps
@@ -18,7 +18,7 @@ const (
 	prioStaticHits
 )
 
-var charts = module.Charts{
+var charts = collectorapi.Charts{
 	requestsChart.Copy(),
 	requestsProcessingChart.Copy(),
 
@@ -34,53 +34,53 @@ var charts = module.Charts{
 }
 
 var (
-	requestsChart = module.Chart{
+	requestsChart = collectorapi.Chart{
 		ID:       "requests",
 		Title:    "Requests",
 		Units:    "requests/s",
 		Fam:      "requests",
 		Ctx:      "litespeed.requests",
 		Priority: prioRequests,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "req_per_sec", Name: "requests", Div: precision},
 		},
 	}
-	requestsProcessingChart = module.Chart{
+	requestsProcessingChart = collectorapi.Chart{
 		ID:       "requests_processing",
 		Title:    "Processing requests",
 		Units:    "requests",
 		Fam:      "requests",
 		Ctx:      "litespeed.requests_processing",
 		Priority: prioRequestsProcessing,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "req_processing", Name: "processing"},
 		},
 	}
 )
 
 var (
-	netThroughputHttpChart = module.Chart{
+	netThroughputHttpChart = collectorapi.Chart{
 		ID:       "net_throughput_http",
 		Title:    "HTTP throughput",
 		Units:    "kilobits/s",
 		Fam:      "throughput",
 		Ctx:      "litespeed.net_throughput",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioNetThroughputHttp,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "bps_in", Name: "in"},
 			{ID: "bps_out", Name: "out", Div: -1},
 		},
 	}
-	netThroughputHttpsChart = module.Chart{
+	netThroughputHttpsChart = collectorapi.Chart{
 		ID:       "net_throughput_https",
 		Title:    "HTTPs throughput",
 		Units:    "kilobits/s",
 		Fam:      "throughput",
 		Ctx:      "litespeed.net_ssl_throughput",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioNetThroughputHttps,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "ssl_bps_in", Name: "in"},
 			{ID: "ssl_bps_out", Name: "out", Div: -1},
 		},
@@ -88,28 +88,28 @@ var (
 )
 
 var (
-	connectionsHttpChart = module.Chart{
+	connectionsHttpChart = collectorapi.Chart{
 		ID:       "connections_http",
 		Title:    "HTTP connections",
 		Units:    "connections",
 		Fam:      "connections",
 		Ctx:      "litespeed.connections",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioConnectionsHttp,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "availconn", Name: "free"},
 			{ID: "plainconn", Name: "used"},
 		},
 	}
-	connectionsHttpsChart = module.Chart{
+	connectionsHttpsChart = collectorapi.Chart{
 		ID:       "connections_https",
 		Title:    "HTTPs connections",
 		Units:    "connections",
 		Fam:      "connections",
 		Ctx:      "litespeed.ssl_connections",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioConnectionsHttps,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "availssl", Name: "free"},
 			{ID: "sslconn", Name: "used"},
 		},
@@ -117,37 +117,37 @@ var (
 )
 
 var (
-	publicCacheHitsChart = module.Chart{
+	publicCacheHitsChart = collectorapi.Chart{
 		ID:       "pub_cache_hits",
 		Title:    "Public cache hits",
 		Units:    "hits/s",
 		Fam:      "cache",
 		Ctx:      "litespeed.public_cache",
 		Priority: prioPublicCacheHits,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "pub_cache_hits_per_sec", Name: "hits", Div: precision},
 		},
 	}
-	privateCacheHitsChart = module.Chart{
+	privateCacheHitsChart = collectorapi.Chart{
 		ID:       "private_cache_hits",
 		Title:    "Private cache hits",
 		Units:    "hits/s",
 		Fam:      "cache",
 		Ctx:      "litespeed.private_cache",
 		Priority: prioPrivateCacheHits,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "private_cache_hits_per_sec", Name: "hits", Div: precision},
 		},
 	}
 
-	staticCacheHitsChart = module.Chart{
+	staticCacheHitsChart = collectorapi.Chart{
 		ID:       "static_hits",
 		Title:    "Static hits",
 		Units:    "hits/s",
 		Fam:      "static",
 		Ctx:      "litespeed.static",
 		Priority: prioStaticHits,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "static_hits_per_sec", Name: "hits", Div: precision},
 		},
 	}

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "apps_plugin.h"
+#include "apps-cgroups-lookup-client.h"
 
 static inline void link_pid_to_its_parent(struct pid_stat *p);
 
@@ -138,6 +139,7 @@ void del_pid_entry(pid_t pid) {
     freez(p->limits_filename);
     freez(p->io_filename);
     freez(p->cmdline_filename);
+    freez(p->cgroup_filename);
 #if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
     freez(p->smaps_rollup_filename);
 #endif
@@ -149,6 +151,15 @@ void del_pid_entry(pid_t pid) {
 
 #if (PROCESSES_HAVE_SID == 1)
     string_freez(p->sid_name);
+#endif
+
+#if (PROCESSES_HAVE_SERVICE == 1)
+    string_freez(p->service_name);
+#endif
+
+#if defined(OS_LINUX)
+    apps_cgroups_lookup_unlink_pid(p);
+    string_freez(p->cgroup_path);
 #endif
 
     string_freez(p->comm_orig);
@@ -401,8 +412,7 @@ static void remove_extension(char *name) {
 static inline STRING *comm_from_cmdline_param_sanitized(STRING *cmdline) {
     if(!cmdline) return NULL;
 
-    char buf[string_strlen(cmdline) + 1];
-    memcpy(buf, string2str(cmdline), sizeof(buf));
+    char *buf = strdupz(string2str(cmdline));
 
     char *words[100];
     size_t num_words = quoted_strings_splitter_whitespace(buf, words, 100);
@@ -420,23 +430,25 @@ static inline STRING *comm_from_cmdline_param_sanitized(STRING *cmdline) {
                 name++;
                 remove_extension(name);
                 sanitize_apps_plugin_chart_meta(name);
-                return string_strdupz(name);
+                STRING *sanitized = string_strdupz(name);
+                freez(buf);
+                return sanitized;
             }
         }
     }
 
+    freez(buf);
     return NULL;
 }
 
 static inline STRING *comm_from_cmdline_sanitized(STRING *comm, STRING *cmdline) {
     if(!cmdline) return NULL;
 
-    char buf[string_strlen(cmdline) + 1];
-    memcpy(buf, string2str(cmdline), sizeof(buf));
+    char *buf = strdupz(string2str(cmdline));
 
     size_t comm_len = string_strlen(comm);
     char *start = strstr(buf, string2str(comm));
-    while (start) {
+    if (start) {
         char *end = start + comm_len;
         while (*end &&
                !isspace((uint8_t) *end) &&
@@ -452,9 +464,12 @@ static inline STRING *comm_from_cmdline_sanitized(STRING *comm, STRING *cmdline)
 
         remove_extension(start);
         sanitize_apps_plugin_chart_meta(start);
-        return string_strdupz(start);
+        STRING *sanitized = string_strdupz(start);
+        freez(buf);
+        return sanitized;
     }
 
+    freez(buf);
     return NULL;
 }
 
@@ -501,16 +516,19 @@ void update_pid_comm(struct pid_stat *p, const char *comm) {
 
     // some process names have ( and ), remove the parenthesis
     size_t len = strlen(comm);
-    char buf[len + 1];
+    char *buf;
     if(comm[0] == '(' && comm[len - 1] == ')') {
+        buf = mallocz(len - 1);
         memcpy(buf, &comm[1], len - 2);
         buf[len - 2] = '\0';
     }
     else
-        memcpy(buf, comm, sizeof(buf));
+        buf = strdupz(comm);
 
     sanitize_apps_plugin_chart_meta(buf);
+    string_freez(p->comm);
     p->comm = string_strdupz(buf);
+    freez(buf);
     p->is_manager = is_process_a_manager(p);
     p->is_aggregator = is_process_an_aggregator(p);
 
@@ -901,6 +919,12 @@ static inline void clear_pid_rates(struct pid_stat *p) {
 }
 
 bool collect_data_for_all_pids(void) {
+    // Pull the latest eBPF snapshot at the start of the cycle so every PID
+    // sees the same shared-memory view before /proc accumulation begins.
+#if defined(OS_LINUX)
+    (void)apps_ebpf_shared_memory_refresh();
+#endif
+
     // mark all pids as unread
 #if (INCREMENTAL_DATA_COLLECTION == 0)
     usec_t now_mon_ut = now_monotonic_usec();
@@ -909,6 +933,7 @@ bool collect_data_for_all_pids(void) {
     for(struct pid_stat *p = root_of_pids(); p ; p = p->next) {
         p->read = p->updated = p->merged = false;
         p->children_count = 0;
+        p->parent = NULL; // clear stale parent pointers from previous iteration to prevent use-after-free
 
 #if (INCREMENTAL_DATA_COLLECTION == 0)
         p->last_stat_collected_usec = p->stat_collected_usec;

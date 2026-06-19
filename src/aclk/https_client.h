@@ -13,7 +13,7 @@ typedef enum https_client_resp {
     HTTPS_CLIENT_RESP_UNKNOWN_ERROR = ND_SOCK_ERR_MAX,
     HTTPS_CLIENT_RESP_NO_MEM,
     HTTPS_CLIENT_RESP_NONBLOCK_FAILED,
-    HTTPS_CLIENT_RESP_PROXY_NOT_200,
+    HTTPS_CLIENT_RESP_PROXY_NEGOTIATION_FAILED,
     HTTPS_CLIENT_RESP_NO_SSL_CTX,
     HTTPS_CLIENT_RESP_NO_SSL_VERIFY_PATHS,
     HTTPS_CLIENT_RESP_NO_SSL_NEW,
@@ -48,7 +48,6 @@ ENUM_STR_DEFINE_FUNCTIONS_EXTERN(https_client_resp_t);
 typedef enum http_req_type {
     HTTP_REQ_GET = 0,
     HTTP_REQ_POST,
-    HTTP_REQ_CONNECT,
     HTTP_REQ_INVALID
 } http_req_type_t;
 
@@ -69,6 +68,7 @@ typedef struct {
     const char *proxy_username;
     const char *proxy_password;
     const char *proxy;
+    int proxy_type; // enum mqtt_wss_proxy_type (int avoids extra header coupling)
 } https_req_t;
 
 typedef struct {
@@ -113,7 +113,8 @@ void https_req_response_free(https_req_response_t *res);
         .payload = NULL,                            \
         .payload_size = 0,                          \
         .proxy_host = NULL,                         \
-        .proxy_port = 8080                          \
+        .proxy_port = 8080,                         \
+        .proxy_type = 0                             \
     }
 
 https_client_resp_t https_request(https_req_t *request, https_req_response_t *response, bool *fallback_ipv4);

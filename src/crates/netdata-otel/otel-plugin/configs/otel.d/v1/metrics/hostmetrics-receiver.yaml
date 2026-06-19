@@ -1,172 +1,150 @@
-configs:
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*networkscraper$
-      metric_name: system\.network\.connections
-    extract:
-      chart_instance_pattern: metric.attributes.protocol
-      dimension_name: metric.attributes.state
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*networkscraper$
-      metric_name: system\.network\.dropped
-    extract:
-      chart_instance_pattern: metric.attributes.device
-      dimension_name: metric.attributes.direction
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*networkscraper$
-      metric_name: system\.network\.errors
-    extract:
-      chart_instance_pattern: metric.attributes.device
-      dimension_name: metric.attributes.direction
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*networkscraper$
-      metric_name: system\.network\.io
-    extract:
-      chart_instance_pattern: metric.attributes.device
-      dimension_name: metric.attributes.direction
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*networkscraper$
-      metric_name: system\.network\.packets
-    extract:
-      chart_instance_pattern: metric.attributes.device
-      dimension_name: metric.attributes.direction
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*cpuscraper$
-      metric_name: system\.cpu\.time
-    extract:
-      chart_instance_pattern: metric.attributes.cpu
-      dimension_name: metric.attributes.state
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*cpuscraper$
-      metric_name: system\.cpu\.frequency
-    extract:
-      chart_instance_pattern: metric.attributes.cpu
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*cpuscraper$
-      metric_name: system\.cpu\.utilization
-    extract:
-      chart_instance_pattern: metric.attributes.cpu
-      dimension_name: metric.attributes.state
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*diskscraper$
-      metric_name: system\.disk\.io$
-    extract:
-      chart_instance_pattern: metric.attributes.device
-      dimension_name: metric.attributes.direction
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*diskscraper$
-      metric_name: system\.disk\.io_time
-    extract:
-      chart_instance_pattern: metric.attributes.device
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*diskscraper$
-      metric_name: system\.disk\.merged
-    extract:
-      chart_instance_pattern: metric.attributes.device
-      dimension_name: metric.attributes.direction
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*diskscraper$
-      metric_name: system\.disk\.operation_time
-    extract:
-      chart_instance_pattern: metric.attributes.device
-      dimension_name: metric.attributes.direction
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*diskscraper$
-      metric_name: system\.disk\.operations
-    extract:
-      chart_instance_pattern: metric.attributes.device
-      dimension_name: metric.attributes.direction
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*diskscraper$
-      metric_name: system\.disk\.pending_operations
-    extract:
-      chart_instance_pattern: metric.attributes.device
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*diskscraper$
-      metric_name: system\.disk\.weighted_io
-    extract:
-      chart_instance_pattern: metric.attributes.device
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*filesystemscraper$
-      metric_name: system\.filesystem\.inodes\.usage
-    extract:
-      chart_instance_pattern: metric.attributes.mountpoint
-      dimension_name: metric.attributes.state
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*filesystemscraper$
-      metric_name: system\.filesystem\.usage
-    extract:
-      chart_instance_pattern: metric.attributes.mountpoint
-      dimension_name: metric.attributes.state
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*filesystemscraper$
-      metric_name: system\.filesystem\.utilization
-    extract:
-      chart_instance_pattern: metric.attributes.mountpoint
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*memoryscraper$
-      metric_name: system\.memory\.utilization
-    extract:
-      dimension_name: metric.attributes.state
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*pagingscraper$
-      metric_name: system\.paging\.faults
-    extract:
-      dimension_name: metric.attributes.type
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*pagingscraper$
-      metric_name: system\.paging\.operations
-    extract:
-      chart_instance_pattern: metric.attributes.type
-      dimension_name: metric.attributes.direction
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*pagingscraper$
-      metric_name: system\.paging\.usage
-    extract:
-      chart_instance_pattern: metric.attributes.device
-      dimension_name: metric.attributes.state
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*pagingscraper$
-      metric_name: system\.paging\.utilization
-    extract:
-      chart_instance_pattern: metric.attributes.device
-      dimension_name: metric.attributes.state
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*processesscraper$
-      metric_name: system\.processes\.count
-    extract:
-      dimension_name: metric.attributes.status
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*processscraper$
-      metric_name: process\.cpu\.time
-    extract:
-      dimension_name: metric.attributes.state
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*processscraper$
-      metric_name: process\.disk\.io
-    extract:
-      dimension_name: metric.attributes.direction
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*processscraper$
-      metric_name: process\.context_switches
-    extract:
-      dimension_name: metric.attributes.type
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*processscraper$
-      metric_name: process\.cpu\.utilization
-    extract:
-      dimension_name: metric.attributes.state
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*processscraper$
-      metric_name: process\.disk\.operations
-    extract:
-      dimension_name: metric.attributes.direction
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*processscraper$
-      metric_name: process\.paging\.faults
-    extract:
-      dimension_name: metric.attributes.type
-  - select:
-      instrumentation_scope_name: .*hostmetricsreceiver.*processscraper$
-      metric_name: process\.paging\.faults
-    extract:
-      dimension_name: metric.attributes.type
+metrics:
+  "system.network.connections":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*networkscraper$
+      dimension_attribute_key: state
+
+  "system.network.dropped":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*networkscraper$
+      dimension_attribute_key: direction
+
+  "system.network.errors":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*networkscraper$
+      dimension_attribute_key: direction
+
+  "system.network.io":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*networkscraper$
+      dimension_attribute_key: direction
+
+  "system.network.packets":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*networkscraper$
+      dimension_attribute_key: direction
+
+  "system.cpu.time":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*cpuscraper$
+      dimension_attribute_key: state
+
+  "system.cpu.frequency":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*cpuscraper$
+
+  "system.cpu.utilization":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*cpuscraper$
+      dimension_attribute_key: state
+
+  "system.disk.io":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*diskscraper$
+      dimension_attribute_key: direction
+
+  "system.disk.io_time":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*diskscraper$
+
+  "system.disk.merged":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*diskscraper$
+      dimension_attribute_key: direction
+
+  "system.disk.operation_time":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*diskscraper$
+      dimension_attribute_key: direction
+
+  "system.disk.operations":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*diskscraper$
+      dimension_attribute_key: direction
+
+  "system.disk.pending_operations":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*diskscraper$
+
+  "system.disk.weighted_io":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*diskscraper$
+
+  "system.filesystem.inodes.usage":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*filesystemscraper$
+      dimension_attribute_key: state
+
+  "system.filesystem.usage":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*filesystemscraper$
+      dimension_attribute_key: state
+
+  "system.filesystem.utilization":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*filesystemscraper$
+
+  "system.memory.utilization":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*memoryscraper$
+      dimension_attribute_key: state
+
+  "system.memory.usage":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*memoryscraper$
+      dimension_attribute_key: state
+
+  "system.paging.faults":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*pagingscraper$
+      dimension_attribute_key: type
+
+  "system.paging.operations":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*pagingscraper$
+      dimension_attribute_key: direction
+
+  "system.paging.usage":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*pagingscraper$
+      dimension_attribute_key: state
+
+  "system.paging.utilization":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*pagingscraper$
+      dimension_attribute_key: state
+
+  "system.processes.count":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*processesscraper$
+      dimension_attribute_key: status
+
+  "process.cpu.time":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*processscraper$
+      dimension_attribute_key: state
+
+  "process.disk.io":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*processscraper$
+      dimension_attribute_key: direction
+
+  "process.context_switches":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*processscraper$
+      dimension_attribute_key: type
+
+  "process.cpu.utilization":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*processscraper$
+      dimension_attribute_key: state
+
+  "process.disk.operations":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*processscraper$
+      dimension_attribute_key: direction
+
+  "process.paging.faults":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*processscraper$
+      dimension_attribute_key: type

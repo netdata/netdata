@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/sqlquery"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
@@ -612,71 +613,40 @@ EXEC sp_executesql @sql;
 }
 
 func (f *funcTopQueries) scanDynamicRows(rows topQueriesRowScanner, cols []topQueriesColumn) ([][]any, error) {
-	data := make([][]any, 0, 500)
-
-	for rows.Next() {
-		values := make([]any, len(cols))
-		valuePtrs := make([]any, len(cols))
-
-		for i, col := range cols {
-			switch col.Type {
-			case funcapi.FieldTypeString:
-				var v sql.NullString
-				values[i] = &v
-			case funcapi.FieldTypeInteger:
-				var v sql.NullInt64
-				values[i] = &v
-			case funcapi.FieldTypeFloat, funcapi.FieldTypeDuration:
-				var v sql.NullFloat64
-				values[i] = &v
-			default:
-				var v any
-				values[i] = &v
-			}
-			valuePtrs[i] = values[i]
-		}
-
-		if err := rows.Scan(valuePtrs...); err != nil {
-			return nil, fmt.Errorf("row scan failed: %w", err)
-		}
-
-		row := make([]any, len(cols))
-		for i, col := range cols {
-			switch v := values[i].(type) {
-			case *sql.NullString:
-				if v.Valid {
-					s := v.String
-					if col.Name == "query" {
-						s = strmutil.TruncateText(s, topQueriesMaxTextLength)
-					}
-					row[i] = s
-				} else {
-					row[i] = ""
-				}
-			case *sql.NullInt64:
-				if v.Valid {
-					row[i] = v.Int64
-				} else {
-					row[i] = int64(0)
-				}
-			case *sql.NullFloat64:
-				if v.Valid {
-					row[i] = v.Float64
-				} else {
-					row[i] = float64(0)
-				}
-			default:
-				row[i] = nil
-			}
-		}
-		data = append(data, row)
+	specs := make([]sqlquery.ScanColumnSpec, len(cols))
+	for i, col := range cols {
+		specs[i] = mssqlTopQueriesScanSpec(col)
 	}
 
+	data, err := sqlquery.ScanTypedRows(rows, specs)
+	if err != nil {
+		return nil, fmt.Errorf("row scan failed: %w", err)
+	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("rows iteration error: %w", err)
 	}
-
 	return data, nil
+}
+
+func mssqlTopQueriesScanSpec(col topQueriesColumn) sqlquery.ScanColumnSpec {
+	spec := sqlquery.ScanColumnSpec{}
+	switch col.Type {
+	case funcapi.FieldTypeString:
+		spec.Type = sqlquery.ScanValueString
+		if col.Name == "query" {
+			spec.Transform = func(v any) any {
+				s, _ := v.(string)
+				return strmutil.TruncateText(s, topQueriesMaxTextLength)
+			}
+		}
+	case funcapi.FieldTypeInteger:
+		spec.Type = sqlquery.ScanValueInteger
+	case funcapi.FieldTypeFloat, funcapi.FieldTypeDuration:
+		spec.Type = sqlquery.ScanValueFloat
+	default:
+		spec.Type = sqlquery.ScanValueDiscard
+	}
+	return spec
 }
 
 func (f *funcTopQueries) buildSortParam(cols []topQueriesColumn) (funcapi.ParamConfig, []funcapi.ParamOption) {

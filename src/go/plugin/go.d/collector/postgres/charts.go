@@ -7,11 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioConnectionsUtilization = module.Priority + iota
+	prioConnectionsUtilization = collectorapi.Priority + iota
 	prioConnectionsUsage
 	prioConnectionsStateCount
 	prioDBConnectionsUtilization
@@ -96,7 +96,7 @@ const (
 	prioUptime
 )
 
-var baseCharts = module.Charts{
+var baseCharts = collectorapi.Charts{
 	serverConnectionsUtilizationChart.Copy(),
 	serverConnectionsUsageChart.Copy(),
 	serverConnectionsStateCount.Copy(),
@@ -119,7 +119,7 @@ var baseCharts = module.Charts{
 	databasesCountChart.Copy(),
 }
 
-var walFilesCharts = module.Charts{
+var walFilesCharts = collectorapi.Charts{
 	walFilesCountChart.Copy(),
 	walArchivingFilesCountChart.Copy(),
 }
@@ -133,39 +133,39 @@ func (c *Collector) addWALFilesCharts() {
 }
 
 var (
-	serverConnectionsUtilizationChart = module.Chart{
+	serverConnectionsUtilizationChart = collectorapi.Chart{
 		ID:       "connections_utilization",
 		Title:    "Connections utilization",
 		Units:    "percentage",
 		Fam:      "connections",
 		Ctx:      "postgres.connections_utilization",
 		Priority: prioConnectionsUtilization,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "server_connections_utilization", Name: "used"},
 		},
 	}
-	serverConnectionsUsageChart = module.Chart{
+	serverConnectionsUsageChart = collectorapi.Chart{
 		ID:       "connections_usage",
 		Title:    "Connections usage",
 		Units:    "connections",
 		Fam:      "connections",
 		Ctx:      "postgres.connections_usage",
 		Priority: prioConnectionsUsage,
-		Type:     module.Stacked,
-		Dims: module.Dims{
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
 			{ID: "server_connections_available", Name: "available"},
 			{ID: "server_connections_used", Name: "used"},
 		},
 	}
-	serverConnectionsStateCount = module.Chart{
+	serverConnectionsStateCount = collectorapi.Chart{
 		ID:       "connections_state",
 		Title:    "Connections in each state",
 		Units:    "connections",
 		Fam:      "connections",
 		Ctx:      "postgres.connections_state_count",
 		Priority: prioConnectionsStateCount,
-		Type:     module.Stacked,
-		Dims: module.Dims{
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
 			{ID: "server_connections_state_active", Name: "active"},
 			{ID: "server_connections_state_idle", Name: "idle"},
 			{ID: "server_connections_state_idle_in_transaction", Name: "idle_in_transaction"},
@@ -175,141 +175,141 @@ var (
 		},
 	}
 
-	locksUtilization = module.Chart{
+	locksUtilization = collectorapi.Chart{
 		ID:       "locks_utilization",
 		Title:    "Acquired locks utilization",
 		Units:    "percentage",
 		Fam:      "locks",
 		Ctx:      "postgres.locks_utilization",
 		Priority: prioLocksUtilization,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "locks_utilization", Name: "used"},
 		},
 	}
 
-	checkpointsChart = module.Chart{
+	checkpointsChart = collectorapi.Chart{
 		ID:       "checkpoints_rate",
 		Title:    "Checkpoints",
 		Units:    "checkpoints/s",
 		Fam:      "maintenance",
 		Ctx:      "postgres.checkpoints_rate",
 		Priority: prioCheckpointsRate,
-		Type:     module.Stacked,
-		Dims: module.Dims{
-			{ID: "checkpoints_timed", Name: "scheduled", Algo: module.Incremental},
-			{ID: "checkpoints_req", Name: "requested", Algo: module.Incremental},
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
+			{ID: "checkpoints_timed", Name: "scheduled", Algo: collectorapi.Incremental},
+			{ID: "checkpoints_req", Name: "requested", Algo: collectorapi.Incremental},
 		},
 	}
 	// TODO: should be seconds, also it is units/s when using incremental...
-	checkpointWriteChart = module.Chart{
+	checkpointWriteChart = collectorapi.Chart{
 		ID:       "checkpoints_time",
 		Title:    "Checkpoint time",
 		Units:    "milliseconds",
 		Fam:      "maintenance",
 		Ctx:      "postgres.checkpoints_time",
 		Priority: prioCheckpointsTime,
-		Type:     module.Stacked,
-		Dims: module.Dims{
-			{ID: "checkpoint_write_time", Name: "write", Algo: module.Incremental},
-			{ID: "checkpoint_sync_time", Name: "sync", Algo: module.Incremental},
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
+			{ID: "checkpoint_write_time", Name: "write", Algo: collectorapi.Incremental},
+			{ID: "checkpoint_sync_time", Name: "sync", Algo: collectorapi.Incremental},
 		},
 	}
-	bgWriterHaltsRateChart = module.Chart{
+	bgWriterHaltsRateChart = collectorapi.Chart{
 		ID:       "bgwriter_halts_rate",
 		Title:    "Background writer scan halts",
 		Units:    "halts/s",
 		Fam:      "maintenance",
 		Ctx:      "postgres.bgwriter_halts_rate",
 		Priority: prioBGWriterHaltsRate,
-		Dims: module.Dims{
-			{ID: "maxwritten_clean", Name: "maxwritten", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "maxwritten_clean", Name: "maxwritten", Algo: collectorapi.Incremental},
 		},
 	}
 
-	buffersIORateChart = module.Chart{
+	buffersIORateChart = collectorapi.Chart{
 		ID:       "buffers_io_rate",
 		Title:    "Buffers written rate",
 		Units:    "B/s",
 		Fam:      "maintenance",
 		Ctx:      "postgres.buffers_io_rate",
 		Priority: prioBuffersIORate,
-		Type:     module.Area,
-		Dims: module.Dims{
-			{ID: "buffers_checkpoint", Name: "checkpoint", Algo: module.Incremental},
-			{ID: "buffers_backend", Name: "backend", Algo: module.Incremental},
-			{ID: "buffers_clean", Name: "bgwriter", Algo: module.Incremental},
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
+			{ID: "buffers_checkpoint", Name: "checkpoint", Algo: collectorapi.Incremental},
+			{ID: "buffers_backend", Name: "backend", Algo: collectorapi.Incremental},
+			{ID: "buffers_clean", Name: "bgwriter", Algo: collectorapi.Incremental},
 		},
 	}
-	buffersBackendFsyncRateChart = module.Chart{
+	buffersBackendFsyncRateChart = collectorapi.Chart{
 		ID:       "buffers_backend_fsync_rate",
 		Title:    "Backend fsync calls",
 		Units:    "calls/s",
 		Fam:      "maintenance",
 		Ctx:      "postgres.buffers_backend_fsync_rate",
 		Priority: prioBuffersBackendFsyncRate,
-		Dims: module.Dims{
-			{ID: "buffers_backend_fsync", Name: "fsync", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "buffers_backend_fsync", Name: "fsync", Algo: collectorapi.Incremental},
 		},
 	}
-	buffersAllocRateChart = module.Chart{
+	buffersAllocRateChart = collectorapi.Chart{
 		ID:       "buffers_alloc_rate",
 		Title:    "Buffers allocated",
 		Units:    "B/s",
 		Fam:      "maintenance",
 		Ctx:      "postgres.buffers_allocated_rate",
 		Priority: prioBuffersAllocRate,
-		Dims: module.Dims{
-			{ID: "buffers_alloc", Name: "allocated", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "buffers_alloc", Name: "allocated", Algo: collectorapi.Incremental},
 		},
 	}
 
-	walIORateChart = module.Chart{
+	walIORateChart = collectorapi.Chart{
 		ID:       "wal_io_rate",
 		Title:    "Write-Ahead Log writes",
 		Units:    "B/s",
 		Fam:      "wal",
 		Ctx:      "postgres.wal_io_rate",
 		Priority: prioWALIORate,
-		Dims: module.Dims{
-			{ID: "wal_writes", Name: "written", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "wal_writes", Name: "written", Algo: collectorapi.Incremental},
 		},
 	}
-	walFilesCountChart = module.Chart{
+	walFilesCountChart = collectorapi.Chart{
 		ID:       "wal_files_count",
 		Title:    "Write-Ahead Log files",
 		Units:    "files",
 		Fam:      "wal",
 		Ctx:      "postgres.wal_files_count",
 		Priority: prioWALFilesCount,
-		Type:     module.Stacked,
-		Dims: module.Dims{
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
 			{ID: "wal_written_files", Name: "written"},
 			{ID: "wal_recycled_files", Name: "recycled"},
 		},
 	}
 
-	walArchivingFilesCountChart = module.Chart{
+	walArchivingFilesCountChart = collectorapi.Chart{
 		ID:       "wal_archiving_files_count",
 		Title:    "Write-Ahead Log archived files",
 		Units:    "files/s",
 		Fam:      "wal",
 		Ctx:      "postgres.wal_archiving_files_count",
 		Priority: prioWALArchivingFilesCount,
-		Type:     module.Stacked,
-		Dims: module.Dims{
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
 			{ID: "wal_archive_files_ready_count", Name: "ready"},
 			{ID: "wal_archive_files_done_count", Name: "done"},
 		},
 	}
 
-	autovacuumWorkersCountChart = module.Chart{
+	autovacuumWorkersCountChart = collectorapi.Chart{
 		ID:       "autovacuum_workers_count",
 		Title:    "Autovacuum workers",
 		Units:    "workers",
 		Fam:      "vacuum and analyze",
 		Ctx:      "postgres.autovacuum_workers_count",
 		Priority: prioAutovacuumWorkersCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "autovacuum_analyze", Name: "analyze"},
 			{ID: "autovacuum_vacuum_analyze", Name: "vacuum_analyze"},
 			{ID: "autovacuum_vacuum", Name: "vacuum"},
@@ -318,49 +318,49 @@ var (
 		},
 	}
 
-	txidExhaustionTowardsAutovacuumPercChart = module.Chart{
+	txidExhaustionTowardsAutovacuumPercChart = collectorapi.Chart{
 		ID:       "txid_exhaustion_towards_autovacuum_perc",
 		Title:    "Percent towards emergency autovacuum",
 		Units:    "percentage",
 		Fam:      "maintenance",
 		Ctx:      "postgres.txid_exhaustion_towards_autovacuum_perc",
 		Priority: prioTXIDExhaustionTowardsAutovacuumPerc,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "percent_towards_emergency_autovacuum", Name: "emergency_autovacuum"},
 		},
 	}
-	txidExhaustionPercChart = module.Chart{
+	txidExhaustionPercChart = collectorapi.Chart{
 		ID:       "txid_exhaustion_perc",
 		Title:    "Percent towards transaction ID wraparound",
 		Units:    "percentage",
 		Fam:      "maintenance",
 		Ctx:      "postgres.txid_exhaustion_perc",
 		Priority: prioTXIDExhaustionPerc,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "percent_towards_wraparound", Name: "txid_exhaustion"},
 		},
 	}
-	txidExhaustionOldestTXIDNumChart = module.Chart{
+	txidExhaustionOldestTXIDNumChart = collectorapi.Chart{
 		ID:       "txid_exhaustion_oldest_txid_num",
 		Title:    "Oldest transaction XID",
 		Units:    "xid",
 		Fam:      "maintenance",
 		Ctx:      "postgres.txid_exhaustion_oldest_txid_num",
 		Priority: prioTXIDExhaustionOldestTXIDNum,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "oldest_current_xid", Name: "xid"},
 		},
 	}
 
-	catalogRelationSCountChart = module.Chart{
+	catalogRelationSCountChart = collectorapi.Chart{
 		ID:       "catalog_relations_count",
 		Title:    "Relation count",
 		Units:    "relations",
 		Fam:      "catalog",
 		Ctx:      "postgres.catalog_relations_count",
 		Priority: prioCatalogRelationsCount,
-		Type:     module.Stacked,
-		Dims: module.Dims{
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
 			{ID: "catalog_relkind_r_count", Name: "ordinary_table"},
 			{ID: "catalog_relkind_i_count", Name: "index"},
 			{ID: "catalog_relkind_S_count", Name: "sequence"},
@@ -373,15 +373,15 @@ var (
 			{ID: "catalog_relkind_I_count", Name: "partitioned_index"},
 		},
 	}
-	catalogRelationsSizeChart = module.Chart{
+	catalogRelationsSizeChart = collectorapi.Chart{
 		ID:       "catalog_relations_size",
 		Title:    "Relation size",
 		Units:    "B",
 		Fam:      "catalog",
 		Ctx:      "postgres.catalog_relations_size",
 		Priority: prioCatalogRelationsSize,
-		Type:     module.Stacked,
-		Dims: module.Dims{
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
 			{ID: "catalog_relkind_r_size", Name: "ordinary_table"},
 			{ID: "catalog_relkind_i_size", Name: "index"},
 			{ID: "catalog_relkind_S_size", Name: "sequence"},
@@ -395,68 +395,68 @@ var (
 		},
 	}
 
-	serverUptimeChart = module.Chart{
+	serverUptimeChart = collectorapi.Chart{
 		ID:       "server_uptime",
 		Title:    "Uptime",
 		Units:    "seconds",
 		Fam:      "uptime",
 		Ctx:      "postgres.uptime",
 		Priority: prioUptime,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "server_uptime", Name: "uptime"},
 		},
 	}
 
-	databasesCountChart = module.Chart{
+	databasesCountChart = collectorapi.Chart{
 		ID:       "databases_count",
 		Title:    "Number of databases",
 		Units:    "databases",
 		Fam:      "catalog",
 		Ctx:      "postgres.databases_count",
 		Priority: prioDatabasesCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "databases_count", Name: "databases"},
 		},
 	}
 
-	transactionsDurationChartTmpl = module.Chart{
+	transactionsDurationChartTmpl = collectorapi.Chart{
 		ID:       "transactions_duration",
 		Title:    "Observed transactions time",
 		Units:    "transactions/s",
 		Fam:      "transactions",
 		Ctx:      "postgres.transactions_duration",
 		Priority: prioTransactionsDuration,
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 	}
-	queriesDurationChartTmpl = module.Chart{
+	queriesDurationChartTmpl = collectorapi.Chart{
 		ID:       "queries_duration",
 		Title:    "Observed active queries time",
 		Units:    "queries/s",
 		Fam:      "queries",
 		Ctx:      "postgres.queries_duration",
 		Priority: prioQueriesDuration,
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 	}
 )
 
-func newRunningTimeHistogramChart(tmpl module.Chart, prefix string, buckets []float64) (*module.Chart, error) {
+func newRunningTimeHistogramChart(tmpl collectorapi.Chart, prefix string, buckets []float64) (*collectorapi.Chart, error) {
 	chart := tmpl.Copy()
 
 	for i, v := range buckets {
-		dim := &module.Dim{
+		dim := &collectorapi.Dim{
 			ID:   fmt.Sprintf("%s_hist_bucket_%d", prefix, i+1),
 			Name: time.Duration(v * float64(time.Second)).String(),
-			Algo: module.Incremental,
+			Algo: collectorapi.Incremental,
 		}
 		if err := chart.AddDim(dim); err != nil {
 			return nil, err
 		}
 	}
 
-	dim := &module.Dim{
+	dim := &collectorapi.Dim{
 		ID:   fmt.Sprintf("%s_hist_bucket_inf", prefix),
 		Name: "+Inf",
-		Algo: module.Incremental,
+		Algo: collectorapi.Incremental,
 	}
 	if err := chart.AddDim(dim); err != nil {
 		return nil, err
@@ -496,32 +496,32 @@ func (c *Collector) addQueriesRunTimeHistogramChart() {
 }
 
 var (
-	replicationStandbyAppCharts = module.Charts{
+	replicationStandbyAppCharts = collectorapi.Charts{
 		replicationAppWALLagSizeChartTmpl.Copy(),
 		replicationAppWALLagTimeChartTmpl.Copy(),
 	}
-	replicationAppWALLagSizeChartTmpl = module.Chart{
+	replicationAppWALLagSizeChartTmpl = collectorapi.Chart{
 		ID:       "replication_app_%s_wal_lag_size",
 		Title:    "Standby application WAL lag size",
 		Units:    "B",
 		Fam:      "replication",
 		Ctx:      "postgres.replication_app_wal_lag_size",
 		Priority: prioReplicationAppWALLagSize,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "repl_standby_app_%s_wal_sent_lag_size", Name: "sent_lag"},
 			{ID: "repl_standby_app_%s_wal_write_lag_size", Name: "write_lag"},
 			{ID: "repl_standby_app_%s_wal_flush_lag_size", Name: "flush_lag"},
 			{ID: "repl_standby_app_%s_wal_replay_lag_size", Name: "replay_lag"},
 		},
 	}
-	replicationAppWALLagTimeChartTmpl = module.Chart{
+	replicationAppWALLagTimeChartTmpl = collectorapi.Chart{
 		ID:       "replication_app_%s_wal_lag_time",
 		Title:    "Standby application WAL lag time",
 		Units:    "seconds",
 		Fam:      "replication",
 		Ctx:      "postgres.replication_app_wal_lag_time",
 		Priority: prioReplicationAppWALLagTime,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "repl_standby_app_%s_wal_write_lag_time", Name: "write_lag"},
 			{ID: "repl_standby_app_%s_wal_flush_lag_time", Name: "flush_lag"},
 			{ID: "repl_standby_app_%s_wal_replay_lag_time", Name: "replay_lag"},
@@ -529,11 +529,11 @@ var (
 	}
 )
 
-func newReplicationStandbyAppCharts(app string) *module.Charts {
+func newReplicationStandbyAppCharts(app string) *collectorapi.Charts {
 	charts := replicationStandbyAppCharts.Copy()
 	for _, c := range *charts {
 		c.ID = fmt.Sprintf(c.ID, app)
-		c.Labels = []module.Label{
+		c.Labels = []collectorapi.Label{
 			{Key: "application", Value: app},
 		}
 		for _, d := range c.Dims {
@@ -561,28 +561,28 @@ func (c *Collector) removeReplicationStandbyAppCharts(app string) {
 }
 
 var (
-	replicationSlotCharts = module.Charts{
+	replicationSlotCharts = collectorapi.Charts{
 		replicationSlotFilesCountChartTmpl.Copy(),
 	}
-	replicationSlotFilesCountChartTmpl = module.Chart{
+	replicationSlotFilesCountChartTmpl = collectorapi.Chart{
 		ID:       "replication_slot_%s_files_count",
 		Title:    "Replication slot files",
 		Units:    "files",
 		Fam:      "replication",
 		Ctx:      "postgres.replication_slot_files_count",
 		Priority: prioReplicationSlotFilesCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "repl_slot_%s_replslot_wal_keep", Name: "wal_keep"},
 			{ID: "repl_slot_%s_replslot_files", Name: "pg_replslot_files"},
 		},
 	}
 )
 
-func newReplicationSlotCharts(slot string) *module.Charts {
+func newReplicationSlotCharts(slot string) *collectorapi.Charts {
 	charts := replicationSlotCharts.Copy()
 	for _, c := range *charts {
 		c.ID = fmt.Sprintf(c.ID, slot)
-		c.Labels = []module.Label{
+		c.Labels = []collectorapi.Label{
 			{Key: "slot", Value: slot},
 		}
 		for _, d := range c.Dims {
@@ -610,7 +610,7 @@ func (c *Collector) removeReplicationSlotCharts(slot string) {
 }
 
 var (
-	dbChartsTmpl = module.Charts{
+	dbChartsTmpl = collectorapi.Charts{
 		dbTransactionsRatioChartTmpl.Copy(),
 		dbTransactionsRateChartTmpl.Copy(),
 		dbConnectionsUtilizationChartTmpl.Copy(),
@@ -627,159 +627,159 @@ var (
 		dbTempFilesIORateChartTmpl.Copy(),
 		dbSizeChartTmpl.Copy(),
 	}
-	dbTransactionsRatioChartTmpl = module.Chart{
+	dbTransactionsRatioChartTmpl = collectorapi.Chart{
 		ID:       "db_%s_transactions_ratio",
 		Title:    "Database transactions ratio",
 		Units:    "percentage",
 		Fam:      "transactions",
 		Ctx:      "postgres.db_transactions_ratio",
 		Priority: prioDBTransactionsRatio,
-		Type:     module.Stacked,
-		Dims: module.Dims{
-			{ID: "db_%s_xact_commit", Name: "committed", Algo: module.PercentOfIncremental},
-			{ID: "db_%s_xact_rollback", Name: "rollback", Algo: module.PercentOfIncremental},
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
+			{ID: "db_%s_xact_commit", Name: "committed", Algo: collectorapi.PercentOfIncremental},
+			{ID: "db_%s_xact_rollback", Name: "rollback", Algo: collectorapi.PercentOfIncremental},
 		},
 	}
-	dbTransactionsRateChartTmpl = module.Chart{
+	dbTransactionsRateChartTmpl = collectorapi.Chart{
 		ID:       "db_%s_transactions_rate",
 		Title:    "Database transactions",
 		Units:    "transactions/s",
 		Fam:      "transactions",
 		Ctx:      "postgres.db_transactions_rate",
 		Priority: prioDBTransactionsRate,
-		Dims: module.Dims{
-			{ID: "db_%s_xact_commit", Name: "committed", Algo: module.Incremental},
-			{ID: "db_%s_xact_rollback", Name: "rollback", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "db_%s_xact_commit", Name: "committed", Algo: collectorapi.Incremental},
+			{ID: "db_%s_xact_rollback", Name: "rollback", Algo: collectorapi.Incremental},
 		},
 	}
-	dbConnectionsUtilizationChartTmpl = module.Chart{
+	dbConnectionsUtilizationChartTmpl = collectorapi.Chart{
 		ID:       "db_%s_connections_utilization",
 		Title:    "Database connections utilization",
 		Units:    "percentage",
 		Fam:      "connections",
 		Ctx:      "postgres.db_connections_utilization",
 		Priority: prioDBConnectionsUtilization,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "db_%s_numbackends_utilization", Name: "used"},
 		},
 	}
-	dbConnectionsCountChartTmpl = module.Chart{
+	dbConnectionsCountChartTmpl = collectorapi.Chart{
 		ID:       "db_%s_connections",
 		Title:    "Database connections",
 		Units:    "connections",
 		Fam:      "connections",
 		Ctx:      "postgres.db_connections_count",
 		Priority: prioDBConnectionsCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "db_%s_numbackends", Name: "connections"},
 		},
 	}
-	dbCacheIORatioChartTmpl = module.Chart{
+	dbCacheIORatioChartTmpl = collectorapi.Chart{
 		ID:       "db_%s_cache_io_ratio",
 		Title:    "Database buffer cache miss ratio",
 		Units:    "percentage",
 		Fam:      "cache",
 		Ctx:      "postgres.db_cache_io_ratio",
 		Priority: prioDBCacheIORatio,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "db_%s_blks_read_perc", Name: "miss"},
 		},
 	}
-	dbIORateChartTmpl = module.Chart{
+	dbIORateChartTmpl = collectorapi.Chart{
 		ID:       "db_%s_io_rate",
 		Title:    "Database reads",
 		Units:    "B/s",
 		Fam:      "cache",
 		Ctx:      "postgres.db_io_rate",
 		Priority: prioDBIORate,
-		Type:     module.Area,
-		Dims: module.Dims{
-			{ID: "db_%s_blks_hit", Name: "memory", Algo: module.Incremental},
-			{ID: "db_%s_blks_read", Name: "disk", Algo: module.Incremental},
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
+			{ID: "db_%s_blks_hit", Name: "memory", Algo: collectorapi.Incremental},
+			{ID: "db_%s_blks_read", Name: "disk", Algo: collectorapi.Incremental},
 		},
 	}
-	dbOpsFetchedRowsRatioChartTmpl = module.Chart{
+	dbOpsFetchedRowsRatioChartTmpl = collectorapi.Chart{
 		ID:       "db_%s_db_ops_fetched_rows_ratio",
 		Title:    "Database rows fetched ratio",
 		Units:    "percentage",
 		Fam:      "throughput",
 		Ctx:      "postgres.db_ops_fetched_rows_ratio",
 		Priority: prioDBOpsFetchedRowsRatio,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "db_%s_tup_fetched_perc", Name: "fetched"},
 		},
 	}
-	dbOpsReadRowsRateChartTmpl = module.Chart{
+	dbOpsReadRowsRateChartTmpl = collectorapi.Chart{
 		ID:       "db_%s_ops_read_rows_rate",
 		Title:    "Database rows read",
 		Units:    "rows/s",
 		Fam:      "throughput",
 		Ctx:      "postgres.db_ops_read_rows_rate",
 		Priority: prioDBOpsReadRowsRate,
-		Dims: module.Dims{
-			{ID: "db_%s_tup_returned", Name: "returned", Algo: module.Incremental},
-			{ID: "db_%s_tup_fetched", Name: "fetched", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "db_%s_tup_returned", Name: "returned", Algo: collectorapi.Incremental},
+			{ID: "db_%s_tup_fetched", Name: "fetched", Algo: collectorapi.Incremental},
 		},
 	}
-	dbOpsWriteRowsRateChartTmpl = module.Chart{
+	dbOpsWriteRowsRateChartTmpl = collectorapi.Chart{
 		ID:       "db_%s_ops_write_rows_rate",
 		Title:    "Database rows written",
 		Units:    "rows/s",
 		Fam:      "throughput",
 		Ctx:      "postgres.db_ops_write_rows_rate",
 		Priority: prioDBOpsWriteRowsRate,
-		Dims: module.Dims{
-			{ID: "db_%s_tup_inserted", Name: "inserted", Algo: module.Incremental},
-			{ID: "db_%s_tup_deleted", Name: "deleted", Algo: module.Incremental},
-			{ID: "db_%s_tup_updated", Name: "updated", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "db_%s_tup_inserted", Name: "inserted", Algo: collectorapi.Incremental},
+			{ID: "db_%s_tup_deleted", Name: "deleted", Algo: collectorapi.Incremental},
+			{ID: "db_%s_tup_updated", Name: "updated", Algo: collectorapi.Incremental},
 		},
 	}
-	dbConflictsRateChartTmpl = module.Chart{
+	dbConflictsRateChartTmpl = collectorapi.Chart{
 		ID:       "db_%s_conflicts_rate",
 		Title:    "Database canceled queries",
 		Units:    "queries/s",
 		Fam:      "replication",
 		Ctx:      "postgres.db_conflicts_rate",
 		Priority: prioDBConflictsRate,
-		Dims: module.Dims{
-			{ID: "db_%s_conflicts", Name: "conflicts", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "db_%s_conflicts", Name: "conflicts", Algo: collectorapi.Incremental},
 		},
 	}
-	dbConflictsReasonRateChartTmpl = module.Chart{
+	dbConflictsReasonRateChartTmpl = collectorapi.Chart{
 		ID:       "db_%s_conflicts_reason_rate",
 		Title:    "Database canceled queries by reason",
 		Units:    "queries/s",
 		Fam:      "replication",
 		Ctx:      "postgres.db_conflicts_reason_rate",
 		Priority: prioDBConflictsReasonRate,
-		Dims: module.Dims{
-			{ID: "db_%s_confl_tablespace", Name: "tablespace", Algo: module.Incremental},
-			{ID: "db_%s_confl_lock", Name: "lock", Algo: module.Incremental},
-			{ID: "db_%s_confl_snapshot", Name: "snapshot", Algo: module.Incremental},
-			{ID: "db_%s_confl_bufferpin", Name: "bufferpin", Algo: module.Incremental},
-			{ID: "db_%s_confl_deadlock", Name: "deadlock", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "db_%s_confl_tablespace", Name: "tablespace", Algo: collectorapi.Incremental},
+			{ID: "db_%s_confl_lock", Name: "lock", Algo: collectorapi.Incremental},
+			{ID: "db_%s_confl_snapshot", Name: "snapshot", Algo: collectorapi.Incremental},
+			{ID: "db_%s_confl_bufferpin", Name: "bufferpin", Algo: collectorapi.Incremental},
+			{ID: "db_%s_confl_deadlock", Name: "deadlock", Algo: collectorapi.Incremental},
 		},
 	}
-	dbDeadlocksRateChartTmpl = module.Chart{
+	dbDeadlocksRateChartTmpl = collectorapi.Chart{
 		ID:       "db_%s_deadlocks_rate",
 		Title:    "Database deadlocks",
 		Units:    "deadlocks/s",
 		Fam:      "locks",
 		Ctx:      "postgres.db_deadlocks_rate",
 		Priority: prioDBDeadlocksRate,
-		Dims: module.Dims{
-			{ID: "db_%s_deadlocks", Name: "deadlocks", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "db_%s_deadlocks", Name: "deadlocks", Algo: collectorapi.Incremental},
 		},
 	}
-	dbLocksHeldCountChartTmpl = module.Chart{
+	dbLocksHeldCountChartTmpl = collectorapi.Chart{
 		ID:       "db_%s_locks_held",
 		Title:    "Database locks held",
 		Units:    "locks",
 		Fam:      "locks",
 		Ctx:      "postgres.db_locks_held_count",
 		Priority: prioDBLocksHeldCount,
-		Type:     module.Stacked,
-		Dims: module.Dims{
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
 			{ID: "db_%s_lock_mode_AccessShareLock_held", Name: "access_share"},
 			{ID: "db_%s_lock_mode_RowShareLock_held", Name: "row_share"},
 			{ID: "db_%s_lock_mode_RowExclusiveLock_held", Name: "row_exclusive"},
@@ -790,15 +790,15 @@ var (
 			{ID: "db_%s_lock_mode_AccessExclusiveLock_held", Name: "access_exclusive"},
 		},
 	}
-	dbLocksAwaitedCountChartTmpl = module.Chart{
+	dbLocksAwaitedCountChartTmpl = collectorapi.Chart{
 		ID:       "db_%s_locks_awaited_count",
 		Title:    "Database locks awaited",
 		Units:    "locks",
 		Fam:      "locks",
 		Ctx:      "postgres.db_locks_awaited_count",
 		Priority: prioDBLocksAwaitedCount,
-		Type:     module.Stacked,
-		Dims: module.Dims{
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
 			{ID: "db_%s_lock_mode_AccessShareLock_awaited", Name: "access_share"},
 			{ID: "db_%s_lock_mode_RowShareLock_awaited", Name: "row_share"},
 			{ID: "db_%s_lock_mode_RowExclusiveLock_awaited", Name: "row_exclusive"},
@@ -809,43 +809,43 @@ var (
 			{ID: "db_%s_lock_mode_AccessExclusiveLock_awaited", Name: "access_exclusive"},
 		},
 	}
-	dbTempFilesCreatedRateChartTmpl = module.Chart{
+	dbTempFilesCreatedRateChartTmpl = collectorapi.Chart{
 		ID:       "db_%s_temp_files_files_created_rate",
 		Title:    "Database created temporary files",
 		Units:    "files/s",
 		Fam:      "throughput",
 		Ctx:      "postgres.db_temp_files_created_rate",
 		Priority: prioDBTempFilesCreatedRate,
-		Dims: module.Dims{
-			{ID: "db_%s_temp_files", Name: "created", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "db_%s_temp_files", Name: "created", Algo: collectorapi.Incremental},
 		},
 	}
-	dbTempFilesIORateChartTmpl = module.Chart{
+	dbTempFilesIORateChartTmpl = collectorapi.Chart{
 		ID:       "db_%s_temp_files_io_rate",
 		Title:    "Database temporary files data written to disk",
 		Units:    "B/s",
 		Fam:      "throughput",
 		Ctx:      "postgres.db_temp_files_io_rate",
 		Priority: prioDBTempFilesIORate,
-		Dims: module.Dims{
-			{ID: "db_%s_temp_bytes", Name: "written", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "db_%s_temp_bytes", Name: "written", Algo: collectorapi.Incremental},
 		},
 	}
-	dbSizeChartTmpl = module.Chart{
+	dbSizeChartTmpl = collectorapi.Chart{
 		ID:       "db_%s_size",
 		Title:    "Database size",
 		Units:    "B",
 		Fam:      "size",
 		Ctx:      "postgres.db_size",
 		Priority: prioDBSize,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "db_%s_size", Name: "size"},
 		},
 	}
 )
 
 func (c *Collector) addDBConflictsCharts(db *dbMetrics) {
-	tmpl := module.Charts{
+	tmpl := collectorapi.Charts{
 		dbConflictsRateChartTmpl.Copy(),
 		dbConflictsReasonRateChartTmpl.Copy(),
 	}
@@ -856,11 +856,11 @@ func (c *Collector) addDBConflictsCharts(db *dbMetrics) {
 	}
 }
 
-func newDatabaseCharts(tmpl *module.Charts, db *dbMetrics) *module.Charts {
+func newDatabaseCharts(tmpl *collectorapi.Charts, db *dbMetrics) *collectorapi.Charts {
 	charts := tmpl.Copy()
 	for _, c := range *charts {
 		c.ID = fmt.Sprintf(c.ID, db.name)
-		c.Labels = []module.Label{
+		c.Labels = []collectorapi.Label{
 			{Key: "database", Value: db.name},
 		}
 		for _, d := range c.Dims {
@@ -893,7 +893,7 @@ func (c *Collector) removeDatabaseCharts(db *dbMetrics) {
 }
 
 var (
-	tableChartsTmpl = module.Charts{
+	tableChartsTmpl = collectorapi.Charts{
 		tableRowsCountChartTmpl.Copy(),
 		tableDeadRowsDeadRatioChartTmpl.Copy(),
 		tableOpsRowsRateChartTmpl.Copy(),
@@ -907,276 +907,276 @@ var (
 		tableBloatSizeChartTmpl.Copy(),
 	}
 
-	tableDeadRowsDeadRatioChartTmpl = module.Chart{
+	tableDeadRowsDeadRatioChartTmpl = collectorapi.Chart{
 		ID:       "table_%s_db_%s_schema_%s_rows_dead_ratio",
 		Title:    "Table dead rows",
 		Units:    "%",
 		Fam:      "maintenance",
 		Ctx:      "postgres.table_rows_dead_ratio",
 		Priority: prioTableRowsDeadRatio,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "table_%s_db_%s_schema_%s_n_dead_tup_perc", Name: "dead"},
 		},
 	}
-	tableRowsCountChartTmpl = module.Chart{
+	tableRowsCountChartTmpl = collectorapi.Chart{
 		ID:       "table_%s_db_%s_schema_%s_rows_count",
 		Title:    "Table total rows",
 		Units:    "rows",
 		Fam:      "maintenance",
 		Ctx:      "postgres.table_rows_count",
 		Priority: prioTableRowsCount,
-		Type:     module.Stacked,
-		Dims: module.Dims{
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
 			{ID: "table_%s_db_%s_schema_%s_n_live_tup", Name: "live"},
 			{ID: "table_%s_db_%s_schema_%s_n_dead_tup", Name: "dead"},
 		},
 	}
-	tableOpsRowsRateChartTmpl = module.Chart{
+	tableOpsRowsRateChartTmpl = collectorapi.Chart{
 		ID:       "table_%s_db_%s_schema_%s_ops_rows_rate",
 		Title:    "Table throughput",
 		Units:    "rows/s",
 		Fam:      "throughput",
 		Ctx:      "postgres.table_ops_rows_rate",
 		Priority: prioTableOpsRowsRate,
-		Type:     module.Stacked,
-		Dims: module.Dims{
-			{ID: "table_%s_db_%s_schema_%s_n_tup_ins", Name: "inserted", Algo: module.Incremental},
-			{ID: "table_%s_db_%s_schema_%s_n_tup_del", Name: "deleted", Algo: module.Incremental},
-			{ID: "table_%s_db_%s_schema_%s_n_tup_upd", Name: "updated", Algo: module.Incremental},
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
+			{ID: "table_%s_db_%s_schema_%s_n_tup_ins", Name: "inserted", Algo: collectorapi.Incremental},
+			{ID: "table_%s_db_%s_schema_%s_n_tup_del", Name: "deleted", Algo: collectorapi.Incremental},
+			{ID: "table_%s_db_%s_schema_%s_n_tup_upd", Name: "updated", Algo: collectorapi.Incremental},
 		},
 	}
-	tableOpsRowsHOTRatioChartTmpl = module.Chart{
+	tableOpsRowsHOTRatioChartTmpl = collectorapi.Chart{
 		ID:       "table_%s_db_%s_schema_%s_ops_rows_hot_ratio",
 		Title:    "Table HOT updates ratio",
 		Units:    "percentage",
 		Fam:      "throughput",
 		Ctx:      "postgres.table_ops_rows_hot_ratio",
 		Priority: prioTableOpsRowsHOTRatio,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "table_%s_db_%s_schema_%s_n_tup_hot_upd_perc", Name: "hot"},
 		},
 	}
-	tableOpsRowsHOTRateChartTmpl = module.Chart{
+	tableOpsRowsHOTRateChartTmpl = collectorapi.Chart{
 		ID:       "table_%s_db_%s_schema_%s_ops_rows_hot_rate",
 		Title:    "Table HOT updates",
 		Units:    "rows/s",
 		Fam:      "throughput",
 		Ctx:      "postgres.table_ops_rows_hot_rate",
 		Priority: prioTableOpsRowsHOTRate,
-		Dims: module.Dims{
-			{ID: "table_%s_db_%s_schema_%s_n_tup_hot_upd", Name: "hot", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "table_%s_db_%s_schema_%s_n_tup_hot_upd", Name: "hot", Algo: collectorapi.Incremental},
 		},
 	}
-	tableCacheIORatioChartTmpl = module.Chart{
+	tableCacheIORatioChartTmpl = collectorapi.Chart{
 		ID:       "table_%s_db_%s_schema_%s_cache_io_ratio",
 		Title:    "Table I/O cache miss ratio",
 		Units:    "percentage",
 		Fam:      "cache",
 		Ctx:      "postgres.table_cache_io_ratio",
 		Priority: prioTableCacheIORatio,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "table_%s_db_%s_schema_%s_heap_blks_read_perc", Name: "miss"},
 		},
 	}
-	tableIORateChartTmpl = module.Chart{
+	tableIORateChartTmpl = collectorapi.Chart{
 		ID:       "table_%s_db_%s_schema_%s_io_rate",
 		Title:    "Table I/O",
 		Units:    "B/s",
 		Fam:      "cache",
 		Ctx:      "postgres.table_io_rate",
 		Priority: prioTableIORate,
-		Dims: module.Dims{
-			{ID: "table_%s_db_%s_schema_%s_heap_blks_hit", Name: "memory", Algo: module.Incremental},
-			{ID: "table_%s_db_%s_schema_%s_heap_blks_read", Name: "disk", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "table_%s_db_%s_schema_%s_heap_blks_hit", Name: "memory", Algo: collectorapi.Incremental},
+			{ID: "table_%s_db_%s_schema_%s_heap_blks_read", Name: "disk", Algo: collectorapi.Incremental},
 		},
 	}
-	tableIndexCacheIORatioChartTmpl = module.Chart{
+	tableIndexCacheIORatioChartTmpl = collectorapi.Chart{
 		ID:       "table_%s_db_%s_schema_%s_index_cache_io_ratio",
 		Title:    "Table index I/O cache miss ratio",
 		Units:    "percentage",
 		Fam:      "cache",
 		Ctx:      "postgres.table_index_cache_io_ratio",
 		Priority: prioTableIndexCacheIORatio,
-		Dims: module.Dims{
-			{ID: "table_%s_db_%s_schema_%s_idx_blks_read_perc", Name: "miss", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "table_%s_db_%s_schema_%s_idx_blks_read_perc", Name: "miss", Algo: collectorapi.Incremental},
 		},
 	}
-	tableIndexIORateChartTmpl = module.Chart{
+	tableIndexIORateChartTmpl = collectorapi.Chart{
 		ID:       "table_%s_db_%s_schema_%s_index_io_rate",
 		Title:    "Table index I/O",
 		Units:    "B/s",
 		Fam:      "cache",
 		Ctx:      "postgres.table_index_io_rate",
 		Priority: prioTableIndexIORate,
-		Dims: module.Dims{
-			{ID: "table_%s_db_%s_schema_%s_idx_blks_hit", Name: "memory", Algo: module.Incremental},
-			{ID: "table_%s_db_%s_schema_%s_idx_blks_read", Name: "disk", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "table_%s_db_%s_schema_%s_idx_blks_hit", Name: "memory", Algo: collectorapi.Incremental},
+			{ID: "table_%s_db_%s_schema_%s_idx_blks_read", Name: "disk", Algo: collectorapi.Incremental},
 		},
 	}
-	tableTOASCacheIORatioChartTmpl = module.Chart{
+	tableTOASCacheIORatioChartTmpl = collectorapi.Chart{
 		ID:       "table_%s_db_%s_schema_%s_toast_cache_io_ratio",
 		Title:    "Table TOAST I/O cache miss ratio",
 		Units:    "percentage",
 		Fam:      "cache",
 		Ctx:      "postgres.table_toast_cache_io_ratio",
 		Priority: prioTableToastCacheIORatio,
-		Dims: module.Dims{
-			{ID: "table_%s_db_%s_schema_%s_toast_blks_read_perc", Name: "miss", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "table_%s_db_%s_schema_%s_toast_blks_read_perc", Name: "miss", Algo: collectorapi.Incremental},
 		},
 	}
-	tableTOASTIORateChartTmpl = module.Chart{
+	tableTOASTIORateChartTmpl = collectorapi.Chart{
 		ID:       "table_%s_db_%s_schema_%s_toast_io_rate",
 		Title:    "Table TOAST I/O",
 		Units:    "B/s",
 		Fam:      "cache",
 		Ctx:      "postgres.table_toast_io_rate",
 		Priority: prioTableToastIORate,
-		Dims: module.Dims{
-			{ID: "table_%s_db_%s_schema_%s_toast_blks_hit", Name: "memory", Algo: module.Incremental},
-			{ID: "table_%s_db_%s_schema_%s_toast_blks_read", Name: "disk", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "table_%s_db_%s_schema_%s_toast_blks_hit", Name: "memory", Algo: collectorapi.Incremental},
+			{ID: "table_%s_db_%s_schema_%s_toast_blks_read", Name: "disk", Algo: collectorapi.Incremental},
 		},
 	}
-	tableTOASTIndexCacheIORatioChartTmpl = module.Chart{
+	tableTOASTIndexCacheIORatioChartTmpl = collectorapi.Chart{
 		ID:       "table_%s_db_%s_schema_%s_toast_index_cache_io_ratio",
 		Title:    "Table TOAST index I/O cache miss ratio",
 		Units:    "percentage",
 		Fam:      "cache",
 		Ctx:      "postgres.table_toast_index_cache_io_ratio",
 		Priority: prioTableToastIndexCacheIORatio,
-		Dims: module.Dims{
-			{ID: "table_%s_db_%s_schema_%s_tidx_blks_read_perc", Name: "miss", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "table_%s_db_%s_schema_%s_tidx_blks_read_perc", Name: "miss", Algo: collectorapi.Incremental},
 		},
 	}
-	tableTOASTIndexIORateChartTmpl = module.Chart{
+	tableTOASTIndexIORateChartTmpl = collectorapi.Chart{
 		ID:       "table_%s_db_%s_schema_%s_toast_index_io_rate",
 		Title:    "Table TOAST index I/O",
 		Units:    "B/s",
 		Fam:      "cache",
 		Ctx:      "postgres.table_toast_index_io_rate",
 		Priority: prioTableToastIndexIORate,
-		Dims: module.Dims{
-			{ID: "table_%s_db_%s_schema_%s_tidx_blks_hit", Name: "memory", Algo: module.Incremental},
-			{ID: "table_%s_db_%s_schema_%s_tidx_blks_read", Name: "disk", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "table_%s_db_%s_schema_%s_tidx_blks_hit", Name: "memory", Algo: collectorapi.Incremental},
+			{ID: "table_%s_db_%s_schema_%s_tidx_blks_read", Name: "disk", Algo: collectorapi.Incremental},
 		},
 	}
-	tableScansRateChartTmpl = module.Chart{
+	tableScansRateChartTmpl = collectorapi.Chart{
 		ID:       "table_%s_db_%s_schema_%s_scans_rate",
 		Title:    "Table scans",
 		Units:    "scans/s",
 		Fam:      "throughput",
 		Ctx:      "postgres.table_scans_rate",
 		Priority: prioTableScansRate,
-		Dims: module.Dims{
-			{ID: "table_%s_db_%s_schema_%s_idx_scan", Name: "index", Algo: module.Incremental},
-			{ID: "table_%s_db_%s_schema_%s_seq_scan", Name: "sequential", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "table_%s_db_%s_schema_%s_idx_scan", Name: "index", Algo: collectorapi.Incremental},
+			{ID: "table_%s_db_%s_schema_%s_seq_scan", Name: "sequential", Algo: collectorapi.Incremental},
 		},
 	}
-	tableScansRowsRateChartTmpl = module.Chart{
+	tableScansRowsRateChartTmpl = collectorapi.Chart{
 		ID:       "table_%s_db_%s_schema_%s_scans_rows_rate",
 		Title:    "Table live rows fetched by scans",
 		Units:    "rows/s",
 		Fam:      "throughput",
 		Ctx:      "postgres.table_scans_rows_rate",
 		Priority: prioTableScansRowsRate,
-		Dims: module.Dims{
-			{ID: "table_%s_db_%s_schema_%s_idx_tup_fetch", Name: "index", Algo: module.Incremental},
-			{ID: "table_%s_db_%s_schema_%s_seq_tup_read", Name: "sequential", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "table_%s_db_%s_schema_%s_idx_tup_fetch", Name: "index", Algo: collectorapi.Incremental},
+			{ID: "table_%s_db_%s_schema_%s_seq_tup_read", Name: "sequential", Algo: collectorapi.Incremental},
 		},
 	}
-	tableAutoVacuumSinceTimeChartTmpl = module.Chart{
+	tableAutoVacuumSinceTimeChartTmpl = collectorapi.Chart{
 		ID:       "table_%s_db_%s_schema_%s_autovacuum_since_time",
 		Title:    "Table time since last auto VACUUM",
 		Units:    "seconds",
 		Fam:      "vacuum and analyze",
 		Ctx:      "postgres.table_autovacuum_since_time",
 		Priority: prioTableAutovacuumSinceTime,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "table_%s_db_%s_schema_%s_last_autovacuum_ago", Name: "time"},
 		},
 	}
-	tableVacuumSinceTimeChartTmpl = module.Chart{
+	tableVacuumSinceTimeChartTmpl = collectorapi.Chart{
 		ID:       "table_%s_db_%s_schema_%s_vacuum_since_time",
 		Title:    "Table time since last manual VACUUM",
 		Units:    "seconds",
 		Fam:      "vacuum and analyze",
 		Ctx:      "postgres.table_vacuum_since_time",
 		Priority: prioTableVacuumSinceTime,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "table_%s_db_%s_schema_%s_last_vacuum_ago", Name: "time"},
 		},
 	}
-	tableAutoAnalyzeSinceTimeChartTmpl = module.Chart{
+	tableAutoAnalyzeSinceTimeChartTmpl = collectorapi.Chart{
 		ID:       "table_%s_db_%s_schema_%s_autoanalyze_since_time",
 		Title:    "Table time since last auto ANALYZE",
 		Units:    "seconds",
 		Fam:      "vacuum and analyze",
 		Ctx:      "postgres.table_autoanalyze_since_time",
 		Priority: prioTableAutoAnalyzeSinceTime,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "table_%s_db_%s_schema_%s_last_autoanalyze_ago", Name: "time"},
 		},
 	}
-	tableAnalyzeSinceTimeChartTmpl = module.Chart{
+	tableAnalyzeSinceTimeChartTmpl = collectorapi.Chart{
 		ID:       "table_%s_db_%s_schema_%s_analyze_since_time",
 		Title:    "Table time since last manual ANALYZE",
 		Units:    "seconds",
 		Fam:      "vacuum and analyze",
 		Ctx:      "postgres.table_analyze_since_time",
 		Priority: prioTableLastAnalyzeAgo,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "table_%s_db_%s_schema_%s_last_analyze_ago", Name: "time"},
 		},
 	}
-	tableNullColumnsCountChartTmpl = module.Chart{
+	tableNullColumnsCountChartTmpl = collectorapi.Chart{
 		ID:       "table_%s_db_%s_schema_%s_null_columns_count",
 		Title:    "Table null columns",
 		Units:    "columns",
 		Fam:      "maintenance",
 		Ctx:      "postgres.table_null_columns_count",
 		Priority: prioTableNullColumns,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "table_%s_db_%s_schema_%s_null_columns", Name: "null"},
 		},
 	}
-	tableTotalSizeChartTmpl = module.Chart{
+	tableTotalSizeChartTmpl = collectorapi.Chart{
 		ID:       "table_%s_db_%s_schema_%s_total_size",
 		Title:    "Table total size",
 		Units:    "B",
 		Fam:      "size",
 		Ctx:      "postgres.table_total_size",
 		Priority: prioTableTotalSize,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "table_%s_db_%s_schema_%s_total_size", Name: "size"},
 		},
 	}
-	tableBloatSizePercChartTmpl = module.Chart{
+	tableBloatSizePercChartTmpl = collectorapi.Chart{
 		ID:       "table_%s_db_%s_schema_%s_bloat_size_perc",
 		Title:    "Table bloat size percentage",
 		Units:    "percentage",
 		Fam:      "bloat",
 		Ctx:      "postgres.table_bloat_size_perc",
 		Priority: prioTableBloatSizePerc,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "table_%s_db_%s_schema_%s_bloat_size_perc", Name: "bloat"},
 		},
-		Vars: module.Vars{
+		Vars: collectorapi.Vars{
 			{ID: "table_%s_db_%s_schema_%s_total_size", Name: "table_size"},
 		},
 	}
-	tableBloatSizeChartTmpl = module.Chart{
+	tableBloatSizeChartTmpl = collectorapi.Chart{
 		ID:       "table_%s_db_%s_schema_%s_bloat_size",
 		Title:    "Table bloat size",
 		Units:    "B",
 		Fam:      "bloat",
 		Ctx:      "postgres.table_bloat_size",
 		Priority: prioTableBloatSize,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "table_%s_db_%s_schema_%s_bloat_size", Name: "bloat"},
 		},
 	}
 )
 
-func newTableCharts(tbl *tableMetrics) *module.Charts {
+func newTableCharts(tbl *tableMetrics) *collectorapi.Charts {
 	charts := tableChartsTmpl.Copy()
 
 	if tbl.bloatSize == nil {
@@ -1191,10 +1191,10 @@ func newTableCharts(tbl *tableMetrics) *module.Charts {
 	return charts
 }
 
-func newTableChart(chart *module.Chart, tbl *tableMetrics) *module.Chart {
+func newTableChart(chart *collectorapi.Chart, tbl *tableMetrics) *collectorapi.Chart {
 	chart = chart.Copy()
 	chart.ID = fmt.Sprintf(chart.ID, tbl.name, tbl.db, tbl.schema)
-	chart.Labels = []module.Label{
+	chart.Labels = []collectorapi.Label{
 		{Key: "database", Value: tbl.db},
 		{Key: "schema", Value: tbl.schema},
 		{Key: "table", Value: tbl.name},
@@ -1249,7 +1249,7 @@ func (c *Collector) addTableLastAnalyzeAgoChart(tbl *tableMetrics) {
 }
 
 func (c *Collector) addTableIOChartsCharts(tbl *tableMetrics) {
-	charts := module.Charts{
+	charts := collectorapi.Charts{
 		newTableChart(tableCacheIORatioChartTmpl.Copy(), tbl),
 		newTableChart(tableIORateChartTmpl.Copy(), tbl),
 	}
@@ -1260,7 +1260,7 @@ func (c *Collector) addTableIOChartsCharts(tbl *tableMetrics) {
 }
 
 func (c *Collector) addTableIndexIOCharts(tbl *tableMetrics) {
-	charts := module.Charts{
+	charts := collectorapi.Charts{
 		newTableChart(tableIndexCacheIORatioChartTmpl.Copy(), tbl),
 		newTableChart(tableIndexIORateChartTmpl.Copy(), tbl),
 	}
@@ -1271,7 +1271,7 @@ func (c *Collector) addTableIndexIOCharts(tbl *tableMetrics) {
 }
 
 func (c *Collector) addTableTOASTIOCharts(tbl *tableMetrics) {
-	charts := module.Charts{
+	charts := collectorapi.Charts{
 		newTableChart(tableTOASCacheIORatioChartTmpl.Copy(), tbl),
 		newTableChart(tableTOASTIORateChartTmpl.Copy(), tbl),
 	}
@@ -1282,7 +1282,7 @@ func (c *Collector) addTableTOASTIOCharts(tbl *tableMetrics) {
 }
 
 func (c *Collector) addTableTOASTIndexIOCharts(tbl *tableMetrics) {
-	charts := module.Charts{
+	charts := collectorapi.Charts{
 		newTableChart(tableTOASTIndexCacheIORatioChartTmpl.Copy(), tbl),
 		newTableChart(tableTOASTIndexIORateChartTmpl.Copy(), tbl),
 	}
@@ -1303,56 +1303,56 @@ func (c *Collector) removeTableCharts(tbl *tableMetrics) {
 }
 
 var (
-	indexChartsTmpl = module.Charts{
+	indexChartsTmpl = collectorapi.Charts{
 		indexSizeChartTmpl.Copy(),
 		indexBloatSizePercChartTmpl.Copy(),
 		indexBloatSizeChartTmpl.Copy(),
 		indexUsageStatusChartTmpl.Copy(),
 	}
-	indexSizeChartTmpl = module.Chart{
+	indexSizeChartTmpl = collectorapi.Chart{
 		ID:       "index_%s_table_%s_db_%s_schema_%s_size",
 		Title:    "Index size",
 		Units:    "B",
 		Fam:      "size",
 		Ctx:      "postgres.index_size",
 		Priority: prioIndexSize,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "index_%s_table_%s_db_%s_schema_%s_size", Name: "size"},
 		},
 	}
-	indexBloatSizePercChartTmpl = module.Chart{
+	indexBloatSizePercChartTmpl = collectorapi.Chart{
 		ID:       "index_%s_table_%s_db_%s_schema_%s_bloat_size_perc",
 		Title:    "Index bloat size percentage",
 		Units:    "percentage",
 		Fam:      "bloat",
 		Ctx:      "postgres.index_bloat_size_perc",
 		Priority: prioIndexBloatSizePerc,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "index_%s_table_%s_db_%s_schema_%s_bloat_size_perc", Name: "bloat"},
 		},
-		Vars: module.Vars{
+		Vars: collectorapi.Vars{
 			{ID: "index_%s_table_%s_db_%s_schema_%s_size", Name: "index_size"},
 		},
 	}
-	indexBloatSizeChartTmpl = module.Chart{
+	indexBloatSizeChartTmpl = collectorapi.Chart{
 		ID:       "index_%s_table_%s_db_%s_schema_%s_bloat_size",
 		Title:    "Index bloat size",
 		Units:    "B",
 		Fam:      "bloat",
 		Ctx:      "postgres.index_bloat_size",
 		Priority: prioIndexBloatSize,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "index_%s_table_%s_db_%s_schema_%s_bloat_size", Name: "bloat"},
 		},
 	}
-	indexUsageStatusChartTmpl = module.Chart{
+	indexUsageStatusChartTmpl = collectorapi.Chart{
 		ID:       "index_%s_table_%s_db_%s_schema_%s_usage_status",
 		Title:    "Index usage status",
 		Units:    "status",
 		Fam:      "maintenance",
 		Ctx:      "postgres.index_usage_status",
 		Priority: prioIndexUsageStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "index_%s_table_%s_db_%s_schema_%s_usage_status_used", Name: "used"},
 			{ID: "index_%s_table_%s_db_%s_schema_%s_usage_status_unused", Name: "unused"},
 		},
@@ -1369,7 +1369,7 @@ func (c *Collector) addNewIndexCharts(idx *indexMetrics) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, idx.name, idx.table, idx.db, idx.schema)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "database", Value: idx.db},
 			{Key: "schema", Value: idx.schema},
 			{Key: "table", Value: idx.table},

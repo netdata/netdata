@@ -20,7 +20,6 @@
 #     - haproxy
 #     - tcp
 #     - balancer
-#   most_popular: false
 # overview:
 #   data_collection:
 #     metrics_description: 'This collector monitors HAProxy metrics about frontend servers, backend servers, responses and more.'

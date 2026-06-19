@@ -1,0 +1,5 @@
+taxonomy_version: 1
+plugin_name: network-viewer.plugin
+module_name: network-viewer.plugin
+taxonomy_optout:
+  reason: This collector exposes live function views only and does not provide static metric contexts for dashboard taxonomy placement.

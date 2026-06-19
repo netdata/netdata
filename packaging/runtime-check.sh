@@ -58,6 +58,7 @@ plugins.d/debugfs.plugin
 plugins.d/ebpf.plugin
 plugins.d/freeipmi.plugin
 plugins.d/go.d.plugin
+plugins.d/snmp-trap-profile-gen
 plugins.d/ioping.plugin
 plugins.d/local-listeners
 plugins.d/ndsudo
@@ -83,6 +84,19 @@ if [ -d "${NETDATA_LIBEXEC_PREFIX}" ]; then
             echo "!!! ${NETDATA_LIBEXEC_PREFIX}/${part} is missing"
         fi
     done
+
+    ebpf_plugin="${NETDATA_LIBEXEC_PREFIX}/plugins.d/ebpf.plugin"
+    ebpf_go_plugin="${NETDATA_LIBEXEC_PREFIX}/plugins.d/ebpf-go.plugin"
+    if [ -f "${ebpf_plugin}" ] && [ -f "${ebpf_go_plugin}" ]; then
+        ebpf_mode="$(stat -c '%a' "${ebpf_plugin}")"
+        ebpf_go_mode="$(stat -c '%a' "${ebpf_go_plugin}")"
+        if [ "${ebpf_mode}" != "${ebpf_go_mode}" ]; then
+            success=0
+            echo "!!! ${ebpf_go_plugin} has mode ${ebpf_go_mode}, expected ${ebpf_mode}"
+        fi
+    elif [ -f "${ebpf_plugin}" ] && [ ! -e "${ebpf_go_plugin}" ]; then
+        :
+    fi
 
     if [ "${success}" -eq 0 ]; then
         exit 1

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "apps_plugin.h"
-#include "libnetdata/required_dummies.h"
+#include "apps-cgroups-lookup-client.h"
+#include "apps-lookup-netipc.h"
 #include "libnetdata/parsers/duration.h"
 
 #define APPS_PLUGIN_FUNCTIONS() do { \
@@ -26,6 +27,9 @@ bool debug_enabled = false;
 bool enable_detailed_uptime_charts = false;
 bool enable_users_charts = true;
 bool enable_groups_charts = true;
+#if (PROCESSES_HAVE_SERVICE == 1)
+bool enable_services_charts = true;
+#endif
 bool include_exited_childs = true;
 bool proc_pid_cmdline_is_needed = true; // true when we need to read /proc/cmdline
 
@@ -518,6 +522,13 @@ static void parse_args(int argc, char **argv)
         }
 #endif
 
+#if (PROCESSES_HAVE_SERVICE == 1)
+        if(strcmp("no-services", argv[i]) == 0 || strcmp("without-services", argv[i]) == 0) {
+            enable_services_charts = false;
+            continue;
+        }
+#endif
+
         if(strcmp("with-detailed-uptime", argv[i]) == 0) {
             enable_detailed_uptime_charts = 1;
             continue;
@@ -573,6 +584,10 @@ static void parse_args(int argc, char **argv)
 #endif
 #if (PROCESSES_HAVE_GID == 1)
                     " without-groups         disable reporting per user group charts\n"
+                    "\n"
+#endif
+#if (PROCESSES_HAVE_SERVICE == 1)
+                    " without-services       disable reporting per Windows service charts\n"
                     "\n"
 #endif
                     " with-detailed-uptime   enable reporting min/avg/max uptime charts\n"
@@ -688,17 +703,54 @@ static inline int check_capabilities() {
 #endif
 #endif
 
+/*
+ * Lock order when more than one apps.plugin mutex is held:
+ * apps_and_stdout_mutex -> apps_pids_mutex -> cgroups_lookup_queue_mutex.
+ * APPS_LOOKUP handlers hold only apps_pids_mutex and never write to stdout.
+ */
 netdata_mutex_t apps_and_stdout_mutex;
+netdata_mutex_t apps_pids_mutex;
+uint64_t apps_collection_generation = 0;
 
 static void __attribute__((constructor)) init_mutex(void) {
     netdata_mutex_init(&apps_and_stdout_mutex);
+    netdata_mutex_init(&apps_pids_mutex);
 }
 
 static void __attribute__((destructor)) destroy_mutex(void) {
+    netdata_mutex_destroy(&apps_pids_mutex);
     netdata_mutex_destroy(&apps_and_stdout_mutex);
 }
 
 static bool apps_plugin_exit = false;
+static bool apps_lookup_server_started = false;
+
+#define APPS_LOOKUP_NETIPC_RETRY_INITIAL_SEC 5U
+#define APPS_LOOKUP_NETIPC_RETRY_MAX_SEC 300U
+
+static usec_t apps_lookup_netipc_next_retry_ut = 0;
+static unsigned apps_lookup_netipc_retry_sec = APPS_LOOKUP_NETIPC_RETRY_INITIAL_SEC;
+
+static void apps_lookup_netipc_try_start(void)
+{
+    if (apps_lookup_server_started)
+        return;
+
+    usec_t now_ut = now_monotonic_usec();
+    if (apps_lookup_netipc_next_retry_ut && now_ut < apps_lookup_netipc_next_retry_ut)
+        return;
+
+    apps_lookup_server_started = apps_lookup_netipc_init();
+    if (apps_lookup_server_started) {
+        apps_lookup_netipc_next_retry_ut = 0;
+        apps_lookup_netipc_retry_sec = APPS_LOOKUP_NETIPC_RETRY_INITIAL_SEC;
+    }
+    else {
+        apps_lookup_netipc_next_retry_ut = now_ut + apps_lookup_netipc_retry_sec * USEC_PER_SEC;
+        if (apps_lookup_netipc_retry_sec < APPS_LOOKUP_NETIPC_RETRY_MAX_SEC)
+            apps_lookup_netipc_retry_sec = MIN(apps_lookup_netipc_retry_sec * 2U, APPS_LOOKUP_NETIPC_RETRY_MAX_SEC);
+    }
+}
 
 int main(int argc, char **argv) {
     nd_log_initialize_for_external_plugins("apps.plugin");
@@ -784,6 +836,7 @@ int main(int argc, char **argv) {
 
     apps_pids_init();
     OS_FUNCTION(apps_os_init)();
+    apps_cgroups_lookup_init();
     int exit_status = 0;
 
     // ------------------------------------------------------------------------
@@ -815,6 +868,8 @@ int main(int argc, char **argv) {
         else
             dt = heartbeat_next(&hb);
 
+        apps_lookup_netipc_try_start();
+
         netdata_mutex_lock(&apps_and_stdout_mutex);
 
         struct pollfd pollfd = { .fd = fileno(stdout), .events = POLLERR };
@@ -827,14 +882,31 @@ int main(int argc, char **argv) {
             fatal("Received error on read pipe.");
         }
 
+        netdata_mutex_lock(&apps_pids_mutex);
+
         if(!collect_data_for_all_pids()) {
             netdata_log_error("Cannot collect /proc data for running processes. Disabling apps.plugin...");
             printf("DISABLE\n");
+            netdata_mutex_unlock(&apps_pids_mutex);
             netdata_mutex_unlock(&apps_and_stdout_mutex);
+            // stop the Function workers before destroying the caches they read
+            functions_evloop_cancel_threads(wg);
+            functions_evloop_join_threads(wg);
+            apps_lookup_netipc_cleanup();
+            apps_cgroups_lookup_cleanup();
             exit(1);
         }
 
         aggregate_processes_to_targets();
+#if defined(OS_LINUX)
+        if (apps_ebpf_cachestat_is_available())
+            apps_ebpf_accumulate_cachestat();
+#endif
+
+        __atomic_add_fetch(&apps_collection_generation, 1, __ATOMIC_RELEASE);
+
+        apps_cgroups_lookup_scan_pids();
+        netdata_mutex_unlock(&apps_pids_mutex);
 
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
         OS_FUNCTION(apps_os_read_global_cpu_utilization)();
@@ -843,11 +915,19 @@ int main(int argc, char **argv) {
 
         if(unlikely(print_tree_and_exit)) {
             print_hierarchy(root_of_pids());
+            netdata_mutex_unlock(&apps_and_stdout_mutex);
+            functions_evloop_cancel_threads(wg);
+            functions_evloop_join_threads(wg);
+            apps_lookup_netipc_cleanup();
+            apps_cgroups_lookup_cleanup();
             exit(0);
         }
 
-        if(send_resource_usage)
+        if(send_resource_usage) {
             send_resource_usage_to_netdata(dt);
+            apps_cgroups_lookup_send_charts_to_netdata(dt);
+            apps_lookup_netipc_send_charts_to_netdata(dt);
+        }
 
 #if (PROCESSES_HAVE_STATE == 1)
         send_proc_states_count(dt);
@@ -877,10 +957,25 @@ int main(int argc, char **argv) {
         }
 #endif
 
+#if (PROCESSES_HAVE_SERVICE == 1)
+        if (enable_services_charts) {
+            send_charts_updates_to_netdata(services_root_target, "service", "service", "Windows Service");
+            send_collected_data_to_netdata(services_root_target, "service", dt);
+        }
+#endif
+
         fflush(stdout);
 
         debug_log("done Loop No %zu", global_iterations_counter);
     }
     netdata_mutex_unlock(&apps_and_stdout_mutex);
+
+    // stop the Function workers before destroying the caches their
+    // process-enrichment serialization still reads
+    functions_evloop_cancel_threads(wg);
+    functions_evloop_join_threads(wg);
+
+    apps_lookup_netipc_cleanup();
+    apps_cgroups_lookup_cleanup();
     exit(exit_status);
 }

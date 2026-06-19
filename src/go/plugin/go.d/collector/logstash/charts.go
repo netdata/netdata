@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioJVMThreads = module.Priority + iota
+	prioJVMThreads = collectorapi.Priority + iota
 	prioJVMMemHeapUsed
 	prioJVMMemHeap
 	prioJVMMemPoolsEden
@@ -26,7 +26,7 @@ const (
 	prioUptime
 )
 
-var charts = module.Charts{
+var charts = collectorapi.Charts{
 	// thread
 	{
 		ID:       "jvm_threads",
@@ -35,7 +35,7 @@ var charts = module.Charts{
 		Fam:      "threads",
 		Ctx:      "logstash.jvm_threads",
 		Priority: prioJVMThreads,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "jvm_threads_count", Name: "threads"},
 		},
 	},
@@ -47,7 +47,7 @@ var charts = module.Charts{
 		Fam:      "memory",
 		Ctx:      "logstash.jvm_mem_heap_used",
 		Priority: prioJVMMemHeapUsed,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "jvm_mem_heap_used_percent", Name: "in use"},
 		},
 	},
@@ -57,9 +57,9 @@ var charts = module.Charts{
 		Units:    "KiB",
 		Fam:      "memory",
 		Ctx:      "logstash.jvm_mem_heap",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioJVMMemHeap,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "jvm_mem_heap_committed_in_bytes", Name: "committed", Div: 1024},
 			{ID: "jvm_mem_heap_used_in_bytes", Name: "used", Div: 1024},
 		},
@@ -70,9 +70,9 @@ var charts = module.Charts{
 		Units:    "KiB",
 		Fam:      "memory",
 		Ctx:      "logstash.jvm_mem_pools_eden",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioJVMMemPoolsEden,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "jvm_mem_pools_eden_committed_in_bytes", Name: "committed", Div: 1024},
 			{ID: "jvm_mem_pools_eden_used_in_bytes", Name: "used", Div: 1024},
 		},
@@ -83,9 +83,9 @@ var charts = module.Charts{
 		Units:    "KiB",
 		Fam:      "memory",
 		Ctx:      "logstash.jvm_mem_pools_survivor",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioJVMMemPoolsSurvivor,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "jvm_mem_pools_survivor_committed_in_bytes", Name: "committed", Div: 1024},
 			{ID: "jvm_mem_pools_survivor_used_in_bytes", Name: "used", Div: 1024},
 		},
@@ -96,9 +96,9 @@ var charts = module.Charts{
 		Units:    "KiB",
 		Fam:      "memory",
 		Ctx:      "logstash.jvm_mem_pools_old",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioJVMMemPoolsOld,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "jvm_mem_pools_old_committed_in_bytes", Name: "committed", Div: 1024},
 			{ID: "jvm_mem_pools_old_used_in_bytes", Name: "used", Div: 1024},
 		},
@@ -111,9 +111,9 @@ var charts = module.Charts{
 		Fam:      "garbage collection",
 		Ctx:      "logstash.jvm_gc_collector_count",
 		Priority: prioJVMGCCollectorCount,
-		Dims: module.Dims{
-			{ID: "jvm_gc_collectors_eden_collection_count", Name: "eden", Algo: module.Incremental},
-			{ID: "jvm_gc_collectors_old_collection_count", Name: "old", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "jvm_gc_collectors_eden_collection_count", Name: "eden", Algo: collectorapi.Incremental},
+			{ID: "jvm_gc_collectors_old_collection_count", Name: "old", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -123,9 +123,9 @@ var charts = module.Charts{
 		Fam:      "garbage collection",
 		Ctx:      "logstash.jvm_gc_collector_time",
 		Priority: prioJVMGCCollectorTime,
-		Dims: module.Dims{
-			{ID: "jvm_gc_collectors_eden_collection_time_in_millis", Name: "eden", Algo: module.Incremental},
-			{ID: "jvm_gc_collectors_old_collection_time_in_millis", Name: "old", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "jvm_gc_collectors_eden_collection_time_in_millis", Name: "eden", Algo: collectorapi.Incremental},
+			{ID: "jvm_gc_collectors_old_collection_time_in_millis", Name: "old", Algo: collectorapi.Incremental},
 		},
 	},
 	// processes
@@ -136,7 +136,7 @@ var charts = module.Charts{
 		Fam:      "processes",
 		Ctx:      "logstash.open_file_descriptors",
 		Priority: prioOpenFileDescriptors,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "process_open_file_descriptors", Name: "open"},
 		},
 	},
@@ -148,10 +148,10 @@ var charts = module.Charts{
 		Fam:      "events",
 		Ctx:      "logstash.event",
 		Priority: prioEvent,
-		Dims: module.Dims{
-			{ID: "event_in", Name: "in", Algo: module.Incremental},
-			{ID: "event_filtered", Name: "filtered", Algo: module.Incremental},
-			{ID: "event_out", Name: "out", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "event_in", Name: "in", Algo: collectorapi.Incremental},
+			{ID: "event_filtered", Name: "filtered", Algo: collectorapi.Incremental},
+			{ID: "event_out", Name: "out", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -161,9 +161,9 @@ var charts = module.Charts{
 		Fam:      "events",
 		Ctx:      "logstash.event_duration",
 		Priority: prioEventDuration,
-		Dims: module.Dims{
-			{ID: "event_duration_in_millis", Name: "event", Div: 1000, Algo: module.Incremental},
-			{ID: "event_queue_push_duration_in_millis", Name: "queue", Div: 1000, Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "event_duration_in_millis", Name: "event", Div: 1000, Algo: collectorapi.Incremental},
+			{ID: "event_queue_push_duration_in_millis", Name: "queue", Div: 1000, Algo: collectorapi.Incremental},
 		},
 	},
 	// uptime
@@ -174,13 +174,13 @@ var charts = module.Charts{
 		Fam:      "uptime",
 		Ctx:      "logstash.uptime",
 		Priority: prioUptime,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "jvm_uptime_in_millis", Name: "uptime", Div: 1000},
 		},
 	},
 }
 
-var pipelineChartsTmpl = module.Charts{
+var pipelineChartsTmpl = collectorapi.Charts{
 	{
 		ID:       "pipeline_%s_event",
 		Title:    "Pipeline Events",
@@ -188,10 +188,10 @@ var pipelineChartsTmpl = module.Charts{
 		Fam:      "pipeline events",
 		Ctx:      "logstash.pipeline_event",
 		Priority: prioPipelineEvent,
-		Dims: module.Dims{
-			{ID: "pipelines_%s_event_in", Name: "in", Algo: module.Incremental},
-			{ID: "pipelines_%s_event_filtered", Name: "filtered", Algo: module.Incremental},
-			{ID: "pipelines_%s_event_out", Name: "out", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "pipelines_%s_event_in", Name: "in", Algo: collectorapi.Incremental},
+			{ID: "pipelines_%s_event_filtered", Name: "filtered", Algo: collectorapi.Incremental},
+			{ID: "pipelines_%s_event_out", Name: "out", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -201,9 +201,9 @@ var pipelineChartsTmpl = module.Charts{
 		Fam:      "pipeline events duration",
 		Ctx:      "logstash.pipeline_event_duration",
 		Priority: prioPipelineEventDurations,
-		Dims: module.Dims{
-			{ID: "pipelines_%s_event_duration_in_millis", Name: "event", Div: 1000, Algo: module.Incremental},
-			{ID: "pipelines_%s_event_queue_push_duration_in_millis", Name: "queue", Div: 1000, Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "pipelines_%s_event_duration_in_millis", Name: "event", Div: 1000, Algo: collectorapi.Incremental},
+			{ID: "pipelines_%s_event_queue_push_duration_in_millis", Name: "queue", Div: 1000, Algo: collectorapi.Incremental},
 		},
 	},
 }
@@ -213,7 +213,7 @@ func (c *Collector) addPipelineCharts(id string) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, id)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "pipeline", Value: id},
 		}
 		for _, dim := range chart.Dims {

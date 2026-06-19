@@ -39,6 +39,7 @@ Send notifications via Email using Netdata's Agent alert notification feature, w
     ```
   
   - Update your container with `docker compose up -d`.
+- If you use Gmail as the SMTP relay and your mail client cannot use Google's OAuth-based sign-in flow, configure your `msmtprc` file with `smtp.gmail.com`, port `587`, TLS enabled, and a Gmail [App Password](https://support.google.com/accounts/answer/185833) instead of your regular account password. Set `EMAIL_SENDER` in `health_alarm_notify.conf` to the same Gmail address used in the `msmtprc` `from` field.
 
 
 
@@ -55,9 +56,10 @@ The following options can be defined for this notification
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
 | EMAIL_SENDER | You can change `EMAIL_SENDER` to the email address sending the notifications. | netdata | no |
-| SEND_EMAIL | Set `SEND_EMAIL` to YES | YES | yes |
-| DEFAULT_RECIPIENT_EMAIL | Set `DEFAULT_RECIPIENT_EMAIL` to the email address you want the email to be sent by default. You can define multiple email addresses like this: `alarms@example.com` `systems@example.com`. | root | yes |
+| SEND_EMAIL | Set `SEND_EMAIL` to YES, NO, or AUTO (enables email when sendmail is available). | AUTO | yes |
+| [DEFAULT_RECIPIENT_EMAIL](#option-default-recipient-email) | Set `DEFAULT_RECIPIENT_EMAIL` to the email address you want the email to be sent by default. You can define multiple email addresses like this: `alarms@example.com` `systems@example.com`. | root | yes |
 
+<a id="option-default-recipient-email"></a>
 ##### DEFAULT_RECIPIENT_EMAIL
 
 All roles will default to this variable if left unconfigured.

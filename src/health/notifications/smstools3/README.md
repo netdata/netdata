@@ -48,10 +48,11 @@ The following options can be defined for this notification
 
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
-| sendsms | Set the path for `sendsms`, otherwise Netdata will search for it in your system `$PATH:` | YES | yes |
+| [sendsms](#option-sendsms) | Set the path for `sendsms`, otherwise Netdata will search for it in your system `$PATH:` | YES | yes |
 | SEND_SMS | Set `SEND_SMS` to `YES`. |  | yes |
-| DEFAULT_RECIPIENT_SMS | Set DEFAULT_RECIPIENT_SMS to the phone number you want the alert notifications to be sent to. You can define multiple phone numbers like this: PHONE1 PHONE2. |  | yes |
+| [DEFAULT_RECIPIENT_SMS](#option-default-recipient-sms) | Set DEFAULT_RECIPIENT_SMS to the phone number you want the alert notifications to be sent to. You can define multiple phone numbers like this: PHONE1 PHONE2. |  | yes |
 
+<a id="option-sendsms"></a>
 ##### sendsms
 
 # The full path of the sendsms command (smstools3).
@@ -60,6 +61,7 @@ The following options can be defined for this notification
 sendsms="/usr/bin/sendsms"
 
 
+<a id="option-default-recipient-sms"></a>
 ##### DEFAULT_RECIPIENT_SMS
 
 All roles will default to this variable if left unconfigured.

@@ -1,0 +1,1 @@
+{"@timestamp": "2024-01-15 10:30:25", "@version": "1.0", "user": {"id": 12345, "name": "john_doe"}, "message": "User login", "level": "info", "tags": ["authentication", "security", "login"]}

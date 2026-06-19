@@ -32,8 +32,6 @@ int  vsnprintfz(char *dst, size_t n, const char *fmt, va_list args);
 int  snprintfz(char *dst, size_t n, const char *fmt, ...) PRINTFLIKE(3, 4);
 
 void json_escape_string(char *dst, const char *src, size_t size);
-void json_fix_string(char *s);
-
 
 extern struct rlimit rlimit_nofile;
 
@@ -57,7 +55,7 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
 bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length);
 struct web_buffer *run_command_and_get_output_to_buffer(const char *command, int max_line_length);
 
-extern const char *netdata_configured_host_prefix;
+#include "runtime-paths/runtime-paths.h"
 
 // safe includes before O/S specific functions
 #include "template-enum.h"
@@ -66,6 +64,11 @@ extern const char *netdata_configured_host_prefix;
 
 #include "string/string.h"
 #include "buffer/buffer.h"
+
+#include "socket/security.h"    // must be before windows.h
+
+// this may include windows.h
+#include "os/os.h"
 
 #include "uuid/uuid.h"
 #include "uuid/uuidmap.h"
@@ -90,6 +93,7 @@ extern const char *netdata_configured_host_prefix;
 
 // this may include windows.h
 #include "os/os.h"
+#include "os/ci.h"
 
 #include "socket/socket.h"
 #include "socket/nd-sock.h"
@@ -125,11 +129,11 @@ extern const char *netdata_configured_host_prefix;
 #include "url/url.h"
 #include "json/json.h"
 #include "json/json-c-parser-inline.h"
+#include "yaml/yaml.h"
 #include "string/utf8.h"
 #include "libnetdata/aral/aral.h"
 #include "onewayalloc/onewayalloc.h"
 #include "worker_utilization/worker_utilization.h"
-#include "yaml.h"
 #include "http/http_defs.h"
 #include "gorilla/gorilla.h"
 #include "facets/facets.h"

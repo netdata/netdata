@@ -6,6 +6,20 @@
 #include "collectors/all.h"
 #include "libnetdata/libnetdata.h"
 
+#if defined(OS_LINUX)
+#include "../ebpf.plugin/ebpfgo.plugin/apps_ebpf_shared_pid_row.h"
+#ifndef NETDATA_APP_FAMILY
+#define NETDATA_APP_FAMILY "app"
+#endif
+
+struct apps_ebpf_cachestat_totals {
+    uint64_t account_page_dirtied;
+    uint64_t add_to_page_cache_lru;
+    uint64_t mark_buffer_dirty;
+    uint64_t mark_page_accessed;
+};
+#endif
+
 #define OS_FUNC_CONCAT(a, b) a##b
 
 #if defined(OS_FREEBSD)
@@ -101,6 +115,7 @@ struct pid_info {
 #define PROCESSES_HAVE_UID                   0
 #define PROCESSES_HAVE_GID                   0
 #define PROCESSES_HAVE_SID                   1
+#define PROCESSES_HAVE_SERVICE               1
 #define PROCESSES_HAVE_MAJFLT                0
 #define PROCESSES_HAVE_CHILDREN_FLTS         0
 #define PROCESSES_HAVE_VMSWAP                1
@@ -216,6 +231,8 @@ extern NETDATA_DOUBLE
 extern size_t pagesize;
 
 extern netdata_mutex_t apps_and_stdout_mutex;
+extern netdata_mutex_t apps_pids_mutex;
+extern uint64_t apps_collection_generation;
 
 // --------------------------------------------------------------------------------------------------------------------
 // string lengths
@@ -293,6 +310,9 @@ typedef enum __attribute__((packed)) {
 #endif
 #if (PROCESSES_HAVE_SID == 1)
     TARGET_TYPE_SID,
+#endif
+#if (PROCESSES_HAVE_SERVICE == 1)
+    TARGET_TYPE_SERVICE,
 #endif
     TARGET_TYPE_TREE,
 } TARGET_TYPE;
@@ -407,11 +427,20 @@ struct target {
 #if (PROCESSES_HAVE_SID == 1)
     STRING *sid_name;
 #endif
+#if (PROCESSES_HAVE_SERVICE == 1)
+    STRING *service_name;
+#endif
 
     kernel_uint_t values[PDF_MAX];
 
     kernel_uint_t uptime_min;
     kernel_uint_t uptime_max;
+
+#if defined(OS_LINUX)
+    struct ebpf_publish_cachestat cachestat;
+    struct apps_ebpf_cachestat_totals cachestat_totals;
+    struct apps_ebpf_cachestat_totals cachestat_totals_prev;
+#endif
 
 #if (PROCESSES_HAVE_FDS == 1)
     struct openfds openfds;
@@ -446,6 +475,7 @@ typedef enum __attribute__((packed)) {
 #if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
     PID_LOG_SMAPS           = (1 << 7),
 #endif
+    PID_LOG_CGROUP          = (1 << 8),
 } PID_LOG;
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -491,6 +521,8 @@ struct pid_fd {
 #define pid_stat_cmdline(p) (string2str((p)->cmdline))
 uint32_t all_files_len_get(void);
 
+struct cgroup_lookup_entry;
+
 struct pid_stat {
     int32_t pid;
     int32_t ppid;
@@ -516,11 +548,20 @@ struct pid_stat {
 #if (PROCESSES_HAVE_SID == 1)
     struct target *sid_target;      // sid based targets
 #endif
+#if (PROCESSES_HAVE_SERVICE == 1)
+    struct target *service_target;  // service based targets
+#endif
 
     STRING *comm_orig;              // the command, as-collected
     STRING *comm;                   // the command, sanitized
     STRING *name;                   // the command name, if any, sanitized
     STRING *cmdline;                // the full command line of the program
+
+#if defined(OS_LINUX)
+    STRING *cgroup_path;            // /proc/PID/cgroup selected lookup key
+    struct cgroup_lookup_entry *cgroup_cache; // borrowed pointer, protected by apps_pids_mutex
+    uint64_t starttime;             // raw /proc/PID/stat field 21, in clock ticks
+#endif
 
 #if defined(OS_WINDOWS)
     COUNTER_DATA perflib[PDF_MAX];
@@ -538,6 +579,9 @@ struct pid_stat {
 #endif
 #if (PROCESSES_HAVE_SID == 1)
     STRING *sid_name;
+#endif
+#if (PROCESSES_HAVE_SERVICE == 1)
+    STRING *service_name;
 #endif
 
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
@@ -597,6 +641,7 @@ struct pid_stat {
     char *io_filename;
     char *cmdline_filename;
     char *limits_filename;
+    char *cgroup_filename;
 #if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
     char *smaps_rollup_filename;
     ARL_BASE *smaps_rollup_arl;
@@ -605,6 +650,11 @@ struct pid_stat {
     size_t last_pss_iteration;
     kernel_uint_t pss_bytes;
 #endif
+
+    struct ebpf_pid_stat ebpf;
+    // last cachestat ct we consumed; gates per-PID delta accumulation
+    uint64_t ebpf_cachestat_ct;
+    bool has_ebpf:1;
 #endif
 };
 
@@ -732,6 +782,12 @@ extern struct target *sids_root_target;
 struct target *get_sid_target(STRING *sid_name);
 #endif
 
+#if (PROCESSES_HAVE_SERVICE == 1)
+extern bool enable_services_charts;
+extern struct target *services_root_target;
+struct target *get_service_target(STRING *service_name);
+#endif
+
 extern struct target *apps_groups_root_target;
 int read_apps_groups_conf(const char *path, const char *file);
 
@@ -752,6 +808,13 @@ void function_processes(const char *transaction, char *function,
                         BUFFER *payload __maybe_unused, HTTP_ACCESS access,
                         const char *source __maybe_unused, void *data __maybe_unused);
 
+#if defined(OS_LINUX)
+bool apps_ebpf_shared_memory_refresh(void);
+bool apps_ebpf_sync_pid_stat(struct pid_stat *p);
+void apps_ebpf_accumulate_cachestat(void);
+bool apps_ebpf_cachestat_is_available(void);
+#endif
+
 // --------------------------------------------------------------------------------------------------------------------
 // operating system functions
 
@@ -764,6 +827,10 @@ bool OS_FUNCTION(apps_os_collect_all_pids)(void);
 bool OS_FUNCTION(apps_os_read_pid_status)(struct pid_stat *p, void *ptr);
 bool OS_FUNCTION(apps_os_read_pid_stat)(struct pid_stat *p, void *ptr);
 bool OS_FUNCTION(apps_os_read_pid_io)(struct pid_stat *p, void *ptr);
+
+#if defined(OS_LINUX)
+bool apps_os_read_pid_cgroup_linux(struct pid_stat *p, void *ptr);
+#endif
 
 #if (PROCESSES_HAVE_PID_LIMITS == 1)
 bool OS_FUNCTION(apps_os_read_pid_limits)(struct pid_stat *p, void *ptr);

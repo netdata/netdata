@@ -11,8 +11,7 @@ import (
 var allowedDelta = 500 * time.Millisecond
 
 func TestTickerParallel(t *testing.T) {
-	for i := 0; i < 100; i++ {
-		i := i
+	for i := range 100 {
 		go func() {
 			time.Sleep(time.Second / 100 * time.Duration(i))
 			TestTicker(t)
@@ -25,7 +24,7 @@ func TestTicker(t *testing.T) {
 	tk := New(time.Second)
 	defer tk.Stop()
 	prev := time.Now()
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		<-tk.C
 		now := time.Now()
 		diff := abs(now.Round(time.Second).Sub(now))

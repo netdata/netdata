@@ -17,7 +17,6 @@ modules:
       keywords:
         - ceph
         - storage
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

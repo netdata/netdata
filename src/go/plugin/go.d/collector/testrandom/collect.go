@@ -5,7 +5,7 @@ package testrandom
 import (
 	"fmt"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 func (c *Collector) collect() (map[string]int64, error) {
@@ -17,7 +17,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return collected, nil
 }
 
-func (c *Collector) collectChart(collected map[string]int64, chart *module.Chart) {
+func (c *Collector) collectChart(collected map[string]int64, chart *collectorapi.Chart) {
 	var num int
 	if chart.Opts.Hidden {
 		num = c.Config.HiddenCharts.Dims
@@ -32,7 +32,7 @@ func (c *Collector) collectChart(collected map[string]int64, chart *module.Chart
 		if !c.collectedDims[id] {
 			c.collectedDims[id] = true
 
-			dim := &module.Dim{ID: id, Name: name}
+			dim := &collectorapi.Dim{ID: id, Name: name}
 			if err := chart.AddDim(dim); err != nil {
 				c.Warning(err)
 			}

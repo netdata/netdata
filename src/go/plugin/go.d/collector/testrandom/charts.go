@@ -5,10 +5,10 @@ package testrandom
 import (
 	"fmt"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
-var chartTemplate = module.Chart{
+var chartTemplate = collectorapi.Chart{
 	ID:    "random_%d",
 	Title: "A Random Number",
 	Units: "random",
@@ -16,26 +16,26 @@ var chartTemplate = module.Chart{
 	Ctx:   "testrandom.random",
 }
 
-var hiddenChartTemplate = module.Chart{
+var hiddenChartTemplate = collectorapi.Chart{
 	ID:    "hidden_random_%d",
 	Title: "A Random Number",
 	Units: "random",
 	Fam:   "random",
 	Ctx:   "testrandom.random",
-	Opts: module.Opts{
+	Opts: collectorapi.Opts{
 		Hidden: true,
 	},
 }
 
-func newChart(num, ctx, labels int, typ module.ChartType) *module.Chart {
+func newChart(num, ctx, labels int, typ collectorapi.ChartType) *collectorapi.Chart {
 	chart := chartTemplate.Copy()
 	chart.ID = fmt.Sprintf(chart.ID, num)
 	chart.Type = typ
 	if ctx > 0 {
 		chart.Ctx += fmt.Sprintf("_%d", ctx)
 	}
-	for i := 0; i < labels; i++ {
-		chart.Labels = append(chart.Labels, module.Label{
+	for i := range labels {
+		chart.Labels = append(chart.Labels, collectorapi.Label{
 			Key:   fmt.Sprintf("random_name_%d", i),
 			Value: fmt.Sprintf("random_value_%d_%d", num, i),
 		})
@@ -43,15 +43,15 @@ func newChart(num, ctx, labels int, typ module.ChartType) *module.Chart {
 	return chart
 }
 
-func newHiddenChart(num, ctx, labels int, typ module.ChartType) *module.Chart {
+func newHiddenChart(num, ctx, labels int, typ collectorapi.ChartType) *collectorapi.Chart {
 	chart := hiddenChartTemplate.Copy()
 	chart.ID = fmt.Sprintf(chart.ID, num)
 	chart.Type = typ
 	if ctx > 0 {
 		chart.Ctx += fmt.Sprintf("_%d", ctx)
 	}
-	for i := 0; i < labels; i++ {
-		chart.Labels = append(chart.Labels, module.Label{
+	for i := range labels {
+		chart.Labels = append(chart.Labels, collectorapi.Label{
 			Key:   fmt.Sprintf("random_name_%d", i),
 			Value: fmt.Sprintf("random_value_%d_%d", num, i),
 		})

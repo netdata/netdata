@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "libnetdata/libnetdata.h"
-#include "libnetdata/required_dummies.h"
 
 #include <xenstat.h>
 #include <libxl.h>
@@ -389,6 +388,7 @@ static int xenstat_collect(xenstat_handle *xhandle, libxl_ctx *ctx, libxl_dominf
         unsigned int id = xenstat_domain_id(domain);
         if(unlikely(libxl_domain_info(ctx, info, id))) {
             netdata_log_error("XENSTAT: cannot get domain info.");
+            continue;
         }
         else {
             snprintfz(uuid, LIBXL_UUID_FMTLEN, LIBXL_UUID_FMT "\n", LIBXL_UUID_BYTES(info->uuid));

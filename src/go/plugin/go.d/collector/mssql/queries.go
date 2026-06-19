@@ -101,6 +101,26 @@ WHERE object_name LIKE '%Databases%'
   );
 `
 
+// queryDatabaseLogCounters gets per-database transaction log size and activity counters
+const queryDatabaseLogCounters = `
+SELECT
+  RTRIM(pc.instance_name) AS database_name,
+  RTRIM(pc.counter_name) AS counter_name,
+  pc.cntr_value
+FROM sys.dm_os_performance_counters AS pc
+INNER JOIN sys.databases AS d
+  ON d.database_id = DB_ID(RTRIM(pc.instance_name))
+WHERE pc.object_name LIKE '%Databases%'
+  AND pc.instance_name NOT IN ('_Total', 'mssqlsystemresource')
+  AND d.database_id > 4
+  AND pc.counter_name IN (
+    'Log File(s) Size (KB)',
+    'Log File(s) Used Size (KB)',
+    'Log Truncations',
+    'Log Shrinks'
+  );
+`
+
 // queryDatabaseLocks gets per-database lock metrics
 const queryDatabaseLocks = `
 SELECT
@@ -122,7 +142,7 @@ WHERE object_name LIKE '%Locks%'
 const queryDatabaseSize = `
 SELECT
   DB_NAME(database_id) AS database_name,
-  SUM(size) * 8 * 1024 AS size_bytes
+  SUM(CAST(size AS BIGINT)) * 8 * 1024 AS size_bytes
 FROM sys.master_files
 WHERE type = 0 -- data files only
   AND database_id > 4 -- exclude system databases
@@ -186,10 +206,122 @@ WHERE ws.[waiting_tasks_count] > 0
 ORDER BY ws.[wait_time_ms] DESC;
 `
 
-// queryJobs gets SQL Agent job status
+// queryJobs gets SQL Agent job configuration status.
 const queryJobs = `
-SELECT name, enabled
-FROM msdb.dbo.sysjobs;
+SELECT
+  CONVERT(varchar(36), job_id) AS job_id,
+  name,
+  enabled
+FROM msdb.dbo.sysjobs
+ORDER BY name, job_id;
+`
+
+// queryJobLastExecutions gets the latest completed SQL Agent job execution.
+const queryJobLastExecutions = `
+WITH final_summary_rows AS (
+  SELECT
+    job_id,
+    instance_id,
+    run_status,
+    run_date,
+    run_time,
+    run_duration,
+    ROW_NUMBER() OVER (
+      PARTITION BY job_id
+      ORDER BY instance_id DESC
+    ) AS row_num
+  FROM msdb.dbo.sysjobhistory
+  WHERE step_id = 0
+    AND run_status IN (0, 1, 3)
+),
+latest_final_summary AS (
+  SELECT
+    fs.job_id,
+    fs.instance_id,
+    (
+      SELECT MAX(prev.instance_id)
+      FROM final_summary_rows AS prev
+      WHERE prev.job_id = fs.job_id
+        AND prev.instance_id < fs.instance_id
+    ) AS previous_summary_instance_id,
+    fs.run_status,
+    ((CAST(fs.run_duration AS bigint) / 10000) * 3600)
+      + (((CAST(fs.run_duration AS bigint) % 10000) / 100) * 60)
+      + (CAST(fs.run_duration AS bigint) % 100) AS duration_seconds,
+    DATEADD(
+      second,
+      ((fs.run_time / 10000) * 3600)
+        + (((fs.run_time % 10000) / 100) * 60)
+        + (fs.run_time % 100),
+      CONVERT(
+        datetime,
+        CASE
+          WHEN ISDATE(CONVERT(char(8), NULLIF(fs.run_date, 0))) = 1
+            THEN CONVERT(char(8), fs.run_date)
+          ELSE NULL
+        END,
+        112
+      )
+    ) AS started_at
+  FROM final_summary_rows AS fs
+  WHERE row_num = 1
+),
+failed_steps AS (
+  SELECT
+    ls.job_id,
+    COUNT_BIG(*) AS failed_step_count
+  FROM latest_final_summary AS ls
+  JOIN msdb.dbo.sysjobhistory AS sh
+    ON sh.job_id = ls.job_id
+   AND sh.step_id > 0
+   AND sh.run_status = 0
+   AND sh.instance_id < ls.instance_id
+   AND (
+        ls.previous_summary_instance_id IS NULL
+        OR sh.instance_id > ls.previous_summary_instance_id
+   )
+  GROUP BY ls.job_id
+)
+SELECT
+  CONVERT(varchar(36), ls.job_id) AS job_id,
+  ls.run_status,
+  ls.duration_seconds,
+  CASE
+    WHEN ls.started_at IS NULL THEN NULL
+    WHEN DATEDIFF(
+      second,
+      DATEADD(second, CAST(ls.duration_seconds AS int), ls.started_at),
+      GETDATE()
+    ) < 0 THEN 0
+    ELSE DATEDIFF(
+      second,
+      DATEADD(second, CAST(ls.duration_seconds AS int), ls.started_at),
+      GETDATE()
+    )
+  END AS age_seconds,
+  CASE WHEN COALESCE(fs.failed_step_count, 0) > 0 THEN 1 ELSE 0 END AS has_failed_step
+FROM latest_final_summary AS ls
+LEFT JOIN failed_steps AS fs
+  ON fs.job_id = ls.job_id;
+`
+
+// queryJobCurrentExecutions gets current SQL Agent job execution runtime.
+const queryJobCurrentExecutions = `
+WITH latest_session AS (
+  SELECT MAX(session_id) AS session_id
+  FROM msdb.dbo.sysjobactivity
+)
+SELECT
+  CONVERT(varchar(36), job_id) AS job_id,
+  CASE
+    WHEN start_execution_date IS NOT NULL
+     AND stop_execution_date IS NULL
+     AND DATEDIFF(second, start_execution_date, GETDATE()) > 0
+      THEN DATEDIFF(second, start_execution_date, GETDATE())
+    ELSE 0
+  END AS current_execution_time_seconds
+FROM msdb.dbo.sysjobactivity
+WHERE session_id = (SELECT session_id FROM latest_session);
 `
 
 // querySQLErrors gets SQL error counts from performance counters
@@ -375,6 +507,135 @@ FROM sys.dm_os_performance_counters
 WHERE object_name LIKE '%Databases%'
   AND counter_name = 'Log Growths'
   AND instance_name NOT IN ('_Total', 'mssqlsystemresource');
+`
+
+// queryHadrEnabled checks if Always On Availability Groups is enabled
+const queryHadrEnabled = `
+SELECT CAST(SERVERPROPERTY('IsHadrEnabled') AS int);
+`
+
+// queryAGHealth gets AG-level health rollup
+const queryAGHealth = `
+SELECT
+  ag.name AS ag_name,
+  ISNULL(ags.synchronization_health, -1) AS synchronization_health,
+  ISNULL(ags.primary_recovery_health, -1) AS primary_recovery_health,
+  ISNULL(ags.secondary_recovery_health, -1) AS secondary_recovery_health
+FROM sys.availability_groups AS ag
+INNER JOIN sys.dm_hadr_availability_group_states AS ags
+  ON ag.group_id = ags.group_id;
+`
+
+// queryAGReplicaStates gets per-replica role, connectivity, and sync health
+const queryAGReplicaStates = `
+SELECT
+  ag.name AS ag_name,
+  ar.replica_server_name,
+  LOWER(ar.availability_mode_desc) AS availability_mode,
+  LOWER(ar.failover_mode_desc) AS failover_mode,
+  ISNULL(ars.role, -1) AS role,
+  ISNULL(ars.connected_state, -1) AS connected_state,
+  ISNULL(ars.synchronization_health, -1) AS synchronization_health
+FROM sys.availability_replicas AS ar
+INNER JOIN sys.availability_groups AS ag
+  ON ar.group_id = ag.group_id
+INNER JOIN sys.dm_hadr_availability_replica_states AS ars
+  ON ar.replica_id = ars.replica_id;
+`
+
+// queryAGDatabaseReplicasPre16 gets per-database replica metrics (SQL Server 2012-2014)
+// No secondary_lag_seconds
+const queryAGDatabaseReplicasPre16 = `
+SELECT
+  ag.name AS ag_name,
+  ar.replica_server_name,
+  DB_NAME(drs.database_id) AS database_name,
+  ISNULL(drs.synchronization_state, -1) AS synchronization_state,
+  CAST(ISNULL(drs.is_suspended, 0) AS int) AS is_suspended,
+  ISNULL(drs.log_send_queue_size, 0) * 1024 AS log_send_queue_size,
+  ISNULL(drs.log_send_rate, 0) * 1024 AS log_send_rate,
+  ISNULL(drs.redo_queue_size, 0) * 1024 AS redo_queue_size,
+  ISNULL(drs.redo_rate, 0) * 1024 AS redo_rate,
+  ISNULL(drs.filestream_send_rate, 0) * 1024 AS filestream_send_rate,
+  -1 AS secondary_lag_seconds
+FROM sys.dm_hadr_database_replica_states AS drs
+INNER JOIN sys.availability_replicas AS ar
+  ON drs.replica_id = ar.replica_id
+INNER JOIN sys.availability_groups AS ag
+  ON drs.group_id = ag.group_id;
+`
+
+// queryAGDatabaseReplicas16 gets per-database replica metrics (SQL Server 2016+)
+// Adds secondary_lag_seconds
+const queryAGDatabaseReplicas16 = `
+SELECT
+  ag.name AS ag_name,
+  ar.replica_server_name,
+  DB_NAME(drs.database_id) AS database_name,
+  ISNULL(drs.synchronization_state, -1) AS synchronization_state,
+  CAST(ISNULL(drs.is_suspended, 0) AS int) AS is_suspended,
+  ISNULL(drs.log_send_queue_size, 0) * 1024 AS log_send_queue_size,
+  ISNULL(drs.log_send_rate, 0) * 1024 AS log_send_rate,
+  ISNULL(drs.redo_queue_size, 0) * 1024 AS redo_queue_size,
+  ISNULL(drs.redo_rate, 0) * 1024 AS redo_rate,
+  ISNULL(drs.filestream_send_rate, 0) * 1024 AS filestream_send_rate,
+  ISNULL(drs.secondary_lag_seconds, -1) AS secondary_lag_seconds
+FROM sys.dm_hadr_database_replica_states AS drs
+INNER JOIN sys.availability_replicas AS ar
+  ON drs.replica_id = ar.replica_id
+INNER JOIN sys.availability_groups AS ag
+  ON drs.group_id = ag.group_id;
+`
+
+// queryAGCluster gets WSFC cluster quorum state
+const queryAGCluster = `
+SELECT
+  quorum_state
+FROM sys.dm_hadr_cluster;
+`
+
+// queryAGClusterMembers gets WSFC cluster member states
+const queryAGClusterMembers = `
+SELECT
+  member_name,
+  member_state,
+  number_of_quorum_votes
+FROM sys.dm_hadr_cluster_members;
+`
+
+// queryAGFailoverReadiness gets per-database failover readiness
+const queryAGFailoverReadiness = `
+SELECT
+  ag.name AS ag_name,
+  ar.replica_server_name,
+  dcs.database_name,
+  CAST(ISNULL(dcs.is_failover_ready, 0) AS int) AS is_failover_ready,
+  CAST(ISNULL(dcs.is_database_joined, 0) AS int) AS is_database_joined
+FROM sys.dm_hadr_database_replica_cluster_states AS dcs
+INNER JOIN sys.availability_replicas AS ar
+  ON dcs.replica_id = ar.replica_id
+INNER JOIN sys.availability_groups AS ag
+  ON ar.group_id = ag.group_id;
+`
+
+// queryAGAutoPageRepair gets page repair event counts per database
+const queryAGAutoPageRepair = `
+SELECT
+  DB_NAME(database_id) AS database_name,
+  SUM(CASE WHEN page_status = 4 THEN 1 ELSE 0 END) AS successful_repairs,
+  SUM(CASE WHEN page_status = 5 THEN 1 ELSE 0 END) AS failed_repairs
+FROM sys.dm_hadr_auto_page_repair
+GROUP BY database_id;
+`
+
+// queryAGThreads gets AG thread usage (SQL Server 2019+ only)
+const queryAGThreads = `
+SELECT
+  name AS ag_name,
+  num_capture_threads,
+  num_redo_threads,
+  num_parallel_redo_threads
+FROM sys.dm_hadr_ag_threads;
 `
 
 // waitTypeCategories maps wait types to their categories

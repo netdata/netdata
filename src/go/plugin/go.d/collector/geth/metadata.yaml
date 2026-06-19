@@ -21,7 +21,6 @@ modules:
               module_name: apps
       info_provided_to_referring_integrations:
         description: ""
-      most_popular: true
     overview:
       data_collection:
         metrics_description: |

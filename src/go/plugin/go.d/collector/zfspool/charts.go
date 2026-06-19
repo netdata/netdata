@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
@@ -21,7 +21,7 @@ const (
 	prioZpoolFragmentation
 )
 
-var zpoolChartsTmpl = module.Charts{
+var zpoolChartsTmpl = collectorapi.Charts{
 	zpoolHealthStateChartTmpl.Copy(),
 
 	zpoolSpaceUtilizationChartTmpl.Copy(),
@@ -31,15 +31,15 @@ var zpoolChartsTmpl = module.Charts{
 }
 
 var (
-	zpoolHealthStateChartTmpl = module.Chart{
+	zpoolHealthStateChartTmpl = collectorapi.Chart{
 		ID:       "zfspool_%s_health_state",
 		Title:    "Zpool health state",
 		Units:    "state",
 		Fam:      "health",
 		Ctx:      "zfspool.pool_health_state",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioZpoolHealthState,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "zpool_%s_health_state_online", Name: "online"},
 			{ID: "zpool_%s_health_state_degraded", Name: "degraded"},
 			{ID: "zpool_%s_health_state_faulted", Name: "faulted"},
@@ -50,60 +50,60 @@ var (
 		},
 	}
 
-	zpoolSpaceUtilizationChartTmpl = module.Chart{
+	zpoolSpaceUtilizationChartTmpl = collectorapi.Chart{
 		ID:       "zfspool_%s_space_utilization",
 		Title:    "Zpool space utilization",
 		Units:    "percentage",
 		Fam:      "space usage",
 		Ctx:      "zfspool.pool_space_utilization",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioZpoolSpaceUtilization,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "zpool_%s_cap", Name: "utilization"},
 		},
 	}
-	zpoolSpaceUsageChartTmpl = module.Chart{
+	zpoolSpaceUsageChartTmpl = collectorapi.Chart{
 		ID:       "zfspool_%s_space_usage",
 		Title:    "Zpool space usage",
 		Units:    "bytes",
 		Fam:      "space usage",
 		Ctx:      "zfspool.pool_space_usage",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioZpoolSpaceUsage,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "zpool_%s_free", Name: "free"},
 			{ID: "zpool_%s_alloc", Name: "used"},
 		},
 	}
 
-	zpoolFragmentationChartTmpl = module.Chart{
+	zpoolFragmentationChartTmpl = collectorapi.Chart{
 		ID:       "zfspool_%s_fragmentation",
 		Title:    "Zpool fragmentation",
 		Units:    "percentage",
 		Fam:      "fragmentation",
 		Ctx:      "zfspool.pool_fragmentation",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioZpoolFragmentation,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "zpool_%s_frag", Name: "fragmentation"},
 		},
 	}
 )
 
-var vdevChartsTmpl = module.Charts{
+var vdevChartsTmpl = collectorapi.Charts{
 	vdevHealthStateChartTmpl.Copy(),
 }
 
 var (
-	vdevHealthStateChartTmpl = module.Chart{
+	vdevHealthStateChartTmpl = collectorapi.Chart{
 		ID:       "vdev_%s_health_state",
 		Title:    "Zpool Vdev health state",
 		Units:    "state",
 		Fam:      "health",
 		Ctx:      "zfspool.vdev_health_state",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioVdevHealthState,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "vdev_%s_health_state_online", Name: "online"},
 			{ID: "vdev_%s_health_state_degraded", Name: "degraded"},
 			{ID: "vdev_%s_health_state_faulted", Name: "faulted"},
@@ -120,7 +120,7 @@ func (c *Collector) addZpoolCharts(name string) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, name)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "pool", Value: name},
 		}
 		for _, dim := range chart.Dims {
@@ -143,7 +143,7 @@ func (c *Collector) addVdevCharts(pool, vdev string) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, cleanVdev(vdev))
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "pool", Value: pool},
 			{Key: "vdev", Value: vdev},
 		}

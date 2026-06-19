@@ -1,0 +1,53 @@
+# IEEE 802.3ad Link Aggregation (LACP) metrics.
+# MIB: IEEE8023-LAG-MIB
+# Cross-vendor reusable — not Cisco-specific.
+
+metrics:
+  # Per-member-port LACP protocol statistics (private — exposed via virtual_metrics)
+  - MIB: IEEE8023-LAG-MIB
+    table:
+      OID: 1.2.840.10006.300.43.1.2.2
+      name: dot3adAggPortStatsTable
+    symbols:
+      - {OID: 1.2.840.10006.300.43.1.2.2.1.1, name: _dot3adAggPortStatsLACPDUsRx}
+      - {OID: 1.2.840.10006.300.43.1.2.2.1.2, name: _dot3adAggPortStatsLACPDUsTx}
+      - {OID: 1.2.840.10006.300.43.1.2.2.1.5, name: _dot3adAggPortStatsIllegalRx}
+    metric_tags:
+      - tag: lag_port_index
+        index: 1
+      - tag: interface
+        table: ifXTable
+        MIB: IF-MIB
+        symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.1
+          name: ifName
+
+  # TODO: LACP operational state (dot3adAggPortActorOperState / PartnerOperState)
+  # These are bitfield (BITS/OCTET STRING) values that encode 8 boolean flags
+  # (lacp_activity, timeout, aggregation, sync, collecting, distributing, defaulted, expired).
+  # Raw bitmap values are not meaningful as gauge metrics — they need bitmask mapping support
+  # to expose individual flags as separate status dimensions.
+  # Waiting for bitmask mapping support to be added to the profile engine.
+
+virtual_metrics:
+  # Consolidate PDU counters into a single per-port chart
+  - name: dot3adAggPortLACPDUs
+    per_row: true
+    group_by: ["interface"]
+    sources:
+      - {metric: _dot3adAggPortStatsLACPDUsRx, table: dot3adAggPortStatsTable, as: rx}
+      - {metric: _dot3adAggPortStatsLACPDUsTx, table: dot3adAggPortStatsTable, as: tx}
+    chart_meta:
+      description: LACP PDUs received and transmitted per port
+      family: 'Network/LAG/Port/PDU'
+      unit: "{pdu}/s"
+
+  - name: dot3adAggPortIllegalRx
+    per_row: true
+    group_by: ["interface"]
+    sources:
+      - {metric: _dot3adAggPortStatsIllegalRx, table: dot3adAggPortStatsTable, as: illegal}
+    chart_meta:
+      description: Invalid Slow Protocol frames received per port
+      family: 'Network/LAG/Port/Errors'
+      unit: "{frame}/s"

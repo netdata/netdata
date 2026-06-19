@@ -1,4 +1,5 @@
 metrics:
+  # IPSec Phase 2 tunnel table
   - MIB: FORTINET-FORTIGATE-MIB
     table:
       OID: 1.3.6.1.4.1.12356.101.12.2.2
@@ -8,27 +9,111 @@ metrics:
         name: fgVpnTunEntInOctets
         chart_meta:
           description: Number of bytes received on tunnel
-          family: 'Network/VPN/Tunnel/Traffic/In'
+          family: 'Network/VPN/IPSec/Phase2/Tunnel/Traffic/In'
           unit: "bit/s"
         scale_factor: 8
       - OID: 1.3.6.1.4.1.12356.101.12.2.2.1.19
         name: fgVpnTunEntOutOctets
         chart_meta:
           description: Number of bytes sent out on tunnel
-          family: 'Network/VPN/Tunnel/Traffic/Out'
+          family: 'Network/VPN/IPSec/Phase2/Tunnel/Traffic/Out'
           unit: "bit/s"
         scale_factor: 8
       - OID: 1.3.6.1.4.1.12356.101.12.2.2.1.20
         name: fgVpnTunEntStatus
         chart_meta:
           description: Current status of tunnel (up or down)
-          family: 'Network/VPN/Tunnel/Status'
+          family: 'Network/VPN/IPSec/Phase2/Tunnel/Status'
           unit: "{status}"
         mapping:
           1: down
           2: up
+      - OID: 1.3.6.1.4.1.12356.101.12.2.2.1.15
+        name: fgVpnTunEntLifeSecs
+        chart_meta:
+          description: Remaining lifetime of this tunnel in seconds
+          family: 'Network/VPN/IPSec/Phase2/Tunnel/Lifetime'
+          unit: "s"
+      - OID: 1.3.6.1.4.1.12356.101.12.2.2.1.16
+        name: fgVpnTunEntLifeBytes
+        chart_meta:
+          description: Remaining lifetime of this tunnel in bytes
+          family: 'Network/VPN/IPSec/Phase2/Tunnel/Lifetime/Bytes'
+          unit: "By"
     metric_tags:
       - tag: vpn_tunnel_name
         symbol:
           OID: 1.3.6.1.4.1.12356.101.12.2.2.1.2
           name: fgVpnTunEntPhase1Name
+      - tag: phase_2_name
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.12.2.2.1.3
+          name: fgVpnTunEntPhase2Name
+      - tag: _remote_gateway_ip
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.12.2.2.1.4
+          name: fgVpnTunEntRemGwyIp
+      - tag: _local_gateway_ip
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.12.2.2.1.6
+          name: fgVpnTunEntLocGwyIp
+      - tag: vdom
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.12.2.2.1.21
+          name: fgVpnTunEntVdom
+
+  # SSL VPN per-VDOM statistics
+  - MIB: FORTINET-FORTIGATE-MIB
+    table:
+      OID: 1.3.6.1.4.1.12356.101.12.2.3
+      name: fgVpnSslStatsTable
+    symbols:
+      - OID: 1.3.6.1.4.1.12356.101.12.2.3.1.1
+        name: fgVpnSslState
+        chart_meta:
+          description: Whether SSL VPN is enabled on this VDOM
+          family: 'Network/VPN/RemoteAccess/Status'
+          unit: "{status}"
+        mapping:
+          1: disabled
+          2: enabled
+      - OID: 1.3.6.1.4.1.12356.101.12.2.3.1.2
+        name: fgVpnSslStatsLoginUsers
+        chart_meta:
+          description: Number of current logged-in SSL VPN users
+          family: 'Network/VPN/RemoteAccess/User/Active'
+          unit: "{user}"
+      - OID: 1.3.6.1.4.1.12356.101.12.2.3.1.3
+        name: fgVpnSslStatsMaxUsers
+        chart_meta:
+          description: Maximum number of SSL VPN users allowed
+          family: 'Network/VPN/RemoteAccess/User/Maximum'
+          unit: "{user}"
+      - OID: 1.3.6.1.4.1.12356.101.12.2.3.1.4
+        name: fgVpnSslStatsActiveWebSessions
+        chart_meta:
+          description: Number of active SSL VPN web sessions
+          family: 'Network/VPN/RemoteAccess/Session/Web/Active'
+          unit: "{session}"
+      - OID: 1.3.6.1.4.1.12356.101.12.2.3.1.5
+        name: fgVpnSslStatsMaxWebSessions
+        chart_meta:
+          description: Maximum number of SSL VPN web sessions allowed
+          family: 'Network/VPN/RemoteAccess/Session/Web/Maximum'
+          unit: "{session}"
+      - OID: 1.3.6.1.4.1.12356.101.12.2.3.1.6
+        name: fgVpnSslStatsActiveTunnels
+        chart_meta:
+          description: Number of active SSL VPN tunnels
+          family: 'Network/VPN/RemoteAccess/Session/Tunnel/Active'
+          unit: "{tunnel}"
+      - OID: 1.3.6.1.4.1.12356.101.12.2.3.1.7
+        name: fgVpnSslStatsMaxTunnels
+        chart_meta:
+          description: Maximum number of SSL VPN tunnels allowed
+          family: 'Network/VPN/RemoteAccess/Session/Tunnel/Maximum'
+          unit: "{tunnel}"
+    metric_tags:
+      # fgVpnSslStatsTable is indexed by VDOM index
+      - tag: vdom_index
+        index: 1

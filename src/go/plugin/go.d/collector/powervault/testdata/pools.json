@@ -1,0 +1,30 @@
+{
+  "pools": [
+    {
+      "name": "Pool-A",
+      "health": "OK",
+      "health-numeric": 0,
+      "total-size": "10.0TB",
+      "total-avail": "4.5TB",
+      "total-size-numeric": 19531250000,
+      "total-avail-numeric": 8789062500
+    },
+    {
+      "name": "Pool-B",
+      "health": "OK",
+      "health-numeric": 0,
+      "total-size": "5.0TB",
+      "total-avail": "3.2TB",
+      "total-size-numeric": 9765625000,
+      "total-avail-numeric": 6250000000
+    }
+  ],
+  "status": [
+    {
+      "response-type": "Success",
+      "response": "Command completed successfully.",
+      "return-code": 0,
+      "response-type-numeric": 0
+    }
+  ]
+}

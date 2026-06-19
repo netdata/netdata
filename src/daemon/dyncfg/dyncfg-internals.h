@@ -58,6 +58,13 @@ void dyncfg_file_load(const char *filename);
 void dyncfg_file_save(const char *id, DYNCFG *df);
 void dyncfg_file_delete(const char *id);
 
+// Returns the canonical command mask a node should advertise given its type
+// and current source_type. Idempotent and order-independent: re-run after a
+// node's source_type changes (e.g. UPDATE flips an existing job from
+// USER/STOCK to DYNCFG-owned) to refresh the mask -- this is what lets
+// REMOVE appear on a freshly overridden alert without an Agent restart.
+// The full rule table lives in dyncfg.c.
+DYNCFG_CMDS dyncfg_sanitize_cmds(DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, DYNCFG_CMDS cmds);
 bool dyncfg_get_schema(const char *id, BUFFER *dst);
 
 void dyncfg_echo_cb(BUFFER *wb, int code, void *result_cb_data);

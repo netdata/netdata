@@ -6,27 +6,27 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioSourceListeners = module.Priority + iota
+	prioSourceListeners = collectorapi.Priority + iota
 )
 
-var sourceChartsTmpl = module.Charts{
+var sourceChartsTmpl = collectorapi.Charts{
 	sourceListenersChartTmpl.Copy(),
 }
 
 var (
-	sourceListenersChartTmpl = module.Chart{
+	sourceListenersChartTmpl = collectorapi.Chart{
 		ID:       "icecast_%s_listeners",
 		Title:    "Icecast Listeners",
 		Units:    "listeners",
 		Fam:      "listeners",
 		Ctx:      "icecast.listeners",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioSourceListeners,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "source_%s_listeners", Name: "listeners"},
 		},
 	}
@@ -36,7 +36,7 @@ func (c *Collector) addSourceCharts(name string) {
 	chart := sourceListenersChartTmpl.Copy()
 
 	chart.ID = fmt.Sprintf(chart.ID, cleanSource(name))
-	chart.Labels = []module.Label{
+	chart.Labels = []collectorapi.Label{
 		{Key: "source", Value: name},
 	}
 	for _, dim := range chart.Dims {

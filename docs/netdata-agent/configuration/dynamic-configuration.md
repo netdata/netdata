@@ -1,18 +1,10 @@
 # Dynamic Configuration Manager
 
-## Table of Contents
-
-- [Overview](#overview)
-- [Quick Access Methods](#quick-access-methods)
-- [Getting Started](#getting-started)
-- [Collectors](#collectors)
-- [Multi-Node Deployment](#multi-node-deployment)
-
 ## Overview
 
 :::important
 
-Netdata Cloud paid subscription is required.
+Netdata Cloud paid plan is required for creating, editing, testing, enabling, disabling, or removing configurations. On Community plans, you can still list configurable items.
 
 :::
 
@@ -273,6 +265,56 @@ This feature is particularly valuable for managing large infrastructures where m
 
 :::
 
+## Troubleshooting
+
+### HTTP 412 Error When Editing Alert Configurations
+
+If you receive an **HTTP 412 error** with a message like "Request failed with status 412" when editing alert configurations, this indicates an **authentication issue**, not a schema validation error.
+
+:::important
+
+In Netdata, HTTP 412 is used to indicate that an authorization bearer token was required but was not present in the request. This differs from the generic HTTP 412 "Precondition Failed" response.
+
+:::
+
+**Common causes:**
+
+1. **Bearer token protection enabled** - Your agent requires Cloud authentication for API access
+2. **Cloud connection lost** - Agent disconnected from Netdata Cloud
+3. **Session expired** - Bearer token has expired (tokens expire after 24 hours)
+4. **Missing browser authentication state** - Your browser is no longer sending a valid Cloud bearer token with the request
+
+**Resolution steps:**
+
+1. **Verify claim and Cloud connection**: Check `http://IP:19999/api/v3/info` and inspect the `cloud` section. Use `cloud.status` to verify whether the Agent is connected to Netdata Cloud, and if it is not `online`, inspect `cloud.reason` for the failure details.
+2. **Re-authenticate**: Log out and log back into Netdata Cloud to refresh your bearer token.
+3. **Verify bearer token protection setting**: If enabled in `netdata.conf`, ensure you're accessing the agent through a Cloud-authenticated session.
+4. **Check permissions only if you get HTTP 403**: If the request changes from HTTP 412 to HTTP 403 after re-authenticating, ensure you have Admin or Manager role in the space containing the agent.
+
+For more information, see [Secure Your Netdata Agent with Bearer Token Protection](/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md).
+
+### Forbidden (HTTP 403) Error When Accessing Configuration Manager
+
+If you see **"forbidden"** (HTTP 403) when opening configuration details or creating, editing, testing, enabling, disabling, or removing configurations in the Configuration Manager, one of the following restrictions is blocking the action.
+
+:::important
+
+Only users with an **Admin** or **Manager** role on a **paid plan** can perform Dynamic Configuration actions beyond listing. Users without Dynamic Configuration permissions and all users on the Community plan will receive **"forbidden"** for those actions.
+
+:::
+
+**Common causes:**
+
+1. **Insufficient role** — Only Admin and Manager roles can perform Dynamic Configuration actions such as **View**, **Add**, **Update**, **Enable/Disable**, **Remove**, and **Test**. Troubleshooters, Observers, and Billing users can still use **List All**, but they will receive **"forbidden"** for actions beyond listing.
+2. **Community (free) plan limitation** — A paid plan is required for all Dynamic Configuration Manager actions except **List All**. Users on the Community plan will see **"forbidden"** when attempting any action beyond listing.
+
+**Resolution steps:**
+
+1. **Check your assigned role**: Go to **Space Settings → Users** and verify your role. If you are not an Admin or Manager, ask a Space Admin to upgrade your role. See the [Role-Based Access Model documentation](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) for the full permissions table.
+2. **Verify your subscription plan**: If you are on the Community plan, [upgrade to a paid plan](https://www.netdata.cloud/pricing/) or ask a Space Admin to do so. A paid plan is required for all Dynamic Configuration actions except **List All**.
+
+---
+
 Experience the efficiency and power of the Dynamic Configuration Manager in Netdata today. Whether you're managing a handful of nodes or a vast infrastructure, this feature will make your monitoring and alerting tasks smoother and more intuitive.
 
-Developing with dynamic configuration? [Click here](https://learn.netdata.cloud/docs/developer-and-contributor-corner/dynamic-configuration/).
+[Read more](/docs/developer-and-contributor-corner/dyncfg.md) on developing with dynamic configuration.

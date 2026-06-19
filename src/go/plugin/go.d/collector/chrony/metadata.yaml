@@ -17,7 +17,6 @@ modules:
       related_resources:
         integrations:
           list: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

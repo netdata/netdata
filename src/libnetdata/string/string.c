@@ -134,10 +134,8 @@ STRING *string_dup(STRING *string) {
 }
 
 // Search the index and return an ACQUIRED string entry, or NULL
-static STRING *string_index_search(const char *str, size_t length) {
+static STRING *string_index_search(const char *str, size_t length, uint8_t partition) {
     STRING *string;
-
-    uint8_t partition = string_partition_str(str);
 
     // Find the string in the index
     // With a read-lock so that multiple readers can use the index concurrently.
@@ -177,10 +175,8 @@ static STRING *string_index_search(const char *str, size_t length) {
 // The returned entry is ACQUIRED, and it can either be:
 //   1. a new item inserted, or
 //   2. an item found in the index that is not currently deleted
-static STRING *string_index_insert(const char *str, size_t length) {
+static STRING *string_index_insert(const char *str, size_t length, uint8_t partition) {
     STRING *string;
-
-    uint8_t partition = string_partition_str(str);
 
     rw_spinlock_write_lock(&string_base[partition].spinlock);
 
@@ -198,8 +194,7 @@ static STRING *string_index_insert(const char *str, size_t length) {
 
         if (unlikely(Rc == PJERR)) {
             fatal(
-                "STRING: Cannot insert entry with name '%s' to JudyHS, JU_ERRNO_* == %u, ID == %d",
-                str,
+                "STRING: Cannot insert entry to JudyHS, JU_ERRNO_* == %u, ID == %d",
                 JU_ERRNO(&J_Error),
                 JU_ERRID(&J_Error));
         }
@@ -210,7 +205,8 @@ static STRING *string_index_insert(const char *str, size_t length) {
         // a new item added to the index
         long mem_size = (long)sizeof(STRING) + (long)length;
         string = mallocz(mem_size);
-        strcpy((char *)string->str, str);
+        memcpy((char *)string->str, str, length - 1);
+        ((char *)string->str)[length - 1] = '\0';
         string->length = length;
         string->refcount = 1;
         
@@ -304,21 +300,22 @@ static void string_index_delete(STRING *string) {
 
 ALWAYS_INLINE
 STRING *string_strdupz(const char *str) {
-    if(unlikely(!str || !*str)) return NULL;
+    size_t length = 0;
+    if(likely(str))
+        length = strlen(str);
 
-#ifdef NETDATA_INTERNAL_CHECKS
+    if(unlikely(!length)) return NULL;
+
+    length++;
     uint8_t partition = string_partition_str(str);
-#endif
-
-    size_t length = strlen(str) + 1;
-    STRING *string = string_index_search(str, length);
+    STRING *string = string_index_search(str, length, partition);
 
     while(!string) {
         // The search above did not find anything,
         // We loop here, because during insert we may find an entry that is being deleted by another thread.
         // So, we have to let it go and retry to insert it again.
 
-        string = string_index_insert(str, length);
+        string = string_index_insert(str, length, partition);
     }
 
     // statistics
@@ -336,17 +333,11 @@ ALWAYS_INLINE
 STRING *string_strndupz(const char *str, size_t len) {
     if(unlikely(!str || !*str || !len)) return NULL;
 
-#ifdef NETDATA_INTERNAL_CHECKS
     uint8_t partition = string_partition_str(str);
-#endif
 
-    char buf[len + 1];
-    memcpy(buf, str, len);
-    buf[len] = '\0';
-
-    STRING *string = string_index_search(buf, len + 1);
+    STRING *string = string_index_search(str, len + 1, partition);
     while(!string)
-        string = string_index_insert(buf, len + 1);
+        string = string_index_insert(str, len + 1, partition);
 
     string_stats_atomic_increment(partition, active_references);
 
@@ -450,7 +441,9 @@ STRING *string_2way_merge(STRING *a, STRING *b) {
     size_t alen = string_strlen(a);
     size_t blen = string_strlen(b);
     size_t length = alen + blen + string_strlen(string_2way_merge_X) + 1;
-    char buf1[length + 1], buf2[length + 1], *dst1;
+    CLEAN_CHAR_P *buf1 = mallocz(length + 1);
+    CLEAN_CHAR_P *buf2 = mallocz(length + 1);
+    char *dst1;
     const char *s1, *s2;
 
     s1 = string2str(a);
@@ -788,6 +781,22 @@ int string_unittest(size_t entries) {
         else
             fprintf(stderr, "OK: string is properly handling different strings\n");
 
+        STRING *s_null = string_strdupz(NULL);
+        if(s_null != NULL) {
+            errors++;
+            fprintf(stderr, "ERROR: NULL string input should return NULL\n");
+        }
+        else
+            fprintf(stderr, "OK: NULL string input returns NULL\n");
+
+        STRING *s_empty = string_strdupz("");
+        if(s_empty != NULL) {
+            errors++;
+            fprintf(stderr, "ERROR: empty string input should return NULL\n");
+        }
+        else
+            fprintf(stderr, "OK: empty string input returns NULL\n");
+
         usec_t start_ut, end_ut;
         STRING **strings = mallocz(entries * sizeof(STRING *));
 
@@ -902,16 +911,16 @@ int string_unittest(size_t entries) {
         string_statistics(&oinserts, &odeletes, &osearches, &oentries, &oreferences, &omemory, &omemory_index, &oduplications, &oreleases);
 
         time_t seconds_to_run = 5;
-        int threads_to_create = 2;
+        enum { STRING_UNITTEST_THREADS = 2 };
         fprintf(
             stderr,
             "Checking string concurrency with %d threads for %lld seconds...\n",
-            threads_to_create,
+            STRING_UNITTEST_THREADS,
             (long long)seconds_to_run);
         // check string concurrency
-        ND_THREAD *threads[threads_to_create];
+        ND_THREAD *threads[STRING_UNITTEST_THREADS];
         tu.join = 0;
-        for (int i = 0; i < threads_to_create; i++) {
+        for (int i = 0; i < STRING_UNITTEST_THREADS; i++) {
             char buf[100 + 1];
             snprintf(buf, 100, "string%d", i);
             threads[i] = nd_thread_create(buf, NETDATA_THREAD_OPTION_DONT_LOG, string_thread, &tu);
@@ -919,7 +928,7 @@ int string_unittest(size_t entries) {
         sleep_usec(seconds_to_run * USEC_PER_SEC);
 
         __atomic_store_n(&tu.join, 1, __ATOMIC_RELAXED);
-        for (int i = 0; i < threads_to_create; i++)
+        for (int i = 0; i < STRING_UNITTEST_THREADS; i++)
             nd_thread_join(threads[i]);
 
         size_t inserts, deletes, searches, sentries, references, memory, memory_index, duplications, releases;

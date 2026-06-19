@@ -60,8 +60,9 @@ static void dyncfg_insert_cb(const DICTIONARY_ITEM *item, void *value, void *dat
     dyncfg_normalize(df);
 
     const char *id = dictionary_acquired_item_name(item);
-    char buf[strlen(id) + 20];
-    snprintfz(buf, sizeof(buf), PLUGINSD_FUNCTION_CONFIG " %s", id);
+    size_t buf_size = strlen(id) + 20;
+    CLEAN_CHAR_P *buf = mallocz(buf_size);
+    snprintfz(buf, buf_size, PLUGINSD_FUNCTION_CONFIG " %s", id);
     df->function = string_strdupz(buf);
 
     if(df->type == DYNCFG_TYPE_JOB && !df->template) {
@@ -285,8 +286,7 @@ bool dyncfg_is_user_disabled(const char *id) {
 }
 
 bool dyncfg_job_has_registered_template(const char *id) {
-    char buf[strlen(id) + 1];
-    memcpy(buf, id, sizeof(buf));
+    CLEAN_CHAR_P *buf = strdupz(id);
     char *colon = strrchr(buf, ':');
     if(!colon)
         return false;
@@ -301,6 +301,43 @@ bool dyncfg_job_has_registered_template(const char *id) {
 
     dictionary_acquired_item_release(dyncfg_globals.nodes, item);
     return ret;
+}
+
+DYNCFG_CMDS dyncfg_sanitize_cmds(DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, DYNCFG_CMDS cmds) {
+    // all configurations support schema
+    cmds |= DYNCFG_CMD_SCHEMA;
+
+    // if there is either enable or disable, both are supported
+    if(cmds & (DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE))
+        cmds |= DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE;
+
+    // add
+    if(type == DYNCFG_TYPE_TEMPLATE) {
+        // templates must always support "add"
+        cmds |= DYNCFG_CMD_ADD;
+    }
+    else {
+        // only templates can have "add"
+        cmds &= ~DYNCFG_CMD_ADD;
+    }
+
+    // remove
+    if(source_type == DYNCFG_SOURCE_TYPE_DYNCFG && type == DYNCFG_TYPE_JOB) {
+        // dyncfg jobs must always be removable
+        cmds |= DYNCFG_CMD_REMOVE;
+    }
+    else {
+        // remove is only available for dyncfg jobs
+        cmds &= ~DYNCFG_CMD_REMOVE;
+    }
+
+    // data
+    if(type == DYNCFG_TYPE_TEMPLATE) {
+        // templates do not have data
+        cmds &= ~(DYNCFG_CMD_GET | DYNCFG_CMD_UPDATE);
+    }
+
+    return cmds;
 }
 
 bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path,
@@ -326,35 +363,7 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path,
     }
 
     DYNCFG_CMDS old_cmds = cmds;
-
-    // all configurations support schema
-    cmds |= DYNCFG_CMD_SCHEMA;
-
-    // if there is either enable or disable, both are supported
-    if(cmds & (DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE))
-        cmds |= DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE;
-
-    // add
-    if(type == DYNCFG_TYPE_TEMPLATE) {
-        // templates must always support "add"
-        cmds |= DYNCFG_CMD_ADD;
-    }
-    else {
-        // only templates can have "add"
-        cmds &= ~DYNCFG_CMD_ADD;
-    }
-
-    // remove
-    if(source_type != DYNCFG_SOURCE_TYPE_DYNCFG || type != DYNCFG_TYPE_JOB) {
-        // remove is only available for dyncfg jobs
-        cmds &= ~DYNCFG_CMD_REMOVE;
-    }
-
-    // data
-    if(type == DYNCFG_TYPE_TEMPLATE) {
-        // templates do not have data
-        cmds &= ~(DYNCFG_CMD_GET | DYNCFG_CMD_UPDATE);
-    }
+    cmds = dyncfg_sanitize_cmds(type, source_type, cmds);
 
     if(cmds != old_cmds) {
         CLEAN_BUFFER *t = buffer_create(1024, NULL);
@@ -467,11 +476,10 @@ void dyncfg_add_streaming(BUFFER *wb) {
 }
 
 bool dyncfg_available_for_rrdhost(RRDHOST *host) {
-    if(host == localhost || rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST))
+    if(host == localhost)
         return true;
 
     return rrd_function_available(host, PLUGINSD_FUNCTION_CONFIG);
 }
 
 // ----------------------------------------------------------------------------
-

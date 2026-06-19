@@ -43,7 +43,7 @@ func toMap(value reflect.Value, rv map[string]int64, key string, mul, div int) {
 		}
 	}
 	switch value.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		convertPtr(value, rv, key, mul, div)
 	case reflect.Struct:
 		convertStruct(value, rv, key)

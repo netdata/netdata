@@ -1,17 +1,19 @@
 #include <google/protobuf/message.h>
 #include <google/protobuf/util/json_util.h>
 
-#include "proto/alarm/v1/config.pb.h"
-#include "proto/alarm/v1/stream.pb.h"
-#include "proto/aclk/v1/lib.pb.h"
-#include "proto/agent/v1/connection.pb.h"
-#include "proto/agent/v1/disconnect.pb.h"
-#include "proto/nodeinstance/connection/v1/connection.pb.h"
-#include "proto/nodeinstance/create/v1/creation.pb.h"
-#include "proto/nodeinstance/info/v1/info.pb.h"
-#include "proto/context/v1/stream.pb.h"
-#include "proto/context/v1/context.pb.h"
-#include "proto/agent/v1/cmds.pb.h"
+#include <memory>
+
+#include "alarm/v1/config.pb.h"
+#include "alarm/v1/stream.pb.h"
+#include "aclk/v1/lib.pb.h"
+#include "agent/v1/connection.pb.h"
+#include "agent/v1/disconnect.pb.h"
+#include "nodeinstance/connection/v1/connection.pb.h"
+#include "nodeinstance/create/v1/creation.pb.h"
+#include "nodeinstance/info/v1/info.pb.h"
+#include "context/v1/stream.pb.h"
+#include "context/v1/context.pb.h"
+#include "agent/v1/cmds.pb.h"
 
 #include "libnetdata/libnetdata.h"
 
@@ -72,8 +74,10 @@ static google::protobuf::Message *msg_name_to_protomsg(const char *msgname)
 
 char *protomsg_to_json(const void *protobin, size_t len, const char *msgname)
 {
-    google::protobuf::Message *msg = msg_name_to_protomsg(msgname);
-    if (msg == NULL)
+    // unique_ptr owns the message and frees it on every return path, so no
+    // manual delete is needed (and no path can leak it).
+    std::unique_ptr<google::protobuf::Message> msg(msg_name_to_protomsg(msgname));
+    if (msg == nullptr)
         return strdupz("Don't know this message type by name.");
 
     if (!msg->ParseFromArray(protobin, len))
@@ -82,7 +86,12 @@ char *protomsg_to_json(const void *protobin, size_t len, const char *msgname)
     JsonPrintOptions options;
 
     std::string output;
-    google::protobuf::util::MessageToJsonString(*msg, &output, options);
-    delete msg;
+    // MessageToJsonString returns a nodiscard Status (absl::Status or the
+    // protobuf util Status depending on the linked version). On failure
+    // 'output' is empty/partial, so check it instead of returning a silent
+    // truncated result. .ok() is available on both Status types.
+    auto status = google::protobuf::util::MessageToJsonString(*msg, &output, options);
+    if (!status.ok())
+        return strdupz("Failed to convert this message to JSON.");
     return strdupz(output.c_str());
 }

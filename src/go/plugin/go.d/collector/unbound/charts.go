@@ -6,25 +6,25 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
 
 type (
-	// Charts is an alias for module.Charts
-	Charts = module.Charts
-	// Chart is an alias for module.Charts
-	Chart = module.Chart
-	// Dims is an alias for module.Dims
-	Dims = module.Dims
-	// Dim is an alias for module.Dim
-	Dim = module.Dim
+	// Charts is an alias for collectorapi.Charts
+	Charts = collectorapi.Charts
+	// Chart is an alias for collectorapi.Charts
+	Chart = collectorapi.Chart
+	// Dims is an alias for collectorapi.Dims
+	Dims = collectorapi.Dims
+	// Dim is an alias for collectorapi.Dim
+	Dim = collectorapi.Dim
 )
 
 const (
-	prioQueries = module.Priority + iota
+	prioQueries = collectorapi.Priority + iota
 	prioIPRateLimitedQueries
 	prioQueryType
 	prioQueryClass
@@ -162,7 +162,7 @@ var (
 		Units:    "events",
 		Fam:      "cache",
 		Ctx:      "unbound.cache",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioCache,
 		Dims: Dims{
 			{ID: "total.num.cachehits", Name: "hits"},
@@ -175,11 +175,11 @@ var (
 		Units:    "percentage",
 		Fam:      "cache",
 		Ctx:      "unbound.cache_percentage",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioCachePercentage,
 		Dims: Dims{
-			{ID: "total.num.cachehits", Name: "hits", Algo: module.PercentOfAbsolute},
-			{ID: "total.num.cachemiss", Name: "miss", Algo: module.PercentOfAbsolute},
+			{ID: "total.num.cachehits", Name: "hits", Algo: collectorapi.PercentOfAbsolute},
+			{ID: "total.num.cachemiss", Name: "miss", Algo: collectorapi.PercentOfAbsolute},
 		},
 	}
 	prefetchChart = Chart{
@@ -256,7 +256,7 @@ var (
 		Units:    "queries",
 		Fam:      "request list",
 		Ctx:      "unbound.current_request_list_usage",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioReqListCurUsage,
 		Dims: Dims{
 			{ID: "total.requestlist.current.all", Name: "all"},
@@ -308,7 +308,7 @@ var (
 		Units:    "KB",
 		Fam:      "mem",
 		Ctx:      "unbound.cache_memory",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioMemCache,
 		Dims: Dims{
 			{ID: "mem.cache.message", Name: "message", Div: 1024},
@@ -320,11 +320,11 @@ var (
 	// TODO: do not add subnet and ipsecmod stuff by default?
 	memModChart = Chart{
 		ID:       "mod_memory",
-		Title:    "Module Memory",
+		Title:    "CollectorV1 Memory",
 		Units:    "KB",
 		Fam:      "mem",
 		Ctx:      "unbound.mod_memory",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioMemMod,
 		Dims: Dims{
 			{ID: "mem.mod.iterator", Name: "iterator", Div: 1024},
@@ -352,7 +352,7 @@ var (
 		Units:    "items",
 		Fam:      "cache",
 		Ctx:      "unbound.cache_count",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioCacheCount,
 		Dims: Dims{
 			{ID: "infra.cache.count", Name: "infra"},
@@ -369,7 +369,7 @@ var (
 		Units:    "queries",
 		Fam:      "queries",
 		Ctx:      "unbound.type_queries",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioQueryType,
 	}
 	queryClassChart = Chart{
@@ -378,7 +378,7 @@ var (
 		Units:    "queries",
 		Fam:      "queries",
 		Ctx:      "unbound.class_queries",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioQueryClass,
 	}
 	queryOpCodeChart = Chart{
@@ -387,7 +387,7 @@ var (
 		Units:    "queries",
 		Fam:      "queries",
 		Ctx:      "unbound.opcode_queries",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioQueryOpCode,
 	}
 	queryFlagChart = Chart{
@@ -396,7 +396,7 @@ var (
 		Units:    "queries",
 		Fam:      "queries",
 		Ctx:      "unbound.flag_queries",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioQueryFlag,
 		Dims: Dims{
 			{ID: "num.query.flags.QR", Name: "QR"},
@@ -415,7 +415,7 @@ var (
 		Units:    "replies",
 		Fam:      "replies",
 		Ctx:      "unbound.rcode_answers",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioReplyRCode,
 	}
 )
@@ -496,7 +496,7 @@ func (c *Collector) addDimToChart(chartID, dimID, dimName string) {
 	}
 	dim := &Dim{ID: dimID, Name: dimName}
 	if c.Cumulative {
-		dim.Algo = module.Incremental
+		dim.Algo = collectorapi.Incremental
 	}
 	if err := chart.AddDim(dim); err != nil {
 		c.Warningf("add '%s' dim: %v", dimID, err)
@@ -511,7 +511,7 @@ func makeIncrIf(chart *Chart, do bool) *Chart {
 	}
 	chart.Units += "/s"
 	for _, d := range chart.Dims {
-		d.Algo = module.Incremental
+		d.Algo = collectorapi.Incremental
 	}
 	return chart
 }
@@ -521,7 +521,7 @@ func makePercOfIncrIf(chart *Chart, do bool) *Chart {
 		return chart
 	}
 	for _, d := range chart.Dims {
-		d.Algo = module.PercentOfIncremental
+		d.Algo = collectorapi.PercentOfIncremental
 	}
 	return chart
 }

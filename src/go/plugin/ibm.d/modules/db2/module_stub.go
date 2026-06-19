@@ -5,15 +5,15 @@
 package db2
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 var configSchema string
 
 func init() {
-	module.Register("db2", module.Creator{
+	collectorapi.Register("db2", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Create:          func() module.Module { return New() },
+		Create:          func() collectorapi.CollectorV1 { return New() },
 		Config:          func() any { return nil },
 	})
 }

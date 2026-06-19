@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //go:build cgo
-// +build cgo
 
 package as400
 
 import (
 	"context"
 	"fmt"
+	"maps"
 	"math"
 	"strconv"
 	"strings"
@@ -934,11 +934,9 @@ func (a *Collector) collectDiskInstances(ctx context.Context) error {
 				// Calculate used_gb from capacity - available
 				// Always calculate used_gb if we have capacity information
 				if m.CapacityGB > 0 {
-					usedGB := m.CapacityGB - m.AvailableGB
-					// Ensure used_gb is not negative
-					if usedGB < 0 {
-						usedGB = 0
-					}
+					usedGB := max(
+						// Ensure used_gb is not negative
+						m.CapacityGB-m.AvailableGB, 0)
 					m.UsedGB = usedGB
 					a.mx.disks[currentUnit] = m
 				}
@@ -1091,9 +1089,7 @@ func (a *Collector) collectSubsystems(ctx context.Context) error {
 			*ptr = meta
 			a.subsystems[key] = ptr
 		}
-		for key, metrics := range snapshot.metrics {
-			a.mx.subsystems[key] = metrics
-		}
+		maps.Copy(a.mx.subsystems, snapshot.metrics)
 		return snapshot.err
 	}
 
@@ -1665,9 +1661,7 @@ func (a *Collector) collectPlanCache(ctx context.Context) error {
 				a.planCache[key] = ptr
 			}
 		}
-		for key, values := range snapshot.values {
-			a.mx.planCache[key] = values
-		}
+		maps.Copy(a.mx.planCache, snapshot.values)
 		return snapshot.err
 	}
 
