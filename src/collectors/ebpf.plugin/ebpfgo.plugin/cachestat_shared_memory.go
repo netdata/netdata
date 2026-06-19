@@ -230,6 +230,12 @@ func (s *cachestatSharedMemoryStore) applySocketDataLocked() {
 
 // UpdateSocketApps stores the latest per-PID socket snapshot and applies it to
 // the current entries.  Called by the socket collector each cycle.
+//
+// When cachestat is also running as publisher, socket data is merged into the
+// cachestat-populated entries via applySocketDataLocked.  When socket is the
+// sole publisher (cachestat disabled or has no apps/cgroups consumers),
+// s.entries is empty and we must build entries directly from socket data so
+// the C consumer can look up per-PID socket stats.
 func (s *cachestatSharedMemoryStore) UpdateSocketApps(entries []libbpfloader.SocketPIDEntry) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -252,5 +258,23 @@ func (s *cachestatSharedMemoryStore) UpdateSocketApps(entries []libbpfloader.Soc
 		}
 	}
 	s.activeModules |= ebpfgoSHMFlagSocket // mark socket as an active producer
-	s.applySocketDataLocked()
+	if len(s.entries) == 0 {
+		s.buildEntriesFromSocketLocked()
+	} else {
+		s.applySocketDataLocked()
+	}
+}
+
+// buildEntriesFromSocketLocked populates s.entries from the latest socket
+// snapshot when cachestat has no entries to merge into.  Must be called with
+// s.mu held for writing.
+func (s *cachestatSharedMemoryStore) buildEntriesFromSocketLocked() {
+	entries := make([]ebpfPidStat, 0, len(s.socketData))
+	for pid, data := range s.socketData {
+		entries = append(entries, ebpfPidStat{pid: pid, socket: data})
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].pid < entries[j].pid
+	})
+	s.entries = entries
 }
