@@ -26,4 +26,21 @@ func recomputeTopologyLinkStats(data *topologyData) {
 		}
 	}
 	data.Stats["links_probable"] = probable
+	recomputeTopologyL3VisibleLinkStats(data)
+}
+
+func recomputeTopologyL3VisibleLinkStats(data *topologyData) {
+	if data == nil || data.Stats == nil {
+		return
+	}
+	if _, ok := data.Stats["l3_subnet_emitted_links"]; !ok {
+		return
+	}
+	count := 0
+	for _, link := range data.Links {
+		if strings.EqualFold(strings.TrimSpace(firstNonEmptyString(link.LinkType, link.Protocol)), topologyL3SubnetLinkType) {
+			count++
+		}
+	}
+	data.Stats["l3_subnet_visible_links"] = count
 }

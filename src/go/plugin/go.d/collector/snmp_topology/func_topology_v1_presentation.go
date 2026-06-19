@@ -153,6 +153,7 @@ func snmpTopologyV1DeviceModal() *topologyv1.ModalPresentation {
 				Sort:    &topologyv1.ModalSort{Column: "if_index", Direction: "asc"},
 			},
 			snmpTopologyV1PortLinksSection(2),
+			snmpTopologyV1L3SubnetSection(3),
 		},
 	}
 }
@@ -249,6 +250,47 @@ func snmpTopologyV1PortLinksSection(order int) topologyv1.ModalSection {
 	}
 }
 
+func snmpTopologyV1L3SubnetSection(order int) topologyv1.ModalSection {
+	return topologyv1.ModalSection{
+		ID:    "l3_adjacencies",
+		Label: "L3 Adjacencies",
+		Order: order,
+		Source: topologyv1.ModalSource{
+			Kind:     "evidence",
+			Evidence: snmpTopologyV1LinkL3Subnet,
+		},
+		OwnerFilter: &topologyv1.ModalOwnerFilter{
+			Mode:           "incident_evidence",
+			LinkColumn:     "link",
+			SrcActorColumn: "src_actor",
+			DstActorColumn: "dst_actor",
+		},
+		Columns: []topologyv1.ModalColumn{
+			{
+				ID:    "remote",
+				Label: "Remote Actor",
+				Projection: topologyv1.ModalProjection{
+					Kind:           "opposite_actor",
+					SrcActorColumn: "src_actor",
+					DstActorColumn: "dst_actor",
+				},
+				Cell: "actor_link",
+			},
+			modalSelectedSideEndpointColumn("local_endpoint", "Local Endpoint", "src_ip", "src_port_name", "dst_ip", "dst_port_name"),
+			modalSelectedSideEndpointColumn("remote_endpoint", "Remote Endpoint", "dst_ip", "dst_port_name", "src_ip", "src_port_name"),
+			modalDirectColumn("subnet", "Subnet", "subnet", "text"),
+			modalDirectColumn("prefix", "Prefix", "prefix", "number"),
+			modalDirectColumnWithVisibility("network", "Network", "network", "text", "expanded"),
+			modalDirectColumnWithVisibility("netmask", "Netmask", "netmask", "text", "expanded"),
+			modalDirectColumnWithVisibility("source", "Source", "source", "badge", "expanded"),
+			modalDirectColumnWithVisibility("inference", "Inference", "inference", "badge", "expanded"),
+			modalDirectColumnWithVisibility("attachment_mode", "Attachment", "attachment_mode", "badge", "expanded"),
+		},
+		Sort:       &topologyv1.ModalSort{Column: "subnet", Direction: "asc"},
+		EmptyLabel: "No L3 adjacencies",
+	}
+}
+
 func modalSelectedSidePortColumn(id, label, selectedSrcPortColumn, selectedDstPortColumn string) topologyv1.ModalColumn {
 	return topologyv1.ModalColumn{
 		ID:    id,
@@ -261,6 +303,23 @@ func modalSelectedSidePortColumn(id, label, selectedSrcPortColumn, selectedDstPo
 			RemotePortColumn: selectedDstPortColumn,
 		},
 		Cell: "text",
+	}
+}
+
+func modalSelectedSideEndpointColumn(id, label, selectedSrcIPColumn, selectedSrcPortColumn, selectedDstIPColumn, selectedDstPortColumn string) topologyv1.ModalColumn {
+	return topologyv1.ModalColumn{
+		ID:    id,
+		Label: label,
+		Projection: topologyv1.ModalProjection{
+			Kind:             "selected_side_endpoint",
+			SrcActorColumn:   "src_actor",
+			DstActorColumn:   "dst_actor",
+			LocalIPColumn:    selectedSrcIPColumn,
+			LocalPortColumn:  selectedSrcPortColumn,
+			RemoteIPColumn:   selectedDstIPColumn,
+			RemotePortColumn: selectedDstPortColumn,
+		},
+		Cell: "endpoint",
 	}
 }
 
@@ -328,6 +387,7 @@ func snmpTopologyV1LinkTypeSpecs() []snmpTopologyV1LinkTypeSpec {
 		{id: snmpTopologyV1LinkFDB, label: "FDB", colorSlot: "neutral", lineStyle: "solid", width: "normal", semanticRole: "normal"},
 		{id: snmpTopologyV1LinkSTP, label: "STP", colorSlot: "muted", lineStyle: "solid", width: "normal", semanticRole: "normal"},
 		{id: snmpTopologyV1LinkARP, label: "ARP", colorSlot: "muted", lineStyle: "solid", width: "normal", semanticRole: "normal"},
+		{id: snmpTopologyV1LinkL3Subnet, label: "L3 subnet", colorSlot: "info", lineStyle: "dashed", width: "normal", semanticRole: "normal"},
 		{id: snmpTopologyV1LinkSNMP, label: "SNMP", colorSlot: "primary", lineStyle: "solid", width: "normal", semanticRole: "normal"},
 		{id: snmpTopologyV1LinkProbable, label: "Probable", colorSlot: "dim", lineStyle: "solid", width: "normal", semanticRole: "normal"},
 		{id: snmpTopologyV1LinkObservation, label: "L2 observation", colorSlot: "neutral", lineStyle: "solid", width: "normal", semanticRole: "normal"},
@@ -368,22 +428,37 @@ func snmpTopologyV1EvidenceTypes() map[string]topologyv1.EvidenceType {
 		types[spec.id] = topologyv1.EvidenceType{
 			LinkType: spec.id,
 			Role:     "observation_evidence",
-			Columns:  snmpTopologyV1EvidenceColumns(),
-			MatchColumns: []string{
-				"src_actor",
-				"dst_actor",
-				"protocol",
-				"src_endpoint",
-				"dst_endpoint",
-			},
+			Columns:  snmpTopologyV1EvidenceColumnsForType(spec.id),
+			MatchColumns: snmpTopologyV1EvidenceMatchColumnsForType(
+				spec.id,
+			),
 		}
 	}
 	return types
 }
 
+func snmpTopologyV1EvidenceMatchColumnsForType(linkType string) []string {
+	if linkType == snmpTopologyV1LinkL3Subnet {
+		return []string{
+			"src_actor",
+			"dst_actor",
+			"subnet",
+			"src_ip",
+			"dst_ip",
+		}
+	}
+	return []string{
+		"src_actor",
+		"dst_actor",
+		"protocol",
+		"src_endpoint",
+		"dst_endpoint",
+	}
+}
+
 func snmpTopologyV1Presentation() *topologyv1.Presentation {
 	return &topologyv1.Presentation{
-		ProfileVersion: "snmp-l2.v1",
+		ProfileVersion: "snmp-l2.v2",
 		Selection: &topologyv1.SelectionPresentation{
 			ActorClick: &topologyv1.ActorClickPresentation{Mode: "highlight_connections"},
 		},
@@ -410,6 +485,7 @@ func snmpTopologyV1Presentation() *topologyv1.Presentation {
 				{Type: snmpTopologyV1LinkCDP, Label: "CDP"},
 				{Type: snmpTopologyV1LinkSNMP, Label: "SNMP"},
 				{Type: snmpTopologyV1LinkBridge, Label: "Bridge"},
+				{Type: snmpTopologyV1LinkL3Subnet, Label: "L3 subnet"},
 				{Type: snmpTopologyV1LinkProbable, Label: "Probable"},
 			},
 			Ports: []topologyv1.LegendEntry{
