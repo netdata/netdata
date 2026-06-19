@@ -604,6 +604,24 @@ source/destination interface IPs, subnet, network, netmask, prefix, source, and
 logical inference/attachment metadata. The evidence is an actor-modal source
 for L3 adjacency drilldowns.
 
+SNMP `ospf_adjacency` links are logical OSPF control-plane adjacency, not
+physical, L2, discovery, or port-neighbor evidence. They use
+`orientation: observed_bidirectional`, `direction_role: observation`, and
+`semantic_role: control`. Their graph presentation should use a dashed line
+style and `purple` color slot so operators do not read them as physical cabling
+or generic success/health state. The producer emits
+graph links only for full OSPF neighbors between resolved managed SNMP device
+actors. Non-full or unresolved OSPF neighbor rows remain diagnostic actor-owned
+detail rows and must not create loose router/IP graph actors.
+Current SNMP OSPF topology scope is OSPFv2 non-virtual neighbors from
+`ospfNbrTable`; OSPFv3 and OSPF virtual-neighbor tables are future scope unless
+a later topology feature explicitly adds their distinct semantics.
+
+When `ospf_adjacency` and `l3_subnet` describe the same resolved actor pair and
+endpoint/subnet relationship, OSPF is the stronger protocol-specific signal for
+the graph. The producer may suppress the matching `l3_subnet` graph link while
+preserving typed OSPF evidence and actor-owned neighbor detail rows.
+
 SNMP modal composition must be port-centric for managed device actors. A managed
 device modal uses actor-label identification for important device facts, a
 primary `Ports` section over `actor_ports`, and a `Port Neighbors` section over
@@ -631,8 +649,12 @@ It exists so device modals can align neighbor rows with the same port identity
 shown in `actor_ports`; it is not a second copy of raw evidence.
 
 SNMP `actor_port_links` must remain port-neighbor oriented. It must not include
-`l3_subnet` links, because shared-subnet L3 adjacency does not prove a physical
-or L2 port neighbor.
+`l3_subnet` or `ospf_adjacency` links, because shared-subnet and
+routing-protocol L3 adjacency do not prove a physical or L2 port neighbor.
+
+SNMP protocol-neighbor detail sections, such as OSPF neighbors, should be
+actor-owned detail tables. They may include unresolved or non-full neighbor
+observations for diagnostics even when no graph link is emitted.
 
 SNMP polished UI must not depend on raw `actor_metadata` and endpoint JSON.
 Important scalar/count summary values live in typed actor or actor-detail

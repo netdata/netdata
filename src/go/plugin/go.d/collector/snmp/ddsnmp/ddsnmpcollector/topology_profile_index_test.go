@@ -122,6 +122,42 @@ func TestTopologyProfile_LLDPManagementAddressUsesIndexFields(t *testing.T) {
 	}, actual)
 }
 
+func TestTopologyProfile_OSPFNeighborUsesNeighborTags(t *testing.T) {
+	ctrl, mockHandler := setupMockHandler(t)
+	defer ctrl.Finish()
+
+	index := "198.51.100.2.0"
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.14.10", []gosnmp.SnmpPDU{
+		createPDU("1.3.6.1.2.1.14.10.1.1."+index, gosnmp.IPAddress, "198.51.100.2"),
+		createIntegerPDU("1.3.6.1.2.1.14.10.1.2."+index, 0),
+		createPDU("1.3.6.1.2.1.14.10.1.3."+index, gosnmp.IPAddress, "2.2.2.2"),
+		createIntegerPDU("1.3.6.1.2.1.14.10.1.6."+index, 8),
+	})
+
+	actual := collectTopologyProfileTables(t, mockHandler, "_std-ospf-mib")
+
+	assertTableMetricsEqual(t, []ddsnmp.Metric{
+		{
+			Name:         "ospf_neighbor",
+			Value:        8,
+			Tags:         map[string]string{"ospf_neighbor_ip": "198.51.100.2", "ospf_neighbor_addressless_index": "0", "ospf_neighbor_router_id": "2.2.2.2", "ospf_neighbor_state": "full"},
+			MetricType:   "gauge",
+			IsTable:      true,
+			Table:        "ospfNbrTable",
+			TopologyKind: ddsnmp.KindOSPFNeighbor,
+		},
+	}, actual)
+}
+
+func TestTopologyProfile_OSPFTopologyExcludesVirtualNeighborTable(t *testing.T) {
+	profile, err := ddsnmp.LoadProfileByName("_std-ospf-mib")
+	require.NoError(t, err)
+	require.NotNil(t, profile.Definition)
+	require.Len(t, profile.Definition.Topology, 1)
+	require.Equal(t, ddsnmp.KindOSPFNeighbor, profile.Definition.Topology[0].Kind)
+	require.Equal(t, "ospfNbrTable", profile.Definition.Topology[0].Table.Name)
+}
+
 func collectTopologyProfileTables(t *testing.T, mockHandler gosnmp.Handler, profileName string) []ddsnmp.Metric {
 	t.Helper()
 

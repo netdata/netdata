@@ -426,6 +426,13 @@ For SNMP managed device actor modals:
 - `l3_subnet` links represent shared-subnet logical L3 adjacency between
   resolved managed SNMP device actors. They must use explicit L3 link/evidence
   types and must not be presented as discovery, physical, or L2 links.
+- Protocol-specific L3 adjacency, such as `ospf_adjacency`, is control-plane
+  logical adjacency. It must not be presented as discovery, physical, L2, or
+  port-neighbor evidence.
+- Preserve protocol-neighbor diagnostics that do not become graph links in
+  actor-owned detail tables, such as `actor_ospf_neighbors`. Non-full or
+  unresolved OSPF neighbors should remain visible there without creating loose
+  router/IP actors.
 - Keep generic graph-link `Links` sections only for endpoint, segment, or
   custom actors that do not own port inventory.
 - Build link endpoint port labels only from real port fields: `port_name`,

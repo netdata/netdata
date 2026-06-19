@@ -341,7 +341,7 @@ func TestSNMPTopologyToV1_PreservesActorCustomTables(t *testing.T) {
 	require.NotNil(t, deviceType.Presentation.Modal.Labels)
 	require.NotNil(t, deviceType.Presentation.Modal.Labels.Identification)
 	assert.Equal(t, "management_ip", deviceType.Presentation.Modal.Labels.Identification.Fields[1].Key)
-	require.Len(t, deviceType.Presentation.Modal.Sections, 3)
+	require.Len(t, deviceType.Presentation.Modal.Sections, 4)
 	assert.Equal(t, "ports", deviceType.Presentation.Modal.Sections[0].ID)
 	assert.Equal(t, "if_index", deviceType.Presentation.Modal.Sections[0].Columns[0].ID)
 	assert.Equal(t, "Port ID", deviceType.Presentation.Modal.Sections[0].Columns[0].Label)
@@ -354,6 +354,9 @@ func TestSNMPTopologyToV1_PreservesActorCustomTables(t *testing.T) {
 	assert.Equal(t, "l3_adjacencies", deviceType.Presentation.Modal.Sections[2].ID)
 	assert.Equal(t, "evidence", deviceType.Presentation.Modal.Sections[2].Source.Kind)
 	assert.Equal(t, snmpTopologyV1LinkL3Subnet, deviceType.Presentation.Modal.Sections[2].Source.Evidence)
+	assert.Equal(t, "ospf_neighbors", deviceType.Presentation.Modal.Sections[3].ID)
+	assert.Equal(t, "actor_table", deviceType.Presentation.Modal.Sections[3].Source.Kind)
+	assert.Equal(t, "actor_ospf_neighbors", deviceType.Presentation.Modal.Sections[3].Source.Table)
 
 	endpointType := payload.Types.ActorTypes["endpoint"]
 	require.NotNil(t, endpointType.Presentation)
@@ -592,6 +595,133 @@ func TestSNMPTopologyToV1_PreservesL3SubnetPresentationAndEvidence(t *testing.T)
 	if payload.Tables != nil {
 		assert.NotContains(t, payload.Tables.Actor, "actor_port_links")
 	}
+}
+
+func TestSNMPTopologyToV1_PreservesOSPFAdjacencyPresentationEvidenceAndNeighborRows(t *testing.T) {
+	data := topologyData{
+		AgentID: "agent-test",
+		View:    "summary",
+		Actors: []topologyActor{
+			{
+				ActorID:   "router-a",
+				ActorType: "router",
+				Source:    "snmp",
+				Tables: map[string][]map[string]any{
+					"ospf_neighbors": {
+						{
+							"local_router_id":    "1.1.1.1",
+							"neighbor_router_id": "2.2.2.2",
+							"neighbor_ip":        "192.0.2.2",
+							"state":              "full",
+							"local_ip":           "192.0.2.1",
+							"subnet":             "192.0.2.0/30",
+							"remote_actor_id":    "router-b",
+						},
+					},
+				},
+			},
+			{
+				ActorID:   "router-b",
+				ActorType: "router",
+				Source:    "snmp",
+			},
+		},
+		Links: []topologyLink{
+			{
+				Protocol:   topologyOSPFAdjacencyLinkType,
+				LinkType:   topologyOSPFAdjacencyLinkType,
+				Direction:  "observed",
+				State:      "full",
+				SrcActorID: "router-a",
+				DstActorID: "router-b",
+				Src: topologyLinkEndpoint{
+					Attributes: map[string]any{
+						"router_id": "1.1.1.1",
+						"ip":        "192.0.2.1",
+						"subnet":    "192.0.2.0/30",
+					},
+				},
+				Dst: topologyLinkEndpoint{
+					Attributes: map[string]any{
+						"router_id": "2.2.2.2",
+						"ip":        "192.0.2.2",
+						"subnet":    "192.0.2.0/30",
+					},
+				},
+				Metrics: map[string]any{
+					"source":             "ospf_mib",
+					"inference":          "ospf_full_adjacency",
+					"attachment_mode":    "logical_l3_ospf",
+					"local_router_id":    "1.1.1.1",
+					"neighbor_router_id": "2.2.2.2",
+					"local_ip":           "192.0.2.1",
+					"neighbor_ip":        "192.0.2.2",
+					"subnet":             "192.0.2.0/30",
+					"network":            "192.0.2.0",
+					"netmask":            "255.255.255.252",
+					"prefix":             uint64(30),
+				},
+			},
+		},
+	}
+
+	payload, err := snmpTopologyToV1(data)
+	require.NoError(t, err)
+	require.NoError(t, validateTopologyV1Data(payload))
+
+	assert.Contains(t, payload.Producer.Capabilities, "ospf")
+	require.Contains(t, payload.Types.LinkTypes, snmpTopologyV1LinkOSPF)
+	linkType := payload.Types.LinkTypes[snmpTopologyV1LinkOSPF]
+	assert.Equal(t, "observed_bidirectional", linkType.Orientation)
+	assert.Equal(t, "observation", linkType.DirectionRole)
+	assert.Equal(t, "control", linkType.SemanticRole)
+	require.NotNil(t, linkType.Presentation)
+	assert.Equal(t, "OSPF adjacency", linkType.Presentation.Label)
+	assert.Equal(t, "purple", linkType.Presentation.ColorSlot)
+	assert.Equal(t, "dashed", linkType.Presentation.LineStyle)
+	assert.Contains(t, topologyV1LegendLinkTypes(payload), snmpTopologyV1LinkOSPF)
+
+	require.Contains(t, payload.Types.EvidenceTypes, snmpTopologyV1LinkOSPF)
+	evidenceType := payload.Types.EvidenceTypes[snmpTopologyV1LinkOSPF]
+	assert.Equal(t, snmpTopologyV1LinkOSPF, evidenceType.LinkType)
+	assert.Equal(t, []string{"src_actor", "dst_actor", "src_router_id", "dst_router_id", "src_ip", "dst_ip"}, evidenceType.MatchColumns)
+
+	require.Contains(t, payload.Evidence, snmpTopologyV1LinkOSPF)
+	evidenceTable := payload.Evidence[snmpTopologyV1LinkOSPF].Table
+	assert.Equal(t, 1, evidenceTable.Rows)
+	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "src_router_id"))
+	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "dst_router_id"))
+	assert.Equal(t, []string{"1.1.1.1"}, topologyV1StringColumnValues(t, payload, evidenceTable, "src_router_id"))
+	assert.Equal(t, []string{"2.2.2.2"}, topologyV1StringColumnValues(t, payload, evidenceTable, "dst_router_id"))
+	assert.Equal(t, []string{"192.0.2.1"}, topologyV1StringColumnValues(t, payload, evidenceTable, "src_ip"))
+	assert.Equal(t, []string{"192.0.2.2"}, topologyV1StringColumnValues(t, payload, evidenceTable, "dst_ip"))
+	assert.Equal(t, []string{"192.0.2.0/30"}, topologyV1StringColumnValues(t, payload, evidenceTable, "subnet"))
+
+	require.NotNil(t, payload.Tables)
+	assert.NotContains(t, payload.Tables.Actor, "actor_port_links")
+	require.Contains(t, payload.Tables.Actor, "actor_ospf_neighbors")
+	neighborsTable := payload.Tables.Actor["actor_ospf_neighbors"].Table
+	assert.Equal(t, 1, neighborsTable.Rows)
+	assert.Equal(t, "actor_ref", topologyV1ColumnType(neighborsTable, "remote_actor"))
+	assert.Equal(t, []any{0}, topologyV1ColumnValues(t, neighborsTable, "actor"))
+	assert.Equal(t, []any{1}, topologyV1ColumnValues(t, neighborsTable, "remote_actor"))
+	assert.Equal(t, []string{"1.1.1.1"}, topologyV1StringColumnValues(t, payload, neighborsTable, "local_router_id"))
+	assert.Equal(t, []string{"2.2.2.2"}, topologyV1StringColumnValues(t, payload, neighborsTable, "neighbor_router_id"))
+	assert.Equal(t, []string{"full"}, topologyV1StringColumnValues(t, payload, neighborsTable, "state"))
+
+	deviceType := payload.Types.ActorTypes["router"]
+	require.NotNil(t, deviceType.Presentation)
+	require.NotNil(t, deviceType.Presentation.Modal)
+	ospfSection := requireTopologyV1ModalSection(t, deviceType.Presentation.Modal.Sections, "ospf_neighbors")
+	assert.Equal(t, "actor_table", ospfSection.Source.Kind)
+	assert.Equal(t, "actor_ospf_neighbors", ospfSection.Source.Table)
+	require.NotNil(t, ospfSection.OwnerFilter)
+	assert.Equal(t, "actor_column", ospfSection.OwnerFilter.Mode)
+	assert.Equal(t, "actor", ospfSection.OwnerFilter.ActorColumn)
+	require.Len(t, ospfSection.Columns, 9)
+	assert.Equal(t, "remote_actor", ospfSection.Columns[3].ID)
+	assert.Equal(t, "actor_link", ospfSection.Columns[3].Cell)
+	assert.Empty(t, ospfSection.Columns[3].Visibility)
 }
 
 func TestSNMPTopologyToV1_ReturnsErrorForL3SubnetWithoutSubnet(t *testing.T) {

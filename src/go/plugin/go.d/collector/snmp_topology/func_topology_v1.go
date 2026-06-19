@@ -25,6 +25,7 @@ const (
 	snmpTopologyV1LinkSNMP        = "snmp"
 	snmpTopologyV1LinkProbable    = "probable"
 	snmpTopologyV1LinkL3Subnet    = topologyL3SubnetLinkType
+	snmpTopologyV1LinkOSPF        = topologyOSPFAdjacencyLinkType
 )
 
 func snmpTopologyToV1(data topologyData) (topologyv1.Data, error) {
@@ -37,7 +38,7 @@ func snmpTopologyToV1(data topologyData) (topologyv1.Data, error) {
 	}
 
 	portNeighborSummaries := buildSNMPTopologyV1PortNeighborSummaries(data.Links, actorIndex)
-	actorDetails, tableTypes, err := buildSNMPTopologyV1ActorDetails(data.Actors, stringsDict, portNeighborSummaries)
+	actorDetails, tableTypes, err := buildSNMPTopologyV1ActorDetails(data.Actors, actorIndex, stringsDict, portNeighborSummaries)
 	if err != nil {
 		return topologyv1.Data{}, err
 	}
@@ -51,6 +52,9 @@ func snmpTopologyToV1(data topologyData) (topologyv1.Data, error) {
 		tableTypes["actor_ports"] = snmpTopologyV1ActorPortsTableType()
 	}
 	tableTypes["actor_port_links"] = snmpTopologyV1ActorPortLinksTableType()
+	if _, ok := tableTypes["actor_ospf_neighbors"]; !ok {
+		tableTypes["actor_ospf_neighbors"] = snmpTopologyV1OSPFNeighborsTableType()
+	}
 	portLinksTable, err := buildSNMPTopologyV1ActorPortLinksTable(data.Links, actorIndex, stringsDict)
 	if err != nil {
 		return topologyv1.Data{}, err
@@ -107,6 +111,7 @@ func snmpTopologyToV1(data topologyData) (topologyv1.Data, error) {
 				"fdb",
 				"stp",
 				"l3_subnet",
+				"ospf",
 			},
 		},
 		CollectedAt: data.CollectedAt,

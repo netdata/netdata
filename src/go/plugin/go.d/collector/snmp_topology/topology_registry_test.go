@@ -7,6 +7,7 @@ import (
 	"time"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -186,6 +187,79 @@ func TestTopologyRegistry_DefaultMapEmitsL3SubnetForManagedRoutersWithoutLLDP(t 
 	require.Equal(t, 1, data.Stats["l3_subnet_emitted_links"])
 	require.Equal(t, 1, data.Stats["l3_subnet_visible_links"])
 	require.Equal(t, 1, data.Stats["links_total"])
+}
+
+func TestTopologyRegistry_OSPFSnapshotEnrichesSubnetAfterNeighborIngest(t *testing.T) {
+	registry := newTopologyRegistry()
+
+	cacheA := newTopologyCache()
+	cacheA.updateTime = time.Now()
+	cacheA.lastUpdate = cacheA.updateTime
+	cacheA.agentID = "agent-test"
+	cacheA.localDevice = topologyDevice{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		SysName:       "router-a",
+		ManagementIP:  "10.0.0.1",
+	}
+	cacheA.updateTopologyProfileTags([]*ddsnmp.ProfileMetrics{{
+		DeviceMetadata: map[string]ddsnmp.MetaTag{
+			tagOSPFRouterID: {Value: "1.1.1.1"},
+		},
+	}})
+	cacheA.updateTopologyCacheEntry(ddsnmp.Metric{
+		TopologyKind: ddsnmp.KindOSPFNeighbor,
+		Tags: map[string]string{
+			tagOSPFNeighborRouterID:         "2.2.2.2",
+			tagOSPFNeighborIP:               "198.51.100.2",
+			tagOSPFNeighborAddresslessIndex: "0",
+			tagOSPFNeighborState:            "full",
+		},
+	})
+	cacheA.updateIfIndexByIP(map[string]string{
+		tagTopoIfIndex: "2",
+		tagTopoIPAddr:  "198.51.100.1",
+		tagTopoIPMask:  "255.255.255.252",
+	})
+
+	cacheB := newTopologyCache()
+	cacheB.updateTime = time.Now().Add(time.Second)
+	cacheB.lastUpdate = cacheB.updateTime
+	cacheB.agentID = "agent-test"
+	cacheB.localDevice = topologyDevice{
+		ChassisID:     "aa:bb:cc:dd:ee:ff",
+		ChassisIDType: "macAddress",
+		SysName:       "router-b",
+		ManagementIP:  "10.0.0.2",
+	}
+	cacheB.updateTopologyProfileTags([]*ddsnmp.ProfileMetrics{{
+		DeviceMetadata: map[string]ddsnmp.MetaTag{
+			tagOSPFRouterID: {Value: "2.2.2.2"},
+		},
+	}})
+	cacheB.updateIfIndexByIP(map[string]string{
+		tagTopoIfIndex: "7",
+		tagTopoIPAddr:  "198.51.100.2",
+		tagTopoIPMask:  "255.255.255.252",
+	})
+
+	registry.register(cacheA)
+	registry.register(cacheB)
+
+	data, ok := snapshotTopologyRegistryForTest(registry)
+
+	require.True(t, ok)
+	require.Len(t, data.Links, 1)
+	link := data.Links[0]
+	require.Equal(t, topologyOSPFAdjacencyLinkType, link.LinkType)
+	require.Equal(t, "198.51.100.0/30", link.Metrics["subnet"])
+	require.Equal(t, "198.51.100.1", link.Src.Attributes["ip"])
+	require.Equal(t, "198.51.100.2", link.Dst.Attributes["ip"])
+	require.Equal(t, 1, data.Stats["l3_subnet_emitted_links"])
+	require.Equal(t, 0, data.Stats["l3_subnet_visible_links"])
+	require.Equal(t, 1, data.Stats["ospf_adjacency_emitted_links"])
+	require.Equal(t, 1, data.Stats["ospf_adjacency_suppressed_l3_subnet_overlap"])
+	require.Equal(t, 1, data.Stats["ospf_adjacency_visible_links"])
 }
 
 func TestCompareCollapseActorPriorityPrefersNonEmptyActorID(t *testing.T) {

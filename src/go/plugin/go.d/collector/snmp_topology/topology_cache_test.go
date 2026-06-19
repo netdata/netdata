@@ -45,6 +45,7 @@ func TestTopologyMetricHandlersRegisteredForRowKinds(t *testing.T) {
 		"vtp_vlan":                 {kind: ddsnmp.KindVtpVlan},
 		"arp_entry":                {kind: ddsnmp.KindArpEntry},
 		"arp_legacy_entry":         {kind: ddsnmp.KindArpLegacyEntry},
+		"ospf_neighbor":            {kind: ddsnmp.KindOSPFNeighbor},
 	}
 
 	for name, tc := range tests {

@@ -40,6 +40,9 @@ func populateLocalActorAttributes(attrs map[string]any, local topologyDevice) ma
 	if model := strings.TrimSpace(local.Model); model != "" {
 		attrs["model"] = model
 	}
+	if routerID := normalizeOSPFRouterID(local.OSPFRouterID); routerID != "" {
+		attrs[tagOSPFRouterID] = routerID
+	}
 	if serial := strings.TrimSpace(local.SerialNumber); serial != "" {
 		attrs["serial_number"] = serial
 	}
