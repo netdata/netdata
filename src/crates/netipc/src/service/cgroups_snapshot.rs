@@ -33,6 +33,7 @@ pub use raw::{
 pub struct ClientConfig {
     pub supported_profiles: u32,
     pub preferred_profiles: u32,
+    pub max_request_payload_bytes: u32,
     pub max_request_batch_items: u32,
     pub max_response_payload_bytes: u32,
     pub auth_token: u64,
@@ -43,6 +44,7 @@ impl Default for ClientConfig {
         Self {
             supported_profiles: PROFILE_BASELINE,
             preferred_profiles: 0,
+            max_request_payload_bytes: 0,
             max_request_batch_items: 0,
             max_response_payload_bytes: 0,
             auth_token: 0,
@@ -55,6 +57,7 @@ impl ClientConfig {
         let mut transport = TransportClientConfig::default();
         transport.supported_profiles = self.supported_profiles;
         transport.preferred_profiles = self.preferred_profiles;
+        transport.max_request_payload_bytes = self.max_request_payload_bytes;
         transport.max_request_batch_items = self.max_request_batch_items;
         transport.max_response_payload_bytes = self.max_response_payload_bytes;
         transport.max_response_batch_items = self.max_request_batch_items;
@@ -71,6 +74,7 @@ impl ClientConfig {
 pub struct ServerConfig {
     pub supported_profiles: u32,
     pub preferred_profiles: u32,
+    pub max_request_payload_bytes: u32,
     pub max_request_batch_items: u32,
     pub max_response_payload_bytes: u32,
     pub auth_token: u64,
@@ -81,6 +85,7 @@ impl Default for ServerConfig {
         Self {
             supported_profiles: PROFILE_BASELINE,
             preferred_profiles: 0,
+            max_request_payload_bytes: 0,
             max_request_batch_items: 0,
             max_response_payload_bytes: 0,
             auth_token: 0,
@@ -93,6 +98,7 @@ impl ServerConfig {
         let mut transport = TransportServerConfig::default();
         transport.supported_profiles = self.supported_profiles;
         transport.preferred_profiles = self.preferred_profiles;
+        transport.max_request_payload_bytes = self.max_request_payload_bytes;
         transport.max_request_batch_items = self.max_request_batch_items;
         transport.max_response_payload_bytes = self.max_response_payload_bytes;
         transport.max_response_batch_items = self.max_request_batch_items;

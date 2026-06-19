@@ -1,5 +1,5 @@
 use super::*;
-use crate::network_sources::NetworkSourceRecord;
+use crate::network_sources::{IPV4_INDEX_MIN_FAMILY_RECORDS, NetworkSourceRecord};
 use crate::plugin_config::{
     AsnProviderConfig, GeoIpConfig, NetProviderConfig, NetworkAttributesConfig,
     NetworkAttributesValue, RemoteNetworkSourceConfig, RoutingDynamicBmpConfig,
@@ -2044,6 +2044,107 @@ fn network_sources_runtime_enrichment_merges_with_static_networks() {
         fields.get("DST_NET_ROLE").map(String::as_str),
         Some("cloud")
     );
+}
+
+#[test]
+fn network_sources_runtime_enrichment_preserves_prefix_and_publish_order() {
+    let cfg = EnrichmentConfig {
+        metadata_static: metadata_config_for_192(),
+        default_sampling_rate: Some(SamplingRateSetting::Single(1000)),
+        network_sources: BTreeMap::from([(
+            "ipam".to_string(),
+            RemoteNetworkSourceConfig {
+                url: "http://127.0.0.1/ipam.json".to_string(),
+                ..Default::default()
+            },
+        )]),
+        networks: BTreeMap::from([(
+            "198.51.100.0/24".to_string(),
+            NetworkAttributesValue::Attributes(NetworkAttributesConfig {
+                name: "static-edge".to_string(),
+                country: "FR".to_string(),
+                ..Default::default()
+            }),
+        )]),
+        ..Default::default()
+    };
+
+    let mut enricher = FlowEnricher::from_config(&cfg)
+        .expect("build enricher")
+        .expect("enricher must be enabled");
+    let runtime = enricher
+        .network_sources_runtime()
+        .expect("network source runtime");
+    let mut records = vec![
+        NetworkSourceRecord {
+            prefix: "198.51.0.0/16"
+                .parse()
+                .expect("parse network source prefix"),
+            attrs: NetworkAttributes {
+                region: "runtime-region".to_string(),
+                tenant: "tenant-a".to_string(),
+                ..Default::default()
+            },
+        },
+        NetworkSourceRecord {
+            prefix: "198.51.100.0/24"
+                .parse()
+                .expect("parse network source prefix"),
+            attrs: NetworkAttributes {
+                name: "runtime-first".to_string(),
+                role: "edge".to_string(),
+                ..Default::default()
+            },
+        },
+        NetworkSourceRecord {
+            prefix: "198.51.100.0/24"
+                .parse()
+                .expect("parse network source prefix"),
+            attrs: NetworkAttributes {
+                name: "runtime-second".to_string(),
+                site: "par1".to_string(),
+                ..Default::default()
+            },
+        },
+    ];
+    for index in 0..(IPV4_INDEX_MIN_FAMILY_RECORDS * 2) {
+        records.push(NetworkSourceRecord {
+            prefix: format!("172.{}.{}.0/24", 16 + index / 256, index % 256)
+                .parse()
+                .expect("parse filler network source prefix"),
+            attrs: NetworkAttributes {
+                name: "filler".to_string(),
+                ..Default::default()
+            },
+        });
+    }
+    runtime.replace_records(records);
+
+    let mut fields = base_fields("192.0.2.10", 10, 20, 1000, 10, 20);
+    fields.insert("SRC_ADDR", "198.51.100.42".to_string());
+    fields.insert("DST_ADDR", "198.51.100.43".to_string());
+    fields.insert("SRC_AS", "0".to_string());
+    fields.insert("DST_AS", "0".to_string());
+    fields.insert("SRC_MASK", "24".to_string());
+    fields.insert("DST_MASK", "24".to_string());
+
+    assert!(enricher.enrich_fields(&mut fields));
+    assert_eq!(
+        fields.get("SRC_NET_NAME").map(String::as_str),
+        Some("static-edge"),
+        "static same-length attributes must still override runtime"
+    );
+    assert_eq!(fields.get("SRC_NET_ROLE").map(String::as_str), Some("edge"));
+    assert_eq!(fields.get("SRC_NET_SITE").map(String::as_str), Some("par1"));
+    assert_eq!(
+        fields.get("SRC_NET_REGION").map(String::as_str),
+        Some("runtime-region")
+    );
+    assert_eq!(
+        fields.get("SRC_NET_TENANT").map(String::as_str),
+        Some("tenant-a")
+    );
+    assert_eq!(fields.get("SRC_COUNTRY").map(String::as_str), Some("FR"));
 }
 
 #[test]

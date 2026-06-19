@@ -74,16 +74,20 @@ func aggregateTopologyObservationSnapshots(snapshots []topologyObservationSnapsh
 	}
 
 	totalObservations := 0
+	totalL3Interfaces := 0
 	for _, snapshot := range snapshots {
 		totalObservations += len(snapshot.l2Observations)
+		totalL3Interfaces += len(snapshot.l3Interfaces)
 	}
 
 	aggregate := topologyObservationAggregate{
 		snapshots:      snapshots,
 		l2Observations: make([]topologyengine.L2Observation, 0, totalObservations),
+		l3Interfaces:   make([]topologyL3Interface, 0, totalL3Interfaces),
 	}
 	for _, snapshot := range snapshots {
 		aggregate.l2Observations = append(aggregate.l2Observations, snapshot.l2Observations...)
+		aggregate.l3Interfaces = append(aggregate.l3Interfaces, snapshot.l3Interfaces...)
 		if aggregate.localDeviceID == "" {
 			aggregate.localDeviceID = snapshot.localDeviceID
 		}

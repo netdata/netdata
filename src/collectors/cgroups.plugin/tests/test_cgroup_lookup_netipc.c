@@ -2,6 +2,7 @@
 
 #include "../cgroup-internals.h"
 #include "../cgroup-netipc.h"
+#include "../cgroup-lookup-resolver.h"
 #include "../cgroup-snapshot-store.h"
 #include "libnetdata/netipc/netipc_netdata.h"
 
@@ -14,6 +15,12 @@ struct discovery_thread discovery_thread = { 0 };
 int cgroup_max_depth = 0;
 bool discovery_signal_pending = false;
 uint64_t cgroup_discovery_generation = 0;
+int cgroup_use_unified_cgroups = 0;
+char *cgroup_cpuset_base = NULL;
+char *cgroup_blkio_base = NULL;
+char *cgroup_memory_base = NULL;
+char *cgroup_cpuacct_base = NULL;
+char *cgroup_unified_base = NULL;
 
 int rrdlabels_walkthrough_read(
     RRDLABELS *labels,
@@ -153,22 +160,101 @@ static bool expect_item(
     return true;
 }
 
+static bool expect_true(bool condition, const char *message)
+{
+    if (condition)
+        return true;
+
+    fprintf(stderr, "%s\n", message);
+    return false;
+}
+
 // Publish a snapshot store holding the known (resolved) and retry (discovered
 // but not yet resolved) cgroups, mirroring what discovery's rebuild would build.
-static void publish_test_store(const char *known_path, const char *retry_path)
+static void publish_test_store_with_generation(
+    uint64_t generation,
+    const char *known_path,
+    const char *retry_path,
+    const char *known_name)
 {
-    CGROUP_SNAPSHOT_BUILDER *builder = cgroup_snapshot_builder_create(1, 2);
+    size_t entries = (known_path ? 1 : 0) + (retry_path ? 1 : 0);
+    CGROUP_SNAPSHOT_BUILDER *builder = cgroup_snapshot_builder_create(generation, entries);
 
-    CGROUP_SNAPSHOT_ENTRY *known = cgroup_snapshot_builder_add_entry(builder, known_path);
-    known->known = true;
-    known->orchestrator = (uint16_t)CGROUPS_ORCHESTRATOR_DOCKER;
-    known->name = string_strdupz("known-container");
-    cgroup_snapshot_entry_add_label(known, "image", "netdata/test");
+    if (known_path) {
+        CGROUP_SNAPSHOT_ENTRY *known = cgroup_snapshot_builder_add_entry(builder, known_path);
+        struct stat known_st = { .st_dev = 1, .st_ino = (ino_t)(10 + generation) };
+        cgroup_snapshot_entry_set_dir_identity(known, &known_st);
+        known->known = true;
+        known->orchestrator = (uint16_t)CGROUPS_ORCHESTRATOR_DOCKER;
+        known->name = string_strdupz(known_name ? known_name : "known-container");
+        cgroup_snapshot_entry_add_label(known, "image", "netdata/test");
+    }
 
     // discovered but unresolved: known stays false -> RETRY_LATER without a name
-    (void)cgroup_snapshot_builder_add_entry(builder, retry_path);
+    if (retry_path)
+        (void)cgroup_snapshot_builder_add_entry(builder, retry_path);
 
     cgroup_snapshot_store_publish(cgroup_snapshot_builder_finalize(builder));
+}
+
+static void publish_test_store(const char *known_path, const char *retry_path)
+{
+    publish_test_store_with_generation(1, known_path, retry_path, "known-container");
+}
+
+static void publish_duplicate_suffix_store(uint64_t generation)
+{
+    CGROUP_SNAPSHOT_BUILDER *builder = cgroup_snapshot_builder_create(generation, 2);
+
+    CGROUP_SNAPSHOT_ENTRY *first = cgroup_snapshot_builder_add_entry(builder, "/left.slice/pod-a/container.scope");
+    first->known = true;
+    first->orchestrator = (uint16_t)CGROUPS_ORCHESTRATOR_DOCKER;
+    first->name = string_strdupz("left-container");
+
+    CGROUP_SNAPSHOT_ENTRY *second = cgroup_snapshot_builder_add_entry(builder, "/right.slice/pod-a/container.scope");
+    second->known = true;
+    second->orchestrator = (uint16_t)CGROUPS_ORCHESTRATOR_DOCKER;
+    second->name = string_strdupz("right-container");
+
+    cgroup_snapshot_store_publish(cgroup_snapshot_builder_finalize(builder));
+}
+
+static bool test_snapshot_lookup_helpers(void)
+{
+    CGROUP_SNAPSHOT_BUILDER *builder = cgroup_snapshot_builder_create(2, 3);
+
+    CGROUP_SNAPSHOT_ENTRY *first = cgroup_snapshot_builder_add_entry(builder, "/kubepods.slice/pod-a/container.scope");
+    struct stat first_st = { .st_dev = 2, .st_ino = 20 };
+    cgroup_snapshot_entry_set_dir_identity(first, &first_st);
+
+    CGROUP_SNAPSHOT_ENTRY *second = cgroup_snapshot_builder_add_entry(builder, "/other.slice/pod-a/container.scope");
+    struct stat second_st = { .st_dev = 2, .st_ino = 21 };
+    cgroup_snapshot_entry_set_dir_identity(second, &second_st);
+
+    cgroup_snapshot_store_publish(cgroup_snapshot_builder_finalize(builder));
+
+    const CGROUP_SNAPSHOT_STORE *store = cgroup_snapshot_store_acquire();
+    bool duplicate = false;
+    bool ok =
+        expect_true(
+            cgroup_snapshot_store_find_unique_identity(store, first_st.st_dev, first_st.st_ino) == first,
+            "unique identity helper did not find first entry") &&
+        expect_true(
+            cgroup_snapshot_store_find_unique_suffix(
+                store, "kubepods.slice/pod-a/container.scope",
+                strlen("kubepods.slice/pod-a/container.scope"), &duplicate) == first,
+            "unique suffix helper did not find first entry") &&
+        expect_true(!duplicate, "unique suffix helper reported a duplicate for unique suffix");
+
+    duplicate = false;
+    ok = expect_true(
+             cgroup_snapshot_store_find_unique_suffix(
+                 store, "pod-a/container.scope", strlen("pod-a/container.scope"), &duplicate) == NULL,
+             "duplicate suffix helper should not return an entry") && ok;
+    ok = expect_true(duplicate, "duplicate suffix helper did not report duplicate") && ok;
+
+    cgroup_snapshot_store_release();
+    return ok;
 }
 
 int main(void)
@@ -213,6 +299,9 @@ int main(void)
     }
 
     cgroup_snapshot_store_init();
+
+    if (!test_snapshot_lookup_helpers())
+        goto cleanup_snapshot_store;
 
     publish_test_store(known_path, retry_path);
 
@@ -286,6 +375,128 @@ int main(void)
         goto cleanup_client;
     }
 
+    const char *namespace_relative_known =
+        "/../../docker/0123456789abcdef";
+    nipc_str_view_t namespace_relative_path = {
+        .ptr = namespace_relative_known,
+        .len = (uint32_t)strlen(namespace_relative_known),
+    };
+    err = nipc_client_call_cgroups_lookup(&client, &namespace_relative_path, 1, &response);
+    if (err != NIPC_OK) {
+        fprintf(stderr, "namespace-relative lookup call failed: %u\n", (unsigned int)err);
+        goto cleanup_client;
+    }
+
+    if (!expect_item(
+            &response, 0, namespace_relative_known,
+            NIPC_CGROUP_LOOKUP_KNOWN, NIPC_ORCHESTRATOR_DOCKER, "known-container", 1))
+        goto cleanup_client;
+
+    if (cgroup_lookup_resolver_suffix_scans_for_testing() == 0) {
+        fprintf(stderr, "namespace-relative lookup did not use suffix resolver path\n");
+        goto cleanup_client;
+    }
+
+    size_t scans_after_first_resolution = cgroup_lookup_resolver_suffix_scans_for_testing();
+    const char *namespace_relative_retry_same_prefix =
+        "/../../docker/aaaaaaaaaaaaaaaa";
+    nipc_str_view_t namespace_relative_retry_same_prefix_path = {
+        .ptr = namespace_relative_retry_same_prefix,
+        .len = (uint32_t)strlen(namespace_relative_retry_same_prefix),
+    };
+    err = nipc_client_call_cgroups_lookup(&client, &namespace_relative_retry_same_prefix_path, 1, &response);
+    if (err != NIPC_OK) {
+        fprintf(stderr, "namespace-relative positive-cache lookup failed: %u\n", (unsigned int)err);
+        goto cleanup_client;
+    }
+
+    if (!expect_item(
+            &response, 0, namespace_relative_retry_same_prefix,
+            NIPC_CGROUP_LOOKUP_UNKNOWN_RETRY_LATER, NIPC_ORCHESTRATOR_UNKNOWN, "", 0))
+        goto cleanup_client;
+
+    if (cgroup_lookup_resolver_suffix_scans_for_testing() != scans_after_first_resolution) {
+        fprintf(stderr, "namespace-relative positive cache did not avoid a second suffix scan\n");
+        goto cleanup_client;
+    }
+
+    __atomic_store_n(&discovery_signal_pending, false, __ATOMIC_RELEASE);
+    const char *namespace_relative_missing =
+        "/../../missing/not-present.scope";
+    nipc_str_view_t namespace_relative_missing_path = {
+        .ptr = namespace_relative_missing,
+        .len = (uint32_t)strlen(namespace_relative_missing),
+    };
+    size_t scans_before_negative_miss = cgroup_lookup_resolver_suffix_scans_for_testing();
+    err = nipc_client_call_cgroups_lookup(&client, &namespace_relative_missing_path, 1, &response);
+    if (err != NIPC_OK) {
+        fprintf(stderr, "namespace-relative missing lookup call failed: %u\n", (unsigned int)err);
+        goto cleanup_client;
+    }
+
+    if (!expect_item(
+            &response, 0, namespace_relative_missing,
+            NIPC_CGROUP_LOOKUP_UNKNOWN_RETRY_LATER, NIPC_ORCHESTRATOR_UNKNOWN, "", 0))
+        goto cleanup_client;
+
+    size_t scans_after_negative_miss = cgroup_lookup_resolver_suffix_scans_for_testing();
+    if (scans_after_negative_miss != scans_before_negative_miss + 1) {
+        fprintf(stderr, "namespace-relative negative lookup did not perform exactly one suffix scan\n");
+        goto cleanup_client;
+    }
+
+    err = nipc_client_call_cgroups_lookup(&client, &namespace_relative_missing_path, 1, &response);
+    if (err != NIPC_OK) {
+        fprintf(stderr, "namespace-relative negative-cache lookup call failed: %u\n", (unsigned int)err);
+        goto cleanup_client;
+    }
+
+    if (!expect_item(
+            &response, 0, namespace_relative_missing,
+            NIPC_CGROUP_LOOKUP_UNKNOWN_RETRY_LATER, NIPC_ORCHESTRATOR_UNKNOWN, "", 0))
+        goto cleanup_client;
+
+    if (cgroup_lookup_resolver_suffix_scans_for_testing() != scans_after_negative_miss) {
+        fprintf(stderr, "namespace-relative negative cache did not avoid a second suffix scan\n");
+        goto cleanup_client;
+    }
+
+    if (__atomic_load_n(&discovery_signal_pending, __ATOMIC_ACQUIRE)) {
+        fprintf(stderr, "namespace-relative miss incorrectly armed discovery signal flag\n");
+        goto cleanup_client;
+    }
+
+    publish_test_store_with_generation(2, "/missing/not-present.scope", retry_path, "late-container");
+    err = nipc_client_call_cgroups_lookup(&client, &namespace_relative_missing_path, 1, &response);
+    if (err != NIPC_OK) {
+        fprintf(stderr, "namespace-relative generation-invalidation lookup failed: %u\n", (unsigned int)err);
+        goto cleanup_client;
+    }
+
+    if (!expect_item(
+            &response, 0, namespace_relative_missing,
+            NIPC_CGROUP_LOOKUP_KNOWN, NIPC_ORCHESTRATOR_DOCKER, "late-container", 1))
+        goto cleanup_client;
+
+    publish_duplicate_suffix_store(3);
+    const char *namespace_relative_duplicate =
+        "/../../pod-a/container.scope";
+    nipc_str_view_t namespace_relative_duplicate_path = {
+        .ptr = namespace_relative_duplicate,
+        .len = (uint32_t)strlen(namespace_relative_duplicate),
+    };
+    err = nipc_client_call_cgroups_lookup(&client, &namespace_relative_duplicate_path, 1, &response);
+    if (err != NIPC_OK) {
+        fprintf(stderr, "namespace-relative duplicate-suffix lookup failed: %u\n", (unsigned int)err);
+        goto cleanup_client;
+    }
+
+    if (!expect_item(
+            &response, 0, namespace_relative_duplicate,
+            NIPC_CGROUP_LOOKUP_UNKNOWN_RETRY_LATER, NIPC_ORCHESTRATOR_UNKNOWN, "", 0))
+        goto cleanup_client;
+
+    publish_test_store(known_path, retry_path);
     err = nipc_client_call_cgroups_lookup(&client, paths, 4, &response);
     if (err != NIPC_OK) {
         fprintf(stderr, "second lookup call failed: %u\n", (unsigned int)err);
@@ -303,6 +514,7 @@ cleanup_client:
     nipc_client_close(&client);
 cleanup_server:
     cgroup_netipc_lookup_cleanup();
+cleanup_snapshot_store:
     cgroup_snapshot_store_shutdown();
     netdata_cond_destroy(&discovery_thread.cond_var);
 cleanup_discovery_mutex:

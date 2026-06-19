@@ -11,6 +11,7 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 )
@@ -134,6 +135,29 @@ func validHelloPacket() []byte {
 	}, payload)
 }
 
+func TestHelloAckStatusErrorsAndSendGuard(t *testing.T) {
+	for _, tc := range []struct {
+		status uint16
+		want   error
+	}{
+		{status: protocol.StatusOK, want: nil},
+		{status: protocol.StatusAuthFailed, want: ErrAuthFailed},
+		{status: protocol.StatusUnsupported, want: ErrNoProfile},
+		{status: protocol.StatusIncompatible, want: ErrIncompatible},
+		{status: protocol.StatusLimitExceeded, want: ErrLimitExceeded},
+		{status: 0xffff, want: ErrHandshake},
+	} {
+		err := helloAckStatusError(tc.status)
+		if !errors.Is(err, tc.want) {
+			t.Fatalf("helloAckStatusError(%d) = %v, want %v", tc.status, err, tc.want)
+		}
+	}
+
+	if err := sendHelloAck(-1, protocol.StatusOK, protocol.HelloAck{}); err == nil {
+		t.Fatal("sendHelloAck with invalid fd should fail")
+	}
+}
+
 func rawSeqpacketListener(t *testing.T, runDir, service string) (int, string) {
 	t.Helper()
 
@@ -210,6 +234,112 @@ func TestUdsRawGenericErrors(t *testing.T) {
 	buf := make([]byte, 16)
 	if _, err := rawRecv(-1, buf); !errors.Is(err, ErrRecv) {
 		t.Fatalf("rawRecv(invalid fd) = %v, want ErrRecv", err)
+	}
+}
+
+func TestReceiveWaitTimeoutAndAbort(t *testing.T) {
+	abortCh := make(chan struct{})
+	close(abortCh)
+	if _, err := newReceiveWait(1000, abortCh).waitMs(); !errors.Is(err, ErrAborted) {
+		t.Fatalf("waitMs aborted = %v, want ErrAborted", err)
+	}
+
+	if _, err := newReceiveWait(1, nil).waitMs(); err != nil {
+		t.Fatalf("waitMs before deadline = %v", err)
+	}
+	time.Sleep(2 * time.Millisecond)
+	if _, err := newReceiveWait(1, nil).waitMs(); err != nil {
+		t.Fatalf("fresh waitMs should reset deadline: %v", err)
+	}
+
+	expired := receiveWait{deadline: time.Now().Add(-time.Millisecond)}
+	if _, err := expired.waitMs(); !errors.Is(err, ErrTimeout) {
+		t.Fatalf("waitMs expired = %v, want ErrTimeout", err)
+	}
+
+	infinite := newReceiveWait(0, nil)
+	if waitMs, err := infinite.waitMs(); err != nil || waitMs != receiveAbortPollMs {
+		t.Fatalf("waitMs infinite = %d/%v, want %d/nil", waitMs, err, receiveAbortPollMs)
+	}
+
+	short := receiveWait{deadline: time.Now().Add(1500 * time.Microsecond)}
+	if waitMs, err := short.waitMs(); err != nil || waitMs < 1 || waitMs > 2 {
+		t.Fatalf("waitMs short deadline = %d/%v, want 1..2/nil", waitMs, err)
+	}
+}
+
+func TestReceiveAndStaleDirectGuards(t *testing.T) {
+	if err := pollReadableForReceive(1<<31, newReceiveWait(1, nil)); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("poll high fd error = %v, want ErrBadParam", err)
+	}
+	if _, err := rawRecvWithTimeout(1<<31, make([]byte, 1), newReceiveWait(1, nil)); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("recv high fd error = %v, want ErrBadParam", err)
+	}
+
+	closedFD, err := syscall.Socket(syscall.AF_UNIX, syscall.SOCK_SEQPACKET, 0)
+	if err != nil {
+		t.Fatalf("socket for closed-fd receive guard: %v", err)
+	}
+	if err := syscall.Close(closedFD); err != nil {
+		t.Fatalf("close guard socket: %v", err)
+	}
+	if err := pollReadableForReceive(closedFD, newReceiveWait(1, nil)); err != nil {
+		t.Fatalf("poll closed fd error = %v, want nil poll readiness for HUP/NVAL", err)
+	}
+	if _, err := rawRecvWithTimeout(closedFD, make([]byte, 1), newReceiveWait(1, nil)); !errors.Is(err, ErrRecv) {
+		t.Fatalf("recv closed fd error = %v, want ErrRecv", err)
+	}
+
+	missing := filepath.Join(t.TempDir(), "missing.sock")
+	if got := checkAndRecoverStale(missing); got != staleNotExist {
+		t.Fatalf("missing stale result = %d, want staleNotExist", got)
+	}
+	if err := dialStaleCandidate(missing); err == nil {
+		t.Fatal("dial missing stale candidate should fail")
+	}
+
+	runDir := testRunDir(t)
+	service := uniqueService(t)
+	lfd, livePath := rawSeqpacketListener(t, runDir, service)
+	defer syscall.Close(lfd)
+	if got := checkAndRecoverStale(livePath); got != staleLiveServer {
+		t.Fatalf("live stale result = %d, want staleLiveServer", got)
+	}
+
+	stalePath := filepath.Join(t.TempDir(), "stale.sock")
+	if err := os.WriteFile(stalePath, []byte("not a socket"), 0o600); err != nil {
+		t.Fatalf("write stale endpoint placeholder: %v", err)
+	}
+	if got := checkAndRecoverStale(stalePath); got != staleRecovered {
+		t.Fatalf("regular-file stale result = %d, want staleRecovered", got)
+	}
+	if _, err := os.Stat(stalePath); !os.IsNotExist(err) {
+		t.Fatalf("regular-file stale path still exists: %v", err)
+	}
+}
+
+func TestReceiveTimeoutFailurePaths(t *testing.T) {
+	client, _ := udsSessionPair(t, defaultServerConfig(), defaultClientConfig())
+	defer client.Close()
+
+	buf := make([]byte, 4096)
+	if _, _, err := client.ReceiveTimeout(buf, 1, nil); !errors.Is(err, ErrTimeout) {
+		t.Fatalf("ReceiveTimeout timeout = %v, want ErrTimeout", err)
+	}
+
+	abortCh := make(chan struct{})
+	close(abortCh)
+	if _, _, err := client.ReceiveTimeout(buf, 1000, abortCh); !errors.Is(err, ErrAborted) {
+		t.Fatalf("ReceiveTimeout aborted = %v, want ErrAborted", err)
+	}
+
+	if err := pollReadableForReceive(-1, newReceiveWait(1, nil)); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("pollReadableForReceive bad fd = %v, want ErrBadParam", err)
+	}
+
+	client.Close()
+	if _, _, err := client.ReceiveTimeout(buf, 1, nil); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("ReceiveTimeout closed session = %v, want ErrBadParam", err)
 	}
 }
 

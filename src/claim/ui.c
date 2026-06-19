@@ -10,8 +10,6 @@
 static LPCTSTR szWindowClass = _T("DesktopApp");
 
 static HINSTANCE hInst;
-static HWND hToken;
-static HWND hRoom;
 
 LRESULT CALLBACK WndProc(HWND hNetdatawnd, UINT message, WPARAM wParam, LPARAM lParam)
 {

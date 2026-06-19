@@ -131,6 +131,7 @@ void nipc_client_init(nipc_client_ctx_t *ctx,
     ctx->call_timeout_ms = (config && config->call_timeout_ms != 0)
         ? config->call_timeout_ms
         : NIPC_CLIENT_CALL_TIMEOUT_DEFAULT_MS;
+    nipc_service_common_client_apply_logical_lookup_config(ctx, config);
     if (ctx->transport_config.max_request_payload_bytes == 0)
         ctx->transport_config.max_request_payload_bytes =
             nipc_service_common_request_payload_default();

@@ -23,6 +23,31 @@ type Defaults struct {
 	Disabled           bool
 }
 
+// InstancePolicy controls how many runtime instances a collector module may
+// have in a single go.d process.
+type InstancePolicy int
+
+const (
+	// InstancePolicyPerJob preserves the existing model: every accepted job
+	// config may create its own runtime collector instance.
+	InstancePolicyPerJob InstancePolicy = iota
+
+	// InstancePolicySingle allows exactly one canonical runtime collector
+	// instance per module. Configs for single-instance collectors must resolve
+	// to name == module after defaults are applied; dyncfg exposes them as a
+	// module-level single config, not as a template plus jobs.
+	InstancePolicySingle
+)
+
+func (p InstancePolicy) valid() bool {
+	switch p {
+	case InstancePolicyPerJob, InstancePolicySingle:
+		return true
+	default:
+		return false
+	}
+}
+
 type (
 	// Creator is a Job builder.
 	// Optional function fields (Methods/MethodHandler) enable the FunctionProvider pattern:
@@ -34,11 +59,20 @@ type (
 		JobConfigSchema string
 		Config          func() any
 
+		// InstancePolicy defaults to InstancePolicyPerJob when omitted.
+		InstancePolicy InstancePolicy
+
 		// Optional: FunctionProvider fields for exposing data functions
 		// If Methods is non-nil, this module provides functions
 		Methods func() []funcapi.MethodConfig
 
-		// Optional: MethodHandler returns a handler for method requests on a specific job.
+		// Optional: MethodHandler returns a handler for method requests.
+		// AgentWide module methods are dispatched with nil job, except that
+		// single-instance collectors receive their running canonical job.
+		// Job-bound module methods and JobMethods are dispatched with the
+		// selected running job.
+		// When the canonical single-instance job is not running, dispatch returns
+		// unavailable before calling MethodHandler.
 		// The handler implements funcapi.MethodHandler interface with:
 		// - MethodParams(ctx, method) for dynamic params
 		// - Handle(ctx, method, params) for request handling
@@ -72,6 +106,9 @@ func Register(name string, creator Creator) {
 func (r Registry) Register(name string, creator Creator) {
 	if _, ok := r[name]; ok {
 		panic(fmt.Sprintf("%s is already in registry", name))
+	}
+	if !creator.InstancePolicy.valid() {
+		panic(fmt.Sprintf("%s has invalid InstancePolicy %d", name, creator.InstancePolicy))
 	}
 	if creator.Methods != nil && creator.JobMethods != nil {
 		panic(fmt.Sprintf("%s has both Methods and JobMethods defined (mutually exclusive)", name))

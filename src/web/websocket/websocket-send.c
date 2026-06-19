@@ -78,7 +78,7 @@ static int websocket_protocol_send_frame(
     if(!wsc)
         return -1;
 
-    const char *disconnect_msg = "";
+    const char *disconnect_msg;
 
     if (wsc->sock.fd < 0) {
         disconnect_msg = "Client not connected";

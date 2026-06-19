@@ -108,6 +108,15 @@ int mcp_sse_serialize_response(struct web_client *w, MCP_CLIENT *mcpc, struct js
         }
     }
 
+    if (!responses_used) {
+        buffer_flush(w->response.data);
+        mcp_http_disable_compression(w);
+        buffer_flush(w->response.header);
+        w->response.code = HTTP_RESP_ACCEPTED;
+        freez(responses);
+        return w->response.code;
+    }
+
     buffer_flush(w->response.data);
     w->response.data->content_type = CT_TEXT_EVENT_STREAM;
     mcp_http_disable_compression(w);

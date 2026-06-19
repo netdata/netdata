@@ -59,13 +59,21 @@ pub(crate) struct FacetPublishedSnapshot {
     pub(crate) fields: BTreeMap<String, FacetPublishedField>,
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct FacetMemoryBreakdown {
     pub(crate) archived_bytes: u64,
     pub(crate) active_bytes: u64,
     pub(crate) active_contributions_bytes: u64,
     pub(crate) published_bytes: u64,
     pub(crate) archived_path_bytes: u64,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct FacetCardinalitySnapshot {
+    pub(crate) populated_fields: u64,
+    pub(crate) total_values: u64,
+    pub(crate) exposed_values: u64,
+    pub(crate) autocomplete_fields: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, allocative::Allocative)]
@@ -155,6 +163,10 @@ impl FacetRuntime {
             .unwrap_or_else(|_| Arc::new(FacetPublishedSnapshot::default()))
     }
 
+    pub(crate) fn cardinality_snapshot(&self) -> FacetCardinalitySnapshot {
+        facet_cardinality_from_published(&self.snapshot())
+    }
+
     pub(crate) fn estimated_memory_breakdown(&self) -> FacetMemoryBreakdown {
         let Ok(state) = self.state.lock() else {
             return FacetMemoryBreakdown::default();
@@ -178,12 +190,6 @@ impl FacetRuntime {
             .filter(|file_info| file_info.file.is_archived())
             .map(|file_info| file_info.file.path().to_string())
             .collect::<BTreeSet<_>>();
-        let _current_active_paths = registry_files
-            .iter()
-            .filter(|file_info| file_info.file.is_active())
-            .map(|file_info| file_info.file.path().to_string())
-            .collect::<BTreeSet<_>>();
-
         let Some(state) = self.state.lock().ok() else {
             return FacetReconcilePlan {
                 current_archived_paths,
@@ -315,8 +321,8 @@ impl FacetRuntime {
             .lock()
             .map_err(|_| anyhow::anyhow!("facet runtime lock poisoned"))?;
         let changed = apply_active_contribution(&mut state, path_str, contribution);
-        mark_dirty(&mut state);
         if changed {
+            mark_dirty(&mut state);
             publish_locked(&self.snapshot, &state);
         }
 
@@ -338,8 +344,8 @@ impl FacetRuntime {
             append_record_facet_values(&mut sink, record);
             sink.changed
         };
-        mark_dirty(&mut state);
         if changed {
+            mark_dirty(&mut state);
             publish_locked(&self.snapshot, &state);
         }
 
@@ -730,6 +736,16 @@ fn published_snapshot_from_archived_and_active_contributions(
 ) -> FacetPublishedSnapshot {
     let mut fields = BTreeMap::new();
 
+    if active_contributions.is_empty() {
+        for spec in FACET_FIELD_SPECS.iter() {
+            fields.insert(
+                spec.name.to_string(),
+                published_field_from_store(*spec, archived_fields.get(spec.name)),
+            );
+        }
+        return FacetPublishedSnapshot { fields };
+    }
+
     for spec in FACET_FIELD_SPECS.iter() {
         let mut combined = archived_fields
             .get(spec.name)
@@ -758,6 +774,27 @@ fn published_snapshot_from_archived_and_active_contributions(
     }
 
     FacetPublishedSnapshot { fields }
+}
+
+fn published_field_from_store(
+    spec: FacetFieldSpec,
+    store: Option<&FacetStore>,
+) -> FacetPublishedField {
+    let total_values = store.map(FacetStore::len).unwrap_or_default();
+    let autocomplete = spec.supports_autocomplete && total_values > FACET_VALUE_LIMIT;
+    let values = if autocomplete {
+        Vec::new()
+    } else {
+        store
+            .map(|store| store.collect_strings(None))
+            .unwrap_or_default()
+    };
+
+    FacetPublishedField {
+        total_values,
+        autocomplete,
+        values,
+    }
 }
 
 fn rebuild_published_fields(state: &mut FacetState) {
@@ -833,9 +870,6 @@ fn apply_active_value(
     {
         return false;
     }
-    let exists_elsewhere = state.active_contributions.len() > 1
-        && active_value_exists_elsewhere(&state.active_contributions, path_str, field, value);
-
     let inserted = state
         .active_contributions
         .get_mut(path_str)
@@ -851,7 +885,10 @@ fn apply_active_value(
     {
         return false;
     }
-    if exists_elsewhere {
+    // Archived duplicates already returned; only new active-only values need the cross-path scan.
+    if state.active_contributions.len() > 1
+        && active_value_exists_elsewhere(&state.active_contributions, path_str, field, value)
+    {
         return false;
     }
 
@@ -954,6 +991,28 @@ fn publish_locked(snapshot: &Arc<RwLock<Arc<FacetPublishedSnapshot>>>, state: &F
     if let Ok(mut guard) = snapshot.write() {
         *guard = published;
     }
+}
+
+fn facet_cardinality_from_published(snapshot: &FacetPublishedSnapshot) -> FacetCardinalitySnapshot {
+    let mut counts = FacetCardinalitySnapshot::default();
+
+    for field in snapshot.fields.values() {
+        if field.total_values == 0 {
+            continue;
+        }
+        counts.populated_fields = counts.populated_fields.saturating_add(1);
+        counts.total_values = counts
+            .total_values
+            .saturating_add(field.total_values as u64);
+        counts.exposed_values = counts
+            .exposed_values
+            .saturating_add(field.values.len() as u64);
+        if field.autocomplete {
+            counts.autocomplete_fields = counts.autocomplete_fields.saturating_add(1);
+        }
+    }
+
+    counts
 }
 
 #[cfg(test)]
@@ -1259,9 +1318,14 @@ mod tests {
     use crate::flow::FlowFields;
     use allocative::size_of_unique_allocated_data;
     use std::sync::Arc;
+    use std::sync::MutexGuard;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    struct FacetDiskWriteHookGuard;
+    static FACET_DISK_WRITE_HOOK_TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    struct FacetDiskWriteHookGuard {
+        _lock: MutexGuard<'static, ()>,
+    }
 
     impl Drop for FacetDiskWriteHookGuard {
         fn drop(&mut self) {
@@ -1274,10 +1338,13 @@ mod tests {
     fn install_facet_disk_write_hook(
         hook: Arc<dyn Fn(&Path) + Send + Sync>,
     ) -> FacetDiskWriteHookGuard {
+        let lock = FACET_DISK_WRITE_HOOK_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         *FACET_BEFORE_DISK_WRITE_HOOK
             .lock()
             .expect("facet disk-write hook mutex poisoned") = Some(hook);
-        FacetDiskWriteHookGuard
+        FacetDiskWriteHookGuard { _lock: lock }
     }
 
     fn fields_with_protocol(protocol: &str) -> FlowFields {
@@ -1370,6 +1437,299 @@ mod tests {
                 .expect("src as")
                 .total_values,
             1
+        );
+    }
+
+    #[test]
+    fn runtime_cardinality_snapshot_counts_published_proxy_state() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let runtime = FacetRuntime::new(tmp.path());
+        let active_path = Path::new("/tmp/flows-cardinality.journal");
+
+        runtime
+            .observe_active_contribution(
+                active_path,
+                &facet_contribution_from_flow_fields(&fields_with_protocol("6")),
+            )
+            .expect("observe protocol contribution");
+
+        for asn in 0..=FACET_VALUE_LIMIT {
+            let mut fields = FlowFields::new();
+            fields.insert("SRC_AS_NAME", format!("AS{asn:05} Provider-{asn:03}"));
+            runtime
+                .observe_active_contribution(
+                    active_path,
+                    &facet_contribution_from_flow_fields(&fields),
+                )
+                .expect("observe as-name contribution");
+        }
+
+        assert_eq!(
+            runtime.cardinality_snapshot(),
+            FacetCardinalitySnapshot {
+                populated_fields: 2,
+                total_values: (FACET_VALUE_LIMIT as u64) + 2,
+                exposed_values: 1,
+                autocomplete_fields: 1,
+            }
+        );
+    }
+
+    #[test]
+    fn archive_only_published_rebuild_uses_archived_values_and_autocomplete_threshold() {
+        let mut archived_fields = empty_field_stores();
+
+        for asn in 0..=FACET_VALUE_LIMIT {
+            let mut fields = FlowFields::new();
+            fields.insert("SRC_AS_NAME", format!("AS{asn:05} Provider-{asn:03}"));
+            merge_global_contribution(
+                &mut archived_fields,
+                &facet_contribution_from_flow_fields(&fields),
+            );
+        }
+
+        let snapshot = published_snapshot_from_archived_and_active_contributions(
+            &archived_fields,
+            &BTreeMap::new(),
+        );
+        let src_as_name = snapshot
+            .fields
+            .get("SRC_AS_NAME")
+            .expect("src as name field");
+
+        assert_eq!(src_as_name.total_values, FACET_VALUE_LIMIT + 1);
+        assert!(
+            src_as_name.autocomplete,
+            "archive-only rebuild must preserve autocomplete promotion"
+        );
+        assert!(
+            src_as_name.values.is_empty(),
+            "autocomplete-promoted archive-only fields must not publish inline values"
+        );
+    }
+
+    #[test]
+    fn runtime_skips_persistence_when_active_contribution_is_unchanged() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let runtime = FacetRuntime::new(tmp.path());
+        let active_path = tmp.path().join("flows-unchanged-contribution.journal");
+        let contribution = facet_contribution_from_flow_fields(&fields_with_protocol("6"));
+
+        runtime
+            .observe_active_contribution(&active_path, &contribution)
+            .expect("observe active contribution");
+        runtime.persist_if_dirty().expect("persist initial state");
+
+        let state_path = tmp.path().join(FACET_STATE_FILE_NAME);
+        let writes = Arc::new(AtomicUsize::new(0));
+        let writes_for_hook = Arc::clone(&writes);
+        let _hook_guard = install_facet_disk_write_hook(Arc::new(move |path| {
+            if path == state_path {
+                writes_for_hook.fetch_add(1, Ordering::Relaxed);
+            }
+        }));
+
+        runtime
+            .observe_active_contribution(&active_path, &contribution)
+            .expect("observe duplicate active contribution");
+        runtime.persist_if_dirty().expect("persist unchanged state");
+
+        assert_eq!(
+            writes.load(Ordering::Relaxed),
+            0,
+            "unchanged active contributions must not rewrite facet state"
+        );
+    }
+
+    #[test]
+    fn runtime_skips_persistence_when_active_record_is_unchanged() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let runtime = FacetRuntime::new(tmp.path());
+        let active_path = tmp.path().join("flows-unchanged-record.journal");
+        let record = FlowRecord::from_fields(&fields_with_protocol("6"));
+
+        runtime
+            .observe_active_record(&active_path, &record)
+            .expect("observe active record");
+        runtime.persist_if_dirty().expect("persist initial state");
+
+        let state_path = tmp.path().join(FACET_STATE_FILE_NAME);
+        let writes = Arc::new(AtomicUsize::new(0));
+        let writes_for_hook = Arc::clone(&writes);
+        let _hook_guard = install_facet_disk_write_hook(Arc::new(move |path| {
+            if path == state_path {
+                writes_for_hook.fetch_add(1, Ordering::Relaxed);
+            }
+        }));
+
+        runtime
+            .observe_active_record(&active_path, &record)
+            .expect("observe duplicate active record");
+        runtime.persist_if_dirty().expect("persist unchanged state");
+
+        assert_eq!(
+            writes.load(Ordering::Relaxed),
+            0,
+            "unchanged active records must not rewrite facet state"
+        );
+    }
+
+    #[test]
+    fn runtime_persists_and_reloads_new_active_contribution_value() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let runtime = FacetRuntime::new(tmp.path());
+        let active_path = tmp.path().join("flows-changed-contribution.journal");
+        let first = facet_contribution_from_flow_fields(&fields_with_protocol("6"));
+        let second = facet_contribution_from_flow_fields(&fields_with_protocol("17"));
+
+        runtime
+            .observe_active_contribution(&active_path, &first)
+            .expect("observe first active contribution");
+        runtime.persist_if_dirty().expect("persist initial state");
+
+        let state_path = tmp.path().join(FACET_STATE_FILE_NAME);
+        let writes = Arc::new(AtomicUsize::new(0));
+        let writes_for_hook = Arc::clone(&writes);
+        let _hook_guard = install_facet_disk_write_hook(Arc::new(move |path| {
+            if path == state_path {
+                writes_for_hook.fetch_add(1, Ordering::Relaxed);
+            }
+        }));
+
+        runtime
+            .observe_active_contribution(&active_path, &second)
+            .expect("observe changed active contribution");
+        runtime.persist_if_dirty().expect("persist changed state");
+
+        assert_eq!(
+            writes.load(Ordering::Relaxed),
+            1,
+            "new active contribution values must persist once"
+        );
+        assert_eq!(
+            FacetRuntime::new(tmp.path())
+                .snapshot()
+                .fields
+                .get("PROTOCOL")
+                .expect("protocol field")
+                .total_values,
+            2
+        );
+    }
+
+    #[test]
+    fn runtime_active_duplicate_of_archived_value_does_not_republish_or_persist() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let runtime = FacetRuntime::new(tmp.path());
+        let archived_path = tmp.path().join("flows-archived-duplicate.journal");
+        let active_path = tmp.path().join("flows-active-duplicate.journal");
+        let contribution = facet_contribution_from_flow_fields(&fields_with_protocol("6"));
+
+        runtime
+            .observe_active_contribution(&archived_path, &contribution)
+            .expect("observe archived contribution");
+        runtime
+            .observe_rotation(
+                &archived_path,
+                &tmp.path().join("flows-archived-duplicate-next.journal"),
+            )
+            .expect("promote contribution to archived state");
+
+        assert_eq!(
+            runtime
+                .snapshot()
+                .fields
+                .get("PROTOCOL")
+                .expect("protocol field")
+                .total_values,
+            1
+        );
+
+        let state_path = tmp.path().join(FACET_STATE_FILE_NAME);
+        let writes = Arc::new(AtomicUsize::new(0));
+        let writes_for_hook = Arc::clone(&writes);
+        let _hook_guard = install_facet_disk_write_hook(Arc::new(move |path| {
+            if path == state_path {
+                writes_for_hook.fetch_add(1, Ordering::Relaxed);
+            }
+        }));
+
+        runtime
+            .observe_active_contribution(&active_path, &contribution)
+            .expect("observe archived duplicate on active path");
+        runtime
+            .persist_if_dirty()
+            .expect("persist duplicate active state");
+
+        assert_eq!(
+            runtime
+                .snapshot()
+                .fields
+                .get("PROTOCOL")
+                .expect("protocol field")
+                .total_values,
+            1,
+            "active duplicates of archived values must not inflate published facets"
+        );
+        assert_eq!(
+            writes.load(Ordering::Relaxed),
+            0,
+            "active duplicates of archived values must not rewrite facet state"
+        );
+    }
+
+    #[test]
+    fn runtime_active_duplicate_across_active_paths_counts_once() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let runtime = FacetRuntime::new(tmp.path());
+        let active_a = tmp.path().join("flows-active-a.journal");
+        let active_b = tmp.path().join("flows-active-b.journal");
+        let contribution = facet_contribution_from_flow_fields(&fields_with_protocol("6"));
+
+        runtime
+            .observe_active_contribution(&active_a, &contribution)
+            .expect("observe first active contribution");
+        runtime
+            .persist_if_dirty()
+            .expect("persist first active state");
+
+        let state_path = tmp.path().join(FACET_STATE_FILE_NAME);
+        let writes = Arc::new(AtomicUsize::new(0));
+        let writes_for_hook = Arc::clone(&writes);
+        let _hook_guard = install_facet_disk_write_hook(Arc::new(move |path| {
+            if path == state_path {
+                writes_for_hook.fetch_add(1, Ordering::Relaxed);
+            }
+        }));
+
+        runtime
+            .observe_active_contribution(&active_b, &contribution)
+            .expect("observe duplicate active contribution");
+        runtime
+            .persist_if_dirty()
+            .expect("persist duplicate active state");
+
+        assert_eq!(
+            runtime
+                .snapshot()
+                .fields
+                .get("PROTOCOL")
+                .expect("protocol field")
+                .total_values,
+            1,
+            "duplicate active values across files must publish once"
+        );
+        assert_eq!(
+            writes.load(Ordering::Relaxed),
+            0,
+            "duplicate active values across files must not rewrite facet state"
+        );
+
+        let state = runtime.state.lock().expect("lock facet state");
+        assert_eq!(
+            state.active_contributions.len(),
+            2,
+            "duplicate active files must still be retained for later rotation"
         );
     }
 

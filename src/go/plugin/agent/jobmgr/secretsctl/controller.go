@@ -88,7 +88,7 @@ func New(opts Options) *Controller {
 		Exposed:   c.exposed,
 		Callbacks: c.cb,
 		Path:      fmt.Sprintf(dyncfgSecretStorePath, c.pluginName),
-		JobCommands: []dyncfg.Command{
+		ConfigCommands: []dyncfg.Command{
 			dyncfg.CommandSchema,
 			dyncfg.CommandGet,
 			dyncfg.CommandUpdate,
@@ -130,7 +130,7 @@ func (c *Controller) PublishExisting() {
 	}
 
 	c.exposed.ForEach(func(_ string, entry *dyncfg.Entry[secretstore.Config]) bool {
-		c.handler.NotifyJobCreate(entry.Cfg, entry.Status)
+		c.handler.NotifyConfigCreate(entry.Cfg, entry.Status)
 		return true
 	})
 }

@@ -178,6 +178,50 @@ func TestPipeWaitReadable(t *testing.T) {
 	}
 }
 
+func TestPipeWaitReadableDetectsDisconnect(t *testing.T) {
+	client, server := sessionPair(t, defaultServerConfig(), defaultClientConfig())
+	client.Close()
+
+	ready, err := server.WaitReadable(1000)
+	if !errors.Is(err, ErrDisconnected) {
+		t.Fatalf("WaitReadable after peer close = ready %v err %v, want ErrDisconnected", ready, err)
+	}
+	if ready {
+		t.Fatal("WaitReadable after peer close returned ready")
+	}
+}
+
+func TestPipeReceiveTimeoutNoData(t *testing.T) {
+	_, server := sessionPair(t, defaultServerConfig(), defaultClientConfig())
+
+	if _, _, err := server.ReceiveTimeout(make([]byte, 4096), 10, nil); !errors.Is(err, ErrTimeout) {
+		t.Fatalf("ReceiveTimeout without data = %v, want ErrTimeout", err)
+	}
+}
+
+func TestPipeReceiveTimeoutWithData(t *testing.T) {
+	client, server := sessionPair(t, defaultServerConfig(), defaultClientConfig())
+
+	payload := []byte("timed receive")
+	hdr := protocol.Header{
+		Kind:      protocol.KindRequest,
+		Code:      protocol.MethodIncrement,
+		ItemCount: 1,
+		MessageID: 88,
+	}
+	if err := client.Send(&hdr, payload); err != nil {
+		t.Fatalf("client Send: %v", err)
+	}
+
+	rHdr, rPayload, err := server.ReceiveTimeout(make([]byte, 4096), 1000, nil)
+	if err != nil {
+		t.Fatalf("ReceiveTimeout with data: %v", err)
+	}
+	if rHdr.MessageID != hdr.MessageID || !bytes.Equal(rPayload, payload) {
+		t.Fatalf("unexpected ReceiveTimeout data: hdr=%+v payload=%q", rHdr, rPayload)
+	}
+}
+
 func TestPipeListenerSetPayloadLimits(t *testing.T) {
 	service := uniquePipeService(t)
 	listener := startListener(t, testPipeRunDir, service, defaultServerConfig())
@@ -556,7 +600,7 @@ func TestPipeDirectionalLimitNegotiation(t *testing.T) {
 	service := uniquePipeService(t)
 
 	sCfg := defaultServerConfig()
-	sCfg.MaxRequestPayloadBytes = 2048
+	sCfg.MaxRequestPayloadBytes = 4096
 	sCfg.MaxRequestBatchItems = 8
 	sCfg.MaxResponsePayloadBytes = 8192
 	sCfg.MaxResponseBatchItems = 32

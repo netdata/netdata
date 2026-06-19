@@ -10,20 +10,7 @@
 
 #include <sys/socket.h>
 #include <sys/stat.h>
-#include <sys/time.h>
 #include <sys/un.h>
-
-#define NIPC_UDS_HANDSHAKE_TIMEOUT_SEC 5
-
-static int nipc_uds_set_recv_timeout(int fd, long sec, long usec)
-{
-    struct timeval tv = {
-        .tv_sec = sec,
-        .tv_usec = usec,
-    };
-
-    return setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-}
 
 static int copy_cstr_checked(char *dst, size_t dst_size, const char *src)
 {
@@ -233,22 +220,12 @@ nipc_uds_error_t nipc_uds_accept(nipc_uds_listener_t *listener,
     if (client_fd < 0)
         return NIPC_UDS_ERR_ACCEPT;
 
-    if (nipc_uds_set_recv_timeout(client_fd, NIPC_UDS_HANDSHAKE_TIMEOUT_SEC, 0) < 0) {
-        close(client_fd);
-        return NIPC_UDS_ERR_SOCKET;
-    }
-
     nipc_uds_error_t err = nipc_uds_server_handshake(
         client_fd, &listener->config, session_id, out);
     if (err != NIPC_UDS_OK) {
         close(client_fd);
         out->fd = -1;
         return err;
-    }
-
-    if (nipc_uds_set_recv_timeout(client_fd, 0, 0) < 0) {
-        nipc_uds_close_session(out);
-        return NIPC_UDS_ERR_SOCKET;
     }
 
     return NIPC_UDS_OK;

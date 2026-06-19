@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "cgroup-topology-rules.h"
+#include "cgroup-path.h"
 
 #include <ctype.h>
 
@@ -501,7 +502,8 @@ void cgroup_topology_classify(
         }
     }
 
-    if(has_systemd_unit) {
+    if(has_systemd_unit &&
+       !(cgroup_status != NIPC_APPS_CGROUP_KNOWN && cgroup_path_is_namespace_relative(cgroup_path))) {
         const CGROUP_TOPOLOGY_SYSTEMD_RULE *rule =
             cgroup_topology_systemd_rule_for_component(out->systemd_unit_name);
         cgroup_topology_set_classification(

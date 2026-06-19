@@ -2064,10 +2064,14 @@ set(CGROUPS_PLUGIN_FILES
         src/collectors/cgroups.plugin/cgroup-internals.h
         src/collectors/cgroups.plugin/cgroup-discovery.c
         src/collectors/cgroups.plugin/cgroup-orchestrator.c
+        src/collectors/common-cgroups/cgroup-path.c
+        src/collectors/common-cgroups/cgroup-path.h
         src/collectors/cgroups.plugin/cgroup-charts.c
         src/collectors/cgroups.plugin/cgroup-top.c
         src/collectors/cgroups.plugin/cgroup-netipc.c
         "$<$<BOOL:${ENABLE_CGROUPS_LOOKUP_SERVER}>:src/collectors/cgroups.plugin/cgroup-lookup-netipc.c>"
+        "$<$<BOOL:${ENABLE_CGROUPS_LOOKUP_SERVER}>:src/collectors/cgroups.plugin/cgroup-lookup-resolver.c>"
+        "$<$<BOOL:${ENABLE_CGROUPS_LOOKUP_SERVER}>:src/collectors/cgroups.plugin/cgroup-lookup-resolver.h>"
         src/collectors/cgroups.plugin/cgroup-netipc.h
         src/collectors/cgroups.plugin/cgroup-snapshot-store.c
         src/collectors/cgroups.plugin/cgroup-snapshot-store.h
@@ -2863,6 +2867,8 @@ if(ENABLE_PLUGIN_APPS)
                 src/collectors/collectors-ipc/ebpfgo_shared_memory.h
                 src/collectors/collectors-ipc/ebpfgo_shared_memory.c
                 src/collectors/apps.plugin/apps_ebpf_shared_memory.c
+                src/collectors/common-cgroups/cgroup-path.c
+                src/collectors/common-cgroups/cgroup-path.h
                 src/collectors/common-cgroups/cgroup-topology-rules.c
                 src/collectors/common-cgroups/cgroup-topology-rules.h
                 src/collectors/apps.plugin/apps-cgroups-path.c
@@ -3084,13 +3090,21 @@ if(OS_LINUX)
 
     add_executable(apps-cgroups-path-test EXCLUDE_FROM_ALL
             src/collectors/apps.plugin/tests/test_apps_cgroups_path.c
+            src/collectors/common-cgroups/cgroup-path.c
             src/collectors/apps.plugin/apps-cgroups-path.c)
     target_link_libraries(apps-cgroups-path-test libnetdata)
 
     add_executable(apps-cgroups-enrichment-test EXCLUDE_FROM_ALL
             src/collectors/apps.plugin/tests/test_apps_cgroups_enrichment.c
+            src/collectors/common-cgroups/cgroup-path.c
             src/collectors/common-cgroups/cgroup-topology-rules.c)
     target_link_libraries(apps-cgroups-enrichment-test libnetdata)
+
+    add_executable(cgroup-topology-rules-test EXCLUDE_FROM_ALL
+            src/collectors/common-cgroups/tests/test_cgroup_topology_rules.c
+            src/collectors/common-cgroups/cgroup-path.c
+            src/collectors/common-cgroups/cgroup-topology-rules.c)
+    target_link_libraries(cgroup-topology-rules-test libnetdata)
 
     add_executable(apps-lookup-protocol-test EXCLUDE_FROM_ALL
             src/collectors/apps.plugin/tests/test_apps_lookup_protocol.c)
@@ -3109,7 +3123,9 @@ if(ENABLE_CGROUPS_LOOKUP_SERVER)
     add_executable(cgroup-lookup-netipc-test EXCLUDE_FROM_ALL
             src/collectors/cgroups.plugin/tests/test_cgroup_lookup_netipc.c
             src/collectors/cgroups.plugin/cgroup-lookup-netipc.c
+            src/collectors/cgroups.plugin/cgroup-lookup-resolver.c
             src/collectors/cgroups.plugin/cgroup-snapshot-store.c
+            src/collectors/common-cgroups/cgroup-path.c
             src/collectors/cgroups.plugin/cgroup-orchestrator.c)
     target_compile_definitions(cgroup-lookup-netipc-test PRIVATE NETDATA_INTERNAL_CHECKS=1)
     target_link_libraries(cgroup-lookup-netipc-test libnetdata)
@@ -3381,6 +3397,8 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
         if(OS_LINUX)
                 list(APPEND NETWORK_VIEWER_FILES
                         src/libnetdata/local-sockets/local-sockets.h
+                        src/collectors/common-cgroups/cgroup-path.c
+                        src/collectors/common-cgroups/cgroup-path.h
                         src/collectors/common-cgroups/cgroup-topology-rules.c
                         src/collectors/common-cgroups/cgroup-topology-rules.h
                         src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.c
@@ -3398,6 +3416,8 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
         if(OS_FREEBSD)
                 list(APPEND NETWORK_VIEWER_FILES
                         src/libnetdata/local-sockets/local-sockets-freebsd.h
+                        src/collectors/common-cgroups/cgroup-path.c
+                        src/collectors/common-cgroups/cgroup-path.h
                         src/collectors/common-cgroups/cgroup-topology-rules.c
                         src/collectors/common-cgroups/cgroup-topology-rules.h
                         src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
@@ -3431,6 +3451,7 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
 
                 add_executable(network-viewer-topology-containers-test EXCLUDE_FROM_ALL
                         src/collectors/network-viewer.plugin/tests/test_network_viewer_topology_containers.c
+                        src/collectors/common-cgroups/cgroup-path.c
                         src/collectors/common-cgroups/cgroup-topology-rules.c
                         src/collectors/network-viewer.plugin/network-viewer-topology-containers.c)
                 target_link_libraries(network-viewer-topology-containers-test libnetdata)

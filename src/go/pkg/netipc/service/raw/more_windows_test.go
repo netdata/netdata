@@ -762,6 +762,58 @@ func TestWinRetryOnClosedSession(t *testing.T) {
 	}
 }
 
+func TestWinCallWithRetryStopsWhenOverflowCannotGrowCapacity(t *testing.T) {
+	svc := uniqueWinService("go_win_retry_no_growth")
+	ts := startTestSnapshotServerWinWithConfig(svc, testWinServerConfig())
+	defer ts.stop()
+
+	client := NewSnapshotClient(winTestRunDir, svc, testWinClientConfig())
+	defer client.Close()
+	waitWinClientReady(t, client)
+
+	attempts := 0
+	err := client.callWithRetry(func() error {
+		attempts++
+		return protocol.ErrOverflow
+	})
+	if !errors.Is(err, protocol.ErrOverflow) {
+		t.Fatalf("callWithRetry no-growth error = %v, want ErrOverflow", err)
+	}
+	if attempts != 1 {
+		t.Fatalf("callWithRetry no-growth attempts = %d, want 1", attempts)
+	}
+	if client.state != StateBroken {
+		t.Fatalf("callWithRetry no-growth state = %d, want StateBroken", client.state)
+	}
+}
+
+func TestWinCallWithRetryCapsOverflowGrowthRetries(t *testing.T) {
+	svc := uniqueWinService("go_win_retry_growth_cap")
+	ts := startTestSnapshotServerWinWithConfig(svc, testWinServerConfig())
+	defer ts.stop()
+
+	client := NewSnapshotClient(winTestRunDir, svc, testWinClientConfig())
+	defer client.Close()
+	waitWinClientReady(t, client)
+	client.config.MaxRequestPayloadBytes = protocol.MaxPayloadDefault
+
+	attempts := 0
+	err := client.callWithRetry(func() error {
+		attempts++
+		client.config.MaxRequestPayloadBytes++
+		return protocol.ErrOverflow
+	})
+	if !errors.Is(err, protocol.ErrOverflow) {
+		t.Fatalf("callWithRetry growth-cap error = %v, want ErrOverflow", err)
+	}
+	if attempts != 8 {
+		t.Fatalf("callWithRetry growth-cap attempts = %d, want 8", attempts)
+	}
+	if client.state != StateBroken {
+		t.Fatalf("callWithRetry growth-cap state = %d, want StateBroken", client.state)
+	}
+}
+
 func TestWinHandlerFailure(t *testing.T) {
 	svc := uniqueWinService("go_win_handler_fail")
 	ts := startTestServerWinWithConfig(svc, testWinServerConfig(), protocol.MethodCgroupsSnapshot, winFailingSnapshotDispatchHandler())

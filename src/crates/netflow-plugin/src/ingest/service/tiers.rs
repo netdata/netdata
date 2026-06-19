@@ -110,7 +110,7 @@ impl IngestService {
         let mut active_hours = std::collections::BTreeSet::new();
         for tier in MATERIALIZED_TIERS {
             if let Some(acc) = self.tier_accumulators.get(&tier) {
-                active_hours.extend(acc.active_hours());
+                acc.extend_active_hours(&mut active_hours);
             }
         }
         // Hours of buckets handed to (or still being committed by) the
@@ -123,23 +123,26 @@ impl IngestService {
     }
 
     pub(in crate::ingest) fn refresh_open_tier_state(&self, now_usec: u64) {
-        let mut snapshot = OpenTierState::default();
-        if let Ok(tier_flow_indexes) = self.tier_flow_indexes.read() {
-            snapshot.generation = tier_flow_indexes.generation();
-        }
+        let generation = self
+            .tier_flow_indexes
+            .read()
+            .map(|tier_flow_indexes| tier_flow_indexes.generation())
+            .unwrap_or_default();
+
+        let Ok(mut guard) = self.open_tiers.write() else {
+            return;
+        };
+
+        guard.clear_retain_capacity();
+        guard.generation = generation;
         if let Some(acc) = self.tier_accumulators.get(&TierKind::Minute1) {
-            snapshot.minute_1 = acc.snapshot_open_rows(now_usec);
+            acc.snapshot_open_rows_into(now_usec, &mut guard.minute_1);
         }
         if let Some(acc) = self.tier_accumulators.get(&TierKind::Minute5) {
-            snapshot.minute_5 = acc.snapshot_open_rows(now_usec);
+            acc.snapshot_open_rows_into(now_usec, &mut guard.minute_5);
         }
         if let Some(acc) = self.tier_accumulators.get(&TierKind::Hour1) {
-            snapshot.hour_1 = acc.snapshot_open_rows(now_usec);
-        }
-
-        if let Ok(mut guard) = self.open_tiers.write() {
-            *guard = snapshot;
+            acc.snapshot_open_rows_into(now_usec, &mut guard.hour_1);
         }
     }
-
 }

@@ -7,6 +7,8 @@ pub const NIPC_UID_UNSET: u32 = u32::MAX;
 
 pub const PID_LOOKUP_KNOWN: u16 = 0;
 pub const PID_LOOKUP_UNKNOWN: u16 = 1;
+pub const PID_LOOKUP_PAYLOAD_EXCEEDED: u16 = 2;
+pub const PID_LOOKUP_OVERSIZED_ITEM: u16 = 3;
 
 pub const APPS_CGROUP_KNOWN: u16 = 0;
 pub const APPS_CGROUP_UNKNOWN_RETRY_LATER: u16 = 1;
@@ -21,6 +23,7 @@ pub const APPS_LOOKUP_KEY_SIZE: usize = 8;
 #[derive(Debug)]
 pub struct AppsLookupRequestView<'a> {
     pub item_count: u32,
+    packed_start: usize,
     payload: &'a [u8],
 }
 
@@ -63,7 +66,7 @@ fn validate_apps_lookup_semantics(
     label_count: u64,
 ) -> Result<(), NipcError> {
     validate_apps_lookup_domains(status, cgroup_status, comm_len)?;
-    if status == PID_LOOKUP_UNKNOWN {
+    if status != PID_LOOKUP_KNOWN {
         return validate_apps_lookup_unknown(
             orchestrator,
             cgroup_status,
@@ -91,7 +94,11 @@ fn validate_apps_lookup_domains(
     cgroup_status: u16,
     comm_len: u64,
 ) -> Result<(), NipcError> {
-    if status != PID_LOOKUP_KNOWN && status != PID_LOOKUP_UNKNOWN {
+    if status != PID_LOOKUP_KNOWN
+        && status != PID_LOOKUP_UNKNOWN
+        && status != PID_LOOKUP_PAYLOAD_EXCEEDED
+        && status != PID_LOOKUP_OVERSIZED_ITEM
+    {
         return Err(NipcError::BadLayout);
     }
     if cgroup_status != APPS_CGROUP_KNOWN
@@ -245,6 +252,7 @@ impl<'a> AppsLookupRequestView<'a> {
         }
         Ok(Self {
             item_count,
+            packed_start: dir_end,
             payload: buf,
         })
     }
@@ -253,12 +261,6 @@ impl<'a> AppsLookupRequestView<'a> {
         if index >= self.item_count {
             return Err(NipcError::OutOfBounds);
         }
-        let dir_size = (self.item_count as usize)
-            .checked_mul(LOOKUP_DIR_ENTRY_SIZE)
-            .ok_or(NipcError::BadItemCount)?;
-        let packed_start = APPS_LOOKUP_REQ_HDR_SIZE
-            .checked_add(dir_size)
-            .ok_or(NipcError::BadItemCount)?;
         let base = APPS_LOOKUP_REQ_HDR_SIZE
             .checked_add(
                 (index as usize)
@@ -268,7 +270,7 @@ impl<'a> AppsLookupRequestView<'a> {
             .ok_or(NipcError::BadItemCount)?;
         let off = u32_at(self.payload, base) as usize;
         Ok(u32_at(
-            checked_subslice(self.payload, packed_start, off, APPS_LOOKUP_KEY_SIZE)?,
+            checked_subslice(self.payload, self.packed_start, off, APPS_LOOKUP_KEY_SIZE)?,
             0,
         ))
     }
@@ -325,6 +327,34 @@ impl<'a> AppsLookupResponseView<'a> {
         let len = u32_at(self.payload, base + 4) as usize;
         decode_apps_item(checked_subslice(self.payload, packed_start, off, len)?)
     }
+
+    pub fn raw_item(&self, index: u32) -> Result<&'a [u8], NipcError> {
+        response_raw_item(
+            self.payload,
+            APPS_LOOKUP_RESP_HDR_SIZE,
+            self.item_count,
+            index,
+        )
+    }
+}
+
+pub fn encode_apps_lookup_raw_response(
+    items: &[&[u8]],
+    generation: u64,
+    buf: &mut [u8],
+) -> Result<usize, NipcError> {
+    encode_raw_response(
+        buf,
+        APPS_LOOKUP_RESP_HDR_SIZE,
+        generation,
+        items,
+        APPS_LOOKUP_ITEM_HDR_SIZE,
+        validate_apps_lookup_raw_item,
+    )
+}
+
+fn validate_apps_lookup_raw_item(item: &[u8]) -> Result<(), NipcError> {
+    decode_apps_item(item).map(|_| ())
 }
 
 fn decode_apps_item(item: &[u8]) -> Result<AppsLookupItemView<'_>, NipcError> {
@@ -415,6 +445,9 @@ pub struct AppsLookupBuilder<'a> {
     max_items: u32,
     data_offset: usize,
     error: Option<NipcError>,
+    payload_exceeded_suffix: bool,
+    payload_exceeded_suffix_bytes: Vec<u32>,
+    payload_exceeded_fixed_item_len: Option<usize>,
 }
 
 impl<'a> AppsLookupBuilder<'a> {
@@ -434,11 +467,24 @@ impl<'a> AppsLookupBuilder<'a> {
             max_items,
             data_offset,
             error: None,
+            payload_exceeded_suffix: false,
+            payload_exceeded_suffix_bytes: Vec::new(),
+            payload_exceeded_fixed_item_len: None,
         }
     }
 
     pub fn set_generation(&mut self, generation: u64) {
         self.generation = generation;
+    }
+
+    pub fn set_payload_exceeded_item_lens(&mut self, item_lens: Vec<usize>) {
+        match payload_exceeded_suffix_bytes_from_lens(item_lens) {
+            Ok(suffix_bytes) => {
+                self.payload_exceeded_suffix_bytes = suffix_bytes;
+                self.payload_exceeded_fixed_item_len = None;
+            }
+            Err(err) => self.error = Some(err),
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -456,6 +502,9 @@ impl<'a> AppsLookupBuilder<'a> {
         cgroup_name: &[u8],
         labels: &[(&[u8], &[u8])],
     ) -> Result<(), NipcError> {
+        if self.payload_exceeded_suffix {
+            return self.add_non_known_item(PID_LOOKUP_PAYLOAD_EXCEEDED, pid);
+        }
         if self.item_count >= self.max_items {
             self.error = Some(NipcError::Overflow);
             return Err(NipcError::Overflow);
@@ -475,6 +524,12 @@ impl<'a> AppsLookupBuilder<'a> {
             self.error = Some(err);
             return Err(err);
         }
+        if status != PID_LOOKUP_KNOWN {
+            return match self.add_non_known_item(status, pid) {
+                Err(NipcError::Overflow) => self.note_item_overflow(pid),
+                other => other,
+            };
+        }
         if source_string_invalid(comm, status == PID_LOOKUP_KNOWN)
             || source_string_invalid(cgroup_path, false)
             || source_string_invalid(cgroup_name, false)
@@ -485,6 +540,9 @@ impl<'a> AppsLookupBuilder<'a> {
         let label_count = match checked_u16(labels.len()) {
             Ok(v) => v,
             Err(err) => {
+                if err == NipcError::Overflow {
+                    return self.note_item_overflow(pid);
+                }
                 self.error = Some(err);
                 return Err(err);
             }
@@ -496,30 +554,34 @@ impl<'a> AppsLookupBuilder<'a> {
             .checked_add(comm.len())
             .and_then(|v| v.checked_add(1))
         else {
-            self.error = Some(NipcError::Overflow);
-            return Err(NipcError::Overflow);
+            return self.note_item_overflow(pid);
         };
         let Some(name_offset) = path_offset
             .checked_add(cgroup_path.len())
             .and_then(|v| v.checked_add(1))
         else {
-            self.error = Some(NipcError::Overflow);
-            return Err(NipcError::Overflow);
+            return self.note_item_overflow(pid);
         };
         let Some(fixed_end) = name_offset
             .checked_add(cgroup_name.len())
             .and_then(|v| v.checked_add(1))
         else {
-            self.error = Some(NipcError::Overflow);
-            return Err(NipcError::Overflow);
+            return self.note_item_overflow(pid);
         };
-        let (table_start, table_bytes, mut item_size) = label_layout(fixed_end, labels)?;
-        let item_end = item_start
-            .checked_add(item_size)
-            .ok_or(NipcError::Overflow)?;
-        if item_end > self.buf.len() {
-            self.error = Some(NipcError::Overflow);
-            return Err(NipcError::Overflow);
+        let (table_start, table_bytes, mut item_size) = match label_layout(fixed_end, labels) {
+            Ok(v) => v,
+            Err(NipcError::Overflow) => return self.note_item_overflow(pid),
+            Err(err) => {
+                self.error = Some(err);
+                return Err(err);
+            }
+        };
+        let item_end = match item_start.checked_add(item_size) {
+            Some(v) if v <= self.buf.len() => v,
+            _ => return self.note_item_overflow(pid),
+        };
+        if !self.payload_exceeded_suffix_fits(item_end) {
+            return self.note_item_overflow(pid);
         }
         if item_start > self.data_offset {
             self.buf[self.data_offset..item_start].fill(0);
@@ -555,6 +617,95 @@ impl<'a> AppsLookupBuilder<'a> {
             item[fixed_end..table_start].fill(0);
             item_size = write_lookup_labels(item, table_start, table_bytes, labels)?;
         }
+        let Some(dir_offset) = (self.item_count as usize).checked_mul(LOOKUP_DIR_ENTRY_SIZE) else {
+            self.error = Some(NipcError::Overflow);
+            return Err(NipcError::Overflow);
+        };
+        let Some(dir) = APPS_LOOKUP_RESP_HDR_SIZE.checked_add(dir_offset) else {
+            self.error = Some(NipcError::Overflow);
+            return Err(NipcError::Overflow);
+        };
+        let item_start_u32 = match checked_u32(item_start) {
+            Ok(v) => v,
+            Err(err) => {
+                self.error = Some(err);
+                return Err(err);
+            }
+        };
+        let item_size_u32 = match checked_u32(item_size) {
+            Ok(v) => v,
+            Err(err) => {
+                self.error = Some(err);
+                return Err(err);
+            }
+        };
+        put_u32(self.buf, dir, item_start_u32);
+        put_u32(self.buf, dir + 4, item_size_u32);
+        self.data_offset = item_end;
+        self.item_count += 1;
+        self.error = None;
+        Ok(())
+    }
+
+    fn payload_exceeded_suffix_fits(&self, data_offset: usize) -> bool {
+        if let Some(item_len) = self.payload_exceeded_fixed_item_len {
+            return payload_exceeded_fixed_suffix_fits(
+                self.buf.len(),
+                data_offset,
+                item_len,
+                self.item_count + 1,
+                self.max_items,
+            );
+        }
+        payload_exceeded_suffix_fits(
+            self.buf.len(),
+            data_offset,
+            &self.payload_exceeded_suffix_bytes,
+            self.item_count + 1,
+            self.max_items,
+        )
+    }
+
+    fn add_non_known_item(&mut self, status: u16, pid: u32) -> Result<(), NipcError> {
+        if self.item_count >= self.max_items {
+            self.error = Some(NipcError::Overflow);
+            return Err(NipcError::Overflow);
+        }
+        let item_start = align8(self.data_offset);
+        let item_size = APPS_LOOKUP_ITEM_HDR_SIZE + 3;
+        let Some(item_end) = item_start.checked_add(item_size) else {
+            self.error = Some(NipcError::Overflow);
+            return Err(NipcError::Overflow);
+        };
+        if item_end > self.buf.len() {
+            self.error = Some(NipcError::Overflow);
+            return Err(NipcError::Overflow);
+        }
+        if item_start > self.data_offset {
+            self.buf[self.data_offset..item_start].fill(0);
+        }
+        let item = &mut self.buf[item_start..item_end];
+        item.fill(0);
+        if let Err(err) = write_apps_item_header(
+            item,
+            status,
+            0,
+            0,
+            pid,
+            0,
+            NIPC_UID_UNSET,
+            0,
+            APPS_LOOKUP_ITEM_HDR_SIZE,
+            0,
+            APPS_LOOKUP_ITEM_HDR_SIZE + 1,
+            0,
+            APPS_LOOKUP_ITEM_HDR_SIZE + 2,
+            0,
+            0,
+        ) {
+            self.error = Some(err);
+            return Err(err);
+        }
         let dir_offset = (self.item_count as usize)
             .checked_mul(LOOKUP_DIR_ENTRY_SIZE)
             .ok_or(NipcError::Overflow)?;
@@ -565,7 +716,16 @@ impl<'a> AppsLookupBuilder<'a> {
         put_u32(self.buf, dir + 4, checked_u32(item_size)?);
         self.data_offset = item_end;
         self.item_count += 1;
+        self.error = None;
         Ok(())
+    }
+
+    fn note_item_overflow(&mut self, pid: u32) -> Result<(), NipcError> {
+        if self.item_count == 0 {
+            return self.add_non_known_item(PID_LOOKUP_OVERSIZED_ITEM, pid);
+        }
+        self.payload_exceeded_suffix = true;
+        self.add_non_known_item(PID_LOOKUP_PAYLOAD_EXCEEDED, pid)
     }
 
     pub fn finish(self) -> Result<usize, NipcError> {
@@ -636,8 +796,11 @@ where
         return Err(NipcError::Overflow);
     }
     let mut builder = AppsLookupBuilder::new(resp, request.item_count, 0);
+    if request.item_count > 0 {
+        builder.payload_exceeded_fixed_item_len = Some(APPS_LOOKUP_ITEM_HDR_SIZE + 3);
+    }
     if !handler(&request, &mut builder) {
-        return Err(builder.error().unwrap_or(NipcError::BadLayout));
+        return Err(builder.error().unwrap_or(NipcError::HandlerFailed));
     }
     if let Some(err) = builder.error() {
         return Err(err);
@@ -727,6 +890,70 @@ mod tests {
         assert_eq!(view.item(3).unwrap().status, PID_LOOKUP_UNKNOWN);
     }
 
+    fn build_apps_lookup_boundary_response(buf: &mut [u8]) -> usize {
+        let mut b = AppsLookupBuilder::new(buf, 2, 222);
+        b.add(
+            PID_LOOKUP_KNOWN,
+            APPS_CGROUP_HOST_ROOT,
+            0,
+            1234,
+            1,
+            1000,
+            42,
+            b"a",
+            b"",
+            b"",
+            &[],
+        )
+        .unwrap();
+        b.add(
+            PID_LOOKUP_KNOWN,
+            APPS_CGROUP_KNOWN,
+            ORCHESTRATOR_DOCKER,
+            5678,
+            1,
+            1000,
+            43,
+            b"worker",
+            b"/docker/long-container-path",
+            b"container-name",
+            &[(b"role".as_slice(), b"api".as_slice())],
+        )
+        .unwrap();
+        b.finish().unwrap()
+    }
+
+    #[test]
+    fn apps_lookup_response_exact_and_short_boundary() {
+        let mut large = vec![0u8; 1024];
+        let exact_len = build_apps_lookup_boundary_response(&mut large);
+        assert!(exact_len > APPS_LOOKUP_RESP_HDR_SIZE + 2 * LOOKUP_DIR_ENTRY_SIZE);
+
+        let mut exact = vec![0u8; exact_len];
+        assert_eq!(build_apps_lookup_boundary_response(&mut exact), exact_len);
+        let view = AppsLookupResponseView::decode(&exact).unwrap();
+        let item = view.item(1).unwrap();
+        assert_eq!(item.status, PID_LOOKUP_KNOWN);
+        assert_eq!(item.pid, 5678);
+
+        let mut plus_one = vec![0u8; exact_len + 1];
+        assert_eq!(
+            build_apps_lookup_boundary_response(&mut plus_one),
+            exact_len
+        );
+        let view = AppsLookupResponseView::decode(&plus_one[..exact_len]).unwrap();
+        let item = view.item(1).unwrap();
+        assert_eq!(item.status, PID_LOOKUP_KNOWN);
+        assert_eq!(item.pid, 5678);
+
+        let mut short = vec![0u8; exact_len - 1];
+        let short_len = build_apps_lookup_boundary_response(&mut short);
+        let view = AppsLookupResponseView::decode(&short[..short_len]).unwrap();
+        let item = view.item(1).unwrap();
+        assert_eq!(item.status, PID_LOOKUP_PAYLOAD_EXCEEDED);
+        assert_eq!(item.pid, 5678);
+    }
+
     #[test]
     fn apps_lookup_comm_boundary() {
         let mut buf = [0u8; 256];
@@ -814,6 +1041,17 @@ mod tests {
             })
             .unwrap_err(),
             NipcError::Overflow
+        );
+    }
+
+    #[test]
+    fn apps_lookup_dispatch_reports_handler_failed() {
+        let mut req = [0u8; 64];
+        let n = encode_apps_lookup_request(&[1234], &mut req).unwrap();
+        let mut resp = vec![0u8; 256];
+        assert_eq!(
+            dispatch_apps_lookup(&req[..n], &mut resp, |_, _| false).unwrap_err(),
+            NipcError::HandlerFailed
         );
     }
 

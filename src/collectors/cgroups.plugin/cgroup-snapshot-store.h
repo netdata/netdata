@@ -35,6 +35,9 @@ typedef struct cgroup_snapshot_entry {
     uint32_t options;
     uint32_t enabled;
     STRING *procs_path;     // precomputed cgroup.procs path; empty when missing
+    bool dir_identity_available;
+    dev_t dir_dev;
+    ino_t dir_ino;
 } CGROUP_SNAPSHOT_ENTRY;
 
 typedef struct cgroup_snapshot_store CGROUP_SNAPSHOT_STORE;
@@ -58,6 +61,7 @@ CGROUP_SNAPSHOT_ENTRY *cgroup_snapshot_builder_add_entry(CGROUP_SNAPSHOT_BUILDER
 
 // Appends a label to an entry returned by _add_entry(); copies key and value.
 void cgroup_snapshot_entry_add_label(CGROUP_SNAPSHOT_ENTRY *entry, const char *key, const char *value);
+void cgroup_snapshot_entry_set_dir_identity(CGROUP_SNAPSHOT_ENTRY *entry, const struct stat *st);
 
 // Finalizes into an immutable store. The builder is consumed.
 CGROUP_SNAPSHOT_STORE *cgroup_snapshot_builder_finalize(CGROUP_SNAPSHOT_BUILDER *builder);
@@ -81,5 +85,9 @@ size_t cgroup_snapshot_store_count(const CGROUP_SNAPSHOT_STORE *store);
 const CGROUP_SNAPSHOT_ENTRY *cgroup_snapshot_store_at(const CGROUP_SNAPSHOT_STORE *store, size_t index);
 const CGROUP_SNAPSHOT_ENTRY *cgroup_snapshot_store_find(
     const CGROUP_SNAPSHOT_STORE *store, const char *path, size_t path_len);
+const CGROUP_SNAPSHOT_ENTRY *cgroup_snapshot_store_find_unique_identity(
+    const CGROUP_SNAPSHOT_STORE *store, dev_t dev, ino_t ino);
+const CGROUP_SNAPSHOT_ENTRY *cgroup_snapshot_store_find_unique_suffix(
+    const CGROUP_SNAPSHOT_STORE *store, const char *suffix, size_t suffix_len, bool *duplicate);
 
 #endif // NETDATA_CGROUP_SNAPSHOT_STORE_H

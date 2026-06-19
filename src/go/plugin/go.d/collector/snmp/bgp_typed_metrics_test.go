@@ -291,7 +291,7 @@ func TestBGPIntegration_PreservesFunctionCacheOnProfileBGPError(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			collr := New()
+			collr := newTestSNMPCollector()
 			collr.sysInfo = &snmputils.SysInfo{}
 			collr.enableBGPIntegration()
 			collr.ddSnmpColl = &mockDdSnmpCollector{pms: tc.initial}
@@ -339,7 +339,7 @@ func TestBGPIntegration_RecoveryClearsStaleFunctionRows(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			collr := New()
+			collr := newTestSNMPCollector()
 			collr.sysInfo = &snmputils.SysInfo{}
 			collr.enableBGPIntegration()
 
@@ -401,7 +401,7 @@ func TestBGPIntegration_MixedProfileBGPErrorRefreshesSuccessfulProfiles(t *testi
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			collr := New()
+			collr := newTestSNMPCollector()
 			collr.sysInfo = &snmputils.SysInfo{}
 			collr.enableBGPIntegration()
 			collr.ddSnmpColl = &mockDdSnmpCollector{pms: tc.initial}
@@ -457,7 +457,7 @@ func TestBGPIntegration_ExpiredFailedProfileDoesNotKeepStaleRowsWithFreshProfile
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			collr := New()
+			collr := newTestSNMPCollector()
 			collr.sysInfo = &snmputils.SysInfo{}
 			collr.enableBGPIntegration()
 			collr.bgp.setStaleAfter(time.Minute)

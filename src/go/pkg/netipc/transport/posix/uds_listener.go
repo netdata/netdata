@@ -4,12 +4,14 @@ package posix
 
 import (
 	"os"
+	"sync"
 	"sync/atomic"
 	"syscall"
 )
 
 // Listener is a listening UDS SEQPACKET endpoint.
 type Listener struct {
+	mu            sync.Mutex
 	fd            int
 	config        ServerConfig
 	path          string
@@ -60,11 +62,15 @@ func Listen(runDir, serviceName string, config ServerConfig) (*Listener, error) 
 
 // Fd returns the raw file descriptor for poll/epoll integration.
 func (l *Listener) Fd() int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	return l.fd
 }
 
 // SetPayloadLimits updates the payload limits used for future handshakes.
 func (l *Listener) SetPayloadLimits(maxRequestPayloadBytes, maxResponsePayloadBytes uint32) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	l.config.MaxRequestPayloadBytes = maxRequestPayloadBytes
 	l.config.MaxResponsePayloadBytes = maxResponsePayloadBytes
 }
@@ -73,13 +79,23 @@ func (l *Listener) SetPayloadLimits(maxRequestPayloadBytes, maxResponsePayloadBy
 // Blocks until a client connects and the handshake completes.
 func (l *Listener) Accept() (*Session, error) {
 	sessionID := l.nextSessionID.Add(1)
-	return l.AcceptWithConfig(sessionID, l.config)
+	l.mu.Lock()
+	config := l.config
+	l.mu.Unlock()
+	return l.AcceptWithConfig(sessionID, config)
 }
 
 // AcceptWithConfig accepts one client connection using a caller-provided
 // per-session server config and session ID.
 func (l *Listener) AcceptWithConfig(sessionID uint64, config ServerConfig) (*Session, error) {
-	nfd, _, err := syscall.Accept(l.fd)
+	l.mu.Lock()
+	fd := l.fd
+	l.mu.Unlock()
+	if fd < 0 {
+		return nil, wrapErr(ErrAccept, "listener closed")
+	}
+
+	nfd, _, err := syscall.Accept(fd)
 	if err != nil {
 		return nil, wrapErr(ErrAccept, err.Error())
 	}
@@ -94,12 +110,17 @@ func (l *Listener) AcceptWithConfig(sessionID uint64, config ServerConfig) (*Ses
 
 // Close closes the listener, stops accepting, and unlinks the socket file.
 func (l *Listener) Close() {
-	if l.fd >= 0 {
-		_ = syscall.Close(l.fd)
-		l.fd = -1
+	l.mu.Lock()
+	fd := l.fd
+	path := l.path
+	l.fd = -1
+	l.path = ""
+	l.mu.Unlock()
+
+	if fd >= 0 {
+		_ = syscall.Close(fd)
 	}
-	if l.path != "" {
-		_ = os.Remove(l.path)
-		l.path = ""
+	if path != "" {
+		_ = os.Remove(path)
 	}
 }

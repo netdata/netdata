@@ -937,6 +937,67 @@ impl WinShmContext {
         Ok(mlen as usize)
     }
 
+    /// Try the spin-only receive path without entering kernel wait/deadline work.
+    pub(crate) fn receive_ready(&mut self, buf: &mut [u8]) -> Result<Option<usize>, WinShmError> {
+        if self.base.is_null() {
+            return Err(WinShmError::BadParam("null context".into()));
+        }
+        if buf.is_empty() {
+            return Err(WinShmError::BadParam("empty buffer".into()));
+        }
+
+        let (area_off, area_cap, len_off, seq_off, expected_seq) = match self.role {
+            WinShmRole::Server => (
+                self.request_offset,
+                self.request_capacity,
+                OFF_REQ_LEN,
+                OFF_REQ_SEQ,
+                self.local_req_seq + 1,
+            ),
+            WinShmRole::Client => (
+                self.response_offset,
+                self.response_capacity,
+                OFF_RESP_LEN,
+                OFF_RESP_SEQ,
+                self.local_resp_seq + 1,
+            ),
+        };
+
+        let max_copy = std::cmp::min(buf.len(), area_cap as usize);
+
+        for _ in 0..self.spin_tries {
+            let cur = interlocked_read_i64(self.base, seq_off);
+            if cur < expected_seq {
+                cpu_relax();
+                continue;
+            }
+
+            let mlen = interlocked_read_i32(self.base, len_off);
+            if mlen > 0 && (mlen as usize) <= max_copy {
+                unsafe {
+                    std::ptr::copy_nonoverlapping(
+                        self.base.add(area_off as usize),
+                        buf.as_mut_ptr(),
+                        mlen as usize,
+                    );
+                }
+            }
+
+            // Match receive(): consume the observed sequence before reporting
+            // malformed or oversized messages.
+            self.advance_seq(expected_seq);
+            if mlen == 0 {
+                return Err(WinShmError::BadHeader);
+            }
+            if (mlen as usize) > max_copy {
+                return Err(WinShmError::MsgTooLarge);
+            }
+            return Ok(Some(mlen as usize));
+        }
+
+        Ok(None)
+    }
+
     fn advance_seq(&mut self, expected_seq: i64) {
         match self.role {
             WinShmRole::Server => self.local_req_seq = expected_seq,
@@ -1560,6 +1621,89 @@ mod tests {
 
         let mut buf = [0u8; 128];
         assert_eq!(server.receive(&mut buf, 10), Err(WinShmError::Timeout));
+
+        client.close();
+        server.destroy();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_receive_ready_hit_and_miss_windows() {
+        let run_dir = test_run_dir();
+        let service = unique_service("rs_win_shm_receive_ready");
+        let auth_token: u64 = 0x8915;
+        let session_id: u64 = 23;
+
+        let mut server = WinShmContext::server_create(
+            &run_dir,
+            &service,
+            auth_token,
+            session_id,
+            PROFILE_HYBRID,
+            4096,
+            4096,
+        )
+        .expect("server_create");
+        let mut client = WinShmContext::client_attach(
+            &run_dir,
+            &service,
+            auth_token,
+            session_id,
+            PROFILE_HYBRID,
+        )
+        .expect("client_attach");
+
+        let mut buf = [0u8; 128];
+        assert_eq!(server.receive_ready(&mut buf), Ok(None));
+
+        client.send(b"ready").expect("client send");
+        assert_eq!(server.receive_ready(&mut buf), Ok(Some(5)));
+        assert_eq!(&buf[..5], b"ready");
+        assert_eq!(server.receive_ready(&mut buf), Ok(None));
+
+        client.close();
+        server.destroy();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_receive_ready_rejects_bad_and_oversized_lengths_windows() {
+        let run_dir = test_run_dir();
+        let service = unique_service("rs_win_shm_receive_ready_bad");
+        let auth_token: u64 = 0x8916;
+        let session_id: u64 = 24;
+
+        let mut server = WinShmContext::server_create(
+            &run_dir,
+            &service,
+            auth_token,
+            session_id,
+            PROFILE_HYBRID,
+            128,
+            128,
+        )
+        .expect("server_create");
+        let mut client = WinShmContext::client_attach(
+            &run_dir,
+            &service,
+            auth_token,
+            session_id,
+            PROFILE_HYBRID,
+        )
+        .expect("client_attach");
+
+        let mut buf = [0u8; 16];
+
+        interlocked_exchange_i32(server.base, OFF_REQ_LEN, 0);
+        interlocked_increment_i64(server.base, OFF_REQ_SEQ);
+        assert_eq!(server.receive_ready(&mut buf), Err(WinShmError::BadHeader));
+
+        interlocked_exchange_i32(server.base, OFF_REQ_LEN, 64);
+        interlocked_increment_i64(server.base, OFF_REQ_SEQ);
+        assert_eq!(
+            server.receive_ready(&mut buf),
+            Err(WinShmError::MsgTooLarge)
+        );
 
         client.close();
         server.destroy();

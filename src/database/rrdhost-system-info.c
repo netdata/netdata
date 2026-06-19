@@ -6,7 +6,10 @@
 #include "daemon/win_system-info.h"
 
 // coverity[ +tainted_string_sanitize_content : arg-0 ]
-static inline void coverity_remove_taint(char *s __maybe_unused) { }
+static inline void coverity_remove_taint(char *s __maybe_unused) {
+    // intentionally empty: only a marker for the Coverity taint sanitizer
+    // (see the annotation above); it has no runtime effect.
+}
 
 void rrdhost_system_info_swap(struct rrdhost_system_info *a, struct rrdhost_system_info *b) {
     if(a && b)
@@ -18,6 +21,9 @@ void rrdhost_system_info_swap(struct rrdhost_system_info *a, struct rrdhost_syst
 // system_info fields must be heap allocated or NULL
 int rrdhost_system_info_set_by_name(struct rrdhost_system_info *system_info, char *name, char *value) {
     int res = 0;
+
+    if (unlikely(!name || !value))
+        return 1;
 
     if (!strcmp(name, "NETDATA_PROTOCOL_VERSION"))
         return res;

@@ -569,7 +569,6 @@ sidebar:
           description: Understand stock trap coverage, custom profiles, overrides, MIB conversion, and profile-defined metrics.
       - meta:
           label: SNMP Trap Profile Format
-          path: snmp-trap-profile-format
           edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md
           description: Reference for SNMP trap profile YAML, trap definitions, varbind metadata, rendering, and profile metric rules.
       - meta:

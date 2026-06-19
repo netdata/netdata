@@ -81,7 +81,7 @@ func TestListenerReadLoopDoesNotReportReadErrorDuringClose(t *testing.T) {
 
 func TestCollectorLogListenerReadErrorIsRateLimited(t *testing.T) {
 	var buf bytes.Buffer
-	c := New()
+	c := newTestSNMPTrapsCollector()
 	c.Logger = logger.NewWithWriter(&buf)
 	ep := EndpointConfig{
 		Protocol: "udp4",

@@ -124,7 +124,7 @@ func (s *dyncfgSim) run(t *testing.T) {
 
 		Path:           fmt.Sprintf(dyncfgSDPath, testPluginName),
 		EnableFailCode: 422,
-		JobCommands: []dyncfg.Command{
+		ConfigCommands: []dyncfg.Command{
 			dyncfg.CommandSchema,
 			dyncfg.CommandGet,
 			dyncfg.CommandEnable,
@@ -578,7 +578,7 @@ CONFIG test:sd:net_listeners:test-job status disabled
 					},
 					wantDyncfg: `
 FUNCTION_RESULT_BEGIN 1-enable 404 application/json
-{"status":404,"errorMessage":"job not found."}
+{"status":404,"errorMessage":"config not found."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -720,7 +720,7 @@ CONFIG test:sd:net_listeners:test-job status accepted
 					},
 					wantDyncfg: `
 FUNCTION_RESULT_BEGIN 1-update 404 application/json
-{"status":404,"errorMessage":"job not found."}
+{"status":404,"errorMessage":"config not found."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -831,7 +831,7 @@ CONFIG test:sd:net_listeners:test-job delete
 					},
 					wantDyncfg: `
 FUNCTION_RESULT_BEGIN 1-remove 404 application/json
-{"status":404,"errorMessage":"job not found."}
+{"status":404,"errorMessage":"config not found."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -1034,7 +1034,7 @@ func TestServiceDiscovery_DyncfgFileConfig(t *testing.T) {
 					},
 					wantDyncfg: `
 FUNCTION_RESULT_BEGIN 1-remove 405 application/json
-{"status":405,"errorMessage":"removing jobs of type 'file' is not supported, only 'dyncfg' jobs can be removed."}
+{"status":405,"errorMessage":"removing configurations of source type 'file' is not supported, only 'dyncfg' configurations can be removed."}
 FUNCTION_RESULT_END
 `,
 				}

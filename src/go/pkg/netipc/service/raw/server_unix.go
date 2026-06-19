@@ -13,17 +13,21 @@ import (
 // Server is an internal managed server bound to one expected request kind.
 // Supports multiple concurrent client sessions up to workerCount.
 type Server struct {
-	runDir                      string
-	serviceName                 string
-	config                      posix.ServerConfig
-	expectedMethodCode          uint16
-	handler                     DispatchHandler
-	running                     atomic.Bool
-	learnedRequestPayloadBytes  atomic.Uint32
-	learnedResponsePayloadBytes atomic.Uint32
-	nextSessionID               atomic.Uint64
-	workerCount                 int
-	wg                          sync.WaitGroup
+	runDir                       string
+	serviceName                  string
+	config                       posix.ServerConfig
+	expectedMethodCode           uint16
+	handler                      DispatchHandler
+	running                      atomic.Bool
+	learnedRequestPayloadBytes   atomic.Uint32
+	learnedResponsePayloadBytes  atomic.Uint32
+	requestPayloadGrowthCeiling  uint32
+	responsePayloadGrowthCeiling uint32
+	nextSessionID                atomic.Uint64
+	workerCount                  int
+	wg                           sync.WaitGroup
+	listenerMu                   sync.Mutex
+	listener                     *posix.Listener
 }
 
 // NewServer creates a new managed server. workerCount limits the
@@ -98,7 +102,8 @@ func (s *Server) Run() error {
 	if err != nil {
 		return err
 	}
-	defer listener.Close()
+	s.setListener(listener)
+	defer s.closeListener(listener)
 
 	s.running.Store(true)
 
@@ -165,9 +170,32 @@ func (s *Server) Run() error {
 	return nil
 }
 
-// Stop signals the server to stop.
+// Stop signals the server to stop and unblocks Accept by closing the listener.
 func (s *Server) Stop() {
 	s.running.Store(false)
+	s.closeListener(nil)
+}
+
+func (s *Server) setListener(listener *posix.Listener) {
+	s.listenerMu.Lock()
+	s.listener = listener
+	s.listenerMu.Unlock()
+}
+
+func (s *Server) closeListener(listener *posix.Listener) {
+	s.listenerMu.Lock()
+	target := listener
+	if target == nil {
+		target = s.listener
+	}
+	if target != nil && s.listener == target {
+		s.listener = nil
+	}
+	s.listenerMu.Unlock()
+
+	if target != nil {
+		target.Close()
+	}
 }
 
 func (s *Server) handleSession(session *posix.Session, shm *posix.ShmContext) {

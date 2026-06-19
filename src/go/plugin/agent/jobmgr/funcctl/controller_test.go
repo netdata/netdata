@@ -411,17 +411,19 @@ func TestParseArgsParams(t *testing.T) {
 
 func TestControllerLifecycleHooks(t *testing.T) {
 	tests := map[string]struct{}{
-		"register modules does not register static methods yet":        {},
-		"first job start registers static methods once":                {},
-		"availability-gated static method registers when available":    {},
-		"public method name collision skips colliding module":          {},
-		"rejected module does not poison planned public names":         {},
-		"topology methods register direct alias":                       {},
-		"job stop unregisters job methods":                             {},
-		"cleanup unregisters static methods":                           {},
-		"cleanup ignores unavailable static methods":                   {},
-		"cleanup with api configured still unregisters static methods": {},
-		"api registration honors method tags":                          {},
+		"register modules does not register static methods yet":         {},
+		"register modules registers available agent-wide methods":       {},
+		"first job start registers static methods once":                 {},
+		"availability-gated static method registers when available":     {},
+		"availability-gated agent-wide method registers when available": {},
+		"public method name collision skips colliding module":           {},
+		"rejected module does not poison planned public names":          {},
+		"topology methods register direct alias":                        {},
+		"job stop unregisters job methods":                              {},
+		"cleanup unregisters static methods":                            {},
+		"cleanup ignores unavailable static methods":                    {},
+		"cleanup with api configured still unregisters static methods":  {},
+		"api registration honors method tags":                           {},
 	}
 
 	for name := range tests {
@@ -438,6 +440,17 @@ func TestControllerLifecycleHooks(t *testing.T) {
 				})
 
 				assert.Empty(t, reg.registeredNames())
+
+			case "register modules registers available agent-wide methods":
+				controller.RegisterModules(collectorapi.Registry{
+					"mod": collectorapi.Creator{
+						Methods: func() []funcapi.MethodConfig {
+							return []funcapi.MethodConfig{{ID: "logs", AgentWide: true}}
+						},
+					},
+				})
+
+				assert.Equal(t, []string{"mod:logs"}, reg.registeredNames())
 
 			case "first job start registers static methods once":
 				controller.RegisterModules(collectorapi.Registry{
@@ -470,6 +483,28 @@ func TestControllerLifecycleHooks(t *testing.T) {
 				available = true
 				controller.OnJobStart(newTestRuntimeJob("mod", "job2", true))
 				controller.OnJobStart(newTestRuntimeJob("mod", "job3", true))
+
+				assert.Equal(t, []string{"mod:logs"}, reg.registeredNames())
+
+			case "availability-gated agent-wide method registers when available":
+				available := false
+				controller.RegisterModules(collectorapi.Registry{
+					"mod": collectorapi.Creator{
+						Methods: func() []funcapi.MethodConfig {
+							return []funcapi.MethodConfig{{
+								ID:        "logs",
+								AgentWide: true,
+								Available: func() bool { return available },
+							}}
+						},
+					},
+				})
+
+				assert.Empty(t, reg.registeredNames())
+
+				available = true
+				controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+				controller.OnJobStart(newTestRuntimeJob("mod", "job2", true))
 
 				assert.Equal(t, []string{"mod:logs"}, reg.registeredNames())
 
@@ -520,14 +555,17 @@ func TestControllerLifecycleHooks(t *testing.T) {
 
 			case "topology methods register direct alias":
 				controller.RegisterModules(collectorapi.Registry{
-					"snmp": collectorapi.Creator{
+					"snmp_topology": collectorapi.Creator{
 						Methods: func() []funcapi.MethodConfig {
-							return []funcapi.MethodConfig{{ID: "topology:snmp", Aliases: []string{"topology:snmp"}}}
+							return []funcapi.MethodConfig{{
+								ID:           "topology:snmp",
+								FunctionName: "snmp:topology:snmp",
+								Aliases:      []string{"topology:snmp"},
+								AgentWide:    true,
+							}}
 						},
 					},
 				})
-
-				controller.OnJobStart(newTestRuntimeJob("snmp", "edge-router", true))
 
 				assert.ElementsMatch(t, []string{"snmp:topology:snmp", "topology:snmp"}, reg.registeredNames())
 
@@ -853,6 +891,235 @@ func TestControllerRawModuleMethodRequest(t *testing.T) {
 	}
 }
 
+func TestControllerRawAgentWideModuleMethodDoesNotRequireRunningJob(t *testing.T) {
+	var gotCode int
+	var gotResp map[string]any
+	var gotJob collectorapi.RuntimeJob
+	reg := newTestFunctionRegistry()
+	controller := New(Options{
+		FnReg: reg,
+		JSONWriter: func(data []byte, code int) {
+			gotCode = code
+			require.NoError(t, json.Unmarshal(data, &gotResp))
+		},
+	})
+
+	controller.RegisterModules(collectorapi.Registry{
+		"mod": collectorapi.Creator{
+			Methods: func() []funcapi.MethodConfig {
+				return []funcapi.MethodConfig{{
+					ID:         "logs",
+					RawRequest: true,
+					AgentWide:  true,
+				}}
+			},
+			MethodHandler: func(job collectorapi.RuntimeJob) funcapi.MethodHandler {
+				gotJob = job
+				return &rawTestHandler{
+					raw: func(_ context.Context, req funcapi.RawMethodRequest) *funcapi.FunctionResponse {
+						assert.Equal(t, "logs", req.Method)
+						return funcapi.RawResponse(map[string]any{
+							"status": 200,
+							"type":   "table",
+						})
+					},
+				}
+			},
+		},
+	})
+
+	reg.call("mod:logs", context.Background(), functions.Function{
+		UID:     "raw-agent-wide",
+		Timeout: time.Second,
+	})
+
+	assert.Equal(t, 200, gotCode)
+	assert.Equal(t, float64(200), gotResp["status"])
+	assert.Nil(t, gotJob)
+}
+
+func TestControllerRawSingleInstanceAgentWideModuleMethodUsesRunningJob(t *testing.T) {
+	var gotCode int
+	var gotResp map[string]any
+	var gotJob collectorapi.RuntimeJob
+	reg := newTestFunctionRegistry()
+	controller := New(Options{
+		FnReg: reg,
+		JSONWriter: func(data []byte, code int) {
+			gotCode = code
+			require.NoError(t, json.Unmarshal(data, &gotResp))
+		},
+	})
+	controller.RegisterModules(collectorapi.Registry{
+		"mod": collectorapi.Creator{
+			InstancePolicy: collectorapi.InstancePolicySingle,
+			Methods: func() []funcapi.MethodConfig {
+				return []funcapi.MethodConfig{{
+					ID:         "logs",
+					RawRequest: true,
+					AgentWide:  true,
+				}}
+			},
+			MethodHandler: func(job collectorapi.RuntimeJob) funcapi.MethodHandler {
+				gotJob = job
+				return &rawTestHandler{
+					raw: func(_ context.Context, req funcapi.RawMethodRequest) *funcapi.FunctionResponse {
+						assert.Equal(t, "logs", req.Method)
+						return funcapi.RawResponse(map[string]any{
+							"status": 200,
+							"type":   "table",
+						})
+					},
+				}
+			},
+		},
+	})
+	job := newTestRuntimeJob("mod", "mod", true)
+	controller.OnJobStart(job)
+
+	reg.call("mod:logs", context.Background(), functions.Function{
+		UID:     "raw-single-agent-wide",
+		Timeout: time.Second,
+	})
+
+	assert.Equal(t, 200, gotCode)
+	assert.Equal(t, float64(200), gotResp["status"])
+	assert.Same(t, job, gotJob)
+}
+
+func TestControllerSingleInstanceAgentWideModuleMethodUsesRunningJob(t *testing.T) {
+	var gotCode int
+	var gotResp map[string]any
+	var gotJob collectorapi.RuntimeJob
+	reg := newTestFunctionRegistry()
+	controller := New(Options{
+		FnReg: reg,
+		JSONWriter: func(data []byte, code int) {
+			gotCode = code
+			require.NoError(t, json.Unmarshal(data, &gotResp))
+		},
+	})
+	controller.RegisterModules(collectorapi.Registry{
+		"mod": collectorapi.Creator{
+			InstancePolicy: collectorapi.InstancePolicySingle,
+			Methods: func() []funcapi.MethodConfig {
+				return []funcapi.MethodConfig{{
+					ID:        "status",
+					AgentWide: true,
+				}}
+			},
+			MethodHandler: func(job collectorapi.RuntimeJob) funcapi.MethodHandler {
+				gotJob = job
+				return &rawTestHandler{
+					params: func(context.Context, string) ([]funcapi.ParamConfig, error) {
+						return []funcapi.ParamConfig{{
+							ID:        "scope",
+							Name:      "Scope",
+							Selection: funcapi.ParamSelect,
+							Options: []funcapi.ParamOption{{
+								ID:      "all",
+								Name:    "All",
+								Default: true,
+							}},
+						}}, nil
+					},
+					handle: func(_ context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+						assert.Equal(t, "status", method)
+						assert.Equal(t, "all", params.GetOne("scope"))
+						return &funcapi.FunctionResponse{
+							Status:       200,
+							ResponseType: "table",
+							Help:         "status",
+						}
+					},
+				}
+			},
+		},
+	})
+	job := newTestRuntimeJob("mod", "mod", true)
+	controller.OnJobStart(job)
+
+	reg.call("mod:status", context.Background(), functions.Function{
+		UID:     "single-agent-wide",
+		Timeout: time.Second,
+		Payload: []byte(`{"scope":"all"}`),
+	})
+
+	assert.Equal(t, 200, gotCode)
+	assert.Equal(t, float64(200), gotResp["status"])
+	assert.Same(t, job, gotJob)
+	assert.Equal(t, []any{"scope"}, gotResp["accepted_params"])
+}
+
+func TestControllerSingleInstanceAgentWideModuleMethodRequiresRunningJob(t *testing.T) {
+	tests := map[string]struct {
+		setup   func(*Controller)
+		message string
+	}{
+		"before start": {
+			message: "module 'mod' is not running",
+		},
+		"after stop": {
+			setup: func(controller *Controller) {
+				job := newTestRuntimeJob("mod", "mod", true)
+				controller.OnJobStart(job)
+				controller.OnJobStop(job)
+			},
+			message: "module 'mod' is not running",
+		},
+		"registered but not running": {
+			setup: func(controller *Controller) {
+				controller.OnJobStart(newTestRuntimeJob("mod", "mod", false))
+			},
+			message: "job 'mod' is no longer running",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var gotCode int
+			var gotResp map[string]any
+			var gotHandler bool
+			reg := newTestFunctionRegistry()
+			controller := New(Options{
+				FnReg: reg,
+				JSONWriter: func(data []byte, code int) {
+					gotCode = code
+					require.NoError(t, json.Unmarshal(data, &gotResp))
+				},
+			})
+			controller.RegisterModules(collectorapi.Registry{
+				"mod": collectorapi.Creator{
+					InstancePolicy: collectorapi.InstancePolicySingle,
+					Methods: func() []funcapi.MethodConfig {
+						return []funcapi.MethodConfig{{
+							ID:        "status",
+							AgentWide: true,
+						}}
+					},
+					MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+						gotHandler = true
+						return &tableTestHandler{}
+					},
+				},
+			})
+			if tc.setup != nil {
+				tc.setup(controller)
+			}
+
+			reg.call("mod:status", context.Background(), functions.Function{
+				UID:     "single-agent-wide-missing-job",
+				Timeout: time.Second,
+			})
+
+			assert.Equal(t, 503, gotCode)
+			assert.Equal(t, float64(503), gotResp["status"])
+			assert.Equal(t, tc.message, gotResp["errorMessage"])
+			assert.False(t, gotHandler)
+		})
+	}
+}
+
 func TestControllerModuleMethodRequestContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -1034,13 +1301,17 @@ func (j *testRuntimeJob) IsRunning() bool    { return j.running }
 func (j *testRuntimeJob) Collector() any     { return nil }
 
 type rawTestHandler struct {
+	params func(context.Context, string) ([]funcapi.ParamConfig, error)
 	handle func(context.Context, string, funcapi.ResolvedParams) *funcapi.FunctionResponse
 	raw    func(context.Context, funcapi.RawMethodRequest) *funcapi.FunctionResponse
 }
 
 var _ funcapi.RawMethodHandler = (*rawTestHandler)(nil)
 
-func (h *rawTestHandler) MethodParams(context.Context, string) ([]funcapi.ParamConfig, error) {
+func (h *rawTestHandler) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
+	if h.params != nil {
+		return h.params(ctx, method)
+	}
 	return nil, nil
 }
 

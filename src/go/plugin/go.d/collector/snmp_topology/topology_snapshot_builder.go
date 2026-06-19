@@ -2,12 +2,7 @@
 
 package snmptopology
 
-import (
-	"time"
-
-	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
-)
+import "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 
 func buildLocalTopologyDevice(dev ddsnmp.DeviceConnectionInfo) topologyDevice {
 	device := topologyDevice{
@@ -71,42 +66,4 @@ func buildLocalTopologyDevice(dev ddsnmp.DeviceConnectionInfo) topologyDevice {
 	}
 
 	return device
-}
-
-func (c *topologyCache) snapshot() (topologyData, bool) {
-	if !c.hasFreshSnapshotAt(time.Now()) {
-		return topologyData{}, false
-	}
-
-	local := c.localDevice
-	local = normalizeTopologyDevice(local)
-
-	observations, localDeviceID := c.buildEngineObservations(local)
-	if len(observations) == 0 {
-		return topologyData{}, false
-	}
-
-	result, err := topologyengine.BuildL2ResultFromObservations(observations, topologyengine.DiscoverOptions{
-		EnableLLDP:   true,
-		EnableCDP:    true,
-		EnableBridge: true,
-		EnableARP:    true,
-	})
-	if err != nil {
-		return topologyData{}, false
-	}
-
-	data := topologyengine.ToGraph(result, topologyengine.GraphOptions{
-		SchemaVersion:  topologySchemaVersion,
-		Source:         "snmp",
-		Layer:          "2",
-		View:           "summary",
-		AgentID:        c.agentID,
-		LocalDeviceID:  localDeviceID,
-		CollectedAt:    c.lastUpdate,
-		ResolveDNSName: resolveTopologyReverseDNSName,
-	})
-
-	augmentLocalActorFromCache(&data, local)
-	return data, true
 }

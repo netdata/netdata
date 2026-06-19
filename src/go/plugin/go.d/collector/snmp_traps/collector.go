@@ -18,6 +18,8 @@ import (
 	"github.com/gosnmp/gosnmp"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 )
 
 //go:embed "config_schema.json"
@@ -40,20 +42,38 @@ func directJournalLogsAvailable() bool {
 	return activeDirectJournalJobs.Load() > 0
 }
 
-func init() {
-	collectorapi.Register("snmp_traps", collectorapi.Creator{
+// Register registers the SNMP traps collector with shared SNMP-family enrichment state.
+func Register(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnrichmentHandle) {
+	collectorapi.Register("snmp_traps", newCreator(deviceStore, topologyEnricher))
+}
+
+func newCreator(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnrichmentHandle) collectorapi.Creator {
+	if deviceStore == nil {
+		panic("snmp_traps Register requires a non-nil device store")
+	}
+	if topologyEnricher == nil {
+		panic("snmp_traps Register requires a non-nil trap enrichment handle")
+	}
+	return collectorapi.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 1,
 		},
-		CreateV2:      func() collectorapi.CollectorV2 { return New() },
+		CreateV2:      func() collectorapi.CollectorV2 { return New(deviceStore, topologyEnricher) },
 		Config:        func() any { return &Config{} },
 		Methods:       snmpTrapsMethods,
 		MethodHandler: snmpTrapsMethodHandler,
-	})
+	}
 }
 
-func New() *Collector {
+// New returns an SNMP traps collector using the provided SNMP-family enrichment state.
+func New(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnrichmentHandle) *Collector {
+	if deviceStore == nil {
+		panic("snmp_traps New requires a non-nil device store")
+	}
+	if topologyEnricher == nil {
+		panic("snmp_traps New requires a non-nil trap enrichment handle")
+	}
 	store := metrix.NewCollectorStore()
 
 	return &Collector{
@@ -63,7 +83,9 @@ func New() *Collector {
 				ReceiveBuffer: defaultListenerReceiveBuffer,
 			},
 		},
-		store: store,
+		store:            store,
+		deviceLookup:     deviceStore,
+		topologyEnricher: topologyEnricher,
 	}
 }
 
@@ -75,6 +97,8 @@ type Collector struct {
 	trapWriter         TrapWriter
 	journalDir         string
 	store              metrix.CollectorStore
+	deviceLookup       deviceLookup
+	topologyEnricher   trapTopologyEnricher
 	jobName            string
 	vnode              string
 	versions           map[SnmpVersion]struct{}
@@ -636,7 +660,7 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 
 	entry := trapEntryFromPDU(c.jobName, pdu, td, time.Now().UnixMicro(), monotonicUsec())
 	entry.PacketSequence = packetSequence
-	enrichTrapEntry(entry, c.reverseDNSEnabled, c.reverseDNS)
+	c.enrichTrapEntry(entry, c.reverseDNSEnabled, c.reverseDNS)
 	renderTrapEntryTemplates(entry, td)
 	if unknownOID {
 		c.incTrapError("unknown_oid")

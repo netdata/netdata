@@ -25,6 +25,7 @@ func (s Status) String() string {
 type ConfigType string
 
 const (
+	ConfigTypeSingle   ConfigType = "single"
 	ConfigTypeTemplate ConfigType = "template"
 	ConfigTypeJob      ConfigType = "job"
 )

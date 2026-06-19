@@ -467,6 +467,16 @@ fn receive_win_shm_with_control(
 ) -> Result<usize, NipcError> {
     use crate::transport::win_shm::WinShmError;
 
+    if abort.load(Ordering::Acquire) {
+        return Err(NipcError::Aborted);
+    }
+    match shm.receive_ready(scratch) {
+        Ok(Some(mlen)) => return Ok(mlen),
+        Ok(None) => {}
+        Err(WinShmError::MsgTooLarge) => return Err(NipcError::Overflow),
+        Err(_) => return Err(NipcError::Truncated),
+    }
+
     let deadline = receive_deadline(timeout_ms);
     loop {
         let wait_ms = receive_wait_slice_ms(deadline, abort)?;
@@ -496,5 +506,87 @@ fn map_np_receive_error(err: crate::transport::windows::NpError) -> NipcError {
         crate::transport::windows::NpError::Aborted => NipcError::Aborted,
         crate::transport::windows::NpError::LimitExceeded => NipcError::Overflow,
         _ => NipcError::Truncated,
+    }
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+    use crate::transport::win_shm::{WinShmContext, PROFILE_HYBRID};
+    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+
+    static RAW_WIN_SHM_TEST_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    fn win_shm_pair(prefix: &str) -> (WinShmContext, WinShmContext) {
+        let id = RAW_WIN_SHM_TEST_COUNTER.fetch_add(1, Ordering::Relaxed) + 1;
+        let run_dir = std::env::temp_dir().join("nipc_raw_win_shm_rust_test");
+        let _ = std::fs::create_dir_all(&run_dir);
+        let service = format!("{}_{}_{}", prefix, std::process::id(), id);
+        let auth_token = 0xfeed_0000 + id;
+        let session_id = 0x1000 + id;
+
+        let server = WinShmContext::server_create(
+            &run_dir.display().to_string(),
+            &service,
+            auth_token,
+            session_id,
+            PROFILE_HYBRID,
+            4096,
+            4096,
+        )
+        .expect("server_create");
+        let client = WinShmContext::client_attach(
+            &run_dir.display().to_string(),
+            &service,
+            auth_token,
+            session_id,
+            PROFILE_HYBRID,
+        )
+        .expect("client_attach");
+
+        (server, client)
+    }
+
+    #[test]
+    fn test_receive_win_shm_with_control_fast_path_and_fallbacks_windows() {
+        let (mut server, mut client) = win_shm_pair("rs_raw_win_shm_ready");
+        let abort = AtomicBool::new(false);
+        let mut scratch = [0u8; 128];
+
+        server.send(b"response").expect("server send");
+        let len = receive_win_shm_with_control(&mut client, &mut scratch, 100, &abort)
+            .expect("receive ready response");
+        assert_eq!(len, 8);
+        assert_eq!(&scratch[..len], b"response");
+
+        client.close();
+        server.destroy();
+
+        let (mut server, mut client) = win_shm_pair("rs_raw_win_shm_abort");
+        let abort = AtomicBool::new(true);
+        assert_eq!(
+            receive_win_shm_with_control(&mut client, &mut scratch, 100, &abort),
+            Err(NipcError::Aborted)
+        );
+        client.close();
+        server.destroy();
+
+        let (mut server, mut client) = win_shm_pair("rs_raw_win_shm_timeout");
+        let abort = AtomicBool::new(false);
+        assert_eq!(
+            receive_win_shm_with_control(&mut client, &mut scratch, 1, &abort),
+            Err(NipcError::Timeout)
+        );
+        client.close();
+        server.destroy();
+
+        let (mut server, mut client) = win_shm_pair("rs_raw_win_shm_close");
+        let abort = AtomicBool::new(false);
+        server.destroy();
+        assert_eq!(
+            receive_win_shm_with_control(&mut client, &mut scratch, 100, &abort),
+            Err(NipcError::Truncated)
+        );
+        client.close();
     }
 }

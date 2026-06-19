@@ -135,6 +135,12 @@ static void rrdcontext_load_context_callback(VERSIONED_CONTEXT_DATA *ctx_data, v
     RRDHOST *host = data;
     (void)host;
 
+    // the insert callback replaces the SQLite-owned hub string pointers with
+    // owned copies only when hub.version is set - a versionless row would
+    // keep dangling pointers, so skip it
+    if(unlikely(!ctx_data->version))
+        return;
+
     RRDCONTEXT trc = {
         .id = string_strdupz(ctx_data->id),
         .flags = RRD_FLAG_ARCHIVED | RRD_FLAG_UPDATE_REASON_LOAD_SQL, // no need for atomics

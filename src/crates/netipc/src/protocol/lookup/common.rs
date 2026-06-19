@@ -166,6 +166,92 @@ pub(super) fn lookup_dir_entry_offset(hdr_size: usize, index: u32) -> Result<usi
         .ok_or(NipcError::BadItemCount)
 }
 
+pub(super) fn payload_exceeded_suffix_bytes_from_lens(
+    item_lens: Vec<usize>,
+) -> Result<Vec<u32>, NipcError> {
+    let capacity = item_lens.len().checked_add(1).ok_or(NipcError::Overflow)?;
+    let mut suffix_bytes = Vec::with_capacity(capacity);
+    for item_len in item_lens {
+        suffix_bytes.push(checked_u32(item_len)?);
+    }
+    suffix_bytes.push(0);
+    for i in (0..suffix_bytes.len() - 1).rev() {
+        let next = suffix_bytes[i + 1];
+        let item_cost = if next > 0 {
+            suffix_bytes[i].checked_add(7).map(|v| v & !7)
+        } else {
+            Some(suffix_bytes[i])
+        }
+        .ok_or(NipcError::Overflow)?;
+        suffix_bytes[i] = item_cost.checked_add(next).ok_or(NipcError::Overflow)?;
+    }
+    Ok(suffix_bytes)
+}
+
+pub(super) fn payload_exceeded_suffix_fits(
+    buf_len: usize,
+    data_offset: usize,
+    suffix_bytes: &[u32],
+    first_index: u32,
+    max_items: u32,
+) -> bool {
+    let max_items = max_items as usize;
+    let Some(expected_len) = max_items.checked_add(1) else {
+        return true;
+    };
+    if suffix_bytes.len() != expected_len {
+        return true;
+    }
+    let first_index = first_index as usize;
+    if first_index > max_items {
+        return true;
+    }
+    if data_offset > usize::MAX - 7 {
+        return false;
+    }
+    let item_start = align8(data_offset);
+    if item_start > buf_len {
+        return false;
+    }
+    suffix_bytes[first_index] as usize <= buf_len - item_start
+}
+
+pub(super) fn payload_exceeded_fixed_suffix_fits(
+    buf_len: usize,
+    data_offset: usize,
+    item_len: usize,
+    first_index: u32,
+    max_items: u32,
+) -> bool {
+    let max_items = max_items as usize;
+    let first_index = first_index as usize;
+    if first_index > max_items {
+        return true;
+    }
+    if data_offset > usize::MAX - 7 {
+        return false;
+    }
+    let item_start = align8(data_offset);
+    if item_start > buf_len {
+        return false;
+    }
+    let remaining = max_items - first_index;
+    if remaining == 0 {
+        return true;
+    }
+    let Some(aligned_item_len) = item_len.checked_add(7).map(|v| v & !7) else {
+        return false;
+    };
+    let tail_items = remaining - 1;
+    let Some(tail_bytes) = tail_items.checked_mul(aligned_item_len) else {
+        return false;
+    };
+    let Some(needed) = item_len.checked_add(tail_bytes) else {
+        return false;
+    };
+    needed <= buf_len - item_start
+}
+
 pub(super) fn validate_labels(
     item: &[u8],
     hdr_size: usize,
@@ -374,6 +460,64 @@ pub(super) fn finish_lookup_response(
     final_packed_start
         .checked_add(packed_data_len)
         .ok_or(NipcError::Overflow)
+}
+
+pub(super) fn response_raw_item<'a>(
+    payload: &'a [u8],
+    hdr_size: usize,
+    item_count: u32,
+    index: u32,
+) -> Result<&'a [u8], NipcError> {
+    if index >= item_count {
+        return Err(NipcError::OutOfBounds);
+    }
+    let packed_start = lookup_data_offset(hdr_size, item_count)?;
+    let base = lookup_dir_entry_offset(hdr_size, index)?;
+    let off = u32_at(payload, base) as usize;
+    let len = u32_at(payload, base + 4) as usize;
+    checked_subslice(payload, packed_start, off, len)
+}
+
+pub(super) fn encode_raw_response(
+    buf: &mut [u8],
+    hdr_size: usize,
+    generation: u64,
+    items: &[&[u8]],
+    min_item_len: usize,
+    validate: fn(&[u8]) -> Result<(), NipcError>,
+) -> Result<usize, NipcError> {
+    let item_count = u32::try_from(items.len()).map_err(|_| NipcError::Overflow)?;
+    let mut data_offset = lookup_data_offset(hdr_size, item_count)?;
+    if buf.len() < data_offset {
+        return Err(NipcError::Overflow);
+    }
+    for (i, item) in items.iter().enumerate() {
+        if item.len() < min_item_len {
+            return Err(NipcError::BadLayout);
+        }
+        validate(item)?;
+        let item_start = align8(data_offset);
+        let item_end = item_start
+            .checked_add(item.len())
+            .ok_or(NipcError::Overflow)?;
+        if item_end > buf.len() {
+            return Err(NipcError::Overflow);
+        }
+        if item_start > data_offset {
+            buf[data_offset..item_start].fill(0);
+        }
+        buf[item_start..item_end].copy_from_slice(item);
+        let dir = hdr_size
+            .checked_add(
+                i.checked_mul(LOOKUP_DIR_ENTRY_SIZE)
+                    .ok_or(NipcError::Overflow)?,
+            )
+            .ok_or(NipcError::Overflow)?;
+        put_u32(buf, dir, checked_u32(item_start)?);
+        put_u32(buf, dir + 4, checked_u32(item.len())?);
+        data_offset = item_end;
+    }
+    finish_lookup_response(buf, hdr_size, item_count, data_offset, generation)
 }
 
 #[cfg(test)]

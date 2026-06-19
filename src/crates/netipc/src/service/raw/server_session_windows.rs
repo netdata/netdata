@@ -23,6 +23,8 @@ pub(super) fn handle_session_win_threaded(
     running: Arc<AtomicBool>,
     learned_request_payload_bytes: Arc<AtomicU32>,
     learned_response_payload_bytes: Arc<AtomicU32>,
+    request_payload_growth_ceiling: u32,
+    response_payload_growth_ceiling: u32,
 ) {
     let mut recv_buf = vec![0u8; HEADER_SIZE + session.max_request_payload_bytes as usize];
     let mut resp_buf = vec![0u8; session.max_response_payload_bytes as usize];
@@ -65,7 +67,11 @@ pub(super) fn handle_session_win_threaded(
         }
 
         if payload.len() <= u32::MAX as usize {
-            server_note_payload_capacity(&learned_request_payload_bytes, payload.len() as u32);
+            server_note_payload_capacity(
+                &learned_request_payload_bytes,
+                payload.len() as u32,
+                request_payload_growth_ceiling,
+            );
         }
 
         if !method_supported_internal(expected_method_code, handler.as_ref(), hdr.code) {
@@ -155,6 +161,7 @@ pub(super) fn handle_session_win_threaded(
                     server_note_payload_capacity(
                         &learned_response_payload_bytes,
                         response_len as u32,
+                        response_payload_growth_ceiling,
                     );
                 }
                 resp_hdr.transport_status = STATUS_OK;
@@ -169,9 +176,17 @@ pub(super) fn handle_session_win_threaded(
             Err(DispatchError::Overflow) => {
                 let current = session.max_response_payload_bytes;
                 if current >= u32::MAX / 2 {
-                    server_note_payload_capacity(&learned_response_payload_bytes, u32::MAX);
+                    server_note_payload_capacity(
+                        &learned_response_payload_bytes,
+                        u32::MAX,
+                        response_payload_growth_ceiling,
+                    );
                 } else {
-                    server_note_payload_capacity(&learned_response_payload_bytes, current * 2);
+                    server_note_payload_capacity(
+                        &learned_response_payload_bytes,
+                        current * 2,
+                        response_payload_growth_ceiling,
+                    );
                 }
                 resp_hdr.transport_status = STATUS_LIMIT_EXCEEDED;
                 resp_hdr.item_count = 1;

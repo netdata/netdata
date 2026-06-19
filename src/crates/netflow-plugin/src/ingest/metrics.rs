@@ -1,5 +1,7 @@
-use super::*;
 use super::tier_commit::TierCommitTelemetry;
+use super::*;
+
+pub(super) const INGEST_STATS_SNAPSHOT_KEY_COUNT: usize = 57;
 
 #[derive(Default)]
 pub(crate) struct IngestMetrics {
@@ -97,238 +99,97 @@ impl IngestMetrics {
             .store(snapshot.hydrated_sources, Ordering::Relaxed);
     }
 
+    #[cfg(test)]
     pub(crate) fn snapshot(&self) -> HashMap<String, u64> {
         let mut stats = HashMap::new();
-        stats.insert(
-            "udp_packets_received".to_string(),
-            self.udp_packets_received.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "udp_bytes_received".to_string(),
-            self.udp_bytes_received.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "decoded_parse_attempts".to_string(),
-            self.parse_attempts.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "decoded_parsed_packets".to_string(),
-            self.parsed_packets.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "decoded_parse_errors".to_string(),
-            self.parse_errors.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "decoded_template_errors".to_string(),
-            self.template_errors.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "decoded_netflow_v5".to_string(),
-            self.netflow_v5_packets.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "decoded_netflow_v7".to_string(),
-            self.netflow_v7_packets.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "decoded_netflow_v9".to_string(),
-            self.netflow_v9_packets.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "decoded_ipfix".to_string(),
-            self.ipfix_packets.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "decoded_sflow".to_string(),
-            self.sflow_datagrams.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "journal_entries_written".to_string(),
-            self.journal_entries_written.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "raw_journal_logical_bytes".to_string(),
-            self.raw_journal_logical_bytes.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "journal_write_errors".to_string(),
-            self.journal_write_errors.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "journal_sync_errors".to_string(),
-            self.journal_sync_errors.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "raw_journal_syncs".to_string(),
-            self.raw_journal_syncs.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "raw_journal_sync_errors".to_string(),
-            self.raw_journal_sync_errors.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "tier_entries_written".to_string(),
-            self.tier_entries_written.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "minute_1_entries_written".to_string(),
-            self.minute_1_entries_written.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "minute_5_entries_written".to_string(),
-            self.minute_5_entries_written.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "hour_1_entries_written".to_string(),
-            self.hour_1_entries_written.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "minute_1_logical_bytes".to_string(),
-            self.minute_1_logical_bytes.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "minute_5_logical_bytes".to_string(),
-            self.minute_5_logical_bytes.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "hour_1_logical_bytes".to_string(),
-            self.hour_1_logical_bytes.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "tier_write_errors".to_string(),
-            self.tier_write_errors.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "tier_flushes".to_string(),
-            self.tier_flushes.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "tier_journal_syncs".to_string(),
-            self.tier_journal_syncs.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "tier_journal_sync_errors".to_string(),
-            self.tier_journal_sync_errors.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "minute_1_commit_age_seconds".to_string(),
-            self.minute_1_commit_age_seconds.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "minute_5_commit_age_seconds".to_string(),
-            self.minute_5_commit_age_seconds.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "hour_1_commit_age_seconds".to_string(),
-            self.hour_1_commit_age_seconds.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "minute_1_commit_duration_usec".to_string(),
-            self.minute_1_commit_duration_usec.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "minute_5_commit_duration_usec".to_string(),
-            self.minute_5_commit_duration_usec.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "hour_1_commit_duration_usec".to_string(),
-            self.hour_1_commit_duration_usec.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "minute_1_commit_batches".to_string(),
-            self.minute_1_commit_batches.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "minute_5_commit_batches".to_string(),
-            self.minute_5_commit_batches.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "hour_1_commit_batches".to_string(),
-            self.hour_1_commit_batches.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "minute_1_commit_stretched".to_string(),
-            self.minute_1_commit_stretched.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "minute_5_commit_stretched".to_string(),
-            self.minute_5_commit_stretched.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "hour_1_commit_stretched".to_string(),
-            self.hour_1_commit_stretched.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "decoder_state_persist_calls".to_string(),
-            self.decoder_state_persist_calls.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "decoder_state_persist_bytes".to_string(),
-            self.decoder_state_persist_bytes.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "decoder_state_write_errors".to_string(),
-            self.decoder_state_write_errors.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "decoder_state_move_errors".to_string(),
-            self.decoder_state_move_errors.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "decoder_v9_sources".to_string(),
-            self.decoder_v9_sources.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "decoder_ipfix_sources".to_string(),
-            self.decoder_ipfix_sources.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "decoder_legacy_sources".to_string(),
-            self.decoder_legacy_sources.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "decoder_namespaces".to_string(),
-            self.decoder_namespaces.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "decoder_hydrated_sources".to_string(),
-            self.decoder_hydrated_sources.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "bioris_refresh_success".to_string(),
-            self.bioris_refresh_success.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "bioris_refresh_errors".to_string(),
-            self.bioris_refresh_errors.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "bioris_dump_success".to_string(),
-            self.bioris_dump_success.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "bioris_dump_errors".to_string(),
-            self.bioris_dump_errors.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "bioris_observe_stream_starts".to_string(),
-            self.bioris_observe_stream_starts.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "bioris_observe_stream_reconnects".to_string(),
-            self.bioris_observe_stream_reconnects
-                .load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "bioris_observe_stream_errors".to_string(),
-            self.bioris_observe_stream_errors.load(Ordering::Relaxed),
-        );
-        stats.insert(
-            "bioris_observe_streams_active".to_string(),
-            self.bioris_observe_streams_active.load(Ordering::Relaxed),
-        );
+        self.extend_snapshot(&mut stats);
         stats
+    }
+
+    pub(crate) fn extend_snapshot(&self, stats: &mut HashMap<String, u64>) {
+        stats.reserve(INGEST_STATS_SNAPSHOT_KEY_COUNT);
+
+        macro_rules! insert {
+            ($key:literal, $counter:ident) => {
+                insert_snapshot_stat(stats, $key, self.$counter.load(Ordering::Relaxed));
+            };
+        }
+
+        insert!("udp_packets_received", udp_packets_received);
+        insert!("udp_bytes_received", udp_bytes_received);
+        insert!("decoded_parse_attempts", parse_attempts);
+        insert!("decoded_parsed_packets", parsed_packets);
+        insert!("decoded_parse_errors", parse_errors);
+        insert!("decoded_template_errors", template_errors);
+        insert!("decoded_netflow_v5", netflow_v5_packets);
+        insert!("decoded_netflow_v7", netflow_v7_packets);
+        insert!("decoded_netflow_v9", netflow_v9_packets);
+        insert!("decoded_ipfix", ipfix_packets);
+        insert!("decoded_sflow", sflow_datagrams);
+        insert!("journal_entries_written", journal_entries_written);
+        insert!("raw_journal_logical_bytes", raw_journal_logical_bytes);
+        insert!("journal_write_errors", journal_write_errors);
+        insert!("journal_sync_errors", journal_sync_errors);
+        insert!("raw_journal_syncs", raw_journal_syncs);
+        insert!("raw_journal_sync_errors", raw_journal_sync_errors);
+        insert!("tier_entries_written", tier_entries_written);
+        insert!("minute_1_entries_written", minute_1_entries_written);
+        insert!("minute_5_entries_written", minute_5_entries_written);
+        insert!("hour_1_entries_written", hour_1_entries_written);
+        insert!("minute_1_logical_bytes", minute_1_logical_bytes);
+        insert!("minute_5_logical_bytes", minute_5_logical_bytes);
+        insert!("hour_1_logical_bytes", hour_1_logical_bytes);
+        insert!("tier_write_errors", tier_write_errors);
+        insert!("tier_flushes", tier_flushes);
+        insert!("tier_journal_syncs", tier_journal_syncs);
+        insert!("tier_journal_sync_errors", tier_journal_sync_errors);
+        insert!("minute_1_commit_age_seconds", minute_1_commit_age_seconds);
+        insert!("minute_5_commit_age_seconds", minute_5_commit_age_seconds);
+        insert!("hour_1_commit_age_seconds", hour_1_commit_age_seconds);
+        insert!(
+            "minute_1_commit_duration_usec",
+            minute_1_commit_duration_usec
+        );
+        insert!(
+            "minute_5_commit_duration_usec",
+            minute_5_commit_duration_usec
+        );
+        insert!("hour_1_commit_duration_usec", hour_1_commit_duration_usec);
+        insert!("minute_1_commit_batches", minute_1_commit_batches);
+        insert!("minute_5_commit_batches", minute_5_commit_batches);
+        insert!("hour_1_commit_batches", hour_1_commit_batches);
+        insert!("minute_1_commit_stretched", minute_1_commit_stretched);
+        insert!("minute_5_commit_stretched", minute_5_commit_stretched);
+        insert!("hour_1_commit_stretched", hour_1_commit_stretched);
+        insert!("decoder_state_persist_calls", decoder_state_persist_calls);
+        insert!("decoder_state_persist_bytes", decoder_state_persist_bytes);
+        insert!("decoder_state_write_errors", decoder_state_write_errors);
+        insert!("decoder_state_move_errors", decoder_state_move_errors);
+        insert!("decoder_v9_sources", decoder_v9_sources);
+        insert!("decoder_ipfix_sources", decoder_ipfix_sources);
+        insert!("decoder_legacy_sources", decoder_legacy_sources);
+        insert!("decoder_namespaces", decoder_namespaces);
+        insert!("decoder_hydrated_sources", decoder_hydrated_sources);
+        insert!("bioris_refresh_success", bioris_refresh_success);
+        insert!("bioris_refresh_errors", bioris_refresh_errors);
+        insert!("bioris_dump_success", bioris_dump_success);
+        insert!("bioris_dump_errors", bioris_dump_errors);
+        insert!("bioris_observe_stream_starts", bioris_observe_stream_starts);
+        insert!(
+            "bioris_observe_stream_reconnects",
+            bioris_observe_stream_reconnects
+        );
+        insert!("bioris_observe_stream_errors", bioris_observe_stream_errors);
+        insert!(
+            "bioris_observe_streams_active",
+            bioris_observe_streams_active
+        );
+    }
+}
+
+fn insert_snapshot_stat(stats: &mut HashMap<String, u64>, key: &'static str, value: u64) {
+    if !stats.contains_key(key) {
+        stats.insert(key.to_string(), value);
     }
 }
 
