@@ -171,5 +171,4 @@ type topologyBGPPeer struct {
 	State                 string
 	EstablishedUptime     *int64
 	LastReceivedUpdateAge *int64
-	RemoteActorID         string
 }

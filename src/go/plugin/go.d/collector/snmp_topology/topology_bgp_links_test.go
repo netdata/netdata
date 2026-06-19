@@ -191,6 +191,38 @@ func TestApplyTopologyBGPAdjacencyEnrichmentDeduplicatesAsymmetricLocalIPObserva
 	require.Equal(t, 1, data.Stats["bgp_adjacency_visible_links"])
 }
 
+func TestApplyTopologyBGPAdjacencyEnrichmentCanonicalizesUndirectedLinkEndpoints(t *testing.T) {
+	data := topologyData{
+		Actors: []topologyActor{
+			topologyBGPManagedActorForTest("router-a", "device-a", nil, "198.51.100.1"),
+			topologyBGPManagedActorForTest("router-b", "device-b", nil, "198.51.100.2"),
+		},
+	}
+	aggregate := topologyObservationAggregate{
+		bgpPeers: []topologyBGPPeer{
+			bgpPeerForTest("device-b", "default", "198.51.100.2", "198.51.100.1", "65002", "65001", "2.2.2.2", "1.1.1.1", "established"),
+		},
+	}
+
+	stats := applyTopologyBGPAdjacencyEnrichment(&data, aggregate)
+
+	require.Equal(t, 1, stats.emittedLinks)
+	require.Len(t, data.Links, 1)
+	link := data.Links[0]
+	require.Equal(t, "router-a", link.SrcActorID)
+	require.Equal(t, "router-b", link.DstActorID)
+	require.Equal(t, "1.1.1.1", link.Src.Attributes["bgp_identifier"])
+	require.Equal(t, "2.2.2.2", link.Dst.Attributes["bgp_identifier"])
+	require.Equal(t, "198.51.100.1", link.Src.Attributes["ip"])
+	require.Equal(t, "198.51.100.2", link.Dst.Attributes["ip"])
+	require.Equal(t, "65001", link.Src.Attributes["as"])
+	require.Equal(t, "65002", link.Dst.Attributes["as"])
+	require.Equal(t, "65001", link.Metrics["local_as"])
+	require.Equal(t, "65002", link.Metrics["remote_as"])
+	require.Equal(t, "1.1.1.1", link.Metrics["local_identifier"])
+	require.Equal(t, "2.2.2.2", link.Metrics["peer_identifier"])
+}
+
 func TestApplyTopologyBGPAdjacencyEnrichmentKeepsRoutingInstancesSeparate(t *testing.T) {
 	data := topologyData{
 		Actors: []topologyActor{

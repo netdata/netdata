@@ -38,7 +38,6 @@ func applyTopologyBGPAdjacencyEnrichment(data *topologyData, aggregate topologyO
 		if localOK {
 			modalRow := topologyBGPPeerActorRow(row)
 			if remoteOK {
-				row.RemoteActorID = remoteRef.actorID
 				modalRow["remote_actor_id"] = remoteRef.actorID
 			}
 			peerRowsByActor[localRef.actorID] = append(peerRowsByActor[localRef.actorID], modalRow)
@@ -140,7 +139,28 @@ func (r topologyBGPActorResolver) addUniqueIdentifier(identifier string, ref top
 	}
 }
 
+type topologyBGPEndpoint struct {
+	identifier string
+	ip         string
+	asn        string
+}
+
 func topologyBGPAdjacencyLink(row topologyBGPPeer, srcRef, dstRef topologyL3ActorRef) topologyLink {
+	src := topologyBGPEndpoint{
+		identifier: row.LocalIdentifier,
+		ip:         row.LocalIP,
+		asn:        row.LocalAS,
+	}
+	dst := topologyBGPEndpoint{
+		identifier: row.PeerIdentifier,
+		ip:         row.NeighborIP,
+		asn:        row.RemoteAS,
+	}
+	if srcRef.actorID > dstRef.actorID {
+		srcRef, dstRef = dstRef, srcRef
+		src, dst = dst, src
+	}
+
 	return topologyLink{
 		Layer:      "3",
 		Protocol:   topologyBGPAdjacencyLinkType,
@@ -151,33 +171,33 @@ func topologyBGPAdjacencyLink(row topologyBGPPeer, srcRef, dstRef topologyL3Acto
 		DstActorID: dstRef.actorID,
 		Src: topologyLinkEndpoint{
 			Match:      srcRef.match,
-			Attributes: topologyBGPEndpointAttributes(row.LocalIdentifier, row.LocalIP, row.LocalAS),
+			Attributes: topologyBGPEndpointAttributes(src),
 		},
 		Dst: topologyLinkEndpoint{
 			Match:      dstRef.match,
-			Attributes: topologyBGPEndpointAttributes(row.PeerIdentifier, row.NeighborIP, row.RemoteAS),
+			Attributes: topologyBGPEndpointAttributes(dst),
 		},
-		Metrics: topologyBGPLinkMetrics(row),
+		Metrics: topologyBGPLinkMetrics(row, src, dst),
 	}
 }
 
-func topologyBGPEndpointAttributes(identifier, ip, asn string) map[string]any {
+func topologyBGPEndpointAttributes(endpoint topologyBGPEndpoint) map[string]any {
 	attrs := map[string]any{
 		"source": "bgp_mib",
 	}
-	if identifier := normalizeBGPRouterID(identifier); identifier != "" {
+	if identifier := normalizeBGPRouterID(endpoint.identifier); identifier != "" {
 		attrs["bgp_identifier"] = identifier
 	}
-	if ip := normalizeNonUnspecifiedIPAddress(ip); ip != "" {
+	if ip := normalizeNonUnspecifiedIPAddress(endpoint.ip); ip != "" {
 		attrs["ip"] = ip
 	}
-	if asn = strings.TrimSpace(asn); asn != "" {
+	if asn := strings.TrimSpace(endpoint.asn); asn != "" {
 		attrs["as"] = asn
 	}
 	return attrs
 }
 
-func topologyBGPLinkMetrics(row topologyBGPPeer) map[string]any {
+func topologyBGPLinkMetrics(row topologyBGPPeer, src, dst topologyBGPEndpoint) map[string]any {
 	metrics := map[string]any{
 		"source":           "bgp_mib",
 		"inference":        "bgp_established_adjacency",
@@ -190,12 +210,12 @@ func topologyBGPLinkMetrics(row topologyBGPPeer) map[string]any {
 			metrics[key] = value
 		}
 	}
-	addStringMetric("local_ip", normalizeNonUnspecifiedIPAddress(row.LocalIP))
-	addStringMetric("neighbor_ip", normalizeNonUnspecifiedIPAddress(row.NeighborIP))
-	addStringMetric("local_as", row.LocalAS)
-	addStringMetric("remote_as", row.RemoteAS)
-	addStringMetric("local_identifier", normalizeBGPRouterID(row.LocalIdentifier))
-	addStringMetric("peer_identifier", normalizeBGPRouterID(row.PeerIdentifier))
+	addStringMetric("local_ip", normalizeNonUnspecifiedIPAddress(src.ip))
+	addStringMetric("neighbor_ip", normalizeNonUnspecifiedIPAddress(dst.ip))
+	addStringMetric("local_as", src.asn)
+	addStringMetric("remote_as", dst.asn)
+	addStringMetric("local_identifier", normalizeBGPRouterID(src.identifier))
+	addStringMetric("peer_identifier", normalizeBGPRouterID(dst.identifier))
 	addStringMetric("peer_type", row.PeerType)
 	addStringMetric("bgp_version", row.BGPVersion)
 	return metrics
@@ -256,8 +276,6 @@ func existingTopologyBGPLinkKeys(links []topologyLink) map[string]struct{} {
 			// Seed the key set so repeated enrichment over already-shaped data remains idempotent.
 			row := topologyBGPPeer{
 				RoutingInstance: topologyMetricValueString(link.Metrics, "routing_instance"),
-				LocalIP:         topologyV1EndpointString(link.Src, "ip"),
-				NeighborIP:      topologyV1EndpointString(link.Dst, "ip"),
 			}
 			seen[topologyBGPPeerLinkKeyParts(row, link.SrcActorID, link.DstActorID)] = struct{}{}
 		}
@@ -298,7 +316,6 @@ func recordTopologyBGPEnrichmentStats(data *topologyData, stats topologyBGPEnric
 	data.Stats["bgp_adjacency_suppressed_unresolved_neighbor"] = stats.suppressedUnresolvedNeighbor
 	data.Stats["bgp_adjacency_suppressed_self_actor"] = stats.suppressedSelfActor
 	data.Stats["bgp_adjacency_suppressed_duplicate_link"] = stats.suppressedDuplicateLink
-	recomputeTopologyBGPVisibleLinkStats(data)
 }
 
 func recomputeTopologyBGPVisibleLinkStats(data *topologyData) {
