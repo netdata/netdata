@@ -21,10 +21,10 @@ See [Alert Configuration Ordering](/src/health/alert-configuration-ordering.md) 
 
 ## Where to Put Your Overrides
 
-Put your overrides in your **user config directory** — files there survive upgrades. The **stock config directory** holds Netdata's built-in alert definitions and is replaced during updates.
+Put your overrides in your [Netdata config directory](/docs/netdata-agent/configuration/README.md) under `health.d/` — files there survive upgrades. The **stock config directory** holds Netdata's built-in alert definitions and is replaced during updates.
 
 :::note
-The default paths used throughout this guide are `/etc/netdata/health.d/` for user configs and `/usr/lib/netdata/conf.d/health.d/` for stock configs. These are installation defaults — your system may use a different prefix. To find your exact paths, check the `[directories]` section of your `netdata.conf` (keys `health config` and `stock health config`), or run `sudo ./edit-config health.d/<file>`, which resolves the user config directory automatically.
+Config paths vary by install prefix. Run `sudo ./edit-config health.d/<file>` from your Netdata config directory to resolve the correct user path automatically, or check the `[directories]` section of `netdata.conf` (keys `health config` and `stock health config`) for exact locations.
 :::
 
 ## Method 1: Override All Instances (Template)
@@ -43,7 +43,7 @@ template: 20min_steal_cpu
     warn: $this > (($status >= $WARNING) ? (5) : (10))
 ```
 
-Your override (in your user config directory; create it with `sudo ./edit-config health.d/my-overrides.conf`):
+Your override (create it with `sudo ./edit-config health.d/my-overrides.conf`):
 ```yaml
 template: 20min_steal_cpu
       on: system.cpu
@@ -72,7 +72,7 @@ template: disk_space_usage
      crit: $this < 10
 ```
 
-Your override (in your user config directory; create it with `sudo ./edit-config health.d/my-overrides.conf`):
+Your override (create it with `sudo ./edit-config health.d/my-overrides.conf`):
 ```yaml
 alarm: disk_space_usage
    on: disk_space._mnt_data
@@ -122,7 +122,7 @@ Use labels when:
 If you want to modify many alerts in one stock file, copy it entirely:
 
 ```bash
-# from your Netdata config directory (default: /etc/netdata):
+# from your Netdata config directory:
 sudo ./edit-config health.d/cpu.conf
 ```
 
@@ -263,17 +263,17 @@ Both can coexist because they match different hosts.
 
 ### How do I find what stock alerts exist?
 
-List all stock alert files in your stock config directory:
+List the stock alert files (the command below uses the default stock directory):
 ```bash
 ls /usr/lib/netdata/conf.d/health.d/
 ```
 
-View a specific stock alert in your stock config directory:
+View a specific stock alert:
 ```bash
 cat /usr/lib/netdata/conf.d/health.d/cpu.conf
 ```
 
-Or use the API to list all alert names:
+Or use the API to list all alert names without dealing with paths:
 ```bash
 curl -s "http://localhost:19999/api/v1/alarms?all" | jq '.alarms | to_entries[].value.name' | sort -u
 ```
@@ -328,12 +328,12 @@ journalctl --namespace netdata -g "health.*load\|health.*read" --no-pager
 grep -iE "health.*(load|read)" /var/log/netdata/error.log
 ```
 
-Compare your active alert config vs stock:
+Compare your active alert config vs stock (default locations shown):
 ```bash
-# Your override (default location)
+# Your override
 cat /etc/netdata/health.d/my-overrides.conf
 
-# Stock definition (default location)
+# Stock definition
 cat /usr/lib/netdata/conf.d/health.d/disks.conf
 ```
 

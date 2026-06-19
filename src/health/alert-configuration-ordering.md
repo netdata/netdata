@@ -77,11 +77,11 @@ Both have the **same name** (`disk_space_usage`), so precedence applies:
 
 Netdata loads alert configurations from two directories:
 
-1. **User config** (loaded first): `/etc/netdata/health.d/`
-2. **Stock config** (loaded second): `/usr/lib/netdata/conf.d/health.d/`
+1. **User config** (loaded first): your `health.d/` directory under the [Netdata config directory](/docs/netdata-agent/configuration/README.md)
+2. **Stock config** (loaded second): the stock `health.d/` directory
 
 :::note
-These paths are installation defaults and may differ on your system depending on install prefix. Check the `[directories]` section of your `netdata.conf` (keys `health config` and `stock health config`) for exact paths, or use `sudo ./edit-config health.d/<file>`, which resolves the correct user config directory automatically.
+Config paths vary by install prefix. Run `sudo ./edit-config health.d/<file>` to resolve the correct user path automatically, or check the `[directories]` section of `netdata.conf` (keys `health config` and `stock health config`) for exact locations.
 :::
 
 ### File Shadowing
