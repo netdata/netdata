@@ -94,6 +94,7 @@ impl IngestService {
                 &mut self.encode_buf,
                 &self.facet_runtime,
                 &self.metrics,
+                &self.journal_host,
             );
 
             if let Some(acc) = self.tier_accumulators.get_mut(&tier) {

@@ -5,7 +5,6 @@ package snmp_traps
 import (
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -23,10 +22,8 @@ const (
 )
 
 func TestNewJournalWriterEagerOpenCreatesSDKJournalDirectory(t *testing.T) {
-	requireLinuxJournalBackend(t)
-
 	dir := t.TempDir()
-	w, err := NewJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
+	w, err := newTestJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
 	require.NoError(t, err)
 	defer w.Close()
 
@@ -39,10 +36,8 @@ func TestNewJournalWriterEagerOpenCreatesSDKJournalDirectory(t *testing.T) {
 }
 
 func TestNewJournalWriterCreatesCompactUnsealedUncompressedJournal(t *testing.T) {
-	requireLinuxJournalBackend(t)
-
 	dir := t.TempDir()
-	w, err := NewJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
+	w, err := newTestJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
 	require.NoError(t, err)
 
 	fields := []JournalField{
@@ -68,7 +63,7 @@ func TestJournalWriterWriteAndQueryWithJournalctl(t *testing.T) {
 	requireJournalctl(t)
 
 	dir := t.TempDir()
-	w, err := NewJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
+	w, err := newTestJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
 	require.NoError(t, err)
 
 	fields := []JournalField{
@@ -94,7 +89,7 @@ func TestJournalWriterCWE117InjectionNotQueryableAsField(t *testing.T) {
 	requireJournalctl(t)
 
 	dir := t.TempDir()
-	w, err := NewJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
+	w, err := newTestJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
 	require.NoError(t, err)
 
 	fields := []JournalField{
@@ -113,10 +108,8 @@ func TestJournalWriterCWE117InjectionNotQueryableAsField(t *testing.T) {
 }
 
 func TestJournalWriterCountsBinaryEncodedFields(t *testing.T) {
-	requireLinuxJournalBackend(t)
-
 	dir := t.TempDir()
-	w, err := NewJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
+	w, err := newTestJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
 	require.NoError(t, err)
 	defer w.Close()
 
@@ -129,10 +122,8 @@ func TestJournalWriterCountsBinaryEncodedFields(t *testing.T) {
 }
 
 func TestJournalTrapWriterCloseReturnsWorkerFailure(t *testing.T) {
-	requireLinuxJournalBackend(t)
-
 	dir := t.TempDir()
-	w, err := NewJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
+	w, err := newTestJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
 	require.NoError(t, err)
 
 	tw := newJournalTrapWriter(w, 10)
@@ -147,16 +138,8 @@ func TestJournalTrapWriterCloseReturnsWorkerFailure(t *testing.T) {
 
 func requireJournalctl(t *testing.T) {
 	t.Helper()
-	requireLinuxJournalBackend(t)
 	if _, err := exec.LookPath("journalctl"); err != nil {
 		t.Skip("journalctl not found")
-	}
-}
-
-func requireLinuxJournalBackend(t *testing.T) {
-	t.Helper()
-	if runtime.GOOS != "linux" {
-		t.Skip("SNMP trap journal backend requires Linux")
 	}
 }
 

@@ -111,7 +111,7 @@ Job names must be 64 characters or shorter, start with a letter or digit, and ma
 | Enrichment | `reverse_dns.enabled` | `false` | Adds best-effort PTR annotation as `TRAP_REVERSE_DNS`. Never used as authoritative identity. |
 | Storm controls | `rate_limit` | disabled | Optional per-source token-bucket rate limiting. |
 | Storm controls | `dedup` | disabled | Optional suppression of repeated identical traps inside a window. |
-| Outputs | `journal.enabled` | `true` | Writes decoded traps to local journal-compatible files and exposes listener jobs through the `snmp:traps` Function. Linux only. |
+| Outputs | `journal.enabled` | `true` | Writes decoded traps to local journal-compatible files and exposes listener jobs through the `snmp:traps` Function. |
 | Outputs | `otlp` | disabled | Optional OTLP/gRPC Logs export. |
 | Storage | `retention` | `max_size: 10GB` | Per-job direct journal retention and rotation. Ignored when `journal.enabled` is `false`. |
 | Meaning | `overrides` | `[]` | Per-OID category, severity, and label overrides on top of profile defaults. |
@@ -319,7 +319,7 @@ The listener can write to the direct journal, export to OTLP/gRPC, or do both.
 
 | Backend | Enabled by default | Local querying | Notes |
 |---|---:|---:|---|
-| Direct journal | yes | yes | Stores journal-compatible files under the Netdata log directory and exposes the job through the `snmp:traps` Function. Linux only. |
+| Direct journal | yes | yes | Stores journal-compatible files under the Netdata log directory and exposes the job through the `snmp:traps` Function. |
 | OTLP/gRPC Logs | no | no | Exports traps as OTLP LogRecords to an external collector. |
 
 When both backends are enabled, traps go to both outputs and the local journal is authoritative: an OTLP export failure does not affect what was already written to the journal. When journal is disabled and OTLP is enabled, no local journal files are created and the job does not appear as a local SNMP trap log source.
@@ -328,7 +328,7 @@ Trap rows can contain sensitive operational payloads, not only credentials. Revi
 
 ### Direct journal
 
-Direct journal storage is enabled by default and requires Linux:
+Direct journal storage is enabled by default:
 
 ```yaml
 journal:

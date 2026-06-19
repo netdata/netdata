@@ -8,12 +8,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 )
 
 var engineBootsDirBase string
@@ -31,10 +30,7 @@ func engineBootsBaseDir() string {
 	if engineBootsDirBase != "" {
 		return engineBootsDirBase
 	}
-	if dir := pluginconfig.VarLibDir(); dir != "" {
-		return filepath.Join(dir, "snmp-trap")
-	}
-	return "/var/lib/netdata/snmp-trap"
+	return filepath.Join(netdataLibDir(), "snmp-trap")
 }
 
 func engineBootsPath(jobName string) string {
@@ -47,6 +43,17 @@ func engineStatePathExistsChecked(path string) (bool, error) {
 		return true, nil
 	}
 	if os.IsNotExist(err) {
+		parent := filepath.Dir(path)
+		info, parentErr := os.Stat(parent)
+		if parentErr != nil {
+			if os.IsNotExist(parentErr) {
+				return false, nil
+			}
+			return false, parentErr
+		}
+		if !info.IsDir() {
+			return false, fmt.Errorf("%s is not a directory", parent)
+		}
 		return false, nil
 	}
 	return false, err
@@ -116,42 +123,7 @@ func (eb *EngineBoots) init() error {
 }
 
 func (eb *EngineBoots) persist() error {
-	tmpPath := eb.path + ".tmp"
-
-	if err := os.WriteFile(tmpPath, fmt.Appendf(nil, "%d\n", eb.value), 0640); err != nil {
-		return fmt.Errorf("engine-boots: write %s: %w", tmpPath, err)
-	}
-
-	f, err := os.Open(tmpPath)
-	if err != nil {
-		return fmt.Errorf("engine-boots: open temp for fsync %s: %w", tmpPath, err)
-	}
-	syncErr := f.Sync()
-	closeErr := f.Close()
-	if syncErr != nil {
-		return fmt.Errorf("engine-boots: fsync %s: %w", tmpPath, syncErr)
-	}
-	if closeErr != nil {
-		return fmt.Errorf("engine-boots: close %s after fsync: %w", tmpPath, closeErr)
-	}
-
-	if err := os.Rename(tmpPath, eb.path); err != nil {
-		return fmt.Errorf("engine-boots: rename %s -> %s: %w", tmpPath, eb.path, err)
-	}
-	dirPath := filepath.Dir(eb.path)
-	dir, err := os.Open(dirPath)
-	if err != nil {
-		return fmt.Errorf("engine-boots: open directory for fsync %s: %w", dirPath, err)
-	}
-	syncErr = dir.Sync()
-	closeErr = dir.Close()
-	if syncErr != nil {
-		return fmt.Errorf("engine-boots: fsync directory %s: %w", dirPath, syncErr)
-	}
-	if closeErr != nil {
-		return fmt.Errorf("engine-boots: close directory %s after fsync: %w", dirPath, closeErr)
-	}
-	return nil
+	return persistEngineStateFile("engine-boots", eb.path, fmt.Appendf(nil, "%d\n", eb.value))
 }
 
 func (eb *EngineBoots) Value() int64 {
@@ -265,40 +237,48 @@ func isAllByte(b []byte, value byte) bool {
 
 func (lid *LocalEngineID) persist() error {
 	hexStr := hex.EncodeToString(lid.value)
-	tmpPath := lid.path + ".tmp"
+	return persistEngineStateFile("local-engine-id", lid.path, []byte(hexStr+"\n"))
+}
 
-	if err := os.WriteFile(tmpPath, []byte(hexStr+"\n"), 0640); err != nil {
-		return fmt.Errorf("local-engine-id: write %s: %w", tmpPath, err)
+func persistEngineStateFile(label, path string, data []byte) error {
+	tmpPath := path + ".tmp"
+
+	if err := os.WriteFile(tmpPath, data, 0640); err != nil {
+		return fmt.Errorf("%s: write %s: %w", label, tmpPath, err)
 	}
 
-	f, err := os.Open(tmpPath)
+	f, err := os.OpenFile(tmpPath, os.O_RDWR, 0)
 	if err != nil {
-		return fmt.Errorf("local-engine-id: open temp for fsync %s: %w", tmpPath, err)
+		return fmt.Errorf("%s: open temp for fsync %s: %w", label, tmpPath, err)
 	}
 	syncErr := f.Sync()
 	closeErr := f.Close()
 	if syncErr != nil {
-		return fmt.Errorf("local-engine-id: fsync %s: %w", tmpPath, syncErr)
+		return fmt.Errorf("%s: fsync %s: %w", label, tmpPath, syncErr)
 	}
 	if closeErr != nil {
-		return fmt.Errorf("local-engine-id: close %s after fsync: %w", tmpPath, closeErr)
+		return fmt.Errorf("%s: close %s after fsync: %w", label, tmpPath, closeErr)
 	}
 
-	if err := os.Rename(tmpPath, lid.path); err != nil {
-		return fmt.Errorf("local-engine-id: rename %s -> %s: %w", tmpPath, lid.path, err)
+	if err := os.Rename(tmpPath, path); err != nil {
+		return fmt.Errorf("%s: rename %s -> %s: %w", label, tmpPath, path, err)
 	}
-	dirPath := filepath.Dir(lid.path)
+	// Windows does not support opening directories for fsync.
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	dirPath := filepath.Dir(path)
 	dir, err := os.Open(dirPath)
 	if err != nil {
-		return fmt.Errorf("local-engine-id: open directory for fsync %s: %w", dirPath, err)
+		return fmt.Errorf("%s: open directory for fsync %s: %w", label, dirPath, err)
 	}
 	syncErr = dir.Sync()
 	closeErr = dir.Close()
 	if syncErr != nil {
-		return fmt.Errorf("local-engine-id: fsync directory %s: %w", dirPath, syncErr)
+		return fmt.Errorf("%s: fsync directory %s: %w", label, dirPath, syncErr)
 	}
 	if closeErr != nil {
-		return fmt.Errorf("local-engine-id: close directory %s after fsync: %w", dirPath, closeErr)
+		return fmt.Errorf("%s: close directory %s after fsync: %w", label, dirPath, closeErr)
 	}
 	return nil
 }

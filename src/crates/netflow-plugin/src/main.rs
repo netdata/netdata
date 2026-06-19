@@ -10,6 +10,7 @@ mod flow;
 #[allow(dead_code)]
 mod flow_index;
 mod ingest;
+mod local_journal_host;
 mod memory_allocator;
 #[cfg(test)]
 mod memory_tests;

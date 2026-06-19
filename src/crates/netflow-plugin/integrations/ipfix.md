@@ -38,9 +38,7 @@ version number 10 and decoded using cached templates. Decoded records are enrich
 appended to disk-backed journal tiers.
 
 
-This integration is only supported on the following platforms:
-
-- Linux
+This integration is supported on all platforms.
 
 This integration runs as a single instance per Netdata Agent.
 

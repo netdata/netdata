@@ -1,4 +1,5 @@
 use super::*;
+use crate::local_journal_host::load_local_journal_provider;
 use crate::plugin_config::DecapsulationMode as ConfigDecapsulationMode;
 use etherparse::{NetSlice, SlicedPacket, TransportSlice};
 use pcap_file::pcap::PcapReader;
@@ -92,18 +93,21 @@ pub(super) fn new_production_benchmark_ingest_service(
     (tmp, service)
 }
 
-pub(super) fn new_disk_benchmark_raw_log() -> (TempDir, Log) {
+pub(super) fn new_disk_benchmark_raw_log() -> (TempDir, Log, Arc<LocalJournalProvider>) {
     let tmp = new_disk_benchmark_tempdir("resource-bench-raw-");
     let mut cfg = PluginConfig::default();
     cfg.journal.journal_dir = tmp.path().join("flows").to_string_lossy().to_string();
+    cfg._netdata_env.lib_dir = Some(tmp.path().join("varlib"));
 
     let raw_dir = cfg.journal.raw_tier_dir();
     std::fs::create_dir_all(&raw_dir)
         .unwrap_or_else(|e| panic!("create raw tier directory {}: {e}", raw_dir.display()));
 
-    let machine_id = load_machine_id().expect("load machine id for raw benchmark log");
+    let journal_host = Arc::new(
+        load_local_journal_provider(&cfg).expect("load local journal host for raw benchmark log"),
+    );
     let origin = Origin {
-        machine_id: Some(machine_id),
+        machine_id: Some(journal_host.machine_id()),
         namespace: None,
         source: Source::System,
     };
@@ -128,11 +132,12 @@ pub(super) fn new_disk_benchmark_raw_log() -> (TempDir, Log) {
         Config::new(origin, rotation_policy, retention_policy)
             .with_compact(true)
             .with_compression(Compression::None)
+            .with_boot_id(journal_host.boot_id())
             .with_live_publish_every_entries(0),
     )
     .unwrap_or_else(|e| panic!("create raw benchmark log in {}: {e}", raw_dir.display()));
 
-    (tmp, log)
+    (tmp, log, journal_host)
 }
 
 pub(super) fn new_test_ingest_service_in_dir(

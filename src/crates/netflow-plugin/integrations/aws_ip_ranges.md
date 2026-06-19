@@ -66,9 +66,7 @@ than the file actually changes; daily is enough for most flow-attribution use
 cases. The plugin floors the configured `interval` at 60s.
 
 
-This integration is only supported on the following platforms:
-
-- Linux
+This integration is supported on all platforms.
 
 This integration supports multiple instances configured side-by-side.
 

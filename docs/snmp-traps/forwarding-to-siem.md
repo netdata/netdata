@@ -39,7 +39,7 @@ OTLP-only jobs create no local trap journal files and do not appear as job sourc
 
 ## Direct journal backend
 
-Direct journal output is enabled by default for listener jobs and requires Linux. On non-Linux systems, jobs with `journal.enabled: true` fail validation; use OTLP-only mode instead.
+Direct journal output is enabled by default for listener jobs. It writes local trap log files that can be read with `journalctl --directory` on systems where `journalctl` is available. Use OTLP-only mode when the external OTLP receiver is the system of record and local trap files are not needed.
 
 ```yaml
 journal:

@@ -35,6 +35,7 @@ groups:
       - snmp_trap_errors_journal_write_failed
       - snmp_trap_errors_otlp_export_failed
       - snmp_trap_errors_listener_read_failed
+      - snmp_trap_errors_listener_buffer_degraded
       - snmp_trap_dedup_suppressed
       - snmp_trap_pipeline_received
       - snmp_trap_pipeline_decoded
@@ -173,6 +174,8 @@ groups:
             name: otlp_export_failed
           - selector: snmp_trap_errors_listener_read_failed
             name: listener_read_failed
+          - selector: snmp_trap_errors_listener_buffer_degraded
+            name: listener_buffer_degraded
       - id: dedup_suppressed
         title: SNMP trap dedup suppressed events
         context: dedup_suppressed

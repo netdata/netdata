@@ -763,6 +763,7 @@ func TestCollectorInit_ReceiveBufferFailureIsRetryableCodedError(t *testing.T) {
 	c := newTestSNMPTrapsCollector()
 	c.SetJobName("local")
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
+	c.Listen.ReceiveBuffer = defaultListenerReceiveBuffer + 1
 
 	err := c.Init(context.Background())
 	require.Error(t, err)

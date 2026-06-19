@@ -15,7 +15,7 @@ use crate::tiering::{
     MATERIALIZED_TIERS, OpenTierState, TierAccumulator, TierFlowIndexStore, TierKind,
 };
 use anyhow::{Context, Result, anyhow};
-use journal_common::load_machine_id;
+use journal_host::LocalJournalProvider;
 use journal_index::Seconds;
 use journal_log_writer::{
     Compression, Config, EntryTimestamps, Log, RetentionPolicy, RotationPolicy,

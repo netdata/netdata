@@ -45,9 +45,7 @@ auto-detected cache directory. The plugin reloads the generated MMDB
 automatically when the file changes.
 
 
-This integration is only supported on the following platforms:
-
-- Linux
+This integration is supported on all platforms.
 
 This integration runs as a single instance per Netdata Agent.
 

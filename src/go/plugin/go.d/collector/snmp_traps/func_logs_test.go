@@ -200,7 +200,7 @@ func TestSNMPTrapsLogsFunctionRejectsInvalidJSON(t *testing.T) {
 func writeTestTrapJournal(t *testing.T, root, jobName, message, category string) string {
 	t.Helper()
 
-	w, err := NewJournalWriter(filepath.Join(root, jobName), RetentionConfig{}.makeJournalConfig())
+	w, err := newTestJournalWriter(filepath.Join(root, jobName), RetentionConfig{}.makeJournalConfig())
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, w.Close()) })
 
@@ -220,7 +220,7 @@ func writeTestTrapJournal(t *testing.T, root, jobName, message, category string)
 		{Name: "TRAP_SOURCE_IP", Value: []byte("192.0.2.1")},
 		{Name: "TRAP_DEVICE_VENDOR", Value: []byte("test-vendor")},
 		{Name: "TRAP_JSON", Value: []byte(`{"trap_oid":"1.3.6.1.6.3.1.1.5.1"}`)},
-	}, now, monotonicUsec()))
+	}, now, 1000))
 	require.NoError(t, w.Sync())
 	return w.JournalDirectory()
 }
@@ -228,7 +228,7 @@ func writeTestTrapJournal(t *testing.T, root, jobName, message, category string)
 func writeHighVarbindTrapJournal(t *testing.T, root, jobName string, varbinds int) string {
 	t.Helper()
 
-	w, err := NewJournalWriter(filepath.Join(root, jobName), RetentionConfig{}.makeJournalConfig())
+	w, err := newTestJournalWriter(filepath.Join(root, jobName), RetentionConfig{}.makeJournalConfig())
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, w.Close()) })
 
@@ -259,7 +259,7 @@ func writeHighVarbindTrapJournal(t *testing.T, root, jobName string, varbinds in
 	})
 
 	now := time.Now().UnixMicro()
-	require.NoError(t, w.WriteEntry(fields, now, monotonicUsec()))
+	require.NoError(t, w.WriteEntry(fields, now, 1000))
 	require.NoError(t, w.Sync())
 	return w.JournalDirectory()
 }

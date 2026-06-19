@@ -64,9 +64,7 @@ under `${NETDATA_STOCK_DATA_DIR}/topology-ip-intel/` (typically
 treated as optional, so a missing or unreadable file does not abort plugin startup.
 
 
-This integration is only supported on the following platforms:
-
-- Linux
+This integration is supported on all platforms.
 
 This integration runs as a single instance per Netdata Agent.
 
