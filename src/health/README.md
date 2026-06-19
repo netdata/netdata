@@ -78,9 +78,11 @@ Each level operates independently while Netdata Cloud provides a coherent, dedup
 
 You configure Netdata alerts in 3 layers:
 
-1. **Stock Alerts**: Netdata provides hundreds of alert definitions in `/usr/lib/netdata/conf.d/health.d` to detect common issues. Don't edit these directly - updates will overwrite your changes.
-2. **Your Custom Alerts**: Create your own definitions in `/etc/netdata/health.d`.
+1. **Stock Alerts**: Netdata provides hundreds of alert definitions in `/usr/lib/netdata/conf.d/health.d` (default) to detect common issues. Don't edit these directly - updates will overwrite your changes.
+2. **Your Custom Alerts**: Create your own definitions in `/etc/netdata/health.d` (default).
 3. **Dynamic UI Configuration**: Use Netdata dashboards to edit, add, enable, or disable alerts on any node through the streaming transport.
+
+These are default locations. On systems with a non-standard install prefix they differ — check the `[directories]` section of your `netdata.conf` (keys `health config` and `stock health config`), or use `sudo ./edit-config health.d/<file>` which resolves the user config directory automatically.
 
 ## Managing Notification Configuration
 
@@ -93,7 +95,7 @@ You can configure notifications for any infrastructure node at 3 levels:
 | **Netdata Cloud**  | Receives Transitions        | Netdata Cloud      | Web-hooks, role/room based | [Cloud integrations](https://learn.netdata.cloud/docs/alerts-&-notifications/notifications/centralized-cloud-notifications) |
 
 :::note
-When using Parents and Cloud with default settings, you may receive duplicate email notifications. Agents send emails by default when an MTA exists on their systems. Disable email notifications on Agents and Parents when using Cloud by setting `SEND_EMAIL="NO"` in `/etc/netdata/health_alarm_notify.conf` [using `edit-config`](/docs/netdata-agent/configuration/README.md).
+When using Parents and Cloud with default settings, you may receive duplicate email notifications. Agents send emails by default when an MTA exists on their systems. Disable email notifications on Agents and Parents when using Cloud by setting `SEND_EMAIL="NO"` in `/etc/netdata/health_alarm_notify.conf` (default) [using `edit-config`](/docs/netdata-agent/configuration/README.md), which resolves the user config directory automatically.
 :::
 
 ### Best Practices for Large Deployments
@@ -108,7 +110,7 @@ When you:
 Follow these steps:
 1. Disable health monitoring on child nodes
 2. Share the same alert configuration across Parents (use git repo or CI/CD)
-3. Disable Parent notifications (`SEND_EMAIL="NO"` in `/etc/netdata/health_alarm_notify.conf`)
+3. Disable Parent notifications (`SEND_EMAIL="NO"` in `/etc/netdata/health_alarm_notify.conf`, default location)
 4. Keep only Cloud notifications
 
 This emulates traditional monitoring tools where you configure alerts centrally and dispatch notifications centrally.
@@ -121,7 +123,7 @@ When you:
 - Use Cloud for all nodes
 
 Follow these steps:
-- Disable stock alerts on children (`enable stock health configuration` to `no` in `/etc/netdata/netdata.conf` `[health]` section)
+- Disable stock alerts on children (set `enable stock health configuration` to `no` in the `[health]` section of `/etc/netdata/netdata.conf` (default; edit with `sudo ./edit-config netdata.conf`))
 - Configure only automation-required alerts on children
 - Keep stock alerts on Parents but disable notifications (`SEND_EMAIL="NO"`)
 - Keep only Cloud notifications
@@ -463,7 +465,11 @@ The Assistant window follows you through dashboards for easy reference while inv
 
 ### Missing or No Stock Alerts
 
-If your node has no stock alerts (the built-in alerts that ship with Netdata), check these common causes in order:
+If your node has no stock alerts (the built-in alerts that ship with Netdata), check these common causes in order.
+
+:::note
+The commands below use the default locations — `/etc/netdata/` for user config and `/usr/lib/netdata/conf.d/` for stock config. If Netdata was installed with a non-standard prefix, these paths differ. Run `sudo ./edit-config` from your Netdata config directory to resolve the correct user config path automatically, or check the `[directories]` section of your `netdata.conf` (keys `config`, `stock config`, `health config`, `stock health config`).
+:::
 
 #### 1. Health monitoring disabled entirely
 
@@ -495,16 +501,16 @@ sudo systemctl restart netdata
 
 #### 3. File shadowing
 
-If a file in `/etc/netdata/health.d/` has the same filename as a stock file (e.g., both contain `cpu.conf`), the stock file is **completely ignored** — only the user copy is loaded. If the user copy contains only a subset of the original alerts, the rest are missing.
+If a file in `/etc/netdata/health.d/` (default) has the same filename as a stock file (e.g., both contain `cpu.conf`), the stock file is **completely ignored** — only the user copy is loaded. If the user copy contains only a subset of the original alerts, the rest are missing.
 
 This is different from overriding individual alerts by name. With file shadowing, you must include **all** alerts you want from that file. See [Alert Configuration Ordering](/src/health/alert-configuration-ordering.md) for the conceptual explanation.
 
-Check — compare filenames between user and stock directories:
+Check — compare filenames between user and stock directories (default paths shown; adjust if your install prefix differs):
 ```bash
 comm -12 <(ls /etc/netdata/health.d/ | sort) <(ls /usr/lib/netdata/conf.d/health.d/ | sort)
 ```
 
-Restore: if the user copy is no longer needed, remove it:
+Restore: if the user copy is no longer needed, remove it from your user health config directory (default `/etc/netdata/health.d/`):
 ```bash
 sudo rm /etc/netdata/health.d/<filename>.conf
 sudo netdatacli reload-health

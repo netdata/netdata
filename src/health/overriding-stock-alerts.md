@@ -23,9 +23,9 @@ See [Alert Configuration Ordering](/src/health/alert-configuration-ordering.md) 
 
 **User config directory** (default): `/etc/netdata/health.d/`
 
-Files here survive upgrades. Stock files in `/usr/lib/netdata/conf.d/health.d/` are replaced during updates.
+Files here survive upgrades. Stock files in `/usr/lib/netdata/conf.d/health.d/` (default) are replaced during updates.
 
-Check your `netdata.conf` `[directories]` section for exact paths on your system.
+These are default locations; on systems with a non-standard install prefix they differ. Check the `[directories]` section of your `netdata.conf` (keys `health config` and `stock health config`) for the exact paths, or use `sudo ./edit-config health.d/<file>` which resolves the user config directory automatically.
 
 ## Method 1: Override All Instances (Template)
 
@@ -33,7 +33,7 @@ Create a template with the same name to change thresholds for ALL instances.
 
 **Example: Raise CPU steal thresholds globally**
 
-Stock alert in `/usr/lib/netdata/conf.d/health.d/cpu.conf`:
+Stock alert in `/usr/lib/netdata/conf.d/health.d/cpu.conf` (default):
 ```yaml
 template: 20min_steal_cpu
       on: system.cpu
@@ -43,7 +43,7 @@ template: 20min_steal_cpu
     warn: $this > (($status >= $WARNING) ? (5) : (10))
 ```
 
-Your override in `/etc/netdata/health.d/my-overrides.conf`:
+Your override in `/etc/netdata/health.d/my-overrides.conf` (default; create it with `sudo ./edit-config health.d/my-overrides.conf`):
 ```yaml
 template: 20min_steal_cpu
       on: system.cpu
@@ -72,7 +72,7 @@ template: disk_space_usage
      crit: $this < 10
 ```
 
-Your override in `/etc/netdata/health.d/my-overrides.conf`:
+Your override in `/etc/netdata/health.d/my-overrides.conf` (default; create it with `sudo ./edit-config health.d/my-overrides.conf`):
 ```yaml
 alarm: disk_space_usage
    on: disk_space._mnt_data
@@ -122,7 +122,7 @@ Use labels when:
 If you want to modify many alerts in one stock file, copy it entirely:
 
 ```bash
-cd /etc/netdata
+# from your Netdata config directory (default: /etc/netdata):
 sudo ./edit-config health.d/cpu.conf
 ```
 
@@ -134,7 +134,7 @@ This means your copy must include ALL alerts you want—not just the ones you're
 
 ### Option A: Global Disable
 
-In `/etc/netdata/netdata.conf`:
+In your `netdata.conf` (default location `/etc/netdata/netdata.conf`; edit it with `sudo ./edit-config netdata.conf`):
 
 ```ini
 [health]
@@ -263,12 +263,12 @@ Both can coexist because they match different hosts.
 
 ### How do I find what stock alerts exist?
 
-List all stock alert files:
+List all stock alert files (default location):
 ```bash
 ls /usr/lib/netdata/conf.d/health.d/
 ```
 
-View a specific stock alert:
+View a specific stock alert (default location):
 ```bash
 cat /usr/lib/netdata/conf.d/health.d/cpu.conf
 ```
@@ -292,7 +292,7 @@ template: my_custom_disk_alert
 
 ### What happens to my overrides after a Netdata upgrade?
 
-User config files in `/etc/netdata/health.d/` are preserved. Stock files in `/usr/lib/netdata/conf.d/health.d/` are replaced.
+User config files in `/etc/netdata/health.d/` (default) are preserved. Stock files in `/usr/lib/netdata/conf.d/health.d/` (default) are replaced.
 
 Your overrides continue working. However, if a stock alert is renamed or removed in a new version, your override may become orphaned (still works, but no longer overriding anything).
 
@@ -330,10 +330,10 @@ grep -iE "health.*(load|read)" /var/log/netdata/error.log
 
 Compare your active alert config vs stock:
 ```bash
-# Your override
+# Your override (default location)
 cat /etc/netdata/health.d/my-overrides.conf
 
-# Stock definition
+# Stock definition (default location)
 cat /usr/lib/netdata/conf.d/health.d/disks.conf
 ```
 
