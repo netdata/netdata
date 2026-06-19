@@ -9,7 +9,6 @@ import (
 
 type topologyL3Interface struct {
 	DeviceID string
-	AgentID  string
 	IP       string
 	Netmask  string
 	IfIndex  string
@@ -17,7 +16,7 @@ type topologyL3Interface struct {
 	IfDescr  string
 }
 
-func (c *topologyCache) snapshotL3Interfaces(localDeviceID, agentID string) []topologyL3Interface {
+func (c *topologyCache) snapshotL3Interfaces(localDeviceID string) []topologyL3Interface {
 	if c == nil || len(c.l3InterfacesByIP) == 0 {
 		return nil
 	}
@@ -32,7 +31,6 @@ func (c *topologyCache) snapshotL3Interfaces(localDeviceID, agentID string) []to
 	for _, ip := range ips {
 		row := c.l3InterfacesByIP[ip]
 		row.DeviceID = strings.TrimSpace(localDeviceID)
-		row.AgentID = strings.TrimSpace(agentID)
 		row.IfIndex = strings.TrimSpace(row.IfIndex)
 		row.IP = normalizeIPAddress(row.IP)
 		row.Netmask = normalizeIPAddress(row.Netmask)

@@ -594,6 +594,32 @@ func TestSNMPTopologyToV1_PreservesL3SubnetPresentationAndEvidence(t *testing.T)
 	}
 }
 
+func TestSNMPTopologyToV1_ReturnsErrorForL3SubnetWithoutSubnet(t *testing.T) {
+	data := topologyData{
+		AgentID: "agent-test",
+		Actors: []topologyActor{
+			{ActorID: "router-a", ActorType: "router"},
+			{ActorID: "router-b", ActorType: "router"},
+		},
+		Links: []topologyLink{
+			{
+				Protocol:   topologyL3SubnetLinkType,
+				LinkType:   topologyL3SubnetLinkType,
+				SrcActorID: "router-a",
+				DstActorID: "router-b",
+				Metrics: map[string]any{
+					"prefix": uint64(30),
+				},
+			},
+		},
+	}
+
+	_, err := snmpTopologyToV1(data)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "l3_subnet link 0 is missing subnet")
+}
+
 func TestSNMPTopologyToV1_PreservesLinkPresentationTypes(t *testing.T) {
 	ts := time.Date(2026, 5, 10, 12, 0, 0, 0, time.UTC)
 	data := topologyData{

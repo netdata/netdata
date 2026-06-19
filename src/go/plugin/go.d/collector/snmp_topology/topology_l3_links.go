@@ -133,12 +133,22 @@ func topologyL3SubnetLinkKey(link topologyLink) string {
 	if src > dst {
 		src, dst = dst, src
 	}
-	return strings.Join([]string{
+	return topologyL3SubnetLinkKeyParts(
 		src,
 		dst,
 		topologyMetricValueString(link.Metrics, "subnet"),
 		strconv.Itoa(intStatValue(link.Metrics["prefix"])),
-	}, "|")
+	)
+}
+
+func topologyL3SubnetLinkKeyParts(parts ...string) string {
+	var b strings.Builder
+	for _, part := range parts {
+		b.WriteString(strconv.Itoa(len(part)))
+		b.WriteByte(':')
+		b.WriteString(part)
+	}
+	return b.String()
 }
 
 func recordTopologyL3EnrichmentStats(data *topologyData, stats topologyL3EnrichmentStats) {

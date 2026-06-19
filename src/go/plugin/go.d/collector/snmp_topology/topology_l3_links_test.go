@@ -107,6 +107,27 @@ func TestApplyTopologyL3SubnetEnrichmentSuppressesDuplicateLink(t *testing.T) {
 	require.Equal(t, 1, data.Stats["l3_subnet_suppressed_duplicate_link"])
 }
 
+func TestTopologyL3SubnetLinkKeySeparatesDelimitedFields(t *testing.T) {
+	left := topologyLink{
+		SrcActorID: "a|b",
+		DstActorID: "c",
+		Metrics: map[string]any{
+			"subnet": "198.51.100.0/30",
+			"prefix": 30,
+		},
+	}
+	right := topologyLink{
+		SrcActorID: "a",
+		DstActorID: "b|c",
+		Metrics: map[string]any{
+			"subnet": "198.51.100.0/30",
+			"prefix": 30,
+		},
+	}
+
+	require.NotEqual(t, topologyL3SubnetLinkKey(left), topologyL3SubnetLinkKey(right))
+}
+
 func TestApplyTopologyDepthFocusFilterKeepsIncidentL3SubnetLink(t *testing.T) {
 	data := topologyData{
 		Stats: map[string]any{

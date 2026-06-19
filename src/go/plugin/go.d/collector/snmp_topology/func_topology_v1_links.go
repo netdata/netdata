@@ -48,6 +48,10 @@ func buildSNMPTopologyV1Links(
 		evidenceCounts[i] = 1
 		discoveredAt[i] = nullableTime(link.DiscoveredAt)
 		lastSeen[i] = nullableTime(link.LastSeen)
+		subnet := topologyMetricValueString(link.Metrics, "subnet")
+		if linkType == snmpTopologyV1LinkL3Subnet && subnet == "" {
+			return topologyv1.Table{}, nil, fmt.Errorf("l3_subnet link %d is missing subnet", i)
+		}
 		srcEndpoint := nullableJSON(link.Src.Attributes)
 		dstEndpoint := nullableJSON(link.Dst.Attributes)
 		metrics := nullableJSON(link.Metrics)
@@ -74,7 +78,7 @@ func buildSNMPTopologyV1Links(
 		evidenceRows.attachmentModes = append(evidenceRows.attachmentModes, nullableStringRef(stringsDict, topologyMetricValueString(link.Metrics, "attachment_mode")))
 		evidenceRows.srcIPs = append(evidenceRows.srcIPs, nullableStringRef(stringsDict, topologyV1EndpointString(link.Src, "ip")))
 		evidenceRows.dstIPs = append(evidenceRows.dstIPs, nullableStringRef(stringsDict, topologyV1EndpointString(link.Dst, "ip")))
-		evidenceRows.subnets = append(evidenceRows.subnets, nullableStringRef(stringsDict, topologyMetricValueString(link.Metrics, "subnet")))
+		evidenceRows.subnets = append(evidenceRows.subnets, nullableStringRef(stringsDict, subnet))
 		evidenceRows.networks = append(evidenceRows.networks, nullableStringRef(stringsDict, topologyMetricValueString(link.Metrics, "network")))
 		evidenceRows.netmasks = append(evidenceRows.netmasks, nullableStringRef(stringsDict, topologyMetricValueString(link.Metrics, "netmask")))
 		evidenceRows.prefixes = append(evidenceRows.prefixes, nullableUintValue(link.Metrics["prefix"]))

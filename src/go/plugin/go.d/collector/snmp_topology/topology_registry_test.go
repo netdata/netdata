@@ -392,7 +392,6 @@ func TestTopologyCache_SnapshotEngineObservationsIncludesL3Interfaces(t *testing
 	require.Len(t, snapshot.l3Interfaces, 1)
 	require.Equal(t, topologyL3Interface{
 		DeviceID: snapshot.localDeviceID,
-		AgentID:  "agent-test",
 		IP:       "198.51.100.1",
 		Netmask:  "255.255.255.252",
 		IfIndex:  "2",
@@ -413,7 +412,6 @@ func TestAggregateTopologyObservationSnapshotsIncludesL3Interfaces(t *testing.T)
 			}},
 			l3Interfaces: []topologyL3Interface{{
 				DeviceID: "device-a",
-				AgentID:  "agent-a",
 				IP:       "198.51.100.1",
 				Netmask:  "255.255.255.252",
 				IfIndex:  "2",

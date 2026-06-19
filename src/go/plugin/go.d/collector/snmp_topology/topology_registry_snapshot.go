@@ -54,7 +54,7 @@ func (c *topologyCache) snapshotEngineObservations() (topologyObservationSnapsho
 
 	return topologyObservationSnapshot{
 		l2Observations: []topologyengine.L2Observation{localObservation},
-		l3Interfaces:   c.snapshotL3Interfaces(localObservation.DeviceID, c.agentID),
+		l3Interfaces:   c.snapshotL3Interfaces(localObservation.DeviceID),
 		localDevice:    local,
 		localDeviceID:  localObservation.DeviceID,
 		agentID:        strings.TrimSpace(c.agentID),

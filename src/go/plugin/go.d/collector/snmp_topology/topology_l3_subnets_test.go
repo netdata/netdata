@@ -160,7 +160,6 @@ func TestBuildTopologyL3SubnetAdjacenciesSuppressesInvalidRows(t *testing.T) {
 func l3InterfaceForTest(deviceID, ip, netmask, ifIndex string) topologyL3Interface {
 	return topologyL3Interface{
 		DeviceID: deviceID,
-		AgentID:  "agent-test",
 		IP:       ip,
 		Netmask:  netmask,
 		IfIndex:  ifIndex,
