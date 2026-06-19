@@ -515,6 +515,21 @@ state collected from IP-MIB `ipAddrTable`, limited to IPv4 point-to-point
 same point-to-point subnet; it does not prove that the devices are physically
 connected.
 
+`ospf_adjacency` represents OSPF control-plane adjacency between two resolved
+managed SNMP device actors. It is a logical L3 routing-protocol relationship,
+not physical, L2, discovery, or port-neighbor evidence. The producer emits graph
+links only for full OSPF neighbors with resolved managed endpoints. Non-full or
+unresolved OSPF neighbor rows remain diagnostic actor-owned detail rows and
+must not create loose router/IP graph actors.
+Current SNMP OSPF topology scope is OSPFv2 non-virtual neighbors from
+`ospfNbrTable`; OSPFv3 and OSPF virtual-neighbor tables are future scope unless
+a later topology feature explicitly adds their distinct semantics.
+
+When `ospf_adjacency` and `l3_subnet` describe the same resolved actor pair and
+endpoint/subnet relationship, OSPF is the stronger protocol-specific signal for
+the graph. The producer may suppress the matching `l3_subnet` graph link while
+preserving typed OSPF evidence and actor-owned neighbor detail rows.
+
 SNMP is not a loose-side topology. Every graph link should have two actors in
 both Agent and aggregator views. `l3_subnet` follows the same rule: unmatched
 or ambiguous L3 endpoints are diagnostic/suppression state, not materialized
@@ -563,6 +578,14 @@ evidence type. Replacement may rewire endpoint actors to stronger managed
 device actors, but it MUST NOT reinterpret `l3_subnet` as discovery protocol
 evidence or port-neighbor evidence.
 
+For `ospf_adjacency`, aggregation MUST preserve the explicit `ospf_adjacency`
+link and evidence type, including its `semantic_role: control`. Replacement may
+rewire endpoint actors to stronger managed device actors, but it MUST NOT
+reinterpret OSPF adjacency as discovery, physical, L2, or port-neighbor
+evidence. Actor-owned OSPF neighbor detail rows should remain attached to the
+local device actor and are not loose-side graph materialization input unless a
+future producer contract explicitly defines such a policy.
+
 ### UI SNMP
 
 The UI should not expose a detailed/aggregated toggle for SNMP unless the
@@ -581,6 +604,10 @@ Device modals should remain port-centric:
   relationship rows so local port identity never contradicts the port table.
 - L3 adjacency information: derived from typed `l3_subnet` relationship
   evidence, not from `actor_port_links`.
+- routing protocol neighbor information: derived from typed actor-owned detail
+  rows such as `actor_ospf_neighbors`, not from `actor_port_links`. The modal
+  may show unresolved or non-full protocol neighbors as diagnostics without
+  creating graph links.
 
 ## Streaming
 

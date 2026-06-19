@@ -9,20 +9,42 @@ import (
 )
 
 func TestNormalizeManagementAddress_DecodesHexAndASCIIIPs(t *testing.T) {
-	addr, addrType := normalizeManagementAddress("0A14043C", "1")
-	require.Equal(t, "10.20.4.60", addr)
-	require.Equal(t, "ipv4", addrType)
+	tests := map[string]struct {
+		addr     string
+		addrType string
+		wantAddr string
+		wantType string
+	}{
+		"hex-ipv4":   {addr: "0A14043C", addrType: "1", wantAddr: "10.20.4.60", wantType: "ipv4"},
+		"ascii-ipv4": {addr: "31302E32302E342E323035", wantAddr: "10.20.4.205", wantType: "ipv4"},
+	}
 
-	addr, addrType = normalizeManagementAddress("31302E32302E342E323035", "")
-	require.Equal(t, "10.20.4.205", addr)
-	require.Equal(t, "ipv4", addrType)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			addr, addrType := normalizeManagementAddress(tc.addr, tc.addrType)
+			require.Equal(t, tc.wantAddr, addr)
+			require.Equal(t, tc.wantType, addrType)
+		})
+	}
 }
 
 func TestNormalizeHexHelpers_ClassifyTokensDeterministically(t *testing.T) {
-	require.Equal(t, "00:11:22:33:44:55", normalizeMAC("hex-string: 00 11 22 33 44 55"))
-	require.Equal(t, "10.20.4.60", normalizeIPAddress("0A14043C"))
-	require.Equal(t, "10.20.4.205", normalizeHexToken("31302E32302E342E323035"))
-	require.Equal(t, "001122334455", normalizeHexIdentifier("00:11:22:33:44:55"))
+	tests := map[string]struct {
+		normalize func(string) string
+		in        string
+		want      string
+	}{
+		"mac":            {normalize: normalizeMAC, in: "hex-string: 00 11 22 33 44 55", want: "00:11:22:33:44:55"},
+		"ip-address":     {normalize: normalizeIPAddress, in: "0A14043C", want: "10.20.4.60"},
+		"hex-token":      {normalize: normalizeHexToken, in: "31302E32302E342E323035", want: "10.20.4.205"},
+		"hex-identifier": {normalize: normalizeHexIdentifier, in: "00:11:22:33:44:55", want: "001122334455"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.want, tc.normalize(tc.in))
+		})
+	}
 }
 
 func TestReconstructLldpRemMgmtAddrHex_FromOctets(t *testing.T) {

@@ -43,13 +43,24 @@ func TestApplySNMPTopologyShapePolicies_EmitsStatsContractKeys(t *testing.T) {
 		"segments_sparse_suppressed",
 		"segments_suppressed",
 	}, keys)
-	require.Equal(t, 1, data.Stats["actors_total"])
-	require.Equal(t, 0, data.Stats["links_total"])
-	require.Equal(t, 1, data.Stats["actors_non_ip_inferred_suppressed"])
-	require.Equal(t, 1, data.Stats["segments_sparse_suppressed"])
-	require.Equal(t, 1, data.Stats["segments_suppressed"])
-	require.Equal(t, topologyMapTypeHighConfidenceInferred, data.Stats["map_type"])
-	require.Equal(t, topologyInferenceStrategySTPParentTree, data.Stats["inference_strategy"])
+
+	expectedStats := map[string]struct {
+		key  string
+		want any
+	}{
+		"actors-total":                      {key: "actors_total", want: 1},
+		"inference-strategy":                {key: "inference_strategy", want: topologyInferenceStrategySTPParentTree},
+		"links-total":                       {key: "links_total", want: 0},
+		"map-type":                          {key: "map_type", want: topologyMapTypeHighConfidenceInferred},
+		"non-ip-inferred-actors-suppressed": {key: "actors_non_ip_inferred_suppressed", want: 1},
+		"sparse-segments-suppressed":        {key: "segments_sparse_suppressed", want: 1},
+		"suppressed-segments-after-cleanup": {key: "segments_suppressed", want: 1},
+	}
+	for name, tc := range expectedStats {
+		t.Run("stat/"+name, func(t *testing.T) {
+			require.Equal(t, tc.want, data.Stats[tc.key])
+		})
+	}
 }
 
 func TestRecomputeTopologyLinkStatsRefreshesExistingL3VisibleCount(t *testing.T) {
@@ -65,7 +76,17 @@ func TestRecomputeTopologyLinkStatsRefreshesExistingL3VisibleCount(t *testing.T)
 
 	recomputeTopologyLinkStats(data)
 
-	require.Equal(t, 2, data.Stats["links_total"])
-	require.Equal(t, 2, data.Stats["l3_subnet_emitted_links"])
-	require.Equal(t, 1, data.Stats["l3_subnet_visible_links"])
+	expectedStats := map[string]struct {
+		key  string
+		want any
+	}{
+		"emitted-l3-subnet-links": {key: "l3_subnet_emitted_links", want: 2},
+		"links-total":             {key: "links_total", want: 2},
+		"visible-l3-subnet-links": {key: "l3_subnet_visible_links", want: 1},
+	}
+	for name, tc := range expectedStats {
+		t.Run("stat/"+name, func(t *testing.T) {
+			require.Equal(t, tc.want, data.Stats[tc.key])
+		})
+	}
 }

@@ -7,7 +7,7 @@ extern "C" {
 #endif
 
 #include "database/rrd.h"
-#include "database/sqlite/vendored/sqlite3.h"
+#include "sqlite3.h"
 
 int perform_database_migration(sqlite3 *database, int target_version);
 int perform_context_database_migration(sqlite3 *database, int target_version);

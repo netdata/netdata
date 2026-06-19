@@ -36,6 +36,7 @@ type topologyCache struct {
 	stpDesignatedRoot    string
 	stpPorts             map[string]*stpPortEntry
 	arpEntries           map[string]*arpEntry
+	ospfNeighborsByKey   map[string]topologyOSPFNeighbor
 }
 
 type ifStatus struct {
@@ -136,4 +137,19 @@ type arpEntry struct {
 	mac      string
 	addrType string
 	state    string
+}
+
+type topologyOSPFNeighbor struct {
+	DeviceID         string
+	LocalRouterID    string
+	NeighborRouterID string
+	NeighborIP       string
+	AddresslessIndex string
+	State            string
+	LocalIP          string
+	Network          string
+	Netmask          string
+	Subnet           string
+	Prefix           int
+	RemoteActorID    string
 }

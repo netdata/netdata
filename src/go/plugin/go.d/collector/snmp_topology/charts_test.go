@@ -22,11 +22,27 @@ func TestCollector_ChartTemplateYAML(t *testing.T) {
 	require.NoError(t, err)
 
 	contexts := chartTemplateContexts(spec.Groups)
-	assert.Contains(t, contexts, "netdata.go.plugin.collector.snmp_topology.devices")
-	assert.Contains(t, contexts, "netdata.go.plugin.collector.snmp_topology.last_refresh")
-	assert.Contains(t, contexts, "netdata.go.plugin.collector.snmp_topology.refreshes")
-	assert.NotContains(t, contexts, "snmp_topology.devices")
-	assert.NotContains(t, contexts, "snmp_topology.links")
+	for name, tc := range map[string]struct {
+		context string
+	}{
+		"devices":      {context: "netdata.go.plugin.collector.snmp_topology.devices"},
+		"last-refresh": {context: "netdata.go.plugin.collector.snmp_topology.last_refresh"},
+		"refreshes":    {context: "netdata.go.plugin.collector.snmp_topology.refreshes"},
+	} {
+		t.Run("contains/"+name, func(t *testing.T) {
+			assert.Contains(t, contexts, tc.context)
+		})
+	}
+	for name, tc := range map[string]struct {
+		context string
+	}{
+		"legacy-devices": {context: "snmp_topology.devices"},
+		"legacy-links":   {context: "snmp_topology.links"},
+	} {
+		t.Run("not-contains/"+name, func(t *testing.T) {
+			assert.NotContains(t, contexts, tc.context)
+		})
+	}
 }
 
 func chartTemplateContexts(groups []charttpl.Group) map[string]struct{} {

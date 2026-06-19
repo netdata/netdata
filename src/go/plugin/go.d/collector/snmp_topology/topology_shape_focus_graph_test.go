@@ -139,11 +139,22 @@ func TestTopologyActorHasIPMatchesMatchAndManagementAddresses(t *testing.T) {
 		},
 	}
 
-	require.True(t, topologyActorHasIP(actor, "10.0.0.1"))
-	require.True(t, topologyActorHasIP(actor, "10.0.0.2"))
-	require.True(t, topologyActorHasIP(actor, "10.0.0.3"))
-	require.False(t, topologyActorHasIP(actor, "10.0.0.9"))
-	require.False(t, topologyActorHasIP(actor, "not-an-ip"))
+	tests := map[string]struct {
+		ip   string
+		want bool
+	}{
+		"match-ip":            {ip: "10.0.0.1", want: true},
+		"management-ip":       {ip: "10.0.0.2", want: true},
+		"management-address":  {ip: "10.0.0.3", want: true},
+		"missing-ip":          {ip: "10.0.0.9"},
+		"invalid-ip-rejected": {ip: "not-an-ip"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.want, topologyActorHasIP(actor, tc.ip))
+		})
+	}
 }
 
 func TestRecordTopologyFocusStatsNormalizesDepthAndFilteredCounts(t *testing.T) {

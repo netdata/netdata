@@ -25,4 +25,5 @@ const (
 	KindVtpVlan              = ddprofiledefinition.KindVtpVlan
 	KindArpEntry             = ddprofiledefinition.KindArpEntry
 	KindArpLegacyEntry       = ddprofiledefinition.KindArpLegacyEntry
+	KindOSPFNeighbor         = ddprofiledefinition.KindOSPFNeighbor
 )

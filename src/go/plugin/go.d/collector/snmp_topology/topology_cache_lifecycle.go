@@ -9,20 +9,21 @@ import (
 
 func newTopologyCache() *topologyCache {
 	return &topologyCache{
-		lldpLocPorts:     make(map[string]*lldpLocPort),
-		lldpRemotes:      make(map[string]*lldpRemote),
-		cdpRemotes:       make(map[string]*cdpRemote),
-		ifNamesByIndex:   make(map[string]string),
-		ifStatusByIndex:  make(map[string]ifStatus),
-		ifIndexByIP:      make(map[string]string),
-		ifNetmaskByIP:    make(map[string]string),
-		l3InterfacesByIP: make(map[string]topologyL3Interface),
-		bridgePortToIf:   make(map[string]string),
-		fdbEntries:       make(map[string]*fdbEntry),
-		fdbIDToVlanID:    make(map[string]string),
-		vlanIDToName:     make(map[string]string),
-		stpPorts:         make(map[string]*stpPortEntry),
-		arpEntries:       make(map[string]*arpEntry),
+		lldpLocPorts:       make(map[string]*lldpLocPort),
+		lldpRemotes:        make(map[string]*lldpRemote),
+		cdpRemotes:         make(map[string]*cdpRemote),
+		ifNamesByIndex:     make(map[string]string),
+		ifStatusByIndex:    make(map[string]ifStatus),
+		ifIndexByIP:        make(map[string]string),
+		ifNetmaskByIP:      make(map[string]string),
+		l3InterfacesByIP:   make(map[string]topologyL3Interface),
+		bridgePortToIf:     make(map[string]string),
+		fdbEntries:         make(map[string]*fdbEntry),
+		fdbIDToVlanID:      make(map[string]string),
+		vlanIDToName:       make(map[string]string),
+		stpPorts:           make(map[string]*stpPortEntry),
+		arpEntries:         make(map[string]*arpEntry),
+		ospfNeighborsByKey: make(map[string]topologyOSPFNeighbor),
 	}
 }
 
@@ -55,6 +56,7 @@ func (c *topologyCache) replaceWith(src *topologyCache) {
 	c.stpDesignatedRoot = src.stpDesignatedRoot
 	c.stpPorts = src.stpPorts
 	c.arpEntries = src.arpEntries
+	c.ospfNeighborsByKey = src.ospfNeighborsByKey
 }
 
 func (c *topologyCache) hasFreshSnapshotAt(now time.Time) bool {

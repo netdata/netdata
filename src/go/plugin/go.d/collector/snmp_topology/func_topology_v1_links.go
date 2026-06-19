@@ -76,6 +76,8 @@ func buildSNMPTopologyV1Links(
 		evidenceRows.confidences = append(evidenceRows.confidences, nullableStringRef(stringsDict, topologyMetricValueString(link.Metrics, "confidence")))
 		evidenceRows.inferences = append(evidenceRows.inferences, nullableStringRef(stringsDict, topologyMetricValueString(link.Metrics, "inference")))
 		evidenceRows.attachmentModes = append(evidenceRows.attachmentModes, nullableStringRef(stringsDict, topologyMetricValueString(link.Metrics, "attachment_mode")))
+		evidenceRows.srcRouterIDs = append(evidenceRows.srcRouterIDs, nullableStringRef(stringsDict, topologyV1EndpointString(link.Src, "router_id")))
+		evidenceRows.dstRouterIDs = append(evidenceRows.dstRouterIDs, nullableStringRef(stringsDict, topologyV1EndpointString(link.Dst, "router_id")))
 		evidenceRows.srcIPs = append(evidenceRows.srcIPs, nullableStringRef(stringsDict, topologyV1EndpointString(link.Src, "ip")))
 		evidenceRows.dstIPs = append(evidenceRows.dstIPs, nullableStringRef(stringsDict, topologyV1EndpointString(link.Dst, "ip")))
 		evidenceRows.subnets = append(evidenceRows.subnets, nullableStringRef(stringsDict, subnet))
@@ -144,6 +146,8 @@ type snmpTopologyV1EvidenceRows struct {
 	confidences      []any
 	inferences       []any
 	attachmentModes  []any
+	srcRouterIDs     []any
+	dstRouterIDs     []any
 	srcIPs           []any
 	dstIPs           []any
 	subnets          []any
@@ -181,7 +185,13 @@ func (rows *snmpTopologyV1EvidenceRows) columnEncodingsForType(linkType string) 
 		topologyv1.Values(rows.inferences...),
 		topologyv1.Values(rows.attachmentModes...),
 	}
-	if linkType == snmpTopologyV1LinkL3Subnet {
+	if linkType == snmpTopologyV1LinkL3Subnet || linkType == snmpTopologyV1LinkOSPF {
+		if linkType == snmpTopologyV1LinkOSPF {
+			encodings = append(encodings,
+				topologyv1.Values(rows.srcRouterIDs...),
+				topologyv1.Values(rows.dstRouterIDs...),
+			)
+		}
 		encodings = append(encodings,
 			topologyv1.Values(rows.srcIPs...),
 			topologyv1.Values(rows.dstIPs...),
@@ -203,6 +213,25 @@ func (rows *snmpTopologyV1EvidenceRows) columnEncodingsForType(linkType string) 
 func snmpTopologyV1EvidenceColumnsForType(linkType string) []topologyv1.Column {
 	columns := snmpTopologyV1EvidenceColumns()
 	if linkType != snmpTopologyV1LinkL3Subnet {
+		if linkType == snmpTopologyV1LinkOSPF {
+			extras := []topologyv1.Column{
+				topologyv1.NewColumn("src_router_id", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
+				topologyv1.NewColumn("dst_router_id", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
+				topologyv1.NewColumn("src_ip", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
+				topologyv1.NewColumn("dst_ip", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
+				topologyv1.NewColumn("subnet", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
+				topologyv1.NewColumn("network", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
+				topologyv1.NewColumn("netmask", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
+				topologyv1.NewColumn("prefix", "uint", topologyv1.WithNullable()),
+				topologyv1.NewColumn("source", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
+			}
+			insertAt := len(columns) - 3
+			out := make([]topologyv1.Column, 0, len(columns)+len(extras))
+			out = append(out, columns[:insertAt]...)
+			out = append(out, extras...)
+			out = append(out, columns[insertAt:]...)
+			return out
+		}
 		return columns
 	}
 	extras := []topologyv1.Column{
@@ -267,6 +296,8 @@ func snmpTopologyV1LinkType(link topologyLink) string {
 		return snmpTopologyV1LinkSNMP
 	case snmpTopologyV1LinkL3Subnet:
 		return snmpTopologyV1LinkL3Subnet
+	case snmpTopologyV1LinkOSPF:
+		return snmpTopologyV1LinkOSPF
 	default:
 		return snmpTopologyV1LinkObservation
 	}
@@ -274,6 +305,15 @@ func snmpTopologyV1LinkType(link topologyLink) string {
 
 func snmpTopologyV1LinkIsL3Subnet(link topologyLink) bool {
 	return snmpTopologyV1LinkType(link) == snmpTopologyV1LinkL3Subnet
+}
+
+func snmpTopologyV1LinkIsLogicalL3(link topologyLink) bool {
+	switch snmpTopologyV1LinkType(link) {
+	case snmpTopologyV1LinkL3Subnet, snmpTopologyV1LinkOSPF:
+		return true
+	default:
+		return false
+	}
 }
 
 func snmpTopologyV1LinkIsProbable(link topologyLink) bool {
