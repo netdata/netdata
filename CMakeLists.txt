@@ -1236,6 +1236,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/get_system_pagesize.h
         src/libnetdata/os/hostname.c
         src/libnetdata/os/hostname.h
+        src/libnetdata/os/socket_egress_interface.c
+        src/libnetdata/os/socket_egress_interface.h
         src/libnetdata/exit/exit_initiated.c
         src/libnetdata/exit/exit_initiated.h
         src/libnetdata/os/disk_space.c

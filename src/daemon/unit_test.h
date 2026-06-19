@@ -8,7 +8,6 @@
 int unit_test_storage(void);
 int unit_test(long delay, long shift);
 int run_all_mockup_tests(void);
-int unittest_stream_egress_iface(void);
 int unit_test_str2ld(void);
 int unit_test_buffer(void);
 int unit_test_static_threads(void);
