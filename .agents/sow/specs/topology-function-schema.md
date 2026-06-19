@@ -16,7 +16,7 @@ The production schema is defined by:
 - `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`
 
 The schema is generic across topology domains. It applies to network
-connections, streaming, SNMP/L2, vSphere, and future topology producers.
+connections, streaming, SNMP, vSphere, and future topology producers.
 
 ## Planes
 
@@ -587,15 +587,29 @@ deduplicated actor-label values when available.
 
 `topology:snmp` now emits `netdata.topology.v1` from the Function handler
 through an adapter over the existing SNMP topology engine output. The adapter
-preserves actors, links, L2 observation evidence, actor metadata, and actor
-custom detail tables. Remaining SNMP refinement is to promote interface metric
-lookup fragments into first-class overlay templates/refs.
+preserves actors, links, L2 observation evidence, bounded L3 adjacency
+evidence, actor metadata, and actor custom detail tables. Remaining SNMP
+refinement is to promote interface metric lookup fragments into first-class
+overlay templates/refs.
+
+SNMP `l3_subnet` links are logical L3 adjacency, not physical or L2 adjacency.
+They use `orientation: observed_bidirectional`, `direction_role: observation`,
+and `semantic_role: normal`. The producer emits them only between resolved
+managed SNMP device actors; unresolved or ambiguous L3 endpoints remain
+diagnostic/suppression state and must not create IP-only graph actors.
+
+SNMP `l3_subnet` evidence must preserve the relationship facts needed for
+drilldown and aggregation, including a `link_ref`, source/destination actors,
+source/destination interface IPs, subnet, network, netmask, prefix, source, and
+logical inference/attachment metadata. The evidence is an actor-modal source
+for L3 adjacency drilldowns.
 
 SNMP modal composition must be port-centric for managed device actors. A managed
 device modal uses actor-label identification for important device facts, a
 primary `Ports` section over `actor_ports`, and a `Port Neighbors` section over
-`actor_port_links`. Generic graph-link `Links` sections are reserved for
-endpoint, segment, or custom actors that do not own port inventory.
+`actor_port_links`. It may also expose an `L3 Adjacencies` section sourced from
+`l3_subnet` relationship evidence. Generic graph-link `Links` sections are
+reserved for endpoint, segment, or custom actors that do not own port inventory.
 
 SNMP `actor_ports` exposes real port identity and status as typed columns:
 SNMP `if_index` as the visible numeric port ID when known, source `port_id`,
@@ -615,6 +629,10 @@ links and evidence. It has one row per incident actor side and carries the local
 state, evidence count, confidence, inference, attachment mode, and timestamps.
 It exists so device modals can align neighbor rows with the same port identity
 shown in `actor_ports`; it is not a second copy of raw evidence.
+
+SNMP `actor_port_links` must remain port-neighbor oriented. It must not include
+`l3_subnet` links, because shared-subnet L3 adjacency does not prove a physical
+or L2 port neighbor.
 
 SNMP polished UI must not depend on raw `actor_metadata` and endpoint JSON.
 Important scalar/count summary values live in typed actor or actor-detail

@@ -100,7 +100,8 @@ developer-facing and must stay in this project skill, not under
 4. Pick evidence rows.
    - Evidence is the lossless relationship proof.
    - For sockets, preserve the exact matching tuple.
-   - For SNMP/L2, preserve LLDP/CDP/FDB/ARP/STP facts according to role.
+   - For SNMP, preserve LLDP/CDP/FDB/ARP/STP facts according to role and keep
+     logical L3 adjacency in distinct L3 link/evidence types.
    - For streaming, keep relationship facts separate from actor-owned path data.
    - For vSphere, preserve inventory/relationship facts using stable object IDs.
 
@@ -395,9 +396,9 @@ For `topology:streaming` actor modals:
   so Cloud aggregation can preserve multiple retaining parents and a future
   explicitly named `Retained by` section can be added without changing facts.
 
-## SNMP/L2 Modal Rules
+## SNMP Topology Modal Rules
 
-For SNMP/L2 managed device actor modals:
+For SNMP managed device actor modals:
 
 - Treat the device as a collection of ports. The primary section is `Ports`
   over `actor_ports`.
@@ -418,6 +419,13 @@ For SNMP/L2 managed device actor modals:
   confidence, inference, attachment mode, or timestamps.
 - `actor_port_links` may carry compact side-specific refs and scalar facts, but
   must not duplicate raw LLDP/CDP/FDB/ARP/STP evidence JSON.
+- Keep logical L3 adjacency out of `actor_port_links`. `l3_subnet` is not a
+  physical or L2 port-neighbor relationship.
+- Expose logical L3 adjacency through typed `l3_subnet` relationship evidence
+  and an evidence-backed device modal section such as `L3 Adjacencies`.
+- `l3_subnet` links represent shared-subnet logical L3 adjacency between
+  resolved managed SNMP device actors. They must use explicit L3 link/evidence
+  types and must not be presented as discovery, physical, or L2 links.
 - Keep generic graph-link `Links` sections only for endpoint, segment, or
   custom actors that do not own port inventory.
 - Build link endpoint port labels only from real port fields: `port_name`,

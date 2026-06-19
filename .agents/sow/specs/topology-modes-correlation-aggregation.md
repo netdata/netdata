@@ -29,7 +29,7 @@ rules, table merge policies, and presentation recipes in the payload.
 ## Terms
 
 - **Producer**: the Agent Function that emits one `netdata.topology.v1`
-  payload, for example network-connections, SNMP/L2, streaming, or vSphere.
+  payload, for example network-connections, SNMP, streaming, or vSphere.
 - **Aggregator**: Cloud service that fans out to many producers, decodes their
   payloads, correlates them, optionally aggregates detail, and returns a normal
   `netdata.topology.v1` payload.
@@ -88,7 +88,7 @@ aggregator returns either detailed or aggregated output according to the
 original user request.
 
 If a producer does not expose `__topology_mode`, the aggregator must not invent
-that parameter for it. SNMP/L2 and streaming are expected to be mode-invariant
+that parameter for it. SNMP and streaming are expected to be mode-invariant
 unless a future producer change defines a real mode difference.
 
 ### Final Output
@@ -497,20 +497,32 @@ Aggregator detailed:
 - Show exact socket evidence with resolved actors where possible.
 - Unresolved rows retain their loose-side facts.
 
-## SNMP/L2
+## SNMP
 
 ### Domain Model
 
-SNMP/L2 topology observations are device, interface, neighbor, forwarding,
-ARP, bridge, VLAN, and protocol facts. A graph link represents an observed or
-inferred L2 relationship between two actors.
+SNMP topology observations are device, interface, neighbor, forwarding, ARP,
+bridge, VLAN, protocol, and bounded L3 adjacency facts.
 
-SNMP is not a loose-side topology. Every link should have two actors in both
-Agent and aggregator views.
+Most graph links represent observed or inferred L2 relationships between two
+actors. SNMP may also emit logical L3 relationships with their own link and
+evidence types. These links MUST NOT be presented as physical or L2 adjacency.
+
+`l3_subnet` represents an observed shared-subnet relationship between two
+managed SNMP device actors. It is currently derived from interface IP/netmask
+state collected from IP-MIB `ipAddrTable`, limited to IPv4 point-to-point
+`/30` and `/31` subnets. It means both devices have managed interfaces in the
+same point-to-point subnet; it does not prove that the devices are physically
+connected.
+
+SNMP is not a loose-side topology. Every graph link should have two actors in
+both Agent and aggregator views. `l3_subnet` follows the same rule: unmatched
+or ambiguous L3 endpoints are diagnostic/suppression state, not materialized
+IP-only graph actors.
 
 ### Mode Behavior
 
-SNMP/L2 detailed and aggregated modes are currently a no-op. The producer should
+SNMP detailed and aggregated modes are currently a no-op. The producer should
 not expose `__topology_mode` until it has a real lower/higher-grain distinction.
 
 If a global Cloud topology request asks for aggregated output, the aggregator
@@ -546,9 +558,14 @@ switch-a port 10 -> managed-switch-b
 The weaker LLDP remote actor is removed from the aggregated output and its
 incident links/tables are rewired to the managed device actor.
 
-### UI SNMP/L2
+For `l3_subnet`, aggregation MUST preserve the explicit `l3_subnet` link and
+evidence type. Replacement may rewire endpoint actors to stronger managed
+device actors, but it MUST NOT reinterpret `l3_subnet` as discovery protocol
+evidence or port-neighbor evidence.
 
-The UI should not expose a detailed/aggregated toggle for SNMP/L2 unless the
+### UI SNMP
+
+The UI should not expose a detailed/aggregated toggle for SNMP unless the
 payload declares supported modes.
 
 Device modals should remain port-centric:
@@ -562,6 +579,8 @@ Device modals should remain port-centric:
   when graph-link facts can align the port to a remote actor;
 - links/neighbor information: derived from the same port rows or aligned
   relationship rows so local port identity never contradicts the port table.
+- L3 adjacency information: derived from typed `l3_subnet` relationship
+  evidence, not from `actor_port_links`.
 
 ## Streaming
 
