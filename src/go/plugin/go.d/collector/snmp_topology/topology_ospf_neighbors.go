@@ -90,6 +90,8 @@ func (c *topologyCache) matchOSPFNeighborLocalInterface(neighborIP string) (topo
 	}
 	sort.Strings(ips)
 
+	var best topologyOSPFLocalInterfaceMatch
+	found := false
 	for _, ip := range ips {
 		row := c.l3InterfacesByIP[ip]
 		row.DeviceID = "local"
@@ -101,16 +103,20 @@ func (c *topologyCache) matchOSPFNeighborLocalInterface(neighborIP string) (topo
 		if !prefix.Contains(neighbor) {
 			continue
 		}
-		return topologyOSPFLocalInterfaceMatch{
+		candidate := topologyOSPFLocalInterfaceMatch{
 			IP:      normalizeIPAddress(row.IP),
 			Network: group.network.String(),
 			Netmask: group.netmask.String(),
 			Subnet:  topologyL3SubnetKey(group.network, group.prefix),
 			Prefix:  group.prefix,
-		}, true
+		}
+		if !found || candidate.Prefix > best.Prefix {
+			best = candidate
+			found = true
+		}
 	}
 
-	return topologyOSPFLocalInterfaceMatch{}, false
+	return best, found
 }
 
 func topologyOSPFNeighborCacheKey(row topologyOSPFNeighbor) string {
