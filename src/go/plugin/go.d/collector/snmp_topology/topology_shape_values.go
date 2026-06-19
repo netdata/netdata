@@ -72,7 +72,25 @@ func intStatValue(value any) int {
 	switch typed := value.(type) {
 	case int:
 		return typed
+	case int8:
+		return int(typed)
+	case int16:
+		return int(typed)
+	case int32:
+		return int(typed)
 	case int64:
+		return int(typed)
+	case uint:
+		return uintStatValue(uint64(typed))
+	case uint8:
+		return int(typed)
+	case uint16:
+		return int(typed)
+	case uint32:
+		return int(typed)
+	case uint64:
+		return uintStatValue(typed)
+	case float32:
 		return int(typed)
 	case float64:
 		return int(typed)
@@ -83,6 +101,13 @@ func intStatValue(value any) int {
 		}
 	}
 	return 0
+}
+
+func uintStatValue(value uint64) int {
+	if value > uint64(^uint(0)>>1) {
+		return 0
+	}
+	return int(value)
 }
 
 func topologyMetricValueString(metrics map[string]any, key string) string {

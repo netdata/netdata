@@ -79,7 +79,7 @@ func TestApplyTopologyL3SubnetEnrichmentSuppressesDuplicateLink(t *testing.T) {
 		DstActorID: "router-b",
 		Metrics: map[string]any{
 			"subnet": "198.51.100.0/30",
-			"prefix": 30,
+			"prefix": uint64(30),
 		},
 	}
 	data := topologyData{
