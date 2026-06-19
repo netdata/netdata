@@ -38,6 +38,12 @@ These two categories are explained further below.
 
 Any platforms not listed in any of these categories may or may not work.
 
+:::note
+
+**Windows**: Windows is available as a dedicated MSI installer but is not currently included in the tiered support model above, which covers Linux distributions, static builds, and related platforms. For installation details, see the [Windows installer documentation](/packaging/windows/WINDOWS_INSTALLER.md).
+
+:::
+
 The following table shows a general outline of the various support tiers and categories.
 
 |                       | Bug Support                            | Guaranteed Configurations      | CI Coverage                                                                                       | Native Packages                          | Static Build Support |
