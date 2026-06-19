@@ -48,9 +48,9 @@ func topologyBGPPeerFromRow(row ddsnmp.BGPRow) (topologyBGPPeer, bool) {
 
 	peer := topologyBGPPeer{
 		RoutingInstance:       topologyBGPRoutingInstance(row),
-		NeighborIP:            normalizeNonUnspecifiedIPAddress(neighbor),
+		NeighborIP:            topologyBGPPeerAddressValue(neighbor),
 		RemoteAS:              strings.TrimSpace(remoteAS),
-		LocalIP:               normalizeNonUnspecifiedIPAddress(row.Descriptors.LocalAddress),
+		LocalIP:               topologyBGPPeerAddressValue(row.Descriptors.LocalAddress),
 		LocalAS:               strings.TrimSpace(row.Descriptors.LocalAS),
 		LocalIdentifier:       normalizeBGPRouterID(row.Descriptors.LocalIdentifier),
 		PeerIdentifier:        normalizeBGPRouterID(row.Descriptors.PeerIdentifier),
@@ -62,10 +62,21 @@ func topologyBGPPeerFromRow(row ddsnmp.BGPRow) (topologyBGPPeer, bool) {
 		EstablishedUptime:     topologyBGPInt64Ptr(row.Connection.EstablishedUptime),
 		LastReceivedUpdateAge: topologyBGPInt64Ptr(row.Connection.LastReceivedUpdateAge),
 	}
-	if peer.NeighborIP == "" {
-		peer.NeighborIP = strings.TrimSpace(neighbor)
-	}
 	return peer, true
+}
+
+func topologyBGPPeerAddressValue(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if ip := normalizeNonUnspecifiedIPAddress(value); ip != "" {
+		return ip
+	}
+	if normalizeIPAddress(value) != "" {
+		return ""
+	}
+	return value
 }
 
 func topologyBGPRoutingInstance(row ddsnmp.BGPRow) string {
@@ -178,7 +189,7 @@ func topologyBGPPeerActorRowSortKey(row map[string]any) string {
 	return strings.Join([]string{
 		anyStringValue(row["routing_instance"]),
 		anyStringValue(row["remote_as"]),
-		normalizeNonUnspecifiedIPAddress(anyStringValue(row["neighbor_ip"])),
+		topologyBGPPeerAddressValue(anyStringValue(row["neighbor_ip"])),
 		anyStringValue(row["peer_identifier"]),
 		anyStringValue(row["state"]),
 	}, "\x00")

@@ -31,11 +31,11 @@ func buildSNMPTopologyV1BGPPeersTable(
 		actorRefs[i] = row.actorRef
 		remoteActors[i] = nullableActorRef(actorIndex, row.values["remote_actor_id"])
 		routingInstances[i] = nullableStringRef(stringsDict, firstNonEmptyString(topologyV1ScalarLabelValue(row.values["routing_instance"]), "default"))
-		neighborIPs[i] = nullableStringRef(stringsDict, normalizeNonUnspecifiedIPAddress(topologyV1ScalarLabelValue(row.values["neighbor_ip"])))
+		neighborIPs[i] = nullableStringRef(stringsDict, topologyBGPPeerAddressValue(topologyV1ScalarLabelValue(row.values["neighbor_ip"])))
 		remoteASes[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["remote_as"]))
 		states[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["state"]))
 		adminStatuses[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["admin_status"]))
-		localIPs[i] = nullableStringRef(stringsDict, normalizeNonUnspecifiedIPAddress(topologyV1ScalarLabelValue(row.values["local_ip"])))
+		localIPs[i] = nullableStringRef(stringsDict, topologyBGPPeerAddressValue(topologyV1ScalarLabelValue(row.values["local_ip"])))
 		localASes[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["local_as"]))
 		localIdentifiers[i] = nullableStringRef(stringsDict, normalizeBGPRouterID(topologyV1ScalarLabelValue(row.values["local_identifier"])))
 		peerIdentifiers[i] = nullableStringRef(stringsDict, normalizeBGPRouterID(topologyV1ScalarLabelValue(row.values["peer_identifier"])))
