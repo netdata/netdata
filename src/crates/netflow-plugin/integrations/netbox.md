@@ -67,9 +67,7 @@ allows) or an explicit `?limit=N` greater than your prefix count, or expose a
 server-side aggregator that returns the full list at one URL.
 
 
-This integration is only supported on the following platforms:
-
-- Linux
+This integration is supported on all platforms.
 
 This integration supports multiple instances configured side-by-side.
 

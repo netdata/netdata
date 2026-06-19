@@ -82,9 +82,7 @@ from. There is no network access, no file watching, and no hot reload --
 changes take effect on the next plugin startup.
 
 
-This integration is only supported on the following platforms:
-
-- Linux
+This integration is supported on all platforms.
 
 This integration runs as a single instance per Netdata Agent.
 

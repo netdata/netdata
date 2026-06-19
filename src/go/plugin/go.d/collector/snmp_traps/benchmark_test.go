@@ -540,10 +540,8 @@ func BenchmarkTrapWriterWrite(b *testing.B) {
 }
 
 func BenchmarkJournalTrapWriterDrain(b *testing.B) {
-	requireLinuxJournalBenchmark(b)
-
 	dir := b.TempDir()
-	w, err := NewJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
+	w, err := newTestJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
 	if err != nil {
 		b.Fatalf("NewJournalWriter: %v", err)
 	}
@@ -579,10 +577,8 @@ func writeTrapEntryWithBackpressure(b *testing.B, tw *journalTrapWriter, entry *
 }
 
 func BenchmarkJournalWriterWriteEntry(b *testing.B) {
-	requireLinuxJournalBenchmark(b)
-
 	dir := b.TempDir()
-	w, err := NewJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
+	w, err := newTestJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
 	if err != nil {
 		b.Fatalf("NewJournalWriter: %v", err)
 	}
@@ -629,7 +625,7 @@ func BenchmarkFullPacketToJournal(b *testing.B) {
 	setBenchProfileIndex(b, map[string]*TrapDef{trap.OID: trap})
 
 	dir := b.TempDir()
-	w, err := NewJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
+	w, err := newTestJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
 	if err != nil {
 		b.Fatalf("NewJournalWriter: %v", err)
 	}
@@ -744,7 +740,7 @@ func newUDPPacketToJournalBenchmark(b *testing.B) *udpPacketToJournalBenchmark {
 	}
 	setBenchProfileIndex(b, map[string]*TrapDef{trap.OID: trap})
 
-	w, err := NewJournalWriter(b.TempDir(), JournalConfig{RotateSize: 200 * bytesPerMB})
+	w, err := newTestJournalWriter(b.TempDir(), JournalConfig{RotateSize: 200 * bytesPerMB})
 	if err != nil {
 		b.Fatalf("NewJournalWriter: %v", err)
 	}
@@ -945,16 +941,8 @@ func BenchmarkDedupAdmitDuplicate(b *testing.B) {
 // Existing helpers (preserved)
 // ---------------------------------------------------------------------------
 
-func requireLinuxJournalBenchmark(b *testing.B) {
-	b.Helper()
-	if runtime.GOOS != "linux" {
-		b.Skip("SNMP trap journal backend requires Linux")
-	}
-}
-
 func requireJournalctlBenchmark(b *testing.B) {
 	b.Helper()
-	requireLinuxJournalBenchmark(b)
 	if _, err := exec.LookPath("journalctl"); err != nil {
 		b.Skip("journalctl not found")
 	}

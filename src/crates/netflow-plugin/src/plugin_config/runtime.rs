@@ -100,6 +100,14 @@ impl PluginConfig {
             .unwrap_or_else(|| PathBuf::from(DEFAULT_NETDATA_STOCK_DATA_DIR))
     }
 
+    pub(crate) fn journal_host_state_dir(&self) -> PathBuf {
+        self._netdata_env
+            .lib_dir
+            .clone()
+            .unwrap_or_else(|| PathBuf::from(DEFAULT_NETDATA_LIB_DIR))
+            .join("systemd-journal-sdk")
+    }
+
     fn load_from_netdata_config(netdata_env: &NetdataEnv) -> Result<Self> {
         let candidates = [
             netdata_env

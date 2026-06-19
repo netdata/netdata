@@ -12,16 +12,16 @@ endmeta-->
 
 Netdata receives SNMP traps with the **snmp_traps** collector in `go.d.plugin`. Trap receiving is explicit: Netdata does not create a trap listener job or configure devices to send traps by itself. You must create an explicit listener job before Netdata can receive traps.
 
-The default direct-journal backend requires Linux. OTLP-only jobs are not blocked by the Linux direct-journal requirement, but they do not create local journal files or local SNMP trap log sources.
+The default direct-journal backend writes local trap log files on every supported platform. OTLP-only jobs do not create local journal files or local SNMP trap log sources.
 
 The default `listen.endpoints` template uses UDP `0.0.0.0` on port `162`. The stock `go.d/snmp_traps.conf` file ships as a commented template; Netdata does not bind any UDP port until a job is uncommented, created, or applied with Dynamic Configuration.
 
 ## Prerequisites
 
 - A Netdata Agent host with the `go.d.plugin` component installed.
-- A Linux host when you want the default direct-journal backend or local SNMP trap log sources.
-- At least one output backend enabled per listener job: `journal.enabled: true` on Linux (the default), `otlp.enabled: true`, or both.
-- For direct-journal jobs on Linux, the files `/etc/machine-id` and `/proc/sys/kernel/random/boot_id` must exist, be readable, and contain non-empty values. Minimal containers, chroots, and embedded systems should check these before relying on local journal storage.
+- A host with writable Netdata log and state directories when you want the default direct-journal backend or local SNMP trap log sources.
+- At least one output backend enabled per listener job: `journal.enabled: true` (the default), `otlp.enabled: true`, or both.
+- For direct-journal jobs, Netdata must be able to resolve a stable local Agent identity and boot identity. Minimal containers, chroots, and embedded systems should validate local journal storage before relying on it.
 - UDP reachability from each trap sender to the Netdata host.
 - Network devices configured to send SNMP Trap or INFORM notifications to the Netdata host IP and listener port.
 - Firewall, security group, ACL, NAT, and host firewall rules that allow the selected UDP port.

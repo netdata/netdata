@@ -49,6 +49,7 @@ type trapDeduper struct {
 	writer          TrapWriter
 	metrics         *perJobMetrics
 	writeFailureDim string
+	monotonicNow    func() int64
 
 	mu      sync.Mutex
 	entries map[dedupKey]*list.Element
@@ -80,12 +81,16 @@ func validateDedupConfig(cfg DedupConfig) error {
 	return nil
 }
 
-func newTrapDeduper(jobName string, cfg DedupConfig, writer TrapWriter, metrics *perJobMetrics, writeFailureDim string) *trapDeduper {
+func newTrapDeduper(jobName string, cfg DedupConfig, writer TrapWriter, metrics *perJobMetrics, writeFailureDim string, monotonicNow ...func() int64) *trapDeduper {
 	if !cfg.Enabled {
 		return nil
 	}
 	if writeFailureDim == "" {
 		writeFailureDim = trapWriteFailureJournal
+	}
+	monotonicFn := func() int64 { return 0 }
+	if len(monotonicNow) > 0 && monotonicNow[0] != nil {
+		monotonicFn = monotonicNow[0]
 	}
 	window := time.Duration(cfg.WindowSec) * time.Second
 	if window <= 0 {
@@ -102,6 +107,7 @@ func newTrapDeduper(jobName string, cfg DedupConfig, writer TrapWriter, metrics 
 		writer:          writer,
 		metrics:         metrics,
 		writeFailureDim: writeFailureDim,
+		monotonicNow:    monotonicFn,
 		entries:         make(map[dedupKey]*list.Element),
 		order:           list.New(),
 		period: dedupPeriodState{
@@ -248,7 +254,7 @@ func (d *trapDeduper) emitSummary(now time.Time) {
 		JobName:               d.jobName,
 		ReportType:            ReportTypeDedupSummary,
 		ReceivedRealtimeUsec:  now.UnixMicro(),
-		ReceivedMonotonicUsec: monotonicUsec(),
+		ReceivedMonotonicUsec: d.monotonicNow(),
 		Message:               d.renderSummaryMessage(summary),
 		Severity:              "info",
 		SummaryCounts:         summary,

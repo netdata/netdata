@@ -205,7 +205,17 @@ impl IngestService {
     ) -> std::result::Result<Option<String>, ()> {
         let timestamps = EntryTimestamps::default()
             .with_source_realtime_usec(source_realtime_usec)
-            .with_entry_realtime_usec(receive_time_usec);
+            .with_entry_realtime_usec(receive_time_usec)
+            .with_entry_monotonic_usec(match self.journal_host.monotonic_usec() {
+                Ok(value) => value,
+                Err(err) => {
+                    self.metrics
+                        .journal_write_errors
+                        .fetch_add(1, Ordering::Relaxed);
+                    tracing::warn!("journal monotonic timestamp failed: {}", err);
+                    return Err(());
+                }
+            });
 
         if let Err(err) =
             self.encode_buf
@@ -277,8 +287,12 @@ impl IngestService {
                 err
             );
         }
-        let workers =
-            tier_writers.into_workers(&self.tier_flow_indexes, &self.facet_runtime, &self.metrics);
+        let workers = tier_writers.into_workers(
+            &self.tier_flow_indexes,
+            &self.facet_runtime,
+            &self.metrics,
+            &self.journal_host,
+        );
         self.tier_worker_handles =
             super::tier_commit::spawn_tier_workers(&self.tier_handoff, workers);
     }

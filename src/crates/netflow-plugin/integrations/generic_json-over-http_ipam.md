@@ -52,9 +52,7 @@ The same flow applies to every JSON-over-HTTP source; the integration-specific
 part is the URL and the `transform` expression.
 
 
-This integration is only supported on the following platforms:
-
-- Linux
+This integration is supported on all platforms.
 
 This integration supports multiple instances configured side-by-side.
 

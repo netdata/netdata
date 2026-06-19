@@ -53,9 +53,7 @@ trie. Same mechanism as AWS / GCP IP Ranges -- different URL and JSON shape,
 plus one important operational caveat documented below.
 
 
-This integration is only supported on the following platforms:
-
-- Linux
+This integration is supported on all platforms.
 
 This integration supports multiple instances configured side-by-side.
 

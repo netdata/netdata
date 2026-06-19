@@ -27,14 +27,21 @@ type listenerEndpoint struct {
 	cfg  EndpointConfig
 }
 
+type listenerReceiveBufferWarning struct {
+	endpoint  EndpointConfig
+	requested int
+	err       error
+}
+
 type Listener struct {
-	jobName     string
-	endpoints   []listenerEndpoint
-	metrics     *perJobMetrics
-	onReadError func(EndpointConfig, error)
-	mu          sync.Mutex
-	closed      bool
-	wg          sync.WaitGroup
+	jobName               string
+	endpoints             []listenerEndpoint
+	receiveBufferWarnings []listenerReceiveBufferWarning
+	metrics               *perJobMetrics
+	onReadError           func(EndpointConfig, error)
+	mu                    sync.Mutex
+	closed                bool
+	wg                    sync.WaitGroup
 }
 
 func newListener(jobName string, cfg ListenConfig) (*Listener, error) {
@@ -60,9 +67,16 @@ func newListener(jobName string, cfg ListenConfig) (*Listener, error) {
 		}
 		if cfg.ReceiveBuffer > 0 {
 			if err := setUDPReadBuffer(conn, cfg.ReceiveBuffer); err != nil {
-				conn.Close()
-				closeConns(bound)
-				return nil, fmt.Errorf("endpoint %d: set receive buffer for %s to %d bytes: %w", i, addr, cfg.ReceiveBuffer, err)
+				if cfg.ReceiveBuffer != defaultListenerReceiveBuffer {
+					conn.Close()
+					closeConns(bound)
+					return nil, fmt.Errorf("endpoint %d: set receive buffer for %s to %d bytes: %w", i, addr, cfg.ReceiveBuffer, err)
+				}
+				l.receiveBufferWarnings = append(l.receiveBufferWarnings, listenerReceiveBufferWarning{
+					endpoint:  ep,
+					requested: cfg.ReceiveBuffer,
+					err:       err,
+				})
 			}
 		}
 

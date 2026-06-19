@@ -163,8 +163,8 @@ func TestInitBindFailureReleasesProfileRef(t *testing.T) {
 // =============================================================================
 
 func TestProfileDirPathBuilders(t *testing.T) {
-	assert.Equal(t, "/etc/netdata/go.d/snmp.trap-profiles", trapProfilesUserDir("/etc/netdata/go.d"))
-	assert.Equal(t, "/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default", trapProfilesStockDir("/usr/lib/netdata/conf.d/go.d"))
+	assert.Equal(t, filepath.Join("/etc/netdata/go.d", "snmp.trap-profiles"), trapProfilesUserDir("/etc/netdata/go.d"))
+	assert.Equal(t, filepath.Join("/usr/lib/netdata/conf.d/go.d", "snmp.trap-profiles", "default"), trapProfilesStockDir("/usr/lib/netdata/conf.d/go.d"))
 }
 
 func setTestDirs(t *testing.T, dirs ...string) {

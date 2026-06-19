@@ -553,6 +553,30 @@ tiers:
 }
 
 #[test]
+fn journal_host_state_dir_uses_configured_netdata_lib_dir() {
+    let dir = tempdir().expect("create tempdir");
+    let lib_dir = dir.path().join("var-lib-netdata");
+
+    let mut cfg = PluginConfig::default();
+    cfg._netdata_env.lib_dir = Some(lib_dir.clone());
+
+    assert_eq!(
+        cfg.journal_host_state_dir(),
+        lib_dir.join("systemd-journal-sdk")
+    );
+}
+
+#[test]
+fn journal_host_state_dir_falls_back_to_build_default() {
+    let cfg = PluginConfig::default();
+
+    assert_eq!(
+        cfg.journal_host_state_dir(),
+        std::path::PathBuf::from(DEFAULT_NETDATA_LIB_DIR).join("systemd-journal-sdk")
+    );
+}
+
+#[test]
 fn auto_detect_geoip_databases_uses_absolute_journal_parent() {
     let dir = tempdir().expect("create tempdir");
     let cache_dir = dir.path();
