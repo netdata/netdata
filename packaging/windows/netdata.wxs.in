@@ -246,7 +246,7 @@
 
             <CustomAction Id="ClaimAgent" Directory="USRBINDIR" ExeCommand='[USRBINDIR]NetdataClaim.exe /T &quot;[TOKEN]&quot; /R &quot;[ROOMS]&quot; /U &quot;[URL]&quot; /I [INSECURE] /P &quot;[PROXY]&quot; /F &quot;[INSTALLFOLDER]etc\netdata\claim.conf&quot;' Execute="deferred" Return="ignore" Impersonate="no"/>
             <InstallExecuteSequence>
-                <Custom Action="ClaimAgent" After="InstallFiles" />
+                <Custom Action="ClaimAgent" After="InstallFiles" Condition="TOKEN AND ROOMS" />
             </InstallExecuteSequence>
 
             <!-- Add new files (stream.conf and netdata.conf) -->
