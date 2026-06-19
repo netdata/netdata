@@ -341,7 +341,7 @@ func TestSNMPTopologyToV1_PreservesActorCustomTables(t *testing.T) {
 	require.NotNil(t, deviceType.Presentation.Modal.Labels)
 	require.NotNil(t, deviceType.Presentation.Modal.Labels.Identification)
 	assert.Equal(t, "management_ip", deviceType.Presentation.Modal.Labels.Identification.Fields[1].Key)
-	require.Len(t, deviceType.Presentation.Modal.Sections, 2)
+	require.Len(t, deviceType.Presentation.Modal.Sections, 3)
 	assert.Equal(t, "ports", deviceType.Presentation.Modal.Sections[0].ID)
 	assert.Equal(t, "if_index", deviceType.Presentation.Modal.Sections[0].Columns[0].ID)
 	assert.Equal(t, "Port ID", deviceType.Presentation.Modal.Sections[0].Columns[0].Label)
@@ -351,6 +351,9 @@ func TestSNMPTopologyToV1_PreservesActorCustomTables(t *testing.T) {
 	assert.Equal(t, "port_neighbors", deviceType.Presentation.Modal.Sections[1].ID)
 	assert.Equal(t, "actor_table", deviceType.Presentation.Modal.Sections[1].Source.Kind)
 	assert.Equal(t, "actor_port_links", deviceType.Presentation.Modal.Sections[1].Source.Table)
+	assert.Equal(t, "l3_adjacencies", deviceType.Presentation.Modal.Sections[2].ID)
+	assert.Equal(t, "evidence", deviceType.Presentation.Modal.Sections[2].Source.Kind)
+	assert.Equal(t, snmpTopologyV1LinkL3Subnet, deviceType.Presentation.Modal.Sections[2].Source.Evidence)
 
 	endpointType := payload.Types.ActorTypes["endpoint"]
 	require.NotNil(t, endpointType.Presentation)
@@ -468,6 +471,153 @@ func TestSNMPTopologyToV1_PortNamesOnlyUsePortFields(t *testing.T) {
 	portLinksTable := payload.Tables.Actor["actor_port_links"].Table
 	assert.Equal(t, []any{nil, nil}, topologyV1ColumnValues(t, portLinksTable, "port_name"))
 	assert.Equal(t, []any{nil, nil}, topologyV1ColumnValues(t, portLinksTable, "remote_port_name"))
+}
+
+func TestSNMPTopologyToV1_PreservesL3SubnetPresentationAndEvidence(t *testing.T) {
+	data := topologyData{
+		AgentID: "agent-test",
+		View:    "summary",
+		Actors: []topologyActor{
+			{
+				ActorID:   "router-a",
+				ActorType: "router",
+				Match: topologyMatch{
+					IPAddresses: []string{"192.0.2.1"},
+					SysName:     "router-a",
+				},
+			},
+			{
+				ActorID:   "router-b",
+				ActorType: "router",
+				Match: topologyMatch{
+					IPAddresses: []string{"192.0.2.2"},
+					SysName:     "router-b",
+				},
+			},
+		},
+		Links: []topologyLink{
+			{
+				Protocol:   topologyL3SubnetLinkType,
+				LinkType:   topologyL3SubnetLinkType,
+				Direction:  "observed",
+				SrcActorID: "router-a",
+				DstActorID: "router-b",
+				Src: topologyLinkEndpoint{
+					Attributes: map[string]any{
+						"if_index": uint64(10),
+						"if_name":  "xe-0/0/0",
+						"ip":       "192.0.2.1",
+						"subnet":   "192.0.2.0/30",
+					},
+				},
+				Dst: topologyLinkEndpoint{
+					Attributes: map[string]any{
+						"if_index": uint64(20),
+						"if_name":  "xe-0/0/1",
+						"ip":       "192.0.2.2",
+						"subnet":   "192.0.2.0/30",
+					},
+				},
+				Metrics: map[string]any{
+					"source":          "ip_mib",
+					"inference":       "shared_subnet",
+					"attachment_mode": "logical_l3_subnet",
+					"subnet":          "192.0.2.0/30",
+					"network":         "192.0.2.0",
+					"netmask":         "255.255.255.252",
+					"prefix":          uint64(30),
+				},
+			},
+		},
+	}
+
+	payload, err := snmpTopologyToV1(data)
+	require.NoError(t, err)
+	require.NoError(t, validateTopologyV1Data(payload))
+
+	assert.Contains(t, payload.Producer.Capabilities, "l3_subnet")
+	require.NotNil(t, payload.Presentation)
+	assert.Equal(t, "snmp-l2.v2", payload.Presentation.ProfileVersion)
+	assert.Contains(t, topologyV1LegendLinkTypes(payload), snmpTopologyV1LinkL3Subnet)
+
+	require.Contains(t, payload.Types.LinkTypes, snmpTopologyV1LinkL3Subnet)
+	linkType := payload.Types.LinkTypes[snmpTopologyV1LinkL3Subnet]
+	assert.Equal(t, "observed_bidirectional", linkType.Orientation)
+	assert.Equal(t, "observation", linkType.DirectionRole)
+	assert.Equal(t, "normal", linkType.SemanticRole)
+	require.NotNil(t, linkType.Presentation)
+	assert.Equal(t, "L3 subnet", linkType.Presentation.Label)
+	assert.Equal(t, "info", linkType.Presentation.ColorSlot)
+	assert.Equal(t, "dashed", linkType.Presentation.LineStyle)
+	assert.Equal(t, "normal", linkType.Presentation.Width)
+
+	require.Contains(t, payload.Types.EvidenceTypes, snmpTopologyV1LinkL3Subnet)
+	evidenceType := payload.Types.EvidenceTypes[snmpTopologyV1LinkL3Subnet]
+	assert.Equal(t, snmpTopologyV1LinkL3Subnet, evidenceType.LinkType)
+	assert.Equal(t, []string{"src_actor", "dst_actor", "subnet", "src_ip", "dst_ip"}, evidenceType.MatchColumns)
+
+	require.Contains(t, payload.Evidence, snmpTopologyV1LinkL3Subnet)
+	evidenceTable := payload.Evidence[snmpTopologyV1LinkL3Subnet].Table
+	assert.Equal(t, 1, evidenceTable.Rows)
+	assert.Equal(t, "link_ref", topologyV1ColumnType(evidenceTable, "link"))
+	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "src_ip"))
+	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "dst_ip"))
+	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "subnet"))
+	assert.Equal(t, "uint", topologyV1ColumnType(evidenceTable, "prefix"))
+	assert.Equal(t, []any{0}, topologyV1ColumnValues(t, evidenceTable, "link"))
+	assert.Equal(t, []string{"192.0.2.1"}, topologyV1StringColumnValues(t, payload, evidenceTable, "src_ip"))
+	assert.Equal(t, []string{"192.0.2.2"}, topologyV1StringColumnValues(t, payload, evidenceTable, "dst_ip"))
+	assert.Equal(t, []string{"192.0.2.0/30"}, topologyV1StringColumnValues(t, payload, evidenceTable, "subnet"))
+	assert.Equal(t, []any{uint64(30)}, topologyV1ColumnValues(t, evidenceTable, "prefix"))
+	assert.Equal(t, []string{"ip_mib"}, topologyV1StringColumnValues(t, payload, evidenceTable, "source"))
+
+	assert.Equal(t, []string{snmpTopologyV1LinkL3Subnet}, topologyV1StringColumnValues(t, payload, payload.Links, "type"))
+	assert.Equal(t, []string{snmpTopologyV1LinkL3Subnet}, topologyV1StringColumnValues(t, payload, payload.Links, "protocol"))
+
+	deviceType := payload.Types.ActorTypes["router"]
+	require.NotNil(t, deviceType.Presentation)
+	require.NotNil(t, deviceType.Presentation.Modal)
+	l3Section := requireTopologyV1ModalSection(t, deviceType.Presentation.Modal.Sections, "l3_adjacencies")
+	assert.Equal(t, "evidence", l3Section.Source.Kind)
+	assert.Equal(t, snmpTopologyV1LinkL3Subnet, l3Section.Source.Evidence)
+	require.NotNil(t, l3Section.OwnerFilter)
+	assert.Equal(t, "incident_evidence", l3Section.OwnerFilter.Mode)
+	assert.Equal(t, "link", l3Section.OwnerFilter.LinkColumn)
+	assert.Equal(t, "src_actor", l3Section.OwnerFilter.SrcActorColumn)
+	assert.Equal(t, "dst_actor", l3Section.OwnerFilter.DstActorColumn)
+	assert.Equal(t, "subnet", l3Section.Sort.Column)
+	assert.Equal(t, "selected_side_endpoint", l3Section.Columns[1].Projection.Kind)
+	assert.Equal(t, "endpoint", l3Section.Columns[1].Cell)
+
+	if payload.Tables != nil {
+		assert.NotContains(t, payload.Tables.Actor, "actor_port_links")
+	}
+}
+
+func TestSNMPTopologyToV1_ReturnsErrorForL3SubnetWithoutSubnet(t *testing.T) {
+	data := topologyData{
+		AgentID: "agent-test",
+		Actors: []topologyActor{
+			{ActorID: "router-a", ActorType: "router"},
+			{ActorID: "router-b", ActorType: "router"},
+		},
+		Links: []topologyLink{
+			{
+				Protocol:   topologyL3SubnetLinkType,
+				LinkType:   topologyL3SubnetLinkType,
+				SrcActorID: "router-a",
+				DstActorID: "router-b",
+				Metrics: map[string]any{
+					"prefix": uint64(30),
+				},
+			},
+		},
+	}
+
+	_, err := snmpTopologyToV1(data)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "l3_subnet link 0 is missing subnet")
 }
 
 func TestSNMPTopologyToV1_PreservesLinkPresentationTypes(t *testing.T) {
@@ -785,4 +935,16 @@ func topologyV1LegendLinkTypes(data topologyv1.Data) []string {
 		out = append(out, entry.Type)
 	}
 	return out
+}
+
+func requireTopologyV1ModalSection(t *testing.T, sections []topologyv1.ModalSection, id string) topologyv1.ModalSection {
+	t.Helper()
+
+	for _, section := range sections {
+		if section.ID == id {
+			return section
+		}
+	}
+	require.Failf(t, "missing modal section", "section %q not found", id)
+	return topologyv1.ModalSection{}
 }

@@ -225,6 +225,20 @@ func TestTopologyCache_UpdateIfIndexByIP_CollectsAllSNMPDeviceIPs(t *testing.T) 
 	require.Equal(t, "1", cache.ifIndexByIP["10.20.4.1"])
 	require.Equal(t, "2", cache.ifIndexByIP["10.20.4.2"])
 	require.Equal(t, "3", cache.ifIndexByIP["2001:db8::1"])
+	require.Equal(t, "255.255.255.0", cache.ifNetmaskByIP["10.20.4.1"])
+	require.Equal(t, "255.255.255.0", cache.ifNetmaskByIP["10.20.4.2"])
+	require.Empty(t, cache.ifNetmaskByIP["2001:db8::1"])
+	require.Equal(t, topologyL3Interface{
+		IP:      "10.20.4.1",
+		Netmask: "255.255.255.0",
+		IfIndex: "1",
+	}, cache.l3InterfacesByIP["10.20.4.1"])
+	require.Equal(t, topologyL3Interface{
+		IP:      "10.20.4.2",
+		Netmask: "255.255.255.0",
+		IfIndex: "2",
+	}, cache.l3InterfacesByIP["10.20.4.2"])
+	require.NotContains(t, cache.l3InterfacesByIP, "2001:db8::1")
 
 	addrs := cache.localDevice.ManagementAddresses
 	require.Len(t, addrs, 3)

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -119,6 +120,72 @@ func TestTopologyRegistry_SnapshotSingleCacheKeepsLLDPUnidirectional(t *testing.
 	require.False(t, hasPairConsistency)
 	require.Equal(t, 1, data.Stats["links_unidirectional"].(int))
 	require.Equal(t, 0, data.Stats["links_bidirectional"].(int))
+}
+
+func TestTopologyRegistry_DefaultMapEmitsL3SubnetForManagedRoutersWithoutLLDP(t *testing.T) {
+	registry := newTopologyRegistry()
+
+	cacheA := newTopologyCache()
+	cacheA.updateTime = time.Now()
+	cacheA.lastUpdate = cacheA.updateTime
+	cacheA.agentID = "agent-test"
+	cacheA.localDevice = topologyDevice{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		SysName:       "router-a",
+		ManagementIP:  "10.0.0.1",
+	}
+	cacheA.updateIfIndexByIP(map[string]string{
+		tagTopoIfIndex: "2",
+		tagTopoIPAddr:  "198.51.100.1",
+		tagTopoIPMask:  "255.255.255.252",
+	})
+	cacheA.updateIfNameByIndex(map[string]string{
+		tagTopoIfIndex: "2",
+		tagTopoIfName:  "wan0",
+	})
+
+	cacheB := newTopologyCache()
+	cacheB.updateTime = time.Now().Add(time.Second)
+	cacheB.lastUpdate = cacheB.updateTime
+	cacheB.agentID = "agent-test"
+	cacheB.localDevice = topologyDevice{
+		ChassisID:     "aa:bb:cc:dd:ee:ff",
+		ChassisIDType: "macAddress",
+		SysName:       "router-b",
+		ManagementIP:  "10.0.0.2",
+	}
+	cacheB.updateIfIndexByIP(map[string]string{
+		tagTopoIfIndex: "7",
+		tagTopoIPAddr:  "198.51.100.2",
+		tagTopoIPMask:  "255.255.255.252",
+	})
+	cacheB.updateIfNameByIndex(map[string]string{
+		tagTopoIfIndex: "7",
+		tagTopoIfName:  "wan7",
+	})
+
+	registry.register(cacheA)
+	registry.register(cacheB)
+
+	data, ok := snapshotTopologyRegistryForTest(registry)
+
+	require.True(t, ok)
+	require.Len(t, data.Actors, 2)
+	require.Len(t, data.Links, 1)
+	link := data.Links[0]
+	require.Equal(t, "3", link.Layer)
+	require.Equal(t, topologyL3SubnetLinkType, link.Protocol)
+	require.Equal(t, topologyL3SubnetLinkType, link.LinkType)
+	require.Equal(t, "observed", link.Direction)
+	require.Equal(t, "198.51.100.0/30", link.Metrics["subnet"])
+	require.Equal(t, "shared_subnet", link.Metrics["inference"])
+	require.Equal(t, "logical_l3_subnet", link.Metrics["attachment_mode"])
+	require.Equal(t, "198.51.100.1", link.Src.Attributes["ip"])
+	require.Equal(t, "198.51.100.2", link.Dst.Attributes["ip"])
+	require.Equal(t, 1, data.Stats["l3_subnet_emitted_links"])
+	require.Equal(t, 1, data.Stats["l3_subnet_visible_links"])
+	require.Equal(t, 1, data.Stats["links_total"])
 }
 
 func TestCompareCollapseActorPriorityPrefersNonEmptyActorID(t *testing.T) {
@@ -291,6 +358,72 @@ func TestTopologyCache_SnapshotEngineObservationsUsesDirectLocalObservation(t *t
 	require.Equal(t, snapshot.localDeviceID, snapshot.l2Observations[0].DeviceID)
 	require.Len(t, snapshot.l2Observations[0].LLDPRemotes, 1)
 	require.Len(t, snapshot.l2Observations[0].CDPRemotes, 1)
+}
+
+func TestTopologyCache_SnapshotEngineObservationsIncludesL3Interfaces(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateTime = time.Now()
+	cache.lastUpdate = cache.updateTime
+	cache.agentID = "agent-test"
+	cache.localDevice = topologyDevice{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		SysName:       "router-a",
+		ManagementIP:  "10.0.0.1",
+	}
+	cache.updateIfIndexByIP(map[string]string{
+		tagTopoIfIndex: "2",
+		tagTopoIPAddr:  "198.51.100.1",
+		tagTopoIPMask:  "255.255.255.252",
+	})
+	cache.updateIfNameByIndex(map[string]string{
+		tagTopoIfIndex: "2",
+		tagTopoIfName:  "Gi0/2",
+		tagTopoIfDescr: "Uplink",
+	})
+	cache.updateIfIndexByIP(map[string]string{
+		tagTopoIfIndex: "3",
+		tagTopoIPAddr:  "2001:db8::1",
+	})
+
+	snapshot, ok := cache.snapshotEngineObservations()
+
+	require.True(t, ok)
+	require.Len(t, snapshot.l3Interfaces, 1)
+	require.Equal(t, topologyL3Interface{
+		DeviceID: snapshot.localDeviceID,
+		IP:       "198.51.100.1",
+		Netmask:  "255.255.255.252",
+		IfIndex:  "2",
+		IfName:   "Gi0/2",
+		IfDescr:  "Uplink",
+	}, snapshot.l3Interfaces[0])
+}
+
+func TestAggregateTopologyObservationSnapshotsIncludesL3Interfaces(t *testing.T) {
+	collectedAt := time.Now()
+	snapshots := []topologyObservationSnapshot{
+		{
+			localDeviceID: "device-a",
+			agentID:       "agent-a",
+			collectedAt:   collectedAt,
+			l2Observations: []topologyengine.L2Observation{{
+				DeviceID: "device-a",
+			}},
+			l3Interfaces: []topologyL3Interface{{
+				DeviceID: "device-a",
+				IP:       "198.51.100.1",
+				Netmask:  "255.255.255.252",
+				IfIndex:  "2",
+			}},
+		},
+	}
+
+	aggregate, ok := aggregateTopologyObservationSnapshots(snapshots)
+
+	require.True(t, ok)
+	require.Len(t, aggregate.l3Interfaces, 1)
+	require.Equal(t, snapshots[0].l3Interfaces[0], aggregate.l3Interfaces[0])
 }
 
 func TestTopologyRegistry_SnapshotReturnsFalseWithoutCollectedCaches(t *testing.T) {

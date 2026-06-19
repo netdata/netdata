@@ -51,3 +51,21 @@ func TestApplySNMPTopologyShapePolicies_EmitsStatsContractKeys(t *testing.T) {
 	require.Equal(t, topologyMapTypeHighConfidenceInferred, data.Stats["map_type"])
 	require.Equal(t, topologyInferenceStrategySTPParentTree, data.Stats["inference_strategy"])
 }
+
+func TestRecomputeTopologyLinkStatsRefreshesExistingL3VisibleCount(t *testing.T) {
+	data := &topologyData{
+		Stats: map[string]any{
+			"l3_subnet_emitted_links": 2,
+		},
+		Links: []topologyLink{
+			{Protocol: topologyL3SubnetLinkType, LinkType: topologyL3SubnetLinkType},
+			{Protocol: "lldp", LinkType: "lldp"},
+		},
+	}
+
+	recomputeTopologyLinkStats(data)
+
+	require.Equal(t, 2, data.Stats["links_total"])
+	require.Equal(t, 2, data.Stats["l3_subnet_emitted_links"])
+	require.Equal(t, 1, data.Stats["l3_subnet_visible_links"])
+}

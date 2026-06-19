@@ -24,6 +24,7 @@ const (
 	snmpTopologyV1LinkARP         = "arp"
 	snmpTopologyV1LinkSNMP        = "snmp"
 	snmpTopologyV1LinkProbable    = "probable"
+	snmpTopologyV1LinkL3Subnet    = topologyL3SubnetLinkType
 )
 
 func snmpTopologyToV1(data topologyData) (topologyv1.Data, error) {
@@ -105,6 +106,7 @@ func snmpTopologyToV1(data topologyData) (topologyv1.Data, error) {
 				"cdp",
 				"fdb",
 				"stp",
+				"l3_subnet",
 			},
 		},
 		CollectedAt: data.CollectedAt,

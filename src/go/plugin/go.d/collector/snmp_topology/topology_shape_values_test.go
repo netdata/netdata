@@ -19,7 +19,9 @@ func TestTopologyShapeValues_ClassifyActorsAndValues(t *testing.T) {
 	require.False(t, boolStatValue("0"))
 
 	require.Equal(t, 7, intStatValue("7"))
+	require.Equal(t, 6, intStatValue(uint(6)))
 	require.Equal(t, 5, intStatValue(int64(5)))
+	require.Equal(t, 30, intStatValue(uint64(30)))
 	require.Equal(t, 0, intStatValue("nan"))
 
 	require.Equal(t, "value", topologyMetricValueString(map[string]any{"key": " value "}, "key"))

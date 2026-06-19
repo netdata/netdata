@@ -9,19 +9,20 @@ import (
 
 func newTopologyCache() *topologyCache {
 	return &topologyCache{
-		lldpLocPorts:    make(map[string]*lldpLocPort),
-		lldpRemotes:     make(map[string]*lldpRemote),
-		cdpRemotes:      make(map[string]*cdpRemote),
-		ifNamesByIndex:  make(map[string]string),
-		ifStatusByIndex: make(map[string]ifStatus),
-		ifIndexByIP:     make(map[string]string),
-		ifNetmaskByIP:   make(map[string]string),
-		bridgePortToIf:  make(map[string]string),
-		fdbEntries:      make(map[string]*fdbEntry),
-		fdbIDToVlanID:   make(map[string]string),
-		vlanIDToName:    make(map[string]string),
-		stpPorts:        make(map[string]*stpPortEntry),
-		arpEntries:      make(map[string]*arpEntry),
+		lldpLocPorts:     make(map[string]*lldpLocPort),
+		lldpRemotes:      make(map[string]*lldpRemote),
+		cdpRemotes:       make(map[string]*cdpRemote),
+		ifNamesByIndex:   make(map[string]string),
+		ifStatusByIndex:  make(map[string]ifStatus),
+		ifIndexByIP:      make(map[string]string),
+		ifNetmaskByIP:    make(map[string]string),
+		l3InterfacesByIP: make(map[string]topologyL3Interface),
+		bridgePortToIf:   make(map[string]string),
+		fdbEntries:       make(map[string]*fdbEntry),
+		fdbIDToVlanID:    make(map[string]string),
+		vlanIDToName:     make(map[string]string),
+		stpPorts:         make(map[string]*stpPortEntry),
+		arpEntries:       make(map[string]*arpEntry),
 	}
 }
 
@@ -42,6 +43,7 @@ func (c *topologyCache) replaceWith(src *topologyCache) {
 	c.ifStatusByIndex = src.ifStatusByIndex
 	c.ifIndexByIP = src.ifIndexByIP
 	c.ifNetmaskByIP = src.ifNetmaskByIP
+	c.l3InterfacesByIP = src.l3InterfacesByIP
 	c.bridgePortToIf = src.bridgePortToIf
 	c.fdbEntries = src.fdbEntries
 	c.fdbIDToVlanID = src.fdbIDToVlanID

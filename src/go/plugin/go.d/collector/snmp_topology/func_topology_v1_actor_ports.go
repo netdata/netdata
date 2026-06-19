@@ -68,6 +68,9 @@ func buildSNMPTopologyV1PortNeighborSummaries(
 	}
 
 	for _, link := range links {
+		if snmpTopologyV1LinkIsL3Subnet(link) {
+			continue
+		}
 		appendSide(link.SrcActorID, link.DstActorID, link.Src, link.Dst)
 		appendSide(link.DstActorID, link.SrcActorID, link.Dst, link.Src)
 	}
@@ -291,6 +294,9 @@ func buildSNMPTopologyV1ActorPortLinksTable(
 	}
 
 	for i, link := range links {
+		if snmpTopologyV1LinkIsL3Subnet(link) {
+			continue
+		}
 		if err := appendSide(i, link, link.SrcActorID, link.DstActorID, link.Src, link.Dst); err != nil {
 			return topologyv1.Table{}, err
 		}

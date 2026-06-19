@@ -24,6 +24,7 @@ type topologyCache struct {
 	ifStatusByIndex      map[string]ifStatus
 	ifIndexByIP          map[string]string
 	ifNetmaskByIP        map[string]string
+	l3InterfacesByIP     map[string]topologyL3Interface
 	bridgePortToIf       map[string]string
 	fdbEntries           map[string]*fdbEntry
 	fdbIDToVlanID        map[string]string
