@@ -4,12 +4,12 @@ This guide explains how to customize Netdata's stock alerts. User configurations
 
 ## Quick Reference
 
-| Goal | Method |
-|------|--------|
+| Goal                                | Method                               |
+|-------------------------------------|--------------------------------------|
 | Change thresholds for ALL instances | Create a template with the same name |
-| Change thresholds for ONE instance | Create an alarm with the same name |
-| Disable an alert completely | Use `enabled alarms` in netdata.conf |
-| Silence notifications only | Set `to: silent` |
+| Change thresholds for ONE instance  | Create an alarm with the same name   |
+| Disable an alert completely         | Use `enabled alarms` in netdata.conf |
+| Silence notifications only          | Set `to: silent`                     |
 
 ## Understanding Overrides
 
@@ -34,23 +34,41 @@ Create a template with the same name to change thresholds for ALL instances.
 **Example: Raise CPU steal thresholds globally**
 
 Stock alert from `cpu.conf` (in the stock config directory):
+
 ```yaml
-template: 20min_steal_cpu
-      on: system.cpu
-  lookup: average -20m unaligned of steal
-   units: %
-   every: 5m
-    warn: $this > (($status >= $WARNING) ? (5) : (10))
+   template: 20min_steal_cpu
+         on: system.cpu
+      class: Latency
+       type: System
+  component: CPU
+host labels: _os=linux
+     lookup: average -20m unaligned of steal
+      units: %
+      every: 5m
+       warn: $this > (($status >= $WARNING) ? (5) : (10))
+      delay: down 1h multiplier 1.5 max 2h
+    summary: System CPU steal time
+       info: Average CPU steal time over the last 20 minutes
+         to: silent
 ```
 
 Your override (create it with `sudo ./edit-config health.d/my-overrides.conf`):
+
 ```yaml
-template: 20min_steal_cpu
-      on: system.cpu
-  lookup: average -20m unaligned of steal
-   units: %
-   every: 5m
-    warn: $this > (($status >= $WARNING) ? (10) : (20))
+   template: 20min_steal_cpu
+         on: system.cpu
+      class: Latency
+       type: System
+  component: CPU
+host labels: _os=linux
+     lookup: average -20m unaligned of steal
+      units: %
+      every: 5m
+       warn: $this > (($status >= $WARNING) ? (10) : (20))
+      delay: down 1h multiplier 1.5 max 2h
+    summary: System CPU steal time
+       info: Average CPU steal time over the last 20 minutes
+         to: silent
 ```
 
 **Why it works:** Same name + same context. Your template is processed first, creating the alert. The stock template is then skipped.
@@ -64,6 +82,7 @@ Create an alarm to override thresholds for ONE specific instance while keeping s
 **Example: Different disk space threshold for `/mnt/data`**
 
 Stock template (applies to all disks):
+
 ```yaml
 template: disk_space_usage
       on: disk.space
@@ -73,6 +92,7 @@ template: disk_space_usage
 ```
 
 Your override (create it with `sudo ./edit-config health.d/my-overrides.conf`):
+
 ```yaml
 alarm: disk_space_usage
    on: disk_space._mnt_data
@@ -82,6 +102,7 @@ alarm: disk_space_usage
 ```
 
 **Why it works:**
+
 - Both have the **same name** (`disk_space_usage`)
 - Your **alarm** targets the specific chart ID `disk_space._mnt_data`
 - Alarms are processed before templates (when names match)
@@ -114,6 +135,7 @@ chart labels: mount_point=/mnt/data
 ```
 
 Use labels when:
+
 - You want to target multiple instances sharing a label
 - Chart IDs are dynamic or unpredictable
 
@@ -184,11 +206,13 @@ If `netdatacli` isn't available, send `SIGUSR2` to the Netdata process.
 ### Verify Your Override
 
 Check via API:
+
 ```bash
 curl -s "http://localhost:19999/api/v1/alarms?all" | jq '.alarms | to_entries[] | select(.value.name == "20min_steal_cpu") | .value'
 ```
 
 Key fields to check:
+
 - `source`: confirms which config file is active (user override vs stock)
 - `lookup_*`: data query parameters
 - `warn`, `crit`: threshold expressions
@@ -208,6 +232,7 @@ grep -i health /var/log/netdata/error.log | tail -20
 ```
 
 Common issues:
+
 - Syntax errors in configuration
 - Alert name doesn't match exactly (case-sensitive)
 - File permissions prevent Netdata from reading your config
@@ -224,6 +249,7 @@ Common issues:
 ### Both Stock and Override Alerts Appear
 
 This happens when matching criteria don't overlap. For example:
+
 - Your override has `host labels: production`
 - Stock alert has no host labels restriction
 
@@ -264,16 +290,19 @@ Both can coexist because they match different hosts.
 ### How do I find what stock alerts exist?
 
 List the stock alert files (the command below uses the default stock directory):
+
 ```bash
 ls /usr/lib/netdata/conf.d/health.d/
 ```
 
 View a specific stock alert:
+
 ```bash
 cat /usr/lib/netdata/conf.d/health.d/cpu.conf
 ```
 
 Or use the API to list all alert names without dealing with paths:
+
 ```bash
 curl -s "http://localhost:19999/api/v1/alarms?all" | jq '.alarms | to_entries[].value.name' | sort -u
 ```
@@ -299,6 +328,7 @@ Your overrides continue working. However, if a stock alert is renamed or removed
 ### How do I override for multiple specific instances?
 
 Option 1: Create multiple alarms (one per instance):
+
 ```yaml
 alarm: disk_space_usage
    on: disk_space._mnt_data
@@ -310,6 +340,7 @@ alarm: disk_space_usage
 ```
 
 Option 2: Use chart labels if instances share a label:
+
 ```yaml
 template: disk_space_usage
       on: disk.space
@@ -320,6 +351,7 @@ chart labels: storage_tier=bulk
 ### Can I see what overrides are currently active?
 
 Check which config files Netdata loaded:
+
 ```bash
 # systemd journal:
 journalctl --namespace netdata -g "health.*load\|health.*read" --no-pager
@@ -329,6 +361,7 @@ grep -iE "health.*(load|read)" /var/log/netdata/error.log
 ```
 
 Compare your active alert config vs stock (default locations shown):
+
 ```bash
 # Your override
 cat /etc/netdata/health.d/my-overrides.conf
