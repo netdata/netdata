@@ -36,6 +36,7 @@ struct inflight_function {
 };
 
 PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser);
+PARSER_RC pluginsd_function_del(char **words, size_t num_words, PARSER *parser);
 PARSER_RC pluginsd_function_result_begin(char **words, size_t num_words, PARSER *parser);
 PARSER_RC pluginsd_function_progress(char **words, size_t num_words, PARSER *parser);
 
