@@ -151,6 +151,45 @@ static void stream_sender_on_connect_and_disconnect(struct sender_state *s) {
 // re-evaluates automatically.
 #if defined(HAVE_NET_IF_H) && !defined(OS_WINDOWS)
 #include <ifaddrs.h>
+#include <arpa/inet.h>
+
+// pure address->interface match, separated from the syscalls so it can be unit-tested with
+// synthetic inputs (see unittest_stream_egress_iface). Writes the first matching interface name
+// into out (capacity out_len) and returns true on match. Handles plain IPv4, native IPv6, and the
+// dual-stack case where getsockname reports the local IPv4 as an IPv6-mapped address (::ffff:a.b.c.d).
+static bool stream_sender_match_egress_iface(const struct sockaddr_storage *local,
+                                             const struct ifaddrs *ifaddr, char *out, size_t out_len) {
+    for (const struct ifaddrs *ifa = ifaddr; ifa; ifa = ifa->ifa_next) {
+        if (!ifa->ifa_addr)
+            continue;
+
+        bool match = false;
+        if (local->ss_family == AF_INET && ifa->ifa_addr->sa_family == AF_INET)
+            match = ((const struct sockaddr_in *)(const void *)local)->sin_addr.s_addr ==
+                    ((const struct sockaddr_in *)(void *)ifa->ifa_addr)->sin_addr.s_addr;
+        else if (local->ss_family == AF_INET6) {
+            const struct sockaddr_in6 *local6 = (const struct sockaddr_in6 *)(const void *)local;
+            if (IN6_IS_ADDR_V4MAPPED(&local6->sin6_addr) && ifa->ifa_addr->sa_family == AF_INET) {
+                // a dual-stack socket reports its local IPv4 as ::ffff:a.b.c.d - match it against the
+                // interface's plain AF_INET address
+                struct in_addr mapped4;
+                memcpy(&mapped4, &local6->sin6_addr.s6_addr[12], sizeof(mapped4));
+                match = mapped4.s_addr ==
+                        ((const struct sockaddr_in *)(void *)ifa->ifa_addr)->sin_addr.s_addr;
+            }
+            else if (ifa->ifa_addr->sa_family == AF_INET6)
+                match = memcmp(&local6->sin6_addr,
+                               &((const struct sockaddr_in6 *)(void *)ifa->ifa_addr)->sin6_addr,
+                               sizeof(struct in6_addr)) == 0;
+        }
+
+        if (match) {
+            strncpyz(out, ifa->ifa_name, out_len - 1);
+            return true;
+        }
+    }
+    return false;
+}
 
 static void stream_sender_update_egress_iface_label(struct sender_state *s) {
     int fd = s->sock.fd;
@@ -167,31 +206,85 @@ static void stream_sender_update_egress_iface_label(struct sender_state *s) {
         return;
 
     char iface[IF_NAMESIZE] = "";
-    for (struct ifaddrs *ifa = ifaddr; ifa; ifa = ifa->ifa_next) {
-        if (!ifa->ifa_addr || ifa->ifa_addr->sa_family != local.ss_family)
-            continue;
-
-        bool match = false;
-        if (local.ss_family == AF_INET)
-            match = ((const struct sockaddr_in *)&local)->sin_addr.s_addr ==
-                    ((const struct sockaddr_in *)(void *)ifa->ifa_addr)->sin_addr.s_addr;
-        else if (local.ss_family == AF_INET6)
-            match = memcmp(&((const struct sockaddr_in6 *)&local)->sin6_addr,
-                           &((const struct sockaddr_in6 *)(void *)ifa->ifa_addr)->sin6_addr,
-                           sizeof(struct in6_addr)) == 0;
-
-        if (match) {
-            strncpyz(iface, ifa->ifa_name, sizeof(iface) - 1);
-            break;
-        }
-    }
+    bool found = stream_sender_match_egress_iface(&local, ifaddr, iface, sizeof(iface));
     freeifaddrs(ifaddr);
 
-    if (iface[0])
+    if (found && iface[0])
         rrdlabels_add(s->host->rrdlabels, "_net_default_iface", iface, RRDLABEL_SRC_AUTO);
+}
+
+// unit test for the address->interface matching, incl. the IPv6-mapped-IPv4 dual-stack case cubic
+// flagged. Builds a synthetic interface list and drives stream_sender_match_egress_iface directly,
+// so it needs no real sockets or interfaces.
+int unittest_stream_egress_iface(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    struct sockaddr_in lo4 = { .sin_family = AF_INET };
+    inet_pton(AF_INET, "127.0.0.1", &lo4.sin_addr);
+    struct sockaddr_in eth0_4 = { .sin_family = AF_INET };
+    inet_pton(AF_INET, "10.20.4.5", &eth0_4.sin_addr);
+    struct sockaddr_in6 eth1_6 = { .sin6_family = AF_INET6 };
+    inet_pton(AF_INET6, "2001:db8::5", &eth1_6.sin6_addr);
+
+    struct ifaddrs if_eth1 = { .ifa_next = NULL,     .ifa_name = (char *)"eth1", .ifa_addr = (struct sockaddr *)&eth1_6 };
+    struct ifaddrs if_eth0 = { .ifa_next = &if_eth1, .ifa_name = (char *)"eth0", .ifa_addr = (struct sockaddr *)&eth0_4 };
+    struct ifaddrs if_lo   = { .ifa_next = &if_eth0, .ifa_name = (char *)"lo",   .ifa_addr = (struct sockaddr *)&lo4   };
+
+    static const struct {
+        const char *name;
+        int family;
+        const char *addr;    // an IPv4 string when mapped==true
+        bool mapped;         // build ::ffff:addr (a dual-stack local)
+        const char *expect;  // NULL = expect no match
+    } cases[] = {
+        { "ipv4 direct",      AF_INET,  "10.20.4.5",    false, "eth0" },
+        { "ipv6 native",      AF_INET6, "2001:db8::5",  false, "eth1" },
+        { "ipv4-mapped ipv6", AF_INET6, "10.20.4.5",    true,  "eth0" },
+        { "no match ipv4",    AF_INET,  "192.0.2.1",    false, NULL   },
+        { "no match ipv6",    AF_INET6, "2001:db8::99", false, NULL   },
+    };
+
+    int errors = 0;
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        struct sockaddr_storage local;
+        memset(&local, 0, sizeof(local));
+
+        if (cases[i].family == AF_INET) {
+            struct sockaddr_in *l = (struct sockaddr_in *)&local;
+            l->sin_family = AF_INET;
+            inet_pton(AF_INET, cases[i].addr, &l->sin_addr);
+        }
+        else {
+            struct sockaddr_in6 *l = (struct sockaddr_in6 *)&local;
+            l->sin6_family = AF_INET6;
+            if (cases[i].mapped) {
+                struct in_addr v4;
+                inet_pton(AF_INET, cases[i].addr, &v4);
+                l->sin6_addr.s6_addr[10] = 0xff;
+                l->sin6_addr.s6_addr[11] = 0xff;
+                memcpy(&l->sin6_addr.s6_addr[12], &v4, sizeof(v4));
+            }
+            else
+                inet_pton(AF_INET6, cases[i].addr, &l->sin6_addr);
+        }
+
+        char iface[IF_NAMESIZE] = "";
+        bool found = stream_sender_match_egress_iface(&local, &if_lo, iface, sizeof(iface));
+
+        bool ok = cases[i].expect ? (found && strcmp(iface, cases[i].expect) == 0) : !found;
+        if (!ok) {
+            fprintf(stderr, "  FAILED %s: expected %s, got %s\n", cases[i].name,
+                    cases[i].expect ? cases[i].expect : "(none)", found ? iface : "(none)");
+            errors++;
+        }
+    }
+
+    fprintf(stderr, "%s() %s\n", __FUNCTION__, errors ? "FAILED" : "passed");
+    return errors;
 }
 #else
 static inline void stream_sender_update_egress_iface_label(struct sender_state *s __maybe_unused) { ; }
+int unittest_stream_egress_iface(void) { return 0; }
 #endif
 
 void stream_sender_on_connect(struct sender_state *s) {

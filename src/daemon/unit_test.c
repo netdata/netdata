@@ -1563,6 +1563,9 @@ int run_all_mockup_tests(void)
     if(check_strdupz_path_subpath())
         return 1;
 
+    if(unittest_stream_egress_iface())
+        return 1;
+
     if(check_number_printing())
         return 1;
 
