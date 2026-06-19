@@ -678,7 +678,7 @@ func TestSNMPTopologyToV1_PreservesOSPFAdjacencyPresentationEvidenceAndNeighborR
 	require.NotNil(t, linkType.Presentation)
 	assert.Equal(t, "OSPF adjacency", linkType.Presentation.Label)
 	assert.Equal(t, "success", linkType.Presentation.ColorSlot)
-	assert.Equal(t, "solid", linkType.Presentation.LineStyle)
+	assert.Equal(t, "dashed", linkType.Presentation.LineStyle)
 
 	require.Contains(t, payload.Types.EvidenceTypes, snmpTopologyV1LinkOSPF)
 	evidenceType := payload.Types.EvidenceTypes[snmpTopologyV1LinkOSPF]

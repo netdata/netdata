@@ -410,7 +410,7 @@ func snmpTopologyV1LinkTypeSpecs() []snmpTopologyV1LinkTypeSpec {
 		{id: snmpTopologyV1LinkSTP, label: "STP", colorSlot: "muted", lineStyle: "solid", width: "normal", semanticRole: "normal"},
 		{id: snmpTopologyV1LinkARP, label: "ARP", colorSlot: "muted", lineStyle: "solid", width: "normal", semanticRole: "normal"},
 		{id: snmpTopologyV1LinkL3Subnet, label: "L3 subnet", colorSlot: "info", lineStyle: "dashed", width: "normal", semanticRole: "normal"},
-		{id: snmpTopologyV1LinkOSPF, label: "OSPF adjacency", colorSlot: "success", lineStyle: "solid", width: "normal", semanticRole: "control"},
+		{id: snmpTopologyV1LinkOSPF, label: "OSPF adjacency", colorSlot: "success", lineStyle: "dashed", width: "normal", semanticRole: "control"},
 		{id: snmpTopologyV1LinkSNMP, label: "SNMP", colorSlot: "primary", lineStyle: "solid", width: "normal", semanticRole: "normal"},
 		{id: snmpTopologyV1LinkProbable, label: "Probable", colorSlot: "dim", lineStyle: "solid", width: "normal", semanticRole: "normal"},
 		{id: snmpTopologyV1LinkObservation, label: "L2 observation", colorSlot: "neutral", lineStyle: "solid", width: "normal", semanticRole: "normal"},
