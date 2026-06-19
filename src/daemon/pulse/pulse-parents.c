@@ -156,6 +156,22 @@ void pulse_host_status(RRDHOST *host, PULSE_HOST_STATUS status, STREAM_HANDSHAKE
         status |= rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST) ?
                       PULSE_HOST_STATUS_EPHEMERAL : PULSE_HOST_STATUS_PERMANENT;
 
+    // running-latch: once the node first reaches RCV_RUNNING after a (re)connect, ignore the
+    // per-chart replication ripples that would otherwise flip the host status back to replicating.
+    // Makes no assumption that replication happens: RCV_RUNNING may be reached directly (replication
+    // disabled), and the block path is only ever taken for an incoming RCV_REPLICATING.
+    if(status & PULSE_HOST_STATUS_RCV_RUNNING)
+        __atomic_store_n(&host->stream.rcv.status.running_latched, true, __ATOMIC_RELAXED);
+    else if(status & PULSE_HOST_STATUS_RCV_REPLICATING) {
+        if(__atomic_load_n(&host->stream.rcv.status.running_latched, __ATOMIC_RELAXED) &&
+           (__atomic_load_n(&host->stream.pulse_state, __ATOMIC_RELAXED) & PULSE_HOST_STATUS_RCV_RUNNING))
+            status = (PULSE_HOST_STATUS)((status & ~PULSE_HOST_STATUS_RCV_REPLICATING) | PULSE_HOST_STATUS_RCV_RUNNING);
+        else
+            __atomic_store_n(&host->stream.rcv.status.running_latched, false, __ATOMIC_RELAXED);
+    }
+    else if(status & PULSE_HOST_STATUS_RCV_OFFLINE)
+        __atomic_store_n(&host->stream.rcv.status.running_latched, false, __ATOMIC_RELAXED);
+
     if(status & basic)
         remove = basic | receiver | ephemerality | sender;
     else if(status & receiver)
@@ -175,6 +191,11 @@ void pulse_host_status(RRDHOST *host, PULSE_HOST_STATUS status, STREAM_HANDSHAKE
                                          false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
 
     PULSE_HOST_STATUS old = (PULSE_HOST_STATUS)cur; // the state we transitioned from
+
+    // reset the inbound-state age timer whenever the inbound (basic|receiver) state changes
+    if(((PULSE_HOST_STATUS)next & (basic | receiver)) != (old & (basic | receiver)))
+        __atomic_store_n(&host->stream.rcv.status.state_changed_s, now_realtime_sec(), __ATOMIC_RELAXED);
+
     if(status == PULSE_HOST_STATUS_DELETED)
         status = 0; // do not add anything, just remove the old flags
 
@@ -325,19 +346,30 @@ static void pulse_child_chart_labels(RRDSET *st, RRDHOST *host) {
     if(!UUIDiszero(host->node_id))
         uuid_unparse_lower(host->node_id.uuid, node_id);
 
+    char hops[16];
+    snprintfz(hops, sizeof(hops), "%d", (int)rrdhost_ingestion_hops(host));
+
     // copy the child's labels FIRST, then set the authoritative identity labels so a colliding
-    // child label cannot overwrite machine_guid/hostname/node_id (rrdlabels_copy/add replace the
-    // value for a shared key)
+    // child label cannot overwrite machine_guid/hostname/node_id/hops (rrdlabels_copy/add replace
+    // the value for a shared key)
     rrdlabels_copy(st->rrdlabels, host->rrdlabels);
     rrdlabels_add(st->rrdlabels, "machine_guid", host->machine_guid, RRDLABEL_SRC_AUTO);
     rrdlabels_add(st->rrdlabels, "hostname", rrdhost_hostname(host), RRDLABEL_SRC_AUTO);
     if(node_id[0])
         rrdlabels_add(st->rrdlabels, "node_id", node_id, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "hops", hops, RRDLABEL_SRC_AUTO);
 }
 
 static void pulse_child_charts_update(RRDHOST *host, PULSE_INBOUND_STATE state) {
     char id[RRD_ID_LENGTH_MAX + 1];
     const char *guid = host->machine_guid;
+
+    // re-apply labels + hops only when the host's labels changed (reconnect / mid-stream push), via a
+    // cheap version compare - so we don't re-copy every child's labels on every pass. hops can change
+    // when a child re-attaches via a different parent in a cluster; that reconnect bumps the version.
+    uint32_t lv = rrdlabels_version(host->rrdlabels);
+    bool refresh_labels = (lv != host->stream.rcv.status.labels_applied_version);
+    host->stream.rcv.status.labels_applied_version = lv;
 
     // --- traffic ---
     snprintfz(id, sizeof(id), "streaming.in.traffic.%s", guid);
@@ -345,7 +377,7 @@ static void pulse_child_charts_update(RRDHOST *host, PULSE_INBOUND_STATE state) 
         "netdata", id, NULL, "Streaming", "netdata.streaming.in.traffic",
         "Inbound Streaming Traffic", "bytes/s", "netdata", "pulse",
         130160, localhost->rrd_update_every, RRDSET_TYPE_AREA);
-    if(unlikely(!rrdlabels_exist(st_traffic->rrdlabels, "machine_guid")))
+    if(unlikely(refresh_labels || !rrdlabels_exist(st_traffic->rrdlabels, "machine_guid")))
         pulse_child_chart_labels(st_traffic, host);
     rrddim_set_by_pointer(st_traffic, rrddim_add(st_traffic, "in", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL),
         (collected_number)single_writer_atomic_read(&host->stream.rcv.status.bytes_in));
@@ -367,7 +399,7 @@ static void pulse_child_charts_update(RRDHOST *host, PULSE_INBOUND_STATE state) 
         "netdata", id, NULL, "Streaming", "netdata.streaming.in.state",
         "Inbound Streaming State", "state", "netdata", "pulse",
         130161, localhost->rrd_update_every, RRDSET_TYPE_LINE);
-    if(unlikely(!rrdlabels_exist(st_state->rrdlabels, "machine_guid")))
+    if(unlikely(refresh_labels || !rrdlabels_exist(st_state->rrdlabels, "machine_guid")))
         pulse_child_chart_labels(st_state, host);
     for(size_t i = 0; i < PULSE_INBOUND_MAX ; i++) {
         if(!state_dim[i]) continue;
@@ -382,11 +414,25 @@ static void pulse_child_charts_update(RRDHOST *host, PULSE_INBOUND_STATE state) 
         "netdata", id, NULL, "Streaming", "netdata.streaming.in.reconnects",
         "Inbound Streaming Reconnects", "connects/s", "netdata", "pulse",
         130162, localhost->rrd_update_every, RRDSET_TYPE_LINE);
-    if(unlikely(!rrdlabels_exist(st_reconnects->rrdlabels, "machine_guid")))
+    if(unlikely(refresh_labels || !rrdlabels_exist(st_reconnects->rrdlabels, "machine_guid")))
         pulse_child_chart_labels(st_reconnects, host);
     rrddim_set_by_pointer(st_reconnects, rrddim_add(st_reconnects, "connections", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL),
         (collected_number)__atomic_load_n(&host->stream.rcv.status.connections, __ATOMIC_RELAXED));
     rrdset_done(st_reconnects);
+
+    // --- age (seconds in the current inbound state; reset to 0 on every state change) ---
+    snprintfz(id, sizeof(id), "streaming.in.age.%s", guid);
+    RRDSET *st_age = rrdset_create_localhost(
+        "netdata", id, NULL, "Streaming", "netdata.streaming.in.age",
+        "Inbound Streaming State Age", "seconds", "netdata", "pulse",
+        130163, localhost->rrd_update_every, RRDSET_TYPE_LINE);
+    if(unlikely(refresh_labels || !rrdlabels_exist(st_age->rrdlabels, "machine_guid")))
+        pulse_child_chart_labels(st_age, host);
+    time_t changed = __atomic_load_n(&host->stream.rcv.status.state_changed_s, __ATOMIC_RELAXED);
+    time_t now_s = now_realtime_sec();
+    rrddim_set_by_pointer(st_age, rrddim_add(st_age, "age", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE),
+        (collected_number)((changed && now_s > changed) ? now_s - changed : 0));
+    rrdset_done(st_age);
 }
 
 // traverse all hosts once: tally BOTH the inbound and outbound aggregates from each host's combined
