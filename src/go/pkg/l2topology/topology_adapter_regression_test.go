@@ -120,6 +120,18 @@ func TestBackfillEndpointPortFromPeerPreservesExistingCanonicalPort(t *testing.T
 	require.Equal(t, "", topologyAttrString(backfilled.Attributes, "port_id"))
 }
 
+func TestTopologyIntegerAttributesParseSNMPEnumLabels(t *testing.T) {
+	attrs := map[string]any{
+		"if_index": "up(1)",
+		"speed":    "fast(1000000000)",
+	}
+
+	require.Equal(t, 1, topologyAttrInt(attrs, "if_index"))
+	require.Equal(t, int64(1000000000), topologyAttrInt64(attrs, "speed"))
+	require.Equal(t, OptionalValue[int]{Has: true, Value: 1}, topologyOptionalAttrInt(attrs, "if_index"))
+	require.Equal(t, OptionalValue[int64]{Has: true, Value: 1000000000}, topologyOptionalAttrInt64(attrs, "speed"))
+}
+
 func TestSegmentProjectionBuilderPruneSegmentsWithoutLinksRemovesEmptySegments(t *testing.T) {
 	builder := &segmentProjectionBuilder{
 		segmentIDs: []string{"segment-a", "segment-b"},
