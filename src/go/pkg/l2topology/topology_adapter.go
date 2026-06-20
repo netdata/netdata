@@ -6,6 +6,8 @@ import (
 	"net/netip"
 	"strings"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
 // GraphOptions controls conversion from Result to the internal graph projection.
@@ -54,8 +56,8 @@ type endpointActorAccumulator struct {
 }
 
 type projectedSegments struct {
-	actors                        []Actor
-	links                         []Link
+	actors                        []graph.Actor
+	links                         []graph.Link
 	linksFdb                      int
 	bidirectionalCount            int
 	endpointLinksCandidates       int
@@ -220,7 +222,7 @@ func topologyInferenceStrategyConfigFor(strategy string) topologyInferenceStrate
 }
 
 // ToGraph converts an engine result to the internal graph projection.
-func ToGraph(result Result, opts GraphOptions) Graph {
+func ToGraph(result Result, opts GraphOptions) graph.Graph {
 	builder := newGraphBuilder(result, opts)
 	builder.prepareIndexes()
 	builder.collectBridgeTopologyInputs()

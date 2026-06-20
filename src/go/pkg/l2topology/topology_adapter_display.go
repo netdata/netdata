@@ -4,6 +4,8 @@ package l2topology
 
 import (
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
 type topologyDisplayNameResolver struct {
@@ -16,7 +18,7 @@ type topologyDisplayName struct {
 	source string
 }
 
-func applyTopologyDisplayNames(actors []Actor, links []Link, lookup func(ip string) string) {
+func applyTopologyDisplayNames(actors []graph.Actor, links []graph.Link, lookup func(ip string) string) {
 	resolver := topologyDisplayNameResolver{
 		lookup: lookup,
 		cache:  make(map[string]string),
@@ -83,7 +85,7 @@ func applyTopologyDisplayNames(actors []Actor, links []Link, lookup func(ip stri
 	}
 }
 
-func topologySetActorDisplay(actor *Actor, display topologyDisplayName) {
+func topologySetActorDisplay(actor *graph.Actor, display topologyDisplayName) {
 	if actor == nil {
 		return
 	}
@@ -108,7 +110,7 @@ func topologySetActorDisplay(actor *Actor, display topologyDisplayName) {
 	actor.Attributes = pruneTopologyAttributes(attrs)
 }
 
-func topologySetEndpointDisplayAndCanonicalPortName(endpoint *LinkEndpoint, display topologyDisplayName) string {
+func topologySetEndpointDisplayAndCanonicalPortName(endpoint *graph.LinkEndpoint, display topologyDisplayName) string {
 	if endpoint == nil {
 		return ""
 	}
@@ -126,7 +128,7 @@ func topologySetEndpointDisplayAndCanonicalPortName(endpoint *LinkEndpoint, disp
 	return name
 }
 
-func topologyEndpointDisplayName(endpoint LinkEndpoint, actorDisplayByMatch map[string]string, resolver *topologyDisplayNameResolver) topologyDisplayName {
+func topologyEndpointDisplayName(endpoint graph.LinkEndpoint, actorDisplayByMatch map[string]string, resolver *topologyDisplayNameResolver) topologyDisplayName {
 	if key := canonicalTopologyMatchKey(endpoint.Match); key != "" {
 		if name := strings.TrimSpace(actorDisplayByMatch[key]); name != "" {
 			return topologyDisplayName{name: name, source: "actor"}
@@ -135,7 +137,7 @@ func topologyEndpointDisplayName(endpoint LinkEndpoint, actorDisplayByMatch map[
 	return topologyDisplayNameFromMatch(endpoint.Match, resolver)
 }
 
-func topologyActorDisplayName(actor Actor, deviceDisplayByID map[string]string, resolver *topologyDisplayNameResolver) topologyDisplayName {
+func topologyActorDisplayName(actor graph.Actor, deviceDisplayByID map[string]string, resolver *topologyDisplayNameResolver) topologyDisplayName {
 	if actor.ActorType == "segment" {
 		if name := topologySegmentDisplayName(actor, deviceDisplayByID); name != "" {
 			return topologyDisplayName{name: name, source: "segment"}
@@ -153,7 +155,7 @@ func topologyActorDisplayName(actor Actor, deviceDisplayByID map[string]string, 
 	return topologyDisplayName{}
 }
 
-func topologyFallbackActorDisplayName(actor Actor) topologyDisplayName {
+func topologyFallbackActorDisplayName(actor graph.Actor) topologyDisplayName {
 	if matchKey := canonicalTopologyMatchKey(actor.Match); matchKey != "" {
 		return topologyDisplayName{name: matchKey, source: "fallback_match"}
 	}
@@ -167,11 +169,11 @@ func topologyFallbackActorDisplayName(actor Actor) topologyDisplayName {
 	return topologyDisplayName{name: actorType + ":[unset]", source: "fallback"}
 }
 
-func topologyActorDeviceID(actor Actor) string {
+func topologyActorDeviceID(actor graph.Actor) string {
 	return topologyAttrString(actor.Attributes, "device_id")
 }
 
-func topologyDisplayNameFromMatch(match Match, resolver *topologyDisplayNameResolver) topologyDisplayName {
+func topologyDisplayNameFromMatch(match graph.Match, resolver *topologyDisplayNameResolver) topologyDisplayName {
 	if dns := topologyMatchPreferredDNSName(match, resolver); dns != "" {
 		return topologyDisplayName{name: dns, source: "dns"}
 	}
@@ -190,7 +192,7 @@ func topologyDisplayNameFromMatch(match Match, resolver *topologyDisplayNameReso
 	return topologyDisplayName{}
 }
 
-func topologyMatchPreferredDNSName(match Match, resolver *topologyDisplayNameResolver) string {
+func topologyMatchPreferredDNSName(match graph.Match, resolver *topologyDisplayNameResolver) string {
 	candidates := make(map[string]struct{})
 	for _, value := range match.DNSNames {
 		if normalized := normalizeDNSName(value); normalized != "" {
@@ -214,11 +216,11 @@ func topologyMatchPreferredDNSName(match Match, resolver *topologyDisplayNameRes
 	return names[0]
 }
 
-func topologyMatchPreferredSysName(match Match) string {
+func topologyMatchPreferredSysName(match graph.Match) string {
 	return strings.TrimSpace(match.SysName)
 }
 
-func topologyMatchPreferredHostname(match Match) string {
+func topologyMatchPreferredHostname(match graph.Match) string {
 	hostnames := uniqueTopologyStrings(match.Hostnames)
 	if len(hostnames) == 0 {
 		return ""
@@ -226,7 +228,7 @@ func topologyMatchPreferredHostname(match Match) string {
 	return hostnames[0]
 }
 
-func topologyMatchPreferredIP(match Match) string {
+func topologyMatchPreferredIP(match graph.Match) string {
 	ips := make([]string, 0, len(match.IPAddresses))
 	for _, value := range match.IPAddresses {
 		if ip := normalizeTopologyIP(value); ip != "" {
@@ -240,7 +242,7 @@ func topologyMatchPreferredIP(match Match) string {
 	return ips[0]
 }
 
-func topologyMatchPreferredMAC(match Match) string {
+func topologyMatchPreferredMAC(match graph.Match) string {
 	macs := make([]string, 0, len(match.MacAddresses)+len(match.ChassisIDs))
 	for _, value := range match.MacAddresses {
 		if mac := normalizeMAC(value); mac != "" {

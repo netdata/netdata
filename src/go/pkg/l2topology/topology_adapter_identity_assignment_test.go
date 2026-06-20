@@ -3,8 +3,10 @@
 package l2topology
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCanonicalTopologyKeyHelpers_NormalizeDeterministically(t *testing.T) {
@@ -19,12 +21,12 @@ func TestCanonicalTopologyKeyHelpers_NormalizeDeterministically(t *testing.T) {
 }
 
 func TestAssignTopologyActorIDsAndLinkEndpoints_IsDeterministic(t *testing.T) {
-	actors := []Actor{
+	actors := []graph.Actor{
 		{
 			ActorType: "device",
 			Layer:     "l2",
 			Source:    "snmp",
-			Match: Match{
+			Match: graph.Match{
 				MacAddresses: []string{"00:11:22:33:44:55"},
 				Hostnames:    []string{"switch-a"},
 			},
@@ -33,7 +35,7 @@ func TestAssignTopologyActorIDsAndLinkEndpoints_IsDeterministic(t *testing.T) {
 			ActorType: "device",
 			Layer:     "l2",
 			Source:    "snmp",
-			Match: Match{
+			Match: graph.Match{
 				MacAddresses: []string{"00-11-22-33-44-55"},
 				Hostnames:    []string{"switch-a-duplicate"},
 			},
@@ -42,7 +44,7 @@ func TestAssignTopologyActorIDsAndLinkEndpoints_IsDeterministic(t *testing.T) {
 			ActorType: "endpoint",
 			Layer:     "l2",
 			Source:    "derived",
-			Match: Match{
+			Match: graph.Match{
 				IPAddresses: []string{"10.0.0.2"},
 			},
 		},
@@ -50,22 +52,22 @@ func TestAssignTopologyActorIDsAndLinkEndpoints_IsDeterministic(t *testing.T) {
 			ActorType: "segment",
 			Layer:     "l2",
 			Source:    "derived",
-			Match:     Match{},
+			Match:     graph.Match{},
 		},
 	}
-	links := []Link{
+	links := []graph.Link{
 		{
 			Protocol:  "lldp",
 			Direction: "outbound",
 			State:     "up",
-			Src: LinkEndpoint{
-				Match: Match{MacAddresses: []string{"00:11:22:33:44:55"}},
+			Src: graph.LinkEndpoint{
+				Match: graph.Match{MacAddresses: []string{"00:11:22:33:44:55"}},
 				Attributes: map[string]any{
 					"if_name": "eth0",
 				},
 			},
-			Dst: LinkEndpoint{
-				Match: Match{IPAddresses: []string{"10.0.0.2"}},
+			Dst: graph.LinkEndpoint{
+				Match: graph.Match{IPAddresses: []string{"10.0.0.2"}},
 				Attributes: map[string]any{
 					"if_name": "eth9",
 				},
@@ -75,14 +77,14 @@ func TestAssignTopologyActorIDsAndLinkEndpoints_IsDeterministic(t *testing.T) {
 			Protocol:  "lldp",
 			Direction: "outbound",
 			State:     "up",
-			Src: LinkEndpoint{
-				Match: Match{IPAddresses: []string{"10.0.0.2"}},
+			Src: graph.LinkEndpoint{
+				Match: graph.Match{IPAddresses: []string{"10.0.0.2"}},
 				Attributes: map[string]any{
 					"if_name": "eth9",
 				},
 			},
-			Dst: LinkEndpoint{
-				Match: Match{MacAddresses: []string{"00:11:22:33:44:55"}},
+			Dst: graph.LinkEndpoint{
+				Match: graph.Match{MacAddresses: []string{"00:11:22:33:44:55"}},
 				Attributes: map[string]any{
 					"if_name": "eth0",
 				},
@@ -117,7 +119,7 @@ func TestAssignTopologyActorIDsAndLinkEndpoints_IsDeterministic(t *testing.T) {
 }
 
 func TestEnrichTopologyPortTablesWithLinkCounts_AddsCountsToMatchingPorts(t *testing.T) {
-	actors := []Actor{
+	actors := []graph.Actor{
 		{
 			ActorID: "device-a",
 			Tables: map[string][]map[string]any{
@@ -136,18 +138,18 @@ func TestEnrichTopologyPortTablesWithLinkCounts_AddsCountsToMatchingPorts(t *tes
 			},
 		},
 	}
-	links := []Link{
+	links := []graph.Link{
 		{
 			SrcActorID: "device-a",
 			DstActorID: "device-b",
-			Src:        LinkEndpoint{Attributes: map[string]any{"if_name": "eth0"}},
-			Dst:        LinkEndpoint{Attributes: map[string]any{"if_name": "xe-0/0/0"}},
+			Src:        graph.LinkEndpoint{Attributes: map[string]any{"if_name": "eth0"}},
+			Dst:        graph.LinkEndpoint{Attributes: map[string]any{"if_name": "xe-0/0/0"}},
 		},
 		{
 			SrcActorID: "device-a",
 			DstActorID: "device-b",
-			Src:        LinkEndpoint{Attributes: map[string]any{"if_name": "eth0"}},
-			Dst:        LinkEndpoint{Attributes: map[string]any{"if_name": "xe-0/0/0"}},
+			Src:        graph.LinkEndpoint{Attributes: map[string]any{"if_name": "eth0"}},
+			Dst:        graph.LinkEndpoint{Attributes: map[string]any{"if_name": "xe-0/0/0"}},
 		},
 	}
 

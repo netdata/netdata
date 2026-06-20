@@ -6,9 +6,11 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
-func buildBridgeSegmentActor(segmentID string, segment *bridgeDomainSegment, layer string, source string) (Match, Actor) {
+func buildBridgeSegmentActor(segmentID string, segment *bridgeDomainSegment, layer string, source string) (graph.Match, graph.Actor) {
 	parentDevices := make(map[string]struct{})
 	ifNames := make(map[string]struct{})
 	ifIndexes := make(map[string]struct{})
@@ -34,7 +36,7 @@ func buildBridgeSegmentActor(segmentID string, segment *bridgeDomainSegment, lay
 		}
 	}
 
-	match := Match{
+	match := graph.Match{
 		Hostnames: []string{"segment:" + segmentID},
 	}
 
@@ -58,7 +60,7 @@ func buildBridgeSegmentActor(segmentID string, segment *bridgeDomainSegment, lay
 		}
 	}
 
-	actor := Actor{
+	actor := graph.Actor{
 		ActorType:  "segment",
 		Layer:      layer,
 		Source:     source,
@@ -72,36 +74,36 @@ func buildBridgeSegmentActor(segmentID string, segment *bridgeDomainSegment, lay
 	return match, actor
 }
 
-func endpointMatchFromID(endpointID string) Match {
+func endpointMatchFromID(endpointID string) graph.Match {
 	kind, value, ok := strings.Cut(strings.TrimSpace(endpointID), ":")
 	if !ok {
-		return Match{}
+		return graph.Match{}
 	}
 	switch strings.ToLower(strings.TrimSpace(kind)) {
 	case "mac":
 		mac := normalizeMAC(value)
 		if mac == "" {
-			return Match{}
+			return graph.Match{}
 		}
-		return Match{
+		return graph.Match{
 			ChassisIDs:   []string{mac},
 			MacAddresses: []string{mac},
 		}
 	case "ip":
 		addr := normalizeTopologyIP(value)
 		if addr == "" {
-			return Match{}
+			return graph.Match{}
 		}
-		return Match{
+		return graph.Match{
 			IPAddresses: []string{addr},
 		}
 	}
-	return Match{}
+	return graph.Match{}
 }
 
 func annotateEndpointActorsWithDirectOwners(
-	actors []Actor,
-	endpointMatchByID map[string]Match,
+	actors []graph.Actor,
+	endpointMatchByID map[string]graph.Match,
 	owners map[string]fdbEndpointOwner,
 	deviceByID map[string]Device,
 ) {

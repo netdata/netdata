@@ -3,12 +3,14 @@
 package l2topology
 
 import (
-	"github.com/stretchr/testify/require"
 	"net/netip"
 	"slices"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
+	"github.com/stretchr/testify/require"
 )
 
 func TestToGraph_ProjectsResult(t *testing.T) {
@@ -840,10 +842,10 @@ func TestToGraph_DeduplicatesEndpointActorOverlappingManagedDevice(t *testing.T)
 }
 
 func TestCanonicalTopologyMatchKey_NormalizesEquivalentMACRepresentations(t *testing.T) {
-	raw := Match{
+	raw := graph.Match{
 		ChassisIDs: []string{"7049a26572cd"},
 	}
-	colon := Match{
+	colon := graph.Match{
 		ChassisIDs: []string{"70:49:A2:65:72:CD"},
 	}
 
@@ -2191,7 +2193,7 @@ func TestToGraph_DisplayNamesPreferDNSThenIPThenMAC(t *testing.T) {
 }
 
 func TestTopologyDisplayNameFromMatch_PrefersSysNameBeforeIP(t *testing.T) {
-	display := topologyDisplayNameFromMatch(Match{
+	display := topologyDisplayNameFromMatch(graph.Match{
 		SysName:     "MikroTik-router",
 		IPAddresses: []string{"10.20.4.1"},
 	}, &topologyDisplayNameResolver{
@@ -2204,7 +2206,7 @@ func TestTopologyDisplayNameFromMatch_PrefersSysNameBeforeIP(t *testing.T) {
 }
 
 func TestTopologyDisplayNameFromMatch_PrefersHostnameBeforeIPWhenSysNameMissing(t *testing.T) {
-	display := topologyDisplayNameFromMatch(Match{
+	display := topologyDisplayNameFromMatch(graph.Match{
 		Hostnames:   []string{"nova"},
 		IPAddresses: []string{"10.20.4.22"},
 	}, &topologyDisplayNameResolver{
@@ -2518,36 +2520,36 @@ func TestToGraph_KeepsChassisPlaceholderDevicesAsDevices(t *testing.T) {
 }
 
 func TestPruneSegmentArtifacts_SuppressesLLDPDuplicateSegmentPath(t *testing.T) {
-	actors := []Actor{
+	actors := []graph.Actor{
 		{
 			ActorType: "device",
-			Match:     Match{IPAddresses: []string{"10.0.0.1"}, SysName: "switch-a"},
+			Match:     graph.Match{IPAddresses: []string{"10.0.0.1"}, SysName: "switch-a"},
 		},
 		{
 			ActorType: "device",
-			Match:     Match{IPAddresses: []string{"10.0.0.2"}, SysName: "switch-b"},
+			Match:     graph.Match{IPAddresses: []string{"10.0.0.2"}, SysName: "switch-b"},
 		},
 		{
 			ActorType: "segment",
-			Match:     Match{Hostnames: []string{"segment:dup"}},
+			Match:     graph.Match{Hostnames: []string{"segment:dup"}},
 		},
 	}
 
-	links := []Link{
+	links := []graph.Link{
 		{
 			Protocol: "lldp",
-			Src:      LinkEndpoint{Match: Match{IPAddresses: []string{"10.0.0.1"}}},
-			Dst:      LinkEndpoint{Match: Match{IPAddresses: []string{"10.0.0.2"}}},
+			Src:      graph.LinkEndpoint{Match: graph.Match{IPAddresses: []string{"10.0.0.1"}}},
+			Dst:      graph.LinkEndpoint{Match: graph.Match{IPAddresses: []string{"10.0.0.2"}}},
 		},
 		{
 			Protocol: "bridge",
-			Src:      LinkEndpoint{Match: Match{IPAddresses: []string{"10.0.0.1"}}},
-			Dst:      LinkEndpoint{Match: Match{Hostnames: []string{"segment:dup"}}},
+			Src:      graph.LinkEndpoint{Match: graph.Match{IPAddresses: []string{"10.0.0.1"}}},
+			Dst:      graph.LinkEndpoint{Match: graph.Match{Hostnames: []string{"segment:dup"}}},
 		},
 		{
 			Protocol: "bridge",
-			Src:      LinkEndpoint{Match: Match{Hostnames: []string{"segment:dup"}}},
-			Dst:      LinkEndpoint{Match: Match{IPAddresses: []string{"10.0.0.2"}}},
+			Src:      graph.LinkEndpoint{Match: graph.Match{Hostnames: []string{"segment:dup"}}},
+			Dst:      graph.LinkEndpoint{Match: graph.Match{IPAddresses: []string{"10.0.0.2"}}},
 		},
 	}
 
@@ -2559,36 +2561,36 @@ func TestPruneSegmentArtifacts_SuppressesLLDPDuplicateSegmentPath(t *testing.T) 
 }
 
 func TestPruneSegmentArtifacts_SuppressesCDPDuplicateSegmentPath(t *testing.T) {
-	actors := []Actor{
+	actors := []graph.Actor{
 		{
 			ActorType: "device",
-			Match:     Match{IPAddresses: []string{"10.0.1.1"}, SysName: "switch-a"},
+			Match:     graph.Match{IPAddresses: []string{"10.0.1.1"}, SysName: "switch-a"},
 		},
 		{
 			ActorType: "device",
-			Match:     Match{IPAddresses: []string{"10.0.1.2"}, SysName: "switch-b"},
+			Match:     graph.Match{IPAddresses: []string{"10.0.1.2"}, SysName: "switch-b"},
 		},
 		{
 			ActorType: "segment",
-			Match:     Match{Hostnames: []string{"segment:dup-cdp"}},
+			Match:     graph.Match{Hostnames: []string{"segment:dup-cdp"}},
 		},
 	}
 
-	links := []Link{
+	links := []graph.Link{
 		{
 			Protocol: "cdp",
-			Src:      LinkEndpoint{Match: Match{IPAddresses: []string{"10.0.1.1"}}},
-			Dst:      LinkEndpoint{Match: Match{IPAddresses: []string{"10.0.1.2"}}},
+			Src:      graph.LinkEndpoint{Match: graph.Match{IPAddresses: []string{"10.0.1.1"}}},
+			Dst:      graph.LinkEndpoint{Match: graph.Match{IPAddresses: []string{"10.0.1.2"}}},
 		},
 		{
 			Protocol: "bridge",
-			Src:      LinkEndpoint{Match: Match{IPAddresses: []string{"10.0.1.1"}}},
-			Dst:      LinkEndpoint{Match: Match{Hostnames: []string{"segment:dup-cdp"}}},
+			Src:      graph.LinkEndpoint{Match: graph.Match{IPAddresses: []string{"10.0.1.1"}}},
+			Dst:      graph.LinkEndpoint{Match: graph.Match{Hostnames: []string{"segment:dup-cdp"}}},
 		},
 		{
 			Protocol: "bridge",
-			Src:      LinkEndpoint{Match: Match{Hostnames: []string{"segment:dup-cdp"}}},
-			Dst:      LinkEndpoint{Match: Match{IPAddresses: []string{"10.0.1.2"}}},
+			Src:      graph.LinkEndpoint{Match: graph.Match{Hostnames: []string{"segment:dup-cdp"}}},
+			Dst:      graph.LinkEndpoint{Match: graph.Match{IPAddresses: []string{"10.0.1.2"}}},
 		},
 	}
 
@@ -2600,22 +2602,22 @@ func TestPruneSegmentArtifacts_SuppressesCDPDuplicateSegmentPath(t *testing.T) {
 }
 
 func TestPruneSegmentArtifacts_SuppressesSegmentsWithSingleNeighbor(t *testing.T) {
-	actors := []Actor{
+	actors := []graph.Actor{
 		{
 			ActorType: "device",
-			Match:     Match{IPAddresses: []string{"10.0.0.1"}, SysName: "router-a"},
+			Match:     graph.Match{IPAddresses: []string{"10.0.0.1"}, SysName: "router-a"},
 		},
 		{
 			ActorType: "segment",
-			Match:     Match{Hostnames: []string{"segment:orphan"}},
+			Match:     graph.Match{Hostnames: []string{"segment:orphan"}},
 		},
 	}
 
-	links := []Link{
+	links := []graph.Link{
 		{
 			Protocol: "bridge",
-			Src:      LinkEndpoint{Match: Match{IPAddresses: []string{"10.0.0.1"}}},
-			Dst:      LinkEndpoint{Match: Match{Hostnames: []string{"segment:orphan"}}},
+			Src:      graph.LinkEndpoint{Match: graph.Match{IPAddresses: []string{"10.0.0.1"}}},
+			Dst:      graph.LinkEndpoint{Match: graph.Match{Hostnames: []string{"segment:orphan"}}},
 		},
 	}
 
@@ -2890,8 +2892,8 @@ func findNeighborByProtocol(neighbors []map[string]any, protocol string) map[str
 	return nil
 }
 
-func findFDBLinksByEndpointMAC(links []Link, mac string) []Link {
-	out := make([]Link, 0)
+func findFDBLinksByEndpointMAC(links []graph.Link, mac string) []graph.Link {
+	out := make([]graph.Link, 0)
 	for _, link := range links {
 		if link.Protocol != "fdb" {
 			continue
@@ -2903,8 +2905,8 @@ func findFDBLinksByEndpointMAC(links []Link, mac string) []Link {
 	return out
 }
 
-func findFDBLinksByEndpointIP(links []Link, ip string) []Link {
-	out := make([]Link, 0)
+func findFDBLinksByEndpointIP(links []graph.Link, ip string) []graph.Link {
+	out := make([]graph.Link, 0)
 	for _, link := range links {
 		if link.Protocol != "fdb" {
 			continue
@@ -2916,7 +2918,7 @@ func findFDBLinksByEndpointIP(links []Link, ip string) []Link {
 	return out
 }
 
-func topologyLinkSignatures(links []Link) map[string]struct{} {
+func topologyLinkSignatures(links []graph.Link) map[string]struct{} {
 	out := make(map[string]struct{}, len(links))
 	for _, link := range links {
 		srcKey := canonicalTopologyMatchKey(link.Src.Match)
@@ -2937,8 +2939,8 @@ func topologyLinkSignatures(links []Link) map[string]struct{} {
 	return out
 }
 
-func findFDBLinksByDstSysName(links []Link, sysName string) []Link {
-	out := make([]Link, 0)
+func findFDBLinksByDstSysName(links []graph.Link, sysName string) []graph.Link {
+	out := make([]graph.Link, 0)
 	for _, link := range links {
 		if link.Protocol != "fdb" {
 			continue
@@ -2951,7 +2953,7 @@ func findFDBLinksByDstSysName(links []Link, sysName string) []Link {
 	return out
 }
 
-func findActorByMatch(actors []Actor, match Match) *Actor {
+func findActorByMatch(actors []graph.Actor, match graph.Match) *graph.Actor {
 	target := canonicalTopologyMatchKey(match)
 	if target == "" {
 		return nil
@@ -2964,7 +2966,7 @@ func findActorByMatch(actors []Actor, match Match) *Actor {
 	return nil
 }
 
-func findActorBySysName(actors []Actor, sysName string) *Actor {
+func findActorBySysName(actors []graph.Actor, sysName string) *graph.Actor {
 	for i := range actors {
 		if actors[i].Match.SysName == sysName {
 			return &actors[i]
@@ -2973,7 +2975,7 @@ func findActorBySysName(actors []Actor, sysName string) *Actor {
 	return nil
 }
 
-func findActorByMAC(actors []Actor, mac string) *Actor {
+func findActorByMAC(actors []graph.Actor, mac string) *graph.Actor {
 	for i := range actors {
 		if slices.Contains(actors[i].Match.MacAddresses, mac) {
 			return &actors[i]
@@ -2982,7 +2984,7 @@ func findActorByMAC(actors []Actor, mac string) *Actor {
 	return nil
 }
 
-func findActorByIP(actors []Actor, ip string) *Actor {
+func findActorByIP(actors []graph.Actor, ip string) *graph.Actor {
 	for i := range actors {
 		if slices.Contains(actors[i].Match.IPAddresses, ip) {
 			return &actors[i]
@@ -2991,7 +2993,7 @@ func findActorByIP(actors []Actor, ip string) *Actor {
 	return nil
 }
 
-func findActorByType(actors []Actor, actorType string) *Actor {
+func findActorByType(actors []graph.Actor, actorType string) *graph.Actor {
 	for i := range actors {
 		if actors[i].ActorType == actorType {
 			return &actors[i]
@@ -3000,7 +3002,7 @@ func findActorByType(actors []Actor, actorType string) *Actor {
 	return nil
 }
 
-func findLinkByProtocol(links []Link, protocol string) *Link {
+func findLinkByProtocol(links []graph.Link, protocol string) *graph.Link {
 	for i := range links {
 		if links[i].Protocol == protocol {
 			return &links[i]

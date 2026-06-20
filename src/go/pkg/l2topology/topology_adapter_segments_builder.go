@@ -4,6 +4,8 @@ package l2topology
 
 import (
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
 type segmentProjectionBuilder struct {
@@ -17,14 +19,14 @@ type segmentProjectionBuilder struct {
 	ifIndexByDeviceName       map[string]int
 	bridgeLinks               []bridgeBridgeLinkRecord
 	reporterAliases           map[string][]string
-	endpointMatchByID         map[string]Match
+	endpointMatchByID         map[string]graph.Match
 	endpointLabelsByID        map[string]map[string]string
 	actorIndex                map[string]struct{}
 	probabilisticConnectivity bool
 	strategyConfig            topologyInferenceStrategyConfig
 	out                       projectedSegments
 	segmentIDs                []string
-	segmentMatchByID          map[string]Match
+	segmentMatchByID          map[string]graph.Match
 	segmentByID               map[string]*bridgeDomainSegment
 	deviceSegmentEdgeSeen     map[string]struct{}
 	endpointSegmentEdgeSeen   map[string]struct{}
@@ -62,7 +64,7 @@ func newSegmentProjectionBuilder(
 	ifIndexByDeviceName map[string]int,
 	bridgeLinks []bridgeBridgeLinkRecord,
 	reporterAliases map[string][]string,
-	endpointMatchByID map[string]Match,
+	endpointMatchByID map[string]graph.Match,
 	endpointLabelsByID map[string]map[string]string,
 	actorIndex map[string]struct{},
 	probabilisticConnectivity bool,
@@ -85,8 +87,8 @@ func newSegmentProjectionBuilder(
 		probabilisticConnectivity: probabilisticConnectivity,
 		strategyConfig:            strategyConfig,
 		out: projectedSegments{
-			actors: make([]Actor, 0),
-			links:  make([]Link, 0),
+			actors: make([]graph.Actor, 0),
+			links:  make([]graph.Link, 0),
 		},
 	}
 }

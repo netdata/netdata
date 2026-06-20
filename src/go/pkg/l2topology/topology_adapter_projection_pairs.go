@@ -5,6 +5,8 @@ package l2topology
 import (
 	"strings"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
 func projectAdjacencyLinks(
@@ -16,7 +18,7 @@ func projectAdjacencyLinks(
 	ifaceByDeviceIndex map[string]Interface,
 ) projectedLinks {
 	out := projectedLinks{
-		links: make([]Link, 0, len(adjacencies)),
+		links: make([]graph.Link, 0, len(adjacencies)),
 	}
 	if len(adjacencies) == 0 {
 		return out
@@ -164,11 +166,11 @@ func backfillPairGroupMissingEndpointPorts(entries []*builtAdjacencyLink) {
 	}
 }
 
-func endpointHasKnownCanonicalPort(endpoint LinkEndpoint) bool {
+func endpointHasKnownCanonicalPort(endpoint graph.LinkEndpoint) bool {
 	return strings.TrimSpace(topologyCanonicalPortName(endpoint.Attributes)) != ""
 }
 
-func backfillEndpointPortFromPeer(endpoint LinkEndpoint, peer LinkEndpoint) LinkEndpoint {
+func backfillEndpointPortFromPeer(endpoint graph.LinkEndpoint, peer graph.LinkEndpoint) graph.LinkEndpoint {
 	if endpointHasKnownCanonicalPort(endpoint) || !endpointHasKnownCanonicalPort(peer) {
 		return endpoint
 	}
@@ -218,14 +220,14 @@ func adjacencyToTopologyLink(
 	deviceByID map[string]Device,
 	ifIndexByDeviceName map[string]int,
 	ifaceByDeviceIndex map[string]Interface,
-) Link {
+) graph.Link {
 	src := adjacencySideToEndpoint(deviceByID[adj.SourceID], adj.SourcePort, ifIndexByDeviceName, ifaceByDeviceIndex)
 	dst := adjacencySideToEndpoint(deviceByID[adj.TargetID], adj.TargetPort, ifIndexByDeviceName, ifaceByDeviceIndex)
 	if rawAddress := strings.TrimSpace(adj.Labels["remote_address_raw"]); rawAddress != "" {
 		dst.Match.IPAddresses = uniqueTopologyStrings(append(dst.Match.IPAddresses, rawAddress))
 	}
 
-	link := Link{
+	link := graph.Link{
 		Layer:        layer,
 		Protocol:     protocol,
 		LinkType:     protocol,
@@ -284,7 +286,7 @@ func buildPairedLinkMetrics(sourceLabels, targetLabels map[string]string) map[st
 	return metrics
 }
 
-func mergeEndpointIPHints(base, extra LinkEndpoint) LinkEndpoint {
+func mergeEndpointIPHints(base, extra graph.LinkEndpoint) graph.LinkEndpoint {
 	if len(extra.Match.IPAddresses) == 0 {
 		return base
 	}
