@@ -366,7 +366,12 @@ inline int wait_on_socket_or_cancel_with_timeout(
     // WSAPoll() (used internally by MinGW poll()) only works for sockets.
     // For pipe file descriptors (e.g. stdin when launched as a subprocess),
     // poll() fails and kills the reader thread. Use PeekNamedPipe instead.
-    if(poll_events & POLLIN) {
+    //
+    // Sockets must be excluded from the pipe path: GetFileType() reports
+    // FILE_TYPE_PIPE for Winsock sockets too (they sit on \Device\Afd), so
+    // relying on GetFileType() alone would route stream sockets through
+    // PeekNamedPipe(), which fails on a socket and breaks receiving.
+    if((poll_events & POLLIN) && !fd_is_socket(fd)) {
         HANDLE h = (HANDLE)_get_osfhandle(fd);
         if(h != INVALID_HANDLE_VALUE && GetFileType(h) == FILE_TYPE_PIPE) {
             bool forever = (timeout_ms <= 0);
