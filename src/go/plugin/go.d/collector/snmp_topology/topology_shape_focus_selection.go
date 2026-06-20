@@ -58,10 +58,5 @@ func topologyActorHasIP(actor topologyActor, ip string) bool {
 	if slices.Contains(normalizedMatchIPs(actor.Match), ip) {
 		return true
 	}
-	for _, value := range topologyActorDetailManagementIPs(actor) {
-		if ip == value {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(topologyActorDetailManagementIPs(actor), ip)
 }
