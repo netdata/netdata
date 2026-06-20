@@ -1450,7 +1450,7 @@ func TestAugmentLocalActorFromCache_InjectsIdentityFields(t *testing.T) {
 							VendorDerivedMatchPrefix: "00:11:22",
 							Ports: []topologyengine.ProjectionPortDetail{
 								{
-									IfIndex: 1,
+									IfIndex: topologyengine.OptionalValue[int]{Value: 1, Has: true},
 									IfName:  "swp07",
 								},
 							},

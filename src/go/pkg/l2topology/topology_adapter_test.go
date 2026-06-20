@@ -168,22 +168,22 @@ func TestToGraph_ProjectsTypedActorDetailsWithFieldPresence(t *testing.T) {
 
 	require.Equal(t, "10.0.0.1", detail.Device.ManagementIP)
 	require.Equal(t, []string{"bridge", "router"}, detail.Device.CapabilitiesEnabled)
-	require.True(t, detail.Device.HasPortsTotal)
-	require.Equal(t, 1, detail.Device.PortsTotal)
-	require.False(t, detail.Device.HasCDPNeighborCount)
-	require.Zero(t, detail.Device.CDPNeighborCount)
+	require.True(t, detail.Device.PortsTotal.Has)
+	require.Equal(t, 1, detail.Device.PortsTotal.Value)
+	require.False(t, detail.Device.CDPNeighborCount.Has)
+	require.Zero(t, detail.Device.CDPNeighborCount.Value)
 	require.Len(t, detail.Device.Ports, 1)
 
 	port := detail.Device.Ports[0]
-	require.True(t, port.HasIfIndex)
-	require.Equal(t, 1, port.IfIndex)
-	require.True(t, port.HasSpeed)
-	require.EqualValues(t, 1000000000, port.Speed)
+	require.True(t, port.IfIndex.Has)
+	require.Equal(t, 1, port.IfIndex.Value)
+	require.True(t, port.Speed.Has)
+	require.EqualValues(t, 1000000000, port.Speed.Value)
 	require.Equal(t, "full", port.Duplex)
-	require.False(t, port.HasNeighborCount)
-	require.Zero(t, port.NeighborCount)
-	require.False(t, port.HasLinkCount)
-	require.Zero(t, port.LinkCount)
+	require.False(t, port.NeighborCount.Has)
+	require.Zero(t, port.NeighborCount.Value)
+	require.False(t, port.LinkCount.Has)
+	require.Zero(t, port.LinkCount.Value)
 }
 
 func TestToGraph_ClassifiesPortLinkModesFromFDBAndSTPEvidence(t *testing.T) {

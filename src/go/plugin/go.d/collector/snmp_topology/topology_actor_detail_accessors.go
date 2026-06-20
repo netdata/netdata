@@ -5,6 +5,8 @@ package snmptopology
 import (
 	"fmt"
 	"strings"
+
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
 func topologyActorDetailDisplayName(actor topologyActor) string {
@@ -99,49 +101,34 @@ func topologyActorDetailCapabilities(actor topologyActor) []string {
 	return actor.Detail.L2.Device.Capabilities
 }
 
-func topologyActorDetailPortsTotal(actor topologyActor) (int, bool) {
-	if actor.Detail.L2.Device.HasPortsTotal {
-		return actor.Detail.L2.Device.PortsTotal, true
+func topologyActorDetailPortsTotal(actor topologyActor) topologyengine.OptionalValue[int] {
+	if actor.Detail.L2.Device.PortsTotal.Has {
+		return actor.Detail.L2.Device.PortsTotal
 	}
-	if actor.Detail.L2.Segment.HasPortsTotal {
-		return actor.Detail.L2.Segment.PortsTotal, true
+	if actor.Detail.L2.Segment.PortsTotal.Has {
+		return actor.Detail.L2.Segment.PortsTotal
 	}
-	return 0, false
+	return topologyengine.OptionalValue[int]{}
 }
 
-func topologyActorDetailVLANCount(actor topologyActor) (int, bool) {
-	if actor.Detail.L2.Device.HasVLANCount {
-		return actor.Detail.L2.Device.VLANCount, true
-	}
-	return 0, false
+func topologyActorDetailVLANCount(actor topologyActor) topologyengine.OptionalValue[int] {
+	return actor.Detail.L2.Device.VLANCount
 }
 
-func topologyActorDetailFDBTotalMACs(actor topologyActor) (int, bool) {
-	if actor.Detail.L2.Device.HasFDBTotalMACs {
-		return actor.Detail.L2.Device.FDBTotalMACs, true
-	}
-	return 0, false
+func topologyActorDetailFDBTotalMACs(actor topologyActor) topologyengine.OptionalValue[int] {
+	return actor.Detail.L2.Device.FDBTotalMACs
 }
 
-func topologyActorDetailLLDPNeighborCount(actor topologyActor) (int, bool) {
-	if actor.Detail.L2.Device.HasLLDPNeighborCount {
-		return actor.Detail.L2.Device.LLDPNeighborCount, true
-	}
-	return 0, false
+func topologyActorDetailLLDPNeighborCount(actor topologyActor) topologyengine.OptionalValue[int] {
+	return actor.Detail.L2.Device.LLDPNeighborCount
 }
 
-func topologyActorDetailCDPNeighborCount(actor topologyActor) (int, bool) {
-	if actor.Detail.L2.Device.HasCDPNeighborCount {
-		return actor.Detail.L2.Device.CDPNeighborCount, true
-	}
-	return 0, false
+func topologyActorDetailCDPNeighborCount(actor topologyActor) topologyengine.OptionalValue[int] {
+	return actor.Detail.L2.Device.CDPNeighborCount
 }
 
-func topologyActorDetailEndpointsTotal(actor topologyActor) (int, bool) {
-	if actor.Detail.L2.Segment.HasEndpointsTotal {
-		return actor.Detail.L2.Segment.EndpointsTotal, true
-	}
-	return 0, false
+func topologyActorDetailEndpointsTotal(actor topologyActor) topologyengine.OptionalValue[int] {
+	return actor.Detail.L2.Segment.EndpointsTotal
 }
 
 func topologyActorDetailChartIDPrefix(actor topologyActor) string {
@@ -176,8 +163,8 @@ func topologyActorDetailScalarLabelValues(actor topologyActor) map[string]string
 		"chart_context_prefix":    topologyActorDetailChartContextPrefix(actor),
 		"netdata_host_id":         topologyActorDetailNetdataHostID(actor),
 		"ports_total":             topologyScalarOptionalInt(topologyActorDetailPortsTotal(actor)),
-		"ports_up":                topologyScalarOptionalInt(actor.Detail.L2.Device.PortsUp, actor.Detail.L2.Device.HasPortsUp),
-		"ports_down":              topologyScalarOptionalInt(actor.Detail.L2.Device.PortsDown, actor.Detail.L2.Device.HasPortsDown),
+		"ports_up":                topologyScalarOptionalInt(actor.Detail.L2.Device.PortsUp),
+		"ports_down":              topologyScalarOptionalInt(actor.Detail.L2.Device.PortsDown),
 		"vlan_count":              topologyScalarOptionalInt(topologyActorDetailVLANCount(actor)),
 		"fdb_total_macs":          topologyScalarOptionalInt(topologyActorDetailFDBTotalMACs(actor)),
 		"lldp_neighbor_count":     topologyScalarOptionalInt(topologyActorDetailLLDPNeighborCount(actor)),
@@ -215,11 +202,11 @@ func topologyActorDetailArrayLabelValues(actor topologyActor) map[string][]strin
 	return out
 }
 
-func topologyScalarOptionalInt(value int, ok bool) string {
-	if !ok {
+func topologyScalarOptionalInt(value topologyengine.OptionalValue[int]) string {
+	if !value.Has {
 		return ""
 	}
-	return fmt.Sprint(value)
+	return fmt.Sprint(value.Value)
 }
 
 func topologyIntMapLabel(values map[string]int) string {
@@ -258,26 +245,6 @@ func firstNonZeroInt64(values ...int64) int64 {
 		}
 	}
 	return 0
-}
-
-func firstPresentInt(dstValue int, dstOK bool, srcValue int, srcOK bool) (int, bool) {
-	if dstOK {
-		return dstValue, true
-	}
-	if srcOK {
-		return srcValue, true
-	}
-	return dstValue, false
-}
-
-func firstPresentInt64(dstValue int64, dstOK bool, srcValue int64, srcOK bool) (int64, bool) {
-	if dstOK {
-		return dstValue, true
-	}
-	if srcOK {
-		return srcValue, true
-	}
-	return dstValue, false
 }
 
 func firstNonEmptyIntMap(values ...map[string]int) map[string]int {

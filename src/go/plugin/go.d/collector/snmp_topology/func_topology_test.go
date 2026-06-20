@@ -185,23 +185,19 @@ func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 				Detail: topologyActorDetail{
 					L2: topologyengine.ProjectionActorDetail{
 						Device: topologyengine.ProjectionDeviceActorDetail{
-							HasPortsTotal: true,
-							PortsTotal:    0,
+							PortsTotal: topologyengine.OptionalValue[int]{Value: 0, Has: true},
 							Ports: []topologyengine.ProjectionPortDetail{
 								{
-									HasIfIndex:             true,
-									IfIndex:                1,
+									IfIndex:                topologyengine.OptionalValue[int]{Value: 1, Has: true},
 									PortID:                 "1",
 									Name:                   "Gi0/1",
 									IfName:                 "Gi0/1",
 									IfDescr:                "GigabitEthernet0/1",
 									IfAlias:                "uplink to sw-b",
 									MAC:                    "00:11:22:33:44:56",
-									HasSpeed:               true,
-									Speed:                  1000000000,
+									Speed:                  topologyengine.OptionalValue[int64]{Value: 1000000000, Has: true},
 									VLANIDs:                []string{"10", "20"},
-									HasNeighborCount:       true,
-									NeighborCount:          0,
+									NeighborCount:          topologyengine.OptionalValue[int]{Value: 0, Has: true},
 									Duplex:                 "full",
 									LinkModeConfidence:     "high",
 									TopologyRoleConfidence: "medium",
@@ -410,11 +406,10 @@ func TestSNMPTopologyToV1_PrefersSNMPActorDetailOverL2(t *testing.T) {
 				Detail: topologyActorDetail{
 					L2: topologyengine.ProjectionActorDetail{
 						Device: topologyengine.ProjectionDeviceActorDetail{
-							ManagementIP:  "10.0.0.1",
-							Vendor:        "L2 Vendor",
-							Capabilities:  []string{"bridge"},
-							HasPortsTotal: true,
-							PortsTotal:    24,
+							ManagementIP: "10.0.0.1",
+							Vendor:       "L2 Vendor",
+							Capabilities: []string{"bridge"},
+							PortsTotal:   topologyengine.OptionalValue[int]{Value: 24, Has: true},
 						},
 					},
 					SNMP: topologySNMPActorDetail{
@@ -476,9 +471,8 @@ func TestSNMPTopologyToV1_UsesIfIndexAsVisiblePortID(t *testing.T) {
 						Device: topologyengine.ProjectionDeviceActorDetail{
 							Ports: []topologyengine.ProjectionPortDetail{
 								{
-									HasIfIndex: true,
-									IfIndex:    42,
-									IfName:     "Gi0/42",
+									IfIndex: topologyengine.OptionalValue[int]{Value: 42, Has: true},
+									IfName:  "Gi0/42",
 								},
 							},
 						},

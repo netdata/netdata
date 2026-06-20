@@ -11,6 +11,12 @@ type Projection struct {
 	ActorDetails map[string]ProjectionActorDetail
 }
 
+// OptionalValue keeps value presence explicit when a zero value is a real value.
+type OptionalValue[T any] struct {
+	Value T
+	Has   bool
+}
+
 // ProjectionActorDetail carries typed L2-owned actor facts keyed by graph actor id.
 type ProjectionActorDetail struct {
 	DisplayName   string
@@ -43,26 +49,17 @@ type ProjectionDeviceActorDetail struct {
 	VendorDerivedConfidence  string
 	VendorDerivedMatchPrefix string
 	VendorMatchPrefix        string
-	HasPortsTotal            bool
-	PortsTotal               int
+	PortsTotal               OptionalValue[int]
 	IfIndexes                []string
 	IfNames                  []string
-	HasPortsUp               bool
-	PortsUp                  int
-	HasPortsDown             bool
-	PortsDown                int
-	HasPortsAdminDown        bool
-	PortsAdminDown           int
-	HasTotalBandwidthBps     bool
-	TotalBandwidthBps        int64
-	HasFDBTotalMACs          bool
-	FDBTotalMACs             int
-	HasVLANCount             bool
-	VLANCount                int
-	HasLLDPNeighborCount     bool
-	LLDPNeighborCount        int
-	HasCDPNeighborCount      bool
-	CDPNeighborCount         int
+	PortsUp                  OptionalValue[int]
+	PortsDown                OptionalValue[int]
+	PortsAdminDown           OptionalValue[int]
+	TotalBandwidthBps        OptionalValue[int64]
+	FDBTotalMACs             OptionalValue[int]
+	VLANCount                OptionalValue[int]
+	LLDPNeighborCount        OptionalValue[int]
+	CDPNeighborCount         OptionalValue[int]
 	AdminStatusCounts        map[string]int
 	OperStatusCounts         map[string]int
 	LinkModeCounts           map[string]int
@@ -97,33 +94,29 @@ type ProjectionEndpointActorDetail struct {
 }
 
 type ProjectionSegmentActorDetail struct {
-	SegmentID         string
-	SegmentType       string
-	ParentDevices     []string
-	IfNames           []string
-	IfIndexes         []string
-	BridgePorts       []string
-	VLANIDs           []string
-	LearnedSources    []string
-	HasPortsTotal     bool
-	PortsTotal        int
-	HasEndpointsTotal bool
-	EndpointsTotal    int
-	DesignatedPort    string
-	SegmentKind       string
+	SegmentID      string
+	SegmentType    string
+	ParentDevices  []string
+	IfNames        []string
+	IfIndexes      []string
+	BridgePorts    []string
+	VLANIDs        []string
+	LearnedSources []string
+	PortsTotal     OptionalValue[int]
+	EndpointsTotal OptionalValue[int]
+	DesignatedPort string
+	SegmentKind    string
 }
 
 type ProjectionPortDetail struct {
-	HasIfIndex             bool
-	IfIndex                int
+	IfIndex                OptionalValue[int]
 	PortID                 string
 	Name                   string
 	IfName                 string
 	IfDescr                string
 	IfAlias                string
 	MAC                    string
-	HasSpeed               bool
-	Speed                  int64
+	Speed                  OptionalValue[int64]
 	TopologyRole           string
 	OperStatus             string
 	AdminStatus            string
@@ -131,12 +124,9 @@ type ProjectionPortDetail struct {
 	LinkMode               string
 	STPState               string
 	VLANIDs                []string
-	HasFDBMACCount         bool
-	FDBMACCount            int
-	HasLinkCount           bool
-	LinkCount              int
-	HasNeighborCount       bool
-	NeighborCount          int
+	FDBMACCount            OptionalValue[int]
+	LinkCount              OptionalValue[int]
+	NeighborCount          OptionalValue[int]
 	Neighbors              []ProjectionPortNeighbor
 	VLANs                  []ProjectionPortVLAN
 	Duplex                 string

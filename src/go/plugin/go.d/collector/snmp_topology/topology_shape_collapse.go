@@ -209,17 +209,17 @@ func mergeTopologyProjectionDeviceDetail(dst, src topologyengine.ProjectionDevic
 	dst.VendorDerivedConfidence = firstNonEmptyString(dst.VendorDerivedConfidence, src.VendorDerivedConfidence)
 	dst.VendorDerivedMatchPrefix = firstNonEmptyString(dst.VendorDerivedMatchPrefix, src.VendorDerivedMatchPrefix)
 	dst.VendorMatchPrefix = firstNonEmptyString(dst.VendorMatchPrefix, src.VendorMatchPrefix)
-	dst.PortsTotal, dst.HasPortsTotal = firstPresentInt(dst.PortsTotal, dst.HasPortsTotal, src.PortsTotal, src.HasPortsTotal)
+	dst.PortsTotal = firstPresentValue(dst.PortsTotal, src.PortsTotal)
 	dst.IfIndexes = firstNonEmptyStringSlice(dst.IfIndexes, src.IfIndexes)
 	dst.IfNames = firstNonEmptyStringSlice(dst.IfNames, src.IfNames)
-	dst.PortsUp, dst.HasPortsUp = firstPresentInt(dst.PortsUp, dst.HasPortsUp, src.PortsUp, src.HasPortsUp)
-	dst.PortsDown, dst.HasPortsDown = firstPresentInt(dst.PortsDown, dst.HasPortsDown, src.PortsDown, src.HasPortsDown)
-	dst.PortsAdminDown, dst.HasPortsAdminDown = firstPresentInt(dst.PortsAdminDown, dst.HasPortsAdminDown, src.PortsAdminDown, src.HasPortsAdminDown)
-	dst.TotalBandwidthBps, dst.HasTotalBandwidthBps = firstPresentInt64(dst.TotalBandwidthBps, dst.HasTotalBandwidthBps, src.TotalBandwidthBps, src.HasTotalBandwidthBps)
-	dst.FDBTotalMACs, dst.HasFDBTotalMACs = firstPresentInt(dst.FDBTotalMACs, dst.HasFDBTotalMACs, src.FDBTotalMACs, src.HasFDBTotalMACs)
-	dst.VLANCount, dst.HasVLANCount = firstPresentInt(dst.VLANCount, dst.HasVLANCount, src.VLANCount, src.HasVLANCount)
-	dst.LLDPNeighborCount, dst.HasLLDPNeighborCount = firstPresentInt(dst.LLDPNeighborCount, dst.HasLLDPNeighborCount, src.LLDPNeighborCount, src.HasLLDPNeighborCount)
-	dst.CDPNeighborCount, dst.HasCDPNeighborCount = firstPresentInt(dst.CDPNeighborCount, dst.HasCDPNeighborCount, src.CDPNeighborCount, src.HasCDPNeighborCount)
+	dst.PortsUp = firstPresentValue(dst.PortsUp, src.PortsUp)
+	dst.PortsDown = firstPresentValue(dst.PortsDown, src.PortsDown)
+	dst.PortsAdminDown = firstPresentValue(dst.PortsAdminDown, src.PortsAdminDown)
+	dst.TotalBandwidthBps = firstPresentValue(dst.TotalBandwidthBps, src.TotalBandwidthBps)
+	dst.FDBTotalMACs = firstPresentValue(dst.FDBTotalMACs, src.FDBTotalMACs)
+	dst.VLANCount = firstPresentValue(dst.VLANCount, src.VLANCount)
+	dst.LLDPNeighborCount = firstPresentValue(dst.LLDPNeighborCount, src.LLDPNeighborCount)
+	dst.CDPNeighborCount = firstPresentValue(dst.CDPNeighborCount, src.CDPNeighborCount)
 	dst.AdminStatusCounts = firstNonEmptyIntMap(dst.AdminStatusCounts, src.AdminStatusCounts)
 	dst.OperStatusCounts = firstNonEmptyIntMap(dst.OperStatusCounts, src.OperStatusCounts)
 	dst.LinkModeCounts = firstNonEmptyIntMap(dst.LinkModeCounts, src.LinkModeCounts)
@@ -266,8 +266,8 @@ func mergeTopologyProjectionSegmentDetail(dst, src topologyengine.ProjectionSegm
 	dst.BridgePorts = firstNonEmptyStringSlice(dst.BridgePorts, src.BridgePorts)
 	dst.VLANIDs = firstNonEmptyStringSlice(dst.VLANIDs, src.VLANIDs)
 	dst.LearnedSources = firstNonEmptyStringSlice(dst.LearnedSources, src.LearnedSources)
-	dst.PortsTotal, dst.HasPortsTotal = firstPresentInt(dst.PortsTotal, dst.HasPortsTotal, src.PortsTotal, src.HasPortsTotal)
-	dst.EndpointsTotal, dst.HasEndpointsTotal = firstPresentInt(dst.EndpointsTotal, dst.HasEndpointsTotal, src.EndpointsTotal, src.HasEndpointsTotal)
+	dst.PortsTotal = firstPresentValue(dst.PortsTotal, src.PortsTotal)
+	dst.EndpointsTotal = firstPresentValue(dst.EndpointsTotal, src.EndpointsTotal)
 	dst.DesignatedPort = firstNonEmptyString(dst.DesignatedPort, src.DesignatedPort)
 	dst.SegmentKind = firstNonEmptyString(dst.SegmentKind, src.SegmentKind)
 	return dst
@@ -297,5 +297,15 @@ func mergeTopologySNMPActorDetail(dst, src topologySNMPActorDetail) topologySNMP
 	dst.ChartContextPrefix = firstNonEmptyString(dst.ChartContextPrefix, src.ChartContextPrefix)
 	dst.DeviceCharts = firstNonEmptyStringMap(dst.DeviceCharts, src.DeviceCharts)
 	dst.InterfaceCharts = firstNonEmptyInterfaceChartMap(dst.InterfaceCharts, src.InterfaceCharts)
+	return dst
+}
+
+func firstPresentValue[T any](dst, src topologyengine.OptionalValue[T]) topologyengine.OptionalValue[T] {
+	if dst.Has {
+		return dst
+	}
+	if src.Has {
+		return src
+	}
 	return dst
 }
