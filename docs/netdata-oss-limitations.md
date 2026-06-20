@@ -95,6 +95,8 @@ When accessing Netdata via Agent/Parent MCP:
 
 - **Without Cloud connection**: MCP can access public functions and metrics, but sensitive functions follow the same restrictions as the dashboard
 - **With Cloud connection**: MCP inherits the user's Cloud permissions, enabling access to sensitive functions for authenticated users
+- **With `[web].bearer token protection = yes`**: local MCP requires the local MCP API key on all transports (HTTP, SSE, WebSocket); anonymous MCP requests are rejected
+- **Network ACL**: local MCP exposure is controlled by `[web].allow mcp from` (in addition to the global `[web].allow connections from`)
 
 For MCP setup and configuration, see the [MCP documentation](/docs/netdata-ai/mcp/README.md).
 
