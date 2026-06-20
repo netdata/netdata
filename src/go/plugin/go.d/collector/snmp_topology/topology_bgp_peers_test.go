@@ -173,6 +173,33 @@ func TestBuildSNMPTopologyV1BGPPeersTableHandlesRawAndUnspecifiedAddresses(t *te
 	}
 }
 
+func TestBuildSNMPTopologyV1BGPPeersTablePreservesOptionalUptimePresence(t *testing.T) {
+	var zero int64
+	stringsDict := topologyv1.NewStringDictionary()
+
+	table := buildSNMPTopologyV1BGPPeersTable([]topologyV1DynamicRow{
+		{
+			actorRef: 0,
+			values: snmpTopologyV1BGPPeerValues(topologyBGPPeerDetailRow{
+				NeighborIP:      "192.0.2.2",
+				RoutingInstance: "default",
+			}),
+		},
+		{
+			actorRef: 0,
+			values: snmpTopologyV1BGPPeerValues(topologyBGPPeerDetailRow{
+				NeighborIP:            "192.0.2.3",
+				RoutingInstance:       "default",
+				EstablishedUptime:     &zero,
+				LastReceivedUpdateAge: &zero,
+			}),
+		},
+	}, nil, stringsDict)
+
+	require.Equal(t, []any{nil, uint64(0)}, topologyV1ColumnValues(t, table, "established_uptime"))
+	require.Equal(t, []any{nil, uint64(0)}, topologyV1ColumnValues(t, table, "last_received_update_age"))
+}
+
 func TestTopologyCacheIngestTopologyBGPPeersSkipsErrorsAndInvalidRows(t *testing.T) {
 	cache := newTopologyCache()
 

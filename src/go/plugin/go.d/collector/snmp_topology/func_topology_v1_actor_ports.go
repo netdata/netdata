@@ -22,6 +22,11 @@ type snmpTopologyV1PortNeighborSummary struct {
 	ambiguous      bool
 }
 
+type topologyV1DynamicRow struct {
+	actorRef int
+	values   map[string]any
+}
+
 func snmpTopologyV1PortNeighborKeyFor(actorRef int, ifIndex any, portName string) snmpTopologyV1PortNeighborKey {
 	if index, ok := uintValue(ifIndex); ok && index > 0 {
 		return snmpTopologyV1PortNeighborKey{actorRef: actorRef, ifIndex: index}

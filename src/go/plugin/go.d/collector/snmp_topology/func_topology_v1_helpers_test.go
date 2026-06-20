@@ -10,41 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBuildSNMPTopologyV1DynamicTable_KeyNormalization(t *testing.T) {
-	tests := map[string]struct {
-		values map[string]any
-		want   []any
-	}{
-		"trimmed-key-lookup": {
-			values: map[string]any{
-				" speed ": uint64(1000),
-			},
-			want: []any{uint64(1000)},
-		},
-		"exact-key-on-trim-collision": {
-			values: map[string]any{
-				" speed ": uint64(1000),
-				"speed":   uint64(2000),
-			},
-			want: []any{uint64(2000)},
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			table, err := buildSNMPTopologyV1DynamicTable([]topologyV1DynamicRow{
-				{
-					actorRef: 0,
-					values:   tc.values,
-				},
-			}, topologyv1.NewStringDictionary(""))
-
-			require.NoError(t, err)
-			assert.Equal(t, tc.want, topologyV1TestColumnValues(t, table, "speed"))
-		})
-	}
-}
-
 func TestAnyStringSlice_DropsNilAndNonScalarItems(t *testing.T) {
 	tests := map[string]struct {
 		in   any
