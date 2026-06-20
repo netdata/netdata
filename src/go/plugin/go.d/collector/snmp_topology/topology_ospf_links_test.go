@@ -162,7 +162,7 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentDeduplicatesBidirectionalObservatio
 	require.Len(t, data.Actors[1].Tables["ospf_neighbors"], 1)
 }
 
-func TestApplyTopologyOSPFAdjacencyEnrichmentSuppressesMatchingL3SubnetEdge(t *testing.T) {
+func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsMatchingL3SubnetEdge(t *testing.T) {
 	l3Link := topologyLink{
 		Protocol:   topologyL3SubnetLinkType,
 		LinkType:   topologyL3SubnetLinkType,
@@ -198,10 +198,10 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentSuppressesMatchingL3SubnetEdge(t *t
 	stats := applyTopologyOSPFAdjacencyEnrichment(&data, aggregate)
 
 	require.Equal(t, 1, stats.emittedLinks)
-	require.Equal(t, 1, stats.suppressedL3SubnetOverlap)
-	require.Len(t, data.Links, 1)
-	require.Equal(t, topologyOSPFAdjacencyLinkType, data.Links[0].LinkType)
-	require.Equal(t, 0, data.Stats["l3_subnet_visible_links"])
+	require.Len(t, data.Links, 2)
+	require.Equal(t, 1, countTopologyLinksByType(data.Links, topologyL3SubnetLinkType))
+	require.Equal(t, 1, countTopologyLinksByType(data.Links, topologyOSPFAdjacencyLinkType))
+	require.Equal(t, 1, data.Stats["l3_subnet_visible_links"])
 	require.Equal(t, 1, data.Stats["ospf_adjacency_visible_links"])
 }
 
@@ -244,7 +244,6 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsUnrelatedL3SubnetEdge(t *testi
 	stats := applyTopologyOSPFAdjacencyEnrichment(&data, aggregate)
 
 	require.Equal(t, 1, stats.emittedLinks)
-	require.Zero(t, stats.suppressedL3SubnetOverlap)
 	require.Len(t, data.Links, 2)
 	require.Equal(t, 1, countTopologyLinksByType(data.Links, topologyL3SubnetLinkType))
 	require.Equal(t, 1, countTopologyLinksByType(data.Links, topologyOSPFAdjacencyLinkType))

@@ -16,14 +16,14 @@ func init() {
 }
 
 func (c *topologyCache) updateOSPFNeighbor(tags map[string]string) {
-	neighborRouterID := normalizeOSPFRouterID(tags[tagOSPFNeighborRouterID])
+	neighborRouterID := normalizeTopologyRouterID(tags[tagOSPFNeighborRouterID])
 	neighborIP := normalizeNonUnspecifiedIPAddress(tags[tagOSPFNeighborIP])
 	if neighborRouterID == "" && neighborIP == "" {
 		return
 	}
 
 	row := topologyOSPFNeighbor{
-		LocalRouterID:    normalizeOSPFRouterID(c.localDevice.OSPFRouterID),
+		LocalRouterID:    normalizeTopologyRouterID(c.localDevice.OSPFRouterID),
 		NeighborRouterID: neighborRouterID,
 		NeighborIP:       neighborIP,
 		AddresslessIndex: strings.TrimSpace(tags[tagOSPFNeighborAddresslessIndex]),
@@ -50,7 +50,7 @@ func (c *topologyCache) snapshotOSPFNeighbors(localDeviceID string) []topologyOS
 		row := c.ospfNeighborsByKey[key]
 		row.DeviceID = strings.TrimSpace(localDeviceID)
 		if row.LocalRouterID == "" {
-			row.LocalRouterID = normalizeOSPFRouterID(c.localDevice.OSPFRouterID)
+			row.LocalRouterID = normalizeTopologyRouterID(c.localDevice.OSPFRouterID)
 		}
 		if iface, ok := c.matchOSPFNeighborLocalInterface(row.NeighborIP); ok {
 			row.LocalIP = iface.IP
@@ -121,21 +121,10 @@ func (c *topologyCache) matchOSPFNeighborLocalInterface(neighborIP string) (topo
 
 func topologyOSPFNeighborCacheKey(row topologyOSPFNeighbor) string {
 	return topologyL3SubnetLinkKeyParts(
-		normalizeOSPFRouterID(row.NeighborRouterID),
+		normalizeTopologyRouterID(row.NeighborRouterID),
 		normalizeNonUnspecifiedIPAddress(row.NeighborIP),
 		strings.TrimSpace(row.AddresslessIndex),
 	)
-}
-
-func normalizeOSPFRouterID(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return ""
-	}
-	if ip := normalizeIPAddress(value); ip != "" {
-		return normalizeNonUnspecifiedIPAddress(ip)
-	}
-	return value
 }
 
 func normalizeOSPFNeighborState(value string) string {
@@ -176,8 +165,8 @@ func topologyOSPFNeighborLinkKeyParts(row topologyOSPFNeighbor, srcActorID, dstA
 		srcActorID, dstActorID = dstActorID, srcActorID
 	}
 
-	localRouterID := normalizeOSPFRouterID(row.LocalRouterID)
-	neighborRouterID := normalizeOSPFRouterID(row.NeighborRouterID)
+	localRouterID := normalizeTopologyRouterID(row.LocalRouterID)
+	neighborRouterID := normalizeTopologyRouterID(row.NeighborRouterID)
 	if localRouterID > neighborRouterID {
 		localRouterID, neighborRouterID = neighborRouterID, localRouterID
 	}

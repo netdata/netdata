@@ -23,8 +23,7 @@ type topologyBGPEnrichmentStats struct {
 func applyTopologyBGPAdjacencyEnrichment(data *topologyData, aggregate topologyObservationAggregate) topologyBGPEnrichmentStats {
 	var stats topologyBGPEnrichmentStats
 	if data == nil || len(aggregate.bgpPeers) == 0 {
-		recordTopologyBGPEnrichmentStats(data, stats)
-		return stats
+		return finishTopologyBGPAdjacencyEnrichment(data, stats)
 	}
 
 	resolver := newTopologyBGPActorResolver(data, aggregate)
@@ -71,10 +70,14 @@ func applyTopologyBGPAdjacencyEnrichment(data *topologyData, aggregate topologyO
 		stats.emittedLinks++
 	}
 
-	attachTopologyBGPPeerRows(data, peerRowsByActor)
+	attachTopologyActorTableRows(data, "bgp_peers", peerRowsByActor, sortTopologyBGPPeerRows)
 	sort.Slice(data.Links, func(i, j int) bool {
 		return topologyLinkSortKey(data.Links[i]) < topologyLinkSortKey(data.Links[j])
 	})
+	return finishTopologyBGPAdjacencyEnrichment(data, stats)
+}
+
+func finishTopologyBGPAdjacencyEnrichment(data *topologyData, stats topologyBGPEnrichmentStats) topologyBGPEnrichmentStats {
 	recordTopologyBGPEnrichmentStats(data, stats)
 	recomputeTopologyLinkStats(data)
 	return stats
@@ -93,7 +96,7 @@ func newTopologyBGPActorResolver(data *topologyData, aggregate topologyObservati
 	for _, row := range aggregate.l3Interfaces {
 		ref, ok := resolver.l3.resolveDeviceID(row.DeviceID)
 		if ok {
-			resolver.l3.addUniqueIP(row.IP, ref)
+			resolver.l3.addUniqueIPAddress(row.IP, ref)
 		}
 	}
 	for _, row := range aggregate.bgpPeers {
@@ -102,7 +105,7 @@ func newTopologyBGPActorResolver(data *topologyData, aggregate topologyObservati
 			continue
 		}
 		resolver.addUniqueIdentifier(row.LocalIdentifier, ref)
-		resolver.l3.addUniqueIP(row.LocalIP, ref)
+		resolver.l3.addUniqueIPAddress(row.LocalIP, ref)
 	}
 	return resolver
 }
@@ -115,13 +118,7 @@ func (r topologyBGPActorResolver) resolveBGPPeer(row topologyBGPPeer) (topologyL
 	if ref, ok := r.byIdentifier[normalizeBGPRouterID(row.PeerIdentifier)]; ok && ref.actorID != "" {
 		return ref, true
 	}
-	if ref, ok := r.l3.byRouterID[normalizeOSPFRouterID(row.PeerIdentifier)]; ok && ref.actorID != "" {
-		return ref, true
-	}
-	if ref, ok := r.l3.byIP[normalizeNonUnspecifiedIPAddress(row.NeighborIP)]; ok && ref.actorID != "" {
-		return ref, true
-	}
-	return topologyL3ActorRef{}, false
+	return r.l3.resolveRouterEndpoint(row.PeerIdentifier, row.NeighborIP)
 }
 
 func (r topologyBGPActorResolver) addUniqueIdentifier(identifier string, ref topologyL3ActorRef) {
@@ -251,24 +248,6 @@ func topologyBGPPeerActorRow(row topologyBGPPeer) map[string]any {
 	return out
 }
 
-func attachTopologyBGPPeerRows(data *topologyData, rowsByActor map[string][]map[string]any) {
-	if data == nil || len(rowsByActor) == 0 {
-		return
-	}
-	for i := range data.Actors {
-		actor := &data.Actors[i]
-		rows := rowsByActor[strings.TrimSpace(actor.ActorID)]
-		if len(rows) == 0 {
-			continue
-		}
-		sortTopologyBGPPeerRows(rows)
-		if actor.Tables == nil {
-			actor.Tables = make(map[string][]map[string]any)
-		}
-		actor.Tables["bgp_peers"] = rows
-	}
-}
-
 func existingTopologyBGPLinkKeys(links []topologyLink) map[string]struct{} {
 	seen := make(map[string]struct{})
 	for _, link := range links {
@@ -316,20 +295,4 @@ func recordTopologyBGPEnrichmentStats(data *topologyData, stats topologyBGPEnric
 	data.Stats["bgp_adjacency_suppressed_unresolved_neighbor"] = stats.suppressedUnresolvedNeighbor
 	data.Stats["bgp_adjacency_suppressed_self_actor"] = stats.suppressedSelfActor
 	data.Stats["bgp_adjacency_suppressed_duplicate_link"] = stats.suppressedDuplicateLink
-}
-
-func recomputeTopologyBGPVisibleLinkStats(data *topologyData) {
-	if data == nil || data.Stats == nil {
-		return
-	}
-	if _, ok := data.Stats["bgp_adjacency_emitted_links"]; !ok {
-		return
-	}
-	count := 0
-	for _, link := range data.Links {
-		if strings.EqualFold(strings.TrimSpace(firstNonEmptyString(link.LinkType, link.Protocol)), topologyBGPAdjacencyLinkType) {
-			count++
-		}
-	}
-	data.Stats["bgp_adjacency_visible_links"] = count
 }

@@ -42,7 +42,7 @@ func buildLocalTopologyDevice(dev ddsnmp.DeviceConnectionInfo) topologyDevice {
 	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasModel); value != "" && device.Model == "" {
 		device.Model = value
 	}
-	if value := normalizeOSPFRouterID(device.Labels[tagOSPFRouterID]); value != "" {
+	if value := normalizeTopologyRouterID(device.Labels[tagOSPFRouterID]); value != "" {
 		device.OSPFRouterID = value
 		setTopologyMetadataLabelIfMissing(device.Labels, tagOSPFRouterID, value)
 	}

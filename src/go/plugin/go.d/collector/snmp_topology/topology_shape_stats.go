@@ -46,3 +46,35 @@ func recomputeTopologyL3VisibleLinkStats(data *topologyData) {
 	}
 	data.Stats["l3_subnet_visible_links"] = count
 }
+
+func recomputeTopologyOSPFVisibleLinkStats(data *topologyData) {
+	if data == nil || data.Stats == nil {
+		return
+	}
+	if _, ok := data.Stats["ospf_adjacency_emitted_links"]; !ok {
+		return
+	}
+	count := 0
+	for _, link := range data.Links {
+		if strings.EqualFold(strings.TrimSpace(firstNonEmptyString(link.LinkType, link.Protocol)), topologyOSPFAdjacencyLinkType) {
+			count++
+		}
+	}
+	data.Stats["ospf_adjacency_visible_links"] = count
+}
+
+func recomputeTopologyBGPVisibleLinkStats(data *topologyData) {
+	if data == nil || data.Stats == nil {
+		return
+	}
+	if _, ok := data.Stats["bgp_adjacency_emitted_links"]; !ok {
+		return
+	}
+	count := 0
+	for _, link := range data.Links {
+		if strings.EqualFold(strings.TrimSpace(firstNonEmptyString(link.LinkType, link.Protocol)), topologyBGPAdjacencyLinkType) {
+			count++
+		}
+	}
+	data.Stats["bgp_adjacency_visible_links"] = count
+}
