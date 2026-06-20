@@ -9,7 +9,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
-const maxProjectionInt64 = int64(1<<63 - 1)
+const (
+	maxProjectionInt   = int(^uint(0) >> 1)
+	maxProjectionInt64 = int64(1<<63 - 1)
+)
 
 func buildProjectionActorDetails(actors []graph.Actor) map[string]ProjectionActorDetail {
 	if len(actors) == 0 {
@@ -326,7 +329,7 @@ func topologyAttrIntMap(attrs map[string]any, key string) map[string]int {
 	case map[string]any:
 		for k, v := range typed {
 			if k = strings.TrimSpace(k); k != "" {
-				out[k] = int(topologyAnyInt64Value(v))
+				out[k] = topologyInt64ToInt(topologyAnyInt64Value(v))
 			}
 		}
 	default:
@@ -340,6 +343,16 @@ func topologyAttrIntMap(attrs map[string]any, key string) map[string]int {
 
 func topologyAnyInt64Value(value any) int64 {
 	return topologyAttrInt64(map[string]any{"value": value}, "value")
+}
+
+func topologyInt64ToInt(value int64) int {
+	if value < 0 {
+		return 0
+	}
+	if value > int64(maxProjectionInt) {
+		return maxProjectionInt
+	}
+	return int(value)
 }
 
 func anyMapSlice(value any) ([]map[string]any, bool) {

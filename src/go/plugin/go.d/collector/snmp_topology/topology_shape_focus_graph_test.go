@@ -159,6 +159,26 @@ func TestTopologyActorHasIPMatchesMatchAndManagementAddresses(t *testing.T) {
 	}
 }
 
+func TestTopologyActorDetailManagementIPsCanonicalizesBeforeDedup(t *testing.T) {
+	actor := topologyActor{
+		Detail: topologyActorDetail{
+			SNMP: topologySNMPActorDetail{
+				ManagementIP: "::ffff:192.0.2.1",
+				ManagementAddresses: []topologyManagementAddress{
+					{Address: "192.0.2.1"},
+				},
+			},
+			L2: topologyengine.ProjectionActorDetail{
+				Device: topologyengine.ProjectionDeviceActorDetail{
+					ManagementAddresses: []string{"::", "::ffff:192.0.2.2", "192.0.2.2"},
+				},
+			},
+		},
+	}
+
+	require.Equal(t, []string{"192.0.2.1", "192.0.2.2"}, topologyActorDetailManagementIPs(actor))
+}
+
 func TestRecordTopologyFocusStatsNormalizesDepthAndFilteredCounts(t *testing.T) {
 	data := &topologyData{
 		Actors: []topologyActor{

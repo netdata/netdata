@@ -64,20 +64,24 @@ func topologyActorDetailManagementIP(actor topologyActor) string {
 
 func topologyActorDetailManagementIPs(actor topologyActor) []string {
 	out := make([]string, 0, 1+len(actor.Detail.SNMP.ManagementAddresses)+len(actor.Detail.L2.Device.ManagementAddresses))
-	if ip := topologyActorDetailManagementIP(actor); ip != "" {
+	if ip := topologyActorDetailManagementIPValue(topologyActorDetailManagementIP(actor)); ip != "" {
 		out = append(out, ip)
 	}
 	for _, address := range actor.Detail.SNMP.ManagementAddresses {
-		if ip := normalizeIPAddress(address.Address); ip != "" {
+		if ip := topologyActorDetailManagementIPValue(address.Address); ip != "" {
 			out = append(out, ip)
 		}
 	}
 	for _, address := range actor.Detail.L2.Device.ManagementAddresses {
-		if ip := normalizeIPAddress(address); ip != "" {
+		if ip := topologyActorDetailManagementIPValue(address); ip != "" {
 			out = append(out, ip)
 		}
 	}
 	return deduplicateSortedStrings(out)
+}
+
+func topologyActorDetailManagementIPValue(value string) string {
+	return normalizeNonUnspecifiedIPAddress(value)
 }
 
 func topologyActorDetailDeviceID(actor topologyActor) string {
