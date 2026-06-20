@@ -284,15 +284,6 @@ func recordTopologyBGPEnrichmentStats(data *topologyData, stats topologyBGPEnric
 	if data == nil {
 		return
 	}
-	if data.Stats == nil {
-		data.Stats = make(map[string]any)
-	}
-	data.Stats["bgp_peer_rows"] = stats.observedRows
-	data.Stats["bgp_peer_detail_rows"] = stats.attachedPeerRows
-	data.Stats["bgp_adjacency_emitted_links"] = stats.emittedLinks
-	data.Stats["bgp_adjacency_suppressed_non_established_state"] = stats.suppressedNonEstablished
-	data.Stats["bgp_adjacency_suppressed_unresolved_local"] = stats.suppressedUnresolvedLocal
-	data.Stats["bgp_adjacency_suppressed_unresolved_neighbor"] = stats.suppressedUnresolvedNeighbor
-	data.Stats["bgp_adjacency_suppressed_self_actor"] = stats.suppressedSelfActor
-	data.Stats["bgp_adjacency_suppressed_duplicate_link"] = stats.suppressedDuplicateLink
+	data.Stats.BGP = stats
+	data.Stats.HasBGP = true
 }

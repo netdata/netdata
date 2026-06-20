@@ -59,7 +59,6 @@ func TestGraphJSONShape(t *testing.T) {
 			LastSeen:     &tm,
 			Metrics:      map[string]any{"cost": float64(10)},
 		}},
-		Stats: map[string]any{"links": float64(1)},
 	}
 
 	bs, err := json.Marshal(payload)
@@ -111,7 +110,6 @@ func TestGraphJSONShape(t *testing.T) {
 			"discovered_at":"2026-06-20T08:09:10Z",
 			"last_seen":"2026-06-20T08:09:10Z",
 			"metrics":{"cost":10}
-		}],
-		"stats":{"links":1}
+		}]
 	}`, string(bs))
 }

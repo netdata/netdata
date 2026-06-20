@@ -5,7 +5,6 @@ package snmptopology
 import (
 	"fmt"
 	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
-	"maps"
 	"math"
 	"reflect"
 	"regexp"
@@ -271,13 +270,4 @@ func firstNonEmptyString(values ...string) string {
 		}
 	}
 	return ""
-}
-
-func cloneAnyMapForTopologyV1(in map[string]any) map[string]any {
-	if len(in) == 0 {
-		return nil
-	}
-	out := make(map[string]any, len(in))
-	maps.Copy(out, in)
-	return out
 }

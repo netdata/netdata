@@ -99,10 +99,10 @@ func TestApplyTopologyL3SubnetEnrichmentSuppressions(t *testing.T) {
 			require.Equal(t, tc.wantUnresolvedActor, stats.suppressedUnresolvedActor)
 			require.Equal(t, tc.wantSelfActor, stats.suppressedSelfActor)
 			require.Equal(t, tc.wantDuplicateLink, stats.suppressedDuplicateLink)
-			require.Equal(t, 1, tc.data.Stats["l3_subnet_candidate_links"])
-			require.Equal(t, 0, tc.data.Stats["l3_subnet_emitted_links"])
-			require.Equal(t, tc.wantVisibleLinks, tc.data.Stats["l3_subnet_visible_links"])
-			require.Equal(t, 1, tc.data.Stats[tc.wantSuppressedMetricName])
+			require.Equal(t, 1, topologyStatsToV1(tc.data.Stats)["l3_subnet_candidate_links"])
+			require.Equal(t, 0, topologyStatsToV1(tc.data.Stats)["l3_subnet_emitted_links"])
+			require.Equal(t, tc.wantVisibleLinks, topologyStatsToV1(tc.data.Stats)["l3_subnet_visible_links"])
+			require.Equal(t, 1, topologyStatsToV1(tc.data.Stats)[tc.wantSuppressedMetricName])
 		})
 	}
 }
@@ -143,8 +143,9 @@ func TestTopologyL3SubnetLinkKeySeparatesDelimitedFields(t *testing.T) {
 
 func TestApplyTopologyDepthFocusFilterKeepsIncidentL3SubnetLink(t *testing.T) {
 	data := topologyData{
-		Stats: map[string]any{
-			"l3_subnet_emitted_links": 1,
+		Stats: topologyStats{
+			L3:    topologyL3EnrichmentStats{emittedLinks: 1},
+			HasL3: true,
 		},
 		Actors: []topologyActor{
 			topologyL3ManagedActorForTest("router-a", nil, "198.51.100.1"),
@@ -175,8 +176,8 @@ func TestApplyTopologyDepthFocusFilterKeepsIncidentL3SubnetLink(t *testing.T) {
 	require.Len(t, data.Actors, 2)
 	require.Len(t, data.Links, 1)
 	require.Equal(t, topologyL3SubnetLinkType, data.Links[0].LinkType)
-	require.Equal(t, 1, data.Stats["l3_subnet_emitted_links"])
-	require.Equal(t, 1, data.Stats["l3_subnet_visible_links"])
+	require.Equal(t, 1, topologyStatsToV1(data.Stats)["l3_subnet_emitted_links"])
+	require.Equal(t, 1, topologyStatsToV1(data.Stats)["l3_subnet_visible_links"])
 }
 
 func topologyL3ManagedActorForTest(actorID string, attrs map[string]any, ips ...string) topologyActor {

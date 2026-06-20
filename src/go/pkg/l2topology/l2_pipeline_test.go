@@ -56,9 +56,9 @@ func TestBuildL2ResultFromObservations_LLDPAndCDP(t *testing.T) {
 	require.Len(t, result.Devices, 2)
 	require.Len(t, result.Interfaces, 2)
 	require.Len(t, result.Adjacencies, 2)
-	require.Equal(t, 2, result.Stats["links_total"])
-	require.Equal(t, 1, result.Stats["links_lldp"])
-	require.Equal(t, 1, result.Stats["links_cdp"])
+	require.Equal(t, 2, result.Stats.LinksTotal)
+	require.Equal(t, 1, result.Stats.LinksLLDP)
+	require.Equal(t, 1, result.Stats.LinksCDP)
 
 	require.Equal(t, "cdp", result.Adjacencies[0].Protocol)
 	require.Equal(t, "switch-a", result.Adjacencies[0].SourceID)
@@ -93,8 +93,8 @@ func TestBuildL2ResultFromObservations_DefaultProtocols(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, result.Adjacencies, 1)
 	require.Equal(t, "switch-b", result.Adjacencies[0].TargetID)
-	require.Equal(t, 0, result.Stats["links_lldp"])
-	require.Equal(t, 1, result.Stats["links_cdp"])
+	require.Equal(t, 0, result.Stats.LinksLLDP)
+	require.Equal(t, 1, result.Stats.LinksCDP)
 }
 
 func TestBuildL2ResultFromObservations_UsesProvidedCollectedAt(t *testing.T) {
@@ -249,9 +249,9 @@ func TestBuildL2ResultFromObservations_SkipsSelfAdjacencies(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, result.Devices, 1)
 	require.Empty(t, result.Adjacencies)
-	require.Equal(t, 0, result.Stats["links_total"])
-	require.Equal(t, 0, result.Stats["links_lldp"])
-	require.Equal(t, 0, result.Stats["links_cdp"])
+	require.Equal(t, 0, result.Stats.LinksTotal)
+	require.Equal(t, 0, result.Stats.LinksLLDP)
+	require.Equal(t, 0, result.Stats.LinksCDP)
 }
 
 func TestBuildL2ResultFromObservations_CDPSysNameAndDeviceID(t *testing.T) {
@@ -330,10 +330,10 @@ func TestBuildL2ResultFromObservations_FDBAttachments(t *testing.T) {
 	require.Equal(t, "7", first.Labels["bridge_port"])
 	require.Equal(t, "Port3", first.Labels["if_name"])
 
-	require.Equal(t, 2, result.Stats["attachments_total"])
-	require.Equal(t, 2, result.Stats["attachments_fdb"])
-	require.Equal(t, 1, result.Stats["bridge_domains_total"])
-	require.Equal(t, 2, result.Stats["endpoints_total"])
+	require.Equal(t, 2, result.Stats.AttachmentsTotal)
+	require.Equal(t, 2, result.Stats.AttachmentsFDB)
+	require.Equal(t, 1, result.Stats.BridgeDomainsTotal)
+	require.Equal(t, 2, result.Stats.EndpointsTotal)
 }
 
 func TestBuildL2ResultFromObservations_FDBDropsDuplicateMACAcrossPorts(t *testing.T) {
@@ -357,7 +357,7 @@ func TestBuildL2ResultFromObservations_FDBDropsDuplicateMACAcrossPorts(t *testin
 	require.NoError(t, err)
 	require.Len(t, result.Attachments, 1)
 	require.Equal(t, "mac:70:49:a2:65:72:ce", result.Attachments[0].EndpointID)
-	require.Equal(t, 1, result.Stats["attachments_fdb"])
+	require.Equal(t, 1, result.Stats.AttachmentsFDB)
 }
 
 func TestBuildL2ResultFromObservations_FDBKeepsSameMACAcrossPortsWhenVLANDiffers(t *testing.T) {
@@ -385,7 +385,7 @@ func TestBuildL2ResultFromObservations_FDBKeepsSameMACAcrossPortsWhenVLANDiffers
 	require.Equal(t, "mac:70:49:a2:65:72:cd", first.EndpointID)
 	require.Equal(t, "mac:70:49:a2:65:72:cd", second.EndpointID)
 	require.NotEqual(t, first.Labels["vlan_id"], second.Labels["vlan_id"])
-	require.Equal(t, 2, result.Stats["attachments_fdb"])
+	require.Equal(t, 2, result.Stats.AttachmentsFDB)
 }
 
 func TestBuildL2ResultFromObservations_FDBSkipsSelfAndNonLearned(t *testing.T) {
@@ -453,7 +453,7 @@ func TestBuildL2ResultFromObservations_STPAdjacency(t *testing.T) {
 	require.Equal(t, "Port3", result.Adjacencies[0].SourcePort)
 	require.Equal(t, "200", result.Adjacencies[0].Labels["vlan_id"])
 	require.Equal(t, "servers", result.Adjacencies[0].Labels["vlan_name"])
-	require.Equal(t, 1, result.Stats["links_stp"])
+	require.Equal(t, 1, result.Stats.LinksSTP)
 }
 
 func TestBuildL2ResultFromObservations_STPDoesNotCreateSyntheticActors(t *testing.T) {
@@ -483,7 +483,7 @@ func TestBuildL2ResultFromObservations_STPDoesNotCreateSyntheticActors(t *testin
 	require.NoError(t, err)
 	require.Len(t, result.Devices, 1)
 	require.Empty(t, result.Adjacencies)
-	require.Equal(t, 0, result.Stats["links_stp"])
+	require.Equal(t, 0, result.Stats.LinksSTP)
 }
 
 func TestBuildL2ResultFromObservations_FDBBridgeDomainFallbackToBridgePort(t *testing.T) {
@@ -602,8 +602,8 @@ func TestBuildL2ResultFromObservations_ARPNDEnrichment(t *testing.T) {
 	require.Equal(t, "Port3,Port5", enrichment.Labels["if_names"])
 	require.Equal(t, "reachable", enrichment.Labels["states"])
 	require.Equal(t, "ipv4", enrichment.Labels["addr_types"])
-	require.Equal(t, 1, result.Stats["enrichments_total"])
-	require.Equal(t, 1, result.Stats["enrichments_arp_nd"])
+	require.Equal(t, 1, result.Stats.EnrichmentsTotal)
+	require.Equal(t, 1, result.Stats.EnrichmentsARPND)
 }
 
 func TestBuildL2ResultFromObservations_SkipsMACLessARPNDEntries(t *testing.T) {
@@ -638,7 +638,7 @@ func TestBuildL2ResultFromObservations_SkipsMACLessARPNDEntries(t *testing.T) {
 	require.Len(t, result.Enrichments, 1)
 	require.Equal(t, "mac:70:49:a2:65:72:cf", result.Enrichments[0].EndpointID)
 	require.Equal(t, []string{"10.20.4.100"}, addressStrings(result.Enrichments[0].IPs))
-	require.Equal(t, 1, result.Stats["endpoints_total"])
+	require.Equal(t, 1, result.Stats.EndpointsTotal)
 }
 
 func TestBuildL2ResultFromObservations_ReconcilesARPAliasIntoLLDPDeviceIdentity(t *testing.T) {
@@ -684,8 +684,8 @@ func TestBuildL2ResultFromObservations_ReconcilesARPAliasIntoLLDPDeviceIdentity(
 		[]string{"10.20.4.205", "fc00:f853:ccd:e793::1"},
 		deviceAddressStrings(*costaDesktop),
 	)
-	require.Equal(t, 1, result.Stats["identity_alias_endpoints_mapped"])
-	require.Equal(t, 1, result.Stats["identity_alias_ips_merged"])
+	require.Equal(t, 1, result.Stats.IdentityAliasEndpointsMapped)
+	require.Equal(t, 1, result.Stats.IdentityAliasIPsMerged)
 }
 
 func TestBuildL2ResultFromObservations_SkipsConflictingARPAliases(t *testing.T) {
@@ -736,9 +736,9 @@ func TestBuildL2ResultFromObservations_SkipsConflictingARPAliases(t *testing.T) 
 	costaDesktop := findDeviceByHostname(result.Devices, "costa-desktop")
 	require.NotNil(t, costaDesktop)
 	require.Equal(t, []string{"fc00:f853:ccd:e793::1"}, deviceAddressStrings(*costaDesktop))
-	require.Equal(t, 1, result.Stats["identity_alias_endpoints_mapped"])
-	require.Equal(t, 0, result.Stats["identity_alias_ips_merged"])
-	require.Equal(t, 1, result.Stats["identity_alias_ips_conflict_skipped"])
+	require.Equal(t, 1, result.Stats.IdentityAliasEndpointsMapped)
+	require.Equal(t, 0, result.Stats.IdentityAliasIPsMerged)
+	require.Equal(t, 1, result.Stats.IdentityAliasIPsConflictSkipped)
 }
 
 func TestBuildL2ResultFromObservations_SkipsAmbiguousMACAliasOwnership(t *testing.T) {
@@ -787,8 +787,8 @@ func TestBuildL2ResultFromObservations_SkipsAmbiguousMACAliasOwnership(t *testin
 	require.NotNil(t, switchB)
 	require.NotContains(t, deviceAddressStrings(*switchA), "10.0.0.50")
 	require.NotContains(t, deviceAddressStrings(*switchB), "10.0.0.50")
-	require.Equal(t, 0, result.Stats["identity_alias_ips_merged"])
-	require.Equal(t, 1, result.Stats["identity_alias_endpoints_ambiguous_mac"])
+	require.Equal(t, 0, result.Stats.IdentityAliasIPsMerged)
+	require.Equal(t, 1, result.Stats.IdentityAliasEndpointsAmbiguousMAC)
 }
 
 func TestNormalizeMAC_PadsSingleNibbleTokens(t *testing.T) {

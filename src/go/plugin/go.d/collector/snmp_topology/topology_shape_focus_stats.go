@@ -6,13 +6,11 @@ func recordTopologyFocusAllDevicesStats(data *topologyData, options topologyQuer
 	if data == nil {
 		return
 	}
-	if data.Stats == nil {
-		data.Stats = make(map[string]any)
-	}
-	data.Stats["managed_snmp_device_focus"] = options.ManagedDeviceFocus
-	data.Stats["depth"] = topologyDepthAll
-	data.Stats["actors_focus_depth_filtered"] = 0
-	data.Stats["links_focus_depth_filtered"] = 0
+	data.Stats.Focus.ManagedSNMPDeviceFocus = options.ManagedDeviceFocus
+	data.Stats.Focus.Depth = topologyFocusDepth{All: true}
+	data.Stats.Focus.ActorsDepthFiltered = 0
+	data.Stats.Focus.LinksDepthFiltered = 0
+	data.Stats.HasFocus = true
 	recomputeTopologyLinkStats(data)
 }
 
@@ -20,16 +18,14 @@ func recordTopologyFocusStats(data *topologyData, options topologyQueryOptions, 
 	if data == nil {
 		return
 	}
-	if data.Stats == nil {
-		data.Stats = make(map[string]any)
-	}
-	data.Stats["managed_snmp_device_focus"] = options.ManagedDeviceFocus
+	data.Stats.Focus.ManagedSNMPDeviceFocus = options.ManagedDeviceFocus
 	if options.Depth == topologyDepthAllInternal {
-		data.Stats["depth"] = topologyDepthAll
+		data.Stats.Focus.Depth = topologyFocusDepth{All: true}
 	} else {
-		data.Stats["depth"] = options.Depth
+		data.Stats.Focus.Depth = topologyFocusDepth{Value: options.Depth}
 	}
-	data.Stats["actors_focus_depth_filtered"] = beforeActors - len(data.Actors)
-	data.Stats["links_focus_depth_filtered"] = beforeLinks - len(data.Links)
+	data.Stats.Focus.ActorsDepthFiltered = beforeActors - len(data.Actors)
+	data.Stats.Focus.LinksDepthFiltered = beforeLinks - len(data.Links)
+	data.Stats.HasFocus = true
 	recomputeTopologyLinkStats(data)
 }

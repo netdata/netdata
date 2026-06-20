@@ -54,13 +54,12 @@ type Link struct {
 }
 
 type Graph struct {
-	SchemaVersion string         `json:"schema_version"`
-	Source        string         `json:"source,omitempty"`
-	Layer         string         `json:"layer,omitempty"`
-	AgentID       string         `json:"agent_id"`
-	CollectedAt   time.Time      `json:"collected_at"`
-	View          string         `json:"view,omitempty"`
-	Actors        []Actor        `json:"actors,omitempty"`
-	Links         []Link         `json:"links,omitempty"`
-	Stats         map[string]any `json:"stats,omitempty"`
+	SchemaVersion string    `json:"schema_version"`
+	Source        string    `json:"source,omitempty"`
+	Layer         string    `json:"layer,omitempty"`
+	AgentID       string    `json:"agent_id"`
+	CollectedAt   time.Time `json:"collected_at"`
+	View          string    `json:"view,omitempty"`
+	Actors        []Actor   `json:"actors,omitempty"`
+	Links         []Link    `json:"links,omitempty"`
 }

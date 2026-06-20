@@ -2,15 +2,78 @@
 
 package snmptopology
 
-import "github.com/netdata/netdata/go/plugins/pkg/topology/graph"
+import (
+	"time"
+
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
+)
 
 const topologySchemaVersion = "2.0"
 
-type topologyData = graph.Graph
 type topologyActor = graph.Actor
 type topologyMatch = graph.Match
 type topologyLink = graph.Link
 type topologyLinkEndpoint = graph.LinkEndpoint
+
+type topologyData struct {
+	SchemaVersion string
+	Source        string
+	Layer         string
+	AgentID       string
+	CollectedAt   time.Time
+	View          string
+	Actors        []topologyActor
+	Links         []topologyLink
+	Stats         topologyStats
+}
+
+type topologyStats struct {
+	L2          topologyengine.ProjectionStats
+	HasL2       bool
+	Shape       topologyShapeStats
+	HasShape    bool
+	Focus       topologyFocusStats
+	HasFocus    bool
+	L3          topologyL3EnrichmentStats
+	HasL3       bool
+	OSPF        topologyOSPFEnrichmentStats
+	HasOSPF     bool
+	BGP         topologyBGPEnrichmentStats
+	HasBGP      bool
+	Recomputed  topologyRecomputedStats
+	HasComputed bool
+}
+
+type topologyShapeStats struct {
+	ActorsCollapsedByIP           int
+	ActorsNonIPInferredSuppressed int
+	ActorsMapTypeSuppressed       int
+	SegmentsSparseSuppressed      int
+	MapType                       string
+	InferenceStrategy             string
+}
+
+type topologyFocusStats struct {
+	ManagedSNMPDeviceFocus string
+	Depth                  topologyFocusDepth
+	ActorsDepthFiltered    int
+	LinksDepthFiltered     int
+}
+
+type topologyFocusDepth struct {
+	All   bool
+	Value int
+}
+
+type topologyRecomputedStats struct {
+	ActorsTotal               int
+	LinksTotal                int
+	LinksProbable             int
+	L3SubnetVisibleLinks      int
+	OSPFAdjacencyVisibleLinks int
+	BGPAdjacencyVisibleLinks  int
+}
 
 type topologyManagementAddress struct {
 	Address     string `json:"address"`

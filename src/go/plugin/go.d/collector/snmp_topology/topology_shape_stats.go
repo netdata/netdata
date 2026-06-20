@@ -10,11 +10,8 @@ func recomputeTopologyLinkStats(data *topologyData) {
 	if data == nil {
 		return
 	}
-	if data.Stats == nil {
-		data.Stats = make(map[string]any)
-	}
-	data.Stats["actors_total"] = len(data.Actors)
-	data.Stats["links_total"] = len(data.Links)
+	data.Stats.Recomputed.ActorsTotal = len(data.Actors)
+	data.Stats.Recomputed.LinksTotal = len(data.Links)
 
 	probable := 0
 	for _, link := range data.Links {
@@ -25,17 +22,15 @@ func recomputeTopologyLinkStats(data *topologyData) {
 			probable++
 		}
 	}
-	data.Stats["links_probable"] = probable
+	data.Stats.Recomputed.LinksProbable = probable
+	data.Stats.HasComputed = true
 	recomputeTopologyL3VisibleLinkStats(data)
 	recomputeTopologyOSPFVisibleLinkStats(data)
 	recomputeTopologyBGPVisibleLinkStats(data)
 }
 
 func recomputeTopologyL3VisibleLinkStats(data *topologyData) {
-	if data == nil || data.Stats == nil {
-		return
-	}
-	if _, ok := data.Stats["l3_subnet_emitted_links"]; !ok {
+	if data == nil || !data.Stats.HasL3 {
 		return
 	}
 	count := 0
@@ -44,14 +39,11 @@ func recomputeTopologyL3VisibleLinkStats(data *topologyData) {
 			count++
 		}
 	}
-	data.Stats["l3_subnet_visible_links"] = count
+	data.Stats.Recomputed.L3SubnetVisibleLinks = count
 }
 
 func recomputeTopologyOSPFVisibleLinkStats(data *topologyData) {
-	if data == nil || data.Stats == nil {
-		return
-	}
-	if _, ok := data.Stats["ospf_adjacency_emitted_links"]; !ok {
+	if data == nil || !data.Stats.HasOSPF {
 		return
 	}
 	count := 0
@@ -60,14 +52,11 @@ func recomputeTopologyOSPFVisibleLinkStats(data *topologyData) {
 			count++
 		}
 	}
-	data.Stats["ospf_adjacency_visible_links"] = count
+	data.Stats.Recomputed.OSPFAdjacencyVisibleLinks = count
 }
 
 func recomputeTopologyBGPVisibleLinkStats(data *topologyData) {
-	if data == nil || data.Stats == nil {
-		return
-	}
-	if _, ok := data.Stats["bgp_adjacency_emitted_links"]; !ok {
+	if data == nil || !data.Stats.HasBGP {
 		return
 	}
 	count := 0
@@ -76,5 +65,5 @@ func recomputeTopologyBGPVisibleLinkStats(data *topologyData) {
 			count++
 		}
 	}
-	data.Stats["bgp_adjacency_visible_links"] = count
+	data.Stats.Recomputed.BGPAdjacencyVisibleLinks = count
 }
