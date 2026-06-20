@@ -44,7 +44,6 @@ func projectionActorDetailFromGraphActor(actor graph.Actor) ProjectionActorDetai
 
 func projectionDeviceActorDetail(attrs map[string]any, portRows []map[string]any) ProjectionDeviceActorDetail {
 	return ProjectionDeviceActorDetail{
-		HasInventoryStats:        topologyAttrsHaveAny(attrs, "ports_total", "ports_up", "ports_down", "ports_admin_down", "total_bandwidth_bps", "fdb_total_macs", "vlan_count", "lldp_neighbor_count", "cdp_neighbor_count", "if_admin_status_counts", "if_oper_status_counts", "if_link_mode_counts", "if_topology_role_counts"),
 		DeviceID:                 topologyAttrString(attrs, "device_id"),
 		Discovered:               topologyAnyBoolValue(attrs["discovered"]),
 		Inferred:                 topologyAnyBoolValue(attrs["inferred"]),
@@ -63,16 +62,25 @@ func projectionDeviceActorDetail(attrs map[string]any, portRows []map[string]any
 		VendorDerivedConfidence:  topologyAttrString(attrs, "vendor_derived_confidence"),
 		VendorDerivedMatchPrefix: topologyAttrString(attrs, "vendor_derived_match_prefix"),
 		VendorMatchPrefix:        topologyAttrString(attrs, "vendor_match_prefix"),
+		HasPortsTotal:            topologyAttrsHaveAny(attrs, "ports_total"),
 		PortsTotal:               topologyAttrInt(attrs, "ports_total"),
 		IfIndexes:                topologyAttrStringSlice(attrs, "if_indexes"),
 		IfNames:                  topologyAttrStringSlice(attrs, "if_names"),
+		HasPortsUp:               topologyAttrsHaveAny(attrs, "ports_up"),
 		PortsUp:                  topologyAttrInt(attrs, "ports_up"),
+		HasPortsDown:             topologyAttrsHaveAny(attrs, "ports_down"),
 		PortsDown:                topologyAttrInt(attrs, "ports_down"),
+		HasPortsAdminDown:        topologyAttrsHaveAny(attrs, "ports_admin_down"),
 		PortsAdminDown:           topologyAttrInt(attrs, "ports_admin_down"),
+		HasTotalBandwidthBps:     topologyAttrsHaveAny(attrs, "total_bandwidth_bps"),
 		TotalBandwidthBps:        topologyAttrInt64(attrs, "total_bandwidth_bps"),
+		HasFDBTotalMACs:          topologyAttrsHaveAny(attrs, "fdb_total_macs"),
 		FDBTotalMACs:             topologyAttrInt(attrs, "fdb_total_macs"),
+		HasVLANCount:             topologyAttrsHaveAny(attrs, "vlan_count"),
 		VLANCount:                topologyAttrInt(attrs, "vlan_count"),
+		HasLLDPNeighborCount:     topologyAttrsHaveAny(attrs, "lldp_neighbor_count"),
 		LLDPNeighborCount:        topologyAttrInt(attrs, "lldp_neighbor_count"),
+		HasCDPNeighborCount:      topologyAttrsHaveAny(attrs, "cdp_neighbor_count"),
 		CDPNeighborCount:         topologyAttrInt(attrs, "cdp_neighbor_count"),
 		AdminStatusCounts:        topologyAttrIntMap(attrs, "if_admin_status_counts"),
 		OperStatusCounts:         topologyAttrIntMap(attrs, "if_oper_status_counts"),
@@ -112,19 +120,20 @@ func projectionEndpointActorDetail(attrs map[string]any, labels map[string]strin
 
 func projectionSegmentActorDetail(attrs map[string]any, labels map[string]string) ProjectionSegmentActorDetail {
 	return ProjectionSegmentActorDetail{
-		HasStats:       topologyAttrsHaveAny(attrs, "ports_total", "endpoints_total"),
-		SegmentID:      topologyAttrString(attrs, "segment_id"),
-		SegmentType:    topologyAttrString(attrs, "segment_type"),
-		ParentDevices:  topologyAttrStringSlice(attrs, "parent_devices"),
-		IfNames:        topologyAttrStringSlice(attrs, "if_names"),
-		IfIndexes:      topologyAttrStringSlice(attrs, "if_indexes"),
-		BridgePorts:    topologyAttrStringSlice(attrs, "bridge_ports"),
-		VLANIDs:        topologyAttrStringSlice(attrs, "vlan_ids"),
-		LearnedSources: topologyAttrStringSlice(attrs, "learned_sources"),
-		PortsTotal:     topologyAttrInt(attrs, "ports_total"),
-		EndpointsTotal: topologyAttrInt(attrs, "endpoints_total"),
-		DesignatedPort: topologyAttrString(attrs, "designated_port"),
-		SegmentKind:    labels["segment_kind"],
+		SegmentID:         topologyAttrString(attrs, "segment_id"),
+		SegmentType:       topologyAttrString(attrs, "segment_type"),
+		ParentDevices:     topologyAttrStringSlice(attrs, "parent_devices"),
+		IfNames:           topologyAttrStringSlice(attrs, "if_names"),
+		IfIndexes:         topologyAttrStringSlice(attrs, "if_indexes"),
+		BridgePorts:       topologyAttrStringSlice(attrs, "bridge_ports"),
+		VLANIDs:           topologyAttrStringSlice(attrs, "vlan_ids"),
+		LearnedSources:    topologyAttrStringSlice(attrs, "learned_sources"),
+		HasPortsTotal:     topologyAttrsHaveAny(attrs, "ports_total"),
+		PortsTotal:        topologyAttrInt(attrs, "ports_total"),
+		HasEndpointsTotal: topologyAttrsHaveAny(attrs, "endpoints_total"),
+		EndpointsTotal:    topologyAttrInt(attrs, "endpoints_total"),
+		DesignatedPort:    topologyAttrString(attrs, "designated_port"),
+		SegmentKind:       labels["segment_kind"],
 	}
 }
 
@@ -150,6 +159,7 @@ func projectionPortDetails(rows []map[string]any) []ProjectionPortDetail {
 			continue
 		}
 		out = append(out, ProjectionPortDetail{
+			HasIfIndex:             topologyAttrsHaveAny(row, "if_index"),
 			IfIndex:                topologyAttrInt(row, "if_index"),
 			PortID:                 topologyAttrString(row, "port_id"),
 			Name:                   topologyAttrString(row, "name"),
@@ -157,6 +167,7 @@ func projectionPortDetails(rows []map[string]any) []ProjectionPortDetail {
 			IfDescr:                topologyAttrString(row, "if_descr"),
 			IfAlias:                topologyAttrString(row, "if_alias"),
 			MAC:                    topologyAttrString(row, "mac"),
+			HasSpeed:               topologyAttrsHaveAny(row, "speed"),
 			Speed:                  topologyAttrInt64(row, "speed"),
 			TopologyRole:           topologyAttrString(row, "topology_role"),
 			OperStatus:             firstNonEmpty(topologyAttrString(row, "oper_status"), topologyAttrString(row, "if_oper_status")),
@@ -165,8 +176,11 @@ func projectionPortDetails(rows []map[string]any) []ProjectionPortDetail {
 			LinkMode:               topologyAttrString(row, "link_mode"),
 			STPState:               topologyAttrString(row, "stp_state"),
 			VLANIDs:                topologyAttrStringSlice(row, "vlan_ids"),
+			HasFDBMACCount:         topologyAttrsHaveAny(row, "fdb_mac_count"),
 			FDBMACCount:            topologyAttrInt(row, "fdb_mac_count"),
+			HasLinkCount:           topologyAttrsHaveAny(row, "link_count"),
 			LinkCount:              topologyAttrInt(row, "link_count"),
+			HasNeighborCount:       topologyAttrsHaveAny(row, "neighbor_count"),
 			NeighborCount:          topologyAttrInt(row, "neighbor_count"),
 			Neighbors:              projectionPortNeighbors(row["neighbors"]),
 			VLANs:                  projectionPortVLANs(row["vlans"]),
@@ -347,11 +361,4 @@ func anyMapSlice(value any) ([]map[string]any, bool) {
 	default:
 		return nil, false
 	}
-}
-
-func projectionDebugString(value any) string {
-	if value == nil {
-		return ""
-	}
-	return strings.TrimSpace(fmt.Sprint(value))
 }

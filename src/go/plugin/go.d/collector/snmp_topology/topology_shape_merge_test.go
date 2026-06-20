@@ -5,6 +5,7 @@ package snmptopology
 import (
 	"testing"
 
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/stretchr/testify/require"
 )
 
@@ -75,6 +76,40 @@ func TestMergeTopologyAnyMapKeepsExistingAndAddsMissingKeys(t *testing.T) {
 	require.Equal(t, "keep", merged["existing"])
 	require.Equal(t, 42, merged["new"])
 	require.NotContains(t, merged, "")
+}
+
+func TestMergeTopologyActorDetailPreservesTypedFieldPresence(t *testing.T) {
+	merged := mergeTopologyActorDetail(
+		topologyActorDetail{
+			L2: topologyengine.ProjectionActorDetail{
+				Device: topologyengine.ProjectionDeviceActorDetail{
+					HasPortsTotal: true,
+					PortsTotal:    2,
+				},
+			},
+		},
+		topologyActorDetail{
+			L2: topologyengine.ProjectionActorDetail{
+				Device: topologyengine.ProjectionDeviceActorDetail{
+					HasPortsTotal:       true,
+					PortsTotal:          5,
+					HasCDPNeighborCount: true,
+					CDPNeighborCount:    0,
+				},
+				Segment: topologyengine.ProjectionSegmentActorDetail{
+					HasEndpointsTotal: true,
+					EndpointsTotal:    0,
+				},
+			},
+		},
+	)
+
+	require.True(t, merged.L2.Device.HasPortsTotal)
+	require.Equal(t, 2, merged.L2.Device.PortsTotal)
+	require.True(t, merged.L2.Device.HasCDPNeighborCount)
+	require.Zero(t, merged.L2.Device.CDPNeighborCount)
+	require.True(t, merged.L2.Segment.HasEndpointsTotal)
+	require.Zero(t, merged.L2.Segment.EndpointsTotal)
 }
 
 func TestTopologyLinkDeltaKeyUsesStableEndpointAndBridgeFields(t *testing.T) {

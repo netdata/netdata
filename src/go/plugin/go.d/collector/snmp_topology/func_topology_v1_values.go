@@ -59,6 +59,13 @@ func nullableOptionalUintValue(value int, ok bool) any {
 	return uint64(value)
 }
 
+func nullableOptionalUint64Value(value int64, ok bool) any {
+	if !ok || value < 0 {
+		return nil
+	}
+	return uint64(value)
+}
+
 func uintValue(value any) (uint64, bool) {
 	switch typed := value.(type) {
 	case int:

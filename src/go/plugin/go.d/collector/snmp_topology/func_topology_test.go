@@ -185,11 +185,11 @@ func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 				Detail: topologyActorDetail{
 					L2: topologyengine.ProjectionActorDetail{
 						Device: topologyengine.ProjectionDeviceActorDetail{
-							HasInventoryStats: true,
-							PortsTotal:        0,
-							LLDPNeighborCount: 0,
+							HasPortsTotal: true,
+							PortsTotal:    0,
 							Ports: []topologyengine.ProjectionPortDetail{
 								{
+									HasIfIndex:             true,
 									IfIndex:                1,
 									PortID:                 "1",
 									Name:                   "Gi0/1",
@@ -197,9 +197,11 @@ func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 									IfDescr:                "GigabitEthernet0/1",
 									IfAlias:                "uplink to sw-b",
 									MAC:                    "00:11:22:33:44:56",
+									HasSpeed:               true,
 									Speed:                  1000000000,
-									NeighborCount:          0,
 									VLANIDs:                []string{"10", "20"},
+									HasNeighborCount:       true,
+									NeighborCount:          0,
 									Duplex:                 "full",
 									LinkModeConfidence:     "high",
 									TopologyRoleConfidence: "medium",
@@ -393,6 +395,71 @@ func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 	assert.Equal(t, "selected_side_endpoint", endpointType.Presentation.Modal.Sections[0].Columns[1].Projection.Kind)
 }
 
+func TestSNMPTopologyToV1_PrefersSNMPActorDetailOverL2(t *testing.T) {
+	data := topologyData{
+		AgentID: "agent-test",
+		View:    "summary",
+		Actors: []topologyActor{
+			{
+				ActorID:   "device-a",
+				ActorType: "device",
+				Match: topologyMatch{
+					ChassisIDs: []string{"00:11:22:33:44:55"},
+					SysName:    "sw-a",
+				},
+				Detail: topologyActorDetail{
+					L2: topologyengine.ProjectionActorDetail{
+						Device: topologyengine.ProjectionDeviceActorDetail{
+							ManagementIP:  "10.0.0.1",
+							Vendor:        "L2 Vendor",
+							Capabilities:  []string{"bridge"},
+							HasPortsTotal: true,
+							PortsTotal:    24,
+						},
+					},
+					SNMP: topologySNMPActorDetail{
+						ManagementIP: "10.0.0.2",
+						Vendor:       "SNMP Vendor",
+						Capabilities: []string{"router"},
+					},
+				},
+			},
+			{
+				ActorID:   "device-b",
+				ActorType: "device",
+				Match: topologyMatch{
+					ChassisIDs: []string{"aa:bb:cc:dd:ee:ff"},
+					SysName:    "sw-b",
+				},
+				Detail: topologyActorDetail{
+					SNMP: topologySNMPActorDetail{
+						ManagementIP: "10.0.0.3",
+						Vendor:       "Peer Vendor",
+						Capabilities: []string{"bridge"},
+					},
+				},
+			},
+		},
+		Links: []topologyLink{
+			{
+				Protocol:   "lldp",
+				LinkType:   "lldp",
+				SrcActorID: "device-a",
+				DstActorID: "device-b",
+			},
+		},
+	}
+
+	payload, err := snmpTopologyToV1(data)
+	require.NoError(t, err)
+	require.NoError(t, validateTopologyV1Data(payload))
+
+	assert.Equal(t, "SNMP Vendor", topologyV1StringColumnValues(t, payload, payload.Actors, "vendor")[0])
+	assert.Equal(t, "10.0.0.2", topologyV1StringColumnValues(t, payload, payload.Actors, "management_ip")[0])
+	assert.Equal(t, []any{"router"}, topologyV1ColumnValues(t, payload.Actors, "capabilities")[0])
+	assert.Equal(t, uint64(24), topologyV1ColumnValues(t, payload.Actors, "ports_total")[0])
+}
+
 func TestSNMPTopologyToV1_UsesIfIndexAsVisiblePortID(t *testing.T) {
 	data := topologyData{
 		AgentID: "agent-test",
@@ -409,8 +476,9 @@ func TestSNMPTopologyToV1_UsesIfIndexAsVisiblePortID(t *testing.T) {
 						Device: topologyengine.ProjectionDeviceActorDetail{
 							Ports: []topologyengine.ProjectionPortDetail{
 								{
-									IfIndex: 42,
-									IfName:  "Gi0/42",
+									HasIfIndex: true,
+									IfIndex:    42,
+									IfName:     "Gi0/42",
 								},
 							},
 						},

@@ -191,7 +191,6 @@ func mergeTopologyProjectionActorDetail(dst, src topologyengine.ProjectionActorD
 }
 
 func mergeTopologyProjectionDeviceDetail(dst, src topologyengine.ProjectionDeviceActorDetail) topologyengine.ProjectionDeviceActorDetail {
-	dst.HasInventoryStats = dst.HasInventoryStats || src.HasInventoryStats
 	dst.DeviceID = firstNonEmptyString(dst.DeviceID, src.DeviceID)
 	dst.Discovered = dst.Discovered || src.Discovered
 	dst.Inferred = dst.Inferred || src.Inferred
@@ -210,17 +209,17 @@ func mergeTopologyProjectionDeviceDetail(dst, src topologyengine.ProjectionDevic
 	dst.VendorDerivedConfidence = firstNonEmptyString(dst.VendorDerivedConfidence, src.VendorDerivedConfidence)
 	dst.VendorDerivedMatchPrefix = firstNonEmptyString(dst.VendorDerivedMatchPrefix, src.VendorDerivedMatchPrefix)
 	dst.VendorMatchPrefix = firstNonEmptyString(dst.VendorMatchPrefix, src.VendorMatchPrefix)
-	dst.PortsTotal = firstNonZeroInt(dst.PortsTotal, src.PortsTotal)
+	dst.PortsTotal, dst.HasPortsTotal = firstPresentInt(dst.PortsTotal, dst.HasPortsTotal, src.PortsTotal, src.HasPortsTotal)
 	dst.IfIndexes = firstNonEmptyStringSlice(dst.IfIndexes, src.IfIndexes)
 	dst.IfNames = firstNonEmptyStringSlice(dst.IfNames, src.IfNames)
-	dst.PortsUp = firstNonZeroInt(dst.PortsUp, src.PortsUp)
-	dst.PortsDown = firstNonZeroInt(dst.PortsDown, src.PortsDown)
-	dst.PortsAdminDown = firstNonZeroInt(dst.PortsAdminDown, src.PortsAdminDown)
-	dst.TotalBandwidthBps = firstNonZeroInt64(dst.TotalBandwidthBps, src.TotalBandwidthBps)
-	dst.FDBTotalMACs = firstNonZeroInt(dst.FDBTotalMACs, src.FDBTotalMACs)
-	dst.VLANCount = firstNonZeroInt(dst.VLANCount, src.VLANCount)
-	dst.LLDPNeighborCount = firstNonZeroInt(dst.LLDPNeighborCount, src.LLDPNeighborCount)
-	dst.CDPNeighborCount = firstNonZeroInt(dst.CDPNeighborCount, src.CDPNeighborCount)
+	dst.PortsUp, dst.HasPortsUp = firstPresentInt(dst.PortsUp, dst.HasPortsUp, src.PortsUp, src.HasPortsUp)
+	dst.PortsDown, dst.HasPortsDown = firstPresentInt(dst.PortsDown, dst.HasPortsDown, src.PortsDown, src.HasPortsDown)
+	dst.PortsAdminDown, dst.HasPortsAdminDown = firstPresentInt(dst.PortsAdminDown, dst.HasPortsAdminDown, src.PortsAdminDown, src.HasPortsAdminDown)
+	dst.TotalBandwidthBps, dst.HasTotalBandwidthBps = firstPresentInt64(dst.TotalBandwidthBps, dst.HasTotalBandwidthBps, src.TotalBandwidthBps, src.HasTotalBandwidthBps)
+	dst.FDBTotalMACs, dst.HasFDBTotalMACs = firstPresentInt(dst.FDBTotalMACs, dst.HasFDBTotalMACs, src.FDBTotalMACs, src.HasFDBTotalMACs)
+	dst.VLANCount, dst.HasVLANCount = firstPresentInt(dst.VLANCount, dst.HasVLANCount, src.VLANCount, src.HasVLANCount)
+	dst.LLDPNeighborCount, dst.HasLLDPNeighborCount = firstPresentInt(dst.LLDPNeighborCount, dst.HasLLDPNeighborCount, src.LLDPNeighborCount, src.HasLLDPNeighborCount)
+	dst.CDPNeighborCount, dst.HasCDPNeighborCount = firstPresentInt(dst.CDPNeighborCount, dst.HasCDPNeighborCount, src.CDPNeighborCount, src.HasCDPNeighborCount)
 	dst.AdminStatusCounts = firstNonEmptyIntMap(dst.AdminStatusCounts, src.AdminStatusCounts)
 	dst.OperStatusCounts = firstNonEmptyIntMap(dst.OperStatusCounts, src.OperStatusCounts)
 	dst.LinkModeCounts = firstNonEmptyIntMap(dst.LinkModeCounts, src.LinkModeCounts)
@@ -259,7 +258,6 @@ func mergeTopologyProjectionEndpointDetail(dst, src topologyengine.ProjectionEnd
 }
 
 func mergeTopologyProjectionSegmentDetail(dst, src topologyengine.ProjectionSegmentActorDetail) topologyengine.ProjectionSegmentActorDetail {
-	dst.HasStats = dst.HasStats || src.HasStats
 	dst.SegmentID = firstNonEmptyString(dst.SegmentID, src.SegmentID)
 	dst.SegmentType = firstNonEmptyString(dst.SegmentType, src.SegmentType)
 	dst.ParentDevices = firstNonEmptyStringSlice(dst.ParentDevices, src.ParentDevices)
@@ -268,8 +266,8 @@ func mergeTopologyProjectionSegmentDetail(dst, src topologyengine.ProjectionSegm
 	dst.BridgePorts = firstNonEmptyStringSlice(dst.BridgePorts, src.BridgePorts)
 	dst.VLANIDs = firstNonEmptyStringSlice(dst.VLANIDs, src.VLANIDs)
 	dst.LearnedSources = firstNonEmptyStringSlice(dst.LearnedSources, src.LearnedSources)
-	dst.PortsTotal = firstNonZeroInt(dst.PortsTotal, src.PortsTotal)
-	dst.EndpointsTotal = firstNonZeroInt(dst.EndpointsTotal, src.EndpointsTotal)
+	dst.PortsTotal, dst.HasPortsTotal = firstPresentInt(dst.PortsTotal, dst.HasPortsTotal, src.PortsTotal, src.HasPortsTotal)
+	dst.EndpointsTotal, dst.HasEndpointsTotal = firstPresentInt(dst.EndpointsTotal, dst.HasEndpointsTotal, src.EndpointsTotal, src.HasEndpointsTotal)
 	dst.DesignatedPort = firstNonEmptyString(dst.DesignatedPort, src.DesignatedPort)
 	dst.SegmentKind = firstNonEmptyString(dst.SegmentKind, src.SegmentKind)
 	return dst

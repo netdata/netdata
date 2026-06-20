@@ -127,6 +127,65 @@ func TestToGraph_ProjectsResult(t *testing.T) {
 	require.Equal(t, 1, stats.EndpointsTotal)
 }
 
+func TestToGraph_ProjectsTypedActorDetailsWithFieldPresence(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:        "sw1",
+				Hostname:  "sw1",
+				ChassisID: "00:11:22:33:44:55",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
+				Labels: map[string]string{
+					"capabilities_enabled": "bridge,router",
+				},
+			},
+		},
+		Interfaces: []Interface{
+			{
+				DeviceID: "sw1",
+				IfIndex:  1,
+				IfName:   "Gi0/1",
+				IfDescr:  "GigabitEthernet0/1",
+				MAC:      "00:11:22:33:44:56",
+				Labels: map[string]string{
+					"speed_bps": "1000000000",
+					"duplex":    "full",
+				},
+			},
+		},
+	}
+
+	projection := ToGraph(result, GraphOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+	})
+
+	actor := findActorBySysName(projection.Graph.Actors, "sw1")
+	require.NotNil(t, actor)
+	detail, ok := projection.ActorDetails[actor.ActorID]
+	require.True(t, ok)
+
+	require.Equal(t, "10.0.0.1", detail.Device.ManagementIP)
+	require.Equal(t, []string{"bridge", "router"}, detail.Device.CapabilitiesEnabled)
+	require.True(t, detail.Device.HasPortsTotal)
+	require.Equal(t, 1, detail.Device.PortsTotal)
+	require.False(t, detail.Device.HasCDPNeighborCount)
+	require.Zero(t, detail.Device.CDPNeighborCount)
+	require.Len(t, detail.Device.Ports, 1)
+
+	port := detail.Device.Ports[0]
+	require.True(t, port.HasIfIndex)
+	require.Equal(t, 1, port.IfIndex)
+	require.True(t, port.HasSpeed)
+	require.EqualValues(t, 1000000000, port.Speed)
+	require.Equal(t, "full", port.Duplex)
+	require.False(t, port.HasNeighborCount)
+	require.Zero(t, port.NeighborCount)
+	require.False(t, port.HasLinkCount)
+	require.Zero(t, port.LinkCount)
+}
+
 func TestToGraph_ClassifiesPortLinkModesFromFDBAndSTPEvidence(t *testing.T) {
 	result := Result{
 		Devices: []Device{

@@ -83,13 +83,11 @@
         "capabilities": [
           "router"
         ],
-        "cdp_neighbor_count": 0,
         "chassis_ids": [
           "aa:bb:cc:00:00:02"
         ],
         "display_name": "Router A",
         "dns_names": [],
-        "fdb_total_macs": 0,
         "hostnames": [],
         "id": "router-a",
         "ip_addresses": [
@@ -97,7 +95,6 @@
           "203.0.113.1"
         ],
         "layer": "network",
-        "lldp_neighbor_count": 0,
         "mac_addresses": [],
         "management_ip": "198.51.100.1",
         "model": "ASR 1001",
@@ -108,8 +105,7 @@
         "sys_name": "router-a",
         "sys_object_id": "1.3.6.1.4.1.9.1.1745",
         "type": "router",
-        "vendor": "Cisco",
-        "vlan_count": 0
+        "vendor": "Cisco"
       },
       {
         "chassis_ids": [
@@ -915,13 +911,6 @@
             },
             {
               "actor": "router-a",
-              "key": "cdp_neighbor_count",
-              "kind": "attribute",
-              "source": "snmp-l2",
-              "value": "0"
-            },
-            {
-              "actor": "router-a",
               "key": "chassis_id",
               "kind": "match",
               "source": "snmp-l2",
@@ -941,13 +930,6 @@
               "kind": "attribute",
               "source": "snmp-l2",
               "value": "Router A"
-            },
-            {
-              "actor": "router-a",
-              "key": "fdb_total_macs",
-              "kind": "attribute",
-              "source": "snmp-l2",
-              "value": "0"
             },
             {
               "actor": "router-a",
@@ -971,13 +953,6 @@
               "kind": "identity",
               "source": "snmp-l2",
               "value": "network"
-            },
-            {
-              "actor": "router-a",
-              "key": "lldp_neighbor_count",
-              "kind": "attribute",
-              "source": "snmp-l2",
-              "value": "0"
             },
             {
               "actor": "router-a",
@@ -1072,13 +1047,6 @@
               "kind": "attribute",
               "source": "snmp-l2",
               "value": "Cisco"
-            },
-            {
-              "actor": "router-a",
-              "key": "vlan_count",
-              "kind": "attribute",
-              "source": "snmp-l2",
-              "value": "0"
             },
             {
               "actor": "router-b",
@@ -1771,11 +1739,9 @@
           "rows": [
             {
               "actor": "router-a",
-              "fdb_mac_count": 0,
               "if_alias": "to switch-a",
               "if_index": 201,
               "if_name": "Gi0/0",
-              "link_count": 0,
               "link_mode": "trunk",
               "name": "Gi0/0",
               "neighbor_actor": "switch-a",
@@ -1783,7 +1749,6 @@
               "neighbor_port_name": "Gi1/0/1",
               "oper_status": "up",
               "port_id": "Gi0/0",
-              "speed": 0,
               "topology_role": "uplink"
             },
             {
