@@ -41,19 +41,14 @@ func applySNMPTopologyShapePolicies(data *topologyData, options topologyQueryOpt
 		return topologyLinkSortKey(data.Links[i]) < topologyLinkSortKey(data.Links[j])
 	})
 
-	if data.Stats == nil {
-		data.Stats = make(map[string]any)
-	}
-	data.Stats["actors_collapsed_by_ip"] = collapsed
-	data.Stats["actors_non_ip_inferred_suppressed"] = removedNonIP
-	data.Stats["actors_map_type_suppressed"] = removedByMapType
-	data.Stats["segments_sparse_suppressed"] = removedSparseSegments
-	data.Stats["map_type"] = options.MapType
+	data.Stats.Shape.ActorsCollapsedByIP = collapsed
+	data.Stats.Shape.ActorsNonIPInferredSuppressed = removedNonIP
+	data.Stats.Shape.ActorsMapTypeSuppressed = removedByMapType
+	data.Stats.Shape.SegmentsSparseSuppressed = removedSparseSegments
+	data.Stats.Shape.MapType = options.MapType
 	if strategy := normalizeTopologyInferenceStrategy(options.InferenceStrategy); strategy != "" {
-		data.Stats["inference_strategy"] = strategy
+		data.Stats.Shape.InferenceStrategy = strategy
 	}
-	if removedSparseSegments > 0 {
-		data.Stats["segments_suppressed"] = intStatValue(data.Stats["segments_suppressed"]) + removedSparseSegments
-	}
+	data.Stats.HasShape = true
 	recomputeTopologyLinkStats(data)
 }

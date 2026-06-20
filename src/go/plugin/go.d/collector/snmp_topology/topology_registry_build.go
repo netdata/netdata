@@ -106,7 +106,7 @@ func buildSNMPL2TopologyData(
 		return topologyData{}, false
 	}
 
-	data := topologyengine.ToGraph(result, topologyengine.GraphOptions{
+	graphData, stats := topologyengine.ToGraph(result, topologyengine.GraphOptions{
 		SchemaVersion:             topologySchemaVersion,
 		Source:                    "snmp",
 		Layer:                     "2",
@@ -120,5 +120,19 @@ func buildSNMPL2TopologyData(
 		ProbabilisticConnectivity: isTopologyMapTypeProbable(options.MapType),
 		InferenceStrategy:         options.InferenceStrategy,
 	})
+	data := topologyData{
+		SchemaVersion: graphData.SchemaVersion,
+		Source:        graphData.Source,
+		Layer:         graphData.Layer,
+		AgentID:       graphData.AgentID,
+		CollectedAt:   graphData.CollectedAt,
+		View:          graphData.View,
+		Actors:        graphData.Actors,
+		Links:         graphData.Links,
+		Stats: topologyStats{
+			L2:    stats,
+			HasL2: true,
+		},
+	}
 	return data, true
 }

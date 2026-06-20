@@ -173,11 +173,11 @@ func TestRecordTopologyFocusStatsNormalizesDepthAndFilteredCounts(t *testing.T) 
 		Depth:              topologyDepthAllInternal,
 	}, 5, 4)
 
-	require.Equal(t, "ip:10.0.0.1", data.Stats["managed_snmp_device_focus"])
-	require.Equal(t, topologyDepthAll, data.Stats["depth"])
-	require.Equal(t, 3, data.Stats["actors_focus_depth_filtered"])
-	require.Equal(t, 3, data.Stats["links_focus_depth_filtered"])
-	require.Equal(t, len(data.Links), intStatValue(data.Stats["links_total"]))
+	require.Equal(t, "ip:10.0.0.1", topologyStatsToV1(data.Stats)["managed_snmp_device_focus"])
+	require.Equal(t, topologyDepthAll, topologyStatsToV1(data.Stats)["depth"])
+	require.Equal(t, 3, topologyStatsToV1(data.Stats)["actors_focus_depth_filtered"])
+	require.Equal(t, 3, topologyStatsToV1(data.Stats)["links_focus_depth_filtered"])
+	require.Equal(t, len(data.Links), intStatValue(topologyStatsToV1(data.Stats)["links_total"]))
 }
 
 func TestRecordTopologyFocusAllDevicesStatsKeepsAllDepth(t *testing.T) {
@@ -191,9 +191,9 @@ func TestRecordTopologyFocusAllDevicesStatsKeepsAllDepth(t *testing.T) {
 		ManagedDeviceFocus: topologyManagedFocusAllDevices,
 	})
 
-	require.Equal(t, topologyManagedFocusAllDevices, data.Stats["managed_snmp_device_focus"])
-	require.Equal(t, topologyDepthAll, data.Stats["depth"])
-	require.Equal(t, 0, data.Stats["actors_focus_depth_filtered"])
-	require.Equal(t, 0, data.Stats["links_focus_depth_filtered"])
-	require.Equal(t, len(data.Links), intStatValue(data.Stats["links_total"]))
+	require.Equal(t, topologyManagedFocusAllDevices, topologyStatsToV1(data.Stats)["managed_snmp_device_focus"])
+	require.Equal(t, topologyDepthAll, topologyStatsToV1(data.Stats)["depth"])
+	require.Equal(t, 0, topologyStatsToV1(data.Stats)["actors_focus_depth_filtered"])
+	require.Equal(t, 0, topologyStatsToV1(data.Stats)["links_focus_depth_filtered"])
+	require.Equal(t, len(data.Links), intStatValue(topologyStatsToV1(data.Stats)["links_total"]))
 }

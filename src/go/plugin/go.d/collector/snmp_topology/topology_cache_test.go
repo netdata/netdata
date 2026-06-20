@@ -425,8 +425,8 @@ func TestTopologyCache_SnapshotBidirectionalPairMetadata(t *testing.T) {
 	require.Equal(t, "lldp", link.Protocol)
 	require.Equal(t, "bidirectional", link.Direction)
 	require.Equal(t, true, link.Metrics["pair_consistent"])
-	require.Equal(t, 1, data.Stats["links_bidirectional"])
-	require.Equal(t, 0, data.Stats["links_unidirectional"])
+	require.Equal(t, 1, topologyStatsToV1(data.Stats)["links_bidirectional"])
+	require.Equal(t, 0, topologyStatsToV1(data.Stats)["links_unidirectional"])
 }
 
 func TestTopologyCache_SnapshotMergesRemoteIdentityAcrossProtocols(t *testing.T) {

@@ -476,20 +476,39 @@ func snmpTopologyV1GoldenInput() topologyData {
 				},
 			},
 		},
-		Stats: map[string]any{
-			"actors_collapsed_by_ip":     uint64(1),
-			"actors_map_type_suppressed": uint64(2),
-			"actors_total":               uint64(5),
-			"bgp_adjacency_visible":      uint64(1),
-			"custom_debug_stat":          "kept",
-			"depth":                      topologyDepthAll,
-			"l3_subnet_visible_links":    uint64(1),
-			"links_total":                uint64(5),
-			"map_type":                   topologyMapTypeHighConfidenceInferred,
-			"ospf_adjacency_visible":     uint64(1),
-			"probable_visible_links":     uint64(1),
-			"renderer_stats_are_open":    true,
-			"suppressed_duplicate_link":  uint64(0),
+		Stats: topologyStats{
+			Shape: topologyShapeStats{
+				ActorsCollapsedByIP:     1,
+				ActorsMapTypeSuppressed: 2,
+				MapType:                 topologyMapTypeHighConfidenceInferred,
+			},
+			HasShape: true,
+			Focus: topologyFocusStats{
+				ManagedSNMPDeviceFocus: topologyManagedFocusAllDevices,
+				Depth:                  topologyFocusDepth{All: true},
+			},
+			HasFocus: true,
+			L3: topologyL3EnrichmentStats{
+				emittedLinks: 1,
+			},
+			HasL3: true,
+			OSPF: topologyOSPFEnrichmentStats{
+				emittedLinks: 1,
+			},
+			HasOSPF: true,
+			BGP: topologyBGPEnrichmentStats{
+				emittedLinks: 1,
+			},
+			HasBGP: true,
+			Recomputed: topologyRecomputedStats{
+				ActorsTotal:               5,
+				LinksTotal:                5,
+				LinksProbable:             1,
+				L3SubnetVisibleLinks:      1,
+				OSPFAdjacencyVisibleLinks: 1,
+				BGPAdjacencyVisibleLinks:  1,
+			},
+			HasComputed: true,
 		},
 	}
 }

@@ -27,8 +27,9 @@ func TestApplySNMPTopologyShapePolicies_EmitsStatsContractKeys(t *testing.T) {
 		MapType:                topologyMapTypeHighConfidenceInferred,
 	})
 
-	keys := make([]string, 0, len(data.Stats))
-	for key := range data.Stats {
+	stats := topologyStatsToV1(data.Stats)
+	keys := make([]string, 0, len(stats))
+	for key := range stats {
 		keys = append(keys, key)
 	}
 	require.ElementsMatch(t, []string{
@@ -58,20 +59,20 @@ func TestApplySNMPTopologyShapePolicies_EmitsStatsContractKeys(t *testing.T) {
 	}
 	for name, tc := range expectedStats {
 		t.Run("stat/"+name, func(t *testing.T) {
-			require.Equal(t, tc.want, data.Stats[tc.key])
+			require.Equal(t, tc.want, topologyStatsToV1(data.Stats)[tc.key])
 		})
 	}
 }
 
 func TestRecomputeTopologyLinkStatsRefreshesExistingLogicalL3VisibleCounts(t *testing.T) {
 	data := &topologyData{
-		Stats: map[string]any{
-			"l3_subnet_emitted_links":      2,
-			"ospf_adjacency_emitted_links": 1,
-			"bgp_adjacency_emitted_links":  1,
-			"l3_subnet_visible_links":      2,
-			"ospf_adjacency_visible_links": 1,
-			"bgp_adjacency_visible_links":  1,
+		Stats: topologyStats{
+			L3:      topologyL3EnrichmentStats{emittedLinks: 2},
+			HasL3:   true,
+			OSPF:    topologyOSPFEnrichmentStats{emittedLinks: 1},
+			HasOSPF: true,
+			BGP:     topologyBGPEnrichmentStats{emittedLinks: 1},
+			HasBGP:  true,
 		},
 		Links: []topologyLink{
 			{Protocol: topologyL3SubnetLinkType, LinkType: topologyL3SubnetLinkType},
@@ -96,7 +97,7 @@ func TestRecomputeTopologyLinkStatsRefreshesExistingLogicalL3VisibleCounts(t *te
 	}
 	for name, tc := range expectedStats {
 		t.Run("stat/"+name, func(t *testing.T) {
-			require.Equal(t, tc.want, data.Stats[tc.key])
+			require.Equal(t, tc.want, topologyStatsToV1(data.Stats)[tc.key])
 		})
 	}
 }

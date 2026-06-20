@@ -41,7 +41,7 @@ type graphBuilder struct {
 	unlinkedSuppressed int
 	linkCounts         topologyLinkCounts
 	probableLinks      int
-	stats              map[string]any
+	stats              ProjectionStats
 }
 
 func newGraphBuilder(result Result, opts GraphOptions) *graphBuilder {
@@ -259,30 +259,29 @@ func (b *graphBuilder) finalizeGraph() {
 }
 
 func (b *graphBuilder) buildStats() {
-	b.stats = cloneAnyMap(b.result.Stats)
-	if b.stats == nil {
-		b.stats = make(map[string]any)
-	}
+	b.stats = ProjectionStats{
+		ResultStats: b.result.Stats,
 
-	b.stats["devices_total"] = len(b.result.Devices)
-	b.stats["devices_discovered"] = discoveredDeviceCount(b.result.Devices, b.opts.LocalDeviceID)
-	b.stats["links_total"] = len(b.links)
-	b.stats["links_lldp"] = b.linkCounts.lldp
-	b.stats["links_cdp"] = b.linkCounts.cdp
-	b.stats["links_bidirectional"] = b.linkCounts.bidirectional
-	b.stats["links_unidirectional"] = b.linkCounts.unidirectional
-	b.stats["links_fdb"] = b.linkCounts.fdb
-	b.stats["links_fdb_endpoint_candidates"] = b.segmentProjection.endpointLinksCandidates
-	b.stats["links_fdb_endpoint_emitted"] = b.segmentProjection.endpointLinksEmitted
-	b.stats["links_fdb_endpoint_suppressed"] = b.segmentProjection.endpointLinksSuppressed
-	b.stats["endpoints_ambiguous_segments"] = b.segmentProjection.endpointsWithAmbiguousSegment
-	b.stats["links_arp"] = b.linkCounts.arp
-	b.stats["links_probable"] = b.probableLinks
-	b.stats["segments_suppressed"] = b.segmentSuppressed
-	b.stats["actors_total"] = len(b.actors)
-	b.stats["actors_unlinked_suppressed"] = b.unlinkedSuppressed
-	b.stats["endpoints_total"] = b.endpointActors.count
-	b.stats["inference_strategy"] = b.strategyConfig.id
+		DevicesDiscovered:          discoveredDeviceCount(b.result.Devices, b.opts.LocalDeviceID),
+		LinksBidirectional:         b.linkCounts.bidirectional,
+		LinksUnidirectional:        b.linkCounts.unidirectional,
+		LinksFDB:                   b.linkCounts.fdb,
+		LinksFDBEndpointCandidates: b.segmentProjection.endpointLinksCandidates,
+		LinksFDBEndpointEmitted:    b.segmentProjection.endpointLinksEmitted,
+		LinksFDBEndpointSuppressed: b.segmentProjection.endpointLinksSuppressed,
+		EndpointsAmbiguousSegments: b.segmentProjection.endpointsWithAmbiguousSegment,
+		LinksARP:                   b.linkCounts.arp,
+		LinksProbable:              b.probableLinks,
+		SegmentsSuppressed:         b.segmentSuppressed,
+		ActorsTotal:                len(b.actors),
+		ActorsUnlinkedSuppressed:   b.unlinkedSuppressed,
+		InferenceStrategy:          b.strategyConfig.id,
+	}
+	b.stats.DevicesTotal = len(b.result.Devices)
+	b.stats.LinksTotal = len(b.links)
+	b.stats.LinksLLDP = b.linkCounts.lldp
+	b.stats.LinksCDP = b.linkCounts.cdp
+	b.stats.EndpointsTotal = b.endpointActors.count
 }
 
 func (b *graphBuilder) graph() graph.Graph {
@@ -295,6 +294,5 @@ func (b *graphBuilder) graph() graph.Graph {
 		View:          b.view,
 		Actors:        b.actors,
 		Links:         b.links,
-		Stats:         b.stats,
 	}
 }

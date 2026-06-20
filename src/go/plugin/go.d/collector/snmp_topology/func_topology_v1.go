@@ -133,7 +133,7 @@ func snmpTopologyToV1(data topologyData) (topologyv1.Data, error) {
 		Actors:       actorRows,
 		Links:        linkRows,
 		Evidence:     evidenceSections,
-		Stats:        cloneAnyMapForTopologyV1(data.Stats),
+		Stats:        topologyStatsToV1(data.Stats),
 	}
 	if payload.CollectedAt.IsZero() {
 		payload.CollectedAt = time.Now().UTC()

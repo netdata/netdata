@@ -220,15 +220,6 @@ func recordTopologyOSPFEnrichmentStats(data *topologyData, stats topologyOSPFEnr
 	if data == nil {
 		return
 	}
-	if data.Stats == nil {
-		data.Stats = make(map[string]any)
-	}
-	data.Stats["ospf_neighbor_rows"] = stats.observedRows
-	data.Stats["ospf_neighbor_detail_rows"] = stats.attachedNeighborRows
-	data.Stats["ospf_adjacency_emitted_links"] = stats.emittedLinks
-	data.Stats["ospf_adjacency_suppressed_non_full_state"] = stats.suppressedNonFullState
-	data.Stats["ospf_adjacency_suppressed_unresolved_local"] = stats.suppressedUnresolvedLocal
-	data.Stats["ospf_adjacency_suppressed_unresolved_neighbor"] = stats.suppressedUnresolvedNeighbor
-	data.Stats["ospf_adjacency_suppressed_self_actor"] = stats.suppressedSelfActor
-	data.Stats["ospf_adjacency_suppressed_duplicate_link"] = stats.suppressedDuplicateLink
+	data.Stats.OSPF = stats
+	data.Stats.HasOSPF = true
 }

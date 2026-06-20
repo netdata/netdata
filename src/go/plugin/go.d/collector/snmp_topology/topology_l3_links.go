@@ -157,19 +157,6 @@ func recordTopologyL3EnrichmentStats(data *topologyData, stats topologyL3Enrichm
 	if data == nil {
 		return
 	}
-	if data.Stats == nil {
-		data.Stats = make(map[string]any)
-	}
-	data.Stats["l3_subnet_candidate_subnets"] = stats.subnetStats.candidateSubnets
-	data.Stats["l3_subnet_candidate_links"] = stats.subnetStats.candidateLinks
-	data.Stats["l3_subnet_emitted_links"] = stats.emittedLinks
-	data.Stats["l3_subnet_suppressed_invalid"] = stats.subnetStats.suppressedInvalid
-	data.Stats["l3_subnet_suppressed_unsupported_prefix"] = stats.subnetStats.suppressedUnsupportedPrefix
-	data.Stats["l3_subnet_suppressed_duplicate_ip"] = stats.subnetStats.suppressedDuplicateIP
-	data.Stats["l3_subnet_suppressed_self_link"] = stats.subnetStats.suppressedSelfLink
-	data.Stats["l3_subnet_suppressed_unmatched"] = stats.subnetStats.suppressedUnmatched
-	data.Stats["l3_subnet_suppressed_multi_access"] = stats.subnetStats.suppressedMultiAccess
-	data.Stats["l3_subnet_suppressed_unresolved_actor"] = stats.suppressedUnresolvedActor
-	data.Stats["l3_subnet_suppressed_self_actor"] = stats.suppressedSelfActor
-	data.Stats["l3_subnet_suppressed_duplicate_link"] = stats.suppressedDuplicateLink
+	data.Stats.L3 = stats
+	data.Stats.HasL3 = true
 }

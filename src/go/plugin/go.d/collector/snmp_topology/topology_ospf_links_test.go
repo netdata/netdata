@@ -30,10 +30,10 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentEmitsFullManagedLink(t *testing.T) 
 	require.Equal(t, "full", link.State)
 	require.Equal(t, "1.1.1.1", link.Src.Attributes["router_id"])
 	require.Equal(t, "2.2.2.2", link.Dst.Attributes["router_id"])
-	require.Equal(t, 1, data.Stats["ospf_neighbor_rows"])
-	require.Equal(t, 1, data.Stats["ospf_neighbor_detail_rows"])
-	require.Equal(t, 1, data.Stats["ospf_adjacency_emitted_links"])
-	require.Equal(t, 1, data.Stats["ospf_adjacency_visible_links"])
+	require.Equal(t, 1, topologyStatsToV1(data.Stats)["ospf_neighbor_rows"])
+	require.Equal(t, 1, topologyStatsToV1(data.Stats)["ospf_neighbor_detail_rows"])
+	require.Equal(t, 1, topologyStatsToV1(data.Stats)["ospf_adjacency_emitted_links"])
+	require.Equal(t, 1, topologyStatsToV1(data.Stats)["ospf_adjacency_visible_links"])
 	require.Len(t, data.Actors[0].Tables["ospf_neighbors"], 1)
 	require.Equal(t, "router-b", data.Actors[0].Tables["ospf_neighbors"][0]["remote_actor_id"])
 }
@@ -133,7 +133,7 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsSuppressedNeighborsAsDetailOnl
 				require.NotContains(t, row, "remote_actor_id")
 			}
 			if tc.wantSuppressedStatsCounter != "" {
-				require.Equal(t, 1, tc.data.Stats[tc.wantSuppressedStatsCounter])
+				require.Equal(t, 1, topologyStatsToV1(tc.data.Stats)[tc.wantSuppressedStatsCounter])
 			}
 		})
 	}
@@ -180,8 +180,9 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsMatchingL3SubnetEdge(t *testin
 		},
 	}
 	data := topologyData{
-		Stats: map[string]any{
-			"l3_subnet_emitted_links": 1,
+		Stats: topologyStats{
+			L3:    topologyL3EnrichmentStats{emittedLinks: 1},
+			HasL3: true,
 		},
 		Actors: []topologyActor{
 			topologyOSPFManagedActorForTest("router-a", "device-a", "1.1.1.1", "198.51.100.1"),
@@ -201,8 +202,8 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsMatchingL3SubnetEdge(t *testin
 	require.Len(t, data.Links, 2)
 	require.Equal(t, 1, countTopologyLinksByType(data.Links, topologyL3SubnetLinkType))
 	require.Equal(t, 1, countTopologyLinksByType(data.Links, topologyOSPFAdjacencyLinkType))
-	require.Equal(t, 1, data.Stats["l3_subnet_visible_links"])
-	require.Equal(t, 1, data.Stats["ospf_adjacency_visible_links"])
+	require.Equal(t, 1, topologyStatsToV1(data.Stats)["l3_subnet_visible_links"])
+	require.Equal(t, 1, topologyStatsToV1(data.Stats)["ospf_adjacency_visible_links"])
 }
 
 func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsUnrelatedL3SubnetEdge(t *testing.T) {
@@ -223,8 +224,9 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsUnrelatedL3SubnetEdge(t *testi
 		},
 	}
 	data := topologyData{
-		Stats: map[string]any{
-			"l3_subnet_emitted_links": 1,
+		Stats: topologyStats{
+			L3:    topologyL3EnrichmentStats{emittedLinks: 1},
+			HasL3: true,
 		},
 		Actors: []topologyActor{
 			topologyOSPFManagedActorForTest("router-a", "device-a", "1.1.1.1", "198.51.100.1"),
@@ -247,8 +249,8 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsUnrelatedL3SubnetEdge(t *testi
 	require.Len(t, data.Links, 2)
 	require.Equal(t, 1, countTopologyLinksByType(data.Links, topologyL3SubnetLinkType))
 	require.Equal(t, 1, countTopologyLinksByType(data.Links, topologyOSPFAdjacencyLinkType))
-	require.Equal(t, 1, data.Stats["l3_subnet_visible_links"])
-	require.Equal(t, 1, data.Stats["ospf_adjacency_visible_links"])
+	require.Equal(t, 1, topologyStatsToV1(data.Stats)["l3_subnet_visible_links"])
+	require.Equal(t, 1, topologyStatsToV1(data.Stats)["ospf_adjacency_visible_links"])
 }
 
 func TestApplyTopologyOSPFAdjacencyEnrichmentResolvesUnnumberedNeighborByRouterID(t *testing.T) {
