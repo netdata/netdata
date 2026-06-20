@@ -396,6 +396,18 @@
 - Chore(snmp-topology): rename graph shaping layer ([#22776](https://github.com/netdata/netdata/issues/22776))
 - Chore(go.d/snmp_topology): make collection cache explicit ([#22777](https://github.com/netdata/netdata/issues/22777))
 - Fix(journal-log-writer): accept only absolute journal directory paths. ([#22771](https://github.com/netdata/netdata/issues/22771))
+- Docs: Explain dbengine retention chart space and time percentages per ([#22676](https://github.com/netdata/netdata/issues/22676))
+- Docs: Add missing stock alerts troubleshooting to health README ([#22677](https://github.com/netdata/netdata/issues/22677))
+- Docs: Clarify statsd config scope vs Cloud aggregation ([#22689](https://github.com/netdata/netdata/issues/22689))
+- Feat(go.d/snmp_topology): add l3 subnet adjacency ([#22780](https://github.com/netdata/netdata/issues/22780))
+- Netdata Claim (adjust installer) ([#22754](https://github.com/netdata/netdata/issues/22754))
+- Feat(go.d/snmp-topology): add OSPF topology adjacencies ([#22783](https://github.com/netdata/netdata/issues/22783))
+- Chore(go.d/snmp_topology): table-drive topology tests ([#22788](https://github.com/netdata/netdata/issues/22788))
+- Replace vendored SQLite amalgamation with build-time generation. ([#21779](https://github.com/netdata/netdata/issues/21779))
+- Feat(plugins.d): add FUNCTION_DEL protocol command ([#21685](https://github.com/netdata/netdata/issues/21685))
+- Update systemd journal SDK host integration ([#22785](https://github.com/netdata/netdata/issues/22785))
+- Pulse: per-child streaming charts on parents + lock-free host status ([#22784](https://github.com/netdata/netdata/issues/22784))
+- Feat(go.d/snmp_topology): add BGP adjacency links ([#22790](https://github.com/netdata/netdata/issues/22790))
 
 ## [2.10.0] - 2026-04-09
 
