@@ -18,6 +18,10 @@ func pruneNilAttributes(attrs map[string]any) map[string]any {
 			if len(vv) == 0 {
 				delete(attrs, k)
 			}
+		case []map[string]any:
+			if len(vv) == 0 {
+				delete(attrs, k)
+			}
 		case []topologyManagementAddress:
 			if len(vv) == 0 {
 				delete(attrs, k)

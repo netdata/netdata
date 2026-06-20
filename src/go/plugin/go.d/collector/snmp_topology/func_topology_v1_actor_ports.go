@@ -286,7 +286,7 @@ func buildSNMPTopologyV1ActorPortsTable(
 		linkCounts[i] = nullableUintValue(row.values["link_count"])
 		neighborCounts[i] = nullableUintValue(row.values["neighbor_count"])
 		if neighborCounts[i] == nil {
-			if values, ok := anyMapSlice(row.values["neighbors"]); ok {
+			if values, ok := anyMapSlice(row.values["neighbors"]); ok && len(values) > 0 {
 				neighborCounts[i] = uint64(len(values))
 			}
 		}

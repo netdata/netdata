@@ -455,6 +455,65 @@ func TestSNMPTopologyToV1_PrefersSNMPActorDetailOverL2(t *testing.T) {
 	assert.Equal(t, uint64(24), topologyV1ColumnValues(t, payload.Actors, "ports_total")[0])
 }
 
+func TestSNMPTopologyToV1_OmitsNeighborCountForEmptyNeighborList(t *testing.T) {
+	data := topologyData{
+		AgentID: "agent-test",
+		View:    "summary",
+		Actors: []topologyActor{
+			{
+				ActorID:   "device-a",
+				ActorType: "device",
+				Match: topologyMatch{
+					SysName: "sw-a",
+				},
+				Detail: topologyActorDetail{
+					L2: topologyengine.ProjectionActorDetail{
+						Device: topologyengine.ProjectionDeviceActorDetail{
+							Ports: []topologyengine.ProjectionPortDetail{
+								{
+									IfIndex:   topologyengine.OptionalValue[int]{Value: 42, Has: true},
+									IfName:    "Gi0/42",
+									Neighbors: []topologyengine.ProjectionPortNeighbor{},
+								},
+							},
+						},
+					},
+				},
+			},
+			{
+				ActorID:   "device-b",
+				ActorType: "device",
+				Match: topologyMatch{
+					SysName: "sw-b",
+				},
+			},
+		},
+		Links: []topologyLink{
+			{
+				Protocol:   "lldp",
+				LinkType:   "lldp",
+				SrcActorID: "device-a",
+				DstActorID: "device-b",
+				Src: topologyLinkEndpoint{
+					Attributes: map[string]any{"if_index": uint64(42), "if_name": "Gi0/42"},
+				},
+				Dst: topologyLinkEndpoint{
+					Attributes: map[string]any{"if_name": "Gi0/1"},
+				},
+			},
+		},
+	}
+
+	payload, err := snmpTopologyToV1(data)
+	require.NoError(t, err)
+	require.NoError(t, validateTopologyV1Data(payload))
+	require.NotNil(t, payload.Tables)
+
+	portTable := payload.Tables.Actor["actor_ports"].Table
+	assert.Equal(t, []any{nil}, topologyV1ColumnValues(t, portTable, "neighbor_count"))
+	assert.Equal(t, []any{nil}, topologyV1ColumnValues(t, portTable, "neighbors"))
+}
+
 func TestSNMPTopologyToV1_UsesIfIndexAsVisiblePortID(t *testing.T) {
 	data := topologyData{
 		AgentID: "agent-test",

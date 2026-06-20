@@ -1745,7 +1745,6 @@
               "link_mode": "trunk",
               "name": "Gi0/0",
               "neighbor_actor": "switch-a",
-              "neighbor_count": 0,
               "neighbor_port_name": "Gi1/0/1",
               "oper_status": "up",
               "port_id": "Gi0/0",
