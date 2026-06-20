@@ -11,8 +11,6 @@ type topologyActor = graph.Actor
 type topologyMatch = graph.Match
 type topologyLink = graph.Link
 type topologyLinkEndpoint = graph.LinkEndpoint
-type topologyFlow = graph.Flow
-type topologyIPPolicy = graph.IPPolicy
 
 type topologyManagementAddress struct {
 	Address     string `json:"address"`

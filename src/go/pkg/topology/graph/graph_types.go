@@ -29,7 +29,6 @@ type Actor struct {
 	Match       Match                       `json:"match"`
 	ParentMatch *Match                      `json:"parent_match,omitempty"`
 	Attributes  map[string]any              `json:"attributes,omitempty"`
-	Derived     map[string]any              `json:"derived,omitempty"`
 	Labels      map[string]string           `json:"labels,omitempty"`
 	Tables      map[string][]map[string]any `json:"tables,omitempty"`
 }
@@ -54,34 +53,6 @@ type Link struct {
 	Metrics      map[string]any `json:"metrics,omitempty"`
 }
 
-type FlowExporter struct {
-	IP           string `json:"ip,omitempty"`
-	Name         string `json:"name,omitempty"`
-	SamplingRate int    `json:"sampling_rate,omitempty"`
-	FlowVersion  string `json:"flow_version,omitempty"`
-}
-
-type Flow struct {
-	Timestamp   time.Time      `json:"timestamp"`
-	DurationSec int            `json:"duration_sec,omitempty"`
-	Exporter    *FlowExporter  `json:"exporter,omitempty"`
-	Src         LinkEndpoint   `json:"src"`
-	Dst         LinkEndpoint   `json:"dst"`
-	Key         map[string]any `json:"key,omitempty"`
-	Metrics     map[string]any `json:"metrics,omitempty"`
-}
-
-type LiveTopN struct {
-	Enabled bool   `json:"enabled,omitempty"`
-	Limit   int    `json:"limit,omitempty"`
-	SortBy  string `json:"sort_by,omitempty"`
-}
-
-type IPPolicy struct {
-	PublicAllowlist []string  `json:"public_allowlist,omitempty"`
-	LiveTopN        *LiveTopN `json:"live_top_n,omitempty"`
-}
-
 type Graph struct {
 	SchemaVersion string         `json:"schema_version"`
 	Source        string         `json:"source,omitempty"`
@@ -89,10 +60,7 @@ type Graph struct {
 	AgentID       string         `json:"agent_id"`
 	CollectedAt   time.Time      `json:"collected_at"`
 	View          string         `json:"view,omitempty"`
-	IPPolicy      *IPPolicy      `json:"ip_policy,omitempty"`
 	Actors        []Actor        `json:"actors,omitempty"`
 	Links         []Link         `json:"links,omitempty"`
-	Flows         []Flow         `json:"flows,omitempty"`
 	Stats         map[string]any `json:"stats,omitempty"`
-	Metrics       map[string]any `json:"metrics,omitempty"`
 }

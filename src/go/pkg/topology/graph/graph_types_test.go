@@ -19,10 +19,6 @@ func TestGraphJSONShape(t *testing.T) {
 		AgentID:       "agent-id",
 		CollectedAt:   tm,
 		View:          "summary",
-		IPPolicy: &IPPolicy{
-			PublicAllowlist: []string{"10.0.0.0/8"},
-			LiveTopN:        &LiveTopN{Enabled: true, Limit: 10, SortBy: "bytes"},
-		},
 		Actors: []Actor{{
 			ActorID:   "actor-a",
 			ActorType: "router",
@@ -46,7 +42,6 @@ func TestGraphJSONShape(t *testing.T) {
 			},
 			ParentMatch: &Match{SysName: "parent"},
 			Attributes:  map[string]any{"role": "core"},
-			Derived:     map[string]any{"score": float64(1)},
 			Labels:      map[string]string{"site": "lab"},
 			Tables:      map[string][]map[string]any{"ports": {{"if_name": "eth0"}}},
 		}},
@@ -64,17 +59,7 @@ func TestGraphJSONShape(t *testing.T) {
 			LastSeen:     &tm,
 			Metrics:      map[string]any{"cost": float64(10)},
 		}},
-		Flows: []Flow{{
-			Timestamp:   tm,
-			DurationSec: 60,
-			Exporter:    &FlowExporter{IP: "10.0.0.1", Name: "router-a", SamplingRate: 1000, FlowVersion: "v9"},
-			Src:         LinkEndpoint{Match: Match{IPAddresses: []string{"10.0.0.10"}}},
-			Dst:         LinkEndpoint{Match: Match{IPAddresses: []string{"10.0.0.20"}}},
-			Key:         map[string]any{"protocol": "tcp"},
-			Metrics:     map[string]any{"bytes": float64(42)},
-		}},
-		Stats:   map[string]any{"links": float64(1)},
-		Metrics: map[string]any{"refresh": float64(1)},
+		Stats: map[string]any{"links": float64(1)},
 	}
 
 	bs, err := json.Marshal(payload)
@@ -87,10 +72,6 @@ func TestGraphJSONShape(t *testing.T) {
 		"agent_id":"agent-id",
 		"collected_at":"2026-06-20T08:09:10Z",
 		"view":"summary",
-		"ip_policy":{
-			"public_allowlist":["10.0.0.0/8"],
-			"live_top_n":{"enabled":true,"limit":10,"sort_by":"bytes"}
-		},
 		"actors":[{
 			"actor_id":"actor-a",
 			"actor_type":"router",
@@ -114,7 +95,6 @@ func TestGraphJSONShape(t *testing.T) {
 			},
 			"parent_match":{"sys_name":"parent"},
 			"attributes":{"role":"core"},
-			"derived":{"score":1},
 			"labels":{"site":"lab"},
 			"tables":{"ports":[{"if_name":"eth0"}]}
 		}],
@@ -132,16 +112,6 @@ func TestGraphJSONShape(t *testing.T) {
 			"last_seen":"2026-06-20T08:09:10Z",
 			"metrics":{"cost":10}
 		}],
-		"flows":[{
-			"timestamp":"2026-06-20T08:09:10Z",
-			"duration_sec":60,
-			"exporter":{"ip":"10.0.0.1","name":"router-a","sampling_rate":1000,"flow_version":"v9"},
-			"src":{"match":{"ip_addresses":["10.0.0.10"]}},
-			"dst":{"match":{"ip_addresses":["10.0.0.20"]}},
-			"key":{"protocol":"tcp"},
-			"metrics":{"bytes":42}
-		}],
-		"stats":{"links":1},
-		"metrics":{"refresh":1}
+		"stats":{"links":1}
 	}`, string(bs))
 }
