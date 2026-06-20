@@ -115,17 +115,6 @@ func (c *topologyCache) snapshotBGPPeers(localDeviceID string) []topologyBGPPeer
 	return rows
 }
 
-func normalizeBGPRouterID(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return ""
-	}
-	if ip := normalizeNonUnspecifiedIPAddress(value); ip != "" {
-		return ip
-	}
-	return value
-}
-
 func topologyBGPAdminStatus(row ddsnmp.BGPRow) string {
 	if !row.Admin.Enabled.Has {
 		return ""

@@ -18,14 +18,12 @@ type topologyOSPFEnrichmentStats struct {
 	suppressedUnresolvedNeighbor int
 	suppressedSelfActor          int
 	suppressedDuplicateLink      int
-	suppressedL3SubnetOverlap    int
 }
 
 func applyTopologyOSPFAdjacencyEnrichment(data *topologyData, aggregate topologyObservationAggregate) topologyOSPFEnrichmentStats {
 	var stats topologyOSPFEnrichmentStats
 	if data == nil || len(aggregate.ospfNeighbors) == 0 {
-		recordTopologyOSPFEnrichmentStats(data, stats)
-		return stats
+		return finishTopologyOSPFAdjacencyEnrichment(data, stats)
 	}
 
 	resolver := newTopologyL3ActorResolver(data, aggregate.snapshots)
@@ -35,7 +33,7 @@ func applyTopologyOSPFAdjacencyEnrichment(data *topologyData, aggregate topology
 	for _, row := range aggregate.ospfNeighbors {
 		stats.observedRows++
 		localRef, localOK := resolver.resolveDeviceID(row.DeviceID)
-		remoteRef, remoteOK := resolver.resolveOSPFNeighbor(row)
+		remoteRef, remoteOK := resolver.resolveRouterEndpoint(row.NeighborRouterID, row.NeighborIP)
 		if localOK {
 			modalRow := topologyOSPFNeighborActorRow(row)
 			if remoteOK {
@@ -70,15 +68,18 @@ func applyTopologyOSPFAdjacencyEnrichment(data *topologyData, aggregate topology
 			continue
 		}
 		seen[key] = struct{}{}
-		stats.suppressedL3SubnetOverlap += suppressMatchingTopologyL3SubnetLinks(data, link)
 		data.Links = append(data.Links, link)
 		stats.emittedLinks++
 	}
 
-	attachTopologyOSPFNeighborRows(data, neighborRowsByActor)
+	attachTopologyActorTableRows(data, "ospf_neighbors", neighborRowsByActor, sortTopologyOSPFNeighborRows)
 	sort.Slice(data.Links, func(i, j int) bool {
 		return topologyLinkSortKey(data.Links[i]) < topologyLinkSortKey(data.Links[j])
 	})
+	return finishTopologyOSPFAdjacencyEnrichment(data, stats)
+}
+
+func finishTopologyOSPFAdjacencyEnrichment(data *topologyData, stats topologyOSPFEnrichmentStats) topologyOSPFEnrichmentStats {
 	recordTopologyOSPFEnrichmentStats(data, stats)
 	recomputeTopologyLinkStats(data)
 	return stats
@@ -109,7 +110,7 @@ func topologyOSPFEndpointAttributes(routerID, ip string, row topologyOSPFNeighbo
 	attrs := map[string]any{
 		"source": "ospf_mib",
 	}
-	if normalizedRouterID := normalizeOSPFRouterID(routerID); normalizedRouterID != "" {
+	if normalizedRouterID := normalizeTopologyRouterID(routerID); normalizedRouterID != "" {
 		attrs["router_id"] = normalizedRouterID
 	}
 	if normalizedIP := normalizeNonUnspecifiedIPAddress(ip); normalizedIP != "" {
@@ -129,10 +130,10 @@ func topologyOSPFLinkMetrics(row topologyOSPFNeighbor) map[string]any {
 		"attachment_mode": "logical_l3_ospf",
 		"state":           "full",
 	}
-	if routerID := normalizeOSPFRouterID(row.LocalRouterID); routerID != "" {
+	if routerID := normalizeTopologyRouterID(row.LocalRouterID); routerID != "" {
 		metrics["local_router_id"] = routerID
 	}
-	if routerID := normalizeOSPFRouterID(row.NeighborRouterID); routerID != "" {
+	if routerID := normalizeTopologyRouterID(row.NeighborRouterID); routerID != "" {
 		metrics["neighbor_router_id"] = routerID
 	}
 	if ip := normalizeNonUnspecifiedIPAddress(row.LocalIP); ip != "" {
@@ -158,10 +159,10 @@ func topologyOSPFNeighborActorRow(row topologyOSPFNeighbor) map[string]any {
 		"state":  normalizeOSPFNeighborState(row.State),
 		"source": "ospf_mib",
 	}
-	if routerID := normalizeOSPFRouterID(row.LocalRouterID); routerID != "" {
+	if routerID := normalizeTopologyRouterID(row.LocalRouterID); routerID != "" {
 		out["local_router_id"] = routerID
 	}
-	if routerID := normalizeOSPFRouterID(row.NeighborRouterID); routerID != "" {
+	if routerID := normalizeTopologyRouterID(row.NeighborRouterID); routerID != "" {
 		out["neighbor_router_id"] = routerID
 	}
 	if ip := normalizeNonUnspecifiedIPAddress(row.NeighborIP); ip != "" {
@@ -179,24 +180,10 @@ func topologyOSPFNeighborActorRow(row topologyOSPFNeighbor) map[string]any {
 	return out
 }
 
-func attachTopologyOSPFNeighborRows(data *topologyData, rowsByActor map[string][]map[string]any) {
-	if data == nil || len(rowsByActor) == 0 {
-		return
-	}
-	for i := range data.Actors {
-		actor := &data.Actors[i]
-		rows := rowsByActor[strings.TrimSpace(actor.ActorID)]
-		if len(rows) == 0 {
-			continue
-		}
-		sort.Slice(rows, func(i, j int) bool {
-			return topologyOSPFNeighborActorRowSortKey(rows[i]) < topologyOSPFNeighborActorRowSortKey(rows[j])
-		})
-		if actor.Tables == nil {
-			actor.Tables = make(map[string][]map[string]any)
-		}
-		actor.Tables["ospf_neighbors"] = rows
-	}
+func sortTopologyOSPFNeighborRows(rows []map[string]any) {
+	sort.Slice(rows, func(i, j int) bool {
+		return topologyOSPFNeighborActorRowSortKey(rows[i]) < topologyOSPFNeighborActorRowSortKey(rows[j])
+	})
 }
 
 func topologyOSPFNeighborActorRowSortKey(row map[string]any) string {
@@ -229,58 +216,6 @@ func existingTopologyOSPFLinkKeys(links []topologyLink) map[string]struct{} {
 	return seen
 }
 
-func suppressMatchingTopologyL3SubnetLinks(data *topologyData, ospfLink topologyLink) int {
-	if data == nil || len(data.Links) == 0 {
-		return 0
-	}
-
-	dst := data.Links[:0]
-	removed := 0
-	for _, link := range data.Links {
-		if topologyLinkMatchesOSPFAdjacencyL3Subnet(link, ospfLink) {
-			removed++
-			continue
-		}
-		dst = append(dst, link)
-	}
-	data.Links = dst
-	return removed
-}
-
-func topologyLinkMatchesOSPFAdjacencyL3Subnet(link, ospfLink topologyLink) bool {
-	if !strings.EqualFold(strings.TrimSpace(firstNonEmptyString(link.LinkType, link.Protocol)), topologyL3SubnetLinkType) {
-		return false
-	}
-	if !sameTopologyActorPair(link, ospfLink) {
-		return false
-	}
-	ospfSubnet := topologyMetricValueString(ospfLink.Metrics, "subnet")
-	if ospfSubnet != "" && ospfSubnet == topologyMetricValueString(link.Metrics, "subnet") {
-		return true
-	}
-	return sameTopologyEndpointIPPair(
-		topologyV1EndpointString(link.Src, "ip"),
-		topologyV1EndpointString(link.Dst, "ip"),
-		topologyV1EndpointString(ospfLink.Src, "ip"),
-		topologyV1EndpointString(ospfLink.Dst, "ip"),
-	)
-}
-
-func sameTopologyActorPair(a, b topologyLink) bool {
-	aSrc, aDst := strings.TrimSpace(a.SrcActorID), strings.TrimSpace(a.DstActorID)
-	bSrc, bDst := strings.TrimSpace(b.SrcActorID), strings.TrimSpace(b.DstActorID)
-	return (aSrc == bSrc && aDst == bDst) || (aSrc == bDst && aDst == bSrc)
-}
-
-func sameTopologyEndpointIPPair(aSrc, aDst, bSrc, bDst string) bool {
-	aSrc, aDst = normalizeNonUnspecifiedIPAddress(aSrc), normalizeNonUnspecifiedIPAddress(aDst)
-	bSrc, bDst = normalizeNonUnspecifiedIPAddress(bSrc), normalizeNonUnspecifiedIPAddress(bDst)
-	if aSrc == "" || aDst == "" || bSrc == "" || bDst == "" {
-		return false
-	}
-	return (aSrc == bSrc && aDst == bDst) || (aSrc == bDst && aDst == bSrc)
-}
-
 func recordTopologyOSPFEnrichmentStats(data *topologyData, stats topologyOSPFEnrichmentStats) {
 	if data == nil {
 		return
@@ -296,22 +231,4 @@ func recordTopologyOSPFEnrichmentStats(data *topologyData, stats topologyOSPFEnr
 	data.Stats["ospf_adjacency_suppressed_unresolved_neighbor"] = stats.suppressedUnresolvedNeighbor
 	data.Stats["ospf_adjacency_suppressed_self_actor"] = stats.suppressedSelfActor
 	data.Stats["ospf_adjacency_suppressed_duplicate_link"] = stats.suppressedDuplicateLink
-	data.Stats["ospf_adjacency_suppressed_l3_subnet_overlap"] = stats.suppressedL3SubnetOverlap
-	recomputeTopologyOSPFVisibleLinkStats(data)
-}
-
-func recomputeTopologyOSPFVisibleLinkStats(data *topologyData) {
-	if data == nil || data.Stats == nil {
-		return
-	}
-	if _, ok := data.Stats["ospf_adjacency_emitted_links"]; !ok {
-		return
-	}
-	count := 0
-	for _, link := range data.Links {
-		if strings.EqualFold(strings.TrimSpace(firstNonEmptyString(link.LinkType, link.Protocol)), topologyOSPFAdjacencyLinkType) {
-			count++
-		}
-	}
-	data.Stats["ospf_adjacency_visible_links"] = count
 }

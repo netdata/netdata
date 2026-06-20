@@ -249,16 +249,12 @@ func TestTopologyRegistry_OSPFSnapshotEnrichesSubnetAfterNeighborIngest(t *testi
 	data, ok := snapshotTopologyRegistryForTest(registry)
 
 	require.True(t, ok)
-	require.Len(t, data.Links, 1)
-	link := data.Links[0]
-	require.Equal(t, topologyOSPFAdjacencyLinkType, link.LinkType)
-	require.Equal(t, "198.51.100.0/30", link.Metrics["subnet"])
-	require.Equal(t, "198.51.100.1", link.Src.Attributes["ip"])
-	require.Equal(t, "198.51.100.2", link.Dst.Attributes["ip"])
+	require.Len(t, data.Links, 2)
+	require.Equal(t, 1, countTopologyLinksByType(data.Links, topologyL3SubnetLinkType))
+	require.Equal(t, 1, countTopologyLinksByType(data.Links, topologyOSPFAdjacencyLinkType))
 	require.Equal(t, 1, data.Stats["l3_subnet_emitted_links"])
-	require.Equal(t, 0, data.Stats["l3_subnet_visible_links"])
+	require.Equal(t, 1, data.Stats["l3_subnet_visible_links"])
 	require.Equal(t, 1, data.Stats["ospf_adjacency_emitted_links"])
-	require.Equal(t, 1, data.Stats["ospf_adjacency_suppressed_l3_subnet_overlap"])
 	require.Equal(t, 1, data.Stats["ospf_adjacency_visible_links"])
 }
 

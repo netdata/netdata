@@ -27,8 +27,8 @@ func buildSNMPTopologyV1OSPFNeighborsTable(
 	for i, row := range rows {
 		actorRefs[i] = row.actorRef
 		remoteActors[i] = nullableActorRef(actorIndex, row.values["remote_actor_id"])
-		localRouterIDs[i] = nullableStringRef(stringsDict, normalizeOSPFRouterID(topologyV1ScalarLabelValue(row.values["local_router_id"])))
-		neighborRouterIDs[i] = nullableStringRef(stringsDict, normalizeOSPFRouterID(topologyV1ScalarLabelValue(row.values["neighbor_router_id"])))
+		localRouterIDs[i] = nullableStringRef(stringsDict, normalizeTopologyRouterID(topologyV1ScalarLabelValue(row.values["local_router_id"])))
+		neighborRouterIDs[i] = nullableStringRef(stringsDict, normalizeTopologyRouterID(topologyV1ScalarLabelValue(row.values["neighbor_router_id"])))
 		neighborIPs[i] = nullableStringRef(stringsDict, normalizeNonUnspecifiedIPAddress(topologyV1ScalarLabelValue(row.values["neighbor_ip"])))
 		states[i] = nullableStringRef(stringsDict, normalizeOSPFNeighborState(topologyV1ScalarLabelValue(row.values["state"])))
 		localIPs[i] = nullableStringRef(stringsDict, normalizeNonUnspecifiedIPAddress(topologyV1ScalarLabelValue(row.values["local_ip"])))

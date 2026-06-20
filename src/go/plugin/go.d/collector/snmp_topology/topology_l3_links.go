@@ -21,15 +21,13 @@ type topologyL3EnrichmentStats struct {
 func applyTopologyL3SubnetEnrichment(data *topologyData, aggregate topologyObservationAggregate) topologyL3EnrichmentStats {
 	var stats topologyL3EnrichmentStats
 	if data == nil || len(aggregate.l3Interfaces) == 0 {
-		recordTopologyL3EnrichmentStats(data, stats)
-		return stats
+		return finishTopologyL3SubnetEnrichment(data, stats)
 	}
 
 	adjacencies, subnetStats := buildTopologyL3SubnetAdjacencies(aggregate.l3Interfaces)
 	stats.subnetStats = subnetStats
 	if len(adjacencies) == 0 {
-		recordTopologyL3EnrichmentStats(data, stats)
-		return stats
+		return finishTopologyL3SubnetEnrichment(data, stats)
 	}
 
 	resolver := newTopologyL3ActorResolver(data, aggregate.snapshots)
@@ -63,6 +61,10 @@ func applyTopologyL3SubnetEnrichment(data *topologyData, aggregate topologyObser
 	sort.Slice(data.Links, func(i, j int) bool {
 		return topologyLinkSortKey(data.Links[i]) < topologyLinkSortKey(data.Links[j])
 	})
+	return finishTopologyL3SubnetEnrichment(data, stats)
+}
+
+func finishTopologyL3SubnetEnrichment(data *topologyData, stats topologyL3EnrichmentStats) topologyL3EnrichmentStats {
 	recordTopologyL3EnrichmentStats(data, stats)
 	recomputeTopologyLinkStats(data)
 	return stats
@@ -170,5 +172,4 @@ func recordTopologyL3EnrichmentStats(data *topologyData, stats topologyL3Enrichm
 	data.Stats["l3_subnet_suppressed_unresolved_actor"] = stats.suppressedUnresolvedActor
 	data.Stats["l3_subnet_suppressed_self_actor"] = stats.suppressedSelfActor
 	data.Stats["l3_subnet_suppressed_duplicate_link"] = stats.suppressedDuplicateLink
-	recomputeTopologyL3VisibleLinkStats(data)
 }

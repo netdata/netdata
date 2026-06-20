@@ -64,7 +64,7 @@ func (c *topologyCache) applyOSPFProfileTags(tags map[string]string) {
 	if c == nil || len(tags) == 0 {
 		return
 	}
-	if v := normalizeOSPFRouterID(tags[tagOSPFRouterID]); v != "" {
+	if v := normalizeTopologyRouterID(tags[tagOSPFRouterID]); v != "" {
 		c.localDevice.OSPFRouterID = v
 		c.localDevice.Labels = ensureLabels(c.localDevice.Labels)
 		c.localDevice.Labels[tagOSPFRouterID] = v

@@ -60,10 +60,10 @@ func normalizeTopologyDevice(dev topologyDevice) topologyDevice {
 	if value := topologyMetadataValue(dev.Labels, topologyMetadataAliasModel); value != "" && dev.Model == "" {
 		dev.Model = value
 	}
-	if value := normalizeOSPFRouterID(dev.Labels[tagOSPFRouterID]); value != "" && dev.OSPFRouterID == "" {
+	if value := normalizeTopologyRouterID(dev.Labels[tagOSPFRouterID]); value != "" && dev.OSPFRouterID == "" {
 		dev.OSPFRouterID = value
 	}
-	if value := normalizeOSPFRouterID(dev.OSPFRouterID); value != "" {
+	if value := normalizeTopologyRouterID(dev.OSPFRouterID); value != "" {
 		dev.OSPFRouterID = value
 		setTopologyMetadataLabelIfMissing(dev.Labels, tagOSPFRouterID, value)
 	}
