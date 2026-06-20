@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/netaddr"
 )
 
 type topologyL3SubnetAdjacency struct {
@@ -118,11 +118,11 @@ func topologyL3SubnetGroupForInterface(row topologyL3Interface) (*topologyL3Subn
 	if err != nil || !netmask.Is4() {
 		return nil, false
 	}
-	network, ok := topologyengine.NetworkAddress(ip, netmask)
+	network, ok := netaddr.NetworkAddress(ip, netmask)
 	if !ok {
 		return nil, false
 	}
-	prefix, err := topologyengine.MaskToCIDRPrefix(netmask)
+	prefix, err := netaddr.MaskToCIDRPrefix(netmask)
 	if err != nil {
 		return nil, false
 	}
