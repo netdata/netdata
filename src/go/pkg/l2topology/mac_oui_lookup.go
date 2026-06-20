@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
 //go:embed mac_oui_vendors.tsv
@@ -114,7 +116,7 @@ func lookupTopologyVendorByMACInIndex(index topologyOUIVendorIndex, mac string) 
 	return "", ""
 }
 
-func inferTopologyVendorFromMatch(match Match) (vendor string, prefix string) {
+func inferTopologyVendorFromMatch(match graph.Match) (vendor string, prefix string) {
 	candidates := make(map[string]struct{}, len(match.MacAddresses)+len(match.ChassisIDs))
 	for _, value := range match.MacAddresses {
 		if mac := normalizeMAC(value); mac != "" {

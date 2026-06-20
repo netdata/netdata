@@ -4,6 +4,8 @@ package l2topology
 
 import (
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
 type topologySegmentPortRef struct {
@@ -13,7 +15,7 @@ type topologySegmentPortRef struct {
 	bridgePort string
 }
 
-func topologySegmentDisplayName(actor Actor, deviceDisplayByID map[string]string) string {
+func topologySegmentDisplayName(actor graph.Actor, deviceDisplayByID map[string]string) string {
 	attrs := actor.Attributes
 	if len(attrs) == 0 {
 		return ""

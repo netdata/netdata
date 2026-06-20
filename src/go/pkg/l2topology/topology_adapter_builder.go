@@ -5,6 +5,8 @@ package l2topology
 import (
 	"strings"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
 type graphBuilder struct {
@@ -26,7 +28,7 @@ type graphBuilder struct {
 	reporterAliases      map[string][]string
 	ifaceSummaryByDevice map[string]topologyDeviceInterfaceSummary
 
-	actors        []Actor
+	actors        []graph.Actor
 	actorIndex    map[string]struct{}
 	actorMACIndex map[string]struct{}
 
@@ -34,7 +36,7 @@ type graphBuilder struct {
 	endpointActors       builtEndpointActors
 	segmentProjection    projectedSegments
 
-	links              []Link
+	links              []graph.Link
 	segmentSuppressed  int
 	unlinkedSuppressed int
 	linkCounts         topologyLinkCounts
@@ -130,7 +132,7 @@ func (b *graphBuilder) collectBridgeTopologyInputs() {
 }
 
 func (b *graphBuilder) buildDeviceActors() {
-	b.actors = make([]Actor, 0, len(b.result.Devices))
+	b.actors = make([]graph.Actor, 0, len(b.result.Devices))
 	b.actorIndex = make(map[string]struct{}, len(b.result.Devices)*2)
 	b.actorMACIndex = make(map[string]struct{}, len(b.result.Devices))
 
@@ -215,7 +217,7 @@ func (b *graphBuilder) buildSegmentTopology() {
 func (b *graphBuilder) finalizeGraph() {
 	sortTopologyActors(b.actors)
 
-	b.links = make([]Link, 0, len(b.projectedAdjacencies.links)+len(b.segmentProjection.links))
+	b.links = make([]graph.Link, 0, len(b.projectedAdjacencies.links)+len(b.segmentProjection.links))
 	b.links = append(b.links, b.projectedAdjacencies.links...)
 	b.links = append(b.links, b.segmentProjection.links...)
 	sortTopologyLinks(b.links)
@@ -283,8 +285,8 @@ func (b *graphBuilder) buildStats() {
 	b.stats["inference_strategy"] = b.strategyConfig.id
 }
 
-func (b *graphBuilder) graph() Graph {
-	return Graph{
+func (b *graphBuilder) graph() graph.Graph {
+	return graph.Graph{
 		SchemaVersion: b.schemaVersion,
 		Source:        b.source,
 		Layer:         b.layer,

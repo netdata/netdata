@@ -4,6 +4,8 @@ package l2topology
 
 import (
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
 func topologyDeviceInferred(dev Device) bool {
@@ -18,8 +20,8 @@ func topologyDeviceInferred(dev Device) bool {
 	}
 }
 
-func buildDeviceActorMatch(dev Device, reporterAliases []string) Match {
-	match := Match{
+func buildDeviceActorMatch(dev Device, reporterAliases []string) graph.Match {
+	match := graph.Match{
 		SysObjectID: strings.TrimSpace(dev.SysObject),
 		SysName:     strings.TrimSpace(dev.Hostname),
 	}
@@ -69,7 +71,7 @@ func buildDeviceActorAttributes(
 	dev Device,
 	localDeviceID string,
 	ifaceSummary topologyDeviceInterfaceSummary,
-	match Match,
+	match graph.Match,
 ) map[string]any {
 	discovered := strings.TrimSpace(localDeviceID) == "" || dev.ID != localDeviceID
 

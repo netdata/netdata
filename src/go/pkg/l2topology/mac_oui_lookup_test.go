@@ -3,9 +3,11 @@
 package l2topology
 
 import (
-	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBuildTopologyOUIVendorIndex_IgnoresInvalidLinesAndKeepsFirstDuplicate(t *testing.T) {
@@ -47,7 +49,7 @@ func TestLookupTopologyVendorByMACInIndex_PrefersLongestPrefixAndNormalizesMAC(t
 }
 
 func TestInferTopologyVendorFromMatch_UsesDeterministicCandidateOrder(t *testing.T) {
-	match := Match{
+	match := graph.Match{
 		MacAddresses: []string{
 			"28:6f:b9:00:00:22",
 			"08:ea:44:11:22:33",
