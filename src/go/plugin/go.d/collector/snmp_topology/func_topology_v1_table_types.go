@@ -40,9 +40,14 @@ func snmpTopologyV1PortModalColumns() []topologyv1.ModalColumn {
 		modalDirectColumnWithVisibility("mac", "MAC", "mac", "text", "expanded"),
 		modalDirectColumnWithVisibility("speed", "Speed", "speed", "number", "expanded"),
 		modalDirectColumnWithVisibility("stp_state", "STP", "stp_state", "badge", "expanded"),
+		modalDirectColumnWithVisibility("duplex", "Duplex", "duplex", "badge", "expanded"),
+		modalDirectColumnWithVisibility("link_mode_confidence", "Mode Confidence", "link_mode_confidence", "badge", "expanded"),
+		modalDirectColumnWithVisibility("topology_role_confidence", "Role Confidence", "topology_role_confidence", "badge", "expanded"),
+		modalDirectColumnWithVisibility("link_mode_sources", "Mode Sources", "link_mode_sources", "array_count", "expanded"),
+		modalDirectColumnWithVisibility("topology_role_sources", "Role Sources", "topology_role_sources", "array_count", "expanded"),
+		modalDirectColumnWithVisibility("last_change", "Last Change", "last_change", "text", "expanded"),
 		modalDirectColumnWithVisibility("neighbors", "Neighbor Data", "neighbors", "debug_json", "debug"),
 		modalDirectColumnWithVisibility("vlans", "VLAN Data", "vlans", "debug_json", "debug"),
-		modalDirectColumnWithVisibility("extra", "Extra", "extra", "debug_json", "debug"),
 	}
 }
 
@@ -195,7 +200,12 @@ func snmpTopologyV1ActorPortsColumns() []topologyv1.Column {
 		topologyv1.NewColumn("neighbor_port_name", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
 		topologyv1.NewColumn("neighbors", "json", topologyv1.WithNullable()),
 		topologyv1.NewColumn("vlans", "json", topologyv1.WithNullable()),
-		topologyv1.NewColumn("extra", "json", topologyv1.WithNullable()),
+		topologyv1.NewColumn("duplex", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("link_mode_confidence", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("topology_role_confidence", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("link_mode_sources", "array", topologyv1.WithNullable()),
+		topologyv1.NewColumn("topology_role_sources", "array", topologyv1.WithNullable()),
+		topologyv1.NewColumn("last_change", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
 	}
 }
 

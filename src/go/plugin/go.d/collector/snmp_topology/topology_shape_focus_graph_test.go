@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/stretchr/testify/require"
 )
 
@@ -130,11 +131,12 @@ func TestTopologyActorHasIPMatchesMatchAndManagementAddresses(t *testing.T) {
 		Match: topologyMatch{
 			IPAddresses: []string{"10.0.0.1"},
 		},
-		Attributes: map[string]any{
-			"management_ip": "10.0.0.2",
-			"management_addresses": []any{
-				"10.0.0.3",
-				"not-an-ip",
+		Detail: topologyActorDetail{
+			L2: topologyengine.ProjectionActorDetail{
+				Device: topologyengine.ProjectionDeviceActorDetail{
+					ManagementIP:        "10.0.0.2",
+					ManagementAddresses: []string{"10.0.0.3", "not-an-ip"},
+				},
 			},
 		},
 	}

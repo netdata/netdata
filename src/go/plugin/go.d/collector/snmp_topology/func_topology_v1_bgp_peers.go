@@ -67,3 +67,29 @@ func buildSNMPTopologyV1BGPPeersTable(
 		topologyv1.Values(sources...),
 	})
 }
+
+func snmpTopologyV1BGPPeerValues(row topologyBGPPeerDetailRow) map[string]any {
+	out := map[string]any{
+		"remote_actor_id":  row.RemoteActorID,
+		"routing_instance": row.RoutingInstance,
+		"neighbor_ip":      row.NeighborIP,
+		"remote_as":        row.RemoteAS,
+		"state":            row.State,
+		"admin_status":     row.AdminStatus,
+		"local_ip":         row.LocalIP,
+		"local_as":         row.LocalAS,
+		"local_identifier": row.LocalIdentifier,
+		"peer_identifier":  row.PeerIdentifier,
+		"peer_type":        row.PeerType,
+		"bgp_version":      row.BGPVersion,
+		"description":      row.Description,
+		"source":           firstNonEmptyString(row.Source, "bgp_mib"),
+	}
+	if row.EstablishedUptime != nil {
+		out["established_uptime"] = *row.EstablishedUptime
+	}
+	if row.LastReceivedUpdateAge != nil {
+		out["last_received_update_age"] = *row.LastReceivedUpdateAge
+	}
+	return pruneNilAttributes(out)
+}

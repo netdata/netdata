@@ -94,15 +94,12 @@ func collapseActorsByIP(data *topologyData) int {
 			replaceActorID[data.Actors[idx].ActorID] = repActor.ActorID
 			repActor.Match = mergeTopologyMatch(repActor.Match, data.Actors[idx].Match)
 			repActor.Labels = mergeTopologyStringMap(repActor.Labels, data.Actors[idx].Labels)
-			repActor.Attributes = mergeTopologyAnyMap(repActor.Attributes, data.Actors[idx].Attributes)
+			repActor.Detail = mergeTopologyActorDetail(repActor.Detail, data.Actors[idx].Detail)
 			keep[idx] = false
 		}
-		if repActor.Attributes == nil {
-			repActor.Attributes = make(map[string]any)
-		}
 		if collapsedCount > 1 {
-			repActor.Attributes["collapsed_by_ip"] = true
-			repActor.Attributes["collapsed_count"] = collapsedCount
+			repActor.Detail.L2.CollapsedByIP = true
+			repActor.Detail.L2.CollapsedCount = collapsedCount
 		}
 		data.Actors[rep] = repActor
 	}
@@ -168,4 +165,139 @@ func compareCollapseActorPriority(left, right topologyActor) int {
 		return 1
 	}
 	return strings.Compare(leftID, rightID)
+}
+
+func mergeTopologyActorDetail(dst, src topologyActorDetail) topologyActorDetail {
+	dst.L2 = mergeTopologyProjectionActorDetail(dst.L2, src.L2)
+	dst.SNMP = mergeTopologySNMPActorDetail(dst.SNMP, src.SNMP)
+	dst.OSPF = append(dst.OSPF, src.OSPF...)
+	dst.BGP = append(dst.BGP, src.BGP...)
+	return dst
+}
+
+func mergeTopologyProjectionActorDetail(dst, src topologyengine.ProjectionActorDetail) topologyengine.ProjectionActorDetail {
+	dst.DisplayName = firstNonEmptyString(dst.DisplayName, src.DisplayName)
+	dst.DisplaySource = firstNonEmptyString(dst.DisplaySource, src.DisplaySource)
+	dst.Device = mergeTopologyProjectionDeviceDetail(dst.Device, src.Device)
+	dst.Endpoint = mergeTopologyProjectionEndpointDetail(dst.Endpoint, src.Endpoint)
+	dst.Segment = mergeTopologyProjectionSegmentDetail(dst.Segment, src.Segment)
+	if !dst.CollapsedByIP {
+		dst.CollapsedByIP = src.CollapsedByIP
+	}
+	if dst.CollapsedCount == 0 {
+		dst.CollapsedCount = src.CollapsedCount
+	}
+	return dst
+}
+
+func mergeTopologyProjectionDeviceDetail(dst, src topologyengine.ProjectionDeviceActorDetail) topologyengine.ProjectionDeviceActorDetail {
+	dst.HasInventoryStats = dst.HasInventoryStats || src.HasInventoryStats
+	dst.DeviceID = firstNonEmptyString(dst.DeviceID, src.DeviceID)
+	dst.Discovered = dst.Discovered || src.Discovered
+	dst.Inferred = dst.Inferred || src.Inferred
+	dst.ManagementIP = firstNonEmptyString(dst.ManagementIP, src.ManagementIP)
+	dst.ManagementAddresses = firstNonEmptyStringSlice(dst.ManagementAddresses, src.ManagementAddresses)
+	dst.Protocols = firstNonEmptyStringSlice(dst.Protocols, src.Protocols)
+	dst.ProtocolsCollected = firstNonEmptyStringSlice(dst.ProtocolsCollected, src.ProtocolsCollected)
+	dst.Capabilities = firstNonEmptyStringSlice(dst.Capabilities, src.Capabilities)
+	dst.CapabilitiesSupported = firstNonEmptyStringSlice(dst.CapabilitiesSupported, src.CapabilitiesSupported)
+	dst.CapabilitiesEnabled = firstNonEmptyStringSlice(dst.CapabilitiesEnabled, src.CapabilitiesEnabled)
+	dst.Vendor = firstNonEmptyString(dst.Vendor, src.Vendor)
+	dst.VendorSource = firstNonEmptyString(dst.VendorSource, src.VendorSource)
+	dst.VendorConfidence = firstNonEmptyString(dst.VendorConfidence, src.VendorConfidence)
+	dst.VendorDerived = firstNonEmptyString(dst.VendorDerived, src.VendorDerived)
+	dst.VendorDerivedSource = firstNonEmptyString(dst.VendorDerivedSource, src.VendorDerivedSource)
+	dst.VendorDerivedConfidence = firstNonEmptyString(dst.VendorDerivedConfidence, src.VendorDerivedConfidence)
+	dst.VendorDerivedMatchPrefix = firstNonEmptyString(dst.VendorDerivedMatchPrefix, src.VendorDerivedMatchPrefix)
+	dst.VendorMatchPrefix = firstNonEmptyString(dst.VendorMatchPrefix, src.VendorMatchPrefix)
+	dst.PortsTotal = firstNonZeroInt(dst.PortsTotal, src.PortsTotal)
+	dst.IfIndexes = firstNonEmptyStringSlice(dst.IfIndexes, src.IfIndexes)
+	dst.IfNames = firstNonEmptyStringSlice(dst.IfNames, src.IfNames)
+	dst.PortsUp = firstNonZeroInt(dst.PortsUp, src.PortsUp)
+	dst.PortsDown = firstNonZeroInt(dst.PortsDown, src.PortsDown)
+	dst.PortsAdminDown = firstNonZeroInt(dst.PortsAdminDown, src.PortsAdminDown)
+	dst.TotalBandwidthBps = firstNonZeroInt64(dst.TotalBandwidthBps, src.TotalBandwidthBps)
+	dst.FDBTotalMACs = firstNonZeroInt(dst.FDBTotalMACs, src.FDBTotalMACs)
+	dst.VLANCount = firstNonZeroInt(dst.VLANCount, src.VLANCount)
+	dst.LLDPNeighborCount = firstNonZeroInt(dst.LLDPNeighborCount, src.LLDPNeighborCount)
+	dst.CDPNeighborCount = firstNonZeroInt(dst.CDPNeighborCount, src.CDPNeighborCount)
+	dst.AdminStatusCounts = firstNonEmptyIntMap(dst.AdminStatusCounts, src.AdminStatusCounts)
+	dst.OperStatusCounts = firstNonEmptyIntMap(dst.OperStatusCounts, src.OperStatusCounts)
+	dst.LinkModeCounts = firstNonEmptyIntMap(dst.LinkModeCounts, src.LinkModeCounts)
+	dst.TopologyRoleCounts = firstNonEmptyIntMap(dst.TopologyRoleCounts, src.TopologyRoleCounts)
+	if len(dst.Ports) == 0 {
+		dst.Ports = src.Ports
+	}
+	return dst
+}
+
+func mergeTopologyProjectionEndpointDetail(dst, src topologyengine.ProjectionEndpointActorDetail) topologyengine.ProjectionEndpointActorDetail {
+	dst.Discovered = dst.Discovered || src.Discovered
+	dst.LearnedSources = firstNonEmptyStringSlice(dst.LearnedSources, src.LearnedSources)
+	dst.LearnedDeviceIDs = firstNonEmptyStringSlice(dst.LearnedDeviceIDs, src.LearnedDeviceIDs)
+	dst.LearnedIfIndexes = firstNonEmptyStringSlice(dst.LearnedIfIndexes, src.LearnedIfIndexes)
+	dst.LearnedIfNames = firstNonEmptyStringSlice(dst.LearnedIfNames, src.LearnedIfNames)
+	dst.Vendor = firstNonEmptyString(dst.Vendor, src.Vendor)
+	dst.VendorSource = firstNonEmptyString(dst.VendorSource, src.VendorSource)
+	dst.VendorConfidence = firstNonEmptyString(dst.VendorConfidence, src.VendorConfidence)
+	dst.VendorMatchPrefix = firstNonEmptyString(dst.VendorMatchPrefix, src.VendorMatchPrefix)
+	dst.VendorDerived = firstNonEmptyString(dst.VendorDerived, src.VendorDerived)
+	dst.VendorDerivedSource = firstNonEmptyString(dst.VendorDerivedSource, src.VendorDerivedSource)
+	dst.VendorDerivedConfidence = firstNonEmptyString(dst.VendorDerivedConfidence, src.VendorDerivedConfidence)
+	dst.VendorDerivedMatchPrefix = firstNonEmptyString(dst.VendorDerivedMatchPrefix, src.VendorDerivedMatchPrefix)
+	dst.AttachmentSource = firstNonEmptyString(dst.AttachmentSource, src.AttachmentSource)
+	dst.AttachedDeviceID = firstNonEmptyString(dst.AttachedDeviceID, src.AttachedDeviceID)
+	dst.AttachedDevice = firstNonEmptyString(dst.AttachedDevice, src.AttachedDevice)
+	dst.AttachedPort = firstNonEmptyString(dst.AttachedPort, src.AttachedPort)
+	dst.AttachedIfName = firstNonEmptyString(dst.AttachedIfName, src.AttachedIfName)
+	dst.AttachedIfIndex = firstNonZeroInt(dst.AttachedIfIndex, src.AttachedIfIndex)
+	dst.AttachedBridgePort = firstNonEmptyString(dst.AttachedBridgePort, src.AttachedBridgePort)
+	dst.AttachedVLAN = firstNonEmptyString(dst.AttachedVLAN, src.AttachedVLAN)
+	dst.AttachedVLANID = firstNonEmptyString(dst.AttachedVLANID, src.AttachedVLANID)
+	dst.AttachedBy = firstNonEmptyString(dst.AttachedBy, src.AttachedBy)
+	return dst
+}
+
+func mergeTopologyProjectionSegmentDetail(dst, src topologyengine.ProjectionSegmentActorDetail) topologyengine.ProjectionSegmentActorDetail {
+	dst.HasStats = dst.HasStats || src.HasStats
+	dst.SegmentID = firstNonEmptyString(dst.SegmentID, src.SegmentID)
+	dst.SegmentType = firstNonEmptyString(dst.SegmentType, src.SegmentType)
+	dst.ParentDevices = firstNonEmptyStringSlice(dst.ParentDevices, src.ParentDevices)
+	dst.IfNames = firstNonEmptyStringSlice(dst.IfNames, src.IfNames)
+	dst.IfIndexes = firstNonEmptyStringSlice(dst.IfIndexes, src.IfIndexes)
+	dst.BridgePorts = firstNonEmptyStringSlice(dst.BridgePorts, src.BridgePorts)
+	dst.VLANIDs = firstNonEmptyStringSlice(dst.VLANIDs, src.VLANIDs)
+	dst.LearnedSources = firstNonEmptyStringSlice(dst.LearnedSources, src.LearnedSources)
+	dst.PortsTotal = firstNonZeroInt(dst.PortsTotal, src.PortsTotal)
+	dst.EndpointsTotal = firstNonZeroInt(dst.EndpointsTotal, src.EndpointsTotal)
+	dst.DesignatedPort = firstNonEmptyString(dst.DesignatedPort, src.DesignatedPort)
+	dst.SegmentKind = firstNonEmptyString(dst.SegmentKind, src.SegmentKind)
+	return dst
+}
+
+func mergeTopologySNMPActorDetail(dst, src topologySNMPActorDetail) topologySNMPActorDetail {
+	dst.ManagementAddresses = firstNonEmptyManagementAddresses(dst.ManagementAddresses, src.ManagementAddresses)
+	dst.Capabilities = firstNonEmptyStringSlice(dst.Capabilities, src.Capabilities)
+	dst.CapabilitiesSupported = firstNonEmptyStringSlice(dst.CapabilitiesSupported, src.CapabilitiesSupported)
+	dst.CapabilitiesEnabled = firstNonEmptyStringSlice(dst.CapabilitiesEnabled, src.CapabilitiesEnabled)
+	dst.SysDescr = firstNonEmptyString(dst.SysDescr, src.SysDescr)
+	dst.SysContact = firstNonEmptyString(dst.SysContact, src.SysContact)
+	dst.SysLocation = firstNonEmptyString(dst.SysLocation, src.SysLocation)
+	dst.SysUptime = firstNonZeroInt64(dst.SysUptime, src.SysUptime)
+	dst.Vendor = firstNonEmptyString(dst.Vendor, src.Vendor)
+	dst.VendorSource = firstNonEmptyString(dst.VendorSource, src.VendorSource)
+	dst.VendorConfidence = firstNonEmptyString(dst.VendorConfidence, src.VendorConfidence)
+	dst.Model = firstNonEmptyString(dst.Model, src.Model)
+	dst.OSPFRouterID = firstNonEmptyString(dst.OSPFRouterID, src.OSPFRouterID)
+	dst.SerialNumber = firstNonEmptyString(dst.SerialNumber, src.SerialNumber)
+	dst.SoftwareVersion = firstNonEmptyString(dst.SoftwareVersion, src.SoftwareVersion)
+	dst.FirmwareVersion = firstNonEmptyString(dst.FirmwareVersion, src.FirmwareVersion)
+	dst.HardwareVersion = firstNonEmptyString(dst.HardwareVersion, src.HardwareVersion)
+	dst.ManagementIP = firstNonEmptyString(dst.ManagementIP, src.ManagementIP)
+	dst.NetdataHostID = firstNonEmptyString(dst.NetdataHostID, src.NetdataHostID)
+	dst.ChartIDPrefix = firstNonEmptyString(dst.ChartIDPrefix, src.ChartIDPrefix)
+	dst.ChartContextPrefix = firstNonEmptyString(dst.ChartContextPrefix, src.ChartContextPrefix)
+	dst.DeviceCharts = firstNonEmptyStringMap(dst.DeviceCharts, src.DeviceCharts)
+	dst.InterfaceCharts = firstNonEmptyInterfaceChartMap(dst.InterfaceCharts, src.InterfaceCharts)
+	return dst
 }

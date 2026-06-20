@@ -3,9 +3,9 @@
 package snmptopology
 
 import (
-	"fmt"
-	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	"strings"
+
+	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 )
 
 func buildSNMPTopologyV1ActorDetails(
@@ -44,7 +44,6 @@ func buildSNMPTopologyV1ActorDetails(
 				Label:             "Debug metadata",
 				DefaultVisibility: "debug",
 				Columns: []topologyv1.ModalColumn{
-					modalDirectColumn("attributes", "Attributes", "attributes", "debug_json"),
 					modalDirectColumn("labels", "Labels", "labels", "debug_json"),
 				},
 			},
@@ -53,98 +52,51 @@ func buildSNMPTopologyV1ActorDetails(
 	}
 
 	tableRowsByName := collectSNMPTopologyV1ActorTableRows(actors)
-	tableNames := sortedMapKeys(tableRowsByName)
-	reservedCustomTableIDs := snmpTopologyV1ReservedCustomTableIDs(tableNames)
-	for _, tableName := range tableNames {
+	for _, tableName := range sortedMapKeys(tableRowsByName) {
 		rows := tableRowsByName[tableName]
 		if len(rows) == 0 {
 			continue
 		}
-		tableID := snmpTopologyV1ActorDetailTableID(tableName, usedTableIDs, reservedCustomTableIDs)
+		tableID := ""
 		var table topologyv1.Table
-		var err error
-		if tableID == "actor_ports" {
+		switch tableName {
+		case "ports":
+			tableID = "actor_ports"
 			table = buildSNMPTopologyV1ActorPortsTable(rows, stringsDict, portNeighborSummaries)
-		} else if tableID == "actor_ospf_neighbors" {
+		case "ospf_neighbors":
+			tableID = "actor_ospf_neighbors"
 			table = buildSNMPTopologyV1OSPFNeighborsTable(rows, actorIndex, stringsDict)
-		} else if tableID == "actor_bgp_peers" {
+		case "bgp_peers":
+			tableID = "actor_bgp_peers"
 			table = buildSNMPTopologyV1BGPPeersTable(rows, actorIndex, stringsDict)
-		} else {
-			table, err = buildSNMPTopologyV1DynamicTable(rows, stringsDict)
-		}
-		if err != nil {
-			return nil, nil, fmt.Errorf("build actor detail table %q: %w", tableName, err)
+		default:
+			continue
 		}
 		details[tableID] = topologyv1.DetailTable{
 			Type:  tableID,
 			Table: table,
 		}
-		if tableID == "actor_ports" {
+		switch tableID {
+		case "actor_ports":
 			tableTypes[tableID] = snmpTopologyV1ActorPortsTableType()
-		} else if tableID == "actor_ospf_neighbors" {
+		case "actor_ospf_neighbors":
 			tableTypes[tableID] = snmpTopologyV1OSPFNeighborsTableType()
-		} else if tableID == "actor_bgp_peers" {
+		case "actor_bgp_peers":
 			tableTypes[tableID] = snmpTopologyV1BGPPeersTableType()
-		} else {
-			tableTypes[tableID] = topologyv1.TableType{
-				Role:        "actor_detail",
-				Owner:       "actor",
-				Aggregation: "append",
-				Columns:     table.Columns,
-			}
 		}
 		usedTableIDs[tableID] = struct{}{}
 	}
 	return details, tableTypes, nil
 }
 
-func snmpTopologyV1ReservedCustomTableIDs(tableNames []string) map[string]struct{} {
-	reserved := make(map[string]struct{})
-	for _, tableName := range tableNames {
-		tableID := topologyID("actor_"+tableName, "actor_detail")
-		switch tableID {
-		case "actor_labels", "actor_metadata", "actor_port_links":
-			reserved[topologyID("actor_custom_"+tableName, "actor_detail")] = struct{}{}
-		}
-	}
-	return reserved
-}
-
-func snmpTopologyV1ActorDetailTableID(tableName string, usedTableIDs, reservedCustomTableIDs map[string]struct{}) string {
-	tableID := topologyID("actor_"+tableName, "actor_detail")
-	switch tableID {
-	case "actor_labels", "actor_metadata", "actor_port_links":
-		return snmpTopologyV1UniqueActorDetailTableID(topologyID("actor_custom_"+tableName, "actor_detail"), usedTableIDs)
-	default:
-		if _, reserved := reservedCustomTableIDs[tableID]; reserved {
-			return snmpTopologyV1UniqueActorDetailTableID(topologyID("actor_detail_"+tableName, "actor_detail"), usedTableIDs)
-		}
-		return snmpTopologyV1UniqueActorDetailTableID(tableID, usedTableIDs)
-	}
-}
-
-func snmpTopologyV1UniqueActorDetailTableID(tableID string, usedTableIDs map[string]struct{}) string {
-	if _, ok := usedTableIDs[tableID]; !ok {
-		return tableID
-	}
-	for suffix := 2; ; suffix++ {
-		candidate := fmt.Sprintf("%s_%d", tableID, suffix)
-		if _, ok := usedTableIDs[candidate]; !ok {
-			return candidate
-		}
-	}
-}
-
 func buildSNMPTopologyV1ActorMetadataTable(actors []topologyActor) topologyv1.Table {
 	actorRefs := make([]any, 0, len(actors))
-	attributes := make([]any, 0, len(actors))
 	labels := make([]any, 0, len(actors))
 	for i, actor := range actors {
-		if len(actor.Attributes) == 0 && len(actor.Labels) == 0 {
+		if len(actor.Labels) == 0 {
 			continue
 		}
 		actorRefs = append(actorRefs, i)
-		attributes = append(attributes, nullableJSON(actor.Attributes))
 		labels = append(labels, nullableJSON(actor.Labels))
 	}
 	if len(actorRefs) == 0 {
@@ -153,12 +105,10 @@ func buildSNMPTopologyV1ActorMetadataTable(actors []topologyActor) topologyv1.Ta
 	return topologyv1.MustTable(len(actorRefs),
 		[]topologyv1.Column{
 			topologyv1.NewColumn("actor", "actor_ref", topologyv1.WithRole("reference")),
-			topologyv1.NewColumn("attributes", "json", topologyv1.WithNullable()),
 			topologyv1.NewColumn("labels", "json", topologyv1.WithNullable()),
 		},
 		[]topologyv1.ColumnEncoding{
 			topologyv1.Values(actorRefs...),
-			topologyv1.Values(attributes...),
 			topologyv1.Values(labels...),
 		},
 	)
@@ -205,18 +155,6 @@ func buildSNMPTopologyV1ActorLabelsTable(
 		}
 	}
 
-	scalarAttributeKeys := []string{
-		"vendor", "vendor_derived", "model", "sys_descr", "sys_location", "sys_contact",
-		"management_ip", tagOSPFRouterID, "display_name", "display_source", "chart_id_prefix", "chart_context_prefix",
-		"netdata_host_id", "ports_total", "ports_up", "ports_down", "vlan_count", "fdb_total_macs",
-		"lldp_neighbor_count", "cdp_neighbor_count", "endpoints_total", "if_admin_status_counts",
-		"if_oper_status_counts", "if_link_mode_counts", "if_topology_role_counts",
-	}
-	arrayAttributeKeys := []string{
-		"protocols", "protocols_collected", "learned_sources", "capabilities",
-		"capabilities_supported", "capabilities_enabled", "if_names", "if_indexes",
-	}
-
 	for actorIndex, actor := range actors {
 		add(actorIndex, "actor_type", snmpTopologyV1ActorType(actor.ActorType), snmpTopologyV1ProducerSource, "identity", nil)
 		add(actorIndex, "layer", snmpTopologyV1ActorLayer(actor), snmpTopologyV1ProducerSource, "identity", nil)
@@ -233,13 +171,13 @@ func buildSNMPTopologyV1ActorLabelsTable(
 		for key, value := range actor.Labels {
 			add(actorIndex, key, value, "producer_label", "label", nil)
 		}
-		for _, key := range scalarAttributeKeys {
-			if value := topologyV1ScalarLabelValue(actor.Attributes[key]); value != "" {
-				add(actorIndex, key, value, snmpTopologyV1ProducerSource, "attribute", nil)
-			}
+		scalarValues := topologyActorDetailScalarLabelValues(actor)
+		for _, key := range sortedMapKeys(scalarValues) {
+			add(actorIndex, key, scalarValues[key], snmpTopologyV1ProducerSource, "attribute", nil)
 		}
-		for _, key := range arrayAttributeKeys {
-			addSlice(actorIndex, key, anyStringSlice(actor.Attributes[key]), snmpTopologyV1ProducerSource, "attribute")
+		arrayValues := topologyActorDetailArrayLabelValues(actor)
+		for _, key := range sortedMapKeys(arrayValues) {
+			addSlice(actorIndex, key, arrayValues[key], snmpTopologyV1ProducerSource, "attribute")
 		}
 	}
 

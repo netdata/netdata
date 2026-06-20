@@ -65,33 +65,29 @@ func buildSNMPTopologyV1Actors(actors []topologyActor, stringsDict *topologyv1.S
 		dnsNames[i] = stringArrayCell(actor.Match.DNSNames)
 		sysObjectIDs[i] = stringsDict.Ref(actor.Match.SysObjectID)
 		sysNames[i] = stringsDict.Ref(actor.Match.SysName)
-		parentDevices[i] = stringArrayCell(anyStringSlice(actor.Attributes["parent_devices"]))
-		vendors[i] = nullableStringRef(stringsDict, firstNonEmptyString(anyStringValue(actor.Attributes["vendor"]), anyStringValue(actor.Attributes["vendor_derived"])))
-		models[i] = nullableStringRef(stringsDict, anyStringValue(actor.Attributes["model"]))
-		sysDescrs[i] = nullableStringRef(stringsDict, anyStringValue(actor.Attributes["sys_descr"]))
-		sysLocations[i] = nullableStringRef(stringsDict, anyStringValue(actor.Attributes["sys_location"]))
-		sysContacts[i] = nullableStringRef(stringsDict, anyStringValue(actor.Attributes["sys_contact"]))
-		managementIPs[i] = nullableStringRef(stringsDict, anyStringValue(actor.Attributes["management_ip"]))
-		protocols[i] = stringArrayCell(anyStringSlice(actor.Attributes["protocols"]))
-		if isEmptyArrayCell(protocols[i]) {
-			// Older SNMP topology payloads used learned_sources for discovered protocols.
-			protocols[i] = stringArrayCell(anyStringSlice(actor.Attributes["learned_sources"]))
-		}
+		parentDevices[i] = stringArrayCell(topologyActorDetailParentDevices(actor))
+		vendors[i] = nullableStringRef(stringsDict, topologyActorDetailVendor(actor))
+		models[i] = nullableStringRef(stringsDict, topologyActorDetailModel(actor))
+		sysDescrs[i] = nullableStringRef(stringsDict, topologyActorDetailSysDescr(actor))
+		sysLocations[i] = nullableStringRef(stringsDict, topologyActorDetailSysLocation(actor))
+		sysContacts[i] = nullableStringRef(stringsDict, topologyActorDetailSysContact(actor))
+		managementIPs[i] = nullableStringRef(stringsDict, topologyActorDetailManagementIP(actor))
+		protocols[i] = stringArrayCell(topologyActorDetailProtocols(actor))
 		if isEmptyArrayCell(protocols[i]) {
 			protocols[i] = nil
 		}
-		capabilities[i] = stringArrayCell(anyStringSlice(actor.Attributes["capabilities"]))
+		capabilities[i] = stringArrayCell(topologyActorDetailCapabilities(actor))
 		if isEmptyArrayCell(capabilities[i]) {
 			capabilities[i] = nil
 		}
-		portsTotal[i] = nullableUintValue(actor.Attributes["ports_total"])
-		vlanCounts[i] = nullableUintValue(actor.Attributes["vlan_count"])
-		fdbTotalMACs[i] = nullableUintValue(actor.Attributes["fdb_total_macs"])
-		lldpNeighborCounts[i] = nullableUintValue(actor.Attributes["lldp_neighbor_count"])
-		cdpNeighborCounts[i] = nullableUintValue(actor.Attributes["cdp_neighbor_count"])
-		endpointsTotal[i] = nullableUintValue(actor.Attributes["endpoints_total"])
-		chartIDPrefixes[i] = nullableStringRef(stringsDict, anyStringValue(actor.Attributes["chart_id_prefix"]))
-		netdataHostIDs[i] = nullableStringRef(stringsDict, anyStringValue(actor.Attributes["netdata_host_id"]))
+		portsTotal[i] = nullableOptionalUintValue(topologyActorDetailPortsTotal(actor))
+		vlanCounts[i] = nullableOptionalUintValue(topologyActorDetailVLANCount(actor))
+		fdbTotalMACs[i] = nullableOptionalUintValue(topologyActorDetailFDBTotalMACs(actor))
+		lldpNeighborCounts[i] = nullableOptionalUintValue(topologyActorDetailLLDPNeighborCount(actor))
+		cdpNeighborCounts[i] = nullableOptionalUintValue(topologyActorDetailCDPNeighborCount(actor))
+		endpointsTotal[i] = nullableOptionalUintValue(topologyActorDetailEndpointsTotal(actor))
+		chartIDPrefixes[i] = nullableStringRef(stringsDict, topologyActorDetailChartIDPrefix(actor))
+		netdataHostIDs[i] = nullableStringRef(stringsDict, topologyActorDetailNetdataHostID(actor))
 	}
 
 	return topologyv1.MustTable(len(actors),
@@ -220,15 +216,7 @@ func snmpTopologyV1ActorType(actorType string) string {
 }
 
 func snmpTopologyV1DisplayName(actor topologyActor) string {
-	return firstNonEmptyString(
-		anyStringValue(actor.Attributes["display_name"]),
-		anyStringValue(actor.Attributes["name"]),
-		actor.Labels["display_name"],
-		actor.Labels["name"],
-		actor.Match.SysName,
-		firstString(actor.Match.Hostnames),
-		firstString(actor.Match.DNSNames),
-	)
+	return topologyActorDetailDisplayName(actor)
 }
 
 func snmpTopologyV1ActorLayer(actor topologyActor) string {

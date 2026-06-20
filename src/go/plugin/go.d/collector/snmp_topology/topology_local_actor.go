@@ -18,8 +18,7 @@ func augmentLocalActorFromCache(data *topologyData, local topologyDevice) {
 			continue
 		}
 
-		attrs := populateLocalActorAttributes(actor.Attributes, local)
-		actor.Attributes = pruneNilAttributes(attrs)
+		actor.Detail.SNMP = topologySNMPActorDetailFromDevice(local)
 		applyLocalActorLabels(actor, local)
 		enrichLocalActorChartReferences(actor, local.InterfaceCharts)
 		return

@@ -42,7 +42,7 @@ func newTopologyL3ActorResolver(data *topologyData, snapshots []topologyObservat
 		if ref.actorID != "" {
 			resolver.byActorID[ref.actorID] = ref
 		}
-		if deviceID := topologyMetricValueString(actor.Attributes, "device_id"); deviceID != "" {
+		if deviceID := topologyActorDetailDeviceID(actor); deviceID != "" {
 			resolver.addUniqueDeviceID(deviceID, ref)
 		}
 		for _, ip := range normalizedMatchIPs(actor.Match) {
@@ -171,7 +171,7 @@ func (r topologyL3ActorResolver) addUniqueRouterID(routerID string, ref topology
 
 func topologyL3ActorRouterIDs(actor topologyActor) []string {
 	values := make([]string, 0, 2)
-	if routerID := normalizeTopologyRouterID(anyStringValue(actor.Attributes[tagOSPFRouterID])); routerID != "" {
+	if routerID := topologyActorDetailOSPFRouterID(actor); routerID != "" {
 		values = append(values, routerID)
 	}
 	if routerID := normalizeTopologyRouterID(actor.Labels[tagOSPFRouterID]); routerID != "" {

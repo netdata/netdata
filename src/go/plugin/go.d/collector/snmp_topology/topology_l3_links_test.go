@@ -5,6 +5,7 @@ package snmptopology
 import (
 	"testing"
 
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/stretchr/testify/require"
 )
 
@@ -181,12 +182,24 @@ func TestApplyTopologyDepthFocusFilterKeepsIncidentL3SubnetLink(t *testing.T) {
 }
 
 func topologyL3ManagedActorForTest(actorID string, attrs map[string]any, ips ...string) topologyActor {
+	detail := topologyActorDetail{
+		L2: topologyengine.ProjectionActorDetail{
+			Device: topologyengine.ProjectionDeviceActorDetail{
+				DeviceID:     topologyMetricValueString(attrs, "device_id"),
+				ManagementIP: topologyMetricValueString(attrs, "management_ip"),
+				Inferred:     boolStatValue(attrs["inferred"]),
+			},
+		},
+		SNMP: topologySNMPActorDetail{
+			OSPFRouterID: normalizeTopologyRouterID(anyStringValue(attrs[tagOSPFRouterID])),
+		},
+	}
 	return topologyActor{
-		ActorID:    actorID,
-		ActorType:  "router",
-		Layer:      "network",
-		Source:     "snmp",
-		Match:      topologyMatch{IPAddresses: ips},
-		Attributes: attrs,
+		ActorID:   actorID,
+		ActorType: "router",
+		Layer:     "network",
+		Source:    "snmp",
+		Match:     topologyMatch{IPAddresses: ips},
+		Detail:    detail,
 	}
 }

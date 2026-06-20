@@ -5,21 +5,21 @@ package snmptopology
 import (
 	"testing"
 
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/stretchr/testify/require"
 )
 
-func TestEnrichLocalActorChartReferencesAddsStatusAndPortRows(t *testing.T) {
+func TestEnrichLocalActorChartReferencesAddsTypedPortDetails(t *testing.T) {
 	actor := &topologyActor{
-		Attributes: map[string]any{
-			"if_statuses": []map[string]any{
-				{"if_name": "Gi0/1"},
-				{"if_name": "Gi0/2"},
-			},
-		},
-		Tables: map[string][]map[string]any{
-			"ports": {
-				{"name": "Gi0/1"},
-				{"name": "Gi0/3"},
+		Detail: topologyActorDetail{
+			L2: topologyengine.ProjectionActorDetail{
+				Device: topologyengine.ProjectionDeviceActorDetail{
+					Ports: []topologyengine.ProjectionPortDetail{
+						{Name: "Gi0/1"},
+						{IfName: "Gi0/2"},
+						{Name: "Gi0/3"},
+					},
+				},
 			},
 		},
 	}
@@ -34,45 +34,22 @@ func TestEnrichLocalActorChartReferencesAddsStatusAndPortRows(t *testing.T) {
 		},
 	})
 
-	statuses, ok := actor.Attributes["if_statuses"].([]map[string]any)
-	require.True(t, ok)
-
 	tests := map[string]struct {
-		row         map[string]any
+		port        topologyengine.ProjectionPortDetail
 		wantSuffix  string
 		wantMetrics []string
 	}{
-		"port-exact":        {row: actor.Tables["ports"][0], wantSuffix: "gi0_1", wantMetrics: []string{"errors", "traffic"}},
-		"status-exact":      {row: statuses[0], wantSuffix: "gi0_1", wantMetrics: []string{"errors", "traffic"}},
-		"status-normalized": {row: statuses[1], wantSuffix: "gi0/2", wantMetrics: []string{"drops"}},
+		"name-match":    {port: actor.Detail.L2.Device.Ports[0], wantSuffix: "gi0_1", wantMetrics: []string{"errors", "traffic"}},
+		"if-name-match": {port: actor.Detail.L2.Device.Ports[1], wantSuffix: "gi0/2", wantMetrics: []string{"drops"}},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			require.Equal(t, tc.wantSuffix, tc.row["chart_id_suffix"])
-			require.Equal(t, tc.wantMetrics, tc.row["available_metrics"])
+			require.Equal(t, tc.wantSuffix, tc.port.ChartIDSuffix)
+			require.Equal(t, tc.wantMetrics, tc.port.AvailableMetrics)
 		})
 	}
 
-	require.NotContains(t, actor.Tables["ports"][1], "chart_id_suffix")
-}
-
-func TestEnrichTopologyInterfaceStatusesWithChartRefsSupportsAnySlices(t *testing.T) {
-	statuses := []any{
-		map[string]any{"if_name": "Gi0/10"},
-		"not-a-map",
-	}
-
-	enriched := enrichTopologyInterfaceStatusesWithChartRefs(statuses, map[string]topologyInterfaceChartRef{
-		"gi0/10": {
-			ChartIDSuffix:    "gi0_10",
-			AvailableMetrics: []string{"traffic"},
-		},
-	}).([]any)
-
-	status, ok := enriched[0].(map[string]any)
-	require.True(t, ok)
-	require.Equal(t, "gi0_10", status["chart_id_suffix"])
-	require.Equal(t, []string{"traffic"}, status["available_metrics"])
-	require.Equal(t, "not-a-map", enriched[1])
+	require.Empty(t, actor.Detail.L2.Device.Ports[2].ChartIDSuffix)
+	require.Empty(t, actor.Detail.L2.Device.Ports[2].AvailableMetrics)
 }

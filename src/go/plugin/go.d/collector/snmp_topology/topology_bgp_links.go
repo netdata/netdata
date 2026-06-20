@@ -20,6 +20,25 @@ type topologyBGPEnrichmentStats struct {
 	suppressedDuplicateLink      int
 }
 
+type topologyBGPPeerDetailRow struct {
+	RemoteActorID         string
+	RoutingInstance       string
+	NeighborIP            string
+	RemoteAS              string
+	State                 string
+	AdminStatus           string
+	LocalIP               string
+	LocalAS               string
+	LocalIdentifier       string
+	PeerIdentifier        string
+	PeerType              string
+	BGPVersion            string
+	Description           string
+	EstablishedUptime     *int64
+	LastReceivedUpdateAge *int64
+	Source                string
+}
+
 func applyTopologyBGPAdjacencyEnrichment(data *topologyData, aggregate topologyObservationAggregate) topologyBGPEnrichmentStats {
 	var stats topologyBGPEnrichmentStats
 	if data == nil || len(aggregate.bgpPeers) == 0 {
@@ -28,7 +47,7 @@ func applyTopologyBGPAdjacencyEnrichment(data *topologyData, aggregate topologyO
 
 	resolver := newTopologyBGPActorResolver(data, aggregate)
 	seen := existingTopologyBGPLinkKeys(data.Links)
-	peerRowsByActor := make(map[string][]map[string]any)
+	peerRowsByActor := make(map[string][]topologyBGPPeerDetailRow)
 
 	for _, row := range aggregate.bgpPeers {
 		stats.observedRows++
@@ -37,7 +56,7 @@ func applyTopologyBGPAdjacencyEnrichment(data *topologyData, aggregate topologyO
 		if localOK {
 			modalRow := topologyBGPPeerActorRow(row)
 			if remoteOK {
-				modalRow["remote_actor_id"] = remoteRef.actorID
+				modalRow.RemoteActorID = remoteRef.actorID
 			}
 			peerRowsByActor[localRef.actorID] = append(peerRowsByActor[localRef.actorID], modalRow)
 			stats.attachedPeerRows++
@@ -70,7 +89,7 @@ func applyTopologyBGPAdjacencyEnrichment(data *topologyData, aggregate topologyO
 		stats.emittedLinks++
 	}
 
-	attachTopologyActorTableRows(data, "bgp_peers", peerRowsByActor, sortTopologyBGPPeerRows)
+	attachTopologyBGPPeerRows(data, peerRowsByActor)
 	sort.Slice(data.Links, func(i, j int) bool {
 		return topologyLinkSortKey(data.Links[i]) < topologyLinkSortKey(data.Links[j])
 	})
@@ -218,34 +237,24 @@ func topologyBGPLinkMetrics(row topologyBGPPeer, src, dst topologyBGPEndpoint) m
 	return metrics
 }
 
-func topologyBGPPeerActorRow(row topologyBGPPeer) map[string]any {
-	out := map[string]any{
-		"routing_instance": row.RoutingInstance,
-		"remote_as":        row.RemoteAS,
-		"state":            row.State,
-		"source":           "bgp_mib",
+func topologyBGPPeerActorRow(row topologyBGPPeer) topologyBGPPeerDetailRow {
+	return topologyBGPPeerDetailRow{
+		RoutingInstance:       row.RoutingInstance,
+		NeighborIP:            strings.TrimSpace(row.NeighborIP),
+		RemoteAS:              strings.TrimSpace(row.RemoteAS),
+		State:                 strings.TrimSpace(row.State),
+		AdminStatus:           strings.TrimSpace(row.AdminStatus),
+		LocalIP:               strings.TrimSpace(row.LocalIP),
+		LocalAS:               strings.TrimSpace(row.LocalAS),
+		LocalIdentifier:       strings.TrimSpace(row.LocalIdentifier),
+		PeerIdentifier:        strings.TrimSpace(row.PeerIdentifier),
+		PeerType:              strings.TrimSpace(row.PeerType),
+		BGPVersion:            strings.TrimSpace(row.BGPVersion),
+		Description:           strings.TrimSpace(row.Description),
+		EstablishedUptime:     row.EstablishedUptime,
+		LastReceivedUpdateAge: row.LastReceivedUpdateAge,
+		Source:                "bgp_mib",
 	}
-	add := func(key, value string) {
-		if value = strings.TrimSpace(value); value != "" {
-			out[key] = value
-		}
-	}
-	add("neighbor_ip", row.NeighborIP)
-	add("local_ip", row.LocalIP)
-	add("local_as", row.LocalAS)
-	add("local_identifier", row.LocalIdentifier)
-	add("peer_identifier", row.PeerIdentifier)
-	add("peer_type", row.PeerType)
-	add("bgp_version", row.BGPVersion)
-	add("description", row.Description)
-	add("admin_status", row.AdminStatus)
-	if row.EstablishedUptime != nil {
-		out["established_uptime"] = *row.EstablishedUptime
-	}
-	if row.LastReceivedUpdateAge != nil {
-		out["last_received_update_age"] = *row.LastReceivedUpdateAge
-	}
-	return out
 }
 
 func existingTopologyBGPLinkKeys(links []topologyLink) map[string]struct{} {

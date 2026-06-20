@@ -96,25 +96,25 @@ func TestTopologyBGPPeerFromRowKeepsOnlyDiagnosticRawAddresses(t *testing.T) {
 }
 
 func TestSortTopologyBGPPeerRowsUsesRawNeighborFallback(t *testing.T) {
-	rows := []map[string]any{
+	rows := []topologyBGPPeerDetailRow{
 		{
-			"routing_instance": "default",
-			"remote_as":        "65002",
-			"neighbor_ip":      "raw-b",
-			"state":            "established",
+			RoutingInstance: "default",
+			RemoteAS:        "65002",
+			NeighborIP:      "raw-b",
+			State:           "established",
 		},
 		{
-			"routing_instance": "default",
-			"remote_as":        "65002",
-			"neighbor_ip":      "raw-a",
-			"state":            "established",
+			RoutingInstance: "default",
+			RemoteAS:        "65002",
+			NeighborIP:      "raw-a",
+			State:           "established",
 		},
 	}
 
-	sortTopologyBGPPeerRows(rows)
+	sortTopologyBGPPeerDetailRows(rows)
 
-	require.Equal(t, "raw-a", rows[0]["neighbor_ip"])
-	require.Equal(t, "raw-b", rows[1]["neighbor_ip"])
+	require.Equal(t, "raw-a", rows[0].NeighborIP)
+	require.Equal(t, "raw-b", rows[1].NeighborIP)
 }
 
 func TestBuildSNMPTopologyV1BGPPeersTableHandlesRawAndUnspecifiedAddresses(t *testing.T) {

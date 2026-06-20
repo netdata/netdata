@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/snmptopologyfunc"
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -165,7 +166,7 @@ func TestTopologyFunctionAdapter_HandleUnknownSelectorsFallbackToDefaults(t *tes
 	assert.Equal(t, defaultData.View.ID, invalidData.View.ID)
 }
 
-func TestSNMPTopologyToV1_PreservesActorCustomTables(t *testing.T) {
+func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 	ts := time.Date(2026, 5, 9, 12, 0, 0, 0, time.UTC)
 	data := topologyData{
 		AgentID:     "agent-test",
@@ -180,46 +181,46 @@ func TestSNMPTopologyToV1_PreservesActorCustomTables(t *testing.T) {
 					MacAddresses: []string{"00:11:22:33:44:55"},
 					SysName:      "sw-a",
 				},
-				Attributes: map[string]any{
-					"ports_total":         uint64(0),
-					"lldp_neighbor_count": uint64(0),
-				},
-				Tables: map[string][]map[string]any{
-					"ports": {
-						{
-							"if_index":       uint64(1),
-							"port_id":        "1",
-							"name":           "Gi0/1",
-							"if_name":        "Gi0/1",
-							"if_descr":       "GigabitEthernet0/1",
-							"if_alias":       "uplink to sw-b",
-							"mac":            "00:11:22:33:44:56",
-							"speed":          uint64(1000000000),
-							"neighbor_count": uint64(0),
-							"vlan_ids":       []int{10, 20},
-							"vendor_note":    "uplink",
-							"neighbors": []map[string]any{
+				Labels: map[string]string{"site": "lab"},
+				Detail: topologyActorDetail{
+					L2: topologyengine.ProjectionActorDetail{
+						Device: topologyengine.ProjectionDeviceActorDetail{
+							HasInventoryStats: true,
+							PortsTotal:        0,
+							LLDPNeighborCount: 0,
+							Ports: []topologyengine.ProjectionPortDetail{
 								{
-									"protocol":    "lldp",
-									"remote_port": "Gi0/2",
-								},
-							},
-							"vlans": []map[string]any{
-								{
-									"id":   "10",
-									"name": "users",
+									IfIndex:                1,
+									PortID:                 "1",
+									Name:                   "Gi0/1",
+									IfName:                 "Gi0/1",
+									IfDescr:                "GigabitEthernet0/1",
+									IfAlias:                "uplink to sw-b",
+									MAC:                    "00:11:22:33:44:56",
+									Speed:                  1000000000,
+									NeighborCount:          0,
+									VLANIDs:                []string{"10", "20"},
+									Duplex:                 "full",
+									LinkModeConfidence:     "high",
+									TopologyRoleConfidence: "medium",
+									LinkModeSources:        []string{"lldp"},
+									TopologyRoleSources:    []string{"bridge"},
+									LastChange:             "2026-01-02T01:02:03Z",
+									Neighbors: []topologyengine.ProjectionPortNeighbor{
+										{
+											Protocol:   "lldp",
+											RemotePort: "Gi0/2",
+										},
+									},
+									VLANs: []topologyengine.ProjectionPortVLAN{
+										{
+											VLANID:   "10",
+											VLANName: "users",
+										},
+									},
 								},
 							},
 						},
-					},
-					"labels": {
-						{"name": "custom-label-row"},
-					},
-					"custom_labels": {
-						{"name": "secondary-custom-label-row"},
-					},
-					"metadata": {
-						{"name": "custom-metadata-row"},
 					},
 				},
 			},
@@ -231,8 +232,16 @@ func TestSNMPTopologyToV1_PreservesActorCustomTables(t *testing.T) {
 					MacAddresses: []string{"aa:bb:cc:dd:ee:ff"},
 					SysName:      "sw-b",
 				},
-				Attributes: map[string]any{
-					"learned_sources": []string{"arp"},
+				Detail: topologyActorDetail{
+					L2: topologyengine.ProjectionActorDetail{
+						Device: topologyengine.ProjectionDeviceActorDetail{
+							CapabilitiesSupported: []string{"router"},
+							CapabilitiesEnabled:   []string{"bridge"},
+						},
+						Endpoint: topologyengine.ProjectionEndpointActorDetail{
+							LearnedSources: []string{"arp"},
+						},
+					},
 				},
 			},
 		},
@@ -266,9 +275,9 @@ func TestSNMPTopologyToV1_PreservesActorCustomTables(t *testing.T) {
 	require.Contains(t, payload.Tables.Actor, "actor_port_links")
 	require.Contains(t, payload.Tables.Actor, "actor_labels")
 	require.Contains(t, payload.Tables.Actor, "actor_metadata")
-	require.Contains(t, payload.Tables.Actor, "actor_custom_labels")
-	require.Contains(t, payload.Tables.Actor, "actor_detail_custom_labels")
-	require.Contains(t, payload.Tables.Actor, "actor_custom_metadata")
+	require.NotContains(t, payload.Tables.Actor, "actor_custom_labels")
+	require.NotContains(t, payload.Tables.Actor, "actor_detail_custom_labels")
+	require.NotContains(t, payload.Tables.Actor, "actor_custom_metadata")
 
 	portTable := payload.Tables.Actor["actor_ports"].Table
 	assert.Equal(t, 1, portTable.Rows)
@@ -284,7 +293,13 @@ func TestSNMPTopologyToV1_PreservesActorCustomTables(t *testing.T) {
 	assert.Equal(t, "string_ref", topologyV1ColumnType(portTable, "neighbor_port_name"))
 	assert.Equal(t, "json", topologyV1ColumnType(portTable, "neighbors"))
 	assert.Equal(t, "json", topologyV1ColumnType(portTable, "vlans"))
-	assert.Equal(t, "json", topologyV1ColumnType(portTable, "extra"))
+	assert.Empty(t, topologyV1ColumnType(portTable, "extra"))
+	assert.Equal(t, "string_ref", topologyV1ColumnType(portTable, "duplex"))
+	assert.Equal(t, "string_ref", topologyV1ColumnType(portTable, "link_mode_confidence"))
+	assert.Equal(t, "string_ref", topologyV1ColumnType(portTable, "topology_role_confidence"))
+	assert.Equal(t, "array", topologyV1ColumnType(portTable, "link_mode_sources"))
+	assert.Equal(t, "array", topologyV1ColumnType(portTable, "topology_role_sources"))
+	assert.Equal(t, "string_ref", topologyV1ColumnType(portTable, "last_change"))
 	assert.Equal(t, []any{uint64(0), nil}, topologyV1ColumnValues(t, payload.Actors, "ports_total"))
 	assert.Equal(t, []any{nil, []any{"arp"}}, topologyV1ColumnValues(t, payload.Actors, "protocols"))
 	assert.Equal(t, []any{nil, nil}, topologyV1ColumnValues(t, payload.Actors, "capabilities"))
@@ -299,7 +314,12 @@ func TestSNMPTopologyToV1_PreservesActorCustomTables(t *testing.T) {
 	assert.Equal(t, []any{uint64(0)}, topologyV1ColumnValues(t, portTable, "neighbor_count"))
 	assert.Equal(t, []any{1}, topologyV1ColumnValues(t, portTable, "neighbor_actor"))
 	assert.Equal(t, []string{"Gi0/2"}, topologyV1StringColumnValues(t, payload, portTable, "neighbor_port_name"))
-	assert.Equal(t, []any{map[string]any{"vendor_note": "uplink"}}, topologyV1ColumnValues(t, portTable, "extra"))
+	assert.Equal(t, []string{"full"}, topologyV1StringColumnValues(t, payload, portTable, "duplex"))
+	assert.Equal(t, []string{"high"}, topologyV1StringColumnValues(t, payload, portTable, "link_mode_confidence"))
+	assert.Equal(t, []string{"medium"}, topologyV1StringColumnValues(t, payload, portTable, "topology_role_confidence"))
+	assert.Equal(t, []any{[]any{"lldp"}}, topologyV1ColumnValues(t, portTable, "link_mode_sources"))
+	assert.Equal(t, []any{[]any{"bridge"}}, topologyV1ColumnValues(t, portTable, "topology_role_sources"))
+	assert.Equal(t, []string{"2026-01-02T01:02:03Z"}, topologyV1StringColumnValues(t, payload, portTable, "last_change"))
 
 	portLinksTable := payload.Tables.Actor["actor_port_links"].Table
 	assert.Equal(t, 2, portLinksTable.Rows)
@@ -320,6 +340,10 @@ func TestSNMPTopologyToV1_PreservesActorCustomTables(t *testing.T) {
 	assert.Equal(t, "actor_ref", topologyV1ColumnType(labelTable, "actor"))
 	assert.Equal(t, "string_ref", topologyV1ColumnType(labelTable, "key"))
 	assert.Equal(t, "attribute", topologyV1ColumnRole(labelTable, "key"))
+	assert.Contains(t, topologyV1StringColumnValues(t, payload, labelTable, "key"), "capabilities_supported")
+	assert.Contains(t, topologyV1StringColumnValues(t, payload, labelTable, "key"), "capabilities_enabled")
+	assert.Contains(t, topologyV1StringColumnValues(t, payload, labelTable, "value"), "router")
+	assert.Contains(t, topologyV1StringColumnValues(t, payload, labelTable, "value"), "bridge")
 
 	require.Contains(t, payload.Evidence, "lldp")
 	evidenceTable := payload.Evidence["lldp"].Table
@@ -380,11 +404,15 @@ func TestSNMPTopologyToV1_UsesIfIndexAsVisiblePortID(t *testing.T) {
 				Match: topologyMatch{
 					SysName: "sw-a",
 				},
-				Tables: map[string][]map[string]any{
-					"ports": {
-						{
-							"if_index": uint64(42),
-							"if_name":  "Gi0/42",
+				Detail: topologyActorDetail{
+					L2: topologyengine.ProjectionActorDetail{
+						Device: topologyengine.ProjectionDeviceActorDetail{
+							Ports: []topologyengine.ProjectionPortDetail{
+								{
+									IfIndex: 42,
+									IfName:  "Gi0/42",
+								},
+							},
 						},
 					},
 				},
@@ -609,16 +637,16 @@ func TestSNMPTopologyToV1_PreservesOSPFAdjacencyPresentationEvidenceAndNeighborR
 				ActorID:   "router-a",
 				ActorType: "router",
 				Source:    "snmp",
-				Tables: map[string][]map[string]any{
-					"ospf_neighbors": {
+				Detail: topologyActorDetail{
+					OSPF: []topologyOSPFNeighborDetailRow{
 						{
-							"local_router_id":    "1.1.1.1",
-							"neighbor_router_id": "2.2.2.2",
-							"neighbor_ip":        "192.0.2.2",
-							"state":              "full",
-							"local_ip":           "192.0.2.1",
-							"subnet":             "192.0.2.0/30",
-							"remote_actor_id":    "router-b",
+							LocalRouterID:    "1.1.1.1",
+							NeighborRouterID: "2.2.2.2",
+							NeighborIP:       "192.0.2.2",
+							State:            "full",
+							LocalIP:          "192.0.2.1",
+							Subnet:           "192.0.2.0/30",
+							RemoteActorID:    "router-b",
 						},
 					},
 				},
@@ -736,24 +764,24 @@ func TestSNMPTopologyToV1_PreservesBGPAdjacencyPresentationEvidenceAndPeerRows(t
 				ActorID:   "router-a",
 				ActorType: "router",
 				Source:    "snmp",
-				Tables: map[string][]map[string]any{
-					"bgp_peers": {
+				Detail: topologyActorDetail{
+					BGP: []topologyBGPPeerDetailRow{
 						{
-							"routing_instance":         "default",
-							"neighbor_ip":              "192.0.2.2",
-							"remote_as":                "65002",
-							"state":                    "established",
-							"admin_status":             "enabled",
-							"local_ip":                 "192.0.2.1",
-							"local_as":                 "65001",
-							"local_identifier":         "1.1.1.1",
-							"peer_identifier":          "2.2.2.2",
-							"peer_type":                "external",
-							"bgp_version":              "4",
-							"description":              "edge-peer",
-							"established_uptime":       int64(300),
-							"last_received_update_age": int64(12),
-							"remote_actor_id":          "router-b",
+							RoutingInstance:       "default",
+							NeighborIP:            "192.0.2.2",
+							RemoteAS:              "65002",
+							State:                 "established",
+							AdminStatus:           "enabled",
+							LocalIP:               "192.0.2.1",
+							LocalAS:               "65001",
+							LocalIdentifier:       "1.1.1.1",
+							PeerIdentifier:        "2.2.2.2",
+							PeerType:              "external",
+							BGPVersion:            "4",
+							Description:           "edge-peer",
+							EstablishedUptime:     int64PtrForTest(300),
+							LastReceivedUpdateAge: int64PtrForTest(12),
+							RemoteActorID:         "router-b",
 						},
 					},
 				},

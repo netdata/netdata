@@ -56,6 +56,10 @@ func defaultTopologyQueryOptionsForTest() topologyQueryOptions {
 	}
 }
 
+func int64PtrForTest(value int64) *int64 {
+	return &value
+}
+
 func containsMgmtAddr(snapshot topologyData, addrs map[string]struct{}) bool {
 	for _, actor := range snapshot.Actors {
 		for _, ip := range actor.Match.IPAddresses {

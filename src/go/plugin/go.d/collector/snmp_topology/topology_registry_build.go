@@ -3,9 +3,11 @@
 package snmptopology
 
 import (
+	"strings"
 	"time"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
 func buildSNMPTopologySnapshot(aggregate topologyObservationAggregate, options topologyQueryOptions) (topologyData, bool) {
@@ -106,7 +108,7 @@ func buildSNMPL2TopologyData(
 		return topologyData{}, false
 	}
 
-	graphData, stats := topologyengine.ToGraph(result, topologyengine.GraphOptions{
+	projection := topologyengine.ToGraph(result, topologyengine.GraphOptions{
 		SchemaVersion:             topologySchemaVersion,
 		Source:                    "snmp",
 		Layer:                     "2",
@@ -120,6 +122,7 @@ func buildSNMPL2TopologyData(
 		ProbabilisticConnectivity: isTopologyMapTypeProbable(options.MapType),
 		InferenceStrategy:         options.InferenceStrategy,
 	})
+	graphData := projection.Graph
 	data := topologyData{
 		SchemaVersion: graphData.SchemaVersion,
 		Source:        graphData.Source,
@@ -127,12 +130,23 @@ func buildSNMPL2TopologyData(
 		AgentID:       graphData.AgentID,
 		CollectedAt:   graphData.CollectedAt,
 		View:          graphData.View,
-		Actors:        graphData.Actors,
+		Actors:        topologyActorsFromProjection(graphData.Actors, projection.ActorDetails),
 		Links:         graphData.Links,
 		Stats: topologyStats{
-			L2:    stats,
+			L2:    projection.Stats,
 			HasL2: true,
 		},
 	}
 	return data, true
+}
+
+func topologyActorsFromProjection(actors []graph.Actor, details map[string]topologyengine.ProjectionActorDetail) []topologyActor {
+	if len(actors) == 0 {
+		return nil
+	}
+	out := make([]topologyActor, len(actors))
+	for i, actor := range actors {
+		out[i] = topologyActorFromGraph(actor, details[strings.TrimSpace(actor.ActorID)])
+	}
+	return out
 }
