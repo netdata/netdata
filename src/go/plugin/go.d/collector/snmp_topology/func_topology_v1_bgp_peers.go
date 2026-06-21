@@ -2,6 +2,8 @@
 
 package snmptopology
 
+import "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+
 import topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 
 func buildSNMPTopologyV1BGPPeersTable(
@@ -30,21 +32,21 @@ func buildSNMPTopologyV1BGPPeersTable(
 	for i, row := range rows {
 		actorRefs[i] = row.actorRef
 		remoteActors[i] = nullableActorRef(actorIndex, row.values["remote_actor_id"])
-		routingInstances[i] = nullableStringRef(stringsDict, firstNonEmptyString(topologyV1ScalarLabelValue(row.values["routing_instance"]), "default"))
+		routingInstances[i] = nullableStringRef(stringsDict, topologyutil.FirstNonEmptyString(topologyV1ScalarLabelValue(row.values["routing_instance"]), "default"))
 		neighborIPs[i] = nullableStringRef(stringsDict, topologyBGPPeerAddressValue(topologyV1ScalarLabelValue(row.values["neighbor_ip"])))
 		remoteASes[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["remote_as"]))
 		states[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["state"]))
 		adminStatuses[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["admin_status"]))
 		localIPs[i] = nullableStringRef(stringsDict, topologyBGPPeerAddressValue(topologyV1ScalarLabelValue(row.values["local_ip"])))
 		localASes[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["local_as"]))
-		localIdentifiers[i] = nullableStringRef(stringsDict, normalizeBGPRouterID(topologyV1ScalarLabelValue(row.values["local_identifier"])))
-		peerIdentifiers[i] = nullableStringRef(stringsDict, normalizeBGPRouterID(topologyV1ScalarLabelValue(row.values["peer_identifier"])))
+		localIdentifiers[i] = nullableStringRef(stringsDict, topologyutil.NormalizeBGPRouterID(topologyV1ScalarLabelValue(row.values["local_identifier"])))
+		peerIdentifiers[i] = nullableStringRef(stringsDict, topologyutil.NormalizeBGPRouterID(topologyV1ScalarLabelValue(row.values["peer_identifier"])))
 		peerTypes[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["peer_type"]))
 		bgpVersions[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["bgp_version"]))
 		descriptions[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["description"]))
 		establishedUptimes[i] = nullableUintValue(row.values["established_uptime"])
 		lastReceivedUpdateAges[i] = nullableUintValue(row.values["last_received_update_age"])
-		sources[i] = nullableStringRef(stringsDict, firstNonEmptyString(topologyV1ScalarLabelValue(row.values["source"]), "bgp_mib"))
+		sources[i] = nullableStringRef(stringsDict, topologyutil.FirstNonEmptyString(topologyV1ScalarLabelValue(row.values["source"]), "bgp_mib"))
 	}
 
 	return topologyv1.MustTable(len(rows), snmpTopologyV1BGPPeersColumns(), []topologyv1.ColumnEncoding{
@@ -83,7 +85,7 @@ func snmpTopologyV1BGPPeerValues(row topologyBGPPeerDetailRow) map[string]any {
 		"peer_type":        row.PeerType,
 		"bgp_version":      row.BGPVersion,
 		"description":      row.Description,
-		"source":           firstNonEmptyString(row.Source, "bgp_mib"),
+		"source":           topologyutil.FirstNonEmptyString(row.Source, "bgp_mib"),
 	}
 	if row.EstablishedUptime != nil {
 		out["established_uptime"] = *row.EstablishedUptime

@@ -14,6 +14,7 @@ import (
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/snmptopologyfunc"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
@@ -1292,7 +1293,7 @@ func TestNormalizeTopologyInferenceStrategy(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tc.want, normalizeTopologyInferenceStrategy(tc.in))
+			assert.Equal(t, tc.want, topologyoptions.NormalizeInferenceStrategy(tc.in))
 		})
 	}
 }
@@ -1315,19 +1316,19 @@ func TestNormalizeTopologyManagedFocuses(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tc.want, normalizeTopologyManagedFocuses(tc.in))
+			assert.Equal(t, tc.want, topologyoptions.NormalizeManagedFocuses(tc.in))
 		})
 	}
 
 	assert.Equal(
 		t,
 		"ip:10.0.0.1,ip:10.0.0.2",
-		formatTopologyManagedFocuses([]string{"ip:10.0.0.2", "ip:10.0.0.1"}),
+		topologyoptions.FormatManagedFocuses([]string{"ip:10.0.0.2", "ip:10.0.0.1"}),
 	)
-	assert.Equal(t, []string{topologyManagedFocusAllDevices}, parseTopologyManagedFocuses(""))
-	assert.Equal(t, []string{"10.0.0.1", "10.0.0.2"}, topologyManagedFocusSelectedIPs("ip:10.0.0.2,ip:10.0.0.1"))
-	assert.True(t, isTopologyManagedFocusAllDevices(topologyManagedFocusAllDevices))
-	assert.False(t, isTopologyManagedFocusAllDevices("ip:10.0.0.1"))
+	assert.Equal(t, []string{topologyManagedFocusAllDevices}, topologyoptions.ParseManagedFocuses(""))
+	assert.Equal(t, []string{"10.0.0.1", "10.0.0.2"}, topologyoptions.ManagedFocusSelectedIPs("ip:10.0.0.2,ip:10.0.0.1"))
+	assert.True(t, topologyoptions.IsManagedFocusAllDevices(topologyManagedFocusAllDevices))
+	assert.False(t, topologyoptions.IsManagedFocusAllDevices("ip:10.0.0.1"))
 }
 
 func newTestTopologyCacheLLDP(

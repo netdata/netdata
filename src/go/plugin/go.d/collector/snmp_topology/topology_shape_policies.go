@@ -2,13 +2,18 @@
 
 package snmptopology
 
-import "sort"
+import (
+	"sort"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
+)
 
 func applySNMPTopologyShapePolicies(data *topologyData, options topologyQueryOptions) {
 	if data == nil {
 		return
 	}
-	mapType := normalizeTopologyMapType(options.MapType)
+	mapType := topologyoptions.NormalizeMapType(options.MapType)
 	if mapType == "" {
 		mapType = topologyMapTypeAllDevicesLowConfidence
 	}
@@ -35,10 +40,10 @@ func applySNMPTopologyShapePolicies(data *topologyData, options topologyQueryOpt
 	filterDanglingLinks(data)
 
 	sort.Slice(data.Actors, func(i, j int) bool {
-		return canonicalMatchKey(data.Actors[i].Match) < canonicalMatchKey(data.Actors[j].Match)
+		return topologymodel.CanonicalMatchKey(data.Actors[i].Match) < topologymodel.CanonicalMatchKey(data.Actors[j].Match)
 	})
 	sort.Slice(data.Links, func(i, j int) bool {
-		return topologyLinkSortKey(data.Links[i]) < topologyLinkSortKey(data.Links[j])
+		return topologymodel.LinkSortKey(data.Links[i]) < topologymodel.LinkSortKey(data.Links[j])
 	})
 
 	data.Stats.Shape.ActorsCollapsedByIP = collapsed
@@ -46,9 +51,9 @@ func applySNMPTopologyShapePolicies(data *topologyData, options topologyQueryOpt
 	data.Stats.Shape.ActorsMapTypeSuppressed = removedByMapType
 	data.Stats.Shape.SegmentsSparseSuppressed = removedSparseSegments
 	data.Stats.Shape.MapType = options.MapType
-	if strategy := normalizeTopologyInferenceStrategy(options.InferenceStrategy); strategy != "" {
+	if strategy := topologyoptions.NormalizeInferenceStrategy(options.InferenceStrategy); strategy != "" {
 		data.Stats.Shape.InferenceStrategy = strategy
 	}
 	data.Stats.HasShape = true
-	recomputeTopologyLinkStats(data)
+	topologymodel.RecomputeLinkStats(data)
 }

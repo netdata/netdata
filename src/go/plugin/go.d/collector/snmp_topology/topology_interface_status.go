@@ -2,8 +2,10 @@
 
 package snmptopology
 
+import "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+
 func normalizeInterfaceAdminStatus(value string) string {
-	value = canonicalSNMPEnumValue(value)
+	value = topologyutil.CanonicalSNMPEnumValue(value)
 	switch value {
 	case "1":
 		return "up"
@@ -19,7 +21,7 @@ func normalizeInterfaceAdminStatus(value string) string {
 }
 
 func normalizeInterfaceOperStatus(value string) string {
-	value = canonicalSNMPEnumValue(value)
+	value = topologyutil.CanonicalSNMPEnumValue(value)
 	switch value {
 	case "1":
 		return "up"
@@ -51,7 +53,7 @@ func normalizeInterfaceOperStatus(value string) string {
 }
 
 func normalizeInterfaceDuplex(value string) string {
-	value = canonicalSNMPEnumValue(value)
+	value = topologyutil.CanonicalSNMPEnumValue(value)
 	switch value {
 	case "1", "unknown":
 		return "unknown"

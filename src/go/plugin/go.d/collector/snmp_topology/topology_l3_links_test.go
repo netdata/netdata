@@ -4,6 +4,7 @@ package snmptopology
 
 import (
 	"fmt"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"strings"
 	"testing"
 
@@ -46,7 +47,7 @@ func TestApplyTopologyL3SubnetEnrichmentSuppressions(t *testing.T) {
 				},
 			},
 			aggregate: topologyObservationAggregate{
-				l3Interfaces: []topologyL3Interface{
+				L3Interfaces: []topologyL3Interface{
 					l3InterfaceForTest("device-a", "198.51.100.1", "255.255.255.252", "2"),
 					l3InterfaceForTest("device-b", "198.51.100.2", "255.255.255.252", "3"),
 				},
@@ -61,7 +62,7 @@ func TestApplyTopologyL3SubnetEnrichmentSuppressions(t *testing.T) {
 				},
 			},
 			aggregate: topologyObservationAggregate{
-				l3Interfaces: []topologyL3Interface{
+				L3Interfaces: []topologyL3Interface{
 					l3InterfaceForTest("device-a", "198.51.100.1", "255.255.255.252", "2"),
 					l3InterfaceForTest("device-b", "198.51.100.2", "255.255.255.252", "3"),
 				},
@@ -78,7 +79,7 @@ func TestApplyTopologyL3SubnetEnrichmentSuppressions(t *testing.T) {
 				Links: []topologyLink{topologyL3SubnetLinkForTest("router-a", "router-b", "198.51.100.0/30", uint64(30))},
 			},
 			aggregate: topologyObservationAggregate{
-				l3Interfaces: []topologyL3Interface{
+				L3Interfaces: []topologyL3Interface{
 					l3InterfaceForTest("router-a", "198.51.100.1", "255.255.255.252", "2"),
 					l3InterfaceForTest("router-b", "198.51.100.2", "255.255.255.252", "3"),
 				},
@@ -99,9 +100,9 @@ func TestApplyTopologyL3SubnetEnrichmentSuppressions(t *testing.T) {
 			} else {
 				require.Equal(t, tc.wantLinks, tc.data.Links)
 			}
-			require.Equal(t, tc.wantUnresolvedActor, stats.suppressedUnresolvedActor)
-			require.Equal(t, tc.wantSelfActor, stats.suppressedSelfActor)
-			require.Equal(t, tc.wantDuplicateLink, stats.suppressedDuplicateLink)
+			require.Equal(t, tc.wantUnresolvedActor, stats.SuppressedUnresolvedActor)
+			require.Equal(t, tc.wantSelfActor, stats.SuppressedSelfActor)
+			require.Equal(t, tc.wantDuplicateLink, stats.SuppressedDuplicateLink)
 			require.Equal(t, 1, topologyStatsToV1(tc.data.Stats)["l3_subnet_candidate_links"])
 			require.Equal(t, 0, topologyStatsToV1(tc.data.Stats)["l3_subnet_emitted_links"])
 			require.Equal(t, tc.wantVisibleLinks, topologyStatsToV1(tc.data.Stats)["l3_subnet_visible_links"])
@@ -153,7 +154,7 @@ func TestTopologyL3SubnetLinkKeySeparatesDelimitedFields(t *testing.T) {
 func TestApplyTopologyDepthFocusFilterKeepsIncidentL3SubnetLink(t *testing.T) {
 	data := topologyData{
 		Stats: topologyStats{
-			L3:    topologyL3EnrichmentStats{emittedLinks: 1},
+			L3:    topologyL3EnrichmentStats{EmittedLinks: 1},
 			HasL3: true,
 		},
 		Actors: []topologyActor{
@@ -201,7 +202,7 @@ func topologyL3ManagedActorForTest(actorID string, attrs map[string]any, ips ...
 			},
 		},
 		SNMP: topologySNMPActorDetail{
-			OSPFRouterID: normalizeTopologyRouterID(anyStringValue(attrs[tagOSPFRouterID])),
+			OSPFRouterID: topologyutil.NormalizeTopologyRouterID(anyStringValue(attrs[tagOSPFRouterID])),
 		},
 	}
 	return topologyActor{

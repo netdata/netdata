@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"maps"
 	"strings"
 )
@@ -60,16 +61,16 @@ func normalizeTopologyDevice(dev topologyDevice) topologyDevice {
 	if value := topologyMetadataValue(dev.Labels, topologyMetadataAliasModel); value != "" && dev.Model == "" {
 		dev.Model = value
 	}
-	if value := normalizeTopologyRouterID(dev.Labels[tagOSPFRouterID]); value != "" && dev.OSPFRouterID == "" {
+	if value := topologyutil.NormalizeTopologyRouterID(dev.Labels[tagOSPFRouterID]); value != "" && dev.OSPFRouterID == "" {
 		dev.OSPFRouterID = value
 	}
-	if value := normalizeTopologyRouterID(dev.OSPFRouterID); value != "" {
+	if value := topologyutil.NormalizeTopologyRouterID(dev.OSPFRouterID); value != "" {
 		dev.OSPFRouterID = value
 		setTopologyMetadataLabelIfMissing(dev.Labels, tagOSPFRouterID, value)
 	}
 	if dev.SysUptime <= 0 {
 		if value := topologyMetadataValue(dev.Labels, topologyMetadataAliasSysUptime); value != "" {
-			dev.SysUptime = parsePositiveInt64(value)
+			dev.SysUptime = topologyutil.ParsePositiveInt64(value)
 		}
 	}
 	if value := topologyMetadataValue(dev.Labels, topologyMetadataAliasSerial); value != "" && dev.SerialNumber == "" {

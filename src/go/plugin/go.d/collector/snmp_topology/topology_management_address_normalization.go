@@ -5,6 +5,7 @@ package snmptopology
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"net"
 	"strconv"
 	"strings"
@@ -44,8 +45,8 @@ func normalizeManagementAddress(rawAddr, rawType string) (string, string) {
 		return ip.String(), normalizeAddressType(rawType, ip.String())
 	}
 
-	if bs, err := decodeHexString(rawAddr); err == nil {
-		if ip := parseIPFromDecodedBytes(bs); ip != nil {
+	if bs, err := topologyutil.DecodeHexString(rawAddr); err == nil {
+		if ip := topologyutil.ParseIPFromDecodedBytes(bs); ip != nil {
 			return ip.String(), normalizeAddressType(rawType, ip.String())
 		}
 	}

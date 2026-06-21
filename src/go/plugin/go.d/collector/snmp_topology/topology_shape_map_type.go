@@ -4,10 +4,12 @@ package snmptopology
 
 import (
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 )
 
 func applyMapTypePolicy(data *topologyData, mapType string) int {
-	switch normalizeTopologyMapType(mapType) {
+	switch topologyoptions.NormalizeMapType(mapType) {
 	case topologyMapTypeLLDPCDPManaged:
 		return applyLLDPCDPManagedMapPolicy(data)
 	case topologyMapTypeHighConfidenceInferred:

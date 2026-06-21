@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"sort"
 	"strings"
 
@@ -40,8 +41,8 @@ func topologyBGPPeerFromRow(row ddsnmp.BGPRow) (topologyBGPPeer, bool) {
 		return topologyBGPPeer{}, false
 	}
 
-	neighbor := firstNonEmptyString(row.Identity.Neighbor, row.Tags["neighbor"])
-	remoteAS := firstNonEmptyString(row.Identity.RemoteAS, row.Tags["remote_as"])
+	neighbor := topologyutil.FirstNonEmptyString(row.Identity.Neighbor, row.Tags["neighbor"])
+	remoteAS := topologyutil.FirstNonEmptyString(row.Identity.RemoteAS, row.Tags["remote_as"])
 	if strings.TrimSpace(neighbor) == "" || strings.TrimSpace(remoteAS) == "" {
 		return topologyBGPPeer{}, false
 	}
@@ -52,8 +53,8 @@ func topologyBGPPeerFromRow(row ddsnmp.BGPRow) (topologyBGPPeer, bool) {
 		RemoteAS:              strings.TrimSpace(remoteAS),
 		LocalIP:               topologyBGPPeerAddressValue(row.Descriptors.LocalAddress),
 		LocalAS:               strings.TrimSpace(row.Descriptors.LocalAS),
-		LocalIdentifier:       normalizeBGPRouterID(row.Descriptors.LocalIdentifier),
-		PeerIdentifier:        normalizeBGPRouterID(row.Descriptors.PeerIdentifier),
+		LocalIdentifier:       topologyutil.NormalizeBGPRouterID(row.Descriptors.LocalIdentifier),
+		PeerIdentifier:        topologyutil.NormalizeBGPRouterID(row.Descriptors.PeerIdentifier),
 		PeerType:              strings.TrimSpace(row.Descriptors.PeerType),
 		BGPVersion:            strings.TrimSpace(row.Descriptors.BGPVersion),
 		Description:           strings.TrimSpace(row.Descriptors.Description),
@@ -70,17 +71,17 @@ func topologyBGPPeerAddressValue(value string) string {
 	if value == "" {
 		return ""
 	}
-	if ip := normalizeNonUnspecifiedIPAddress(value); ip != "" {
+	if ip := topologyutil.NormalizeNonUnspecifiedIPAddress(value); ip != "" {
 		return ip
 	}
-	if normalizeIPAddress(value) != "" {
+	if topologyutil.NormalizeIPAddress(value) != "" {
 		return ""
 	}
 	return value
 }
 
 func topologyBGPRoutingInstance(row ddsnmp.BGPRow) string {
-	return firstNonEmptyString(row.Identity.RoutingInstance, row.Tags["routing_instance"], "default")
+	return topologyutil.FirstNonEmptyString(row.Identity.RoutingInstance, row.Tags["routing_instance"], "default")
 }
 
 func topologyBGPPeerCacheKey(row ddsnmp.BGPRow, peer topologyBGPPeer) string {
@@ -102,7 +103,7 @@ func (c *topologyCache) snapshotBGPPeers(localDeviceID string) []topologyBGPPeer
 		return nil
 	}
 
-	keys := sortedMapKeys(c.bgpPeersByKey)
+	keys := topologyutil.SortedMapKeys(c.bgpPeersByKey)
 	rows := make([]topologyBGPPeer, 0, len(keys))
 	for _, key := range keys {
 		row := c.bgpPeersByKey[key]

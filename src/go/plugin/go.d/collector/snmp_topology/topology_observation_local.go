@@ -3,19 +3,20 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"strings"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
 func (c *topologyCache) buildEngineObservation(local topologyDevice) topologyengine.L2Observation {
-	localManagementIP := normalizeIPAddress(local.ManagementIP)
+	localManagementIP := topologyutil.NormalizeIPAddress(local.ManagementIP)
 	if localManagementIP == "" {
 		localManagementIP = pickManagementIP(local.ManagementAddresses)
 	}
 
 	baseBridgeAddress := c.resolveLocalBaseBridgeAddress(localManagementIP)
-	if baseBridgeAddress != "" && normalizeMAC(local.ChassisID) == "" {
+	if baseBridgeAddress != "" && topologyutil.NormalizeMAC(local.ChassisID) == "" {
 		local.ChassisID = baseBridgeAddress
 		local.ChassisIDType = "macAddress"
 	}

@@ -2,7 +2,11 @@
 
 package snmptopology
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+)
 
 func topologyLinkDeltaKey(link topologyLink) string {
 	return strings.Join([]string{
@@ -10,12 +14,12 @@ func topologyLinkDeltaKey(link topologyLink) string {
 		strings.ToLower(strings.TrimSpace(link.Direction)),
 		strings.TrimSpace(link.SrcActorID),
 		strings.TrimSpace(link.DstActorID),
-		topologyEndpointKey(link.Src, "if_index"),
-		topologyEndpointKey(link.Src, "if_name"),
-		topologyEndpointKey(link.Src, "port_id"),
-		topologyEndpointKey(link.Dst, "if_index"),
-		topologyEndpointKey(link.Dst, "if_name"),
-		topologyEndpointKey(link.Dst, "port_id"),
+		topologymodel.EndpointKey(link.Src, "if_index"),
+		topologymodel.EndpointKey(link.Src, "if_name"),
+		topologymodel.EndpointKey(link.Src, "port_id"),
+		topologymodel.EndpointKey(link.Dst, "if_index"),
+		topologymodel.EndpointKey(link.Dst, "if_name"),
+		topologymodel.EndpointKey(link.Dst, "port_id"),
 		topologyL2BridgeDomain(link),
 	}, "|")
 }
@@ -36,7 +40,7 @@ func markProbableDeltaLinks(strictData, probableData *topologyData) {
 			continue
 		}
 		link.State = "probable"
-		inference := ensureTopologyLinkInference(&link)
+		inference := topologymodel.EnsureLinkInference(&link)
 		if inference != nil {
 			inference.Inference = "probable"
 		}
@@ -52,7 +56,7 @@ func markProbableDeltaLinks(strictData, probableData *topologyData) {
 		}
 		probableData.Links[idx] = link
 	}
-	recomputeTopologyLinkStats(probableData)
+	topologymodel.RecomputeLinkStats(probableData)
 }
 
 func topologyLinkActorKey(link topologyLink) string {
@@ -61,16 +65,16 @@ func topologyLinkActorKey(link topologyLink) string {
 		link.Direction,
 		link.SrcActorID,
 		link.DstActorID,
-		topologyEndpointKey(link.Src, "if_index"),
-		topologyEndpointKey(link.Src, "if_name"),
-		topologyEndpointKey(link.Src, "port_id"),
-		topologyEndpointKey(link.Dst, "if_index"),
-		topologyEndpointKey(link.Dst, "if_name"),
-		topologyEndpointKey(link.Dst, "port_id"),
+		topologymodel.EndpointKey(link.Src, "if_index"),
+		topologymodel.EndpointKey(link.Src, "if_name"),
+		topologymodel.EndpointKey(link.Src, "port_id"),
+		topologymodel.EndpointKey(link.Dst, "if_index"),
+		topologymodel.EndpointKey(link.Dst, "if_name"),
+		topologymodel.EndpointKey(link.Dst, "port_id"),
 		link.State,
 		topologyL2BridgeDomain(link),
-		topologyLinkAttachmentModeValue(link),
-		topologyLinkInferenceValue(link),
+		topologymodel.LinkAttachmentModeValue(link),
+		topologymodel.LinkInferenceValue(link),
 	}, "|")
 }
 

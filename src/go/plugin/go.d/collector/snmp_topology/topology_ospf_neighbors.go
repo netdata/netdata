@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"net/netip"
 	"sort"
 	"strconv"
@@ -16,14 +17,14 @@ func init() {
 }
 
 func (c *topologyCache) updateOSPFNeighbor(tags map[string]string) {
-	neighborRouterID := normalizeTopologyRouterID(tags[tagOSPFNeighborRouterID])
-	neighborIP := normalizeNonUnspecifiedIPAddress(tags[tagOSPFNeighborIP])
+	neighborRouterID := topologyutil.NormalizeTopologyRouterID(tags[tagOSPFNeighborRouterID])
+	neighborIP := topologyutil.NormalizeNonUnspecifiedIPAddress(tags[tagOSPFNeighborIP])
 	if neighborRouterID == "" && neighborIP == "" {
 		return
 	}
 
 	row := topologyOSPFNeighbor{
-		LocalRouterID:    normalizeTopologyRouterID(c.localDevice.OSPFRouterID),
+		LocalRouterID:    topologyutil.NormalizeTopologyRouterID(c.localDevice.OSPFRouterID),
 		NeighborRouterID: neighborRouterID,
 		NeighborIP:       neighborIP,
 		AddresslessIndex: strings.TrimSpace(tags[tagOSPFNeighborAddresslessIndex]),
@@ -44,13 +45,13 @@ func (c *topologyCache) snapshotOSPFNeighbors(localDeviceID string) []topologyOS
 		return nil
 	}
 
-	keys := sortedMapKeys(c.ospfNeighborsByKey)
+	keys := topologyutil.SortedMapKeys(c.ospfNeighborsByKey)
 	rows := make([]topologyOSPFNeighbor, 0, len(keys))
 	for _, key := range keys {
 		row := c.ospfNeighborsByKey[key]
 		row.DeviceID = strings.TrimSpace(localDeviceID)
 		if row.LocalRouterID == "" {
-			row.LocalRouterID = normalizeTopologyRouterID(c.localDevice.OSPFRouterID)
+			row.LocalRouterID = topologyutil.NormalizeTopologyRouterID(c.localDevice.OSPFRouterID)
 		}
 		if iface, ok := c.matchOSPFNeighborLocalInterface(row.NeighborIP); ok {
 			row.LocalIP = iface.IP
@@ -76,7 +77,7 @@ type topologyOSPFLocalInterfaceMatch struct {
 }
 
 func (c *topologyCache) matchOSPFNeighborLocalInterface(neighborIP string) (topologyOSPFLocalInterfaceMatch, bool) {
-	neighbor, err := netip.ParseAddr(normalizeIPAddress(neighborIP))
+	neighbor, err := netip.ParseAddr(topologyutil.NormalizeIPAddress(neighborIP))
 	if err != nil || !neighbor.Is4() {
 		return topologyOSPFLocalInterfaceMatch{}, false
 	}
@@ -104,7 +105,7 @@ func (c *topologyCache) matchOSPFNeighborLocalInterface(neighborIP string) (topo
 			continue
 		}
 		candidate := topologyOSPFLocalInterfaceMatch{
-			IP:      normalizeIPAddress(row.IP),
+			IP:      topologyutil.NormalizeIPAddress(row.IP),
 			Network: group.network.String(),
 			Netmask: group.netmask.String(),
 			Subnet:  topologyL3SubnetKey(group.network, group.prefix),
@@ -121,8 +122,8 @@ func (c *topologyCache) matchOSPFNeighborLocalInterface(neighborIP string) (topo
 
 func topologyOSPFNeighborCacheKey(row topologyOSPFNeighbor) string {
 	return topologyL3SubnetLinkKeyParts(
-		normalizeTopologyRouterID(row.NeighborRouterID),
-		normalizeNonUnspecifiedIPAddress(row.NeighborIP),
+		topologyutil.NormalizeTopologyRouterID(row.NeighborRouterID),
+		topologyutil.NormalizeNonUnspecifiedIPAddress(row.NeighborIP),
 		strings.TrimSpace(row.AddresslessIndex),
 	)
 }
@@ -165,8 +166,8 @@ func topologyOSPFNeighborLinkKeyParts(row topologyOSPFNeighbor, srcActorID, dstA
 		srcActorID, dstActorID = dstActorID, srcActorID
 	}
 
-	localRouterID := normalizeTopologyRouterID(row.LocalRouterID)
-	neighborRouterID := normalizeTopologyRouterID(row.NeighborRouterID)
+	localRouterID := topologyutil.NormalizeTopologyRouterID(row.LocalRouterID)
+	neighborRouterID := topologyutil.NormalizeTopologyRouterID(row.NeighborRouterID)
 	if localRouterID > neighborRouterID {
 		localRouterID, neighborRouterID = neighborRouterID, localRouterID
 	}
@@ -198,7 +199,7 @@ func topologyOSPFAdjacencyDiscriminator(row topologyOSPFNeighbor) string {
 }
 
 func topologyOSPFDedupIP(value string) string {
-	return normalizeNonUnspecifiedIPAddress(value)
+	return topologyutil.NormalizeNonUnspecifiedIPAddress(value)
 }
 
 func topologyOSPFSubnetMatch(row topologyOSPFNeighbor) (network, subnet string, prefix int, ok bool) {

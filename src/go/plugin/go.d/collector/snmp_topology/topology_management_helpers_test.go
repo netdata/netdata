@@ -28,26 +28,6 @@ func TestNormalizeManagementAddress_DecodesHexAndASCIIIPs(t *testing.T) {
 	}
 }
 
-func TestNormalizeHexHelpers_ClassifyTokensDeterministically(t *testing.T) {
-	tests := map[string]struct {
-		normalize func(string) string
-		in        string
-		want      string
-	}{
-		"mac":            {normalize: normalizeMAC, in: "hex-string: 00 11 22 33 44 55", want: "00:11:22:33:44:55"},
-		"ip-address":     {normalize: normalizeIPAddress, in: "0A14043C", want: "10.20.4.60"},
-		"mapped-ipv4":    {normalize: normalizeNonUnspecifiedIPAddress, in: "::ffff:192.0.2.1", want: "192.0.2.1"},
-		"hex-token":      {normalize: normalizeHexToken, in: "31302E32302E342E323035", want: "10.20.4.205"},
-		"hex-identifier": {normalize: normalizeHexIdentifier, in: "00:11:22:33:44:55", want: "001122334455"},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			require.Equal(t, tc.want, tc.normalize(tc.in))
-		})
-	}
-}
-
 func TestReconstructLldpRemMgmtAddrHex_FromOctets(t *testing.T) {
 	require.Equal(t, "0a14043c", reconstructLldpRemMgmtAddrHex(map[string]string{
 		tagLldpRemMgmtAddrLen:             "4",

@@ -471,15 +471,15 @@ func snmpTopologyV1GoldenInput() topologyData {
 			},
 			HasFocus: true,
 			L3: topologyL3EnrichmentStats{
-				emittedLinks: 1,
+				EmittedLinks: 1,
 			},
 			HasL3: true,
 			OSPF: topologyOSPFEnrichmentStats{
-				emittedLinks: 1,
+				EmittedLinks: 1,
 			},
 			HasOSPF: true,
 			BGP: topologyBGPEnrichmentStats{
-				emittedLinks: 1,
+				EmittedLinks: 1,
 			},
 			HasBGP: true,
 			Recomputed: topologyRecomputedStats{

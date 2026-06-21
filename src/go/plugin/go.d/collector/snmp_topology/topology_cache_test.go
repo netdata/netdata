@@ -3,6 +3,8 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"slices"
 	"sort"
 	"strings"
@@ -1111,7 +1113,7 @@ func TestTopologyCache_SnapshotDeterministicOrdering(t *testing.T) {
 
 	actorOrder := make([]string, 0, len(data.Actors))
 	for _, actor := range data.Actors {
-		actorOrder = append(actorOrder, actor.ActorType+"|"+canonicalMatchKey(actor.Match))
+		actorOrder = append(actorOrder, actor.ActorType+"|"+topologymodel.CanonicalMatchKey(actor.Match))
 	}
 	expectedActorOrder := append([]string(nil), actorOrder...)
 	sort.Strings(expectedActorOrder)
@@ -1119,7 +1121,7 @@ func TestTopologyCache_SnapshotDeterministicOrdering(t *testing.T) {
 
 	linkOrder := make([]string, 0, len(data.Links))
 	for _, link := range data.Links {
-		linkOrder = append(linkOrder, topologyLinkSortKey(link))
+		linkOrder = append(linkOrder, topologymodel.LinkSortKey(link))
 	}
 	expectedLinkOrder := append([]string(nil), linkOrder...)
 	sort.Strings(expectedLinkOrder)
@@ -1144,18 +1146,18 @@ func TestTopologyObservationIdentityResolver_ReusesStableRemoteIdentityAcrossSig
 }
 
 func TestDecodePrintableASCII_HumanReadableHex(t *testing.T) {
-	bs, err := decodeHexString("766d7831")
+	bs, err := topologyutil.DecodeHexString("766d7831")
 	require.NoError(t, err)
 
-	decoded := decodePrintableASCII(bs)
+	decoded := topologyutil.DecodePrintableASCII(bs)
 	require.Equal(t, "vmx1", decoded)
 }
 
 func TestDecodePrintableASCII_HexValueIsNotNumeric(t *testing.T) {
-	bs, err := decodeHexString("766d7831")
+	bs, err := topologyutil.DecodeHexString("766d7831")
 	require.NoError(t, err)
 
-	decoded := decodePrintableASCII(bs)
+	decoded := topologyutil.DecodePrintableASCII(bs)
 	assert.NotRegexp(t, "^[0-9]+$", decoded)
 }
 

@@ -2,7 +2,10 @@
 
 package snmptopology
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+)
 
 func buildLocalTopologyDevice(dev ddsnmp.DeviceConnectionInfo) topologyDevice {
 	device := topologyDevice{
@@ -42,13 +45,13 @@ func buildLocalTopologyDevice(dev ddsnmp.DeviceConnectionInfo) topologyDevice {
 	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasModel); value != "" && device.Model == "" {
 		device.Model = value
 	}
-	if value := normalizeTopologyRouterID(device.Labels[tagOSPFRouterID]); value != "" {
+	if value := topologyutil.NormalizeTopologyRouterID(device.Labels[tagOSPFRouterID]); value != "" {
 		device.OSPFRouterID = value
 		setTopologyMetadataLabelIfMissing(device.Labels, tagOSPFRouterID, value)
 	}
 
 	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasSysUptime); value != "" {
-		if uptime := parsePositiveInt64(value); uptime > 0 {
+		if uptime := topologyutil.ParsePositiveInt64(value); uptime > 0 {
 			device.SysUptime = uptime
 		}
 	}

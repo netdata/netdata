@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"net"
 	"sort"
 	"strings"
@@ -98,7 +99,7 @@ func pickManagementIP(addrs []topologyManagementAddress) string {
 		if value == "" {
 			continue
 		}
-		if ip := normalizeIPAddress(value); ip != "" {
+		if ip := topologyutil.NormalizeIPAddress(value); ip != "" {
 			if _, exists := ipSet[ip]; exists {
 				continue
 			}

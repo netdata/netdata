@@ -4,6 +4,7 @@ package snmptopology
 
 import (
 	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"time"
 )
 
@@ -107,7 +108,7 @@ func snmpTopologyToV1(data topologyData) (topologyv1.Data, error) {
 		SchemaVersion: topologyv1.SchemaVersion,
 		Producer: topologyv1.Producer{
 			Source:   snmpTopologyV1ProducerSource,
-			Instance: firstNonEmptyString(data.AgentID, snmpTopologyV1Instance),
+			Instance: topologyutil.FirstNonEmptyString(data.AgentID, snmpTopologyV1Instance),
 			Plugin:   "go.d/snmp_topology",
 			Capabilities: []string{
 				"lldp",
@@ -121,7 +122,7 @@ func snmpTopologyToV1(data topologyData) (topologyv1.Data, error) {
 		},
 		CollectedAt: data.CollectedAt,
 		View: &topologyv1.View{
-			ID:    firstNonEmptyString(data.View, "summary"),
+			ID:    topologyutil.FirstNonEmptyString(data.View, "summary"),
 			Scope: "network",
 			Mode:  "detailed",
 		},

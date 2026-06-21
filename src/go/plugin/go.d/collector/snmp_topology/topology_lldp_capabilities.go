@@ -2,8 +2,10 @@
 
 package snmptopology
 
+import "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+
 func decodeLLDPCapabilities(value string) []string {
-	bs, err := decodeHexString(value)
+	bs, err := topologyutil.DecodeHexString(value)
 	if err != nil {
 		return nil
 	}

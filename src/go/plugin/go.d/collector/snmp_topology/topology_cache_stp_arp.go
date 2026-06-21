@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -63,8 +64,8 @@ func (c *topologyCache) updateStpPortEntry(tags map[string]string) {
 }
 
 func (c *topologyCache) updateArpEntry(tags map[string]string) {
-	ip := normalizeIPAddress(tags[tagArpIP])
-	mac := normalizeMAC(tags[tagArpMac])
+	ip := topologyutil.NormalizeIPAddress(tags[tagArpIP])
+	mac := topologyutil.NormalizeMAC(tags[tagArpMac])
 	if ip == "" || mac == "" {
 		return
 	}

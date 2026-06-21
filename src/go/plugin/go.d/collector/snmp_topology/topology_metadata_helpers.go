@@ -2,10 +2,7 @@
 
 package snmptopology
 
-import (
-	"sort"
-	"strings"
-)
+import "strings"
 
 func pruneNilAttributes(attrs map[string]any) map[string]any {
 	for k, v := range attrs {
@@ -79,28 +76,4 @@ func ensureLabels(labels map[string]string) map[string]string {
 		return make(map[string]string)
 	}
 	return labels
-}
-
-func deduplicateSortedStrings(values []string) []string {
-	if len(values) == 0 {
-		return nil
-	}
-	out := make([]string, 0, len(values))
-	seen := make(map[string]struct{}, len(values))
-	for _, value := range values {
-		value = strings.TrimSpace(value)
-		if value == "" {
-			continue
-		}
-		if _, ok := seen[value]; ok {
-			continue
-		}
-		seen[value] = struct{}{}
-		out = append(out, value)
-	}
-	sort.Strings(out)
-	if len(out) == 0 {
-		return nil
-	}
-	return out
 }

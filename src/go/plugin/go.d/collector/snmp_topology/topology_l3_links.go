@@ -3,6 +3,8 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"sort"
 	"strconv"
 	"strings"
@@ -10,65 +12,55 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
-const topologyL3SubnetLinkType = "l3_subnet"
-
-type topologyL3EnrichmentStats struct {
-	subnetStats               topologyL3SubnetBuildStats
-	emittedLinks              int
-	suppressedUnresolvedActor int
-	suppressedSelfActor       int
-	suppressedDuplicateLink   int
-}
-
 func applyTopologyL3SubnetEnrichment(data *topologyData, aggregate topologyObservationAggregate) topologyL3EnrichmentStats {
 	var stats topologyL3EnrichmentStats
-	if data == nil || len(aggregate.l3Interfaces) == 0 {
+	if data == nil || len(aggregate.L3Interfaces) == 0 {
 		return finishTopologyL3SubnetEnrichment(data, stats)
 	}
 
-	adjacencies, subnetStats := buildTopologyL3SubnetAdjacencies(aggregate.l3Interfaces)
-	stats.subnetStats = subnetStats
+	adjacencies, subnetStats := buildTopologyL3SubnetAdjacencies(aggregate.L3Interfaces)
+	stats.SubnetStats = subnetStats
 	if len(adjacencies) == 0 {
 		return finishTopologyL3SubnetEnrichment(data, stats)
 	}
 
-	resolver := newTopologyL3ActorResolver(data, aggregate.snapshots)
+	resolver := newTopologyL3ActorResolver(data, aggregate.Snapshots)
 	seen := existingTopologyL3LinkKeys(data.Links)
 	for _, adjacency := range adjacencies {
 		srcRef, ok := resolver.resolve(adjacency.A)
 		if !ok {
-			stats.suppressedUnresolvedActor++
+			stats.SuppressedUnresolvedActor++
 			continue
 		}
 		dstRef, ok := resolver.resolve(adjacency.B)
 		if !ok {
-			stats.suppressedUnresolvedActor++
+			stats.SuppressedUnresolvedActor++
 			continue
 		}
 		if srcRef.actorID == dstRef.actorID {
-			stats.suppressedSelfActor++
+			stats.SuppressedSelfActor++
 			continue
 		}
 		link := topologyL3SubnetLink(adjacency, srcRef, dstRef)
 		key := topologyL3SubnetLinkKey(link)
 		if _, exists := seen[key]; exists {
-			stats.suppressedDuplicateLink++
+			stats.SuppressedDuplicateLink++
 			continue
 		}
 		seen[key] = struct{}{}
 		data.Links = append(data.Links, link)
-		stats.emittedLinks++
+		stats.EmittedLinks++
 	}
 
 	sort.Slice(data.Links, func(i, j int) bool {
-		return topologyLinkSortKey(data.Links[i]) < topologyLinkSortKey(data.Links[j])
+		return topologymodel.LinkSortKey(data.Links[i]) < topologymodel.LinkSortKey(data.Links[j])
 	})
 	return finishTopologyL3SubnetEnrichment(data, stats)
 }
 
 func finishTopologyL3SubnetEnrichment(data *topologyData, stats topologyL3EnrichmentStats) topologyL3EnrichmentStats {
 	recordTopologyL3EnrichmentStats(data, stats)
-	recomputeTopologyLinkStats(data)
+	topologymodel.RecomputeLinkStats(data)
 	return stats
 }
 
@@ -82,13 +74,13 @@ func topologyL3SubnetLink(adjacency topologyL3SubnetAdjacency, srcRef, dstRef to
 		DstActorID: dstRef.actorID,
 		Src: topologyLinkEndpoint{
 			Match:   srcRef.match,
-			IfIndex: parseIndex(adjacency.A.IfIndex),
+			IfIndex: topologyutil.ParseIndex(adjacency.A.IfIndex),
 			IfName:  strings.TrimSpace(adjacency.A.IfName),
 			IfDescr: strings.TrimSpace(adjacency.A.IfDescr),
 		},
 		Dst: topologyLinkEndpoint{
 			Match:   dstRef.match,
-			IfIndex: parseIndex(adjacency.B.IfIndex),
+			IfIndex: topologyutil.ParseIndex(adjacency.B.IfIndex),
 			IfName:  strings.TrimSpace(adjacency.B.IfName),
 			IfDescr: strings.TrimSpace(adjacency.B.IfDescr),
 		},
@@ -99,8 +91,8 @@ func topologyL3SubnetLink(adjacency topologyL3SubnetAdjacency, srcRef, dstRef to
 		Detail: topologyLinkDetail{
 			L3Subnet: &topologyL3SubnetLinkDetail{
 				Source:  "ip_mib",
-				SrcIP:   normalizeIPAddress(adjacency.A.IP),
-				DstIP:   normalizeIPAddress(adjacency.B.IP),
+				SrcIP:   topologyutil.NormalizeIPAddress(adjacency.A.IP),
+				DstIP:   topologyutil.NormalizeIPAddress(adjacency.B.IP),
 				Subnet:  adjacency.Subnet,
 				Network: adjacency.Network,
 				Netmask: adjacency.Netmask,
@@ -113,7 +105,7 @@ func topologyL3SubnetLink(adjacency topologyL3SubnetAdjacency, srcRef, dstRef to
 func existingTopologyL3LinkKeys(links []topologyLink) map[string]struct{} {
 	seen := make(map[string]struct{})
 	for _, link := range links {
-		if strings.EqualFold(strings.TrimSpace(firstNonEmptyString(link.LinkType, link.Protocol)), topologyL3SubnetLinkType) {
+		if strings.EqualFold(strings.TrimSpace(topologyutil.FirstNonEmptyString(link.LinkType, link.Protocol)), topologyL3SubnetLinkType) {
 			seen[topologyL3SubnetLinkKey(link)] = struct{}{}
 		}
 	}

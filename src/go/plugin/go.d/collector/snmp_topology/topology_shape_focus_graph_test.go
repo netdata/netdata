@@ -7,6 +7,7 @@ import (
 	"time"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/stretchr/testify/require"
 )
 
@@ -176,7 +177,7 @@ func TestTopologyActorDetailManagementIPsCanonicalizesBeforeDedup(t *testing.T) 
 		},
 	}
 
-	require.Equal(t, []string{"192.0.2.1", "192.0.2.2"}, topologyActorDetailManagementIPs(actor))
+	require.Equal(t, []string{"192.0.2.1", "192.0.2.2"}, topologymodel.ActorDetailManagementIPs(actor))
 }
 
 func TestRecordTopologyFocusStatsNormalizesDepthAndFilteredCounts(t *testing.T) {

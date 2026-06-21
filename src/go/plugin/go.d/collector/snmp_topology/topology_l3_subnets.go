@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"net/netip"
 	"sort"
 	"strconv"
@@ -18,17 +19,6 @@ type topologyL3SubnetAdjacency struct {
 	Prefix  int
 	A       topologyL3Interface
 	B       topologyL3Interface
-}
-
-type topologyL3SubnetBuildStats struct {
-	candidateSubnets            int
-	candidateLinks              int
-	suppressedInvalid           int
-	suppressedUnsupportedPrefix int
-	suppressedDuplicateIP       int
-	suppressedSelfLink          int
-	suppressedUnmatched         int
-	suppressedMultiAccess       int
 }
 
 type topologyL3SubnetGroup struct {
@@ -48,11 +38,11 @@ func buildTopologyL3SubnetAdjacencies(rows []topologyL3Interface) ([]topologyL3S
 	for _, row := range rows {
 		group, ok := topologyL3SubnetGroupForInterface(row)
 		if !ok {
-			stats.suppressedInvalid++
+			stats.SuppressedInvalid++
 			continue
 		}
 		if !topologyL3SubnetPrefixSupported(group.prefix) {
-			stats.suppressedUnsupportedPrefix++
+			stats.SuppressedUnsupportedPrefix++
 			continue
 		}
 		key := topologyL3SubnetKey(group.network, group.prefix)
@@ -73,22 +63,22 @@ func buildTopologyL3SubnetAdjacencies(rows []topologyL3Interface) ([]topologyL3S
 	adjacencies := make([]topologyL3SubnetAdjacency, 0, len(keys))
 	for _, key := range keys {
 		group := groups[key]
-		stats.candidateSubnets++
+		stats.CandidateSubnets++
 		sortTopologyL3Interfaces(group.rows)
 		if topologyL3SubnetHasDuplicateIP(group.rows) {
-			stats.suppressedDuplicateIP++
+			stats.SuppressedDuplicateIP++
 			continue
 		}
 		if len(group.rows) < 2 {
-			stats.suppressedUnmatched++
+			stats.SuppressedUnmatched++
 			continue
 		}
 		if len(group.rows) > 2 {
-			stats.suppressedMultiAccess++
+			stats.SuppressedMultiAccess++
 			continue
 		}
 		if strings.TrimSpace(group.rows[0].DeviceID) == strings.TrimSpace(group.rows[1].DeviceID) {
-			stats.suppressedSelfLink++
+			stats.SuppressedSelfLink++
 			continue
 		}
 		adjacencies = append(adjacencies, topologyL3SubnetAdjacency{
@@ -99,7 +89,7 @@ func buildTopologyL3SubnetAdjacencies(rows []topologyL3Interface) ([]topologyL3S
 			A:       group.rows[0],
 			B:       group.rows[1],
 		})
-		stats.candidateLinks++
+		stats.CandidateLinks++
 	}
 
 	return adjacencies, stats
@@ -110,11 +100,11 @@ func topologyL3SubnetGroupForInterface(row topologyL3Interface) (*topologyL3Subn
 	if deviceID == "" || strings.TrimSpace(row.IfIndex) == "" {
 		return nil, false
 	}
-	ip, err := netip.ParseAddr(normalizeIPAddress(row.IP))
+	ip, err := netip.ParseAddr(topologyutil.NormalizeIPAddress(row.IP))
 	if err != nil || !ip.Is4() {
 		return nil, false
 	}
-	netmask, err := netip.ParseAddr(normalizeIPAddress(row.Netmask))
+	netmask, err := netip.ParseAddr(topologyutil.NormalizeIPAddress(row.Netmask))
 	if err != nil || !netmask.Is4() {
 		return nil, false
 	}
@@ -150,7 +140,7 @@ func sortTopologyL3Interfaces(rows []topologyL3Interface) {
 func topologyL3InterfaceSortKey(row topologyL3Interface) string {
 	return strings.Join([]string{
 		strings.TrimSpace(row.DeviceID),
-		normalizeIPAddress(row.IP),
+		topologyutil.NormalizeIPAddress(row.IP),
 		strings.TrimSpace(row.IfIndex),
 	}, "\x00")
 }
@@ -158,7 +148,7 @@ func topologyL3InterfaceSortKey(row topologyL3Interface) string {
 func topologyL3SubnetHasDuplicateIP(rows []topologyL3Interface) bool {
 	seen := make(map[string]string, len(rows))
 	for _, row := range rows {
-		ip := normalizeIPAddress(row.IP)
+		ip := topologyutil.NormalizeIPAddress(row.IP)
 		if ip == "" {
 			continue
 		}

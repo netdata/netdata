@@ -139,36 +139,3 @@ type arpEntry struct {
 	addrType string
 	state    string
 }
-
-type topologyOSPFNeighbor struct {
-	DeviceID         string
-	LocalRouterID    string
-	NeighborRouterID string
-	NeighborIP       string
-	AddresslessIndex string
-	State            string
-	LocalIP          string
-	Network          string
-	Netmask          string
-	Subnet           string
-	Prefix           int
-	RemoteActorID    string
-}
-
-type topologyBGPPeer struct {
-	DeviceID              string
-	RoutingInstance       string
-	NeighborIP            string
-	RemoteAS              string
-	LocalIP               string
-	LocalAS               string
-	LocalIdentifier       string
-	PeerIdentifier        string
-	PeerType              string
-	BGPVersion            string
-	Description           string
-	AdminStatus           string
-	State                 string
-	EstablishedUptime     *int64
-	LastReceivedUpdateAge *int64
-}

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"strings"
 )
 
@@ -56,7 +58,7 @@ func buildSNMPTopologyV1Actors(actors []topologyActor, stringsDict *topologyv1.S
 		ids[i] = stringsDict.Ref(actorID)
 		types[i] = stringsDict.Ref(snmpTopologyV1ActorType(actor.ActorType))
 		layers[i] = stringsDict.Ref(snmpTopologyV1ActorLayer(actor))
-		sources[i] = stringsDict.Ref(firstNonEmptyString(actor.Source, snmpTopologyV1ProducerSource))
+		sources[i] = stringsDict.Ref(topologyutil.FirstNonEmptyString(actor.Source, snmpTopologyV1ProducerSource))
 		displayNames[i] = nullableStringRef(stringsDict, snmpTopologyV1DisplayName(actor))
 		chassisIDs[i] = stringArrayCell(actor.Match.ChassisIDs)
 		macAddresses[i] = stringArrayCell(actor.Match.MacAddresses)
@@ -65,29 +67,29 @@ func buildSNMPTopologyV1Actors(actors []topologyActor, stringsDict *topologyv1.S
 		dnsNames[i] = stringArrayCell(actor.Match.DNSNames)
 		sysObjectIDs[i] = stringsDict.Ref(actor.Match.SysObjectID)
 		sysNames[i] = stringsDict.Ref(actor.Match.SysName)
-		parentDevices[i] = stringArrayCell(topologyActorDetailParentDevices(actor))
-		vendors[i] = nullableStringRef(stringsDict, topologyActorDetailVendor(actor))
-		models[i] = nullableStringRef(stringsDict, topologyActorDetailModel(actor))
-		sysDescrs[i] = nullableStringRef(stringsDict, topologyActorDetailSysDescr(actor))
-		sysLocations[i] = nullableStringRef(stringsDict, topologyActorDetailSysLocation(actor))
-		sysContacts[i] = nullableStringRef(stringsDict, topologyActorDetailSysContact(actor))
-		managementIPs[i] = nullableStringRef(stringsDict, topologyActorDetailManagementIP(actor))
-		protocols[i] = stringArrayCell(topologyActorDetailProtocols(actor))
+		parentDevices[i] = stringArrayCell(topologymodel.ActorDetailParentDevices(actor))
+		vendors[i] = nullableStringRef(stringsDict, topologymodel.ActorDetailVendor(actor))
+		models[i] = nullableStringRef(stringsDict, topologymodel.ActorDetailModel(actor))
+		sysDescrs[i] = nullableStringRef(stringsDict, topologymodel.ActorDetailSysDescr(actor))
+		sysLocations[i] = nullableStringRef(stringsDict, topologymodel.ActorDetailSysLocation(actor))
+		sysContacts[i] = nullableStringRef(stringsDict, topologymodel.ActorDetailSysContact(actor))
+		managementIPs[i] = nullableStringRef(stringsDict, topologymodel.ActorDetailManagementIP(actor))
+		protocols[i] = stringArrayCell(topologymodel.ActorDetailProtocols(actor))
 		if isEmptyArrayCell(protocols[i]) {
 			protocols[i] = nil
 		}
-		capabilities[i] = stringArrayCell(topologyActorDetailCapabilities(actor))
+		capabilities[i] = stringArrayCell(topologymodel.ActorDetailCapabilities(actor))
 		if isEmptyArrayCell(capabilities[i]) {
 			capabilities[i] = nil
 		}
-		portsTotal[i] = nullableOptionalUintValue(topologyActorDetailPortsTotal(actor))
-		vlanCounts[i] = nullableOptionalUintValue(topologyActorDetailVLANCount(actor))
-		fdbTotalMACs[i] = nullableOptionalUintValue(topologyActorDetailFDBTotalMACs(actor))
-		lldpNeighborCounts[i] = nullableOptionalUintValue(topologyActorDetailLLDPNeighborCount(actor))
-		cdpNeighborCounts[i] = nullableOptionalUintValue(topologyActorDetailCDPNeighborCount(actor))
-		endpointsTotal[i] = nullableOptionalUintValue(topologyActorDetailEndpointsTotal(actor))
-		chartIDPrefixes[i] = nullableStringRef(stringsDict, topologyActorDetailChartIDPrefix(actor))
-		netdataHostIDs[i] = nullableStringRef(stringsDict, topologyActorDetailNetdataHostID(actor))
+		portsTotal[i] = nullableOptionalUintValue(topologymodel.ActorDetailPortsTotal(actor))
+		vlanCounts[i] = nullableOptionalUintValue(topologymodel.ActorDetailVLANCount(actor))
+		fdbTotalMACs[i] = nullableOptionalUintValue(topologymodel.ActorDetailFDBTotalMACs(actor))
+		lldpNeighborCounts[i] = nullableOptionalUintValue(topologymodel.ActorDetailLLDPNeighborCount(actor))
+		cdpNeighborCounts[i] = nullableOptionalUintValue(topologymodel.ActorDetailCDPNeighborCount(actor))
+		endpointsTotal[i] = nullableOptionalUintValue(topologymodel.ActorDetailEndpointsTotal(actor))
+		chartIDPrefixes[i] = nullableStringRef(stringsDict, topologymodel.ActorDetailChartIDPrefix(actor))
+		netdataHostIDs[i] = nullableStringRef(stringsDict, topologymodel.ActorDetailNetdataHostID(actor))
 	}
 
 	return topologyv1.MustTable(len(actors),
@@ -216,7 +218,7 @@ func snmpTopologyV1ActorType(actorType string) string {
 }
 
 func snmpTopologyV1DisplayName(actor topologyActor) string {
-	return topologyActorDetailDisplayName(actor)
+	return topologymodel.ActorDetailDisplayName(actor)
 }
 
 func snmpTopologyV1ActorLayer(actor topologyActor) string {
