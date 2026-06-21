@@ -44,6 +44,10 @@ struct nd_thread {
 
     ND_THREAD_LIST list;
     struct nd_thread *prev, *next;
+
+    // refcount for safe join from multiple paths
+    // incremented on creation, decremented and freed when join completes
+    size_t refcount;
 };
 
 static struct {
@@ -318,9 +322,14 @@ void nd_thread_join_threads()
         if(nti) {
             // Remove from exited list while holding the lock to prevent race condition
             // where another thread with a direct pointer calls nd_thread_join() and frees
-            // the nti before we get a chance to use it
+            // the nti before we get a chance to use it.
+            //
+            // We also increment the refcount here so that the auto-drain path
+            // and a direct nd_thread_join() caller both have a valid reference
+            // until the one that reaches zero frees the structure.
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
             nti->list = ND_THREAD_LIST_NONE;
+            __atomic_fetch_add(&nti->refcount, 1, __ATOMIC_ACQ_REL);
         }
         spinlock_unlock(&threads_globals.exited.spinlock);
 
@@ -448,6 +457,7 @@ ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, voi
     nti->arg = arg;
     nti->start_routine = start_routine;
     nti->options = (options & NETDATA_THREAD_OPTIONS_ALL);
+    nti->refcount = 1;  // creator holds one reference
     strncpyz(nti->tag, tag, ND_THREAD_TAG_MAX);
 
     int retries = 0;
@@ -563,7 +573,14 @@ int nd_thread_join(ND_THREAD *nti) {
     }
     spinlock_unlock(&threads_globals.exited.spinlock);
 
-    freez(nti);
+    // Only free the structure if this is the last reference.
+    // nd_thread_join_threads() removes from the exited list before calling
+    // nd_thread_join(), so the direct caller and the auto-drain path both
+    // decrement. The first one to reach zero frees.
+    size_t old_ref = __atomic_fetch_sub(&nti->refcount, 1, __ATOMIC_ACQ_REL);
+    if(old_ref == 1) {
+        freez(nti);
+    }
 
     return ret;
 }
