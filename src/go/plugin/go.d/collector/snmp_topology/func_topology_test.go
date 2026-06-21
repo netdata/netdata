@@ -49,7 +49,7 @@ func TestTopologyFunctionAdapter_MethodParamsUsesRegistryFocusTargets(t *testing
 	assert.Equal(t, snmptopologyfunc.ParamManagedDeviceFocus, params[3].ID)
 	assert.Equal(t, snmptopologyfunc.ParamDepth, params[4].ID)
 	require.GreaterOrEqual(t, len(params[3].Options), 2)
-	assert.Equal(t, snmptopologyfunc.ManagedFocusAllDevices, params[3].Options[0].ID)
+	assert.Equal(t, topologyoptions.ManagedFocusAllDevices, params[3].Options[0].ID)
 	assert.Equal(t, "ip:10.0.0.1", params[3].Options[1].ID)
 
 	params, err = handler.MethodParams(context.Background(), "unknown")
@@ -111,8 +111,8 @@ func TestTopologyFunctionAdapter_HandleSelectorParams(t *testing.T) {
 
 	params := funcapi.ResolveParams(cfg, map[string][]string{
 		snmptopologyfunc.ParamNodesIdentity:      {snmptopologyfunc.NodesIdentityMAC},
-		snmptopologyfunc.ParamMapType:            {snmptopologyfunc.MapTypeHighConfidenceInferred},
-		snmptopologyfunc.ParamInferenceStrategy:  {snmptopologyfunc.InferenceStrategySTPFDBCorrelated},
+		snmptopologyfunc.ParamMapType:            {topologyoptions.MapTypeHighConfidenceInferred},
+		snmptopologyfunc.ParamInferenceStrategy:  {topologyoptions.InferenceStrategySTPFDBCorrelated},
 		snmptopologyfunc.ParamManagedDeviceFocus: {"ip:10.0.0.1"},
 		snmptopologyfunc.ParamDepth:              {"2"},
 	})
@@ -172,21 +172,21 @@ func TestTopologyFunctionAdapter_HandleUnknownSelectorsFallbackToDefaults(t *tes
 
 func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 	ts := time.Date(2026, 5, 9, 12, 0, 0, 0, time.UTC)
-	data := topologyData{
+	data := topologymodel.Data{
 		AgentID:     "agent-test",
 		CollectedAt: ts,
 		View:        "summary",
-		Actors: []topologyActor{
+		Actors: []topologymodel.Actor{
 			{
 				ActorID:   "device-a",
 				ActorType: "device",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					ChassisIDs:   []string{"00:11:22:33:44:55"},
 					MacAddresses: []string{"00:11:22:33:44:55"},
 					SysName:      "sw-a",
 				},
 				Labels: map[string]string{"site": "lab"},
-				Detail: topologyActorDetail{
+				Detail: topologymodel.ActorDetail{
 					L2: topologyengine.ProjectionActorDetail{
 						Device: topologyengine.ProjectionDeviceActorDetail{
 							PortsTotal: topologyengine.OptionalValue[int]{Value: 0, Has: true},
@@ -229,12 +229,12 @@ func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 			{
 				ActorID:   "device-b",
 				ActorType: "device",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					ChassisIDs:   []string{"aa:bb:cc:dd:ee:ff"},
 					MacAddresses: []string{"aa:bb:cc:dd:ee:ff"},
 					SysName:      "sw-b",
 				},
-				Detail: topologyActorDetail{
+				Detail: topologymodel.ActorDetail{
 					L2: topologyengine.ProjectionActorDetail{
 						Device: topologyengine.ProjectionDeviceActorDetail{
 							CapabilitiesSupported: []string{"router"},
@@ -247,19 +247,19 @@ func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 				},
 			},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{
 				Protocol:   "lldp",
 				LinkType:   "lldp",
 				Direction:  "bidirectional",
 				SrcActorID: "device-a",
 				DstActorID: "device-b",
-				Src: topologyLinkEndpoint{
+				Src: topologymodel.LinkEndpoint{
 					IfIndex: 1,
 					IfName:  "Gi0/1",
 					PortID:  "1",
 				},
-				Dst: topologyLinkEndpoint{
+				Dst: topologymodel.LinkEndpoint{
 					IfIndex: 2,
 					IfName:  "Gi0/2",
 					PortID:  "2",
@@ -407,18 +407,18 @@ func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 }
 
 func TestSNMPTopologyToV1_PrefersSNMPActorDetailOverL2(t *testing.T) {
-	data := topologyData{
+	data := topologymodel.Data{
 		AgentID: "agent-test",
 		View:    "summary",
-		Actors: []topologyActor{
+		Actors: []topologymodel.Actor{
 			{
 				ActorID:   "device-a",
 				ActorType: "device",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					ChassisIDs: []string{"00:11:22:33:44:55"},
 					SysName:    "sw-a",
 				},
-				Detail: topologyActorDetail{
+				Detail: topologymodel.ActorDetail{
 					L2: topologyengine.ProjectionActorDetail{
 						Device: topologyengine.ProjectionDeviceActorDetail{
 							ManagementIP: "10.0.0.1",
@@ -427,7 +427,7 @@ func TestSNMPTopologyToV1_PrefersSNMPActorDetailOverL2(t *testing.T) {
 							PortsTotal:   topologyengine.OptionalValue[int]{Value: 24, Has: true},
 						},
 					},
-					SNMP: topologySNMPActorDetail{
+					SNMP: topologymodel.SNMPActorDetail{
 						ManagementIP: "10.0.0.2",
 						Vendor:       "SNMP Vendor",
 						Capabilities: []string{"router"},
@@ -437,12 +437,12 @@ func TestSNMPTopologyToV1_PrefersSNMPActorDetailOverL2(t *testing.T) {
 			{
 				ActorID:   "device-b",
 				ActorType: "device",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					ChassisIDs: []string{"aa:bb:cc:dd:ee:ff"},
 					SysName:    "sw-b",
 				},
-				Detail: topologyActorDetail{
-					SNMP: topologySNMPActorDetail{
+				Detail: topologymodel.ActorDetail{
+					SNMP: topologymodel.SNMPActorDetail{
 						ManagementIP: "10.0.0.3",
 						Vendor:       "Peer Vendor",
 						Capabilities: []string{"bridge"},
@@ -450,7 +450,7 @@ func TestSNMPTopologyToV1_PrefersSNMPActorDetailOverL2(t *testing.T) {
 				},
 			},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{
 				Protocol:   "lldp",
 				LinkType:   "lldp",
@@ -471,17 +471,17 @@ func TestSNMPTopologyToV1_PrefersSNMPActorDetailOverL2(t *testing.T) {
 }
 
 func TestSNMPTopologyToV1_OmitsNeighborCountForEmptyNeighborList(t *testing.T) {
-	data := topologyData{
+	data := topologymodel.Data{
 		AgentID: "agent-test",
 		View:    "summary",
-		Actors: []topologyActor{
+		Actors: []topologymodel.Actor{
 			{
 				ActorID:   "device-a",
 				ActorType: "device",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					SysName: "sw-a",
 				},
-				Detail: topologyActorDetail{
+				Detail: topologymodel.ActorDetail{
 					L2: topologyengine.ProjectionActorDetail{
 						Device: topologyengine.ProjectionDeviceActorDetail{
 							Ports: []topologyengine.ProjectionPortDetail{
@@ -498,22 +498,22 @@ func TestSNMPTopologyToV1_OmitsNeighborCountForEmptyNeighborList(t *testing.T) {
 			{
 				ActorID:   "device-b",
 				ActorType: "device",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					SysName: "sw-b",
 				},
 			},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{
 				Protocol:   "lldp",
 				LinkType:   "lldp",
 				SrcActorID: "device-a",
 				DstActorID: "device-b",
-				Src: topologyLinkEndpoint{
+				Src: topologymodel.LinkEndpoint{
 					IfIndex: 42,
 					IfName:  "Gi0/42",
 				},
-				Dst: topologyLinkEndpoint{
+				Dst: topologymodel.LinkEndpoint{
 					IfName: "Gi0/1",
 				},
 			},
@@ -531,17 +531,17 @@ func TestSNMPTopologyToV1_OmitsNeighborCountForEmptyNeighborList(t *testing.T) {
 }
 
 func TestSNMPTopologyToV1_UsesIfIndexAsVisiblePortID(t *testing.T) {
-	data := topologyData{
+	data := topologymodel.Data{
 		AgentID: "agent-test",
 		View:    "summary",
-		Actors: []topologyActor{
+		Actors: []topologymodel.Actor{
 			{
 				ActorID:   "device-a",
 				ActorType: "device",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					SysName: "sw-a",
 				},
-				Detail: topologyActorDetail{
+				Detail: topologymodel.ActorDetail{
 					L2: topologyengine.ProjectionActorDetail{
 						Device: topologyengine.ProjectionDeviceActorDetail{
 							Ports: []topologyengine.ProjectionPortDetail{
@@ -557,22 +557,22 @@ func TestSNMPTopologyToV1_UsesIfIndexAsVisiblePortID(t *testing.T) {
 			{
 				ActorID:   "device-b",
 				ActorType: "device",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					SysName: "sw-b",
 				},
 			},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{
 				Protocol:   "lldp",
 				LinkType:   "lldp",
 				SrcActorID: "device-a",
 				DstActorID: "device-b",
-				Src: topologyLinkEndpoint{
+				Src: topologymodel.LinkEndpoint{
 					IfIndex: 42,
 					IfName:  "Gi0/42",
 				},
-				Dst: topologyLinkEndpoint{
+				Dst: topologymodel.LinkEndpoint{
 					IfName: "Gi0/1",
 				},
 			},
@@ -597,35 +597,35 @@ func TestSNMPTopologyToV1_UsesIfIndexAsVisiblePortID(t *testing.T) {
 }
 
 func TestSNMPTopologyToV1_PortNamesOnlyUsePortFields(t *testing.T) {
-	data := topologyData{
+	data := topologymodel.Data{
 		AgentID: "agent-test",
 		View:    "summary",
-		Actors: []topologyActor{
+		Actors: []topologymodel.Actor{
 			{
 				ActorID:   "device-a",
 				ActorType: "device",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					SysName: "sw-a",
 				},
 			},
 			{
 				ActorID:   "device-b",
 				ActorType: "device",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					SysName: "sw-b",
 				},
 			},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{
 				Protocol:   "lldp",
 				LinkType:   "lldp",
 				SrcActorID: "device-a",
 				DstActorID: "device-b",
-				Src: topologyLinkEndpoint{
+				Src: topologymodel.LinkEndpoint{
 					DisplayName: "10.0.0.10",
 				},
-				Dst: topologyLinkEndpoint{
+				Dst: topologymodel.LinkEndpoint{
 					SysName: "sw-b",
 				},
 			},
@@ -646,14 +646,14 @@ func TestSNMPTopologyToV1_PortNamesOnlyUsePortFields(t *testing.T) {
 }
 
 func TestSNMPTopologyToV1_PreservesL3SubnetPresentationAndEvidence(t *testing.T) {
-	data := topologyData{
+	data := topologymodel.Data{
 		AgentID: "agent-test",
 		View:    "summary",
-		Actors: []topologyActor{
+		Actors: []topologymodel.Actor{
 			{
 				ActorID:   "router-a",
 				ActorType: "router",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					IPAddresses: []string{"192.0.2.1"},
 					SysName:     "router-a",
 				},
@@ -661,24 +661,24 @@ func TestSNMPTopologyToV1_PreservesL3SubnetPresentationAndEvidence(t *testing.T)
 			{
 				ActorID:   "router-b",
 				ActorType: "router",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					IPAddresses: []string{"192.0.2.2"},
 					SysName:     "router-b",
 				},
 			},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{
-				Protocol:   topologyL3SubnetLinkType,
-				LinkType:   topologyL3SubnetLinkType,
+				Protocol:   topologymodel.L3SubnetLinkType,
+				LinkType:   topologymodel.L3SubnetLinkType,
 				Direction:  "observed",
 				SrcActorID: "router-a",
 				DstActorID: "router-b",
-				Src: topologyLinkEndpoint{
+				Src: topologymodel.LinkEndpoint{
 					IfIndex: 10,
 					IfName:  "xe-0/0/0",
 				},
-				Dst: topologyLinkEndpoint{
+				Dst: topologymodel.LinkEndpoint{
 					IfIndex: 20,
 					IfName:  "xe-0/0/1",
 				},
@@ -686,8 +686,8 @@ func TestSNMPTopologyToV1_PreservesL3SubnetPresentationAndEvidence(t *testing.T)
 					Inference:      "shared_subnet",
 					AttachmentMode: "logical_l3_subnet",
 				},
-				Detail: topologyLinkDetail{
-					L3Subnet: &topologyL3SubnetLinkDetail{
+				Detail: topologymodel.LinkDetail{
+					L3Subnet: &topologymodel.L3SubnetLinkDetail{
 						Source:  "ip_mib",
 						SrcIP:   "192.0.2.1",
 						DstIP:   "192.0.2.2",
@@ -765,16 +765,16 @@ func TestSNMPTopologyToV1_PreservesL3SubnetPresentationAndEvidence(t *testing.T)
 }
 
 func TestSNMPTopologyToV1_PreservesOSPFAdjacencyPresentationEvidenceAndNeighborRows(t *testing.T) {
-	data := topologyData{
+	data := topologymodel.Data{
 		AgentID: "agent-test",
 		View:    "summary",
-		Actors: []topologyActor{
+		Actors: []topologymodel.Actor{
 			{
 				ActorID:   "router-a",
 				ActorType: "router",
 				Source:    "snmp",
-				Detail: topologyActorDetail{
-					OSPF: []topologyOSPFNeighborDetailRow{
+				Detail: topologymodel.ActorDetail{
+					OSPF: []topologymodel.OSPFNeighborDetailRow{
 						{
 							LocalRouterID:    "1.1.1.1",
 							NeighborRouterID: "2.2.2.2",
@@ -793,22 +793,22 @@ func TestSNMPTopologyToV1_PreservesOSPFAdjacencyPresentationEvidenceAndNeighborR
 				Source:    "snmp",
 			},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{
-				Protocol:   topologyOSPFAdjacencyLinkType,
-				LinkType:   topologyOSPFAdjacencyLinkType,
+				Protocol:   topologymodel.OSPFAdjacencyLinkType,
+				LinkType:   topologymodel.OSPFAdjacencyLinkType,
 				Direction:  "observed",
 				State:      "full",
 				SrcActorID: "router-a",
 				DstActorID: "router-b",
-				Src:        topologyLinkEndpoint{},
-				Dst:        topologyLinkEndpoint{},
+				Src:        topologymodel.LinkEndpoint{},
+				Dst:        topologymodel.LinkEndpoint{},
 				Inference: &graph.LinkInference{
 					Inference:      "ospf_full_adjacency",
 					AttachmentMode: "logical_l3_ospf",
 				},
-				Detail: topologyLinkDetail{
-					OSPF: &topologyOSPFAdjacencyLinkDetail{
+				Detail: topologymodel.LinkDetail{
+					OSPF: &topologymodel.OSPFAdjacencyLinkDetail{
 						Source:           "ospf_mib",
 						LocalRouterID:    "1.1.1.1",
 						NeighborRouterID: "2.2.2.2",
@@ -884,16 +884,16 @@ func TestSNMPTopologyToV1_PreservesOSPFAdjacencyPresentationEvidenceAndNeighborR
 }
 
 func TestSNMPTopologyToV1_PreservesBGPAdjacencyPresentationEvidenceAndPeerRows(t *testing.T) {
-	data := topologyData{
+	data := topologymodel.Data{
 		AgentID: "agent-test",
 		View:    "summary",
-		Actors: []topologyActor{
+		Actors: []topologymodel.Actor{
 			{
 				ActorID:   "router-a",
 				ActorType: "router",
 				Source:    "snmp",
-				Detail: topologyActorDetail{
-					BGP: []topologyBGPPeerDetailRow{
+				Detail: topologymodel.ActorDetail{
+					BGP: []topologymodel.BGPPeerDetailRow{
 						{
 							RoutingInstance:       "default",
 							NeighborIP:            "192.0.2.2",
@@ -920,22 +920,22 @@ func TestSNMPTopologyToV1_PreservesBGPAdjacencyPresentationEvidenceAndPeerRows(t
 				Source:    "snmp",
 			},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{
-				Protocol:   topologyBGPAdjacencyLinkType,
-				LinkType:   topologyBGPAdjacencyLinkType,
+				Protocol:   topologymodel.BGPAdjacencyLinkType,
+				LinkType:   topologymodel.BGPAdjacencyLinkType,
 				Direction:  "observed",
 				State:      "established",
 				SrcActorID: "router-a",
 				DstActorID: "router-b",
-				Src:        topologyLinkEndpoint{},
-				Dst:        topologyLinkEndpoint{},
+				Src:        topologymodel.LinkEndpoint{},
+				Dst:        topologymodel.LinkEndpoint{},
 				Inference: &graph.LinkInference{
 					Inference:      "bgp_established_adjacency",
 					AttachmentMode: "logical_l3_bgp",
 				},
-				Detail: topologyLinkDetail{
-					BGP: &topologyBGPAdjacencyLinkDetail{
+				Detail: topologymodel.LinkDetail{
+					BGP: &topologymodel.BGPAdjacencyLinkDetail{
 						Source:          "bgp_mib",
 						RoutingInstance: "default",
 						LocalIdentifier: "1.1.1.1",
@@ -1016,20 +1016,20 @@ func TestSNMPTopologyToV1_PreservesBGPAdjacencyPresentationEvidenceAndPeerRows(t
 }
 
 func TestSNMPTopologyToV1_ReturnsErrorForL3SubnetWithoutSubnet(t *testing.T) {
-	data := topologyData{
+	data := topologymodel.Data{
 		AgentID: "agent-test",
-		Actors: []topologyActor{
+		Actors: []topologymodel.Actor{
 			{ActorID: "router-a", ActorType: "router"},
 			{ActorID: "router-b", ActorType: "router"},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{
-				Protocol:   topologyL3SubnetLinkType,
-				LinkType:   topologyL3SubnetLinkType,
+				Protocol:   topologymodel.L3SubnetLinkType,
+				LinkType:   topologymodel.L3SubnetLinkType,
 				SrcActorID: "router-a",
 				DstActorID: "router-b",
-				Detail: topologyLinkDetail{
-					L3Subnet: &topologyL3SubnetLinkDetail{
+				Detail: topologymodel.LinkDetail{
+					L3Subnet: &topologymodel.L3SubnetLinkDetail{
 						Prefix: 30,
 					},
 				},
@@ -1045,15 +1045,15 @@ func TestSNMPTopologyToV1_ReturnsErrorForL3SubnetWithoutSubnet(t *testing.T) {
 
 func TestSNMPTopologyToV1_PreservesLinkPresentationTypes(t *testing.T) {
 	ts := time.Date(2026, 5, 10, 12, 0, 0, 0, time.UTC)
-	data := topologyData{
+	data := topologymodel.Data{
 		AgentID:     "agent-test",
 		CollectedAt: ts,
 		View:        "summary",
-		Actors: []topologyActor{
+		Actors: []topologymodel.Actor{
 			{
 				ActorID:   "device-a",
 				ActorType: "device",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					ChassisIDs:   []string{"00:11:22:33:44:55"},
 					MacAddresses: []string{"00:11:22:33:44:55"},
 					SysName:      "sw-a",
@@ -1062,14 +1062,14 @@ func TestSNMPTopologyToV1_PreservesLinkPresentationTypes(t *testing.T) {
 			{
 				ActorID:   "device-b",
 				ActorType: "device",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					ChassisIDs:   []string{"aa:bb:cc:dd:ee:ff"},
 					MacAddresses: []string{"aa:bb:cc:dd:ee:ff"},
 					SysName:      "sw-b",
 				},
 			},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{
 				Protocol:   "lldp",
 				LinkType:   "lldp",
@@ -1143,7 +1143,7 @@ func TestSNMPTopologyV1EvidenceMatchColumnsUseTypedL2EndpointFields(t *testing.T
 		"snmp":     "snmp",
 		"probable": "probable",
 	}
-	payload, err := topologyv1renderer.Render(topologyData{})
+	payload, err := topologyv1renderer.Render(topologymodel.Data{})
 	require.NoError(t, err)
 
 	for name, linkType := range tests {
@@ -1161,25 +1161,25 @@ func TestSNMPTopologyV1EvidenceMatchColumnsUseTypedL2EndpointFields(t *testing.T
 }
 
 func TestSNMPTopologyToV1_PortlessFDBEvidenceUsesLinkRef(t *testing.T) {
-	data := topologyData{
+	data := topologymodel.Data{
 		AgentID:     "agent-test",
 		CollectedAt: time.Date(2026, 5, 10, 12, 0, 0, 0, time.UTC),
 		View:        "summary",
-		Actors: []topologyActor{
+		Actors: []topologymodel.Actor{
 			{
 				ActorID:   "device-a",
 				ActorType: "device",
 				Source:    "snmp",
-				Match:     topologyMatch{SysName: "switch-a"},
+				Match:     topologymodel.Match{SysName: "switch-a"},
 			},
 			{
 				ActorID:   "endpoint-a",
 				ActorType: "endpoint",
 				Source:    "fdb",
-				Match:     topologyMatch{MacAddresses: []string{"00:11:22:33:44:55"}},
+				Match:     topologymodel.Match{MacAddresses: []string{"00:11:22:33:44:55"}},
 			},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{
 				Protocol:   "fdb",
 				LinkType:   "fdb",
@@ -1207,38 +1207,38 @@ func TestSNMPTopologyToV1_PortlessFDBEvidenceUsesLinkRef(t *testing.T) {
 }
 
 func TestSNMPTopologyToV1_L2EvidenceDistinguishesParallelLinksByTypedEndpoints(t *testing.T) {
-	data := topologyData{
+	data := topologymodel.Data{
 		AgentID:     "agent-test",
 		CollectedAt: time.Date(2026, 5, 10, 12, 0, 0, 0, time.UTC),
 		View:        "summary",
-		Actors: []topologyActor{
+		Actors: []topologymodel.Actor{
 			{
 				ActorID:   "device-a",
 				ActorType: "device",
 				Source:    "snmp",
-				Match:     topologyMatch{SysName: "switch-a"},
+				Match:     topologymodel.Match{SysName: "switch-a"},
 			},
 			{
 				ActorID:   "device-b",
 				ActorType: "device",
 				Source:    "snmp",
-				Match:     topologyMatch{SysName: "switch-b"},
+				Match:     topologymodel.Match{SysName: "switch-b"},
 			},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{
 				Protocol:   "lldp",
 				LinkType:   "lldp",
 				Direction:  "bidirectional",
 				SrcActorID: "device-a",
 				DstActorID: "device-b",
-				Src: topologyLinkEndpoint{
+				Src: topologymodel.LinkEndpoint{
 					IfIndex:  1,
 					IfName:   "Gi0/1",
 					PortID:   "1",
 					PortName: "Gi0/1",
 				},
-				Dst: topologyLinkEndpoint{
+				Dst: topologymodel.LinkEndpoint{
 					IfIndex:  11,
 					IfName:   "Eth1",
 					PortID:   "11",
@@ -1251,13 +1251,13 @@ func TestSNMPTopologyToV1_L2EvidenceDistinguishesParallelLinksByTypedEndpoints(t
 				Direction:  "bidirectional",
 				SrcActorID: "device-a",
 				DstActorID: "device-b",
-				Src: topologyLinkEndpoint{
+				Src: topologymodel.LinkEndpoint{
 					IfIndex:  2,
 					IfName:   "Gi0/2",
 					PortID:   "2",
 					PortName: "Gi0/2",
 				},
-				Dst: topologyLinkEndpoint{
+				Dst: topologymodel.LinkEndpoint{
 					IfIndex:  12,
 					IfName:   "Eth2",
 					PortID:   "12",
@@ -1288,12 +1288,12 @@ func TestNormalizeTopologyInferenceStrategy(t *testing.T) {
 		in   string
 		want string
 	}{
-		"default-empty":         {in: "", want: topologyInferenceStrategyFDBMinimumKnowledge},
-		"fdb-minimum-knowledge": {in: topologyInferenceStrategyFDBMinimumKnowledge, want: topologyInferenceStrategyFDBMinimumKnowledge},
-		"stp-parent-tree":       {in: topologyInferenceStrategySTPParentTree, want: topologyInferenceStrategySTPParentTree},
-		"fdb-pairwise":          {in: topologyInferenceStrategyFDBPairwise, want: topologyInferenceStrategyFDBPairwise},
-		"stp-fdb-correlated":    {in: topologyInferenceStrategySTPFDBCorrelated, want: topologyInferenceStrategySTPFDBCorrelated},
-		"cdp-fdb-hybrid":        {in: topologyInferenceStrategyCDPFDBHybrid, want: topologyInferenceStrategyCDPFDBHybrid},
+		"default-empty":         {in: "", want: topologyoptions.InferenceStrategyFDBMinimumKnowledge},
+		"fdb-minimum-knowledge": {in: topologyoptions.InferenceStrategyFDBMinimumKnowledge, want: topologyoptions.InferenceStrategyFDBMinimumKnowledge},
+		"stp-parent-tree":       {in: topologyoptions.InferenceStrategySTPParentTree, want: topologyoptions.InferenceStrategySTPParentTree},
+		"fdb-pairwise":          {in: topologyoptions.InferenceStrategyFDBPairwise, want: topologyoptions.InferenceStrategyFDBPairwise},
+		"stp-fdb-correlated":    {in: topologyoptions.InferenceStrategySTPFDBCorrelated, want: topologyoptions.InferenceStrategySTPFDBCorrelated},
+		"cdp-fdb-hybrid":        {in: topologyoptions.InferenceStrategyCDPFDBHybrid, want: topologyoptions.InferenceStrategyCDPFDBHybrid},
 		"invalid":               {in: "invalid", want: ""},
 	}
 
@@ -1309,15 +1309,15 @@ func TestNormalizeTopologyManagedFocuses(t *testing.T) {
 		in   []string
 		want []string
 	}{
-		"nil":                 {in: nil, want: []string{topologyManagedFocusAllDevices}},
-		"empty":               {in: []string{}, want: []string{topologyManagedFocusAllDevices}},
-		"blank":               {in: []string{""}, want: []string{topologyManagedFocusAllDevices}},
-		"comma-blanks":        {in: []string{" , , "}, want: []string{topologyManagedFocusAllDevices}},
-		"invalid":             {in: []string{"invalid"}, want: []string{topologyManagedFocusAllDevices}},
+		"nil":                 {in: nil, want: []string{topologyoptions.ManagedFocusAllDevices}},
+		"empty":               {in: []string{}, want: []string{topologyoptions.ManagedFocusAllDevices}},
+		"blank":               {in: []string{""}, want: []string{topologyoptions.ManagedFocusAllDevices}},
+		"comma-blanks":        {in: []string{" , , "}, want: []string{topologyoptions.ManagedFocusAllDevices}},
+		"invalid":             {in: []string{"invalid"}, want: []string{topologyoptions.ManagedFocusAllDevices}},
 		"deduplicated-ips":    {in: []string{"ip:10.0.0.2", "ip:10.0.0.1", "ip:10.0.0.2"}, want: []string{"ip:10.0.0.1", "ip:10.0.0.2"}},
 		"comma-separated-ips": {in: []string{" ip:10.0.0.2 , ip:10.0.0.1 "}, want: []string{"ip:10.0.0.1", "ip:10.0.0.2"}},
-		"all-devices-token":   {in: []string{"ip:10.0.0.1", topologyManagedFocusAllDevices}, want: []string{topologyManagedFocusAllDevices}},
-		"all-devices-comma":   {in: []string{"ip:10.0.0.1,all_devices"}, want: []string{topologyManagedFocusAllDevices}},
+		"all-devices-token":   {in: []string{"ip:10.0.0.1", topologyoptions.ManagedFocusAllDevices}, want: []string{topologyoptions.ManagedFocusAllDevices}},
+		"all-devices-comma":   {in: []string{"ip:10.0.0.1,all_devices"}, want: []string{topologyoptions.ManagedFocusAllDevices}},
 	}
 
 	for name, tc := range tests {
@@ -1331,9 +1331,9 @@ func TestNormalizeTopologyManagedFocuses(t *testing.T) {
 		"ip:10.0.0.1,ip:10.0.0.2",
 		topologyoptions.FormatManagedFocuses([]string{"ip:10.0.0.2", "ip:10.0.0.1"}),
 	)
-	assert.Equal(t, []string{topologyManagedFocusAllDevices}, topologyoptions.ParseManagedFocuses(""))
+	assert.Equal(t, []string{topologyoptions.ManagedFocusAllDevices}, topologyoptions.ParseManagedFocuses(""))
 	assert.Equal(t, []string{"10.0.0.1", "10.0.0.2"}, topologyoptions.ManagedFocusSelectedIPs("ip:10.0.0.2,ip:10.0.0.1"))
-	assert.True(t, topologyoptions.IsManagedFocusAllDevices(topologyManagedFocusAllDevices))
+	assert.True(t, topologyoptions.IsManagedFocusAllDevices(topologyoptions.ManagedFocusAllDevices))
 	assert.False(t, topologyoptions.IsManagedFocusAllDevices("ip:10.0.0.1"))
 }
 
@@ -1347,7 +1347,7 @@ func newTestTopologyCacheLLDP(
 	cache.updateTime = ts
 	cache.lastUpdate = ts
 	cache.agentID = agentID
-	cache.localDevice = topologyDevice{
+	cache.localDevice = topologymodel.Device{
 		ChassisID:     localChassis,
 		ChassisIDType: "macAddress",
 		SysName:       localSysName,

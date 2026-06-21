@@ -5,6 +5,8 @@ package snmptopology
 import (
 	"sort"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
@@ -22,13 +24,13 @@ func (r *topologyRegistry) activeCaches() []*topologyCache {
 	return caches
 }
 
-func (r *topologyRegistry) observationSnapshots() []topologyObservationSnapshot {
+func (r *topologyRegistry) observationSnapshots() []topologymodel.ObservationSnapshot {
 	caches := r.activeCaches()
 	if len(caches) == 0 {
 		return nil
 	}
 
-	snapshots := make([]topologyObservationSnapshot, 0, len(caches))
+	snapshots := make([]topologymodel.ObservationSnapshot, 0, len(caches))
 	for _, cache := range caches {
 		snapshot, ok := cache.snapshotEngineObservations()
 		if !ok {
@@ -44,7 +46,7 @@ func (r *topologyRegistry) observationSnapshots() []topologyObservationSnapshot 
 	return snapshots
 }
 
-func sortTopologyObservationSnapshots(snapshots []topologyObservationSnapshot) {
+func sortTopologyObservationSnapshots(snapshots []topologymodel.ObservationSnapshot) {
 	sort.Slice(snapshots, func(i, j int) bool {
 		if snapshots[i].LocalDeviceID != snapshots[j].LocalDeviceID {
 			return snapshots[i].LocalDeviceID < snapshots[j].LocalDeviceID
@@ -61,16 +63,16 @@ func sortTopologyObservationSnapshots(snapshots []topologyObservationSnapshot) {
 	})
 }
 
-func topologyObservationSnapshotIdentity(snapshot topologyObservationSnapshot) (managementIP, hostname string) {
+func topologyObservationSnapshotIdentity(snapshot topologymodel.ObservationSnapshot) (managementIP, hostname string) {
 	if len(snapshot.L2Observations) == 0 {
 		return "", ""
 	}
 	return snapshot.L2Observations[0].ManagementIP, snapshot.L2Observations[0].Hostname
 }
 
-func aggregateTopologyObservationSnapshots(snapshots []topologyObservationSnapshot) (topologyObservationAggregate, bool) {
+func aggregateTopologyObservationSnapshots(snapshots []topologymodel.ObservationSnapshot) (topologymodel.ObservationAggregate, bool) {
 	if len(snapshots) == 0 {
-		return topologyObservationAggregate{}, false
+		return topologymodel.ObservationAggregate{}, false
 	}
 
 	totalObservations := 0
@@ -84,12 +86,12 @@ func aggregateTopologyObservationSnapshots(snapshots []topologyObservationSnapsh
 		totalBGPPeers += len(snapshot.BGPPeers)
 	}
 
-	aggregate := topologyObservationAggregate{
+	aggregate := topologymodel.ObservationAggregate{
 		Snapshots:      snapshots,
 		L2Observations: make([]topologyengine.L2Observation, 0, totalObservations),
-		L3Interfaces:   make([]topologyL3Interface, 0, totalL3Interfaces),
-		OSPFNeighbors:  make([]topologyOSPFNeighbor, 0, totalOSPFNeighbors),
-		BGPPeers:       make([]topologyBGPPeer, 0, totalBGPPeers),
+		L3Interfaces:   make([]topologymodel.L3Interface, 0, totalL3Interfaces),
+		OSPFNeighbors:  make([]topologymodel.OSPFNeighbor, 0, totalOSPFNeighbors),
+		BGPPeers:       make([]topologymodel.BGPPeer, 0, totalBGPPeers),
 	}
 	for _, snapshot := range snapshots {
 		aggregate.L2Observations = append(aggregate.L2Observations, snapshot.L2Observations...)

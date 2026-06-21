@@ -6,6 +6,9 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 )
 
 // TestTopologyRegistry_ConcurrentSnapshotsDoNotRaceOnDeviceLabels reproduces the
@@ -21,7 +24,7 @@ func TestTopologyRegistry_ConcurrentSnapshotsDoNotRaceOnDeviceLabels(t *testing.
 
 	cache := newTopologyCache()
 	cache.lastUpdate = time.Now()
-	cache.localDevice = topologyDevice{
+	cache.localDevice = topologymodel.Device{
 		ManagementIP:  "192.0.2.1",
 		ChassisID:     "aa:bb:cc:dd:ee:ff",
 		ChassisIDType: "macAddress",
@@ -56,7 +59,7 @@ func TestTopologyRegistry_ConcurrentSnapshotsDoNotRaceOnDeviceLabels(t *testing.
 			if collectPath {
 				_, _ = snapshotTopologyRegistryForTest(registry)
 			} else {
-				_, _ = registry.snapshotWithOptions(topologyQueryOptions{})
+				_, _ = registry.snapshotWithOptions(topologyoptions.QueryOptions{})
 			}
 		}()
 	}

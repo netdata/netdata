@@ -3,17 +3,20 @@
 package snmptopology
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"sort"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
-func buildTopologyManagedFocusTargets(snapshots []topologyObservationSnapshot) []topologyManagedFocusTarget {
+func buildTopologyManagedFocusTargets(snapshots []topologymodel.ObservationSnapshot) []topologyoptions.ManagedFocusTarget {
 	if len(snapshots) == 0 {
 		return nil
 	}
 
-	targetByValue := make(map[string]topologyManagedFocusTarget)
+	targetByValue := make(map[string]topologyoptions.ManagedFocusTarget)
 	for _, snapshot := range snapshots {
 		managementIP := topologyutil.NormalizeIPAddress(snapshot.LocalDevice.ManagementIP)
 		if managementIP == "" && len(snapshot.L2Observations) > 0 {
@@ -22,7 +25,7 @@ func buildTopologyManagedFocusTargets(snapshots []topologyObservationSnapshot) [
 		if managementIP == "" {
 			continue
 		}
-		value := topologyManagedFocusIPPrefix + managementIP
+		value := topologyoptions.ManagedFocusIPPrefix + managementIP
 
 		displayName := strings.TrimSpace(snapshot.LocalDevice.SysName)
 		if displayName == "" && len(snapshot.L2Observations) > 0 {
@@ -38,7 +41,7 @@ func buildTopologyManagedFocusTargets(snapshots []topologyObservationSnapshot) [
 
 		existing, exists := targetByValue[value]
 		if !exists || label < existing.Name {
-			targetByValue[value] = topologyManagedFocusTarget{
+			targetByValue[value] = topologyoptions.ManagedFocusTarget{
 				Value: value,
 				Name:  label,
 			}
@@ -48,7 +51,7 @@ func buildTopologyManagedFocusTargets(snapshots []topologyObservationSnapshot) [
 		return nil
 	}
 
-	out := make([]topologyManagedFocusTarget, 0, len(targetByValue))
+	out := make([]topologyoptions.ManagedFocusTarget, 0, len(targetByValue))
 	for _, target := range targetByValue {
 		out = append(out, target)
 	}

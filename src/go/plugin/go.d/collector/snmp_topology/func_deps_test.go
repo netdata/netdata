@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/snmptopologyfunc"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,7 +24,7 @@ func TestFuncDepsAdapterSnapshotUnavailable(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			data, ok, err := tc.adapter.Snapshot(snmptopologyfunc.QueryOptions{})
+			data, ok, err := tc.adapter.Snapshot(topologyoptions.QueryOptions{})
 
 			require.NoError(t, err)
 			require.False(t, ok)

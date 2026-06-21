@@ -3,12 +3,14 @@
 package snmptopology
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"maps"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
-func normalizeTopologyDevice(dev topologyDevice) topologyDevice {
+func normalizeTopologyDevice(dev topologymodel.Device) topologymodel.Device {
 	// dev is a shallow copy of the caller's value, so dev.Labels still aliases
 	// the caller's map (e.g. a live topologyCache.localDevice read under RLock).
 	// Clone it before the mutations below so concurrent snapshot readers never
@@ -92,16 +94,9 @@ func normalizeTopologyDevice(dev topologyDevice) topologyDevice {
 	return dev
 }
 
-func topologyDeviceKey(dev topologyDevice) string {
+func topologyDeviceKey(dev topologymodel.Device) string {
 	if dev.ChassisID == "" {
 		return ""
 	}
 	return dev.ChassisIDType + ":" + dev.ChassisID
-}
-
-func normalizeLLDPSubtype(value string, mapping map[string]string) string {
-	if v, ok := mapping[value]; ok {
-		return v
-	}
-	return value
 }

@@ -3,12 +3,13 @@
 package snmptopology
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"net/netip"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
@@ -24,7 +25,7 @@ func (c *topologyCache) updateOSPFNeighbor(tags map[string]string) {
 		return
 	}
 
-	row := topologyOSPFNeighbor{
+	row := topologymodel.OSPFNeighbor{
 		LocalRouterID:    topologyutil.NormalizeTopologyRouterID(c.localDevice.OSPFRouterID),
 		NeighborRouterID: neighborRouterID,
 		NeighborIP:       neighborIP,
@@ -36,18 +37,18 @@ func (c *topologyCache) updateOSPFNeighbor(tags map[string]string) {
 	}
 
 	if c.ospfNeighborsByKey == nil {
-		c.ospfNeighborsByKey = make(map[string]topologyOSPFNeighbor)
+		c.ospfNeighborsByKey = make(map[string]topologymodel.OSPFNeighbor)
 	}
 	c.ospfNeighborsByKey[topologyOSPFNeighborCacheKey(row)] = row
 }
 
-func (c *topologyCache) snapshotOSPFNeighbors(localDeviceID string) []topologyOSPFNeighbor {
+func (c *topologyCache) snapshotOSPFNeighbors(localDeviceID string) []topologymodel.OSPFNeighbor {
 	if c == nil || len(c.ospfNeighborsByKey) == 0 {
 		return nil
 	}
 
 	keys := topologyutil.SortedMapKeys(c.ospfNeighborsByKey)
-	rows := make([]topologyOSPFNeighbor, 0, len(keys))
+	rows := make([]topologymodel.OSPFNeighbor, 0, len(keys))
 	for _, key := range keys {
 		row := c.ospfNeighborsByKey[key]
 		row.DeviceID = strings.TrimSpace(localDeviceID)
@@ -121,7 +122,7 @@ func (c *topologyCache) matchOSPFNeighborLocalInterface(neighborIP string) (topo
 	return best, found
 }
 
-func topologyOSPFNeighborCacheKey(row topologyOSPFNeighbor) string {
+func topologyOSPFNeighborCacheKey(row topologymodel.OSPFNeighbor) string {
 	return topologyutil.JoinKeyParts(
 		topologyutil.NormalizeTopologyRouterID(row.NeighborRouterID),
 		topologyutil.NormalizeNonUnspecifiedIPAddress(row.NeighborIP),

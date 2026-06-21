@@ -6,6 +6,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/stretchr/testify/require"
@@ -55,12 +57,12 @@ func TestTopologyBGPPeerFromRowKeepsOnlyDiagnosticRawAddresses(t *testing.T) {
 	tests := map[string]struct {
 		neighbor  string
 		localAddr string
-		wantPeer  topologyBGPPeer
+		wantPeer  topologymodel.BGPPeer
 	}{
 		"normalizes-non-unspecified-ip-addresses": {
 			neighbor:  "C0000202",
 			localAddr: "192.0.2.1",
-			wantPeer: topologyBGPPeer{
+			wantPeer: topologymodel.BGPPeer{
 				NeighborIP: "192.0.2.2",
 				LocalIP:    "192.0.2.1",
 			},
@@ -68,12 +70,12 @@ func TestTopologyBGPPeerFromRowKeepsOnlyDiagnosticRawAddresses(t *testing.T) {
 		"drops-unspecified-ip-addresses": {
 			neighbor:  "0.0.0.0",
 			localAddr: "::",
-			wantPeer:  topologyBGPPeer{},
+			wantPeer:  topologymodel.BGPPeer{},
 		},
 		"preserves-raw-non-ip-diagnostics": {
 			neighbor:  "peer-token",
 			localAddr: "local-token",
-			wantPeer: topologyBGPPeer{
+			wantPeer: topologymodel.BGPPeer{
 				NeighborIP: "peer-token",
 				LocalIP:    "local-token",
 			},
