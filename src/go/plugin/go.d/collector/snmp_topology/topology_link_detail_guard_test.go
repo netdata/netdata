@@ -18,9 +18,9 @@ import (
 )
 
 func TestTopologyLinkDetailDoesNotUseMapCarriers(t *testing.T) {
-	_, hasEndpointAttributes := reflect.TypeOf(graph.LinkEndpoint{}).FieldByName("Attributes")
+	_, hasEndpointAttributes := reflect.TypeFor[graph.LinkEndpoint]().FieldByName("Attributes")
 	require.False(t, hasEndpointAttributes)
-	_, hasLinkMetrics := reflect.TypeOf(graph.Link{}).FieldByName("Metrics")
+	_, hasLinkMetrics := reflect.TypeFor[graph.Link]().FieldByName("Metrics")
 	require.False(t, hasLinkMetrics)
 
 	for _, root := range []struct {
