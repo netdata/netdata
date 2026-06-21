@@ -1,19 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyenrich
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
-func applyTopologyL3SubnetEnrichment(data *topologyData, aggregate topologyObservationAggregate) topologyL3EnrichmentStats {
-	var stats topologyL3EnrichmentStats
+func ApplyL3Subnet(data *topologymodel.Data, aggregate topologymodel.ObservationAggregate) topologymodel.L3EnrichmentStats {
+	var stats topologymodel.L3EnrichmentStats
 	if data == nil || len(aggregate.L3Interfaces) == 0 {
 		return finishTopologyL3SubnetEnrichment(data, stats)
 	}
@@ -58,27 +59,27 @@ func applyTopologyL3SubnetEnrichment(data *topologyData, aggregate topologyObser
 	return finishTopologyL3SubnetEnrichment(data, stats)
 }
 
-func finishTopologyL3SubnetEnrichment(data *topologyData, stats topologyL3EnrichmentStats) topologyL3EnrichmentStats {
+func finishTopologyL3SubnetEnrichment(data *topologymodel.Data, stats topologymodel.L3EnrichmentStats) topologymodel.L3EnrichmentStats {
 	recordTopologyL3EnrichmentStats(data, stats)
 	topologymodel.RecomputeLinkStats(data)
 	return stats
 }
 
-func topologyL3SubnetLink(adjacency topologyL3SubnetAdjacency, srcRef, dstRef topologyL3ActorRef) topologyLink {
-	return topologyLink{
+func topologyL3SubnetLink(adjacency topologyL3SubnetAdjacency, srcRef, dstRef topologyL3ActorRef) topologymodel.Link {
+	return topologymodel.Link{
 		Layer:      "3",
-		Protocol:   topologyL3SubnetLinkType,
-		LinkType:   topologyL3SubnetLinkType,
+		Protocol:   topologymodel.L3SubnetLinkType,
+		LinkType:   topologymodel.L3SubnetLinkType,
 		Direction:  "observed",
 		SrcActorID: srcRef.actorID,
 		DstActorID: dstRef.actorID,
-		Src: topologyLinkEndpoint{
+		Src: topologymodel.LinkEndpoint{
 			Match:   srcRef.match,
 			IfIndex: topologyutil.ParseIndex(adjacency.A.IfIndex),
 			IfName:  strings.TrimSpace(adjacency.A.IfName),
 			IfDescr: strings.TrimSpace(adjacency.A.IfDescr),
 		},
-		Dst: topologyLinkEndpoint{
+		Dst: topologymodel.LinkEndpoint{
 			Match:   dstRef.match,
 			IfIndex: topologyutil.ParseIndex(adjacency.B.IfIndex),
 			IfName:  strings.TrimSpace(adjacency.B.IfName),
@@ -88,8 +89,8 @@ func topologyL3SubnetLink(adjacency topologyL3SubnetAdjacency, srcRef, dstRef to
 			Inference:      "shared_subnet",
 			AttachmentMode: "logical_l3_subnet",
 		},
-		Detail: topologyLinkDetail{
-			L3Subnet: &topologyL3SubnetLinkDetail{
+		Detail: topologymodel.LinkDetail{
+			L3Subnet: &topologymodel.L3SubnetLinkDetail{
 				Source:  "ip_mib",
 				SrcIP:   topologyutil.NormalizeIPAddress(adjacency.A.IP),
 				DstIP:   topologyutil.NormalizeIPAddress(adjacency.B.IP),
@@ -102,23 +103,23 @@ func topologyL3SubnetLink(adjacency topologyL3SubnetAdjacency, srcRef, dstRef to
 	}
 }
 
-func existingTopologyL3LinkKeys(links []topologyLink) map[string]struct{} {
+func existingTopologyL3LinkKeys(links []topologymodel.Link) map[string]struct{} {
 	seen := make(map[string]struct{})
 	for _, link := range links {
-		if strings.EqualFold(strings.TrimSpace(topologyutil.FirstNonEmptyString(link.LinkType, link.Protocol)), topologyL3SubnetLinkType) {
+		if strings.EqualFold(strings.TrimSpace(topologyutil.FirstNonEmptyString(link.LinkType, link.Protocol)), topologymodel.L3SubnetLinkType) {
 			seen[topologyL3SubnetLinkKey(link)] = struct{}{}
 		}
 	}
 	return seen
 }
 
-func topologyL3SubnetLinkKey(link topologyLink) string {
+func topologyL3SubnetLinkKey(link topologymodel.Link) string {
 	src := strings.TrimSpace(link.SrcActorID)
 	dst := strings.TrimSpace(link.DstActorID)
 	if src > dst {
 		src, dst = dst, src
 	}
-	return topologyL3SubnetLinkKeyParts(
+	return topologyutil.JoinKeyParts(
 		src,
 		dst,
 		topologyL3Subnet(link),
@@ -126,31 +127,21 @@ func topologyL3SubnetLinkKey(link topologyLink) string {
 	)
 }
 
-func topologyL3Subnet(link topologyLink) string {
+func topologyL3Subnet(link topologymodel.Link) string {
 	if link.Detail.L3Subnet == nil {
 		return ""
 	}
 	return strings.TrimSpace(link.Detail.L3Subnet.Subnet)
 }
 
-func topologyL3SubnetPrefix(link topologyLink) int {
+func topologyL3SubnetPrefix(link topologymodel.Link) int {
 	if link.Detail.L3Subnet == nil {
 		return 0
 	}
 	return link.Detail.L3Subnet.Prefix
 }
 
-func topologyL3SubnetLinkKeyParts(parts ...string) string {
-	var b strings.Builder
-	for _, part := range parts {
-		b.WriteString(strconv.Itoa(len(part)))
-		b.WriteByte(':')
-		b.WriteString(part)
-	}
-	return b.String()
-}
-
-func recordTopologyL3EnrichmentStats(data *topologyData, stats topologyL3EnrichmentStats) {
+func recordTopologyL3EnrichmentStats(data *topologymodel.Data, stats topologymodel.L3EnrichmentStats) {
 	if data == nil {
 		return
 	}

@@ -4,6 +4,7 @@ package topologyutil
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -60,6 +61,16 @@ func SortedMapKeys[T any](m map[string]T) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+func JoinKeyParts(parts ...string) string {
+	var b strings.Builder
+	for _, part := range parts {
+		b.WriteString(strconv.Itoa(len(part)))
+		b.WriteByte(':')
+		b.WriteString(part)
+	}
+	return b.String()
 }
 
 func DeduplicateSortedStrings(values []string) []string {

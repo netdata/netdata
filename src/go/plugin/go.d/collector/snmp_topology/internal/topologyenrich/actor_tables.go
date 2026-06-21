@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyenrich
 
-import "strings"
+import (
+	"strings"
 
-func attachTopologyOSPFNeighborRows(data *topologyData, rowsByActor map[string][]topologyOSPFNeighborDetailRow) {
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+)
+
+func attachTopologyOSPFNeighborRows(data *topologymodel.Data, rowsByActor map[string][]topologymodel.OSPFNeighborDetailRow) {
 	if data == nil || len(rowsByActor) == 0 {
 		return
 	}
@@ -19,7 +23,7 @@ func attachTopologyOSPFNeighborRows(data *topologyData, rowsByActor map[string][
 	}
 }
 
-func attachTopologyBGPPeerRows(data *topologyData, rowsByActor map[string][]topologyBGPPeerDetailRow) {
+func attachTopologyBGPPeerRows(data *topologymodel.Data, rowsByActor map[string][]topologymodel.BGPPeerDetailRow) {
 	if data == nil || len(rowsByActor) == 0 {
 		return
 	}

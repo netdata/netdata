@@ -3,7 +3,6 @@
 package snmptopology
 
 import (
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
@@ -75,7 +74,7 @@ func topologyBGPPeerCacheKey(row ddsnmp.BGPRow, peer topologyBGPPeer) string {
 	if key := strings.TrimSpace(row.StructuralID); key != "" {
 		return key
 	}
-	return topologyL3SubnetLinkKeyParts(
+	return topologyutil.JoinKeyParts(
 		row.OriginProfileID,
 		row.Table,
 		row.RowKey,
@@ -150,24 +149,4 @@ func topologyBGPInt64Ptr(value ddsnmp.BGPInt64) *int64 {
 	}
 	v := value.Value
 	return &v
-}
-
-func isBGPPeerEstablished(row topologyBGPPeer) bool {
-	return strings.EqualFold(strings.TrimSpace(row.State), string(ddprofiledefinition.BGPPeerStateEstablished))
-}
-
-func sortTopologyBGPPeerDetailRows(rows []topologyBGPPeerDetailRow) {
-	sort.Slice(rows, func(i, j int) bool {
-		return topologyBGPPeerActorRowSortKey(rows[i]) < topologyBGPPeerActorRowSortKey(rows[j])
-	})
-}
-
-func topologyBGPPeerActorRowSortKey(row topologyBGPPeerDetailRow) string {
-	return strings.Join([]string{
-		row.RoutingInstance,
-		row.RemoteAS,
-		topologyutil.NormalizeBGPPeerAddress(row.NeighborIP),
-		row.PeerIdentifier,
-		row.State,
-	}, "\x00")
 }

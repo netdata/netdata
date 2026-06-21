@@ -8,6 +8,7 @@ import (
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyenrich"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyshape"
 )
@@ -37,9 +38,9 @@ func buildSingleMapTopologySnapshot(aggregate topologyObservationAggregate, opti
 	}
 	augmentTopologySnapshotLocals(&data, aggregate.Snapshots)
 	topologyshape.ApplyPolicies(&data, options)
-	applyTopologyL3SubnetEnrichment(&data, aggregate)
-	applyTopologyOSPFAdjacencyEnrichment(&data, aggregate)
-	applyTopologyBGPAdjacencyEnrichment(&data, aggregate)
+	topologyenrich.ApplyL3Subnet(&data, aggregate)
+	topologyenrich.ApplyOSPFAdjacency(&data, aggregate)
+	topologyenrich.ApplyBGPAdjacency(&data, aggregate)
 	topologyshape.ApplyDepthFocusFilter(&data, options)
 	return data, true
 }
@@ -75,9 +76,9 @@ func buildProbableTopologySnapshot(aggregate topologyObservationAggregate, optio
 	augmentTopologySnapshotLocals(&probableData, aggregate.Snapshots)
 	topologyshape.ApplyPolicies(&probableData, probableOptions)
 	topologyshape.MarkProbableDeltaLinks(&strictData, &probableData)
-	applyTopologyL3SubnetEnrichment(&probableData, aggregate)
-	applyTopologyOSPFAdjacencyEnrichment(&probableData, aggregate)
-	applyTopologyBGPAdjacencyEnrichment(&probableData, aggregate)
+	topologyenrich.ApplyL3Subnet(&probableData, aggregate)
+	topologyenrich.ApplyOSPFAdjacency(&probableData, aggregate)
+	topologyenrich.ApplyBGPAdjacency(&probableData, aggregate)
 	topologyshape.ApplyDepthFocusFilter(&probableData, options)
 	return probableData, true
 }

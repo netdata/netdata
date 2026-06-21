@@ -94,28 +94,6 @@ func TestTopologyBGPPeerFromRowKeepsOnlyDiagnosticRawAddresses(t *testing.T) {
 	}
 }
 
-func TestSortTopologyBGPPeerRowsUsesRawNeighborFallback(t *testing.T) {
-	rows := []topologyBGPPeerDetailRow{
-		{
-			RoutingInstance: "default",
-			RemoteAS:        "65002",
-			NeighborIP:      "raw-b",
-			State:           "established",
-		},
-		{
-			RoutingInstance: "default",
-			RemoteAS:        "65002",
-			NeighborIP:      "raw-a",
-			State:           "established",
-		},
-	}
-
-	sortTopologyBGPPeerDetailRows(rows)
-
-	require.Equal(t, "raw-a", rows[0].NeighborIP)
-	require.Equal(t, "raw-b", rows[1].NeighborIP)
-}
-
 func TestTopologyCacheIngestTopologyBGPPeersSkipsErrorsAndInvalidRows(t *testing.T) {
 	cache := newTopologyCache()
 
