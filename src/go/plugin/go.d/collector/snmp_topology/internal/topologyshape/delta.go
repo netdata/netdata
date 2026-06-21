@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyshape
 
 import (
 	"strings"
@@ -8,7 +8,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 )
 
-func topologyLinkDeltaKey(link topologyLink) string {
+func topologyLinkDeltaKey(link topologymodel.Link) string {
 	return strings.Join([]string{
 		strings.ToLower(strings.TrimSpace(link.Protocol)),
 		strings.ToLower(strings.TrimSpace(link.Direction)),
@@ -24,7 +24,7 @@ func topologyLinkDeltaKey(link topologyLink) string {
 	}, "|")
 }
 
-func markProbableDeltaLinks(strictData, probableData *topologyData) {
+func MarkProbableDeltaLinks(strictData, probableData *topologymodel.Data) {
 	if strictData == nil || probableData == nil {
 		return
 	}
@@ -59,7 +59,7 @@ func markProbableDeltaLinks(strictData, probableData *topologyData) {
 	topologymodel.RecomputeLinkStats(probableData)
 }
 
-func topologyLinkActorKey(link topologyLink) string {
+func topologyLinkActorKey(link topologymodel.Link) string {
 	return strings.Join([]string{
 		link.Protocol,
 		link.Direction,
@@ -78,7 +78,7 @@ func topologyLinkActorKey(link topologyLink) string {
 	}, "|")
 }
 
-func topologyL2BridgeDomain(link topologyLink) string {
+func topologyL2BridgeDomain(link topologymodel.Link) string {
 	if link.L2 == nil {
 		return ""
 	}

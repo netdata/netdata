@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyshape
 
 import (
 	"sort"
@@ -9,7 +9,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 )
 
-func applyTopologyDepthFocusFilter(data *topologyData, options topologyQueryOptions) {
+func ApplyDepthFocusFilter(data *topologymodel.Data, options topologyoptions.QueryOptions) {
 	if data == nil || len(data.Actors) == 0 {
 		return
 	}

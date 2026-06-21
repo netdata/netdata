@@ -1,11 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyshape
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
+)
 
 type topologyFocusGraph struct {
-	actorByID        map[string]topologyActor
+	actorByID        map[string]topologymodel.Actor
 	segmentSet       map[string]struct{}
 	nonSegmentSet    map[string]struct{}
 	nonSegmentAdj    map[string]map[string]struct{}
@@ -13,9 +18,9 @@ type topologyFocusGraph struct {
 	segmentNeighbors map[string]map[string]struct{}
 }
 
-func buildTopologyFocusGraph(data *topologyData) topologyFocusGraph {
+func buildTopologyFocusGraph(data *topologymodel.Data) topologyFocusGraph {
 	graph := topologyFocusGraph{
-		actorByID:        make(map[string]topologyActor, len(data.Actors)),
+		actorByID:        make(map[string]topologymodel.Actor, len(data.Actors)),
 		segmentSet:       make(map[string]struct{}),
 		nonSegmentSet:    make(map[string]struct{}),
 		nonSegmentAdj:    make(map[string]map[string]struct{}),
@@ -83,7 +88,7 @@ func traverseTopologyFocusDepth(graph topologyFocusGraph, roots map[string]struc
 	for head := 0; head < len(queue); head++ {
 		current := queue[head]
 		currentDepth := distance[current]
-		if depth != topologyDepthAllInternal && currentDepth >= depth {
+		if depth != topologyoptions.DepthAllInternal && currentDepth >= depth {
 			continue
 		}
 
@@ -120,7 +125,7 @@ func collectTopologyFocusDepthSets(
 ) (map[string]struct{}, map[string]struct{}) {
 	includedNonSegment := make(map[string]struct{}, len(distance))
 	for actorID, currentDepth := range distance {
-		if depth == topologyDepthAllInternal || currentDepth <= depth {
+		if depth == topologyoptions.DepthAllInternal || currentDepth <= depth {
 			includedNonSegment[actorID] = struct{}{}
 		}
 	}
@@ -129,7 +134,7 @@ func collectTopologyFocusDepthSets(
 	for actorID := range includedNonSegment {
 		includedActorsByDepth[actorID] = struct{}{}
 	}
-	if depth == topologyDepthAllInternal || depth > 0 {
+	if depth == topologyoptions.DepthAllInternal || depth > 0 {
 		for segmentID, neighbors := range graph.segmentNeighbors {
 			for actorID := range neighbors {
 				if _, ok := includedNonSegment[actorID]; ok {

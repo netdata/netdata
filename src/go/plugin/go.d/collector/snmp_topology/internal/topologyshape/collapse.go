@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyshape
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"strings"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
-func collapseActorsByIP(data *topologyData) int {
+func collapseActorsByIP(data *topologymodel.Data) int {
 	if data == nil || len(data.Actors) <= 1 {
 		return 0
 	}
@@ -47,7 +48,7 @@ func collapseActorsByIP(data *topologyData) int {
 		if strings.EqualFold(strings.TrimSpace(actor.ActorType), "segment") {
 			continue
 		}
-		ips := normalizedMatchIPs(actor.Match)
+		ips := topologymodel.NormalizedMatchIPs(actor.Match)
 		if len(ips) == 0 {
 			continue
 		}
@@ -109,7 +110,7 @@ func collapseActorsByIP(data *topologyData) int {
 		return 0
 	}
 
-	actors := make([]topologyActor, 0, len(data.Actors)-collapsed)
+	actors := make([]topologymodel.Actor, 0, len(data.Actors)-collapsed)
 	for idx, actor := range data.Actors {
 		if !keep[idx] {
 			continue
@@ -118,7 +119,7 @@ func collapseActorsByIP(data *topologyData) int {
 	}
 	data.Actors = actors
 
-	links := make([]topologyLink, 0, len(data.Links))
+	links := make([]topologymodel.Link, 0, len(data.Links))
 	seen := make(map[string]struct{}, len(data.Links))
 	for _, link := range data.Links {
 		if replacement, ok := replaceActorID[link.SrcActorID]; ok && replacement != "" {
@@ -144,14 +145,14 @@ func collapseActorsByIP(data *topologyData) int {
 	return collapsed
 }
 
-func compareCollapseActorPriority(left, right topologyActor) int {
+func compareCollapseActorPriority(left, right topologymodel.Actor) int {
 	if leftDevice, rightDevice := topologyengine.IsDeviceActorType(left.ActorType), topologyengine.IsDeviceActorType(right.ActorType); leftDevice != rightDevice {
 		if leftDevice {
 			return -1
 		}
 		return 1
 	}
-	if leftInferred, rightInferred := topologyActorIsInferred(left), topologyActorIsInferred(right); leftInferred != rightInferred {
+	if leftInferred, rightInferred := topologymodel.ActorIsInferred(left), topologymodel.ActorIsInferred(right); leftInferred != rightInferred {
 		if !leftInferred {
 			return -1
 		}
@@ -168,7 +169,7 @@ func compareCollapseActorPriority(left, right topologyActor) int {
 	return strings.Compare(leftID, rightID)
 }
 
-func mergeTopologyActorDetail(dst, src topologyActorDetail) topologyActorDetail {
+func mergeTopologyActorDetail(dst, src topologymodel.ActorDetail) topologymodel.ActorDetail {
 	dst.L2 = mergeTopologyProjectionActorDetail(dst.L2, src.L2)
 	dst.SNMP = mergeTopologySNMPActorDetail(dst.SNMP, src.SNMP)
 	dst.OSPF = append(dst.OSPF, src.OSPF...)
@@ -274,7 +275,7 @@ func mergeTopologyProjectionSegmentDetail(dst, src topologyengine.ProjectionSegm
 	return dst
 }
 
-func mergeTopologySNMPActorDetail(dst, src topologySNMPActorDetail) topologySNMPActorDetail {
+func mergeTopologySNMPActorDetail(dst, src topologymodel.SNMPActorDetail) topologymodel.SNMPActorDetail {
 	dst.ManagementAddresses = topologyutil.FirstNonEmptySlice(dst.ManagementAddresses, src.ManagementAddresses)
 	dst.Capabilities = topologyutil.FirstNonEmptySlice(dst.Capabilities, src.Capabilities)
 	dst.CapabilitiesSupported = topologyutil.FirstNonEmptySlice(dst.CapabilitiesSupported, src.CapabilitiesSupported)

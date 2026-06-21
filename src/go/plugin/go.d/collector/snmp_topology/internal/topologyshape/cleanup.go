@@ -1,18 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyshape
 
-import "strings"
+import (
+	"strings"
 
-func eliminateNonIPInferredActors(data *topologyData) int {
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+)
+
+func eliminateNonIPInferredActors(data *topologymodel.Data) int {
 	if data == nil || len(data.Actors) == 0 {
 		return 0
 	}
 
 	removedIDs := make(map[string]struct{})
-	keptActors := make([]topologyActor, 0, len(data.Actors))
+	keptActors := make([]topologymodel.Actor, 0, len(data.Actors))
 	for _, actor := range data.Actors {
-		if topologyActorIsInferred(actor) && len(normalizedMatchIPs(actor.Match)) == 0 {
+		if topologymodel.ActorIsInferred(actor) && len(topologymodel.NormalizedMatchIPs(actor.Match)) == 0 {
 			removedIDs[actor.ActorID] = struct{}{}
 			continue
 		}
@@ -24,7 +28,7 @@ func eliminateNonIPInferredActors(data *topologyData) int {
 	}
 
 	data.Actors = keptActors
-	links := make([]topologyLink, 0, len(data.Links))
+	links := make([]topologymodel.Link, 0, len(data.Links))
 	for _, link := range data.Links {
 		if _, removed := removedIDs[link.SrcActorID]; removed {
 			continue
@@ -38,7 +42,7 @@ func eliminateNonIPInferredActors(data *topologyData) int {
 	return len(removedIDs)
 }
 
-func pruneSparseSegments(data *topologyData, threshold int) int {
+func pruneSparseSegments(data *topologymodel.Data, threshold int) int {
 	if data == nil || len(data.Actors) == 0 {
 		return 0
 	}
@@ -79,7 +83,7 @@ func pruneSparseSegments(data *topologyData, threshold int) int {
 		}
 		removedTotal += len(removeSegments)
 
-		filteredActors := make([]topologyActor, 0, len(data.Actors)-len(removeSegments))
+		filteredActors := make([]topologymodel.Actor, 0, len(data.Actors)-len(removeSegments))
 		for _, actor := range data.Actors {
 			if _, drop := removeSegments[actor.ActorID]; drop {
 				continue
@@ -88,7 +92,7 @@ func pruneSparseSegments(data *topologyData, threshold int) int {
 		}
 		data.Actors = filteredActors
 
-		filteredLinks := make([]topologyLink, 0, len(data.Links))
+		filteredLinks := make([]topologymodel.Link, 0, len(data.Links))
 		for _, link := range data.Links {
 			if _, drop := removeSegments[link.SrcActorID]; drop {
 				continue
@@ -102,7 +106,7 @@ func pruneSparseSegments(data *topologyData, threshold int) int {
 	}
 }
 
-func filterDanglingLinks(data *topologyData) {
+func filterDanglingLinks(data *topologymodel.Data) {
 	if data == nil || len(data.Links) == 0 {
 		return
 	}
@@ -116,7 +120,7 @@ func filterDanglingLinks(data *topologyData) {
 		data.Links = nil
 		return
 	}
-	filtered := make([]topologyLink, 0, len(data.Links))
+	filtered := make([]topologymodel.Link, 0, len(data.Links))
 	for _, link := range data.Links {
 		if _, ok := actorSet[strings.TrimSpace(link.SrcActorID)]; !ok {
 			continue

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyshape
 
 import (
 	"sort"
@@ -9,13 +9,13 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 )
 
-func applySNMPTopologyShapePolicies(data *topologyData, options topologyQueryOptions) {
+func ApplyPolicies(data *topologymodel.Data, options topologyoptions.QueryOptions) {
 	if data == nil {
 		return
 	}
 	mapType := topologyoptions.NormalizeMapType(options.MapType)
 	if mapType == "" {
-		mapType = topologyMapTypeAllDevicesLowConfidence
+		mapType = topologyoptions.MapTypeAllDevicesLowConfidence
 	}
 	options.MapType = mapType
 

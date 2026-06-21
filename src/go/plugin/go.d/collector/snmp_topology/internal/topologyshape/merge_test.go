@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyshape
 
 import (
 	"testing"
@@ -18,7 +18,7 @@ func TestAppendUniqueTopologyStringsSortsAndDeduplicates(t *testing.T) {
 
 func TestMergeTopologyMatchUnionsIdentityAndFillsMissingSystemNames(t *testing.T) {
 	merged := mergeTopologyMatch(
-		topologyMatch{
+		topologymodel.Match{
 			ChassisIDs:   []string{" chassis-b ", "chassis-a"},
 			MacAddresses: []string{"aa:aa:aa:aa:aa:aa"},
 			IPAddresses:  []string{"10.0.0.2"},
@@ -26,7 +26,7 @@ func TestMergeTopologyMatchUnionsIdentityAndFillsMissingSystemNames(t *testing.T
 			DNSNames:     []string{"dns-b"},
 			SysObjectID:  "1.3.6.1.4.1.1",
 		},
-		topologyMatch{
+		topologymodel.Match{
 			ChassisIDs:   []string{"chassis-c", "chassis-a"},
 			MacAddresses: []string{"bb:bb:bb:bb:bb:bb", "aa:aa:aa:aa:aa:aa"},
 			IPAddresses:  []string{"10.0.0.1", "10.0.0.2"},
@@ -82,14 +82,14 @@ func TestMergeTopologyAnyMapKeepsExistingAndAddsMissingKeys(t *testing.T) {
 
 func TestMergeTopologyActorDetailPreservesTypedFieldPresence(t *testing.T) {
 	merged := mergeTopologyActorDetail(
-		topologyActorDetail{
+		topologymodel.ActorDetail{
 			L2: topologyengine.ProjectionActorDetail{
 				Device: topologyengine.ProjectionDeviceActorDetail{
 					PortsTotal: topologyengine.OptionalValue[int]{Value: 2, Has: true},
 				},
 			},
 		},
-		topologyActorDetail{
+		topologymodel.ActorDetail{
 			L2: topologyengine.ProjectionActorDetail{
 				Device: topologyengine.ProjectionDeviceActorDetail{
 					PortsTotal:       topologyengine.OptionalValue[int]{Value: 5, Has: true},
@@ -110,18 +110,36 @@ func TestMergeTopologyActorDetailPreservesTypedFieldPresence(t *testing.T) {
 	require.Zero(t, merged.L2.Segment.EndpointsTotal.Value)
 }
 
+func TestCompareCollapseActorPriorityPrefersNonEmptyActorID(t *testing.T) {
+	left := topologymodel.Actor{
+		ActorID:   "",
+		ActorType: "device",
+		Layer:     "2",
+		Source:    "snmp",
+	}
+	right := topologymodel.Actor{
+		ActorID:   "device-1",
+		ActorType: "device",
+		Layer:     "2",
+		Source:    "snmp",
+	}
+
+	require.Greater(t, compareCollapseActorPriority(left, right), 0)
+	require.Less(t, compareCollapseActorPriority(right, left), 0)
+}
+
 func TestTopologyLinkDeltaKeyUsesStableEndpointAndBridgeFields(t *testing.T) {
-	link := topologyLink{
+	link := topologymodel.Link{
 		Protocol:   " LLDP ",
 		Direction:  " Bidirectional ",
 		SrcActorID: " device:a ",
 		DstActorID: " device:b ",
-		Src: topologyLinkEndpoint{
+		Src: topologymodel.LinkEndpoint{
 			IfIndex: 7,
 			IfName:  "Gi0/1",
 			PortID:  "port-a",
 		},
-		Dst: topologyLinkEndpoint{
+		Dst: topologymodel.LinkEndpoint{
 			IfIndex: 8,
 			IfName:  "Gi0/2",
 			PortID:  "port-b",
@@ -136,19 +154,19 @@ func TestTopologyLinkDeltaKeyUsesStableEndpointAndBridgeFields(t *testing.T) {
 }
 
 func TestTopologyLinkSortKeyUsesStableEndpointFields(t *testing.T) {
-	link := topologyLink{
+	link := topologymodel.Link{
 		Protocol:  "lldp",
 		Direction: "bidirectional",
-		Src: topologyLinkEndpoint{
-			Match: topologyMatch{
+		Src: topologymodel.LinkEndpoint{
+			Match: topologymodel.Match{
 				ChassisIDs: []string{"00:11:22:33:44:55"},
 			},
 			IfIndex: -1,
 			IfName:  "Gi0/1",
 			PortID:  "port-a",
 		},
-		Dst: topologyLinkEndpoint{
-			Match: topologyMatch{
+		Dst: topologymodel.LinkEndpoint{
+			Match: topologymodel.Match{
 				ChassisIDs: []string{"aa:bb:cc:dd:ee:ff"},
 			},
 			IfName: "Gi0/2",
@@ -172,21 +190,21 @@ func TestTopologyEndpointKeyDropsNonPositiveIfIndex(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			require.Equal(t, tc.want, topologymodel.EndpointKey(topologyLinkEndpoint{IfIndex: tc.ifIndex}, "if_index"))
+			require.Equal(t, tc.want, topologymodel.EndpointKey(topologymodel.LinkEndpoint{IfIndex: tc.ifIndex}, "if_index"))
 		})
 	}
 }
 
 func TestTopologyLinkActorKeyIncludesStateAndAttachmentMode(t *testing.T) {
-	base := topologyLink{
+	base := topologymodel.Link{
 		Protocol:   "bridge",
 		Direction:  "bidirectional",
 		SrcActorID: "device:a",
 		DstActorID: "endpoint:b",
-		Src: topologyLinkEndpoint{
+		Src: topologymodel.LinkEndpoint{
 			IfName: "Gi0/1",
 		},
-		Dst: topologyLinkEndpoint{
+		Dst: topologymodel.LinkEndpoint{
 			IfName: "Gi0/2",
 		},
 		L2: &graph.LinkL2{
@@ -208,19 +226,19 @@ func TestTopologyLinkActorKeyIncludesStateAndAttachmentMode(t *testing.T) {
 }
 
 func TestMarkProbableDeltaLinksPreservesExistingConfidenceAndAttachmentMode(t *testing.T) {
-	strictData := topologyData{
-		Links: []topologyLink{
+	strictData := topologymodel.Data{
+		Links: []topologymodel.Link{
 			{
 				Protocol:   "lldp",
 				Direction:  "bidirectional",
 				SrcActorID: "device:a",
 				DstActorID: "device:b",
-				Src: topologyLinkEndpoint{
+				Src: topologymodel.LinkEndpoint{
 					IfIndex: 1,
 					IfName:  "Gi0/1",
 					PortID:  "1",
 				},
-				Dst: topologyLinkEndpoint{
+				Dst: topologymodel.LinkEndpoint{
 					IfIndex: 2,
 					IfName:  "Gi0/2",
 					PortID:  "2",
@@ -228,15 +246,15 @@ func TestMarkProbableDeltaLinksPreservesExistingConfidenceAndAttachmentMode(t *t
 			},
 		},
 	}
-	probableData := topologyData{
-		Links: []topologyLink{
+	probableData := topologymodel.Data{
+		Links: []topologymodel.Link{
 			strictData.Links[0],
 			{
 				Protocol:   "bridge",
 				Direction:  "bidirectional",
 				SrcActorID: "device:a",
 				DstActorID: "segment:10",
-				Src: topologyLinkEndpoint{
+				Src: topologymodel.LinkEndpoint{
 					IfIndex: 3,
 					IfName:  "Gi0/3",
 					PortID:  "3",
@@ -252,7 +270,7 @@ func TestMarkProbableDeltaLinksPreservesExistingConfidenceAndAttachmentMode(t *t
 		},
 	}
 
-	markProbableDeltaLinks(&strictData, &probableData)
+	MarkProbableDeltaLinks(&strictData, &probableData)
 
 	require.Len(t, probableData.Links, 2)
 	probableLink := probableData.Links[1]

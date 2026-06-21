@@ -1,20 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyshape
 
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/stretchr/testify/require"
 )
 
 func TestFilterDanglingLinks_TrimActorIDsBeforeLookup(t *testing.T) {
-	data := &topologyData{
-		Actors: []topologyActor{
+	data := &topologymodel.Data{
+		Actors: []topologymodel.Actor{
 			{ActorID: "device-a"},
 			{ActorID: "device-b"},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{SrcActorID: " device-a ", DstActorID: "\tdevice-b\n"},
 			{SrcActorID: "device-a", DstActorID: "missing"},
 		},
@@ -28,13 +29,13 @@ func TestFilterDanglingLinks_TrimActorIDsBeforeLookup(t *testing.T) {
 }
 
 func TestPruneSparseSegmentsRemovesMultiRoundFixpoint(t *testing.T) {
-	data := &topologyData{
-		Actors: []topologyActor{
+	data := &topologymodel.Data{
+		Actors: []topologymodel.Actor{
 			{ActorID: "device-a", ActorType: "device"},
 			{ActorID: "segment-a", ActorType: "segment"},
 			{ActorID: "segment-b", ActorType: "segment"},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{SrcActorID: "device-a", DstActorID: "segment-a"},
 			{SrcActorID: "segment-a", DstActorID: "segment-b"},
 		},
@@ -43,6 +44,6 @@ func TestPruneSparseSegmentsRemovesMultiRoundFixpoint(t *testing.T) {
 	removed := pruneSparseSegments(data, 1)
 
 	require.Equal(t, 2, removed)
-	require.Equal(t, []topologyActor{{ActorID: "device-a", ActorType: "device"}}, data.Actors)
+	require.Equal(t, []topologymodel.Actor{{ActorID: "device-a", ActorType: "device"}}, data.Actors)
 	require.Empty(t, data.Links)
 }

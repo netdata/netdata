@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyshape
 
 import (
 	"sort"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 )
 
-func mergeTopologyMatch(base, other topologyMatch) topologyMatch {
+func mergeTopologyMatch(base, other topologymodel.Match) topologymodel.Match {
 	base.ChassisIDs = appendUniqueTopologyStrings(base.ChassisIDs, other.ChassisIDs...)
 	base.MacAddresses = appendUniqueTopologyStrings(base.MacAddresses, other.MacAddresses...)
 	base.IPAddresses = appendUniqueTopologyStrings(base.IPAddresses, other.IPAddresses...)

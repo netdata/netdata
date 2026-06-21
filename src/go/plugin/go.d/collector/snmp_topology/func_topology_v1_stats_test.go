@@ -8,6 +8,7 @@ import (
 
 	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyshape"
 	"github.com/stretchr/testify/require"
 )
 
@@ -198,7 +199,7 @@ func TestTopologyStatsToV1_OmitsFocusKeysWhenFocusFilterReturnsEarly(t *testing.
 		},
 	}
 
-	applyTopologyDepthFocusFilter(data, topologyQueryOptions{
+	topologyshape.ApplyDepthFocusFilter(data, topologyQueryOptions{
 		ManagedDeviceFocus: "ip:10.0.0.1",
 		Depth:              1,
 	})

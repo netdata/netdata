@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyshape
 
 import (
 	"sort"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 )
 
 func topologyShortestPathUnion(
-	data *topologyData,
+	data *topologymodel.Data,
 	roots map[string]struct{},
 ) (map[string]struct{}, map[string]struct{}) {
 	includedActors := make(map[string]struct{})
