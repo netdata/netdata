@@ -3,10 +3,11 @@
 package snmptopology
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"maps"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
 func normalizeTopologyDevice(dev topologymodel.Device) topologymodel.Device {
@@ -98,11 +99,4 @@ func topologyDeviceKey(dev topologymodel.Device) string {
 		return ""
 	}
 	return dev.ChassisIDType + ":" + dev.ChassisID
-}
-
-func normalizeLLDPSubtype(value string, mapping map[string]string) string {
-	if v, ok := mapping[value]; ok {
-		return v
-	}
-	return value
 }

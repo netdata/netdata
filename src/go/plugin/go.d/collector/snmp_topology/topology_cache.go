@@ -127,11 +127,6 @@ type stpPortEntry struct {
 	designatedPort   string
 }
 
-type topologyVLANContext struct {
-	vlanID   string
-	vlanName string
-}
-
 type arpEntry struct {
 	ifIndex  string
 	ifName   string

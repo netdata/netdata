@@ -2,7 +2,27 @@
 
 package snmptopology
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+import (
+	"strconv"
+	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+)
+
+func normalizeInterfaceType(value string) string {
+	value = topologyutil.CanonicalSNMPEnumValue(value)
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if name, ok := ianaIfTypeByNumber[value]; ok {
+		return name
+	}
+	if _, err := strconv.Atoi(value); err == nil {
+		return "type-" + value
+	}
+	return strings.ToLower(strings.NewReplacer("_", "", "-", "", " ", "").Replace(value))
+}
 
 func normalizeInterfaceAdminStatus(value string) string {
 	value = topologyutil.CanonicalSNMPEnumValue(value)
