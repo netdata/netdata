@@ -408,6 +408,14 @@
 - Update systemd journal SDK host integration ([#22785](https://github.com/netdata/netdata/issues/22785))
 - Pulse: per-child streaming charts on parents + lock-free host status ([#22784](https://github.com/netdata/netdata/issues/22784))
 - Feat(go.d/snmp_topology): add BGP adjacency links ([#22790](https://github.com/netdata/netdata/issues/22790))
+- Fix(windows): exclude sockets from the pipe poll path so streaming receive works ([#22789](https://github.com/netdata/netdata/issues/22789))
+- Chore(go.d/snmp_topology): extract neutral topology graph model ([#22791](https://github.com/netdata/netdata/issues/22791))
+- Chore(go.d/snmp_topology): remove dead l2topology ([#22792](https://github.com/netdata/netdata/issues/22792))
+- Chore(go.d/snmp_topology): align protocol enrichment ([#22793](https://github.com/netdata/netdata/issues/22793))
+- Test(snmp_topology): add topology v1 golden output test ([#22794](https://github.com/netdata/netdata/issues/22794))
+- Chore(go.d/topology): remove unused graph dto surface ([#22795](https://github.com/netdata/netdata/issues/22795))
+- Refactor(go.d/snmp_topology): type internal topology stats ([#22796](https://github.com/netdata/netdata/issues/22796))
+- Add dedicated MCP ACL and enforce bearer token protection on MCP endpoints ([#21880](https://github.com/netdata/netdata/issues/21880))
 
 ## [2.10.0] - 2026-04-09
 
