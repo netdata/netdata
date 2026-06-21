@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyshape
 
 import (
 	"sort"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 )
 
-func mergeTopologyMatch(base, other topologyMatch) topologyMatch {
+func mergeTopologyMatch(base, other topologymodel.Match) topologymodel.Match {
 	base.ChassisIDs = appendUniqueTopologyStrings(base.ChassisIDs, other.ChassisIDs...)
 	base.MacAddresses = appendUniqueTopologyStrings(base.MacAddresses, other.MacAddresses...)
 	base.IPAddresses = appendUniqueTopologyStrings(base.IPAddresses, other.IPAddresses...)
@@ -33,26 +35,6 @@ func mergeTopologyStringMap(base, other map[string]string) map[string]string {
 		key = strings.TrimSpace(key)
 		value = strings.TrimSpace(value)
 		if key == "" || value == "" {
-			continue
-		}
-		if _, exists := base[key]; exists {
-			continue
-		}
-		base[key] = value
-	}
-	return base
-}
-
-func mergeTopologyAnyMap(base, other map[string]any) map[string]any {
-	if len(other) == 0 {
-		return base
-	}
-	if base == nil {
-		base = make(map[string]any, len(other))
-	}
-	for key, value := range other {
-		key = strings.TrimSpace(key)
-		if key == "" {
 			continue
 		}
 		if _, exists := base[key]; exists {

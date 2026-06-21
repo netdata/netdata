@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyshape
 
 import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
@@ -14,7 +14,7 @@ func collectTopologyFocusRoots(graph topologyFocusGraph, focusIPs []string) map[
 		if _, ok := graph.nonSegmentSet[actorID]; !ok {
 			continue
 		}
-		if !isManagedSNMPDeviceActor(actor) {
+		if !topologymodel.IsManagedSNMPDeviceActor(actor) {
 			continue
 		}
 		for _, focusIP := range focusIPs {
@@ -28,12 +28,12 @@ func collectTopologyFocusRoots(graph topologyFocusGraph, focusIPs []string) map[
 	return roots
 }
 
-func topologyActorHasIP(actor topologyActor, ip string) bool {
+func topologyActorHasIP(actor topologymodel.Actor, ip string) bool {
 	ip = topologyutil.NormalizeIPAddress(ip)
 	if ip == "" {
 		return false
 	}
-	if slices.Contains(normalizedMatchIPs(actor.Match), ip) {
+	if slices.Contains(topologymodel.NormalizedMatchIPs(actor.Match), ip) {
 		return true
 	}
 	return slices.Contains(topologymodel.ActorDetailManagementIPs(actor), ip)

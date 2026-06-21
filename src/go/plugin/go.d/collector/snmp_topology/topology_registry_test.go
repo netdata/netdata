@@ -10,6 +10,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyshape"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -388,24 +389,6 @@ func TestTopologyRegistry_BGPAdjacencyKeepsUnresolvedAndNonEstablishedPeersAsDet
 	for _, row := range routerA.Detail.BGP {
 		require.Empty(t, row.RemoteActorID)
 	}
-}
-
-func TestCompareCollapseActorPriorityPrefersNonEmptyActorID(t *testing.T) {
-	left := topologyActor{
-		ActorID:   "",
-		ActorType: "device",
-		Layer:     "2",
-		Source:    "snmp",
-	}
-	right := topologyActor{
-		ActorID:   "device-1",
-		ActorType: "device",
-		Layer:     "2",
-		Source:    "snmp",
-	}
-
-	assert.Greater(t, compareCollapseActorPriority(left, right), 0)
-	assert.Less(t, compareCollapseActorPriority(right, left), 0)
 }
 
 func TestTopologyRegistry_SnapshotWithOptions_LLDPManagedKeepsRequestedMapType(t *testing.T) {
@@ -794,7 +777,7 @@ func TestApplySNMPTopologyShapePolicies_CollapsesActorsByIP(t *testing.T) {
 		},
 	}
 
-	applySNMPTopologyShapePolicies(&data, topologyQueryOptions{
+	topologyshape.ApplyPolicies(&data, topologyQueryOptions{
 		CollapseActorsByIP: true,
 		MapType:            topologyMapTypeHighConfidenceInferred,
 	})
@@ -832,7 +815,7 @@ func TestApplySNMPTopologyShapePolicies_EliminatesNonIPInferredActorsAndSparseSe
 		},
 	}
 
-	applySNMPTopologyShapePolicies(&data, topologyQueryOptions{
+	topologyshape.ApplyPolicies(&data, topologyQueryOptions{
 		EliminateNonIPInferred: true,
 		MapType:                topologyMapTypeHighConfidenceInferred,
 	})
@@ -875,7 +858,7 @@ func TestApplySNMPTopologyShapePolicies_HighConfidenceSuppressesUnlinkedInferred
 		},
 	}
 
-	applySNMPTopologyShapePolicies(&data, topologyQueryOptions{
+	topologyshape.ApplyPolicies(&data, topologyQueryOptions{
 		MapType: topologyMapTypeHighConfidenceInferred,
 	})
 
@@ -924,7 +907,7 @@ func TestApplySNMPTopologyShapePolicies_LLDPManagedMapKeepsOnlyLLDPCDPAndManaged
 		},
 	}
 
-	applySNMPTopologyShapePolicies(&data, topologyQueryOptions{
+	topologyshape.ApplyPolicies(&data, topologyQueryOptions{
 		MapType: topologyMapTypeLLDPCDPManaged,
 	})
 
@@ -965,7 +948,7 @@ func TestMarkProbableDeltaLinks_MarksAllAddedLinksAsProbable(t *testing.T) {
 		},
 	}
 
-	markProbableDeltaLinks(&strictData, &probableData)
+	topologyshape.MarkProbableDeltaLinks(&strictData, &probableData)
 
 	require.Len(t, probableData.Links, 2)
 	require.Equal(t, "", probableData.Links[0].State)
@@ -1024,7 +1007,7 @@ func TestApplyTopologyDepthFocusFilter_ManagedFocusDepthZero(t *testing.T) {
 		},
 	}
 
-	applyTopologyDepthFocusFilter(&data, topologyQueryOptions{
+	topologyshape.ApplyDepthFocusFilter(&data, topologyQueryOptions{
 		ManagedDeviceFocus:     "ip:10.0.0.1",
 		Depth:                  0,
 		EliminateNonIPInferred: true,
@@ -1086,7 +1069,7 @@ func TestApplyTopologyDepthFocusFilter_ManagedFocusDepthOneIncludesDirectNeighbo
 		},
 	}
 
-	applyTopologyDepthFocusFilter(&data, topologyQueryOptions{
+	topologyshape.ApplyDepthFocusFilter(&data, topologyQueryOptions{
 		ManagedDeviceFocus:     "ip:10.0.0.1",
 		Depth:                  1,
 		EliminateNonIPInferred: true,
@@ -1154,7 +1137,7 @@ func TestApplyTopologyDepthFocusFilter_MultiFocusDepthZeroIncludesAllShortestPat
 		},
 	}
 
-	applyTopologyDepthFocusFilter(&data, topologyQueryOptions{
+	topologyshape.ApplyDepthFocusFilter(&data, topologyQueryOptions{
 		ManagedDeviceFocus:     "ip:10.0.0.3,ip:10.0.0.1",
 		Depth:                  0,
 		EliminateNonIPInferred: true,
@@ -1224,7 +1207,7 @@ func TestApplyTopologyDepthFocusFilter_DepthExpandsFromSelectedRootsOnly(t *test
 		},
 	}
 
-	applyTopologyDepthFocusFilter(&data, topologyQueryOptions{
+	topologyshape.ApplyDepthFocusFilter(&data, topologyQueryOptions{
 		ManagedDeviceFocus:     "ip:10.0.0.1,ip:10.0.0.3",
 		Depth:                  1,
 		EliminateNonIPInferred: true,

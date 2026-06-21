@@ -9,6 +9,7 @@ import (
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyshape"
 )
 
 func buildSNMPTopologySnapshot(aggregate topologyObservationAggregate, options topologyQueryOptions) (topologyData, bool) {
@@ -35,11 +36,11 @@ func buildSingleMapTopologySnapshot(aggregate topologyObservationAggregate, opti
 		return topologyData{}, false
 	}
 	augmentTopologySnapshotLocals(&data, aggregate.Snapshots)
-	applySNMPTopologyShapePolicies(&data, options)
+	topologyshape.ApplyPolicies(&data, options)
 	applyTopologyL3SubnetEnrichment(&data, aggregate)
 	applyTopologyOSPFAdjacencyEnrichment(&data, aggregate)
 	applyTopologyBGPAdjacencyEnrichment(&data, aggregate)
-	applyTopologyDepthFocusFilter(&data, options)
+	topologyshape.ApplyDepthFocusFilter(&data, options)
 	return data, true
 }
 
@@ -57,7 +58,7 @@ func buildProbableTopologySnapshot(aggregate topologyObservationAggregate, optio
 		return topologyData{}, false
 	}
 	augmentTopologySnapshotLocals(&strictData, aggregate.Snapshots)
-	applySNMPTopologyShapePolicies(&strictData, strictOptions)
+	topologyshape.ApplyPolicies(&strictData, strictOptions)
 
 	probableOptions := options
 	probableOptions.MapType = topologyMapTypeAllDevicesLowConfidence
@@ -72,12 +73,12 @@ func buildProbableTopologySnapshot(aggregate topologyObservationAggregate, optio
 		return topologyData{}, false
 	}
 	augmentTopologySnapshotLocals(&probableData, aggregate.Snapshots)
-	applySNMPTopologyShapePolicies(&probableData, probableOptions)
-	markProbableDeltaLinks(&strictData, &probableData)
+	topologyshape.ApplyPolicies(&probableData, probableOptions)
+	topologyshape.MarkProbableDeltaLinks(&strictData, &probableData)
 	applyTopologyL3SubnetEnrichment(&probableData, aggregate)
 	applyTopologyOSPFAdjacencyEnrichment(&probableData, aggregate)
 	applyTopologyBGPAdjacencyEnrichment(&probableData, aggregate)
-	applyTopologyDepthFocusFilter(&probableData, options)
+	topologyshape.ApplyDepthFocusFilter(&probableData, options)
 	return probableData, true
 }
 

@@ -4,11 +4,12 @@ package snmptopology
 
 import (
 	"fmt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"strings"
 	"testing"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyshape"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -120,7 +121,7 @@ func topologyL3SubnetLinkForTest(srcActorID, dstActorID, subnet string, prefix a
 		Detail: topologyLinkDetail{
 			L3Subnet: &topologyL3SubnetLinkDetail{
 				Subnet: subnet,
-				Prefix: intStatValue(prefix),
+				Prefix: testTopologyIntValue(prefix),
 			},
 		},
 	}
@@ -177,7 +178,7 @@ func TestApplyTopologyDepthFocusFilterKeepsIncidentL3SubnetLink(t *testing.T) {
 		},
 	}
 
-	applyTopologyDepthFocusFilter(&data, topologyQueryOptions{
+	topologyshape.ApplyDepthFocusFilter(&data, topologyQueryOptions{
 		ManagedDeviceFocus:     "ip:198.51.100.1",
 		Depth:                  1,
 		InferenceStrategy:      topologyInferenceStrategyFDBMinimumKnowledge,
@@ -198,7 +199,7 @@ func topologyL3ManagedActorForTest(actorID string, attrs map[string]any, ips ...
 			Device: topologyengine.ProjectionDeviceActorDetail{
 				DeviceID:     topologyL3TestString(attrs, "device_id"),
 				ManagementIP: topologyL3TestString(attrs, "management_ip"),
-				Inferred:     boolStatValue(attrs["inferred"]),
+				Inferred:     testTopologyBoolValue(attrs["inferred"]),
 			},
 		},
 		SNMP: topologySNMPActorDetail{
@@ -212,6 +213,22 @@ func topologyL3ManagedActorForTest(actorID string, attrs map[string]any, ips ...
 		Source:    "snmp",
 		Match:     topologyMatch{IPAddresses: ips},
 		Detail:    detail,
+	}
+}
+
+func testTopologyBoolValue(value any) bool {
+	typed, _ := value.(bool)
+	return typed
+}
+
+func testTopologyIntValue(value any) int {
+	switch typed := value.(type) {
+	case int:
+		return typed
+	case uint64:
+		return int(typed)
+	default:
+		return 0
 	}
 }
 

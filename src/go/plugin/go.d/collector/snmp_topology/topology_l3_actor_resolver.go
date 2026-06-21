@@ -33,7 +33,7 @@ func newTopologyL3ActorResolver(data *topologyData, snapshots []topologyObservat
 
 	managedActors := make([]topologyActor, 0, len(data.Actors))
 	for _, actor := range data.Actors {
-		if !isManagedSNMPDeviceActor(actor) {
+		if !topologymodel.IsManagedSNMPDeviceActor(actor) {
 			continue
 		}
 		managedActors = append(managedActors, actor)
@@ -47,7 +47,7 @@ func newTopologyL3ActorResolver(data *topologyData, snapshots []topologyObservat
 		if deviceID := topologymodel.ActorDetailDeviceID(actor); deviceID != "" {
 			resolver.addUniqueDeviceID(deviceID, ref)
 		}
-		for _, ip := range normalizedMatchIPs(actor.Match) {
+		for _, ip := range topologymodel.NormalizedMatchIPs(actor.Match) {
 			resolver.addUniqueIPAddress(ip, ref)
 		}
 		for _, routerID := range topologyL3ActorRouterIDs(actor) {

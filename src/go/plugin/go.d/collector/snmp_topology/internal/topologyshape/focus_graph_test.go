@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyshape
 
 import (
 	"testing"
@@ -8,21 +8,22 @@ import (
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 	"github.com/stretchr/testify/require"
 )
 
 func TestTopologyFocusGraphBuildAndDepthTraversal(t *testing.T) {
 	now := time.Now().UTC()
-	data := &topologyData{
-		SchemaVersion: topologySchemaVersion,
+	data := &topologymodel.Data{
+		SchemaVersion: topologymodel.SchemaVersion,
 		CollectedAt:   now,
-		Actors: []topologyActor{
+		Actors: []topologymodel.Actor{
 			{
 				ActorID:   "device-a",
 				ActorType: "device",
 				Layer:     "2",
 				Source:    "snmp",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					IPAddresses: []string{"10.0.0.1"},
 				},
 			},
@@ -31,7 +32,7 @@ func TestTopologyFocusGraphBuildAndDepthTraversal(t *testing.T) {
 				ActorType: "device",
 				Layer:     "2",
 				Source:    "snmp",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					IPAddresses: []string{"10.0.0.2"},
 				},
 			},
@@ -46,12 +47,12 @@ func TestTopologyFocusGraphBuildAndDepthTraversal(t *testing.T) {
 				ActorType: "device",
 				Layer:     "2",
 				Source:    "snmp",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					IPAddresses: []string{"10.0.0.3"},
 				},
 			},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{
 				Layer:      "2",
 				Protocol:   "lldp",
@@ -128,11 +129,11 @@ func TestTopologyFocusGraphBuildAndDepthTraversal(t *testing.T) {
 }
 
 func TestTopologyActorHasIPMatchesMatchAndManagementAddresses(t *testing.T) {
-	actor := topologyActor{
-		Match: topologyMatch{
+	actor := topologymodel.Actor{
+		Match: topologymodel.Match{
 			IPAddresses: []string{"10.0.0.1"},
 		},
-		Detail: topologyActorDetail{
+		Detail: topologymodel.ActorDetail{
 			L2: topologyengine.ProjectionActorDetail{
 				Device: topologyengine.ProjectionDeviceActorDetail{
 					ManagementIP:        "10.0.0.2",
@@ -161,11 +162,11 @@ func TestTopologyActorHasIPMatchesMatchAndManagementAddresses(t *testing.T) {
 }
 
 func TestTopologyActorDetailManagementIPsCanonicalizesBeforeDedup(t *testing.T) {
-	actor := topologyActor{
-		Detail: topologyActorDetail{
-			SNMP: topologySNMPActorDetail{
+	actor := topologymodel.Actor{
+		Detail: topologymodel.ActorDetail{
+			SNMP: topologymodel.SNMPActorDetail{
 				ManagementIP: "::ffff:192.0.2.1",
-				ManagementAddresses: []topologyManagementAddress{
+				ManagementAddresses: []topologymodel.ManagementAddress{
 					{Address: "192.0.2.1"},
 				},
 			},
@@ -181,42 +182,42 @@ func TestTopologyActorDetailManagementIPsCanonicalizesBeforeDedup(t *testing.T) 
 }
 
 func TestRecordTopologyFocusStatsNormalizesDepthAndFilteredCounts(t *testing.T) {
-	data := &topologyData{
-		Actors: []topologyActor{
+	data := &topologymodel.Data{
+		Actors: []topologymodel.Actor{
 			{ActorID: "device-a", ActorType: "device"},
 			{ActorID: "device-b", ActorType: "device"},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{Protocol: "lldp", Direction: "bidirectional", SrcActorID: "device-a", DstActorID: "device-b"},
 		},
 	}
 
-	recordTopologyFocusStats(data, topologyQueryOptions{
+	recordTopologyFocusStats(data, topologyoptions.QueryOptions{
 		ManagedDeviceFocus: "ip:10.0.0.1",
-		Depth:              topologyDepthAllInternal,
+		Depth:              topologyoptions.DepthAllInternal,
 	}, 5, 4)
 
-	require.Equal(t, "ip:10.0.0.1", topologyStatsToV1(data.Stats)["managed_snmp_device_focus"])
-	require.Equal(t, topologyDepthAll, topologyStatsToV1(data.Stats)["depth"])
-	require.Equal(t, 3, topologyStatsToV1(data.Stats)["actors_focus_depth_filtered"])
-	require.Equal(t, 3, topologyStatsToV1(data.Stats)["links_focus_depth_filtered"])
-	require.Equal(t, len(data.Links), intStatValue(topologyStatsToV1(data.Stats)["links_total"]))
+	require.Equal(t, "ip:10.0.0.1", data.Stats.Focus.ManagedSNMPDeviceFocus)
+	require.True(t, data.Stats.Focus.Depth.All)
+	require.Equal(t, 3, data.Stats.Focus.ActorsDepthFiltered)
+	require.Equal(t, 3, data.Stats.Focus.LinksDepthFiltered)
+	require.Equal(t, len(data.Links), data.Stats.Recomputed.LinksTotal)
 }
 
 func TestRecordTopologyFocusAllDevicesStatsKeepsAllDepth(t *testing.T) {
-	data := &topologyData{
-		Links: []topologyLink{
+	data := &topologymodel.Data{
+		Links: []topologymodel.Link{
 			{Protocol: "lldp", Direction: "bidirectional", SrcActorID: "device-a", DstActorID: "device-b"},
 		},
 	}
 
-	recordTopologyFocusAllDevicesStats(data, topologyQueryOptions{
-		ManagedDeviceFocus: topologyManagedFocusAllDevices,
+	recordTopologyFocusAllDevicesStats(data, topologyoptions.QueryOptions{
+		ManagedDeviceFocus: topologyoptions.ManagedFocusAllDevices,
 	})
 
-	require.Equal(t, topologyManagedFocusAllDevices, topologyStatsToV1(data.Stats)["managed_snmp_device_focus"])
-	require.Equal(t, topologyDepthAll, topologyStatsToV1(data.Stats)["depth"])
-	require.Equal(t, 0, topologyStatsToV1(data.Stats)["actors_focus_depth_filtered"])
-	require.Equal(t, 0, topologyStatsToV1(data.Stats)["links_focus_depth_filtered"])
-	require.Equal(t, len(data.Links), intStatValue(topologyStatsToV1(data.Stats)["links_total"]))
+	require.Equal(t, topologyoptions.ManagedFocusAllDevices, data.Stats.Focus.ManagedSNMPDeviceFocus)
+	require.True(t, data.Stats.Focus.Depth.All)
+	require.Equal(t, 0, data.Stats.Focus.ActorsDepthFiltered)
+	require.Equal(t, 0, data.Stats.Focus.LinksDepthFiltered)
+	require.Equal(t, len(data.Links), data.Stats.Recomputed.LinksTotal)
 }

@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyshape
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+)
 
 func filterTopologyDataByFocus(
-	data *topologyData,
+	data *topologymodel.Data,
 	includedActorsByDepth map[string]struct{},
 	shortestPathActors map[string]struct{},
 	shortestPathPairs map[string]struct{},
@@ -18,7 +22,7 @@ func filterTopologyDataByFocus(
 		includedActors[actorID] = struct{}{}
 	}
 
-	filteredLinks := make([]topologyLink, 0, len(data.Links))
+	filteredLinks := make([]topologymodel.Link, 0, len(data.Links))
 	linkActors := make(map[string]struct{})
 	for _, link := range data.Links {
 		srcActorID := strings.TrimSpace(link.SrcActorID)
@@ -44,7 +48,7 @@ func filterTopologyDataByFocus(
 		includedActors[actorID] = struct{}{}
 	}
 
-	filteredActors := make([]topologyActor, 0, len(data.Actors))
+	filteredActors := make([]topologymodel.Actor, 0, len(data.Actors))
 	for _, actor := range data.Actors {
 		if _, ok := includedActors[actor.ActorID]; ok {
 			filteredActors = append(filteredActors, actor)
