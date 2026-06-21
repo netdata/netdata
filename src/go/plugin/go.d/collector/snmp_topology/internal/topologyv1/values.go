@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyv1
 
 import (
 	"fmt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"math"
 	"reflect"
 	"regexp"
@@ -12,21 +11,12 @@ import (
 	"time"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
-	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	topologyapi "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
 var topologyV1IDInvalidChars = regexp.MustCompile(`[^A-Za-z0-9_.:-]+`)
-
-func anyStringValue(value any) string {
-	switch typed := value.(type) {
-	case string:
-		return strings.TrimSpace(typed)
-	case fmt.Stringer:
-		return strings.TrimSpace(typed.String())
-	default:
-		return ""
-	}
-}
 
 func topologyV1ScalarLabelValue(value any) string {
 	switch typed := value.(type) {
@@ -112,7 +102,7 @@ func uintValue(value any) (uint64, bool) {
 	return 0, false
 }
 
-func topologyV1EndpointString(endpoint topologyLinkEndpoint, key string) string {
+func topologyV1EndpointString(endpoint topologymodel.LinkEndpoint, key string) string {
 	switch key {
 	case "if_name":
 		return strings.TrimSpace(endpoint.IfName)
@@ -133,14 +123,14 @@ func topologyV1EndpointString(endpoint topologyLinkEndpoint, key string) string 
 	}
 }
 
-func nullableEndpointIfIndex(endpoint topologyLinkEndpoint) any {
+func nullableEndpointIfIndex(endpoint topologymodel.LinkEndpoint) any {
 	if endpoint.IfIndex <= 0 {
 		return nil
 	}
 	return uint64(endpoint.IfIndex)
 }
 
-func topologyV1EndpointPortName(endpoint topologyLinkEndpoint) string {
+func topologyV1EndpointPortName(endpoint topologymodel.LinkEndpoint) string {
 	return topologyutil.FirstNonEmptyString(
 		topologyV1EndpointString(endpoint, "port_name"),
 		topologyV1EndpointString(endpoint, "if_name"),
@@ -149,7 +139,7 @@ func topologyV1EndpointPortName(endpoint topologyLinkEndpoint) string {
 	)
 }
 
-func topologyV1MatchString(match topologyMatch, key string) string {
+func topologyV1MatchString(match topologymodel.Match, key string) string {
 	switch key {
 	case "sys_name":
 		return match.SysName
@@ -176,7 +166,7 @@ func nullableTime(value *time.Time) any {
 	return value.UTC().Format(time.RFC3339Nano)
 }
 
-func nullableStringRef(dict *topologyv1.StringDictionary, value string) any {
+func nullableStringRef(dict *topologyapi.StringDictionary, value string) any {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return nil
@@ -206,6 +196,36 @@ func nullableJSON(value any) any {
 		}
 	}
 	return value
+}
+
+func pruneNilAttributes(attrs map[string]any) map[string]any {
+	for k, v := range attrs {
+		switch vv := v.(type) {
+		case string:
+			if vv == "" {
+				delete(attrs, k)
+			}
+		case []string:
+			if len(vv) == 0 {
+				delete(attrs, k)
+			}
+		case []map[string]any:
+			if len(vv) == 0 {
+				delete(attrs, k)
+			}
+		case nil:
+			delete(attrs, k)
+		default:
+			rv := reflect.ValueOf(v)
+			if rv.Kind() == reflect.Slice && rv.Len() == 0 {
+				delete(attrs, k)
+			}
+		}
+	}
+	if len(attrs) == 0 {
+		return nil
+	}
+	return attrs
 }
 
 func stringArrayCell(values []string) []any {

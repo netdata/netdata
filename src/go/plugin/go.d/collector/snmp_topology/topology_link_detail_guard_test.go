@@ -302,7 +302,7 @@ func forbiddenLinkMapCarrierUseError(
 }
 
 func isAllowedLinkMapCarrierUse(path, name string, node ast.Node) bool {
-	if filepath.Base(path) != "func_topology_v1_presentation.go" || name != "Metrics" {
+	if filepath.Base(path) != "presentation.go" || name != "Metrics" {
 		return false
 	}
 	kv, ok := node.(*ast.KeyValueExpr)

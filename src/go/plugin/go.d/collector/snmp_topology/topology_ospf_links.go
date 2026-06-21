@@ -117,7 +117,7 @@ func topologyOSPFNeighborActorRow(row topologyOSPFNeighbor) topologyOSPFNeighbor
 		LocalRouterID:    topologyutil.NormalizeTopologyRouterID(row.LocalRouterID),
 		NeighborRouterID: topologyutil.NormalizeTopologyRouterID(row.NeighborRouterID),
 		NeighborIP:       topologyutil.NormalizeNonUnspecifiedIPAddress(row.NeighborIP),
-		State:            normalizeOSPFNeighborState(row.State),
+		State:            topologyutil.NormalizeOSPFNeighborState(row.State),
 		LocalIP:          topologyutil.NormalizeNonUnspecifiedIPAddress(row.LocalIP),
 		Subnet:           row.Subnet,
 		AddresslessIndex: row.AddresslessIndex,

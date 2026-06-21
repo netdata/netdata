@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyv1
 
 import (
 	"fmt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
-	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	topologyapi "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 )
 
 type snmpTopologyV1PortNeighborKey struct {
@@ -41,11 +42,11 @@ func snmpTopologyV1PortNeighborKeyFor(actorRef int, ifIndex any, portName string
 }
 
 func buildSNMPTopologyV1PortNeighborSummaries(
-	links []topologyLink,
+	links []topologymodel.Link,
 	actorIndex map[string]int,
 ) map[snmpTopologyV1PortNeighborKey]snmpTopologyV1PortNeighborSummary {
 	summaries := make(map[snmpTopologyV1PortNeighborKey]snmpTopologyV1PortNeighborSummary)
-	appendSide := func(actorID, remoteActorID string, endpoint, remoteEndpoint topologyLinkEndpoint) {
+	appendSide := func(actorID, remoteActorID string, endpoint, remoteEndpoint topologymodel.LinkEndpoint) {
 		actorRef, ok := actorIndex[strings.TrimSpace(actorID)]
 		if !ok {
 			return
@@ -130,7 +131,7 @@ func snmpTopologyV1PortNeighborSummaryFor(
 	return snmpTopologyV1PortNeighborSummary{}, false
 }
 
-func collectSNMPTopologyV1ActorTableRows(actors []topologyActor) map[string][]topologyV1DynamicRow {
+func collectSNMPTopologyV1ActorTableRows(actors []topologymodel.Actor) map[string][]topologyV1DynamicRow {
 	tables := make(map[string][]topologyV1DynamicRow)
 	for actorIndex, actor := range actors {
 		for _, port := range actor.Detail.L2.Device.Ports {
@@ -221,9 +222,9 @@ func snmpTopologyV1PortVLANValues(vlans []topologyengine.ProjectionPortVLAN) []m
 
 func buildSNMPTopologyV1ActorPortsTable(
 	rows []topologyV1DynamicRow,
-	stringsDict *topologyv1.StringDictionary,
+	stringsDict *topologyapi.StringDictionary,
 	portNeighborSummaries map[snmpTopologyV1PortNeighborKey]snmpTopologyV1PortNeighborSummary,
-) topologyv1.Table {
+) topologyapi.Table {
 	actorRefs := make([]any, len(rows))
 	ifIndexes := make([]any, len(rows))
 	portIDs := make([]any, len(rows))
@@ -317,46 +318,46 @@ func buildSNMPTopologyV1ActorPortsTable(
 		lastChanges[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["last_change"]))
 	}
 
-	return topologyv1.MustTable(len(rows), snmpTopologyV1ActorPortsColumns(), []topologyv1.ColumnEncoding{
-		topologyv1.Values(actorRefs...),
-		topologyv1.Values(ifIndexes...),
-		topologyv1.Values(portIDs...),
-		topologyv1.Values(names...),
-		topologyv1.Values(ifNames...),
-		topologyv1.Values(ifDescrs...),
-		topologyv1.Values(ifAliases...),
-		topologyv1.Values(macs...),
-		topologyv1.Values(speeds...),
-		topologyv1.Values(topologyRoles...),
-		topologyv1.Values(operStatuses...),
-		topologyv1.Values(adminStatuses...),
-		topologyv1.Values(portTypes...),
-		topologyv1.Values(linkModes...),
-		topologyv1.Values(stpStates...),
-		topologyv1.Values(vlanIDs...),
-		topologyv1.Values(fdbMACCounts...),
-		topologyv1.Values(linkCounts...),
-		topologyv1.Values(neighborCounts...),
-		topologyv1.Values(neighborActors...),
-		topologyv1.Values(neighborPortNames...),
-		topologyv1.Values(neighbors...),
-		topologyv1.Values(vlans...),
-		topologyv1.Values(duplexes...),
-		topologyv1.Values(linkModeConfidences...),
-		topologyv1.Values(topologyRoleConfidences...),
-		topologyv1.Values(linkModeSources...),
-		topologyv1.Values(topologyRoleSources...),
-		topologyv1.Values(lastChanges...),
+	return topologyapi.MustTable(len(rows), snmpTopologyV1ActorPortsColumns(), []topologyapi.ColumnEncoding{
+		topologyapi.Values(actorRefs...),
+		topologyapi.Values(ifIndexes...),
+		topologyapi.Values(portIDs...),
+		topologyapi.Values(names...),
+		topologyapi.Values(ifNames...),
+		topologyapi.Values(ifDescrs...),
+		topologyapi.Values(ifAliases...),
+		topologyapi.Values(macs...),
+		topologyapi.Values(speeds...),
+		topologyapi.Values(topologyRoles...),
+		topologyapi.Values(operStatuses...),
+		topologyapi.Values(adminStatuses...),
+		topologyapi.Values(portTypes...),
+		topologyapi.Values(linkModes...),
+		topologyapi.Values(stpStates...),
+		topologyapi.Values(vlanIDs...),
+		topologyapi.Values(fdbMACCounts...),
+		topologyapi.Values(linkCounts...),
+		topologyapi.Values(neighborCounts...),
+		topologyapi.Values(neighborActors...),
+		topologyapi.Values(neighborPortNames...),
+		topologyapi.Values(neighbors...),
+		topologyapi.Values(vlans...),
+		topologyapi.Values(duplexes...),
+		topologyapi.Values(linkModeConfidences...),
+		topologyapi.Values(topologyRoleConfidences...),
+		topologyapi.Values(linkModeSources...),
+		topologyapi.Values(topologyRoleSources...),
+		topologyapi.Values(lastChanges...),
 	})
 }
 
 func buildSNMPTopologyV1ActorPortLinksTable(
-	links []topologyLink,
+	links []topologymodel.Link,
 	actorIndex map[string]int,
-	stringsDict *topologyv1.StringDictionary,
-) (topologyv1.Table, error) {
+	stringsDict *topologyapi.StringDictionary,
+) (topologyapi.Table, error) {
 	rows := &snmpTopologyV1ActorPortLinkRows{}
-	appendSide := func(linkIndex int, link topologyLink, actorID, remoteActorID string, endpoint, remoteEndpoint topologyLinkEndpoint) error {
+	appendSide := func(linkIndex int, link topologymodel.Link, actorID, remoteActorID string, endpoint, remoteEndpoint topologymodel.LinkEndpoint) error {
 		actorRef, ok := actorIndex[strings.TrimSpace(actorID)]
 		if !ok {
 			return fmt.Errorf("link %d references unknown actor %q", linkIndex, actorID)
@@ -394,10 +395,10 @@ func buildSNMPTopologyV1ActorPortLinksTable(
 			continue
 		}
 		if err := appendSide(i, link, link.SrcActorID, link.DstActorID, link.Src, link.Dst); err != nil {
-			return topologyv1.Table{}, err
+			return topologyapi.Table{}, err
 		}
 		if err := appendSide(i, link, link.DstActorID, link.SrcActorID, link.Dst, link.Src); err != nil {
-			return topologyv1.Table{}, err
+			return topologyapi.Table{}, err
 		}
 	}
 
@@ -425,28 +426,28 @@ type snmpTopologyV1ActorPortLinkRows struct {
 	lastSeen        []any
 }
 
-func (rows *snmpTopologyV1ActorPortLinkRows) table() topologyv1.Table {
-	return topologyv1.MustTable(len(rows.actors),
+func (rows *snmpTopologyV1ActorPortLinkRows) table() topologyapi.Table {
+	return topologyapi.MustTable(len(rows.actors),
 		snmpTopologyV1ActorPortLinksColumns(),
-		[]topologyv1.ColumnEncoding{
-			topologyv1.Values(rows.actors...),
-			topologyv1.Values(rows.links...),
-			topologyv1.Values(rows.remoteActors...),
-			topologyv1.Values(rows.ifIndexes...),
-			topologyv1.Values(rows.portIDs...),
-			topologyv1.Values(rows.portNames...),
-			topologyv1.Values(rows.remoteIfIndexes...),
-			topologyv1.Values(rows.remotePortIDs...),
-			topologyv1.Values(rows.remotePortNames...),
-			topologyv1.Values(rows.types...),
-			topologyv1.Values(rows.protocols...),
-			topologyv1.Values(rows.states...),
-			topologyv1.Values(rows.evidenceCounts...),
-			topologyv1.Values(rows.confidences...),
-			topologyv1.Values(rows.inferences...),
-			topologyv1.Values(rows.attachmentModes...),
-			topologyv1.Values(rows.discoveredAt...),
-			topologyv1.Values(rows.lastSeen...),
+		[]topologyapi.ColumnEncoding{
+			topologyapi.Values(rows.actors...),
+			topologyapi.Values(rows.links...),
+			topologyapi.Values(rows.remoteActors...),
+			topologyapi.Values(rows.ifIndexes...),
+			topologyapi.Values(rows.portIDs...),
+			topologyapi.Values(rows.portNames...),
+			topologyapi.Values(rows.remoteIfIndexes...),
+			topologyapi.Values(rows.remotePortIDs...),
+			topologyapi.Values(rows.remotePortNames...),
+			topologyapi.Values(rows.types...),
+			topologyapi.Values(rows.protocols...),
+			topologyapi.Values(rows.states...),
+			topologyapi.Values(rows.evidenceCounts...),
+			topologyapi.Values(rows.confidences...),
+			topologyapi.Values(rows.inferences...),
+			topologyapi.Values(rows.attachmentModes...),
+			topologyapi.Values(rows.discoveredAt...),
+			topologyapi.Values(rows.lastSeen...),
 		},
 	)
 }

@@ -215,6 +215,47 @@ func NormalizeBGPRouterID(value string) string {
 	return value
 }
 
+func NormalizeBGPPeerAddress(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if ip := NormalizeNonUnspecifiedIPAddress(value); ip != "" {
+		return ip
+	}
+	if NormalizeIPAddress(value) != "" {
+		return ""
+	}
+	return value
+}
+
+func NormalizeOSPFNeighborState(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	switch strings.ToLower(strings.ReplaceAll(value, "_", "")) {
+	case "1", "down":
+		return "down"
+	case "2", "attempt":
+		return "attempt"
+	case "3", "init":
+		return "init"
+	case "4", "twoway":
+		return "twoWay"
+	case "5", "exchangestart", "exstart":
+		return "exchangeStart"
+	case "6", "exchange":
+		return "exchange"
+	case "7", "loading":
+		return "loading"
+	case "8", "full":
+		return "full"
+	default:
+		return value
+	}
+}
+
 func ParsePositiveInt64(value string) int64 {
 	value = strings.TrimSpace(value)
 	if value == "" {

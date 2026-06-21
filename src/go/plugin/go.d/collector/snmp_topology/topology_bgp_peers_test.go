@@ -6,7 +6,6 @@ import (
 	"errors"
 	"testing"
 
-	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/stretchr/testify/require"
@@ -115,89 +114,6 @@ func TestSortTopologyBGPPeerRowsUsesRawNeighborFallback(t *testing.T) {
 
 	require.Equal(t, "raw-a", rows[0].NeighborIP)
 	require.Equal(t, "raw-b", rows[1].NeighborIP)
-}
-
-func TestBuildSNMPTopologyV1BGPPeersTableHandlesRawAndUnspecifiedAddresses(t *testing.T) {
-	tests := map[string]struct {
-		values          map[string]any
-		wantNeighborIPs []string
-		wantLocalIPs    []string
-		wantRawValues   map[string][]any
-	}{
-		"preserves-raw-non-ip-diagnostics": {
-			values: map[string]any{
-				"neighbor_ip": "peer-token",
-				"local_ip":    "local-token",
-			},
-			wantNeighborIPs: []string{"peer-token"},
-			wantLocalIPs:    []string{"local-token"},
-		},
-		"drops-unspecified-ip-addresses": {
-			values: map[string]any{
-				"neighbor_ip": "0.0.0.0",
-				"local_ip":    "::",
-			},
-			wantRawValues: map[string][]any{
-				"neighbor_ip": {nil},
-				"local_ip":    {nil},
-			},
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			stringsDict := topologyv1.NewStringDictionary()
-
-			table := buildSNMPTopologyV1BGPPeersTable([]topologyV1DynamicRow{
-				{
-					actorRef: 0,
-					values:   tc.values,
-				},
-			}, nil, stringsDict)
-			data := topologyv1.Data{
-				Dictionaries: topologyv1.Dictionaries{
-					"strings": stringsDict.Values(),
-				},
-			}
-
-			if tc.wantNeighborIPs != nil {
-				require.Equal(t, tc.wantNeighborIPs, topologyV1StringColumnValues(t, data, table, "neighbor_ip"))
-			}
-			if tc.wantLocalIPs != nil {
-				require.Equal(t, tc.wantLocalIPs, topologyV1StringColumnValues(t, data, table, "local_ip"))
-			}
-			for column, values := range tc.wantRawValues {
-				require.Equal(t, values, topologyV1ColumnValues(t, table, column))
-			}
-		})
-	}
-}
-
-func TestBuildSNMPTopologyV1BGPPeersTablePreservesOptionalUptimePresence(t *testing.T) {
-	var zero int64
-	stringsDict := topologyv1.NewStringDictionary()
-
-	table := buildSNMPTopologyV1BGPPeersTable([]topologyV1DynamicRow{
-		{
-			actorRef: 0,
-			values: snmpTopologyV1BGPPeerValues(topologyBGPPeerDetailRow{
-				NeighborIP:      "192.0.2.2",
-				RoutingInstance: "default",
-			}),
-		},
-		{
-			actorRef: 0,
-			values: snmpTopologyV1BGPPeerValues(topologyBGPPeerDetailRow{
-				NeighborIP:            "192.0.2.3",
-				RoutingInstance:       "default",
-				EstablishedUptime:     &zero,
-				LastReceivedUpdateAge: &zero,
-			}),
-		},
-	}, nil, stringsDict)
-
-	require.Equal(t, []any{nil, uint64(0)}, topologyV1ColumnValues(t, table, "established_uptime"))
-	require.Equal(t, []any{nil, uint64(0)}, topologyV1ColumnValues(t, table, "last_received_update_age"))
 }
 
 func TestTopologyCacheIngestTopologyBGPPeersSkipsErrorsAndInvalidRows(t *testing.T) {

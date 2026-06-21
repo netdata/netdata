@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyv1
 
 import (
-	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"time"
+
+	topologyapi "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
 const (
@@ -25,27 +27,27 @@ const (
 	snmpTopologyV1LinkARP         = "arp"
 	snmpTopologyV1LinkSNMP        = "snmp"
 	snmpTopologyV1LinkProbable    = "probable"
-	snmpTopologyV1LinkL3Subnet    = topologyL3SubnetLinkType
-	snmpTopologyV1LinkOSPF        = topologyOSPFAdjacencyLinkType
-	snmpTopologyV1LinkBGP         = topologyBGPAdjacencyLinkType
+	snmpTopologyV1LinkL3Subnet    = topologymodel.L3SubnetLinkType
+	snmpTopologyV1LinkOSPF        = topologymodel.OSPFAdjacencyLinkType
+	snmpTopologyV1LinkBGP         = topologymodel.BGPAdjacencyLinkType
 )
 
-func snmpTopologyToV1(data topologyData) (topologyv1.Data, error) {
-	stringsDict := topologyv1.NewStringDictionary("")
+func Render(data topologymodel.Data) (topologyapi.Data, error) {
+	stringsDict := topologyapi.NewStringDictionary("")
 	actorRows, actorIndex := buildSNMPTopologyV1Actors(data.Actors, stringsDict)
 
 	linkRows, evidenceSections, err := buildSNMPTopologyV1Links(data.Links, actorIndex, stringsDict)
 	if err != nil {
-		return topologyv1.Data{}, err
+		return topologyapi.Data{}, err
 	}
 
 	portNeighborSummaries := buildSNMPTopologyV1PortNeighborSummaries(data.Links, actorIndex)
 	actorDetails, tableTypes, err := buildSNMPTopologyV1ActorDetails(data.Actors, actorIndex, stringsDict, portNeighborSummaries)
 	if err != nil {
-		return topologyv1.Data{}, err
+		return topologyapi.Data{}, err
 	}
 	if tableTypes == nil {
-		tableTypes = make(map[string]topologyv1.TableType)
+		tableTypes = make(map[string]topologyapi.TableType)
 	}
 	if _, ok := tableTypes["actor_labels"]; !ok {
 		tableTypes["actor_labels"] = snmpTopologyV1ActorLabelsTableType()
@@ -62,25 +64,25 @@ func snmpTopologyToV1(data topologyData) (topologyv1.Data, error) {
 	}
 	portLinksTable, err := buildSNMPTopologyV1ActorPortLinksTable(data.Links, actorIndex, stringsDict)
 	if err != nil {
-		return topologyv1.Data{}, err
+		return topologyapi.Data{}, err
 	}
 	if portLinksTable.Rows > 0 {
 		if actorDetails == nil {
-			actorDetails = make(map[string]topologyv1.DetailTable)
+			actorDetails = make(map[string]topologyapi.DetailTable)
 		}
-		actorDetails["actor_port_links"] = topologyv1.DetailTable{
+		actorDetails["actor_port_links"] = topologyapi.DetailTable{
 			Type:  "actor_port_links",
 			Table: portLinksTable,
 		}
 	}
 
-	types := topologyv1.TypeRegistry{
+	types := topologyapi.TypeRegistry{
 		ActorTypes:    snmpTopologyV1ActorTypes(),
 		LinkTypes:     snmpTopologyV1LinkTypes(),
 		PortTypes:     snmpTopologyV1PortTypes(),
 		EvidenceTypes: snmpTopologyV1EvidenceTypes(),
 		TableTypes:    tableTypes,
-		AggregationScopes: map[string]topologyv1.AggregationScope{
+		AggregationScopes: map[string]topologyapi.AggregationScope{
 			"device": {
 				Columns:        []string{"id"},
 				EvidencePolicy: "preserve",
@@ -104,9 +106,9 @@ func snmpTopologyToV1(data topologyData) (topologyv1.Data, error) {
 		types.TableTypes = nil
 	}
 
-	payload := topologyv1.Data{
-		SchemaVersion: topologyv1.SchemaVersion,
-		Producer: topologyv1.Producer{
+	payload := topologyapi.Data{
+		SchemaVersion: topologyapi.SchemaVersion,
+		Producer: topologyapi.Producer{
 			Source:   snmpTopologyV1ProducerSource,
 			Instance: topologyutil.FirstNonEmptyString(data.AgentID, snmpTopologyV1Instance),
 			Plugin:   "go.d/snmp_topology",
@@ -121,12 +123,12 @@ func snmpTopologyToV1(data topologyData) (topologyv1.Data, error) {
 			},
 		},
 		CollectedAt: data.CollectedAt,
-		View: &topologyv1.View{
+		View: &topologyapi.View{
 			ID:    topologyutil.FirstNonEmptyString(data.View, "summary"),
 			Scope: "network",
 			Mode:  "detailed",
 		},
-		Dictionaries: topologyv1.Dictionaries{
+		Dictionaries: topologyapi.Dictionaries{
 			"strings": stringsDict.Values(),
 		},
 		Types:        types,
@@ -140,7 +142,7 @@ func snmpTopologyToV1(data topologyData) (topologyv1.Data, error) {
 		payload.CollectedAt = time.Now().UTC()
 	}
 	if actorDetails != nil {
-		payload.Tables = &topologyv1.DetailTables{
+		payload.Tables = &topologyapi.DetailTables{
 			Actor: actorDetails,
 		}
 	}

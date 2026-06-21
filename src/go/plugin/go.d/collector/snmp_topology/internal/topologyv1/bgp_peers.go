@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyv1
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
-
-import topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+import (
+	topologyapi "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+)
 
 func buildSNMPTopologyV1BGPPeersTable(
 	rows []topologyV1DynamicRow,
 	actorIndex map[string]int,
-	stringsDict *topologyv1.StringDictionary,
-) topologyv1.Table {
+	stringsDict *topologyapi.StringDictionary,
+) topologyapi.Table {
 	actorRefs := make([]any, len(rows))
 	remoteActors := make([]any, len(rows))
 	routingInstances := make([]any, len(rows))
@@ -33,11 +35,11 @@ func buildSNMPTopologyV1BGPPeersTable(
 		actorRefs[i] = row.actorRef
 		remoteActors[i] = nullableActorRef(actorIndex, row.values["remote_actor_id"])
 		routingInstances[i] = nullableStringRef(stringsDict, topologyutil.FirstNonEmptyString(topologyV1ScalarLabelValue(row.values["routing_instance"]), "default"))
-		neighborIPs[i] = nullableStringRef(stringsDict, topologyBGPPeerAddressValue(topologyV1ScalarLabelValue(row.values["neighbor_ip"])))
+		neighborIPs[i] = nullableStringRef(stringsDict, topologyutil.NormalizeBGPPeerAddress(topologyV1ScalarLabelValue(row.values["neighbor_ip"])))
 		remoteASes[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["remote_as"]))
 		states[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["state"]))
 		adminStatuses[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["admin_status"]))
-		localIPs[i] = nullableStringRef(stringsDict, topologyBGPPeerAddressValue(topologyV1ScalarLabelValue(row.values["local_ip"])))
+		localIPs[i] = nullableStringRef(stringsDict, topologyutil.NormalizeBGPPeerAddress(topologyV1ScalarLabelValue(row.values["local_ip"])))
 		localASes[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["local_as"]))
 		localIdentifiers[i] = nullableStringRef(stringsDict, topologyutil.NormalizeBGPRouterID(topologyV1ScalarLabelValue(row.values["local_identifier"])))
 		peerIdentifiers[i] = nullableStringRef(stringsDict, topologyutil.NormalizeBGPRouterID(topologyV1ScalarLabelValue(row.values["peer_identifier"])))
@@ -49,28 +51,28 @@ func buildSNMPTopologyV1BGPPeersTable(
 		sources[i] = nullableStringRef(stringsDict, topologyutil.FirstNonEmptyString(topologyV1ScalarLabelValue(row.values["source"]), "bgp_mib"))
 	}
 
-	return topologyv1.MustTable(len(rows), snmpTopologyV1BGPPeersColumns(), []topologyv1.ColumnEncoding{
-		topologyv1.Values(actorRefs...),
-		topologyv1.Values(remoteActors...),
-		topologyv1.Values(routingInstances...),
-		topologyv1.Values(neighborIPs...),
-		topologyv1.Values(remoteASes...),
-		topologyv1.Values(states...),
-		topologyv1.Values(adminStatuses...),
-		topologyv1.Values(localIPs...),
-		topologyv1.Values(localASes...),
-		topologyv1.Values(localIdentifiers...),
-		topologyv1.Values(peerIdentifiers...),
-		topologyv1.Values(peerTypes...),
-		topologyv1.Values(bgpVersions...),
-		topologyv1.Values(descriptions...),
-		topologyv1.Values(establishedUptimes...),
-		topologyv1.Values(lastReceivedUpdateAges...),
-		topologyv1.Values(sources...),
+	return topologyapi.MustTable(len(rows), snmpTopologyV1BGPPeersColumns(), []topologyapi.ColumnEncoding{
+		topologyapi.Values(actorRefs...),
+		topologyapi.Values(remoteActors...),
+		topologyapi.Values(routingInstances...),
+		topologyapi.Values(neighborIPs...),
+		topologyapi.Values(remoteASes...),
+		topologyapi.Values(states...),
+		topologyapi.Values(adminStatuses...),
+		topologyapi.Values(localIPs...),
+		topologyapi.Values(localASes...),
+		topologyapi.Values(localIdentifiers...),
+		topologyapi.Values(peerIdentifiers...),
+		topologyapi.Values(peerTypes...),
+		topologyapi.Values(bgpVersions...),
+		topologyapi.Values(descriptions...),
+		topologyapi.Values(establishedUptimes...),
+		topologyapi.Values(lastReceivedUpdateAges...),
+		topologyapi.Values(sources...),
 	})
 }
 
-func snmpTopologyV1BGPPeerValues(row topologyBGPPeerDetailRow) map[string]any {
+func snmpTopologyV1BGPPeerValues(row topologymodel.BGPPeerDetailRow) map[string]any {
 	out := map[string]any{
 		"remote_actor_id":  row.RemoteActorID,
 		"routing_instance": row.RoutingInstance,

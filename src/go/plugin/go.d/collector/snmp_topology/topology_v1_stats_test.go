@@ -8,7 +8,9 @@ import (
 
 	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyshape"
+	topologyv1renderer "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyv1"
 	"github.com/stretchr/testify/require"
 )
 
@@ -57,7 +59,7 @@ func TestSNMPTopologyToV1_RealPipelineStatsCensus(t *testing.T) {
 	data, ok := snapshotTopologyRegistryForTestWithOptions(registry, options)
 	require.True(t, ok)
 
-	payload, err := snmpTopologyToV1(data)
+	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
 	require.NotNil(t, payload.Stats)
 
@@ -179,7 +181,7 @@ func TestSNMPTopologyToV1_RealPipelineStatsCensusNoProtocolDataEmitsZeroProtocol
 	data, ok := snapshotTopologyRegistryForTestWithOptions(registry, options)
 	require.True(t, ok)
 
-	payload, err := snmpTopologyToV1(data)
+	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
 	require.Equal(t, 0, payload.Stats["l3_subnet_candidate_links"])
 	require.Equal(t, 0, payload.Stats["l3_subnet_emitted_links"])
@@ -204,7 +206,7 @@ func TestTopologyStatsToV1_OmitsFocusKeysWhenFocusFilterReturnsEarly(t *testing.
 		Depth:              1,
 	})
 
-	stats := topologyStatsToV1(data.Stats)
+	stats := topologyStatsToV1ForTest(t, data.Stats)
 	require.Equal(t, 1, stats["actors_total"])
 	require.Equal(t, 0, stats["links_total"])
 	require.NotContains(t, stats, "managed_snmp_device_focus")
@@ -264,10 +266,10 @@ func requireRealPipelineLinkEvidenceCensus(t *testing.T, payload topologyv1.Data
 	require.Greater(t, payload.Tables.Actor["actor_port_links"].Table.Rows, 0)
 
 	for _, linkType := range []string{
-		snmpTopologyV1LinkLLDP,
-		snmpTopologyV1LinkL3Subnet,
-		snmpTopologyV1LinkOSPF,
-		snmpTopologyV1LinkBGP,
+		"lldp",
+		topologymodel.L3SubnetLinkType,
+		topologymodel.OSPFAdjacencyLinkType,
+		topologymodel.BGPAdjacencyLinkType,
 	} {
 		require.Contains(t, payload.Evidence, linkType)
 		table := payload.Evidence[linkType].Table
@@ -278,7 +280,7 @@ func requireRealPipelineLinkEvidenceCensus(t *testing.T, payload topologyv1.Data
 		require.Empty(t, topologyV1ColumnType(table, "metrics"), "removed raw metrics column for %s", linkType)
 	}
 
-	lldpTable := payload.Evidence[snmpTopologyV1LinkLLDP].Table
+	lldpTable := payload.Evidence["lldp"].Table
 	require.Equal(t, []string{"xe-0/0/0"}, topologyV1StringColumnValues(t, payload, lldpTable, "src_port_id"))
 	require.Equal(t, []string{"xe-0/0/1"}, topologyV1StringColumnValues(t, payload, lldpTable, "dst_port_id"))
 }

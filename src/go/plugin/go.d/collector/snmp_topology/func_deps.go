@@ -6,6 +6,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	topologyv1renderer "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyv1"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/snmptopologyfunc"
 )
 
@@ -31,7 +32,7 @@ func (a funcDepsAdapter) Snapshot(options snmptopologyfunc.QueryOptions) (topolo
 		return topologyv1.Data{}, false, nil
 	}
 
-	payload, err := snmpTopologyToV1(data)
+	payload, err := topologyv1renderer.Render(data)
 	if err != nil {
 		return topologyv1.Data{}, false, err
 	}
