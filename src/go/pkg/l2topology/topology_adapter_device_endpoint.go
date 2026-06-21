@@ -5,9 +5,11 @@ package l2topology
 import (
 	"strconv"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
-func adjacencySideToEndpoint(dev Device, port string, ifIndexByDeviceName map[string]int, ifaceByDeviceIndex map[string]Interface) LinkEndpoint {
+func adjacencySideToEndpoint(dev Device, port string, ifIndexByDeviceName map[string]int, ifaceByDeviceIndex map[string]Interface) graph.LinkEndpoint {
 	match := buildDeviceActorMatch(dev, nil)
 
 	port = strings.TrimSpace(port)
@@ -37,27 +39,25 @@ func adjacencySideToEndpoint(dev Device, port string, ifIndexByDeviceName map[st
 		ifName = strconv.Itoa(ifIndex)
 	}
 
-	attrs := map[string]any{
-		"if_index":      ifIndex,
-		"if_name":       ifName,
-		"port_id":       port,
-		"sys_name":      strings.TrimSpace(dev.Hostname),
-		"management_ip": firstAddress(dev.Addresses),
+	endpoint := graph.LinkEndpoint{
+		Match:        match,
+		IfIndex:      ifIndex,
+		IfName:       ifName,
+		PortID:       port,
+		SysName:      strings.TrimSpace(dev.Hostname),
+		ManagementIP: firstAddress(dev.Addresses),
 	}
 	if ifDescr != "" {
-		attrs["if_descr"] = ifDescr
+		endpoint.IfDescr = ifDescr
 	}
 	if ifIndex > 0 && hasIface {
 		if admin := strings.TrimSpace(iface.Labels["admin_status"]); admin != "" {
-			attrs["if_admin_status"] = admin
+			endpoint.AdminStatus = admin
 		}
 		if oper := strings.TrimSpace(iface.Labels["oper_status"]); oper != "" {
-			attrs["if_oper_status"] = oper
+			endpoint.OperStatus = oper
 		}
 	}
 
-	return LinkEndpoint{
-		Match:      match,
-		Attributes: pruneTopologyAttributes(attrs),
-	}
+	return endpoint
 }

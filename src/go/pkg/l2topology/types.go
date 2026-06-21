@@ -64,7 +64,7 @@ type Result struct {
 	Adjacencies  []Adjacency
 	Attachments  []Attachment
 	Enrichments  []Enrichment
-	Stats        map[string]any
+	Stats        ResultStats
 	SourceLabels map[string]string
 }
 

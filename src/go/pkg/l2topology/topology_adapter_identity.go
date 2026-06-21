@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
 var interfaceNameLookupSanitizer = strings.NewReplacer(
@@ -109,7 +111,7 @@ func buildDeviceIdentityKeySetByID(
 			continue
 		}
 		keys := topologyMatchIdentityKeys(
-			deviceToTopologyActor(device, "", "", "", topologyDeviceInterfaceSummary{}, nil).Match,
+			deviceToTopologyActor(device, "", "", "", topologyDeviceInterfaceSummary{}, nil).Actor.Match,
 		)
 		if len(keys) == 0 {
 			continue
@@ -171,7 +173,7 @@ func buildDeviceIdentityKeySetByID(
 	return out
 }
 
-func topologyMatchIdentityKeys(match Match) []string {
+func topologyMatchIdentityKeys(match graph.Match) []string {
 	seen := make(map[string]struct{}, 8)
 	add := func(kind, value string) {
 		value = strings.TrimSpace(value)
@@ -232,7 +234,7 @@ func topologyMatchIdentityKeys(match Match) []string {
 	return keys
 }
 
-func topologyMatchHardwareIdentityKeys(match Match) []string {
+func topologyMatchHardwareIdentityKeys(match graph.Match) []string {
 	seen := make(map[string]struct{}, len(match.MacAddresses)+len(match.ChassisIDs))
 	add := func(value string) {
 		if mac := normalizeMAC(value); mac != "" {
@@ -259,7 +261,7 @@ func topologyMatchHardwareIdentityKeys(match Match) []string {
 }
 
 func endpointMatchOverlappingKnownDeviceIDs(
-	endpointMatch Match,
+	endpointMatch graph.Match,
 	deviceIdentityByID map[string]topologyIdentityKeySet,
 ) []string {
 	if len(deviceIdentityByID) == 0 {

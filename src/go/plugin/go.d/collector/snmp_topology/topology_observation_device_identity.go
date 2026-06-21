@@ -2,7 +2,10 @@
 
 package snmptopology
 
-import "strings"
+import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+	"strings"
+)
 
 func ensureTopologyObservationDeviceID(device topologyDevice, baseBridgeAddress string) string {
 	if mac := topologyPrimaryIdentityMAC(device.ChassisID, baseBridgeAddress); mac != "" {
@@ -14,7 +17,7 @@ func ensureTopologyObservationDeviceID(device topologyDevice, baseBridgeAddress 
 	if sysName := strings.TrimSpace(device.SysName); sysName != "" {
 		return "sysname:" + strings.ToLower(sysName)
 	}
-	if ip := normalizeIPAddress(device.ManagementIP); ip != "" {
+	if ip := topologyutil.NormalizeIPAddress(device.ManagementIP); ip != "" {
 		return "management_ip:" + ip
 	}
 	if managementIP := strings.TrimSpace(device.ManagementIP); managementIP != "" {
@@ -34,7 +37,7 @@ func ensureTopologyObservationDeviceID(device topologyDevice, baseBridgeAddress 
 
 func topologyPrimaryIdentityMAC(chassisID, baseBridgeAddress string) string {
 	for _, candidate := range []string{chassisID, baseBridgeAddress} {
-		if mac := normalizeMAC(candidate); mac != "" && mac != "00:00:00:00:00:00" {
+		if mac := topologyutil.NormalizeMAC(candidate); mac != "" && mac != "00:00:00:00:00:00" {
 			return mac
 		}
 	}

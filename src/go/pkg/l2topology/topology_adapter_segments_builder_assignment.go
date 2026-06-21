@@ -146,7 +146,7 @@ func (b *segmentProjectionBuilder) registerProbableSegment(endpointID string, hi
 			b.segmentIfNames[segmentID][ifName] = struct{}{}
 		}
 		match, actor := buildBridgeSegmentActor(segmentID, b.segmentByID[segmentID], b.layer, b.source)
-		keys := topologyMatchIdentityKeys(actor.Match)
+		keys := topologyMatchIdentityKeys(actor.Actor.Match)
 		if len(keys) > 0 && !topologyIdentityIndexOverlaps(b.actorIndex, keys) {
 			addTopologyIdentityKeys(b.actorIndex, keys)
 		}

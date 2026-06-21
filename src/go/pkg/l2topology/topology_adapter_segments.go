@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
 func projectSegmentTopology(
@@ -19,7 +21,7 @@ func projectSegmentTopology(
 	ifIndexByDeviceName map[string]int,
 	bridgeLinks []bridgeBridgeLinkRecord,
 	reporterAliases map[string][]string,
-	endpointMatchByID map[string]Match,
+	endpointMatchByID map[string]graph.Match,
 	endpointLabelsByID map[string]map[string]string,
 	actorIndex map[string]struct{},
 	probabilisticConnectivity bool,

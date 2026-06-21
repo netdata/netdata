@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"strings"
 	"time"
 )
@@ -24,6 +25,7 @@ func newTopologyCache() *topologyCache {
 		stpPorts:           make(map[string]*stpPortEntry),
 		arpEntries:         make(map[string]*arpEntry),
 		ospfNeighborsByKey: make(map[string]topologyOSPFNeighbor),
+		bgpPeersByKey:      make(map[string]topologyBGPPeer),
 	}
 }
 
@@ -57,6 +59,7 @@ func (c *topologyCache) replaceWith(src *topologyCache) {
 	c.stpPorts = src.stpPorts
 	c.arpEntries = src.arpEntries
 	c.ospfNeighborsByKey = src.ospfNeighborsByKey
+	c.bgpPeersByKey = src.bgpPeersByKey
 }
 
 func (c *topologyCache) hasFreshSnapshotAt(now time.Time) bool {
@@ -118,7 +121,7 @@ func (c *topologyCache) updateFDBDiagnostics() {
 		if bridgePort == "" || bridgePort == "0" {
 			continue
 		}
-		if parseIndex(c.bridgePortToIf[bridgePort]) == 0 {
+		if topologyutil.ParseIndex(c.bridgePortToIf[bridgePort]) == 0 {
 			c.fdbRowsUnmappedPort++
 		}
 	}

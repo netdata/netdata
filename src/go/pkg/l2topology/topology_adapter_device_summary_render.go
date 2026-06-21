@@ -2,64 +2,93 @@
 
 package l2topology
 
-import "strings"
+import (
+	"strconv"
+	"strings"
+)
 
-func buildTopologyDevicePortStatusAttributes(st topologyDevicePortStatus) map[string]any {
-	portStatus := map[string]any{
-		"if_index":                 st.IfIndex,
-		"if_name":                  strings.TrimSpace(st.IfName),
-		"if_descr":                 strings.TrimSpace(st.IfDescr),
-		"if_alias":                 strings.TrimSpace(st.IfAlias),
-		"mac":                      strings.TrimSpace(st.MAC),
-		"duplex":                   strings.TrimSpace(st.Duplex),
-		"link_mode":                st.LinkMode,
-		"link_mode_confidence":     st.ModeConfidence,
-		"topology_role":            st.TopologyRole,
-		"topology_role_confidence": st.RoleConfidence,
+func buildTopologyDevicePortDetail(st topologyDevicePortStatus) ProjectionPortDetail {
+	detail := ProjectionPortDetail{
+		Name:                   strings.TrimSpace(st.IfName),
+		IfName:                 strings.TrimSpace(st.IfName),
+		IfDescr:                strings.TrimSpace(st.IfDescr),
+		IfAlias:                strings.TrimSpace(st.IfAlias),
+		MAC:                    strings.TrimSpace(st.MAC),
+		Duplex:                 strings.TrimSpace(st.Duplex),
+		LinkMode:               st.LinkMode,
+		LinkModeConfidence:     st.ModeConfidence,
+		TopologyRole:           st.TopologyRole,
+		TopologyRoleConfidence: st.RoleConfidence,
+		AdminStatus:            st.AdminStatus,
+		OperStatus:             st.OperStatus,
+		PortType:               st.InterfaceType,
+		VLANIDs:                st.VLANIDs,
+		VLANs:                  st.VLANs,
+		STPState:               st.STPState,
+		Neighbors:              topologyPortNeighborDetails(st.Neighbors),
+	}
+	if st.IfIndex > 0 {
+		detail.IfIndex = OptionalValue[int]{Value: st.IfIndex, Has: true}
 	}
 	if st.SpeedBps > 0 {
-		portStatus["speed"] = st.SpeedBps
+		detail.Speed = OptionalValue[int64]{Value: st.SpeedBps, Has: true}
 	}
 	if st.LastChange > 0 {
-		portStatus["last_change"] = st.LastChange
+		detail.LastChange = strings.TrimSpace(formatTopologyLabelInt64(st.LastChange))
 	}
 	if len(st.ModeSources) > 0 {
-		portStatus["link_mode_sources"] = st.ModeSources
+		detail.LinkModeSources = st.ModeSources
 	}
 	if len(st.RoleSources) > 0 {
-		portStatus["topology_role_sources"] = st.RoleSources
-	}
-	if len(st.VLANIDs) > 0 {
-		portStatus["vlan_ids"] = st.VLANIDs
-	}
-	if len(st.VLANs) > 0 {
-		portStatus["vlans"] = st.VLANs
+		detail.TopologyRoleSources = st.RoleSources
 	}
 	if st.FDBMACCount > 0 {
-		portStatus["fdb_mac_count"] = st.FDBMACCount
+		detail.FDBMACCount = OptionalValue[int]{Value: st.FDBMACCount, Has: true}
 	}
-	if st.STPState != "" {
-		portStatus["stp_state"] = st.STPState
+	if len(detail.Neighbors) > 0 {
+		detail.NeighborCount = OptionalValue[int]{Value: len(detail.Neighbors), Has: true}
 	}
-	if len(st.Neighbors) > 0 {
-		neighbors := make([]map[string]any, 0, len(st.Neighbors))
-		for _, neighbor := range st.Neighbors {
-			if attrs := topologyPortNeighborStatusToAttributes(neighbor); len(attrs) > 0 {
-				neighbors = append(neighbors, attrs)
-			}
+	return detail
+}
+
+func formatTopologyLabelInt64(value int64) string {
+	if value <= 0 {
+		return ""
+	}
+	return strconv.FormatInt(value, 10)
+}
+
+func topologyPortNeighborDetails(statuses []topologyPortNeighborStatus) []ProjectionPortNeighbor {
+	if len(statuses) == 0 {
+		return nil
+	}
+	out := make([]ProjectionPortNeighbor, 0, len(statuses))
+	for _, status := range statuses {
+		neighbor := ProjectionPortNeighbor{
+			Protocol:           strings.ToLower(strings.TrimSpace(status.Protocol)),
+			RemoteDevice:       strings.TrimSpace(status.RemoteDevice),
+			RemotePort:         strings.TrimSpace(status.RemotePort),
+			RemoteIP:           strings.TrimSpace(status.RemoteIP),
+			RemoteChassisID:    strings.TrimSpace(status.RemoteChassisID),
+			RemoteCapabilities: uniqueTopologyStrings(status.RemoteCapabilities),
 		}
-		if len(neighbors) > 0 {
-			portStatus["neighbors"] = neighbors
+		if topologyPortNeighborStatusKey(topologyDevicePortNeighborStatus(neighbor)) == "" {
+			continue
 		}
+		out = append(out, neighbor)
 	}
-	if st.AdminStatus != "" {
-		portStatus["admin_status"] = st.AdminStatus
+	if len(out) == 0 {
+		return nil
 	}
-	if st.OperStatus != "" {
-		portStatus["oper_status"] = st.OperStatus
+	return out
+}
+
+func topologyDevicePortNeighborStatus(neighbor ProjectionPortNeighbor) topologyPortNeighborStatus {
+	return topologyPortNeighborStatus{
+		Protocol:        neighbor.Protocol,
+		RemoteDevice:    neighbor.RemoteDevice,
+		RemotePort:      neighbor.RemotePort,
+		RemoteIP:        neighbor.RemoteIP,
+		RemoteChassisID: neighbor.RemoteChassisID,
 	}
-	if st.InterfaceType != "" {
-		portStatus["if_type"] = st.InterfaceType
-	}
-	return pruneTopologyAttributes(portStatus)
 }

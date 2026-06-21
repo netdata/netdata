@@ -28,7 +28,7 @@ func (b *deviceInterfaceSummaryBuilder) buildSummaries() map[string]topologyDevi
 		fdbTotalMACs := 0
 		lldpNeighborCount := 0
 		cdpNeighborCount := 0
-		portStatuses := make([]map[string]any, 0, len(col.portStatuses))
+		portStatuses := make([]ProjectionPortDetail, 0, len(col.portStatuses))
 		for _, st := range col.portStatuses {
 			evidence := col.portEvidence[st.IfIndex]
 			mode, confidence, sources, vlans := classifyTopologyPortLinkMode(evidence)
@@ -43,7 +43,7 @@ func (b *deviceInterfaceSummaryBuilder) buildSummaries() map[string]topologyDevi
 			if evidence != nil {
 				st.FDBMACCount = len(evidence.fdbEndpointIDs)
 				st.STPState = summarizeTopologySTPState(evidence.stpStates)
-				st.VLANs = topologyPortVLANAttributes(st.VLANIDs, evidence.vlanNames, st.LinkMode)
+				st.VLANs = topologyPortVLANDetails(st.VLANIDs, evidence.vlanNames, st.LinkMode)
 				st.Neighbors = sortedTopologyPortNeighbors(evidence.neighbors)
 			}
 
@@ -71,17 +71,17 @@ func (b *deviceInterfaceSummaryBuilder) buildSummaries() map[string]topologyDevi
 
 			modeCounts[mode]++
 			roleCounts[role]++
-			portStatuses = append(portStatuses, buildTopologyDevicePortStatusAttributes(st))
+			portStatuses = append(portStatuses, buildTopologyDevicePortDetail(st))
 		}
 
 		out[deviceID] = topologyDeviceInterfaceSummary{
 			portsTotal:        len(col.ifIndexes),
 			ifIndexes:         sortedTopologySet(col.ifIndexes),
 			ifNames:           sortedTopologySet(col.ifNames),
-			adminStatusCount:  intCountMapToAny(col.adminCounts),
-			operStatusCount:   intCountMapToAny(col.operCounts),
-			linkModeCount:     intCountMapToAny(modeCounts),
-			roleCount:         intCountMapToAny(roleCounts),
+			adminStatusCount:  normalizedIntCountMap(col.adminCounts),
+			operStatusCount:   normalizedIntCountMap(col.operCounts),
+			linkModeCount:     normalizedIntCountMap(modeCounts),
+			roleCount:         normalizedIntCountMap(roleCounts),
 			portsUp:           portsUp,
 			portsDown:         portsDown,
 			portsAdminDown:    portsAdminDown,

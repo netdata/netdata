@@ -3,27 +3,13 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 	"sync"
 )
-
-type topologyQueryOptions struct {
-	CollapseActorsByIP     bool
-	EliminateNonIPInferred bool
-	MapType                string
-	InferenceStrategy      string
-	ManagedDeviceFocus     string
-	Depth                  int
-	ResolveDNSName         func(ip string) string
-}
 
 type topologyRegistry struct {
 	mu     sync.RWMutex
 	caches map[*topologyCache]struct{}
-}
-
-type topologyManagedFocusTarget struct {
-	Value string
-	Name  string
 }
 
 func newTopologyRegistry() *topologyRegistry {
@@ -54,7 +40,7 @@ func (r *topologyRegistry) snapshotWithOptions(options topologyQueryOptions) (to
 	if r == nil {
 		return topologyData{}, false
 	}
-	options = normalizeTopologyQueryOptions(options)
+	options = topologyoptions.NormalizeQueryOptions(options)
 
 	aggregate, ok := aggregateTopologyObservationSnapshots(r.observationSnapshots())
 	if !ok {
@@ -62,26 +48,6 @@ func (r *topologyRegistry) snapshotWithOptions(options topologyQueryOptions) (to
 	}
 
 	return buildSNMPTopologySnapshot(aggregate, options)
-}
-
-func normalizeTopologyQueryOptions(options topologyQueryOptions) topologyQueryOptions {
-	options.MapType = normalizeTopologyMapType(options.MapType)
-	if options.MapType == "" {
-		options.MapType = topologyMapTypeLLDPCDPManaged
-	}
-	options.InferenceStrategy = normalizeTopologyInferenceStrategy(options.InferenceStrategy)
-	if options.InferenceStrategy == "" {
-		options.InferenceStrategy = topologyInferenceStrategyFDBMinimumKnowledge
-	}
-	options.ManagedDeviceFocus = formatTopologyManagedFocuses(parseTopologyManagedFocuses(options.ManagedDeviceFocus))
-	if options.Depth != topologyDepthAllInternal {
-		if options.Depth < topologyDepthMin {
-			options.Depth = topologyDepthMin
-		} else if options.Depth > topologyDepthMax {
-			options.Depth = topologyDepthMax
-		}
-	}
-	return options
 }
 
 func (r *topologyRegistry) managedDeviceFocusTargets() []topologyManagedFocusTarget {

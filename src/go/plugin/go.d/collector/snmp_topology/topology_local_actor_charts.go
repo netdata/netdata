@@ -3,8 +3,10 @@
 package snmptopology
 
 import (
-	"fmt"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"strings"
+
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
 func enrichLocalActorChartReferences(actor *topologyActor, interfaceCharts map[string]topologyInterfaceChartRef) {
@@ -17,14 +19,7 @@ func enrichLocalActorChartReferences(actor *topologyActor, interfaceCharts map[s
 		return
 	}
 
-	if statuses, ok := actor.Attributes["if_statuses"]; ok && statuses != nil {
-		actor.Attributes["if_statuses"] = enrichTopologyInterfaceStatusesWithChartRefs(statuses, lookup)
-	}
-	if actor.Tables != nil {
-		if portRows, ok := actor.Tables["ports"]; ok && len(portRows) > 0 {
-			enrichTopologyTableRowsWithChartRefs(portRows, lookup)
-		}
-	}
+	enrichTopologyPortDetailsWithChartRefs(actor.Detail.L2.Device.Ports, lookup)
 }
 
 func topologyInterfaceChartLookup(interfaceCharts map[string]topologyInterfaceChartRef) map[string]topologyInterfaceChartRef {
@@ -37,70 +32,23 @@ func topologyInterfaceChartLookup(interfaceCharts map[string]topologyInterfaceCh
 		if strings.TrimSpace(ref.ChartIDSuffix) == "" {
 			ref.ChartIDSuffix = ifName
 		}
-		ref.AvailableMetrics = deduplicateSortedStrings(ref.AvailableMetrics)
+		ref.AvailableMetrics = topologyutil.DeduplicateSortedStrings(ref.AvailableMetrics)
 		lookup[ifName] = ref
 	}
 	return lookup
 }
 
-func enrichTopologyInterfaceStatusesWithChartRefs(
-	statuses any,
-	lookup map[string]topologyInterfaceChartRef,
-) any {
-	if len(lookup) == 0 || statuses == nil {
-		return statuses
-	}
-
-	switch typed := statuses.(type) {
-	case []map[string]any:
-		for _, status := range typed {
-			ifName := strings.ToLower(strings.TrimSpace(fmt.Sprint(status["if_name"])))
-			if ifName == "" {
-				continue
-			}
-			ref, ok := lookup[ifName]
-			if !ok {
-				continue
-			}
-			status["chart_id_suffix"] = ref.ChartIDSuffix
-			if len(ref.AvailableMetrics) > 0 {
-				status["available_metrics"] = ref.AvailableMetrics
-			}
-		}
-		return typed
-	case []any:
-		for i := range typed {
-			status, ok := typed[i].(map[string]any)
-			if !ok || status == nil {
-				continue
-			}
-			ifName := strings.ToLower(strings.TrimSpace(fmt.Sprint(status["if_name"])))
-			if ifName == "" {
-				continue
-			}
-			ref, ok := lookup[ifName]
-			if !ok {
-				continue
-			}
-			status["chart_id_suffix"] = ref.ChartIDSuffix
-			if len(ref.AvailableMetrics) > 0 {
-				status["available_metrics"] = ref.AvailableMetrics
-			}
-			typed[i] = status
-		}
-		return typed
-	default:
-		return statuses
-	}
-}
-
-func enrichTopologyTableRowsWithChartRefs(rows []map[string]any, lookup map[string]topologyInterfaceChartRef) {
-	if len(lookup) == 0 || len(rows) == 0 {
+func enrichTopologyPortDetailsWithChartRefs(ports []topologyengine.ProjectionPortDetail, lookup map[string]topologyInterfaceChartRef) {
+	if len(lookup) == 0 || len(ports) == 0 {
 		return
 	}
 
-	for _, row := range rows {
-		name := strings.ToLower(strings.TrimSpace(fmt.Sprint(row["name"])))
+	for i := range ports {
+		name := strings.ToLower(strings.TrimSpace(topologyutil.FirstNonEmptyString(
+			ports[i].IfName,
+			ports[i].Name,
+			ports[i].PortID,
+		)))
 		if name == "" {
 			continue
 		}
@@ -108,9 +56,9 @@ func enrichTopologyTableRowsWithChartRefs(rows []map[string]any, lookup map[stri
 		if !ok {
 			continue
 		}
-		row["chart_id_suffix"] = ref.ChartIDSuffix
+		ports[i].ChartIDSuffix = ref.ChartIDSuffix
 		if len(ref.AvailableMetrics) > 0 {
-			row["available_metrics"] = ref.AvailableMetrics
+			ports[i].AvailableMetrics = ref.AvailableMetrics
 		}
 	}
 }

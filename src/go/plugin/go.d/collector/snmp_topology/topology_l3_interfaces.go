@@ -3,18 +3,10 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"sort"
 	"strings"
 )
-
-type topologyL3Interface struct {
-	DeviceID string
-	IP       string
-	Netmask  string
-	IfIndex  string
-	IfName   string
-	IfDescr  string
-}
 
 func (c *topologyCache) snapshotL3Interfaces(localDeviceID string) []topologyL3Interface {
 	if c == nil || len(c.l3InterfacesByIP) == 0 {
@@ -32,8 +24,8 @@ func (c *topologyCache) snapshotL3Interfaces(localDeviceID string) []topologyL3I
 		row := c.l3InterfacesByIP[ip]
 		row.DeviceID = strings.TrimSpace(localDeviceID)
 		row.IfIndex = strings.TrimSpace(row.IfIndex)
-		row.IP = normalizeIPAddress(row.IP)
-		row.Netmask = normalizeIPAddress(row.Netmask)
+		row.IP = topologyutil.NormalizeIPAddress(row.IP)
+		row.Netmask = topologyutil.NormalizeIPAddress(row.Netmask)
 		if row.IP == "" || row.Netmask == "" || row.IfIndex == "" {
 			continue
 		}

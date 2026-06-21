@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"sort"
 	"strings"
 
@@ -26,7 +27,7 @@ func (c *topologyCache) appendObservedLLDPRemotes(observation *topologyengine.L2
 			continue
 		}
 
-		managementIP := normalizeIPAddress(remote.managementAddr)
+		managementIP := topologyutil.NormalizeIPAddress(remote.managementAddr)
 		if managementIP == "" {
 			managementIP = pickManagementIP(remote.managementAddrs)
 		}
@@ -94,7 +95,7 @@ func (c *topologyCache) appendObservedCDPRemotes(observation *topologyengine.L2O
 		}
 
 		observation.CDPRemotes = append(observation.CDPRemotes, topologyengine.CDPRemoteObservation{
-			LocalIfIndex: parseIndex(remote.ifIndex),
+			LocalIfIndex: topologyutil.ParseIndex(remote.ifIndex),
 			LocalIfName:  ifName,
 			DeviceIndex:  strings.TrimSpace(remote.deviceIndex),
 			DeviceID:     deviceID,

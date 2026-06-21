@@ -3,13 +3,18 @@
 package snmptopology
 
 import (
+	"strings"
 	"time"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyenrich"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyshape"
 )
 
 func buildSNMPTopologySnapshot(aggregate topologyObservationAggregate, options topologyQueryOptions) (topologyData, bool) {
-	if len(aggregate.l2Observations) == 0 {
+	if len(aggregate.L2Observations) == 0 {
 		return topologyData{}, false
 	}
 
@@ -22,20 +27,21 @@ func buildSNMPTopologySnapshot(aggregate topologyObservationAggregate, options t
 
 func buildSingleMapTopologySnapshot(aggregate topologyObservationAggregate, options topologyQueryOptions) (topologyData, bool) {
 	data, ok := buildSNMPL2TopologyData(
-		aggregate.l2Observations,
-		aggregate.agentID,
-		aggregate.localDeviceID,
-		aggregate.collectedAt,
+		aggregate.L2Observations,
+		aggregate.AgentID,
+		aggregate.LocalDeviceID,
+		aggregate.CollectedAt,
 		options,
 	)
 	if !ok {
 		return topologyData{}, false
 	}
-	augmentTopologySnapshotLocals(&data, aggregate.snapshots)
-	applySNMPTopologyShapePolicies(&data, options)
-	applyTopologyL3SubnetEnrichment(&data, aggregate)
-	applyTopologyOSPFAdjacencyEnrichment(&data, aggregate)
-	applyTopologyDepthFocusFilter(&data, options)
+	augmentTopologySnapshotLocals(&data, aggregate.Snapshots)
+	topologyshape.ApplyPolicies(&data, options)
+	topologyenrich.ApplyL3Subnet(&data, aggregate)
+	topologyenrich.ApplyOSPFAdjacency(&data, aggregate)
+	topologyenrich.ApplyBGPAdjacency(&data, aggregate)
+	topologyshape.ApplyDepthFocusFilter(&data, options)
 	return data, true
 }
 
@@ -43,42 +49,43 @@ func buildProbableTopologySnapshot(aggregate topologyObservationAggregate, optio
 	strictOptions := options
 	strictOptions.MapType = topologyMapTypeHighConfidenceInferred
 	strictData, strictOK := buildSNMPL2TopologyData(
-		aggregate.l2Observations,
-		aggregate.agentID,
-		aggregate.localDeviceID,
-		aggregate.collectedAt,
+		aggregate.L2Observations,
+		aggregate.AgentID,
+		aggregate.LocalDeviceID,
+		aggregate.CollectedAt,
 		strictOptions,
 	)
 	if !strictOK {
 		return topologyData{}, false
 	}
-	augmentTopologySnapshotLocals(&strictData, aggregate.snapshots)
-	applySNMPTopologyShapePolicies(&strictData, strictOptions)
+	augmentTopologySnapshotLocals(&strictData, aggregate.Snapshots)
+	topologyshape.ApplyPolicies(&strictData, strictOptions)
 
 	probableOptions := options
 	probableOptions.MapType = topologyMapTypeAllDevicesLowConfidence
 	probableData, probableOK := buildSNMPL2TopologyData(
-		aggregate.l2Observations,
-		aggregate.agentID,
-		aggregate.localDeviceID,
-		aggregate.collectedAt,
+		aggregate.L2Observations,
+		aggregate.AgentID,
+		aggregate.LocalDeviceID,
+		aggregate.CollectedAt,
 		probableOptions,
 	)
 	if !probableOK {
 		return topologyData{}, false
 	}
-	augmentTopologySnapshotLocals(&probableData, aggregate.snapshots)
-	applySNMPTopologyShapePolicies(&probableData, probableOptions)
-	markProbableDeltaLinks(&strictData, &probableData)
-	applyTopologyL3SubnetEnrichment(&probableData, aggregate)
-	applyTopologyOSPFAdjacencyEnrichment(&probableData, aggregate)
-	applyTopologyDepthFocusFilter(&probableData, options)
+	augmentTopologySnapshotLocals(&probableData, aggregate.Snapshots)
+	topologyshape.ApplyPolicies(&probableData, probableOptions)
+	topologyshape.MarkProbableDeltaLinks(&strictData, &probableData)
+	topologyenrich.ApplyL3Subnet(&probableData, aggregate)
+	topologyenrich.ApplyOSPFAdjacency(&probableData, aggregate)
+	topologyenrich.ApplyBGPAdjacency(&probableData, aggregate)
+	topologyshape.ApplyDepthFocusFilter(&probableData, options)
 	return probableData, true
 }
 
 func augmentTopologySnapshotLocals(data *topologyData, snapshots []topologyObservationSnapshot) {
 	for _, snapshot := range snapshots {
-		augmentLocalActorFromCache(data, snapshot.localDevice)
+		augmentLocalActorFromCache(data, snapshot.LocalDevice)
 	}
 }
 
@@ -104,7 +111,7 @@ func buildSNMPL2TopologyData(
 		return topologyData{}, false
 	}
 
-	data := topologyengine.ToGraph(result, topologyengine.GraphOptions{
+	projection := topologyengine.ToGraph(result, topologyengine.GraphOptions{
 		SchemaVersion:             topologySchemaVersion,
 		Source:                    "snmp",
 		Layer:                     "2",
@@ -115,8 +122,34 @@ func buildSNMPL2TopologyData(
 		ResolveDNSName:            options.ResolveDNSName,
 		CollapseActorsByIP:        options.CollapseActorsByIP,
 		EliminateNonIPInferred:    options.EliminateNonIPInferred,
-		ProbabilisticConnectivity: isTopologyMapTypeProbable(options.MapType),
+		ProbabilisticConnectivity: topologyoptions.IsMapTypeProbable(options.MapType),
 		InferenceStrategy:         options.InferenceStrategy,
 	})
+	graphData := projection.Graph
+	data := topologyData{
+		SchemaVersion: graphData.SchemaVersion,
+		Source:        graphData.Source,
+		Layer:         graphData.Layer,
+		AgentID:       graphData.AgentID,
+		CollectedAt:   graphData.CollectedAt,
+		View:          graphData.View,
+		Actors:        topologyActorsFromProjection(graphData.Actors, projection.ActorDetails),
+		Links:         topologyLinksFromGraph(graphData.Links),
+		Stats: topologyStats{
+			L2:    projection.Stats,
+			HasL2: true,
+		},
+	}
 	return data, true
+}
+
+func topologyActorsFromProjection(actors []graph.Actor, details map[string]topologyengine.ProjectionActorDetail) []topologyActor {
+	if len(actors) == 0 {
+		return nil
+	}
+	out := make([]topologyActor, len(actors))
+	for i, actor := range actors {
+		out[i] = topologyActorFromGraph(actor, details[strings.TrimSpace(actor.ActorID)])
+	}
+	return out
 }

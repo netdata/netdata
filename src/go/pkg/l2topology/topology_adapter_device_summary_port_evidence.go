@@ -7,23 +7,23 @@ import (
 	"strings"
 )
 
-func topologyPortVLANAttributes(vlanIDs []string, vlanNames map[string]string, linkMode string) []map[string]any {
+func topologyPortVLANDetails(vlanIDs []string, vlanNames map[string]string, linkMode string) []ProjectionPortVLAN {
 	if len(vlanIDs) == 0 {
 		return nil
 	}
 	tagged := len(vlanIDs) != 1 || !strings.EqualFold(strings.TrimSpace(linkMode), "access")
-	out := make([]map[string]any, 0, len(vlanIDs))
+	out := make([]ProjectionPortVLAN, 0, len(vlanIDs))
 	for _, vlanID := range vlanIDs {
 		vlanID = normalizeTopologyVLANID(vlanID)
 		if vlanID == "" {
 			continue
 		}
-		entry := map[string]any{
-			"vlan_id": vlanID,
-			"tagged":  tagged,
+		entry := ProjectionPortVLAN{
+			VLANID: vlanID,
+			Tagged: tagged,
 		}
 		if vlanName := strings.TrimSpace(vlanNames[vlanID]); vlanName != "" {
-			entry["vlan_name"] = vlanName
+			entry.VLANName = vlanName
 		}
 		out = append(out, entry)
 	}
@@ -212,7 +212,7 @@ func isTopologyLAGInterfaceType(ifType string) bool {
 	}
 }
 
-func intCountMapToAny(in map[string]int) map[string]any {
+func normalizedIntCountMap(in map[string]int) map[string]int {
 	if len(in) == 0 {
 		return nil
 	}
@@ -228,7 +228,7 @@ func intCountMapToAny(in map[string]int) map[string]any {
 		return nil
 	}
 	sort.Strings(keys)
-	out := make(map[string]any, len(keys))
+	out := make(map[string]int, len(keys))
 	for _, key := range keys {
 		out[key] = in[key]
 	}

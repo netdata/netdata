@@ -34,8 +34,8 @@ func TestBuildL2ResultFromWalks_LLDP_NMS8003(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, result.Devices, 5)
 	require.Len(t, result.Adjacencies, 12)
-	require.Equal(t, 12, result.Stats["links_lldp"])
-	require.Equal(t, 0, result.Stats["links_cdp"])
+	require.Equal(t, 12, result.Stats.LinksLLDP)
+	require.Equal(t, 0, result.Stats.LinksCDP)
 
 	golden, err := LoadGoldenYAML(resolved.GoldenYAML)
 	require.NoError(t, err)
@@ -73,28 +73,28 @@ func TestBuildL2ResultFromWalks_CDP_NMS8000(t *testing.T) {
 
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableCDP: true})
 	require.NoError(t, errStep1)
-	require.Equal(t, 3, step1.Stats["links_cdp"])
+	require.Equal(t, 3, step1.Stats.LinksCDP)
 
 	step2, errStep2 := buildResultFromScenarioPrefix(resolved, 2, BuildOptions{EnableCDP: true})
 	require.NoError(t, errStep2)
-	require.Equal(t, 6, step2.Stats["links_cdp"])
+	require.Equal(t, 6, step2.Stats.LinksCDP)
 
 	step3, errStep3 := buildResultFromScenarioPrefix(resolved, 3, BuildOptions{EnableCDP: true})
 	require.NoError(t, errStep3)
-	require.Equal(t, 9, step3.Stats["links_cdp"])
+	require.Equal(t, 9, step3.Stats.LinksCDP)
 
 	step4, errStep4 := buildResultFromScenarioPrefix(resolved, 4, BuildOptions{EnableCDP: true})
 	require.NoError(t, errStep4)
-	require.Equal(t, 11, step4.Stats["links_cdp"])
+	require.Equal(t, 11, step4.Stats.LinksCDP)
 
 	step5, errStep5 := buildResultFromScenarioPrefix(resolved, 5, BuildOptions{EnableCDP: true})
 	require.NoError(t, errStep5)
-	require.Equal(t, 13, step5.Stats["links_cdp"])
+	require.Equal(t, 13, step5.Stats.LinksCDP)
 
 	final := step5
 	require.Len(t, final.Adjacencies, 13)
-	require.Equal(t, 13, final.Stats["links_cdp"])
-	require.Equal(t, 0, final.Stats["links_lldp"])
+	require.Equal(t, 13, final.Stats.LinksCDP)
+	require.Equal(t, 0, final.Stats.LinksLLDP)
 
 	expected := map[string]struct{}{
 		"cdp|nmmr1|Gi0/0|nmmr3|GigabitEthernet0/1":                                {},
@@ -144,28 +144,28 @@ func TestBuildL2ResultFromWalks_LLDP_NMS8000(t *testing.T) {
 
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
-	require.Equal(t, 3, step1.Stats["links_lldp"])
+	require.Equal(t, 3, step1.Stats.LinksLLDP)
 
 	step2, errStep2 := buildResultFromScenarioPrefix(resolved, 2, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep2)
-	require.Equal(t, 6, step2.Stats["links_lldp"])
+	require.Equal(t, 6, step2.Stats.LinksLLDP)
 
 	step3, errStep3 := buildResultFromScenarioPrefix(resolved, 3, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep3)
-	require.Equal(t, 8, step3.Stats["links_lldp"])
+	require.Equal(t, 8, step3.Stats.LinksLLDP)
 
 	step4, errStep4 := buildResultFromScenarioPrefix(resolved, 4, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep4)
-	require.Equal(t, 10, step4.Stats["links_lldp"])
+	require.Equal(t, 10, step4.Stats.LinksLLDP)
 
 	step5, errStep5 := buildResultFromScenarioPrefix(resolved, 5, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep5)
-	require.Equal(t, 12, step5.Stats["links_lldp"])
+	require.Equal(t, 12, step5.Stats.LinksLLDP)
 
 	final := step5
 	require.Len(t, final.Adjacencies, 12)
-	require.Equal(t, 12, final.Stats["links_lldp"])
-	require.Equal(t, 0, final.Stats["links_cdp"])
+	require.Equal(t, 12, final.Stats.LinksLLDP)
+	require.Equal(t, 0, final.Stats.LinksCDP)
 
 	expected := map[string]struct{}{
 		"lldp|nmmr1|Gi0/0|nmmr3|Gi0/1":  {},
@@ -205,20 +205,20 @@ func TestBuildL2ResultFromWalks_LLDP_NMS13637(t *testing.T) {
 
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
-	require.Equal(t, 5, step1.Stats["links_lldp"])
+	require.Equal(t, 5, step1.Stats.LinksLLDP)
 
 	step2, errStep2 := buildResultFromScenarioPrefix(resolved, 2, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep2)
-	require.Equal(t, 10, step2.Stats["links_lldp"])
+	require.Equal(t, 10, step2.Stats.LinksLLDP)
 
 	step3, errStep3 := buildResultFromScenarioPrefix(resolved, 3, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep3)
-	require.Equal(t, 19, step3.Stats["links_lldp"])
+	require.Equal(t, 19, step3.Stats.LinksLLDP)
 
 	final := step3
 	require.Len(t, final.Adjacencies, 19)
-	require.Equal(t, 19, final.Stats["links_lldp"])
-	require.Equal(t, 0, final.Stats["links_cdp"])
+	require.Equal(t, 19, final.Stats.LinksLLDP)
+	require.Equal(t, 0, final.Stats.LinksCDP)
 
 	golden, err := LoadGoldenYAML(resolved.GoldenYAML)
 	require.NoError(t, err)
@@ -285,13 +285,13 @@ func TestBuildL2ResultFromWalks_LLDP_NMS10205B(t *testing.T) {
 
 		sourceCounts := countAdjacenciesBySource(result.Adjacencies, "lldp")
 		require.Equal(t, expected.sourceLinks, sourceCounts[expected.fixtureID])
-		require.Equal(t, expected.totalLinks, result.Stats["links_lldp"])
+		require.Equal(t, expected.totalLinks, result.Stats.LinksLLDP)
 		require.Equal(t, expected.lldpElementCnt, countFixturesWithLLDPLocalElements(walks))
 		final = result
 	}
 
-	require.Equal(t, 10, final.Stats["links_lldp"])
-	require.Equal(t, 0, final.Stats["links_cdp"])
+	require.Equal(t, 10, final.Stats.LinksLLDP)
+	require.Equal(t, 0, final.Stats.LinksCDP)
 	allWalks, err := loadScenarioWalkPrefix(resolved, len(resolved.Fixtures))
 	require.NoError(t, err)
 	require.Equal(t, 6, countFixturesWithLLDPLocalElements(allWalks))
@@ -378,7 +378,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS17216(t *testing.T) {
 		require.NoError(t, buildErr)
 
 		sourceCounts := countAdjacenciesBySource(result.Adjacencies, "lldp")
-		require.Equal(t, expected.totalLinks, result.Stats["links_lldp"])
+		require.Equal(t, expected.totalLinks, result.Stats.LinksLLDP)
 		require.Equal(t, expected.sourceLinks, sourceCounts[expected.fixtureID])
 		require.Equal(t, expected.lldpElementCnt, countFixturesWithLLDPLocalElements(walks))
 		final = result
@@ -386,8 +386,8 @@ func TestBuildL2ResultFromWalks_LLDP_NMS17216(t *testing.T) {
 
 	require.Len(t, final.Devices, 5)
 	require.Len(t, final.Adjacencies, 12)
-	require.Equal(t, 12, final.Stats["links_lldp"])
-	require.Equal(t, 0, final.Stats["links_cdp"])
+	require.Equal(t, 12, final.Stats.LinksLLDP)
+	require.Equal(t, 0, final.Stats.LinksCDP)
 	require.Equal(t, 6, countBidirectionalPairs(final.Adjacencies, "lldp"))
 
 	golden, err := LoadGoldenYAML(resolved.GoldenYAML)
@@ -445,15 +445,15 @@ func TestBuildL2ResultFromWalks_CDP_NMS17216(t *testing.T) {
 		require.NoError(t, buildErr)
 
 		sourceCounts := countAdjacenciesBySource(result.Adjacencies, "cdp")
-		require.Equal(t, expected.totalLinks, result.Stats["links_cdp"])
+		require.Equal(t, expected.totalLinks, result.Stats.LinksCDP)
 		require.Equal(t, expected.sourceLinks, sourceCounts[expected.fixtureID])
 		final = result
 	}
 
 	require.Len(t, final.Devices, 9)
 	require.Len(t, final.Adjacencies, 26)
-	require.Equal(t, 26, final.Stats["links_cdp"])
-	require.Equal(t, 0, final.Stats["links_lldp"])
+	require.Equal(t, 26, final.Stats.LinksCDP)
+	require.Equal(t, 0, final.Stats.LinksLLDP)
 
 	require.Equal(t, map[string]int{
 		"Switch1": 5,
@@ -497,13 +497,13 @@ func TestBuildL2ResultFromWalks_CDP_NMS17216_TopologyProjection(t *testing.T) {
 
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableCDP: true})
 	require.NoError(t, errStep1)
-	require.Equal(t, 5, step1.Stats["links_cdp"])
-	require.Equal(t, 0, step1.Stats["links_lldp"])
+	require.Equal(t, 5, step1.Stats.LinksCDP)
+	require.Equal(t, 0, step1.Stats.LinksLLDP)
 
 	step2, errStep2 := buildResultFromScenarioPrefix(resolved, 2, BuildOptions{EnableCDP: true})
 	require.NoError(t, errStep2)
-	require.Equal(t, 11, step2.Stats["links_cdp"])
-	require.Equal(t, 0, step2.Stats["links_lldp"])
+	require.Equal(t, 11, step2.Stats.LinksCDP)
+	require.Equal(t, 0, step2.Stats.LinksLLDP)
 	require.Equal(t, map[string]int{
 		"Switch1": 5,
 		"Switch2": 6,
@@ -538,13 +538,13 @@ func TestBuildL2ResultFromWalks_LLDP_NMS17216_TopologyProjection(t *testing.T) {
 
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
-	require.Equal(t, 4, step1.Stats["links_lldp"])
-	require.Equal(t, 0, step1.Stats["links_cdp"])
+	require.Equal(t, 4, step1.Stats.LinksLLDP)
+	require.Equal(t, 0, step1.Stats.LinksCDP)
 
 	step2, errStep2 := buildResultFromScenarioPrefix(resolved, 2, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep2)
-	require.Equal(t, 10, step2.Stats["links_lldp"])
-	require.Equal(t, 0, step2.Stats["links_cdp"])
+	require.Equal(t, 10, step2.Stats.LinksLLDP)
+	require.Equal(t, 0, step2.Stats.LinksCDP)
 
 	localStep2 := map[string]struct{}{
 		"Switch1": {},
@@ -560,8 +560,8 @@ func TestBuildL2ResultFromWalks_LLDP_NMS17216_TopologyProjection(t *testing.T) {
 
 	step3, errStep3 := BuildL2ResultFromWalks(step3Walks, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep3)
-	require.Equal(t, 12, step3.Stats["links_lldp"])
-	require.Equal(t, 0, step3.Stats["links_cdp"])
+	require.Equal(t, 12, step3.Stats.LinksLLDP)
+	require.Equal(t, 0, step3.Stats.LinksCDP)
 
 	localStep3 := map[string]struct{}{
 		"Switch1": {},
@@ -615,7 +615,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS0123(t *testing.T) {
 		result, buildErr := BuildL2ResultFromWalks(walks, BuildOptions{EnableLLDP: true})
 		require.NoError(t, buildErr)
 
-		require.Equal(t, expected.totalLinks, result.Stats["links_lldp"])
+		require.Equal(t, expected.totalLinks, result.Stats.LinksLLDP)
 		final = result
 	}
 
@@ -623,8 +623,8 @@ func TestBuildL2ResultFromWalks_LLDP_NMS0123(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, final.Adjacencies, 23)
-	require.Equal(t, 23, final.Stats["links_lldp"])
-	require.Equal(t, 0, final.Stats["links_cdp"])
+	require.Equal(t, 23, final.Stats.LinksLLDP)
+	require.Equal(t, 0, final.Stats.LinksCDP)
 	require.Equal(t, 8, countFixturesWithLLDPLocalElements(allWalks))
 
 	localDevices := map[string]struct{}{
@@ -676,19 +676,19 @@ func TestBuildL2ResultFromWalks_LLDP_NMS0002_CISCO_JUNIPER(t *testing.T) {
 
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
-	require.Equal(t, 1, step1.Stats["links_lldp"])
+	require.Equal(t, 1, step1.Stats.LinksLLDP)
 
 	step2First, errStep2First := buildResultFromScenarioPrefix(resolved, 2, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep2First)
 
 	step2Second, errStep2Second := buildResultFromScenarioPrefix(resolved, 2, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep2Second)
-	require.Equal(t, step2First.Stats["links_lldp"], step2Second.Stats["links_lldp"])
+	require.Equal(t, step2First.Stats.LinksLLDP, step2Second.Stats.LinksLLDP)
 
 	final := step2Second
 	require.Len(t, final.Adjacencies, 2)
-	require.Equal(t, 2, final.Stats["links_lldp"])
-	require.Equal(t, 0, final.Stats["links_cdp"])
+	require.Equal(t, 2, final.Stats.LinksLLDP)
+	require.Equal(t, 0, final.Stats.LinksCDP)
 
 	require.Equal(t, map[string]int{
 		"Rluck001": 1,
@@ -731,27 +731,27 @@ func TestBuildL2ResultFromWalks_LLDP_NMS0002_CISCO_ALCATEL(t *testing.T) {
 
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
-	require.Equal(t, 0, step1.Stats["links_lldp"])
+	require.Equal(t, 0, step1.Stats.LinksLLDP)
 
 	step2, errStep2 := buildResultFromScenarioPrefix(resolved, 2, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep2)
-	require.Equal(t, 1, step2.Stats["links_lldp"])
+	require.Equal(t, 1, step2.Stats.LinksLLDP)
 
 	step3, errStep3 := buildResultFromScenarioPrefix(resolved, 3, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep3)
-	require.Equal(t, 2, step3.Stats["links_lldp"])
+	require.Equal(t, 2, step3.Stats.LinksLLDP)
 
 	step4, errStep4 := buildResultFromScenarioPrefix(resolved, 4, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep4)
-	require.Equal(t, 4, step4.Stats["links_lldp"])
+	require.Equal(t, 4, step4.Stats.LinksLLDP)
 
 	step5, errStep5 := buildResultFromScenarioPrefix(resolved, 5, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep5)
 
 	final := step5
 	require.Len(t, final.Adjacencies, 6)
-	require.Equal(t, 6, final.Stats["links_lldp"])
-	require.Equal(t, 0, final.Stats["links_cdp"])
+	require.Equal(t, 6, final.Stats.LinksLLDP)
+	require.Equal(t, 0, final.Stats.LinksCDP)
 
 	golden, err := LoadGoldenYAML(resolved.GoldenYAML)
 	require.NoError(t, err)
@@ -854,15 +854,15 @@ func TestBuildL2ResultFromWalks_LLDP_NMS0000_NETWORK_ALL(t *testing.T) {
 		require.NoError(t, buildErr)
 
 		sourceCounts := countAdjacenciesBySource(result.Adjacencies, "lldp")
-		require.Equal(t, expected.totalLinks, result.Stats["links_lldp"])
+		require.Equal(t, expected.totalLinks, result.Stats.LinksLLDP)
 		require.Equal(t, expected.sourceLinks, sourceCounts[expected.fixtureID])
 		require.Equal(t, expected.lldpElementCnt, countFixturesWithLLDPLocalElements(allWalks[:i+1]))
 		final = result
 	}
 
 	require.Len(t, final.Adjacencies, 73)
-	require.Equal(t, 73, final.Stats["links_lldp"])
-	require.Equal(t, 0, final.Stats["links_cdp"])
+	require.Equal(t, 73, final.Stats.LinksLLDP)
+	require.Equal(t, 0, final.Stats.LinksCDP)
 	require.Equal(t, 18, countFixturesWithLLDPLocalElements(allWalks))
 
 	localDevices := map[string]struct{}{
@@ -927,20 +927,20 @@ func TestBuildL2ResultFromWalks_LLDP_NMS0000_NETWORK_TWO_CONNECTED(t *testing.T)
 
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
-	require.Equal(t, 3, step1.Stats["links_lldp"])
+	require.Equal(t, 3, step1.Stats.LinksLLDP)
 	require.Equal(t, map[string]int{"ms07": 3}, countAdjacenciesBySource(step1.Adjacencies, "lldp"))
 	require.Equal(t, 1, countFixturesWithLLDPLocalElements(allWalks[:1]))
 
 	step2, errStep2 := buildResultFromScenarioPrefix(resolved, 2, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep2)
-	require.Equal(t, 8, step2.Stats["links_lldp"])
+	require.Equal(t, 8, step2.Stats.LinksLLDP)
 	require.Equal(t, map[string]int{"ms07": 3, "ms08": 5}, countAdjacenciesBySource(step2.Adjacencies, "lldp"))
 	require.Equal(t, 2, countFixturesWithLLDPLocalElements(allWalks))
 
 	final := step2
 	require.Len(t, final.Adjacencies, 8)
-	require.Equal(t, 8, final.Stats["links_lldp"])
-	require.Equal(t, 0, final.Stats["links_cdp"])
+	require.Equal(t, 8, final.Stats.LinksLLDP)
+	require.Equal(t, 0, final.Stats.LinksCDP)
 
 	localDevices := map[string]struct{}{
 		"ms07": {},
@@ -988,20 +988,20 @@ func TestBuildL2ResultFromWalks_LLDP_NMS0000_NETWORK_THREE_CONNECTED(t *testing.
 
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
-	require.Equal(t, 5, step1.Stats["links_lldp"])
+	require.Equal(t, 5, step1.Stats.LinksLLDP)
 	require.Equal(t, map[string]int{"ms08": 5}, countAdjacenciesBySource(step1.Adjacencies, "lldp"))
 	require.Equal(t, 1, countFixturesWithLLDPLocalElements(allWalks[:1]))
 
 	step2, errStep2 := buildResultFromScenarioPrefix(resolved, 2, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep2)
-	require.Equal(t, 10, step2.Stats["links_lldp"])
+	require.Equal(t, 10, step2.Stats.LinksLLDP)
 	require.Equal(t, map[string]int{"ms08": 5, "ms10": 5}, countAdjacenciesBySource(step2.Adjacencies, "lldp"))
 	require.Equal(t, 2, countFixturesWithLLDPLocalElements(allWalks))
 
 	final := step2
 	require.Len(t, final.Adjacencies, 10)
-	require.Equal(t, 10, final.Stats["links_lldp"])
-	require.Equal(t, 0, final.Stats["links_cdp"])
+	require.Equal(t, 10, final.Stats.LinksLLDP)
+	require.Equal(t, 0, final.Stats.LinksCDP)
 
 	localDevices := map[string]struct{}{
 		"ms08": {},
@@ -1050,8 +1050,8 @@ func TestBuildL2ResultFromWalks_LLDP_NMS0000_MICROSENSE(t *testing.T) {
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
 	require.Len(t, step1.Adjacencies, 5)
-	require.Equal(t, 5, step1.Stats["links_lldp"])
-	require.Equal(t, 0, step1.Stats["links_cdp"])
+	require.Equal(t, 5, step1.Stats.LinksLLDP)
+	require.Equal(t, 0, step1.Stats.LinksCDP)
 	require.Equal(t, 1, countFixturesWithLLDPLocalElements(allWalks))
 	require.Equal(t, map[string]int{"ms08": 5}, countAdjacenciesBySource(step1.Adjacencies, "lldp"))
 
@@ -1110,8 +1110,8 @@ func TestBuildL2ResultFromWalks_LLDP_NMS0000_MS16(t *testing.T) {
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
 	require.Len(t, step1.Adjacencies, 5)
-	require.Equal(t, 5, step1.Stats["links_lldp"])
-	require.Equal(t, 0, step1.Stats["links_cdp"])
+	require.Equal(t, 5, step1.Stats.LinksLLDP)
+	require.Equal(t, 0, step1.Stats.LinksCDP)
 	require.Equal(t, 1, countFixturesWithLLDPLocalElements(allWalks))
 	require.Equal(t, map[string]int{"ms16": 5}, countAdjacenciesBySource(step1.Adjacencies, "lldp"))
 
@@ -1170,8 +1170,8 @@ func TestBuildL2ResultFromWalks_LLDP_NMS0000_PLANET(t *testing.T) {
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
 	require.Len(t, step1.Adjacencies, 3)
-	require.Equal(t, 3, step1.Stats["links_lldp"])
-	require.Equal(t, 0, step1.Stats["links_cdp"])
+	require.Equal(t, 3, step1.Stats.LinksLLDP)
+	require.Equal(t, 0, step1.Stats.LinksCDP)
 	require.Equal(t, 1, countFixturesWithLLDPLocalElements(allWalks))
 	require.Equal(t, map[string]int{"planet": 3}, countAdjacenciesBySource(step1.Adjacencies, "lldp"))
 
@@ -1269,32 +1269,32 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_NETWORK_ALL(t *testing.T) {
 
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
-	require.Equal(t, 2, step1.Stats["links_lldp"])
+	require.Equal(t, 2, step1.Stats.LinksLLDP)
 	require.Equal(t, 1, countFixturesWithLLDPLocalElements(allWalks[:1]))
 
 	step2, errStep2 := buildResultFromScenarioPrefix(resolved, 2, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep2)
-	require.Equal(t, 4, step2.Stats["links_lldp"])
+	require.Equal(t, 4, step2.Stats.LinksLLDP)
 	require.Equal(t, 2, countFixturesWithLLDPLocalElements(allWalks[:2]))
 
 	step3, errStep3 := buildResultFromScenarioPrefix(resolved, 3, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep3)
-	require.Equal(t, 5, step3.Stats["links_lldp"])
+	require.Equal(t, 5, step3.Stats.LinksLLDP)
 	require.Equal(t, 3, countFixturesWithLLDPLocalElements(allWalks[:3]))
 
 	step4, errStep4 := buildResultFromScenarioPrefix(resolved, 4, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep4)
-	require.Equal(t, 9, step4.Stats["links_lldp"])
+	require.Equal(t, 9, step4.Stats.LinksLLDP)
 	require.Equal(t, 4, countFixturesWithLLDPLocalElements(allWalks[:4]))
 
 	step5, errStep5 := buildResultFromScenarioPrefix(resolved, 5, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep5)
-	require.Equal(t, 12, step5.Stats["links_lldp"])
+	require.Equal(t, 12, step5.Stats.LinksLLDP)
 	require.Equal(t, 5, countFixturesWithLLDPLocalElements(allWalks[:5]))
 
 	step6, errStep6 := buildResultFromScenarioPrefix(resolved, 6, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep6)
-	require.Equal(t, 19, step6.Stats["links_lldp"])
+	require.Equal(t, 19, step6.Stats.LinksLLDP)
 	require.Equal(t, 6, countFixturesWithLLDPLocalElements(allWalks[:6]))
 
 	localPreQFX := map[string]struct{}{
@@ -1311,7 +1311,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_NETWORK_ALL(t *testing.T) {
 
 	step7, errStep7 := buildResultFromScenarioPrefix(resolved, 7, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep7)
-	require.Equal(t, 34, step7.Stats["links_lldp"])
+	require.Equal(t, 34, step7.Stats.LinksLLDP)
 	require.Equal(t, 7, countFixturesWithLLDPLocalElements(allWalks))
 
 	localAll := map[string]struct{}{
@@ -1356,22 +1356,22 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_TOPO_QFX_SW01_SW02_SW03(t *testing
 
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
-	require.Equal(t, 15, step1.Stats["links_lldp"])
+	require.Equal(t, 15, step1.Stats.LinksLLDP)
 	require.Equal(t, 1, countFixturesWithLLDPLocalElements(allWalks[:1]))
 
 	step2, errStep2 := buildResultFromScenarioPrefix(resolved, 2, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep2)
-	require.Equal(t, 17, step2.Stats["links_lldp"])
+	require.Equal(t, 17, step2.Stats.LinksLLDP)
 	require.Equal(t, 2, countFixturesWithLLDPLocalElements(allWalks[:2]))
 
 	step3, errStep3 := buildResultFromScenarioPrefix(resolved, 3, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep3)
-	require.Equal(t, 19, step3.Stats["links_lldp"])
+	require.Equal(t, 19, step3.Stats.LinksLLDP)
 	require.Equal(t, 3, countFixturesWithLLDPLocalElements(allWalks[:3]))
 
 	step4, errStep4 := buildResultFromScenarioPrefix(resolved, 4, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep4)
-	require.Equal(t, 20, step4.Stats["links_lldp"])
+	require.Equal(t, 20, step4.Stats.LinksLLDP)
 	require.Equal(t, 4, countFixturesWithLLDPLocalElements(allWalks))
 
 	localDevices := map[string]struct{}{
@@ -1418,12 +1418,12 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_TOPO_QFX_SW01(t *testing.T) {
 
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
-	require.Equal(t, 15, step1.Stats["links_lldp"])
+	require.Equal(t, 15, step1.Stats.LinksLLDP)
 	require.Equal(t, 1, countFixturesWithLLDPLocalElements(allWalks[:1]))
 
 	step2, errStep2 := buildResultFromScenarioPrefix(resolved, 2, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep2)
-	require.Equal(t, 17, step2.Stats["links_lldp"])
+	require.Equal(t, 17, step2.Stats.LinksLLDP)
 	require.Equal(t, 2, countFixturesWithLLDPLocalElements(allWalks))
 
 	localDevices := map[string]struct{}{
@@ -1468,12 +1468,12 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_TOPO_QFX_SW02(t *testing.T) {
 
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
-	require.Equal(t, 15, step1.Stats["links_lldp"])
+	require.Equal(t, 15, step1.Stats.LinksLLDP)
 	require.Equal(t, 1, countFixturesWithLLDPLocalElements(allWalks[:1]))
 
 	step2, errStep2 := buildResultFromScenarioPrefix(resolved, 2, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep2)
-	require.Equal(t, 17, step2.Stats["links_lldp"])
+	require.Equal(t, 17, step2.Stats.LinksLLDP)
 	require.Equal(t, 2, countFixturesWithLLDPLocalElements(allWalks))
 
 	localDevices := map[string]struct{}{
@@ -1518,12 +1518,12 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_TOPO_QFX_SW03(t *testing.T) {
 
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
-	require.Equal(t, 15, step1.Stats["links_lldp"])
+	require.Equal(t, 15, step1.Stats.LinksLLDP)
 	require.Equal(t, 1, countFixturesWithLLDPLocalElements(allWalks[:1]))
 
 	step2, errStep2 := buildResultFromScenarioPrefix(resolved, 2, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep2)
-	require.Equal(t, 16, step2.Stats["links_lldp"])
+	require.Equal(t, 16, step2.Stats.LinksLLDP)
 	require.Equal(t, 2, countFixturesWithLLDPLocalElements(allWalks))
 
 	localDevices := map[string]struct{}{
@@ -1568,12 +1568,12 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_TOPO_QFX_SW04(t *testing.T) {
 
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
-	require.Equal(t, 15, step1.Stats["links_lldp"])
+	require.Equal(t, 15, step1.Stats.LinksLLDP)
 	require.Equal(t, 1, countFixturesWithLLDPLocalElements(allWalks[:1]))
 
 	step2, errStep2 := buildResultFromScenarioPrefix(resolved, 2, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep2)
-	require.Equal(t, 19, step2.Stats["links_lldp"])
+	require.Equal(t, 19, step2.Stats.LinksLLDP)
 	require.Equal(t, 2, countFixturesWithLLDPLocalElements(allWalks))
 
 	localDevices := map[string]struct{}{
@@ -1618,12 +1618,12 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_TOPO_QFX_SW08(t *testing.T) {
 
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
-	require.Equal(t, 15, step1.Stats["links_lldp"])
+	require.Equal(t, 15, step1.Stats.LinksLLDP)
 	require.Equal(t, 1, countFixturesWithLLDPLocalElements(allWalks[:1]))
 
 	step2, errStep2 := buildResultFromScenarioPrefix(resolved, 2, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep2)
-	require.Equal(t, 18, step2.Stats["links_lldp"])
+	require.Equal(t, 18, step2.Stats.LinksLLDP)
 	require.Equal(t, 2, countFixturesWithLLDPLocalElements(allWalks))
 
 	localDevices := map[string]struct{}{
@@ -1666,12 +1666,12 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_TOPO_QFX_SW09(t *testing.T) {
 
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
-	require.Equal(t, 15, step1.Stats["links_lldp"])
+	require.Equal(t, 15, step1.Stats.LinksLLDP)
 	require.Equal(t, 1, countFixturesWithLLDPLocalElements(allWalks[:1]))
 
 	step2, errStep2 := buildResultFromScenarioPrefix(resolved, 2, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep2)
-	require.Equal(t, 22, step2.Stats["links_lldp"])
+	require.Equal(t, 22, step2.Stats.LinksLLDP)
 	require.Equal(t, 2, countFixturesWithLLDPLocalElements(allWalks))
 
 	localDevices := map[string]struct{}{
@@ -1717,8 +1717,8 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_QFX(t *testing.T) {
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
 	require.Len(t, step1.Adjacencies, 15)
-	require.Equal(t, 15, step1.Stats["links_lldp"])
-	require.Equal(t, 0, step1.Stats["links_cdp"])
+	require.Equal(t, 15, step1.Stats.LinksLLDP)
+	require.Equal(t, 0, step1.Stats.LinksCDP)
 	require.Equal(t, 1, countFixturesWithLLDPLocalElements(allWalks))
 	require.Equal(t, map[string]int{"E0281L-ScALBENGA2-QFX": 15}, countAdjacenciesBySource(step1.Adjacencies, "lldp"))
 
@@ -1771,8 +1771,8 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_MICROSENS_SW01(t *testing.T) {
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
 	require.Len(t, step1.Adjacencies, 2)
-	require.Equal(t, 2, step1.Stats["links_lldp"])
-	require.Equal(t, 0, step1.Stats["links_cdp"])
+	require.Equal(t, 2, step1.Stats.LinksLLDP)
+	require.Equal(t, 0, step1.Stats.LinksCDP)
 	require.Equal(t, 1, countFixturesWithLLDPLocalElements(allWalks))
 	require.Equal(t, map[string]int{"SW_D6_01_M": 2}, countAdjacenciesBySource(step1.Adjacencies, "lldp"))
 
@@ -1812,8 +1812,8 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_MICROSENS_SW02(t *testing.T) {
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
 	require.Len(t, step1.Adjacencies, 2)
-	require.Equal(t, 2, step1.Stats["links_lldp"])
-	require.Equal(t, 0, step1.Stats["links_cdp"])
+	require.Equal(t, 2, step1.Stats.LinksLLDP)
+	require.Equal(t, 0, step1.Stats.LinksCDP)
 	require.Equal(t, 1, countFixturesWithLLDPLocalElements(allWalks))
 	require.Equal(t, map[string]int{"SW_D6_02_M": 2}, countAdjacenciesBySource(step1.Adjacencies, "lldp"))
 
@@ -1853,8 +1853,8 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_MICROSENS_SW03(t *testing.T) {
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
 	require.Len(t, step1.Adjacencies, 1)
-	require.Equal(t, 1, step1.Stats["links_lldp"])
-	require.Equal(t, 0, step1.Stats["links_cdp"])
+	require.Equal(t, 1, step1.Stats.LinksLLDP)
+	require.Equal(t, 0, step1.Stats.LinksCDP)
 	require.Equal(t, 1, countFixturesWithLLDPLocalElements(allWalks))
 	require.Equal(t, map[string]int{"SW_D6_03_M": 1}, countAdjacenciesBySource(step1.Adjacencies, "lldp"))
 
@@ -1893,8 +1893,8 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_MICROSENS_SW04(t *testing.T) {
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
 	require.Len(t, step1.Adjacencies, 4)
-	require.Equal(t, 4, step1.Stats["links_lldp"])
-	require.Equal(t, 0, step1.Stats["links_cdp"])
+	require.Equal(t, 4, step1.Stats.LinksLLDP)
+	require.Equal(t, 0, step1.Stats.LinksCDP)
 	require.Equal(t, 1, countFixturesWithLLDPLocalElements(allWalks))
 	require.Equal(t, map[string]int{"SW_D6_04_M": 4}, countAdjacenciesBySource(step1.Adjacencies, "lldp"))
 
@@ -1936,8 +1936,8 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_MICROSENS_SW08(t *testing.T) {
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
 	require.Len(t, step1.Adjacencies, 3)
-	require.Equal(t, 3, step1.Stats["links_lldp"])
-	require.Equal(t, 0, step1.Stats["links_cdp"])
+	require.Equal(t, 3, step1.Stats.LinksLLDP)
+	require.Equal(t, 0, step1.Stats.LinksCDP)
 	require.Equal(t, 1, countFixturesWithLLDPLocalElements(allWalks))
 	require.Equal(t, map[string]int{"SW_D6_08_M": 3}, countAdjacenciesBySource(step1.Adjacencies, "lldp"))
 
@@ -1978,8 +1978,8 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_MICROSENS_SW09(t *testing.T) {
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
 	require.Len(t, step1.Adjacencies, 7)
-	require.Equal(t, 7, step1.Stats["links_lldp"])
-	require.Equal(t, 0, step1.Stats["links_cdp"])
+	require.Equal(t, 7, step1.Stats.LinksLLDP)
+	require.Equal(t, 0, step1.Stats.LinksCDP)
 	require.Equal(t, 1, countFixturesWithLLDPLocalElements(allWalks))
 	require.Equal(t, map[string]int{"SW_D6_09_M": 7}, countAdjacenciesBySource(step1.Adjacencies, "lldp"))
 
@@ -2029,8 +2029,8 @@ func TestBuildL2ResultFromWalks_CDP_NMS7467(t *testing.T) {
 	final, buildErr := BuildL2ResultFromWalks(walks, BuildOptions{EnableCDP: true})
 	require.NoError(t, buildErr)
 	require.Len(t, final.Adjacencies, 5)
-	require.Equal(t, 5, final.Stats["links_cdp"])
-	require.Equal(t, 0, final.Stats["links_lldp"])
+	require.Equal(t, 5, final.Stats.LinksCDP)
+	require.Equal(t, 0, final.Stats.LinksLLDP)
 	require.Equal(t, map[string]int{"ciscoswitch": 5}, countAdjacenciesBySource(final.Adjacencies, "cdp"))
 
 	for _, adj := range final.Adjacencies {
@@ -2087,8 +2087,8 @@ func TestBuildL2ResultFromWalks_MIXED_NMS7563_CISCO01(t *testing.T) {
 	require.NoError(t, buildErr)
 	require.Len(t, final.Devices, 2)
 	require.Len(t, final.Adjacencies, 1)
-	require.Equal(t, 1, final.Stats["links_lldp"])
-	require.Equal(t, 0, final.Stats["links_cdp"])
+	require.Equal(t, 1, final.Stats.LinksLLDP)
+	require.Equal(t, 0, final.Stats.LinksCDP)
 	require.Equal(t, 1, countFixturesWithLLDPLocalElements(walks))
 	require.Equal(t, 0, countBidirectionalPairs(final.Adjacencies, "lldp"))
 
@@ -2142,8 +2142,8 @@ func TestBuildL2ResultFromWalks_LLDP_NMS7563_HOMESERVER(t *testing.T) {
 	require.NoError(t, buildErr)
 	require.Len(t, final.Devices, 2)
 	require.Len(t, final.Adjacencies, 1)
-	require.Equal(t, 1, final.Stats["links_lldp"])
-	require.Equal(t, 0, final.Stats["links_cdp"])
+	require.Equal(t, 1, final.Stats.LinksLLDP)
+	require.Equal(t, 0, final.Stats.LinksCDP)
 	require.Equal(t, 1, countFixturesWithLLDPLocalElements(walks))
 
 	deviceByID := make(map[string]l2topology.Device, len(final.Devices))
@@ -2202,8 +2202,8 @@ func TestBuildL2ResultFromWalks_CDP_NMS7563_SWITCH02(t *testing.T) {
 	require.NoError(t, buildErr)
 	require.Len(t, final.Devices, 3)
 	require.Len(t, final.Adjacencies, 3)
-	require.Equal(t, 3, final.Stats["links_cdp"])
-	require.Equal(t, 0, final.Stats["links_lldp"])
+	require.Equal(t, 3, final.Stats.LinksCDP)
+	require.Equal(t, 0, final.Stats.LinksLLDP)
 	require.Equal(t, map[string]int{"switch02": 3}, countAdjacenciesBySource(final.Adjacencies, "cdp"))
 
 	deviceByID := make(map[string]l2topology.Device, len(final.Devices))
@@ -2279,8 +2279,8 @@ func TestBuildL2ResultFromWalks_LLDP_NMS7777DW_NO_LINKS(t *testing.T) {
 	final := step1
 	require.Len(t, final.Devices, 1)
 	require.Len(t, final.Adjacencies, 0)
-	require.Equal(t, 0, final.Stats["links_lldp"])
-	require.Equal(t, 0, final.Stats["links_cdp"])
+	require.Equal(t, 0, final.Stats.LinksLLDP)
+	require.Equal(t, 0, final.Stats.LinksCDP)
 	require.Equal(t, 0, countBidirectionalPairs(final.Adjacencies, "lldp"))
 
 	golden, err := LoadGoldenYAML(resolved.GoldenYAML)
@@ -2341,7 +2341,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS13923(t *testing.T) {
 
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
-	require.Equal(t, 49, step1.Stats["links_lldp"])
+	require.Equal(t, 49, step1.Stats.LinksLLDP)
 	require.Len(t, step1.Adjacencies, 49)
 	require.Equal(t, 0, countBidirectionalPairs(step1.Adjacencies, "lldp"))
 
@@ -2391,12 +2391,12 @@ func TestBuildL2ResultFromWalks_LLDP_NMS13593(t *testing.T) {
 
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep1)
-	require.Equal(t, 3, step1.Stats["links_lldp"])
+	require.Equal(t, 3, step1.Stats.LinksLLDP)
 	require.Len(t, step1.Adjacencies, 3)
 
 	step2, errStep2 := buildResultFromScenarioPrefix(resolved, 2, BuildOptions{EnableLLDP: true})
 	require.NoError(t, errStep2)
-	require.Equal(t, 7, step2.Stats["links_lldp"])
+	require.Equal(t, 7, step2.Stats.LinksLLDP)
 	require.Len(t, step2.Adjacencies, 7)
 	require.Equal(t, 0, countBidirectionalPairs(step2.Adjacencies, "lldp"))
 
@@ -2573,7 +2573,7 @@ func TestBuildL2ResultFromWalks_FDB(t *testing.T) {
 	require.Equal(t, "7", attachment.Labels["bridge_port"])
 	require.Equal(t, "learned", attachment.Labels["fdb_status"])
 	require.Equal(t, "Port3", attachment.Labels["if_name"])
-	require.Equal(t, 1, result.Stats["attachments_fdb"])
+	require.Equal(t, 1, result.Stats.AttachmentsFDB)
 }
 
 func TestBuildL2ResultFromWalks_ARPEnrichment(t *testing.T) {
@@ -2607,7 +2607,7 @@ func TestBuildL2ResultFromWalks_ARPEnrichment(t *testing.T) {
 	require.Equal(t, "Port3", enrichment.Labels["if_names"])
 	require.Equal(t, "dynamic", enrichment.Labels["states"])
 	require.Equal(t, "ipv4", enrichment.Labels["addr_types"])
-	require.Equal(t, 1, result.Stats["enrichments_arp_nd"])
+	require.Equal(t, 1, result.Stats.EnrichmentsARPND)
 }
 
 func TestParseCDPInterfaceGetter_NMS0002_RPICT001(t *testing.T) {
@@ -2840,7 +2840,7 @@ func TestBuildL2ResultFromWalks_ARP_NMS102(t *testing.T) {
 	require.Empty(t, result.Adjacencies)
 	require.Empty(t, result.Attachments)
 	require.Len(t, result.Enrichments, 6)
-	require.Equal(t, 6, result.Stats["enrichments_arp_nd"])
+	require.Equal(t, 6, result.Stats.EnrichmentsARPND)
 
 	expectedByIP := map[string]struct {
 		endpointID string
@@ -2977,7 +2977,7 @@ func TestBuildL2ResultFromWalks_FDB_NMS4930(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, result.Adjacencies)
 	require.Len(t, result.Attachments, 17)
-	require.Equal(t, 17, result.Stats["attachments_fdb"])
+	require.Equal(t, 17, result.Stats.AttachmentsFDB)
 
 	expectedPortByEndpoint := map[string]int{
 		"mac:00:0c:29:dc:c0:76": 24,
@@ -3042,7 +3042,7 @@ func TestBuildL2ResultFromWalks_BRIDGE_NMS4930_DLINK1(t *testing.T) {
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableBridge: true})
 	require.NoError(t, errStep1)
 	require.Empty(t, step1.Adjacencies)
-	require.Equal(t, 17, step1.Stats["attachments_fdb"])
+	require.Equal(t, 17, step1.Stats.AttachmentsFDB)
 	require.Len(t, step1.Attachments, 17)
 }
 
@@ -3076,7 +3076,7 @@ func TestBuildL2ResultFromWalks_BRIDGE_NMS4930_DLINK2(t *testing.T) {
 	step1, errStep1 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableBridge: true})
 	require.NoError(t, errStep1)
 	require.Empty(t, step1.Adjacencies)
-	require.Equal(t, 11, step1.Stats["attachments_fdb"])
+	require.Equal(t, 11, step1.Stats.AttachmentsFDB)
 	require.Len(t, step1.Attachments, 11)
 }
 
@@ -3127,25 +3127,25 @@ func TestBuildL2ResultFromWalks_BRIDGE_NMS7918_ASW01(t *testing.T) {
 	require.NoError(t, errStep1)
 	require.Len(t, step1.Devices, 1)
 	require.Empty(t, step1.Adjacencies)
-	require.Equal(t, 0, step1.Stats["links_lldp"])
+	require.Equal(t, 0, step1.Stats.LinksLLDP)
 	require.Len(t, step1.Attachments, 40)
-	require.Equal(t, 40, step1.Stats["attachments_fdb"])
+	require.Equal(t, 40, step1.Stats.AttachmentsFDB)
 
 	step2, errStep2 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableBridge: true})
 	require.NoError(t, errStep2)
 	require.Len(t, step2.Devices, 1)
 	require.Empty(t, step2.Adjacencies)
-	require.Equal(t, 0, step2.Stats["links_lldp"])
+	require.Equal(t, 0, step2.Stats.LinksLLDP)
 	require.Len(t, step2.Attachments, 40)
-	require.Equal(t, 40, step2.Stats["attachments_fdb"])
+	require.Equal(t, 40, step2.Stats.AttachmentsFDB)
 
 	step3, errStep3 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableBridge: true})
 	require.NoError(t, errStep3)
 	require.Len(t, step3.Devices, 1)
 	require.Empty(t, step3.Adjacencies)
-	require.Equal(t, 0, step3.Stats["links_lldp"])
+	require.Equal(t, 0, step3.Stats.LinksLLDP)
 	require.Len(t, step3.Attachments, 40)
-	require.Equal(t, 40, step3.Stats["attachments_fdb"])
+	require.Equal(t, 40, step3.Stats.AttachmentsFDB)
 
 	golden, err := LoadGoldenYAML(resolved.GoldenYAML)
 	require.NoError(t, err)
@@ -3183,25 +3183,25 @@ func TestBuildL2ResultFromWalks_BRIDGE_NMS7918_SAMASW01(t *testing.T) {
 	require.NoError(t, errStep1)
 	require.Len(t, step1.Devices, 1)
 	require.Empty(t, step1.Adjacencies)
-	require.Equal(t, 0, step1.Stats["links_lldp"])
+	require.Equal(t, 0, step1.Stats.LinksLLDP)
 	require.Len(t, step1.Attachments, 22)
-	require.Equal(t, 22, step1.Stats["attachments_fdb"])
+	require.Equal(t, 22, step1.Stats.AttachmentsFDB)
 
 	step2, errStep2 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableBridge: true})
 	require.NoError(t, errStep2)
 	require.Len(t, step2.Devices, 1)
 	require.Empty(t, step2.Adjacencies)
-	require.Equal(t, 0, step2.Stats["links_lldp"])
+	require.Equal(t, 0, step2.Stats.LinksLLDP)
 	require.Len(t, step2.Attachments, 22)
-	require.Equal(t, 22, step2.Stats["attachments_fdb"])
+	require.Equal(t, 22, step2.Stats.AttachmentsFDB)
 
 	step3, errStep3 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableBridge: true})
 	require.NoError(t, errStep3)
 	require.Len(t, step3.Devices, 1)
 	require.Empty(t, step3.Adjacencies)
-	require.Equal(t, 0, step3.Stats["links_lldp"])
+	require.Equal(t, 0, step3.Stats.LinksLLDP)
 	require.Len(t, step3.Attachments, 22)
-	require.Equal(t, 22, step3.Stats["attachments_fdb"])
+	require.Equal(t, 22, step3.Stats.AttachmentsFDB)
 
 	golden, err := LoadGoldenYAML(resolved.GoldenYAML)
 	require.NoError(t, err)
@@ -3239,25 +3239,25 @@ func TestBuildL2ResultFromWalks_BRIDGE_NMS7918_STCASW01(t *testing.T) {
 	require.NoError(t, errStep1)
 	require.Len(t, step1.Devices, 1)
 	require.Empty(t, step1.Adjacencies)
-	require.Equal(t, 0, step1.Stats["links_lldp"])
+	require.Equal(t, 0, step1.Stats.LinksLLDP)
 	require.Len(t, step1.Attachments, 34)
-	require.Equal(t, 34, step1.Stats["attachments_fdb"])
+	require.Equal(t, 34, step1.Stats.AttachmentsFDB)
 
 	step2, errStep2 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableBridge: true})
 	require.NoError(t, errStep2)
 	require.Len(t, step2.Devices, 1)
 	require.Empty(t, step2.Adjacencies)
-	require.Equal(t, 0, step2.Stats["links_lldp"])
+	require.Equal(t, 0, step2.Stats.LinksLLDP)
 	require.Len(t, step2.Attachments, 34)
-	require.Equal(t, 34, step2.Stats["attachments_fdb"])
+	require.Equal(t, 34, step2.Stats.AttachmentsFDB)
 
 	step3, errStep3 := buildResultFromScenarioPrefix(resolved, 1, BuildOptions{EnableBridge: true})
 	require.NoError(t, errStep3)
 	require.Len(t, step3.Devices, 1)
 	require.Empty(t, step3.Adjacencies)
-	require.Equal(t, 0, step3.Stats["links_lldp"])
+	require.Equal(t, 0, step3.Stats.LinksLLDP)
 	require.Len(t, step3.Attachments, 34)
-	require.Equal(t, 34, step3.Stats["attachments_fdb"])
+	require.Equal(t, 34, step3.Stats.AttachmentsFDB)
 
 	golden, err := LoadGoldenYAML(resolved.GoldenYAML)
 	require.NoError(t, err)
@@ -3300,7 +3300,7 @@ func TestBuildL2ResultFromWalks_ARP_NMS7918_OSPWL01(t *testing.T) {
 	require.Empty(t, step1.Adjacencies)
 	require.Empty(t, step1.Attachments)
 	require.Len(t, step1.Enrichments, 1)
-	require.Equal(t, 1, step1.Stats["enrichments_arp_nd"])
+	require.Equal(t, 1, step1.Stats.EnrichmentsARPND)
 
 	enrichment := step1.Enrichments[0]
 	require.Equal(t, "00:13:19:bd:b4:40", enrichment.MAC)
@@ -3351,7 +3351,7 @@ func TestBuildL2ResultFromWalks_ARP_NMS7918_OSPESS01(t *testing.T) {
 	require.Empty(t, step1.Adjacencies)
 	require.Empty(t, step1.Attachments)
 	require.Len(t, step1.Enrichments, 4)
-	require.Equal(t, 4, step1.Stats["enrichments_arp_nd"])
+	require.Equal(t, 4, step1.Stats.EnrichmentsARPND)
 	require.Equal(t, 5, countEnrichmentIPs(step1.Enrichments))
 
 	byMAC := enrichmentByMAC(step1.Enrichments)
@@ -3416,7 +3416,7 @@ func TestBuildL2ResultFromWalks_ARP_NMS7918_PE01(t *testing.T) {
 	require.Empty(t, step1.Adjacencies)
 	require.Empty(t, step1.Attachments)
 	require.Len(t, step1.Enrichments, 37)
-	require.Equal(t, 37, step1.Stats["enrichments_arp_nd"])
+	require.Equal(t, 37, step1.Stats.EnrichmentsARPND)
 	require.Equal(t, 113, countEnrichmentIPs(step1.Enrichments))
 
 	byMAC := enrichmentByMAC(step1.Enrichments)

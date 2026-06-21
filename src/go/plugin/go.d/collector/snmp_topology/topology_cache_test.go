@@ -3,6 +3,8 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"slices"
 	"sort"
 	"strings"
@@ -11,6 +13,7 @@ import (
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -103,9 +106,9 @@ func TestTopologyCache_LldpSnapshot(t *testing.T) {
 	link := data.Links[0]
 	assert.Equal(t, "lldp", link.Protocol)
 	assert.Equal(t, "unidirectional", link.Direction)
-	assert.Equal(t, "Gi0/1", link.Src.Attributes["port_id"])
-	assert.Equal(t, "Gi0/2", link.Dst.Attributes["port_id"])
-	assert.Equal(t, "sw2", link.Dst.Attributes["sys_name"])
+	assert.Equal(t, "Gi0/1", link.Src.PortID)
+	assert.Equal(t, "Gi0/2", link.Dst.PortID)
+	assert.Equal(t, "sw2", link.Dst.SysName)
 }
 
 func TestTopologyCache_CdpSnapshot(t *testing.T) {
@@ -134,8 +137,8 @@ func TestTopologyCache_CdpSnapshot(t *testing.T) {
 	require.Len(t, data.Links, 1)
 	assert.Equal(t, "cdp", data.Links[0].Protocol)
 	assert.Equal(t, "unidirectional", data.Links[0].Direction)
-	assert.Equal(t, "Gi0/2", data.Links[0].Src.Attributes["if_name"])
-	assert.Equal(t, "Gi0/3", data.Links[0].Dst.Attributes["port_id"])
+	assert.Equal(t, "Gi0/2", data.Links[0].Src.IfName)
+	assert.Equal(t, "Gi0/3", data.Links[0].Dst.PortID)
 }
 
 func TestTopologyCache_UpdateTopologyProfileTags_STPBridgeAddressSetsSNMPIdentity(t *testing.T) {
@@ -306,7 +309,7 @@ func TestTopologyCache_CdpSnapshotHexAddress(t *testing.T) {
 	require.Len(t, data.Links, 1)
 	assert.Equal(t, "cdp", data.Links[0].Protocol)
 	assert.Equal(t, "unidirectional", data.Links[0].Direction)
-	assert.True(t, linkHasRawAddressMetric(data.Links[0], "0a000003"))
+	assert.True(t, linkHasRawAddressHint(data.Links[0], "0a000003"))
 
 	remote := findDeviceActorBySysName(data, "sw3")
 	require.NotNil(t, remote)
@@ -353,7 +356,7 @@ func TestTopologyCache_CdpSnapshotRawAddressWithoutIP(t *testing.T) {
 	require.Len(t, data.Links, 1)
 	assert.Equal(t, "cdp", data.Links[0].Protocol)
 	assert.Equal(t, "unidirectional", data.Links[0].Direction)
-	assert.True(t, linkHasRawAddressMetric(data.Links[0], "edge-sw3.mgmt.local"))
+	assert.True(t, linkHasRawAddressHint(data.Links[0], "edge-sw3.mgmt.local"))
 }
 
 func TestTopologyCache_SnapshotBidirectionalPairMetadata(t *testing.T) {
@@ -423,9 +426,10 @@ func TestTopologyCache_SnapshotBidirectionalPairMetadata(t *testing.T) {
 	link := data.Links[0]
 	require.Equal(t, "lldp", link.Protocol)
 	require.Equal(t, "bidirectional", link.Direction)
-	require.Equal(t, true, link.Metrics["pair_consistent"])
-	require.Equal(t, 1, data.Stats["links_bidirectional"])
-	require.Equal(t, 0, data.Stats["links_unidirectional"])
+	require.NotNil(t, link.L2)
+	require.True(t, link.L2.PairConsistent)
+	require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["links_bidirectional"])
+	require.Equal(t, 0, topologyStatsToV1ForTest(t, data.Stats)["links_unidirectional"])
 }
 
 func TestTopologyCache_SnapshotMergesRemoteIdentityAcrossProtocols(t *testing.T) {
@@ -563,8 +567,8 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 
 	require.True(t, ok)
 	require.Greater(t, len(data.Actors), 1)
-	require.True(t, actorHasAttributeList(data, "management_addresses"))
-	require.True(t, actorHasAttributeList(data, "capabilities_enabled"))
+	require.True(t, actorHasManagementAddresses(data))
+	require.True(t, actorHasCapabilitiesEnabled(data))
 	require.True(t, containsMgmtAddr(data, map[string]struct{}{
 		"10.0.0.2":              {},
 		"10.20.4.21":            {},
@@ -648,8 +652,8 @@ func TestTopologyCache_FDBAndARPEnrichment(t *testing.T) {
 	require.NotNil(t, ep)
 	assert.Equal(t, "endpoint", ep.ActorType)
 	assert.Contains(t, ep.Match.IPAddresses, "10.20.4.84")
-	assert.Equal(t, "single_port_mac", ep.Attributes["attachment_source"])
-	assert.Equal(t, "Port3", ep.Attributes["attached_port"])
+	assert.Equal(t, "single_port_mac", ep.Detail.L2.Endpoint.AttachmentSource)
+	assert.Equal(t, "Port3", ep.Detail.L2.Endpoint.AttachedPort)
 }
 
 func TestTopologyCache_Dot1qVLANEnrichment(t *testing.T) {
@@ -1109,7 +1113,7 @@ func TestTopologyCache_SnapshotDeterministicOrdering(t *testing.T) {
 
 	actorOrder := make([]string, 0, len(data.Actors))
 	for _, actor := range data.Actors {
-		actorOrder = append(actorOrder, actor.ActorType+"|"+canonicalMatchKey(actor.Match))
+		actorOrder = append(actorOrder, actor.ActorType+"|"+topologymodel.CanonicalMatchKey(actor.Match))
 	}
 	expectedActorOrder := append([]string(nil), actorOrder...)
 	sort.Strings(expectedActorOrder)
@@ -1117,7 +1121,7 @@ func TestTopologyCache_SnapshotDeterministicOrdering(t *testing.T) {
 
 	linkOrder := make([]string, 0, len(data.Links))
 	for _, link := range data.Links {
-		linkOrder = append(linkOrder, topologyLinkSortKey(link))
+		linkOrder = append(linkOrder, topologymodel.LinkSortKey(link))
 	}
 	expectedLinkOrder := append([]string(nil), linkOrder...)
 	sort.Strings(expectedLinkOrder)
@@ -1142,18 +1146,18 @@ func TestTopologyObservationIdentityResolver_ReusesStableRemoteIdentityAcrossSig
 }
 
 func TestDecodePrintableASCII_HumanReadableHex(t *testing.T) {
-	bs, err := decodeHexString("766d7831")
+	bs, err := topologyutil.DecodeHexString("766d7831")
 	require.NoError(t, err)
 
-	decoded := decodePrintableASCII(bs)
+	decoded := topologyutil.DecodePrintableASCII(bs)
 	require.Equal(t, "vmx1", decoded)
 }
 
 func TestDecodePrintableASCII_HexValueIsNotNumeric(t *testing.T) {
-	bs, err := decodeHexString("766d7831")
+	bs, err := topologyutil.DecodeHexString("766d7831")
 	require.NoError(t, err)
 
-	decoded := decodePrintableASCII(bs)
+	decoded := topologyutil.DecodePrintableASCII(bs)
 	assert.NotRegexp(t, "^[0-9]+$", decoded)
 }
 
@@ -1349,6 +1353,72 @@ func TestTopologyCache_IngestTopologyProfileMetrics_IncludesTopologyMetrics(t *t
 	require.Empty(t, cache.localDevice.Labels["sys_uptime"])
 }
 
+func TestTopologyCache_IngestTopologyBGPPeers_IncludesOnlyPeerRows(t *testing.T) {
+	established := int64(300)
+	cache := newTopologyCache()
+
+	cache.ingestTopologyBGPPeers([]*ddsnmp.ProfileMetrics{
+		{
+			BGPRows: []ddsnmp.BGPRow{
+				{
+					Kind:         ddprofiledefinition.BGPRowKindPeer,
+					StructuralID: "peer-1",
+					Identity: ddsnmp.BGPIdentity{
+						RoutingInstance: "blue",
+						Neighbor:        "192.0.2.2",
+						RemoteAS:        "65002",
+					},
+					Descriptors: ddsnmp.BGPDescriptors{
+						LocalAddress:    "192.0.2.1",
+						LocalAS:         "65001",
+						LocalIdentifier: "1.1.1.1",
+						PeerIdentifier:  "2.2.2.2",
+						PeerType:        "external",
+						BGPVersion:      "4",
+						Description:     "edge-peer",
+					},
+					Admin: ddsnmp.BGPAdmin{
+						Enabled: ddsnmp.BGPBool{Has: true, Value: true},
+					},
+					State: ddsnmp.BGPState{
+						Has:   true,
+						State: ddprofiledefinition.BGPPeerStateEstablished,
+					},
+					Connection: ddsnmp.BGPConnection{
+						EstablishedUptime: ddsnmp.BGPInt64{Has: true, Value: established},
+					},
+				},
+				{
+					Kind: ddprofiledefinition.BGPRowKindPeerFamily,
+					Identity: ddsnmp.BGPIdentity{
+						Neighbor:                "192.0.2.2",
+						RemoteAS:                "65002",
+						AddressFamily:           ddprofiledefinition.BGPAddressFamilyIPv4,
+						SubsequentAddressFamily: ddprofiledefinition.BGPSubsequentAddressFamilyUnicast,
+					},
+				},
+			},
+		},
+	})
+
+	require.Len(t, cache.bgpPeersByKey, 1)
+	peer := cache.bgpPeersByKey["peer-1"]
+	require.Equal(t, "blue", peer.RoutingInstance)
+	require.Equal(t, "192.0.2.2", peer.NeighborIP)
+	require.Equal(t, "65002", peer.RemoteAS)
+	require.Equal(t, "192.0.2.1", peer.LocalIP)
+	require.Equal(t, "65001", peer.LocalAS)
+	require.Equal(t, "1.1.1.1", peer.LocalIdentifier)
+	require.Equal(t, "2.2.2.2", peer.PeerIdentifier)
+	require.Equal(t, "external", peer.PeerType)
+	require.Equal(t, "4", peer.BGPVersion)
+	require.Equal(t, "edge-peer", peer.Description)
+	require.Equal(t, "enabled", peer.AdminStatus)
+	require.Equal(t, "established", peer.State)
+	require.NotNil(t, peer.EstablishedUptime)
+	require.Equal(t, established, *peer.EstablishedUptime)
+}
+
 func TestBuildLocalTopologyDevice_MapsVersionToSoftwareOnly(t *testing.T) {
 	dev := ddsnmp.DeviceConnectionInfo{
 		Hostname:  "10.0.0.2",
@@ -1374,15 +1444,19 @@ func TestAugmentLocalActorFromCache_InjectsIdentityFields(t *testing.T) {
 					ChassisIDs:  []string{"00:11:22:33:44:55"},
 					IPAddresses: []string{"10.0.0.1"},
 				},
-				Attributes: map[string]any{
-					"vendor_derived":              "Acme Derived",
-					"vendor_derived_source":       "mac_oui",
-					"vendor_derived_confidence":   "low",
-					"vendor_derived_match_prefix": "00:11:22",
-					"if_statuses": []map[string]any{
-						{
-							"if_index": 1,
-							"if_name":  "swp07",
+				Detail: topologyActorDetail{
+					L2: topologyengine.ProjectionActorDetail{
+						Device: topologyengine.ProjectionDeviceActorDetail{
+							VendorDerived:            "Acme Derived",
+							VendorDerivedSource:      "mac_oui",
+							VendorDerivedConfidence:  "low",
+							VendorDerivedMatchPrefix: "00:11:22",
+							Ports: []topologyengine.ProjectionPortDetail{
+								{
+									IfIndex: topologyengine.OptionalValue[int]{Value: 1, Has: true},
+									IfName:  "swp07",
+								},
+							},
 						},
 					},
 				},
@@ -1421,60 +1495,49 @@ func TestAugmentLocalActorFromCache_InjectsIdentityFields(t *testing.T) {
 
 	actor := findDeviceActorBySysName(data, "sw1")
 	require.NotNil(t, actor)
-	require.Equal(t, "Switch 1", actor.Attributes["sys_descr"])
-	require.Equal(t, "ops@example.net", actor.Attributes["sys_contact"])
-	require.Equal(t, "dc1", actor.Attributes["sys_location"])
-	require.EqualValues(t, 987654, actor.Attributes["sys_uptime"])
-	require.Equal(t, "Cisco", actor.Attributes["vendor"])
-	require.Equal(t, "snmp", actor.Attributes["vendor_source"])
-	require.Equal(t, "high", actor.Attributes["vendor_confidence"])
-	require.Equal(t, "Acme Derived", actor.Attributes["vendor_derived"])
-	require.Equal(t, "mac_oui", actor.Attributes["vendor_derived_source"])
-	require.Equal(t, "low", actor.Attributes["vendor_derived_confidence"])
-	require.Equal(t, "00:11:22", actor.Attributes["vendor_derived_match_prefix"])
-	require.Equal(t, "C9300-24T", actor.Attributes["model"])
-	require.Equal(t, "SN-12345", actor.Attributes["serial_number"])
-	require.Equal(t, "17.9.4", actor.Attributes["software_version"])
-	require.Equal(t, "1.2.3", actor.Attributes["firmware_version"])
-	require.Equal(t, "A1", actor.Attributes["hardware_version"])
-	require.Equal(t, "11111111-1111-1111-1111-111111111111", actor.Attributes["netdata_host_id"])
-	require.Equal(t, topologyProfileChartIDPrefix, actor.Attributes["chart_id_prefix"])
-	require.Equal(t, topologyProfileChartContextPrefix, actor.Attributes["chart_context_prefix"])
-
-	deviceCharts, ok := actor.Attributes["device_charts"].(map[string]any)
-	require.True(t, ok)
-	require.Equal(t, "ping_rtt", deviceCharts["ping_rtt"])
-
-	statuses, ok := actor.Attributes["if_statuses"].([]map[string]any)
-	require.True(t, ok)
-	require.Len(t, statuses, 1)
-	require.Equal(t, "swp07", statuses[0]["chart_id_suffix"])
-	require.Equal(t, []string{"ifErrors", "ifTraffic"}, statuses[0]["available_metrics"])
+	require.Equal(t, "Switch 1", actor.Detail.SNMP.SysDescr)
+	require.Equal(t, "ops@example.net", actor.Detail.SNMP.SysContact)
+	require.Equal(t, "dc1", actor.Detail.SNMP.SysLocation)
+	require.EqualValues(t, 987654, actor.Detail.SNMP.SysUptime)
+	require.Equal(t, "Cisco", actor.Detail.SNMP.Vendor)
+	require.Equal(t, "snmp", actor.Detail.SNMP.VendorSource)
+	require.Equal(t, "high", actor.Detail.SNMP.VendorConfidence)
+	require.Equal(t, "Acme Derived", actor.Detail.L2.Device.VendorDerived)
+	require.Equal(t, "mac_oui", actor.Detail.L2.Device.VendorDerivedSource)
+	require.Equal(t, "low", actor.Detail.L2.Device.VendorDerivedConfidence)
+	require.Equal(t, "00:11:22", actor.Detail.L2.Device.VendorDerivedMatchPrefix)
+	require.Equal(t, "C9300-24T", actor.Detail.SNMP.Model)
+	require.Equal(t, "SN-12345", actor.Detail.SNMP.SerialNumber)
+	require.Equal(t, "17.9.4", actor.Detail.SNMP.SoftwareVersion)
+	require.Equal(t, "1.2.3", actor.Detail.SNMP.FirmwareVersion)
+	require.Equal(t, "A1", actor.Detail.SNMP.HardwareVersion)
+	require.Equal(t, "11111111-1111-1111-1111-111111111111", actor.Detail.SNMP.NetdataHostID)
+	require.Equal(t, topologyProfileChartIDPrefix, actor.Detail.SNMP.ChartIDPrefix)
+	require.Equal(t, topologyProfileChartContextPrefix, actor.Detail.SNMP.ChartContextPrefix)
+	require.Equal(t, map[string]string{"ping_rtt": "ping_rtt"}, actor.Detail.SNMP.DeviceCharts)
+	require.Len(t, actor.Detail.L2.Device.Ports, 1)
+	require.Equal(t, "swp07", actor.Detail.L2.Device.Ports[0].ChartIDSuffix)
+	require.Equal(t, []string{"ifErrors", "ifTraffic"}, actor.Detail.L2.Device.Ports[0].AvailableMetrics)
 }
 
-func actorHasAttributeList(snapshot topologyData, key string) bool {
+func actorHasManagementAddresses(snapshot topologyData) bool {
 	for _, actor := range snapshot.Actors {
-		if actor.Attributes == nil {
-			continue
+		if len(actor.Detail.SNMP.ManagementAddresses) > 0 {
+			return true
 		}
-		value, ok := actor.Attributes[key]
-		if !ok || value == nil {
-			continue
+		if len(actor.Detail.L2.Device.ManagementAddresses) > 0 {
+			return true
 		}
-		switch v := value.(type) {
-		case []string:
-			if len(v) > 0 {
-				return true
-			}
-		case []topologyManagementAddress:
-			if len(v) > 0 {
-				return true
-			}
-		case []any:
-			if len(v) > 0 {
-				return true
-			}
-		default:
+	}
+	return false
+}
+
+func actorHasCapabilitiesEnabled(snapshot topologyData) bool {
+	for _, actor := range snapshot.Actors {
+		if len(actor.Detail.SNMP.CapabilitiesEnabled) > 0 {
+			return true
+		}
+		if len(actor.Detail.L2.Device.CapabilitiesEnabled) > 0 {
 			return true
 		}
 	}
@@ -1513,17 +1576,12 @@ func containsString(values []string, target string) bool {
 	return slices.Contains(values, target)
 }
 
-func linkHasRawAddressMetric(link topologyLink, raw string) bool {
+func linkHasRawAddressHint(link topologyLink, raw string) bool {
 	raw = strings.TrimSpace(raw)
-	if raw == "" || len(link.Metrics) == 0 {
+	if raw == "" {
 		return false
 	}
-	if value, ok := link.Metrics["remote_address_raw"].(string); ok && value == raw {
-		return true
-	}
-	srcRaw, srcOK := link.Metrics["src_remote_address_raw"].(string)
-	dstRaw, dstOK := link.Metrics["dst_remote_address_raw"].(string)
-	return (srcOK && srcRaw == raw) || (dstOK && dstRaw == raw)
+	return containsString(link.Src.Match.IPAddresses, raw) || containsString(link.Dst.Match.IPAddresses, raw)
 }
 
 func findDeviceActorBySysName(snapshot topologyData, sysName string) *topologyActor {

@@ -6,6 +6,8 @@ import (
 	"net/netip"
 	"strings"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
 // GraphOptions controls conversion from Result to the internal graph projection.
@@ -53,9 +55,14 @@ type endpointActorAccumulator struct {
 	ifNames    map[string]struct{}
 }
 
+type projectedActor struct {
+	Actor  graph.Actor
+	Detail ProjectionActorDetail
+}
+
 type projectedSegments struct {
-	actors                        []Actor
-	links                         []Link
+	actors                        []projectedActor
+	links                         []graph.Link
 	linksFdb                      int
 	bidirectionalCount            int
 	endpointLinksCandidates       int
@@ -113,7 +120,7 @@ type topologyDevicePortStatus struct {
 	RoleSources    []string
 	FDBMACCount    int
 	STPState       string
-	VLANs          []map[string]any
+	VLANs          []ProjectionPortVLAN
 	Neighbors      []topologyPortNeighborStatus
 }
 
@@ -130,10 +137,10 @@ type topologyDeviceInterfaceSummary struct {
 	portsTotal        int
 	ifIndexes         []string
 	ifNames           []string
-	adminStatusCount  map[string]any
-	operStatusCount   map[string]any
-	linkModeCount     map[string]any
-	roleCount         map[string]any
+	adminStatusCount  map[string]int
+	operStatusCount   map[string]int
+	linkModeCount     map[string]int
+	roleCount         map[string]int
 	portsUp           int
 	portsDown         int
 	portsAdminDown    int
@@ -142,7 +149,7 @@ type topologyDeviceInterfaceSummary struct {
 	vlanCount         int
 	lldpNeighborCount int
 	cdpNeighborCount  int
-	portStatuses      []map[string]any
+	portStatuses      []ProjectionPortDetail
 }
 
 type topologyDevicePortEvidence struct {
@@ -220,7 +227,7 @@ func topologyInferenceStrategyConfigFor(strategy string) topologyInferenceStrate
 }
 
 // ToGraph converts an engine result to the internal graph projection.
-func ToGraph(result Result, opts GraphOptions) Graph {
+func ToGraph(result Result, opts GraphOptions) Projection {
 	builder := newGraphBuilder(result, opts)
 	builder.prepareIndexes()
 	builder.collectBridgeTopologyInputs()
@@ -230,5 +237,10 @@ func ToGraph(result Result, opts GraphOptions) Graph {
 	builder.buildSegmentTopology()
 	builder.finalizeGraph()
 	builder.buildStats()
-	return builder.graph()
+	graphData := builder.graph()
+	return Projection{
+		Graph:        graphData,
+		Stats:        builder.stats,
+		ActorDetails: builder.actorDetails(),
+	}
 }

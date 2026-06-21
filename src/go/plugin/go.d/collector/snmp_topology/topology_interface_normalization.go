@@ -3,12 +3,13 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"strconv"
 	"strings"
 )
 
 func normalizeInterfaceType(value string) string {
-	value = canonicalSNMPEnumValue(value)
+	value = topologyutil.CanonicalSNMPEnumValue(value)
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return ""

@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
 func (b *segmentProjectionBuilder) initializeSegments() bool {
@@ -25,7 +27,7 @@ func (b *segmentProjectionBuilder) initializeSegments() bool {
 		return false
 	}
 
-	b.segmentMatchByID = make(map[string]Match)
+	b.segmentMatchByID = make(map[string]graph.Match)
 	b.segmentByID = make(map[string]*bridgeDomainSegment)
 	for _, domain := range model.domains {
 		if domain == nil {
@@ -54,7 +56,7 @@ func (b *segmentProjectionBuilder) initializeSegments() bool {
 			continue
 		}
 		match, actor := buildBridgeSegmentActor(segmentID, segment, b.layer, b.source)
-		keys := topologyMatchIdentityKeys(actor.Match)
+		keys := topologyMatchIdentityKeys(actor.Actor.Match)
 		if len(keys) > 0 && !topologyIdentityIndexOverlaps(b.actorIndex, keys) {
 			addTopologyIdentityKeys(b.actorIndex, keys)
 		}

@@ -2,22 +2,39 @@
 
 package l2topology
 
-func newL2ResultStats() map[string]any {
-	return map[string]any{
-		"devices_total":                          0,
-		"links_total":                            0,
-		"links_lldp":                             0,
-		"links_cdp":                              0,
-		"links_stp":                              0,
-		"attachments_total":                      0,
-		"attachments_fdb":                        0,
-		"enrichments_total":                      0,
-		"enrichments_arp_nd":                     0,
-		"bridge_domains_total":                   0,
-		"endpoints_total":                        0,
-		"identity_alias_endpoints_mapped":        0,
-		"identity_alias_endpoints_ambiguous_mac": 0,
-		"identity_alias_ips_merged":              0,
-		"identity_alias_ips_conflict_skipped":    0,
-	}
+type ResultStats struct {
+	DevicesTotal                       int
+	LinksTotal                         int
+	LinksLLDP                          int
+	LinksCDP                           int
+	LinksSTP                           int
+	AttachmentsTotal                   int
+	AttachmentsFDB                     int
+	EnrichmentsTotal                   int
+	EnrichmentsARPND                   int
+	BridgeDomainsTotal                 int
+	EndpointsTotal                     int
+	IdentityAliasEndpointsMapped       int
+	IdentityAliasEndpointsAmbiguousMAC int
+	IdentityAliasIPsMerged             int
+	IdentityAliasIPsConflictSkipped    int
+}
+
+type ProjectionStats struct {
+	ResultStats
+
+	DevicesDiscovered          int
+	LinksBidirectional         int
+	LinksUnidirectional        int
+	LinksFDB                   int
+	LinksFDBEndpointCandidates int
+	LinksFDBEndpointEmitted    int
+	LinksFDBEndpointSuppressed int
+	EndpointsAmbiguousSegments int
+	LinksARP                   int
+	LinksProbable              int
+	SegmentsSuppressed         int
+	ActorsTotal                int
+	ActorsUnlinkedSuppressed   int
+	InferenceStrategy          string
 }

@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"sort"
 	"strings"
 )
@@ -14,18 +15,18 @@ func buildTopologyManagedFocusTargets(snapshots []topologyObservationSnapshot) [
 
 	targetByValue := make(map[string]topologyManagedFocusTarget)
 	for _, snapshot := range snapshots {
-		managementIP := normalizeIPAddress(snapshot.localDevice.ManagementIP)
-		if managementIP == "" && len(snapshot.l2Observations) > 0 {
-			managementIP = normalizeIPAddress(snapshot.l2Observations[0].ManagementIP)
+		managementIP := topologyutil.NormalizeIPAddress(snapshot.LocalDevice.ManagementIP)
+		if managementIP == "" && len(snapshot.L2Observations) > 0 {
+			managementIP = topologyutil.NormalizeIPAddress(snapshot.L2Observations[0].ManagementIP)
 		}
 		if managementIP == "" {
 			continue
 		}
 		value := topologyManagedFocusIPPrefix + managementIP
 
-		displayName := strings.TrimSpace(snapshot.localDevice.SysName)
-		if displayName == "" && len(snapshot.l2Observations) > 0 {
-			displayName = strings.TrimSpace(snapshot.l2Observations[0].Hostname)
+		displayName := strings.TrimSpace(snapshot.LocalDevice.SysName)
+		if displayName == "" && len(snapshot.L2Observations) > 0 {
+			displayName = strings.TrimSpace(snapshot.L2Observations[0].Hostname)
 		}
 		if displayName == "" {
 			displayName = managementIP
