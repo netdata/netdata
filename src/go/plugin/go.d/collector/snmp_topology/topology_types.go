@@ -70,8 +70,6 @@ type topologyBGPAdjacencyLinkDetail struct {
 	RemoteAS        string
 	LocalIdentifier string
 	PeerIdentifier  string
-	PeerType        string
-	BGPVersion      string
 }
 
 type topologyActor struct {

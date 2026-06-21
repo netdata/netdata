@@ -3,6 +3,8 @@
 package snmptopology
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
@@ -193,8 +195,8 @@ func topologyL3ManagedActorForTest(actorID string, attrs map[string]any, ips ...
 	detail := topologyActorDetail{
 		L2: topologyengine.ProjectionActorDetail{
 			Device: topologyengine.ProjectionDeviceActorDetail{
-				DeviceID:     topologyMetricValueString(attrs, "device_id"),
-				ManagementIP: topologyMetricValueString(attrs, "management_ip"),
+				DeviceID:     topologyL3TestString(attrs, "device_id"),
+				ManagementIP: topologyL3TestString(attrs, "management_ip"),
 				Inferred:     boolStatValue(attrs["inferred"]),
 			},
 		},
@@ -210,4 +212,15 @@ func topologyL3ManagedActorForTest(actorID string, attrs map[string]any, ips ...
 		Match:     topologyMatch{IPAddresses: ips},
 		Detail:    detail,
 	}
+}
+
+func topologyL3TestString(values map[string]any, key string) string {
+	if values == nil {
+		return ""
+	}
+	value, ok := values[key]
+	if !ok || value == nil {
+		return ""
+	}
+	return strings.TrimSpace(fmt.Sprint(value))
 }

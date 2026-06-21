@@ -303,17 +303,6 @@ func topologyActorSortKey(actor graph.Actor) string {
 	}, keySep)
 }
 
-func topologyAttrKey(attrs map[string]any, key string) string {
-	if len(attrs) == 0 {
-		return ""
-	}
-	value, ok := attrs[key]
-	if !ok || value == nil {
-		return ""
-	}
-	return fmt.Sprint(value)
-}
-
 func sortTopologyActors(actors []graph.Actor) {
 	if len(actors) < 2 {
 		return

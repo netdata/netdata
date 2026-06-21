@@ -163,3 +163,58 @@ func TestTopologyLinkActorKeyIncludesStateAndAttachmentMode(t *testing.T) {
 	require.NotEqual(t, topologyLinkActorKey(base), topologyLinkActorKey(strict))
 	require.NotEqual(t, topologyLinkDeltaKey(base), topologyLinkActorKey(base))
 }
+
+func TestMarkProbableDeltaLinksPreservesExistingConfidenceAndAttachmentMode(t *testing.T) {
+	strictData := topologyData{
+		Links: []topologyLink{
+			{
+				Protocol:   "lldp",
+				Direction:  "bidirectional",
+				SrcActorID: "device:a",
+				DstActorID: "device:b",
+				Src: topologyLinkEndpoint{
+					IfIndex: 1,
+					IfName:  "Gi0/1",
+					PortID:  "1",
+				},
+				Dst: topologyLinkEndpoint{
+					IfIndex: 2,
+					IfName:  "Gi0/2",
+					PortID:  "2",
+				},
+			},
+		},
+	}
+	probableData := topologyData{
+		Links: []topologyLink{
+			strictData.Links[0],
+			{
+				Protocol:   "bridge",
+				Direction:  "bidirectional",
+				SrcActorID: "device:a",
+				DstActorID: "segment:10",
+				Src: topologyLinkEndpoint{
+					IfIndex: 3,
+					IfName:  "Gi0/3",
+					PortID:  "3",
+				},
+				L2: &graph.LinkL2{
+					BridgeDomain: "vlan-10",
+				},
+				Inference: &graph.LinkInference{
+					Confidence:     "medium",
+					AttachmentMode: "source_specific",
+				},
+			},
+		},
+	}
+
+	markProbableDeltaLinks(&strictData, &probableData)
+
+	require.Len(t, probableData.Links, 2)
+	probableLink := probableData.Links[1]
+	require.Equal(t, "probable", probableLink.State)
+	require.Equal(t, "probable", topologyLinkInferenceValue(probableLink))
+	require.Equal(t, "medium", topologyLinkConfidenceValue(probableLink))
+	require.Equal(t, "source_specific", topologyLinkAttachmentModeValue(probableLink))
+}

@@ -207,8 +207,6 @@ func topologyBGPAdjacencyLink(row topologyBGPPeer, srcRef, dstRef topologyL3Acto
 				RemoteAS:        strings.TrimSpace(dst.asn),
 				LocalIdentifier: normalizeBGPRouterID(src.identifier),
 				PeerIdentifier:  normalizeBGPRouterID(dst.identifier),
-				PeerType:        strings.TrimSpace(row.PeerType),
-				BGPVersion:      strings.TrimSpace(row.BGPVersion),
 			},
 		},
 	}
@@ -313,20 +311,6 @@ func topologyBGPPeerIdentifier(link topologyLink) string {
 		return ""
 	}
 	return strings.TrimSpace(link.Detail.BGP.PeerIdentifier)
-}
-
-func topologyBGPPeerType(link topologyLink) string {
-	if link.Detail.BGP == nil {
-		return ""
-	}
-	return strings.TrimSpace(link.Detail.BGP.PeerType)
-}
-
-func topologyBGPVersion(link topologyLink) string {
-	if link.Detail.BGP == nil {
-		return ""
-	}
-	return strings.TrimSpace(link.Detail.BGP.BGPVersion)
 }
 
 func recordTopologyBGPEnrichmentStats(data *topologyData, stats topologyBGPEnrichmentStats) {

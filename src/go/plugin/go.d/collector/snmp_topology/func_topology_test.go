@@ -1199,6 +1199,83 @@ func TestSNMPTopologyToV1_PortlessFDBEvidenceUsesLinkRef(t *testing.T) {
 	assert.Equal(t, []any{nil}, topologyV1ColumnValues(t, evidenceTable, "dst_port_id"))
 }
 
+func TestSNMPTopologyToV1_L2EvidenceDistinguishesParallelLinksByTypedEndpoints(t *testing.T) {
+	data := topologyData{
+		AgentID:     "agent-test",
+		CollectedAt: time.Date(2026, 5, 10, 12, 0, 0, 0, time.UTC),
+		View:        "summary",
+		Actors: []topologyActor{
+			{
+				ActorID:   "device-a",
+				ActorType: "device",
+				Source:    "snmp",
+				Match:     topologyMatch{SysName: "switch-a"},
+			},
+			{
+				ActorID:   "device-b",
+				ActorType: "device",
+				Source:    "snmp",
+				Match:     topologyMatch{SysName: "switch-b"},
+			},
+		},
+		Links: []topologyLink{
+			{
+				Protocol:   "lldp",
+				LinkType:   "lldp",
+				Direction:  "bidirectional",
+				SrcActorID: "device-a",
+				DstActorID: "device-b",
+				Src: topologyLinkEndpoint{
+					IfIndex:  1,
+					IfName:   "Gi0/1",
+					PortID:   "1",
+					PortName: "Gi0/1",
+				},
+				Dst: topologyLinkEndpoint{
+					IfIndex:  11,
+					IfName:   "Eth1",
+					PortID:   "11",
+					PortName: "Eth1",
+				},
+			},
+			{
+				Protocol:   "lldp",
+				LinkType:   "lldp",
+				Direction:  "bidirectional",
+				SrcActorID: "device-a",
+				DstActorID: "device-b",
+				Src: topologyLinkEndpoint{
+					IfIndex:  2,
+					IfName:   "Gi0/2",
+					PortID:   "2",
+					PortName: "Gi0/2",
+				},
+				Dst: topologyLinkEndpoint{
+					IfIndex:  12,
+					IfName:   "Eth2",
+					PortID:   "12",
+					PortName: "Eth2",
+				},
+			},
+		},
+	}
+
+	payload, err := snmpTopologyToV1(data)
+	require.NoError(t, err)
+	require.NoError(t, validateTopologyV1Data(payload))
+	require.Contains(t, payload.Evidence, snmpTopologyV1LinkLLDP)
+
+	evidenceTable := payload.Evidence[snmpTopologyV1LinkLLDP].Table
+	require.Equal(t, 2, evidenceTable.Rows)
+	assert.Equal(t, []any{0, 1}, topologyV1ColumnValues(t, evidenceTable, "link"))
+	assert.Equal(t, []any{uint64(1), uint64(2)}, topologyV1ColumnValues(t, evidenceTable, "src_if_index"))
+	assert.Equal(t, []string{"Gi0/1", "Gi0/2"}, topologyV1StringColumnValues(t, payload, evidenceTable, "src_port_name"))
+	assert.Equal(t, []string{"1", "2"}, topologyV1StringColumnValues(t, payload, evidenceTable, "src_port_id"))
+	assert.Equal(t, []any{uint64(11), uint64(12)}, topologyV1ColumnValues(t, evidenceTable, "dst_if_index"))
+	assert.Equal(t, []string{"Eth1", "Eth2"}, topologyV1StringColumnValues(t, payload, evidenceTable, "dst_port_name"))
+	assert.Equal(t, []string{"11", "12"}, topologyV1StringColumnValues(t, payload, evidenceTable, "dst_port_id"))
+}
+
 func TestNormalizeTopologyInferenceStrategy(t *testing.T) {
 	tests := map[string]struct {
 		in   string

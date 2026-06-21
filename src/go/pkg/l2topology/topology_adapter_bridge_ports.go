@@ -9,21 +9,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
-func topologyMetricString(metrics map[string]any, key string) string {
-	if len(metrics) == 0 {
-		return ""
-	}
-	value, ok := metrics[key]
-	if !ok || value == nil {
-		return ""
-	}
-	typed, ok := value.(string)
-	if !ok {
-		return ""
-	}
-	return strings.TrimSpace(typed)
-}
-
 func topologyLinkBridgeDomain(link graph.Link) string {
 	if link.L2 == nil {
 		return ""
