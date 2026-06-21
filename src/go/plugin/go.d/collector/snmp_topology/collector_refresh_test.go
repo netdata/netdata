@@ -5,10 +5,11 @@ package snmptopology
 import (
 	"context"
 	"errors"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 
 	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"

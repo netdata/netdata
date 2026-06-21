@@ -3,9 +3,10 @@
 package snmptopology
 
 import (
+	"strings"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
-	"strings"
 )
 
 func ensureTopologyObservationDeviceID(device topologymodel.Device, baseBridgeAddress string) string {

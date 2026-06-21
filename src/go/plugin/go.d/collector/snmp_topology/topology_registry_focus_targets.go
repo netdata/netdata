@@ -3,11 +3,12 @@
 package snmptopology
 
 import (
+	"sort"
+	"strings"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
-	"sort"
-	"strings"
 )
 
 func buildTopologyManagedFocusTargets(snapshots []topologymodel.ObservationSnapshot) []topologyoptions.ManagedFocusTarget {

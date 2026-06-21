@@ -3,9 +3,10 @@
 package snmptopology
 
 import (
+	"sync"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
-	"sync"
 )
 
 type topologyRegistry struct {

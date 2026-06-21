@@ -4,9 +4,10 @@ package snmptopology
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
-	"strings"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
