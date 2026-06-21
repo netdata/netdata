@@ -105,11 +105,14 @@ func topologyAttrInt(attrs map[string]any, key string) int {
 		}
 		return int(typed)
 	case string:
-		parsed, err := strconv.Atoi(strings.TrimSpace(typed))
-		if err != nil || parsed <= 0 {
+		parsed := parseTopologyLabelInt64(typed)
+		if parsed <= 0 {
 			return 0
 		}
-		return parsed
+		if parsed > math.MaxInt {
+			return math.MaxInt
+		}
+		return int(parsed)
 	default:
 		return 0
 	}

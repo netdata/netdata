@@ -331,9 +331,8 @@ func TestTopologyRegistry_BGPAdjacencyEmitsEstablishedManagedPeerLinkAndDetailRo
 	require.NotNil(t, routerA)
 	routerB := findDeviceActorBySysName(data, "router-b")
 	require.NotNil(t, routerB)
-	require.Contains(t, routerA.Tables, "bgp_peers")
-	require.Len(t, routerA.Tables["bgp_peers"], 1)
-	require.Equal(t, routerB.ActorID, routerA.Tables["bgp_peers"][0]["remote_actor_id"])
+	require.Len(t, routerA.Detail.BGP, 1)
+	require.Equal(t, routerB.ActorID, routerA.Detail.BGP[0].RemoteActorID)
 }
 
 func TestTopologyRegistry_BGPAdjacencyKeepsUnresolvedAndNonEstablishedPeersAsDetails(t *testing.T) {
@@ -384,10 +383,9 @@ func TestTopologyRegistry_BGPAdjacencyKeepsUnresolvedAndNonEstablishedPeersAsDet
 
 	routerA := findDeviceActorBySysName(data, "router-a")
 	require.NotNil(t, routerA)
-	require.Contains(t, routerA.Tables, "bgp_peers")
-	require.Len(t, routerA.Tables["bgp_peers"], 2)
-	for _, row := range routerA.Tables["bgp_peers"] {
-		require.NotContains(t, row, "remote_actor_id")
+	require.Len(t, routerA.Detail.BGP, 2)
+	for _, row := range routerA.Detail.BGP {
+		require.Empty(t, row.RemoteActorID)
 	}
 }
 
@@ -775,7 +773,6 @@ func TestApplySNMPTopologyShapePolicies_CollapsesActorsByIP(t *testing.T) {
 					IPAddresses:  []string{"10.0.0.10"},
 					MacAddresses: []string{"aa:aa:aa:aa:aa:aa"},
 				},
-				Attributes: map[string]any{"inferred": false},
 			},
 			{
 				ActorID:   "endpoint:b",

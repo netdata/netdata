@@ -46,7 +46,6 @@
         "dns_names": [
           "switch-a.example.test"
         ],
-        "endpoints_total": 12,
         "fdb_total_macs": 42,
         "hostnames": [
           "switch-a.example.test"
@@ -884,30 +883,6 @@
         },
         "type": "actor_bgp_peers"
       },
-      "actor_inventory": {
-        "table": {
-          "columns": [
-            "actor:actor_ref:role=reference",
-            "enabled:bool:nullable",
-            "sensor_labels:array:nullable",
-            "slot:string_ref:dict=strings:nullable",
-            "temperature_c:float:nullable"
-          ],
-          "rows": [
-            {
-              "actor": "switch-a",
-              "enabled": true,
-              "sensor_labels": [
-                "ambient",
-                "rack"
-              ],
-              "slot": "1",
-              "temperature_c": 42.5
-            }
-          ]
-        },
-        "type": "actor_inventory"
-      },
       "actor_labels": {
         "table": {
           "columns": [
@@ -1382,13 +1357,6 @@
             },
             {
               "actor": "switch-a",
-              "key": "endpoints_total",
-              "kind": "attribute",
-              "source": "snmp-l2",
-              "value": "12"
-            },
-            {
-              "actor": "switch-a",
               "key": "fdb_total_macs",
               "kind": "attribute",
               "source": "snmp-l2",
@@ -1569,93 +1537,23 @@
         "table": {
           "columns": [
             "actor:actor_ref:role=reference",
-            "attributes:json:nullable",
             "labels:json:nullable"
           ],
           "rows": [
             {
               "actor": "router-a",
-              "attributes": {
-                "capabilities": [
-                  "router"
-                ],
-                "display_name": "Router A",
-                "management_ip": "198.51.100.1",
-                "model": "ASR 1001",
-                "ospf_router_id": "10.255.0.1",
-                "ports_total": 4,
-                "protocols_collected": [
-                  "ip_mib",
-                  "ospf_mib",
-                  "bgp_mib"
-                ],
-                "sys_descr": "Synthetic router A",
-                "vendor": "Cisco"
-              },
               "labels": {
                 "role": "edge"
               }
             },
             {
-              "actor": "router-b",
-              "attributes": {
-                "display_name": "Router B",
-                "management_ip": "198.51.100.2",
-                "model": "MX204",
-                "ospf_router_id": "10.255.0.2",
-                "sys_descr": "Synthetic router B",
-                "vendor": "Juniper"
-              }
-            },
-            {
-              "actor": "segment-198-51-100-0-30",
-              "attributes": {
-                "display_name": "198.51.100.0/30"
-              }
-            },
-            {
               "actor": "server-a",
-              "attributes": {
-                "display_name": "Server A",
-                "learned_sources": [
-                  "fdb",
-                  "arp"
-                ]
-              },
               "labels": {
                 "role": "application"
               }
             },
             {
               "actor": "switch-a",
-              "attributes": {
-                "capabilities": [
-                  "bridge",
-                  "router"
-                ],
-                "cdp_neighbor_count": 1,
-                "chart_context_prefix": "snmp.switch_a",
-                "chart_id_prefix": "snmp_switch_a",
-                "display_name": "Switch A",
-                "endpoints_total": 12,
-                "fdb_total_macs": 42,
-                "lldp_neighbor_count": 1,
-                "management_ip": "192.0.2.10",
-                "model": "Catalyst 9300",
-                "netdata_host_id": "host-switch-a",
-                "ospf_router_id": "10.255.0.1",
-                "ports_total": 2,
-                "protocols": [
-                  "lldp",
-                  "cdp",
-                  "snmp"
-                ],
-                "sys_contact": "noc@example.test",
-                "sys_descr": "Synthetic switch fixture",
-                "sys_location": "lab-rack-1",
-                "vendor": "Cisco",
-                "vlan_count": 3
-              },
               "labels": {
                 "role": "distribution",
                 "site": "lab"
@@ -1831,14 +1729,16 @@
             "neighbor_port_name:string_ref:dict=strings:nullable",
             "neighbors:json:nullable",
             "vlans:json:nullable",
-            "extra:json:nullable"
+            "duplex:string_ref:dict=strings:nullable",
+            "link_mode_confidence:string_ref:dict=strings:nullable",
+            "topology_role_confidence:string_ref:dict=strings:nullable",
+            "link_mode_sources:array:nullable",
+            "topology_role_sources:array:nullable",
+            "last_change:string_ref:dict=strings:nullable"
           ],
           "rows": [
             {
               "actor": "router-a",
-              "extra": {
-                "vendor_context": "router uplink debug field"
-              },
               "if_alias": "to switch-a",
               "if_index": 201,
               "if_name": "Gi0/0",
@@ -1853,28 +1753,20 @@
             {
               "actor": "switch-a",
               "admin_status": "up",
-              "extra": {
-                "duplex": "full",
-                "last_change": "2026-01-02T01:02:03Z",
-                "link_mode_confidence": "high",
-                "link_mode_sources": [
-                  "if_mib",
-                  "lldp"
-                ],
-                "topology_role_confidence": "medium",
-                "topology_role_sources": [
-                  "stp",
-                  "fdb"
-                ],
-                "vendor_note": "kept in actor_ports.extra until typed ports replace it"
-              },
+              "duplex": "full",
               "fdb_mac_count": 12,
               "if_alias": "to router-a",
               "if_descr": "GigabitEthernet1/0/1",
               "if_index": 101,
               "if_name": "Gi1/0/1",
+              "last_change": "2026-01-02T01:02:03Z",
               "link_count": 1,
               "link_mode": "trunk",
+              "link_mode_confidence": "high",
+              "link_mode_sources": [
+                "if_mib",
+                "lldp"
+              ],
               "mac": "aa:bb:cc:00:01:01",
               "name": "Gi1/0/1",
               "neighbor_actor": "router-a",
@@ -1893,18 +1785,25 @@
               "speed": 1000000000,
               "stp_state": "forwarding",
               "topology_role": "uplink",
+              "topology_role_confidence": "medium",
+              "topology_role_sources": [
+                "stp",
+                "fdb"
+              ],
               "vlan_ids": [
                 "10",
                 "20"
               ],
               "vlans": [
                 {
-                  "id": "10",
-                  "name": "users"
+                  "tagged": false,
+                  "vlan_id": "10",
+                  "vlan_name": "users"
                 },
                 {
-                  "id": "20",
-                  "name": "servers"
+                  "tagged": false,
+                  "vlan_id": "20",
+                  "vlan_name": "servers"
                 }
               ]
             }
@@ -2194,6 +2093,66 @@
                     "visibility": "expanded"
                   },
                   {
+                    "cell": "badge",
+                    "id": "duplex",
+                    "label": "Duplex",
+                    "projection": {
+                      "column": "duplex",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "link_mode_confidence",
+                    "label": "Mode Confidence",
+                    "projection": {
+                      "column": "link_mode_confidence",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "topology_role_confidence",
+                    "label": "Role Confidence",
+                    "projection": {
+                      "column": "topology_role_confidence",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "array_count",
+                    "id": "link_mode_sources",
+                    "label": "Mode Sources",
+                    "projection": {
+                      "column": "link_mode_sources",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "array_count",
+                    "id": "topology_role_sources",
+                    "label": "Role Sources",
+                    "projection": {
+                      "column": "topology_role_sources",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "last_change",
+                    "label": "Last Change",
+                    "projection": {
+                      "column": "last_change",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
                     "cell": "debug_json",
                     "id": "neighbors",
                     "label": "Neighbor Data",
@@ -2209,16 +2168,6 @@
                     "label": "VLAN Data",
                     "projection": {
                       "column": "vlans",
-                      "kind": "direct"
-                    },
-                    "visibility": "debug"
-                  },
-                  {
-                    "cell": "debug_json",
-                    "id": "extra",
-                    "label": "Extra",
-                    "projection": {
-                      "column": "extra",
                       "kind": "direct"
                     },
                     "visibility": "debug"
@@ -3138,6 +3087,66 @@
                     "visibility": "expanded"
                   },
                   {
+                    "cell": "badge",
+                    "id": "duplex",
+                    "label": "Duplex",
+                    "projection": {
+                      "column": "duplex",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "link_mode_confidence",
+                    "label": "Mode Confidence",
+                    "projection": {
+                      "column": "link_mode_confidence",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "topology_role_confidence",
+                    "label": "Role Confidence",
+                    "projection": {
+                      "column": "topology_role_confidence",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "array_count",
+                    "id": "link_mode_sources",
+                    "label": "Mode Sources",
+                    "projection": {
+                      "column": "link_mode_sources",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "array_count",
+                    "id": "topology_role_sources",
+                    "label": "Role Sources",
+                    "projection": {
+                      "column": "topology_role_sources",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "last_change",
+                    "label": "Last Change",
+                    "projection": {
+                      "column": "last_change",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
                     "cell": "debug_json",
                     "id": "neighbors",
                     "label": "Neighbor Data",
@@ -3153,16 +3162,6 @@
                     "label": "VLAN Data",
                     "projection": {
                       "column": "vlans",
-                      "kind": "direct"
-                    },
-                    "visibility": "debug"
-                  },
-                  {
-                    "cell": "debug_json",
-                    "id": "extra",
-                    "label": "Extra",
-                    "projection": {
-                      "column": "extra",
                       "kind": "direct"
                     },
                     "visibility": "debug"
@@ -4232,6 +4231,66 @@
                     "visibility": "expanded"
                   },
                   {
+                    "cell": "badge",
+                    "id": "duplex",
+                    "label": "Duplex",
+                    "projection": {
+                      "column": "duplex",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "link_mode_confidence",
+                    "label": "Mode Confidence",
+                    "projection": {
+                      "column": "link_mode_confidence",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "topology_role_confidence",
+                    "label": "Role Confidence",
+                    "projection": {
+                      "column": "topology_role_confidence",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "array_count",
+                    "id": "link_mode_sources",
+                    "label": "Mode Sources",
+                    "projection": {
+                      "column": "link_mode_sources",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "array_count",
+                    "id": "topology_role_sources",
+                    "label": "Role Sources",
+                    "projection": {
+                      "column": "topology_role_sources",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "last_change",
+                    "label": "Last Change",
+                    "projection": {
+                      "column": "last_change",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
                     "cell": "debug_json",
                     "id": "neighbors",
                     "label": "Neighbor Data",
@@ -4247,16 +4306,6 @@
                     "label": "VLAN Data",
                     "projection": {
                       "column": "vlans",
-                      "kind": "direct"
-                    },
-                    "visibility": "debug"
-                  },
-                  {
-                    "cell": "debug_json",
-                    "id": "extra",
-                    "label": "Extra",
-                    "projection": {
-                      "column": "extra",
                       "kind": "direct"
                     },
                     "visibility": "debug"
@@ -5338,6 +5387,66 @@
                     "visibility": "expanded"
                   },
                   {
+                    "cell": "badge",
+                    "id": "duplex",
+                    "label": "Duplex",
+                    "projection": {
+                      "column": "duplex",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "link_mode_confidence",
+                    "label": "Mode Confidence",
+                    "projection": {
+                      "column": "link_mode_confidence",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "topology_role_confidence",
+                    "label": "Role Confidence",
+                    "projection": {
+                      "column": "topology_role_confidence",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "array_count",
+                    "id": "link_mode_sources",
+                    "label": "Mode Sources",
+                    "projection": {
+                      "column": "link_mode_sources",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "array_count",
+                    "id": "topology_role_sources",
+                    "label": "Role Sources",
+                    "projection": {
+                      "column": "topology_role_sources",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "last_change",
+                    "label": "Last Change",
+                    "projection": {
+                      "column": "last_change",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
                     "cell": "debug_json",
                     "id": "neighbors",
                     "label": "Neighbor Data",
@@ -5353,16 +5462,6 @@
                     "label": "VLAN Data",
                     "projection": {
                       "column": "vlans",
-                      "kind": "direct"
-                    },
-                    "visibility": "debug"
-                  },
-                  {
-                    "cell": "debug_json",
-                    "id": "extra",
-                    "label": "Extra",
-                    "projection": {
-                      "column": "extra",
                       "kind": "direct"
                     },
                     "visibility": "debug"
@@ -6282,6 +6381,66 @@
                     "visibility": "expanded"
                   },
                   {
+                    "cell": "badge",
+                    "id": "duplex",
+                    "label": "Duplex",
+                    "projection": {
+                      "column": "duplex",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "link_mode_confidence",
+                    "label": "Mode Confidence",
+                    "projection": {
+                      "column": "link_mode_confidence",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "topology_role_confidence",
+                    "label": "Role Confidence",
+                    "projection": {
+                      "column": "topology_role_confidence",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "array_count",
+                    "id": "link_mode_sources",
+                    "label": "Mode Sources",
+                    "projection": {
+                      "column": "link_mode_sources",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "array_count",
+                    "id": "topology_role_sources",
+                    "label": "Role Sources",
+                    "projection": {
+                      "column": "topology_role_sources",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "last_change",
+                    "label": "Last Change",
+                    "projection": {
+                      "column": "last_change",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
                     "cell": "debug_json",
                     "id": "neighbors",
                     "label": "Neighbor Data",
@@ -6297,16 +6456,6 @@
                     "label": "VLAN Data",
                     "projection": {
                       "column": "vlans",
-                      "kind": "direct"
-                    },
-                    "visibility": "debug"
-                  },
-                  {
-                    "cell": "debug_json",
-                    "id": "extra",
-                    "label": "Extra",
-                    "projection": {
-                      "column": "extra",
                       "kind": "direct"
                     },
                     "visibility": "debug"
@@ -7226,6 +7375,66 @@
                     "visibility": "expanded"
                   },
                   {
+                    "cell": "badge",
+                    "id": "duplex",
+                    "label": "Duplex",
+                    "projection": {
+                      "column": "duplex",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "link_mode_confidence",
+                    "label": "Mode Confidence",
+                    "projection": {
+                      "column": "link_mode_confidence",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "topology_role_confidence",
+                    "label": "Role Confidence",
+                    "projection": {
+                      "column": "topology_role_confidence",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "array_count",
+                    "id": "link_mode_sources",
+                    "label": "Mode Sources",
+                    "projection": {
+                      "column": "link_mode_sources",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "array_count",
+                    "id": "topology_role_sources",
+                    "label": "Role Sources",
+                    "projection": {
+                      "column": "topology_role_sources",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "last_change",
+                    "label": "Last Change",
+                    "projection": {
+                      "column": "last_change",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
                     "cell": "debug_json",
                     "id": "neighbors",
                     "label": "Neighbor Data",
@@ -7241,16 +7450,6 @@
                     "label": "VLAN Data",
                     "projection": {
                       "column": "vlans",
-                      "kind": "direct"
-                    },
-                    "visibility": "debug"
-                  },
-                  {
-                    "cell": "debug_json",
-                    "id": "extra",
-                    "label": "Extra",
-                    "projection": {
-                      "column": "extra",
                       "kind": "direct"
                     },
                     "visibility": "debug"
@@ -8170,6 +8369,66 @@
                     "visibility": "expanded"
                   },
                   {
+                    "cell": "badge",
+                    "id": "duplex",
+                    "label": "Duplex",
+                    "projection": {
+                      "column": "duplex",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "link_mode_confidence",
+                    "label": "Mode Confidence",
+                    "projection": {
+                      "column": "link_mode_confidence",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "topology_role_confidence",
+                    "label": "Role Confidence",
+                    "projection": {
+                      "column": "topology_role_confidence",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "array_count",
+                    "id": "link_mode_sources",
+                    "label": "Mode Sources",
+                    "projection": {
+                      "column": "link_mode_sources",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "array_count",
+                    "id": "topology_role_sources",
+                    "label": "Role Sources",
+                    "projection": {
+                      "column": "topology_role_sources",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "last_change",
+                    "label": "Last Change",
+                    "projection": {
+                      "column": "last_change",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
                     "cell": "debug_json",
                     "id": "neighbors",
                     "label": "Neighbor Data",
@@ -8185,16 +8444,6 @@
                     "label": "VLAN Data",
                     "projection": {
                       "column": "vlans",
-                      "kind": "direct"
-                    },
-                    "visibility": "debug"
-                  },
-                  {
-                    "cell": "debug_json",
-                    "id": "extra",
-                    "label": "Extra",
-                    "projection": {
-                      "column": "extra",
                       "kind": "direct"
                     },
                     "visibility": "debug"
@@ -9114,6 +9363,66 @@
                     "visibility": "expanded"
                   },
                   {
+                    "cell": "badge",
+                    "id": "duplex",
+                    "label": "Duplex",
+                    "projection": {
+                      "column": "duplex",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "link_mode_confidence",
+                    "label": "Mode Confidence",
+                    "projection": {
+                      "column": "link_mode_confidence",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "topology_role_confidence",
+                    "label": "Role Confidence",
+                    "projection": {
+                      "column": "topology_role_confidence",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "array_count",
+                    "id": "link_mode_sources",
+                    "label": "Mode Sources",
+                    "projection": {
+                      "column": "link_mode_sources",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "array_count",
+                    "id": "topology_role_sources",
+                    "label": "Role Sources",
+                    "projection": {
+                      "column": "topology_role_sources",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "last_change",
+                    "label": "Last Change",
+                    "projection": {
+                      "column": "last_change",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
                     "cell": "debug_json",
                     "id": "neighbors",
                     "label": "Neighbor Data",
@@ -9129,16 +9438,6 @@
                     "label": "VLAN Data",
                     "projection": {
                       "column": "vlans",
-                      "kind": "direct"
-                    },
-                    "visibility": "debug"
-                  },
-                  {
-                    "cell": "debug_json",
-                    "id": "extra",
-                    "label": "Extra",
-                    "projection": {
-                      "column": "extra",
                       "kind": "direct"
                     },
                     "visibility": "debug"
@@ -10217,6 +10516,66 @@
                     "visibility": "expanded"
                   },
                   {
+                    "cell": "badge",
+                    "id": "duplex",
+                    "label": "Duplex",
+                    "projection": {
+                      "column": "duplex",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "link_mode_confidence",
+                    "label": "Mode Confidence",
+                    "projection": {
+                      "column": "link_mode_confidence",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "topology_role_confidence",
+                    "label": "Role Confidence",
+                    "projection": {
+                      "column": "topology_role_confidence",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "array_count",
+                    "id": "link_mode_sources",
+                    "label": "Mode Sources",
+                    "projection": {
+                      "column": "link_mode_sources",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "array_count",
+                    "id": "topology_role_sources",
+                    "label": "Role Sources",
+                    "projection": {
+                      "column": "topology_role_sources",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "last_change",
+                    "label": "Last Change",
+                    "projection": {
+                      "column": "last_change",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
                     "cell": "debug_json",
                     "id": "neighbors",
                     "label": "Neighbor Data",
@@ -10232,16 +10591,6 @@
                     "label": "VLAN Data",
                     "projection": {
                       "column": "vlans",
-                      "kind": "direct"
-                    },
-                    "visibility": "debug"
-                  },
-                  {
-                    "cell": "debug_json",
-                    "id": "extra",
-                    "label": "Extra",
-                    "projection": {
-                      "column": "extra",
                       "kind": "direct"
                     },
                     "visibility": "debug"
@@ -11161,6 +11510,66 @@
                     "visibility": "expanded"
                   },
                   {
+                    "cell": "badge",
+                    "id": "duplex",
+                    "label": "Duplex",
+                    "projection": {
+                      "column": "duplex",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "link_mode_confidence",
+                    "label": "Mode Confidence",
+                    "projection": {
+                      "column": "link_mode_confidence",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "topology_role_confidence",
+                    "label": "Role Confidence",
+                    "projection": {
+                      "column": "topology_role_confidence",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "array_count",
+                    "id": "link_mode_sources",
+                    "label": "Mode Sources",
+                    "projection": {
+                      "column": "link_mode_sources",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "array_count",
+                    "id": "topology_role_sources",
+                    "label": "Role Sources",
+                    "projection": {
+                      "column": "topology_role_sources",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "last_change",
+                    "label": "Last Change",
+                    "projection": {
+                      "column": "last_change",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
                     "cell": "debug_json",
                     "id": "neighbors",
                     "label": "Neighbor Data",
@@ -11176,16 +11585,6 @@
                     "label": "VLAN Data",
                     "projection": {
                       "column": "vlans",
-                      "kind": "direct"
-                    },
-                    "visibility": "debug"
-                  },
-                  {
-                    "cell": "debug_json",
-                    "id": "extra",
-                    "label": "Extra",
-                    "projection": {
-                      "column": "extra",
                       "kind": "direct"
                     },
                     "visibility": "debug"
@@ -12105,6 +12504,66 @@
                     "visibility": "expanded"
                   },
                   {
+                    "cell": "badge",
+                    "id": "duplex",
+                    "label": "Duplex",
+                    "projection": {
+                      "column": "duplex",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "link_mode_confidence",
+                    "label": "Mode Confidence",
+                    "projection": {
+                      "column": "link_mode_confidence",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "topology_role_confidence",
+                    "label": "Role Confidence",
+                    "projection": {
+                      "column": "topology_role_confidence",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "array_count",
+                    "id": "link_mode_sources",
+                    "label": "Mode Sources",
+                    "projection": {
+                      "column": "link_mode_sources",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "array_count",
+                    "id": "topology_role_sources",
+                    "label": "Role Sources",
+                    "projection": {
+                      "column": "topology_role_sources",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "last_change",
+                    "label": "Last Change",
+                    "projection": {
+                      "column": "last_change",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
                     "cell": "debug_json",
                     "id": "neighbors",
                     "label": "Neighbor Data",
@@ -12120,16 +12579,6 @@
                     "label": "VLAN Data",
                     "projection": {
                       "column": "vlans",
-                      "kind": "direct"
-                    },
-                    "visibility": "debug"
-                  },
-                  {
-                    "cell": "debug_json",
-                    "id": "extra",
-                    "label": "Extra",
-                    "projection": {
-                      "column": "extra",
                       "kind": "direct"
                     },
                     "visibility": "debug"
@@ -13049,6 +13498,66 @@
                     "visibility": "expanded"
                   },
                   {
+                    "cell": "badge",
+                    "id": "duplex",
+                    "label": "Duplex",
+                    "projection": {
+                      "column": "duplex",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "link_mode_confidence",
+                    "label": "Mode Confidence",
+                    "projection": {
+                      "column": "link_mode_confidence",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "topology_role_confidence",
+                    "label": "Role Confidence",
+                    "projection": {
+                      "column": "topology_role_confidence",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "array_count",
+                    "id": "link_mode_sources",
+                    "label": "Mode Sources",
+                    "projection": {
+                      "column": "link_mode_sources",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "array_count",
+                    "id": "topology_role_sources",
+                    "label": "Role Sources",
+                    "projection": {
+                      "column": "topology_role_sources",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "last_change",
+                    "label": "Last Change",
+                    "projection": {
+                      "column": "last_change",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
                     "cell": "debug_json",
                     "id": "neighbors",
                     "label": "Neighbor Data",
@@ -13064,16 +13573,6 @@
                     "label": "VLAN Data",
                     "projection": {
                       "column": "vlans",
-                      "kind": "direct"
-                    },
-                    "visibility": "debug"
-                  },
-                  {
-                    "cell": "debug_json",
-                    "id": "extra",
-                    "label": "Extra",
-                    "projection": {
-                      "column": "extra",
                       "kind": "direct"
                     },
                     "visibility": "debug"
@@ -15853,39 +16352,6 @@
         },
         "role": "actor_detail"
       },
-      "actor_inventory": {
-        "aggregation": "append",
-        "columns": [
-          {
-            "id": "actor",
-            "role": "reference",
-            "type": "actor_ref"
-          },
-          {
-            "id": "enabled",
-            "nullable": true,
-            "type": "bool"
-          },
-          {
-            "id": "sensor_labels",
-            "nullable": true,
-            "type": "array"
-          },
-          {
-            "dictionary": "strings",
-            "id": "slot",
-            "nullable": true,
-            "type": "string_ref"
-          },
-          {
-            "id": "temperature_c",
-            "nullable": true,
-            "type": "float"
-          }
-        ],
-        "owner": "actor",
-        "role": "actor_detail"
-      },
       "actor_labels": {
         "aggregation": "set",
         "columns": [
@@ -15980,11 +16446,6 @@
             "type": "actor_ref"
           },
           {
-            "id": "attributes",
-            "nullable": true,
-            "type": "json"
-          },
-          {
             "id": "labels",
             "nullable": true,
             "type": "json"
@@ -15993,15 +16454,6 @@
         "owner": "actor",
         "presentation": {
           "columns": [
-            {
-              "cell": "debug_json",
-              "id": "attributes",
-              "label": "Attributes",
-              "projection": {
-                "column": "attributes",
-                "kind": "direct"
-              }
-            },
             {
               "cell": "debug_json",
               "id": "labels",
@@ -16576,9 +17028,38 @@
             "type": "json"
           },
           {
-            "id": "extra",
+            "dictionary": "strings",
+            "id": "duplex",
             "nullable": true,
-            "type": "json"
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "link_mode_confidence",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "topology_role_confidence",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "id": "link_mode_sources",
+            "nullable": true,
+            "type": "array"
+          },
+          {
+            "id": "topology_role_sources",
+            "nullable": true,
+            "type": "array"
+          },
+          {
+            "dictionary": "strings",
+            "id": "last_change",
+            "nullable": true,
+            "type": "string_ref"
           }
         ],
         "owner": "actor",
@@ -16774,6 +17255,66 @@
               "visibility": "expanded"
             },
             {
+              "cell": "badge",
+              "id": "duplex",
+              "label": "Duplex",
+              "projection": {
+                "column": "duplex",
+                "kind": "direct"
+              },
+              "visibility": "expanded"
+            },
+            {
+              "cell": "badge",
+              "id": "link_mode_confidence",
+              "label": "Mode Confidence",
+              "projection": {
+                "column": "link_mode_confidence",
+                "kind": "direct"
+              },
+              "visibility": "expanded"
+            },
+            {
+              "cell": "badge",
+              "id": "topology_role_confidence",
+              "label": "Role Confidence",
+              "projection": {
+                "column": "topology_role_confidence",
+                "kind": "direct"
+              },
+              "visibility": "expanded"
+            },
+            {
+              "cell": "array_count",
+              "id": "link_mode_sources",
+              "label": "Mode Sources",
+              "projection": {
+                "column": "link_mode_sources",
+                "kind": "direct"
+              },
+              "visibility": "expanded"
+            },
+            {
+              "cell": "array_count",
+              "id": "topology_role_sources",
+              "label": "Role Sources",
+              "projection": {
+                "column": "topology_role_sources",
+                "kind": "direct"
+              },
+              "visibility": "expanded"
+            },
+            {
+              "cell": "text",
+              "id": "last_change",
+              "label": "Last Change",
+              "projection": {
+                "column": "last_change",
+                "kind": "direct"
+              },
+              "visibility": "expanded"
+            },
+            {
               "cell": "debug_json",
               "id": "neighbors",
               "label": "Neighbor Data",
@@ -16789,16 +17330,6 @@
               "label": "VLAN Data",
               "projection": {
                 "column": "vlans",
-                "kind": "direct"
-              },
-              "visibility": "debug"
-            },
-            {
-              "cell": "debug_json",
-              "id": "extra",
-              "label": "Extra",
-              "projection": {
-                "column": "extra",
                 "kind": "direct"
               },
               "visibility": "debug"

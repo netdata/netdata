@@ -96,25 +96,25 @@ func TestTopologyBGPPeerFromRowKeepsOnlyDiagnosticRawAddresses(t *testing.T) {
 }
 
 func TestSortTopologyBGPPeerRowsUsesRawNeighborFallback(t *testing.T) {
-	rows := []map[string]any{
+	rows := []topologyBGPPeerDetailRow{
 		{
-			"routing_instance": "default",
-			"remote_as":        "65002",
-			"neighbor_ip":      "raw-b",
-			"state":            "established",
+			RoutingInstance: "default",
+			RemoteAS:        "65002",
+			NeighborIP:      "raw-b",
+			State:           "established",
 		},
 		{
-			"routing_instance": "default",
-			"remote_as":        "65002",
-			"neighbor_ip":      "raw-a",
-			"state":            "established",
+			RoutingInstance: "default",
+			RemoteAS:        "65002",
+			NeighborIP:      "raw-a",
+			State:           "established",
 		},
 	}
 
-	sortTopologyBGPPeerRows(rows)
+	sortTopologyBGPPeerDetailRows(rows)
 
-	require.Equal(t, "raw-a", rows[0]["neighbor_ip"])
-	require.Equal(t, "raw-b", rows[1]["neighbor_ip"])
+	require.Equal(t, "raw-a", rows[0].NeighborIP)
+	require.Equal(t, "raw-b", rows[1].NeighborIP)
 }
 
 func TestBuildSNMPTopologyV1BGPPeersTableHandlesRawAndUnspecifiedAddresses(t *testing.T) {
@@ -171,6 +171,33 @@ func TestBuildSNMPTopologyV1BGPPeersTableHandlesRawAndUnspecifiedAddresses(t *te
 			}
 		})
 	}
+}
+
+func TestBuildSNMPTopologyV1BGPPeersTablePreservesOptionalUptimePresence(t *testing.T) {
+	var zero int64
+	stringsDict := topologyv1.NewStringDictionary()
+
+	table := buildSNMPTopologyV1BGPPeersTable([]topologyV1DynamicRow{
+		{
+			actorRef: 0,
+			values: snmpTopologyV1BGPPeerValues(topologyBGPPeerDetailRow{
+				NeighborIP:      "192.0.2.2",
+				RoutingInstance: "default",
+			}),
+		},
+		{
+			actorRef: 0,
+			values: snmpTopologyV1BGPPeerValues(topologyBGPPeerDetailRow{
+				NeighborIP:            "192.0.2.3",
+				RoutingInstance:       "default",
+				EstablishedUptime:     &zero,
+				LastReceivedUpdateAge: &zero,
+			}),
+		},
+	}, nil, stringsDict)
+
+	require.Equal(t, []any{nil, uint64(0)}, topologyV1ColumnValues(t, table, "established_uptime"))
+	require.Equal(t, []any{nil, uint64(0)}, topologyV1ColumnValues(t, table, "last_received_update_age"))
 }
 
 func TestTopologyCacheIngestTopologyBGPPeersSkipsErrorsAndInvalidRows(t *testing.T) {

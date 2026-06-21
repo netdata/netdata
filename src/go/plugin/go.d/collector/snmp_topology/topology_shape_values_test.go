@@ -5,6 +5,7 @@ package snmptopology
 import (
 	"testing"
 
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/stretchr/testify/require"
 )
 
@@ -13,10 +14,19 @@ func TestTopologyActorIsInferred(t *testing.T) {
 		actor topologyActor
 		want  bool
 	}{
-		"endpoint-type":      {actor: topologyActor{ActorType: "endpoint"}, want: true},
-		"inferred-label":     {actor: topologyActor{Labels: map[string]string{"inferred": "yes"}}, want: true},
-		"inferred-attribute": {actor: topologyActor{Attributes: map[string]any{"inferred": true}}, want: true},
-		"device-type":        {actor: topologyActor{ActorType: "device"}},
+		"endpoint-type":  {actor: topologyActor{ActorType: "endpoint"}, want: true},
+		"inferred-label": {actor: topologyActor{Labels: map[string]string{"inferred": "yes"}}, want: true},
+		"inferred-detail": {
+			actor: topologyActor{
+				Detail: topologyActorDetail{
+					L2: topologyengine.ProjectionActorDetail{
+						Device: topologyengine.ProjectionDeviceActorDetail{Inferred: true},
+					},
+				},
+			},
+			want: true,
+		},
+		"device-type": {actor: topologyActor{ActorType: "device"}},
 	}
 
 	for name, tc := range tests {

@@ -4,13 +4,15 @@ package snmptopology
 
 import (
 	"fmt"
-	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	"math"
 	"reflect"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
+
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
+	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 )
 
 var topologyV1IDInvalidChars = regexp.MustCompile(`[^A-Za-z0-9_.:-]+`)
@@ -50,6 +52,20 @@ func nullableUintValue(value any) any {
 		return nil
 	}
 	return out
+}
+
+func nullableOptionalUintValue(value topologyengine.OptionalValue[int]) any {
+	if !value.Has || value.Value < 0 {
+		return nil
+	}
+	return uint64(value.Value)
+}
+
+func nullableOptionalUint64Value(value topologyengine.OptionalValue[int64]) any {
+	if !value.Has || value.Value < 0 {
+		return nil
+	}
+	return uint64(value.Value)
 }
 
 func uintValue(value any) (uint64, bool) {

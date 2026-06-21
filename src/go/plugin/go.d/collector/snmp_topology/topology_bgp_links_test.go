@@ -34,8 +34,8 @@ func TestApplyTopologyBGPAdjacencyEnrichmentEmitsEstablishedManagedLink(t *testi
 	require.Equal(t, 1, topologyStatsToV1(data.Stats)["bgp_peer_detail_rows"])
 	require.Equal(t, 1, topologyStatsToV1(data.Stats)["bgp_adjacency_emitted_links"])
 	require.Equal(t, 1, topologyStatsToV1(data.Stats)["bgp_adjacency_visible_links"])
-	require.Len(t, data.Actors[0].Tables["bgp_peers"], 1)
-	require.Equal(t, "router-b", data.Actors[0].Tables["bgp_peers"][0]["remote_actor_id"])
+	require.Len(t, data.Actors[0].Detail.BGP, 1)
+	require.Equal(t, "router-b", data.Actors[0].Detail.BGP[0].RemoteActorID)
 }
 
 func TestApplyTopologyBGPAdjacencyEnrichmentKeepsSuppressedPeersAsDetailOnly(t *testing.T) {
@@ -125,16 +125,16 @@ func TestApplyTopologyBGPAdjacencyEnrichmentKeepsSuppressedPeersAsDetailOnly(t *
 			require.Equal(t, tc.wantUnresolvedNeighbor, stats.suppressedUnresolvedNeighbor)
 			require.Equal(t, tc.wantSelfActor, stats.suppressedSelfActor)
 			require.Empty(t, tc.data.Links)
-			require.Len(t, tc.data.Actors[0].Tables["bgp_peers"], 1)
-			row := tc.data.Actors[0].Tables["bgp_peers"][0]
+			require.Len(t, tc.data.Actors[0].Detail.BGP, 1)
+			row := tc.data.Actors[0].Detail.BGP[0]
 			if tc.wantDetailState != "" {
-				require.Equal(t, tc.wantDetailState, row["state"])
+				require.Equal(t, tc.wantDetailState, row.State)
 			}
 			if tc.wantRemoteActorID != "" {
-				require.Equal(t, tc.wantRemoteActorID, row["remote_actor_id"])
+				require.Equal(t, tc.wantRemoteActorID, row.RemoteActorID)
 			}
 			if tc.wantRemoteActorIDAbsent {
-				require.NotContains(t, row, "remote_actor_id")
+				require.Empty(t, row.RemoteActorID)
 			}
 			if tc.wantSuppressedStatsCounter != "" {
 				require.Equal(t, 1, topologyStatsToV1(tc.data.Stats)[tc.wantSuppressedStatsCounter])
@@ -168,8 +168,8 @@ func TestApplyTopologyBGPAdjacencyEnrichmentBuildsManagedLinks(t *testing.T) {
 				require.Equal(t, 1, stats.emittedLinks)
 				require.Equal(t, 1, stats.suppressedDuplicateLink)
 				require.Len(t, data.Links, 1)
-				require.Len(t, data.Actors[0].Tables["bgp_peers"], 1)
-				require.Len(t, data.Actors[1].Tables["bgp_peers"], 1)
+				require.Len(t, data.Actors[0].Detail.BGP, 1)
+				require.Len(t, data.Actors[1].Detail.BGP, 1)
 				require.Equal(t, 1, topologyStatsToV1(data.Stats)["bgp_adjacency_visible_links"])
 			},
 		},
@@ -192,8 +192,8 @@ func TestApplyTopologyBGPAdjacencyEnrichmentBuildsManagedLinks(t *testing.T) {
 				require.Equal(t, 1, stats.emittedLinks)
 				require.Equal(t, 1, stats.suppressedDuplicateLink)
 				require.Len(t, data.Links, 1)
-				require.Len(t, data.Actors[0].Tables["bgp_peers"], 1)
-				require.Len(t, data.Actors[1].Tables["bgp_peers"], 1)
+				require.Len(t, data.Actors[0].Detail.BGP, 1)
+				require.Len(t, data.Actors[1].Detail.BGP, 1)
 				require.Equal(t, 1, topologyStatsToV1(data.Stats)["bgp_adjacency_visible_links"])
 			},
 		},
@@ -238,7 +238,7 @@ func TestApplyTopologyBGPAdjacencyEnrichmentBuildsManagedLinks(t *testing.T) {
 				require.Equal(t, 1, stats.emittedLinks)
 				require.Equal(t, 1, stats.suppressedDuplicateLink)
 				require.Len(t, data.Links, 1)
-				require.Len(t, data.Actors[0].Tables["bgp_peers"], 2)
+				require.Len(t, data.Actors[0].Detail.BGP, 2)
 				require.Equal(t, 1, topologyStatsToV1(data.Stats)["bgp_adjacency_visible_links"])
 			},
 		},
@@ -304,8 +304,8 @@ func TestApplyTopologyBGPAdjacencyEnrichmentResolvesPeerIdentifierByRouterID(t *
 	require.Len(t, data.Links, 1)
 	require.Equal(t, "router-b", data.Links[0].DstActorID)
 	require.Equal(t, "2.2.2.2", data.Links[0].Dst.Attributes["bgp_identifier"])
-	require.Len(t, data.Actors[0].Tables["bgp_peers"], 1)
-	require.Equal(t, "router-b", data.Actors[0].Tables["bgp_peers"][0]["remote_actor_id"])
+	require.Len(t, data.Actors[0].Detail.BGP, 1)
+	require.Equal(t, "router-b", data.Actors[0].Detail.BGP[0].RemoteActorID)
 }
 
 func topologyBGPManagedActorForTest(actorID, deviceID string, attrs map[string]any, ips ...string) topologyActor {

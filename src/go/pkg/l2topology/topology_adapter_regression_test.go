@@ -3,6 +3,7 @@
 package l2topology
 
 import (
+	"math"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
@@ -118,6 +119,34 @@ func TestBackfillEndpointPortFromPeerPreservesExistingCanonicalPort(t *testing.T
 	require.Equal(t, "Gi0/10", topologyAttrString(backfilled.Attributes, "if_name"))
 	require.Zero(t, topologyAttrInt(backfilled.Attributes, "if_index"))
 	require.Equal(t, "", topologyAttrString(backfilled.Attributes, "port_id"))
+}
+
+func TestTopologyIntegerAttributesParseSNMPEnumLabels(t *testing.T) {
+	attrs := map[string]any{
+		"if_index": "up(1)",
+		"speed":    "fast(1000000000)",
+	}
+
+	require.Equal(t, 1, topologyAttrInt(attrs, "if_index"))
+	require.Equal(t, int64(1000000000), topologyAttrInt64(attrs, "speed"))
+	require.Equal(t, OptionalValue[int]{Has: true, Value: 1}, topologyOptionalAttrInt(attrs, "if_index"))
+	require.Equal(t, OptionalValue[int64]{Has: true, Value: 1000000000}, topologyOptionalAttrInt64(attrs, "speed"))
+}
+
+func TestTopologyAttrIntMapClampsParsedValues(t *testing.T) {
+	counts := topologyAttrIntMap(map[string]any{
+		"counts": map[string]any{
+			"huge": int64(math.MaxInt64),
+			"ok":   "active(7)",
+			"neg":  int64(-1),
+		},
+	}, "counts")
+
+	require.Equal(t, map[string]int{
+		"huge": maxProjectionInt,
+		"ok":   7,
+		"neg":  0,
+	}, counts)
 }
 
 func TestSegmentProjectionBuilderPruneSegmentsWithoutLinksRemovesEmptySegments(t *testing.T) {

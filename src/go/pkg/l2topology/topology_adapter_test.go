@@ -64,7 +64,7 @@ func TestToGraph_ProjectsResult(t *testing.T) {
 		},
 	}
 
-	data, stats := ToGraph(result, GraphOptions{
+	data, stats := toGraphForTest(result, GraphOptions{
 		SchemaVersion: "2.0",
 		Source:        "snmp",
 		Layer:         "2",
@@ -125,6 +125,65 @@ func TestToGraph_ProjectsResult(t *testing.T) {
 	require.Equal(t, 1, stats.LinksUnidirectional)
 	require.Equal(t, 3, stats.ActorsTotal)
 	require.Equal(t, 1, stats.EndpointsTotal)
+}
+
+func TestToGraph_ProjectsTypedActorDetailsWithFieldPresence(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:        "sw1",
+				Hostname:  "sw1",
+				ChassisID: "00:11:22:33:44:55",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
+				Labels: map[string]string{
+					"capabilities_enabled": "bridge,router",
+				},
+			},
+		},
+		Interfaces: []Interface{
+			{
+				DeviceID: "sw1",
+				IfIndex:  1,
+				IfName:   "Gi0/1",
+				IfDescr:  "GigabitEthernet0/1",
+				MAC:      "00:11:22:33:44:56",
+				Labels: map[string]string{
+					"speed_bps": "1000000000",
+					"duplex":    "full",
+				},
+			},
+		},
+	}
+
+	projection := ToGraph(result, GraphOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+	})
+
+	actor := findActorBySysName(projection.Graph.Actors, "sw1")
+	require.NotNil(t, actor)
+	detail, ok := projection.ActorDetails[actor.ActorID]
+	require.True(t, ok)
+
+	require.Equal(t, "10.0.0.1", detail.Device.ManagementIP)
+	require.Equal(t, []string{"bridge", "router"}, detail.Device.CapabilitiesEnabled)
+	require.True(t, detail.Device.PortsTotal.Has)
+	require.Equal(t, 1, detail.Device.PortsTotal.Value)
+	require.False(t, detail.Device.CDPNeighborCount.Has)
+	require.Zero(t, detail.Device.CDPNeighborCount.Value)
+	require.Len(t, detail.Device.Ports, 1)
+
+	port := detail.Device.Ports[0]
+	require.True(t, port.IfIndex.Has)
+	require.Equal(t, 1, port.IfIndex.Value)
+	require.True(t, port.Speed.Has)
+	require.EqualValues(t, 1000000000, port.Speed.Value)
+	require.Equal(t, "full", port.Duplex)
+	require.False(t, port.NeighborCount.Has)
+	require.Zero(t, port.NeighborCount.Value)
+	require.False(t, port.LinkCount.Has)
+	require.Zero(t, port.LinkCount.Value)
 }
 
 func TestToGraph_ClassifiesPortLinkModesFromFDBAndSTPEvidence(t *testing.T) {
@@ -229,7 +288,7 @@ func TestToGraph_ClassifiesPortLinkModesFromFDBAndSTPEvidence(t *testing.T) {
 		},
 	}
 
-	data, _ := ToGraph(result, GraphOptions{
+	data, _ := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -317,7 +376,7 @@ func TestToGraph_IgnoresIgnoredFDBStatusForLinkModeClassification(t *testing.T) 
 		},
 	}
 
-	data, _ := ToGraph(result, GraphOptions{
+	data, _ := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -382,7 +441,7 @@ func TestToGraph_ClassifiesSTPCorroboratedManagedAliasAsSwitchFacing(t *testing.
 		},
 	}
 
-	data, _ := ToGraph(result, GraphOptions{
+	data, _ := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -521,7 +580,7 @@ func TestToGraph_EnrichesPortStatusesWithNeighborsFDBAndSTP(t *testing.T) {
 		},
 	}
 
-	data, _ := ToGraph(result, GraphOptions{
+	data, _ := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -614,7 +673,7 @@ func TestToGraph_InfersVendorFromMACOUI(t *testing.T) {
 		},
 	}
 
-	data, _ := ToGraph(result, GraphOptions{
+	data, _ := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -677,7 +736,7 @@ func TestToGraph_DefaultDiscoveredCountWithoutLocalID(t *testing.T) {
 		},
 	}
 
-	_, stats := ToGraph(result, GraphOptions{})
+	_, stats := toGraphForTest(result, GraphOptions{})
 	require.Equal(t, 2, stats.DevicesDiscovered)
 }
 
@@ -708,7 +767,7 @@ func TestToGraph_AssignsDeterministicActorIDsAndLinkActorIDs(t *testing.T) {
 		},
 	}
 
-	data, _ := ToGraph(result, GraphOptions{
+	data, _ := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -792,9 +851,9 @@ func TestToGraph_DeterministicAcrossRepeatedCalls(t *testing.T) {
 		LocalDeviceID: "local-device",
 	}
 
-	baseline, _ := ToGraph(result, opts)
+	baseline, _ := toGraphForTest(result, opts)
 	for range 10 {
-		next, _ := ToGraph(result, opts)
+		next, _ := toGraphForTest(result, opts)
 		require.Equal(t, baseline, next)
 	}
 }
@@ -826,7 +885,7 @@ func TestToGraph_DeduplicatesEndpointActorOverlappingManagedDevice(t *testing.T)
 		},
 	}
 
-	data, stats := ToGraph(result, GraphOptions{
+	data, stats := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -869,7 +928,7 @@ func TestToGraph_UsesDeterministicPrimaryManagementIP(t *testing.T) {
 		},
 	}
 
-	data, _ := ToGraph(result, GraphOptions{
+	data, _ := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -899,7 +958,7 @@ func TestToGraph_KeepsDistinctActorsWhenMACDiffersDespiteSameSecondaryIdentity(t
 		},
 	}
 
-	data, _ := ToGraph(result, GraphOptions{
+	data, _ := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -962,7 +1021,7 @@ func TestToGraph_MergesPairedAdjacenciesIntoBidirectionalLink(t *testing.T) {
 		},
 	}
 
-	data, stats := ToGraph(result, GraphOptions{
+	data, stats := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -1032,7 +1091,7 @@ func TestToGraph_MergesPairedAdjacenciesPreservesRawAddressHints(t *testing.T) {
 		},
 	}
 
-	data, _ := ToGraph(result, GraphOptions{
+	data, _ := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -1093,7 +1152,7 @@ func TestToGraph_MergesReversePairsWithoutDirectionalPairLabels(t *testing.T) {
 		},
 	}
 
-	data, stats := ToGraph(result, GraphOptions{
+	data, stats := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -1146,7 +1205,7 @@ func TestToGraph_UnknownAdjacencyPortsRemainUnsetWithoutZeroFallback(t *testing.
 		},
 	}
 
-	data, _ := ToGraph(result, GraphOptions{
+	data, _ := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -1188,7 +1247,7 @@ func TestToGraph_DropsAmbiguousEndpointSegmentLinks(t *testing.T) {
 		},
 	}
 
-	data, stats := ToGraph(result, GraphOptions{
+	data, stats := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -1242,14 +1301,14 @@ func TestToGraph_ProbableConnectivityConnectsAmbiguousEndpoint(t *testing.T) {
 		},
 	}
 
-	strictData, _ := ToGraph(result, GraphOptions{
+	strictData, _ := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
 	})
 	require.Len(t, findFDBLinksByEndpointMAC(strictData.Links, "70:49:a2:65:72:cd"), 0)
 
-	data, stats := ToGraph(result, GraphOptions{
+	data, stats := toGraphForTest(result, GraphOptions{
 		Source:                    "snmp",
 		Layer:                     "2",
 		View:                      "summary",
@@ -1286,7 +1345,7 @@ func TestToGraph_ProbableConnectivityDoesNotReclassifyStrictSinglePortEndpoint(t
 		},
 	}
 
-	strictData, _ := ToGraph(result, GraphOptions{
+	strictData, _ := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -1296,7 +1355,7 @@ func TestToGraph_ProbableConnectivityDoesNotReclassifyStrictSinglePortEndpoint(t
 	require.Equal(t, "", strings.TrimSpace(strictFDBLinks[0].State))
 	require.Equal(t, "", strings.TrimSpace(topologyMetricString(strictFDBLinks[0].Metrics, "inference")))
 
-	data, stats := ToGraph(result, GraphOptions{
+	data, stats := toGraphForTest(result, GraphOptions{
 		Source:                    "snmp",
 		Layer:                     "2",
 		View:                      "summary",
@@ -1337,14 +1396,14 @@ func TestToGraph_ProbableConnectivityConnectsUnlinkedLLDPEndpoint(t *testing.T) 
 		},
 	}
 
-	strictData, _ := ToGraph(result, GraphOptions{
+	strictData, _ := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
 	})
 	require.Len(t, findFDBLinksByEndpointMAC(strictData.Links, "70:49:a2:65:72:cf"), 0)
 
-	data, _ := ToGraph(result, GraphOptions{
+	data, _ := toGraphForTest(result, GraphOptions{
 		Source:                    "snmp",
 		Layer:                     "2",
 		View:                      "summary",
@@ -1404,14 +1463,14 @@ func TestToGraph_ProbableConnectivityAvoidsExtraBridgePathForLLDPPeers(t *testin
 		},
 	}
 
-	strictData, _ := ToGraph(result, GraphOptions{
+	strictData, _ := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
 	})
 	require.Len(t, findFDBLinksByEndpointMAC(strictData.Links, "70:49:a2:65:72:aa"), 0)
 
-	data, _ := ToGraph(result, GraphOptions{
+	data, _ := toGraphForTest(result, GraphOptions{
 		Source:                    "snmp",
 		Layer:                     "2",
 		View:                      "summary",
@@ -1473,14 +1532,14 @@ func TestToGraph_ProbableConnectivityConnectsZeroCandidateEndpointUsingReporterH
 		},
 	}
 
-	strictData, _ := ToGraph(result, GraphOptions{
+	strictData, _ := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
 	})
 	require.Len(t, findFDBLinksByEndpointIP(strictData.Links, "10.0.0.99"), 0)
 
-	data, _ := ToGraph(result, GraphOptions{
+	data, _ := toGraphForTest(result, GraphOptions{
 		Source:                    "snmp",
 		Layer:                     "2",
 		View:                      "summary",
@@ -1532,7 +1591,7 @@ func TestToGraph_ProbableConnectivityCreatesPortlessAttachmentForZeroCandidateEn
 		},
 	}
 
-	data, _ := ToGraph(result, GraphOptions{
+	data, _ := toGraphForTest(result, GraphOptions{
 		Source:                    "snmp",
 		Layer:                     "2",
 		View:                      "summary",
@@ -1597,7 +1656,7 @@ func TestToGraph_InferenceStrategy_STPParentDoesNotSuppressFDBEndpointOwnership(
 		},
 	}
 
-	_, baselineStats := ToGraph(result, GraphOptions{
+	_, baselineStats := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -1605,7 +1664,7 @@ func TestToGraph_InferenceStrategy_STPParentDoesNotSuppressFDBEndpointOwnership(
 	require.Equal(t, topologyInferenceStrategyFDBMinimumKnowledge, baselineStats.InferenceStrategy)
 	require.Greater(t, baselineStats.LinksFDBEndpointEmitted, 0)
 
-	_, stpStats := ToGraph(result, GraphOptions{
+	_, stpStats := toGraphForTest(result, GraphOptions{
 		Source:            "snmp",
 		Layer:             "2",
 		View:              "summary",
@@ -1650,7 +1709,7 @@ func TestToGraph_InferenceStrategy_CDPHybridPrefersCDPBridgeLinks(t *testing.T) 
 		},
 	}
 
-	_, baselineStats := ToGraph(result, GraphOptions{
+	_, baselineStats := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -1658,7 +1717,7 @@ func TestToGraph_InferenceStrategy_CDPHybridPrefersCDPBridgeLinks(t *testing.T) 
 	require.Equal(t, topologyInferenceStrategyFDBMinimumKnowledge, baselineStats.InferenceStrategy)
 	require.Equal(t, 0, baselineStats.LinksFDBEndpointEmitted)
 
-	_, stats := ToGraph(result, GraphOptions{
+	_, stats := toGraphForTest(result, GraphOptions{
 		Source:            "snmp",
 		Layer:             "2",
 		View:              "summary",
@@ -1843,14 +1902,14 @@ func TestToGraph_ProbableConnectivityRecoversUnmanagedOverlapSuppression(t *test
 		},
 	}
 
-	strictData, _ := ToGraph(result, GraphOptions{
+	strictData, _ := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
 	})
 	require.Len(t, findFDBLinksByEndpointMAC(strictData.Links, "cc:cc:cc:cc:cc:cc"), 0)
 
-	data, _ := ToGraph(result, GraphOptions{
+	data, _ := toGraphForTest(result, GraphOptions{
 		Source:                    "snmp",
 		Layer:                     "2",
 		View:                      "summary",
@@ -1910,14 +1969,14 @@ func TestToGraph_CollapseByIPPrunesSuppressedManagedOverlapEndpoint(t *testing.T
 		},
 	}
 
-	withoutCollapse, _ := ToGraph(result, GraphOptions{
+	withoutCollapse, _ := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
 	})
 	require.NotNil(t, findActorByMAC(withoutCollapse.Actors, "9c:6b:00:7b:98:c7"))
 
-	withCollapse, withCollapseStats := ToGraph(result, GraphOptions{
+	withCollapse, withCollapseStats := toGraphForTest(result, GraphOptions{
 		Source:             "snmp",
 		Layer:              "2",
 		View:               "summary",
@@ -1952,7 +2011,7 @@ func TestToGraph_ReplacesKnownDeviceEndpointWithManagedDeviceEdge(t *testing.T) 
 		},
 	}
 
-	data, stats := ToGraph(result, GraphOptions{
+	data, stats := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -1999,7 +2058,7 @@ func TestToGraph_KnownDeviceOverlapUsesInterfaceMACAlias(t *testing.T) {
 		},
 	}
 
-	data, stats := ToGraph(result, GraphOptions{
+	data, stats := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -2029,7 +2088,7 @@ func TestToGraph_DeviceActorIncludesInterfaceMACAliases(t *testing.T) {
 		},
 	}
 
-	data, _ := ToGraph(result, GraphOptions{
+	data, _ := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -2062,7 +2121,7 @@ func TestToGraph_KeepsUnlinkedEndpointsAndDevices(t *testing.T) {
 		},
 	}
 
-	data, stats := ToGraph(result, GraphOptions{
+	data, stats := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -2122,7 +2181,7 @@ func TestToGraph_KeepsUnlinkedEndpointWhenIdentityOverlapsLinkedDevice(t *testin
 		},
 	}
 
-	data, stats := ToGraph(result, GraphOptions{
+	data, stats := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -2153,7 +2212,7 @@ func TestToGraph_DisplayNamesPreferDNSThenIPThenMAC(t *testing.T) {
 		},
 	}
 
-	data, _ := ToGraph(result, GraphOptions{
+	data, _ := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -2237,7 +2296,7 @@ func TestToGraph_SegmentDisplayNameUsesParentPortPattern(t *testing.T) {
 		},
 	}
 
-	data, _ := ToGraph(result, GraphOptions{
+	data, _ := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -2295,7 +2354,7 @@ func TestToGraph_FDBOwnerInferencePrefersNonLLDPSide(t *testing.T) {
 		},
 	}
 
-	data, _ := ToGraph(result, GraphOptions{
+	data, _ := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -2335,7 +2394,7 @@ func TestToGraph_FDBOwnerInferenceUsesSingleMACPortRule(t *testing.T) {
 		},
 	}
 
-	data, _ := ToGraph(result, GraphOptions{
+	data, _ := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -2391,7 +2450,7 @@ func TestToGraph_FDBOwnerInferenceSuppressesManagedAliasSwitchFacingPorts(t *tes
 		},
 	}
 
-	data, _ := ToGraph(result, GraphOptions{
+	data, _ := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -2449,7 +2508,7 @@ func TestToGraph_SuppressesFDBEndpointsOnLLDPPorts(t *testing.T) {
 		},
 	}
 
-	data, stats := ToGraph(result, GraphOptions{
+	data, stats := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -2508,7 +2567,7 @@ func TestToGraph_KeepsChassisPlaceholderDevicesAsDevices(t *testing.T) {
 		},
 	}
 
-	data, _ := ToGraph(result, GraphOptions{
+	data, _ := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -2659,7 +2718,7 @@ func TestToGraph_DeterministicTransitRuleSuppressesFDBOnLLDPPortInExperimental(t
 		},
 	}
 
-	data, stats := ToGraph(result, GraphOptions{
+	data, stats := toGraphForTest(result, GraphOptions{
 		Source:            "snmp",
 		Layer:             "2",
 		View:              "summary",
@@ -2703,7 +2762,7 @@ func TestToGraph_DeterministicTransitRuleMatchesNumericLLDPPortToIfIndex(t *test
 		},
 	}
 
-	data, stats := ToGraph(result, GraphOptions{
+	data, stats := toGraphForTest(result, GraphOptions{
 		Source:            "snmp",
 		Layer:             "2",
 		View:              "summary",
@@ -2749,7 +2808,7 @@ func TestToGraph_SwitchFacingPortDoesNotSuppressEndpointOwnership(t *testing.T) 
 		},
 	}
 
-	data, _ := ToGraph(result, GraphOptions{
+	data, _ := toGraphForTest(result, GraphOptions{
 		Source:            "snmp",
 		Layer:             "2",
 		View:              "summary",
@@ -2857,7 +2916,7 @@ func TestToGraph_FDBOwnerInferenceUsesReporterMatrixRule(t *testing.T) {
 		},
 	}
 
-	data, _ := ToGraph(result, GraphOptions{
+	data, _ := toGraphForTest(result, GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",

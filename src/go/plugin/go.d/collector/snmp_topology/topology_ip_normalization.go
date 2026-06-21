@@ -35,7 +35,7 @@ func normalizeNonUnspecifiedIPAddress(value string) string {
 	if err != nil || addr.IsUnspecified() {
 		return ""
 	}
-	return ip
+	return addr.Unmap().String()
 }
 
 func parseIPFromDecodedBytes(bs []byte) net.IP {

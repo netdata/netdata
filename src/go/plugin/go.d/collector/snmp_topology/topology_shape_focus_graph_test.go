@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/stretchr/testify/require"
 )
 
@@ -130,11 +131,12 @@ func TestTopologyActorHasIPMatchesMatchAndManagementAddresses(t *testing.T) {
 		Match: topologyMatch{
 			IPAddresses: []string{"10.0.0.1"},
 		},
-		Attributes: map[string]any{
-			"management_ip": "10.0.0.2",
-			"management_addresses": []any{
-				"10.0.0.3",
-				"not-an-ip",
+		Detail: topologyActorDetail{
+			L2: topologyengine.ProjectionActorDetail{
+				Device: topologyengine.ProjectionDeviceActorDetail{
+					ManagementIP:        "10.0.0.2",
+					ManagementAddresses: []string{"10.0.0.3", "not-an-ip"},
+				},
 			},
 		},
 	}
@@ -155,6 +157,26 @@ func TestTopologyActorHasIPMatchesMatchAndManagementAddresses(t *testing.T) {
 			require.Equal(t, tc.want, topologyActorHasIP(actor, tc.ip))
 		})
 	}
+}
+
+func TestTopologyActorDetailManagementIPsCanonicalizesBeforeDedup(t *testing.T) {
+	actor := topologyActor{
+		Detail: topologyActorDetail{
+			SNMP: topologySNMPActorDetail{
+				ManagementIP: "::ffff:192.0.2.1",
+				ManagementAddresses: []topologyManagementAddress{
+					{Address: "192.0.2.1"},
+				},
+			},
+			L2: topologyengine.ProjectionActorDetail{
+				Device: topologyengine.ProjectionDeviceActorDetail{
+					ManagementAddresses: []string{"::", "::ffff:192.0.2.2", "192.0.2.2"},
+				},
+			},
+		},
+	}
+
+	require.Equal(t, []string{"192.0.2.1", "192.0.2.2"}, topologyActorDetailManagementIPs(actor))
 }
 
 func TestRecordTopologyFocusStatsNormalizesDepthAndFilteredCounts(t *testing.T) {

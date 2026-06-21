@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 )
 
@@ -19,6 +20,11 @@ type snmpTopologyV1PortNeighborSummary struct {
 	remoteActor    any
 	remotePortName string
 	ambiguous      bool
+}
+
+type topologyV1DynamicRow struct {
+	actorRef int
+	values   map[string]any
 }
 
 func snmpTopologyV1PortNeighborKeyFor(actorRef int, ifIndex any, portName string) snmpTopologyV1PortNeighborKey {
@@ -125,23 +131,90 @@ func snmpTopologyV1PortNeighborSummaryFor(
 func collectSNMPTopologyV1ActorTableRows(actors []topologyActor) map[string][]topologyV1DynamicRow {
 	tables := make(map[string][]topologyV1DynamicRow)
 	for actorIndex, actor := range actors {
-		for tableName, rows := range actor.Tables {
-			tableName = strings.TrimSpace(tableName)
-			if tableName == "" || len(rows) == 0 {
-				continue
-			}
-			for _, row := range rows {
-				if len(row) == 0 {
-					continue
-				}
-				tables[tableName] = append(tables[tableName], topologyV1DynamicRow{
-					actorRef: actorIndex,
-					values:   row,
-				})
-			}
+		for _, port := range actor.Detail.L2.Device.Ports {
+			tables["ports"] = append(tables["ports"], topologyV1DynamicRow{
+				actorRef: actorIndex,
+				values:   snmpTopologyV1PortValues(port),
+			})
+		}
+		for _, row := range actor.Detail.OSPF {
+			tables["ospf_neighbors"] = append(tables["ospf_neighbors"], topologyV1DynamicRow{
+				actorRef: actorIndex,
+				values:   snmpTopologyV1OSPFNeighborValues(row),
+			})
+		}
+		for _, row := range actor.Detail.BGP {
+			tables["bgp_peers"] = append(tables["bgp_peers"], topologyV1DynamicRow{
+				actorRef: actorIndex,
+				values:   snmpTopologyV1BGPPeerValues(row),
+			})
 		}
 	}
 	return tables
+}
+
+func snmpTopologyV1PortValues(port topologyengine.ProjectionPortDetail) map[string]any {
+	return pruneNilAttributes(map[string]any{
+		"if_index":                 nullableOptionalUintValue(port.IfIndex),
+		"port_id":                  port.PortID,
+		"name":                     firstNonEmptyString(port.Name, port.IfName, port.PortID),
+		"if_name":                  port.IfName,
+		"if_descr":                 port.IfDescr,
+		"if_alias":                 port.IfAlias,
+		"mac":                      port.MAC,
+		"speed":                    nullableOptionalUint64Value(port.Speed),
+		"topology_role":            port.TopologyRole,
+		"oper_status":              port.OperStatus,
+		"admin_status":             port.AdminStatus,
+		"port_type":                port.PortType,
+		"link_mode":                port.LinkMode,
+		"stp_state":                port.STPState,
+		"vlan_ids":                 port.VLANIDs,
+		"fdb_mac_count":            nullableOptionalUintValue(port.FDBMACCount),
+		"link_count":               nullableOptionalUintValue(port.LinkCount),
+		"neighbor_count":           nullableOptionalUintValue(port.NeighborCount),
+		"neighbors":                snmpTopologyV1PortNeighborValues(port.Neighbors),
+		"vlans":                    snmpTopologyV1PortVLANValues(port.VLANs),
+		"duplex":                   port.Duplex,
+		"link_mode_confidence":     port.LinkModeConfidence,
+		"topology_role_confidence": port.TopologyRoleConfidence,
+		"link_mode_sources":        port.LinkModeSources,
+		"topology_role_sources":    port.TopologyRoleSources,
+		"last_change":              port.LastChange,
+	})
+}
+
+func snmpTopologyV1PortNeighborValues(neighbors []topologyengine.ProjectionPortNeighbor) []map[string]any {
+	if len(neighbors) == 0 {
+		return nil
+	}
+	out := make([]map[string]any, 0, len(neighbors))
+	for _, neighbor := range neighbors {
+		out = append(out, pruneNilAttributes(map[string]any{
+			"protocol":            neighbor.Protocol,
+			"remote_device":       neighbor.RemoteDevice,
+			"remote_port":         neighbor.RemotePort,
+			"remote_ip":           neighbor.RemoteIP,
+			"remote_chassis_id":   neighbor.RemoteChassisID,
+			"remote_capabilities": neighbor.RemoteCapabilities,
+		}))
+	}
+	return out
+}
+
+func snmpTopologyV1PortVLANValues(vlans []topologyengine.ProjectionPortVLAN) []map[string]any {
+	if len(vlans) == 0 {
+		return nil
+	}
+	out := make([]map[string]any, 0, len(vlans))
+	for _, vlan := range vlans {
+		out = append(out, pruneNilAttributes(map[string]any{
+			"vlan_id":   vlan.VLANID,
+			"vlan_name": vlan.VLANName,
+			"tagged":    vlan.Tagged,
+		}))
+	}
+	return out
 }
 
 func buildSNMPTopologyV1ActorPortsTable(
@@ -172,7 +245,12 @@ func buildSNMPTopologyV1ActorPortsTable(
 	neighborPortNames := make([]any, len(rows))
 	neighbors := make([]any, len(rows))
 	vlans := make([]any, len(rows))
-	extra := make([]any, len(rows))
+	duplexes := make([]any, len(rows))
+	linkModeConfidences := make([]any, len(rows))
+	topologyRoleConfidences := make([]any, len(rows))
+	linkModeSources := make([]any, len(rows))
+	topologyRoleSources := make([]any, len(rows))
+	lastChanges := make([]any, len(rows))
 
 	for i, row := range rows {
 		actorRefs[i] = row.actorRef
@@ -213,7 +291,7 @@ func buildSNMPTopologyV1ActorPortsTable(
 		linkCounts[i] = nullableUintValue(row.values["link_count"])
 		neighborCounts[i] = nullableUintValue(row.values["neighbor_count"])
 		if neighborCounts[i] == nil {
-			if values, ok := anyMapSlice(row.values["neighbors"]); ok {
+			if values, ok := anyMapSlice(row.values["neighbors"]); ok && len(values) > 0 {
 				neighborCounts[i] = uint64(len(values))
 			}
 		}
@@ -223,7 +301,18 @@ func buildSNMPTopologyV1ActorPortsTable(
 		}
 		neighbors[i] = nullableJSON(row.values["neighbors"])
 		vlans[i] = nullableJSON(row.values["vlans"])
-		extra[i] = nullableJSON(snmpTopologyV1ExtraPortValues(row.values))
+		duplexes[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["duplex"]))
+		linkModeConfidences[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["link_mode_confidence"]))
+		topologyRoleConfidences[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["topology_role_confidence"]))
+		linkModeSources[i] = stringArrayCell(anyStringSlice(row.values["link_mode_sources"]))
+		if isEmptyArrayCell(linkModeSources[i]) {
+			linkModeSources[i] = nil
+		}
+		topologyRoleSources[i] = stringArrayCell(anyStringSlice(row.values["topology_role_sources"]))
+		if isEmptyArrayCell(topologyRoleSources[i]) {
+			topologyRoleSources[i] = nil
+		}
+		lastChanges[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["last_change"]))
 	}
 
 	return topologyv1.MustTable(len(rows), snmpTopologyV1ActorPortsColumns(), []topologyv1.ColumnEncoding{
@@ -250,7 +339,12 @@ func buildSNMPTopologyV1ActorPortsTable(
 		topologyv1.Values(neighborPortNames...),
 		topologyv1.Values(neighbors...),
 		topologyv1.Values(vlans...),
-		topologyv1.Values(extra...),
+		topologyv1.Values(duplexes...),
+		topologyv1.Values(linkModeConfidences...),
+		topologyv1.Values(topologyRoleConfidences...),
+		topologyv1.Values(linkModeSources...),
+		topologyv1.Values(topologyRoleSources...),
+		topologyv1.Values(lastChanges...),
 	})
 }
 
@@ -353,51 +447,4 @@ func (rows *snmpTopologyV1ActorPortLinkRows) table() topologyv1.Table {
 			topologyv1.Values(rows.lastSeen...),
 		},
 	)
-}
-
-var snmpTopologyV1ActorPortCanonicalKeys = map[string]struct{}{
-	"admin_status":       {},
-	"fdb_mac_count":      {},
-	"if_admin_status":    {},
-	"if_alias":           {},
-	"if_descr":           {},
-	"if_index":           {},
-	"if_name":            {},
-	"if_oper_status":     {},
-	"if_type":            {},
-	"link_count":         {},
-	"link_mode":          {},
-	"mac":                {},
-	"name":               {},
-	"neighbor_actor":     {},
-	"neighbor_count":     {},
-	"neighbor_port_name": {},
-	"neighbors":          {},
-	"oper_status":        {},
-	"port_id":            {},
-	"port_name":          {},
-	"port_type":          {},
-	"speed":              {},
-	"stp_state":          {},
-	"topology_role":      {},
-	"vlan_ids":           {},
-	"vlans":              {},
-}
-
-func snmpTopologyV1ExtraPortValues(values map[string]any) map[string]any {
-	extra := make(map[string]any)
-	for key, value := range values {
-		key = strings.TrimSpace(key)
-		if key == "" {
-			continue
-		}
-		if _, ok := snmpTopologyV1ActorPortCanonicalKeys[key]; ok {
-			continue
-		}
-		extra[key] = value
-	}
-	if len(extra) == 0 {
-		return nil
-	}
-	return extra
 }

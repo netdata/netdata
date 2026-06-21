@@ -62,3 +62,17 @@ func nullableActorRef(actorIndex map[string]int, value any) any {
 	}
 	return ref
 }
+
+func snmpTopologyV1OSPFNeighborValues(row topologyOSPFNeighborDetailRow) map[string]any {
+	return pruneNilAttributes(map[string]any{
+		"remote_actor_id":    row.RemoteActorID,
+		"local_router_id":    row.LocalRouterID,
+		"neighbor_router_id": row.NeighborRouterID,
+		"neighbor_ip":        row.NeighborIP,
+		"state":              row.State,
+		"local_ip":           row.LocalIP,
+		"subnet":             row.Subnet,
+		"addressless_index":  row.AddresslessIndex,
+		"source":             firstNonEmptyString(row.Source, "ospf_mib"),
+	})
+}

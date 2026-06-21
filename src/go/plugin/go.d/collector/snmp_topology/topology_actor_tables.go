@@ -4,8 +4,8 @@ package snmptopology
 
 import "strings"
 
-func attachTopologyActorTableRows(data *topologyData, tableName string, rowsByActor map[string][]map[string]any, sortRows func([]map[string]any)) {
-	if data == nil || tableName == "" || len(rowsByActor) == 0 {
+func attachTopologyOSPFNeighborRows(data *topologyData, rowsByActor map[string][]topologyOSPFNeighborDetailRow) {
+	if data == nil || len(rowsByActor) == 0 {
 		return
 	}
 	for i := range data.Actors {
@@ -14,12 +14,22 @@ func attachTopologyActorTableRows(data *topologyData, tableName string, rowsByAc
 		if len(rows) == 0 {
 			continue
 		}
-		if sortRows != nil {
-			sortRows(rows)
+		sortTopologyOSPFNeighborDetailRows(rows)
+		actor.Detail.OSPF = rows
+	}
+}
+
+func attachTopologyBGPPeerRows(data *topologyData, rowsByActor map[string][]topologyBGPPeerDetailRow) {
+	if data == nil || len(rowsByActor) == 0 {
+		return
+	}
+	for i := range data.Actors {
+		actor := &data.Actors[i]
+		rows := rowsByActor[strings.TrimSpace(actor.ActorID)]
+		if len(rows) == 0 {
+			continue
 		}
-		if actor.Tables == nil {
-			actor.Tables = make(map[string][]map[string]any)
-		}
-		actor.Tables[tableName] = rows
+		sortTopologyBGPPeerDetailRows(rows)
+		actor.Detail.BGP = rows
 	}
 }

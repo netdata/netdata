@@ -3,7 +3,6 @@
 package snmptopology
 
 import (
-	"fmt"
 	"slices"
 	"strings"
 )
@@ -59,24 +58,5 @@ func topologyActorHasIP(actor topologyActor, ip string) bool {
 	if slices.Contains(normalizedMatchIPs(actor.Match), ip) {
 		return true
 	}
-	if ip == normalizeIPAddress(topologyMetricValueString(actor.Attributes, "management_ip")) {
-		return true
-	}
-	if raw, ok := actor.Attributes["management_addresses"]; ok {
-		switch values := raw.(type) {
-		case []string:
-			for _, value := range values {
-				if ip == normalizeIPAddress(value) {
-					return true
-				}
-			}
-		case []any:
-			for _, value := range values {
-				if ip == normalizeIPAddress(fmt.Sprint(value)) {
-					return true
-				}
-			}
-		}
-	}
-	return false
+	return slices.Contains(topologyActorDetailManagementIPs(actor), ip)
 }

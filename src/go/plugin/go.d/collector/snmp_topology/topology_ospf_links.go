@@ -20,6 +20,18 @@ type topologyOSPFEnrichmentStats struct {
 	suppressedDuplicateLink      int
 }
 
+type topologyOSPFNeighborDetailRow struct {
+	RemoteActorID    string
+	LocalRouterID    string
+	NeighborRouterID string
+	NeighborIP       string
+	State            string
+	LocalIP          string
+	Subnet           string
+	AddresslessIndex string
+	Source           string
+}
+
 func applyTopologyOSPFAdjacencyEnrichment(data *topologyData, aggregate topologyObservationAggregate) topologyOSPFEnrichmentStats {
 	var stats topologyOSPFEnrichmentStats
 	if data == nil || len(aggregate.ospfNeighbors) == 0 {
@@ -28,7 +40,7 @@ func applyTopologyOSPFAdjacencyEnrichment(data *topologyData, aggregate topology
 
 	resolver := newTopologyL3ActorResolver(data, aggregate.snapshots)
 	seen := existingTopologyOSPFLinkKeys(data.Links)
-	neighborRowsByActor := make(map[string][]map[string]any)
+	neighborRowsByActor := make(map[string][]topologyOSPFNeighborDetailRow)
 
 	for _, row := range aggregate.ospfNeighbors {
 		stats.observedRows++
@@ -38,7 +50,7 @@ func applyTopologyOSPFAdjacencyEnrichment(data *topologyData, aggregate topology
 			modalRow := topologyOSPFNeighborActorRow(row)
 			if remoteOK {
 				row.RemoteActorID = remoteRef.actorID
-				modalRow["remote_actor_id"] = remoteRef.actorID
+				modalRow.RemoteActorID = remoteRef.actorID
 			}
 			neighborRowsByActor[localRef.actorID] = append(neighborRowsByActor[localRef.actorID], modalRow)
 			stats.attachedNeighborRows++
@@ -72,7 +84,7 @@ func applyTopologyOSPFAdjacencyEnrichment(data *topologyData, aggregate topology
 		stats.emittedLinks++
 	}
 
-	attachTopologyActorTableRows(data, "ospf_neighbors", neighborRowsByActor, sortTopologyOSPFNeighborRows)
+	attachTopologyOSPFNeighborRows(data, neighborRowsByActor)
 	sort.Slice(data.Links, func(i, j int) bool {
 		return topologyLinkSortKey(data.Links[i]) < topologyLinkSortKey(data.Links[j])
 	})
@@ -154,44 +166,31 @@ func topologyOSPFLinkMetrics(row topologyOSPFNeighbor) map[string]any {
 	return metrics
 }
 
-func topologyOSPFNeighborActorRow(row topologyOSPFNeighbor) map[string]any {
-	out := map[string]any{
-		"state":  normalizeOSPFNeighborState(row.State),
-		"source": "ospf_mib",
+func topologyOSPFNeighborActorRow(row topologyOSPFNeighbor) topologyOSPFNeighborDetailRow {
+	return topologyOSPFNeighborDetailRow{
+		LocalRouterID:    normalizeTopologyRouterID(row.LocalRouterID),
+		NeighborRouterID: normalizeTopologyRouterID(row.NeighborRouterID),
+		NeighborIP:       normalizeNonUnspecifiedIPAddress(row.NeighborIP),
+		State:            normalizeOSPFNeighborState(row.State),
+		LocalIP:          normalizeNonUnspecifiedIPAddress(row.LocalIP),
+		Subnet:           row.Subnet,
+		AddresslessIndex: row.AddresslessIndex,
+		Source:           "ospf_mib",
 	}
-	if routerID := normalizeTopologyRouterID(row.LocalRouterID); routerID != "" {
-		out["local_router_id"] = routerID
-	}
-	if routerID := normalizeTopologyRouterID(row.NeighborRouterID); routerID != "" {
-		out["neighbor_router_id"] = routerID
-	}
-	if ip := normalizeNonUnspecifiedIPAddress(row.NeighborIP); ip != "" {
-		out["neighbor_ip"] = ip
-	}
-	if ip := normalizeNonUnspecifiedIPAddress(row.LocalIP); ip != "" {
-		out["local_ip"] = ip
-	}
-	if row.AddresslessIndex != "" {
-		out["addressless_index"] = row.AddresslessIndex
-	}
-	if row.Subnet != "" {
-		out["subnet"] = row.Subnet
-	}
-	return out
 }
 
-func sortTopologyOSPFNeighborRows(rows []map[string]any) {
+func sortTopologyOSPFNeighborDetailRows(rows []topologyOSPFNeighborDetailRow) {
 	sort.Slice(rows, func(i, j int) bool {
 		return topologyOSPFNeighborActorRowSortKey(rows[i]) < topologyOSPFNeighborActorRowSortKey(rows[j])
 	})
 }
 
-func topologyOSPFNeighborActorRowSortKey(row map[string]any) string {
+func topologyOSPFNeighborActorRowSortKey(row topologyOSPFNeighborDetailRow) string {
 	return strings.Join([]string{
-		anyStringValue(row["neighbor_router_id"]),
-		normalizeNonUnspecifiedIPAddress(anyStringValue(row["neighbor_ip"])),
-		anyStringValue(row["addressless_index"]),
-		anyStringValue(row["state"]),
+		row.NeighborRouterID,
+		normalizeNonUnspecifiedIPAddress(row.NeighborIP),
+		row.AddresslessIndex,
+		row.State,
 	}, "\x00")
 }
 

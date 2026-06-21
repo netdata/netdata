@@ -36,7 +36,7 @@ func topologyActorIsInferred(actor topologyActor) bool {
 	if strings.EqualFold(strings.TrimSpace(actor.ActorType), "endpoint") {
 		return true
 	}
-	if boolStatValue(actor.Attributes["inferred"]) {
+	if actor.Detail.L2.Device.Inferred {
 		return true
 	}
 	if boolStatValue(actor.Labels["inferred"]) {

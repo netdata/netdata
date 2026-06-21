@@ -34,8 +34,8 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentEmitsFullManagedLink(t *testing.T) 
 	require.Equal(t, 1, topologyStatsToV1(data.Stats)["ospf_neighbor_detail_rows"])
 	require.Equal(t, 1, topologyStatsToV1(data.Stats)["ospf_adjacency_emitted_links"])
 	require.Equal(t, 1, topologyStatsToV1(data.Stats)["ospf_adjacency_visible_links"])
-	require.Len(t, data.Actors[0].Tables["ospf_neighbors"], 1)
-	require.Equal(t, "router-b", data.Actors[0].Tables["ospf_neighbors"][0]["remote_actor_id"])
+	require.Len(t, data.Actors[0].Detail.OSPF, 1)
+	require.Equal(t, "router-b", data.Actors[0].Detail.OSPF[0].RemoteActorID)
 }
 
 func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsSuppressedNeighborsAsDetailOnly(t *testing.T) {
@@ -121,16 +121,16 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsSuppressedNeighborsAsDetailOnl
 			require.Equal(t, tc.wantUnresolvedNeighbor, stats.suppressedUnresolvedNeighbor)
 			require.Equal(t, tc.wantSelfActor, stats.suppressedSelfActor)
 			require.Empty(t, tc.data.Links)
-			require.Len(t, tc.data.Actors[0].Tables["ospf_neighbors"], 1)
-			row := tc.data.Actors[0].Tables["ospf_neighbors"][0]
+			require.Len(t, tc.data.Actors[0].Detail.OSPF, 1)
+			row := tc.data.Actors[0].Detail.OSPF[0]
 			if tc.wantDetailState != "" {
-				require.Equal(t, tc.wantDetailState, row["state"])
+				require.Equal(t, tc.wantDetailState, row.State)
 			}
 			if tc.wantRemoteActorID != "" {
-				require.Equal(t, tc.wantRemoteActorID, row["remote_actor_id"])
+				require.Equal(t, tc.wantRemoteActorID, row.RemoteActorID)
 			}
 			if tc.wantRemoteActorIDAbsent {
-				require.NotContains(t, row, "remote_actor_id")
+				require.Empty(t, row.RemoteActorID)
 			}
 			if tc.wantSuppressedStatsCounter != "" {
 				require.Equal(t, 1, topologyStatsToV1(tc.data.Stats)[tc.wantSuppressedStatsCounter])
@@ -158,8 +158,8 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentDeduplicatesBidirectionalObservatio
 	require.Equal(t, 1, stats.emittedLinks)
 	require.Equal(t, 1, stats.suppressedDuplicateLink)
 	require.Len(t, data.Links, 1)
-	require.Len(t, data.Actors[0].Tables["ospf_neighbors"], 1)
-	require.Len(t, data.Actors[1].Tables["ospf_neighbors"], 1)
+	require.Len(t, data.Actors[0].Detail.OSPF, 1)
+	require.Len(t, data.Actors[1].Detail.OSPF, 1)
 }
 
 func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsMatchingL3SubnetEdge(t *testing.T) {
@@ -281,7 +281,7 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentResolvesUnnumberedNeighborByRouterI
 	require.Equal(t, "2.2.2.2", data.Links[0].Dst.Attributes["router_id"])
 	require.NotContains(t, data.Links[0].Dst.Attributes, "ip")
 	require.NotContains(t, data.Links[0].Metrics, "neighbor_ip")
-	require.NotContains(t, data.Actors[0].Tables["ospf_neighbors"][0], "neighbor_ip")
+	require.Empty(t, data.Actors[0].Detail.OSPF[0].NeighborIP)
 }
 
 func TestApplyTopologyOSPFAdjacencyEnrichmentDeduplicatesBidirectionalUnnumberedObservations(t *testing.T) {
@@ -318,8 +318,8 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentDeduplicatesBidirectionalUnnumbered
 	require.Equal(t, 1, stats.suppressedDuplicateLink)
 	require.Len(t, data.Links, 1)
 	require.Equal(t, topologyOSPFAdjacencyLinkType, data.Links[0].LinkType)
-	require.Len(t, data.Actors[0].Tables["ospf_neighbors"], 1)
-	require.Len(t, data.Actors[1].Tables["ospf_neighbors"], 1)
+	require.Len(t, data.Actors[0].Detail.OSPF, 1)
+	require.Len(t, data.Actors[1].Detail.OSPF, 1)
 }
 
 func countTopologyLinksByType(links []topologyLink, linkType string) int {

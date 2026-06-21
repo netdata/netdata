@@ -168,18 +168,18 @@ func isBGPPeerEstablished(row topologyBGPPeer) bool {
 	return strings.EqualFold(strings.TrimSpace(row.State), string(ddprofiledefinition.BGPPeerStateEstablished))
 }
 
-func sortTopologyBGPPeerRows(rows []map[string]any) {
+func sortTopologyBGPPeerDetailRows(rows []topologyBGPPeerDetailRow) {
 	sort.Slice(rows, func(i, j int) bool {
 		return topologyBGPPeerActorRowSortKey(rows[i]) < topologyBGPPeerActorRowSortKey(rows[j])
 	})
 }
 
-func topologyBGPPeerActorRowSortKey(row map[string]any) string {
+func topologyBGPPeerActorRowSortKey(row topologyBGPPeerDetailRow) string {
 	return strings.Join([]string{
-		anyStringValue(row["routing_instance"]),
-		anyStringValue(row["remote_as"]),
-		topologyBGPPeerAddressValue(anyStringValue(row["neighbor_ip"])),
-		anyStringValue(row["peer_identifier"]),
-		anyStringValue(row["state"]),
+		row.RoutingInstance,
+		row.RemoteAS,
+		topologyBGPPeerAddressValue(row.NeighborIP),
+		row.PeerIdentifier,
+		row.State,
 	}, "\x00")
 }

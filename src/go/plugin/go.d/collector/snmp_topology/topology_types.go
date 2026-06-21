@@ -11,10 +11,53 @@ import (
 
 const topologySchemaVersion = "2.0"
 
-type topologyActor = graph.Actor
 type topologyMatch = graph.Match
 type topologyLink = graph.Link
 type topologyLinkEndpoint = graph.LinkEndpoint
+
+type topologyActor struct {
+	ActorID     string
+	ActorType   string
+	Layer       string
+	Source      string
+	Match       topologyMatch
+	ParentMatch *topologyMatch
+	Labels      map[string]string
+	Detail      topologyActorDetail
+}
+
+type topologyActorDetail struct {
+	L2   topologyengine.ProjectionActorDetail
+	SNMP topologySNMPActorDetail
+	OSPF []topologyOSPFNeighborDetailRow
+	BGP  []topologyBGPPeerDetailRow
+}
+
+type topologySNMPActorDetail struct {
+	ManagementAddresses   []topologyManagementAddress
+	Capabilities          []string
+	CapabilitiesSupported []string
+	CapabilitiesEnabled   []string
+	SysDescr              string
+	SysContact            string
+	SysLocation           string
+	SysUptime             int64
+	Vendor                string
+	VendorSource          string
+	VendorConfidence      string
+	Model                 string
+	OSPFRouterID          string
+	SerialNumber          string
+	SoftwareVersion       string
+	FirmwareVersion       string
+	HardwareVersion       string
+	ManagementIP          string
+	NetdataHostID         string
+	ChartIDPrefix         string
+	ChartContextPrefix    string
+	DeviceCharts          map[string]string
+	InterfaceCharts       map[string]topologyInterfaceChartRef
+}
 
 type topologyData struct {
 	SchemaVersion string
@@ -26,6 +69,19 @@ type topologyData struct {
 	Actors        []topologyActor
 	Links         []topologyLink
 	Stats         topologyStats
+}
+
+func topologyActorFromGraph(actor graph.Actor, detail topologyengine.ProjectionActorDetail) topologyActor {
+	return topologyActor{
+		ActorID:     actor.ActorID,
+		ActorType:   actor.ActorType,
+		Layer:       actor.Layer,
+		Source:      actor.Source,
+		Match:       actor.Match,
+		ParentMatch: actor.ParentMatch,
+		Labels:      actor.Labels,
+		Detail:      topologyActorDetail{L2: detail},
+	}
 }
 
 type topologyStats struct {
