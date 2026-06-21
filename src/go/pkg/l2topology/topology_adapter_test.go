@@ -91,28 +91,31 @@ func TestToGraph_ProjectsResult(t *testing.T) {
 
 	localActor := findActorBySysName(data.Actors, "sw1")
 	require.NotNil(t, localActor)
-	require.Equal(t, false, localActor.Attributes["discovered"])
-	require.Equal(t, false, localActor.Attributes["inferred"])
-	require.Equal(t, []string{"bridge", "fdb", "stp"}, localActor.Attributes["protocols"])
-	require.Equal(t, []string{"bridge", "fdb", "stp"}, localActor.Attributes["protocols_collected"])
-	require.Equal(t, 2, localActor.Attributes["ports_total"])
-	require.NotNil(t, localActor.Attributes["if_admin_status_counts"])
-	require.NotNil(t, localActor.Attributes["if_oper_status_counts"])
-	require.NotNil(t, localActor.Attributes["if_link_mode_counts"])
-	require.NotNil(t, localActor.Attributes["if_topology_role_counts"])
-	require.NotNil(t, localActor.Attributes["if_statuses"])
+	localDetail := requireActorDetail(t, data, localActor)
+	require.False(t, localDetail.Device.Discovered)
+	require.False(t, localDetail.Device.Inferred)
+	require.Equal(t, []string{"bridge", "fdb", "stp"}, localDetail.Device.Protocols)
+	require.Equal(t, []string{"bridge", "fdb", "stp"}, localDetail.Device.ProtocolsCollected)
+	require.Equal(t, OptionalValue[int]{Value: 2, Has: true}, localDetail.Device.PortsTotal)
+	require.NotNil(t, localDetail.Device.AdminStatusCounts)
+	require.NotNil(t, localDetail.Device.OperStatusCounts)
+	require.NotNil(t, localDetail.Device.LinkModeCounts)
+	require.NotNil(t, localDetail.Device.TopologyRoleCounts)
+	require.NotNil(t, localDetail.Device.Ports)
 	remoteActor := findActorBySysName(data.Actors, "sw2")
 	require.NotNil(t, remoteActor)
-	require.Equal(t, true, remoteActor.Attributes["inferred"])
+	remoteDetail := requireActorDetail(t, data, remoteActor)
+	require.True(t, remoteDetail.Device.Inferred)
 
 	endpointActor := findActorByMAC(data.Actors, "70:49:a2:65:72:cd")
 	require.NotNil(t, endpointActor)
 	require.Equal(t, "endpoint", endpointActor.ActorType)
 	require.Equal(t, []string{"10.20.4.84"}, endpointActor.Match.IPAddresses)
-	require.Equal(t, []string{"arp", "fdb"}, endpointActor.Attributes["learned_sources"])
-	require.Equal(t, "single_port_mac", endpointActor.Attributes["attachment_source"])
-	require.Equal(t, "sw1", endpointActor.Attributes["attached_device"])
-	require.Equal(t, "Gi0/4", endpointActor.Attributes["attached_port"])
+	endpointDetail := requireActorDetail(t, data, endpointActor)
+	require.Equal(t, []string{"arp", "fdb"}, endpointDetail.Endpoint.LearnedSources)
+	require.Equal(t, "single_port_mac", endpointDetail.Endpoint.AttachmentSource)
+	require.Equal(t, "sw1", endpointDetail.Endpoint.AttachedDevice)
+	require.Equal(t, "Gi0/4", endpointDetail.Endpoint.AttachedPort)
 
 	require.Equal(t, 2, stats.DevicesTotal)
 	require.Equal(t, 1, stats.DevicesDiscovered)
@@ -296,59 +299,56 @@ func TestToGraph_ClassifiesPortLinkModesFromFDBAndSTPEvidence(t *testing.T) {
 
 	actor := findActorBySysName(data.Actors, "sw1")
 	require.NotNil(t, actor)
+	detail := requireActorDetail(t, data, actor)
 
-	modeCounts, ok := actor.Attributes["if_link_mode_counts"].(map[string]any)
-	require.True(t, ok)
-	require.Equal(t, 1, modeCounts["trunk"])
-	require.Equal(t, 1, modeCounts["access"])
-	require.Equal(t, 2, modeCounts["unknown"])
+	require.Equal(t, 1, detail.Device.LinkModeCounts["trunk"])
+	require.Equal(t, 1, detail.Device.LinkModeCounts["access"])
+	require.Equal(t, 2, detail.Device.LinkModeCounts["unknown"])
 
-	roleCounts, ok := actor.Attributes["if_topology_role_counts"].(map[string]any)
-	require.True(t, ok)
-	require.Equal(t, 1, roleCounts["switch_facing"])
-	require.Equal(t, 1, roleCounts["host_facing"])
-	require.Equal(t, 1, roleCounts["host_candidate"])
-	require.Equal(t, 1, roleCounts["unknown"])
+	require.Equal(t, 1, detail.Device.TopologyRoleCounts["switch_facing"])
+	require.Equal(t, 1, detail.Device.TopologyRoleCounts["host_facing"])
+	require.Equal(t, 1, detail.Device.TopologyRoleCounts["host_candidate"])
+	require.Equal(t, 1, detail.Device.TopologyRoleCounts["unknown"])
 
-	statuses, ok := actor.Attributes["if_statuses"].([]map[string]any)
-	require.True(t, ok)
+	port1 := findInterfaceStatusByIndex(detail.Device.Ports, 1)
+	require.NotNil(t, port1)
+	require.Equal(t, "trunk", port1.LinkMode)
+	require.Equal(t, "high", port1.LinkModeConfidence)
+	require.Equal(t, []string{"fdb", "stp"}, port1.LinkModeSources)
+	require.Equal(t, []string{"10", "20"}, port1.VLANIDs)
+	require.Equal(t, "unknown", port1.TopologyRole)
+	require.Equal(t, "low", port1.TopologyRoleConfidence)
+	require.Equal(t, []string{"stp", "fdb"}, port1.TopologyRoleSources)
 
-	port1 := findInterfaceStatusByIndex(statuses, 1)
-	require.Equal(t, "trunk", port1["link_mode"])
-	require.Equal(t, "high", port1["link_mode_confidence"])
-	require.Equal(t, []string{"fdb", "stp"}, port1["link_mode_sources"])
-	require.Equal(t, []string{"10", "20"}, port1["vlan_ids"])
-	require.Equal(t, "unknown", port1["topology_role"])
-	require.Equal(t, "low", port1["topology_role_confidence"])
-	require.Equal(t, []string{"stp", "fdb"}, port1["topology_role_sources"])
+	port2 := findInterfaceStatusByIndex(detail.Device.Ports, 2)
+	require.NotNil(t, port2)
+	require.Equal(t, "access", port2.LinkMode)
+	require.Equal(t, "medium", port2.LinkModeConfidence)
+	require.Equal(t, []string{"fdb"}, port2.LinkModeSources)
+	require.Equal(t, []string{"30"}, port2.VLANIDs)
+	require.Equal(t, "host_facing", port2.TopologyRole)
+	require.Equal(t, "medium", port2.TopologyRoleConfidence)
+	require.Equal(t, []string{"fdb"}, port2.TopologyRoleSources)
 
-	port2 := findInterfaceStatusByIndex(statuses, 2)
-	require.Equal(t, "access", port2["link_mode"])
-	require.Equal(t, "medium", port2["link_mode_confidence"])
-	require.Equal(t, []string{"fdb"}, port2["link_mode_sources"])
-	require.Equal(t, []string{"30"}, port2["vlan_ids"])
-	require.Equal(t, "host_facing", port2["topology_role"])
-	require.Equal(t, "medium", port2["topology_role_confidence"])
-	require.Equal(t, []string{"fdb"}, port2["topology_role_sources"])
+	port3 := findInterfaceStatusByIndex(detail.Device.Ports, 3)
+	require.NotNil(t, port3)
+	require.Equal(t, "unknown", port3.LinkMode)
+	require.Equal(t, "low", port3.LinkModeConfidence)
+	require.Equal(t, []string{"fdb", "peer_link"}, port3.LinkModeSources)
+	require.Equal(t, []string{"40"}, port3.VLANIDs)
+	require.Equal(t, "switch_facing", port3.TopologyRole)
+	require.Equal(t, "high", port3.TopologyRoleConfidence)
+	require.Equal(t, []string{"peer_link", "bridge_link", "fdb"}, port3.TopologyRoleSources)
 
-	port3 := findInterfaceStatusByIndex(statuses, 3)
-	require.Equal(t, "unknown", port3["link_mode"])
-	require.Equal(t, "low", port3["link_mode_confidence"])
-	require.Equal(t, []string{"fdb", "peer_link"}, port3["link_mode_sources"])
-	require.Equal(t, []string{"40"}, port3["vlan_ids"])
-	require.Equal(t, "switch_facing", port3["topology_role"])
-	require.Equal(t, "high", port3["topology_role_confidence"])
-	require.Equal(t, []string{"peer_link", "bridge_link", "fdb"}, port3["topology_role_sources"])
-
-	port4 := findInterfaceStatusByIndex(statuses, 4)
-	require.Equal(t, "unknown", port4["link_mode"])
-	require.Equal(t, "low", port4["link_mode_confidence"])
-	require.Equal(t, []string{"fdb"}, port4["link_mode_sources"])
-	_, hasVLANs := port4["vlan_ids"]
-	require.False(t, hasVLANs)
-	require.Equal(t, "host_candidate", port4["topology_role"])
-	require.Equal(t, "low", port4["topology_role_confidence"])
-	require.Equal(t, []string{"fdb"}, port4["topology_role_sources"])
+	port4 := findInterfaceStatusByIndex(detail.Device.Ports, 4)
+	require.NotNil(t, port4)
+	require.Equal(t, "unknown", port4.LinkMode)
+	require.Equal(t, "low", port4.LinkModeConfidence)
+	require.Equal(t, []string{"fdb"}, port4.LinkModeSources)
+	require.Empty(t, port4.VLANIDs)
+	require.Equal(t, "host_candidate", port4.TopologyRole)
+	require.Equal(t, "low", port4.TopologyRoleConfidence)
+	require.Equal(t, []string{"fdb"}, port4.TopologyRoleSources)
 }
 
 func TestToGraph_IgnoresIgnoredFDBStatusForLinkModeClassification(t *testing.T) {
@@ -384,19 +384,16 @@ func TestToGraph_IgnoresIgnoredFDBStatusForLinkModeClassification(t *testing.T) 
 
 	actor := findActorBySysName(data.Actors, "sw1")
 	require.NotNil(t, actor)
-	statuses, ok := actor.Attributes["if_statuses"].([]map[string]any)
-	require.True(t, ok)
-	port := findInterfaceStatusByIndex(statuses, 10)
-	require.Equal(t, "unknown", port["link_mode"])
-	require.Equal(t, "low", port["link_mode_confidence"])
-	_, hasSources := port["link_mode_sources"]
-	require.False(t, hasSources)
-	_, hasVLANs := port["vlan_ids"]
-	require.False(t, hasVLANs)
-	require.Equal(t, "unknown", port["topology_role"])
-	require.Equal(t, "low", port["topology_role_confidence"])
-	_, hasRoleSources := port["topology_role_sources"]
-	require.False(t, hasRoleSources)
+	detail := requireActorDetail(t, data, actor)
+	port := findInterfaceStatusByIndex(detail.Device.Ports, 10)
+	require.NotNil(t, port)
+	require.Equal(t, "unknown", port.LinkMode)
+	require.Equal(t, "low", port.LinkModeConfidence)
+	require.Empty(t, port.LinkModeSources)
+	require.Empty(t, port.VLANIDs)
+	require.Equal(t, "unknown", port.TopologyRole)
+	require.Equal(t, "low", port.TopologyRoleConfidence)
+	require.Empty(t, port.TopologyRoleSources)
 }
 
 func TestToGraph_ClassifiesSTPCorroboratedManagedAliasAsSwitchFacing(t *testing.T) {
@@ -449,13 +446,12 @@ func TestToGraph_ClassifiesSTPCorroboratedManagedAliasAsSwitchFacing(t *testing.
 
 	actor := findActorBySysName(data.Actors, "sw1")
 	require.NotNil(t, actor)
-
-	statuses, ok := actor.Attributes["if_statuses"].([]map[string]any)
-	require.True(t, ok)
-	port1 := findInterfaceStatusByIndex(statuses, 1)
-	require.Equal(t, "switch_facing", port1["topology_role"])
-	require.Equal(t, "medium", port1["topology_role_confidence"])
-	require.Equal(t, []string{"stp", "fdb", "fdb_managed_alias"}, port1["topology_role_sources"])
+	detail := requireActorDetail(t, data, actor)
+	port1 := findInterfaceStatusByIndex(detail.Device.Ports, 1)
+	require.NotNil(t, port1)
+	require.Equal(t, "switch_facing", port1.TopologyRole)
+	require.Equal(t, "medium", port1.TopologyRoleConfidence)
+	require.Equal(t, []string{"stp", "fdb", "fdb_managed_alias"}, port1.TopologyRoleSources)
 }
 
 func TestToGraph_EnrichesPortStatusesWithNeighborsFDBAndSTP(t *testing.T) {
@@ -588,63 +584,58 @@ func TestToGraph_EnrichesPortStatusesWithNeighborsFDBAndSTP(t *testing.T) {
 
 	actor := findActorBySysName(data.Actors, "sw1")
 	require.NotNil(t, actor)
-	require.Equal(t, 1, actor.Attributes["ports_up"])
-	require.Equal(t, 1, actor.Attributes["ports_down"])
-	require.Equal(t, 1, actor.Attributes["ports_admin_down"])
-	require.EqualValues(t, 1_000_000_000, actor.Attributes["total_bandwidth_bps"])
-	require.Equal(t, 3, actor.Attributes["fdb_total_macs"])
-	require.Equal(t, 2, actor.Attributes["vlan_count"])
-	require.Equal(t, 1, actor.Attributes["lldp_neighbor_count"])
-	require.Equal(t, 1, actor.Attributes["cdp_neighbor_count"])
+	detail := requireActorDetail(t, data, actor)
+	require.Equal(t, OptionalValue[int]{Value: 1, Has: true}, detail.Device.PortsUp)
+	require.Equal(t, OptionalValue[int]{Value: 1, Has: true}, detail.Device.PortsDown)
+	require.Equal(t, OptionalValue[int]{Value: 1, Has: true}, detail.Device.PortsAdminDown)
+	require.Equal(t, OptionalValue[int64]{Value: 1_000_000_000, Has: true}, detail.Device.TotalBandwidthBps)
+	require.Equal(t, OptionalValue[int]{Value: 3, Has: true}, detail.Device.FDBTotalMACs)
+	require.Equal(t, OptionalValue[int]{Value: 2, Has: true}, detail.Device.VLANCount)
+	require.Equal(t, OptionalValue[int]{Value: 1, Has: true}, detail.Device.LLDPNeighborCount)
+	require.Equal(t, OptionalValue[int]{Value: 1, Has: true}, detail.Device.CDPNeighborCount)
 
-	statuses, ok := actor.Attributes["if_statuses"].([]map[string]any)
-	require.True(t, ok)
+	port1 := findInterfaceStatusByIndex(detail.Device.Ports, 1)
+	require.NotNil(t, port1)
+	require.Equal(t, "Gi0/1", port1.IfDescr)
+	require.Equal(t, "uplink-core", port1.IfAlias)
+	require.Equal(t, "00:11:22:33:44:55", port1.MAC)
+	require.Equal(t, OptionalValue[int64]{Value: 1_000_000_000, Has: true}, port1.Speed)
+	require.Equal(t, "12345", port1.LastChange)
+	require.Equal(t, "full", port1.Duplex)
+	require.Equal(t, OptionalValue[int]{Value: 2, Has: true}, port1.FDBMACCount)
+	require.Equal(t, "blocking", port1.STPState)
+	require.Len(t, port1.VLANs, 2)
+	require.Equal(t, "10", port1.VLANs[0].VLANID)
+	require.True(t, port1.VLANs[0].Tagged)
+	require.Equal(t, "20", port1.VLANs[1].VLANID)
+	require.True(t, port1.VLANs[1].Tagged)
+	require.Len(t, port1.Neighbors, 2)
 
-	port1 := findInterfaceStatusByIndex(statuses, 1)
-	require.Equal(t, "Gi0/1", port1["if_descr"])
-	require.Equal(t, "uplink-core", port1["if_alias"])
-	require.Equal(t, "00:11:22:33:44:55", port1["mac"])
-	require.EqualValues(t, 1_000_000_000, port1["speed"])
-	require.EqualValues(t, 12345, port1["last_change"])
-	require.Equal(t, "full", port1["duplex"])
-	require.Equal(t, 2, port1["fdb_mac_count"])
-	require.Equal(t, "blocking", port1["stp_state"])
-	vlans, ok := port1["vlans"].([]map[string]any)
-	require.True(t, ok)
-	require.Len(t, vlans, 2)
-	require.Equal(t, "10", vlans[0]["vlan_id"])
-	require.Equal(t, true, vlans[0]["tagged"])
-	require.Equal(t, "20", vlans[1]["vlan_id"])
-	require.Equal(t, true, vlans[1]["tagged"])
-	neighbors, ok := port1["neighbors"].([]map[string]any)
-	require.True(t, ok)
-	require.Len(t, neighbors, 2)
-
-	cdpNeighbor := findNeighborByProtocol(neighbors, "cdp")
+	cdpNeighbor := findNeighborByProtocol(port1.Neighbors, "cdp")
 	require.NotNil(t, cdpNeighbor)
-	require.Equal(t, "sw2", cdpNeighbor["remote_device"])
-	require.Equal(t, "Gi0/24", cdpNeighbor["remote_port"])
-	require.Equal(t, "10.0.0.2", cdpNeighbor["remote_ip"])
-	require.Equal(t, "aa:bb:cc:dd:ee:ff", cdpNeighbor["remote_chassis_id"])
-	require.Equal(t, []string{"bridge", "router"}, cdpNeighbor["remote_capabilities"])
+	require.Equal(t, "sw2", cdpNeighbor.RemoteDevice)
+	require.Equal(t, "Gi0/24", cdpNeighbor.RemotePort)
+	require.Equal(t, "10.0.0.2", cdpNeighbor.RemoteIP)
+	require.Equal(t, "aa:bb:cc:dd:ee:ff", cdpNeighbor.RemoteChassisID)
+	require.Equal(t, []string{"bridge", "router"}, cdpNeighbor.RemoteCapabilities)
 
-	lldpNeighbor := findNeighborByProtocol(neighbors, "lldp")
+	lldpNeighbor := findNeighborByProtocol(port1.Neighbors, "lldp")
 	require.NotNil(t, lldpNeighbor)
-	require.Equal(t, "sw2", lldpNeighbor["remote_device"])
-	require.Equal(t, "Gi0/24", lldpNeighbor["remote_port"])
-	require.Equal(t, "10.0.0.2", lldpNeighbor["remote_ip"])
-	require.Equal(t, "aa:bb:cc:dd:ee:ff", lldpNeighbor["remote_chassis_id"])
-	require.Equal(t, []string{"bridge", "router"}, lldpNeighbor["remote_capabilities"])
+	require.Equal(t, "sw2", lldpNeighbor.RemoteDevice)
+	require.Equal(t, "Gi0/24", lldpNeighbor.RemotePort)
+	require.Equal(t, "10.0.0.2", lldpNeighbor.RemoteIP)
+	require.Equal(t, "aa:bb:cc:dd:ee:ff", lldpNeighbor.RemoteChassisID)
+	require.Equal(t, []string{"bridge", "router"}, lldpNeighbor.RemoteCapabilities)
 
-	port2 := findInterfaceStatusByIndex(statuses, 2)
-	require.Equal(t, "server-a", port2["if_alias"])
-	require.Equal(t, "00:11:22:33:44:66", port2["mac"])
-	require.EqualValues(t, 100_000_000, port2["speed"])
-	require.EqualValues(t, 54321, port2["last_change"])
-	require.Equal(t, "half", port2["duplex"])
-	require.Equal(t, 1, port2["fdb_mac_count"])
-	_, hasNeighbors := port2["neighbors"]
-	require.False(t, hasNeighbors)
+	port2 := findInterfaceStatusByIndex(detail.Device.Ports, 2)
+	require.NotNil(t, port2)
+	require.Equal(t, "server-a", port2.IfAlias)
+	require.Equal(t, "00:11:22:33:44:66", port2.MAC)
+	require.Equal(t, OptionalValue[int64]{Value: 100_000_000, Has: true}, port2.Speed)
+	require.Equal(t, "54321", port2.LastChange)
+	require.Equal(t, "half", port2.Duplex)
+	require.Equal(t, OptionalValue[int]{Value: 1, Has: true}, port2.FDBMACCount)
+	require.Empty(t, port2.Neighbors)
 }
 
 func TestToGraph_InfersVendorFromMACOUI(t *testing.T) {
@@ -681,24 +672,26 @@ func TestToGraph_InfersVendorFromMACOUI(t *testing.T) {
 
 	remote := findActorBySysName(data.Actors, "edge-remote")
 	require.NotNil(t, remote)
-	require.Equal(t, "Nokia Shanghai Bell Co., Ltd.", remote.Attributes["vendor"])
-	require.Equal(t, "mac_oui", remote.Attributes["vendor_source"])
-	require.Equal(t, "low", remote.Attributes["vendor_confidence"])
-	require.Equal(t, "Nokia Shanghai Bell Co., Ltd.", remote.Attributes["vendor_derived"])
-	require.Equal(t, "mac_oui", remote.Attributes["vendor_derived_source"])
-	require.Equal(t, "low", remote.Attributes["vendor_derived_confidence"])
-	require.NotEmpty(t, remote.Attributes["vendor_derived_match_prefix"])
+	remoteDetail := requireActorDetail(t, data, remote)
+	require.Equal(t, "Nokia Shanghai Bell Co., Ltd.", remoteDetail.Device.Vendor)
+	require.Equal(t, "mac_oui", remoteDetail.Device.VendorSource)
+	require.Equal(t, "low", remoteDetail.Device.VendorConfidence)
+	require.Equal(t, "Nokia Shanghai Bell Co., Ltd.", remoteDetail.Device.VendorDerived)
+	require.Equal(t, "mac_oui", remoteDetail.Device.VendorDerivedSource)
+	require.Equal(t, "low", remoteDetail.Device.VendorDerivedConfidence)
+	require.NotEmpty(t, remoteDetail.Device.VendorDerivedMatchPrefix)
 
 	endpoint := findActorByMAC(data.Actors, "08:ea:44:11:22:33")
 	require.NotNil(t, endpoint)
 	require.Equal(t, "endpoint", endpoint.ActorType)
-	require.Equal(t, "Extreme Networks Headquarters", endpoint.Attributes["vendor"])
-	require.Equal(t, "mac_oui", endpoint.Attributes["vendor_source"])
-	require.Equal(t, "low", endpoint.Attributes["vendor_confidence"])
-	require.Equal(t, "Extreme Networks Headquarters", endpoint.Attributes["vendor_derived"])
-	require.Equal(t, "mac_oui", endpoint.Attributes["vendor_derived_source"])
-	require.Equal(t, "low", endpoint.Attributes["vendor_derived_confidence"])
-	require.NotEmpty(t, endpoint.Attributes["vendor_derived_match_prefix"])
+	endpointDetail := requireActorDetail(t, data, endpoint)
+	require.Equal(t, "Extreme Networks Headquarters", endpointDetail.Endpoint.Vendor)
+	require.Equal(t, "mac_oui", endpointDetail.Endpoint.VendorSource)
+	require.Equal(t, "low", endpointDetail.Endpoint.VendorConfidence)
+	require.Equal(t, "Extreme Networks Headquarters", endpointDetail.Endpoint.VendorDerived)
+	require.Equal(t, "mac_oui", endpointDetail.Endpoint.VendorDerivedSource)
+	require.Equal(t, "low", endpointDetail.Endpoint.VendorDerivedConfidence)
+	require.NotEmpty(t, endpointDetail.Endpoint.VendorDerivedMatchPrefix)
 }
 
 func TestDeviceToTopologyActor_DoesNotOverrideExplicitVendor(t *testing.T) {
@@ -718,13 +711,13 @@ func TestDeviceToTopologyActor_DoesNotOverrideExplicitVendor(t *testing.T) {
 		nil,
 	)
 
-	require.Equal(t, "Explicit Vendor", actor.Attributes["vendor"])
-	require.Equal(t, "labels", actor.Attributes["vendor_source"])
-	require.Equal(t, "high", actor.Attributes["vendor_confidence"])
-	require.Equal(t, "Extreme Networks Headquarters", actor.Attributes["vendor_derived"])
-	require.Equal(t, "mac_oui", actor.Attributes["vendor_derived_source"])
-	require.Equal(t, "low", actor.Attributes["vendor_derived_confidence"])
-	require.NotEmpty(t, actor.Attributes["vendor_derived_match_prefix"])
+	require.Equal(t, "Explicit Vendor", actor.Detail.Device.Vendor)
+	require.Equal(t, "labels", actor.Detail.Device.VendorSource)
+	require.Equal(t, "high", actor.Detail.Device.VendorConfidence)
+	require.Equal(t, "Extreme Networks Headquarters", actor.Detail.Device.VendorDerived)
+	require.Equal(t, "mac_oui", actor.Detail.Device.VendorDerivedSource)
+	require.Equal(t, "low", actor.Detail.Device.VendorDerivedConfidence)
+	require.NotEmpty(t, actor.Detail.Device.VendorDerivedMatchPrefix)
 }
 
 func TestToGraph_DefaultDiscoveredCountWithoutLocalID(t *testing.T) {
@@ -936,8 +929,9 @@ func TestToGraph_UsesDeterministicPrimaryManagementIP(t *testing.T) {
 
 	actor := findActorBySysName(data.Actors, "device-a")
 	require.NotNil(t, actor)
-	require.Equal(t, "10.0.0.2", actor.Attributes["management_ip"])
-	require.Equal(t, []string{"10.0.0.2", "10.0.0.9"}, actor.Attributes["management_addresses"])
+	detail := requireActorDetail(t, data, actor)
+	require.Equal(t, "10.0.0.2", detail.Device.ManagementIP)
+	require.Equal(t, []string{"10.0.0.2", "10.0.0.9"}, detail.Device.ManagementAddresses)
 }
 
 func TestToGraph_KeepsDistinctActorsWhenMACDiffersDespiteSameSecondaryIdentity(t *testing.T) {
@@ -1604,8 +1598,9 @@ func TestToGraph_ProbableConnectivityCreatesPortlessAttachmentForZeroCandidateEn
 
 	segmentActor := findActorByMatch(data.Actors, fdbLinks[0].Src.Match)
 	require.NotNil(t, segmentActor)
-	require.Contains(t, topologyAttrString(segmentActor.Attributes, "segment_id"), "bridge-domain:probable:")
-	require.Equal(t, []string{"switch-a"}, segmentActor.Attributes["parent_devices"])
+	segmentDetail := requireActorDetail(t, data, segmentActor)
+	require.Contains(t, segmentDetail.Segment.SegmentID, "bridge-domain:probable:")
+	require.Equal(t, []string{"switch-a"}, segmentDetail.Segment.ParentDevices)
 
 	bridgeCount := 0
 	for _, link := range data.Links {
@@ -2229,7 +2224,9 @@ func TestToGraph_DisplayNamesPreferDNSThenIPThenMAC(t *testing.T) {
 	require.NotNil(t, device)
 	require.Equal(t, "switch-a.example.net", device.Labels["display_name"])
 	require.Equal(t, "dns", device.Labels["display_source"])
-	require.Equal(t, "switch-a.example.net", device.Attributes["display_name"])
+	deviceDetail := requireActorDetail(t, data, device)
+	require.Equal(t, "switch-a.example.net", deviceDetail.DisplayName)
+	require.Equal(t, "dns", deviceDetail.DisplaySource)
 
 	ipEndpoint := findActorByIP(data.Actors, "10.0.0.42")
 	require.NotNil(t, ipEndpoint)
@@ -2309,7 +2306,9 @@ func TestToGraph_SegmentDisplayNameUsesParentPortPattern(t *testing.T) {
 	require.NotNil(t, segment)
 	require.Equal(t, "switch-a.example.net.gi0/3.segment", segment.Labels["display_name"])
 	require.Equal(t, "segment", segment.Labels["display_source"])
-	require.Equal(t, "switch-a.example.net.gi0/3.segment", segment.Attributes["display_name"])
+	segmentDetail := requireActorDetail(t, data, segment)
+	require.Equal(t, "switch-a.example.net.gi0/3.segment", segmentDetail.DisplayName)
+	require.Equal(t, "segment", segmentDetail.DisplaySource)
 }
 
 func TestToGraph_FDBOwnerInferencePrefersNonLLDPSide(t *testing.T) {
@@ -2362,8 +2361,9 @@ func TestToGraph_FDBOwnerInferencePrefersNonLLDPSide(t *testing.T) {
 
 	segmentActor := findActorByMatch(data.Actors, targetLinks[0].Src.Match)
 	require.NotNil(t, segmentActor)
-	require.Equal(t, []string{"switch-b"}, segmentActor.Attributes["parent_devices"])
-	require.Equal(t, []string{"Gi0/2"}, segmentActor.Attributes["if_names"])
+	segmentDetail := requireActorDetail(t, data, segmentActor)
+	require.Equal(t, []string{"switch-b"}, segmentDetail.Segment.ParentDevices)
+	require.Equal(t, []string{"Gi0/2"}, segmentDetail.Segment.IfNames)
 }
 
 func TestToGraph_FDBOwnerInferenceUsesSingleMACPortRule(t *testing.T) {
@@ -2408,10 +2408,11 @@ func TestToGraph_FDBOwnerInferenceUsesSingleMACPortRule(t *testing.T) {
 	endpointActor := findActorByMAC(data.Actors, "dd:dd:dd:dd:dd:dd")
 	require.NotNil(t, endpointActor)
 	require.Equal(t, "endpoint", endpointActor.ActorType)
-	require.Equal(t, "single_port_mac", endpointActor.Attributes["attachment_source"])
-	require.Equal(t, "switch-a", endpointActor.Attributes["attached_device"])
-	require.Equal(t, "Gi0/1", endpointActor.Attributes["attached_port"])
-	require.Equal(t, "single_port_mac", endpointActor.Labels["attached_by"])
+	endpointDetail := requireActorDetail(t, data, endpointActor)
+	require.Equal(t, "single_port_mac", endpointDetail.Endpoint.AttachmentSource)
+	require.Equal(t, "switch-a", endpointDetail.Endpoint.AttachedDevice)
+	require.Equal(t, "Gi0/1", endpointDetail.Endpoint.AttachedPort)
+	require.Equal(t, "single_port_mac", endpointDetail.Endpoint.AttachedBy)
 }
 
 func TestToGraph_FDBOwnerInferenceSuppressesManagedAliasSwitchFacingPorts(t *testing.T) {
@@ -2457,10 +2458,9 @@ func TestToGraph_FDBOwnerInferenceSuppressesManagedAliasSwitchFacingPorts(t *tes
 	require.Len(t, ddLinks, 0)
 	ddActor := findActorByMAC(data.Actors, "dd:dd:dd:dd:dd:dd")
 	require.NotNil(t, ddActor)
-	_, hasAttachmentSource := ddActor.Attributes["attachment_source"]
-	require.False(t, hasAttachmentSource)
-	_, hasAttachedDevice := ddActor.Attributes["attached_device"]
-	require.False(t, hasAttachedDevice)
+	ddDetail := requireActorDetail(t, data, ddActor)
+	require.Empty(t, ddDetail.Endpoint.AttachmentSource)
+	require.Empty(t, ddDetail.Endpoint.AttachedDevice)
 
 	eeLinks := findFDBLinksByEndpointMAC(data.Links, "ee:ee:ee:ee:ee:ee")
 	require.Len(t, eeLinks, 1)
@@ -2576,18 +2576,24 @@ func TestToGraph_KeepsChassisPlaceholderDevicesAsDevices(t *testing.T) {
 }
 
 func TestPruneSegmentArtifacts_SuppressesLLDPDuplicateSegmentPath(t *testing.T) {
-	actors := []graph.Actor{
+	actors := []projectedActor{
 		{
-			ActorType: "device",
-			Match:     graph.Match{IPAddresses: []string{"10.0.0.1"}, SysName: "switch-a"},
+			Actor: graph.Actor{
+				ActorType: "device",
+				Match:     graph.Match{IPAddresses: []string{"10.0.0.1"}, SysName: "switch-a"},
+			},
 		},
 		{
-			ActorType: "device",
-			Match:     graph.Match{IPAddresses: []string{"10.0.0.2"}, SysName: "switch-b"},
+			Actor: graph.Actor{
+				ActorType: "device",
+				Match:     graph.Match{IPAddresses: []string{"10.0.0.2"}, SysName: "switch-b"},
+			},
 		},
 		{
-			ActorType: "segment",
-			Match:     graph.Match{Hostnames: []string{"segment:dup"}},
+			Actor: graph.Actor{
+				ActorType: "segment",
+				Match:     graph.Match{Hostnames: []string{"segment:dup"}},
+			},
 		},
 	}
 
@@ -2617,18 +2623,24 @@ func TestPruneSegmentArtifacts_SuppressesLLDPDuplicateSegmentPath(t *testing.T) 
 }
 
 func TestPruneSegmentArtifacts_SuppressesCDPDuplicateSegmentPath(t *testing.T) {
-	actors := []graph.Actor{
+	actors := []projectedActor{
 		{
-			ActorType: "device",
-			Match:     graph.Match{IPAddresses: []string{"10.0.1.1"}, SysName: "switch-a"},
+			Actor: graph.Actor{
+				ActorType: "device",
+				Match:     graph.Match{IPAddresses: []string{"10.0.1.1"}, SysName: "switch-a"},
+			},
 		},
 		{
-			ActorType: "device",
-			Match:     graph.Match{IPAddresses: []string{"10.0.1.2"}, SysName: "switch-b"},
+			Actor: graph.Actor{
+				ActorType: "device",
+				Match:     graph.Match{IPAddresses: []string{"10.0.1.2"}, SysName: "switch-b"},
+			},
 		},
 		{
-			ActorType: "segment",
-			Match:     graph.Match{Hostnames: []string{"segment:dup-cdp"}},
+			Actor: graph.Actor{
+				ActorType: "segment",
+				Match:     graph.Match{Hostnames: []string{"segment:dup-cdp"}},
+			},
 		},
 	}
 
@@ -2658,14 +2670,18 @@ func TestPruneSegmentArtifacts_SuppressesCDPDuplicateSegmentPath(t *testing.T) {
 }
 
 func TestPruneSegmentArtifacts_SuppressesSegmentsWithSingleNeighbor(t *testing.T) {
-	actors := []graph.Actor{
+	actors := []projectedActor{
 		{
-			ActorType: "device",
-			Match:     graph.Match{IPAddresses: []string{"10.0.0.1"}, SysName: "router-a"},
+			Actor: graph.Actor{
+				ActorType: "device",
+				Match:     graph.Match{IPAddresses: []string{"10.0.0.1"}, SysName: "router-a"},
+			},
 		},
 		{
-			ActorType: "segment",
-			Match:     graph.Match{Hostnames: []string{"segment:orphan"}},
+			Actor: graph.Actor{
+				ActorType: "segment",
+				Match:     graph.Match{Hostnames: []string{"segment:orphan"}},
+			},
 		},
 	}
 
@@ -2815,21 +2831,18 @@ func TestToGraph_SwitchFacingPortDoesNotSuppressEndpointOwnership(t *testing.T) 
 	actor := findActorBySysName(data.Actors, "switch-a")
 	require.NotNil(t, actor)
 
-	statuses, ok := actor.Attributes["if_statuses"].([]map[string]any)
-	require.True(t, ok)
-	port1 := findInterfaceStatusByIndex(statuses, 1)
-	require.Equal(t, "switch_facing", port1["topology_role"])
+	detail := requireActorDetail(t, data, actor)
+	port1 := findInterfaceStatusByIndex(detail.Device.Ports, 1)
+	require.NotNil(t, port1)
+	require.Equal(t, "switch_facing", port1.TopologyRole)
 
 	targetLinks := findFDBLinksByEndpointMAC(data.Links, "00:00:00:00:00:11")
 	require.Len(t, targetLinks, 1)
 	segmentActor := findActorByMatch(data.Actors, targetLinks[0].Src.Match)
 	require.NotNil(t, segmentActor)
-	parentDevices, ok := segmentActor.Attributes["parent_devices"].([]string)
-	require.True(t, ok)
-	require.Contains(t, parentDevices, "switch-a")
-	ifNames, ok := segmentActor.Attributes["if_names"].([]string)
-	require.True(t, ok)
-	require.Contains(t, ifNames, "Gi0/1")
+	segmentDetail := requireActorDetail(t, data, segmentActor)
+	require.Contains(t, segmentDetail.Segment.ParentDevices, "switch-a")
+	require.Contains(t, segmentDetail.Segment.IfNames, "Gi0/1")
 }
 
 func TestSuppressInferredBridgeLinksOnDeterministicDiscovery(t *testing.T) {
@@ -2924,25 +2937,24 @@ func TestToGraph_FDBOwnerInferenceUsesReporterMatrixRule(t *testing.T) {
 
 	segmentActor := findActorByMatch(data.Actors, targetLinks[0].Src.Match)
 	require.NotNil(t, segmentActor)
-	require.Equal(t, []string{"switch-c"}, segmentActor.Attributes["parent_devices"])
-	require.Equal(t, []string{"Gi0/2"}, segmentActor.Attributes["if_names"])
+	segmentDetail := requireActorDetail(t, data, segmentActor)
+	require.Equal(t, []string{"switch-c"}, segmentDetail.Segment.ParentDevices)
+	require.Equal(t, []string{"Gi0/2"}, segmentDetail.Segment.IfNames)
 }
 
-func findInterfaceStatusByIndex(statuses []map[string]any, ifIndex int) map[string]any {
+func findInterfaceStatusByIndex(statuses []ProjectionPortDetail, ifIndex int) *ProjectionPortDetail {
 	for _, status := range statuses {
-		value, ok := status["if_index"].(int)
-		if ok && value == ifIndex {
-			return status
+		if status.IfIndex.Has && status.IfIndex.Value == ifIndex {
+			return &status
 		}
 	}
 	return nil
 }
 
-func findNeighborByProtocol(neighbors []map[string]any, protocol string) map[string]any {
+func findNeighborByProtocol(neighbors []ProjectionPortNeighbor, protocol string) *ProjectionPortNeighbor {
 	for _, neighbor := range neighbors {
-		value, ok := neighbor["protocol"].(string)
-		if ok && strings.EqualFold(value, protocol) {
-			return neighbor
+		if strings.EqualFold(neighbor.Protocol, protocol) {
+			return &neighbor
 		}
 	}
 	return nil

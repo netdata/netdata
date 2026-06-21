@@ -9,7 +9,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
-func collapseActorsByIP(actors []graph.Actor) []graph.Actor {
+func collapseActorsByIP(actors []projectedActor) []projectedActor {
 	if len(actors) <= 1 {
 		return actors
 	}
@@ -40,7 +40,7 @@ func collapseActorsByIP(actors []graph.Actor) []graph.Actor {
 
 	ipOwner := make(map[string]int)
 	for idx, actor := range actors {
-		if strings.EqualFold(strings.TrimSpace(actor.ActorType), "segment") {
+		if strings.EqualFold(strings.TrimSpace(actor.Actor.ActorType), "segment") {
 			continue
 		}
 		ips := normalizedTopologyActorIPs(actor)
@@ -83,22 +83,19 @@ func collapseActorsByIP(actors []graph.Actor) []graph.Actor {
 				continue
 			}
 			collapsedCount++
-			merged.Match = mergeTopologyActorMatch(merged.Match, actors[idx].Match)
-			merged.Labels = mergeTopologyActorLabels(merged.Labels, actors[idx].Labels)
-			merged.Attributes = mergeTopologyActorAttributes(merged.Attributes, actors[idx].Attributes)
+			merged.Actor.Match = mergeTopologyActorMatch(merged.Actor.Match, actors[idx].Actor.Match)
+			merged.Actor.Labels = mergeTopologyActorLabels(merged.Actor.Labels, actors[idx].Actor.Labels)
+			merged.Detail = mergeProjectionActorDetail(merged.Detail, actors[idx].Detail)
 			keep[idx] = false
 		}
 		if collapsedCount > 1 {
-			if merged.Attributes == nil {
-				merged.Attributes = make(map[string]any)
-			}
-			merged.Attributes["collapsed_by_ip"] = true
-			merged.Attributes["collapsed_count"] = collapsedCount
+			merged.Detail.CollapsedByIP = true
+			merged.Detail.CollapsedCount = collapsedCount
 		}
 		actors[rep] = merged
 	}
 
-	out := make([]graph.Actor, 0, len(actors))
+	out := make([]projectedActor, 0, len(actors))
 	for idx, actor := range actors {
 		if !keep[idx] {
 			continue
@@ -108,15 +105,15 @@ func collapseActorsByIP(actors []graph.Actor) []graph.Actor {
 	return out
 }
 
-func eliminateNonIPInferredActors(actors []graph.Actor, links []graph.Link) ([]graph.Actor, []graph.Link) {
+func eliminateNonIPInferredActors(actors []projectedActor, links []graph.Link) ([]projectedActor, []graph.Link) {
 	if len(actors) == 0 {
 		return actors, links
 	}
 	removedIdentityKeys := make(map[string]struct{})
-	filteredActors := make([]graph.Actor, 0, len(actors))
+	filteredActors := make([]projectedActor, 0, len(actors))
 	for _, actor := range actors {
 		if topologyActorIsInferred(actor) && len(normalizedTopologyActorIPs(actor)) == 0 {
-			for _, key := range topologyMatchIdentityKeys(actor.Match) {
+			for _, key := range topologyMatchIdentityKeys(actor.Actor.Match) {
 				removedIdentityKeys[key] = struct{}{}
 			}
 			continue
@@ -154,13 +151,13 @@ func topologyIdentityKeysOverlap(keys []string, set map[string]struct{}) bool {
 	return false
 }
 
-func normalizedTopologyActorIPs(actor graph.Actor) []string {
-	if len(actor.Match.IPAddresses) == 0 {
+func normalizedTopologyActorIPs(actor projectedActor) []string {
+	if len(actor.Actor.Match.IPAddresses) == 0 {
 		return nil
 	}
-	seen := make(map[string]struct{}, len(actor.Match.IPAddresses))
-	out := make([]string, 0, len(actor.Match.IPAddresses))
-	for _, value := range actor.Match.IPAddresses {
+	seen := make(map[string]struct{}, len(actor.Actor.Match.IPAddresses))
+	out := make([]string, 0, len(actor.Actor.Match.IPAddresses))
+	for _, value := range actor.Actor.Match.IPAddresses {
 		ip := normalizeTopologyIP(value)
 		if ip == "" {
 			continue
@@ -175,9 +172,9 @@ func normalizedTopologyActorIPs(actor graph.Actor) []string {
 	return out
 }
 
-func compareTopologyActorCollapsePriority(left, right graph.Actor) int {
-	leftDevice := IsDeviceActorType(left.ActorType)
-	rightDevice := IsDeviceActorType(right.ActorType)
+func compareTopologyActorCollapsePriority(left, right projectedActor) int {
+	leftDevice := IsDeviceActorType(left.Actor.ActorType)
+	rightDevice := IsDeviceActorType(right.Actor.ActorType)
 	if leftDevice != rightDevice {
 		if leftDevice {
 			return -1
@@ -192,8 +189,8 @@ func compareTopologyActorCollapsePriority(left, right graph.Actor) int {
 		}
 		return 1
 	}
-	leftKey := canonicalTopologyMatchKey(left.Match)
-	rightKey := canonicalTopologyMatchKey(right.Match)
+	leftKey := canonicalTopologyMatchKey(left.Actor.Match)
+	rightKey := canonicalTopologyMatchKey(right.Actor.Match)
 	return strings.Compare(leftKey, rightKey)
 }
 
@@ -254,12 +251,125 @@ func mergeTopologyActorLabels(base, extra map[string]string) map[string]string {
 	return base
 }
 
-func mergeTopologyActorAttributes(base, extra map[string]any) map[string]any {
+func mergeProjectionActorDetail(base, extra ProjectionActorDetail) ProjectionActorDetail {
+	base.Device = mergeProjectionDeviceActorDetail(base.Device, extra.Device)
+	base.Endpoint = mergeProjectionEndpointActorDetail(base.Endpoint, extra.Endpoint)
+	base.Segment = mergeProjectionSegmentActorDetail(base.Segment, extra.Segment)
+	if strings.TrimSpace(base.DisplayName) == "" {
+		base.DisplayName = strings.TrimSpace(extra.DisplayName)
+	}
+	if strings.TrimSpace(base.DisplaySource) == "" {
+		base.DisplaySource = strings.TrimSpace(extra.DisplaySource)
+	}
+	return base
+}
+
+func mergeProjectionDeviceActorDetail(base, extra ProjectionDeviceActorDetail) ProjectionDeviceActorDetail {
+	if strings.TrimSpace(base.DeviceID) == "" {
+		base.DeviceID = strings.TrimSpace(extra.DeviceID)
+	}
+	base.ManagementAddresses = mergeTopologyStringLists(base.ManagementAddresses, extra.ManagementAddresses)
+	base.Protocols = mergeTopologyStringLists(base.Protocols, extra.Protocols)
+	base.ProtocolsCollected = mergeTopologyStringLists(base.ProtocolsCollected, extra.ProtocolsCollected)
+	base.Capabilities = mergeTopologyStringLists(base.Capabilities, extra.Capabilities)
+	base.CapabilitiesSupported = mergeTopologyStringLists(base.CapabilitiesSupported, extra.CapabilitiesSupported)
+	base.CapabilitiesEnabled = mergeTopologyStringLists(base.CapabilitiesEnabled, extra.CapabilitiesEnabled)
+	base.IfIndexes = mergeTopologyStringLists(base.IfIndexes, extra.IfIndexes)
+	base.IfNames = mergeTopologyStringLists(base.IfNames, extra.IfNames)
+	if !base.PortsTotal.Has {
+		base.PortsTotal = extra.PortsTotal
+	}
+	if !base.PortsUp.Has {
+		base.PortsUp = extra.PortsUp
+	}
+	if !base.PortsDown.Has {
+		base.PortsDown = extra.PortsDown
+	}
+	if !base.PortsAdminDown.Has {
+		base.PortsAdminDown = extra.PortsAdminDown
+	}
+	if !base.TotalBandwidthBps.Has {
+		base.TotalBandwidthBps = extra.TotalBandwidthBps
+	}
+	if !base.FDBTotalMACs.Has {
+		base.FDBTotalMACs = extra.FDBTotalMACs
+	}
+	if !base.VLANCount.Has {
+		base.VLANCount = extra.VLANCount
+	}
+	if !base.LLDPNeighborCount.Has {
+		base.LLDPNeighborCount = extra.LLDPNeighborCount
+	}
+	if !base.CDPNeighborCount.Has {
+		base.CDPNeighborCount = extra.CDPNeighborCount
+	}
+	base.AdminStatusCounts = mergeTopologyIntMaps(base.AdminStatusCounts, extra.AdminStatusCounts)
+	base.OperStatusCounts = mergeTopologyIntMaps(base.OperStatusCounts, extra.OperStatusCounts)
+	base.LinkModeCounts = mergeTopologyIntMaps(base.LinkModeCounts, extra.LinkModeCounts)
+	base.TopologyRoleCounts = mergeTopologyIntMaps(base.TopologyRoleCounts, extra.TopologyRoleCounts)
+	if len(base.Ports) == 0 {
+		base.Ports = cloneProjectionPortDetails(extra.Ports)
+	}
+	return base
+}
+
+func mergeProjectionEndpointActorDetail(base, extra ProjectionEndpointActorDetail) ProjectionEndpointActorDetail {
+	base.LearnedSources = mergeTopologyStringLists(base.LearnedSources, extra.LearnedSources)
+	base.LearnedDeviceIDs = mergeTopologyStringLists(base.LearnedDeviceIDs, extra.LearnedDeviceIDs)
+	base.LearnedIfIndexes = mergeTopologyStringLists(base.LearnedIfIndexes, extra.LearnedIfIndexes)
+	base.LearnedIfNames = mergeTopologyStringLists(base.LearnedIfNames, extra.LearnedIfNames)
+	if !base.Discovered {
+		base.Discovered = extra.Discovered
+	}
+	if strings.TrimSpace(base.AttachmentSource) == "" {
+		base.AttachmentSource = strings.TrimSpace(extra.AttachmentSource)
+		base.AttachedDeviceID = strings.TrimSpace(extra.AttachedDeviceID)
+		base.AttachedDevice = strings.TrimSpace(extra.AttachedDevice)
+		base.AttachedPort = strings.TrimSpace(extra.AttachedPort)
+		base.AttachedIfName = strings.TrimSpace(extra.AttachedIfName)
+		base.AttachedIfIndex = extra.AttachedIfIndex
+		base.AttachedBridgePort = strings.TrimSpace(extra.AttachedBridgePort)
+		base.AttachedVLAN = strings.TrimSpace(extra.AttachedVLAN)
+		base.AttachedVLANID = strings.TrimSpace(extra.AttachedVLANID)
+		base.AttachedBy = strings.TrimSpace(extra.AttachedBy)
+	}
+	return base
+}
+
+func mergeProjectionSegmentActorDetail(base, extra ProjectionSegmentActorDetail) ProjectionSegmentActorDetail {
+	if strings.TrimSpace(base.SegmentID) == "" {
+		base.SegmentID = strings.TrimSpace(extra.SegmentID)
+	}
+	if strings.TrimSpace(base.SegmentType) == "" {
+		base.SegmentType = strings.TrimSpace(extra.SegmentType)
+	}
+	if strings.TrimSpace(base.SegmentKind) == "" {
+		base.SegmentKind = strings.TrimSpace(extra.SegmentKind)
+	}
+	base.ParentDevices = mergeTopologyStringLists(base.ParentDevices, extra.ParentDevices)
+	base.IfNames = mergeTopologyStringLists(base.IfNames, extra.IfNames)
+	base.IfIndexes = mergeTopologyStringLists(base.IfIndexes, extra.IfIndexes)
+	base.BridgePorts = mergeTopologyStringLists(base.BridgePorts, extra.BridgePorts)
+	base.VLANIDs = mergeTopologyStringLists(base.VLANIDs, extra.VLANIDs)
+	base.LearnedSources = mergeTopologyStringLists(base.LearnedSources, extra.LearnedSources)
+	if !base.PortsTotal.Has {
+		base.PortsTotal = extra.PortsTotal
+	}
+	if !base.EndpointsTotal.Has {
+		base.EndpointsTotal = extra.EndpointsTotal
+	}
+	if strings.TrimSpace(base.DesignatedPort) == "" {
+		base.DesignatedPort = strings.TrimSpace(extra.DesignatedPort)
+	}
+	return base
+}
+
+func mergeTopologyIntMaps(base, extra map[string]int) map[string]int {
 	if len(extra) == 0 {
 		return base
 	}
 	if base == nil {
-		base = make(map[string]any, len(extra))
+		base = make(map[string]int, len(extra))
 	}
 	for key, value := range extra {
 		key = strings.TrimSpace(key)
@@ -274,17 +384,12 @@ func mergeTopologyActorAttributes(base, extra map[string]any) map[string]any {
 	return base
 }
 
-func topologyActorIsInferred(actor graph.Actor) bool {
-	if strings.EqualFold(strings.TrimSpace(actor.ActorType), "endpoint") {
+func topologyActorIsInferred(actor projectedActor) bool {
+	if strings.EqualFold(strings.TrimSpace(actor.Actor.ActorType), "endpoint") {
 		return true
 	}
-	if topologyAnyBoolValue(actor.Attributes["inferred"]) {
+	if actor.Detail.Device.Inferred {
 		return true
-	}
-	if len(actor.Labels) > 0 {
-		if topologyAnyBoolValue(actor.Labels["inferred"]) {
-			return true
-		}
 	}
 	return false
 }

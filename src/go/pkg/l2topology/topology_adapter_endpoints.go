@@ -12,7 +12,7 @@ import (
 )
 
 type builtEndpointActors struct {
-	actors             []graph.Actor
+	actors             []projectedActor
 	count              int
 	matchByEndpointID  map[string]graph.Match
 	labelsByEndpointID map[string]map[string]string
@@ -103,7 +103,7 @@ func buildEndpointActors(
 	}
 	sort.Strings(keys)
 
-	actors := make([]graph.Actor, 0, len(keys))
+	actors := make([]projectedActor, 0, len(keys))
 	endpointCount := 0
 	matchByEndpointID := make(map[string]graph.Match, len(keys))
 	labelsByEndpointID := make(map[string]map[string]string, len(keys))
@@ -127,37 +127,41 @@ func buildEndpointActors(
 			"learned_if_names":   strings.Join(sortedTopologySet(acc.ifNames), ","),
 		}
 
-		attrs := map[string]any{
-			"discovered":         true,
-			"learned_sources":    sortedTopologySet(acc.sources),
-			"learned_device_ids": sortedTopologySet(acc.deviceIDs),
-			"learned_if_indexes": sortedTopologySet(acc.ifIndexes),
-			"learned_if_names":   sortedTopologySet(acc.ifNames),
+		detail := ProjectionEndpointActorDetail{
+			Discovered:       true,
+			LearnedSources:   sortedTopologySet(acc.sources),
+			LearnedDeviceIDs: sortedTopologySet(acc.deviceIDs),
+			LearnedIfIndexes: sortedTopologySet(acc.ifIndexes),
+			LearnedIfNames:   sortedTopologySet(acc.ifNames),
 		}
 		derivedVendor, derivedPrefix := inferTopologyVendorFromMatch(match)
 		if derivedVendor != "" {
-			attrs["vendor"] = derivedVendor
-			attrs["vendor_source"] = "mac_oui"
-			attrs["vendor_confidence"] = "low"
-			attrs["vendor_match_prefix"] = derivedPrefix
-			attrs["vendor_derived"] = derivedVendor
-			attrs["vendor_derived_source"] = "mac_oui"
-			attrs["vendor_derived_confidence"] = "low"
-			attrs["vendor_derived_match_prefix"] = derivedPrefix
+			detail.Vendor = derivedVendor
+			detail.VendorSource = "mac_oui"
+			detail.VendorConfidence = "low"
+			detail.VendorMatchPrefix = derivedPrefix
+			detail.VendorDerived = derivedVendor
+			detail.VendorDerivedSource = "mac_oui"
+			detail.VendorDerivedConfidence = "low"
+			detail.VendorDerivedMatchPrefix = derivedPrefix
 		}
-		actor := graph.Actor{
-			ActorType:  "endpoint",
-			Layer:      layer,
-			Source:     source,
-			Match:      match,
-			Attributes: pruneTopologyAttributes(attrs),
+		actor := projectedActor{
+			Actor: graph.Actor{
+				ActorType: "endpoint",
+				Layer:     layer,
+				Source:    source,
+				Match:     match,
+			},
+			Detail: ProjectionActorDetail{
+				Endpoint: detail,
+			},
 		}
 
-		keys := topologyMatchIdentityKeys(actor.Match)
+		keys := topologyMatchIdentityKeys(actor.Actor.Match)
 		if len(keys) == 0 {
 			continue
 		}
-		macKeys := topologyMatchHardwareIdentityKeys(actor.Match)
+		macKeys := topologyMatchHardwareIdentityKeys(actor.Actor.Match)
 		if len(macKeys) > 0 {
 			if topologyIdentityIndexOverlaps(actorMACIndex, macKeys) {
 				continue

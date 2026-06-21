@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -18,6 +19,10 @@ import (
 )
 
 func TestTopologyLinkDetailDoesNotUseMapCarriers(t *testing.T) {
+	_, hasActorAttributes := reflect.TypeFor[graph.Actor]().FieldByName("Attributes")
+	require.False(t, hasActorAttributes)
+	_, hasActorTables := reflect.TypeFor[graph.Actor]().FieldByName("Tables")
+	require.False(t, hasActorTables)
 	_, hasEndpointAttributes := reflect.TypeFor[graph.LinkEndpoint]().FieldByName("Attributes")
 	require.False(t, hasEndpointAttributes)
 	_, hasLinkMetrics := reflect.TypeFor[graph.Link]().FieldByName("Metrics")
@@ -33,15 +38,26 @@ func TestTopologyLinkDetailDoesNotUseMapCarriers(t *testing.T) {
 		},
 		{
 			path:  "../../../../pkg/l2topology",
-			names: []string{"Metrics"},
+			names: []string{"Attributes", "Tables", "Metrics"},
 		},
 		{
 			path:  "../../../../pkg/topology/graph",
-			names: []string{"Metrics"},
+			names: []string{"Attributes", "Tables", "Metrics"},
 		},
 	} {
 		assertNoForbiddenLinkMapCarrierUse(t, root.path, root.names...)
 	}
+}
+
+func TestTopologyActorSemanticDetailDoesNotFallbackToLabels(t *testing.T) {
+	assertNoForbiddenTopologyActorLabelFallbacks(t, ".", map[string]struct{}{
+		"display_name":    {},
+		"display_source":  {},
+		"inferred":        {},
+		"name":            {},
+		tagOSPFRouterID:   {},
+		"tagOSPFRouterID": {},
+	})
 }
 
 func TestNoForbiddenLinkMapCarrierUseIgnoresCommentsAndStrings(t *testing.T) {
@@ -99,6 +115,80 @@ func assertNoForbiddenLinkMapCarrierUse(t *testing.T, root string, names ...stri
 		return nil
 	})
 	require.NoError(t, err)
+}
+
+func assertNoForbiddenTopologyActorLabelFallbacks(t *testing.T, root string, forbiddenKeys map[string]struct{}) {
+	t.Helper()
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		require.NoError(t, err)
+		if entry.IsDir() {
+			return nil
+		}
+		if filepath.Ext(path) != ".go" || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		fset := token.NewFileSet()
+		file, err := parser.ParseFile(fset, path, nil, 0)
+		require.NoError(t, err)
+
+		var scanErr error
+		ast.Inspect(file, func(node ast.Node) bool {
+			if scanErr != nil || node == nil {
+				return false
+			}
+			index, ok := node.(*ast.IndexExpr)
+			if !ok {
+				return true
+			}
+			selector, ok := index.X.(*ast.SelectorExpr)
+			if !ok || selector.Sel.Name != "Labels" {
+				return true
+			}
+			if topologyLabelFallbackRootName(selector.X) != "actor" {
+				return true
+			}
+			key := topologyLabelFallbackIndexKey(index.Index)
+			if _, forbidden := forbiddenKeys[key]; !forbidden {
+				return true
+			}
+			position := fset.Position(index.Pos())
+			scanErr = fmt.Errorf("forbidden topology actor label fallback in %s:%d: %q", path, position.Line, key)
+			return false
+		})
+		return scanErr
+	})
+	require.NoError(t, err)
+}
+
+func topologyLabelFallbackRootName(expr ast.Expr) string {
+	switch typed := expr.(type) {
+	case *ast.Ident:
+		return typed.Name
+	case *ast.SelectorExpr:
+		return topologyLabelFallbackRootName(typed.X)
+	case *ast.ParenExpr:
+		return topologyLabelFallbackRootName(typed.X)
+	default:
+		return ""
+	}
+}
+
+func topologyLabelFallbackIndexKey(expr ast.Expr) string {
+	switch typed := expr.(type) {
+	case *ast.BasicLit:
+		if typed.Kind != token.STRING {
+			return ""
+		}
+		value, err := strconv.Unquote(typed.Value)
+		if err != nil {
+			return ""
+		}
+		return value
+	case *ast.Ident:
+		return typed.Name
+	default:
+		return ""
+	}
 }
 
 func forbiddenLinkMapCarrierKeyValueError(

@@ -12,8 +12,6 @@ import (
 func topologyActorDetailDisplayName(actor topologyActor) string {
 	return firstNonEmptyString(
 		actor.Detail.L2.DisplayName,
-		actor.Labels["display_name"],
-		actor.Labels["name"],
 		actor.Match.SysName,
 		firstString(actor.Match.Hostnames),
 		firstString(actor.Match.DNSNames),
@@ -21,7 +19,7 @@ func topologyActorDetailDisplayName(actor topologyActor) string {
 }
 
 func topologyActorDetailDisplaySource(actor topologyActor) string {
-	return firstNonEmptyString(actor.Detail.L2.DisplaySource, actor.Labels["display_source"])
+	return actor.Detail.L2.DisplaySource
 }
 
 func topologyActorDetailParentDevices(actor topologyActor) []string {

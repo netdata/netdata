@@ -141,19 +141,23 @@ func TestSegmentProjectionBuilderPruneSegmentsWithoutLinksRemovesEmptySegments(t
 	builder := &segmentProjectionBuilder{
 		segmentIDs: []string{"segment-a", "segment-b"},
 		out: projectedSegments{
-			actors: []graph.Actor{
+			actors: []projectedActor{
 				{
-					ActorID:   "segment-a",
-					ActorType: "segment",
-					Attributes: map[string]any{
-						"segment_id": "segment-a",
+					Actor: graph.Actor{
+						ActorID:   "segment-a",
+						ActorType: "segment",
+					},
+					Detail: ProjectionActorDetail{
+						Segment: ProjectionSegmentActorDetail{SegmentID: "segment-a"},
 					},
 				},
 				{
-					ActorID:   "segment-b",
-					ActorType: "segment",
-					Attributes: map[string]any{
-						"segment_id": "segment-b",
+					Actor: graph.Actor{
+						ActorID:   "segment-b",
+						ActorType: "segment",
+					},
+					Detail: ProjectionActorDetail{
+						Segment: ProjectionSegmentActorDetail{SegmentID: "segment-b"},
 					},
 				},
 			},
@@ -177,7 +181,7 @@ func TestSegmentProjectionBuilderPruneSegmentsWithoutLinksRemovesEmptySegments(t
 	})
 
 	require.Len(t, builder.out.actors, 1)
-	require.Equal(t, "segment-a", builder.out.actors[0].ActorID)
+	require.Equal(t, "segment-a", builder.out.actors[0].Actor.ActorID)
 	require.Len(t, builder.out.links, 1)
 	require.Equal(t, "segment-a", topologyLinkBridgeDomain(builder.out.links[0]))
 	require.Equal(t, 1, builder.out.linksFdb)

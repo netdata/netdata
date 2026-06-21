@@ -9,7 +9,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
-func pruneSegmentArtifacts(actors []graph.Actor, links []graph.Link) ([]graph.Actor, []graph.Link, int) {
+func pruneSegmentArtifacts(actors []projectedActor, links []graph.Link) ([]projectedActor, []graph.Link, int) {
 	if len(actors) == 0 || len(links) == 0 {
 		return actors, links, 0
 	}
@@ -17,10 +17,10 @@ func pruneSegmentArtifacts(actors []graph.Actor, links []graph.Link) ([]graph.Ac
 	segmentKeys := make(map[string]struct{})
 	segmentOrder := make([]string, 0)
 	for _, actor := range actors {
-		if !strings.EqualFold(strings.TrimSpace(actor.ActorType), "segment") {
+		if !strings.EqualFold(strings.TrimSpace(actor.Actor.ActorType), "segment") {
 			continue
 		}
-		key := canonicalTopologyMatchKey(actor.Match)
+		key := canonicalTopologyMatchKey(actor.Actor.Match)
 		if key == "" {
 			continue
 		}
@@ -132,14 +132,14 @@ func pruneSegmentArtifacts(actors []graph.Actor, links []graph.Link) ([]graph.Ac
 		return actors, links, 0
 	}
 
-	filteredActors := make([]graph.Actor, 0, len(actors))
+	filteredActors := make([]projectedActor, 0, len(actors))
 	for _, actor := range actors {
-		key := canonicalTopologyMatchKey(actor.Match)
+		key := canonicalTopologyMatchKey(actor.Actor.Match)
 		if key == "" {
 			filteredActors = append(filteredActors, actor)
 			continue
 		}
-		if _, isSuppressed := suppressed[key]; isSuppressed && strings.EqualFold(strings.TrimSpace(actor.ActorType), "segment") {
+		if _, isSuppressed := suppressed[key]; isSuppressed && strings.EqualFold(strings.TrimSpace(actor.Actor.ActorType), "segment") {
 			continue
 		}
 		filteredActors = append(filteredActors, actor)
@@ -211,10 +211,10 @@ func summarizeTopologyLinks(links []graph.Link) topologyLinkCounts {
 }
 
 func pruneManagedOverlapUnlinkedEndpointActors(
-	actors []graph.Actor,
+	actors []projectedActor,
 	links []graph.Link,
 	suppressedEndpointIDs map[string]struct{},
-) ([]graph.Actor, int) {
+) ([]projectedActor, int) {
 	if len(actors) == 0 || len(suppressedEndpointIDs) == 0 {
 		return actors, 0
 	}
@@ -256,15 +256,15 @@ func pruneManagedOverlapUnlinkedEndpointActors(
 		}
 	}
 
-	filtered := make([]graph.Actor, 0, len(actors))
+	filtered := make([]projectedActor, 0, len(actors))
 	suppressedCount := 0
 	for _, actor := range actors {
-		if !strings.EqualFold(strings.TrimSpace(actor.ActorType), "endpoint") {
+		if !strings.EqualFold(strings.TrimSpace(actor.Actor.ActorType), "endpoint") {
 			filtered = append(filtered, actor)
 			continue
 		}
 
-		actorKeys := topologyMatchIdentityKeys(actor.Match)
+		actorKeys := topologyMatchIdentityKeys(actor.Actor.Match)
 		if !topologyIdentityKeysOverlap(actorKeys, suppressedIdentityKeys) {
 			filtered = append(filtered, actor)
 			continue

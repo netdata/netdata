@@ -22,15 +22,13 @@ type Match struct {
 }
 
 type Actor struct {
-	ActorID     string                      `json:"actor_id,omitempty"`
-	ActorType   string                      `json:"actor_type"`
-	Layer       string                      `json:"layer"`
-	Source      string                      `json:"source"`
-	Match       Match                       `json:"match"`
-	ParentMatch *Match                      `json:"parent_match,omitempty"`
-	Attributes  map[string]any              `json:"attributes,omitempty"`
-	Labels      map[string]string           `json:"labels,omitempty"`
-	Tables      map[string][]map[string]any `json:"tables,omitempty"`
+	ActorID     string            `json:"actor_id,omitempty"`
+	ActorType   string            `json:"actor_type"`
+	Layer       string            `json:"layer"`
+	Source      string            `json:"source"`
+	Match       Match             `json:"match"`
+	ParentMatch *Match            `json:"parent_match,omitempty"`
+	Labels      map[string]string `json:"labels,omitempty"`
 }
 
 type LinkEndpoint struct {

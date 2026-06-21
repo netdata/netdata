@@ -21,38 +21,46 @@ func TestCanonicalTopologyKeyHelpers_NormalizeDeterministically(t *testing.T) {
 }
 
 func TestAssignTopologyActorIDsAndLinkEndpoints_IsDeterministic(t *testing.T) {
-	actors := []graph.Actor{
+	actors := []projectedActor{
 		{
-			ActorType: "device",
-			Layer:     "l2",
-			Source:    "snmp",
-			Match: graph.Match{
-				MacAddresses: []string{"00:11:22:33:44:55"},
-				Hostnames:    []string{"switch-a"},
+			Actor: graph.Actor{
+				ActorType: "device",
+				Layer:     "l2",
+				Source:    "snmp",
+				Match: graph.Match{
+					MacAddresses: []string{"00:11:22:33:44:55"},
+					Hostnames:    []string{"switch-a"},
+				},
 			},
 		},
 		{
-			ActorType: "device",
-			Layer:     "l2",
-			Source:    "snmp",
-			Match: graph.Match{
-				MacAddresses: []string{"00-11-22-33-44-55"},
-				Hostnames:    []string{"switch-a-duplicate"},
+			Actor: graph.Actor{
+				ActorType: "device",
+				Layer:     "l2",
+				Source:    "snmp",
+				Match: graph.Match{
+					MacAddresses: []string{"00-11-22-33-44-55"},
+					Hostnames:    []string{"switch-a-duplicate"},
+				},
 			},
 		},
 		{
-			ActorType: "endpoint",
-			Layer:     "l2",
-			Source:    "derived",
-			Match: graph.Match{
-				IPAddresses: []string{"10.0.0.2"},
+			Actor: graph.Actor{
+				ActorType: "endpoint",
+				Layer:     "l2",
+				Source:    "derived",
+				Match: graph.Match{
+					IPAddresses: []string{"10.0.0.2"},
+				},
 			},
 		},
 		{
-			ActorType: "segment",
-			Layer:     "l2",
-			Source:    "derived",
-			Match:     graph.Match{},
+			Actor: graph.Actor{
+				ActorType: "segment",
+				Layer:     "l2",
+				Source:    "derived",
+				Match:     graph.Match{},
+			},
 		},
 	}
 	links := []graph.Link{
@@ -86,22 +94,22 @@ func TestAssignTopologyActorIDsAndLinkEndpoints_IsDeterministic(t *testing.T) {
 
 	assignTopologyActorIDsAndLinkEndpoints(actors, links)
 
-	require.Equal(t, "mac:00:11:22:33:44:55", actors[0].ActorID)
-	require.Equal(t, "mac:00:11:22:33:44:55#2", actors[1].ActorID)
-	require.Equal(t, "ip:10.0.0.2", actors[2].ActorID)
-	require.Equal(t, "generated:segment", actors[3].ActorID)
+	require.Equal(t, "mac:00:11:22:33:44:55", actors[0].Actor.ActorID)
+	require.Equal(t, "mac:00:11:22:33:44:55#2", actors[1].Actor.ActorID)
+	require.Equal(t, "ip:10.0.0.2", actors[2].Actor.ActorID)
+	require.Equal(t, "generated:segment", actors[3].Actor.ActorID)
 	require.Equal(t, "mac:00:11:22:33:44:55", links[0].SrcActorID)
 	require.Equal(t, "ip:10.0.0.2", links[0].DstActorID)
 	require.Equal(t, "ip:10.0.0.2", links[1].SrcActorID)
 	require.Equal(t, "mac:00:11:22:33:44:55", links[1].DstActorID)
 
-	sortTopologyActors(actors)
+	sortProjectedTopologyActors(actors)
 	require.Equal(t, []string{
 		"mac:00:11:22:33:44:55",
 		"mac:00:11:22:33:44:55#2",
 		"ip:10.0.0.2",
 		"generated:segment",
-	}, []string{actors[0].ActorID, actors[1].ActorID, actors[2].ActorID, actors[3].ActorID})
+	}, []string{actors[0].Actor.ActorID, actors[1].Actor.ActorID, actors[2].Actor.ActorID, actors[3].Actor.ActorID})
 
 	sortTopologyLinks(links)
 	require.Equal(t, "ip:10.0.0.2", links[0].SrcActorID)
@@ -110,22 +118,26 @@ func TestAssignTopologyActorIDsAndLinkEndpoints_IsDeterministic(t *testing.T) {
 	require.Equal(t, "ip:10.0.0.2", links[1].DstActorID)
 }
 
-func TestEnrichTopologyPortTablesWithLinkCounts_AddsCountsToMatchingPorts(t *testing.T) {
-	actors := []graph.Actor{
+func TestEnrichTopologyPortDetailsWithLinkCounts_AddsCountsToMatchingPorts(t *testing.T) {
+	actors := []projectedActor{
 		{
-			ActorID: "device-a",
-			Tables: map[string][]map[string]any{
-				"ports": {
-					{"name": "eth0"},
-					{"name": "eth1"},
+			Actor: graph.Actor{ActorID: "device-a"},
+			Detail: ProjectionActorDetail{
+				Device: ProjectionDeviceActorDetail{
+					Ports: []ProjectionPortDetail{
+						{Name: "eth0"},
+						{Name: "eth1"},
+					},
 				},
 			},
 		},
 		{
-			ActorID: "device-b",
-			Tables: map[string][]map[string]any{
-				"ports": {
-					{"name": "xe-0/0/0"},
+			Actor: graph.Actor{ActorID: "device-b"},
+			Detail: ProjectionActorDetail{
+				Device: ProjectionDeviceActorDetail{
+					Ports: []ProjectionPortDetail{
+						{Name: "xe-0/0/0"},
+					},
 				},
 			},
 		},
@@ -145,10 +157,9 @@ func TestEnrichTopologyPortTablesWithLinkCounts_AddsCountsToMatchingPorts(t *tes
 		},
 	}
 
-	enrichTopologyPortTablesWithLinkCounts(actors, links)
+	enrichTopologyPortDetailsWithLinkCounts(actors, links)
 
-	require.Equal(t, 2, actors[0].Tables["ports"][0]["link_count"])
-	_, exists := actors[0].Tables["ports"][1]["link_count"]
-	require.False(t, exists)
-	require.Equal(t, 2, actors[1].Tables["ports"][0]["link_count"])
+	require.Equal(t, OptionalValue[int]{Value: 2, Has: true}, actors[0].Detail.Device.Ports[0].LinkCount)
+	require.False(t, actors[0].Detail.Device.Ports[1].LinkCount.Has)
+	require.Equal(t, OptionalValue[int]{Value: 2, Has: true}, actors[1].Detail.Device.Ports[0].LinkCount)
 }
