@@ -228,29 +228,7 @@ echo "============================================================"
 echo ""
 
 ${GITHUB_ACTIONS+echo "::group::Netdata buildinfo"}
-# `netdata.exe -W buildinfo` is a post-build smoke test - it should print
-# build flags and exit. On Windows the freshly-built binary has been
-# observed to hang at cold start (likely trying to bind a port, read a
-# config dir, or perform side-effects that block in this environment).
-# Without a timeout, the wrapper script appears to hang forever AFTER a
-# successful build, with the last visible output being the ninja line
-# "[794/795] Linking CXX executable netdata.exe" - making it look like
-# the linker is stuck when in fact it finished seconds earlier.
-# SOW P27: bound the smoke test, print a clear marker on hang.
-echo "Probing netdata.exe -W buildinfo (60 s timeout)..."
-if timeout 60 "${build}/netdata.exe" -W buildinfo; then
-    echo "buildinfo OK."
-else
-    rc=$?
-    if [ "${rc}" = "124" ]; then
-        echo "WARNING: 'netdata.exe -W buildinfo' did not return within 60 s." >&2
-        echo "  The build itself is successful - the binary at ${build}/netdata.exe is usable." >&2
-        echo "  This is a known cold-start quirk of the Windows build that does NOT" >&2
-        echo "  affect the packaged installer; the wrapper continues." >&2
-    else
-        echo "WARNING: 'netdata.exe -W buildinfo' exited ${rc} (non-fatal)." >&2
-    fi
-fi
+"${build}/netdata.exe" -W buildinfo || true
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 if [ -t 1 ]; then
