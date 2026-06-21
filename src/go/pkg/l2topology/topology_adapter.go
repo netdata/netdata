@@ -55,8 +55,13 @@ type endpointActorAccumulator struct {
 	ifNames    map[string]struct{}
 }
 
+type projectedActor struct {
+	Actor  graph.Actor
+	Detail ProjectionActorDetail
+}
+
 type projectedSegments struct {
-	actors                        []graph.Actor
+	actors                        []projectedActor
 	links                         []graph.Link
 	linksFdb                      int
 	bidirectionalCount            int
@@ -115,7 +120,7 @@ type topologyDevicePortStatus struct {
 	RoleSources    []string
 	FDBMACCount    int
 	STPState       string
-	VLANs          []map[string]any
+	VLANs          []ProjectionPortVLAN
 	Neighbors      []topologyPortNeighborStatus
 }
 
@@ -132,10 +137,10 @@ type topologyDeviceInterfaceSummary struct {
 	portsTotal        int
 	ifIndexes         []string
 	ifNames           []string
-	adminStatusCount  map[string]any
-	operStatusCount   map[string]any
-	linkModeCount     map[string]any
-	roleCount         map[string]any
+	adminStatusCount  map[string]int
+	operStatusCount   map[string]int
+	linkModeCount     map[string]int
+	roleCount         map[string]int
 	portsUp           int
 	portsDown         int
 	portsAdminDown    int
@@ -144,7 +149,7 @@ type topologyDeviceInterfaceSummary struct {
 	vlanCount         int
 	lldpNeighborCount int
 	cdpNeighborCount  int
-	portStatuses      []map[string]any
+	portStatuses      []ProjectionPortDetail
 }
 
 type topologyDevicePortEvidence struct {
@@ -236,6 +241,6 @@ func ToGraph(result Result, opts GraphOptions) Projection {
 	return Projection{
 		Graph:        graphData,
 		Stats:        builder.stats,
-		ActorDetails: buildProjectionActorDetails(graphData.Actors),
+		ActorDetails: builder.actorDetails(),
 	}
 }

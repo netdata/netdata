@@ -87,7 +87,7 @@ func newSegmentProjectionBuilder(
 		probabilisticConnectivity: probabilisticConnectivity,
 		strategyConfig:            strategyConfig,
 		out: projectedSegments{
-			actors: make([]graph.Actor, 0),
+			actors: make([]projectedActor, 0),
 			links:  make([]graph.Link, 0),
 		},
 	}

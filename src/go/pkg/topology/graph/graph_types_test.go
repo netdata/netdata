@@ -41,9 +41,7 @@ func TestGraphJSONShape(t *testing.T) {
 				NamespaceIDs:       []string{"namespace-a"},
 			},
 			ParentMatch: &Match{SysName: "parent"},
-			Attributes:  map[string]any{"role": "core"},
 			Labels:      map[string]string{"site": "lab"},
-			Tables:      map[string][]map[string]any{"ports": {{"if_name": "eth0"}}},
 		}},
 		Links: []Link{{
 			Layer:      "3",
@@ -114,9 +112,7 @@ func TestGraphJSONShape(t *testing.T) {
 				"namespace_ids":["namespace-a"]
 			},
 			"parent_match":{"sys_name":"parent"},
-			"attributes":{"role":"core"},
-			"labels":{"site":"lab"},
-			"tables":{"ports":[{"if_name":"eth0"}]}
+			"labels":{"site":"lab"}
 		}],
 		"links":[{
 			"layer":"3",

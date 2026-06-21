@@ -248,9 +248,9 @@ func (b *segmentProjectionBuilder) pruneSegmentsWithoutLinks(segmentsWithAnyLink
 		return
 	}
 
-	filteredActors := make([]graph.Actor, 0, len(b.out.actors))
+	filteredActors := make([]projectedActor, 0, len(b.out.actors))
 	for _, actor := range b.out.actors {
-		segmentID := topologyAttrString(actor.Attributes, "segment_id")
+		segmentID := strings.TrimSpace(actor.Detail.Segment.SegmentID)
 		if segmentID == "" {
 			continue
 		}

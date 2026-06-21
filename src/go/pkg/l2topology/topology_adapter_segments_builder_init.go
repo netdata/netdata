@@ -56,7 +56,7 @@ func (b *segmentProjectionBuilder) initializeSegments() bool {
 			continue
 		}
 		match, actor := buildBridgeSegmentActor(segmentID, segment, b.layer, b.source)
-		keys := topologyMatchIdentityKeys(actor.Match)
+		keys := topologyMatchIdentityKeys(actor.Actor.Match)
 		if len(keys) > 0 && !topologyIdentityIndexOverlaps(b.actorIndex, keys) {
 			addTopologyIdentityKeys(b.actorIndex, keys)
 		}

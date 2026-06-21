@@ -67,122 +67,103 @@ func buildDeviceActorMatch(dev Device, reporterAliases []string) graph.Match {
 	return match
 }
 
-func buildDeviceActorAttributes(
+func buildDeviceActorDetail(
 	dev Device,
 	localDeviceID string,
 	ifaceSummary topologyDeviceInterfaceSummary,
 	match graph.Match,
-) map[string]any {
+) ProjectionDeviceActorDetail {
 	discovered := strings.TrimSpace(localDeviceID) == "" || dev.ID != localDeviceID
 
-	attrs := map[string]any{
-		"device_id":              dev.ID,
-		"discovered":             discovered,
-		"inferred":               topologyDeviceInferred(dev),
-		"management_ip":          firstAddress(dev.Addresses),
-		"management_addresses":   addressStrings(dev.Addresses),
-		"protocols":              labelsCSVToSlice(dev.Labels, "protocols_observed"),
-		"protocols_collected":    labelsCSVToSlice(dev.Labels, "protocols_observed"),
-		"capabilities":           labelsCSVToSlice(dev.Labels, "capabilities"),
-		"capabilities_supported": labelsCSVToSlice(dev.Labels, "capabilities_supported"),
-		"capabilities_enabled":   labelsCSVToSlice(dev.Labels, "capabilities_enabled"),
+	detail := ProjectionDeviceActorDetail{
+		DeviceID:              strings.TrimSpace(dev.ID),
+		Discovered:            discovered,
+		Inferred:              topologyDeviceInferred(dev),
+		ManagementIP:          firstAddress(dev.Addresses),
+		ManagementAddresses:   addressStrings(dev.Addresses),
+		Protocols:             labelsCSVToSlice(dev.Labels, "protocols_observed"),
+		ProtocolsCollected:    labelsCSVToSlice(dev.Labels, "protocols_observed"),
+		Capabilities:          labelsCSVToSlice(dev.Labels, "capabilities"),
+		CapabilitiesSupported: labelsCSVToSlice(dev.Labels, "capabilities_supported"),
+		CapabilitiesEnabled:   labelsCSVToSlice(dev.Labels, "capabilities_enabled"),
+		IfIndexes:             ifaceSummary.ifIndexes,
+		IfNames:               ifaceSummary.ifNames,
+		AdminStatusCounts:     cloneIntMap(ifaceSummary.adminStatusCount),
+		OperStatusCounts:      cloneIntMap(ifaceSummary.operStatusCount),
+		LinkModeCounts:        cloneIntMap(ifaceSummary.linkModeCount),
+		TopologyRoleCounts:    cloneIntMap(ifaceSummary.roleCount),
+		Ports:                 cloneProjectionPortDetails(ifaceSummary.portStatuses),
 	}
 	derivedVendor, derivedPrefix := inferTopologyVendorFromMatch(match)
 	if derivedVendor != "" {
-		attrs["vendor_derived"] = derivedVendor
-		attrs["vendor_derived_source"] = "mac_oui"
-		attrs["vendor_derived_confidence"] = "low"
-		attrs["vendor_derived_match_prefix"] = derivedPrefix
+		detail.VendorDerived = derivedVendor
+		detail.VendorDerivedSource = "mac_oui"
+		detail.VendorDerivedConfidence = "low"
+		detail.VendorDerivedMatchPrefix = derivedPrefix
 	}
 	if vendor := strings.TrimSpace(dev.Labels["vendor"]); vendor != "" {
-		attrs["vendor"] = vendor
-		attrs["vendor_source"] = "labels"
-		attrs["vendor_confidence"] = "high"
+		detail.Vendor = vendor
+		detail.VendorSource = "labels"
+		detail.VendorConfidence = "high"
 	} else if derivedVendor != "" {
-		attrs["vendor"] = derivedVendor
-		attrs["vendor_source"] = "mac_oui"
-		attrs["vendor_confidence"] = "low"
-		attrs["vendor_match_prefix"] = derivedPrefix
+		detail.Vendor = derivedVendor
+		detail.VendorSource = "mac_oui"
+		detail.VendorConfidence = "low"
+		detail.VendorMatchPrefix = derivedPrefix
 	}
 	if ifaceSummary.portsTotal > 0 {
-		attrs["ports_total"] = ifaceSummary.portsTotal
-	}
-	if len(ifaceSummary.ifIndexes) > 0 {
-		attrs["if_indexes"] = ifaceSummary.ifIndexes
-	}
-	if len(ifaceSummary.ifNames) > 0 {
-		attrs["if_names"] = ifaceSummary.ifNames
+		detail.PortsTotal = OptionalValue[int]{Value: ifaceSummary.portsTotal, Has: true}
 	}
 	if ifaceSummary.portsUp > 0 {
-		attrs["ports_up"] = ifaceSummary.portsUp
+		detail.PortsUp = OptionalValue[int]{Value: ifaceSummary.portsUp, Has: true}
 	}
 	if ifaceSummary.portsDown > 0 {
-		attrs["ports_down"] = ifaceSummary.portsDown
+		detail.PortsDown = OptionalValue[int]{Value: ifaceSummary.portsDown, Has: true}
 	}
 	if ifaceSummary.portsAdminDown > 0 {
-		attrs["ports_admin_down"] = ifaceSummary.portsAdminDown
+		detail.PortsAdminDown = OptionalValue[int]{Value: ifaceSummary.portsAdminDown, Has: true}
 	}
 	if ifaceSummary.totalBandwidthBps > 0 {
-		attrs["total_bandwidth_bps"] = ifaceSummary.totalBandwidthBps
+		detail.TotalBandwidthBps = OptionalValue[int64]{Value: ifaceSummary.totalBandwidthBps, Has: true}
 	}
 	if ifaceSummary.fdbTotalMACs > 0 {
-		attrs["fdb_total_macs"] = ifaceSummary.fdbTotalMACs
+		detail.FDBTotalMACs = OptionalValue[int]{Value: ifaceSummary.fdbTotalMACs, Has: true}
 	}
 	if ifaceSummary.vlanCount > 0 {
-		attrs["vlan_count"] = ifaceSummary.vlanCount
+		detail.VLANCount = OptionalValue[int]{Value: ifaceSummary.vlanCount, Has: true}
 	}
 	if ifaceSummary.lldpNeighborCount > 0 {
-		attrs["lldp_neighbor_count"] = ifaceSummary.lldpNeighborCount
+		detail.LLDPNeighborCount = OptionalValue[int]{Value: ifaceSummary.lldpNeighborCount, Has: true}
 	}
 	if ifaceSummary.cdpNeighborCount > 0 {
-		attrs["cdp_neighbor_count"] = ifaceSummary.cdpNeighborCount
+		detail.CDPNeighborCount = OptionalValue[int]{Value: ifaceSummary.cdpNeighborCount, Has: true}
 	}
-	if len(ifaceSummary.adminStatusCount) > 0 {
-		attrs["if_admin_status_counts"] = ifaceSummary.adminStatusCount
-	}
-	if len(ifaceSummary.operStatusCount) > 0 {
-		attrs["if_oper_status_counts"] = ifaceSummary.operStatusCount
-	}
-	if len(ifaceSummary.linkModeCount) > 0 {
-		attrs["if_link_mode_counts"] = ifaceSummary.linkModeCount
-	}
-	if len(ifaceSummary.roleCount) > 0 {
-		attrs["if_topology_role_counts"] = ifaceSummary.roleCount
-	}
-	if len(ifaceSummary.portStatuses) > 0 {
-		attrs["if_statuses"] = ifaceSummary.portStatuses
-	}
-	return attrs
+	return detail
 }
 
-func buildDeviceActorTables(ifaceSummary topologyDeviceInterfaceSummary) map[string][]map[string]any {
-	if len(ifaceSummary.portStatuses) == 0 {
+func cloneIntMap(in map[string]int) map[string]int {
+	if len(in) == 0 {
 		return nil
 	}
-
-	rows := make([]map[string]any, 0, len(ifaceSummary.portStatuses))
-	for _, ps := range ifaceSummary.portStatuses {
-		row := make(map[string]any, len(ps)+2)
-		for k, v := range ps {
-			switch k {
-			case "if_name":
-				row["name"] = v
-			case "if_type":
-				row["port_type"] = v
-			default:
-				row[k] = v
-			}
+	out := make(map[string]int, len(in))
+	for key, value := range in {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
 		}
-		if neighbors, ok := ps["neighbors"]; ok {
-			switch nb := neighbors.(type) {
-			case []map[string]any:
-				row["neighbor_count"] = len(nb)
-			case []any:
-				row["neighbor_count"] = len(nb)
-			}
-		}
-		rows = append(rows, row)
+		out[key] = value
 	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
 
-	return map[string][]map[string]any{"ports": rows}
+func cloneProjectionPortDetails(in []ProjectionPortDetail) []ProjectionPortDetail {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]ProjectionPortDetail, len(in))
+	copy(out, in)
+	return out
 }

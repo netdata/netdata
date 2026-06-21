@@ -10,7 +10,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
-func buildBridgeSegmentActor(segmentID string, segment *bridgeDomainSegment, layer string, source string) (graph.Match, graph.Actor) {
+func buildBridgeSegmentActor(segmentID string, segment *bridgeDomainSegment, layer string, source string) (graph.Match, projectedActor) {
 	parentDevices := make(map[string]struct{})
 	ifNames := make(map[string]struct{})
 	ifIndexes := make(map[string]struct{})
@@ -40,34 +40,34 @@ func buildBridgeSegmentActor(segmentID string, segment *bridgeDomainSegment, lay
 		Hostnames: []string{"segment:" + segmentID},
 	}
 
-	attrs := map[string]any{
-		"segment_id":      segmentID,
-		"segment_type":    "broadcast_domain",
-		"parent_devices":  sortedTopologySet(parentDevices),
-		"if_names":        sortedTopologySet(ifNames),
-		"if_indexes":      sortedTopologySet(ifIndexes),
-		"bridge_ports":    sortedTopologySet(bridgePorts),
-		"vlan_ids":        sortedTopologySet(vlanIDs),
-		"ports_total":     0,
-		"endpoints_total": 0,
+	detail := ProjectionSegmentActorDetail{
+		SegmentID:     strings.TrimSpace(segmentID),
+		SegmentType:   "broadcast_domain",
+		ParentDevices: sortedTopologySet(parentDevices),
+		IfNames:       sortedTopologySet(ifNames),
+		IfIndexes:     sortedTopologySet(ifIndexes),
+		BridgePorts:   sortedTopologySet(bridgePorts),
+		VLANIDs:       sortedTopologySet(vlanIDs),
+		SegmentKind:   "broadcast_domain",
 	}
 	if segment != nil {
-		attrs["learned_sources"] = sortedTopologySet(segment.methods)
-		attrs["ports_total"] = len(segment.ports)
-		attrs["endpoints_total"] = len(segment.endpointIDs)
+		detail.LearnedSources = sortedTopologySet(segment.methods)
+		detail.PortsTotal = OptionalValue[int]{Value: len(segment.ports), Has: true}
+		detail.EndpointsTotal = OptionalValue[int]{Value: len(segment.endpointIDs), Has: true}
 		if bridgePortRefKey(segment.designatedPort, false, false) != "" {
-			attrs["designated_port"] = bridgePortRefSortKey(segment.designatedPort)
+			detail.DesignatedPort = bridgePortRefSortKey(segment.designatedPort)
 		}
 	}
 
-	actor := graph.Actor{
-		ActorType:  "segment",
-		Layer:      layer,
-		Source:     source,
-		Match:      match,
-		Attributes: pruneTopologyAttributes(attrs),
-		Labels: map[string]string{
-			"segment_kind": "broadcast_domain",
+	actor := projectedActor{
+		Actor: graph.Actor{
+			ActorType: "segment",
+			Layer:     layer,
+			Source:    source,
+			Match:     match,
+		},
+		Detail: ProjectionActorDetail{
+			Segment: detail,
 		},
 	}
 
@@ -102,7 +102,7 @@ func endpointMatchFromID(endpointID string) graph.Match {
 }
 
 func annotateEndpointActorsWithDirectOwners(
-	actors []graph.Actor,
+	actors []projectedActor,
 	endpointMatchByID map[string]graph.Match,
 	owners map[string]fdbEndpointOwner,
 	deviceByID map[string]Device,
@@ -140,10 +140,10 @@ func annotateEndpointActorsWithDirectOwners(
 
 	for i := range actors {
 		actor := &actors[i]
-		if !strings.EqualFold(strings.TrimSpace(actor.ActorType), "endpoint") {
+		if !strings.EqualFold(strings.TrimSpace(actor.Actor.ActorType), "endpoint") {
 			continue
 		}
-		key := canonicalTopologyMatchKey(actor.Match)
+		key := canonicalTopologyMatchKey(actor.Actor.Match)
 		if key == "" {
 			continue
 		}
@@ -152,42 +152,32 @@ func annotateEndpointActorsWithDirectOwners(
 			continue
 		}
 
-		attrs := cloneAnyMap(actor.Attributes)
-		if attrs == nil {
-			attrs = make(map[string]any)
-		}
-		labels := cloneStringMap(actor.Labels)
-		if labels == nil {
-			labels = make(map[string]string)
-		}
-
 		deviceID := strings.TrimSpace(owner.port.deviceID)
 		port := bridgePortDisplay(owner.port)
 		ifName := strings.TrimSpace(owner.port.ifName)
 		bridgePort := strings.TrimSpace(owner.port.bridgePort)
 		vlanID := strings.TrimSpace(owner.port.vlanID)
 
-		attrs["attachment_source"] = "single_port_mac"
+		detail := &actor.Detail.Endpoint
+		detail.AttachmentSource = "single_port_mac"
 		if deviceID != "" {
-			attrs["attached_device_id"] = deviceID
-			labels["attached_device_id"] = deviceID
+			detail.AttachedDeviceID = deviceID
 		}
 		if port != "" {
-			attrs["attached_port"] = port
-			labels["attached_port"] = port
+			detail.AttachedPort = port
 		}
 		if ifName != "" {
-			attrs["attached_if_name"] = ifName
+			detail.AttachedIfName = ifName
 		}
 		if owner.port.ifIndex > 0 {
-			attrs["attached_if_index"] = owner.port.ifIndex
+			detail.AttachedIfIndex = owner.port.ifIndex
 		}
 		if bridgePort != "" {
-			attrs["attached_bridge_port"] = bridgePort
+			detail.AttachedBridgePort = bridgePort
 		}
 		if vlanID != "" {
-			attrs["attached_vlan"] = vlanID
-			attrs["attached_vlan_id"] = vlanID
+			detail.AttachedVLAN = vlanID
+			detail.AttachedVLANID = vlanID
 		}
 		if device, ok := deviceByID[deviceID]; ok {
 			display := strings.TrimSpace(device.Hostname)
@@ -195,16 +185,10 @@ func annotateEndpointActorsWithDirectOwners(
 				display = deviceID
 			}
 			if display != "" {
-				attrs["attached_device"] = display
-				labels["attached_device"] = display
+				detail.AttachedDevice = display
 			}
 		}
-		labels["attached_by"] = "single_port_mac"
-
-		actor.Attributes = pruneTopologyAttributes(attrs)
-		if len(labels) > 0 {
-			actor.Labels = labels
-		}
+		detail.AttachedBy = "single_port_mac"
 	}
 }
 

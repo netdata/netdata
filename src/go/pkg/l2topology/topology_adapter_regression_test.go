@@ -3,7 +3,6 @@
 package l2topology
 
 import (
-	"math"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
@@ -109,51 +108,27 @@ func TestBackfillEndpointPortFromPeerPreservesExistingCanonicalPort(t *testing.T
 	require.Empty(t, backfilled.PortID)
 }
 
-func TestTopologyIntegerAttributesParseSNMPEnumLabels(t *testing.T) {
-	attrs := map[string]any{
-		"if_index": "up(1)",
-		"speed":    "fast(1000000000)",
-	}
-
-	require.Equal(t, 1, topologyAttrInt(attrs, "if_index"))
-	require.Equal(t, int64(1000000000), topologyAttrInt64(attrs, "speed"))
-	require.Equal(t, OptionalValue[int]{Has: true, Value: 1}, topologyOptionalAttrInt(attrs, "if_index"))
-	require.Equal(t, OptionalValue[int64]{Has: true, Value: 1000000000}, topologyOptionalAttrInt64(attrs, "speed"))
-}
-
-func TestTopologyAttrIntMapClampsParsedValues(t *testing.T) {
-	counts := topologyAttrIntMap(map[string]any{
-		"counts": map[string]any{
-			"huge": int64(math.MaxInt64),
-			"ok":   "active(7)",
-			"neg":  int64(-1),
-		},
-	}, "counts")
-
-	require.Equal(t, map[string]int{
-		"huge": maxProjectionInt,
-		"ok":   7,
-		"neg":  0,
-	}, counts)
-}
-
 func TestSegmentProjectionBuilderPruneSegmentsWithoutLinksRemovesEmptySegments(t *testing.T) {
 	builder := &segmentProjectionBuilder{
 		segmentIDs: []string{"segment-a", "segment-b"},
 		out: projectedSegments{
-			actors: []graph.Actor{
+			actors: []projectedActor{
 				{
-					ActorID:   "segment-a",
-					ActorType: "segment",
-					Attributes: map[string]any{
-						"segment_id": "segment-a",
+					Actor: graph.Actor{
+						ActorID:   "segment-a",
+						ActorType: "segment",
+					},
+					Detail: ProjectionActorDetail{
+						Segment: ProjectionSegmentActorDetail{SegmentID: "segment-a"},
 					},
 				},
 				{
-					ActorID:   "segment-b",
-					ActorType: "segment",
-					Attributes: map[string]any{
-						"segment_id": "segment-b",
+					Actor: graph.Actor{
+						ActorID:   "segment-b",
+						ActorType: "segment",
+					},
+					Detail: ProjectionActorDetail{
+						Segment: ProjectionSegmentActorDetail{SegmentID: "segment-b"},
 					},
 				},
 			},
@@ -177,10 +152,116 @@ func TestSegmentProjectionBuilderPruneSegmentsWithoutLinksRemovesEmptySegments(t
 	})
 
 	require.Len(t, builder.out.actors, 1)
-	require.Equal(t, "segment-a", builder.out.actors[0].ActorID)
+	require.Equal(t, "segment-a", builder.out.actors[0].Actor.ActorID)
 	require.Len(t, builder.out.links, 1)
 	require.Equal(t, "segment-a", topologyLinkBridgeDomain(builder.out.links[0]))
 	require.Equal(t, 1, builder.out.linksFdb)
 	require.Equal(t, 1, builder.out.bidirectionalCount)
 	require.Equal(t, 1, builder.out.endpointLinksEmitted)
+}
+
+func TestBuildBridgeSegmentActorMarksKnownZeroCountsPresent(t *testing.T) {
+	segment := &bridgeDomainSegment{
+		ports:       map[string]bridgePortRef{},
+		endpointIDs: map[string]struct{}{},
+		methods:     map[string]struct{}{},
+	}
+
+	_, actor := buildBridgeSegmentActor("empty-segment", segment, "2", "snmp")
+
+	require.Equal(t, OptionalValue[int]{Has: true}, actor.Detail.Segment.PortsTotal)
+	require.Equal(t, OptionalValue[int]{Has: true}, actor.Detail.Segment.EndpointsTotal)
+}
+
+func TestCollapseActorsByIPMergesTypedActorDetail(t *testing.T) {
+	actors := []projectedActor{
+		{
+			Actor: graph.Actor{
+				ActorType: "device",
+				Match: graph.Match{
+					MacAddresses: []string{"00:00:00:00:00:01"},
+					IPAddresses:  []string{"192.0.2.10"},
+				},
+			},
+			Detail: ProjectionActorDetail{
+				Device: ProjectionDeviceActorDetail{
+					DeviceID: "rep",
+				},
+			},
+		},
+		{
+			Actor: graph.Actor{
+				ActorType: "device",
+				Match: graph.Match{
+					MacAddresses: []string{"ff:ff:ff:ff:ff:ff"},
+					IPAddresses:  []string{"192.0.2.10"},
+				},
+			},
+			Detail: ProjectionActorDetail{
+				Device: ProjectionDeviceActorDetail{
+					DeviceID:                 "member",
+					Discovered:               true,
+					Inferred:                 true,
+					ManagementIP:             "10.0.0.10",
+					ManagementAddresses:      []string{"10.0.0.10"},
+					Protocols:                []string{"lldp"},
+					ProtocolsCollected:       []string{"lldp"},
+					Capabilities:             []string{"bridge"},
+					CapabilitiesSupported:    []string{"router"},
+					CapabilitiesEnabled:      []string{"bridge"},
+					Vendor:                   "Example Vendor",
+					VendorSource:             "labels",
+					VendorConfidence:         "high",
+					VendorDerived:            "Derived Vendor",
+					VendorDerivedSource:      "mac_oui",
+					VendorDerivedConfidence:  "low",
+					VendorDerivedMatchPrefix: "ffffff",
+					VendorMatchPrefix:        "ffffff",
+				},
+				Endpoint: ProjectionEndpointActorDetail{
+					Vendor:                   "Endpoint Vendor",
+					VendorSource:             "mac_oui",
+					VendorConfidence:         "low",
+					VendorMatchPrefix:        "ffffff",
+					VendorDerived:            "Endpoint Vendor",
+					VendorDerivedSource:      "mac_oui",
+					VendorDerivedConfidence:  "low",
+					VendorDerivedMatchPrefix: "ffffff",
+				},
+			},
+		},
+	}
+
+	collapsed := collapseActorsByIP(actors)
+
+	require.Len(t, collapsed, 1)
+	detail := collapsed[0].Detail
+	require.True(t, detail.CollapsedByIP)
+	require.Equal(t, 2, detail.CollapsedCount)
+	require.Equal(t, "rep", detail.Device.DeviceID)
+	require.True(t, detail.Device.Discovered)
+	require.True(t, detail.Device.Inferred)
+	require.Equal(t, "10.0.0.10", detail.Device.ManagementIP)
+	require.Equal(t, []string{"10.0.0.10"}, detail.Device.ManagementAddresses)
+	require.Equal(t, []string{"lldp"}, detail.Device.Protocols)
+	require.Equal(t, []string{"lldp"}, detail.Device.ProtocolsCollected)
+	require.Equal(t, []string{"bridge"}, detail.Device.Capabilities)
+	require.Equal(t, []string{"router"}, detail.Device.CapabilitiesSupported)
+	require.Equal(t, []string{"bridge"}, detail.Device.CapabilitiesEnabled)
+	require.Equal(t, "Example Vendor", detail.Device.Vendor)
+	require.Equal(t, "labels", detail.Device.VendorSource)
+	require.Equal(t, "high", detail.Device.VendorConfidence)
+	require.Equal(t, "Derived Vendor", detail.Device.VendorDerived)
+	require.Equal(t, "mac_oui", detail.Device.VendorDerivedSource)
+	require.Equal(t, "low", detail.Device.VendorDerivedConfidence)
+	require.Equal(t, "ffffff", detail.Device.VendorDerivedMatchPrefix)
+	require.Equal(t, "ffffff", detail.Device.VendorMatchPrefix)
+	require.Equal(t, "Endpoint Vendor", detail.Endpoint.Vendor)
+	require.Equal(t, "mac_oui", detail.Endpoint.VendorSource)
+	require.Equal(t, "low", detail.Endpoint.VendorConfidence)
+	require.Equal(t, "ffffff", detail.Endpoint.VendorMatchPrefix)
+	require.Equal(t, "Endpoint Vendor", detail.Endpoint.VendorDerived)
+	require.Equal(t, "mac_oui", detail.Endpoint.VendorDerivedSource)
+	require.Equal(t, "low", detail.Endpoint.VendorDerivedConfidence)
+	require.Equal(t, "ffffff", detail.Endpoint.VendorDerivedMatchPrefix)
 }

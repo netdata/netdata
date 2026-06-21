@@ -174,8 +174,5 @@ func topologyL3ActorRouterIDs(actor topologyActor) []string {
 	if routerID := topologyActorDetailOSPFRouterID(actor); routerID != "" {
 		values = append(values, routerID)
 	}
-	if routerID := normalizeTopologyRouterID(actor.Labels[tagOSPFRouterID]); routerID != "" {
-		values = append(values, routerID)
-	}
 	return values
 }

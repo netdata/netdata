@@ -111,7 +111,7 @@ func buildDeviceIdentityKeySetByID(
 			continue
 		}
 		keys := topologyMatchIdentityKeys(
-			deviceToTopologyActor(device, "", "", "", topologyDeviceInterfaceSummary{}, nil).Match,
+			deviceToTopologyActor(device, "", "", "", topologyDeviceInterfaceSummary{}, nil).Actor.Match,
 		)
 		if len(keys) == 0 {
 			continue

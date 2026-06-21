@@ -15,8 +15,8 @@ type topologyMatchLookup struct {
 	identityKeys []string
 }
 
-type topologyActorSortEntry struct {
-	actor graph.Actor
+type projectedTopologyActorSortEntry struct {
+	actor projectedActor
 	key   string
 }
 
@@ -50,7 +50,7 @@ func canonicalTopologyMatchKey(match graph.Match) string {
 	return ""
 }
 
-func assignTopologyActorIDsAndLinkEndpoints(actors []graph.Actor, links []graph.Link) {
+func assignTopologyActorIDsAndLinkEndpoints(actors []projectedActor, links []graph.Link) {
 	if len(actors) == 0 {
 		return
 	}
@@ -61,11 +61,11 @@ func assignTopologyActorIDsAndLinkEndpoints(actors []graph.Actor, links []graph.
 	actorLookups := make([]topologyMatchLookup, len(actors))
 
 	for i := range actors {
-		actorLookups[i] = newTopologyMatchLookup(actors[i].Match)
+		actorLookups[i] = newTopologyMatchLookup(actors[i].Actor.Match)
 
 		baseID := actorLookups[i].canonical
 		if baseID == "" {
-			actorType := strings.ToLower(strings.TrimSpace(actors[i].ActorType))
+			actorType := strings.ToLower(strings.TrimSpace(actors[i].Actor.ActorType))
 			if actorType == "" {
 				actorType = "actor"
 			}
@@ -73,7 +73,7 @@ func assignTopologyActorIDsAndLinkEndpoints(actors []graph.Actor, links []graph.
 		}
 
 		actorID := responseScopedActorID(baseID, usedActorIDs)
-		actors[i].ActorID = actorID
+		actors[i].Actor.ActorID = actorID
 
 		if actorLookups[i].canonical != "" {
 			if _, exists := actorIDByCanonicalMatch[actorLookups[i].canonical]; !exists {
@@ -131,7 +131,7 @@ func resolveTopologyEndpointActorID(lookup topologyMatchLookup, byCanonicalMatch
 	return ""
 }
 
-func enrichTopologyPortTablesWithLinkCounts(actors []graph.Actor, links []graph.Link) {
+func enrichTopologyPortDetailsWithLinkCounts(actors []projectedActor, links []graph.Link) {
 	type actorPort struct {
 		actorID  string
 		portName string
@@ -154,19 +154,20 @@ func enrichTopologyPortTablesWithLinkCounts(actors []graph.Actor, links []graph.
 	}
 
 	for i := range actors {
-		portRows := actors[i].Tables["ports"]
-		if len(portRows) == 0 {
+		ports := actors[i].Detail.Device.Ports
+		if len(ports) == 0 {
 			continue
 		}
-		for j := range portRows {
-			name := strings.TrimSpace(fmt.Sprintf("%v", portRows[j]["name"]))
+		for j := range ports {
+			name := strings.TrimSpace(firstNonEmpty(ports[j].Name, ports[j].IfName, ports[j].PortID))
 			if name == "" {
 				continue
 			}
-			if c := counts[actorPort{actors[i].ActorID, name}]; c > 0 {
-				portRows[j]["link_count"] = c
+			if c := counts[actorPort{actors[i].Actor.ActorID, name}]; c > 0 {
+				ports[j].LinkCount = OptionalValue[int]{Value: c, Has: true}
 			}
 		}
+		actors[i].Detail.Device.Ports = ports
 	}
 }
 
@@ -303,16 +304,16 @@ func topologyActorSortKey(actor graph.Actor) string {
 	}, keySep)
 }
 
-func sortTopologyActors(actors []graph.Actor) {
+func sortProjectedTopologyActors(actors []projectedActor) {
 	if len(actors) < 2 {
 		return
 	}
 
-	entries := make([]topologyActorSortEntry, len(actors))
+	entries := make([]projectedTopologyActorSortEntry, len(actors))
 	for i := range actors {
-		entries[i] = topologyActorSortEntry{
+		entries[i] = projectedTopologyActorSortEntry{
 			actor: actors[i],
-			key:   topologyActorSortKey(actors[i]),
+			key:   topologyActorSortKey(actors[i].Actor),
 		}
 	}
 

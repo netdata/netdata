@@ -9,18 +9,19 @@ func deviceToTopologyActor(
 	source, layer, localDeviceID string,
 	ifaceSummary topologyDeviceInterfaceSummary,
 	reporterAliases []string,
-) graph.Actor {
+) projectedActor {
 	match := buildDeviceActorMatch(dev, reporterAliases)
-	attrs := buildDeviceActorAttributes(dev, localDeviceID, ifaceSummary, match)
-	tables := buildDeviceActorTables(ifaceSummary)
 
-	return graph.Actor{
-		ActorType:  resolveDeviceActorType(dev.Labels),
-		Layer:      layer,
-		Source:     source,
-		Match:      match,
-		Attributes: pruneTopologyAttributes(attrs),
-		Labels:     cloneStringMap(dev.Labels),
-		Tables:     tables,
+	return projectedActor{
+		Actor: graph.Actor{
+			ActorType: resolveDeviceActorType(dev.Labels),
+			Layer:     layer,
+			Source:    source,
+			Match:     match,
+			Labels:    cloneStringMap(dev.Labels),
+		},
+		Detail: ProjectionActorDetail{
+			Device: buildDeviceActorDetail(dev, localDeviceID, ifaceSummary, match),
+		},
 	}
 }

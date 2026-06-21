@@ -14,8 +14,7 @@ func TestTopologyActorIsInferred(t *testing.T) {
 		actor topologyActor
 		want  bool
 	}{
-		"endpoint-type":  {actor: topologyActor{ActorType: "endpoint"}, want: true},
-		"inferred-label": {actor: topologyActor{Labels: map[string]string{"inferred": "yes"}}, want: true},
+		"endpoint-type": {actor: topologyActor{ActorType: "endpoint"}, want: true},
 		"inferred-detail": {
 			actor: topologyActor{
 				Detail: topologyActorDetail{

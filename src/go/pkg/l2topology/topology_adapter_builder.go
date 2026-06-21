@@ -28,7 +28,7 @@ type graphBuilder struct {
 	reporterAliases      map[string][]string
 	ifaceSummaryByDevice map[string]topologyDeviceInterfaceSummary
 
-	actors        []graph.Actor
+	actors        []projectedActor
 	actorIndex    map[string]struct{}
 	actorMACIndex map[string]struct{}
 
@@ -132,7 +132,7 @@ func (b *graphBuilder) collectBridgeTopologyInputs() {
 }
 
 func (b *graphBuilder) buildDeviceActors() {
-	b.actors = make([]graph.Actor, 0, len(b.result.Devices))
+	b.actors = make([]projectedActor, 0, len(b.result.Devices))
 	b.actorIndex = make(map[string]struct{}, len(b.result.Devices)*2)
 	b.actorMACIndex = make(map[string]struct{}, len(b.result.Devices))
 
@@ -145,11 +145,11 @@ func (b *graphBuilder) buildDeviceActors() {
 			b.ifaceSummaryByDevice[dev.ID],
 			b.reporterAliases[dev.ID],
 		)
-		keys := topologyMatchIdentityKeys(actor.Match)
+		keys := topologyMatchIdentityKeys(actor.Actor.Match)
 		if len(keys) == 0 {
 			continue
 		}
-		macKeys := topologyMatchHardwareIdentityKeys(actor.Match)
+		macKeys := topologyMatchHardwareIdentityKeys(actor.Actor.Match)
 		if len(macKeys) > 0 {
 			if topologyIdentityIndexOverlaps(b.actorMACIndex, macKeys) {
 				continue
@@ -215,7 +215,7 @@ func (b *graphBuilder) buildSegmentTopology() {
 }
 
 func (b *graphBuilder) finalizeGraph() {
-	sortTopologyActors(b.actors)
+	sortProjectedTopologyActors(b.actors)
 
 	b.links = make([]graph.Link, 0, len(b.projectedAdjacencies.links)+len(b.segmentProjection.links))
 	b.links = append(b.links, b.projectedAdjacencies.links...)
@@ -239,11 +239,11 @@ func (b *graphBuilder) finalizeGraph() {
 	var additionalSegmentSuppressed int
 	b.actors, b.links, additionalSegmentSuppressed = pruneSegmentArtifacts(b.actors, b.links)
 	b.segmentSuppressed += additionalSegmentSuppressed
-	sortTopologyActors(b.actors)
+	sortProjectedTopologyActors(b.actors)
 	sortTopologyLinks(b.links)
 	applyTopologyDisplayNames(b.actors, b.links, b.opts.ResolveDNSName)
 	assignTopologyActorIDsAndLinkEndpoints(b.actors, b.links)
-	enrichTopologyPortTablesWithLinkCounts(b.actors, b.links)
+	enrichTopologyPortDetailsWithLinkCounts(b.actors, b.links)
 
 	b.linkCounts = summarizeTopologyLinks(b.links)
 	b.probableLinks = 0
@@ -292,7 +292,36 @@ func (b *graphBuilder) graph() graph.Graph {
 		AgentID:       b.opts.AgentID,
 		CollectedAt:   b.collectedAt,
 		View:          b.view,
-		Actors:        b.actors,
+		Actors:        graphActorsFromProjected(b.actors),
 		Links:         b.links,
 	}
+}
+
+func (b *graphBuilder) actorDetails() map[string]ProjectionActorDetail {
+	if len(b.actors) == 0 {
+		return nil
+	}
+	out := make(map[string]ProjectionActorDetail, len(b.actors))
+	for _, actor := range b.actors {
+		actorID := strings.TrimSpace(actor.Actor.ActorID)
+		if actorID == "" {
+			continue
+		}
+		out[actorID] = actor.Detail
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func graphActorsFromProjected(actors []projectedActor) []graph.Actor {
+	if len(actors) == 0 {
+		return nil
+	}
+	out := make([]graph.Actor, len(actors))
+	for i, actor := range actors {
+		out[i] = actor.Actor
+	}
+	return out
 }

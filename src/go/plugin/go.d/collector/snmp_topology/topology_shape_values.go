@@ -38,9 +38,6 @@ func topologyActorIsInferred(actor topologyActor) bool {
 	if actor.Detail.L2.Device.Inferred {
 		return true
 	}
-	if boolStatValue(actor.Labels["inferred"]) {
-		return true
-	}
 	return false
 }
 

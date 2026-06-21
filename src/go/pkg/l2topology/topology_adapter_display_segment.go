@@ -2,11 +2,7 @@
 
 package l2topology
 
-import (
-	"strings"
-
-	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
-)
+import "strings"
 
 type topologySegmentPortRef struct {
 	deviceID   string
@@ -15,13 +11,13 @@ type topologySegmentPortRef struct {
 	bridgePort string
 }
 
-func topologySegmentDisplayName(actor graph.Actor, deviceDisplayByID map[string]string) string {
-	attrs := actor.Attributes
-	if len(attrs) == 0 {
+func topologySegmentDisplayName(actor projectedActor, deviceDisplayByID map[string]string) string {
+	detail := actor.Detail.Segment
+	if detail.SegmentID == "" && detail.DesignatedPort == "" && len(detail.ParentDevices) == 0 {
 		return ""
 	}
 
-	ref := parseTopologySegmentPortRef(topologyAttrString(attrs, "designated_port"))
+	ref := parseTopologySegmentPortRef(detail.DesignatedPort)
 	parent := topologySegmentParentDisplayName(ref.deviceID, deviceDisplayByID)
 	port := topologySegmentPortDisplay(ref)
 	if parent != "" && port != "" {
@@ -29,19 +25,19 @@ func topologySegmentDisplayName(actor graph.Actor, deviceDisplayByID map[string]
 	}
 
 	parentCandidates := make(map[string]struct{})
-	for _, candidate := range topologyAttrStringSlice(attrs, "parent_devices") {
+	for _, candidate := range detail.ParentDevices {
 		if value := topologySegmentParentDisplayName(candidate, deviceDisplayByID); value != "" {
 			parentCandidates[value] = struct{}{}
 		}
 	}
 	portCandidates := make(map[string]struct{})
-	for _, candidate := range topologyAttrStringSlice(attrs, "if_names") {
+	for _, candidate := range detail.IfNames {
 		if candidate = strings.TrimSpace(candidate); candidate != "" {
 			portCandidates[candidate] = struct{}{}
 		}
 	}
 	if len(portCandidates) == 0 {
-		for _, candidate := range topologyAttrStringSlice(attrs, "bridge_ports") {
+		for _, candidate := range detail.BridgePorts {
 			if candidate = strings.TrimSpace(candidate); candidate != "" {
 				portCandidates[candidate] = struct{}{}
 			}
@@ -53,7 +49,7 @@ func topologySegmentDisplayName(actor graph.Actor, deviceDisplayByID map[string]
 		return parents[0] + "." + ports[0] + ".segment"
 	}
 
-	return topologyCompactSegmentID(topologyAttrString(attrs, "segment_id"))
+	return topologyCompactSegmentID(detail.SegmentID)
 }
 
 func parseTopologySegmentPortRef(raw string) topologySegmentPortRef {
