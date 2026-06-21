@@ -49,11 +49,13 @@ func TestNormalizeHexHelpers_ClassifyTokensDeterministically(t *testing.T) {
 		in        string
 		want      string
 	}{
-		"mac":            {normalize: NormalizeMAC, in: "hex-string: 00 11 22 33 44 55", want: "00:11:22:33:44:55"},
-		"ip-address":     {normalize: NormalizeIPAddress, in: "0A14043C", want: "10.20.4.60"},
-		"mapped-ipv4":    {normalize: NormalizeNonUnspecifiedIPAddress, in: "::ffff:192.0.2.1", want: "192.0.2.1"},
-		"hex-token":      {normalize: NormalizeHexToken, in: "31302E32302E342E323035", want: "10.20.4.205"},
-		"hex-identifier": {normalize: NormalizeHexIdentifier, in: "00:11:22:33:44:55", want: "001122334455"},
+		"mac":             {normalize: NormalizeMAC, in: "hex-string: 00 11 22 33 44 55", want: "00:11:22:33:44:55"},
+		"ip-address":      {normalize: NormalizeIPAddress, in: "0A14043C", want: "10.20.4.60"},
+		"mapped-ipv4":     {normalize: NormalizeIPAddress, in: "::ffff:192.0.2.1", want: "192.0.2.1"},
+		"mapped-ipv4-hex": {normalize: NormalizeIPAddress, in: "00000000000000000000ffffc0000201", want: "192.0.2.1"},
+		"non-unspecified": {normalize: NormalizeNonUnspecifiedIPAddress, in: "::ffff:192.0.2.1", want: "192.0.2.1"},
+		"hex-token":       {normalize: NormalizeHexToken, in: "31302E32302E342E323035", want: "10.20.4.205"},
+		"hex-identifier":  {normalize: NormalizeHexIdentifier, in: "00:11:22:33:44:55", want: "001122334455"},
 	}
 
 	for name, tc := range tests {

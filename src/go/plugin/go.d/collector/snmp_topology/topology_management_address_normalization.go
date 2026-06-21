@@ -5,10 +5,11 @@ package snmptopology
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
 func reconstructLldpRemMgmtAddrHex(tags map[string]string) string {
@@ -41,14 +42,8 @@ func normalizeManagementAddress(rawAddr, rawType string) (string, string) {
 		return "", normalizeAddressType(rawType, "")
 	}
 
-	if ip := net.ParseIP(rawAddr); ip != nil {
-		return ip.String(), normalizeAddressType(rawType, ip.String())
-	}
-
-	if bs, err := topologyutil.DecodeHexString(rawAddr); err == nil {
-		if ip := topologyutil.ParseIPFromDecodedBytes(bs); ip != nil {
-			return ip.String(), normalizeAddressType(rawType, ip.String())
-		}
+	if ip := topologyutil.NormalizeIPAddress(rawAddr); ip != "" {
+		return ip, normalizeAddressType(rawType, ip)
 	}
 
 	return rawAddr, normalizeAddressType(rawType, rawAddr)

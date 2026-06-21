@@ -65,16 +65,23 @@ func NormalizeIPAddress(value string) string {
 		return ""
 	}
 	if ip := net.ParseIP(value); ip != nil {
-		return ip.String()
+		return canonicalIPAddress(ip)
 	}
 
 	if bs, err := DecodeHexString(value); err == nil {
 		if ip := ParseIPFromDecodedBytes(bs); ip != nil {
-			return ip.String()
+			return canonicalIPAddress(ip)
 		}
 	}
 
 	return ""
+}
+
+func canonicalIPAddress(ip net.IP) string {
+	if ip4 := ip.To4(); ip4 != nil {
+		return net.IP(ip4).String()
+	}
+	return ip.String()
 }
 
 func NormalizeNonUnspecifiedIPAddress(value string) string {
