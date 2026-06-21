@@ -82,7 +82,7 @@ require (
 	github.com/klauspost/compress v1.18.6
 	github.com/maxmind/mmdbwriter v1.2.0
 	github.com/microsoft/go-mssqldb v1.10.0
-	github.com/moby/moby/api v1.54.2
+	github.com/moby/moby/api v1.55.0
 	github.com/moby/moby/client v0.4.1
 	github.com/netdata/systemd-journal-sdk/go v0.7.4
 	github.com/oschwald/maxminddb-golang v1.13.1
