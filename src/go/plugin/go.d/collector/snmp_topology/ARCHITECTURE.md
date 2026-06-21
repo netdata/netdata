@@ -9,7 +9,7 @@ per-protocol details; those live in the profile definitions and focused tests.
 `snmp_topology` is a single-instance go.d collector that periodically builds a
 cached topology view from SNMP devices registered by the SNMP collector.
 
-It has two independent runtime surfaces:
+It has three independent entry points:
 
 - `Run(ctx)` refreshes topology in the background.
 - `Collect(ctx)` only publishes internal collector metrics.
@@ -214,6 +214,36 @@ The internal packages are deliberately narrower:
 - conversion of request params into `topologyoptions.QueryOptions`.
 
 It does not own graph building or rendering.
+
+### Dependency Direction
+
+The internal packages form a one-way dependency DAG. `internal/topologyutil` is
+the only leaf; the other packages point inward toward the model, and the root
+package composes all of them.
+
+```text
+topologyutil       leaf (stdlib only)
+topologymodel    -> topologyutil
+topologyoptions  -> topologyutil
+topologyshape    -> topologymodel, topologyoptions, topologyutil
+topologyenrich   -> topologymodel, topologyutil
+topologyv1       -> topologymodel, topologyoptions, topologyutil
+snmptopologyfunc -> topologyoptions, topologyutil
+root snmptopology-> all of the above
+```
+
+Invariants (enforced by `go list -deps` in the decomposition validation):
+
+- No internal package imports the root `collector/snmp_topology` package. The
+  root composes the internal packages; they never depend back on it.
+- The sibling layers `topologyshape`, `topologyenrich`, and `topologyv1` do not
+  import one another. Logic shared between them lives in `topologymodel` or
+  `topologyutil`.
+- `topologyutil` imports no sibling; `topologymodel` and `topologyoptions`
+  import only `topologyutil`.
+- `snmptopologyfunc` (Function transport) depends on `topologyoptions`;
+  `topologyoptions` owns the canonical query-option vocabulary and never imports
+  the Function package.
 
 ## Function Request Path
 
