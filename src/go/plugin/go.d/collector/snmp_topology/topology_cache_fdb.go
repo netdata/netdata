@@ -5,6 +5,8 @@ package snmptopology
 import (
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
 
@@ -18,7 +20,7 @@ func init() {
 func (c *topologyCache) updateFdbEntry(tags map[string]string) {
 	c.updateLocalBridgeIdentityFromTags(tags)
 
-	mac := normalizeMAC(firstNonEmpty(tags[tagFdbMac], tags[tagDot1qFdbMac]))
+	mac := topologyutil.NormalizeMAC(firstNonEmpty(tags[tagFdbMac], tags[tagDot1qFdbMac]))
 	if mac == "" {
 		c.fdbRowsDroppedNoMAC++
 		return

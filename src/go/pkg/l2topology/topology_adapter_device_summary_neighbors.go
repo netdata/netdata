@@ -117,15 +117,3 @@ func sortedTopologyPortNeighbors(neighbors map[string]topologyPortNeighborStatus
 	}
 	return out
 }
-
-func topologyPortNeighborStatusToAttributes(status topologyPortNeighborStatus) map[string]any {
-	attrs := map[string]any{
-		"protocol":            strings.ToLower(strings.TrimSpace(status.Protocol)),
-		"remote_device":       strings.TrimSpace(status.RemoteDevice),
-		"remote_port":         strings.TrimSpace(status.RemotePort),
-		"remote_ip":           strings.TrimSpace(status.RemoteIP),
-		"remote_chassis_id":   strings.TrimSpace(status.RemoteChassisID),
-		"remote_capabilities": uniqueTopologyStrings(status.RemoteCapabilities),
-	}
-	return pruneTopologyAttributes(attrs)
-}

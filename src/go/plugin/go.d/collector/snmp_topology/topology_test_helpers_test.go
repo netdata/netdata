@@ -5,6 +5,9 @@ package snmptopology
 import (
 	"fmt"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
 
@@ -24,39 +27,49 @@ func registerTestDeviceState(store *ddsnmp.DeviceStore, devices ...ddsnmp.Device
 	}
 }
 
-func snapshotTopologyRegistryForTest(registry *topologyRegistry) (topologyData, bool) {
+func snapshotTopologyRegistryForTest(registry *topologyRegistry) (topologymodel.Data, bool) {
 	return snapshotTopologyRegistryForTestWithOptions(registry, defaultTopologyQueryOptionsForTest())
 }
 
-func snapshotTopologyRegistryForTestWithOptions(registry *topologyRegistry, options topologyQueryOptions) (topologyData, bool) {
+func testCountTopologyLinksByType(links []topologymodel.Link, linkType string) int {
+	count := 0
+	for _, link := range links {
+		if link.LinkType == linkType {
+			count++
+		}
+	}
+	return count
+}
+
+func snapshotTopologyRegistryForTestWithOptions(registry *topologyRegistry, options topologyoptions.QueryOptions) (topologymodel.Data, bool) {
 	if options.ResolveDNSName == nil {
 		options.ResolveDNSName = resolveTopologyReverseDNSNameNoop
 	}
 	return registry.snapshotWithOptions(options)
 }
 
-func snapshotTopologyCacheForTest(cache *topologyCache) (topologyData, bool) {
+func snapshotTopologyCacheForTest(cache *topologyCache) (topologymodel.Data, bool) {
 	return snapshotTopologyCacheForTestWithOptions(cache, defaultTopologyQueryOptionsForTest())
 }
 
-func snapshotTopologyCacheForTestWithOptions(cache *topologyCache, options topologyQueryOptions) (topologyData, bool) {
+func snapshotTopologyCacheForTestWithOptions(cache *topologyCache, options topologyoptions.QueryOptions) (topologymodel.Data, bool) {
 	registry := newTopologyRegistry()
 	registry.register(cache)
 	return snapshotTopologyRegistryForTestWithOptions(registry, options)
 }
 
-func defaultTopologyQueryOptionsForTest() topologyQueryOptions {
-	return topologyQueryOptions{
+func defaultTopologyQueryOptionsForTest() topologyoptions.QueryOptions {
+	return topologyoptions.QueryOptions{
 		CollapseActorsByIP:     true,
 		EliminateNonIPInferred: true,
-		MapType:                topologyMapTypeLLDPCDPManaged,
-		InferenceStrategy:      topologyInferenceStrategyFDBMinimumKnowledge,
-		ManagedDeviceFocus:     topologyManagedFocusAllDevices,
-		Depth:                  topologyDepthAllInternal,
+		MapType:                topologyoptions.MapTypeLLDPCDPManaged,
+		InferenceStrategy:      topologyoptions.InferenceStrategyFDBMinimumKnowledge,
+		ManagedDeviceFocus:     topologyoptions.ManagedFocusAllDevices,
+		Depth:                  topologyoptions.DepthAllInternal,
 	}
 }
 
-func containsMgmtAddr(snapshot topologyData, addrs map[string]struct{}) bool {
+func containsMgmtAddr(snapshot topologymodel.Data, addrs map[string]struct{}) bool {
 	for _, actor := range snapshot.Actors {
 		for _, ip := range actor.Match.IPAddresses {
 			if _, ok := addrs[ip]; ok {

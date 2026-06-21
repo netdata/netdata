@@ -2,7 +2,7 @@
 
 package l2topology
 
-import "fmt"
+import "errors"
 
 const (
 	fdbStatusLearned = "learned"
@@ -15,7 +15,7 @@ const (
 // DiscoverOptions.CollectedAt explicitly.
 func BuildL2ResultFromObservations(observations []L2Observation, opts DiscoverOptions) (Result, error) {
 	if len(observations) == 0 {
-		return Result{}, fmt.Errorf("%w: at least one observation is required", ErrInvalidRequest)
+		return Result{}, errors.New("at least one observation is required")
 	}
 	if !opts.EnableLLDP && !opts.EnableCDP && !opts.EnableBridge && !opts.EnableARP && !opts.EnableSTP {
 		opts.EnableLLDP = true

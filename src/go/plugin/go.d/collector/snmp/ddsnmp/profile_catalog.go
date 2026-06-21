@@ -136,6 +136,108 @@ func (v ProjectedView) FilterByKind(kinds map[ddprofiledefinition.TopologyKind]b
 	})}
 }
 
+func (v ProjectedView) FilterBGPByKind(kinds map[ddprofiledefinition.BGPRowKind]bool) ProjectedView {
+	for _, prof := range v.profiles {
+		if prof == nil || prof.Definition == nil {
+			continue
+		}
+		prof.Definition.BGP = slices.DeleteFunc(prof.Definition.BGP, func(row ddprofiledefinition.BGPConfig) bool {
+			return !kinds[row.Kind]
+		})
+	}
+	return ProjectedView{profiles: slices.DeleteFunc(v.profiles, func(prof *Profile) bool {
+		return prof == nil || prof.Definition == nil ||
+			(len(prof.Definition.Topology) == 0 && len(prof.Definition.Metrics) == 0 && len(prof.Definition.BGP) == 0)
+	})}
+}
+
+// FilterBGPToTopologyPeers keeps BGP peer rows and prunes them to fields used
+// by SNMP topology, preserving one fallback row-anchor category when needed.
+func (v ProjectedView) FilterBGPToTopologyPeers() ProjectedView {
+	for _, prof := range v.profiles {
+		if prof == nil || prof.Definition == nil {
+			continue
+		}
+		prof.Definition.BGP = slices.DeleteFunc(prof.Definition.BGP, func(row ddprofiledefinition.BGPConfig) bool {
+			return row.Kind != ddprofiledefinition.BGPRowKindPeer
+		})
+		for i := range prof.Definition.BGP {
+			pruneBGPConfigToTopologyFields(&prof.Definition.BGP[i])
+		}
+		prof.Definition.BGP = slices.DeleteFunc(prof.Definition.BGP, func(row ddprofiledefinition.BGPConfig) bool {
+			return !bgpConfigHasSignal(row)
+		})
+	}
+	return ProjectedView{profiles: slices.DeleteFunc(v.profiles, func(prof *Profile) bool {
+		return prof == nil || prof.Definition == nil ||
+			(len(prof.Definition.Topology) == 0 && len(prof.Definition.Metrics) == 0 && len(prof.Definition.BGP) == 0)
+	})}
+}
+
+func pruneBGPConfigToTopologyFields(row *ddprofiledefinition.BGPConfig) {
+	original := row.Clone()
+	row.Previous = ddprofiledefinition.BGPStateConfig{}
+	row.Traffic = ddprofiledefinition.BGPTrafficConfig{}
+	row.Transitions = ddprofiledefinition.BGPTransitionsConfig{}
+	row.Timers = ddprofiledefinition.BGPTimersConfig{}
+	row.LastError = ddprofiledefinition.BGPLastErrorConfig{}
+	row.LastNotify = ddprofiledefinition.BGPLastNotifyConfig{}
+	row.Reasons = ddprofiledefinition.BGPReasonsConfig{}
+	row.Restart = ddprofiledefinition.BGPGracefulRestartConfig{}
+	row.Routes = ddprofiledefinition.BGPRoutesConfig{}
+	row.RouteLimits = ddprofiledefinition.BGPRouteLimitsConfig{}
+	row.Device = ddprofiledefinition.BGPDeviceCountsConfig{}
+	row.StaticTags = nil
+	row.MetricTags = nil
+
+	restoreBGPTopologyRowAnchor(row, original)
+}
+
+func bgpConfigHasTopologySignal(row ddprofiledefinition.BGPConfig) bool {
+	return row.Admin.Enabled.IsSet() ||
+		row.State.BGPValueConfig.IsSet() ||
+		row.Connection.EstablishedUptime.IsSet() ||
+		row.Connection.LastReceivedUpdateAge.IsSet()
+}
+
+func restoreBGPTopologyRowAnchor(row *ddprofiledefinition.BGPConfig, original ddprofiledefinition.BGPConfig) {
+	if bgpConfigHasTopologySignal(original) {
+		return
+	}
+	switch {
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{Previous: original.Previous}):
+		row.Previous = original.Previous
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{Transitions: original.Transitions}):
+		row.Transitions = original.Transitions
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{Traffic: original.Traffic}):
+		row.Traffic = original.Traffic
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{Timers: original.Timers}):
+		row.Timers = original.Timers
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{LastError: original.LastError}):
+		row.LastError = original.LastError
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{LastNotify: original.LastNotify}):
+		row.LastNotify = original.LastNotify
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{Reasons: original.Reasons}):
+		row.Reasons = original.Reasons
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{Restart: original.Restart}):
+		row.Restart = original.Restart
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{Routes: original.Routes}):
+		row.Routes = original.Routes
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{RouteLimits: original.RouteLimits}):
+		row.RouteLimits = original.RouteLimits
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{Device: original.Device}):
+		row.Device = original.Device
+	}
+}
+
+func bgpConfigHasSignal(row ddprofiledefinition.BGPConfig) bool {
+	hasSignal := false
+	ddprofiledefinition.ForEachBGPSignalValue(row, func(_ string, _ ddprofiledefinition.BGPValueConfig) {
+		hasSignal = true
+	})
+	return hasSignal
+}
+
 func selectMatchedProfiles(available []*Profile, sysObjID, sysDescr string) []*Profile {
 	matchedOIDs := make(map[*Profile]string)
 	var selected []*Profile

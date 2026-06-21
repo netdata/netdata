@@ -324,6 +324,7 @@ func (c *Collector) refreshDeviceTopology(ctx context.Context, key string, dev d
 	next.updateTopologySysUptime(sysUptime)
 	next.updateTopologyProfileTags(pms)
 	next.ingestTopologyProfileMetrics(pms)
+	next.ingestTopologyBGPPeers(pms)
 	c.collectTopologyVTPVLANContexts(ctx, next, dev)
 	if ctx.Err() != nil {
 		return false
@@ -384,7 +385,7 @@ func (c *Collector) findTopologyProfiles(dev ddsnmp.DeviceConnectionInfo) []*dds
 		SysDescr:       dev.SysDescr,
 		ManualProfiles: dev.ManualProfiles,
 		ManualPolicy:   ddsnmp.ManualProfileAugment,
-	}).Project(ddsnmp.ConsumerTopology).Profiles()
+	}).Project(ddsnmp.ConsumerTopology, ddsnmp.ConsumerBGP).FilterBGPToTopologyPeers().Profiles()
 }
 
 func (c *Collector) getTopologyProfiles(dev ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile {

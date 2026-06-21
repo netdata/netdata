@@ -8,6 +8,11 @@ import (
 	"strings"
 )
 
+type topologyVLANContext struct {
+	vlanID   string
+	vlanName string
+}
+
 func (c *topologyCache) vtpVLANContexts() []topologyVLANContext {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

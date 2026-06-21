@@ -9,15 +9,6 @@ import (
 	"strings"
 )
 
-func cloneAnyMap(in map[string]any) map[string]any {
-	if len(in) == 0 {
-		return nil
-	}
-	out := make(map[string]any, len(in))
-	maps.Copy(out, in)
-	return out
-}
-
 func cloneStringMap(in map[string]string) map[string]string {
 	if len(in) == 0 {
 		return nil
@@ -146,55 +137,4 @@ func labelsCSVToSlice(labels map[string]string, key string) []string {
 		return nil
 	}
 	return csvToSet(labels[key])
-}
-
-func pruneTopologyAttributes(attrs map[string]any) map[string]any {
-	for key, value := range attrs {
-		switch typed := value.(type) {
-		case string:
-			if strings.TrimSpace(typed) == "" {
-				delete(attrs, key)
-			}
-		case []string:
-			if len(typed) == 0 {
-				delete(attrs, key)
-			}
-		case map[string]string:
-			if len(typed) == 0 {
-				delete(attrs, key)
-			}
-		case map[string]any:
-			if len(typed) == 0 {
-				delete(attrs, key)
-			}
-		case int:
-			if typed == 0 {
-				delete(attrs, key)
-			}
-		case nil:
-			delete(attrs, key)
-		}
-	}
-	if len(attrs) == 0 {
-		return nil
-	}
-	return attrs
-}
-
-func mapStringStringToAny(in map[string]string) map[string]any {
-	if len(in) == 0 {
-		return nil
-	}
-	out := make(map[string]any, len(in))
-	for key, value := range in {
-		value = strings.TrimSpace(value)
-		if value == "" {
-			continue
-		}
-		out[key] = value
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
 }

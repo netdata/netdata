@@ -525,6 +525,20 @@ Current SNMP OSPF topology scope is OSPFv2 non-virtual neighbors from
 `ospfNbrTable`; OSPFv3 and OSPF virtual-neighbor tables are future scope unless
 a later topology feature explicitly adds their distinct semantics.
 
+`bgp_adjacency` represents BGP control-plane adjacency between two resolved
+managed SNMP device actors. It is a logical routing-protocol relationship, not
+physical, L2, discovery, or port-neighbor evidence. The producer emits graph
+links only for established BGP peers with resolved local and remote managed
+actors. Unresolved or non-established BGP peer rows remain diagnostic
+actor-owned detail rows and must not create loose router/IP graph actors.
+BGP adjacency graph identity should use the managed actor pair plus routing
+instance. BGP identifiers, ASNs, and endpoint IPs are useful evidence and
+display fields, but they must not be the primary graph deduplication key because
+SNMP BGP profiles expose those fields inconsistently across vendors. Parallel
+sessions between the same managed actor pair in the same routing instance should
+remain actor-owned peer detail rows under one compact graph relationship unless
+a future producer contract explicitly adds a more detailed BGP graph mode.
+
 When `ospf_adjacency` and `l3_subnet` describe the same resolved actor pair and
 endpoint/subnet relationship, OSPF is the stronger protocol-specific signal for
 the graph. The producer may suppress the matching `l3_subnet` graph link while
@@ -586,6 +600,14 @@ evidence. Actor-owned OSPF neighbor detail rows should remain attached to the
 local device actor and are not loose-side graph materialization input unless a
 future producer contract explicitly defines such a policy.
 
+For `bgp_adjacency`, aggregation MUST preserve the explicit `bgp_adjacency`
+link and evidence type, including its `semantic_role: control`. Replacement may
+rewire endpoint actors to stronger managed device actors, but it MUST NOT
+reinterpret BGP adjacency as discovery, physical, L2, or port-neighbor
+evidence. Actor-owned BGP peer detail rows should remain attached to the local
+device actor and are not loose-side graph materialization input unless a future
+producer contract explicitly defines such a policy.
+
 ### UI SNMP
 
 The UI should not expose a detailed/aggregated toggle for SNMP unless the
@@ -605,9 +627,9 @@ Device modals should remain port-centric:
 - L3 adjacency information: derived from typed `l3_subnet` relationship
   evidence, not from `actor_port_links`.
 - routing protocol neighbor information: derived from typed actor-owned detail
-  rows such as `actor_ospf_neighbors`, not from `actor_port_links`. The modal
-  may show unresolved or non-full protocol neighbors as diagnostics without
-  creating graph links.
+  rows such as `actor_ospf_neighbors` and `actor_bgp_peers`, not from
+  `actor_port_links`. The modal may show unresolved or non-established protocol
+  neighbors as diagnostics without creating graph links.
 
 ## Streaming
 

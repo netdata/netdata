@@ -32,6 +32,13 @@ func parseTopologyLabelInt64(value string) int64 {
 		return 0
 	}
 	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err == nil && parsed > 0 {
+		return parsed
+	}
+	start := strings.LastIndex(value, "(")
+	if start >= 0 && strings.HasSuffix(value, ")") {
+		parsed, err = strconv.ParseInt(strings.TrimSpace(value[start+1:len(value)-1]), 10, 64)
+	}
 	if err != nil || parsed <= 0 {
 		return 0
 	}

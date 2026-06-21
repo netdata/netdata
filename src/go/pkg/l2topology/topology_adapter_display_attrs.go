@@ -3,37 +3,38 @@
 package l2topology
 
 import (
-	"math"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
-func topologyCanonicalPortName(attrs map[string]any) string {
-	if name := topologyAttrString(attrs, "port_name"); name != "" {
+func topologyEndpointCanonicalPortName(endpoint graph.LinkEndpoint) string {
+	if name := strings.TrimSpace(endpoint.PortName); name != "" {
 		return name
 	}
-	if name := topologyAttrString(attrs, "if_name"); name != "" {
+	if name := strings.TrimSpace(endpoint.IfName); name != "" {
 		return name
 	}
-	if name := topologyAttrString(attrs, "if_descr"); name != "" {
+	if name := strings.TrimSpace(endpoint.IfDescr); name != "" {
 		return name
 	}
-	if name := topologyAttrString(attrs, "if_alias"); name != "" {
+	if name := strings.TrimSpace(endpoint.IfAlias); name != "" {
 		return name
 	}
 
-	if ifIndex := topologyAttrInt(attrs, "if_index"); ifIndex > 0 {
-		return strconv.Itoa(ifIndex)
+	if endpoint.IfIndex > 0 {
+		return strconv.Itoa(endpoint.IfIndex)
 	}
 
-	if portID := topologyAttrString(attrs, "port_id"); portID != "" {
+	if portID := strings.TrimSpace(endpoint.PortID); portID != "" {
 		if n, err := strconv.Atoi(strings.TrimSpace(portID)); err == nil && n > 0 {
 			return strconv.Itoa(n)
 		}
 		return portID
 	}
-	if bridgePort := topologyAttrString(attrs, "bridge_port"); bridgePort != "" {
+	if bridgePort := strings.TrimSpace(endpoint.BridgePort); bridgePort != "" {
 		if n, err := strconv.Atoi(strings.TrimSpace(bridgePort)); err == nil && n > 0 {
 			return strconv.Itoa(n)
 		}
@@ -60,87 +61,6 @@ func topologyCanonicalLinkName(srcName, srcPortName, dstName, dstPortName string
 		dstPortName = "[unset]"
 	}
 	return srcName + ":" + srcPortName + " -> " + dstName + ":" + dstPortName
-}
-
-func topologyAttrString(attrs map[string]any, key string) string {
-	if len(attrs) == 0 {
-		return ""
-	}
-	value, ok := attrs[key]
-	if !ok || value == nil {
-		return ""
-	}
-	str, ok := value.(string)
-	if !ok {
-		return ""
-	}
-	return strings.TrimSpace(str)
-}
-
-func topologyAttrInt(attrs map[string]any, key string) int {
-	if len(attrs) == 0 {
-		return 0
-	}
-	value, ok := attrs[key]
-	if !ok || value == nil {
-		return 0
-	}
-	switch typed := value.(type) {
-	case int:
-		return typed
-	case int64:
-		if typed < 0 {
-			return 0
-		}
-		if typed > math.MaxInt {
-			return math.MaxInt
-		}
-		return int(typed)
-	case float64:
-		if typed <= 0 {
-			return 0
-		}
-		if typed > math.MaxInt {
-			return math.MaxInt
-		}
-		return int(typed)
-	case string:
-		parsed, err := strconv.Atoi(strings.TrimSpace(typed))
-		if err != nil || parsed <= 0 {
-			return 0
-		}
-		return parsed
-	default:
-		return 0
-	}
-}
-
-func topologyAttrStringSlice(attrs map[string]any, key string) []string {
-	if len(attrs) == 0 {
-		return nil
-	}
-	value, ok := attrs[key]
-	if !ok || value == nil {
-		return nil
-	}
-	switch typed := value.(type) {
-	case []string:
-		return append([]string(nil), typed...)
-	case []any:
-		out := make([]string, 0, len(typed))
-		for _, item := range typed {
-			str, ok := item.(string)
-			if !ok {
-				continue
-			}
-			if str = strings.TrimSpace(str); str != "" {
-				out = append(out, str)
-			}
-		}
-		return out
-	default:
-		return nil
-	}
 }
 
 func topologyTimePtr(t time.Time) *time.Time {

@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
@@ -35,11 +38,11 @@ func (r *topologyObservationIdentityResolver) resolve(hostAliases []string, chas
 			return id
 		}
 
-		candidate := normalizeTopologyDevice(topologyDevice{
+		candidate := normalizeTopologyDevice(topologymodel.Device{
 			ChassisID:     mac,
 			ChassisIDType: "macAddress",
 			SysName:       firstNonEmpty(hostAliases...),
-			ManagementIP:  normalizeIPAddress(managementIP),
+			ManagementIP:  topologyutil.NormalizeIPAddress(managementIP),
 		})
 		id := strings.TrimSpace(ensureTopologyObservationDeviceID(candidate, ""))
 		if id == "" || id == "local-device" {
@@ -65,11 +68,11 @@ func (r *topologyObservationIdentityResolver) resolve(hostAliases []string, chas
 		return id
 	}
 
-	candidate := normalizeTopologyDevice(topologyDevice{
+	candidate := normalizeTopologyDevice(topologymodel.Device{
 		ChassisID:     strings.TrimSpace(chassisID),
 		ChassisIDType: strings.TrimSpace(chassisType),
 		SysName:       firstNonEmpty(hostAliases...),
-		ManagementIP:  normalizeIPAddress(managementIP),
+		ManagementIP:  topologyutil.NormalizeIPAddress(managementIP),
 	})
 	id := strings.TrimSpace(ensureTopologyObservationDeviceID(candidate, ""))
 	if id == "" || id == "local-device" {
@@ -118,21 +121,21 @@ func canonicalObservationChassis(value string) string {
 	if value == "" {
 		return ""
 	}
-	if mac := normalizeMAC(value); mac != "" {
+	if mac := topologyutil.NormalizeMAC(value); mac != "" {
 		return mac
 	}
 	return strings.ToLower(value)
 }
 
 func canonicalObservationMAC(value string) string {
-	if mac := normalizeMAC(value); mac != "" {
+	if mac := topologyutil.NormalizeMAC(value); mac != "" {
 		return mac
 	}
 	return ""
 }
 
 func canonicalObservationIP(value string) string {
-	value = normalizeIPAddress(value)
+	value = topologyutil.NormalizeIPAddress(value)
 	if value != "" {
 		return strings.ToLower(value)
 	}

@@ -5,18 +5,12 @@ package snmptopology
 import (
 	"sort"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
-type topologyL3Interface struct {
-	DeviceID string
-	IP       string
-	Netmask  string
-	IfIndex  string
-	IfName   string
-	IfDescr  string
-}
-
-func (c *topologyCache) snapshotL3Interfaces(localDeviceID string) []topologyL3Interface {
+func (c *topologyCache) snapshotL3Interfaces(localDeviceID string) []topologymodel.L3Interface {
 	if c == nil || len(c.l3InterfacesByIP) == 0 {
 		return nil
 	}
@@ -27,13 +21,13 @@ func (c *topologyCache) snapshotL3Interfaces(localDeviceID string) []topologyL3I
 	}
 	sort.Strings(ips)
 
-	rows := make([]topologyL3Interface, 0, len(ips))
+	rows := make([]topologymodel.L3Interface, 0, len(ips))
 	for _, ip := range ips {
 		row := c.l3InterfacesByIP[ip]
 		row.DeviceID = strings.TrimSpace(localDeviceID)
 		row.IfIndex = strings.TrimSpace(row.IfIndex)
-		row.IP = normalizeIPAddress(row.IP)
-		row.Netmask = normalizeIPAddress(row.Netmask)
+		row.IP = topologyutil.NormalizeIPAddress(row.IP)
+		row.Netmask = topologyutil.NormalizeIPAddress(row.Netmask)
 		if row.IP == "" || row.Netmask == "" || row.IfIndex == "" {
 			continue
 		}

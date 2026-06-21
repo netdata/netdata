@@ -6,61 +6,45 @@ import (
 	"strings"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
-type topologyObservationSnapshot struct {
-	l2Observations []topologyengine.L2Observation
-	l3Interfaces   []topologyL3Interface
-	ospfNeighbors  []topologyOSPFNeighbor
-	localDevice    topologyDevice
-	localDeviceID  string
-	agentID        string
-	collectedAt    time.Time
-}
-
-type topologyObservationAggregate struct {
-	snapshots      []topologyObservationSnapshot
-	l2Observations []topologyengine.L2Observation
-	l3Interfaces   []topologyL3Interface
-	ospfNeighbors  []topologyOSPFNeighbor
-	localDeviceID  string
-	agentID        string
-	collectedAt    time.Time
-}
-
-func (c *topologyCache) snapshotEngineObservations() (topologyObservationSnapshot, bool) {
+func (c *topologyCache) snapshotEngineObservations() (topologymodel.ObservationSnapshot, bool) {
 	if c == nil {
-		return topologyObservationSnapshot{}, false
+		return topologymodel.ObservationSnapshot{}, false
 	}
 
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	if !c.hasFreshSnapshotAt(time.Now()) {
-		return topologyObservationSnapshot{}, false
+		return topologymodel.ObservationSnapshot{}, false
 	}
 
 	local := normalizeTopologyDevice(c.localDevice)
 	localObservation := c.buildEngineObservation(local)
 	localObservation.DeviceID = strings.TrimSpace(localObservation.DeviceID)
 	if localObservation.DeviceID == "" {
-		return topologyObservationSnapshot{}, false
+		return topologymodel.ObservationSnapshot{}, false
 	}
-	if normalizeMAC(local.ChassisID) == "" {
-		if mac := normalizeMAC(localObservation.BaseBridgeAddress); mac != "" {
+	if topologyutil.NormalizeMAC(local.ChassisID) == "" {
+		if mac := topologyutil.NormalizeMAC(localObservation.BaseBridgeAddress); mac != "" {
 			local.ChassisID = mac
 			local.ChassisIDType = "macAddress"
 		}
 	}
 
-	return topologyObservationSnapshot{
-		l2Observations: []topologyengine.L2Observation{localObservation},
-		l3Interfaces:   c.snapshotL3Interfaces(localObservation.DeviceID),
-		ospfNeighbors:  c.snapshotOSPFNeighbors(localObservation.DeviceID),
-		localDevice:    local,
-		localDeviceID:  localObservation.DeviceID,
-		agentID:        strings.TrimSpace(c.agentID),
-		collectedAt:    c.lastUpdate,
+	return topologymodel.ObservationSnapshot{
+		L2Observations: []topologyengine.L2Observation{localObservation},
+		L3Interfaces:   c.snapshotL3Interfaces(localObservation.DeviceID),
+		OSPFNeighbors:  c.snapshotOSPFNeighbors(localObservation.DeviceID),
+		BGPPeers:       c.snapshotBGPPeers(localObservation.DeviceID),
+		LocalDevice:    local,
+		LocalDeviceID:  localObservation.DeviceID,
+		AgentID:        strings.TrimSpace(c.agentID),
+		CollectedAt:    c.lastUpdate,
 	}, true
 }

@@ -5,6 +5,8 @@ package l2topology
 import (
 	"strings"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
 type graphBuilder struct {
@@ -26,7 +28,7 @@ type graphBuilder struct {
 	reporterAliases      map[string][]string
 	ifaceSummaryByDevice map[string]topologyDeviceInterfaceSummary
 
-	actors        []Actor
+	actors        []projectedActor
 	actorIndex    map[string]struct{}
 	actorMACIndex map[string]struct{}
 
@@ -34,12 +36,12 @@ type graphBuilder struct {
 	endpointActors       builtEndpointActors
 	segmentProjection    projectedSegments
 
-	links              []Link
+	links              []graph.Link
 	segmentSuppressed  int
 	unlinkedSuppressed int
 	linkCounts         topologyLinkCounts
 	probableLinks      int
-	stats              map[string]any
+	stats              ProjectionStats
 }
 
 func newGraphBuilder(result Result, opts GraphOptions) *graphBuilder {
@@ -130,7 +132,7 @@ func (b *graphBuilder) collectBridgeTopologyInputs() {
 }
 
 func (b *graphBuilder) buildDeviceActors() {
-	b.actors = make([]Actor, 0, len(b.result.Devices))
+	b.actors = make([]projectedActor, 0, len(b.result.Devices))
 	b.actorIndex = make(map[string]struct{}, len(b.result.Devices)*2)
 	b.actorMACIndex = make(map[string]struct{}, len(b.result.Devices))
 
@@ -143,11 +145,11 @@ func (b *graphBuilder) buildDeviceActors() {
 			b.ifaceSummaryByDevice[dev.ID],
 			b.reporterAliases[dev.ID],
 		)
-		keys := topologyMatchIdentityKeys(actor.Match)
+		keys := topologyMatchIdentityKeys(actor.Actor.Match)
 		if len(keys) == 0 {
 			continue
 		}
-		macKeys := topologyMatchHardwareIdentityKeys(actor.Match)
+		macKeys := topologyMatchHardwareIdentityKeys(actor.Actor.Match)
 		if len(macKeys) > 0 {
 			if topologyIdentityIndexOverlaps(b.actorMACIndex, macKeys) {
 				continue
@@ -213,9 +215,9 @@ func (b *graphBuilder) buildSegmentTopology() {
 }
 
 func (b *graphBuilder) finalizeGraph() {
-	sortTopologyActors(b.actors)
+	sortProjectedTopologyActors(b.actors)
 
-	b.links = make([]Link, 0, len(b.projectedAdjacencies.links)+len(b.segmentProjection.links))
+	b.links = make([]graph.Link, 0, len(b.projectedAdjacencies.links)+len(b.segmentProjection.links))
 	b.links = append(b.links, b.projectedAdjacencies.links...)
 	b.links = append(b.links, b.segmentProjection.links...)
 	sortTopologyLinks(b.links)
@@ -237,11 +239,11 @@ func (b *graphBuilder) finalizeGraph() {
 	var additionalSegmentSuppressed int
 	b.actors, b.links, additionalSegmentSuppressed = pruneSegmentArtifacts(b.actors, b.links)
 	b.segmentSuppressed += additionalSegmentSuppressed
-	sortTopologyActors(b.actors)
+	sortProjectedTopologyActors(b.actors)
 	sortTopologyLinks(b.links)
 	applyTopologyDisplayNames(b.actors, b.links, b.opts.ResolveDNSName)
 	assignTopologyActorIDsAndLinkEndpoints(b.actors, b.links)
-	enrichTopologyPortTablesWithLinkCounts(b.actors, b.links)
+	enrichTopologyPortDetailsWithLinkCounts(b.actors, b.links)
 
 	b.linkCounts = summarizeTopologyLinks(b.links)
 	b.probableLinks = 0
@@ -250,49 +252,76 @@ func (b *graphBuilder) finalizeGraph() {
 			b.probableLinks++
 			continue
 		}
-		if strings.EqualFold(topologyMetricString(link.Metrics, "inference"), "probable") {
+		if strings.EqualFold(topologyLinkInference(link), "probable") {
 			b.probableLinks++
 		}
 	}
 }
 
 func (b *graphBuilder) buildStats() {
-	b.stats = cloneAnyMap(b.result.Stats)
-	if b.stats == nil {
-		b.stats = make(map[string]any)
-	}
+	b.stats = ProjectionStats{
+		ResultStats: b.result.Stats,
 
-	b.stats["devices_total"] = len(b.result.Devices)
-	b.stats["devices_discovered"] = discoveredDeviceCount(b.result.Devices, b.opts.LocalDeviceID)
-	b.stats["links_total"] = len(b.links)
-	b.stats["links_lldp"] = b.linkCounts.lldp
-	b.stats["links_cdp"] = b.linkCounts.cdp
-	b.stats["links_bidirectional"] = b.linkCounts.bidirectional
-	b.stats["links_unidirectional"] = b.linkCounts.unidirectional
-	b.stats["links_fdb"] = b.linkCounts.fdb
-	b.stats["links_fdb_endpoint_candidates"] = b.segmentProjection.endpointLinksCandidates
-	b.stats["links_fdb_endpoint_emitted"] = b.segmentProjection.endpointLinksEmitted
-	b.stats["links_fdb_endpoint_suppressed"] = b.segmentProjection.endpointLinksSuppressed
-	b.stats["endpoints_ambiguous_segments"] = b.segmentProjection.endpointsWithAmbiguousSegment
-	b.stats["links_arp"] = b.linkCounts.arp
-	b.stats["links_probable"] = b.probableLinks
-	b.stats["segments_suppressed"] = b.segmentSuppressed
-	b.stats["actors_total"] = len(b.actors)
-	b.stats["actors_unlinked_suppressed"] = b.unlinkedSuppressed
-	b.stats["endpoints_total"] = b.endpointActors.count
-	b.stats["inference_strategy"] = b.strategyConfig.id
+		DevicesDiscovered:          discoveredDeviceCount(b.result.Devices, b.opts.LocalDeviceID),
+		LinksBidirectional:         b.linkCounts.bidirectional,
+		LinksUnidirectional:        b.linkCounts.unidirectional,
+		LinksFDB:                   b.linkCounts.fdb,
+		LinksFDBEndpointCandidates: b.segmentProjection.endpointLinksCandidates,
+		LinksFDBEndpointEmitted:    b.segmentProjection.endpointLinksEmitted,
+		LinksFDBEndpointSuppressed: b.segmentProjection.endpointLinksSuppressed,
+		EndpointsAmbiguousSegments: b.segmentProjection.endpointsWithAmbiguousSegment,
+		LinksARP:                   b.linkCounts.arp,
+		LinksProbable:              b.probableLinks,
+		SegmentsSuppressed:         b.segmentSuppressed,
+		ActorsTotal:                len(b.actors),
+		ActorsUnlinkedSuppressed:   b.unlinkedSuppressed,
+		InferenceStrategy:          b.strategyConfig.id,
+	}
+	b.stats.DevicesTotal = len(b.result.Devices)
+	b.stats.LinksTotal = len(b.links)
+	b.stats.LinksLLDP = b.linkCounts.lldp
+	b.stats.LinksCDP = b.linkCounts.cdp
+	b.stats.EndpointsTotal = b.endpointActors.count
 }
 
-func (b *graphBuilder) graph() Graph {
-	return Graph{
+func (b *graphBuilder) graph() graph.Graph {
+	return graph.Graph{
 		SchemaVersion: b.schemaVersion,
 		Source:        b.source,
 		Layer:         b.layer,
 		AgentID:       b.opts.AgentID,
 		CollectedAt:   b.collectedAt,
 		View:          b.view,
-		Actors:        b.actors,
+		Actors:        graphActorsFromProjected(b.actors),
 		Links:         b.links,
-		Stats:         b.stats,
 	}
+}
+
+func (b *graphBuilder) actorDetails() map[string]ProjectionActorDetail {
+	if len(b.actors) == 0 {
+		return nil
+	}
+	out := make(map[string]ProjectionActorDetail, len(b.actors))
+	for _, actor := range b.actors {
+		actorID := strings.TrimSpace(actor.Actor.ActorID)
+		if actorID == "" {
+			continue
+		}
+		out[actorID] = actor.Detail
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func graphActorsFromProjected(actors []projectedActor) []graph.Actor {
+	if len(actors) == 0 {
+		return nil
+	}
+	out := make([]graph.Actor, len(actors))
+	for i, actor := range actors {
+		out[i] = actor.Actor
+	}
+	return out
 }

@@ -4,26 +4,14 @@ package snmptopology
 
 import (
 	"sync"
-)
 
-type topologyQueryOptions struct {
-	CollapseActorsByIP     bool
-	EliminateNonIPInferred bool
-	MapType                string
-	InferenceStrategy      string
-	ManagedDeviceFocus     string
-	Depth                  int
-	ResolveDNSName         func(ip string) string
-}
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
+)
 
 type topologyRegistry struct {
 	mu     sync.RWMutex
 	caches map[*topologyCache]struct{}
-}
-
-type topologyManagedFocusTarget struct {
-	Value string
-	Name  string
 }
 
 func newTopologyRegistry() *topologyRegistry {
@@ -50,41 +38,21 @@ func (r *topologyRegistry) unregister(cache *topologyCache) {
 	r.mu.Unlock()
 }
 
-func (r *topologyRegistry) snapshotWithOptions(options topologyQueryOptions) (topologyData, bool) {
+func (r *topologyRegistry) snapshotWithOptions(options topologyoptions.QueryOptions) (topologymodel.Data, bool) {
 	if r == nil {
-		return topologyData{}, false
+		return topologymodel.Data{}, false
 	}
-	options = normalizeTopologyQueryOptions(options)
+	options = topologyoptions.NormalizeQueryOptions(options)
 
 	aggregate, ok := aggregateTopologyObservationSnapshots(r.observationSnapshots())
 	if !ok {
-		return topologyData{}, false
+		return topologymodel.Data{}, false
 	}
 
 	return buildSNMPTopologySnapshot(aggregate, options)
 }
 
-func normalizeTopologyQueryOptions(options topologyQueryOptions) topologyQueryOptions {
-	options.MapType = normalizeTopologyMapType(options.MapType)
-	if options.MapType == "" {
-		options.MapType = topologyMapTypeLLDPCDPManaged
-	}
-	options.InferenceStrategy = normalizeTopologyInferenceStrategy(options.InferenceStrategy)
-	if options.InferenceStrategy == "" {
-		options.InferenceStrategy = topologyInferenceStrategyFDBMinimumKnowledge
-	}
-	options.ManagedDeviceFocus = formatTopologyManagedFocuses(parseTopologyManagedFocuses(options.ManagedDeviceFocus))
-	if options.Depth != topologyDepthAllInternal {
-		if options.Depth < topologyDepthMin {
-			options.Depth = topologyDepthMin
-		} else if options.Depth > topologyDepthMax {
-			options.Depth = topologyDepthMax
-		}
-	}
-	return options
-}
-
-func (r *topologyRegistry) managedDeviceFocusTargets() []topologyManagedFocusTarget {
+func (r *topologyRegistry) managedDeviceFocusTargets() []topologyoptions.ManagedFocusTarget {
 	if r == nil {
 		return nil
 	}

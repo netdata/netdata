@@ -93,22 +93,23 @@ func (s *l2BuildState) buildResult(identityAliasStats identityAliasReconcileStat
 		collectedAt = collectedAt.UTC()
 	}
 
-	stats := newL2ResultStats()
-	stats["devices_total"] = len(s.devices)
-	stats["links_total"] = len(s.adjacencies)
-	stats["links_lldp"] = s.linksLLDP
-	stats["links_cdp"] = s.linksCDP
-	stats["links_stp"] = s.linksSTP
-	stats["attachments_total"] = len(s.attachments)
-	stats["attachments_fdb"] = s.attachmentsFDB
-	stats["enrichments_total"] = len(s.enrichments)
-	stats["enrichments_arp_nd"] = s.enrichmentsARPND
-	stats["bridge_domains_total"] = len(s.bridgeDomains)
-	stats["endpoints_total"] = len(s.endpointIDs)
-	stats["identity_alias_endpoints_mapped"] = identityAliasStats.endpointsMapped
-	stats["identity_alias_endpoints_ambiguous_mac"] = identityAliasStats.endpointsAmbiguousMAC
-	stats["identity_alias_ips_merged"] = identityAliasStats.ipsMerged
-	stats["identity_alias_ips_conflict_skipped"] = identityAliasStats.ipsConflictSkipped
+	stats := ResultStats{
+		DevicesTotal:                       len(s.devices),
+		LinksTotal:                         len(s.adjacencies),
+		LinksLLDP:                          s.linksLLDP,
+		LinksCDP:                           s.linksCDP,
+		LinksSTP:                           s.linksSTP,
+		AttachmentsTotal:                   len(s.attachments),
+		AttachmentsFDB:                     s.attachmentsFDB,
+		EnrichmentsTotal:                   len(s.enrichments),
+		EnrichmentsARPND:                   s.enrichmentsARPND,
+		BridgeDomainsTotal:                 len(s.bridgeDomains),
+		EndpointsTotal:                     len(s.endpointIDs),
+		IdentityAliasEndpointsMapped:       identityAliasStats.endpointsMapped,
+		IdentityAliasEndpointsAmbiguousMAC: identityAliasStats.endpointsAmbiguousMAC,
+		IdentityAliasIPsMerged:             identityAliasStats.ipsMerged,
+		IdentityAliasIPsConflictSkipped:    identityAliasStats.ipsConflictSkipped,
+	}
 
 	return Result{
 		CollectedAt: collectedAt,
