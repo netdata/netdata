@@ -28,6 +28,7 @@ members = [
     "otel-plugin",
     "otel-ledger",
     "otel-catalog",
+    "file-cache",
     "flatten-otel",
 
     # Stress test tools
@@ -220,6 +221,7 @@ otel-normalize = { path = "otel-normalize" }
 otel-ledger = { path = "otel-ledger" }
 otel-ingestor = { path = "otel-ingestor" }
 otel-catalog = { path = "otel-catalog" }
+file-cache = { path = "file-cache" }
 
 # IPC / RPC crates
 ferryboat = { path = "ferryboat" }

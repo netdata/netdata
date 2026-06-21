@@ -1417,6 +1417,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "file-cache"
+version = "0.1.3"
+dependencies = [
+ "anyhow",
+ "file-registry",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "file-registry"
 version = "0.1.3"
 dependencies = [

@@ -8,7 +8,7 @@
 //! trait) keeps calls monomorphized and zero-cost. The `+ Send` bound on each
 //! returned future is needed because storage futures run in spawned upload
 //! tasks (`write`) and under `join_all` during recovery (`list`); it is applied
-//! uniformly across all three methods so any backend stays usable there.
+//! uniformly across all methods so any backend stays usable there.
 //!
 //! [`Component`]: crate::component::Component
 
@@ -60,6 +60,11 @@ pub(crate) trait Storage: Send + Sync + 'static {
 
     /// List object keys (full paths) under `prefix`.
     fn list(&self, prefix: &str) -> impl Future<Output = Result<Vec<String>, StorageError>> + Send;
+
+    /// Read the whole object at `key` into memory. `NotFound` is preserved for
+    /// parity with the other methods, so a caller can distinguish an absent object
+    /// from a transient failure if it needs to.
+    fn read(&self, key: &str) -> impl Future<Output = Result<Vec<u8>, StorageError>> + Send;
 
     /// Probe a single object. `Ok(())` if present; `Err(StorageError::NotFound)`
     /// if absent; `Err(StorageError::Other)` for a transient/other failure.
@@ -155,6 +160,11 @@ impl Storage for OpendalStorage {
         Ok(entries.into_iter().map(|e| e.path().to_owned()).collect())
     }
 
+    async fn read(&self, key: &str) -> Result<Vec<u8>, StorageError> {
+        let buf = self.op.read(key).await?;
+        Ok(buf.to_vec())
+    }
+
     async fn stat(&self, key: &str) -> Result<(), StorageError> {
         self.op.stat(key).await.map(|_| ()).map_err(StorageError::from)
     }
@@ -177,6 +187,14 @@ pub(crate) struct MockStorage {
     pub list_response: Vec<String>,
     /// If `Some`, `list` fails with this message — drives the LIST-error path.
     pub list_error: Option<String>,
+    /// Bytes every `read` call returns (the happy path). Empty by default.
+    pub read_response: Vec<u8>,
+    /// If `Some`, `read` fails with this message — drives the fetch-error path.
+    pub read_error: Option<String>,
+    /// If `true`, `read` returns `NotFound` — drives the absent-object path.
+    /// Takes priority over `read_error`; a real backend never returns both, so
+    /// tests set exactly one error mode at a time.
+    pub read_not_found: bool,
 }
 
 #[cfg(test)]
@@ -196,6 +214,9 @@ impl Default for MockStorage {
             stat: MockStat::NotFound,
             list_response: Vec::new(),
             list_error: None,
+            read_response: Vec::new(),
+            read_error: None,
+            read_not_found: false,
         }
     }
 }
@@ -226,6 +247,16 @@ impl Storage for MockStorage {
             .collect())
     }
 
+    async fn read(&self, _key: &str) -> Result<Vec<u8>, StorageError> {
+        if self.read_not_found {
+            return Err(StorageError::NotFound);
+        }
+        if let Some(msg) = &self.read_error {
+            return Err(StorageError::Other(anyhow::anyhow!(msg.clone())));
+        }
+        Ok(self.read_response.clone())
+    }
+
     async fn stat(&self, _key: &str) -> Result<(), StorageError> {
         match self.stat {
             MockStat::Found => Ok(()),
@@ -236,7 +267,7 @@ impl Storage for MockStorage {
 }
 
 #[cfg(test)]
-mod probe_tests {
+mod storage_tests {
     use super::*;
 
     #[tokio::test]
@@ -265,5 +296,35 @@ mod probe_tests {
             probe_reachable(&down).await,
             Err(StorageError::Other(_))
         ));
+    }
+
+    #[tokio::test]
+    async fn read_returns_configured_bytes() {
+        let s = MockStorage {
+            read_response: b"hello".to_vec(),
+            ..Default::default()
+        };
+        assert_eq!(s.read("any/key").await.unwrap(), b"hello");
+    }
+
+    #[tokio::test]
+    async fn read_error_maps_to_other() {
+        let s = MockStorage {
+            read_error: Some("boom".to_owned()),
+            ..Default::default()
+        };
+        assert!(matches!(
+            s.read("any/key").await,
+            Err(StorageError::Other(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn read_can_report_not_found() {
+        let s = MockStorage {
+            read_not_found: true,
+            ..Default::default()
+        };
+        assert!(matches!(s.read("any/key").await, Err(StorageError::NotFound)));
     }
 }
