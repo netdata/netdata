@@ -45,26 +45,6 @@ func mergeTopologyStringMap(base, other map[string]string) map[string]string {
 	return base
 }
 
-func mergeTopologyAnyMap(base, other map[string]any) map[string]any {
-	if len(other) == 0 {
-		return base
-	}
-	if base == nil {
-		base = make(map[string]any, len(other))
-	}
-	for key, value := range other {
-		key = strings.TrimSpace(key)
-		if key == "" {
-			continue
-		}
-		if _, exists := base[key]; exists {
-			continue
-		}
-		base[key] = value
-	}
-	return base
-}
-
 func appendUniqueTopologyStrings(base []string, values ...string) []string {
 	seen := make(map[string]struct{}, len(base)+len(values))
 	out := make([]string, 0, len(base)+len(values))

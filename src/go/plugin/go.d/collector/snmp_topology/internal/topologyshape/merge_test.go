@@ -64,22 +64,6 @@ func TestMergeTopologyStringMapKeepsExistingAndIgnoresBlankEntries(t *testing.T)
 	}, merged)
 }
 
-func TestMergeTopologyAnyMapKeepsExistingAndAddsMissingKeys(t *testing.T) {
-	base := map[string]any{
-		"existing": "keep",
-	}
-
-	merged := mergeTopologyAnyMap(base, map[string]any{
-		"existing": "replace",
-		" new ":    42,
-		"":         "ignored",
-	})
-
-	require.Equal(t, "keep", merged["existing"])
-	require.Equal(t, 42, merged["new"])
-	require.NotContains(t, merged, "")
-}
-
 func TestMergeTopologyActorDetailPreservesTypedFieldPresence(t *testing.T) {
 	merged := mergeTopologyActorDetail(
 		topologymodel.ActorDetail{
