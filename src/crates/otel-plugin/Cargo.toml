@@ -24,6 +24,7 @@ otel-ledger = { workspace = true }
 otel-ingestor = { path = "../otel-ingestor" }
 otel-legacy-logs = { path = "../otel-legacy-logs" }
 rt = { workspace = true }
+sfsq-cli = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }

@@ -203,6 +203,7 @@ treight = { path = "treight" }
 sfst = { path = "sfst" }
 sfst-indexer = { path = "sfst-indexer" }
 sfsq = { path = "sfsq" }
+sfsq-cli = { path = "sfsq-cli" }
 
 # Netdata plugin crates
 netdata-plugin-error = { path = "netdata-plugin/error" }

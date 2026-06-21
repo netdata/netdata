@@ -3833,6 +3833,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "sfsq-cli",
  "tokio",
  "tracing",
 ]

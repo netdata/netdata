@@ -5,6 +5,12 @@ terminal, without a running agent. Useful for forensic and offline inspection: i
 reads the same files the live `otel-logs` Function serves, through the same query
 engine, and prints NDJSON.
 
+> The same capability ships inside the Netdata Agent as `otel-plugin logs` (the
+> shipped binary; this standalone `sfsq-cli` is a dev/forensic tool, not
+> installed). Both front doors flatten the same `Args` and call the same
+> `sfsq_cli::run`, so the flags and output below are identical — `otel-plugin
+> logs --since -1h …` behaves exactly like `sfsq-cli --since -1h …`.
+
 ## How it finds the files
 
 It needs the WAL directory and the SFST (index) directory. Each is resolved
