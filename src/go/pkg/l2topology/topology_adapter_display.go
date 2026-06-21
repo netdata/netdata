@@ -76,12 +76,11 @@ func applyTopologyDisplayNames(actors []graph.Actor, links []graph.Link, lookup 
 		dstPortName := topologySetEndpointDisplayAndCanonicalPortName(&links[i].Dst, dst)
 
 		linkName := topologyCanonicalLinkName(src.name, srcPortName, dst.name, dstPortName)
-		if links[i].Metrics == nil {
-			links[i].Metrics = make(map[string]any)
+		links[i].Display = &graph.LinkDisplay{
+			Name:        linkName,
+			SrcPortName: srcPortName,
+			DstPortName: dstPortName,
 		}
-		links[i].Metrics["display_name"] = linkName
-		links[i].Metrics["src_port_name"] = srcPortName
-		links[i].Metrics["dst_port_name"] = dstPortName
 	}
 }
 
@@ -114,17 +113,10 @@ func topologySetEndpointDisplayAndCanonicalPortName(endpoint *graph.LinkEndpoint
 	if endpoint == nil {
 		return ""
 	}
-	attrs := cloneAnyMap(endpoint.Attributes)
-	if attrs == nil {
-		attrs = make(map[string]any)
-	}
-	attrs["display_name"] = display.name
-	if display.source != "" {
-		attrs["display_source"] = display.source
-	}
-	name := topologyCanonicalPortName(attrs)
-	attrs["port_name"] = name
-	endpoint.Attributes = pruneTopologyAttributes(attrs)
+	endpoint.DisplayName = strings.TrimSpace(display.name)
+	endpoint.DisplaySource = strings.TrimSpace(display.source)
+	name := topologyEndpointCanonicalPortName(*endpoint)
+	endpoint.PortName = name
 	return name
 }
 

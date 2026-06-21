@@ -5,6 +5,8 @@ package snmptopology
 import (
 	"sort"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
 const topologyOSPFAdjacencyLinkType = "ospf_adjacency"
@@ -107,63 +109,30 @@ func topologyOSPFAdjacencyLink(row topologyOSPFNeighbor, srcRef, dstRef topology
 		SrcActorID: srcRef.actorID,
 		DstActorID: dstRef.actorID,
 		Src: topologyLinkEndpoint{
-			Match:      srcRef.match,
-			Attributes: topologyOSPFEndpointAttributes(row.LocalRouterID, row.LocalIP, row),
+			Match: srcRef.match,
 		},
 		Dst: topologyLinkEndpoint{
-			Match:      dstRef.match,
-			Attributes: topologyOSPFEndpointAttributes(row.NeighborRouterID, row.NeighborIP, row),
+			Match: dstRef.match,
 		},
-		Metrics: topologyOSPFLinkMetrics(row),
+		Inference: &graph.LinkInference{
+			Inference:      "ospf_full_adjacency",
+			AttachmentMode: "logical_l3_ospf",
+		},
+		Detail: topologyLinkDetail{
+			OSPF: &topologyOSPFAdjacencyLinkDetail{
+				Source:           "ospf_mib",
+				LocalRouterID:    normalizeTopologyRouterID(row.LocalRouterID),
+				NeighborRouterID: normalizeTopologyRouterID(row.NeighborRouterID),
+				LocalIP:          normalizeNonUnspecifiedIPAddress(row.LocalIP),
+				NeighborIP:       normalizeNonUnspecifiedIPAddress(row.NeighborIP),
+				AddresslessIndex: strings.TrimSpace(row.AddresslessIndex),
+				Subnet:           strings.TrimSpace(row.Subnet),
+				Network:          strings.TrimSpace(row.Network),
+				Netmask:          strings.TrimSpace(row.Netmask),
+				Prefix:           row.Prefix,
+			},
+		},
 	}
-}
-
-func topologyOSPFEndpointAttributes(routerID, ip string, row topologyOSPFNeighbor) map[string]any {
-	attrs := map[string]any{
-		"source": "ospf_mib",
-	}
-	if normalizedRouterID := normalizeTopologyRouterID(routerID); normalizedRouterID != "" {
-		attrs["router_id"] = normalizedRouterID
-	}
-	if normalizedIP := normalizeNonUnspecifiedIPAddress(ip); normalizedIP != "" {
-		attrs["ip"] = normalizedIP
-	}
-	if _, subnet, prefix, ok := topologyOSPFSubnetMatch(row); ok {
-		attrs["subnet"] = subnet
-		attrs["prefix"] = prefix
-	}
-	return attrs
-}
-
-func topologyOSPFLinkMetrics(row topologyOSPFNeighbor) map[string]any {
-	metrics := map[string]any{
-		"source":          "ospf_mib",
-		"inference":       "ospf_full_adjacency",
-		"attachment_mode": "logical_l3_ospf",
-		"state":           "full",
-	}
-	if routerID := normalizeTopologyRouterID(row.LocalRouterID); routerID != "" {
-		metrics["local_router_id"] = routerID
-	}
-	if routerID := normalizeTopologyRouterID(row.NeighborRouterID); routerID != "" {
-		metrics["neighbor_router_id"] = routerID
-	}
-	if ip := normalizeNonUnspecifiedIPAddress(row.LocalIP); ip != "" {
-		metrics["local_ip"] = ip
-	}
-	if ip := normalizeNonUnspecifiedIPAddress(row.NeighborIP); ip != "" {
-		metrics["neighbor_ip"] = ip
-	}
-	if row.AddresslessIndex != "" {
-		metrics["addressless_index"] = row.AddresslessIndex
-	}
-	if row.Subnet != "" {
-		metrics["subnet"] = row.Subnet
-		metrics["network"] = row.Network
-		metrics["netmask"] = row.Netmask
-		metrics["prefix"] = row.Prefix
-	}
-	return metrics
 }
 
 func topologyOSPFNeighborActorRow(row topologyOSPFNeighbor) topologyOSPFNeighborDetailRow {
@@ -199,20 +168,67 @@ func existingTopologyOSPFLinkKeys(links []topologyLink) map[string]struct{} {
 	for _, link := range links {
 		if strings.EqualFold(strings.TrimSpace(firstNonEmptyString(link.LinkType, link.Protocol)), topologyOSPFAdjacencyLinkType) {
 			row := topologyOSPFNeighbor{
-				LocalRouterID:    topologyV1EndpointString(link.Src, "router_id"),
-				NeighborRouterID: topologyV1EndpointString(link.Dst, "router_id"),
-				LocalIP:          topologyV1EndpointString(link.Src, "ip"),
-				NeighborIP:       topologyV1EndpointString(link.Dst, "ip"),
-				AddresslessIndex: topologyMetricValueString(link.Metrics, "addressless_index"),
-				Subnet:           topologyMetricValueString(link.Metrics, "subnet"),
-			}
-			if prefix, ok := uintValue(link.Metrics["prefix"]); ok {
-				row.Prefix = int(prefix)
+				LocalRouterID:    topologyOSPFLocalRouterID(link),
+				NeighborRouterID: topologyOSPFNeighborRouterID(link),
+				LocalIP:          topologyOSPFLocalIP(link),
+				NeighborIP:       topologyOSPFNeighborIP(link),
+				AddresslessIndex: topologyOSPFAddresslessIndex(link),
+				Subnet:           topologyOSPFSubnet(link),
+				Prefix:           topologyOSPFPrefix(link),
 			}
 			seen[topologyOSPFNeighborLinkKeyParts(row, link.SrcActorID, link.DstActorID)] = struct{}{}
 		}
 	}
 	return seen
+}
+
+func topologyOSPFLocalRouterID(link topologyLink) string {
+	if link.Detail.OSPF == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.Detail.OSPF.LocalRouterID)
+}
+
+func topologyOSPFNeighborRouterID(link topologyLink) string {
+	if link.Detail.OSPF == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.Detail.OSPF.NeighborRouterID)
+}
+
+func topologyOSPFLocalIP(link topologyLink) string {
+	if link.Detail.OSPF == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.Detail.OSPF.LocalIP)
+}
+
+func topologyOSPFNeighborIP(link topologyLink) string {
+	if link.Detail.OSPF == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.Detail.OSPF.NeighborIP)
+}
+
+func topologyOSPFAddresslessIndex(link topologyLink) string {
+	if link.Detail.OSPF == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.Detail.OSPF.AddresslessIndex)
+}
+
+func topologyOSPFSubnet(link topologyLink) string {
+	if link.Detail.OSPF == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.Detail.OSPF.Subnet)
+}
+
+func topologyOSPFPrefix(link topologyLink) int {
+	if link.Detail.OSPF == nil {
+		return 0
+	}
+	return link.Detail.OSPF.Prefix
 }
 
 func recordTopologyOSPFEnrichmentStats(data *topologyData, stats topologyOSPFEnrichmentStats) {

@@ -7,33 +7,35 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
-func topologyCanonicalPortName(attrs map[string]any) string {
-	if name := topologyAttrString(attrs, "port_name"); name != "" {
+func topologyEndpointCanonicalPortName(endpoint graph.LinkEndpoint) string {
+	if name := strings.TrimSpace(endpoint.PortName); name != "" {
 		return name
 	}
-	if name := topologyAttrString(attrs, "if_name"); name != "" {
+	if name := strings.TrimSpace(endpoint.IfName); name != "" {
 		return name
 	}
-	if name := topologyAttrString(attrs, "if_descr"); name != "" {
+	if name := strings.TrimSpace(endpoint.IfDescr); name != "" {
 		return name
 	}
-	if name := topologyAttrString(attrs, "if_alias"); name != "" {
+	if name := strings.TrimSpace(endpoint.IfAlias); name != "" {
 		return name
 	}
 
-	if ifIndex := topologyAttrInt(attrs, "if_index"); ifIndex > 0 {
-		return strconv.Itoa(ifIndex)
+	if endpoint.IfIndex > 0 {
+		return strconv.Itoa(endpoint.IfIndex)
 	}
 
-	if portID := topologyAttrString(attrs, "port_id"); portID != "" {
+	if portID := strings.TrimSpace(endpoint.PortID); portID != "" {
 		if n, err := strconv.Atoi(strings.TrimSpace(portID)); err == nil && n > 0 {
 			return strconv.Itoa(n)
 		}
 		return portID
 	}
-	if bridgePort := topologyAttrString(attrs, "bridge_port"); bridgePort != "" {
+	if bridgePort := strings.TrimSpace(endpoint.BridgePort); bridgePort != "" {
 		if n, err := strconv.Atoi(strings.TrimSpace(bridgePort)); err == nil && n > 0 {
 			return strconv.Itoa(n)
 		}

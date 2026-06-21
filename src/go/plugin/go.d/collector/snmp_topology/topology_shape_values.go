@@ -3,7 +3,6 @@
 package snmptopology
 
 import (
-	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -108,15 +107,4 @@ func uintStatValue(value uint64) int {
 		return 0
 	}
 	return int(value)
-}
-
-func topologyMetricValueString(metrics map[string]any, key string) string {
-	if metrics == nil {
-		return ""
-	}
-	value, ok := metrics[key]
-	if !ok || value == nil {
-		return ""
-	}
-	return strings.TrimSpace(fmt.Sprint(value))
 }

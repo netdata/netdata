@@ -5,6 +5,8 @@ package snmptopology
 import (
 	"sort"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
 const topologyBGPAdjacencyLinkType = "bgp_adjacency"
@@ -186,55 +188,28 @@ func topologyBGPAdjacencyLink(row topologyBGPPeer, srcRef, dstRef topologyL3Acto
 		SrcActorID: srcRef.actorID,
 		DstActorID: dstRef.actorID,
 		Src: topologyLinkEndpoint{
-			Match:      srcRef.match,
-			Attributes: topologyBGPEndpointAttributes(src),
+			Match: srcRef.match,
 		},
 		Dst: topologyLinkEndpoint{
-			Match:      dstRef.match,
-			Attributes: topologyBGPEndpointAttributes(dst),
+			Match: dstRef.match,
 		},
-		Metrics: topologyBGPLinkMetrics(row, src, dst),
+		Inference: &graph.LinkInference{
+			Inference:      "bgp_established_adjacency",
+			AttachmentMode: "logical_l3_bgp",
+		},
+		Detail: topologyLinkDetail{
+			BGP: &topologyBGPAdjacencyLinkDetail{
+				Source:          "bgp_mib",
+				RoutingInstance: topologyBGPRoutingInstanceValue(row.RoutingInstance),
+				LocalIP:         normalizeNonUnspecifiedIPAddress(src.ip),
+				NeighborIP:      normalizeNonUnspecifiedIPAddress(dst.ip),
+				LocalAS:         strings.TrimSpace(src.asn),
+				RemoteAS:        strings.TrimSpace(dst.asn),
+				LocalIdentifier: normalizeBGPRouterID(src.identifier),
+				PeerIdentifier:  normalizeBGPRouterID(dst.identifier),
+			},
+		},
 	}
-}
-
-func topologyBGPEndpointAttributes(endpoint topologyBGPEndpoint) map[string]any {
-	attrs := map[string]any{
-		"source": "bgp_mib",
-	}
-	if identifier := normalizeBGPRouterID(endpoint.identifier); identifier != "" {
-		attrs["bgp_identifier"] = identifier
-	}
-	if ip := normalizeNonUnspecifiedIPAddress(endpoint.ip); ip != "" {
-		attrs["ip"] = ip
-	}
-	if asn := strings.TrimSpace(endpoint.asn); asn != "" {
-		attrs["as"] = asn
-	}
-	return attrs
-}
-
-func topologyBGPLinkMetrics(row topologyBGPPeer, src, dst topologyBGPEndpoint) map[string]any {
-	metrics := map[string]any{
-		"source":           "bgp_mib",
-		"inference":        "bgp_established_adjacency",
-		"attachment_mode":  "logical_l3_bgp",
-		"state":            "established",
-		"routing_instance": row.RoutingInstance,
-	}
-	addStringMetric := func(key, value string) {
-		if value = strings.TrimSpace(value); value != "" {
-			metrics[key] = value
-		}
-	}
-	addStringMetric("local_ip", normalizeNonUnspecifiedIPAddress(src.ip))
-	addStringMetric("neighbor_ip", normalizeNonUnspecifiedIPAddress(dst.ip))
-	addStringMetric("local_as", src.asn)
-	addStringMetric("remote_as", dst.asn)
-	addStringMetric("local_identifier", normalizeBGPRouterID(src.identifier))
-	addStringMetric("peer_identifier", normalizeBGPRouterID(dst.identifier))
-	addStringMetric("peer_type", row.PeerType)
-	addStringMetric("bgp_version", row.BGPVersion)
-	return metrics
 }
 
 func topologyBGPPeerActorRow(row topologyBGPPeer) topologyBGPPeerDetailRow {
@@ -263,7 +238,7 @@ func existingTopologyBGPLinkKeys(links []topologyLink) map[string]struct{} {
 		if strings.EqualFold(strings.TrimSpace(firstNonEmptyString(link.LinkType, link.Protocol)), topologyBGPAdjacencyLinkType) {
 			// Seed the key set so repeated enrichment over already-shaped data remains idempotent.
 			row := topologyBGPPeer{
-				RoutingInstance: topologyMetricValueString(link.Metrics, "routing_instance"),
+				RoutingInstance: topologyBGPLinkRoutingInstance(link),
 			}
 			seen[topologyBGPPeerLinkKeyParts(row, link.SrcActorID, link.DstActorID)] = struct{}{}
 		}
@@ -287,6 +262,55 @@ func topologyBGPPeerLinkKeyParts(row topologyBGPPeer, srcActorID, dstActorID str
 
 func topologyBGPRoutingInstanceValue(routingInstance string) string {
 	return firstNonEmptyString(routingInstance, "default")
+}
+
+func topologyBGPLinkRoutingInstance(link topologyLink) string {
+	if link.Detail.BGP == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.Detail.BGP.RoutingInstance)
+}
+
+func topologyBGPLocalIP(link topologyLink) string {
+	if link.Detail.BGP == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.Detail.BGP.LocalIP)
+}
+
+func topologyBGPNeighborIP(link topologyLink) string {
+	if link.Detail.BGP == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.Detail.BGP.NeighborIP)
+}
+
+func topologyBGPLocalAS(link topologyLink) string {
+	if link.Detail.BGP == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.Detail.BGP.LocalAS)
+}
+
+func topologyBGPRemoteAS(link topologyLink) string {
+	if link.Detail.BGP == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.Detail.BGP.RemoteAS)
+}
+
+func topologyBGPLocalIdentifier(link topologyLink) string {
+	if link.Detail.BGP == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.Detail.BGP.LocalIdentifier)
+}
+
+func topologyBGPPeerIdentifier(link topologyLink) string {
+	if link.Detail.BGP == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.Detail.BGP.PeerIdentifier)
 }
 
 func recordTopologyBGPEnrichmentStats(data *topologyData, stats topologyBGPEnrichmentStats) {

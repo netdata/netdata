@@ -71,7 +71,3 @@ func TestIntStatValue(t *testing.T) {
 		})
 	}
 }
-
-func TestTopologyMetricValueString(t *testing.T) {
-	require.Equal(t, "value", topologyMetricValueString(map[string]any{"key": " value "}, "key"))
-}

@@ -61,16 +61,12 @@ func TestAssignTopologyActorIDsAndLinkEndpoints_IsDeterministic(t *testing.T) {
 			Direction: "outbound",
 			State:     "up",
 			Src: graph.LinkEndpoint{
-				Match: graph.Match{MacAddresses: []string{"00:11:22:33:44:55"}},
-				Attributes: map[string]any{
-					"if_name": "eth0",
-				},
+				Match:  graph.Match{MacAddresses: []string{"00:11:22:33:44:55"}},
+				IfName: "eth0",
 			},
 			Dst: graph.LinkEndpoint{
-				Match: graph.Match{IPAddresses: []string{"10.0.0.2"}},
-				Attributes: map[string]any{
-					"if_name": "eth9",
-				},
+				Match:  graph.Match{IPAddresses: []string{"10.0.0.2"}},
+				IfName: "eth9",
 			},
 		},
 		{
@@ -78,16 +74,12 @@ func TestAssignTopologyActorIDsAndLinkEndpoints_IsDeterministic(t *testing.T) {
 			Direction: "outbound",
 			State:     "up",
 			Src: graph.LinkEndpoint{
-				Match: graph.Match{IPAddresses: []string{"10.0.0.2"}},
-				Attributes: map[string]any{
-					"if_name": "eth9",
-				},
+				Match:  graph.Match{IPAddresses: []string{"10.0.0.2"}},
+				IfName: "eth9",
 			},
 			Dst: graph.LinkEndpoint{
-				Match: graph.Match{MacAddresses: []string{"00:11:22:33:44:55"}},
-				Attributes: map[string]any{
-					"if_name": "eth0",
-				},
+				Match:  graph.Match{MacAddresses: []string{"00:11:22:33:44:55"}},
+				IfName: "eth0",
 			},
 		},
 	}
@@ -142,14 +134,14 @@ func TestEnrichTopologyPortTablesWithLinkCounts_AddsCountsToMatchingPorts(t *tes
 		{
 			SrcActorID: "device-a",
 			DstActorID: "device-b",
-			Src:        graph.LinkEndpoint{Attributes: map[string]any{"if_name": "eth0"}},
-			Dst:        graph.LinkEndpoint{Attributes: map[string]any{"if_name": "xe-0/0/0"}},
+			Src:        graph.LinkEndpoint{IfName: "eth0"},
+			Dst:        graph.LinkEndpoint{IfName: "xe-0/0/0"},
 		},
 		{
 			SrcActorID: "device-a",
 			DstActorID: "device-b",
-			Src:        graph.LinkEndpoint{Attributes: map[string]any{"if_name": "eth0"}},
-			Dst:        graph.LinkEndpoint{Attributes: map[string]any{"if_name": "xe-0/0/0"}},
+			Src:        graph.LinkEndpoint{IfName: "eth0"},
+			Dst:        graph.LinkEndpoint{IfName: "xe-0/0/0"},
 		},
 	}
 

@@ -18,8 +18,8 @@ func TestBackfillPairGroupMissingEndpointPortsCopiesPeerInterfaceAttributes(t *t
 				TargetID: "device-b",
 			},
 			link: graph.Link{
-				Src: graph.LinkEndpoint{Attributes: map[string]any{}},
-				Dst: graph.LinkEndpoint{Attributes: map[string]any{}},
+				Src: graph.LinkEndpoint{},
+				Dst: graph.LinkEndpoint{},
 			},
 		},
 		{
@@ -28,28 +28,28 @@ func TestBackfillPairGroupMissingEndpointPortsCopiesPeerInterfaceAttributes(t *t
 				TargetID: "device-a",
 			},
 			link: graph.Link{
-				Src: graph.LinkEndpoint{Attributes: map[string]any{
-					"if_index": 2,
-					"if_name":  "Gi0/2",
-					"port_id":  "Gi0/2",
-				}},
-				Dst: graph.LinkEndpoint{Attributes: map[string]any{
-					"if_index": 1,
-					"if_name":  "Gi0/1",
-					"port_id":  "Gi0/1",
-				}},
+				Src: graph.LinkEndpoint{
+					IfIndex: 2,
+					IfName:  "Gi0/2",
+					PortID:  "Gi0/2",
+				},
+				Dst: graph.LinkEndpoint{
+					IfIndex: 1,
+					IfName:  "Gi0/1",
+					PortID:  "Gi0/1",
+				},
 			},
 		},
 	}
 
 	backfillPairGroupMissingEndpointPorts(entries)
 
-	require.Equal(t, 1, topologyAttrInt(entries[0].link.Src.Attributes, "if_index"))
-	require.Equal(t, "Gi0/1", topologyAttrString(entries[0].link.Src.Attributes, "if_name"))
-	require.Equal(t, "Gi0/1", topologyAttrString(entries[0].link.Src.Attributes, "port_id"))
-	require.Equal(t, 2, topologyAttrInt(entries[0].link.Dst.Attributes, "if_index"))
-	require.Equal(t, "Gi0/2", topologyAttrString(entries[0].link.Dst.Attributes, "if_name"))
-	require.Equal(t, "Gi0/2", topologyAttrString(entries[0].link.Dst.Attributes, "port_id"))
+	require.Equal(t, 1, entries[0].link.Src.IfIndex)
+	require.Equal(t, "Gi0/1", entries[0].link.Src.IfName)
+	require.Equal(t, "Gi0/1", entries[0].link.Src.PortID)
+	require.Equal(t, 2, entries[0].link.Dst.IfIndex)
+	require.Equal(t, "Gi0/2", entries[0].link.Dst.IfName)
+	require.Equal(t, "Gi0/2", entries[0].link.Dst.PortID)
 }
 
 func TestBackfillPairGroupMissingEndpointPortsSkipsAmbiguousReverseCandidates(t *testing.T) {
@@ -60,8 +60,8 @@ func TestBackfillPairGroupMissingEndpointPortsSkipsAmbiguousReverseCandidates(t 
 				TargetID: "device-b",
 			},
 			link: graph.Link{
-				Src: graph.LinkEndpoint{Attributes: map[string]any{}},
-				Dst: graph.LinkEndpoint{Attributes: map[string]any{}},
+				Src: graph.LinkEndpoint{},
+				Dst: graph.LinkEndpoint{},
 			},
 		},
 		{
@@ -70,12 +70,8 @@ func TestBackfillPairGroupMissingEndpointPortsSkipsAmbiguousReverseCandidates(t 
 				TargetID: "device-a",
 			},
 			link: graph.Link{
-				Src: graph.LinkEndpoint{Attributes: map[string]any{
-					"if_name": "Gi0/2",
-				}},
-				Dst: graph.LinkEndpoint{Attributes: map[string]any{
-					"if_name": "Gi0/1",
-				}},
+				Src: graph.LinkEndpoint{IfName: "Gi0/2"},
+				Dst: graph.LinkEndpoint{IfName: "Gi0/1"},
 			},
 		},
 		{
@@ -84,41 +80,33 @@ func TestBackfillPairGroupMissingEndpointPortsSkipsAmbiguousReverseCandidates(t 
 				TargetID: "device-a",
 			},
 			link: graph.Link{
-				Src: graph.LinkEndpoint{Attributes: map[string]any{
-					"if_name": "Gi0/22",
-				}},
-				Dst: graph.LinkEndpoint{Attributes: map[string]any{
-					"if_name": "Gi0/11",
-				}},
+				Src: graph.LinkEndpoint{IfName: "Gi0/22"},
+				Dst: graph.LinkEndpoint{IfName: "Gi0/11"},
 			},
 		},
 	}
 
 	backfillPairGroupMissingEndpointPorts(entries)
 
-	require.Equal(t, "", topologyAttrString(entries[0].link.Src.Attributes, "if_name"))
-	require.Equal(t, "", topologyAttrString(entries[0].link.Dst.Attributes, "if_name"))
+	require.Empty(t, entries[0].link.Src.IfName)
+	require.Empty(t, entries[0].link.Dst.IfName)
 }
 
 func TestBackfillEndpointPortFromPeerPreservesExistingCanonicalPort(t *testing.T) {
 	endpoint := graph.LinkEndpoint{
-		Attributes: map[string]any{
-			"if_name": "Gi0/10",
-		},
+		IfName: "Gi0/10",
 	}
 	peer := graph.LinkEndpoint{
-		Attributes: map[string]any{
-			"if_index": 7,
-			"if_name":  "Gi0/7",
-			"port_id":  "Gi0/7",
-		},
+		IfIndex: 7,
+		IfName:  "Gi0/7",
+		PortID:  "Gi0/7",
 	}
 
 	backfilled := backfillEndpointPortFromPeer(endpoint, peer)
 
-	require.Equal(t, "Gi0/10", topologyAttrString(backfilled.Attributes, "if_name"))
-	require.Zero(t, topologyAttrInt(backfilled.Attributes, "if_index"))
-	require.Equal(t, "", topologyAttrString(backfilled.Attributes, "port_id"))
+	require.Equal(t, "Gi0/10", backfilled.IfName)
+	require.Zero(t, backfilled.IfIndex)
+	require.Empty(t, backfilled.PortID)
 }
 
 func TestTopologyIntegerAttributesParseSNMPEnumLabels(t *testing.T) {
@@ -173,16 +161,12 @@ func TestSegmentProjectionBuilderPruneSegmentsWithoutLinksRemovesEmptySegments(t
 				{
 					Protocol:  "fdb",
 					Direction: "bidirectional",
-					Metrics: map[string]any{
-						"bridge_domain": "segment-a",
-					},
+					L2:        &graph.LinkL2{BridgeDomain: "segment-a"},
 				},
 				{
 					Protocol:  "fdb",
 					Direction: "bidirectional",
-					Metrics: map[string]any{
-						"bridge_domain": "segment-b",
-					},
+					L2:        &graph.LinkL2{BridgeDomain: "segment-b"},
 				},
 			},
 		},
@@ -195,7 +179,7 @@ func TestSegmentProjectionBuilderPruneSegmentsWithoutLinksRemovesEmptySegments(t
 	require.Len(t, builder.out.actors, 1)
 	require.Equal(t, "segment-a", builder.out.actors[0].ActorID)
 	require.Len(t, builder.out.links, 1)
-	require.Equal(t, "segment-a", topologyMetricString(builder.out.links[0].Metrics, "bridge_domain"))
+	require.Equal(t, "segment-a", topologyLinkBridgeDomain(builder.out.links[0]))
 	require.Equal(t, 1, builder.out.linksFdb)
 	require.Equal(t, 1, builder.out.bidirectionalCount)
 	require.Equal(t, 1, builder.out.endpointLinksEmitted)

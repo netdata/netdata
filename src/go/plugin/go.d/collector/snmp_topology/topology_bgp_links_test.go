@@ -28,8 +28,8 @@ func TestApplyTopologyBGPAdjacencyEnrichmentEmitsEstablishedManagedLink(t *testi
 	link := data.Links[0]
 	require.Equal(t, topologyBGPAdjacencyLinkType, link.LinkType)
 	require.Equal(t, "established", link.State)
-	require.Equal(t, "65001", link.Src.Attributes["as"])
-	require.Equal(t, "65002", link.Dst.Attributes["as"])
+	require.Equal(t, "65001", topologyBGPLocalAS(link))
+	require.Equal(t, "65002", topologyBGPRemoteAS(link))
 	require.Equal(t, 1, topologyStatsToV1(data.Stats)["bgp_peer_rows"])
 	require.Equal(t, 1, topologyStatsToV1(data.Stats)["bgp_peer_detail_rows"])
 	require.Equal(t, 1, topologyStatsToV1(data.Stats)["bgp_adjacency_emitted_links"])
@@ -216,7 +216,10 @@ func TestApplyTopologyBGPAdjacencyEnrichmentBuildsManagedLinks(t *testing.T) {
 				require.Equal(t, 2, stats.emittedLinks)
 				require.Len(t, data.Links, 2)
 				require.Equal(t, 2, topologyStatsToV1(data.Stats)["bgp_adjacency_visible_links"])
-				require.ElementsMatch(t, []any{"blue", "red"}, []any{data.Links[0].Metrics["routing_instance"], data.Links[1].Metrics["routing_instance"]})
+				require.ElementsMatch(t, []string{"blue", "red"}, []string{
+					topologyBGPLinkRoutingInstance(data.Links[0]),
+					topologyBGPLinkRoutingInstance(data.Links[1]),
+				})
 			},
 		},
 		"compacts-parallel-same-routing-instance-peers": {
@@ -273,16 +276,12 @@ func TestApplyTopologyBGPAdjacencyEnrichmentCanonicalizesUndirectedLinkEndpoints
 	link := data.Links[0]
 	require.Equal(t, "router-a", link.SrcActorID)
 	require.Equal(t, "router-b", link.DstActorID)
-	require.Equal(t, "1.1.1.1", link.Src.Attributes["bgp_identifier"])
-	require.Equal(t, "2.2.2.2", link.Dst.Attributes["bgp_identifier"])
-	require.Equal(t, "198.51.100.1", link.Src.Attributes["ip"])
-	require.Equal(t, "198.51.100.2", link.Dst.Attributes["ip"])
-	require.Equal(t, "65001", link.Src.Attributes["as"])
-	require.Equal(t, "65002", link.Dst.Attributes["as"])
-	require.Equal(t, "65001", link.Metrics["local_as"])
-	require.Equal(t, "65002", link.Metrics["remote_as"])
-	require.Equal(t, "1.1.1.1", link.Metrics["local_identifier"])
-	require.Equal(t, "2.2.2.2", link.Metrics["peer_identifier"])
+	require.Equal(t, "1.1.1.1", topologyBGPLocalIdentifier(link))
+	require.Equal(t, "2.2.2.2", topologyBGPPeerIdentifier(link))
+	require.Equal(t, "198.51.100.1", topologyBGPLocalIP(link))
+	require.Equal(t, "198.51.100.2", topologyBGPNeighborIP(link))
+	require.Equal(t, "65001", topologyBGPLocalAS(link))
+	require.Equal(t, "65002", topologyBGPRemoteAS(link))
 }
 
 func TestApplyTopologyBGPAdjacencyEnrichmentResolvesPeerIdentifierByRouterID(t *testing.T) {
@@ -303,7 +302,7 @@ func TestApplyTopologyBGPAdjacencyEnrichmentResolvesPeerIdentifierByRouterID(t *
 	require.Equal(t, 1, stats.emittedLinks)
 	require.Len(t, data.Links, 1)
 	require.Equal(t, "router-b", data.Links[0].DstActorID)
-	require.Equal(t, "2.2.2.2", data.Links[0].Dst.Attributes["bgp_identifier"])
+	require.Equal(t, "2.2.2.2", topologyBGPPeerIdentifier(data.Links[0]))
 	require.Len(t, data.Actors[0].Detail.BGP, 1)
 	require.Equal(t, "router-b", data.Actors[0].Detail.BGP[0].RemoteActorID)
 }

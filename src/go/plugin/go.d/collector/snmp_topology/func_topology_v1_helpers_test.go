@@ -108,15 +108,10 @@ func topologyV1PortNeighborSummaryLinkForTest(remotePortName string) topologyLin
 	link := topologyLink{
 		SrcActorID: "device-a",
 		DstActorID: "device-b",
-		Src: topologyLinkEndpoint{Attributes: map[string]any{
-			"if_index":  uint64(1),
-			"port_name": "Gi0/1",
-		}},
+		Src:        topologyLinkEndpoint{IfIndex: 1, PortName: "Gi0/1"},
 	}
 	if remotePortName != "" {
-		link.Dst = topologyLinkEndpoint{Attributes: map[string]any{
-			"port_name": remotePortName,
-		}}
+		link.Dst = topologyLinkEndpoint{PortName: remotePortName}
 	}
 	return link
 }

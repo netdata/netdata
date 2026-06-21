@@ -12,6 +12,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/snmptopologyfunc"
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -251,15 +252,19 @@ func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 				SrcActorID: "device-a",
 				DstActorID: "device-b",
 				Src: topologyLinkEndpoint{
-					Attributes: map[string]any{"if_name": "Gi0/1", "if_index": uint64(1), "port_id": "1"},
+					IfIndex: 1,
+					IfName:  "Gi0/1",
+					PortID:  "1",
 				},
 				Dst: topologyLinkEndpoint{
-					Attributes: map[string]any{"if_name": "Gi0/2", "if_index": uint64(2), "port_id": "2"},
+					IfIndex: 2,
+					IfName:  "Gi0/2",
+					PortID:  "2",
 				},
-				Metrics: map[string]any{
-					"confidence":      "high",
-					"inference":       "observed",
-					"attachment_mode": "lldp",
+				Inference: &graph.LinkInference{
+					Confidence:     "high",
+					Inference:      "observed",
+					AttachmentMode: "lldp",
 				},
 			},
 		},
@@ -349,13 +354,20 @@ func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "dst_port_name"))
 	assert.Equal(t, "uint", topologyV1ColumnType(evidenceTable, "src_if_index"))
 	assert.Equal(t, "uint", topologyV1ColumnType(evidenceTable, "dst_if_index"))
+	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "src_port_id"))
+	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "dst_port_id"))
 	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "src_management_ip"))
 	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "dst_management_ip"))
 	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "confidence"))
 	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "inference"))
 	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "attachment_mode"))
+	assert.Empty(t, topologyV1ColumnType(evidenceTable, "src_endpoint"))
+	assert.Empty(t, topologyV1ColumnType(evidenceTable, "dst_endpoint"))
+	assert.Empty(t, topologyV1ColumnType(evidenceTable, "metrics"))
 	assert.Equal(t, []any{uint64(1)}, topologyV1ColumnValues(t, evidenceTable, "src_if_index"))
 	assert.Equal(t, []any{uint64(2)}, topologyV1ColumnValues(t, evidenceTable, "dst_if_index"))
+	assert.Equal(t, []string{"1"}, topologyV1StringColumnValues(t, payload, evidenceTable, "src_port_id"))
+	assert.Equal(t, []string{"2"}, topologyV1StringColumnValues(t, payload, evidenceTable, "dst_port_id"))
 
 	deviceType := payload.Types.ActorTypes["device"]
 	require.NotNil(t, deviceType.Presentation)
@@ -495,10 +507,11 @@ func TestSNMPTopologyToV1_OmitsNeighborCountForEmptyNeighborList(t *testing.T) {
 				SrcActorID: "device-a",
 				DstActorID: "device-b",
 				Src: topologyLinkEndpoint{
-					Attributes: map[string]any{"if_index": uint64(42), "if_name": "Gi0/42"},
+					IfIndex: 42,
+					IfName:  "Gi0/42",
 				},
 				Dst: topologyLinkEndpoint{
-					Attributes: map[string]any{"if_name": "Gi0/1"},
+					IfName: "Gi0/1",
 				},
 			},
 		},
@@ -553,10 +566,11 @@ func TestSNMPTopologyToV1_UsesIfIndexAsVisiblePortID(t *testing.T) {
 				SrcActorID: "device-a",
 				DstActorID: "device-b",
 				Src: topologyLinkEndpoint{
-					Attributes: map[string]any{"if_index": uint64(42), "if_name": "Gi0/42"},
+					IfIndex: 42,
+					IfName:  "Gi0/42",
 				},
 				Dst: topologyLinkEndpoint{
-					Attributes: map[string]any{"if_name": "Gi0/1"},
+					IfName: "Gi0/1",
 				},
 			},
 		},
@@ -606,10 +620,10 @@ func TestSNMPTopologyToV1_PortNamesOnlyUsePortFields(t *testing.T) {
 				SrcActorID: "device-a",
 				DstActorID: "device-b",
 				Src: topologyLinkEndpoint{
-					Attributes: map[string]any{"display_name": "10.0.0.10"},
+					DisplayName: "10.0.0.10",
 				},
 				Dst: topologyLinkEndpoint{
-					Attributes: map[string]any{"sys_name": "sw-b"},
+					SysName: "sw-b",
 				},
 			},
 		},
@@ -658,29 +672,27 @@ func TestSNMPTopologyToV1_PreservesL3SubnetPresentationAndEvidence(t *testing.T)
 				SrcActorID: "router-a",
 				DstActorID: "router-b",
 				Src: topologyLinkEndpoint{
-					Attributes: map[string]any{
-						"if_index": uint64(10),
-						"if_name":  "xe-0/0/0",
-						"ip":       "192.0.2.1",
-						"subnet":   "192.0.2.0/30",
-					},
+					IfIndex: 10,
+					IfName:  "xe-0/0/0",
 				},
 				Dst: topologyLinkEndpoint{
-					Attributes: map[string]any{
-						"if_index": uint64(20),
-						"if_name":  "xe-0/0/1",
-						"ip":       "192.0.2.2",
-						"subnet":   "192.0.2.0/30",
-					},
+					IfIndex: 20,
+					IfName:  "xe-0/0/1",
 				},
-				Metrics: map[string]any{
-					"source":          "ip_mib",
-					"inference":       "shared_subnet",
-					"attachment_mode": "logical_l3_subnet",
-					"subnet":          "192.0.2.0/30",
-					"network":         "192.0.2.0",
-					"netmask":         "255.255.255.252",
-					"prefix":          uint64(30),
+				Inference: &graph.LinkInference{
+					Inference:      "shared_subnet",
+					AttachmentMode: "logical_l3_subnet",
+				},
+				Detail: topologyLinkDetail{
+					L3Subnet: &topologyL3SubnetLinkDetail{
+						Source:  "ip_mib",
+						SrcIP:   "192.0.2.1",
+						DstIP:   "192.0.2.2",
+						Subnet:  "192.0.2.0/30",
+						Network: "192.0.2.0",
+						Netmask: "255.255.255.252",
+						Prefix:  30,
+					},
 				},
 			},
 		},
@@ -786,32 +798,24 @@ func TestSNMPTopologyToV1_PreservesOSPFAdjacencyPresentationEvidenceAndNeighborR
 				State:      "full",
 				SrcActorID: "router-a",
 				DstActorID: "router-b",
-				Src: topologyLinkEndpoint{
-					Attributes: map[string]any{
-						"router_id": "1.1.1.1",
-						"ip":        "192.0.2.1",
-						"subnet":    "192.0.2.0/30",
-					},
+				Src:        topologyLinkEndpoint{},
+				Dst:        topologyLinkEndpoint{},
+				Inference: &graph.LinkInference{
+					Inference:      "ospf_full_adjacency",
+					AttachmentMode: "logical_l3_ospf",
 				},
-				Dst: topologyLinkEndpoint{
-					Attributes: map[string]any{
-						"router_id": "2.2.2.2",
-						"ip":        "192.0.2.2",
-						"subnet":    "192.0.2.0/30",
+				Detail: topologyLinkDetail{
+					OSPF: &topologyOSPFAdjacencyLinkDetail{
+						Source:           "ospf_mib",
+						LocalRouterID:    "1.1.1.1",
+						NeighborRouterID: "2.2.2.2",
+						LocalIP:          "192.0.2.1",
+						NeighborIP:       "192.0.2.2",
+						Subnet:           "192.0.2.0/30",
+						Network:          "192.0.2.0",
+						Netmask:          "255.255.255.252",
+						Prefix:           30,
 					},
-				},
-				Metrics: map[string]any{
-					"source":             "ospf_mib",
-					"inference":          "ospf_full_adjacency",
-					"attachment_mode":    "logical_l3_ospf",
-					"local_router_id":    "1.1.1.1",
-					"neighbor_router_id": "2.2.2.2",
-					"local_ip":           "192.0.2.1",
-					"neighbor_ip":        "192.0.2.2",
-					"subnet":             "192.0.2.0/30",
-					"network":            "192.0.2.0",
-					"netmask":            "255.255.255.252",
-					"prefix":             uint64(30),
 				},
 			},
 		},
@@ -921,31 +925,23 @@ func TestSNMPTopologyToV1_PreservesBGPAdjacencyPresentationEvidenceAndPeerRows(t
 				State:      "established",
 				SrcActorID: "router-a",
 				DstActorID: "router-b",
-				Src: topologyLinkEndpoint{
-					Attributes: map[string]any{
-						"bgp_identifier": "1.1.1.1",
-						"ip":             "192.0.2.1",
-						"as":             "65001",
-					},
+				Src:        topologyLinkEndpoint{},
+				Dst:        topologyLinkEndpoint{},
+				Inference: &graph.LinkInference{
+					Inference:      "bgp_established_adjacency",
+					AttachmentMode: "logical_l3_bgp",
 				},
-				Dst: topologyLinkEndpoint{
-					Attributes: map[string]any{
-						"bgp_identifier": "2.2.2.2",
-						"ip":             "192.0.2.2",
-						"as":             "65002",
+				Detail: topologyLinkDetail{
+					BGP: &topologyBGPAdjacencyLinkDetail{
+						Source:          "bgp_mib",
+						RoutingInstance: "default",
+						LocalIdentifier: "1.1.1.1",
+						PeerIdentifier:  "2.2.2.2",
+						LocalIP:         "192.0.2.1",
+						NeighborIP:      "192.0.2.2",
+						LocalAS:         "65001",
+						RemoteAS:        "65002",
 					},
-				},
-				Metrics: map[string]any{
-					"source":           "bgp_mib",
-					"inference":        "bgp_established_adjacency",
-					"attachment_mode":  "logical_l3_bgp",
-					"routing_instance": "default",
-					"local_identifier": "1.1.1.1",
-					"peer_identifier":  "2.2.2.2",
-					"local_ip":         "192.0.2.1",
-					"neighbor_ip":      "192.0.2.2",
-					"local_as":         "65001",
-					"remote_as":        "65002",
 				},
 			},
 		},
@@ -1029,8 +1025,10 @@ func TestSNMPTopologyToV1_ReturnsErrorForL3SubnetWithoutSubnet(t *testing.T) {
 				LinkType:   topologyL3SubnetLinkType,
 				SrcActorID: "router-a",
 				DstActorID: "router-b",
-				Metrics: map[string]any{
-					"prefix": uint64(30),
+				Detail: topologyLinkDetail{
+					L3Subnet: &topologyL3SubnetLinkDetail{
+						Prefix: 30,
+					},
 				},
 			},
 		},
@@ -1083,9 +1081,9 @@ func TestSNMPTopologyToV1_PreservesLinkPresentationTypes(t *testing.T) {
 				State:      "probable",
 				SrcActorID: "device-a",
 				DstActorID: "device-b",
-				Metrics: map[string]any{
-					"attachment_mode": "probable_bridge_anchor",
-					"inference":       "probable",
+				Inference: &graph.LinkInference{
+					AttachmentMode: "probable_bridge_anchor",
+					Inference:      "probable",
 				},
 			},
 		},
@@ -1118,6 +1116,164 @@ func TestSNMPTopologyToV1_PreservesLinkPresentationTypes(t *testing.T) {
 
 	assert.Contains(t, topologyV1LegendLinkTypes(payload), "lldp")
 	assert.Contains(t, topologyV1LegendLinkTypes(payload), "probable")
+}
+
+func TestSNMPTopologyV1EvidenceMatchColumnsUseTypedL2EndpointFields(t *testing.T) {
+	want := []string{
+		"src_actor",
+		"dst_actor",
+		"protocol",
+		"src_if_index",
+		"src_port_name",
+		"src_port_id",
+		"dst_if_index",
+		"dst_port_name",
+		"dst_port_id",
+	}
+	tests := map[string]string{
+		"lldp":     snmpTopologyV1LinkLLDP,
+		"cdp":      snmpTopologyV1LinkCDP,
+		"bridge":   snmpTopologyV1LinkBridge,
+		"fdb":      snmpTopologyV1LinkFDB,
+		"stp":      snmpTopologyV1LinkSTP,
+		"arp":      snmpTopologyV1LinkARP,
+		"snmp":     snmpTopologyV1LinkSNMP,
+		"probable": snmpTopologyV1LinkProbable,
+	}
+
+	for name, linkType := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := snmpTopologyV1EvidenceMatchColumnsForType(linkType)
+
+			require.Equal(t, want, got)
+			require.NotContains(t, got, "src_endpoint")
+			require.NotContains(t, got, "dst_endpoint")
+			require.NotContains(t, got, "metrics")
+		})
+	}
+}
+
+func TestSNMPTopologyToV1_PortlessFDBEvidenceUsesLinkRef(t *testing.T) {
+	data := topologyData{
+		AgentID:     "agent-test",
+		CollectedAt: time.Date(2026, 5, 10, 12, 0, 0, 0, time.UTC),
+		View:        "summary",
+		Actors: []topologyActor{
+			{
+				ActorID:   "device-a",
+				ActorType: "device",
+				Source:    "snmp",
+				Match:     topologyMatch{SysName: "switch-a"},
+			},
+			{
+				ActorID:   "endpoint-a",
+				ActorType: "endpoint",
+				Source:    "fdb",
+				Match:     topologyMatch{MacAddresses: []string{"00:11:22:33:44:55"}},
+			},
+		},
+		Links: []topologyLink{
+			{
+				Protocol:   "fdb",
+				LinkType:   "fdb",
+				Direction:  "observed",
+				SrcActorID: "device-a",
+				DstActorID: "endpoint-a",
+			},
+		},
+	}
+
+	payload, err := snmpTopologyToV1(data)
+	require.NoError(t, err)
+	require.NoError(t, validateTopologyV1Data(payload))
+	require.Contains(t, payload.Evidence, snmpTopologyV1LinkFDB)
+
+	evidenceTable := payload.Evidence[snmpTopologyV1LinkFDB].Table
+	require.Equal(t, 1, evidenceTable.Rows)
+	assert.Equal(t, []any{0}, topologyV1ColumnValues(t, evidenceTable, "link"))
+	assert.Equal(t, []any{nil}, topologyV1ColumnValues(t, evidenceTable, "src_if_index"))
+	assert.Equal(t, []any{nil}, topologyV1ColumnValues(t, evidenceTable, "dst_if_index"))
+	assert.Equal(t, []any{nil}, topologyV1ColumnValues(t, evidenceTable, "src_port_name"))
+	assert.Equal(t, []any{nil}, topologyV1ColumnValues(t, evidenceTable, "dst_port_name"))
+	assert.Equal(t, []any{nil}, topologyV1ColumnValues(t, evidenceTable, "src_port_id"))
+	assert.Equal(t, []any{nil}, topologyV1ColumnValues(t, evidenceTable, "dst_port_id"))
+}
+
+func TestSNMPTopologyToV1_L2EvidenceDistinguishesParallelLinksByTypedEndpoints(t *testing.T) {
+	data := topologyData{
+		AgentID:     "agent-test",
+		CollectedAt: time.Date(2026, 5, 10, 12, 0, 0, 0, time.UTC),
+		View:        "summary",
+		Actors: []topologyActor{
+			{
+				ActorID:   "device-a",
+				ActorType: "device",
+				Source:    "snmp",
+				Match:     topologyMatch{SysName: "switch-a"},
+			},
+			{
+				ActorID:   "device-b",
+				ActorType: "device",
+				Source:    "snmp",
+				Match:     topologyMatch{SysName: "switch-b"},
+			},
+		},
+		Links: []topologyLink{
+			{
+				Protocol:   "lldp",
+				LinkType:   "lldp",
+				Direction:  "bidirectional",
+				SrcActorID: "device-a",
+				DstActorID: "device-b",
+				Src: topologyLinkEndpoint{
+					IfIndex:  1,
+					IfName:   "Gi0/1",
+					PortID:   "1",
+					PortName: "Gi0/1",
+				},
+				Dst: topologyLinkEndpoint{
+					IfIndex:  11,
+					IfName:   "Eth1",
+					PortID:   "11",
+					PortName: "Eth1",
+				},
+			},
+			{
+				Protocol:   "lldp",
+				LinkType:   "lldp",
+				Direction:  "bidirectional",
+				SrcActorID: "device-a",
+				DstActorID: "device-b",
+				Src: topologyLinkEndpoint{
+					IfIndex:  2,
+					IfName:   "Gi0/2",
+					PortID:   "2",
+					PortName: "Gi0/2",
+				},
+				Dst: topologyLinkEndpoint{
+					IfIndex:  12,
+					IfName:   "Eth2",
+					PortID:   "12",
+					PortName: "Eth2",
+				},
+			},
+		},
+	}
+
+	payload, err := snmpTopologyToV1(data)
+	require.NoError(t, err)
+	require.NoError(t, validateTopologyV1Data(payload))
+	require.Contains(t, payload.Evidence, snmpTopologyV1LinkLLDP)
+
+	evidenceTable := payload.Evidence[snmpTopologyV1LinkLLDP].Table
+	require.Equal(t, 2, evidenceTable.Rows)
+	assert.Equal(t, []any{0, 1}, topologyV1ColumnValues(t, evidenceTable, "link"))
+	assert.Equal(t, []any{uint64(1), uint64(2)}, topologyV1ColumnValues(t, evidenceTable, "src_if_index"))
+	assert.Equal(t, []string{"Gi0/1", "Gi0/2"}, topologyV1StringColumnValues(t, payload, evidenceTable, "src_port_name"))
+	assert.Equal(t, []string{"1", "2"}, topologyV1StringColumnValues(t, payload, evidenceTable, "src_port_id"))
+	assert.Equal(t, []any{uint64(11), uint64(12)}, topologyV1ColumnValues(t, evidenceTable, "dst_if_index"))
+	assert.Equal(t, []string{"Eth1", "Eth2"}, topologyV1StringColumnValues(t, payload, evidenceTable, "dst_port_name"))
+	assert.Equal(t, []string{"11", "12"}, topologyV1StringColumnValues(t, payload, evidenceTable, "dst_port_id"))
 }
 
 func TestNormalizeTopologyInferenceStrategy(t *testing.T) {

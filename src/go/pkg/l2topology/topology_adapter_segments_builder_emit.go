@@ -21,9 +21,6 @@ func (b *segmentProjectionBuilder) emitLinks() {
 		}
 		segmentEndpoint := graph.LinkEndpoint{
 			Match: b.segmentMatchByID[segmentID],
-			Attributes: map[string]any{
-				"segment_id": segmentID,
-			},
 		}
 
 		portIDs := make([]string, 0, len(segment.ports))
@@ -51,11 +48,9 @@ func (b *segmentProjectionBuilder) emitLinks() {
 			}
 			b.deviceSegmentEdgeSeen[edgeKey] = struct{}{}
 
-			metrics := map[string]any{
-				"bridge_domain": segmentID,
-			}
+			l2 := &graph.LinkL2{BridgeDomain: segmentID}
 			if segment.portIdentityKey(port) == segment.portIdentityKey(segment.designatedPort) {
-				metrics["designated"] = true
+				l2.Designated = true
 			}
 			b.out.links = append(b.out.links, graph.Link{
 				Layer:        b.layer,
@@ -66,7 +61,7 @@ func (b *segmentProjectionBuilder) emitLinks() {
 				Dst:          segmentEndpoint,
 				DiscoveredAt: topologyTimePtr(b.collectedAt),
 				LastSeen:     topologyTimePtr(b.collectedAt),
-				Metrics:      metrics,
+				L2:           l2,
 			})
 			b.out.linksFdb++
 			b.out.bidirectionalCount++
@@ -129,10 +124,8 @@ func (b *segmentProjectionBuilder) emitLinks() {
 									Dst:          adjacencySideToEndpoint(matchedDevice, "", b.ifIndexByDeviceName, b.ifaceByDeviceIndex),
 									DiscoveredAt: topologyTimePtr(b.collectedAt),
 									LastSeen:     topologyTimePtr(b.collectedAt),
-									Metrics: map[string]any{
-										"bridge_domain":   segmentID,
-										"attachment_mode": "managed_device_overlap",
-									},
+									L2:           &graph.LinkL2{BridgeDomain: segmentID},
+									Inference:    &graph.LinkInference{AttachmentMode: "managed_device_overlap"},
 								})
 								b.out.linksFdb++
 								b.out.bidirectionalCount++
@@ -169,15 +162,13 @@ func (b *segmentProjectionBuilder) emitLinks() {
 						edgeKey := "direct" + keySep + bridgePortObservationVLANKey(owner.port) + keySep + endpointID
 						if _, seen := b.endpointSegmentEdgeSeen[edgeKey]; !seen {
 							b.endpointSegmentEdgeSeen[edgeKey] = struct{}{}
-							metrics := map[string]any{
-								"attachment_mode": "direct",
-							}
+							inference := &graph.LinkInference{AttachmentMode: "direct"}
 							linkState := ""
 							if probableSet := b.probableEndpointBySegment[segmentID]; len(probableSet) > 0 {
 								if _, isProbable := probableSet[endpointID]; isProbable {
-									metrics["attachment_mode"] = "probable_direct"
-									metrics["inference"] = "probable"
-									metrics["confidence"] = "low"
+									inference.AttachmentMode = "probable_direct"
+									inference.Inference = "probable"
+									inference.Confidence = "low"
 									linkState = "probable"
 								}
 							}
@@ -191,7 +182,7 @@ func (b *segmentProjectionBuilder) emitLinks() {
 								DiscoveredAt: topologyTimePtr(b.collectedAt),
 								LastSeen:     topologyTimePtr(b.collectedAt),
 								State:        linkState,
-								Metrics:      metrics,
+								Inference:    inference,
 							})
 							b.out.linksFdb++
 							b.out.bidirectionalCount++
@@ -208,9 +199,8 @@ func (b *segmentProjectionBuilder) emitLinks() {
 			}
 			b.endpointSegmentEdgeSeen[edgeKey] = struct{}{}
 
-			metrics := map[string]any{
-				"bridge_domain": segmentID,
-			}
+			l2 := &graph.LinkL2{BridgeDomain: segmentID}
+			var inference *graph.LinkInference
 			linkState := ""
 			if probableSet := b.probableEndpointBySegment[segmentID]; len(probableSet) > 0 {
 				if _, isProbable := probableSet[endpointID]; isProbable {
@@ -221,9 +211,11 @@ func (b *segmentProjectionBuilder) emitLinks() {
 					if probableMode == "" {
 						probableMode = "probable_segment"
 					}
-					metrics["attachment_mode"] = probableMode
-					metrics["inference"] = "probable"
-					metrics["confidence"] = "low"
+					inference = &graph.LinkInference{
+						AttachmentMode: probableMode,
+						Inference:      "probable",
+						Confidence:     "low",
+					}
 					linkState = "probable"
 				}
 			}
@@ -238,7 +230,8 @@ func (b *segmentProjectionBuilder) emitLinks() {
 				DiscoveredAt: topologyTimePtr(b.collectedAt),
 				LastSeen:     topologyTimePtr(b.collectedAt),
 				State:        linkState,
-				Metrics:      metrics,
+				L2:           l2,
+				Inference:    inference,
 			})
 			b.out.linksFdb++
 			b.out.bidirectionalCount++
@@ -272,7 +265,7 @@ func (b *segmentProjectionBuilder) pruneSegmentsWithoutLinks(segmentsWithAnyLink
 	b.out.bidirectionalCount = 0
 	b.out.endpointLinksEmitted = 0
 	for _, link := range b.out.links {
-		segmentID := topologyMetricString(link.Metrics, "bridge_domain")
+		segmentID := topologyLinkBridgeDomain(link)
 		if segmentID != "" {
 			if _, ok := segmentsWithAnyLinks[segmentID]; !ok {
 				continue

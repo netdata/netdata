@@ -16,8 +16,8 @@ func recomputeTopologyLinkStats(data *topologyData) {
 	probable := 0
 	for _, link := range data.Links {
 		state := strings.ToLower(strings.TrimSpace(link.State))
-		inference := strings.ToLower(topologyMetricValueString(link.Metrics, "inference"))
-		attachment := strings.ToLower(topologyMetricValueString(link.Metrics, "attachment_mode"))
+		inference := strings.ToLower(topologyLinkInferenceValue(link))
+		attachment := strings.ToLower(topologyLinkAttachmentModeValue(link))
 		if state == "probable" || inference == "probable" || strings.HasPrefix(attachment, "probable_") {
 			probable++
 		}

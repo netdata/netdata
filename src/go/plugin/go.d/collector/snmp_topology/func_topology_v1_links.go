@@ -48,13 +48,10 @@ func buildSNMPTopologyV1Links(
 		evidenceCounts[i] = 1
 		discoveredAt[i] = nullableTime(link.DiscoveredAt)
 		lastSeen[i] = nullableTime(link.LastSeen)
-		subnet := topologyMetricValueString(link.Metrics, "subnet")
+		subnet := topologyEvidenceSubnet(link)
 		if linkType == snmpTopologyV1LinkL3Subnet && subnet == "" {
 			return topologyv1.Table{}, nil, fmt.Errorf("l3_subnet link %d is missing subnet", i)
 		}
-		srcEndpoint := nullableJSON(link.Src.Attributes)
-		dstEndpoint := nullableJSON(link.Dst.Attributes)
-		metrics := nullableJSON(link.Metrics)
 
 		evidenceRows := evidenceRowsByType[linkType]
 		if evidenceRows == nil {
@@ -69,39 +66,38 @@ func buildSNMPTopologyV1Links(
 		evidenceRows.states = append(evidenceRows.states, nullableStringRef(stringsDict, link.State))
 		evidenceRows.srcPortNames = append(evidenceRows.srcPortNames, nullableStringRef(stringsDict, topologyV1EndpointPortName(link.Src)))
 		evidenceRows.dstPortNames = append(evidenceRows.dstPortNames, nullableStringRef(stringsDict, topologyV1EndpointPortName(link.Dst)))
-		evidenceRows.srcIfIndexes = append(evidenceRows.srcIfIndexes, nullableUintValue(link.Src.Attributes["if_index"]))
-		evidenceRows.dstIfIndexes = append(evidenceRows.dstIfIndexes, nullableUintValue(link.Dst.Attributes["if_index"]))
+		evidenceRows.srcIfIndexes = append(evidenceRows.srcIfIndexes, nullableEndpointIfIndex(link.Src))
+		evidenceRows.dstIfIndexes = append(evidenceRows.dstIfIndexes, nullableEndpointIfIndex(link.Dst))
+		evidenceRows.srcPortIDs = append(evidenceRows.srcPortIDs, nullableStringRef(stringsDict, topologyV1EndpointString(link.Src, "port_id")))
+		evidenceRows.dstPortIDs = append(evidenceRows.dstPortIDs, nullableStringRef(stringsDict, topologyV1EndpointString(link.Dst, "port_id")))
 		evidenceRows.srcManagementIPs = append(evidenceRows.srcManagementIPs, nullableStringRef(stringsDict, topologyV1EndpointString(link.Src, "management_ip")))
 		evidenceRows.dstManagementIPs = append(evidenceRows.dstManagementIPs, nullableStringRef(stringsDict, topologyV1EndpointString(link.Dst, "management_ip")))
-		evidenceRows.confidences = append(evidenceRows.confidences, nullableStringRef(stringsDict, topologyMetricValueString(link.Metrics, "confidence")))
-		evidenceRows.inferences = append(evidenceRows.inferences, nullableStringRef(stringsDict, topologyMetricValueString(link.Metrics, "inference")))
-		evidenceRows.attachmentModes = append(evidenceRows.attachmentModes, nullableStringRef(stringsDict, topologyMetricValueString(link.Metrics, "attachment_mode")))
+		evidenceRows.confidences = append(evidenceRows.confidences, nullableStringRef(stringsDict, topologyLinkConfidenceValue(link)))
+		evidenceRows.inferences = append(evidenceRows.inferences, nullableStringRef(stringsDict, topologyLinkInferenceValue(link)))
+		evidenceRows.attachmentModes = append(evidenceRows.attachmentModes, nullableStringRef(stringsDict, topologyLinkAttachmentModeValue(link)))
 		if linkType == snmpTopologyV1LinkL3Subnet || linkType == snmpTopologyV1LinkOSPF {
 			if linkType == snmpTopologyV1LinkOSPF {
-				evidenceRows.srcRouterIDs = append(evidenceRows.srcRouterIDs, nullableStringRef(stringsDict, topologyV1EndpointString(link.Src, "router_id")))
-				evidenceRows.dstRouterIDs = append(evidenceRows.dstRouterIDs, nullableStringRef(stringsDict, topologyV1EndpointString(link.Dst, "router_id")))
+				evidenceRows.srcRouterIDs = append(evidenceRows.srcRouterIDs, nullableStringRef(stringsDict, topologyOSPFLocalRouterID(link)))
+				evidenceRows.dstRouterIDs = append(evidenceRows.dstRouterIDs, nullableStringRef(stringsDict, topologyOSPFNeighborRouterID(link)))
 			}
-			evidenceRows.srcIPs = append(evidenceRows.srcIPs, nullableStringRef(stringsDict, topologyV1EndpointString(link.Src, "ip")))
-			evidenceRows.dstIPs = append(evidenceRows.dstIPs, nullableStringRef(stringsDict, topologyV1EndpointString(link.Dst, "ip")))
+			evidenceRows.srcIPs = append(evidenceRows.srcIPs, nullableStringRef(stringsDict, topologyEvidenceSrcIP(link)))
+			evidenceRows.dstIPs = append(evidenceRows.dstIPs, nullableStringRef(stringsDict, topologyEvidenceDstIP(link)))
 			evidenceRows.subnets = append(evidenceRows.subnets, nullableStringRef(stringsDict, subnet))
-			evidenceRows.networks = append(evidenceRows.networks, nullableStringRef(stringsDict, topologyMetricValueString(link.Metrics, "network")))
-			evidenceRows.netmasks = append(evidenceRows.netmasks, nullableStringRef(stringsDict, topologyMetricValueString(link.Metrics, "netmask")))
-			evidenceRows.prefixes = append(evidenceRows.prefixes, nullableUintValue(link.Metrics["prefix"]))
-			evidenceRows.sources = append(evidenceRows.sources, nullableStringRef(stringsDict, topologyMetricValueString(link.Metrics, "source")))
+			evidenceRows.networks = append(evidenceRows.networks, nullableStringRef(stringsDict, topologyEvidenceNetwork(link)))
+			evidenceRows.netmasks = append(evidenceRows.netmasks, nullableStringRef(stringsDict, topologyEvidenceNetmask(link)))
+			evidenceRows.prefixes = append(evidenceRows.prefixes, nullableEvidencePrefix(link))
+			evidenceRows.sources = append(evidenceRows.sources, nullableStringRef(stringsDict, topologyEvidenceSource(link)))
 		}
 		if linkType == snmpTopologyV1LinkBGP {
-			evidenceRows.routingInstances = append(evidenceRows.routingInstances, nullableStringRef(stringsDict, topologyMetricValueString(link.Metrics, "routing_instance")))
-			evidenceRows.localIdentifiers = append(evidenceRows.localIdentifiers, nullableStringRef(stringsDict, topologyV1EndpointString(link.Src, "bgp_identifier")))
-			evidenceRows.peerIdentifiers = append(evidenceRows.peerIdentifiers, nullableStringRef(stringsDict, topologyV1EndpointString(link.Dst, "bgp_identifier")))
-			evidenceRows.localIPs = append(evidenceRows.localIPs, nullableStringRef(stringsDict, topologyV1EndpointString(link.Src, "ip")))
-			evidenceRows.neighborIPs = append(evidenceRows.neighborIPs, nullableStringRef(stringsDict, topologyV1EndpointString(link.Dst, "ip")))
-			evidenceRows.localASes = append(evidenceRows.localASes, nullableStringRef(stringsDict, topologyV1EndpointString(link.Src, "as")))
-			evidenceRows.remoteASes = append(evidenceRows.remoteASes, nullableStringRef(stringsDict, topologyV1EndpointString(link.Dst, "as")))
-			evidenceRows.sources = append(evidenceRows.sources, nullableStringRef(stringsDict, topologyMetricValueString(link.Metrics, "source")))
+			evidenceRows.routingInstances = append(evidenceRows.routingInstances, nullableStringRef(stringsDict, topologyBGPLinkRoutingInstance(link)))
+			evidenceRows.localIdentifiers = append(evidenceRows.localIdentifiers, nullableStringRef(stringsDict, topologyBGPLocalIdentifier(link)))
+			evidenceRows.peerIdentifiers = append(evidenceRows.peerIdentifiers, nullableStringRef(stringsDict, topologyBGPPeerIdentifier(link)))
+			evidenceRows.localIPs = append(evidenceRows.localIPs, nullableStringRef(stringsDict, topologyBGPLocalIP(link)))
+			evidenceRows.neighborIPs = append(evidenceRows.neighborIPs, nullableStringRef(stringsDict, topologyBGPNeighborIP(link)))
+			evidenceRows.localASes = append(evidenceRows.localASes, nullableStringRef(stringsDict, topologyBGPLocalAS(link)))
+			evidenceRows.remoteASes = append(evidenceRows.remoteASes, nullableStringRef(stringsDict, topologyBGPRemoteAS(link)))
+			evidenceRows.sources = append(evidenceRows.sources, nullableStringRef(stringsDict, topologyBGPSource(link)))
 		}
-		evidenceRows.srcEndpoints = append(evidenceRows.srcEndpoints, srcEndpoint)
-		evidenceRows.dstEndpoints = append(evidenceRows.dstEndpoints, dstEndpoint)
-		evidenceRows.metrics = append(evidenceRows.metrics, metrics)
 	}
 
 	linkTable := topologyv1.MustTable(len(links),
@@ -155,6 +151,8 @@ type snmpTopologyV1EvidenceRows struct {
 	dstPortNames     []any
 	srcIfIndexes     []any
 	dstIfIndexes     []any
+	srcPortIDs       []any
+	dstPortIDs       []any
 	srcManagementIPs []any
 	dstManagementIPs []any
 	confidences      []any
@@ -176,9 +174,6 @@ type snmpTopologyV1EvidenceRows struct {
 	remoteASes       []any
 	localIPs         []any
 	neighborIPs      []any
-	srcEndpoints     []any
-	dstEndpoints     []any
-	metrics          []any
 }
 
 func (rows *snmpTopologyV1EvidenceRows) table(linkType string) topologyv1.Table {
@@ -200,6 +195,8 @@ func (rows *snmpTopologyV1EvidenceRows) columnEncodingsForType(linkType string) 
 		topologyv1.Values(rows.dstPortNames...),
 		topologyv1.Values(rows.srcIfIndexes...),
 		topologyv1.Values(rows.dstIfIndexes...),
+		topologyv1.Values(rows.srcPortIDs...),
+		topologyv1.Values(rows.dstPortIDs...),
 		topologyv1.Values(rows.srcManagementIPs...),
 		topologyv1.Values(rows.dstManagementIPs...),
 		topologyv1.Values(rows.confidences...),
@@ -235,11 +232,6 @@ func (rows *snmpTopologyV1EvidenceRows) columnEncodingsForType(linkType string) 
 			topologyv1.Values(rows.sources...),
 		)
 	}
-	encodings = append(encodings,
-		topologyv1.Values(rows.srcEndpoints...),
-		topologyv1.Values(rows.dstEndpoints...),
-		topologyv1.Values(rows.metrics...),
-	)
 	return encodings
 }
 
@@ -288,7 +280,7 @@ func snmpTopologyV1EvidenceColumnsForType(linkType string) []topologyv1.Column {
 }
 
 func snmpTopologyV1EvidenceColumnsWithExtras(columns, extras []topologyv1.Column) []topologyv1.Column {
-	insertAt := len(columns) - 3
+	insertAt := len(columns)
 	out := make([]topologyv1.Column, 0, len(columns)+len(extras))
 	out = append(out, columns[:insertAt]...)
 	out = append(out, extras...)
@@ -308,15 +300,97 @@ func snmpTopologyV1EvidenceColumns() []topologyv1.Column {
 		topologyv1.NewColumn("dst_port_name", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
 		topologyv1.NewColumn("src_if_index", "uint", topologyv1.WithNullable()),
 		topologyv1.NewColumn("dst_if_index", "uint", topologyv1.WithNullable()),
+		topologyv1.NewColumn("src_port_id", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
+		topologyv1.NewColumn("dst_port_id", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
 		topologyv1.NewColumn("src_management_ip", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
 		topologyv1.NewColumn("dst_management_ip", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
 		topologyv1.NewColumn("confidence", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
 		topologyv1.NewColumn("inference", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
 		topologyv1.NewColumn("attachment_mode", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
-		topologyv1.NewColumn("src_endpoint", "json", topologyv1.WithNullable()),
-		topologyv1.NewColumn("dst_endpoint", "json", topologyv1.WithNullable()),
-		topologyv1.NewColumn("metrics", "json", topologyv1.WithNullable()),
 	}
+}
+
+func topologyEvidenceSource(link topologyLink) string {
+	if link.Detail.L3Subnet != nil {
+		return strings.TrimSpace(link.Detail.L3Subnet.Source)
+	}
+	if link.Detail.OSPF != nil {
+		return strings.TrimSpace(link.Detail.OSPF.Source)
+	}
+	if link.Detail.BGP != nil {
+		return strings.TrimSpace(link.Detail.BGP.Source)
+	}
+	return ""
+}
+
+func topologyEvidenceSrcIP(link topologyLink) string {
+	if link.Detail.L3Subnet != nil {
+		return strings.TrimSpace(link.Detail.L3Subnet.SrcIP)
+	}
+	if link.Detail.OSPF != nil {
+		return strings.TrimSpace(link.Detail.OSPF.LocalIP)
+	}
+	return ""
+}
+
+func topologyEvidenceDstIP(link topologyLink) string {
+	if link.Detail.L3Subnet != nil {
+		return strings.TrimSpace(link.Detail.L3Subnet.DstIP)
+	}
+	if link.Detail.OSPF != nil {
+		return strings.TrimSpace(link.Detail.OSPF.NeighborIP)
+	}
+	return ""
+}
+
+func topologyEvidenceSubnet(link topologyLink) string {
+	if link.Detail.L3Subnet != nil {
+		return strings.TrimSpace(link.Detail.L3Subnet.Subnet)
+	}
+	if link.Detail.OSPF != nil {
+		return strings.TrimSpace(link.Detail.OSPF.Subnet)
+	}
+	return ""
+}
+
+func topologyEvidenceNetwork(link topologyLink) string {
+	if link.Detail.L3Subnet != nil {
+		return strings.TrimSpace(link.Detail.L3Subnet.Network)
+	}
+	if link.Detail.OSPF != nil {
+		return strings.TrimSpace(link.Detail.OSPF.Network)
+	}
+	return ""
+}
+
+func topologyEvidenceNetmask(link topologyLink) string {
+	if link.Detail.L3Subnet != nil {
+		return strings.TrimSpace(link.Detail.L3Subnet.Netmask)
+	}
+	if link.Detail.OSPF != nil {
+		return strings.TrimSpace(link.Detail.OSPF.Netmask)
+	}
+	return ""
+}
+
+func nullableEvidencePrefix(link topologyLink) any {
+	prefix := 0
+	if link.Detail.L3Subnet != nil {
+		prefix = link.Detail.L3Subnet.Prefix
+	} else if link.Detail.OSPF != nil {
+		prefix = link.Detail.OSPF.Prefix
+	}
+	if prefix <= 0 {
+		return nil
+	}
+	return uint64(prefix)
+}
+
+func topologyBGPSource(link topologyLink) string {
+	if link.Detail.BGP == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.Detail.BGP.Source)
 }
 
 func snmpTopologyV1LinkType(link topologyLink) string {
@@ -363,11 +437,8 @@ func snmpTopologyV1LinkIsProbable(link topologyLink) bool {
 	if strings.EqualFold(strings.TrimSpace(link.State), snmpTopologyV1LinkProbable) {
 		return true
 	}
-	if len(link.Metrics) == 0 {
-		return false
-	}
-	if strings.EqualFold(topologyMetricValueString(link.Metrics, "inference"), snmpTopologyV1LinkProbable) {
+	if strings.EqualFold(topologyLinkInferenceValue(link), snmpTopologyV1LinkProbable) {
 		return true
 	}
-	return strings.HasPrefix(strings.ToLower(topologyMetricValueString(link.Metrics, "attachment_mode")), snmpTopologyV1LinkProbable+"_")
+	return strings.HasPrefix(strings.ToLower(topologyLinkAttachmentModeValue(link)), snmpTopologyV1LinkProbable+"_")
 }

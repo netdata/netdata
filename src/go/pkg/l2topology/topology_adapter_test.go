@@ -83,11 +83,11 @@ func TestToGraph_ProjectsResult(t *testing.T) {
 	require.Len(t, data.Links, 2)
 	lldpLink := findLinkByProtocol(data.Links, "lldp")
 	require.NotNil(t, lldpLink)
-	require.Equal(t, "Gi0/3", lldpLink.Src.Attributes["if_name"])
-	require.Equal(t, "Gi0/3", lldpLink.Src.Attributes["port_id"])
-	require.Equal(t, "up", lldpLink.Src.Attributes["if_admin_status"])
-	require.Equal(t, "up", lldpLink.Src.Attributes["if_oper_status"])
-	require.Equal(t, "sw2", lldpLink.Dst.Attributes["sys_name"])
+	require.Equal(t, "Gi0/3", lldpLink.Src.IfName)
+	require.Equal(t, "Gi0/3", lldpLink.Src.PortID)
+	require.Equal(t, "up", lldpLink.Src.AdminStatus)
+	require.Equal(t, "up", lldpLink.Src.OperStatus)
+	require.Equal(t, "sw2", lldpLink.Dst.SysName)
 
 	localActor := findActorBySysName(data.Actors, "sw1")
 	require.NotNil(t, localActor)
@@ -1031,15 +1031,15 @@ func TestToGraph_MergesPairedAdjacenciesIntoBidirectionalLink(t *testing.T) {
 	link := data.Links[0]
 	require.Equal(t, "lldp", link.Protocol)
 	require.Equal(t, "bidirectional", link.Direction)
-	require.Equal(t, "Gi0/1", link.Src.Attributes["if_name"])
-	require.Equal(t, "Gi0/1", link.Src.Attributes["port_id"])
-	require.Equal(t, "Gi0/2", link.Dst.Attributes["if_name"])
-	require.Equal(t, "Gi0/2", link.Dst.Attributes["port_id"])
+	require.Equal(t, "Gi0/1", link.Src.IfName)
+	require.Equal(t, "Gi0/1", link.Src.PortID)
+	require.Equal(t, "Gi0/2", link.Dst.IfName)
+	require.Equal(t, "Gi0/2", link.Dst.PortID)
 
-	require.NotNil(t, link.Metrics)
-	require.Equal(t, "lldp:pair-a-b", link.Metrics[adjacencyLabelPairID])
-	require.Equal(t, lldpMatchPassDefault, link.Metrics[adjacencyLabelPairPass])
-	require.Equal(t, true, link.Metrics["pair_consistent"])
+	require.NotNil(t, link.L2)
+	require.Equal(t, "lldp:pair-a-b", link.L2.PairID)
+	require.Equal(t, lldpMatchPassDefault, link.L2.PairPass)
+	require.True(t, link.L2.PairConsistent)
 
 	require.Equal(t, 1, stats.LinksTotal)
 	require.Equal(t, 1, stats.LinksLLDP)
@@ -1102,8 +1102,7 @@ func TestToGraph_MergesPairedAdjacenciesPreservesRawAddressHints(t *testing.T) {
 	require.Equal(t, "cdp", link.Protocol)
 	require.Equal(t, "bidirectional", link.Direction)
 	require.Contains(t, link.Dst.Match.IPAddresses, "edge-sw3.mgmt.local")
-	require.Contains(t, link.Metrics, "src_remote_address_raw")
-	require.Contains(t, link.Metrics, "dst_remote_address_raw")
+	require.Contains(t, link.Src.Match.IPAddresses, "10.0.0.1")
 }
 
 func TestToGraph_MergesReversePairsWithoutDirectionalPairLabels(t *testing.T) {
@@ -1167,12 +1166,12 @@ func TestToGraph_MergesReversePairsWithoutDirectionalPairLabels(t *testing.T) {
 	link := data.Links[0]
 	require.Equal(t, "lldp", link.Protocol)
 	require.Equal(t, "bidirectional", link.Direction)
-	require.Equal(t, "MikroTik-router", topologyAttrString(link.Src.Attributes, "sys_name"))
-	require.Equal(t, "XS1930", topologyAttrString(link.Dst.Attributes, "sys_name"))
-	require.Equal(t, "ether3", topologyAttrString(link.Src.Attributes, "if_name"))
-	require.Equal(t, "swp07", topologyAttrString(link.Dst.Attributes, "if_name"))
-	require.Equal(t, "8", topologyAttrString(link.Dst.Attributes, "port_id"))
-	require.Equal(t, "swp07", topologyAttrString(link.Dst.Attributes, "port_name"))
+	require.Equal(t, "MikroTik-router", link.Src.SysName)
+	require.Equal(t, "XS1930", link.Dst.SysName)
+	require.Equal(t, "ether3", link.Src.IfName)
+	require.Equal(t, "swp07", link.Dst.IfName)
+	require.Equal(t, "8", link.Dst.PortID)
+	require.Equal(t, "swp07", link.Dst.PortName)
 }
 
 func TestToGraph_UnknownAdjacencyPortsRemainUnsetWithoutZeroFallback(t *testing.T) {
@@ -1215,10 +1214,10 @@ func TestToGraph_UnknownAdjacencyPortsRemainUnsetWithoutZeroFallback(t *testing.
 	link := data.Links[0]
 	require.Equal(t, "lldp", link.Protocol)
 	require.Equal(t, "unidirectional", link.Direction)
-	_, hasPortName := link.Dst.Attributes["port_name"]
-	require.False(t, hasPortName)
-	require.Equal(t, "", strings.TrimSpace(topologyMetricString(link.Metrics, "dst_port_name")))
-	require.Contains(t, topologyMetricString(link.Metrics, "display_name"), ":[unset]")
+	require.Empty(t, link.Dst.PortName)
+	require.NotNil(t, link.Display)
+	require.Empty(t, strings.TrimSpace(link.Display.DstPortName))
+	require.Contains(t, link.Display.Name, ":[unset]")
 }
 
 func TestToGraph_DropsAmbiguousEndpointSegmentLinks(t *testing.T) {
@@ -1318,9 +1317,9 @@ func TestToGraph_ProbableConnectivityConnectsAmbiguousEndpoint(t *testing.T) {
 	fdbLinks := findFDBLinksByEndpointMAC(data.Links, "70:49:a2:65:72:cd")
 	require.Len(t, fdbLinks, 1)
 	require.Equal(t, "probable", strings.ToLower(strings.TrimSpace(fdbLinks[0].State)))
-	require.Equal(t, "probable", strings.ToLower(strings.TrimSpace(topologyMetricString(fdbLinks[0].Metrics, "inference"))))
-	require.Equal(t, "probable_segment", topologyMetricString(fdbLinks[0].Metrics, "attachment_mode"))
-	require.Equal(t, "low", topologyMetricString(fdbLinks[0].Metrics, "confidence"))
+	require.Equal(t, "probable", strings.ToLower(strings.TrimSpace(topologyLinkInference(fdbLinks[0]))))
+	require.Equal(t, "probable_segment", topologyLinkAttachmentMode(fdbLinks[0]))
+	require.Equal(t, "low", topologyLinkConfidence(fdbLinks[0]))
 
 	require.Equal(t, 1, stats.LinksProbable)
 	require.Equal(t, 1, stats.LinksFDBEndpointEmitted)
@@ -1353,7 +1352,7 @@ func TestToGraph_ProbableConnectivityDoesNotReclassifyStrictSinglePortEndpoint(t
 	strictFDBLinks := findFDBLinksByEndpointMAC(strictData.Links, "dd:dd:dd:dd:dd:dd")
 	require.Len(t, strictFDBLinks, 1)
 	require.Equal(t, "", strings.TrimSpace(strictFDBLinks[0].State))
-	require.Equal(t, "", strings.TrimSpace(topologyMetricString(strictFDBLinks[0].Metrics, "inference")))
+	require.Equal(t, "", strings.TrimSpace(topologyLinkInference(strictFDBLinks[0])))
 
 	data, stats := toGraphForTest(result, GraphOptions{
 		Source:                    "snmp",
@@ -1365,8 +1364,8 @@ func TestToGraph_ProbableConnectivityDoesNotReclassifyStrictSinglePortEndpoint(t
 	fdbLinks := findFDBLinksByEndpointMAC(data.Links, "dd:dd:dd:dd:dd:dd")
 	require.Len(t, fdbLinks, 1)
 	require.Equal(t, "", strings.TrimSpace(fdbLinks[0].State))
-	require.Equal(t, "", strings.TrimSpace(topologyMetricString(fdbLinks[0].Metrics, "inference")))
-	require.Equal(t, "direct", topologyMetricString(fdbLinks[0].Metrics, "attachment_mode"))
+	require.Equal(t, "", strings.TrimSpace(topologyLinkInference(fdbLinks[0])))
+	require.Equal(t, "direct", topologyLinkAttachmentMode(fdbLinks[0]))
 	require.Equal(t, 0, stats.LinksProbable)
 }
 
@@ -1413,8 +1412,8 @@ func TestToGraph_ProbableConnectivityConnectsUnlinkedLLDPEndpoint(t *testing.T) 
 	fdbLinks := findFDBLinksByEndpointMAC(data.Links, "70:49:a2:65:72:cf")
 	require.Len(t, fdbLinks, 1)
 	require.Equal(t, "probable", strings.ToLower(strings.TrimSpace(fdbLinks[0].State)))
-	require.Equal(t, "probable", strings.ToLower(strings.TrimSpace(topologyMetricString(fdbLinks[0].Metrics, "inference"))))
-	require.Equal(t, "probable_segment", topologyMetricString(fdbLinks[0].Metrics, "attachment_mode"))
+	require.Equal(t, "probable", strings.ToLower(strings.TrimSpace(topologyLinkInference(fdbLinks[0]))))
+	require.Equal(t, "probable_segment", topologyLinkAttachmentMode(fdbLinks[0]))
 }
 
 func TestToGraph_ProbableConnectivityAvoidsExtraBridgePathForLLDPPeers(t *testing.T) {
@@ -1549,9 +1548,9 @@ func TestToGraph_ProbableConnectivityConnectsZeroCandidateEndpointUsingReporterH
 	fdbLinks := findFDBLinksByEndpointIP(data.Links, "10.0.0.99")
 	require.Len(t, fdbLinks, 1)
 	require.Equal(t, "probable", strings.ToLower(strings.TrimSpace(fdbLinks[0].State)))
-	require.Equal(t, "probable", strings.ToLower(strings.TrimSpace(topologyMetricString(fdbLinks[0].Metrics, "inference"))))
-	require.Equal(t, "probable_segment", topologyMetricString(fdbLinks[0].Metrics, "attachment_mode"))
-	require.Equal(t, "low", topologyMetricString(fdbLinks[0].Metrics, "confidence"))
+	require.Equal(t, "probable", strings.ToLower(strings.TrimSpace(topologyLinkInference(fdbLinks[0]))))
+	require.Equal(t, "probable_segment", topologyLinkAttachmentMode(fdbLinks[0]))
+	require.Equal(t, "low", topologyLinkConfidence(fdbLinks[0]))
 
 	strictSignatures := topologyLinkSignatures(strictData.Links)
 	probableSignatures := topologyLinkSignatures(data.Links)
@@ -1601,7 +1600,7 @@ func TestToGraph_ProbableConnectivityCreatesPortlessAttachmentForZeroCandidateEn
 	fdbLinks := findFDBLinksByEndpointIP(data.Links, "10.0.0.199")
 	require.Len(t, fdbLinks, 1)
 	require.Equal(t, "probable", strings.ToLower(strings.TrimSpace(fdbLinks[0].State)))
-	require.Equal(t, "probable_portless", topologyMetricString(fdbLinks[0].Metrics, "attachment_mode"))
+	require.Equal(t, "probable_portless", topologyLinkAttachmentMode(fdbLinks[0]))
 
 	segmentActor := findActorByMatch(data.Actors, fdbLinks[0].Src.Match)
 	require.NotNil(t, segmentActor)
@@ -1919,9 +1918,9 @@ func TestToGraph_ProbableConnectivityRecoversUnmanagedOverlapSuppression(t *test
 	fdbLinks := findFDBLinksByEndpointMAC(data.Links, "cc:cc:cc:cc:cc:cc")
 	require.Len(t, fdbLinks, 1)
 	require.Equal(t, "probable", strings.ToLower(strings.TrimSpace(fdbLinks[0].State)))
-	require.Equal(t, "probable", strings.ToLower(strings.TrimSpace(topologyMetricString(fdbLinks[0].Metrics, "inference"))))
-	require.Equal(t, "probable_direct", topologyMetricString(fdbLinks[0].Metrics, "attachment_mode"))
-	require.Equal(t, "low", topologyMetricString(fdbLinks[0].Metrics, "confidence"))
+	require.Equal(t, "probable", strings.ToLower(strings.TrimSpace(topologyLinkInference(fdbLinks[0]))))
+	require.Equal(t, "probable_direct", topologyLinkAttachmentMode(fdbLinks[0]))
+	require.Equal(t, "low", topologyLinkConfidence(fdbLinks[0]))
 }
 
 func TestToGraph_CollapseByIPPrunesSuppressedManagedOverlapEndpoint(t *testing.T) {
@@ -2019,7 +2018,7 @@ func TestToGraph_ReplacesKnownDeviceEndpointWithManagedDeviceEdge(t *testing.T) 
 
 	fdbLinks := findFDBLinksByDstSysName(data.Links, "switch-b")
 	require.Len(t, fdbLinks, 1)
-	require.Equal(t, "managed_device_overlap", fdbLinks[0].Metrics["attachment_mode"])
+	require.Equal(t, "managed_device_overlap", topologyLinkAttachmentMode(fdbLinks[0]))
 	require.Equal(t, 1, stats.LinksFDBEndpointEmitted)
 	require.Equal(t, 0, stats.LinksFDBEndpointSuppressed)
 
@@ -2066,7 +2065,7 @@ func TestToGraph_KnownDeviceOverlapUsesInterfaceMACAlias(t *testing.T) {
 
 	fdbLinks := findFDBLinksByDstSysName(data.Links, "router-a")
 	require.Len(t, fdbLinks, 1)
-	require.Equal(t, "managed_device_overlap", fdbLinks[0].Metrics["attachment_mode"])
+	require.Equal(t, "managed_device_overlap", topologyLinkAttachmentMode(fdbLinks[0]))
 	require.Equal(t, 1, stats.LinksFDBEndpointEmitted)
 	require.Equal(t, 0, stats.LinksFDBEndpointSuppressed)
 }
@@ -2244,10 +2243,8 @@ func TestToGraph_DisplayNamesPreferDNSThenIPThenMAC(t *testing.T) {
 
 	require.NotEmpty(t, data.Links)
 	for _, link := range data.Links {
-		require.NotNil(t, link.Src.Attributes)
-		require.NotNil(t, link.Dst.Attributes)
-		require.NotEmpty(t, link.Src.Attributes["display_name"])
-		require.NotEmpty(t, link.Dst.Attributes["display_name"])
+		require.NotEmpty(t, link.Src.DisplayName)
+		require.NotEmpty(t, link.Dst.DisplayName)
 	}
 }
 
@@ -2773,12 +2770,12 @@ func TestToGraph_DeterministicTransitRuleMatchesNumericLLDPPortToIfIndex(t *test
 	require.Nil(t, findActorByType(data.Actors, "segment"))
 	lldpLink := findLinkByProtocol(data.Links, "lldp")
 	require.NotNil(t, lldpLink)
-	require.Equal(t, 2, lldpLink.Src.Attributes["if_index"])
-	require.Equal(t, "GigabitEthernet2", lldpLink.Src.Attributes["if_name"])
-	require.Equal(t, "2", lldpLink.Src.Attributes["port_id"])
-	require.Equal(t, 4, lldpLink.Dst.Attributes["if_index"])
-	require.Equal(t, "ether4", lldpLink.Dst.Attributes["if_name"])
-	require.Equal(t, "ether4", lldpLink.Dst.Attributes["port_id"])
+	require.Equal(t, 2, lldpLink.Src.IfIndex)
+	require.Equal(t, "GigabitEthernet2", lldpLink.Src.IfName)
+	require.Equal(t, "2", lldpLink.Src.PortID)
+	require.Equal(t, 4, lldpLink.Dst.IfIndex)
+	require.Equal(t, "ether4", lldpLink.Dst.IfName)
+	require.Equal(t, "ether4", lldpLink.Dst.PortID)
 }
 
 func TestToGraph_SwitchFacingPortDoesNotSuppressEndpointOwnership(t *testing.T) {
@@ -2991,7 +2988,7 @@ func topologyLinkSignatures(links []graph.Link) map[string]struct{} {
 			srcKey,
 			dstKey,
 			strings.ToLower(strings.TrimSpace(link.State)),
-			strings.ToLower(topologyMetricString(link.Metrics, "attachment_mode")),
+			strings.ToLower(topologyLinkAttachmentMode(link)),
 		}, keySep)
 		out[key] = struct{}{}
 	}

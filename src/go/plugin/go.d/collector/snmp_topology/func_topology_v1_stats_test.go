@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/stretchr/testify/require"
 )
@@ -14,6 +15,7 @@ func TestSNMPTopologyToV1_RealPipelineStatsCensus(t *testing.T) {
 	registry := newTopologyRegistry()
 
 	cacheA := newTopologyStatsCensusRouterCache(t, "router-a", "00:11:22:33:44:55", "10.0.0.1", "1.1.1.1", "198.51.100.1", "2")
+	addTopologyStatsCensusLLDP(cacheA, "xe-0/0/0", "aa:bb:cc:dd:ee:ff", "router-b", "10.0.0.2", "xe-0/0/1")
 	cacheA.updateTopologyCacheEntry(ddsnmp.Metric{
 		TopologyKind: ddsnmp.KindOSPFNeighbor,
 		Tags: map[string]string{
@@ -140,6 +142,7 @@ func TestSNMPTopologyToV1_RealPipelineStatsCensus(t *testing.T) {
 	require.Equal(t, 1, payload.Stats["ospf_adjacency_visible_links"])
 	require.Equal(t, 1, payload.Stats["bgp_adjacency_emitted_links"])
 	require.Equal(t, 1, payload.Stats["bgp_adjacency_visible_links"])
+	requireRealPipelineLinkEvidenceCensus(t, payload)
 
 	stringStats := map[string]struct{}{
 		"map_type":                  {},
@@ -233,6 +236,50 @@ func newTopologyStatsCensusRouterCache(t *testing.T, sysName, chassisID, managem
 		tagTopoIPMask:  "255.255.255.252",
 	})
 	return cache
+}
+
+func addTopologyStatsCensusLLDP(cache *topologyCache, localPortID, remoteChassis, remoteSysName, remoteMgmtIP, remotePortID string) {
+	cache.lldpLocPorts["1"] = &lldpLocPort{
+		portNum:       "1",
+		portID:        localPortID,
+		portIDSubtype: "interfaceName",
+	}
+	cache.lldpRemotes["1:1"] = &lldpRemote{
+		localPortNum:     "1",
+		remIndex:         "1",
+		chassisID:        remoteChassis,
+		chassisIDSubtype: "macAddress",
+		portID:           remotePortID,
+		portIDSubtype:    "interfaceName",
+		sysName:          remoteSysName,
+		managementAddr:   remoteMgmtIP,
+	}
+}
+
+func requireRealPipelineLinkEvidenceCensus(t *testing.T, payload topologyv1.Data) {
+	t.Helper()
+
+	require.Contains(t, payload.Tables.Actor, "actor_port_links")
+	require.Greater(t, payload.Tables.Actor["actor_port_links"].Table.Rows, 0)
+
+	for _, linkType := range []string{
+		snmpTopologyV1LinkLLDP,
+		snmpTopologyV1LinkL3Subnet,
+		snmpTopologyV1LinkOSPF,
+		snmpTopologyV1LinkBGP,
+	} {
+		require.Contains(t, payload.Evidence, linkType)
+		table := payload.Evidence[linkType].Table
+		require.Equal(t, 1, table.Rows, "evidence rows for %s", linkType)
+		require.Equal(t, "link_ref", topologyV1ColumnType(table, "link"), "evidence link_ref for %s", linkType)
+		require.Empty(t, topologyV1ColumnType(table, "src_endpoint"), "removed raw src endpoint column for %s", linkType)
+		require.Empty(t, topologyV1ColumnType(table, "dst_endpoint"), "removed raw dst endpoint column for %s", linkType)
+		require.Empty(t, topologyV1ColumnType(table, "metrics"), "removed raw metrics column for %s", linkType)
+	}
+
+	lldpTable := payload.Evidence[snmpTopologyV1LinkLLDP].Table
+	require.Equal(t, []string{"xe-0/0/0"}, topologyV1StringColumnValues(t, payload, lldpTable, "src_port_id"))
+	require.Equal(t, []string{"xe-0/0/1"}, topologyV1StringColumnValues(t, payload, lldpTable, "dst_port_id"))
 }
 
 func topologyStatsKeysForTest(stats map[string]any) []string {

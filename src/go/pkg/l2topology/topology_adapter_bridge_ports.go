@@ -5,21 +5,36 @@ package l2topology
 import (
 	"strconv"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
-func topologyMetricString(metrics map[string]any, key string) string {
-	if len(metrics) == 0 {
+func topologyLinkBridgeDomain(link graph.Link) string {
+	if link.L2 == nil {
 		return ""
 	}
-	value, ok := metrics[key]
-	if !ok || value == nil {
+	return strings.TrimSpace(link.L2.BridgeDomain)
+}
+
+func topologyLinkInference(link graph.Link) string {
+	if link.Inference == nil {
 		return ""
 	}
-	typed, ok := value.(string)
-	if !ok {
+	return strings.TrimSpace(link.Inference.Inference)
+}
+
+func topologyLinkAttachmentMode(link graph.Link) string {
+	if link.Inference == nil {
 		return ""
 	}
-	return strings.TrimSpace(typed)
+	return strings.TrimSpace(link.Inference.AttachmentMode)
+}
+
+func topologyLinkConfidence(link graph.Link) string {
+	if link.Inference == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.Inference.Confidence)
 }
 
 func bridgeDomainSegmentID(segment *bridgeDomainSegment) string {

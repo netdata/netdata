@@ -131,7 +131,7 @@ func buildSNMPL2TopologyData(
 		CollectedAt:   graphData.CollectedAt,
 		View:          graphData.View,
 		Actors:        topologyActorsFromProjection(graphData.Actors, projection.ActorDetails),
-		Links:         graphData.Links,
+		Links:         topologyLinksFromGraph(graphData.Links),
 		Stats: topologyStats{
 			L2:    projection.Stats,
 			HasL2: true,
