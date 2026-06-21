@@ -157,6 +157,30 @@ impl Ledger {
         let (storage, mut uploader) = if logs_config.storage.enabled {
             let storage = OpendalStorage::new(logs_config.storage.uri.as_str())?;
 
+            // Non-blocking startup reachability probe: confirm the backend is
+            // reachable and the credentials are accepted, logging a clear error
+            // on misconfig instead of letting uploads fail silently in the
+            // background. Spawned (not awaited) because the opendal retry layer
+            // can stall for minutes on an unreachable endpoint — awaiting here
+            // would re-introduce the `Ledger::new` stall noted in recovery/remote.rs.
+            //
+            // Deliberately NOT wired to `cancel` (unlike the worker components):
+            // it is a read-only one-shot diagnostic holding only an Arc-backed
+            // `Operator` clone, bounded by the retry layer. Tying it to the
+            // shutdown token would merely suppress a useful "remote unreachable"
+            // signal during shutdown; letting it finish (or die with the runtime)
+            // is fine.
+            let probe_storage = storage.clone();
+            tracing::info!("probing remote storage reachability");
+            tokio::spawn(async move {
+                match crate::storage::probe_reachable(&probe_storage).await {
+                    Ok(()) => tracing::info!("remote storage reachable and credentials accepted"),
+                    Err(e) => tracing::error!(
+                        "remote storage enabled but unreachable or misconfigured: {e}"
+                    ),
+                }
+            });
+
             let uploader = ComponentHandle::spawn::<Uploader<OpendalStorage>>(
                 UploaderArgs {
                     storage: storage.clone(),
@@ -264,11 +288,7 @@ impl Ledger {
                     match tokio::time::timeout(
                         STARTUP_REMOTE_BUDGET,
                         crate::recovery::reconcile_local_catalog_uploads(
-                            registry,
-                            uploader,
-                            storage,
-                            tenant_id,
-                            &retention,
+                            registry, uploader, storage, tenant_id, &retention,
                         ),
                     )
                     .await

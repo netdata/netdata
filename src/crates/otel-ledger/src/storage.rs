@@ -66,6 +66,30 @@ pub(crate) trait Storage: Send + Sync + 'static {
     fn stat(&self, key: &str) -> impl Future<Output = Result<(), StorageError>> + Send;
 }
 
+/// Sentinel key for the startup reachability probe. Never written; a `stat` on
+/// it round-trips to the backend and exercises credentials.
+const STORAGE_PROBE_KEY: &str = ".netdata-otel-storage-probe";
+
+/// Startup connectivity probe: confirm the configured backend is reachable and
+/// the credentials are accepted, without requiring any object to exist.
+///
+/// A `stat` on [`STORAGE_PROBE_KEY`] returning `Ok` or `NotFound` both mean the
+/// request reached the backend and was authorized — `NotFound` is the expected
+/// case, since the sentinel is never written. Only `Other` signals a real
+/// problem (bad credentials, wrong bucket, unreachable endpoint).
+///
+/// The call runs through the operator's retry layer, so a *temporary* failure
+/// (e.g. an unreachable endpoint) is retried before it surfaces, while permanent
+/// failures (auth, missing bucket) are not retried by opendal and surface
+/// immediately. Because that retry window can be minutes, callers MUST run this
+/// off the startup path (see `Ledger::new`, which spawns it).
+pub(crate) async fn probe_reachable<S: Storage>(storage: &S) -> Result<(), StorageError> {
+    match storage.stat(STORAGE_PROBE_KEY).await {
+        Ok(()) | Err(StorageError::NotFound) => Ok(()),
+        Err(other) => Err(other),
+    }
+}
+
 /// opendal-backed [`Storage`]. Owns the `Operator` construction and retry layer.
 #[derive(Clone)]
 pub(crate) struct OpendalStorage {
@@ -208,5 +232,38 @@ impl Storage for MockStorage {
             MockStat::NotFound => Err(StorageError::NotFound),
             MockStat::Transient => Err(StorageError::Other(anyhow::anyhow!("transient"))),
         }
+    }
+}
+
+#[cfg(test)]
+mod probe_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn probe_treats_found_and_notfound_as_reachable() {
+        // A present sentinel and an absent one both prove reachability+auth.
+        let found = MockStorage {
+            stat: MockStat::Found,
+            ..Default::default()
+        };
+        assert!(probe_reachable(&found).await.is_ok());
+
+        let absent = MockStorage {
+            stat: MockStat::NotFound,
+            ..Default::default()
+        };
+        assert!(probe_reachable(&absent).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn probe_reports_transient_failure_as_error() {
+        let down = MockStorage {
+            stat: MockStat::Transient,
+            ..Default::default()
+        };
+        assert!(matches!(
+            probe_reachable(&down).await,
+            Err(StorageError::Other(_))
+        ));
     }
 }

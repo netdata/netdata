@@ -99,9 +99,35 @@ logs:
     # Whether to upload SFST and catalog files to remote object storage.
     enabled: false
 
-    # OpenDAL URI for the remote storage backend.
-    # Examples: "fs:///tmp/otel-remote", "s3://bucket/?region=us-east-1"
+    # OpenDAL URI for the remote storage backend. The scheme selects the
+    # backend; all NON-SECRET backend options go in the query string (OpenDAL
+    # parses them — see https://docs.rs/opendal). Built-in schemes: fs, s3.
+    # Examples:
+    #   fs:///var/lib/netdata/otel/remote
+    #   s3://bucket/prefix?region=us-east-1
+    #   s3://bucket/prefix?region=us-east-1&endpoint=https://minio.example:9000
     uri: "fs://@logdir_POST@/otel/v1/remote"
+
+    # CREDENTIALS ARE NEVER PUT IN THIS FILE. Do not place access keys, secret
+    # keys, SAS tokens, or account keys in the URI or anywhere in otel.yaml.
+    # Credentials are loaded by OpenDAL from the netdata process environment and
+    # the cloud-standard locations, exactly like any other tool on the host:
+    #   - S3:    AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (and AWS_SESSION_TOKEN),
+    #            ~/.aws/{config,credentials}, EC2 instance role / IMDS, IRSA.
+    #   - GCS:   GOOGLE_APPLICATION_CREDENTIALS (path to a service-account JSON),
+    #            gcloud well-known location, GCE VM metadata. (build with services-gcs)
+    #   - Azure: AZURE_STORAGE_ACCOUNT / _KEY / _SAS_TOKEN, managed identity.
+    #            (build with services-azblob)
+    # Set these in the environment of the netdata service (e.g. a systemd
+    # EnvironmentFile with 0600 perms) — the plugin inherits it. On a cloud VM
+    # with an attached role, nothing needs to be set at all.
+    #
+    # On startup (when enabled) the plugin probes the backend and logs, under the
+    # systemd-journal identifier "otel-plugin/ledger", either
+    #   "remote storage reachable and credentials accepted"  or
+    #   "remote storage enabled but unreachable or misconfigured: <error>".
+    # The configured URI is intentionally NOT logged, so a misplaced secret in it
+    # cannot leak into the journal.
 
   auth:
     # Whether to require tenant identification via the X-Scope-OrgID gRPC
