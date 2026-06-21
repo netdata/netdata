@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 	"sync"
 )
@@ -36,21 +37,21 @@ func (r *topologyRegistry) unregister(cache *topologyCache) {
 	r.mu.Unlock()
 }
 
-func (r *topologyRegistry) snapshotWithOptions(options topologyQueryOptions) (topologyData, bool) {
+func (r *topologyRegistry) snapshotWithOptions(options topologyoptions.QueryOptions) (topologymodel.Data, bool) {
 	if r == nil {
-		return topologyData{}, false
+		return topologymodel.Data{}, false
 	}
 	options = topologyoptions.NormalizeQueryOptions(options)
 
 	aggregate, ok := aggregateTopologyObservationSnapshots(r.observationSnapshots())
 	if !ok {
-		return topologyData{}, false
+		return topologymodel.Data{}, false
 	}
 
 	return buildSNMPTopologySnapshot(aggregate, options)
 }
 
-func (r *topologyRegistry) managedDeviceFocusTargets() []topologyManagedFocusTarget {
+func (r *topologyRegistry) managedDeviceFocusTargets() []topologyoptions.ManagedFocusTarget {
 	if r == nil {
 		return nil
 	}

@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 	"testing"
 	"time"
 
@@ -28,7 +29,7 @@ func TestSNMPTopologyToV1_RealPipelineStatsCensus(t *testing.T) {
 			tagOSPFNeighborState:            "full",
 		},
 	})
-	cacheA.bgpPeersByKey["peer-router-b"] = topologyBGPPeer{
+	cacheA.bgpPeersByKey["peer-router-b"] = topologymodel.BGPPeer{
 		RoutingInstance: "default",
 		NeighborIP:      "198.51.100.2",
 		RemoteAS:        "65002",
@@ -40,7 +41,7 @@ func TestSNMPTopologyToV1_RealPipelineStatsCensus(t *testing.T) {
 	}
 
 	cacheB := newTopologyStatsCensusRouterCache(t, "router-b", "aa:bb:cc:dd:ee:ff", "10.0.0.2", "2.2.2.2", "198.51.100.2", "7")
-	cacheB.bgpPeersByKey["peer-router-a"] = topologyBGPPeer{
+	cacheB.bgpPeersByKey["peer-router-a"] = topologymodel.BGPPeer{
 		RoutingInstance: "default",
 		NeighborIP:      "198.51.100.1",
 		RemoteAS:        "65001",
@@ -55,7 +56,7 @@ func TestSNMPTopologyToV1_RealPipelineStatsCensus(t *testing.T) {
 	registry.register(cacheB)
 
 	options := defaultTopologyQueryOptionsForTest()
-	options.MapType = topologyMapTypeAllDevicesLowConfidence
+	options.MapType = topologyoptions.MapTypeAllDevicesLowConfidence
 	data, ok := snapshotTopologyRegistryForTestWithOptions(registry, options)
 	require.True(t, ok)
 
@@ -135,10 +136,10 @@ func TestSNMPTopologyToV1_RealPipelineStatsCensus(t *testing.T) {
 		"bgp_adjacency_visible_links",
 	}, topologyStatsKeysForTest(payload.Stats))
 
-	require.Equal(t, topologyMapTypeAllDevicesLowConfidence, payload.Stats["map_type"])
-	require.Equal(t, topologyInferenceStrategyFDBMinimumKnowledge, payload.Stats["inference_strategy"])
-	require.Equal(t, topologyManagedFocusAllDevices, payload.Stats["managed_snmp_device_focus"])
-	require.Equal(t, topologyDepthAll, payload.Stats["depth"])
+	require.Equal(t, topologyoptions.MapTypeAllDevicesLowConfidence, payload.Stats["map_type"])
+	require.Equal(t, topologyoptions.InferenceStrategyFDBMinimumKnowledge, payload.Stats["inference_strategy"])
+	require.Equal(t, topologyoptions.ManagedFocusAllDevices, payload.Stats["managed_snmp_device_focus"])
+	require.Equal(t, topologyoptions.DepthAll, payload.Stats["depth"])
 	require.Equal(t, 1, payload.Stats["l3_subnet_emitted_links"])
 	require.Equal(t, 1, payload.Stats["l3_subnet_visible_links"])
 	require.Equal(t, 1, payload.Stats["ospf_adjacency_emitted_links"])
@@ -168,7 +169,7 @@ func TestSNMPTopologyToV1_RealPipelineStatsCensusNoProtocolDataEmitsZeroProtocol
 	cache.updateTime = time.Date(2026, time.June, 20, 12, 0, 0, 0, time.UTC)
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent-test"
-	cache.localDevice = topologyDevice{
+	cache.localDevice = topologymodel.Device{
 		ChassisID:     "00:11:22:33:44:55",
 		ChassisIDType: "macAddress",
 		SysName:       "switch-a",
@@ -177,7 +178,7 @@ func TestSNMPTopologyToV1_RealPipelineStatsCensusNoProtocolDataEmitsZeroProtocol
 	registry.register(cache)
 
 	options := defaultTopologyQueryOptionsForTest()
-	options.MapType = topologyMapTypeAllDevicesLowConfidence
+	options.MapType = topologyoptions.MapTypeAllDevicesLowConfidence
 	data, ok := snapshotTopologyRegistryForTestWithOptions(registry, options)
 	require.True(t, ok)
 
@@ -195,13 +196,13 @@ func TestSNMPTopologyToV1_RealPipelineStatsCensusNoProtocolDataEmitsZeroProtocol
 }
 
 func TestTopologyStatsToV1_OmitsFocusKeysWhenFocusFilterReturnsEarly(t *testing.T) {
-	data := &topologyData{
-		Actors: []topologyActor{
-			{ActorID: "segment-a", ActorType: "segment", Match: topologyMatch{IPAddresses: []string{"10.0.0.1"}}},
+	data := &topologymodel.Data{
+		Actors: []topologymodel.Actor{
+			{ActorID: "segment-a", ActorType: "segment", Match: topologymodel.Match{IPAddresses: []string{"10.0.0.1"}}},
 		},
 	}
 
-	topologyshape.ApplyDepthFocusFilter(data, topologyQueryOptions{
+	topologyshape.ApplyDepthFocusFilter(data, topologyoptions.QueryOptions{
 		ManagedDeviceFocus: "ip:10.0.0.1",
 		Depth:              1,
 	})
@@ -222,7 +223,7 @@ func newTopologyStatsCensusRouterCache(t *testing.T, sysName, chassisID, managem
 	cache.updateTime = time.Date(2026, time.June, 20, 12, 0, 0, 0, time.UTC)
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent-test"
-	cache.localDevice = topologyDevice{
+	cache.localDevice = topologymodel.Device{
 		ChassisID:     chassisID,
 		ChassisIDType: "macAddress",
 		SysName:       sysName,

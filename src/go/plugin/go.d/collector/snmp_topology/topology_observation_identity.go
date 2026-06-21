@@ -4,6 +4,7 @@ package snmptopology
 
 import (
 	"fmt"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"strings"
 
@@ -36,7 +37,7 @@ func (r *topologyObservationIdentityResolver) resolve(hostAliases []string, chas
 			return id
 		}
 
-		candidate := normalizeTopologyDevice(topologyDevice{
+		candidate := normalizeTopologyDevice(topologymodel.Device{
 			ChassisID:     mac,
 			ChassisIDType: "macAddress",
 			SysName:       firstNonEmpty(hostAliases...),
@@ -66,7 +67,7 @@ func (r *topologyObservationIdentityResolver) resolve(hostAliases []string, chas
 		return id
 	}
 
-	candidate := normalizeTopologyDevice(topologyDevice{
+	candidate := normalizeTopologyDevice(topologymodel.Device{
 		ChassisID:     strings.TrimSpace(chassisID),
 		ChassisIDType: strings.TrimSpace(chassisType),
 		SysName:       firstNonEmpty(hostAliases...),

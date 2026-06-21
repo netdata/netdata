@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"testing"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
@@ -10,8 +11,8 @@ import (
 )
 
 func TestEnrichLocalActorChartReferencesAddsTypedPortDetails(t *testing.T) {
-	actor := &topologyActor{
-		Detail: topologyActorDetail{
+	actor := &topologymodel.Actor{
+		Detail: topologymodel.ActorDetail{
 			L2: topologyengine.ProjectionActorDetail{
 				Device: topologyengine.ProjectionDeviceActorDetail{
 					Ports: []topologyengine.ProjectionPortDetail{
@@ -24,7 +25,7 @@ func TestEnrichLocalActorChartReferencesAddsTypedPortDetails(t *testing.T) {
 		},
 	}
 
-	enrichLocalActorChartReferences(actor, map[string]topologyInterfaceChartRef{
+	enrichLocalActorChartReferences(actor, map[string]topologymodel.InterfaceChartRef{
 		"Gi0/1": {
 			ChartIDSuffix:    "gi0_1",
 			AvailableMetrics: []string{"errors", "traffic", "traffic"},

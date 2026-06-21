@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"sync"
 	"time"
 )
@@ -14,7 +15,7 @@ type topologyCache struct {
 	staleAfter time.Duration
 
 	agentID     string
-	localDevice topologyDevice
+	localDevice topologymodel.Device
 
 	lldpLocPorts map[string]*lldpLocPort
 	lldpRemotes  map[string]*lldpRemote
@@ -24,7 +25,7 @@ type topologyCache struct {
 	ifStatusByIndex      map[string]ifStatus
 	ifIndexByIP          map[string]string
 	ifNetmaskByIP        map[string]string
-	l3InterfacesByIP     map[string]topologyL3Interface
+	l3InterfacesByIP     map[string]topologymodel.L3Interface
 	bridgePortToIf       map[string]string
 	fdbEntries           map[string]*fdbEntry
 	fdbIDToVlanID        map[string]string
@@ -36,8 +37,8 @@ type topologyCache struct {
 	stpDesignatedRoot    string
 	stpPorts             map[string]*stpPortEntry
 	arpEntries           map[string]*arpEntry
-	ospfNeighborsByKey   map[string]topologyOSPFNeighbor
-	bgpPeersByKey        map[string]topologyBGPPeer
+	ospfNeighborsByKey   map[string]topologymodel.OSPFNeighbor
+	bgpPeersByKey        map[string]topologymodel.BGPPeer
 }
 
 type ifStatus struct {
@@ -73,7 +74,7 @@ type lldpRemote struct {
 	sysCapEnabled      string
 	managementAddr     string
 	managementAddrType string
-	managementAddrs    []topologyManagementAddress
+	managementAddrs    []topologymodel.ManagementAddress
 }
 
 type cdpRemote struct {
@@ -100,7 +101,7 @@ type cdpRemote struct {
 	secondaryMgmtAddr     string
 	physicalLocation      string
 	lastChange            string
-	managementAddrs       []topologyManagementAddress
+	managementAddrs       []topologymodel.ManagementAddress
 }
 
 type fdbEntry struct {

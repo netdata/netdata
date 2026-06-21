@@ -3,13 +3,14 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"strings"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
-func enrichLocalActorChartReferences(actor *topologyActor, interfaceCharts map[string]topologyInterfaceChartRef) {
+func enrichLocalActorChartReferences(actor *topologymodel.Actor, interfaceCharts map[string]topologymodel.InterfaceChartRef) {
 	if actor == nil || len(interfaceCharts) == 0 {
 		return
 	}
@@ -22,8 +23,8 @@ func enrichLocalActorChartReferences(actor *topologyActor, interfaceCharts map[s
 	enrichTopologyPortDetailsWithChartRefs(actor.Detail.L2.Device.Ports, lookup)
 }
 
-func topologyInterfaceChartLookup(interfaceCharts map[string]topologyInterfaceChartRef) map[string]topologyInterfaceChartRef {
-	lookup := make(map[string]topologyInterfaceChartRef, len(interfaceCharts))
+func topologyInterfaceChartLookup(interfaceCharts map[string]topologymodel.InterfaceChartRef) map[string]topologymodel.InterfaceChartRef {
+	lookup := make(map[string]topologymodel.InterfaceChartRef, len(interfaceCharts))
 	for ifName, ref := range interfaceCharts {
 		ifName = strings.ToLower(strings.TrimSpace(ifName))
 		if ifName == "" {
@@ -38,7 +39,7 @@ func topologyInterfaceChartLookup(interfaceCharts map[string]topologyInterfaceCh
 	return lookup
 }
 
-func enrichTopologyPortDetailsWithChartRefs(ports []topologyengine.ProjectionPortDetail, lookup map[string]topologyInterfaceChartRef) {
+func enrichTopologyPortDetailsWithChartRefs(ports []topologyengine.ProjectionPortDetail, lookup map[string]topologymodel.InterfaceChartRef) {
 	if len(lookup) == 0 || len(ports) == 0 {
 		return
 	}

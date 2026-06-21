@@ -3,12 +3,13 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"strings"
 )
 
-func topologySNMPActorDetailFromDevice(local topologyDevice) topologySNMPActorDetail {
-	return topologySNMPActorDetail{
+func topologySNMPActorDetailFromDevice(local topologymodel.Device) topologymodel.SNMPActorDetail {
+	return topologymodel.SNMPActorDetail{
 		ManagementAddresses:   local.ManagementAddresses,
 		Capabilities:          local.Capabilities,
 		CapabilitiesSupported: local.CapabilitiesSupported,
@@ -35,7 +36,7 @@ func topologySNMPActorDetailFromDevice(local topologyDevice) topologySNMPActorDe
 	}
 }
 
-func applyLocalActorLabels(actor *topologyActor, local topologyDevice) {
+func applyLocalActorLabels(actor *topologymodel.Actor, local topologymodel.Device) {
 	if actor == nil {
 		return
 	}

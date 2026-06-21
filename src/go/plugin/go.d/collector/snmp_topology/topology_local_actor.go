@@ -7,7 +7,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 )
 
-func augmentLocalActorFromCache(data *topologyData, local topologyDevice) {
+func augmentLocalActorFromCache(data *topologymodel.Data, local topologymodel.Device) {
 	if data == nil || len(data.Actors) == 0 {
 		return
 	}

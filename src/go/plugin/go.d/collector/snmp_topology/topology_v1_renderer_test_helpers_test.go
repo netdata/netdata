@@ -3,16 +3,17 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"testing"
 
 	topologyv1renderer "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyv1"
 	"github.com/stretchr/testify/require"
 )
 
-func topologyStatsToV1ForTest(t *testing.T, stats topologyStats) map[string]any {
+func topologyStatsToV1ForTest(t *testing.T, stats topologymodel.Stats) map[string]any {
 	t.Helper()
 
-	payload, err := topologyv1renderer.Render(topologyData{Stats: stats})
+	payload, err := topologyv1renderer.Render(topologymodel.Data{Stats: stats})
 	require.NoError(t, err)
 	return payload.Stats
 }

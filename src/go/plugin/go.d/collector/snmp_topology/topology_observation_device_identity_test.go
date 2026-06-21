@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -10,19 +11,19 @@ import (
 
 func TestEnsureTopologyObservationDeviceID_PrefersAgentScopedFallbacks(t *testing.T) {
 	tests := map[string]struct {
-		device topologyDevice
+		device topologymodel.Device
 		want   string
 	}{
 		"agent-job-id": {
-			device: topologyDevice{AgentJobID: "Job-1"},
+			device: topologymodel.Device{AgentJobID: "Job-1"},
 			want:   "agent_job:job-1",
 		},
 		"netdata-host-id": {
-			device: topologyDevice{NetdataHostID: "11111111-1111-1111-1111-111111111111"},
+			device: topologymodel.Device{NetdataHostID: "11111111-1111-1111-1111-111111111111"},
 			want:   "agent:11111111-1111-1111-1111-111111111111",
 		},
 		"agent-id": {
-			device: topologyDevice{AgentID: "22222222-2222-2222-2222-222222222222"},
+			device: topologymodel.Device{AgentID: "22222222-2222-2222-2222-222222222222"},
 			want:   "agent:22222222-2222-2222-2222-222222222222",
 		},
 	}

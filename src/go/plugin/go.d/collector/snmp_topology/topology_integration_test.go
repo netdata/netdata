@@ -6,6 +6,7 @@ package snmptopology
 
 import (
 	"context"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"net"
 	"os"
 	"path/filepath"
@@ -89,7 +90,7 @@ func TestTopologyIntegrationWithSnmpsimV3(t *testing.T) {
 	}
 }
 
-func collectTopologySnapshotFromDevice(t *testing.T, dev ddsnmp.DeviceConnectionInfo) topologyData {
+func collectTopologySnapshotFromDevice(t *testing.T, dev ddsnmp.DeviceConnectionInfo) topologymodel.Data {
 	t.Helper()
 
 	deviceStore := ddsnmp.NewDeviceStore()
@@ -104,7 +105,7 @@ func collectTopologySnapshotFromDevice(t *testing.T, dev ddsnmp.DeviceConnection
 	require.NoError(t, coll.Check(context.Background()))
 	coll.refreshTopology(context.Background())
 
-	var snapshot topologyData
+	var snapshot topologymodel.Data
 	cacheKey := dev.Hostname + ":" + strconv.Itoa(dev.Port)
 	require.Eventuallyf(t, func() bool {
 		cache := coll.deviceCaches[cacheKey]
@@ -159,7 +160,7 @@ func integrationV3DeviceInfo(host string, port int, contextName, user, level, au
 	}
 }
 
-func assertExpectedTopologySnapshot(t *testing.T, subject string, expectation topologyIntegrationExpectation, snapshot topologyData) {
+func assertExpectedTopologySnapshot(t *testing.T, subject string, expectation topologyIntegrationExpectation, snapshot topologymodel.Data) {
 	t.Helper()
 
 	require.Greaterf(t, len(snapshot.Links), 0, "expected topology links for %q", subject)

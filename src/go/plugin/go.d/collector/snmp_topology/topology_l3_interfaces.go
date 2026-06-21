@@ -3,12 +3,13 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"sort"
 	"strings"
 )
 
-func (c *topologyCache) snapshotL3Interfaces(localDeviceID string) []topologyL3Interface {
+func (c *topologyCache) snapshotL3Interfaces(localDeviceID string) []topologymodel.L3Interface {
 	if c == nil || len(c.l3InterfacesByIP) == 0 {
 		return nil
 	}
@@ -19,7 +20,7 @@ func (c *topologyCache) snapshotL3Interfaces(localDeviceID string) []topologyL3I
 	}
 	sort.Strings(ips)
 
-	rows := make([]topologyL3Interface, 0, len(ips))
+	rows := make([]topologymodel.L3Interface, 0, len(ips))
 	for _, ip := range ips {
 		row := c.l3InterfacesByIP[ip]
 		row.DeviceID = strings.TrimSpace(localDeviceID)

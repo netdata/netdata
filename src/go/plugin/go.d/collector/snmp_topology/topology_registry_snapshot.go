@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"strings"
 	"time"
@@ -10,23 +11,23 @@ import (
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
-func (c *topologyCache) snapshotEngineObservations() (topologyObservationSnapshot, bool) {
+func (c *topologyCache) snapshotEngineObservations() (topologymodel.ObservationSnapshot, bool) {
 	if c == nil {
-		return topologyObservationSnapshot{}, false
+		return topologymodel.ObservationSnapshot{}, false
 	}
 
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	if !c.hasFreshSnapshotAt(time.Now()) {
-		return topologyObservationSnapshot{}, false
+		return topologymodel.ObservationSnapshot{}, false
 	}
 
 	local := normalizeTopologyDevice(c.localDevice)
 	localObservation := c.buildEngineObservation(local)
 	localObservation.DeviceID = strings.TrimSpace(localObservation.DeviceID)
 	if localObservation.DeviceID == "" {
-		return topologyObservationSnapshot{}, false
+		return topologymodel.ObservationSnapshot{}, false
 	}
 	if topologyutil.NormalizeMAC(local.ChassisID) == "" {
 		if mac := topologyutil.NormalizeMAC(localObservation.BaseBridgeAddress); mac != "" {
@@ -35,7 +36,7 @@ func (c *topologyCache) snapshotEngineObservations() (topologyObservationSnapsho
 		}
 	}
 
-	return topologyObservationSnapshot{
+	return topologymodel.ObservationSnapshot{
 		L2Observations: []topologyengine.L2Observation{localObservation},
 		L3Interfaces:   c.snapshotL3Interfaces(localObservation.DeviceID),
 		OSPFNeighbors:  c.snapshotOSPFNeighbors(localObservation.DeviceID),

@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -50,7 +51,7 @@ func (c *topologyCache) updateLldpLocManAddr(tags map[string]string) {
 		return
 	}
 
-	mgmt := topologyManagementAddress{
+	mgmt := topologymodel.ManagementAddress{
 		Address:     addr,
 		AddressType: addrType,
 		IfSubtype:   tags[tagLldpLocMgmtAddrIfSubtype],
@@ -114,7 +115,7 @@ func (c *topologyCache) updateLldpRemote(tags map[string]string) {
 		entry.managementAddr = v
 		addr, addrType := normalizeManagementAddress(v, tags[tagLldpRemMgmtAddrSubtype])
 		if addr != "" {
-			entry.managementAddrs = appendManagementAddress(entry.managementAddrs, topologyManagementAddress{
+			entry.managementAddrs = appendManagementAddress(entry.managementAddrs, topologymodel.ManagementAddress{
 				Address:     addr,
 				AddressType: addrType,
 				Source:      "lldp_remote",
@@ -153,7 +154,7 @@ func (c *topologyCache) updateLldpRemManAddr(tags map[string]string) {
 		return
 	}
 
-	mgmt := topologyManagementAddress{
+	mgmt := topologymodel.ManagementAddress{
 		Address:     addr,
 		AddressType: addrType,
 		IfSubtype:   tags[tagLldpRemMgmtAddrIfSubtype],
