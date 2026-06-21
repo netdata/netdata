@@ -16,8 +16,8 @@ func ActorDetailDisplayName(actor Actor) string {
 	return topologyutil.FirstNonEmptyString(
 		actor.Detail.L2.DisplayName,
 		actor.Match.SysName,
-		firstString(actor.Match.Hostnames),
-		firstString(actor.Match.DNSNames),
+		topologyutil.FirstNonEmptyString(actor.Match.Hostnames...),
+		topologyutil.FirstNonEmptyString(actor.Match.DNSNames...),
 	)
 }
 
@@ -205,15 +205,6 @@ func ActorDetailArrayLabelValues(actor Actor) map[string][]string {
 		}
 	}
 	return out
-}
-
-func firstString(values []string) string {
-	for _, value := range values {
-		if value = strings.TrimSpace(value); value != "" {
-			return value
-		}
-	}
-	return ""
 }
 
 func scalarOptionalInt(value topologyengine.OptionalValue[int]) string {
