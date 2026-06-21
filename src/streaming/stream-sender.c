@@ -141,6 +141,19 @@ static void stream_sender_on_connect_and_disconnect(struct sender_state *s) {
     stream_sender_unlock(s);
 }
 
+// Record the interface the stream actually egresses on as the host's _net_default_iface label, so
+// the parent sees the real uplink. The OS-specific lookup (getsockname + getifaddrs match) lives in
+// libnetdata/os/socket_egress_interface; here we only stamp the label. This is correct under policy
+// routing / multi-WAN, where the main routing table's default route can point at a different
+// interface than the stream uses. Runs once per (re)connect and rides out with the first host-labels
+// push in on_ready_to_dispatch(); on failover the connection breaks and reconnects over the new
+// interface, so it re-evaluates automatically.
+static void stream_sender_update_egress_iface_label(struct sender_state *s) {
+    char iface[OS_IFNAME_MAX];
+    if (os_socket_egress_interface(s->sock.fd, iface, sizeof(iface)) && iface[0])
+        rrdlabels_add(s->host->rrdlabels, "_net_default_iface", iface, RRDLABEL_SRC_AUTO);
+}
+
 void stream_sender_on_connect(struct sender_state *s) {
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "STREAM SND [%s]: running on-connect hooks...",
@@ -151,6 +164,9 @@ void stream_sender_on_connect(struct sender_state *s) {
     stream_sender_on_connect_and_disconnect(s);
 
     s->thread.last_traffic_ut = now_monotonic_usec();
+
+    // record the real uplink interface before the first host-labels push
+    stream_sender_update_egress_iface_label(s);
 
     freez(s->thread.rbuf.b);
     s->thread.rbuf.size = PLUGINSD_LINE_MAX + 1;

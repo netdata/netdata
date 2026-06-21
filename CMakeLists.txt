@@ -1218,6 +1218,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/locks/rw-spinlock-unittest.c
         src/libnetdata/atomics/atomic_flags.h
         src/libnetdata/atomics/atomics.h
+        src/libnetdata/atomics/single_writer.h
         src/libnetdata/locks/waitq.c
         src/libnetdata/locks/waitq.h
         src/libnetdata/object-state/object-state.c
@@ -1239,6 +1240,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/get_system_pagesize.h
         src/libnetdata/os/hostname.c
         src/libnetdata/os/hostname.h
+        src/libnetdata/os/socket_egress_interface.c
+        src/libnetdata/os/socket_egress_interface.h
         src/libnetdata/exit/exit_initiated.c
         src/libnetdata/exit/exit_initiated.h
         src/libnetdata/os/disk_space.c
