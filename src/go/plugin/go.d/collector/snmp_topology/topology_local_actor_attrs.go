@@ -2,7 +2,10 @@
 
 package snmptopology
 
-import "strings"
+import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+	"strings"
+)
 
 func topologySNMPActorDetailFromDevice(local topologyDevice) topologySNMPActorDetail {
 	return topologySNMPActorDetail{
@@ -18,12 +21,12 @@ func topologySNMPActorDetailFromDevice(local topologyDevice) topologySNMPActorDe
 		VendorSource:          "snmp",
 		VendorConfidence:      "high",
 		Model:                 strings.TrimSpace(local.Model),
-		OSPFRouterID:          normalizeTopologyRouterID(local.OSPFRouterID),
+		OSPFRouterID:          topologyutil.NormalizeTopologyRouterID(local.OSPFRouterID),
 		SerialNumber:          strings.TrimSpace(local.SerialNumber),
 		SoftwareVersion:       strings.TrimSpace(local.SoftwareVersion),
 		FirmwareVersion:       strings.TrimSpace(local.FirmwareVersion),
 		HardwareVersion:       strings.TrimSpace(local.HardwareVersion),
-		ManagementIP:          normalizeIPAddress(local.ManagementIP),
+		ManagementIP:          topologyutil.NormalizeIPAddress(local.ManagementIP),
 		NetdataHostID:         strings.TrimSpace(local.NetdataHostID),
 		ChartIDPrefix:         strings.TrimSpace(local.ChartIDPrefix),
 		ChartContextPrefix:    strings.TrimSpace(local.ChartContextPrefix),

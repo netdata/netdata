@@ -31,8 +31,8 @@ func TestBuildTopologyL3SubnetAdjacencies(t *testing.T) {
 				},
 			},
 			wantStats: topologyL3SubnetBuildStats{
-				candidateSubnets: 1,
-				candidateLinks:   1,
+				CandidateSubnets: 1,
+				CandidateLinks:   1,
 			},
 		},
 		"ipv4-thirty-one": {
@@ -51,8 +51,8 @@ func TestBuildTopologyL3SubnetAdjacencies(t *testing.T) {
 				},
 			},
 			wantStats: topologyL3SubnetBuildStats{
-				candidateSubnets: 1,
-				candidateLinks:   1,
+				CandidateSubnets: 1,
+				CandidateLinks:   1,
 			},
 		},
 		"unsupported-prefix": {
@@ -61,7 +61,7 @@ func TestBuildTopologyL3SubnetAdjacencies(t *testing.T) {
 				l3InterfaceForTest("device-b", "198.51.100.2", "255.255.255.0", "3"),
 			},
 			wantStats: topologyL3SubnetBuildStats{
-				suppressedUnsupportedPrefix: 2,
+				SuppressedUnsupportedPrefix: 2,
 			},
 		},
 		"duplicate-ip-ownership": {
@@ -70,8 +70,8 @@ func TestBuildTopologyL3SubnetAdjacencies(t *testing.T) {
 				l3InterfaceForTest("device-b", "198.51.100.1", "255.255.255.252", "3"),
 			},
 			wantStats: topologyL3SubnetBuildStats{
-				candidateSubnets:      1,
-				suppressedDuplicateIP: 1,
+				CandidateSubnets:      1,
+				SuppressedDuplicateIP: 1,
 			},
 		},
 		"same-device-self-link": {
@@ -80,8 +80,8 @@ func TestBuildTopologyL3SubnetAdjacencies(t *testing.T) {
 				l3InterfaceForTest("device-a", "198.51.100.2", "255.255.255.252", "3"),
 			},
 			wantStats: topologyL3SubnetBuildStats{
-				candidateSubnets:   1,
-				suppressedSelfLink: 1,
+				CandidateSubnets:   1,
+				SuppressedSelfLink: 1,
 			},
 		},
 		"unmatched-subnet": {
@@ -89,8 +89,8 @@ func TestBuildTopologyL3SubnetAdjacencies(t *testing.T) {
 				l3InterfaceForTest("device-a", "198.51.100.1", "255.255.255.252", "2"),
 			},
 			wantStats: topologyL3SubnetBuildStats{
-				candidateSubnets:    1,
-				suppressedUnmatched: 1,
+				CandidateSubnets:    1,
+				SuppressedUnmatched: 1,
 			},
 		},
 		"multi-access-rows": {
@@ -100,8 +100,8 @@ func TestBuildTopologyL3SubnetAdjacencies(t *testing.T) {
 				l3InterfaceForTest("device-c", "198.51.100.3", "255.255.255.252", "4"),
 			},
 			wantStats: topologyL3SubnetBuildStats{
-				candidateSubnets:      1,
-				suppressedMultiAccess: 1,
+				CandidateSubnets:      1,
+				SuppressedMultiAccess: 1,
 			},
 		},
 		"invalid-rows": {
@@ -112,7 +112,7 @@ func TestBuildTopologyL3SubnetAdjacencies(t *testing.T) {
 				l3InterfaceForTest("device-a", "198.51.100.1", "255.255.255.252", ""),
 			},
 			wantStats: topologyL3SubnetBuildStats{
-				suppressedInvalid: 4,
+				SuppressedInvalid: 4,
 			},
 		},
 	}

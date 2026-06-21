@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"sort"
 	"strings"
 	"sync/atomic"
@@ -67,7 +68,7 @@ func (r *topologyRegistry) trapEnrichmentForSource(ip, trapIfIndex string) *Trap
 		return nil
 	}
 
-	ip = normalizeIPAddress(ip)
+	ip = topologyutil.NormalizeIPAddress(ip)
 	if ip == "" {
 		return nil
 	}
@@ -200,11 +201,11 @@ func cdpRemoteIfIndex(key string, r *cdpRemote) string {
 }
 
 func (c *topologyCache) localDeviceIPMatchMethod(ip string) string {
-	if normalizeIPAddress(c.localDevice.ManagementIP) == ip {
+	if topologyutil.NormalizeIPAddress(c.localDevice.ManagementIP) == ip {
 		return "management_ip"
 	}
 	for _, addr := range c.localDevice.ManagementAddresses {
-		if normalizeIPAddress(addr.Address) == ip {
+		if topologyutil.NormalizeIPAddress(addr.Address) == ip {
 			return "management_address"
 		}
 	}

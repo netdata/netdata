@@ -16,14 +16,14 @@ func TestApplyTopologyBGPAdjacencyEnrichmentEmitsEstablishedManagedLink(t *testi
 		},
 	}
 	aggregate := topologyObservationAggregate{
-		bgpPeers: []topologyBGPPeer{
+		BGPPeers: []topologyBGPPeer{
 			bgpPeerForTest("device-a", "default", "198.51.100.1", "198.51.100.2", "65001", "65002", "1.1.1.1", "2.2.2.2", "established"),
 		},
 	}
 
 	stats := applyTopologyBGPAdjacencyEnrichment(&data, aggregate)
 
-	require.Equal(t, 1, stats.emittedLinks)
+	require.Equal(t, 1, stats.EmittedLinks)
 	require.Len(t, data.Links, 1)
 	link := data.Links[0]
 	require.Equal(t, topologyBGPAdjacencyLinkType, link.LinkType)
@@ -58,7 +58,7 @@ func TestApplyTopologyBGPAdjacencyEnrichmentKeepsSuppressedPeersAsDetailOnly(t *
 				},
 			},
 			aggregate: topologyObservationAggregate{
-				bgpPeers: []topologyBGPPeer{
+				BGPPeers: []topologyBGPPeer{
 					bgpPeerForTest("device-a", "default", "198.51.100.1", "198.51.100.2", "65001", "65002", "1.1.1.1", "2.2.2.2", "active"),
 				},
 			},
@@ -73,7 +73,7 @@ func TestApplyTopologyBGPAdjacencyEnrichmentKeepsSuppressedPeersAsDetailOnly(t *
 				},
 			},
 			aggregate: topologyObservationAggregate{
-				bgpPeers: []topologyBGPPeer{
+				BGPPeers: []topologyBGPPeer{
 					bgpPeerForTest("device-a", "default", "198.51.100.1", "203.0.113.2", "65001", "65002", "1.1.1.1", "2.2.2.2", "established"),
 				},
 			},
@@ -87,7 +87,7 @@ func TestApplyTopologyBGPAdjacencyEnrichmentKeepsSuppressedPeersAsDetailOnly(t *
 				},
 			},
 			aggregate: topologyObservationAggregate{
-				bgpPeers: []topologyBGPPeer{
+				BGPPeers: []topologyBGPPeer{
 					bgpPeerForTest("device-a", "default", "198.51.100.1", "198.51.100.2", "65001", "65002", "1.1.1.1", "2.2.2.2", "established"),
 				},
 			},
@@ -104,7 +104,7 @@ func TestApplyTopologyBGPAdjacencyEnrichmentKeepsSuppressedPeersAsDetailOnly(t *
 				},
 			},
 			aggregate: topologyObservationAggregate{
-				bgpPeers: []topologyBGPPeer{
+				BGPPeers: []topologyBGPPeer{
 					bgpPeerForTest("device-b", "default", "198.51.100.2", "203.0.113.1", "65002", "65001", "2.2.2.2", "", "idle"),
 					bgpPeerForTest("device-c", "default", "198.51.100.3", "203.0.113.1", "65002", "65001", "2.2.2.2", "", "idle"),
 					bgpPeerForTest("device-a", "default", "198.51.100.1", "", "65001", "65002", "1.1.1.1", "2.2.2.2", "established"),
@@ -120,10 +120,10 @@ func TestApplyTopologyBGPAdjacencyEnrichmentKeepsSuppressedPeersAsDetailOnly(t *
 		t.Run(name, func(t *testing.T) {
 			stats := applyTopologyBGPAdjacencyEnrichment(&tc.data, tc.aggregate)
 
-			require.Zero(t, stats.emittedLinks)
-			require.Equal(t, tc.wantNonEstablished, stats.suppressedNonEstablished)
-			require.Equal(t, tc.wantUnresolvedNeighbor, stats.suppressedUnresolvedNeighbor)
-			require.Equal(t, tc.wantSelfActor, stats.suppressedSelfActor)
+			require.Zero(t, stats.EmittedLinks)
+			require.Equal(t, tc.wantNonEstablished, stats.SuppressedNonEstablished)
+			require.Equal(t, tc.wantUnresolvedNeighbor, stats.SuppressedUnresolvedNeighbor)
+			require.Equal(t, tc.wantSelfActor, stats.SuppressedSelfActor)
 			require.Empty(t, tc.data.Links)
 			require.Len(t, tc.data.Actors[0].Detail.BGP, 1)
 			row := tc.data.Actors[0].Detail.BGP[0]
@@ -157,7 +157,7 @@ func TestApplyTopologyBGPAdjacencyEnrichmentBuildsManagedLinks(t *testing.T) {
 				},
 			},
 			aggregate: topologyObservationAggregate{
-				bgpPeers: []topologyBGPPeer{
+				BGPPeers: []topologyBGPPeer{
 					bgpPeerForTest("device-a", "default", "198.51.100.1", "198.51.100.2", "65001", "65002", "1.1.1.1", "2.2.2.2", "established"),
 					bgpPeerForTest("device-b", "default", "198.51.100.2", "198.51.100.1", "65002", "65001", "", "", "established"),
 				},
@@ -165,8 +165,8 @@ func TestApplyTopologyBGPAdjacencyEnrichmentBuildsManagedLinks(t *testing.T) {
 			validate: func(t *testing.T, data topologyData, stats topologyBGPEnrichmentStats) {
 				t.Helper()
 
-				require.Equal(t, 1, stats.emittedLinks)
-				require.Equal(t, 1, stats.suppressedDuplicateLink)
+				require.Equal(t, 1, stats.EmittedLinks)
+				require.Equal(t, 1, stats.SuppressedDuplicateLink)
 				require.Len(t, data.Links, 1)
 				require.Len(t, data.Actors[0].Detail.BGP, 1)
 				require.Len(t, data.Actors[1].Detail.BGP, 1)
@@ -181,7 +181,7 @@ func TestApplyTopologyBGPAdjacencyEnrichmentBuildsManagedLinks(t *testing.T) {
 				},
 			},
 			aggregate: topologyObservationAggregate{
-				bgpPeers: []topologyBGPPeer{
+				BGPPeers: []topologyBGPPeer{
 					bgpPeerForTest("device-a", "default", "", "198.51.100.2", "65001", "65002", "1.1.1.1", "2.2.2.2", "established"),
 					bgpPeerForTest("device-b", "default", "198.51.100.2", "198.51.100.1", "65002", "65001", "2.2.2.2", "1.1.1.1", "established"),
 				},
@@ -189,8 +189,8 @@ func TestApplyTopologyBGPAdjacencyEnrichmentBuildsManagedLinks(t *testing.T) {
 			validate: func(t *testing.T, data topologyData, stats topologyBGPEnrichmentStats) {
 				t.Helper()
 
-				require.Equal(t, 1, stats.emittedLinks)
-				require.Equal(t, 1, stats.suppressedDuplicateLink)
+				require.Equal(t, 1, stats.EmittedLinks)
+				require.Equal(t, 1, stats.SuppressedDuplicateLink)
 				require.Len(t, data.Links, 1)
 				require.Len(t, data.Actors[0].Detail.BGP, 1)
 				require.Len(t, data.Actors[1].Detail.BGP, 1)
@@ -205,7 +205,7 @@ func TestApplyTopologyBGPAdjacencyEnrichmentBuildsManagedLinks(t *testing.T) {
 				},
 			},
 			aggregate: topologyObservationAggregate{
-				bgpPeers: []topologyBGPPeer{
+				BGPPeers: []topologyBGPPeer{
 					bgpPeerForTest("device-a", "blue", "198.51.100.1", "198.51.100.2", "65001", "65002", "1.1.1.1", "2.2.2.2", "established"),
 					bgpPeerForTest("device-a", "red", "198.51.100.1", "198.51.100.2", "65001", "65002", "1.1.1.1", "2.2.2.2", "established"),
 				},
@@ -213,7 +213,7 @@ func TestApplyTopologyBGPAdjacencyEnrichmentBuildsManagedLinks(t *testing.T) {
 			validate: func(t *testing.T, data topologyData, stats topologyBGPEnrichmentStats) {
 				t.Helper()
 
-				require.Equal(t, 2, stats.emittedLinks)
+				require.Equal(t, 2, stats.EmittedLinks)
 				require.Len(t, data.Links, 2)
 				require.Equal(t, 2, topologyStatsToV1(data.Stats)["bgp_adjacency_visible_links"])
 				require.ElementsMatch(t, []string{"blue", "red"}, []string{
@@ -230,7 +230,7 @@ func TestApplyTopologyBGPAdjacencyEnrichmentBuildsManagedLinks(t *testing.T) {
 				},
 			},
 			aggregate: topologyObservationAggregate{
-				bgpPeers: []topologyBGPPeer{
+				BGPPeers: []topologyBGPPeer{
 					bgpPeerForTest("device-a", "default", "198.51.100.1", "198.51.100.2", "65001", "65002", "1.1.1.1", "2.2.2.2", "established"),
 					bgpPeerForTest("device-a", "default", "198.51.100.5", "198.51.100.6", "65001", "65002", "1.1.1.1", "2.2.2.2", "established"),
 				},
@@ -238,8 +238,8 @@ func TestApplyTopologyBGPAdjacencyEnrichmentBuildsManagedLinks(t *testing.T) {
 			validate: func(t *testing.T, data topologyData, stats topologyBGPEnrichmentStats) {
 				t.Helper()
 
-				require.Equal(t, 1, stats.emittedLinks)
-				require.Equal(t, 1, stats.suppressedDuplicateLink)
+				require.Equal(t, 1, stats.EmittedLinks)
+				require.Equal(t, 1, stats.SuppressedDuplicateLink)
 				require.Len(t, data.Links, 1)
 				require.Len(t, data.Actors[0].Detail.BGP, 2)
 				require.Equal(t, 1, topologyStatsToV1(data.Stats)["bgp_adjacency_visible_links"])
@@ -264,14 +264,14 @@ func TestApplyTopologyBGPAdjacencyEnrichmentCanonicalizesUndirectedLinkEndpoints
 		},
 	}
 	aggregate := topologyObservationAggregate{
-		bgpPeers: []topologyBGPPeer{
+		BGPPeers: []topologyBGPPeer{
 			bgpPeerForTest("device-b", "default", "198.51.100.2", "198.51.100.1", "65002", "65001", "2.2.2.2", "1.1.1.1", "established"),
 		},
 	}
 
 	stats := applyTopologyBGPAdjacencyEnrichment(&data, aggregate)
 
-	require.Equal(t, 1, stats.emittedLinks)
+	require.Equal(t, 1, stats.EmittedLinks)
 	require.Len(t, data.Links, 1)
 	link := data.Links[0]
 	require.Equal(t, "router-a", link.SrcActorID)
@@ -292,14 +292,14 @@ func TestApplyTopologyBGPAdjacencyEnrichmentResolvesPeerIdentifierByRouterID(t *
 		},
 	}
 	aggregate := topologyObservationAggregate{
-		bgpPeers: []topologyBGPPeer{
+		BGPPeers: []topologyBGPPeer{
 			bgpPeerForTest("device-a", "default", "198.51.100.1", "", "65001", "65002", "1.1.1.1", "2.2.2.2", "established"),
 		},
 	}
 
 	stats := applyTopologyBGPAdjacencyEnrichment(&data, aggregate)
 
-	require.Equal(t, 1, stats.emittedLinks)
+	require.Equal(t, 1, stats.EmittedLinks)
 	require.Len(t, data.Links, 1)
 	require.Equal(t, "router-b", data.Links[0].DstActorID)
 	require.Equal(t, "2.2.2.2", topologyBGPPeerIdentifier(data.Links[0]))

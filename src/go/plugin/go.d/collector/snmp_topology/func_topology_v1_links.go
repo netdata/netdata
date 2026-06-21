@@ -4,8 +4,11 @@ package snmptopology
 
 import (
 	"fmt"
-	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"strings"
+
+	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 )
 
 func buildSNMPTopologyV1Links(
@@ -35,13 +38,13 @@ func buildSNMPTopologyV1Links(
 		if !ok {
 			return topologyv1.Table{}, nil, fmt.Errorf("link %d references unknown destination actor %q", i, link.DstActorID)
 		}
-		protocol := firstNonEmptyString(link.Protocol, link.LinkType, "l2")
+		protocol := topologyutil.FirstNonEmptyString(link.Protocol, link.LinkType, "l2")
 		linkType := snmpTopologyV1LinkType(link)
 		srcActors[i] = src
 		dstActors[i] = dst
 		linkTypes[i] = stringsDict.Ref(linkType)
 		protocols[i] = stringsDict.Ref(protocol)
-		directions[i] = stringsDict.Ref(firstNonEmptyString(link.Direction, "observed"))
+		directions[i] = stringsDict.Ref(topologyutil.FirstNonEmptyString(link.Direction, "observed"))
 		states[i] = nullableStringRef(stringsDict, link.State)
 		srcPortNames[i] = nullableStringRef(stringsDict, topologyV1EndpointPortName(link.Src))
 		dstPortNames[i] = nullableStringRef(stringsDict, topologyV1EndpointPortName(link.Dst))
@@ -62,7 +65,7 @@ func buildSNMPTopologyV1Links(
 		evidenceRows.srcActors = append(evidenceRows.srcActors, src)
 		evidenceRows.dstActors = append(evidenceRows.dstActors, dst)
 		evidenceRows.protocols = append(evidenceRows.protocols, stringsDict.Ref(protocol))
-		evidenceRows.directions = append(evidenceRows.directions, stringsDict.Ref(firstNonEmptyString(link.Direction, "observed")))
+		evidenceRows.directions = append(evidenceRows.directions, stringsDict.Ref(topologyutil.FirstNonEmptyString(link.Direction, "observed")))
 		evidenceRows.states = append(evidenceRows.states, nullableStringRef(stringsDict, link.State))
 		evidenceRows.srcPortNames = append(evidenceRows.srcPortNames, nullableStringRef(stringsDict, topologyV1EndpointPortName(link.Src)))
 		evidenceRows.dstPortNames = append(evidenceRows.dstPortNames, nullableStringRef(stringsDict, topologyV1EndpointPortName(link.Dst)))
@@ -72,9 +75,9 @@ func buildSNMPTopologyV1Links(
 		evidenceRows.dstPortIDs = append(evidenceRows.dstPortIDs, nullableStringRef(stringsDict, topologyV1EndpointString(link.Dst, "port_id")))
 		evidenceRows.srcManagementIPs = append(evidenceRows.srcManagementIPs, nullableStringRef(stringsDict, topologyV1EndpointString(link.Src, "management_ip")))
 		evidenceRows.dstManagementIPs = append(evidenceRows.dstManagementIPs, nullableStringRef(stringsDict, topologyV1EndpointString(link.Dst, "management_ip")))
-		evidenceRows.confidences = append(evidenceRows.confidences, nullableStringRef(stringsDict, topologyLinkConfidenceValue(link)))
-		evidenceRows.inferences = append(evidenceRows.inferences, nullableStringRef(stringsDict, topologyLinkInferenceValue(link)))
-		evidenceRows.attachmentModes = append(evidenceRows.attachmentModes, nullableStringRef(stringsDict, topologyLinkAttachmentModeValue(link)))
+		evidenceRows.confidences = append(evidenceRows.confidences, nullableStringRef(stringsDict, topologymodel.LinkConfidenceValue(link)))
+		evidenceRows.inferences = append(evidenceRows.inferences, nullableStringRef(stringsDict, topologymodel.LinkInferenceValue(link)))
+		evidenceRows.attachmentModes = append(evidenceRows.attachmentModes, nullableStringRef(stringsDict, topologymodel.LinkAttachmentModeValue(link)))
 		if linkType == snmpTopologyV1LinkL3Subnet || linkType == snmpTopologyV1LinkOSPF {
 			if linkType == snmpTopologyV1LinkOSPF {
 				evidenceRows.srcRouterIDs = append(evidenceRows.srcRouterIDs, nullableStringRef(stringsDict, topologyOSPFLocalRouterID(link)))
@@ -398,7 +401,7 @@ func snmpTopologyV1LinkType(link topologyLink) string {
 		return snmpTopologyV1LinkProbable
 	}
 
-	switch strings.ToLower(strings.TrimSpace(firstNonEmptyString(link.Protocol, link.LinkType))) {
+	switch strings.ToLower(strings.TrimSpace(topologyutil.FirstNonEmptyString(link.Protocol, link.LinkType))) {
 	case snmpTopologyV1LinkLLDP:
 		return snmpTopologyV1LinkLLDP
 	case snmpTopologyV1LinkCDP:
@@ -437,8 +440,8 @@ func snmpTopologyV1LinkIsProbable(link topologyLink) bool {
 	if strings.EqualFold(strings.TrimSpace(link.State), snmpTopologyV1LinkProbable) {
 		return true
 	}
-	if strings.EqualFold(topologyLinkInferenceValue(link), snmpTopologyV1LinkProbable) {
+	if strings.EqualFold(topologymodel.LinkInferenceValue(link), snmpTopologyV1LinkProbable) {
 		return true
 	}
-	return strings.HasPrefix(strings.ToLower(topologyLinkAttachmentModeValue(link)), snmpTopologyV1LinkProbable+"_")
+	return strings.HasPrefix(strings.ToLower(topologymodel.LinkAttachmentModeValue(link)), snmpTopologyV1LinkProbable+"_")
 }

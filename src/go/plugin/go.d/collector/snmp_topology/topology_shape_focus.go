@@ -2,26 +2,31 @@
 
 package snmptopology
 
-import "sort"
+import (
+	"sort"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
+)
 
 func applyTopologyDepthFocusFilter(data *topologyData, options topologyQueryOptions) {
 	if data == nil || len(data.Actors) == 0 {
 		return
 	}
-	options = normalizeTopologyQueryOptions(options)
-	focusIPs := topologyManagedFocusSelectedIPs(options.ManagedDeviceFocus)
+	options = topologyoptions.NormalizeQueryOptions(options)
+	focusIPs := topologyoptions.ManagedFocusSelectedIPs(options.ManagedDeviceFocus)
 
 	beforeActors := len(data.Actors)
 	beforeLinks := len(data.Links)
 
-	if isTopologyManagedFocusAllDevices(options.ManagedDeviceFocus) {
+	if topologyoptions.IsManagedFocusAllDevices(options.ManagedDeviceFocus) {
 		recordTopologyFocusAllDevicesStats(data, options)
 		return
 	}
 
 	graph := buildTopologyFocusGraph(data)
 	if len(graph.nonSegmentSet) == 0 || len(focusIPs) == 0 {
-		recomputeTopologyLinkStats(data)
+		topologymodel.RecomputeLinkStats(data)
 		return
 	}
 
@@ -34,7 +39,7 @@ func applyTopologyDepthFocusFilter(data *topologyData, options topologyQueryOpti
 	distance := traverseTopologyFocusDepth(graph, roots, options.Depth)
 	includedNonSegment, includedActorsByDepth := collectTopologyFocusDepthSets(graph, distance, options.Depth)
 	if len(includedNonSegment) == 0 {
-		recomputeTopologyLinkStats(data)
+		topologymodel.RecomputeLinkStats(data)
 		return
 	}
 
@@ -48,10 +53,10 @@ func applyTopologyDepthFocusFilter(data *topologyData, options topologyQueryOpti
 	}
 
 	sort.Slice(data.Actors, func(i, j int) bool {
-		return canonicalMatchKey(data.Actors[i].Match) < canonicalMatchKey(data.Actors[j].Match)
+		return topologymodel.CanonicalMatchKey(data.Actors[i].Match) < topologymodel.CanonicalMatchKey(data.Actors[j].Match)
 	})
 	sort.Slice(data.Links, func(i, j int) bool {
-		return topologyLinkSortKey(data.Links[i]) < topologyLinkSortKey(data.Links[j])
+		return topologymodel.LinkSortKey(data.Links[i]) < topologymodel.LinkSortKey(data.Links[j])
 	})
 
 	recordTopologyFocusStats(data, options, beforeActors, beforeLinks)

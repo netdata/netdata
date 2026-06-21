@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"math"
 	"strings"
 
@@ -44,19 +45,19 @@ func (c *topologyCache) updateIfNameByIndex(tags map[string]string) {
 	if ifAlias := strings.TrimSpace(tags[tagTopoIfAlias]); ifAlias != "" {
 		status.ifAlias = ifAlias
 	}
-	if mac := normalizeMAC(tags[tagTopoIfPhys]); mac != "" && mac != "00:00:00:00:00:00" {
+	if mac := topologyutil.NormalizeMAC(tags[tagTopoIfPhys]); mac != "" && mac != "00:00:00:00:00:00" {
 		status.mac = mac
 	}
-	if ifHighSpeed := parsePositiveInt64(tags[tagTopoIfHigh]); ifHighSpeed > 0 {
+	if ifHighSpeed := topologyutil.ParsePositiveInt64(tags[tagTopoIfHigh]); ifHighSpeed > 0 {
 		if ifHighSpeed > math.MaxInt64/topologyHighSpeedMultiplier {
 			status.speedBps = math.MaxInt64
 		} else {
 			status.speedBps = ifHighSpeed * topologyHighSpeedMultiplier
 		}
-	} else if ifSpeed := parsePositiveInt64(tags[tagTopoIfSpeed]); ifSpeed > 0 {
+	} else if ifSpeed := topologyutil.ParsePositiveInt64(tags[tagTopoIfSpeed]); ifSpeed > 0 {
 		status.speedBps = ifSpeed
 	}
-	if lastChange := parsePositiveInt64(tags[tagTopoIfLast]); lastChange > 0 {
+	if lastChange := topologyutil.ParsePositiveInt64(tags[tagTopoIfLast]); lastChange > 0 {
 		status.lastChange = lastChange
 	}
 	if duplex := normalizeInterfaceDuplex(tags[tagTopoIfDuplex]); duplex != "" {
@@ -81,7 +82,7 @@ func (c *topologyCache) updateIfIndexByIP(tags map[string]string) {
 		return
 	}
 
-	ip := normalizeIPAddress(tags[tagTopoIPAddr])
+	ip := topologyutil.NormalizeIPAddress(tags[tagTopoIPAddr])
 	if ip == "" {
 		return
 	}
@@ -92,7 +93,7 @@ func (c *topologyCache) updateIfIndexByIP(tags map[string]string) {
 		AddressType: managementAddressTypeFromIP(ip),
 		Source:      "ip_mib",
 	})
-	if mask := normalizeIPAddress(tags[tagTopoIPMask]); mask != "" {
+	if mask := topologyutil.NormalizeIPAddress(tags[tagTopoIPMask]); mask != "" {
 		c.ifNetmaskByIP[ip] = mask
 		c.l3InterfacesByIP[ip] = topologyL3Interface{
 			IP:      ip,

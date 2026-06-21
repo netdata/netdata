@@ -4,10 +4,10 @@ package snmptopology
 
 import (
 	"fmt"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"math"
 	"reflect"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 
@@ -127,7 +127,7 @@ func topologyV1EndpointString(endpoint topologyLinkEndpoint, key string) string 
 	case "management_ip":
 		return strings.TrimSpace(endpoint.ManagementIP)
 	case "sys_name":
-		return firstNonEmptyString(endpoint.SysName, topologyV1MatchString(endpoint.Match, key))
+		return topologyutil.FirstNonEmptyString(endpoint.SysName, topologyV1MatchString(endpoint.Match, key))
 	default:
 		return topologyV1MatchString(endpoint.Match, key)
 	}
@@ -141,7 +141,7 @@ func nullableEndpointIfIndex(endpoint topologyLinkEndpoint) any {
 }
 
 func topologyV1EndpointPortName(endpoint topologyLinkEndpoint) string {
-	return firstNonEmptyString(
+	return topologyutil.FirstNonEmptyString(
 		topologyV1EndpointString(endpoint, "port_name"),
 		topologyV1EndpointString(endpoint, "if_name"),
 		topologyV1EndpointString(endpoint, "if_descr"),
@@ -273,15 +273,6 @@ func anyMapSlice(value any) ([]map[string]any, bool) {
 	}
 }
 
-func sortedMapKeys[T any](m map[string]T) []string {
-	keys := make([]string, 0, len(m))
-	for key := range m {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return keys
-}
-
 func topologyID(value, fallback string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
@@ -297,14 +288,4 @@ func topologyID(value, fallback string) string {
 		return value
 	}
 	return "x_" + value
-}
-
-func firstNonEmptyString(values ...string) string {
-	for _, value := range values {
-		value = strings.TrimSpace(value)
-		if value != "" {
-			return value
-		}
-	}
-	return ""
 }

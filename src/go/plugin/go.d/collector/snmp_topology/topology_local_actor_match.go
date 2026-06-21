@@ -2,7 +2,10 @@
 
 package snmptopology
 
-import "strings"
+import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+	"strings"
+)
 
 func matchLocalTopologyActor(match topologyMatch, local topologyDevice) bool {
 	localChassisID := strings.TrimSpace(local.ChassisID)
@@ -19,10 +22,10 @@ func matchLocalTopologyActor(match topologyMatch, local topologyDevice) bool {
 		return true
 	}
 
-	localIP := normalizeIPAddress(local.ManagementIP)
+	localIP := topologyutil.NormalizeIPAddress(local.ManagementIP)
 	if localIP != "" {
 		for _, ip := range match.IPAddresses {
-			if normalizeIPAddress(ip) == localIP {
+			if topologyutil.NormalizeIPAddress(ip) == localIP {
 				return true
 			}
 		}

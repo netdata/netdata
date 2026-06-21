@@ -3,6 +3,8 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"strings"
 )
 
@@ -42,7 +44,7 @@ func newTopologyL3ActorResolver(data *topologyData, snapshots []topologyObservat
 		if ref.actorID != "" {
 			resolver.byActorID[ref.actorID] = ref
 		}
-		if deviceID := topologyActorDetailDeviceID(actor); deviceID != "" {
+		if deviceID := topologymodel.ActorDetailDeviceID(actor); deviceID != "" {
 			resolver.addUniqueDeviceID(deviceID, ref)
 		}
 		for _, ip := range normalizedMatchIPs(actor.Match) {
@@ -54,19 +56,19 @@ func newTopologyL3ActorResolver(data *topologyData, snapshots []topologyObservat
 	}
 
 	for _, snapshot := range snapshots {
-		deviceID := strings.TrimSpace(snapshot.localDeviceID)
+		deviceID := strings.TrimSpace(snapshot.LocalDeviceID)
 		if deviceID == "" {
 			continue
 		}
 		for _, actor := range managedActors {
-			if !matchLocalTopologyActor(actor.Match, snapshot.localDevice) {
+			if !matchLocalTopologyActor(actor.Match, snapshot.LocalDevice) {
 				continue
 			}
 			resolver.addUniqueDeviceID(deviceID, topologyL3ActorRef{
 				actorID: strings.TrimSpace(actor.ActorID),
 				match:   actor.Match,
 			})
-			resolver.addUniqueRouterID(snapshot.localDevice.OSPFRouterID, topologyL3ActorRef{
+			resolver.addUniqueRouterID(snapshot.LocalDevice.OSPFRouterID, topologyL3ActorRef{
 				actorID: strings.TrimSpace(actor.ActorID),
 				match:   actor.Match,
 			})
@@ -104,21 +106,21 @@ func (r topologyL3ActorResolver) resolveRouterEndpoint(routerID, ip string) (top
 }
 
 func (r topologyL3ActorResolver) resolveRouterID(routerID string) (topologyL3ActorRef, bool) {
-	if ref, ok := r.byRouterID[normalizeTopologyRouterID(routerID)]; ok && ref.actorID != "" {
+	if ref, ok := r.byRouterID[topologyutil.NormalizeTopologyRouterID(routerID)]; ok && ref.actorID != "" {
 		return ref, true
 	}
 	return topologyL3ActorRef{}, false
 }
 
 func (r topologyL3ActorResolver) resolveIPAddress(ip string) (topologyL3ActorRef, bool) {
-	if ref, ok := r.byIP[normalizeIPAddress(ip)]; ok && ref.actorID != "" {
+	if ref, ok := r.byIP[topologyutil.NormalizeIPAddress(ip)]; ok && ref.actorID != "" {
 		return ref, true
 	}
 	return topologyL3ActorRef{}, false
 }
 
 func (r topologyL3ActorResolver) resolveNonUnspecifiedIPAddress(ip string) (topologyL3ActorRef, bool) {
-	if ref, ok := r.byIP[normalizeNonUnspecifiedIPAddress(ip)]; ok && ref.actorID != "" {
+	if ref, ok := r.byIP[topologyutil.NormalizeNonUnspecifiedIPAddress(ip)]; ok && ref.actorID != "" {
 		return ref, true
 	}
 	return topologyL3ActorRef{}, false
@@ -140,7 +142,7 @@ func (r topologyL3ActorResolver) addUniqueDeviceID(deviceID string, ref topology
 }
 
 func (r topologyL3ActorResolver) addUniqueIPAddress(ip string, ref topologyL3ActorRef) {
-	ip = normalizeIPAddress(ip)
+	ip = topologyutil.NormalizeIPAddress(ip)
 	if ip == "" || ref.actorID == "" {
 		return
 	}
@@ -155,7 +157,7 @@ func (r topologyL3ActorResolver) addUniqueIPAddress(ip string, ref topologyL3Act
 }
 
 func (r topologyL3ActorResolver) addUniqueRouterID(routerID string, ref topologyL3ActorRef) {
-	routerID = normalizeTopologyRouterID(routerID)
+	routerID = topologyutil.NormalizeTopologyRouterID(routerID)
 	if routerID == "" || ref.actorID == "" {
 		return
 	}
@@ -171,7 +173,7 @@ func (r topologyL3ActorResolver) addUniqueRouterID(routerID string, ref topology
 
 func topologyL3ActorRouterIDs(actor topologyActor) []string {
 	values := make([]string, 0, 2)
-	if routerID := topologyActorDetailOSPFRouterID(actor); routerID != "" {
+	if routerID := topologymodel.ActorDetailOSPFRouterID(actor); routerID != "" {
 		values = append(values, routerID)
 	}
 	return values

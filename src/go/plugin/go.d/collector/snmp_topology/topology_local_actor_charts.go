@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"strings"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
@@ -31,7 +32,7 @@ func topologyInterfaceChartLookup(interfaceCharts map[string]topologyInterfaceCh
 		if strings.TrimSpace(ref.ChartIDSuffix) == "" {
 			ref.ChartIDSuffix = ifName
 		}
-		ref.AvailableMetrics = deduplicateSortedStrings(ref.AvailableMetrics)
+		ref.AvailableMetrics = topologyutil.DeduplicateSortedStrings(ref.AvailableMetrics)
 		lookup[ifName] = ref
 	}
 	return lookup
@@ -43,7 +44,7 @@ func enrichTopologyPortDetailsWithChartRefs(ports []topologyengine.ProjectionPor
 	}
 
 	for i := range ports {
-		name := strings.ToLower(strings.TrimSpace(firstNonEmptyString(
+		name := strings.ToLower(strings.TrimSpace(topologyutil.FirstNonEmptyString(
 			ports[i].IfName,
 			ports[i].Name,
 			ports[i].PortID,

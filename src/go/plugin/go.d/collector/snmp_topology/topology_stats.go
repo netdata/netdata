@@ -115,19 +115,19 @@ func addTopologyFocusStats(out map[string]any, stats topologyFocusStats) {
 func addTopologyL3Stats(out map[string]any, stats topologyStats) {
 	l3 := stats.L3
 
-	out["l3_subnet_candidate_subnets"] = l3.subnetStats.candidateSubnets
-	out["l3_subnet_candidate_links"] = l3.subnetStats.candidateLinks
-	out["l3_subnet_emitted_links"] = l3.emittedLinks
-	out["l3_subnet_suppressed_invalid"] = l3.subnetStats.suppressedInvalid
-	out["l3_subnet_suppressed_unsupported_prefix"] = l3.subnetStats.suppressedUnsupportedPrefix
-	out["l3_subnet_suppressed_duplicate_ip"] = l3.subnetStats.suppressedDuplicateIP
-	out["l3_subnet_suppressed_self_link"] = l3.subnetStats.suppressedSelfLink
-	out["l3_subnet_suppressed_unmatched"] = l3.subnetStats.suppressedUnmatched
-	out["l3_subnet_suppressed_multi_access"] = l3.subnetStats.suppressedMultiAccess
-	out["l3_subnet_suppressed_unresolved_actor"] = l3.suppressedUnresolvedActor
-	out["l3_subnet_suppressed_self_actor"] = l3.suppressedSelfActor
-	out["l3_subnet_suppressed_duplicate_link"] = l3.suppressedDuplicateLink
-	out["l3_subnet_visible_links"] = l3.emittedLinks
+	out["l3_subnet_candidate_subnets"] = l3.SubnetStats.CandidateSubnets
+	out["l3_subnet_candidate_links"] = l3.SubnetStats.CandidateLinks
+	out["l3_subnet_emitted_links"] = l3.EmittedLinks
+	out["l3_subnet_suppressed_invalid"] = l3.SubnetStats.SuppressedInvalid
+	out["l3_subnet_suppressed_unsupported_prefix"] = l3.SubnetStats.SuppressedUnsupportedPrefix
+	out["l3_subnet_suppressed_duplicate_ip"] = l3.SubnetStats.SuppressedDuplicateIP
+	out["l3_subnet_suppressed_self_link"] = l3.SubnetStats.SuppressedSelfLink
+	out["l3_subnet_suppressed_unmatched"] = l3.SubnetStats.SuppressedUnmatched
+	out["l3_subnet_suppressed_multi_access"] = l3.SubnetStats.SuppressedMultiAccess
+	out["l3_subnet_suppressed_unresolved_actor"] = l3.SuppressedUnresolvedActor
+	out["l3_subnet_suppressed_self_actor"] = l3.SuppressedSelfActor
+	out["l3_subnet_suppressed_duplicate_link"] = l3.SuppressedDuplicateLink
+	out["l3_subnet_visible_links"] = l3.EmittedLinks
 	if stats.HasComputed {
 		out["l3_subnet_visible_links"] = stats.Recomputed.L3SubnetVisibleLinks
 	}
@@ -136,15 +136,15 @@ func addTopologyL3Stats(out map[string]any, stats topologyStats) {
 func addTopologyOSPFStats(out map[string]any, stats topologyStats) {
 	ospf := stats.OSPF
 
-	out["ospf_neighbor_rows"] = ospf.observedRows
-	out["ospf_neighbor_detail_rows"] = ospf.attachedNeighborRows
-	out["ospf_adjacency_emitted_links"] = ospf.emittedLinks
-	out["ospf_adjacency_suppressed_non_full_state"] = ospf.suppressedNonFullState
-	out["ospf_adjacency_suppressed_unresolved_local"] = ospf.suppressedUnresolvedLocal
-	out["ospf_adjacency_suppressed_unresolved_neighbor"] = ospf.suppressedUnresolvedNeighbor
-	out["ospf_adjacency_suppressed_self_actor"] = ospf.suppressedSelfActor
-	out["ospf_adjacency_suppressed_duplicate_link"] = ospf.suppressedDuplicateLink
-	out["ospf_adjacency_visible_links"] = ospf.emittedLinks
+	out["ospf_neighbor_rows"] = ospf.ObservedRows
+	out["ospf_neighbor_detail_rows"] = ospf.AttachedNeighborRows
+	out["ospf_adjacency_emitted_links"] = ospf.EmittedLinks
+	out["ospf_adjacency_suppressed_non_full_state"] = ospf.SuppressedNonFullState
+	out["ospf_adjacency_suppressed_unresolved_local"] = ospf.SuppressedUnresolvedLocal
+	out["ospf_adjacency_suppressed_unresolved_neighbor"] = ospf.SuppressedUnresolvedNeighbor
+	out["ospf_adjacency_suppressed_self_actor"] = ospf.SuppressedSelfActor
+	out["ospf_adjacency_suppressed_duplicate_link"] = ospf.SuppressedDuplicateLink
+	out["ospf_adjacency_visible_links"] = ospf.EmittedLinks
 	if stats.HasComputed {
 		out["ospf_adjacency_visible_links"] = stats.Recomputed.OSPFAdjacencyVisibleLinks
 	}
@@ -153,15 +153,15 @@ func addTopologyOSPFStats(out map[string]any, stats topologyStats) {
 func addTopologyBGPStats(out map[string]any, stats topologyStats) {
 	bgp := stats.BGP
 
-	out["bgp_peer_rows"] = bgp.observedRows
-	out["bgp_peer_detail_rows"] = bgp.attachedPeerRows
-	out["bgp_adjacency_emitted_links"] = bgp.emittedLinks
-	out["bgp_adjacency_suppressed_non_established_state"] = bgp.suppressedNonEstablished
-	out["bgp_adjacency_suppressed_unresolved_local"] = bgp.suppressedUnresolvedLocal
-	out["bgp_adjacency_suppressed_unresolved_neighbor"] = bgp.suppressedUnresolvedNeighbor
-	out["bgp_adjacency_suppressed_self_actor"] = bgp.suppressedSelfActor
-	out["bgp_adjacency_suppressed_duplicate_link"] = bgp.suppressedDuplicateLink
-	out["bgp_adjacency_visible_links"] = bgp.emittedLinks
+	out["bgp_peer_rows"] = bgp.ObservedRows
+	out["bgp_peer_detail_rows"] = bgp.AttachedPeerRows
+	out["bgp_adjacency_emitted_links"] = bgp.EmittedLinks
+	out["bgp_adjacency_suppressed_non_established_state"] = bgp.SuppressedNonEstablished
+	out["bgp_adjacency_suppressed_unresolved_local"] = bgp.SuppressedUnresolvedLocal
+	out["bgp_adjacency_suppressed_unresolved_neighbor"] = bgp.SuppressedUnresolvedNeighbor
+	out["bgp_adjacency_suppressed_self_actor"] = bgp.SuppressedSelfActor
+	out["bgp_adjacency_suppressed_duplicate_link"] = bgp.SuppressedDuplicateLink
+	out["bgp_adjacency_visible_links"] = bgp.EmittedLinks
 	if stats.HasComputed {
 		out["bgp_adjacency_visible_links"] = stats.Recomputed.BGPAdjacencyVisibleLinks
 	}

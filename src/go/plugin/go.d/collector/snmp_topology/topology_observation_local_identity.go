@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"sort"
 	"strings"
 )
@@ -34,7 +35,7 @@ func (c *topologyCache) deriveLocalBridgeMACFromFDBSelfEntries() string {
 		if entry == nil || !isFDBSelfStatus(entry.status) {
 			continue
 		}
-		mac := normalizeMAC(entry.mac)
+		mac := topologyutil.NormalizeMAC(entry.mac)
 		if mac == "" || mac == "00:00:00:00:00:00" {
 			continue
 		}
@@ -49,12 +50,12 @@ func (c *topologyCache) deriveLocalBridgeMACFromInterfacePhysAddress(localManage
 		return ""
 	}
 
-	localManagementIP = normalizeIPAddress(localManagementIP)
+	localManagementIP = topologyutil.NormalizeIPAddress(localManagementIP)
 	if localManagementIP != "" {
 		ifIndex := strings.TrimSpace(c.ifIndexByIP[localManagementIP])
 		if ifIndex != "" {
 			if status, ok := c.ifStatusByIndex[ifIndex]; ok {
-				if mac := normalizeMAC(status.mac); mac != "" && mac != "00:00:00:00:00:00" {
+				if mac := topologyutil.NormalizeMAC(status.mac); mac != "" && mac != "00:00:00:00:00:00" {
 					return mac
 				}
 			}
@@ -66,8 +67,8 @@ func (c *topologyCache) deriveLocalBridgeMACFromInterfacePhysAddress(localManage
 		keys = append(keys, key)
 	}
 	sort.Slice(keys, func(i, j int) bool {
-		left := parseIndex(keys[i])
-		right := parseIndex(keys[j])
+		left := topologyutil.ParseIndex(keys[i])
+		right := topologyutil.ParseIndex(keys[j])
 		if left > 0 && right > 0 && left != right {
 			return left < right
 		}
@@ -81,7 +82,7 @@ func (c *topologyCache) deriveLocalBridgeMACFromInterfacePhysAddress(localManage
 	})
 
 	for _, key := range keys {
-		mac := normalizeMAC(c.ifStatusByIndex[key].mac)
+		mac := topologyutil.NormalizeMAC(c.ifStatusByIndex[key].mac)
 		if mac == "" || mac == "00:00:00:00:00:00" {
 			continue
 		}

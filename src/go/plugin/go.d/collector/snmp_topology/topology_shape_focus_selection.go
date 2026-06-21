@@ -3,32 +3,10 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"slices"
-	"strings"
 )
-
-func topologyManagedFocusSelectedIPs(value string) []string {
-	normalized := parseTopologyManagedFocuses(value)
-	if len(normalized) == 1 && normalized[0] == topologyManagedFocusAllDevices {
-		return nil
-	}
-
-	out := make([]string, 0, len(normalized))
-	for _, focus := range normalized {
-		if len(focus) <= len(topologyManagedFocusIPPrefix) {
-			continue
-		}
-		if !strings.EqualFold(focus[:len(topologyManagedFocusIPPrefix)], topologyManagedFocusIPPrefix) {
-			continue
-		}
-		ip := normalizeIPAddress(strings.TrimSpace(focus[len(topologyManagedFocusIPPrefix):]))
-		if ip == "" {
-			continue
-		}
-		out = append(out, ip)
-	}
-	return out
-}
 
 func collectTopologyFocusRoots(graph topologyFocusGraph, focusIPs []string) map[string]struct{} {
 	roots := make(map[string]struct{})
@@ -51,12 +29,12 @@ func collectTopologyFocusRoots(graph topologyFocusGraph, focusIPs []string) map[
 }
 
 func topologyActorHasIP(actor topologyActor, ip string) bool {
-	ip = normalizeIPAddress(ip)
+	ip = topologyutil.NormalizeIPAddress(ip)
 	if ip == "" {
 		return false
 	}
 	if slices.Contains(normalizedMatchIPs(actor.Match), ip) {
 		return true
 	}
-	return slices.Contains(topologyActorDetailManagementIPs(actor), ip)
+	return slices.Contains(topologymodel.ActorDetailManagementIPs(actor), ip)
 }

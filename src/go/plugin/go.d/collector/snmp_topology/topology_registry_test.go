@@ -9,6 +9,7 @@ import (
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -180,8 +181,8 @@ func TestTopologyRegistry_DefaultMapEmitsL3SubnetForManagedRoutersWithoutLLDP(t 
 	require.Equal(t, topologyL3SubnetLinkType, link.LinkType)
 	require.Equal(t, "observed", link.Direction)
 	require.Equal(t, "198.51.100.0/30", topologyL3Subnet(link))
-	require.Equal(t, "shared_subnet", topologyLinkInferenceValue(link))
-	require.Equal(t, "logical_l3_subnet", topologyLinkAttachmentModeValue(link))
+	require.Equal(t, "shared_subnet", topologymodel.LinkInferenceValue(link))
+	require.Equal(t, "logical_l3_subnet", topologymodel.LinkAttachmentModeValue(link))
 	require.Equal(t, "198.51.100.1", topologyEvidenceSrcIP(link))
 	require.Equal(t, "198.51.100.2", topologyEvidenceDstIP(link))
 	require.Equal(t, 1, topologyStatsToV1(data.Stats)["l3_subnet_emitted_links"])
@@ -316,8 +317,8 @@ func TestTopologyRegistry_BGPAdjacencyEmitsEstablishedManagedPeerLinkAndDetailRo
 	require.Equal(t, topologyBGPAdjacencyLinkType, link.LinkType)
 	require.Equal(t, "observed", link.Direction)
 	require.Equal(t, "established", link.State)
-	require.Equal(t, "bgp_established_adjacency", topologyLinkInferenceValue(link))
-	require.Equal(t, "logical_l3_bgp", topologyLinkAttachmentModeValue(link))
+	require.Equal(t, "bgp_established_adjacency", topologymodel.LinkInferenceValue(link))
+	require.Equal(t, "logical_l3_bgp", topologymodel.LinkAttachmentModeValue(link))
 	require.Equal(t, "default", topologyBGPLinkRoutingInstance(link))
 	require.Equal(t, "65001", topologyBGPLocalAS(link))
 	require.Equal(t, "65002", topologyBGPRemoteAS(link))
@@ -555,10 +556,10 @@ func TestTopologyCache_SnapshotEngineObservationsUsesDirectLocalObservation(t *t
 
 	snapshot, ok := cache.snapshotEngineObservations()
 	require.True(t, ok)
-	require.Len(t, snapshot.l2Observations, 1)
-	require.Equal(t, snapshot.localDeviceID, snapshot.l2Observations[0].DeviceID)
-	require.Len(t, snapshot.l2Observations[0].LLDPRemotes, 1)
-	require.Len(t, snapshot.l2Observations[0].CDPRemotes, 1)
+	require.Len(t, snapshot.L2Observations, 1)
+	require.Equal(t, snapshot.LocalDeviceID, snapshot.L2Observations[0].DeviceID)
+	require.Len(t, snapshot.L2Observations[0].LLDPRemotes, 1)
+	require.Len(t, snapshot.L2Observations[0].CDPRemotes, 1)
 }
 
 func TestTopologyCache_SnapshotEngineObservationsIncludesL3Interfaces(t *testing.T) {
@@ -590,28 +591,28 @@ func TestTopologyCache_SnapshotEngineObservationsIncludesL3Interfaces(t *testing
 	snapshot, ok := cache.snapshotEngineObservations()
 
 	require.True(t, ok)
-	require.Len(t, snapshot.l3Interfaces, 1)
+	require.Len(t, snapshot.L3Interfaces, 1)
 	require.Equal(t, topologyL3Interface{
-		DeviceID: snapshot.localDeviceID,
+		DeviceID: snapshot.LocalDeviceID,
 		IP:       "198.51.100.1",
 		Netmask:  "255.255.255.252",
 		IfIndex:  "2",
 		IfName:   "Gi0/2",
 		IfDescr:  "Uplink",
-	}, snapshot.l3Interfaces[0])
+	}, snapshot.L3Interfaces[0])
 }
 
 func TestAggregateTopologyObservationSnapshotsIncludesL3Interfaces(t *testing.T) {
 	collectedAt := time.Now()
 	snapshots := []topologyObservationSnapshot{
 		{
-			localDeviceID: "device-a",
-			agentID:       "agent-a",
-			collectedAt:   collectedAt,
-			l2Observations: []topologyengine.L2Observation{{
+			LocalDeviceID: "device-a",
+			AgentID:       "agent-a",
+			CollectedAt:   collectedAt,
+			L2Observations: []topologyengine.L2Observation{{
 				DeviceID: "device-a",
 			}},
-			l3Interfaces: []topologyL3Interface{{
+			L3Interfaces: []topologyL3Interface{{
 				DeviceID: "device-a",
 				IP:       "198.51.100.1",
 				Netmask:  "255.255.255.252",
@@ -623,8 +624,8 @@ func TestAggregateTopologyObservationSnapshotsIncludesL3Interfaces(t *testing.T)
 	aggregate, ok := aggregateTopologyObservationSnapshots(snapshots)
 
 	require.True(t, ok)
-	require.Len(t, aggregate.l3Interfaces, 1)
-	require.Equal(t, snapshots[0].l3Interfaces[0], aggregate.l3Interfaces[0])
+	require.Len(t, aggregate.L3Interfaces, 1)
+	require.Equal(t, snapshots[0].L3Interfaces[0], aggregate.L3Interfaces[0])
 }
 
 func TestTopologyRegistry_SnapshotReturnsFalseWithoutCollectedCaches(t *testing.T) {
@@ -757,10 +758,10 @@ func TestTopologyRegistry_SnapshotDeduplicatesDuplicateDeviceObservations(t *tes
 func TestCanonicalMatchKey_NormalizesEquivalentMACRepresentations(t *testing.T) {
 	raw := topologyMatch{ChassisIDs: []string{"7049a26572cd"}}
 	colon := topologyMatch{MacAddresses: []string{"70:49:A2:65:72:CD"}}
-	require.Equal(t, "mac:70:49:a2:65:72:cd", canonicalMatchKey(raw))
-	require.Equal(t, "mac:70:49:a2:65:72:cd", canonicalMatchKey(colon))
-	require.Contains(t, topologyMatchIdentityKeys(raw), "hw:70:49:a2:65:72:cd")
-	require.Contains(t, topologyMatchIdentityKeys(colon), "hw:70:49:a2:65:72:cd")
+	require.Equal(t, "mac:70:49:a2:65:72:cd", topologymodel.CanonicalMatchKey(raw))
+	require.Equal(t, "mac:70:49:a2:65:72:cd", topologymodel.CanonicalMatchKey(colon))
+	require.Contains(t, topologymodel.MatchIdentityKeys(raw), "hw:70:49:a2:65:72:cd")
+	require.Contains(t, topologymodel.MatchIdentityKeys(colon), "hw:70:49:a2:65:72:cd")
 }
 
 func TestApplySNMPTopologyShapePolicies_CollapsesActorsByIP(t *testing.T) {
@@ -969,8 +970,8 @@ func TestMarkProbableDeltaLinks_MarksAllAddedLinksAsProbable(t *testing.T) {
 	require.Len(t, probableData.Links, 2)
 	require.Equal(t, "", probableData.Links[0].State)
 	require.Equal(t, "probable", probableData.Links[1].State)
-	require.Equal(t, "probable", topologyLinkInferenceValue(probableData.Links[1]))
-	require.Equal(t, "probable_bridge_anchor", topologyLinkAttachmentModeValue(probableData.Links[1]))
+	require.Equal(t, "probable", topologymodel.LinkInferenceValue(probableData.Links[1]))
+	require.Equal(t, "probable_bridge_anchor", topologymodel.LinkAttachmentModeValue(probableData.Links[1]))
 }
 
 func TestApplyTopologyDepthFocusFilter_ManagedFocusDepthZero(t *testing.T) {

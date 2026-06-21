@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -16,14 +17,14 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentEmitsFullManagedLink(t *testing.T) 
 		},
 	}
 	aggregate := topologyObservationAggregate{
-		ospfNeighbors: []topologyOSPFNeighbor{
+		OSPFNeighbors: []topologyOSPFNeighbor{
 			ospfNeighborForTest("device-a", "1.1.1.1", "2.2.2.2", "198.51.100.2", "full"),
 		},
 	}
 
 	stats := applyTopologyOSPFAdjacencyEnrichment(&data, aggregate)
 
-	require.Equal(t, 1, stats.emittedLinks)
+	require.Equal(t, 1, stats.EmittedLinks)
 	require.Len(t, data.Links, 1)
 	link := data.Links[0]
 	require.Equal(t, topologyOSPFAdjacencyLinkType, link.LinkType)
@@ -58,7 +59,7 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsSuppressedNeighborsAsDetailOnl
 				},
 			},
 			aggregate: topologyObservationAggregate{
-				ospfNeighbors: []topologyOSPFNeighbor{
+				OSPFNeighbors: []topologyOSPFNeighbor{
 					ospfNeighborForTest("device-a", "1.1.1.1", "2.2.2.2", "198.51.100.2", "twoWay"),
 				},
 			},
@@ -72,7 +73,7 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsSuppressedNeighborsAsDetailOnl
 				},
 			},
 			aggregate: topologyObservationAggregate{
-				ospfNeighbors: []topologyOSPFNeighbor{
+				OSPFNeighbors: []topologyOSPFNeighbor{
 					ospfNeighborForTest("device-a", "1.1.1.1", "2.2.2.2", "198.51.100.2", "full"),
 				},
 			},
@@ -88,7 +89,7 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsSuppressedNeighborsAsDetailOnl
 				},
 			},
 			aggregate: topologyObservationAggregate{
-				ospfNeighbors: []topologyOSPFNeighbor{
+				OSPFNeighbors: []topologyOSPFNeighbor{
 					ospfNeighborForTest("device-a", "1.1.1.1", "2.2.2.2", "0.0.0.0", "full"),
 				},
 			},
@@ -102,7 +103,7 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsSuppressedNeighborsAsDetailOnl
 				},
 			},
 			aggregate: topologyObservationAggregate{
-				ospfNeighbors: []topologyOSPFNeighbor{
+				OSPFNeighbors: []topologyOSPFNeighbor{
 					ospfNeighborForTest("device-a", "1.1.1.1", "1.1.1.1", "198.51.100.1", "full"),
 				},
 			},
@@ -116,10 +117,10 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsSuppressedNeighborsAsDetailOnl
 		t.Run(name, func(t *testing.T) {
 			stats := applyTopologyOSPFAdjacencyEnrichment(&tc.data, tc.aggregate)
 
-			require.Zero(t, stats.emittedLinks)
-			require.Equal(t, tc.wantNonFullState, stats.suppressedNonFullState)
-			require.Equal(t, tc.wantUnresolvedNeighbor, stats.suppressedUnresolvedNeighbor)
-			require.Equal(t, tc.wantSelfActor, stats.suppressedSelfActor)
+			require.Zero(t, stats.EmittedLinks)
+			require.Equal(t, tc.wantNonFullState, stats.SuppressedNonFullState)
+			require.Equal(t, tc.wantUnresolvedNeighbor, stats.SuppressedUnresolvedNeighbor)
+			require.Equal(t, tc.wantSelfActor, stats.SuppressedSelfActor)
 			require.Empty(t, tc.data.Links)
 			require.Len(t, tc.data.Actors[0].Detail.OSPF, 1)
 			row := tc.data.Actors[0].Detail.OSPF[0]
@@ -147,7 +148,7 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentDeduplicatesBidirectionalObservatio
 		},
 	}
 	aggregate := topologyObservationAggregate{
-		ospfNeighbors: []topologyOSPFNeighbor{
+		OSPFNeighbors: []topologyOSPFNeighbor{
 			ospfNeighborForTest("device-a", "1.1.1.1", "2.2.2.2", "198.51.100.2", "full"),
 			ospfNeighborForTest("device-b", "2.2.2.2", "1.1.1.1", "198.51.100.1", "full"),
 		},
@@ -155,8 +156,8 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentDeduplicatesBidirectionalObservatio
 
 	stats := applyTopologyOSPFAdjacencyEnrichment(&data, aggregate)
 
-	require.Equal(t, 1, stats.emittedLinks)
-	require.Equal(t, 1, stats.suppressedDuplicateLink)
+	require.Equal(t, 1, stats.EmittedLinks)
+	require.Equal(t, 1, stats.SuppressedDuplicateLink)
 	require.Len(t, data.Links, 1)
 	require.Len(t, data.Actors[0].Detail.OSPF, 1)
 	require.Len(t, data.Actors[1].Detail.OSPF, 1)
@@ -183,7 +184,7 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsMatchingL3SubnetEdge(t *testin
 	}
 	data := topologyData{
 		Stats: topologyStats{
-			L3:    topologyL3EnrichmentStats{emittedLinks: 1},
+			L3:    topologyL3EnrichmentStats{EmittedLinks: 1},
 			HasL3: true,
 		},
 		Actors: []topologyActor{
@@ -193,14 +194,14 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsMatchingL3SubnetEdge(t *testin
 		Links: []topologyLink{l3Link},
 	}
 	aggregate := topologyObservationAggregate{
-		ospfNeighbors: []topologyOSPFNeighbor{
+		OSPFNeighbors: []topologyOSPFNeighbor{
 			ospfNeighborForTest("device-a", "1.1.1.1", "2.2.2.2", "198.51.100.2", "full"),
 		},
 	}
 
 	stats := applyTopologyOSPFAdjacencyEnrichment(&data, aggregate)
 
-	require.Equal(t, 1, stats.emittedLinks)
+	require.Equal(t, 1, stats.EmittedLinks)
 	require.Len(t, data.Links, 2)
 	require.Equal(t, 1, countTopologyLinksByType(data.Links, topologyL3SubnetLinkType))
 	require.Equal(t, 1, countTopologyLinksByType(data.Links, topologyOSPFAdjacencyLinkType))
@@ -229,7 +230,7 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsUnrelatedL3SubnetEdge(t *testi
 	}
 	data := topologyData{
 		Stats: topologyStats{
-			L3:    topologyL3EnrichmentStats{emittedLinks: 1},
+			L3:    topologyL3EnrichmentStats{EmittedLinks: 1},
 			HasL3: true,
 		},
 		Actors: []topologyActor{
@@ -244,12 +245,12 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsUnrelatedL3SubnetEdge(t *testi
 	neighbor.Subnet = ""
 	neighbor.Prefix = 0
 	aggregate := topologyObservationAggregate{
-		ospfNeighbors: []topologyOSPFNeighbor{neighbor},
+		OSPFNeighbors: []topologyOSPFNeighbor{neighbor},
 	}
 
 	stats := applyTopologyOSPFAdjacencyEnrichment(&data, aggregate)
 
-	require.Equal(t, 1, stats.emittedLinks)
+	require.Equal(t, 1, stats.EmittedLinks)
 	require.Len(t, data.Links, 2)
 	require.Equal(t, 1, countTopologyLinksByType(data.Links, topologyL3SubnetLinkType))
 	require.Equal(t, 1, countTopologyLinksByType(data.Links, topologyOSPFAdjacencyLinkType))
@@ -265,7 +266,7 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentResolvesUnnumberedNeighborByRouterI
 		},
 	}
 	aggregate := topologyObservationAggregate{
-		ospfNeighbors: []topologyOSPFNeighbor{
+		OSPFNeighbors: []topologyOSPFNeighbor{
 			{
 				DeviceID:         "device-a",
 				LocalRouterID:    "1.1.1.1",
@@ -279,7 +280,7 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentResolvesUnnumberedNeighborByRouterI
 
 	stats := applyTopologyOSPFAdjacencyEnrichment(&data, aggregate)
 
-	require.Equal(t, 1, stats.emittedLinks)
+	require.Equal(t, 1, stats.EmittedLinks)
 	require.Len(t, data.Links, 1)
 	require.Equal(t, topologyOSPFAdjacencyLinkType, data.Links[0].LinkType)
 	require.Equal(t, "2.2.2.2", topologyOSPFNeighborRouterID(data.Links[0]))
@@ -295,7 +296,7 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentDeduplicatesBidirectionalUnnumbered
 		},
 	}
 	aggregate := topologyObservationAggregate{
-		ospfNeighbors: []topologyOSPFNeighbor{
+		OSPFNeighbors: []topologyOSPFNeighbor{
 			{
 				DeviceID:         "device-a",
 				LocalRouterID:    "1.1.1.1",
@@ -317,8 +318,8 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentDeduplicatesBidirectionalUnnumbered
 
 	stats := applyTopologyOSPFAdjacencyEnrichment(&data, aggregate)
 
-	require.Equal(t, 1, stats.emittedLinks)
-	require.Equal(t, 1, stats.suppressedDuplicateLink)
+	require.Equal(t, 1, stats.EmittedLinks)
+	require.Equal(t, 1, stats.SuppressedDuplicateLink)
 	require.Len(t, data.Links, 1)
 	require.Equal(t, topologyOSPFAdjacencyLinkType, data.Links[0].LinkType)
 	require.Len(t, data.Actors[0].Detail.OSPF, 1)
@@ -328,7 +329,7 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentDeduplicatesBidirectionalUnnumbered
 func countTopologyLinksByType(links []topologyLink, linkType string) int {
 	count := 0
 	for _, link := range links {
-		if firstNonEmptyString(link.LinkType, link.Protocol) == linkType {
+		if topologyutil.FirstNonEmptyString(link.LinkType, link.Protocol) == linkType {
 			count++
 		}
 	}

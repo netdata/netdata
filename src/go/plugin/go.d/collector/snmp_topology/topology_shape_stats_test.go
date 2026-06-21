@@ -5,6 +5,7 @@ package snmptopology
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/stretchr/testify/require"
 )
 
@@ -67,11 +68,11 @@ func TestApplySNMPTopologyShapePolicies_EmitsStatsContractKeys(t *testing.T) {
 func TestRecomputeTopologyLinkStatsRefreshesExistingLogicalL3VisibleCounts(t *testing.T) {
 	data := &topologyData{
 		Stats: topologyStats{
-			L3:      topologyL3EnrichmentStats{emittedLinks: 2},
+			L3:      topologyL3EnrichmentStats{EmittedLinks: 2},
 			HasL3:   true,
-			OSPF:    topologyOSPFEnrichmentStats{emittedLinks: 1},
+			OSPF:    topologyOSPFEnrichmentStats{EmittedLinks: 1},
 			HasOSPF: true,
-			BGP:     topologyBGPEnrichmentStats{emittedLinks: 1},
+			BGP:     topologyBGPEnrichmentStats{EmittedLinks: 1},
 			HasBGP:  true,
 		},
 		Links: []topologyLink{
@@ -81,7 +82,7 @@ func TestRecomputeTopologyLinkStatsRefreshesExistingLogicalL3VisibleCounts(t *te
 		},
 	}
 
-	recomputeTopologyLinkStats(data)
+	topologymodel.RecomputeLinkStats(data)
 
 	expectedStats := map[string]struct {
 		key  string

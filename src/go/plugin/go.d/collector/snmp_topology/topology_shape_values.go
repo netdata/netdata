@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"sort"
 	"strconv"
 	"strings"
@@ -17,7 +18,7 @@ func normalizedMatchIPs(match topologyMatch) []string {
 	out := make([]string, 0, len(match.IPAddresses))
 	seen := make(map[string]struct{}, len(match.IPAddresses))
 	for _, value := range match.IPAddresses {
-		ip := normalizeIPAddress(value)
+		ip := topologyutil.NormalizeIPAddress(value)
 		if ip == "" {
 			continue
 		}

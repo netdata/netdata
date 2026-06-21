@@ -352,9 +352,9 @@ func TestCollector_RefreshKeepsPublishedSnapshotWhileCollectionRuns(t *testing.T
 
 	snapshot, ok := published.snapshotEngineObservations()
 	require.True(t, ok)
-	require.Len(t, snapshot.l2Observations, 1)
-	require.Len(t, snapshot.l2Observations[0].FDBEntries, 1)
-	require.Len(t, snapshot.l2Observations[0].ARPNDEntries, 1)
+	require.Len(t, snapshot.L2Observations, 1)
+	require.Len(t, snapshot.L2Observations[0].FDBEntries, 1)
+	require.Len(t, snapshot.L2Observations[0].ARPNDEntries, 1)
 
 	close(release)
 	<-done
@@ -391,9 +391,9 @@ func TestCollector_RefreshFailureKeepsPublishedSnapshot(t *testing.T) {
 
 	snapshot, ok := published.snapshotEngineObservations()
 	require.True(t, ok)
-	require.Len(t, snapshot.l2Observations, 1)
-	require.Len(t, snapshot.l2Observations[0].FDBEntries, 1)
-	require.Len(t, snapshot.l2Observations[0].ARPNDEntries, 1)
+	require.Len(t, snapshot.L2Observations, 1)
+	require.Len(t, snapshot.L2Observations[0].FDBEntries, 1)
+	require.Len(t, snapshot.L2Observations[0].ARPNDEntries, 1)
 }
 
 type blockingTopologyCollector struct {

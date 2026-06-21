@@ -7,6 +7,7 @@ import (
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/stretchr/testify/require"
 )
 
@@ -156,7 +157,7 @@ func TestTopologyLinkSortKeyUsesStableEndpointFields(t *testing.T) {
 		State: "up",
 	}
 
-	require.Equal(t, "lldp|bidirectional|mac:00:11:22:33:44:55|mac:aa:bb:cc:dd:ee:ff||Gi0/1|port-a||Gi0/2|port-b|up", topologyLinkSortKey(link))
+	require.Equal(t, "lldp|bidirectional|mac:00:11:22:33:44:55|mac:aa:bb:cc:dd:ee:ff||Gi0/1|port-a||Gi0/2|port-b|up", topologymodel.LinkSortKey(link))
 }
 
 func TestTopologyEndpointKeyDropsNonPositiveIfIndex(t *testing.T) {
@@ -171,7 +172,7 @@ func TestTopologyEndpointKeyDropsNonPositiveIfIndex(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			require.Equal(t, tc.want, topologyEndpointKey(topologyLinkEndpoint{IfIndex: tc.ifIndex}, "if_index"))
+			require.Equal(t, tc.want, topologymodel.EndpointKey(topologyLinkEndpoint{IfIndex: tc.ifIndex}, "if_index"))
 		})
 	}
 }
@@ -256,7 +257,7 @@ func TestMarkProbableDeltaLinksPreservesExistingConfidenceAndAttachmentMode(t *t
 	require.Len(t, probableData.Links, 2)
 	probableLink := probableData.Links[1]
 	require.Equal(t, "probable", probableLink.State)
-	require.Equal(t, "probable", topologyLinkInferenceValue(probableLink))
-	require.Equal(t, "medium", topologyLinkConfidenceValue(probableLink))
-	require.Equal(t, "source_specific", topologyLinkAttachmentModeValue(probableLink))
+	require.Equal(t, "probable", topologymodel.LinkInferenceValue(probableLink))
+	require.Equal(t, "medium", topologymodel.LinkConfidenceValue(probableLink))
+	require.Equal(t, "source_specific", topologymodel.LinkAttachmentModeValue(probableLink))
 }

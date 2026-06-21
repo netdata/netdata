@@ -4,6 +4,8 @@ package snmptopology
 
 import (
 	"fmt"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"strings"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
@@ -157,7 +159,7 @@ func snmpTopologyV1PortValues(port topologyengine.ProjectionPortDetail) map[stri
 	return pruneNilAttributes(map[string]any{
 		"if_index":                 nullableOptionalUintValue(port.IfIndex),
 		"port_id":                  port.PortID,
-		"name":                     firstNonEmptyString(port.Name, port.IfName, port.PortID),
+		"name":                     topologyutil.FirstNonEmptyString(port.Name, port.IfName, port.PortID),
 		"if_name":                  port.IfName,
 		"if_descr":                 port.IfDescr,
 		"if_alias":                 port.IfAlias,
@@ -256,7 +258,7 @@ func buildSNMPTopologyV1ActorPortsTable(
 		actorRefs[i] = row.actorRef
 		ifIndexes[i] = nullableUintValue(row.values["if_index"])
 		portIDs[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["port_id"]))
-		portName := firstNonEmptyString(
+		portName := topologyutil.FirstNonEmptyString(
 			topologyV1ScalarLabelValue(row.values["name"]),
 			topologyV1ScalarLabelValue(row.values["if_name"]),
 			topologyV1ScalarLabelValue(row.values["port_name"]),
@@ -269,15 +271,15 @@ func buildSNMPTopologyV1ActorPortsTable(
 		macs[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["mac"]))
 		speeds[i] = nullableUintValue(row.values["speed"])
 		topologyRoles[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["topology_role"]))
-		operStatuses[i] = nullableStringRef(stringsDict, firstNonEmptyString(
+		operStatuses[i] = nullableStringRef(stringsDict, topologyutil.FirstNonEmptyString(
 			topologyV1ScalarLabelValue(row.values["oper_status"]),
 			topologyV1ScalarLabelValue(row.values["if_oper_status"]),
 		))
-		adminStatuses[i] = nullableStringRef(stringsDict, firstNonEmptyString(
+		adminStatuses[i] = nullableStringRef(stringsDict, topologyutil.FirstNonEmptyString(
 			topologyV1ScalarLabelValue(row.values["admin_status"]),
 			topologyV1ScalarLabelValue(row.values["if_admin_status"]),
 		))
-		portTypes[i] = nullableStringRef(stringsDict, firstNonEmptyString(
+		portTypes[i] = nullableStringRef(stringsDict, topologyutil.FirstNonEmptyString(
 			topologyV1ScalarLabelValue(row.values["port_type"]),
 			topologyV1ScalarLabelValue(row.values["if_type"]),
 		))
@@ -363,7 +365,7 @@ func buildSNMPTopologyV1ActorPortLinksTable(
 		if !ok {
 			return fmt.Errorf("link %d references unknown remote actor %q", linkIndex, remoteActorID)
 		}
-		protocol := firstNonEmptyString(link.Protocol, link.LinkType, "l2")
+		protocol := topologyutil.FirstNonEmptyString(link.Protocol, link.LinkType, "l2")
 		linkType := snmpTopologyV1LinkType(link)
 
 		rows.actors = append(rows.actors, actorRef)
@@ -379,9 +381,9 @@ func buildSNMPTopologyV1ActorPortLinksTable(
 		rows.protocols = append(rows.protocols, stringsDict.Ref(protocol))
 		rows.states = append(rows.states, nullableStringRef(stringsDict, link.State))
 		rows.evidenceCounts = append(rows.evidenceCounts, uint64(1))
-		rows.confidences = append(rows.confidences, nullableStringRef(stringsDict, topologyLinkConfidenceValue(link)))
-		rows.inferences = append(rows.inferences, nullableStringRef(stringsDict, topologyLinkInferenceValue(link)))
-		rows.attachmentModes = append(rows.attachmentModes, nullableStringRef(stringsDict, topologyLinkAttachmentModeValue(link)))
+		rows.confidences = append(rows.confidences, nullableStringRef(stringsDict, topologymodel.LinkConfidenceValue(link)))
+		rows.inferences = append(rows.inferences, nullableStringRef(stringsDict, topologymodel.LinkInferenceValue(link)))
+		rows.attachmentModes = append(rows.attachmentModes, nullableStringRef(stringsDict, topologymodel.LinkAttachmentModeValue(link)))
 		rows.discoveredAt = append(rows.discoveredAt, nullableTime(link.DiscoveredAt))
 		rows.lastSeen = append(rows.lastSeen, nullableTime(link.LastSeen))
 		return nil

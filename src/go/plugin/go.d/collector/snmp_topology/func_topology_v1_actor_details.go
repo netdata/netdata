@@ -3,6 +3,8 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"strings"
 
 	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
@@ -52,7 +54,7 @@ func buildSNMPTopologyV1ActorDetails(
 	}
 
 	tableRowsByName := collectSNMPTopologyV1ActorTableRows(actors)
-	for _, tableName := range sortedMapKeys(tableRowsByName) {
+	for _, tableName := range topologyutil.SortedMapKeys(tableRowsByName) {
 		rows := tableRowsByName[tableName]
 		if len(rows) == 0 {
 			continue
@@ -158,7 +160,7 @@ func buildSNMPTopologyV1ActorLabelsTable(
 	for actorIndex, actor := range actors {
 		add(actorIndex, "actor_type", snmpTopologyV1ActorType(actor.ActorType), snmpTopologyV1ProducerSource, "identity", nil)
 		add(actorIndex, "layer", snmpTopologyV1ActorLayer(actor), snmpTopologyV1ProducerSource, "identity", nil)
-		add(actorIndex, "source", firstNonEmptyString(actor.Source, snmpTopologyV1ProducerSource), snmpTopologyV1ProducerSource, "identity", nil)
+		add(actorIndex, "source", topologyutil.FirstNonEmptyString(actor.Source, snmpTopologyV1ProducerSource), snmpTopologyV1ProducerSource, "identity", nil)
 		add(actorIndex, "display_name", snmpTopologyV1DisplayName(actor), snmpTopologyV1ProducerSource, "attribute", nil)
 		add(actorIndex, "sys_name", actor.Match.SysName, snmpTopologyV1ProducerSource, "match", nil)
 		add(actorIndex, "sys_object_id", actor.Match.SysObjectID, snmpTopologyV1ProducerSource, "match", nil)
@@ -171,12 +173,12 @@ func buildSNMPTopologyV1ActorLabelsTable(
 		for key, value := range actor.Labels {
 			add(actorIndex, key, value, "producer_label", "label", nil)
 		}
-		scalarValues := topologyActorDetailScalarLabelValues(actor)
-		for _, key := range sortedMapKeys(scalarValues) {
+		scalarValues := topologymodel.ActorDetailScalarLabelValues(actor)
+		for _, key := range topologyutil.SortedMapKeys(scalarValues) {
 			add(actorIndex, key, scalarValues[key], snmpTopologyV1ProducerSource, "attribute", nil)
 		}
-		arrayValues := topologyActorDetailArrayLabelValues(actor)
-		for _, key := range sortedMapKeys(arrayValues) {
+		arrayValues := topologymodel.ActorDetailArrayLabelValues(actor)
+		for _, key := range topologyutil.SortedMapKeys(arrayValues) {
 			addSlice(actorIndex, key, arrayValues[key], snmpTopologyV1ProducerSource, "attribute")
 		}
 	}

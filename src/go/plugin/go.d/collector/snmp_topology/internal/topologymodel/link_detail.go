@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologymodel
 
 import (
 	"strings"
@@ -8,28 +8,28 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
-func topologyLinkInferenceValue(link topologyLink) string {
+func LinkInferenceValue(link Link) string {
 	if link.Inference == nil {
 		return ""
 	}
 	return strings.TrimSpace(link.Inference.Inference)
 }
 
-func topologyLinkConfidenceValue(link topologyLink) string {
+func LinkConfidenceValue(link Link) string {
 	if link.Inference == nil {
 		return ""
 	}
 	return strings.TrimSpace(link.Inference.Confidence)
 }
 
-func topologyLinkAttachmentModeValue(link topologyLink) string {
+func LinkAttachmentModeValue(link Link) string {
 	if link.Inference == nil {
 		return ""
 	}
 	return strings.TrimSpace(link.Inference.AttachmentMode)
 }
 
-func ensureTopologyLinkInference(link *topologyLink) *graph.LinkInference {
+func EnsureLinkInference(link *Link) *graph.LinkInference {
 	if link == nil {
 		return nil
 	}

@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"strings"
 	"time"
 )
@@ -120,7 +121,7 @@ func (c *topologyCache) updateFDBDiagnostics() {
 		if bridgePort == "" || bridgePort == "0" {
 			continue
 		}
-		if parseIndex(c.bridgePortToIf[bridgePort]) == 0 {
+		if topologyutil.ParseIndex(c.bridgePortToIf[bridgePort]) == 0 {
 			c.fdbRowsUnmappedPort++
 		}
 	}
