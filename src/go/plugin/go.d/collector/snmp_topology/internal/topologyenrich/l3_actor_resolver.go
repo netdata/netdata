@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyenrich
 
 import (
+	"strings"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
-	"strings"
 )
 
 type topologyL3ActorRef struct {
 	actorID string
-	match   topologyMatch
+	match   topologymodel.Match
 }
 
 type topologyL3ActorResolver struct {
@@ -20,7 +21,7 @@ type topologyL3ActorResolver struct {
 	byRouterID map[string]topologyL3ActorRef
 }
 
-func newTopologyL3ActorResolver(data *topologyData, snapshots []topologyObservationSnapshot) topologyL3ActorResolver {
+func newTopologyL3ActorResolver(data *topologymodel.Data, snapshots []topologymodel.ObservationSnapshot) topologyL3ActorResolver {
 	resolver := topologyL3ActorResolver{
 		byActorID:  make(map[string]topologyL3ActorRef),
 		byDeviceID: make(map[string]topologyL3ActorRef),
@@ -31,7 +32,7 @@ func newTopologyL3ActorResolver(data *topologyData, snapshots []topologyObservat
 		return resolver
 	}
 
-	managedActors := make([]topologyActor, 0, len(data.Actors))
+	managedActors := make([]topologymodel.Actor, 0, len(data.Actors))
 	for _, actor := range data.Actors {
 		if !topologymodel.IsManagedSNMPDeviceActor(actor) {
 			continue
@@ -61,7 +62,7 @@ func newTopologyL3ActorResolver(data *topologyData, snapshots []topologyObservat
 			continue
 		}
 		for _, actor := range managedActors {
-			if !matchLocalTopologyActor(actor.Match, snapshot.LocalDevice) {
+			if !topologymodel.MatchLocalActor(actor.Match, snapshot.LocalDevice) {
 				continue
 			}
 			resolver.addUniqueDeviceID(deviceID, topologyL3ActorRef{
@@ -78,7 +79,7 @@ func newTopologyL3ActorResolver(data *topologyData, snapshots []topologyObservat
 	return resolver
 }
 
-func (r topologyL3ActorResolver) resolve(row topologyL3Interface) (topologyL3ActorRef, bool) {
+func (r topologyL3ActorResolver) resolve(row topologymodel.L3Interface) (topologyL3ActorRef, bool) {
 	if ref, ok := r.byDeviceID[strings.TrimSpace(row.DeviceID)]; ok && ref.actorID != "" {
 		return ref, true
 	}
@@ -171,7 +172,7 @@ func (r topologyL3ActorResolver) addUniqueRouterID(routerID string, ref topology
 	}
 }
 
-func topologyL3ActorRouterIDs(actor topologyActor) []string {
+func topologyL3ActorRouterIDs(actor topologymodel.Actor) []string {
 	values := make([]string, 0, 2)
 	if routerID := topologymodel.ActorDetailOSPFRouterID(actor); routerID != "" {
 		values = append(values, routerID)

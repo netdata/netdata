@@ -8,22 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTopologyOSPFNeighborLinkKeyIgnoresUnspecifiedIPs(t *testing.T) {
-	base := topologyOSPFNeighbor{
-		LocalRouterID:    "1.1.1.1",
-		NeighborRouterID: "2.2.2.2",
-	}
-	withUnspecifiedIPs := base
-	withUnspecifiedIPs.LocalIP = "::"
-	withUnspecifiedIPs.NeighborIP = "0.0.0.0"
-
-	require.Equal(
-		t,
-		topologyOSPFNeighborLinkKeyParts(base, "router-a", "router-b"),
-		topologyOSPFNeighborLinkKeyParts(withUnspecifiedIPs, "router-a", "router-b"),
-	)
-}
-
 func TestTopologyCache_OSPFNeighborDropsUnspecifiedOnlyNeighborIdentity(t *testing.T) {
 	cache := newTopologyCache()
 

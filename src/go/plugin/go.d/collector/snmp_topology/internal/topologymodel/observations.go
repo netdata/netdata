@@ -3,9 +3,12 @@
 package topologymodel
 
 import (
+	"net/netip"
 	"time"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/netaddr"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
 type ObservationSnapshot struct {
@@ -101,4 +104,34 @@ type BGPPeerDetailRow struct {
 	EstablishedUptime     *int64
 	LastReceivedUpdateAge *int64
 	Source                string
+}
+
+type L3Subnet struct {
+	Network netip.Addr
+	Netmask netip.Addr
+	Prefix  int
+}
+
+func L3SubnetForInterface(row L3Interface) (L3Subnet, bool) {
+	ip, err := netip.ParseAddr(topologyutil.NormalizeIPAddress(row.IP))
+	if err != nil || !ip.Is4() {
+		return L3Subnet{}, false
+	}
+	netmask, err := netip.ParseAddr(topologyutil.NormalizeIPAddress(row.Netmask))
+	if err != nil || !netmask.Is4() {
+		return L3Subnet{}, false
+	}
+	network, ok := netaddr.NetworkAddress(ip, netmask)
+	if !ok {
+		return L3Subnet{}, false
+	}
+	prefix, err := netaddr.MaskToCIDRPrefix(netmask)
+	if err != nil {
+		return L3Subnet{}, false
+	}
+	return L3Subnet{
+		Network: network,
+		Netmask: netmask,
+		Prefix:  prefix,
+	}, true
 }

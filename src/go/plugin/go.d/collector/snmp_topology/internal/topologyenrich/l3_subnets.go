@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyenrich
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"net/netip"
 	"sort"
 	"strconv"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/pkg/topology/netaddr"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
 type topologyL3SubnetAdjacency struct {
@@ -17,19 +17,19 @@ type topologyL3SubnetAdjacency struct {
 	Network string
 	Netmask string
 	Prefix  int
-	A       topologyL3Interface
-	B       topologyL3Interface
+	A       topologymodel.L3Interface
+	B       topologymodel.L3Interface
 }
 
 type topologyL3SubnetGroup struct {
 	network netip.Addr
 	netmask netip.Addr
 	prefix  int
-	rows    []topologyL3Interface
+	rows    []topologymodel.L3Interface
 }
 
-func buildTopologyL3SubnetAdjacencies(rows []topologyL3Interface) ([]topologyL3SubnetAdjacency, topologyL3SubnetBuildStats) {
-	var stats topologyL3SubnetBuildStats
+func buildTopologyL3SubnetAdjacencies(rows []topologymodel.L3Interface) ([]topologyL3SubnetAdjacency, topologymodel.L3SubnetBuildStats) {
+	var stats topologymodel.L3SubnetBuildStats
 	if len(rows) == 0 {
 		return nil, stats
 	}
@@ -95,31 +95,19 @@ func buildTopologyL3SubnetAdjacencies(rows []topologyL3Interface) ([]topologyL3S
 	return adjacencies, stats
 }
 
-func topologyL3SubnetGroupForInterface(row topologyL3Interface) (*topologyL3SubnetGroup, bool) {
+func topologyL3SubnetGroupForInterface(row topologymodel.L3Interface) (*topologyL3SubnetGroup, bool) {
 	deviceID := strings.TrimSpace(row.DeviceID)
 	if deviceID == "" || strings.TrimSpace(row.IfIndex) == "" {
 		return nil, false
 	}
-	ip, err := netip.ParseAddr(topologyutil.NormalizeIPAddress(row.IP))
-	if err != nil || !ip.Is4() {
-		return nil, false
-	}
-	netmask, err := netip.ParseAddr(topologyutil.NormalizeIPAddress(row.Netmask))
-	if err != nil || !netmask.Is4() {
-		return nil, false
-	}
-	network, ok := netaddr.NetworkAddress(ip, netmask)
+	subnet, ok := topologymodel.L3SubnetForInterface(row)
 	if !ok {
 		return nil, false
 	}
-	prefix, err := netaddr.MaskToCIDRPrefix(netmask)
-	if err != nil {
-		return nil, false
-	}
 	return &topologyL3SubnetGroup{
-		network: network,
-		netmask: netmask,
-		prefix:  prefix,
+		network: subnet.Network,
+		netmask: subnet.Netmask,
+		prefix:  subnet.Prefix,
 	}, true
 }
 
@@ -131,13 +119,13 @@ func topologyL3SubnetKey(network netip.Addr, prefix int) string {
 	return network.String() + "/" + strconv.Itoa(prefix)
 }
 
-func sortTopologyL3Interfaces(rows []topologyL3Interface) {
+func sortTopologyL3Interfaces(rows []topologymodel.L3Interface) {
 	sort.Slice(rows, func(i, j int) bool {
 		return topologyL3InterfaceSortKey(rows[i]) < topologyL3InterfaceSortKey(rows[j])
 	})
 }
 
-func topologyL3InterfaceSortKey(row topologyL3Interface) string {
+func topologyL3InterfaceSortKey(row topologymodel.L3Interface) string {
 	return strings.Join([]string{
 		strings.TrimSpace(row.DeviceID),
 		topologyutil.NormalizeIPAddress(row.IP),
@@ -145,7 +133,7 @@ func topologyL3InterfaceSortKey(row topologyL3Interface) string {
 	}, "\x00")
 }
 
-func topologyL3SubnetHasDuplicateIP(rows []topologyL3Interface) bool {
+func topologyL3SubnetHasDuplicateIP(rows []topologymodel.L3Interface) bool {
 	seen := make(map[string]string, len(rows))
 	for _, row := range rows {
 		ip := topologyutil.NormalizeIPAddress(row.IP)

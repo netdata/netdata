@@ -50,3 +50,30 @@ func IsManagedSNMPDeviceActor(actor Actor) bool {
 	}
 	return !ActorIsInferred(actor)
 }
+
+func MatchLocalActor(match Match, local Device) bool {
+	localChassisID := strings.TrimSpace(local.ChassisID)
+	if localChassisID != "" {
+		for _, chassisID := range match.ChassisIDs {
+			if strings.EqualFold(strings.TrimSpace(chassisID), localChassisID) {
+				return true
+			}
+		}
+	}
+
+	localSysName := strings.TrimSpace(local.SysName)
+	if localSysName != "" && strings.EqualFold(strings.TrimSpace(match.SysName), localSysName) {
+		return true
+	}
+
+	localIP := topologyutil.NormalizeIPAddress(local.ManagementIP)
+	if localIP != "" {
+		for _, ip := range match.IPAddresses {
+			if topologyutil.NormalizeIPAddress(ip) == localIP {
+				return true
+			}
+		}
+	}
+
+	return false
+}

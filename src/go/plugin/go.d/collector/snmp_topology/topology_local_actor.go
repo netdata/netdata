@@ -2,7 +2,10 @@
 
 package snmptopology
 
-import topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
+import (
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+)
 
 func augmentLocalActorFromCache(data *topologyData, local topologyDevice) {
 	if data == nil || len(data.Actors) == 0 {
@@ -14,7 +17,7 @@ func augmentLocalActorFromCache(data *topologyData, local topologyDevice) {
 		if !topologyengine.IsDeviceActorType(actor.ActorType) {
 			continue
 		}
-		if !matchLocalTopologyActor(actor.Match, local) {
+		if !topologymodel.MatchLocalActor(actor.Match, local) {
 			continue
 		}
 
