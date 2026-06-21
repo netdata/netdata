@@ -30,10 +30,10 @@ func TestApplyTopologyBGPAdjacencyEnrichmentEmitsEstablishedManagedLink(t *testi
 	require.Equal(t, "established", link.State)
 	require.Equal(t, "65001", topologyBGPLocalAS(link))
 	require.Equal(t, "65002", topologyBGPRemoteAS(link))
-	require.Equal(t, 1, topologyStatsToV1(data.Stats)["bgp_peer_rows"])
-	require.Equal(t, 1, topologyStatsToV1(data.Stats)["bgp_peer_detail_rows"])
-	require.Equal(t, 1, topologyStatsToV1(data.Stats)["bgp_adjacency_emitted_links"])
-	require.Equal(t, 1, topologyStatsToV1(data.Stats)["bgp_adjacency_visible_links"])
+	require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["bgp_peer_rows"])
+	require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["bgp_peer_detail_rows"])
+	require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["bgp_adjacency_emitted_links"])
+	require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["bgp_adjacency_visible_links"])
 	require.Len(t, data.Actors[0].Detail.BGP, 1)
 	require.Equal(t, "router-b", data.Actors[0].Detail.BGP[0].RemoteActorID)
 }
@@ -137,7 +137,7 @@ func TestApplyTopologyBGPAdjacencyEnrichmentKeepsSuppressedPeersAsDetailOnly(t *
 				require.Empty(t, row.RemoteActorID)
 			}
 			if tc.wantSuppressedStatsCounter != "" {
-				require.Equal(t, 1, topologyStatsToV1(tc.data.Stats)[tc.wantSuppressedStatsCounter])
+				require.Equal(t, 1, topologyStatsToV1ForTest(t, tc.data.Stats)[tc.wantSuppressedStatsCounter])
 			}
 		})
 	}
@@ -170,7 +170,7 @@ func TestApplyTopologyBGPAdjacencyEnrichmentBuildsManagedLinks(t *testing.T) {
 				require.Len(t, data.Links, 1)
 				require.Len(t, data.Actors[0].Detail.BGP, 1)
 				require.Len(t, data.Actors[1].Detail.BGP, 1)
-				require.Equal(t, 1, topologyStatsToV1(data.Stats)["bgp_adjacency_visible_links"])
+				require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["bgp_adjacency_visible_links"])
 			},
 		},
 		"deduplicates-asymmetric-local-ip-observations": {
@@ -194,7 +194,7 @@ func TestApplyTopologyBGPAdjacencyEnrichmentBuildsManagedLinks(t *testing.T) {
 				require.Len(t, data.Links, 1)
 				require.Len(t, data.Actors[0].Detail.BGP, 1)
 				require.Len(t, data.Actors[1].Detail.BGP, 1)
-				require.Equal(t, 1, topologyStatsToV1(data.Stats)["bgp_adjacency_visible_links"])
+				require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["bgp_adjacency_visible_links"])
 			},
 		},
 		"keeps-routing-instances-separate": {
@@ -215,7 +215,7 @@ func TestApplyTopologyBGPAdjacencyEnrichmentBuildsManagedLinks(t *testing.T) {
 
 				require.Equal(t, 2, stats.EmittedLinks)
 				require.Len(t, data.Links, 2)
-				require.Equal(t, 2, topologyStatsToV1(data.Stats)["bgp_adjacency_visible_links"])
+				require.Equal(t, 2, topologyStatsToV1ForTest(t, data.Stats)["bgp_adjacency_visible_links"])
 				require.ElementsMatch(t, []string{"blue", "red"}, []string{
 					topologyBGPLinkRoutingInstance(data.Links[0]),
 					topologyBGPLinkRoutingInstance(data.Links[1]),
@@ -242,7 +242,7 @@ func TestApplyTopologyBGPAdjacencyEnrichmentBuildsManagedLinks(t *testing.T) {
 				require.Equal(t, 1, stats.SuppressedDuplicateLink)
 				require.Len(t, data.Links, 1)
 				require.Len(t, data.Actors[0].Detail.BGP, 2)
-				require.Equal(t, 1, topologyStatsToV1(data.Stats)["bgp_adjacency_visible_links"])
+				require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["bgp_adjacency_visible_links"])
 			},
 		},
 	}

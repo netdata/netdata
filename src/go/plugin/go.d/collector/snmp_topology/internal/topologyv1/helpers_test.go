@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyv1
 
 import (
 	"testing"
 
-	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	topologyapi "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -38,14 +39,14 @@ func TestAnyStringSlice_DropsNilAndNonScalarItems(t *testing.T) {
 }
 
 func TestBuildSNMPTopologyV1Actors_UsesStableFallbackActorID(t *testing.T) {
-	actors := []topologyActor{
-		{ActorType: "device", Match: topologyMatch{IPAddresses: []string{"10.0.0.2"}}},
-		{ActorType: "device", Match: topologyMatch{IPAddresses: []string{"10.0.0.1"}}},
+	actors := []topologymodel.Actor{
+		{ActorType: "device", Match: topologymodel.Match{IPAddresses: []string{"10.0.0.2"}}},
+		{ActorType: "device", Match: topologymodel.Match{IPAddresses: []string{"10.0.0.1"}}},
 	}
-	reorderedActors := []topologyActor{actors[1], actors[0]}
+	reorderedActors := []topologymodel.Actor{actors[1], actors[0]}
 
-	_, actorIndex := buildSNMPTopologyV1Actors(actors, topologyv1.NewStringDictionary(""))
-	_, reorderedActorIndex := buildSNMPTopologyV1Actors(reorderedActors, topologyv1.NewStringDictionary(""))
+	_, actorIndex := buildSNMPTopologyV1Actors(actors, topologyapi.NewStringDictionary(""))
+	_, reorderedActorIndex := buildSNMPTopologyV1Actors(reorderedActors, topologyapi.NewStringDictionary(""))
 
 	require.Contains(t, actorIndex, "generated:device:ip:x_10.0.0.1")
 	require.Contains(t, actorIndex, "generated:device:ip:x_10.0.0.2")
@@ -54,16 +55,16 @@ func TestBuildSNMPTopologyV1Actors_UsesStableFallbackActorID(t *testing.T) {
 }
 
 func TestBuildSNMPTopologyV1Actors_FallbackDoesNotCollideWithExplicitActorID(t *testing.T) {
-	_, actorIndex := buildSNMPTopologyV1Actors([]topologyActor{
+	_, actorIndex := buildSNMPTopologyV1Actors([]topologymodel.Actor{
 		{
 			ActorType: "device",
-			Match:     topologyMatch{IPAddresses: []string{"10.0.0.1"}},
+			Match:     topologymodel.Match{IPAddresses: []string{"10.0.0.1"}},
 		},
 		{
 			ActorID:   "generated:device:ip:x_10.0.0.1",
 			ActorType: "device",
 		},
-	}, topologyv1.NewStringDictionary(""))
+	}, topologyapi.NewStringDictionary(""))
 
 	assert.Equal(t, map[string]int{
 		"generated:device:ip:x_10.0.0.1_2": 0,
@@ -73,18 +74,18 @@ func TestBuildSNMPTopologyV1Actors_FallbackDoesNotCollideWithExplicitActorID(t *
 
 func TestBuildSNMPTopologyV1PortNeighborSummaries_RemotePortName(t *testing.T) {
 	tests := map[string]struct {
-		links              []topologyLink
+		links              []topologymodel.Link
 		wantRemotePortName string
 	}{
 		"normalizes-before-ambiguity-check": {
-			links: []topologyLink{
+			links: []topologymodel.Link{
 				topologyV1PortNeighborSummaryLinkForTest(" Gi0/2 "),
 				topologyV1PortNeighborSummaryLinkForTest("gi0/2"),
 			},
 			wantRemotePortName: "Gi0/2",
 		},
 		"fills-missing-remote-port-name": {
-			links: []topologyLink{
+			links: []topologymodel.Link{
 				topologyV1PortNeighborSummaryLinkForTest(""),
 				topologyV1PortNeighborSummaryLinkForTest("Gi0/2"),
 			},
@@ -104,26 +105,26 @@ func TestBuildSNMPTopologyV1PortNeighborSummaries_RemotePortName(t *testing.T) {
 	}
 }
 
-func topologyV1PortNeighborSummaryLinkForTest(remotePortName string) topologyLink {
-	link := topologyLink{
+func topologyV1PortNeighborSummaryLinkForTest(remotePortName string) topologymodel.Link {
+	link := topologymodel.Link{
 		SrcActorID: "device-a",
 		DstActorID: "device-b",
-		Src:        topologyLinkEndpoint{IfIndex: 1, PortName: "Gi0/1"},
+		Src:        topologymodel.LinkEndpoint{IfIndex: 1, PortName: "Gi0/1"},
 	}
 	if remotePortName != "" {
-		link.Dst = topologyLinkEndpoint{PortName: remotePortName}
+		link.Dst = topologymodel.LinkEndpoint{PortName: remotePortName}
 	}
 	return link
 }
 
-func topologyV1TestColumnValues(t *testing.T, table topologyv1.Table, columnID string) []any {
+func topologyV1TestColumnValues(t *testing.T, table topologyapi.Table, columnID string) []any {
 	t.Helper()
 
 	for i, column := range table.Columns {
 		if column.ID != columnID {
 			continue
 		}
-		values, ok := table.Values[i].(topologyv1.ValuesEncoding)
+		values, ok := table.Values[i].(topologyapi.ValuesEncoding)
 		require.True(t, ok)
 		return values.Values
 	}

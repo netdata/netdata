@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyv1
 
 import (
 	"fmt"
+	"strings"
+
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
-	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	topologyapi "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
-	"strings"
 )
 
-func buildSNMPTopologyV1Actors(actors []topologyActor, stringsDict *topologyv1.StringDictionary) (topologyv1.Table, map[string]int) {
+func buildSNMPTopologyV1Actors(actors []topologymodel.Actor, stringsDict *topologyapi.StringDictionary) (topologyapi.Table, map[string]int) {
 	actorIndex := make(map[string]int, len(actors))
 	usedActorIDs := make(map[string]struct{}, len(actors))
 	for _, actor := range actors {
@@ -92,73 +93,73 @@ func buildSNMPTopologyV1Actors(actors []topologyActor, stringsDict *topologyv1.S
 		netdataHostIDs[i] = nullableStringRef(stringsDict, topologymodel.ActorDetailNetdataHostID(actor))
 	}
 
-	return topologyv1.MustTable(len(actors),
-		[]topologyv1.Column{
-			topologyv1.NewColumn("id", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithRole("identity")),
-			topologyv1.NewColumn("type", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithRole("group_key")),
-			topologyv1.NewColumn("layer", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithRole("group_key")),
-			topologyv1.NewColumn("source", "string_ref", topologyv1.WithDictionary("strings")),
-			topologyv1.NewColumn("display_name", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable(), topologyv1.WithRole("attribute")),
-			topologyv1.NewColumn("chassis_ids", "array", topologyv1.WithRole("merge_identity")),
-			topologyv1.NewColumn("mac_addresses", "array", topologyv1.WithRole("merge_identity")),
-			topologyv1.NewColumn("ip_addresses", "array", topologyv1.WithRole("merge_identity")),
-			topologyv1.NewColumn("hostnames", "array"),
-			topologyv1.NewColumn("dns_names", "array"),
-			topologyv1.NewColumn("sys_object_id", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithRole("merge_identity")),
-			topologyv1.NewColumn("sys_name", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithRole("merge_identity")),
-			topologyv1.NewColumn("parent_devices", "array", topologyv1.WithRole("parent_identity")),
-			topologyv1.NewColumn("vendor", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
-			topologyv1.NewColumn("model", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
-			topologyv1.NewColumn("sys_descr", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
-			topologyv1.NewColumn("sys_location", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
-			topologyv1.NewColumn("sys_contact", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
-			topologyv1.NewColumn("management_ip", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
-			topologyv1.NewColumn("protocols", "array", topologyv1.WithNullable()),
-			topologyv1.NewColumn("capabilities", "array", topologyv1.WithNullable()),
-			topologyv1.NewColumn("ports_total", "uint", topologyv1.WithNullable()),
-			topologyv1.NewColumn("vlan_count", "uint", topologyv1.WithNullable()),
-			topologyv1.NewColumn("fdb_total_macs", "uint", topologyv1.WithNullable()),
-			topologyv1.NewColumn("lldp_neighbor_count", "uint", topologyv1.WithNullable()),
-			topologyv1.NewColumn("cdp_neighbor_count", "uint", topologyv1.WithNullable()),
-			topologyv1.NewColumn("endpoints_total", "uint", topologyv1.WithNullable()),
-			topologyv1.NewColumn("chart_id_prefix", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
-			topologyv1.NewColumn("netdata_host_id", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
+	return topologyapi.MustTable(len(actors),
+		[]topologyapi.Column{
+			topologyapi.NewColumn("id", "string_ref", topologyapi.WithDictionary("strings"), topologyapi.WithRole("identity")),
+			topologyapi.NewColumn("type", "string_ref", topologyapi.WithDictionary("strings"), topologyapi.WithRole("group_key")),
+			topologyapi.NewColumn("layer", "string_ref", topologyapi.WithDictionary("strings"), topologyapi.WithRole("group_key")),
+			topologyapi.NewColumn("source", "string_ref", topologyapi.WithDictionary("strings")),
+			topologyapi.NewColumn("display_name", "string_ref", topologyapi.WithDictionary("strings"), topologyapi.WithNullable(), topologyapi.WithRole("attribute")),
+			topologyapi.NewColumn("chassis_ids", "array", topologyapi.WithRole("merge_identity")),
+			topologyapi.NewColumn("mac_addresses", "array", topologyapi.WithRole("merge_identity")),
+			topologyapi.NewColumn("ip_addresses", "array", topologyapi.WithRole("merge_identity")),
+			topologyapi.NewColumn("hostnames", "array"),
+			topologyapi.NewColumn("dns_names", "array"),
+			topologyapi.NewColumn("sys_object_id", "string_ref", topologyapi.WithDictionary("strings"), topologyapi.WithRole("merge_identity")),
+			topologyapi.NewColumn("sys_name", "string_ref", topologyapi.WithDictionary("strings"), topologyapi.WithRole("merge_identity")),
+			topologyapi.NewColumn("parent_devices", "array", topologyapi.WithRole("parent_identity")),
+			topologyapi.NewColumn("vendor", "string_ref", topologyapi.WithDictionary("strings"), topologyapi.WithNullable()),
+			topologyapi.NewColumn("model", "string_ref", topologyapi.WithDictionary("strings"), topologyapi.WithNullable()),
+			topologyapi.NewColumn("sys_descr", "string_ref", topologyapi.WithDictionary("strings"), topologyapi.WithNullable()),
+			topologyapi.NewColumn("sys_location", "string_ref", topologyapi.WithDictionary("strings"), topologyapi.WithNullable()),
+			topologyapi.NewColumn("sys_contact", "string_ref", topologyapi.WithDictionary("strings"), topologyapi.WithNullable()),
+			topologyapi.NewColumn("management_ip", "string_ref", topologyapi.WithDictionary("strings"), topologyapi.WithNullable()),
+			topologyapi.NewColumn("protocols", "array", topologyapi.WithNullable()),
+			topologyapi.NewColumn("capabilities", "array", topologyapi.WithNullable()),
+			topologyapi.NewColumn("ports_total", "uint", topologyapi.WithNullable()),
+			topologyapi.NewColumn("vlan_count", "uint", topologyapi.WithNullable()),
+			topologyapi.NewColumn("fdb_total_macs", "uint", topologyapi.WithNullable()),
+			topologyapi.NewColumn("lldp_neighbor_count", "uint", topologyapi.WithNullable()),
+			topologyapi.NewColumn("cdp_neighbor_count", "uint", topologyapi.WithNullable()),
+			topologyapi.NewColumn("endpoints_total", "uint", topologyapi.WithNullable()),
+			topologyapi.NewColumn("chart_id_prefix", "string_ref", topologyapi.WithDictionary("strings"), topologyapi.WithNullable()),
+			topologyapi.NewColumn("netdata_host_id", "string_ref", topologyapi.WithDictionary("strings"), topologyapi.WithNullable()),
 		},
-		[]topologyv1.ColumnEncoding{
-			topologyv1.Values(ids...),
-			topologyv1.Values(types...),
-			topologyv1.Values(layers...),
-			topologyv1.Values(sources...),
-			topologyv1.Values(displayNames...),
-			topologyv1.Values(chassisIDs...),
-			topologyv1.Values(macAddresses...),
-			topologyv1.Values(ipAddresses...),
-			topologyv1.Values(hostnames...),
-			topologyv1.Values(dnsNames...),
-			topologyv1.Values(sysObjectIDs...),
-			topologyv1.Values(sysNames...),
-			topologyv1.Values(parentDevices...),
-			topologyv1.Values(vendors...),
-			topologyv1.Values(models...),
-			topologyv1.Values(sysDescrs...),
-			topologyv1.Values(sysLocations...),
-			topologyv1.Values(sysContacts...),
-			topologyv1.Values(managementIPs...),
-			topologyv1.Values(protocols...),
-			topologyv1.Values(capabilities...),
-			topologyv1.Values(portsTotal...),
-			topologyv1.Values(vlanCounts...),
-			topologyv1.Values(fdbTotalMACs...),
-			topologyv1.Values(lldpNeighborCounts...),
-			topologyv1.Values(cdpNeighborCounts...),
-			topologyv1.Values(endpointsTotal...),
-			topologyv1.Values(chartIDPrefixes...),
-			topologyv1.Values(netdataHostIDs...),
+		[]topologyapi.ColumnEncoding{
+			topologyapi.Values(ids...),
+			topologyapi.Values(types...),
+			topologyapi.Values(layers...),
+			topologyapi.Values(sources...),
+			topologyapi.Values(displayNames...),
+			topologyapi.Values(chassisIDs...),
+			topologyapi.Values(macAddresses...),
+			topologyapi.Values(ipAddresses...),
+			topologyapi.Values(hostnames...),
+			topologyapi.Values(dnsNames...),
+			topologyapi.Values(sysObjectIDs...),
+			topologyapi.Values(sysNames...),
+			topologyapi.Values(parentDevices...),
+			topologyapi.Values(vendors...),
+			topologyapi.Values(models...),
+			topologyapi.Values(sysDescrs...),
+			topologyapi.Values(sysLocations...),
+			topologyapi.Values(sysContacts...),
+			topologyapi.Values(managementIPs...),
+			topologyapi.Values(protocols...),
+			topologyapi.Values(capabilities...),
+			topologyapi.Values(portsTotal...),
+			topologyapi.Values(vlanCounts...),
+			topologyapi.Values(fdbTotalMACs...),
+			topologyapi.Values(lldpNeighborCounts...),
+			topologyapi.Values(cdpNeighborCounts...),
+			topologyapi.Values(endpointsTotal...),
+			topologyapi.Values(chartIDPrefixes...),
+			topologyapi.Values(netdataHostIDs...),
 		},
 	), actorIndex
 }
 
-func snmpTopologyV1FallbackActorID(actor topologyActor, index int, used map[string]struct{}) string {
+func snmpTopologyV1FallbackActorID(actor topologymodel.Actor, index int, used map[string]struct{}) string {
 	for _, candidate := range []struct {
 		kind  string
 		value string
@@ -217,11 +218,11 @@ func snmpTopologyV1ActorType(actorType string) string {
 	}
 }
 
-func snmpTopologyV1DisplayName(actor topologyActor) string {
+func snmpTopologyV1DisplayName(actor topologymodel.Actor) string {
 	return topologymodel.ActorDetailDisplayName(actor)
 }
 
-func snmpTopologyV1ActorLayer(actor topologyActor) string {
+func snmpTopologyV1ActorLayer(actor topologymodel.Actor) string {
 	switch snmpTopologyV1ActorType(actor.ActorType) {
 	case snmpTopologyV1ActorEndpoint, snmpTopologyV1ActorSegment:
 		return "network"

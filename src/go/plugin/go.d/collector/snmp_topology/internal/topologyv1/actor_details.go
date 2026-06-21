@@ -1,26 +1,27 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyv1
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"strings"
 
-	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+
+	topologyapi "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 )
 
 func buildSNMPTopologyV1ActorDetails(
-	actors []topologyActor,
+	actors []topologymodel.Actor,
 	actorIndex map[string]int,
-	stringsDict *topologyv1.StringDictionary,
+	stringsDict *topologyapi.StringDictionary,
 	portNeighborSummaries map[snmpTopologyV1PortNeighborKey]snmpTopologyV1PortNeighborSummary,
-) (map[string]topologyv1.DetailTable, map[string]topologyv1.TableType, error) {
-	details := make(map[string]topologyv1.DetailTable)
-	tableTypes := make(map[string]topologyv1.TableType)
+) (map[string]topologyapi.DetailTable, map[string]topologyapi.TableType, error) {
+	details := make(map[string]topologyapi.DetailTable)
+	tableTypes := make(map[string]topologyapi.TableType)
 
 	labelsTable := buildSNMPTopologyV1ActorLabelsTable(actors, stringsDict)
-	details["actor_labels"] = topologyv1.DetailTable{
+	details["actor_labels"] = topologyapi.DetailTable{
 		Type:  "actor_labels",
 		Table: labelsTable,
 	}
@@ -33,19 +34,19 @@ func buildSNMPTopologyV1ActorDetails(
 	metadataTable := buildSNMPTopologyV1ActorMetadataTable(actors)
 	if metadataTable.Rows > 0 {
 		tableID := "actor_metadata"
-		details[tableID] = topologyv1.DetailTable{
+		details[tableID] = topologyapi.DetailTable{
 			Type:  tableID,
 			Table: metadataTable,
 		}
-		tableTypes[tableID] = topologyv1.TableType{
+		tableTypes[tableID] = topologyapi.TableType{
 			Role:        "actor_detail",
 			Owner:       "actor",
 			Aggregation: "append",
 			Columns:     metadataTable.Columns,
-			Presentation: &topologyv1.TableTypePresentation{
+			Presentation: &topologyapi.TableTypePresentation{
 				Label:             "Debug metadata",
 				DefaultVisibility: "debug",
-				Columns: []topologyv1.ModalColumn{
+				Columns: []topologyapi.ModalColumn{
 					modalDirectColumn("labels", "Labels", "labels", "debug_json"),
 				},
 			},
@@ -60,7 +61,7 @@ func buildSNMPTopologyV1ActorDetails(
 			continue
 		}
 		tableID := ""
-		var table topologyv1.Table
+		var table topologyapi.Table
 		switch tableName {
 		case "ports":
 			tableID = "actor_ports"
@@ -74,7 +75,7 @@ func buildSNMPTopologyV1ActorDetails(
 		default:
 			continue
 		}
-		details[tableID] = topologyv1.DetailTable{
+		details[tableID] = topologyapi.DetailTable{
 			Type:  tableID,
 			Table: table,
 		}
@@ -91,7 +92,7 @@ func buildSNMPTopologyV1ActorDetails(
 	return details, tableTypes, nil
 }
 
-func buildSNMPTopologyV1ActorMetadataTable(actors []topologyActor) topologyv1.Table {
+func buildSNMPTopologyV1ActorMetadataTable(actors []topologymodel.Actor) topologyapi.Table {
 	actorRefs := make([]any, 0, len(actors))
 	labels := make([]any, 0, len(actors))
 	for i, actor := range actors {
@@ -102,24 +103,24 @@ func buildSNMPTopologyV1ActorMetadataTable(actors []topologyActor) topologyv1.Ta
 		labels = append(labels, nullableJSON(actor.Labels))
 	}
 	if len(actorRefs) == 0 {
-		return topologyv1.EmptyTable()
+		return topologyapi.EmptyTable()
 	}
-	return topologyv1.MustTable(len(actorRefs),
-		[]topologyv1.Column{
-			topologyv1.NewColumn("actor", "actor_ref", topologyv1.WithRole("reference")),
-			topologyv1.NewColumn("labels", "json", topologyv1.WithNullable()),
+	return topologyapi.MustTable(len(actorRefs),
+		[]topologyapi.Column{
+			topologyapi.NewColumn("actor", "actor_ref", topologyapi.WithRole("reference")),
+			topologyapi.NewColumn("labels", "json", topologyapi.WithNullable()),
 		},
-		[]topologyv1.ColumnEncoding{
-			topologyv1.Values(actorRefs...),
-			topologyv1.Values(labels...),
+		[]topologyapi.ColumnEncoding{
+			topologyapi.Values(actorRefs...),
+			topologyapi.Values(labels...),
 		},
 	)
 }
 
 func buildSNMPTopologyV1ActorLabelsTable(
-	actors []topologyActor,
-	stringsDict *topologyv1.StringDictionary,
-) topologyv1.Table {
+	actors []topologymodel.Actor,
+	stringsDict *topologyapi.StringDictionary,
+) topologyapi.Table {
 	type labelRow struct {
 		actor      int
 		key        string
@@ -198,12 +199,12 @@ func buildSNMPTopologyV1ActorLabelsTable(
 		valueIndexes[i] = row.valueIndex
 	}
 
-	return topologyv1.MustTable(len(rows), snmpTopologyV1ActorLabelsTableType().Columns, []topologyv1.ColumnEncoding{
-		topologyv1.Values(actorRefs...),
-		topologyv1.Values(keys...),
-		topologyv1.Values(values...),
-		topologyv1.Values(sources...),
-		topologyv1.Values(kinds...),
-		topologyv1.Values(valueIndexes...),
+	return topologyapi.MustTable(len(rows), snmpTopologyV1ActorLabelsTableType().Columns, []topologyapi.ColumnEncoding{
+		topologyapi.Values(actorRefs...),
+		topologyapi.Values(keys...),
+		topologyapi.Values(values...),
+		topologyapi.Values(sources...),
+		topologyapi.Values(kinds...),
+		topologyapi.Values(valueIndexes...),
 	})
 }

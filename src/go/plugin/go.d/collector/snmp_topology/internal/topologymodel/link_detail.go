@@ -38,3 +38,73 @@ func EnsureLinkInference(link *Link) *graph.LinkInference {
 	}
 	return link.Inference
 }
+
+func LinkOSPFLocalRouterID(link Link) string {
+	if link.Detail.OSPF == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.Detail.OSPF.LocalRouterID)
+}
+
+func LinkOSPFNeighborRouterID(link Link) string {
+	if link.Detail.OSPF == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.Detail.OSPF.NeighborRouterID)
+}
+
+func LinkBGPRoutingInstance(link Link) string {
+	if link.Detail.BGP == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.Detail.BGP.RoutingInstance)
+}
+
+func LinkBGPLocalIP(link Link) string {
+	if link.Detail.BGP == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.Detail.BGP.LocalIP)
+}
+
+func LinkBGPNeighborIP(link Link) string {
+	if link.Detail.BGP == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.Detail.BGP.NeighborIP)
+}
+
+func LinkBGPLocalAS(link Link) string {
+	if link.Detail.BGP == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.Detail.BGP.LocalAS)
+}
+
+func LinkBGPRemoteAS(link Link) string {
+	if link.Detail.BGP == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.Detail.BGP.RemoteAS)
+}
+
+func LinkBGPLocalIdentifier(link Link) string {
+	if link.Detail.BGP == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.Detail.BGP.LocalIdentifier)
+}
+
+func LinkBGPPeerIdentifier(link Link) string {
+	if link.Detail.BGP == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.Detail.BGP.PeerIdentifier)
+}
+
+func LinkBGPSource(link Link) string {
+	if link.Detail.BGP == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.Detail.BGP.Source)
+}

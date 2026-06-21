@@ -14,7 +14,9 @@ import (
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
+	topologyv1renderer "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyv1"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/snmptopologyfunc"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
@@ -80,7 +82,7 @@ func TestTopologyFunctionAdapter_HandleDefaultStrictL2(t *testing.T) {
 	require.True(t, ok)
 	require.NoError(t, validateTopologyV1Data(data))
 	assert.Equal(t, topologyv1.SchemaVersion, data.SchemaVersion)
-	assert.Equal(t, snmpTopologyV1ProducerSource, data.Producer.Source)
+	assert.Equal(t, "snmp-l2", data.Producer.Source)
 	require.NotNil(t, data.View)
 	assert.Equal(t, "summary", data.View.ID)
 	assert.Equal(t, "network", data.View.Scope)
@@ -271,7 +273,7 @@ func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 		},
 	}
 
-	payload, err := snmpTopologyToV1(data)
+	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
 	require.NoError(t, validateTopologyV1Data(payload))
 	require.NotNil(t, payload.Tables)
@@ -388,7 +390,7 @@ func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 	assert.Equal(t, "actor_port_links", deviceType.Presentation.Modal.Sections[1].Source.Table)
 	assert.Equal(t, "l3_adjacencies", deviceType.Presentation.Modal.Sections[2].ID)
 	assert.Equal(t, "evidence", deviceType.Presentation.Modal.Sections[2].Source.Kind)
-	assert.Equal(t, snmpTopologyV1LinkL3Subnet, deviceType.Presentation.Modal.Sections[2].Source.Evidence)
+	assert.Equal(t, topologymodel.L3SubnetLinkType, deviceType.Presentation.Modal.Sections[2].Source.Evidence)
 	assert.Equal(t, "ospf_neighbors", deviceType.Presentation.Modal.Sections[3].ID)
 	assert.Equal(t, "actor_table", deviceType.Presentation.Modal.Sections[3].Source.Kind)
 	assert.Equal(t, "actor_ospf_neighbors", deviceType.Presentation.Modal.Sections[3].Source.Table)
@@ -458,7 +460,7 @@ func TestSNMPTopologyToV1_PrefersSNMPActorDetailOverL2(t *testing.T) {
 		},
 	}
 
-	payload, err := snmpTopologyToV1(data)
+	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
 	require.NoError(t, validateTopologyV1Data(payload))
 
@@ -518,7 +520,7 @@ func TestSNMPTopologyToV1_OmitsNeighborCountForEmptyNeighborList(t *testing.T) {
 		},
 	}
 
-	payload, err := snmpTopologyToV1(data)
+	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
 	require.NoError(t, validateTopologyV1Data(payload))
 	require.NotNil(t, payload.Tables)
@@ -577,7 +579,7 @@ func TestSNMPTopologyToV1_UsesIfIndexAsVisiblePortID(t *testing.T) {
 		},
 	}
 
-	payload, err := snmpTopologyToV1(data)
+	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
 	require.NoError(t, validateTopologyV1Data(payload))
 	require.NotNil(t, payload.Tables)
@@ -630,7 +632,7 @@ func TestSNMPTopologyToV1_PortNamesOnlyUsePortFields(t *testing.T) {
 		},
 	}
 
-	payload, err := snmpTopologyToV1(data)
+	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
 	require.NoError(t, validateTopologyV1Data(payload))
 
@@ -699,17 +701,17 @@ func TestSNMPTopologyToV1_PreservesL3SubnetPresentationAndEvidence(t *testing.T)
 		},
 	}
 
-	payload, err := snmpTopologyToV1(data)
+	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
 	require.NoError(t, validateTopologyV1Data(payload))
 
 	assert.Contains(t, payload.Producer.Capabilities, "l3_subnet")
 	require.NotNil(t, payload.Presentation)
 	assert.Equal(t, "snmp-l2.v2", payload.Presentation.ProfileVersion)
-	assert.Contains(t, topologyV1LegendLinkTypes(payload), snmpTopologyV1LinkL3Subnet)
+	assert.Contains(t, topologyV1LegendLinkTypes(payload), topologymodel.L3SubnetLinkType)
 
-	require.Contains(t, payload.Types.LinkTypes, snmpTopologyV1LinkL3Subnet)
-	linkType := payload.Types.LinkTypes[snmpTopologyV1LinkL3Subnet]
+	require.Contains(t, payload.Types.LinkTypes, topologymodel.L3SubnetLinkType)
+	linkType := payload.Types.LinkTypes[topologymodel.L3SubnetLinkType]
 	assert.Equal(t, "observed_bidirectional", linkType.Orientation)
 	assert.Equal(t, "observation", linkType.DirectionRole)
 	assert.Equal(t, "normal", linkType.SemanticRole)
@@ -719,13 +721,13 @@ func TestSNMPTopologyToV1_PreservesL3SubnetPresentationAndEvidence(t *testing.T)
 	assert.Equal(t, "dashed", linkType.Presentation.LineStyle)
 	assert.Equal(t, "normal", linkType.Presentation.Width)
 
-	require.Contains(t, payload.Types.EvidenceTypes, snmpTopologyV1LinkL3Subnet)
-	evidenceType := payload.Types.EvidenceTypes[snmpTopologyV1LinkL3Subnet]
-	assert.Equal(t, snmpTopologyV1LinkL3Subnet, evidenceType.LinkType)
+	require.Contains(t, payload.Types.EvidenceTypes, topologymodel.L3SubnetLinkType)
+	evidenceType := payload.Types.EvidenceTypes[topologymodel.L3SubnetLinkType]
+	assert.Equal(t, topologymodel.L3SubnetLinkType, evidenceType.LinkType)
 	assert.Equal(t, []string{"src_actor", "dst_actor", "subnet", "src_ip", "dst_ip"}, evidenceType.MatchColumns)
 
-	require.Contains(t, payload.Evidence, snmpTopologyV1LinkL3Subnet)
-	evidenceTable := payload.Evidence[snmpTopologyV1LinkL3Subnet].Table
+	require.Contains(t, payload.Evidence, topologymodel.L3SubnetLinkType)
+	evidenceTable := payload.Evidence[topologymodel.L3SubnetLinkType].Table
 	assert.Equal(t, 1, evidenceTable.Rows)
 	assert.Equal(t, "link_ref", topologyV1ColumnType(evidenceTable, "link"))
 	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "src_ip"))
@@ -739,15 +741,15 @@ func TestSNMPTopologyToV1_PreservesL3SubnetPresentationAndEvidence(t *testing.T)
 	assert.Equal(t, []any{uint64(30)}, topologyV1ColumnValues(t, evidenceTable, "prefix"))
 	assert.Equal(t, []string{"ip_mib"}, topologyV1StringColumnValues(t, payload, evidenceTable, "source"))
 
-	assert.Equal(t, []string{snmpTopologyV1LinkL3Subnet}, topologyV1StringColumnValues(t, payload, payload.Links, "type"))
-	assert.Equal(t, []string{snmpTopologyV1LinkL3Subnet}, topologyV1StringColumnValues(t, payload, payload.Links, "protocol"))
+	assert.Equal(t, []string{topologymodel.L3SubnetLinkType}, topologyV1StringColumnValues(t, payload, payload.Links, "type"))
+	assert.Equal(t, []string{topologymodel.L3SubnetLinkType}, topologyV1StringColumnValues(t, payload, payload.Links, "protocol"))
 
 	deviceType := payload.Types.ActorTypes["router"]
 	require.NotNil(t, deviceType.Presentation)
 	require.NotNil(t, deviceType.Presentation.Modal)
 	l3Section := requireTopologyV1ModalSection(t, deviceType.Presentation.Modal.Sections, "l3_adjacencies")
 	assert.Equal(t, "evidence", l3Section.Source.Kind)
-	assert.Equal(t, snmpTopologyV1LinkL3Subnet, l3Section.Source.Evidence)
+	assert.Equal(t, topologymodel.L3SubnetLinkType, l3Section.Source.Evidence)
 	require.NotNil(t, l3Section.OwnerFilter)
 	assert.Equal(t, "incident_evidence", l3Section.OwnerFilter.Mode)
 	assert.Equal(t, "link", l3Section.OwnerFilter.LinkColumn)
@@ -822,13 +824,13 @@ func TestSNMPTopologyToV1_PreservesOSPFAdjacencyPresentationEvidenceAndNeighborR
 		},
 	}
 
-	payload, err := snmpTopologyToV1(data)
+	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
 	require.NoError(t, validateTopologyV1Data(payload))
 
 	assert.Contains(t, payload.Producer.Capabilities, "ospf")
-	require.Contains(t, payload.Types.LinkTypes, snmpTopologyV1LinkOSPF)
-	linkType := payload.Types.LinkTypes[snmpTopologyV1LinkOSPF]
+	require.Contains(t, payload.Types.LinkTypes, topologymodel.OSPFAdjacencyLinkType)
+	linkType := payload.Types.LinkTypes[topologymodel.OSPFAdjacencyLinkType]
 	assert.Equal(t, "observed_bidirectional", linkType.Orientation)
 	assert.Equal(t, "observation", linkType.DirectionRole)
 	assert.Equal(t, "control", linkType.SemanticRole)
@@ -836,15 +838,15 @@ func TestSNMPTopologyToV1_PreservesOSPFAdjacencyPresentationEvidenceAndNeighborR
 	assert.Equal(t, "OSPF adjacency", linkType.Presentation.Label)
 	assert.Equal(t, "purple", linkType.Presentation.ColorSlot)
 	assert.Equal(t, "dashed", linkType.Presentation.LineStyle)
-	assert.Contains(t, topologyV1LegendLinkTypes(payload), snmpTopologyV1LinkOSPF)
+	assert.Contains(t, topologyV1LegendLinkTypes(payload), topologymodel.OSPFAdjacencyLinkType)
 
-	require.Contains(t, payload.Types.EvidenceTypes, snmpTopologyV1LinkOSPF)
-	evidenceType := payload.Types.EvidenceTypes[snmpTopologyV1LinkOSPF]
-	assert.Equal(t, snmpTopologyV1LinkOSPF, evidenceType.LinkType)
+	require.Contains(t, payload.Types.EvidenceTypes, topologymodel.OSPFAdjacencyLinkType)
+	evidenceType := payload.Types.EvidenceTypes[topologymodel.OSPFAdjacencyLinkType]
+	assert.Equal(t, topologymodel.OSPFAdjacencyLinkType, evidenceType.LinkType)
 	assert.Equal(t, []string{"src_actor", "dst_actor", "src_router_id", "dst_router_id", "src_ip", "dst_ip"}, evidenceType.MatchColumns)
 
-	require.Contains(t, payload.Evidence, snmpTopologyV1LinkOSPF)
-	evidenceTable := payload.Evidence[snmpTopologyV1LinkOSPF].Table
+	require.Contains(t, payload.Evidence, topologymodel.OSPFAdjacencyLinkType)
+	evidenceTable := payload.Evidence[topologymodel.OSPFAdjacencyLinkType].Table
 	assert.Equal(t, 1, evidenceTable.Rows)
 	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "src_router_id"))
 	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "dst_router_id"))
@@ -948,13 +950,13 @@ func TestSNMPTopologyToV1_PreservesBGPAdjacencyPresentationEvidenceAndPeerRows(t
 		},
 	}
 
-	payload, err := snmpTopologyToV1(data)
+	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
 	require.NoError(t, validateTopologyV1Data(payload))
 
 	assert.Contains(t, payload.Producer.Capabilities, "bgp")
-	require.Contains(t, payload.Types.LinkTypes, snmpTopologyV1LinkBGP)
-	linkType := payload.Types.LinkTypes[snmpTopologyV1LinkBGP]
+	require.Contains(t, payload.Types.LinkTypes, topologymodel.BGPAdjacencyLinkType)
+	linkType := payload.Types.LinkTypes[topologymodel.BGPAdjacencyLinkType]
 	assert.Equal(t, "observed_bidirectional", linkType.Orientation)
 	assert.Equal(t, "observation", linkType.DirectionRole)
 	assert.Equal(t, "control", linkType.SemanticRole)
@@ -962,15 +964,15 @@ func TestSNMPTopologyToV1_PreservesBGPAdjacencyPresentationEvidenceAndPeerRows(t
 	assert.Equal(t, "BGP adjacency", linkType.Presentation.Label)
 	assert.Equal(t, "accent", linkType.Presentation.ColorSlot)
 	assert.Equal(t, "dashed", linkType.Presentation.LineStyle)
-	assert.Contains(t, topologyV1LegendLinkTypes(payload), snmpTopologyV1LinkBGP)
+	assert.Contains(t, topologyV1LegendLinkTypes(payload), topologymodel.BGPAdjacencyLinkType)
 
-	require.Contains(t, payload.Types.EvidenceTypes, snmpTopologyV1LinkBGP)
-	evidenceType := payload.Types.EvidenceTypes[snmpTopologyV1LinkBGP]
-	assert.Equal(t, snmpTopologyV1LinkBGP, evidenceType.LinkType)
+	require.Contains(t, payload.Types.EvidenceTypes, topologymodel.BGPAdjacencyLinkType)
+	evidenceType := payload.Types.EvidenceTypes[topologymodel.BGPAdjacencyLinkType]
+	assert.Equal(t, topologymodel.BGPAdjacencyLinkType, evidenceType.LinkType)
 	assert.Equal(t, []string{"src_actor", "dst_actor", "routing_instance"}, evidenceType.MatchColumns)
 
-	require.Contains(t, payload.Evidence, snmpTopologyV1LinkBGP)
-	evidenceTable := payload.Evidence[snmpTopologyV1LinkBGP].Table
+	require.Contains(t, payload.Evidence, topologymodel.BGPAdjacencyLinkType)
+	evidenceTable := payload.Evidence[topologymodel.BGPAdjacencyLinkType].Table
 	assert.Equal(t, 1, evidenceTable.Rows)
 	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "routing_instance"))
 	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "local_identifier"))
@@ -1035,7 +1037,7 @@ func TestSNMPTopologyToV1_ReturnsErrorForL3SubnetWithoutSubnet(t *testing.T) {
 		},
 	}
 
-	_, err := snmpTopologyToV1(data)
+	_, err := topologyv1renderer.Render(data)
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "l3_subnet link 0 is missing subnet")
@@ -1090,7 +1092,7 @@ func TestSNMPTopologyToV1_PreservesLinkPresentationTypes(t *testing.T) {
 		},
 	}
 
-	payload, err := snmpTopologyToV1(data)
+	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
 	require.NoError(t, validateTopologyV1Data(payload))
 
@@ -1132,19 +1134,23 @@ func TestSNMPTopologyV1EvidenceMatchColumnsUseTypedL2EndpointFields(t *testing.T
 		"dst_port_id",
 	}
 	tests := map[string]string{
-		"lldp":     snmpTopologyV1LinkLLDP,
-		"cdp":      snmpTopologyV1LinkCDP,
-		"bridge":   snmpTopologyV1LinkBridge,
-		"fdb":      snmpTopologyV1LinkFDB,
-		"stp":      snmpTopologyV1LinkSTP,
-		"arp":      snmpTopologyV1LinkARP,
-		"snmp":     snmpTopologyV1LinkSNMP,
-		"probable": snmpTopologyV1LinkProbable,
+		"lldp":     "lldp",
+		"cdp":      "cdp",
+		"bridge":   "bridge",
+		"fdb":      "fdb",
+		"stp":      "stp",
+		"arp":      "arp",
+		"snmp":     "snmp",
+		"probable": "probable",
 	}
+	payload, err := topologyv1renderer.Render(topologyData{})
+	require.NoError(t, err)
 
 	for name, linkType := range tests {
 		t.Run(name, func(t *testing.T) {
-			got := snmpTopologyV1EvidenceMatchColumnsForType(linkType)
+			evidenceType, ok := payload.Types.EvidenceTypes[linkType]
+			require.True(t, ok)
+			got := evidenceType.MatchColumns
 
 			require.Equal(t, want, got)
 			require.NotContains(t, got, "src_endpoint")
@@ -1184,12 +1190,12 @@ func TestSNMPTopologyToV1_PortlessFDBEvidenceUsesLinkRef(t *testing.T) {
 		},
 	}
 
-	payload, err := snmpTopologyToV1(data)
+	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
 	require.NoError(t, validateTopologyV1Data(payload))
-	require.Contains(t, payload.Evidence, snmpTopologyV1LinkFDB)
+	require.Contains(t, payload.Evidence, "fdb")
 
-	evidenceTable := payload.Evidence[snmpTopologyV1LinkFDB].Table
+	evidenceTable := payload.Evidence["fdb"].Table
 	require.Equal(t, 1, evidenceTable.Rows)
 	assert.Equal(t, []any{0}, topologyV1ColumnValues(t, evidenceTable, "link"))
 	assert.Equal(t, []any{nil}, topologyV1ColumnValues(t, evidenceTable, "src_if_index"))
@@ -1261,12 +1267,12 @@ func TestSNMPTopologyToV1_L2EvidenceDistinguishesParallelLinksByTypedEndpoints(t
 		},
 	}
 
-	payload, err := snmpTopologyToV1(data)
+	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
 	require.NoError(t, validateTopologyV1Data(payload))
-	require.Contains(t, payload.Evidence, snmpTopologyV1LinkLLDP)
+	require.Contains(t, payload.Evidence, "lldp")
 
-	evidenceTable := payload.Evidence[snmpTopologyV1LinkLLDP].Table
+	evidenceTable := payload.Evidence["lldp"].Table
 	require.Equal(t, 2, evidenceTable.Rows)
 	assert.Equal(t, []any{0, 1}, topologyV1ColumnValues(t, evidenceTable, "link"))
 	assert.Equal(t, []any{uint64(1), uint64(2)}, topologyV1ColumnValues(t, evidenceTable, "src_if_index"))

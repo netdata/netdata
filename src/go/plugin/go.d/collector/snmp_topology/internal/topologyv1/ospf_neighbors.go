@@ -1,19 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyv1
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"strings"
 
-	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	topologyapi "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
 func buildSNMPTopologyV1OSPFNeighborsTable(
 	rows []topologyV1DynamicRow,
 	actorIndex map[string]int,
-	stringsDict *topologyv1.StringDictionary,
-) topologyv1.Table {
+	stringsDict *topologyapi.StringDictionary,
+) topologyapi.Table {
 	actorRefs := make([]any, len(rows))
 	remoteActors := make([]any, len(rows))
 	localRouterIDs := make([]any, len(rows))
@@ -31,24 +32,24 @@ func buildSNMPTopologyV1OSPFNeighborsTable(
 		localRouterIDs[i] = nullableStringRef(stringsDict, topologyutil.NormalizeTopologyRouterID(topologyV1ScalarLabelValue(row.values["local_router_id"])))
 		neighborRouterIDs[i] = nullableStringRef(stringsDict, topologyutil.NormalizeTopologyRouterID(topologyV1ScalarLabelValue(row.values["neighbor_router_id"])))
 		neighborIPs[i] = nullableStringRef(stringsDict, topologyutil.NormalizeNonUnspecifiedIPAddress(topologyV1ScalarLabelValue(row.values["neighbor_ip"])))
-		states[i] = nullableStringRef(stringsDict, normalizeOSPFNeighborState(topologyV1ScalarLabelValue(row.values["state"])))
+		states[i] = nullableStringRef(stringsDict, topologyutil.NormalizeOSPFNeighborState(topologyV1ScalarLabelValue(row.values["state"])))
 		localIPs[i] = nullableStringRef(stringsDict, topologyutil.NormalizeNonUnspecifiedIPAddress(topologyV1ScalarLabelValue(row.values["local_ip"])))
 		subnets[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["subnet"]))
 		addresslessIndexes[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["addressless_index"]))
 		sources[i] = nullableStringRef(stringsDict, topologyutil.FirstNonEmptyString(topologyV1ScalarLabelValue(row.values["source"]), "ospf_mib"))
 	}
 
-	return topologyv1.MustTable(len(rows), snmpTopologyV1OSPFNeighborsColumns(), []topologyv1.ColumnEncoding{
-		topologyv1.Values(actorRefs...),
-		topologyv1.Values(remoteActors...),
-		topologyv1.Values(localRouterIDs...),
-		topologyv1.Values(neighborRouterIDs...),
-		topologyv1.Values(neighborIPs...),
-		topologyv1.Values(states...),
-		topologyv1.Values(localIPs...),
-		topologyv1.Values(subnets...),
-		topologyv1.Values(addresslessIndexes...),
-		topologyv1.Values(sources...),
+	return topologyapi.MustTable(len(rows), snmpTopologyV1OSPFNeighborsColumns(), []topologyapi.ColumnEncoding{
+		topologyapi.Values(actorRefs...),
+		topologyapi.Values(remoteActors...),
+		topologyapi.Values(localRouterIDs...),
+		topologyapi.Values(neighborRouterIDs...),
+		topologyapi.Values(neighborIPs...),
+		topologyapi.Values(states...),
+		topologyapi.Values(localIPs...),
+		topologyapi.Values(subnets...),
+		topologyapi.Values(addresslessIndexes...),
+		topologyapi.Values(sources...),
 	})
 }
 
@@ -64,7 +65,7 @@ func nullableActorRef(actorIndex map[string]int, value any) any {
 	return ref
 }
 
-func snmpTopologyV1OSPFNeighborValues(row topologyOSPFNeighborDetailRow) map[string]any {
+func snmpTopologyV1OSPFNeighborValues(row topologymodel.OSPFNeighborDetailRow) map[string]any {
 	return pruneNilAttributes(map[string]any{
 		"remote_actor_id":    row.RemoteActorID,
 		"local_router_id":    row.LocalRouterID,

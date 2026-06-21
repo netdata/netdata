@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyv1
 
-func topologyStatsToV1(stats topologyStats) map[string]any {
+import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
+)
+
+func topologyStatsToV1(stats topologymodel.Stats) map[string]any {
 	if !stats.HasL2 && !stats.HasShape && !stats.HasFocus && !stats.HasL3 && !stats.HasOSPF && !stats.HasBGP && !stats.HasComputed {
 		return nil
 	}
@@ -38,7 +43,7 @@ func topologyStatsToV1(stats topologyStats) map[string]any {
 	return out
 }
 
-func addTopologyL2Stats(out map[string]any, stats topologyStats) {
+func addTopologyL2Stats(out map[string]any, stats topologymodel.Stats) {
 	l2 := stats.L2
 
 	out["devices_total"] = l2.DevicesTotal
@@ -85,7 +90,7 @@ func addTopologyL2Stats(out map[string]any, stats topologyStats) {
 	}
 }
 
-func addTopologyShapeStats(out map[string]any, stats topologyStats) {
+func addTopologyShapeStats(out map[string]any, stats topologymodel.Stats) {
 	shape := stats.Shape
 
 	out["actors_collapsed_by_ip"] = shape.ActorsCollapsedByIP
@@ -101,10 +106,10 @@ func addTopologyShapeStats(out map[string]any, stats topologyStats) {
 	}
 }
 
-func addTopologyFocusStats(out map[string]any, stats topologyFocusStats) {
+func addTopologyFocusStats(out map[string]any, stats topologymodel.FocusStats) {
 	out["managed_snmp_device_focus"] = stats.ManagedSNMPDeviceFocus
 	if stats.Depth.All {
-		out["depth"] = topologyDepthAll
+		out["depth"] = topologyoptions.DepthAll
 	} else {
 		out["depth"] = stats.Depth.Value
 	}
@@ -112,7 +117,7 @@ func addTopologyFocusStats(out map[string]any, stats topologyFocusStats) {
 	out["links_focus_depth_filtered"] = stats.LinksDepthFiltered
 }
 
-func addTopologyL3Stats(out map[string]any, stats topologyStats) {
+func addTopologyL3Stats(out map[string]any, stats topologymodel.Stats) {
 	l3 := stats.L3
 
 	out["l3_subnet_candidate_subnets"] = l3.SubnetStats.CandidateSubnets
@@ -133,7 +138,7 @@ func addTopologyL3Stats(out map[string]any, stats topologyStats) {
 	}
 }
 
-func addTopologyOSPFStats(out map[string]any, stats topologyStats) {
+func addTopologyOSPFStats(out map[string]any, stats topologymodel.Stats) {
 	ospf := stats.OSPF
 
 	out["ospf_neighbor_rows"] = ospf.ObservedRows
@@ -150,7 +155,7 @@ func addTopologyOSPFStats(out map[string]any, stats topologyStats) {
 	}
 }
 
-func addTopologyBGPStats(out map[string]any, stats topologyStats) {
+func addTopologyBGPStats(out map[string]any, stats topologymodel.Stats) {
 	bgp := stats.BGP
 
 	out["bgp_peer_rows"] = bgp.ObservedRows

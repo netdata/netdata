@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyv1
 
 import (
 	"bytes"
@@ -15,7 +15,10 @@ import (
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
-	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	topologyapi "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,12 +28,12 @@ var updateSNMPTopologyV1Golden = flag.Bool(
 	"rewrite snmp_topology normalized topology.v1 golden testdata",
 )
 
-const snmpTopologyV1GoldenPayloadPath = "testdata/topology_v1_normalized_golden.json"
+const snmpTopologyV1GoldenPayloadPath = "../../testdata/topology_v1_normalized_golden.json"
 
 // Refresh with:
-// go test -count=1 ./plugin/go.d/collector/snmp_topology -run TestSNMPTopologyToV1_NormalizedGolden -update-snmp-topology-v1-golden
+// go test -count=1 ./plugin/go.d/collector/snmp_topology/internal/topologyv1 -run TestSNMPTopologyToV1_NormalizedGolden -update-snmp-topology-v1-golden
 func TestSNMPTopologyToV1_NormalizedGolden(t *testing.T) {
-	data, err := snmpTopologyToV1(snmpTopologyV1GoldenInput())
+	data, err := Render(snmpTopologyV1GoldenInput())
 	require.NoError(t, err)
 	require.NoError(t, validateTopologyV1Data(data))
 
@@ -48,25 +51,25 @@ func TestSNMPTopologyToV1_NormalizedGolden(t *testing.T) {
 	}
 }
 
-func snmpTopologyV1GoldenInput() topologyData {
+func snmpTopologyV1GoldenInput() topologymodel.Data {
 	collectedAt := time.Date(2026, time.January, 2, 3, 4, 5, 0, time.UTC)
 	discoveredAt := time.Date(2026, time.January, 2, 2, 4, 5, 0, time.UTC)
 	lastSeen := time.Date(2026, time.January, 2, 3, 3, 5, 0, time.UTC)
 
-	return topologyData{
-		SchemaVersion: topologySchemaVersion,
+	return topologymodel.Data{
+		SchemaVersion: topologymodel.SchemaVersion,
 		Source:        "snmp_topology_test",
 		Layer:         "multi",
 		AgentID:       "golden-agent",
 		CollectedAt:   collectedAt,
 		View:          "summary",
-		Actors: []topologyActor{
+		Actors: []topologymodel.Actor{
 			{
 				ActorID:   "switch-a",
 				ActorType: "switch",
 				Layer:     "2",
 				Source:    "snmp",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					ChassisIDs:   []string{"aa:bb:cc:00:00:01"},
 					MacAddresses: []string{"aa:bb:cc:00:00:01"},
 					IPAddresses:  []string{"192.0.2.10"},
@@ -79,7 +82,7 @@ func snmpTopologyV1GoldenInput() topologyData {
 					"role": "distribution",
 					"site": "lab",
 				},
-				Detail: topologyActorDetail{
+				Detail: topologymodel.ActorDetail{
 					L2: topologyengine.ProjectionActorDetail{
 						DisplayName: "Switch A",
 						Device: topologyengine.ProjectionDeviceActorDetail{
@@ -130,7 +133,7 @@ func snmpTopologyV1GoldenInput() topologyData {
 							},
 						},
 					},
-					SNMP: topologySNMPActorDetail{
+					SNMP: topologymodel.SNMPActorDetail{
 						Capabilities:       []string{"bridge", "router"},
 						ChartIDPrefix:      "snmp_switch_a",
 						ChartContextPrefix: "snmp.switch_a",
@@ -150,7 +153,7 @@ func snmpTopologyV1GoldenInput() topologyData {
 				ActorType: "router",
 				Layer:     "3",
 				Source:    "snmp",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					ChassisIDs: []string{"aa:bb:cc:00:00:02"},
 					IPAddresses: []string{
 						"198.51.100.1",
@@ -162,7 +165,7 @@ func snmpTopologyV1GoldenInput() topologyData {
 				Labels: map[string]string{
 					"role": "edge",
 				},
-				Detail: topologyActorDetail{
+				Detail: topologymodel.ActorDetail{
 					L2: topologyengine.ProjectionActorDetail{
 						DisplayName: "Router A",
 						Device: topologyengine.ProjectionDeviceActorDetail{
@@ -182,7 +185,7 @@ func snmpTopologyV1GoldenInput() topologyData {
 							},
 						},
 					},
-					SNMP: topologySNMPActorDetail{
+					SNMP: topologymodel.SNMPActorDetail{
 						Capabilities: []string{"router"},
 						ManagementIP: "198.51.100.1",
 						Model:        "ASR 1001",
@@ -190,7 +193,7 @@ func snmpTopologyV1GoldenInput() topologyData {
 						SysDescr:     "Synthetic router A",
 						Vendor:       "Cisco",
 					},
-					BGP: []topologyBGPPeerDetailRow{
+					BGP: []topologymodel.BGPPeerDetailRow{
 						{
 							AdminStatus:           "enabled",
 							BGPVersion:            "4",
@@ -210,7 +213,7 @@ func snmpTopologyV1GoldenInput() topologyData {
 							State:                 "established",
 						},
 					},
-					OSPF: []topologyOSPFNeighborDetailRow{
+					OSPF: []topologymodel.OSPFNeighborDetailRow{
 						{
 							AddresslessIndex: "0",
 							LocalIP:          "198.51.100.1",
@@ -230,27 +233,27 @@ func snmpTopologyV1GoldenInput() topologyData {
 				ActorType: "router",
 				Layer:     "3",
 				Source:    "snmp",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					ChassisIDs:  []string{"aa:bb:cc:00:00:03"},
 					IPAddresses: []string{"198.51.100.2", "203.0.113.2"},
 					SysObjectID: "1.3.6.1.4.1.2636.1.1.1.2.131",
 					SysName:     "router-b",
 				},
-				Detail: topologyActorDetail{
+				Detail: topologymodel.ActorDetail{
 					L2: topologyengine.ProjectionActorDetail{
 						DisplayName: "Router B",
 						Device: topologyengine.ProjectionDeviceActorDetail{
 							ManagementIP: "198.51.100.2",
 						},
 					},
-					SNMP: topologySNMPActorDetail{
+					SNMP: topologymodel.SNMPActorDetail{
 						ManagementIP: "198.51.100.2",
 						Model:        "MX204",
 						OSPFRouterID: "10.255.0.2",
 						SysDescr:     "Synthetic router B",
 						Vendor:       "Juniper",
 					},
-					BGP: []topologyBGPPeerDetailRow{
+					BGP: []topologymodel.BGPPeerDetailRow{
 						{
 							AdminStatus:           "enabled",
 							BGPVersion:            "4",
@@ -270,7 +273,7 @@ func snmpTopologyV1GoldenInput() topologyData {
 							State:                 "established",
 						},
 					},
-					OSPF: []topologyOSPFNeighborDetailRow{
+					OSPF: []topologymodel.OSPFNeighborDetailRow{
 						{
 							AddresslessIndex: "0",
 							LocalIP:          "198.51.100.2",
@@ -290,7 +293,7 @@ func snmpTopologyV1GoldenInput() topologyData {
 				ActorType: "endpoint",
 				Layer:     "2",
 				Source:    "fdb",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					MacAddresses: []string{"00:11:22:33:44:55"},
 					IPAddresses:  []string{"192.0.2.50"},
 					Hostnames:    []string{"server-a"},
@@ -298,7 +301,7 @@ func snmpTopologyV1GoldenInput() topologyData {
 				Labels: map[string]string{
 					"role": "application",
 				},
-				Detail: topologyActorDetail{
+				Detail: topologymodel.ActorDetail{
 					L2: topologyengine.ProjectionActorDetail{
 						DisplayName: "Server A",
 						Endpoint: topologyengine.ProjectionEndpointActorDetail{
@@ -312,17 +315,17 @@ func snmpTopologyV1GoldenInput() topologyData {
 				ActorType: "segment",
 				Layer:     "3",
 				Source:    "ip_mib",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					IPAddresses: []string{"198.51.100.0"},
 				},
-				Detail: topologyActorDetail{
+				Detail: topologymodel.ActorDetail{
 					L2: topologyengine.ProjectionActorDetail{
 						DisplayName: "198.51.100.0/30",
 					},
 				},
 			},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{
 				Layer:      "2",
 				Protocol:   "lldp",
@@ -331,13 +334,13 @@ func snmpTopologyV1GoldenInput() topologyData {
 				State:      "up",
 				SrcActorID: "switch-a",
 				DstActorID: "router-a",
-				Src: topologyLinkEndpoint{
+				Src: topologymodel.LinkEndpoint{
 					IfIndex:      101,
 					IfName:       "Gi1/0/1",
 					ManagementIP: "192.0.2.10",
 					PortID:       "Gi1/0/1",
 				},
-				Dst: topologyLinkEndpoint{
+				Dst: topologymodel.LinkEndpoint{
 					IfIndex:      201,
 					IfName:       "Gi0/0",
 					ManagementIP: "198.51.100.1",
@@ -359,12 +362,12 @@ func snmpTopologyV1GoldenInput() topologyData {
 				State:      "probable",
 				SrcActorID: "switch-a",
 				DstActorID: "server-a",
-				Src: topologyLinkEndpoint{
+				Src: topologymodel.LinkEndpoint{
 					IfIndex: 102,
 					IfName:  "Gi1/0/2",
 					PortID:  "Gi1/0/2",
 				},
-				Dst: topologyLinkEndpoint{},
+				Dst: topologymodel.LinkEndpoint{},
 				Inference: &graph.LinkInference{
 					AttachmentMode: "probable_host",
 					Confidence:     "low",
@@ -373,16 +376,16 @@ func snmpTopologyV1GoldenInput() topologyData {
 			},
 			{
 				Layer:      "3",
-				Protocol:   topologyL3SubnetLinkType,
-				LinkType:   topologyL3SubnetLinkType,
+				Protocol:   topologymodel.L3SubnetLinkType,
+				LinkType:   topologymodel.L3SubnetLinkType,
 				Direction:  "observed",
 				SrcActorID: "router-a",
 				DstActorID: "router-b",
-				Src: topologyLinkEndpoint{
+				Src: topologymodel.LinkEndpoint{
 					IfIndex: 301,
 					IfName:  "xe-0/0/0",
 				},
-				Dst: topologyLinkEndpoint{
+				Dst: topologymodel.LinkEndpoint{
 					IfIndex: 401,
 					IfName:  "xe-0/0/1",
 				},
@@ -390,8 +393,8 @@ func snmpTopologyV1GoldenInput() topologyData {
 					AttachmentMode: "logical_l3_subnet",
 					Inference:      "shared_subnet",
 				},
-				Detail: topologyLinkDetail{
-					L3Subnet: &topologyL3SubnetLinkDetail{
+				Detail: topologymodel.LinkDetail{
+					L3Subnet: &topologymodel.L3SubnetLinkDetail{
 						Source:  "ip_mib",
 						SrcIP:   "198.51.100.1",
 						DstIP:   "198.51.100.2",
@@ -404,20 +407,20 @@ func snmpTopologyV1GoldenInput() topologyData {
 			},
 			{
 				Layer:      "3",
-				Protocol:   topologyOSPFAdjacencyLinkType,
-				LinkType:   topologyOSPFAdjacencyLinkType,
+				Protocol:   topologymodel.OSPFAdjacencyLinkType,
+				LinkType:   topologymodel.OSPFAdjacencyLinkType,
 				Direction:  "observed",
 				State:      "full",
 				SrcActorID: "router-a",
 				DstActorID: "router-b",
-				Src:        topologyLinkEndpoint{},
-				Dst:        topologyLinkEndpoint{},
+				Src:        topologymodel.LinkEndpoint{},
+				Dst:        topologymodel.LinkEndpoint{},
 				Inference: &graph.LinkInference{
 					AttachmentMode: "logical_ospf_adjacency",
 					Inference:      "ospf_neighbor",
 				},
-				Detail: topologyLinkDetail{
-					OSPF: &topologyOSPFAdjacencyLinkDetail{
+				Detail: topologymodel.LinkDetail{
+					OSPF: &topologymodel.OSPFAdjacencyLinkDetail{
 						Source:           "ospf_mib",
 						LocalRouterID:    "10.255.0.1",
 						NeighborRouterID: "10.255.0.2",
@@ -432,20 +435,20 @@ func snmpTopologyV1GoldenInput() topologyData {
 			},
 			{
 				Layer:      "3",
-				Protocol:   topologyBGPAdjacencyLinkType,
-				LinkType:   topologyBGPAdjacencyLinkType,
+				Protocol:   topologymodel.BGPAdjacencyLinkType,
+				LinkType:   topologymodel.BGPAdjacencyLinkType,
 				Direction:  "observed",
 				State:      "established",
 				SrcActorID: "router-a",
 				DstActorID: "router-b",
-				Src:        topologyLinkEndpoint{},
-				Dst:        topologyLinkEndpoint{},
+				Src:        topologymodel.LinkEndpoint{},
+				Dst:        topologymodel.LinkEndpoint{},
 				Inference: &graph.LinkInference{
 					AttachmentMode: "logical_bgp_adjacency",
 					Inference:      "bgp_peer",
 				},
-				Detail: topologyLinkDetail{
-					BGP: &topologyBGPAdjacencyLinkDetail{
+				Detail: topologymodel.LinkDetail{
+					BGP: &topologymodel.BGPAdjacencyLinkDetail{
 						Source:          "bgp_mib",
 						RoutingInstance: "default",
 						LocalIdentifier: "10.255.0.1",
@@ -458,31 +461,31 @@ func snmpTopologyV1GoldenInput() topologyData {
 				},
 			},
 		},
-		Stats: topologyStats{
-			Shape: topologyShapeStats{
+		Stats: topologymodel.Stats{
+			Shape: topologymodel.ShapeStats{
 				ActorsCollapsedByIP:     1,
 				ActorsMapTypeSuppressed: 2,
-				MapType:                 topologyMapTypeHighConfidenceInferred,
+				MapType:                 topologyoptions.MapTypeHighConfidenceInferred,
 			},
 			HasShape: true,
-			Focus: topologyFocusStats{
-				ManagedSNMPDeviceFocus: topologyManagedFocusAllDevices,
-				Depth:                  topologyFocusDepth{All: true},
+			Focus: topologymodel.FocusStats{
+				ManagedSNMPDeviceFocus: topologyoptions.ManagedFocusAllDevices,
+				Depth:                  topologymodel.FocusDepth{All: true},
 			},
 			HasFocus: true,
-			L3: topologyL3EnrichmentStats{
+			L3: topologymodel.L3EnrichmentStats{
 				EmittedLinks: 1,
 			},
 			HasL3: true,
-			OSPF: topologyOSPFEnrichmentStats{
+			OSPF: topologymodel.OSPFEnrichmentStats{
 				EmittedLinks: 1,
 			},
 			HasOSPF: true,
-			BGP: topologyBGPEnrichmentStats{
+			BGP: topologymodel.BGPEnrichmentStats{
 				EmittedLinks: 1,
 			},
 			HasBGP: true,
-			Recomputed: topologyRecomputedStats{
+			Recomputed: topologymodel.RecomputedStats{
 				ActorsTotal:               5,
 				LinksTotal:                5,
 				LinksProbable:             1,
@@ -497,13 +500,13 @@ func snmpTopologyV1GoldenInput() topologyData {
 
 type normalizedTopologyV1GoldenData struct {
 	SchemaVersion string                                   `json:"schema_version"`
-	Producer      topologyv1.Producer                      `json:"producer"`
+	Producer      topologyapi.Producer                     `json:"producer"`
 	CollectedAt   string                                   `json:"collected_at"`
 	ValidAfter    string                                   `json:"valid_after,omitempty"`
 	ValidUntil    string                                   `json:"valid_until,omitempty"`
-	View          *topologyv1.View                         `json:"view,omitempty"`
-	Types         topologyv1.TypeRegistry                  `json:"types"`
-	Presentation  *topologyv1.Presentation                 `json:"presentation,omitempty"`
+	View          *topologyapi.View                        `json:"view,omitempty"`
+	Types         topologyapi.TypeRegistry                 `json:"types"`
+	Presentation  *topologyapi.Presentation                `json:"presentation,omitempty"`
 	Correlation   any                                      `json:"correlation,omitempty"`
 	Actors        normalizedTopologyV1GoldenTable          `json:"actors"`
 	Links         normalizedTopologyV1GoldenTable          `json:"links"`
@@ -533,7 +536,7 @@ type topologyV1GoldenRefs struct {
 	links  []string
 }
 
-func normalizeTopologyV1GoldenData(t *testing.T, data topologyv1.Data) normalizedTopologyV1GoldenData {
+func normalizeTopologyV1GoldenData(t *testing.T, data topologyapi.Data) normalizedTopologyV1GoldenData {
 	t.Helper()
 
 	refs := topologyV1GoldenRefs{}
@@ -598,8 +601,8 @@ func normalizeTopologyV1GoldenData(t *testing.T, data topologyv1.Data) normalize
 
 func topologyV1GoldenNormalizeTable(
 	t *testing.T,
-	data topologyv1.Data,
-	table topologyv1.Table,
+	data topologyapi.Data,
+	table topologyapi.Table,
 	refs topologyV1GoldenRefs,
 ) normalizedTopologyV1GoldenTable {
 	t.Helper()
@@ -612,8 +615,8 @@ func topologyV1GoldenNormalizeTable(
 
 func topologyV1GoldenTableRows(
 	t *testing.T,
-	data topologyv1.Data,
-	table topologyv1.Table,
+	data topologyapi.Data,
+	table topologyapi.Table,
 	refs topologyV1GoldenRefs,
 ) []map[string]any {
 	t.Helper()
@@ -635,7 +638,89 @@ func topologyV1GoldenTableRows(
 	return rows
 }
 
-func topologyV1GoldenColumnSummaries(columns []topologyv1.Column) []string {
+func validateTopologyV1Data(data topologyapi.Data) error {
+	bs, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(bs, &decoded); err != nil {
+		return err
+	}
+	if err := topologyapi.ValidateDecodedData(decoded); err != nil {
+		return err
+	}
+
+	schemaPath := filepath.Clean(filepath.Join("..", "..", "..", "..", "..", "..", "..", "plugins.d", "FUNCTION_TOPOLOGY_SCHEMA.json"))
+	schemaBytes, err := os.ReadFile(schemaPath)
+	if err != nil {
+		return err
+	}
+	var schemaDoc any
+	if err := json.Unmarshal(schemaBytes, &schemaDoc); err != nil {
+		return err
+	}
+	compiler := jsonschema.NewCompiler()
+	if err := compiler.AddResource("schema.json", schemaDoc); err != nil {
+		return err
+	}
+	schema, err := compiler.Compile("schema.json")
+	if err != nil {
+		return err
+	}
+	var response any
+	if err := json.Unmarshal([]byte(`{"status":200,"type":"topology","data":`+string(bs)+`}`), &response); err != nil {
+		return err
+	}
+	return schema.Validate(response)
+}
+
+func topologyV1DecodeColumnValues(t *testing.T, table topologyapi.Table, columnIndex int) []any {
+	t.Helper()
+
+	switch encoding := table.Values[columnIndex].(type) {
+	case topologyapi.ValuesEncoding:
+		return encoding.Values
+	case *topologyapi.ValuesEncoding:
+		require.NotNil(t, encoding)
+		return encoding.Values
+	case topologyapi.ConstEncoding:
+		values := make([]any, table.Rows)
+		for i := range values {
+			values[i] = encoding.Value
+		}
+		return values
+	case *topologyapi.ConstEncoding:
+		require.NotNil(t, encoding)
+		values := make([]any, table.Rows)
+		for i := range values {
+			values[i] = encoding.Value
+		}
+		return values
+	case topologyapi.DictEncoding:
+		values := make([]any, 0, len(encoding.Indexes))
+		for _, index := range encoding.Indexes {
+			require.GreaterOrEqual(t, index, 0)
+			require.Less(t, index, len(encoding.Values))
+			values = append(values, encoding.Values[index])
+		}
+		return values
+	case *topologyapi.DictEncoding:
+		require.NotNil(t, encoding)
+		values := make([]any, 0, len(encoding.Indexes))
+		for _, index := range encoding.Indexes {
+			require.GreaterOrEqual(t, index, 0)
+			require.Less(t, index, len(encoding.Values))
+			values = append(values, encoding.Values[index])
+		}
+		return values
+	default:
+		require.Failf(t, "unsupported encoding", "column %d has unsupported encoding %T", columnIndex, encoding)
+		return nil
+	}
+}
+
+func topologyV1GoldenColumnSummaries(columns []topologyapi.Column) []string {
 	out := make([]string, len(columns))
 	for i, column := range columns {
 		summary := column.ID + ":" + column.Type
@@ -661,8 +746,8 @@ func topologyV1GoldenColumnSummaries(columns []topologyv1.Column) []string {
 
 func topologyV1GoldenDecodeValue(
 	t *testing.T,
-	data topologyv1.Data,
-	column topologyv1.Column,
+	data topologyapi.Data,
+	column topologyapi.Column,
 	value any,
 	refs topologyV1GoldenRefs,
 ) any {
@@ -684,7 +769,7 @@ func topologyV1GoldenDecodeValue(
 	}
 }
 
-func topologyV1GoldenDictionaryValue(t *testing.T, data topologyv1.Data, column topologyv1.Column, value any) any {
+func topologyV1GoldenDictionaryValue(t *testing.T, data topologyapi.Data, column topologyapi.Column, value any) any {
 	t.Helper()
 
 	ref := topologyV1GoldenIntValue(t, value)

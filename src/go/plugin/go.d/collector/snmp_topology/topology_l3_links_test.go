@@ -104,10 +104,10 @@ func TestApplyTopologyL3SubnetEnrichmentSuppressions(t *testing.T) {
 			require.Equal(t, tc.wantUnresolvedActor, stats.SuppressedUnresolvedActor)
 			require.Equal(t, tc.wantSelfActor, stats.SuppressedSelfActor)
 			require.Equal(t, tc.wantDuplicateLink, stats.SuppressedDuplicateLink)
-			require.Equal(t, 1, topologyStatsToV1(tc.data.Stats)["l3_subnet_candidate_links"])
-			require.Equal(t, 0, topologyStatsToV1(tc.data.Stats)["l3_subnet_emitted_links"])
-			require.Equal(t, tc.wantVisibleLinks, topologyStatsToV1(tc.data.Stats)["l3_subnet_visible_links"])
-			require.Equal(t, 1, topologyStatsToV1(tc.data.Stats)[tc.wantSuppressedMetricName])
+			require.Equal(t, 1, topologyStatsToV1ForTest(t, tc.data.Stats)["l3_subnet_candidate_links"])
+			require.Equal(t, 0, topologyStatsToV1ForTest(t, tc.data.Stats)["l3_subnet_emitted_links"])
+			require.Equal(t, tc.wantVisibleLinks, topologyStatsToV1ForTest(t, tc.data.Stats)["l3_subnet_visible_links"])
+			require.Equal(t, 1, topologyStatsToV1ForTest(t, tc.data.Stats)[tc.wantSuppressedMetricName])
 		})
 	}
 }
@@ -189,8 +189,8 @@ func TestApplyTopologyDepthFocusFilterKeepsIncidentL3SubnetLink(t *testing.T) {
 	require.Len(t, data.Actors, 2)
 	require.Len(t, data.Links, 1)
 	require.Equal(t, topologyL3SubnetLinkType, data.Links[0].LinkType)
-	require.Equal(t, 1, topologyStatsToV1(data.Stats)["l3_subnet_emitted_links"])
-	require.Equal(t, 1, topologyStatsToV1(data.Stats)["l3_subnet_visible_links"])
+	require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["l3_subnet_emitted_links"])
+	require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["l3_subnet_visible_links"])
 }
 
 func topologyL3ManagedActorForTest(actorID string, attrs map[string]any, ips ...string) topologyActor {
@@ -203,7 +203,7 @@ func topologyL3ManagedActorForTest(actorID string, attrs map[string]any, ips ...
 			},
 		},
 		SNMP: topologySNMPActorDetail{
-			OSPFRouterID: topologyutil.NormalizeTopologyRouterID(anyStringValue(attrs[tagOSPFRouterID])),
+			OSPFRouterID: topologyutil.NormalizeTopologyRouterID(topologyL3TestString(attrs, tagOSPFRouterID)),
 		},
 	}
 	return topologyActor{

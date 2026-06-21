@@ -64,3 +64,43 @@ func TestNormalizeHexHelpers_ClassifyTokensDeterministically(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeBGPPeerAddress(t *testing.T) {
+	tests := map[string]struct {
+		in   string
+		want string
+	}{
+		"normalizes-hex-ip":             {in: "C0000202", want: "192.0.2.2"},
+		"normalizes-ipv6-mapped-ipv4":   {in: "::ffff:192.0.2.2", want: "192.0.2.2"},
+		"drops-unspecified-ip":          {in: "0.0.0.0"},
+		"drops-unspecified-ipv6":        {in: "::"},
+		"preserves-non-ip-diagnostic":   {in: "peer-token", want: "peer-token"},
+		"trims-non-ip-diagnostic-token": {in: " peer-token ", want: "peer-token"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.want, NormalizeBGPPeerAddress(tc.in))
+		})
+	}
+}
+
+func TestNormalizeOSPFNeighborState(t *testing.T) {
+	tests := map[string]struct {
+		in   string
+		want string
+	}{
+		"numeric-full":          {in: "8", want: "full"},
+		"numeric-two-way":       {in: "4", want: "twoWay"},
+		"snake-exstart":         {in: "exchange_start", want: "exchangeStart"},
+		"short-exstart":         {in: "exstart", want: "exchangeStart"},
+		"preserves-vendor":      {in: "vendorSpecific", want: "vendorSpecific"},
+		"trims-preserved-value": {in: " vendorSpecific ", want: "vendorSpecific"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.want, NormalizeOSPFNeighborState(tc.in))
+		})
+	}
+}

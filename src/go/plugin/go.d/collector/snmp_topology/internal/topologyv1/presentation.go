@@ -1,38 +1,41 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologyv1
 
-import topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+import (
+	topologyapi "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+)
 
-func snmpTopologyV1ActorTypes() map[string]topologyv1.ActorType {
-	types := make(map[string]topologyv1.ActorType)
+func snmpTopologyV1ActorTypes() map[string]topologyapi.ActorType {
+	types := make(map[string]topologyapi.ActorType)
 	addDevice := func(id, label, colorSlot, icon string) {
-		types[id] = topologyv1.ActorType{
+		types[id] = topologyapi.ActorType{
 			Layer:             "network",
 			Identity:          []string{"id"},
 			MergeIdentity:     []string{"chassis_ids", "mac_addresses", "ip_addresses", "sys_name"},
 			AggregationScopes: []string{"device", "network"},
-			Search: &topologyv1.ActorSearchPolicy{
+			Search: &topologyapi.ActorSearchPolicy{
 				Columns:   []string{"display_name", "sys_name", "management_ip", "vendor", "model"},
-				LabelKeys: []string{tagOSPFRouterID},
+				LabelKeys: []string{topologymodel.LabelOSPFRouterID},
 			},
-			Presentation: &topologyv1.ActorPresentation{
+			Presentation: &topologyapi.ActorPresentation{
 				Label:     label,
 				Role:      "actor",
 				Icon:      icon,
 				ColorSlot: colorSlot,
-				Border:    &topologyv1.BorderPresentation{Enabled: new(true)},
-				Size:      &topologyv1.ActorSizePresentation{Mode: "link_count", Scale: "emphasized"},
-				Layout:    &topologyv1.ActorLayoutPresentation{Repulsion: "stronger"},
-				LabelPolicy: &topologyv1.LabelPolicy{
+				Border:    &topologyapi.BorderPresentation{Enabled: new(true)},
+				Size:      &topologyapi.ActorSizePresentation{Mode: "link_count", Scale: "emphasized"},
+				Layout:    &topologyapi.ActorLayoutPresentation{Repulsion: "stronger"},
+				LabelPolicy: &topologyapi.LabelPolicy{
 					Columns:   []string{"display_name", "sys_name"},
 					Fallback:  "type_label",
 					MaxLength: 80,
 					Array:     "reject",
 				},
-				Ports: &topologyv1.ActorPortsPresentation{
+				Ports: &topologyapi.ActorPortsPresentation{
 					ShowBullets: true,
-					Sources: []topologyv1.PortSourcePresentation{
+					Sources: []topologyapi.PortSourcePresentation{
 						{
 							Source:       "actor_table",
 							Table:        "actor_ports",
@@ -64,21 +67,21 @@ func snmpTopologyV1ActorTypes() map[string]topologyv1.ActorType {
 	addDevice("ups", "UPS", "structural", "ups")
 	addDevice("camera", "Camera", "neutral", "camera")
 
-	types[snmpTopologyV1ActorEndpoint] = topologyv1.ActorType{
+	types[snmpTopologyV1ActorEndpoint] = topologyapi.ActorType{
 		Layer:             "network",
 		Identity:          []string{"id"},
 		MergeIdentity:     []string{"mac_addresses", "ip_addresses"},
 		AggregationScopes: []string{"endpoint", "network"},
-		Search:            &topologyv1.ActorSearchPolicy{Columns: []string{"display_name"}},
-		Presentation: &topologyv1.ActorPresentation{
+		Search:            &topologyapi.ActorSearchPolicy{Columns: []string{"display_name"}},
+		Presentation: &topologyapi.ActorPresentation{
 			Label:     "Inferred endpoint",
 			Role:      "endpoint",
 			Icon:      "remote-endpoint",
 			ColorSlot: "derived",
-			Border:    &topologyv1.BorderPresentation{Enabled: new(true)},
-			Size:      &topologyv1.ActorSizePresentation{Mode: "fixed", Scale: "compact"},
-			Layout:    &topologyv1.ActorLayoutPresentation{Repulsion: "weaker"},
-			LabelPolicy: &topologyv1.LabelPolicy{
+			Border:    &topologyapi.BorderPresentation{Enabled: new(true)},
+			Size:      &topologyapi.ActorSizePresentation{Mode: "fixed", Scale: "compact"},
+			Layout:    &topologyapi.ActorLayoutPresentation{Repulsion: "weaker"},
+			LabelPolicy: &topologyapi.LabelPolicy{
 				Columns:   []string{"display_name"},
 				Fallback:  "type_label",
 				MaxLength: 80,
@@ -87,21 +90,21 @@ func snmpTopologyV1ActorTypes() map[string]topologyv1.ActorType {
 			Modal: snmpTopologyV1EndpointModal(),
 		},
 	}
-	types[snmpTopologyV1ActorSegment] = topologyv1.ActorType{
+	types[snmpTopologyV1ActorSegment] = topologyapi.ActorType{
 		Layer:             "network",
 		Identity:          []string{"id"},
 		MergeIdentity:     []string{"id"},
 		ParentIdentity:    []string{"parent_devices"},
 		AggregationScopes: []string{"segment", "network"},
-		Search:            &topologyv1.ActorSearchPolicy{Enabled: new(false)},
-		Presentation: &topologyv1.ActorPresentation{
+		Search:            &topologyapi.ActorSearchPolicy{Enabled: new(false)},
+		Presentation: &topologyapi.ActorPresentation{
 			Label:     "Network segment",
 			Role:      "group",
 			Icon:      "segment",
 			ColorSlot: "dim",
-			Size:      &topologyv1.ActorSizePresentation{Mode: "fixed", Scale: "compact"},
-			Layout:    &topologyv1.ActorLayoutPresentation{Repulsion: "weakest"},
-			LabelPolicy: &topologyv1.LabelPolicy{
+			Size:      &topologyapi.ActorSizePresentation{Mode: "fixed", Scale: "compact"},
+			Layout:    &topologyapi.ActorLayoutPresentation{Repulsion: "weakest"},
+			LabelPolicy: &topologyapi.LabelPolicy{
 				Columns:   []string{"display_name"},
 				Fallback:  "type_label",
 				MaxLength: 80,
@@ -110,18 +113,18 @@ func snmpTopologyV1ActorTypes() map[string]topologyv1.ActorType {
 			Modal: snmpTopologyV1EndpointModal(),
 		},
 	}
-	types["custom"] = topologyv1.ActorType{
+	types["custom"] = topologyapi.ActorType{
 		Layer:             "custom",
 		Identity:          []string{"id"},
 		MergeIdentity:     []string{"id"},
 		AggregationScopes: []string{"network"},
-		Search:            &topologyv1.ActorSearchPolicy{Columns: []string{"display_name"}},
-		Presentation: &topologyv1.ActorPresentation{
+		Search:            &topologyapi.ActorSearchPolicy{Columns: []string{"display_name"}},
+		Presentation: &topologyapi.ActorPresentation{
 			Label:     "Custom",
 			Role:      "actor",
 			Icon:      "service",
 			ColorSlot: "neutral",
-			LabelPolicy: &topologyv1.LabelPolicy{
+			LabelPolicy: &topologyapi.LabelPolicy{
 				Columns:   []string{"display_name"},
 				Fallback:  "type_label",
 				MaxLength: 80,
@@ -133,25 +136,25 @@ func snmpTopologyV1ActorTypes() map[string]topologyv1.ActorType {
 	return types
 }
 
-func snmpTopologyV1DeviceModal() *topologyv1.ModalPresentation {
-	return &topologyv1.ModalPresentation{
+func snmpTopologyV1DeviceModal() *topologyapi.ModalPresentation {
+	return &topologyapi.ModalPresentation{
 		Labels:       snmpTopologyV1DeviceModalLabels(),
-		MiniTopology: &topologyv1.ModalMiniTopologyPresentation{Depth: 1},
-		Sections: []topologyv1.ModalSection{
+		MiniTopology: &topologyapi.ModalMiniTopologyPresentation{Depth: 1},
+		Sections: []topologyapi.ModalSection{
 			{
 				ID:    "ports",
 				Label: "Ports",
 				Order: 1,
-				Source: topologyv1.ModalSource{
+				Source: topologyapi.ModalSource{
 					Kind:  "actor_table",
 					Table: "actor_ports",
 				},
-				OwnerFilter: &topologyv1.ModalOwnerFilter{
+				OwnerFilter: &topologyapi.ModalOwnerFilter{
 					Mode:        "actor_column",
 					ActorColumn: "actor",
 				},
 				Columns: snmpTopologyV1PortModalColumns(),
-				Sort:    &topologyv1.ModalSort{Column: "if_index", Direction: "asc"},
+				Sort:    &topologyapi.ModalSort{Column: "if_index", Direction: "asc"},
 			},
 			snmpTopologyV1PortLinksSection(2),
 			snmpTopologyV1L3SubnetSection(3),
@@ -161,24 +164,24 @@ func snmpTopologyV1DeviceModal() *topologyv1.ModalPresentation {
 	}
 }
 
-func snmpTopologyV1EndpointModal() *topologyv1.ModalPresentation {
-	return &topologyv1.ModalPresentation{
+func snmpTopologyV1EndpointModal() *topologyapi.ModalPresentation {
+	return &topologyapi.ModalPresentation{
 		Labels:       snmpTopologyV1EndpointModalLabels(),
-		MiniTopology: &topologyv1.ModalMiniTopologyPresentation{Depth: 1},
-		Sections:     []topologyv1.ModalSection{snmpTopologyV1LinksSection(1)},
+		MiniTopology: &topologyapi.ModalMiniTopologyPresentation{Depth: 1},
+		Sections:     []topologyapi.ModalSection{snmpTopologyV1LinksSection(1)},
 	}
 }
 
-func snmpTopologyV1DeviceModalLabels() *topologyv1.ModalLabelsPresentation {
-	return &topologyv1.ModalLabelsPresentation{
+func snmpTopologyV1DeviceModalLabels() *topologyapi.ModalLabelsPresentation {
+	return &topologyapi.ModalLabelsPresentation{
 		Table: "actor_labels",
-		Identification: &topologyv1.ModalLabelIdentificationPresentation{
-			Fields: []topologyv1.ModalLabelIdentificationField{
+		Identification: &topologyapi.ModalLabelIdentificationPresentation{
+			Fields: []topologyapi.ModalLabelIdentificationField{
 				{Key: "display_name", Label: "Name", MaxValues: 1},
 				{Key: "management_ip", Label: "Management IP", MaxValues: 1},
 				{Key: "vendor", Label: "Vendor", MaxValues: 1},
 				{Key: "model", Label: "Model", MaxValues: 1},
-				{Key: tagOSPFRouterID, Label: "OSPF Router ID", MaxValues: 1},
+				{Key: topologymodel.LabelOSPFRouterID, Label: "OSPF Router ID", MaxValues: 1},
 				{Key: "ports_total", Label: "Ports", MaxValues: 1},
 				{Key: "lldp_neighbor_count", Label: "LLDP", MaxValues: 1},
 				{Key: "cdp_neighbor_count", Label: "CDP", MaxValues: 1},
@@ -187,11 +190,11 @@ func snmpTopologyV1DeviceModalLabels() *topologyv1.ModalLabelsPresentation {
 	}
 }
 
-func snmpTopologyV1EndpointModalLabels() *topologyv1.ModalLabelsPresentation {
-	return &topologyv1.ModalLabelsPresentation{
+func snmpTopologyV1EndpointModalLabels() *topologyapi.ModalLabelsPresentation {
+	return &topologyapi.ModalLabelsPresentation{
 		Table: "actor_labels",
-		Identification: &topologyv1.ModalLabelIdentificationPresentation{
-			Fields: []topologyv1.ModalLabelIdentificationField{
+		Identification: &topologyapi.ModalLabelIdentificationPresentation{
+			Fields: []topologyapi.ModalLabelIdentificationField{
 				{Key: "display_name", Label: "Name", MaxValues: 1},
 				{Key: "ip_address", Label: "IP", MaxValues: 2},
 				{Key: "mac_address", Label: "MAC", MaxValues: 2},
@@ -201,24 +204,24 @@ func snmpTopologyV1EndpointModalLabels() *topologyv1.ModalLabelsPresentation {
 	}
 }
 
-func snmpTopologyV1LinksSection(order int) topologyv1.ModalSection {
-	return topologyv1.ModalSection{
+func snmpTopologyV1LinksSection(order int) topologyapi.ModalSection {
+	return topologyapi.ModalSection{
 		ID:    "links",
 		Label: "Links",
 		Order: order,
-		Source: topologyv1.ModalSource{
+		Source: topologyapi.ModalSource{
 			Kind: "links",
 		},
-		OwnerFilter: &topologyv1.ModalOwnerFilter{
+		OwnerFilter: &topologyapi.ModalOwnerFilter{
 			Mode:           "incident_link",
 			SrcActorColumn: "src_actor",
 			DstActorColumn: "dst_actor",
 		},
-		Columns: []topologyv1.ModalColumn{
+		Columns: []topologyapi.ModalColumn{
 			{
 				ID:    "remote",
 				Label: "Remote Actor",
-				Projection: topologyv1.ModalProjection{
+				Projection: topologyapi.ModalProjection{
 					Kind:           "opposite_actor",
 					SrcActorColumn: "src_actor",
 					DstActorColumn: "dst_actor",
@@ -235,45 +238,45 @@ func snmpTopologyV1LinksSection(order int) topologyv1.ModalSection {
 	}
 }
 
-func snmpTopologyV1PortLinksSection(order int) topologyv1.ModalSection {
-	return topologyv1.ModalSection{
+func snmpTopologyV1PortLinksSection(order int) topologyapi.ModalSection {
+	return topologyapi.ModalSection{
 		ID:    "port_neighbors",
 		Label: "Port Neighbors",
 		Order: order,
-		Source: topologyv1.ModalSource{
+		Source: topologyapi.ModalSource{
 			Kind:  "actor_table",
 			Table: "actor_port_links",
 		},
-		OwnerFilter: &topologyv1.ModalOwnerFilter{
+		OwnerFilter: &topologyapi.ModalOwnerFilter{
 			Mode:        "actor_column",
 			ActorColumn: "actor",
 		},
 		Columns:    snmpTopologyV1PortLinkModalColumns(),
-		Sort:       &topologyv1.ModalSort{Column: "if_index", Direction: "asc"},
+		Sort:       &topologyapi.ModalSort{Column: "if_index", Direction: "asc"},
 		EmptyLabel: "No port neighbors",
 	}
 }
 
-func snmpTopologyV1L3SubnetSection(order int) topologyv1.ModalSection {
-	return topologyv1.ModalSection{
+func snmpTopologyV1L3SubnetSection(order int) topologyapi.ModalSection {
+	return topologyapi.ModalSection{
 		ID:    "l3_adjacencies",
 		Label: "L3 Adjacencies",
 		Order: order,
-		Source: topologyv1.ModalSource{
+		Source: topologyapi.ModalSource{
 			Kind:     "evidence",
 			Evidence: snmpTopologyV1LinkL3Subnet,
 		},
-		OwnerFilter: &topologyv1.ModalOwnerFilter{
+		OwnerFilter: &topologyapi.ModalOwnerFilter{
 			Mode:           "incident_evidence",
 			LinkColumn:     "link",
 			SrcActorColumn: "src_actor",
 			DstActorColumn: "dst_actor",
 		},
-		Columns: []topologyv1.ModalColumn{
+		Columns: []topologyapi.ModalColumn{
 			{
 				ID:    "remote",
 				Label: "Remote Actor",
-				Projection: topologyv1.ModalProjection{
+				Projection: topologyapi.ModalProjection{
 					Kind:           "opposite_actor",
 					SrcActorColumn: "src_actor",
 					DstActorColumn: "dst_actor",
@@ -290,54 +293,54 @@ func snmpTopologyV1L3SubnetSection(order int) topologyv1.ModalSection {
 			modalDirectColumnWithVisibility("inference", "Inference", "inference", "badge", "expanded"),
 			modalDirectColumnWithVisibility("attachment_mode", "Attachment", "attachment_mode", "badge", "expanded"),
 		},
-		Sort:       &topologyv1.ModalSort{Column: "subnet", Direction: "asc"},
+		Sort:       &topologyapi.ModalSort{Column: "subnet", Direction: "asc"},
 		EmptyLabel: "No L3 adjacencies",
 	}
 }
 
-func snmpTopologyV1OSPFNeighborsSection(order int) topologyv1.ModalSection {
-	return topologyv1.ModalSection{
+func snmpTopologyV1OSPFNeighborsSection(order int) topologyapi.ModalSection {
+	return topologyapi.ModalSection{
 		ID:    "ospf_neighbors",
 		Label: "OSPF Neighbors",
 		Order: order,
-		Source: topologyv1.ModalSource{
+		Source: topologyapi.ModalSource{
 			Kind:  "actor_table",
 			Table: "actor_ospf_neighbors",
 		},
-		OwnerFilter: &topologyv1.ModalOwnerFilter{
+		OwnerFilter: &topologyapi.ModalOwnerFilter{
 			Mode:        "actor_column",
 			ActorColumn: "actor",
 		},
 		Columns:    snmpTopologyV1OSPFNeighborModalColumns(),
-		Sort:       &topologyv1.ModalSort{Column: "neighbor_router_id", Direction: "asc"},
+		Sort:       &topologyapi.ModalSort{Column: "neighbor_router_id", Direction: "asc"},
 		EmptyLabel: "No OSPF neighbors",
 	}
 }
 
-func snmpTopologyV1BGPPeersSection(order int) topologyv1.ModalSection {
-	return topologyv1.ModalSection{
+func snmpTopologyV1BGPPeersSection(order int) topologyapi.ModalSection {
+	return topologyapi.ModalSection{
 		ID:    "bgp_peers",
 		Label: "BGP Peers",
 		Order: order,
-		Source: topologyv1.ModalSource{
+		Source: topologyapi.ModalSource{
 			Kind:  "actor_table",
 			Table: "actor_bgp_peers",
 		},
-		OwnerFilter: &topologyv1.ModalOwnerFilter{
+		OwnerFilter: &topologyapi.ModalOwnerFilter{
 			Mode:        "actor_column",
 			ActorColumn: "actor",
 		},
 		Columns:    snmpTopologyV1BGPPeerModalColumns(),
-		Sort:       &topologyv1.ModalSort{Column: "neighbor_ip", Direction: "asc"},
+		Sort:       &topologyapi.ModalSort{Column: "neighbor_ip", Direction: "asc"},
 		EmptyLabel: "No BGP peers",
 	}
 }
 
-func modalSelectedSidePortColumn(id, label, selectedSrcPortColumn, selectedDstPortColumn string) topologyv1.ModalColumn {
-	return topologyv1.ModalColumn{
+func modalSelectedSidePortColumn(id, label, selectedSrcPortColumn, selectedDstPortColumn string) topologyapi.ModalColumn {
+	return topologyapi.ModalColumn{
 		ID:    id,
 		Label: label,
-		Projection: topologyv1.ModalProjection{
+		Projection: topologyapi.ModalProjection{
 			Kind:             "selected_side_endpoint",
 			SrcActorColumn:   "src_actor",
 			DstActorColumn:   "dst_actor",
@@ -348,11 +351,11 @@ func modalSelectedSidePortColumn(id, label, selectedSrcPortColumn, selectedDstPo
 	}
 }
 
-func modalSelectedSideEndpointColumn(id, label, selectedSrcIPColumn, selectedSrcPortColumn, selectedDstIPColumn, selectedDstPortColumn string) topologyv1.ModalColumn {
-	return topologyv1.ModalColumn{
+func modalSelectedSideEndpointColumn(id, label, selectedSrcIPColumn, selectedSrcPortColumn, selectedDstIPColumn, selectedDstPortColumn string) topologyapi.ModalColumn {
+	return topologyapi.ModalColumn{
 		ID:    id,
 		Label: label,
-		Projection: topologyv1.ModalProjection{
+		Projection: topologyapi.ModalProjection{
 			Kind:             "selected_side_endpoint",
 			SrcActorColumn:   "src_actor",
 			DstActorColumn:   "dst_actor",
@@ -365,26 +368,26 @@ func modalSelectedSideEndpointColumn(id, label, selectedSrcIPColumn, selectedSrc
 	}
 }
 
-func modalDirectColumn(id, label, sourceColumn, cell string) topologyv1.ModalColumn {
-	return topologyv1.ModalColumn{
+func modalDirectColumn(id, label, sourceColumn, cell string) topologyapi.ModalColumn {
+	return topologyapi.ModalColumn{
 		ID:         id,
 		Label:      label,
-		Projection: topologyv1.ModalProjection{Kind: "direct", Column: sourceColumn},
+		Projection: topologyapi.ModalProjection{Kind: "direct", Column: sourceColumn},
 		Cell:       cell,
 	}
 }
 
-func modalDirectColumnWithVisibility(id, label, sourceColumn, cell, visibility string) topologyv1.ModalColumn {
+func modalDirectColumnWithVisibility(id, label, sourceColumn, cell, visibility string) topologyapi.ModalColumn {
 	column := modalDirectColumn(id, label, sourceColumn, cell)
 	column.Visibility = visibility
 	return column
 }
 
-func modalActorRefColumn(id, label, actorColumn string) topologyv1.ModalColumn {
-	return topologyv1.ModalColumn{
+func modalActorRefColumn(id, label, actorColumn string) topologyapi.ModalColumn {
+	return topologyapi.ModalColumn{
 		ID:    id,
 		Label: label,
-		Projection: topologyv1.ModalProjection{
+		Projection: topologyapi.ModalProjection{
 			Kind:        "actor_ref_label",
 			ActorColumn: actorColumn,
 		},
@@ -392,23 +395,23 @@ func modalActorRefColumn(id, label, actorColumn string) topologyv1.ModalColumn {
 	}
 }
 
-func modalActorRefColumnWithVisibility(id, label, actorColumn, visibility string) topologyv1.ModalColumn {
+func modalActorRefColumnWithVisibility(id, label, actorColumn, visibility string) topologyapi.ModalColumn {
 	column := modalActorRefColumn(id, label, actorColumn)
 	column.Visibility = visibility
 	return column
 }
 
-func snmpTopologyV1PortTypes() map[string]topologyv1.PortType {
-	return map[string]topologyv1.PortType{
-		"lldp":           {Presentation: &topologyv1.PortPresentation{Label: "lldp/cdp", ColorSlot: "accent", Opacity: "normal"}},
-		"switch_facing":  {Presentation: &topologyv1.PortPresentation{Label: "switch-facing", ColorSlot: "primary", Opacity: "normal"}},
-		"host_facing":    {Presentation: &topologyv1.PortPresentation{Label: "host-facing", ColorSlot: "secondary", Opacity: "normal"}},
-		"host_candidate": {Presentation: &topologyv1.PortPresentation{Label: "host-candidate", ColorSlot: "info", Opacity: "normal"}},
-		"trunk":          {Presentation: &topologyv1.PortPresentation{Label: "trunk", ColorSlot: "warning", Opacity: "normal"}},
-		"access":         {Presentation: &topologyv1.PortPresentation{Label: "access", ColorSlot: "derived", Opacity: "normal"}},
-		"topology":       {Presentation: &topologyv1.PortPresentation{Label: "unclassified", ColorSlot: "neutral", Opacity: "normal"}},
-		"idle":           {Presentation: &topologyv1.PortPresentation{Label: "idle", ColorSlot: "muted", Opacity: "muted"}},
-		"unknown":        {Presentation: &topologyv1.PortPresentation{Label: "unknown", ColorSlot: "dim", Opacity: "muted"}},
+func snmpTopologyV1PortTypes() map[string]topologyapi.PortType {
+	return map[string]topologyapi.PortType{
+		"lldp":           {Presentation: &topologyapi.PortPresentation{Label: "lldp/cdp", ColorSlot: "accent", Opacity: "normal"}},
+		"switch_facing":  {Presentation: &topologyapi.PortPresentation{Label: "switch-facing", ColorSlot: "primary", Opacity: "normal"}},
+		"host_facing":    {Presentation: &topologyapi.PortPresentation{Label: "host-facing", ColorSlot: "secondary", Opacity: "normal"}},
+		"host_candidate": {Presentation: &topologyapi.PortPresentation{Label: "host-candidate", ColorSlot: "info", Opacity: "normal"}},
+		"trunk":          {Presentation: &topologyapi.PortPresentation{Label: "trunk", ColorSlot: "warning", Opacity: "normal"}},
+		"access":         {Presentation: &topologyapi.PortPresentation{Label: "access", ColorSlot: "derived", Opacity: "normal"}},
+		"topology":       {Presentation: &topologyapi.PortPresentation{Label: "unclassified", ColorSlot: "neutral", Opacity: "normal"}},
+		"idle":           {Presentation: &topologyapi.PortPresentation{Label: "idle", ColorSlot: "muted", Opacity: "muted"}},
+		"unknown":        {Presentation: &topologyapi.PortPresentation{Label: "unknown", ColorSlot: "dim", Opacity: "muted"}},
 	}
 }
 
@@ -438,14 +441,14 @@ func snmpTopologyV1LinkTypeSpecs() []snmpTopologyV1LinkTypeSpec {
 	}
 }
 
-func snmpTopologyV1LinkTypes() map[string]topologyv1.LinkType {
-	types := make(map[string]topologyv1.LinkType)
+func snmpTopologyV1LinkTypes() map[string]topologyapi.LinkType {
+	types := make(map[string]topologyapi.LinkType)
 	for _, spec := range snmpTopologyV1LinkTypeSpecs() {
-		types[spec.id] = topologyv1.LinkType{
+		types[spec.id] = topologyapi.LinkType{
 			Orientation:   "observed_bidirectional",
 			DirectionRole: "observation",
 			SemanticRole:  spec.semanticRole,
-			Aggregation: topologyv1.LinkAggregation{
+			Aggregation: topologyapi.LinkAggregation{
 				Direction: "canonicalize_unordered",
 				Evidence:  "append",
 				Metrics: map[string]string{
@@ -453,7 +456,7 @@ func snmpTopologyV1LinkTypes() map[string]topologyv1.LinkType {
 				},
 			},
 			EvidenceTypes: []string{spec.id},
-			Presentation: &topologyv1.LinkPresentation{
+			Presentation: &topologyapi.LinkPresentation{
 				Label:     spec.label,
 				ColorSlot: spec.colorSlot,
 				LineStyle: spec.lineStyle,
@@ -466,10 +469,10 @@ func snmpTopologyV1LinkTypes() map[string]topologyv1.LinkType {
 	return types
 }
 
-func snmpTopologyV1EvidenceTypes() map[string]topologyv1.EvidenceType {
-	types := make(map[string]topologyv1.EvidenceType)
+func snmpTopologyV1EvidenceTypes() map[string]topologyapi.EvidenceType {
+	types := make(map[string]topologyapi.EvidenceType)
 	for _, spec := range snmpTopologyV1LinkTypeSpecs() {
-		types[spec.id] = topologyv1.EvidenceType{
+		types[spec.id] = topologyapi.EvidenceType{
 			LinkType: spec.id,
 			Role:     "observation_evidence",
 			Columns:  snmpTopologyV1EvidenceColumnsForType(spec.id),
@@ -521,14 +524,14 @@ func snmpTopologyV1EvidenceMatchColumnsForType(linkType string) []string {
 	}
 }
 
-func snmpTopologyV1Presentation() *topologyv1.Presentation {
-	return &topologyv1.Presentation{
+func snmpTopologyV1Presentation() *topologyapi.Presentation {
+	return &topologyapi.Presentation{
 		ProfileVersion: "snmp-l2.v2",
-		Selection: &topologyv1.SelectionPresentation{
-			ActorClick: &topologyv1.ActorClickPresentation{Mode: "highlight_connections"},
+		Selection: &topologyapi.SelectionPresentation{
+			ActorClick: &topologyapi.ActorClickPresentation{Mode: "highlight_connections"},
 		},
-		Legend: &topologyv1.PresentationLegend{
-			Actors: []topologyv1.LegendEntry{
+		Legend: &topologyapi.PresentationLegend{
+			Actors: []topologyapi.LegendEntry{
 				{Type: "router", Label: "Router"},
 				{Type: "switch", Label: "Switch"},
 				{Type: "firewall", Label: "Firewall"},
@@ -545,7 +548,7 @@ func snmpTopologyV1Presentation() *topologyv1.Presentation {
 				{Type: "endpoint", Label: "Inferred endpoint"},
 				{Type: "segment", Label: "Network segment"},
 			},
-			Links: []topologyv1.LegendEntry{
+			Links: []topologyapi.LegendEntry{
 				{Type: snmpTopologyV1LinkLLDP, Label: "LLDP"},
 				{Type: snmpTopologyV1LinkCDP, Label: "CDP"},
 				{Type: snmpTopologyV1LinkSNMP, Label: "SNMP"},
@@ -555,7 +558,7 @@ func snmpTopologyV1Presentation() *topologyv1.Presentation {
 				{Type: snmpTopologyV1LinkBGP, Label: "BGP adjacency"},
 				{Type: snmpTopologyV1LinkProbable, Label: "Probable"},
 			},
-			Ports: []topologyv1.LegendEntry{
+			Ports: []topologyapi.LegendEntry{
 				{Type: "lldp", Label: "lldp/cdp"},
 				{Type: "switch_facing", Label: "switch-facing"},
 				{Type: "host_facing", Label: "host-facing"},
@@ -567,7 +570,7 @@ func snmpTopologyV1Presentation() *topologyv1.Presentation {
 				{Type: "unknown", Label: "unknown"},
 			},
 		},
-		PortFields: []topologyv1.PresentationField{
+		PortFields: []topologyapi.PresentationField{
 			{Key: "type", Label: "Type"},
 			{Key: "role", Label: "Role"},
 			{Key: "status", Label: "Status"},

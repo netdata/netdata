@@ -28,7 +28,7 @@ func (c *topologyCache) updateOSPFNeighbor(tags map[string]string) {
 		NeighborRouterID: neighborRouterID,
 		NeighborIP:       neighborIP,
 		AddresslessIndex: strings.TrimSpace(tags[tagOSPFNeighborAddresslessIndex]),
-		State:            normalizeOSPFNeighborState(tags[tagOSPFNeighborState]),
+		State:            topologyutil.NormalizeOSPFNeighborState(tags[tagOSPFNeighborState]),
 	}
 	if row.State == "" {
 		row.State = strings.TrimSpace(tags[tagOSPFNeighborState])
@@ -128,35 +128,8 @@ func topologyOSPFNeighborCacheKey(row topologyOSPFNeighbor) string {
 	)
 }
 
-func normalizeOSPFNeighborState(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return ""
-	}
-	switch strings.ToLower(strings.ReplaceAll(value, "_", "")) {
-	case "1", "down":
-		return "down"
-	case "2", "attempt":
-		return "attempt"
-	case "3", "init":
-		return "init"
-	case "4", "twoway":
-		return "twoWay"
-	case "5", "exchangestart", "exstart":
-		return "exchangeStart"
-	case "6", "exchange":
-		return "exchange"
-	case "7", "loading":
-		return "loading"
-	case "8", "full":
-		return "full"
-	default:
-		return value
-	}
-}
-
 func isOSPFNeighborFull(row topologyOSPFNeighbor) bool {
-	return strings.EqualFold(normalizeOSPFNeighborState(row.State), "full")
+	return strings.EqualFold(topologyutil.NormalizeOSPFNeighborState(row.State), "full")
 }
 
 func topologyOSPFNeighborLinkKeyParts(row topologyOSPFNeighbor, srcActorID, dstActorID string) string {
