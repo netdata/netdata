@@ -50,14 +50,29 @@ func TestTopologyLinkDetailDoesNotUseMapCarriers(t *testing.T) {
 }
 
 func TestTopologyActorSemanticDetailDoesNotFallbackToLabels(t *testing.T) {
-	assertNoForbiddenTopologyActorLabelFallbacks(t, ".", map[string]struct{}{
+	forbiddenKeys := map[string]struct{}{
 		"display_name":    {},
 		"display_source":  {},
 		"inferred":        {},
 		"name":            {},
 		tagOSPFRouterID:   {},
 		"tagOSPFRouterID": {},
-	})
+	}
+	for _, root := range []struct {
+		path  string
+		names []string
+	}{
+		{
+			path:  ".",
+			names: []string{"actor", "left", "right", "base", "extra", "src", "dst"},
+		},
+		{
+			path:  "../../../../pkg/l2topology",
+			names: []string{"actor", "left", "right", "base", "extra", "merged"},
+		},
+	} {
+		assertNoForbiddenTopologyActorLabelFallbacks(t, root.path, topologyActorLabelFallbackRootNames(root.names...), forbiddenKeys)
+	}
 }
 
 func TestNoForbiddenLinkMapCarrierUseIgnoresCommentsAndStrings(t *testing.T) {
@@ -117,7 +132,12 @@ func assertNoForbiddenLinkMapCarrierUse(t *testing.T, root string, names ...stri
 	require.NoError(t, err)
 }
 
-func assertNoForbiddenTopologyActorLabelFallbacks(t *testing.T, root string, forbiddenKeys map[string]struct{}) {
+func assertNoForbiddenTopologyActorLabelFallbacks(
+	t *testing.T,
+	root string,
+	rootNames map[string]struct{},
+	forbiddenKeys map[string]struct{},
+) {
 	t.Helper()
 	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 		require.NoError(t, err)
@@ -144,7 +164,7 @@ func assertNoForbiddenTopologyActorLabelFallbacks(t *testing.T, root string, for
 			if !ok || selector.Sel.Name != "Labels" {
 				return true
 			}
-			if topologyLabelFallbackRootName(selector.X) != "actor" {
+			if _, ok := rootNames[topologyLabelFallbackRootName(selector.X)]; !ok {
 				return true
 			}
 			key := topologyLabelFallbackIndexKey(index.Index)
@@ -158,6 +178,17 @@ func assertNoForbiddenTopologyActorLabelFallbacks(t *testing.T, root string, for
 		return scanErr
 	})
 	require.NoError(t, err)
+}
+
+func topologyActorLabelFallbackRootNames(names ...string) map[string]struct{} {
+	out := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name != "" {
+			out[name] = struct{}{}
+		}
+	}
+	return out
 }
 
 func topologyLabelFallbackRootName(expr ast.Expr) string {

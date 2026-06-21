@@ -74,6 +74,7 @@ func TestBuildTopologyDevicePortDetail_RendersOptionalFields(t *testing.T) {
 		FDBMACCount:    3,
 		STPState:       "forwarding",
 		Neighbors: []topologyPortNeighborStatus{
+			{},
 			{
 				Protocol:           "lldp",
 				RemoteDevice:       "switch-b",
@@ -108,6 +109,7 @@ func TestBuildTopologyDevicePortDetail_RendersOptionalFields(t *testing.T) {
 	require.Equal(t, "up", detail.AdminStatus)
 	require.Equal(t, "up", detail.OperStatus)
 	require.Equal(t, "ethernetCsmacd", detail.PortType)
+	require.Equal(t, OptionalValue[int]{Value: 1, Has: true}, detail.NeighborCount)
 
 	require.Len(t, detail.Neighbors, 1)
 	require.Equal(t, "lldp", detail.Neighbors[0].Protocol)

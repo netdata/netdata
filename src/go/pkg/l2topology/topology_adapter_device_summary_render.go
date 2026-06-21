@@ -45,8 +45,8 @@ func buildTopologyDevicePortDetail(st topologyDevicePortStatus) ProjectionPortDe
 	if st.FDBMACCount > 0 {
 		detail.FDBMACCount = OptionalValue[int]{Value: st.FDBMACCount, Has: true}
 	}
-	if len(st.Neighbors) > 0 {
-		detail.NeighborCount = OptionalValue[int]{Value: len(st.Neighbors), Has: true}
+	if len(detail.Neighbors) > 0 {
+		detail.NeighborCount = OptionalValue[int]{Value: len(detail.Neighbors), Has: true}
 	}
 	return detail
 }

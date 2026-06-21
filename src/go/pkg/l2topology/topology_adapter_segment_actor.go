@@ -52,12 +52,8 @@ func buildBridgeSegmentActor(segmentID string, segment *bridgeDomainSegment, lay
 	}
 	if segment != nil {
 		detail.LearnedSources = sortedTopologySet(segment.methods)
-		if len(segment.ports) > 0 {
-			detail.PortsTotal = OptionalValue[int]{Value: len(segment.ports), Has: true}
-		}
-		if len(segment.endpointIDs) > 0 {
-			detail.EndpointsTotal = OptionalValue[int]{Value: len(segment.endpointIDs), Has: true}
-		}
+		detail.PortsTotal = OptionalValue[int]{Value: len(segment.ports), Has: true}
+		detail.EndpointsTotal = OptionalValue[int]{Value: len(segment.endpointIDs), Has: true}
 		if bridgePortRefKey(segment.designatedPort, false, false) != "" {
 			detail.DesignatedPort = bridgePortRefSortKey(segment.designatedPort)
 		}

@@ -268,12 +268,41 @@ func mergeProjectionDeviceActorDetail(base, extra ProjectionDeviceActorDetail) P
 	if strings.TrimSpace(base.DeviceID) == "" {
 		base.DeviceID = strings.TrimSpace(extra.DeviceID)
 	}
+	base.Discovered = base.Discovered || extra.Discovered
+	base.Inferred = base.Inferred || extra.Inferred
+	if strings.TrimSpace(base.ManagementIP) == "" {
+		base.ManagementIP = strings.TrimSpace(extra.ManagementIP)
+	}
 	base.ManagementAddresses = mergeTopologyStringLists(base.ManagementAddresses, extra.ManagementAddresses)
 	base.Protocols = mergeTopologyStringLists(base.Protocols, extra.Protocols)
 	base.ProtocolsCollected = mergeTopologyStringLists(base.ProtocolsCollected, extra.ProtocolsCollected)
 	base.Capabilities = mergeTopologyStringLists(base.Capabilities, extra.Capabilities)
 	base.CapabilitiesSupported = mergeTopologyStringLists(base.CapabilitiesSupported, extra.CapabilitiesSupported)
 	base.CapabilitiesEnabled = mergeTopologyStringLists(base.CapabilitiesEnabled, extra.CapabilitiesEnabled)
+	if strings.TrimSpace(base.Vendor) == "" {
+		base.Vendor = strings.TrimSpace(extra.Vendor)
+	}
+	if strings.TrimSpace(base.VendorSource) == "" {
+		base.VendorSource = strings.TrimSpace(extra.VendorSource)
+	}
+	if strings.TrimSpace(base.VendorConfidence) == "" {
+		base.VendorConfidence = strings.TrimSpace(extra.VendorConfidence)
+	}
+	if strings.TrimSpace(base.VendorDerived) == "" {
+		base.VendorDerived = strings.TrimSpace(extra.VendorDerived)
+	}
+	if strings.TrimSpace(base.VendorDerivedSource) == "" {
+		base.VendorDerivedSource = strings.TrimSpace(extra.VendorDerivedSource)
+	}
+	if strings.TrimSpace(base.VendorDerivedConfidence) == "" {
+		base.VendorDerivedConfidence = strings.TrimSpace(extra.VendorDerivedConfidence)
+	}
+	if strings.TrimSpace(base.VendorDerivedMatchPrefix) == "" {
+		base.VendorDerivedMatchPrefix = strings.TrimSpace(extra.VendorDerivedMatchPrefix)
+	}
+	if strings.TrimSpace(base.VendorMatchPrefix) == "" {
+		base.VendorMatchPrefix = strings.TrimSpace(extra.VendorMatchPrefix)
+	}
 	base.IfIndexes = mergeTopologyStringLists(base.IfIndexes, extra.IfIndexes)
 	base.IfNames = mergeTopologyStringLists(base.IfNames, extra.IfNames)
 	if !base.PortsTotal.Has {
@@ -320,6 +349,30 @@ func mergeProjectionEndpointActorDetail(base, extra ProjectionEndpointActorDetai
 	base.LearnedIfNames = mergeTopologyStringLists(base.LearnedIfNames, extra.LearnedIfNames)
 	if !base.Discovered {
 		base.Discovered = extra.Discovered
+	}
+	if strings.TrimSpace(base.Vendor) == "" {
+		base.Vendor = strings.TrimSpace(extra.Vendor)
+	}
+	if strings.TrimSpace(base.VendorSource) == "" {
+		base.VendorSource = strings.TrimSpace(extra.VendorSource)
+	}
+	if strings.TrimSpace(base.VendorConfidence) == "" {
+		base.VendorConfidence = strings.TrimSpace(extra.VendorConfidence)
+	}
+	if strings.TrimSpace(base.VendorMatchPrefix) == "" {
+		base.VendorMatchPrefix = strings.TrimSpace(extra.VendorMatchPrefix)
+	}
+	if strings.TrimSpace(base.VendorDerived) == "" {
+		base.VendorDerived = strings.TrimSpace(extra.VendorDerived)
+	}
+	if strings.TrimSpace(base.VendorDerivedSource) == "" {
+		base.VendorDerivedSource = strings.TrimSpace(extra.VendorDerivedSource)
+	}
+	if strings.TrimSpace(base.VendorDerivedConfidence) == "" {
+		base.VendorDerivedConfidence = strings.TrimSpace(extra.VendorDerivedConfidence)
+	}
+	if strings.TrimSpace(base.VendorDerivedMatchPrefix) == "" {
+		base.VendorDerivedMatchPrefix = strings.TrimSpace(extra.VendorDerivedMatchPrefix)
 	}
 	if strings.TrimSpace(base.AttachmentSource) == "" {
 		base.AttachmentSource = strings.TrimSpace(extra.AttachmentSource)
@@ -390,19 +443,6 @@ func topologyActorIsInferred(actor projectedActor) bool {
 	}
 	if actor.Detail.Device.Inferred {
 		return true
-	}
-	return false
-}
-
-func topologyAnyBoolValue(value any) bool {
-	switch typed := value.(type) {
-	case bool:
-		return typed
-	case string:
-		switch strings.ToLower(strings.TrimSpace(typed)) {
-		case "1", "true", "yes", "on":
-			return true
-		}
 	}
 	return false
 }

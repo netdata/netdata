@@ -3,7 +3,6 @@
 package l2topology
 
 import (
-	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -62,90 +61,6 @@ func topologyCanonicalLinkName(srcName, srcPortName, dstName, dstPortName string
 		dstPortName = "[unset]"
 	}
 	return srcName + ":" + srcPortName + " -> " + dstName + ":" + dstPortName
-}
-
-func topologyAttrString(attrs map[string]any, key string) string {
-	if len(attrs) == 0 {
-		return ""
-	}
-	value, ok := attrs[key]
-	if !ok || value == nil {
-		return ""
-	}
-	str, ok := value.(string)
-	if !ok {
-		return ""
-	}
-	return strings.TrimSpace(str)
-}
-
-func topologyAttrInt(attrs map[string]any, key string) int {
-	if len(attrs) == 0 {
-		return 0
-	}
-	value, ok := attrs[key]
-	if !ok || value == nil {
-		return 0
-	}
-	switch typed := value.(type) {
-	case int:
-		return typed
-	case int64:
-		if typed < 0 {
-			return 0
-		}
-		if typed > math.MaxInt {
-			return math.MaxInt
-		}
-		return int(typed)
-	case float64:
-		if typed <= 0 {
-			return 0
-		}
-		if typed > math.MaxInt {
-			return math.MaxInt
-		}
-		return int(typed)
-	case string:
-		parsed := parseTopologyLabelInt64(typed)
-		if parsed <= 0 {
-			return 0
-		}
-		if parsed > math.MaxInt {
-			return math.MaxInt
-		}
-		return int(parsed)
-	default:
-		return 0
-	}
-}
-
-func topologyAttrStringSlice(attrs map[string]any, key string) []string {
-	if len(attrs) == 0 {
-		return nil
-	}
-	value, ok := attrs[key]
-	if !ok || value == nil {
-		return nil
-	}
-	switch typed := value.(type) {
-	case []string:
-		return append([]string(nil), typed...)
-	case []any:
-		out := make([]string, 0, len(typed))
-		for _, item := range typed {
-			str, ok := item.(string)
-			if !ok {
-				continue
-			}
-			if str = strings.TrimSpace(str); str != "" {
-				out = append(out, str)
-			}
-		}
-		return out
-	default:
-		return nil
-	}
 }
 
 func topologyTimePtr(t time.Time) *time.Time {

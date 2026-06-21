@@ -151,8 +151,9 @@ func TestToGraph_ProjectsTypedActorDetailsWithFieldPresence(t *testing.T) {
 				IfDescr:  "GigabitEthernet0/1",
 				MAC:      "00:11:22:33:44:56",
 				Labels: map[string]string{
-					"speed_bps": "1000000000",
-					"duplex":    "full",
+					"speed_bps":   "fast(1000000000)",
+					"last_change": "ticks(12345)",
+					"duplex":      "full",
 				},
 			},
 		},
@@ -182,6 +183,7 @@ func TestToGraph_ProjectsTypedActorDetailsWithFieldPresence(t *testing.T) {
 	require.Equal(t, 1, port.IfIndex.Value)
 	require.True(t, port.Speed.Has)
 	require.EqualValues(t, 1000000000, port.Speed.Value)
+	require.Equal(t, "12345", port.LastChange)
 	require.Equal(t, "full", port.Duplex)
 	require.False(t, port.NeighborCount.Has)
 	require.Zero(t, port.NeighborCount.Value)
