@@ -15,11 +15,6 @@ type topologyMatchLookup struct {
 	identityKeys []string
 }
 
-type topologyActorSortEntry struct {
-	actor graph.Actor
-	key   string
-}
-
 type projectedTopologyActorSortEntry struct {
 	actor projectedActor
 	key   string
@@ -307,28 +302,6 @@ func topologyActorSortKey(actor graph.Actor) string {
 		actor.Source,
 		actor.Layer,
 	}, keySep)
-}
-
-func sortTopologyActors(actors []graph.Actor) {
-	if len(actors) < 2 {
-		return
-	}
-
-	entries := make([]topologyActorSortEntry, len(actors))
-	for i := range actors {
-		entries[i] = topologyActorSortEntry{
-			actor: actors[i],
-			key:   topologyActorSortKey(actors[i]),
-		}
-	}
-
-	sort.SliceStable(entries, func(i, j int) bool {
-		return entries[i].key < entries[j].key
-	})
-
-	for i := range entries {
-		actors[i] = entries[i].actor
-	}
 }
 
 func sortProjectedTopologyActors(actors []projectedActor) {

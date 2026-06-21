@@ -51,12 +51,11 @@ func TestTopologyLinkDetailDoesNotUseMapCarriers(t *testing.T) {
 
 func TestTopologyActorSemanticDetailDoesNotFallbackToLabels(t *testing.T) {
 	forbiddenKeys := map[string]struct{}{
-		"display_name":    {},
-		"display_source":  {},
-		"inferred":        {},
-		"name":            {},
-		tagOSPFRouterID:   {},
-		"tagOSPFRouterID": {},
+		"display_name":   {},
+		"display_source": {},
+		"inferred":       {},
+		"name":           {},
+		tagOSPFRouterID:  {},
 	}
 	for _, root := range []struct {
 		path  string
@@ -86,6 +85,23 @@ const attributesText = ".Attributes"
 `), 0o644))
 
 	assertNoForbiddenLinkMapCarrierUse(t, root, "Attributes", "Metrics")
+}
+
+func TestTopologyActorSemanticDetailGuardCatchesIndexedActorRoots(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(root, "fixture.go"), []byte(`package fixture
+
+func fallback(actors []struct{ Actor struct{ Labels map[string]string } }) string {
+	return actors[0].Actor.Labels["display_name"]
+}
+`), 0o644))
+
+	err := forbiddenTopologyActorLabelFallbacksError(
+		root,
+		topologyActorLabelFallbackRootNames("actors"),
+		map[string]struct{}{"display_name": {}},
+	)
+	require.Error(t, err)
 }
 
 func assertNoForbiddenLinkMapCarrierUse(t *testing.T, root string, names ...string) {
@@ -139,8 +155,18 @@ func assertNoForbiddenTopologyActorLabelFallbacks(
 	forbiddenKeys map[string]struct{},
 ) {
 	t.Helper()
-	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		require.NoError(t, err)
+	require.NoError(t, forbiddenTopologyActorLabelFallbacksError(root, rootNames, forbiddenKeys))
+}
+
+func forbiddenTopologyActorLabelFallbacksError(
+	root string,
+	rootNames map[string]struct{},
+	forbiddenKeys map[string]struct{},
+) error {
+	return filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
 		if entry.IsDir() {
 			return nil
 		}
@@ -149,7 +175,9 @@ func assertNoForbiddenTopologyActorLabelFallbacks(
 		}
 		fset := token.NewFileSet()
 		file, err := parser.ParseFile(fset, path, nil, 0)
-		require.NoError(t, err)
+		if err != nil {
+			return err
+		}
 
 		var scanErr error
 		ast.Inspect(file, func(node ast.Node) bool {
@@ -177,7 +205,6 @@ func assertNoForbiddenTopologyActorLabelFallbacks(
 		})
 		return scanErr
 	})
-	require.NoError(t, err)
 }
 
 func topologyActorLabelFallbackRootNames(names ...string) map[string]struct{} {
@@ -196,6 +223,10 @@ func topologyLabelFallbackRootName(expr ast.Expr) string {
 	case *ast.Ident:
 		return typed.Name
 	case *ast.SelectorExpr:
+		return topologyLabelFallbackRootName(typed.X)
+	case *ast.IndexExpr:
+		return topologyLabelFallbackRootName(typed.X)
+	case *ast.IndexListExpr:
 		return topologyLabelFallbackRootName(typed.X)
 	case *ast.ParenExpr:
 		return topologyLabelFallbackRootName(typed.X)
