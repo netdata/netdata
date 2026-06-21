@@ -7,6 +7,7 @@ import (
 	"time"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -117,8 +118,7 @@ func TestTopologyRegistry_SnapshotSingleCacheKeepsLLDPUnidirectional(t *testing.
 	require.Len(t, data.Links, 1)
 	require.Equal(t, "lldp", data.Links[0].Protocol)
 	require.Equal(t, "unidirectional", data.Links[0].Direction)
-	_, hasPairConsistency := data.Links[0].Metrics["pair_consistent"]
-	require.False(t, hasPairConsistency)
+	require.Nil(t, data.Links[0].L2)
 	require.Equal(t, 1, topologyStatsToV1(data.Stats)["links_unidirectional"].(int))
 	require.Equal(t, 0, topologyStatsToV1(data.Stats)["links_bidirectional"].(int))
 }
@@ -179,11 +179,11 @@ func TestTopologyRegistry_DefaultMapEmitsL3SubnetForManagedRoutersWithoutLLDP(t 
 	require.Equal(t, topologyL3SubnetLinkType, link.Protocol)
 	require.Equal(t, topologyL3SubnetLinkType, link.LinkType)
 	require.Equal(t, "observed", link.Direction)
-	require.Equal(t, "198.51.100.0/30", link.Metrics["subnet"])
-	require.Equal(t, "shared_subnet", link.Metrics["inference"])
-	require.Equal(t, "logical_l3_subnet", link.Metrics["attachment_mode"])
-	require.Equal(t, "198.51.100.1", link.Src.Attributes["ip"])
-	require.Equal(t, "198.51.100.2", link.Dst.Attributes["ip"])
+	require.Equal(t, "198.51.100.0/30", topologyL3Subnet(link))
+	require.Equal(t, "shared_subnet", topologyLinkInferenceValue(link))
+	require.Equal(t, "logical_l3_subnet", topologyLinkAttachmentModeValue(link))
+	require.Equal(t, "198.51.100.1", topologyEvidenceSrcIP(link))
+	require.Equal(t, "198.51.100.2", topologyEvidenceDstIP(link))
 	require.Equal(t, 1, topologyStatsToV1(data.Stats)["l3_subnet_emitted_links"])
 	require.Equal(t, 1, topologyStatsToV1(data.Stats)["l3_subnet_visible_links"])
 	require.Equal(t, 1, topologyStatsToV1(data.Stats)["links_total"])
@@ -316,11 +316,11 @@ func TestTopologyRegistry_BGPAdjacencyEmitsEstablishedManagedPeerLinkAndDetailRo
 	require.Equal(t, topologyBGPAdjacencyLinkType, link.LinkType)
 	require.Equal(t, "observed", link.Direction)
 	require.Equal(t, "established", link.State)
-	require.Equal(t, "bgp_established_adjacency", link.Metrics["inference"])
-	require.Equal(t, "logical_l3_bgp", link.Metrics["attachment_mode"])
-	require.Equal(t, "default", link.Metrics["routing_instance"])
-	require.Equal(t, "65001", link.Src.Attributes["as"])
-	require.Equal(t, "65002", link.Dst.Attributes["as"])
+	require.Equal(t, "bgp_established_adjacency", topologyLinkInferenceValue(link))
+	require.Equal(t, "logical_l3_bgp", topologyLinkAttachmentModeValue(link))
+	require.Equal(t, "default", topologyBGPLinkRoutingInstance(link))
+	require.Equal(t, "65001", topologyBGPLocalAS(link))
+	require.Equal(t, "65002", topologyBGPRemoteAS(link))
 	require.Equal(t, 2, topologyStatsToV1(data.Stats)["bgp_peer_rows"])
 	require.Equal(t, 2, topologyStatsToV1(data.Stats)["bgp_peer_detail_rows"])
 	require.Equal(t, 1, topologyStatsToV1(data.Stats)["bgp_adjacency_emitted_links"])
@@ -957,8 +957,8 @@ func TestMarkProbableDeltaLinks_MarksAllAddedLinksAsProbable(t *testing.T) {
 				DstActorID: "segment:s1",
 				Protocol:   "bridge",
 				Direction:  "bidirectional",
-				Metrics: map[string]any{
-					"bridge_domain": "bridge-domain:s1",
+				L2: &graph.LinkL2{
+					BridgeDomain: "bridge-domain:s1",
 				},
 			},
 		},
@@ -969,8 +969,8 @@ func TestMarkProbableDeltaLinks_MarksAllAddedLinksAsProbable(t *testing.T) {
 	require.Len(t, probableData.Links, 2)
 	require.Equal(t, "", probableData.Links[0].State)
 	require.Equal(t, "probable", probableData.Links[1].State)
-	require.Equal(t, "probable", probableData.Links[1].Metrics["inference"])
-	require.Equal(t, "probable_bridge_anchor", probableData.Links[1].Metrics["attachment_mode"])
+	require.Equal(t, "probable", topologyLinkInferenceValue(probableData.Links[1]))
+	require.Equal(t, "probable_bridge_anchor", topologyLinkAttachmentModeValue(probableData.Links[1]))
 }
 
 func TestApplyTopologyDepthFocusFilter_ManagedFocusDepthZero(t *testing.T) {

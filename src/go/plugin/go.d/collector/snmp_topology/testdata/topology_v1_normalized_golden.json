@@ -190,6 +190,8 @@
           "dst_port_name:string_ref:dict=strings:nullable",
           "src_if_index:uint:nullable",
           "dst_if_index:uint:nullable",
+          "src_port_id:string_ref:dict=strings:nullable",
+          "dst_port_id:string_ref:dict=strings:nullable",
           "src_management_ip:string_ref:dict=strings:nullable",
           "dst_management_ip:string_ref:dict=strings:nullable",
           "confidence:string_ref:dict=strings:nullable",
@@ -202,33 +204,18 @@
           "neighbor_ip:string_ref:dict=strings:nullable",
           "local_as:string_ref:dict=strings:nullable",
           "remote_as:string_ref:dict=strings:nullable",
-          "source:string_ref:dict=strings:nullable",
-          "src_endpoint:json:nullable",
-          "dst_endpoint:json:nullable",
-          "metrics:json:nullable"
+          "source:string_ref:dict=strings:nullable"
         ],
         "rows": [
           {
             "attachment_mode": "logical_bgp_adjacency",
             "direction": "observed",
             "dst_actor": "router-b",
-            "dst_endpoint": {
-              "as": "64513",
-              "bgp_identifier": "10.255.0.2",
-              "ip": "203.0.113.2",
-              "source": "bgp_mib"
-            },
             "inference": "bgp_peer",
             "link": "router-a -\u003e router-b | bgp_adjacency | bgp_adjacency | established | \u003cnil\u003e | \u003cnil\u003e",
             "local_as": "64512",
             "local_identifier": "10.255.0.1",
             "local_ip": "203.0.113.1",
-            "metrics": {
-              "attachment_mode": "logical_bgp_adjacency",
-              "inference": "bgp_peer",
-              "routing_instance": "default",
-              "source": "bgp_mib"
-            },
             "neighbor_ip": "203.0.113.2",
             "peer_identifier": "10.255.0.2",
             "protocol": "bgp_adjacency",
@@ -236,12 +223,6 @@
             "routing_instance": "default",
             "source": "bgp_mib",
             "src_actor": "router-a",
-            "src_endpoint": {
-              "as": "64512",
-              "bgp_identifier": "10.255.0.1",
-              "ip": "203.0.113.1",
-              "source": "bgp_mib"
-            },
             "state": "established"
           }
         ]
@@ -261,6 +242,8 @@
           "dst_port_name:string_ref:dict=strings:nullable",
           "src_if_index:uint:nullable",
           "dst_if_index:uint:nullable",
+          "src_port_id:string_ref:dict=strings:nullable",
+          "dst_port_id:string_ref:dict=strings:nullable",
           "src_management_ip:string_ref:dict=strings:nullable",
           "dst_management_ip:string_ref:dict=strings:nullable",
           "confidence:string_ref:dict=strings:nullable",
@@ -272,56 +255,24 @@
           "network:string_ref:dict=strings:nullable",
           "netmask:string_ref:dict=strings:nullable",
           "prefix:uint:nullable",
-          "source:string_ref:dict=strings:nullable",
-          "src_endpoint:json:nullable",
-          "dst_endpoint:json:nullable",
-          "metrics:json:nullable"
+          "source:string_ref:dict=strings:nullable"
         ],
         "rows": [
           {
             "attachment_mode": "logical_l3_subnet",
             "direction": "observed",
             "dst_actor": "router-b",
-            "dst_endpoint": {
-              "if_index": 401,
-              "if_name": "xe-0/0/1",
-              "ip": "198.51.100.2",
-              "netmask": "255.255.255.252",
-              "network": "198.51.100.0",
-              "prefix": 30,
-              "source": "ip_mib",
-              "subnet": "198.51.100.0/30"
-            },
             "dst_if_index": 401,
             "dst_ip": "198.51.100.2",
             "dst_port_name": "xe-0/0/1",
             "inference": "shared_subnet",
             "link": "router-a -\u003e router-b | l3_subnet | l3_subnet | \u003cnil\u003e | xe-0/0/0 | xe-0/0/1",
-            "metrics": {
-              "attachment_mode": "logical_l3_subnet",
-              "inference": "shared_subnet",
-              "netmask": "255.255.255.252",
-              "network": "198.51.100.0",
-              "prefix": 30,
-              "source": "ip_mib",
-              "subnet": "198.51.100.0/30"
-            },
             "netmask": "255.255.255.252",
             "network": "198.51.100.0",
             "prefix": 30,
             "protocol": "l3_subnet",
             "source": "ip_mib",
             "src_actor": "router-a",
-            "src_endpoint": {
-              "if_index": 301,
-              "if_name": "xe-0/0/0",
-              "ip": "198.51.100.1",
-              "netmask": "255.255.255.252",
-              "network": "198.51.100.0",
-              "prefix": 30,
-              "source": "ip_mib",
-              "subnet": "198.51.100.0/30"
-            },
             "src_if_index": 301,
             "src_ip": "198.51.100.1",
             "src_port_name": "xe-0/0/0",
@@ -344,14 +295,13 @@
           "dst_port_name:string_ref:dict=strings:nullable",
           "src_if_index:uint:nullable",
           "dst_if_index:uint:nullable",
+          "src_port_id:string_ref:dict=strings:nullable",
+          "dst_port_id:string_ref:dict=strings:nullable",
           "src_management_ip:string_ref:dict=strings:nullable",
           "dst_management_ip:string_ref:dict=strings:nullable",
           "confidence:string_ref:dict=strings:nullable",
           "inference:string_ref:dict=strings:nullable",
-          "attachment_mode:string_ref:dict=strings:nullable",
-          "src_endpoint:json:nullable",
-          "dst_endpoint:json:nullable",
-          "metrics:json:nullable"
+          "attachment_mode:string_ref:dict=strings:nullable"
         ],
         "rows": [
           {
@@ -359,32 +309,17 @@
             "confidence": "high",
             "direction": "observed",
             "dst_actor": "router-a",
-            "dst_endpoint": {
-              "if_index": 201,
-              "if_name": "Gi0/0",
-              "management_ip": "198.51.100.1",
-              "port_id": "Gi0/0"
-            },
             "dst_if_index": 201,
             "dst_management_ip": "198.51.100.1",
+            "dst_port_id": "Gi0/0",
             "dst_port_name": "Gi0/0",
             "inference": "lldp",
             "link": "switch-a -\u003e router-a | lldp | lldp | up | Gi1/0/1 | Gi0/0",
-            "metrics": {
-              "attachment_mode": "direct",
-              "confidence": "high",
-              "inference": "lldp"
-            },
             "protocol": "lldp",
             "src_actor": "switch-a",
-            "src_endpoint": {
-              "if_index": 101,
-              "if_name": "Gi1/0/1",
-              "management_ip": "192.0.2.10",
-              "port_id": "Gi1/0/1"
-            },
             "src_if_index": 101,
             "src_management_ip": "192.0.2.10",
+            "src_port_id": "Gi1/0/1",
             "src_port_name": "Gi1/0/1",
             "state": "up"
           }
@@ -405,6 +340,8 @@
           "dst_port_name:string_ref:dict=strings:nullable",
           "src_if_index:uint:nullable",
           "dst_if_index:uint:nullable",
+          "src_port_id:string_ref:dict=strings:nullable",
+          "dst_port_id:string_ref:dict=strings:nullable",
           "src_management_ip:string_ref:dict=strings:nullable",
           "dst_management_ip:string_ref:dict=strings:nullable",
           "confidence:string_ref:dict=strings:nullable",
@@ -418,47 +355,23 @@
           "network:string_ref:dict=strings:nullable",
           "netmask:string_ref:dict=strings:nullable",
           "prefix:uint:nullable",
-          "source:string_ref:dict=strings:nullable",
-          "src_endpoint:json:nullable",
-          "dst_endpoint:json:nullable",
-          "metrics:json:nullable"
+          "source:string_ref:dict=strings:nullable"
         ],
         "rows": [
           {
             "attachment_mode": "logical_ospf_adjacency",
             "direction": "observed",
             "dst_actor": "router-b",
-            "dst_endpoint": {
-              "ip": "198.51.100.2",
-              "router_id": "10.255.0.2",
-              "source": "ospf_mib",
-              "subnet": "198.51.100.0/30"
-            },
             "dst_ip": "198.51.100.2",
             "dst_router_id": "10.255.0.2",
             "inference": "ospf_neighbor",
             "link": "router-a -\u003e router-b | ospf_adjacency | ospf_adjacency | full | \u003cnil\u003e | \u003cnil\u003e",
-            "metrics": {
-              "attachment_mode": "logical_ospf_adjacency",
-              "inference": "ospf_neighbor",
-              "netmask": "255.255.255.252",
-              "network": "198.51.100.0",
-              "prefix": 30,
-              "source": "ospf_mib",
-              "subnet": "198.51.100.0/30"
-            },
             "netmask": "255.255.255.252",
             "network": "198.51.100.0",
             "prefix": 30,
             "protocol": "ospf_adjacency",
             "source": "ospf_mib",
             "src_actor": "router-a",
-            "src_endpoint": {
-              "ip": "198.51.100.1",
-              "router_id": "10.255.0.1",
-              "source": "ospf_mib",
-              "subnet": "198.51.100.0/30"
-            },
             "src_ip": "198.51.100.1",
             "src_router_id": "10.255.0.1",
             "state": "full",
@@ -481,14 +394,13 @@
           "dst_port_name:string_ref:dict=strings:nullable",
           "src_if_index:uint:nullable",
           "dst_if_index:uint:nullable",
+          "src_port_id:string_ref:dict=strings:nullable",
+          "dst_port_id:string_ref:dict=strings:nullable",
           "src_management_ip:string_ref:dict=strings:nullable",
           "dst_management_ip:string_ref:dict=strings:nullable",
           "confidence:string_ref:dict=strings:nullable",
           "inference:string_ref:dict=strings:nullable",
-          "attachment_mode:string_ref:dict=strings:nullable",
-          "src_endpoint:json:nullable",
-          "dst_endpoint:json:nullable",
-          "metrics:json:nullable"
+          "attachment_mode:string_ref:dict=strings:nullable"
         ],
         "rows": [
           {
@@ -496,24 +408,12 @@
             "confidence": "low",
             "direction": "observed",
             "dst_actor": "server-a",
-            "dst_endpoint": {
-              "mac": "00:11:22:33:44:55"
-            },
             "inference": "probable",
             "link": "switch-a -\u003e server-a | probable | fdb | probable | Gi1/0/2 | \u003cnil\u003e",
-            "metrics": {
-              "attachment_mode": "probable_host",
-              "confidence": "low",
-              "inference": "probable"
-            },
             "protocol": "fdb",
             "src_actor": "switch-a",
-            "src_endpoint": {
-              "if_index": 102,
-              "if_name": "Gi1/0/2",
-              "port_id": "Gi1/0/2"
-            },
             "src_if_index": 102,
+            "src_port_id": "Gi1/0/2",
             "src_port_name": "Gi1/0/2",
             "state": "probable"
           }
@@ -14301,6 +14201,18 @@
           },
           {
             "dictionary": "strings",
+            "id": "src_port_id",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "dst_port_id",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
             "id": "src_management_ip",
             "nullable": true,
             "type": "string_ref"
@@ -14328,21 +14240,6 @@
             "id": "attachment_mode",
             "nullable": true,
             "type": "string_ref"
-          },
-          {
-            "id": "src_endpoint",
-            "nullable": true,
-            "type": "json"
-          },
-          {
-            "id": "dst_endpoint",
-            "nullable": true,
-            "type": "json"
-          },
-          {
-            "id": "metrics",
-            "nullable": true,
-            "type": "json"
           }
         ],
         "link_type": "arp",
@@ -14350,8 +14247,12 @@
           "src_actor",
           "dst_actor",
           "protocol",
-          "src_endpoint",
-          "dst_endpoint"
+          "src_if_index",
+          "src_port_name",
+          "src_port_id",
+          "dst_if_index",
+          "dst_port_name",
+          "dst_port_id"
         ],
         "role": "observation_evidence"
       },
@@ -14411,6 +14312,18 @@
             "id": "dst_if_index",
             "nullable": true,
             "type": "uint"
+          },
+          {
+            "dictionary": "strings",
+            "id": "src_port_id",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "dst_port_id",
+            "nullable": true,
+            "type": "string_ref"
           },
           {
             "dictionary": "strings",
@@ -14489,21 +14402,6 @@
             "id": "source",
             "nullable": true,
             "type": "string_ref"
-          },
-          {
-            "id": "src_endpoint",
-            "nullable": true,
-            "type": "json"
-          },
-          {
-            "id": "dst_endpoint",
-            "nullable": true,
-            "type": "json"
-          },
-          {
-            "id": "metrics",
-            "nullable": true,
-            "type": "json"
           }
         ],
         "link_type": "bgp_adjacency",
@@ -14573,6 +14471,18 @@
           },
           {
             "dictionary": "strings",
+            "id": "src_port_id",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "dst_port_id",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
             "id": "src_management_ip",
             "nullable": true,
             "type": "string_ref"
@@ -14600,21 +14510,6 @@
             "id": "attachment_mode",
             "nullable": true,
             "type": "string_ref"
-          },
-          {
-            "id": "src_endpoint",
-            "nullable": true,
-            "type": "json"
-          },
-          {
-            "id": "dst_endpoint",
-            "nullable": true,
-            "type": "json"
-          },
-          {
-            "id": "metrics",
-            "nullable": true,
-            "type": "json"
           }
         ],
         "link_type": "bridge",
@@ -14622,8 +14517,12 @@
           "src_actor",
           "dst_actor",
           "protocol",
-          "src_endpoint",
-          "dst_endpoint"
+          "src_if_index",
+          "src_port_name",
+          "src_port_id",
+          "dst_if_index",
+          "dst_port_name",
+          "dst_port_id"
         ],
         "role": "observation_evidence"
       },
@@ -14686,6 +14585,18 @@
           },
           {
             "dictionary": "strings",
+            "id": "src_port_id",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "dst_port_id",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
             "id": "src_management_ip",
             "nullable": true,
             "type": "string_ref"
@@ -14713,21 +14624,6 @@
             "id": "attachment_mode",
             "nullable": true,
             "type": "string_ref"
-          },
-          {
-            "id": "src_endpoint",
-            "nullable": true,
-            "type": "json"
-          },
-          {
-            "id": "dst_endpoint",
-            "nullable": true,
-            "type": "json"
-          },
-          {
-            "id": "metrics",
-            "nullable": true,
-            "type": "json"
           }
         ],
         "link_type": "cdp",
@@ -14735,8 +14631,12 @@
           "src_actor",
           "dst_actor",
           "protocol",
-          "src_endpoint",
-          "dst_endpoint"
+          "src_if_index",
+          "src_port_name",
+          "src_port_id",
+          "dst_if_index",
+          "dst_port_name",
+          "dst_port_id"
         ],
         "role": "observation_evidence"
       },
@@ -14799,6 +14699,18 @@
           },
           {
             "dictionary": "strings",
+            "id": "src_port_id",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "dst_port_id",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
             "id": "src_management_ip",
             "nullable": true,
             "type": "string_ref"
@@ -14826,21 +14738,6 @@
             "id": "attachment_mode",
             "nullable": true,
             "type": "string_ref"
-          },
-          {
-            "id": "src_endpoint",
-            "nullable": true,
-            "type": "json"
-          },
-          {
-            "id": "dst_endpoint",
-            "nullable": true,
-            "type": "json"
-          },
-          {
-            "id": "metrics",
-            "nullable": true,
-            "type": "json"
           }
         ],
         "link_type": "fdb",
@@ -14848,8 +14745,12 @@
           "src_actor",
           "dst_actor",
           "protocol",
-          "src_endpoint",
-          "dst_endpoint"
+          "src_if_index",
+          "src_port_name",
+          "src_port_id",
+          "dst_if_index",
+          "dst_port_name",
+          "dst_port_id"
         ],
         "role": "observation_evidence"
       },
@@ -14912,6 +14813,18 @@
           },
           {
             "dictionary": "strings",
+            "id": "src_port_id",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "dst_port_id",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
             "id": "src_management_ip",
             "nullable": true,
             "type": "string_ref"
@@ -14939,21 +14852,6 @@
             "id": "attachment_mode",
             "nullable": true,
             "type": "string_ref"
-          },
-          {
-            "id": "src_endpoint",
-            "nullable": true,
-            "type": "json"
-          },
-          {
-            "id": "dst_endpoint",
-            "nullable": true,
-            "type": "json"
-          },
-          {
-            "id": "metrics",
-            "nullable": true,
-            "type": "json"
           }
         ],
         "link_type": "l2_observation",
@@ -14961,8 +14859,12 @@
           "src_actor",
           "dst_actor",
           "protocol",
-          "src_endpoint",
-          "dst_endpoint"
+          "src_if_index",
+          "src_port_name",
+          "src_port_id",
+          "dst_if_index",
+          "dst_port_name",
+          "dst_port_id"
         ],
         "role": "observation_evidence"
       },
@@ -15022,6 +14924,18 @@
             "id": "dst_if_index",
             "nullable": true,
             "type": "uint"
+          },
+          {
+            "dictionary": "strings",
+            "id": "src_port_id",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "dst_port_id",
+            "nullable": true,
+            "type": "string_ref"
           },
           {
             "dictionary": "strings",
@@ -15093,21 +15007,6 @@
             "id": "source",
             "nullable": true,
             "type": "string_ref"
-          },
-          {
-            "id": "src_endpoint",
-            "nullable": true,
-            "type": "json"
-          },
-          {
-            "id": "dst_endpoint",
-            "nullable": true,
-            "type": "json"
-          },
-          {
-            "id": "metrics",
-            "nullable": true,
-            "type": "json"
           }
         ],
         "link_type": "l3_subnet",
@@ -15179,6 +15078,18 @@
           },
           {
             "dictionary": "strings",
+            "id": "src_port_id",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "dst_port_id",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
             "id": "src_management_ip",
             "nullable": true,
             "type": "string_ref"
@@ -15206,21 +15117,6 @@
             "id": "attachment_mode",
             "nullable": true,
             "type": "string_ref"
-          },
-          {
-            "id": "src_endpoint",
-            "nullable": true,
-            "type": "json"
-          },
-          {
-            "id": "dst_endpoint",
-            "nullable": true,
-            "type": "json"
-          },
-          {
-            "id": "metrics",
-            "nullable": true,
-            "type": "json"
           }
         ],
         "link_type": "lldp",
@@ -15228,8 +15124,12 @@
           "src_actor",
           "dst_actor",
           "protocol",
-          "src_endpoint",
-          "dst_endpoint"
+          "src_if_index",
+          "src_port_name",
+          "src_port_id",
+          "dst_if_index",
+          "dst_port_name",
+          "dst_port_id"
         ],
         "role": "observation_evidence"
       },
@@ -15289,6 +15189,18 @@
             "id": "dst_if_index",
             "nullable": true,
             "type": "uint"
+          },
+          {
+            "dictionary": "strings",
+            "id": "src_port_id",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "dst_port_id",
+            "nullable": true,
+            "type": "string_ref"
           },
           {
             "dictionary": "strings",
@@ -15372,21 +15284,6 @@
             "id": "source",
             "nullable": true,
             "type": "string_ref"
-          },
-          {
-            "id": "src_endpoint",
-            "nullable": true,
-            "type": "json"
-          },
-          {
-            "id": "dst_endpoint",
-            "nullable": true,
-            "type": "json"
-          },
-          {
-            "id": "metrics",
-            "nullable": true,
-            "type": "json"
           }
         ],
         "link_type": "ospf_adjacency",
@@ -15459,6 +15356,18 @@
           },
           {
             "dictionary": "strings",
+            "id": "src_port_id",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "dst_port_id",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
             "id": "src_management_ip",
             "nullable": true,
             "type": "string_ref"
@@ -15486,21 +15395,6 @@
             "id": "attachment_mode",
             "nullable": true,
             "type": "string_ref"
-          },
-          {
-            "id": "src_endpoint",
-            "nullable": true,
-            "type": "json"
-          },
-          {
-            "id": "dst_endpoint",
-            "nullable": true,
-            "type": "json"
-          },
-          {
-            "id": "metrics",
-            "nullable": true,
-            "type": "json"
           }
         ],
         "link_type": "probable",
@@ -15508,8 +15402,12 @@
           "src_actor",
           "dst_actor",
           "protocol",
-          "src_endpoint",
-          "dst_endpoint"
+          "src_if_index",
+          "src_port_name",
+          "src_port_id",
+          "dst_if_index",
+          "dst_port_name",
+          "dst_port_id"
         ],
         "role": "observation_evidence"
       },
@@ -15572,6 +15470,18 @@
           },
           {
             "dictionary": "strings",
+            "id": "src_port_id",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "dst_port_id",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
             "id": "src_management_ip",
             "nullable": true,
             "type": "string_ref"
@@ -15599,21 +15509,6 @@
             "id": "attachment_mode",
             "nullable": true,
             "type": "string_ref"
-          },
-          {
-            "id": "src_endpoint",
-            "nullable": true,
-            "type": "json"
-          },
-          {
-            "id": "dst_endpoint",
-            "nullable": true,
-            "type": "json"
-          },
-          {
-            "id": "metrics",
-            "nullable": true,
-            "type": "json"
           }
         ],
         "link_type": "snmp",
@@ -15621,8 +15516,12 @@
           "src_actor",
           "dst_actor",
           "protocol",
-          "src_endpoint",
-          "dst_endpoint"
+          "src_if_index",
+          "src_port_name",
+          "src_port_id",
+          "dst_if_index",
+          "dst_port_name",
+          "dst_port_id"
         ],
         "role": "observation_evidence"
       },
@@ -15685,6 +15584,18 @@
           },
           {
             "dictionary": "strings",
+            "id": "src_port_id",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "dst_port_id",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
             "id": "src_management_ip",
             "nullable": true,
             "type": "string_ref"
@@ -15712,21 +15623,6 @@
             "id": "attachment_mode",
             "nullable": true,
             "type": "string_ref"
-          },
-          {
-            "id": "src_endpoint",
-            "nullable": true,
-            "type": "json"
-          },
-          {
-            "id": "dst_endpoint",
-            "nullable": true,
-            "type": "json"
-          },
-          {
-            "id": "metrics",
-            "nullable": true,
-            "type": "json"
           }
         ],
         "link_type": "stp",
@@ -15734,8 +15630,12 @@
           "src_actor",
           "dst_actor",
           "protocol",
-          "src_endpoint",
-          "dst_endpoint"
+          "src_if_index",
+          "src_port_name",
+          "src_port_id",
+          "dst_if_index",
+          "dst_port_name",
+          "dst_port_id"
         ],
         "role": "observation_evidence"
       }

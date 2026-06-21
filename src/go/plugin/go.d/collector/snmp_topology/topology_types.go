@@ -12,8 +12,67 @@ import (
 const topologySchemaVersion = "2.0"
 
 type topologyMatch = graph.Match
-type topologyLink = graph.Link
 type topologyLinkEndpoint = graph.LinkEndpoint
+
+type topologyLink struct {
+	Layer        string
+	Protocol     string
+	LinkType     string
+	Direction    string
+	State        string
+	SrcActorID   string
+	DstActorID   string
+	Src          topologyLinkEndpoint
+	Dst          topologyLinkEndpoint
+	DiscoveredAt *time.Time
+	LastSeen     *time.Time
+	Display      *graph.LinkDisplay
+	L2           *graph.LinkL2
+	Inference    *graph.LinkInference
+	Detail       topologyLinkDetail
+}
+
+type topologyLinkDetail struct {
+	L3Subnet *topologyL3SubnetLinkDetail
+	OSPF     *topologyOSPFAdjacencyLinkDetail
+	BGP      *topologyBGPAdjacencyLinkDetail
+}
+
+type topologyL3SubnetLinkDetail struct {
+	Source  string
+	SrcIP   string
+	DstIP   string
+	Subnet  string
+	Network string
+	Netmask string
+	Prefix  int
+}
+
+type topologyOSPFAdjacencyLinkDetail struct {
+	Source           string
+	LocalRouterID    string
+	NeighborRouterID string
+	LocalIP          string
+	NeighborIP       string
+	AddresslessIndex string
+	Subnet           string
+	Network          string
+	Netmask          string
+	Prefix           int
+}
+
+type topologyBGPAdjacencyLinkDetail struct {
+	Source          string
+	RoutingInstance string
+	LocalIP         string
+	NeighborIP      string
+	LocalAS         string
+	RemoteAS        string
+	LocalIdentifier string
+	PeerIdentifier  string
+	PeerType        string
+	BGPVersion      string
+}
 
 type topologyActor struct {
 	ActorID     string
@@ -81,6 +140,36 @@ func topologyActorFromGraph(actor graph.Actor, detail topologyengine.ProjectionA
 		ParentMatch: actor.ParentMatch,
 		Labels:      actor.Labels,
 		Detail:      topologyActorDetail{L2: detail},
+	}
+}
+
+func topologyLinksFromGraph(links []graph.Link) []topologyLink {
+	if len(links) == 0 {
+		return nil
+	}
+	out := make([]topologyLink, len(links))
+	for i, link := range links {
+		out[i] = topologyLinkFromGraph(link)
+	}
+	return out
+}
+
+func topologyLinkFromGraph(link graph.Link) topologyLink {
+	return topologyLink{
+		Layer:        link.Layer,
+		Protocol:     link.Protocol,
+		LinkType:     link.LinkType,
+		Direction:    link.Direction,
+		State:        link.State,
+		SrcActorID:   link.SrcActorID,
+		DstActorID:   link.DstActorID,
+		Src:          link.Src,
+		Dst:          link.Dst,
+		DiscoveredAt: link.DiscoveredAt,
+		LastSeen:     link.LastSeen,
+		Display:      link.Display,
+		L2:           link.L2,
+		Inference:    link.Inference,
 	}
 }
 

@@ -64,7 +64,7 @@ func projectAdjacencyLinks(
 			merged.Direction = "bidirectional"
 			merged.Src = mergeEndpointIPHints(left.link.Src, right.link.Dst)
 			merged.Dst = mergeEndpointIPHints(right.link.Src, left.link.Dst)
-			merged.Metrics = buildPairedLinkMetrics(left.adj.Labels, right.adj.Labels)
+			merged.L2 = buildPairedLinkL2(left.adj.Labels, right.adj.Labels)
 			out.links = append(out.links, merged)
 			incrementProjectedProtocolCounters(&out, left.protocol, true)
 			continue
@@ -167,48 +167,40 @@ func backfillPairGroupMissingEndpointPorts(entries []*builtAdjacencyLink) {
 }
 
 func endpointHasKnownCanonicalPort(endpoint graph.LinkEndpoint) bool {
-	return strings.TrimSpace(topologyCanonicalPortName(endpoint.Attributes)) != ""
+	return strings.TrimSpace(topologyEndpointCanonicalPortName(endpoint)) != ""
 }
 
 func backfillEndpointPortFromPeer(endpoint graph.LinkEndpoint, peer graph.LinkEndpoint) graph.LinkEndpoint {
 	if endpointHasKnownCanonicalPort(endpoint) || !endpointHasKnownCanonicalPort(peer) {
 		return endpoint
 	}
-
-	attrs := cloneAnyMap(endpoint.Attributes)
-	if attrs == nil {
-		attrs = make(map[string]any)
+	if endpoint.IfIndex <= 0 && peer.IfIndex > 0 {
+		endpoint.IfIndex = peer.IfIndex
 	}
-	peerAttrs := peer.Attributes
-	if len(peerAttrs) == 0 {
-		return endpoint
+	if strings.TrimSpace(endpoint.IfName) == "" {
+		endpoint.IfName = strings.TrimSpace(peer.IfName)
 	}
-
-	if topologyAttrInt(attrs, "if_index") <= 0 {
-		if ifIndex := topologyAttrInt(peerAttrs, "if_index"); ifIndex > 0 {
-			attrs["if_index"] = ifIndex
-		}
+	if strings.TrimSpace(endpoint.IfDescr) == "" {
+		endpoint.IfDescr = strings.TrimSpace(peer.IfDescr)
 	}
-
-	copyIfMissing := func(key string) {
-		if topologyAttrString(attrs, key) != "" {
-			return
-		}
-		if value := topologyAttrString(peerAttrs, key); value != "" {
-			attrs[key] = value
-		}
+	if strings.TrimSpace(endpoint.IfAlias) == "" {
+		endpoint.IfAlias = strings.TrimSpace(peer.IfAlias)
 	}
-
-	copyIfMissing("if_name")
-	copyIfMissing("if_descr")
-	copyIfMissing("if_alias")
-	copyIfMissing("port_id")
-	copyIfMissing("port_name")
-	copyIfMissing("bridge_port")
-	copyIfMissing("if_admin_status")
-	copyIfMissing("if_oper_status")
-
-	endpoint.Attributes = pruneTopologyAttributes(attrs)
+	if strings.TrimSpace(endpoint.PortID) == "" {
+		endpoint.PortID = strings.TrimSpace(peer.PortID)
+	}
+	if strings.TrimSpace(endpoint.PortName) == "" {
+		endpoint.PortName = strings.TrimSpace(peer.PortName)
+	}
+	if strings.TrimSpace(endpoint.BridgePort) == "" {
+		endpoint.BridgePort = strings.TrimSpace(peer.BridgePort)
+	}
+	if strings.TrimSpace(endpoint.AdminStatus) == "" {
+		endpoint.AdminStatus = strings.TrimSpace(peer.AdminStatus)
+	}
+	if strings.TrimSpace(endpoint.OperStatus) == "" {
+		endpoint.OperStatus = strings.TrimSpace(peer.OperStatus)
+	}
 	return endpoint
 }
 
@@ -237,21 +229,17 @@ func adjacencyToTopologyLink(
 		DiscoveredAt: topologyTimePtr(collectedAt),
 		LastSeen:     topologyTimePtr(collectedAt),
 	}
-	if len(adj.Labels) > 0 {
-		link.Metrics = mapStringStringToAny(adj.Labels)
-	}
 	return link
 }
 
-func buildPairedLinkMetrics(sourceLabels, targetLabels map[string]string) map[string]any {
-	metrics := make(map[string]any)
-
+func buildPairedLinkL2(sourceLabels, targetLabels map[string]string) *graph.LinkL2 {
+	l2 := &graph.LinkL2{}
 	pairID := strings.TrimSpace(sourceLabels[adjacencyLabelPairID])
 	if pairID == "" {
 		pairID = strings.TrimSpace(targetLabels[adjacencyLabelPairID])
 	}
 	if pairID != "" {
-		metrics[adjacencyLabelPairID] = pairID
+		l2.PairID = pairID
 	}
 
 	pairPass := strings.TrimSpace(sourceLabels[adjacencyLabelPairPass])
@@ -259,31 +247,10 @@ func buildPairedLinkMetrics(sourceLabels, targetLabels map[string]string) map[st
 		pairPass = strings.TrimSpace(targetLabels[adjacencyLabelPairPass])
 	}
 	if pairPass != "" {
-		metrics[adjacencyLabelPairPass] = pairPass
+		l2.PairPass = pairPass
 	}
-	metrics["pair_consistent"] = true
-
-	for key, value := range sourceLabels {
-		key = strings.TrimSpace(key)
-		value = strings.TrimSpace(value)
-		if key == "" || value == "" || isPairLabelKey(key) {
-			continue
-		}
-		metrics["src_"+key] = value
-	}
-	for key, value := range targetLabels {
-		key = strings.TrimSpace(key)
-		value = strings.TrimSpace(value)
-		if key == "" || value == "" || isPairLabelKey(key) {
-			continue
-		}
-		metrics["dst_"+key] = value
-	}
-
-	if len(metrics) == 0 {
-		return nil
-	}
-	return metrics
+	l2.PairConsistent = true
+	return l2
 }
 
 func mergeEndpointIPHints(base, extra graph.LinkEndpoint) graph.LinkEndpoint {

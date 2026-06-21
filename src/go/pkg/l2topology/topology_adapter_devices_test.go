@@ -33,12 +33,10 @@ func TestAdjacencySideToEndpoint_FallsBackToRequestedPort(t *testing.T) {
 	require.Equal(t, []string{"00:11:22:33:44:55"}, endpoint.Match.ChassisIDs)
 	require.Equal(t, []string{"00:11:22:33:44:55"}, endpoint.Match.MacAddresses)
 	require.Equal(t, []string{"10.0.0.1"}, endpoint.Match.IPAddresses)
-	_, hasIfIndex := endpoint.Attributes["if_index"]
-	require.False(t, hasIfIndex)
-	require.Equal(t, "Gi0/9", endpoint.Attributes["if_name"])
-	require.Equal(t, "Gi0/9", endpoint.Attributes["port_id"])
-	require.Equal(t, "switch-a", endpoint.Attributes["sys_name"])
-	require.Equal(t, "10.0.0.1", endpoint.Attributes["management_ip"])
-	_, hasDescr := endpoint.Attributes["if_descr"]
-	require.False(t, hasDescr)
+	require.Zero(t, endpoint.IfIndex)
+	require.Equal(t, "Gi0/9", endpoint.IfName)
+	require.Equal(t, "Gi0/9", endpoint.PortID)
+	require.Equal(t, "switch-a", endpoint.SysName)
+	require.Equal(t, "10.0.0.1", endpoint.ManagementIP)
+	require.Empty(t, endpoint.IfDescr)
 }

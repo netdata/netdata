@@ -113,10 +113,31 @@ func uintValue(value any) (uint64, bool) {
 }
 
 func topologyV1EndpointString(endpoint topologyLinkEndpoint, key string) string {
-	return firstNonEmptyString(
-		anyStringValue(endpoint.Attributes[key]),
-		topologyV1MatchString(endpoint.Match, key),
-	)
+	switch key {
+	case "if_name":
+		return strings.TrimSpace(endpoint.IfName)
+	case "if_descr":
+		return strings.TrimSpace(endpoint.IfDescr)
+	case "if_alias":
+		return strings.TrimSpace(endpoint.IfAlias)
+	case "port_id":
+		return strings.TrimSpace(endpoint.PortID)
+	case "port_name":
+		return strings.TrimSpace(endpoint.PortName)
+	case "management_ip":
+		return strings.TrimSpace(endpoint.ManagementIP)
+	case "sys_name":
+		return firstNonEmptyString(endpoint.SysName, topologyV1MatchString(endpoint.Match, key))
+	default:
+		return topologyV1MatchString(endpoint.Match, key)
+	}
+}
+
+func nullableEndpointIfIndex(endpoint topologyLinkEndpoint) any {
+	if endpoint.IfIndex <= 0 {
+		return nil
+	}
+	return uint64(endpoint.IfIndex)
 }
 
 func topologyV1EndpointPortName(endpoint topologyLinkEndpoint) string {

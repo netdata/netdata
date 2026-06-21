@@ -28,8 +28,8 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentEmitsFullManagedLink(t *testing.T) 
 	link := data.Links[0]
 	require.Equal(t, topologyOSPFAdjacencyLinkType, link.LinkType)
 	require.Equal(t, "full", link.State)
-	require.Equal(t, "1.1.1.1", link.Src.Attributes["router_id"])
-	require.Equal(t, "2.2.2.2", link.Dst.Attributes["router_id"])
+	require.Equal(t, "1.1.1.1", topologyOSPFLocalRouterID(link))
+	require.Equal(t, "2.2.2.2", topologyOSPFNeighborRouterID(link))
 	require.Equal(t, 1, topologyStatsToV1(data.Stats)["ospf_neighbor_rows"])
 	require.Equal(t, 1, topologyStatsToV1(data.Stats)["ospf_neighbor_detail_rows"])
 	require.Equal(t, 1, topologyStatsToV1(data.Stats)["ospf_adjacency_emitted_links"])
@@ -169,14 +169,16 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsMatchingL3SubnetEdge(t *testin
 		SrcActorID: "router-a",
 		DstActorID: "router-b",
 		Src: topologyLinkEndpoint{
-			Attributes: map[string]any{"ip": "198.51.100.1"},
+			Match: topologyMatch{IPAddresses: []string{"198.51.100.1"}},
 		},
 		Dst: topologyLinkEndpoint{
-			Attributes: map[string]any{"ip": "198.51.100.2"},
+			Match: topologyMatch{IPAddresses: []string{"198.51.100.2"}},
 		},
-		Metrics: map[string]any{
-			"subnet": "198.51.100.0/30",
-			"prefix": 30,
+		Detail: topologyLinkDetail{
+			L3Subnet: &topologyL3SubnetLinkDetail{
+				Subnet: "198.51.100.0/30",
+				Prefix: 30,
+			},
 		},
 	}
 	data := topologyData{
@@ -213,14 +215,16 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsUnrelatedL3SubnetEdge(t *testi
 		SrcActorID: "router-a",
 		DstActorID: "router-b",
 		Src: topologyLinkEndpoint{
-			Attributes: map[string]any{"ip": "203.0.113.1"},
+			Match: topologyMatch{IPAddresses: []string{"203.0.113.1"}},
 		},
 		Dst: topologyLinkEndpoint{
-			Attributes: map[string]any{"ip": "203.0.113.2"},
+			Match: topologyMatch{IPAddresses: []string{"203.0.113.2"}},
 		},
-		Metrics: map[string]any{
-			"subnet": "203.0.113.0/30",
-			"prefix": 30,
+		Detail: topologyLinkDetail{
+			L3Subnet: &topologyL3SubnetLinkDetail{
+				Subnet: "203.0.113.0/30",
+				Prefix: 30,
+			},
 		},
 	}
 	data := topologyData{
@@ -278,9 +282,8 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentResolvesUnnumberedNeighborByRouterI
 	require.Equal(t, 1, stats.emittedLinks)
 	require.Len(t, data.Links, 1)
 	require.Equal(t, topologyOSPFAdjacencyLinkType, data.Links[0].LinkType)
-	require.Equal(t, "2.2.2.2", data.Links[0].Dst.Attributes["router_id"])
-	require.NotContains(t, data.Links[0].Dst.Attributes, "ip")
-	require.NotContains(t, data.Links[0].Metrics, "neighbor_ip")
+	require.Equal(t, "2.2.2.2", topologyOSPFNeighborRouterID(data.Links[0]))
+	require.Empty(t, topologyOSPFNeighborIP(data.Links[0]))
 	require.Empty(t, data.Actors[0].Detail.OSPF[0].NeighborIP)
 }
 

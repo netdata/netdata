@@ -641,7 +641,7 @@ func hasProtocolLink(snapshot topologyData, protocol string) bool {
 
 func containsSysName(snapshot topologyData, names map[string]struct{}) bool {
 	for _, link := range snapshot.Links {
-		sysName, _ := link.Dst.Attributes["sys_name"].(string)
+		sysName := strings.TrimSpace(link.Dst.SysName)
 		if sysName == "" {
 			continue
 		}
@@ -727,7 +727,7 @@ func containsIdentifier(snapshot topologyData, ids map[string]struct{}) bool {
 	}
 
 	for _, link := range snapshot.Links {
-		if sysName, _ := link.Dst.Attributes["sys_name"].(string); sysName != "" {
+		if sysName := strings.TrimSpace(link.Dst.SysName); sysName != "" {
 			if matches(sysName) {
 				return true
 			}

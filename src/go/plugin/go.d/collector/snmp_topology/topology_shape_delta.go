@@ -2,10 +2,7 @@
 
 package snmptopology
 
-import (
-	"fmt"
-	"strings"
-)
+import "strings"
 
 func topologyLinkDeltaKey(link topologyLink) string {
 	return strings.Join([]string{
@@ -13,13 +10,13 @@ func topologyLinkDeltaKey(link topologyLink) string {
 		strings.ToLower(strings.TrimSpace(link.Direction)),
 		strings.TrimSpace(link.SrcActorID),
 		strings.TrimSpace(link.DstActorID),
-		attrKey(link.Src.Attributes, "if_index"),
-		attrKey(link.Src.Attributes, "if_name"),
-		attrKey(link.Src.Attributes, "port_id"),
-		attrKey(link.Dst.Attributes, "if_index"),
-		attrKey(link.Dst.Attributes, "if_name"),
-		attrKey(link.Dst.Attributes, "port_id"),
-		fmt.Sprint(link.Metrics["bridge_domain"]),
+		topologyEndpointKey(link.Src, "if_index"),
+		topologyEndpointKey(link.Src, "if_name"),
+		topologyEndpointKey(link.Src, "port_id"),
+		topologyEndpointKey(link.Dst, "if_index"),
+		topologyEndpointKey(link.Dst, "if_name"),
+		topologyEndpointKey(link.Dst, "port_id"),
+		topologyL2BridgeDomain(link),
 	}, "|")
 }
 
@@ -39,18 +36,18 @@ func markProbableDeltaLinks(strictData, probableData *topologyData) {
 			continue
 		}
 		link.State = "probable"
-		if link.Metrics == nil {
-			link.Metrics = make(map[string]any)
+		inference := ensureTopologyLinkInference(&link)
+		if inference != nil {
+			inference.Inference = "probable"
 		}
-		link.Metrics["inference"] = "probable"
-		if topologyMetricValueString(link.Metrics, "confidence") == "" {
-			link.Metrics["confidence"] = "low"
+		if inference != nil && strings.TrimSpace(inference.Confidence) == "" {
+			inference.Confidence = "low"
 		}
-		if topologyMetricValueString(link.Metrics, "attachment_mode") == "" {
+		if inference != nil && strings.TrimSpace(inference.AttachmentMode) == "" {
 			if strings.EqualFold(strings.TrimSpace(link.Protocol), "bridge") {
-				link.Metrics["attachment_mode"] = "probable_bridge_anchor"
+				inference.AttachmentMode = "probable_bridge_anchor"
 			} else {
-				link.Metrics["attachment_mode"] = "probable_added"
+				inference.AttachmentMode = "probable_added"
 			}
 		}
 		probableData.Links[idx] = link
@@ -64,15 +61,22 @@ func topologyLinkActorKey(link topologyLink) string {
 		link.Direction,
 		link.SrcActorID,
 		link.DstActorID,
-		attrKey(link.Src.Attributes, "if_index"),
-		attrKey(link.Src.Attributes, "if_name"),
-		attrKey(link.Src.Attributes, "port_id"),
-		attrKey(link.Dst.Attributes, "if_index"),
-		attrKey(link.Dst.Attributes, "if_name"),
-		attrKey(link.Dst.Attributes, "port_id"),
+		topologyEndpointKey(link.Src, "if_index"),
+		topologyEndpointKey(link.Src, "if_name"),
+		topologyEndpointKey(link.Src, "port_id"),
+		topologyEndpointKey(link.Dst, "if_index"),
+		topologyEndpointKey(link.Dst, "if_name"),
+		topologyEndpointKey(link.Dst, "port_id"),
 		link.State,
-		fmt.Sprint(link.Metrics["bridge_domain"]),
-		fmt.Sprint(link.Metrics["attachment_mode"]),
-		fmt.Sprint(link.Metrics["inference"]),
+		topologyL2BridgeDomain(link),
+		topologyLinkAttachmentModeValue(link),
+		topologyLinkInferenceValue(link),
 	}, "|")
+}
+
+func topologyL2BridgeDomain(link topologyLink) string {
+	if link.L2 == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.L2.BridgeDomain)
 }

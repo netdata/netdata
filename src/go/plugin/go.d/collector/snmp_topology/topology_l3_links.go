@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
 const topologyL3SubnetLinkType = "l3_subnet"
@@ -79,44 +81,33 @@ func topologyL3SubnetLink(adjacency topologyL3SubnetAdjacency, srcRef, dstRef to
 		SrcActorID: srcRef.actorID,
 		DstActorID: dstRef.actorID,
 		Src: topologyLinkEndpoint{
-			Match:      srcRef.match,
-			Attributes: topologyL3EndpointAttributes(adjacency.A, adjacency),
+			Match:   srcRef.match,
+			IfIndex: parseIndex(adjacency.A.IfIndex),
+			IfName:  strings.TrimSpace(adjacency.A.IfName),
+			IfDescr: strings.TrimSpace(adjacency.A.IfDescr),
 		},
 		Dst: topologyLinkEndpoint{
-			Match:      dstRef.match,
-			Attributes: topologyL3EndpointAttributes(adjacency.B, adjacency),
+			Match:   dstRef.match,
+			IfIndex: parseIndex(adjacency.B.IfIndex),
+			IfName:  strings.TrimSpace(adjacency.B.IfName),
+			IfDescr: strings.TrimSpace(adjacency.B.IfDescr),
 		},
-		Metrics: map[string]any{
-			"source":          "ip_mib",
-			"inference":       "shared_subnet",
-			"attachment_mode": "logical_l3_subnet",
-			"subnet":          adjacency.Subnet,
-			"network":         adjacency.Network,
-			"netmask":         adjacency.Netmask,
-			"prefix":          adjacency.Prefix,
+		Inference: &graph.LinkInference{
+			Inference:      "shared_subnet",
+			AttachmentMode: "logical_l3_subnet",
+		},
+		Detail: topologyLinkDetail{
+			L3Subnet: &topologyL3SubnetLinkDetail{
+				Source:  "ip_mib",
+				SrcIP:   normalizeIPAddress(adjacency.A.IP),
+				DstIP:   normalizeIPAddress(adjacency.B.IP),
+				Subnet:  adjacency.Subnet,
+				Network: adjacency.Network,
+				Netmask: adjacency.Netmask,
+				Prefix:  adjacency.Prefix,
+			},
 		},
 	}
-}
-
-func topologyL3EndpointAttributes(row topologyL3Interface, adjacency topologyL3SubnetAdjacency) map[string]any {
-	attrs := map[string]any{
-		"ip":      normalizeIPAddress(row.IP),
-		"subnet":  adjacency.Subnet,
-		"network": adjacency.Network,
-		"netmask": adjacency.Netmask,
-		"prefix":  adjacency.Prefix,
-		"source":  "ip_mib",
-	}
-	if ifIndex := parseIndex(row.IfIndex); ifIndex > 0 {
-		attrs["if_index"] = ifIndex
-	}
-	if ifName := strings.TrimSpace(row.IfName); ifName != "" {
-		attrs["if_name"] = ifName
-	}
-	if ifDescr := strings.TrimSpace(row.IfDescr); ifDescr != "" {
-		attrs["if_descr"] = ifDescr
-	}
-	return attrs
 }
 
 func existingTopologyL3LinkKeys(links []topologyLink) map[string]struct{} {
@@ -138,9 +129,23 @@ func topologyL3SubnetLinkKey(link topologyLink) string {
 	return topologyL3SubnetLinkKeyParts(
 		src,
 		dst,
-		topologyMetricValueString(link.Metrics, "subnet"),
-		strconv.Itoa(intStatValue(link.Metrics["prefix"])),
+		topologyL3Subnet(link),
+		strconv.Itoa(topologyL3SubnetPrefix(link)),
 	)
+}
+
+func topologyL3Subnet(link topologyLink) string {
+	if link.Detail.L3Subnet == nil {
+		return ""
+	}
+	return strings.TrimSpace(link.Detail.L3Subnet.Subnet)
+}
+
+func topologyL3SubnetPrefix(link topologyLink) int {
+	if link.Detail.L3Subnet == nil {
+		return 0
+	}
+	return link.Detail.L3Subnet.Prefix
 }
 
 func topologyL3SubnetLinkKeyParts(parts ...string) string {

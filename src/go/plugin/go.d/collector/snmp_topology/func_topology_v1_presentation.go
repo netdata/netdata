@@ -512,8 +512,12 @@ func snmpTopologyV1EvidenceMatchColumnsForType(linkType string) []string {
 		"src_actor",
 		"dst_actor",
 		"protocol",
-		"src_endpoint",
-		"dst_endpoint",
+		"src_if_index",
+		"src_port_name",
+		"src_port_id",
+		"dst_if_index",
+		"dst_port_name",
+		"dst_port_id",
 	}
 }
 

@@ -104,9 +104,9 @@ func TestTopologyCache_LldpSnapshot(t *testing.T) {
 	link := data.Links[0]
 	assert.Equal(t, "lldp", link.Protocol)
 	assert.Equal(t, "unidirectional", link.Direction)
-	assert.Equal(t, "Gi0/1", link.Src.Attributes["port_id"])
-	assert.Equal(t, "Gi0/2", link.Dst.Attributes["port_id"])
-	assert.Equal(t, "sw2", link.Dst.Attributes["sys_name"])
+	assert.Equal(t, "Gi0/1", link.Src.PortID)
+	assert.Equal(t, "Gi0/2", link.Dst.PortID)
+	assert.Equal(t, "sw2", link.Dst.SysName)
 }
 
 func TestTopologyCache_CdpSnapshot(t *testing.T) {
@@ -135,8 +135,8 @@ func TestTopologyCache_CdpSnapshot(t *testing.T) {
 	require.Len(t, data.Links, 1)
 	assert.Equal(t, "cdp", data.Links[0].Protocol)
 	assert.Equal(t, "unidirectional", data.Links[0].Direction)
-	assert.Equal(t, "Gi0/2", data.Links[0].Src.Attributes["if_name"])
-	assert.Equal(t, "Gi0/3", data.Links[0].Dst.Attributes["port_id"])
+	assert.Equal(t, "Gi0/2", data.Links[0].Src.IfName)
+	assert.Equal(t, "Gi0/3", data.Links[0].Dst.PortID)
 }
 
 func TestTopologyCache_UpdateTopologyProfileTags_STPBridgeAddressSetsSNMPIdentity(t *testing.T) {
@@ -307,7 +307,7 @@ func TestTopologyCache_CdpSnapshotHexAddress(t *testing.T) {
 	require.Len(t, data.Links, 1)
 	assert.Equal(t, "cdp", data.Links[0].Protocol)
 	assert.Equal(t, "unidirectional", data.Links[0].Direction)
-	assert.True(t, linkHasRawAddressMetric(data.Links[0], "0a000003"))
+	assert.True(t, linkHasRawAddressHint(data.Links[0], "0a000003"))
 
 	remote := findDeviceActorBySysName(data, "sw3")
 	require.NotNil(t, remote)
@@ -354,7 +354,7 @@ func TestTopologyCache_CdpSnapshotRawAddressWithoutIP(t *testing.T) {
 	require.Len(t, data.Links, 1)
 	assert.Equal(t, "cdp", data.Links[0].Protocol)
 	assert.Equal(t, "unidirectional", data.Links[0].Direction)
-	assert.True(t, linkHasRawAddressMetric(data.Links[0], "edge-sw3.mgmt.local"))
+	assert.True(t, linkHasRawAddressHint(data.Links[0], "edge-sw3.mgmt.local"))
 }
 
 func TestTopologyCache_SnapshotBidirectionalPairMetadata(t *testing.T) {
@@ -424,7 +424,8 @@ func TestTopologyCache_SnapshotBidirectionalPairMetadata(t *testing.T) {
 	link := data.Links[0]
 	require.Equal(t, "lldp", link.Protocol)
 	require.Equal(t, "bidirectional", link.Direction)
-	require.Equal(t, true, link.Metrics["pair_consistent"])
+	require.NotNil(t, link.L2)
+	require.True(t, link.L2.PairConsistent)
 	require.Equal(t, 1, topologyStatsToV1(data.Stats)["links_bidirectional"])
 	require.Equal(t, 0, topologyStatsToV1(data.Stats)["links_unidirectional"])
 }
@@ -1573,17 +1574,12 @@ func containsString(values []string, target string) bool {
 	return slices.Contains(values, target)
 }
 
-func linkHasRawAddressMetric(link topologyLink, raw string) bool {
+func linkHasRawAddressHint(link topologyLink, raw string) bool {
 	raw = strings.TrimSpace(raw)
-	if raw == "" || len(link.Metrics) == 0 {
+	if raw == "" {
 		return false
 	}
-	if value, ok := link.Metrics["remote_address_raw"].(string); ok && value == raw {
-		return true
-	}
-	srcRaw, srcOK := link.Metrics["src_remote_address_raw"].(string)
-	dstRaw, dstOK := link.Metrics["dst_remote_address_raw"].(string)
-	return (srcOK && srcRaw == raw) || (dstOK && dstRaw == raw)
+	return containsString(link.Src.Match.IPAddresses, raw) || containsString(link.Dst.Match.IPAddresses, raw)
 }
 
 func findDeviceActorBySysName(snapshot topologyData, sysName string) *topologyActor {

@@ -114,9 +114,11 @@ func topologyL3SubnetLinkForTest(srcActorID, dstActorID, subnet string, prefix a
 		LinkType:   topologyL3SubnetLinkType,
 		SrcActorID: srcActorID,
 		DstActorID: dstActorID,
-		Metrics: map[string]any{
-			"subnet": subnet,
-			"prefix": prefix,
+		Detail: topologyLinkDetail{
+			L3Subnet: &topologyL3SubnetLinkDetail{
+				Subnet: subnet,
+				Prefix: intStatValue(prefix),
+			},
 		},
 	}
 }
@@ -125,17 +127,21 @@ func TestTopologyL3SubnetLinkKeySeparatesDelimitedFields(t *testing.T) {
 	left := topologyLink{
 		SrcActorID: "a|b",
 		DstActorID: "c",
-		Metrics: map[string]any{
-			"subnet": "198.51.100.0/30",
-			"prefix": 30,
+		Detail: topologyLinkDetail{
+			L3Subnet: &topologyL3SubnetLinkDetail{
+				Subnet: "198.51.100.0/30",
+				Prefix: 30,
+			},
 		},
 	}
 	right := topologyLink{
 		SrcActorID: "a",
 		DstActorID: "b|c",
-		Metrics: map[string]any{
-			"subnet": "198.51.100.0/30",
-			"prefix": 30,
+		Detail: topologyLinkDetail{
+			L3Subnet: &topologyL3SubnetLinkDetail{
+				Subnet: "198.51.100.0/30",
+				Prefix: 30,
+			},
 		},
 	}
 
@@ -158,9 +164,11 @@ func TestApplyTopologyDepthFocusFilterKeepsIncidentL3SubnetLink(t *testing.T) {
 				LinkType:   topologyL3SubnetLinkType,
 				SrcActorID: "router-a",
 				DstActorID: "router-b",
-				Metrics: map[string]any{
-					"subnet": "198.51.100.0/30",
-					"prefix": 30,
+				Detail: topologyLinkDetail{
+					L3Subnet: &topologyL3SubnetLinkDetail{
+						Subnet: "198.51.100.0/30",
+						Prefix: 30,
+					},
 				},
 			},
 		},

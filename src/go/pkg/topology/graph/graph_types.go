@@ -34,8 +34,40 @@ type Actor struct {
 }
 
 type LinkEndpoint struct {
-	Match      Match          `json:"match"`
-	Attributes map[string]any `json:"attributes,omitempty"`
+	Match         Match  `json:"match"`
+	IfIndex       int    `json:"if_index,omitempty"`
+	IfName        string `json:"if_name,omitempty"`
+	IfDescr       string `json:"if_descr,omitempty"`
+	IfAlias       string `json:"if_alias,omitempty"`
+	PortID        string `json:"port_id,omitempty"`
+	PortName      string `json:"port_name,omitempty"`
+	BridgePort    string `json:"bridge_port,omitempty"`
+	SysName       string `json:"sys_name,omitempty"`
+	ManagementIP  string `json:"management_ip,omitempty"`
+	DisplayName   string `json:"display_name,omitempty"`
+	DisplaySource string `json:"display_source,omitempty"`
+	AdminStatus   string `json:"if_admin_status,omitempty"`
+	OperStatus    string `json:"if_oper_status,omitempty"`
+}
+
+type LinkDisplay struct {
+	Name        string `json:"name,omitempty"`
+	SrcPortName string `json:"src_port_name,omitempty"`
+	DstPortName string `json:"dst_port_name,omitempty"`
+}
+
+type LinkL2 struct {
+	BridgeDomain   string `json:"bridge_domain,omitempty"`
+	Designated     bool   `json:"designated,omitempty"`
+	PairID         string `json:"pair_id,omitempty"`
+	PairPass       string `json:"pair_pass,omitempty"`
+	PairConsistent bool   `json:"pair_consistent,omitempty"`
+}
+
+type LinkInference struct {
+	Inference      string `json:"inference,omitempty"`
+	Confidence     string `json:"confidence,omitempty"`
+	AttachmentMode string `json:"attachment_mode,omitempty"`
 }
 
 type Link struct {
@@ -50,7 +82,9 @@ type Link struct {
 	Dst          LinkEndpoint   `json:"dst"`
 	DiscoveredAt *time.Time     `json:"discovered_at,omitempty"`
 	LastSeen     *time.Time     `json:"last_seen,omitempty"`
-	Metrics      map[string]any `json:"metrics,omitempty"`
+	Display      *LinkDisplay   `json:"display,omitempty"`
+	L2           *LinkL2        `json:"l2,omitempty"`
+	Inference    *LinkInference `json:"inference,omitempty"`
 }
 
 type Graph struct {

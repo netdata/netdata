@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 	"github.com/stretchr/testify/require"
 )
 
@@ -114,18 +115,18 @@ func TestTopologyLinkDeltaKeyUsesStableEndpointAndBridgeFields(t *testing.T) {
 		Direction:  " Bidirectional ",
 		SrcActorID: " device:a ",
 		DstActorID: " device:b ",
-		Src: topologyLinkEndpoint{Attributes: map[string]any{
-			"if_index": 7,
-			"if_name":  "Gi0/1",
-			"port_id":  "port-a",
-		}},
-		Dst: topologyLinkEndpoint{Attributes: map[string]any{
-			"if_index": 8,
-			"if_name":  "Gi0/2",
-			"port_id":  "port-b",
-		}},
-		Metrics: map[string]any{
-			"bridge_domain": "vlan-10",
+		Src: topologyLinkEndpoint{
+			IfIndex: 7,
+			IfName:  "Gi0/1",
+			PortID:  "port-a",
+		},
+		Dst: topologyLinkEndpoint{
+			IfIndex: 8,
+			IfName:  "Gi0/2",
+			PortID:  "port-b",
+		},
+		L2: &graph.LinkL2{
+			BridgeDomain: "vlan-10",
 		},
 		State: "probable",
 	}
@@ -139,25 +140,25 @@ func TestTopologyLinkActorKeyIncludesStateAndAttachmentMode(t *testing.T) {
 		Direction:  "bidirectional",
 		SrcActorID: "device:a",
 		DstActorID: "endpoint:b",
-		Src: topologyLinkEndpoint{Attributes: map[string]any{
-			"if_name": "Gi0/1",
-		}},
-		Dst: topologyLinkEndpoint{Attributes: map[string]any{
-			"if_name": "Gi0/2",
-		}},
-		Metrics: map[string]any{
-			"bridge_domain":   "vlan-200",
-			"attachment_mode": "probable_bridge_anchor",
-			"inference":       "probable",
+		Src: topologyLinkEndpoint{
+			IfName: "Gi0/1",
+		},
+		Dst: topologyLinkEndpoint{
+			IfName: "Gi0/2",
+		},
+		L2: &graph.LinkL2{
+			BridgeDomain: "vlan-200",
+		},
+		Inference: &graph.LinkInference{
+			AttachmentMode: "probable_bridge_anchor",
+			Inference:      "probable",
 		},
 		State: "probable",
 	}
 
 	strict := base
 	strict.State = ""
-	strict.Metrics = map[string]any{
-		"bridge_domain": "vlan-200",
-	}
+	strict.Inference = nil
 
 	require.NotEqual(t, topologyLinkActorKey(base), topologyLinkActorKey(strict))
 	require.NotEqual(t, topologyLinkDeltaKey(base), topologyLinkActorKey(base))

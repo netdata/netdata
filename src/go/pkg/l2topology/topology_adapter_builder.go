@@ -252,7 +252,7 @@ func (b *graphBuilder) finalizeGraph() {
 			b.probableLinks++
 			continue
 		}
-		if strings.EqualFold(topologyMetricString(link.Metrics, "inference"), "probable") {
+		if strings.EqualFold(topologyLinkInference(link), "probable") {
 			b.probableLinks++
 		}
 	}

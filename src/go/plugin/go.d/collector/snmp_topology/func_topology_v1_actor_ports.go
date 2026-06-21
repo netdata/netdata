@@ -52,7 +52,7 @@ func buildSNMPTopologyV1PortNeighborSummaries(
 		if !ok {
 			return
 		}
-		key := snmpTopologyV1PortNeighborKeyFor(actorRef, endpoint.Attributes["if_index"], topologyV1EndpointPortName(endpoint))
+		key := snmpTopologyV1PortNeighborKeyFor(actorRef, nullableEndpointIfIndex(endpoint), topologyV1EndpointPortName(endpoint))
 		if key.actorRef < 0 {
 			return
 		}
@@ -369,19 +369,19 @@ func buildSNMPTopologyV1ActorPortLinksTable(
 		rows.actors = append(rows.actors, actorRef)
 		rows.links = append(rows.links, linkIndex)
 		rows.remoteActors = append(rows.remoteActors, remoteActorRef)
-		rows.ifIndexes = append(rows.ifIndexes, nullableUintValue(endpoint.Attributes["if_index"]))
+		rows.ifIndexes = append(rows.ifIndexes, nullableEndpointIfIndex(endpoint))
 		rows.portIDs = append(rows.portIDs, nullableStringRef(stringsDict, topologyV1EndpointString(endpoint, "port_id")))
 		rows.portNames = append(rows.portNames, nullableStringRef(stringsDict, topologyV1EndpointPortName(endpoint)))
-		rows.remoteIfIndexes = append(rows.remoteIfIndexes, nullableUintValue(remoteEndpoint.Attributes["if_index"]))
+		rows.remoteIfIndexes = append(rows.remoteIfIndexes, nullableEndpointIfIndex(remoteEndpoint))
 		rows.remotePortIDs = append(rows.remotePortIDs, nullableStringRef(stringsDict, topologyV1EndpointString(remoteEndpoint, "port_id")))
 		rows.remotePortNames = append(rows.remotePortNames, nullableStringRef(stringsDict, topologyV1EndpointPortName(remoteEndpoint)))
 		rows.types = append(rows.types, stringsDict.Ref(linkType))
 		rows.protocols = append(rows.protocols, stringsDict.Ref(protocol))
 		rows.states = append(rows.states, nullableStringRef(stringsDict, link.State))
 		rows.evidenceCounts = append(rows.evidenceCounts, uint64(1))
-		rows.confidences = append(rows.confidences, nullableStringRef(stringsDict, topologyMetricValueString(link.Metrics, "confidence")))
-		rows.inferences = append(rows.inferences, nullableStringRef(stringsDict, topologyMetricValueString(link.Metrics, "inference")))
-		rows.attachmentModes = append(rows.attachmentModes, nullableStringRef(stringsDict, topologyMetricValueString(link.Metrics, "attachment_mode")))
+		rows.confidences = append(rows.confidences, nullableStringRef(stringsDict, topologyLinkConfidenceValue(link)))
+		rows.inferences = append(rows.inferences, nullableStringRef(stringsDict, topologyLinkInferenceValue(link)))
+		rows.attachmentModes = append(rows.attachmentModes, nullableStringRef(stringsDict, topologyLinkAttachmentModeValue(link)))
 		rows.discoveredAt = append(rows.discoveredAt, nullableTime(link.DiscoveredAt))
 		rows.lastSeen = append(rows.lastSeen, nullableTime(link.LastSeen))
 		return nil

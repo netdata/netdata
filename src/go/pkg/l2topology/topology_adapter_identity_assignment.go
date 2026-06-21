@@ -140,19 +140,15 @@ func enrichTopologyPortTablesWithLinkCounts(actors []graph.Actor, links []graph.
 
 	for _, link := range links {
 		if link.SrcActorID != "" {
-			if ifName, ok := link.Src.Attributes["if_name"]; ok {
-				name := strings.TrimSpace(fmt.Sprintf("%v", ifName))
-				if name != "" {
-					counts[actorPort{link.SrcActorID, name}]++
-				}
+			name := strings.TrimSpace(link.Src.IfName)
+			if name != "" {
+				counts[actorPort{link.SrcActorID, name}]++
 			}
 		}
 		if link.DstActorID != "" {
-			if ifName, ok := link.Dst.Attributes["if_name"]; ok {
-				name := strings.TrimSpace(fmt.Sprintf("%v", ifName))
-				if name != "" {
-					counts[actorPort{link.DstActorID, name}]++
-				}
+			name := strings.TrimSpace(link.Dst.IfName)
+			if name != "" {
+				counts[actorPort{link.DstActorID, name}]++
 			}
 		}
 	}
@@ -274,14 +270,28 @@ func topologyLinkSortKey(link graph.Link) string {
 		link.Direction,
 		canonicalTopologyMatchKey(link.Src.Match),
 		canonicalTopologyMatchKey(link.Dst.Match),
-		topologyAttrKey(link.Src.Attributes, "if_index"),
-		topologyAttrKey(link.Src.Attributes, "if_name"),
-		topologyAttrKey(link.Src.Attributes, "port_id"),
-		topologyAttrKey(link.Dst.Attributes, "if_index"),
-		topologyAttrKey(link.Dst.Attributes, "if_name"),
-		topologyAttrKey(link.Dst.Attributes, "port_id"),
+		topologyEndpointKey(link.Src, "if_index"),
+		topologyEndpointKey(link.Src, "if_name"),
+		topologyEndpointKey(link.Src, "port_id"),
+		topologyEndpointKey(link.Dst, "if_index"),
+		topologyEndpointKey(link.Dst, "if_name"),
+		topologyEndpointKey(link.Dst, "port_id"),
 		link.State,
 	}, keySep)
+}
+
+func topologyEndpointKey(endpoint graph.LinkEndpoint, key string) string {
+	switch key {
+	case "if_index":
+		if endpoint.IfIndex > 0 {
+			return fmt.Sprint(endpoint.IfIndex)
+		}
+	case "if_name":
+		return strings.TrimSpace(endpoint.IfName)
+	case "port_id":
+		return strings.TrimSpace(endpoint.PortID)
+	}
+	return ""
 }
 
 func topologyActorSortKey(actor graph.Actor) string {

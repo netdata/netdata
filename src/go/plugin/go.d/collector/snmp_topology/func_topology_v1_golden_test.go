@@ -14,6 +14,7 @@ import (
 	"time"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	"github.com/stretchr/testify/require"
 )
@@ -331,27 +332,23 @@ func snmpTopologyV1GoldenInput() topologyData {
 				SrcActorID: "switch-a",
 				DstActorID: "router-a",
 				Src: topologyLinkEndpoint{
-					Attributes: map[string]any{
-						"if_index":      uint64(101),
-						"if_name":       "Gi1/0/1",
-						"management_ip": "192.0.2.10",
-						"port_id":       "Gi1/0/1",
-					},
+					IfIndex:      101,
+					IfName:       "Gi1/0/1",
+					ManagementIP: "192.0.2.10",
+					PortID:       "Gi1/0/1",
 				},
 				Dst: topologyLinkEndpoint{
-					Attributes: map[string]any{
-						"if_index":      uint64(201),
-						"if_name":       "Gi0/0",
-						"management_ip": "198.51.100.1",
-						"port_id":       "Gi0/0",
-					},
+					IfIndex:      201,
+					IfName:       "Gi0/0",
+					ManagementIP: "198.51.100.1",
+					PortID:       "Gi0/0",
 				},
 				DiscoveredAt: &discoveredAt,
 				LastSeen:     &lastSeen,
-				Metrics: map[string]any{
-					"attachment_mode": "direct",
-					"confidence":      "high",
-					"inference":       "lldp",
+				Inference: &graph.LinkInference{
+					AttachmentMode: "direct",
+					Confidence:     "high",
+					Inference:      "lldp",
 				},
 			},
 			{
@@ -363,21 +360,15 @@ func snmpTopologyV1GoldenInput() topologyData {
 				SrcActorID: "switch-a",
 				DstActorID: "server-a",
 				Src: topologyLinkEndpoint{
-					Attributes: map[string]any{
-						"if_index": uint64(102),
-						"if_name":  "Gi1/0/2",
-						"port_id":  "Gi1/0/2",
-					},
+					IfIndex: 102,
+					IfName:  "Gi1/0/2",
+					PortID:  "Gi1/0/2",
 				},
-				Dst: topologyLinkEndpoint{
-					Attributes: map[string]any{
-						"mac": "00:11:22:33:44:55",
-					},
-				},
-				Metrics: map[string]any{
-					"attachment_mode": "probable_host",
-					"confidence":      "low",
-					"inference":       "probable",
+				Dst: topologyLinkEndpoint{},
+				Inference: &graph.LinkInference{
+					AttachmentMode: "probable_host",
+					Confidence:     "low",
+					Inference:      "probable",
 				},
 			},
 			{
@@ -388,37 +379,27 @@ func snmpTopologyV1GoldenInput() topologyData {
 				SrcActorID: "router-a",
 				DstActorID: "router-b",
 				Src: topologyLinkEndpoint{
-					Attributes: map[string]any{
-						"if_index": uint64(301),
-						"if_name":  "xe-0/0/0",
-						"ip":       "198.51.100.1",
-						"netmask":  "255.255.255.252",
-						"network":  "198.51.100.0",
-						"prefix":   uint64(30),
-						"source":   "ip_mib",
-						"subnet":   "198.51.100.0/30",
-					},
+					IfIndex: 301,
+					IfName:  "xe-0/0/0",
 				},
 				Dst: topologyLinkEndpoint{
-					Attributes: map[string]any{
-						"if_index": uint64(401),
-						"if_name":  "xe-0/0/1",
-						"ip":       "198.51.100.2",
-						"netmask":  "255.255.255.252",
-						"network":  "198.51.100.0",
-						"prefix":   uint64(30),
-						"source":   "ip_mib",
-						"subnet":   "198.51.100.0/30",
-					},
+					IfIndex: 401,
+					IfName:  "xe-0/0/1",
 				},
-				Metrics: map[string]any{
-					"attachment_mode": "logical_l3_subnet",
-					"inference":       "shared_subnet",
-					"netmask":         "255.255.255.252",
-					"network":         "198.51.100.0",
-					"prefix":          uint64(30),
-					"source":          "ip_mib",
-					"subnet":          "198.51.100.0/30",
+				Inference: &graph.LinkInference{
+					AttachmentMode: "logical_l3_subnet",
+					Inference:      "shared_subnet",
+				},
+				Detail: topologyLinkDetail{
+					L3Subnet: &topologyL3SubnetLinkDetail{
+						Source:  "ip_mib",
+						SrcIP:   "198.51.100.1",
+						DstIP:   "198.51.100.2",
+						Subnet:  "198.51.100.0/30",
+						Network: "198.51.100.0",
+						Netmask: "255.255.255.252",
+						Prefix:  30,
+					},
 				},
 			},
 			{
@@ -429,30 +410,24 @@ func snmpTopologyV1GoldenInput() topologyData {
 				State:      "full",
 				SrcActorID: "router-a",
 				DstActorID: "router-b",
-				Src: topologyLinkEndpoint{
-					Attributes: map[string]any{
-						"ip":        "198.51.100.1",
-						"router_id": "10.255.0.1",
-						"source":    "ospf_mib",
-						"subnet":    "198.51.100.0/30",
-					},
+				Src:        topologyLinkEndpoint{},
+				Dst:        topologyLinkEndpoint{},
+				Inference: &graph.LinkInference{
+					AttachmentMode: "logical_ospf_adjacency",
+					Inference:      "ospf_neighbor",
 				},
-				Dst: topologyLinkEndpoint{
-					Attributes: map[string]any{
-						"ip":        "198.51.100.2",
-						"router_id": "10.255.0.2",
-						"source":    "ospf_mib",
-						"subnet":    "198.51.100.0/30",
+				Detail: topologyLinkDetail{
+					OSPF: &topologyOSPFAdjacencyLinkDetail{
+						Source:           "ospf_mib",
+						LocalRouterID:    "10.255.0.1",
+						NeighborRouterID: "10.255.0.2",
+						LocalIP:          "198.51.100.1",
+						NeighborIP:       "198.51.100.2",
+						Subnet:           "198.51.100.0/30",
+						Network:          "198.51.100.0",
+						Netmask:          "255.255.255.252",
+						Prefix:           30,
 					},
-				},
-				Metrics: map[string]any{
-					"attachment_mode": "logical_ospf_adjacency",
-					"inference":       "ospf_neighbor",
-					"netmask":         "255.255.255.252",
-					"network":         "198.51.100.0",
-					"prefix":          uint64(30),
-					"source":          "ospf_mib",
-					"subnet":          "198.51.100.0/30",
 				},
 			},
 			{
@@ -463,27 +438,23 @@ func snmpTopologyV1GoldenInput() topologyData {
 				State:      "established",
 				SrcActorID: "router-a",
 				DstActorID: "router-b",
-				Src: topologyLinkEndpoint{
-					Attributes: map[string]any{
-						"as":             "64512",
-						"bgp_identifier": "10.255.0.1",
-						"ip":             "203.0.113.1",
-						"source":         "bgp_mib",
-					},
+				Src:        topologyLinkEndpoint{},
+				Dst:        topologyLinkEndpoint{},
+				Inference: &graph.LinkInference{
+					AttachmentMode: "logical_bgp_adjacency",
+					Inference:      "bgp_peer",
 				},
-				Dst: topologyLinkEndpoint{
-					Attributes: map[string]any{
-						"as":             "64513",
-						"bgp_identifier": "10.255.0.2",
-						"ip":             "203.0.113.2",
-						"source":         "bgp_mib",
+				Detail: topologyLinkDetail{
+					BGP: &topologyBGPAdjacencyLinkDetail{
+						Source:          "bgp_mib",
+						RoutingInstance: "default",
+						LocalIdentifier: "10.255.0.1",
+						PeerIdentifier:  "10.255.0.2",
+						LocalIP:         "203.0.113.1",
+						NeighborIP:      "203.0.113.2",
+						LocalAS:         "64512",
+						RemoteAS:        "64513",
 					},
-				},
-				Metrics: map[string]any{
-					"attachment_mode":  "logical_bgp_adjacency",
-					"inference":        "bgp_peer",
-					"routing_instance": "default",
-					"source":           "bgp_mib",
 				},
 			},
 		},

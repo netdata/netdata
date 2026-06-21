@@ -3,7 +3,7 @@
 package snmptopology
 
 import (
-	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -38,23 +38,30 @@ func topologyLinkSortKey(link topologyLink) string {
 		link.Direction,
 		canonicalMatchKey(link.Src.Match),
 		canonicalMatchKey(link.Dst.Match),
-		attrKey(link.Src.Attributes, "if_index"),
-		attrKey(link.Src.Attributes, "if_name"),
-		attrKey(link.Src.Attributes, "port_id"),
-		attrKey(link.Dst.Attributes, "if_index"),
-		attrKey(link.Dst.Attributes, "if_name"),
-		attrKey(link.Dst.Attributes, "port_id"),
+		topologyEndpointKey(link.Src, "if_index"),
+		topologyEndpointKey(link.Src, "if_name"),
+		topologyEndpointKey(link.Src, "port_id"),
+		topologyEndpointKey(link.Dst, "if_index"),
+		topologyEndpointKey(link.Dst, "if_name"),
+		topologyEndpointKey(link.Dst, "port_id"),
 		link.State,
 	}, "|")
 }
 
-func attrKey(attrs map[string]any, key string) string {
-	if len(attrs) == 0 {
+func topologyEndpointKey(endpoint topologyLinkEndpoint, key string) string {
+	switch key {
+	case "if_index":
+		if endpoint.IfIndex <= 0 {
+			return ""
+		}
+		return strconv.Itoa(endpoint.IfIndex)
+	case "if_name":
+		return strings.TrimSpace(endpoint.IfName)
+	case "port_id":
+		return strings.TrimSpace(endpoint.PortID)
+	case "port_name":
+		return strings.TrimSpace(endpoint.PortName)
+	default:
 		return ""
 	}
-	v, ok := attrs[key]
-	if !ok || v == nil {
-		return ""
-	}
-	return fmt.Sprint(v)
 }
