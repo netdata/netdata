@@ -261,10 +261,6 @@ func mergeEndpointIPHints(base, extra graph.LinkEndpoint) graph.LinkEndpoint {
 	return base
 }
 
-func isPairLabelKey(key string) bool {
-	return key == adjacencyLabelPairID || key == adjacencyLabelPairPass
-}
-
 func incrementProjectedProtocolCounters(out *projectedLinks, protocol string, bidirectional bool) {
 	if out == nil {
 		return

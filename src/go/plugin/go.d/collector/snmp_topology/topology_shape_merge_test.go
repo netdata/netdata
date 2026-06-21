@@ -134,6 +134,48 @@ func TestTopologyLinkDeltaKeyUsesStableEndpointAndBridgeFields(t *testing.T) {
 	require.Equal(t, "lldp|bidirectional|device:a|device:b|7|Gi0/1|port-a|8|Gi0/2|port-b|vlan-10", topologyLinkDeltaKey(link))
 }
 
+func TestTopologyLinkSortKeyUsesStableEndpointFields(t *testing.T) {
+	link := topologyLink{
+		Protocol:  "lldp",
+		Direction: "bidirectional",
+		Src: topologyLinkEndpoint{
+			Match: topologyMatch{
+				ChassisIDs: []string{"00:11:22:33:44:55"},
+			},
+			IfIndex: -1,
+			IfName:  "Gi0/1",
+			PortID:  "port-a",
+		},
+		Dst: topologyLinkEndpoint{
+			Match: topologyMatch{
+				ChassisIDs: []string{"aa:bb:cc:dd:ee:ff"},
+			},
+			IfName: "Gi0/2",
+			PortID: "port-b",
+		},
+		State: "up",
+	}
+
+	require.Equal(t, "lldp|bidirectional|mac:00:11:22:33:44:55|mac:aa:bb:cc:dd:ee:ff||Gi0/1|port-a||Gi0/2|port-b|up", topologyLinkSortKey(link))
+}
+
+func TestTopologyEndpointKeyDropsNonPositiveIfIndex(t *testing.T) {
+	tests := map[string]struct {
+		ifIndex int
+		want    string
+	}{
+		"negative": {ifIndex: -1},
+		"zero":     {ifIndex: 0},
+		"positive": {ifIndex: 7, want: "7"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.want, topologyEndpointKey(topologyLinkEndpoint{IfIndex: tc.ifIndex}, "if_index"))
+		})
+	}
+}
+
 func TestTopologyLinkActorKeyIncludesStateAndAttachmentMode(t *testing.T) {
 	base := topologyLink{
 		Protocol:   "bridge",

@@ -180,21 +180,3 @@ func pruneTopologyAttributes(attrs map[string]any) map[string]any {
 	}
 	return attrs
 }
-
-func mapStringStringToAny(in map[string]string) map[string]any {
-	if len(in) == 0 {
-		return nil
-	}
-	out := make(map[string]any, len(in))
-	for key, value := range in {
-		value = strings.TrimSpace(value)
-		if value == "" {
-			continue
-		}
-		out[key] = value
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
-}
