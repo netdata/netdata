@@ -3,10 +3,13 @@
 package snmptopology
 
 import (
+	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"reflect"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -21,37 +24,45 @@ func TestTopologyLinkDetailDoesNotUseMapCarriers(t *testing.T) {
 	require.False(t, hasLinkMetrics)
 
 	for _, root := range []struct {
-		path     string
-		patterns []*regexp.Regexp
+		path  string
+		names []string
 	}{
 		{
-			path: ".",
-			patterns: []*regexp.Regexp{
-				regexp.MustCompile(`\.(Attributes|Metrics)\b`),
-				regexp.MustCompile(`(^|[^A-Za-z0-9_])(Attributes|Metrics)\s*[:\[]`),
-			},
+			path:  ".",
+			names: []string{"Attributes", "Metrics"},
 		},
 		{
-			path: "../../../../pkg/l2topology",
-			patterns: []*regexp.Regexp{
-				regexp.MustCompile(`\.Metrics\b`),
-				regexp.MustCompile(`(^|[^A-Za-z0-9_])Metrics\s*[:\[]`),
-			},
+			path:  "../../../../pkg/l2topology",
+			names: []string{"Metrics"},
 		},
 		{
-			path: "../../../../pkg/topology/graph",
-			patterns: []*regexp.Regexp{
-				regexp.MustCompile(`\.Metrics\b`),
-				regexp.MustCompile(`(^|[^A-Za-z0-9_])Metrics\s*[:\[]`),
-			},
+			path:  "../../../../pkg/topology/graph",
+			names: []string{"Metrics"},
 		},
 	} {
-		assertNoForbiddenLinkMapCarrierUse(t, root.path, root.patterns)
+		assertNoForbiddenLinkMapCarrierUse(t, root.path, root.names...)
 	}
 }
 
-func assertNoForbiddenLinkMapCarrierUse(t *testing.T, root string, patterns []*regexp.Regexp) {
+func TestNoForbiddenLinkMapCarrierUseIgnoresCommentsAndStrings(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(root, "fixture.go"), []byte(`package fixture
+
+// Metrics: map[string]any{} in a comment is not code.
+// Attributes["key"] in a comment is not code.
+const metricsText = "Metrics[\"key\"]"
+const attributesText = ".Attributes"
+`), 0o644))
+
+	assertNoForbiddenLinkMapCarrierUse(t, root, "Attributes", "Metrics")
+}
+
+func assertNoForbiddenLinkMapCarrierUse(t *testing.T, root string, names ...string) {
 	t.Helper()
+	forbidden := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		forbidden[name] = struct{}{}
+	}
 
 	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 		require.NoError(t, err)
@@ -61,24 +72,107 @@ func assertNoForbiddenLinkMapCarrierUse(t *testing.T, root string, patterns []*r
 		if filepath.Ext(path) != ".go" || strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
-		bs, err := os.ReadFile(path)
+		fset := token.NewFileSet()
+		file, err := parser.ParseFile(fset, path, nil, 0)
 		require.NoError(t, err)
-		for lineNo, line := range strings.Split(string(bs), "\n") {
-			if isAllowedLinkMapCarrierLine(path, line) {
-				continue
+
+		var scanErr error
+		ast.Inspect(file, func(node ast.Node) bool {
+			if scanErr != nil || node == nil {
+				return false
 			}
-			for _, pattern := range patterns {
-				require.Falsef(t, pattern.MatchString(line), "forbidden link map carrier use in %s:%d: %s", path, lineNo+1, strings.TrimSpace(line))
+			switch typed := node.(type) {
+			case *ast.SelectorExpr:
+				scanErr = forbiddenLinkMapCarrierUseError(path, fset, typed, typed.Sel.Name, "selector", forbidden)
+			case *ast.KeyValueExpr:
+				scanErr = forbiddenLinkMapCarrierKeyValueError(path, fset, typed, forbidden)
+			case *ast.IndexExpr:
+				scanErr = forbiddenLinkMapCarrierIndexError(path, fset, typed.X, typed, forbidden)
+			case *ast.IndexListExpr:
+				scanErr = forbiddenLinkMapCarrierIndexError(path, fset, typed.X, typed, forbidden)
 			}
+			return scanErr == nil
+		})
+		if scanErr != nil {
+			return scanErr
 		}
 		return nil
 	})
 	require.NoError(t, err)
 }
 
-func isAllowedLinkMapCarrierLine(path, line string) bool {
-	if filepath.Base(path) == "func_topology_v1_presentation.go" && strings.Contains(line, "Metrics: map[string]string") {
-		return true
+func forbiddenLinkMapCarrierKeyValueError(
+	path string,
+	fset *token.FileSet,
+	node *ast.KeyValueExpr,
+	forbidden map[string]struct{},
+) error {
+	name := ""
+	if ident, ok := node.Key.(*ast.Ident); ok {
+		name = ident.Name
 	}
-	return false
+	if name == "" {
+		return nil
+	}
+	if isAllowedLinkMapCarrierUse(path, name, node) {
+		return nil
+	}
+	return forbiddenLinkMapCarrierUseError(path, fset, node, name, "composite field", forbidden)
+}
+
+func forbiddenLinkMapCarrierIndexError(
+	path string,
+	fset *token.FileSet,
+	expr ast.Expr,
+	node ast.Node,
+	forbidden map[string]struct{},
+) error {
+	ident, ok := expr.(*ast.Ident)
+	if !ok {
+		return nil
+	}
+	return forbiddenLinkMapCarrierUseError(path, fset, node, ident.Name, "index", forbidden)
+}
+
+func forbiddenLinkMapCarrierUseError(
+	path string,
+	fset *token.FileSet,
+	node ast.Node,
+	name string,
+	kind string,
+	forbidden map[string]struct{},
+) error {
+	if _, ok := forbidden[name]; !ok {
+		return nil
+	}
+	position := fset.Position(node.Pos())
+	return fmt.Errorf("forbidden link map carrier use in %s:%d: %s %q", path, position.Line, kind, name)
+}
+
+func isAllowedLinkMapCarrierUse(path, name string, node ast.Node) bool {
+	if filepath.Base(path) != "func_topology_v1_presentation.go" || name != "Metrics" {
+		return false
+	}
+	kv, ok := node.(*ast.KeyValueExpr)
+	if !ok {
+		return false
+	}
+	return isStringStringMapComposite(kv.Value)
+}
+
+func isStringStringMapComposite(expr ast.Expr) bool {
+	lit, ok := expr.(*ast.CompositeLit)
+	if !ok {
+		return false
+	}
+	mapType, ok := lit.Type.(*ast.MapType)
+	if !ok {
+		return false
+	}
+	key, ok := mapType.Key.(*ast.Ident)
+	if !ok || key.Name != "string" {
+		return false
+	}
+	value, ok := mapType.Value.(*ast.Ident)
+	return ok && value.Name == "string"
 }
