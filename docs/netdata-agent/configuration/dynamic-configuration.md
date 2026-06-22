@@ -299,20 +299,24 @@ If you disabled an alert template (for example `10min_cpu_usage`) through the Dy
 
 **Resolution:**
 
-Apply the disable to each Agent that is actually raising the alert:
+Apply the disable to each Agent that is actually raising the alert. The recommended approach is to use the [Multi-Node Deployment](#multi-node-deployment) feature to select every node still raising the alert and push the disabled configuration to all of them at once.
 
-1. **Multi-node deployment (recommended):** Use the [Multi-Node Deployment](#multi-node-deployment) feature to select every node still raising the alert and push the disabled configuration to all of them at once.
+<details>
+<summary>Alternative: configure each node manually (optional)</summary>
 
-2. **Manual configuration on each node:** On each affected node, disable the alert in its local health configuration:
-   - In `netdata.conf`, under the `[health]` section, exclude the alert name and restart the Agent:
-     ```conf
-     [health]
-         enabled alarms = !10min_cpu_usage *
-     ```
-     Restarting the Agent is required because `netdatacli reload-health` reloads health configuration files but does not reload `netdata.conf`.
-   - Alternatively, edit the corresponding `health.d/*.conf` file (for example `health.d/cpu.conf`), comment out the alert definition, and run `netdatacli reload-health`.
+If you prefer not to use Multi-Node Deployment, disable the alert directly in each affected node's local health configuration:
 
-   For the full manual configuration syntax, see [How to Disable or Silence Alerts](/src/health/REFERENCE.md#how-to-disable-or-silence-alerts).
+- In `netdata.conf`, under the `[health]` section, exclude the alert name and restart the Agent:
+  ```conf
+  [health]
+      enabled alarms = !10min_cpu_usage *
+  ```
+  Restarting the Agent is required because `netdatacli reload-health` reloads health configuration files but does not reload `netdata.conf`.
+- Alternatively, edit the corresponding `health.d/*.conf` file (for example `health.d/cpu.conf`), comment out the alert definition, and run `netdatacli reload-health`.
+
+For the full manual configuration syntax, see [How to Disable or Silence Alerts](/src/health/REFERENCE.md#how-to-disable-or-silence-alerts).
+
+</details>
 
 :::note
 
