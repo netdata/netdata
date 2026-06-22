@@ -7,56 +7,19 @@ import (
 	"time"
 )
 
-// Credential describes one SNMP authentication profile.
-type Credential struct {
-	Version      string
-	Community    string
-	Username     string
-	AuthProtocol string
-	AuthPassword string
-	PrivProtocol string
-	PrivPassword string
-	ContextName  string
-	Port         uint16
-	Timeout      time.Duration
-	Retries      int
-}
-
-// DiscoverOptions controls the discovery behavior.
+// DiscoverOptions controls which normalized L2 observation families contribute
+// to the result.
 type DiscoverOptions struct {
 	EnableLLDP   bool
 	EnableCDP    bool
 	EnableBridge bool
 	EnableARP    bool
 	EnableSTP    bool
-	MaxDepth     int
-	Concurrency  int
 	CollectedAt  time.Time
 }
 
-// CIDRRequest starts discovery from CIDR ranges.
-type CIDRRequest struct {
-	CIDRs       []netip.Prefix
-	Credentials []Credential
-	Options     DiscoverOptions
-}
-
-// DeviceRequest starts discovery from known device addresses.
-type DeviceRequest struct {
-	Devices     []DeviceTarget
-	Credentials []Credential
-	Options     DiscoverOptions
-}
-
-// DeviceTarget identifies one seed device.
-type DeviceTarget struct {
-	Address  netip.Addr
-	Port     uint16
-	Hostname string
-	Labels   map[string]string
-}
-
-// Result is the discovery output from the engine.
+// Result is the deterministic L2 topology result derived from normalized
+// observations.
 type Result struct {
 	CollectedAt  time.Time
 	Devices      []Device
@@ -115,11 +78,11 @@ type Enrichment struct {
 	Labels     map[string]string
 }
 
-// L2Observation contains one device's normalized layer-2 SNMP observations.
+// L2Observation contains one device's normalized layer-2 observations.
 type L2Observation struct {
 	DeviceID string
 	// Inferred marks observations synthesized from neighbor advertisements
-	// (for example LLDP/CDP remotes), not directly polled SNMP targets.
+	// (for example LLDP/CDP remotes), not directly observed local devices.
 	Inferred          bool
 	Hostname          string
 	ManagementIP      string

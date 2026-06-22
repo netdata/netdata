@@ -226,7 +226,8 @@ func topologyInferenceStrategyConfigFor(strategy string) topologyInferenceStrate
 	}
 }
 
-// ToGraph converts an engine result to the internal graph projection.
+// ToGraph converts an L2 topology result to the graph projection consumed by
+// topology producers.
 func ToGraph(result Result, opts GraphOptions) Projection {
 	builder := newGraphBuilder(result, opts)
 	builder.prepareIndexes()

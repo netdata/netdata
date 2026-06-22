@@ -4,7 +4,7 @@ package l2topology
 
 import "github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 
-// Projection is the L2 engine output consumed by topology producers.
+// Projection is the L2 graph output consumed by topology producers.
 type Projection struct {
 	Graph        graph.Graph
 	Stats        ProjectionStats
