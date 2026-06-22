@@ -124,6 +124,19 @@ pub struct StorageConfig {
     /// OpenDAL URI for the remote storage backend.
     /// Examples: "fs:///tmp/otel-remote", "s3://bucket/?region=us-east-1"
     pub uri: String,
+    /// Local directory for the remote-read cache (objects fetched back from
+    /// remote storage to answer queries). When unset, derived next to the index
+    /// directory. Only used when `enabled`.
+    #[serde(default)]
+    pub read_cache_dir: Option<PathBuf>,
+    /// Hard byte cap for the remote-read cache on disk. Default 4 GiB.
+    #[serde(default = "default_read_cache_max_size")]
+    pub read_cache_max_size: ByteSize,
+}
+
+/// Default remote-read cache size: 4 GiB.
+fn default_read_cache_max_size() -> ByteSize {
+    ByteSize::gib(4)
 }
 
 /// Index file configuration.

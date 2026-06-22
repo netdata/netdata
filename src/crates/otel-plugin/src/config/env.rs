@@ -166,6 +166,10 @@ impl LogsOverride {
         let storage = StorageOverride {
             enabled: parse_env_bool("NETDATA_OTEL_LOGS_STORAGE_ENABLED")?,
             uri: env_var("NETDATA_OTEL_LOGS_STORAGE_URI")?,
+            read_cache_dir: env_var("NETDATA_OTEL_LOGS_STORAGE_READ_CACHE_DIR")?.map(PathBuf::from),
+            read_cache_max_size: parse_env_bytesize(
+                "NETDATA_OTEL_LOGS_STORAGE_READ_CACHE_MAX_SIZE",
+            )?,
         };
         let auth = AuthOverride {
             enabled: parse_env_bool("NETDATA_OTEL_LOGS_AUTH_ENABLED")?,

@@ -18,7 +18,7 @@ mod uploader;
 pub(crate) use helpers::{
     build_catalog_entry, catalog_retention_days, sfst_retention_policy, sfst_upload_request,
 };
-pub(crate) use rpc::OtelLogsHandler;
+pub(crate) use rpc::{OtelLogsHandler, RemoteRead};
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -154,7 +154,7 @@ impl Ledger {
         // retry layer); deferring it behind the flag means a malformed URI
         // cannot abort startup for a local-only (storage.enabled = false)
         // deployment.
-        let (storage, mut uploader) = if logs_config.storage.enabled {
+        let (storage, mut uploader, read_cache) = if logs_config.storage.enabled {
             let storage = OpendalStorage::new(logs_config.storage.uri.as_str())?;
 
             // Non-blocking startup reachability probe: confirm the backend is
@@ -189,10 +189,33 @@ impl Ledger {
                 cancel.child_token(),
             );
             tracing::info!(max_concurrent = UPLOAD_CONCURRENCY, "uploader spawned");
-            (Some(storage), Some(uploader))
+
+            // Local read-through cache for fetching SFSTs back from remote
+            // storage to answer queries after local retention evicted them. The
+            // directory defaults to a sibling of the index dir; the byte cap comes
+            // from config. Opening it recovers any previously-cached files.
+            let cache_dir = logs_config.storage.read_cache_dir.clone().unwrap_or_else(|| {
+                logs_config
+                    .index
+                    .dir
+                    .parent()
+                    .map(|p| p.join("remote-read"))
+                    .unwrap_or_else(|| logs_config.index.dir.join("remote-read"))
+            });
+            let read_cache = file_cache::FileCache::open(
+                &cache_dir,
+                logs_config.storage.read_cache_max_size.as_u64(),
+            )?;
+            tracing::info!(
+                dir = %cache_dir.display(),
+                capacity = logs_config.storage.read_cache_max_size.as_u64(),
+                "remote-read cache opened"
+            );
+
+            (Some(storage), Some(uploader), Some(read_cache))
         } else {
             tracing::info!("remote storage disabled; storage client and uploader not constructed");
-            (None, None)
+            (None, None, None)
         };
 
         let mut catalog_builder = ComponentHandle::spawn::<CatalogBuilder>(
@@ -350,8 +373,18 @@ impl Ledger {
         let mut retry_timer = tokio::time::interval(std::time::Duration::from_secs(30));
         retry_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
-        let otel_handler =
-            OtelLogsHandler::new(registries.clone(), chunk_cache.clone(), CHUNK_MIN_ENTRIES);
+        // Remote-read capability for the query path: present only when storage is
+        // enabled (so the handler can fetch evicted SFSTs back through the cache).
+        let remote = match (storage.as_ref(), read_cache.as_ref()) {
+            (Some(s), Some(c)) => Some(RemoteRead::new(s.clone(), c.clone())),
+            _ => None,
+        };
+        let otel_handler = OtelLogsHandler::new(
+            registries.clone(),
+            chunk_cache.clone(),
+            CHUNK_MIN_ENTRIES,
+            remote,
+        );
 
         // Signal Ready between handler setup and the ingestor accept;
         // see the method docstring for the full ordering rationale.

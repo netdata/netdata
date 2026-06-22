@@ -8,9 +8,13 @@ config (`config/logs.rs`, `config/env.rs`), `netdata-plugin/bridge` config
 
 ## Configuration contract
 
-- Storage config is exactly two fields: `StorageConfig { enabled: bool, uri: String }`
-  (`netdata-plugin/bridge/src/config.rs`). Overridable via env
-  `NETDATA_OTEL_LOGS_STORAGE_ENABLED` / `NETDATA_OTEL_LOGS_STORAGE_URI`.
+- `StorageConfig` (`netdata-plugin/bridge/src/config.rs`) has four fields:
+  `enabled: bool`, `uri: String`, and the read-cache pair `read_cache_dir:
+  Option<PathBuf>` + `read_cache_max_size: ByteSize` (default `4 GiB`). All four are
+  env-overridable: `NETDATA_OTEL_LOGS_STORAGE_ENABLED`, `_URI`,
+  `_READ_CACHE_DIR`, and `_READ_CACHE_MAX_SIZE` (parsed as `ByteSize`). Env
+  overrides apply on top of `otel.yaml` (env wins), via the shared
+  `StorageOverride` path in `config/{logs,env}.rs`.
 - `uri` is a single **OpenDAL URI**. The scheme selects the backend
   (`fs://`, `s3://`, …); all **non-secret** backend options are URI query params
   (`s3://bucket/prefix?region=…&endpoint=…`). OpenDAL owns the per-backend option
@@ -65,6 +69,30 @@ config (`config/logs.rs`, `config/env.rs`), `netdata-plugin/bridge` config
   credentials), so a misplaced secret in the URI cannot leak into the journal.
 - Logs land in systemd-journal under `otel-plugin/ledger` (query via the MCP
   `netdata_agent_logs` tool, component `ledger`).
+
+## Read-through cache (query path)
+
+- When `storage.enabled`, `Ledger::new` opens a bounded local read-through cache
+  (the `file-cache` crate) at `read_cache_dir` (default: a `remote-read` directory
+  beside the index dir), capped at `read_cache_max_size`. The directory MUST be
+  local, owner-private storage; it is created `0700` and recovered on open.
+- A log query answers over SFSTs that local retention evicted but that a catalog
+  records on remote. `Registry::remote_candidates(q)` returns the catalog entries
+  whose seq is absent locally (no local SFST and no durable-prefix WAL), deduped by
+  seq — the same local-wins rule the query planner uses. The handler fetches them
+  through the cache (`Storage::read(remote_key)` as the fetch closure), maps each to
+  a sealed-SFST source (summary taken from the catalog entry), and holds the cache
+  pin guards across the blocking query run. Per-object fetch failures degrade (the
+  source is omitted); the local query path is unchanged.
+- A query whose remote footprint exceeds the cache cap is **rejected** with an
+  actionable error (`CacheError::TooLarge` → "narrow the time window or stream
+  filter"); a broken cache directory surfaces as `EvictionFailed`. Reject is the
+  **final** design: time-window narrowing (serving the most recent fitting window
+  instead of rejecting) was considered and declined — without cross-repo in-UI
+  "window narrowed" disclosure it would silently truncate results, a worse trust
+  hazard than an honest error.
+- Cache filenames are the SFST `FileId` encoding (content-stable), never the remote
+  key, so the cache's path-traversal guard is belt-and-suspenders.
 
 ## Non-goals
 

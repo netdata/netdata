@@ -12,9 +12,15 @@
 //! Design (clean-room, informed by Quickwit's `SplitCache` and SlateDB's
 //! `CachedObjectStore`):
 //!
-//! - **Hard byte cap.** Total bytes on disk never exceed the configured capacity.
-//!   A query atomically *reserves* the footprint it needs before fetching, so
-//!   concurrent queries share one budget rather than each blowing past it.
+//! - **Hard byte cap.** The *accounted* total never exceeds the configured
+//!   capacity. A query atomically *reserves* the footprint it needs before
+//!   fetching, so concurrent queries share one budget rather than each blowing
+//!   past it. Actual bytes on disk can transiently exceed the cap only by orphans
+//!   from a write whose parent call was cancelled/dropped mid-write: the durable
+//!   write runs on a detached blocking thread and may complete after the
+//!   reservation is released, leaving an unaccounted file. Such orphans are
+//!   reconciled into the accounting (or overwritten) by the next [`FileCache::open`]
+//!   recovery sweep or a re-fetch of the same filename; see [`FileCache::acquire`].
 //! - **Deadlock-free admission.** A query commits to *all* of its files at once or
 //!   waits holding nothing. Because a consumer typically needs every file of a
 //!   query available together, partial holds would deadlock; atomic all-or-nothing
@@ -578,9 +584,17 @@ impl FileCache {
     ///
     /// Cancellation is honored at fetch boundaries (before/after each object),
     /// not mid-write: the durable write of an already-fetched object runs to
-    /// completion on a blocking thread before the next cancellation check. This
-    /// is bounded by local disk speed and never leaks budget, but a cancelled
-    /// call may briefly finish one in-flight write.
+    /// completion on a detached blocking thread before the next cancellation
+    /// check. This is bounded by local disk speed and never leaks budget, but a
+    /// cancelled call may finish one in-flight write after its reservation is
+    /// released — and because that clears the single-flight marker, a second
+    /// call can re-admit the same filename and write the same temp path
+    /// concurrently. The losing writer's bytes are discarded by the atomic
+    /// rename, but interleaved writes can leave a malformed file; the reader
+    /// degrades on a parse failure (the source is skipped, no crash) and the
+    /// next clean fetch overwrites it. This is an accepted degraded mode for the
+    /// rare cancel-mid-write-then-refetch-same-file race, not a guaranteed
+    /// invariant; a per-filename write lock would close it if it ever matters.
     pub async fn acquire<F, Fut>(
         &self,
         items: &[Want],

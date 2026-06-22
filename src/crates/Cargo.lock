@@ -3775,6 +3775,7 @@ dependencies = [
  "bytesize",
  "chrono",
  "ferryboat",
+ "file-cache",
  "file-registry",
  "fst-index",
  "futures",

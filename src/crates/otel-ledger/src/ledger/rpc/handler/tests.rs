@@ -20,6 +20,7 @@ fn make_handler(tr: TenantRegistries) -> OtelLogsHandler {
         Arc::new(RwLock::new(tr)),
         Arc::new(crate::chunk::ChunkCache::new(64 * 1024 * 1024)),
         16_384,
+        None,
     )
 }
 
@@ -1034,4 +1035,132 @@ async fn tenant_scoping_isolates_unions_nothing_and_defaults() {
 #[test]
 fn accepted_params_advertise_tenant() {
     assert!(super::super::wire::ACCEPTED_PARAMS.contains(&"tenant"));
+}
+
+// ── remote-read query path (evicted SFST fetched back from remote) ───────────
+
+/// Register a catalog entry for `id` (no local SFST) so `remote_candidates`
+/// surfaces it. Mirrors the catalog-write fixture used in `query/tests.rs`.
+fn track_remote_catalog(
+    tr: &mut TenantRegistries,
+    tenant: &str,
+    id: FileId,
+    remote_key: &str,
+    min_s: u32,
+    max_s: u32,
+    size: u64,
+) {
+    use chrono::NaiveDate;
+    let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
+    let entry = otel_catalog::CatalogEntry {
+        id,
+        remote_key: remote_key.to_string(),
+        min_timestamp_s: min_s,
+        max_timestamp_s: max_s,
+        total_logs: 6,
+        stream: ServiceStream::new("ns", "svc"),
+        size: ByteSize(size),
+        uploaded_at_ns: TimestampNs(0),
+        remote_etag: None,
+    };
+    let reg = tr.get_or_create(&TenantId::from(tenant));
+    let mut catalog =
+        otel_catalog::Catalog::new(TenantId::from(tenant), date, id.machine_id, id.boot_id);
+    catalog.add(entry);
+    let path = reg
+        .catalog_files
+        .file_path(date, id.machine_id, id.boot_id, id.seq, min_s, max_s);
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(&path, catalog.to_container_bytes().unwrap()).unwrap();
+    let csize = ByteSize(std::fs::metadata(&path).unwrap().len());
+    reg.catalog_files.track(
+        otel_catalog::File::new(date, id.machine_id, id.boot_id, id.seq, min_s, max_s, csize),
+        path,
+    );
+}
+
+fn make_handler_with_remote(tr: TenantRegistries, remote: RemoteRead) -> OtelLogsHandler {
+    OtelLogsHandler::new(
+        Arc::new(RwLock::new(tr)),
+        Arc::new(crate::chunk::ChunkCache::new(64 * 1024 * 1024)),
+        16_384,
+        Some(remote),
+    )
+}
+
+/// End-to-end: a tenant whose only copy of an SFST is in remote object storage
+/// (no local SFST/WAL) still answers a query — the handler fetches the file back
+/// through the read cache and the engine serves all 6 logs. Uses a real
+/// `OpendalStorage` over an `fs://` backend (exercises the real `Storage::read`).
+#[tokio::test]
+async fn remote_only_sfst_is_fetched_and_served() {
+    let mut tr = make_tenant_registries();
+
+    // Build a real SFST's bytes; do NOT install it locally.
+    let id = FileId::new(Uuid::from_u128(0x11), Uuid::from_u128(0x22), 1, 7);
+    let min_s = 1_700_000_000u32;
+    let sfst_tmp = tempfile::NamedTempFile::new().unwrap();
+    write_test_sfst(sfst_tmp.path(), min_s);
+    let sfst_bytes = std::fs::read(sfst_tmp.path()).unwrap();
+
+    // Place the object in an fs:// remote backend at its catalog remote_key.
+    let remote_dir = tempfile::tempdir().unwrap().keep();
+    let remote_key = "v1/tenants/default/sfst/seq1.sfst";
+    let obj_path = remote_dir.join(remote_key);
+    std::fs::create_dir_all(obj_path.parent().unwrap()).unwrap();
+    std::fs::write(&obj_path, &sfst_bytes).unwrap();
+
+    track_remote_catalog(&mut tr, "default", id, remote_key, min_s, min_s + 5, sfst_bytes.len() as u64);
+
+    let storage =
+        crate::storage::OpendalStorage::new(&format!("fs://{}", remote_dir.display())).unwrap();
+    let cache =
+        file_cache::FileCache::open(tempfile::tempdir().unwrap().keep(), 64 * 1024 * 1024).unwrap();
+    let h = make_handler_with_remote(tr, RemoteRead::new(storage, cache));
+
+    let req: OtelLogsRequest = serde_json::from_slice(
+        format!(
+            r#"{{"info":false,"tenant":"default","after":{},"before":{}}}"#,
+            min_s - 10,
+            min_s + 100
+        )
+        .as_bytes(),
+    )
+    .unwrap();
+    let v = serde_json::to_value(&h.on_call(make_ctx("t1"), req).await.unwrap()).unwrap();
+    assert_eq!(
+        v["items"]["matched"], 6,
+        "evicted remote SFST should be fetched and queried: {v:#}"
+    );
+}
+
+/// When the remote object cannot be read, the query degrades gracefully (no
+/// panic, no error) rather than failing — the bad source is simply omitted.
+#[tokio::test]
+async fn remote_fetch_failure_degrades() {
+    let mut tr = make_tenant_registries();
+    let id = FileId::new(Uuid::from_u128(0x11), Uuid::from_u128(0x22), 1, 7);
+    let min_s = 1_700_000_000u32;
+    // Catalog entry points at a remote_key that does not exist in the backend.
+    let remote_dir = tempfile::tempdir().unwrap().keep();
+    track_remote_catalog(&mut tr, "default", id, "missing/object.sfst", min_s, min_s + 5, 10);
+
+    let storage =
+        crate::storage::OpendalStorage::new(&format!("fs://{}", remote_dir.display())).unwrap();
+    let cache =
+        file_cache::FileCache::open(tempfile::tempdir().unwrap().keep(), 64 * 1024 * 1024).unwrap();
+    let h = make_handler_with_remote(tr, RemoteRead::new(storage, cache));
+
+    let req: OtelLogsRequest = serde_json::from_slice(
+        format!(
+            r#"{{"info":false,"tenant":"default","after":{},"before":{}}}"#,
+            min_s - 10,
+            min_s + 100
+        )
+        .as_bytes(),
+    )
+    .unwrap();
+    // Degrades: the unreadable remote source is omitted, the query still answers.
+    let v = serde_json::to_value(&h.on_call(make_ctx("t1"), req).await.unwrap()).unwrap();
+    assert_eq!(v["items"]["matched"], 0, "unreadable remote source is omitted: {v:#}");
 }

@@ -269,3 +269,69 @@ fn stream_filter_applies_to_both_sources() {
     // (whose summary stream matches "ns/a") survives.
     assert!(matches!(plan[0], CandidateSource::Sfst(f) if f.id.seq == 1));
 }
+
+// ── remote_candidates (the evicted-but-cataloged set the read cache fetches) ──
+
+fn seqs(entries: &[otel_catalog::CatalogEntry]) -> Vec<u64> {
+    entries.iter().map(|e| e.id.seq).collect()
+}
+
+#[test]
+fn remote_candidates_returns_catalog_only_entries() {
+    let mut reg = make_registry();
+    track_remote(&mut reg, 1, 100, 200);
+    track_remote(&mut reg, 2, 300, 400);
+
+    assert_eq!(seqs(&reg.remote_candidates(&full_range_query())), vec![1, 2]);
+}
+
+#[test]
+fn remote_candidates_excludes_locally_present_seqs() {
+    let mut reg = make_registry();
+    // seq 1 has a local SFST → masked; seq 3 is catalog-only → remains.
+    track_sfst(&mut reg, 1, 7, 100, 200);
+    track_remote(&mut reg, 1, 100, 200);
+    track_remote(&mut reg, 3, 500, 600);
+
+    assert_eq!(seqs(&reg.remote_candidates(&full_range_query())), vec![3]);
+}
+
+#[test]
+fn remote_candidates_kept_when_wal_has_no_durable_prefix() {
+    // A WAL with no durable prefix (`valid_up_to == 0`, as `track_wal` produces)
+    // is not a servable local copy — `query_snapshot` skips it too — so it must
+    // NOT mask the remote entry for the same seq. (Regression guard for the dedup
+    // divergence between `remote_candidates` and `query_snapshot`.)
+    let mut reg = make_registry();
+    track_wal(&mut reg, 2, 7, 300, 400);
+    track_remote(&mut reg, 2, 300, 400);
+
+    assert_eq!(seqs(&reg.remote_candidates(&full_range_query())), vec![2]);
+}
+
+#[test]
+fn remote_candidates_empty_when_all_local() {
+    let mut reg = make_registry();
+    track_sfst(&mut reg, 1, 7, 100, 200);
+    track_remote(&mut reg, 1, 100, 200);
+
+    assert!(reg.remote_candidates(&full_range_query()).is_empty());
+}
+
+#[test]
+fn remote_candidates_excluded_by_time_range() {
+    let mut reg = make_registry();
+    track_remote(&mut reg, 1, 1000, 2000);
+
+    let q = Query {
+        time_range: 0..500,
+        stream_hashes: Vec::new(),
+    };
+    assert!(reg.remote_candidates(&q).is_empty());
+}
+
+#[test]
+fn remote_candidates_empty_registry() {
+    let reg = make_registry();
+    assert!(reg.remote_candidates(&full_range_query()).is_empty());
+}

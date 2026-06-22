@@ -128,6 +128,20 @@ logs:
     #   "remote storage enabled but unreachable or misconfigured: <error>".
     # The configured URI is intentionally NOT logged, so a misplaced secret in it
     # cannot leak into the journal.
+    #
+    # Read cache: to answer a query over SFSTs that local retention has already
+    # evicted, the plugin fetches them back from remote storage into a bounded
+    # local cache and memory-maps them like any local file. The cache lives on
+    # locally-attached, owner-private storage (created 0700) and is capped by size.
+    #
+    # Directory for the read cache. Defaults to a "remote-read" directory beside
+    # the index dir. MUST be local (not a network mount).
+    # read_cache_dir: @logdir_POST@/otel/v1/remote-read
+    #
+    # Hard size cap for the read cache (e.g. "4GB", "512MB"). Default "4GiB".
+    # A query whose evicted footprint exceeds this cap is rejected with a message
+    # asking to narrow the time window or stream filter.
+    # read_cache_max_size: "4GiB"
 
   auth:
     # Whether to require tenant identification via the X-Scope-OrgID gRPC

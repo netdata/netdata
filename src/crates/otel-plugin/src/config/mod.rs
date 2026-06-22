@@ -467,6 +467,29 @@ logs:
         assert_eq!(rotation.max_file_duration, Duration::from_secs(4 * 3600));
     }
 
+    #[test]
+    fn override_storage_read_cache() {
+        let mut config = stock_config();
+        // Stock omits both read-cache fields: dir defaults to None, size to 4 GiB.
+        assert!(config.logs.storage.read_cache_dir.is_none());
+        assert_eq!(config.logs.storage.read_cache_max_size, ByteSize::gib(4));
+        let o: ConfigOverride = serde_yaml::from_str(
+            r#"
+logs:
+  storage:
+    read_cache_dir: /var/cache/otel-rr
+    read_cache_max_size: "2GiB"
+"#,
+        )
+        .unwrap();
+        apply_overrides(&mut config, &o);
+        assert_eq!(
+            config.logs.storage.read_cache_dir.as_deref(),
+            Some(std::path::Path::new("/var/cache/otel-rr"))
+        );
+        assert_eq!(config.logs.storage.read_cache_max_size, ByteSize::gib(2));
+    }
+
     // -- Cross-section overrides --
 
     #[test]
@@ -651,6 +674,32 @@ logs:
     }
 
     #[test]
+    fn env_override_storage_read_cache() {
+        with_env_vars(
+            &[
+                (
+                    "NETDATA_OTEL_LOGS_STORAGE_READ_CACHE_DIR",
+                    "/var/cache/otel-rr",
+                ),
+                ("NETDATA_OTEL_LOGS_STORAGE_READ_CACHE_MAX_SIZE", "2GiB"),
+            ],
+            || {
+                let o = ConfigOverride::from_env().unwrap();
+                // Guard against a future refactor dropping the new fields from
+                // `StorageOverride::has_any()` — that would silently discard the
+                // override (a set-but-not-applied footgun) while still parsing.
+                assert!(o.has_any());
+                let storage = o.logs.as_ref().unwrap().storage.as_ref().unwrap();
+                assert_eq!(
+                    storage.read_cache_dir.as_deref(),
+                    Some(std::path::Path::new("/var/cache/otel-rr"))
+                );
+                assert_eq!(storage.read_cache_max_size, Some(ByteSize::gib(2)));
+            },
+        );
+    }
+
+    #[test]
     fn env_override_invalid_number_rejected() {
         with_env_vars(
             &[("NETDATA_OTEL_METRICS_INTERVAL_SECS", "not_a_number")],
@@ -663,6 +712,14 @@ logs:
         with_env_vars(&[("NETDATA_OTEL_LOGS_WAL_CRC_ENABLED", "maybe")], || {
             assert!(ConfigOverride::from_env().is_err());
         });
+    }
+
+    #[test]
+    fn env_override_invalid_bytesize_rejected() {
+        with_env_vars(
+            &[("NETDATA_OTEL_LOGS_STORAGE_READ_CACHE_MAX_SIZE", "not-a-size")],
+            || assert!(ConfigOverride::from_env().is_err()),
+        );
     }
 
     #[test]

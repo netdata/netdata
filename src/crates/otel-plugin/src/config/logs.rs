@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use bridge::config::{LogsConfig, RetentionEntry};
+use bytesize::ByteSize;
 use serde::Deserialize;
 
 #[derive(Debug, Default, Deserialize)]
@@ -52,6 +53,10 @@ pub(super) struct StorageOverride {
     pub(super) enabled: Option<bool>,
     #[serde(default)]
     pub(super) uri: Option<String>,
+    #[serde(default)]
+    pub(super) read_cache_dir: Option<PathBuf>,
+    #[serde(default)]
+    pub(super) read_cache_max_size: Option<ByteSize>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -78,7 +83,10 @@ impl LogsOverride {
 
 impl StorageOverride {
     pub(super) fn has_any(&self) -> bool {
-        self.enabled.is_some() || self.uri.is_some()
+        self.enabled.is_some()
+            || self.uri.is_some()
+            || self.read_cache_dir.is_some()
+            || self.read_cache_max_size.is_some()
     }
 }
 
@@ -163,6 +171,14 @@ pub(super) fn apply(config: &mut LogsConfig, o: &LogsOverride) {
         }
         if let Some(v) = &s.uri {
             config.storage.uri = v.clone();
+        }
+        if let Some(v) = &s.read_cache_dir {
+            // Target is `Option<PathBuf>` (unlike the plain-`PathBuf` dir fields
+            // elsewhere), so the `Some(...)` wrap is the assignment, not a bug.
+            config.storage.read_cache_dir = Some(v.clone());
+        }
+        if let Some(v) = s.read_cache_max_size {
+            config.storage.read_cache_max_size = v;
         }
     }
     if let Some(a) = &o.auth {

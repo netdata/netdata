@@ -17,6 +17,7 @@ async-trait = { workspace = true }
 bridge = { path = "../netdata-plugin/bridge" }
 chrono = { workspace = true }
 ferryboat = { workspace = true }
+file-cache = { workspace = true }
 file-registry = { workspace = true }
 futures = { workspace = true }
 moka = { workspace = true }

@@ -432,6 +432,21 @@ impl TenantRegistries {
         (sfsts, wals)
     }
 
+    /// Catalog entries for `tenant` describing SFSTs that overlap `q` but exist
+    /// only in remote storage (no local SFST or WAL of the same seq). The query
+    /// handler fetches these back through the read cache. An unknown tenant
+    /// yields an empty list.
+    pub fn remote_candidates(
+        &self,
+        tenant: &TenantId,
+        q: &file_registry::Query,
+    ) -> Vec<otel_catalog::CatalogEntry> {
+        self.tenants
+            .get(tenant)
+            .map(|r| r.remote_candidates(q))
+            .unwrap_or_default()
+    }
+
     /// Every distinct stream `tenant` currently holds, with aggregate
     /// stats, for the otel-logs stream selector. **Window-independent**:
     /// it lists streams across all of the tenant's files regardless of

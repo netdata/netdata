@@ -25,6 +25,7 @@ use netdata_plugin_types::HttpAccess;
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 
+use crate::storage::{Storage, StorageError};
 use sfsq::logs::{LogSource, SfstCandidate, Source, WalTail, run};
 
 use super::adapter::{stream_required_params, to_result, window_secs};
@@ -124,12 +125,115 @@ fn build_files_response(tr: &TenantRegistries) -> FilesResponse {
     }
 }
 
+/// The query path's handle to remote storage: a fetcher ([`OpendalStorage`]) and
+/// the local read-through [`FileCache`] that materializes evicted SFSTs back to
+/// disk. Present only when `storage.enabled`.
+#[derive(Clone)]
+pub(crate) struct RemoteRead {
+    storage: crate::storage::OpendalStorage,
+    cache: file_cache::FileCache,
+}
+
+impl RemoteRead {
+    pub(crate) fn new(
+        storage: crate::storage::OpendalStorage,
+        cache: file_cache::FileCache,
+    ) -> Self {
+        Self { storage, cache }
+    }
+
+    /// Materialize remote-only catalog entries into local cache files and return
+    /// them as engine sources, plus the [`CachedFile`](file_cache::CachedFile) pin
+    /// guards the caller MUST hold for the query's duration (so the files are not
+    /// evicted mid-read). Per-entry fetch failures degrade (the entry is omitted).
+    /// Errors only on a query-wide cache condition (footprint over capacity, a
+    /// broken cache dir, or cancellation).
+    async fn fetch_candidates(
+        &self,
+        entries: Vec<otel_catalog::CatalogEntry>,
+        cancel: &CancellationToken,
+    ) -> Result<(Vec<SfstCandidate>, Vec<file_cache::CachedFile>), file_cache::CacheError> {
+        // filename → entry (carries the catalog summary + remote key + size).
+        let mut by_name: std::collections::HashMap<String, otel_catalog::CatalogEntry> =
+            std::collections::HashMap::with_capacity(entries.len());
+        let mut wants = Vec::with_capacity(entries.len());
+        for e in entries {
+            let filename = e.id.to_filename("sfst");
+            wants.push(file_cache::Want {
+                filename: filename.clone(),
+                size: e.size.as_u64(),
+            });
+            by_name.insert(filename, e);
+        }
+
+        // Fetch closure: map the cache filename back to its remote key and read
+        // the object. Clones the key out before the async block so it borrows
+        // nothing across the await.
+        let storage = self.storage.clone();
+        let keys: std::collections::HashMap<String, String> = by_name
+            .iter()
+            .map(|(name, e)| (name.clone(), e.remote_key.clone()))
+            .collect();
+        let files = self
+            .cache
+            .acquire(
+                &wants,
+                move |filename| {
+                    let storage = storage.clone();
+                    let key = keys.get(filename).cloned();
+                    async move {
+                        match key {
+                            // Preserve the full error chain: pull the inner
+                            // `anyhow::Error` out of `Other` (the cache logs the
+                            // fetch error with `{e:#}`) rather than flattening it
+                            // via `to_string()`.
+                            Some(k) => storage.read(&k).await.map_err(|e| match e {
+                                StorageError::NotFound => {
+                                    anyhow::anyhow!("remote object not found: {k}")
+                                }
+                                StorageError::Other(err) => {
+                                    err.context(format!("remote read failed for {k}"))
+                                }
+                            }),
+                            None => Err(anyhow::anyhow!("no remote key for cache entry")),
+                        }
+                    }
+                },
+                cancel,
+            )
+            .await?;
+
+        // Each cached file becomes a sealed-SFST source; its time/stream summary
+        // comes from the catalog entry (no need to re-open the file for it).
+        let mut sources = Vec::with_capacity(files.len());
+        for cf in &files {
+            let Some(e) = by_name.get(cf.filename()) else {
+                continue;
+            };
+            sources.push(SfstCandidate {
+                summary: sfst::Summary {
+                    min_timestamp_s: e.min_timestamp_s,
+                    max_timestamp_s: e.max_timestamp_s,
+                    total_logs: e.total_logs,
+                    stream: e.stream.clone(),
+                },
+                file_seq: e.id.seq,
+                part: sfsq::logs::Part::Indexed(0),
+                source: Source::File(cf.path().to_path_buf()),
+            });
+        }
+        Ok((sources, files))
+    }
+}
+
 pub(crate) struct OtelLogsHandler {
     registries: Arc<RwLock<TenantRegistries>>,
     /// Shared with the ledger (which drops a WAL's chunks on rotation).
     chunk_cache: Arc<ChunkCache>,
     /// Minimum records per chunk when indexing an active WAL's prefix.
     min_entries: u64,
+    /// Remote-read capability; `None` when remote storage is disabled.
+    remote: Option<RemoteRead>,
 }
 
 impl OtelLogsHandler {
@@ -137,11 +241,13 @@ impl OtelLogsHandler {
         registries: Arc<RwLock<TenantRegistries>>,
         chunk_cache: Arc<ChunkCache>,
         min_entries: u64,
+        remote: Option<RemoteRead>,
     ) -> Self {
         Self {
             registries,
             chunk_cache,
             min_entries,
+            remote,
         }
     }
 
@@ -317,7 +423,7 @@ impl FunctionHandler for OtelLogsHandler {
         // the whole query sees one consistent durable prefix even as
         // ingestion advances it. Under the same lock, enumerate the
         // tenant's streams (window-independent) for the selector control.
-        let (mut sfst_candidates, wal_descs, required_params) = {
+        let (mut sfst_candidates, wal_descs, required_params, remote_cands) = {
             let guard = self.registries.read().await;
             let q = file_registry::Query {
                 time_range: time_range.clone(),
@@ -325,7 +431,14 @@ impl FunctionHandler for OtelLogsHandler {
             };
             let (sfsts, wals) = guard.query_snapshot(&tenant, &q);
             let required_params = stream_required_params(guard.enumerate_streams(&tenant));
-            (sfsts, wals, required_params)
+            // Catalog entries for SFSTs evicted locally but present on remote —
+            // only when remote storage (and thus the read cache) is configured.
+            let remote_cands = if self.remote.is_some() {
+                guard.remote_candidates(&tenant, &q)
+            } else {
+                Vec::new()
+            };
+            (sfsts, wals, required_params, remote_cands)
         };
 
         // Resolve each WAL into in-memory chunk SFSTs + a tail (off the
@@ -338,6 +451,52 @@ impl FunctionHandler for OtelLogsHandler {
             sfst_candidates.extend(chunks);
             wal_tails.extend(tails);
         }
+
+        // Fetch any remote-only SFSTs (evicted locally) back through the read
+        // cache and add them as sources. The returned pin guards MUST outlive the
+        // blocking query run below; the `_`-prefixed binding holds them (kept alive
+        // for their `Drop`, not read) until this function returns, after
+        // `spawn_blocking`. (If the call is cancelled and this future is dropped
+        // before the blocking task maps the files, a since-evicted source just
+        // degrades in the engine — acceptable, since a cancelled query's result is
+        // discarded anyway.) Per-entry fetch failures degrade inside
+        // `fetch_candidates`; query-wide failures surface as actionable errors.
+        let _remote_guards: Vec<file_cache::CachedFile> = if let Some(remote) = &self.remote
+            && !remote_cands.is_empty()
+        {
+            match remote
+                .fetch_candidates(remote_cands, &ctx.cancellation)
+                .await
+            {
+                Ok((mut remote_sources, guards)) => {
+                    sfst_candidates.append(&mut remote_sources);
+                    guards
+                }
+                Err(file_cache::CacheError::Cancelled) => {
+                    // Match the other empty-return paths: keep the stream selector.
+                    let mut stub = LogsResult::empty_stub(time_range.start, time_range.end, last);
+                    stub.required_params = required_params;
+                    return Ok(OtelLogsResponse::Logs(stub));
+                }
+                Err(file_cache::CacheError::TooLarge { footprint, capacity }) => {
+                    return Err(netdata_plugin_error::NetdataPluginError::FunctionHandler {
+                        message: format!(
+                            "this query needs {footprint} bytes of remote log data, more than the \
+                             read cache can hold ({capacity}); narrow the time window or stream filter"
+                        ),
+                    });
+                }
+                Err(file_cache::CacheError::EvictionFailed) => {
+                    return Err(netdata_plugin_error::NetdataPluginError::FunctionHandler {
+                        message: "remote-read cache directory is unwritable (eviction failed); \
+                                  check its permissions and free space"
+                            .to_string(),
+                    });
+                }
+            }
+        } else {
+            Vec::new()
+        };
 
         // One mixed source list for the engine: indexed SFSTs (sealed +
         // in-memory chunks) and the row-scanned WAL tails. Order is
