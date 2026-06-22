@@ -14,47 +14,26 @@ Use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configurati
 
 ## RAM and ALLOC Mode Retention
 
-When `mode` is set to `ram` or `alloc` (instead of the default `dbengine`), the Agent keeps each metric in a single in-memory ring buffer. There is no disk persistence and there are no storage tiers — the `dbengine tier ...` retention settings described in [Tiers](#tiers) do not apply to these modes.
+When `mode` is set to `ram` or `alloc`, the Agent keeps metrics in memory only — there is no disk persistence and no storage tiers. The `dbengine tier ...` retention settings in [Tiers](#tiers) do not apply.
 
-The ring-buffer size is set by `retention` (default `3600`):
+The amount of history available depends on both `retention` and `update every`:
 
-```text
-[db]
-    mode = ram
-    retention = 3600
-    update every = 10
-```
+> **Effective retention ≈ `retention` × `update every`**
 
-`retention` is written as a duration in seconds, but the Agent uses it as the **number of ring-buffer slots** (entries) it keeps per chart dimension. Because one sample is stored per slot and one sample is collected every `update every` seconds, the history you can query is:
+| `retention` | `update every` | Effective retention  |
+|:-----------:|:--------------:|:--------------------:|
+| `3600`      | `1`            | ~1 hour (3 600 s)    |
+| `3600`      | `10`           | ~10 hours (36 000 s) |
 
-> **Effective wall-clock retention = slots × `update every`**
-
-The slot count comes from `retention` alone — it does **not** change when you change `update every`. Raising `update every` therefore *lengthens* the wall-clock window for the same `retention` value and the same memory; it never shortens it.
-
-### Worked example: `update every = 1` vs `update every = 10`
-
-With `retention = 3600`, the slot count stays at 3600 in both cases. Only the wall-clock span each slot covers changes:
-
-| `retention` | `update every` | Ring-buffer slots | Effective wall-clock retention | Memory per dimension |
-|:-----------:|:--------------:|:-----------------:|:------------------------------:|:--------------------:|
-| `3600`      | `1`            | 3600              | 3600s (1 hour)                 | unchanged            |
-| `3600`      | `10`           | 3600              | 36000s (10 hours)              | unchanged            |
-
-To choose a `retention` value for a target history window, divide the desired wall-clock seconds by `update every`. For roughly 1 hour (3600s) of local history at `update every = 10`, use `retention = 360` (360 slots × 10s = 3600s).
+To target a specific history window, set `retention = target_seconds / update_every`. For roughly 1 hour of history at `update every = 10`, use `retention = 360`.
 
 :::note
 
-In `ram` mode the slot count is rounded up to the host's memory-page boundary (for example, 3600 becomes 4096 slots on a 4 KiB page system), so the actual figures are marginally higher than the nominal `retention`. `alloc` uses the `retention` value directly. The relationship to `update every` is identical in both modes.
+These `[db]` settings are read at Agent startup — changing `mode`, `retention`, or `update every` takes effect only after restarting the Agent. `netdatacli reload-health` reloads health configuration only and does not apply `[db]` changes.
 
 :::
 
-:::note
-
-These `[db]` settings are read at Agent startup, so changing `mode`, `retention`, or `update every` takes effect only after restarting the Agent. `netdatacli reload-health` reloads health configuration only and does not apply `[db]` changes.
-
-:::
-
-In a Parent–Child streaming setup, a `ram`-mode Child normally keeps only this short local buffer while the Parent persists long-term history in `dbengine`. Child and Parent storage are independent — see the note in [Tiers](#tiers).
+In a Parent–Child streaming setup, a `ram`-mode Child keeps only this short local buffer while the Parent persists long-term history in `dbengine`. Child and Parent storage are independent — see [Tiers](#tiers).
 
 ## Tiers
 
