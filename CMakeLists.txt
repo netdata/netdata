@@ -3595,6 +3595,24 @@ if(OS_WINDOWS)
         install(FILES "${NETDATA_DRIVER_FILE_INF}"
                 COMPONENT netdata_driver_inf
                 DESTINATION "${BINDIR}")
+
+        # Remove Windows system DLLs that should never live in the build
+        # directory alongside netdata.exe. These get staged there by the old
+        # stage-runtime-dlls.sh logic (which had an inverted allow-list) and
+        # then shadow the real System32 versions, causing access violations
+        # in KernelBase.dll during DLL initialization before main() runs.
+        # Running this as a POST_BUILD command ensures incremental cmake --build
+        # runs also clean up leftover stale DLLs without needing a full rebuild.
+        foreach(_nd_stale_dll IN ITEMS
+                bcrypt.dll  Secur32.dll  USERENV.dll  SSPICLI.DLL
+                CRYPTBASE.DLL  dbghelp.dll  dbgcore.DLL
+                CRYPT32.dll  WLDAP32.dll  SHELL32.dll)
+                add_custom_command(TARGET netdata POST_BUILD
+                        COMMAND "${CMAKE_COMMAND}" -E rm -f
+                                "$<TARGET_FILE_DIR:netdata>/${_nd_stale_dll}"
+                        COMMENT "Removing stale system DLL: ${_nd_stale_dll}"
+                        VERBATIM)
+        endforeach()
 endif()
 
 target_compile_options(netdata PRIVATE

@@ -570,10 +570,8 @@ static inline int poll(struct pollfd *fds, nfds_t nfds, int timeout) {
 // The wrappers take char* (Winsock's actual type) to avoid void* parameters.
 // The replacement macros cast the caller's pointer so call sites need no changes.
 static inline int nd_getsockopt(int s, int l, int o, char *v, socklen_t *vl) {
-    int ilen = (int)*vl;
-    int r = getsockopt(s, l, o, v, &ilen);
-    *vl = (socklen_t)ilen;
-    return r;
+    // On Windows socklen_t == int, so socklen_t* and int* have identical layout.
+    return getsockopt(s, l, o, v, (int *)vl);
 }
 static inline int nd_setsockopt(int s, int l, int o, const char *v, socklen_t vl) {
     return setsockopt(s, l, o, v, (int)vl);
