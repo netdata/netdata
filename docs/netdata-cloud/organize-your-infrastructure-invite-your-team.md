@@ -75,17 +75,9 @@ Only users with the **Admin** role can delete a Space. See the [role-based acces
 
 :::warning
 
-Deleting a Space is permanent and cannot be undone.
+Deleting a Space is permanent and cannot be undone. You cannot delete the only Space on your account — each account must have at least one Space.
 
 :::
-
-**Before you delete a Space:**
-
-- All nodes connected to the Space are disconnected from Netdata Cloud. They continue collecting and storing metrics locally but lose Cloud integration (dashboards, centralized alerting, and team access).
-- All Rooms, dashboards, alert configurations, and notification settings within the Space are permanently removed.
-- All team members lose access to the Space.
-- If the Space has a paid subscription, cancel the plan first via **Space Settings** > **Plan & Billing**. See [Netdata Plans & Billing](/docs/netdata-cloud/view-plan-and-billing.md) for cancellation details.
-- For refund eligibility within 14 days of purchase, contact billing@netdata.cloud.
 
 **Steps to delete a Space:**
 
