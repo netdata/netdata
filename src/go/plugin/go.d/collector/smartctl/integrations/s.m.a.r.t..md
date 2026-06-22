@@ -22,9 +22,10 @@ Module: smartctl
 ## Overview
 
 This collector monitors the health status of storage devices by analyzing S.M.A.R.T. (Self-Monitoring, Analysis, and Reporting Technology) counters.
-It relies on the [`smartctl`](https://linux.die.net/man/8/smartctl) CLI tool but avoids directly executing the binary.
-Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
-This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
+It relies on the [`smartctl`](https://linux.die.net/man/8/smartctl) CLI tool from [smartmontools](https://www.smartmontools.org/).
+
+On Linux and BSD, the collector runs `smartctl` through `ndsudo`, a Netdata helper that runs privileged commands securely within the Netdata environment, eliminating the need for `sudo`.
+On Windows, the collector executes `smartctl.exe` directly and auto-detects it in the system `PATH` or in the default smartmontools install location (`%ProgramFiles%\smartmontools\bin\`).
 
 Executed commands:
 -  `smartctl --json --scan`
@@ -37,6 +38,7 @@ This collector is only supported on the following platforms:
 
 - Linux
 - BSD
+- Windows
 
 This collector only supports collecting metrics from a single instance of this integration.
 
@@ -76,7 +78,10 @@ UI configuration requires paid Netdata Cloud plan.
 
 #### Install smartmontools (v7.0+)
 
-Install `smartmontools` version 7.0 or later using your distribution's package manager. Version 7.0 introduced the `--json` output mode, which is required for this collector to function properly.
+Install `smartmontools` version 7.0 or later. Version 7.0 introduced the `--json` output mode, which is required for this collector to function properly.
+
+On **Linux/BSD**, use your distribution's package manager.
+On **Windows**, install smartmontools with the default options. The collector auto-detects `smartctl.exe` in the system `PATH` or in the default install location (`%ProgramFiles%\smartmontools\bin\`).
 
 
 #### For Netdata running in a Docker container
