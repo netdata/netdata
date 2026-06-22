@@ -3,8 +3,10 @@
 package snmptopology
 
 import (
+	"context"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
@@ -12,15 +14,19 @@ import (
 )
 
 type topologyRegistry struct {
-	mu              sync.RWMutex
-	caches          map[*topologyCache]struct{}
-	producerScopeID string
+	mu                    sync.RWMutex
+	caches                map[*topologyCache]struct{}
+	producerScopeID       string
+	reverseDNS            *topologyReverseDNSResolver
+	reverseDNSWarmCtx     context.Context
+	reverseDNSSnapshotRun atomic.Bool
 }
 
 func newTopologyRegistry() *topologyRegistry {
 	return &topologyRegistry{
 		caches:          make(map[*topologyCache]struct{}),
 		producerScopeID: strings.TrimSpace(pluginconfig.RegistryUniqueID()),
+		reverseDNS:      newTopologyReverseDNSResolver(),
 	}
 }
 
@@ -85,4 +91,69 @@ func (r *topologyRegistry) managedDeviceFocusTargets() []topologyoptions.Managed
 		return nil
 	}
 	return buildTopologyManagedFocusTargets(r.observationSnapshots())
+}
+
+func (r *topologyRegistry) setReverseDNSWarmContext(ctx context.Context) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	r.reverseDNSWarmCtx = ctx
+	r.mu.Unlock()
+}
+
+func (r *topologyRegistry) reverseDNSContext() context.Context {
+	if r == nil {
+		return nil
+	}
+	r.mu.RLock()
+	ctx := r.reverseDNSWarmCtx
+	r.mu.RUnlock()
+	return ctx
+}
+
+func (r *topologyRegistry) reverseDNSCandidateCollector() *topologyReverseDNSCandidateCollector {
+	if r == nil || r.reverseDNS == nil {
+		return nil
+	}
+	return r.reverseDNS.newCandidateCollector()
+}
+
+func (r *topologyRegistry) enqueueReverseDNSWarm(candidates []string) bool {
+	if r == nil || r.reverseDNS == nil || len(candidates) == 0 {
+		return false
+	}
+	ctx := r.reverseDNSContext()
+	if ctx == nil || ctx.Err() != nil {
+		return false
+	}
+	return r.reverseDNS.warmAsync(ctx, candidates)
+}
+
+func (r *topologyRegistry) enqueueReverseDNSWarmFromDefaultSnapshot() bool {
+	if r == nil || r.reverseDNS == nil {
+		return false
+	}
+	ctx := r.reverseDNSContext()
+	if ctx == nil || ctx.Err() != nil {
+		return false
+	}
+	if !r.reverseDNSSnapshotRun.CompareAndSwap(false, true) {
+		return false
+	}
+
+	go func() {
+		defer r.reverseDNSSnapshotRun.Store(false)
+		collector := r.reverseDNSCandidateCollector()
+		if collector == nil {
+			return
+		}
+		options := topologyoptions.DefaultQueryOptions()
+		options.ResolveDNSName = collector.lookupCached
+		if _, ok := r.snapshotWithOptions(options); !ok {
+			return
+		}
+		r.reverseDNS.warm(ctx, collector.collectedCandidates())
+	}()
+	return true
 }

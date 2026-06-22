@@ -10,14 +10,7 @@ import (
 )
 
 func resolveQueryOptions(params funcapi.ResolvedParams) topologyoptions.QueryOptions {
-	options := topologyoptions.QueryOptions{
-		CollapseActorsByIP:     true,
-		EliminateNonIPInferred: true,
-		MapType:                topologyoptions.MapTypeLLDPCDPManaged,
-		InferenceStrategy:      topologyoptions.InferenceStrategyFDBMinimumKnowledge,
-		ManagedDeviceFocus:     topologyoptions.ManagedFocusAllDevices,
-		Depth:                  topologyoptions.DepthAllInternal,
-	}
+	options := topologyoptions.DefaultQueryOptions()
 
 	if identity := normalizeNodesIdentity(params.GetOne(ParamNodesIdentity)); identity == NodesIdentityMAC {
 		options.CollapseActorsByIP = false

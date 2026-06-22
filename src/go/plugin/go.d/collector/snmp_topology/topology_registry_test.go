@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -84,6 +85,38 @@ func TestTopologyRegistry_SnapshotAggregatesAcrossCaches(t *testing.T) {
 	require.GreaterOrEqual(t, topologyStatsToV1ForTest(t, data.Stats)["devices_total"].(int), 2)
 	require.GreaterOrEqual(t, topologyStatsToV1ForTest(t, data.Stats)["links_total"].(int), 1)
 	require.GreaterOrEqual(t, topologyStatsToV1ForTest(t, data.Stats)["links_lldp"].(int), 1)
+}
+
+func TestTopologyRegistry_EnqueueReverseDNSWarmFromDefaultSnapshotUsesDisplayCandidates(t *testing.T) {
+	clock := newReverseDNSTestClock()
+	warmed := make(chan string, 4)
+	registry := newTopologyRegistry()
+	registry.reverseDNS = newTopologyReverseDNSResolverWithConfig(topologyReverseDNSConfig{
+		now:         clock.Now,
+		timeout:     time.Second,
+		positiveTTL: time.Hour,
+		negativeTTL: time.Minute,
+		concurrency: 1,
+		lookup: func(_ context.Context, ip string) ([]string, error) {
+			warmed <- ip
+			return []string{ip + ".example.test"}, nil
+		},
+	})
+	registry.setReverseDNSWarmContext(context.Background())
+
+	cache := newTopologyCache()
+	seedPublishedEndpointSnapshot(cache)
+	registry.register(cache)
+
+	require.True(t, registry.enqueueReverseDNSWarmFromDefaultSnapshot())
+	require.Eventually(t, func() bool {
+		select {
+		case ip := <-warmed:
+			return ip == "10.0.0.10" || ip == "10.0.0.20"
+		default:
+			return false
+		}
+	}, time.Second, 10*time.Millisecond)
 }
 
 func TestTopologyRegistry_SnapshotSingleCacheKeepsLLDPUnidirectional(t *testing.T) {
