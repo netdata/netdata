@@ -23,10 +23,6 @@ sqlite3 *ml_db = NULL;
 static bool ml_db_unusable = false;
 static netdata_mutex_t db_mutex;
 
-// Definition for the thread-local declared in ml_memory.h. Lives here so
-// that mimalloc builds (which skip ml_memory.cc) still have the symbol.
-thread_local bool ml_alloc_active = false;
-
 bool ml_db_is_unusable(void)
 {
     return __atomic_load_n(&ml_db_unusable, __ATOMIC_RELAXED);
@@ -506,12 +502,6 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
 
     if (!is_empty)
         return 0;
-
-    // Called from the metadata sqlite worker thread, so the calling
-    // thread's MlAllocScope is not active. Tag the function body
-    // explicitly so the km_contexts vector growth here is attributed to
-    // ML, matching the eventual decrement at ml_dimension_delete.
-    MlAllocScope _ml_scope;
 
     std::vector<ml_kmeans_t> V;
 
@@ -1064,11 +1054,6 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     }
 
     if (cns_size < n) {
-        // Warmup growth is the only allocating path in this function
-        // (steady-state ring-buffer mode below does not allocate). Keep
-        // the MlAllocScope narrow so the per-sample hot path does not
-        // pay the TLS toggle once warmup is complete.
-        MlAllocScope _ml_scope;
         dim->cns.push_back(value);
         spinlock_unlock(&dim->slock);
         return false;
@@ -1346,8 +1331,6 @@ void ml_detect_main(void *arg)
 {
     UNUSED(arg);
 
-    MlAllocScope _ml_scope;
-
     worker_register("MLDETECT");
     worker_register_job_name(WORKER_JOB_DETECTION_COLLECT_STATS, "collect stats");
     worker_register_job_name(WORKER_JOB_DETECTION_DIM_CHART, "dim chart");
@@ -1563,8 +1546,6 @@ static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, m
 
 void ml_train_main(void *arg) {
     ml_worker_t *worker = (ml_worker_t *) arg;
-
-    MlAllocScope _ml_scope;
 
     char worker_name[1024];
     snprintfz(worker_name, 1024, "ml_worker_%zu", worker->id);

@@ -55,9 +55,11 @@ void pulse_ml_memory_freed(size_t n)
         return;
     }
 
-    // Clamp at zero: cross-thread allocations whose new/delete happen on
-    // different sides of an MlAllocScope guard can produce a free without a
-    // matching counted allocation. Saturate so the counter cannot wrap.
+    // Clamp at zero so the counter can never wrap. The global new/delete
+    // overrides account every allocation symmetrically, so a counted free
+    // always has a matching counted allocation; this saturation is defensive
+    // against a free whose allocation bypassed the overrides (for example
+    // memory handed in from a foreign allocator).
     uint64_t cur = __atomic_load_n(&ml_statistics.ml_memory_consumption, __ATOMIC_RELAXED);
     while (true) {
         uint64_t next = (n > cur) ? 0 : (cur - n);
