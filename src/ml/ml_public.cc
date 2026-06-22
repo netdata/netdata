@@ -87,8 +87,6 @@ void ml_host_new(RRDHOST *rh)
     if (!ml_enabled(rh))
         return;
 
-    MlAllocScope _ml_scope;
-
     ml_host_t *host = new ml_host_t();
 
     host->rh = rh;
@@ -126,8 +124,6 @@ void ml_host_delete(RRDHOST *rh)
     if (!host)
         return;
 
-    MlAllocScope _ml_scope;
-
     ml_host_clear_context_anomaly_rate(host);
     netdata_mutex_destroy(&host->mutex);
     netdata_mutex_destroy(&host->start_stop_mutex);
@@ -150,8 +146,6 @@ void ml_host_start(RRDHOST *rh) {
         netdata_mutex_unlock(&host->start_stop_mutex);
         return;
     }
-
-    MlAllocScope _ml_scope;
 
     // Run the sweep under host->mutex so the visibility window of the flag
     // flip is bounded by the same critical section that performs the sweep.
@@ -193,8 +187,6 @@ void ml_host_stop(RRDHOST *rh) {
         netdata_mutex_unlock(&host->start_stop_mutex);
         return;
     }
-
-    MlAllocScope _ml_scope;
 
     // Prevent new ML activity from publishing while we reset host/dimension
     // state. The ml_running flag gates collectors and the detect loop; the
@@ -359,8 +351,6 @@ void ml_chart_new(RRDSET *rs)
             return;
     }
 
-    MlAllocScope _ml_scope;
-
     ml_chart_t *chart = new ml_chart_t();
 
     chart->rs = rs;
@@ -393,8 +383,6 @@ void ml_chart_delete(RRDSET *rs)
     // set) or NULL -- never the freed chart memory.
     ml_chart_t *chart = (ml_chart_t *) __atomic_exchange_n(&rs->ml_chart, (rrd_ml_chart_t *)NULL, __ATOMIC_ACQ_REL);
 
-    MlAllocScope _ml_scope;
-
     delete chart;
 }
 
@@ -420,8 +408,6 @@ void ml_dimension_new(RRDDIM *rd)
     ml_chart_t *chart = (ml_chart_t *) __atomic_load_n(&rd->rrdset->ml_chart, __ATOMIC_ACQUIRE);
     if (!chart)
         return;
-
-    MlAllocScope _ml_scope;
 
     ml_dimension_t *dim = new ml_dimension_t();
 
@@ -471,8 +457,6 @@ void ml_dimension_delete(RRDDIM *rd)
     if (!dim)
         return;
 
-    MlAllocScope _ml_scope;
-
     // Wait for any in-progress training to complete before deleting
     // This prevents use-after-free crashes when training thread accesses dim->rd
     size_t wait_iterations = 0;
@@ -511,9 +495,6 @@ ALWAYS_INLINE_ONLY void ml_dimension_received_anomaly(RRDDIM *rd, bool is_anomal
     if (!chart)
         return;
 
-    // No MlAllocScope here: ml_chart_update_dimension() only mutates
-    // integer counters on an existing chart struct and never allocates.
-
     ml_chart_update_dimension(chart, dim, is_anomalous);
 }
 
@@ -532,11 +513,6 @@ bool ml_dimension_is_anomalous(RRDDIM *rd, time_t curr_time, double value, bool 
     if (!chart)
         return false;
 
-    // No MlAllocScope here: this is the per-sample hot path. The only
-    // allocating site inside ml_dimension_predict() is the warmup
-    // push_back on dim->cns, which carries its own narrow MlAllocScope.
-    // ml_chart_update_dimension() does not allocate.
-
     bool is_anomalous = ml_dimension_predict(dim, value, exists);
     ml_chart_update_dimension(chart, dim, is_anomalous);
 
@@ -545,8 +521,6 @@ bool ml_dimension_is_anomalous(RRDDIM *rd, time_t curr_time, double value, bool 
 
 void ml_init()
 {
-    MlAllocScope _ml_scope;
-
     // Read config values
     ml_config_load(&Cfg);
 
@@ -752,8 +726,6 @@ void ml_fini() {
         return;
     }
 
-    MlAllocScope _ml_scope;
-
     sql_close_database(ml_db, "ML");
     ml_db = NULL;
 }
@@ -761,8 +733,6 @@ void ml_fini() {
 void ml_start_threads() {
     if (!Cfg.enable_anomaly_detection)
         return;
-
-    MlAllocScope _ml_scope;
 
     // start detection & training threads
     Cfg.detection_stop = false;
@@ -784,8 +754,6 @@ void ml_stop_threads()
 {
     if (!Cfg.enable_anomaly_detection)
         return;
-
-    MlAllocScope _ml_scope;
 
     Cfg.detection_stop = true;
     Cfg.training_stop = true;
@@ -847,8 +815,6 @@ void ml_workers_free()
 
 bool ml_model_received_from_child(RRDHOST *host, const char *json)
 {
-    MlAllocScope _ml_scope;
-
     // host is the host this streaming connection is authenticated for; the deserializer requires
     // the payload to name it.
     bool ok = ml_dimension_deserialize_kmeans(host, json);
