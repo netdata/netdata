@@ -202,42 +202,21 @@ spec:
 Netdata extracts `netdata.cloud/*` annotations from pod metadata and uses
 `netdata.cloud/cgroup.name` to override the resolved name.
 
-#### How the chart identifier is derived from the name
+#### Verifying the result and troubleshooting
 
-The override value is used as the cgroup's display name. Netdata then derives a
-chart identifier from that name by sanitizing it. This sanitization performs
-character substitution only — it does **not** prepend a hash or any other prefix.
-
-| Override name (input) | Chart identifier (output) |
-|:----------------------|:--------------------------|
-| `My Web App`          | `My_Web_App`              |
-| `storefront.green`    | `storefront-green`        |
-| `app@host`            | `app_host`                |
-
-The transformations applied are:
-
-- Spaces become underscores (`_`).
-- The `@` character becomes `_`.
-- Dots (`.`) become hyphens (`-`).
-- Other special characters (`$`, `%`, `&`, `*`, `+`, `=`, `?`, `|`, `^`, single
-  and double quotes) are replaced with `_`.
-- Letters, digits, hyphens, underscores, and a few separator characters (`:`,
-  `-`, `/`) are preserved.
+You can check the chart names Netdata created through the Agent's
+`/api/v1/charts` endpoint and filter for the `cgroup_` prefix to confirm the
+override took effect. Use the chart name shown by that endpoint when referencing
+the chart in API queries.
 
 > If you see a long alphanumeric string such as `twxae02wzkyy2d19gz4dsj6a-` at the
-> start of a chart name, that string is part of the resolved name itself (typically
-> a container ID or Kubernetes UID taken from the cgroup path), not a prefix added
-> by Netdata. Setting `netdata.cloud/cgroup.name` replaces it with your own value.
+> start of a cgroup's chart name, that string is part of the resolved name itself
+> (typically a container ID or Kubernetes UID from the cgroup path), not a prefix
+> added by Netdata. Setting `netdata.cloud/cgroup.name` replaces it with your own
+> value.
 
-You can list the chart names Netdata actually created through the Agent's
-`/api/v1/charts` endpoint and filter for the `cgroup_` prefix to confirm the
-result. If you use the raw name instead of the sanitized chart identifier in a
-query, the query will not match — use the chart identifier shown by that endpoint.
-
-If no override is set and runtime resolution does not find a name, the raw cgroup
-path is used as the name, and the chart identifier is derived from it by removing
-the leading slash, replacing dots with hyphens, and sanitizing the remaining
-characters as described above.
+If no override is set and Netdata cannot resolve a friendly name via Docker,
+Kubernetes, or Podman, the raw cgroup path is used as the display name.
 
 ### Alerts
 
