@@ -207,6 +207,12 @@ include only managed SNMP network devices that can be resolved to topology
 actors. Depth/focus filtering may show a focused device and the subnet segment
 without fanning out to every other device on that subnet.
 
+Current L3 subnet segments are single-routing-context. `L3Interface` has no
+VRF/routing-context field, so segment identity is producer scope plus
+subnet/prefix. Identical subnet/prefix values in multiple VRFs inside the same
+producer scope are therefore one logical segment until collection adds routing
+context and segment identity includes it.
+
 ## Internal Packages
 
 The root package owns collector lifecycle, cache ingestion, registry snapshots,

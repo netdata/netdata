@@ -83,6 +83,31 @@ func TestBuildTopologyL3SubnetCandidates(t *testing.T) {
 				CandidateMemberships: 3,
 			},
 		},
+		"ipv4-subnet-segment-twenty-nine-boundary": {
+			rows: []topologymodel.L3Interface{
+				l3InterfaceForTest("device-b", "198.51.100.2", "255.255.255.248", "3"),
+				l3InterfaceForTest("device-a", "198.51.100.1", "255.255.255.248", "2"),
+			},
+			wantCandidates: topologyL3SubnetCandidates{
+				Segments: []topologyL3SubnetSegment{
+					{
+						Subnet:  "198.51.100.0/29",
+						Network: "198.51.100.0",
+						Netmask: "255.255.255.248",
+						Prefix:  29,
+						Rows: []topologymodel.L3Interface{
+							l3InterfaceForTest("device-a", "198.51.100.1", "255.255.255.248", "2"),
+							l3InterfaceForTest("device-b", "198.51.100.2", "255.255.255.248", "3"),
+						},
+					},
+				},
+			},
+			wantStats: topologymodel.L3SubnetBuildStats{
+				CandidateSubnets:     1,
+				CandidateSegments:    1,
+				CandidateMemberships: 2,
+			},
+		},
 		"unsupported-prefix": {
 			rows: []topologymodel.L3Interface{
 				l3InterfaceForTest("device-a", "198.51.100.1", "255.255.254.0", "2"),
@@ -119,6 +144,15 @@ func TestBuildTopologyL3SubnetCandidates(t *testing.T) {
 			wantStats: topologymodel.L3SubnetBuildStats{
 				CandidateSubnets:    1,
 				SuppressedUnmatched: 1,
+			},
+		},
+		"single-member-subnet-segment": {
+			rows: []topologymodel.L3Interface{
+				l3InterfaceForTest("device-a", "198.51.100.1", "255.255.255.0", "2"),
+			},
+			wantStats: topologymodel.L3SubnetBuildStats{
+				CandidateSubnets:           1,
+				SuppressedSegmentUnmatched: 1,
 			},
 		},
 		"multi-access-rows": {

@@ -531,6 +531,12 @@ cannot obtain a stable scope id, it must omit L3 subnet segments rather than
 fall back to a process-local or random id. This prevents identical private
 subnets from different Agents from colliding after Cloud aggregation.
 
+Current SNMP L3 subnet segments are single-routing-context. `L3Interface` does
+not currently carry a VRF or routing-context field, so identical subnet/prefix
+values inside one producer scope are treated as one logical segment. Producers
+MUST NOT present these segments as VRF-aware until collection adds routing
+context to L3 interface observations and segment identity includes it.
+
 `ospf_adjacency` represents OSPF control-plane adjacency between two resolved
 managed SNMP device actors. It is a logical L3 routing-protocol relationship,
 not physical, L2, discovery, or port-neighbor evidence. The producer emits graph
@@ -615,6 +621,8 @@ MUST NOT reinterpret subnet membership as L2 segment membership, discovery
 protocol evidence, or port-neighbor evidence. Aggregation may merge identical
 scoped subnet segment actors from the same producer scope, but must not merge
 identical private subnet strings across different producer scopes.
+Within one producer scope, the current identity is subnet/prefix only because
+SNMP topology does not yet collect VRF/routing-context for L3 interfaces.
 
 For `ospf_adjacency`, aggregation MUST preserve the explicit `ospf_adjacency`
 link and evidence type, including its `semantic_role: control`. Replacement may
