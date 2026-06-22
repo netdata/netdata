@@ -1418,17 +1418,21 @@ static void populate_system_info(void) {
     }
     else {
         bool started_spawn_server = false;
+#if !defined(OS_WINDOWS)
         if(!netdata_main_spawn_server) {
             started_spawn_server = true;
             netdata_main_spawn_server_init(NULL, 0, NULL);
         }
+#endif
 
         system_info = rrdhost_system_info_create();
         rrdhost_system_info_detect(system_info);
         free_system_info = true;
 
+#if !defined(OS_WINDOWS)
         if(started_spawn_server)
             netdata_main_spawn_server_cleanup();
+#endif
     }
 
     build_info_set_value_strdupz(BIB_OS_KERNEL_NAME, system_info->kernel_name);
