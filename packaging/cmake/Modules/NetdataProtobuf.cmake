@@ -71,6 +71,15 @@ function(netdata_bundle_protobuf)
         set(protobuf_BUILD_LIBPROTOC Off)
         set(protobuf_BUILD_TESTS Off)
         set(protobuf_BUILD_SHARED_LIBS Off)
+        # On Windows: build the protoc binary from the same source tree as
+        # libprotobuf.  The system protoc from MSYS2 UCRT64 can be a different
+        # version, causing compile-time version checks in generated headers to
+        # fail.  Building protoc here guarantees gencode version == runtime
+        # version.  (protobuf_BUILD_LIBPROTOC stays Off — libprotoc is the
+        # plugin-developer API, not needed for code generation.)
+        if(OS_WINDOWS)
+                set(protobuf_BUILD_PROTOC_BINARIES On)
+        endif()
         set(protobuf_repo https://github.com/protocolbuffers/protobuf)
 
         message(STATUS "Preparing bundled Protobuf")
@@ -105,25 +114,39 @@ macro(netdata_detect_protobuf)
                         netdata_bundle_protobuf()
                 endif()
 
-                # Always resolve protoc from the system; the bundled build does not
-                # produce a usable host protoc binary at cmake configuration time.
-                # IMPORTANT: do NOT use find_program(PROTOBUF_PROTOC_EXECUTABLE …)
-                # directly after set(PROTOBUF_PROTOC_EXECUTABLE "") — the preceding
-                # set() creates a regular variable that shadows the CACHE entry
-                # written by find_program, leaving PROTOBUF_PROTOC_EXECUTABLE empty.
-                # Using a temporary variable avoids the shadowing.
+                # Resolve protoc.  Priority order (highest first):
+                #  1. PROTOBUF_PROTOC_EXECUTABLE env var — explicit user override.
+                #  2. Bundled protoc target (protobuf::protoc) — when
+                #     ENABLE_BUNDLED_PROTOBUF is On; gencode version then equals
+                #     the bundled runtime version, avoiding compile-time version
+                #     mismatch errors in generated headers.
+                #  3. System protoc found by find_program — fallback.
+                # IMPORTANT: avoid find_program(PROTOBUF_PROTOC_EXECUTABLE …) with
+                # the same variable name — a preceding set() creates a regular
+                # variable that shadows the CACHE entry.  Use a temp variable.
                 set(PROTOBUF_PROTOC_EXECUTABLE "$ENV{PROTOBUF_PROTOC_EXECUTABLE}")
                 if(NOT PROTOBUF_PROTOC_EXECUTABLE)
-                        find_program(_nd_protoc_exe NAMES protoc protoc.exe)
-                        if(_nd_protoc_exe)
-                                set(PROTOBUF_PROTOC_EXECUTABLE "${_nd_protoc_exe}")
+                        if(ENABLE_BUNDLED_PROTOBUF AND TARGET protobuf::protoc)
+                                # Namespaced alias (protobuf v22+, added by protobuf's CMakeLists).
+                                set(PROTOBUF_PROTOC_EXECUTABLE "$<TARGET_FILE:protobuf::protoc>")
+                                set(PROTOBUF_PROTOC_TARGET "protobuf::protoc")
+                        elseif(ENABLE_BUNDLED_PROTOBUF AND TARGET protoc)
+                                # Non-namespaced target — older bundled protobuf or cmake version
+                                # that did not create the alias.
+                                set(PROTOBUF_PROTOC_EXECUTABLE "$<TARGET_FILE:protoc>")
+                                set(PROTOBUF_PROTOC_TARGET "protoc")
                         else()
-                                message(FATAL_ERROR
-                                        "protoc compiler not found. "
-                                        "Install it (e.g. pacman -S mingw-w64-ucrt-x86_64-protobuf) "
-                                        "or set the PROTOBUF_PROTOC_EXECUTABLE environment variable.")
+                                find_program(_nd_protoc_exe NAMES protoc protoc.exe)
+                                if(_nd_protoc_exe)
+                                        set(PROTOBUF_PROTOC_EXECUTABLE "${_nd_protoc_exe}")
+                                else()
+                                        message(FATAL_ERROR
+                                                "protoc compiler not found. "
+                                                "Install it (e.g. pacman -S mingw-w64-ucrt-x86_64-protobuf) "
+                                                "or set the PROTOBUF_PROTOC_EXECUTABLE environment variable.")
+                                endif()
+                                unset(_nd_protoc_exe CACHE)
                         endif()
-                        unset(_nd_protoc_exe CACHE)
                 endif()
 
                 if(NOT ENABLE_BUNDLED_PROTOBUF)
@@ -231,6 +254,16 @@ function(netdata_protoc_generate_cpp PROTO_ROOT_DIR OUTPUT_ROOT_DIR GENERATED_SO
         list(APPEND protoc_include_paths ${CMAKE_BINARY_DIR}/_deps/protobuf-src/src/)
     endif()
 
+    # When using the bundled protoc (PROTOBUF_PROTOC_TARGET is the cmake target
+    # name), add the TARGET to DEPENDS so cmake builds protoc before running
+    # proto generation.  When using the system protoc, depend on the file path
+    # as before.
+    if(PROTOBUF_PROTOC_TARGET)
+        set(_nd_protoc_dep "${PROTOBUF_PROTOC_TARGET}")
+    else()
+        set(_nd_protoc_dep "${PROTOBUF_PROTOC_EXECUTABLE}")
+    endif()
+
     # Process each proto file
     foreach(proto_file ${ARGN})
         # Get absolute paths and component parts
@@ -257,10 +290,10 @@ function(netdata_protoc_generate_cpp PROTO_ROOT_DIR OUTPUT_ROOT_DIR GENERATED_SO
             OUTPUT "${generated_source}" "${generated_header}"
             COMMAND ${CMAKE_COMMAND} -E make_directory "${output_dir}"
             COMMAND ${PROTOBUF_PROTOC_EXECUTABLE}
-            ARGS "-I$<JOIN:${protoc_include_paths},;-I>" 
-                 --cpp_out=${OUTPUT_ROOT_DIR} 
+            ARGS "-I$<JOIN:${protoc_include_paths},;-I>"
+                 --cpp_out=${OUTPUT_ROOT_DIR}
                  ${proto_file_abs_path}
-            DEPENDS ${proto_file_abs_path} ${PROTOBUF_PROTOC_EXECUTABLE}
+            DEPENDS ${proto_file_abs_path} "${_nd_protoc_dep}"
             COMMENT "Generating C++ protocol buffer files from ${proto_file}"
             COMMAND_EXPAND_LISTS
             VERBATIM

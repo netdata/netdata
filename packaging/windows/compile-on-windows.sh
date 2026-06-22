@@ -153,6 +153,7 @@ CFLAGS="${BUILD_CFLAGS}" /ucrt64/bin/cmake \
     "${cmake_make_program[@]}" \
     "${linker_cmake_flags[@]}" \
     -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}" \
+    -DCMAKE_PREFIX_PATH=/ucrt64 \
     -DCMAKE_INSTALL_PREFIX="/opt/netdata" \
     -DBUILD_FOR_PACKAGING=On \
     -DNETDATA_USER="${USER}" \
