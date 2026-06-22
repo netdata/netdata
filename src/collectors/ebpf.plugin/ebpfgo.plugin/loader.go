@@ -520,24 +520,37 @@ func buildKprobeLegacyPlan(req kprobePlanRequest) LoadPlan {
 }
 
 // buildFallbackPlans returns plans in preference order: primary first, then
-// progressively less demanding flavors (arena → buffer → base).  Both the
-// socket and DNS loaders share this policy; callers pass the BPF object name
-// ("socket", "dns") and the two config fields that vary across collectors.
+// progressively less demanding flavors (arena -> buffer -> base).  RHF plans
+// also try the generic filename for each flavor because some object families
+// use the RHF kernel selector without shipping .rhf-suffixed object files.
 func buildFallbackPlans(primary LoadPlan, pluginsDir string, isRHF int, name string) []LoadPlan {
-	plans := []LoadPlan{primary}
+	plans := make([]LoadPlan, 0, 6)
+	addPlan := func(plan LoadPlan) {
+		plans = append(plans, plan)
+		if isRHF == -1 {
+			return
+		}
+
+		generic := plan
+		generic.IsRHF = -1
+		generic.ObjectPath = BuildObjectPathWithFlavor(pluginsDir, plan.Selector, name, false, -1, plan.Flavor)
+		plans = append(plans, generic)
+	}
+
+	addPlan(primary)
 
 	if primary.Flavor == ObjectFlavorArena {
 		fb := primary
 		fb.Flavor = ObjectFlavorBuffer
 		fb.ObjectPath = BuildObjectPathWithFlavor(pluginsDir, primary.Selector, name, false, isRHF, ObjectFlavorBuffer)
-		plans = append(plans, fb)
+		addPlan(fb)
 	}
 
 	if primary.Flavor != ObjectFlavorBase {
 		fb := primary
 		fb.Flavor = ObjectFlavorBase
 		fb.ObjectPath = BuildObjectPathWithFlavor(pluginsDir, primary.Selector, name, false, isRHF, ObjectFlavorBase)
-		plans = append(plans, fb)
+		addPlan(fb)
 	}
 
 	return plans
