@@ -19,3 +19,9 @@ All configurations on this page are persistent and visible to all users in the R
 | **Filters sub-tab**                  | Allows filtering of nodes by: <br/>• Host labels <br/>• [Node status](/docs/netdata-cloud/node-states-and-transitions.md) <br/>• Netdata version <br/>• Individual nodes                                                                                                                                                                                                                                                                                                                                                     |
 | **Alerts sub-tab**                   | Displays Room alerts and additional details for each alert.                                                                                                                                                                                                                                                                                                                                                                                                            |
 | **Info sub-tab**                     | Shows detailed node information when you click the info (`i`) icon next to a node's name.                                                                                                                                                                                                                                                                                                              |
+
+:::tip
+
+To customize the hostname displayed for a node (for example, to replace a local IP address with a meaningful name), see [Hostname Override](/docs/learn/node-identities.md#hostname-override).
+
+:::
