@@ -11,8 +11,8 @@ const (
 )
 
 // BuildL2ResultFromObservations converts normalized L2 observations into a
-// deterministic engine result. Callers that need a stable timestamp should set
-// DiscoverOptions.CollectedAt explicitly.
+// deterministic L2 topology result. Callers that need a stable timestamp should
+// set DiscoverOptions.CollectedAt explicitly.
 func BuildL2ResultFromObservations(observations []L2Observation, opts DiscoverOptions) (Result, error) {
 	if len(observations) == 0 {
 		return Result{}, errors.New("at least one observation is required")

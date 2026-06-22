@@ -1,7 +1,7 @@
 # Topology Parity Runbook
 
 ## Scope
-- Validate topology engine parity against imported Enlinkd fixtures and assertion inventories.
+- Validate l2topology behavior against imported Enlinkd fixtures and assertion inventories.
 - Evidence files live in `src/go/pkg/l2topology/parity/evidence`.
 
 ## Prerequisites
@@ -54,7 +54,7 @@ Outputs:
 
 ## Run Go Test Gates
 ```bash
-go test ./pkg/l2topology/... ./plugin/go.d/collector/snmp ./tools/topology-parity-evidence -count=1
+go test ./pkg/l2topology/... ./plugin/go.d/collector/snmp_topology ./tools/topology-parity-evidence -count=1
 ```
 
 Expected:
