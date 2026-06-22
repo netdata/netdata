@@ -315,9 +315,9 @@ Only users with an **Admin** or **Manager** role on a **paid plan** can perform 
 
 ### Disabled Alert Template Still Appears on Nodes
 
-If you disabled an alert template (for example `10min_cpu_usage`) through the Dynamic Configuration Manager but still see it firing on an individual node, the disable only applies to the node you applied it to. **Each node — including every child in a parent/child streaming setup — evaluates its own alerts from its own health configuration.** Disabling an alert template on one node does not change any other node's configuration.
+The Dynamic Configuration Manager has a function to bulk-apply configurations to multiple nodes. Without it, any change you do is for the specific node you have selected. So, if you want to disable an alert template (for example `10min_cpu_usage`) for X desired nodes, you need to target all of them.
 
-**Resolution:**
+**Solution:**
 
 Apply the disable to each node that is actually raising the alert. The recommended approach is to use the [Multi-Node Deployment](#multi-node-deployment) feature to select every node still raising the alert and push the disabled configuration to all of them at once.
 
