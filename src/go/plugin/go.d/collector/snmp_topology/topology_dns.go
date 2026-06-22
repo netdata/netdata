@@ -14,12 +14,11 @@ import (
 )
 
 const (
-	topologyReverseDNSLookupTimeout   = 500 * time.Millisecond
-	topologyReverseDNSPositiveTTL     = 24 * time.Hour
-	topologyReverseDNSNegativeTTL     = 6 * time.Hour
-	topologyReverseDNSMaxCandidates   = 1024
-	topologyReverseDNSMaxCacheEntries = 4096
-	topologyReverseDNSMaxConcurrency  = 4
+	topologyReverseDNSLookupTimeout  = 500 * time.Millisecond
+	topologyReverseDNSPositiveTTL    = 24 * time.Hour
+	topologyReverseDNSNegativeTTL    = 24 * time.Hour
+	topologyReverseDNSMaxCandidates  = 1024
+	topologyReverseDNSMaxConcurrency = 4
 )
 
 type topologyReverseDNSLookupFunc func(context.Context, string) ([]string, error)
@@ -31,14 +30,12 @@ type topologyReverseDNSConfig struct {
 	positiveTTL   time.Duration
 	negativeTTL   time.Duration
 	maxCandidates int
-	maxEntries    int
 	concurrency   int
 }
 
 type topologyReverseDNSCacheEntry struct {
-	name       string
-	expiresAt  time.Time
-	lastAccess time.Time
+	name      string
+	expiresAt time.Time
 }
 
 type topologyReverseDNSResolver struct {
@@ -87,9 +84,6 @@ func normalizeTopologyReverseDNSConfig(config topologyReverseDNSConfig) topology
 	if config.maxCandidates <= 0 {
 		config.maxCandidates = topologyReverseDNSMaxCandidates
 	}
-	if config.maxEntries <= 0 {
-		config.maxEntries = topologyReverseDNSMaxCacheEntries
-	}
 	if config.concurrency <= 0 {
 		config.concurrency = topologyReverseDNSMaxConcurrency
 	}
@@ -121,8 +115,6 @@ func (r *topologyReverseDNSResolver) lookupCachedNormalized(ip string) string {
 		delete(r.cache, ip)
 		return ""
 	}
-	entry.lastAccess = now
-	r.cache[ip] = entry
 	return entry.name
 }
 
@@ -264,8 +256,6 @@ func (r *topologyReverseDNSResolver) hasFreshEntry(ip string, now time.Time) boo
 		delete(r.cache, ip)
 		return false
 	}
-	entry.lastAccess = now
-	r.cache[ip] = entry
 	return true
 }
 
@@ -302,32 +292,17 @@ func (r *topologyReverseDNSResolver) store(ip, name string, expiresAt time.Time)
 	defer r.mu.Unlock()
 
 	r.cache[ip] = topologyReverseDNSCacheEntry{
-		name:       name,
-		expiresAt:  expiresAt,
-		lastAccess: now,
+		name:      name,
+		expiresAt: expiresAt,
 	}
-	r.evictLocked(now)
+	r.deleteExpiredLocked(now)
 }
 
-func (r *topologyReverseDNSResolver) evictLocked(now time.Time) {
+func (r *topologyReverseDNSResolver) deleteExpiredLocked(now time.Time) {
 	for ip, entry := range r.cache {
 		if !now.Before(entry.expiresAt) {
 			delete(r.cache, ip)
 		}
-	}
-	for len(r.cache) > r.config.maxEntries {
-		oldestIP := ""
-		var oldest time.Time
-		for ip, entry := range r.cache {
-			if oldestIP == "" || entry.lastAccess.Before(oldest) || (entry.lastAccess.Equal(oldest) && ip < oldestIP) {
-				oldestIP = ip
-				oldest = entry.lastAccess
-			}
-		}
-		if oldestIP == "" {
-			return
-		}
-		delete(r.cache, oldestIP)
 	}
 }
 

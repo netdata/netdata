@@ -96,7 +96,6 @@ func TestTopologyRegistry_EnqueueReverseDNSWarmFromDefaultSnapshotUsesDisplayCan
 		timeout:     time.Second,
 		positiveTTL: time.Hour,
 		negativeTTL: time.Minute,
-		maxEntries:  10,
 		concurrency: 1,
 		lookup: func(_ context.Context, ip string) ([]string, error) {
 			warmed <- ip

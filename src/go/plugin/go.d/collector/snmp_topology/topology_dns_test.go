@@ -39,9 +39,8 @@ func TestTopologyReverseDNSDefaultConfig(t *testing.T) {
 
 	require.Equal(t, 500*time.Millisecond, config.timeout)
 	require.Equal(t, 24*time.Hour, config.positiveTTL)
-	require.Equal(t, 6*time.Hour, config.negativeTTL)
+	require.Equal(t, 24*time.Hour, config.negativeTTL)
 	require.Equal(t, 1024, config.maxCandidates)
-	require.Equal(t, 4096, config.maxEntries)
 	require.Equal(t, 4, config.concurrency)
 	require.NotNil(t, config.lookup)
 	require.NotNil(t, config.now)
@@ -83,7 +82,6 @@ func TestTopologyReverseDNSResolverWarmCachesNormalizedPositiveResult(t *testing
 		now:         clock.Now,
 		positiveTTL: time.Hour,
 		negativeTTL: time.Minute,
-		maxEntries:  10,
 		concurrency: 1,
 		lookup: func(_ context.Context, ip string) ([]string, error) {
 			calls = append(calls, ip)
@@ -124,7 +122,6 @@ func TestTopologyReverseDNSResolverNegativeCacheSuppressesRetriesUntilTTL(t *tes
 		now:         clock.Now,
 		positiveTTL: time.Hour,
 		negativeTTL: time.Minute,
-		maxEntries:  10,
 		concurrency: 1,
 		lookup: func(context.Context, string) ([]string, error) {
 			calls.Add(1)
@@ -149,7 +146,6 @@ func TestTopologyReverseDNSResolverPositiveCacheSuppressesRetriesUntilTTL(t *tes
 		now:         clock.Now,
 		positiveTTL: time.Minute,
 		negativeTTL: time.Hour,
-		maxEntries:  10,
 		concurrency: 1,
 		lookup: func(context.Context, string) ([]string, error) {
 			call := calls.Add(1)
@@ -169,43 +165,6 @@ func TestTopologyReverseDNSResolverPositiveCacheSuppressesRetriesUntilTTL(t *tes
 	resolver.warm(context.Background(), []string{"192.0.2.10"})
 	require.Equal(t, int64(2), calls.Load())
 	require.Equal(t, "switch-b.example.test", resolver.lookupCached("192.0.2.10"))
-}
-
-func TestTopologyReverseDNSResolverEvictsLeastRecentlyUsedWhenCacheIsCapped(t *testing.T) {
-	clock := newReverseDNSTestClock()
-	resolver := newTopologyReverseDNSResolverWithConfig(topologyReverseDNSConfig{
-		now:        clock.Now,
-		maxEntries: 2,
-	})
-
-	resolver.store("192.0.2.10", "a.example.test", clock.Now().Add(time.Hour))
-	clock.Add(time.Second)
-	resolver.store("192.0.2.11", "b.example.test", clock.Now().Add(time.Hour))
-	clock.Add(time.Second)
-	require.Equal(t, "a.example.test", resolver.lookupCached("192.0.2.10"))
-	clock.Add(time.Second)
-	resolver.store("192.0.2.12", "c.example.test", clock.Now().Add(time.Hour))
-
-	require.Equal(t, "a.example.test", resolver.lookupCached("192.0.2.10"))
-	require.Empty(t, resolver.lookupCached("192.0.2.11"))
-	require.Equal(t, "c.example.test", resolver.lookupCached("192.0.2.12"))
-}
-
-func TestTopologyReverseDNSResolverEvictsLexicographicallyWhenLastAccessTies(t *testing.T) {
-	clock := newReverseDNSTestClock()
-	resolver := newTopologyReverseDNSResolverWithConfig(topologyReverseDNSConfig{
-		now:        clock.Now,
-		maxEntries: 2,
-	})
-
-	expiresAt := clock.Now().Add(time.Hour)
-	resolver.store("192.0.2.10", "a.example.test", expiresAt)
-	resolver.store("192.0.2.11", "b.example.test", expiresAt)
-	resolver.store("192.0.2.12", "c.example.test", expiresAt)
-
-	require.Empty(t, resolver.lookupCached("192.0.2.10"))
-	require.Equal(t, "b.example.test", resolver.lookupCached("192.0.2.11"))
-	require.Equal(t, "c.example.test", resolver.lookupCached("192.0.2.12"))
 }
 
 func TestTopologyReverseDNSCandidateCollectorRecordsCandidatesAndUsesOnlyCache(t *testing.T) {
@@ -236,7 +195,6 @@ func TestTopologyReverseDNSResolverWarmStopsOnContextCancel(t *testing.T) {
 	resolver := newTopologyReverseDNSResolverWithConfig(topologyReverseDNSConfig{
 		now:         clock.Now,
 		timeout:     time.Minute,
-		maxEntries:  10,
 		concurrency: 2,
 		lookup: func(ctx context.Context, _ string) ([]string, error) {
 			calls.Add(1)
@@ -276,7 +234,6 @@ func TestTopologyReverseDNSResolverWarmHonorsConcurrencyLimit(t *testing.T) {
 	resolver := newTopologyReverseDNSResolverWithConfig(topologyReverseDNSConfig{
 		now:         clock.Now,
 		timeout:     time.Second,
-		maxEntries:  20,
 		concurrency: 3,
 		lookup: func(context.Context, string) ([]string, error) {
 			calls.Add(1)
@@ -308,7 +265,6 @@ func TestTopologyReverseDNSResolverWarmHonorsCandidateLimit(t *testing.T) {
 	resolver := newTopologyReverseDNSResolverWithConfig(topologyReverseDNSConfig{
 		now:           clock.Now,
 		timeout:       time.Second,
-		maxEntries:    10,
 		maxCandidates: 3,
 		concurrency:   1,
 		lookup: func(context.Context, string) ([]string, error) {
@@ -332,7 +288,6 @@ func TestTopologyReverseDNSResolverWarmAsyncDoesNotOverlap(t *testing.T) {
 	resolver := newTopologyReverseDNSResolverWithConfig(topologyReverseDNSConfig{
 		now:         clock.Now,
 		timeout:     time.Second,
-		maxEntries:  10,
 		concurrency: 1,
 		lookup: func(ctx context.Context, ip string) ([]string, error) {
 			calls.Add(1)

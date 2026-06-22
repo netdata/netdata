@@ -73,7 +73,6 @@ func TestFuncDepsAdapterSnapshotEnqueuesReverseDNSWarmCandidates(t *testing.T) {
 		timeout:     time.Second,
 		positiveTTL: time.Hour,
 		negativeTTL: time.Minute,
-		maxEntries:  10,
 		concurrency: 1,
 		lookup: func(_ context.Context, ip string) ([]string, error) {
 			warmed <- ip
