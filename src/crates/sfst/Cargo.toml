@@ -1,0 +1,36 @@
+[package]
+name = "sfst"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Container format for split FST indexes with a chunk-file TOC"
+
+[lints]
+workspace = true
+
+[dependencies]
+# Format
+fst-index = { workspace = true, features = ["serde"] }
+serde = { workspace = true, features = ["derive"] }
+serde_bytes = { workspace = true }
+bincode = { workspace = true }
+zstd = { workspace = true }
+chunk-file = { workspace = true }
+thiserror = { workspace = true }
+treight = { workspace = true, features = ["roaring", "serde"] }
+regex = { workspace = true }
+
+# Registry
+file-registry = { workspace = true }
+memmap2 = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+uuid = { workspace = true }
+clap = { workspace = true }
+chrono = { workspace = true }
+
+[[example]]
+name = "inspect"
+path = "examples/inspect.rs"

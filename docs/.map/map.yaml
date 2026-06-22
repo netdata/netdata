@@ -437,7 +437,7 @@ sidebar:
           edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/statsd.plugin/README.md
       - meta:
           label: OpenTelemetry Metrics
-          edit_url: https://github.com/netdata/netdata/edit/master/src/crates/netdata-otel/otel-plugin/README.md
+          edit_url: https://github.com/netdata/netdata/edit/master/src/crates/otel-plugin/README.md
           description: Ingesting storing and visualizing OpenTelemetry metrics
           path: OpenTelemetry
       - meta:

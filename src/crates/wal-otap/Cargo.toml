@@ -1,0 +1,18 @@
+[package]
+name = "wal-otap"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "OTAP payload decoding for WAL frames: bytes to OTel log rows"
+
+[lints]
+workspace = true
+
+[dependencies]
+wal = { workspace = true }
+thiserror = { workspace = true }
+hashbrown = { workspace = true }
+
+# OTAP / Arrow payload format
+arrow = { version = "57" }
+otap-df-pdata = { git = "https://github.com/open-telemetry/otel-arrow.git", tag = "v0.46.0" }

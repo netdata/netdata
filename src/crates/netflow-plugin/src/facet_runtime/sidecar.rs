@@ -106,8 +106,11 @@ fn write_field_sidecar(journal_path: &Path, field: &str, values: &[String]) -> R
         BufWriter::new(File::create(&tmp_path).with_context(|| {
             format!("failed to create temporary sidecar {}", tmp_path.display())
         })?);
-    let mut builder =
-        SetBuilder::new(writer).with_context(|| format!("failed to init fst for {}", field))?;
+    // The workspace `fst` fork allocates builder scratch in a bumpalo arena
+    // that must outlive the builder.
+    let bump = bumpalo::Bump::new();
+    let mut builder = SetBuilder::new(writer, &bump)
+        .with_context(|| format!("failed to init fst for {}", field))?;
     let mut sorted_values = values.to_vec();
     sorted_values.sort_unstable();
     sorted_values.dedup();

@@ -1,0 +1,34 @@
+[package]
+name = "sfsq"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Query layer over SFST log indexes"
+
+[lints]
+workspace = true
+
+[lib]
+name = "sfsq"
+path = "src/lib.rs"
+
+[dependencies]
+sfst = { workspace = true }
+wal = { workspace = true }
+wal-otap = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+tracing = { workspace = true }
+memmap2 = { workspace = true }
+tokio-util = { workspace = true }
+libc = { workspace = true }
+regex = { workspace = true }
+
+[dev-dependencies]
+clap = { workspace = true }
+# The WAL-equivalence harness (tests/wal_equivalence.rs) builds real OTAP
+# frames through the production encoder and writes real WAL files.
+otel-ingestor = { workspace = true }
+sfst-indexer = { workspace = true }
+opentelemetry-proto = { workspace = true }
+file-registry = { workspace = true }
+tempfile = { workspace = true }

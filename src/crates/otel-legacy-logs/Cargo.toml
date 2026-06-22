@@ -1,0 +1,24 @@
+[package]
+name = "otel-legacy-logs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+bridge = { path = "../netdata-plugin/bridge" }
+ferryboat = { workspace = true }
+netdata-plugin-error = { path = "../netdata-plugin/error" }
+netdata-plugin-protocol = { path = "../netdata-plugin/protocol" }
+netdata-plugin-schema = { path = "../netdata-plugin/schema" }
+netdata-plugin-types = { path = "../netdata-plugin/types" }
+journal-function = { workspace = true }
+journal-index = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+tracing = { workspace = true }
