@@ -21,6 +21,19 @@ ${GITHUB_ACTIONS+echo "::group::Installing"}
 cmake --install "${build}"
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
+${GITHUB_ACTIONS+echo "::group::Staging Windows runtime DLLs"}
+runtime_dll_destination="/opt/netdata/usr/bin"
+for runtime_executable in \
+    /opt/netdata/usr/bin/*.exe \
+    /opt/netdata/usr/libexec/netdata/plugins.d/*.exe \
+    /opt/netdata/usr/libexec/netdata/plugins.d/*.plugin \
+    /opt/netdata/usr/libexec/netdata/plugins.d/*.plugin.exe; do
+    if [ -f "${runtime_executable}" ]; then
+        "${repo_root}/packaging/windows/stage-runtime-dlls.sh" "${runtime_executable}" "${runtime_dll_destination}"
+    fi
+done
+${GITHUB_ACTIONS+echo "::endgroup::"}
+
 if [ ! -f "/msys2-latest.tar.zst" ]; then
     ${GITHUB_ACTIONS+echo "::group::Fetching MSYS2 files"}
     "${repo_root}/packaging/windows/fetch-msys2-installer.py" /msys2-latest.tar.zst
