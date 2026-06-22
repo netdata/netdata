@@ -416,6 +416,18 @@
 - Chore(go.d/topology): remove unused graph dto surface ([#22795](https://github.com/netdata/netdata/issues/22795))
 - Refactor(go.d/snmp_topology): type internal topology stats ([#22796](https://github.com/netdata/netdata/issues/22796))
 - Add dedicated MCP ACL and enforce bearer token protection on MCP endpoints ([#21880](https://github.com/netdata/netdata/issues/21880))
+- Refactor(go.d): type snmp topology actor detail ([#22797](https://github.com/netdata/netdata/issues/22797))
+- Refactor(go.d): type snmp topology link detail ([#22798](https://github.com/netdata/netdata/issues/22798))
+- Refactor(go.d/snmp_topology): type actor scratch details ([#22801](https://github.com/netdata/netdata/issues/22801))
+- Refactor(go.d/snmp_topology): extract model utility options ([#22802](https://github.com/netdata/netdata/issues/22802))
+- Refactor(snmp_topology): extract topology shape package ([#22803](https://github.com/netdata/netdata/issues/22803))
+- Refactor(go.d/snmp_topology): extract topology v1 renderer ([#22804](https://github.com/netdata/netdata/issues/22804))
+- Refactor(go.d/snmp_topology): extract topology enrichment ([#22806](https://github.com/netdata/netdata/issues/22806))
+- Build(deps): bump go.mongodb.org/mongo-driver/v2 from 2.6.1 to 2.7.0 in /src/go ([#22809](https://github.com/netdata/netdata/issues/22809))
+- Build(deps): bump github.com/moby/moby/api from 1.54.2 to 1.55.0 in /src/go ([#22810](https://github.com/netdata/netdata/issues/22810))
+- Chore(go.d/snmp_topology): file-organization cleanup ([#22807](https://github.com/netdata/netdata/issues/22807))
+- Build(deps): bump github.com/prometheus/common from 0.68.1 to 0.69.0 in /src/go ([#22811](https://github.com/netdata/netdata/issues/22811))
+- Build(deps): bump github.com/Azure/azure-sdk-for-go/sdk/azidentity from 1.13.1 to 1.14.0 in /src/go ([#22808](https://github.com/netdata/netdata/issues/22808))
 
 ## [2.10.0] - 2026-04-09
 
