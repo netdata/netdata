@@ -319,7 +319,7 @@ If you disabled an alert template (for example `10min_cpu_usage`) through the Dy
 
 **Resolution:**
 
-Apply the disable to each Agent that is actually raising the alert. The recommended approach is to use the [Multi-Node Deployment](#multi-node-deployment) feature to select every node still raising the alert and push the disabled configuration to all of them at once.
+Apply the disable to each node that is actually raising the alert. The recommended approach is to use the [Multi-Node Deployment](#multi-node-deployment) feature to select every node still raising the alert and push the disabled configuration to all of them at once.
 
 <details>
 <summary>Alternative: configure each node manually (optional)</summary>
