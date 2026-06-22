@@ -69,6 +69,11 @@ All nodes automatically appear in the "All nodes" Room. Each Room has independen
 2. Click **Space Settings** (⚙️) on the left sidebar below the spaces list
 3. Access settings for room management, node configuration, integration setup, and general Space settings
 
+### Room Configuration
+
+1. Click the ⚙️ next to the Room name
+2. Manage room access, node grouping, dashboard settings, and monitoring configurations
+
 ### Delete a Space
 
 Only users with the **Admin** role can delete a Space. See the [role-based access model](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) for full permission details.
@@ -84,8 +89,3 @@ Deleting a Space is permanent and cannot be undone. You cannot delete the only S
 1. Navigate to **Space Settings** (⚙️) on the left sidebar below the spaces list.
 2. Select the **Info** tab.
 3. Click **Delete Space**.
-
-### Room Configuration
-
-1. Click the ⚙️ next to the Room name
-2. Manage room access, node grouping, dashboard settings, and monitoring configurations
