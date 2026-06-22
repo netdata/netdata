@@ -315,7 +315,7 @@ Only users with an **Admin** or **Manager** role on a **paid plan** can perform 
 
 ### Disabled Alert Template Still Appears on Nodes
 
-If you disabled an alert template (for example `10min_cpu_usage`) through the Dynamic Configuration Manager but still see it firing on an individual node, the disable only affects the Agent that handled the request. **Each node — including every child in a parent/child streaming setup — evaluates its own alerts from its own health configuration.** Disabling an alert template on one Agent does not change any other Agent's configuration, so the node still raising the alert is evaluating it from its local configuration.
+If you disabled an alert template (for example `10min_cpu_usage`) through the Dynamic Configuration Manager but still see it firing on an individual node, the disable only applies to the node you applied it to. **Each node — including every child in a parent/child streaming setup — evaluates its own alerts from its own health configuration.** Disabling an alert template on one node does not change any other node's configuration.
 
 **Resolution:**
 
