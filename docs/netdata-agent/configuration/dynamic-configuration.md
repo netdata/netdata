@@ -279,7 +279,7 @@ In Netdata, HTTP 412 is used to indicate that an authorization bearer token was 
 
 **Common causes:**
 
-1. **Bearer token protection enabled** - Your agent requires Cloud authentication for API access
+1. **Bearer token protection enabled** - Your Agent requires Cloud authentication for API access
 2. **Cloud connection lost** - Agent disconnected from Netdata Cloud
 3. **Session expired** - Bearer token has expired (tokens expire after 24 hours)
 4. **Missing browser authentication state** - Your browser is no longer sending a valid Cloud bearer token with the request
@@ -288,41 +288,35 @@ In Netdata, HTTP 412 is used to indicate that an authorization bearer token was 
 
 1. **Verify claim and Cloud connection**: Check `http://IP:19999/api/v3/info` and inspect the `cloud` section. Use `cloud.status` to verify whether the Agent is connected to Netdata Cloud, and if it is not `online`, inspect `cloud.reason` for the failure details.
 2. **Re-authenticate**: Log out and log back into Netdata Cloud to refresh your bearer token.
-3. **Verify bearer token protection setting**: If enabled in `netdata.conf`, ensure you're accessing the agent through a Cloud-authenticated session.
-4. **Check permissions only if you get HTTP 403**: If the request changes from HTTP 412 to HTTP 403 after re-authenticating, ensure you have Admin or Manager role in the space containing the agent.
+3. **Verify bearer token protection setting**: If enabled in `netdata.conf`, ensure you're accessing the Agent through a Cloud-authenticated session.
+4. **Check permissions only if you get HTTP 403**: If the request changes from HTTP 412 to HTTP 403 after re-authenticating, ensure you have Admin or Manager role in the space containing the Agent.
 
 For more information, see [Secure Your Netdata Agent with Bearer Token Protection](/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md).
 
-### Disabled Alert Prototype Still Appears on Nodes
+### Disabled Alert Template Still Appears on Nodes
 
-If you disabled an alert prototype (for example `10min_cpu_usage`) through the Dynamic Configuration Manager but still see the alert firing on an individual node, this happens because **a disable is processed by the single agent that receives the request and does not change any other agent's health configuration.**
-
-**Why this happens:**
-
-Each Netdata Agent — including every child in a parent/child streaming setup — maintains its own health configuration and evaluates its own alerts independently. When you disable a prototype, the change is applied by the agent whose API handled the request and takes effect only on that agent's own health evaluation. Disabling a prototype on one agent (such as a parent or a standalone node) does not change the configuration of any other agent.
-
-If the alert still appears on a node, that node's own agent is still evaluating the alert from its own local configuration.
+If you disabled an alert template (for example `10min_cpu_usage`) through the Dynamic Configuration Manager but still see it firing on an individual node, the disable only affects the Agent that handled the request. **Each node — including every child in a parent/child streaming setup — evaluates its own alerts from its own health configuration.** Disabling an alert template on one Agent does not change any other Agent's configuration, so the node still raising the alert is evaluating it from its local configuration.
 
 **Resolution:**
 
-Apply the disable to each agent that is actually raising the alert. You have two options:
+Apply the disable to each Agent that is actually raising the alert:
 
-1. **Multi-node deployment (recommended):** Use the [Multi-Node Deployment](#multi-node-deployment) feature to select every node whose agent is still raising the alert and push the disabled configuration to all of them at once.
+1. **Multi-node deployment (recommended):** Use the [Multi-Node Deployment](#multi-node-deployment) feature to select every node still raising the alert and push the disabled configuration to all of them at once.
 
-2. **Manual configuration on each node:** On each affected node, disable the alert in its local health configuration, then apply the change:
-   - In `netdata.conf`, under the `[health]` section, exclude the alert name and restart the agent:
+2. **Manual configuration on each node:** On each affected node, disable the alert in its local health configuration:
+   - In `netdata.conf`, under the `[health]` section, exclude the alert name and restart the Agent:
      ```conf
      [health]
          enabled alarms = !10min_cpu_usage *
      ```
-     Restarting the agent is required because `netdatacli reload-health` reloads health configuration files but does not reload `netdata.conf`.
+     Restarting the Agent is required because `netdatacli reload-health` reloads health configuration files but does not reload `netdata.conf`.
    - Alternatively, edit the corresponding `health.d/*.conf` file (for example `health.d/cpu.conf`), comment out the alert definition, and run `netdatacli reload-health`.
 
    For the full manual configuration syntax, see [How to Disable or Silence Alerts](/src/health/REFERENCE.md#how-to-disable-or-silence-alerts).
 
 :::note
 
-After the disable takes effect on the correct node, an already-triggered alert clears on that node's next health evaluation cycle (based on the alert's configured check interval).
+An already-triggered alert clears on the next evaluation of that alert.
 
 :::
 
