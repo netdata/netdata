@@ -307,6 +307,7 @@ jobs:
           sudo apt-get upgrade -y
           sudo apt-get install -y qemu-user-static
       - name: Build
+        id: build
         if: needs.file-check.outputs.run == 'true'
         run: |
           [ "${{ matrix.qemu }}" == "true" ] || export SKIP_EMULATION=1
