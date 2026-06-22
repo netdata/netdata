@@ -32,15 +32,25 @@ function(netdata_bundle_protobuf)
                 set(absl_repo https://github.com/abseil/abseil-cpp)
 
                 message(STATUS "Preparing bundled Abseil (required by bundled Protobuf)")
-                find_program(PATCH patch REQUIRED)
+
+                # The only abseil patch targets musl/powerpc; skip on Windows to avoid
+                # requiring bash in PATCH_COMMAND (ExternalProject runs commands via
+                # cmd.exe on Windows, which cannot execute .sh scripts directly).
+                if(NOT OS_WINDOWS)
+                        find_program(PATCH patch REQUIRED)
+                        set(_nd_absl_patch_args
+                                PATCH_COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/patches/apply-patches.sh
+                                              ${absl_SOURCE_DIR}
+                                              ${CMAKE_SOURCE_DIR}/packaging/cmake/patches/abseil
+                        )
+                endif()
+
                 if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.28)
                     FetchContent_Declare(absl
                             GIT_REPOSITORY ${absl_repo}
                             GIT_TAG ${ABSL_TAG}
                             SOURCE_DIR ${absl_SOURCE_DIR}
-                            PATCH_COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/patches/apply-patches.sh
-                                        ${absl_SOURCE_DIR}
-                                        ${CMAKE_SOURCE_DIR}/packaging/cmake/patches/abseil
+                            ${_nd_absl_patch_args}
                             CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
                             EXCLUDE_FROM_ALL
                     )
@@ -49,9 +59,7 @@ function(netdata_bundle_protobuf)
                             GIT_REPOSITORY ${absl_repo}
                             GIT_TAG ${ABSL_TAG}
                             SOURCE_DIR ${absl_SOURCE_DIR}
-                            PATCH_COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/patches/apply-patches.sh
-                                        ${absl_SOURCE_DIR}
-                                        ${CMAKE_SOURCE_DIR}/packaging/cmake/patches/abseil
+                            ${_nd_absl_patch_args}
                             CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
                     )
                 endif()
@@ -89,7 +97,16 @@ endfunction()
 # Handle detection of Protobuf
 macro(netdata_detect_protobuf)
         if(OS_WINDOWS)
-                # Prefer an explicit env-var override; fall back to PATH search.
+                if(ENABLE_BUNDLED_PROTOBUF)
+                        # Build static protobuf+abseil from source.  The ~30 libabsl_*.dll
+                        # shared libraries from MSYS2 UCRT64 crash before main() due to
+                        # DLL static-initializer ordering; linking abseil statically into
+                        # netdata.exe eliminates all DLL init races.
+                        netdata_bundle_protobuf()
+                endif()
+
+                # Always resolve protoc from the system; the bundled build does not
+                # produce a usable host protoc binary at cmake configuration time.
                 # IMPORTANT: do NOT use find_program(PROTOBUF_PROTOC_EXECUTABLE …)
                 # directly after set(PROTOBUF_PROTOC_EXECUTABLE "") — the preceding
                 # set() creates a regular variable that shadows the CACHE entry
@@ -108,23 +125,31 @@ macro(netdata_detect_protobuf)
                         endif()
                         unset(_nd_protoc_exe CACHE)
                 endif()
-                set(PROTOBUF_CFLAGS_OTHER "")
-                set(PROTOBUF_INCLUDE_DIRS "")
 
-                # Use CMake config mode so Abseil transitive deps are resolved
-                # automatically (protobuf v22+ depends on absl_* libraries).
-                # Falling back to a raw -lprotobuf flag drops the transitive
-                # deps and causes undefined-reference linker errors at final link.
-                find_package(Protobuf CONFIG QUIET)
-                if(TARGET protobuf::libprotobuf)
-                        set(PROTOBUF_LIBRARIES protobuf::libprotobuf)
-                else()
-                        # Module-mode fallback (older protobuf installs)
-                        find_package(Protobuf QUIET)
+                if(NOT ENABLE_BUNDLED_PROTOBUF)
+                        set(PROTOBUF_CFLAGS_OTHER "")
+                        set(PROTOBUF_INCLUDE_DIRS "")
+
+                        # Use CMake config mode so Abseil transitive deps are resolved
+                        # automatically (protobuf v22+ depends on absl_* libraries).
+                        # Falling back to a raw -lprotobuf flag drops the transitive
+                        # deps and causes undefined-reference linker errors at final link.
+                        find_package(Protobuf CONFIG QUIET)
                         if(TARGET protobuf::libprotobuf)
                                 set(PROTOBUF_LIBRARIES protobuf::libprotobuf)
                         else()
-                                set(PROTOBUF_LIBRARIES "-lprotobuf")
+                                # Module-mode fallback (older protobuf installs)
+                                find_package(Protobuf QUIET)
+                                if(TARGET protobuf::libprotobuf)
+                                        set(PROTOBUF_LIBRARIES protobuf::libprotobuf)
+                                else()
+                                        set(PROTOBUF_LIBRARIES "-lprotobuf")
+                                endif()
+                        endif()
+                else()
+                        # Bundled path: FetchContent populated the protobuf::libprotobuf target.
+                        if(TARGET protobuf::libprotobuf)
+                                set(PROTOBUF_LIBRARIES protobuf::libprotobuf)
                         endif()
                 endif()
 

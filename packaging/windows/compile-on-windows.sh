@@ -164,7 +164,7 @@ CFLAGS="${BUILD_CFLAGS}" /ucrt64/bin/cmake \
     -DENABLE_PLUGIN_OTEL=Off \
     -DENABLE_PLUGIN_SYSTEMD_JOURNAL=Off \
     -DENABLE_BUNDLED_JSONC=On \
-    -DENABLE_BUNDLED_PROTOBUF=Off \
+    -DENABLE_BUNDLED_PROTOBUF=On \
     -DRust_COMPILER=/ucrt64/bin/rustc \
     -DCMAKE_NINJA_FORCE_RESPONSE_FILE=ON \
     "${windows_path_prefix_arg[@]}" \
