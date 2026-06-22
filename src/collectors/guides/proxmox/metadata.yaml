@@ -124,25 +124,26 @@ modules:
     troubleshooting:
       problems:
         list:
-          - name: Kickstart fails during apt-get update (401 Unauthorized)
+          - name: Kickstart fails during apt-get update
             description: |
-              A default Proxmox VE installation enables the `pve-enterprise` package repository, which requires a paid Proxmox subscription. Without a subscription, the `apt-get update` step the kickstart runs to install dependencies fails with an error such as:
+              The kickstart runs `apt-get update` to install dependencies before Netdata is set up. On a Proxmox VE host this step can fail for reasons unrelated to Netdata. The most common causes are:
 
-              ```
-              Err:5 https://enterprise.proxmox.com/debian/pve bookworm InRelease
-                401  Unauthorized [IP: ...]
-              ```
+              - **Proxmox enterprise repository without a subscription:** a default Proxmox VE installation enables the `pve-enterprise` package repository in `/etc/apt/sources.list.d/pve-enterprise.list`, which requires a paid Proxmox VE subscription. Without a subscription, `apt-get update` fails when it reaches the `enterprise.proxmox.com` repository.
+              - **Network connectivity issues:** the host cannot reach external package repositories.
+              - **DNS resolution failures:** the host cannot resolve repository hostnames.
 
-              Choose one of these remediation paths:
+              If the failure is caused by the enterprise repository, choose one of these remediation paths:
 
-              - **Use a valid subscription:** register your Proxmox VE subscription so the enterprise repository authenticates successfully.
+              - **Use a valid subscription:** register your Proxmox VE subscription so the enterprise repository is accessible.
               - **Use the no-subscription repository:** comment out the enterprise line in `/etc/apt/sources.list.d/pve-enterprise.list`, then add the no-subscription repository. Replace `<codename>` with your Debian release codename (for example, `bookworm`):
 
                 ```
                 deb http://download.proxmox.com/debian/pve <codename> pve-no-subscription
                 ```
 
-              After fixing the apt source, re-run the kickstart command:
+              For network or DNS problems, verify the host's network configuration and DNS resolver settings.
+
+              After resolving the underlying issue, re-run the kickstart command:
 
               ```bash
               wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh
