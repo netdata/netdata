@@ -227,6 +227,10 @@ echo "BUILD COMPLETE: ${build}/netdata.exe ($(stat -c %s "${build}/netdata.exe" 
 echo "============================================================"
 echo ""
 
+${GITHUB_ACTIONS+echo "::group::Staging Windows runtime DLLs"}
+"${REPO_ROOT}/packaging/windows/stage-runtime-dlls.sh" "${build}/netdata.exe" "${build}"
+${GITHUB_ACTIONS+echo "::endgroup::"}
+
 ${GITHUB_ACTIONS+echo "::group::Netdata buildinfo"}
 buildinfo_out="${build}/netdata-buildinfo.out"
 buildinfo_err="${build}/netdata-buildinfo.err"

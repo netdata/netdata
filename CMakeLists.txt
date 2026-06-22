@@ -3984,58 +3984,6 @@ configure_file(packaging/cmake/config.cmake.h.in config.h)
 
 install(TARGETS netdata COMPONENT netdata DESTINATION "${BINDIR}")
 
-if(OS_WINDOWS)
-        get_filename_component(NETDATA_WINDOWS_RUNTIME_DLL_DIR "${CMAKE_C_COMPILER}" DIRECTORY)
-        set(NETDATA_WINDOWS_RUNTIME_TARGETS
-                netdata
-                netdatacli
-                NetdataClaim
-                windows-events.plugin)
-
-        foreach(NETDATA_WINDOWS_OPTIONAL_RUNTIME_TARGET
-                apps.plugin
-                log2journal
-                local-listeners
-                network-viewer.plugin
-                systemd-cat-native)
-                if(TARGET "${NETDATA_WINDOWS_OPTIONAL_RUNTIME_TARGET}")
-                        list(APPEND NETDATA_WINDOWS_RUNTIME_TARGETS "${NETDATA_WINDOWS_OPTIONAL_RUNTIME_TARGET}")
-                endif()
-        endforeach()
-
-        set(NETDATA_WINDOWS_RUNTIME_EXECUTABLES "")
-        foreach(NETDATA_WINDOWS_RUNTIME_TARGET IN LISTS NETDATA_WINDOWS_RUNTIME_TARGETS)
-                string(APPEND NETDATA_WINDOWS_RUNTIME_EXECUTABLES " \"$<TARGET_FILE:${NETDATA_WINDOWS_RUNTIME_TARGET}>\"")
-        endforeach()
-
-        install(CODE "
-                file(GET_RUNTIME_DEPENDENCIES
-                     EXECUTABLES ${NETDATA_WINDOWS_RUNTIME_EXECUTABLES}
-                     RESOLVED_DEPENDENCIES_VAR NETDATA_WINDOWS_RUNTIME_DEPENDENCIES
-                     UNRESOLVED_DEPENDENCIES_VAR NETDATA_WINDOWS_UNRESOLVED_DEPENDENCIES
-                     DIRECTORIES \"${NETDATA_WINDOWS_RUNTIME_DLL_DIR}\"
-                     PRE_EXCLUDE_REGEXES
-                        \"api-ms-\"
-                        \"ext-ms-\"
-                     POST_EXCLUDE_REGEXES
-                        \"[/\\\\\\\\][Ww]indows[/\\\\\\\\][Ss]ystem32[/\\\\\\\\].*\"
-                        \"[/\\\\\\\\][Ww]indows[/\\\\\\\\][Ss]ysWOW64[/\\\\\\\\].*\")
-
-                if(NETDATA_WINDOWS_UNRESOLVED_DEPENDENCIES)
-                        message(FATAL_ERROR
-                                \"Unresolved Windows runtime dependencies: \${NETDATA_WINDOWS_UNRESOLVED_DEPENDENCIES}\")
-                endif()
-
-                foreach(NETDATA_WINDOWS_RUNTIME_DEPENDENCY IN LISTS NETDATA_WINDOWS_RUNTIME_DEPENDENCIES)
-                        file(INSTALL
-                             DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${BINDIR}\"
-                             TYPE FILE
-                             FOLLOW_SYMLINK_CHAIN
-                             FILES \"\${NETDATA_WINDOWS_RUNTIME_DEPENDENCY}\")
-                endforeach()
-        ")
-endif()
-
 install(DIRECTORY COMPONENT netdata DESTINATION var/cache/netdata)
 install(DIRECTORY COMPONENT netdata DESTINATION var/log/netdata)
 install(DIRECTORY COMPONENT netdata DESTINATION var/lib/netdata/registry)
