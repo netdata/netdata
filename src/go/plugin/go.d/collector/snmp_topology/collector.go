@@ -128,8 +128,11 @@ func (c *Collector) Run(ctx context.Context) error {
 	}
 	c.publishTrapTopologyEnrichment()
 	defer c.unpublishTrapTopologyEnrichment()
+	c.topologyRegistry.setReverseDNSWarmContext(ctx)
+	defer c.topologyRegistry.setReverseDNSWarmContext(nil)
 
 	c.refreshTopologyRecovering(ctx)
+	c.topologyRegistry.enqueueReverseDNSWarmFromDefaultSnapshot()
 
 	ticker := time.NewTicker(c.deviceCheckEvery())
 	defer ticker.Stop()
@@ -140,6 +143,7 @@ func (c *Collector) Run(ctx context.Context) error {
 			return nil
 		case <-ticker.C:
 			c.refreshTopologyRecovering(ctx)
+			c.topologyRegistry.enqueueReverseDNSWarmFromDefaultSnapshot()
 		}
 	}
 }

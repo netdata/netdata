@@ -42,6 +42,17 @@ type ManagedFocusTarget struct {
 	Name  string
 }
 
+func DefaultQueryOptions() QueryOptions {
+	return QueryOptions{
+		CollapseActorsByIP:     true,
+		EliminateNonIPInferred: true,
+		MapType:                MapTypeLLDPCDPManaged,
+		InferenceStrategy:      InferenceStrategyFDBMinimumKnowledge,
+		ManagedDeviceFocus:     ManagedFocusAllDevices,
+		Depth:                  DepthAllInternal,
+	}
+}
+
 func NormalizeQueryOptions(options QueryOptions) QueryOptions {
 	options.MapType = NormalizeMapType(options.MapType)
 	if options.MapType == "" {

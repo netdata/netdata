@@ -301,8 +301,16 @@ snmp:topology:snmp request
 
 The Function returns `503` while no usable topology snapshot exists yet.
 
-Reverse DNS is intentionally disabled in the Function adapter. Rendering must
-not block on network I/O while serving a Function call.
+Reverse DNS is cache-backed and non-blocking on the Function path:
+
+- Function rendering uses a registry-owned cache-only resolver.
+- The same display-name code records IPs it tried to resolve.
+- `Run(ctx)` warms those candidates asynchronously after refresh snapshots and
+  after Function requests enqueue newly observed candidates.
+- DNS failures, timeouts, and cache misses fall through to the existing
+  sysName, hostname, IP, and MAC display-name order.
+
+Function requests must not perform live DNS I/O while serving a response.
 
 ## Trap Enrichment
 
