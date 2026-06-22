@@ -1418,15 +1418,10 @@ static void populate_system_info(void) {
     }
     else {
         bool started_spawn_server = false;
-
-#if !defined(OS_WINDOWS)
-        // Windows system-info detection uses direct Windows APIs and does not
-        // need spawn_popen(); avoid starting the helper server for buildinfo.
         if(!netdata_main_spawn_server) {
             started_spawn_server = true;
             netdata_main_spawn_server_init(NULL, 0, NULL);
         }
-#endif
 
         system_info = rrdhost_system_info_create();
         rrdhost_system_info_detect(system_info);

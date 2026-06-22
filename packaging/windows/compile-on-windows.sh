@@ -228,7 +228,43 @@ echo "============================================================"
 echo ""
 
 ${GITHUB_ACTIONS+echo "::group::Netdata buildinfo"}
-"${build}/netdata.exe" -W buildinfo || true
+buildinfo_out="${build}/netdata-buildinfo.out"
+buildinfo_err="${build}/netdata-buildinfo.err"
+rm -f "${buildinfo_out}" "${buildinfo_err}"
+
+# Run the native Windows binary under PowerShell instead of MSYS2 timeout. MSYS2
+# timeout has been observed to leave native Windows children running, which makes
+# the compile wrapper appear unfinished even after netdata.exe has linked.
+if command -v powershell.exe >/dev/null 2>&1; then
+    buildinfo_exe="$(cygpath -w "${build}/netdata.exe")"
+    buildinfo_out_win="$(cygpath -w "${buildinfo_out}")"
+    buildinfo_err_win="$(cygpath -w "${buildinfo_err}")"
+    buildinfo_ucrt64_bin="$(cygpath -w /ucrt64/bin)"
+    buildinfo_ucrt64_sbin="$(cygpath -w /ucrt64/sbin)"
+    buildinfo_usr_bin="$(cygpath -w /usr/bin)"
+
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "\
+\$env:MSYSTEM = 'UCRT64'; \
+\$env:PATH = '${buildinfo_ucrt64_bin};${buildinfo_ucrt64_sbin};${buildinfo_usr_bin};' + \$env:PATH; \
+\$p = Start-Process -FilePath '${buildinfo_exe}' -ArgumentList '-W','buildinfo' -NoNewWindow -RedirectStandardOutput '${buildinfo_out_win}' -RedirectStandardError '${buildinfo_err_win}' -PassThru; \
+if (-not \$p.WaitForExit(60 * 1000)) { \
+    Stop-Process -Id \$p.Id -Force; \
+    exit 124; \
+}; \
+exit \$p.ExitCode" || buildinfo_rc=$?
+else
+    timeout 60 "${build}/netdata.exe" -W buildinfo > "${buildinfo_out}" 2> "${buildinfo_err}" || buildinfo_rc=$?
+fi
+
+cat "${buildinfo_out}" 2>/dev/null || true
+cat "${buildinfo_err}" >&2 2>/dev/null || true
+
+if [ "${buildinfo_rc:-0}" -eq 124 ]; then
+    echo "WARNING: 'netdata.exe -W buildinfo' did not return within 60 s." >&2
+    echo "  The build itself is successful - the binary at ${build}/netdata.exe is usable." >&2
+elif [ "${buildinfo_rc:-0}" -ne 0 ]; then
+    echo "WARNING: 'netdata.exe -W buildinfo' exited ${buildinfo_rc} (non-fatal)." >&2
+fi
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 if [ -t 1 ]; then

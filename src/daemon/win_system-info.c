@@ -171,6 +171,12 @@ static void netdata_windows_get_total_disk_size(struct rrdhost_system_info *syst
         if (!(lDrives & 1 << i))
             continue;
 
+        char cRoot[] = "C:\\";
+        cRoot[0] = 'A' + i;
+        UINT drive_type = GetDriveTypeA(cRoot);
+        if (drive_type != DRIVE_FIXED && drive_type != DRIVE_RAMDISK)
+            continue;
+
         cVolume[4] = 'A' + i;
         total += netdata_windows_get_disk_size(cVolume);
     }
