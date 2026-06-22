@@ -86,3 +86,19 @@ Rejoining a Room depends on your role:
 - **Troubleshooters** and **Observers** cannot rejoin on their own and must be re-added to the Room by an Admin or Manager.
 
 For the full permission breakdown, see the [Room Management table in the RBAC reference](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
+
+### Delete a Space
+
+Only users with the **Admin** role can delete a Space. See the [role-based access model](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) for full permission details.
+
+:::warning
+
+Deleting a Space is permanent and cannot be undone. You cannot delete the only Space on your account — each account must have at least one Space.
+
+:::
+
+**Steps to delete a Space:**
+
+1. Navigate to **Space Settings** (⚙️) on the left sidebar below the spaces list.
+2. Select the **Info** tab.
+3. Click **Delete Space**.
