@@ -49,12 +49,11 @@ func buildSNMPTopologyV1Links(
 		states[i] = nullableStringRef(stringsDict, link.State)
 		srcPortNames[i] = nullableStringRef(stringsDict, topologyV1EndpointPortName(link.Src))
 		dstPortNames[i] = nullableStringRef(stringsDict, topologyV1EndpointPortName(link.Dst))
-		evidenceCounts[i] = 1
 		discoveredAt[i] = nullableTime(link.DiscoveredAt)
 		lastSeen[i] = nullableTime(link.LastSeen)
 		subnet := topologyEvidenceSubnet(link)
-		if linkType == snmpTopologyV1LinkL3Subnet && subnet == "" {
-			return topologyapi.Table{}, nil, fmt.Errorf("l3_subnet link %d is missing subnet", i)
+		if (linkType == snmpTopologyV1LinkL3Subnet || linkType == snmpTopologyV1LinkL3SubnetMembership) && subnet == "" {
+			return topologyapi.Table{}, nil, fmt.Errorf("%s link %d is missing subnet", linkType, i)
 		}
 
 		evidenceRows := evidenceRowsByType[linkType]
@@ -62,6 +61,15 @@ func buildSNMPTopologyV1Links(
 			evidenceRows = &snmpTopologyV1EvidenceRows{}
 			evidenceRowsByType[linkType] = evidenceRows
 		}
+		if linkType == snmpTopologyV1LinkL3SubnetMembership {
+			count, err := appendSNMPTopologyV1L3SubnetMembershipEvidenceRows(evidenceRows, i, src, dst, link, protocol, stringsDict)
+			if err != nil {
+				return topologyapi.Table{}, nil, err
+			}
+			evidenceCounts[i] = count
+			continue
+		}
+		evidenceCounts[i] = 1
 		evidenceRows.linkRefs = append(evidenceRows.linkRefs, i)
 		evidenceRows.srcActors = append(evidenceRows.srcActors, src)
 		evidenceRows.dstActors = append(evidenceRows.dstActors, dst)
@@ -144,6 +152,58 @@ func buildSNMPTopologyV1Links(
 	return linkTable, evidenceSections, nil
 }
 
+func appendSNMPTopologyV1L3SubnetMembershipEvidenceRows(
+	rows *snmpTopologyV1EvidenceRows,
+	linkIndex int,
+	srcActor, dstActor int,
+	link topologymodel.Link,
+	protocol string,
+	stringsDict *topologyapi.StringDictionary,
+) (any, error) {
+	detail := link.Detail.L3SubnetMembership
+	if detail == nil {
+		return nil, fmt.Errorf("l3_subnet_membership link %d is missing detail", linkIndex)
+	}
+	if len(detail.Interfaces) == 0 {
+		return nil, fmt.Errorf("l3_subnet_membership link %d is missing member interfaces", linkIndex)
+	}
+	for _, iface := range detail.Interfaces {
+		rows.linkRefs = append(rows.linkRefs, linkIndex)
+		rows.srcActors = append(rows.srcActors, srcActor)
+		rows.dstActors = append(rows.dstActors, dstActor)
+		rows.protocols = append(rows.protocols, stringsDict.Ref(protocol))
+		rows.directions = append(rows.directions, stringsDict.Ref(topologyutil.FirstNonEmptyString(link.Direction, "observed")))
+		rows.states = append(rows.states, nullableStringRef(stringsDict, link.State))
+		rows.srcPortNames = append(rows.srcPortNames, nullableStringRef(stringsDict, topologyV1L3SubnetMembershipPortName(iface)))
+		rows.dstPortNames = append(rows.dstPortNames, nil)
+		rows.srcIfIndexes = append(rows.srcIfIndexes, nullableUintFromInt(iface.IfIndex))
+		rows.dstIfIndexes = append(rows.dstIfIndexes, nil)
+		rows.srcPortIDs = append(rows.srcPortIDs, nil)
+		rows.dstPortIDs = append(rows.dstPortIDs, nil)
+		rows.srcManagementIPs = append(rows.srcManagementIPs, nullableStringRef(stringsDict, topologyV1EndpointString(link.Src, "management_ip")))
+		rows.dstManagementIPs = append(rows.dstManagementIPs, nil)
+		rows.confidences = append(rows.confidences, nullableStringRef(stringsDict, topologymodel.LinkConfidenceValue(link)))
+		rows.inferences = append(rows.inferences, nullableStringRef(stringsDict, topologymodel.LinkInferenceValue(link)))
+		rows.attachmentModes = append(rows.attachmentModes, nullableStringRef(stringsDict, topologymodel.LinkAttachmentModeValue(link)))
+		rows.memberActors = append(rows.memberActors, srcActor)
+		rows.segmentActors = append(rows.segmentActors, dstActor)
+		rows.memberIPs = append(rows.memberIPs, nullableStringRef(stringsDict, iface.MemberIP))
+		rows.memberIfIndexes = append(rows.memberIfIndexes, nullableUintFromInt(iface.IfIndex))
+		rows.memberIfNames = append(rows.memberIfNames, nullableStringRef(stringsDict, iface.IfName))
+		rows.memberIfDescrs = append(rows.memberIfDescrs, nullableStringRef(stringsDict, iface.IfDescr))
+		rows.subnets = append(rows.subnets, nullableStringRef(stringsDict, detail.Subnet))
+		rows.networks = append(rows.networks, nullableStringRef(stringsDict, detail.Network))
+		rows.netmasks = append(rows.netmasks, nullableStringRef(stringsDict, detail.Netmask))
+		rows.prefixes = append(rows.prefixes, nullableUintFromInt(detail.Prefix))
+		rows.sources = append(rows.sources, nullableStringRef(stringsDict, detail.Source))
+	}
+	return len(detail.Interfaces), nil
+}
+
+func topologyV1L3SubnetMembershipPortName(iface topologymodel.L3SubnetMembershipInterface) string {
+	return topologyutil.FirstNonEmptyString(iface.IfName, iface.IfDescr)
+}
+
 type snmpTopologyV1EvidenceRows struct {
 	linkRefs         []any
 	srcActors        []any
@@ -162,6 +222,12 @@ type snmpTopologyV1EvidenceRows struct {
 	confidences      []any
 	inferences       []any
 	attachmentModes  []any
+	memberActors     []any
+	segmentActors    []any
+	memberIPs        []any
+	memberIfIndexes  []any
+	memberIfNames    []any
+	memberIfDescrs   []any
 	srcRouterIDs     []any
 	dstRouterIDs     []any
 	srcIPs           []any
@@ -236,6 +302,21 @@ func (rows *snmpTopologyV1EvidenceRows) columnEncodingsForType(linkType string) 
 			topologyapi.Values(rows.sources...),
 		)
 	}
+	if linkType == snmpTopologyV1LinkL3SubnetMembership {
+		encodings = append(encodings,
+			topologyapi.Values(rows.memberActors...),
+			topologyapi.Values(rows.segmentActors...),
+			topologyapi.Values(rows.memberIPs...),
+			topologyapi.Values(rows.memberIfIndexes...),
+			topologyapi.Values(rows.memberIfNames...),
+			topologyapi.Values(rows.memberIfDescrs...),
+			topologyapi.Values(rows.subnets...),
+			topologyapi.Values(rows.networks...),
+			topologyapi.Values(rows.netmasks...),
+			topologyapi.Values(rows.prefixes...),
+			topologyapi.Values(rows.sources...),
+		)
+	}
 	return encodings
 }
 
@@ -264,6 +345,22 @@ func snmpTopologyV1EvidenceColumnsForType(linkType string) []topologyapi.Column 
 			topologyapi.NewColumn("neighbor_ip", "string_ref", topologyapi.WithDictionary("strings"), topologyapi.WithNullable()),
 			topologyapi.NewColumn("local_as", "string_ref", topologyapi.WithDictionary("strings"), topologyapi.WithNullable()),
 			topologyapi.NewColumn("remote_as", "string_ref", topologyapi.WithDictionary("strings"), topologyapi.WithNullable()),
+			topologyapi.NewColumn("source", "string_ref", topologyapi.WithDictionary("strings"), topologyapi.WithNullable()),
+		}
+		return snmpTopologyV1EvidenceColumnsWithExtras(columns, extras)
+	}
+	if linkType == snmpTopologyV1LinkL3SubnetMembership {
+		extras := []topologyapi.Column{
+			topologyapi.NewColumn("member_actor", "actor_ref", topologyapi.WithRole("reference")),
+			topologyapi.NewColumn("segment_actor", "actor_ref", topologyapi.WithRole("reference")),
+			topologyapi.NewColumn("member_ip", "string_ref", topologyapi.WithDictionary("strings"), topologyapi.WithNullable()),
+			topologyapi.NewColumn("member_if_index", "uint", topologyapi.WithNullable()),
+			topologyapi.NewColumn("member_if_name", "string_ref", topologyapi.WithDictionary("strings"), topologyapi.WithNullable()),
+			topologyapi.NewColumn("member_if_descr", "string_ref", topologyapi.WithDictionary("strings"), topologyapi.WithNullable()),
+			topologyapi.NewColumn("subnet", "string_ref", topologyapi.WithDictionary("strings"), topologyapi.WithRole("group_key")),
+			topologyapi.NewColumn("network", "string_ref", topologyapi.WithDictionary("strings"), topologyapi.WithNullable()),
+			topologyapi.NewColumn("netmask", "string_ref", topologyapi.WithDictionary("strings"), topologyapi.WithNullable()),
+			topologyapi.NewColumn("prefix", "uint", topologyapi.WithNullable()),
 			topologyapi.NewColumn("source", "string_ref", topologyapi.WithDictionary("strings"), topologyapi.WithNullable()),
 		}
 		return snmpTopologyV1EvidenceColumnsWithExtras(columns, extras)
@@ -318,6 +415,9 @@ func topologyEvidenceSource(link topologymodel.Link) string {
 	if link.Detail.L3Subnet != nil {
 		return strings.TrimSpace(link.Detail.L3Subnet.Source)
 	}
+	if link.Detail.L3SubnetMembership != nil {
+		return strings.TrimSpace(link.Detail.L3SubnetMembership.Source)
+	}
 	if link.Detail.OSPF != nil {
 		return strings.TrimSpace(link.Detail.OSPF.Source)
 	}
@@ -351,6 +451,9 @@ func topologyEvidenceSubnet(link topologymodel.Link) string {
 	if link.Detail.L3Subnet != nil {
 		return strings.TrimSpace(link.Detail.L3Subnet.Subnet)
 	}
+	if link.Detail.L3SubnetMembership != nil {
+		return strings.TrimSpace(link.Detail.L3SubnetMembership.Subnet)
+	}
 	if link.Detail.OSPF != nil {
 		return strings.TrimSpace(link.Detail.OSPF.Subnet)
 	}
@@ -360,6 +463,9 @@ func topologyEvidenceSubnet(link topologymodel.Link) string {
 func topologyEvidenceNetwork(link topologymodel.Link) string {
 	if link.Detail.L3Subnet != nil {
 		return strings.TrimSpace(link.Detail.L3Subnet.Network)
+	}
+	if link.Detail.L3SubnetMembership != nil {
+		return strings.TrimSpace(link.Detail.L3SubnetMembership.Network)
 	}
 	if link.Detail.OSPF != nil {
 		return strings.TrimSpace(link.Detail.OSPF.Network)
@@ -371,6 +477,9 @@ func topologyEvidenceNetmask(link topologymodel.Link) string {
 	if link.Detail.L3Subnet != nil {
 		return strings.TrimSpace(link.Detail.L3Subnet.Netmask)
 	}
+	if link.Detail.L3SubnetMembership != nil {
+		return strings.TrimSpace(link.Detail.L3SubnetMembership.Netmask)
+	}
 	if link.Detail.OSPF != nil {
 		return strings.TrimSpace(link.Detail.OSPF.Netmask)
 	}
@@ -381,6 +490,8 @@ func nullableEvidencePrefix(link topologymodel.Link) any {
 	prefix := 0
 	if link.Detail.L3Subnet != nil {
 		prefix = link.Detail.L3Subnet.Prefix
+	} else if link.Detail.L3SubnetMembership != nil {
+		prefix = link.Detail.L3SubnetMembership.Prefix
 	} else if link.Detail.OSPF != nil {
 		prefix = link.Detail.OSPF.Prefix
 	}
@@ -412,6 +523,8 @@ func snmpTopologyV1LinkType(link topologymodel.Link) string {
 		return snmpTopologyV1LinkSNMP
 	case snmpTopologyV1LinkL3Subnet:
 		return snmpTopologyV1LinkL3Subnet
+	case snmpTopologyV1LinkL3SubnetMembership:
+		return snmpTopologyV1LinkL3SubnetMembership
 	case snmpTopologyV1LinkOSPF:
 		return snmpTopologyV1LinkOSPF
 	case snmpTopologyV1LinkBGP:
@@ -423,7 +536,7 @@ func snmpTopologyV1LinkType(link topologymodel.Link) string {
 
 func snmpTopologyV1LinkIsLogicalL3(link topologymodel.Link) bool {
 	switch snmpTopologyV1LinkType(link) {
-	case snmpTopologyV1LinkL3Subnet, snmpTopologyV1LinkOSPF, snmpTopologyV1LinkBGP:
+	case snmpTopologyV1LinkL3Subnet, snmpTopologyV1LinkL3SubnetMembership, snmpTopologyV1LinkOSPF, snmpTopologyV1LinkBGP:
 		return true
 	default:
 		return false

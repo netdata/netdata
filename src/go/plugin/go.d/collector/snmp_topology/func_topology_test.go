@@ -378,7 +378,7 @@ func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 	require.NotNil(t, deviceType.Presentation.Modal.Labels)
 	require.NotNil(t, deviceType.Presentation.Modal.Labels.Identification)
 	assert.Equal(t, "management_ip", deviceType.Presentation.Modal.Labels.Identification.Fields[1].Key)
-	require.Len(t, deviceType.Presentation.Modal.Sections, 5)
+	require.Len(t, deviceType.Presentation.Modal.Sections, 6)
 	assert.Equal(t, "ports", deviceType.Presentation.Modal.Sections[0].ID)
 	assert.Equal(t, "if_index", deviceType.Presentation.Modal.Sections[0].Columns[0].ID)
 	assert.Equal(t, "Port ID", deviceType.Presentation.Modal.Sections[0].Columns[0].Label)
@@ -391,12 +391,15 @@ func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 	assert.Equal(t, "l3_adjacencies", deviceType.Presentation.Modal.Sections[2].ID)
 	assert.Equal(t, "evidence", deviceType.Presentation.Modal.Sections[2].Source.Kind)
 	assert.Equal(t, topologymodel.L3SubnetLinkType, deviceType.Presentation.Modal.Sections[2].Source.Evidence)
-	assert.Equal(t, "ospf_neighbors", deviceType.Presentation.Modal.Sections[3].ID)
-	assert.Equal(t, "actor_table", deviceType.Presentation.Modal.Sections[3].Source.Kind)
-	assert.Equal(t, "actor_ospf_neighbors", deviceType.Presentation.Modal.Sections[3].Source.Table)
-	assert.Equal(t, "bgp_peers", deviceType.Presentation.Modal.Sections[4].ID)
+	assert.Equal(t, "l3_subnet_memberships", deviceType.Presentation.Modal.Sections[3].ID)
+	assert.Equal(t, "evidence", deviceType.Presentation.Modal.Sections[3].Source.Kind)
+	assert.Equal(t, topologymodel.L3SubnetMembershipLinkType, deviceType.Presentation.Modal.Sections[3].Source.Evidence)
+	assert.Equal(t, "ospf_neighbors", deviceType.Presentation.Modal.Sections[4].ID)
 	assert.Equal(t, "actor_table", deviceType.Presentation.Modal.Sections[4].Source.Kind)
-	assert.Equal(t, "actor_bgp_peers", deviceType.Presentation.Modal.Sections[4].Source.Table)
+	assert.Equal(t, "actor_ospf_neighbors", deviceType.Presentation.Modal.Sections[4].Source.Table)
+	assert.Equal(t, "bgp_peers", deviceType.Presentation.Modal.Sections[5].ID)
+	assert.Equal(t, "actor_table", deviceType.Presentation.Modal.Sections[5].Source.Kind)
+	assert.Equal(t, "actor_bgp_peers", deviceType.Presentation.Modal.Sections[5].Source.Table)
 
 	endpointType := payload.Types.ActorTypes["endpoint"]
 	require.NotNil(t, endpointType.Presentation)
@@ -758,6 +761,129 @@ func TestSNMPTopologyToV1_PreservesL3SubnetPresentationAndEvidence(t *testing.T)
 	assert.Equal(t, "subnet", l3Section.Sort.Column)
 	assert.Equal(t, "selected_side_endpoint", l3Section.Columns[1].Projection.Kind)
 	assert.Equal(t, "endpoint", l3Section.Columns[1].Cell)
+
+	if payload.Tables != nil {
+		assert.NotContains(t, payload.Tables.Actor, "actor_port_links")
+	}
+}
+
+func TestSNMPTopologyToV1_PreservesL3SubnetMembershipPresentationAndEvidence(t *testing.T) {
+	data := topologymodel.Data{
+		AgentID: "agent-test",
+		View:    "summary",
+		Actors: []topologymodel.Actor{
+			{
+				ActorID:   "router-a",
+				ActorType: "router",
+				Match: topologymodel.Match{
+					IPAddresses: []string{"192.0.2.10"},
+					SysName:     "router-a",
+				},
+			},
+			{
+				ActorID:     "subnet-a",
+				ActorType:   topologymodel.L3SubnetSegmentActorType,
+				SegmentKind: topologymodel.SegmentKindL3Subnet,
+				Detail: topologymodel.ActorDetail{
+					L2: topologyengine.ProjectionActorDetail{
+						DisplayName: "192.0.2.0/24",
+					},
+				},
+			},
+		},
+		Links: []topologymodel.Link{
+			{
+				Protocol:   topologymodel.L3SubnetMembershipLinkType,
+				LinkType:   topologymodel.L3SubnetMembershipLinkType,
+				Direction:  "observed",
+				SrcActorID: "router-a",
+				DstActorID: "subnet-a",
+				Src: topologymodel.LinkEndpoint{
+					IfIndex: 10,
+					IfName:  "xe-0/0/0",
+				},
+				Inference: &graph.LinkInference{
+					Inference:      "shared_subnet_membership",
+					AttachmentMode: "logical_l3_subnet_membership",
+				},
+				Detail: topologymodel.LinkDetail{
+					L3SubnetMembership: &topologymodel.L3SubnetMembershipLinkDetail{
+						Source:  "ip_mib",
+						Subnet:  "192.0.2.0/24",
+						Network: "192.0.2.0",
+						Netmask: "255.255.255.0",
+						Prefix:  24,
+						Interfaces: []topologymodel.L3SubnetMembershipInterface{
+							{MemberIP: "192.0.2.10", IfIndex: 10, IfName: "xe-0/0/0", IfDescr: "primary"},
+							{MemberIP: "192.0.2.11", IfIndex: 11, IfName: "xe-0/0/1", IfDescr: "secondary"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	payload, err := topologyv1renderer.Render(data)
+	require.NoError(t, err)
+	require.NoError(t, validateTopologyV1Data(payload))
+
+	assert.Contains(t, payload.Producer.Capabilities, "l3_subnet_membership")
+	assert.Contains(t, topologyV1LegendActorTypes(payload), topologymodel.L3SubnetSegmentActorType)
+	assert.Contains(t, topologyV1LegendLinkTypes(payload), topologymodel.L3SubnetMembershipLinkType)
+
+	require.Contains(t, payload.Types.ActorTypes, topologymodel.L3SubnetSegmentActorType)
+	segmentType := payload.Types.ActorTypes[topologymodel.L3SubnetSegmentActorType]
+	assert.Equal(t, []string{"id"}, segmentType.Identity)
+	assert.Equal(t, []string{"id"}, segmentType.MergeIdentity)
+	assert.Empty(t, segmentType.ParentIdentity)
+	require.NotNil(t, segmentType.Presentation)
+	assert.Equal(t, "L3 subnet", segmentType.Presentation.Label)
+	require.NotNil(t, segmentType.Presentation.Modal)
+	segmentMembers := requireTopologyV1ModalSection(t, segmentType.Presentation.Modal.Sections, "l3_subnet_members")
+	assert.Equal(t, topologymodel.L3SubnetMembershipLinkType, segmentMembers.Source.Evidence)
+	assert.Equal(t, "member", segmentMembers.Columns[0].ID)
+
+	require.Contains(t, payload.Types.LinkTypes, topologymodel.L3SubnetMembershipLinkType)
+	linkType := payload.Types.LinkTypes[topologymodel.L3SubnetMembershipLinkType]
+	assert.Equal(t, "observed_bidirectional", linkType.Orientation)
+	assert.Equal(t, "observation", linkType.DirectionRole)
+	assert.Equal(t, "normal", linkType.SemanticRole)
+	require.NotNil(t, linkType.Presentation)
+	assert.Equal(t, "L3 subnet membership", linkType.Presentation.Label)
+	assert.Equal(t, "dashed", linkType.Presentation.LineStyle)
+
+	require.Contains(t, payload.Types.EvidenceTypes, topologymodel.L3SubnetMembershipLinkType)
+	evidenceType := payload.Types.EvidenceTypes[topologymodel.L3SubnetMembershipLinkType]
+	assert.Equal(t, topologymodel.L3SubnetMembershipLinkType, evidenceType.LinkType)
+	assert.Equal(t, []string{"member_actor", "segment_actor", "member_ip", "subnet"}, evidenceType.MatchColumns)
+
+	require.Contains(t, payload.Evidence, topologymodel.L3SubnetMembershipLinkType)
+	evidenceTable := payload.Evidence[topologymodel.L3SubnetMembershipLinkType].Table
+	require.Equal(t, 2, evidenceTable.Rows)
+	assert.Equal(t, "actor_ref", topologyV1ColumnType(evidenceTable, "member_actor"))
+	assert.Equal(t, "actor_ref", topologyV1ColumnType(evidenceTable, "segment_actor"))
+	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "member_ip"))
+	assert.Equal(t, "uint", topologyV1ColumnType(evidenceTable, "member_if_index"))
+	assert.Equal(t, []any{0, 0}, topologyV1ColumnValues(t, evidenceTable, "link"))
+	assert.Equal(t, []any{0, 0}, topologyV1ColumnValues(t, evidenceTable, "member_actor"))
+	assert.Equal(t, []any{1, 1}, topologyV1ColumnValues(t, evidenceTable, "segment_actor"))
+	assert.Equal(t, []string{"192.0.2.10", "192.0.2.11"}, topologyV1StringColumnValues(t, payload, evidenceTable, "member_ip"))
+	assert.Equal(t, []any{uint64(10), uint64(11)}, topologyV1ColumnValues(t, evidenceTable, "member_if_index"))
+	assert.Equal(t, []string{"xe-0/0/0", "xe-0/0/1"}, topologyV1StringColumnValues(t, payload, evidenceTable, "member_if_name"))
+	assert.Equal(t, []string{"192.0.2.0/24", "192.0.2.0/24"}, topologyV1StringColumnValues(t, payload, evidenceTable, "subnet"))
+	assert.Equal(t, []any{uint64(24), uint64(24)}, topologyV1ColumnValues(t, evidenceTable, "prefix"))
+
+	assert.Equal(t, []string{topologymodel.L3SubnetMembershipLinkType}, topologyV1StringColumnValues(t, payload, payload.Links, "type"))
+	assert.Equal(t, []any{2}, topologyV1ColumnValues(t, payload.Links, "evidence_count"))
+
+	routerType := payload.Types.ActorTypes["router"]
+	require.NotNil(t, routerType.Presentation)
+	require.NotNil(t, routerType.Presentation.Modal)
+	membershipSection := requireTopologyV1ModalSection(t, routerType.Presentation.Modal.Sections, "l3_subnet_memberships")
+	assert.Equal(t, "evidence", membershipSection.Source.Kind)
+	assert.Equal(t, topologymodel.L3SubnetMembershipLinkType, membershipSection.Source.Evidence)
+	require.NotNil(t, membershipSection.OwnerFilter)
+	assert.Equal(t, "incident_evidence", membershipSection.OwnerFilter.Mode)
 
 	if payload.Tables != nil {
 		assert.NotContains(t, payload.Tables.Actor, "actor_port_links")
@@ -1520,6 +1646,17 @@ func topologyV1LegendLinkTypes(data topologyv1.Data) []string {
 	}
 	out := make([]string, 0, len(data.Presentation.Legend.Links))
 	for _, entry := range data.Presentation.Legend.Links {
+		out = append(out, entry.Type)
+	}
+	return out
+}
+
+func topologyV1LegendActorTypes(data topologyv1.Data) []string {
+	if data.Presentation == nil || data.Presentation.Legend == nil {
+		return nil
+	}
+	out := make([]string, 0, len(data.Presentation.Legend.Actors))
+	for _, entry := range data.Presentation.Legend.Actors {
 		out = append(out, entry.Type)
 	}
 	return out

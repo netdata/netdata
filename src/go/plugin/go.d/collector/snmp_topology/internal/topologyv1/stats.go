@@ -123,9 +123,18 @@ func addTopologyL3Stats(out map[string]any, stats topologymodel.Stats) {
 	out["l3_subnet_candidate_subnets"] = l3.SubnetStats.CandidateSubnets
 	out["l3_subnet_candidate_links"] = l3.SubnetStats.CandidateLinks
 	out["l3_subnet_emitted_links"] = l3.EmittedLinks
+	out["l3_subnet_segment_candidate_segments"] = l3.SubnetStats.CandidateSegments
+	out["l3_subnet_segment_emitted_segments"] = l3.EmittedSegments
+	out["l3_subnet_membership_candidate_links"] = l3.SubnetStats.CandidateMemberships
+	out["l3_subnet_membership_emitted_links"] = l3.EmittedMembershipLinks
 	out["l3_subnet_suppressed_invalid"] = l3.SubnetStats.SuppressedInvalid
 	out["l3_subnet_suppressed_unsupported_prefix"] = l3.SubnetStats.SuppressedUnsupportedPrefix
 	out["l3_subnet_suppressed_duplicate_ip"] = l3.SubnetStats.SuppressedDuplicateIP
+	out["l3_subnet_segment_suppressed_no_producer_scope"] = l3.SuppressedNoProducerScope
+	out["l3_subnet_membership_suppressed_duplicate_ip"] = l3.SubnetStats.SuppressedSegmentDuplicateIP
+	out["l3_subnet_membership_suppressed_unmatched"] = l3.SuppressedMembershipUnmatched + l3.SubnetStats.SuppressedSegmentUnmatched
+	out["l3_subnet_membership_suppressed_unresolved_actor"] = l3.SuppressedMembershipUnresolvedActor
+	out["l3_subnet_membership_suppressed_duplicate_link"] = l3.SuppressedDuplicateMembershipLink
 	out["l3_subnet_suppressed_self_link"] = l3.SubnetStats.SuppressedSelfLink
 	out["l3_subnet_suppressed_unmatched"] = l3.SubnetStats.SuppressedUnmatched
 	out["l3_subnet_suppressed_multi_access"] = l3.SubnetStats.SuppressedMultiAccess
@@ -133,8 +142,10 @@ func addTopologyL3Stats(out map[string]any, stats topologymodel.Stats) {
 	out["l3_subnet_suppressed_self_actor"] = l3.SuppressedSelfActor
 	out["l3_subnet_suppressed_duplicate_link"] = l3.SuppressedDuplicateLink
 	out["l3_subnet_visible_links"] = l3.EmittedLinks
+	out["l3_subnet_membership_visible_links"] = l3.EmittedMembershipLinks
 	if stats.HasComputed {
 		out["l3_subnet_visible_links"] = stats.Recomputed.L3SubnetVisibleLinks
+		out["l3_subnet_membership_visible_links"] = stats.Recomputed.L3SubnetMembershipVisibleLinks
 	}
 }
 

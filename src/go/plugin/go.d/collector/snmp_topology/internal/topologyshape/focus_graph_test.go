@@ -37,10 +37,11 @@ func TestTopologyFocusGraphBuildAndDepthTraversal(t *testing.T) {
 				},
 			},
 			{
-				ActorID:   "segment-1",
-				ActorType: "segment",
-				Layer:     "2",
-				Source:    "snmp",
+				ActorID:     "segment-1",
+				ActorType:   "segment",
+				SegmentKind: topologymodel.SegmentKindBroadcastDomain,
+				Layer:       "2",
+				Source:      "snmp",
 			},
 			{
 				ActorID:   "device-c",
@@ -126,6 +127,32 @@ func TestTopologyFocusGraphBuildAndDepthTraversal(t *testing.T) {
 		"device-c":  {},
 		"segment-1": {},
 	}, includedActorsDepth2)
+}
+
+func TestTopologyFocusGraphDoesNotFanOutThroughL3SubnetSegment(t *testing.T) {
+	data := &topologymodel.Data{
+		Actors: []topologymodel.Actor{
+			{ActorID: "router-a", ActorType: "router"},
+			{ActorID: "router-b", ActorType: "router"},
+			{ActorID: "router-c", ActorType: "router"},
+			{ActorID: "subnet-a", ActorType: topologymodel.L3SubnetSegmentActorType, SegmentKind: topologymodel.SegmentKindL3Subnet},
+		},
+		Links: []topologymodel.Link{
+			{SrcActorID: "router-a", DstActorID: "subnet-a", Protocol: topologymodel.L3SubnetMembershipLinkType, LinkType: topologymodel.L3SubnetMembershipLinkType},
+			{SrcActorID: "router-b", DstActorID: "subnet-a", Protocol: topologymodel.L3SubnetMembershipLinkType, LinkType: topologymodel.L3SubnetMembershipLinkType},
+			{SrcActorID: "router-c", DstActorID: "subnet-a", Protocol: topologymodel.L3SubnetMembershipLinkType, LinkType: topologymodel.L3SubnetMembershipLinkType},
+		},
+	}
+
+	graph := buildTopologyFocusGraph(data)
+	distance := traverseTopologyFocusDepth(graph, map[string]struct{}{"router-a": {}}, topologyoptions.DepthAllInternal)
+	_, includedActors := collectTopologyFocusDepthSets(graph, distance, topologyoptions.DepthAllInternal)
+
+	require.Equal(t, map[string]int{"router-a": 0}, distance)
+	require.Contains(t, includedActors, "router-a")
+	require.Contains(t, includedActors, "subnet-a")
+	require.NotContains(t, includedActors, "router-b")
+	require.NotContains(t, includedActors, "router-c")
 }
 
 func TestTopologyActorHasIPMatchesMatchAndManagementAddresses(t *testing.T) {

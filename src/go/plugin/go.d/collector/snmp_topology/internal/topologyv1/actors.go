@@ -213,6 +213,8 @@ func snmpTopologyV1ActorType(actorType string) string {
 		return snmpTopologyV1ActorEndpoint
 	case snmpTopologyV1ActorSegment:
 		return snmpTopologyV1ActorSegment
+	case snmpTopologyV1ActorL3SubnetSegment:
+		return snmpTopologyV1ActorL3SubnetSegment
 	default:
 		return "custom"
 	}
@@ -224,7 +226,7 @@ func snmpTopologyV1DisplayName(actor topologymodel.Actor) string {
 
 func snmpTopologyV1ActorLayer(actor topologymodel.Actor) string {
 	switch snmpTopologyV1ActorType(actor.ActorType) {
-	case snmpTopologyV1ActorEndpoint, snmpTopologyV1ActorSegment:
+	case snmpTopologyV1ActorEndpoint, snmpTopologyV1ActorSegment, snmpTopologyV1ActorL3SubnetSegment:
 		return "network"
 	default:
 		if topologyengine.IsDeviceActorType(actor.ActorType) {

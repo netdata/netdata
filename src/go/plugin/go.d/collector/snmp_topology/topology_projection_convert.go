@@ -3,6 +3,8 @@
 package snmptopology
 
 import (
+	"strings"
+
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
@@ -12,6 +14,7 @@ func topologyActorFromGraph(actor graph.Actor, detail topologyengine.ProjectionA
 	return topologymodel.Actor{
 		ActorID:     actor.ActorID,
 		ActorType:   actor.ActorType,
+		SegmentKind: strings.TrimSpace(detail.Segment.SegmentKind),
 		Layer:       actor.Layer,
 		Source:      actor.Source,
 		Match:       actor.Match,
