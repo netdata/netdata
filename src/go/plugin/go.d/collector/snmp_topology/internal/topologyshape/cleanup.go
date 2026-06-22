@@ -18,7 +18,7 @@ func eliminateNonIPInferredActors(data *topologymodel.Data) int {
 	keptActors := make([]topologymodel.Actor, 0, len(data.Actors))
 	for _, actor := range data.Actors {
 		if topologymodel.ActorIsInferred(actor) && len(topologymodel.NormalizedMatchIPs(actor.Match)) == 0 {
-			removedIDs[actor.ActorID] = struct{}{}
+			removedIDs[strings.TrimSpace(actor.ActorID)] = struct{}{}
 			continue
 		}
 		keptActors = append(keptActors, actor)
@@ -31,10 +31,10 @@ func eliminateNonIPInferredActors(data *topologymodel.Data) int {
 	data.Actors = keptActors
 	links := make([]topologymodel.Link, 0, len(data.Links))
 	for _, link := range data.Links {
-		if _, removed := removedIDs[link.SrcActorID]; removed {
+		if _, removed := removedIDs[strings.TrimSpace(link.SrcActorID)]; removed {
 			continue
 		}
-		if _, removed := removedIDs[link.DstActorID]; removed {
+		if _, removed := removedIDs[strings.TrimSpace(link.DstActorID)]; removed {
 			continue
 		}
 		links = append(links, link)
@@ -74,11 +74,13 @@ func pruneSparseSegments(data *topologymodel.Data, threshold int) int {
 			neighborSet[segmentID] = make(map[string]struct{})
 		}
 		for _, link := range data.Links {
-			if _, ok := segmentSet[link.SrcActorID]; ok {
-				neighborSet[link.SrcActorID][link.DstActorID] = struct{}{}
+			srcActorID := strings.TrimSpace(link.SrcActorID)
+			dstActorID := strings.TrimSpace(link.DstActorID)
+			if _, ok := segmentSet[srcActorID]; ok {
+				neighborSet[srcActorID][dstActorID] = struct{}{}
 			}
-			if _, ok := segmentSet[link.DstActorID]; ok {
-				neighborSet[link.DstActorID][link.SrcActorID] = struct{}{}
+			if _, ok := segmentSet[dstActorID]; ok {
+				neighborSet[dstActorID][srcActorID] = struct{}{}
 			}
 		}
 
@@ -99,7 +101,7 @@ func pruneSparseSegments(data *topologymodel.Data, threshold int) int {
 
 		filteredActors := make([]topologymodel.Actor, 0, len(data.Actors)-len(removeSegments))
 		for _, actor := range data.Actors {
-			if _, drop := removeSegments[actor.ActorID]; drop {
+			if _, drop := removeSegments[strings.TrimSpace(actor.ActorID)]; drop {
 				continue
 			}
 			filteredActors = append(filteredActors, actor)
@@ -108,10 +110,10 @@ func pruneSparseSegments(data *topologymodel.Data, threshold int) int {
 
 		filteredLinks := make([]topologymodel.Link, 0, len(data.Links))
 		for _, link := range data.Links {
-			if _, drop := removeSegments[link.SrcActorID]; drop {
+			if _, drop := removeSegments[strings.TrimSpace(link.SrcActorID)]; drop {
 				continue
 			}
-			if _, drop := removeSegments[link.DstActorID]; drop {
+			if _, drop := removeSegments[strings.TrimSpace(link.DstActorID)]; drop {
 				continue
 			}
 			filteredLinks = append(filteredLinks, link)

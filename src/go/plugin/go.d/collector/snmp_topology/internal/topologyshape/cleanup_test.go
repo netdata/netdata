@@ -48,6 +48,26 @@ func TestPruneSparseSegmentsRemovesMultiRoundFixpoint(t *testing.T) {
 	require.Empty(t, data.Links)
 }
 
+func TestPruneSparseSegmentsTrimsLinkEndpointIDsBeforeNeighborLookup(t *testing.T) {
+	data := &topologymodel.Data{
+		Actors: []topologymodel.Actor{
+			{ActorID: "device-a", ActorType: "device"},
+			{ActorID: "device-b", ActorType: "device"},
+			{ActorID: "segment-a", ActorType: "segment", SegmentKind: topologymodel.SegmentKindBroadcastDomain},
+		},
+		Links: []topologymodel.Link{
+			{SrcActorID: "device-a", DstActorID: " segment-a "},
+			{SrcActorID: "\tsegment-a\n", DstActorID: "device-b"},
+		},
+	}
+
+	removed := pruneSparseSegments(data, 1)
+
+	require.Zero(t, removed)
+	require.Len(t, data.Actors, 3)
+	require.Len(t, data.Links, 2)
+}
+
 func TestPruneSparseSegmentsKeepsVisibleL3SubnetSegment(t *testing.T) {
 	data := &topologymodel.Data{
 		Actors: []topologymodel.Actor{
