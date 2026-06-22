@@ -138,14 +138,16 @@ static void netdata_windows_get_mem(struct rrdhost_system_info *systemInfo)
 static ULONGLONG netdata_windows_get_disk_size(char *cVolume)
 {
     HANDLE disk = CreateFile(cVolume, GENERIC_READ, FILE_SHARE_VALID_FLAGS, 0, OPEN_EXISTING, 0, 0);
-    if (!disk)
+    if (disk == INVALID_HANDLE_VALUE)
         return 0;
 
     GET_LENGTH_INFORMATION length;
     DWORD ret;
 
-    if (!DeviceIoControl(disk, IOCTL_DISK_GET_LENGTH_INFO, 0, 0, &length, sizeof(length), &ret, 0))
+    if (!DeviceIoControl(disk, IOCTL_DISK_GET_LENGTH_INFO, 0, 0, &length, sizeof(length), &ret, 0)) {
+        CloseHandle(disk);
         return 0;
+    }
 
     CloseHandle(disk);
 
@@ -167,6 +169,12 @@ static void netdata_windows_get_total_disk_size(struct rrdhost_system_info *syst
 #define ND_POSSIBLE_VOLUMES 26
     for (i = 0; i < ND_POSSIBLE_VOLUMES; i++) {
         if (!(lDrives & 1 << i))
+            continue;
+
+        char cRoot[] = "C:\\";
+        cRoot[0] = 'A' + i;
+        UINT drive_type = GetDriveTypeA(cRoot);
+        if (drive_type != DRIVE_FIXED && drive_type != DRIVE_RAMDISK)
             continue;
 
         cVolume[4] = 'A' + i;
