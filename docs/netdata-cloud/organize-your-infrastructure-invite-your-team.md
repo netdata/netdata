@@ -90,9 +90,8 @@ Deleting a Space is permanent and cannot be undone.
 **Steps to delete a Space:**
 
 1. Navigate to **Space Settings** (⚙️) on the left sidebar below the spaces list.
-2. Scroll to the **Danger Zone** area.
-3. Click the option to delete the Space.
-4. Confirm the deletion when prompted.
+2. Select the **Info** tab.
+3. Click **Delete Space**.
 
 ### Room Configuration
 
