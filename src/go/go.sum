@@ -202,8 +202,8 @@ github.com/hashicorp/terraform-plugin-log v0.10.0/go.mod h1:/9RR5Cv2aAbrqcTSdNmY
 github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpOxQnU=
 github.com/huandu/xstrings v1.5.0 h1:2ag3IFq9ZDANvthTwTiqSSZLjDc+BedvHPAp5tJy2TI=
 github.com/huandu/xstrings v1.5.0/go.mod h1:y5/lhBue+AyNmUVz9RLU9xbLR0o4KIIExikq4ovT0aE=
-github.com/ibm-messaging/mq-golang/v5 v5.7.1 h1:CSITrun6yG3uOY/FHhYjapBiE+psz6zMUUCqaZD79ag=
-github.com/ibm-messaging/mq-golang/v5 v5.7.1/go.mod h1:xCV0vl1+ik3VyWZnwAj++2J89vSTzhXP1gXhG0X3IYE=
+github.com/ibm-messaging/mq-golang/v5 v5.7.2 h1:ONq3Wykce9lBqTAeFlngpr5ikW2mxpzmC/q6iweDNtg=
+github.com/ibm-messaging/mq-golang/v5 v5.7.2/go.mod h1:xCV0vl1+ik3VyWZnwAj++2J89vSTzhXP1gXhG0X3IYE=
 github.com/ibmdb/go_ibm_db v0.5.4 h1:cveEOt1J2PoQivQdxIQB0f8ugDJYKaSmh7RUKAaJyAE=
 github.com/ibmdb/go_ibm_db v0.5.4/go.mod h1:BA12Alfe+h5BMGZGE+b0pqP4leILZkpoxe5qr/iMoHw=
 github.com/ibmruntimes/go-recordio/v2 v2.0.0-20260316030125-5f5b8d0a3634 h1:hNqSwr82ttA5vO6q+bICpbgJuzO1sxwjDlJQuaGWcbY=
