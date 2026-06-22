@@ -73,3 +73,19 @@ All nodes automatically appear in the "All nodes" Room. Each Room has independen
 
 1. Click the ⚙️ next to the Room name
 2. Manage room access, node grouping, dashboard settings, and monitoring configurations
+
+### Delete a Space
+
+Only users with the **Admin** role can delete a Space. See the [role-based access model](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) for full permission details.
+
+:::warning
+
+Deleting a Space is permanent and cannot be undone. You cannot delete the only Space on your account — each account must have at least one Space.
+
+:::
+
+**Steps to delete a Space:**
+
+1. Navigate to **Space Settings** (⚙️) on the left sidebar below the spaces list.
+2. Select the **Info** tab.
+3. Click **Delete Space**.
