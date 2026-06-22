@@ -20,7 +20,7 @@ jobs:
   no-working-files:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Reject committed SOW working files
         run: |
@@ -44,7 +44,7 @@ jobs:
   sensitive-data:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
