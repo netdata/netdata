@@ -4,16 +4,16 @@
 
 - **What it does**: collects metrics from databases, middleware, services, APIs, and infrastructure components using built-in collectors.
 - **How you use it**:
-    - set collector-specific jobs in `config/go.d/*.conf`,
-    - restart Netdata and the collector jobs start automatically.
+  - set collector-specific jobs in `config/go.d/*.conf`,
+  - restart Netdata and the collector jobs start automatically.
 - **Operational behavior**:
-    - runs as a separate process from Netdata core (visible in `ps fax`),
-    - lifecycle is managed by Netdata (start/stop/restart),
-    - communicates through the external plugin pipe.
+  - runs as a separate process from Netdata core (visible in `ps fax`),
+  - lifecycle is managed by Netdata (start/stop/restart),
+  - communicates through the external plugin pipe.
 - **Scale model**:
-    - supports many collectors,
-    - each collector can run multiple jobs,
-    - collectors can be added/extended independently.
+  - supports many collectors,
+  - each collector can run multiple jobs,
+  - collectors can be added/extended independently.
 
 ### Required Linux capabilities
 
@@ -103,7 +103,7 @@ All capabilities are set automatically during Netdata installation using the [of
 | [openldap](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/openldap)                     |           OpenLDAP            |
 | [openvpn](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/openvpn)                       |            OpenVPN            |
 | [openvpn_status_log](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/openvpn_status_log) |            OpenVPN            |
-| [panos](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/panos)                           | Palo Alto Networks PAN-OS     |
+| [panos](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/panos)                           |   Palo Alto Networks PAN-OS   |
 | [pgbouncer](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/pgbouncer)                   |           PgBouncer           |
 | [oracledb](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/oracledb)                     |           Oracle DB           |
 | [phpdaemon](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/phpdaemon)                   |           phpDaemon           |
@@ -235,4 +235,8 @@ Then run the plugin in debug mode, specifying your target collector:
 
 Replace `<collector_name>` with the [specific collector](#available-collectors) you wish to debug.
 
-Debug mode (`-d`) runs the collector in a continuous live collection loop — it does **not** exit after producing output, so the command will appear to run indefinitely. This is expected; press **Ctrl+C** to stop it when you are done. Collection output appears periodically, once every `update_every` seconds (default: `1`), so wait at least one collection interval before concluding the collector is broken. If you see no output at all after waiting, the collector likely failed to connect to its target or no job is configured for it — check the preceding log lines for connection or autodetection errors.
+Debug mode (`-d`) collects data continuously and does **not** exit on its own — press **Ctrl+C** to stop it when you are done.
+
+Output appears once per collection interval (`update_every`), which varies by collector (commonly 1–60 seconds). Wait at least one full interval before concluding the collector is broken.
+
+If you see no output after waiting, the collector likely failed to connect to its target or has no configured job — check the log lines printed above for connection or autodetection errors.
