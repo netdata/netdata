@@ -194,6 +194,116 @@ func TestTopologyRegistry_DefaultMapEmitsL3SubnetForManagedRoutersWithoutLLDP(t 
 	require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["links_total"])
 }
 
+func TestTopologyRegistry_DefaultMapEmitsL3SubnetSegmentForManagedRouters(t *testing.T) {
+	registry := newTopologyRegistry()
+	registry.producerScopeID = "producer-a"
+
+	cacheA := newTopologyCache()
+	cacheA.updateTime = time.Now()
+	cacheA.lastUpdate = cacheA.updateTime
+	cacheA.agentID = "agent-test"
+	cacheA.localDevice = topologymodel.Device{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		SysName:       "router-a",
+		ManagementIP:  "10.0.0.1",
+	}
+	cacheA.updateIfIndexByIP(map[string]string{
+		tagTopoIfIndex: "2",
+		tagTopoIPAddr:  "203.0.113.1",
+		tagTopoIPMask:  "255.255.255.0",
+	})
+	cacheA.updateIfNameByIndex(map[string]string{
+		tagTopoIfIndex: "2",
+		tagTopoIfName:  "wan0",
+	})
+
+	cacheB := newTopologyCache()
+	cacheB.updateTime = time.Now().Add(time.Second)
+	cacheB.lastUpdate = cacheB.updateTime
+	cacheB.agentID = "agent-test"
+	cacheB.localDevice = topologymodel.Device{
+		ChassisID:     "aa:bb:cc:dd:ee:ff",
+		ChassisIDType: "macAddress",
+		SysName:       "router-b",
+		ManagementIP:  "10.0.0.2",
+	}
+	cacheB.updateIfIndexByIP(map[string]string{
+		tagTopoIfIndex: "7",
+		tagTopoIPAddr:  "203.0.113.2",
+		tagTopoIPMask:  "255.255.255.0",
+	})
+	cacheB.updateIfNameByIndex(map[string]string{
+		tagTopoIfIndex: "7",
+		tagTopoIfName:  "wan7",
+	})
+
+	cacheC := newTopologyCache()
+	cacheC.updateTime = time.Now().Add(2 * time.Second)
+	cacheC.lastUpdate = cacheC.updateTime
+	cacheC.agentID = "agent-test"
+	cacheC.localDevice = topologymodel.Device{
+		ChassisID:     "cc:dd:ee:ff:00:11",
+		ChassisIDType: "macAddress",
+		SysName:       "router-c",
+		ManagementIP:  "10.0.0.3",
+	}
+	cacheC.updateIfIndexByIP(map[string]string{
+		tagTopoIfIndex: "9",
+		tagTopoIPAddr:  "203.0.113.3",
+		tagTopoIPMask:  "255.255.255.0",
+	})
+	cacheC.updateIfNameByIndex(map[string]string{
+		tagTopoIfIndex: "9",
+		tagTopoIfName:  "wan9",
+	})
+
+	registry.register(cacheA)
+	registry.register(cacheB)
+	registry.register(cacheC)
+
+	data, ok := snapshotTopologyRegistryForTest(registry)
+
+	require.True(t, ok)
+	require.Len(t, data.Actors, 4)
+	require.Equal(t, 3, testCountTopologyLinksByType(data.Links, topologymodel.L3SubnetMembershipLinkType))
+	require.Equal(t, 0, testCountTopologyLinksByType(data.Links, topologymodel.L3SubnetLinkType))
+
+	var segment *topologymodel.Actor
+	for i := range data.Actors {
+		if data.Actors[i].ActorType == topologymodel.L3SubnetSegmentActorType {
+			segment = &data.Actors[i]
+			break
+		}
+	}
+	require.NotNil(t, segment)
+	require.Equal(t, topologymodel.SegmentKindL3Subnet, segment.SegmentKind)
+	require.Equal(t, "203.0.113.0/24", topologymodel.ActorDetailDisplayName(*segment))
+
+	memberIDs := make([]string, 0, 3)
+	for _, link := range data.Links {
+		if link.LinkType != topologymodel.L3SubnetMembershipLinkType {
+			continue
+		}
+		require.Equal(t, segment.ActorID, link.DstActorID)
+		require.NotNil(t, link.Detail.L3SubnetMembership)
+		require.Equal(t, "203.0.113.0/24", link.Detail.L3SubnetMembership.Subnet)
+		require.Len(t, link.Detail.L3SubnetMembership.Interfaces, 1)
+		memberIDs = append(memberIDs, link.SrcActorID)
+	}
+	routerA := findDeviceActorBySysName(data, "router-a")
+	require.NotNil(t, routerA)
+	routerB := findDeviceActorBySysName(data, "router-b")
+	require.NotNil(t, routerB)
+	routerC := findDeviceActorBySysName(data, "router-c")
+	require.NotNil(t, routerC)
+	require.ElementsMatch(t, []string{routerA.ActorID, routerB.ActorID, routerC.ActorID}, memberIDs)
+	require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["l3_subnet_segment_emitted_segments"])
+	require.Equal(t, 3, topologyStatsToV1ForTest(t, data.Stats)["l3_subnet_membership_emitted_links"])
+	require.Equal(t, 3, topologyStatsToV1ForTest(t, data.Stats)["l3_subnet_membership_visible_links"])
+	require.Equal(t, 3, topologyStatsToV1ForTest(t, data.Stats)["links_total"])
+}
+
 func TestTopologyRegistry_OSPFSnapshotEnrichesSubnetAfterNeighborIngest(t *testing.T) {
 	registry := newTopologyRegistry()
 
@@ -795,8 +905,9 @@ func TestApplySNMPTopologyShapePolicies_EliminatesNonIPInferredActorsAndSparseSe
 	data := topologymodel.Data{
 		Actors: []topologymodel.Actor{
 			{
-				ActorID:   "segment:s1",
-				ActorType: "segment",
+				ActorID:     "segment:s1",
+				ActorType:   "segment",
+				SegmentKind: topologymodel.SegmentKindBroadcastDomain,
 				Match: topologymodel.Match{
 					Hostnames: []string{"segment:s1"},
 				},
@@ -983,10 +1094,11 @@ func TestApplyTopologyDepthFocusFilter_ManagedFocusDepthZero(t *testing.T) {
 				Match:     topologymodel.Match{IPAddresses: []string{"10.0.0.3"}},
 			},
 			{
-				ActorID:   "segment:s1",
-				ActorType: "segment",
-				Source:    "snmp",
-				Match:     topologymodel.Match{Hostnames: []string{"segment:s1"}},
+				ActorID:     "segment:s1",
+				ActorType:   "segment",
+				SegmentKind: topologymodel.SegmentKindBroadcastDomain,
+				Source:      "snmp",
+				Match:       topologymodel.Match{Hostnames: []string{"segment:s1"}},
 			},
 		},
 		Links: []topologymodel.Link{
@@ -1045,10 +1157,11 @@ func TestApplyTopologyDepthFocusFilter_ManagedFocusDepthOneIncludesDirectNeighbo
 				Match:     topologymodel.Match{IPAddresses: []string{"10.0.0.3"}},
 			},
 			{
-				ActorID:   "segment:s1",
-				ActorType: "segment",
-				Source:    "snmp",
-				Match:     topologymodel.Match{Hostnames: []string{"segment:s1"}},
+				ActorID:     "segment:s1",
+				ActorType:   "segment",
+				SegmentKind: topologymodel.SegmentKindBroadcastDomain,
+				Source:      "snmp",
+				Match:       topologymodel.Match{Hostnames: []string{"segment:s1"}},
 			},
 		},
 		Links: []topologymodel.Link{
@@ -1107,10 +1220,11 @@ func TestApplyTopologyDepthFocusFilter_MultiFocusDepthZeroIncludesAllShortestPat
 				Match:     topologymodel.Match{IPAddresses: []string{"10.0.0.3"}},
 			},
 			{
-				ActorID:   "segment:s1",
-				ActorType: "segment",
-				Source:    "snmp",
-				Match:     topologymodel.Match{Hostnames: []string{"segment:s1"}},
+				ActorID:     "segment:s1",
+				ActorType:   "segment",
+				SegmentKind: topologymodel.SegmentKindBroadcastDomain,
+				Source:      "snmp",
+				Match:       topologymodel.Match{Hostnames: []string{"segment:s1"}},
 			},
 		},
 		Links: []topologymodel.Link{

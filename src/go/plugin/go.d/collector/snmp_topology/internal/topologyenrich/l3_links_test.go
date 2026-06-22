@@ -114,6 +114,77 @@ func TestApplyTopologyL3SubnetEnrichmentSuppressions(t *testing.T) {
 	}
 }
 
+func TestApplyTopologyL3SubnetEnrichmentEmitsSegmentMemberships(t *testing.T) {
+	data := topologymodel.Data{
+		Actors: []topologymodel.Actor{
+			topologyL3ManagedActorForTest("router-a", nil, "203.0.113.1"),
+			topologyL3ManagedActorForTest("router-b", nil, "203.0.113.2"),
+			topologyL3ManagedActorForTest("router-c", nil, "203.0.113.3"),
+		},
+	}
+	aggregate := topologymodel.ObservationAggregate{
+		ProducerScopeID: "producer-a",
+		L3Interfaces: []topologymodel.L3Interface{
+			{DeviceID: "router-c", IP: "203.0.113.3", Netmask: "255.255.255.0", IfIndex: "3", IfName: "xe-0/0/3", IfDescr: "transit-c"},
+			{DeviceID: "router-a", IP: "203.0.113.1", Netmask: "255.255.255.0", IfIndex: "1", IfName: "xe-0/0/1", IfDescr: "transit-a"},
+			{DeviceID: "router-b", IP: "203.0.113.2", Netmask: "255.255.255.0", IfIndex: "2", IfName: "xe-0/0/2", IfDescr: "transit-b"},
+			{DeviceID: "unmanaged", IP: "203.0.113.4", Netmask: "255.255.255.0", IfIndex: "4", IfName: "xe-0/0/4", IfDescr: "unmanaged"},
+		},
+	}
+
+	stats := ApplyL3Subnet(&data, aggregate)
+
+	require.Equal(t, 1, stats.EmittedSegments)
+	require.Equal(t, 3, stats.EmittedMembershipLinks)
+	require.Equal(t, 0, stats.EmittedLinks)
+	require.Equal(t, 1, stats.SubnetStats.CandidateSegments)
+	require.Equal(t, 4, stats.SubnetStats.CandidateMemberships)
+	require.Equal(t, 1, stats.SuppressedMembershipUnresolvedActor)
+	require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["l3_subnet_segment_emitted_segments"])
+	require.Equal(t, 3, topologyStatsToV1ForTest(t, data.Stats)["l3_subnet_membership_visible_links"])
+	require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["l3_subnet_membership_suppressed_unresolved_actor"])
+
+	segments := topologyActorsByTypeForTest(data.Actors, topologymodel.L3SubnetSegmentActorType)
+	require.Len(t, segments, 1)
+	require.Equal(t, topologymodel.SegmentKindL3Subnet, segments[0].SegmentKind)
+	require.Equal(t, "203.0.113.0/24", topologymodel.ActorDetailDisplayName(segments[0]))
+	require.Equal(t, topologyengine.OptionalValue[int]{Value: 3, Has: true}, segments[0].Detail.L2.Segment.PortsTotal)
+	require.Equal(t, topologyengine.OptionalValue[int]{Value: 3, Has: true}, segments[0].Detail.L2.Segment.EndpointsTotal)
+
+	memberships := topologyLinksByTypeForTest(data.Links, topologymodel.L3SubnetMembershipLinkType)
+	require.Len(t, memberships, 3)
+	require.Equal(t, "router-a", memberships[0].SrcActorID)
+	require.Equal(t, segments[0].ActorID, memberships[0].DstActorID)
+	require.NotNil(t, memberships[0].Detail.L3SubnetMembership)
+	require.Equal(t, "203.0.113.0/24", memberships[0].Detail.L3SubnetMembership.Subnet)
+	require.Equal(t, []topologymodel.L3SubnetMembershipInterface{
+		{MemberIP: "203.0.113.1", IfIndex: 1, IfName: "xe-0/0/1", IfDescr: "transit-a"},
+	}, memberships[0].Detail.L3SubnetMembership.Interfaces)
+}
+
+func TestApplyTopologyL3SubnetEnrichmentOmitsSegmentsWithoutProducerScope(t *testing.T) {
+	data := topologymodel.Data{
+		Actors: []topologymodel.Actor{
+			topologyL3ManagedActorForTest("router-a", nil, "203.0.113.1"),
+			topologyL3ManagedActorForTest("router-b", nil, "203.0.113.2"),
+		},
+	}
+	aggregate := topologymodel.ObservationAggregate{
+		L3Interfaces: []topologymodel.L3Interface{
+			l3InterfaceForTest("router-a", "203.0.113.1", "255.255.255.0", "1"),
+			l3InterfaceForTest("router-b", "203.0.113.2", "255.255.255.0", "2"),
+		},
+	}
+
+	stats := ApplyL3Subnet(&data, aggregate)
+
+	require.Equal(t, 1, stats.SuppressedNoProducerScope)
+	require.Empty(t, topologyActorsByTypeForTest(data.Actors, topologymodel.L3SubnetSegmentActorType))
+	require.Empty(t, topologyLinksByTypeForTest(data.Links, topologymodel.L3SubnetMembershipLinkType))
+	require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["l3_subnet_segment_suppressed_no_producer_scope"])
+	require.Equal(t, 0, topologyStatsToV1ForTest(t, data.Stats)["l3_subnet_membership_visible_links"])
+}
+
 func topologyL3SubnetLinkForTest(srcActorID, dstActorID, subnet string, prefix any) topologymodel.Link {
 	return topologymodel.Link{
 		Protocol:   topologymodel.L3SubnetLinkType,
@@ -127,6 +198,26 @@ func topologyL3SubnetLinkForTest(srcActorID, dstActorID, subnet string, prefix a
 			},
 		},
 	}
+}
+
+func topologyActorsByTypeForTest(actors []topologymodel.Actor, actorType string) []topologymodel.Actor {
+	var out []topologymodel.Actor
+	for _, actor := range actors {
+		if strings.EqualFold(strings.TrimSpace(actor.ActorType), actorType) {
+			out = append(out, actor)
+		}
+	}
+	return out
+}
+
+func topologyLinksByTypeForTest(links []topologymodel.Link, linkType string) []topologymodel.Link {
+	var out []topologymodel.Link
+	for _, link := range links {
+		if strings.EqualFold(strings.TrimSpace(topologyutil.FirstNonEmptyString(link.LinkType, link.Protocol)), linkType) {
+			out = append(out, link)
+		}
+	}
+	return out
 }
 
 func TestTopologyL3SubnetLinkKeySeparatesDelimitedFields(t *testing.T) {

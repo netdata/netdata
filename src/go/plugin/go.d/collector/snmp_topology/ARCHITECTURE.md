@@ -162,6 +162,12 @@ Each cache snapshot is converted into:
   peers;
 - local device detail used to enrich the selected local actor.
 
+The aggregate also carries the producer scope id read from the parent Agent
+registry id. L3 subnet segment actor ids use that scope so identical private
+subnets observed by different Agents do not collide after Cloud aggregation.
+If the registry id is unavailable, L3 subnet segment actors are omitted; direct
+L3 subnet links, OSPF, and BGP enrichment still run.
+
 Only fresh caches contribute snapshots. Stale caches are ignored until refreshed
 or pruned.
 
@@ -187,6 +193,19 @@ aggregate observations
 For the low-confidence map type, the builder creates a strict map and a
 probable map, marks probable-only link deltas, then applies the same L3/OSPF/BGP
 enrichment and depth/focus filtering to the probable map.
+
+L3 subnet enrichment has two grains:
+
+- `/30` and `/31` shared subnets emit direct managed-device
+  `l3_subnet` links.
+- `/24` through `/29` shared subnets emit an `l3_subnet_segment` actor plus
+  `l3_subnet_membership` links from each resolved managed SNMP device to that
+  segment.
+
+L3 subnet segments are logical shared-subnet evidence, not physical links. They
+include only managed SNMP network devices that can be resolved to topology
+actors. Depth/focus filtering may show a focused device and the subnet segment
+without fanning out to every other device on that subnet.
 
 ## Internal Packages
 

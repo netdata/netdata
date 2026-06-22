@@ -51,6 +51,18 @@ func IsManagedSNMPDeviceActor(actor Actor) bool {
 	return !ActorIsInferred(actor)
 }
 
+func ActorSegmentKind(actor Actor) string {
+	return strings.ToLower(strings.TrimSpace(actor.SegmentKind))
+}
+
+func ActorIsSegment(actor Actor) bool {
+	return ActorSegmentKind(actor) != ""
+}
+
+func ActorIsL3SubnetSegment(actor Actor) bool {
+	return ActorSegmentKind(actor) == SegmentKindL3Subnet
+}
+
 func MatchLocalActor(match Match, local Device) bool {
 	localChassisID := strings.TrimSpace(local.ChassisID)
 	if localChassisID != "" {

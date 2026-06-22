@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
 func eliminateNonIPInferredActors(data *topologymodel.Data) int {
@@ -50,9 +51,18 @@ func pruneSparseSegments(data *topologymodel.Data, threshold int) int {
 	removedTotal := 0
 	for {
 		segmentSet := make(map[string]struct{})
+		l3SegmentSet := make(map[string]struct{})
 		for _, actor := range data.Actors {
-			if strings.EqualFold(strings.TrimSpace(actor.ActorType), "segment") {
-				segmentSet[actor.ActorID] = struct{}{}
+			if !topologymodel.ActorIsSegment(actor) {
+				continue
+			}
+			actorID := strings.TrimSpace(actor.ActorID)
+			if actorID == "" {
+				continue
+			}
+			segmentSet[actorID] = struct{}{}
+			if topologymodel.ActorIsL3SubnetSegment(actor) {
+				l3SegmentSet[actorID] = struct{}{}
 			}
 		}
 		if len(segmentSet) == 0 {
@@ -72,8 +82,12 @@ func pruneSparseSegments(data *topologymodel.Data, threshold int) int {
 			}
 		}
 
+		protectedSegments := l3SubnetSegmentsWithMembershipLinks(data.Links, l3SegmentSet)
 		removeSegments := make(map[string]struct{})
 		for segmentID, neighbors := range neighborSet {
+			if _, protected := protectedSegments[segmentID]; protected {
+				continue
+			}
 			if len(neighbors) <= threshold {
 				removeSegments[segmentID] = struct{}{}
 			}
@@ -104,6 +118,25 @@ func pruneSparseSegments(data *topologymodel.Data, threshold int) int {
 		}
 		data.Links = filteredLinks
 	}
+}
+
+func l3SubnetSegmentsWithMembershipLinks(links []topologymodel.Link, l3SegmentSet map[string]struct{}) map[string]struct{} {
+	protected := make(map[string]struct{})
+	if len(l3SegmentSet) == 0 {
+		return protected
+	}
+	for _, link := range links {
+		if !strings.EqualFold(strings.TrimSpace(topologyutil.FirstNonEmptyString(link.LinkType, link.Protocol)), topologymodel.L3SubnetMembershipLinkType) {
+			continue
+		}
+		if _, ok := l3SegmentSet[strings.TrimSpace(link.SrcActorID)]; ok {
+			protected[strings.TrimSpace(link.SrcActorID)] = struct{}{}
+		}
+		if _, ok := l3SegmentSet[strings.TrimSpace(link.DstActorID)]; ok {
+			protected[strings.TrimSpace(link.DstActorID)] = struct{}{}
+		}
+	}
+	return protected
 }
 
 func filterDanglingLinks(data *topologymodel.Data) {

@@ -12,6 +12,7 @@ import (
 type topologyFocusGraph struct {
 	actorByID        map[string]topologymodel.Actor
 	segmentSet       map[string]struct{}
+	segmentKind      map[string]string
 	nonSegmentSet    map[string]struct{}
 	nonSegmentAdj    map[string]map[string]struct{}
 	nodeSegments     map[string]map[string]struct{}
@@ -22,6 +23,7 @@ func buildTopologyFocusGraph(data *topologymodel.Data) topologyFocusGraph {
 	graph := topologyFocusGraph{
 		actorByID:        make(map[string]topologymodel.Actor, len(data.Actors)),
 		segmentSet:       make(map[string]struct{}),
+		segmentKind:      make(map[string]string),
 		nonSegmentSet:    make(map[string]struct{}),
 		nonSegmentAdj:    make(map[string]map[string]struct{}),
 		nodeSegments:     make(map[string]map[string]struct{}),
@@ -34,8 +36,9 @@ func buildTopologyFocusGraph(data *topologymodel.Data) topologyFocusGraph {
 			continue
 		}
 		graph.actorByID[id] = actor
-		if strings.EqualFold(strings.TrimSpace(actor.ActorType), "segment") {
+		if topologymodel.ActorIsSegment(actor) {
 			graph.segmentSet[id] = struct{}{}
+			graph.segmentKind[id] = topologymodel.ActorSegmentKind(actor)
 		} else {
 			graph.nonSegmentSet[id] = struct{}{}
 		}
@@ -101,6 +104,9 @@ func traverseTopologyFocusDepth(graph topologyFocusGraph, roots map[string]struc
 		}
 
 		for segmentID := range graph.nodeSegments[current] {
+			if graph.segmentKind[segmentID] == topologymodel.SegmentKindL3Subnet {
+				continue
+			}
 			if expandedAt, ok := segmentExpandedDepth[segmentID]; ok && expandedAt <= currentDepth {
 				continue
 			}

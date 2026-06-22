@@ -32,8 +32,8 @@ func TestPruneSparseSegmentsRemovesMultiRoundFixpoint(t *testing.T) {
 	data := &topologymodel.Data{
 		Actors: []topologymodel.Actor{
 			{ActorID: "device-a", ActorType: "device"},
-			{ActorID: "segment-a", ActorType: "segment"},
-			{ActorID: "segment-b", ActorType: "segment"},
+			{ActorID: "segment-a", ActorType: "segment", SegmentKind: topologymodel.SegmentKindBroadcastDomain},
+			{ActorID: "segment-b", ActorType: "segment", SegmentKind: topologymodel.SegmentKindBroadcastDomain},
 		},
 		Links: []topologymodel.Link{
 			{SrcActorID: "device-a", DstActorID: "segment-a"},
@@ -46,4 +46,22 @@ func TestPruneSparseSegmentsRemovesMultiRoundFixpoint(t *testing.T) {
 	require.Equal(t, 2, removed)
 	require.Equal(t, []topologymodel.Actor{{ActorID: "device-a", ActorType: "device"}}, data.Actors)
 	require.Empty(t, data.Links)
+}
+
+func TestPruneSparseSegmentsKeepsVisibleL3SubnetSegment(t *testing.T) {
+	data := &topologymodel.Data{
+		Actors: []topologymodel.Actor{
+			{ActorID: "router-a", ActorType: "router"},
+			{ActorID: "subnet-a", ActorType: topologymodel.L3SubnetSegmentActorType, SegmentKind: topologymodel.SegmentKindL3Subnet},
+		},
+		Links: []topologymodel.Link{
+			{SrcActorID: "router-a", DstActorID: "subnet-a", Protocol: topologymodel.L3SubnetMembershipLinkType, LinkType: topologymodel.L3SubnetMembershipLinkType},
+		},
+	}
+
+	removed := pruneSparseSegments(data, 1)
+
+	require.Zero(t, removed)
+	require.Len(t, data.Actors, 2)
+	require.Len(t, data.Links, 1)
 }

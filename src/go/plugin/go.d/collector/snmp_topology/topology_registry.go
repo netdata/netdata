@@ -3,20 +3,24 @@
 package snmptopology
 
 import (
+	"strings"
 	"sync"
 
+	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 )
 
 type topologyRegistry struct {
-	mu     sync.RWMutex
-	caches map[*topologyCache]struct{}
+	mu              sync.RWMutex
+	caches          map[*topologyCache]struct{}
+	producerScopeID string
 }
 
 func newTopologyRegistry() *topologyRegistry {
 	return &topologyRegistry{
-		caches: make(map[*topologyCache]struct{}),
+		caches:          make(map[*topologyCache]struct{}),
+		producerScopeID: strings.TrimSpace(pluginconfig.RegistryUniqueID()),
 	}
 }
 
@@ -48,8 +52,32 @@ func (r *topologyRegistry) snapshotWithOptions(options topologyoptions.QueryOpti
 	if !ok {
 		return topologymodel.Data{}, false
 	}
+	aggregate.ProducerScopeID = r.producerScope()
 
 	return buildSNMPTopologySnapshot(aggregate, options)
+}
+
+func (r *topologyRegistry) producerScope() string {
+	r.mu.RLock()
+	scope := strings.TrimSpace(r.producerScopeID)
+	r.mu.RUnlock()
+	if scope != "" {
+		return scope
+	}
+
+	scope = strings.TrimSpace(pluginconfig.RegistryUniqueID())
+	if scope == "" {
+		return ""
+	}
+
+	r.mu.Lock()
+	if strings.TrimSpace(r.producerScopeID) == "" {
+		r.producerScopeID = scope
+	} else {
+		scope = strings.TrimSpace(r.producerScopeID)
+	}
+	r.mu.Unlock()
+	return scope
 }
 
 func (r *topologyRegistry) managedDeviceFocusTargets() []topologyoptions.ManagedFocusTarget {

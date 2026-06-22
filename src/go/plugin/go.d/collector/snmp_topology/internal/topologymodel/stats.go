@@ -48,31 +48,42 @@ type FocusDepth struct {
 }
 
 type RecomputedStats struct {
-	ActorsTotal               int
-	LinksTotal                int
-	LinksProbable             int
-	L3SubnetVisibleLinks      int
-	OSPFAdjacencyVisibleLinks int
-	BGPAdjacencyVisibleLinks  int
+	ActorsTotal                    int
+	LinksTotal                     int
+	LinksProbable                  int
+	L3SubnetVisibleLinks           int
+	L3SubnetMembershipVisibleLinks int
+	OSPFAdjacencyVisibleLinks      int
+	BGPAdjacencyVisibleLinks       int
 }
 
 type L3EnrichmentStats struct {
-	SubnetStats               L3SubnetBuildStats
-	EmittedLinks              int
-	SuppressedUnresolvedActor int
-	SuppressedSelfActor       int
-	SuppressedDuplicateLink   int
+	SubnetStats                         L3SubnetBuildStats
+	EmittedLinks                        int
+	EmittedSegments                     int
+	EmittedMembershipLinks              int
+	SuppressedUnresolvedActor           int
+	SuppressedSelfActor                 int
+	SuppressedDuplicateLink             int
+	SuppressedNoProducerScope           int
+	SuppressedMembershipUnresolvedActor int
+	SuppressedMembershipUnmatched       int
+	SuppressedDuplicateMembershipLink   int
 }
 
 type L3SubnetBuildStats struct {
-	CandidateSubnets            int
-	CandidateLinks              int
-	SuppressedInvalid           int
-	SuppressedUnsupportedPrefix int
-	SuppressedDuplicateIP       int
-	SuppressedSelfLink          int
-	SuppressedUnmatched         int
-	SuppressedMultiAccess       int
+	CandidateSubnets             int
+	CandidateLinks               int
+	CandidateSegments            int
+	CandidateMemberships         int
+	SuppressedInvalid            int
+	SuppressedUnsupportedPrefix  int
+	SuppressedDuplicateIP        int
+	SuppressedSegmentDuplicateIP int
+	SuppressedSelfLink           int
+	SuppressedUnmatched          int
+	SuppressedMultiAccess        int
+	SuppressedSegmentUnmatched   int
 }
 
 type OSPFEnrichmentStats struct {
@@ -124,13 +135,18 @@ func RecomputeL3VisibleLinkStats(data *Data) {
 	if data == nil || !data.Stats.HasL3 {
 		return
 	}
-	count := 0
+	directCount := 0
+	membershipCount := 0
 	for _, link := range data.Links {
-		if strings.EqualFold(strings.TrimSpace(topologyutil.FirstNonEmptyString(link.LinkType, link.Protocol)), L3SubnetLinkType) {
-			count++
+		switch strings.ToLower(strings.TrimSpace(topologyutil.FirstNonEmptyString(link.LinkType, link.Protocol))) {
+		case L3SubnetLinkType:
+			directCount++
+		case L3SubnetMembershipLinkType:
+			membershipCount++
 		}
 	}
-	data.Stats.Recomputed.L3SubnetVisibleLinks = count
+	data.Stats.Recomputed.L3SubnetVisibleLinks = directCount
+	data.Stats.Recomputed.L3SubnetMembershipVisibleLinks = membershipCount
 }
 
 func RecomputeOSPFVisibleLinkStats(data *Data) {
