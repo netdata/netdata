@@ -338,12 +338,6 @@ For the full manual configuration syntax, see [How to Disable or Silence Alerts]
 
 </details>
 
-:::note
-
-An already-triggered alert clears on the next evaluation of that alert.
-
-:::
-
 ---
 
 Experience the efficiency and power of the Dynamic Configuration Manager in Netdata today. Whether you're managing a handful of nodes or a vast infrastructure, this feature will make your monitoring and alerting tasks smoother and more intuitive.
