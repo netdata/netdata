@@ -28,28 +28,25 @@ fi
 
 mkdir -p "${destination}"
 
+for stale_system_dll in \
+    CRYPT32.dll WLDAP32.dll SHELL32.dll bcrypt.dll Secur32.dll USERENV.dll \
+    SSPICLI.DLL CRYPTBASE.DLL dbghelp.dll dbgcore.DLL; do
+    rm -f "${destination}/${stale_system_dll}"
+done
+
 is_ignored_dll() {
     local dll="${1,,}"
 
     case "${dll}" in
+        lib*.dll|zlib1.dll)
+            return 1
+            ;;
         api-ms-*|ext-ms-*)
-            return 0
-            ;;
-        ntdll.dll|kernel32.dll|kernelbase.dll|advapi32.dll|msvcrt.dll|ucrtbase.dll)
-            return 0
-            ;;
-        sechost.dll|rpcrt4.dll|ole32.dll|oleaut32.dll|gdi32.dll|gdi32full.dll)
-            return 0
-            ;;
-        user32.dll|win32u.dll|combase.dll|setupapi.dll|ws2_32.dll|iphlpapi.dll)
-            return 0
-            ;;
-        winmm.dll|msvcp_win.dll)
             return 0
             ;;
     esac
 
-    return 1
+    return 0
 }
 
 copy_missing_dlls_once() {
