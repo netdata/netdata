@@ -201,15 +201,12 @@ func (r *topologyReverseDNSResolver) warmStarted(ctx context.Context, candidates
 		return
 	}
 
-	workers := r.config.concurrency
-	if workers > len(ips) {
-		workers = len(ips)
-	}
+	workers := min(r.config.concurrency, len(ips))
 
 	jobs := make(chan string)
 	var wg sync.WaitGroup
 	wg.Add(workers)
-	for i := 0; i < workers; i++ {
+	for range workers {
 		go func() {
 			defer wg.Done()
 			for ip := range jobs {
