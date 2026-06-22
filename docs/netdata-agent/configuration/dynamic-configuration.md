@@ -331,15 +331,11 @@ If you prefer not to use Multi-Node Deployment, disable the alert directly in ea
   [health]
       enabled alarms = !10min_cpu_usage *
   ```
-  Restarting the Agent is required because `netdatacli reload-health` reloads health configuration files but does not reload `netdata.conf`.
+  [Restarting the Agent](/docs/netdata-agent/start-stop-restart.md) is required because `netdatacli reload-health` reloads health configuration files but does not reload `netdata.conf`.
 - Alternatively, edit the corresponding `health.d/*.conf` file (for example `health.d/cpu.conf`), comment out the alert definition, and run `netdatacli reload-health`.
 
 For the full manual configuration syntax, see [How to Disable or Silence Alerts](/src/health/REFERENCE.md#how-to-disable-or-silence-alerts).
 
 </details>
-
----
-
-Experience the efficiency and power of the Dynamic Configuration Manager in Netdata today. Whether you're managing a handful of nodes or a vast infrastructure, this feature will make your monitoring and alerting tasks smoother and more intuitive.
 
 [Read more](/docs/developer-and-contributor-corner/dyncfg.md) on developing with dynamic configuration.
