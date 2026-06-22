@@ -324,7 +324,7 @@ Apply the disable to each node that is actually raising the alert. The recommend
 <details>
 <summary>Alternative: configure each node manually (optional)</summary>
 
-If you prefer not to use Multi-Node Deployment, disable the alert directly in each affected node's local health configuration:
+If you prefer not to use Multi-Node Deployment, disable the alert directly in each desired node's local health configuration:
 
 - In `netdata.conf`, under the `[health]` section, exclude the alert name and restart the Agent:
   ```conf
