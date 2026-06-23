@@ -74,6 +74,19 @@ All nodes automatically appear in the "All nodes" Room. Each Room has independen
 1. Click the ⚙️ next to the Room name
 2. Manage room access, node grouping, dashboard settings, and monitoring configurations
 
+### Leaving a Room
+
+Any user with Room access — **Admin**, **Manager**, **Troubleshooter**, or **Observer** — can leave a Room. **Billing** users do not have Room access and cannot leave a Room.
+
+Leaving a Room removes your access to that Room's nodes, dashboards, metrics, and functions. It does not delete the Room or affect other members.
+
+Rejoining a Room depends on your role:
+
+- **Admins** and **Managers** can rejoin any Room at any time on their own.
+- **Troubleshooters** and **Observers** cannot rejoin on their own and must be re-added to the Room by an Admin or Manager.
+
+For the full permission breakdown, see the [Room Management table in the RBAC reference](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
+
 ### Delete a Space
 
 Only users with the **Admin** role can delete a Space. See the [role-based access model](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) for full permission details.
