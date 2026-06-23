@@ -1127,11 +1127,22 @@ async fn remote_only_sfst_is_fetched_and_served() {
         .as_bytes(),
     )
     .unwrap();
-    let v = serde_json::to_value(&h.on_call(make_ctx("t1"), req).await.unwrap()).unwrap();
+    // Keep a handle to the progress state so we can assert the fetch phase
+    // advanced it. Build the context inline (make_ctx hides its ProgressState).
+    let progress = bridge::function::ProgressState::new();
+    let ctx = FunctionCallContext::new("t1".to_string(), progress.clone(), CancellationToken::new());
+    let v = serde_json::to_value(&h.on_call(ctx, req).await.unwrap()).unwrap();
     assert_eq!(
         v["items"]["matched"], 6,
         "evicted remote SFST should be fetched and queried: {v:#}"
     );
+    // One remote-only SFST, no local sources: total = 0 local + 2*1 remote
+    // (one download unit + one scan unit). `done` reaches both — the fetch
+    // closure counted the download, the engine counted the scan. Without
+    // fetch-phase progress, `done` would only reach 1.
+    let (done, total) = progress.load();
+    assert_eq!(total, 2, "fetch + scan phases sized into total");
+    assert_eq!(done, 2, "fetch phase advanced done, then the scan completed it");
 }
 
 /// When the remote object cannot be read, the query degrades gracefully (no

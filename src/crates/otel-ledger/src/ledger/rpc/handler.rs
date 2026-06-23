@@ -16,6 +16,7 @@
 //! args→payload shim, and the lock/scheduling dance.
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use async_trait::async_trait;
 use bridge::function::{FunctionCallContext, FunctionHandler};
@@ -148,10 +149,14 @@ impl RemoteRead {
     /// evicted mid-read). Per-entry fetch failures degrade (the entry is omitted).
     /// Errors only on a query-wide cache condition (footprint over capacity, a
     /// broken cache dir, or cancellation).
+    /// `progress` counts one unit per object actually downloaded (cache misses),
+    /// feeding the fetch phase of the function's progress bar. Hits are instant
+    /// and not counted; the caller sizes `total` to absorb that.
     async fn fetch_candidates(
         &self,
         entries: Vec<otel_catalog::CatalogEntry>,
         cancel: &CancellationToken,
+        progress: Arc<AtomicUsize>,
     ) -> Result<(Vec<SfstCandidate>, Vec<file_cache::CachedFile>), file_cache::CacheError> {
         // filename → entry (carries the catalog summary + remote key + size).
         let mut by_name: std::collections::HashMap<String, otel_catalog::CatalogEntry> =
@@ -180,6 +185,7 @@ impl RemoteRead {
                 &wants,
                 move |filename| {
                     let storage = storage.clone();
+                    let progress = progress.clone();
                     let key = keys.get(filename).cloned();
                     async move {
                         match key {
@@ -187,14 +193,19 @@ impl RemoteRead {
                             // `anyhow::Error` out of `Other` (the cache logs the
                             // fetch error with `{e:#}`) rather than flattening it
                             // via `to_string()`.
-                            Some(k) => storage.read(&k).await.map_err(|e| match e {
-                                StorageError::NotFound => {
-                                    anyhow::anyhow!("remote object not found: {k}")
-                                }
-                                StorageError::Other(err) => {
-                                    err.context(format!("remote read failed for {k}"))
-                                }
-                            }),
+                            Some(k) => {
+                                let bytes = storage.read(&k).await.map_err(|e| match e {
+                                    StorageError::NotFound => {
+                                        anyhow::anyhow!("remote object not found: {k}")
+                                    }
+                                    StorageError::Other(err) => {
+                                        err.context(format!("remote read failed for {k}"))
+                                    }
+                                })?;
+                                // One download done — advance the fetch-phase bar.
+                                progress.fetch_add(1, Ordering::Relaxed);
+                                Ok(bytes)
+                            }
                             None => Err(anyhow::anyhow!("no remote key for cache entry")),
                         }
                     }
@@ -452,6 +463,20 @@ impl FunctionHandler for OtelLogsHandler {
             wal_tails.extend(tails);
         }
 
+        // Progress spans two phases: the remote fetch (one unit per downloaded
+        // SFST) then the engine scan (one unit per source). Set `total` upfront —
+        // `remote_count` downloads + the eventual scan-source count (local sources
+        // plus the fetched remotes) — so the fetch phase, which can be the slow
+        // network-bound part, advances a real bar instead of sitting at the
+        // indeterminate 1%. With no remote candidates this reduces to the scan
+        // count, identical to before. `total` is an upper bound (cache hits and
+        // degraded fetches make `done` finish just under it); the bar caps at 99%
+        // regardless and completion is signaled by the RESULT, so that is benign.
+        let remote_count = remote_cands.len();
+        let local_scan = sfst_candidates.len() + wal_tails.len();
+        ctx.progress.set_total(local_scan + 2 * remote_count);
+        let done = ctx.progress.done_counter();
+
         // Fetch any remote-only SFSTs (evicted locally) back through the read
         // cache and add them as sources. The returned pin guards MUST outlive the
         // blocking query run below; the `_`-prefixed binding holds them (kept alive
@@ -465,7 +490,7 @@ impl FunctionHandler for OtelLogsHandler {
             && !remote_cands.is_empty()
         {
             match remote
-                .fetch_candidates(remote_cands, &ctx.cancellation)
+                .fetch_candidates(remote_cands, &ctx.cancellation, done.clone())
                 .await
             {
                 Ok((mut remote_sources, guards)) => {
@@ -521,16 +546,14 @@ impl FunctionHandler for OtelLogsHandler {
         // SFSTs, row-scans the tails); run it and shape the neutral
         // result into the wire envelope off the runtime thread.
         //
-        // Progress: total = number of query sources; the engine bumps the
-        // done counter as each source's stats shard completes and the
-        // bridge's 250ms ticker emits FUNCTION_PROGRESS lines from it.
-        // Cancellation is cooperative — a `spawn_blocking` closure cannot
-        // be aborted, so the engine polls the token per source and bails
-        // early; the bridge's cancel `select!` already returns the 499 to
-        // the caller and discards this partial result.
-        ctx.progress.set_total(sources.len());
+        // Progress: `total` and the `done` counter were set up before the fetch
+        // (above); the engine continues bumping `done` as each source's stats
+        // shard completes, and the bridge's 250ms ticker emits FUNCTION_PROGRESS
+        // lines from it. Cancellation is cooperative — a `spawn_blocking` closure
+        // cannot be aborted, so the engine polls the token per source and bails
+        // early; the bridge's cancel `select!` already returns the 499 to the
+        // caller and discards this partial result.
         let cancel = ctx.cancellation.clone();
-        let done = ctx.progress.done_counter();
         let mut result = match tokio::task::spawn_blocking(move || {
             to_result(run(sources, query, cancel, done), last)
         })
