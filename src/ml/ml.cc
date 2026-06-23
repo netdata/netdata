@@ -1012,7 +1012,15 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
             // dlib (kmeans/matrix) can throw dlib::fatal_error on numerical
             // edge cases. Letting it escape ml_train_main terminates the
             // process. Skip this dimension's model for this round instead.
+            // Clear training_in_progress here (the normal path clears it via
+            // ml_dimension_update_models()); otherwise the precheck would keep
+            // returning TRAINING_IN_PROGRESS and the dimension would be stuck.
+            // Do NOT finalize constant state -- this is a transient failure and
+            // the dimension should retrain normally next round.
             netdata_log_error("ML: KMeans training raised an exception (%s); skipping model creation for this dimension this round", e.what());
+            spinlock_lock(&dim->slock);
+            dim->training_in_progress = false;
+            spinlock_unlock(&dim->slock);
             return ML_WORKER_RESULT_NOT_ENOUGH_COLLECTED_VALUES;
         }
     }
