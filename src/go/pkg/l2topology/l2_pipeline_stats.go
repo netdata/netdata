@@ -2,39 +2,8 @@
 
 package l2topology
 
-type ResultStats struct {
-	DevicesTotal                       int
-	LinksTotal                         int
-	LinksLLDP                          int
-	LinksCDP                           int
-	LinksSTP                           int
-	AttachmentsTotal                   int
-	AttachmentsFDB                     int
-	EnrichmentsTotal                   int
-	EnrichmentsARPND                   int
-	BridgeDomainsTotal                 int
-	EndpointsTotal                     int
-	IdentityAliasEndpointsMapped       int
-	IdentityAliasEndpointsAmbiguousMAC int
-	IdentityAliasIPsMerged             int
-	IdentityAliasIPsConflictSkipped    int
-}
+import "github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 
-type ProjectionStats struct {
-	ResultStats
+type ResultStats = model.ResultStats
 
-	DevicesDiscovered          int
-	LinksBidirectional         int
-	LinksUnidirectional        int
-	LinksFDB                   int
-	LinksFDBEndpointCandidates int
-	LinksFDBEndpointEmitted    int
-	LinksFDBEndpointSuppressed int
-	EndpointsAmbiguousSegments int
-	LinksARP                   int
-	LinksProbable              int
-	SegmentsSuppressed         int
-	ActorsTotal                int
-	ActorsUnlinkedSuppressed   int
-	InferenceStrategy          string
-}
+type ProjectionStats = model.ProjectionStats

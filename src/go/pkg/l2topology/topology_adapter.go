@@ -5,26 +5,13 @@ package l2topology
 import (
 	"net/netip"
 	"strings"
-	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
 // GraphOptions controls conversion from Result to the internal graph projection.
-type GraphOptions struct {
-	SchemaVersion             string
-	Source                    string
-	Layer                     string
-	View                      string
-	AgentID                   string
-	LocalDeviceID             string
-	CollectedAt               time.Time
-	ResolveDNSName            func(ip string) string
-	CollapseActorsByIP        bool
-	EliminateNonIPInferred    bool
-	ProbabilisticConnectivity bool
-	InferenceStrategy         string
-}
+type GraphOptions = model.GraphOptions
 
 const (
 	topologyInferenceStrategyFDBMinimumKnowledge = "fdb_minimum_knowledge"
