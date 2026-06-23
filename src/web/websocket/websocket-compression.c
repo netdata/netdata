@@ -273,11 +273,18 @@ bool websocket_client_decompress_message(WS_CLIENT *wsc) {
             : compressed_len * WS_MAX_DECOMPRESSION_RATIO;
     size_t max_decompressed = MIN(WS_MAX_DECOMPRESSED_SIZE, MAX(ratio_cap, WS_MIN_DECOMPRESSED_SIZE));
 
+    // Give the loop one byte of headroom beyond the limit. These messages are raw
+    // deflate (no Z_STREAM_END), so completion is detected by inflate leaving avail_out
+    // > 0. The extra byte lets a message that decompresses to exactly max_decompressed
+    // be recognized as complete (avail_out stays > 0) instead of being mistaken for an
+    // overflow, while anything strictly larger still fills it and is rejected below.
+    size_t cap = max_decompressed + 1;
+
     // Decompress with loop for multiple buffer expansions if needed
     int ret = Z_MEM_ERROR;
     bool success = false;
     int retries = 24;
-    size_t wanted_size = MIN(MAX(wsb_size(&wsc->u_payload), compressed_len * 2), max_decompressed);
+    size_t wanted_size = MIN(MAX(wsb_size(&wsc->u_payload), compressed_len * 2), cap);
     do {
         wsb_resize(&wsc->u_payload, wanted_size);
 
@@ -285,12 +292,12 @@ bool websocket_client_decompress_message(WS_CLIENT *wsc) {
         size_t len_before = wsb_length(&wsc->u_payload);
         zstrm->next_out = (Bytef *)wsb_data(&wsc->u_payload) + len_before;
 
-        // Offer zlib the free space, but never let the decompressed output exceed
-        // max_decompressed - even if the physical buffer is larger. The buffer is
-        // grow-only (wsb_resize never shrinks) and may have been enlarged by a previous
-        // message on this connection (permessage-deflate context takeover), so capping
-        // avail_out here - not the buffer size - is what actually enforces the limit.
-        size_t offered = MIN(wsb_size(&wsc->u_payload) - len_before, max_decompressed - len_before);
+        // Offer zlib the free space, but never let the decompressed output exceed the cap
+        // (max_decompressed + 1 probe byte) - even if the physical buffer is larger. The
+        // buffer is grow-only (wsb_resize never shrinks) and may have been enlarged by a
+        // previous message on this connection (permessage-deflate context takeover), so
+        // capping avail_out here - not the buffer size - is what actually enforces the limit.
+        size_t offered = MIN(wsb_size(&wsc->u_payload) - len_before, cap - len_before);
         zstrm->avail_out = offered;
 
         // Try to decompress
@@ -315,17 +322,17 @@ bool websocket_client_decompress_message(WS_CLIENT *wsc) {
 
         // Check if we need more output space
         if (!success && (ret == Z_BUF_ERROR || ret == Z_OK)) {
-            if (wsb_length(&wsc->u_payload) >= max_decompressed) {
-                // We have already produced max_decompressed bytes and the message is
-                // still not complete: either a decompression bomb or a message larger
-                // than we allow. Reject it (handled by the !success path below).
+            if (wsb_length(&wsc->u_payload) > max_decompressed) {
+                // We produced more than max_decompressed bytes (the probe byte was used)
+                // and the message is still not complete: either a decompression bomb or a
+                // message larger than we allow. Reject it (handled by the !success path).
                 websocket_error(wsc,
                                 "Decompression aborted: %zu compressed bytes expand beyond the %zu byte limit "
                                 "(max ratio %llu:1) - possible decompression bomb",
                                 compressed_len, max_decompressed, WS_MAX_DECOMPRESSION_RATIO);
                 break;
             }
-            wanted_size = MIN(wanted_size * 2, max_decompressed);
+            wanted_size = MIN(wanted_size * 2, cap);
         }
     } while (!success && retries-- > 0);
 
@@ -535,6 +542,32 @@ int websocket_compression_unittest(void) {
             }
             freez(bomb);
         }
+        ws_test_client_destroy(wsc, &def);
+    }
+
+    // Case 4 (boundary): a message that decompresses to EXACTLY the cap must be accepted,
+    // not mistaken for an overflow. 1MB of zeros compresses to ~1KB, so the floor applies
+    // (max_decompressed == WS_MIN_DECOMPRESSED_SIZE) and the output is exactly at the limit.
+    {
+        z_stream def;
+        WS_CLIENT *wsc = ws_test_client_create(&wth, &def);
+        if (!wsc) { fprintf(stderr, "  FAILED setup (case 4)\n"); return 1; }
+
+        size_t exact_len = WS_MIN_DECOMPRESSED_SIZE; // == max_decompressed for this tiny input
+        char *exact = callocz(1, exact_len);
+        if (!ws_test_compress_msg(&def, exact, exact_len, &wsc->payload)) {
+            fprintf(stderr, "  FAILED case4: test compressor error\n"); errors++;
+        }
+        else if (!websocket_client_decompress_message(wsc)) {
+            fprintf(stderr, "  FAILED case4: exact-limit %zuB message falsely rejected\n", exact_len);
+            errors++;
+        }
+        else if (wsb_length(&wsc->u_payload) != exact_len) {
+            fprintf(stderr, "  FAILED case4: accepted but length %zu != %zu\n",
+                    wsb_length(&wsc->u_payload), exact_len);
+            errors++;
+        }
+        freez(exact);
         ws_test_client_destroy(wsc, &def);
     }
 
