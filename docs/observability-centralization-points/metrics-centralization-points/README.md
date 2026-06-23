@@ -35,6 +35,10 @@ To install a Netdata Parent:
 
    See [Configuring Metrics Centralization Points](/docs/observability-centralization-points/metrics-centralization-points/configuration.md) for detailed configuration instructions.
 
+3. Connect your Parent to Netdata Cloud.
+
+   Claiming the Parent lets Netdata Cloud query it, and registers all connected Children to Netdata Cloud automatically. See the [Connect Agent to Cloud guide](/src/claim/README.md) for instructions.
+
 ## Key Features
 
 :::important
