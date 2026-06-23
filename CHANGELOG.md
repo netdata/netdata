@@ -428,6 +428,18 @@
 - Chore(go.d/snmp_topology): file-organization cleanup ([#22807](https://github.com/netdata/netdata/issues/22807))
 - Build(deps): bump github.com/prometheus/common from 0.68.1 to 0.69.0 in /src/go ([#22811](https://github.com/netdata/netdata/issues/22811))
 - Build(deps): bump github.com/Azure/azure-sdk-for-go/sdk/azidentity from 1.13.1 to 1.14.0 in /src/go ([#22808](https://github.com/netdata/netdata/issues/22808))
+- Build(deps): bump github.com/moby/moby/client from 0.4.1 to 0.5.0 in /src/go ([#22813](https://github.com/netdata/netdata/issues/22813))
+- Build(deps): bump github.com/ibm-messaging/mq-golang/v5 from 5.7.1 to 5.7.2 in /src/go ([#22814](https://github.com/netdata/netdata/issues/22814))
+- Docs: Add Space deletion procedure to Spaces and Rooms doc ([#22695](https://github.com/netdata/netdata/issues/22695))
+- Docs: Clarify go.d.plugin debug mode runs continuously until stopped ([#22717](https://github.com/netdata/netdata/issues/22717))
+- Docs: document the Nodes tab CSV download feature ([#22692](https://github.com/netdata/netdata/issues/22692))
+- Ci: fix invalid step-output references in failure notifications ([#22816](https://github.com/netdata/netdata/issues/22816))
+- Build(deps): bump actions/checkout from 6 to 7 ([#22812](https://github.com/netdata/netdata/issues/22812))
+- Docs: Add troubleshooting for disabled alerts still visible on nodes ([#22721](https://github.com/netdata/netdata/issues/22721))
+- Feat(go.d/snmp_topology): add l3 subnet segments ([#22822](https://github.com/netdata/netdata/issues/22822))
+- Fix(go.d/snmp_topology): restore reverse DNS warming ([#22826](https://github.com/netdata/netdata/issues/22826))
+- Fix response help message ([#22820](https://github.com/netdata/netdata/issues/22820))
+- Chore(go.d): clarify l2topology public surface ([#22827](https://github.com/netdata/netdata/issues/22827))
 
 ## [2.10.0] - 2026-04-09
 
