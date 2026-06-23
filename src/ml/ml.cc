@@ -1005,7 +1005,16 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
         }
 
         ml_kmeans_init(&dim->kmeans);
-        ml_kmeans_train(&dim->kmeans, worker->training_samples, Cfg.max_kmeans_iters, training_response.query_after_t, training_response.query_before_t);
+        try {
+            ml_kmeans_train(&dim->kmeans, worker->training_samples, Cfg.max_kmeans_iters, training_response.query_after_t, training_response.query_before_t);
+        }
+        catch (const std::exception &e) {
+            // dlib (kmeans/matrix) can throw dlib::fatal_error on numerical
+            // edge cases. Letting it escape ml_train_main terminates the
+            // process. Skip this dimension's model for this round instead.
+            netdata_log_error("ML: KMeans training raised an exception (%s); skipping model creation for this dimension this round", e.what());
+            return ML_WORKER_RESULT_NOT_ENOUGH_COLLECTED_VALUES;
+        }
     }
 
     // update models
