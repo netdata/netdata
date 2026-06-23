@@ -208,6 +208,9 @@ sudo rm -f /etc/cron.d/netdata-updater-daily
 <br/>
 </details>
 
+<details>
+<summary><strong>Re-enable automatic updates</strong></summary><br/>
+
 To re-enable automatic updates later, run:
 
 ```bash
@@ -215,6 +218,9 @@ sudo /usr/libexec/netdata/netdata-updater.sh --enable-auto-updates
 ```
 
 This auto-detects the appropriate scheduling method for your system. You can optionally specify a method explicitly (`systemd`, `interval`, or `crontab`).
+
+<br/>
+</details>
 
 :::note
 
