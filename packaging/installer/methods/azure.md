@@ -3,6 +3,18 @@
 Netdata is fully compatible with Azure.
 You can install Netdata on cloud instances to monitor the apps/services running there, or use multiple instances in a [parent-child streaming](/src/streaming/README.md) configuration.
 
+## Recommended VM sizing
+
+Netdata is lightweight and runs on most cloud VM sizes. What you need to provision depends on how you use it:
+
+- **A single Agent** monitoring the instance it runs on has a small footprint — typically a fraction of a single CPU core (around 1.5-5%), roughly 150-350 MB of RAM, and about 4 GiB of disk for the default metric retention. Most general-purpose VM sizes are more than enough.
+- **A Netdata Parent** that receives streams from many Child nodes needs more. Its resource use scales with the number of metrics collected and how long you keep them, so size the VM for your expected metric volume rather than for a single Agent.
+
+For detailed sizing guidance, see:
+
+- [Resource utilization](/docs/netdata-agent/sizing-netdata-agents/README.md): CPU, RAM, disk, and bandwidth requirements for a standalone Agent.
+- [Parent Configuration Best Practices](/docs/observability-centralization-points/best-practices.md): sizing and configuration guidance for Parent nodes receiving streams.
+
 ## Recommended installation method
 
 The best installation method depends on the instance's operating system, distribution, and version. For Linux instances, we recommend the [`kickstart.sh` automatic installation script](/packaging/installer/methods/kickstart.md).
