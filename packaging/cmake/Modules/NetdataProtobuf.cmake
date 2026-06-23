@@ -63,6 +63,27 @@ function(netdata_bundle_protobuf)
                             CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
                     )
                 endif()
+                if(OS_WINDOWS AND NOT TARGET _nd_rt_stub)
+                        # MSYS2 UCRT64 sets UNIX=TRUE, so abseil's cmake may add -lrt
+                        # to its link options even though no separate librt.a exists on
+                        # Windows (clock_gettime is in the main UCRT).  A stale cmake
+                        # cache from a prior build can also hold HAVE_LIBRT=TRUE.
+                        # Force the result variable to FALSE before abseil processes it,
+                        # and create an empty stub librt.a so the linker never errors on
+                        # any -lrt reference that slips through transitive dependencies.
+                        # Guard with NOT TARGET so this block only runs once even when
+                        # netdata_bundle_protobuf() is called more than once.
+                        set(HAVE_LIBRT FALSE CACHE BOOL "No separate librt on Windows UCRT64" FORCE)
+                        file(WRITE "${CMAKE_BINARY_DIR}/_nd_rt_stub.c"
+                             "/* librt stub: clock_gettime is in the UCRT on MSYS2 UCRT64 */\n")
+                        add_library(_nd_rt_stub STATIC "${CMAKE_BINARY_DIR}/_nd_rt_stub.c")
+                        set_target_properties(_nd_rt_stub PROPERTIES
+                                OUTPUT_NAME "rt"
+                                ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/_nd_rt_stub_dir"
+                        )
+                        link_directories("${CMAKE_BINARY_DIR}/_nd_rt_stub_dir")
+                endif()
+
                 FetchContent_MakeAvailable_NoInstall(absl)
                 message(STATUS "Finished preparing bundled Abseil")
         endif()
@@ -99,6 +120,13 @@ function(netdata_bundle_protobuf)
         endif()
         FetchContent_MakeAvailable_NoInstall(protobuf)
         message(STATUS "Finished preparing bundled Protobuf.")
+
+        if(OS_WINDOWS AND TARGET _nd_rt_stub AND TARGET protoc)
+                # protobuf::protoc is an alias for protoc; add_dependencies() requires
+                # a real (non-alias) target, so we use protoc directly.  Called on both
+                # invocations of this function — adding the same dependency twice is harmless.
+                add_dependencies(protoc _nd_rt_stub)
+        endif()
 
         set(ENABLE_BUNDLED_PROTOBUF True PARENT_SCOPE)
 endfunction()
