@@ -1047,7 +1047,7 @@ static bool epdl_populate_pages_from_extent_data(
     uLong crc;
 
     bool can_use_data = true;
-    if(data_length < sizeof(*header) + sizeof(header->descr[0]) + sizeof(*trailer)) {
+    if(!rrdeng_valid_extent_disk_size(data_length)) {
         can_use_data = false;
 
         // added to satisfy the requirements of older compilers (prevent warnings)
@@ -1079,7 +1079,7 @@ static bool epdl_populate_pages_from_extent_data(
     }
 
     crc = crc32(0L, Z_NULL, 0);
-    crc = crc32(crc, data, epdl->extent_size - sizeof(*trailer));
+    crc = crc32(crc, data, data_length - sizeof(*trailer));
     if (unlikely(crc32cmp(trailer->checksum, crc))) {
         ctx_io_error(ctx);
         have_read_error = true;
@@ -1178,13 +1178,27 @@ static bool epdl_populate_pages_from_extent_data(
         }
         else {
             if (RRDENG_COMPRESSION_NONE == header->compression_algorithm) {
-                pgd = pgd_create_from_disk_data(header->descr[i].type,
-                                                      data + payload_offset + page_offset,
-                                                vd.page_length);
-                stats_load_uncompressed++;
+                if (unlikely(vd.page_length > payload_length ||
+                             page_offset > payload_length - vd.page_length)) {
+                    char log[200 + 1];
+                    snprintfz(log, sizeof(log) - 1, "page %u (out of %u) offset %u + page length %zu, "
+                                        "exceeds the payload size %" PRIu64,
+                                        i, count, page_offset, vd.page_length, payload_length);
+                    epdl_extent_loading_error_log(ctx, epdl, &header->descr[i], log, NDLP_ERR);
+
+                    pgd = PGD_EMPTY;
+                    stats_load_invalid_page++;
+                }
+                else {
+                    pgd = pgd_create_from_disk_data(header->descr[i].type,
+                                                    data + payload_offset + page_offset,
+                                                    vd.page_length);
+                    stats_load_uncompressed++;
+                }
             }
             else {
-                if (unlikely(page_offset + vd.page_length > uncompressed_payload_length)) {
+                if (unlikely(vd.page_length > uncompressed_payload_length ||
+                             page_offset > uncompressed_payload_length - vd.page_length)) {
                     char log[200 + 1];
                     snprintfz(log, sizeof(log) - 1, "page %u (out of %u) offset %u + page length %zu, "
                                         "exceeds the uncompressed buffer size %u",
@@ -1275,6 +1289,15 @@ static bool epdl_populate_pages_from_extent_data(
 
 static inline void *datafile_extent_read(struct rrdengine_instance *ctx, uv_file file, uint32_t block, unsigned size_bytes)
 {
+    if (unlikely(!rrdeng_valid_extent_disk_size(size_bytes))) {
+        nd_log_limit_static_global_var(erl, 1, 0);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
+                     "DBENGINE: refusing to read extent at offset %" PRIu64 " with invalid size %u",
+                     BLOCK_TO_OFFSET(block), size_bytes);
+        ctx_io_error(ctx);
+        return NULL;
+    }
+
     void *buffer = NULL;
     uv_fs_t request;
 
@@ -1283,7 +1306,7 @@ static inline void *datafile_extent_read(struct rrdengine_instance *ctx, uv_file
 
     uv_buf_t iov = uv_buf_init(buffer, real_io_size);
     int ret = uv_fs_read(NULL, &request, file, &iov, 1, (int64_t) BLOCK_TO_OFFSET(block), NULL);
-    if (unlikely(-1 == ret)) {
+    if (unlikely(ret < 0 || (unsigned)ret != real_io_size)) {
         ctx_io_error(ctx);
         posix_memalign_freez(buffer);
         buffer = NULL;

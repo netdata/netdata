@@ -729,7 +729,7 @@ get_redirect() {
   if [ -n "${CURL}" ]; then
     checked=1
 
-    if run sh -c "${CURL} ${url} -s -L -I -o /dev/null -w '%{url_effective}' | grep -Eo '[^/]+$'"; then
+    if run sh -c "${CURL} ${url} -s -L -I -o /dev/null -w '%{url_effective}' | grep -Eo '[^/]+/?$' | grep -Eo '^[^/]+'"; then
       succeeded=1
     fi
   fi
@@ -738,7 +738,7 @@ get_redirect() {
     if command -v wget > /dev/null 2>&1; then
       checked=1
 
-      if run sh -c "wget -S -O /dev/null ${url} 2>&1 | grep -m 1 Location | grep -Eo '[^/]+$'"; then
+      if run sh -c "wget -S -O /dev/null ${url} 2>&1 | grep -m 1 Location | grep -Eo '[^/]+/?$' | grep -Eo '^[^/]+'"; then
         succeeded=1
       fi
     fi

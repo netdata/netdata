@@ -935,6 +935,9 @@ size_t dictionary_unittest_views(void) {
     struct dictionary_stats stats = {};
     DICTIONARY *master = dictionary_create_advanced(DICT_OPTION_NONE, &stats, 0);
     DICTIONARY *view = dictionary_create_view(master);
+    DICTIONARY_ITEM *master_item2 = NULL;
+    DICTIONARY_ITEM *view_item2 = NULL;
+    DICTIONARY_ITEM *lookup = NULL;
 
     fprintf(stderr, "\n\nChecking dictionary views...\n");
 
@@ -1004,10 +1007,275 @@ size_t dictionary_unittest_views(void) {
     errors += unittest_check_dictionary("master", master, 0, 0, 1, 0, 1);
     errors += unittest_check_dictionary("view", view, 0, 0, 1, 0, 1);
 
+    fprintf(stderr, "\nPASS 3: Replacing a stale view item after master deletion:\n");
+    item1_on_master = dictionary_set_and_acquire_item(master, "KEY 1", "VALUE1", strlen("VALUE1") + 1);
+    item1_on_view = dictionary_view_set_and_acquire_item(view, "KEY 1 ON VIEW", item1_on_master);
+    dictionary_acquired_item_release(view, item1_on_view);
+    dictionary_del(master, "KEY 1");
+
+    // Suppress the preflight garbage collection once so view_set() exercises
+    // the stale-entry cleanup path inside dict_item_add_or_reset_value_and_acquire().
+    __atomic_store_n(&view->last_gc_run_us, now_realtime_usec(), __ATOMIC_RELAXED);
+
+    master_item2 = dictionary_set_and_acquire_item(master, "KEY 1", "VALUE2", strlen("VALUE2") + 1);
+    view_item2 = dictionary_view_set_and_acquire_item(view, "KEY 1 ON VIEW", master_item2);
+
+    if(!view_item2) {
+        fprintf(stderr, "View replacement returned NULL\n");
+        errors++;
+    }
+    else if(item_flag_check(view_item2, ITEM_FLAG_DELETED) || view_item2->shared != master_item2->shared) {
+        fprintf(stderr, "View replacement returned stale/deleted item\n");
+        dictionary_acquired_item_release(view, view_item2);
+        errors++;
+    }
+    else
+        dictionary_acquired_item_release(view, view_item2);
+
+    lookup = (DICTIONARY_ITEM *)dictionary_get_and_acquire_item(view, "KEY 1 ON VIEW");
+    if(!lookup || item_flag_check(lookup, ITEM_FLAG_DELETED) || lookup->shared != master_item2->shared) {
+        fprintf(stderr, "View lookup did not resolve to the replacement item\n");
+        errors++;
+    }
+    if(lookup)
+        dictionary_acquired_item_release(view, lookup);
+
+    dictionary_acquired_item_release(master, master_item2);
+    dictionary_acquired_item_release(master, item1_on_master);
+
     dictionary_destroy(master);
     dictionary_destroy(view);
     return errors;
 }
+
+// ----------------------------------------------------------------------------
+// Test: dictionary_destroy() TOCTOU race
+//
+// Stress test for the race where dictionary_destroy() could start force-freeing
+// a dictionary while concurrent get/set/traversal operations were still able
+// to enter through stale pre-lock destroyed-state checks.
+//
+// The test runs the racy workload in a forked child process so that a crash
+// is detected as a child signal instead of bringing down the test harness.
+
+#ifndef OS_WINDOWS
+#include <sys/wait.h>
+#endif
+
+#ifndef OS_WINDOWS
+
+struct dict_destroy_race_data {
+    DICTIONARY *dict;
+    int ready;          // atomic: worker signals it is looping
+    int stop;           // atomic: main tells worker to stop
+};
+
+// Worker that continuously acquires and releases an item.
+// Keep the reference briefly so destroy() can observe an in-flight access in
+// the post-index-teardown recheck without forcing the old "already referenced"
+// path up front.
+static void dict_destroy_race_getter_thread(void *arg) {
+    struct dict_destroy_race_data *d = arg;
+
+    __atomic_store_n(&d->ready, 1, __ATOMIC_RELEASE);
+
+    while(!__atomic_load_n(&d->stop, __ATOMIC_RELAXED)) {
+        DICTIONARY_ITEM *item = (DICTIONARY_ITEM *)dictionary_get_and_acquire_item(d->dict, "key");
+        if(item) {
+            const char *val = dictionary_acquired_item_value(item);
+            if(val) {
+                volatile char c __attribute__((unused)) = val[0];
+            }
+            tinysleep();
+            dictionary_acquired_item_release(d->dict, item);
+        }
+    }
+}
+
+// Worker that continuously sets (inserts/updates) items.
+static void dict_destroy_race_setter_thread(void *arg) {
+    struct dict_destroy_race_data *d = arg;
+
+    __atomic_store_n(&d->ready, 1, __ATOMIC_RELEASE);
+
+    int counter = 0;
+    while(!__atomic_load_n(&d->stop, __ATOMIC_RELAXED)) {
+        char key[32], val[32];
+        // Use unique keys so the test exercises concurrent inserts during
+        // destruction without racing on value replacement semantics.
+        snprintfz(key, sizeof(key), "key-%d", counter);
+        snprintfz(val, sizeof(val), "val-%d", counter);
+        dictionary_set(d->dict, key, val, strlen(val) + 1);
+        counter++;
+    }
+}
+
+// Worker that continuously traverses (dfe_start_read / dfe_done).
+static void dict_destroy_race_traverser_thread(void *arg) {
+    struct dict_destroy_race_data *d = arg;
+
+    __atomic_store_n(&d->ready, 1, __ATOMIC_RELEASE);
+
+    while(!__atomic_load_n(&d->stop, __ATOMIC_RELAXED)) {
+        void *val;
+        dfe_start_read(d->dict, val) {
+            if(val) {
+                volatile char c __attribute__((unused)) = ((const char *)val)[0];
+            }
+        }
+        dfe_done(val);
+    }
+}
+
+// Run the racy workload in a child process: concurrent get/set/traverse
+// while the main thread destroys the dictionary. Without the fix this may
+// crash or trip internal consistency checks, depending on timing.
+static void dict_destroy_race_child(int iterations) {
+    for(int i = 0; i < iterations; i++) {
+        DICTIONARY *dict = dictionary_create(DICT_OPTION_NONE);
+        dictionary_set(dict, "key", "value", 6);
+
+        struct dict_destroy_race_data getter_data = { .dict = dict, .ready = 0, .stop = 0 };
+        struct dict_destroy_race_data setter_data = { .dict = dict, .ready = 0, .stop = 0 };
+        struct dict_destroy_race_data traverser_data = { .dict = dict, .ready = 0, .stop = 0 };
+
+        ND_THREAD *getter = nd_thread_create(
+            "race-getter", NETDATA_THREAD_OPTION_DONT_LOG,
+            dict_destroy_race_getter_thread, &getter_data);
+
+        ND_THREAD *setter = nd_thread_create(
+            "race-setter", NETDATA_THREAD_OPTION_DONT_LOG,
+            dict_destroy_race_setter_thread, &setter_data);
+
+        ND_THREAD *traverser = nd_thread_create(
+            "race-trav", NETDATA_THREAD_OPTION_DONT_LOG,
+            dict_destroy_race_traverser_thread, &traverser_data);
+
+        if(!getter || !setter || !traverser) {
+            // Thread creation failed — stop any that did start and clean up.
+            __atomic_store_n(&getter_data.stop, 1, __ATOMIC_RELEASE);
+            __atomic_store_n(&setter_data.stop, 1, __ATOMIC_RELEASE);
+            __atomic_store_n(&traverser_data.stop, 1, __ATOMIC_RELEASE);
+            if(getter) nd_thread_join(getter);
+            if(setter) nd_thread_join(setter);
+            if(traverser) nd_thread_join(traverser);
+            dictionary_destroy(dict);
+            cleanup_destroyed_dictionaries(false);
+            _exit(2);
+        }
+
+        // wait for all workers to be running
+        while(!__atomic_load_n(&getter_data.ready, __ATOMIC_ACQUIRE) ||
+              !__atomic_load_n(&setter_data.ready, __ATOMIC_ACQUIRE) ||
+              !__atomic_load_n(&traverser_data.ready, __ATOMIC_ACQUIRE))
+            tinysleep();
+
+        tinysleep();
+
+        // Do not hold a permanent acquired item here: that would force the old
+        // "already referenced" delayed-destroy path before destroy() reaches
+        // the new destroyed-flag + index-teardown synchronization. Instead,
+        // rely on the active workers to create transient in-flight accesses
+        // while destroy() races with get/set/traversal.
+        dictionary_destroy(dict);
+
+        __atomic_store_n(&getter_data.stop, 1, __ATOMIC_RELEASE);
+        __atomic_store_n(&setter_data.stop, 1, __ATOMIC_RELEASE);
+        __atomic_store_n(&traverser_data.stop, 1, __ATOMIC_RELEASE);
+        nd_thread_join(getter);
+        nd_thread_join(setter);
+        nd_thread_join(traverser);
+
+        cleanup_destroyed_dictionaries(false);
+    }
+}
+
+static int dictionary_destroy_race_unittest(void) {
+    const int iterations = nd_is_running_under_ci() ? 10 : 100;
+
+    fprintf(stderr,
+            "\nTesting dictionary_destroy() TOCTOU race (%d iterations in child process)...\n",
+            iterations);
+
+    fflush(stderr);
+    fflush(stdout);
+
+    pid_t pid = fork();
+    if(pid == 0) {
+        // child — run the racy workload
+        dict_destroy_race_child(iterations);
+        _exit(0);
+    }
+
+    if(pid < 0) {
+        fprintf(stderr, "dictionary_destroy() TOCTOU race test: fork() failed: %s\n",
+                strerror(errno));
+        return 1;
+    }
+
+    // Give the child a generous timeout so a hang doesn't stall the suite.
+    int timeout_sec = 120;
+    int status = 0;
+    bool reaped = false;
+    for(int elapsed = 0; elapsed < timeout_sec; elapsed++) {
+        pid_t rc = waitpid(pid, &status, WNOHANG);
+        if(rc > 0) { reaped = true; break; }
+        if(rc < 0) {
+            if(errno == EINTR)
+                continue;
+            fprintf(stderr, "dictionary_destroy() TOCTOU race test: waitpid() failed: %s\n",
+                    strerror(errno));
+            return 1;
+        }
+        sleep_usec(USEC_PER_SEC);
+    }
+    if(!reaped) {
+        kill(pid, SIGKILL);
+        while(waitpid(pid, &status, 0) < 0) {
+            if(errno != EINTR) {
+                fprintf(stderr, "dictionary_destroy() TOCTOU race test: waitpid() failed after SIGKILL: %s\n",
+                        strerror(errno));
+                return 1;
+            }
+        }
+        fprintf(stderr, "dictionary_destroy() TOCTOU race test: FAILED — "
+                "child hung (killed after %d seconds)\n", timeout_sec);
+        return 1;
+    }
+
+    if(WIFSIGNALED(status)) {
+        int sig = WTERMSIG(status);
+        fprintf(stderr,
+                "dictionary_destroy() TOCTOU race test: FAILED — "
+                "child killed by signal %d (%s) — "
+                "dictionary_destroy() still has a TOCTOU in its destroy/access "
+                "synchronization path\n",
+                sig, strsignal(sig));
+        return 1;
+    }
+
+    if(WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+        fprintf(stderr,
+                "dictionary_destroy() TOCTOU race test: FAILED — "
+                "child exited with status %d\n",
+                WEXITSTATUS(status));
+        return 1;
+    }
+
+    fprintf(stderr, "dictionary_destroy() TOCTOU race test: OK\n");
+    return 0;
+}
+
+#else
+
+static int dictionary_destroy_race_unittest(void) {
+    fprintf(stderr,
+            "\nTesting dictionary_destroy() TOCTOU race: SKIPPED "
+            "(fork-based test is unsupported on this platform)\n");
+    return 0;
+}
+
+#endif
 
 bool dictionary_traverse_or_destroy_unittest(void) {
     DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
@@ -1634,6 +1902,8 @@ int dictionary_unittest(size_t entries) {
     }
     else
         fprintf(stderr, "Destroy on traversal test OK\n");
+
+    errors += dictionary_destroy_race_unittest();
 
     cleanup_destroyed_dictionaries(false);
 

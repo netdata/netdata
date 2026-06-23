@@ -7,6 +7,7 @@
 #define MAX_SEARCH 3
 #define MAX_PARAMETERS 128
 #define ERROR_BUFFER_SIZE 1024
+#define FAIL2BAN_SOCKET_PATH_IN_DOCKER "/host/var/run/fail2ban/fail2ban.sock"
 
 struct command {
     const char *name;
@@ -133,7 +134,7 @@ struct command {
     },
     {
         .name = "fail2ban-client-status-socket",
-        .params = "-s {{socket_path}} status",
+        .params = "-s " FAIL2BAN_SOCKET_PATH_IN_DOCKER " status",
         .search = {
             [0] = "fail2ban-client",
             [1] = NULL,
@@ -149,7 +150,7 @@ struct command {
     },
     {
         .name = "fail2ban-client-status-jail-socket",
-        .params = "-s {{socket_path}} status {{jail}}",
+        .params = "-s " FAIL2BAN_SOCKET_PATH_IN_DOCKER " status {{jail}}",
         .search = {
             [0] = "fail2ban-client",
             [1] = NULL,

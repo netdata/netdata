@@ -719,8 +719,6 @@ static ALWAYS_INLINE void pgc_queue_del(PGC *cache __maybe_unused, struct pgc_qu
                    page_get_status_flags(page),
         q->flags);
 
-    page_flag_clear(page, q->flags);
-
     struct section_pages *sp_to_free = NULL;
 
     if(q->linked_list_in_sections_judy) {
@@ -755,6 +753,15 @@ static ALWAYS_INLINE void pgc_queue_del(PGC *cache __maybe_unused, struct pgc_qu
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(q->base, page, link.prev, link.next);
         q->version++;
     }
+
+    // Clear the queue flag only after the unlink, while still under the queue
+    // lock. This guarantees that "flag cleared" implies "page already unlinked",
+    // so a lockless reader observing "no longer on this queue" cannot race
+    // with an in-progress unlink. The reciprocal (flag set implies on the
+    // list) is intentionally not provided; readers that act on link pointers
+    // must re-validate under the queue lock, as commit 2733e6fc60 (#21793)
+    // does in page_has_been_accessed.
+    page_flag_clear(page, q->flags);
 
     if(!having_lock)
         pgc_queue_unlock(cache, q);
@@ -1394,6 +1401,14 @@ static PGC_PAGE *pgc_page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
     internal_fatal(entry->start_time_s < 0 || entry->end_time_s < 0,
                    "DBENGINE CACHE: timestamps are negative");
 
+    // Clamp before the values are copied into the new PGC_PAGE and used as
+    // the Judy index key, so the struct and the index agree.
+    if(unlikely(entry->start_time_s < 0))
+        entry->start_time_s = 0;
+
+    if(unlikely(entry->end_time_s < 0))
+        entry->end_time_s = 0;
+
     p2_add_fetch(&cache->stats.p2_workers_add, 1);
 
     size_t partition = pgc_indexing_partition(cache, entry->metric_id);
@@ -1403,7 +1418,7 @@ static PGC_PAGE *pgc_page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
 #else
     PGC_PAGE *allocation = mallocz(sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page);
 #endif
-    
+
     allocation->refcount = 1;
     allocation->accesses = (entry->hot) ? 0 : 1;
     allocation->flags = 0;
@@ -1417,22 +1432,16 @@ static PGC_PAGE *pgc_page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
     spinlock_init(&allocation->transition_spinlock);
     allocation->link.prev = NULL;
     allocation->link.next = NULL;
-    
+
     if(cache->config.additional_bytes_per_page) {
         if(entry->custom_data)
             memcpy(allocation->custom_data, entry->custom_data, cache->config.additional_bytes_per_page);
         else
             memset(allocation->custom_data, 0, cache->config.additional_bytes_per_page);
     }
-    
+
     PGC_PAGE *page;
     size_t spins = 0;
-
-    if(unlikely(entry->start_time_s < 0))
-        entry->start_time_s = 0;
-
-    if(unlikely(entry->end_time_s < 0))
-        entry->end_time_s = 0;
 
     do {
         spins++;

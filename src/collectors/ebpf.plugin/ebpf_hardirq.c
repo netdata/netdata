@@ -224,7 +224,7 @@ static void hardirq_cleanup(void *pptr)
     if (!em)
         return;
 
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
+    if (ebpf_module_enabled_get(em) == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
         netdata_mutex_lock(&lock);
 
         if (hardirq_safe_clean)
@@ -236,7 +236,7 @@ static void hardirq_cleanup(void *pptr)
 
     if (!hardirq_safe_clean) {
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+        ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPED);
         netdata_mutex_unlock(&ebpf_exit_cleanup);
         return;
     }
@@ -275,7 +275,7 @@ static void hardirq_cleanup(void *pptr)
     }
 
     netdata_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPED);
     netdata_mutex_unlock(&ebpf_exit_cleanup);
 }
 

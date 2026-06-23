@@ -924,6 +924,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/log/nd_log.h
         src/libnetdata/os/os.c
         src/libnetdata/os/os.h
+        src/libnetdata/os/ci.c
+        src/libnetdata/os/ci.h
         src/libnetdata/os/byteorder.h
         src/libnetdata/onewayalloc/onewayalloc.c
         src/libnetdata/onewayalloc/onewayalloc.h

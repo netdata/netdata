@@ -21,6 +21,7 @@ struct health_plugin_globals health_globals = {
 
         .run_at_least_every_seconds = 10,
         .postpone_alarms_during_hibernation_for_seconds = 60,
+        .notification_execution_timeout_seconds = 120,
     },
     .prototypes = {
         .dict = NULL,
@@ -88,6 +89,17 @@ void health_load_config_defaults(void) {
         inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_HEALTH,
                                     "postpone alarms during hibernation for",
                                     health_globals.config.postpone_alarms_during_hibernation_for_seconds);
+
+    time_t notification_execution_timeout =
+        inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_HEALTH,
+                                    "notification execution timeout",
+                                    health_globals.config.notification_execution_timeout_seconds);
+    // clamp to [0, INT32_MAX] before narrowing to int32: the upper clamp prevents a huge
+    // value from overflowing into a negative, the lower clamp normalizes negatives to 0.
+    // 0 means "wait forever".
+    if(notification_execution_timeout < 0) notification_execution_timeout = 0;
+    if(notification_execution_timeout > INT32_MAX) notification_execution_timeout = INT32_MAX;
+    health_globals.config.notification_execution_timeout_seconds = (int32_t)notification_execution_timeout;
 
     health_globals.config.default_recipient =
         string_strdupz("root");

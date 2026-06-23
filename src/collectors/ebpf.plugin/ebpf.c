@@ -1002,7 +1002,7 @@ static inline void ebpf_check_before2go()
         int active_count = 0;
         netdata_mutex_lock(&ebpf_exit_cleanup);
         for (j = 0; ebpf_modules[j].info.thread_name != NULL; j++) {
-            if (ebpf_modules[j].enabled < NETDATA_THREAD_EBPF_STOPPING)
+            if (ebpf_module_enabled_get(&ebpf_modules[j]) < NETDATA_THREAD_EBPF_STOPPING)
                 active_count++;
         }
         netdata_mutex_unlock(&ebpf_exit_cleanup);
@@ -1130,7 +1130,9 @@ void ebpf_stop_threads(int sig)
 
     int i;
     for (i = 0; ebpf_modules[i].info.thread_name != NULL; i++) {
-        if (ebpf_modules[i].enabled < NETDATA_THREAD_EBPF_STOPPING && ebpf_modules[i].thread &&
+        enum ebpf_threads_status enabled = ebpf_module_enabled_get(&ebpf_modules[i]);
+
+        if (enabled < NETDATA_THREAD_EBPF_STOPPING && ebpf_modules[i].thread &&
             ebpf_modules[i].thread->thread) {
             nd_thread_signal_cancel(ebpf_modules[i].thread->thread);
 #ifdef NETDATA_DEV_MODE
@@ -1141,12 +1143,14 @@ void ebpf_stop_threads(int sig)
     netdata_mutex_unlock(&ebpf_exit_cleanup);
 
     for (i = 0; ebpf_modules[i].info.thread_name != NULL; i++) {
-        if (ebpf_modules[i].enabled < NETDATA_THREAD_EBPF_STOPPED && ebpf_threads[i].thread) {
+        enum ebpf_threads_status enabled = ebpf_module_enabled_get(&ebpf_modules[i]);
+
+        if (enabled < NETDATA_THREAD_EBPF_STOPPED && ebpf_threads[i].thread) {
             netdata_log_info(
                 "EBPF SHUTDOWN: about to join module[%d]='%s' (state=%u).",
                 i,
                 ebpf_modules[i].info.thread_name,
-                ebpf_modules[i].enabled);
+                enabled);
             usec_t join_started_ut = now_monotonic_usec();
             nd_thread_join(ebpf_threads[i].thread);
             usec_t join_duration_ut = now_monotonic_usec() - join_started_ut;
@@ -1576,7 +1580,7 @@ static inline void ebpf_send_hash_table_pid_data(char *chart, uint32_t idx)
         if (wem->functions.apps_routine)
             write_chart_dimension(
                 (char *)wem->info.thread_name,
-                (wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ? wem->hash_table_stats[idx] : 0);
+                (ebpf_module_enabled_get(wem) < NETDATA_THREAD_EBPF_STOPPING) ? wem->hash_table_stats[idx] : 0);
     }
     ebpf_write_end_chart();
 }
@@ -1594,7 +1598,8 @@ static inline void ebpf_send_global_hash_table_data()
     for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
         ebpf_module_t *wem = &ebpf_modules[i];
         write_chart_dimension(
-            (char *)wem->info.thread_name, (wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ? NETDATA_CONTROLLER_END : 0);
+            (char *)wem->info.thread_name,
+            (ebpf_module_enabled_get(wem) < NETDATA_THREAD_EBPF_STOPPING) ? NETDATA_CONTROLLER_END : 0);
     }
     ebpf_write_end_chart();
 }
@@ -1616,7 +1621,8 @@ void ebpf_send_statistic_data()
         if (wem->functions.fnct_routine)
             continue;
 
-        write_chart_dimension((char *)wem->info.thread_name, (wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ? 1 : 0);
+        write_chart_dimension(
+            (char *)wem->info.thread_name, (ebpf_module_enabled_get(wem) < NETDATA_THREAD_EBPF_STOPPING) ? 1 : 0);
     }
     ebpf_write_end_chart();
 
@@ -1635,7 +1641,7 @@ void ebpf_send_statistic_data()
 
         write_chart_dimension(
             (char *)wem->info.thread_name,
-            (wem->lifetime && wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ?
+            (wem->lifetime && ebpf_module_enabled_get(wem) < NETDATA_THREAD_EBPF_STOPPING) ?
                 (long long)(wem->lifetime - wem->running_time) :
                 0);
     }
@@ -1682,13 +1688,14 @@ void ebpf_send_statistic_data()
             continue;
 
         ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, wem->functions.fcnt_thread_chart_name, "");
-        write_chart_dimension((char *)wem->info.thread_name, (wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ? 1 : 0);
+        write_chart_dimension(
+            (char *)wem->info.thread_name, (ebpf_module_enabled_get(wem) < NETDATA_THREAD_EBPF_STOPPING) ? 1 : 0);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, wem->functions.fcnt_thread_lifetime_name, "");
         write_chart_dimension(
             (char *)wem->info.thread_name,
-            (wem->lifetime && wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ?
+            (wem->lifetime && ebpf_module_enabled_get(wem) < NETDATA_THREAD_EBPF_STOPPING) ?
                 (long long)(wem->lifetime - wem->running_time) :
                 0);
         ebpf_write_end_chart();
@@ -2372,8 +2379,8 @@ int main(int argc, char **argv)
         ebpf_module_t *em = &ebpf_modules[i];
         em->thread = st;
         em->thread_id = i;
-        if (em->enabled != NETDATA_THREAD_EBPF_NOT_RUNNING) {
-            em->enabled = NETDATA_THREAD_EBPF_RUNNING;
+        if (ebpf_module_enabled_get(em) != NETDATA_THREAD_EBPF_NOT_RUNNING) {
+            ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_RUNNING);
             em->lifetime = EBPF_NON_FUNCTION_LIFE_TIME;
 
             if (em->functions.apps_routine && (em->apps_charts || em->cgroup_charts)) {

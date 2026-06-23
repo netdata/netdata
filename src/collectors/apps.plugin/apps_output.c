@@ -233,7 +233,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
 #if (PROCESSES_HAVE_FDS == 1)
             send_SET("files", w->openfds.files);
             send_SET("sockets", w->openfds.sockets);
-            send_SET("pipes", w->openfds.sockets);
+            send_SET("pipes", w->openfds.pipes);
             send_SET("inotifies", w->openfds.inotifies);
             send_SET("event", w->openfds.eventfds);
             send_SET("timer", w->openfds.timerfds);

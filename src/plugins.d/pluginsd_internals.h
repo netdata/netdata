@@ -369,13 +369,36 @@ static inline RRDSET *pluginsd_find_chart(RRDHOST *host, const char *chart, cons
     return st;
 }
 
-static ALWAYS_INLINE ssize_t pluginsd_parse_rrd_slot(char **words, size_t num_words) {
+static ALWAYS_INLINE ssize_t pluginsd_parse_rrd_slot(char **words, size_t num_words, size_t max_slot) {
+    // Contract: max_slot must fit in ssize_t so the (ssize_t) cast below stays
+    // non-negative. All callers pass small compile-time caps (PLUGINSD_*_SLOT_MAX),
+    // so for the inlined constant this check is folded away by the compiler.
+    internal_fatal(max_slot > (size_t)SSIZE_MAX,
+                   "PLUGINSD: max_slot %zu exceeds SSIZE_MAX", max_slot);
+
     ssize_t slot = -1;
     char *id = get_word(words, num_words, 1);
+    // Words are NUL-terminated and && short-circuits left-to-right, so each id[k]
+    // is read only after id[0..k-1] matched the non-NUL "SLOT" chars. A shorter word
+    // (e.g. "X" or "SLOT") fails an earlier comparison or hits the terminator at id[4],
+    // so these fixed-index reads never go past the token's NUL. No bounds check needed.
     if(id && id[0] == PLUGINSD_KEYWORD_SLOT[0] && id[1] == PLUGINSD_KEYWORD_SLOT[1] &&
        id[2] == PLUGINSD_KEYWORD_SLOT[2] && id[3] == PLUGINSD_KEYWORD_SLOT[3] && id[4] == ':') {
-        slot = (ssize_t) str2ull_encoded(&id[5]);
-        if(slot < 0) slot = 0; // to make the caller increment its idx of the words
+        unsigned long long parsed_slot = str2ull_encoded(&id[5]);
+        if(unlikely(parsed_slot > max_slot)) {
+            nd_log_limit_static_global_var(erl_slot, 1, 0);
+            nd_log_limit(&erl_slot, NDLS_COLLECTORS, NDLP_WARNING,
+                         "PLUGINSD: ignoring invalid SLOT value '%s' above the supported maximum %zu",
+                         &id[5], max_slot);
+            // slot 0 means: the SLOT word was present (so the caller still advances its
+            // word index), but the value is unusable as a cache index. Each caller
+            // handles slot < 1 per its own path -- chart lookups fall back to finding
+            // the chart by id, and dimension caching switches to the non-slotted
+            // (by-position) path (pluginsd_rrddim_put_to_slot sets dims_with_slots=false).
+            slot = 0;
+        }
+        else
+            slot = (ssize_t)parsed_slot;
     }
 
     return slot;

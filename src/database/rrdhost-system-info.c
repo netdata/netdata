@@ -19,6 +19,9 @@ void rrdhost_system_info_swap(struct rrdhost_system_info *a, struct rrdhost_syst
 int rrdhost_system_info_set_by_name(struct rrdhost_system_info *system_info, char *name, char *value) {
     int res = 0;
 
+    if (unlikely(!name || !value))
+        return 1;
+
     if (!strcmp(name, "NETDATA_PROTOCOL_VERSION"))
         return res;
 

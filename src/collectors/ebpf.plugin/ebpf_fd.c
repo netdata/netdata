@@ -621,7 +621,7 @@ static void ebpf_fd_exit(void *pptr)
 
     if (!fd_safe_clean) {
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+        ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPED);
         netdata_mutex_unlock(&ebpf_exit_cleanup);
         return;
     }
@@ -642,7 +642,7 @@ static void ebpf_fd_exit(void *pptr)
         sem_post(shm_mutex_ebpf_integration);
     }
 
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
+    if (ebpf_module_enabled_get(em) == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
         netdata_mutex_lock(&lock);
         if (em->cgroup_charts) {
             ebpf_obsolete_fd_cgroup_charts(em);
@@ -668,7 +668,7 @@ static void ebpf_fd_exit(void *pptr)
         em->functions.bpf_unload(em);
 
     netdata_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPED);
     netdata_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -778,6 +778,8 @@ static void ebpf_read_fd_apps_table(int maps_per_core)
         if (ebpf_plugin_stop())
             break;
 
+        key = next_key;
+
         if (bpf_map_lookup_elem(fd, &key, fv)) {
             netdata_log_error("Failed to lookup PID %u in FD map", key);
             goto end_fd_loop;
@@ -804,7 +806,6 @@ static void ebpf_read_fd_apps_table(int maps_per_core)
     end_fd_loop:
         // We are cleaning to avoid passing data read from one process to other.
         memset(fv, 0, length);
-        key = next_key;
     }
 }
 
