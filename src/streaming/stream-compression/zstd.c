@@ -215,6 +215,11 @@ int unittest_stream_decompress_bomb_zstd(void) {
         size_t cbound = ZSTD_compressBound(msg_len);
         char *cmsg = mallocz(cbound);
         size_t cmsg_len = ZSTD_compress(cmsg, cbound, msg, msg_len, 1);
+        if (ZSTD_isError(cmsg_len)) {
+            fprintf(stderr, "  FAILED: ZSTD_compress() error: %s\n", ZSTD_getErrorName(cmsg_len));
+            freez(cmsg); freez(plain); freez(comp);
+            return errors + 1;
+        }
 
         struct decompressor_state dctx = { .initialized = false, .algorithm = COMPRESSION_ALGORITHM_ZSTD };
         stream_decompressor_init(&dctx);
