@@ -25,9 +25,15 @@
 #define EBPF_MAX_MODE_LENGTH 6
 
 #define EBPF_CFG_TYPE_FORMAT "ebpf type format"
+#define EBPF_CFG_OBJECT_FLAVOR "ebpf object flavor"
 #define EBPF_CFG_DEFAULT_PROGRAM "auto"
 #define EBPF_CFG_CORE_PROGRAM "CO-RE"
 #define EBPF_CFG_LEGACY_PROGRAM "legacy"
+#define EBPF_CFG_TRACING_PROGRAM "tracing"
+#define EBPF_CFG_BUFFER_PROGRAM "buffer"
+#define EBPF_CFG_BUFFER_RING_PROGRAM "buffer ring"
+#define EBPF_CFG_RING_BUFFER_PROGRAM "ring buffer"
+#define EBPF_CFG_ARENA_PROGRAM "arena"
 
 #define EBPF_CFG_COLLECT_PID "collect pid"
 #define EBPF_CFG_PID_REAL_PARENT "real parent"
@@ -468,6 +474,7 @@ int ebpf_disable_tracing_values(const char *subsys, const char *eventname);
 #define NETDATA_EBPF_MAX_SYSCALL_LENGTH 255
 
 netdata_ebpf_load_mode_t epbf_convert_string_to_load_mode(const char *str);
+netdata_ebpf_load_mode_t ebpf_convert_object_flavor_to_load_mode(const char *str);
 netdata_ebpf_program_loaded_t ebpf_convert_core_type(const char *str, netdata_run_mode_t lmode);
 void ebpf_select_host_prefix(char *output, size_t length, char *syscall, int kver);
 #ifdef LIBBPF_MAJOR_VERSION

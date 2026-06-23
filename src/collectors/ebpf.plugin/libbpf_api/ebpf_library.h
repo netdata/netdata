@@ -105,6 +105,7 @@ void ebpf_update_table_size();
 void ebpf_update_lifetime();
 void ebpf_set_load_mode(netdata_ebpf_load_mode_t load, netdata_ebpf_load_mode_t origin);
 void ebpf_update_load_mode(const char *str, netdata_ebpf_load_mode_t origin);
+void ebpf_update_object_flavor(const char *str, netdata_ebpf_load_mode_t origin);
 void ebpf_update_map_per_core();
 void ebpf_set_ipc_value(const char *integration);
 void ebpf_parse_ipc_section();

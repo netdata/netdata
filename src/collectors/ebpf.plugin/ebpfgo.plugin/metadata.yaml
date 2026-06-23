@@ -91,7 +91,7 @@ modules:
               default_value: 32768
               required: false
             - name: ebpf object flavor
-              description: "Select the cachestat object flavor to load. Available values are `buffer`, `arena`, and `tracing`. The default is `buffer`, and the collector falls back to `tracing` when the requested flavor is not available on the system."
+              description: "Select the cachestat object flavor to load. Available values are `arena`, `buffer ring` (also accepted as `buffer`), and `legacy` (also accepted as `tracing`). The default is `buffer`, and the collector falls back when the requested flavor is not available on the system."
               default_value: buffer
               required: false
             - name: ebpf type format
@@ -230,7 +230,7 @@ modules:
               default_value: 10
               required: false
             - name: ebpf object flavor
-              description: "Select the BPF object flavor. Available values are `buffer`, `arena`, and `tracing`. The collector falls back to the next available flavor when the requested one is not supported by the running kernel."
+              description: "Select the BPF object flavor. Available values are `arena`, `buffer ring` (also accepted as `buffer`), and `legacy` (also accepted as `tracing`). The collector falls back to the next available flavor when the requested one is not supported by the running kernel."
               default_value: buffer
               required: false
         examples:
@@ -333,7 +333,7 @@ modules:
               default_value: /sys/kernel/btf/
               required: false
             - name: ebpf object flavor
-              description: "Select the BPF object flavor. Available values are `buffer`, `arena`, and `tracing`. The collector falls back to the next available flavor when the requested one is not supported by the running kernel."
+              description: "Select the BPF object flavor. Available values are `arena`, `buffer ring` (also accepted as `buffer`), and `legacy` (also accepted as `tracing`). The collector falls back to the next available flavor when the requested one is not supported by the running kernel."
               default_value: buffer
               required: false
         examples:

@@ -1090,6 +1090,19 @@ netdata_ebpf_load_mode_t epbf_convert_string_to_load_mode(const char *str)
     return EBPF_LOAD_PLAY_DICE;
 }
 
+netdata_ebpf_load_mode_t ebpf_convert_object_flavor_to_load_mode(const char *str)
+{
+    if (!strcasecmp(str, EBPF_CFG_LEGACY_PROGRAM) || !strcasecmp(str, EBPF_CFG_TRACING_PROGRAM))
+        return EBPF_LOAD_LEGACY;
+
+    if (!strcasecmp(str, EBPF_CFG_BUFFER_PROGRAM) || !strcasecmp(str, EBPF_CFG_BUFFER_RING_PROGRAM) ||
+        !strcasecmp(str, EBPF_CFG_RING_BUFFER_PROGRAM) || !strcasecmp(str, EBPF_CFG_ARENA_PROGRAM))
+        return EBPF_LOAD_PLAY_DICE;
+
+    netdata_log_error("the option %s for \"ebpf object flavor\" is not a valid option.", str);
+    return EBPF_LOAD_PLAY_DICE;
+}
+
 /**
  * Convert load mode to string
  *
@@ -1368,6 +1381,9 @@ void ebpf_update_module_using_config(
     char *value = ebpf_convert_load_mode_to_string(modules->load & NETDATA_EBPF_LOAD_METHODS);
     const char *type_format = inicfg_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_TYPE_FORMAT, value);
     netdata_ebpf_load_mode_t load = epbf_convert_string_to_load_mode(type_format);
+    const char *object_flavor = inicfg_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_OBJECT_FLAVOR, NULL);
+    if (object_flavor)
+        load = ebpf_convert_object_flavor_to_load_mode(object_flavor);
     load = ebpf_select_load_mode(btf_file, load, kver, is_rh);
     modules->load = origin | load;
 

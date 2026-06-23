@@ -363,6 +363,13 @@ void ebpf_update_load_mode(const char *str, netdata_ebpf_load_mode_t origin)
     ebpf_set_load_mode(load, origin);
 }
 
+void ebpf_update_object_flavor(const char *str, netdata_ebpf_load_mode_t origin)
+{
+    netdata_ebpf_load_mode_t load = ebpf_convert_object_flavor_to_load_mode(str);
+
+    ebpf_set_load_mode(load, origin);
+}
+
 void ebpf_update_map_per_core()
 {
     int value = inicfg_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_MAPS_PER_CORE, CONFIG_BOOLEAN_YES);
@@ -476,6 +483,10 @@ void read_collector_values(int *disable_cgroups, int update_every, netdata_ebpf_
     value = inicfg_get(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_TYPE_FORMAT, EBPF_CFG_DEFAULT_PROGRAM);
 
     ebpf_update_load_mode(value, origin);
+
+    value = inicfg_get(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_OBJECT_FLAVOR, NULL);
+    if (value)
+        ebpf_update_object_flavor(value, origin);
 
     ebpf_update_interval(update_every);
 

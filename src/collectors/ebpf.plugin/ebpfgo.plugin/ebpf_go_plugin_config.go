@@ -344,9 +344,17 @@ func parseCollectPidLevel(value string) int {
 }
 
 func parseObjectFlavor(value string) (string, bool) {
-	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "buffer", "arena", "tracing":
-		return strings.ToLower(strings.TrimSpace(value)), true
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	normalized = strings.NewReplacer("_", " ", "-", " ").Replace(normalized)
+	normalized = strings.Join(strings.Fields(normalized), " ")
+
+	switch normalized {
+	case "buffer", "buffer ring", "ring buffer":
+		return "buffer", true
+	case "arena":
+		return "arena", true
+	case "tracing", "legacy":
+		return "tracing", true
 	default:
 		return "", false
 	}

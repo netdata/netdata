@@ -70,6 +70,21 @@ func TestParsePluginConfigFileLegacyKeys(t *testing.T) {
 			wantFlavor:   "",
 			wantPidLevel: -1,
 		},
+		"ebpf object flavor legacy maps to tracing flavor": {
+			content:      "[global]\nebpf object flavor = legacy\n",
+			wantFlavor:   "tracing",
+			wantPidLevel: -1,
+		},
+		"ebpf object flavor buffer ring maps to buffer flavor": {
+			content:      "[global]\nebpf object flavor = buffer ring\n",
+			wantFlavor:   "buffer",
+			wantPidLevel: -1,
+		},
+		"ebpf object flavor ring buffer maps to buffer flavor": {
+			content:      "[global]\nebpf object flavor = ring-buffer\n",
+			wantFlavor:   "buffer",
+			wantPidLevel: -1,
+		},
 		"collect pid real parent sets level 0": {
 			content:      "[global]\ncollect pid = real parent\n",
 			wantFlavor:   "",
