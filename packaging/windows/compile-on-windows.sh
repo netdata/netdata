@@ -82,7 +82,7 @@ if [ -x "/ucrt64/bin/ninja" ]; then
     cmake_make_program=("-DCMAKE_MAKE_PROGRAM=/ucrt64/bin/ninja")
 fi
 
-COMMON_CFLAGS="-Wa,-mbig-obj -pipe -D_FILE_OFFSET_BITS=64 -D__USE_MINGW_ANSI_STDIO=1"
+COMMON_CFLAGS="-Wa,-mbig-obj -pipe -D_FILE_OFFSET_BITS=64"
 
 # GNU BFD ld.exe hangs (or OOMs) on large RelWithDebInfo builds because it
 # cannot handle the combined DWARF load from 700+ objects + absl + protobuf.
