@@ -32,7 +32,9 @@ FLOWS_SOURCES = [
 ]
 
 DEVICE_SOURCES = [
-    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'go.d' / 'collector' / 'snmp' / 'npm-catalog' / 'metadata.yaml', False),
+    (AGENT_REPO,
+     REPO_PATH / 'src' / 'go' / 'plugin' / 'go.d' / 'collector' / 'snmp' / 'npm-catalog' / 'metadata.yaml',
+     False),
 ]
 
 DEPLOY_SOURCES = [
@@ -317,7 +319,8 @@ def load_device():
                 DEVICE_VALIDATOR.validate(data)
             except ValidationError as e:
                 warn(
-                    f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})',
+                    f'Failed to validate {file} against the schema: {e.message} '
+                    f'(path: {"/".join(str(p) for p in e.absolute_path)})',
                     file)
                 continue
 
@@ -1384,10 +1387,13 @@ def main():
     service_discoveries, clean_service_discoveries, ids = render_service_discoveries(categories, service_discoveries,
                                                                                      ids)
 
-    integrations = collectors + deploy + exporters + agent_notifications + cloud_notifications + logs + flows + devices + authentications + secretstores + service_discoveries
+    integrations = (collectors + deploy + exporters + agent_notifications + cloud_notifications
+                    + logs + flows + devices + authentications + secretstores + service_discoveries)
     render_integrations(categories, integrations)
 
-    clean_integrations = clean_collectors + clean_deploy + clean_exporters + clean_agent_notifications + clean_cloud_notifications + clean_logs + clean_flows + clean_devices + clean_authentications + clean_secretstores + clean_service_discoveries
+    clean_integrations = (clean_collectors + clean_deploy + clean_exporters + clean_agent_notifications
+                          + clean_cloud_notifications + clean_logs + clean_flows + clean_devices
+                          + clean_authentications + clean_secretstores + clean_service_discoveries)
     render_json(categories, clean_integrations)
 
     return fail_on_warnings()

@@ -84,7 +84,8 @@ class CategoryMapper:
                 # integrations category whose children (Device Metrics, Network
                 # Flows, SNMP Traps, BGP, Licensing, Topologies, Syslog) are
                 # sections in their own right.
-                if parent in ('data-collection', 'network-performance-monitoring') or (parent is None and cid == 'flows'):
+                if (parent in ('data-collection', 'network-performance-monitoring')
+                        or (parent is None and cid == 'flows')):
                     self.section_level_ids.append(cid)
 
                 # Track categories with collector_default=true

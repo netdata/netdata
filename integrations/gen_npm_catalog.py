@@ -33,7 +33,8 @@ from ruamel.yaml import YAML
 
 REPO_PATH = Path(__file__).resolve().parent.parent
 PROFILES_DIR = REPO_PATH / 'src' / 'go' / 'plugin' / 'go.d' / 'config' / 'go.d' / 'snmp.profiles' / 'default'
-TRAP_CATALOGUE = REPO_PATH / 'src' / 'go' / 'plugin' / 'go.d' / 'config' / 'go.d' / 'snmp.trap-profiles' / 'catalogue.json'
+TRAP_CATALOGUE = (REPO_PATH / 'src' / 'go' / 'plugin' / 'go.d' / 'config' / 'go.d'
+                  / 'snmp.trap-profiles' / 'catalogue.json')
 TRAP_PROFILES_DIR = TRAP_CATALOGUE.parent / 'default'
 OUTPUT = REPO_PATH / 'src' / 'go' / 'plugin' / 'go.d' / 'collector' / 'snmp' / 'npm-catalog' / 'metadata.yaml'
 
@@ -202,12 +203,16 @@ def overview(metrics_description, method_description, auto_detection):
 SETUP = {
     'prerequisites': {'list': [{
         'title': 'SNMP access',
-        'description': 'SNMP must be enabled on the device and reachable from the Netdata Agent acting as the site\'s SNMP hub.',
+        'description': 'SNMP must be enabled on the device and reachable from the Netdata Agent acting as the site\'s '
+        'SNMP '
+        'hub.',
     }]},
     'configuration': {
         'file': {'name': 'go.d/snmp.conf'},
         'options': {
-            'description': 'Configure the SNMP collector with the device hostname and SNMP credentials. See the SNMP collector reference for all options.',
+            'description': 'Configure the SNMP collector with the device hostname and SNMP credentials. See the SNMP '
+            'collector '
+            'reference for all options.',
             'folding': {'title': 'Config options', 'enabled': True},
             'list': [],
         },
@@ -390,8 +395,12 @@ def build_device_modules(profiles):
             icon=icon_for(vkey) if vkey else FALLBACK_ICON,
             keywords=[w.lower() for w in display.split()] + ['snmp', cls.lower(), 'npm'],
             ov=overview(
-                f'Monitor {display} ({cls.lower()}) with Netdata over SNMP. Netdata recognizes the device automatically by its `sysObjectID`{id_hint} and collects the metrics this profile declares — on top of the generic SNMP baseline — with no manual OID configuration.',
-                f'Netdata\'s SNMP collector matches the device to the **{name}** profile via `sysObjectID`/`sysDescr`, then polls the OIDs it declares.',
+                f'Monitor {display} ({cls.lower()}) with Netdata over SNMP. Netdata recognizes the device '
+                f'automatically '
+                f'by its `sysObjectID`{id_hint} and collects the metrics this profile declares — on top of the generic '
+                f'SNMP baseline — with no manual OID configuration.',
+                f'Netdata\'s SNMP collector matches the device to the **{name}** profile via `sysObjectID`/`sysDescr`, '
+                f'then polls the OIDs it declares.',
                 f'Auto-detected as {display} via sysObjectID/sysDescr.',
             ),
             metrics=metrics_block(render_profile_metrics_md(mets, display)),
@@ -412,7 +421,9 @@ def build_capability_modules(vendors):
         icon=FALLBACK_ICON,
         keywords=['bgp', 'bgp4-mib', 'snmp', 'routing', 'peering', 'npm'],
         ov=overview(
-            'Monitor BGP peering and routing health on any device that implements the standard BGP4-MIB, over SNMP with Netdata.',
+            'Monitor BGP peering and routing health on any device that implements the standard BGP4-MIB, over SNMP '
+            'with '
+            'Netdata.',
             'Netdata polls the standard BGP4-MIB peer table via SNMP and exposes per-peer state and counters.',
             'Available on any SNMP device that exposes the standard BGP4-MIB.',
         ),
@@ -426,8 +437,11 @@ def build_capability_modules(vendors):
             icon=icon_for(key),
             keywords=[key, 'bgp', 'snmp', 'routing', 'peering', 'npm'],
             ov=overview(
-                f'Monitor BGP peering and routing health on {display} devices over SNMP with Netdata, using {display} BGP profile coverage.',
-                f'Netdata polls the BGP peer tables exposed by {display} devices (vendor and standard BGP MIBs) via SNMP.',
+                f'Monitor BGP peering and routing health on {display} devices over SNMP with Netdata, using {display} '
+                f'BGP '
+                f'profile coverage.',
+                f'Netdata polls the BGP peer tables exposed by {display} devices (vendor and standard BGP MIBs) via '
+                f'SNMP.',
                 f'Detected automatically for {display} devices that expose BGP MIBs.',
             ),
         ))
@@ -442,7 +456,9 @@ def build_capability_modules(vendors):
             keywords=[key, 'license', 'licensing', 'entitlement', 'expiry', 'snmp', 'npm'],
             ov=overview(
                 f'Track license state, entitlements, and expiry on {display} devices over SNMP with Netdata.',
-                f'Netdata reads {display} licensing telemetry (state, usage, and expiry timers) exposed over SNMP and normalizes it into per-device licensing charts and the `snmp:licenses` function.',
+                f'Netdata reads {display} licensing telemetry (state, usage, and expiry timers) exposed over SNMP and '
+                f'normalizes '
+                f'it into per-device licensing charts and the `snmp:licenses` function.',
                 f'Detected automatically for {display} devices that expose licensing telemetry.',
             ),
         ))
@@ -460,31 +476,55 @@ def build_topology_modules():
     """
     snmp_methods = [
         ('LLDP Topology', ['lldp', 'topology', 'l2', 'snmp', 'npm'],
-         'Map Layer 2 neighbor links from devices that advertise LLDP (IEEE 802.1AB). Netdata\'s SNMP topology collector reads the LLDP local and remote tables and builds device-to-device links carrying chassis ID, port, system name, and management address.',
-         'Netdata reads the LLDP-MIB local and remote neighbor tables over SNMP and stitches the links into the `topology:snmp` view.',
+         'Map Layer 2 neighbor links from devices that advertise LLDP (IEEE 802.1AB). Netdata\'s SNMP topology '
+         'collector '
+         'reads the LLDP local and remote tables and builds device-to-device links carrying chassis ID, port, system '
+         'name, '
+         'and management address.',
+         'Netdata reads the LLDP-MIB local and remote neighbor tables over SNMP and stitches the links into the '
+         '`topology:snmp` '
+         'view.',
          'Discovered automatically on devices that expose the LLDP-MIB.'),
         ('CDP Topology', ['cdp', 'cisco', 'topology', 'l2', 'snmp', 'npm'],
-         'Map Layer 2 neighbor links on Cisco and Cisco-compatible devices that run CDP. Netdata reads the CDP cache table and records the neighbor device ID, remote port, platform, native VLAN, and duplex.',
+         'Map Layer 2 neighbor links on Cisco and Cisco-compatible devices that run CDP. Netdata reads the CDP cache '
+         'table '
+         'and records the neighbor device ID, remote port, platform, native VLAN, and duplex.',
          'Netdata reads the Cisco `cdpCacheTable` over SNMP and adds the neighbor links to the `topology:snmp` view.',
          'Discovered automatically on Cisco devices that expose the CDP cache.'),
         ('FDB / MAC Forwarding Topology', ['fdb', 'bridge', 'mac', 'topology', 'l2', 'snmp', 'npm'],
-         'Build the Layer 2 forwarding picture from switch MAC tables. Netdata reads the bridge forwarding database (BRIDGE-MIB / Q-BRIDGE-MIB) to learn which MAC addresses are seen on which switch ports — the basis for locating endpoints.',
-         'Netdata reads the BRIDGE-MIB and Q-BRIDGE-MIB forwarding tables over SNMP, with VLAN context, to map MAC addresses to switch ports.',
+         'Build the Layer 2 forwarding picture from switch MAC tables. Netdata reads the bridge forwarding database '
+         '(BRIDGE-MIB '
+         '/ Q-BRIDGE-MIB) to learn which MAC addresses are seen on which switch ports — the basis for locating '
+         'endpoints.',
+         'Netdata reads the BRIDGE-MIB and Q-BRIDGE-MIB forwarding tables over SNMP, with VLAN context, to map MAC '
+         'addresses '
+         'to switch ports.',
          'Discovered automatically on switches that expose the bridge forwarding database.'),
         ('ARP / IP Neighbor Topology', ['arp', 'ip neighbor', 'topology', 'l3', 'snmp', 'npm'],
-         'Bind IP addresses to MAC addresses across the fabric. Netdata reads the IP neighbor / ARP table (IP-MIB ipNetToMediaTable) and cross-references it with switch FDB data to position endpoints by IP.',
-         'Netdata reads the IP-MIB neighbor / ARP tables over SNMP and joins them with FDB data in the `topology:snmp` view.',
+         'Bind IP addresses to MAC addresses across the fabric. Netdata reads the IP neighbor / ARP table (IP-MIB '
+         'ipNetToMediaTable) '
+         'and cross-references it with switch FDB data to position endpoints by IP.',
+         'Netdata reads the IP-MIB neighbor / ARP tables over SNMP and joins them with FDB data in the `topology:snmp` '
+         'view.',
          'Discovered automatically on routers and switches that expose the ARP / IP neighbor table.'),
         ('STP Topology', ['stp', 'spanning tree', 'topology', 'l2', 'snmp', 'npm'],
-         'See which Layer 2 links are forwarding and which are blocked. Netdata reads the Spanning Tree port table (BRIDGE-MIB dot1dStpPortTable) for port state, root bridge, and path cost.',
+         'See which Layer 2 links are forwarding and which are blocked. Netdata reads the Spanning Tree port table '
+         '(BRIDGE-MIB '
+         'dot1dStpPortTable) for port state, root bridge, and path cost.',
          'Netdata reads the BRIDGE-MIB Spanning Tree port table over SNMP to annotate L2 links with their STP state.',
          'Discovered automatically on switches that expose the STP port table.'),
         ('BGP Peering Topology', ['bgp', 'peering', 'topology', 'l3', 'routing', 'snmp', 'npm'],
-         'Map routers to their BGP neighbors. Netdata reads BGP peer tables (BGP4-MIB plus vendor MIBs) and renders router-to-router peering links with remote AS and session state.',
-         'Netdata reads the BGP4-MIB and vendor BGP peer tables over SNMP and renders the peering graph in the `topology:snmp` view.',
+         'Map routers to their BGP neighbors. Netdata reads BGP peer tables (BGP4-MIB plus vendor MIBs) and renders '
+         'router-to-router '
+         'peering links with remote AS and session state.',
+         'Netdata reads the BGP4-MIB and vendor BGP peer tables over SNMP and renders the peering graph in the '
+         '`topology:snmp` '
+         'view.',
          'Discovered automatically on routers that expose BGP peer tables.'),
         ('OSPF Adjacency Topology', ['ospf', 'adjacency', 'topology', 'l3', 'routing', 'snmp', 'npm'],
-         'Map OSPF adjacencies between routers. Netdata reads the OSPF neighbor table (OSPF-MIB ospfNbrTable) and renders the L3 adjacency graph.',
+         'Map OSPF adjacencies between routers. Netdata reads the OSPF neighbor table (OSPF-MIB ospfNbrTable) and '
+         'renders '
+         'the L3 adjacency graph.',
          'Netdata reads the OSPF-MIB neighbor table over SNMP and renders adjacencies in the `topology:snmp` view.',
          'Discovered automatically on routers that expose the OSPF neighbor table.'),
     ]
@@ -492,23 +532,35 @@ def build_topology_modules():
     other = [
         ('Live Network Connections', 'network-viewer.plugin', 'network-viewer', FALLBACK_ICON,
          ['network connections', 'sockets', 'processes', 'topology', 'live', 'npm'],
-         'Visualize live host network connections. The network-viewer plugin maps local processes and services to the sockets and remote endpoints they are talking to, in real time.',
-         'The network-viewer plugin builds the `topology:network-connections` view directly from the host\'s live socket table — no SNMP and no configuration.',
+         'Visualize live host network connections. The network-viewer plugin maps local processes and services to the '
+         'sockets '
+         'and remote endpoints they are talking to, in real time.',
+         'The network-viewer plugin builds the `topology:network-connections` view directly from the host\'s live '
+         'socket '
+         'table — no SNMP and no configuration.',
          'Always on; observes the host\'s live network connections.'),
         ('Netdata Streaming Topology', 'netdata', 'streaming', FALLBACK_ICON,
          ['streaming', 'parents', 'children', 'topology', 'agents', 'npm'],
-         'See how your Netdata Agents connect. The streaming topology renders the parent-child hierarchy of a Netdata deployment — which Agents stream to which Parents.',
+         'See how your Netdata Agents connect. The streaming topology renders the parent-child hierarchy of a Netdata '
+         'deployment '
+         '— which Agents stream to which Parents.',
          'Netdata builds the `topology:streaming` view from the live streaming connections between Agents and Parents.',
          'Always available; reflects the live streaming connections of the deployment.'),
         ('vSphere Topology', 'go.d.plugin', 'vsphere', icon_for('vmware'),
          ['vsphere', 'vmware', 'vcenter', 'virtualization', 'topology', 'npm'],
-         'Map VMware vSphere infrastructure. The vSphere collector renders clusters, hosts, VMs, and datastores with placement and network-attachment links, plus datastore-utilization overlays.',
+         'Map VMware vSphere infrastructure. The vSphere collector renders clusters, hosts, VMs, and datastores with '
+         'placement '
+         'and network-attachment links, plus datastore-utilization overlays.',
          'The vSphere collector reads the vCenter inventory and renders it as a `netdata.topology.v1` graph.',
          'Built from the configured vCenter inventory.'),
         ('Cato Networks Topology', 'go.d.plugin', 'cato_networks', FALLBACK_ICON,
          ['cato', 'sase', 'sd-wan', 'topology', 'npm'],
-         'Map a Cato Networks SASE fabric. The Cato collector renders sites, sockets, and gateways with their tunnel and transport paths.',
-         'The Cato collector reads the Cato Management Application over its API and renders the fabric as a `netdata.topology.v1` graph.',
+         'Map a Cato Networks SASE fabric. The Cato collector renders sites, sockets, and gateways with their tunnel '
+         'and '
+         'transport paths.',
+         'The Cato collector reads the Cato Management Application over its API and renders the fabric as a '
+         '`netdata.topology.v1` '
+         'graph.',
          'Built from the configured Cato account.'),
     ]
 
@@ -537,9 +589,18 @@ def build_syslog_modules():
         icon=FALLBACK_ICON,
         keywords=['syslog', 'opentelemetry', 'otel', 'otlp', 'network devices', 'logs', 'npm'],
         ov=overview(
-            'Ingest syslog from routers, switches, and firewalls into Netdata. An OpenTelemetry Collector with a syslog receiver parses the device syslog stream and forwards it over OTLP/gRPC to the Netdata Agent, which stores it as structured journal logs you explore and query in the Logs tab.',
-            'Netdata does not listen for syslog directly. You run an OpenTelemetry Collector configured with a syslog receiver pointed at the Agent\'s OTLP/gRPC endpoint (default `127.0.0.1:4317`); the Agent\'s otel plugin writes the records to systemd-compatible journal files.',
-            'Not auto-detected. Configure an OpenTelemetry Collector syslog receiver to forward to the Agent\'s OTLP endpoint.',
+            'Ingest syslog from routers, switches, and firewalls into Netdata. An OpenTelemetry Collector with a '
+            'syslog '
+            'receiver parses the device syslog stream and forwards it over OTLP/gRPC to the Netdata Agent, which '
+            'stores '
+            'it as structured journal logs you explore and query in the Logs tab.',
+            'Netdata does not listen for syslog directly. You run an OpenTelemetry Collector configured with a syslog '
+            'receiver '
+            'pointed at the Agent\'s OTLP/gRPC endpoint (default `127.0.0.1:4317`); the Agent\'s otel plugin writes '
+            'the '
+            'records to systemd-compatible journal files.',
+            'Not auto-detected. Configure an OpenTelemetry Collector syslog receiver to forward to the Agent\'s OTLP '
+            'endpoint.',
         ),
         plugin_name='otel.plugin',
         module_name='otel',
@@ -569,9 +630,17 @@ def build_trap_modules():
             icon=icon_for(slug),
             keywords=[slug, 'snmp', 'trap', 'traps', 'inform', 'notification', 'npm'],
             ov=overview(
-                f'Receive, decode, and store SNMP traps and INFORMs from {display} devices with Netdata. The bundled {display} trap profile decodes {_plural(traps, "trap definition")} across {_plural(mibs, "MIB")} into structured journal events with named, typed varbinds — searchable and filterable in the Logs tab.',
-                f'Netdata\'s SNMP trap listener receives traps on UDP/162, matches them to the {display} enterprise OID space, and decodes the varbinds using the bundled {display} trap profile. No per-trap configuration.',
-                f'Traps from {display} devices are decoded automatically once the device is pointed at the Agent\'s trap listener.',
+                f'Receive, decode, and store SNMP traps and INFORMs from {display} devices with Netdata. The bundled '
+                f'{display} '
+                f'trap profile decodes {_plural(traps, "trap definition")} across {_plural(mibs, "MIB")} into '
+                f'structured '
+                f'journal events with named, typed varbinds — searchable and filterable in the Logs tab.',
+                f'Netdata\'s SNMP trap listener receives traps on UDP/162, matches them to the {display} enterprise '
+                f'OID '
+                f'space, and decodes the varbinds using the bundled {display} trap profile. No per-trap configuration.',
+                f'Traps from {display} devices are decoded automatically once the device is pointed at the Agent\'s '
+                f'trap '
+                f'listener.',
             ),
             metrics=metrics_block(render_trap_coverage_md(entry, display)),
             plugin_name='go.d.plugin',
@@ -662,16 +731,26 @@ def build_trap_enrichment_modules():
     source identity and context to received traps."""
     enrichment = [
         ('SNMP Trap Reverse DNS Enrichment', ['reverse dns', 'rdns', 'ptr', 'enrichment', 'traps', 'npm'],
-         'Annotate each trap with the reverse-DNS (PTR) name of its source IP, emitted as `TRAP_REVERSE_DNS`, so traps from raw IP addresses become readable by hostname.',
-         'Netdata performs a best-effort, cached PTR lookup on the trap source IP; results never override authoritative identity fields.',
+         'Annotate each trap with the reverse-DNS (PTR) name of its source IP, emitted as `TRAP_REVERSE_DNS`, so traps '
+         'from raw IP addresses become readable by hostname.',
+         'Netdata performs a best-effort, cached PTR lookup on the trap source IP; results never override '
+         'authoritative '
+         'identity fields.',
          'Optional; enable reverse DNS in the trap listener configuration.'),
         ('SNMP Trap Node Attribution', ['vnode', 'identity', 'attribution', 'enrichment', 'traps', 'npm'],
-         'Attribute each trap to the right Netdata node. When enrichment resolves the trap source to an unambiguous vnode, the trap and any profile metrics attach to that node; otherwise a bounded source label is used.',
-         'Netdata matches the trap source identity against known vnodes and host scopes, falling back to a bounded source label when attribution is ambiguous.',
+         'Attribute each trap to the right Netdata node. When enrichment resolves the trap source to an unambiguous '
+         'vnode, '
+         'the trap and any profile metrics attach to that node; otherwise a bounded source label is used.',
+         'Netdata matches the trap source identity against known vnodes and host scopes, falling back to a bounded '
+         'source '
+         'label when attribution is ambiguous.',
          'Always on; attribution uses the configured vnodes and host scopes.'),
         ('SNMP Trap Relay Source Resolution', ['relay', 'snmptrapaddress', 'source', 'enrichment', 'traps', 'npm'],
-         'Recover the original device identity when traps arrive through a relay. For trusted relay CIDRs, Netdata reads `snmpTrapAddress.0` to attribute the trap to the originating device rather than the relay.',
-         'Netdata trusts `snmpTrapAddress.0` only from the configured relay CIDR allowlist, then resolves the original source identity.',
+         'Recover the original device identity when traps arrive through a relay. For trusted relay CIDRs, Netdata '
+         'reads '
+         '`snmpTrapAddress.0` to attribute the trap to the originating device rather than the relay.',
+         'Netdata trusts `snmpTrapAddress.0` only from the configured relay CIDR allowlist, then resolves the original '
+         'source identity.',
          'Optional; configure the trusted relay CIDR allowlist.'),
     ]
     return [make_entry(
@@ -715,6 +794,9 @@ def main():
     yaml = YAML()
     yaml.default_flow_style = False
     yaml.width = 4096
+    # Indent block sequences under their key (yamllint indent-sequences + repo
+    # metadata.yaml house style): `  - meta:` with mapping values at col 6.
+    yaml.indent(mapping=2, sequence=4, offset=2)
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     with OUTPUT.open('w', encoding='utf-8') as f:
         f.write('# DO NOT EDIT THIS FILE DIRECTLY.\n')
@@ -725,7 +807,8 @@ def main():
     n_bgp = sum(1 for v in vendors.values() if v['bgp']) + 1
     n_lic = sum(1 for v in vendors.values() if v['lic'])
     print(f'Wrote {OUTPUT} with {len(modules)} entries ({len(device)} device profiles, {n_bgp} bgp, {n_lic} licensing, '
-          f'{len(topology)} topology, {len(syslog)} syslog, {len(traps)} trap vendors, {len(trap_enrichment)} trap enrichment).')
+          f'{len(topology)} topology, {len(syslog)} syslog, {len(traps)} trap vendors, {len(trap_enrichment)} trap '
+          f'enrichment).')
     print(f'Metric-metadata gaps (metrics missing family/unit/description): {gaps} (see metrics-metadata-gaps.txt).')
 
 
