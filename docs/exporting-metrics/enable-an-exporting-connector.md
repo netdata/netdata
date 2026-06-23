@@ -60,3 +60,26 @@ Replace `netdata` with an instance name of your choice, and change the `destinat
 Any further configuration is optional, based on your needs and the configuration of your Graphite database. See the [Graphite connector doc](/src/exporting/graphite/README.md) and [exporting engine reference](/src/exporting/README.md#configuration-structure) for details.
 
 </details>
+
+## Export to Multiple Databases Simultaneously
+
+You can export metrics to more than one external database at the same time. To do this, add a separate connector section for each destination in the same `exporting.conf` file. Every section that has `enabled = yes` exports independently to its own destination, so all enabled destinations receive the same metrics from your Agent.
+
+For example, to export to both a Graphite database and an OpenTSDB HTTP database, combine the two connector sections in a single `exporting.conf`:
+
+```text
+[exporting:global]
+    enabled = yes
+
+[graphite:my_graphite_instance]
+    enabled = yes
+    destination = localhost:2003
+
+[opentsdb:http:my_opentsdb_http_instance]
+    enabled = yes
+    destination = localhost:4242
+```
+
+Replace the instance names and `destination` values with those of your own databases. [Restart your Agent](/docs/netdata-agent/start-stop-restart.md) to start exporting. As with a single connector, all enabled destinations begin receiving metrics **starting from the Agent restart time**, not the historical database.
+
+You can add as many connector sections as you need, even mixing different connector types in the same file. Each section can also define its own settings, such as its own `destination`, export interval, and metric filters. See the [exporting engine reference](/src/exporting/README.md#configuration-structure) for the full set of per-section options.
