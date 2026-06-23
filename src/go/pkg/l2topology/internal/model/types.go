@@ -89,6 +89,7 @@ type L2Observation struct {
 	SysObjectID       string
 	ChassisID         string
 	BaseBridgeAddress string
+	Labels            map[string]string
 	Interfaces        []ObservedInterface
 	BridgePorts       []BridgePortObservation
 	STPPorts          []STPPortObservation
