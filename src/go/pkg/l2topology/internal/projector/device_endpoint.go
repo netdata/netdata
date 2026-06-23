@@ -6,17 +6,18 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
-func adjacencySideToEndpoint(dev Device, port string, ifIndexByDeviceName map[string]int, ifaceByDeviceIndex map[string]Interface) graph.LinkEndpoint {
+func adjacencySideToEndpoint(dev model.Device, port string, ifIndexByDeviceName map[string]int, ifaceByDeviceIndex map[string]model.Interface) graph.LinkEndpoint {
 	match := buildDeviceActorMatch(dev, nil)
 
 	port = strings.TrimSpace(port)
 	ifName := ""
 	ifDescr := ""
 	ifIndex := 0
-	var iface Interface
+	var iface model.Interface
 	hasIface := false
 	if port != "" {
 		ifIndex = resolveIfIndexByPortName(dev.ID, port, ifIndexByDeviceName)

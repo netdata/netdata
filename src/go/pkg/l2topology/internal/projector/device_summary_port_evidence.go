@@ -5,20 +5,22 @@ package projector
 import (
 	"sort"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 )
 
-func topologyPortVLANDetails(vlanIDs []string, vlanNames map[string]string, linkMode string) []ProjectionPortVLAN {
+func topologyPortVLANDetails(vlanIDs []string, vlanNames map[string]string, linkMode string) []model.ProjectionPortVLAN {
 	if len(vlanIDs) == 0 {
 		return nil
 	}
 	tagged := len(vlanIDs) != 1 || !strings.EqualFold(strings.TrimSpace(linkMode), "access")
-	out := make([]ProjectionPortVLAN, 0, len(vlanIDs))
+	out := make([]model.ProjectionPortVLAN, 0, len(vlanIDs))
 	for _, vlanID := range vlanIDs {
 		vlanID = normalizeTopologyVLANID(vlanID)
 		if vlanID == "" {
 			continue
 		}
-		entry := ProjectionPortVLAN{
+		entry := model.ProjectionPortVLAN{
 			VLANID: vlanID,
 			Tagged: tagged,
 		}
@@ -108,7 +110,7 @@ func ensureTopologyPortEvidence(
 	return evidence
 }
 
-func resolveAdjacencySourceIfIndex(adj Adjacency, ifIndexByDeviceName map[string]int) int {
+func resolveAdjacencySourceIfIndex(adj model.Adjacency, ifIndexByDeviceName map[string]int) int {
 	ifIndex := 0
 	if ifName := strings.TrimSpace(adj.SourcePort); ifName != "" {
 		ifIndex = resolveIfIndexByPortName(adj.SourceID, ifName, ifIndexByDeviceName)

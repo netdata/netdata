@@ -6,6 +6,7 @@ import (
 	"net/netip"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
@@ -40,7 +41,7 @@ type endpointActorAccumulator struct {
 
 type projectedActor struct {
 	Actor  graph.Actor
-	Detail ProjectionActorDetail
+	Detail model.ProjectionActorDetail
 }
 
 type projectedSegments struct {
@@ -103,7 +104,7 @@ type topologyDevicePortStatus struct {
 	RoleSources    []string
 	FDBMACCount    int
 	STPState       string
-	VLANs          []ProjectionPortVLAN
+	VLANs          []model.ProjectionPortVLAN
 	Neighbors      []topologyPortNeighborStatus
 }
 
@@ -132,7 +133,7 @@ type topologyDeviceInterfaceSummary struct {
 	vlanCount         int
 	lldpNeighborCount int
 	cdpNeighborCount  int
-	portStatuses      []ProjectionPortDetail
+	portStatuses      []model.ProjectionPortDetail
 }
 
 type topologyDevicePortEvidence struct {
@@ -211,7 +212,7 @@ func topologyInferenceStrategyConfigFor(strategy string) topologyInferenceStrate
 
 // ToGraph converts an L2 topology result to the graph projection consumed by
 // topology producers.
-func ToGraph(result Result, opts GraphOptions) Projection {
+func ToGraph(result model.Result, opts model.GraphOptions) model.Projection {
 	builder := newGraphBuilder(result, opts)
 	builder.prepareIndexes()
 	builder.collectBridgeTopologyInputs()
@@ -222,7 +223,7 @@ func ToGraph(result Result, opts GraphOptions) Projection {
 	builder.finalizeGraph()
 	builder.buildStats()
 	graphData := builder.graph()
-	return Projection{
+	return model.Projection{
 		Graph:        graphData,
 		Stats:        builder.stats,
 		ActorDetails: builder.actorDetails(),

@@ -5,10 +5,12 @@ package projector
 import (
 	"sort"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 )
 
 func collectBridgeLinkRecords(
-	adjacencies []Adjacency,
+	adjacencies []model.Adjacency,
 	ifIndexByDeviceName map[string]int,
 	strategy topologyInferenceStrategyConfig,
 ) []bridgeBridgeLinkRecord {
@@ -113,14 +115,14 @@ func mergeBridgeLinkRecordSets(base, extra []bridgeBridgeLinkRecord) []bridgeBri
 }
 
 func collectBridgeMacLinkRecords(
-	attachments []Attachment,
-	ifaceByDeviceIndex map[string]Interface,
+	attachments []model.Attachment,
+	ifaceByDeviceIndex map[string]model.Interface,
 	switchFacingPortKeys map[string]struct{},
 ) []bridgeMacLinkRecord {
 	records := make([]bridgeMacLinkRecord, 0, len(attachments))
 	seen := make(map[string]struct{}, len(attachments))
 
-	attachmentsSorted := append([]Attachment(nil), attachments...)
+	attachmentsSorted := append([]model.Attachment(nil), attachments...)
 	sort.SliceStable(attachmentsSorted, func(i, j int) bool {
 		return bridgeAttachmentSortKey(attachmentsSorted[i]) < bridgeAttachmentSortKey(attachmentsSorted[j])
 	})

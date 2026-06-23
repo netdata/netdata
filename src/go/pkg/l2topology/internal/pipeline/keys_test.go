@@ -5,11 +5,12 @@ package pipeline
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/stretchr/testify/require"
 )
 
 func TestAdjacencyKey_NormalizesProtocolAndEndpointWhitespace(t *testing.T) {
-	raw := Adjacency{
+	raw := model.Adjacency{
 		Protocol:   " LLDP ",
 		SourceID:   " sw1 ",
 		SourcePort: " Gi0/1 ",
@@ -17,7 +18,7 @@ func TestAdjacencyKey_NormalizesProtocolAndEndpointWhitespace(t *testing.T) {
 		TargetPort: " Gi0/2 ",
 	}
 
-	normalized := Adjacency{
+	normalized := model.Adjacency{
 		Protocol:   "lldp",
 		SourceID:   "sw1",
 		SourcePort: "Gi0/1",
@@ -29,7 +30,7 @@ func TestAdjacencyKey_NormalizesProtocolAndEndpointWhitespace(t *testing.T) {
 }
 
 func TestAttachmentKey_NormalizesIDsAndMethod(t *testing.T) {
-	raw := Attachment{
+	raw := model.Attachment{
 		DeviceID:   " sw1 ",
 		IfIndex:    10,
 		EndpointID: " endpoint-1 ",
@@ -39,7 +40,7 @@ func TestAttachmentKey_NormalizesIDsAndMethod(t *testing.T) {
 		},
 	}
 
-	normalized := Attachment{
+	normalized := model.Attachment{
 		DeviceID:   "sw1",
 		IfIndex:    10,
 		EndpointID: "endpoint-1",
@@ -53,14 +54,14 @@ func TestAttachmentKey_NormalizesIDsAndMethod(t *testing.T) {
 }
 
 func TestAdjacencyKey_DistinguishesEmbeddedSeparators(t *testing.T) {
-	first := Adjacency{
+	first := model.Adjacency{
 		Protocol:   "lldp",
 		SourceID:   "node-a",
 		SourcePort: "Gi0/1\x00Gi0/2",
 		TargetID:   "node-b",
 		TargetPort: "Eth1",
 	}
-	second := Adjacency{
+	second := model.Adjacency{
 		Protocol:   "lldp",
 		SourceID:   "node-a\x00Gi0/1",
 		SourcePort: "Gi0/2",
@@ -72,12 +73,12 @@ func TestAdjacencyKey_DistinguishesEmbeddedSeparators(t *testing.T) {
 }
 
 func TestIfaceKey_DistinguishesEmbeddedSeparators(t *testing.T) {
-	first := Interface{
+	first := model.Interface{
 		DeviceID: "sw-a",
 		IfIndex:  1,
 		IfName:   "2\x00uplink",
 	}
-	second := Interface{
+	second := model.Interface{
 		DeviceID: "sw-a\x001",
 		IfIndex:  2,
 		IfName:   "uplink",

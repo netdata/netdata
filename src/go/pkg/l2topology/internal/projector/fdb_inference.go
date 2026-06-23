@@ -5,11 +5,13 @@ package projector
 import (
 	"sort"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 )
 
 func inferFDBPairwiseBridgeLinks(
-	attachments []Attachment,
-	ifaceByDeviceIndex map[string]Interface,
+	attachments []model.Attachment,
+	ifaceByDeviceIndex map[string]model.Interface,
 	reporterAliases map[string][]string,
 ) []bridgeBridgeLinkRecord {
 	if len(attachments) == 0 || len(reporterAliases) == 0 {

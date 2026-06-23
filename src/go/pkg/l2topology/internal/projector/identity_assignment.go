@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
@@ -164,7 +165,7 @@ func enrichTopologyPortDetailsWithLinkCounts(actors []projectedActor, links []gr
 				continue
 			}
 			if c := counts[actorPort{actors[i].Actor.ActorID, name}]; c > 0 {
-				ports[j].LinkCount = OptionalValue[int]{Value: c, Has: true}
+				ports[j].LinkCount = model.OptionalValue[int]{Value: c, Has: true}
 			}
 		}
 		actors[i].Detail.Device.Ports = ports

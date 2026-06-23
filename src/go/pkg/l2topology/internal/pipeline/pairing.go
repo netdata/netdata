@@ -2,7 +2,11 @@
 
 package pipeline
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
+)
 
 type matchedPairMetadata struct {
 	id   string
@@ -22,7 +26,7 @@ func canonicalAdjacencyPairID(protocol, leftDeviceID, leftPort, rightDeviceID, r
 	return protocol + ":" + leftKey + "<->" + rightKey
 }
 
-func applyAdjacencyPairMetadata(adj *Adjacency, metadata matchedPairMetadata) {
+func applyAdjacencyPairMetadata(adj *model.Adjacency, metadata matchedPairMetadata) {
 	if adj == nil || metadata.id == "" {
 		return
 	}
@@ -35,7 +39,7 @@ func applyAdjacencyPairMetadata(adj *Adjacency, metadata matchedPairMetadata) {
 	}
 }
 
-func addAdjacency(adjacencies map[string]Adjacency, adj Adjacency) bool {
+func addAdjacency(adjacencies map[string]model.Adjacency, adj model.Adjacency) bool {
 	sourceID := strings.TrimSpace(adj.SourceID)
 	targetID := strings.TrimSpace(adj.TargetID)
 	if sourceID == "" || targetID == "" {
@@ -56,7 +60,7 @@ func addAdjacency(adjacencies map[string]Adjacency, adj Adjacency) bool {
 	return true
 }
 
-func addAttachment(attachments map[string]Attachment, attachment Attachment) bool {
+func addAttachment(attachments map[string]model.Attachment, attachment model.Attachment) bool {
 	if strings.TrimSpace(attachment.DeviceID) == "" || strings.TrimSpace(attachment.EndpointID) == "" {
 		return false
 	}

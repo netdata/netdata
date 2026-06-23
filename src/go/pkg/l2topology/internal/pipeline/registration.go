@@ -7,9 +7,11 @@ import (
 	"net/netip"
 	"strconv"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 )
 
-func (s *l2BuildState) registerObservations(observations []L2Observation) error {
+func (s *l2BuildState) registerObservations(observations []model.L2Observation) error {
 	for _, obs := range observations {
 		if err := s.registerObservation(obs); err != nil {
 			return err
@@ -18,13 +20,13 @@ func (s *l2BuildState) registerObservations(observations []L2Observation) error 
 	return nil
 }
 
-func (s *l2BuildState) registerObservation(obs L2Observation) error {
+func (s *l2BuildState) registerObservation(obs model.L2Observation) error {
 	deviceID := strings.TrimSpace(obs.DeviceID)
 	if deviceID == "" {
 		return fmt.Errorf("observation with empty device id")
 	}
 
-	device := Device{
+	device := model.Device{
 		ID:        deviceID,
 		Hostname:  strings.TrimSpace(obs.Hostname),
 		SysObject: strings.TrimSpace(obs.SysObjectID),
@@ -95,7 +97,7 @@ func (s *l2BuildState) registerObservation(obs L2Observation) error {
 		if ifName == "" {
 			continue
 		}
-		engIface := Interface{
+		engIface := model.Interface{
 			DeviceID: device.ID,
 			IfIndex:  iface.IfIndex,
 			IfName:   ifName,
@@ -157,7 +159,7 @@ func (s *l2BuildState) registerObservation(obs L2Observation) error {
 	return nil
 }
 
-func mergeObservedDevice(existing, incoming Device) Device {
+func mergeObservedDevice(existing, incoming model.Device) model.Device {
 	out := existing
 	if strings.TrimSpace(out.ID) == "" {
 		out.ID = incoming.ID

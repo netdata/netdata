@@ -2,6 +2,8 @@
 
 package projector
 
+import "github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
+
 type deviceInterfaceCollector struct {
 	ifIndexes    map[string]struct{}
 	ifNames      map[string]struct{}
@@ -13,10 +15,10 @@ type deviceInterfaceCollector struct {
 }
 
 type deviceInterfaceSummaryBuilder struct {
-	interfaces          []Interface
-	attachments         []Attachment
-	adjacencies         []Adjacency
-	deviceByID          map[string]Device
+	interfaces          []model.Interface
+	attachments         []model.Attachment
+	adjacencies         []model.Adjacency
+	deviceByID          map[string]model.Device
 	ifIndexByDeviceName map[string]int
 	bridgeLinks         []bridgeBridgeLinkRecord
 	reporterAliases     map[string][]string
@@ -25,10 +27,10 @@ type deviceInterfaceSummaryBuilder struct {
 }
 
 func buildTopologyDeviceInterfaceSummaries(
-	interfaces []Interface,
-	attachments []Attachment,
-	adjacencies []Adjacency,
-	deviceByID map[string]Device,
+	interfaces []model.Interface,
+	attachments []model.Attachment,
+	adjacencies []model.Adjacency,
+	deviceByID map[string]model.Device,
 	ifIndexByDeviceName map[string]int,
 	bridgeLinks []bridgeBridgeLinkRecord,
 	reporterAliases map[string][]string,
@@ -45,10 +47,10 @@ func buildTopologyDeviceInterfaceSummaries(
 }
 
 func newDeviceInterfaceSummaryBuilder(
-	interfaces []Interface,
-	attachments []Attachment,
-	adjacencies []Adjacency,
-	deviceByID map[string]Device,
+	interfaces []model.Interface,
+	attachments []model.Attachment,
+	adjacencies []model.Adjacency,
+	deviceByID map[string]model.Device,
 	ifIndexByDeviceName map[string]int,
 	bridgeLinks []bridgeBridgeLinkRecord,
 	reporterAliases map[string][]string,

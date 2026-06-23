@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
@@ -64,7 +65,7 @@ func bridgePortFromAdjacencySide(deviceID, port string, ifIndexByDeviceName map[
 	}
 }
 
-func bridgePortFromAttachment(attachment Attachment, ifaceByDeviceIndex map[string]Interface) bridgePortRef {
+func bridgePortFromAttachment(attachment model.Attachment, ifaceByDeviceIndex map[string]model.Interface) bridgePortRef {
 	deviceID := strings.TrimSpace(attachment.DeviceID)
 	if deviceID == "" {
 		return bridgePortRef{}
@@ -97,7 +98,7 @@ func bridgePortFromAttachment(attachment Attachment, ifaceByDeviceIndex map[stri
 	}
 }
 
-func bridgeAttachmentSortKey(attachment Attachment) string {
+func bridgeAttachmentSortKey(attachment model.Attachment) string {
 	vlanID := strings.TrimSpace(attachment.Labels["vlan"])
 	if vlanID == "" {
 		vlanID = strings.TrimSpace(attachment.Labels["vlan_id"])

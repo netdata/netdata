@@ -5,6 +5,7 @@ package projector
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 	"github.com/stretchr/testify/require"
 )
@@ -122,9 +123,9 @@ func TestEnrichTopologyPortDetailsWithLinkCounts_AddsCountsToMatchingPorts(t *te
 	actors := []projectedActor{
 		{
 			Actor: graph.Actor{ActorID: "device-a"},
-			Detail: ProjectionActorDetail{
-				Device: ProjectionDeviceActorDetail{
-					Ports: []ProjectionPortDetail{
+			Detail: model.ProjectionActorDetail{
+				Device: model.ProjectionDeviceActorDetail{
+					Ports: []model.ProjectionPortDetail{
 						{Name: "eth0"},
 						{Name: "eth1"},
 					},
@@ -133,9 +134,9 @@ func TestEnrichTopologyPortDetailsWithLinkCounts_AddsCountsToMatchingPorts(t *te
 		},
 		{
 			Actor: graph.Actor{ActorID: "device-b"},
-			Detail: ProjectionActorDetail{
-				Device: ProjectionDeviceActorDetail{
-					Ports: []ProjectionPortDetail{
+			Detail: model.ProjectionActorDetail{
+				Device: model.ProjectionDeviceActorDetail{
+					Ports: []model.ProjectionPortDetail{
 						{Name: "xe-0/0/0"},
 					},
 				},
@@ -159,7 +160,7 @@ func TestEnrichTopologyPortDetailsWithLinkCounts_AddsCountsToMatchingPorts(t *te
 
 	enrichTopologyPortDetailsWithLinkCounts(actors, links)
 
-	require.Equal(t, OptionalValue[int]{Value: 2, Has: true}, actors[0].Detail.Device.Ports[0].LinkCount)
+	require.Equal(t, model.OptionalValue[int]{Value: 2, Has: true}, actors[0].Detail.Device.Ports[0].LinkCount)
 	require.False(t, actors[0].Detail.Device.Ports[1].LinkCount.Has)
-	require.Equal(t, OptionalValue[int]{Value: 2, Has: true}, actors[1].Detail.Device.Ports[0].LinkCount)
+	require.Equal(t, model.OptionalValue[int]{Value: 2, Has: true}, actors[1].Detail.Device.Ports[0].LinkCount)
 }

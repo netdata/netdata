@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
@@ -40,7 +41,7 @@ func buildBridgeSegmentActor(segmentID string, segment *bridgeDomainSegment, lay
 		Hostnames: []string{"segment:" + segmentID},
 	}
 
-	detail := ProjectionSegmentActorDetail{
+	detail := model.ProjectionSegmentActorDetail{
 		SegmentID:     strings.TrimSpace(segmentID),
 		SegmentType:   "broadcast_domain",
 		ParentDevices: sortedTopologySet(parentDevices),
@@ -52,8 +53,8 @@ func buildBridgeSegmentActor(segmentID string, segment *bridgeDomainSegment, lay
 	}
 	if segment != nil {
 		detail.LearnedSources = sortedTopologySet(segment.methods)
-		detail.PortsTotal = OptionalValue[int]{Value: len(segment.ports), Has: true}
-		detail.EndpointsTotal = OptionalValue[int]{Value: len(segment.endpointIDs), Has: true}
+		detail.PortsTotal = model.OptionalValue[int]{Value: len(segment.ports), Has: true}
+		detail.EndpointsTotal = model.OptionalValue[int]{Value: len(segment.endpointIDs), Has: true}
 		if bridgePortRefKey(segment.designatedPort, false, false) != "" {
 			detail.DesignatedPort = bridgePortRefSortKey(segment.designatedPort)
 		}
@@ -66,7 +67,7 @@ func buildBridgeSegmentActor(segmentID string, segment *bridgeDomainSegment, lay
 			Source:    source,
 			Match:     match,
 		},
-		Detail: ProjectionActorDetail{
+		Detail: model.ProjectionActorDetail{
 			Segment: detail,
 		},
 	}
@@ -105,7 +106,7 @@ func annotateEndpointActorsWithDirectOwners(
 	actors []projectedActor,
 	endpointMatchByID map[string]graph.Match,
 	owners map[string]fdbEndpointOwner,
-	deviceByID map[string]Device,
+	deviceByID map[string]model.Device,
 ) {
 	if len(actors) == 0 || len(owners) == 0 {
 		return

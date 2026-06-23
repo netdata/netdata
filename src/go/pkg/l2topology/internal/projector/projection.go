@@ -2,10 +2,13 @@
 
 package projector
 
-import "github.com/netdata/netdata/go/plugins/pkg/topology/graph"
+import (
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
+)
 
 type builtAdjacencyLink struct {
-	adj      Adjacency
+	adj      model.Adjacency
 	protocol string
 	link     graph.Link
 }

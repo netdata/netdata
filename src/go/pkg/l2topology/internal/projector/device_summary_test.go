@@ -5,6 +5,7 @@ package projector
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/stretchr/testify/require"
 )
 
@@ -64,7 +65,7 @@ func TestBuildTopologyDevicePortDetail_RendersOptionalFields(t *testing.T) {
 		ModeConfidence: "high",
 		ModeSources:    []string{"fdb", "stp"},
 		VLANIDs:        []string{"100", "200"},
-		VLANs: []ProjectionPortVLAN{
+		VLANs: []model.ProjectionPortVLAN{
 			{VLANID: "100", Tagged: true},
 			{VLANID: "200", Tagged: true, VLANName: "servers"},
 		},
@@ -87,14 +88,14 @@ func TestBuildTopologyDevicePortDetail_RendersOptionalFields(t *testing.T) {
 	}
 
 	detail := buildTopologyDevicePortDetail(status)
-	require.Equal(t, OptionalValue[int]{Value: 7, Has: true}, detail.IfIndex)
+	require.Equal(t, model.OptionalValue[int]{Value: 7, Has: true}, detail.IfIndex)
 	require.Empty(t, detail.PortID)
 	require.Equal(t, "Gi0/7", detail.Name)
 	require.Equal(t, "Gi0/7", detail.IfName)
 	require.Equal(t, "Uplink", detail.IfDescr)
 	require.Equal(t, "core", detail.IfAlias)
 	require.Equal(t, "00:11:22:33:44:55", detail.MAC)
-	require.Equal(t, OptionalValue[int64]{Value: 1000000000, Has: true}, detail.Speed)
+	require.Equal(t, model.OptionalValue[int64]{Value: 1000000000, Has: true}, detail.Speed)
 	require.Equal(t, "12345", detail.LastChange)
 	require.Equal(t, "full", detail.Duplex)
 	require.Equal(t, "trunk", detail.LinkMode)
@@ -104,12 +105,12 @@ func TestBuildTopologyDevicePortDetail_RendersOptionalFields(t *testing.T) {
 	require.Equal(t, "switch_facing", detail.TopologyRole)
 	require.Equal(t, "high", detail.TopologyRoleConfidence)
 	require.Equal(t, []string{"peer_link", "bridge_link"}, detail.TopologyRoleSources)
-	require.Equal(t, OptionalValue[int]{Value: 3, Has: true}, detail.FDBMACCount)
+	require.Equal(t, model.OptionalValue[int]{Value: 3, Has: true}, detail.FDBMACCount)
 	require.Equal(t, "forwarding", detail.STPState)
 	require.Equal(t, "up", detail.AdminStatus)
 	require.Equal(t, "up", detail.OperStatus)
 	require.Equal(t, "ethernetCsmacd", detail.PortType)
-	require.Equal(t, OptionalValue[int]{Value: 1, Has: true}, detail.NeighborCount)
+	require.Equal(t, model.OptionalValue[int]{Value: 1, Has: true}, detail.NeighborCount)
 
 	require.Len(t, detail.Neighbors, 1)
 	require.Equal(t, "lldp", detail.Neighbors[0].Protocol)

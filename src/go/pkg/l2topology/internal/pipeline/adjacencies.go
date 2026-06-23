@@ -2,9 +2,13 @@
 
 package pipeline
 
-import "strings"
+import (
+	"strings"
 
-func (s *l2BuildState) applyLLDP(observations []L2Observation) {
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
+)
+
+func (s *l2BuildState) applyLLDP(observations []model.L2Observation) {
 	lldpLinks := buildLLDPMatchLinks(observations)
 	annotateLLDPLinkMatchIdentities(lldpLinks, s.hostToID, s.chassisToID, s.ipToID)
 	lldpPairs := matchLLDPLinksEnlinkdPassOrder(lldpLinks)
@@ -17,7 +21,7 @@ func (s *l2BuildState) applyLLDP(observations []L2Observation) {
 			targetID = s.resolveRemote(link.remoteSysName, link.remoteChassisID, link.remoteManagement, link.remoteFallbackID)
 		}
 
-		adj := Adjacency{
+		adj := model.Adjacency{
 			Protocol:   "lldp",
 			SourceID:   link.sourceDeviceID,
 			SourcePort: link.sourcePort,
@@ -31,7 +35,7 @@ func (s *l2BuildState) applyLLDP(observations []L2Observation) {
 	}
 }
 
-func (s *l2BuildState) applyCDP(observations []L2Observation) {
+func (s *l2BuildState) applyCDP(observations []model.L2Observation) {
 	cdpLinks := buildCDPMatchLinks(observations)
 	cdpPairs := matchCDPLinksEnlinkdPassOrder(cdpLinks)
 	cdpTargetOverrides := buildCDPTargetOverrides(cdpLinks, cdpPairs)
@@ -45,7 +49,7 @@ func (s *l2BuildState) applyCDP(observations []L2Observation) {
 			targetID = s.resolveRemoteEnforcingHostnameMACGuard(link.remoteHost, link.remoteDeviceID, targetIP, link.remoteDeviceID)
 		}
 
-		adj := Adjacency{
+		adj := model.Adjacency{
 			Protocol:   "cdp",
 			SourceID:   link.sourceDeviceID,
 			SourcePort: link.localInterfaceName,
@@ -64,7 +68,7 @@ func (s *l2BuildState) applyCDP(observations []L2Observation) {
 	}
 }
 
-func (s *l2BuildState) applySTP(observations []L2Observation) {
+func (s *l2BuildState) applySTP(observations []model.L2Observation) {
 	for _, obs := range observations {
 		sourceID := strings.TrimSpace(obs.DeviceID)
 		if sourceID == "" {
@@ -107,7 +111,7 @@ func (s *l2BuildState) applySTP(observations []L2Observation) {
 				sourcePort = strings.TrimSpace(entry.Port)
 			}
 
-			adj := Adjacency{
+			adj := model.Adjacency{
 				Protocol:   "stp",
 				SourceID:   sourceID,
 				SourcePort: sourcePort,

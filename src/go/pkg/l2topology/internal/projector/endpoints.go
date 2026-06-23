@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
@@ -19,9 +20,9 @@ type builtEndpointActors struct {
 }
 
 func buildEndpointActors(
-	attachments []Attachment,
-	enrichments []Enrichment,
-	ifaceByDeviceIndex map[string]Interface,
+	attachments []model.Attachment,
+	enrichments []model.Enrichment,
+	ifaceByDeviceIndex map[string]model.Interface,
 	source string,
 	layer string,
 	actorIndex map[string]struct{},
@@ -127,7 +128,7 @@ func buildEndpointActors(
 			"learned_if_names":   strings.Join(sortedTopologySet(acc.ifNames), ","),
 		}
 
-		detail := ProjectionEndpointActorDetail{
+		detail := model.ProjectionEndpointActorDetail{
 			Discovered:       true,
 			LearnedSources:   sortedTopologySet(acc.sources),
 			LearnedDeviceIDs: sortedTopologySet(acc.deviceIDs),
@@ -152,7 +153,7 @@ func buildEndpointActors(
 				Source:    source,
 				Match:     match,
 			},
-			Detail: ProjectionActorDetail{
+			Detail: model.ProjectionActorDetail{
 				Endpoint: detail,
 			},
 		}
@@ -221,7 +222,7 @@ func addEndpointIDIdentity(acc *endpointActorAccumulator, endpointID string) {
 	}
 }
 
-func discoveredDeviceCount(devices []Device, localDeviceID string) int {
+func discoveredDeviceCount(devices []model.Device, localDeviceID string) int {
 	if len(devices) == 0 {
 		return 0
 	}

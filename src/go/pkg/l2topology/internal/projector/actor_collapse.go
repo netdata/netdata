@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
@@ -251,7 +252,7 @@ func mergeTopologyActorLabels(base, extra map[string]string) map[string]string {
 	return base
 }
 
-func mergeProjectionActorDetail(base, extra ProjectionActorDetail) ProjectionActorDetail {
+func mergeProjectionActorDetail(base, extra model.ProjectionActorDetail) model.ProjectionActorDetail {
 	base.Device = mergeProjectionDeviceActorDetail(base.Device, extra.Device)
 	base.Endpoint = mergeProjectionEndpointActorDetail(base.Endpoint, extra.Endpoint)
 	base.Segment = mergeProjectionSegmentActorDetail(base.Segment, extra.Segment)
@@ -264,7 +265,7 @@ func mergeProjectionActorDetail(base, extra ProjectionActorDetail) ProjectionAct
 	return base
 }
 
-func mergeProjectionDeviceActorDetail(base, extra ProjectionDeviceActorDetail) ProjectionDeviceActorDetail {
+func mergeProjectionDeviceActorDetail(base, extra model.ProjectionDeviceActorDetail) model.ProjectionDeviceActorDetail {
 	if strings.TrimSpace(base.DeviceID) == "" {
 		base.DeviceID = strings.TrimSpace(extra.DeviceID)
 	}
@@ -342,7 +343,7 @@ func mergeProjectionDeviceActorDetail(base, extra ProjectionDeviceActorDetail) P
 	return base
 }
 
-func mergeProjectionEndpointActorDetail(base, extra ProjectionEndpointActorDetail) ProjectionEndpointActorDetail {
+func mergeProjectionEndpointActorDetail(base, extra model.ProjectionEndpointActorDetail) model.ProjectionEndpointActorDetail {
 	base.LearnedSources = mergeTopologyStringLists(base.LearnedSources, extra.LearnedSources)
 	base.LearnedDeviceIDs = mergeTopologyStringLists(base.LearnedDeviceIDs, extra.LearnedDeviceIDs)
 	base.LearnedIfIndexes = mergeTopologyStringLists(base.LearnedIfIndexes, extra.LearnedIfIndexes)
@@ -389,7 +390,7 @@ func mergeProjectionEndpointActorDetail(base, extra ProjectionEndpointActorDetai
 	return base
 }
 
-func mergeProjectionSegmentActorDetail(base, extra ProjectionSegmentActorDetail) ProjectionSegmentActorDetail {
+func mergeProjectionSegmentActorDetail(base, extra model.ProjectionSegmentActorDetail) model.ProjectionSegmentActorDetail {
 	if strings.TrimSpace(base.SegmentID) == "" {
 		base.SegmentID = strings.TrimSpace(extra.SegmentID)
 	}

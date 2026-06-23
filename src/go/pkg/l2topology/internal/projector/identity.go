@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
@@ -97,9 +98,9 @@ func addTopologyIdentityKeys(index map[string]struct{}, keys []string) {
 }
 
 func buildDeviceIdentityKeySetByID(
-	deviceByID map[string]Device,
-	adjacencies []Adjacency,
-	ifaceByDeviceIndex map[string]Interface,
+	deviceByID map[string]model.Device,
+	adjacencies []model.Adjacency,
+	ifaceByDeviceIndex map[string]model.Interface,
 ) map[string]topologyIdentityKeySet {
 	if len(deviceByID) == 0 {
 		return nil

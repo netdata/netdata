@@ -2,10 +2,13 @@
 
 package projector
 
-import "github.com/netdata/netdata/go/plugins/pkg/topology/graph"
+import (
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
+)
 
 func deviceToTopologyActor(
-	dev Device,
+	dev model.Device,
 	source, layer, localDeviceID string,
 	ifaceSummary topologyDeviceInterfaceSummary,
 	reporterAliases []string,
@@ -20,7 +23,7 @@ func deviceToTopologyActor(
 			Match:     match,
 			Labels:    cloneStringMap(dev.Labels),
 		},
-		Detail: ProjectionActorDetail{
+		Detail: model.ProjectionActorDetail{
 			Device: buildDeviceActorDetail(dev, localDeviceID, ifaceSummary, match),
 		},
 	}

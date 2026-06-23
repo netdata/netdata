@@ -2,9 +2,13 @@
 
 package projector
 
-import "strings"
+import (
+	"strings"
 
-func buildDeterministicDiscoveryDevicePairSet(adjacencies []Adjacency) map[string]struct{} {
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
+)
+
+func buildDeterministicDiscoveryDevicePairSet(adjacencies []model.Adjacency) map[string]struct{} {
 	if len(adjacencies) == 0 {
 		return nil
 	}
@@ -79,7 +83,7 @@ func suppressInferredBridgeLinksOnDeterministicDiscovery(
 }
 
 func buildDeterministicTransitPortKeySet(
-	adjacencies []Adjacency,
+	adjacencies []model.Adjacency,
 	ifIndexByDeviceName map[string]int,
 ) map[string]struct{} {
 	if len(adjacencies) == 0 {

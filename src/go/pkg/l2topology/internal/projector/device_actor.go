@@ -5,10 +5,11 @@ package projector
 import (
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
-func topologyDeviceInferred(dev Device) bool {
+func topologyDeviceInferred(dev model.Device) bool {
 	if len(dev.Labels) == 0 {
 		return false
 	}
@@ -20,7 +21,7 @@ func topologyDeviceInferred(dev Device) bool {
 	}
 }
 
-func buildDeviceActorMatch(dev Device, reporterAliases []string) graph.Match {
+func buildDeviceActorMatch(dev model.Device, reporterAliases []string) graph.Match {
 	match := graph.Match{
 		SysObjectID: strings.TrimSpace(dev.SysObject),
 		SysName:     strings.TrimSpace(dev.Hostname),
@@ -68,14 +69,14 @@ func buildDeviceActorMatch(dev Device, reporterAliases []string) graph.Match {
 }
 
 func buildDeviceActorDetail(
-	dev Device,
+	dev model.Device,
 	localDeviceID string,
 	ifaceSummary topologyDeviceInterfaceSummary,
 	match graph.Match,
-) ProjectionDeviceActorDetail {
+) model.ProjectionDeviceActorDetail {
 	discovered := strings.TrimSpace(localDeviceID) == "" || dev.ID != localDeviceID
 
-	detail := ProjectionDeviceActorDetail{
+	detail := model.ProjectionDeviceActorDetail{
 		DeviceID:              strings.TrimSpace(dev.ID),
 		Discovered:            discovered,
 		Inferred:              topologyDeviceInferred(dev),
@@ -112,31 +113,31 @@ func buildDeviceActorDetail(
 		detail.VendorMatchPrefix = derivedPrefix
 	}
 	if ifaceSummary.portsTotal > 0 {
-		detail.PortsTotal = OptionalValue[int]{Value: ifaceSummary.portsTotal, Has: true}
+		detail.PortsTotal = model.OptionalValue[int]{Value: ifaceSummary.portsTotal, Has: true}
 	}
 	if ifaceSummary.portsUp > 0 {
-		detail.PortsUp = OptionalValue[int]{Value: ifaceSummary.portsUp, Has: true}
+		detail.PortsUp = model.OptionalValue[int]{Value: ifaceSummary.portsUp, Has: true}
 	}
 	if ifaceSummary.portsDown > 0 {
-		detail.PortsDown = OptionalValue[int]{Value: ifaceSummary.portsDown, Has: true}
+		detail.PortsDown = model.OptionalValue[int]{Value: ifaceSummary.portsDown, Has: true}
 	}
 	if ifaceSummary.portsAdminDown > 0 {
-		detail.PortsAdminDown = OptionalValue[int]{Value: ifaceSummary.portsAdminDown, Has: true}
+		detail.PortsAdminDown = model.OptionalValue[int]{Value: ifaceSummary.portsAdminDown, Has: true}
 	}
 	if ifaceSummary.totalBandwidthBps > 0 {
-		detail.TotalBandwidthBps = OptionalValue[int64]{Value: ifaceSummary.totalBandwidthBps, Has: true}
+		detail.TotalBandwidthBps = model.OptionalValue[int64]{Value: ifaceSummary.totalBandwidthBps, Has: true}
 	}
 	if ifaceSummary.fdbTotalMACs > 0 {
-		detail.FDBTotalMACs = OptionalValue[int]{Value: ifaceSummary.fdbTotalMACs, Has: true}
+		detail.FDBTotalMACs = model.OptionalValue[int]{Value: ifaceSummary.fdbTotalMACs, Has: true}
 	}
 	if ifaceSummary.vlanCount > 0 {
-		detail.VLANCount = OptionalValue[int]{Value: ifaceSummary.vlanCount, Has: true}
+		detail.VLANCount = model.OptionalValue[int]{Value: ifaceSummary.vlanCount, Has: true}
 	}
 	if ifaceSummary.lldpNeighborCount > 0 {
-		detail.LLDPNeighborCount = OptionalValue[int]{Value: ifaceSummary.lldpNeighborCount, Has: true}
+		detail.LLDPNeighborCount = model.OptionalValue[int]{Value: ifaceSummary.lldpNeighborCount, Has: true}
 	}
 	if ifaceSummary.cdpNeighborCount > 0 {
-		detail.CDPNeighborCount = OptionalValue[int]{Value: ifaceSummary.cdpNeighborCount, Has: true}
+		detail.CDPNeighborCount = model.OptionalValue[int]{Value: ifaceSummary.cdpNeighborCount, Has: true}
 	}
 	return detail
 }
@@ -159,11 +160,11 @@ func cloneIntMap(in map[string]int) map[string]int {
 	return out
 }
 
-func cloneProjectionPortDetails(in []ProjectionPortDetail) []ProjectionPortDetail {
+func cloneProjectionPortDetails(in []model.ProjectionPortDetail) []model.ProjectionPortDetail {
 	if len(in) == 0 {
 		return nil
 	}
-	out := make([]ProjectionPortDetail, len(in))
+	out := make([]model.ProjectionPortDetail, len(in))
 	copy(out, in)
 	return out
 }

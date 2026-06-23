@@ -12,6 +12,9 @@ type DiscoverOptions = model.DiscoverOptions
 // observations.
 type Result = model.Result
 
+// ResultStats summarizes the normalized L2 result before graph projection.
+type ResultStats = model.ResultStats
+
 // Device is a discovered network device.
 type Device = model.Device
 

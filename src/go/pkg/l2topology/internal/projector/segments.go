@@ -7,17 +7,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
 func projectSegmentTopology(
-	attachments []Attachment,
-	adjacencies []Adjacency,
+	attachments []model.Attachment,
+	adjacencies []model.Adjacency,
 	layer string,
 	source string,
 	collectedAt time.Time,
-	deviceByID map[string]Device,
-	ifaceByDeviceIndex map[string]Interface,
+	deviceByID map[string]model.Device,
+	ifaceByDeviceIndex map[string]model.Interface,
 	ifIndexByDeviceName map[string]int,
 	bridgeLinks []bridgeBridgeLinkRecord,
 	reporterAliases map[string][]string,

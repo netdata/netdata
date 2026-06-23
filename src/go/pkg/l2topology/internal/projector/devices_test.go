@@ -6,6 +6,7 @@ import (
 	"net/netip"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,7 +22,7 @@ func TestResolveDeviceActorType_MapsAndFallsBack(t *testing.T) {
 
 func TestAdjacencySideToEndpoint_FallsBackToRequestedPort(t *testing.T) {
 	addr := netip.MustParseAddr("10.0.0.1")
-	dev := Device{
+	dev := model.Device{
 		ID:        "switch-a",
 		Hostname:  "switch-a",
 		SysObject: "1.2.3.4",

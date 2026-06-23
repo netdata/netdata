@@ -2,7 +2,11 @@
 
 package pipeline
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
+)
 
 type lldpMatchLink struct {
 	index int
@@ -35,7 +39,7 @@ type lldpMatchedPair struct {
 	pass        string
 }
 
-func buildLLDPMatchLinks(observations []L2Observation) []lldpMatchLink {
+func buildLLDPMatchLinks(observations []model.L2Observation) []lldpMatchLink {
 	links := make([]lldpMatchLink, 0)
 	for _, obs := range observations {
 		sourceID := strings.TrimSpace(obs.DeviceID)

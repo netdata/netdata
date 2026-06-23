@@ -5,6 +5,8 @@ package projector
 import (
 	"sort"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 )
 
 func topologyNeighborCapabilitiesFromLabels(labels map[string]string) []string {
@@ -24,7 +26,7 @@ func topologyNeighborCapabilitiesFromLabels(labels map[string]string) []string {
 	return sortedTopologySet(seen)
 }
 
-func buildTopologyPortNeighborStatus(protocol string, adj Adjacency, deviceByID map[string]Device) topologyPortNeighborStatus {
+func buildTopologyPortNeighborStatus(protocol string, adj model.Adjacency, deviceByID map[string]model.Device) topologyPortNeighborStatus {
 	protocol = strings.ToLower(strings.TrimSpace(protocol))
 	targetID := strings.TrimSpace(adj.TargetID)
 

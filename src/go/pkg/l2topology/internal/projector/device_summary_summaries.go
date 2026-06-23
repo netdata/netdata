@@ -5,6 +5,8 @@ package projector
 import (
 	"sort"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 )
 
 func (b *deviceInterfaceSummaryBuilder) buildSummaries() map[string]topologyDeviceInterfaceSummary {
@@ -28,7 +30,7 @@ func (b *deviceInterfaceSummaryBuilder) buildSummaries() map[string]topologyDevi
 		fdbTotalMACs := 0
 		lldpNeighborCount := 0
 		cdpNeighborCount := 0
-		portStatuses := make([]ProjectionPortDetail, 0, len(col.portStatuses))
+		portStatuses := make([]model.ProjectionPortDetail, 0, len(col.portStatuses))
 		for _, st := range col.portStatuses {
 			evidence := col.portEvidence[st.IfIndex]
 			mode, confidence, sources, vlans := classifyTopologyPortLinkMode(evidence)

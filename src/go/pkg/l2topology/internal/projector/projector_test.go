@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 	"github.com/stretchr/testify/require"
 )
@@ -16,9 +17,9 @@ import (
 func TestToGraph_ProjectsResult(t *testing.T) {
 	collectedAt := time.Date(2026, time.February, 20, 4, 5, 6, 0, time.UTC)
 
-	result := Result{
+	result := model.Result{
 		CollectedAt: collectedAt,
-		Devices: []Device{
+		Devices: []model.Device{
 			{
 				ID:        "local-device",
 				Hostname:  "sw1",
@@ -34,11 +35,11 @@ func TestToGraph_ProjectsResult(t *testing.T) {
 				Labels:    map[string]string{"inferred": "true"},
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "local-device", IfIndex: 3, IfName: "Gi0/3", IfDescr: "Gi0/3", Labels: map[string]string{"admin_status": "up", "oper_status": "up"}},
 			{DeviceID: "local-device", IfIndex: 4, IfName: "Gi0/4", IfDescr: "Gi0/4", Labels: map[string]string{"admin_status": "up", "oper_status": "lowerLayerDown"}},
 		},
-		Adjacencies: []Adjacency{
+		Adjacencies: []model.Adjacency{
 			{
 				Protocol:   "lldp",
 				SourceID:   "local-device",
@@ -47,10 +48,10 @@ func TestToGraph_ProjectsResult(t *testing.T) {
 				TargetPort: "Gi0/1",
 			},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{DeviceID: "local-device", IfIndex: 4, EndpointID: "mac:70:49:a2:65:72:cd", Method: "fdb"},
 		},
-		Enrichments: []Enrichment{
+		Enrichments: []model.Enrichment{
 			{
 				EndpointID: "mac:70:49:a2:65:72:cd",
 				MAC:        "70:49:a2:65:72:cd",
@@ -64,7 +65,7 @@ func TestToGraph_ProjectsResult(t *testing.T) {
 		},
 	}
 
-	data, stats := toGraphForTest(result, GraphOptions{
+	data, stats := toGraphForTest(result, model.GraphOptions{
 		SchemaVersion: "2.0",
 		Source:        "snmp",
 		Layer:         "2",
@@ -96,7 +97,7 @@ func TestToGraph_ProjectsResult(t *testing.T) {
 	require.False(t, localDetail.Device.Inferred)
 	require.Equal(t, []string{"bridge", "fdb", "stp"}, localDetail.Device.Protocols)
 	require.Equal(t, []string{"bridge", "fdb", "stp"}, localDetail.Device.ProtocolsCollected)
-	require.Equal(t, OptionalValue[int]{Value: 2, Has: true}, localDetail.Device.PortsTotal)
+	require.Equal(t, model.OptionalValue[int]{Value: 2, Has: true}, localDetail.Device.PortsTotal)
 	require.NotNil(t, localDetail.Device.AdminStatusCounts)
 	require.NotNil(t, localDetail.Device.OperStatusCounts)
 	require.NotNil(t, localDetail.Device.LinkModeCounts)
@@ -131,8 +132,8 @@ func TestToGraph_ProjectsResult(t *testing.T) {
 }
 
 func TestToGraph_ProjectsTypedActorDetailsWithFieldPresence(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "sw1",
 				Hostname:  "sw1",
@@ -143,7 +144,7 @@ func TestToGraph_ProjectsTypedActorDetailsWithFieldPresence(t *testing.T) {
 				},
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{
 				DeviceID: "sw1",
 				IfIndex:  1,
@@ -159,7 +160,7 @@ func TestToGraph_ProjectsTypedActorDetailsWithFieldPresence(t *testing.T) {
 		},
 	}
 
-	projection := ToGraph(result, GraphOptions{
+	projection := ToGraph(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -192,8 +193,8 @@ func TestToGraph_ProjectsTypedActorDetailsWithFieldPresence(t *testing.T) {
 }
 
 func TestToGraph_ClassifiesPortLinkModesFromFDBAndSTPEvidence(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "sw1",
 				Hostname:  "sw1",
@@ -205,14 +206,14 @@ func TestToGraph_ClassifiesPortLinkModesFromFDBAndSTPEvidence(t *testing.T) {
 				ChassisID: "00:11:22:33:44:66",
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "sw1", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
 			{DeviceID: "sw1", IfIndex: 2, IfName: "Gi0/2", IfDescr: "Gi0/2"},
 			{DeviceID: "sw1", IfIndex: 3, IfName: "Gi0/3", IfDescr: "Gi0/3"},
 			{DeviceID: "sw1", IfIndex: 4, IfName: "Gi0/4", IfDescr: "Gi0/4"},
 			{DeviceID: "sw2", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
 		},
-		Adjacencies: []Adjacency{
+		Adjacencies: []model.Adjacency{
 			{
 				Protocol:   "lldp",
 				SourceID:   "sw1",
@@ -231,7 +232,7 @@ func TestToGraph_ClassifiesPortLinkModesFromFDBAndSTPEvidence(t *testing.T) {
 				},
 			},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{
 				DeviceID:   "sw1",
 				IfIndex:    1,
@@ -293,7 +294,7 @@ func TestToGraph_ClassifiesPortLinkModesFromFDBAndSTPEvidence(t *testing.T) {
 		},
 	}
 
-	data, _ := toGraphForTest(result, GraphOptions{
+	data, _ := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -354,17 +355,17 @@ func TestToGraph_ClassifiesPortLinkModesFromFDBAndSTPEvidence(t *testing.T) {
 }
 
 func TestToGraph_IgnoresIgnoredFDBStatusForLinkModeClassification(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:       "sw1",
 				Hostname: "sw1",
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "sw1", IfIndex: 10, IfName: "Gi0/10", IfDescr: "Gi0/10"},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{
 				DeviceID:   "sw1",
 				IfIndex:    10,
@@ -378,7 +379,7 @@ func TestToGraph_IgnoresIgnoredFDBStatusForLinkModeClassification(t *testing.T) 
 		},
 	}
 
-	data, _ := toGraphForTest(result, GraphOptions{
+	data, _ := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -399,8 +400,8 @@ func TestToGraph_IgnoresIgnoredFDBStatusForLinkModeClassification(t *testing.T) 
 }
 
 func TestToGraph_ClassifiesSTPCorroboratedManagedAliasAsSwitchFacing(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "sw1",
 				Hostname:  "sw1",
@@ -412,10 +413,10 @@ func TestToGraph_ClassifiesSTPCorroboratedManagedAliasAsSwitchFacing(t *testing.
 				ChassisID: "00:11:22:33:44:66",
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "sw1", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
 		},
-		Adjacencies: []Adjacency{
+		Adjacencies: []model.Adjacency{
 			{
 				Protocol:   "stp",
 				SourceID:   "sw1",
@@ -426,7 +427,7 @@ func TestToGraph_ClassifiesSTPCorroboratedManagedAliasAsSwitchFacing(t *testing.
 				},
 			},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{
 				DeviceID:   "sw1",
 				IfIndex:    1,
@@ -440,7 +441,7 @@ func TestToGraph_ClassifiesSTPCorroboratedManagedAliasAsSwitchFacing(t *testing.
 		},
 	}
 
-	data, _ := toGraphForTest(result, GraphOptions{
+	data, _ := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -457,8 +458,8 @@ func TestToGraph_ClassifiesSTPCorroboratedManagedAliasAsSwitchFacing(t *testing.
 }
 
 func TestToGraph_EnrichesPortStatusesWithNeighborsFDBAndSTP(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "sw1",
 				Hostname:  "sw1",
@@ -475,7 +476,7 @@ func TestToGraph_EnrichesPortStatusesWithNeighborsFDBAndSTP(t *testing.T) {
 				},
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{
 				DeviceID: "sw1",
 				IfIndex:  1,
@@ -507,7 +508,7 @@ func TestToGraph_EnrichesPortStatusesWithNeighborsFDBAndSTP(t *testing.T) {
 				},
 			},
 		},
-		Adjacencies: []Adjacency{
+		Adjacencies: []model.Adjacency{
 			{
 				Protocol:   "lldp",
 				SourceID:   "sw1",
@@ -545,7 +546,7 @@ func TestToGraph_EnrichesPortStatusesWithNeighborsFDBAndSTP(t *testing.T) {
 				},
 			},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{
 				DeviceID:   "sw1",
 				IfIndex:    1,
@@ -578,7 +579,7 @@ func TestToGraph_EnrichesPortStatusesWithNeighborsFDBAndSTP(t *testing.T) {
 		},
 	}
 
-	data, _ := toGraphForTest(result, GraphOptions{
+	data, _ := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -587,24 +588,24 @@ func TestToGraph_EnrichesPortStatusesWithNeighborsFDBAndSTP(t *testing.T) {
 	actor := findActorBySysName(data.Actors, "sw1")
 	require.NotNil(t, actor)
 	detail := requireActorDetail(t, data, actor)
-	require.Equal(t, OptionalValue[int]{Value: 1, Has: true}, detail.Device.PortsUp)
-	require.Equal(t, OptionalValue[int]{Value: 1, Has: true}, detail.Device.PortsDown)
-	require.Equal(t, OptionalValue[int]{Value: 1, Has: true}, detail.Device.PortsAdminDown)
-	require.Equal(t, OptionalValue[int64]{Value: 1_000_000_000, Has: true}, detail.Device.TotalBandwidthBps)
-	require.Equal(t, OptionalValue[int]{Value: 3, Has: true}, detail.Device.FDBTotalMACs)
-	require.Equal(t, OptionalValue[int]{Value: 2, Has: true}, detail.Device.VLANCount)
-	require.Equal(t, OptionalValue[int]{Value: 1, Has: true}, detail.Device.LLDPNeighborCount)
-	require.Equal(t, OptionalValue[int]{Value: 1, Has: true}, detail.Device.CDPNeighborCount)
+	require.Equal(t, model.OptionalValue[int]{Value: 1, Has: true}, detail.Device.PortsUp)
+	require.Equal(t, model.OptionalValue[int]{Value: 1, Has: true}, detail.Device.PortsDown)
+	require.Equal(t, model.OptionalValue[int]{Value: 1, Has: true}, detail.Device.PortsAdminDown)
+	require.Equal(t, model.OptionalValue[int64]{Value: 1_000_000_000, Has: true}, detail.Device.TotalBandwidthBps)
+	require.Equal(t, model.OptionalValue[int]{Value: 3, Has: true}, detail.Device.FDBTotalMACs)
+	require.Equal(t, model.OptionalValue[int]{Value: 2, Has: true}, detail.Device.VLANCount)
+	require.Equal(t, model.OptionalValue[int]{Value: 1, Has: true}, detail.Device.LLDPNeighborCount)
+	require.Equal(t, model.OptionalValue[int]{Value: 1, Has: true}, detail.Device.CDPNeighborCount)
 
 	port1 := findInterfaceStatusByIndex(detail.Device.Ports, 1)
 	require.NotNil(t, port1)
 	require.Equal(t, "Gi0/1", port1.IfDescr)
 	require.Equal(t, "uplink-core", port1.IfAlias)
 	require.Equal(t, "00:11:22:33:44:55", port1.MAC)
-	require.Equal(t, OptionalValue[int64]{Value: 1_000_000_000, Has: true}, port1.Speed)
+	require.Equal(t, model.OptionalValue[int64]{Value: 1_000_000_000, Has: true}, port1.Speed)
 	require.Equal(t, "12345", port1.LastChange)
 	require.Equal(t, "full", port1.Duplex)
-	require.Equal(t, OptionalValue[int]{Value: 2, Has: true}, port1.FDBMACCount)
+	require.Equal(t, model.OptionalValue[int]{Value: 2, Has: true}, port1.FDBMACCount)
 	require.Equal(t, "blocking", port1.STPState)
 	require.Len(t, port1.VLANs, 2)
 	require.Equal(t, "10", port1.VLANs[0].VLANID)
@@ -633,16 +634,16 @@ func TestToGraph_EnrichesPortStatusesWithNeighborsFDBAndSTP(t *testing.T) {
 	require.NotNil(t, port2)
 	require.Equal(t, "server-a", port2.IfAlias)
 	require.Equal(t, "00:11:22:33:44:66", port2.MAC)
-	require.Equal(t, OptionalValue[int64]{Value: 100_000_000, Has: true}, port2.Speed)
+	require.Equal(t, model.OptionalValue[int64]{Value: 100_000_000, Has: true}, port2.Speed)
 	require.Equal(t, "54321", port2.LastChange)
 	require.Equal(t, "half", port2.Duplex)
-	require.Equal(t, OptionalValue[int]{Value: 1, Has: true}, port2.FDBMACCount)
+	require.Equal(t, model.OptionalValue[int]{Value: 1, Has: true}, port2.FDBMACCount)
 	require.Empty(t, port2.Neighbors)
 }
 
 func TestToGraph_InfersVendorFromMACOUI(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "sw1",
 				Hostname:  "sw1",
@@ -655,18 +656,18 @@ func TestToGraph_InfersVendorFromMACOUI(t *testing.T) {
 				Labels:    map[string]string{"inferred": "true"},
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "sw1", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{DeviceID: "sw1", IfIndex: 1, EndpointID: "mac:08:ea:44:11:22:33", Method: "fdb"},
 		},
-		Enrichments: []Enrichment{
+		Enrichments: []model.Enrichment{
 			{EndpointID: "mac:08:ea:44:11:22:33", MAC: "08:ea:44:11:22:33"},
 		},
 	}
 
-	data, _ := toGraphForTest(result, GraphOptions{
+	data, _ := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -698,7 +699,7 @@ func TestToGraph_InfersVendorFromMACOUI(t *testing.T) {
 
 func TestDeviceToTopologyActor_DoesNotOverrideExplicitVendor(t *testing.T) {
 	actor := deviceToTopologyActor(
-		Device{
+		model.Device{
 			ID:        "switch-a",
 			Hostname:  "switch-a",
 			ChassisID: "08:ea:44:99:88:77",
@@ -723,21 +724,21 @@ func TestDeviceToTopologyActor_DoesNotOverrideExplicitVendor(t *testing.T) {
 }
 
 func TestToGraph_DefaultDiscoveredCountWithoutLocalID(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{ID: "a", Hostname: "a"},
 			{ID: "b", Hostname: "b"},
 			{ID: "c", Hostname: "c"},
 		},
 	}
 
-	_, stats := toGraphForTest(result, GraphOptions{})
+	_, stats := toGraphForTest(result, model.GraphOptions{})
 	require.Equal(t, 2, stats.DevicesDiscovered)
 }
 
 func TestToGraph_AssignsDeterministicActorIDsAndLinkActorIDs(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "sw1",
 				Hostname:  "sw1",
@@ -751,7 +752,7 @@ func TestToGraph_AssignsDeterministicActorIDsAndLinkActorIDs(t *testing.T) {
 				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")},
 			},
 		},
-		Adjacencies: []Adjacency{
+		Adjacencies: []model.Adjacency{
 			{
 				Protocol:   "lldp",
 				SourceID:   "sw1",
@@ -762,7 +763,7 @@ func TestToGraph_AssignsDeterministicActorIDsAndLinkActorIDs(t *testing.T) {
 		},
 	}
 
-	data, _ := toGraphForTest(result, GraphOptions{
+	data, _ := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -789,9 +790,9 @@ func TestToGraph_AssignsDeterministicActorIDsAndLinkActorIDs(t *testing.T) {
 func TestToGraph_DeterministicAcrossRepeatedCalls(t *testing.T) {
 	collectedAt := time.Date(2026, time.February, 20, 4, 5, 6, 0, time.UTC)
 
-	result := Result{
+	result := model.Result{
 		CollectedAt: collectedAt,
-		Devices: []Device{
+		Devices: []model.Device{
 			{
 				ID:        "local-device",
 				Hostname:  "sw1",
@@ -807,11 +808,11 @@ func TestToGraph_DeterministicAcrossRepeatedCalls(t *testing.T) {
 				Labels:    map[string]string{"inferred": "true"},
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "local-device", IfIndex: 3, IfName: "Gi0/3", IfDescr: "Gi0/3", Labels: map[string]string{"admin_status": "up", "oper_status": "up"}},
 			{DeviceID: "local-device", IfIndex: 4, IfName: "Gi0/4", IfDescr: "Gi0/4", Labels: map[string]string{"admin_status": "up", "oper_status": "lowerLayerDown"}},
 		},
-		Adjacencies: []Adjacency{
+		Adjacencies: []model.Adjacency{
 			{
 				Protocol:   "lldp",
 				SourceID:   "local-device",
@@ -820,10 +821,10 @@ func TestToGraph_DeterministicAcrossRepeatedCalls(t *testing.T) {
 				TargetPort: "Gi0/1",
 			},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{DeviceID: "local-device", IfIndex: 4, EndpointID: "mac:70:49:a2:65:72:cd", Method: "fdb"},
 		},
-		Enrichments: []Enrichment{
+		Enrichments: []model.Enrichment{
 			{
 				EndpointID: "mac:70:49:a2:65:72:cd",
 				MAC:        "70:49:a2:65:72:cd",
@@ -837,7 +838,7 @@ func TestToGraph_DeterministicAcrossRepeatedCalls(t *testing.T) {
 		},
 	}
 
-	opts := GraphOptions{
+	opts := model.GraphOptions{
 		SchemaVersion: "2.0",
 		Source:        "snmp",
 		Layer:         "2",
@@ -854,8 +855,8 @@ func TestToGraph_DeterministicAcrossRepeatedCalls(t *testing.T) {
 }
 
 func TestToGraph_DeduplicatesEndpointActorOverlappingManagedDevice(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "sw1",
 				Hostname:  "sw1",
@@ -863,7 +864,7 @@ func TestToGraph_DeduplicatesEndpointActorOverlappingManagedDevice(t *testing.T)
 				Addresses: []netip.Addr{netip.MustParseAddr("10.20.4.84")},
 			},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{
 				DeviceID:   "sw1",
 				IfIndex:    1,
@@ -871,7 +872,7 @@ func TestToGraph_DeduplicatesEndpointActorOverlappingManagedDevice(t *testing.T)
 				Method:     "fdb",
 			},
 		},
-		Enrichments: []Enrichment{
+		Enrichments: []model.Enrichment{
 			{
 				EndpointID: "mac:70:49:a2:65:72:cd",
 				MAC:        "70:49:a2:65:72:cd",
@@ -880,7 +881,7 @@ func TestToGraph_DeduplicatesEndpointActorOverlappingManagedDevice(t *testing.T)
 		},
 	}
 
-	data, stats := toGraphForTest(result, GraphOptions{
+	data, stats := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -908,8 +909,8 @@ func TestCanonicalTopologyMatchKey_NormalizesEquivalentMACRepresentations(t *tes
 }
 
 func TestToGraph_UsesDeterministicPrimaryManagementIP(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "device-a",
 				Hostname:  "device-a",
@@ -923,7 +924,7 @@ func TestToGraph_UsesDeterministicPrimaryManagementIP(t *testing.T) {
 		},
 	}
 
-	data, _ := toGraphForTest(result, GraphOptions{
+	data, _ := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -937,8 +938,8 @@ func TestToGraph_UsesDeterministicPrimaryManagementIP(t *testing.T) {
 }
 
 func TestToGraph_KeepsDistinctActorsWhenMACDiffersDespiteSameSecondaryIdentity(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "device-a",
 				Hostname:  "shared-name",
@@ -954,7 +955,7 @@ func TestToGraph_KeepsDistinctActorsWhenMACDiffersDespiteSameSecondaryIdentity(t
 		},
 	}
 
-	data, _ := toGraphForTest(result, GraphOptions{
+	data, _ := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -972,8 +973,8 @@ func TestToGraph_KeepsDistinctActorsWhenMACDiffersDespiteSameSecondaryIdentity(t
 }
 
 func TestToGraph_MergesPairedAdjacenciesIntoBidirectionalLink(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "switch-a",
 				Hostname:  "switch-a",
@@ -987,11 +988,11 @@ func TestToGraph_MergesPairedAdjacenciesIntoBidirectionalLink(t *testing.T) {
 				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")},
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
 			{DeviceID: "switch-b", IfIndex: 2, IfName: "Gi0/2", IfDescr: "Gi0/2"},
 		},
-		Adjacencies: []Adjacency{
+		Adjacencies: []model.Adjacency{
 			{
 				Protocol:   "lldp",
 				SourceID:   "switch-a",
@@ -1017,7 +1018,7 @@ func TestToGraph_MergesPairedAdjacenciesIntoBidirectionalLink(t *testing.T) {
 		},
 	}
 
-	data, stats := toGraphForTest(result, GraphOptions{
+	data, stats := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -1044,8 +1045,8 @@ func TestToGraph_MergesPairedAdjacenciesIntoBidirectionalLink(t *testing.T) {
 }
 
 func TestToGraph_MergesPairedAdjacenciesPreservesRawAddressHints(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "switch-a",
 				Hostname:  "switch-a",
@@ -1059,7 +1060,7 @@ func TestToGraph_MergesPairedAdjacenciesPreservesRawAddressHints(t *testing.T) {
 				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")},
 			},
 		},
-		Adjacencies: []Adjacency{
+		Adjacencies: []model.Adjacency{
 			{
 				Protocol:   "cdp",
 				SourceID:   "switch-a",
@@ -1087,7 +1088,7 @@ func TestToGraph_MergesPairedAdjacenciesPreservesRawAddressHints(t *testing.T) {
 		},
 	}
 
-	data, _ := toGraphForTest(result, GraphOptions{
+	data, _ := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -1102,8 +1103,8 @@ func TestToGraph_MergesPairedAdjacenciesPreservesRawAddressHints(t *testing.T) {
 }
 
 func TestToGraph_MergesReversePairsWithoutDirectionalPairLabels(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "router-a",
 				Hostname:  "MikroTik-router",
@@ -1117,11 +1118,11 @@ func TestToGraph_MergesReversePairsWithoutDirectionalPairLabels(t *testing.T) {
 				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")},
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "router-a", IfIndex: 3, IfName: "ether3", IfDescr: "ether3"},
 			{DeviceID: "switch-b", IfIndex: 8, IfName: "swp07", IfDescr: "swp07"},
 		},
-		Adjacencies: []Adjacency{
+		Adjacencies: []model.Adjacency{
 			{
 				Protocol:   "lldp",
 				SourceID:   "router-a",
@@ -1147,7 +1148,7 @@ func TestToGraph_MergesReversePairsWithoutDirectionalPairLabels(t *testing.T) {
 		},
 	}
 
-	data, stats := toGraphForTest(result, GraphOptions{
+	data, stats := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -1171,8 +1172,8 @@ func TestToGraph_MergesReversePairsWithoutDirectionalPairLabels(t *testing.T) {
 }
 
 func TestToGraph_UnknownAdjacencyPortsRemainUnsetWithoutZeroFallback(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "router-a",
 				Hostname:  "MikroTik-router",
@@ -1186,10 +1187,10 @@ func TestToGraph_UnknownAdjacencyPortsRemainUnsetWithoutZeroFallback(t *testing.
 				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")},
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "router-a", IfIndex: 3, IfName: "ether3", IfDescr: "ether3"},
 		},
-		Adjacencies: []Adjacency{
+		Adjacencies: []model.Adjacency{
 			{
 				Protocol:   "lldp",
 				SourceID:   "router-a",
@@ -1200,7 +1201,7 @@ func TestToGraph_UnknownAdjacencyPortsRemainUnsetWithoutZeroFallback(t *testing.
 		},
 	}
 
-	data, _ := toGraphForTest(result, GraphOptions{
+	data, _ := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -1217,8 +1218,8 @@ func TestToGraph_UnknownAdjacencyPortsRemainUnsetWithoutZeroFallback(t *testing.
 }
 
 func TestToGraph_DropsAmbiguousEndpointSegmentLinks(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "switch-a",
 				Hostname:  "switch-a",
@@ -1232,17 +1233,17 @@ func TestToGraph_DropsAmbiguousEndpointSegmentLinks(t *testing.T) {
 				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")},
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
 			{DeviceID: "switch-b", IfIndex: 2, IfName: "Gi0/2", IfDescr: "Gi0/2"},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:70:49:a2:65:72:cd", Method: "fdb"},
 			{DeviceID: "switch-b", IfIndex: 2, EndpointID: "mac:70:49:a2:65:72:cd", Method: "fdb"},
 		},
 	}
 
-	data, stats := toGraphForTest(result, GraphOptions{
+	data, stats := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -1271,8 +1272,8 @@ func TestToGraph_DropsAmbiguousEndpointSegmentLinks(t *testing.T) {
 }
 
 func TestToGraph_ProbableConnectivityConnectsAmbiguousEndpoint(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "switch-a",
 				Hostname:  "switch-a",
@@ -1286,24 +1287,24 @@ func TestToGraph_ProbableConnectivityConnectsAmbiguousEndpoint(t *testing.T) {
 				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")},
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
 			{DeviceID: "switch-b", IfIndex: 2, IfName: "Gi0/2", IfDescr: "Gi0/2"},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:70:49:a2:65:72:cd", Method: "fdb"},
 			{DeviceID: "switch-b", IfIndex: 2, EndpointID: "mac:70:49:a2:65:72:cd", Method: "fdb"},
 		},
 	}
 
-	strictData, _ := toGraphForTest(result, GraphOptions{
+	strictData, _ := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
 	})
 	require.Len(t, findFDBLinksByEndpointMAC(strictData.Links, "70:49:a2:65:72:cd"), 0)
 
-	data, stats := toGraphForTest(result, GraphOptions{
+	data, stats := toGraphForTest(result, model.GraphOptions{
 		Source:                    "snmp",
 		Layer:                     "2",
 		View:                      "summary",
@@ -1323,8 +1324,8 @@ func TestToGraph_ProbableConnectivityConnectsAmbiguousEndpoint(t *testing.T) {
 }
 
 func TestToGraph_ProbableConnectivityDoesNotReclassifyStrictSinglePortEndpoint(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "switch-a",
 				Hostname:  "switch-a",
@@ -1332,15 +1333,15 @@ func TestToGraph_ProbableConnectivityDoesNotReclassifyStrictSinglePortEndpoint(t
 				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:dd:dd:dd:dd:dd:dd", Method: "fdb"},
 		},
 	}
 
-	strictData, _ := toGraphForTest(result, GraphOptions{
+	strictData, _ := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -1350,7 +1351,7 @@ func TestToGraph_ProbableConnectivityDoesNotReclassifyStrictSinglePortEndpoint(t
 	require.Equal(t, "", strings.TrimSpace(strictFDBLinks[0].State))
 	require.Equal(t, "", strings.TrimSpace(topologyLinkInference(strictFDBLinks[0])))
 
-	data, stats := toGraphForTest(result, GraphOptions{
+	data, stats := toGraphForTest(result, model.GraphOptions{
 		Source:                    "snmp",
 		Layer:                     "2",
 		View:                      "summary",
@@ -1366,8 +1367,8 @@ func TestToGraph_ProbableConnectivityDoesNotReclassifyStrictSinglePortEndpoint(t
 }
 
 func TestToGraph_ProbableConnectivityConnectsUnlinkedLLDPEndpoint(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "switch-a",
 				Hostname:  "switch-a",
@@ -1381,24 +1382,24 @@ func TestToGraph_ProbableConnectivityConnectsUnlinkedLLDPEndpoint(t *testing.T) 
 				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")},
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
 			{DeviceID: "switch-b", IfIndex: 2, IfName: "Gi0/2", IfDescr: "Gi0/2"},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:70:49:a2:65:72:cf", Method: "lldp"},
 			{DeviceID: "switch-b", IfIndex: 2, EndpointID: "mac:70:49:a2:65:72:cf", Method: "lldp"},
 		},
 	}
 
-	strictData, _ := toGraphForTest(result, GraphOptions{
+	strictData, _ := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
 	})
 	require.Len(t, findFDBLinksByEndpointMAC(strictData.Links, "70:49:a2:65:72:cf"), 0)
 
-	data, _ := toGraphForTest(result, GraphOptions{
+	data, _ := toGraphForTest(result, model.GraphOptions{
 		Source:                    "snmp",
 		Layer:                     "2",
 		View:                      "summary",
@@ -1413,8 +1414,8 @@ func TestToGraph_ProbableConnectivityConnectsUnlinkedLLDPEndpoint(t *testing.T) 
 }
 
 func TestToGraph_ProbableConnectivityAvoidsExtraBridgePathForLLDPPeers(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "switch-a",
 				Hostname:  "switch-a",
@@ -1428,13 +1429,13 @@ func TestToGraph_ProbableConnectivityAvoidsExtraBridgePathForLLDPPeers(t *testin
 				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")},
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
 			{DeviceID: "switch-a", IfIndex: 2, IfName: "Gi0/2", IfDescr: "Gi0/2"},
 			{DeviceID: "switch-b", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
 			{DeviceID: "switch-b", IfIndex: 2, IfName: "Gi0/2", IfDescr: "Gi0/2"},
 		},
-		Adjacencies: []Adjacency{
+		Adjacencies: []model.Adjacency{
 			{
 				Protocol:   "lldp",
 				SourceID:   "switch-a",
@@ -1450,7 +1451,7 @@ func TestToGraph_ProbableConnectivityAvoidsExtraBridgePathForLLDPPeers(t *testin
 				TargetPort: "Gi0/2",
 			},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:70:49:a2:65:72:aa", Method: "lldp"},
 			{DeviceID: "switch-b", IfIndex: 1, EndpointID: "mac:70:49:a2:65:72:aa", Method: "lldp"},
 			{DeviceID: "switch-a", IfIndex: 2, EndpointID: "mac:70:49:a2:65:72:aa", Method: "lldp"},
@@ -1458,14 +1459,14 @@ func TestToGraph_ProbableConnectivityAvoidsExtraBridgePathForLLDPPeers(t *testin
 		},
 	}
 
-	strictData, _ := toGraphForTest(result, GraphOptions{
+	strictData, _ := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
 	})
 	require.Len(t, findFDBLinksByEndpointMAC(strictData.Links, "70:49:a2:65:72:aa"), 0)
 
-	data, _ := toGraphForTest(result, GraphOptions{
+	data, _ := toGraphForTest(result, model.GraphOptions{
 		Source:                    "snmp",
 		Layer:                     "2",
 		View:                      "summary",
@@ -1498,8 +1499,8 @@ func TestToGraph_ProbableConnectivityAvoidsExtraBridgePathForLLDPPeers(t *testin
 }
 
 func TestToGraph_ProbableConnectivityConnectsZeroCandidateEndpointUsingReporterHints(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "switch-a",
 				Hostname:  "switch-a",
@@ -1507,13 +1508,13 @@ func TestToGraph_ProbableConnectivityConnectsZeroCandidateEndpointUsingReporterH
 				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:dd:dd:dd:dd:dd:dd", Method: "fdb"},
 		},
-		Enrichments: []Enrichment{
+		Enrichments: []model.Enrichment{
 			{
 				EndpointID: "ip:10.0.0.99",
 				IPs:        []netip.Addr{netip.MustParseAddr("10.0.0.99")},
@@ -1527,14 +1528,14 @@ func TestToGraph_ProbableConnectivityConnectsZeroCandidateEndpointUsingReporterH
 		},
 	}
 
-	strictData, _ := toGraphForTest(result, GraphOptions{
+	strictData, _ := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
 	})
 	require.Len(t, findFDBLinksByEndpointIP(strictData.Links, "10.0.0.99"), 0)
 
-	data, _ := toGraphForTest(result, GraphOptions{
+	data, _ := toGraphForTest(result, model.GraphOptions{
 		Source:                    "snmp",
 		Layer:                     "2",
 		View:                      "summary",
@@ -1557,8 +1558,8 @@ func TestToGraph_ProbableConnectivityConnectsZeroCandidateEndpointUsingReporterH
 }
 
 func TestToGraph_ProbableConnectivityCreatesPortlessAttachmentForZeroCandidateEndpoint(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "switch-a",
 				Hostname:  "switch-a",
@@ -1566,13 +1567,13 @@ func TestToGraph_ProbableConnectivityCreatesPortlessAttachmentForZeroCandidateEn
 				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:dd:dd:dd:dd:dd:dd", Method: "fdb"},
 		},
-		Enrichments: []Enrichment{
+		Enrichments: []model.Enrichment{
 			{
 				EndpointID: "ip:10.0.0.199",
 				IPs:        []netip.Addr{netip.MustParseAddr("10.0.0.199")},
@@ -1586,7 +1587,7 @@ func TestToGraph_ProbableConnectivityCreatesPortlessAttachmentForZeroCandidateEn
 		},
 	}
 
-	data, _ := toGraphForTest(result, GraphOptions{
+	data, _ := toGraphForTest(result, model.GraphOptions{
 		Source:                    "snmp",
 		Layer:                     "2",
 		View:                      "summary",
@@ -1618,8 +1619,8 @@ func TestToGraph_ProbableConnectivityCreatesPortlessAttachmentForZeroCandidateEn
 }
 
 func TestToGraph_InferenceStrategy_STPParentDoesNotSuppressFDBEndpointOwnership(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "switch-a",
 				Hostname:  "switch-a",
@@ -1633,11 +1634,11 @@ func TestToGraph_InferenceStrategy_STPParentDoesNotSuppressFDBEndpointOwnership(
 				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")},
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
 			{DeviceID: "switch-b", IfIndex: 2, IfName: "Gi0/2", IfDescr: "Gi0/2"},
 		},
-		Adjacencies: []Adjacency{
+		Adjacencies: []model.Adjacency{
 			{
 				Protocol:   "stp",
 				SourceID:   "switch-a",
@@ -1646,13 +1647,13 @@ func TestToGraph_InferenceStrategy_STPParentDoesNotSuppressFDBEndpointOwnership(
 				TargetPort: "Gi0/2",
 			},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:00:00:00:00:00:11", Method: "fdb"},
 			{DeviceID: "switch-b", IfIndex: 2, EndpointID: "mac:00:00:00:00:00:22", Method: "fdb"},
 		},
 	}
 
-	_, baselineStats := toGraphForTest(result, GraphOptions{
+	_, baselineStats := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -1660,7 +1661,7 @@ func TestToGraph_InferenceStrategy_STPParentDoesNotSuppressFDBEndpointOwnership(
 	require.Equal(t, topologyInferenceStrategyFDBMinimumKnowledge, baselineStats.InferenceStrategy)
 	require.Greater(t, baselineStats.LinksFDBEndpointEmitted, 0)
 
-	_, stpStats := toGraphForTest(result, GraphOptions{
+	_, stpStats := toGraphForTest(result, model.GraphOptions{
 		Source:            "snmp",
 		Layer:             "2",
 		View:              "summary",
@@ -1671,19 +1672,19 @@ func TestToGraph_InferenceStrategy_STPParentDoesNotSuppressFDBEndpointOwnership(
 }
 
 func TestToGraph_InferenceStrategy_CDPHybridPrefersCDPBridgeLinks(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{ID: "sw-a", Hostname: "sw-a", ChassisID: "00:00:00:00:00:aa"},
 			{ID: "sw-b", Hostname: "sw-b", ChassisID: "00:00:00:00:00:bb"},
 			{ID: "sw-c", Hostname: "sw-c", ChassisID: "00:00:00:00:00:cc"},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "sw-a", IfIndex: 1, IfName: "Gi0/1"},
 			{DeviceID: "sw-a", IfIndex: 2, IfName: "Gi0/2"},
 			{DeviceID: "sw-b", IfIndex: 1, IfName: "Gi0/1"},
 			{DeviceID: "sw-c", IfIndex: 1, IfName: "Gi0/1"},
 		},
-		Adjacencies: []Adjacency{
+		Adjacencies: []model.Adjacency{
 			{
 				Protocol:   "lldp",
 				SourceID:   "sw-a",
@@ -1699,13 +1700,13 @@ func TestToGraph_InferenceStrategy_CDPHybridPrefersCDPBridgeLinks(t *testing.T) 
 				TargetPort: "Gi0/1",
 			},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{DeviceID: "sw-a", IfIndex: 1, EndpointID: "mac:00:00:00:00:10:01", Method: "fdb"},
 			{DeviceID: "sw-a", IfIndex: 2, EndpointID: "mac:00:00:00:00:10:02", Method: "fdb"},
 		},
 	}
 
-	_, baselineStats := toGraphForTest(result, GraphOptions{
+	_, baselineStats := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -1713,7 +1714,7 @@ func TestToGraph_InferenceStrategy_CDPHybridPrefersCDPBridgeLinks(t *testing.T) 
 	require.Equal(t, topologyInferenceStrategyFDBMinimumKnowledge, baselineStats.InferenceStrategy)
 	require.Equal(t, 0, baselineStats.LinksFDBEndpointEmitted)
 
-	_, stats := toGraphForTest(result, GraphOptions{
+	_, stats := toGraphForTest(result, model.GraphOptions{
 		Source:            "snmp",
 		Layer:             "2",
 		View:              "summary",
@@ -1871,8 +1872,8 @@ func TestEnsureManagedProbableReporterHint_FallsBackToFirstManagedDevice(t *test
 }
 
 func TestToGraph_ProbableConnectivityRecoversUnmanagedOverlapSuppression(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "switch-a",
 				Hostname:  "switch-a",
@@ -1880,11 +1881,11 @@ func TestToGraph_ProbableConnectivityRecoversUnmanagedOverlapSuppression(t *test
 				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
 			{DeviceID: "switch-a", IfIndex: 2, IfName: "Gi0/2", IfDescr: "Gi0/2"},
 		},
-		Adjacencies: []Adjacency{
+		Adjacencies: []model.Adjacency{
 			{
 				Protocol:   "lldp",
 				SourceID:   "switch-a",
@@ -1893,19 +1894,19 @@ func TestToGraph_ProbableConnectivityRecoversUnmanagedOverlapSuppression(t *test
 				TargetPort: "cc:cc:cc:cc:cc:cc",
 			},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{DeviceID: "switch-a", IfIndex: 2, EndpointID: "mac:cc:cc:cc:cc:cc:cc", Method: "fdb"},
 		},
 	}
 
-	strictData, _ := toGraphForTest(result, GraphOptions{
+	strictData, _ := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
 	})
 	require.Len(t, findFDBLinksByEndpointMAC(strictData.Links, "cc:cc:cc:cc:cc:cc"), 0)
 
-	data, _ := toGraphForTest(result, GraphOptions{
+	data, _ := toGraphForTest(result, model.GraphOptions{
 		Source:                    "snmp",
 		Layer:                     "2",
 		View:                      "summary",
@@ -1921,8 +1922,8 @@ func TestToGraph_ProbableConnectivityRecoversUnmanagedOverlapSuppression(t *test
 }
 
 func TestToGraph_CollapseByIPPrunesSuppressedManagedOverlapEndpoint(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "switch-a",
 				Hostname:  "switch-a",
@@ -1937,11 +1938,11 @@ func TestToGraph_CollapseByIPPrunesSuppressedManagedOverlapEndpoint(t *testing.T
 				Labels:    map[string]string{"inferred": "true"},
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
 			{DeviceID: "switch-a", IfIndex: 2, IfName: "Gi0/2", IfDescr: "Gi0/2"},
 		},
-		Adjacencies: []Adjacency{
+		Adjacencies: []model.Adjacency{
 			{
 				Protocol:   "lldp",
 				SourceID:   "switch-a",
@@ -1950,10 +1951,10 @@ func TestToGraph_CollapseByIPPrunesSuppressedManagedOverlapEndpoint(t *testing.T
 				TargetPort: "9c:6b:00:7b:98:c7",
 			},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{DeviceID: "switch-a", IfIndex: 2, EndpointID: "mac:9c:6b:00:7b:98:c7", Method: "fdb"},
 		},
-		Enrichments: []Enrichment{
+		Enrichments: []model.Enrichment{
 			{
 				EndpointID: "mac:9c:6b:00:7b:98:c7",
 				MAC:        "9c:6b:00:7b:98:c7",
@@ -1965,14 +1966,14 @@ func TestToGraph_CollapseByIPPrunesSuppressedManagedOverlapEndpoint(t *testing.T
 		},
 	}
 
-	withoutCollapse, _ := toGraphForTest(result, GraphOptions{
+	withoutCollapse, _ := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
 	})
 	require.NotNil(t, findActorByMAC(withoutCollapse.Actors, "9c:6b:00:7b:98:c7"))
 
-	withCollapse, withCollapseStats := toGraphForTest(result, GraphOptions{
+	withCollapse, withCollapseStats := toGraphForTest(result, model.GraphOptions{
 		Source:             "snmp",
 		Layer:              "2",
 		View:               "summary",
@@ -1984,8 +1985,8 @@ func TestToGraph_CollapseByIPPrunesSuppressedManagedOverlapEndpoint(t *testing.T
 }
 
 func TestToGraph_ReplacesKnownDeviceEndpointWithManagedDeviceEdge(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "router-a",
 				Hostname:  "router-a",
@@ -1999,15 +2000,15 @@ func TestToGraph_ReplacesKnownDeviceEndpointWithManagedDeviceEdge(t *testing.T) 
 				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")},
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "router-a", IfIndex: 1, IfName: "ether1"},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{DeviceID: "router-a", IfIndex: 1, EndpointID: "mac:bb:bb:bb:bb:bb:bb", Method: "fdb"},
 		},
 	}
 
-	data, stats := toGraphForTest(result, GraphOptions{
+	data, stats := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -2030,8 +2031,8 @@ func TestToGraph_ReplacesKnownDeviceEndpointWithManagedDeviceEdge(t *testing.T) 
 }
 
 func TestToGraph_KnownDeviceOverlapUsesInterfaceMACAlias(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "router-a",
 				Hostname:  "router-a",
@@ -2045,16 +2046,16 @@ func TestToGraph_KnownDeviceOverlapUsesInterfaceMACAlias(t *testing.T) {
 				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")},
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "router-a", IfIndex: 1, IfName: "ether1", MAC: "aa:aa:aa:aa:aa:8c"},
 			{DeviceID: "switch-b", IfIndex: 1, IfName: "ether1"},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{DeviceID: "switch-b", IfIndex: 1, EndpointID: "mac:aa:aa:aa:aa:aa:8c", Method: "fdb"},
 		},
 	}
 
-	data, stats := toGraphForTest(result, GraphOptions{
+	data, stats := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -2068,8 +2069,8 @@ func TestToGraph_KnownDeviceOverlapUsesInterfaceMACAlias(t *testing.T) {
 }
 
 func TestToGraph_DeviceActorIncludesInterfaceMACAliases(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "switch-a",
 				Hostname:  "switch-a",
@@ -2077,14 +2078,14 @@ func TestToGraph_DeviceActorIncludesInterfaceMACAliases(t *testing.T) {
 				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", MAC: "aa:aa:aa:aa:aa:11"},
 			{DeviceID: "switch-a", IfIndex: 2, IfName: "Gi0/2", MAC: "aa:aa:aa:aa:aa:12"},
 			{DeviceID: "switch-a", IfIndex: 3, IfName: "Gi0/3", MAC: "AA-AA-AA-AA-AA-12"},
 		},
 	}
 
-	data, _ := toGraphForTest(result, GraphOptions{
+	data, _ := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -2100,8 +2101,8 @@ func TestToGraph_DeviceActorIncludesInterfaceMACAliases(t *testing.T) {
 }
 
 func TestToGraph_KeepsUnlinkedEndpointsAndDevices(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "device-a",
 				Hostname:  "device-a",
@@ -2109,7 +2110,7 @@ func TestToGraph_KeepsUnlinkedEndpointsAndDevices(t *testing.T) {
 				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
 			},
 		},
-		Enrichments: []Enrichment{
+		Enrichments: []model.Enrichment{
 			{
 				EndpointID: "ip:10.0.0.42",
 				IPs:        []netip.Addr{netip.MustParseAddr("10.0.0.42")},
@@ -2117,7 +2118,7 @@ func TestToGraph_KeepsUnlinkedEndpointsAndDevices(t *testing.T) {
 		},
 	}
 
-	data, stats := toGraphForTest(result, GraphOptions{
+	data, stats := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -2141,8 +2142,8 @@ func TestToGraph_KeepsUnlinkedEndpointsAndDevices(t *testing.T) {
 }
 
 func TestToGraph_KeepsUnlinkedEndpointWhenIdentityOverlapsLinkedDevice(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "switch-a",
 				Hostname:  "switch-a",
@@ -2156,11 +2157,11 @@ func TestToGraph_KeepsUnlinkedEndpointWhenIdentityOverlapsLinkedDevice(t *testin
 				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")},
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1"},
 			{DeviceID: "mega", IfIndex: 1, IfName: "eth0"},
 		},
-		Adjacencies: []Adjacency{
+		Adjacencies: []model.Adjacency{
 			{
 				Protocol:   "lldp",
 				SourceID:   "switch-a",
@@ -2169,7 +2170,7 @@ func TestToGraph_KeepsUnlinkedEndpointWhenIdentityOverlapsLinkedDevice(t *testin
 				TargetPort: "eth0",
 			},
 		},
-		Enrichments: []Enrichment{
+		Enrichments: []model.Enrichment{
 			{
 				EndpointID: "mac:cc:cc:cc:cc:cc:cc",
 				IPs:        []netip.Addr{netip.MustParseAddr("10.0.0.2")},
@@ -2177,7 +2178,7 @@ func TestToGraph_KeepsUnlinkedEndpointWhenIdentityOverlapsLinkedDevice(t *testin
 		},
 	}
 
-	data, stats := toGraphForTest(result, GraphOptions{
+	data, stats := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -2190,8 +2191,8 @@ func TestToGraph_KeepsUnlinkedEndpointWhenIdentityOverlapsLinkedDevice(t *testin
 }
 
 func TestToGraph_DisplayNamesPreferDNSThenIPThenMAC(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "switch-a",
 				Hostname:  "switch-a",
@@ -2199,16 +2200,16 @@ func TestToGraph_DisplayNamesPreferDNSThenIPThenMAC(t *testing.T) {
 				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "switch-a", IfIndex: 3, IfName: "Gi0/3", IfDescr: "Gi0/3"},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{DeviceID: "switch-a", IfIndex: 3, EndpointID: "ip:10.0.0.42", Method: "arp"},
 			{DeviceID: "switch-a", IfIndex: 3, EndpointID: "mac:70:49:a2:65:72:cd", Method: "fdb"},
 		},
 	}
 
-	data, _ := toGraphForTest(result, GraphOptions{
+	data, _ := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -2274,8 +2275,8 @@ func TestTopologyDisplayNameFromMatch_PrefersHostnameBeforeIPWhenSysNameMissing(
 }
 
 func TestToGraph_SegmentDisplayNameUsesParentPortPattern(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "switch-a",
 				Hostname:  "switch-a",
@@ -2283,16 +2284,16 @@ func TestToGraph_SegmentDisplayNameUsesParentPortPattern(t *testing.T) {
 				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "switch-a", IfIndex: 3, IfName: "Gi0/3", IfDescr: "Gi0/3"},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{DeviceID: "switch-a", IfIndex: 3, EndpointID: "mac:70:49:a2:65:72:cd", Method: "fdb"},
 			{DeviceID: "switch-a", IfIndex: 3, EndpointID: "mac:70:49:a2:65:72:ce", Method: "fdb"},
 		},
 	}
 
-	data, _ := toGraphForTest(result, GraphOptions{
+	data, _ := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -2314,8 +2315,8 @@ func TestToGraph_SegmentDisplayNameUsesParentPortPattern(t *testing.T) {
 }
 
 func TestToGraph_FDBOwnerInferencePrefersNonLLDPSide(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "switch-a",
 				Hostname:  "switch-a",
@@ -2329,12 +2330,12 @@ func TestToGraph_FDBOwnerInferencePrefersNonLLDPSide(t *testing.T) {
 				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")},
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", MAC: "aa:aa:aa:aa:aa:aa"},
 			{DeviceID: "switch-b", IfIndex: 1, IfName: "Gi0/1", MAC: "bb:bb:bb:bb:bb:bb"},
 			{DeviceID: "switch-b", IfIndex: 2, IfName: "Gi0/2", MAC: "bb:bb:bb:bb:bb:bc"},
 		},
-		Adjacencies: []Adjacency{
+		Adjacencies: []model.Adjacency{
 			{
 				Protocol:   "lldp",
 				SourceID:   "switch-a",
@@ -2343,7 +2344,7 @@ func TestToGraph_FDBOwnerInferencePrefersNonLLDPSide(t *testing.T) {
 				TargetPort: "Gi0/1",
 			},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:bb:bb:bb:bb:bb:bb", Method: "fdb"},
 			{DeviceID: "switch-b", IfIndex: 1, EndpointID: "mac:aa:aa:aa:aa:aa:aa", Method: "fdb"},
 			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:70:49:a2:65:72:cd", Method: "fdb"},
@@ -2352,7 +2353,7 @@ func TestToGraph_FDBOwnerInferencePrefersNonLLDPSide(t *testing.T) {
 		},
 	}
 
-	data, _ := toGraphForTest(result, GraphOptions{
+	data, _ := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -2369,8 +2370,8 @@ func TestToGraph_FDBOwnerInferencePrefersNonLLDPSide(t *testing.T) {
 }
 
 func TestToGraph_FDBOwnerInferenceUsesSingleMACPortRule(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:       "switch-a",
 				Hostname: "switch-a",
@@ -2380,12 +2381,12 @@ func TestToGraph_FDBOwnerInferenceUsesSingleMACPortRule(t *testing.T) {
 				Hostname: "switch-b",
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1"},
 			{DeviceID: "switch-a", IfIndex: 2, IfName: "Gi0/2"},
 			{DeviceID: "switch-b", IfIndex: 1, IfName: "Gi0/1"},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:dd:dd:dd:dd:dd:dd", Method: "fdb"},
 			{DeviceID: "switch-a", IfIndex: 2, EndpointID: "mac:aa:aa:aa:aa:aa:aa", Method: "fdb"},
 			{DeviceID: "switch-b", IfIndex: 1, EndpointID: "mac:dd:dd:dd:dd:dd:dd", Method: "fdb"},
@@ -2393,7 +2394,7 @@ func TestToGraph_FDBOwnerInferenceUsesSingleMACPortRule(t *testing.T) {
 		},
 	}
 
-	data, _ := toGraphForTest(result, GraphOptions{
+	data, _ := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -2418,8 +2419,8 @@ func TestToGraph_FDBOwnerInferenceUsesSingleMACPortRule(t *testing.T) {
 }
 
 func TestToGraph_FDBOwnerInferenceSuppressesManagedAliasSwitchFacingPorts(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "switch-a",
 				Hostname:  "switch-a",
@@ -2431,12 +2432,12 @@ func TestToGraph_FDBOwnerInferenceSuppressesManagedAliasSwitchFacingPorts(t *tes
 				ChassisID: "bb:bb:bb:bb:bb:bb",
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1"},
 			{DeviceID: "switch-a", IfIndex: 2, IfName: "Gi0/2"},
 			{DeviceID: "switch-b", IfIndex: 1, IfName: "Gi0/1"},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			// Managed-device aliases learned on the same port mark it as switch-facing.
 			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:bb:bb:bb:bb:bb:bb", Method: "fdb"},
 			{DeviceID: "switch-b", IfIndex: 1, EndpointID: "mac:aa:aa:aa:aa:aa:aa", Method: "fdb"},
@@ -2450,7 +2451,7 @@ func TestToGraph_FDBOwnerInferenceSuppressesManagedAliasSwitchFacingPorts(t *tes
 		},
 	}
 
-	data, _ := toGraphForTest(result, GraphOptions{
+	data, _ := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -2473,8 +2474,8 @@ func TestToGraph_FDBOwnerInferenceSuppressesManagedAliasSwitchFacingPorts(t *tes
 }
 
 func TestToGraph_SuppressesFDBEndpointsOnLLDPPorts(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "switch-a",
 				Hostname:  "switch-a",
@@ -2488,11 +2489,11 @@ func TestToGraph_SuppressesFDBEndpointsOnLLDPPorts(t *testing.T) {
 				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")},
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", MAC: "aa:aa:aa:aa:aa:aa"},
 			{DeviceID: "host-b", IfIndex: 1, IfName: "eth0", MAC: "bb:bb:bb:bb:bb:bb"},
 		},
-		Adjacencies: []Adjacency{
+		Adjacencies: []model.Adjacency{
 			{
 				Protocol:   "lldp",
 				SourceID:   "switch-a",
@@ -2501,13 +2502,13 @@ func TestToGraph_SuppressesFDBEndpointsOnLLDPPorts(t *testing.T) {
 				TargetPort: "eth0",
 			},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:bb:bb:bb:bb:bb:bb", Method: "fdb"},
 			{DeviceID: "host-b", IfIndex: 1, EndpointID: "mac:aa:aa:aa:aa:aa:aa", Method: "fdb"},
 		},
 	}
 
-	data, stats := toGraphForTest(result, GraphOptions{
+	data, stats := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -2541,8 +2542,8 @@ func TestToGraph_SuppressesFDBEndpointsOnLLDPPorts(t *testing.T) {
 }
 
 func TestToGraph_KeepsChassisPlaceholderDevicesAsDevices(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "switch-a",
 				Hostname:  "switch-a",
@@ -2555,7 +2556,7 @@ func TestToGraph_KeepsChassisPlaceholderDevicesAsDevices(t *testing.T) {
 				ChassisID: "78:8c:b5:95:df:cc",
 			},
 		},
-		Adjacencies: []Adjacency{
+		Adjacencies: []model.Adjacency{
 			{
 				Protocol:   "lldp",
 				SourceID:   "switch-a",
@@ -2566,7 +2567,7 @@ func TestToGraph_KeepsChassisPlaceholderDevicesAsDevices(t *testing.T) {
 		},
 	}
 
-	data, _ := toGraphForTest(result, GraphOptions{
+	data, _ := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -2702,8 +2703,8 @@ func TestPruneSegmentArtifacts_SuppressesSegmentsWithSingleNeighbor(t *testing.T
 }
 
 func TestToGraph_DeterministicTransitRuleSuppressesFDBOnLLDPPortInExperimental(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "switch-a",
 				Hostname:  "switch-a",
@@ -2715,11 +2716,11 @@ func TestToGraph_DeterministicTransitRuleSuppressesFDBOnLLDPPortInExperimental(t
 				ChassisID: "bb:bb:bb:bb:bb:bb",
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
 			{DeviceID: "switch-b", IfIndex: 2, IfName: "Gi0/2", IfDescr: "Gi0/2"},
 		},
-		Adjacencies: []Adjacency{
+		Adjacencies: []model.Adjacency{
 			{
 				Protocol:   "lldp",
 				SourceID:   "switch-a",
@@ -2728,12 +2729,12 @@ func TestToGraph_DeterministicTransitRuleSuppressesFDBOnLLDPPortInExperimental(t
 				TargetPort: "Gi0/2",
 			},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:00:00:00:00:00:11", Method: "fdb"},
 		},
 	}
 
-	data, stats := toGraphForTest(result, GraphOptions{
+	data, stats := toGraphForTest(result, model.GraphOptions{
 		Source:            "snmp",
 		Layer:             "2",
 		View:              "summary",
@@ -2746,8 +2747,8 @@ func TestToGraph_DeterministicTransitRuleSuppressesFDBOnLLDPPortInExperimental(t
 }
 
 func TestToGraph_DeterministicTransitRuleMatchesNumericLLDPPortToIfIndex(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "switch-a",
 				Hostname:  "switch-a",
@@ -2759,11 +2760,11 @@ func TestToGraph_DeterministicTransitRuleMatchesNumericLLDPPortToIfIndex(t *test
 				ChassisID: "bb:bb:bb:bb:bb:bb",
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "switch-a", IfIndex: 2, IfName: "GigabitEthernet2", IfDescr: "GigabitEthernet2"},
 			{DeviceID: "switch-b", IfIndex: 4, IfName: "ether4", IfDescr: "ether4"},
 		},
-		Adjacencies: []Adjacency{
+		Adjacencies: []model.Adjacency{
 			{
 				Protocol:   "lldp",
 				SourceID:   "switch-a",
@@ -2772,12 +2773,12 @@ func TestToGraph_DeterministicTransitRuleMatchesNumericLLDPPortToIfIndex(t *test
 				TargetPort: "ether4",
 			},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{DeviceID: "switch-a", IfIndex: 2, EndpointID: "mac:00:00:00:00:00:11", Method: "fdb"},
 		},
 	}
 
-	data, stats := toGraphForTest(result, GraphOptions{
+	data, stats := toGraphForTest(result, model.GraphOptions{
 		Source:            "snmp",
 		Layer:             "2",
 		View:              "summary",
@@ -2797,8 +2798,8 @@ func TestToGraph_DeterministicTransitRuleMatchesNumericLLDPPortToIfIndex(t *test
 }
 
 func TestToGraph_SwitchFacingPortDoesNotSuppressEndpointOwnership(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "switch-a",
 				Hostname:  "switch-a",
@@ -2810,11 +2811,11 @@ func TestToGraph_SwitchFacingPortDoesNotSuppressEndpointOwnership(t *testing.T) 
 				ChassisID: "bb:bb:bb:bb:bb:bb",
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", MAC: "aa:aa:aa:aa:aa:aa"},
 			{DeviceID: "switch-b", IfIndex: 1, IfName: "Gi0/1", MAC: "bb:bb:bb:bb:bb:bb"},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			// Reciprocal managed-alias observations make this a switch-facing bridge pair.
 			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:bb:bb:bb:bb:bb:bb", Method: "fdb"},
 			{DeviceID: "switch-b", IfIndex: 1, EndpointID: "mac:aa:aa:aa:aa:aa:aa", Method: "fdb"},
@@ -2823,7 +2824,7 @@ func TestToGraph_SwitchFacingPortDoesNotSuppressEndpointOwnership(t *testing.T) 
 		},
 	}
 
-	data, _ := toGraphForTest(result, GraphOptions{
+	data, _ := toGraphForTest(result, model.GraphOptions{
 		Source:            "snmp",
 		Layer:             "2",
 		View:              "summary",
@@ -2889,8 +2890,8 @@ func TestSuppressInferredBridgeLinksOnDeterministicDiscovery(t *testing.T) {
 }
 
 func TestToGraph_FDBOwnerInferenceUsesReporterMatrixRule(t *testing.T) {
-	result := Result{
-		Devices: []Device{
+	result := model.Result{
+		Devices: []model.Device{
 			{
 				ID:        "switch-a",
 				Hostname:  "switch-a",
@@ -2907,14 +2908,14 @@ func TestToGraph_FDBOwnerInferenceUsesReporterMatrixRule(t *testing.T) {
 				ChassisID: "cc:cc:cc:cc:cc:cc",
 			},
 		},
-		Interfaces: []Interface{
+		Interfaces: []model.Interface{
 			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", MAC: "aa:aa:aa:aa:aa:aa"},
 			{DeviceID: "switch-b", IfIndex: 1, IfName: "Gi0/1", MAC: "bb:bb:bb:bb:bb:bb"},
 			{DeviceID: "switch-b", IfIndex: 2, IfName: "Gi0/2", MAC: "bb:bb:bb:bb:bb:bc"},
 			{DeviceID: "switch-c", IfIndex: 1, IfName: "Gi0/1", MAC: "cc:cc:cc:cc:cc:cc"},
 			{DeviceID: "switch-c", IfIndex: 2, IfName: "Gi0/2", MAC: "cc:cc:cc:cc:cc:cd"},
 		},
-		Attachments: []Attachment{
+		Attachments: []model.Attachment{
 			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:bb:bb:bb:bb:bb:bb", Method: "fdb"},
 			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:cc:cc:cc:cc:cc:cc", Method: "fdb"},
 			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:dd:dd:dd:dd:dd:dd", Method: "fdb"},
@@ -2928,7 +2929,7 @@ func TestToGraph_FDBOwnerInferenceUsesReporterMatrixRule(t *testing.T) {
 		},
 	}
 
-	data, _ := toGraphForTest(result, GraphOptions{
+	data, _ := toGraphForTest(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
@@ -2944,7 +2945,7 @@ func TestToGraph_FDBOwnerInferenceUsesReporterMatrixRule(t *testing.T) {
 	require.Equal(t, []string{"Gi0/2"}, segmentDetail.Segment.IfNames)
 }
 
-func findInterfaceStatusByIndex(statuses []ProjectionPortDetail, ifIndex int) *ProjectionPortDetail {
+func findInterfaceStatusByIndex(statuses []model.ProjectionPortDetail, ifIndex int) *model.ProjectionPortDetail {
 	for _, status := range statuses {
 		if status.IfIndex.Has && status.IfIndex.Value == ifIndex {
 			return &status
@@ -2953,7 +2954,7 @@ func findInterfaceStatusByIndex(statuses []ProjectionPortDetail, ifIndex int) *P
 	return nil
 }
 
-func findNeighborByProtocol(neighbors []ProjectionPortNeighbor, protocol string) *ProjectionPortNeighbor {
+func findNeighborByProtocol(neighbors []model.ProjectionPortNeighbor, protocol string) *model.ProjectionPortNeighbor {
 	for _, neighbor := range neighbors {
 		if strings.EqualFold(neighbor.Protocol, protocol) {
 			return &neighbor

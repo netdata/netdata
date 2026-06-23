@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/keyutil"
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 )
 
 const keySep = keyutil.Sep
@@ -20,7 +21,7 @@ func topologyMatchCompositeKey(parts ...string) string {
 	return opaqueCompositeKey(parts...)
 }
 
-func adjacencyKey(adj Adjacency) string {
+func adjacencyKey(adj model.Adjacency) string {
 	protocol := strings.ToLower(strings.TrimSpace(adj.Protocol))
 	sourceID := strings.TrimSpace(adj.SourceID)
 	sourcePort := strings.TrimSpace(adj.SourcePort)
@@ -30,7 +31,7 @@ func adjacencyKey(adj Adjacency) string {
 	return opaqueCompositeKey(protocol, sourceID, sourcePort, targetID, targetPort)
 }
 
-func attachmentKey(attachment Attachment) string {
+func attachmentKey(attachment model.Attachment) string {
 	deviceID := strings.TrimSpace(attachment.DeviceID)
 	endpointID := strings.TrimSpace(attachment.EndpointID)
 	method := strings.ToLower(strings.TrimSpace(attachment.Method))
@@ -50,7 +51,7 @@ func attachmentKey(attachment Attachment) string {
 	)
 }
 
-func ifaceKey(iface Interface) string {
+func ifaceKey(iface model.Interface) string {
 	return opaqueCompositeKey(iface.DeviceID, strconv.Itoa(iface.IfIndex), iface.IfName)
 }
 
@@ -66,7 +67,7 @@ func deriveBridgeDomainFromBridgePort(deviceID, bridgePort string) string {
 	return fmt.Sprintf("bridge-domain:%s:bp:%s", deviceID, bridgePort)
 }
 
-func attachmentDomain(attachment Attachment) string {
+func attachmentDomain(attachment model.Attachment) string {
 	if len(attachment.Labels) == 0 {
 		return ""
 	}

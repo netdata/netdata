@@ -5,6 +5,7 @@ package projector
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 	"github.com/stretchr/testify/require"
 )
@@ -12,7 +13,7 @@ import (
 func TestBackfillPairGroupMissingEndpointPortsCopiesPeerInterfaceAttributes(t *testing.T) {
 	entries := []*builtAdjacencyLink{
 		{
-			adj: Adjacency{
+			adj: model.Adjacency{
 				SourceID: "device-a",
 				TargetID: "device-b",
 			},
@@ -22,7 +23,7 @@ func TestBackfillPairGroupMissingEndpointPortsCopiesPeerInterfaceAttributes(t *t
 			},
 		},
 		{
-			adj: Adjacency{
+			adj: model.Adjacency{
 				SourceID: "device-b",
 				TargetID: "device-a",
 			},
@@ -54,7 +55,7 @@ func TestBackfillPairGroupMissingEndpointPortsCopiesPeerInterfaceAttributes(t *t
 func TestBackfillPairGroupMissingEndpointPortsSkipsAmbiguousReverseCandidates(t *testing.T) {
 	entries := []*builtAdjacencyLink{
 		{
-			adj: Adjacency{
+			adj: model.Adjacency{
 				SourceID: "device-a",
 				TargetID: "device-b",
 			},
@@ -64,7 +65,7 @@ func TestBackfillPairGroupMissingEndpointPortsSkipsAmbiguousReverseCandidates(t 
 			},
 		},
 		{
-			adj: Adjacency{
+			adj: model.Adjacency{
 				SourceID: "device-b",
 				TargetID: "device-a",
 			},
@@ -74,7 +75,7 @@ func TestBackfillPairGroupMissingEndpointPortsSkipsAmbiguousReverseCandidates(t 
 			},
 		},
 		{
-			adj: Adjacency{
+			adj: model.Adjacency{
 				SourceID: "device-b",
 				TargetID: "device-a",
 			},
@@ -118,8 +119,8 @@ func TestSegmentProjectionBuilderPruneSegmentsWithoutLinksRemovesEmptySegments(t
 						ActorID:   "segment-a",
 						ActorType: "segment",
 					},
-					Detail: ProjectionActorDetail{
-						Segment: ProjectionSegmentActorDetail{SegmentID: "segment-a"},
+					Detail: model.ProjectionActorDetail{
+						Segment: model.ProjectionSegmentActorDetail{SegmentID: "segment-a"},
 					},
 				},
 				{
@@ -127,8 +128,8 @@ func TestSegmentProjectionBuilderPruneSegmentsWithoutLinksRemovesEmptySegments(t
 						ActorID:   "segment-b",
 						ActorType: "segment",
 					},
-					Detail: ProjectionActorDetail{
-						Segment: ProjectionSegmentActorDetail{SegmentID: "segment-b"},
+					Detail: model.ProjectionActorDetail{
+						Segment: model.ProjectionSegmentActorDetail{SegmentID: "segment-b"},
 					},
 				},
 			},
@@ -169,8 +170,8 @@ func TestBuildBridgeSegmentActorMarksKnownZeroCountsPresent(t *testing.T) {
 
 	_, actor := buildBridgeSegmentActor("empty-segment", segment, "2", "snmp")
 
-	require.Equal(t, OptionalValue[int]{Has: true}, actor.Detail.Segment.PortsTotal)
-	require.Equal(t, OptionalValue[int]{Has: true}, actor.Detail.Segment.EndpointsTotal)
+	require.Equal(t, model.OptionalValue[int]{Has: true}, actor.Detail.Segment.PortsTotal)
+	require.Equal(t, model.OptionalValue[int]{Has: true}, actor.Detail.Segment.EndpointsTotal)
 }
 
 func TestCollapseActorsByIPMergesTypedActorDetail(t *testing.T) {
@@ -183,8 +184,8 @@ func TestCollapseActorsByIPMergesTypedActorDetail(t *testing.T) {
 					IPAddresses:  []string{"192.0.2.10"},
 				},
 			},
-			Detail: ProjectionActorDetail{
-				Device: ProjectionDeviceActorDetail{
+			Detail: model.ProjectionActorDetail{
+				Device: model.ProjectionDeviceActorDetail{
 					DeviceID: "rep",
 				},
 			},
@@ -197,8 +198,8 @@ func TestCollapseActorsByIPMergesTypedActorDetail(t *testing.T) {
 					IPAddresses:  []string{"192.0.2.10"},
 				},
 			},
-			Detail: ProjectionActorDetail{
-				Device: ProjectionDeviceActorDetail{
+			Detail: model.ProjectionActorDetail{
+				Device: model.ProjectionDeviceActorDetail{
 					DeviceID:                 "member",
 					Discovered:               true,
 					Inferred:                 true,
@@ -218,7 +219,7 @@ func TestCollapseActorsByIPMergesTypedActorDetail(t *testing.T) {
 					VendorDerivedMatchPrefix: "ffffff",
 					VendorMatchPrefix:        "ffffff",
 				},
-				Endpoint: ProjectionEndpointActorDetail{
+				Endpoint: model.ProjectionEndpointActorDetail{
 					Vendor:                   "Endpoint Vendor",
 					VendorSource:             "mac_oui",
 					VendorConfidence:         "low",

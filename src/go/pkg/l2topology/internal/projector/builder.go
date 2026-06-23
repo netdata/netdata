@@ -6,12 +6,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
 type graphBuilder struct {
-	result Result
-	opts   GraphOptions
+	result model.Result
+	opts   model.GraphOptions
 
 	schemaVersion string
 	source        string
@@ -21,8 +22,8 @@ type graphBuilder struct {
 
 	strategyConfig topologyInferenceStrategyConfig
 
-	deviceByID           map[string]Device
-	ifaceByDeviceIndex   map[string]Interface
+	deviceByID           map[string]model.Device
+	ifaceByDeviceIndex   map[string]model.Interface
 	ifIndexByDeviceName  map[string]int
 	bridgeLinks          []bridgeBridgeLinkRecord
 	reporterAliases      map[string][]string
@@ -41,10 +42,10 @@ type graphBuilder struct {
 	unlinkedSuppressed int
 	linkCounts         topologyLinkCounts
 	probableLinks      int
-	stats              ProjectionStats
+	stats              model.ProjectionStats
 }
 
-func newGraphBuilder(result Result, opts GraphOptions) *graphBuilder {
+func newGraphBuilder(result model.Result, opts model.GraphOptions) *graphBuilder {
 	builder := &graphBuilder{
 		result: result,
 		opts:   opts,
@@ -83,8 +84,8 @@ func newGraphBuilder(result Result, opts GraphOptions) *graphBuilder {
 }
 
 func (b *graphBuilder) prepareIndexes() {
-	b.deviceByID = make(map[string]Device, len(b.result.Devices))
-	b.ifaceByDeviceIndex = make(map[string]Interface, len(b.result.Interfaces))
+	b.deviceByID = make(map[string]model.Device, len(b.result.Devices))
+	b.ifaceByDeviceIndex = make(map[string]model.Interface, len(b.result.Interfaces))
 	b.ifIndexByDeviceName = make(map[string]int, len(b.result.Interfaces))
 
 	for _, dev := range b.result.Devices {
@@ -259,7 +260,7 @@ func (b *graphBuilder) finalizeGraph() {
 }
 
 func (b *graphBuilder) buildStats() {
-	b.stats = ProjectionStats{
+	b.stats = model.ProjectionStats{
 		ResultStats: b.result.Stats,
 
 		DevicesDiscovered:          discoveredDeviceCount(b.result.Devices, b.opts.LocalDeviceID),
@@ -297,11 +298,11 @@ func (b *graphBuilder) graph() graph.Graph {
 	}
 }
 
-func (b *graphBuilder) actorDetails() map[string]ProjectionActorDetail {
+func (b *graphBuilder) actorDetails() map[string]model.ProjectionActorDetail {
 	if len(b.actors) == 0 {
 		return nil
 	}
-	out := make(map[string]ProjectionActorDetail, len(b.actors))
+	out := make(map[string]model.ProjectionActorDetail, len(b.actors))
 	for _, actor := range b.actors {
 		actorID := strings.TrimSpace(actor.Actor.ActorID)
 		if actorID == "" {

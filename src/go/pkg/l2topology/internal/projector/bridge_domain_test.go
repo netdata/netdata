@@ -5,6 +5,7 @@ package projector
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/stretchr/testify/require"
 )
 
@@ -108,7 +109,7 @@ func TestMergeRootDomainSets_MergesTwoNonRootMembersAcrossDomains(t *testing.T) 
 }
 
 func TestCollectBridgeLinkRecords_DeduplicatesUndirectedAdjacencies(t *testing.T) {
-	records := collectBridgeLinkRecords([]Adjacency{
+	records := collectBridgeLinkRecords([]model.Adjacency{
 		{
 			Protocol:   "lldp",
 			SourceID:   "a",
@@ -134,7 +135,7 @@ func TestCollectBridgeLinkRecords_DeduplicatesUndirectedAdjacencies(t *testing.T
 }
 
 func TestCollectBridgeLinkRecords_SkipsAdjacencyWithoutRemotePort(t *testing.T) {
-	records := collectBridgeLinkRecords([]Adjacency{
+	records := collectBridgeLinkRecords([]model.Adjacency{
 		{
 			Protocol:   "lldp",
 			SourceID:   "a",
@@ -150,7 +151,7 @@ func TestCollectBridgeLinkRecords_SkipsAdjacencyWithoutRemotePort(t *testing.T) 
 }
 
 func TestCollectBridgeLinkRecords_STPParentTreeUsesDesignatedTargetPort(t *testing.T) {
-	records := collectBridgeLinkRecords([]Adjacency{
+	records := collectBridgeLinkRecords([]model.Adjacency{
 		{
 			Protocol:   "stp",
 			SourceID:   "child",
@@ -170,7 +171,7 @@ func TestCollectBridgeLinkRecords_STPParentTreeUsesDesignatedTargetPort(t *testi
 }
 
 func TestCollectBridgeLinkRecords_CDPHybridSkipsLLDPAdjacencies(t *testing.T) {
-	records := collectBridgeLinkRecords([]Adjacency{
+	records := collectBridgeLinkRecords([]model.Adjacency{
 		{
 			Protocol:   "lldp",
 			SourceID:   "a",
@@ -199,7 +200,7 @@ func TestCollectBridgeLinkRecords_CDPHybridSkipsLLDPAdjacencies(t *testing.T) {
 }
 
 func TestInferFDBPairwiseBridgeLinks_ReciprocalUniquePortPerSide(t *testing.T) {
-	attachments := []Attachment{
+	attachments := []model.Attachment{
 		{
 			DeviceID:   "sw-a",
 			IfIndex:    1,
@@ -213,7 +214,7 @@ func TestInferFDBPairwiseBridgeLinks_ReciprocalUniquePortPerSide(t *testing.T) {
 			Method:     "fdb",
 		},
 	}
-	ifaceByDeviceIndex := map[string]Interface{
+	ifaceByDeviceIndex := map[string]model.Interface{
 		deviceIfIndexKey("sw-a", 1): {DeviceID: "sw-a", IfIndex: 1, IfName: "Gi0/1"},
 		deviceIfIndexKey("sw-b", 2): {DeviceID: "sw-b", IfIndex: 2, IfName: "Gi0/2"},
 	}

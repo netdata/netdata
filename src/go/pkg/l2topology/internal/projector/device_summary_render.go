@@ -5,10 +5,12 @@ package projector
 import (
 	"strconv"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 )
 
-func buildTopologyDevicePortDetail(st topologyDevicePortStatus) ProjectionPortDetail {
-	detail := ProjectionPortDetail{
+func buildTopologyDevicePortDetail(st topologyDevicePortStatus) model.ProjectionPortDetail {
+	detail := model.ProjectionPortDetail{
 		Name:                   strings.TrimSpace(st.IfName),
 		IfName:                 strings.TrimSpace(st.IfName),
 		IfDescr:                strings.TrimSpace(st.IfDescr),
@@ -28,10 +30,10 @@ func buildTopologyDevicePortDetail(st topologyDevicePortStatus) ProjectionPortDe
 		Neighbors:              topologyPortNeighborDetails(st.Neighbors),
 	}
 	if st.IfIndex > 0 {
-		detail.IfIndex = OptionalValue[int]{Value: st.IfIndex, Has: true}
+		detail.IfIndex = model.OptionalValue[int]{Value: st.IfIndex, Has: true}
 	}
 	if st.SpeedBps > 0 {
-		detail.Speed = OptionalValue[int64]{Value: st.SpeedBps, Has: true}
+		detail.Speed = model.OptionalValue[int64]{Value: st.SpeedBps, Has: true}
 	}
 	if st.LastChange > 0 {
 		detail.LastChange = strings.TrimSpace(formatTopologyLabelInt64(st.LastChange))
@@ -43,10 +45,10 @@ func buildTopologyDevicePortDetail(st topologyDevicePortStatus) ProjectionPortDe
 		detail.TopologyRoleSources = st.RoleSources
 	}
 	if st.FDBMACCount > 0 {
-		detail.FDBMACCount = OptionalValue[int]{Value: st.FDBMACCount, Has: true}
+		detail.FDBMACCount = model.OptionalValue[int]{Value: st.FDBMACCount, Has: true}
 	}
 	if len(detail.Neighbors) > 0 {
-		detail.NeighborCount = OptionalValue[int]{Value: len(detail.Neighbors), Has: true}
+		detail.NeighborCount = model.OptionalValue[int]{Value: len(detail.Neighbors), Has: true}
 	}
 	return detail
 }
@@ -58,13 +60,13 @@ func formatTopologyLabelInt64(value int64) string {
 	return strconv.FormatInt(value, 10)
 }
 
-func topologyPortNeighborDetails(statuses []topologyPortNeighborStatus) []ProjectionPortNeighbor {
+func topologyPortNeighborDetails(statuses []topologyPortNeighborStatus) []model.ProjectionPortNeighbor {
 	if len(statuses) == 0 {
 		return nil
 	}
-	out := make([]ProjectionPortNeighbor, 0, len(statuses))
+	out := make([]model.ProjectionPortNeighbor, 0, len(statuses))
 	for _, status := range statuses {
-		neighbor := ProjectionPortNeighbor{
+		neighbor := model.ProjectionPortNeighbor{
 			Protocol:           strings.ToLower(strings.TrimSpace(status.Protocol)),
 			RemoteDevice:       strings.TrimSpace(status.RemoteDevice),
 			RemotePort:         strings.TrimSpace(status.RemotePort),
@@ -83,7 +85,7 @@ func topologyPortNeighborDetails(statuses []topologyPortNeighborStatus) []Projec
 	return out
 }
 
-func topologyDevicePortNeighborStatus(neighbor ProjectionPortNeighbor) topologyPortNeighborStatus {
+func topologyDevicePortNeighborStatus(neighbor model.ProjectionPortNeighbor) topologyPortNeighborStatus {
 	return topologyPortNeighborStatus{
 		Protocol:        neighbor.Protocol,
 		RemoteDevice:    neighbor.RemoteDevice,

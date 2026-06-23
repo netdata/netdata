@@ -6,16 +6,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
 func projectAdjacencyLinks(
-	adjacencies []Adjacency,
+	adjacencies []model.Adjacency,
 	layer string,
 	collectedAt time.Time,
-	deviceByID map[string]Device,
+	deviceByID map[string]model.Device,
 	ifIndexByDeviceName map[string]int,
-	ifaceByDeviceIndex map[string]Interface,
+	ifaceByDeviceIndex map[string]model.Interface,
 ) projectedLinks {
 	out := projectedLinks{
 		links: make([]graph.Link, 0, len(adjacencies)),
@@ -205,13 +206,13 @@ func backfillEndpointPortFromPeer(endpoint graph.LinkEndpoint, peer graph.LinkEn
 }
 
 func adjacencyToTopologyLink(
-	adj Adjacency,
+	adj model.Adjacency,
 	protocol string,
 	layer string,
 	collectedAt time.Time,
-	deviceByID map[string]Device,
+	deviceByID map[string]model.Device,
 	ifIndexByDeviceName map[string]int,
-	ifaceByDeviceIndex map[string]Interface,
+	ifaceByDeviceIndex map[string]model.Interface,
 ) graph.Link {
 	src := adjacencySideToEndpoint(deviceByID[adj.SourceID], adj.SourcePort, ifIndexByDeviceName, ifaceByDeviceIndex)
 	dst := adjacencySideToEndpoint(deviceByID[adj.TargetID], adj.TargetPort, ifIndexByDeviceName, ifaceByDeviceIndex)

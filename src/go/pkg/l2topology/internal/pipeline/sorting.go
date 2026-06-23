@@ -5,10 +5,12 @@ package pipeline
 import (
 	"sort"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 )
 
-func sortedLLDPRemotes(in []LLDPRemoteObservation) []LLDPRemoteObservation {
-	out := make([]LLDPRemoteObservation, 0, len(in))
+func sortedLLDPRemotes(in []model.LLDPRemoteObservation) []model.LLDPRemoteObservation {
+	out := make([]model.LLDPRemoteObservation, 0, len(in))
 	for _, remote := range in {
 		if strings.TrimSpace(remote.ChassisID) == "" && strings.TrimSpace(remote.SysName) == "" {
 			continue
@@ -49,8 +51,8 @@ func sortedLLDPRemotes(in []LLDPRemoteObservation) []LLDPRemoteObservation {
 	return out
 }
 
-func sortedCDPRemotes(in []CDPRemoteObservation) []CDPRemoteObservation {
-	out := make([]CDPRemoteObservation, 0, len(in))
+func sortedCDPRemotes(in []model.CDPRemoteObservation) []model.CDPRemoteObservation {
+	out := make([]model.CDPRemoteObservation, 0, len(in))
 	for _, remote := range in {
 		if strings.TrimSpace(remote.DeviceID) == "" && strings.TrimSpace(remote.Address) == "" {
 			continue
@@ -76,8 +78,8 @@ func sortedCDPRemotes(in []CDPRemoteObservation) []CDPRemoteObservation {
 	return out
 }
 
-func sortedBridgePorts(in []BridgePortObservation) []BridgePortObservation {
-	out := make([]BridgePortObservation, 0, len(in))
+func sortedBridgePorts(in []model.BridgePortObservation) []model.BridgePortObservation {
+	out := make([]model.BridgePortObservation, 0, len(in))
 	for _, bridgePort := range in {
 		if strings.TrimSpace(bridgePort.BasePort) == "" || bridgePort.IfIndex <= 0 {
 			continue
@@ -94,8 +96,8 @@ func sortedBridgePorts(in []BridgePortObservation) []BridgePortObservation {
 	return out
 }
 
-func sortedSTPPortEntries(in []STPPortObservation) []STPPortObservation {
-	out := make([]STPPortObservation, 0, len(in))
+func sortedSTPPortEntries(in []model.STPPortObservation) []model.STPPortObservation {
+	out := make([]model.STPPortObservation, 0, len(in))
 	for _, entry := range in {
 		if strings.TrimSpace(entry.Port) == "" {
 			continue
@@ -121,8 +123,8 @@ func sortedSTPPortEntries(in []STPPortObservation) []STPPortObservation {
 	return out
 }
 
-func sortedFDBEntries(in []FDBObservation) []FDBObservation {
-	out := make([]FDBObservation, 0, len(in))
+func sortedFDBEntries(in []model.FDBObservation) []model.FDBObservation {
+	out := make([]model.FDBObservation, 0, len(in))
 	for _, entry := range in {
 		if strings.TrimSpace(entry.MAC) == "" {
 			continue
@@ -148,8 +150,8 @@ func sortedFDBEntries(in []FDBObservation) []FDBObservation {
 	return out
 }
 
-func sortedARPNDEntries(in []ARPNDObservation) []ARPNDObservation {
-	out := make([]ARPNDObservation, 0, len(in))
+func sortedARPNDEntries(in []model.ARPNDObservation) []model.ARPNDObservation {
+	out := make([]model.ARPNDObservation, 0, len(in))
 	for _, entry := range in {
 		if strings.TrimSpace(entry.MAC) == "" && strings.TrimSpace(entry.IP) == "" {
 			continue
@@ -178,8 +180,8 @@ func sortedARPNDEntries(in []ARPNDObservation) []ARPNDObservation {
 	return out
 }
 
-func sortedDevices(in map[string]Device) []Device {
-	out := make([]Device, 0, len(in))
+func sortedDevices(in map[string]model.Device) []model.Device {
+	out := make([]model.Device, 0, len(in))
 	for _, dev := range in {
 		out = append(out, dev)
 	}
@@ -192,8 +194,8 @@ func sortedDevices(in map[string]Device) []Device {
 	return out
 }
 
-func sortedInterfaces(in map[string]Interface) []Interface {
-	out := make([]Interface, 0, len(in))
+func sortedInterfaces(in map[string]model.Interface) []model.Interface {
+	out := make([]model.Interface, 0, len(in))
 	for _, iface := range in {
 		out = append(out, iface)
 	}
@@ -210,8 +212,8 @@ func sortedInterfaces(in map[string]Interface) []Interface {
 	return out
 }
 
-func sortedAdjacencies(in map[string]Adjacency) []Adjacency {
-	out := make([]Adjacency, 0, len(in))
+func sortedAdjacencies(in map[string]model.Adjacency) []model.Adjacency {
+	out := make([]model.Adjacency, 0, len(in))
 	for _, adj := range in {
 		out = append(out, adj)
 	}
@@ -234,8 +236,8 @@ func sortedAdjacencies(in map[string]Adjacency) []Adjacency {
 	return out
 }
 
-func sortedAttachments(in map[string]Attachment) []Attachment {
-	out := make([]Attachment, 0, len(in))
+func sortedAttachments(in map[string]model.Attachment) []model.Attachment {
+	out := make([]model.Attachment, 0, len(in))
 	for _, attachment := range in {
 		out = append(out, attachment)
 	}
@@ -255,13 +257,13 @@ func sortedAttachments(in map[string]Attachment) []Attachment {
 	return out
 }
 
-func sortedEnrichments(in map[string]*enrichmentAccumulator) []Enrichment {
-	out := make([]Enrichment, 0, len(in))
+func sortedEnrichments(in map[string]*enrichmentAccumulator) []model.Enrichment {
+	out := make([]model.Enrichment, 0, len(in))
 	for _, acc := range in {
 		if acc == nil || strings.TrimSpace(acc.EndpointID) == "" {
 			continue
 		}
-		enrichment := Enrichment{
+		enrichment := model.Enrichment{
 			EndpointID: acc.EndpointID,
 			MAC:        acc.MAC,
 			IPs:        sortedAddrValues(acc.IPs),

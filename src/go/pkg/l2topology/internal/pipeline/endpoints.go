@@ -5,9 +5,11 @@ package pipeline
 import (
 	"strconv"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 )
 
-func (s *l2BuildState) applyBridge(observations []L2Observation) {
+func (s *l2BuildState) applyBridge(observations []model.L2Observation) {
 	for _, obs := range observations {
 		sourceID := strings.TrimSpace(obs.DeviceID)
 		if sourceID == "" {
@@ -25,7 +27,7 @@ func (s *l2BuildState) applyBridge(observations []L2Observation) {
 
 		for _, candidate := range buildFDBCandidates(obs.FDBEntries, bridgePortToIfIndex) {
 			endpointID := "mac:" + candidate.mac
-			attachment := Attachment{
+			attachment := model.Attachment{
 				DeviceID:   sourceID,
 				IfIndex:    candidate.ifIndex,
 				EndpointID: endpointID,
@@ -70,7 +72,7 @@ func (s *l2BuildState) applyBridge(observations []L2Observation) {
 	}
 }
 
-func (s *l2BuildState) applyARP(observations []L2Observation) {
+func (s *l2BuildState) applyARP(observations []model.L2Observation) {
 	for _, obs := range observations {
 		sourceID := strings.TrimSpace(obs.DeviceID)
 		if sourceID == "" {

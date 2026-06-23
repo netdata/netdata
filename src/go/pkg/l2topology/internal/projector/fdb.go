@@ -5,11 +5,13 @@ package projector
 import (
 	"sort"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 )
 
 func buildFDBReporterAliases(
-	deviceByID map[string]Device,
-	ifaceByDeviceIndex map[string]Interface,
+	deviceByID map[string]model.Device,
+	ifaceByDeviceIndex map[string]model.Interface,
 ) map[string][]string {
 	aliases := make(map[string]map[string]struct{}, len(deviceByID))
 

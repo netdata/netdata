@@ -5,11 +5,12 @@ package projector
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/stretchr/testify/require"
 )
 
 func TestBridgeAttachmentSortKey_DistinguishesVLANAndMethod(t *testing.T) {
-	base := Attachment{
+	base := model.Attachment{
 		DeviceID:   "switch-a",
 		IfIndex:    7,
 		EndpointID: "mac:00:11:22:33:44:55",
