@@ -5,42 +5,10 @@ package snmptopology
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+
 	"github.com/stretchr/testify/require"
 )
-
-func TestNormalizeOSPFRouterIDDropsUnspecifiedAddresses(t *testing.T) {
-	tests := map[string]struct {
-		in   string
-		want string
-	}{
-		"ipv4-unspecified": {in: "0.0.0.0"},
-		"ipv6-unspecified": {in: "::"},
-		"hex-unspecified":  {in: "00000000"},
-		"valid-router-id":  {in: " 1.2.3.4 ", want: "1.2.3.4"},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			require.Equal(t, tc.want, normalizeOSPFRouterID(tc.in))
-		})
-	}
-}
-
-func TestTopologyOSPFNeighborLinkKeyIgnoresUnspecifiedIPs(t *testing.T) {
-	base := topologyOSPFNeighbor{
-		LocalRouterID:    "1.1.1.1",
-		NeighborRouterID: "2.2.2.2",
-	}
-	withUnspecifiedIPs := base
-	withUnspecifiedIPs.LocalIP = "::"
-	withUnspecifiedIPs.NeighborIP = "0.0.0.0"
-
-	require.Equal(
-		t,
-		topologyOSPFNeighborLinkKeyParts(base, "router-a", "router-b"),
-		topologyOSPFNeighborLinkKeyParts(withUnspecifiedIPs, "router-a", "router-b"),
-	)
-}
 
 func TestTopologyCache_OSPFNeighborDropsUnspecifiedOnlyNeighborIdentity(t *testing.T) {
 	cache := newTopologyCache()
@@ -56,7 +24,7 @@ func TestTopologyCache_OSPFNeighborDropsUnspecifiedOnlyNeighborIdentity(t *testi
 
 func TestTopologyCache_MatchOSPFNeighborLocalInterfaceUsesLongestPrefix(t *testing.T) {
 	cache := newTopologyCache()
-	cache.l3InterfacesByIP = map[string]topologyL3Interface{
+	cache.l3InterfacesByIP = map[string]topologymodel.L3Interface{
 		"10.0.0.1": {
 			IP:      "10.0.0.1",
 			Netmask: "255.255.0.0",

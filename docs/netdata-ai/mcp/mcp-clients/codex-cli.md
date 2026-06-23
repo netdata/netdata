@@ -21,7 +21,7 @@ Codex CLI supports both stdio launchers and direct Streamable HTTP when the RMCP
    - **v2.6.0 - v2.7.1**: Only WebSocket transport available, requires `nd-mcp` bridge
    - **v2.7.2+**: Can use `npx mcp-remote` bridge for HTTP/SSE support
 3. **Launcher** – Run Netdata through `nd-mcp` (always) or `npx mcp-remote` (useful when you want a single stdio launcher for multiple MCP clients). Direct HTTP is also available for v2.7.2+ when you enable the RMCP client.
-4. **Optionally, the Netdata MCP API key** that unlocks full access to sensitive observability data (protected functions, full access to logs) on your Netdata. Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/netdata-ai/mcp/README.md#finding-your-api-key)
+4. **Netdata MCP API key** - required when `[web].bearer token protection = yes`. When bearer protection is disabled, it is optional and unlocks sensitive observability data (protected functions, full access to logs). Each Netdata Agent or Parent has its own unique MCP API key - [Find your Netdata MCP API key](/docs/netdata-ai/mcp/README.md#finding-your-api-key)
 
 ## Installation
 

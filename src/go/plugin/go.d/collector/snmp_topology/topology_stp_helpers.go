@@ -6,6 +6,8 @@ import (
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
 type stpBridgeIDStatus uint8
@@ -34,7 +36,7 @@ func parseSTPBridgeID(value string, depth int) (string, stpBridgeIDStatus) {
 		return "", stpBridgeIDEmpty
 	}
 
-	if mac := normalizeMAC(value); mac != "" && strings.Count(mac, ":") == 5 {
+	if mac := topologyutil.NormalizeMAC(value); mac != "" && strings.Count(mac, ":") == 5 {
 		if mac == "00:00:00:00:00:00" {
 			return "", stpBridgeIDEmpty
 		}
@@ -48,14 +50,14 @@ func parseSTPBridgeID(value string, depth int) (string, stpBridgeIDStatus) {
 		return parseSTPBridgeID(bridgeID, depth+1)
 	}
 
-	bs, err := decodeHexString(value)
+	bs, err := topologyutil.DecodeHexString(value)
 	if err != nil || len(bs) == 0 {
 		return "", stpBridgeIDInvalid
 	}
 	if allBytesZero(bs) {
 		return "", stpBridgeIDEmpty
 	}
-	if ascii := decodePrintableASCII(bs); ascii != "" && depth < 2 {
+	if ascii := topologyutil.DecodePrintableASCII(bs); ascii != "" && depth < 2 {
 		return parseSTPBridgeID(ascii, depth+1)
 	}
 	switch len(bs) {
@@ -93,14 +95,14 @@ func splitSTPBridgeIDWithPriority(value string) (string, string, bool) {
 }
 
 func isSTPAllZeroBridgeID(value string) bool {
-	mac := normalizeMAC(value)
+	mac := topologyutil.NormalizeMAC(value)
 	if mac == "00:00:00:00:00:00" {
 		return true
 	}
 	if mac != "" {
 		return false
 	}
-	clean := normalizeHexIdentifier(value)
+	clean := topologyutil.NormalizeHexIdentifier(value)
 	if clean == "" {
 		return false
 	}
@@ -129,5 +131,5 @@ func stpDesignatedPortString(value string) string {
 	if _, err := strconv.Atoi(value); err == nil {
 		return value
 	}
-	return normalizeHexIdentifier(value)
+	return topologyutil.NormalizeHexIdentifier(value)
 }

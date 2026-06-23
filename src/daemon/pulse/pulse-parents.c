@@ -3,8 +3,6 @@
 #define PULSE_INTERNALS
 #include "pulse.h"
 
-DEFINE_JUDYL_TYPED(PHOST, PULSE_HOST_STATUS);
-
 // --------------------------------------------------------------------------------------------------------------------
 // parents
 
@@ -19,15 +17,12 @@ struct by_reason {
 #define STREAM_HANDSHAKE_OTHER (STREAM_HANDSHAKE_NEGATIVE_MAX + 2)
 
 struct {
-    SPINLOCK spinlock;
-    PHOST_JudyLSet index;
-
     struct {
-        // counters
+        // event counters (event-driven)
         struct by_reason events_by_reason;
         struct by_reason disconnects_by_reason;
 
-        // gauges
+        // gauge chart pointers (the per-state counts are computed read-side by the traversal)
         struct {
             RRDSET *st_nodes;
             RRDDIM *rd_loading;
@@ -39,34 +34,14 @@ struct {
             RRDDIM *rd_replication_waiting;
             RRDDIM *rd_replicating;
             RRDDIM *rd_running;
-
-            ssize_t nodes_local;
-            ssize_t nodes_virtual;
-            ssize_t nodes_loading;
-            ssize_t nodes_archived;
-            ssize_t nodes_offline;
-            ssize_t nodes_waiting;
-            ssize_t nodes_replicating;
-            ssize_t nodes_replication_waiting;
-            ssize_t nodes_running;
         } type[2];
     } parent;
 
     struct {
-        // counters
+        // event counters (event-driven)
         struct by_reason stream_info_failed_by_reason;
         struct by_reason events_by_reason;
         struct by_reason disconnects_by_reason;
-
-        // gauges
-        ssize_t nodes_offline;
-        ssize_t nodes_connecting;
-        ssize_t nodes_pending;
-        ssize_t nodes_waiting;
-        ssize_t nodes_replicating;
-        ssize_t nodes_running;
-        ssize_t nodes_no_dst;
-        ssize_t nodes_no_dst_failed;
     } sender;
 
 } p = { 0 };
@@ -115,7 +90,6 @@ static void update_reason(struct by_reason *b, STREAM_HANDSHAKE reason) {
 }
 
 static void pulse_host_add_sub_status(PULSE_HOST_STATUS status, ssize_t val, STREAM_HANDSHAKE reason) {
-    size_t idx = status & PULSE_HOST_STATUS_EPHEMERAL ? 1 : 0;
     status &= ~(PULSE_HOST_STATUS_EPHEMERAL | PULSE_HOST_STATUS_PERMANENT);
 
     while(status) {
@@ -128,77 +102,23 @@ static void pulse_host_add_sub_status(PULSE_HOST_STATUS status, ssize_t val, STR
             default:
                 break;
 
-            case PULSE_HOST_STATUS_LOCAL:
-                __atomic_add_fetch(&p.parent.type[idx].nodes_local, val, __ATOMIC_RELAXED);
-                break;
-
-            case PULSE_HOST_STATUS_VIRTUAL:
-                __atomic_add_fetch(&p.parent.type[idx].nodes_virtual, val, __ATOMIC_RELAXED);
-                break;
-
-            case PULSE_HOST_STATUS_LOADING:
-                __atomic_add_fetch(&p.parent.type[idx].nodes_loading, val, __ATOMIC_RELAXED);
-                break;
-
-            case PULSE_HOST_STATUS_ARCHIVED:
-                __atomic_add_fetch(&p.parent.type[idx].nodes_archived, val, __ATOMIC_RELAXED);
-                break;
-
+            // inbound and outbound node gauges are now computed read-side by the pulse traversal;
+            // only the event-driven reason/event counters remain here.
             case PULSE_HOST_STATUS_RCV_OFFLINE:
-                __atomic_add_fetch(&p.parent.type[idx].nodes_offline, val, __ATOMIC_RELAXED);
                 do_parent_reason = true;
                 break;
 
             case PULSE_HOST_STATUS_RCV_WAITING:
-                __atomic_add_fetch(&p.parent.type[idx].nodes_waiting, val, __ATOMIC_RELAXED);
                 do_parent_reason = true;
                 reason = 0;
                 break;
 
-            case PULSE_HOST_STATUS_RCV_REPLICATION_WAIT:
-                __atomic_add_fetch(&p.parent.type[idx].nodes_replication_waiting, val, __ATOMIC_RELAXED);
-                break;
-
-            case PULSE_HOST_STATUS_RCV_REPLICATING:
-                __atomic_add_fetch(&p.parent.type[idx].nodes_replicating, val, __ATOMIC_RELAXED);
-                break;
-
-            case PULSE_HOST_STATUS_RCV_RUNNING:
-                __atomic_add_fetch(&p.parent.type[idx].nodes_running, val, __ATOMIC_RELAXED);
-                break;
-
             case PULSE_HOST_STATUS_SND_OFFLINE:
-                __atomic_add_fetch(&p.sender.nodes_offline, val, __ATOMIC_RELAXED);
                 do_sender_reason = true;
                 break;
 
-            case PULSE_HOST_STATUS_SND_PENDING:
-                __atomic_add_fetch(&p.sender.nodes_pending, val, __ATOMIC_RELAXED);
-                break;
-
             case PULSE_HOST_STATUS_SND_CONNECTING:
-                __atomic_add_fetch(&p.sender.nodes_connecting, val, __ATOMIC_RELAXED);
                 __atomic_add_fetch(&p.sender.events_by_reason.counters[STREAM_HANDSHAKE_CONNECT], 1, __ATOMIC_RELAXED);
-                break;
-
-            case PULSE_HOST_STATUS_SND_WAITING:
-                __atomic_add_fetch(&p.sender.nodes_waiting, val, __ATOMIC_RELAXED);
-                break;
-
-            case PULSE_HOST_STATUS_SND_REPLICATING:
-                __atomic_add_fetch(&p.sender.nodes_replicating, val, __ATOMIC_RELAXED);
-                break;
-
-            case PULSE_HOST_STATUS_SND_RUNNING:
-                __atomic_add_fetch(&p.sender.nodes_running, val, __ATOMIC_RELAXED);
-                break;
-
-            case PULSE_HOST_STATUS_SND_NO_DST:
-                __atomic_add_fetch(&p.sender.nodes_no_dst, val, __ATOMIC_RELAXED);
-                break;
-
-            case PULSE_HOST_STATUS_SND_NO_DST_FAILED:
-                __atomic_add_fetch(&p.sender.nodes_no_dst_failed, val, __ATOMIC_RELAXED);
                 break;
         }
 
@@ -236,6 +156,22 @@ void pulse_host_status(RRDHOST *host, PULSE_HOST_STATUS status, STREAM_HANDSHAKE
         status |= rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST) ?
                       PULSE_HOST_STATUS_EPHEMERAL : PULSE_HOST_STATUS_PERMANENT;
 
+    // running-latch: once the node first reaches RCV_RUNNING after a (re)connect, ignore the
+    // per-chart replication ripples that would otherwise flip the host status back to replicating.
+    // Makes no assumption that replication happens: RCV_RUNNING may be reached directly (replication
+    // disabled), and the block path is only ever taken for an incoming RCV_REPLICATING.
+    if(status & PULSE_HOST_STATUS_RCV_RUNNING)
+        __atomic_store_n(&host->stream.rcv.status.running_latched, true, __ATOMIC_RELAXED);
+    else if(status & PULSE_HOST_STATUS_RCV_REPLICATING) {
+        if(__atomic_load_n(&host->stream.rcv.status.running_latched, __ATOMIC_RELAXED) &&
+           (__atomic_load_n(&host->stream.pulse_state, __ATOMIC_RELAXED) & PULSE_HOST_STATUS_RCV_RUNNING))
+            status = (PULSE_HOST_STATUS)((status & ~PULSE_HOST_STATUS_RCV_REPLICATING) | PULSE_HOST_STATUS_RCV_RUNNING);
+        else
+            __atomic_store_n(&host->stream.rcv.status.running_latched, false, __ATOMIC_RELAXED);
+    }
+    else if(status & PULSE_HOST_STATUS_RCV_OFFLINE)
+        __atomic_store_n(&host->stream.rcv.status.running_latched, false, __ATOMIC_RELAXED);
+
     if(status & basic)
         remove = basic | receiver | ephemerality | sender;
     else if(status & receiver)
@@ -243,18 +179,28 @@ void pulse_host_status(RRDHOST *host, PULSE_HOST_STATUS status, STREAM_HANDSHAKE
     else if(status & sender)
         remove = sender;
 
-    spinlock_lock(&p.spinlock);
-    PULSE_HOST_STATUS old = PHOST_GET(&p.index, (uintptr_t)host);
-    if(status == PULSE_HOST_STATUS_DELETED) {
-        PHOST_DEL(&p.index, (uintptr_t)host);
+    // maintain the combined resolved state on the host (CAS, lock-free; replaces the global PHOST
+    // Judy + spinlock). The pulse traversal reads it to compute the streaming_inbound and
+    // streaming_outbound gauges read-side.
+    uint32_t cur = __atomic_load_n(&host->stream.pulse_state, __ATOMIC_RELAXED);
+    uint32_t next;
+    do {
+        next = (status == PULSE_HOST_STATUS_DELETED) ? 0u
+                                                     : (uint32_t)((cur & ~(uint32_t)remove) | (uint32_t)status);
+    } while(!__atomic_compare_exchange_n(&host->stream.pulse_state, &cur, next,
+                                         false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
+
+    PULSE_HOST_STATUS old = (PULSE_HOST_STATUS)cur; // the state we transitioned from
+
+    // reset the inbound-state age timer whenever the inbound (basic|receiver) state changes
+    if(((PULSE_HOST_STATUS)next & (basic | receiver)) != (old & (basic | receiver)))
+        __atomic_store_n(&host->stream.rcv.status.state_changed_s, now_realtime_sec(), __ATOMIC_RELAXED);
+
+    if(status == PULSE_HOST_STATUS_DELETED)
         status = 0; // do not add anything, just remove the old flags
-    }
-    else
-        PHOST_SET(&p.index, (uintptr_t)host, (old & ~remove) | status);
-    spinlock_unlock(&p.spinlock);
 
+    // event-driven reason/event counters only (gauges are computed by the traversal)
     remove &= old;
-
     pulse_host_add_sub_status(remove, -1, 0);
     pulse_host_add_sub_status(status, 1, reason);
 }
@@ -330,8 +276,206 @@ static void chart_by_reason(struct by_reason *b, const char *id, const char *con
     rrdset_done(b->st);
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+// inbound aggregate + per-child charts (parent only)
+//
+// One read-only pass over the rrdhost dictionary computes BOTH the streaming_inbound aggregate
+// (nodes per ephemerality x state) AND each child's per-instance charts on the parent's localhost.
+// No global shared counters and no rrd_rdlock: dfe_start_reentrant() refcounts each host during
+// iteration, and every per-host value read here is a single-writer relaxed atomic.
+
+typedef enum {
+    PULSE_INBOUND_LOCAL = 0,
+    PULSE_INBOUND_VIRTUAL,
+    PULSE_INBOUND_LOADING,
+    PULSE_INBOUND_ARCHIVED,
+    PULSE_INBOUND_OFFLINE,
+    PULSE_INBOUND_WAITING,
+    PULSE_INBOUND_REPLICATION_WAITING,
+    PULSE_INBOUND_REPLICATING,
+    PULSE_INBOUND_RUNNING,
+
+    PULSE_INBOUND_MAX,
+} PULSE_INBOUND_STATE;
+
+static PULSE_INBOUND_STATE pulse_inbound_state(PULSE_HOST_STATUS s) {
+    if(s & PULSE_HOST_STATUS_LOCAL)                 return PULSE_INBOUND_LOCAL;
+    if(s & PULSE_HOST_STATUS_VIRTUAL)               return PULSE_INBOUND_VIRTUAL;
+    if(s & PULSE_HOST_STATUS_LOADING)               return PULSE_INBOUND_LOADING;
+    if(s & PULSE_HOST_STATUS_ARCHIVED)              return PULSE_INBOUND_ARCHIVED;
+    if(s & PULSE_HOST_STATUS_RCV_OFFLINE)           return PULSE_INBOUND_OFFLINE;
+    if(s & PULSE_HOST_STATUS_RCV_WAITING)           return PULSE_INBOUND_WAITING;
+    if(s & PULSE_HOST_STATUS_RCV_REPLICATION_WAIT)  return PULSE_INBOUND_REPLICATION_WAITING;
+    if(s & PULSE_HOST_STATUS_RCV_REPLICATING)       return PULSE_INBOUND_REPLICATING;
+    if(s & PULSE_HOST_STATUS_RCV_RUNNING)           return PULSE_INBOUND_RUNNING;
+    return PULSE_INBOUND_MAX;
+}
+
+typedef enum {
+    PULSE_OUTBOUND_OFFLINE = 0,
+    PULSE_OUTBOUND_CONNECTING,
+    PULSE_OUTBOUND_PENDING,
+    PULSE_OUTBOUND_WAITING,
+    PULSE_OUTBOUND_REPLICATING,
+    PULSE_OUTBOUND_RUNNING,
+    PULSE_OUTBOUND_NO_DST,
+    PULSE_OUTBOUND_NO_DST_FAILED,
+
+    PULSE_OUTBOUND_MAX,
+} PULSE_OUTBOUND_STATE;
+
+static PULSE_OUTBOUND_STATE pulse_outbound_state(PULSE_HOST_STATUS s) {
+    if(s & PULSE_HOST_STATUS_SND_OFFLINE)       return PULSE_OUTBOUND_OFFLINE;
+    if(s & PULSE_HOST_STATUS_SND_CONNECTING)    return PULSE_OUTBOUND_CONNECTING;
+    if(s & PULSE_HOST_STATUS_SND_PENDING)       return PULSE_OUTBOUND_PENDING;
+    if(s & PULSE_HOST_STATUS_SND_WAITING)       return PULSE_OUTBOUND_WAITING;
+    if(s & PULSE_HOST_STATUS_SND_REPLICATING)   return PULSE_OUTBOUND_REPLICATING;
+    if(s & PULSE_HOST_STATUS_SND_RUNNING)       return PULSE_OUTBOUND_RUNNING;
+    if(s & PULSE_HOST_STATUS_SND_NO_DST)        return PULSE_OUTBOUND_NO_DST;
+    if(s & PULSE_HOST_STATUS_SND_NO_DST_FAILED) return PULSE_OUTBOUND_NO_DST_FAILED;
+    return PULSE_OUTBOUND_MAX;
+}
+
+// per-child charts on the parent's localhost: one set per child, found-or-created by id on every
+// pass. No registry/cache is kept: a host that leaves the dictionary stops being updated and the
+// chart engine obsoletes its charts via the standard not-collected timer (rrdset_free_obsolete_time_s),
+// exactly like every other collector. Identity + copied child labels are set once, at chart creation.
+
+static void pulse_child_chart_labels(RRDSET *st, RRDHOST *host) {
+    char node_id[UUID_STR_LEN] = "";
+    if(!UUIDiszero(host->node_id))
+        uuid_unparse_lower(host->node_id.uuid, node_id);
+
+    char hops[16];
+    snprintfz(hops, sizeof(hops), "%d", (int)rrdhost_ingestion_hops(host));
+
+    // copy the child's labels FIRST, then set the authoritative identity labels so a colliding
+    // child label cannot overwrite machine_guid/hostname/node_id/hops (rrdlabels_copy/add replace
+    // the value for a shared key)
+    rrdlabels_copy(st->rrdlabels, host->rrdlabels);
+    rrdlabels_add(st->rrdlabels, "machine_guid", host->machine_guid, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "hostname", rrdhost_hostname(host), RRDLABEL_SRC_AUTO);
+    if(node_id[0])
+        rrdlabels_add(st->rrdlabels, "node_id", node_id, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "hops", hops, RRDLABEL_SRC_AUTO);
+}
+
+static void pulse_child_charts_update(RRDHOST *host, PULSE_INBOUND_STATE state) {
+    char id[RRD_ID_LENGTH_MAX + 1];
+    const char *guid = host->machine_guid;
+
+    // re-apply labels + hops only when the host's labels changed (reconnect / mid-stream push), via a
+    // cheap version compare - so we don't re-copy every child's labels on every pass. hops can change
+    // when a child re-attaches via a different parent in a cluster; that reconnect bumps the version.
+    uint32_t lv = rrdlabels_version(host->rrdlabels);
+    bool refresh_labels = (lv != host->stream.rcv.status.labels_applied_version);
+    host->stream.rcv.status.labels_applied_version = lv;
+
+    // --- traffic ---
+    snprintfz(id, sizeof(id), "streaming.in.traffic.%s", guid);
+    RRDSET *st_traffic = rrdset_create_localhost(
+        "netdata", id, NULL, "Streaming", "netdata.streaming.in.traffic",
+        "Inbound Streaming Traffic", "bytes/s", "netdata", "pulse",
+        130160, localhost->rrd_update_every, RRDSET_TYPE_AREA);
+    if(unlikely(refresh_labels || !rrdlabels_exist(st_traffic->rrdlabels, "machine_guid")))
+        pulse_child_chart_labels(st_traffic, host);
+    rrddim_set_by_pointer(st_traffic, rrddim_add(st_traffic, "in", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL),
+        (collected_number)single_writer_atomic_read(&host->stream.rcv.status.bytes_in));
+    rrddim_set_by_pointer(st_traffic, rrddim_add(st_traffic, "out", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL),
+        (collected_number)single_writer_atomic_read(&host->stream.rcv.status.bytes_out));
+    rrdset_done(st_traffic);
+
+    // --- state (one-hot) ---
+    static const char *state_dim[PULSE_INBOUND_MAX] = {
+        [PULSE_INBOUND_ARCHIVED]            = "archived",
+        [PULSE_INBOUND_OFFLINE]             = "offline",
+        [PULSE_INBOUND_WAITING]             = "waiting",
+        [PULSE_INBOUND_REPLICATION_WAITING] = "waiting replication",
+        [PULSE_INBOUND_REPLICATING]         = "replicating",
+        [PULSE_INBOUND_RUNNING]             = "running",
+    };
+    snprintfz(id, sizeof(id), "streaming.in.state.%s", guid);
+    RRDSET *st_state = rrdset_create_localhost(
+        "netdata", id, NULL, "Streaming", "netdata.streaming.in.state",
+        "Inbound Streaming State", "state", "netdata", "pulse",
+        130161, localhost->rrd_update_every, RRDSET_TYPE_LINE);
+    if(unlikely(refresh_labels || !rrdlabels_exist(st_state->rrdlabels, "machine_guid")))
+        pulse_child_chart_labels(st_state, host);
+    for(size_t i = 0; i < PULSE_INBOUND_MAX ; i++) {
+        if(!state_dim[i]) continue;
+        rrddim_set_by_pointer(st_state, rrddim_add(st_state, state_dim[i], NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE),
+            (collected_number)(state == i ? 1 : 0));
+    }
+    rrdset_done(st_state);
+
+    // --- reconnects ---
+    snprintfz(id, sizeof(id), "streaming.in.reconnects.%s", guid);
+    RRDSET *st_reconnects = rrdset_create_localhost(
+        "netdata", id, NULL, "Streaming", "netdata.streaming.in.reconnects",
+        "Inbound Streaming Reconnects", "connects/s", "netdata", "pulse",
+        130162, localhost->rrd_update_every, RRDSET_TYPE_LINE);
+    if(unlikely(refresh_labels || !rrdlabels_exist(st_reconnects->rrdlabels, "machine_guid")))
+        pulse_child_chart_labels(st_reconnects, host);
+    rrddim_set_by_pointer(st_reconnects, rrddim_add(st_reconnects, "connections", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL),
+        (collected_number)__atomic_load_n(&host->stream.rcv.status.connections, __ATOMIC_RELAXED));
+    rrdset_done(st_reconnects);
+
+    // --- age (seconds in the current inbound state; reset to 0 on every state change) ---
+    snprintfz(id, sizeof(id), "streaming.in.age.%s", guid);
+    RRDSET *st_age = rrdset_create_localhost(
+        "netdata", id, NULL, "Streaming", "netdata.streaming.in.age",
+        "Inbound Streaming State Age", "seconds", "netdata", "pulse",
+        130163, localhost->rrd_update_every, RRDSET_TYPE_LINE);
+    if(unlikely(refresh_labels || !rrdlabels_exist(st_age->rrdlabels, "machine_guid")))
+        pulse_child_chart_labels(st_age, host);
+    time_t changed = __atomic_load_n(&host->stream.rcv.status.state_changed_s, __ATOMIC_RELAXED);
+    time_t now_s = now_realtime_sec();
+    rrddim_set_by_pointer(st_age, rrddim_add(st_age, "age", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE),
+        (collected_number)((changed && now_s > changed) ? now_s - changed : 0));
+    rrdset_done(st_age);
+}
+
+// traverse all hosts once: tally BOTH the inbound and outbound aggregates from each host's combined
+// pulse_state, and refresh the per-child charts. A host may carry both an inbound (receiver) and an
+// outbound (sender) state simultaneously, so both are tallied independently.
+static void pulse_parents_traverse(ssize_t inbound[2][PULSE_INBOUND_MAX], ssize_t outbound[PULSE_OUTBOUND_MAX]) {
+    // per-child charts only when streaming ingest is actually configured
+    bool do_children = stream_conf_is_parent(false);
+
+    RRDHOST *host;
+    dfe_start_reentrant(rrdhost_root_index, host) {
+        PULSE_HOST_STATUS s = __atomic_load_n(&host->stream.pulse_state, __ATOMIC_RELAXED);
+        if(!s)
+            continue; // not classified yet
+
+        PULSE_INBOUND_STATE in = pulse_inbound_state(s);
+        if(in < PULSE_INBOUND_MAX) {
+            size_t type = (s & PULSE_HOST_STATUS_EPHEMERAL) ? 1 : 0;
+            inbound[type][in]++;
+
+            if(do_children && !rrdhost_is_local(host))
+                pulse_child_charts_update(host, in);
+        }
+
+        PULSE_OUTBOUND_STATE out = pulse_outbound_state(s);
+        if(out < PULSE_OUTBOUND_MAX)
+            outbound[out]++;
+    }
+    dfe_done(host);
+}
+
 void pulse_parents_do(bool extended) {
-    if(netdata_conf_is_parent()) {
+    bool is_parent = netdata_conf_is_parent();
+    bool is_child = stream_conf_is_child();
+
+    // one read-only pass over the host dictionary: tally both streaming aggregates and refresh the
+    // per-child charts (no global counters, no rrd_rdlock)
+    ssize_t inbound[2][PULSE_INBOUND_MAX] = { 0 };
+    ssize_t outbound[PULSE_OUTBOUND_MAX] = { 0 };
+    if(is_parent || is_child)
+        pulse_parents_traverse(inbound, outbound);
+
+    if(is_parent) {
         for(size_t idx = 0; idx < _countof(p.parent.type) ; idx++) {
             if (unlikely(!p.parent.type[idx].st_nodes)) {
                 const char *type;
@@ -373,15 +517,15 @@ void pulse_parents_do(bool extended) {
                 p.parent.type[idx].rd_running = rrddim_add(p.parent.type[idx].st_nodes, "running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
 
-            rrddim_set_by_pointer(p.parent.type[idx].st_nodes, p.parent.type[idx].rd_local, (collected_number)__atomic_load_n(&p.parent.type[idx].nodes_local, __ATOMIC_RELAXED));
-            rrddim_set_by_pointer(p.parent.type[idx].st_nodes, p.parent.type[idx].rd_virtual, (collected_number)__atomic_load_n(&p.parent.type[idx].nodes_virtual, __ATOMIC_RELAXED));
-            rrddim_set_by_pointer(p.parent.type[idx].st_nodes,p.parent.type[idx].rd_loading, (collected_number)__atomic_load_n(&p.parent.type[idx].nodes_loading, __ATOMIC_RELAXED));
-            rrddim_set_by_pointer(p.parent.type[idx].st_nodes, p.parent.type[idx].rd_archived, (collected_number)__atomic_load_n(&p.parent.type[idx].nodes_archived, __ATOMIC_RELAXED));
-            rrddim_set_by_pointer(p.parent.type[idx].st_nodes, p.parent.type[idx].rd_offline, (collected_number)__atomic_load_n(&p.parent.type[idx].nodes_offline, __ATOMIC_RELAXED));
-            rrddim_set_by_pointer(p.parent.type[idx].st_nodes, p.parent.type[idx].rd_waiting, (collected_number)__atomic_load_n(&p.parent.type[idx].nodes_waiting, __ATOMIC_RELAXED));
-            rrddim_set_by_pointer(p.parent.type[idx].st_nodes, p.parent.type[idx].rd_replication_waiting, (collected_number)__atomic_load_n(&p.parent.type[idx].nodes_replication_waiting, __ATOMIC_RELAXED));
-            rrddim_set_by_pointer(p.parent.type[idx].st_nodes, p.parent.type[idx].rd_replicating, (collected_number)__atomic_load_n(&p.parent.type[idx].nodes_replicating, __ATOMIC_RELAXED));
-            rrddim_set_by_pointer(p.parent.type[idx].st_nodes, p.parent.type[idx].rd_running, (collected_number)__atomic_load_n(&p.parent.type[idx].nodes_running, __ATOMIC_RELAXED));
+            rrddim_set_by_pointer(p.parent.type[idx].st_nodes, p.parent.type[idx].rd_local, (collected_number)inbound[idx][PULSE_INBOUND_LOCAL]);
+            rrddim_set_by_pointer(p.parent.type[idx].st_nodes, p.parent.type[idx].rd_virtual, (collected_number)inbound[idx][PULSE_INBOUND_VIRTUAL]);
+            rrddim_set_by_pointer(p.parent.type[idx].st_nodes, p.parent.type[idx].rd_loading, (collected_number)inbound[idx][PULSE_INBOUND_LOADING]);
+            rrddim_set_by_pointer(p.parent.type[idx].st_nodes, p.parent.type[idx].rd_archived, (collected_number)inbound[idx][PULSE_INBOUND_ARCHIVED]);
+            rrddim_set_by_pointer(p.parent.type[idx].st_nodes, p.parent.type[idx].rd_offline, (collected_number)inbound[idx][PULSE_INBOUND_OFFLINE]);
+            rrddim_set_by_pointer(p.parent.type[idx].st_nodes, p.parent.type[idx].rd_waiting, (collected_number)inbound[idx][PULSE_INBOUND_WAITING]);
+            rrddim_set_by_pointer(p.parent.type[idx].st_nodes, p.parent.type[idx].rd_replication_waiting, (collected_number)inbound[idx][PULSE_INBOUND_REPLICATION_WAITING]);
+            rrddim_set_by_pointer(p.parent.type[idx].st_nodes, p.parent.type[idx].rd_replicating, (collected_number)inbound[idx][PULSE_INBOUND_REPLICATING]);
+            rrddim_set_by_pointer(p.parent.type[idx].st_nodes, p.parent.type[idx].rd_running, (collected_number)inbound[idx][PULSE_INBOUND_RUNNING]);
 
             rrdset_done(p.parent.type[idx].st_nodes);
         }
@@ -404,7 +548,7 @@ void pulse_parents_do(bool extended) {
         }
     }
 
-    if(stream_conf_is_child()) {
+    if(is_child) {
         {
             static RRDSET *st_nodes = NULL;
             static RRDDIM *rd_pending = NULL;
@@ -442,14 +586,14 @@ void pulse_parents_do(bool extended) {
                 rd_no_dst_failed = rrddim_add(st_nodes, "failed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
 
-            rrddim_set_by_pointer(st_nodes, rd_connecting, (collected_number)__atomic_load_n(&p.sender.nodes_connecting, __ATOMIC_RELAXED));
-            rrddim_set_by_pointer(st_nodes, rd_pending, (collected_number)__atomic_load_n(&p.sender.nodes_pending, __ATOMIC_RELAXED));
-            rrddim_set_by_pointer(st_nodes, rd_offline, (collected_number)__atomic_load_n(&p.sender.nodes_offline, __ATOMIC_RELAXED));
-            rrddim_set_by_pointer(st_nodes, rd_waiting, (collected_number)__atomic_load_n(&p.sender.nodes_waiting, __ATOMIC_RELAXED));
-            rrddim_set_by_pointer(st_nodes, rd_replicating, (collected_number)__atomic_load_n(&p.sender.nodes_replicating, __ATOMIC_RELAXED));
-            rrddim_set_by_pointer(st_nodes, rd_running, (collected_number)__atomic_load_n(&p.sender.nodes_running, __ATOMIC_RELAXED));
-            rrddim_set_by_pointer(st_nodes, rd_no_dst, (collected_number)__atomic_load_n(&p.sender.nodes_no_dst, __ATOMIC_RELAXED));
-            rrddim_set_by_pointer(st_nodes, rd_no_dst_failed, (collected_number)__atomic_load_n(&p.sender.nodes_no_dst_failed, __ATOMIC_RELAXED));
+            rrddim_set_by_pointer(st_nodes, rd_connecting, (collected_number)outbound[PULSE_OUTBOUND_CONNECTING]);
+            rrddim_set_by_pointer(st_nodes, rd_pending, (collected_number)outbound[PULSE_OUTBOUND_PENDING]);
+            rrddim_set_by_pointer(st_nodes, rd_offline, (collected_number)outbound[PULSE_OUTBOUND_OFFLINE]);
+            rrddim_set_by_pointer(st_nodes, rd_waiting, (collected_number)outbound[PULSE_OUTBOUND_WAITING]);
+            rrddim_set_by_pointer(st_nodes, rd_replicating, (collected_number)outbound[PULSE_OUTBOUND_REPLICATING]);
+            rrddim_set_by_pointer(st_nodes, rd_running, (collected_number)outbound[PULSE_OUTBOUND_RUNNING]);
+            rrddim_set_by_pointer(st_nodes, rd_no_dst, (collected_number)outbound[PULSE_OUTBOUND_NO_DST]);
+            rrddim_set_by_pointer(st_nodes, rd_no_dst_failed, (collected_number)outbound[PULSE_OUTBOUND_NO_DST_FAILED]);
 
             rrdset_done(st_nodes);
         }

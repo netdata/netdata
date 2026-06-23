@@ -515,6 +515,28 @@ state collected from IP-MIB `ipAddrTable`, limited to IPv4 point-to-point
 same point-to-point subnet; it does not prove that the devices are physically
 connected.
 
+`l3_subnet_segment` represents a broader IPv4 shared subnet observed from
+managed SNMP device interface state. SNMP currently emits these segment actors
+for `/24` through `/29` subnets. The segment actor is a logical grouping point,
+not a physical switch, bridge domain, VLAN, or endpoint. Each member device is
+connected to the segment by an `l3_subnet_membership` link. Membership evidence
+contains the member actor, subnet, member IP, interface index/name/description,
+network, netmask, prefix, and source. Only resolved managed SNMP network-device
+actors participate; unmanaged endpoints and unresolved rows are suppression
+state, not graph actors.
+
+`l3_subnet_segment` actor ids must be scoped by a stable producer scope, such
+as the parent Agent registry id, plus the subnet identity. If the producer
+cannot obtain a stable scope id, it must omit L3 subnet segments rather than
+fall back to a process-local or random id. This prevents identical private
+subnets from different Agents from colliding after Cloud aggregation.
+
+Current SNMP L3 subnet segments are single-routing-context. `L3Interface` does
+not currently carry a VRF or routing-context field, so identical subnet/prefix
+values inside one producer scope are treated as one logical segment. Producers
+MUST NOT present these segments as VRF-aware until collection adds routing
+context to L3 interface observations and segment identity includes it.
+
 `ospf_adjacency` represents OSPF control-plane adjacency between two resolved
 managed SNMP device actors. It is a logical L3 routing-protocol relationship,
 not physical, L2, discovery, or port-neighbor evidence. The producer emits graph
@@ -524,6 +546,20 @@ must not create loose router/IP graph actors.
 Current SNMP OSPF topology scope is OSPFv2 non-virtual neighbors from
 `ospfNbrTable`; OSPFv3 and OSPF virtual-neighbor tables are future scope unless
 a later topology feature explicitly adds their distinct semantics.
+
+`bgp_adjacency` represents BGP control-plane adjacency between two resolved
+managed SNMP device actors. It is a logical routing-protocol relationship, not
+physical, L2, discovery, or port-neighbor evidence. The producer emits graph
+links only for established BGP peers with resolved local and remote managed
+actors. Unresolved or non-established BGP peer rows remain diagnostic
+actor-owned detail rows and must not create loose router/IP graph actors.
+BGP adjacency graph identity should use the managed actor pair plus routing
+instance. BGP identifiers, ASNs, and endpoint IPs are useful evidence and
+display fields, but they must not be the primary graph deduplication key because
+SNMP BGP profiles expose those fields inconsistently across vendors. Parallel
+sessions between the same managed actor pair in the same routing instance should
+remain actor-owned peer detail rows under one compact graph relationship unless
+a future producer contract explicitly adds a more detailed BGP graph mode.
 
 When `ospf_adjacency` and `l3_subnet` describe the same resolved actor pair and
 endpoint/subnet relationship, OSPF is the stronger protocol-specific signal for
@@ -578,6 +614,16 @@ evidence type. Replacement may rewire endpoint actors to stronger managed
 device actors, but it MUST NOT reinterpret `l3_subnet` as discovery protocol
 evidence or port-neighbor evidence.
 
+For `l3_subnet_segment`, aggregation MUST preserve the explicit
+`l3_subnet_segment` actor type and `l3_subnet_membership` link/evidence type.
+Replacement may rewire member actors to stronger managed device actors, but it
+MUST NOT reinterpret subnet membership as L2 segment membership, discovery
+protocol evidence, or port-neighbor evidence. Aggregation may merge identical
+scoped subnet segment actors from the same producer scope, but must not merge
+identical private subnet strings across different producer scopes.
+Within one producer scope, the current identity is subnet/prefix only because
+SNMP topology does not yet collect VRF/routing-context for L3 interfaces.
+
 For `ospf_adjacency`, aggregation MUST preserve the explicit `ospf_adjacency`
 link and evidence type, including its `semantic_role: control`. Replacement may
 rewire endpoint actors to stronger managed device actors, but it MUST NOT
@@ -585,6 +631,14 @@ reinterpret OSPF adjacency as discovery, physical, L2, or port-neighbor
 evidence. Actor-owned OSPF neighbor detail rows should remain attached to the
 local device actor and are not loose-side graph materialization input unless a
 future producer contract explicitly defines such a policy.
+
+For `bgp_adjacency`, aggregation MUST preserve the explicit `bgp_adjacency`
+link and evidence type, including its `semantic_role: control`. Replacement may
+rewire endpoint actors to stronger managed device actors, but it MUST NOT
+reinterpret BGP adjacency as discovery, physical, L2, or port-neighbor
+evidence. Actor-owned BGP peer detail rows should remain attached to the local
+device actor and are not loose-side graph materialization input unless a future
+producer contract explicitly defines such a policy.
 
 ### UI SNMP
 
@@ -604,10 +658,14 @@ Device modals should remain port-centric:
   relationship rows so local port identity never contradicts the port table.
 - L3 adjacency information: derived from typed `l3_subnet` relationship
   evidence, not from `actor_port_links`.
+- L3 subnet membership information: derived from typed
+  `l3_subnet_membership` evidence. A focused device may show the shared subnet
+  segment and the focused membership without automatically fanning out to every
+  other managed device in that broader subnet.
 - routing protocol neighbor information: derived from typed actor-owned detail
-  rows such as `actor_ospf_neighbors`, not from `actor_port_links`. The modal
-  may show unresolved or non-full protocol neighbors as diagnostics without
-  creating graph links.
+  rows such as `actor_ospf_neighbors` and `actor_bgp_peers`, not from
+  `actor_port_links`. The modal may show unresolved or non-established protocol
+  neighbors as diagnostics without creating graph links.
 
 ## Streaming
 

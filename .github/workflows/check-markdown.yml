@@ -19,13 +19,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PR branch
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           path: netdata
 
       - name: Checkout netdata/learn repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: netdata/learn
           path: learn

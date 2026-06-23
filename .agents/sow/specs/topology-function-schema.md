@@ -108,6 +108,13 @@ Actor/link modal composition is declared separately under actor/link type
 presentation and table type presentation. Modal recipes are selectors and
 projections over existing facts; they are not duplicate row stores.
 
+Helper actors that represent grouping constructs may use distinct actor types
+instead of overloading a generic `segment` type. Each such type must declare
+its own identity, merge identity, presentation, modal sections, legend entry,
+and aggregation behavior. Consumers must use the declared type metadata and
+must not infer semantics only from a type id containing words such as
+`segment`, `subnet`, or `network`.
+
 Cloud aggregation may only canonicalize endpoint order when link type policy
 explicitly allows unordered aggregation. Direction-significant links must
 preserve direction.

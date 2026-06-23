@@ -11,6 +11,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/stretchr/testify/require"
 )
@@ -630,7 +633,7 @@ func parseOIDSuffix(oid, prefix string) (string, bool) {
 	return strings.TrimPrefix(oid, prefix+"."), true
 }
 
-func hasProtocolLink(snapshot topologyData, protocol string) bool {
+func hasProtocolLink(snapshot topologymodel.Data, protocol string) bool {
 	for _, link := range snapshot.Links {
 		if link.Protocol == protocol {
 			return true
@@ -639,9 +642,9 @@ func hasProtocolLink(snapshot topologyData, protocol string) bool {
 	return false
 }
 
-func containsSysName(snapshot topologyData, names map[string]struct{}) bool {
+func containsSysName(snapshot topologymodel.Data, names map[string]struct{}) bool {
 	for _, link := range snapshot.Links {
-		sysName, _ := link.Dst.Attributes["sys_name"].(string)
+		sysName := strings.TrimSpace(link.Dst.SysName)
 		if sysName == "" {
 			continue
 		}
@@ -683,7 +686,7 @@ func hasLinkableCDP(data snmprecTopology) bool {
 	return false
 }
 
-func containsIdentifier(snapshot topologyData, ids map[string]struct{}) bool {
+func containsIdentifier(snapshot topologymodel.Data, ids map[string]struct{}) bool {
 	exact := make(map[string]struct{}, len(ids))
 	macs := make(map[string]struct{}, len(ids))
 	ips := make(map[string]struct{}, len(ids))
@@ -694,10 +697,10 @@ func containsIdentifier(snapshot topologyData, ids map[string]struct{}) bool {
 			continue
 		}
 		exact[strings.ToLower(id)] = struct{}{}
-		if mac := normalizeMAC(id); mac != "" {
+		if mac := topologyutil.NormalizeMAC(id); mac != "" {
 			macs[mac] = struct{}{}
 		}
-		if ip := normalizeIPAddress(id); ip != "" {
+		if ip := topologyutil.NormalizeIPAddress(id); ip != "" {
 			ips[ip] = struct{}{}
 		}
 		hosts[strings.ToLower(strings.TrimSuffix(id, "."))] = struct{}{}
@@ -710,12 +713,12 @@ func containsIdentifier(snapshot topologyData, ids map[string]struct{}) bool {
 		if _, ok := exact[strings.ToLower(value)]; ok {
 			return true
 		}
-		if mac := normalizeMAC(value); mac != "" {
+		if mac := topologyutil.NormalizeMAC(value); mac != "" {
 			if _, ok := macs[mac]; ok {
 				return true
 			}
 		}
-		if ip := normalizeIPAddress(value); ip != "" {
+		if ip := topologyutil.NormalizeIPAddress(value); ip != "" {
 			if _, ok := ips[ip]; ok {
 				return true
 			}
@@ -727,7 +730,7 @@ func containsIdentifier(snapshot topologyData, ids map[string]struct{}) bool {
 	}
 
 	for _, link := range snapshot.Links {
-		if sysName, _ := link.Dst.Attributes["sys_name"].(string); sysName != "" {
+		if sysName := strings.TrimSpace(link.Dst.SysName); sysName != "" {
 			if matches(sysName) {
 				return true
 			}

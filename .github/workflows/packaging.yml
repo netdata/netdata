@@ -35,7 +35,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           submodules: recursive
@@ -96,7 +96,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Prepare tools
         id: prepare
         run: |
@@ -144,7 +144,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Check Version
         id: check-version
         run: |
@@ -203,7 +203,7 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 1
           submodules: false
@@ -254,7 +254,7 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           submodules: recursive
@@ -341,7 +341,7 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0 # We need full history for versioning
           submodules: recursive

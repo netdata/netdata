@@ -5,6 +5,8 @@ package snmptopology
 import (
 	"sort"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
@@ -22,13 +24,13 @@ func (r *topologyRegistry) activeCaches() []*topologyCache {
 	return caches
 }
 
-func (r *topologyRegistry) observationSnapshots() []topologyObservationSnapshot {
+func (r *topologyRegistry) observationSnapshots() []topologymodel.ObservationSnapshot {
 	caches := r.activeCaches()
 	if len(caches) == 0 {
 		return nil
 	}
 
-	snapshots := make([]topologyObservationSnapshot, 0, len(caches))
+	snapshots := make([]topologymodel.ObservationSnapshot, 0, len(caches))
 	for _, cache := range caches {
 		snapshot, ok := cache.snapshotEngineObservations()
 		if !ok {
@@ -44,10 +46,10 @@ func (r *topologyRegistry) observationSnapshots() []topologyObservationSnapshot 
 	return snapshots
 }
 
-func sortTopologyObservationSnapshots(snapshots []topologyObservationSnapshot) {
+func sortTopologyObservationSnapshots(snapshots []topologymodel.ObservationSnapshot) {
 	sort.Slice(snapshots, func(i, j int) bool {
-		if snapshots[i].localDeviceID != snapshots[j].localDeviceID {
-			return snapshots[i].localDeviceID < snapshots[j].localDeviceID
+		if snapshots[i].LocalDeviceID != snapshots[j].LocalDeviceID {
+			return snapshots[i].LocalDeviceID < snapshots[j].LocalDeviceID
 		}
 		leftMgmt, leftHost := topologyObservationSnapshotIdentity(snapshots[i])
 		rightMgmt, rightHost := topologyObservationSnapshotIdentity(snapshots[j])
@@ -57,51 +59,55 @@ func sortTopologyObservationSnapshots(snapshots []topologyObservationSnapshot) {
 		if leftHost != rightHost {
 			return leftHost < rightHost
 		}
-		return snapshots[i].collectedAt.Before(snapshots[j].collectedAt)
+		return snapshots[i].CollectedAt.Before(snapshots[j].CollectedAt)
 	})
 }
 
-func topologyObservationSnapshotIdentity(snapshot topologyObservationSnapshot) (managementIP, hostname string) {
-	if len(snapshot.l2Observations) == 0 {
+func topologyObservationSnapshotIdentity(snapshot topologymodel.ObservationSnapshot) (managementIP, hostname string) {
+	if len(snapshot.L2Observations) == 0 {
 		return "", ""
 	}
-	return snapshot.l2Observations[0].ManagementIP, snapshot.l2Observations[0].Hostname
+	return snapshot.L2Observations[0].ManagementIP, snapshot.L2Observations[0].Hostname
 }
 
-func aggregateTopologyObservationSnapshots(snapshots []topologyObservationSnapshot) (topologyObservationAggregate, bool) {
+func aggregateTopologyObservationSnapshots(snapshots []topologymodel.ObservationSnapshot) (topologymodel.ObservationAggregate, bool) {
 	if len(snapshots) == 0 {
-		return topologyObservationAggregate{}, false
+		return topologymodel.ObservationAggregate{}, false
 	}
 
 	totalObservations := 0
 	totalL3Interfaces := 0
 	totalOSPFNeighbors := 0
+	totalBGPPeers := 0
 	for _, snapshot := range snapshots {
-		totalObservations += len(snapshot.l2Observations)
-		totalL3Interfaces += len(snapshot.l3Interfaces)
-		totalOSPFNeighbors += len(snapshot.ospfNeighbors)
+		totalObservations += len(snapshot.L2Observations)
+		totalL3Interfaces += len(snapshot.L3Interfaces)
+		totalOSPFNeighbors += len(snapshot.OSPFNeighbors)
+		totalBGPPeers += len(snapshot.BGPPeers)
 	}
 
-	aggregate := topologyObservationAggregate{
-		snapshots:      snapshots,
-		l2Observations: make([]topologyengine.L2Observation, 0, totalObservations),
-		l3Interfaces:   make([]topologyL3Interface, 0, totalL3Interfaces),
-		ospfNeighbors:  make([]topologyOSPFNeighbor, 0, totalOSPFNeighbors),
+	aggregate := topologymodel.ObservationAggregate{
+		Snapshots:      snapshots,
+		L2Observations: make([]topologyengine.L2Observation, 0, totalObservations),
+		L3Interfaces:   make([]topologymodel.L3Interface, 0, totalL3Interfaces),
+		OSPFNeighbors:  make([]topologymodel.OSPFNeighbor, 0, totalOSPFNeighbors),
+		BGPPeers:       make([]topologymodel.BGPPeer, 0, totalBGPPeers),
 	}
 	for _, snapshot := range snapshots {
-		aggregate.l2Observations = append(aggregate.l2Observations, snapshot.l2Observations...)
-		aggregate.l3Interfaces = append(aggregate.l3Interfaces, snapshot.l3Interfaces...)
-		aggregate.ospfNeighbors = append(aggregate.ospfNeighbors, snapshot.ospfNeighbors...)
-		if aggregate.localDeviceID == "" {
-			aggregate.localDeviceID = snapshot.localDeviceID
+		aggregate.L2Observations = append(aggregate.L2Observations, snapshot.L2Observations...)
+		aggregate.L3Interfaces = append(aggregate.L3Interfaces, snapshot.L3Interfaces...)
+		aggregate.OSPFNeighbors = append(aggregate.OSPFNeighbors, snapshot.OSPFNeighbors...)
+		aggregate.BGPPeers = append(aggregate.BGPPeers, snapshot.BGPPeers...)
+		if aggregate.LocalDeviceID == "" {
+			aggregate.LocalDeviceID = snapshot.LocalDeviceID
 		}
-		if aggregate.agentID == "" && snapshot.agentID != "" {
-			aggregate.agentID = snapshot.agentID
+		if aggregate.AgentID == "" && snapshot.AgentID != "" {
+			aggregate.AgentID = snapshot.AgentID
 		}
-		if snapshot.collectedAt.After(aggregate.collectedAt) {
-			aggregate.collectedAt = snapshot.collectedAt
+		if snapshot.CollectedAt.After(aggregate.CollectedAt) {
+			aggregate.CollectedAt = snapshot.CollectedAt
 		}
 	}
 
-	return aggregate, len(aggregate.l2Observations) > 0
+	return aggregate, len(aggregate.L2Observations) > 0
 }

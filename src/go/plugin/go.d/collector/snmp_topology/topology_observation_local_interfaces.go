@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
@@ -29,7 +31,7 @@ func (c *topologyCache) appendObservedInterfaces(observation *topologyengine.L2O
 	sort.Strings(ifaceKeyList)
 
 	for _, ifIndex := range ifaceKeyList {
-		idx := parseIndex(ifIndex)
+		idx := topologyutil.ParseIndex(ifIndex)
 		if idx <= 0 {
 			continue
 		}
@@ -70,7 +72,7 @@ func (c *topologyCache) appendObservedBridgePorts(observation *topologyengine.L2
 	sort.Strings(keys)
 
 	for _, basePort := range keys {
-		ifIndex := parseIndex(c.bridgePortToIf[basePort])
+		ifIndex := topologyutil.ParseIndex(c.bridgePortToIf[basePort])
 		if ifIndex <= 0 {
 			continue
 		}

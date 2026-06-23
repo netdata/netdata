@@ -5,6 +5,7 @@ package snmptopologyfunc
 import (
 	"context"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
@@ -39,29 +40,29 @@ func TestMethodsIncludesSelectors(t *testing.T) {
 	assert.Equal(t, "Map", mapType.Name)
 	assert.Equal(t, funcapi.ParamSelect, mapType.Selection)
 	require.Len(t, mapType.Options, 3)
-	assert.Equal(t, MapTypeLLDPCDPManaged, mapType.Options[0].ID)
+	assert.Equal(t, topologyoptions.MapTypeLLDPCDPManaged, mapType.Options[0].ID)
 	assert.True(t, mapType.Options[0].Default)
-	assert.Equal(t, MapTypeHighConfidenceInferred, mapType.Options[1].ID)
-	assert.Equal(t, MapTypeAllDevicesLowConfidence, mapType.Options[2].ID)
+	assert.Equal(t, topologyoptions.MapTypeHighConfidenceInferred, mapType.Options[1].ID)
+	assert.Equal(t, topologyoptions.MapTypeAllDevicesLowConfidence, mapType.Options[2].ID)
 
 	strategy := cfg.RequiredParams[2]
 	assert.Equal(t, ParamInferenceStrategy, strategy.ID)
 	assert.Equal(t, "Infer Strategy", strategy.Name)
 	assert.Equal(t, funcapi.ParamSelect, strategy.Selection)
 	require.Len(t, strategy.Options, 5)
-	assert.Equal(t, InferenceStrategyFDBMinimumKnowledge, strategy.Options[0].ID)
+	assert.Equal(t, topologyoptions.InferenceStrategyFDBMinimumKnowledge, strategy.Options[0].ID)
 	assert.True(t, strategy.Options[0].Default)
-	assert.Equal(t, InferenceStrategySTPParentTree, strategy.Options[1].ID)
-	assert.Equal(t, InferenceStrategyFDBPairwise, strategy.Options[2].ID)
-	assert.Equal(t, InferenceStrategySTPFDBCorrelated, strategy.Options[3].ID)
-	assert.Equal(t, InferenceStrategyCDPFDBHybrid, strategy.Options[4].ID)
+	assert.Equal(t, topologyoptions.InferenceStrategySTPParentTree, strategy.Options[1].ID)
+	assert.Equal(t, topologyoptions.InferenceStrategyFDBPairwise, strategy.Options[2].ID)
+	assert.Equal(t, topologyoptions.InferenceStrategySTPFDBCorrelated, strategy.Options[3].ID)
+	assert.Equal(t, topologyoptions.InferenceStrategyCDPFDBHybrid, strategy.Options[4].ID)
 
 	managedFocus := cfg.RequiredParams[3]
 	assert.Equal(t, ParamManagedDeviceFocus, managedFocus.ID)
 	assert.Equal(t, "Focus On", managedFocus.Name)
 	assert.Equal(t, funcapi.ParamMultiSelect, managedFocus.Selection)
 	require.Len(t, managedFocus.Options, 1)
-	assert.Equal(t, ManagedFocusAllDevices, managedFocus.Options[0].ID)
+	assert.Equal(t, topologyoptions.ManagedFocusAllDevices, managedFocus.Options[0].ID)
 	assert.True(t, managedFocus.Options[0].Default)
 
 	depth := cfg.RequiredParams[4]
@@ -69,13 +70,13 @@ func TestMethodsIncludesSelectors(t *testing.T) {
 	assert.Equal(t, "Focus Depth", depth.Name)
 	assert.Equal(t, funcapi.ParamSelect, depth.Selection)
 	require.NotEmpty(t, depth.Options)
-	assert.Equal(t, DepthAll, depth.Options[0].ID)
+	assert.Equal(t, topologyoptions.DepthAll, depth.Options[0].ID)
 	assert.True(t, depth.Options[0].Default)
 }
 
 func TestTopologyHandlerMethodParams(t *testing.T) {
 	deps := &fakeDeps{
-		targets: []ManagedFocusTarget{
+		targets: []topologyoptions.ManagedFocusTarget{
 			{Value: "", Name: "skip"},
 			{Value: "ip:10.0.0.1", Name: "sw-a (10.0.0.1)"},
 		},
@@ -91,7 +92,7 @@ func TestTopologyHandlerMethodParams(t *testing.T) {
 	assert.Equal(t, ParamManagedDeviceFocus, params[3].ID)
 	assert.Equal(t, ParamDepth, params[4].ID)
 	require.Len(t, params[3].Options, 2)
-	assert.Equal(t, ManagedFocusAllDevices, params[3].Options[0].ID)
+	assert.Equal(t, topologyoptions.ManagedFocusAllDevices, params[3].Options[0].ID)
 	assert.Equal(t, "ip:10.0.0.1", params[3].Options[1].ID)
 
 	params, err = handler.MethodParams(context.Background(), "unknown")
@@ -111,13 +112,13 @@ func TestTopologyHandlerHandleDefaultOptions(t *testing.T) {
 	assert.Equal(t, deps.data, resp.Data)
 
 	require.Equal(t, 1, deps.snapshotCalls)
-	assert.Equal(t, QueryOptions{
+	assert.Equal(t, topologyoptions.QueryOptions{
 		CollapseActorsByIP:     true,
 		EliminateNonIPInferred: true,
-		MapType:                MapTypeLLDPCDPManaged,
-		InferenceStrategy:      InferenceStrategyFDBMinimumKnowledge,
-		ManagedDeviceFocus:     ManagedFocusAllDevices,
-		Depth:                  DepthAllInternal,
+		MapType:                topologyoptions.MapTypeLLDPCDPManaged,
+		InferenceStrategy:      topologyoptions.InferenceStrategyFDBMinimumKnowledge,
+		ManagedDeviceFocus:     topologyoptions.ManagedFocusAllDevices,
+		Depth:                  topologyoptions.DepthAllInternal,
 	}, deps.lastOptions)
 }
 
@@ -125,7 +126,7 @@ func TestTopologyHandlerHandleSelectorParams(t *testing.T) {
 	deps := &fakeDeps{
 		data: topologyv1.Data{SchemaVersion: topologyv1.SchemaVersion},
 		ok:   true,
-		targets: []ManagedFocusTarget{
+		targets: []topologyoptions.ManagedFocusTarget{
 			{Value: "ip:10.0.0.2", Name: "sw-b (10.0.0.2)"},
 			{Value: "ip:10.0.0.1", Name: "sw-a (10.0.0.1)"},
 		},
@@ -136,8 +137,8 @@ func TestTopologyHandlerHandleSelectorParams(t *testing.T) {
 
 	params := funcapi.ResolveParams(paramCfgs, map[string][]string{
 		ParamNodesIdentity:      {NodesIdentityMAC},
-		ParamMapType:            {MapTypeHighConfidenceInferred},
-		ParamInferenceStrategy:  {InferenceStrategySTPFDBCorrelated},
+		ParamMapType:            {topologyoptions.MapTypeHighConfidenceInferred},
+		ParamInferenceStrategy:  {topologyoptions.InferenceStrategySTPFDBCorrelated},
 		ParamManagedDeviceFocus: {"ip:10.0.0.2", "ip:10.0.0.1"},
 		ParamDepth:              {"2"},
 	})
@@ -146,11 +147,11 @@ func TestTopologyHandlerHandleSelectorParams(t *testing.T) {
 	require.NotNil(t, resp)
 	assert.Equal(t, 200, resp.Status)
 	require.Equal(t, 1, deps.snapshotCalls)
-	assert.Equal(t, QueryOptions{
+	assert.Equal(t, topologyoptions.QueryOptions{
 		CollapseActorsByIP:     false,
 		EliminateNonIPInferred: false,
-		MapType:                MapTypeHighConfidenceInferred,
-		InferenceStrategy:      InferenceStrategySTPFDBCorrelated,
+		MapType:                topologyoptions.MapTypeHighConfidenceInferred,
+		InferenceStrategy:      topologyoptions.InferenceStrategySTPFDBCorrelated,
 		ManagedDeviceFocus:     "ip:10.0.0.1,ip:10.0.0.2",
 		Depth:                  2,
 	}, deps.lastOptions)
@@ -171,13 +172,13 @@ func TestTopologyHandlerHandleUnknownSelectorsFallbackToDefaults(t *testing.T) {
 	require.NotNil(t, resp)
 	assert.Equal(t, 200, resp.Status)
 	require.Equal(t, 1, deps.snapshotCalls)
-	assert.Equal(t, QueryOptions{
+	assert.Equal(t, topologyoptions.QueryOptions{
 		CollapseActorsByIP:     true,
 		EliminateNonIPInferred: true,
-		MapType:                MapTypeLLDPCDPManaged,
-		InferenceStrategy:      InferenceStrategyFDBMinimumKnowledge,
-		ManagedDeviceFocus:     ManagedFocusAllDevices,
-		Depth:                  DepthAllInternal,
+		MapType:                topologyoptions.MapTypeLLDPCDPManaged,
+		InferenceStrategy:      topologyoptions.InferenceStrategyFDBMinimumKnowledge,
+		ManagedDeviceFocus:     topologyoptions.ManagedFocusAllDevices,
+		Depth:                  topologyoptions.DepthAllInternal,
 	}, deps.lastOptions)
 }
 
@@ -229,18 +230,18 @@ type fakeDeps struct {
 	ok   bool
 	err  error
 
-	targets []ManagedFocusTarget
+	targets []topologyoptions.ManagedFocusTarget
 
 	snapshotCalls int
-	lastOptions   QueryOptions
+	lastOptions   topologyoptions.QueryOptions
 }
 
-func (d *fakeDeps) Snapshot(options QueryOptions) (topologyv1.Data, bool, error) {
+func (d *fakeDeps) Snapshot(options topologyoptions.QueryOptions) (topologyv1.Data, bool, error) {
 	d.snapshotCalls++
 	d.lastOptions = options
 	return d.data, d.ok, d.err
 }
 
-func (d *fakeDeps) ManagedDeviceFocusTargets() []ManagedFocusTarget {
+func (d *fakeDeps) ManagedDeviceFocusTargets() []topologyoptions.ManagedFocusTarget {
 	return d.targets
 }

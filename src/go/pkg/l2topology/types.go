@@ -2,218 +2,54 @@
 
 package l2topology
 
-import (
-	"net/netip"
-	"time"
-)
+import "github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 
-// Credential describes one SNMP authentication profile.
-type Credential struct {
-	Version      string
-	Community    string
-	Username     string
-	AuthProtocol string
-	AuthPassword string
-	PrivProtocol string
-	PrivPassword string
-	ContextName  string
-	Port         uint16
-	Timeout      time.Duration
-	Retries      int
-}
+// DiscoverOptions controls which normalized L2 observation families contribute
+// to the result.
+type DiscoverOptions = model.DiscoverOptions
 
-// DiscoverOptions controls the discovery behavior.
-type DiscoverOptions struct {
-	EnableLLDP   bool
-	EnableCDP    bool
-	EnableBridge bool
-	EnableARP    bool
-	EnableSTP    bool
-	MaxDepth     int
-	Concurrency  int
-	CollectedAt  time.Time
-}
+// Result is the deterministic L2 topology result derived from normalized
+// observations.
+type Result = model.Result
 
-// CIDRRequest starts discovery from CIDR ranges.
-type CIDRRequest struct {
-	CIDRs       []netip.Prefix
-	Credentials []Credential
-	Options     DiscoverOptions
-}
-
-// DeviceRequest starts discovery from known device addresses.
-type DeviceRequest struct {
-	Devices     []DeviceTarget
-	Credentials []Credential
-	Options     DiscoverOptions
-}
-
-// DeviceTarget identifies one seed device.
-type DeviceTarget struct {
-	Address  netip.Addr
-	Port     uint16
-	Hostname string
-	Labels   map[string]string
-}
-
-// Result is the discovery output from the engine.
-type Result struct {
-	CollectedAt  time.Time
-	Devices      []Device
-	Interfaces   []Interface
-	Adjacencies  []Adjacency
-	Attachments  []Attachment
-	Enrichments  []Enrichment
-	Stats        map[string]any
-	SourceLabels map[string]string
-}
+// ResultStats summarizes the normalized L2 result before graph projection.
+type ResultStats = model.ResultStats
 
 // Device is a discovered network device.
-type Device struct {
-	ID        string
-	Hostname  string
-	Addresses []netip.Addr
-	SysObject string
-	ChassisID string
-	Labels    map[string]string
-}
+type Device = model.Device
 
 // Interface is a discovered interface on a device.
-type Interface struct {
-	DeviceID string
-	IfIndex  int
-	IfName   string
-	IfDescr  string
-	MAC      string
-	Labels   map[string]string
-}
+type Interface = model.Interface
 
 // Adjacency represents a direct device-to-device neighbor relation.
-type Adjacency struct {
-	Protocol   string
-	SourceID   string
-	SourcePort string
-	TargetID   string
-	TargetPort string
-	Labels     map[string]string
-}
+type Adjacency = model.Adjacency
 
 // Attachment ties an endpoint to a device interface.
-type Attachment struct {
-	DeviceID   string
-	IfIndex    int
-	EndpointID string
-	Method     string
-	Labels     map[string]string
-}
+type Attachment = model.Attachment
 
 // Enrichment carries non-structural observations that can assist correlation.
-type Enrichment struct {
-	EndpointID string
-	IPs        []netip.Addr
-	MAC        string
-	Labels     map[string]string
-}
+type Enrichment = model.Enrichment
 
-// L2Observation contains one device's normalized layer-2 SNMP observations.
-type L2Observation struct {
-	DeviceID string
-	// Inferred marks observations synthesized from neighbor advertisements
-	// (for example LLDP/CDP remotes), not directly polled SNMP targets.
-	Inferred          bool
-	Hostname          string
-	ManagementIP      string
-	SysObjectID       string
-	ChassisID         string
-	BaseBridgeAddress string
-	Interfaces        []ObservedInterface
-	BridgePorts       []BridgePortObservation
-	STPPorts          []STPPortObservation
-	FDBEntries        []FDBObservation
-	ARPNDEntries      []ARPNDObservation
-	LLDPRemotes       []LLDPRemoteObservation
-	CDPRemotes        []CDPRemoteObservation
-}
+// L2Observation contains one device's normalized layer-2 observations.
+type L2Observation = model.L2Observation
 
 // ObservedInterface describes one local interface seen on a device.
-type ObservedInterface struct {
-	IfIndex       int
-	IfName        string
-	IfDescr       string
-	IfAlias       string
-	MAC           string
-	SpeedBps      int64
-	LastChange    int64
-	Duplex        string
-	InterfaceType string
-	AdminStatus   string
-	OperStatus    string
-}
+type ObservedInterface = model.ObservedInterface
 
 // LLDPRemoteObservation captures one remote LLDP neighbor advertised by a device.
-type LLDPRemoteObservation struct {
-	LocalPortNum       string
-	RemoteIndex        string
-	LocalPortID        string
-	LocalPortIDSubtype string
-	LocalPortDesc      string
-	ChassisID          string
-	SysName            string
-	PortID             string
-	PortIDSubtype      string
-	PortDesc           string
-	ManagementIP       string
-}
+type LLDPRemoteObservation = model.LLDPRemoteObservation
 
 // CDPRemoteObservation captures one remote CDP neighbor advertised by a device.
-type CDPRemoteObservation struct {
-	LocalIfIndex int
-	LocalIfName  string
-	DeviceIndex  string
-	DeviceID     string
-	SysName      string
-	DevicePort   string
-	Address      string
-}
+type CDPRemoteObservation = model.CDPRemoteObservation
 
 // BridgePortObservation maps one bridge base port to an interface index.
-type BridgePortObservation struct {
-	BasePort string
-	IfIndex  int
-}
+type BridgePortObservation = model.BridgePortObservation
 
 // FDBObservation captures one forwarding database entry from a bridge table.
-type FDBObservation struct {
-	MAC        string
-	BridgePort string
-	IfIndex    int
-	Status     string
-	VLANID     string
-	VLANName   string
-}
+type FDBObservation = model.FDBObservation
 
 // STPPortObservation captures one spanning-tree port row.
-type STPPortObservation struct {
-	Port             string
-	IfIndex          int
-	IfName           string
-	VLANID           string
-	VLANName         string
-	State            string
-	Enable           string
-	PathCost         string
-	DesignatedRoot   string
-	DesignatedBridge string
-	DesignatedPort   string
-}
+type STPPortObservation = model.STPPortObservation
 
 // ARPNDObservation captures one ARP or ND neighbor-table observation.
-type ARPNDObservation struct {
-	Protocol string
-	IfIndex  int
-	IfName   string
-	IP       string
-	MAC      string
-	State    string
-	AddrType string
-}
+type ARPNDObservation = model.ARPNDObservation
