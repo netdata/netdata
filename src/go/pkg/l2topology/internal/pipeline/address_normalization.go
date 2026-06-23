@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package l2topology
+package pipeline
 
 import (
 	"net/netip"
-	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/addrnorm"
 )
@@ -39,11 +38,7 @@ func canonicalIP(v string) string {
 }
 
 func parseAddr(v string) netip.Addr {
-	addr, err := netip.ParseAddr(strings.TrimSpace(v))
-	if err != nil {
-		return netip.Addr{}
-	}
-	return addr.Unmap()
+	return addrnorm.ParseAddr(v)
 }
 
 func decodeHexIP(v string) string {

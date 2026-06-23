@@ -1,17 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package l2topology
+package pipeline
 
 import "strings"
-
-const (
-	lldpMatchPassDefault      = "default"
-	lldpMatchPassPortDesc     = "port_description"
-	lldpMatchPassSysName      = "sysname"
-	lldpMatchPassChassisPort  = "chassis_port_id_subtype"
-	lldpMatchPassChassisDescr = "chassis_port_descr"
-	lldpMatchPassChassis      = "chassis"
-)
 
 type lldpMatchLink struct {
 	index int

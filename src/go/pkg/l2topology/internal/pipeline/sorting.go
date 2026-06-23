@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package l2topology
+package pipeline
 
 import (
 	"sort"

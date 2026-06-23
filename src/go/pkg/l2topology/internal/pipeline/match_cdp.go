@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package l2topology
+package pipeline
 
 import (
 	"strconv"
 	"strings"
 )
-
-const cdpMatchPassDefault = "default"
 
 type cdpMatchLink struct {
 	index int

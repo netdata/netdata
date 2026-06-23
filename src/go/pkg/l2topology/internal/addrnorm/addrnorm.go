@@ -5,6 +5,7 @@ package addrnorm
 import (
 	"encoding/hex"
 	"fmt"
+	"net/netip"
 	"strconv"
 	"strings"
 )
@@ -74,6 +75,14 @@ func NormalizeMAC(value string) string {
 		return formatMAC(bs)
 	}
 	return ""
+}
+
+func ParseAddr(value string) netip.Addr {
+	addr, err := netip.ParseAddr(strings.TrimSpace(value))
+	if err != nil {
+		return netip.Addr{}
+	}
+	return addr.Unmap()
 }
 
 func decodeGroupedHexParts(parts []string) []byte {
