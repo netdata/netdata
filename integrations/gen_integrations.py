@@ -31,6 +31,10 @@ FLOWS_SOURCES = [
     (AGENT_REPO, REPO_PATH / 'src' / 'crates' / 'netflow-plugin' / 'metadata.yaml', False),
 ]
 
+DEVICE_SOURCES = [
+    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'go.d' / 'collector' / 'snmp' / 'npm-catalog' / 'metadata.yaml', False),
+]
+
 DEPLOY_SOURCES = [
     (AGENT_REPO, INTEGRATIONS_PATH / 'deploy.yaml', False),
 ]
@@ -74,6 +78,16 @@ COLLECTOR_RENDER_KEYS = [
 ]
 
 FLOWS_RENDER_KEYS = [
+    'alerts',
+    'metrics',
+    'functions',
+    'overview',
+    'related_resources',
+    'setup',
+    'troubleshooting',
+]
+
+DEVICE_RENDER_KEYS = [
     'alerts',
     'metrics',
     'functions',
@@ -137,6 +151,7 @@ CLOUD_NOTIFICATION_VALIDATOR = make_validator('./cloud_notification.json#')
 LOGS_VALIDATOR = make_validator('./logs.json#')
 AUTHENTICATION_VALIDATOR = make_validator('./authentication.json#')
 FLOWS_VALIDATOR = make_validator('./flows.json#')
+DEVICE_VALIDATOR = make_validator('./device.json#')
 SECRETSTORE_VALIDATOR = make_validator('./secretstore.json#')
 SERVICE_DISCOVERY_VALIDATOR = make_validator('./service_discovery.json#')
 
@@ -272,6 +287,45 @@ def load_flows():
             for idx, item in enumerate(data['modules']):
                 item['meta']['plugin_name'] = data['plugin_name']
                 item['integration_type'] = 'flows'
+                item['_src_path'] = file
+                item['_repo'] = repo
+                item['_index'] = idx
+                ret.append(item)
+
+    return ret
+
+
+def load_device():
+    ret = []
+
+    for repo, path, match in DEVICE_SOURCES:
+        if match and path.exists() and path.is_dir():
+            files = list(path.glob(METADATA_PATTERN))
+        elif not match and path.exists() and path.is_file():
+            files = [path]
+        else:
+            files = []
+
+        for file in files:
+            debug(f'Loading {file}.')
+            data = load_yaml(file)
+
+            if not data:
+                continue
+
+            try:
+                DEVICE_VALIDATOR.validate(data)
+            except ValidationError as e:
+                warn(
+                    f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})',
+                    file)
+                continue
+
+            for idx, item in enumerate(data['modules']):
+                # Honor a per-entry plugin_name (topology/syslog tiles name their
+                # real producer); fall back to the doc-level plugin for the rest.
+                item['meta']['plugin_name'] = item['meta'].get('plugin_name') or data['plugin_name']
+                item['integration_type'] = 'device'
                 item['_src_path'] = file
                 item['_repo'] = repo
                 item['_index'] = idx
@@ -1054,6 +1108,53 @@ def render_flows(categories, flows, ids):
     return flows, clean_flows, ids
 
 
+def render_device(categories, devices, ids):
+    debug('Generating device IDs.')
+
+    for item in devices:
+        item['id'] = make_id(item['meta'])
+
+    debug('Sorting devices.')
+
+    sort_integrations(devices)
+
+    debug('Checking device ids.')
+
+    devices, ids = dedupe_integrations(devices, ids)
+
+    clean_devices = []
+
+    for item in devices:
+        item['edit_link'] = make_edit_link(item)
+
+        clean_item = deepcopy(item)
+
+        for key in DEVICE_RENDER_KEYS:
+            if key in item.keys():
+                template = get_jinja_env().get_template(get_section_template_name(item, key))
+                data = template.render(entry=item, clean=False)
+                clean_data = template.render(entry=item, clean=True)
+
+                if 'variables' in item['meta']:
+                    template = get_jinja_env().from_string(data)
+                    data = template.render(variables=item['meta']['variables'], clean=False)
+                    template = get_jinja_env().from_string(clean_data)
+                    clean_data = template.render(variables=item['meta']['variables'], clean=True)
+            else:
+                data = ''
+                clean_data = ''
+
+            item[key] = data
+            clean_item[key] = clean_data
+
+        for k in ['_src_path', '_repo', '_index']:
+            del item[k], clean_item[k]
+
+        clean_devices.append(clean_item)
+
+    return devices, clean_devices, ids
+
+
 def render_logs(categories, logs, ids):
     debug('Sorting logs.')
 
@@ -1263,6 +1364,7 @@ def main():
     cloud_notifications = load_cloud_notifications()
     logs = load_logs()
     flows = load_flows()
+    devices = load_device()
     authentications = load_authentications()
     secretstores = load_secretstores()
     service_discoveries = load_service_discoveries()
@@ -1276,15 +1378,16 @@ def main():
                                                                                      ids)
     logs, clean_logs, ids = render_logs(categories, logs, ids)
     flows, clean_flows, ids = render_flows(categories, flows, ids)
+    devices, clean_devices, ids = render_device(categories, devices, ids)
     authentications, clean_authentications, ids = render_authentications(categories, authentications, ids)
     secretstores, clean_secretstores, ids = render_secretstores(categories, secretstores, ids)
     service_discoveries, clean_service_discoveries, ids = render_service_discoveries(categories, service_discoveries,
                                                                                      ids)
 
-    integrations = collectors + deploy + exporters + agent_notifications + cloud_notifications + logs + flows + authentications + secretstores + service_discoveries
+    integrations = collectors + deploy + exporters + agent_notifications + cloud_notifications + logs + flows + devices + authentications + secretstores + service_discoveries
     render_integrations(categories, integrations)
 
-    clean_integrations = clean_collectors + clean_deploy + clean_exporters + clean_agent_notifications + clean_cloud_notifications + clean_logs + clean_flows + clean_authentications + clean_secretstores + clean_service_discoveries
+    clean_integrations = clean_collectors + clean_deploy + clean_exporters + clean_agent_notifications + clean_cloud_notifications + clean_logs + clean_flows + clean_devices + clean_authentications + clean_secretstores + clean_service_discoveries
     render_json(categories, clean_integrations)
 
     return fail_on_warnings()
