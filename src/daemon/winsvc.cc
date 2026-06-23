@@ -258,7 +258,22 @@ int main(int argc, char *argv[])
 
         if (!StartServiceCtrlDispatcher(serviceTable))
         {
-            netdata_service_log("@main() - StartServiceCtrlDispatcher() failed...");
+            DWORD err = GetLastError();
+            if (err == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT)
+            {
+                // Not invoked by the Service Control Manager (e.g. run from a
+                // script or shell where stdin is not a TTY).  Fall back to CLI
+                // mode so that invocations like "netdata.exe -W buildinfo" work
+                // from non-interactive contexts (PowerShell, GDB, CI scripts).
+                int rc = netdata_main(argc, argv);
+                if (rc != 10)
+                    return rc;
+
+                nd_process_signals();
+                return 1;
+            }
+
+            netdata_service_log("@main() - StartServiceCtrlDispatcher() failed (%lu)", (unsigned long)err);
             return 1;
         }
 
