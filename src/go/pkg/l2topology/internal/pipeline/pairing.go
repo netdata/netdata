@@ -1,13 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package l2topology
+package pipeline
 
 import "strings"
-
-const (
-	adjacencyLabelPairID   = "pair_id"
-	adjacencyLabelPairPass = "pair_pass"
-)
 
 type matchedPairMetadata struct {
 	id   string

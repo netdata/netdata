@@ -1,29 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package l2topology
+package pipeline
 
 import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/keyutil"
 )
 
-// keySep separates delimiter-based identifiers that some topology paths still split later.
-// Opaque keys built from observation data should use opaqueCompositeKey() instead.
-const keySep = "\x00"
+const keySep = keyutil.Sep
 
 func opaqueCompositeKey(parts ...string) string {
-	if len(parts) == 0 {
-		return ""
-	}
-
-	var b strings.Builder
-	for _, part := range parts {
-		b.WriteString(strconv.Itoa(len(part)))
-		b.WriteByte(':')
-		b.WriteString(part)
-	}
-	return b.String()
+	return keyutil.OpaqueCompositeKey(parts...)
 }
 
 func topologyMatchCompositeKey(parts ...string) string {
@@ -65,7 +55,7 @@ func ifaceKey(iface Interface) string {
 }
 
 func deviceIfIndexKey(deviceID string, ifIndex int) string {
-	return opaqueCompositeKey(deviceID, strconv.Itoa(ifIndex))
+	return keyutil.DeviceIfIndexKey(deviceID, ifIndex)
 }
 
 func deriveBridgeDomainFromIfIndex(deviceID string, ifIndex int) string {
