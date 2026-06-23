@@ -37,7 +37,7 @@ To install a Netdata Parent:
 
 3. Connect your Parent to Netdata Cloud.
 
-   Claiming the Parent lets Netdata Cloud query it, and registers all connected Children to Netdata Cloud automatically. See the [Connect Agent to Cloud guide](/src/claim/README.md) for the claiming process and command.
+   Claiming the Parent lets Netdata Cloud query it, and registers all connected Children to Netdata Cloud automatically. See the [Connect Agent to Cloud guide](/src/claim/README.md) for instructions.
 
 ## Key Features
 
