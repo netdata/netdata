@@ -30,6 +30,7 @@ func (c *topologyCache) buildEngineObservation(local topologymodel.Device) topol
 		SysObjectID:       strings.TrimSpace(local.SysObjectID),
 		ChassisID:         strings.TrimSpace(local.ChassisID),
 		BaseBridgeAddress: baseBridgeAddress,
+		Labels:            cloneTopologyLabels(local.Labels),
 	}
 	if observation.BaseBridgeAddress == "" {
 		observation.BaseBridgeAddress = stpBridgeAddressToMAC(observation.ChassisID)

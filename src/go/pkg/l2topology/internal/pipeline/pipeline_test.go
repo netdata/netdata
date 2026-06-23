@@ -179,6 +179,31 @@ func TestBuildL2ResultFromObservations_DeviceProtocolsObservedLabel(t *testing.T
 	require.Equal(t, "arp,bridge,fdb,stp", result.Devices[0].Labels["protocols_observed"])
 }
 
+func TestBuildL2ResultFromObservations_PreservesObservationDeviceLabels(t *testing.T) {
+	observations := []model.L2Observation{
+		{
+			DeviceID: "router-a",
+			Hostname: "router-a.example.test",
+			Labels: map[string]string{
+				"type":   "router",
+				"vendor": "synthetic",
+			},
+			BridgePorts: []model.BridgePortObservation{
+				{BasePort: "3", IfIndex: 3},
+			},
+		},
+	}
+
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableBridge: true})
+	require.NoError(t, err)
+
+	device := findDeviceByID(result.Devices, "router-a")
+	require.NotNil(t, device)
+	require.Equal(t, "router", device.Labels["type"])
+	require.Equal(t, "synthetic", device.Labels["vendor"])
+	require.Equal(t, "bridge", device.Labels["protocols_observed"])
+}
+
 func TestBuildL2ResultFromObservations_MergesDuplicateDeviceObservations(t *testing.T) {
 	observations := []model.L2Observation{
 		{
