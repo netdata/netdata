@@ -14,16 +14,6 @@ const (
 	adjacencyLabelPairPass = model.AdjacencyLabelPairPass
 )
 
-const (
-	lldpMatchPassDefault      = model.LLDPMatchPassDefault
-	lldpMatchPassPortDesc     = model.LLDPMatchPassPortDesc
-	lldpMatchPassSysName      = model.LLDPMatchPassSysName
-	lldpMatchPassChassisPort  = model.LLDPMatchPassChassisPort
-	lldpMatchPassChassisDescr = model.LLDPMatchPassChassisDescr
-	lldpMatchPassChassis      = model.LLDPMatchPassChassis
-	cdpMatchPassDefault       = model.CDPMatchPassDefault
-)
-
 func deviceIfIndexKey(deviceID string, ifIndex int) string {
 	return keyutil.DeviceIfIndexKey(deviceID, ifIndex)
 }

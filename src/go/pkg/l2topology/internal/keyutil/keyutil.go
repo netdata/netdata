@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Package keyutil contains shared internal topology key helpers for the L2
+// pipeline and graph projection code.
 package keyutil
 
 import (
