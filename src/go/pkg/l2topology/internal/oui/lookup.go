@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package l2topology
+package oui
 
 import (
 	_ "embed"
@@ -8,30 +8,30 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/addrnorm"
 )
 
 //go:embed mac_oui_vendors.tsv
 var macOUIVendorsTSV string
 
-type topologyOUIVendorIndex struct {
+type vendorIndex struct {
 	byPrefixLen map[int]map[string]string
 	prefixLens  []int
 }
 
 var (
-	topologyOUIVendorsOnce  sync.Once
-	topologyOUIVendorsIndex topologyOUIVendorIndex
+	vendorsOnce  sync.Once
+	vendorsIndex vendorIndex
 )
 
-func loadTopologyOUIVendorsIndex() topologyOUIVendorIndex {
-	topologyOUIVendorsOnce.Do(func() {
-		topologyOUIVendorsIndex = buildTopologyOUIVendorIndex(macOUIVendorsTSV)
+func loadVendorsIndex() vendorIndex {
+	vendorsOnce.Do(func() {
+		vendorsIndex = buildVendorIndex(macOUIVendorsTSV)
 	})
-	return topologyOUIVendorsIndex
+	return vendorsIndex
 }
 
-func buildTopologyOUIVendorIndex(tsv string) topologyOUIVendorIndex {
+func buildVendorIndex(tsv string) vendorIndex {
 	byPrefixLen := make(map[int]map[string]string)
 	for line := range strings.SplitSeq(tsv, "\n") {
 		line = strings.TrimSpace(line)
@@ -69,7 +69,7 @@ func buildTopologyOUIVendorIndex(tsv string) topologyOUIVendorIndex {
 	sort.Slice(prefixLens, func(i, j int) bool {
 		return prefixLens[i] > prefixLens[j]
 	})
-	return topologyOUIVendorIndex{
+	return vendorIndex{
 		byPrefixLen: byPrefixLen,
 		prefixLens:  prefixLens,
 	}
@@ -88,59 +88,30 @@ func isHexToken(value string) bool {
 	return true
 }
 
-func lookupTopologyVendorByMAC(mac string) (vendor string, prefix string) {
-	return lookupTopologyVendorByMACInIndex(loadTopologyOUIVendorsIndex(), mac)
+func LookupVendorByMAC(mac string) (vendor string, prefix string) {
+	return lookupVendorByMACInIndex(loadVendorsIndex(), mac)
 }
 
-func lookupTopologyVendorByMACInIndex(index topologyOUIVendorIndex, mac string) (vendor string, prefix string) {
-	mac = normalizeMAC(mac)
+func lookupVendorByMACInIndex(index vendorIndex, mac string) (vendor string, prefix string) {
+	mac = addrnorm.NormalizeMAC(mac)
 	if mac == "" {
 		return "", ""
 	}
-	hex := strings.ToUpper(strings.ReplaceAll(mac, ":", ""))
-	if hex == "" {
+	hexMAC := strings.ToUpper(strings.ReplaceAll(mac, ":", ""))
+	if hexMAC == "" {
 		return "", ""
 	}
 
 	for _, prefixLen := range index.prefixLens {
-		if len(hex) < prefixLen {
+		if len(hexMAC) < prefixLen {
 			continue
 		}
-		candidatePrefix := hex[:prefixLen]
+		candidatePrefix := hexMAC[:prefixLen]
 		candidateVendor, ok := index.byPrefixLen[prefixLen][candidatePrefix]
 		if !ok {
 			continue
 		}
 		return candidateVendor, candidatePrefix
-	}
-	return "", ""
-}
-
-func inferTopologyVendorFromMatch(match graph.Match) (vendor string, prefix string) {
-	candidates := make(map[string]struct{}, len(match.MacAddresses)+len(match.ChassisIDs))
-	for _, value := range match.MacAddresses {
-		if mac := normalizeMAC(value); mac != "" {
-			candidates[mac] = struct{}{}
-		}
-	}
-	for _, value := range match.ChassisIDs {
-		if mac := normalizeMAC(value); mac != "" {
-			candidates[mac] = struct{}{}
-		}
-	}
-	if len(candidates) == 0 {
-		return "", ""
-	}
-
-	macs := make([]string, 0, len(candidates))
-	for mac := range candidates {
-		macs = append(macs, mac)
-	}
-	sort.Strings(macs)
-	for _, mac := range macs {
-		if vendor, prefix := lookupTopologyVendorByMAC(mac); vendor != "" {
-			return vendor, prefix
-		}
 	}
 	return "", ""
 }
