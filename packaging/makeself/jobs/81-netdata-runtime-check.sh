@@ -146,6 +146,11 @@ check_static_installer_systemd_capability_bounding_set() {
   [ -f "${installer}" ] || return 0
   [ -f "${unit}" ] || return 0
 
+  if [ ! -r "${installer}" ]; then
+    echo >&2 "!!! ${installer} is not a readable regular file"
+    return 1
+  fi
+
   if [ ! -r "${unit}" ]; then
     echo >&2 "!!! ${unit} is not a readable regular file"
     return 1
