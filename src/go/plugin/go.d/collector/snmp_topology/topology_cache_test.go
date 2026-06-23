@@ -579,6 +579,46 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 	}))
 }
 
+func TestTopologyCache_LLDPCapabilitiesDriveLocalActorType(t *testing.T) {
+	tests := map[string]struct {
+		sysName      string
+		capabilities string
+		wantType     string
+	}{
+		"bridge":        {sysName: "switch-a", capabilities: "20", wantType: "switch"},
+		"bridge-router": {sysName: "l3-switch-a", capabilities: "28", wantType: "router"},
+		"none":          {sysName: "device-a", capabilities: "", wantType: "device"},
+		"router":        {sysName: "router-a", capabilities: "08", wantType: "router"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cache := newTestTopologyCache(ddsnmp.DeviceConnectionInfo{
+				Hostname: tc.sysName + ".example.test",
+				SysName:  tc.sysName,
+			})
+			if tc.capabilities != "" {
+				cache.updateTopologyProfileTags([]*ddsnmp.ProfileMetrics{{
+					DeviceMetadata: map[string]ddsnmp.MetaTag{
+						tagLldpLocChassisID:        {Value: "00:11:22:33:44:55"},
+						tagLldpLocChassisIDSubtype: {Value: "4"},
+						tagLldpLocSysCapEnabled:    {Value: tc.capabilities},
+						tagLldpLocSysCapSupported:  {Value: tc.capabilities},
+					},
+				}})
+			}
+			cache.finalizeTopologyCache()
+
+			data, ok := snapshotTopologyCacheForTest(cache)
+			require.True(t, ok)
+
+			actor := findManagedDeviceActorBySysName(data, tc.sysName)
+			require.NotNil(t, actor)
+			require.Equal(t, tc.wantType, actor.ActorType)
+		})
+	}
+}
+
 func TestTopologyCache_CDPManagementAddresses(t *testing.T) {
 	cache := newTopologyCache()
 	cache.updateTime = time.Now()
@@ -1587,9 +1627,13 @@ func linkHasRawAddressHint(link topologymodel.Link, raw string) bool {
 }
 
 func findDeviceActorBySysName(snapshot topologymodel.Data, sysName string) *topologymodel.Actor {
+	return findManagedDeviceActorBySysName(snapshot, sysName)
+}
+
+func findManagedDeviceActorBySysName(snapshot topologymodel.Data, sysName string) *topologymodel.Actor {
 	for i := range snapshot.Actors {
 		actor := &snapshot.Actors[i]
-		if actor.ActorType != "device" {
+		if !topologyengine.IsDeviceActorType(actor.ActorType) {
 			continue
 		}
 		if actor.Match.SysName == sysName {
