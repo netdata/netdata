@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
 #include <dlfcn.h>
@@ -44,7 +45,6 @@ extern size_t ebpf_hash_table_pids_count;
 #include "process.skel.h"
 #include "shm.skel.h"
 #include "sync.skel.h"
-#include "socket.skel.h"
 #include "swap.skel.h"
 #include "vfs.skel.h"
 
@@ -55,7 +55,6 @@ extern struct hardirq_bpf *hardirq_bpf_obj;
 extern struct mount_bpf *mount_bpf_obj;
 extern struct mdflush_bpf *mdflush_bpf_obj;
 extern struct shm_bpf *shm_bpf_obj;
-extern struct socket_bpf *socket_bpf_obj;
 extern struct swap_bpf *swap_bpf_obj;
 extern struct vfs_bpf *vfs_bpf_obj;
 extern struct process_bpf *process_bpf_obj;
@@ -109,13 +108,98 @@ typedef struct netdata_ebpf_judy_pid {
 
 typedef struct netdata_ebpf_judy_pid_stats {
     char *cmdline;
-
-    // Index for Socket timestamp
-    struct {                     // support for multiple indexing engines
-        Pvoid_t JudyLArray;      // the hash table
-        RW_SPINLOCK rw_spinlock; // protect the index
-    } socket_stats;
 } netdata_ebpf_judy_pid_stats_t;
+
+#define EBPF_NETWORK_VIEWER_SECTION "network connections"
+#define EBPF_CONFIG_RESOLVE_HOSTNAME "resolve hostnames"
+#define EBPF_CONFIG_RESOLVE_SERVICE "resolve service names"
+#define EBPF_CONFIG_PORTS "ports"
+#define EBPF_CONFIG_HOSTNAMES "hostnames"
+#define NETDATA_MINIMUM_PORT_VALUE 1
+#define NETDATA_MAXIMUM_PORT_VALUE 65535
+#define NETDATA_MINIMUM_IPV4_CIDR 0
+#define NETDATA_MAXIMUM_IPV4_CIDR 32
+#define NETDATA_EBPF_PID_STATS_ARAL_TABLE_NAME "ebpf_pid_stats"
+
+typedef struct ebpf_network_viewer_dimension_names {
+    char *name;
+    uint32_t hash;
+
+    uint16_t port;
+
+    struct ebpf_network_viewer_dimension_names *next;
+} ebpf_network_viewer_dim_name_t;
+
+typedef struct ebpf_network_viewer_port_list {
+    char *value;
+    uint32_t hash;
+
+    uint16_t first;
+    uint16_t last;
+
+    uint16_t cmp_first;
+    uint16_t cmp_last;
+
+    uint16_t protocol;
+    uint32_t pid;
+    uint32_t tgid;
+    uint64_t connections;
+    struct ebpf_network_viewer_port_list *next;
+} ebpf_network_viewer_port_list_t;
+
+union netdata_ip_t {
+    uint8_t addr8[16];
+    uint16_t addr16[8];
+    uint32_t addr32[4];
+    uint64_t addr64[2];
+};
+
+typedef struct ebpf_network_viewer_ip_list {
+    char *value;
+    uint32_t hash;
+
+    uint8_t ver;
+
+    union netdata_ip_t first;
+    union netdata_ip_t last;
+
+    struct ebpf_network_viewer_ip_list *next;
+} ebpf_network_viewer_ip_list_t;
+
+typedef struct ebpf_network_viewer_hostname_list {
+    char *value;
+    uint32_t hash;
+
+    SIMPLE_PATTERN *value_pattern;
+
+    struct ebpf_network_viewer_hostname_list *next;
+} ebpf_network_viewer_hostname_list_t;
+
+typedef struct ebpf_network_viewer_options {
+    RW_SPINLOCK rw_spinlock;
+
+    uint32_t enabled;
+    uint32_t family;
+
+    uint32_t hostname_resolution_enabled;
+    uint32_t service_resolution_enabled;
+
+    ebpf_network_viewer_port_list_t *excluded_port;
+    ebpf_network_viewer_port_list_t *included_port;
+
+    ebpf_network_viewer_dim_name_t *names;
+
+    ebpf_network_viewer_ip_list_t *excluded_ips;
+    ebpf_network_viewer_ip_list_t *included_ips;
+
+    ebpf_network_viewer_hostname_list_t *excluded_hostnames;
+    ebpf_network_viewer_hostname_list_t *included_hostnames;
+
+    ebpf_network_viewer_ip_list_t *ipv4_local_ip;
+    ebpf_network_viewer_ip_list_t *ipv6_local_ip;
+} ebpf_network_viewer_options_t;
+
+extern ebpf_network_viewer_options_t network_viewer_opt;
 
 extern ebpf_module_t ebpf_modules[];
 extern bool ebpf_program_loaded_any;
@@ -183,8 +267,6 @@ enum ebpf_algorithms_list { NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_INCREMENTAL_
 
 // Threads
 void ebpf_process_thread(void *ptr);
-void ebpf_socket_thread(void *ptr);
-bool ebpf_socket_is_migration_disabled(void);
 
 // Common variables
 extern netdata_mutex_t lock;
@@ -318,6 +400,7 @@ netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array
 
 void ebpf_clean_ip_structure(ebpf_network_viewer_ip_list_t **clean);
 void ebpf_clean_port_structure(ebpf_network_viewer_port_list_t **clean);
+void ebpf_fill_ip_list_unsafe(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, char *table);
 void ebpf_read_local_addresses_unsafe();
 
 extern ebpf_filesystem_partitions_t localfs[];

@@ -25,7 +25,6 @@
 #include "ebpf_mount.h"
 #include "ebpf_oomkill.h"
 #include "ebpf_shm.h"
-#include "ebpf_socket.h"
 #include "ebpf_softirq.h"
 #include "ebpf_sync.h"
 #include "ebpf_swap.h"
@@ -40,7 +39,6 @@
 
 enum ebpf_main_index {
     EBPF_MODULE_PROCESS_IDX,
-    EBPF_MODULE_SOCKET_IDX,
     EBPF_MODULE_SYNC_IDX,
     EBPF_MODULE_DCSTAT_IDX,
     EBPF_MODULE_SWAP_IDX,

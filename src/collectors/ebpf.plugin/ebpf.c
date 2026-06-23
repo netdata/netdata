@@ -7,7 +7,6 @@
 #include <stdint.h>
 
 #include "ebpf.h"
-#include "ebpf_socket.h"
 #include "ebpf_unittest.h"
 #include "libbpf_api/ebpf_library.h"
 #include "libnetdata/libjudy/judy-malloc.h"
@@ -40,13 +39,6 @@ netdata_mutex_t lock;
 netdata_mutex_t ebpf_exit_cleanup;
 netdata_mutex_t collect_data_mutex;
 
-bool ebpf_socket_is_migration_disabled(void)
-{
-    // Keep the socket code available during the ebpf.plugin -> ebpfgo.plugin migration,
-    // but prevent ebpf.plugin from starting or advertising the socket runtime.
-    return true;
-}
-
 struct netdata_static_thread cgroup_integration_thread = {
     .name = "EBPF CGROUP INT",
     .config_section = NULL,
@@ -56,8 +48,6 @@ struct netdata_static_thread cgroup_integration_thread = {
     .thread = NULL,
     .init_routine = NULL,
     .start_routine = NULL};
-
-static void ebpf_socket_unload_bpf(ebpf_module_t *em);
 
 ebpf_module_t ebpf_modules[] = {
     {.info =
@@ -83,33 +73,6 @@ ebpf_module_t ebpf_modules[] = {
          NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_10 | NETDATA_V5_14,
      .load = EBPF_LOAD_LEGACY,
      .targets = process_targets,
-     .probe_links = NULL,
-     .objects = NULL,
-     .thread = NULL,
-     .maps_per_core = CONFIG_BOOLEAN_YES,
-     .lifetime = EBPF_DEFAULT_LIFETIME,
-     .running_time = 0},
-    {.info = {.thread_name = "socket", .config_name = "socket", .thread_description = NETDATA_EBPF_SOCKET_MODULE_DESC},
-     .functions =
-         {.start_routine = ebpf_socket_thread,
-          .apps_routine = NULL,
-          .bpf_unload = ebpf_socket_unload_bpf},
-     .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
-     .update_every = EBPF_DEFAULT_UPDATE_EVERY,
-     .global_charts = 1,
-     .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
-     .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT,
-     .cgroup_charts = CONFIG_BOOLEAN_NO,
-     .mode = MODE_ENTRY,
-     .optional = 0,
-     .maps = NULL,
-     .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE,
-     .names = NULL,
-     .cfg = &socket_config,
-     .config_file = NETDATA_NETWORK_CONFIG_FILE,
-     .kernels = NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
-     .load = EBPF_LOAD_LEGACY,
-     .targets = socket_targets,
      .probe_links = NULL,
      .objects = NULL,
      .thread = NULL,
@@ -796,7 +759,6 @@ struct hardirq_bpf *hardirq_bpf_obj = NULL;
 struct mdflush_bpf *mdflush_bpf_obj = NULL;
 struct mount_bpf *mount_bpf_obj = NULL;
 struct shm_bpf *shm_bpf_obj = NULL;
-struct socket_bpf *socket_bpf_obj = NULL;
 struct swap_bpf *swap_bpf_obj = NULL;
 struct vfs_bpf *vfs_bpf_obj = NULL;
 struct process_bpf *process_bpf_obj = NULL;
@@ -856,8 +818,6 @@ netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array
         pid_ptr = *pid_pptr;
 
         pid_ptr->cmdline = NULL;
-        pid_ptr->socket_stats.JudyLArray = NULL;
-        rw_spinlock_init(&pid_ptr->socket_stats.rw_spinlock);
     }
 
     return pid_ptr;
@@ -997,18 +957,6 @@ void ebpf_unload_legacy_bpf(ebpf_module_t *em)
     }
 }
 
-static void ebpf_socket_unload_bpf(ebpf_module_t *em)
-{
-    ebpf_unload_legacy_bpf(em);
-
-#ifdef LIBBPF_MAJOR_VERSION
-    if (socket_bpf_obj) {
-        socket_bpf__destroy(socket_bpf_obj);
-        socket_bpf_obj = NULL;
-    }
-#endif
-}
-
 /**
  *  Read Local Ports
  *
@@ -1124,7 +1072,7 @@ static void ebpf_mutex_initialize()
 static void ebpf_allocate_common_vectors()
 {
     ebpf_judy_pid.pid_table =
-        ebpf_allocate_pid_aral(NETDATA_EBPF_PID_SOCKET_ARAL_TABLE_NAME, sizeof(netdata_ebpf_judy_pid_stats_t));
+        ebpf_allocate_pid_aral(NETDATA_EBPF_PID_STATS_ARAL_TABLE_NAME, sizeof(netdata_ebpf_judy_pid_stats_t));
     ebpf_aral_init();
 }
 
@@ -1176,7 +1124,6 @@ static void ebpf_parse_args(int argc, char **argv)
     uint64_t select_threads = 0;
     static struct option long_options[] = {
         {"process", no_argument, 0, 0},
-        {"net", no_argument, 0, 0},
         {"sync", no_argument, 0, 0},
         {"dcstat", no_argument, 0, 0},
         {"swap", no_argument, 0, 0},
@@ -1236,13 +1183,6 @@ static void ebpf_parse_args(int argc, char **argv)
 #ifdef NETDATA_INTERNAL_CHECKS
                 netdata_log_info(
                     "EBPF enabling \"PROCESS\" charts, because it was started with the option \"[-]-process\".");
-#endif
-                break;
-            }
-            case EBPF_MODULE_SOCKET_IDX: {
-                select_threads |= 1 << EBPF_MODULE_SOCKET_IDX;
-#ifdef NETDATA_INTERNAL_CHECKS
-                netdata_log_info("EBPF enabling \"NET\" charts, because it was started with the option \"[-]-net\".");
 #endif
                 break;
             }
@@ -2237,10 +2177,6 @@ int main(int argc, char **argv)
 #endif
 
     ebpf_read_local_addresses_unsafe();
-    read_local_ports("/proc/net/tcp", IPPROTO_TCP);
-    read_local_ports("/proc/net/tcp6", IPPROTO_TCP);
-    read_local_ports("/proc/net/udp", IPPROTO_UDP);
-    read_local_ports("/proc/net/udp6", IPPROTO_UDP);
 
     ebpf_set_static_routine();
 

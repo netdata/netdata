@@ -3191,8 +3191,6 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/ebpf_process.h
             src/collectors/ebpf.plugin/ebpf_shm.c
             src/collectors/ebpf.plugin/ebpf_shm.h
-            src/collectors/ebpf.plugin/ebpf_socket.c
-            src/collectors/ebpf.plugin/ebpf_socket.h
             src/collectors/ebpf.plugin/ebpf_socket_ipc.c
             src/collectors/ebpf.plugin/ebpf_socket_ipc.h
             src/collectors/ebpf.plugin/ebpf_softirq.c

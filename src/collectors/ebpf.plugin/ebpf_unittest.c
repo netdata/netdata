@@ -10,7 +10,6 @@
 #include <netinet/in.h>
 #include "libbpf_api/ebpf_library.h"
 #include "ebpf.h"
-#include "ebpf_socket.h"
 
 extern uint32_t integration_with_collectors;
 extern int running_on_kernel;

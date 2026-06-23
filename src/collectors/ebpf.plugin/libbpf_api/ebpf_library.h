@@ -113,7 +113,6 @@ void ebpf_enable_chart(int idx, int disable_cgroup);
 void ebpf_enable_specific_chart(ebpf_module_t *em, int disable_cgroup);
 void read_collector_values(int *disable_cgroups, int update_every, netdata_ebpf_load_mode_t origin);
 void parse_network_viewer_section(struct config *cfg);
-void ebpf_parse_service_name_section(struct config *cfg);
 void ebpf_parse_ports(const char *ptr);
 void ebpf_parse_ips_unsafe(const char *ptr);
 void ebpf_read_local_addresses_unsafe();
@@ -177,7 +176,5 @@ uint32_t ebpf_enable_tracepoints(ebpf_tracepoint_t *tps);
  *  AUXILIARY FUNCTIONS USED DURING INITIALIZATION
  *
  *****************************************************************/
-
-void read_local_ports(char *filename, uint8_t proto);
 
 #endif /* NETDATA_COLLECTOR_EBPF_LIBRARY_H */
