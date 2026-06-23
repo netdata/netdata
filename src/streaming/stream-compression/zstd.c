@@ -144,7 +144,7 @@ size_t stream_decompress_zstd(struct decompressor_state *state, const char *comp
 
     if(inBuffer.pos < inBuffer.size) {
         // The peer sent a frame that decompresses to more than our output buffer.
-        // A conforming sender never does this (it compresses in <= COMPRESSION_MAX_CHUNK
+        // A conforming sender never does this (it compresses in <= COMPRESSION_MAX_MSG_SIZE
         // plaintext chunks), but a malicious/compromised peer is not bound by that.
         // Return an error (like the gzip path and the ZSTD_isError branch above) so the
         // caller fails the stream connection, instead of fatal()-ing the whole Agent.
