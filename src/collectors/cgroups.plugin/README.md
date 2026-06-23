@@ -137,22 +137,11 @@ should be set to the proxy's URL in this case.
 
 ### Customizing cgroup names
 
-When Netdata resolves a cgroup to a friendly name (a Docker container name, a
-Kubernetes pod name, and so on), you can override the resolved name with your own
-value by setting a label or annotation with the key `netdata.cloud/cgroup.name`.
-The value becomes the cgroup's display name, and Netdata derives the chart
-identifier from it.
+When Netdata resolves a cgroup to a friendly name (a Docker container name, a Kubernetes pod name, and so on), you can override the resolved name with your own value by setting a label or annotation with the key `netdata.cloud/cgroup.name`. The value becomes the cgroup's display name, and Netdata derives the chart identifier from it.
 
-This is useful when the auto-resolved name is a raw container ID, a long
-auto-generated string, or simply not the name you want to see on the dashboard —
-for example, to turn a chart name like
-`cgroup_twxae02wzkyy2d19gz4dsj6a-storefront-green-1.cpu` into
-`cgroup_storefront-green.cpu`.
+This is useful when the auto-resolved name is a raw container ID, a long auto-generated string, or simply not the name you want to see on the dashboard — for example, to turn a chart name like `cgroup_twxae02wzkyy2d19gz4dsj6a-storefront-green-1.cpu` into `cgroup_storefront-green.cpu`.
 
-The override changes only the cgroup-name segment of a chart name such as
-`cgroup_<name>.cpu`. It does not affect the chart-type prefix (`cgroup_`), the
-metric suffix (e.g. `.cpu`), or the `@<node>` identifier shown when metrics come
-from a different node.
+The override changes only the cgroup-name segment of a chart name such as `cgroup_<name>.cpu`. It does not affect the chart-type prefix (`cgroup_`), the metric suffix (e.g. `.cpu`), or the `@<node>` identifier shown when metrics come from a different node.
 
 #### Docker and Podman containers
 
@@ -172,10 +161,7 @@ services:
       - "netdata.cloud/cgroup.name=my-web-app"
 ```
 
-Netdata reads the label from the same `docker inspect` / `podman inspect` output
-it already uses for name resolution and applies the override. Podman works the
-same way (see the [Podman note](#note-on-podman-container-names) for the socket
-access requirement).
+Netdata reads the label from the same `docker inspect` / `podman inspect` output it already uses for name resolution and applies the override. Podman works the same way (see the [Podman note](#note-on-podman-container-names) for the socket access requirement).
 
 #### Kubernetes pods
 
@@ -199,24 +185,15 @@ spec:
         netdata.cloud/cgroup.name: "storefront-green"
 ```
 
-Netdata extracts `netdata.cloud/*` annotations from pod metadata and uses
-`netdata.cloud/cgroup.name` to override the resolved name.
+Netdata extracts `netdata.cloud/*` annotations from pod metadata and uses `netdata.cloud/cgroup.name` to override the resolved name.
 
 #### Verifying the result and troubleshooting
 
-You can check the chart names Netdata created through the Agent's
-`/api/v1/charts` endpoint and filter for the `cgroup_` prefix to confirm the
-override took effect. Use the chart name shown by that endpoint when referencing
-the chart in API queries.
+You can check the chart names Netdata created through the Agent's `/api/v1/charts` endpoint and filter for the `cgroup_` prefix to confirm the override took effect. Use the chart name shown by that endpoint when referencing the chart in API queries.
 
-> If you see a long alphanumeric string such as `twxae02wzkyy2d19gz4dsj6a-` at the
-> start of a cgroup's chart name, that string is part of the resolved name itself
-> (typically a container ID or Kubernetes UID from the cgroup path), not a prefix
-> added by Netdata. Setting `netdata.cloud/cgroup.name` replaces it with your own
-> value.
+> If you see a long alphanumeric string such as `twxae02wzkyy2d19gz4dsj6a-` at the start of a cgroup's chart name, that string is part of the resolved name itself (typically a container ID or Kubernetes UID from the cgroup path), not a prefix added by Netdata. Setting `netdata.cloud/cgroup.name` replaces it with your own value.
 
-If no override is set and Netdata cannot resolve a friendly name via Docker,
-Kubernetes, or Podman, the raw cgroup path is used as the display name.
+If no override is set and Netdata cannot resolve a friendly name via Docker, Kubernetes, or Podman, the raw cgroup path is used as the display name.
 
 ### Alerts
 
