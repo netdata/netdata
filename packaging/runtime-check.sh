@@ -36,38 +36,136 @@ skip_libexec_part() {
 }
 
 find_netdata_systemd_unit() {
+    if [ -n "${NETDATA_SYSTEMD_UNIT}" ]; then
+        if [ -f "${NETDATA_SYSTEMD_UNIT}" ] && [ -r "${NETDATA_SYSTEMD_UNIT}" ]; then
+            printf "%s\n" "${NETDATA_SYSTEMD_UNIT}"
+            return 0
+        fi
+
+        printf "!!! %s is not a readable regular file\n" "${NETDATA_SYSTEMD_UNIT}" >&2
+        return 2
+    fi
+
     for unit in \
-        ${NETDATA_SYSTEMD_UNIT:-} \
         /etc/systemd/system/netdata.service \
         /usr/lib/systemd/system/netdata.service \
         /lib/systemd/system/netdata.service \
         /usr/local/lib/systemd/system/netdata.service; do
-        if [ -f "${unit}" ]; then
+        if [ ! -e "${unit}" ] && [ ! -L "${unit}" ]; then
+            continue
+        fi
+
+        if [ -f "${unit}" ] && [ -r "${unit}" ]; then
             printf "%s\n" "${unit}"
             return 0
         fi
+
+        printf "!!! %s is not a readable regular file\n" "${unit}" >&2
+        return 2
     done
 
     return 1
 }
 
-systemd_unit_capability_bounding_set() {
-    awk '
-        /^[[:space:]]*CapabilityBoundingSet[[:space:]]*=/ {
-            line = $0
-            sub(/^[^=]*=/, "", line)
-            count = split(line, caps, /[[:space:]]+/)
+systemd_unit_allows_capability() {
+    awk -v wanted="${2}" '
+        BEGIN {
+            wanted = toupper(wanted)
+        }
+
+        function trim(value) {
+            sub(/^[[:space:]]+/, "", value)
+            sub(/[[:space:]]+$/, "", value)
+            return value
+        }
+
+        function contains_wanted(value,    count, caps, i) {
+            count = split(value, caps, /[[:space:]]+/)
             for (i = 1; i <= count; i++) {
-                if (caps[i] != "") {
-                    print caps[i]
+                if (toupper(caps[i]) == wanted) {
+                    return 1
                 }
             }
-            found = 1
+
+            return 0
         }
-        END {
-            if (!found) {
-                exit 1
+
+        function apply_capability_bounding_set(line,    inverted, value) {
+            if (line !~ /^[[:space:]]*CapabilityBoundingSet[[:space:]]*=/) {
+                return
             }
+
+            sub(/^[^=]*=/, "", line)
+            value = trim(line)
+
+            if (value == "") {
+                allowed = 0
+                found = 1
+                return
+            }
+
+            if (value == "~") {
+                allowed = 1
+                found = 1
+                return
+            }
+
+            inverted = 0
+            if (substr(value, 1, 1) == "~") {
+                inverted = 1
+                value = trim(substr(value, 2))
+            }
+
+            if (inverted) {
+                if (!found) {
+                    allowed = 1
+                }
+
+                found = 1
+                if (contains_wanted(value)) {
+                    allowed = 0
+                }
+            } else {
+                if (!found) {
+                    allowed = 0
+                }
+
+                found = 1
+                if (contains_wanted(value)) {
+                    allowed = 1
+                }
+            }
+        }
+
+        {
+            line = $0
+            sub(/\r$/, "", line)
+
+            if (continued == "" && line ~ /^[[:space:]]*[#;]/) {
+                next
+            }
+
+            if (line ~ /\\[[:space:]]*$/) {
+                sub(/\\[[:space:]]*$/, " ", line)
+                continued = continued line
+                next
+            }
+
+            line = continued line
+            continued = ""
+            apply_capability_bounding_set(line)
+        }
+
+        END {
+            if (continued != "") {
+                apply_capability_bounding_set(continued)
+            }
+
+            if (!found) {
+                exit 2
+            }
+
+            exit allowed ? 0 : 1
         }
     ' "${1}"
 }
@@ -75,8 +173,17 @@ systemd_unit_capability_bounding_set() {
 check_systemd_capability_bounding_set() {
     command -v getcap >/dev/null 2>&1 || return 0
 
-    systemd_unit="$(find_netdata_systemd_unit)" || return 0
-    bounding_caps="$(systemd_unit_capability_bounding_set "${systemd_unit}")" || return 0
+    systemd_unit="$(find_netdata_systemd_unit)"
+    case "${?}" in
+        0)
+            ;;
+        1)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
 
     cap_success=1
     for part in ${NETDATA_LIBEXEC_PARTS}; do
@@ -104,11 +211,23 @@ check_systemd_capability_bounding_set() {
                 IFS="${old_ifs}"
                 cap_name="$(printf "%s" "${cap_name}" | tr "[:lower:]" "[:upper:]")"
 
-                if ! printf "%s\n" "${bounding_caps}" | grep -qx "${cap_name}"; then
-                    cap_success=0
-                    printf "!!! %s has file capability %s, but %s CapabilityBoundingSet does not allow it\n" \
-                        "${plugin}" "${cap_name}" "${systemd_unit}"
-                fi
+                systemd_unit_allows_capability "${systemd_unit}" "${cap_name}"
+                case "${?}" in
+                    0)
+                        ;;
+                    1)
+                        cap_success=0
+                        printf "!!! %s has file capability %s, but %s CapabilityBoundingSet does not allow it\n" \
+                            "${plugin}" "${cap_name}" "${systemd_unit}"
+                        ;;
+                    2)
+                        return 0
+                        ;;
+                    *)
+                        cap_success=0
+                        printf "!!! could not parse %s CapabilityBoundingSet\n" "${systemd_unit}"
+                        ;;
+                esac
 
                 IFS=","
             done
