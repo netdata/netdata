@@ -206,15 +206,7 @@ flowchart TB
 
 ## Connect your Parent to Netdata Cloud
 
-A Parent is a regular Netdata Agent, so you connect it to Netdata Cloud using the standard claiming process. Once your Parent is claimed, Netdata Cloud can query it directly and all of its connected Children are registered to Netdata Cloud automatically.
-
-To claim an already-installed Parent, run the command Netdata Cloud provides for your Space:
-
-```bash
-bash <(curl -Ss https://get.netdata.cloud/kickstart.sh) --claim-token YOUR_TOKEN --claim-rooms YOUR_ROOMS --claim-url https://app.netdata.cloud
-```
-
-Replace `YOUR_TOKEN` and `YOUR_ROOMS` with the claiming token and Room identifiers from your Space.
+A Parent is a regular Netdata Agent, so you connect it to Netdata Cloud using the standard claiming process — there is no separate procedure for Parents. Once your Parent is claimed, Netdata Cloud can query it directly and all of its connected Children are registered to Netdata Cloud automatically.
 
 :::tip
 
