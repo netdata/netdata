@@ -670,7 +670,7 @@ impl FunctionHandler for CatalogFunction {
             has_history: true,
             status: 200,
             response_type: String::from("table"),
-            help: String::from("View, search and analyze systemd journal entries."),
+            help: String::from("View, search and analyze OpenTelemetry logs."),
             pagination: netdata::Pagination::default(),
         };
 

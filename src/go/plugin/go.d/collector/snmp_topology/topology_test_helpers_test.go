@@ -42,9 +42,6 @@ func testCountTopologyLinksByType(links []topologymodel.Link, linkType string) i
 }
 
 func snapshotTopologyRegistryForTestWithOptions(registry *topologyRegistry, options topologyoptions.QueryOptions) (topologymodel.Data, bool) {
-	if options.ResolveDNSName == nil {
-		options.ResolveDNSName = resolveTopologyReverseDNSNameNoop
-	}
 	return registry.snapshotWithOptions(options)
 }
 

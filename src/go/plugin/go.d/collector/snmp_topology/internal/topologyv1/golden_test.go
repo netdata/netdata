@@ -311,16 +311,36 @@ func snmpTopologyV1GoldenInput() topologymodel.Data {
 				},
 			},
 			{
-				ActorID:   "segment-198-51-100-0-30",
-				ActorType: "segment",
-				Layer:     "3",
-				Source:    "ip_mib",
+				ActorID:     "segment-198-51-100-0-30",
+				ActorType:   "segment",
+				SegmentKind: topologymodel.SegmentKindBroadcastDomain,
+				Layer:       "3",
+				Source:      "ip_mib",
 				Match: topologymodel.Match{
 					IPAddresses: []string{"198.51.100.0"},
 				},
 				Detail: topologymodel.ActorDetail{
 					L2: topologyengine.ProjectionActorDetail{
 						DisplayName: "198.51.100.0/30",
+					},
+				},
+			},
+			{
+				ActorID:     "l3-subnet-segment-203-0-113-0-24",
+				ActorType:   topologymodel.L3SubnetSegmentActorType,
+				SegmentKind: topologymodel.SegmentKindL3Subnet,
+				Layer:       "3",
+				Source:      "ip_mib",
+				Detail: topologymodel.ActorDetail{
+					L2: topologyengine.ProjectionActorDetail{
+						DisplayName: "203.0.113.0/24",
+						Segment: topologyengine.ProjectionSegmentActorDetail{
+							SegmentID:      "l3-subnet-segment-203-0-113-0-24",
+							SegmentType:    topologymodel.SegmentKindL3Subnet,
+							SegmentKind:    topologymodel.SegmentKindL3Subnet,
+							PortsTotal:     topologyengine.OptionalValue[int]{Value: 2, Has: true},
+							EndpointsTotal: topologyengine.OptionalValue[int]{Value: 2, Has: true},
+						},
 					},
 				},
 			},
@@ -460,6 +480,64 @@ func snmpTopologyV1GoldenInput() topologymodel.Data {
 					},
 				},
 			},
+			{
+				Layer:      "3",
+				Protocol:   topologymodel.L3SubnetMembershipLinkType,
+				LinkType:   topologymodel.L3SubnetMembershipLinkType,
+				Direction:  "observed",
+				SrcActorID: "router-a",
+				DstActorID: "l3-subnet-segment-203-0-113-0-24",
+				Src: topologymodel.LinkEndpoint{
+					IfIndex: 302,
+					IfName:  "xe-0/0/2",
+				},
+				Dst: topologymodel.LinkEndpoint{},
+				Inference: &graph.LinkInference{
+					AttachmentMode: "logical_l3_subnet_membership",
+					Inference:      "shared_subnet_membership",
+				},
+				Detail: topologymodel.LinkDetail{
+					L3SubnetMembership: &topologymodel.L3SubnetMembershipLinkDetail{
+						Source:  "ip_mib",
+						Subnet:  "203.0.113.0/24",
+						Network: "203.0.113.0",
+						Netmask: "255.255.255.0",
+						Prefix:  24,
+						Interfaces: []topologymodel.L3SubnetMembershipInterface{
+							{MemberIP: "203.0.113.1", IfIndex: 302, IfName: "xe-0/0/2", IfDescr: "Transit VLAN"},
+						},
+					},
+				},
+			},
+			{
+				Layer:      "3",
+				Protocol:   topologymodel.L3SubnetMembershipLinkType,
+				LinkType:   topologymodel.L3SubnetMembershipLinkType,
+				Direction:  "observed",
+				SrcActorID: "router-b",
+				DstActorID: "l3-subnet-segment-203-0-113-0-24",
+				Src: topologymodel.LinkEndpoint{
+					IfIndex: 402,
+					IfName:  "xe-0/0/2",
+				},
+				Dst: topologymodel.LinkEndpoint{},
+				Inference: &graph.LinkInference{
+					AttachmentMode: "logical_l3_subnet_membership",
+					Inference:      "shared_subnet_membership",
+				},
+				Detail: topologymodel.LinkDetail{
+					L3SubnetMembership: &topologymodel.L3SubnetMembershipLinkDetail{
+						Source:  "ip_mib",
+						Subnet:  "203.0.113.0/24",
+						Network: "203.0.113.0",
+						Netmask: "255.255.255.0",
+						Prefix:  24,
+						Interfaces: []topologymodel.L3SubnetMembershipInterface{
+							{MemberIP: "203.0.113.2", IfIndex: 402, IfName: "xe-0/0/2", IfDescr: "Transit VLAN"},
+						},
+					},
+				},
+			},
 		},
 		Stats: topologymodel.Stats{
 			Shape: topologymodel.ShapeStats{
@@ -474,7 +552,14 @@ func snmpTopologyV1GoldenInput() topologymodel.Data {
 			},
 			HasFocus: true,
 			L3: topologymodel.L3EnrichmentStats{
-				EmittedLinks: 1,
+				SubnetStats: topologymodel.L3SubnetBuildStats{
+					CandidateLinks:       1,
+					CandidateSegments:    1,
+					CandidateMemberships: 2,
+				},
+				EmittedLinks:           1,
+				EmittedSegments:        1,
+				EmittedMembershipLinks: 2,
 			},
 			HasL3: true,
 			OSPF: topologymodel.OSPFEnrichmentStats{
@@ -486,12 +571,13 @@ func snmpTopologyV1GoldenInput() topologymodel.Data {
 			},
 			HasBGP: true,
 			Recomputed: topologymodel.RecomputedStats{
-				ActorsTotal:               5,
-				LinksTotal:                5,
-				LinksProbable:             1,
-				L3SubnetVisibleLinks:      1,
-				OSPFAdjacencyVisibleLinks: 1,
-				BGPAdjacencyVisibleLinks:  1,
+				ActorsTotal:                    6,
+				LinksTotal:                     7,
+				LinksProbable:                  1,
+				L3SubnetVisibleLinks:           1,
+				L3SubnetMembershipVisibleLinks: 2,
+				OSPFAdjacencyVisibleLinks:      1,
+				BGPAdjacencyVisibleLinks:       1,
 			},
 			HasComputed: true,
 		},

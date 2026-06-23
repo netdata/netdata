@@ -14,7 +14,7 @@ func TestApplyPoliciesRecordsShapeStats(t *testing.T) {
 	data := topologymodel.Data{
 		Actors: []topologymodel.Actor{
 			{ActorID: "device-a", ActorType: "device", Match: topologymodel.Match{IPAddresses: []string{"10.0.0.1"}}},
-			{ActorID: "segment-a", ActorType: "segment"},
+			{ActorID: "segment-a", ActorType: "segment", SegmentKind: topologymodel.SegmentKindBroadcastDomain},
 			{ActorID: "endpoint-a", ActorType: "endpoint"},
 		},
 		Links: []topologymodel.Link{

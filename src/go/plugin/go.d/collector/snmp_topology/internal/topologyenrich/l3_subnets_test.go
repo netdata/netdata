@@ -10,26 +10,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBuildTopologyL3SubnetAdjacencies(t *testing.T) {
+func TestBuildTopologyL3SubnetCandidates(t *testing.T) {
 	tests := map[string]struct {
-		rows      []topologymodel.L3Interface
-		wantLinks []topologyL3SubnetAdjacency
-		wantStats topologymodel.L3SubnetBuildStats
+		rows           []topologymodel.L3Interface
+		wantCandidates topologyL3SubnetCandidates
+		wantStats      topologymodel.L3SubnetBuildStats
 	}{
 		"ipv4-point-to-point": {
 			rows: []topologymodel.L3Interface{
 				l3InterfaceForTest("device-b", "198.51.100.2", "255.255.255.252", "3"),
 				l3InterfaceForTest("device-a", "198.51.100.1", "255.255.255.252", "2"),
 			},
-			wantLinks: []topologyL3SubnetAdjacency{
-				{
+			wantCandidates: topologyL3SubnetCandidates{
+				Adjacencies: []topologyL3SubnetAdjacency{{
 					Subnet:  "198.51.100.0/30",
 					Network: "198.51.100.0",
 					Netmask: "255.255.255.252",
 					Prefix:  30,
 					A:       l3InterfaceForTest("device-a", "198.51.100.1", "255.255.255.252", "2"),
 					B:       l3InterfaceForTest("device-b", "198.51.100.2", "255.255.255.252", "3"),
-				},
+				}},
 			},
 			wantStats: topologymodel.L3SubnetBuildStats{
 				CandidateSubnets: 1,
@@ -41,25 +41,77 @@ func TestBuildTopologyL3SubnetAdjacencies(t *testing.T) {
 				l3InterfaceForTest("device-a", "198.51.100.0", "255.255.255.254", "2"),
 				l3InterfaceForTest("device-b", "198.51.100.1", "255.255.255.254", "3"),
 			},
-			wantLinks: []topologyL3SubnetAdjacency{
-				{
+			wantCandidates: topologyL3SubnetCandidates{
+				Adjacencies: []topologyL3SubnetAdjacency{{
 					Subnet:  "198.51.100.0/31",
 					Network: "198.51.100.0",
 					Netmask: "255.255.255.254",
 					Prefix:  31,
 					A:       l3InterfaceForTest("device-a", "198.51.100.0", "255.255.255.254", "2"),
 					B:       l3InterfaceForTest("device-b", "198.51.100.1", "255.255.255.254", "3"),
-				},
+				}},
 			},
 			wantStats: topologymodel.L3SubnetBuildStats{
 				CandidateSubnets: 1,
 				CandidateLinks:   1,
 			},
 		},
+		"ipv4-subnet-segment": {
+			rows: []topologymodel.L3Interface{
+				l3InterfaceForTest("device-b", "198.51.100.2", "255.255.255.0", "3"),
+				l3InterfaceForTest("device-a", "198.51.100.1", "255.255.255.0", "2"),
+				l3InterfaceForTest("device-c", "198.51.100.3", "255.255.255.0", "4"),
+			},
+			wantCandidates: topologyL3SubnetCandidates{
+				Segments: []topologyL3SubnetSegment{
+					{
+						Subnet:  "198.51.100.0/24",
+						Network: "198.51.100.0",
+						Netmask: "255.255.255.0",
+						Prefix:  24,
+						Rows: []topologymodel.L3Interface{
+							l3InterfaceForTest("device-a", "198.51.100.1", "255.255.255.0", "2"),
+							l3InterfaceForTest("device-b", "198.51.100.2", "255.255.255.0", "3"),
+							l3InterfaceForTest("device-c", "198.51.100.3", "255.255.255.0", "4"),
+						},
+					},
+				},
+			},
+			wantStats: topologymodel.L3SubnetBuildStats{
+				CandidateSubnets:     1,
+				CandidateSegments:    1,
+				CandidateMemberships: 3,
+			},
+		},
+		"ipv4-subnet-segment-twenty-nine-boundary": {
+			rows: []topologymodel.L3Interface{
+				l3InterfaceForTest("device-b", "198.51.100.2", "255.255.255.248", "3"),
+				l3InterfaceForTest("device-a", "198.51.100.1", "255.255.255.248", "2"),
+			},
+			wantCandidates: topologyL3SubnetCandidates{
+				Segments: []topologyL3SubnetSegment{
+					{
+						Subnet:  "198.51.100.0/29",
+						Network: "198.51.100.0",
+						Netmask: "255.255.255.248",
+						Prefix:  29,
+						Rows: []topologymodel.L3Interface{
+							l3InterfaceForTest("device-a", "198.51.100.1", "255.255.255.248", "2"),
+							l3InterfaceForTest("device-b", "198.51.100.2", "255.255.255.248", "3"),
+						},
+					},
+				},
+			},
+			wantStats: topologymodel.L3SubnetBuildStats{
+				CandidateSubnets:     1,
+				CandidateSegments:    1,
+				CandidateMemberships: 2,
+			},
+		},
 		"unsupported-prefix": {
 			rows: []topologymodel.L3Interface{
-				l3InterfaceForTest("device-a", "198.51.100.1", "255.255.255.0", "2"),
-				l3InterfaceForTest("device-b", "198.51.100.2", "255.255.255.0", "3"),
+				l3InterfaceForTest("device-a", "198.51.100.1", "255.255.254.0", "2"),
+				l3InterfaceForTest("device-b", "198.51.100.2", "255.255.254.0", "3"),
 			},
 			wantStats: topologymodel.L3SubnetBuildStats{
 				SuppressedUnsupportedPrefix: 2,
@@ -94,6 +146,15 @@ func TestBuildTopologyL3SubnetAdjacencies(t *testing.T) {
 				SuppressedUnmatched: 1,
 			},
 		},
+		"single-member-subnet-segment": {
+			rows: []topologymodel.L3Interface{
+				l3InterfaceForTest("device-a", "198.51.100.1", "255.255.255.0", "2"),
+			},
+			wantStats: topologymodel.L3SubnetBuildStats{
+				CandidateSubnets:           1,
+				SuppressedSegmentUnmatched: 1,
+			},
+		},
 		"multi-access-rows": {
 			rows: []topologymodel.L3Interface{
 				l3InterfaceForTest("device-a", "198.51.100.1", "255.255.255.252", "2"),
@@ -120,19 +181,24 @@ func TestBuildTopologyL3SubnetAdjacencies(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			links, stats := buildTopologyL3SubnetAdjacencies(tc.rows)
+			candidates, stats := buildTopologyL3SubnetCandidates(tc.rows)
 
-			if len(tc.wantLinks) == 0 {
-				require.Empty(t, links)
+			if len(tc.wantCandidates.Adjacencies) == 0 {
+				require.Empty(t, candidates.Adjacencies)
 			} else {
-				require.Equal(t, tc.wantLinks, links)
+				require.Equal(t, tc.wantCandidates.Adjacencies, candidates.Adjacencies)
+			}
+			if len(tc.wantCandidates.Segments) == 0 {
+				require.Empty(t, candidates.Segments)
+			} else {
+				require.Equal(t, tc.wantCandidates.Segments, candidates.Segments)
 			}
 			require.Equal(t, tc.wantStats, stats)
 		})
 	}
 }
 
-func TestBuildTopologyL3SubnetAdjacenciesDeterministic(t *testing.T) {
+func TestBuildTopologyL3SubnetCandidatesDeterministic(t *testing.T) {
 	rows := []topologymodel.L3Interface{
 		l3InterfaceForTest("device-d", "198.51.100.6", "255.255.255.252", "6"),
 		l3InterfaceForTest("device-b", "198.51.100.2", "255.255.255.252", "3"),
@@ -142,14 +208,14 @@ func TestBuildTopologyL3SubnetAdjacenciesDeterministic(t *testing.T) {
 	reversed := slices.Clone(rows)
 	slices.Reverse(reversed)
 
-	links, stats := buildTopologyL3SubnetAdjacencies(rows)
-	reversedLinks, reversedStats := buildTopologyL3SubnetAdjacencies(reversed)
+	candidates, stats := buildTopologyL3SubnetCandidates(rows)
+	reversedCandidates, reversedStats := buildTopologyL3SubnetCandidates(reversed)
 
-	require.Equal(t, links, reversedLinks)
+	require.Equal(t, candidates, reversedCandidates)
 	require.Equal(t, stats, reversedStats)
-	require.Len(t, links, 2)
-	require.Equal(t, "198.51.100.0/30", links[0].Subnet)
-	require.Equal(t, "198.51.100.4/30", links[1].Subnet)
+	require.Len(t, candidates.Adjacencies, 2)
+	require.Equal(t, "198.51.100.0/30", candidates.Adjacencies[0].Subnet)
+	require.Equal(t, "198.51.100.4/30", candidates.Adjacencies[1].Subnet)
 }
 
 func l3InterfaceForTest(deviceID, ip, netmask, ifIndex string) topologymodel.L3Interface {

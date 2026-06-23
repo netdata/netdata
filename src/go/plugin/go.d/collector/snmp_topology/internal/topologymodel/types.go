@@ -12,9 +12,16 @@ import (
 const SchemaVersion = "2.0"
 
 const (
-	L3SubnetLinkType      = "l3_subnet"
-	OSPFAdjacencyLinkType = "ospf_adjacency"
-	BGPAdjacencyLinkType  = "bgp_adjacency"
+	L3SubnetSegmentActorType   = "l3_subnet_segment"
+	L3SubnetLinkType           = "l3_subnet"
+	L3SubnetMembershipLinkType = "l3_subnet_membership"
+	OSPFAdjacencyLinkType      = "ospf_adjacency"
+	BGPAdjacencyLinkType       = "bgp_adjacency"
+)
+
+const (
+	SegmentKindBroadcastDomain = "broadcast_domain"
+	SegmentKindL3Subnet        = "l3_subnet"
 )
 
 type Match = graph.Match
@@ -39,9 +46,10 @@ type Link struct {
 }
 
 type LinkDetail struct {
-	L3Subnet *L3SubnetLinkDetail
-	OSPF     *OSPFAdjacencyLinkDetail
-	BGP      *BGPAdjacencyLinkDetail
+	L3Subnet           *L3SubnetLinkDetail
+	L3SubnetMembership *L3SubnetMembershipLinkDetail
+	OSPF               *OSPFAdjacencyLinkDetail
+	BGP                *BGPAdjacencyLinkDetail
 }
 
 type L3SubnetLinkDetail struct {
@@ -52,6 +60,22 @@ type L3SubnetLinkDetail struct {
 	Network string
 	Netmask string
 	Prefix  int
+}
+
+type L3SubnetMembershipLinkDetail struct {
+	Source     string
+	Subnet     string
+	Network    string
+	Netmask    string
+	Prefix     int
+	Interfaces []L3SubnetMembershipInterface
+}
+
+type L3SubnetMembershipInterface struct {
+	MemberIP string
+	IfIndex  int
+	IfName   string
+	IfDescr  string
 }
 
 type OSPFAdjacencyLinkDetail struct {
@@ -81,6 +105,7 @@ type BGPAdjacencyLinkDetail struct {
 type Actor struct {
 	ActorID     string
 	ActorType   string
+	SegmentKind string
 	Layer       string
 	Source      string
 	Match       Match

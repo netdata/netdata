@@ -20,10 +20,16 @@ func (a funcDepsAdapter) Snapshot(options topologyoptions.QueryOptions) (topolog
 		return topologyv1.Data{}, false, nil
 	}
 
-	options.ResolveDNSName = resolveTopologyReverseDNSNameNoop // never block on network I/O
+	dnsCandidates := a.registry.reverseDNSCandidateCollector()
+	if dnsCandidates != nil {
+		options.ResolveDNSName = dnsCandidates.lookupCached
+	}
 	data, ok := a.registry.snapshotWithOptions(options)
 	if !ok {
 		return topologyv1.Data{}, false, nil
+	}
+	if dnsCandidates != nil {
+		a.registry.enqueueReverseDNSWarm(dnsCandidates.collectedCandidates())
 	}
 
 	payload, err := topologyv1renderer.Render(data)

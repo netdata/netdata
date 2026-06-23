@@ -58,6 +58,13 @@ func nullableOptionalUint64Value(value topologyengine.OptionalValue[int64]) any 
 	return uint64(value.Value)
 }
 
+func nullableUintFromInt(value int) any {
+	if value <= 0 {
+		return nil
+	}
+	return uint64(value)
+}
+
 func uintValue(value any) (uint64, bool) {
 	switch typed := value.(type) {
 	case int:

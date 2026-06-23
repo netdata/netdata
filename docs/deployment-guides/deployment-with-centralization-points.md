@@ -204,6 +204,11 @@ flowchart TB
 
 </details><br/>
 
+## Connect your Parent to Netdata Cloud
+
+A Parent is a regular Netdata Agent. Once it is connected to Netdata Cloud using the standard claiming process, its Children can be directly queried and are registered to Netdata Cloud automatically. See the [Connect Agent to Cloud guide](/src/claim/README.md) for instructions.
+:::
+
 :::tip
 
 Check out our [Parent-Child Deployment Guide](/docs/deployment-guides/deployment-with-centralization-points.md) for step-by-step instructions.
