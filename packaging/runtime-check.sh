@@ -31,6 +31,94 @@ wait_for() {
   printf "OK\n"
 }
 
+skip_libexec_part() {
+    [ -n "${NETDATA_SKIP_LIBEXEC_PARTS}" ] && printf "%s\n" "${1}" | grep -qE "${NETDATA_SKIP_LIBEXEC_PARTS}"
+}
+
+find_netdata_systemd_unit() {
+    for unit in \
+        ${NETDATA_SYSTEMD_UNIT:-} \
+        /etc/systemd/system/netdata.service \
+        /usr/lib/systemd/system/netdata.service \
+        /lib/systemd/system/netdata.service \
+        /usr/local/lib/systemd/system/netdata.service; do
+        if [ -f "${unit}" ]; then
+            printf "%s\n" "${unit}"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+systemd_unit_capability_bounding_set() {
+    awk '
+        /^[[:space:]]*CapabilityBoundingSet[[:space:]]*=/ {
+            line = $0
+            sub(/^[^=]*=/, "", line)
+            count = split(line, caps, /[[:space:]]+/)
+            for (i = 1; i <= count; i++) {
+                if (caps[i] != "") {
+                    print caps[i]
+                }
+            }
+            found = 1
+        }
+        END {
+            if (!found) {
+                exit 1
+            }
+        }
+    ' "${1}"
+}
+
+check_systemd_capability_bounding_set() {
+    command -v getcap >/dev/null 2>&1 || return 0
+
+    systemd_unit="$(find_netdata_systemd_unit)" || return 0
+    bounding_caps="$(systemd_unit_capability_bounding_set "${systemd_unit}")" || return 0
+
+    cap_success=1
+    for part in ${NETDATA_LIBEXEC_PARTS}; do
+        if skip_libexec_part "${part}"; then
+            continue
+        fi
+
+        plugin="${NETDATA_LIBEXEC_PREFIX}/${part}"
+        if [ ! -f "${plugin}" ]; then
+            continue
+        fi
+
+        file_caps="$(getcap "${plugin}" 2>/dev/null || true)"
+        if [ -z "${file_caps}" ]; then
+            continue
+        fi
+
+        file_caps="${file_caps#* }"
+        for cap_spec in ${file_caps}; do
+            cap_names="${cap_spec%%[=+]*}"
+
+            old_ifs="${IFS}"
+            IFS=","
+            for cap_name in ${cap_names}; do
+                IFS="${old_ifs}"
+                cap_name="$(printf "%s" "${cap_name}" | tr "[:lower:]" "[:upper:]")"
+
+                if ! printf "%s\n" "${bounding_caps}" | grep -qx "${cap_name}"; then
+                    cap_success=0
+                    printf "!!! %s has file capability %s, but %s CapabilityBoundingSet does not allow it\n" \
+                        "${plugin}" "${cap_name}" "${systemd_unit}"
+                fi
+
+                IFS=","
+            done
+            IFS="${old_ifs}"
+        done
+    done
+
+    [ "${cap_success}" -eq 1 ]
+}
+
 wait_for localhost 19999 netdata
 
 case $? in
@@ -96,6 +184,10 @@ if [ -d "${NETDATA_LIBEXEC_PREFIX}" ]; then
         fi
     elif [ -f "${ebpf_plugin}" ] && [ ! -e "${ebpf_go_plugin}" ]; then
         :
+    fi
+
+    if ! check_systemd_capability_bounding_set; then
+        success=0
     fi
 
     if [ "${success}" -eq 0 ]; then
