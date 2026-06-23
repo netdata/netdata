@@ -262,19 +262,36 @@ bool websocket_client_decompress_message(WS_CLIENT *wsc) {
     zstrm->total_in = 0;
     zstrm->total_out = 0;
 
+    // Decompression-bomb guard: bound the output buffer by a maximum ratio over the
+    // compressed input (with a floor for small messages), in addition to the absolute
+    // WS_MAX_DECOMPRESSED_SIZE cap. Without this, a ~100-byte payload of repeated bytes
+    // can force the loop below to grow the buffer toward the 200MB ceiling (CWE-409).
+    size_t compressed_len = wsb_length(&wsc->payload);
+    size_t ratio_cap =
+        (compressed_len > WS_MAX_DECOMPRESSED_SIZE / WS_MAX_DECOMPRESSION_RATIO)
+            ? WS_MAX_DECOMPRESSED_SIZE
+            : compressed_len * WS_MAX_DECOMPRESSION_RATIO;
+    size_t max_decompressed = MIN(WS_MAX_DECOMPRESSED_SIZE, MAX(ratio_cap, WS_MIN_DECOMPRESSED_SIZE));
+
     // Decompress with loop for multiple buffer expansions if needed
     int ret = Z_MEM_ERROR;
     bool success = false;
     int retries = 24;
-    size_t wanted_size = MAX(wsb_size(&wsc->u_payload), wsb_length(&wsc->payload) * 2);
+    size_t wanted_size = MIN(MAX(wsb_size(&wsc->u_payload), compressed_len * 2), max_decompressed);
     do {
         wsb_resize(&wsc->u_payload, wanted_size);
 
         // Position next_out to point to the end of the currently decompressed data
-        zstrm->next_out = (Bytef *)wsb_data(&wsc->u_payload) + wsb_length(&wsc->u_payload);
+        size_t len_before = wsb_length(&wsc->u_payload);
+        zstrm->next_out = (Bytef *)wsb_data(&wsc->u_payload) + len_before;
 
-        // Only make the newly available space available to zlib
-        zstrm->avail_out = wsb_size(&wsc->u_payload) - wsb_length(&wsc->u_payload);
+        // Offer zlib the free space, but never let the decompressed output exceed
+        // max_decompressed - even if the physical buffer is larger. The buffer is
+        // grow-only (wsb_resize never shrinks) and may have been enlarged by a previous
+        // message on this connection (permessage-deflate context takeover), so capping
+        // avail_out here - not the buffer size - is what actually enforces the limit.
+        size_t offered = MIN(wsb_size(&wsc->u_payload) - len_before, max_decompressed - len_before);
+        zstrm->avail_out = offered;
 
         // Try to decompress
         ret = inflate(zstrm, Z_SYNC_FLUSH);
@@ -292,14 +309,23 @@ bool websocket_client_decompress_message(WS_CLIENT *wsc) {
         success = ret == Z_STREAM_END ||
             (zstrm->avail_in == 0 && zstrm->avail_out > 0 && (ret == Z_OK || ret == Z_BUF_ERROR));
 
-        // Update the buffer's length to include the newly written data
-        wsb_set_length(&wsc->u_payload, wsb_size(&wsc->u_payload) - zstrm->avail_out);
+        // Update the buffer's length to include the newly written data. We only offered
+        // 'offered' bytes, so the bytes written this pass are (offered - avail_out).
+        wsb_set_length(&wsc->u_payload, len_before + (offered - zstrm->avail_out));
 
         // Check if we need more output space
         if (!success && (ret == Z_BUF_ERROR || ret == Z_OK)) {
-            wanted_size = MIN(wanted_size * 2, WS_MAX_DECOMPRESSED_SIZE);
-            if (wanted_size == WS_MAX_DECOMPRESSED_SIZE && wanted_size == wsb_size(&wsc->u_payload))
-                break; // we cannot resize more
+            if (wsb_length(&wsc->u_payload) >= max_decompressed) {
+                // We have already produced max_decompressed bytes and the message is
+                // still not complete: either a decompression bomb or a message larger
+                // than we allow. Reject it (handled by the !success path below).
+                websocket_error(wsc,
+                                "Decompression aborted: %zu compressed bytes expand beyond the %zu byte limit "
+                                "(max ratio %llu:1) - possible decompression bomb",
+                                compressed_len, max_decompressed, WS_MAX_DECOMPRESSION_RATIO);
+                break;
+            }
+            wanted_size = MIN(wanted_size * 2, max_decompressed);
         }
     } while (!success && retries-- > 0);
 
@@ -340,4 +366,182 @@ bool websocket_client_decompress_message(WS_CLIENT *wsc) {
     zstrm->total_out = 0;
 
     return true;
+}
+
+// ---------------------------------------------------------------------------
+// Unit test: decompression-bomb guard (CWE-409)
+// ---------------------------------------------------------------------------
+//
+// Exercises websocket_client_decompress_message()'s ratio/floor cap, including the
+// grow-only-buffer regression: a previously decompressed large message enlarges
+// u_payload (wsb_resize never shrinks), and under permessage-deflate context
+// takeover the next tiny message must still be capped - the guard limits avail_out
+// per pass, not the physical buffer size.
+
+// Compress one message raw-deflate style and store it in 'out' the way the receiver
+// expects it: WITHOUT the trailing 4-byte 00 00 FF FF sync marker (the receiver
+// re-appends it). A persistent z_stream lets a sequence of messages share the
+// compression window, mirroring the inflate side's client_context_takeover.
+static bool ws_test_compress_msg(z_stream *def, const char *in, size_t in_len, WS_BUF *out) {
+    wsb_reset(out);
+    size_t bound = (size_t)deflateBound(def, (uLong)in_len) + 64;
+    wsb_resize(out, bound);
+
+    def->next_in = (Bytef *)in;
+    def->avail_in = (uInt)in_len;
+    def->next_out = (Bytef *)wsb_data(out);
+    def->avail_out = (uInt)bound;
+
+    int ret = deflate(def, Z_SYNC_FLUSH);
+    if ((ret != Z_OK && ret != Z_BUF_ERROR) || def->avail_in != 0)
+        return false;
+
+    size_t produced = bound - def->avail_out;
+    if (produced < 4)
+        return false;
+
+    // strip the 00 00 FF FF emitted by Z_SYNC_FLUSH (the receiver re-adds it)
+    wsb_set_length(out, produced - 4);
+    return true;
+}
+
+// Deterministic low-compressibility fill (xorshift32) so a "legit" large message is
+// accepted under the ratio cap and grows u_payload. Avoids Math.random()/time().
+static void ws_test_fill_incompressible(char *buf, size_t len) {
+    uint32_t x = 0x9e3779b9u;
+    for (size_t i = 0; i < len; i++) {
+        x ^= x << 13; x ^= x >> 17; x ^= x << 5;
+        buf[i] = (char)(x & 0xff);
+    }
+}
+
+// Build a fresh client + matching test compressor. Independent per case so a
+// rejection (which resets the inflate stream) cannot desync later cases.
+static WS_CLIENT *ws_test_client_create(WEBSOCKET_THREAD *wth, z_stream *def) {
+    WS_CLIENT *wsc = callocz(1, sizeof(*wsc));
+    wsc->wth = wth;
+    wsc->compression = WEBSOCKET_COMPRESSION_DEFAULTS;
+    wsc->compression.enabled = true;
+    wsc->is_compressed = true;
+
+    if (!websocket_decompression_init(wsc)) {
+        freez(wsc);
+        return NULL;
+    }
+
+    memset(def, 0, sizeof(*def));
+    if (deflateInit2(def, Z_DEFAULT_COMPRESSION, Z_DEFLATED,
+                     -wsc->compression.client_max_window_bits, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
+        websocket_decompression_cleanup(wsc);
+        freez(wsc);
+        return NULL;
+    }
+    return wsc;
+}
+
+static void ws_test_client_destroy(WS_CLIENT *wsc, z_stream *def) {
+    deflateEnd(def);
+    websocket_decompression_cleanup(wsc);
+    wsb_cleanup(&wsc->payload);
+    wsb_cleanup(&wsc->u_payload);
+    wsb_cleanup(&wsc->c_payload);
+    freez(wsc);
+}
+
+int websocket_compression_unittest(void) {
+    fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
+    int errors = 0;
+
+    WEBSOCKET_THREAD wth = { 0 };
+    wth.tid = gettid_cached(); // satisfy the collector-thread internal_fatal in decompress
+
+    // Case 1: a legit small message round-trips correctly (guard must not break normal traffic)
+    {
+        z_stream def;
+        WS_CLIENT *wsc = ws_test_client_create(&wth, &def);
+        if (!wsc) { fprintf(stderr, "  FAILED setup (case 1)\n"); return 1; }
+
+        char msg[4096];
+        ws_test_fill_incompressible(msg, sizeof(msg)); // < WS_MIN_DECOMPRESSED_SIZE, must pass
+        if (!ws_test_compress_msg(&def, msg, sizeof(msg), &wsc->payload)) {
+            fprintf(stderr, "  FAILED case1: test compressor error\n"); errors++;
+        }
+        else if (!websocket_client_decompress_message(wsc)) {
+            fprintf(stderr, "  FAILED case1: legit message rejected\n"); errors++;
+        }
+        else if (wsb_length(&wsc->u_payload) != sizeof(msg) ||
+                 memcmp(wsb_data(&wsc->u_payload), msg, sizeof(msg)) != 0) {
+            fprintf(stderr, "  FAILED case1: round-trip mismatch (%zu bytes)\n", wsb_length(&wsc->u_payload));
+            errors++;
+        }
+        ws_test_client_destroy(wsc, &def);
+    }
+
+    // Case 2: a tiny payload that inflates past the floor cap is rejected (classic bomb)
+    {
+        z_stream def;
+        WS_CLIENT *wsc = ws_test_client_create(&wth, &def);
+        if (!wsc) { fprintf(stderr, "  FAILED setup (case 2)\n"); return 1; }
+
+        size_t bomb_len = 4 * 1024 * 1024; // 4MB of zeros -> tiny compressed, cap = 1MB floor
+        char *bomb = callocz(1, bomb_len);
+        if (!ws_test_compress_msg(&def, bomb, bomb_len, &wsc->payload)) {
+            fprintf(stderr, "  FAILED case2: test compressor error\n"); errors++;
+        }
+        else if (websocket_client_decompress_message(wsc)) {
+            fprintf(stderr, "  FAILED case2: %zuB->%zuB bomb accepted (should be rejected)\n",
+                    wsb_length(&wsc->payload), wsb_length(&wsc->u_payload));
+            errors++;
+        }
+        freez(bomb);
+        ws_test_client_destroy(wsc, &def);
+    }
+
+    // Case 3 (regression): a legit large message grows u_payload, then a tiny bomb on the
+    // SAME client (context takeover) must STILL be rejected. Pre-fix, the retained large
+    // buffer let the bomb complete in one inflate pass and be accepted.
+    {
+        z_stream def;
+        WS_CLIENT *wsc = ws_test_client_create(&wth, &def);
+        if (!wsc) { fprintf(stderr, "  FAILED setup (case 3)\n"); return 1; }
+
+        // (a) legit large: ~4MB incompressible -> ratio ~1 -> accepted, grows u_payload
+        size_t big_len = 4 * 1024 * 1024;
+        char *big = mallocz(big_len);
+        ws_test_fill_incompressible(big, big_len);
+        bool a_ok = ws_test_compress_msg(&def, big, big_len, &wsc->payload) &&
+                    websocket_client_decompress_message(wsc);
+        size_t grown = wsb_size(&wsc->u_payload);
+        if (!a_ok) {
+            fprintf(stderr, "  FAILED case3a: legit large message rejected\n"); errors++;
+        }
+        else if (grown < big_len) {
+            fprintf(stderr, "  FAILED case3a: u_payload did not grow as expected (%zu)\n", grown); errors++;
+        }
+        freez(big);
+
+        // (b) tiny bomb on the same client: 4MB zeros -> cap 1MB -> must be rejected even
+        // though u_payload capacity is already ~4MB.
+        if (a_ok) {
+            size_t bomb_len = 4 * 1024 * 1024;
+            char *bomb = callocz(1, bomb_len);
+            if (!ws_test_compress_msg(&def, bomb, bomb_len, &wsc->payload)) {
+                fprintf(stderr, "  FAILED case3b: test compressor error\n"); errors++;
+            }
+            else if (websocket_client_decompress_message(wsc)) {
+                fprintf(stderr, "  FAILED case3b: bomb accepted despite retained %zuB buffer "
+                                "(grow-only bypass regression)\n", grown);
+                errors++;
+            }
+            freez(bomb);
+        }
+        ws_test_client_destroy(wsc, &def);
+    }
+
+    if (errors)
+        fprintf(stderr, "%s() FAILED with %d error(s)\n", __FUNCTION__, errors);
+    else
+        fprintf(stderr, "%s() passed\n", __FUNCTION__);
+
+    return errors ? 1 : 0;
 }

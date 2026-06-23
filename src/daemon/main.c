@@ -213,6 +213,7 @@ int buffer_unittest(void);
 int pgc_unittest(void);
 int mrg_unittest(void);
 int pluginsd_parser_unittest(void);
+int websocket_compression_unittest(void);
 void replication_initialize(void);
 void bearer_tokens_init(void);
 int unittest_stream_compressions(void);
@@ -430,6 +431,7 @@ int netdata_main(int argc, char **argv) {
                             rrdlabels_aral_init(false);
 
                             if (pluginsd_parser_unittest()) return 1;
+                            if (websocket_compression_unittest()) return 1;
                             if (unit_test_static_threads()) return 1;
                             if (unit_test_buffer()) return 1;
                             if (unit_test_str2ld()) return 1;
@@ -597,6 +599,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "parsertest") == 0) {
                             unittest_running = true;
                             return pluginsd_parser_unittest();
+                        }
+                        else if(strcmp(optarg, "websockettest") == 0) {
+                            unittest_running = true;
+                            return websocket_compression_unittest();
                         }
                         else if(strcmp(optarg, "stream_compressions_test") == 0) {
                             unittest_running = true;
