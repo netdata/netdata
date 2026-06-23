@@ -31,6 +31,7 @@ func (s *l2BuildState) registerObservation(obs model.L2Observation) error {
 		Hostname:  strings.TrimSpace(obs.Hostname),
 		SysObject: strings.TrimSpace(obs.SysObjectID),
 		ChassisID: strings.TrimSpace(obs.ChassisID),
+		Labels:    mergeObservedDeviceLabels(nil, obs.Labels),
 	}
 	if primaryMAC := primaryL2MACIdentity(obs.ChassisID, obs.BaseBridgeAddress); primaryMAC != "" {
 		device.ChassisID = primaryMAC
