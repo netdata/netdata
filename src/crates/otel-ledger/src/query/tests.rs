@@ -66,15 +66,22 @@ fn track_sfst(reg: &mut Registry, seq: u64, ns_hash: u64, min_s: u32, max_s: u32
 /// register it with the catalog registry. The entry's stream is
 /// always `("ns", "a")` to match `track_sfst`'s default.
 fn track_remote(reg: &mut Registry, seq: u64, min_s: u32, max_s: u32) {
+    track_remote_as(reg, seq, ServiceStream::new("ns", "a"), min_s, max_s);
+}
+
+/// Like [`track_remote`] but with a caller-chosen stream. The catalog entry's
+/// `id.ns_hash` matches the stream's hash, as production `build_catalog_entry`
+/// guarantees (it copies both `id` and `stream` from the same SFST).
+fn track_remote_as(reg: &mut Registry, seq: u64, stream: ServiceStream, min_s: u32, max_s: u32) {
     use chrono::NaiveDate;
     let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
     let entry = otel_catalog::CatalogEntry {
-        id: fid(seq, 0),
+        id: fid(seq, stream.ns_hash()),
         remote_key: format!("k{seq}"),
         min_timestamp_s: min_s,
         max_timestamp_s: max_s,
         total_logs: 1,
-        stream: ServiceStream::new("ns", "a"),
+        stream: stream.clone(),
         size: ByteSize(1),
         uploaded_at_ns: TimestampNs(0),
         remote_etag: None,
@@ -167,4 +174,82 @@ fn remote_candidates_excluded_by_time_range() {
 fn remote_candidates_empty_registry() {
     let reg = make_registry();
     assert!(reg.remote_candidates(&full_range_query()).is_empty());
+}
+
+// ── enumerate_streams_from (the window-scoped, remote-inclusive selector) ──
+
+/// Drive the selector fold the way the handler does: parse the in-window catalog
+/// and the time-only local mask, then fold.
+fn enumerate(reg: &Registry, q: &Query) -> Vec<crate::registry::StreamStat> {
+    let catalog: Vec<otel_catalog::CatalogEntry> = reg.catalog_files.candidates(q).collect();
+    reg.enumerate_streams_from(q, &catalog)
+}
+
+fn window(after: u32, before: u32) -> Query {
+    Query {
+        time_range: after..before,
+        stream_hashes: Vec::new(),
+    }
+}
+
+#[test]
+fn enumerate_streams_excludes_streams_outside_window() {
+    let mut reg = make_registry();
+    track_sfst(&mut reg, 1, 7, 100, 200);
+    // Window misses the only file → the stream is not listed (window-scoped).
+    assert!(enumerate(&reg, &window(500, 600)).is_empty());
+    // Window overlaps it → the stream appears.
+    assert_eq!(enumerate(&reg, &window(50, 250)).len(), 1);
+}
+
+#[test]
+fn enumerate_streams_includes_remote_only_stream() {
+    let mut reg = make_registry();
+    // An evicted-but-cataloged stream with in-window data, no local copy.
+    track_remote(&mut reg, 2, 100, 200);
+    let streams = enumerate(&reg, &window(50, 250));
+    assert_eq!(streams.len(), 1);
+    assert_eq!(streams[0].stream, ServiceStream::new("ns", "a"));
+    assert_eq!(streams[0].file_count, 1);
+}
+
+#[test]
+fn enumerate_streams_lists_local_and_remote_only_together() {
+    let mut reg = make_registry();
+    track_sfst(&mut reg, 1, 7, 100, 200); // local stream ns/a
+    track_remote_as(&mut reg, 2, ServiceStream::new("ns", "b"), 100, 200); // remote-only ns/b
+    let streams = enumerate(&reg, &window(50, 250));
+    assert_eq!(streams.len(), 2);
+    // Sorted by (namespace, name): a before b.
+    assert_eq!(streams[0].stream, ServiceStream::new("ns", "a"));
+    assert_eq!(streams[1].stream, ServiceStream::new("ns", "b"));
+}
+
+#[test]
+fn enumerate_streams_dedups_local_and_remote_same_seq() {
+    let mut reg = make_registry();
+    // Uploaded-but-not-yet-evicted: same seq exists locally AND in the catalog.
+    track_sfst(&mut reg, 1, 7, 100, 200);
+    track_remote(&mut reg, 1, 100, 200);
+    let streams = enumerate(&reg, &window(50, 250));
+    assert_eq!(streams.len(), 1);
+    // Counted once — the local SFST; the catalog entry for the same seq is masked.
+    assert_eq!(streams[0].file_count, 1);
+}
+
+#[test]
+fn enumerate_streams_dedups_wal_and_remote_same_seq() {
+    let mut reg = make_registry();
+    // `track_wal` produces a `valid_up_to == 0` WAL (Created+Closed, no Synced),
+    // which is NOT in the servable mask. A catalog entry for the SAME seq+stream
+    // must still be skipped because the WAL was folded — the dedup keys on the
+    // folded seqs, not the servable mask. (Robustness guard; the catalog-write
+    // lifecycle makes this WAL/catalog pairing unreachable in production. On the
+    // old servable-mask dedup this would double-count to file_count == 2.)
+    track_wal(&mut reg, 2, 7, 100, 200);
+    track_remote_as(&mut reg, 2, ServiceStream::new("ns", "svc"), 100, 200);
+    let streams = enumerate(&reg, &window(50, 250));
+    assert_eq!(streams.len(), 1);
+    assert_eq!(streams[0].stream, ServiceStream::new("ns", "svc"));
+    assert_eq!(streams[0].file_count, 1);
 }

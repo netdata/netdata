@@ -231,7 +231,13 @@ fn enumerate_streams_dedups_and_aggregates_sfst_and_unsealed_wal() {
             .unwrap();
     }
 
-    let streams = tr.enumerate_streams(&tenant);
+    // Full-range, time-only query (the selector lists all in-window streams,
+    // independent of any stream filter). Every file above is in range.
+    let full = file_registry::Query {
+        time_range: 0..u32::MAX,
+        stream_hashes: Vec::new(),
+    };
+    let streams = tr.enumerate_streams(&tenant, &full);
     assert_eq!(streams.len(), 2);
     // Sorted by (namespace, name): "" < "prod" → the absent-namespace
     // db stream comes first.
@@ -249,5 +255,5 @@ fn enumerate_streams_dedups_and_aggregates_sfst_and_unsealed_wal() {
     assert_eq!(streams[1].max_timestamp_s, Some(300));
 
     // Unknown tenant → empty list, never a panic.
-    assert!(tr.enumerate_streams(&TenantId::from("nope")).is_empty());
+    assert!(tr.enumerate_streams(&TenantId::from("nope"), &full).is_empty());
 }

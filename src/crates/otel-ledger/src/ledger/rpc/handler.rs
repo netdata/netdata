@@ -433,19 +433,44 @@ impl FunctionHandler for OtelLogsHandler {
         // once — every chunk and tail derives from this single value, so
         // the whole query sees one consistent durable prefix even as
         // ingestion advances it. Under the same lock, enumerate the
-        // tenant's streams (window-independent) for the selector control.
+        // tenant's streams (window-scoped) for the selector control, and parse
+        // the in-window catalog ONCE — shared by the selector and the remote
+        // fetch so we don't read+parse it twice under the lock.
         let (mut sfst_candidates, wal_descs, required_params, remote_cands) = {
             let guard = self.registries.read().await;
+            // The selector lists every stream in the window, independent of the
+            // user's current pick, so it uses a time-only query (empty
+            // stream_hashes); `q` carries the user's filter for the data query.
+            let stream_q = file_registry::Query {
+                time_range: time_range.clone(),
+                stream_hashes: Vec::new(),
+            };
             let q = file_registry::Query {
                 time_range: time_range.clone(),
                 stream_hashes,
             };
             let (sfsts, wals) = guard.query_snapshot(&tenant, &q);
-            let required_params = stream_required_params(guard.enumerate_streams(&tenant));
-            // Catalog entries for SFSTs evicted locally but present on remote —
-            // only when remote storage (and thus the read cache) is configured.
+            // Parse the in-window catalog ONLY when remote is configured:
+            // otherwise the selector would advertise evicted streams that can't
+            // be fetched, and a remote-disabled agent would pay a needless parse
+            // under the lock.
+            let catalog = if self.remote.is_some() {
+                guard.catalog_entries_in_window(&tenant, &stream_q)
+            } else {
+                Vec::new()
+            };
+            // The selector folds the local candidates + the (remote-only) catalog and
+            // computes its own per-seq dedup internally — it needs no servable mask.
+            let required_params = stream_required_params(
+                guard.enumerate_streams_from(&tenant, &stream_q, &catalog),
+            );
+            // The remote fetch masks the catalog by the servable-local seqs. Compute
+            // that mask only when remote is enabled (its sole consumer); a single
+            // time-only mask is sound to reuse for the stream-filtered fetch because
+            // one seq maps to exactly one stream.
             let remote_cands = if self.remote.is_some() {
-                guard.remote_candidates(&tenant, &q)
+                let local_seqs = guard.local_servable_seqs(&tenant, &stream_q);
+                guard.remote_candidates_from(&tenant, &q, &catalog, &local_seqs)
             } else {
                 Vec::new()
             };

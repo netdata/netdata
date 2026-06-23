@@ -1051,6 +1051,14 @@ fn track_remote_catalog(
     size: u64,
 ) {
     use chrono::NaiveDate;
+    let stream = ServiceStream::new("ns", "svc");
+    // Production `build_catalog_entry` copies both id and stream from one SFST, so
+    // the FileId's ns_hash always matches the stream's. Enforce it on the fixture.
+    assert_eq!(
+        id.ns_hash,
+        stream.ns_hash(),
+        "catalog fixture id.ns_hash must match its stream"
+    );
     let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
     let entry = otel_catalog::CatalogEntry {
         id,
@@ -1058,7 +1066,7 @@ fn track_remote_catalog(
         min_timestamp_s: min_s,
         max_timestamp_s: max_s,
         total_logs: 6,
-        stream: ServiceStream::new("ns", "svc"),
+        stream: stream.clone(),
         size: ByteSize(size),
         uploaded_at_ns: TimestampNs(0),
         remote_etag: None,
@@ -1096,8 +1104,14 @@ fn make_handler_with_remote(tr: TenantRegistries, remote: RemoteRead) -> OtelLog
 async fn remote_only_sfst_is_fetched_and_served() {
     let mut tr = make_tenant_registries();
 
-    // Build a real SFST's bytes; do NOT install it locally.
-    let id = FileId::new(Uuid::from_u128(0x11), Uuid::from_u128(0x22), 1, 7);
+    // Build a real SFST's bytes; do NOT install it locally. The FileId's ns_hash
+    // matches the stream (as production `build_catalog_entry` guarantees).
+    let id = FileId::new(
+        Uuid::from_u128(0x11),
+        Uuid::from_u128(0x22),
+        1,
+        ServiceStream::new("ns", "svc").ns_hash(),
+    );
     let min_s = 1_700_000_000u32;
     let sfst_tmp = tempfile::NamedTempFile::new().unwrap();
     write_test_sfst(sfst_tmp.path(), min_s);
@@ -1136,6 +1150,19 @@ async fn remote_only_sfst_is_fetched_and_served() {
         v["items"]["matched"], 6,
         "evicted remote SFST should be fetched and queried: {v:#}"
     );
+    // #5: the remote-only stream is advertised in the window-scoped selector
+    // (its data is fetchable, so the user can filter to it).
+    let streams = v["required_params"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"] == "__streams")
+        .and_then(|p| p["options"].as_array())
+        .expect("stream selector present");
+    assert!(
+        streams.iter().any(|o| o["name"] == "ns/svc"),
+        "remote-only stream must appear in the selector: {v:#}"
+    );
     // One remote-only SFST, no local sources: total = 0 local + 2*1 remote
     // (one download unit + one scan unit). `done` reaches both — the fetch
     // closure counted the download, the engine counted the scan. Without
@@ -1150,7 +1177,12 @@ async fn remote_only_sfst_is_fetched_and_served() {
 #[tokio::test]
 async fn remote_fetch_failure_degrades() {
     let mut tr = make_tenant_registries();
-    let id = FileId::new(Uuid::from_u128(0x11), Uuid::from_u128(0x22), 1, 7);
+    let id = FileId::new(
+        Uuid::from_u128(0x11),
+        Uuid::from_u128(0x22),
+        1,
+        ServiceStream::new("ns", "svc").ns_hash(),
+    );
     let min_s = 1_700_000_000u32;
     // Catalog entry points at a remote_key that does not exist in the backend.
     let remote_dir = tempfile::tempdir().unwrap().keep();

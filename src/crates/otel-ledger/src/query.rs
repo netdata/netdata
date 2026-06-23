@@ -21,27 +21,34 @@ impl Registry {
     /// `valid_up_to == 0` does not, because `query_snapshot` cannot serve it either.
     /// Deduped by seq; sorted by seq for determinism.
     pub fn remote_candidates(&self, q: &Query) -> Vec<otel_catalog::CatalogEntry> {
-        // Exclude seqs that have a local copy. WALs with no durable prefix
-        // (`valid_up_to == 0`) are NOT a servable local copy — `query_snapshot`
-        // skips them too — so they must not mask the remote entry.
-        let local_seqs: HashSet<u64> = self
-            .sfst
-            .candidates(q)
-            .map(|f| f.id.seq)
-            .chain(
-                self.wal
-                    .candidates(q)
-                    .filter(|f| f.valid_up_to.0 != 0)
-                    .map(|f| f.id.seq),
-            )
-            .collect();
-        // Dedup by seq (a seq may appear in more than one catalog file after
-        // recovery / re-cataloging), keeping a single entry per seq.
+        let catalog: Vec<otel_catalog::CatalogEntry> = self.catalog_files.candidates(q).collect();
+        let local_seqs = self.local_servable_seqs(q);
+        self.remote_candidates_from(q, &catalog, &local_seqs)
+    }
+
+    /// Remote-only catalog entries from a pre-parsed in-window `catalog` (the
+    /// 3b "parse once" path): the entries matching `q`'s stream filter whose seq
+    /// has no servable local copy (`local_seqs`), deduped by seq and sorted by seq.
+    ///
+    /// `local_seqs` may be computed time-only (all streams) and still be correct
+    /// here: one seq maps to exactly one file and one stream (`build_catalog_entry`
+    /// copies both `id` and `stream` from the same SFST), so a stream-matching
+    /// entry whose seq is locally served is served by that same stream — the
+    /// time-only and stream-filtered masks agree on every entry the stream filter
+    /// keeps. `catalog` parsed time-only means the stream filter is NOT applied
+    /// during parsing, so it is reapplied here via `q.matches_stream`.
+    pub fn remote_candidates_from(
+        &self,
+        q: &Query,
+        catalog: &[otel_catalog::CatalogEntry],
+        local_seqs: &HashSet<u64>,
+    ) -> Vec<otel_catalog::CatalogEntry> {
         let mut seen: HashSet<u64> = HashSet::new();
-        let mut out: Vec<otel_catalog::CatalogEntry> = self
-            .catalog_files
-            .candidates(q)
+        let mut out: Vec<otel_catalog::CatalogEntry> = catalog
+            .iter()
+            .filter(|e| q.matches_stream(e.stream.ns_hash()))
             .filter(|e| !local_seqs.contains(&e.id.seq) && seen.insert(e.id.seq))
+            .cloned()
             .collect();
         out.sort_by_key(|e| e.id.seq);
         out

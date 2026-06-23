@@ -94,6 +94,24 @@ config (`config/logs.rs`, `config/env.rs`), `netdata-plugin/bridge` config
 - Cache filenames are the SFST `FileId` encoding (content-stable), never the remote
   key, so the cache's path-traversal guard is belt-and-suspenders.
 
+## Stream selector (query path)
+
+- The otel-logs "Services" stream selector (`required_params.__streams`) is
+  **window-scoped and remote-inclusive**: it lists exactly the streams with data in
+  the query window — local files **plus** remote-only (evicted-but-cataloged)
+  streams — so a stream quiet in the window is omitted, and an evicted stream whose
+  data is still fetchable is offered. (This deliberately diverges from the former
+  window-independent behavior.)
+- `Registry::enumerate_streams_from` folds the in-window local SFST/WAL candidates
+  and the in-window catalog entries (keyed on the stream's `ns_hash`), skipping a
+  catalog seq already served locally. The catalog is folded **only when remote is
+  enabled** — otherwise the selector would advertise streams that cannot be fetched.
+- The handler parses the in-window catalog **once** and shares it (plus a single
+  time-only `local_seqs` mask) between the selector and the remote fetch, avoiding a
+  second parse under the read lock. The shared time-only mask is correct because one
+  seq maps to exactly one file and one stream (`build_catalog_entry` copies both the
+  id and the stream from the same SFST).
+
 ## Non-goals
 
 - Modeling per-backend options in `otel.yaml`.
