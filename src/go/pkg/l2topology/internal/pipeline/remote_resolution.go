@@ -5,6 +5,8 @@ package pipeline
 import (
 	"net/netip"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 )
 
 func (s *l2BuildState) isMACCompatibleWithDevice(deviceID, remoteMAC string) bool {
@@ -90,7 +92,7 @@ func (s *l2BuildState) resolveRemoteWithHostnameMACGuard(hostname, chassisID, mg
 			generatedID = deriveRemoteDeviceID("", remoteMAC, mgmtIP, fallbackID)
 		}
 		if _, ok := s.devices[generatedID]; !ok {
-			device := Device{
+			device := model.Device{
 				ID:        generatedID,
 				Hostname:  strings.TrimSpace(hostname),
 				SysObject: "",
@@ -134,7 +136,7 @@ func (s *l2BuildState) resolveRemoteWithHostnameMACGuard(hostname, chassisID, mg
 
 	generatedID := deriveRemoteDeviceID(hostname, chassisID, mgmtIP, fallbackID)
 	if _, ok := s.devices[generatedID]; !ok {
-		device := Device{
+		device := model.Device{
 			ID:        generatedID,
 			Hostname:  strings.TrimSpace(hostname),
 			SysObject: "",

@@ -2,7 +2,11 @@
 
 package pipeline
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
+)
 
 const (
 	fdbStatusLearned = "learned"
@@ -12,10 +16,10 @@ const (
 
 // BuildL2ResultFromObservations converts normalized L2 observations into a
 // deterministic L2 topology result. Callers that need a stable timestamp should
-// set DiscoverOptions.CollectedAt explicitly.
-func BuildL2ResultFromObservations(observations []L2Observation, opts DiscoverOptions) (Result, error) {
+// set model.DiscoverOptions.CollectedAt explicitly.
+func BuildL2ResultFromObservations(observations []model.L2Observation, opts model.DiscoverOptions) (model.Result, error) {
 	if len(observations) == 0 {
-		return Result{}, errors.New("at least one observation is required")
+		return model.Result{}, errors.New("at least one observation is required")
 	}
 	if !opts.EnableLLDP && !opts.EnableCDP && !opts.EnableBridge && !opts.EnableARP && !opts.EnableSTP {
 		opts.EnableLLDP = true
@@ -24,7 +28,7 @@ func BuildL2ResultFromObservations(observations []L2Observation, opts DiscoverOp
 
 	state := newL2BuildState(len(observations))
 	if err := state.registerObservations(observations); err != nil {
-		return Result{}, err
+		return model.Result{}, err
 	}
 	if opts.EnableLLDP {
 		state.applyLLDP(observations)

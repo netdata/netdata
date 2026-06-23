@@ -6,20 +6,21 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/stretchr/testify/require"
 )
 
 func TestBuildL2ResultFromObservations_LLDPAndCDP(t *testing.T) {
-	observations := []L2Observation{
+	observations := []model.L2Observation{
 		{
 			DeviceID:     "switch-a",
 			Hostname:     "switch-a.example.net",
 			ManagementIP: "10.0.0.1",
 			ChassisID:    "aa:bb:cc:dd:ee:ff",
-			Interfaces: []ObservedInterface{
+			Interfaces: []model.ObservedInterface{
 				{IfIndex: 8, IfName: "Gi0/0", IfDescr: "Gi0/0"},
 			},
-			LLDPRemotes: []LLDPRemoteObservation{
+			LLDPRemotes: []model.LLDPRemoteObservation{
 				{
 					LocalPortNum: "8",
 					RemoteIndex:  "1",
@@ -30,7 +31,7 @@ func TestBuildL2ResultFromObservations_LLDPAndCDP(t *testing.T) {
 					ManagementIP: "10.0.0.2",
 				},
 			},
-			CDPRemotes: []CDPRemoteObservation{
+			CDPRemotes: []model.CDPRemoteObservation{
 				{
 					LocalIfIndex: 8,
 					LocalIfName:  "Gi0/0",
@@ -45,13 +46,13 @@ func TestBuildL2ResultFromObservations_LLDPAndCDP(t *testing.T) {
 			Hostname:     "switch-b.example.net",
 			ManagementIP: "10.0.0.2",
 			ChassisID:    "bb:cc:dd:ee:ff:00",
-			Interfaces: []ObservedInterface{
+			Interfaces: []model.ObservedInterface{
 				{IfIndex: 9, IfName: "Gi0/1", IfDescr: "Gi0/1"},
 			},
 		},
 	}
 
-	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableLLDP: true, EnableCDP: true})
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableLLDP: true, EnableCDP: true})
 	require.NoError(t, err)
 	require.Len(t, result.Devices, 2)
 	require.Len(t, result.Interfaces, 2)
@@ -69,12 +70,12 @@ func TestBuildL2ResultFromObservations_LLDPAndCDP(t *testing.T) {
 }
 
 func TestBuildL2ResultFromObservations_DefaultProtocols(t *testing.T) {
-	observations := []L2Observation{
+	observations := []model.L2Observation{
 		{
 			DeviceID:     "switch-a",
 			Hostname:     "switch-a",
 			ManagementIP: "10.0.0.1",
-			CDPRemotes: []CDPRemoteObservation{
+			CDPRemotes: []model.CDPRemoteObservation{
 				{
 					LocalIfIndex: 8,
 					DeviceIndex:  "1",
@@ -89,7 +90,7 @@ func TestBuildL2ResultFromObservations_DefaultProtocols(t *testing.T) {
 		},
 	}
 
-	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{})
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{})
 	require.NoError(t, err)
 	require.Len(t, result.Adjacencies, 1)
 	require.Equal(t, "switch-b", result.Adjacencies[0].TargetID)
@@ -100,22 +101,22 @@ func TestBuildL2ResultFromObservations_DefaultProtocols(t *testing.T) {
 func TestBuildL2ResultFromObservations_UsesProvidedCollectedAt(t *testing.T) {
 	collectedAt := time.Date(2026, time.April, 2, 0, 0, 0, 0, time.UTC)
 
-	result, err := BuildL2ResultFromObservations([]L2Observation{
+	result, err := BuildL2ResultFromObservations([]model.L2Observation{
 		{
 			DeviceID: "switch-a",
 			Hostname: "switch-a.example.net",
 		},
-	}, DiscoverOptions{CollectedAt: collectedAt})
+	}, model.DiscoverOptions{CollectedAt: collectedAt})
 	require.NoError(t, err)
 	require.Equal(t, collectedAt, result.CollectedAt)
 }
 
 func TestBuildL2ResultFromObservations_InterfaceStatusLabels(t *testing.T) {
-	observations := []L2Observation{
+	observations := []model.L2Observation{
 		{
 			DeviceID: "switch-a",
 			Hostname: "switch-a",
-			Interfaces: []ObservedInterface{
+			Interfaces: []model.ObservedInterface{
 				{
 					IfIndex:       8,
 					IfName:        "Gi0/0",
@@ -133,7 +134,7 @@ func TestBuildL2ResultFromObservations_InterfaceStatusLabels(t *testing.T) {
 		},
 	}
 
-	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{})
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{})
 	require.NoError(t, err)
 	require.Len(t, result.Interfaces, 1)
 	require.Equal(t, "ethernetcsmacd", result.Interfaces[0].Labels["if_type"])
@@ -147,28 +148,28 @@ func TestBuildL2ResultFromObservations_InterfaceStatusLabels(t *testing.T) {
 }
 
 func TestBuildL2ResultFromObservations_DeviceProtocolsObservedLabel(t *testing.T) {
-	observations := []L2Observation{
+	observations := []model.L2Observation{
 		{
 			DeviceID:     "switch-a",
 			Hostname:     "switch-a",
 			ManagementIP: "10.0.0.1",
-			BridgePorts: []BridgePortObservation{
+			BridgePorts: []model.BridgePortObservation{
 				{BasePort: "3", IfIndex: 3},
 			},
-			FDBEntries: []FDBObservation{
+			FDBEntries: []model.FDBObservation{
 				{MAC: "70:49:a2:65:72:cd", BridgePort: "3", Status: "learned"},
 			},
-			ARPNDEntries: []ARPNDObservation{
+			ARPNDEntries: []model.ARPNDObservation{
 				{IfIndex: 3, IP: "10.0.0.20", MAC: "70:49:a2:65:72:cd", Protocol: "arp"},
 			},
 			// Collected STP row that does not form a usable topology edge.
-			STPPorts: []STPPortObservation{
+			STPPorts: []model.STPPortObservation{
 				{Port: "3", DesignatedBridge: "00:11:22:33:44:55"},
 			},
 		},
 	}
 
-	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{
 		EnableBridge: true,
 		EnableARP:    true,
 		EnableSTP:    true,
@@ -179,27 +180,27 @@ func TestBuildL2ResultFromObservations_DeviceProtocolsObservedLabel(t *testing.T
 }
 
 func TestBuildL2ResultFromObservations_MergesDuplicateDeviceObservations(t *testing.T) {
-	observations := []L2Observation{
+	observations := []model.L2Observation{
 		{
 			DeviceID:     "switch-a",
 			Hostname:     "switch-a.example.net",
 			ManagementIP: "10.0.0.1",
 			SysObjectID:  "1.3.6.1.4.1.9.1.1",
 			ChassisID:    "aa:bb:cc:dd:ee:ff",
-			BridgePorts: []BridgePortObservation{
+			BridgePorts: []model.BridgePortObservation{
 				{BasePort: "3", IfIndex: 3},
 			},
 		},
 		{
 			DeviceID:     "switch-a",
 			ManagementIP: "10.0.0.2",
-			ARPNDEntries: []ARPNDObservation{
+			ARPNDEntries: []model.ARPNDObservation{
 				{IfIndex: 3, IP: "10.0.0.20", MAC: "70:49:a2:65:72:cd", Protocol: "arp"},
 			},
 		},
 	}
 
-	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{
 		EnableBridge: true,
 		EnableARP:    true,
 	})
@@ -215,13 +216,13 @@ func TestBuildL2ResultFromObservations_MergesDuplicateDeviceObservations(t *test
 }
 
 func TestBuildL2ResultFromObservations_SkipsSelfAdjacencies(t *testing.T) {
-	observations := []L2Observation{
+	observations := []model.L2Observation{
 		{
 			DeviceID:     "dw",
 			Hostname:     "dw",
 			ManagementIP: "10.104.133.114",
 			ChassisID:    "cf",
-			LLDPRemotes: []LLDPRemoteObservation{
+			LLDPRemotes: []model.LLDPRemoteObservation{
 				{
 					LocalPortNum: "1",
 					RemoteIndex:  "1",
@@ -231,7 +232,7 @@ func TestBuildL2ResultFromObservations_SkipsSelfAdjacencies(t *testing.T) {
 					PortID:       "CF",
 				},
 			},
-			CDPRemotes: []CDPRemoteObservation{
+			CDPRemotes: []model.CDPRemoteObservation{
 				{
 					LocalIfIndex: 1,
 					LocalIfName:  "CF",
@@ -245,7 +246,7 @@ func TestBuildL2ResultFromObservations_SkipsSelfAdjacencies(t *testing.T) {
 		},
 	}
 
-	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableLLDP: true, EnableCDP: true})
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableLLDP: true, EnableCDP: true})
 	require.NoError(t, err)
 	require.Len(t, result.Devices, 1)
 	require.Empty(t, result.Adjacencies)
@@ -255,12 +256,12 @@ func TestBuildL2ResultFromObservations_SkipsSelfAdjacencies(t *testing.T) {
 }
 
 func TestBuildL2ResultFromObservations_CDPSysNameAndDeviceID(t *testing.T) {
-	observations := []L2Observation{
+	observations := []model.L2Observation{
 		{
 			DeviceID:     "switch-a",
 			Hostname:     "switch-a",
 			ManagementIP: "10.0.0.1",
-			CDPRemotes: []CDPRemoteObservation{
+			CDPRemotes: []model.CDPRemoteObservation{
 				{
 					LocalIfIndex: 1,
 					DeviceIndex:  "1",
@@ -273,14 +274,14 @@ func TestBuildL2ResultFromObservations_CDPSysNameAndDeviceID(t *testing.T) {
 		},
 	}
 
-	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableCDP: true})
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableCDP: true})
 	require.NoError(t, err)
 	require.Len(t, result.Devices, 2)
 	require.Len(t, result.Adjacencies, 1)
 	require.Equal(t, "distribution-sw", result.Adjacencies[0].TargetID)
 
-	var remote Device
-	var local Device
+	var remote model.Device
+	var local model.Device
 	for _, dev := range result.Devices {
 		if dev.ID == "distribution-sw" {
 			remote = dev
@@ -298,17 +299,17 @@ func TestBuildL2ResultFromObservations_CDPSysNameAndDeviceID(t *testing.T) {
 }
 
 func TestBuildL2ResultFromObservations_FDBAttachments(t *testing.T) {
-	observations := []L2Observation{
+	observations := []model.L2Observation{
 		{
 			DeviceID: "switch-a",
 			Hostname: "switch-a",
-			Interfaces: []ObservedInterface{
+			Interfaces: []model.ObservedInterface{
 				{IfIndex: 3, IfName: "Port3", IfDescr: "Port3"},
 			},
-			BridgePorts: []BridgePortObservation{
+			BridgePorts: []model.BridgePortObservation{
 				{BasePort: "7", IfIndex: 3},
 			},
-			FDBEntries: []FDBObservation{
+			FDBEntries: []model.FDBObservation{
 				{MAC: "7049a26572cd", BridgePort: "7", Status: "learned"},
 				{MAC: "70:49:a2:65:72:ce", BridgePort: "7", Status: "learned"},
 				{MAC: "70:49:a2:65:72:cd", BridgePort: "7", Status: "learned"},
@@ -316,7 +317,7 @@ func TestBuildL2ResultFromObservations_FDBAttachments(t *testing.T) {
 		},
 	}
 
-	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableBridge: true})
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableBridge: true})
 	require.NoError(t, err)
 	require.Empty(t, result.Adjacencies)
 	require.Len(t, result.Attachments, 2)
@@ -337,15 +338,15 @@ func TestBuildL2ResultFromObservations_FDBAttachments(t *testing.T) {
 }
 
 func TestBuildL2ResultFromObservations_FDBDropsDuplicateMACAcrossPorts(t *testing.T) {
-	observations := []L2Observation{
+	observations := []model.L2Observation{
 		{
 			DeviceID: "switch-a",
 			Hostname: "switch-a",
-			BridgePorts: []BridgePortObservation{
+			BridgePorts: []model.BridgePortObservation{
 				{BasePort: "1", IfIndex: 1},
 				{BasePort: "2", IfIndex: 2},
 			},
-			FDBEntries: []FDBObservation{
+			FDBEntries: []model.FDBObservation{
 				{MAC: "70:49:a2:65:72:cd", BridgePort: "1", Status: "learned"},
 				{MAC: "70:49:a2:65:72:cd", BridgePort: "2", Status: "learned"},
 				{MAC: "70:49:a2:65:72:ce", BridgePort: "2", Status: "learned"},
@@ -353,7 +354,7 @@ func TestBuildL2ResultFromObservations_FDBDropsDuplicateMACAcrossPorts(t *testin
 		},
 	}
 
-	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableBridge: true})
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableBridge: true})
 	require.NoError(t, err)
 	require.Len(t, result.Attachments, 1)
 	require.Equal(t, "mac:70:49:a2:65:72:ce", result.Attachments[0].EndpointID)
@@ -361,22 +362,22 @@ func TestBuildL2ResultFromObservations_FDBDropsDuplicateMACAcrossPorts(t *testin
 }
 
 func TestBuildL2ResultFromObservations_FDBKeepsSameMACAcrossPortsWhenVLANDiffers(t *testing.T) {
-	observations := []L2Observation{
+	observations := []model.L2Observation{
 		{
 			DeviceID: "switch-a",
 			Hostname: "switch-a",
-			BridgePorts: []BridgePortObservation{
+			BridgePorts: []model.BridgePortObservation{
 				{BasePort: "1", IfIndex: 1},
 				{BasePort: "2", IfIndex: 2},
 			},
-			FDBEntries: []FDBObservation{
+			FDBEntries: []model.FDBObservation{
 				{MAC: "70:49:a2:65:72:cd", BridgePort: "1", Status: "learned", VLANID: "10"},
 				{MAC: "70:49:a2:65:72:cd", BridgePort: "2", Status: "learned", VLANID: "20"},
 			},
 		},
 	}
 
-	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableBridge: true})
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableBridge: true})
 	require.NoError(t, err)
 	require.Len(t, result.Attachments, 2)
 
@@ -389,16 +390,16 @@ func TestBuildL2ResultFromObservations_FDBKeepsSameMACAcrossPortsWhenVLANDiffers
 }
 
 func TestBuildL2ResultFromObservations_FDBSkipsSelfAndNonLearned(t *testing.T) {
-	observations := []L2Observation{
+	observations := []model.L2Observation{
 		{
 			DeviceID: "switch-a",
 			Hostname: "switch-a",
-			BridgePorts: []BridgePortObservation{
+			BridgePorts: []model.BridgePortObservation{
 				{BasePort: "1", IfIndex: 1},
 				{BasePort: "2", IfIndex: 2},
 				{BasePort: "3", IfIndex: 3},
 			},
-			FDBEntries: []FDBObservation{
+			FDBEntries: []model.FDBObservation{
 				{MAC: "00:11:22:33:44:55", BridgePort: "1", Status: "self"},
 				{MAC: "00:11:22:33:44:55", BridgePort: "2", Status: "learned"},
 				{MAC: "00:aa:bb:cc:dd:ee", BridgePort: "2", Status: "mgmt"},
@@ -407,7 +408,7 @@ func TestBuildL2ResultFromObservations_FDBSkipsSelfAndNonLearned(t *testing.T) {
 		},
 	}
 
-	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableBridge: true})
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableBridge: true})
 	require.NoError(t, err)
 	require.Len(t, result.Attachments, 1)
 	require.Equal(t, "mac:00:ff:ee:dd:cc:bb", result.Attachments[0].EndpointID)
@@ -415,18 +416,18 @@ func TestBuildL2ResultFromObservations_FDBSkipsSelfAndNonLearned(t *testing.T) {
 }
 
 func TestBuildL2ResultFromObservations_STPAdjacency(t *testing.T) {
-	observations := []L2Observation{
+	observations := []model.L2Observation{
 		{
 			DeviceID:          "switch-a",
 			Hostname:          "switch-a",
 			BaseBridgeAddress: "00:11:22:33:44:55",
-			Interfaces: []ObservedInterface{
+			Interfaces: []model.ObservedInterface{
 				{IfIndex: 3, IfName: "Port3", IfDescr: "Port3"},
 			},
-			BridgePorts: []BridgePortObservation{
+			BridgePorts: []model.BridgePortObservation{
 				{BasePort: "3", IfIndex: 3},
 			},
-			STPPorts: []STPPortObservation{
+			STPPorts: []model.STPPortObservation{
 				{
 					Port:             "3",
 					VLANID:           "200",
@@ -444,7 +445,7 @@ func TestBuildL2ResultFromObservations_STPAdjacency(t *testing.T) {
 		},
 	}
 
-	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableSTP: true})
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableSTP: true})
 	require.NoError(t, err)
 	require.Len(t, result.Adjacencies, 1)
 	require.Equal(t, "stp", result.Adjacencies[0].Protocol)
@@ -457,18 +458,18 @@ func TestBuildL2ResultFromObservations_STPAdjacency(t *testing.T) {
 }
 
 func TestBuildL2ResultFromObservations_STPDoesNotCreateSyntheticActors(t *testing.T) {
-	observations := []L2Observation{
+	observations := []model.L2Observation{
 		{
 			DeviceID:          "switch-a",
 			Hostname:          "switch-a",
 			BaseBridgeAddress: "00:11:22:33:44:55",
-			Interfaces: []ObservedInterface{
+			Interfaces: []model.ObservedInterface{
 				{IfIndex: 3, IfName: "Port3", IfDescr: "Port3"},
 			},
-			BridgePorts: []BridgePortObservation{
+			BridgePorts: []model.BridgePortObservation{
 				{BasePort: "3", IfIndex: 3},
 			},
-			STPPorts: []STPPortObservation{
+			STPPorts: []model.STPPortObservation{
 				{
 					Port:             "3",
 					DesignatedBridge: "66:77:88:99:aa:bb",
@@ -479,7 +480,7 @@ func TestBuildL2ResultFromObservations_STPDoesNotCreateSyntheticActors(t *testin
 		},
 	}
 
-	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableSTP: true})
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableSTP: true})
 	require.NoError(t, err)
 	require.Len(t, result.Devices, 1)
 	require.Empty(t, result.Adjacencies)
@@ -487,17 +488,17 @@ func TestBuildL2ResultFromObservations_STPDoesNotCreateSyntheticActors(t *testin
 }
 
 func TestBuildL2ResultFromObservations_FDBBridgeDomainFallbackToBridgePort(t *testing.T) {
-	observations := []L2Observation{
+	observations := []model.L2Observation{
 		{
 			DeviceID: "switch-a",
 			Hostname: "switch-a",
-			FDBEntries: []FDBObservation{
+			FDBEntries: []model.FDBObservation{
 				{MAC: "70:49:a2:65:72:cd", BridgePort: "77", Status: "learned"},
 			},
 		},
 	}
 
-	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableBridge: true})
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableBridge: true})
 	require.NoError(t, err)
 	require.Len(t, result.Attachments, 1)
 	require.Equal(t, 0, result.Attachments[0].IfIndex)
@@ -505,31 +506,31 @@ func TestBuildL2ResultFromObservations_FDBBridgeDomainFallbackToBridgePort(t *te
 }
 
 func TestBuildL2ResultFromObservations_FDBVLANNameLabel(t *testing.T) {
-	observations := []L2Observation{
+	observations := []model.L2Observation{
 		{
 			DeviceID: "switch-a",
 			Hostname: "switch-a",
-			BridgePorts: []BridgePortObservation{
+			BridgePorts: []model.BridgePortObservation{
 				{BasePort: "7", IfIndex: 3},
 			},
-			FDBEntries: []FDBObservation{
+			FDBEntries: []model.FDBObservation{
 				{MAC: "70:49:a2:65:72:cd", BridgePort: "7", Status: "learned", VLANID: "200", VLANName: "servers"},
 			},
 		},
 	}
 
-	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableBridge: true})
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableBridge: true})
 	require.NoError(t, err)
 	require.Len(t, result.Attachments, 1)
 	require.Equal(t, "servers", result.Attachments[0].Labels["vlan_name"])
 }
 
 func TestBuildL2ResultFromObservations_BridgeOnlyDoesNotAutoEnableDiscoveryProtocols(t *testing.T) {
-	observations := []L2Observation{
+	observations := []model.L2Observation{
 		{
 			DeviceID: "switch-a",
 			Hostname: "switch-a",
-			LLDPRemotes: []LLDPRemoteObservation{
+			LLDPRemotes: []model.LLDPRemoteObservation{
 				{
 					LocalPortNum: "1",
 					LocalPortID:  "Gi0/1",
@@ -537,10 +538,10 @@ func TestBuildL2ResultFromObservations_BridgeOnlyDoesNotAutoEnableDiscoveryProto
 					PortID:       "Gi0/2",
 				},
 			},
-			BridgePorts: []BridgePortObservation{
+			BridgePorts: []model.BridgePortObservation{
 				{BasePort: "1", IfIndex: 1},
 			},
-			FDBEntries: []FDBObservation{
+			FDBEntries: []model.FDBObservation{
 				{MAC: "70:49:a2:65:72:cd", BridgePort: "1"},
 			},
 		},
@@ -550,18 +551,18 @@ func TestBuildL2ResultFromObservations_BridgeOnlyDoesNotAutoEnableDiscoveryProto
 		},
 	}
 
-	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableBridge: true})
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableBridge: true})
 	require.NoError(t, err)
 	require.Empty(t, result.Adjacencies)
 	require.Len(t, result.Attachments, 1)
 }
 
 func TestBuildL2ResultFromObservations_ARPNDEnrichment(t *testing.T) {
-	observations := []L2Observation{
+	observations := []model.L2Observation{
 		{
 			DeviceID: "switch-a",
 			Hostname: "switch-a",
-			ARPNDEntries: []ARPNDObservation{
+			ARPNDEntries: []model.ARPNDObservation{
 				{
 					Protocol: "arp",
 					IfIndex:  3,
@@ -584,7 +585,7 @@ func TestBuildL2ResultFromObservations_ARPNDEnrichment(t *testing.T) {
 		},
 	}
 
-	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableARP: true})
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableARP: true})
 	require.NoError(t, err)
 	require.Empty(t, result.Adjacencies)
 	require.Empty(t, result.Attachments)
@@ -607,11 +608,11 @@ func TestBuildL2ResultFromObservations_ARPNDEnrichment(t *testing.T) {
 }
 
 func TestBuildL2ResultFromObservations_SkipsMACLessARPNDEntries(t *testing.T) {
-	observations := []L2Observation{
+	observations := []model.L2Observation{
 		{
 			DeviceID: "switch-a",
 			Hostname: "switch-a",
-			ARPNDEntries: []ARPNDObservation{
+			ARPNDEntries: []model.ARPNDObservation{
 				{
 					Protocol: "arp",
 					IfIndex:  7,
@@ -633,7 +634,7 @@ func TestBuildL2ResultFromObservations_SkipsMACLessARPNDEntries(t *testing.T) {
 		},
 	}
 
-	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableARP: true})
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableARP: true})
 	require.NoError(t, err)
 	require.Len(t, result.Enrichments, 1)
 	require.Equal(t, "mac:70:49:a2:65:72:cf", result.Enrichments[0].EndpointID)
@@ -642,13 +643,13 @@ func TestBuildL2ResultFromObservations_SkipsMACLessARPNDEntries(t *testing.T) {
 }
 
 func TestBuildL2ResultFromObservations_ReconcilesARPAliasIntoLLDPDeviceIdentity(t *testing.T) {
-	observations := []L2Observation{
+	observations := []model.L2Observation{
 		{
 			DeviceID:     "mikrotik-router",
 			Hostname:     "MikroTik-router",
 			ManagementIP: "10.20.4.1",
 			ChassisID:    "18:fd:74:7e:c5:80",
-			LLDPRemotes: []LLDPRemoteObservation{
+			LLDPRemotes: []model.LLDPRemoteObservation{
 				{
 					LocalPortNum:       "5",
 					LocalPortID:        "ether5",
@@ -660,7 +661,7 @@ func TestBuildL2ResultFromObservations_ReconcilesARPAliasIntoLLDPDeviceIdentity(
 					ManagementIP:       "fc00:f853:ccd:e793::1",
 				},
 			},
-			ARPNDEntries: []ARPNDObservation{
+			ARPNDEntries: []model.ARPNDObservation{
 				{
 					Protocol: "arp",
 					IfIndex:  5,
@@ -674,7 +675,7 @@ func TestBuildL2ResultFromObservations_ReconcilesARPAliasIntoLLDPDeviceIdentity(
 		},
 	}
 
-	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableLLDP: true, EnableARP: true})
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableLLDP: true, EnableARP: true})
 	require.NoError(t, err)
 
 	costaDesktop := findDeviceByHostname(result.Devices, "costa-desktop")
@@ -689,13 +690,13 @@ func TestBuildL2ResultFromObservations_ReconcilesARPAliasIntoLLDPDeviceIdentity(
 }
 
 func TestBuildL2ResultFromObservations_SkipsConflictingARPAliases(t *testing.T) {
-	observations := []L2Observation{
+	observations := []model.L2Observation{
 		{
 			DeviceID:     "mikrotik-router",
 			Hostname:     "MikroTik-router",
 			ManagementIP: "10.20.4.1",
 			ChassisID:    "18:fd:74:7e:c5:80",
-			LLDPRemotes: []LLDPRemoteObservation{
+			LLDPRemotes: []model.LLDPRemoteObservation{
 				{
 					LocalPortNum:       "5",
 					LocalPortID:        "ether5",
@@ -707,7 +708,7 @@ func TestBuildL2ResultFromObservations_SkipsConflictingARPAliases(t *testing.T) 
 					ManagementIP:       "fc00:f853:ccd:e793::1",
 				},
 			},
-			ARPNDEntries: []ARPNDObservation{
+			ARPNDEntries: []model.ARPNDObservation{
 				{
 					Protocol: "arp",
 					IfIndex:  5,
@@ -730,7 +731,7 @@ func TestBuildL2ResultFromObservations_SkipsConflictingARPAliases(t *testing.T) 
 		},
 	}
 
-	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableLLDP: true, EnableARP: true})
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableLLDP: true, EnableARP: true})
 	require.NoError(t, err)
 
 	costaDesktop := findDeviceByHostname(result.Devices, "costa-desktop")
@@ -742,13 +743,13 @@ func TestBuildL2ResultFromObservations_SkipsConflictingARPAliases(t *testing.T) 
 }
 
 func TestBuildL2ResultFromObservations_SkipsAmbiguousMACAliasOwnership(t *testing.T) {
-	observations := []L2Observation{
+	observations := []model.L2Observation{
 		{
 			DeviceID:     "switch-a",
 			Hostname:     "switch-a",
 			ManagementIP: "10.0.0.1",
 			ChassisID:    "00:11:22:33:44:55",
-			Interfaces: []ObservedInterface{
+			Interfaces: []model.ObservedInterface{
 				{IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1", MAC: "aa:aa:aa:aa:aa:aa"},
 			},
 		},
@@ -757,14 +758,14 @@ func TestBuildL2ResultFromObservations_SkipsAmbiguousMACAliasOwnership(t *testin
 			Hostname:     "switch-b",
 			ManagementIP: "10.0.0.2",
 			ChassisID:    "00:11:22:33:44:66",
-			Interfaces: []ObservedInterface{
+			Interfaces: []model.ObservedInterface{
 				{IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1", MAC: "aa:aa:aa:aa:aa:aa"},
 			},
 		},
 		{
 			DeviceID: "observer",
 			Hostname: "observer",
-			ARPNDEntries: []ARPNDObservation{
+			ARPNDEntries: []model.ARPNDObservation{
 				{
 					Protocol: "arp",
 					IfIndex:  9,
@@ -778,7 +779,7 @@ func TestBuildL2ResultFromObservations_SkipsAmbiguousMACAliasOwnership(t *testin
 		},
 	}
 
-	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableARP: true})
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableARP: true})
 	require.NoError(t, err)
 
 	switchA := findDeviceByID(result.Devices, "switch-a")
@@ -799,22 +800,22 @@ func TestNormalizeMAC_PadsSingleNibbleTokens(t *testing.T) {
 }
 
 func TestBuildL2ResultFromObservations_DeterministicOrderingAndDedup(t *testing.T) {
-	observations := []L2Observation{
+	observations := []model.L2Observation{
 		{
 			DeviceID: "switch-a",
 			Hostname: "switch-a",
-			Interfaces: []ObservedInterface{
+			Interfaces: []model.ObservedInterface{
 				{IfIndex: 7, IfName: "Port7", IfDescr: "Port7"},
 			},
-			BridgePorts: []BridgePortObservation{
+			BridgePorts: []model.BridgePortObservation{
 				{BasePort: "2", IfIndex: 7},
 			},
-			FDBEntries: []FDBObservation{
+			FDBEntries: []model.FDBObservation{
 				{MAC: "70:49:a2:65:72:ce", BridgePort: "2"},
 				{MAC: "70:49:a2:65:72:cd", BridgePort: "2"},
 				{MAC: "7049a26572ce", BridgePort: "2"}, // duplicate MAC, different format
 			},
-			ARPNDEntries: []ARPNDObservation{
+			ARPNDEntries: []model.ARPNDObservation{
 				{Protocol: "arp", IfIndex: 7, IfName: "Port7", IP: "10.20.4.86", MAC: "70:49:a2:65:72:ce"},
 				{Protocol: "arp", IfIndex: 7, IfName: "Port7", IP: "10.20.4.85", MAC: "70:49:a2:65:72:ce"},
 				{Protocol: "arp", IfIndex: 7, IfName: "Port7", IP: "10.20.4.85", MAC: "7049a26572ce"}, // duplicate
@@ -822,7 +823,7 @@ func TestBuildL2ResultFromObservations_DeterministicOrderingAndDedup(t *testing.
 		},
 	}
 
-	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableBridge: true, EnableARP: true})
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableBridge: true, EnableARP: true})
 	require.NoError(t, err)
 
 	require.Len(t, result.Attachments, 2)
@@ -1055,13 +1056,13 @@ func TestMatchLLDPLinksEnlinkdPassOrder_FallbackPasses(t *testing.T) {
 }
 
 func TestBuildL2ResultFromObservations_LLDPPairsAcrossChassisRepresentations(t *testing.T) {
-	observations := []L2Observation{
+	observations := []model.L2Observation{
 		{
 			DeviceID:     "router-a",
 			Hostname:     "MikroTik-router",
 			ManagementIP: "10.20.4.1",
 			ChassisID:    "18:FD:74:7E:C5:80",
-			LLDPRemotes: []LLDPRemoteObservation{
+			LLDPRemotes: []model.LLDPRemoteObservation{
 				{
 					LocalPortNum:       "3",
 					LocalPortID:        "ether3",
@@ -1079,7 +1080,7 @@ func TestBuildL2ResultFromObservations_LLDPPairsAcrossChassisRepresentations(t *
 			Hostname:     "XS1930",
 			ManagementIP: "10.20.4.84",
 			ChassisID:    "70:49:a2:65:72:cd",
-			LLDPRemotes: []LLDPRemoteObservation{
+			LLDPRemotes: []model.LLDPRemoteObservation{
 				{
 					LocalPortNum:       "8",
 					LocalPortID:        "8",
@@ -1094,7 +1095,7 @@ func TestBuildL2ResultFromObservations_LLDPPairsAcrossChassisRepresentations(t *
 		},
 	}
 
-	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableLLDP: true})
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableLLDP: true})
 	require.NoError(t, err)
 	require.Len(t, result.Adjacencies, 2)
 
@@ -1111,13 +1112,13 @@ func TestBuildL2ResultFromObservations_LLDPPairsAcrossChassisRepresentations(t *
 }
 
 func TestBuildL2ResultFromObservations_LLDPPairsAcrossKnownDeviceIdentityDespiteChassisMismatch(t *testing.T) {
-	observations := []L2Observation{
+	observations := []model.L2Observation{
 		{
 			DeviceID:     "mikrotik-router",
 			Hostname:     "MikroTik-router",
 			ManagementIP: "10.20.4.1",
 			ChassisID:    "18:FD:74:7E:C5:80",
-			LLDPRemotes: []LLDPRemoteObservation{
+			LLDPRemotes: []model.LLDPRemoteObservation{
 				{
 					LocalPortNum:       "3",
 					LocalPortID:        "ether3",
@@ -1135,7 +1136,7 @@ func TestBuildL2ResultFromObservations_LLDPPairsAcrossKnownDeviceIdentityDespite
 			Hostname:     "XS1930",
 			ManagementIP: "10.20.4.84",
 			ChassisID:    "70:49:A2:65:72:CD",
-			LLDPRemotes: []LLDPRemoteObservation{
+			LLDPRemotes: []model.LLDPRemoteObservation{
 				{
 					LocalPortNum:       "8",
 					LocalPortID:        "8",
@@ -1150,7 +1151,7 @@ func TestBuildL2ResultFromObservations_LLDPPairsAcrossKnownDeviceIdentityDespite
 		},
 	}
 
-	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableLLDP: true})
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableLLDP: true})
 	require.NoError(t, err)
 	require.Len(t, result.Adjacencies, 2)
 
@@ -1162,13 +1163,13 @@ func TestBuildL2ResultFromObservations_LLDPPairsAcrossKnownDeviceIdentityDespite
 }
 
 func TestBuildL2ResultFromObservations_KeepsDistinctRemotesWhenMACDiffersDespiteSameSecondaryIdentity(t *testing.T) {
-	observations := []L2Observation{
+	observations := []model.L2Observation{
 		{
 			DeviceID:     "local-a",
 			Hostname:     "local-a",
 			ManagementIP: "10.0.0.1",
 			ChassisID:    "00:00:00:00:10:01",
-			LLDPRemotes: []LLDPRemoteObservation{
+			LLDPRemotes: []model.LLDPRemoteObservation{
 				{
 					LocalPortNum:       "1",
 					LocalPortID:        "eth1",
@@ -1184,7 +1185,7 @@ func TestBuildL2ResultFromObservations_KeepsDistinctRemotesWhenMACDiffersDespite
 			Hostname:     "local-b",
 			ManagementIP: "10.0.0.2",
 			ChassisID:    "00:00:00:00:10:02",
-			LLDPRemotes: []LLDPRemoteObservation{
+			LLDPRemotes: []model.LLDPRemoteObservation{
 				{
 					LocalPortNum:       "1",
 					LocalPortID:        "eth1",
@@ -1197,7 +1198,7 @@ func TestBuildL2ResultFromObservations_KeepsDistinctRemotesWhenMACDiffersDespite
 		},
 	}
 
-	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableLLDP: true})
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableLLDP: true})
 	require.NoError(t, err)
 
 	var remoteCount int
@@ -1247,7 +1248,7 @@ func TestMatchLLDPLinksEnlinkdPassOrder_DoesNotDropLinksWhenSysNamesAreEmpty(t *
 
 func TestResolveKnownRemote_RejectsHostnameMatchWhenMACMismatchesWithoutMgmtIP(t *testing.T) {
 	state := newL2BuildState(1)
-	state.devices["known-device"] = Device{
+	state.devices["known-device"] = model.Device{
 		ID:        "known-device",
 		Hostname:  "shared-host",
 		ChassisID: "00:11:22:33:44:55",
@@ -1259,7 +1260,7 @@ func TestResolveKnownRemote_RejectsHostnameMatchWhenMACMismatchesWithoutMgmtIP(t
 
 func TestResolveRemote_UsesMACDerivedIDWhenManagedHostnameCollidesWithoutMgmtIP(t *testing.T) {
 	state := newL2BuildState(1)
-	state.devices["known-device"] = Device{
+	state.devices["known-device"] = model.Device{
 		ID:        "known-device",
 		Hostname:  "shared-host",
 		ChassisID: "00:11:22:33:44:55",
@@ -1299,11 +1300,11 @@ func TestResolveRemoteEnforcingHostnameMACGuard_SplitsUnmanagedHostnameCollision
 
 func TestRegisterObservation_ReinitializesLabelsAfterEmptyMerge(t *testing.T) {
 	state := newL2BuildState(1)
-	state.devices["switch-a"] = Device{ID: "switch-a", Hostname: "switch-a"}
+	state.devices["switch-a"] = model.Device{ID: "switch-a", Hostname: "switch-a"}
 
-	err := state.registerObservation(L2Observation{
+	err := state.registerObservation(model.L2Observation{
 		DeviceID: "switch-a",
-		LLDPRemotes: []LLDPRemoteObservation{
+		LLDPRemotes: []model.LLDPRemoteObservation{
 			{LocalPortNum: "1", ChassisID: "00:11:22:33:44:55"},
 		},
 	})
@@ -1444,16 +1445,16 @@ func TestMatchCDPLinksEnlinkdPassOrder_SkipsSelfTarget(t *testing.T) {
 }
 
 func TestBuildL2ResultFromObservations_AnnotatesPairMetadata(t *testing.T) {
-	observations := []L2Observation{
+	observations := []model.L2Observation{
 		{
 			DeviceID:     "switch-a",
 			Hostname:     "A-GID",
 			ManagementIP: "10.0.0.1",
 			ChassisID:    "aa:aa:aa:aa:aa:aa",
-			Interfaces: []ObservedInterface{
+			Interfaces: []model.ObservedInterface{
 				{IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
 			},
-			LLDPRemotes: []LLDPRemoteObservation{
+			LLDPRemotes: []model.LLDPRemoteObservation{
 				{
 					LocalPortNum:       "1",
 					RemoteIndex:        "1",
@@ -1465,7 +1466,7 @@ func TestBuildL2ResultFromObservations_AnnotatesPairMetadata(t *testing.T) {
 					PortIDSubtype:      "5",
 				},
 			},
-			CDPRemotes: []CDPRemoteObservation{
+			CDPRemotes: []model.CDPRemoteObservation{
 				{
 					LocalIfIndex: 1,
 					LocalIfName:  "Gi0/1",
@@ -1481,10 +1482,10 @@ func TestBuildL2ResultFromObservations_AnnotatesPairMetadata(t *testing.T) {
 			Hostname:     "B-GID",
 			ManagementIP: "10.0.0.2",
 			ChassisID:    "bb:bb:bb:bb:bb:bb",
-			Interfaces: []ObservedInterface{
+			Interfaces: []model.ObservedInterface{
 				{IfIndex: 2, IfName: "Gi0/2", IfDescr: "Gi0/2"},
 			},
-			LLDPRemotes: []LLDPRemoteObservation{
+			LLDPRemotes: []model.LLDPRemoteObservation{
 				{
 					LocalPortNum:       "2",
 					RemoteIndex:        "1",
@@ -1496,7 +1497,7 @@ func TestBuildL2ResultFromObservations_AnnotatesPairMetadata(t *testing.T) {
 					PortIDSubtype:      "5",
 				},
 			},
-			CDPRemotes: []CDPRemoteObservation{
+			CDPRemotes: []model.CDPRemoteObservation{
 				{
 					LocalIfIndex: 2,
 					LocalIfName:  "Gi0/2",
@@ -1509,7 +1510,7 @@ func TestBuildL2ResultFromObservations_AnnotatesPairMetadata(t *testing.T) {
 		},
 	}
 
-	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableLLDP: true, EnableCDP: true})
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableLLDP: true, EnableCDP: true})
 	require.NoError(t, err)
 	require.Len(t, result.Adjacencies, 4)
 
@@ -1544,11 +1545,11 @@ func TestBuildL2ResultFromObservations_AnnotatesPairMetadata(t *testing.T) {
 }
 
 func TestBuildL2ResultFromObservations_ErrorsOnEmptyInput(t *testing.T) {
-	_, err := BuildL2ResultFromObservations(nil, DiscoverOptions{EnableLLDP: true})
+	_, err := BuildL2ResultFromObservations(nil, model.DiscoverOptions{EnableLLDP: true})
 	require.Error(t, err)
 }
 
-func findDeviceByHostname(devices []Device, hostname string) *Device {
+func findDeviceByHostname(devices []model.Device, hostname string) *model.Device {
 	for i := range devices {
 		if devices[i].Hostname == hostname {
 			return &devices[i]
@@ -1557,7 +1558,7 @@ func findDeviceByHostname(devices []Device, hostname string) *Device {
 	return nil
 }
 
-func findDeviceByID(devices []Device, id string) *Device {
+func findDeviceByID(devices []model.Device, id string) *model.Device {
 	for i := range devices {
 		if devices[i].ID == id {
 			return &devices[i]
@@ -1566,7 +1567,7 @@ func findDeviceByID(devices []Device, id string) *Device {
 	return nil
 }
 
-func deviceAddressStrings(device Device) []string {
+func deviceAddressStrings(device model.Device) []string {
 	out := make([]string, 0, len(device.Addresses))
 	for _, addr := range device.Addresses {
 		if !addr.IsValid() {

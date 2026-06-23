@@ -5,14 +5,16 @@ package pipeline
 import (
 	"strings"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 )
 
 type l2BuildState struct {
-	devices                      map[string]Device
+	devices                      map[string]model.Device
 	managedObservationByDeviceID map[string]bool
-	interfaces                   map[string]Interface
-	adjacencies                  map[string]Adjacency
-	attachments                  map[string]Attachment
+	interfaces                   map[string]model.Interface
+	adjacencies                  map[string]model.Adjacency
+	attachments                  map[string]model.Attachment
 	enrichments                  map[string]*enrichmentAccumulator
 	ifNameByDeviceIfIndex        map[string]string
 
@@ -34,11 +36,11 @@ type l2BuildState struct {
 
 func newL2BuildState(observationCount int) *l2BuildState {
 	return &l2BuildState{
-		devices:                      make(map[string]Device, observationCount),
+		devices:                      make(map[string]model.Device, observationCount),
 		managedObservationByDeviceID: make(map[string]bool, observationCount),
-		interfaces:                   make(map[string]Interface),
-		adjacencies:                  make(map[string]Adjacency),
-		attachments:                  make(map[string]Attachment),
+		interfaces:                   make(map[string]model.Interface),
+		adjacencies:                  make(map[string]model.Adjacency),
+		attachments:                  make(map[string]model.Attachment),
 		enrichments:                  make(map[string]*enrichmentAccumulator),
 		ifNameByDeviceIfIndex:        make(map[string]string),
 		hostToID:                     make(map[string]string, observationCount),
@@ -88,12 +90,12 @@ func (s *l2BuildState) markManagedDevices() {
 	}
 }
 
-func (s *l2BuildState) buildResult(identityAliasStats identityAliasReconcileStats, collectedAt time.Time) Result {
+func (s *l2BuildState) buildResult(identityAliasStats identityAliasReconcileStats, collectedAt time.Time) model.Result {
 	if !collectedAt.IsZero() {
 		collectedAt = collectedAt.UTC()
 	}
 
-	stats := ResultStats{
+	stats := model.ResultStats{
 		DevicesTotal:                       len(s.devices),
 		LinksTotal:                         len(s.adjacencies),
 		LinksLLDP:                          s.linksLLDP,
@@ -111,7 +113,7 @@ func (s *l2BuildState) buildResult(identityAliasStats identityAliasReconcileStat
 		IdentityAliasIPsConflictSkipped:    identityAliasStats.ipsConflictSkipped,
 	}
 
-	return Result{
+	return model.Result{
 		CollectedAt: collectedAt,
 		Devices:     sortedDevices(s.devices),
 		Interfaces:  sortedInterfaces(s.interfaces),

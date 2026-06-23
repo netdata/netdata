@@ -5,6 +5,8 @@ package pipeline
 import (
 	"strconv"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 )
 
 type cdpMatchLink struct {
@@ -27,7 +29,7 @@ type cdpMatchedPair struct {
 	pass        string
 }
 
-func buildCDPMatchLinks(observations []L2Observation) []cdpMatchLink {
+func buildCDPMatchLinks(observations []model.L2Observation) []cdpMatchLink {
 	links := make([]cdpMatchLink, 0)
 	for _, obs := range observations {
 		sourceID := strings.TrimSpace(obs.DeviceID)

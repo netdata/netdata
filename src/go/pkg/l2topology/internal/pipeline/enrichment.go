@@ -7,6 +7,8 @@ import (
 	"net/netip"
 	"sort"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 )
 
 type enrichmentAccumulator struct {
@@ -76,8 +78,8 @@ type identityAliasReconcileStats struct {
 }
 
 func reconcileDeviceIdentityAliases(
-	devices map[string]Device,
-	interfaces map[string]Interface,
+	devices map[string]model.Device,
+	interfaces map[string]model.Interface,
 	enrichments map[string]*enrichmentAccumulator,
 ) identityAliasReconcileStats {
 	stats := identityAliasReconcileStats{}
@@ -197,8 +199,8 @@ func reconcileDeviceIdentityAliases(
 }
 
 func buildUniqueMACToDeviceIndex(
-	devices map[string]Device,
-	interfaces map[string]Interface,
+	devices map[string]model.Device,
+	interfaces map[string]model.Interface,
 ) (map[string]string, map[string]struct{}) {
 	ownersByMAC := make(map[string]map[string]struct{})
 	addOwner := func(mac, deviceID string) {

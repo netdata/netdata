@@ -6,6 +6,8 @@ import (
 	"net/netip"
 	"sort"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 )
 
 func sortedAddrValues(in map[string]netip.Addr) []netip.Addr {
@@ -57,7 +59,7 @@ func csvToTopologySet(value string) map[string]struct{} {
 	return out
 }
 
-func observationProtocolsUsed(obs L2Observation) map[string]struct{} {
+func observationProtocolsUsed(obs model.L2Observation) map[string]struct{} {
 	out := make(map[string]struct{}, 6)
 	if len(obs.LLDPRemotes) > 0 {
 		out["lldp"] = struct{}{}

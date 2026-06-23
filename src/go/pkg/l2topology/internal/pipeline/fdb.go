@@ -5,6 +5,8 @@ package pipeline
 import (
 	"sort"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 )
 
 type fdbCandidate struct {
@@ -16,7 +18,7 @@ type fdbCandidate struct {
 	vlanName   string
 }
 
-func buildFDBCandidates(entries []FDBObservation, bridgePortToIfIndex map[string]int) []fdbCandidate {
+func buildFDBCandidates(entries []model.FDBObservation, bridgePortToIfIndex map[string]int) []fdbCandidate {
 	if len(entries) == 0 {
 		return nil
 	}

@@ -5,11 +5,12 @@ package pipeline
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/stretchr/testify/require"
 )
 
 func TestBuildFDBCandidates_KeepsDistinctVLANScopedCandidates(t *testing.T) {
-	candidates := buildFDBCandidates([]FDBObservation{
+	candidates := buildFDBCandidates([]model.FDBObservation{
 		{
 			MAC:        "70:49:a2:65:72:cd",
 			BridgePort: "7",
@@ -30,7 +31,7 @@ func TestBuildFDBCandidates_KeepsDistinctVLANScopedCandidates(t *testing.T) {
 }
 
 func TestBuildFDBCandidates_DoesNotReintroduceDuplicateEndpoint(t *testing.T) {
-	candidates := buildFDBCandidates([]FDBObservation{
+	candidates := buildFDBCandidates([]model.FDBObservation{
 		{
 			MAC:        "70:49:a2:65:72:cd",
 			BridgePort: "1",
