@@ -55,6 +55,7 @@ const (
 	cmdTestWorkerCap       = 4
 	cmdTestDefaultTimeout  = 60 * time.Second
 	cmdTestWorkerDrainWait = 5 * time.Second
+	funcReconcileQueueSize = 64
 )
 
 func New(cfg Config) *Manager {
@@ -114,11 +115,12 @@ func New(cfg Config) *Manager {
 		runningJobs:       newRunningJobsCache(),
 		retryingTasks:     newRetryingTasksCache(),
 
-		started:    make(chan struct{}),
-		addCh:      make(chan confgroup.Config),
-		rmCh:       make(chan confgroup.Config),
-		dyncfgCh:   make(chan dyncfg.Function, 32),
-		cmdTestSem: make(chan struct{}, cmdTestWorkerCap),
+		started:     make(chan struct{}),
+		addCh:       make(chan confgroup.Config),
+		rmCh:        make(chan confgroup.Config),
+		dyncfgCh:    make(chan dyncfg.Function, 32),
+		funcReconCh: make(chan string, funcReconcileQueueSize),
+		cmdTestSem:  make(chan struct{}, cmdTestWorkerCap),
 
 		dyncfgResponder: api,
 		runtimeService:  cfg.RuntimeService,
@@ -217,13 +219,14 @@ type Manager struct {
 	vnodesCtl          *vnodectl.Controller
 
 	// Runtime loop state.
-	ctx        context.Context
-	started    chan struct{}
-	addCh      chan confgroup.Config
-	rmCh       chan confgroup.Config
-	dyncfgCh   chan dyncfg.Function
-	cmdTestSem chan struct{}
-	cmdTestWG  sync.WaitGroup
+	ctx         context.Context
+	started     chan struct{}
+	addCh       chan confgroup.Config
+	rmCh        chan confgroup.Config
+	dyncfgCh    chan dyncfg.Function
+	funcReconCh chan string
+	cmdTestSem  chan struct{}
+	cmdTestWG   sync.WaitGroup
 
 	// Shared service seams.
 	dyncfgResponder *dyncfg.Responder
@@ -326,14 +329,10 @@ func (m *Manager) runProcessConfGroups(in chan []*confgroup.Group) {
 func (m *Manager) run() {
 	for {
 		if m.collectorHandler.WaitingForDecision() {
-			step, ok := m.collectorHandler.NextWaitDecisionStep(m.ctx, m.dyncfgCh)
-			if !ok {
+			if !m.runWaitDecisionStep() {
 				return
 			}
-			if step.HasCommand {
-				m.dyncfgSeqExec(step.Command)
-				continue
-			}
+			continue
 		} else {
 			select {
 			case <-m.ctx.Done():
@@ -344,6 +343,8 @@ func (m *Manager) run() {
 				m.removeConfig(cfg)
 			case fn := <-m.dyncfgCh:
 				m.dyncfgSeqExec(fn)
+			case moduleName := <-m.funcReconCh:
+				m.funcCtl.ReconcileModuleMethods(moduleName)
 			}
 		}
 	}
@@ -388,6 +389,43 @@ func (m *Manager) addConfig(cfg confgroup.Config) {
 	}
 }
 
+func (m *Manager) runWaitDecisionStep() bool {
+	waitFor, hasTimeout := m.collectorHandler.WaitDecisionRemaining()
+	if !hasTimeout {
+		select {
+		case <-m.ctx.Done():
+			return false
+		case fn := <-m.dyncfgCh:
+			m.dyncfgSeqExec(fn)
+		case moduleName := <-m.funcReconCh:
+			m.funcCtl.ReconcileModuleMethods(moduleName)
+		}
+		return true
+	}
+
+	timer := time.NewTimer(waitFor)
+	defer func() {
+		if !timer.Stop() {
+			select {
+			case <-timer.C:
+			default:
+			}
+		}
+	}()
+
+	select {
+	case <-m.ctx.Done():
+		return false
+	case fn := <-m.dyncfgCh:
+		m.dyncfgSeqExec(fn)
+	case moduleName := <-m.funcReconCh:
+		m.funcCtl.ReconcileModuleMethods(moduleName)
+	case <-timer.C:
+		m.collectorHandler.ExpireWaitDecision()
+	}
+	return true
+}
+
 func (m *Manager) removeConfig(cfg confgroup.Config) {
 	m.retryingTasks.remove(cfg)
 
@@ -414,11 +452,31 @@ func (m *Manager) runNotifyRunningJobs() {
 		case <-m.ctx.Done():
 			return
 		case clock := <-tk.C:
+			reconcileModules := make(map[string]struct{})
 			for _, job := range m.runningJobs.snapshot() {
 				job.Tick(clock)
-				m.funcCtl.ReconcileModuleMethodsForJob(job)
+				reconcileModules[job.ModuleName()] = struct{}{}
+			}
+			for moduleName := range reconcileModules {
+				m.requestFunctionReconcile(moduleName)
 			}
 		}
+	}
+}
+
+func (m *Manager) requestFunctionReconcile(moduleName string) {
+	if moduleName == "" {
+		return
+	}
+	ctx := m.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	select {
+	case <-ctx.Done():
+	case m.funcReconCh <- moduleName:
+	default:
+		// The next running-job tick will retry. Keep the tick path non-blocking.
 	}
 }
 

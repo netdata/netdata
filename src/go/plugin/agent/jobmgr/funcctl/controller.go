@@ -37,6 +37,10 @@ type Controller struct {
 	staticMethodsSeen map[string]struct{}
 }
 
+type functionPublish struct {
+	opts netdataapi.FunctionGlobalOpts
+}
+
 func New(opts Options) *Controller {
 	log := opts.Logger
 	if log == nil {
@@ -158,11 +162,20 @@ func (c *Controller) ReconcileModuleMethodsForJob(job collectorapi.RuntimeJob) {
 	if _, ok := c.registry.getJob(job.ModuleName(), job.Name()); !ok {
 		return
 	}
-	methods := c.registry.getMethods(job.ModuleName())
+	c.ReconcileModuleMethods(job.ModuleName())
+}
+
+// ReconcileModuleMethods rechecks module/static method availability for modules
+// with at least one registered running job.
+func (c *Controller) ReconcileModuleMethods(moduleName string) {
+	if moduleName == "" || !c.registry.hasRunningJob(moduleName) {
+		return
+	}
+	methods := c.registry.getMethods(moduleName)
 	if len(methods) == 0 {
 		return
 	}
-	c.registerAvailableModuleMethods(job.ModuleName(), methods, false)
+	c.registerAvailableModuleMethods(moduleName, methods, false)
 }
 
 func (c *Controller) OnJobStop(job collectorapi.RuntimeJob) {
@@ -176,11 +189,16 @@ func (c *Controller) OnJobStop(job collectorapi.RuntimeJob) {
 
 func (c *Controller) Cleanup() {
 	c.staticMethodsMu.Lock()
-	defer c.staticMethodsMu.Unlock()
-
+	names := make([]string, 0, len(c.staticMethodsSeen))
 	for funcName := range c.staticMethodsSeen {
 		c.fnReg.Unregister(funcName)
-		if c.api != nil {
+		names = append(names, funcName)
+	}
+	c.staticMethodsMu.Unlock()
+
+	if c.api != nil {
+		sort.Strings(names)
+		for _, funcName := range names {
 			c.api.FunctionRemove(funcName)
 		}
 	}
@@ -196,9 +214,20 @@ func (c *Controller) registerModuleMethodsOnJobStart(moduleName string) {
 }
 
 func (c *Controller) registerAvailableModuleMethods(moduleName string, methods []funcapi.MethodConfig, agentWideOnly bool) {
+	publishes := c.collectAvailableModuleMethodPublishes(moduleName, methods, agentWideOnly)
+	if c.api == nil {
+		return
+	}
+	for _, publish := range publishes {
+		c.api.FunctionGlobal(publish.opts)
+	}
+}
+
+func (c *Controller) collectAvailableModuleMethodPublishes(moduleName string, methods []funcapi.MethodConfig, agentWideOnly bool) []functionPublish {
 	c.staticMethodsMu.Lock()
 	defer c.staticMethodsMu.Unlock()
 
+	var publishes []functionPublish
 	for i, method := range methods {
 		if agentWideOnly && !method.AgentWide {
 			continue
@@ -215,31 +244,33 @@ func (c *Controller) registerAvailableModuleMethods(moduleName string, methods [
 			continue
 		}
 
+		help := method.Help
+		if help == "" {
+			help = fmt.Sprintf("%s %s data function", moduleName, method.ID)
+		}
+
+		const cloudAccess = "0x0013"
+		access := "0x0000"
+		if method.RequireCloud {
+			access = cloudAccess
+		}
+
 		if c.api != nil {
-			help := method.Help
-			if help == "" {
-				help = fmt.Sprintf("%s %s data function", moduleName, method.ID)
-			}
-
-			const cloudAccess = "0x0013"
-			access := "0x0000"
-			if method.RequireCloud {
-				access = cloudAccess
-			}
-
 			for _, funcName := range funcapi.MethodFunctionNames(moduleName, method) {
 				if _, seen := c.staticMethodsSeen[funcName]; seen {
 					continue
 				}
 				c.registerFunction(funcName, c.makeMethodFuncHandler(moduleName, method.ID))
-				c.api.FunctionGlobal(netdataapi.FunctionGlobalOpts{
-					Name:     funcName,
-					Timeout:  60,
-					Help:     help,
-					Tags:     methodTags(method),
-					Access:   access,
-					Priority: 100,
-					Version:  3,
+				publishes = append(publishes, functionPublish{
+					opts: netdataapi.FunctionGlobalOpts{
+						Name:     funcName,
+						Timeout:  60,
+						Help:     help,
+						Tags:     methodTags(method),
+						Access:   access,
+						Priority: 100,
+						Version:  3,
+					},
 				})
 				c.staticMethodsSeen[funcName] = struct{}{}
 			}
@@ -254,6 +285,7 @@ func (c *Controller) registerAvailableModuleMethods(moduleName string, methods [
 			c.staticMethodsSeen[funcName] = struct{}{}
 		}
 	}
+	return publishes
 }
 
 func (c *Controller) allStaticMethodNamesSeenLocked(moduleName string, method funcapi.MethodConfig) bool {

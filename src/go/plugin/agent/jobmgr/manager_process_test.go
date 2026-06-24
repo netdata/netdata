@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -145,6 +146,11 @@ func TestRunNotifyRunningJobs_ReconcilesLateAvailableModuleMethods(t *testing.T)
 	mgr.ctx = ctx
 	mgr.funcCtl.Init(ctx)
 	mgr.funcCtl.RegisterModules(mgr.modules)
+	runDone := make(chan struct{})
+	go func() {
+		mgr.run()
+		close(runDone)
+	}()
 
 	job := &tickProbeJob{
 		fullName:   "mod_job1",
@@ -170,7 +176,82 @@ func TestRunNotifyRunningJobs_ReconcilesLateAvailableModuleMethods(t *testing.T)
 
 	cancel()
 	select {
+	case <-runDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("run did not stop")
+	}
+	select {
 	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("runNotifyRunningJobs did not stop")
+	}
+}
+
+func TestRunNotifyRunningJobs_DeduplicatesFunctionReconcileByModule(t *testing.T) {
+	reg := &recordingFunctionRegistry{}
+	available := false
+	var availableCalls atomic.Int32
+	mgr := New(Config{
+		PluginName: testPluginName,
+		FnReg:      reg,
+		Modules: collectorapi.Registry{
+			"mod": collectorapi.Creator{
+				Methods: func() []funcapi.MethodConfig {
+					return []funcapi.MethodConfig{{
+						ID: "late",
+						Available: func() bool {
+							if available {
+								availableCalls.Add(1)
+							}
+							return available
+						},
+					}}
+				},
+			},
+		},
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	mgr.ctx = ctx
+	mgr.funcCtl.Init(ctx)
+	mgr.funcCtl.RegisterModules(mgr.modules)
+	runDone := make(chan struct{})
+	go func() {
+		mgr.run()
+		close(runDone)
+	}()
+
+	job1 := &tickProbeJob{fullName: "mod_job1", moduleName: "mod", name: "job1"}
+	job2 := &tickProbeJob{fullName: "mod_job2", moduleName: "mod", name: "job2"}
+	mgr.funcCtl.OnJobStart(job1)
+	mgr.funcCtl.OnJobStart(job2)
+	mgr.runningJobs.lock()
+	mgr.runningJobs.add(job1.FullName(), job1)
+	mgr.runningJobs.add(job2.FullName(), job2)
+	mgr.runningJobs.unlock()
+
+	availableCalls.Store(0)
+	available = true
+	notifyDone := make(chan struct{})
+	go func() {
+		mgr.runNotifyRunningJobs()
+		close(notifyDone)
+	}()
+
+	require.Eventually(t, func() bool {
+		return slices.Contains(reg.registeredNames(), "mod:late")
+	}, 2*time.Second, 10*time.Millisecond)
+	assert.Equal(t, int32(1), availableCalls.Load())
+
+	cancel()
+	select {
+	case <-runDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("run did not stop")
+	}
+	select {
+	case <-notifyDone:
 	case <-time.After(2 * time.Second):
 		t.Fatal("runNotifyRunningJobs did not stop")
 	}

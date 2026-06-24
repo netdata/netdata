@@ -852,6 +852,56 @@ func TestControllerReconcileModuleMethodsConcurrentLifecycle(t *testing.T) {
 	assert.ElementsMatch(t, expected, reg.registeredNames())
 }
 
+func TestControllerStaticPublicationDoesNotHoldLockDuringFunctionGlobal(t *testing.T) {
+	reg := newTestFunctionRegistry()
+	writer := newBlockingFunctionWriter()
+	t.Cleanup(writer.Release)
+	controller := New(Options{
+		FnReg: reg,
+		API:   dyncfg.NewResponder(netdataapi.New(writer)),
+	})
+
+	registerDone := make(chan struct{})
+	go func() {
+		controller.RegisterModules(collectorapi.Registry{
+			"mod": collectorapi.Creator{
+				Methods: func() []funcapi.MethodConfig {
+					return []funcapi.MethodConfig{{
+						ID:        "late",
+						AgentWide: true,
+					}}
+				},
+			},
+		})
+		close(registerDone)
+	}()
+
+	select {
+	case <-writer.started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("FunctionGlobal write did not start")
+	}
+
+	startDone := make(chan struct{})
+	go func() {
+		controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+		close(startDone)
+	}()
+
+	select {
+	case <-startDone:
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("OnJobStart blocked while FunctionGlobal was writing")
+	}
+
+	writer.Release()
+	select {
+	case <-registerDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("RegisterModules did not finish")
+	}
+}
+
 func TestControllerRegisterJobMethods(t *testing.T) {
 	tests := map[string]struct{}{
 		"fail fast on collision with static method":          {},
@@ -1617,4 +1667,28 @@ func (r *testFunctionRegistry) unregisteredNames() []string {
 	out := make([]string, len(r.unregistered))
 	copy(out, r.unregistered)
 	return out
+}
+
+type blockingFunctionWriter struct {
+	started     chan struct{}
+	release     chan struct{}
+	once        sync.Once
+	releaseOnce sync.Once
+}
+
+func newBlockingFunctionWriter() *blockingFunctionWriter {
+	return &blockingFunctionWriter{
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+	}
+}
+
+func (w *blockingFunctionWriter) Write(p []byte) (int, error) {
+	w.once.Do(func() { close(w.started) })
+	<-w.release
+	return len(p), nil
+}
+
+func (w *blockingFunctionWriter) Release() {
+	w.releaseOnce.Do(func() { close(w.release) })
 }
