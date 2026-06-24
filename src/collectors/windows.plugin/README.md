@@ -47,7 +47,7 @@ to avoid overloading the host, Netdata uses different `update every` intervals f
 | Period (seconds) | Threads                                                                          |
 |------------------|----------------------------------------------------------------------------------|
 | 5                | `PerflibHyperV`, `PerflibThermalZone`                                            |
-| 10               | `PerflibAD`, `PerflibADCS`, `PerflibADFS`, and `PerflibExchange` |
+| 10               | `GetHardwareInfo`, `PerflibAD`, `PerflibADCS`, `PerflibADFS`, and `PerflibExchange` |
 | 30               | `PerflibServices`                                                                |
 
 To customize the update interval for a specific thread, you can set the update every value within the corresponding
