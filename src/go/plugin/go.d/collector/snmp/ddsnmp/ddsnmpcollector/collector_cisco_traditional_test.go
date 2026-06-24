@@ -157,6 +157,42 @@ func TestCollector_Collect_CiscoTraditionalLicensingProfile(t *testing.T) {
 	}
 }
 
+func TestCollector_Collect_CiscoTraditionalLicensingProfile_RejectsMalformedNonPlaceholderExpiry(t *testing.T) {
+	ctrl, mockHandler := setupMockHandler(t)
+	defer ctrl.Finish()
+
+	expectCiscoTraditionalLicensingWalk(mockHandler, ciscoTraditionalRow{
+		entPhysical:   1,
+		storeUsed:     1,
+		index:         2,
+		name:          "WLC-BASE",
+		version:       "1.0",
+		licenseType:   4,
+		capacity:      100,
+		available:     100,
+		impact:        "Permanent base license",
+		status:        1,
+		endDatePDU:    []byte("bad"),
+		hasEndDatePDU: true,
+	})
+	profile := mustLoadTypedLicensingProfile(t, "cisco", func(row ddprofiledefinition.LicensingConfig) bool {
+		return strings.TrimPrefix(row.Table.OID, ".") == "1.3.6.1.4.1.9.9.543.1.2.3.1"
+	})
+	require.Len(t, profile.Definition.Licensing, 1)
+
+	collector := New(Config{
+		SnmpClient:  mockHandler,
+		Profiles:    []*ddsnmp.Profile{profile},
+		Log:         logger.New(),
+		SysObjectID: "",
+	})
+
+	rows, err := collector.collectLicenseRows(profile, &ddsnmp.CollectionStats{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "expiry.timestamp: invalid SNMP DateAndTime length 3")
+	assert.Empty(t, rows)
+}
+
 type ciscoTraditionalRow struct {
 	entPhysical   int
 	storeUsed     int

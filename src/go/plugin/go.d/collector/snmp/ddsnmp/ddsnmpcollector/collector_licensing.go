@@ -20,6 +20,7 @@ import (
 const (
 	licenseRowsPartialErrorLogKey = "snmp-licensing-rows-partial-error:"
 	licenseRowsFailedLogKey       = "snmp-licensing-rows-failed:"
+	licenseTimerNoValueLogKey     = "snmp-licensing-timer-no-value:"
 	licenseRowsErrorLogEvery      = time.Hour
 )
 
@@ -381,16 +382,16 @@ func (c *Collector) populateLicenseRow(row *ddsnmp.LicenseRow, cfg ddprofiledefi
 	if err := c.populateLicenseState(row, cfg.State, ctx); err != nil {
 		return fmt.Errorf("state: %w", err)
 	}
-	if err := c.populateLicenseTimer(&row.Expiry, cfg.Signals.Expiry, ctx); err != nil {
+	if err := c.populateLicenseTimer(&row.Expiry, cfg.Signals.Expiry, ctx, "expiry"); err != nil {
 		return err
 	}
-	if err := c.populateLicenseTimer(&row.Authorization, cfg.Signals.Authorization, ctx); err != nil {
+	if err := c.populateLicenseTimer(&row.Authorization, cfg.Signals.Authorization, ctx, "authorization"); err != nil {
 		return err
 	}
-	if err := c.populateLicenseTimer(&row.Certificate, cfg.Signals.Certificate, ctx); err != nil {
+	if err := c.populateLicenseTimer(&row.Certificate, cfg.Signals.Certificate, ctx, "certificate"); err != nil {
 		return err
 	}
-	if err := c.populateLicenseTimer(&row.Grace, cfg.Signals.Grace, ctx); err != nil {
+	if err := c.populateLicenseTimer(&row.Grace, cfg.Signals.Grace, ctx, "grace"); err != nil {
 		return err
 	}
 	if err := c.populateLicenseUsage(&row.Usage, cfg.Signals.Usage, ctx); err != nil {
@@ -450,32 +451,35 @@ func licenseStateRawValueByPolicy(raw string, policy ddprofiledefinition.License
 	return raw
 }
 
-func (c *Collector) populateLicenseTimer(timer *ddsnmp.LicenseTimer, cfg ddprofiledefinition.LicenseTimerSignalsConfig, ctx licenseValueContext) error {
+func (c *Collector) populateLicenseTimer(timer *ddsnmp.LicenseTimer, cfg ddprofiledefinition.LicenseTimerSignalsConfig, ctx licenseValueContext, name string) error {
 	if cfg.LicenseValueConfig.IsSet() {
-		if err := c.populateLicenseTimerTimestamp(timer, cfg.LicenseValueConfig, ctx); err != nil {
+		if err := c.populateLicenseTimerTimestamp(timer, cfg.LicenseValueConfig, ctx, name); err != nil {
 			return err
 		}
 	}
 	if cfg.Timestamp.IsSet() {
-		if err := c.populateLicenseTimerTimestamp(timer, cfg.Timestamp, ctx); err != nil {
+		if err := c.populateLicenseTimerTimestamp(timer, cfg.Timestamp, ctx, name+".timestamp"); err != nil {
 			return err
 		}
 	}
 	if cfg.Remaining.IsSet() {
-		if err := c.populateLicenseTimerRemaining(timer, cfg.Remaining, ctx); err != nil {
+		if err := c.populateLicenseTimerRemaining(timer, cfg.Remaining, ctx, name+".remaining"); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (c *Collector) populateLicenseTimerTimestamp(timer *ddsnmp.LicenseTimer, cfg ddprofiledefinition.LicenseValueConfig, ctx licenseValueContext) error {
+func (c *Collector) populateLicenseTimerTimestamp(timer *ddsnmp.LicenseTimer, cfg ddprofiledefinition.LicenseValueConfig, ctx licenseValueContext, name string) error {
+	if sourceOID, ok := licenseTimerZeroDateAndTimePlaceholder(cfg, ctx); ok {
+		c.log.Limit(licenseTimerNoValueLogKey+sourceOID, 1, licenseRowsErrorLogEvery).
+			Warningf("license timer %q returned zero DateAndTime placeholder; treating timer as absent", sourceOID)
+		return nil
+	}
+
 	value, sourceOID, ok, err := c.licenseNumericValue(cfg, ctx)
 	if err != nil {
-		// Timer values are optional. Devices can publish malformed placeholders
-		// for non-expiring or not-applicable licenses; keep the row and omit the
-		// timer rather than dropping state/usage data.
-		return nil
+		return fmt.Errorf("%s: %w", name, err)
 	}
 	if !ok || licenseValueRejectedBySentinel(value, cfg.Sentinel) {
 		return nil
@@ -487,10 +491,10 @@ func (c *Collector) populateLicenseTimerTimestamp(timer *ddsnmp.LicenseTimer, cf
 	return nil
 }
 
-func (c *Collector) populateLicenseTimerRemaining(timer *ddsnmp.LicenseTimer, cfg ddprofiledefinition.LicenseValueConfig, ctx licenseValueContext) error {
+func (c *Collector) populateLicenseTimerRemaining(timer *ddsnmp.LicenseTimer, cfg ddprofiledefinition.LicenseValueConfig, ctx licenseValueContext, name string) error {
 	value, sourceOID, ok, err := c.licenseNumericValue(cfg, ctx)
 	if err != nil {
-		return nil
+		return fmt.Errorf("%s: %w", name, err)
 	}
 	if !ok || licenseValueRejectedBySentinel(value, cfg.Sentinel) {
 		return nil
@@ -500,6 +504,29 @@ func (c *Collector) populateLicenseTimerRemaining(timer *ddsnmp.LicenseTimer, cf
 	timer.RemainingSeconds = value
 	timer.SourceOID = sourceOID
 	return nil
+}
+
+func licenseTimerZeroDateAndTimePlaceholder(cfg ddprofiledefinition.LicenseValueConfig, ctx licenseValueContext) (string, bool) {
+	sym := licenseValueSymbol(cfg)
+	if sym.Format != "snmp_dateandtime" || sym.OID == "" {
+		return "", false
+	}
+	pdu, ok := ctx.lookupPDU(sym.OID)
+	if !ok || !isZeroDateAndTimePlaceholderPDU(pdu) {
+		return "", false
+	}
+	return trimOID(sym.OID), true
+}
+
+func isZeroDateAndTimePlaceholderPDU(pdu gosnmp.SnmpPDU) bool {
+	switch v := pdu.Value.(type) {
+	case []byte:
+		return string(v) == "0" || (len(v) == 1 && v[0] == 0)
+	case string:
+		return v == "0"
+	default:
+		return false
+	}
 }
 
 func (c *Collector) populateLicenseUsage(usage *ddsnmp.LicenseUsage, cfg ddprofiledefinition.LicenseUsageSignalsConfig, ctx licenseValueContext) error {
