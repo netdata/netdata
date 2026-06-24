@@ -120,6 +120,10 @@ If the script is valid, this command will return `OK, VALID`. We recommend verif
 - Always verify the downloaded script for security
 - Use the `--non-interactive` flag in CI/CD pipelines
 
+## Troubleshooting
+
+If `curl` fails to download the install script with `curl: (60) SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)`, this is an OS-level certificate-trust issue: the host's CA certificate store is missing or outdated. Update your system CA certificates using your package manager (for example `sudo apt-get install --reinstall ca-certificates` on Debian/Ubuntu or `sudo dnf reinstall ca-certificates` on RHEL/Fedora), then re-run the install command.
+
 ## Related Docs
 
 - [Connect to Netdata Cloud](/src/claim/README.md)
