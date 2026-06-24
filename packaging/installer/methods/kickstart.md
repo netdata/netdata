@@ -122,62 +122,7 @@ If the script is valid, this command will return `OK, VALID`. We recommend verif
 
 ## Troubleshooting
 
-### SSL certificate verification fails during the one-line download
-
-When you run the one-line install command, `curl` or `wget` may fail to download `kickstart.sh` or the install artifacts from `https://get.netdata.cloud` or GitHub releases because your system cannot validate the remote server's TLS certificate. This is a **download-phase** error — it happens *before* Netdata is installed.
-
-The exact message depends on your HTTP client. With `curl`, the common form is:
-
-```text
-curl: (60) SSL certificate problem: unable to get local issuer certificate
-```
-
-Some `curl` builds report the underlying OpenSSL verify result with its numeric code:
-
-```text
-curl: (60) SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
-```
-
-The `(20)` is OpenSSL's verify result code, meaning the local trust store has no certificate that chains back to the issuer of the server's certificate. With `wget`, the same condition looks like:
-
-```text
-ERROR: cannot verify get.netdata.cloud's certificate, issued by '...': Unable to locally verify the issuer's authority.
-To connect to get.netdata.cloud insecurely, you can use `--no-check-certificate'.
-```
-
-It occurs when the system's CA certificate store cannot validate the remote certificate. Common causes:
-
-- The `ca-certificates` package is **missing or outdated** (common on minimal containers, freshly provisioned VMs, or older distributions that no longer receive trust-root updates).
-- The host is **older or air-gapped** and never received updated trust roots.
-- A **TLS-inspecting proxy, firewall, or MITM appliance** re-signs traffic with its own root CA, which is not present in the host's trust store.
-
-#### Fix 1: Update or reinstall the system CA certificate store
-
-Refresh the system CA bundle, then rebuild the trust store:
-
-| Distribution family    | Refresh the CA package                                       | Rebuild the trust store               |
-|------------------------|--------------------------------------------------------------|---------------------------------------|
-| Debian / Ubuntu        | `sudo apt-get install --reinstall -y ca-certificates`        | `sudo update-ca-certificates`         |
-| RHEL / Fedora / CentOS | `sudo dnf reinstall -y ca-certificates`                      | `sudo update-ca-trust`                |
-| openSUSE / SLES        | `sudo zypper install -f ca-certificates-mozilla`             | `sudo update-ca-certificates`         |
-| Alpine                 | `sudo apk add --force-reinstall ca-certificates`             | `sudo update-ca-certificates --fresh` |
-| Arch Linux             | `sudo pacman -S --noconfirm ca-certificates`                 | `sudo update-ca-trust`                |
-
-Then re-run the one-line install command. If your distribution is not listed, consult its documentation for the equivalent package and trust-store rebuild command.
-
-#### Fix 2: Use the offline installer on air-gapped hosts
-
-Refreshing the CA store requires internet access. If the target host has no connectivity, do not attempt the download-based install — use the [Offline Installation Guide](/packaging/installer/methods/offline.md) to prepare a self-contained install source on an online machine and transfer it to the offline host.
-
-#### Fix 3: Install a TLS-inspecting proxy's root CA
-
-If your network uses a proxy, firewall, or security appliance that intercepts and re-signs TLS connections, install that appliance's root CA certificate into the system trust store so the host can validate the re-signed certificates. See [Using custom CA certificates with Netdata](/docs/netdata-agent/configuration/using-custom-ca-certificates-with-netdata.md) for per-distribution instructions on installing a certificate in the system certificate store.
-
-:::note
-
-**This is a download-phase error, not an agent-runtime trust issue.** It occurs while *downloading* `kickstart.sh` and its artifacts. It is separate from configuring TLS trust for the **running Netdata Agent** (streaming to a Parent, exporting metrics, or collecting from secure endpoints). For agent-runtime TLS trust configuration, see [Using custom CA certificates with Netdata](/docs/netdata-agent/configuration/using-custom-ca-certificates-with-netdata.md).
-
-:::
+If `curl` fails to download the install script with `curl: (60) SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)`, this is an OS-level certificate-trust issue: the host's CA certificate store is missing or outdated. Update your system CA certificates using your package manager (for example `sudo apt-get install --reinstall ca-certificates` on Debian/Ubuntu or `sudo dnf reinstall ca-certificates` on RHEL/Fedora), then re-run the install command.
 
 ## Related Docs
 
