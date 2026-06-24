@@ -436,6 +436,10 @@ sidebar:
           label: StatsD
           edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/statsd.plugin/README.md
       - meta:
+          label: Containers and cgroups
+          edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/cgroups.plugin/README.md
+          description: Monitor containers and virtual machines via Linux cgroups, with friendly name resolution for Docker, Kubernetes, Podman, LXC, libvirt, Proxmox, and more.
+      - meta:
           label: OpenTelemetry Metrics
           edit_url: https://github.com/netdata/netdata/edit/master/src/crates/netdata-otel/otel-plugin/README.md
           description: Ingesting storing and visualizing OpenTelemetry metrics
