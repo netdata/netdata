@@ -188,6 +188,22 @@ func (r *moduleFuncRegistry) getJobNames(moduleName string) []string {
 	return names
 }
 
+func (r *moduleFuncRegistry) hasRunningJob(moduleName string) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	module, ok := r.modules[moduleName]
+	if !ok {
+		return false
+	}
+	for _, entry := range module.jobs {
+		if entry.job.IsRunning() {
+			return true
+		}
+	}
+	return false
+}
+
 func (r *moduleFuncRegistry) getJob(moduleName, jobName string) (collectorapi.RuntimeJob, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
