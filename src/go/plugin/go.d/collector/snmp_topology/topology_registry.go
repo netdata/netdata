@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
@@ -63,9 +64,17 @@ func (r *topologyRegistry) snapshotWithOptions(options topologyoptions.QueryOpti
 	return buildSNMPTopologySnapshot(aggregate, options)
 }
 
-func (r *topologyRegistry) hasRenderableSnapshot() bool {
-	_, ok := r.snapshotWithOptions(topologyoptions.DefaultQueryOptions())
-	return ok
+func (r *topologyRegistry) hasRenderableObservations() bool {
+	if r == nil {
+		return false
+	}
+	now := time.Now()
+	for _, cache := range r.activeCaches() {
+		if cache.hasRenderableObservationAt(now) {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *topologyRegistry) producerScope() string {

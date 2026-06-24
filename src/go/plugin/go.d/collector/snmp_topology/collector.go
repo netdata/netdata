@@ -267,7 +267,7 @@ func (c *Collector) updateFunctionAvailability() {
 	if c.functionAvailability == nil || c.functionAvailability.Available() {
 		return
 	}
-	if c.topologyRegistry.hasRenderableSnapshot() {
+	if c.topologyRegistry.hasRenderableObservations() {
 		c.functionAvailability.MarkAvailable()
 	}
 }

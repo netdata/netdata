@@ -66,7 +66,7 @@ func TestSNMPTopologyCreatorRequiresSharedDependencies(t *testing.T) {
 	}
 }
 
-func TestSNMPTopologyFunctionAvailabilityBecomesReadyAfterRenderableSnapshot(t *testing.T) {
+func TestSNMPTopologyFunctionAvailabilityBecomesReadyAfterRenderableObservation(t *testing.T) {
 	creator := newCreator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle())
 	methods := creator.Methods()
 	require.Len(t, methods, 1)

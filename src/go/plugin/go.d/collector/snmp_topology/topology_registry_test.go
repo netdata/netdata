@@ -119,6 +119,67 @@ func TestTopologyRegistry_EnqueueReverseDNSWarmFromDefaultSnapshotUsesDisplayCan
 	}, time.Second, 10*time.Millisecond)
 }
 
+func TestTopologyRegistry_HasRenderableObservations(t *testing.T) {
+	var nilRegistry *topologyRegistry
+	require.False(t, nilRegistry.hasRenderableObservations())
+
+	tests := map[string]struct {
+		setup func(*topologyRegistry)
+		want  bool
+	}{
+		"empty-registry": {
+			want: false,
+		},
+		"cache-not-yet-published": {
+			setup: func(registry *topologyRegistry) {
+				registry.register(newTopologyCache())
+			},
+			want: false,
+		},
+		"cache-stale": {
+			setup: func(registry *topologyRegistry) {
+				cache := newTopologyCache()
+				seedPublishedEndpointSnapshot(cache)
+				cache.lastUpdate = time.Now().Add(-2 * time.Hour)
+				cache.staleAfter = time.Hour
+				registry.register(cache)
+			},
+			want: false,
+		},
+		"fresh-local-observation": {
+			setup: func(registry *topologyRegistry) {
+				cache := newTopologyCache()
+				now := time.Now()
+				cache.updateTime = now
+				cache.lastUpdate = now
+				cache.staleAfter = time.Hour
+				cache.localDevice = topologymodel.Device{ManagementIP: "10.0.0.1"}
+				registry.register(cache)
+			},
+			want: true,
+		},
+		"fresh-published-endpoint-snapshot": {
+			setup: func(registry *topologyRegistry) {
+				cache := newTopologyCache()
+				seedPublishedEndpointSnapshot(cache)
+				registry.register(cache)
+			},
+			want: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			registry := newTopologyRegistry()
+			if tc.setup != nil {
+				tc.setup(registry)
+			}
+
+			require.Equal(t, tc.want, registry.hasRenderableObservations())
+		})
+	}
+}
+
 func TestTopologyRegistry_SnapshotSingleCacheKeepsLLDPUnidirectional(t *testing.T) {
 	registry := newTopologyRegistry()
 
