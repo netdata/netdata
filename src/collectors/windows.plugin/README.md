@@ -12,9 +12,11 @@ By default, all collector threads are enabled except for `PerflibSMB` and `Perfl
 
 To change a setting, remove the comment symbol (`#`) from the beginning of the line and set the value to either `yes` or `no`.
 
-> **Note**
->
-> The `[plugin:windows]` section is generated dynamically by the Agent and appears in `netdata.conf` **only on Windows hosts**, because `windows.plugin` runs exclusively on Microsoft Windows. On non-Windows systems (for example Linux) this section is not present in `netdata.conf` at all — its absence there is expected and is not an error. On Windows, the complete live configuration (including every `[plugin:windows]` key with its current default) is available at `http://localhost:19999/netdata.conf`; copy it from there or add the `[plugin:windows]` section manually to your `netdata.conf`. Every option listed below is a valid key.
+:::note
+
+The `[plugin:windows]` section is generated dynamically by the Agent and appears in `netdata.conf` **only on Windows hosts**, because `windows.plugin` runs exclusively on Microsoft Windows. On non-Windows systems (for example Linux) this section is not present in `netdata.conf` at all — its absence there is expected and is not an error. On Windows, the complete live configuration (including every `[plugin:windows]` key with its current default) is available at `http://localhost:19999/netdata.conf`; copy it from there or add the `[plugin:windows]` section manually to your `netdata.conf`. Every option listed below is a valid key.
+
+:::
 
 ```text
 [plugin:windows]
