@@ -14,13 +14,13 @@ The netflow plugin is **packaged separately from the main Netdata Agent**. You i
 
 The package name is **`netdata-plugin-netflow`** on both Debian and RPM distributions. It is not installed by the standard `netdata` package or by the netdata-updater on its own — you have to install it explicitly on native-package systems.
 
-The static install (the kickstart `--static-only` path) bundles the plugin automatically. If you used the kickstart installer with the static option, no extra step is needed.
+The static install (the kickstart `--static-only` path) bundles the plugin automatically on x86_64, ARMv7, and ARM64. It is **not** included in the ARMv6 static build (Raspberry Pi 1 / Zero). If you used the kickstart installer with the static option on a supported architecture, no extra step is needed.
 
 ## Prerequisites
 
 - A working Netdata Agent on the host that will receive flow data.
 - That host must be reachable on UDP from your routers and switches (default port `2055`).
-- A Netdata installation that includes `netdata-plugin-netflow`. Native Linux packages install it as a separate package; static installs bundle it automatically; source builds need a Rust toolchain.
+- A Netdata installation that includes `netdata-plugin-netflow`. Native Linux packages install it as a separate package; static installs bundle it automatically (except the ARMv6 build — Raspberry Pi 1 / Zero); source builds need a Rust toolchain.
 
 ## Install on Debian / Ubuntu / Mint
 
@@ -55,7 +55,7 @@ wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && \
   sh /tmp/netdata-kickstart.sh --static-only
 ```
 
-…the netflow plugin is already installed under `/opt/netdata/usr/libexec/netdata/plugins.d/netflow-plugin`. No extra step.
+…the netflow plugin is already installed under `/opt/netdata/usr/libexec/netdata/plugins.d/netflow-plugin`. No extra step. (The ARMv6 static build — Raspberry Pi 1 / Zero — does not include the plugin; build from source there, see [Source build](#source-build) below.)
 
 To verify:
 

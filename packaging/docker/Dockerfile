@@ -39,6 +39,7 @@ RUN chmod +x netdata-installer.sh && \
    --disable-ebpf \
    --enable-plugin-otel \
    --enable-plugin-otel-signal-viewer \
+   --enable-plugin-netflow \
    --internal-systemd-journal \
    ${EXTRA_INSTALL_OPTS} \
    --install-no-prefix / \
