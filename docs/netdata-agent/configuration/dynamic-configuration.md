@@ -338,4 +338,25 @@ For the full manual configuration syntax, see [How to Disable or Silence Alerts]
 
 </details>
 
+### "No items to enable" when enabling a single alert
+
+Netdata alerts use a **two-level enable/disable model**:
+
+1. **Prototype level** — Each alert prototype (the entry you toggle on or off from the **Alerts tab** or **Space Settings → Configurations → Health**) has its own on/off switch.
+2. **Rule level** — Inside each prototype are one or more **rules**. Every rule has its own enable/disable control, which you reach by opening the prototype's **Update** form.
+
+When a prototype is switched off, none of the alerts it produces can run. If you try to enable an individual alert while its prototype is still off, Netdata shows **"no items to enable"** — the prototype itself has to be turned back on before any of its alerts can run.
+
+**What happens when you turn a prototype back on:** Enabling a prototype reactivates every alert its still-enabled rules produce. It does **not** switch back on any rule you have disabled individually. Because each rule runs on every node and chart it applies to, a single prototype can switch on a large number of alerts at once — potentially hundreds, depending on how broadly the prototype applies. The count you see when enabling a prototype (for example "899 alerts") is the total alerts those still-enabled rules produce across all matching nodes and charts — it is not the number of rules, and it never includes rules you have disabled. This is normal, not an error.
+
+**To enable only one alert from a prototype:**
+
+1. Open the alert prototype from the **Alerts tab** or **Space Settings → Configurations → Health**.
+2. Open its **Update** form.
+3. Enable the rule you want to run, and disable every other rule you do not need. Leave at least one rule enabled — if every rule is disabled, the prototype has nothing to activate.
+4. **Save** the prototype.
+5. **Enable** the prototype. Only the rule(s) you left enabled become active.
+
+If you would rather keep the prototype fully enabled and suppress specific alerts afterwards, disable those alerts individually in the UI, or use [Multi-Node Deployment](#multi-node-deployment) to push the change across several nodes at once. For the manual, file-based alternative, use the `netdata.conf` exclusion pattern described in [Disabled Alert Template Still Appears on Nodes](#disabled-alert-template-still-appears-on-nodes).
+
 [Read more](/docs/developer-and-contributor-corner/dyncfg.md) on developing with dynamic configuration.
