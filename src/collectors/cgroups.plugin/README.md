@@ -1,5 +1,3 @@
-<!-- markdownlint-disable-file -->
-
 # Monitor Cgroups (cgroups.plugin)
 
 You can monitor containers and virtual machines using **cgroups**.
@@ -26,24 +24,25 @@ resolves friendly names (e.g., showing "my-web-app" instead of a raw cgroup path
 The **Naming** column below indicates whether Netdata can resolve the cgroup path to a human-readable name
 (e.g., the container name, VM name, or service name):
 
-| Technology | Naming |
-|:---|:---:|
-| Docker | Yes |
-| Podman | Yes |
-| Kubernetes pods/containers | Yes |
-| Nomad (via Docker) | Yes |
-| AWS ECS (via Docker) | Yes |
-| containerd (via Docker) | Yes |
-| Proxmox QEMU/KVM VMs | Yes |
-| Proxmox LXC containers | Yes |
-| libvirt QEMU/KVM VMs | Yes |
-| libvirt LXC containers | Yes |
-| LXC 4.0+ (including Incus) | Yes |
-| systemd-nspawn | Yes |
-| Systemd services | Yes |
-| KubeVirt VMs (in K8s) | Partial |
+| Technology                 | Naming  |
+|:---------------------------|:-------:|
+| Docker                     |   Yes   |
+| Podman                     |   Yes   |
+| Kubernetes pods/containers |   Yes   |
+| Nomad (via Docker)         |   Yes   |
+| AWS ECS (via Docker)       |   Yes   |
+| containerd (via Docker)    |   Yes   |
+| Proxmox QEMU/KVM VMs       |   Yes   |
+| Proxmox LXC containers     |   Yes   |
+| libvirt QEMU/KVM VMs       |   Yes   |
+| libvirt LXC containers     |   Yes   |
+| LXC 4.0+ (including Incus) |   Yes   |
+| systemd-nspawn             |   Yes   |
+| Systemd services           |   Yes   |
+| KubeVirt VMs (in K8s)      | Partial |
 
 Technologies that use the above as their underlying infrastructure are also covered. For example:
+
 - **OpenShift** and other Kubernetes distributions (k3s, RKE, RKE2, MicroK8s, EKS, GKE, AKS) — via Kubernetes cgroup paths
 - **OpenStack Nova** — via libvirt/QEMU cgroup paths
 - **oVirt / RHV** — via libvirt/QEMU cgroup paths
@@ -61,20 +60,20 @@ collects their metrics.
 Linux exposes resource usage reporting and provides dynamic configuration for cgroups, using virtual files (usually)
 under `/sys/fs/cgroup`. Netdata reads `/proc/self/mountinfo` to detect the exact mount point of cgroups.
 
-Netdata rescans directories inside `/sys/fs/cgroup` for added or removed cgroups every `checking for new cgroups every`
-seconds.
+Netdata rescans directories inside `/sys/fs/cgroup` for added or removed cgroups every `check for new cgroups every`
+seconds (default: 10 seconds).
 
 ### Hierarchical search for cgroups
 
 Since cgroups are hierarchical, for each of the directories shown above, Netdata walks through the subdirectories
 recursively searching for cgroups (each subdirectory is another cgroup).
 
-To provide a sane default for this setting, Netdata uses the following pattern list (patterns starting with `!` give a
+To provide a sensible default for this setting, Netdata uses the following pattern list (patterns starting with `!` give a
 negative match and their order is important: the first matching a path will be used):
 
 ```text
 [plugin:cgroups]
-	search for cgroups in subpaths matching =  !*/init.scope  !*-qemu  !/init.scope  !/system  !/systemd  !/user  !/user.slice  *
+ search for cgroups in subpaths matching =  !*/init.scope  !*-qemu  !*.libvirt-qemu  !/init.scope  !/system  !/systemd  !/user  !/lxc/*/*  !/lxc.monitor  !/lxc.payload/*/*  !/lxc.payload.*  *
 ```
 
 So, we disable checking for **child cgroups** in systemd internal
@@ -84,39 +83,37 @@ others are enabled.
 
 ### Enabled cgroups
 
-To provide a sane default, Netdata uses the
+To provide a sensible default, Netdata uses the
 following [pattern list](/src/libnetdata/simple_pattern/README.md):
 
 - Checks the pattern against the path of the cgroup
 
   ```text
   [plugin:cgroups]
-  	enable by default cgroups matching =  !*/init.scope  *.scope  !*/vcpu*  !*/emulator  !*.mount  !*.partition  !*.service  !*.slice  !*.swap  !*.user  !/  !/docker  !/libvirt  !/lxc  !/lxc/*/ns  !/lxc/*/ns/*  !/machine  !/qemu  !/system  !/systemd  !/user  *
+   enable by default cgroups matching =  !*/init.scope  !/system.slice/run-*.scope  *user.slice/docker-*  !*user.slice*  *.scope  !/machine.slice/*/.control  !/machine.slice/*/payload*  !/machine.slice/*/supervisor  /machine.slice/*.service  */kubepods/pod*/*  */kubepods/*/pod*/*  */*-kubepods-pod*/*  */*-kubepods-*-pod*/*  !*kubepods*  !*kubelet*  !*/vcpu*  !*/emulator  !*.mount  !*.partition  !*.service  !*.service/udev  !*.socket  !*.slice  !*.swap  !*.user  !/  !/docker  !*/libvirt  !/lxc  !/lxc/*/*  !/lxc.monitor*  !/lxc.pivot  !/lxc.payload  !*lxcfs.service/.control  !/machine  !/qemu  !/system  !/systemd  !/user  *
   ```
 
 - Checks the pattern against the name of the cgroup (as you see it on the dashboard)
 
   ```text
   [plugin:cgroups]
-  	enable by default cgroups names matching = *
+   enable by default cgroups names matching = *
   ```
 
 Renaming is configured with the following options:
 
 ```text
 [plugin:cgroups]
-	run script to rename cgroups matching =  *.scope  *docker*  *lxc*  *qemu*  !/  !*.mount  !*.partition  !*.service  !*.slice  !*.swap  !*.user  *
-	script to get cgroup names = /usr/libexec/netdata/plugins.d/cgroup-name.sh
+ run script to rename cgroups matching =  !/  !*.mount  !*.socket  !*.partition  /machine.slice/*.service  !*.service  !*.slice  !*.swap  !*.user  !init.scope  !*.scope/vcpu*  !*.scope/emulator  *.scope  *docker*  *lxc*  *qemu*  */kubepods/pod*/*  */kubepods/*/pod*/*  */*-kubepods-pod*/*  */*-kubepods-*-pod*/*  !*kubepods*  !*kubelet*  *.libvirt-qemu  *
+ script to get cgroup names = /usr/libexec/netdata/plugins.d/cgroup-name.sh
 ```
 
-The whole point for the additional pattern list, is to limit the number of
-times the script will be called. Without this pattern list, the script
-might be called thousands of times, depending on the number of cgroups
-available in the system.
+The additional pattern list serves to limit the number of times the script will be called. Without it, the script
+might be called thousands of times, depending on the number of cgroups available in the system.
 
 The above pattern list is matched against the path of the cgroup. For matched
 cgroups, Netdata calls the
-script [cgroup-name.sh](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/cgroup-name.sh.in)
+script [cgroup-name.sh.in](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/cgroup-name.sh.in)
 to get its name. This script queries `docker`, `kubectl`, `podman`, or applies
 heuristics to find a name for the cgroup.
 
@@ -165,13 +162,7 @@ Netdata reads the label from the same `docker inspect` / `podman inspect` output
 
 #### Kubernetes pods
 
-Add a pod annotation named `netdata.cloud/cgroup.name`:
-
-```sh
-kubectl annotate pods <pod-name> netdata.cloud/cgroup.name=<desired-name>
-```
-
-For declarative workloads, add the annotation in the pod template:
+For controller-managed pods (Deployments, StatefulSets, and similar), add the annotation in the pod template so it persists across pod restarts:
 
 ```yaml
 apiVersion: apps/v1
@@ -185,19 +176,27 @@ spec:
         netdata.cloud/cgroup.name: "storefront-green"
 ```
 
+To annotate a running pod directly (does not persist when the pod is replaced by a controller):
+
+```sh
+kubectl annotate pods <pod-name> netdata.cloud/cgroup.name=<desired-name>
+```
+
 Netdata extracts `netdata.cloud/*` annotations from pod metadata and uses `netdata.cloud/cgroup.name` to override the resolved name.
 
 #### Verifying the result and troubleshooting
 
-You can check the chart names Netdata created through the Agent's `/api/v1/charts` endpoint and filter for the `cgroup_` prefix to confirm the override took effect. Use the chart name shown by that endpoint when referencing the chart in API queries.
+You can check the chart names Netdata created through the Agent's `/api/v3/contexts` endpoint and filter for the `cgroup_` prefix to confirm the override took effect. Use the chart name shown by that endpoint when referencing the chart in API queries.
 
-> If you see a long alphanumeric string such as `twxae02wzkyy2d19gz4dsj6a-` at the start of a cgroup's chart name, that string is part of the resolved name itself (typically a container ID or Kubernetes UID from the cgroup path), not a prefix added by Netdata. Setting `netdata.cloud/cgroup.name` replaces it with your own value.
+:::note
+If you see a long alphanumeric string such as `twxae02wzkyy2d19gz4dsj6a-` at the start of a cgroup's chart name, that string is part of the resolved name itself (typically a container ID or Kubernetes UID from the cgroup path), not a prefix added by Netdata. Setting `netdata.cloud/cgroup.name` replaces it with your own value.
+:::
 
 If no override is set and Netdata cannot resolve a friendly name via Docker, Kubernetes, or Podman, the raw cgroup path is used as the display name.
 
 ### Alerts
 
-CPU and memory limits are watched and used to rise alerts. Memory usage for every cgroup is checked against `ram`
+CPU and memory limits are watched and used to raise alerts. Memory usage for every cgroup is checked against `ram`
 and `ram+swap` limits. CPU usage for every cgroup is checked against `cpuset.cpus`
 and `cpu.cfs_period_us` + `cpu.cfs_quota_us` pair assigned for the cgroup. Configuration for the alerts is available
 in `health.d/cgroups.conf` file.
@@ -206,47 +205,28 @@ in `health.d/cgroups.conf` file.
 
 Netdata monitors **systemd services**.
 
-Support per distribution:
-
-|      system      | charts shown |        `/sys/fs/cgroup` tree         | comments                  |
-|:----------------:|:------------:|:------------------------------------:|:--------------------------|
-|    Arch Linux    |     YES      |                                      |                           |
-|      Gentoo      |      NO      |                                      | can be enabled, see below |
-| Ubuntu 16.04 LTS |     YES      |                                      |                           |
-|   Ubuntu 16.10   |     YES      | [here](http://pastebin.com/PiWbQEXy) |                           |
-|    Fedora 25     |     YES      | [here](http://pastebin.com/ax0373wF) |                           |
-|     Debian 8     |      NO      |                                      | can be enabled, see below |
-|       AMI        |      NO      | [here](http://pastebin.com/FrxmptjL) | not a systemd system      |
-| CentOS 7.3.1611  |      NO      | [here](http://pastebin.com/SpzgezAg) | can be enabled, see below |
-
 ### Monitored systemd service metrics
 
 - CPU utilization
-- Used memory
-- RSS memory
-- Mapped memory
-- Cache memory
-- Writeback memory
-- Memory minor page faults
-- Memory major page faults
-- Memory charging activity
-- Memory uncharging activity
-- Memory limit failures
-- Swap memory used
-- Disk read bandwidth
-- Disk write bandwidth
-- Disk read operations
-- Disk write operations
-- Throttle disk read bandwidth
-- Throttle disk write bandwidth
-- Throttle disk read operations
-- Throttle disk write operations
-- Queued disk read operations
-- Queued disk write operations
-- Merged disk read operations
-- Merged disk write operations
+- Memory
+- Writeback Memory
+- Memory Paging I/O
+- Memory Page Faults
+- Memory Limit Failures
+- Used Memory
+- Disk Read/Write Bandwidth
+- Disk Read/Write Operations
+- Throttle Disk Read/Write Bandwidth
+- Throttle Disk Read/Write Operations
+- Queued Disk Read/Write Operations
+- Merged Disk Read/Write Operations
+- Number of Processes
 
 ### How to enable cgroup accounting on systemd systems that is by default disabled
+
+:::note
+On systems using cgroup v2 (the default on Ubuntu 22.04+, Fedora 31+, RHEL 9+, and other modern distributions), memory accounting is always enabled — no kernel boot parameters or systemd changes are needed. To check which cgroup version is active: `stat -fc %T /sys/fs/cgroup` returns `cgroup2fs` for cgroup v2 or `tmpfs` for cgroup v1.
+:::
 
 You can verify there is no accounting enabled, by running `systemd-cgtop`. The program will show only resources for
 cgroup `/`, but all services will show nothing.
@@ -285,13 +265,12 @@ sudo cp /tmp/system.conf /etc/systemd/system.conf
 sudo systemctl daemon-reexec
 ```
 
-(`systemctl daemon-reload` does not reload the configuration of the server - so you have to
-execute `systemctl daemon-reexec`).
+Note: `systemctl daemon-reload` does not reload systemd's own configuration — use `systemctl daemon-reexec` instead.
 
 Now, when you run `systemd-cgtop`, services will start reporting usage (if it does not, restart any service to wake it
 up). Refresh your Netdata dashboard, and you will have the charts too.
 
-In case memory accounting is missing, you will need to enable it at your kernel, by appending the following kernel boot
+In case memory accounting is missing (cgroup v1 systems), you will need to enable it at your kernel, by appending the following kernel boot
 options and rebooting:
 
 ```sh
@@ -306,10 +285,8 @@ Which systemd services are monitored by Netdata is determined by the following p
 
 ```text
 [plugin:cgroups]
-	cgroups to match as systemd services =  !/system.slice/*.service/*.service  /system.slice/*.service
+ cgroups to match as systemd services =  !/system.slice/*.service/*.service  /system.slice/*.service
 ```
-
-- - -
 
 ## Monitoring ephemeral containers
 
@@ -329,28 +306,43 @@ log a few errors in error.log complaining about files it cannot find, but immedi
 
 ### Monitored container metrics
 
-- CPU usage
-- CPU usage within the limits
-- CPU usage per core
-- Memory usage
-- Writeback memory
-- Memory activity
-- Memory page faults
-- Used memory
+- CPU Usage
+- CPU Usage within the limits
+- CPU Throttled Runnable Periods
+- CPU Throttled Time Duration
+- CPU Time Relative Share
+- CPU Usage Per Core
+- Memory Usage
+- Writeback Memory
+- Memory Activity
+- Memory Page Faults
 - Used RAM within the limits
-- Memory utilization
-- Memory limit failures
-- I/O bandwidth (all disks)
-- Serviced I/O operations (all disks)
-- Throttle I/O bandwidth (all disks)
-- Throttle serviced I/O operations (all disks)
-- Queued I/O operations (all disks)
-- Merged I/O operations (all disks)
-- CPU pressure
-- Memory pressure
+- Memory Utilization
+- Memory Limit Failures
+- Used Memory
+- I/O Bandwidth (all disks)
+- Serviced I/O Operations (all disks)
+- Throttle I/O Bandwidth (all disks)
+- Throttle Serviced I/O Operations (all disks)
+- Queued I/O Operations (all disks)
+- Merged I/O Operations (all disks)
+- CPU some pressure
+- CPU some pressure stall time
+- CPU full pressure
+- CPU full pressure stall time
+- Memory some pressure
+- Memory some pressure stall time
 - Memory full pressure
-- I/O pressure
+- Memory full pressure stall time
+- IRQ some pressure
+- IRQ some pressure stall time
+- IRQ full pressure
+- IRQ full pressure stall time
+- I/O some pressure
+- I/O some pressure stall time
 - I/O full pressure
+- I/O full pressure stall time
+- Number of processes
 
-Network interfaces are monitored by means of
-the [proc plugin](/src/collectors/proc.plugin/README.md#monitored-network-interface-metrics).
+Network interfaces inside containers are discovered and monitored by the cgroups plugin using
+[`cgroup-network-helper.sh`](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/cgroup-network-helper.sh).
