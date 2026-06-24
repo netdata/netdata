@@ -164,7 +164,19 @@ This configuration file can be edited using our [`edit-config` script](/docs/net
 
 ### Disable automatic updates
 
-To disable automatic updates on an existing installation, run the updater script with the `--disable-auto-updates` option using root privileges:
+**At install time**, pass `--no-updates` to the kickstart script to skip setting up auto-updates entirely:
+
+```bash
+wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --no-updates
+```
+
+To explicitly control the scheduling method at install time, use `--auto-update-type` with one of `systemd`, `interval`, or `crontab`:
+
+```bash
+wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --auto-update-type systemd
+```
+
+**On an existing installation**, run the updater script with the `--disable-auto-updates` option using root privileges:
 
 ```bash
 sudo /usr/libexec/netdata/netdata-updater.sh --disable-auto-updates
