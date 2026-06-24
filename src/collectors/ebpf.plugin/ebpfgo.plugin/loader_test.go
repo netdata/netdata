@@ -358,7 +358,7 @@ func TestBuildFallbackPlansRHFGenericAlternates(t *testing.T) {
 		ProgramMode:   LoadTrampoline,
 	}
 
-	plans := buildFallbackPlans(primary, defaultPluginsDir(), primary.IsRHF, "socket")
+	plans := buildFallbackPlans(primary, defaultPluginsDir(), primary.IsRHF, "socket", socketMaxBaseSelector)
 
 	wantPaths := []string{
 		"pnetdata_ebpf_socket_buffer.5.14.rhf.o",

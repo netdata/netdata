@@ -12,6 +12,10 @@ const cachestatDefaultPIDTableSize uint32 = 32768
 const cachestatMaxPIDTableSize uint32 = 32768
 const cachestatDefaultBTFFile = "vmlinux"
 
+// cachestatMaxBaseSelector is the highest SelectKernelName index for which a
+// base-flavor (no suffix) cachestat object file is shipped.
+const cachestatMaxBaseSelector = 9 // 5.16
+
 type CachestatLegacyConfig struct {
 	PluginsDir      string
 	Kernels         uint32
@@ -151,14 +155,15 @@ func resolveCachestatLegacyConfig() (CachestatLegacyConfig, error) {
 
 func BuildCachestatLegacyPlan(cfg CachestatLegacyConfig) LoadPlan {
 	return buildKprobeLegacyPlan(kprobePlanRequest{
-		PluginsDir:    cfg.PluginsDir,
-		Kernels:       cfg.Kernels,
-		IsRHF:         cfg.IsRHF,
-		KernelVersion: cfg.KernelVersion,
-		IsDebian:      cfg.IsDebian,
-		HasBTF:        cfg.HasBTF,
-		ObjectFlavor:  cfg.ObjectFlavor,
-		Name:          "cachestat",
+		PluginsDir:      cfg.PluginsDir,
+		Kernels:         cfg.Kernels,
+		IsRHF:           cfg.IsRHF,
+		KernelVersion:   cfg.KernelVersion,
+		IsDebian:        cfg.IsDebian,
+		HasBTF:          cfg.HasBTF,
+		ObjectFlavor:    cfg.ObjectFlavor,
+		Name:            "cachestat",
+		MaxBaseSelector: cachestatMaxBaseSelector,
 	})
 }
 

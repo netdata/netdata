@@ -491,14 +491,15 @@ func resolveKernelAndRH() (kver uint32, isRHF int, err error) {
 // collectors.  It exists solely to keep buildKprobeLegacyPlan within the
 // parameter-count limit while preserving all field names at call sites.
 type kprobePlanRequest struct {
-	PluginsDir    string
-	Kernels       uint32
-	IsRHF         int
-	KernelVersion uint32
-	IsDebian      bool
-	HasBTF        bool
-	ObjectFlavor  string
-	Name          string
+	PluginsDir      string
+	Kernels         uint32
+	IsRHF           int
+	KernelVersion   uint32
+	IsDebian        bool
+	HasBTF          bool
+	ObjectFlavor    string
+	Name            string
+	MaxBaseSelector int // highest selector index for which a base-flavor object exists
 }
 
 // buildKprobeLegacyPlan constructs the LoadPlan for kprobe/trampoline-based
@@ -508,6 +509,11 @@ func buildKprobeLegacyPlan(req kprobePlanRequest) LoadPlan {
 	flavor := selectConfiguredObjectFlavor(req.ObjectFlavor, req.KernelVersion, req.IsDebian)
 	loadMode := SelectLoadMode(req.HasBTF, LoadCore, req.KernelVersion, req.IsRHF)
 	selector := SelectIndex(req.Kernels, req.IsRHF, req.KernelVersion)
+	// Base-flavor objects are not built for every kernel the buffer/arena objects
+	// cover.  Cap the selector so we never construct a path that does not exist.
+	if flavor == ObjectFlavorBase && req.MaxBaseSelector > 0 && int(selector) > req.MaxBaseSelector {
+		selector = uint32(req.MaxBaseSelector)
+	}
 	return LoadPlan{
 		KernelVersion: req.KernelVersion,
 		IsRHF:         req.IsRHF,
@@ -523,7 +529,9 @@ func buildKprobeLegacyPlan(req kprobePlanRequest) LoadPlan {
 // progressively less demanding flavors (arena -> buffer -> base).  RHF plans
 // also try the generic filename for each flavor because some object families
 // use the RHF kernel selector without shipping .rhf-suffixed object files.
-func buildFallbackPlans(primary LoadPlan, pluginsDir string, isRHF int, name string) []LoadPlan {
+// maxBaseSelector is the highest selector index for which base-flavor objects
+// exist for this module; pass 0 to disable the cap.
+func buildFallbackPlans(primary LoadPlan, pluginsDir string, isRHF int, name string, maxBaseSelector int) []LoadPlan {
 	plans := make([]LoadPlan, 0, 6)
 	addPlan := func(plan LoadPlan) {
 		plans = append(plans, plan)
@@ -549,7 +557,12 @@ func buildFallbackPlans(primary LoadPlan, pluginsDir string, isRHF int, name str
 	if primary.Flavor != ObjectFlavorBase {
 		fb := primary
 		fb.Flavor = ObjectFlavorBase
-		fb.ObjectPath = BuildObjectPathWithFlavor(pluginsDir, primary.Selector, name, false, isRHF, ObjectFlavorBase)
+		fbSelector := primary.Selector
+		if maxBaseSelector > 0 && int(fbSelector) > maxBaseSelector {
+			fbSelector = uint32(maxBaseSelector)
+		}
+		fb.Selector = fbSelector
+		fb.ObjectPath = BuildObjectPathWithFlavor(pluginsDir, fbSelector, name, false, isRHF, ObjectFlavorBase)
 		addPlan(fb)
 	}
 

@@ -12,6 +12,10 @@ const (
 	// socketDefaultPIDTableSize matches cachestatDefaultPIDTableSize so both
 	// modules produce an identically-sized SHM segment.
 	socketDefaultPIDTableSize uint32 = 32768
+	// socketMaxBaseSelector is the highest SelectKernelName index for which a
+	// base-flavor (no suffix) socket object file is shipped.  Objects for newer
+	// kernels use the buffer or arena flavor only.
+	socketMaxBaseSelector = 7 // 5.14
 )
 
 type SocketLegacyConfig struct {
@@ -97,13 +101,14 @@ func resolveSocketLegacyConfig() (SocketLegacyConfig, error) {
 
 func BuildSocketLegacyPlan(cfg SocketLegacyConfig) LoadPlan {
 	return buildKprobeLegacyPlan(kprobePlanRequest{
-		PluginsDir:    cfg.PluginsDir,
-		Kernels:       cfg.Kernels,
-		IsRHF:         cfg.IsRHF,
-		KernelVersion: cfg.KernelVersion,
-		IsDebian:      cfg.IsDebian,
-		HasBTF:        cfg.HasBTF,
-		ObjectFlavor:  cfg.ObjectFlavor,
-		Name:          "socket",
+		PluginsDir:      cfg.PluginsDir,
+		Kernels:         cfg.Kernels,
+		IsRHF:           cfg.IsRHF,
+		KernelVersion:   cfg.KernelVersion,
+		IsDebian:        cfg.IsDebian,
+		HasBTF:          cfg.HasBTF,
+		ObjectFlavor:    cfg.ObjectFlavor,
+		Name:            "socket",
+		MaxBaseSelector: socketMaxBaseSelector,
 	})
 }

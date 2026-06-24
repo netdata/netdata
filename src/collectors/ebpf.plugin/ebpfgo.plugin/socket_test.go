@@ -98,6 +98,9 @@ func TestBuildSocketLegacyPlan(t *testing.T) {
 			wantMode: LoadLegacy,
 		},
 		"arena-on-debian-falls-back-to-base": {
+			// Arena is blocked on Debian; base flavor is chosen.  The selector must be
+			// capped to socketMaxBaseSelector (7 = 5.14) because no base object exists
+			// for kernels beyond 5.14.
 			cfg: SocketLegacyConfig{
 				PluginsDir:    defaultPluginsDir(),
 				Kernels:       socketKernelMask,
@@ -107,10 +110,13 @@ func TestBuildSocketLegacyPlan(t *testing.T) {
 				HasBTF:        true,
 				ObjectFlavor:  "arena",
 			},
-			want:     "pnetdata_ebpf_socket.6.12.o",
+			want:     "pnetdata_ebpf_socket.5.14.o",
 			wantMode: LoadCore,
 		},
 		"tracing-explicit": {
+			// "tracing" (= legacy / base flavor) on kernel 6.12 must fall back to the
+			// highest existing base object (5.14, selector 7) rather than a non-existent
+			// pnetdata_ebpf_socket.6.12.o.
 			cfg: SocketLegacyConfig{
 				PluginsDir:    defaultPluginsDir(),
 				Kernels:       socketKernelMask,
@@ -120,7 +126,7 @@ func TestBuildSocketLegacyPlan(t *testing.T) {
 				HasBTF:        true,
 				ObjectFlavor:  "tracing",
 			},
-			want:     "pnetdata_ebpf_socket.6.12.o",
+			want:     "pnetdata_ebpf_socket.5.14.o",
 			wantMode: LoadCore,
 		},
 	}

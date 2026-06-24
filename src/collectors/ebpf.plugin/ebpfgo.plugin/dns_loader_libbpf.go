@@ -42,7 +42,7 @@ func tryLoadDNSPlan(plan LoadPlan) (*DNSLegacyHandle, error) {
 func LoadDNSLegacy(cfg DNSLegacyConfig) (*DNSLegacyHandle, error) {
 	plan := BuildDNSLegacyPlan(cfg)
 
-	plans := buildFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "dns")
+	plans := buildFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "dns", dnsMaxBaseSelector)
 	var lastErr error
 	for i, fp := range plans {
 		handle, err := tryLoadDNSPlan(fp)

@@ -67,13 +67,16 @@ func LoadCachestatLegacy(cfg CachestatLegacyConfig) (*CachestatLegacyHandle, err
 	coreSupported := libbpfloader.SupportsCore()
 	if !coreSupported {
 		selector := SelectIndex(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion)
+		if int(selector) > cachestatMaxBaseSelector {
+			selector = uint32(cachestatMaxBaseSelector)
+		}
 		plan.ObjectPath = BuildObjectPathWithFlavor(cfg.PluginsDir, selector, "cachestat", false, cfg.IsRHF, ObjectFlavorBase)
 		plan.LoadMode = LoadLegacy
 		// No fallback in legacy mode: there is only one object.
 		return tryLoadCachestatPlan(cfg, plan)
 	}
 
-	plans := buildFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "cachestat")
+	plans := buildFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "cachestat", cachestatMaxBaseSelector)
 	var lastErr error
 	for i, fp := range plans {
 		handle, err := tryLoadCachestatPlan(cfg, fp)

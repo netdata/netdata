@@ -8,6 +8,9 @@ const (
 	dnsKernelMask          uint32 = (1 << 12) - 1
 	dnsDefaultUpdateEvery         = 10
 	dnsDefaultObjectFlavor        = "buffer"
+	// dnsMaxBaseSelector is the highest SelectKernelName index for which a
+	// base-flavor (no suffix) dns object file is shipped.
+	dnsMaxBaseSelector = 7 // 5.14
 )
 
 type DNSLegacyConfig struct {
@@ -80,6 +83,11 @@ func resolveDNSLegacyConfig() (DNSLegacyConfig, error) {
 func BuildDNSLegacyPlan(cfg DNSLegacyConfig) LoadPlan {
 	flavor := selectConfiguredObjectFlavor(cfg.ObjectFlavor, cfg.KernelVersion, cfg.IsDebian)
 	selector := SelectIndex(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion)
+	// Base-flavor DNS objects are not built beyond 5.14; cap the selector so we
+	// never construct a path that does not exist.
+	if flavor == ObjectFlavorBase && int(selector) > dnsMaxBaseSelector {
+		selector = uint32(dnsMaxBaseSelector)
+	}
 	return LoadPlan{
 		KernelVersion: cfg.KernelVersion,
 		IsRHF:         cfg.IsRHF,

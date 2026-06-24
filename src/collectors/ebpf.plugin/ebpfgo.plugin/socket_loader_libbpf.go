@@ -47,6 +47,9 @@ func LoadSocketLegacy(cfg SocketLegacyConfig) (*SocketLegacyHandle, error) {
 	coreSupported := libbpfloader.SupportsCore()
 	if !coreSupported {
 		selector := SelectIndex(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion)
+		if int(selector) > socketMaxBaseSelector {
+			selector = uint32(socketMaxBaseSelector)
+		}
 		plan = LoadPlan{
 			KernelVersion: cfg.KernelVersion,
 			IsRHF:         cfg.IsRHF,
@@ -60,7 +63,7 @@ func LoadSocketLegacy(cfg SocketLegacyConfig) (*SocketLegacyHandle, error) {
 		return tryLoadSocketPlan(cfg, plan)
 	}
 
-	plans := buildFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "socket")
+	plans := buildFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "socket", socketMaxBaseSelector)
 	var lastErr error
 	for i, fp := range plans {
 		handle, err := tryLoadSocketPlan(cfg, fp)

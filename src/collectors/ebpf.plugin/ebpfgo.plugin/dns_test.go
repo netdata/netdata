@@ -49,8 +49,9 @@ func TestBuildDNSLegacyPlan(t *testing.T) {
 			wantMode: LoadCore,
 		},
 		"arena-on-debian-falls-back-to-base": {
-			// selectConfiguredObjectFlavor: "arena" on Debian → blocked → default base.
-			// To get buffer on Debian, configure ObjectFlavor = "buffer" explicitly.
+			// Arena is blocked on Debian; base flavor is chosen.  The selector must be
+			// capped to dnsMaxBaseSelector (7 = 5.14) because no base object exists for
+			// kernels beyond 5.14.  To get buffer on Debian, configure ObjectFlavor = "buffer".
 			cfg: DNSLegacyConfig{
 				PluginsDir:    defaultPluginsDir(),
 				Kernels:       dnsKernelMask,
@@ -59,7 +60,7 @@ func TestBuildDNSLegacyPlan(t *testing.T) {
 				IsDebian:      true,
 				ObjectFlavor:  "arena",
 			},
-			want:     "pnetdata_ebpf_dns.6.12.o",
+			want:     "pnetdata_ebpf_dns.5.14.o",
 			wantMode: LoadCore,
 		},
 		"debian-explicit-buffer": {

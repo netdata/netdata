@@ -77,6 +77,9 @@ func TestBuildCachestatLegacyPlan(t *testing.T) {
 			wantMode: LoadLegacy,
 		},
 		"arena-on-debian-falls-back-to-tracing": {
+			// Arena is blocked on Debian; base flavor is chosen.  The selector must be
+			// capped to cachestatMaxBaseSelector (9 = 5.16) because no base object
+			// exists for kernels beyond 5.16.
 			cfg: CachestatLegacyConfig{
 				PluginsDir:    defaultPluginsDir(),
 				Kernels:       cachestatKernelMask,
@@ -86,10 +89,13 @@ func TestBuildCachestatLegacyPlan(t *testing.T) {
 				HasBTF:        true,
 				ObjectFlavor:  "arena",
 			},
-			want:     "pnetdata_ebpf_cachestat.6.12.o",
+			want:     "pnetdata_ebpf_cachestat.5.16.o",
 			wantMode: LoadCore,
 		},
 		"tracing-explicit": {
+			// "tracing" (= legacy / base flavor) on kernel 6.12 must fall back to the
+			// highest existing base object (5.16, selector 9) rather than a non-existent
+			// pnetdata_ebpf_cachestat.6.12.o.
 			cfg: CachestatLegacyConfig{
 				PluginsDir:    defaultPluginsDir(),
 				Kernels:       cachestatKernelMask,
@@ -99,7 +105,7 @@ func TestBuildCachestatLegacyPlan(t *testing.T) {
 				HasBTF:        true,
 				ObjectFlavor:  "tracing",
 			},
-			want:     "pnetdata_ebpf_cachestat.6.12.o",
+			want:     "pnetdata_ebpf_cachestat.5.16.o",
 			wantMode: LoadCore,
 		},
 	}
