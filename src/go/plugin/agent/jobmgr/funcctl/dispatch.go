@@ -52,6 +52,12 @@ func (c *Controller) ExecuteFunction(functionName string, fn functions.Function)
 	c.makeMethodFuncHandler(moduleName, methodID)(c.baseContext(), fn)
 }
 
+func (c *Controller) publishedFunctionGenerationMatches(functionName string, generation uint64) bool {
+	c.publishedMu.Lock()
+	defer c.publishedMu.Unlock()
+	return c.publishedFns.generationMatches(functionName, generation)
+}
+
 func (c *Controller) executeMethodRequest(parent context.Context, in methodExecutionInput) {
 	if parent == nil {
 		parent = c.baseContext()
@@ -144,6 +150,17 @@ func (c *Controller) executeMethodRequest(parent context.Context, in methodExecu
 	updateEvery := max(in.methodCfg.UpdateEvery, 1)
 
 	in.respond(dataResp, methodParams, updateEvery)
+}
+
+func (c *Controller) makePublishedMethodFuncHandler(functionName string, generation uint64, moduleName, methodID string) functions.Handler {
+	handler := c.makeMethodFuncHandler(moduleName, methodID)
+	return func(ctx context.Context, fn functions.Function) {
+		if !c.publishedFunctionGenerationMatches(functionName, generation) {
+			c.respondError(fn, 404, "unknown function '%s'", functionName)
+			return
+		}
+		handler(ctx, fn)
+	}
 }
 
 func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) functions.Handler {
@@ -511,6 +528,17 @@ func buildAcceptedParams(methodParams []funcapi.ParamConfig, includeJobParam boo
 
 func methodRequiresJobParam(cfg *funcapi.MethodConfig) bool {
 	return cfg == nil || !cfg.AgentWide
+}
+
+func (c *Controller) makePublishedJobMethodFuncHandler(functionName string, generation uint64, moduleName, jobName, methodID string) functions.Handler {
+	handler := c.makeJobMethodFuncHandler(moduleName, jobName, methodID)
+	return func(ctx context.Context, fn functions.Function) {
+		if !c.publishedFunctionGenerationMatches(functionName, generation) {
+			c.respondError(fn, 404, "unknown function '%s'", functionName)
+			return
+		}
+		handler(ctx, fn)
+	}
 }
 
 func (c *Controller) makeJobMethodFuncHandler(moduleName, jobName, methodID string) functions.Handler {

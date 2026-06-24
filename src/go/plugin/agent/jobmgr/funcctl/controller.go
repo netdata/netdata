@@ -32,13 +32,15 @@ type Controller struct {
 	fnReg      functions.Registry
 	ctx        context.Context
 
-	registry          *moduleFuncRegistry
-	staticMethodsMu   sync.Mutex
-	staticMethodsSeen map[string]struct{}
+	registry     *moduleFuncRegistry
+	publishedMu  sync.Mutex
+	publishedFns *publishedFunctionStore
 }
 
 type functionPublish struct {
-	opts netdataapi.FunctionGlobalOpts
+	name    string
+	handler functions.Handler
+	opts    netdataapi.FunctionGlobalOpts
 }
 
 func New(opts Options) *Controller {
@@ -52,12 +54,12 @@ func New(opts Options) *Controller {
 	}
 
 	return &Controller{
-		Logger:            log,
-		api:               opts.API,
-		jsonWriter:        opts.JSONWriter,
-		fnReg:             reg,
-		registry:          newModuleFuncRegistry(),
-		staticMethodsSeen: make(map[string]struct{}),
+		Logger:       log,
+		api:          opts.API,
+		jsonWriter:   opts.JSONWriter,
+		fnReg:        reg,
+		registry:     newModuleFuncRegistry(),
+		publishedFns: newPublishedFunctionStore(),
 	}
 }
 
@@ -173,16 +175,15 @@ func (c *Controller) OnJobStop(job collectorapi.RuntimeJob) {
 }
 
 func (c *Controller) Cleanup() {
-	c.staticMethodsMu.Lock()
-	names := make([]string, 0, len(c.staticMethodsSeen))
-	for funcName := range c.staticMethodsSeen {
-		c.fnReg.Unregister(funcName)
-		names = append(names, funcName)
-	}
-	c.staticMethodsMu.Unlock()
+	c.publishedMu.Lock()
+	names := c.publishedFns.removeKind(publishedFunctionModuleMethod)
+	c.publishedMu.Unlock()
 
+	sort.Strings(names)
+	for _, funcName := range names {
+		c.fnReg.Unregister(funcName)
+	}
 	if c.api != nil {
-		sort.Strings(names)
 		for _, funcName := range names {
 			c.api.FunctionRemove(funcName)
 		}
@@ -200,6 +201,9 @@ func (c *Controller) registerModuleMethodsOnJobStart(moduleName string) {
 
 func (c *Controller) registerAvailableModuleMethods(moduleName string, methods []funcapi.MethodConfig, agentWideOnly bool) {
 	publishes := c.collectAvailableModuleMethodPublishes(moduleName, methods, agentWideOnly)
+	for _, publish := range publishes {
+		c.registerFunction(publish.name, publish.handler)
+	}
 	if c.api == nil {
 		return
 	}
@@ -209,15 +213,15 @@ func (c *Controller) registerAvailableModuleMethods(moduleName string, methods [
 }
 
 func (c *Controller) collectAvailableModuleMethodPublishes(moduleName string, methods []funcapi.MethodConfig, agentWideOnly bool) []functionPublish {
-	c.staticMethodsMu.Lock()
-	defer c.staticMethodsMu.Unlock()
+	c.publishedMu.Lock()
+	defer c.publishedMu.Unlock()
 
 	var publishes []functionPublish
 	for i, method := range methods {
 		if agentWideOnly && !method.AgentWide {
 			continue
 		}
-		if method.ID != "" && c.allStaticMethodNamesSeenLocked(moduleName, method) {
+		if method.ID != "" && c.allMethodFunctionNamesPublishedLocked(moduleName, method) {
 			continue
 		}
 		if !methodAvailable(method) {
@@ -242,11 +246,13 @@ func (c *Controller) collectAvailableModuleMethodPublishes(moduleName string, me
 
 		if c.api != nil {
 			for _, funcName := range funcapi.MethodFunctionNames(moduleName, method) {
-				if _, seen := c.staticMethodsSeen[funcName]; seen {
+				if c.publishedFns.has(funcName) {
 					continue
 				}
-				c.registerFunction(funcName, c.makeMethodFuncHandler(moduleName, method.ID))
+				record, _ := c.publishedFns.add(funcName, moduleMethodOwner(moduleName, method.ID))
 				publishes = append(publishes, functionPublish{
+					name:    funcName,
+					handler: c.makePublishedMethodFuncHandler(funcName, record.generation, moduleName, method.ID),
 					opts: netdataapi.FunctionGlobalOpts{
 						Name:     funcName,
 						Timeout:  60,
@@ -257,33 +263,27 @@ func (c *Controller) collectAvailableModuleMethodPublishes(moduleName string, me
 						Version:  3,
 					},
 				})
-				c.staticMethodsSeen[funcName] = struct{}{}
 			}
 			continue
 		}
 
 		for _, funcName := range funcapi.MethodFunctionNames(moduleName, method) {
-			if _, seen := c.staticMethodsSeen[funcName]; seen {
+			if c.publishedFns.has(funcName) {
 				continue
 			}
-			c.registerFunction(funcName, c.makeMethodFuncHandler(moduleName, method.ID))
-			c.staticMethodsSeen[funcName] = struct{}{}
+			record, _ := c.publishedFns.add(funcName, moduleMethodOwner(moduleName, method.ID))
+			publishes = append(publishes, functionPublish{
+				name:    funcName,
+				handler: c.makePublishedMethodFuncHandler(funcName, record.generation, moduleName, method.ID),
+			})
 		}
 	}
 	return publishes
 }
 
-func (c *Controller) allStaticMethodNamesSeenLocked(moduleName string, method funcapi.MethodConfig) bool {
+func (c *Controller) allMethodFunctionNamesPublishedLocked(moduleName string, method funcapi.MethodConfig) bool {
 	names := funcapi.MethodFunctionNames(moduleName, method)
-	if len(names) == 0 {
-		return false
-	}
-	for _, name := range names {
-		if _, seen := c.staticMethodsSeen[name]; !seen {
-			return false
-		}
-	}
-	return true
+	return c.publishedFns.all(names)
 }
 
 func methodTags(method funcapi.MethodConfig) string {
@@ -337,27 +337,50 @@ func (c *Controller) registerJobMethods(job collectorapi.RuntimeJob, methods []f
 	// Record methods before publishing handlers so startup-time calls do not race a false 404.
 	c.registry.registerJobMethods(job.ModuleName(), job.Name(), methods)
 
+	publishes := c.collectJobMethodPublishes(job, methods)
+
+	for _, publish := range publishes {
+		c.registerFunction(publish.name, publish.handler)
+		if c.api != nil {
+			c.api.FunctionGlobal(publish.opts)
+		}
+
+		c.Debugf("registered job method: %s for job %s[%s]", publish.name, job.ModuleName(), job.Name())
+	}
+}
+
+func (c *Controller) collectJobMethodPublishes(job collectorapi.RuntimeJob, methods []funcapi.MethodConfig) []functionPublish {
+	c.publishedMu.Lock()
+	defer c.publishedMu.Unlock()
+
+	var publishes []functionPublish
 	for _, method := range methods {
 		if method.ID == "" {
 			continue
 		}
 
 		funcName := fmt.Sprintf("%s:%s", job.ModuleName(), method.ID)
-		c.registerFunction(funcName, c.makeJobMethodFuncHandler(job.ModuleName(), job.Name(), method.ID))
+		if c.publishedFns.has(funcName) {
+			continue
+		}
 
-		if c.api != nil {
-			help := method.Help
-			if help == "" {
-				help = fmt.Sprintf("%s %s data function", job.ModuleName(), method.ID)
-			}
+		record, _ := c.publishedFns.add(funcName, jobMethodOwner(job.ModuleName(), job.Name(), method.ID))
 
-			const cloudAccess = "0x0013"
-			access := "0x0000"
-			if method.RequireCloud {
-				access = cloudAccess
-			}
+		help := method.Help
+		if help == "" {
+			help = fmt.Sprintf("%s %s data function", job.ModuleName(), method.ID)
+		}
 
-			c.api.FunctionGlobal(netdataapi.FunctionGlobalOpts{
+		const cloudAccess = "0x0013"
+		access := "0x0000"
+		if method.RequireCloud {
+			access = cloudAccess
+		}
+
+		publishes = append(publishes, functionPublish{
+			name:    funcName,
+			handler: c.makePublishedJobMethodFuncHandler(funcName, record.generation, job.ModuleName(), job.Name(), method.ID),
+			opts: netdataapi.FunctionGlobalOpts{
 				Name:     funcName,
 				Timeout:  60,
 				Help:     help,
@@ -365,11 +388,10 @@ func (c *Controller) registerJobMethods(job collectorapi.RuntimeJob, methods []f
 				Access:   access,
 				Priority: 100,
 				Version:  3,
-			})
-		}
-
-		c.Debugf("registered job method: %s for job %s[%s]", funcName, job.ModuleName(), job.Name())
+			},
+		})
 	}
+	return publishes
 }
 
 func (c *Controller) unregisterJobMethods(job collectorapi.RuntimeJob) {
@@ -378,14 +400,18 @@ func (c *Controller) unregisterJobMethods(job collectorapi.RuntimeJob) {
 		return
 	}
 
+	var names []string
+	c.publishedMu.Lock()
 	for _, method := range methods {
 		if method.ID == "" {
 			continue
 		}
+		names = append(names, c.publishedFns.removeOwner(jobMethodOwner(job.ModuleName(), job.Name(), method.ID))...)
+	}
+	c.publishedMu.Unlock()
 
-		// FIXME: keep this in sync with registerJobMethods() if job-method alias
-		// support is added later; today only the canonical name is removed here.
-		funcName := fmt.Sprintf("%s:%s", job.ModuleName(), method.ID)
+	sort.Strings(names)
+	for _, funcName := range names {
 		c.fnReg.Unregister(funcName)
 		if c.api != nil {
 			c.api.FunctionRemove(funcName)
