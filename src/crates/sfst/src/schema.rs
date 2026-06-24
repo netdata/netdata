@@ -12,14 +12,15 @@ use treight::Bitmap;
 // ── SUMR ─────────────────────────────────────────────────────────
 
 /// The cheap, content-agnostic per-file summary stored in the `SUMR` chunk —
-/// time span, record count, opaque partition key, and opaque content metadata —
-/// read by a registry to pick this SFST as a query candidate without opening
-/// the heavy `META` chunk.
+/// time span, record count, and opaque content metadata — read by a registry
+/// to pick this SFST as a query candidate without opening the heavy `META`
+/// chunk.
 ///
 /// This is the substrate's [`file_registry::FileSummary`]; the SFST stores it
-/// verbatim and never interprets `part_key`/`content_meta`. A query keeps the
-/// file as a candidate when its `[min_timestamp_s, max_timestamp_s]` span
-/// overlaps the request window and its `part_key` matches; the file's
+/// verbatim and never interprets `content_meta`. A query keeps the file as a
+/// candidate when its `[min_timestamp_s, max_timestamp_s]` span overlaps the
+/// request window and its `id.part_key` matches (the partition key lives in the
+/// `FileId`, not the summary); the file's
 /// stream-batch geometry comes from `record_count` (see
 /// [`stream_batch_size`](crate::stream_batch_size)). Kept in its own `SUMR`
 /// chunk so a registry rebuilds on startup by faulting in only the header, TOC,

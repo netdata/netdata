@@ -379,12 +379,13 @@ mod tests {
         let seqs: Vec<u64> = registry.archived_files().map(|f| f.id.seq).collect();
         assert_eq!(seqs, vec![1, 2]);
 
-        // Recovery reads the stream from the v2 header (no frame decode).
+        // Recovery reads the partition key from the filename (FileId), not the
+        // header — since v4 the header no longer stores part_key.
         assert!(
             registry
                 .archived_files()
                 .all(|f| f.id.part_key == crate::opaque_part_key("ns", "svc")),
-            "recovery must recover each file's stream from its header"
+            "recovery must recover each file's partition key from its filename (FileId)"
         );
     }
 

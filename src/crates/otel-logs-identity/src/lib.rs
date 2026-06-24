@@ -6,9 +6,11 @@
 //! serialized into the substrate's opaque per-file metadata blob.
 //!
 //! It is the content-plane counterpart to the content-agnostic substrate
-//! (`file-registry`/`wal`/`sfst`/`otel-catalog`): the substrate stores an opaque
-//! `part_key: u64` and an opaque `content_meta: Vec<u8>` and never interprets
-//! either. This crate is the one place that gives them meaning, for logs — the
+//! (`file-registry`/`wal`/`sfst`/`otel-catalog`): the substrate carries an
+//! opaque `part_key: u64` (in the file's `FileId`/filename, the single source
+//! of truth) and an opaque `content_meta: Vec<u8>` (in the per-file summary)
+//! and never interprets either. This crate is the one place that gives them
+//! meaning, for logs — the
 //! producer (`otel-ingestor`) encodes the identity here before writing, and the
 //! query layer (`otel-ledger`) decodes it here for display. A second signal
 //! (traces) will get its own sibling identity crate; the opinion-free hash

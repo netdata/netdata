@@ -32,7 +32,7 @@ impl Registry {
     ///
     /// `local_seqs` may be computed time-only (all streams) and still be correct
     /// here: one seq maps to exactly one file and one partition (`build_catalog_entry`
-    /// copies both `id` and `part_key` from the same SFST), so a stream-matching
+    /// copies `id` — which carries `part_key` — from the same SFST), so a stream-matching
     /// entry whose seq is locally served is served by that same stream — the
     /// time-only and stream-filtered masks agree on every entry the stream filter
     /// keeps. `catalog` parsed time-only means the stream filter is NOT applied

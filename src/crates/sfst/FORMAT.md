@@ -200,6 +200,21 @@ identity. The file's opaque **partition key is NOT stored in the
 summary** — it is the single source of truth in the filename (`FileId`);
 candidate filtering reads it from there.
 
+#### Partition-key authority
+
+The partition key in the filename is **authoritative**: every reader
+(WAL, SFST, catalog, query planner) routes a file by `id.part_key`
+parsed from its name, and the key is never re-derived from the file's
+contents or cross-checked against them at read time. The producer chain
+guarantees the filename matches the contents — the WAL writer stamps the
+`FileId` from the same partition key it routes a frame to, and the SFST
+indexer inherits that `FileId` verbatim — so for self-produced files the
+label and the content always agree by construction. The trade-off is
+explicit: a file whose name is altered out-of-band (manual rename, disk
+corruption) would be routed by its (now wrong) label, not its contents.
+This is accepted because filenames are internal and never rewritten
+externally; there is intentionally no runtime content-vs-label guard.
+
 ### `META` — Metadata
 
 Heavy query-time metadata:

@@ -20,6 +20,9 @@ pub use registry::{File, Registry, filename, scan_max_sequence};
 /// Current catalog JSON schema version (the `version` field inside the
 /// JSON payload). Distinct from [`CONTAINER_VERSION`], which versions
 /// the on-disk framing around it.
+///
+/// v3 drops the top-level `part_key` from `CatalogEntry` — the partition key
+/// lives only in `entry.id` (the `FileId`), the single source of truth.
 pub const FORMAT_VERSION: u32 = 3;
 
 /// Magic bytes of the on-disk catalog container.

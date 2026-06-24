@@ -61,11 +61,16 @@ has two front doors over one shared code path (see below).
   and avoiding double-counting.
 - **Stream filter** mirrors the live planner and the
   [stream-identity contract](otel-stream-identity.md):
-  - SFST: exact `ServiceStream` equality against the summary stream.
-  - WAL: `FileId.ns_hash` compared against the query stream's
-    `ServiceStream::ns_hash()` (empty field == absent). The raw
-    `compute_ns_hash(Some(&ns), …)` MUST NOT be used here — it would hash an
-    absent namespace as `Some("")` and miss every absent-namespace WAL file.
+  - Both tiers filter identically by **`FileId.part_key` membership**: each
+    candidate's `id.part_key` (parsed from the filename) is tested against the
+    query's `partition_keys` set via `Query::matches_partition`. There is no
+    content-derived `ServiceStream` equality — the substrate is content-agnostic
+    and routes purely by the opaque partition key in the filename.
+  - The CLI derives the one filter key from `--namespace`/`--name` via
+    `otel_logs_identity::part_key` (i.e. `ServiceStream::ns_hash`, empty field ==
+    absent). The raw `compute_ns_hash(Some(&ns), …)` MUST NOT be used here — it
+    would hash an absent namespace as `Some("")` and miss every absent-namespace
+    file.
   - A stream needs a `--name`; `--namespace` defaults to empty and requires
     `--name` (a namespace alone cannot identify a stream).
 

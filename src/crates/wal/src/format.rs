@@ -240,4 +240,22 @@ mod tests {
         let err = FileHeader::from_bytes(&buf).unwrap_err();
         assert!(matches!(err, crate::Error::UnsupportedVersion(1)));
     }
+
+    #[test]
+    fn header_rejects_v3_layout_before_misreading_offset() {
+        // The v3->v4 break removed the 8-byte `part_key` that sat at bytes
+        // 16..24, shifting `content_meta_len` from 24..26 to 16..18. A v3
+        // header must reject at the version check *before* its old part_key
+        // bytes at 16..18 are misread as a v4 content_meta_len. Forge such a
+        // header with a huge value where v4 would read the length, and confirm
+        // the failure is the version rejection, not an oversize-content-meta
+        // error.
+        let mut buf = [0u8; HEADER_SIZE];
+        buf[0..4].copy_from_slice(&MAGIC);
+        buf[4..6].copy_from_slice(&3u16.to_le_bytes());
+        buf[CONTENT_META_OFFSET - 2..CONTENT_META_OFFSET]
+            .copy_from_slice(&u16::MAX.to_le_bytes());
+        let err = FileHeader::from_bytes(&buf).unwrap_err();
+        assert!(matches!(err, crate::Error::UnsupportedVersion(3)));
+    }
 }

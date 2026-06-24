@@ -396,6 +396,13 @@ pub(super) fn build_into<W: Write + Seek>(
     // the substrate's opaque `content_meta` (display identity). The `part_key`
     // is NOT stored in the summary — it is the single source of truth in the
     // filename (`FileId`), propagated from the WAL file the SFST is built from.
+    //
+    // Label authority: the partition key in the filename is trusted as-is and
+    // is deliberately NOT cross-checked against the row-derived stream here.
+    // For self-produced files the two always agree by construction (the
+    // ingestor derives both from the same stream); files are never renamed
+    // externally. See `FORMAT.md` ("Partition-key authority").
+    //
     // This is the transitional content-plane touch in the builder; a later
     // stage lifts identity derivation to the caller and removes this dependency.
     let summary = sfst::Summary {

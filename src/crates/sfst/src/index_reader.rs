@@ -46,7 +46,8 @@ impl<'a> IndexReader<'a> {
     }
 
     /// The cheap summary fields (timestamps, record count, opaque
-    /// `part_key`/`content_meta` identity).
+    /// `content_meta` identity). The partition key is not here — it lives in
+    /// the file's `FileId` (filename), the single source of truth.
     pub fn summary(&self) -> &Summary {
         &self.summary
     }

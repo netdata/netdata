@@ -16,7 +16,7 @@ pub struct Query {
     /// file as a candidate if its `[min_timestamp, max_timestamp]` range
     /// overlaps `[start, end)`.
     pub time_range: Range<u32>,
-    /// Partition filter, as a set of opaque [`FileId::part_key`] values.
+    /// Partition filter, as a set of opaque [`FileId::part_key`](crate::FileId#structfield.part_key) values.
     /// **Empty matches every partition**; a non-empty set keeps only files
     /// whose `part_key` is one of these values. The substrate compares the
     /// key as an opaque `u64` and ascribes it no meaning; the content plane

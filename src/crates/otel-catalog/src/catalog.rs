@@ -355,7 +355,7 @@ mod tests {
     #[test]
     fn from_json_rejects_old_schema_on_version_not_serde() {
         // A real v1 catalog: old-schema entry (`total_logs`/`stream`, missing
-        // the current `record_count`/`part_key`/`content_meta`). The version
+        // the current `record_count`/`content_meta`). The version
         // peek must reject it as `UnsupportedVersion(1)` — not a serde
         // "missing field" error from attempting the full parse.
         let json = br#"{
@@ -371,6 +371,28 @@ mod tests {
         match Catalog::from_json(json) {
             Err(Error::UnsupportedVersion(1)) => {}
             other => panic!("expected UnsupportedVersion(1), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn from_json_rejects_v2_schema_on_version_not_serde() {
+        // The immediately-superseded v2 schema carried a top-level `part_key`
+        // on each entry (dropped in v3). The version peek must reject a v2
+        // catalog as `UnsupportedVersion(2)` before any per-entry parse — never
+        // misread the v2 `part_key` field into the v3 schema.
+        let json = br#"{
+            "version": 2,
+            "tenant_id": "t",
+            "date": "2026-04-17",
+            "machine_id": "00000000-0000-0000-0000-000000000000",
+            "boot_id": "00000000-0000-0000-0000-000000000000",
+            "entries": [
+                {"id": "x", "record_count": 5, "part_key": 42, "content_meta": []}
+            ]
+        }"#;
+        match Catalog::from_json(json) {
+            Err(Error::UnsupportedVersion(2)) => {}
+            other => panic!("expected UnsupportedVersion(2), got {other:?}"),
         }
     }
 
