@@ -5,6 +5,14 @@ repo_root="$(dirname "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/nu
 # shellcheck source=./win-build-dir.sh
 . "${repo_root}/packaging/windows/win-build-dir.sh"
 
+# Prepend UCRT64 toolchain so cmake, ldd.exe, and other build tools resolve
+# to the UCRT64 native Windows binaries instead of the POSIX MSYS2 wrappers.
+# cmake --install must use the same cmake that generated cmake_install.cmake
+# (i.e. /ucrt64/bin/cmake); the POSIX cmake at /usr/bin/cmake treats Windows
+# absolute paths (C:/...) as relative paths and fails with path concatenation
+# errors.  This mirrors the PATH setup in compile-on-windows.sh.
+export PATH="/ucrt64/bin:/ucrt64/sbin:${PATH}"
+
 set -eu -o pipefail
 
 # Regenerate keys everytime there is an update
