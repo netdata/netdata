@@ -7,7 +7,7 @@ modules:
         name: NetFlow
         link: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/iproute_pi/configuration/15-s/nf-15-s-book/ios-netflow-ov.html
         categories:
-          - flows.sources
+          - network-performance-monitoring.flows.sources
         icon_filename: network-wired.svg
       keywords:
         - netflow
@@ -36,7 +36,7 @@ modules:
           Enrichment adds GeoIP country/city/ASN, static metadata, and classifier tags.
 
           For full documentation including vendor configuration examples, sampling caveats, template
-          handling and verification steps, see the [Network Flows Overview](https://learn.netdata.cloud/docs/network-flows/).
+          handling and verification steps, see the [Network Flows Overview](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/).
         method_description: |
           The plugin listens on a configurable UDP socket for NetFlow datagrams.
           NetFlow v5 and v7 records are decoded directly. NetFlow v9 records are decoded using
@@ -140,11 +140,11 @@ modules:
         list:
           - name: Verifying flow data is arriving and diagnosing failures
             description: |
-              See [Troubleshooting](https://learn.netdata.cloud/docs/network-flows/troubleshooting) for
+              See [Troubleshooting](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/troubleshooting) for
               the full diagnostic recipe -- including UDP path checks, template-error analysis,
               and the "looks like a bug but isn't" section (doubling, mirroring, internal-IP geolocation).
-              See also [Validation and Data Quality](https://learn.netdata.cloud/docs/network-flows/validation-and-data-quality)
-              and [Anti-patterns](https://learn.netdata.cloud/docs/network-flows/anti-patterns).
+              See also [Validation and Data Quality](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/validation-and-data-quality)
+              and [Anti-patterns](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/anti-patterns).
     alerts: []
     metrics:
       folding:
@@ -154,10 +154,10 @@ modules:
         Network flow data is stored as journal records, not as traditional metrics.
         Use the Network Flows view in the Netdata dashboard to query and visualize flow data.
         For the full list of fields and the per-protocol availability matrix, see the
-        [Field Reference](https://learn.netdata.cloud/docs/network-flows/field-reference).
-        For visualisation guidance see [Sankey and Table](https://learn.netdata.cloud/docs/network-flows/visualization/sankey-and-table),
-        [Time-Series](https://learn.netdata.cloud/docs/network-flows/visualization/time-series),
-        and [Maps and Globe](https://learn.netdata.cloud/docs/network-flows/visualization/maps-and-globe).
+        [Field Reference](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/field-reference).
+        For visualisation guidance see [Sankey and Table](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/visualization/sankey-and-table),
+        [Time-Series](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/visualization/time-series),
+        and [Maps and Globe](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/visualization/maps-and-globe).
       availability: []
       scopes: []
 
@@ -168,7 +168,7 @@ modules:
         name: IPFIX
         link: https://datatracker.ietf.org/doc/html/rfc7011
         categories:
-          - flows.sources
+          - network-performance-monitoring.flows.sources
         icon_filename: network-wired.svg
       keywords:
         - ipfix
@@ -196,7 +196,7 @@ modules:
 
           For full documentation including vendor configuration examples (Cisco, Juniper, Arista,
           ASA NSEL), biflow handling, sampling caveats, and verification steps, see the
-          [Network Flows Overview](https://learn.netdata.cloud/docs/network-flows/).
+          [Network Flows Overview](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/).
         method_description: |
           The plugin listens on the same UDP socket as NetFlow. IPFIX messages are identified by
           version number 10 and decoded using cached templates. Decoded records are enriched and
@@ -276,11 +276,11 @@ modules:
         list:
           - name: Verifying flow data is arriving and diagnosing failures
             description: |
-              See [Troubleshooting](https://learn.netdata.cloud/docs/network-flows/troubleshooting) for
+              See [Troubleshooting](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/troubleshooting) for
               the full diagnostic recipe. For IPFIX specifically, watch the `template_errors` dimension
               on `netflow.input_packets` -- IPFIX is template-driven and data records arriving before
               their templates are dropped. See also
-              [Validation and Data Quality](https://learn.netdata.cloud/docs/network-flows/validation-and-data-quality).
+              [Validation and Data Quality](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/validation-and-data-quality).
     alerts: []
     metrics:
       folding:
@@ -290,7 +290,7 @@ modules:
         Network flow data is stored as journal records, not as traditional metrics.
         Use the Network Flows view in the Netdata dashboard to query and visualize flow data.
         For the full list of fields and the per-protocol availability matrix, see the
-        [Field Reference](https://learn.netdata.cloud/docs/network-flows/field-reference).
+        [Field Reference](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/field-reference).
         IPFIX biflow records are emitted as two separate flow records (forward + reverse).
       availability: []
       scopes: []
@@ -302,7 +302,7 @@ modules:
         name: sFlow
         link: https://sflow.org/
         categories:
-          - flows.sources
+          - network-performance-monitoring.flows.sources
         icon_filename: network-wired.svg
       keywords:
         - sflow
@@ -332,7 +332,7 @@ modules:
           For full documentation including how sFlow differs fundamentally from NetFlow (packet
           sampling vs aggregated flows), vendor configuration examples (Arista, Juniper, Aruba CX,
           Ruckus, hsflowd), and the limits of sampled data, see the
-          [Network Flows Overview](https://learn.netdata.cloud/docs/network-flows/).
+          [Network Flows Overview](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/).
         method_description: |
           The plugin listens on the same UDP socket as NetFlow. sFlow datagrams are identified by
           their distinct header format and decoded per the sFlow v5 specification. Decoded records
@@ -412,13 +412,13 @@ modules:
         list:
           - name: Verifying sFlow is arriving and diagnosing failures
             description: |
-              See [Troubleshooting](https://learn.netdata.cloud/docs/network-flows/troubleshooting) for
+              See [Troubleshooting](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/troubleshooting) for
               the full diagnostic recipe. sFlow-specific gotchas: counter samples are not surfaced
               (only flow samples), bytes/packets are statistical estimates that won't match SNMP
               byte-for-byte, and VLAN information comes from `ExtendedSwitch` records only -- not
               from 802.1Q tags inside the sampled header. See also
-              [Validation and Data Quality](https://learn.netdata.cloud/docs/network-flows/validation-and-data-quality)
-              and the sFlow section of [Anti-patterns](https://learn.netdata.cloud/docs/network-flows/anti-patterns).
+              [Validation and Data Quality](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/validation-and-data-quality)
+              and the sFlow section of [Anti-patterns](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/anti-patterns).
     alerts: []
     metrics:
       folding:
@@ -428,7 +428,7 @@ modules:
         Network flow data is stored as journal records, not as traditional metrics.
         Use the Network Flows view in the Netdata dashboard to query and visualize flow data.
         For the full list of fields and the per-protocol availability matrix, see the
-        [Field Reference](https://learn.netdata.cloud/docs/network-flows/field-reference).
+        [Field Reference](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/field-reference).
         sFlow byte counts are statistical estimates (sampled packets multiplied by sampling rate);
         they will not reconcile byte-for-byte with SNMP interface counters.
       availability: []
@@ -445,7 +445,7 @@ modules:
         name: DB-IP IP Intelligence
         link: https://db-ip.com/
         categories:
-          - flows.enrichment-methods
+          - network-performance-monitoring.flows.enrichment-methods
         icon_filename: network-wired.svg
       keywords:
         - geoip
@@ -507,7 +507,7 @@ modules:
           For the cross-provider mechanics (lookup pass ordering, the 30-second hot-reload poll,
           the auto-detect path order, multi-database composition, IPv4/IPv6 handling, the failure
           modes shared by every MMDB provider), see
-          [IP Intelligence](https://learn.netdata.cloud/docs/network-flows/enrichment).
+          [IP Intelligence](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
         method_description: |
           Files are read on plugin start and reloaded automatically when their mtime or size
           changes. Auto-detection scans `${NETDATA_CACHE_DIR}/topology-ip-intel/` first
@@ -543,7 +543,7 @@ modules:
               sudo /usr/sbin/topology-ip-intel-downloader
               ```
 
-              See the [Enrichment Intel Downloader](https://learn.netdata.cloud/docs/network-flows/enrichment-intel-downloader)
+              See the [Enrichment Intel Downloader](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment-intel-downloader)
               page for downloader options and how to schedule periodic refreshes. DB-IP Lite
               data is published monthly, so a monthly cron of the downloader is the right
               cadence -- more frequent runs will not produce newer data.
@@ -612,7 +612,7 @@ modules:
               renders as `AS0 Private IP Address Space`, while geographic fields stay empty and
               private addresses do not appear on maps. Declare your internal CIDRs under
               `enrichment.networks` when you want internal labels -- see
-              [Static metadata](https://learn.netdata.cloud/docs/network-flows/enrichment).
+              [Static metadata](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
           - name: Stale databases
             description: |
               The plugin does not alert on staleness. Check file mtime:
@@ -646,7 +646,7 @@ modules:
         name: MaxMind GeoIP / GeoLite2
         link: https://www.maxmind.com/
         categories:
-          - flows.enrichment-methods
+          - network-performance-monitoring.flows.enrichment-methods
         icon_filename: network-wired.svg
       keywords:
         - maxmind
@@ -703,7 +703,7 @@ modules:
 
           For the cross-cutting concept (resolver poll loop, multi-database composition,
           ASN provider chain, failure-modes table), see
-          [IP Intelligence](https://learn.netdata.cloud/docs/network-flows/enrichment).
+          [IP Intelligence](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
         method_description: |
           You can use MaxMind in two ways:
 
@@ -807,7 +807,7 @@ modules:
             Override the default DB-IP auto-detection by pointing `asn_database` and
             `geo_database` at your MaxMind MMDB files. Both keys take a list -- you can
             chain MaxMind alongside other MMDB sources; see the
-            [IP Intelligence](https://learn.netdata.cloud/docs/network-flows/enrichment)
+            [IP Intelligence](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment)
             page for the per-field "last non-empty wins" composition rule.
           folding:
             title: Config options
@@ -857,7 +857,7 @@ modules:
             - name: MaxMind ASN + DB-IP geo (mixed)
               folding:
                 enabled: true
-              description: Use MaxMind for ASN richness and keep the bundled DB-IP geo file. Both lookups run; the multi-DB composition rule is documented on the [IP Intelligence](https://learn.netdata.cloud/docs/network-flows/enrichment) page.
+              description: Use MaxMind for ASN richness and keep the bundled DB-IP geo file. Both lookups run; the multi-DB composition rule is documented on the [IP Intelligence](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment) page.
               config: |
                 enrichment:
                   geoip:
@@ -893,7 +893,7 @@ modules:
             description: |
               The plugin loads every configured MMDB. If you list both, the per-field
               "last non-empty wins" rule applies (see the
-              [IP Intelligence](https://learn.netdata.cloud/docs/network-flows/enrichment)
+              [IP Intelligence](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment)
               concept page). Order matters: list the source whose values you want to win
               **last**.
     alerts: []
@@ -915,7 +915,7 @@ modules:
         name: IPtoASN
         link: https://iptoasn.com/
         categories:
-          - flows.enrichment-methods
+          - network-performance-monitoring.flows.enrichment-methods
         icon_filename: network-wired.svg
       keywords:
         - iptoasn
@@ -966,7 +966,7 @@ modules:
 
           For the IP-intelligence mechanism (lookup order, MMDB composition, refresh,
           provider chains), see
-          [IP Intelligence](https://learn.netdata.cloud/docs/network-flows/enrichment).
+          [IP Intelligence](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
         method_description: |
           The Netdata plugin reads MMDB only. IPtoASN ships gzipped TSV
           (`https://iptoasn.com/data/ip2asn-combined.tsv.gz`), so the TSV must be
@@ -993,7 +993,7 @@ modules:
           description: |
             Not auto-detected as the default ASN source -- the plugin auto-detects
             DB-IP MMDBs in the cache directory at startup
-            (see [IP Intelligence](https://learn.netdata.cloud/docs/network-flows/enrichment)).
+            (see [IP Intelligence](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment)).
             To use IPtoASN, run `topology-ip-intel-downloader` when available to produce IPtoASN-derived
             MMDBs (the downloader writes to the same cache paths the plugin scans,
             so once present they are picked up automatically on the 30-second
@@ -1112,7 +1112,7 @@ modules:
               coverage matters, layer a MaxMind GeoLite2-ASN MMDB after IPtoASN in
               `asn_database` -- per-field "last database with a non-empty value
               wins" composition (see
-              [IP Intelligence](https://learn.netdata.cloud/docs/network-flows/enrichment))
+              [IP Intelligence](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment))
               means MaxMind names override IPtoASN's empty entries.
           - name: Country empty although IPtoASN was selected
             description: |
@@ -1147,7 +1147,7 @@ modules:
         name: CAIDA Routeviews Prefix-to-AS
         link: https://www.caida.org/catalog/datasets/routeviews-prefix2as/
         categories:
-          - flows.enrichment-methods
+          - network-performance-monitoring.flows.enrichment-methods
         icon_filename: network-wired.svg
       keywords:
         - caida
@@ -1188,7 +1188,7 @@ modules:
 
           For the IP-intelligence mechanism (lookup order, MMDB composition, refresh,
           provider chains), see
-          [IP Intelligence](https://learn.netdata.cloud/docs/network-flows/enrichment).
+          [IP Intelligence](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
         method_description: |
           The netflow plugin reads MMDB files only. CAIDA publishes compressed text data,
           so use Netdata's `topology-ip-intel-downloader` to fetch the latest Routeviews
@@ -1317,7 +1317,7 @@ modules:
         name: IP2Location LITE IP-Country
         link: https://lite.ip2location.com/database/db1-ip-country?lang=en_US
         categories:
-          - flows.enrichment-methods
+          - network-performance-monitoring.flows.enrichment-methods
         icon_filename: network-wired.svg
       keywords:
         - ip2location
@@ -1354,7 +1354,7 @@ modules:
 
           For the IP-intelligence mechanism (lookup order, MMDB composition, refresh,
           provider chains), see
-          [IP Intelligence](https://learn.netdata.cloud/docs/network-flows/enrichment).
+          [IP Intelligence](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
         method_description: |
           The netflow plugin reads MMDB files only. Use Netdata's
           `topology-ip-intel-downloader` to fetch the IP2Location LITE CSV ZIP, convert
@@ -1481,7 +1481,7 @@ modules:
         name: IPDeny Country Zones
         link: https://www.ipdeny.com/ipblocks/
         categories:
-          - flows.enrichment-methods
+          - network-performance-monitoring.flows.enrichment-methods
         icon_filename: network-wired.svg
       keywords:
         - ipdeny
@@ -1520,7 +1520,7 @@ modules:
 
           For the IP-intelligence mechanism (lookup order, MMDB composition, refresh,
           provider chains), see
-          [IP Intelligence](https://learn.netdata.cloud/docs/network-flows/enrichment).
+          [IP Intelligence](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
         method_description: |
           The netflow plugin reads MMDB files only. Use Netdata's
           `topology-ip-intel-downloader` to fetch IPDeny's HTTPS country-zone archive,
@@ -1646,7 +1646,7 @@ modules:
         name: IPIP Country Database
         link: https://en.ipip.net/about.html
         categories:
-          - flows.enrichment-methods
+          - network-performance-monitoring.flows.enrichment-methods
         icon_filename: network-wired.svg
       keywords:
         - ipip
@@ -1683,7 +1683,7 @@ modules:
 
           For the IP-intelligence mechanism (lookup order, MMDB composition, refresh,
           provider chains), see
-          [IP Intelligence](https://learn.netdata.cloud/docs/network-flows/enrichment).
+          [IP Intelligence](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
         method_description: |
           The netflow plugin reads MMDB files only. Use Netdata's
           `topology-ip-intel-downloader` to fetch the IPIP country ZIP, convert the
@@ -1809,7 +1809,7 @@ modules:
         name: Custom MMDB Database
         link: https://maxmind.github.io/MaxMind-DB/
         categories:
-          - flows.enrichment-methods
+          - network-performance-monitoring.flows.enrichment-methods
         icon_filename: network-wired.svg
       keywords:
         - mmdb
@@ -1863,7 +1863,7 @@ modules:
 
           For the full IP-intelligence concept (composition rule, ASN provider chain,
           auto-detect path order, dual-stack handling, hot reload semantics), see
-          [IP Intelligence](https://learn.netdata.cloud/docs/network-flows/enrichment).
+          [IP Intelligence](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
         method_description: |
           You build (or download) the MMDB file with your own tooling, place it on the
           agent host, and point `enrichment.geoip.asn_database` and / or
@@ -1999,7 +1999,7 @@ modules:
               plugin will pick it up; if it was edited byte-by-byte (rare with MMDB
               builders) verify size or mtime actually changed. The reload mechanism
               and its 30-second cadence are documented in
-              [IP Intelligence](https://learn.netdata.cloud/docs/network-flows/enrichment).
+              [IP Intelligence](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
               Operational practice: have your build pipeline write the new MMDB to a
               temp file in the same directory and `rename(2)` it over the live path so
               the swap is atomic.
@@ -2019,7 +2019,7 @@ modules:
         name: BMP (BGP Monitoring Protocol)
         link: https://www.rfc-editor.org/rfc/rfc7854
         categories:
-          - flows.enrichment-methods
+          - network-performance-monitoring.flows.enrichment-methods
         icon_filename: network-wired.svg
       keywords:
         - bmp
@@ -2064,7 +2064,7 @@ modules:
 
           For the cross-cutting Enrichment concept (provider chains, shared trie with
           BioRIS, withdrawal handling, restart convergence), see
-          [Enrichment](https://learn.netdata.cloud/docs/network-flows/enrichment).
+          [Enrichment](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
         method_description: |
           The plugin runs a TCP listener on `0.0.0.0:10179`. This port is the Akvorado
           convention -- RFC 7854 does not register a port, and IANA does not assign one
@@ -2389,7 +2389,7 @@ modules:
         name: bio-rd / RIPE RIS
         link: https://github.com/bio-routing/bio-rd
         categories:
-          - flows.enrichment-methods
+          - network-performance-monitoring.flows.enrichment-methods
         icon_filename: network-wired.svg
       keywords:
         - bioris
@@ -2696,7 +2696,7 @@ modules:
         name: AWS IP Ranges
         link: https://docs.aws.amazon.com/general/latest/gr/aws-ip-ranges.html
         categories:
-          - flows.enrichment-methods
+          - network-performance-monitoring.flows.enrichment-methods
         icon_filename: network-wired.svg
       keywords:
         - aws
@@ -2750,7 +2750,7 @@ modules:
           For the cross-cutting concepts (how multiple network sources merge, the lookup
           priority vs static `networks` config, TLS verification rules, the jq engine and
           its expected output schema, fetch loop and retry/backoff), see
-          [Network Identity](https://learn.netdata.cloud/docs/network-flows/enrichment).
+          [Network Identity](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
         method_description: |
           The plugin issues a periodic GET to `https://ip-ranges.amazonaws.com/ip-ranges.json`,
           parses the JSON body, runs the configured jq transform via the
@@ -2796,7 +2796,7 @@ modules:
 
             The expected `transform` output is a stream of objects, each carrying a `prefix`
             (CIDR string) plus any subset of the optional attribute fields. See the
-            cross-cutting [Network Identity](https://learn.netdata.cloud/docs/network-flows/enrichment)
+            cross-cutting [Network Identity](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment)
             page for the full output schema.
           folding:
             title: Config options
@@ -2967,7 +2967,7 @@ modules:
         name: GCP IP Ranges
         link: https://cloud.google.com/compute/docs/faq#find_ip_range
         categories:
-          - flows.enrichment-methods
+          - network-performance-monitoring.flows.enrichment-methods
         icon_filename: network-wired.svg
       keywords:
         - gcp
@@ -3018,7 +3018,7 @@ modules:
           For the cross-cutting network-identity behavior (merge order with GeoIP and
           static config, jq output contract, TLS rules, single-page fetch, failure /
           backoff handling), see
-          [Network Identity](https://learn.netdata.cloud/docs/network-flows/enrichment).
+          [Network Identity](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
         method_description: |
           Periodic HTTPS GET against the chosen `gstatic.com` URL. The body is parsed
           as JSON and the configured `transform` (a [jaq](https://github.com/01mf02/jaq)
@@ -3260,7 +3260,7 @@ modules:
         name: Azure IP Ranges
         link: https://www.microsoft.com/en-us/download/details.aspx?id=56519
         categories:
-          - flows.enrichment-methods
+          - network-performance-monitoring.flows.enrichment-methods
         icon_filename: network-wired.svg
       keywords:
         - azure
@@ -3305,7 +3305,7 @@ modules:
 
           For the full network-identity concept (merge order, jq output shape, TLS
           verification, failure modes), see
-          [Network Identity](https://learn.netdata.cloud/docs/network-flows/enrichment).
+          [Network Identity](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
         method_description: |
           Periodic HTTPS GET against the Service Tags JSON, jq transform via the
           [jaq](https://github.com/01mf02/jaq) library, merge into the network-attributes
@@ -3550,7 +3550,7 @@ modules:
         name: NetBox
         link: https://github.com/netbox-community/netbox
         categories:
-          - flows.enrichment-methods
+          - network-performance-monitoring.flows.enrichment-methods
         icon_filename: network-wired.svg
       keywords:
         - netbox
@@ -3589,7 +3589,7 @@ modules:
           fields you map. NetBox is the authoritative source -- when the same prefix is
           tagged in NetBox and in the static `networks:` block, the static block wins
           (operator override is intentional, see the
-          [Network Identity](https://learn.netdata.cloud/docs/network-flows/enrichment)
+          [Network Identity](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment)
           concept page).
 
           Use cases: applying your organisation's data-centre rack labels, tenant names,
@@ -3860,9 +3860,9 @@ modules:
       module_name: generic-ipam
       monitored_instance:
         name: Generic JSON-over-HTTP IPAM
-        link: https://learn.netdata.cloud/docs/network-flows/enrichment
+        link: https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment
         categories:
-          - flows.enrichment-methods
+          - network-performance-monitoring.flows.enrichment-methods
         icon_filename: network-wired.svg
       keywords:
         - ipam
@@ -3906,7 +3906,7 @@ modules:
 
           For the full network-identity concept (merge order vs GeoIP and static, what
           fields you can populate, why TLS verification cannot be disabled), see
-          [Network Identity](https://learn.netdata.cloud/docs/network-flows/enrichment).
+          [Network Identity](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
         method_description: |
           The plugin issues a periodic HTTP request (GET by default, POST optionally) to
           your configured URL with the headers you specify, parses the response as JSON,
@@ -4210,9 +4210,9 @@ modules:
       module_name: static-metadata
       monitored_instance:
         name: Static Metadata
-        link: https://learn.netdata.cloud/docs/network-flows/enrichment
+        link: https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment
         categories:
-          - flows.enrichment-methods
+          - network-performance-monitoring.flows.enrichment-methods
         icon_filename: network-wired.svg
       keywords:
         - static metadata
@@ -4291,7 +4291,7 @@ modules:
           For the cross-cutting Enrichment concept (provider chains, merge order rules,
           how static composes with dynamic sources, the static-blocks-classifiers
           interaction, and shared failure modes), see
-          [Enrichment](https://learn.netdata.cloud/docs/network-flows/enrichment).
+          [Enrichment](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
         method_description: |
           Edit `netflow.yaml`, restart the plugin, and the YAML-defined data is loaded
           into the same in-memory tries the GeoIP, IPAM, and BGP enrichment paths read
@@ -4401,7 +4401,7 @@ modules:
                 Forces the AS *number* for traffic in this prefix, overriding whatever
                 the `asn_providers` chain computed. The AS *name* is still resolved
                 from the ASN MMDB -- there is no `asn_name` config field. See the ASN
-                section of [Enrichment](https://learn.netdata.cloud/docs/network-flows/enrichment).
+                section of [Enrichment](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
               default_value: "0"
               required: false
             - name: enrichment.networks.&lt;cidr&gt;.latitude / longitude
@@ -4616,9 +4616,9 @@ modules:
       module_name: classifiers
       monitored_instance:
         name: Classifiers
-        link: https://learn.netdata.cloud/docs/network-flows/enrichment
+        link: https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment
         categories:
-          - flows.enrichment-methods
+          - network-performance-monitoring.flows.enrichment-methods
         icon_filename: network-wired.svg
       keywords:
         - classifiers
@@ -4646,7 +4646,7 @@ modules:
       data_collection:
         metrics_description: |
           Annotate network flows with exporter and interface labels derived from reusable
-          classification rules. Where [static metadata](https://learn.netdata.cloud/docs/network-flows/enrichment)
+          classification rules. Where [static metadata](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment)
           forces you to enumerate every exporter and every ifIndex by hand, classifiers
           let you express the network design once -- "anything matching `^edge-` is the
           edge tier", "any interface with `BACKBONE-LUMEN` in its description is on
@@ -4683,7 +4683,7 @@ modules:
 
           For the cross-cutting Enrichment concept (where classifiers sit in the merge
           order vs static metadata, GeoIP, IPAM, BGP routing), see
-          [Enrichment](https://learn.netdata.cloud/docs/network-flows/enrichment).
+          [Enrichment](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
         method_description: |
           Each rule is a single boolean expression; an action with no condition (e.g.
           `Classify("edge")` at top level) is treated as always-true and always fires.
@@ -4743,7 +4743,7 @@ modules:
               conventions (`edge-...`, `core-...`), management-IP subnets per site,
               SNMP interface descriptions that follow a template (`BACKBONE-<carrier>`,
               `TRANSIT-...`, `IX-...`), or 100Gbps-equals-core conventions. If your
-              fleet has no such pattern, [static metadata](https://learn.netdata.cloud/docs/network-flows/enrichment)
+              fleet has no such pattern, [static metadata](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment)
               is the better fit -- it lets you list each exporter and ifIndex by hand.
           - title: Configure interface metadata first if you want interface rules
             description: |
@@ -5013,7 +5013,7 @@ modules:
         name: Decapsulation
         link: https://datatracker.ietf.org/doc/html/rfc7348
         categories:
-          - flows.enrichment-methods
+          - network-performance-monitoring.flows.enrichment-methods
         icon_filename: network-wired.svg
       keywords:
         - decapsulation
@@ -5083,7 +5083,7 @@ modules:
           For the cross-cutting concept (how decap composes with the rest of the enrichment
           pipeline, the non-tunnel "drop, do not fall back" semantics, and per-source
           dependence on the L2-section path), see
-          [Decapsulation](https://learn.netdata.cloud/docs/network-flows/enrichment).
+          [Decapsulation](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
         method_description: |
           Set `protocols.decapsulation_mode` in `netflow.yaml` to `srv6` or `vxlan`. The
           plugin then runs the inner-packet parser whenever a flow record carries an L2
