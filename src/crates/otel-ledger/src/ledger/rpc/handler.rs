@@ -162,7 +162,8 @@ impl RemoteRead {
         entries: Vec<otel_catalog::CatalogEntry>,
         cancel: &CancellationToken,
         progress: Arc<AtomicUsize>,
-    ) -> Result<(Vec<SfstCandidate>, Vec<file_cache::CachedFile>), file_cache::CacheError> {
+    ) -> Result<(Vec<file_registry::SelectedFile>, Vec<file_cache::CachedFile>), file_cache::CacheError>
+    {
         // filename → entry (carries the catalog summary + remote key + size).
         let mut by_name: std::collections::HashMap<String, otel_catalog::CatalogEntry> =
             std::collections::HashMap::with_capacity(entries.len());
@@ -226,16 +227,15 @@ impl RemoteRead {
             let Some(e) = by_name.get(cf.filename()) else {
                 continue;
             };
-            sources.push(SfstCandidate {
+            sources.push(file_registry::SelectedFile {
+                id: e.id,
                 summary: sfst::Summary {
                     min_timestamp_s: e.min_timestamp_s,
                     max_timestamp_s: e.max_timestamp_s,
                     record_count: e.record_count,
                     content_meta: e.content_meta.clone(),
                 },
-                file_seq: e.id.seq,
-                part: sfsq::logs::Part::Indexed(0),
-                source: Source::File(cf.path().to_path_buf()),
+                path: cf.path().to_path_buf(),
             });
         }
         Ok((sources, files))
@@ -479,7 +479,11 @@ impl FunctionHandler for OtelLogsHandler {
             } else {
                 Vec::new()
             };
-            (sfsts, wals, required_params, remote_cands)
+            // Convert the signal-neutral selected files into the logs engine's
+            // sealed-SFST candidates at this (logs-specific) boundary.
+            let sfst_candidates: Vec<SfstCandidate> =
+                sfsts.into_iter().map(SfstCandidate::from).collect();
+            (sfst_candidates, wals, required_params, remote_cands)
         };
 
         // Resolve each WAL into in-memory chunk SFSTs + a tail (off the
@@ -523,8 +527,10 @@ impl FunctionHandler for OtelLogsHandler {
                 .fetch_candidates(remote_cands, &ctx.cancellation, done.clone())
                 .await
             {
-                Ok((mut remote_sources, guards)) => {
-                    sfst_candidates.append(&mut remote_sources);
+                Ok((remote_sources, guards)) => {
+                    // Convert the neutral selected files to engine candidates at
+                    // the boundary, same as the local sealed ones.
+                    sfst_candidates.extend(remote_sources.into_iter().map(SfstCandidate::from));
                     guards
                 }
                 Err(file_cache::CacheError::Cancelled) => {

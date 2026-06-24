@@ -82,6 +82,21 @@ pub struct SfstCandidate {
     pub source: Source,
 }
 
+/// A signal-neutral [`file_registry::SelectedFile`] (the substrate's selection
+/// result) becomes a sealed-SFST candidate at the engine boundary: always read
+/// from its path, always the single indexed part (`Indexed(0)`). The active-WAL
+/// in-memory chunk path builds `SfstCandidate` directly and is not covered here.
+impl From<file_registry::SelectedFile> for SfstCandidate {
+    fn from(f: file_registry::SelectedFile) -> Self {
+        SfstCandidate {
+            summary: f.summary,
+            file_seq: f.id.seq,
+            part: Part::Indexed(0),
+            source: Source::File(f.path),
+        }
+    }
+}
+
 /// A byte range of an active WAL whose log records have not been indexed
 /// into an SFST — the sub-chunk *tail*. Evaluated by a row scan
 /// ([`WalScan`]) rather than the SFST engine. Bounded (< one chunk) by

@@ -3,7 +3,6 @@ use std::path::PathBuf;
 
 use file_registry::{FileId, TenantId};
 use otel_logs_identity::ServiceStream;
-use sfsq::logs::SfstCandidate;
 
 /// An active (or sealed-but-unindexed) WAL file overlapping a query
 /// window — owned so it outlives the registry read lock. The query path
@@ -380,17 +379,16 @@ impl TenantRegistries {
         &self,
         tenant: &TenantId,
         q: &file_registry::Query,
-    ) -> Vec<SfstCandidate> {
+    ) -> Vec<file_registry::SelectedFile> {
         let Some(r) = self.tenants.get(tenant) else {
             return Vec::new();
         };
         r.sfst
             .candidates(q)
-            .map(|f| SfstCandidate {
+            .map(|f| file_registry::SelectedFile {
+                id: f.id,
                 summary: f.summary.clone(),
-                file_seq: f.id.seq,
-                part: sfsq::logs::Part::Indexed(0), // sealed SFST
-                source: sfsq::logs::Source::File(r.sfst.file_path(f.id)),
+                path: r.sfst.file_path(f.id),
             })
             .collect()
     }
@@ -416,9 +414,9 @@ impl TenantRegistries {
         &self,
         tenant: &TenantId,
         q: &file_registry::Query,
-    ) -> (Vec<SfstCandidate>, Vec<WalDesc>) {
+    ) -> (Vec<file_registry::SelectedFile>, Vec<WalDesc>) {
         let sfsts = self.sfst_candidates(tenant, q);
-        let sfst_seqs: HashSet<u64> = sfsts.iter().map(|c| c.file_seq).collect();
+        let sfst_seqs: HashSet<u64> = sfsts.iter().map(|c| c.id.seq).collect();
 
         let mut wals = Vec::new();
         if let Some(r) = self.tenants.get(tenant) {

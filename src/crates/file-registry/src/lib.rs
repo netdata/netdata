@@ -5,6 +5,9 @@ pub mod stem;
 mod types;
 pub use types::{ByteSize, FileId, FileSummary, TenantId, TimestampNs};
 
+mod selection;
+pub use selection::SelectedFile;
+
 mod clock;
 pub use clock::MonotonicClock;
 

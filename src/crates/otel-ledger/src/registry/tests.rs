@@ -129,13 +129,13 @@ fn query_snapshot_is_scoped_to_one_tenant() {
     // Each tenant sees exactly its own candidate — never the union.
     let (sfsts, wals) = tr.query_snapshot(&tenant_a, &q);
     assert_eq!(
-        sfsts.iter().map(|c| c.file_seq).collect::<Vec<_>>(),
+        sfsts.iter().map(|c| c.id.seq).collect::<Vec<_>>(),
         vec![1]
     );
     assert!(wals.is_empty());
     let (sfsts, _) = tr.query_snapshot(&tenant_b, &q);
     assert_eq!(
-        sfsts.iter().map(|c| c.file_seq).collect::<Vec<_>>(),
+        sfsts.iter().map(|c| c.id.seq).collect::<Vec<_>>(),
         vec![2]
     );
 

@@ -15,6 +15,7 @@ path = "src/lib.rs"
 [dependencies]
 sfst = { workspace = true }
 wal = { workspace = true }
+file-registry = { workspace = true }
 wal-otap = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 tracing = { workspace = true }
@@ -31,5 +32,4 @@ otel-ingestor = { workspace = true }
 otel-logs-identity = { workspace = true }
 sfst-indexer = { workspace = true }
 opentelemetry-proto = { workspace = true }
-file-registry = { workspace = true }
 tempfile = { workspace = true }
