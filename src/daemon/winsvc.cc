@@ -17,7 +17,21 @@ static void netdata_service_log(const char *fmt, ...)
 
     FILE *fp = fopen(path, "a");
     if (fp == NULL) {
-        return;
+        // LOG_DIR is a POSIX path compiled for the staging environment
+        // (e.g. /opt/netdata/var/log/netdata).  UCRT64 binaries use the
+        // native Windows CRT directly — there is no msys-2.0.dll POSIX path
+        // translation layer — so /opt/netdata/... resolves to
+        // C:\opt\netdata\... on the target machine, which never exists.
+        // Fall back to the Windows temp directory, which is always writable
+        // by the service account (SYSTEM writes to C:\Windows\Temp\).
+        char tmp_dir[FILENAME_MAX + 1];
+        DWORD tmp_len = GetTempPathA(FILENAME_MAX, tmp_dir);
+        if (tmp_len > 0 && tmp_len < FILENAME_MAX - 24) {
+            snprintfz(path, FILENAME_MAX, "%snetdata-service.log", tmp_dir);
+            fp = fopen(path, "a");
+        }
+        if (fp == NULL)
+            return;
     }
 
     SYSTEMTIME time;
@@ -234,53 +248,39 @@ static bool update_path() {
 
 int main(int argc, char *argv[])
 {
-#if defined(OS_WINDOWS) && defined(RUN_UNDER_CLION)
-    bool tty = true;
-#else
-    bool tty = isatty(fileno(stdin)) == 1;
-#endif
-
     if (!update_path()) {
         return 1;
     }
 
-    if (tty)
-    {
-        int rc = netdata_main(argc, argv);
-        if (rc != 10)
-            return rc;
+    SERVICE_TABLE_ENTRY serviceTable[] = {
+        { strdupz("Netdata"), ServiceMain },
+        { nullptr, nullptr }
+    };
 
-        nd_process_signals();
-        return 1;
-    }
-    else
+    if (!StartServiceCtrlDispatcher(serviceTable))
     {
-        SERVICE_TABLE_ENTRY serviceTable[] = {
-            { strdupz("Netdata"), ServiceMain },
-            { nullptr, nullptr }
-        };
-
-        if (!StartServiceCtrlDispatcher(serviceTable))
+        DWORD err = GetLastError();
+        if (err == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT)
         {
-            DWORD err = GetLastError();
-            if (err == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT)
-            {
-                // Not invoked by the Service Control Manager (e.g. run from a
-                // script or shell where stdin is not a TTY).  Fall back to CLI
-                // mode so that invocations like "netdata.exe -W buildinfo" work
-                // from non-interactive contexts (PowerShell, GDB, CI scripts).
-                int rc = netdata_main(argc, argv);
-                if (rc != 10)
-                    return rc;
+            // Not invoked by the Service Control Manager — run in CLI mode.
+            // This covers interactive terminals, GDB, PowerShell, CLion, and
+            // CI scripts.  StartServiceCtrlDispatcher() is the authoritative
+            // Windows API for detecting service context: unlike isatty(), it
+            // returns ERROR_FAILED_SERVICE_CONTROLLER_CONNECT correctly on
+            // UCRT64 even when Windows allocates an invisible console for the
+            // process (which causes isatty() to return true for service
+            // processes linked against the native CRT).
+            int rc = netdata_main(argc, argv);
+            if (rc != 10)
+                return rc;
 
-                nd_process_signals();
-                return 1;
-            }
-
-            netdata_service_log("@main() - StartServiceCtrlDispatcher() failed (%lu)", (unsigned long)err);
+            nd_process_signals();
             return 1;
         }
 
-        return 0;
+        netdata_service_log("@main() - StartServiceCtrlDispatcher() failed (%lu)", (unsigned long)err);
+        return 1;
     }
+
+    return 0;
 }
