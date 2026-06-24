@@ -411,6 +411,37 @@ impl PartialOrd for FileId {
 }
 
 // ---------------------------------------------------------------------------
+// FileSummary
+// ---------------------------------------------------------------------------
+
+/// Neutral, content-agnostic per-file summary: the cheap facts the substrate
+/// needs to select, age, and account for a file, plus an opaque `content_meta`
+/// blob that the content plane (de)serializes and the substrate never
+/// interprets.
+///
+/// This is the substrate's replacement for the content-typed per-file summary
+/// the storage tiers carried before the restructure (where the summary embedded
+/// an OTLP `ServiceStream`). The time range and `record_count` drive candidate
+/// selection and retention; `part_key` is the opaque partition key (for OTel
+/// logs, the service-stream hash); `content_meta` carries the content plane's
+/// per-file identity (for logs, the encoded `(namespace, name)` — see the
+/// `otel-logs-identity` crate).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FileSummary {
+    /// Earliest record timestamp in the file, seconds since the Unix epoch.
+    pub min_timestamp_s: u32,
+    /// Latest record timestamp in the file, seconds since the Unix epoch.
+    pub max_timestamp_s: u32,
+    /// Number of records (rows) the file holds.
+    pub record_count: u32,
+    /// Opaque partition key; the content plane derives it.
+    pub part_key: u64,
+    /// Opaque content-plane metadata, stored verbatim and never parsed by the
+    /// substrate.
+    pub content_meta: Vec<u8>,
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
