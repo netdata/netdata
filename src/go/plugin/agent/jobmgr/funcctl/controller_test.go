@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
@@ -422,6 +424,7 @@ func TestControllerLifecycleHooks(t *testing.T) {
 		"reconcile registers late available static method":              {},
 		"reconcile ignores stopped job":                                 {},
 		"reconcile does not duplicate published static method":          {},
+		"reconcile logs empty static method ID once":                    {},
 		"public method name collision skips colliding module":           {},
 		"rejected module does not poison planned public names":          {},
 		"topology methods register direct alias":                        {},
@@ -576,6 +579,29 @@ func TestControllerLifecycleHooks(t *testing.T) {
 
 				assert.Equal(t, []string{"mod:logs"}, reg.registeredNames())
 				assert.Equal(t, 1, availableCalls)
+
+			case "reconcile logs empty static method ID once":
+				var logBuf bytes.Buffer
+				controller = New(Options{
+					FnReg:  reg,
+					Logger: logger.NewWithWriter(&logBuf),
+				})
+				controller.RegisterModules(collectorapi.Registry{
+					"mod": collectorapi.Creator{
+						Methods: func() []funcapi.MethodConfig {
+							return []funcapi.MethodConfig{{Name: "invalid"}}
+						},
+					},
+				})
+
+				job1 := newTestRuntimeJob("mod", "job1", true)
+				job2 := newTestRuntimeJob("mod", "job2", true)
+				controller.OnJobStart(job1)
+				controller.ReconcileModuleMethodsForJob(job1)
+				controller.OnJobStart(job2)
+				controller.ReconcileModuleMethodsForJob(job2)
+
+				assert.Equal(t, 1, strings.Count(logBuf.String(), "empty method ID"))
 
 			case "public method name collision skips colliding module":
 				controller.RegisterModules(collectorapi.Registry{

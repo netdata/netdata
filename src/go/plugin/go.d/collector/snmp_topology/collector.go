@@ -134,6 +134,7 @@ func (c *Collector) Run(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return nil
 	}
+	c.functionAvailability.Reset()
 	c.publishTrapTopologyEnrichment()
 	defer c.unpublishTrapTopologyEnrichment()
 	c.topologyRegistry.setReverseDNSWarmContext(ctx)

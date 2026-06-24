@@ -16,6 +16,12 @@ func (a *topologyFunctionAvailability) Available() bool {
 	return a != nil && a.ready.Load()
 }
 
+func (a *topologyFunctionAvailability) Reset() {
+	if a != nil {
+		a.ready.Store(false)
+	}
+}
+
 func (a *topologyFunctionAvailability) MarkAvailable() {
 	if a != nil {
 		a.ready.Store(true)
