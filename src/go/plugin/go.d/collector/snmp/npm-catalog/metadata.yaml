@@ -26210,7 +26210,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.traps
-        icon_filename: SNMP.png
+        icon_filename: ibm.svg
       keywords:
         - ibm-eserver-x
         - snmp
@@ -26259,7 +26259,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.traps
-        icon_filename: SNMP.png
+        icon_filename: ibm.svg
       keywords:
         - ibm-https-w3-ibm-com-standards
         - snmp

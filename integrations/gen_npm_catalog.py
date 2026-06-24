@@ -185,15 +185,17 @@ def icon_for(vendor_key):
     """Resolve a brand icon from a vendor name or IANA enterprise slug.
 
     Device profiles pass a short vendor name ('juniper'); the trap catalogue
-    passes the IANA slug ('juniper-networks-inc'). Match exact first, then the
-    longest brand prefix (restricted to keys >= 4 chars so short keys like
-    'hp'/'ibm' do not over-match unrelated slugs)."""
+    passes the IANA slug ('juniper-networks-inc', 'ibm-eserver-x'). Match exact
+    first, then the longest brand prefix. Prefix matching is restricted to keys
+    >= 3 chars: that excludes only the 2-char 'hp' key (too ambiguous to prefix
+    on; HP is still resolved by its exact entry and the 'hewlettpackard' alias),
+    while distinctive 3-char brands like 'ibm'/'hpe' still brand their slugs."""
     k = re.sub(r'[^a-z0-9]', '', (vendor_key or '').lower())
     if not k:
         return FALLBACK_ICON
     if k in VENDOR_ICONS:
         return VENDOR_ICONS[k]
-    for token in sorted((t for t in VENDOR_ICONS if len(t) >= 4), key=len, reverse=True):
+    for token in sorted((t for t in VENDOR_ICONS if len(t) >= 3), key=len, reverse=True):
         if k.startswith(token):
             return VENDOR_ICONS[token]
     return FALLBACK_ICON
