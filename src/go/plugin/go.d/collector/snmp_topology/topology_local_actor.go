@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"maps"
 	"strings"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
@@ -10,9 +11,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
-func augmentLocalActorFromCache(data *topologymodel.Data, local topologymodel.Device) {
+func augmentLocalActorFromCache(data *topologymodel.Data, local topologymodel.Device) bool {
 	if data == nil || len(data.Actors) == 0 {
-		return
+		return false
 	}
 
 	for i := range data.Actors {
@@ -27,8 +28,77 @@ func augmentLocalActorFromCache(data *topologymodel.Data, local topologymodel.De
 		actor.Detail.SNMP = topologySNMPActorDetailFromDevice(local)
 		applyLocalActorLabels(actor, local)
 		enrichLocalActorChartReferences(actor, local.InterfaceCharts)
-		return
+		return true
 	}
+
+	return false
+}
+
+func addLocalActorFromCache(data *topologymodel.Data, localDeviceID string, local topologymodel.Device) bool {
+	if data == nil {
+		return false
+	}
+
+	actorID := strings.TrimSpace(localDeviceID)
+	if actorID == "" {
+		actorID = ensureTopologyObservationDeviceID(local, "")
+	}
+	if actorID == "" || topologyLocalActorExists(data.Actors, actorID) {
+		return false
+	}
+
+	labels := cloneTopologyLabels(local.Labels)
+	actor := topologymodel.Actor{
+		ActorID:   actorID,
+		ActorType: topologyengine.ResolveDeviceActorType(labels),
+		Layer:     "network",
+		Source:    "snmp",
+		Match:     topologyLocalActorMatch(local),
+		Labels:    labels,
+		Detail: topologymodel.ActorDetail{
+			SNMP: topologySNMPActorDetailFromDevice(local),
+		},
+	}
+	if actor.ActorType == "" {
+		actor.ActorType = "device"
+	}
+	data.Actors = append(data.Actors, actor)
+	return true
+}
+
+func topologyLocalActorExists(actors []topologymodel.Actor, actorID string) bool {
+	for _, actor := range actors {
+		if strings.TrimSpace(actor.ActorID) == actorID {
+			return true
+		}
+	}
+	return false
+}
+
+func topologyLocalActorMatch(local topologymodel.Device) topologymodel.Match {
+	match := topologymodel.Match{
+		SysObjectID: strings.TrimSpace(local.SysObjectID),
+		SysName:     strings.TrimSpace(local.SysName),
+	}
+	if chassisID := strings.TrimSpace(local.ChassisID); chassisID != "" {
+		match.ChassisIDs = []string{chassisID}
+		if mac := topologyutil.NormalizeMAC(chassisID); mac != "" {
+			match.MacAddresses = []string{mac}
+		}
+	}
+
+	ips := make([]string, 0, 1+len(local.ManagementAddresses))
+	if ip := topologyutil.NormalizeIPAddress(local.ManagementIP); ip != "" {
+		ips = append(ips, ip)
+	}
+	for _, addr := range local.ManagementAddresses {
+		if ip := topologyutil.NormalizeIPAddress(addr.Address); ip != "" {
+			ips = append(ips, ip)
+		}
+	}
+	match.IPAddresses = topologyutil.DeduplicateSortedStrings(ips)
+
+	return match
 }
 
 func topologySNMPActorDetailFromDevice(local topologymodel.Device) topologymodel.SNMPActorDetail {
@@ -66,13 +136,7 @@ func applyLocalActorLabels(actor *topologymodel.Actor, local topologymodel.Devic
 	if actor.Labels == nil {
 		actor.Labels = make(map[string]string)
 	}
-	for key, value := range local.Labels {
-		value = strings.TrimSpace(value)
-		if value == "" {
-			continue
-		}
-		actor.Labels[key] = value
-	}
+	maps.Copy(actor.Labels, cloneTopologyLabels(local.Labels))
 }
 
 func enrichLocalActorChartReferences(actor *topologymodel.Actor, interfaceCharts map[string]topologymodel.InterfaceChartRef) {

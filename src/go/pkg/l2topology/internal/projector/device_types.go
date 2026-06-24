@@ -83,6 +83,10 @@ func resolveDeviceActorType(labels map[string]string) string {
 	return "device"
 }
 
+func ResolveDeviceActorType(labels map[string]string) string {
+	return resolveDeviceActorType(labels)
+}
+
 func IsDeviceActorType(actorType string) bool {
 	_, ok := deviceActorTypes[strings.ToLower(strings.TrimSpace(actorType))]
 	return ok

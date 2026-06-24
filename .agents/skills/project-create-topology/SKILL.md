@@ -450,6 +450,15 @@ For SNMP managed device actor modals:
 - Build link endpoint port labels only from real port fields: `port_name`,
   `if_name`, `if_descr`, or source `port_id`. Never use actor labels such as
   `display_name` or `sys_name` as port-name fallbacks.
+- For SNMP topology changes, update and run the scenario-golden suite in
+  `src/go/plugin/go.d/collector/snmp_topology`. The suite starts from synthetic
+  SNMP-shaped `ddsnmp` inputs, runs the real cache, registry, and Function
+  rendering path, validates the final `topology.v1` payload, and checks semantic
+  product expectations.
+- Store the bulky SNMP topology full-payload JSON oracle in the external
+  `netdata/testdata` fixture repository under `snmp/topology-scenarios/`.
+  Local regeneration may point the test at that checkout with
+  `NETDATA_SNMP_TOPOLOGY_SCENARIO_GOLDEN_DIR`.
 
 ## Validation Checklist
 

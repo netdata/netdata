@@ -194,6 +194,12 @@ func TestTableBuilderBuildsEmptyZeroColumnTable(t *testing.T) {
 	assert.Equal(t, EmptyTable(), table)
 }
 
+func TestValuesEncodingKeepsEmptyValuesArray(t *testing.T) {
+	encoding := Values()
+
+	assert.Equal(t, ValuesEncoding{Codec: "values", Values: []any{}}, encoding)
+}
+
 func TestStringDictionaryDeduplicatesValues(t *testing.T) {
 	dict := NewStringDictionary()
 
