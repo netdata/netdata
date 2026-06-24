@@ -32,10 +32,9 @@ type Controller struct {
 	fnReg      functions.Registry
 	ctx        context.Context
 
-	registry           *moduleFuncRegistry
-	staticMethodsMu    sync.Mutex
-	staticMethodsSeen  map[string]struct{}
-	staticWarningsSeen map[string]struct{}
+	registry          *moduleFuncRegistry
+	staticMethodsMu   sync.Mutex
+	staticMethodsSeen map[string]struct{}
 }
 
 func New(opts Options) *Controller {
@@ -49,13 +48,12 @@ func New(opts Options) *Controller {
 	}
 
 	return &Controller{
-		Logger:             log,
-		api:                opts.API,
-		jsonWriter:         opts.JSONWriter,
-		fnReg:              reg,
-		registry:           newModuleFuncRegistry(),
-		staticMethodsSeen:  make(map[string]struct{}),
-		staticWarningsSeen: make(map[string]struct{}),
+		Logger:            log,
+		api:               opts.API,
+		jsonWriter:        opts.JSONWriter,
+		fnReg:             reg,
+		registry:          newModuleFuncRegistry(),
+		staticMethodsSeen: make(map[string]struct{}),
 	}
 }
 
@@ -212,8 +210,8 @@ func (c *Controller) registerAvailableModuleMethods(moduleName string, methods [
 			continue
 		}
 		if method.ID == "" {
-			c.warnStaticMethodOnceLocked(fmt.Sprintf("%s:%d:empty-id", moduleName, i),
-				"skipping function registration for module '%s': empty method ID", moduleName)
+			c.Once(fmt.Sprintf("funcctl:static-method:%s:%d:empty-id", moduleName, i)).
+				Warningf("skipping function registration for module '%s': empty method ID", moduleName)
 			continue
 		}
 
@@ -256,14 +254,6 @@ func (c *Controller) registerAvailableModuleMethods(moduleName string, methods [
 			c.staticMethodsSeen[funcName] = struct{}{}
 		}
 	}
-}
-
-func (c *Controller) warnStaticMethodOnceLocked(key string, format string, args ...any) {
-	if _, seen := c.staticWarningsSeen[key]; seen {
-		return
-	}
-	c.Warningf(format, args...)
-	c.staticWarningsSeen[key] = struct{}{}
 }
 
 func (c *Controller) allStaticMethodNamesSeenLocked(moduleName string, method funcapi.MethodConfig) bool {
