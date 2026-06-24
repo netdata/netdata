@@ -20,6 +20,8 @@ import (
 const (
 	licenseRowsPartialErrorLogKey = "snmp-licensing-rows-partial-error:"
 	licenseRowsFailedLogKey       = "snmp-licensing-rows-failed:"
+	licenseTimerMalformedLogKey   = "snmp-licensing-timer-malformed:"
+	licenseTimerNoValueLogKey     = "snmp-licensing-timer-no-value:"
 	licenseRowsErrorLogEvery      = time.Hour
 )
 
@@ -470,9 +472,18 @@ func (c *Collector) populateLicenseTimer(timer *ddsnmp.LicenseTimer, cfg ddprofi
 }
 
 func (c *Collector) populateLicenseTimerTimestamp(timer *ddsnmp.LicenseTimer, cfg ddprofiledefinition.LicenseValueConfig, ctx licenseValueContext, name string) error {
+	if sourceOID, ok := licenseTimerZeroDateAndTimePlaceholder(cfg, ctx); ok {
+		c.log.Limit(licenseTimerNoValueLogKey+sourceOID, 1, licenseRowsErrorLogEvery).
+			Warningf("license timer %q returned zero DateAndTime placeholder; treating timer as absent", sourceOID)
+		return nil
+	}
+
 	value, sourceOID, ok, err := c.licenseNumericValue(cfg, ctx)
 	if err != nil {
-		return fmt.Errorf("%s: %w", name, err)
+		source := licenseTimerSource(cfg, name)
+		c.log.Limit(licenseTimerMalformedLogKey+source, 1, licenseRowsErrorLogEvery).
+			Warningf("license timer %q is malformed: %v; treating timer as absent", source, err)
+		return nil
 	}
 	if !ok || licenseValueRejectedBySentinel(value, cfg.Sentinel) {
 		return nil
@@ -487,7 +498,10 @@ func (c *Collector) populateLicenseTimerTimestamp(timer *ddsnmp.LicenseTimer, cf
 func (c *Collector) populateLicenseTimerRemaining(timer *ddsnmp.LicenseTimer, cfg ddprofiledefinition.LicenseValueConfig, ctx licenseValueContext, name string) error {
 	value, sourceOID, ok, err := c.licenseNumericValue(cfg, ctx)
 	if err != nil {
-		return fmt.Errorf("%s: %w", name, err)
+		source := licenseTimerSource(cfg, name)
+		c.log.Limit(licenseTimerMalformedLogKey+source, 1, licenseRowsErrorLogEvery).
+			Warningf("license timer %q is malformed: %v; treating timer as absent", source, err)
+		return nil
 	}
 	if !ok || licenseValueRejectedBySentinel(value, cfg.Sentinel) {
 		return nil
@@ -497,6 +511,36 @@ func (c *Collector) populateLicenseTimerRemaining(timer *ddsnmp.LicenseTimer, cf
 	timer.RemainingSeconds = value
 	timer.SourceOID = sourceOID
 	return nil
+}
+
+func licenseTimerZeroDateAndTimePlaceholder(cfg ddprofiledefinition.LicenseValueConfig, ctx licenseValueContext) (string, bool) {
+	sym := licenseValueSymbol(cfg)
+	if sym.Format != "snmp_dateandtime" || sym.OID == "" {
+		return "", false
+	}
+	pdu, ok := ctx.lookupPDU(sym.OID)
+	if !ok || !isZeroDateAndTimePlaceholderPDU(pdu) {
+		return "", false
+	}
+	return trimOID(sym.OID), true
+}
+
+func licenseTimerSource(cfg ddprofiledefinition.LicenseValueConfig, fallback string) string {
+	if oid := trimOID(licenseValueSymbol(cfg).OID); oid != "" {
+		return oid
+	}
+	return fallback
+}
+
+func isZeroDateAndTimePlaceholderPDU(pdu gosnmp.SnmpPDU) bool {
+	switch v := pdu.Value.(type) {
+	case []byte:
+		return string(v) == "0" || (len(v) == 1 && v[0] == 0)
+	case string:
+		return v == "0"
+	default:
+		return false
+	}
 }
 
 func (c *Collector) populateLicenseUsage(usage *ddsnmp.LicenseUsage, cfg ddprofiledefinition.LicenseUsageSignalsConfig, ctx licenseValueContext) error {
