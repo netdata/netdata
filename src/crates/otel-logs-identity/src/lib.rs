@@ -1,0 +1,203 @@
+//! Content-plane identity for OTel **logs**.
+//!
+//! This crate owns the OTel-logs notion of "which stream a file belongs to" —
+//! the `(service.namespace, service.name)` pair ([`ServiceStream`]) — and how
+//! that identity is derived into the substrate's opaque partition key and
+//! serialized into the substrate's opaque per-file metadata blob.
+//!
+//! It is the content-plane counterpart to the content-agnostic
+//! [`file_registry`] substrate: the substrate stores an opaque `part_key: u64`
+//! and (in a later stage) an opaque `content_meta: Vec<u8>` and never
+//! interprets either. This crate is the one place that gives them meaning, for
+//! logs. A second signal (traces) will get its own sibling identity crate; the
+//! opinion-free hash primitive is only extracted into a shared leaf crate if and
+//! when a second signal actually needs to share it.
+//!
+//! Scope note (restructure staging): today [`ServiceStream`] and its hash still
+//! live in [`file_registry`] and are re-exported here so that callers can import
+//! the identity from this crate now; a later stage relocates the type itself
+//! here without changing that import path. Nothing in this crate is wired into
+//! the storage path yet — it is the destination the format flip will target.
+
+pub use file_registry::ServiceStream;
+
+/// Schema version stamped as the first byte of every [`encode_content_meta`]
+/// blob. Bump when the on-the-wire layout changes; [`decode_content_meta`]
+/// rejects any other version so a format drift fails loudly rather than
+/// silently mis-decoding.
+pub const CONTENT_META_VERSION: u8 = 1;
+
+/// Maximum byte length of a single `content_meta` field (`namespace` or
+/// `name`). The on-wire length prefix is a `u16`, so a field cannot exceed
+/// this; [`encode_content_meta`] returns `None` rather than panicking on a
+/// longer field. OTel service-identity attributes are short in practice, but
+/// they are attacker-controlled (copied verbatim from OTLP resource
+/// attributes), so the encoder rejects pathological input instead of crashing
+/// the writer.
+pub const MAX_FIELD_BYTES: usize = u16::MAX as usize;
+
+/// Derive the substrate partition key for a logs stream.
+///
+/// This is the content-plane entry point the write side uses to turn a
+/// [`ServiceStream`] into the opaque `u64` the substrate files under. It is the
+/// canonical `ServiceStream::ns_hash` (absent-equals-empty collapse included);
+/// the substrate ascribes the result no meaning.
+pub fn part_key(stream: &ServiceStream) -> u64 {
+    stream.ns_hash()
+}
+
+/// Serialize a logs [`ServiceStream`] into the substrate's opaque `content_meta`
+/// blob, or `None` if a field exceeds [`MAX_FIELD_BYTES`].
+///
+/// Layout: a 1-byte [`CONTENT_META_VERSION`] tag, then each field as a
+/// little-endian `u16` byte-length prefix followed by its UTF-8 bytes
+/// (`namespace` then `name`). The substrate stores these bytes verbatim and
+/// never parses them; only this crate does. The encoder is fallible (mirroring
+/// the decoder) so an over-long, attacker-controlled identity is rejected by
+/// the caller rather than panicking the write path.
+///
+/// ```
+/// use otel_logs_identity::{ServiceStream, encode_content_meta, decode_content_meta};
+/// let s = ServiceStream::new("prod", "api");
+/// let blob = encode_content_meta(&s).expect("a short identity always encodes");
+/// assert_eq!(decode_content_meta(&blob).as_ref(), Some(&s));
+/// ```
+pub fn encode_content_meta(stream: &ServiceStream) -> Option<Vec<u8>> {
+    let ns = stream.namespace.as_bytes();
+    let name = stream.name.as_bytes();
+    // Bound the attacker-controlled fields to the u16 length prefix here — the
+    // single source of truth — and reject (None) before allocating, so a
+    // pathological identity can neither panic nor drive a large allocation.
+    let ns_len = u16::try_from(ns.len()).ok()?;
+    let name_len = u16::try_from(name.len()).ok()?;
+    let mut out = Vec::with_capacity(1 + 2 + ns.len() + 2 + name.len());
+    out.push(CONTENT_META_VERSION);
+    put_field(&mut out, ns_len, ns);
+    put_field(&mut out, name_len, name);
+    Some(out)
+}
+
+/// Reconstruct a logs [`ServiceStream`] from a `content_meta` blob produced by
+/// [`encode_content_meta`].
+///
+/// Returns `None` on an unknown version, truncated/over-long input, trailing
+/// bytes, or non-UTF-8 fields. This gives *structural* integrity only — it does
+/// not detect content corruption that preserves structure (e.g. a bit-flip into
+/// different valid UTF-8). A content checksum, if ever needed, belongs to the
+/// Stage 2 framing layer, not this codec. (A typed error enum distinguishing the
+/// rejection reasons for recovery diagnostics is likewise deferred to the first
+/// real caller — the Stage 2 format flip.)
+pub fn decode_content_meta(bytes: &[u8]) -> Option<ServiceStream> {
+    let (&version, rest) = bytes.split_first()?;
+    if version != CONTENT_META_VERSION {
+        return None;
+    }
+    let (namespace, rest) = take_field(rest)?;
+    let (name, rest) = take_field(rest)?;
+    if !rest.is_empty() {
+        return None;
+    }
+    Some(ServiceStream::new(
+        std::str::from_utf8(namespace).ok()?,
+        std::str::from_utf8(name).ok()?,
+    ))
+}
+
+/// Append a field with its pre-validated `u16` length prefix. The length is
+/// computed and bounded by the sole caller ([`encode_content_meta`]), so this
+/// helper holds no cast that could silently truncate.
+fn put_field(out: &mut Vec<u8>, len: u16, field: &[u8]) {
+    out.extend_from_slice(&len.to_le_bytes());
+    out.extend_from_slice(field);
+}
+
+fn take_field(bytes: &[u8]) -> Option<(&[u8], &[u8])> {
+    let (len_bytes, rest) = bytes.split_at_checked(2)?;
+    let len = u16::from_le_bytes([len_bytes[0], len_bytes[1]]) as usize;
+    rest.split_at_checked(len)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn part_key_matches_ns_hash_and_distinguishes_streams() {
+        // The cross-component invariant the file naming + Services selector
+        // rely on: part_key IS exactly ServiceStream::ns_hash.
+        let s = ServiceStream::new("prod", "api");
+        assert_eq!(part_key(&s), s.ns_hash());
+        // Distinct streams resolve to distinct keys.
+        assert_ne!(
+            part_key(&ServiceStream::new("prod", "api")),
+            part_key(&ServiceStream::new("prod", "worker")),
+        );
+        // The all-empty stream collapses to the `0` "no attribution" sentinel.
+        assert_eq!(part_key(&ServiceStream::new("", "")), 0);
+    }
+
+    #[test]
+    fn content_meta_roundtrips() {
+        for s in [
+            ServiceStream::new("prod", "api"),
+            ServiceStream::new("", "api"),  // absent namespace
+            ServiceStream::new("prod", ""), // absent name
+            ServiceStream::new("", ""),     // both absent
+            ServiceStream::new("ns-with-dash", "svc.with.dots"),
+            ServiceStream::new("производство", "日本-🦀"), // multi-byte UTF-8 preserved
+        ] {
+            let blob = encode_content_meta(&s).expect("short identity encodes");
+            assert_eq!(blob[0], CONTENT_META_VERSION, "version tag first");
+            assert_eq!(decode_content_meta(&blob).as_ref(), Some(&s));
+        }
+    }
+
+    #[test]
+    fn encode_rejects_oversize_field() {
+        let huge = "x".repeat(MAX_FIELD_BYTES + 1);
+        assert_eq!(encode_content_meta(&ServiceStream::new(huge.clone(), "api")), None);
+        assert_eq!(encode_content_meta(&ServiceStream::new("prod", huge)), None);
+        // Exactly at the limit still encodes.
+        let max = "x".repeat(MAX_FIELD_BYTES);
+        assert!(encode_content_meta(&ServiceStream::new(max, "api")).is_some());
+    }
+
+    #[test]
+    fn decode_rejects_unknown_version() {
+        let mut blob = encode_content_meta(&ServiceStream::new("prod", "api")).unwrap();
+        blob[0] = 0xff; // a version this codec does not know (only 1 is valid)
+        assert_eq!(decode_content_meta(&blob), None);
+    }
+
+    #[test]
+    fn decode_rejects_non_utf8_field() {
+        // Invalid UTF-8 in the namespace slot: version=1, ns len=2=[0xff,0xfe], empty name.
+        assert_eq!(
+            decode_content_meta(&[CONTENT_META_VERSION, 2, 0, 0xff, 0xfe, 0, 0]),
+            None
+        );
+        // Symmetric: invalid UTF-8 in the name slot (empty namespace, name=[0xff,0xfe]).
+        assert_eq!(
+            decode_content_meta(&[CONTENT_META_VERSION, 0, 0, 2, 0, 0xff, 0xfe]),
+            None
+        );
+    }
+
+    #[test]
+    fn decode_rejects_truncated_trailing_and_oversized_prefix() {
+        let blob = encode_content_meta(&ServiceStream::new("prod", "api")).unwrap();
+        // Truncated mid-field.
+        assert_eq!(decode_content_meta(&blob[..blob.len() - 1]), None);
+        // Empty input (no version byte).
+        assert_eq!(decode_content_meta(&[]), None);
+        // Bare version byte (no first length prefix).
+        assert_eq!(decode_content_meta(&[CONTENT_META_VERSION]), None);
+        // Trailing garbage after a valid blob.
+        let mut extra = blob.clone();
+        extra.push(0xff);
+        assert_eq!(decode_content_meta(&extra), None);
+        // Length prefix claims more bytes than are present.
+        let oversized = [CONTENT_META_VERSION, 100, 0, b'x'];
+        assert_eq!(decode_content_meta(&oversized), None);
+    }
+}

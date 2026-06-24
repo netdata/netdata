@@ -28,6 +28,7 @@ members = [
     "otel-plugin",
     "otel-ledger",
     "otel-catalog",
+    "otel-logs-identity",
     "file-cache",
     "flatten-otel",
 
@@ -227,6 +228,7 @@ file-cache = { path = "file-cache" }
 ferryboat = { path = "ferryboat" }
 
 file-registry = { path = "file-registry" }
+otel-logs-identity = { path = "otel-logs-identity" }
 wal = { path = "wal" }
 wal-otap = { path = "wal-otap" }
 
