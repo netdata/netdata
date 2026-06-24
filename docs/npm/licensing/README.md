@@ -12,12 +12,6 @@ endmeta-->
 
 Netdata tracks the license state of your network devices — what's entitled, how much is used, and when it expires — so a license doesn't quietly lapse and disable a feature you depend on.
 
-This section is for the teams running licensed network gear — firewalls especially — who need to know about an expiry **before** it turns off threat prevention, VPN, or routing at the worst possible time.
-
-## Why it matters
-
-A licensed feature can stop at midnight when its license expires — the device stays up, traffic keeps flowing, but the feature silently goes dark, and users notice hours later. Licensing monitoring exists to catch that while there's still time to renew.
-
 ## What Netdata tracks
 
 For devices that expose licensing over SNMP:
@@ -30,11 +24,11 @@ These appear as live charts and in the **`snmp:licenses`** function — a per-de
 
 ## Which vendors
 
-Licensing telemetry comes up automatically with the device's profile, for the vendors that ship dedicated licensing telemetry over SNMP — Check Point, Fortinet, Cisco (including Smart Licensing), Sophos, Blue Coat ProxySG, and MikroTik. The list grows as more vendors expose licensing telemetry over SNMP.
+Licensing telemetry comes up automatically with the device's profile, for the vendors that ship dedicated licensing telemetry over SNMP — Check Point, Fortinet, Cisco (including Smart Licensing), Sophos, Blue Coat ProxySG, and MikroTik.
 
 ## Alerts
 
-Netdata ships stock alerts on licensing health — an approaching expiry (so you renew with lead time), a license moving into a degraded or broken state, and a licensed pool filling up — so the problem surfaces before a feature stops.
+Stock alerts on licensing health — an approaching expiry, a license moving into a degraded or broken state, and a licensed pool filling up.
 
 ## Where to start
 
