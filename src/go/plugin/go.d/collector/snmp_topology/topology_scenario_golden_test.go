@@ -861,12 +861,6 @@ func assertScenarioNoActorPortLinkType(t testing.TB, data topologyv1test.Normali
 	}
 }
 
-func assertScenarioNoVisibleLinks(t testing.TB, data topologyv1test.NormalizedData) {
-	t.Helper()
-
-	require.Empty(t, data.Links.Rows)
-}
-
 func assertScenarioStatEquals(t testing.TB, data topologyv1test.NormalizedData, stat string, want any) {
 	t.Helper()
 
