@@ -1109,22 +1109,18 @@ func TestControllerPublishedFunctionWrapperConcurrentMutation(t *testing.T) {
 			start := make(chan struct{})
 			var wg sync.WaitGroup
 			for range 8 {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
+				wg.Go(func() {
 					<-start
 					for range 100 {
 						handler(functions.Function{UID: "wrapped-dispatch", Timeout: time.Second})
 					}
-				}()
+				})
 			}
 
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				<-start
 				tc.mutate(controller)
-			}()
+			})
 
 			close(start)
 			wg.Wait()
