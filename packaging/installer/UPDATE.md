@@ -47,7 +47,6 @@ wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /
 
 If you installed Netdata using an installation prefix, you will need to add an `--install-prefix` option specifying that prefix to make sure it finds the existing installation.
 
-
 If you see a line starting with `--- Would attempt to update existing installation by running the updater script located at:`, then our [kickstart script update method](#update-methods-by-platform) will work for you.
 
 Otherwise, it should either indicate that the installation type is not supported (which probably means you either have a `custom` install or built Netdata manually) or indicate that it would create a new install (which means that you either used a non-standard installation path, or that you don't have Netdata installed).
@@ -193,11 +192,11 @@ sudo systemctl stop netdata-updater.timer
 
 On cron-based systems, remove the cron entry used by the updater. The file location depends on how auto-updates were originally configured:
 
-| Scheduling method            | File to remove                                                                    |
-|------------------------------|-----------------------------------------------------------------------------------|
-| Drop-in crontab (`cron.d`)   | `/etc/cron.d/netdata-updater-daily` or `/etc/cron.d/netdata-updater`              |
-| Periodic script (`cron.daily`) | `/etc/cron.daily/netdata-updater.sh` or `/etc/cron.daily/netdata-updater`       |
-| Periodic script (Alpine/BSD) | `/etc/periodic/daily/netdata-updater.sh` or `/etc/periodic/daily/netdata-updater` |
+| Scheduling method              | File to remove                                                                    |
+|--------------------------------|-----------------------------------------------------------------------------------|
+| Drop-in crontab (`cron.d`)     | `/etc/cron.d/netdata-updater-daily` or `/etc/cron.d/netdata-updater`              |
+| Periodic script (`cron.daily`) | `/etc/cron.daily/netdata-updater.sh` or `/etc/cron.daily/netdata-updater`         |
+| Periodic script (Alpine/BSD)   | `/etc/periodic/daily/netdata-updater.sh` or `/etc/periodic/daily/netdata-updater` |
 
 For example:
 
@@ -217,7 +216,13 @@ To re-enable automatic updates later, run:
 sudo /usr/libexec/netdata/netdata-updater.sh --enable-auto-updates
 ```
 
-This auto-detects the appropriate scheduling method for your system. You can optionally specify a method explicitly (`systemd`, `interval`, or `crontab`).
+This auto-detects the appropriate scheduling method for your system. To explicitly set the method, pass it as an argument:
+
+```bash
+sudo /usr/libexec/netdata/netdata-updater.sh --enable-auto-updates systemd
+```
+
+Valid methods are `systemd`, `interval`, and `crontab`.
 
 <br/>
 </details>
@@ -226,7 +231,7 @@ This auto-detects the appropriate scheduling method for your system. You can opt
 
 **Native package installations**
 
-If you installed Netdata using native packages (`binpkg-rpm` or `binpkg-deb`), control upgrades through your system's package manager by holding or pinning the installed version:
+`--disable-auto-updates` stops the Netdata-managed update scheduler for all install types, including native packages. However, system-level auto-upgrade tools (such as `unattended-upgrades` on Debian/Ubuntu or `dnf-automatic` on RHEL-based systems) can still update Netdata independently of the Netdata scheduler. To prevent that, also pin the package using your system's package manager:
 
 ```bash
 # DEB-based systems
@@ -251,5 +256,5 @@ sudo dnf versionlock add netdata
 | **custom**                 | System package manager | Use your system's package manager                                                                          |
 | **macOS (Homebrew)**       | Homebrew               | `brew upgrade netdata`                                                                                     |
 | **Manual Git**             | Git + installer        | See [manual installation steps](#update-methods-by-platform)                                               |
-| **Docker (OCI)**           | Image pull + recreate  | See [Docker update instructions](/packaging/docker/README.md#update-your-netdata-docker-container)                |
+| **Docker (OCI)**           | Image pull + recreate  | See [Docker update instructions](/packaging/docker/README.md#update-your-netdata-docker-container)         |
 | **Windows**                | MSI installer          | Download and run latest installer                                                                          |
