@@ -345,7 +345,7 @@ Netdata alerts use a **two-level enable/disable model**:
 1. **Prototype level** — Each alert prototype (the entry you toggle on or off from the **Alerts tab** or **Space Settings → Configurations → Health**) has its own on/off switch.
 2. **Rule level** — Inside each prototype are one or more **rules**. Every rule has its own enable/disable control, which you reach by opening the prototype's **Update** form.
 
-When a prototype is switched off, none of the alerts it produces can run. If you try to enable an individual alert while its prototype is still off, Netdata shows **"no items to enable"** — the prototype itself has to be turned back on before any of its alerts can run.
+When a prototype is switched off, none of the alerts it produces can run. If you try to enable an individual alert while its prototype is still off, Netdata shows **"No items to enable"** — the prototype itself has to be turned back on before any of its alerts can run.
 
 **What happens when you turn a prototype back on:** Enabling a prototype reactivates every alert its still-enabled rules produce. It does **not** switch back on any rule you have disabled individually. Because each rule runs on every node and chart it applies to, a single prototype can switch on a large number of alerts at once — potentially hundreds, depending on how broadly the prototype applies. The count you see when enabling a prototype (for example "899 alerts") is the total alerts those still-enabled rules produce across all matching nodes and charts — it is not the number of rules, and it never includes rules you have disabled. This is normal, not an error.
 
