@@ -57,6 +57,12 @@ This collector is supported on all platforms.
 
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 
+The collector works with all SQL Server editions, including Express Edition.
+
+On editions that do not include SQL Server Agent (such as Express), SQL Agent job metrics are not collected; the collector omits them without error, just as it does when `msdb` grants are missing.
+
+On editions that do not support Always On Availability Groups (such as Express), AG metrics are not collected.
+
 The monitoring user requires the VIEW SERVER STATE permission to access DMVs.
 
 SQL Agent job metrics require access to `msdb.dbo.sysjobs`.
@@ -89,7 +95,7 @@ You must configure proper credentials for monitoring.
 
 #### Limits
 
-The default configuration for this integration does not impose any limits on data collection.
+The collector works with all SQL Server editions, including Express Edition. SQL Server Agent job metrics and Always On Availability Group metrics are available only on editions that include those features; on editions that lack them (such as Express), the collector omits those metrics without error.
 
 #### Performance Impact
 
