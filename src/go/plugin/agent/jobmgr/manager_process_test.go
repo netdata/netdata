@@ -5,6 +5,7 @@ package jobmgr
 import (
 	"bytes"
 	"context"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -114,6 +115,60 @@ func TestRunNotifyRunningJobs_TickOutsideLock(t *testing.T) {
 	close(job.tickRelease)
 	cancel()
 
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("runNotifyRunningJobs did not stop")
+	}
+}
+
+func TestRunNotifyRunningJobs_ReconcilesLateAvailableModuleMethods(t *testing.T) {
+	reg := &recordingFunctionRegistry{}
+	available := false
+	mgr := New(Config{
+		PluginName: testPluginName,
+		FnReg:      reg,
+		Modules: collectorapi.Registry{
+			"mod": collectorapi.Creator{
+				Methods: func() []funcapi.MethodConfig {
+					return []funcapi.MethodConfig{{
+						ID:        "late",
+						Available: func() bool { return available },
+					}}
+				},
+			},
+		},
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	mgr.ctx = ctx
+	mgr.funcCtl.Init(ctx)
+	mgr.funcCtl.RegisterModules(mgr.modules)
+
+	job := &tickProbeJob{
+		fullName:   "mod_job1",
+		moduleName: "mod",
+		name:       "job1",
+	}
+	mgr.funcCtl.OnJobStart(job)
+
+	mgr.runningJobs.lock()
+	mgr.runningJobs.add(job.FullName(), job)
+	mgr.runningJobs.unlock()
+
+	available = true
+	done := make(chan struct{})
+	go func() {
+		mgr.runNotifyRunningJobs()
+		close(done)
+	}()
+
+	require.Eventually(t, func() bool {
+		return slices.Contains(reg.registeredNames(), "mod:late")
+	}, 2*time.Second, 10*time.Millisecond)
+
+	cancel()
 	select {
 	case <-done:
 	case <-time.After(2 * time.Second):
@@ -474,6 +529,28 @@ func (j *lockProbeJob) IsRunning() bool                   { return true }
 func (j *lockProbeJob) Panicked() bool                    { return false }
 func (j *lockProbeJob) Vnode() vnodes.VirtualNode         { return vnodes.VirtualNode{} }
 func (j *lockProbeJob) UpdateVnode(_ *vnodes.VirtualNode) {}
+
+type tickProbeJob struct {
+	fullName   string
+	moduleName string
+	name       string
+}
+
+func (j *tickProbeJob) FullName() string                  { return j.fullName }
+func (j *tickProbeJob) ModuleName() string                { return j.moduleName }
+func (j *tickProbeJob) Name() string                      { return j.name }
+func (j *tickProbeJob) Collector() any                    { return nil }
+func (j *tickProbeJob) Start()                            {}
+func (j *tickProbeJob) Stop()                             {}
+func (j *tickProbeJob) Tick(int)                          {}
+func (j *tickProbeJob) AutoDetection() error              { return nil }
+func (j *tickProbeJob) AutoDetectionEvery() int           { return 0 }
+func (j *tickProbeJob) RetryAutoDetection() bool          { return false }
+func (j *tickProbeJob) Cleanup()                          {}
+func (j *tickProbeJob) IsRunning() bool                   { return true }
+func (j *tickProbeJob) Panicked() bool                    { return false }
+func (j *tickProbeJob) Vnode() vnodes.VirtualNode         { return vnodes.VirtualNode{} }
+func (j *tickProbeJob) UpdateVnode(_ *vnodes.VirtualNode) {}
 
 type recordingFunctionRegistry struct {
 	mu         sync.Mutex

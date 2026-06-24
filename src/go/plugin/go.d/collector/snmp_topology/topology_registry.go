@@ -63,6 +63,11 @@ func (r *topologyRegistry) snapshotWithOptions(options topologyoptions.QueryOpti
 	return buildSNMPTopologySnapshot(aggregate, options)
 }
 
+func (r *topologyRegistry) hasRenderableSnapshot() bool {
+	_, ok := r.snapshotWithOptions(topologyoptions.DefaultQueryOptions())
+	return ok
+}
+
 func (r *topologyRegistry) producerScope() string {
 	r.mu.RLock()
 	scope := strings.TrimSpace(r.producerScopeID)

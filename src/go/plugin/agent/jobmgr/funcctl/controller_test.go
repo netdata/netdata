@@ -416,6 +416,9 @@ func TestControllerLifecycleHooks(t *testing.T) {
 		"first job start registers static methods once":                 {},
 		"availability-gated static method registers when available":     {},
 		"availability-gated agent-wide method registers when available": {},
+		"reconcile registers late available static method":              {},
+		"reconcile ignores stopped job":                                 {},
+		"reconcile does not duplicate published static method":          {},
 		"public method name collision skips colliding module":           {},
 		"rejected module does not poison planned public names":          {},
 		"topology methods register direct alias":                        {},
@@ -507,6 +510,69 @@ func TestControllerLifecycleHooks(t *testing.T) {
 				controller.OnJobStart(newTestRuntimeJob("mod", "job2", true))
 
 				assert.Equal(t, []string{"mod:logs"}, reg.registeredNames())
+
+			case "reconcile registers late available static method":
+				available := false
+				controller.RegisterModules(collectorapi.Registry{
+					"mod": collectorapi.Creator{
+						Methods: func() []funcapi.MethodConfig {
+							return []funcapi.MethodConfig{{
+								ID:        "logs",
+								Available: func() bool { return available },
+							}}
+						},
+					},
+				})
+
+				job := newTestRuntimeJob("mod", "job1", true)
+				controller.OnJobStart(job)
+				assert.Empty(t, reg.registeredNames())
+
+				available = true
+				controller.ReconcileModuleMethodsForJob(job)
+
+				assert.Equal(t, []string{"mod:logs"}, reg.registeredNames())
+
+			case "reconcile ignores stopped job":
+				available := true
+				controller.RegisterModules(collectorapi.Registry{
+					"mod": collectorapi.Creator{
+						Methods: func() []funcapi.MethodConfig {
+							return []funcapi.MethodConfig{{
+								ID:        "logs",
+								Available: func() bool { return available },
+							}}
+						},
+					},
+				})
+
+				controller.ReconcileModuleMethodsForJob(newTestRuntimeJob("mod", "job1", false))
+
+				assert.Empty(t, reg.registeredNames())
+
+			case "reconcile does not duplicate published static method":
+				availableCalls := 0
+				controller.RegisterModules(collectorapi.Registry{
+					"mod": collectorapi.Creator{
+						Methods: func() []funcapi.MethodConfig {
+							return []funcapi.MethodConfig{{
+								ID: "logs",
+								Available: func() bool {
+									availableCalls++
+									return true
+								},
+							}}
+						},
+					},
+				})
+
+				job := newTestRuntimeJob("mod", "job1", true)
+				controller.OnJobStart(job)
+				controller.ReconcileModuleMethodsForJob(job)
+				controller.ReconcileModuleMethodsForJob(job)
+
+				assert.Equal(t, []string{"mod:logs"}, reg.registeredNames())
+				assert.Equal(t, 1, availableCalls)
 
 			case "public method name collision skips colliding module":
 				controller.RegisterModules(collectorapi.Registry{

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"sort"
+	"sync"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
@@ -32,6 +33,7 @@ type Controller struct {
 	ctx        context.Context
 
 	registry          *moduleFuncRegistry
+	staticMethodsMu   sync.Mutex
 	staticMethodsSeen map[string]struct{}
 }
 
@@ -144,6 +146,25 @@ func (c *Controller) OnJobStart(job collectorapi.RuntimeJob) {
 	}
 }
 
+// ReconcileModuleMethodsForJob rechecks module/static method availability for a running job.
+//
+// This supports late publication for module methods whose availability depends on
+// runtime state that can appear after job start. Publication remains monotonic:
+// already-published methods are never removed here.
+func (c *Controller) ReconcileModuleMethodsForJob(job collectorapi.RuntimeJob) {
+	if job == nil || !job.IsRunning() {
+		return
+	}
+	if _, ok := c.registry.getJob(job.ModuleName(), job.Name()); !ok {
+		return
+	}
+	methods := c.registry.getMethods(job.ModuleName())
+	if len(methods) == 0 {
+		return
+	}
+	c.registerAvailableModuleMethods(job.ModuleName(), methods, false)
+}
+
 func (c *Controller) OnJobStop(job collectorapi.RuntimeJob) {
 	if job == nil {
 		return
@@ -154,6 +175,9 @@ func (c *Controller) OnJobStop(job collectorapi.RuntimeJob) {
 }
 
 func (c *Controller) Cleanup() {
+	c.staticMethodsMu.Lock()
+	defer c.staticMethodsMu.Unlock()
+
 	for funcName := range c.staticMethodsSeen {
 		c.fnReg.Unregister(funcName)
 		if c.api != nil {
@@ -163,17 +187,23 @@ func (c *Controller) Cleanup() {
 }
 
 func (c *Controller) registerModuleMethodsOnJobStart(moduleName string) {
-	creator, ok := c.registry.getCreator(moduleName)
-	if !ok || creator.Methods == nil {
+	methods := c.registry.getMethods(moduleName)
+	if len(methods) == 0 {
 		return
 	}
 
-	c.registerAvailableModuleMethods(moduleName, creator.Methods(), false)
+	c.registerAvailableModuleMethods(moduleName, methods, false)
 }
 
 func (c *Controller) registerAvailableModuleMethods(moduleName string, methods []funcapi.MethodConfig, agentWideOnly bool) {
+	c.staticMethodsMu.Lock()
+	defer c.staticMethodsMu.Unlock()
+
 	for _, method := range methods {
 		if agentWideOnly && !method.AgentWide {
+			continue
+		}
+		if method.ID != "" && c.allStaticMethodNamesSeenLocked(moduleName, method) {
 			continue
 		}
 		if !methodAvailable(method) {
@@ -223,6 +253,19 @@ func (c *Controller) registerAvailableModuleMethods(moduleName string, methods [
 			c.staticMethodsSeen[funcName] = struct{}{}
 		}
 	}
+}
+
+func (c *Controller) allStaticMethodNamesSeenLocked(moduleName string, method funcapi.MethodConfig) bool {
+	names := funcapi.MethodFunctionNames(moduleName, method)
+	if len(names) == 0 {
+		return false
+	}
+	for _, name := range names {
+		if _, seen := c.staticMethodsSeen[name]; !seen {
+			return false
+		}
+	}
+	return true
 }
 
 func methodTags(method funcapi.MethodConfig) string {

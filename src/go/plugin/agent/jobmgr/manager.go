@@ -416,6 +416,7 @@ func (m *Manager) runNotifyRunningJobs() {
 		case clock := <-tk.C:
 			for _, job := range m.runningJobs.snapshot() {
 				job.Tick(clock)
+				m.funcCtl.ReconcileModuleMethodsForJob(job)
 			}
 		}
 	}

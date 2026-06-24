@@ -27,6 +27,8 @@ func TestSNMPTopologyCreatorOwnsTopologyFunction(t *testing.T) {
 	require.Equal(t, snmptopologyfunc.MethodID, methods[0].ID)
 	require.Equal(t, snmptopologyfunc.FunctionName, methods[0].FunctionName)
 	require.True(t, methods[0].AgentWide)
+	require.NotNil(t, methods[0].Available)
+	require.False(t, methods[0].Available())
 
 	coll := newTestSNMPTopologyCollector()
 	handler := creator.MethodHandler(&topologyRuntimeJobForTest{collector: coll})
@@ -60,6 +62,25 @@ func TestSNMPTopologyCreatorRequiresSharedDependencies(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestSNMPTopologyFunctionAvailabilityBecomesReadyAfterRenderableSnapshot(t *testing.T) {
+	creator := newCreator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle())
+	methods := creator.Methods()
+	require.Len(t, methods, 1)
+	require.NotNil(t, methods[0].Available)
+	require.False(t, methods[0].Available())
+
+	coll, ok := creator.CreateV2().(*Collector)
+	require.True(t, ok)
+	cache := newTopologyCache()
+	seedPublishedEndpointSnapshot(cache)
+	coll.topologyRegistry.register(cache)
+
+	coll.updateFunctionAvailability()
+
+	require.True(t, methods[0].Available())
+	require.True(t, creator.Methods()[0].Available())
 }
 
 func TestSNMPTopologyNewRequiresSharedDependencies(t *testing.T) {
