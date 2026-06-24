@@ -29,7 +29,10 @@ func TestAugmentTopologySnapshotLocalsMaterializesMissingPolledManagedActor(t *t
 				SysObjectID:  "1.3.6.1.4.1.8072.3.2.1",
 				ChassisID:    "02:00:00:00:01:02",
 				ManagementIP: "192.0.2.2",
-				Labels:       map[string]string{"type": "router"},
+				Labels: map[string]string{
+					" type ": " router ",
+					"empty":  "   ",
+				},
 			},
 		},
 	}
@@ -43,6 +46,7 @@ func TestAugmentTopologySnapshotLocalsMaterializesMissingPolledManagedActor(t *t
 	require.Equal(t, "router", actor.ActorType)
 	require.Equal(t, "network", actor.Layer)
 	require.Equal(t, "snmp", actor.Source)
+	require.Equal(t, map[string]string{"type": "router"}, actor.Labels)
 	require.Equal(t, "router-b", actor.Match.SysName)
 	require.Equal(t, "1.3.6.1.4.1.8072.3.2.1", actor.Match.SysObjectID)
 	require.Equal(t, []string{"02:00:00:00:01:02"}, actor.Match.ChassisIDs)

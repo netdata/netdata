@@ -3,7 +3,6 @@
 package snmptopology
 
 import (
-	"maps"
 	"strings"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
@@ -47,13 +46,14 @@ func addLocalActorFromCache(data *topologymodel.Data, localDeviceID string, loca
 		return false
 	}
 
+	labels := cloneTopologyLabels(local.Labels)
 	actor := topologymodel.Actor{
 		ActorID:   actorID,
-		ActorType: topologyengine.ResolveDeviceActorType(local.Labels),
+		ActorType: topologyengine.ResolveDeviceActorType(labels),
 		Layer:     "network",
 		Source:    "snmp",
 		Match:     topologyLocalActorMatch(local),
-		Labels:    maps.Clone(local.Labels),
+		Labels:    labels,
 		Detail: topologymodel.ActorDetail{
 			SNMP: topologySNMPActorDetailFromDevice(local),
 		},
@@ -135,11 +135,7 @@ func applyLocalActorLabels(actor *topologymodel.Actor, local topologymodel.Devic
 	if actor.Labels == nil {
 		actor.Labels = make(map[string]string)
 	}
-	for key, value := range local.Labels {
-		value = strings.TrimSpace(value)
-		if value == "" {
-			continue
-		}
+	for key, value := range cloneTopologyLabels(local.Labels) {
 		actor.Labels[key] = value
 	}
 }
