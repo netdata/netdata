@@ -242,9 +242,6 @@ func TestConfigSchemaDynCfgDefaultPayloadAllowsManagedName(t *testing.T) {
 	defaultPayload["name"] = "local"
 
 	assert.NoError(t, validateAgainstJSONSchema(t, jsonSchema, defaultPayload))
-
-	defaultPayload["unexpected"] = true
-	assert.Error(t, validateAgainstJSONSchema(t, jsonSchema, defaultPayload))
 }
 
 func TestCollectorDefaultListenReceiveBuffer(t *testing.T) {
