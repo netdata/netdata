@@ -46,8 +46,14 @@ func (a funcDepsAdapter) ManagedDeviceFocusTargets() []topologyoptions.ManagedFo
 	return a.registry.managedDeviceFocusTargets()
 }
 
-func topologyMethods() []funcapi.MethodConfig {
-	return snmptopologyfunc.Methods()
+func topologyMethods(availability *topologyFunctionAvailability) []funcapi.MethodConfig {
+	methods := snmptopologyfunc.Methods()
+	for i := range methods {
+		if methods[i].ID == snmptopologyfunc.MethodID {
+			methods[i].Available = availability.Available
+		}
+	}
+	return methods
 }
 
 func topologyFunctionHandler(job collectorapi.RuntimeJob) funcapi.MethodHandler {

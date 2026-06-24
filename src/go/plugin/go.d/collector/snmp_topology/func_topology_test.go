@@ -4,9 +4,6 @@ package snmptopology
 
 import (
 	"context"
-	"encoding/json"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -17,8 +14,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 	topologyv1renderer "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyv1"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyv1test"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/snmptopologyfunc"
-	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -80,7 +77,7 @@ func TestTopologyFunctionAdapter_HandleDefaultStrictL2(t *testing.T) {
 
 	data, ok := resp.Data.(topologyv1.Data)
 	require.True(t, ok)
-	require.NoError(t, validateTopologyV1Data(data))
+	require.NoError(t, topologyv1test.ValidateData(data))
 	assert.Equal(t, topologyv1.SchemaVersion, data.SchemaVersion)
 	assert.Equal(t, "snmp-l2", data.Producer.Source)
 	require.NotNil(t, data.View)
@@ -121,7 +118,7 @@ func TestTopologyFunctionAdapter_HandleSelectorParams(t *testing.T) {
 	assert.Equal(t, 200, resp.Status)
 	data, ok := resp.Data.(topologyv1.Data)
 	require.True(t, ok)
-	require.NoError(t, validateTopologyV1Data(data))
+	require.NoError(t, topologyv1test.ValidateData(data))
 	require.NotNil(t, data.View)
 	assert.Equal(t, "network", data.View.Scope)
 }
@@ -163,7 +160,7 @@ func TestTopologyFunctionAdapter_HandleUnknownSelectorsFallbackToDefaults(t *tes
 	invalidData, ok := invalidResp.Data.(topologyv1.Data)
 	require.True(t, ok)
 
-	require.NoError(t, validateTopologyV1Data(invalidData))
+	require.NoError(t, topologyv1test.ValidateData(invalidData))
 	require.NotNil(t, defaultData.View)
 	require.NotNil(t, invalidData.View)
 	assert.Equal(t, defaultData.View.Scope, invalidData.View.Scope)
@@ -275,7 +272,7 @@ func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
-	require.NoError(t, validateTopologyV1Data(payload))
+	require.NoError(t, topologyv1test.ValidateData(payload))
 	require.NotNil(t, payload.Tables)
 	require.Contains(t, payload.Tables.Actor, "actor_ports")
 	require.Contains(t, payload.Tables.Actor, "actor_port_links")
@@ -465,7 +462,7 @@ func TestSNMPTopologyToV1_PrefersSNMPActorDetailOverL2(t *testing.T) {
 
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
-	require.NoError(t, validateTopologyV1Data(payload))
+	require.NoError(t, topologyv1test.ValidateData(payload))
 
 	assert.Equal(t, "SNMP Vendor", topologyV1StringColumnValues(t, payload, payload.Actors, "vendor")[0])
 	assert.Equal(t, "10.0.0.2", topologyV1StringColumnValues(t, payload, payload.Actors, "management_ip")[0])
@@ -525,7 +522,7 @@ func TestSNMPTopologyToV1_OmitsNeighborCountForEmptyNeighborList(t *testing.T) {
 
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
-	require.NoError(t, validateTopologyV1Data(payload))
+	require.NoError(t, topologyv1test.ValidateData(payload))
 	require.NotNil(t, payload.Tables)
 
 	portTable := payload.Tables.Actor["actor_ports"].Table
@@ -584,7 +581,7 @@ func TestSNMPTopologyToV1_UsesIfIndexAsVisiblePortID(t *testing.T) {
 
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
-	require.NoError(t, validateTopologyV1Data(payload))
+	require.NoError(t, topologyv1test.ValidateData(payload))
 	require.NotNil(t, payload.Tables)
 
 	portTable := payload.Tables.Actor["actor_ports"].Table
@@ -637,7 +634,7 @@ func TestSNMPTopologyToV1_PortNamesOnlyUsePortFields(t *testing.T) {
 
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
-	require.NoError(t, validateTopologyV1Data(payload))
+	require.NoError(t, topologyv1test.ValidateData(payload))
 
 	assert.Equal(t, []any{nil}, topologyV1ColumnValues(t, payload.Links, "src_port_name"))
 	assert.Equal(t, []any{nil}, topologyV1ColumnValues(t, payload.Links, "dst_port_name"))
@@ -706,7 +703,7 @@ func TestSNMPTopologyToV1_PreservesL3SubnetPresentationAndEvidence(t *testing.T)
 
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
-	require.NoError(t, validateTopologyV1Data(payload))
+	require.NoError(t, topologyv1test.ValidateData(payload))
 
 	assert.Contains(t, payload.Producer.Capabilities, "l3_subnet")
 	require.NotNil(t, payload.Presentation)
@@ -825,7 +822,7 @@ func TestSNMPTopologyToV1_PreservesL3SubnetMembershipPresentationAndEvidence(t *
 
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
-	require.NoError(t, validateTopologyV1Data(payload))
+	require.NoError(t, topologyv1test.ValidateData(payload))
 
 	assert.Contains(t, payload.Producer.Capabilities, "l3_subnet_membership")
 	assert.Contains(t, topologyV1LegendActorTypes(payload), topologymodel.L3SubnetSegmentActorType)
@@ -952,7 +949,7 @@ func TestSNMPTopologyToV1_PreservesOSPFAdjacencyPresentationEvidenceAndNeighborR
 
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
-	require.NoError(t, validateTopologyV1Data(payload))
+	require.NoError(t, topologyv1test.ValidateData(payload))
 
 	assert.Contains(t, payload.Producer.Capabilities, "ospf")
 	require.Contains(t, payload.Types.LinkTypes, topologymodel.OSPFAdjacencyLinkType)
@@ -1078,7 +1075,7 @@ func TestSNMPTopologyToV1_PreservesBGPAdjacencyPresentationEvidenceAndPeerRows(t
 
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
-	require.NoError(t, validateTopologyV1Data(payload))
+	require.NoError(t, topologyv1test.ValidateData(payload))
 
 	assert.Contains(t, payload.Producer.Capabilities, "bgp")
 	require.Contains(t, payload.Types.LinkTypes, topologymodel.BGPAdjacencyLinkType)
@@ -1220,7 +1217,7 @@ func TestSNMPTopologyToV1_PreservesLinkPresentationTypes(t *testing.T) {
 
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
-	require.NoError(t, validateTopologyV1Data(payload))
+	require.NoError(t, topologyv1test.ValidateData(payload))
 
 	assert.Equal(t, []string{"lldp", "probable"}, topologyV1StringColumnValues(t, payload, payload.Links, "type"))
 
@@ -1318,7 +1315,7 @@ func TestSNMPTopologyToV1_PortlessFDBEvidenceUsesLinkRef(t *testing.T) {
 
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
-	require.NoError(t, validateTopologyV1Data(payload))
+	require.NoError(t, topologyv1test.ValidateData(payload))
 	require.Contains(t, payload.Evidence, "fdb")
 
 	evidenceTable := payload.Evidence["fdb"].Table
@@ -1395,7 +1392,7 @@ func TestSNMPTopologyToV1_L2EvidenceDistinguishesParallelLinksByTypedEndpoints(t
 
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
-	require.NoError(t, validateTopologyV1Data(payload))
+	require.NoError(t, topologyv1test.ValidateData(payload))
 	require.Contains(t, payload.Evidence, "lldp")
 
 	evidenceTable := payload.Evidence["lldp"].Table
@@ -1497,43 +1494,6 @@ func newTestTopologyCacheLLDP(
 	return cache
 }
 
-func validateTopologyV1Data(data topologyv1.Data) error {
-	bs, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-	var decoded map[string]any
-	if err := json.Unmarshal(bs, &decoded); err != nil {
-		return err
-	}
-	if err := topologyv1.ValidateDecodedData(decoded); err != nil {
-		return err
-	}
-
-	schemaPath := filepath.Clean(filepath.Join("..", "..", "..", "..", "..", "plugins.d", "FUNCTION_TOPOLOGY_SCHEMA.json"))
-	schemaBytes, err := os.ReadFile(schemaPath)
-	if err != nil {
-		return err
-	}
-	var schemaDoc any
-	if err := json.Unmarshal(schemaBytes, &schemaDoc); err != nil {
-		return err
-	}
-	compiler := jsonschema.NewCompiler()
-	if err := compiler.AddResource("schema.json", schemaDoc); err != nil {
-		return err
-	}
-	schema, err := compiler.Compile("schema.json")
-	if err != nil {
-		return err
-	}
-	var response any
-	if err := json.Unmarshal([]byte(`{"status":200,"type":"topology","data":`+string(bs)+`}`), &response); err != nil {
-		return err
-	}
-	return schema.Validate(response)
-}
-
 func topologyV1ColumnType(table topologyv1.Table, columnID string) string {
 	for _, column := range table.Columns {
 		if column.ID == columnID {
@@ -1557,7 +1517,7 @@ func topologyV1ColumnValues(t *testing.T, table topologyv1.Table, columnID strin
 
 	for columnIndex, column := range table.Columns {
 		if column.ID == columnID {
-			return topologyV1DecodeColumnValues(t, table, columnIndex)
+			return topologyv1test.DecodeColumnValues(t, table, columnIndex)
 		}
 	}
 
@@ -1577,7 +1537,7 @@ func topologyV1StringColumnValues(t *testing.T, data topologyv1.Data, table topo
 		dict := data.Dictionaries[column.Dictionary]
 		require.NotNil(t, dict)
 
-		values := topologyV1DecodeColumnValues(t, table, columnIndex)
+		values := topologyv1test.DecodeColumnValues(t, table, columnIndex)
 		out := make([]string, 0, len(values))
 		for _, value := range values {
 			ref, ok := value.(int)
@@ -1593,51 +1553,6 @@ func topologyV1StringColumnValues(t *testing.T, data topologyv1.Data, table topo
 
 	require.Failf(t, "missing column", "column %q not found", columnID)
 	return nil
-}
-
-func topologyV1DecodeColumnValues(t *testing.T, table topologyv1.Table, columnIndex int) []any {
-	t.Helper()
-
-	switch encoding := table.Values[columnIndex].(type) {
-	case topologyv1.ValuesEncoding:
-		return encoding.Values
-	case *topologyv1.ValuesEncoding:
-		require.NotNil(t, encoding)
-		return encoding.Values
-	case topologyv1.ConstEncoding:
-		values := make([]any, table.Rows)
-		for i := range values {
-			values[i] = encoding.Value
-		}
-		return values
-	case *topologyv1.ConstEncoding:
-		require.NotNil(t, encoding)
-		values := make([]any, table.Rows)
-		for i := range values {
-			values[i] = encoding.Value
-		}
-		return values
-	case topologyv1.DictEncoding:
-		values := make([]any, 0, len(encoding.Indexes))
-		for _, index := range encoding.Indexes {
-			require.GreaterOrEqual(t, index, 0)
-			require.Less(t, index, len(encoding.Values))
-			values = append(values, encoding.Values[index])
-		}
-		return values
-	case *topologyv1.DictEncoding:
-		require.NotNil(t, encoding)
-		values := make([]any, 0, len(encoding.Indexes))
-		for _, index := range encoding.Indexes {
-			require.GreaterOrEqual(t, index, 0)
-			require.Less(t, index, len(encoding.Values))
-			values = append(values, encoding.Values[index])
-		}
-		return values
-	default:
-		require.Failf(t, "unsupported encoding", "column %d has unsupported encoding %T", columnIndex, encoding)
-		return nil
-	}
 }
 
 func topologyV1LegendLinkTypes(data topologyv1.Data) []string {

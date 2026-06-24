@@ -15,6 +15,7 @@ research cannot be mistaken for product specification.
 
 | Spec | Scope | Main consumers |
 |---|---|---|
+| [go-function-publication-lifecycle.md](go-function-publication-lifecycle.md) | Go Function publication lifecycle for module/static methods, `Available`, monotonic late publication, and job-method boundaries. | go.d Function producers, `funcctl`, `jobmgr`, collector authors with runtime-gated Functions. |
 | [go-v2-host-scope.md](go-v2-host-scope.md) | Go framework V2 host-scope and vnode metric routing contract. | Go V2 collector work, `metrix`, `jobruntime`, `chartengine`, go.d collector docs and skills. |
 | [journal-log-writer-directory-contract.md](journal-log-writer-directory-contract.md) | `Log::new` requires an absolute journal directory (rejected early otherwise); consumers must resolve relative config against a stable base. | journal-log-writer consumers: otel-plugin logs, netflow-plugin tiers. |
 | [netflow-tier-commit-workers.md](netflow-tier-commit-workers.md) | NetFlow rollup-tier commit worker contract: ownership, doorbell protocol, shutdown order, stretch semantics, lock discipline, telemetry. | netflow-plugin ingest/tiering work, tier benchmark and soak/crash tests, network-flows operator docs. |

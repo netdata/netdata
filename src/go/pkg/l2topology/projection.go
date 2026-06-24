@@ -46,6 +46,12 @@ func ToGraph(result Result, opts GraphOptions) Projection {
 	return projector.ToGraph(result, opts)
 }
 
+// ResolveDeviceActorType returns the managed actor type for device labels using
+// the same category mapping as the L2 graph projection.
+func ResolveDeviceActorType(labels map[string]string) string {
+	return projector.ResolveDeviceActorType(labels)
+}
+
 // IsDeviceActorType reports whether actorType is one of the managed device
 // actor types emitted by the L2 graph projection.
 func IsDeviceActorType(actorType string) bool {

@@ -50,6 +50,12 @@ func (r *moduleFuncRegistry) registerModuleWithMethods(name string, creator coll
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	affectedRoutes := make(map[string]struct{})
+	if existing, ok := r.modules[name]; ok {
+		collectModuleMethodFunctionNames(name, existing.methods, affectedRoutes)
+	}
+	collectModuleMethodFunctionNames(name, methods, affectedRoutes)
+
 	r.modules[name] = &moduleFunc{
 		creator:     creator,
 		methods:     methods,
@@ -57,7 +63,7 @@ func (r *moduleFuncRegistry) registerModuleWithMethods(name string, creator coll
 		jobs:        make(map[string]*jobEntry),
 		jobMethods:  make(map[string][]funcapi.MethodConfig),
 	}
-	r.rebuildMethodRoutesLocked()
+	r.refreshModuleMethodRoutesLocked(affectedRoutes)
 }
 
 func indexMethods(methods []funcapi.MethodConfig) map[string]funcapi.MethodConfig {
@@ -188,6 +194,22 @@ func (r *moduleFuncRegistry) getJobNames(moduleName string) []string {
 	return names
 }
 
+func (r *moduleFuncRegistry) hasRunningJob(moduleName string) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	module, ok := r.modules[moduleName]
+	if !ok {
+		return false
+	}
+	for _, entry := range module.jobs {
+		if entry.job.IsRunning() {
+			return true
+		}
+	}
+	return false
+}
+
 func (r *moduleFuncRegistry) getJob(moduleName, jobName string) (collectorapi.RuntimeJob, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -304,8 +326,25 @@ func (r *moduleFuncRegistry) findMethodCollision(moduleName, jobName, methodID s
 	return "", false
 }
 
-func (r *moduleFuncRegistry) rebuildMethodRoutesLocked() {
-	r.methodRoutes = make(map[string]methodRoute)
+func collectModuleMethodFunctionNames(moduleName string, methods []funcapi.MethodConfig, out map[string]struct{}) {
+	for _, method := range methods {
+		if method.ID == "" {
+			continue
+		}
+		for _, functionName := range funcapi.MethodFunctionNames(moduleName, method) {
+			out[functionName] = struct{}{}
+		}
+	}
+}
+
+func (r *moduleFuncRegistry) refreshModuleMethodRoutesLocked(functionNames map[string]struct{}) {
+	if len(functionNames) == 0 {
+		return
+	}
+	for functionName := range functionNames {
+		delete(r.methodRoutes, functionName)
+	}
+
 	moduleNames := make([]string, 0, len(r.modules))
 	for moduleName := range r.modules {
 		moduleNames = append(moduleNames, moduleName)
@@ -320,6 +359,9 @@ func (r *moduleFuncRegistry) rebuildMethodRoutesLocked() {
 			}
 			route := methodRoute{moduleName: moduleName, methodID: method.ID}
 			for _, functionName := range funcapi.MethodFunctionNames(moduleName, method) {
+				if _, affected := functionNames[functionName]; !affected {
+					continue
+				}
 				if _, exists := r.methodRoutes[functionName]; exists {
 					continue
 				}

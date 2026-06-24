@@ -10,6 +10,10 @@
 //   - Discovery ingestion (runProcessConfGroups) does not mutate manager state directly.
 //     It publishes add/remove intents through channels consumed by Manager.run().
 //
+//   - Tick-triggered Function publication reconcile is manager-run-loop owned.
+//     runNotifyRunningJobs may request module reconcile, but must not perform
+//     Function publication directly.
+//
 //   - runningJobs.items is protected by runningJobs.mux.
 //     All traversals must use runningJobs.snapshot() and execute callbacks outside the lock.
 //     No external API/job callbacks may execute while holding runningJobs.mux.

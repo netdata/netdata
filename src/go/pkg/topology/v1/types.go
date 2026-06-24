@@ -543,9 +543,13 @@ func (ValuesEncoding) isColumnEncoding() {
 }
 
 func Values(values ...any) ValuesEncoding {
+	copied := append([]any(nil), values...)
+	if copied == nil {
+		copied = []any{}
+	}
 	return ValuesEncoding{
 		Codec:  "values",
-		Values: append([]any(nil), values...),
+		Values: copied,
 	}
 }
 

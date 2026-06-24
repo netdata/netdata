@@ -14,6 +14,7 @@ import (
 	"github.com/gosnmp/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -36,21 +37,26 @@ func newCreator(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentH
 	if trapEnrichment == nil {
 		panic("snmp_topology Register requires a non-nil trap enrichment handle")
 	}
+	availability := newTopologyFunctionAvailability()
 	return collectorapi.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 60,
 		},
-		CreateV2:       func() collectorapi.CollectorV2 { return New(deviceStore, trapEnrichment) },
+		CreateV2:       func() collectorapi.CollectorV2 { return newCollector(deviceStore, trapEnrichment, availability) },
 		Config:         func() any { return &Config{} },
 		InstancePolicy: collectorapi.InstancePolicySingle,
-		Methods:        topologyMethods,
+		Methods:        func() []funcapi.MethodConfig { return topologyMethods(availability) },
 		MethodHandler:  topologyFunctionHandler,
 	}
 }
 
 // New returns an SNMP topology collector using the provided SNMP-family state.
 func New(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentHandle) *Collector {
+	return newCollector(deviceStore, trapEnrichment, newTopologyFunctionAvailability())
+}
+
+func newCollector(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentHandle, availability *topologyFunctionAvailability) *Collector {
 	if deviceStore == nil {
 		panic("snmp_topology New requires a non-nil device store")
 	}
@@ -59,12 +65,13 @@ func New(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentHandle) 
 	}
 	metricStore := metrix.NewCollectorStore()
 	return &Collector{
-		deviceCaches:        make(map[string]*topologyCache),
-		deviceLastCollected: make(map[string]time.Time),
-		topologyRegistry:    newTopologyRegistry(),
-		deviceSource:        deviceStore,
-		trapEnrichment:      trapEnrichment,
-		newSnmpClient:       gosnmp.NewHandler,
+		deviceCaches:         make(map[string]*topologyCache),
+		deviceLastCollected:  make(map[string]time.Time),
+		topologyRegistry:     newTopologyRegistry(),
+		functionAvailability: availability,
+		deviceSource:         deviceStore,
+		trapEnrichment:       trapEnrichment,
+		newSnmpClient:        gosnmp.NewHandler,
 		newDdSnmpColl: func(cfg ddsnmpcollector.Config) ddCollector {
 			return ddsnmpcollector.New(cfg)
 		},
@@ -78,11 +85,12 @@ type (
 		collectorapi.Base `yaml:",inline"`
 		Config            `yaml:",inline"`
 
-		deviceCaches        map[string]*topologyCache // one cache per SNMP device
-		deviceLastCollected map[string]time.Time      // last collection time per device
-		topologyRegistry    *topologyRegistry
-		deviceSource        deviceSource
-		trapEnrichment      *TrapEnrichmentHandle
+		deviceCaches         map[string]*topologyCache // one cache per SNMP device
+		deviceLastCollected  map[string]time.Time      // last collection time per device
+		topologyRegistry     *topologyRegistry
+		functionAvailability *topologyFunctionAvailability
+		deviceSource         deviceSource
+		trapEnrichment       *TrapEnrichmentHandle
 
 		refreshMu sync.Mutex
 		statsMu   sync.RWMutex
@@ -126,6 +134,7 @@ func (c *Collector) Run(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return nil
 	}
+	c.functionAvailability.Reset()
 	c.publishTrapTopologyEnrichment()
 	defer c.unpublishTrapTopologyEnrichment()
 	c.topologyRegistry.setReverseDNSWarmContext(ctx)
@@ -251,6 +260,16 @@ func (c *Collector) refreshTopologyRecovering(ctx context.Context) {
 	}()
 
 	c.recordRefreshStats(c.refreshTopology(ctx))
+	c.updateFunctionAvailability()
+}
+
+func (c *Collector) updateFunctionAvailability() {
+	if c.functionAvailability == nil || c.functionAvailability.Available() {
+		return
+	}
+	if c.topologyRegistry.hasRenderableObservations() {
+		c.functionAvailability.MarkAvailable()
+	}
 }
 
 // refreshDeviceTopology collects topology data for a single device into its own cache.
