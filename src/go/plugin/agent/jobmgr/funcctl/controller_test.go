@@ -6,6 +6,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -733,6 +736,96 @@ func TestControllerLifecycleHooks(t *testing.T) {
 	}
 }
 
+func TestControllerReconcileModuleMethodsConcurrentLifecycle(t *testing.T) {
+	reg := newTestFunctionRegistry()
+	controller := New(Options{FnReg: reg})
+
+	var enabled atomic.Bool
+	var availableCalls atomic.Int32
+	var firstAvailable sync.Once
+	firstAvailableCalled := make(chan struct{})
+	releaseAvailable := make(chan struct{})
+	var releaseOnce sync.Once
+	defer releaseOnce.Do(func() { close(releaseAvailable) })
+
+	aliases := make([]string, 0, 32)
+	for i := range 32 {
+		aliases = append(aliases, fmt.Sprintf("mod:late:alias:%02d", i))
+	}
+
+	controller.RegisterModules(collectorapi.Registry{
+		"mod": collectorapi.Creator{
+			Methods: func() []funcapi.MethodConfig {
+				return []funcapi.MethodConfig{{
+					ID:      "late",
+					Aliases: aliases,
+					Available: func() bool {
+						if !enabled.Load() {
+							return false
+						}
+						if availableCalls.Add(1) == 1 {
+							firstAvailable.Do(func() { close(firstAvailableCalled) })
+						}
+						<-releaseAvailable
+						return true
+					},
+				}}
+			},
+		},
+	})
+
+	const seedJobs = 8
+	jobs := make([]collectorapi.RuntimeJob, 0, seedJobs)
+	for i := range seedJobs {
+		job := newTestRuntimeJob("mod", fmt.Sprintf("seed-%02d", i), true)
+		controller.OnJobStart(job)
+		jobs = append(jobs, job)
+	}
+	require.Empty(t, reg.registeredNames())
+
+	enabled.Store(true)
+
+	const workers = 8
+	const iterations = 40
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	for i := range workers {
+		wg.Add(1)
+		go func(worker int) {
+			defer wg.Done()
+			<-start
+			for n := range iterations {
+				controller.ReconcileModuleMethodsForJob(jobs[(worker+n)%len(jobs)])
+			}
+		}(i)
+	}
+	for i := range workers {
+		wg.Add(1)
+		go func(worker int) {
+			defer wg.Done()
+			<-start
+			for n := range iterations {
+				job := newTestRuntimeJob("mod", fmt.Sprintf("runtime-%02d-%02d", worker, n), true)
+				controller.OnJobStart(job)
+				controller.OnJobStop(job)
+			}
+		}(i)
+	}
+
+	close(start)
+	select {
+	case <-firstAvailableCalled:
+	case <-time.After(2 * time.Second):
+		t.Fatal("available predicate was not reached")
+	}
+	time.Sleep(20 * time.Millisecond)
+	releaseOnce.Do(func() { close(releaseAvailable) })
+	wg.Wait()
+
+	expected := append([]string{"mod:late"}, aliases...)
+	assert.ElementsMatch(t, expected, reg.registeredNames())
+}
+
 func TestControllerRegisterJobMethods(t *testing.T) {
 	tests := map[string]struct{}{
 		"fail fast on collision with static method":          {},
@@ -1412,6 +1505,7 @@ func (h *tableTestHandler) Handle(context.Context, string, funcapi.ResolvedParam
 func (h *tableTestHandler) Cleanup(context.Context) {}
 
 type testFunctionRegistry struct {
+	mu              sync.Mutex
 	handlers        map[string]func(functions.Function)
 	contextHandlers map[string]functions.Handler
 	registered      []string
@@ -1427,10 +1521,14 @@ func newTestFunctionRegistry() *testFunctionRegistry {
 }
 
 func (r *testFunctionRegistry) Register(name string, fn func(functions.Function)) {
+	r.mu.Lock()
 	r.handlers[name] = fn
 	r.registered = append(r.registered, name)
-	if r.onRegister != nil {
-		r.onRegister(name, fn)
+	onRegister := r.onRegister
+	r.mu.Unlock()
+
+	if onRegister != nil {
+		onRegister(name, fn)
 	}
 }
 
@@ -1438,15 +1536,22 @@ func (r *testFunctionRegistry) RegisterWithContext(name string, fn functions.Han
 	legacy := func(f functions.Function) {
 		fn(context.Background(), f)
 	}
+	r.mu.Lock()
 	r.handlers[name] = legacy
 	r.contextHandlers[name] = fn
 	r.registered = append(r.registered, name)
-	if r.onRegister != nil {
-		r.onRegister(name, legacy)
+	onRegister := r.onRegister
+	r.mu.Unlock()
+
+	if onRegister != nil {
+		onRegister(name, legacy)
 	}
 }
 
 func (r *testFunctionRegistry) Unregister(name string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	r.unregistered = append(r.unregistered, name)
 	delete(r.handlers, name)
 	delete(r.contextHandlers, name)
@@ -1458,20 +1563,31 @@ func (r *testFunctionRegistry) UnregisterPrefix(string, string)                 
 func (r *testFunctionRegistry) RegisterPrefixWithContext(string, string, functions.Handler) {}
 
 func (r *testFunctionRegistry) call(name string, ctx context.Context, fn functions.Function) {
-	if handler := r.contextHandlers[name]; handler != nil {
+	r.mu.Lock()
+	handler := r.contextHandlers[name]
+	legacy := r.handlers[name]
+	r.mu.Unlock()
+
+	if handler != nil {
 		handler(ctx, fn)
 		return
 	}
-	r.handlers[name](fn)
+	legacy(fn)
 }
 
 func (r *testFunctionRegistry) registeredNames() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	out := make([]string, len(r.registered))
 	copy(out, r.registered)
 	return out
 }
 
 func (r *testFunctionRegistry) unregisteredNames() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	out := make([]string, len(r.unregistered))
 	copy(out, r.unregistered)
 	return out

@@ -18,8 +18,8 @@ type MethodConfig struct {
 	Tags         string   // Function tags for registration; empty defaults to "top"
 	ResponseType string   // Response schema type; empty defaults to "table" when dispatched
 	// Available gates publication of module/static methods. Nil means available.
-	// Unavailable module methods may be rechecked while jobs are running.
-	// Once a Function is published, later false results do not remove it.
+	// funcctl may recheck unavailable module methods while jobs are running.
+	// Once a Function is published, later false results do not withdraw it.
 	Available func() bool
 	// RawRequest routes the complete Function request to a RawMethodHandler.
 	// Use this for Function APIs that need raw payloads, args, or full response envelopes.
