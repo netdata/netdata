@@ -2607,9 +2607,10 @@ if(OS_WINDOWS)
                                 COMPONENT wevt_netdata_dll
                                 DESTINATION "${BINDIR}")
                 else()
-                        # do not install the manifest in this case
-                        # the nsi installer will skip registering the ETW publisher
-                        install(FILES "${WEVT_DLL_FILE}"
+                        # The manifest is always generated (both ETW and WEL paths run
+                        # --manifest). The WiX installer references it unconditionally, so
+                        # install it here too. Only the ETW install .bat script is skipped.
+                        install(FILES "${WEVT_DLL_FILE}" "${WEVT_MAN_FILE}"
                                 COMPONENT wevt_netdata_dll
                                 DESTINATION "${BINDIR}")
                 endif()
