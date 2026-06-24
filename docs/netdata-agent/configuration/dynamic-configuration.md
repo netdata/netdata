@@ -340,21 +340,21 @@ For the full manual configuration syntax, see [How to Disable or Silence Alerts]
 
 ### "No items to enable" when enabling a single alert
 
-Netdata alerts use a **two-level enable/disable model**:
+Alerts in Netdata use a **two-level enable/disable model**:
 
-1. **Prototype level** — Each alert prototype (the entry you toggle on or off from the **Alerts tab** or **Space Settings → Configurations → Health**) has its own on/off switch.
-2. **Rule level** — Inside each prototype are one or more **rules**. Every rule has its own enable/disable control, which you reach by opening the prototype's **Update** form.
+1. **Alert level** — Each alert has its own on/off switch, controlled from the **Alerts tab** or **Space Settings → Configurations → Health**.
+2. **Rule level** — Inside each alert are one or more **rules**. Each rule has its own enable/disable control, accessible from the alert's **Update** form.
 
-When a prototype is switched off, none of the alerts it produces can run. If you try to enable an individual alert while its prototype is still off, Netdata shows **"No items to enable"** — the prototype itself has to be turned back on before any of its alerts can run.
+When an alert is switched off, its rules cannot run. If you try to enable its rules while the alert itself is off, Netdata shows **"No items to enable"** — turn the alert on first.
 
-**To enable only one alert from a prototype:**
+**To enable only specific rules:**
 
-1. Open the alert prototype from the **Alerts tab** or **Space Settings → Configurations → Health**.
+1. Open the alert from the **Alerts tab** or **Space Settings → Configurations → Health**.
 2. Open its **Update** form.
-3. Enable the rule you want to run, and disable every other rule you do not need. Leave at least one rule enabled — if every rule is disabled, the prototype has nothing to activate.
-4. **Save** the prototype.
-5. **Enable** the prototype. Only the rules you left enabled become active — depending on how broadly the prototype applies, this can activate a large number of alerts at once. This is normal.
+3. Enable the rules you want to run, and disable every other rule. Leave at least one rule enabled — if all rules are disabled, the alert has nothing to activate.
+4. **Save** the alert.
+5. **Enable** the alert. Only the rules you left enabled become active — depending on how broadly the alert applies, this can activate a large number of alert instances at once. This is normal.
 
-If you would rather keep the prototype fully enabled, disable the specific alerts individually using [Multi-Node Deployment](#multi-node-deployment) to apply the change across all affected nodes at once. For the manual, file-based alternative, see [Disabled Alert Template Still Appears on Nodes](#disabled-alert-template-still-appears-on-nodes).
+If you would rather keep the alert fully enabled, disable specific alert instances individually using [Multi-Node Deployment](#multi-node-deployment) to apply the change across all affected nodes at once. For the manual, file-based alternative, see [Disabled Alert Template Still Appears on Nodes](#disabled-alert-template-still-appears-on-nodes).
 
 [Read more](/docs/developer-and-contributor-corner/dyncfg.md) on developing with dynamic configuration.
