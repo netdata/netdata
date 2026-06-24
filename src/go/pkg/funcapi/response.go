@@ -17,8 +17,9 @@ type MethodConfig struct {
 	RequireCloud bool     // Indicates whether the method requires cloud connection
 	Tags         string   // Function tags for registration; empty defaults to "top"
 	ResponseType string   // Response schema type; empty defaults to "table" when dispatched
-	// Available gates first publication of module/static methods. Nil means available.
-	// Once a Function is published, later false results do not remove it.
+	// Available gates publication of module/static methods. Nil means available.
+	// funcctl may recheck unavailable module methods while jobs are running.
+	// Once a Function is published, later false results do not withdraw it.
 	Available func() bool
 	// RawRequest routes the complete Function request to a RawMethodHandler.
 	// Use this for Function APIs that need raw payloads, args, or full response envelopes.

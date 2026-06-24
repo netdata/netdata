@@ -3,7 +3,9 @@
 package snmptopology
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -27,6 +29,8 @@ func TestSNMPTopologyCreatorOwnsTopologyFunction(t *testing.T) {
 	require.Equal(t, snmptopologyfunc.MethodID, methods[0].ID)
 	require.Equal(t, snmptopologyfunc.FunctionName, methods[0].FunctionName)
 	require.True(t, methods[0].AgentWide)
+	require.NotNil(t, methods[0].Available)
+	require.False(t, methods[0].Available())
 
 	coll := newTestSNMPTopologyCollector()
 	handler := creator.MethodHandler(&topologyRuntimeJobForTest{collector: coll})
@@ -59,6 +63,62 @@ func TestSNMPTopologyCreatorRequiresSharedDependencies(t *testing.T) {
 				_ = newCreator(tc.store, tc.traps)
 			})
 		})
+	}
+}
+
+func TestSNMPTopologyFunctionAvailabilityBecomesReadyAfterRenderableObservation(t *testing.T) {
+	creator := newCreator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle())
+	methods := creator.Methods()
+	require.Len(t, methods, 1)
+	require.NotNil(t, methods[0].Available)
+	require.False(t, methods[0].Available())
+
+	coll, ok := creator.CreateV2().(*Collector)
+	require.True(t, ok)
+	cache := newTopologyCache()
+	seedPublishedEndpointSnapshot(cache)
+	coll.topologyRegistry.register(cache)
+
+	coll.updateFunctionAvailability()
+
+	require.True(t, methods[0].Available())
+	require.True(t, creator.Methods()[0].Available())
+}
+
+func TestSNMPTopologyFunctionAvailabilityResetsWhenReplacementCollectorRuns(t *testing.T) {
+	creator := newCreator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle())
+	methods := creator.Methods()
+	require.Len(t, methods, 1)
+	require.NotNil(t, methods[0].Available)
+
+	coll, ok := creator.CreateV2().(*Collector)
+	require.True(t, ok)
+	cache := newTopologyCache()
+	seedPublishedEndpointSnapshot(cache)
+	coll.topologyRegistry.register(cache)
+	coll.updateFunctionAvailability()
+	require.True(t, methods[0].Available())
+
+	replacement, ok := creator.CreateV2().(*Collector)
+	require.True(t, ok)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- replacement.Run(ctx)
+	}()
+
+	require.Eventually(t, func() bool {
+		return !methods[0].Available()
+	}, time.Second, 10*time.Millisecond)
+
+	cancel()
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("replacement collector did not stop")
 	}
 }
 
