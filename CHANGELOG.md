@@ -440,6 +440,14 @@
 - Fix(go.d/snmp_topology): restore reverse DNS warming ([#22826](https://github.com/netdata/netdata/issues/22826))
 - Fix response help message ([#22820](https://github.com/netdata/netdata/issues/22820))
 - Chore(go.d): clarify l2topology public surface ([#22827](https://github.com/netdata/netdata/issues/22827))
+- Chore(go.d/l2topology): extract OUI lookup ([#22829](https://github.com/netdata/netdata/issues/22829))
+- Docs: Document room-leaving consequences and rejoin behavior ([#22732](https://github.com/netdata/netdata/issues/22732))
+- Chore(go.d/l2topology): extract model types ([#22832](https://github.com/netdata/netdata/issues/22832))
+- Chore(go.d/l2topology): move L2 pipeline internal ([#22833](https://github.com/netdata/netdata/issues/22833))
+- Chore(go.d/l2topology): move graph projector internal ([#22834](https://github.com/netdata/netdata/issues/22834))
+- Docs: Add Parent-to-Cloud claim step to centralization deployment guide ([#22736](https://github.com/netdata/netdata/issues/22736))
+- Fix debugfs audit capability service limit ([#22831](https://github.com/netdata/netdata/issues/22831))
+- Fix(go.d/snmp-topology): preserve capability actor type ([#22839](https://github.com/netdata/netdata/issues/22839))
 
 ## [2.10.0] - 2026-04-09
 
