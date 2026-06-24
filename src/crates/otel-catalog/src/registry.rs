@@ -817,7 +817,7 @@ mod tests {
 
         let q = Query {
             time_range: 50..250,
-            stream_hashes: Vec::new(),
+            partition_keys: Vec::new(),
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![1]);
     }
@@ -839,7 +839,7 @@ mod tests {
 
         let q = Query {
             time_range: 0..1000,
-            stream_hashes: Vec::new(),
+            partition_keys: Vec::new(),
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![1, 2]);
     }
@@ -859,7 +859,7 @@ mod tests {
 
         let q = Query {
             time_range: 0..1000,
-            stream_hashes: vec![ServiceStream::new("prod", "api").ns_hash()],
+            partition_keys: vec![ServiceStream::new("prod", "api").ns_hash()],
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![1]);
     }
@@ -884,7 +884,7 @@ mod tests {
 
         let q = Query {
             time_range: 0..1000,
-            stream_hashes: Vec::new(),
+            partition_keys: Vec::new(),
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![1]);
     }
@@ -915,7 +915,7 @@ mod tests {
 
         let q = Query {
             time_range: 0..1000,
-            stream_hashes: Vec::new(),
+            partition_keys: Vec::new(),
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![1]);
     }
@@ -948,7 +948,7 @@ mod tests {
         // produce no warning (we don't read it).
         let q = Query {
             time_range: 0..500,
-            stream_hashes: Vec::new(),
+            partition_keys: Vec::new(),
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![1]);
     }
@@ -959,7 +959,7 @@ mod tests {
         let reg = Registry::new(tmp.path(), TenantId::from(TENANT));
         let q = Query {
             time_range: 0..u32::MAX,
-            stream_hashes: Vec::new(),
+            partition_keys: Vec::new(),
         };
         assert_eq!(reg.candidates(&q).count(), 0);
     }

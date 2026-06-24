@@ -195,7 +195,7 @@ pub struct TenantFiles {
 #[derive(Debug, Serialize)]
 pub struct WalFileEntry {
     pub seq: u64,
-    /// Stream-identity hash, 16-hex (matches the `{ns_hash:016x}` in the filename).
+    /// Stream-identity hash, 16-hex (matches the `{part_key:016x}` in the filename).
     pub ns_hash: String,
     pub stream: StreamId,
     /// `active` (being written) or `archived` (sealed, awaiting indexing).
@@ -446,7 +446,7 @@ impl Default for Pagination {
 /// Reserved `selections` key carrying the stream-selector picks. The
 /// handler removes it from `selections` before building the engine query
 /// (so the engine never treats it as a row facet) and decodes the picks
-/// into the file-pruning `file_registry::Query::stream_hashes`. Also the
+/// into the file-pruning `file_registry::Query::partition_keys`. Also the
 /// `id` of the advertised [`MultiSelection`] control, so the UI echoes
 /// picks back under this key. The `__` prefix follows the systemd-journal
 /// `__logs_sources` convention for plugin-reserved selection keys.

@@ -356,12 +356,16 @@ fn compute_seq_seed(
 mod seed_tests {
     use super::*;
 
-    /// `{machine:32}-{boot:32}-{seq:010}-{ns_hash:016x}.{ext}` — the
-    /// FileId filename shape both data-file scanners parse.
+    /// The `FileId` filename shape both data-file scanners parse. Built via the
+    /// real `FileId` codec so it can never drift from the on-disk format.
     fn data_filename(seq: u64, ext: &str) -> String {
-        let machine = uuid::Uuid::from_u128(1).as_simple().to_string();
-        let boot = uuid::Uuid::from_u128(2).as_simple().to_string();
-        format!("{machine}-{boot}-{seq:010}-{:016x}.{ext}", 0xabcdu64)
+        file_registry::FileId::new(
+            uuid::Uuid::from_u128(1),
+            uuid::Uuid::from_u128(2),
+            seq,
+            0xabcd,
+        )
+        .to_filename(ext)
     }
 
     #[test]

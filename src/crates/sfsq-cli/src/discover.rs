@@ -13,8 +13,8 @@
 //!
 //! Dedup mirrors the live planner: a WAL whose sequence is already sealed into
 //! an SFST is skipped (SFST wins). Stream filtering mirrors the live planner
-//! too: both tiers match by `ns_hash` — the SFST `Query` carries the stream's
-//! hash, and the WAL is matched on its `FileId.ns_hash`.
+//! too: both tiers match by partition key — the SFST `Query` carries the
+//! stream's key, and the WAL is matched on its `FileId.part_key`.
 //!
 //! The dedup set is built from the *windowed* SFST candidates, so an SFST
 //! entirely outside the query window is not added and its WAL twin is scanned
@@ -65,7 +65,7 @@ pub fn discover(
     let query = Query {
         time_range: window,
         // Single-stream CLI filter → a one-element hash set (empty = all).
-        stream_hashes: stream.map(|s| vec![s.ns_hash()]).unwrap_or_default(),
+        partition_keys: stream.map(|s| vec![s.ns_hash()]).unwrap_or_default(),
     };
     for file in registry.candidates(&query) {
         sfst_seqs.insert(file.id.seq);
@@ -97,9 +97,9 @@ pub fn discover(
                     continue;
                 }
                 // Stream filter: a WAL file is single-stream by construction,
-                // identified by the ns_hash in its FileId.
+                // identified by the part_key in its FileId.
                 if let Some(hash) = stream_hash {
-                    if id.ns_hash != hash {
+                    if id.part_key != hash {
                         continue;
                     }
                 }

@@ -290,12 +290,12 @@ fn build_row_cells_layout_join_severity_and_missing() {
 }
 
 #[test]
-fn take_stream_hashes_decodes_hex_skips_garbage_and_removes_key() {
+fn take_partition_keys_decodes_hex_skips_garbage_and_removes_key() {
     let mut req: OtelLogsRequest = serde_json::from_slice(
         br#"{"selections":{"__streams":["000000000000002a","ff","nothex"],"level":["error"]}}"#,
     )
     .unwrap();
-    let hashes = req.take_stream_hashes();
+    let hashes = req.take_partition_keys();
     // 0x2a = 42, 0xff = 255; the non-hex entry is skipped, not fatal.
     assert_eq!(hashes, vec![42, 255]);
     // The reserved key is consumed so the engine never sees it as a facet;
@@ -305,10 +305,10 @@ fn take_stream_hashes_decodes_hex_skips_garbage_and_removes_key() {
 }
 
 #[test]
-fn take_stream_hashes_absent_selection_is_all() {
+fn take_partition_keys_absent_selection_is_all() {
     let mut req: OtelLogsRequest = serde_json::from_slice(br#"{}"#).unwrap();
     // No selection → empty vec → Query reads it as "all streams".
-    assert!(req.take_stream_hashes().is_empty());
+    assert!(req.take_partition_keys().is_empty());
 }
 
 #[test]

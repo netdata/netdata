@@ -121,8 +121,8 @@ impl OtelLogsRequest {
     /// treats `__streams` as a row facet. An unparseable pick is skipped
     /// (a UI-supplied filter should degrade, not fail the whole query);
     /// an absent or empty selection yields an empty vec, which
-    /// `file_registry::Query::stream_hashes` reads as "all streams".
-    pub fn take_stream_hashes(&mut self) -> Vec<u64> {
+    /// `file_registry::Query::partition_keys` reads as "all streams".
+    pub fn take_partition_keys(&mut self) -> Vec<u64> {
         self.selections
             .remove(STREAM_SELECTION_PARAM)
             .unwrap_or_default()

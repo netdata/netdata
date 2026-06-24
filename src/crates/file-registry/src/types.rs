@@ -279,42 +279,70 @@ impl ServiceStream {
 // FileId
 // ---------------------------------------------------------------------------
 
-/// Uniquely identifies a file across machines, boots, and sequences.
+/// Uniquely identifies a file across machines, boots, pipelines, and sequences.
 ///
-/// The filename format is: `<machine_id>-<boot_id>-<seq:010>-<ns_hash:016x>.<ext>`
+/// The filename format is:
+/// `<machine_id>-<boot_id>-<pipeline_id:05>-<seq:010>-<part_key:016x>.<ext>`
 /// where machine_id and boot_id are 32-character lowercase hex (no hyphens),
-/// seq is a 10-digit zero-padded decimal, and ns_hash is a 16-character
-/// zero-padded hex u64.
+/// pipeline_id is a 5-digit zero-padded decimal, seq is a 10-digit zero-padded
+/// decimal, and part_key is a 16-character zero-padded hex u64.
 ///
-/// The `ns_hash` is the xxhash64 digest of `service.namespace` and
-/// `service.name` (see [`compute_ns_hash`]). Zero means "no service
-/// attribution." If the hash genuinely produces zero, it is remapped
-/// to `u64::MAX`.
+/// `part_key` is an opaque partition key and `pipeline_id` an opaque
+/// signal/pipeline discriminator: this crate never interprets either. The
+/// content plane derives them and assigns their meaning (for OTel logs today,
+/// `part_key` is the service-stream hash — see [`ServiceStream::ns_hash`]).
+/// `seq` is a single global counter, unique across pipelines, so it alone
+/// identifies a file; `pipeline_id` routes it to its owning pipeline.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct FileId {
     pub machine_id: Uuid,
     pub boot_id: Uuid,
+    /// Opaque pipeline/signal discriminator assigned by the integration layer.
+    /// Today there is a single pipeline ([`FileId::DEFAULT_PIPELINE`]); distinct
+    /// ids per signal are assigned in a later restructure stage.
+    pub pipeline_id: u16,
     pub seq: u64,
-    pub ns_hash: u64,
+    /// Opaque partition key; the content plane derives it.
+    pub part_key: u64,
 }
 
 impl FileId {
-    pub fn new(machine_id: Uuid, boot_id: Uuid, seq: u64, ns_hash: u64) -> Self {
+    /// The default (and currently only) pipeline. The integration layer will
+    /// assign distinct pipeline ids per signal in a later restructure stage;
+    /// `file-registry` ascribes no meaning to the value.
+    pub const DEFAULT_PIPELINE: u16 = 0;
+
+    /// Construct a `FileId` in the [`DEFAULT_PIPELINE`](Self::DEFAULT_PIPELINE).
+    pub fn new(machine_id: Uuid, boot_id: Uuid, seq: u64, part_key: u64) -> Self {
+        Self::with_pipeline(machine_id, boot_id, Self::DEFAULT_PIPELINE, seq, part_key)
+    }
+
+    /// Construct a `FileId` in an explicit pipeline.
+    pub fn with_pipeline(
+        machine_id: Uuid,
+        boot_id: Uuid,
+        pipeline_id: u16,
+        seq: u64,
+        part_key: u64,
+    ) -> Self {
         Self {
             machine_id,
             boot_id,
+            pipeline_id,
             seq,
-            ns_hash,
+            part_key,
         }
     }
 
-    /// Format the stem portion: `<machine_id>-<boot_id>-<seq:010>-<ns_hash:016x>`
+    /// Format the stem portion:
+    /// `<machine_id>-<boot_id>-<pipeline_id:05>-<seq:010>-<part_key:016x>`
     pub fn to_stem(&self) -> String {
         format!(
-            "{}-{:010}-{:016x}",
+            "{}-{:05}-{:010}-{:016x}",
             crate::stem::format_uuid_pair(self.machine_id, self.boot_id),
+            self.pipeline_id,
             self.seq,
-            self.ns_hash,
+            self.part_key,
         )
     }
 
@@ -325,29 +353,35 @@ impl FileId {
 
     /// Parse a filename (not a full path) into a FileId.
     ///
-    /// Expects: `<machine_id>-<boot_id>-<seq>-<ns_hash>.<ext>`
+    /// Expects: `<machine_id>-<boot_id>-<pipeline_id>-<seq>-<part_key>.<ext>`
     pub fn parse(path: &Path) -> Option<Self> {
         let name = path.file_stem()?.to_str()?;
         Self::parse_stem(name)
     }
 
-    /// Parse just the stem: `<machine_id>-<boot_id>-<seq>-<ns_hash>`
+    /// Parse just the stem: `<machine_id>-<boot_id>-<pipeline_id>-<seq>-<part_key>`
     pub fn parse_stem(stem: &str) -> Option<Self> {
         let (machine_id, boot_id, rest) = crate::stem::parse_uuid_pair(stem)?;
 
-        // Find the last '-' to separate seq from ns_hash
-        let last_dash = rest.rfind('-')?;
-        let seq_str = &rest[..last_dash];
-        let hash_str = &rest[last_dash + 1..];
+        // rest = "<pipeline_id>-<seq>-<part_key>": split off pipeline (first
+        // '-'), then split the remainder into seq and part_key (last '-').
+        let first_dash = rest.find('-')?;
+        let pipeline_str = &rest[..first_dash];
+        let after = &rest[first_dash + 1..];
+        let last_dash = after.rfind('-')?;
+        let seq_str = &after[..last_dash];
+        let key_str = &after[last_dash + 1..];
 
+        let pipeline_id = pipeline_str.parse().ok()?;
         let seq = seq_str.parse().ok()?;
-        let ns_hash = u64::from_str_radix(hash_str, 16).ok()?;
+        let part_key = u64::from_str_radix(key_str, 16).ok()?;
 
         Some(Self {
             machine_id,
             boot_id,
+            pipeline_id,
             seq,
-            ns_hash,
+            part_key,
         })
     }
 }
@@ -364,8 +398,9 @@ impl Ord for FileId {
             .as_bytes()
             .cmp(other.machine_id.as_bytes())
             .then_with(|| self.boot_id.as_bytes().cmp(other.boot_id.as_bytes()))
+            .then_with(|| self.pipeline_id.cmp(&other.pipeline_id))
             .then_with(|| self.seq.cmp(&other.seq))
-            .then_with(|| self.ns_hash.cmp(&other.ns_hash))
+            .then_with(|| self.part_key.cmp(&other.part_key))
     }
 }
 
@@ -397,10 +432,20 @@ mod tests {
         let stem = id.to_stem();
         assert_eq!(
             stem,
-            "550e8400e29b41d4a716446655440000-7f3b2a1e9c4d4f8ab1c2d3e4f5a6b7c8-0000000042-a1b2c3d4e5f60001"
+            "550e8400e29b41d4a716446655440000-7f3b2a1e9c4d4f8ab1c2d3e4f5a6b7c8-00000-0000000042-a1b2c3d4e5f60001"
         );
         let parsed = FileId::parse_stem(&stem).unwrap();
         assert_eq!(parsed, id);
+    }
+
+    #[test]
+    fn file_id_with_pipeline_roundtrip() {
+        let id = FileId::with_pipeline(test_machine_id(), test_boot_id(), 7, 42, 0xdeadbeef);
+        let stem = id.to_stem();
+        assert!(stem.contains("-00007-0000000042-"));
+        let parsed = FileId::parse_stem(&stem).unwrap();
+        assert_eq!(parsed, id);
+        assert_eq!(parsed.pipeline_id, 7);
     }
 
     #[test]
@@ -418,7 +463,7 @@ mod tests {
         let stem = id.to_stem();
         assert!(stem.ends_with("-0000000000000000"));
         let parsed = FileId::parse_stem(&stem).unwrap();
-        assert_eq!(parsed.ns_hash, 0);
+        assert_eq!(parsed.part_key, 0);
     }
 
     #[test]
@@ -427,7 +472,7 @@ mod tests {
         let stem = id.to_stem();
         assert!(stem.ends_with("-ffffffffffffffff"));
         let parsed = FileId::parse_stem(&stem).unwrap();
-        assert_eq!(parsed.ns_hash, u64::MAX);
+        assert_eq!(parsed.part_key, u64::MAX);
     }
 
     #[test]
@@ -443,10 +488,16 @@ mod tests {
         let b = FileId::new(test_machine_id(), test_boot_id(), 2, 0);
         assert!(a < b);
 
-        // Same seq, different ns_hash
+        // Same seq, different part_key
         let c = FileId::new(test_machine_id(), test_boot_id(), 1, 1);
         let d = FileId::new(test_machine_id(), test_boot_id(), 1, 2);
         assert!(c < d);
+
+        // pipeline_id orders ahead of seq: a lower pipeline sorts first even
+        // when its seq is higher.
+        let p0 = FileId::with_pipeline(test_machine_id(), test_boot_id(), 0, 9, 0);
+        let p1 = FileId::with_pipeline(test_machine_id(), test_boot_id(), 1, 1, 0);
+        assert!(p0 < p1);
     }
 
     #[test]

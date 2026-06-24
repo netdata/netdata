@@ -18,7 +18,7 @@ pub const HEADER_SIZE: usize = 4096;
 
 /// Max stored length (bytes) for each stream field in the header. A longer
 /// value is truncated for display only — the partition key is the filename's
-/// `ns_hash`, which is unaffected. Two fields fit easily in the 4 KiB header.
+/// `part_key`, which is unaffected. Two fields fit easily in the 4 KiB header.
 pub const MAX_STREAM_FIELD_BYTES: usize = 256;
 
 /// Bit 0: CRC32 checksums are present in batch frames.

@@ -126,7 +126,7 @@ fn query_snapshot_is_scoped_to_one_tenant() {
 
     let q = file_registry::Query {
         time_range: 0..1000,
-        stream_hashes: Vec::new(),
+        partition_keys: Vec::new(),
     };
 
     // Each tenant sees exactly its own candidate — never the union.
@@ -235,7 +235,7 @@ fn enumerate_streams_dedups_and_aggregates_sfst_and_unsealed_wal() {
     // independent of any stream filter). Every file above is in range.
     let full = file_registry::Query {
         time_range: 0..u32::MAX,
-        stream_hashes: Vec::new(),
+        partition_keys: Vec::new(),
     };
     let streams = tr.enumerate_streams(&tenant, &full);
     assert_eq!(streams.len(), 2);

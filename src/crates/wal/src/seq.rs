@@ -1,7 +1,7 @@
 //! Durable WAL sequence allocator.
 //!
 //! `seq` is one component of the durable global identity
-//! `FileId { machine_id, boot_id, seq, ns_hash }`, embedded in every
+//! `FileId { machine_id, boot_id, pipeline_id, seq, part_key }`, embedded in every
 //! local filename, every remote object key, and every catalog entry.
 //! A seq value, once issued, must never be reissued while any artifact
 //! bearing its FileId still exists — locally or in remote storage

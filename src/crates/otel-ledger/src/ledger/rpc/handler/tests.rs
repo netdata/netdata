@@ -361,7 +361,7 @@ async fn files_request_returns_inventory_with_upload_state() {
     assert_eq!(sfst[0]["min_ts_s"], 1_700_000_000u64);
     assert_eq!(sfst[0]["stream"]["namespace"], "ns");
     assert_eq!(sfst[0]["stream"]["name"], "svc");
-    assert_eq!(sfst[0]["ns_hash"], "0000000000000007"); // FileId ns_hash = 7
+    assert_eq!(sfst[0]["ns_hash"], "0000000000000007"); // wire ns_hash = FileId part_key = 7
     // seq 1 went through the upload lifecycle; seq 2 did not
     assert_eq!(sfst[0]["rotated"], true);
     assert_eq!(sfst[0]["uploaded"], true);
@@ -1053,11 +1053,11 @@ fn track_remote_catalog(
     use chrono::NaiveDate;
     let stream = ServiceStream::new("ns", "svc");
     // Production `build_catalog_entry` copies both id and stream from one SFST, so
-    // the FileId's ns_hash always matches the stream's. Enforce it on the fixture.
+    // the FileId's part_key always matches the stream's ns_hash. Enforce it on the fixture.
     assert_eq!(
-        id.ns_hash,
+        id.part_key,
         stream.ns_hash(),
-        "catalog fixture id.ns_hash must match its stream"
+        "catalog fixture id.part_key must match its stream"
     );
     let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
     let entry = otel_catalog::CatalogEntry {

@@ -2,8 +2,8 @@
 //!
 //! Every durable artifact's filename starts with the producing
 //! machine's id and boot id as 32-hex-char simple UUIDs; the fields
-//! after that prefix are the artifact's own (seq + ns_hash for data
-//! files, seq + time bounds for catalogs). This module owns the shared
+//! after that prefix are the artifact's own (pipeline + seq + part_key for
+//! data files, seq + time bounds for catalogs). This module owns the shared
 //! prefix so no format parses it by hand.
 
 use uuid::Uuid;

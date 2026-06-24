@@ -131,14 +131,14 @@ fn candidates_filter_by_time_range_overlap() {
     // Window [50, 250) covers files 1 and 3.
     let q = Query {
         time_range: 50..250,
-        stream_hashes: Vec::new(),
+        partition_keys: Vec::new(),
     };
     assert_eq!(seqs(reg.candidates(&q)), vec![1, 3]);
 
     // Window [500, 600) covers nothing.
     let q = Query {
         time_range: 500..600,
-        stream_hashes: Vec::new(),
+        partition_keys: Vec::new(),
     };
     assert_eq!(seqs(reg.candidates(&q)), Vec::<u64>::new());
 }
@@ -161,7 +161,7 @@ fn candidates_inclusive_lower_exclusive_upper() {
     // because q.end=300 is exclusive and file 3's min is 300.
     let q = Query {
         time_range: 200..300,
-        stream_hashes: Vec::new(),
+        partition_keys: Vec::new(),
     };
     assert_eq!(seqs(reg.candidates(&q)), vec![1, 2]);
 }
@@ -183,7 +183,7 @@ fn candidates_single_point_query() {
     // (max=250 ≥ 150, min=150 < 151), but not file 3.
     let q = Query {
         time_range: 150..151,
-        stream_hashes: Vec::new(),
+        partition_keys: Vec::new(),
     };
     assert_eq!(seqs(reg.candidates(&q)), vec![1, 2]);
 }
@@ -197,7 +197,7 @@ fn candidates_empty_query_matches_nothing() {
     // start == end is an empty window.
     let q = Query {
         time_range: 200..200,
-        stream_hashes: Vec::new(),
+        partition_keys: Vec::new(),
     };
     assert!(reg.candidates(&q).next().is_none());
 }
@@ -217,7 +217,7 @@ fn candidates_filter_by_stream() {
 
     let q = Query {
         time_range: 0..u32::MAX,
-        stream_hashes: vec![ServiceStream::new("prod", "api").ns_hash()],
+        partition_keys: vec![ServiceStream::new("prod", "api").ns_hash()],
     };
     assert_eq!(seqs(reg.candidates(&q)), vec![1]);
 }
@@ -237,7 +237,7 @@ fn candidates_no_stream_filter_returns_all_in_range() {
 
     let q = Query {
         time_range: 0..u32::MAX,
-        stream_hashes: Vec::new(),
+        partition_keys: Vec::new(),
     };
     assert_eq!(seqs(reg.candidates(&q)), vec![1, 2, 3]);
 }
@@ -258,7 +258,7 @@ fn candidates_skip_pending_deletion() {
 
     let q = Query {
         time_range: 0..u32::MAX,
-        stream_hashes: Vec::new(),
+        partition_keys: Vec::new(),
     };
     assert_eq!(seqs(reg.candidates(&q)), vec![1, 3]);
 }
@@ -269,7 +269,7 @@ fn candidates_on_empty_registry() {
     let reg = Registry::new(dir.path());
     let q = Query {
         time_range: 0..u32::MAX,
-        stream_hashes: Vec::new(),
+        partition_keys: Vec::new(),
     };
     assert!(reg.candidates(&q).next().is_none());
 }

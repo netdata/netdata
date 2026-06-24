@@ -9,8 +9,8 @@ fn machine() -> Uuid {
 fn boot() -> Uuid {
     Uuid::from_u128(0xaaaa_bbbb_cccc_dddd_eeee_ffff_0000_1111)
 }
-fn fid(seq: u64, ns_hash: u64) -> FileId {
-    FileId::new(machine(), boot(), seq, ns_hash)
+fn fid(seq: u64, part_key: u64) -> FileId {
+    FileId::new(machine(), boot(), seq, part_key)
 }
 
 fn make_registry() -> Registry {
@@ -26,9 +26,9 @@ fn make_registry() -> Registry {
 
 /// Track a WAL file via the event flow with the given range and
 /// `Archived` status (post-Closed).
-fn track_wal(reg: &mut Registry, seq: u64, ns_hash: u64, min_s: u32, max_s: u32) {
+fn track_wal(reg: &mut Registry, seq: u64, part_key: u64, min_s: u32, max_s: u32) {
     const NS: u64 = 1_000_000_000;
-    let id = fid(seq, ns_hash);
+    let id = fid(seq, part_key);
     reg.wal
         .apply_event(&FileEvent::Created {
             file_id: id,
@@ -48,8 +48,8 @@ fn track_wal(reg: &mut Registry, seq: u64, ns_hash: u64, min_s: u32, max_s: u32)
 }
 
 /// Track an SFST file with the given range and stream.
-fn track_sfst(reg: &mut Registry, seq: u64, ns_hash: u64, min_s: u32, max_s: u32) {
-    let id = fid(seq, ns_hash);
+fn track_sfst(reg: &mut Registry, seq: u64, part_key: u64, min_s: u32, max_s: u32) {
+    let id = fid(seq, part_key);
     reg.sfst.track(
         id,
         ByteSize(1),
@@ -70,7 +70,7 @@ fn track_remote(reg: &mut Registry, seq: u64, min_s: u32, max_s: u32) {
 }
 
 /// Like [`track_remote`] but with a caller-chosen stream. The catalog entry's
-/// `id.ns_hash` matches the stream's hash, as production `build_catalog_entry`
+/// `id.part_key` matches the stream's hash, as production `build_catalog_entry`
 /// guarantees (it copies both `id` and `stream` from the same SFST).
 fn track_remote_as(reg: &mut Registry, seq: u64, stream: ServiceStream, min_s: u32, max_s: u32) {
     use chrono::NaiveDate;
@@ -106,7 +106,7 @@ fn track_remote_as(reg: &mut Registry, seq: u64, stream: ServiceStream, min_s: u
 fn full_range_query() -> Query {
     Query {
         time_range: 0..u32::MAX,
-        stream_hashes: Vec::new(),
+        partition_keys: Vec::new(),
     }
 }
 
@@ -165,7 +165,7 @@ fn remote_candidates_excluded_by_time_range() {
 
     let q = Query {
         time_range: 0..500,
-        stream_hashes: Vec::new(),
+        partition_keys: Vec::new(),
     };
     assert!(reg.remote_candidates(&q).is_empty());
 }
@@ -188,7 +188,7 @@ fn enumerate(reg: &Registry, q: &Query) -> Vec<crate::registry::StreamStat> {
 fn window(after: u32, before: u32) -> Query {
     Query {
         time_range: after..before,
-        stream_hashes: Vec::new(),
+        partition_keys: Vec::new(),
     }
 }
 

@@ -283,7 +283,7 @@ fn wal_stream_filter_matches_absent_namespace() {
         .find(|p| p.extension().is_some_and(|x| x == "wal"))
         .unwrap();
     assert_eq!(
-        FileId::parse(&wal_path).unwrap().ns_hash,
+        FileId::parse(&wal_path).unwrap().part_key,
         compute_ns_hash(None, Some("api")),
     );
 

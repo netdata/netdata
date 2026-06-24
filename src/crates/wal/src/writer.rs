@@ -474,7 +474,7 @@ mod tests {
         // Filenames carry each stream's distinct ns_hash.
         let mut hashes: Vec<u64> = wal_files
             .iter()
-            .map(|e| FileId::parse(&e.path()).unwrap().ns_hash)
+            .map(|e| FileId::parse(&e.path()).unwrap().part_key)
             .collect();
         hashes.sort();
         let mut expected = vec![s(1).ns_hash(), s(2).ns_hash()];

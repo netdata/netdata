@@ -64,12 +64,12 @@ impl Catalog {
         // q. Decouples the iterator's lifetime from q's, letting callers
         // pass a temporary `Query`.
         let q_range = q.time_range.clone();
-        let stream_hashes = q.stream_hashes.clone();
+        let partition_keys = q.partition_keys.clone();
         self.entries
             .values()
             .filter(move |e| range_overlaps(e, &q_range))
             .filter(move |e| {
-                stream_hashes.is_empty() || stream_hashes.contains(&e.stream.ns_hash())
+                partition_keys.is_empty() || partition_keys.contains(&e.stream.ns_hash())
             })
     }
 
@@ -247,7 +247,7 @@ mod tests {
         // min=150 is in range, file 2's min=300 is past the upper bound.
         let q = Query {
             time_range: 50..250,
-            stream_hashes: Vec::new(),
+            partition_keys: Vec::new(),
         };
         let hits: Vec<u64> = c.find(&q).map(|e| e.id.seq).collect();
         assert_eq!(hits, vec![1, 3]);
@@ -258,14 +258,14 @@ mod tests {
         //  - file 3: max=350 ≥ 200 ✓ and min=150 < 300 ✓ → in
         let q = Query {
             time_range: 200..300,
-            stream_hashes: Vec::new(),
+            partition_keys: Vec::new(),
         };
         let hits: Vec<u64> = c.find(&q).map(|e| e.id.seq).collect();
         assert_eq!(hits, vec![1, 3]);
 
         let q = Query {
             time_range: 500..600,
-            stream_hashes: Vec::new(),
+            partition_keys: Vec::new(),
         };
         assert_eq!(c.find(&q).count(), 0);
 
@@ -273,7 +273,7 @@ mod tests {
         // file 3 (min=150, max=350); file 2's min=300 is out.
         let q = Query {
             time_range: 200..201,
-            stream_hashes: Vec::new(),
+            partition_keys: Vec::new(),
         };
         let hits: Vec<u64> = c.find(&q).map(|e| e.id.seq).collect();
         assert_eq!(hits, vec![1, 3]);
@@ -289,7 +289,7 @@ mod tests {
 
         let q = Query {
             time_range: 0..1000,
-            stream_hashes: vec![ServiceStream::new("prod", "api").ns_hash()],
+            partition_keys: vec![ServiceStream::new("prod", "api").ns_hash()],
         };
         let hits: Vec<u64> = c.find(&q).map(|e| e.id.seq).collect();
         assert_eq!(hits, vec![1, 3]);
@@ -305,7 +305,7 @@ mod tests {
         // only the empty entry shares it, so prod/api is excluded.
         let q = Query {
             time_range: 0..1000,
-            stream_hashes: vec![ServiceStream::new("", "").ns_hash()],
+            partition_keys: vec![ServiceStream::new("", "").ns_hash()],
         };
         let hits: Vec<u64> = c.find(&q).map(|e| e.id.seq).collect();
         assert_eq!(hits, vec![1]);
@@ -319,7 +319,7 @@ mod tests {
         // start == end → empty window.
         let q = Query {
             time_range: 200..200,
-            stream_hashes: Vec::new(),
+            partition_keys: Vec::new(),
         };
         assert_eq!(c.find(&q).count(), 0);
     }

@@ -36,7 +36,7 @@ impl Registry {
     /// entry whose seq is locally served is served by that same stream — the
     /// time-only and stream-filtered masks agree on every entry the stream filter
     /// keeps. `catalog` parsed time-only means the stream filter is NOT applied
-    /// during parsing, so it is reapplied here via `q.matches_stream`.
+    /// during parsing, so it is reapplied here via `q.matches_partition`.
     pub fn remote_candidates_from(
         &self,
         q: &Query,
@@ -46,7 +46,7 @@ impl Registry {
         let mut seen: HashSet<u64> = HashSet::new();
         let mut out: Vec<otel_catalog::CatalogEntry> = catalog
             .iter()
-            .filter(|e| q.matches_stream(e.stream.ns_hash()))
+            .filter(|e| q.matches_partition(e.stream.ns_hash()))
             .filter(|e| !local_seqs.contains(&e.id.seq) && seen.insert(e.id.seq))
             .cloned()
             .collect();

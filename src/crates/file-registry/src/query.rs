@@ -1,13 +1,13 @@
 use std::ops::Range;
 
-/// A time-range + optional stream filter, used by `Registry::candidates`
+/// A time-range + optional partition filter, used by `Registry::candidates`
 /// implementations across the file-registry-backed sources (`sfst`,
 /// `wal`, …) to identify which files satisfy a read.
 ///
 /// The query is intentionally minimal: it carries only what the
 /// registries can answer from their cheap inline summaries (per-file
-/// `(min, max)` timestamps and stream identity), without opening any
-/// file. Predicate pushdown for within-file selection is a separate
+/// `(min, max)` timestamps and the opaque partition key), without opening
+/// any file. Predicate pushdown for within-file selection is a separate
 /// concern handled by the readers.
 #[derive(Debug, Clone)]
 pub struct Query {
@@ -16,16 +16,14 @@ pub struct Query {
     /// file as a candidate if its `[min_timestamp, max_timestamp]` range
     /// overlaps `[start, end)`.
     pub time_range: Range<u32>,
-    /// Stream filter, as a set of [`ServiceStream::ns_hash`] values.
-    /// **Empty matches every stream**; a non-empty set keeps only files
-    /// whose stream hashes to one of these values. Hash membership (not
-    /// `ServiceStream` equality) is the filter because the ingestor's
-    /// per-`(tenant, ns_hash)` collision table guarantees one stream per
-    /// hash within a tenant, and `ns_hash` already collapses an absent
-    /// `service.namespace` to the same value as an empty one — so an
-    /// absent-namespace query matches files written with an empty one and
-    /// vice versa. The selector (otel-logs `__streams`) drives this set.
-    pub stream_hashes: Vec<u64>,
+    /// Partition filter, as a set of opaque [`FileId::part_key`] values.
+    /// **Empty matches every partition**; a non-empty set keeps only files
+    /// whose `part_key` is one of these values. The substrate compares the
+    /// key as an opaque `u64` and ascribes it no meaning; the content plane
+    /// supplies the set (for OTel logs, these are `ServiceStream::ns_hash`
+    /// values driven by the `__streams` selector — one stream per key within
+    /// a tenant via the ingestor's collision table).
+    pub partition_keys: Vec<u64>,
 }
 
 impl Query {
@@ -35,12 +33,12 @@ impl Query {
         range_overlaps(&self.time_range, min_s, max_s)
     }
 
-    /// Whether a file whose stream hashes to `ns_hash` passes the stream
-    /// filter. An empty [`Query::stream_hashes`] matches every stream;
-    /// otherwise the file's hash must be in the set. Centralized so the
+    /// Whether a file with partition key `part_key` passes the partition
+    /// filter. An empty [`Query::partition_keys`] matches every partition;
+    /// otherwise the file's key must be in the set. Centralized so the
     /// per-source `candidates` filters cannot drift on the empty=all rule.
-    pub fn matches_stream(&self, ns_hash: u64) -> bool {
-        self.stream_hashes.is_empty() || self.stream_hashes.contains(&ns_hash)
+    pub fn matches_partition(&self, part_key: u64) -> bool {
+        self.partition_keys.is_empty() || self.partition_keys.contains(&part_key)
     }
 }
 
@@ -65,22 +63,22 @@ mod tests {
     use super::{Query, range_overlaps};
 
     #[test]
-    fn matches_stream_empty_is_all_nonempty_is_membership() {
+    fn matches_partition_empty_is_all_nonempty_is_membership() {
         let all = Query {
             time_range: 0..1,
-            stream_hashes: Vec::new(),
+            partition_keys: Vec::new(),
         };
-        // Empty set matches every stream, including the `0` sentinel.
-        assert!(all.matches_stream(0));
-        assert!(all.matches_stream(42));
+        // Empty set matches every partition, including the `0` key.
+        assert!(all.matches_partition(0));
+        assert!(all.matches_partition(42));
 
         let filtered = Query {
             time_range: 0..1,
-            stream_hashes: vec![7, 9],
+            partition_keys: vec![7, 9],
         };
-        assert!(filtered.matches_stream(7));
-        assert!(filtered.matches_stream(9));
-        assert!(!filtered.matches_stream(8));
+        assert!(filtered.matches_partition(7));
+        assert!(filtered.matches_partition(9));
+        assert!(!filtered.matches_partition(8));
     }
 
     #[test]

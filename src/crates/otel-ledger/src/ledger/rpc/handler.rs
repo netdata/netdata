@@ -52,7 +52,7 @@ fn build_files_response(tr: &TenantRegistries) -> FilesResponse {
                 .values()
                 .map(|f| WalFileEntry {
                     seq: f.id.seq,
-                    ns_hash: format!("{:016x}", f.id.ns_hash),
+                    ns_hash: format!("{:016x}", f.id.part_key),
                     stream: StreamId {
                         namespace: f.stream.namespace.clone(),
                         name: f.stream.name.clone(),
@@ -74,7 +74,7 @@ fn build_files_response(tr: &TenantRegistries) -> FilesResponse {
                 .values()
                 .map(|f| SfstFileEntry {
                     seq: f.id.seq,
-                    ns_hash: format!("{:016x}", f.id.ns_hash),
+                    ns_hash: format!("{:016x}", f.id.part_key),
                     stream: StreamId {
                         namespace: f.summary.stream.namespace.clone(),
                         name: f.summary.stream.name.clone(),
@@ -419,7 +419,7 @@ impl FunctionHandler for OtelLogsHandler {
         // Pull the reserved stream-selector picks out of `selections`
         // before `into_query`, so the engine never row-filters on the
         // synthetic `__streams` facet; they drive file pruning instead.
-        let stream_hashes = req.take_stream_hashes();
+        let partition_keys = req.take_partition_keys();
         // A malformed free-text `query` regex is a clean request error.
         let query = req.into_query().map_err(|e| {
             netdata_plugin_error::NetdataPluginError::FunctionHandler {
@@ -440,14 +440,14 @@ impl FunctionHandler for OtelLogsHandler {
             let guard = self.registries.read().await;
             // The selector lists every stream in the window, independent of the
             // user's current pick, so it uses a time-only query (empty
-            // stream_hashes); `q` carries the user's filter for the data query.
+            // partition_keys); `q` carries the user's filter for the data query.
             let stream_q = file_registry::Query {
                 time_range: time_range.clone(),
-                stream_hashes: Vec::new(),
+                partition_keys: Vec::new(),
             };
             let q = file_registry::Query {
                 time_range: time_range.clone(),
-                stream_hashes,
+                partition_keys,
             };
             let (sfsts, wals) = guard.query_snapshot(&tenant, &q);
             // Parse the in-window catalog ONLY when remote is configured:

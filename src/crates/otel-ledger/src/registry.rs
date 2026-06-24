@@ -434,7 +434,7 @@ impl TenantRegistries {
     }
 
     /// Parse `tenant`'s in-window catalog entries once (pass a time-only query —
-    /// empty `stream_hashes` — so it yields every stream's in-window entries). The
+    /// empty `partition_keys` — so it yields every stream's in-window entries). The
     /// handler shares the result between the selector and the remote fetch to avoid
     /// a second parse under the read lock. An unknown tenant yields empty.
     pub fn catalog_entries_in_window(
@@ -512,7 +512,7 @@ impl TenantRegistries {
         // the filter empty for its local fold.
         let stream_q = file_registry::Query {
             time_range: q.time_range.clone(),
-            stream_hashes: Vec::new(),
+            partition_keys: Vec::new(),
         };
         self.tenants
             .get(tenant)
@@ -554,7 +554,7 @@ impl Registry {
     ///
     /// Only `q.time_range` is used: the stream filter is forced empty internally, so
     /// the selector always lists EVERY in-window stream regardless of the caller's
-    /// `q.stream_hashes`. The caller must pass the in-window catalog entries (e.g.
+    /// `q.partition_keys`. The caller must pass the in-window catalog entries (e.g.
     /// from [`TenantRegistries::catalog_entries_in_window`]); they are folded as-is.
     pub fn enumerate_streams_from(
         &self,
@@ -565,7 +565,7 @@ impl Registry {
         // force the stream filter empty so a stream-filtered `q` cannot narrow it.
         let q = &file_registry::Query {
             time_range: q.time_range.clone(),
-            stream_hashes: Vec::new(),
+            partition_keys: Vec::new(),
         };
         let mut by_hash: HashMap<u64, StreamStat> = HashMap::new();
         // Seqs already folded from a local file. Dedup is keyed on the *folded*

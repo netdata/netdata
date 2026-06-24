@@ -247,8 +247,8 @@ impl Registry {
     /// failed `recover_unindexed` is impossible in steady state because
     /// the ledger refuses to start when indexing fails.
     ///
-    /// Stream filter is matched against the file's `id.ns_hash`
-    /// (one hash per `(namespace, name)` pair); equivalent to comparing
+    /// Partition filter is matched against the file's `id.part_key`
+    /// (one key per `(namespace, name)` pair); equivalent to comparing
     /// canonical stream identities given the ingestor's collision-
     /// detection invariant.
     pub fn candidates<'a>(&'a self, q: &Query) -> impl Iterator<Item = &'a File> + 'a {
@@ -257,14 +257,14 @@ impl Registry {
         // callers pass a temporary `Query` without binding it to a local.
         let q_min_ns = (q.time_range.start as u64) * 1_000_000_000;
         let q_max_ns = (q.time_range.end as u64) * 1_000_000_000;
-        let stream_hashes = q.stream_hashes.clone();
+        let partition_keys = q.partition_keys.clone();
 
         self.files
             .values()
             .filter(|f| f.min_timestamp_ns != TimestampNs::ZERO)
             .filter(move |f| range_overlaps_ns(f, q_min_ns, q_max_ns))
             .filter(move |f| {
-                stream_hashes.is_empty() || stream_hashes.contains(&f.id.ns_hash)
+                partition_keys.is_empty() || partition_keys.contains(&f.id.part_key)
             })
     }
 
@@ -583,10 +583,10 @@ mod tests {
 
     use file_registry::ServiceStream;
 
-    fn fid_with(seq: u64, ns_hash: u64) -> FileId {
+    fn fid_with(seq: u64, part_key: u64) -> FileId {
         let machine_id = uuid::Uuid::try_parse("550e8400e29b41d4a716446655440000").unwrap();
         let boot_id = uuid::Uuid::try_parse("7f3b2a1e9c4d4f8ab1c2d3e4f5a6b7c8").unwrap();
-        FileId::new(machine_id, boot_id, seq, ns_hash)
+        FileId::new(machine_id, boot_id, seq, part_key)
     }
 
     /// Insert a file via the event flow with the given (min, max) range
@@ -594,12 +594,12 @@ mod tests {
     fn track(
         reg: &mut Registry,
         seq: u64,
-        ns_hash: u64,
+        part_key: u64,
         min_ns: u64,
         max_ns: u64,
         status: FileStatus,
     ) -> FileId {
-        let id = fid_with(seq, ns_hash);
+        let id = fid_with(seq, part_key);
         reg.apply_event(&FileEvent::Created {
             file_id: id,
             created_at_ns: TimestampNs(0),
@@ -653,7 +653,7 @@ mod tests {
 
         let q = Query {
             time_range: 50..250,
-            stream_hashes: Vec::new(),
+            partition_keys: Vec::new(),
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![1, 3]);
     }
@@ -673,7 +673,7 @@ mod tests {
         // - file 3: min=300, but query.end=300 (exclusive) → out
         let q = Query {
             time_range: 200..300,
-            stream_hashes: Vec::new(),
+            partition_keys: Vec::new(),
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![1, 2]);
     }
@@ -686,7 +686,7 @@ mod tests {
 
         let q = Query {
             time_range: 200..200,
-            stream_hashes: Vec::new(),
+            partition_keys: Vec::new(),
         };
         assert!(reg.candidates(&q).next().is_none());
     }
@@ -725,7 +725,7 @@ mod tests {
 
         let q = Query {
             time_range: 0..u32::MAX,
-            stream_hashes: vec![ServiceStream::new("prod", "api").ns_hash()],
+            partition_keys: vec![ServiceStream::new("prod", "api").ns_hash()],
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![1, 3]);
     }
@@ -753,7 +753,7 @@ mod tests {
 
         let q = Query {
             time_range: 0..u32::MAX,
-            stream_hashes: vec![ServiceStream::new("", "api").ns_hash()],
+            partition_keys: vec![ServiceStream::new("", "api").ns_hash()],
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![1]);
     }
@@ -786,7 +786,7 @@ mod tests {
 
         let q = Query {
             time_range: 0..u32::MAX,
-            stream_hashes: vec![ServiceStream::new("", "api").ns_hash()],
+            partition_keys: vec![ServiceStream::new("", "api").ns_hash()],
         };
         assert!(reg.candidates(&q).next().is_none());
     }
@@ -812,7 +812,7 @@ mod tests {
 
         let q = Query {
             time_range: 0..u32::MAX,
-            stream_hashes: Vec::new(),
+            partition_keys: Vec::new(),
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![2]);
     }
@@ -827,7 +827,7 @@ mod tests {
 
         let q = Query {
             time_range: 0..u32::MAX,
-            stream_hashes: Vec::new(),
+            partition_keys: Vec::new(),
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![1, 2]);
     }
@@ -838,7 +838,7 @@ mod tests {
         let reg = Registry::new(dir.path());
         let q = Query {
             time_range: 0..u32::MAX,
-            stream_hashes: Vec::new(),
+            partition_keys: Vec::new(),
         };
         assert!(reg.candidates(&q).next().is_none());
     }

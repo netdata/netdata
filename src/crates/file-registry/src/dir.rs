@@ -188,7 +188,7 @@ mod tests {
         assert_eq!(fd.scan_max_sequence().unwrap(), 0);
     }
 
-    /// Create an empty file named `<machine>-<boot>-<seq:010>-<ns_hash:016x>.<ext>`
+    /// Create an empty file named `<machine>-<boot>-<pipeline:05>-<seq:010>-<part_key:016x>.<ext>`
     /// under `dir`. Sentinel for the recursive-scan tests below.
     fn touch_file(dir: &Path, seq: u64, ext: &str) {
         let id = FileId::new(test_machine_id(), test_boot_id(), seq, 0);

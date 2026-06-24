@@ -183,7 +183,7 @@ impl Registry {
     /// included if any second is shared by both ranges.
     ///
     /// Stream filter, when non-empty, keeps files whose stream hashes to
-    /// one of [`Query::stream_hashes`] — there is no partial / prefix
+    /// one of [`Query::partition_keys`] — there is no partial / prefix
     /// matching, by design (each SFST holds exactly one stream; see
     /// [`crate::ServiceStream`]). Matching by `ns_hash` rather than
     /// `ServiceStream` equality is safe: the ingestor's per-tenant
@@ -194,13 +194,13 @@ impl Registry {
         // q. This decouples the iterator's lifetime from q's, letting
         // callers pass a temporary `Query` without binding it to a local.
         let q_range = q.time_range.clone();
-        let stream_hashes = q.stream_hashes.clone();
+        let partition_keys = q.partition_keys.clone();
         self.inner
             .values()
             .filter(|f| !f.pending_deletion)
             .filter(move |f| range_overlaps(&f.summary, &q_range))
             .filter(move |f| {
-                stream_hashes.is_empty() || stream_hashes.contains(&f.summary.stream.ns_hash())
+                partition_keys.is_empty() || partition_keys.contains(&f.summary.stream.ns_hash())
             })
     }
 
