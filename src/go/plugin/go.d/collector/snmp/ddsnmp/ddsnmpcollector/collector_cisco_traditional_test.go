@@ -91,6 +91,40 @@ func TestCollector_Collect_CiscoTraditionalLicensingProfile(t *testing.T) {
 				assert.False(t, grace.Expiry.Has)
 			},
 		},
+		"invalid expiry DateAndTime is absent": {
+			rows: []ciscoTraditionalRow{
+				{
+					entPhysical:   1,
+					storeUsed:     1,
+					index:         2,
+					name:          "WLC-BASE",
+					version:       "1.0",
+					licenseType:   4,
+					remaining:     0,
+					capacity:      100,
+					available:     100,
+					impact:        "Permanent base license",
+					status:        1,
+					endDatePDU:    []byte("0"),
+					hasEndDatePDU: true,
+				},
+			},
+			assertRows: func(t *testing.T, rows []ddsnmp.LicenseRow) {
+				require.Len(t, rows, 1)
+				row := rows[0]
+				assert.Equal(t, "1.1.2", row.ID)
+				assert.Equal(t, "WLC-BASE", row.Name)
+				assert.Equal(t, "permanent", row.Type)
+				assert.True(t, row.IsPerpetual)
+				assert.False(t, row.Expiry.Has)
+				require.True(t, row.Usage.HasCapacity)
+				assert.EqualValues(t, 100, row.Usage.Capacity)
+				require.True(t, row.Usage.HasAvailable)
+				assert.EqualValues(t, 100, row.Usage.Available)
+				require.True(t, row.State.Has)
+				assert.EqualValues(t, 0, row.State.Severity)
+			},
+		},
 	}
 
 	for name, tc := range tests {
@@ -136,6 +170,7 @@ type ciscoTraditionalRow struct {
 	impact        string
 	status        int
 	endDate       time.Time
+	endDatePDU    []byte
 	hasEndDatePDU bool
 }
 
@@ -156,7 +191,12 @@ func expectCiscoTraditionalLicensingWalk(mockHandler *snmpmock.MockHandler, rows
 			createIntegerPDU("1.3.6.1.4.1.9.9.543.1.2.3.1.14."+idx, row.status),
 		)
 		if row.hasEndDatePDU {
-			pdus = append(pdus, createDateAndTimePDU("1.3.6.1.4.1.9.9.543.1.2.3.1.16."+idx, row.endDate))
+			oid := "1.3.6.1.4.1.9.9.543.1.2.3.1.16." + idx
+			if row.endDatePDU != nil {
+				pdus = append(pdus, createPDU(oid, gosnmp.OctetString, row.endDatePDU))
+			} else {
+				pdus = append(pdus, createDateAndTimePDU(oid, row.endDate))
+			}
 		}
 	}
 

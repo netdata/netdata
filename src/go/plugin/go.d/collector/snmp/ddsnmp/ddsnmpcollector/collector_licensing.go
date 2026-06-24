@@ -381,16 +381,16 @@ func (c *Collector) populateLicenseRow(row *ddsnmp.LicenseRow, cfg ddprofiledefi
 	if err := c.populateLicenseState(row, cfg.State, ctx); err != nil {
 		return fmt.Errorf("state: %w", err)
 	}
-	if err := c.populateLicenseTimer(&row.Expiry, cfg.Signals.Expiry, ctx, "expiry"); err != nil {
+	if err := c.populateLicenseTimer(&row.Expiry, cfg.Signals.Expiry, ctx); err != nil {
 		return err
 	}
-	if err := c.populateLicenseTimer(&row.Authorization, cfg.Signals.Authorization, ctx, "authorization"); err != nil {
+	if err := c.populateLicenseTimer(&row.Authorization, cfg.Signals.Authorization, ctx); err != nil {
 		return err
 	}
-	if err := c.populateLicenseTimer(&row.Certificate, cfg.Signals.Certificate, ctx, "certificate"); err != nil {
+	if err := c.populateLicenseTimer(&row.Certificate, cfg.Signals.Certificate, ctx); err != nil {
 		return err
 	}
-	if err := c.populateLicenseTimer(&row.Grace, cfg.Signals.Grace, ctx, "grace"); err != nil {
+	if err := c.populateLicenseTimer(&row.Grace, cfg.Signals.Grace, ctx); err != nil {
 		return err
 	}
 	if err := c.populateLicenseUsage(&row.Usage, cfg.Signals.Usage, ctx); err != nil {
@@ -450,29 +450,32 @@ func licenseStateRawValueByPolicy(raw string, policy ddprofiledefinition.License
 	return raw
 }
 
-func (c *Collector) populateLicenseTimer(timer *ddsnmp.LicenseTimer, cfg ddprofiledefinition.LicenseTimerSignalsConfig, ctx licenseValueContext, name string) error {
+func (c *Collector) populateLicenseTimer(timer *ddsnmp.LicenseTimer, cfg ddprofiledefinition.LicenseTimerSignalsConfig, ctx licenseValueContext) error {
 	if cfg.LicenseValueConfig.IsSet() {
-		if err := c.populateLicenseTimerTimestamp(timer, cfg.LicenseValueConfig, ctx, name); err != nil {
+		if err := c.populateLicenseTimerTimestamp(timer, cfg.LicenseValueConfig, ctx); err != nil {
 			return err
 		}
 	}
 	if cfg.Timestamp.IsSet() {
-		if err := c.populateLicenseTimerTimestamp(timer, cfg.Timestamp, ctx, name+".timestamp"); err != nil {
+		if err := c.populateLicenseTimerTimestamp(timer, cfg.Timestamp, ctx); err != nil {
 			return err
 		}
 	}
 	if cfg.Remaining.IsSet() {
-		if err := c.populateLicenseTimerRemaining(timer, cfg.Remaining, ctx, name+".remaining"); err != nil {
+		if err := c.populateLicenseTimerRemaining(timer, cfg.Remaining, ctx); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (c *Collector) populateLicenseTimerTimestamp(timer *ddsnmp.LicenseTimer, cfg ddprofiledefinition.LicenseValueConfig, ctx licenseValueContext, name string) error {
+func (c *Collector) populateLicenseTimerTimestamp(timer *ddsnmp.LicenseTimer, cfg ddprofiledefinition.LicenseValueConfig, ctx licenseValueContext) error {
 	value, sourceOID, ok, err := c.licenseNumericValue(cfg, ctx)
 	if err != nil {
-		return fmt.Errorf("%s: %w", name, err)
+		// Timer values are optional. Devices can publish malformed placeholders
+		// for non-expiring or not-applicable licenses; keep the row and omit the
+		// timer rather than dropping state/usage data.
+		return nil
 	}
 	if !ok || licenseValueRejectedBySentinel(value, cfg.Sentinel) {
 		return nil
@@ -484,10 +487,10 @@ func (c *Collector) populateLicenseTimerTimestamp(timer *ddsnmp.LicenseTimer, cf
 	return nil
 }
 
-func (c *Collector) populateLicenseTimerRemaining(timer *ddsnmp.LicenseTimer, cfg ddprofiledefinition.LicenseValueConfig, ctx licenseValueContext, name string) error {
+func (c *Collector) populateLicenseTimerRemaining(timer *ddsnmp.LicenseTimer, cfg ddprofiledefinition.LicenseValueConfig, ctx licenseValueContext) error {
 	value, sourceOID, ok, err := c.licenseNumericValue(cfg, ctx)
 	if err != nil {
-		return fmt.Errorf("%s: %w", name, err)
+		return nil
 	}
 	if !ok || licenseValueRejectedBySentinel(value, cfg.Sentinel) {
 		return nil
