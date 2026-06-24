@@ -8,12 +8,12 @@ use crate::registry::Registry;
 /// Convert a summary's `min_timestamp_s` to the calendar date used for
 /// catalog partitioning.
 ///
-/// Returns `None` for an empty SFST (`total_logs == 0`) or a timestamp
+/// Returns `None` for an empty SFST (`record_count == 0`) or a timestamp
 /// outside the representable chrono range. Callers fall back to the
 /// current date when `None` — encoded once at each call site rather than
 /// hidden inside this helper, so the fallback is visible.
 pub(crate) fn date_from_summary(summary: &sfst::Summary) -> Option<chrono::NaiveDate> {
-    if summary.total_logs == 0 {
+    if summary.record_count == 0 {
         return None;
     }
     chrono::DateTime::from_timestamp(summary.min_timestamp_s as i64, 0).map(|dt| dt.date_naive())
@@ -62,8 +62,9 @@ pub(crate) fn build_catalog_entry(
         remote_key,
         min_timestamp_s: summary.min_timestamp_s,
         max_timestamp_s: summary.max_timestamp_s,
-        total_logs: summary.total_logs,
-        stream: summary.stream.clone(),
+        record_count: summary.record_count,
+        part_key: summary.part_key,
+        content_meta: summary.content_meta.clone(),
         size: sfst_file.size,
         uploaded_at_ns,
         remote_etag,

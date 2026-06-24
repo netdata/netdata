@@ -122,9 +122,14 @@ fn write_wal_seq(wal_tenant_dir: &Path, batches: &[Vec<ResourceLogs>], seq_start
     for (i, b) in batches.iter().enumerate() {
         let (data, count) = otel_ingestor::arrow_bridge::encode(b.clone()).expect("encode");
         let ingestion = TimestampNs((BASE_S + 500 + i as u64) * NS);
+        let stream = stream_of(&b[0]);
+        let part_key = otel_logs_identity::part_key(&stream);
+        let content_meta =
+            otel_logs_identity::encode_content_meta(&stream).expect("identity encodes");
         writer
             .write_frame(
-                &stream_of(&b[0]),
+                part_key,
+                &content_meta,
                 &data,
                 count,
                 ingestion,
@@ -263,9 +268,13 @@ fn wal_stream_filter_matches_absent_namespace() {
     let mut writer = wal::Writer::new(&wal_dir, wal::Config::default(), seq).expect("writer");
     let (data, count) =
         otel_ingestor::arrow_bridge::encode(batch_for(records(0..10), "", "api")).expect("encode");
+    let stream = ServiceStream::new("", "api");
+    let part_key = otel_logs_identity::part_key(&stream);
+    let content_meta = otel_logs_identity::encode_content_meta(&stream).expect("identity encodes");
     writer
         .write_frame(
-            &ServiceStream::new("", "api"),
+            part_key,
+            &content_meta,
             &data,
             count,
             TimestampNs((BASE_S + 500) * NS),

@@ -27,7 +27,9 @@ pub struct WalDesc {
 /// mirroring [`TenantRegistries::query_snapshot`].
 #[derive(Debug, Clone)]
 pub struct StreamStat {
-    /// Identity hash (the option id the selector echoes back).
+    /// The file's opaque `part_key` (the option id the selector echoes back).
+    /// Named `ns_hash` for wire/IPC continuity — for OTel logs `part_key` *is*
+    /// the stream's `ns_hash`; the substrate treats it as an opaque partition key.
     pub ns_hash: u64,
     /// `(service.namespace, service.name)` for display.
     pub stream: ServiceStream,
@@ -43,10 +45,10 @@ pub struct StreamStat {
 }
 
 impl StreamStat {
-    fn new(stream: &ServiceStream) -> Self {
+    fn new(part_key: u64, stream: ServiceStream) -> Self {
         Self {
-            ns_hash: stream.ns_hash(),
-            stream: stream.clone(),
+            ns_hash: part_key,
+            stream,
             total_size: 0,
             file_count: 0,
             min_timestamp_s: None,
@@ -580,8 +582,8 @@ impl Registry {
         for f in self.sfst.candidates(q) {
             folded.insert(f.id.seq);
             by_hash
-                .entry(f.summary.stream.ns_hash())
-                .or_insert_with(|| StreamStat::new(&f.summary.stream))
+                .entry(f.summary.part_key)
+                .or_insert_with(|| StreamStat::new(f.summary.part_key, otel_logs_identity::decode_content_meta_or_empty(&f.summary.content_meta)))
                 .add(f.size.0, f.summary.min_timestamp_s, f.summary.max_timestamp_s);
         }
         for f in self.wal.candidates(q) {
@@ -595,8 +597,8 @@ impl Registry {
             let to_s = |ns: u64| (ns / 1_000_000_000) as u32;
             let size = f.size.0.max(f.valid_up_to.0);
             by_hash
-                .entry(f.stream.ns_hash())
-                .or_insert_with(|| StreamStat::new(&f.stream))
+                .entry(f.part_key)
+                .or_insert_with(|| StreamStat::new(f.part_key, otel_logs_identity::decode_content_meta_or_empty(&f.content_meta)))
                 .add(size, to_s(f.min_timestamp_ns.0), to_s(f.max_timestamp_ns.0));
         }
         // Remote-only streams: catalog entries whose seq has no local file folded
@@ -606,8 +608,8 @@ impl Registry {
                 continue;
             }
             by_hash
-                .entry(e.stream.ns_hash())
-                .or_insert_with(|| StreamStat::new(&e.stream))
+                .entry(e.part_key)
+                .or_insert_with(|| StreamStat::new(e.part_key, otel_logs_identity::decode_content_meta_or_empty(&e.content_meta)))
                 .add(e.size.0, e.min_timestamp_s, e.max_timestamp_s);
         }
 

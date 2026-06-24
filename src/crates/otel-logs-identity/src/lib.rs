@@ -7,17 +7,18 @@
 //!
 //! It is the content-plane counterpart to the content-agnostic
 //! [`file_registry`] substrate: the substrate stores an opaque `part_key: u64`
-//! and (in a later stage) an opaque `content_meta: Vec<u8>` and never
-//! interprets either. This crate is the one place that gives them meaning, for
-//! logs. A second signal (traces) will get its own sibling identity crate; the
-//! opinion-free hash primitive is only extracted into a shared leaf crate if and
-//! when a second signal actually needs to share it.
+//! and an opaque `content_meta: Vec<u8>` and never interprets either. This
+//! crate is the one place that gives them meaning, for logs — the producer
+//! (`otel-ingestor`) encodes the identity here before writing, and the query
+//! layer (`otel-ledger`) decodes it here for display. A second signal (traces)
+//! will get its own sibling identity crate; the opinion-free hash primitive is
+//! only extracted into a shared leaf crate if and when a second signal actually
+//! needs to share it.
 //!
 //! Scope note (restructure staging): today [`ServiceStream`] and its hash still
 //! live in [`file_registry`] and are re-exported here so that callers can import
 //! the identity from this crate now; a later stage relocates the type itself
-//! here without changing that import path. Nothing in this crate is wired into
-//! the storage path yet — it is the destination the format flip will target.
+//! here without changing that import path.
 
 pub use file_registry::ServiceStream;
 
@@ -101,6 +102,17 @@ pub fn decode_content_meta(bytes: &[u8]) -> Option<ServiceStream> {
         std::str::from_utf8(namespace).ok()?,
         std::str::from_utf8(name).ok()?,
     ))
+}
+
+/// Decode `content_meta` for display, falling back to the empty stream
+/// (`("", "")`) when the blob is absent or unparseable.
+///
+/// Stream-listing paths use this so a corrupt or missing blob still appears
+/// (under an empty name) instead of vanishing; the authoritative `part_key`
+/// is carried separately. Centralizing the fallback here keeps every listing
+/// call site identical — the policy cannot drift between them.
+pub fn decode_content_meta_or_empty(bytes: &[u8]) -> ServiceStream {
+    decode_content_meta(bytes).unwrap_or_else(|| ServiceStream::new("", ""))
 }
 
 /// Append a field with its pre-validated `u16` length prefix. The length is
@@ -199,5 +211,20 @@ mod tests {
         // Length prefix claims more bytes than are present.
         let oversized = [CONTENT_META_VERSION, 100, 0, b'x'];
         assert_eq!(decode_content_meta(&oversized), None);
+    }
+
+    #[test]
+    fn decode_or_empty_falls_back_to_empty_stream() {
+        // A valid blob round-trips through the fallback decoder.
+        let blob = encode_content_meta(&ServiceStream::new("prod", "api")).unwrap();
+        assert_eq!(
+            decode_content_meta_or_empty(&blob),
+            ServiceStream::new("prod", "api")
+        );
+        // Absent (empty) and unparseable blobs both fall back to the empty
+        // stream rather than vanishing — the listing/display contract.
+        let empty = ServiceStream::new("", "");
+        assert_eq!(decode_content_meta_or_empty(&[]), empty);
+        assert_eq!(decode_content_meta_or_empty(&[0xff, 0xff, 0xff]), empty);
     }
 }

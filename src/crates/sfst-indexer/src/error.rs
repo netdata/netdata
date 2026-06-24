@@ -61,4 +61,19 @@ pub enum IndexError {
         namespaces: Vec<String>,
         names: Vec<String>,
     },
+
+    /// The resolved stream identity is too large to encode into the
+    /// substrate's `content_meta` blob (a field exceeds the codec's size
+    /// limit). Fails the build rather than truncating identity.
+    ///
+    /// Unreachable for WALs this binary produces: the ingestor drops any frame
+    /// whose identity exceeds the codec or WAL-header caps *before* it reaches
+    /// the WAL, and the indexer re-derives identity from those same rows — so a
+    /// persisted frame always re-encodes within budget. This guards only
+    /// hand-crafted or future-producer WALs.
+    #[error(
+        "service identity too large to encode into content_meta; \
+         shorten the service.namespace / service.name attributes"
+    )]
+    IdentityTooLarge,
 }

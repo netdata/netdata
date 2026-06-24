@@ -34,8 +34,8 @@ fn sample_summary() -> Summary {
     Summary {
         min_timestamp_s: 1_700_000_000,
         max_timestamp_s: 1_700_003_600,
-        total_logs: 1234,
-        stream: ServiceStream::new("prod", "api"),
+        record_count: 1234,
+        part_key: ServiceStream::new("prod", "api").ns_hash(), content_meta: Vec::new(),
     }
 }
 
@@ -320,7 +320,7 @@ fn full_file_round_trip() {
     assert_eq!(reader.num_mid().unwrap(), 0);
     assert_eq!(reader.num_high().unwrap(), 0);
     assert_eq!(reader.timestamps().unwrap(), timestamps);
-    // A small `total_logs` puts everything in a single batch.
+    // A small `record_count` puts everything in a single batch.
     assert_eq!(reader.num_stream_batches().unwrap(), 1);
     assert_eq!(
         reader.stream_batch(0).unwrap(),
@@ -331,20 +331,20 @@ fn full_file_round_trip() {
 #[test]
 fn round_trip_multi_batch_stream() {
     // 3072 logs → exactly 3 batches of 1024.
-    let total_logs = 3072u32;
-    assert_eq!(num_stream_batches(total_logs), 3);
-    assert_eq!(stream_batch_size(total_logs), 1024);
+    let record_count = 3072u32;
+    assert_eq!(num_stream_batches(record_count), 3);
+    assert_eq!(stream_batch_size(record_count), 1024);
 
     let summary = Summary {
         min_timestamp_s: 1_700_000_000,
         max_timestamp_s: 1_700_003_071,
-        total_logs,
-        stream: ServiceStream::new("prod", "api"),
+        record_count,
+        part_key: ServiceStream::new("prod", "api").ns_hash(), content_meta: Vec::new(),
     };
     let metadata = Metadata {
         histogram: Histogram {
             timestamps: vec![1_700_000_000],
-            counts: vec![total_logs],
+            counts: vec![record_count],
         },
         id_ranges: IdRanges {
             low_end: KvId(1),
@@ -369,8 +369,8 @@ fn round_trip_multi_batch_stream() {
     let primary = build_primary(&["level=info"]);
     // A high-card value that lives only in batches 0 and 2.
     let high_trace = HighField::for_write(&["trace_id=abc"], vec![0b0000_0101]);
-    let entries: Vec<Vec<KvId>> = (0..total_logs).map(|i| vec![KvId(i)]).collect();
-    let timestamps: Vec<i64> = (0..total_logs as i64).collect();
+    let entries: Vec<Vec<KvId>> = (0..record_count).map(|i| vec![KvId(i)]).collect();
+    let timestamps: Vec<i64> = (0..record_count as i64).collect();
 
     let mut writer = FixtureWriter::new();
     writer.set_summary(pack(&summary, 1).unwrap());
@@ -413,12 +413,12 @@ fn round_trip_multi_batch_stream() {
     let index = IndexReader::open(&buf).unwrap();
     assert_eq!(index.num_stream_batches(), 3);
     let all = index.load_all_stream_entries().unwrap();
-    assert_eq!(all.len(), total_logs as usize);
+    assert_eq!(all.len(), record_count as usize);
     assert_eq!(all[0], vec![KvId(0)]);
-    assert_eq!(all[total_logs as usize - 1], vec![KvId(total_logs - 1)]);
+    assert_eq!(all[record_count as usize - 1], vec![KvId(record_count - 1)]);
 }
 
-// ── v5 container integrity ───────────────────────────────────────
+// ── v6 container integrity ───────────────────────────────────────
 
 /// Minimal valid file: primary + timestamps + one stream batch.
 fn minimal_file() -> Vec<u8> {
@@ -440,6 +440,18 @@ fn v4_file_is_rejected_on_open() {
     assert!(matches!(
         Reader::open(&buf),
         Err(Error::UnsupportedVersion(4))
+    ));
+}
+
+#[test]
+fn v5_file_is_rejected_on_open() {
+    let mut buf = minimal_file();
+    // The v5→v6 break (content-agnostic SUMR schema): a v5 file must reject
+    // at the version check, not surface a later bincode decode error.
+    buf[4..8].copy_from_slice(&5u32.to_le_bytes());
+    assert!(matches!(
+        Reader::open(&buf),
+        Err(Error::UnsupportedVersion(5))
     ));
 }
 

@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use file_registry::{ByteSize, FileDir, FileId, FileRegistry, Query, ServiceStream, TimestampNs};
+use file_registry::{ByteSize, FileDir, FileId, FileRegistry, Query, TimestampNs};
 
 use crate::format::{FileEvent, HEADER_SIZE};
 use crate::{Error, Result};
@@ -42,10 +42,12 @@ pub struct File {
     pub status: FileStatus,
     pub created_at_ns: TimestampNs,
     pub size: ByteSize,
-    /// The single stream this file holds, recovered cheaply from the WAL
-    /// header (no frame decode). Used to name the stream in enumeration /
-    /// the query-side stream selector.
-    pub stream: ServiceStream,
+    /// Opaque partition key for the single partition this file holds.
+    pub part_key: u64,
+    /// Opaque content-plane identity blob, recovered cheaply from the WAL
+    /// header (no frame decode). The content plane decodes it to name the
+    /// stream in enumeration / the query-side selector; the WAL never parses it.
+    pub content_meta: Vec<u8>,
     pub min_timestamp_ns: TimestampNs,
     pub max_timestamp_ns: TimestampNs,
     /// Byte offset of the durable, fully-written prefix — the end of the
@@ -103,8 +105,9 @@ impl Registry {
                     status: FileStatus::Archived,
                     created_at_ns: TimestampNs(header.created_at),
                     size,
-                    // Recovered cheaply from the header (v2 records it).
-                    stream: header.stream,
+                    // Recovered cheaply from the header.
+                    part_key: header.part_key,
+                    content_meta: header.content_meta,
                     // Recovery cannot retrieve log-data range from the
                     // WAL file format today. Re-indexing populates the
                     // SFST summary with the authoritative values.
@@ -144,7 +147,8 @@ impl Registry {
             FileEvent::Created {
                 file_id,
                 created_at_ns,
-                stream,
+                part_key,
+                content_meta,
             } => {
                 if self.files.contains(file_id.seq) {
                     return Err(Error::DuplicateSequence(file_id.seq));
@@ -156,7 +160,8 @@ impl Registry {
                         status: FileStatus::Active,
                         created_at_ns: *created_at_ns,
                         size: ByteSize::ZERO,
-                        stream: stream.clone(),
+                        part_key: *part_key,
+                        content_meta: content_meta.clone(),
                         min_timestamp_ns: TimestampNs::ZERO,
                         max_timestamp_ns: TimestampNs::ZERO,
                         valid_up_to: ByteSize::ZERO,
@@ -327,8 +332,7 @@ mod tests {
         for &count in entry_counts {
             for i in 0..count {
                 writer
-                    .write_frame(
-                        &ServiceStream::new("ns", "svc"),
+                    .write_frame(ServiceStream::new("ns", "svc").ns_hash(), &[],
                         &(i as u32).to_le_bytes(),
                         1,
                         TimestampNs(i as u64 + 1),
@@ -383,7 +387,7 @@ mod tests {
         assert!(
             registry
                 .archived_files()
-                .all(|f| f.stream == ServiceStream::new("ns", "svc")),
+                .all(|f| f.part_key == ServiceStream::new("ns", "svc").ns_hash()),
             "recovery must recover each file's stream from its header"
         );
     }
@@ -412,7 +416,7 @@ mod tests {
             .apply_event(&FileEvent::Created {
                 file_id: id,
                 created_at_ns: TimestampNs(1),
-                stream: ServiceStream::new("ns", "svc"),
+                part_key: ServiceStream::new("ns", "svc").ns_hash(), content_meta: Vec::new(),
             })
             .unwrap();
         // Created starts at ZERO/ZERO.
@@ -477,7 +481,7 @@ mod tests {
             .apply_event(&FileEvent::Created {
                 file_id: id,
                 created_at_ns: TimestampNs(1),
-                stream: ServiceStream::new("ns", "svc"),
+                part_key: ServiceStream::new("ns", "svc").ns_hash(), content_meta: Vec::new(),
             })
             .unwrap();
         // Created: durable prefix unknown.
@@ -558,7 +562,7 @@ mod tests {
             .apply_event(&FileEvent::Created {
                 file_id: id,
                 created_at_ns: TimestampNs(1_000_000_000),
-                stream: ServiceStream::new("ns", "svc"),
+                part_key: ServiceStream::new("ns", "svc").ns_hash(), content_meta: Vec::new(),
             })
             .unwrap();
 
@@ -603,7 +607,8 @@ mod tests {
         reg.apply_event(&FileEvent::Created {
             file_id: id,
             created_at_ns: TimestampNs(0),
-            stream: ServiceStream::new("ns", "svc"),
+            part_key,
+            content_meta: Vec::new(),
         })
         .unwrap();
         match status {
@@ -803,7 +808,7 @@ mod tests {
         reg.apply_event(&FileEvent::Created {
             file_id: id_zero,
             created_at_ns: TimestampNs(0),
-            stream: ServiceStream::new("ns", "svc"),
+            part_key: ServiceStream::new("ns", "svc").ns_hash(), content_meta: Vec::new(),
         })
         .unwrap();
 
@@ -855,14 +860,14 @@ mod tests {
             .apply_event(&FileEvent::Created {
                 file_id: id,
                 created_at_ns: TimestampNs(1_000_000_000),
-                stream: ServiceStream::new("ns", "svc"),
+                part_key: ServiceStream::new("ns", "svc").ns_hash(), content_meta: Vec::new(),
             })
             .unwrap();
         let err = registry
             .apply_event(&FileEvent::Created {
                 file_id: id,
                 created_at_ns: TimestampNs(2_000_000_000),
-                stream: ServiceStream::new("ns", "svc"),
+                part_key: ServiceStream::new("ns", "svc").ns_hash(), content_meta: Vec::new(),
             })
             .unwrap_err();
         assert!(matches!(err, Error::DuplicateSequence(1)));

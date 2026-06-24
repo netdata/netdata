@@ -211,9 +211,12 @@ pub struct WalFileEntry {
 #[derive(Debug, Serialize)]
 pub struct SfstFileEntry {
     pub seq: u64,
+    /// Stream-identity hash, 16-hex (matches the `{part_key:016x}` in the filename).
     pub ns_hash: String,
     pub stream: StreamId,
     pub size: u64,
+    /// Wire-compatibility name: clients see `total_logs`; internally this is
+    /// `FileSummary::record_count` (the substrate's content-neutral name).
     pub total_logs: u32,
     /// Log-data time range in unix **seconds** (from the SFST summary).
     pub min_ts_s: u32,

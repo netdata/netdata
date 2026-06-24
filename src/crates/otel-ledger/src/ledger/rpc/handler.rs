@@ -39,6 +39,17 @@ use wal::prefix::{chunk_boundaries, tail_start};
 use wal::registry::FileStatus;
 use crate::registry::{TenantRegistries, WalDesc};
 
+/// Decode a file's opaque `content_meta` blob into the wire `StreamId`
+/// shown by the `files: true` inventory. Falls back to empty namespace/name
+/// when the blob is absent or unparseable, so a corrupt entry still lists.
+fn stream_id_from_content_meta(content_meta: &[u8]) -> StreamId {
+    let stream = otel_logs_identity::decode_content_meta_or_empty(content_meta);
+    StreamId {
+        namespace: stream.namespace,
+        name: stream.name,
+    }
+}
+
 /// Build the `files: true` inventory snapshot from a read-locked registry set.
 /// Read-only; tenants and per-kind files are sorted for stable output (the
 /// registries are HashMap-backed, so iteration order is otherwise arbitrary).
@@ -53,10 +64,7 @@ fn build_files_response(tr: &TenantRegistries) -> FilesResponse {
                 .map(|f| WalFileEntry {
                     seq: f.id.seq,
                     ns_hash: format!("{:016x}", f.id.part_key),
-                    stream: StreamId {
-                        namespace: f.stream.namespace.clone(),
-                        name: f.stream.name.clone(),
-                    },
+                    stream: stream_id_from_content_meta(&f.content_meta),
                     status: match f.status {
                         FileStatus::Active => "active",
                         FileStatus::Archived => "archived",
@@ -75,12 +83,9 @@ fn build_files_response(tr: &TenantRegistries) -> FilesResponse {
                 .map(|f| SfstFileEntry {
                     seq: f.id.seq,
                     ns_hash: format!("{:016x}", f.id.part_key),
-                    stream: StreamId {
-                        namespace: f.summary.stream.namespace.clone(),
-                        name: f.summary.stream.name.clone(),
-                    },
+                    stream: stream_id_from_content_meta(&f.summary.content_meta),
                     size: f.size.as_u64(),
-                    total_logs: f.summary.total_logs,
+                    total_logs: f.summary.record_count,
                     min_ts_s: f.summary.min_timestamp_s,
                     max_ts_s: f.summary.max_timestamp_s,
                     rotated: reg.is_rotated(f.id.seq),
@@ -225,8 +230,9 @@ impl RemoteRead {
                 summary: sfst::Summary {
                     min_timestamp_s: e.min_timestamp_s,
                     max_timestamp_s: e.max_timestamp_s,
-                    total_logs: e.total_logs,
-                    stream: e.stream.clone(),
+                    record_count: e.record_count,
+                    part_key: e.part_key,
+                    content_meta: e.content_meta.clone(),
                 },
                 file_seq: e.id.seq,
                 part: sfsq::logs::Part::Indexed(0),
@@ -323,10 +329,10 @@ impl OtelLogsHandler {
             let init = async move {
                 match tokio::task::spawn_blocking(move || sfst_indexer::index_range(&path, range)).await {
                     Ok(Ok((summary, bytes))) => {
-                        if u64::from(summary.total_logs) != expected {
+                        if u64::from(summary.record_count) != expected {
                             Err(format!(
                                 "chunk record count {} != expected {expected}",
-                                summary.total_logs
+                                summary.record_count
                             ))
                         } else {
                             Ok(Arc::new(bytes))

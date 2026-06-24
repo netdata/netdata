@@ -12,15 +12,18 @@ fn boot() -> uuid::Uuid {
 use crate::test_helpers::empty_summary;
 
 fn make_entry(seq: u64) -> otel_catalog::CatalogEntry {
-    let id = file_registry::FileId::new(machine(), boot(), seq, 0);
+    let stream = ServiceStream::new("prod", "api");
+    let part_key = stream.ns_hash();
+    let id = file_registry::FileId::new(machine(), boot(), seq, part_key);
     let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
     otel_catalog::CatalogEntry {
         id,
         remote_key: crate::remote_keys::sfst(&TenantId::from("tenant1"), date, id),
         min_timestamp_s: 1_700_000_000,
         max_timestamp_s: 1_700_003_600,
-        total_logs: 10,
-        stream: ServiceStream::new("prod", "api"),
+        record_count: 10,
+        part_key,
+        content_meta: otel_logs_identity::encode_content_meta(&stream).unwrap(),
         size: ByteSize(1024),
         uploaded_at_ns: file_registry::TimestampNs(2_000_000_000),
         remote_etag: None,

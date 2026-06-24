@@ -12,7 +12,7 @@ use fst_index::FstIndex;
 
 use crate::{
     BitmapValue, Bucket, FacetResult, FieldEntry, FieldTier, Filter, Grid, Histogram, IdRanges,
-    KvId, Matcher, Metadata, ServiceStream, Summary, Timeline, Timestamps,
+    KvId, Matcher, Metadata, Summary, Timeline, Timestamps,
 };
 
 /// A successfully opened split-FST index.
@@ -45,7 +45,8 @@ impl<'a> IndexReader<'a> {
         })
     }
 
-    /// The cheap summary fields (timestamps, total logs, stream).
+    /// The cheap summary fields (timestamps, record count, opaque
+    /// `part_key`/`content_meta` identity).
     pub fn summary(&self) -> &Summary {
         &self.summary
     }
@@ -59,7 +60,7 @@ impl<'a> IndexReader<'a> {
 
     /// Total number of log entries in this index.
     pub fn total_logs(&self) -> u32 {
-        self.summary.total_logs
+        self.summary.record_count
     }
 
     /// The ID ranges for the three cardinality tiers.
@@ -72,9 +73,15 @@ impl<'a> IndexReader<'a> {
         &self.metadata().histogram
     }
 
-    /// The file's single stream.
-    pub fn stream(&self) -> &ServiceStream {
-        &self.summary.stream
+    /// The file's opaque partition key (the content plane assigns its meaning).
+    pub fn part_key(&self) -> u64 {
+        self.summary.part_key
+    }
+
+    /// The file's opaque content-plane metadata blob (the content plane decodes
+    /// it; the substrate never interprets it).
+    pub fn content_meta(&self) -> &[u8] {
+        &self.summary.content_meta
     }
 
     // ── Field table ─────────────────────────────────────────────────
@@ -127,9 +134,9 @@ impl<'a> IndexReader<'a> {
     // ── Stream-batch chunks ─────────────────────────────────────────
 
     /// Number of stream-batch chunks in this file. Derived from
-    /// `summary.total_logs` via [`crate::num_stream_batches`].
+    /// `summary.record_count` via [`crate::num_stream_batches`].
     pub fn num_stream_batches(&self) -> u8 {
-        crate::num_stream_batches(self.summary.total_logs)
+        crate::num_stream_batches(self.summary.record_count)
     }
 
     /// Load one stream-batch chunk by index (`0..num_stream_batches`).
@@ -148,7 +155,7 @@ impl<'a> IndexReader<'a> {
     /// paths use [`StreamBatch`](crate::StreamBatch) directly instead.
     pub fn load_all_stream_entries(&self) -> Result<Vec<Vec<KvId>>, crate::Error> {
         let n = self.num_stream_batches();
-        let mut out = Vec::with_capacity(self.summary.total_logs as usize);
+        let mut out = Vec::with_capacity(self.summary.record_count as usize);
         for i in 0..n {
             let batch = self.sfst.stream_batch(i)?;
             for r in 0..batch.num_rows() {
@@ -246,7 +253,7 @@ impl<'a> IndexReader<'a> {
     ) -> Result<Vec<crate::MaterializedRow>, crate::Error> {
         let timestamps = self.load_timestamps()?;
         let strings = self.build_string_table(self.field_table())?;
-        let total = self.summary.total_logs;
+        let total = self.summary.record_count;
         let batch_size = crate::stream_batch_size(total);
 
         // Decode only the batches the requested positions fall in (a page is
@@ -270,7 +277,7 @@ impl<'a> IndexReader<'a> {
             // position-to-row pairing, attaching rows to the wrong cursors.
             if pos >= total {
                 return Err(crate::Error::CorruptIndex(format!(
-                    "materialize: position {pos} >= total_logs {total}"
+                    "materialize: position {pos} >= record_count {total}"
                 )));
             }
             let b = (pos / batch_size) as usize;
@@ -315,7 +322,7 @@ impl<'a> IndexReader<'a> {
     /// filter, so a query that touches `matched`/`facets`/`timeline`
     /// resolves the filter once instead of per call.
     ///
-    /// An empty filter compiles to the full range `0..total_logs`. A field
+    /// An empty filter compiles to the full range `0..record_count`. A field
     /// mentioned in the filter but absent from this file resolves to the
     /// empty set, collapsing the full scope to empty — single-file SFSTs
     /// with disjoint field sets fall out of the query naturally.
@@ -324,7 +331,7 @@ impl<'a> IndexReader<'a> {
         filter: &Filter,
         query: Option<&str>,
     ) -> Result<BitmapFilter, crate::Error> {
-        let universe = self.summary.total_logs;
+        let universe = self.summary.record_count;
         let mut per_field: Vec<(String, PosSet)> = Vec::new();
         for (field, values) in filter.iter() {
             per_field.push((field.clone(), self.field_values_or(field, values)?));
@@ -375,7 +382,7 @@ impl<'a> IndexReader<'a> {
         filter: &BitmapFilter,
         window_ns: std::ops::Range<i64>,
     ) -> Result<u64, crate::Error> {
-        let total = self.summary.total_logs;
+        let total = self.summary.record_count;
         let (lo, hi) = self.range_positions(window_ns)?;
         let mut set = filter.full().clone();
         set.and_assign(&PosSet::range(lo, hi, total));
@@ -391,7 +398,7 @@ impl<'a> IndexReader<'a> {
         filter: &BitmapFilter,
         window_ns: std::ops::Range<i64>,
     ) -> Result<Vec<u32>, crate::Error> {
-        let total = self.summary.total_logs;
+        let total = self.summary.record_count;
         let (lo, hi) = self.range_positions(window_ns)?;
         let mut set = filter.full().clone();
         set.and_assign(&PosSet::range(lo, hi, total));
@@ -437,7 +444,7 @@ impl<'a> IndexReader<'a> {
         filter: &BitmapFilter,
         window_ns: std::ops::Range<i64>,
     ) -> Result<Vec<FacetResult>, crate::Error> {
-        let total = self.summary.total_logs;
+        let total = self.summary.record_count;
         let (lo, hi) = self.range_positions(window_ns)?;
         let range_set = PosSet::range(lo, hi, total);
 
@@ -526,7 +533,7 @@ impl<'a> IndexReader<'a> {
         let prefix_len = prefix.len();
         let mut dimensions: Vec<String> = Vec::new();
         let mut dim_counts: Vec<Vec<u64>> = Vec::new();
-        let mut has_field = PosSet::empty(self.summary.total_logs);
+        let mut has_field = PosSet::empty(self.summary.record_count);
         match self.locate_field(field) {
             None => {}
             Some(FieldLocation::Low) => {
@@ -634,7 +641,7 @@ impl<'a> IndexReader<'a> {
     /// A malformed pattern is a hard failure ([`crate::Error::InvalidPattern`]),
     /// not "matches nothing" — validate patterns at the request boundary.
     fn field_values_or(&self, field: &str, matchers: &[Matcher]) -> Result<PosSet, crate::Error> {
-        let total = self.summary.total_logs;
+        let total = self.summary.record_count;
         let location = match self.locate_field(field) {
             Some(loc) => loc,
             None => return Ok(PosSet::empty(total)),
@@ -760,7 +767,7 @@ impl<'a> IndexReader<'a> {
     /// This is a full distinct-key scan — the inherent cost of field-less
     /// full text without a token index.
     fn query_positions(&self, query: &regex::bytes::Regex) -> Result<PosSet, crate::Error> {
-        let total = self.summary.total_logs;
+        let total = self.summary.record_count;
         let mut result = PosSet::empty(total);
 
         // Low-card: the primary FST holds every low-card field's keys. The
@@ -1042,7 +1049,7 @@ impl BitmapFilter {
 /// [`treight::Bitmap`] (a `Copy` descriptor plus its external tree bytes).
 /// The whole query path operates on these — on-disk value bitmaps are used
 /// as-is, and unions/intersections stay native (no Roaring round-trip). The
-/// universe (position upper bound) is the file's `total_logs`; every set
+/// universe (position upper bound) is the file's `record_count`; every set
 /// built for a file shares it so boolean ops line up.
 #[derive(Clone, Debug)]
 struct PosSet {
@@ -1079,7 +1086,7 @@ impl PosSet {
     /// `Copy`; only the tree bytes are cloned.
     ///
     /// Invariant: every value bitmap in a file is built with the same
-    /// `universe_size` (`== total_logs`; see the writer's `remap_one_bitmap`),
+    /// `universe_size` (`== record_count`; see the writer's `remap_one_bitmap`),
     /// which is what lets the resulting set combine with `range`/`full`/other
     /// values via `and`/`or` — those require matching universes (a mismatch
     /// is only a debug assert, so it would be silently wrong in release).

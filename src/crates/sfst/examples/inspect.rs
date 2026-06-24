@@ -132,13 +132,12 @@ fn dump(path: &PathBuf, limit: Option<u32>) -> Result<(), Box<dyn std::error::Er
     let string_table = reader.build_string_table(fields)?;
     eprintln!("string table: {} entries", string_table.len());
 
-    let stream = reader.stream();
+    let part_key = reader.part_key();
     let entries = reader.load_all_stream_entries()?;
     let timestamps = reader.load_timestamps()?;
     eprintln!(
-        "stream {}/{}: {} entries across {} batch(es)",
-        stream.namespace,
-        stream.name,
+        "part_key {:016x}: {} entries across {} batch(es)",
+        part_key,
         entries.len(),
         reader.num_stream_batches(),
     );
@@ -242,12 +241,12 @@ fn sections(path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let stream = reader.stream();
+    let part_key = reader.part_key();
     let mut stream_total = 0usize;
     for b in 0..reader.num_stream_batches() {
         if let Ok(raw) = sfst.stream_batch_raw(b) {
             print_section(
-                &format!("SB{b:02} {}/{}", stream.namespace, stream.name),
+                &format!("SB{b:02} part_key={part_key:016x}"),
                 raw.len(),
                 file_size,
             );

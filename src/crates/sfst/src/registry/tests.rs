@@ -28,14 +28,14 @@ fn recover_rebuilds_summary_from_disk() {
     let s1 = Summary {
         min_timestamp_s: 100,
         max_timestamp_s: 200,
-        total_logs: 50,
-        stream: ServiceStream::new("ns", "a"),
+        record_count: 50,
+        part_key: ServiceStream::new("ns", "a").ns_hash(), content_meta: Vec::new(),
     };
     let s2 = Summary {
         min_timestamp_s: 300,
         max_timestamp_s: 400,
-        total_logs: 25,
-        stream: ServiceStream::new("ns", "b"),
+        record_count: 25,
+        part_key: ServiceStream::new("ns", "b").ns_hash(), content_meta: Vec::new(),
     };
     write_sfst_with_summary(dir.path(), id1, &s1);
     write_sfst_with_summary(dir.path(), id2, &s2);
@@ -56,8 +56,8 @@ fn recover_skips_unreadable_files() {
     let s = Summary {
         min_timestamp_s: 1,
         max_timestamp_s: 2,
-        total_logs: 1,
-        stream: ServiceStream::new("", ""),
+        record_count: 1,
+        part_key: ServiceStream::new("", "").ns_hash(), content_meta: Vec::new(),
     };
     write_sfst_with_summary(dir.path(), id_good, &s);
     // Garbage file with the right extension/name shape but invalid contents.
@@ -78,8 +78,8 @@ fn track_sets_summary() {
     let summary = Summary {
         min_timestamp_s: 1,
         max_timestamp_s: 9,
-        total_logs: 7,
-        stream: ServiceStream::new("a", "b"),
+        record_count: 7,
+        part_key: ServiceStream::new("a", "b").ns_hash(), content_meta: Vec::new(),
     };
     reg.track(id, ByteSize(1), summary.clone());
     assert_eq!(reg.get(5).unwrap().summary, summary);
@@ -102,8 +102,8 @@ fn populate(
             Summary {
                 min_timestamp_s: min_s,
                 max_timestamp_s: max_s,
-                total_logs: 1,
-                stream: ServiceStream::new(ns, name),
+                record_count: 1,
+                part_key: ServiceStream::new(ns, name).ns_hash(), content_meta: Vec::new(),
             },
         );
     }

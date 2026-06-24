@@ -105,21 +105,18 @@ fn query_snapshot_is_scoped_to_one_tenant() {
         catalog_base.path().to_path_buf(),
     );
 
-    let summary = sfst::Summary {
-        min_timestamp_s: 100,
-        max_timestamp_s: 200,
-        total_logs: 1,
-        stream: sfst::ServiceStream::new("ns", "svc"),
-    };
+    let stream = sfst::ServiceStream::new("ns", "svc");
+    let part_key = stream.ns_hash();
+    let summary = crate::test_helpers::summary_for(&stream, 1, 100, 200);
     let tenant_a = TenantId::from("tenant-a");
     let tenant_b = TenantId::from("tenant-b");
     tr.get_or_create(&tenant_a).sfst.track(
-        FileId::new(Uuid::from_u128(1), Uuid::from_u128(2), 1, 0),
+        FileId::new(Uuid::from_u128(1), Uuid::from_u128(2), 1, part_key),
         ByteSize(1),
         summary.clone(),
     );
     tr.get_or_create(&tenant_b).sfst.track(
-        FileId::new(Uuid::from_u128(1), Uuid::from_u128(2), 2, 0),
+        FileId::new(Uuid::from_u128(1), Uuid::from_u128(2), 2, part_key),
         ByteSize(1),
         summary,
     );
@@ -168,12 +165,8 @@ fn enumerate_streams_dedups_and_aggregates_sfst_and_unsealed_wal() {
     let api = ServiceStream::new("prod", "api");
     let db = ServiceStream::new("", "db"); // absent namespace, unsealed-only
 
-    let sfst_sum = |min, max, stream: &ServiceStream| sfst::Summary {
-        min_timestamp_s: min,
-        max_timestamp_s: max,
-        total_logs: 1,
-        stream: stream.clone(),
-    };
+    let sfst_sum =
+        |min, max, stream: &ServiceStream| crate::test_helpers::summary_for(stream, 1, min, max);
     {
         let r = tr.get_or_create(&tenant);
         // Two SFSTs on the same stream → aggregated into one entry.
@@ -193,11 +186,13 @@ fn enumerate_streams_dedups_and_aggregates_sfst_and_unsealed_wal() {
         // range but NOT `File.size` (that lands on close), so this also
         // exercises the `valid_up_to` size proxy in `enumerate_streams`.
         let db_id = FileId::new(mid, bid, 3, db.ns_hash());
+        let (db_part_key, db_content_meta) = crate::test_helpers::identity_for(&db);
         r.wal
             .apply_event(&FileEvent::Created {
                 file_id: db_id,
                 created_at_ns: TimestampNs(0),
-                stream: db.clone(),
+                part_key: db_part_key,
+                content_meta: db_content_meta,
             })
             .unwrap();
         r.wal
@@ -213,11 +208,13 @@ fn enumerate_streams_dedups_and_aggregates_sfst_and_unsealed_wal() {
         // A WAL shadow of SFST seq=1 (post-index/pre-delete window). SFST
         // wins by seq, so its huge size must NOT double-count.
         let shadow = FileId::new(mid, bid, 1, api.ns_hash());
+        let (api_part_key, api_content_meta) = crate::test_helpers::identity_for(&api);
         r.wal
             .apply_event(&FileEvent::Created {
                 file_id: shadow,
                 created_at_ns: TimestampNs(0),
-                stream: api.clone(),
+                part_key: api_part_key,
+                content_meta: api_content_meta,
             })
             .unwrap();
         r.wal

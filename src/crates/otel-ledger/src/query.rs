@@ -31,8 +31,8 @@ impl Registry {
     /// has no servable local copy (`local_seqs`), deduped by seq and sorted by seq.
     ///
     /// `local_seqs` may be computed time-only (all streams) and still be correct
-    /// here: one seq maps to exactly one file and one stream (`build_catalog_entry`
-    /// copies both `id` and `stream` from the same SFST), so a stream-matching
+    /// here: one seq maps to exactly one file and one partition (`build_catalog_entry`
+    /// copies both `id` and `part_key` from the same SFST), so a stream-matching
     /// entry whose seq is locally served is served by that same stream — the
     /// time-only and stream-filtered masks agree on every entry the stream filter
     /// keeps. `catalog` parsed time-only means the stream filter is NOT applied
@@ -46,7 +46,7 @@ impl Registry {
         let mut seen: HashSet<u64> = HashSet::new();
         let mut out: Vec<otel_catalog::CatalogEntry> = catalog
             .iter()
-            .filter(|e| q.matches_partition(e.stream.ns_hash()))
+            .filter(|e| q.matches_partition(e.part_key))
             .filter(|e| !local_seqs.contains(&e.id.seq) && seen.insert(e.id.seq))
             .cloned()
             .collect();

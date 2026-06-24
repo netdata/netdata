@@ -277,6 +277,9 @@ fn gen_corpus(seed: u64) -> Corpus {
 fn write_wal(dir: &Path, corpus: &Corpus) -> PathBuf {
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
     let mut writer = wal::Writer::new(dir, wal::Config::default(), seq).expect("writer");
+    let stream = file_registry::ServiceStream::new("ns", "svc");
+    let part_key = otel_logs_identity::part_key(&stream);
+    let content_meta = otel_logs_identity::encode_content_meta(&stream).expect("identity encodes");
     for (i, batch) in corpus.batches.iter().enumerate() {
         let (data, count) =
             otel_ingestor::arrow_bridge::encode(batch.clone()).expect("arrow encode");
@@ -286,7 +289,8 @@ fn write_wal(dir: &Path, corpus: &Corpus) -> PathBuf {
         let ingestion = TimestampNs((BASE_S + 500 + i as u64) * NS);
         writer
             .write_frame(
-                &file_registry::ServiceStream::new("ns", "svc"),
+                part_key,
+                &content_meta,
                 &data,
                 count,
                 ingestion,
@@ -352,7 +356,7 @@ fn check_corpus(
     let scan = WalScan::scan(&wal_path).expect("scan");
 
     assert_eq!(
-        candidate.summary.total_logs as usize,
+        candidate.summary.record_count as usize,
         scan.num_rows(),
         "row count diverged [{label}]"
     );
@@ -790,8 +794,8 @@ fn index_range_whole_file_matches_disk_index() {
         let disk_bytes = std::fs::read(&sfst_path).unwrap();
 
         assert_eq!(
-            mem_summary.total_logs, disk.summary.total_logs,
-            "seed={seed}: total_logs diverged"
+            mem_summary.record_count, disk.summary.record_count,
+            "seed={seed}: record_count diverged"
         );
         assert_eq!(
             mem_bytes, disk_bytes,
@@ -840,13 +844,13 @@ fn index_range_interior_split_partitions_logs() {
 
         // Logs partition exactly, by both the index and the scan.
         assert_eq!(
-            a_sum.total_logs + b_sum.total_logs,
-            whole.summary.total_logs,
-            "seed={seed}: chunk total_logs don't sum to the whole"
+            a_sum.record_count + b_sum.record_count,
+            whole.summary.record_count,
+            "seed={seed}: chunk record_count don't sum to the whole"
         );
         let scan_entries: u32 = frames.iter().map(|f| f.entry_count).sum();
         assert_eq!(
-            scan_entries, whole.summary.total_logs,
+            scan_entries, whole.summary.record_count,
             "seed={seed}: scanned entry counts don't sum to the whole"
         );
 
@@ -934,7 +938,7 @@ fn wal_data_stats_equal_whole_file_index() {
 
         // Ground truth: the whole WAL as one on-disk SFST.
         let whole = index_candidate(&wal_path, dir.path());
-        let total = whole.summary.total_logs;
+        let total = whole.summary.record_count;
         let start = whole.summary.min_timestamp_s as i64 * NS as i64;
         let span = ((whole.summary.max_timestamp_s - whole.summary.min_timestamp_s) as i64 + 1)
             * NS as i64;
@@ -1197,7 +1201,7 @@ fn index_range_empty_range_is_a_valid_zero_log_sfst() {
         wal::FrameRange::new(wal::HEADER_SIZE as u64, wal::HEADER_SIZE as u64),
     )
     .expect("index_range over an empty range");
-    assert_eq!(summary.total_logs, 0);
+    assert_eq!(summary.record_count, 0);
     sfst::IndexReader::open(&bytes).expect("empty-range SFST parses");
 }
 

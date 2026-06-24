@@ -69,7 +69,7 @@ impl Catalog {
             .values()
             .filter(move |e| range_overlaps(e, &q_range))
             .filter(move |e| {
-                partition_keys.is_empty() || partition_keys.contains(&e.stream.ns_hash())
+                partition_keys.is_empty() || partition_keys.contains(&e.part_key)
             })
     }
 
@@ -109,10 +109,21 @@ impl Catalog {
     }
 
     fn from_json(bytes: &[u8]) -> Result<Self, Error> {
-        let env: Envelope = serde_json::from_slice(bytes)?;
-        if env.version != FORMAT_VERSION {
-            return Err(Error::UnsupportedVersion(env.version));
+        // Peek the version before the full parse. An older-schema catalog
+        // (e.g. v1's `total_logs`/`stream` entries) lacks the current required
+        // fields, so a direct full deserialize would fail with a confusing
+        // serde "missing field" error instead of a clean `UnsupportedVersion`.
+        // This matches the WAL (header) and SFST (container) tiers, which both
+        // reject on version before touching the payload.
+        #[derive(serde::Deserialize)]
+        struct VersionOnly {
+            version: u32,
         }
+        let VersionOnly { version } = serde_json::from_slice(bytes)?;
+        if version != FORMAT_VERSION {
+            return Err(Error::UnsupportedVersion(version));
+        }
+        let env: Envelope = serde_json::from_slice(bytes)?;
         let mut entries = BTreeMap::new();
         for entry in env.entries {
             entries.insert(entry.id, entry);
@@ -162,12 +173,13 @@ mod tests {
 
     fn entry_at(seq: u64, min_s: u32, max_s: u32, stream: ServiceStream) -> CatalogEntry {
         CatalogEntry {
-            id: FileId::new(Uuid::nil(), Uuid::from_u128(1), seq, 0),
+            id: FileId::new(Uuid::nil(), Uuid::from_u128(1), seq, stream.ns_hash()),
             remote_key: format!("tenant1/sfst/2026-04-17/{seq}.sfst"),
             min_timestamp_s: min_s,
             max_timestamp_s: max_s,
-            total_logs: 10,
-            stream,
+            record_count: 10,
+            part_key: stream.ns_hash(),
+            content_meta: Vec::new(),
             size: ByteSize(1024),
             uploaded_at_ns: TimestampNs(2_000_000_000),
             remote_etag: None,
@@ -337,6 +349,28 @@ mod tests {
         match Catalog::from_json(json) {
             Err(Error::UnsupportedVersion(999)) => {}
             other => panic!("expected UnsupportedVersion(999), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn from_json_rejects_old_schema_on_version_not_serde() {
+        // A real v1 catalog: old-schema entry (`total_logs`/`stream`, missing
+        // the current `record_count`/`part_key`/`content_meta`). The version
+        // peek must reject it as `UnsupportedVersion(1)` — not a serde
+        // "missing field" error from attempting the full parse.
+        let json = br#"{
+            "version": 1,
+            "tenant_id": "t",
+            "date": "2026-04-17",
+            "machine_id": "00000000-0000-0000-0000-000000000000",
+            "boot_id": "00000000-0000-0000-0000-000000000000",
+            "entries": [
+                {"id": "x", "total_logs": 5, "stream": {"namespace": "p", "name": "a"}}
+            ]
+        }"#;
+        match Catalog::from_json(json) {
+            Err(Error::UnsupportedVersion(1)) => {}
+            other => panic!("expected UnsupportedVersion(1), got {other:?}"),
         }
     }
 

@@ -69,8 +69,8 @@ fn build_query_fixture() -> Vec<u8> {
     let summary = Summary {
         min_timestamp_s: 1_700_000_000,
         max_timestamp_s: 1_700_000_005,
-        total_logs: 6,
-        stream: ServiceStream::new("ns", "svc"),
+        record_count: 6,
+        part_key: ServiceStream::new("ns", "svc").ns_hash(), content_meta: Vec::new(),
     };
     let metadata = Metadata {
         histogram: Histogram {
@@ -466,8 +466,8 @@ fn build_multivalued_fixture() -> Vec<u8> {
     let summary = Summary {
         min_timestamp_s: 1_700_000_000,
         max_timestamp_s: 1_700_000_002,
-        total_logs: 3,
-        stream: ServiceStream::new("ns", "svc"),
+        record_count: 3,
+        part_key: ServiceStream::new("ns", "svc").ns_hash(), content_meta: Vec::new(),
     };
     let metadata = Metadata {
         histogram: Histogram {
@@ -707,8 +707,8 @@ fn build_complemented_fixture() -> Vec<u8> {
     let summary = Summary {
         min_timestamp_s: 1_700_000_000,
         max_timestamp_s: 1_700_000_005,
-        total_logs: 6,
-        stream: ServiceStream::new("ns", "svc"),
+        record_count: 6,
+        part_key: ServiceStream::new("ns", "svc").ns_hash(), content_meta: Vec::new(),
     };
     let metadata = Metadata {
         histogram: Histogram {
@@ -924,8 +924,8 @@ fn build_tiered_fixture() -> Vec<u8> {
     let summary = Summary {
         min_timestamp_s: 1_700_000_000,
         max_timestamp_s: 1_700_000_005,
-        total_logs: N,
-        stream: ServiceStream::new("ns", "svc"),
+        record_count: N,
+        part_key: ServiceStream::new("ns", "svc").ns_hash(), content_meta: Vec::new(),
     };
     let metadata = Metadata {
         histogram: Histogram {

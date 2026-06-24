@@ -19,6 +19,7 @@ netdata-plugin-types = { path = "../netdata-plugin/types" }
 
 # WAL writing
 file-registry = { workspace = true }
+otel-logs-identity = { workspace = true }
 otel-catalog = { workspace = true }
 otel-normalize = { workspace = true }
 prost = { workspace = true }

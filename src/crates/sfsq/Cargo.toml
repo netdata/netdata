@@ -28,6 +28,7 @@ clap = { workspace = true }
 # The WAL-equivalence harness (tests/wal_equivalence.rs) builds real OTAP
 # frames through the production encoder and writes real WAL files.
 otel-ingestor = { workspace = true }
+otel-logs-identity = { workspace = true }
 sfst-indexer = { workspace = true }
 opentelemetry-proto = { workspace = true }
 file-registry = { workspace = true }

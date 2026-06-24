@@ -13,6 +13,13 @@ pub use seq::{DEFAULT_RESERVE_BATCH, SeqAllocator, read_seq_highwater, write_seq
 /// Byte offset of the first frame — the lower bound for
 /// [`Reader::open_range`] `start` and the start of a whole-prefix read.
 pub use format::HEADER_SIZE;
+/// Maximum size of a WAL file's opaque `content_meta` identity blob — a
+/// per-file/per-partition header field, the same for every frame written to
+/// that file; validation merely happens at the [`Writer::write_frame`]
+/// boundary. The substrate hard-rejects a larger blob there; the producer
+/// (content plane) MUST validate against this before writing so an oversized
+/// identity drops a single frame rather than failing the batch.
+pub use format::MAX_CONTENT_META_BYTES;
 pub use format::{FileEvent, Message};
 pub use reader::{Frame, FrameBoundary, FrameRange, Reader, scan_frame_boundaries};
 pub use registry::{File, Registry};

@@ -147,19 +147,19 @@ the file. Both writer and reader compute it identically:
     pub const MIN_LOGS_PER_BATCH: u32 = 1024;
     pub const MAX_STREAM_BATCHES: u8 = 8;
 
-    pub fn num_stream_batches(total_logs: u32) -> u8 {
-        (total_logs / MIN_LOGS_PER_BATCH).clamp(1, MAX_STREAM_BATCHES as u32) as u8
+    pub fn num_stream_batches(record_count: u32) -> u8 {
+        (record_count / MIN_LOGS_PER_BATCH).clamp(1, MAX_STREAM_BATCHES as u32) as u8
     }
 
-    pub fn stream_batch_size(total_logs: u32) -> u32 {
-        if total_logs == 0 { 1 } else { total_logs.div_ceil(num_stream_batches(total_logs) as u32) }
+    pub fn stream_batch_size(record_count: u32) -> u32 {
+        if record_count == 0 { 1 } else { record_count.div_ceil(num_stream_batches(record_count) as u32) }
     }
 
 Properties:
 
-- A file with `total_logs == 0` carries exactly one (empty) `SB00`
+- A file with `record_count == 0` carries exactly one (empty) `SB00`
   chunk so the TOC always has at least one stream-batch entry.
-- Files with `total_logs ≤ MIN_LOGS_PER_BATCH` (1024) use one batch.
+- Files with `record_count ≤ MIN_LOGS_PER_BATCH` (1024) use one batch.
 - Files above that scale linearly until they hit `MAX_STREAM_BATCHES`
   (8), where the rule clamps. The 8-batch ceiling exists so the
   per-value batch-membership mask in each `HF{i}` chunk fits in a
@@ -167,9 +167,9 @@ Properties:
   [§ `HF{i}`](#hfi--high-card-field-columnar)).
 
 The writer partitions chronologically-sorted log positions into
-`stream_batch_size(total_logs)`-sized contiguous slices and emits one
+`stream_batch_size(record_count)`-sized contiguous slices and emits one
 `SB{i}` chunk per slice. The reader, given a chronological position
-`p`, finds its batch as `p / stream_batch_size(total_logs)`.
+`p`, finds its batch as `p / stream_batch_size(record_count)`.
 
 ---
 
@@ -180,24 +180,25 @@ decoded type of each chunk is given below.
 
 ### `SUMR` — Summary
 
-The cheap recovery summary. Decodes to:
+The cheap recovery summary. Decodes to `file_registry::FileSummary`
+(re-exported as `sfst::Summary`):
 
-    pub struct Summary {
+    pub struct FileSummary {
         pub min_timestamp_s: u32,
         pub max_timestamp_s: u32,
-        pub total_logs:      u32,
-        pub stream:          ServiceStream,
-    }
-
-    pub struct ServiceStream {
-        pub namespace: String,
-        pub name:      String,
+        pub record_count:    u32,
+        pub part_key:        u64,
+        pub content_meta:    Vec<u8>,
     }
 
 `min_timestamp_s` and `max_timestamp_s` are the earliest and latest
-log seconds (Unix epoch) in the file. `total_logs` drives the
-stream-batch partitioning (see above). `stream` carries the file's
-single `(service.namespace, service.name)` identity.
+record seconds (Unix epoch) in the file. `record_count` drives the
+stream-batch partitioning (see above). `part_key` is the file's opaque
+partition key; the SFST layer stores and compares it but never
+interprets it. `content_meta` is an opaque content-plane identity blob,
+stored verbatim — the content plane (e.g. `otel-logs-identity`) is the
+sole encoder/decoder. The substrate is content-agnostic: it holds these
+neutral fields and never decodes the identity.
 
 ### `META` — Metadata
 
@@ -319,7 +320,7 @@ fixed-width arena (`StreamBatch`):
 
 Row `local_pos`'s `KvId`s are `kv_bytes[4*off(p) .. 4*off(p+1)]`, where
 `off` is the prefix-sum of `row_lens` (in `KvId` units) and
-`local_pos = global_pos - i * stream_batch_size(total_logs)`.
+`local_pos = global_pos - i * stream_batch_size(record_count)`.
 Concatenating every `SB{i}` chunk in id order recovers the full
 chronological log stream.
 
@@ -386,7 +387,24 @@ CRC then fails to match.
 
 ## Format Version
 
-The current version is **5**.
+The current version is **6**.
+
+### v6 changelog (from v5)
+
+- **Content-agnostic `SUMR`.** The summary payload changed from the typed
+  `Summary { total_logs: u32, stream: ServiceStream }` to
+  `file_registry::FileSummary { record_count: u32, part_key: u64,
+  content_meta: Vec<u8> }`. The SFST layer no longer knows about
+  `(service.namespace, service.name)`: it stores an opaque `part_key`
+  (compared for candidate selection) and an opaque `content_meta` blob
+  (stored verbatim; decoded only by the content plane). The bincode byte
+  layouts are incompatible, so a v5 file is rejected at the version check
+  (`Error::UnsupportedVersion`) rather than failing later inside the bincode
+  decode. No other chunk changed.
+
+v5 files cannot be read by a v6 reader and vice versa
+(`Error::UnsupportedVersion` on the version field). No migration tool
+exists.
 
 ### v5 changelog (from v4)
 
@@ -449,7 +467,7 @@ exists.
   attribute list in a single `STRM` chunk; v2 partitions logs
   chronologically into 1–8 `SB{i}` chunks (`SB00`..`SB07`), one per
   partition. Partition count and size are derived from
-  `Summary::total_logs` via `num_stream_batches` /
+  `Summary::record_count` via `num_stream_batches` /
   `stream_batch_size` — see
   [§ Stream-batch partitioning](#stream-batch-partitioning).
   This enables a high-card filter to materialise only the batches

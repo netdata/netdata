@@ -66,7 +66,7 @@ pub async fn recover_unindexed(
 
             let index_file_path = registry.sfst.file_path(id);
 
-            if summary.total_logs == 0 {
+            if summary.record_count == 0 {
                 // Empty WAL → empty SFST. Don't track it; remove the empty
                 // index file directly so it isn't re-discovered on the next
                 // restart. Mirrors the steady-state suppression in

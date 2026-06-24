@@ -20,8 +20,8 @@ fn summary() -> Summary {
     Summary {
         min_timestamp_s: 1,
         max_timestamp_s: 2,
-        total_logs: 3,
-        stream: crate::ServiceStream::new("ns", "svc"),
+        record_count: 3,
+        part_key: crate::ServiceStream::new("ns", "svc").ns_hash(), content_meta: Vec::new(),
     }
 }
 

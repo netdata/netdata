@@ -39,8 +39,8 @@
 //! let summary = sfst::Summary {
 //!     min_timestamp_s: 0,
 //!     max_timestamp_s: 0,
-//!     total_logs: 0,
-//!     stream: sfst::ServiceStream::new("ns", "svc"),
+//!     record_count: 0,
+//!     part_key: sfst::ServiceStream::new("ns", "svc").ns_hash(), content_meta: Vec::new(),
 //! };
 //! let metadata = sfst::Metadata {
 //!     histogram: sfst::Histogram { timestamps: vec![], counts: vec![] },
@@ -116,7 +116,12 @@ const MAGIC: &[u8; 4] = b"SFST";
 //     helper. Every chunk payload is followed by a crc32 over its stored
 //     (compressed) bytes, verified on access. Older files are rejected on
 //     open.
-const VERSION: u32 = 5;
+// v6: SUMR payload made content-agnostic — `Summary` is now
+//     `file_registry::FileSummary { record_count, part_key, content_meta }`,
+//     replacing the typed `{ total_logs, stream: ServiceStream }`. The bincode
+//     bytes are incompatible, so older files are rejected on open rather than
+//     surfacing a decode error.
+const VERSION: u32 = 6;
 
 const CHUNK_SUMMARY: chunk_file::ChunkId = *b"SUMR";
 const CHUNK_META: chunk_file::ChunkId = *b"META";
@@ -148,26 +153,26 @@ pub(crate) const ZSTD_LEVEL_DEFAULT: i32 = 1;
 /// smaller payload. Private: [`StreamWriter`] owns the pairing.
 pub(crate) const ZSTD_LEVEL_FST: i32 = 3;
 
-/// Number of stream-batch (`SB{i}`) chunks in a file with `total_logs`
+/// Number of stream-batch (`SB{i}`) chunks in a file with `record_count`
 /// log entries. Both writer and reader call this; the rule is the
 /// format invariant, not stored in the file.
-pub fn num_stream_batches(total_logs: u32) -> u8 {
-    (total_logs / MIN_LOGS_PER_BATCH).clamp(1, MAX_STREAM_BATCHES as u32) as u8
+pub fn num_stream_batches(record_count: u32) -> u8 {
+    (record_count / MIN_LOGS_PER_BATCH).clamp(1, MAX_STREAM_BATCHES as u32) as u8
 }
 
-/// Logical batch size for a file with `total_logs` log entries. Used by
+/// Logical batch size for a file with `record_count` log entries. Used by
 /// the writer to partition log positions into batches and by the reader
 /// to decide which batch a given position belongs to.
 ///
-/// Returns `1` for an empty file (`total_logs == 0`) — there are no
+/// Returns `1` for an empty file (`record_count == 0`) — there are no
 /// positions to partition, but a non-zero divisor lets callers compose
-/// the result with integer division without a separate `total_logs == 0`
+/// the result with integer division without a separate `record_count == 0`
 /// branch.
-pub fn stream_batch_size(total_logs: u32) -> u32 {
-    if total_logs == 0 {
+pub fn stream_batch_size(record_count: u32) -> u32 {
+    if record_count == 0 {
         return 1;
     }
-    total_logs.div_ceil(num_stream_batches(total_logs) as u32)
+    record_count.div_ceil(num_stream_batches(record_count) as u32)
 }
 
 /// Chunk id for the mid-card field FST at `index`. The id encodes the

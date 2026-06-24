@@ -200,7 +200,7 @@ impl Registry {
             .filter(|f| !f.pending_deletion)
             .filter(move |f| range_overlaps(&f.summary, &q_range))
             .filter(move |f| {
-                partition_keys.is_empty() || partition_keys.contains(&f.summary.stream.ns_hash())
+                partition_keys.is_empty() || partition_keys.contains(&f.summary.part_key)
             })
     }
 
@@ -221,7 +221,7 @@ impl Registry {
     /// marked for eviction if any limit is exceeded.
     ///
     /// Age is measured against `summary.max_timestamp_s` — the most recent
-    /// log entry in the file. An empty SFST (`total_logs == 0`,
+    /// log entry in the file. An empty SFST (`record_count == 0`,
     /// `max_timestamp_s == 0`) ages out immediately, which matches the
     /// "no useful data" disposition.
     pub fn evaluate_retention(&self, policy: &RetentionPolicy, now_ns: u64) -> Vec<u64> {
@@ -271,7 +271,7 @@ impl Registry {
 /// the query's half-open `[start, end)` range — the shared
 /// [`file_registry::range_overlaps`] rule.
 ///
-/// Edge case: empty SFSTs (`total_logs == 0`, `min == max == 0`)
+/// Edge case: empty SFSTs (`record_count == 0`, `min == max == 0`)
 /// overlap with any query that includes second 0; in practice they're
 /// filtered earlier by retention.
 fn range_overlaps(summary: &Summary, q: &Range<u32>) -> bool {

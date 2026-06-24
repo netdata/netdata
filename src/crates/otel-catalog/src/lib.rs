@@ -20,7 +20,7 @@ pub use registry::{File, Registry, filename, scan_max_sequence};
 /// Current catalog JSON schema version (the `version` field inside the
 /// JSON payload). Distinct from [`CONTAINER_VERSION`], which versions
 /// the on-disk framing around it.
-pub const FORMAT_VERSION: u32 = 1;
+pub const FORMAT_VERSION: u32 = 2;
 
 /// Magic bytes of the on-disk catalog container.
 pub const CONTAINER_MAGIC: [u8; 4] = *b"NCAT";

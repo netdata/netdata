@@ -10,6 +10,7 @@ workspace = true
 
 [dependencies]
 sfst = { workspace = true }
+otel-logs-identity = { workspace = true }
 wal = { workspace = true }
 wal-otap = { workspace = true }
 

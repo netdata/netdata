@@ -203,51 +203,107 @@ fn check_collisions(
     }
 }
 
-/// Build the OTLP `partial_success` payload from the collision list.
+/// One frame dropped because its stream identity could not be encoded into the
+/// substrate's `content_meta` budget (the codec's per-field `u16` cap or the
+/// WAL header budget). Reported to the OTLP client via `partial_success`, the
+/// same as a collision — so a sender learns its records were not stored.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct OversizedDrop {
+    part_key: u64,
+    namespace_len: usize,
+    name_len: usize,
+    /// Bounded previews (≤ `IDENTITY_LOG_PREVIEW_CHARS`) so the client message
+    /// names the offending stream, like the collision path, without echoing a
+    /// full attacker-controlled identity.
+    namespace_preview: String,
+    name_preview: String,
+    /// Total log records dropped for this stream — the sum across every
+    /// `ResourceLogs` in the request whose identity collapsed to this
+    /// `part_key` (one drop covers the whole group, like a collision). OTLP's
+    /// `rejected_log_records` is a request-wide sum, so this is the right unit.
+    log_records: usize,
+}
+
+/// Build the OTLP `partial_success` payload from the rejected records of a
+/// request — both `ns_hash` collisions and oversized-identity frame drops.
 ///
-/// Returns `None` when the list is empty (no collisions = full success);
-/// otherwise builds a payload that reports the total rejected count and a
-/// developer-facing message naming each colliding pair.
-fn build_partial_success(collisions: &[Collision]) -> Option<ExportLogsPartialSuccess> {
-    if collisions.is_empty() {
+/// Returns `None` only when nothing was rejected (full success); otherwise
+/// reports the total rejected count and a developer-facing message describing
+/// each rejection.
+fn build_partial_success(
+    collisions: &[Collision],
+    oversized: &[OversizedDrop],
+) -> Option<ExportLogsPartialSuccess> {
+    if collisions.is_empty() && oversized.is_empty() {
         return None;
     }
     let total: i64 = collisions
         .iter()
         .map(|c| c.rejected_log_records as i64)
-        .sum();
+        .sum::<i64>()
+        + oversized.iter().map(|o| o.log_records as i64).sum::<i64>();
     Some(ExportLogsPartialSuccess {
         rejected_log_records: total,
-        error_message: format_collision_error(collisions),
+        error_message: format_rejection_error(collisions, oversized),
     })
 }
 
-/// Format collision details for `ExportLogsPartialSuccess::error_message`.
-fn format_collision_error(collisions: &[Collision]) -> String {
+/// Format the rejected-records detail for `ExportLogsPartialSuccess::error_message`,
+/// covering both `ns_hash` collisions and oversized-identity frame drops.
+fn format_rejection_error(collisions: &[Collision], oversized: &[OversizedDrop]) -> String {
     fn show(s: &str) -> &str {
         if s.is_empty() { "<none>" } else { s }
     }
 
-    let parts: Vec<String> = collisions
-        .iter()
-        .map(|c| {
-            format!(
-                "ns_hash={:#x}: rejected ({}/{}) collides with canonical ({}/{}) ({} log records dropped)",
-                c.hash,
-                show(&c.rejected.namespace),
-                show(&c.rejected.name),
-                show(&c.canonical.namespace),
-                show(&c.canonical.name),
-                c.rejected_log_records,
-            )
-        })
-        .collect();
-    format!(
-        "{} ns_hash collision{} detected; rename one of the colliding (service.namespace, service.name) pairs to dedupe: {}",
-        collisions.len(),
-        if collisions.len() == 1 { "" } else { "s" },
-        parts.join("; "),
-    )
+    let mut sections: Vec<String> = Vec::new();
+
+    if !collisions.is_empty() {
+        let parts: Vec<String> = collisions
+            .iter()
+            .map(|c| {
+                format!(
+                    "ns_hash={:#x}: rejected ({}/{}) collides with canonical ({}/{}) ({} log records dropped)",
+                    c.hash,
+                    show(&c.rejected.namespace),
+                    show(&c.rejected.name),
+                    show(&c.canonical.namespace),
+                    show(&c.canonical.name),
+                    c.rejected_log_records,
+                )
+            })
+            .collect();
+        sections.push(format!(
+            "{} ns_hash collision{} detected; rename one of the colliding (service.namespace, service.name) pairs to dedupe: {}",
+            collisions.len(),
+            if collisions.len() == 1 { "" } else { "s" },
+            parts.join("; "),
+        ));
+    }
+
+    if !oversized.is_empty() {
+        let parts: Vec<String> = oversized
+            .iter()
+            .map(|o| {
+                format!(
+                    "part_key={:#x}: identity too large (namespace={:?} len={}, name={:?} len={}) ({} log records dropped)",
+                    o.part_key,
+                    o.namespace_preview,
+                    o.namespace_len,
+                    o.name_preview,
+                    o.name_len,
+                    o.log_records,
+                )
+            })
+            .collect();
+        sections.push(format!(
+            "{} stream{} dropped for oversized identity; shorten the (service.namespace, service.name) fields: {}",
+            oversized.len(),
+            if oversized.len() == 1 { "" } else { "s" },
+            parts.join("; "),
+        ));
+    }
+
+    sections.join(" | ")
 }
 
 fn extract_tenant_id(
@@ -266,6 +322,16 @@ fn extract_tenant_id(
     // The id policy (strict: becomes a directory name) lives on the
     // type; this layer only maps the reason onto the transport error.
     TenantId::validate_ingest(tenant).map_err(Status::invalid_argument)
+}
+
+/// Max chars of an attacker-controlled identity field to echo into a
+/// drop-frame log line. `service.namespace`/`service.name` come straight from
+/// OTLP resource attributes and can be up to 64 KiB; cap the preview so a
+/// pathological identity can't inflate log volume.
+const IDENTITY_LOG_PREVIEW_CHARS: usize = 64;
+
+fn identity_preview(s: &str) -> String {
+    s.chars().take(IDENTITY_LOG_PREVIEW_CHARS).collect()
 }
 
 pub struct NetdataLogsService {
@@ -325,6 +391,55 @@ impl NetdataLogsService {
     }
 }
 
+/// Lower a stream identity onto the substrate's content-agnostic contract:
+/// encode the opaque `content_meta` blob and validate it against both caps that
+/// can reject an identity — the codec's per-field `u16` limit
+/// (`encode_content_meta` returns `None`) and the WAL header budget
+/// (`wal::MAX_CONTENT_META_BYTES`). Both are attacker-reachable via OTLP
+/// resource attributes.
+///
+/// Returns the encoded blob, or an [`OversizedDrop`] (after logging a bounded
+/// preview) when the identity is unstorable. Callers validate up front, before
+/// the collision check claims a canonical `part_key`, so an unstorable identity
+/// never occupies a slot it can't write to and the offending strings are freed
+/// immediately rather than held for the batch.
+fn encode_identity_or_drop(
+    stream: &ServiceStream,
+    log_records: usize,
+) -> Result<Vec<u8>, OversizedDrop> {
+    let make_drop = || OversizedDrop {
+        part_key: otel_logs_identity::part_key(stream),
+        namespace_len: stream.namespace.len(),
+        name_len: stream.name.len(),
+        namespace_preview: identity_preview(&stream.namespace),
+        name_preview: identity_preview(&stream.name),
+        log_records,
+    };
+    let Some(content_meta) = otel_logs_identity::encode_content_meta(stream) else {
+        tracing::error!(
+            namespace_len = stream.namespace.len(),
+            name_len = stream.name.len(),
+            namespace_preview = %identity_preview(&stream.namespace),
+            name_preview = %identity_preview(&stream.name),
+            "stream identity too large to encode into content_meta; dropping frame"
+        );
+        return Err(make_drop());
+    };
+    if content_meta.len() > wal::MAX_CONTENT_META_BYTES {
+        tracing::error!(
+            namespace_len = stream.namespace.len(),
+            name_len = stream.name.len(),
+            namespace_preview = %identity_preview(&stream.namespace),
+            name_preview = %identity_preview(&stream.name),
+            content_meta_len = content_meta.len(),
+            max = wal::MAX_CONTENT_META_BYTES,
+            "stream identity exceeds the WAL content_meta budget; dropping frame"
+        );
+        return Err(make_drop());
+    }
+    Ok(content_meta)
+}
+
 #[tonic::async_trait]
 impl LogsService for NetdataLogsService {
     #[tracing::instrument(skip_all, fields(received_logs))]
@@ -348,14 +463,40 @@ impl LogsService for NetdataLogsService {
             }));
         }
 
-        // Group, then run the collision check.
         let groups = group_by_stream(resource_logs);
+
+        // Validate identity encodability BEFORE the collision check mutates the
+        // canonical table. An oversized identity is unstorable, so it must not
+        // claim a canonical `part_key` it can never write to — otherwise a later
+        // valid stream colliding on that hash would be rejected against a stream
+        // that was never persisted. Drop+report such streams up front; this also
+        // frees the (attacker-controlled) oversized strings immediately. The
+        // surviving `content_meta` blobs are reused at write time (no re-encode).
+        let mut oversized: Vec<OversizedDrop> = Vec::new();
+        let mut content_meta_by_stream: HashMap<ServiceStream, Vec<u8>> = HashMap::new();
+        let storable: HashMap<ServiceStream, StreamGroup> = groups
+            .into_iter()
+            .filter_map(
+                |(stream, group)| match encode_identity_or_drop(&stream, group.log_record_count) {
+                    Ok(content_meta) => {
+                        content_meta_by_stream.insert(stream.clone(), content_meta);
+                        Some((stream, group))
+                    }
+                    Err(drop) => {
+                        oversized.push(drop);
+                        None
+                    }
+                },
+            )
+            .collect();
+
+        // Run the collision check only over storable streams.
         let CollisionCheck {
             accepted,
             collisions,
         } = {
             let mut canonical = self.canonical.lock().unwrap();
-            check_collisions(&mut canonical, &tenant_id, groups)
+            check_collisions(&mut canonical, &tenant_id, storable)
         };
 
         for c in &collisions {
@@ -367,11 +508,12 @@ impl LogsService for NetdataLogsService {
             );
         }
 
-        // No-op short-circuit: every group was rejected as a collision,
-        // so there's nothing to write.
+        // No-op short-circuit: nothing left to write (every storable group was a
+        // collision, or every group was dropped as oversized). Still report the
+        // rejected records — collisions and oversized drops — to the client.
         if accepted.is_empty() {
             return Ok(Response::new(ExportLogsServiceResponse {
-                partial_success: build_partial_success(&collisions),
+                partial_success: build_partial_success(&collisions, &oversized),
             }));
         }
 
@@ -389,6 +531,14 @@ impl LogsService for NetdataLogsService {
         };
 
         for (stream, group) in accepted {
+            // Identity was validated up front (before the collision check); reuse
+            // the `part_key` + the already-encoded `content_meta` blob recorded
+            // there. `accepted ⊆ storable`, so the lookup is always present.
+            let part_key = otel_logs_identity::part_key(&stream);
+            let content_meta = content_meta_by_stream
+                .get(&stream)
+                .expect("accepted stream was validated and its content_meta recorded");
+
             // One clock tick per frame. The same value flows into the
             // WAL frame header (`ingestion_ns`), into the indexer's
             // tier-3 fallback during indexing, and into
@@ -402,7 +552,7 @@ impl LogsService for NetdataLogsService {
             })?;
 
             writer
-                .write_frame(&stream, &data, count, ingestion_ns, log_min_ts, log_max_ts)
+                .write_frame(part_key, content_meta, &data, count, ingestion_ns, log_min_ts, log_max_ts)
                 .map_err(|e| {
                     tracing::error!(%e, "failed to write WAL entry");
                     Status::internal("WAL write error")
@@ -418,7 +568,7 @@ impl LogsService for NetdataLogsService {
         self.sender.send_events(tenant_id, events);
 
         Ok(Response::new(ExportLogsServiceResponse {
-            partial_success: build_partial_success(&collisions),
+            partial_success: build_partial_success(&collisions, &oversized),
         }))
     }
 }
@@ -861,6 +1011,113 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn oversized_identity_drops_frame_not_whole_request() {
+        let tmp = tempfile::tempdir().unwrap();
+        let wal_dir = tmp.path().to_path_buf();
+        let service = test_service(wal_dir.clone());
+
+        // A namespace far past the WAL `content_meta` budget but well under the
+        // codec's per-field `u16` cap: `encode_content_meta` succeeds, only the
+        // WAL header budget rejects it. Pre-fix this `Err` aborted the whole
+        // export RPC (a trivial OTLP-driven DoS); post-fix the offending frame
+        // is dropped and the co-submitted well-formed stream still persists.
+        let huge_ns = "n".repeat(wal::MAX_CONTENT_META_BYTES + 64);
+        let req = Request::new(ExportLogsServiceRequest {
+            resource_logs: vec![
+                rl(Some(&huge_ns), Some("svc"), 2),
+                rl(Some("prod"), Some("api"), 2),
+            ],
+        });
+
+        let resp = service
+            .export(req)
+            .await
+            .expect("an oversized identity must not fail the whole batch");
+
+        // The dropped frame is reported to the client via `partial_success`
+        // (the same contract as a collision), not silently swallowed: the 2
+        // records of the oversized stream are counted as rejected.
+        let partial = resp
+            .into_inner()
+            .partial_success
+            .expect("the dropped oversized stream must be reported as partial_success");
+        assert_eq!(partial.rejected_log_records, 2);
+        assert!(
+            partial.error_message.contains("oversized identity"),
+            "error_message must describe the oversized-identity drop, got: {}",
+            partial.error_message
+        );
+
+        // The writer keys a WAL file per `part_key`, so exactly one file must
+        // exist: the well-formed stream's. The oversized stream was dropped
+        // before `write_frame` and produced no file.
+        let tenant_dir = wal_dir.join("default");
+        let wal_files: Vec<_> = std::fs::read_dir(&tenant_dir)
+            .expect("tenant WAL dir exists")
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().is_some_and(|x| x == "wal"))
+            .collect();
+        assert_eq!(
+            wal_files.len(),
+            1,
+            "only the well-formed stream may produce a WAL file; the oversized one is dropped"
+        );
+
+        // The oversized identity is unstorable, so it must NOT have claimed a
+        // canonical `part_key` (validated before the collision check). Only the
+        // well-formed stream's pair is registered — otherwise a later valid
+        // stream colliding on that hash would be rejected against a phantom.
+        let canonical = service.canonical.lock().unwrap();
+        let tenant = TenantId::from("default");
+        assert!(
+            canonical.contains_key(&(tenant.clone(), ServiceStream::new("prod", "api").ns_hash())),
+            "the well-formed stream must claim its canonical pair"
+        );
+        assert!(
+            !canonical.contains_key(&(tenant, ServiceStream::new(&huge_ns, "svc").ns_hash())),
+            "the dropped oversized stream must NOT claim a canonical pair"
+        );
+        assert_eq!(canonical.len(), 1, "only the storable stream is registered");
+    }
+
+    #[tokio::test]
+    async fn codec_unencodable_identity_drops_frame_not_whole_request() {
+        let tmp = tempfile::tempdir().unwrap();
+        let wal_dir = tmp.path().to_path_buf();
+        let service = test_service(wal_dir.clone());
+
+        // A field past the codec's per-field `u16` cap (> 65535 bytes):
+        // `encode_content_meta` returns `None` — the *first* drop branch, vs the
+        // WAL-budget branch exercised above. Co-submitted well-formed stream
+        // must still persist, and the drop must be reported via partial_success.
+        let huge_name = "x".repeat((u16::MAX as usize) + 16);
+        let req = Request::new(ExportLogsServiceRequest {
+            resource_logs: vec![
+                rl(Some("svc"), Some(&huge_name), 3),
+                rl(Some("prod"), Some("api"), 2),
+            ],
+        });
+
+        let resp = service
+            .export(req)
+            .await
+            .expect("an unencodable identity must not fail the whole batch");
+        let partial = resp
+            .into_inner()
+            .partial_success
+            .expect("the dropped unencodable stream must be reported as partial_success");
+        assert_eq!(partial.rejected_log_records, 3);
+
+        let tenant_dir = wal_dir.join("default");
+        let wal_files: Vec<_> = std::fs::read_dir(&tenant_dir)
+            .expect("tenant WAL dir exists")
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().is_some_and(|x| x == "wal"))
+            .collect();
+        assert_eq!(wal_files.len(), 1, "only the well-formed stream may produce a WAL file");
+    }
+
     #[test]
     fn error_message_describes_each_collision() {
         let collisions = vec![
@@ -877,12 +1134,31 @@ mod tests {
                 rejected_log_records: 1,
             },
         ];
-        let msg = format_collision_error(&collisions);
+        let msg = format_rejection_error(&collisions, &[]);
         assert!(msg.contains("2 ns_hash collisions"));
         assert!(msg.contains("prod"));
         assert!(msg.contains("staging"));
         // An empty (absent) field renders as `<none>`.
         assert!(msg.contains("<none>"));
         assert!(msg.contains("3 log records"));
+    }
+
+    #[test]
+    fn error_message_describes_oversized_drops() {
+        let oversized = vec![OversizedDrop {
+            part_key: 0xabc,
+            namespace_len: 2048,
+            name_len: 4,
+            namespace_preview: "prod-namespace".to_string(),
+            name_preview: "api".to_string(),
+            log_records: 5,
+        }];
+        let msg = format_rejection_error(&[], &oversized);
+        assert!(msg.contains("1 stream dropped for oversized identity"));
+        assert!(msg.contains("part_key=0xabc"));
+        assert!(msg.contains("len=2048"));
+        // The bounded preview names the offending stream, like the collision path.
+        assert!(msg.contains("prod-namespace"));
+        assert!(msg.contains("5 log records"));
     }
 }

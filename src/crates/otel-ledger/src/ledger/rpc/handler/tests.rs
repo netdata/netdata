@@ -53,12 +53,8 @@ fn write_test_sfst(path: &std::path::Path, min_s: u32) {
     ];
     let primary: FstIndex<BitmapValue> = FstIndex::build(primary_entries).unwrap();
 
-    let summary = sfst::Summary {
-        min_timestamp_s: min_s,
-        max_timestamp_s: min_s + 5,
-        total_logs: 6,
-        stream: ServiceStream::new("ns", "svc"),
-    };
+    let summary =
+        crate::test_helpers::summary_for(&ServiceStream::new("ns", "svc"), 6, min_s, min_s + 5);
     let metadata = sfst::Metadata {
         histogram: sfst::Histogram {
             timestamps: vec![min_s],
@@ -127,12 +123,8 @@ fn install_sfst(tr: &mut TenantRegistries, tenant: &str, seq: u64, min_s: u32) -
     let path = reg.sfst.file_path(id);
     write_test_sfst(&path, min_s);
     let size = ByteSize(std::fs::metadata(&path).unwrap().len());
-    let summary = sfst::Summary {
-        min_timestamp_s: min_s,
-        max_timestamp_s: min_s + 5,
-        total_logs: 6,
-        stream: ServiceStream::new("ns", "svc"),
-    };
+    let summary =
+        crate::test_helpers::summary_for(&ServiceStream::new("ns", "svc"), 6, min_s, min_s + 5);
     reg.sfst.track(id, size, summary);
     (machine, boot)
 }
@@ -148,12 +140,8 @@ fn write_service_only_sfst(path: &std::path::Path, min_s: u32) {
     ];
     let primary: FstIndex<BitmapValue> = FstIndex::build(primary_entries).unwrap();
 
-    let summary = sfst::Summary {
-        min_timestamp_s: min_s,
-        max_timestamp_s: min_s + 2,
-        total_logs: 3,
-        stream: ServiceStream::new("ns", "svc"),
-    };
+    let summary =
+        crate::test_helpers::summary_for(&ServiceStream::new("ns", "svc"), 3, min_s, min_s + 2);
     let metadata = sfst::Metadata {
         histogram: sfst::Histogram {
             timestamps: vec![min_s],
@@ -205,12 +193,8 @@ fn install_service_only_sfst(tr: &mut TenantRegistries, tenant: &str, seq: u64, 
     let path = reg.sfst.file_path(id);
     write_service_only_sfst(&path, min_s);
     let size = ByteSize(std::fs::metadata(&path).unwrap().len());
-    let summary = sfst::Summary {
-        min_timestamp_s: min_s,
-        max_timestamp_s: min_s + 2,
-        total_logs: 3,
-        stream: ServiceStream::new("ns", "svc"),
-    };
+    let summary =
+        crate::test_helpers::summary_for(&ServiceStream::new("ns", "svc"), 3, min_s, min_s + 2);
     reg.sfst.track(id, size, summary);
 }
 
@@ -223,12 +207,8 @@ fn write_same_ts_sfst(path: &std::path::Path, ts_s: u32, n: usize) {
         vec![("severity_text=info", bitmap_with(&positions, n as u32))];
     let primary: FstIndex<BitmapValue> = FstIndex::build(primary_entries).unwrap();
 
-    let summary = sfst::Summary {
-        min_timestamp_s: ts_s,
-        max_timestamp_s: ts_s,
-        total_logs: n as u32,
-        stream: ServiceStream::new("ns", "svc"),
-    };
+    let summary =
+        crate::test_helpers::summary_for(&ServiceStream::new("ns", "svc"), n as u32, ts_s, ts_s);
     let metadata = sfst::Metadata {
         histogram: sfst::Histogram {
             timestamps: vec![ts_s],
@@ -272,12 +252,8 @@ fn install_same_ts_sfst(tr: &mut TenantRegistries, tenant: &str, seq: u64, ts_s:
     let path = reg.sfst.file_path(id);
     write_same_ts_sfst(&path, ts_s, n);
     let size = ByteSize(std::fs::metadata(&path).unwrap().len());
-    let summary = sfst::Summary {
-        min_timestamp_s: ts_s,
-        max_timestamp_s: ts_s,
-        total_logs: n as u32,
-        stream: ServiceStream::new("ns", "svc"),
-    };
+    let summary =
+        crate::test_helpers::summary_for(&ServiceStream::new("ns", "svc"), n as u32, ts_s, ts_s);
     reg.sfst.track(id, size, summary);
 }
 
@@ -382,6 +358,7 @@ async fn files_request_includes_wal_and_catalog_entries() {
     let machine = Uuid::from_u128(0xa1);
     let boot = Uuid::from_u128(0xb2);
     let stream = ServiceStream::new("walns", "walsvc");
+    let (wal_part_key, wal_content_meta) = crate::test_helpers::identity_for(&stream);
     {
         let reg = tr.get_or_create(&TenantId::from("default"));
         // An active WAL: Created, then Synced sets entry_count + time range.
@@ -390,7 +367,8 @@ async fn files_request_includes_wal_and_catalog_entries() {
             .apply_event(&wal::FileEvent::Created {
                 file_id: active,
                 created_at_ns: TimestampNs(1_000),
-                stream: stream.clone(),
+                part_key: wal_part_key,
+                content_meta: wal_content_meta.clone(),
             })
             .unwrap();
         reg.wal
@@ -409,7 +387,8 @@ async fn files_request_includes_wal_and_catalog_entries() {
             .apply_event(&wal::FileEvent::Created {
                 file_id: archived,
                 created_at_ns: TimestampNs(2_000),
-                stream: stream.clone(),
+                part_key: wal_part_key,
+                content_meta: wal_content_meta.clone(),
             })
             .unwrap();
         reg.wal
@@ -1065,8 +1044,9 @@ fn track_remote_catalog(
         remote_key: remote_key.to_string(),
         min_timestamp_s: min_s,
         max_timestamp_s: max_s,
-        total_logs: 6,
-        stream: stream.clone(),
+        record_count: 6,
+        part_key: stream.ns_hash(),
+        content_meta: otel_logs_identity::encode_content_meta(&stream).unwrap(),
         size: ByteSize(size),
         uploaded_at_ns: TimestampNs(0),
         remote_etag: None,

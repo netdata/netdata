@@ -16,13 +16,16 @@ fn date() -> NaiveDate {
 }
 
 fn entry_for(seq: u64) -> CatalogEntry {
+    let stream = ServiceStream::new("prod", "api");
+    let part_key = stream.ns_hash();
     CatalogEntry {
-        id: FileId::new(machine(), boot(), seq, 0),
+        id: FileId::new(machine(), boot(), seq, part_key),
         remote_key: format!("tenant1/sfst/2026-04-17/{seq}.sfst"),
         min_timestamp_s: 1_700_000_000,
         max_timestamp_s: 1_700_003_600,
-        total_logs: 100,
-        stream: ServiceStream::new("prod", "api"),
+        record_count: 100,
+        part_key,
+        content_meta: otel_logs_identity::encode_content_meta(&stream).unwrap(),
         size: ByteSize(1024),
         uploaded_at_ns: file_registry::TimestampNs(2_000_000_000),
         remote_etag: None,

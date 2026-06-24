@@ -110,7 +110,7 @@ pub fn index_with_options(
 /// frame-boundary and durable-prefix soundness checks.
 ///
 /// The returned bytes parse with [`sfst::IndexReader::open`]. The caller
-/// cross-checks `summary.total_logs` against the expected record count for
+/// cross-checks `summary.record_count` against the expected record count for
 /// the range (the registry's `entry_count`) to confirm the prefix wasn't
 /// truncated — the count check that [`wal::Reader::open_range`] defers.
 pub fn index_range(

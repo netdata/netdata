@@ -6,49 +6,25 @@
 //! [`crate::Reader`]. The container layout and chunk encoding are
 //! specified in `FORMAT.md`.
 
-use file_registry::ServiceStream;
 use serde::{Deserialize, Serialize};
 use treight::Bitmap;
 
 // ── SUMR ─────────────────────────────────────────────────────────
 
-/// The cheap facts a registry needs to pick this SFST as a query
-/// candidate — its time span, its stream, and its size — without
-/// opening the file's heavy metadata.
+/// The cheap, content-agnostic per-file summary stored in the `SUMR` chunk —
+/// time span, record count, opaque partition key, and opaque content metadata —
+/// read by a registry to pick this SFST as a query candidate without opening
+/// the heavy `META` chunk.
 ///
-/// A query keeps this file as a candidate when its
-/// `[min_timestamp_s, max_timestamp_s]` span overlaps the request
-/// window and its [`stream`](Self::stream) matches; both checks read
-/// only these four fields. See [`Registry::candidates`](crate::Registry::candidates).
-///
-/// Stored as its own `SUMR` chunk, kept separate from the heavier
-/// `META` chunk ([`Metadata`]: histogram + id ranges + field table), so
-/// a registry can rebuild itself on startup by faulting in only the
-/// header, TOC, and SUMR — never decompressing META.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Summary {
-    /// Second of the earliest log in the file — seconds since the Unix
-    /// epoch, **inclusive**. First bucket of the sparse [`Histogram`];
-    /// `0` for an empty file.
-    pub min_timestamp_s: u32,
-    /// Second of the latest log in the file — seconds since the Unix
-    /// epoch, **inclusive**; also the file's age for retention. `0` for
-    /// an empty file.
-    ///
-    /// Granularity matters: these bounds drive *which files* a query
-    /// opens at second resolution, whereas rows are ordered within a
-    /// page by nanosecond timestamp — the two are not the same clock.
-    pub max_timestamp_s: u32,
-    /// Number of log records in the file. `0` marks an empty SFST (which
-    /// also has `min == max == 0` and ages out immediately) and sets the
-    /// file's stream-batch geometry (see
-    /// [`stream_batch_size`](crate::stream_batch_size)).
-    pub total_logs: u32,
-    /// The single `(namespace, name)` [`stream`](ServiceStream) this
-    /// file holds. A query's stream filter is exact equality — each SFST
-    /// contains exactly one stream by construction.
-    pub stream: ServiceStream,
-}
+/// This is the substrate's [`file_registry::FileSummary`]; the SFST stores it
+/// verbatim and never interprets `part_key`/`content_meta`. A query keeps the
+/// file as a candidate when its `[min_timestamp_s, max_timestamp_s]` span
+/// overlaps the request window and its `part_key` matches; the file's
+/// stream-batch geometry comes from `record_count` (see
+/// [`stream_batch_size`](crate::stream_batch_size)). Kept in its own `SUMR`
+/// chunk so a registry rebuilds on startup by faulting in only the header, TOC,
+/// and SUMR — never decompressing `META`.
+pub use file_registry::FileSummary as Summary;
 
 // ── META ─────────────────────────────────────────────────────────
 

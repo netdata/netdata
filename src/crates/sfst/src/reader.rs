@@ -226,7 +226,7 @@ impl<'a> Reader<'a> {
 
     /// Decompress and deserialize one stream-batch chunk by index.
     ///
-    /// `index` must be in `0..num_stream_batches(summary.total_logs)`
+    /// `index` must be in `0..num_stream_batches(summary.record_count)`
     /// (see [`crate::num_stream_batches`]). The returned [`StreamBatch`]
     /// holds the attribute lists for the logs in that batch, in
     /// chronological order; concatenating all batches in order yields the
@@ -250,12 +250,12 @@ impl<'a> Reader<'a> {
     }
 
     /// Number of stream-batch chunks in this file, derived from
-    /// `summary.total_logs` via [`crate::num_stream_batches`].
+    /// `summary.record_count` via [`crate::num_stream_batches`].
     ///
     /// Reads the `SUMR` chunk; callers that already hold a [`Summary`]
     /// should call [`crate::num_stream_batches`] directly.
     pub fn num_stream_batches(&self) -> Result<u8, Error> {
-        Ok(num_stream_batches(self.summary()?.total_logs))
+        Ok(num_stream_batches(self.summary()?.record_count))
     }
 
     /// Resolve a chunk's payload through the shared container — the

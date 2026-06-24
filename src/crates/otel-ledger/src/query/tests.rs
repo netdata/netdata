@@ -26,14 +26,17 @@ fn make_registry() -> Registry {
 
 /// Track a WAL file via the event flow with the given range and
 /// `Archived` status (post-Closed).
-fn track_wal(reg: &mut Registry, seq: u64, part_key: u64, min_s: u32, max_s: u32) {
+fn track_wal(reg: &mut Registry, seq: u64, min_s: u32, max_s: u32) {
     const NS: u64 = 1_000_000_000;
+    let stream = ServiceStream::new("ns", "svc");
+    let (part_key, content_meta) = crate::test_helpers::identity_for(&stream);
     let id = fid(seq, part_key);
     reg.wal
         .apply_event(&FileEvent::Created {
             file_id: id,
             created_at_ns: TimestampNs(0),
-            stream: file_registry::ServiceStream::new("ns", "svc"),
+            part_key,
+            content_meta,
         })
         .unwrap();
     reg.wal
@@ -48,17 +51,13 @@ fn track_wal(reg: &mut Registry, seq: u64, part_key: u64, min_s: u32, max_s: u32
 }
 
 /// Track an SFST file with the given range and stream.
-fn track_sfst(reg: &mut Registry, seq: u64, part_key: u64, min_s: u32, max_s: u32) {
-    let id = fid(seq, part_key);
+fn track_sfst(reg: &mut Registry, seq: u64, min_s: u32, max_s: u32) {
+    let stream = ServiceStream::new("ns", "a");
+    let id = fid(seq, stream.ns_hash());
     reg.sfst.track(
         id,
         ByteSize(1),
-        sfst::Summary {
-            min_timestamp_s: min_s,
-            max_timestamp_s: max_s,
-            total_logs: 1,
-            stream: ServiceStream::new("ns", "a"),
-        },
+        crate::test_helpers::summary_for(&stream, 1, min_s, max_s),
     );
 }
 
@@ -75,13 +74,15 @@ fn track_remote(reg: &mut Registry, seq: u64, min_s: u32, max_s: u32) {
 fn track_remote_as(reg: &mut Registry, seq: u64, stream: ServiceStream, min_s: u32, max_s: u32) {
     use chrono::NaiveDate;
     let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
+    let (part_key, content_meta) = crate::test_helpers::identity_for(&stream);
     let entry = otel_catalog::CatalogEntry {
-        id: fid(seq, stream.ns_hash()),
+        id: fid(seq, part_key),
         remote_key: format!("k{seq}"),
         min_timestamp_s: min_s,
         max_timestamp_s: max_s,
-        total_logs: 1,
-        stream: stream.clone(),
+        record_count: 1,
+        part_key,
+        content_meta,
         size: ByteSize(1),
         uploaded_at_ns: TimestampNs(0),
         remote_etag: None,
@@ -129,7 +130,7 @@ fn remote_candidates_returns_catalog_only_entries() {
 fn remote_candidates_excludes_locally_present_seqs() {
     let mut reg = make_registry();
     // seq 1 has a local SFST → masked; seq 3 is catalog-only → remains.
-    track_sfst(&mut reg, 1, 7, 100, 200);
+    track_sfst(&mut reg, 1, 100, 200);
     track_remote(&mut reg, 1, 100, 200);
     track_remote(&mut reg, 3, 500, 600);
 
@@ -143,7 +144,7 @@ fn remote_candidates_kept_when_wal_has_no_durable_prefix() {
     // NOT mask the remote entry for the same seq. (Regression guard for the dedup
     // divergence between `remote_candidates` and `query_snapshot`.)
     let mut reg = make_registry();
-    track_wal(&mut reg, 2, 7, 300, 400);
+    track_wal(&mut reg, 2, 300, 400);
     track_remote(&mut reg, 2, 300, 400);
 
     assert_eq!(seqs(&reg.remote_candidates(&full_range_query())), vec![2]);
@@ -152,7 +153,7 @@ fn remote_candidates_kept_when_wal_has_no_durable_prefix() {
 #[test]
 fn remote_candidates_empty_when_all_local() {
     let mut reg = make_registry();
-    track_sfst(&mut reg, 1, 7, 100, 200);
+    track_sfst(&mut reg, 1, 100, 200);
     track_remote(&mut reg, 1, 100, 200);
 
     assert!(reg.remote_candidates(&full_range_query()).is_empty());
@@ -195,7 +196,7 @@ fn window(after: u32, before: u32) -> Query {
 #[test]
 fn enumerate_streams_excludes_streams_outside_window() {
     let mut reg = make_registry();
-    track_sfst(&mut reg, 1, 7, 100, 200);
+    track_sfst(&mut reg, 1, 100, 200);
     // Window misses the only file → the stream is not listed (window-scoped).
     assert!(enumerate(&reg, &window(500, 600)).is_empty());
     // Window overlaps it → the stream appears.
@@ -216,7 +217,7 @@ fn enumerate_streams_includes_remote_only_stream() {
 #[test]
 fn enumerate_streams_lists_local_and_remote_only_together() {
     let mut reg = make_registry();
-    track_sfst(&mut reg, 1, 7, 100, 200); // local stream ns/a
+    track_sfst(&mut reg, 1, 100, 200); // local stream ns/a
     track_remote_as(&mut reg, 2, ServiceStream::new("ns", "b"), 100, 200); // remote-only ns/b
     let streams = enumerate(&reg, &window(50, 250));
     assert_eq!(streams.len(), 2);
@@ -229,7 +230,7 @@ fn enumerate_streams_lists_local_and_remote_only_together() {
 fn enumerate_streams_dedups_local_and_remote_same_seq() {
     let mut reg = make_registry();
     // Uploaded-but-not-yet-evicted: same seq exists locally AND in the catalog.
-    track_sfst(&mut reg, 1, 7, 100, 200);
+    track_sfst(&mut reg, 1, 100, 200);
     track_remote(&mut reg, 1, 100, 200);
     let streams = enumerate(&reg, &window(50, 250));
     assert_eq!(streams.len(), 1);
@@ -246,7 +247,7 @@ fn enumerate_streams_dedups_wal_and_remote_same_seq() {
     // folded seqs, not the servable mask. (Robustness guard; the catalog-write
     // lifecycle makes this WAL/catalog pairing unreachable in production. On the
     // old servable-mask dedup this would double-count to file_count == 2.)
-    track_wal(&mut reg, 2, 7, 100, 200);
+    track_wal(&mut reg, 2, 100, 200);
     track_remote_as(&mut reg, 2, ServiceStream::new("ns", "svc"), 100, 200);
     let streams = enumerate(&reg, &window(50, 250));
     assert_eq!(streams.len(), 1);

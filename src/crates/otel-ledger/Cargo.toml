@@ -12,6 +12,7 @@ name = "otel_ledger"
 path = "src/lib.rs"
 
 [dependencies]
+otel-logs-identity = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 bridge = { path = "../netdata-plugin/bridge" }

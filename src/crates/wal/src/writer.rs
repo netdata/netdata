@@ -11,7 +11,7 @@ use uuid::Uuid;
 use crate::Result;
 use crate::config::Config;
 use crate::seq::SeqAllocator;
-use file_registry::{ByteSize, FileId, ServiceStream, TimestampNs};
+use file_registry::{ByteSize, FileId, TimestampNs};
 
 use crate::format::{
     COMPRESSION_NONE, FLAG_CRC_ENABLED, FORMAT_VERSION, FRAME_ALIGNMENT, FRAME_HEADER_SIZE,
@@ -44,7 +44,7 @@ impl SeqCounter {
     }
 }
 
-/// A single WAL output stream for one service (identified by `ns_hash`).
+/// A single WAL output stream for one partition (identified by `part_key`).
 ///
 /// Handles frame writing, compression, rotation, and lifecycle event
 /// emission. The stream does not own a clock — every per-frame
@@ -58,11 +58,12 @@ struct Stream {
     config: Config,
     active: Option<ActiveFile>,
     seq: SeqCounter,
-    /// The stream this writer serves. `ns_hash` is its cached
-    /// [`ServiceStream::ns_hash`] (the file-naming/partition key); `stream`
-    /// is the textual pair recorded in each file's header.
-    ns_hash: u64,
-    stream: ServiceStream,
+    /// Opaque partition key for this stream's files — the file-naming/partition
+    /// key. The WAL does not interpret it (the content plane derives it).
+    part_key: u64,
+    /// Opaque content-plane identity blob recorded in each file's header so the
+    /// file's identity is available cheaply without decoding frames.
+    content_meta: Vec<u8>,
     pending_events: Vec<FileEvent>,
 }
 
@@ -73,7 +74,8 @@ impl Stream {
         boot_id: Uuid,
         config: Config,
         seq: SeqCounter,
-        stream: ServiceStream,
+        part_key: u64,
+        content_meta: Vec<u8>,
     ) -> Self {
         Self {
             dir,
@@ -82,15 +84,15 @@ impl Stream {
             config,
             active: None,
             seq,
-            ns_hash: stream.ns_hash(),
-            stream,
+            part_key,
+            content_meta,
             pending_events: Vec::new(),
         }
     }
 
-    /// Create a [`FileId`] stamped with this stream's identity.
+    /// Create a [`FileId`] stamped with this stream's partition key.
     fn file_id(&self, seq: u64) -> FileId {
-        FileId::new(self.machine_id, self.boot_id, seq, self.ns_hash)
+        FileId::new(self.machine_id, self.boot_id, seq, self.part_key)
     }
 
     fn write_frame(
@@ -237,7 +239,8 @@ impl Stream {
             version: FORMAT_VERSION,
             flags,
             created_at: created_at_ns.0,
-            stream: self.stream.clone(),
+            part_key: self.part_key,
+            content_meta: self.content_meta.clone(),
         };
         writer.write_all(&header.to_bytes())?;
         writer.flush()?;
@@ -247,7 +250,8 @@ impl Stream {
         self.pending_events.push(FileEvent::Created {
             file_id,
             created_at_ns,
-            stream: self.stream.clone(),
+            part_key: self.part_key,
+            content_meta: self.content_meta.clone(),
         });
 
         self.active = Some(ActiveFile {
@@ -317,7 +321,7 @@ impl Config {
 // Writer
 // ---------------------------------------------------------------------------
 
-/// Manages multiple WAL output streams (one per `ns_hash`), with a shared
+/// Manages multiple WAL output streams (one per `part_key`), with a shared
 /// monotonic sequence counter so that file sequence numbers are globally
 /// unique within the WAL directory.
 pub struct Writer {
@@ -350,11 +354,13 @@ impl Writer {
         })
     }
 
-    /// Write a frame to the writer for the given `stream`.
+    /// Write a frame to the writer for the given partition.
     ///
-    /// Lazily creates a new per-stream writer (keyed by the stream's
-    /// `ns_hash`) if one doesn't exist yet; the stream's `(namespace, name)`
-    /// is recorded in each file's header.
+    /// Lazily creates a new per-partition writer (keyed by `part_key`) if one
+    /// doesn't exist yet; the opaque `content_meta` identity blob is recorded
+    /// in each file's header. A `content_meta` larger than
+    /// [`MAX_CONTENT_META_BYTES`](crate::format::MAX_CONTENT_META_BYTES) is
+    /// rejected (the caller drops the record) rather than truncated.
     ///
     /// `ingestion_ns` is the caller's monotonic timestamp for this frame
     /// — stamped into the frame header on disk and used by the indexer
@@ -369,16 +375,25 @@ impl Writer {
     /// the ingestor's `compute_log_ts_range`). Pass `TimestampNs::ZERO`
     /// for both when no log row in the frame had a usable timestamp —
     /// the writer's per-file accumulator is then left unchanged.
+    #[allow(clippy::too_many_arguments)]
     pub fn write_frame(
         &mut self,
-        stream: &ServiceStream,
+        part_key: u64,
+        content_meta: &[u8],
         data: &[u8],
         log_entry_count: usize,
         ingestion_ns: TimestampNs,
         log_min_ts_ns: TimestampNs,
         log_max_ts_ns: TimestampNs,
     ) -> Result<u64> {
-        self.get_or_create(stream).write_frame(
+        if content_meta.len() > crate::format::MAX_CONTENT_META_BYTES {
+            return Err(crate::Error::InvalidHeader(format!(
+                "content_meta length {} exceeds {}",
+                content_meta.len(),
+                crate::format::MAX_CONTENT_META_BYTES
+            )));
+        }
+        self.get_or_create(part_key, content_meta).write_frame(
             data,
             log_entry_count,
             ingestion_ns,
@@ -387,16 +402,19 @@ impl Writer {
         )
     }
 
-    /// Get or lazily create the writer for `stream` (keyed by its `ns_hash`).
-    fn get_or_create(&mut self, stream: &ServiceStream) -> &mut Stream {
-        self.streams.entry(stream.ns_hash()).or_insert_with(|| {
+    /// Get or lazily create the writer for `part_key`. On first use the stream
+    /// records `content_meta` in each file's header; later frames for the same
+    /// key reuse the already-recorded blob.
+    fn get_or_create(&mut self, part_key: u64, content_meta: &[u8]) -> &mut Stream {
+        self.streams.entry(part_key).or_insert_with(|| {
             Stream::new(
                 Arc::clone(&self.dir),
                 self.machine_id,
                 self.boot_id,
                 self.config.clone(),
                 SeqCounter(Arc::clone(&self.seq)),
-                stream.clone(),
+                part_key,
+                content_meta.to_vec(),
             )
         })
     }
@@ -432,6 +450,7 @@ impl Writer {
 mod tests {
     use super::*;
     use crate::Config;
+    use file_registry::ServiceStream;
 
     fn test_writer(tmp: &std::path::Path) -> Writer {
         let seq = Arc::new(SeqAllocator::ephemeral(0));
@@ -452,13 +471,13 @@ mod tests {
         let data = b"test payload";
 
         writer
-            .write_frame(&s(1), data, 1, TimestampNs(1), TimestampNs::ZERO, TimestampNs::ZERO)
+            .write_frame(s(1).ns_hash(), &[], data, 1, TimestampNs(1), TimestampNs::ZERO, TimestampNs::ZERO)
             .unwrap();
         writer
-            .write_frame(&s(2), data, 1, TimestampNs(2), TimestampNs::ZERO, TimestampNs::ZERO)
+            .write_frame(s(2).ns_hash(), &[], data, 1, TimestampNs(2), TimestampNs::ZERO, TimestampNs::ZERO)
             .unwrap();
         writer
-            .write_frame(&s(1), data, 1, TimestampNs(3), TimestampNs::ZERO, TimestampNs::ZERO)
+            .write_frame(s(1).ns_hash(), &[], data, 1, TimestampNs(3), TimestampNs::ZERO, TimestampNs::ZERO)
             .unwrap();
 
         writer.sync_all().unwrap();
@@ -490,13 +509,13 @@ mod tests {
 
         // Three frames with growing & overlapping ranges.
         writer
-            .write_frame(&s(1), data, 1, TimestampNs(1), TimestampNs(200), TimestampNs(300))
+            .write_frame(s(1).ns_hash(), &[], data, 1, TimestampNs(1), TimestampNs(200), TimestampNs(300))
             .unwrap();
         writer
-            .write_frame(&s(1), data, 1, TimestampNs(2), TimestampNs(150), TimestampNs(250))
+            .write_frame(s(1).ns_hash(), &[], data, 1, TimestampNs(2), TimestampNs(150), TimestampNs(250))
             .unwrap();
         writer
-            .write_frame(&s(1), data, 1, TimestampNs(3), TimestampNs(180), TimestampNs(400))
+            .write_frame(s(1).ns_hash(), &[], data, 1, TimestampNs(3), TimestampNs(180), TimestampNs(400))
             .unwrap();
 
         writer.sync_all().unwrap();
@@ -537,14 +556,14 @@ mod tests {
         let data = b"x";
 
         writer
-            .write_frame(&s(1), data, 1, TimestampNs(1), TimestampNs(500), TimestampNs(600))
+            .write_frame(s(1).ns_hash(), &[], data, 1, TimestampNs(1), TimestampNs(500), TimestampNs(600))
             .unwrap();
         // Frame whose logs all lacked time/observed timestamps — must
         // not regress the accumulator. (In production the ingestor would
         // synthesize a fallback range; this test exercises the defense-
         // in-depth ZERO/ZERO skip.)
         writer
-            .write_frame(&s(1), data, 1, TimestampNs(2), TimestampNs::ZERO, TimestampNs::ZERO)
+            .write_frame(s(1).ns_hash(), &[], data, 1, TimestampNs(2), TimestampNs::ZERO, TimestampNs::ZERO)
             .unwrap();
 
         writer.sync_all().unwrap();
@@ -570,10 +589,10 @@ mod tests {
 
         let data = b"test payload";
         writer
-            .write_frame(&s(10), data, 1, TimestampNs(1), TimestampNs::ZERO, TimestampNs::ZERO)
+            .write_frame(s(10).ns_hash(), &[], data, 1, TimestampNs(1), TimestampNs::ZERO, TimestampNs::ZERO)
             .unwrap();
         writer
-            .write_frame(&s(20), data, 1, TimestampNs(2), TimestampNs::ZERO, TimestampNs::ZERO)
+            .write_frame(s(20).ns_hash(), &[], data, 1, TimestampNs(2), TimestampNs::ZERO, TimestampNs::ZERO)
             .unwrap();
 
         writer.sync_all().unwrap();
