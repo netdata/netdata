@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"maps"
 	"strings"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
@@ -135,9 +136,7 @@ func applyLocalActorLabels(actor *topologymodel.Actor, local topologymodel.Devic
 	if actor.Labels == nil {
 		actor.Labels = make(map[string]string)
 	}
-	for key, value := range cloneTopologyLabels(local.Labels) {
-		actor.Labels[key] = value
-	}
+	maps.Copy(actor.Labels, cloneTopologyLabels(local.Labels))
 }
 
 func enrichLocalActorChartReferences(actor *topologymodel.Actor, interfaceCharts map[string]topologymodel.InterfaceChartRef) {
