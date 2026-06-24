@@ -200,6 +200,13 @@ def build_readme_from_integration(integration, categories, mode: str = ""):
             learn_rel_path = generate_category_from_name(
                 integration["meta"]["monitored_instance"]["categories"][0].split("."), categories
             ).replace("Data Collection", "Collecting Metrics/Collectors")
+            # NPM collectors (SNMP, PAN-OS, Cato, SNMP traps) re-tagged into the
+            # Network Performance Monitoring chapters nest under the chapter's
+            # "Integrations" sub-node, alongside the per-vendor catalog tiles, so
+            # they don't sit among the hand-authored chapter pages. Non-NPM
+            # collectors (Collecting Metrics/...) are unaffected.
+            if learn_rel_path.startswith("Network Performance Monitoring/"):
+                learn_rel_path += "/Integrations"
             keywords = integration["meta"]["keywords"] if "keywords" in integration["meta"] else None
 
             md = f"""<!--startmeta
@@ -266,9 +273,13 @@ endmeta-->
         elif mode == "device":
             meta_yaml = integration["edit_link"].replace("blob", "edit")
             sidebar_label = integration["meta"]["monitored_instance"]["name"]
+            # NPM catalog tiles (per-vendor / per-profile) nest under an
+            # "Integrations" sub-node of their chapter so the hundreds of vendor
+            # pages do not flood the chapter sidebars. Sidebar placement only —
+            # the category (website integrations browser) is unchanged.
             learn_rel_path = generate_category_from_name(
                 integration["meta"]["monitored_instance"]["categories"][0].split("."), categories
-            )
+            ) + "/Integrations"
             keywords = integration["meta"]["keywords"] if "keywords" in integration["meta"] else None
 
             md = f"""<!--startmeta

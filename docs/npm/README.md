@@ -10,43 +10,32 @@ endmeta-->
 
 # Network Performance Monitoring
 
-You run a network — devices spread across sites, the traffic moving between them, and the events and logs they emit. Netdata gives you **one way to see all of it**, without building a monitoring system to do it.
+Network Performance Monitoring (NPM) in Netdata covers your network devices and the traffic between them — metrics, topology, flows, events, and logs — collected by the Netdata Agent and visualized per second in Netdata dashboards and Netdata Cloud.
 
-This section is for the network and SRE teams who keep the fabric running: you want to find the saturated link, the unhealthy device, the flapping peer, the expiring license — across your whole network, in one place.
+## What you can monitor
 
-## One Agent per site, and it does the rest
+- **Device metrics (SNMP)** — poll routers, switches, firewalls, access points, UPSs, and PDUs. Netdata matches each device to a vendor profile by its `sysObjectID` and collects interfaces (traffic, errors, discards, operational state), system and host resources, and vendor-specific hardware, environmental, and protocol metrics. Every metric is a chart you can alert on, with interactive per-interface and per-device tables.
 
-Put a Netdata Agent at each site and point it at your network. It becomes the **hub** for that part of the network:
+- **Topology** — see how your network connects. Netdata builds Layer 2 maps (LLDP, CDP, MAC/FDB, STP) and Layer 3 maps (BGP, OSPF, ARP), plus live host connections, the Netdata streaming hierarchy, and virtual infrastructure (VMware vSphere, Cato).
 
-- it **discovers your devices** and monitors them — interfaces, health, errors;
-- it **maps how they connect** — the Layer 2 and Layer 3 topology;
-- it **catches the events and logs** they send — traps and syslog.
+- **BGP monitoring** — peer state, advertised and received prefixes, and session health on your routers, with an interactive peer table and alerts on session changes.
 
-These come up **together, automatically, already correlated**: a trap arrives knowing which device sent it and where it sits in the topology. There are no correlation rules to write. Add **network flows** and you also see who is talking to whom, how much, and where.
+- **Licensing** — license state, entitlements, and expiry on devices that report them (Cisco Smart Licensing, Fortinet, Check Point, and others), so a feature never silently stops.
 
-## Scale by adding Agents — the view stays the same
+- **Network flows** — collect NetFlow, sFlow, and IPFIX. See who is talking to whom, how much, and over which ports and protocols, enriched with geolocation, ASN, and IPAM data, in Sankey, time-series, and map views.
 
-Grow the way your network is shaped: a **bigger Agent** for more devices, or **more Agents**, each owning a site, a building, or a subnet. Keep a slice's SNMP, traps, and topology on the same Agent and the correlation stays automatic; flows can run wherever you like.
+- **SNMP traps** — receive and decode the events your devices report (thousands of trap definitions across hundreds of vendors) into structured, searchable journal entries with severity and category, queryable in Netdata Logs and forwardable to your SIEM.
 
-However you split it, **Netdata Cloud gives you one unified view** — dashboards and a single topology of the whole network. There's no central server to size or babysit: you add a site by adding an Agent.
+- **Syslog from network devices** — ingest device syslog through the OpenTelemetry Collector into Netdata Logs.
 
-## What's in this section
+## Supported devices
 
-- **[Device Metrics](/docs/npm/device-metrics/README.md)** — discover and monitor your devices over SNMP: interfaces, health, errors, and more.
-- **[Topologies](/docs/npm/topology/README.md)** — see how your network is connected: device topology, live connections, and virtual infrastructure.
-- **[BGP Monitoring](/docs/npm/bgp/README.md)** — peer state, prefixes, and session health on your routers.
-- **[Licensing Monitoring](/docs/npm/licensing/README.md)** — track license state and expiry before a feature silently stops.
-- **[Network Flows](/docs/npm/network-flows/README.md)** — who is talking to whom, how much, over what, and to where (NetFlow / IPFIX / sFlow).
-- **[SNMP Traps](/docs/npm/snmp-traps/README.md)** — the asynchronous events your devices report.
-- **[Syslog from Network Devices](/docs/npm/syslog/README.md)** — device logs, ingested through the OpenTelemetry Collector.
+Netdata ships profiles for hundreds of device and trap vendors. Each capability lists exactly what it covers under its **Integrations** submenu: if your device is there, Netdata collects it out of the box; if it isn't, you can add a custom profile. Start from [Device Metrics](/docs/npm/device-metrics/README.md) to check coverage and add devices.
 
 ## Where to start
 
-- **Monitor your devices** — [Device Metrics](/docs/npm/device-metrics/README.md).
-- **See how they connect** — [Topologies](/docs/npm/topology/README.md).
-- **Catch their events** — [SNMP Traps](/docs/npm/snmp-traps/README.md).
-- **Analyze their traffic** — [Network Flows](/docs/npm/network-flows/README.md).
-- **Read their logs** — [Syslog from Network Devices](/docs/npm/syslog/README.md).
-- **Watch routing and licensing** — [BGP Monitoring](/docs/npm/bgp/README.md) and [Licensing Monitoring](/docs/npm/licensing/README.md).
-
-Each one runs on the same hub. Start with whichever question is in front of you.
+- **Monitor your devices** → [Device Metrics](/docs/npm/device-metrics/README.md)
+- **See how they connect** → [Topologies](/docs/npm/topology/README.md)
+- **Watch routing and licensing** → [BGP Monitoring](/docs/npm/bgp/README.md) and [Licensing Monitoring](/docs/npm/licensing/README.md)
+- **Analyze their traffic** → [Network Flows](/docs/npm/network-flows/README.md)
+- **Catch their events and logs** → [SNMP Traps](/docs/npm/snmp-traps/README.md) and [Syslog from Network Devices](/docs/npm/syslog/README.md)
