@@ -159,7 +159,7 @@ struct Envelope {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entry::ServiceStream;
+    use crate::entry::opaque_part_key;
     use file_registry::{ByteSize, TimestampNs};
 
     fn test_catalog() -> Catalog {
@@ -171,14 +171,15 @@ mod tests {
         )
     }
 
-    fn entry_at(seq: u64, min_s: u32, max_s: u32, stream: ServiceStream) -> CatalogEntry {
+    fn entry_at(seq: u64, min_s: u32, max_s: u32, ns: &str, name: &str) -> CatalogEntry {
+        let part_key = opaque_part_key(ns, name);
         CatalogEntry {
-            id: FileId::new(Uuid::nil(), Uuid::from_u128(1), seq, stream.ns_hash()),
+            id: FileId::new(Uuid::nil(), Uuid::from_u128(1), seq, part_key),
             remote_key: format!("tenant1/sfst/2026-04-17/{seq}.sfst"),
             min_timestamp_s: min_s,
             max_timestamp_s: max_s,
             record_count: 10,
-            part_key: stream.ns_hash(),
+            part_key,
             content_meta: Vec::new(),
             size: ByteSize(1024),
             uploaded_at_ns: TimestampNs(2_000_000_000),
@@ -195,7 +196,7 @@ mod tests {
     #[test]
     fn add_then_remove_returns_to_empty() {
         let mut c = test_catalog();
-        let e = entry_at(1, 100, 200, ServiceStream::new("", ""));
+        let e = entry_at(1, 100, 200, "", "");
         c.add(e.clone());
         assert_eq!(c.entries.len(), 1);
 
@@ -207,8 +208,8 @@ mod tests {
     #[test]
     fn roundtrip_container_preserves_entries_and_metadata() {
         let mut c = test_catalog();
-        c.add(entry_at(1, 100, 200, ServiceStream::new("prod", "api")));
-        c.add(entry_at(2, 300, 500, ServiceStream::new("", "")));
+        c.add(entry_at(1, 100, 200, "prod", "api"));
+        c.add(entry_at(2, 300, 500, "", ""));
 
         let bytes = c.to_container_bytes().unwrap();
         assert_eq!(&bytes[0..4], &CONTAINER_MAGIC, "container leads with NCAT");
@@ -219,7 +220,7 @@ mod tests {
     #[test]
     fn from_container_bytes_rejects_corruption_and_foreign_bytes() {
         let mut c = test_catalog();
-        c.add(entry_at(1, 100, 200, ServiceStream::new("prod", "api")));
+        c.add(entry_at(1, 100, 200, "prod", "api"));
         let clean = c.to_container_bytes().unwrap();
 
         // Any flipped payload byte fails the JSON chunk's crc32.
@@ -251,9 +252,9 @@ mod tests {
     #[test]
     fn find_range_overlap_semantics() {
         let mut c = test_catalog();
-        c.add(entry_at(1, 100, 200, ServiceStream::new("", "")));
-        c.add(entry_at(2, 300, 400, ServiceStream::new("", "")));
-        c.add(entry_at(3, 150, 350, ServiceStream::new("", "")));
+        c.add(entry_at(1, 100, 200, "", ""));
+        c.add(entry_at(2, 300, 400, "", ""));
+        c.add(entry_at(3, 150, 350, "", ""));
 
         // Window [50, 250) — file 1's max=200 is in range, file 3's
         // min=150 is in range, file 2's min=300 is past the upper bound.
@@ -292,32 +293,32 @@ mod tests {
     }
 
     #[test]
-    fn find_with_stream_filter_matches_by_ns_hash() {
+    fn find_with_part_key_filter_matches_only_that_partition() {
         let mut c = test_catalog();
-        // Two entries on the "api" stream, one on "worker".
-        c.add(entry_at(1, 100, 200, ServiceStream::new("prod", "api")));
-        c.add(entry_at(2, 100, 200, ServiceStream::new("prod", "worker")));
-        c.add(entry_at(3, 100, 200, ServiceStream::new("prod", "api")));
+        // Two entries on one partition, one on another.
+        c.add(entry_at(1, 100, 200, "prod", "api"));
+        c.add(entry_at(2, 100, 200, "prod", "worker"));
+        c.add(entry_at(3, 100, 200, "prod", "api"));
 
         let q = Query {
             time_range: 0..1000,
-            partition_keys: vec![ServiceStream::new("prod", "api").ns_hash()],
+            partition_keys: vec![opaque_part_key("prod", "api")],
         };
         let hits: Vec<u64> = c.find(&q).map(|e| e.id.seq).collect();
         assert_eq!(hits, vec![1, 3]);
     }
 
     #[test]
-    fn find_empty_stream_matches_only_the_empty_entry_by_hash() {
+    fn find_with_part_key_filter_excludes_non_matching_entries() {
         let mut c = test_catalog();
-        c.add(entry_at(1, 100, 200, ServiceStream::new("", "")));
-        c.add(entry_at(2, 100, 200, ServiceStream::new("prod", "api")));
+        c.add(entry_at(1, 100, 200, "", ""));
+        c.add(entry_at(2, 100, 200, "prod", "api"));
 
-        // The all-empty stream hashes to the `0` no-attribution sentinel;
-        // only the empty entry shares it, so prod/api is excluded.
+        // The catalog compares `part_key` as an opaque u64: only the entry
+        // whose key equals the query's is kept (entry 2 has a different key).
         let q = Query {
             time_range: 0..1000,
-            partition_keys: vec![ServiceStream::new("", "").ns_hash()],
+            partition_keys: vec![opaque_part_key("", "")],
         };
         let hits: Vec<u64> = c.find(&q).map(|e| e.id.seq).collect();
         assert_eq!(hits, vec![1]);
@@ -326,7 +327,7 @@ mod tests {
     #[test]
     fn find_empty_query_matches_nothing() {
         let mut c = test_catalog();
-        c.add(entry_at(1, 100, 200, ServiceStream::new("", "")));
+        c.add(entry_at(1, 100, 200, "", ""));
 
         // start == end → empty window.
         let q = Query {

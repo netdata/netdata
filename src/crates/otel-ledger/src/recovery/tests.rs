@@ -1,5 +1,5 @@
 use super::*;
-use otel_catalog::ServiceStream;
+use otel_logs_identity::ServiceStream;
 
 fn machine() -> uuid::Uuid {
     uuid::Uuid::from_u128(0x0011_2233_4455_6677_8899_aabb_ccdd_eeff)

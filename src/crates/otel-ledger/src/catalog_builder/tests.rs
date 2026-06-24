@@ -1,7 +1,8 @@
 use super::*;
 use crate::component::ComponentHandle;
 use file_registry::FileId;
-use otel_catalog::{CatalogEntry, ServiceStream};
+use otel_catalog::CatalogEntry;
+use otel_logs_identity::ServiceStream;
 
 fn machine() -> Uuid {
     Uuid::from_u128(0x0011_2233_4455_6677_8899_aabb_ccdd_eeff)

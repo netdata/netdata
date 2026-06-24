@@ -450,17 +450,16 @@ impl Writer {
 mod tests {
     use super::*;
     use crate::Config;
-    use otel_logs_identity::ServiceStream;
 
     fn test_writer(tmp: &std::path::Path) -> Writer {
         let seq = Arc::new(SeqAllocator::ephemeral(0));
         Writer::new(tmp, Config::default(), seq).unwrap()
     }
 
-    /// A distinct stream per label — distinct labels give distinct `ns_hash`es,
-    /// so a test can partition by stream without hand-picking hashes.
-    fn s(label: u64) -> ServiceStream {
-        ServiceStream::new("ns", format!("svc{label}"))
+    /// A distinct opaque `part_key` per label — distinct labels give distinct
+    /// keys, so a test can partition by key without hand-picking values.
+    fn pk(label: u64) -> u64 {
+        crate::opaque_part_key("ns", &format!("svc{label}"))
     }
 
     #[test]
@@ -471,13 +470,13 @@ mod tests {
         let data = b"test payload";
 
         writer
-            .write_frame(s(1).ns_hash(), &[], data, 1, TimestampNs(1), TimestampNs::ZERO, TimestampNs::ZERO)
+            .write_frame(pk(1), &[], data, 1, TimestampNs(1), TimestampNs::ZERO, TimestampNs::ZERO)
             .unwrap();
         writer
-            .write_frame(s(2).ns_hash(), &[], data, 1, TimestampNs(2), TimestampNs::ZERO, TimestampNs::ZERO)
+            .write_frame(pk(2), &[], data, 1, TimestampNs(2), TimestampNs::ZERO, TimestampNs::ZERO)
             .unwrap();
         writer
-            .write_frame(s(1).ns_hash(), &[], data, 1, TimestampNs(3), TimestampNs::ZERO, TimestampNs::ZERO)
+            .write_frame(pk(1), &[], data, 1, TimestampNs(3), TimestampNs::ZERO, TimestampNs::ZERO)
             .unwrap();
 
         writer.sync_all().unwrap();
@@ -496,7 +495,7 @@ mod tests {
             .map(|e| FileId::parse(&e.path()).unwrap().part_key)
             .collect();
         hashes.sort();
-        let mut expected = vec![s(1).ns_hash(), s(2).ns_hash()];
+        let mut expected = vec![pk(1), pk(2)];
         expected.sort();
         assert_eq!(hashes, expected);
     }
@@ -509,13 +508,13 @@ mod tests {
 
         // Three frames with growing & overlapping ranges.
         writer
-            .write_frame(s(1).ns_hash(), &[], data, 1, TimestampNs(1), TimestampNs(200), TimestampNs(300))
+            .write_frame(pk(1), &[], data, 1, TimestampNs(1), TimestampNs(200), TimestampNs(300))
             .unwrap();
         writer
-            .write_frame(s(1).ns_hash(), &[], data, 1, TimestampNs(2), TimestampNs(150), TimestampNs(250))
+            .write_frame(pk(1), &[], data, 1, TimestampNs(2), TimestampNs(150), TimestampNs(250))
             .unwrap();
         writer
-            .write_frame(s(1).ns_hash(), &[], data, 1, TimestampNs(3), TimestampNs(180), TimestampNs(400))
+            .write_frame(pk(1), &[], data, 1, TimestampNs(3), TimestampNs(180), TimestampNs(400))
             .unwrap();
 
         writer.sync_all().unwrap();
@@ -556,14 +555,14 @@ mod tests {
         let data = b"x";
 
         writer
-            .write_frame(s(1).ns_hash(), &[], data, 1, TimestampNs(1), TimestampNs(500), TimestampNs(600))
+            .write_frame(pk(1), &[], data, 1, TimestampNs(1), TimestampNs(500), TimestampNs(600))
             .unwrap();
         // Frame whose logs all lacked time/observed timestamps — must
         // not regress the accumulator. (In production the ingestor would
         // synthesize a fallback range; this test exercises the defense-
         // in-depth ZERO/ZERO skip.)
         writer
-            .write_frame(s(1).ns_hash(), &[], data, 1, TimestampNs(2), TimestampNs::ZERO, TimestampNs::ZERO)
+            .write_frame(pk(1), &[], data, 1, TimestampNs(2), TimestampNs::ZERO, TimestampNs::ZERO)
             .unwrap();
 
         writer.sync_all().unwrap();
@@ -589,10 +588,10 @@ mod tests {
 
         let data = b"test payload";
         writer
-            .write_frame(s(10).ns_hash(), &[], data, 1, TimestampNs(1), TimestampNs::ZERO, TimestampNs::ZERO)
+            .write_frame(pk(10), &[], data, 1, TimestampNs(1), TimestampNs::ZERO, TimestampNs::ZERO)
             .unwrap();
         writer
-            .write_frame(s(20).ns_hash(), &[], data, 1, TimestampNs(2), TimestampNs::ZERO, TimestampNs::ZERO)
+            .write_frame(pk(20), &[], data, 1, TimestampNs(2), TimestampNs::ZERO, TimestampNs::ZERO)
             .unwrap();
 
         writer.sync_all().unwrap();

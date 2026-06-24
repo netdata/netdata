@@ -142,10 +142,10 @@ impl<'a> RowIndex<'a> {
             });
         }
 
-        Ok(ServiceStream {
-            namespace: namespaces.first().copied().unwrap_or("").to_string(),
-            name: names.first().copied().unwrap_or("").to_string(),
-        })
+        Ok(ServiceStream::new(
+            namespaces.first().copied().unwrap_or(""),
+            names.first().copied().unwrap_or(""),
+        ))
     }
 }
 

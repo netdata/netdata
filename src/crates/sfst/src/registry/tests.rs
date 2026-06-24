@@ -1,7 +1,6 @@
 use super::*;
 use crate::tests::fixture::FixtureWriter;
 use crate::writer::pack;
-use crate::ServiceStream;
 use fst_index::FstIndex;
 
 fn write_sfst_with_summary(dir: &Path, id: FileId, summary: &Summary) {
@@ -29,13 +28,13 @@ fn recover_rebuilds_summary_from_disk() {
         min_timestamp_s: 100,
         max_timestamp_s: 200,
         record_count: 50,
-        part_key: ServiceStream::new("ns", "a").ns_hash(), content_meta: Vec::new(),
+        part_key: crate::opaque_part_key("ns", "a"), content_meta: Vec::new(),
     };
     let s2 = Summary {
         min_timestamp_s: 300,
         max_timestamp_s: 400,
         record_count: 25,
-        part_key: ServiceStream::new("ns", "b").ns_hash(), content_meta: Vec::new(),
+        part_key: crate::opaque_part_key("ns", "b"), content_meta: Vec::new(),
     };
     write_sfst_with_summary(dir.path(), id1, &s1);
     write_sfst_with_summary(dir.path(), id2, &s2);
@@ -57,7 +56,7 @@ fn recover_skips_unreadable_files() {
         min_timestamp_s: 1,
         max_timestamp_s: 2,
         record_count: 1,
-        part_key: ServiceStream::new("", "").ns_hash(), content_meta: Vec::new(),
+        part_key: crate::opaque_part_key("", ""), content_meta: Vec::new(),
     };
     write_sfst_with_summary(dir.path(), id_good, &s);
     // Garbage file with the right extension/name shape but invalid contents.
@@ -79,7 +78,7 @@ fn track_sets_summary() {
         min_timestamp_s: 1,
         max_timestamp_s: 9,
         record_count: 7,
-        part_key: ServiceStream::new("a", "b").ns_hash(), content_meta: Vec::new(),
+        part_key: crate::opaque_part_key("a", "b"), content_meta: Vec::new(),
     };
     reg.track(id, ByteSize(1), summary.clone());
     assert_eq!(reg.get(5).unwrap().summary, summary);
@@ -103,7 +102,7 @@ fn populate(
                 min_timestamp_s: min_s,
                 max_timestamp_s: max_s,
                 record_count: 1,
-                part_key: ServiceStream::new(ns, name).ns_hash(), content_meta: Vec::new(),
+                part_key: crate::opaque_part_key(ns, name), content_meta: Vec::new(),
             },
         );
     }
@@ -217,7 +216,7 @@ fn candidates_filter_by_stream() {
 
     let q = Query {
         time_range: 0..u32::MAX,
-        partition_keys: vec![ServiceStream::new("prod", "api").ns_hash()],
+        partition_keys: vec![crate::opaque_part_key("prod", "api")],
     };
     assert_eq!(seqs(reg.candidates(&q)), vec![1]);
 }

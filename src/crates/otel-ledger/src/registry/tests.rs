@@ -105,7 +105,7 @@ fn query_snapshot_is_scoped_to_one_tenant() {
         catalog_base.path().to_path_buf(),
     );
 
-    let stream = sfst::ServiceStream::new("ns", "svc");
+    let stream = otel_logs_identity::ServiceStream::new("ns", "svc");
     let part_key = stream.ns_hash();
     let summary = crate::test_helpers::summary_for(&stream, 1, 100, 200);
     let tenant_a = TenantId::from("tenant-a");

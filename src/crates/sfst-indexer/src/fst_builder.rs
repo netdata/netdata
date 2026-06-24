@@ -31,7 +31,8 @@ use super::bitset::Bitset;
 use super::kv_interner::KvSlot;
 use super::row_index::{TimeOrder, RowIndex};
 use crate::IndexError;
-use sfst::{BitmapValue, FieldEntry, FieldTier, IdRanges, KvId, Metadata, ServiceStream};
+use otel_logs_identity::ServiceStream;
+use sfst::{BitmapValue, FieldEntry, FieldTier, IdRanges, KvId, Metadata};
 
 /// Build tier-aligned key=value ID translation table.
 ///

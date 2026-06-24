@@ -326,6 +326,15 @@ mod tests {
     // ── compute_ns_hash / ServiceStream::ns_hash semantics ──────────────
 
     #[test]
+    fn service_stream_serde_roundtrip() {
+        for s in [ServiceStream::new("prod", "api"), ServiceStream::new("", "")] {
+            let json = serde_json::to_string(&s).unwrap();
+            let parsed: ServiceStream = serde_json::from_str(&json).unwrap();
+            assert_eq!(parsed, s);
+        }
+    }
+
+    #[test]
     fn ns_hash_both_missing_is_zero() {
         assert_eq!(compute_ns_hash(None, None), 0);
     }
@@ -364,13 +373,38 @@ mod tests {
 
     #[test]
     fn ns_hash_empty_field_collapses_to_absent() {
-        // The absent-equals-empty rule `ServiceStream::ns_hash` enforces: an
-        // empty-string field hashes the same as an absent one (and differently
-        // from the raw `compute_ns_hash(Some(""), ...)` primitive).
+        // The absent-equals-empty rule `ServiceStream::ns_hash` enforces, on
+        // BOTH fields: an empty-string field hashes the same as an absent one.
         assert_eq!(
             ServiceStream::new("", "api").ns_hash(),
             compute_ns_hash(None, Some("api"))
         );
+        assert_eq!(
+            ServiceStream::new("prod", "").ns_hash(),
+            compute_ns_hash(Some("prod"), None)
+        );
         assert_eq!(ServiceStream::new("", "").ns_hash(), 0);
+    }
+
+    #[test]
+    fn ns_hash_matches_primitive_when_both_present() {
+        // When both fields are present, `ns_hash` delegates straight to the
+        // primitive (no collapse applies).
+        assert_eq!(
+            ServiceStream::new("prod", "api").ns_hash(),
+            compute_ns_hash(Some("prod"), Some("api"))
+        );
+    }
+
+    #[test]
+    fn ns_hash_differs_from_literal_empty_namespace_primitive() {
+        // The collapse means an empty-namespace stream does NOT hash like the
+        // raw `Some("")` primitive — a literal-empty-namespace file written
+        // before the collapse existed re-partitions under the new key (a
+        // one-time rollover the substrate handled for short-lived WAL files).
+        assert_ne!(
+            ServiceStream::new("", "api").ns_hash(),
+            compute_ns_hash(Some(""), Some("api"))
+        );
     }
 }

@@ -395,7 +395,7 @@ mod tests {
         let mut bounds = Vec::new();
         for (i, payload) in payloads.iter().enumerate() {
             writer
-                .write_frame(otel_logs_identity::ServiceStream::new("ns", "svc").ns_hash(), &[],
+                .write_frame(crate::opaque_part_key("ns", "svc"), &[],
                     payload,
                     1,
                     TimestampNs(i as u64 + 1),
@@ -578,7 +578,7 @@ mod tests {
         let mut bounds = Vec::new();
         for (i, &count) in counts.iter().enumerate() {
             writer
-                .write_frame(otel_logs_identity::ServiceStream::new("ns", "svc").ns_hash(), &[],
+                .write_frame(crate::opaque_part_key("ns", "svc"), &[],
                     b"payload",
                     count,
                     TimestampNs(i as u64 + 1),

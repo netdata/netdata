@@ -10,3 +10,6 @@ workspace = true
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
 twox-hash = { workspace = true, features = ["xxhash64"] }
+
+[dev-dependencies]
+serde_json = { workspace = true }

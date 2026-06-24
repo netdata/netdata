@@ -182,13 +182,12 @@ impl Registry {
     /// the query's `time_range` is `[start, end)` (half-open). A file is
     /// included if any second is shared by both ranges.
     ///
-    /// Stream filter, when non-empty, keeps files whose stream hashes to
-    /// one of [`Query::partition_keys`] — there is no partial / prefix
-    /// matching, by design (each SFST holds exactly one stream; see
-    /// [`crate::ServiceStream`]). Matching by `ns_hash` rather than
-    /// `ServiceStream` equality is safe: the ingestor's per-tenant
-    /// collision table guarantees one stream per hash, and `ns_hash`
-    /// already collapses absent and empty `service.namespace`.
+    /// Partition filter, when non-empty, keeps files whose opaque `part_key`
+    /// is one of [`Query::partition_keys`] — there is no partial / prefix
+    /// matching, by design (each SFST holds exactly one partition). The
+    /// substrate compares the key as an opaque `u64`; the content plane
+    /// guarantees one stream per key (the ingestor's per-tenant collision
+    /// table) and supplies the query keys.
     pub fn candidates<'a>(&'a self, q: &Query) -> impl Iterator<Item = &'a File> + 'a {
         // Extract q's contents upfront so the filter closures don't borrow
         // q. This decouples the iterator's lifetime from q's, letting

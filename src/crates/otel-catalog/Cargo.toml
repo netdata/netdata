@@ -15,8 +15,6 @@ chrono = { workspace = true, features = ["serde"] }
 thiserror = { workspace = true }
 chunk-file = { workspace = true }
 file-registry = { workspace = true }
-# Transitional (2b-cleanup commit 2 removes the `ServiceStream` re-export + this dep).
-otel-logs-identity = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]

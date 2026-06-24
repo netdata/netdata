@@ -40,7 +40,10 @@
 //!     min_timestamp_s: 0,
 //!     max_timestamp_s: 0,
 //!     record_count: 0,
-//!     part_key: sfst::ServiceStream::new("ns", "svc").ns_hash(), content_meta: Vec::new(),
+//!     // `part_key`/`content_meta` are opaque to sfst — the content plane
+//!     // (otel-logs-identity) derives them; here an empty partition.
+//!     part_key: 0,
+//!     content_meta: Vec::new(),
 //! };
 //! let metadata = sfst::Metadata {
 //!     histogram: sfst::Histogram { timestamps: vec![], counts: vec![] },
@@ -76,7 +79,6 @@ mod writer;
 pub mod registry;
 
 pub use error::Error;
-pub use otel_logs_identity::ServiceStream;
 pub use index_reader::{BitmapFilter, IndexReader};
 pub use query::{
     Bucket, FacetResult, Filter, Grid, Matcher, MaterializedRow, Timeline, Timestamps,
@@ -84,6 +86,19 @@ pub use query::{
 };
 pub use reader::Reader;
 pub use registry::{File, Registry, RetentionPolicy};
+
+/// Deterministic opaque partition key for tests. SFST treats `part_key` as an
+/// opaque `u64` and never decodes it, so tests fabricate distinct keys per
+/// logical stream without depending on the content-plane identity codec —
+/// same label → same key, different label → (almost surely) different key.
+#[cfg(test)]
+pub(crate) fn opaque_part_key(namespace: &str, name: &str) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    namespace.hash(&mut h);
+    name.hash(&mut h);
+    h.finish()
+}
 
 /// Highest SFST sequence on disk across every tenant subdir of
 /// `base`. Returns `0` when `base` is missing or empty. Paired with

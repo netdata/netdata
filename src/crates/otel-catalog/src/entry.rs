@@ -1,4 +1,3 @@
-pub use otel_logs_identity::ServiceStream;
 use file_registry::{ByteSize, FileId, TimestampNs};
 use serde::{Deserialize, Serialize};
 
@@ -31,26 +30,23 @@ pub struct CatalogEntry {
     pub remote_etag: Option<String>,
 }
 
+/// Deterministic opaque partition key for tests. The catalog treats `part_key`
+/// as an opaque `u64` and never decodes it, so tests fabricate distinct keys
+/// per logical stream without depending on the content-plane identity codec —
+/// same label → same key, different label → (almost surely) different key.
+#[cfg(test)]
+pub(crate) fn opaque_part_key(namespace: &str, name: &str) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    namespace.hash(&mut h);
+    name.hash(&mut h);
+    h.finish()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use uuid::Uuid;
-
-    #[test]
-    fn stream_entry_roundtrip() {
-        let s = ServiceStream::new("prod", "api");
-        let json = serde_json::to_string(&s).unwrap();
-        let parsed: ServiceStream = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed, s);
-    }
-
-    #[test]
-    fn stream_entry_empty_strings_roundtrip() {
-        let s = ServiceStream::new("", "");
-        let json = serde_json::to_string(&s).unwrap();
-        let parsed: ServiceStream = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed, s);
-    }
 
     #[test]
     fn catalog_entry_roundtrip() {
@@ -60,10 +56,11 @@ mod tests {
             min_timestamp_s: 1_700_000_000,
             max_timestamp_s: 1_700_003_600,
             record_count: 1234,
-            part_key: ServiceStream::new("prod", "api").ns_hash(),
-            // Opaque to the catalog (content-agnostic, no identity-codec dep):
-            // hand-built blob for ("prod", "api") — version 1, u16-LE-len-prefixed
-            // namespace then name — kept consistent with `part_key` above.
+            // The catalog treats both fields as opaque (content-agnostic, no
+            // identity-codec dep): an arbitrary partition key and a hand-built
+            // `content_meta` blob, here for ("prod", "api") — version 1,
+            // u16-LE-len-prefixed namespace then name.
+            part_key: 0xC0FFEE,
             content_meta: vec![1, 4, 0, b'p', b'r', b'o', b'd', 3, 0, b'a', b'p', b'i'],
             size: ByteSize(9876),
             uploaded_at_ns: TimestampNs(1_700_003_700_000_000_000),

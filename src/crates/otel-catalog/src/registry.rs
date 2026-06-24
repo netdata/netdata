@@ -755,7 +755,7 @@ mod tests {
 
     // ── candidates() tests ───────────────────────────────────────
 
-    use crate::entry::ServiceStream;
+    use crate::entry::opaque_part_key;
 
     /// Write a catalog file containing `entries` to disk and return the
     /// path. Also tracks it in the registry under the canonical
@@ -782,14 +782,15 @@ mod tests {
         path
     }
 
-    fn entry_at(seq: u64, min_s: u32, max_s: u32, stream: ServiceStream) -> CatalogEntry {
+    fn entry_at(seq: u64, min_s: u32, max_s: u32, ns: &str, name: &str) -> CatalogEntry {
+        let part_key = opaque_part_key(ns, name);
         CatalogEntry {
-            id: file_registry::FileId::new(machine(), boot(), seq, 0),
+            id: file_registry::FileId::new(machine(), boot(), seq, part_key),
             remote_key: format!("k{seq}"),
             min_timestamp_s: min_s,
             max_timestamp_s: max_s,
             record_count: 1,
-            part_key: stream.ns_hash(),
+            part_key,
             content_meta: Vec::new(),
             size: ByteSize(1),
             uploaded_at_ns: file_registry::TimestampNs(0),
@@ -811,8 +812,8 @@ mod tests {
             &mut reg,
             10,
             vec![
-                entry_at(1, 100, 200, ServiceStream::new("ns", "a")),
-                entry_at(2, 300, 400, ServiceStream::new("ns", "a")),
+                entry_at(1, 100, 200, "ns", "a"),
+                entry_at(2, 300, 400, "ns", "a"),
             ],
         );
 
@@ -830,12 +831,12 @@ mod tests {
         write_catalog_file(
             &mut reg,
             10,
-            vec![entry_at(1, 100, 200, ServiceStream::new("ns", "a"))],
+            vec![entry_at(1, 100, 200, "ns", "a")],
         );
         write_catalog_file(
             &mut reg,
             20,
-            vec![entry_at(2, 300, 400, ServiceStream::new("ns", "a"))],
+            vec![entry_at(2, 300, 400, "ns", "a")],
         );
 
         let q = Query {
@@ -853,14 +854,14 @@ mod tests {
             &mut reg,
             10,
             vec![
-                entry_at(1, 100, 200, ServiceStream::new("prod", "api")),
-                entry_at(2, 100, 200, ServiceStream::new("prod", "worker")),
+                entry_at(1, 100, 200, "prod", "api"),
+                entry_at(2, 100, 200, "prod", "worker"),
             ],
         );
 
         let q = Query {
             time_range: 0..1000,
-            partition_keys: vec![ServiceStream::new("prod", "api").ns_hash()],
+            partition_keys: vec![opaque_part_key("prod", "api")],
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![1]);
     }
@@ -872,12 +873,12 @@ mod tests {
         let live = write_catalog_file(
             &mut reg,
             10,
-            vec![entry_at(1, 100, 200, ServiceStream::new("ns", "a"))],
+            vec![entry_at(1, 100, 200, "ns", "a")],
         );
         let evicting = write_catalog_file(
             &mut reg,
             20,
-            vec![entry_at(2, 100, 200, ServiceStream::new("ns", "a"))],
+            vec![entry_at(2, 100, 200, "ns", "a")],
         );
         reg.mark_pending_deletion(&evicting);
         // `live` stays in normal state.
@@ -899,7 +900,7 @@ mod tests {
         write_catalog_file(
             &mut reg,
             10,
-            vec![entry_at(1, 100, 200, ServiceStream::new("ns", "a"))],
+            vec![entry_at(1, 100, 200, "ns", "a")],
         );
 
         // Corrupt catalog: file exists but contains garbage. The registry
@@ -932,7 +933,7 @@ mod tests {
         write_catalog_file(
             &mut reg,
             10,
-            vec![entry_at(1, 100, 200, ServiceStream::new("ns", "a"))],
+            vec![entry_at(1, 100, 200, "ns", "a")],
         );
 
         // Out-of-window catalog with corrupt body — would error if parsed.

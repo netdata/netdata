@@ -25,6 +25,19 @@ pub use reader::{Frame, FrameBoundary, FrameRange, Reader, scan_frame_boundaries
 pub use registry::{File, Registry};
 pub use writer::Writer;
 
+/// Deterministic opaque partition key for tests. The WAL treats `part_key` as
+/// an opaque `u64` and never decodes it, so tests fabricate distinct keys per
+/// logical stream without depending on the content-plane identity codec —
+/// same label → same key, different label → (almost surely) different key.
+#[cfg(test)]
+pub(crate) fn opaque_part_key(namespace: &str, name: &str) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    namespace.hash(&mut h);
+    name.hash(&mut h);
+    h.finish()
+}
+
 /// Highest WAL sequence on disk across every tenant subdir of `base`.
 /// Returns `0` when `base` is missing or empty. Used at process
 /// startup to seed the seq counter so it stays monotonic across

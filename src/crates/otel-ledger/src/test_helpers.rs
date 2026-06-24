@@ -6,7 +6,7 @@
 /// Derive the substrate identity fields — the partition key and the opaque
 /// `content_meta` blob — for a stream, exactly as production indexing does.
 /// Returns `(part_key, content_meta)`.
-pub(crate) fn identity_for(stream: &sfst::ServiceStream) -> (u64, Vec<u8>) {
+pub(crate) fn identity_for(stream: &otel_logs_identity::ServiceStream) -> (u64, Vec<u8>) {
     (
         otel_logs_identity::part_key(stream),
         otel_logs_identity::encode_content_meta(stream)
@@ -17,7 +17,7 @@ pub(crate) fn identity_for(stream: &sfst::ServiceStream) -> (u64, Vec<u8>) {
 /// A `Summary` for `stream` with the given range and record count, deriving
 /// `part_key`/`content_meta` the way production does.
 pub(crate) fn summary_for(
-    stream: &sfst::ServiceStream,
+    stream: &otel_logs_identity::ServiceStream,
     record_count: u32,
     min_s: u32,
     max_s: u32,
@@ -36,5 +36,5 @@ pub(crate) fn summary_for(
 /// identity. Used by registry/recovery tests that need to call
 /// `Registry::track` without caring about the summary's contents.
 pub(crate) fn empty_summary() -> sfst::Summary {
-    summary_for(&sfst::ServiceStream::new("", ""), 0, 0, 0)
+    summary_for(&otel_logs_identity::ServiceStream::new("", ""), 0, 0, 0)
 }

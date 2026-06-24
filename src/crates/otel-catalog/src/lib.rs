@@ -1,7 +1,7 @@
 //! Catalog data model: what the otel-plugin records about uploaded SFST files.
 //!
-//! This crate defines the types (`Catalog`, `CatalogEntry`, `ServiceStream`)
-//! and their on-disk serialization: a [`chunk_file::container`] file
+//! This crate defines the types (`Catalog`, `CatalogEntry`) and their on-disk
+//! serialization: a [`chunk_file::container`] file
 //! (magic `NCAT` + version + TOC + crc32) holding a single JSON chunk.
 //! It does not perform I/O — writing,
 //! uploading, and reconciliation live in later phases of the catalog
@@ -14,7 +14,7 @@ pub mod entry;
 pub mod registry;
 
 pub use catalog::Catalog;
-pub use entry::{CatalogEntry, ServiceStream};
+pub use entry::CatalogEntry;
 pub use registry::{File, Registry, filename, scan_max_sequence};
 
 /// Current catalog JSON schema version (the `version` field inside the

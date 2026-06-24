@@ -332,7 +332,7 @@ mod tests {
         for &count in entry_counts {
             for i in 0..count {
                 writer
-                    .write_frame(ServiceStream::new("ns", "svc").ns_hash(), &[],
+                    .write_frame(crate::opaque_part_key("ns", "svc"), &[],
                         &(i as u32).to_le_bytes(),
                         1,
                         TimestampNs(i as u64 + 1),
@@ -387,7 +387,7 @@ mod tests {
         assert!(
             registry
                 .archived_files()
-                .all(|f| f.part_key == ServiceStream::new("ns", "svc").ns_hash()),
+                .all(|f| f.part_key == crate::opaque_part_key("ns", "svc")),
             "recovery must recover each file's stream from its header"
         );
     }
@@ -416,7 +416,7 @@ mod tests {
             .apply_event(&FileEvent::Created {
                 file_id: id,
                 created_at_ns: TimestampNs(1),
-                part_key: ServiceStream::new("ns", "svc").ns_hash(), content_meta: Vec::new(),
+                part_key: crate::opaque_part_key("ns", "svc"), content_meta: Vec::new(),
             })
             .unwrap();
         // Created starts at ZERO/ZERO.
@@ -481,7 +481,7 @@ mod tests {
             .apply_event(&FileEvent::Created {
                 file_id: id,
                 created_at_ns: TimestampNs(1),
-                part_key: ServiceStream::new("ns", "svc").ns_hash(), content_meta: Vec::new(),
+                part_key: crate::opaque_part_key("ns", "svc"), content_meta: Vec::new(),
             })
             .unwrap();
         // Created: durable prefix unknown.
@@ -562,7 +562,7 @@ mod tests {
             .apply_event(&FileEvent::Created {
                 file_id: id,
                 created_at_ns: TimestampNs(1_000_000_000),
-                part_key: ServiceStream::new("ns", "svc").ns_hash(), content_meta: Vec::new(),
+                part_key: crate::opaque_part_key("ns", "svc"), content_meta: Vec::new(),
             })
             .unwrap();
 
@@ -584,8 +584,6 @@ mod tests {
     }
 
     // ── candidates() tests ───────────────────────────────────────
-
-    use otel_logs_identity::ServiceStream;
 
     fn fid_with(seq: u64, part_key: u64) -> FileId {
         let machine_id = uuid::Uuid::try_parse("550e8400e29b41d4a716446655440000").unwrap();
@@ -697,103 +695,24 @@ mod tests {
     }
 
     #[test]
-    fn candidates_filter_by_stream_via_ns_hash() {
+    fn candidates_filter_by_part_key() {
+        // The WAL filter matches files by their opaque `part_key` (the content
+        // plane's stream-hash collapse — absent vs empty namespace — is the
+        // content plane's concern, covered by otel-logs-identity's tests).
         let dir = tempfile::tempdir().unwrap();
         let mut reg = Registry::new(dir.path());
 
-        let api_hash = otel_logs_identity::compute_ns_hash(Some("prod"), Some("api"));
-        let worker_hash = otel_logs_identity::compute_ns_hash(Some("prod"), Some("worker"));
-        track(
-            &mut reg,
-            1,
-            api_hash,
-            100 * NS,
-            200 * NS,
-            FileStatus::Archived,
-        );
-        track(
-            &mut reg,
-            2,
-            worker_hash,
-            100 * NS,
-            200 * NS,
-            FileStatus::Archived,
-        );
-        track(
-            &mut reg,
-            3,
-            api_hash,
-            100 * NS,
-            200 * NS,
-            FileStatus::Active,
-        );
+        let api = crate::opaque_part_key("prod", "api");
+        let worker = crate::opaque_part_key("prod", "worker");
+        track(&mut reg, 1, api, 100 * NS, 200 * NS, FileStatus::Archived);
+        track(&mut reg, 2, worker, 100 * NS, 200 * NS, FileStatus::Archived);
+        track(&mut reg, 3, api, 100 * NS, 200 * NS, FileStatus::Active);
 
         let q = Query {
             time_range: 0..u32::MAX,
-            partition_keys: vec![ServiceStream::new("prod", "api").ns_hash()],
+            partition_keys: vec![api],
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![1, 3]);
-    }
-
-    #[test]
-    fn candidates_match_absent_namespace_stream() {
-        // Regression: the ingestor names an absent-namespace file with
-        // `compute_ns_hash(None, name)`, while the caller derives the query
-        // hash from a collapsed `ServiceStream` with an empty namespace via
-        // `ServiceStream::ns_hash` (empty == absent). The two must agree so
-        // the file matches — previously the query hashed `Some("")` and
-        // missed it.
-        let dir = tempfile::tempdir().unwrap();
-        let mut reg = Registry::new(dir.path());
-
-        let absent_ns_hash = otel_logs_identity::compute_ns_hash(None, Some("api"));
-        track(
-            &mut reg,
-            1,
-            absent_ns_hash,
-            100 * NS,
-            200 * NS,
-            FileStatus::Archived,
-        );
-
-        let q = Query {
-            time_range: 0..u32::MAX,
-            partition_keys: vec![ServiceStream::new("", "api").ns_hash()],
-        };
-        assert_eq!(seqs(reg.candidates(&q)), vec![1]);
-    }
-
-    #[test]
-    fn candidates_miss_stale_literal_empty_namespace_file() {
-        // The accepted migration cost: a file named before this change with the
-        // *literal* empty-string namespace hash (`compute_ns_hash(Some(""), name)`)
-        // is no longer found by a stream-filtered query, because the query now
-        // derives `compute_ns_hash(None, name)`. The common absent-namespace file
-        // is unaffected (see `candidates_match_absent_namespace_stream`); only the
-        // rare literal-empty file re-partitions and would need re-indexing.
-        let old_literal_empty_hash = otel_logs_identity::compute_ns_hash(Some(""), Some("api"));
-        let new_empty_hash = ServiceStream::new("", "api").ns_hash();
-        assert_ne!(
-            old_literal_empty_hash, new_empty_hash,
-            "the hash change this migration accepts"
-        );
-
-        let dir = tempfile::tempdir().unwrap();
-        let mut reg = Registry::new(dir.path());
-        track(
-            &mut reg,
-            1,
-            old_literal_empty_hash,
-            100 * NS,
-            200 * NS,
-            FileStatus::Archived,
-        );
-
-        let q = Query {
-            time_range: 0..u32::MAX,
-            partition_keys: vec![ServiceStream::new("", "api").ns_hash()],
-        };
-        assert!(reg.candidates(&q).next().is_none());
     }
 
     #[test]
@@ -808,7 +727,7 @@ mod tests {
         reg.apply_event(&FileEvent::Created {
             file_id: id_zero,
             created_at_ns: TimestampNs(0),
-            part_key: ServiceStream::new("ns", "svc").ns_hash(), content_meta: Vec::new(),
+            part_key: crate::opaque_part_key("ns", "svc"), content_meta: Vec::new(),
         })
         .unwrap();
 
@@ -860,14 +779,14 @@ mod tests {
             .apply_event(&FileEvent::Created {
                 file_id: id,
                 created_at_ns: TimestampNs(1_000_000_000),
-                part_key: ServiceStream::new("ns", "svc").ns_hash(), content_meta: Vec::new(),
+                part_key: crate::opaque_part_key("ns", "svc"), content_meta: Vec::new(),
             })
             .unwrap();
         let err = registry
             .apply_event(&FileEvent::Created {
                 file_id: id,
                 created_at_ns: TimestampNs(2_000_000_000),
-                part_key: ServiceStream::new("ns", "svc").ns_hash(), content_meta: Vec::new(),
+                part_key: crate::opaque_part_key("ns", "svc"), content_meta: Vec::new(),
             })
             .unwrap_err();
         assert!(matches!(err, Error::DuplicateSequence(1)));

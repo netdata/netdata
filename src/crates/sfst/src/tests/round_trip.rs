@@ -35,7 +35,7 @@ fn sample_summary() -> Summary {
         min_timestamp_s: 1_700_000_000,
         max_timestamp_s: 1_700_003_600,
         record_count: 1234,
-        part_key: ServiceStream::new("prod", "api").ns_hash(), content_meta: Vec::new(),
+        part_key: crate::opaque_part_key("prod", "api"), content_meta: Vec::new(),
     }
 }
 
@@ -339,7 +339,7 @@ fn round_trip_multi_batch_stream() {
         min_timestamp_s: 1_700_000_000,
         max_timestamp_s: 1_700_003_071,
         record_count,
-        part_key: ServiceStream::new("prod", "api").ns_hash(), content_meta: Vec::new(),
+        part_key: crate::opaque_part_key("prod", "api"), content_meta: Vec::new(),
     };
     let metadata = Metadata {
         histogram: Histogram {
