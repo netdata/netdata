@@ -63,7 +63,6 @@ pub(crate) fn build_catalog_entry(
         min_timestamp_s: summary.min_timestamp_s,
         max_timestamp_s: summary.max_timestamp_s,
         record_count: summary.record_count,
-        part_key: summary.part_key,
         content_meta: summary.content_meta.clone(),
         size: sfst_file.size,
         uploaded_at_ns,

@@ -231,7 +231,6 @@ impl RemoteRead {
                     min_timestamp_s: e.min_timestamp_s,
                     max_timestamp_s: e.max_timestamp_s,
                     record_count: e.record_count,
-                    part_key: e.part_key,
                     content_meta: e.content_meta.clone(),
                 },
                 file_seq: e.id.seq,

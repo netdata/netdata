@@ -69,7 +69,7 @@ impl Catalog {
             .values()
             .filter(move |e| range_overlaps(e, &q_range))
             .filter(move |e| {
-                partition_keys.is_empty() || partition_keys.contains(&e.part_key)
+                partition_keys.is_empty() || partition_keys.contains(&e.id.part_key)
             })
     }
 
@@ -179,7 +179,6 @@ mod tests {
             min_timestamp_s: min_s,
             max_timestamp_s: max_s,
             record_count: 10,
-            part_key,
             content_meta: Vec::new(),
             size: ByteSize(1024),
             uploaded_at_ns: TimestampNs(2_000_000_000),

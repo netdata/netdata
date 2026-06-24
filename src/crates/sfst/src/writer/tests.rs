@@ -21,7 +21,7 @@ fn summary() -> Summary {
         min_timestamp_s: 1,
         max_timestamp_s: 2,
         record_count: 3,
-        part_key: crate::opaque_part_key("ns", "svc"), content_meta: Vec::new(),
+        content_meta: Vec::new(),
     }
 }
 

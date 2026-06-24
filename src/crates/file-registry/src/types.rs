@@ -325,10 +325,9 @@ pub struct FileSummary {
     pub max_timestamp_s: u32,
     /// Number of records (rows) the file holds.
     pub record_count: u32,
-    /// Opaque partition key; the content plane derives it.
-    pub part_key: u64,
     /// Opaque content-plane metadata, stored verbatim and never parsed by the
-    /// substrate.
+    /// substrate. The partition key is NOT stored here — it lives only in the
+    /// file's `FileId` (filename), the single source of truth.
     pub content_meta: Vec<u8>,
 }
 

@@ -239,7 +239,6 @@ impl Stream {
             version: FORMAT_VERSION,
             flags,
             created_at: created_at_ns.0,
-            part_key: self.part_key,
             content_meta: self.content_meta.clone(),
         };
         writer.write_all(&header.to_bytes())?;
@@ -250,7 +249,6 @@ impl Stream {
         self.pending_events.push(FileEvent::Created {
             file_id,
             created_at_ns,
-            part_key: self.part_key,
             content_meta: self.content_meta.clone(),
         });
 

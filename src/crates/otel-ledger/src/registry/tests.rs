@@ -187,12 +187,11 @@ fn enumerate_streams_dedups_and_aggregates_sfst_and_unsealed_wal() {
         // range but NOT `File.size` (that lands on close), so this also
         // exercises the `valid_up_to` size proxy in `enumerate_streams`.
         let db_id = FileId::new(mid, bid, 3, db.ns_hash());
-        let (db_part_key, db_content_meta) = crate::test_helpers::identity_for(&db);
+        let (_, db_content_meta) = crate::test_helpers::identity_for(&db);
         r.wal
             .apply_event(&FileEvent::Created {
                 file_id: db_id,
                 created_at_ns: TimestampNs(0),
-                part_key: db_part_key,
                 content_meta: db_content_meta,
             })
             .unwrap();
@@ -209,12 +208,11 @@ fn enumerate_streams_dedups_and_aggregates_sfst_and_unsealed_wal() {
         // A WAL shadow of SFST seq=1 (post-index/pre-delete window). SFST
         // wins by seq, so its huge size must NOT double-count.
         let shadow = FileId::new(mid, bid, 1, api.ns_hash());
-        let (api_part_key, api_content_meta) = crate::test_helpers::identity_for(&api);
+        let (_, api_content_meta) = crate::test_helpers::identity_for(&api);
         r.wal
             .apply_event(&FileEvent::Created {
                 file_id: shadow,
                 created_at_ns: TimestampNs(0),
-                part_key: api_part_key,
                 content_meta: api_content_meta,
             })
             .unwrap();

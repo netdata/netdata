@@ -7,11 +7,13 @@ use file_registry::{ByteSize, FileId, TenantId, TimestampNs};
 /// Magic bytes at the start of every WAL file.
 pub const MAGIC: [u8; 4] = *b"NWAL";
 
-/// Current format version. v3 records the file's opaque `part_key` and an
-/// opaque `content_meta` blob in the header (replacing v2's typed
-/// `ServiceStream`). There is no back-compat: an older file is rejected (the
+/// Current format version. v4 drops the header's `part_key` — the partition key
+/// is the single source of truth in the filename (`FileId`), never duplicated in
+/// the header. The header now records only the opaque `content_meta` identity
+/// blob. (v3 stored `part_key` in the header too; v2 stored a typed
+/// `ServiceStream`.) There is no back-compat: an older file is rejected (the
 /// OTel logs feature is experimental and WAL files are short-lived).
-pub const FORMAT_VERSION: u16 = 3;
+pub const FORMAT_VERSION: u16 = 4;
 
 /// Total size of the file header in bytes (one 4 KiB page).
 pub const HEADER_SIZE: usize = 4096;
@@ -23,9 +25,9 @@ pub const HEADER_SIZE: usize = 4096;
 pub const MAX_CONTENT_META_BYTES: usize = 1024;
 
 /// Byte offset where the header's `content_meta` blob begins:
-/// `MAGIC(4) + version(2) + flags(2) + created_at(8) + part_key(8) +
-/// content_meta_len(2)`.
-pub const CONTENT_META_OFFSET: usize = 26;
+/// `MAGIC(4) + version(2) + flags(2) + created_at(8) + content_meta_len(2)`.
+/// (No `part_key` in the header — it lives only in the filename `FileId`.)
+pub const CONTENT_META_OFFSET: usize = 18;
 
 /// The `content_meta` blob plus its fixed prefix must fit the header page.
 /// A compile error here means `MAX_CONTENT_META_BYTES` was raised past the
@@ -52,19 +54,18 @@ pub const FRAME_ALIGNMENT: usize = 8;
 
 /// Fixed-size file header written once when a WAL file is created.
 ///
-/// Layout: `MAGIC(4)`, `version(2)`, `flags(2)`, `created_at(8)`,
-/// `part_key(8, u64 LE)`, then `content_meta` length-prefixed —
-/// `content_meta_len(2) content_meta` — capped at [`MAX_CONTENT_META_BYTES`].
-/// The rest of the 4 KiB page is zero. The header stores no content type:
-/// `part_key` is the opaque partition key and `content_meta` an opaque
-/// content-plane blob (for OTel logs, the encoded service identity).
+/// Layout: `MAGIC(4)`, `version(2)`, `flags(2)`, `created_at(8)`, then
+/// `content_meta` length-prefixed — `content_meta_len(2) content_meta` —
+/// capped at [`MAX_CONTENT_META_BYTES`]. The rest of the 4 KiB page is zero.
+/// The header stores no content type and no partition key: the `part_key` is
+/// the single source of truth in the filename (`FileId`), and `content_meta`
+/// is an opaque content-plane blob (for OTel logs, the encoded service
+/// identity) the WAL never interprets.
 #[derive(Debug, Clone)]
 pub struct FileHeader {
     pub version: u16,
     pub flags: u16,
     pub created_at: u64,
-    /// Opaque partition key for the single partition this file holds.
-    pub part_key: u64,
     /// Opaque content-plane metadata, recorded so the file's identity is
     /// available cheaply (recovery, the stream selector) without decoding any
     /// frame. The WAL never interprets it.
@@ -97,7 +98,6 @@ impl FileHeader {
         buf[4..6].copy_from_slice(&self.version.to_le_bytes());
         buf[6..8].copy_from_slice(&self.flags.to_le_bytes());
         buf[8..16].copy_from_slice(&self.created_at.to_le_bytes());
-        buf[16..24].copy_from_slice(&self.part_key.to_le_bytes());
 
         let len = self.content_meta.len();
         buf[CONTENT_META_OFFSET - 2..CONTENT_META_OFFSET].copy_from_slice(&(len as u16).to_le_bytes());
@@ -124,7 +124,6 @@ impl FileHeader {
             ));
         }
         let created_at = u64::from_le_bytes(buf[8..16].try_into().unwrap());
-        let part_key = u64::from_le_bytes(buf[16..24].try_into().unwrap());
 
         let content_meta_len =
             u16::from_le_bytes([buf[CONTENT_META_OFFSET - 2], buf[CONTENT_META_OFFSET - 1]]) as usize;
@@ -139,7 +138,6 @@ impl FileHeader {
             version,
             flags,
             created_at,
-            part_key,
             content_meta,
         })
     }
@@ -161,10 +159,9 @@ pub enum FileEvent {
     Created {
         file_id: FileId,
         created_at_ns: TimestampNs,
-        /// Opaque partition key for the single partition this file holds.
-        part_key: u64,
         /// Opaque content-plane metadata for the file (the content plane
         /// interprets it; the registry stores it for cheap identity/display).
+        /// The partition key is carried by `file_id`, not duplicated here.
         content_meta: Vec<u8>,
     },
     Synced {
@@ -200,38 +197,37 @@ pub struct Message {
 mod tests {
     use super::*;
 
-    fn header(part_key: u64, content_meta: Vec<u8>) -> FileHeader {
+    fn header(content_meta: Vec<u8>) -> FileHeader {
         FileHeader {
             version: FORMAT_VERSION,
             flags: 0,
             created_at: 12345,
-            part_key,
             content_meta,
         }
     }
 
     #[test]
-    fn header_roundtrips_part_key_and_content_meta() {
-        for (pk, cm) in [
-            (0u64, Vec::new()),
-            (0xabcd_u64, vec![1, 2, 3, 4, 5]),
+    fn header_roundtrips_content_meta() {
+        for cm in [
+            Vec::new(),
+            vec![1, 2, 3, 4, 5],
             // A blob the size of an encoded (namespace, name) identity.
-            (u64::MAX, b"\x01\x04\x00prod\x03\x00api".to_vec()),
+            b"\x01\x04\x00prod\x03\x00api".to_vec(),
         ] {
-            let h = header(pk, cm.clone());
+            let h = header(cm.clone());
             let parsed = FileHeader::from_bytes(&h.to_bytes()).unwrap();
             assert_eq!(parsed.version, FORMAT_VERSION);
             assert_eq!(parsed.created_at, 12345);
-            assert_eq!(parsed.part_key, pk);
             assert_eq!(parsed.content_meta, cm);
         }
     }
 
     #[test]
     fn from_bytes_rejects_oversize_content_meta() {
-        let mut buf = header(1, Vec::new()).to_bytes();
+        let mut buf = header(Vec::new()).to_bytes();
         // Forge a content_meta length above the cap; from_bytes must reject it.
-        buf[24..26].copy_from_slice(&((MAX_CONTENT_META_BYTES + 1) as u16).to_le_bytes());
+        buf[CONTENT_META_OFFSET - 2..CONTENT_META_OFFSET]
+            .copy_from_slice(&((MAX_CONTENT_META_BYTES + 1) as u16).to_le_bytes());
         assert!(FileHeader::from_bytes(&buf).is_err());
     }
 

@@ -359,7 +359,7 @@ async fn files_request_includes_wal_and_catalog_entries() {
     let machine = Uuid::from_u128(0xa1);
     let boot = Uuid::from_u128(0xb2);
     let stream = ServiceStream::new("walns", "walsvc");
-    let (wal_part_key, wal_content_meta) = crate::test_helpers::identity_for(&stream);
+    let (_, wal_content_meta) = crate::test_helpers::identity_for(&stream);
     {
         let reg = tr.get_or_create(&TenantId::from("default"));
         // An active WAL: Created, then Synced sets entry_count + time range.
@@ -368,7 +368,6 @@ async fn files_request_includes_wal_and_catalog_entries() {
             .apply_event(&wal::FileEvent::Created {
                 file_id: active,
                 created_at_ns: TimestampNs(1_000),
-                part_key: wal_part_key,
                 content_meta: wal_content_meta.clone(),
             })
             .unwrap();
@@ -388,7 +387,6 @@ async fn files_request_includes_wal_and_catalog_entries() {
             .apply_event(&wal::FileEvent::Created {
                 file_id: archived,
                 created_at_ns: TimestampNs(2_000),
-                part_key: wal_part_key,
                 content_meta: wal_content_meta.clone(),
             })
             .unwrap();
@@ -1046,7 +1044,6 @@ fn track_remote_catalog(
         min_timestamp_s: min_s,
         max_timestamp_s: max_s,
         record_count: 6,
-        part_key: stream.ns_hash(),
         content_meta: otel_logs_identity::encode_content_meta(&stream).unwrap(),
         size: ByteSize(size),
         uploaded_at_ns: TimestampNs(0),

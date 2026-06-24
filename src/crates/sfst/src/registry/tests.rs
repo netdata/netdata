@@ -28,13 +28,13 @@ fn recover_rebuilds_summary_from_disk() {
         min_timestamp_s: 100,
         max_timestamp_s: 200,
         record_count: 50,
-        part_key: crate::opaque_part_key("ns", "a"), content_meta: Vec::new(),
+        content_meta: Vec::new(),
     };
     let s2 = Summary {
         min_timestamp_s: 300,
         max_timestamp_s: 400,
         record_count: 25,
-        part_key: crate::opaque_part_key("ns", "b"), content_meta: Vec::new(),
+        content_meta: Vec::new(),
     };
     write_sfst_with_summary(dir.path(), id1, &s1);
     write_sfst_with_summary(dir.path(), id2, &s2);
@@ -56,7 +56,7 @@ fn recover_skips_unreadable_files() {
         min_timestamp_s: 1,
         max_timestamp_s: 2,
         record_count: 1,
-        part_key: crate::opaque_part_key("", ""), content_meta: Vec::new(),
+        content_meta: Vec::new(),
     };
     write_sfst_with_summary(dir.path(), id_good, &s);
     // Garbage file with the right extension/name shape but invalid contents.
@@ -78,7 +78,7 @@ fn track_sets_summary() {
         min_timestamp_s: 1,
         max_timestamp_s: 9,
         record_count: 7,
-        part_key: crate::opaque_part_key("a", "b"), content_meta: Vec::new(),
+        content_meta: Vec::new(),
     };
     reg.track(id, ByteSize(1), summary.clone());
     assert_eq!(reg.get(5).unwrap().summary, summary);
@@ -86,23 +86,22 @@ fn track_sets_summary() {
 
 // ── Candidate selection tests ───────────────────────────────────
 
-fn fid(seq: u64) -> FileId {
-    FileId::new(uuid::Uuid::nil(), uuid::Uuid::from_u128(1), seq, 0)
-}
-
 fn populate(
     reg: &mut Registry,
     entries: &[(u64, u32, u32, &str, &str)], // (seq, min_s, max_s, ns, name)
 ) {
     for &(seq, min_s, max_s, ns, name) in entries {
+        // The partition key is the single source of truth in the `FileId`
+        // (filename); candidate filtering reads `f.id.part_key`.
+        let part_key = crate::opaque_part_key(ns, name);
         reg.track(
-            fid(seq),
+            FileId::new(uuid::Uuid::nil(), uuid::Uuid::from_u128(1), seq, part_key),
             ByteSize(1),
             Summary {
                 min_timestamp_s: min_s,
                 max_timestamp_s: max_s,
                 record_count: 1,
-                part_key: crate::opaque_part_key(ns, name), content_meta: Vec::new(),
+                content_meta: Vec::new(),
             },
         );
     }

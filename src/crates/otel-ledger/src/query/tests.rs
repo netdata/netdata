@@ -36,7 +36,6 @@ fn track_wal(reg: &mut Registry, seq: u64, min_s: u32, max_s: u32) {
         .apply_event(&FileEvent::Created {
             file_id: id,
             created_at_ns: TimestampNs(0),
-            part_key,
             content_meta,
         })
         .unwrap();
@@ -82,7 +81,6 @@ fn track_remote_as(reg: &mut Registry, seq: u64, stream: ServiceStream, min_s: u
         min_timestamp_s: min_s,
         max_timestamp_s: max_s,
         record_count: 1,
-        part_key,
         content_meta,
         size: ByteSize(1),
         uploaded_at_ns: TimestampNs(0),

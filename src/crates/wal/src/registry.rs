@@ -42,11 +42,10 @@ pub struct File {
     pub status: FileStatus,
     pub created_at_ns: TimestampNs,
     pub size: ByteSize,
-    /// Opaque partition key for the single partition this file holds.
-    pub part_key: u64,
     /// Opaque content-plane identity blob, recovered cheaply from the WAL
     /// header (no frame decode). The content plane decodes it to name the
     /// stream in enumeration / the query-side selector; the WAL never parses it.
+    /// The partition key lives in `id` (the filename `FileId`), not here.
     pub content_meta: Vec<u8>,
     pub min_timestamp_ns: TimestampNs,
     pub max_timestamp_ns: TimestampNs,
@@ -106,7 +105,6 @@ impl Registry {
                     created_at_ns: TimestampNs(header.created_at),
                     size,
                     // Recovered cheaply from the header.
-                    part_key: header.part_key,
                     content_meta: header.content_meta,
                     // Recovery cannot retrieve log-data range from the
                     // WAL file format today. Re-indexing populates the
@@ -147,7 +145,6 @@ impl Registry {
             FileEvent::Created {
                 file_id,
                 created_at_ns,
-                part_key,
                 content_meta,
             } => {
                 if self.files.contains(file_id.seq) {
@@ -160,7 +157,6 @@ impl Registry {
                         status: FileStatus::Active,
                         created_at_ns: *created_at_ns,
                         size: ByteSize::ZERO,
-                        part_key: *part_key,
                         content_meta: content_meta.clone(),
                         min_timestamp_ns: TimestampNs::ZERO,
                         max_timestamp_ns: TimestampNs::ZERO,
@@ -387,7 +383,7 @@ mod tests {
         assert!(
             registry
                 .archived_files()
-                .all(|f| f.part_key == crate::opaque_part_key("ns", "svc")),
+                .all(|f| f.id.part_key == crate::opaque_part_key("ns", "svc")),
             "recovery must recover each file's stream from its header"
         );
     }
@@ -416,7 +412,7 @@ mod tests {
             .apply_event(&FileEvent::Created {
                 file_id: id,
                 created_at_ns: TimestampNs(1),
-                part_key: crate::opaque_part_key("ns", "svc"), content_meta: Vec::new(),
+                content_meta: Vec::new(),
             })
             .unwrap();
         // Created starts at ZERO/ZERO.
@@ -481,7 +477,7 @@ mod tests {
             .apply_event(&FileEvent::Created {
                 file_id: id,
                 created_at_ns: TimestampNs(1),
-                part_key: crate::opaque_part_key("ns", "svc"), content_meta: Vec::new(),
+                content_meta: Vec::new(),
             })
             .unwrap();
         // Created: durable prefix unknown.
@@ -562,7 +558,7 @@ mod tests {
             .apply_event(&FileEvent::Created {
                 file_id: id,
                 created_at_ns: TimestampNs(1_000_000_000),
-                part_key: crate::opaque_part_key("ns", "svc"), content_meta: Vec::new(),
+                content_meta: Vec::new(),
             })
             .unwrap();
 
@@ -605,7 +601,6 @@ mod tests {
         reg.apply_event(&FileEvent::Created {
             file_id: id,
             created_at_ns: TimestampNs(0),
-            part_key,
             content_meta: Vec::new(),
         })
         .unwrap();
@@ -727,7 +722,7 @@ mod tests {
         reg.apply_event(&FileEvent::Created {
             file_id: id_zero,
             created_at_ns: TimestampNs(0),
-            part_key: crate::opaque_part_key("ns", "svc"), content_meta: Vec::new(),
+            content_meta: Vec::new(),
         })
         .unwrap();
 
@@ -779,14 +774,14 @@ mod tests {
             .apply_event(&FileEvent::Created {
                 file_id: id,
                 created_at_ns: TimestampNs(1_000_000_000),
-                part_key: crate::opaque_part_key("ns", "svc"), content_meta: Vec::new(),
+                content_meta: Vec::new(),
             })
             .unwrap();
         let err = registry
             .apply_event(&FileEvent::Created {
                 file_id: id,
                 created_at_ns: TimestampNs(2_000_000_000),
-                part_key: crate::opaque_part_key("ns", "svc"), content_meta: Vec::new(),
+                content_meta: Vec::new(),
             })
             .unwrap_err();
         assert!(matches!(err, Error::DuplicateSequence(1)));

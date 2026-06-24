@@ -132,7 +132,11 @@ fn dump(path: &PathBuf, limit: Option<u32>) -> Result<(), Box<dyn std::error::Er
     let string_table = reader.build_string_table(fields)?;
     eprintln!("string table: {} entries", string_table.len());
 
-    let part_key = reader.part_key();
+    // part_key is the single source of truth in the filename, not the file
+    // bytes — parse it from the path (0 if the name isn't a conformant FileId).
+    let part_key = file_registry::FileId::parse(path)
+        .map(|id| id.part_key)
+        .unwrap_or(0);
     let entries = reader.load_all_stream_entries()?;
     let timestamps = reader.load_timestamps()?;
     eprintln!(
@@ -241,7 +245,11 @@ fn sections(path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let part_key = reader.part_key();
+    // part_key is the single source of truth in the filename, not the file
+    // bytes — parse it from the path (0 if the name isn't a conformant FileId).
+    let part_key = file_registry::FileId::parse(path)
+        .map(|id| id.part_key)
+        .unwrap_or(0);
     let mut stream_total = 0usize;
     for b in 0..reader.num_stream_batches() {
         if let Ok(raw) = sfst.stream_batch_raw(b) {

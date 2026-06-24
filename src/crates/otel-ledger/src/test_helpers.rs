@@ -15,20 +15,21 @@ pub(crate) fn identity_for(stream: &otel_logs_identity::ServiceStream) -> (u64, 
 }
 
 /// A `Summary` for `stream` with the given range and record count, deriving
-/// `part_key`/`content_meta` the way production does.
+/// `content_meta` the way production does. The partition key is NOT in the
+/// summary — it lives in the file's `FileId`; tests that filter by partition
+/// pass the key via [`identity_for`] into the `FileId`.
 pub(crate) fn summary_for(
     stream: &otel_logs_identity::ServiceStream,
     record_count: u32,
     min_s: u32,
     max_s: u32,
 ) -> sfst::Summary {
-    let (part_key, content_meta) = identity_for(stream);
     sfst::Summary {
         min_timestamp_s: min_s,
         max_timestamp_s: max_s,
         record_count,
-        part_key,
-        content_meta,
+        content_meta: otel_logs_identity::encode_content_meta(stream)
+            .expect("test service identity encodes within content_meta limits"),
     }
 }
 

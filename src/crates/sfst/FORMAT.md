@@ -187,18 +187,18 @@ The cheap recovery summary. Decodes to `file_registry::FileSummary`
         pub min_timestamp_s: u32,
         pub max_timestamp_s: u32,
         pub record_count:    u32,
-        pub part_key:        u64,
         pub content_meta:    Vec<u8>,
     }
 
 `min_timestamp_s` and `max_timestamp_s` are the earliest and latest
 record seconds (Unix epoch) in the file. `record_count` drives the
-stream-batch partitioning (see above). `part_key` is the file's opaque
-partition key; the SFST layer stores and compares it but never
-interprets it. `content_meta` is an opaque content-plane identity blob,
-stored verbatim — the content plane (e.g. `otel-logs-identity`) is the
-sole encoder/decoder. The substrate is content-agnostic: it holds these
-neutral fields and never decodes the identity.
+stream-batch partitioning (see above). `content_meta` is an opaque
+content-plane identity blob, stored verbatim — the content plane (e.g.
+`otel-logs-identity`) is the sole encoder/decoder. The substrate is
+content-agnostic: it holds these neutral fields and never decodes the
+identity. The file's opaque **partition key is NOT stored in the
+summary** — it is the single source of truth in the filename (`FileId`);
+candidate filtering reads it from there.
 
 ### `META` — Metadata
 
@@ -387,7 +387,20 @@ CRC then fails to match.
 
 ## Format Version
 
-The current version is **6**.
+The current version is **7**.
+
+### v7 changelog (from v6)
+
+- **`SUMR` drops `part_key`.** The partition key is no longer stored in the
+  summary — it is the single source of truth in the filename (`FileId`),
+  propagated from the WAL file the SFST is built from. `FileSummary` is now
+  `{ min_timestamp_s, max_timestamp_s, record_count, content_meta }`. Candidate
+  filtering reads `id.part_key` (from the filename) instead of `summary.part_key`.
+  The bincode layout is incompatible, so a v6 file is rejected at the version
+  check (`Error::UnsupportedVersion`).
+
+v6 files cannot be read by a v7 reader and vice versa
+(`Error::UnsupportedVersion`). No migration tool exists.
 
 ### v6 changelog (from v5)
 

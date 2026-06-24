@@ -393,14 +393,15 @@ pub(super) fn build_into<W: Write + Seek>(
 
     // The indexer still derives the single stream from the rows (the
     // one-stream-per-file `MultipleStreams` check above), then encodes it into
-    // the substrate's opaque part_key + content_meta. This is the transitional
-    // content-plane touch in the builder; a later stage lifts identity
-    // derivation to the caller and removes this dependency.
+    // the substrate's opaque `content_meta` (display identity). The `part_key`
+    // is NOT stored in the summary — it is the single source of truth in the
+    // filename (`FileId`), propagated from the WAL file the SFST is built from.
+    // This is the transitional content-plane touch in the builder; a later
+    // stage lifts identity derivation to the caller and removes this dependency.
     let summary = sfst::Summary {
         min_timestamp_s: histogram.timestamps.first().copied().unwrap_or(0),
         max_timestamp_s: histogram.timestamps.last().copied().unwrap_or(0),
         record_count: total_logs,
-        part_key: otel_logs_identity::part_key(&stream),
         content_meta: otel_logs_identity::encode_content_meta(&stream)
             .ok_or(IndexError::IdentityTooLarge)?,
     };

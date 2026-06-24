@@ -22,7 +22,6 @@ fn make_entry(seq: u64) -> otel_catalog::CatalogEntry {
         min_timestamp_s: 1_700_000_000,
         max_timestamp_s: 1_700_003_600,
         record_count: 10,
-        part_key,
         content_meta: otel_logs_identity::encode_content_meta(&stream).unwrap(),
         size: ByteSize(1024),
         uploaded_at_ns: file_registry::TimestampNs(2_000_000_000),

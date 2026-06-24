@@ -73,11 +73,6 @@ impl<'a> IndexReader<'a> {
         &self.metadata().histogram
     }
 
-    /// The file's opaque partition key (the content plane assigns its meaning).
-    pub fn part_key(&self) -> u64 {
-        self.summary.part_key
-    }
-
     /// The file's opaque content-plane metadata blob (the content plane decodes
     /// it; the substrate never interprets it).
     pub fn content_meta(&self) -> &[u8] {

@@ -70,7 +70,7 @@ fn build_query_fixture() -> Vec<u8> {
         min_timestamp_s: 1_700_000_000,
         max_timestamp_s: 1_700_000_005,
         record_count: 6,
-        part_key: crate::opaque_part_key("ns", "svc"), content_meta: Vec::new(),
+        content_meta: Vec::new(),
     };
     let metadata = Metadata {
         histogram: Histogram {
@@ -467,7 +467,7 @@ fn build_multivalued_fixture() -> Vec<u8> {
         min_timestamp_s: 1_700_000_000,
         max_timestamp_s: 1_700_000_002,
         record_count: 3,
-        part_key: crate::opaque_part_key("ns", "svc"), content_meta: Vec::new(),
+        content_meta: Vec::new(),
     };
     let metadata = Metadata {
         histogram: Histogram {
@@ -708,7 +708,7 @@ fn build_complemented_fixture() -> Vec<u8> {
         min_timestamp_s: 1_700_000_000,
         max_timestamp_s: 1_700_000_005,
         record_count: 6,
-        part_key: crate::opaque_part_key("ns", "svc"), content_meta: Vec::new(),
+        content_meta: Vec::new(),
     };
     let metadata = Metadata {
         histogram: Histogram {
@@ -925,7 +925,7 @@ fn build_tiered_fixture() -> Vec<u8> {
         min_timestamp_s: 1_700_000_000,
         max_timestamp_s: 1_700_000_005,
         record_count: N,
-        part_key: crate::opaque_part_key("ns", "svc"), content_meta: Vec::new(),
+        content_meta: Vec::new(),
     };
     let metadata = Metadata {
         histogram: Histogram {

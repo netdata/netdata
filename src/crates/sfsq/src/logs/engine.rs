@@ -280,7 +280,6 @@ mod tests {
                         min_timestamp_s: 0,
                         max_timestamp_s: 10,
                         record_count: 0,
-                        part_key: 0,
                         content_meta: Vec::new(),
                     },
                     file_seq: i as u64 + 1,

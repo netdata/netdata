@@ -13,11 +13,9 @@ pub struct CatalogEntry {
     pub min_timestamp_s: u32,
     pub max_timestamp_s: u32,
     pub record_count: u32,
-    /// Opaque partition key; the content plane derives it. The catalog filters
-    /// candidates by it but never interprets it.
-    pub part_key: u64,
     /// Opaque content-plane identity blob, stored verbatim and never parsed by
-    /// the catalog.
+    /// the catalog. The partition key is NOT stored here — it lives only in
+    /// `id` (the filename `FileId`), the single source of truth.
     pub content_meta: Vec<u8>,
     pub size: ByteSize,
     pub uploaded_at_ns: TimestampNs,
@@ -56,11 +54,10 @@ mod tests {
             min_timestamp_s: 1_700_000_000,
             max_timestamp_s: 1_700_003_600,
             record_count: 1234,
-            // The catalog treats both fields as opaque (content-agnostic, no
-            // identity-codec dep): an arbitrary partition key and a hand-built
-            // `content_meta` blob, here for ("prod", "api") — version 1,
-            // u16-LE-len-prefixed namespace then name.
-            part_key: 0xC0FFEE,
+            // The catalog treats `content_meta` as opaque (content-agnostic, no
+            // identity-codec dep): a hand-built blob for ("prod", "api") —
+            // version 1, u16-LE-len-prefixed namespace then name. The partition
+            // key lives in `id` above, not as a separate field.
             content_meta: vec![1, 4, 0, b'p', b'r', b'o', b'd', 3, 0, b'a', b'p', b'i'],
             size: ByteSize(9876),
             uploaded_at_ns: TimestampNs(1_700_003_700_000_000_000),

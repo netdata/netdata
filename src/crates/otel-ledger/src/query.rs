@@ -46,7 +46,7 @@ impl Registry {
         let mut seen: HashSet<u64> = HashSet::new();
         let mut out: Vec<otel_catalog::CatalogEntry> = catalog
             .iter()
-            .filter(|e| q.matches_partition(e.part_key))
+            .filter(|e| q.matches_partition(e.id.part_key))
             .filter(|e| !local_seqs.contains(&e.id.seq) && seen.insert(e.id.seq))
             .cloned()
             .collect();

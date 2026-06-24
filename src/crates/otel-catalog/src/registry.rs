@@ -790,7 +790,6 @@ mod tests {
             min_timestamp_s: min_s,
             max_timestamp_s: max_s,
             record_count: 1,
-            part_key,
             content_meta: Vec::new(),
             size: ByteSize(1),
             uploaded_at_ns: file_registry::TimestampNs(0),

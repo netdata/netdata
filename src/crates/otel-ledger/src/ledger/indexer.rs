@@ -74,25 +74,13 @@ impl Ledger {
                     sfst_path: registry.sfst.file_path(file_id),
                 }
             } else {
-                // The WAL file's `part_key` (from its header/FileId) and the
-                // freshly-indexed summary's `part_key` (re-derived from the same
-                // rows) must agree — both describe the one partition this file
-                // holds, and they are equal by construction for files this binary
-                // produces. They can only diverge on an indexer bug or external
-                // corruption; this `debug_assert` catches the bug case in
-                // tests/CI (the selector keys on `summary.part_key` while the
-                // `files:true` inventory reports `id.part_key`, so a mismatch
-                // would make the two disagree about the same file). Release-time
-                // enforcement across every ingestion/recovery point, plus the
-                // single-source-of-truth that removes the duplication, is
-                // deferred to Stage 3 (the `part_key` propagation seam).
-                debug_assert_eq!(
-                    file_id.part_key, summary.part_key,
-                    "WAL FileId.part_key must match the indexed SFST summary.part_key"
-                );
-                // Summary fields (timestamps, record count, part_key, content_meta)
-                // live on the registry entry; the uploader response handler reads
-                // them back.
+                // `part_key` is the single source of truth in the SFST's `FileId`
+                // (its filename), propagated from the WAL file this index was
+                // built from — never re-derived or stored in the summary, so the
+                // selector and the `files:true` inventory both read `id.part_key`
+                // and cannot disagree. Summary fields (timestamps, record count,
+                // content_meta) live on the registry entry; the uploader response
+                // handler reads them back.
                 registry.sfst.track(file_id, size, summary);
 
                 let upload = if self.logs_config.storage.enabled {

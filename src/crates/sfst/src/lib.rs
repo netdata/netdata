@@ -40,9 +40,8 @@
 //!     min_timestamp_s: 0,
 //!     max_timestamp_s: 0,
 //!     record_count: 0,
-//!     // `part_key`/`content_meta` are opaque to sfst — the content plane
-//!     // (otel-logs-identity) derives them; here an empty partition.
-//!     part_key: 0,
+//!     // `content_meta` is opaque to sfst — the content plane derives it.
+//!     // The partition key is NOT here; it lives in the file's `FileId`.
 //!     content_meta: Vec::new(),
 //! };
 //! let metadata = sfst::Metadata {
@@ -136,7 +135,11 @@ const MAGIC: &[u8; 4] = b"SFST";
 //     replacing the typed `{ total_logs, stream: ServiceStream }`. The bincode
 //     bytes are incompatible, so older files are rejected on open rather than
 //     surfacing a decode error.
-const VERSION: u32 = 6;
+// v7: SUMR drops `part_key` — the partition key is the single source of truth in
+//     the filename (`FileId`), never duplicated in the summary. `FileSummary` is
+//     now `{ min_timestamp_s, max_timestamp_s, record_count, content_meta }`.
+//     Incompatible bincode layout; older files rejected on open.
+const VERSION: u32 = 7;
 
 const CHUNK_SUMMARY: chunk_file::ChunkId = *b"SUMR";
 const CHUNK_META: chunk_file::ChunkId = *b"META";
