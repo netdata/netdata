@@ -240,6 +240,30 @@ func TestModuleFuncRegistry_MethodRouteCollisionUsesDeterministicOwner(t *testin
 	assert.Equal(t, "logs", methodID)
 }
 
+func TestModuleFuncRegistry_MethodRouteRefreshesAffectedNames(t *testing.T) {
+	r := newModuleFuncRegistry()
+	r.registerModuleWithMethods("bbb", collectorapi.Creator{}, []funcapi.MethodConfig{{
+		ID:           "logs",
+		FunctionName: "shared:logs",
+	}})
+	r.registerModuleWithMethods("aaa", collectorapi.Creator{}, []funcapi.MethodConfig{{
+		ID:           "logs",
+		FunctionName: "shared:logs",
+	}})
+
+	r.registerModuleWithMethods("aaa", collectorapi.Creator{}, nil)
+
+	moduleName, methodID, ok := r.resolveMethodRoute("shared:logs")
+	require.True(t, ok)
+	assert.Equal(t, "bbb", moduleName)
+	assert.Equal(t, "logs", methodID)
+
+	r.registerModuleWithMethods("bbb", collectorapi.Creator{}, nil)
+
+	_, _, ok = r.resolveMethodRoute("shared:logs")
+	assert.False(t, ok)
+}
+
 func TestModuleFuncRegistry_VerifyJobGeneration_JobStopped(t *testing.T) {
 	r := newModuleFuncRegistry()
 	r.registerModule("postgres", collectorapi.Creator{})
@@ -991,6 +1015,76 @@ func TestControllerRegisterJobMethods(t *testing.T) {
 				assert.ElementsMatch(t, []string{"mod:a", "mod:b"}, reg.registeredNames())
 				assert.Len(t, controller.registry.getJobMethods("mod", "job1"), 2)
 			}
+		})
+	}
+}
+
+func TestControllerPublishedFunctionGenerationInvalidatesStaleHandlers(t *testing.T) {
+	tests := map[string]struct {
+		setup func(*Controller)
+	}{
+		"module method after cleanup": {
+			setup: func(controller *Controller) {
+				controller.RegisterModules(collectorapi.Registry{
+					"mod": collectorapi.Creator{
+						Methods: func() []funcapi.MethodConfig {
+							return []funcapi.MethodConfig{{ID: "a"}}
+						},
+						MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+							return &tableTestHandler{}
+						},
+					},
+				})
+				controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+				controller.Cleanup()
+			},
+		},
+		"job method after job stop": {
+			setup: func(controller *Controller) {
+				controller.RegisterModules(collectorapi.Registry{
+					"mod": collectorapi.Creator{
+						JobMethods: func(collectorapi.RuntimeJob) []funcapi.MethodConfig {
+							return []funcapi.MethodConfig{{ID: "a"}}
+						},
+						MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+							return &tableTestHandler{}
+						},
+					},
+				})
+				job := newTestRuntimeJob("mod", "job1", true)
+				controller.OnJobStart(job)
+				controller.OnJobStop(job)
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var gotCode int
+			var gotResp map[string]any
+			var stale func(functions.Function)
+			reg := newTestFunctionRegistry()
+			reg.onRegister = func(name string, fn func(functions.Function)) {
+				if name == "mod:a" {
+					stale = fn
+				}
+			}
+			controller := New(Options{
+				FnReg: reg,
+				JSONWriter: func(data []byte, code int) {
+					gotCode = code
+					require.NoError(t, json.Unmarshal(data, &gotResp))
+				},
+			})
+
+			tc.setup(controller)
+			require.NotNil(t, stale)
+
+			stale(functions.Function{UID: "stale-handler", Timeout: time.Second})
+
+			assert.Equal(t, 404, gotCode)
+			assert.Equal(t, float64(404), gotResp["status"])
+			assert.Equal(t, "unknown function 'mod:a'", gotResp["errorMessage"])
 		})
 	}
 }
