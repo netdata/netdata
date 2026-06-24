@@ -164,19 +164,28 @@ This configuration file can be edited using our [`edit-config` script](/docs/net
 
 ### Disable automatic updates
 
-**At install time**, pass `--no-updates` to the kickstart script to skip setting up auto-updates entirely:
+<details>
+<summary><strong>At install time (kickstart)</strong></summary><br/>
+
+Pass `--no-updates` to the kickstart script to skip setting up auto-updates entirely:
 
 ```bash
 wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --no-updates
 ```
 
-To explicitly control the scheduling method at install time, use `--auto-update-type` with one of `systemd`, `interval`, or `crontab`:
+To explicitly control the scheduling method, use `--auto-update-type` with one of `systemd`, `interval`, or `crontab`:
 
 ```bash
 wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --auto-update-type systemd
 ```
 
-**On an existing installation**, run the updater script with the `--disable-auto-updates` option using root privileges:
+<br/>
+</details>
+
+<details>
+<summary><strong>On an existing installation</strong></summary><br/>
+
+Run the updater script with the `--disable-auto-updates` option using root privileges:
 
 ```bash
 sudo /usr/libexec/netdata/netdata-updater.sh --disable-auto-updates
@@ -216,7 +225,6 @@ For example:
 sudo rm -f /etc/cron.d/netdata-updater-daily
 ```
 
-<br/>
 </details>
 
 <details>
@@ -236,7 +244,6 @@ sudo /usr/libexec/netdata/netdata-updater.sh --enable-auto-updates systemd
 
 Valid methods are `systemd`, `interval`, and `crontab`.
 
-<br/>
 </details>
 
 :::note
@@ -254,6 +261,8 @@ sudo dnf versionlock add netdata
 ```
 
 :::
+
+</details>
 
 ## Quick Reference
 
