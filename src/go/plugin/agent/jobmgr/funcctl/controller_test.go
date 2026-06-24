@@ -422,7 +422,7 @@ func TestControllerLifecycleHooks(t *testing.T) {
 		"availability-gated static method registers when available":     {},
 		"availability-gated agent-wide method registers when available": {},
 		"reconcile registers late available static method":              {},
-		"reconcile ignores stopped job":                                 {},
+		"reconcile ignores module with no running job":                  {},
 		"reconcile does not duplicate published static method":          {},
 		"reconcile logs empty static method ID once":                    {},
 		"public method name collision skips colliding module":           {},
@@ -535,11 +535,11 @@ func TestControllerLifecycleHooks(t *testing.T) {
 				assert.Empty(t, reg.registeredNames())
 
 				available = true
-				controller.ReconcileModuleMethodsForJob(job)
+				controller.ReconcileModuleMethods(job.ModuleName())
 
 				assert.Equal(t, []string{"mod:logs"}, reg.registeredNames())
 
-			case "reconcile ignores stopped job":
+			case "reconcile ignores module with no running job":
 				available := true
 				controller.RegisterModules(collectorapi.Registry{
 					"mod": collectorapi.Creator{
@@ -552,7 +552,7 @@ func TestControllerLifecycleHooks(t *testing.T) {
 					},
 				})
 
-				controller.ReconcileModuleMethodsForJob(newTestRuntimeJob("mod", "job1", false))
+				controller.ReconcileModuleMethods("mod")
 
 				assert.Empty(t, reg.registeredNames())
 
@@ -574,8 +574,8 @@ func TestControllerLifecycleHooks(t *testing.T) {
 
 				job := newTestRuntimeJob("mod", "job1", true)
 				controller.OnJobStart(job)
-				controller.ReconcileModuleMethodsForJob(job)
-				controller.ReconcileModuleMethodsForJob(job)
+				controller.ReconcileModuleMethods(job.ModuleName())
+				controller.ReconcileModuleMethods(job.ModuleName())
 
 				assert.Equal(t, []string{"mod:logs"}, reg.registeredNames())
 				assert.Equal(t, 1, availableCalls)
@@ -597,9 +597,9 @@ func TestControllerLifecycleHooks(t *testing.T) {
 				job1 := newTestRuntimeJob("mod", "job1", true)
 				job2 := newTestRuntimeJob("mod", "job2", true)
 				controller.OnJobStart(job1)
-				controller.ReconcileModuleMethodsForJob(job1)
+				controller.ReconcileModuleMethods(job1.ModuleName())
 				controller.OnJobStart(job2)
-				controller.ReconcileModuleMethodsForJob(job2)
+				controller.ReconcileModuleMethods(job2.ModuleName())
 
 				assert.Equal(t, 1, strings.Count(logBuf.String(), "empty method ID"))
 
@@ -821,7 +821,7 @@ func TestControllerReconcileModuleMethodsConcurrentLifecycle(t *testing.T) {
 			defer wg.Done()
 			<-start
 			for n := range iterations {
-				controller.ReconcileModuleMethodsForJob(jobs[(worker+n)%len(jobs)])
+				controller.ReconcileModuleMethods(jobs[(worker+n)%len(jobs)].ModuleName())
 			}
 		}(i)
 	}

@@ -150,21 +150,6 @@ func (c *Controller) OnJobStart(job collectorapi.RuntimeJob) {
 	}
 }
 
-// ReconcileModuleMethodsForJob rechecks module/static method availability for a running job.
-//
-// This supports late publication for module methods whose availability depends on
-// runtime state that can appear after job start. Publication remains monotonic:
-// already-published methods are never removed here.
-func (c *Controller) ReconcileModuleMethodsForJob(job collectorapi.RuntimeJob) {
-	if job == nil || !job.IsRunning() {
-		return
-	}
-	if _, ok := c.registry.getJob(job.ModuleName(), job.Name()); !ok {
-		return
-	}
-	c.ReconcileModuleMethods(job.ModuleName())
-}
-
 // ReconcileModuleMethods rechecks module/static method availability for modules
 // with at least one registered running job.
 func (c *Controller) ReconcileModuleMethods(moduleName string) {
