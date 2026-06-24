@@ -11,6 +11,46 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestAugmentTopologySnapshotLocalsMaterializesMissingPolledManagedActor(t *testing.T) {
+	data := topologymodel.Data{
+		Actors: []topologymodel.Actor{
+			{
+				ActorID:   "existing",
+				ActorType: "switch",
+				Match:     topologymodel.Match{SysName: "existing-switch"},
+			},
+		},
+	}
+	snapshots := []topologymodel.ObservationSnapshot{
+		{
+			LocalDeviceID: "router-b-id",
+			LocalDevice: topologymodel.Device{
+				SysName:      "router-b",
+				SysObjectID:  "1.3.6.1.4.1.8072.3.2.1",
+				ChassisID:    "02:00:00:00:01:02",
+				ManagementIP: "192.0.2.2",
+				Labels:       map[string]string{"type": "router"},
+			},
+		},
+	}
+
+	augmentTopologySnapshotLocals(&data, snapshots)
+	augmentTopologySnapshotLocals(&data, snapshots)
+
+	require.Len(t, data.Actors, 2)
+	actor := data.Actors[1]
+	require.Equal(t, "router-b-id", actor.ActorID)
+	require.Equal(t, "router", actor.ActorType)
+	require.Equal(t, "network", actor.Layer)
+	require.Equal(t, "snmp", actor.Source)
+	require.Equal(t, "router-b", actor.Match.SysName)
+	require.Equal(t, "1.3.6.1.4.1.8072.3.2.1", actor.Match.SysObjectID)
+	require.Equal(t, []string{"02:00:00:00:01:02"}, actor.Match.ChassisIDs)
+	require.Equal(t, []string{"02:00:00:00:01:02"}, actor.Match.MacAddresses)
+	require.Equal(t, []string{"192.0.2.2"}, actor.Match.IPAddresses)
+	require.Equal(t, "192.0.2.2", actor.Detail.SNMP.ManagementIP)
+}
+
 func TestEnrichLocalActorChartReferencesAddsTypedPortDetails(t *testing.T) {
 	actor := &topologymodel.Actor{
 		Detail: topologymodel.ActorDetail{
