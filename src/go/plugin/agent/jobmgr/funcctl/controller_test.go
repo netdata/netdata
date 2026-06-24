@@ -448,6 +448,7 @@ func TestControllerLifecycleHooks(t *testing.T) {
 		"reconcile registers late available static method":              {},
 		"reconcile ignores module with no running job":                  {},
 		"reconcile does not duplicate published static method":          {},
+		"reconcile does not withdraw published static method":           {},
 		"reconcile logs empty static method ID once":                    {},
 		"public method name collision skips colliding module":           {},
 		"rejected module does not poison planned public names":          {},
@@ -603,6 +604,35 @@ func TestControllerLifecycleHooks(t *testing.T) {
 
 				assert.Equal(t, []string{"mod:logs"}, reg.registeredNames())
 				assert.Equal(t, 1, availableCalls)
+
+			case "reconcile does not withdraw published static method":
+				var buf bytes.Buffer
+				available := true
+				controller = New(Options{
+					FnReg: reg,
+					API:   dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))),
+				})
+				controller.RegisterModules(collectorapi.Registry{
+					"mod": collectorapi.Creator{
+						Methods: func() []funcapi.MethodConfig {
+							return []funcapi.MethodConfig{{
+								ID:        "logs",
+								Available: func() bool { return available },
+							}}
+						},
+					},
+				})
+
+				job := newTestRuntimeJob("mod", "job1", true)
+				controller.OnJobStart(job)
+				assert.Contains(t, buf.String(), "FUNCTION GLOBAL \"mod:logs\"")
+
+				available = false
+				controller.ReconcileModuleMethods(job.ModuleName())
+
+				assert.Equal(t, []string{"mod:logs"}, reg.registeredNames())
+				assert.Empty(t, reg.unregisteredNames())
+				assert.NotContains(t, buf.String(), "FUNCTION_DEL")
 
 			case "reconcile logs empty static method ID once":
 				var logBuf bytes.Buffer
@@ -1015,6 +1045,102 @@ func TestControllerRegisterJobMethods(t *testing.T) {
 				assert.ElementsMatch(t, []string{"mod:a", "mod:b"}, reg.registeredNames())
 				assert.Len(t, controller.registry.getJobMethods("mod", "job1"), 2)
 			}
+		})
+	}
+}
+
+func TestControllerPublishedFunctionWrapperConcurrentMutation(t *testing.T) {
+	tests := map[string]struct {
+		setup  func(*Controller)
+		mutate func(*Controller)
+	}{
+		"module cleanup": {
+			setup: func(controller *Controller) {
+				controller.RegisterModules(collectorapi.Registry{
+					"mod": collectorapi.Creator{
+						Methods: func() []funcapi.MethodConfig {
+							return []funcapi.MethodConfig{{ID: "a"}}
+						},
+						MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+							return &tableTestHandler{}
+						},
+					},
+				})
+				controller.OnJobStart(newTestRuntimeJob("mod", "job0", true))
+			},
+			mutate: func(controller *Controller) {
+				for i := range 100 {
+					controller.Cleanup()
+					controller.OnJobStart(newTestRuntimeJob("mod", fmt.Sprintf("job%d", i+1), true))
+				}
+			},
+		},
+		"job stop": {
+			setup: func(controller *Controller) {
+				controller.RegisterModules(collectorapi.Registry{
+					"mod": collectorapi.Creator{
+						JobMethods: func(collectorapi.RuntimeJob) []funcapi.MethodConfig {
+							return []funcapi.MethodConfig{{ID: "a"}}
+						},
+						MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+							return &tableTestHandler{}
+						},
+					},
+				})
+				controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+			},
+			mutate: func(controller *Controller) {
+				job := newTestRuntimeJob("mod", "job1", true)
+				for range 100 {
+					controller.OnJobStop(job)
+					controller.OnJobStart(job)
+				}
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			reg := newTestFunctionRegistry()
+			firstHandler := make(chan func(functions.Function), 1)
+			var captureOnce sync.Once
+			reg.onRegister = func(name string, fn func(functions.Function)) {
+				if name == "mod:a" {
+					captureOnce.Do(func() { firstHandler <- fn })
+				}
+			}
+			controller := New(Options{FnReg: reg})
+			tc.setup(controller)
+
+			var handler func(functions.Function)
+			select {
+			case handler = <-firstHandler:
+			case <-time.After(2 * time.Second):
+				t.Fatal("published handler was not registered")
+			}
+
+			start := make(chan struct{})
+			var wg sync.WaitGroup
+			for range 8 {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					<-start
+					for range 100 {
+						handler(functions.Function{UID: "wrapped-dispatch", Timeout: time.Second})
+					}
+				}()
+			}
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				<-start
+				tc.mutate(controller)
+			}()
+
+			close(start)
+			wg.Wait()
 		})
 	}
 }
