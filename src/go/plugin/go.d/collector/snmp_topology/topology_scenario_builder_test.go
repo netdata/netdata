@@ -4,6 +4,7 @@ package snmptopology
 
 import (
 	"fmt"
+	"hash/fnv"
 	"net"
 	"strconv"
 	"strings"
@@ -480,13 +481,20 @@ func topologyScenarioPortMAC(chassisMAC string, ifIndex int) string {
 	if mac == "" {
 		return ""
 	}
-	parts := strings.Split(mac, ":")
-	if len(parts) != 6 {
-		return mac
-	}
-	parts[1] = "aa"
-	parts[5] = fmt.Sprintf("%02x", ifIndex&0xff)
-	return strings.Join(parts, ":")
+	// Keep synthetic interface MACs unique across devices; duplicate port MACs
+	// collapse projected actors before semantic link assertions can see them.
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(mac))
+	_, _ = h.Write([]byte{0})
+	_, _ = h.Write([]byte(strconv.Itoa(ifIndex)))
+	sum := h.Sum64()
+	return fmt.Sprintf("02:%02x:%02x:%02x:%02x:%02x",
+		byte(sum>>32),
+		byte(sum>>24),
+		byte(sum>>16),
+		byte(sum>>8),
+		byte(sum),
+	)
 }
 
 func topologyScenarioIPv4CIDR(cidr string) (string, string) {

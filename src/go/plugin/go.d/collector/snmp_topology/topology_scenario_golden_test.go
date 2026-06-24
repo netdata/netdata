@@ -56,6 +56,27 @@ func topologyScenarioCases() map[string]topologyScenarioCase {
 			scenario: newFocusDepthL2Scenario(),
 			assert:   assertFocusDepthL2Scenario,
 		},
+		"cdp_direct": {
+			scenario: newCDPDirectScenario(),
+			assert:   assertCDPDirectScenario,
+		},
+		"stp_inferred": {
+			scenario: newSTPInferredScenario(),
+			assert:   assertSTPInferredScenario,
+		},
+		"l3_p2p_31": {
+			scenario: newL3P2P31Scenario(),
+			assert:   assertL3P2P31Scenario,
+		},
+	}
+}
+
+func topologyScenarioGoldenCases() map[string]topologyScenarioCase {
+	all := topologyScenarioCases()
+	return map[string]topologyScenarioCase{
+		"mixed_l2_l3_control":         all["mixed_l2_l3_control"],
+		"probable_fdb_low_confidence": all["probable_fdb_low_confidence"],
+		"focus_depth_l2":              all["focus_depth_l2"],
 	}
 }
 
@@ -82,11 +103,10 @@ func TestSNMPTopologyScenarioGoldens(t *testing.T) {
 		t.Skipf("SNMP topology scenario golden directory is missing; set %s or checkout netdata/testdata into src/go/testdata", topologyScenarioGoldenDirEnv)
 	}
 
-	for name, tc := range topologyScenarioCases() {
+	for name, tc := range topologyScenarioGoldenCases() {
 		t.Run(name, func(t *testing.T) {
 			payload := tc.scenario.render(t)
 			normalized := topologyv1test.NormalizeData(t, payload)
-			tc.assert(t, normalized)
 
 			actual := topologyv1test.CanonicalJSON(t, normalized)
 			if *updateSNMPTopologyScenarioGoldens {
@@ -215,6 +235,39 @@ func newFocusDepthL2Scenario() *topologyScenario {
 	return s
 }
 
+func newCDPDirectScenario() *topologyScenario {
+	s := newTopologyScenario("cdp_direct").WithOptions(func(options *topologyoptions.QueryOptions) {
+		options.CollapseActorsByIP = false
+	})
+	switchA := s.Switch("cdp-switch-a", "192.0.2.41", "02:00:00:00:05:01")
+	switchB := s.Switch("cdp-switch-b", "192.0.2.42", "02:00:00:00:05:02")
+	s.CDP(switchA.Port("a-b", 1), switchB.Port("b-a", 1))
+	return s
+}
+
+func newSTPInferredScenario() *topologyScenario {
+	s := newTopologyScenario("stp_inferred").WithOptions(func(options *topologyoptions.QueryOptions) {
+		options.CollapseActorsByIP = false
+		options.MapType = topologyoptions.MapTypeHighConfidenceInferred
+		options.InferenceStrategy = topologyoptions.InferenceStrategySTPParentTree
+	})
+	switchA := s.Switch("stp-switch-a", "192.0.2.51", "02:00:00:00:06:01")
+	switchB := s.Switch("stp-switch-b", "192.0.2.52", "02:00:00:00:06:02")
+	s.STP(switchA.Port("a-b", 1), switchB.Port("b-a", 1))
+	return s
+}
+
+func newL3P2P31Scenario() *topologyScenario {
+	s := newTopologyScenario("l3_p2p_31").WithOptions(func(options *topologyoptions.QueryOptions) {
+		options.CollapseActorsByIP = false
+	})
+	routerA := s.Router("p2p-router-a", "192.0.2.61", "02:00:00:00:07:01", "192.0.2.161", "65061")
+	routerB := s.Router("p2p-router-b", "192.0.2.62", "02:00:00:00:07:02", "192.0.2.162", "65062")
+	routerA.Port("wan0", 1).IPv4("198.51.100.10/31")
+	routerB.Port("wan0", 1).IPv4("198.51.100.11/31")
+	return s
+}
+
 func assertMixedL2L3ControlScenario(t testing.TB, data topologyv1test.NormalizedData) {
 	t.Helper()
 
@@ -227,6 +280,7 @@ func assertMixedL2L3ControlScenario(t testing.TB, data topologyv1test.Normalized
 	})
 	assertScenarioLinks(t, data, []topologyScenarioLinkExpectation{
 		{Type: "lldp", Src: "router-a", Dst: "switch-a", Direction: "bidirectional", Protocol: "lldp", SrcPort: "lan0", DstPort: "uplink-a"},
+		{Type: "cdp", Src: "switch-a", Dst: "switch-b", Direction: "bidirectional", Protocol: "cdp", SrcPort: "uplink-a", DstPort: "uplink-b"},
 		{Type: topologymodel.L3SubnetMembershipLinkType, Src: "router-a", Dst: "10.10.10.0/24", Direction: "observed", Protocol: topologymodel.L3SubnetMembershipLinkType, SrcPort: "lan0"},
 		{Type: topologymodel.L3SubnetMembershipLinkType, Src: "switch-a", Dst: "10.10.10.0/24", Direction: "observed", Protocol: topologymodel.L3SubnetMembershipLinkType, SrcPort: "uplink-a"},
 		{Type: topologymodel.L3SubnetMembershipLinkType, Src: "switch-b", Dst: "10.10.10.0/24", Direction: "observed", Protocol: topologymodel.L3SubnetMembershipLinkType, SrcPort: "uplink-b"},
@@ -236,12 +290,14 @@ func assertMixedL2L3ControlScenario(t testing.TB, data topologyv1test.Normalized
 	})
 	assertScenarioTableRowsContain(t, data, "actor_ports", []map[string]any{
 		{"actor": "router-a", "if_index": 2, "name": "lan0", "neighbor_actor": "switch-a", "neighbor_port_name": "uplink-a", "neighbor_count": 1, "link_count": 1, "topology_role": "switch_facing"},
-		{"actor": "switch-a", "if_index": 1, "name": "uplink-a", "neighbor_actor": "router-a", "neighbor_port_name": "lan0", "neighbor_count": 2, "link_count": 4, "stp_state": "forwarding"},
+		{"actor": "switch-a", "if_index": 1, "name": "uplink-a", "neighbor_count": 2, "link_count": 4, "stp_state": "forwarding", "topology_role": "switch_facing"},
 		{"actor": "switch-a", "if_index": 2, "name": "host-a", "fdb_mac_count": 1, "topology_role": "host_facing"},
 	})
 	assertScenarioTableRowsExactly(t, data, "actor_port_links", []map[string]any{
 		{"actor": "router-a", "remote_actor": "switch-a", "type": "lldp", "protocol": "lldp", "if_index": 2, "port_name": "lan0", "remote_if_index": 1, "remote_port_name": "uplink-a"},
 		{"actor": "switch-a", "remote_actor": "router-a", "type": "lldp", "protocol": "lldp", "if_index": 1, "port_name": "uplink-a", "remote_if_index": 2, "remote_port_name": "lan0"},
+		{"actor": "switch-a", "remote_actor": "switch-b", "type": "cdp", "protocol": "cdp", "if_index": 1, "port_name": "uplink-a", "remote_if_index": 1, "remote_port_name": "uplink-b"},
+		{"actor": "switch-b", "remote_actor": "switch-a", "type": "cdp", "protocol": "cdp", "if_index": 1, "port_name": "uplink-b", "remote_if_index": 1, "remote_port_name": "uplink-a"},
 	})
 	assertScenarioTableRowsExactly(t, data, "actor_ospf_neighbors", []map[string]any{
 		{"actor": "router-a", "remote_actor": "router-b", "local_ip": "198.51.100.1", "neighbor_ip": "198.51.100.2", "local_router_id": "192.0.2.101", "neighbor_router_id": "192.0.2.102", "state": "full", "subnet": "198.51.100.0/30"},
@@ -253,6 +309,9 @@ func assertMixedL2L3ControlScenario(t testing.TB, data topologyv1test.Normalized
 	})
 	assertScenarioEvidenceRowsExactly(t, data, "lldp", []map[string]any{
 		{"src_actor": "router-a", "dst_actor": "switch-a", "src_if_index": 2, "dst_if_index": 1, "src_port_name": "lan0", "dst_port_name": "uplink-a", "protocol": "lldp"},
+	})
+	assertScenarioEvidenceRowsExactly(t, data, "cdp", []map[string]any{
+		{"src_actor": "switch-a", "dst_actor": "switch-b", "src_if_index": 1, "dst_if_index": 1, "src_port_name": "uplink-a", "dst_port_name": "uplink-b", "protocol": "cdp"},
 	})
 	assertScenarioEvidenceRowsExactly(t, data, topologymodel.L3SubnetLinkType, []map[string]any{
 		{"src_actor": "router-a", "dst_actor": "router-b", "src_ip": "198.51.100.1", "dst_ip": "198.51.100.2", "src_if_index": 1, "dst_if_index": 1, "src_port_name": "wan0", "dst_port_name": "wan0", "subnet": "198.51.100.0/30", "prefix": 30},
@@ -305,17 +364,81 @@ func assertFocusDepthL2Scenario(t testing.TB, data topologyv1test.NormalizedData
 
 	assertScenarioActors(t, data, []topologyScenarioActorExpectation{
 		{Name: "focus-switch-a", Type: "switch", ManagementIP: "192.0.2.31"},
+		{Name: "focus-switch-b", Type: "switch", ManagementIP: "192.0.2.32"},
 	})
-	assertScenarioNoVisibleLinks(t, data)
+	assertScenarioLinks(t, data, []topologyScenarioLinkExpectation{
+		{Type: "lldp", Src: "focus-switch-a", Dst: "focus-switch-b", Direction: "bidirectional", Protocol: "lldp", SrcPort: "a-b", DstPort: "b-a"},
+	})
 	assertScenarioTableRowsContain(t, data, "actor_ports", []map[string]any{
 		{"actor": "focus-switch-a", "if_index": 1, "name": "a-b", "neighbor_count": 1, "link_count": 1, "topology_role": "switch_facing"},
 	})
-	assertScenarioTableRowsExactly(t, data, "actor_port_links", nil)
-	assertScenarioStatEquals(t, data, "actors_focus_depth_filtered", 2)
-	assertScenarioStatEquals(t, data, "links_total", 0)
+	assertScenarioTableRowsExactly(t, data, "actor_port_links", []map[string]any{
+		{"actor": "focus-switch-a", "remote_actor": "focus-switch-b", "type": "lldp", "protocol": "lldp", "if_index": 1, "port_name": "a-b", "remote_if_index": 1, "remote_port_name": "b-a"},
+		{"actor": "focus-switch-b", "remote_actor": "focus-switch-a", "type": "lldp", "protocol": "lldp", "if_index": 1, "port_name": "b-a", "remote_if_index": 1, "remote_port_name": "a-b"},
+	})
+	assertScenarioEvidenceRowsExactly(t, data, "lldp", []map[string]any{
+		{"src_actor": "focus-switch-a", "dst_actor": "focus-switch-b", "src_if_index": 1, "dst_if_index": 1, "src_port_name": "a-b", "dst_port_name": "b-a", "protocol": "lldp"},
+	})
+	assertScenarioStatEquals(t, data, "actors_focus_depth_filtered", 1)
+	assertScenarioStatEquals(t, data, "links_total", 1)
 	assertScenarioStatEquals(t, data, "links_lldp", 2)
-	assertScenarioNoActor(t, data, "focus-switch-b")
 	assertScenarioNoActor(t, data, "focus-switch-c")
+}
+
+func assertCDPDirectScenario(t testing.TB, data topologyv1test.NormalizedData) {
+	t.Helper()
+
+	assertScenarioActors(t, data, []topologyScenarioActorExpectation{
+		{Name: "cdp-switch-a", Type: "switch", ManagementIP: "192.0.2.41"},
+		{Name: "cdp-switch-b", Type: "switch", ManagementIP: "192.0.2.42"},
+	})
+	assertScenarioLinks(t, data, []topologyScenarioLinkExpectation{
+		{Type: "cdp", Src: "cdp-switch-a", Dst: "cdp-switch-b", Direction: "bidirectional", Protocol: "cdp", SrcPort: "a-b", DstPort: "b-a"},
+	})
+	assertScenarioTableRowsExactly(t, data, "actor_port_links", []map[string]any{
+		{"actor": "cdp-switch-a", "remote_actor": "cdp-switch-b", "type": "cdp", "protocol": "cdp", "if_index": 1, "port_name": "a-b", "remote_if_index": 1, "remote_port_name": "b-a"},
+		{"actor": "cdp-switch-b", "remote_actor": "cdp-switch-a", "type": "cdp", "protocol": "cdp", "if_index": 1, "port_name": "b-a", "remote_if_index": 1, "remote_port_name": "a-b"},
+	})
+	assertScenarioEvidenceRowsExactly(t, data, "cdp", []map[string]any{
+		{"src_actor": "cdp-switch-a", "dst_actor": "cdp-switch-b", "src_if_index": 1, "dst_if_index": 1, "src_port_name": "a-b", "dst_port_name": "b-a", "protocol": "cdp"},
+	})
+	assertScenarioStatEquals(t, data, "links_cdp", 1)
+}
+
+func assertSTPInferredScenario(t testing.TB, data topologyv1test.NormalizedData) {
+	t.Helper()
+
+	assertScenarioActors(t, data, []topologyScenarioActorExpectation{
+		{Name: "stp-switch-a", Type: "switch", ManagementIP: "192.0.2.51"},
+		{Name: "stp-switch-b", Type: "switch", ManagementIP: "192.0.2.52"},
+	})
+	assertScenarioLinks(t, data, []topologyScenarioLinkExpectation{
+		{Type: "stp", Src: "stp-switch-a", Dst: "stp-switch-b", Direction: "unidirectional", Protocol: "stp", SrcPort: "a-b", DstPort: "b-a"},
+		{Type: "stp", Src: "stp-switch-b", Dst: "stp-switch-a", Direction: "unidirectional", Protocol: "stp", SrcPort: "b-a", DstPort: "a-b"},
+	})
+	assertScenarioEvidenceRowsExactly(t, data, "stp", []map[string]any{
+		{"src_actor": "stp-switch-a", "dst_actor": "stp-switch-b", "src_if_index": 1, "dst_if_index": 1, "src_port_name": "a-b", "dst_port_name": "b-a", "protocol": "stp"},
+		{"src_actor": "stp-switch-b", "dst_actor": "stp-switch-a", "src_if_index": 1, "dst_if_index": 1, "src_port_name": "b-a", "dst_port_name": "a-b", "protocol": "stp"},
+	})
+	assertScenarioStatEquals(t, data, "links_stp", 2)
+}
+
+func assertL3P2P31Scenario(t testing.TB, data topologyv1test.NormalizedData) {
+	t.Helper()
+
+	assertScenarioActors(t, data, []topologyScenarioActorExpectation{
+		{Name: "p2p-router-a", Type: "router", ManagementIP: "192.0.2.61"},
+		{Name: "p2p-router-b", Type: "router", ManagementIP: "192.0.2.62"},
+	})
+	assertScenarioLinks(t, data, []topologyScenarioLinkExpectation{
+		{Type: topologymodel.L3SubnetLinkType, Src: "p2p-router-a", Dst: "p2p-router-b", Direction: "observed", Protocol: topologymodel.L3SubnetLinkType, SrcPort: "wan0", DstPort: "wan0"},
+	})
+	assertScenarioEvidenceRowsExactly(t, data, topologymodel.L3SubnetLinkType, []map[string]any{
+		{"src_actor": "p2p-router-a", "dst_actor": "p2p-router-b", "src_ip": "198.51.100.10", "dst_ip": "198.51.100.11", "src_if_index": 1, "dst_if_index": 1, "src_port_name": "wan0", "dst_port_name": "wan0", "subnet": "198.51.100.10/31", "prefix": 31},
+	})
+	assertScenarioNoActor(t, data, "198.51.100.10/31")
+	assertScenarioStatEquals(t, data, "l3_subnet_visible_links", 1)
+	assertScenarioStatEquals(t, data, "l3_subnet_segment_emitted_segments", 0)
 }
 
 func assertScenarioActors(t testing.TB, data topologyv1test.NormalizedData, want []topologyScenarioActorExpectation) {
