@@ -157,7 +157,7 @@ func TestCollector_Collect_CiscoTraditionalLicensingProfile(t *testing.T) {
 	}
 }
 
-func TestCollector_Collect_CiscoTraditionalLicensingProfile_RejectsMalformedNonPlaceholderExpiry(t *testing.T) {
+func TestCollector_Collect_CiscoTraditionalLicensingProfile_OmitsMalformedNonPlaceholderExpiry(t *testing.T) {
 	ctrl, mockHandler := setupMockHandler(t)
 	defer ctrl.Finish()
 
@@ -188,9 +188,19 @@ func TestCollector_Collect_CiscoTraditionalLicensingProfile_RejectsMalformedNonP
 	})
 
 	rows, err := collector.collectLicenseRows(profile, &ddsnmp.CollectionStats{})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "expiry.timestamp: invalid SNMP DateAndTime length 3")
-	assert.Empty(t, rows)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+
+	row := rows[0]
+	assert.Equal(t, "1.1.2", row.ID)
+	assert.Equal(t, "WLC-BASE", row.Name)
+	assert.False(t, row.Expiry.Has)
+	require.True(t, row.Usage.HasCapacity)
+	assert.EqualValues(t, 100, row.Usage.Capacity)
+	require.True(t, row.Usage.HasAvailable)
+	assert.EqualValues(t, 100, row.Usage.Available)
+	require.True(t, row.State.Has)
+	assert.EqualValues(t, 0, row.State.Severity)
 }
 
 type ciscoTraditionalRow struct {

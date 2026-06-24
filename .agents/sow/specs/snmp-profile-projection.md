@@ -147,6 +147,12 @@ Supported licensing signal fields are:
 Timer signals may declare exactly one of the shorthand timer value,
 `timestamp`, or `remaining`. Sentinel policies are closed names and are
 evaluated by the typed licensing producer before runtime consumers see the row.
+Known no-value timer placeholders are treated as absent rather than as expired.
+For `snmp_dateandtime`, a one-byte zero placeholder (`"0"` or `0x00`) is a
+known no-value placeholder and is warning-logged through limited logging.
+Malformed timer values are also treated as absent and warning-logged through
+limited logging, so valid state/usage from the same row remains visible.
+Identity, state, and usage values remain strict row errors.
 
 ## BGP Rows
 
@@ -207,6 +213,11 @@ fields are `peers`, `ibgp_peers`, `ebgp_peers`, and per-state fields under
 Peer rows must declare stable `neighbor` and `remote_as` identity fields.
 Peer-family rows must additionally declare canonical `address_family` and
 `subsequent_address_family` identity fields.
+
+BGP descriptor fields are enrichment-only. Descriptor decode failures omit that
+descriptor and keep the row, while identity, state, and signal decode failures
+remain strict row errors. Descriptor omissions are debug-logged so profile
+authoring defects are diagnosable without noisy default logs.
 
 The BGP state mapping is a closed RFC 4271 state contract. Rows that declare
 state must map all six states by default:

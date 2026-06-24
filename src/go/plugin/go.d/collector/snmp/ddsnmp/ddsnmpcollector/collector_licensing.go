@@ -20,6 +20,7 @@ import (
 const (
 	licenseRowsPartialErrorLogKey = "snmp-licensing-rows-partial-error:"
 	licenseRowsFailedLogKey       = "snmp-licensing-rows-failed:"
+	licenseTimerMalformedLogKey   = "snmp-licensing-timer-malformed:"
 	licenseTimerNoValueLogKey     = "snmp-licensing-timer-no-value:"
 	licenseRowsErrorLogEvery      = time.Hour
 )
@@ -479,7 +480,10 @@ func (c *Collector) populateLicenseTimerTimestamp(timer *ddsnmp.LicenseTimer, cf
 
 	value, sourceOID, ok, err := c.licenseNumericValue(cfg, ctx)
 	if err != nil {
-		return fmt.Errorf("%s: %w", name, err)
+		source := licenseTimerSource(cfg, name)
+		c.log.Limit(licenseTimerMalformedLogKey+source, 1, licenseRowsErrorLogEvery).
+			Warningf("license timer %q is malformed: %v; treating timer as absent", source, err)
+		return nil
 	}
 	if !ok || licenseValueRejectedBySentinel(value, cfg.Sentinel) {
 		return nil
@@ -494,7 +498,10 @@ func (c *Collector) populateLicenseTimerTimestamp(timer *ddsnmp.LicenseTimer, cf
 func (c *Collector) populateLicenseTimerRemaining(timer *ddsnmp.LicenseTimer, cfg ddprofiledefinition.LicenseValueConfig, ctx licenseValueContext, name string) error {
 	value, sourceOID, ok, err := c.licenseNumericValue(cfg, ctx)
 	if err != nil {
-		return fmt.Errorf("%s: %w", name, err)
+		source := licenseTimerSource(cfg, name)
+		c.log.Limit(licenseTimerMalformedLogKey+source, 1, licenseRowsErrorLogEvery).
+			Warningf("license timer %q is malformed: %v; treating timer as absent", source, err)
+		return nil
 	}
 	if !ok || licenseValueRejectedBySentinel(value, cfg.Sentinel) {
 		return nil
@@ -516,6 +523,13 @@ func licenseTimerZeroDateAndTimePlaceholder(cfg ddprofiledefinition.LicenseValue
 		return "", false
 	}
 	return trimOID(sym.OID), true
+}
+
+func licenseTimerSource(cfg ddprofiledefinition.LicenseValueConfig, fallback string) string {
+	if oid := trimOID(licenseValueSymbol(cfg).OID); oid != "" {
+		return oid
+	}
+	return fallback
 }
 
 func isZeroDateAndTimePlaceholderPDU(pdu gosnmp.SnmpPDU) bool {

@@ -816,6 +816,8 @@ func (c *Collector) bgpTextValue(cfg ddprofiledefinition.BGPValueConfig, ctx bgp
 func (c *Collector) bgpOptionalTextValue(cfg ddprofiledefinition.BGPValueConfig, ctx bgpValueContext) string {
 	value, err := c.bgpTextValue(cfg, ctx)
 	if err != nil {
+		sym := bgpValueSymbol(cfg)
+		c.log.Debugf("BGP optional descriptor %q on table %q row %q is unavailable: %v", sym.Name, ctx.tableName, ctx.rowIndex, err)
 		// Descriptors enrich the row, but identity and signals already decide
 		// whether the row is usable. Some devices publish malformed descriptor
 		// placeholders, so keep the row and omit the descriptor.
