@@ -16,6 +16,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -232,6 +233,20 @@ func TestConfigSchemaDynCfgRetentionDefaultDisablesTimeRotation(t *testing.T) {
 	assert.Nil(t, rotationDuration["default"])
 }
 
+func TestConfigSchemaDynCfgDefaultPayloadAllowsManagedName(t *testing.T) {
+	var schema map[string]any
+	require.NoError(t, json.Unmarshal([]byte(configSchema), &schema))
+
+	jsonSchema := schemaProperty(t, schema, "jsonSchema")
+	defaultPayload := collectConfigSchemaDefaults(t, jsonSchema)
+	defaultPayload["name"] = "local"
+
+	assert.NoError(t, validateAgainstJSONSchema(t, jsonSchema, defaultPayload))
+
+	defaultPayload["unexpected"] = true
+	assert.Error(t, validateAgainstJSONSchema(t, jsonSchema, defaultPayload))
+}
+
 func TestCollectorDefaultListenReceiveBuffer(t *testing.T) {
 	assert.Equal(t, defaultListenerReceiveBuffer, newTestSNMPTrapsCollector().Listen.ReceiveBuffer)
 }
@@ -310,6 +325,41 @@ func schemaStringSlice(t *testing.T, raw any, name string) []string {
 		out = append(out, s)
 	}
 	return out
+}
+
+func collectConfigSchemaDefaults(t *testing.T, schema map[string]any) map[string]any {
+	t.Helper()
+	props := schemaProperty(t, schema, "properties")
+
+	out := make(map[string]any)
+	for key, raw := range props {
+		prop, ok := raw.(map[string]any)
+		require.Truef(t, ok, "schema property %q is %T", key, raw)
+
+		if defaultValue, ok := prop["default"]; ok {
+			out[key] = defaultValue
+			continue
+		}
+
+		if prop["type"] == "object" {
+			child := collectConfigSchemaDefaults(t, prop)
+			if len(child) > 0 {
+				out[key] = child
+			}
+		}
+	}
+	return out
+}
+
+func validateAgainstJSONSchema(t *testing.T, schemaDoc any, payload any) error {
+	t.Helper()
+
+	compiler := jsonschema.NewCompiler()
+	require.NoError(t, compiler.AddResource("schema.json", schemaDoc))
+	schema, err := compiler.Compile("schema.json")
+	require.NoError(t, err)
+
+	return schema.Validate(payload)
 }
 
 func schemaProperty(t *testing.T, schema map[string]any, path ...string) map[string]any {

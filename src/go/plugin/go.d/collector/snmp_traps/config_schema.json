@@ -4,6 +4,9 @@
     "title": "SNMP trap collector configuration.",
     "type": "object",
     "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    },
     "properties": {
       "update_every": {
         "title": "Update every",
