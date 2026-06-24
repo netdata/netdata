@@ -343,18 +343,18 @@ For the full manual configuration syntax, see [How to Disable or Silence Alerts]
 Alerts in Netdata have two separate on/off controls:
 
 1. **Alert level** — Each alert has its own on/off switch, controlled from the **Alerts tab** or **Space Settings → Configurations → Health**.
-2. **Rule level** — Inside each alert are one or more **rules**. Each rule has its own enable/disable control, found in the alert's **Update** form.
+2. **Rule level** — Each alert contains one or more **rules**. Each rule has its own enable/disable control, found in the alert's **Update** form.
 
 When an alert is switched off, its rules cannot run. If you try to enable its rules while the alert itself is off, Netdata shows **"No items to enable"** — turn the alert on first.
 
-**To activate only specific rules within an alert:**
+**To enable only specific rules within an alert:**
 
 1. Open the alert from the **Alerts tab** or **Space Settings → Configurations → Health**.
 2. Open its **Update** form.
 3. Enable the rules you want to run, and disable every other rule. Leave at least one rule enabled — if all rules are disabled, enabling the alert has no effect.
 4. **Save** the alert.
-5. **Enable** the alert. Only the rules you left enabled become active — depending on how broadly the alert applies, this can activate a large number of alerts at once. This is normal.
+5. **Enable** the alert. Only the rules you left enabled will run — depending on how broadly the alert applies, this can activate a large number of alerts at once. This is normal.
 
-If you would rather keep the alert fully enabled, disable specific alerts individually using [Multi-Node Deployment](#multi-node-deployment) to apply the change across all affected nodes at once. For the manual, file-based alternative, see [Disabled Alert Template Still Appears on Nodes](#disabled-alert-template-still-appears-on-nodes).
+If you would rather keep the alert fully enabled, disable the specific alerts you don't want using [Multi-Node Deployment](#multi-node-deployment) to push the change across all affected nodes at once. For the manual, file-based alternative, see [Disabled Alert Template Still Appears on Nodes](#disabled-alert-template-still-appears-on-nodes).
 
 [Read more](/docs/developer-and-contributor-corner/dyncfg.md) on developing with dynamic configuration.
