@@ -26,7 +26,8 @@ use std::collections::HashSet;
 use std::ops::Range;
 
 use anyhow::Result;
-use file_registry::{FileDir, Query, ServiceStream};
+use file_registry::{FileDir, Query};
+use otel_logs_identity::ServiceStream;
 use sfsq::logs::{LogSource, Part, SfstCandidate, Source, WalTail};
 
 use crate::config::Dirs;

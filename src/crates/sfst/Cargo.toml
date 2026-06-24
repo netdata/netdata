@@ -22,6 +22,8 @@ regex = { workspace = true }
 
 # Registry
 file-registry = { workspace = true }
+# Transitional (2b-cleanup commit 2 removes the `ServiceStream` re-export + this dep).
+otel-logs-identity = { workspace = true }
 memmap2 = { workspace = true }
 tracing = { workspace = true }
 

@@ -147,7 +147,8 @@ fn query_snapshot_is_scoped_to_one_tenant() {
 
 #[test]
 fn enumerate_streams_dedups_and_aggregates_sfst_and_unsealed_wal() {
-    use file_registry::{ServiceStream, TimestampNs};
+    use file_registry::TimestampNs;
+    use otel_logs_identity::ServiceStream;
     use wal::FileEvent;
     const NS: u64 = 1_000_000_000;
 

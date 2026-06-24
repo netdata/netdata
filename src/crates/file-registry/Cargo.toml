@@ -10,7 +10,6 @@ workspace = true
 [dependencies]
 chrono = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-twox-hash = { workspace = true, features = ["xxhash64"] }
 uuid = { workspace = true, features = ["serde"] }
 tracing = { workspace = true }
 

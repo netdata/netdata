@@ -1,5 +1,6 @@
 use super::*;
-use file_registry::{ByteSize, FileId, ServiceStream, TenantId, TimestampNs};
+use file_registry::{ByteSize, FileId, TenantId, TimestampNs};
+use otel_logs_identity::ServiceStream;
 use fst_index::FstIndex;
 use serde_json::Value;
 use sfst::BitmapValue;

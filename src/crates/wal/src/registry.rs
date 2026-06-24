@@ -585,7 +585,7 @@ mod tests {
 
     // ── candidates() tests ───────────────────────────────────────
 
-    use file_registry::ServiceStream;
+    use otel_logs_identity::ServiceStream;
 
     fn fid_with(seq: u64, part_key: u64) -> FileId {
         let machine_id = uuid::Uuid::try_parse("550e8400e29b41d4a716446655440000").unwrap();
@@ -701,8 +701,8 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut reg = Registry::new(dir.path());
 
-        let api_hash = file_registry::compute_ns_hash(Some("prod"), Some("api"));
-        let worker_hash = file_registry::compute_ns_hash(Some("prod"), Some("worker"));
+        let api_hash = otel_logs_identity::compute_ns_hash(Some("prod"), Some("api"));
+        let worker_hash = otel_logs_identity::compute_ns_hash(Some("prod"), Some("worker"));
         track(
             &mut reg,
             1,
@@ -746,7 +746,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut reg = Registry::new(dir.path());
 
-        let absent_ns_hash = file_registry::compute_ns_hash(None, Some("api"));
+        let absent_ns_hash = otel_logs_identity::compute_ns_hash(None, Some("api"));
         track(
             &mut reg,
             1,
@@ -771,7 +771,7 @@ mod tests {
         // derives `compute_ns_hash(None, name)`. The common absent-namespace file
         // is unaffected (see `candidates_match_absent_namespace_stream`); only the
         // rare literal-empty file re-partitions and would need re-indexing.
-        let old_literal_empty_hash = file_registry::compute_ns_hash(Some(""), Some("api"));
+        let old_literal_empty_hash = otel_logs_identity::compute_ns_hash(Some(""), Some("api"));
         let new_empty_hash = ServiceStream::new("", "api").ns_hash();
         assert_ne!(
             old_literal_empty_hash, new_empty_hash,

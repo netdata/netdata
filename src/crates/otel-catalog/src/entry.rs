@@ -1,4 +1,4 @@
-pub use file_registry::ServiceStream;
+pub use otel_logs_identity::ServiceStream;
 use file_registry::{ByteSize, FileId, TimestampNs};
 use serde::{Deserialize, Serialize};
 

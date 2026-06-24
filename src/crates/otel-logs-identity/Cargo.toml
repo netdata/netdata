@@ -8,4 +8,5 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-file-registry = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+twox-hash = { workspace = true, features = ["xxhash64"] }

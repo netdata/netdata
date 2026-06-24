@@ -76,7 +76,7 @@ mod writer;
 pub mod registry;
 
 pub use error::Error;
-pub use file_registry::ServiceStream;
+pub use otel_logs_identity::ServiceStream;
 pub use index_reader::{BitmapFilter, IndexReader};
 pub use query::{
     Bucket, FacetResult, Filter, Grid, Matcher, MaterializedRow, Timeline, Timestamps,

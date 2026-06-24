@@ -277,7 +277,7 @@ fn gen_corpus(seed: u64) -> Corpus {
 fn write_wal(dir: &Path, corpus: &Corpus) -> PathBuf {
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
     let mut writer = wal::Writer::new(dir, wal::Config::default(), seq).expect("writer");
-    let stream = file_registry::ServiceStream::new("ns", "svc");
+    let stream = otel_logs_identity::ServiceStream::new("ns", "svc");
     let part_key = otel_logs_identity::part_key(&stream);
     let content_meta = otel_logs_identity::encode_content_meta(&stream).expect("identity encodes");
     for (i, batch) in corpus.batches.iter().enumerate() {

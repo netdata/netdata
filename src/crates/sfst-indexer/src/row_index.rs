@@ -13,7 +13,7 @@
 use crate::IndexError;
 use sfst::Histogram;
 use bumpalo::Bump;
-use file_registry::ServiceStream;
+use otel_logs_identity::ServiceStream;
 use roaring::RoaringBitmap;
 
 use super::kv_interner::{KeyValueInterner, KvSlot};

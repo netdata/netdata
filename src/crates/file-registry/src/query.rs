@@ -20,9 +20,9 @@ pub struct Query {
     /// **Empty matches every partition**; a non-empty set keeps only files
     /// whose `part_key` is one of these values. The substrate compares the
     /// key as an opaque `u64` and ascribes it no meaning; the content plane
-    /// supplies the set (for OTel logs, these are `ServiceStream::ns_hash`
-    /// values driven by the `__streams` selector — one stream per key within
-    /// a tenant via the ingestor's collision table).
+    /// supplies the set (for OTel logs, these are the content plane's
+    /// service-stream hashes, driven by the `__streams` selector — one stream
+    /// per key within a tenant via the ingestor's collision table).
     pub partition_keys: Vec<u64>,
 }
 

@@ -3,9 +3,7 @@ pub mod layout;
 pub mod stem;
 
 mod types;
-pub use types::{
-    ByteSize, FileId, FileSummary, ServiceStream, TenantId, TimestampNs, compute_ns_hash,
-};
+pub use types::{ByteSize, FileId, FileSummary, TenantId, TimestampNs};
 
 mod clock;
 pub use clock::MonotonicClock;

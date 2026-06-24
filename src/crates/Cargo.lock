@@ -1437,7 +1437,6 @@ dependencies = [
  "serde",
  "tempfile",
  "tracing",
- "twox-hash",
  "uuid",
 ]
 
@@ -3725,6 +3724,7 @@ dependencies = [
  "chrono",
  "chunk-file",
  "file-registry",
+ "otel-logs-identity",
  "serde",
  "serde_json",
  "tempfile",
@@ -3826,7 +3826,8 @@ dependencies = [
 name = "otel-logs-identity"
 version = "0.1.3"
 dependencies = [
- "file-registry",
+ "serde",
+ "twox-hash",
 ]
 
 [[package]]
@@ -5235,6 +5236,7 @@ dependencies = [
  "file-registry",
  "fst-index",
  "memmap2",
+ "otel-logs-identity",
  "regex",
  "serde",
  "serde_bytes",
@@ -6361,6 +6363,7 @@ dependencies = [
  "journal-common",
  "lz4_flex 0.12.2",
  "nix 0.30.1",
+ "otel-logs-identity",
  "serde",
  "tempfile",
  "thiserror 2.0.18",

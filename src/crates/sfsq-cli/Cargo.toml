@@ -21,6 +21,7 @@ sfsq = { workspace = true }
 sfst = { workspace = true }
 wal = { workspace = true }
 file-registry = { workspace = true }
+otel-logs-identity = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 anyhow = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -38,7 +39,6 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 # Fixture building mirrors the sfsq WAL-equivalence harness: real OTAP frames
 # through the production encoder, real WAL files, real SFST indexes.
 otel-ingestor = { workspace = true }
-otel-logs-identity = { workspace = true }
 sfst-indexer = { workspace = true }
 opentelemetry-proto = { workspace = true }
 tempfile = { workspace = true }

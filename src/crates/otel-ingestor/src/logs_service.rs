@@ -4,7 +4,8 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use bridge::config::AuthConfig;
-use file_registry::{MonotonicClock, ServiceStream, TenantId};
+use file_registry::{MonotonicClock, TenantId};
+use otel_logs_identity::ServiceStream;
 use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
     logs_service_server::LogsService,
@@ -762,7 +763,7 @@ mod tests {
         assert_eq!(s, ServiceStream::new("prod", "api"));
         assert_eq!(
             s.ns_hash(),
-            file_registry::compute_ns_hash(Some("prod"), Some("api"))
+            otel_logs_identity::compute_ns_hash(Some("prod"), Some("api"))
         );
     }
 
@@ -770,7 +771,7 @@ mod tests {
     fn extract_stream_handles_missing_attrs() {
         let s = extract_stream(&rl(None, None, 0));
         assert_eq!(s, ServiceStream::new("", ""));
-        assert_eq!(s.ns_hash(), file_registry::compute_ns_hash(None, None));
+        assert_eq!(s.ns_hash(), otel_logs_identity::compute_ns_hash(None, None));
     }
 
     #[test]

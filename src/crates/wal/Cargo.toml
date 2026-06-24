@@ -20,3 +20,6 @@ uuid = { workspace = true, features = ["serde"] }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+# Transitional: tests build identities via the content-plane codec. 2b-cleanup
+# commit 2 rewrites them to opaque part_keys and removes this dev-dep.
+otel-logs-identity = { workspace = true }

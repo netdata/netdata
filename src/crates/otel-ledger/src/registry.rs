@@ -1,7 +1,8 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::PathBuf;
 
-use file_registry::{FileId, ServiceStream, TenantId};
+use file_registry::{FileId, TenantId};
+use otel_logs_identity::ServiceStream;
 use sfsq::logs::SfstCandidate;
 
 /// An active (or sealed-but-unindexed) WAL file overlapping a query

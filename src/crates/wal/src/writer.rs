@@ -450,7 +450,7 @@ impl Writer {
 mod tests {
     use super::*;
     use crate::Config;
-    use file_registry::ServiceStream;
+    use otel_logs_identity::ServiceStream;
 
     fn test_writer(tmp: &std::path::Path) -> Writer {
         let seq = Arc::new(SeqAllocator::ephemeral(0));

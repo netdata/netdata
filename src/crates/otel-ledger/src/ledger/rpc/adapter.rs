@@ -20,7 +20,7 @@ use super::wire::{
     STREAM_SELECTION_PARAM, Version,
 };
 use crate::registry::StreamStat;
-use file_registry::ServiceStream;
+use otel_logs_identity::ServiceStream;
 
 /// One nanosecond expressed as a millisecond fraction. Histogram bucket
 /// timestamps go on the wire in milliseconds (legacy chart contract).

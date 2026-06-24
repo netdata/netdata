@@ -20,7 +20,7 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 
 use anyhow::{Context, Result, anyhow, bail};
-use file_registry::ServiceStream;
+use otel_logs_identity::ServiceStream;
 use tokio_util::sync::CancellationToken;
 
 use crate::config::{DirInputs, resolve_dirs};
