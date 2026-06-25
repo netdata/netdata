@@ -18,7 +18,7 @@ fn make_entry(seq: u64) -> otel_catalog::CatalogEntry {
     let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
     otel_catalog::CatalogEntry {
         id,
-        remote_key: crate::remote_keys::sfst(&TenantId::from("tenant1"), date, id),
+        remote_key: crate::remote_keys::sfst(crate::LOGS_SIGNAL, &TenantId::from("tenant1"), date, id),
         min_timestamp_s: 1_700_000_000,
         max_timestamp_s: 1_700_003_600,
         record_count: 10,
@@ -266,6 +266,7 @@ async fn reconcile_local_catalog_uploads_re_uploads_missing_files() {
 
     // Remote now has the file.
     let expected_remote = crate::remote_keys::catalog(
+        crate::LOGS_SIGNAL,
         date,
         &TenantId::from("tenant1"),
         machine(),
@@ -296,6 +297,7 @@ async fn reconcile_local_catalog_uploads_skips_existing_files() {
     let storage = crate::storage::OpendalStorage::from_operator(op.clone());
     // Pre-populate the remote so reconcile finds it already present.
     let remote_key = crate::remote_keys::catalog(
+        crate::LOGS_SIGNAL,
         date,
         &TenantId::from("tenant1"),
         machine(),
@@ -427,6 +429,7 @@ async fn reconcile_local_catalog_uploads_skips_pending_deletion_files() {
     // Pending-deletion files are skipped: nothing was uploaded.
     assert_eq!(uploader.pending(), 0);
     let remote_key = crate::remote_keys::catalog(
+        crate::LOGS_SIGNAL,
         date,
         &TenantId::from("tenant1"),
         machine(),
@@ -576,7 +579,7 @@ fn spawn_idle_catalog_builder(
 fn remote_sfst_key(seq: u64) -> (file_registry::FileId, String) {
     let id = file_registry::FileId::new(machine(), boot(), seq, 0);
     let today = chrono::Utc::now().date_naive();
-    (id, crate::remote_keys::sfst(&TenantId::from("tenant1"), today, id))
+    (id, crate::remote_keys::sfst(crate::LOGS_SIGNAL, &TenantId::from("tenant1"), today, id))
 }
 
 #[tokio::test]
@@ -731,7 +734,7 @@ async fn reconcile_remote_uploads_skips_unparseable_key() {
     let today = chrono::Utc::now().date_naive();
     let bad_key = format!(
         "{}not-a-valid-file-id",
-        crate::remote_keys::sfst_prefix(&TenantId::from("tenant1"), today)
+        crate::remote_keys::sfst_prefix(crate::LOGS_SIGNAL, &TenantId::from("tenant1"), today)
     );
     let storage = crate::storage::MockStorage {
         list_response: vec![bad_key],

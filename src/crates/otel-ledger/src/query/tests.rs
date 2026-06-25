@@ -178,11 +178,22 @@ fn remote_candidates_empty_registry() {
 
 // ── enumerate_streams_from (the window-scoped, remote-inclusive selector) ──
 
-/// Drive the selector fold the way the handler does: parse the in-window catalog
-/// and the time-only local mask, then fold.
-fn enumerate(reg: &Registry, q: &Query) -> Vec<crate::registry::StreamStat> {
+/// Drive the selector fold the way the handler does: parse the in-window catalog,
+/// fold into neutral `PartitionStat`s, then decode + sort by `(namespace, name)`
+/// the way the rpc adapter does for display (the substrate orders by `part_key`).
+fn enumerate(reg: &Registry, q: &Query) -> Vec<crate::registry::PartitionStat> {
     let catalog: Vec<otel_catalog::CatalogEntry> = reg.catalog_files.candidates(q).collect();
-    reg.enumerate_streams_from(q, &catalog)
+    let mut parts = reg.enumerate_streams_from(q, &catalog);
+    parts.sort_by_key(|p| {
+        let s = otel_logs_identity::decode_content_meta_or_empty(&p.content_meta);
+        (s.namespace, s.name)
+    });
+    parts
+}
+
+/// The decoded `(namespace, name)` identity of a folded partition.
+fn sid(p: &crate::registry::PartitionStat) -> ServiceStream {
+    otel_logs_identity::decode_content_meta_or_empty(&p.content_meta)
 }
 
 fn window(after: u32, before: u32) -> Query {
@@ -209,7 +220,7 @@ fn enumerate_streams_includes_remote_only_stream() {
     track_remote(&mut reg, 2, 100, 200);
     let streams = enumerate(&reg, &window(50, 250));
     assert_eq!(streams.len(), 1);
-    assert_eq!(streams[0].stream, ServiceStream::new("ns", "a"));
+    assert_eq!(sid(&streams[0]), ServiceStream::new("ns", "a"));
     assert_eq!(streams[0].file_count, 1);
 }
 
@@ -221,8 +232,8 @@ fn enumerate_streams_lists_local_and_remote_only_together() {
     let streams = enumerate(&reg, &window(50, 250));
     assert_eq!(streams.len(), 2);
     // Sorted by (namespace, name): a before b.
-    assert_eq!(streams[0].stream, ServiceStream::new("ns", "a"));
-    assert_eq!(streams[1].stream, ServiceStream::new("ns", "b"));
+    assert_eq!(sid(&streams[0]), ServiceStream::new("ns", "a"));
+    assert_eq!(sid(&streams[1]), ServiceStream::new("ns", "b"));
 }
 
 #[test]
@@ -250,6 +261,6 @@ fn enumerate_streams_dedups_wal_and_remote_same_seq() {
     track_remote_as(&mut reg, 2, ServiceStream::new("ns", "svc"), 100, 200);
     let streams = enumerate(&reg, &window(50, 250));
     assert_eq!(streams.len(), 1);
-    assert_eq!(streams[0].stream, ServiceStream::new("ns", "svc"));
+    assert_eq!(sid(&streams[0]), ServiceStream::new("ns", "svc"));
     assert_eq!(streams[0].file_count, 1);
 }

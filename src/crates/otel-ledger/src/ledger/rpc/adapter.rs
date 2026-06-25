@@ -19,8 +19,37 @@ use super::wire::{
     MultiSelection, MultiSelectionOption, OtelLogsRequest, Pagination, RequiredParam,
     STREAM_SELECTION_PARAM, Version,
 };
-use crate::registry::StreamStat;
+use crate::registry::PartitionStat;
 use otel_logs_identity::ServiceStream;
+
+/// The logs view of one selector partition: the substrate's neutral
+/// [`PartitionStat`] with its opaque `content_meta` decoded into the
+/// `(service.namespace, service.name)` identity for display.
+#[derive(Debug, Clone)]
+struct StreamStat {
+    /// The partition's opaque `part_key` (the option id the selector echoes back).
+    ns_hash: u64,
+    /// `(service.namespace, service.name)` for display.
+    stream: ServiceStream,
+    total_size: u64,
+    file_count: u64,
+    min_timestamp_s: Option<u32>,
+    max_timestamp_s: Option<u32>,
+}
+
+impl StreamStat {
+    /// Decode a neutral [`PartitionStat`]'s `content_meta` into the logs identity.
+    fn from_partition(p: PartitionStat) -> Self {
+        Self {
+            ns_hash: p.part_key,
+            stream: otel_logs_identity::decode_content_meta_or_empty(&p.content_meta),
+            total_size: p.total_size,
+            file_count: p.file_count,
+            min_timestamp_s: p.min_timestamp_s,
+            max_timestamp_s: p.max_timestamp_s,
+        }
+    }
+}
 
 /// One nanosecond expressed as a millisecond fraction. Histogram bucket
 /// timestamps go on the wire in milliseconds (legacy chart contract).
@@ -137,10 +166,16 @@ impl OtelLogsRequest {
 /// streams, each pre-selected so the default view spans all of them. An
 /// empty `stats` yields `Vec::new()` — a tenant with no streams advertises
 /// no selector.
-pub fn stream_required_params(stats: Vec<StreamStat>) -> Vec<RequiredParam> {
-    if stats.is_empty() {
+pub fn stream_required_params(partitions: Vec<PartitionStat>) -> Vec<RequiredParam> {
+    if partitions.is_empty() {
         return Vec::new();
     }
+    // Decode each partition's opaque identity, then sort by `(namespace, name)`
+    // for display (the substrate yields them ordered by opaque `part_key`).
+    let mut stats: Vec<StreamStat> = partitions.into_iter().map(StreamStat::from_partition).collect();
+    stats.sort_by(|a, b| {
+        (&a.stream.namespace, &a.stream.name).cmp(&(&b.stream.namespace, &b.stream.name))
+    });
     let options = stats
         .into_iter()
         .map(|s| MultiSelectionOption {

@@ -35,6 +35,7 @@ impl Ledger {
                 );
 
                 let remote_key = crate::remote_keys::catalog(
+                    crate::LOGS_SIGNAL,
                     date,
                     &tenant_id,
                     machine_id,

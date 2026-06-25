@@ -84,7 +84,7 @@ pub(crate) fn sfst_upload_request(
     Some(UploaderRequest::Upload {
         seq: id.seq,
         local_path: registry.sfst.file_path(id),
-        remote_key: crate::remote_keys::sfst(tenant_id, date, id),
+        remote_key: crate::remote_keys::sfst(crate::LOGS_SIGNAL, tenant_id, date, id),
     })
 }
 

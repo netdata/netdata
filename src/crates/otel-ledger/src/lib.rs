@@ -17,6 +17,12 @@ pub mod uploader;
 
 pub use ledger::Ledger;
 
+/// Signal segment for the logs pipeline's remote-storage keys
+/// (`v1/{signal}/...`). Stage 4 prep: logs call sites pass this constant; the
+/// flip commit moves it into the logs pipeline's seam provision so a second
+/// signal (traces) supplies its own.
+pub(crate) const LOGS_SIGNAL: &str = "logs";
+
 use anyhow::{Context, Result};
 use bridge::{LedgerRequest, LedgerResponse};
 use ferryboat::{Connection, Endpoint};

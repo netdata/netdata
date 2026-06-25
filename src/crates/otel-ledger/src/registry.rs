@@ -2,7 +2,6 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::PathBuf;
 
 use file_registry::{FileId, TenantId};
-use otel_logs_identity::ServiceStream;
 
 /// An active (or sealed-but-unindexed) WAL file overlapping a query
 /// window — owned so it outlives the registry read lock. The query path
@@ -16,7 +15,12 @@ pub struct WalDesc {
     pub valid_up_to: u64,
 }
 
-/// One stream's aggregate stats for the otel-logs stream selector.
+/// One partition's aggregate stats for the signal selector — content-agnostic.
+///
+/// The substrate folds in-window files per `part_key` and carries each
+/// partition's opaque `content_meta` through verbatim; it never decodes the
+/// identity. The signal's query layer (for logs, the rpc adapter) decodes
+/// `content_meta` and builds its own display-typed selector option.
 ///
 /// Window-scoped and remote-inclusive: only files overlapping the query
 /// window contribute, and a stream whose in-window data is evicted locally
@@ -26,29 +30,29 @@ pub struct WalDesc {
 /// entry whose seq is already served locally — are counted once, SFST-wins,
 /// mirroring [`TenantRegistries::query_snapshot`].
 #[derive(Debug, Clone)]
-pub struct StreamStat {
-    /// The file's opaque `part_key` (the option id the selector echoes back).
-    /// Named `ns_hash` for wire/IPC continuity — for OTel logs `part_key` *is*
-    /// the stream's `ns_hash`; the substrate treats it as an opaque partition key.
-    pub ns_hash: u64,
-    /// `(service.namespace, service.name)` for display.
-    pub stream: ServiceStream,
-    /// Sum of file sizes for this stream (the size pill).
+pub struct PartitionStat {
+    /// The files' opaque `part_key` (the option id the selector echoes back).
+    pub part_key: u64,
+    /// The partition's opaque content-plane identity blob, carried verbatim
+    /// from the files' summaries. The substrate never decodes it; the signal's
+    /// query layer does (for logs, into `(service.namespace, service.name)`).
+    pub content_meta: Vec<u8>,
+    /// Sum of file sizes for this partition (the size pill).
     pub total_size: u64,
-    /// Number of files holding this stream.
+    /// Number of files holding this partition.
     pub file_count: u64,
-    /// Earliest known log second across the stream's files; `None` when no
+    /// Earliest known log second across the partition's files; `None` when no
     /// file has a known range yet (e.g. only just-recovered WALs).
     pub min_timestamp_s: Option<u32>,
-    /// Latest known log second across the stream's files.
+    /// Latest known log second across the partition's files.
     pub max_timestamp_s: Option<u32>,
 }
 
-impl StreamStat {
-    fn new(part_key: u64, stream: ServiceStream) -> Self {
+impl PartitionStat {
+    fn new(part_key: u64, content_meta: Vec<u8>) -> Self {
         Self {
-            ns_hash: part_key,
-            stream,
+            part_key,
+            content_meta,
             total_size: 0,
             file_count: 0,
             min_timestamp_s: None,
@@ -56,7 +60,7 @@ impl StreamStat {
         }
     }
 
-    /// Fold one file's size and `[min, max]` second range into the stream.
+    /// Fold one file's size and `[min, max]` second range into the partition.
     /// A `0` bound means "unknown" (an empty SFST or a recovered WAL whose
     /// range the format can't recover) and does not move the span.
     fn add(&mut self, size: u64, min_s: u32, max_s: u32) {
@@ -471,7 +475,7 @@ impl TenantRegistries {
         tenant: &TenantId,
         q: &file_registry::Query,
         catalog: &[otel_catalog::CatalogEntry],
-    ) -> Vec<StreamStat> {
+    ) -> Vec<PartitionStat> {
         self.tenants
             .get(tenant)
             .map(|r| r.enumerate_streams_from(q, catalog))
@@ -500,14 +504,15 @@ impl TenantRegistries {
     /// omitted. Only `q.time_range` matters (the stream filter is ignored — the
     /// selector lists all streams, independent of the user's current pick).
     /// Self-parsing convenience over [`Self::enumerate_streams_from`] (the handler
-    /// shares one catalog parse via the `_from` variant). Deduped by `ns_hash`,
-    /// SFST-wins over WAL over remote per seq; sorted by `(namespace, name)`.
+    /// shares one catalog parse via the `_from` variant). Deduped by `part_key`,
+    /// SFST-wins over WAL over remote per seq; sorted by `part_key`. The signal's
+    /// query layer decodes each `content_meta` and re-sorts for display.
     /// Unknown tenant ⇒ empty.
     pub fn enumerate_streams(
         &self,
         tenant: &TenantId,
         q: &file_registry::Query,
-    ) -> Vec<StreamStat> {
+    ) -> Vec<PartitionStat> {
         // Time-only: parse the catalog across all streams (the stream filter is the
         // selector's output, not its input). `enumerate_streams_from` likewise forces
         // the filter empty for its local fold.
@@ -561,14 +566,14 @@ impl Registry {
         &self,
         q: &file_registry::Query,
         catalog: &[otel_catalog::CatalogEntry],
-    ) -> Vec<StreamStat> {
-        // The selector lists all in-window streams, never the caller's current pick:
-        // force the stream filter empty so a stream-filtered `q` cannot narrow it.
+    ) -> Vec<PartitionStat> {
+        // The selector lists all in-window partitions, never the caller's current
+        // pick: force the filter empty so a partition-filtered `q` cannot narrow it.
         let q = &file_registry::Query {
             time_range: q.time_range.clone(),
             partition_keys: Vec::new(),
         };
-        let mut by_hash: HashMap<u64, StreamStat> = HashMap::new();
+        let mut by_part: HashMap<u64, PartitionStat> = HashMap::new();
         // Seqs already folded from a local file. Dedup is keyed on the *folded*
         // seqs (not the servable `local_seqs` mask): a catalog entry whose seq was
         // folded locally is that same file's remote copy, so skipping it keeps a
@@ -580,9 +585,9 @@ impl Registry {
         let mut folded: HashSet<u64> = HashSet::new();
         for f in self.sfst.candidates(q) {
             folded.insert(f.id.seq);
-            by_hash
+            by_part
                 .entry(f.id.part_key)
-                .or_insert_with(|| StreamStat::new(f.id.part_key, otel_logs_identity::decode_content_meta_or_empty(&f.summary.content_meta)))
+                .or_insert_with(|| PartitionStat::new(f.id.part_key, f.summary.content_meta.clone()))
                 .add(f.size.0, f.summary.min_timestamp_s, f.summary.max_timestamp_s);
         }
         for f in self.wal.candidates(q) {
@@ -595,27 +600,27 @@ impl Registry {
             // the size proxy for an unsealed WAL.
             let to_s = |ns: u64| (ns / 1_000_000_000) as u32;
             let size = f.size.0.max(f.valid_up_to.0);
-            by_hash
+            by_part
                 .entry(f.id.part_key)
-                .or_insert_with(|| StreamStat::new(f.id.part_key, otel_logs_identity::decode_content_meta_or_empty(&f.content_meta)))
+                .or_insert_with(|| PartitionStat::new(f.id.part_key, f.content_meta.clone()))
                 .add(size, to_s(f.min_timestamp_ns.0), to_s(f.max_timestamp_ns.0));
         }
-        // Remote-only streams: catalog entries whose seq has no local file folded
+        // Remote-only partitions: catalog entries whose seq has no local file folded
         // above (and deduped against a seq re-cataloged into more than one file).
         for e in catalog {
             if !folded.insert(e.id.seq) {
                 continue;
             }
-            by_hash
+            by_part
                 .entry(e.id.part_key)
-                .or_insert_with(|| StreamStat::new(e.id.part_key, otel_logs_identity::decode_content_meta_or_empty(&e.content_meta)))
+                .or_insert_with(|| PartitionStat::new(e.id.part_key, e.content_meta.clone()))
                 .add(e.size.0, e.min_timestamp_s, e.max_timestamp_s);
         }
 
-        let mut out: Vec<StreamStat> = by_hash.into_values().collect();
-        out.sort_by(|a, b| {
-            (&a.stream.namespace, &a.stream.name).cmp(&(&b.stream.namespace, &b.stream.name))
-        });
+        // Sort by the opaque `part_key` for a deterministic order; the signal's
+        // query layer decodes `content_meta` and re-sorts for display.
+        let mut out: Vec<PartitionStat> = by_part.into_values().collect();
+        out.sort_by_key(|p| p.part_key);
         out
     }
 }

@@ -98,7 +98,7 @@ pub async fn reconcile_remote_uploads<S: Storage>(
         .filter_map(|offset| {
             today
                 .checked_sub_signed(chrono::Duration::days(offset as i64))
-                .map(|d| (d, crate::remote_keys::sfst_prefix(tenant_id, d)))
+                .map(|d| (d, crate::remote_keys::sfst_prefix(crate::LOGS_SIGNAL, tenant_id, d)))
         })
         .collect();
 
@@ -206,6 +206,7 @@ pub async fn reconcile_local_catalog_uploads<S: Storage>(
         .filter(|(_, file)| !file.is_pending_deletion())
         .map(|(local_path, file)| {
             let remote_key = crate::remote_keys::catalog(
+                crate::LOGS_SIGNAL,
                 file.date,
                 tenant_id,
                 file.machine_id,

@@ -233,17 +233,26 @@ fn enumerate_streams_dedups_and_aggregates_sfst_and_unsealed_wal() {
         time_range: 0..u32::MAX,
         partition_keys: Vec::new(),
     };
-    let streams = tr.enumerate_streams(&tenant, &full);
+    // The substrate yields neutral `PartitionStat`s ordered by opaque `part_key`;
+    // decode + sort by `(namespace, name)` the way the rpc adapter does for display.
+    let mut streams = tr.enumerate_streams(&tenant, &full);
+    let sid = |p: &crate::registry::PartitionStat| {
+        otel_logs_identity::decode_content_meta_or_empty(&p.content_meta)
+    };
+    streams.sort_by_key(|p| {
+        let s = sid(p);
+        (s.namespace, s.name)
+    });
     assert_eq!(streams.len(), 2);
     // Sorted by (namespace, name): "" < "prod" → the absent-namespace
     // db stream comes first.
-    assert_eq!(streams[0].stream, db);
+    assert_eq!(sid(&streams[0]), db);
     assert_eq!(streams[0].file_count, 1);
     assert_eq!(streams[0].total_size, 200);
     assert_eq!(streams[0].min_timestamp_s, Some(400));
     assert_eq!(streams[0].max_timestamp_s, Some(460));
 
-    assert_eq!(streams[1].stream, api);
+    assert_eq!(sid(&streams[1]), api);
     // The WAL shadow of seq=1 is excluded; only the two SFSTs are counted.
     assert_eq!(streams[1].file_count, 2);
     assert_eq!(streams[1].total_size, 1500);

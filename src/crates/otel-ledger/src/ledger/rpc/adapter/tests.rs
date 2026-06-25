@@ -313,18 +313,23 @@ fn take_partition_keys_absent_selection_is_all() {
 
 #[test]
 fn stream_required_params_builds_all_default_selected_selector() {
+    // Build neutral PartitionStats (opaque content_meta) — `stream_required_params`
+    // decodes and sorts them, so this exercises the real codec + display path.
+    let enc = |ns: &str, name: &str| {
+        otel_logs_identity::encode_content_meta(&ServiceStream::new(ns, name)).unwrap()
+    };
     let stats = vec![
-        StreamStat {
-            ns_hash: 0x2a,
-            stream: ServiceStream::new("prod", "api"),
+        PartitionStat {
+            part_key: 0x2a,
+            content_meta: enc("prod", "api"),
             total_size: 2048,
             file_count: 2,
             min_timestamp_s: Some(100),
             max_timestamp_s: Some(160),
         },
-        StreamStat {
-            ns_hash: 0,
-            stream: ServiceStream::new("", ""),
+        PartitionStat {
+            part_key: 0,
+            content_meta: enc("", ""),
             total_size: 0,
             file_count: 1,
             min_timestamp_s: None,
