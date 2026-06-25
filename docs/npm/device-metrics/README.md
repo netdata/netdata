@@ -12,6 +12,10 @@ endmeta-->
 
 Netdata monitors your network devices over SNMP — routers, switches, firewalls, access points, load balancers, UPS and PDU units. It recognizes each device's model automatically and collects interface, health, and vendor-specific metrics, with no OID lists to build and no per-device dashboards to design.
 
+![Network devices on the Nodes tab](https://www.netdata.cloud/img/dashboard-screens/nodes-tab-network-devices.png)
+
+Each SNMP device becomes its own node — model-recognized, with live interface, health, and vendor metrics.
+
 ## What you can monitor
 
 - **Interfaces** — traffic, errors, discards, and operational status, per interface.

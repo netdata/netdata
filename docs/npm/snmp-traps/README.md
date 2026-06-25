@@ -14,6 +14,10 @@ Netdata listens for SNMP Trap and INFORM notifications from your network devices
 
 This section is for NetOps, NOC, SRE, SecOps, and MSP operators who need to know which network events a device reported, whether the receiver is healthy, and when trap data should be queried or forwarded.
 
+![SNMP trap events in the Netdata Logs UI](https://www.netdata.cloud/img/network/snmp-trap-logs.png)
+
+Decoded trap and INFORM events in the Netdata Logs tab — named, categorized, and searchable, with severity and source.
+
 ## What trap data is
 
 An SNMP trap is an *asynchronous event notification*. A device sends one when it decides something happened — an interface changed state, an authentication failed, a configuration changed, a sensor crossed a threshold. It is one telemetry leg among several: traps and streaming telemetry carry events, polling confirms current state, syslog carries narrative, flow carries traffic. Traps are indispensable because every device supports them and they catch transient transitions that polling would miss between intervals.
