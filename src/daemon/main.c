@@ -1011,8 +1011,21 @@ int netdata_main(int argc, char **argv) {
     delta_startup_time("cd to user config dir");
 
     // cd into config_dir to allow the plugins refer to their config files using relative filenames
+#if defined(OS_WINDOWS)
+    // netdata_configured_user_config_dir is in POSIX/MSYS2 form (/c/...).
+    // UCRT64's chdir() calls SetCurrentDirectoryA() directly without POSIX
+    // translation — /c/... would resolve to C:\c\... which does not exist.
+    // Convert to Windows-native form first so SetCurrentDirectoryA() succeeds.
+    {
+        char win_config_dir[FILENAME_MAX + 1];
+        os_translate_path(win_config_dir, netdata_configured_user_config_dir, FILENAME_MAX);
+        if(chdir(win_config_dir) == -1)
+            fatal("Cannot cd to '%s'", netdata_configured_user_config_dir);
+    }
+#else
     if(chdir(netdata_configured_user_config_dir) == -1)
         fatal("Cannot cd to '%s'", netdata_configured_user_config_dir);
+#endif
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("analytics");
