@@ -273,7 +273,7 @@ pub(crate) async fn build_logs_pipeline(
 /// tagging each with `pipeline_id`. On source-channel close (the worker task
 /// ended) it emits one [`PipelineResp::WorkerGone`] so the run-loop can treat a
 /// dead worker as fatal, then exits.
-fn spawn_forwarder<T: Send + 'static>(
+pub(super) fn spawn_forwarder<T: Send + 'static>(
     mut rx: mpsc::UnboundedReceiver<T>,
     pipeline_id: u16,
     tx: mpsc::UnboundedSender<(u16, PipelineResp)>,

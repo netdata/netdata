@@ -10,6 +10,7 @@ use bridge::{IngestorRequest, IngestorResponse};
 use ferryboat::{Connection, Endpoint};
 use opentelemetry_proto::tonic::collector::logs::v1::logs_service_server::LogsServiceServer;
 use opentelemetry_proto::tonic::collector::metrics::v1::metrics_service_server::MetricsServiceServer;
+use opentelemetry_proto::tonic::collector::trace::v1::trace_service_server::TraceServiceServer;
 use tokio::sync::RwLock;
 use tonic::transport::{Identity, Server, ServerTlsConfig};
 
@@ -26,10 +27,13 @@ mod logs_service;
 mod metrics_service;
 mod otel;
 mod output;
+// PROOF SCAFFOLD (traces-proof SOW; revert with the skeleton).
+mod trace_service;
 
 use chart_config::ChartConfigManager;
 use logs_service::NetdataLogsService;
 use metrics_service::{ChartManager, NetdataMetricsService};
+use trace_service::NetdataTracesService;
 
 /// Ingestor worker entry point.
 ///
@@ -149,8 +153,14 @@ async fn run_ingestor(
         }
     });
 
-    // Set up logs pipeline
-    let logs_service = create_logs_service(&config.logs, &config.writer_socket_path)?;
+    // Set up logs + (proof-scaffold) traces pipelines. They SHARE one
+    // writer→ledger sender and one global seq allocator: the ledger accepts a
+    // single writer connection and gap-checks one global `frame_seq`, and file
+    // `seq` must be globally unique across signals.
+    let (sender, seq) = create_shared_writer_state(&config.logs, &config.writer_socket_path)?;
+    let logs_service =
+        create_logs_service(&config.logs, Arc::clone(&sender), Arc::clone(&seq));
+    let traces_service = create_traces_service(&config.logs, sender, seq);
 
     // Parse gRPC endpoint address
     let addr =
@@ -190,16 +200,19 @@ async fn run_ingestor(
         );
     }
 
-    // Build gRPC router with metrics + logs
+    // Build gRPC router with metrics + logs + (proof-scaffold) traces
     let metrics_svc = MetricsServiceServer::new(metrics_service)
         .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
     let logs_svc = LogsServiceServer::new(logs_service)
         .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
+    let traces_svc = TraceServiceServer::new(traces_service)
+        .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
 
-    tracing::info!(endpoint = %config.endpoint.path, "gRPC server starting (metrics + logs)");
+    tracing::info!(endpoint = %config.endpoint.path, "gRPC server starting (metrics + logs + traces)");
     let grpc_server = server_builder
         .add_service(metrics_svc)
         .add_service(logs_svc)
+        .add_service(traces_svc)
         .serve(addr);
 
     // Main loop: forward chart data to supervisor, handle incoming requests, run gRPC
@@ -256,16 +269,24 @@ async fn run_ingestor(
     Ok(())
 }
 
-fn create_logs_service(
+/// Build the writer→ledger state shared by every ingestion signal: one
+/// `LedgerSender` (the ledger accepts a single writer connection and gap-checks
+/// one global `frame_seq`) and one global `SeqAllocator` (file `seq` is globally
+/// unique across signals).
+///
+/// PROOF-SCAFFOLD NOTE: the seq seed scans only the logs dirs. Once traces files
+/// also persist, the seed MUST take the max across both signals' dirs too, or a
+/// restart could reissue a seq still live as a traces SFST (Step 3 item).
+fn create_shared_writer_state(
     logs_config: &LogsConfig,
     writer_socket_path: &str,
-) -> Result<NetdataLogsService> {
+) -> Result<(Arc<ledger_sender::LedgerSender>, Arc<wal::SeqAllocator>)> {
     let wal_base_dir = logs_config.wal.dir.clone();
     let index_base_dir = logs_config.index.dir.clone();
     let catalog_base_dir = logs_config.catalog.dir.clone();
 
     let seed = compute_seq_seed(&wal_base_dir, &index_base_dir, &catalog_base_dir)?;
-    let seq = std::sync::Arc::new(
+    let seq = Arc::new(
         wal::SeqAllocator::durable(
             seq_highwater_path(&index_base_dir),
             seed.seed,
@@ -274,7 +295,7 @@ fn create_logs_service(
         .context("initializing seq high-water allocator")?,
     );
 
-    let sender = ledger_sender::LedgerSender::new(writer_socket_path);
+    let sender = Arc::new(ledger_sender::LedgerSender::new(writer_socket_path));
 
     tracing::info!(
         wal_dir = %logs_config.wal.dir.display(),
@@ -285,16 +306,47 @@ fn create_logs_service(
         catalog_max = seed.catalog_max,
         highwater = seed.highwater,
         seed = seed.seed,
-        "logs ingestion enabled (multi-tenant WAL)"
+        "ingestion enabled (multi-tenant WAL); seq allocator + ledger sender shared across signals"
     );
 
-    Ok(NetdataLogsService::new(
+    Ok((sender, seq))
+}
+
+fn create_logs_service(
+    logs_config: &LogsConfig,
+    sender: Arc<ledger_sender::LedgerSender>,
+    seq: Arc<wal::SeqAllocator>,
+) -> NetdataLogsService {
+    NetdataLogsService::new(
         sender,
-        wal_base_dir,
+        logs_config.wal.dir.clone(),
         logs_config.wal.clone(),
         seq,
         logs_config.auth.clone(),
-    ))
+    )
+}
+
+/// PROOF SCAFFOLD (traces-proof SOW): the skeletal traces ingestion service.
+/// Its WAL dir + rotation come from `LogsConfig::traces_proof_lifecycle` (the
+/// `*-traces` sibling dirs — the same derivation the ledger uses), so the two
+/// processes agree on where traces WAL files live.
+fn create_traces_service(
+    logs_config: &LogsConfig,
+    sender: Arc<ledger_sender::LedgerSender>,
+    seq: Arc<wal::SeqAllocator>,
+) -> NetdataTracesService {
+    let traces_lc = logs_config.traces_proof_lifecycle();
+    tracing::info!(
+        wal_dir = %traces_lc.wal.dir.display(),
+        "traces ingestion enabled (PROOF SCAFFOLD)"
+    );
+    NetdataTracesService::new(
+        sender,
+        traces_lc.wal.dir.clone(),
+        traces_lc.wal.clone(),
+        seq,
+        logs_config.auth.clone(),
+    )
 }
 
 /// Canonical location of the seq high-water file. Lives at the index

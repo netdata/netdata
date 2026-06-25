@@ -350,7 +350,10 @@ pub struct NetdataLogsService {
     /// clock across all tenants and streams keeps `ingestion_ns`
     /// monotonic globally within this process.
     clock: Mutex<MonotonicClock>,
-    sender: LedgerSender,
+    /// Shared with the traces ingestion service: the writer → ledger IPC accepts
+    /// exactly one connection and the ledger gap-checks one global `frame_seq`
+    /// stream, so every signal's events MUST funnel through one sender.
+    sender: Arc<LedgerSender>,
     wal_base_dir: PathBuf,
     wal_config: bridge::config::WalConfig,
     seq: Arc<wal::SeqAllocator>,
@@ -359,7 +362,7 @@ pub struct NetdataLogsService {
 
 impl NetdataLogsService {
     pub fn new(
-        sender: LedgerSender,
+        sender: Arc<LedgerSender>,
         wal_base_dir: PathBuf,
         wal_config: bridge::config::WalConfig,
         seq: Arc<wal::SeqAllocator>,
@@ -918,7 +921,7 @@ mod tests {
     /// the tokio runtime.
     fn test_service(wal_dir: std::path::PathBuf) -> NetdataLogsService {
         let socket = format!("/tmp/netdata-ingestor-test-{}.sock", std::process::id());
-        let sender = LedgerSender::new(&socket);
+        let sender = Arc::new(LedgerSender::new(&socket));
 
         let mut rotation = HashMap::new();
         rotation.insert(

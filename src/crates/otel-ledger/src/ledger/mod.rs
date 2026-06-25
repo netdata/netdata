@@ -26,6 +26,7 @@ mod ingestor;
 mod pipeline;
 mod retention;
 mod rpc;
+mod traces_pipeline;
 mod uploader;
 
 use file_lifecycle::Pipeline;
@@ -63,6 +64,11 @@ const UPLOAD_CONCURRENCY: usize = 8;
 /// The logs pipeline's signal axis; matches the `pipeline_id` carried in
 /// logs `FileId`s (the writer stamps [`FileId::DEFAULT_PIPELINE`]).
 const LOGS_PIPELINE_ID: u16 = FileId::DEFAULT_PIPELINE;
+
+/// PROOF SCAFFOLD (traces-proof SOW): the skeletal traces pipeline's signal
+/// axis; matches the `pipeline_id` the ingestor's traces WAL writer stamps
+/// (`wal::Writer::with_pipeline(..., TRACES_PIPELINE_ID)`).
+const TRACES_PIPELINE_ID: u16 = 1;
 
 pub struct Ledger {
     supervisor: Connection<LedgerResponse, LedgerRequest>,
@@ -131,6 +137,12 @@ impl Ledger {
         mut supervisor: Connection<LedgerResponse, LedgerRequest>,
         writer_socket_path: &str,
         lifecycle: &LifecycleConfig,
+        // PROOF SCAFFOLD (traces-proof SOW): the skeletal traces pipeline's
+        // lifecycle config (sibling `*-traces` dirs, derived by
+        // `LogsConfig::traces_proof_lifecycle`). The N-signal generalization
+        // (a signal list instead of two explicit args) is a real-traces-SOW
+        // finding, deliberately not done for the proof.
+        traces_lifecycle: &LifecycleConfig,
     ) -> anyhow::Result<Self> {
         let cancel = CancellationToken::new();
 
@@ -231,13 +243,30 @@ impl Ledger {
         )
         .await?;
 
-        // All pipelines (today only logs). Both routing keys MUST be unique:
+        // PROOF SCAFFOLD (traces-proof SOW): the skeletal traces pipeline,
+        // sharing the same cleaner/uploader/storage but with its own
+        // `*-traces` dirs, a content-light seal, and a stub query handler.
+        // This is the whole point of the proof — a second signal plugs in with
+        // another `build_*_pipeline` call, no shell edits.
+        let traces = traces_pipeline::build_traces_pipeline(
+            TRACES_PIPELINE_ID,
+            crate::TRACES_SIGNAL,
+            traces_lifecycle,
+            &cancel,
+            &mut cleaner,
+            uploader.as_mut(),
+            storage.as_ref(),
+            &pipeline_tx,
+        )
+        .await?;
+
+        // All pipelines (logs + the skeletal traces proof). Both routing keys MUST be unique:
         // `pipeline_id` keys the `pipelines` map (writer-event + worker-response
         // routing) and the function name is the call-dispatch key
         // (`rpc::dispatch`). A duplicate of either would silently route to
         // whichever entry the map/scan yields first, so fail loudly at startup
         // — these are hardcoded by us, so a clash is a programming error.
-        let built = vec![logs];
+        let built = vec![logs, traces];
         {
             let mut seen_ids = std::collections::HashSet::new();
             let mut seen_names = std::collections::HashSet::new();

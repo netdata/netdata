@@ -129,6 +129,30 @@ impl LogsConfig {
             storage: self.storage.clone(),
         }
     }
+
+    /// PROOF SCAFFOLD (traces-proof SOW; revert with the skeleton): the
+    /// signal-neutral lifecycle config for a skeletal second ("traces") pipeline.
+    ///
+    /// Derived from the logs config by relocating each dir to a `*-traces`
+    /// sibling (`/x/wal` → `/x/wal-traces`) and cloning everything else
+    /// (rotation/retention/storage). Both the ingestor (traces WAL write + seq
+    /// scan) and the ledger (`build_traces_pipeline`) call this so they agree on
+    /// the traces dirs without a real per-signal config. The real traces feature
+    /// (Stage 6) replaces this with operator-facing traces config.
+    pub fn traces_proof_lifecycle(&self) -> LifecycleConfig {
+        fn sibling(dir: &std::path::Path) -> PathBuf {
+            let name = dir
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "wal".to_string());
+            dir.with_file_name(format!("{name}-traces"))
+        }
+        let mut lc = self.lifecycle();
+        lc.wal.dir = sibling(&self.wal.dir);
+        lc.index.dir = sibling(&self.index.dir);
+        lc.catalog.dir = sibling(&self.catalog.dir);
+        lc
+    }
 }
 
 /// Signal-neutral file-lifecycle configuration: the per-signal WAL, index,

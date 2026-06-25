@@ -10,6 +10,7 @@ pub mod indexer;
 mod ledger;
 #[cfg(test)]
 pub(crate) mod test_helpers;
+pub mod traces_indexer;
 
 pub use ledger::Ledger;
 
@@ -18,6 +19,11 @@ pub use ledger::Ledger;
 /// flip commit moves it into the logs pipeline's seam provision so a second
 /// signal (traces) supplies its own.
 pub(crate) const LOGS_SIGNAL: &str = "logs";
+
+/// PROOF SCAFFOLD (traces-proof SOW): signal segment for the skeletal traces
+/// pipeline's remote-storage keys (`v1/traces/...`). The real traces feature
+/// keeps a constant like this; the rest of the traces binding is throwaway.
+pub(crate) const TRACES_SIGNAL: &str = "traces";
 
 use anyhow::{Context, Result};
 use bridge::{LedgerRequest, LedgerResponse};
@@ -51,10 +57,15 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
     // for the step order and what `Ready` claims. The logs pipeline's
     // lifecycle config is carved out of `LogsConfig`; a second signal would
     // build its own `LifecycleConfig` the same way from its own config.
+    // PROOF SCAFFOLD (traces-proof SOW): derive the skeletal traces pipeline's
+    // lifecycle config alongside logs, from the same `LogsConfig`, so the two
+    // signals agree on the `*-traces` sibling dirs (the ingestor's traces WAL
+    // writer derives them the same way).
     let mut ledger = Ledger::new(
         supervisor,
         &config.writer_socket_path,
         &config.logs.lifecycle(),
+        &config.logs.traces_proof_lifecycle(),
     )
     .await
     .context("failed to initialize ledger")?;
