@@ -274,22 +274,32 @@ async fn run_ingestor(
 /// one global `frame_seq`) and one global `SeqAllocator` (file `seq` is globally
 /// unique across signals).
 ///
-/// PROOF-SCAFFOLD NOTE: the seq seed scans only the logs dirs. Once traces files
-/// also persist, the seed MUST take the max across both signals' dirs too, or a
-/// restart could reissue a seq still live as a traces SFST (Step 3 item).
+/// The seq is GLOBAL across signals (one allocator → one highwater file), so the
+/// seed scans BOTH signals' dirs and takes the max. Seeding from logs alone would
+/// let a restart reissue a seq still live as a traces SFST, making a new file look
+/// "older" than a retained one and triggering wrong eviction. The single highwater
+/// file lives at the logs index dir (where `compute_seq_seed` reads it); the traces
+/// scan contributes only its dir maxes, so `max(logs.seed, traces.seed)` is the
+/// correct global seed.
+///
+/// PROOF SCAFFOLD: the traces dir set comes from `traces_proof_lifecycle`; the real
+/// feature seeds from each signal's own configured dirs.
 fn create_shared_writer_state(
     logs_config: &LogsConfig,
     writer_socket_path: &str,
 ) -> Result<(Arc<ledger_sender::LedgerSender>, Arc<wal::SeqAllocator>)> {
-    let wal_base_dir = logs_config.wal.dir.clone();
-    let index_base_dir = logs_config.index.dir.clone();
-    let catalog_base_dir = logs_config.catalog.dir.clone();
+    let logs_lc = logs_config.lifecycle();
+    let traces_lc = logs_config.traces_proof_lifecycle();
 
-    let seed = compute_seq_seed(&wal_base_dir, &index_base_dir, &catalog_base_dir)?;
+    let logs_seed = compute_seq_seed(&logs_lc.wal.dir, &logs_lc.index.dir, &logs_lc.catalog.dir)?;
+    let traces_seed =
+        compute_seq_seed(&traces_lc.wal.dir, &traces_lc.index.dir, &traces_lc.catalog.dir)?;
+    let seed = logs_seed.seed.max(traces_seed.seed);
+
     let seq = Arc::new(
         wal::SeqAllocator::durable(
-            seq_highwater_path(&index_base_dir),
-            seed.seed,
+            seq_highwater_path(&logs_lc.index.dir),
+            seed,
             wal::DEFAULT_RESERVE_BATCH,
         )
         .context("initializing seq high-water allocator")?,
@@ -298,15 +308,15 @@ fn create_shared_writer_state(
     let sender = Arc::new(ledger_sender::LedgerSender::new(writer_socket_path));
 
     tracing::info!(
-        wal_dir = %logs_config.wal.dir.display(),
-        index_dir = %logs_config.index.dir.display(),
-        catalog_dir = %logs_config.catalog.dir.display(),
-        wal_max = seed.wal_max,
-        sfst_max = seed.sfst_max,
-        catalog_max = seed.catalog_max,
-        highwater = seed.highwater,
-        seed = seed.seed,
-        "ingestion enabled (multi-tenant WAL); seq allocator + ledger sender shared across signals"
+        logs_wal = logs_seed.wal_max,
+        logs_sfst = logs_seed.sfst_max,
+        logs_catalog = logs_seed.catalog_max,
+        traces_wal = traces_seed.wal_max,
+        traces_sfst = traces_seed.sfst_max,
+        traces_catalog = traces_seed.catalog_max,
+        highwater = logs_seed.highwater,
+        seed,
+        "ingestion enabled (multi-tenant WAL); seq allocator + ledger sender shared across logs + traces"
     );
 
     Ok((sender, seq))
