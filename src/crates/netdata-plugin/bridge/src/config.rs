@@ -115,6 +115,38 @@ pub struct LogsConfig {
     pub auth: AuthConfig,
 }
 
+impl LogsConfig {
+    /// The signal-neutral file-lifecycle view of this config: the WAL, index,
+    /// catalog, and storage settings that the content-agnostic ledger substrate
+    /// consumes per signal. `auth` is excluded — it is tenant-scoped, not a
+    /// per-signal file-lifecycle concern. A second signal (traces) builds its
+    /// own [`LifecycleConfig`] the same way from its own config.
+    pub fn lifecycle(&self) -> LifecycleConfig {
+        LifecycleConfig {
+            wal: self.wal.clone(),
+            index: self.index.clone(),
+            catalog: self.catalog.clone(),
+            storage: self.storage.clone(),
+        }
+    }
+}
+
+/// Signal-neutral file-lifecycle configuration: the per-signal WAL, index,
+/// catalog, and remote-storage settings the ledger substrate needs to manage a
+/// signal's file lifecycle. Built from a signal's own config (for logs, via
+/// [`LogsConfig::lifecycle`]); the substrate ascribes no signal meaning to it.
+#[derive(Debug, Clone)]
+pub struct LifecycleConfig {
+    /// WAL file configuration (dir, rotation, crc/compression).
+    pub wal: WalConfig,
+    /// Index (SFST) file configuration (dir, retention).
+    pub index: IndexConfig,
+    /// Catalog file configuration (dir, rotation count).
+    pub catalog: CatalogConfig,
+    /// Remote object-storage configuration.
+    pub storage: StorageConfig,
+}
+
 /// Remote object storage configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StorageConfig {

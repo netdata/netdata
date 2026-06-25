@@ -38,16 +38,41 @@ impl Component for Cleaner {
 }
 
 fn process(req: CleanerRequest) -> CleanerResponse {
+    // `pipeline_id` is opaque here: the cleaner only deletes paths. It is
+    // echoed verbatim from request to response so the run-loop can route the
+    // registry mutation back to the owning pipeline.
     match req {
-        CleanerRequest::DeleteWalFile { sequence, path } => match remove_file(&path) {
-            Ok(()) => CleanerResponse::WalFileDeleted { sequence },
-            Err(error) => CleanerResponse::WalFileFailed { sequence, error },
+        CleanerRequest::DeleteWalFile {
+            pipeline_id,
+            sequence,
+            path,
+        } => match remove_file(&path) {
+            Ok(()) => CleanerResponse::WalFileDeleted {
+                pipeline_id,
+                sequence,
+            },
+            Err(error) => CleanerResponse::WalFileFailed {
+                pipeline_id,
+                sequence,
+                error,
+            },
         },
-        CleanerRequest::DeleteIndexFile { sequence, path } => match remove_file(&path) {
-            Ok(()) => CleanerResponse::IndexFileDeleted { sequence },
-            Err(error) => CleanerResponse::IndexFileFailed { sequence, error },
+        CleanerRequest::DeleteIndexFile {
+            pipeline_id,
+            sequence,
+            path,
+        } => match remove_file(&path) {
+            Ok(()) => CleanerResponse::IndexFileDeleted {
+                pipeline_id,
+                sequence,
+            },
+            Err(error) => CleanerResponse::IndexFileFailed {
+                pipeline_id,
+                sequence,
+                error,
+            },
         },
-        CleanerRequest::DeleteCatalogFile { path } => match remove_file(&path) {
+        CleanerRequest::DeleteCatalogFile { pipeline_id, path } => match remove_file(&path) {
             Ok(()) => {
                 // Catalog layout is `{base}/{date}/{tenant}/{file}.catalog`.
                 // After deleting the file, prune the now-possibly-empty
@@ -55,9 +80,13 @@ fn process(req: CleanerRequest) -> CleanerResponse {
                 // per-tenant so they don't need this; only catalogs have
                 // date-bucketed dirs that accumulate over retention.
                 prune_empty_parents(&path, 2);
-                CleanerResponse::CatalogFileDeleted { path }
+                CleanerResponse::CatalogFileDeleted { pipeline_id, path }
             }
-            Err(error) => CleanerResponse::CatalogFileFailed { path, error },
+            Err(error) => CleanerResponse::CatalogFileFailed {
+                pipeline_id,
+                path,
+                error,
+            },
         },
     }
 }

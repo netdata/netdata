@@ -130,6 +130,7 @@ mod tests {
 
     fn upload(seq: u64) -> UploaderRequest {
         UploaderRequest::Upload {
+            pipeline_id: 0,
             seq,
             local_path: format!("/tmp/{seq}.sfst").into(),
             remote_key: format!("k{seq}"),

@@ -633,7 +633,7 @@ fn resolve_query_tenant(raw: Option<&str>) -> TenantId {
 /// when no synthesis happened (no args, or the upstream rt shim
 /// already produced a payload), in which case the caller falls back
 /// to the original payload.
-pub(super) fn patch_args_into_payload(args: &[String], payload: Option<&[u8]>) -> Option<Vec<u8>> {
+pub fn patch_args_into_payload(args: &[String], payload: Option<&[u8]>) -> Option<Vec<u8>> {
     if args.is_empty() || payload.is_some() {
         return None;
     }

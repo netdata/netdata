@@ -16,7 +16,10 @@ fn delete_catalog_leaves_dir_when_siblings_remain() {
     let p1 = write_catalog(base, "2026-04-17", "tenant1", "a.catalog");
     let _p2 = write_catalog(base, "2026-04-17", "tenant1", "b.catalog");
 
-    let resp = process(CleanerRequest::DeleteCatalogFile { path: p1.clone() });
+    let resp = process(CleanerRequest::DeleteCatalogFile {
+        pipeline_id: 0,
+        path: p1.clone(),
+    });
     assert!(matches!(resp, CleanerResponse::CatalogFileDeleted { .. }));
     assert!(!p1.exists());
 
@@ -31,7 +34,10 @@ fn delete_last_catalog_prunes_tenant_and_date_dirs() {
     let base = tmp.path();
     let p = write_catalog(base, "2026-04-17", "tenant1", "a.catalog");
 
-    let resp = process(CleanerRequest::DeleteCatalogFile { path: p.clone() });
+    let resp = process(CleanerRequest::DeleteCatalogFile {
+        pipeline_id: 0,
+        path: p.clone(),
+    });
     assert!(matches!(resp, CleanerResponse::CatalogFileDeleted { .. }));
     assert!(!p.exists());
 
@@ -49,7 +55,10 @@ fn delete_last_catalog_keeps_date_dir_if_other_tenant_present() {
     let p1 = write_catalog(base, "2026-04-17", "tenant1", "a.catalog");
     let _p2 = write_catalog(base, "2026-04-17", "tenant2", "a.catalog");
 
-    let resp = process(CleanerRequest::DeleteCatalogFile { path: p1.clone() });
+    let resp = process(CleanerRequest::DeleteCatalogFile {
+        pipeline_id: 0,
+        path: p1.clone(),
+    });
     assert!(matches!(resp, CleanerResponse::CatalogFileDeleted { .. }));
 
     // tenant1/ pruned (empty); date dir kept (tenant2/ still there).
@@ -72,6 +81,7 @@ fn delete_missing_catalog_is_noop_and_does_not_prune() {
         .join("missing.catalog");
 
     let resp = process(CleanerRequest::DeleteCatalogFile {
+        pipeline_id: 0,
         path: missing.clone(),
     });
     assert!(matches!(resp, CleanerResponse::CatalogFileDeleted { .. }));

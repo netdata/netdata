@@ -35,7 +35,7 @@ enum Indexed {
 
 impl Ledger {
     #[tracing::instrument(skip_all)]
-    pub(super) async fn handle_indexer_resp(&mut self, resp: IndexerResponse) {
+    pub(super) async fn handle_indexer_resp(&mut self, pipeline_id: u16, resp: IndexerResponse) {
         let (seq, summary, size) = match resp {
             IndexerResponse::IndexFailed { path, error } => {
                 tracing::error!(path = %path.display(), "indexing failed: {error}");
@@ -48,13 +48,23 @@ impl Ledger {
 
         tracing::info!(seq, record_count = summary.record_count, "indexed");
 
+        // Snapshot the owning pipeline's seam provisions (signal segment + the
+        // storage flag) and its registries handle before locking.
+        let Some(pipeline) = self.pipelines.get(&pipeline_id) else {
+            tracing::error!(pipeline_id, "indexed for unknown pipeline; dropping");
+            return;
+        };
+        let signal = pipeline.signal;
+        let storage_enabled = pipeline.storage_enabled();
+        let registries = pipeline.registries.clone();
+
         // Decide everything under the registry write lock — including building
         // the upload request — then act after the guard is dropped. Building
         // the request here (rather than re-acquiring the lock in a helper)
         // removes the second lookup that previously needed an `.expect` on the
         // tenant still being present.
         let outcome = {
-            let mut registries = self.registries.write().await;
+            let mut registries = registries.write().await;
             let Some((tenant_id, registry)) = registries.for_seq_mut(seq) else {
                 tracing::error!(seq, "indexed unknown seq; no tenant mapping");
                 return;
@@ -83,8 +93,8 @@ impl Ledger {
                 // handler reads them back.
                 registry.sfst.track(file_id, size, summary);
 
-                let upload = if self.logs_config.storage.enabled {
-                    super::sfst_upload_request(registry, &tenant_id, file_id)
+                let upload = if storage_enabled {
+                    super::sfst_upload_request(registry, signal, &tenant_id, file_id)
                 } else {
                     None
                 };
@@ -114,12 +124,14 @@ impl Ledger {
                 self.chunk_cache.drop_seq(file_id.seq).await;
 
                 if let Err(e) = self.cleaner.send(CleanerRequest::DeleteWalFile {
+                    pipeline_id: file_id.pipeline_id,
                     sequence: file_id.seq,
                     path: wal_path,
                 }) {
                     tracing::error!(seq = file_id.seq, "failed to send WAL delete request: {e}");
                 }
                 if let Err(e) = self.cleaner.send(CleanerRequest::DeleteIndexFile {
+                    pipeline_id: file_id.pipeline_id,
                     sequence: file_id.seq,
                     path: sfst_path,
                 }) {
@@ -132,7 +144,7 @@ impl Ledger {
                 // No new SFST was tracked, but keep retention on the same
                 // per-response cadence (e.g. age-based eviction while a stream
                 // is idle and only producing empty WAL rotations).
-                self.evaluate_retention(&tenant_id).await;
+                self.evaluate_retention(pipeline_id, &tenant_id).await;
             }
             Indexed::Tracked {
                 tenant_id,
@@ -147,6 +159,7 @@ impl Ledger {
                 self.chunk_cache.drop_seq(file_id.seq).await;
 
                 if let Err(e) = self.cleaner.send(CleanerRequest::DeleteWalFile {
+                    pipeline_id: file_id.pipeline_id,
                     sequence: file_id.seq,
                     path: wal_path,
                 }) {
@@ -164,7 +177,7 @@ impl Ledger {
                     }
                 }
 
-                self.evaluate_retention(&tenant_id).await;
+                self.evaluate_retention(pipeline_id, &tenant_id).await;
             }
         }
     }

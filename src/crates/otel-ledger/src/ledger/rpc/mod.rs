@@ -19,4 +19,4 @@ mod dispatch;
 mod handler;
 mod wire;
 
-pub(crate) use handler::{OtelLogsHandler, RemoteRead};
+pub(crate) use handler::{OtelLogsHandler, RemoteRead, patch_args_into_payload};

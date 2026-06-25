@@ -57,6 +57,7 @@ pub async fn recover_unindexed(
             // The WAL entry is removed from the registry when the cleaner confirms.
             let wal_path = registry.wal.file_path(id);
             let req = CleanerRequest::DeleteWalFile {
+                pipeline_id: id.pipeline_id,
                 sequence: seq,
                 path: wal_path,
             };
@@ -126,11 +127,13 @@ pub async fn drain_wal_deletes(
     cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
 ) -> anyhow::Result<()> {
     drain_pending(cleaner, |resp| match resp {
-        CleanerResponse::WalFileDeleted { sequence } => {
+        CleanerResponse::WalFileDeleted { sequence, .. } => {
             registry.wal.remove_by_seq(sequence);
             tracing::info!("recovery: WAL deleted seq={sequence}");
         }
-        CleanerResponse::WalFileFailed { sequence, error } => {
+        CleanerResponse::WalFileFailed {
+            sequence, error, ..
+        } => {
             tracing::error!("recovery: WAL deletion failed seq={sequence}: {error}");
         }
         resp => {
@@ -159,17 +162,20 @@ pub async fn recover_orphaned_wals(
     let requests: Vec<_> = orphaned
         .iter()
         .map(|&id| CleanerRequest::DeleteWalFile {
+            pipeline_id: id.pipeline_id,
             sequence: id.seq,
             path: registry.wal.file_path(id),
         })
         .collect();
 
     batch_recover(requests, cleaner, |resp| match resp {
-        CleanerResponse::WalFileDeleted { sequence } => {
+        CleanerResponse::WalFileDeleted { sequence, .. } => {
             registry.wal.remove_by_seq(sequence);
             tracing::info!("recovery: orphaned WAL deleted seq={sequence}");
         }
-        CleanerResponse::WalFileFailed { sequence, error } => {
+        CleanerResponse::WalFileFailed {
+            sequence, error, ..
+        } => {
             tracing::error!("recovery: orphaned WAL deletion failed seq={sequence}: {error}");
         }
         resp => {
@@ -187,6 +193,7 @@ pub async fn recover_orphaned_wals(
 /// [`crate::ledger::catalog_retention_days`].
 pub async fn recover_retention(
     registry: &mut Registry,
+    pipeline_id: u16,
     cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
     retention: &bridge::config::RetentionConfig,
     storage_enabled: bool,
@@ -236,28 +243,31 @@ pub async fn recover_retention(
         if let Some(entry) = registry.sfst.get(seq) {
             let path = registry.sfst.file_path(entry.id);
             requests.push(CleanerRequest::DeleteIndexFile {
+                pipeline_id: entry.id.pipeline_id,
                 sequence: seq,
                 path,
             });
         }
     }
     for path in evictable_catalog {
-        requests.push(CleanerRequest::DeleteCatalogFile { path });
+        requests.push(CleanerRequest::DeleteCatalogFile { pipeline_id, path });
     }
 
     batch_recover(requests, cleaner, |resp| match resp {
-        CleanerResponse::IndexFileDeleted { sequence } => {
+        CleanerResponse::IndexFileDeleted { sequence, .. } => {
             registry.evict_seq(sequence);
             tracing::info!("recovery: index file evicted seq={sequence}");
         }
-        CleanerResponse::IndexFileFailed { sequence, error } => {
+        CleanerResponse::IndexFileFailed {
+            sequence, error, ..
+        } => {
             tracing::error!("recovery: index eviction failed seq={sequence} error={error}");
         }
-        CleanerResponse::CatalogFileDeleted { path } => {
+        CleanerResponse::CatalogFileDeleted { path, .. } => {
             registry.catalog_files.remove(&path);
             tracing::info!(path = %path.display(), "recovery: catalog file evicted");
         }
-        CleanerResponse::CatalogFileFailed { path, error } => {
+        CleanerResponse::CatalogFileFailed { path, error, .. } => {
             tracing::error!(
                 path = %path.display(),
                 "recovery: catalog eviction failed: {error}",

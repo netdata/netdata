@@ -1,16 +1,21 @@
 //! Catalog builder response handling.
 //!
-//! On `Rotated`, records the new catalog file in the tenant's registry,
-//! marks the contained SFST seqs as rotated (so retention can evict them
-//! safely), and forwards a `UploadCatalog` request to the uploader when
-//! storage is enabled.
+//! On `Rotated`, records the new catalog file in the owning pipeline's tenant
+//! registry, marks the contained SFST seqs as rotated (so retention can evict
+//! them safely), and forwards a `UploadCatalog` request to the shared uploader
+//! when storage is enabled. The `pipeline_id` arrives tagged by the forwarder
+//! that funnels this pipeline's catalog-builder responses into the run-loop.
 
 use crate::ipc::{CatalogBuilderResponse, UploaderRequest};
 
 use super::Ledger;
 
 impl Ledger {
-    pub(super) async fn handle_catalog_builder_resp(&mut self, resp: CatalogBuilderResponse) {
+    pub(super) async fn handle_catalog_builder_resp(
+        &mut self,
+        pipeline_id: u16,
+        resp: CatalogBuilderResponse,
+    ) {
         match resp {
             CatalogBuilderResponse::EntryAccepted { seq } => {
                 tracing::debug!(seq, "catalog entry accepted");
@@ -34,8 +39,14 @@ impl Ledger {
                     "catalog rotated",
                 );
 
+                let Some(pipeline) = self.pipelines.get(&pipeline_id) else {
+                    tracing::error!(pipeline_id, "catalog rotation for unknown pipeline; dropping");
+                    return;
+                };
+                let registries = pipeline.registries.clone();
+
                 let remote_key = crate::remote_keys::catalog(
-                    crate::LOGS_SIGNAL,
+                    pipeline.signal,
                     date,
                     &tenant_id,
                     machine_id,
@@ -46,7 +57,7 @@ impl Ledger {
                 );
 
                 {
-                    let mut registries = self.registries.write().await;
+                    let mut registries = registries.write().await;
                     if let Some(registry) = registries.get_mut(&tenant_id) {
                         let file = otel_catalog::File::new(
                             date,
@@ -64,6 +75,7 @@ impl Ledger {
 
                 if let Some(uploader) = self.uploader.as_mut() {
                     let req = UploaderRequest::UploadCatalog {
+                        pipeline_id,
                         local_path: path,
                         remote_key,
                         seqs,

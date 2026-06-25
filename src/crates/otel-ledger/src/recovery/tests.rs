@@ -117,7 +117,7 @@ async fn run_recover_retention(
 
     let cancel = CancellationToken::new();
     let mut cleaner = ComponentHandle::spawn::<Cleaner>((), cancel.child_token());
-    recover_retention(registry, &mut cleaner, retention, storage_enabled)
+    recover_retention(registry, 0, &mut cleaner, retention, storage_enabled)
         .await
         .unwrap();
     cancel.cancel();
@@ -252,6 +252,8 @@ async fn reconcile_local_catalog_uploads_re_uploads_missing_files() {
 
     reconcile_local_catalog_uploads(
         &mut reg,
+        0,
+        crate::LOGS_SIGNAL,
         &mut uploader,
         &storage,
         &TenantId::from("tenant1"),
@@ -323,6 +325,8 @@ async fn reconcile_local_catalog_uploads_skips_existing_files() {
 
     reconcile_local_catalog_uploads(
         &mut reg,
+        0,
+        crate::LOGS_SIGNAL,
         &mut uploader,
         &storage,
         &TenantId::from("tenant1"),
@@ -380,6 +384,8 @@ async fn reconcile_local_catalog_uploads_skips_past_retention_files() {
 
     reconcile_local_catalog_uploads(
         &mut reg,
+        0,
+        crate::LOGS_SIGNAL,
         &mut uploader,
         &storage,
         &TenantId::from("tenant1"),
@@ -418,6 +424,8 @@ async fn reconcile_local_catalog_uploads_skips_pending_deletion_files() {
 
     reconcile_local_catalog_uploads(
         &mut reg,
+        0,
+        crate::LOGS_SIGNAL,
         &mut uploader,
         &storage,
         &TenantId::from("tenant1"),
@@ -476,6 +484,8 @@ async fn reconcile_local_catalog_uploads_skips_on_transient_stat_error() {
 
     reconcile_local_catalog_uploads(
         &mut reg,
+        0,
+        crate::LOGS_SIGNAL,
         &mut uploader,
         &storage,
         &TenantId::from("tenant1"),
@@ -524,6 +534,8 @@ async fn reconcile_local_catalog_uploads_confirms_present_via_mock() {
 
     reconcile_local_catalog_uploads(
         &mut reg,
+        0,
+        crate::LOGS_SIGNAL,
         &mut uploader,
         &storage,
         &TenantId::from("tenant1"),
@@ -600,6 +612,7 @@ async fn reconcile_remote_uploads_marks_uploaded_and_enqueues_add_entry() {
 
     reconcile_remote_uploads(
         &mut reg,
+        crate::LOGS_SIGNAL,
         &mut catalog_builder,
         &storage,
         &TenantId::from("tenant1"),
@@ -636,6 +649,7 @@ async fn reconcile_remote_uploads_skips_already_rotated() {
 
     reconcile_remote_uploads(
         &mut reg,
+        crate::LOGS_SIGNAL,
         &mut catalog_builder,
         &storage,
         &TenantId::from("tenant1"),
@@ -671,6 +685,7 @@ async fn reconcile_remote_uploads_skips_when_local_sfst_missing() {
 
     reconcile_remote_uploads(
         &mut reg,
+        crate::LOGS_SIGNAL,
         &mut catalog_builder,
         &storage,
         &TenantId::from("tenant1"),
@@ -708,6 +723,7 @@ async fn reconcile_remote_uploads_propagates_list_error() {
 
     let result = reconcile_remote_uploads(
         &mut reg,
+        crate::LOGS_SIGNAL,
         &mut catalog_builder,
         &storage,
         &TenantId::from("tenant1"),
@@ -745,6 +761,7 @@ async fn reconcile_remote_uploads_skips_unparseable_key() {
 
     reconcile_remote_uploads(
         &mut reg,
+        crate::LOGS_SIGNAL,
         &mut catalog_builder,
         &storage,
         &TenantId::from("tenant1"),

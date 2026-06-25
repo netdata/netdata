@@ -9,13 +9,12 @@
 
 use std::sync::Arc;
 
-use bridge::function::{FunctionContext, RawFunctionHandler};
+use bridge::function::FunctionContext;
 use bridge::{LedgerRequest, LedgerResponse};
 use netdata_plugin_protocol::{FunctionCall, Message};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use super::handler;
 use crate::ledger::Ledger;
 
 impl Ledger {
@@ -112,8 +111,11 @@ impl Ledger {
         args: Vec<String>,
         payload: Option<Vec<u8>>,
     ) {
-        if name != "otel-logs" {
-            // Engine isn't routed for unknown names; emit a 404 directly.
+        // Route by declared function name to the owning pipeline. Each pipeline
+        // owns its handler and its pre-handler args→payload shim (a per-signal
+        // provision), so this dispatcher stays signal-neutral.
+        let Some(pipeline) = self.pipelines.values().find(|p| p.function_name() == name) else {
+            // No pipeline answers this name; emit a 404 directly.
             let result = netdata_plugin_types::FunctionResult {
                 transaction: transaction.clone(),
                 status: 404,
@@ -123,9 +125,11 @@ impl Ledger {
             };
             let _ = self.outbound_tx.send(LedgerResponse::Result(result));
             return;
-        }
+        };
+        let handler = pipeline.handler.clone();
+        let arg_shim = pipeline.arg_shim;
 
-        let payload = handler::patch_args_into_payload(&args, payload.as_deref()).or(payload);
+        let payload = arg_shim(&args, payload.as_deref()).or(payload);
 
         let cancel = CancellationToken::new();
         self.transactions
@@ -154,7 +158,6 @@ impl Ledger {
             outbound_tx: msg_tx,
         });
 
-        let handler = self.handler.clone();
         let ledger_out = self.outbound_tx.clone();
         tokio::spawn(async move {
             let result = handler.handle_raw(ctx).await;

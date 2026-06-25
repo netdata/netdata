@@ -138,9 +138,14 @@ async fn put_file<S: Storage>(
 }
 
 /// Perform one upload request, producing the matching response.
+///
+/// `pipeline_id` is opaque to the uploader (it only moves bytes) and is echoed
+/// verbatim onto the response so the run-loop can route the registry mutation
+/// back to the owning pipeline.
 async fn process<S: Storage>(storage: &S, request: UploaderRequest) -> UploaderResponse {
     match request {
         UploaderRequest::Upload {
+            pipeline_id,
             seq,
             local_path,
             remote_key,
@@ -154,6 +159,7 @@ async fn process<S: Storage>(storage: &S, request: UploaderRequest) -> UploaderR
                         start.elapsed().as_millis(),
                     );
                     UploaderResponse::Uploaded {
+                        pipeline_id,
                         seq,
                         remote_key,
                         etag: meta.etag,
@@ -162,6 +168,7 @@ async fn process<S: Storage>(storage: &S, request: UploaderRequest) -> UploaderR
                 Err(error) => {
                     tracing::error!("upload failed seq={seq}: {error}");
                     UploaderResponse::UploadFailed {
+                        pipeline_id,
                         seq,
                         local_path,
                         remote_key,
@@ -171,6 +178,7 @@ async fn process<S: Storage>(storage: &S, request: UploaderRequest) -> UploaderR
             }
         }
         UploaderRequest::UploadCatalog {
+            pipeline_id,
             local_path,
             remote_key,
             seqs,
@@ -189,6 +197,7 @@ async fn process<S: Storage>(storage: &S, request: UploaderRequest) -> UploaderR
                         "catalog upload complete",
                     );
                     UploaderResponse::CatalogUploaded {
+                        pipeline_id,
                         local_path,
                         remote_key,
                         seqs,
@@ -200,6 +209,7 @@ async fn process<S: Storage>(storage: &S, request: UploaderRequest) -> UploaderR
                         "catalog upload failed: {error}",
                     );
                     UploaderResponse::CatalogUploadFailed {
+                        pipeline_id,
                         local_path,
                         remote_key,
                         seqs,
@@ -227,6 +237,7 @@ mod tests {
 
     fn upload_req(path: &Path) -> UploaderRequest {
         UploaderRequest::Upload {
+            pipeline_id: 0,
             seq: 7,
             local_path: path.to_path_buf(),
             remote_key: "v1/key".to_owned(),
@@ -307,6 +318,7 @@ mod tests {
         let (file, _len) = temp_file(b"catalog-bytes");
         let storage = MockStorage::default();
         let req = UploaderRequest::UploadCatalog {
+            pipeline_id: 0,
             local_path: file.path().to_path_buf(),
             remote_key: "v1/catalog/key".to_owned(),
             seqs: vec![1, 2, 3],
@@ -326,6 +338,7 @@ mod tests {
             ..MockStorage::default()
         };
         let req = UploaderRequest::UploadCatalog {
+            pipeline_id: 0,
             local_path: file.path().to_path_buf(),
             remote_key: "v1/catalog/key".to_owned(),
             seqs: vec![5],

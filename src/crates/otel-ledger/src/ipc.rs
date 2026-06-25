@@ -12,33 +12,62 @@ use file_registry::TenantId;
 pub const WRITER_SOCKET_PATH: &str = "/tmp/netdata-ledger-writer.sock";
 
 /// Requests sent from the ledger to the cleaner.
+///
+/// The cleaner is a single worker shared by every signal pipeline (stateless
+/// path deletion). Each request carries the `pipeline_id` of the pipeline that
+/// owns the file so the cleaner can echo it back on the response, letting the
+/// run-loop route the registry mutation to the right pipeline. For requests
+/// built from a [`FileId`](file_registry::FileId) it is simply `id.pipeline_id`;
+/// for the path-keyed catalog delete it is supplied by the owning pipeline.
 #[derive(Debug, Clone)]
 pub enum CleanerRequest {
     /// Delete a WAL file that has been successfully indexed.
-    DeleteWalFile { sequence: u64, path: PathBuf },
+    DeleteWalFile {
+        pipeline_id: u16,
+        sequence: u64,
+        path: PathBuf,
+    },
     /// Delete an index file evicted by retention policy.
-    DeleteIndexFile { sequence: u64, path: PathBuf },
+    DeleteIndexFile {
+        pipeline_id: u16,
+        sequence: u64,
+        path: PathBuf,
+    },
     /// Delete a catalog file evicted by retention policy. Catalog files are
     /// not seq-keyed (they span multiple SFST seqs), so they're routed by
     /// path.
-    DeleteCatalogFile { path: PathBuf },
+    DeleteCatalogFile { pipeline_id: u16, path: PathBuf },
 }
 
-/// Responses sent from the cleaner back to the ledger.
+/// Responses sent from the cleaner back to the ledger. `pipeline_id` is echoed
+/// from the request so the run-loop can route the registry mutation to the
+/// owning pipeline.
 #[derive(Debug, Clone)]
 pub enum CleanerResponse {
     /// A WAL file has been deleted.
-    WalFileDeleted { sequence: u64 },
+    WalFileDeleted { pipeline_id: u16, sequence: u64 },
     /// An index file has been deleted.
-    IndexFileDeleted { sequence: u64 },
+    IndexFileDeleted { pipeline_id: u16, sequence: u64 },
     /// A catalog file has been deleted.
-    CatalogFileDeleted { path: PathBuf },
+    CatalogFileDeleted { pipeline_id: u16, path: PathBuf },
     /// Failed to delete a WAL file.
-    WalFileFailed { sequence: u64, error: String },
+    WalFileFailed {
+        pipeline_id: u16,
+        sequence: u64,
+        error: String,
+    },
     /// Failed to delete an index file.
-    IndexFileFailed { sequence: u64, error: String },
+    IndexFileFailed {
+        pipeline_id: u16,
+        sequence: u64,
+        error: String,
+    },
     /// Failed to delete a catalog file.
-    CatalogFileFailed { path: PathBuf, error: String },
+    CatalogFileFailed {
+        pipeline_id: u16,
+        path: PathBuf,
+        error: String,
+    },
 }
 
 /// Requests sent from the ledger to the indexer.
@@ -73,16 +102,24 @@ pub enum IndexerResponse {
 }
 
 /// Requests sent from the ledger to the uploader.
+///
+/// The uploader is a single worker shared by every signal pipeline (one global
+/// upload-concurrency budget + shared storage handle). Each request carries the
+/// owning `pipeline_id` so the uploader can echo it back, letting the run-loop
+/// route the response (mark-uploaded, `AddEntry`, mark-remote-cataloged) to the
+/// right pipeline.
 #[derive(Debug, Clone)]
 pub enum UploaderRequest {
     /// Upload an index (SFST) file to remote object storage.
     Upload {
+        pipeline_id: u16,
         seq: u64,
         local_path: PathBuf,
         remote_key: String,
     },
     /// Upload a catalog file to remote object storage.
     UploadCatalog {
+        pipeline_id: u16,
         local_path: PathBuf,
         remote_key: String,
         /// SFST sequence numbers contained in this catalog. Carried through to
@@ -93,11 +130,14 @@ pub enum UploaderRequest {
     },
 }
 
-/// Responses sent from the uploader back to the ledger.
+/// Responses sent from the uploader back to the ledger. `pipeline_id` is echoed
+/// from the request so the run-loop can route the registry mutation to the
+/// owning pipeline.
 #[derive(Debug, Clone)]
 pub enum UploaderResponse {
     /// An SFST file has been uploaded successfully.
     Uploaded {
+        pipeline_id: u16,
         seq: u64,
         remote_key: String,
         /// Remote object validator (S3 ETag) returned by the write, if the
@@ -108,6 +148,7 @@ pub enum UploaderResponse {
     /// Failed to upload an SFST file. `local_path`/`remote_key` are carried so
     /// the retry queue can re-issue the upload without rebuilding them.
     UploadFailed {
+        pipeline_id: u16,
         seq: u64,
         local_path: PathBuf,
         remote_key: String,
@@ -116,6 +157,7 @@ pub enum UploaderResponse {
     /// A catalog file has been uploaded successfully. `seqs` are the SFSTs it
     /// covers; they become eligible for local eviction once this lands.
     CatalogUploaded {
+        pipeline_id: u16,
         local_path: PathBuf,
         remote_key: String,
         seqs: Vec<u64>,
@@ -123,6 +165,7 @@ pub enum UploaderResponse {
     /// Failed to upload a catalog file. `seqs` are carried so a retry can be
     /// re-issued without re-reading the catalog.
     CatalogUploadFailed {
+        pipeline_id: u16,
         local_path: PathBuf,
         remote_key: String,
         seqs: Vec<u64>,

@@ -9,7 +9,9 @@ impl Ledger {
         fields(tenant = %msg.tenant_id, frame_seq = msg.frame_seq, event = ?msg.event),
     )]
     pub(super) async fn handle_ingestor_msg(&mut self, msg: wal::Message) {
-        // Check consistency of frame sequence numbers
+        // Check consistency of frame sequence numbers. The writer is a single
+        // process feeding every signal, so this gap-check stays global (Fork
+        // I=A: one global frame-seq counter) — it runs before routing.
         if msg.frame_seq != self.expected_frame_seq {
             tracing::error!(
                 "ingestor frame gap: expected={} missed={}",
@@ -19,8 +21,20 @@ impl Ledger {
         }
         self.expected_frame_seq = msg.frame_seq + 1;
 
+        // Route to the owning pipeline by the `pipeline_id` carried in the
+        // event's `FileId` (every `FileEvent` variant carries one).
+        let pipeline_id = match &msg.event {
+            wal::FileEvent::Created { file_id, .. }
+            | wal::FileEvent::Synced { file_id, .. }
+            | wal::FileEvent::Closed { file_id, .. } => file_id.pipeline_id,
+        };
+        let Some(pipeline) = self.pipelines.get(&pipeline_id) else {
+            tracing::error!(pipeline_id, "WAL event for unknown pipeline; dropping");
+            return;
+        };
+
         let req = {
-            let mut registries = self.registries.write().await;
+            let mut registries = pipeline.registries.write().await;
 
             if let Err(e) = registries.apply_wal_event(&msg.tenant_id, &msg.event) {
                 tracing::error!("failed to apply WAL event: {e}");
@@ -43,7 +57,7 @@ impl Ledger {
         };
 
         if let Some(req) = req
-            && let Err(e) = self.indexer.send(req)
+            && let Err(e) = pipeline.indexer_tx.send(req)
         {
             tracing::error!("failed to send to indexer: {e}");
         }

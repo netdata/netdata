@@ -52,10 +52,16 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
     };
 
     // `Ledger::new` runs the full supervisor handshake; see its docs
-    // for the step order and what `Ready` claims.
-    let mut ledger = Ledger::new(supervisor, &config.writer_socket_path, &config.logs)
-        .await
-        .context("failed to initialize ledger")?;
+    // for the step order and what `Ready` claims. The logs pipeline's
+    // lifecycle config is carved out of `LogsConfig`; a second signal would
+    // build its own `LifecycleConfig` the same way from its own config.
+    let mut ledger = Ledger::new(
+        supervisor,
+        &config.writer_socket_path,
+        &config.logs.lifecycle(),
+    )
+    .await
+    .context("failed to initialize ledger")?;
 
     // Log the error while `ledger` is still in scope: returning drops its
     // supervisor connection, and the supervisor SIGKILLs workers as soon as

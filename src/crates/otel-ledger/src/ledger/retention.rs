@@ -18,19 +18,27 @@ impl Ledger {
     /// `pending_deletion: true` and no in-flight cleaner request.
     /// Restructure to do mark + send under one lock guard, or thread
     /// a deferred-rollback helper.
-    pub(super) async fn evaluate_retention(&mut self, tenant_id: &TenantId) {
+    pub(super) async fn evaluate_retention(&mut self, pipeline_id: u16, tenant_id: &TenantId) {
+        // Resolve the owning pipeline's retention config + registries handle
+        // up front so the shared cleaner (a `&mut self` field) stays borrowable.
+        let Some(pipeline) = self.pipelines.get(&pipeline_id) else {
+            tracing::error!(pipeline_id, "retention for unknown pipeline; skipping");
+            return;
+        };
         let retention = bridge::config::RetentionConfig::resolve(
-            &self.logs_config.index.retention,
+            &pipeline.config.index.retention,
             tenant_id.as_str(),
         );
+        let storage_enabled = pipeline.storage_enabled();
+        let registries = pipeline.registries.clone();
+
         let catalog_days = catalog_retention_days(&retention);
         let today = chrono::Utc::now().date_naive();
-        let storage_enabled = self.logs_config.storage.enabled;
 
         // SFST retention pass — collect deletion requests under the
         // write lock, then send them after dropping the guard.
         let sfst_reqs: Vec<CleanerRequest> = {
-            let mut registries = self.registries.write().await;
+            let mut registries = registries.write().await;
             let registry = match registries.get_mut(tenant_id) {
                 Some(r) => r,
                 None => return,
@@ -60,6 +68,7 @@ impl Ledger {
                     let path = registry.sfst.file_path(entry.id);
                     tracing::info!("retention: evicting seq={seq} path={}", path.display());
                     reqs.push(CleanerRequest::DeleteIndexFile {
+                        pipeline_id: entry.id.pipeline_id,
                         sequence: seq,
                         path,
                     });
@@ -75,7 +84,7 @@ impl Ledger {
             };
             if let Err(e) = self.cleaner.send(req) {
                 tracing::error!("failed to send index eviction seq={seq}: {e}");
-                let mut registries = self.registries.write().await;
+                let mut registries = registries.write().await;
                 if let Some(registry) = registries.get_mut(tenant_id) {
                     registry.sfst.clear_pending_deletion(seq);
                 }
@@ -87,7 +96,7 @@ impl Ledger {
         // is evicted when its date is strictly older than `today -
         // max_days`.
         let catalog_reqs: Vec<CleanerRequest> = {
-            let mut registries = self.registries.write().await;
+            let mut registries = registries.write().await;
             let registry = match registries.get_mut(tenant_id) {
                 Some(r) => r,
                 None => return,
@@ -99,14 +108,14 @@ impl Ledger {
             for path in to_evict_catalog {
                 registry.catalog_files.mark_pending_deletion(&path);
                 tracing::info!("retention: evicting catalog path={}", path.display());
-                reqs.push(CleanerRequest::DeleteCatalogFile { path });
+                reqs.push(CleanerRequest::DeleteCatalogFile { pipeline_id, path });
             }
             reqs
         };
 
         for req in catalog_reqs {
             let path = match &req {
-                CleanerRequest::DeleteCatalogFile { path } => path.clone(),
+                CleanerRequest::DeleteCatalogFile { path, .. } => path.clone(),
                 _ => unreachable!(),
             };
             if let Err(e) = self.cleaner.send(req) {
@@ -114,7 +123,7 @@ impl Ledger {
                     path = %path.display(),
                     "failed to send catalog eviction: {e}",
                 );
-                let mut registries = self.registries.write().await;
+                let mut registries = registries.write().await;
                 if let Some(registry) = registries.get_mut(tenant_id) {
                     registry.catalog_files.clear_pending_deletion(&path);
                 }

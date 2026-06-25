@@ -29,6 +29,7 @@ use super::now_ns;
 /// failures into the steady-state retry queue.
 pub fn recover_unuploaded(
     registry: &Registry,
+    signal: &str,
     uploader: &mut ComponentHandle<UploaderRequest, UploaderResponse>,
     tenant_id: &TenantId,
 ) {
@@ -44,7 +45,7 @@ pub fn recover_unuploaded(
     );
 
     for id in unuploaded {
-        let Some(req) = crate::ledger::sfst_upload_request(registry, tenant_id, id) else {
+        let Some(req) = crate::ledger::sfst_upload_request(registry, signal, tenant_id, id) else {
             continue;
         };
         if let Err(e) = uploader.send(req) {
@@ -82,6 +83,7 @@ const MAX_RECONCILE_DAYS: u32 = 366;
 /// without the file's header.
 pub async fn reconcile_remote_uploads<S: Storage>(
     registry: &mut Registry,
+    signal: &str,
     catalog_builder: &mut ComponentHandle<CatalogBuilderRequest, CatalogBuilderResponse>,
     storage: &S,
     tenant_id: &TenantId,
@@ -98,7 +100,7 @@ pub async fn reconcile_remote_uploads<S: Storage>(
         .filter_map(|offset| {
             today
                 .checked_sub_signed(chrono::Duration::days(offset as i64))
-                .map(|d| (d, crate::remote_keys::sfst_prefix(crate::LOGS_SIGNAL, tenant_id, d)))
+                .map(|d| (d, crate::remote_keys::sfst_prefix(signal, tenant_id, d)))
         })
         .collect();
 
@@ -182,6 +184,8 @@ pub async fn reconcile_remote_uploads<S: Storage>(
 /// defer every SFST after a restart until its catalog were re-uploaded.
 pub async fn reconcile_local_catalog_uploads<S: Storage>(
     registry: &mut Registry,
+    pipeline_id: u16,
+    signal: &str,
     uploader: &mut ComponentHandle<UploaderRequest, UploaderResponse>,
     storage: &S,
     tenant_id: &TenantId,
@@ -206,7 +210,7 @@ pub async fn reconcile_local_catalog_uploads<S: Storage>(
         .filter(|(_, file)| !file.is_pending_deletion())
         .map(|(local_path, file)| {
             let remote_key = crate::remote_keys::catalog(
-                crate::LOGS_SIGNAL,
+                signal,
                 file.date,
                 tenant_id,
                 file.machine_id,
@@ -248,6 +252,7 @@ pub async fn reconcile_local_catalog_uploads<S: Storage>(
                     continue;
                 }
                 let req = UploaderRequest::UploadCatalog {
+                    pipeline_id,
                     local_path: local_path.clone(),
                     remote_key,
                     seqs,

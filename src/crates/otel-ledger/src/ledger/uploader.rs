@@ -20,16 +20,32 @@ use super::helpers::{build_catalog_entry, date_from_summary};
 
 impl Ledger {
     pub(super) async fn handle_uploader_resp(&mut self, resp: UploaderResponse) {
+        let pipeline_id = match &resp {
+            UploaderResponse::Uploaded { pipeline_id, .. }
+            | UploaderResponse::UploadFailed { pipeline_id, .. }
+            | UploaderResponse::CatalogUploaded { pipeline_id, .. }
+            | UploaderResponse::CatalogUploadFailed { pipeline_id, .. } => *pipeline_id,
+        };
+        let Some(pipeline) = self.pipelines.get(&pipeline_id) else {
+            tracing::error!(pipeline_id, "uploader response for unknown pipeline; dropping");
+            return;
+        };
+        // Snapshot the pipeline's registries handle + catalog-builder sender so
+        // the shared `upload_retry` (a `&mut self` field) stays freely borrowable.
+        let registries = pipeline.registries.clone();
+        let catalog_builder_tx = pipeline.catalog_builder_tx.clone();
+
         match resp {
             UploaderResponse::Uploaded {
                 seq,
                 remote_key,
                 etag,
+                ..
             } => {
                 tracing::info!("upload complete seq={seq} remote_key={remote_key}");
                 self.upload_retry.clear_sfst(seq);
                 let (tenant_id, entry, date) = {
-                    let mut registries = self.registries.write().await;
+                    let mut registries = registries.write().await;
                     match registries.for_seq_mut(seq) {
                         Some((tid, registry)) => {
                             let Some(sfst_file) = registry.sfst.get(seq).cloned() else {
@@ -57,7 +73,7 @@ impl Ledger {
                     date,
                     entry,
                 };
-                if let Err(e) = self.catalog_builder.send(req) {
+                if let Err(e) = catalog_builder_tx.send(req) {
                     tracing::error!("failed to send catalog add entry seq={seq}: {e}");
                 }
             }
@@ -66,6 +82,7 @@ impl Ledger {
                 local_path,
                 remote_key,
                 error,
+                ..
             } => {
                 tracing::error!(seq, remote_key = %remote_key, "upload failed: {error}");
                 // Retry only while the local source still exists; if it was
@@ -74,6 +91,7 @@ impl Ledger {
                 if local_path.exists() {
                     self.upload_retry.record_failure(
                         UploaderRequest::Upload {
+                            pipeline_id,
                             seq,
                             local_path,
                             remote_key,
@@ -89,6 +107,7 @@ impl Ledger {
                 local_path,
                 remote_key,
                 seqs,
+                ..
             } => {
                 tracing::info!(
                     path = %local_path.display(),
@@ -103,7 +122,7 @@ impl Ledger {
                 // the still-registered siblings would otherwise never be marked
                 // and would be deferred from eviction forever.
                 if !seqs.is_empty() {
-                    let mut registries = self.registries.write().await;
+                    let mut registries = registries.write().await;
                     for seq in &seqs {
                         if let Some((_tenant, registry)) = registries.for_seq_mut(*seq) {
                             registry.mark_remote_cataloged([*seq]);
@@ -116,6 +135,7 @@ impl Ledger {
                 remote_key,
                 seqs,
                 error,
+                ..
             } => {
                 tracing::error!(
                     path = %local_path.display(),
@@ -126,6 +146,7 @@ impl Ledger {
                 if local_path.exists() {
                     self.upload_retry.record_failure(
                         UploaderRequest::UploadCatalog {
+                            pipeline_id,
                             local_path,
                             remote_key,
                             seqs,
