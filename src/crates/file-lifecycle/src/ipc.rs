@@ -89,7 +89,7 @@ pub enum IndexerResponse {
     Indexed {
         seq: u64,
         path: PathBuf,
-        /// Cheap summary fields (min/max timestamp, total logs, stream).
+        /// Cheap summary fields (min/max timestamp, record count, opaque content_meta).
         /// Stored on the registry entry on `track`; used by the uploader
         /// response handler to build the catalog entry directly from the
         /// registry without a pending-metadata side-channel.

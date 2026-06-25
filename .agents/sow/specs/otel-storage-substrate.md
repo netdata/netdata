@@ -35,9 +35,10 @@ The substrate owns the machinery that operates only on neutral types
   (stateless deletion; concurrency-bounded upload; per-`(tenant,date,machine,boot)`
   catalog accumulation + rotation).
 - `storage` — the `Storage` trait + `OpendalStorage` client + reachability probe.
-- `remote_keys` — the object-storage key scheme, **signal-segmented**
-  (`v1/tenants/{tenant}/{signal}/sfst/{date}/…`, catalog likewise); every signal
-  carries its segment, none is implicit.
+- `remote_keys` — the object-storage key scheme, **signal-scoped at the root**
+  (`v1/{signal}/tenants/{tenant}/sfst/{date}/{file_id}.sfst` and
+  `v1/{signal}/catalog/{date}/{tenant}/…`); every signal carries its segment,
+  none is implicit.
 - `chunk` — the query-time chunk cache (build singleflight + byte-budget LRU).
 - `query` — neutral candidate selection over the registry (local + remote).
 - `recovery` — startup reconciliation (`local` + `remote`): orphan cleanup,

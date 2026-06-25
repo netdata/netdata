@@ -22,7 +22,7 @@ use crate::component::Component;
 use crate::ipc::{CatalogBuilderRequest, CatalogBuilderResponse};
 
 pub struct CatalogBuilderArgs {
-    /// Tenant-prefix root for catalog storage (typically `logs_config.index.dir`).
+    /// Tenant-prefix root for catalog storage (the signal's `config.catalog.dir`).
     /// Per-tenant subdirectories `{tenant}/catalog/{date}/` are created lazily.
     pub catalog_base_dir: PathBuf,
     /// Number of entries that triggers a rotation for a scope.
