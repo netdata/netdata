@@ -23,8 +23,8 @@ use crate::component::ComponentHandle;
 use crate::event::PipelineResp;
 use crate::indexer::Indexer;
 use crate::ipc::{
-    CatalogBuilderRequest, CatalogBuilderResponse, CleanerRequest, CleanerResponse, IndexerRequest,
-    IndexerResponse, UploaderRequest, UploaderResponse,
+    CatalogBuilderRequest, CleanerRequest, CleanerResponse, IndexerRequest, UploaderRequest,
+    UploaderResponse,
 };
 use crate::recovery::{
     drain_wal_deletes, recover_orphaned_wals, recover_retention, recover_unindexed,
@@ -279,8 +279,18 @@ pub(crate) async fn build_logs_pipeline(
     let handler: Arc<dyn RawFunctionHandler> = Arc::new(HandlerAdapter::new(otel_handler));
 
     // Detach the per-pipeline workers' response streams into pid-tagged
-    // forwarders feeding the run-loop's single merged channel. Recovery
-    // synchronously drained both handles, so nothing is in flight at the split.
+    // forwarders feeding the run-loop's single merged channel. The indexer is
+    // fully drained by recovery (`recover_unindexed` → `batch_recover` recvs
+    // every response). The catalog builder may still carry in-flight
+    // `EntryAccepted`/`Rotated` responses enqueued fire-and-forget by
+    // `reconcile_remote_uploads` (it sends `AddEntry` without recv-ing); those
+    // are not lost — `into_parts` moves the live receiver into the forwarder,
+    // which hands them to the run-loop exactly as the pre-carve `select!` drained
+    // them in steady state.
+    //
+    // The last `spawn_forwarder` arg is the tuple-variant constructor used as
+    // `fn(T) -> PipelineResp` (`T` inferred from the receiver); adding a second
+    // field to the variant would reject the coercion at compile time.
     let (indexer_tx, indexer_rx) = indexer.into_parts();
     let (catalog_builder_tx, catalog_builder_rx) = catalog_builder.into_parts();
     spawn_forwarder(
@@ -331,9 +341,3 @@ fn spawn_forwarder<T: Send + 'static>(
         let _ = tx.send((pipeline_id, PipelineResp::WorkerGone { kind }));
     });
 }
-
-// Silence unused-import warnings for response types referenced only via the
-// `wrap` constructors above; they document the forwarded payloads.
-const _: () = {
-    fn _assert(_: IndexerResponse, _: CatalogBuilderResponse) {}
-};

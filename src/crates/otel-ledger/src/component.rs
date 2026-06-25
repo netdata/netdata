@@ -82,13 +82,16 @@ impl<Req: Send + 'static, Resp: Send + 'static> ComponentHandle<Req, Resp> {
     /// Split into the raw request sender and response receiver, dropping the
     /// in-flight counter.
     ///
-    /// Used once per per-pipeline worker after recovery has drained it
-    /// (`pending() == 0`): the owning `Pipeline` keeps the sender to issue
-    /// steady-state requests, while the receiver is moved into a forwarder
-    /// task that tags each response with the pipeline id and funnels it into
-    /// the run-loop's single merged channel. The `pending` counter is only
-    /// meaningful for the synchronous recovery drains (`batch_recover` /
-    /// `drain_pending`); steady-state routing does not consult it.
+    /// Used once per per-pipeline worker at the end of recovery: the owning
+    /// `Pipeline` keeps the sender to issue steady-state requests, while the
+    /// receiver is moved into a forwarder task that tags each response with the
+    /// pipeline id and funnels it into the run-loop's single merged channel.
+    /// Any responses still queued on the receiver (e.g. catalog-builder
+    /// `AddEntry`s enqueued fire-and-forget by `reconcile_remote_uploads`) are
+    /// preserved — the live receiver carries them into the forwarder, which
+    /// hands them to the run-loop. The `pending` counter is only meaningful for
+    /// the synchronous recovery drains (`batch_recover` / `drain_pending`);
+    /// steady-state routing does not consult it.
     pub fn into_parts(
         self,
     ) -> (

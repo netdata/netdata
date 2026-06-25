@@ -236,10 +236,34 @@ impl Ledger {
         )
         .await?;
 
+        // All pipelines (today only logs). Both routing keys MUST be unique:
+        // `pipeline_id` keys the `pipelines` map (writer-event + worker-response
+        // routing) and the function name is the call-dispatch key
+        // (`rpc::dispatch`). A duplicate of either would silently route to
+        // whichever entry the map/scan yields first, so fail loudly at startup
+        // — these are hardcoded by us, so a clash is a programming error.
+        let built = vec![logs];
+        {
+            let mut seen_ids = std::collections::HashSet::new();
+            let mut seen_names = std::collections::HashSet::new();
+            for p in &built {
+                assert!(
+                    seen_ids.insert(p.pipeline_id),
+                    "duplicate pipeline_id {}",
+                    p.pipeline_id,
+                );
+                assert!(
+                    seen_names.insert(p.function_name().to_owned()),
+                    "duplicate pipeline function name {:?}",
+                    p.function_name(),
+                );
+            }
+        }
+
         // Signal Ready (with every pipeline's declaration) between pipeline
         // construction and the ingestor accept; see the method docstring for the
         // full ordering rationale.
-        let declarations = vec![logs.declaration.clone()];
+        let declarations: Vec<_> = built.iter().map(|p| p.declaration.clone()).collect();
         supervisor
             .send(LedgerResponse::Ready { declarations })
             .await
@@ -255,8 +279,8 @@ impl Ledger {
         let mut retry_timer = tokio::time::interval(std::time::Duration::from_secs(30));
         retry_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
-        let mut pipelines = HashMap::new();
-        pipelines.insert(logs.pipeline_id, logs);
+        let pipelines: HashMap<u16, Pipeline> =
+            built.into_iter().map(|p| (p.pipeline_id, p)).collect();
 
         Ok(Self {
             supervisor,
