@@ -5,7 +5,8 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
-use bridge::config::{LogsConfig, PluginConfig};
+use bridge::config::{AuthConfig, LifecycleConfig, PluginConfig};
+use bridge::signals::{LOGS_SIGNAL, TRACES_SIGNAL};
 use bridge::{IngestorRequest, IngestorResponse};
 use ferryboat::{Connection, Endpoint};
 use opentelemetry_proto::tonic::collector::logs::v1::logs_service_server::LogsServiceServer;
@@ -164,18 +165,22 @@ async fn run_ingestor(
     // writer→ledger sender and one global seq allocator: the ledger accepts a
     // single writer connection (and gap-checks the frame sequence per signal),
     // and file `seq` must be globally unique across signals.
-    let (sender, seq) = create_shared_writer_state(&config.logs, &config.writer_socket_path)?;
+    let (sender, seq) = create_shared_writer_state(&config, &config.writer_socket_path)?;
     // One process-wide monotonic clock, shared across signals — the WAL writer's
     // contract is that all per-frame `ingestion_ns` come from a single clock so
     // frame-level ordering is consistent across every stream/signal.
     let clock = Arc::new(std::sync::Mutex::new(file_registry::MonotonicClock::new()));
+    let logs_lifecycle = config.lifecycle_for(LOGS_SIGNAL);
+    let traces_lifecycle = config.lifecycle_for(TRACES_SIGNAL);
     let logs_service = create_logs_service(
-        &config.logs,
+        &logs_lifecycle,
+        &config.auth,
         Arc::clone(&sender),
         Arc::clone(&seq),
         Arc::clone(&clock),
     );
-    let traces_service = create_traces_service(&config.logs, sender, seq, clock);
+    let traces_service =
+        create_traces_service(&traces_lifecycle, &config.auth, sender, seq, clock);
 
     // Parse gRPC endpoint address
     let addr =
@@ -290,46 +295,43 @@ async fn run_ingestor(
 /// (file `seq` is globally unique across signals).
 ///
 /// The seq is GLOBAL across signals (one allocator → one highwater file), so the
-/// seed scans BOTH signals' dirs and takes the max. Seeding from logs alone would
-/// let a restart reissue a seq still live as a traces SFST, making a new file look
-/// "older" than a retained one and triggering wrong eviction. The single highwater
-/// file lives at the logs index dir (where `compute_seq_seed` reads it); the traces
-/// scan contributes only its dir maxes, so `max(logs.seed, traces.seed)` is the
-/// correct global seed.
-///
-/// PROOF SCAFFOLD: the traces dir set comes from `traces_proof_lifecycle`; the real
-/// feature seeds from each signal's own configured dirs.
+/// seed scans BOTH signals' dirs and takes the max. Seeding from one signal alone
+/// would let a restart reissue a seq still live as another signal's SFST, making
+/// a new file look "older" than a retained one and triggering wrong eviction. The
+/// single highwater file is signal-neutral (`{base_dir}/shared/seq_highwater`),
+/// so global seq durability does not depend on any one signal's directory.
 fn create_shared_writer_state(
-    logs_config: &LogsConfig,
+    config: &PluginConfig,
     writer_socket_path: &str,
 ) -> Result<(Arc<ledger_sender::LedgerSender>, Arc<wal::SeqAllocator>)> {
-    let logs_lc = logs_config.lifecycle();
-    let traces_lc = logs_config.traces_proof_lifecycle();
+    let logs_lc = config.lifecycle_for(LOGS_SIGNAL);
+    let traces_lc = config.lifecycle_for(TRACES_SIGNAL);
+    let highwater_path = config.seq_highwater_path();
 
-    let logs_seed = compute_seq_seed(&logs_lc.wal.dir, &logs_lc.index.dir, &logs_lc.catalog.dir)?;
-    let traces_seed =
-        compute_seq_seed(&traces_lc.wal.dir, &traces_lc.index.dir, &traces_lc.catalog.dir)?;
-    let seed = logs_seed.seed.max(traces_seed.seed);
+    let logs_scan = scan_seq_dirs(&logs_lc.wal.dir, &logs_lc.index.dir, &logs_lc.catalog.dir)?;
+    let traces_scan =
+        scan_seq_dirs(&traces_lc.wal.dir, &traces_lc.index.dir, &traces_lc.catalog.dir)?;
+    let highwater = wal::read_seq_highwater(&highwater_path);
+    let seed = logs_scan
+        .max()
+        .max(traces_scan.max())
+        .max(highwater.unwrap_or(0));
 
     let seq = Arc::new(
-        wal::SeqAllocator::durable(
-            seq_highwater_path(&logs_lc.index.dir),
-            seed,
-            wal::DEFAULT_RESERVE_BATCH,
-        )
-        .context("initializing seq high-water allocator")?,
+        wal::SeqAllocator::durable(highwater_path, seed, wal::DEFAULT_RESERVE_BATCH)
+            .context("initializing seq high-water allocator")?,
     );
 
     let sender = Arc::new(ledger_sender::LedgerSender::new(writer_socket_path));
 
     tracing::info!(
-        logs_wal = logs_seed.wal_max,
-        logs_sfst = logs_seed.sfst_max,
-        logs_catalog = logs_seed.catalog_max,
-        traces_wal = traces_seed.wal_max,
-        traces_sfst = traces_seed.sfst_max,
-        traces_catalog = traces_seed.catalog_max,
-        highwater = logs_seed.highwater,
+        logs_wal = logs_scan.wal_max,
+        logs_sfst = logs_scan.sfst_max,
+        logs_catalog = logs_scan.catalog_max,
+        traces_wal = traces_scan.wal_max,
+        traces_sfst = traces_scan.sfst_max,
+        traces_catalog = traces_scan.catalog_max,
+        highwater,
         seed,
         "ingestion enabled (multi-tenant WAL); seq allocator + ledger sender shared across logs + traces"
     );
@@ -338,98 +340,85 @@ fn create_shared_writer_state(
 }
 
 fn create_logs_service(
-    logs_config: &LogsConfig,
+    lifecycle: &LifecycleConfig,
+    auth: &AuthConfig,
     sender: Arc<ledger_sender::LedgerSender>,
     seq: Arc<wal::SeqAllocator>,
     clock: Arc<std::sync::Mutex<file_registry::MonotonicClock>>,
 ) -> NetdataLogsService {
     NetdataLogsService::new(
         sender,
-        logs_config.wal.dir.clone(),
-        logs_config.wal.clone(),
+        lifecycle.wal.dir.clone(),
+        lifecycle.wal.clone(),
         seq,
         clock,
-        logs_config.auth.clone(),
+        auth.clone(),
     )
 }
 
 /// PROOF SCAFFOLD (traces-proof SOW): the skeletal traces ingestion service.
-/// Its WAL dir + rotation come from `LogsConfig::traces_proof_lifecycle` (the
-/// `*-traces` sibling dirs — the same derivation the ledger uses), so the two
+/// Its WAL dir + rotation come from the derived traces lifecycle
+/// (`{base_dir}/traces/wal` — the same derivation the ledger uses), so the two
 /// processes agree on where traces WAL files live.
 fn create_traces_service(
-    logs_config: &LogsConfig,
+    lifecycle: &LifecycleConfig,
+    auth: &AuthConfig,
     sender: Arc<ledger_sender::LedgerSender>,
     seq: Arc<wal::SeqAllocator>,
     clock: Arc<std::sync::Mutex<file_registry::MonotonicClock>>,
 ) -> NetdataTracesService {
-    let traces_lc = logs_config.traces_proof_lifecycle();
     tracing::info!(
-        wal_dir = %traces_lc.wal.dir.display(),
+        wal_dir = %lifecycle.wal.dir.display(),
         "traces ingestion enabled (PROOF SCAFFOLD)"
     );
     NetdataTracesService::new(
         sender,
-        traces_lc.wal.dir.clone(),
-        traces_lc.wal.clone(),
+        lifecycle.wal.dir.clone(),
+        lifecycle.wal.clone(),
         seq,
         clock,
-        logs_config.auth.clone(),
+        auth.clone(),
     )
 }
 
-/// Canonical location of the seq high-water file. Lives at the index
-/// root with no data-file extension so no recursive scanner ever picks
-/// it up.
-fn seq_highwater_path(index_base_dir: &std::path::Path) -> std::path::PathBuf {
-    index_base_dir.join(".seq_highwater")
-}
-
-/// Inputs and result of the startup seq-counter seed.
-struct SeqSeed {
+/// The highest seq found by scanning one signal's on-disk data files.
+struct DirScan {
     wal_max: u64,
     sfst_max: u64,
     catalog_max: u64,
-    highwater: Option<u64>,
-    seed: u64,
 }
 
-/// Seed the seq counter from the highest seq found across every place
-/// where seq-tagged state persists.
+impl DirScan {
+    fn max(&self) -> u64 {
+        self.wal_max.max(self.sfst_max).max(self.catalog_max)
+    }
+}
+
+/// Scan one signal's WAL, index, and catalog dirs for the highest seq.
 ///
-/// Looking at WAL alone is unsafe: post-restart the cleaner may have
-/// pruned every WAL but SFSTs at higher seqs still sit on disk;
-/// starting low would make new files appear "older" than retained ones
-/// and trigger immediate eviction by the seq-ordered retention loop.
-/// Catalogs outlive the SFSTs they describe, so they bound the seed
-/// when the data files are gone. None of the scans is a safe upper
-/// bound on its own (age-based eviction is keyed on data timestamps,
-/// not seq), so the persisted high-water mark — the highest seq ever
-/// reserved — is the load-bearing input; the scans self-heal a missing
-/// or corrupt high-water file, which is treated as absent and never
-/// fails startup.
-fn compute_seq_seed(
-    wal_base_dir: &std::path::Path,
-    index_base_dir: &std::path::Path,
-    catalog_base_dir: &std::path::Path,
-) -> Result<SeqSeed> {
-    let wal_max = wal::scan_max_sequence_recursive(wal_base_dir)
-        .with_context(|| format!("scanning WAL dirs in {:?}", wal_base_dir))?;
-    let sfst_max = sfst::scan_max_sequence_recursive(index_base_dir)
-        .with_context(|| format!("scanning SFST dirs in {:?}", index_base_dir))?;
-    let catalog_max = otel_catalog::scan_max_sequence(catalog_base_dir)
-        .with_context(|| format!("scanning catalog dirs in {:?}", catalog_base_dir))?;
-    let highwater = wal::read_seq_highwater(&seq_highwater_path(index_base_dir));
-    let seed = wal_max
-        .max(sfst_max)
-        .max(catalog_max)
-        .max(highwater.unwrap_or(0));
-    Ok(SeqSeed {
+/// Looking at WAL alone is unsafe: post-restart the cleaner may have pruned every
+/// WAL but SFSTs at higher seqs still sit on disk; starting low would make new
+/// files appear "older" than retained ones and trigger immediate eviction by the
+/// seq-ordered retention loop. Catalogs outlive the SFSTs they describe, so they
+/// bound the seed when the data files are gone. None of the scans is a safe upper
+/// bound on its own (age-based eviction is keyed on data timestamps, not seq), so
+/// the caller also folds in the persisted high-water mark — the highest seq ever
+/// reserved — which is the load-bearing input. A missing dir scans as 0.
+fn scan_seq_dirs(
+    wal_dir: &std::path::Path,
+    index_dir: &std::path::Path,
+    catalog_dir: &std::path::Path,
+) -> Result<DirScan> {
+    let wal_max = wal::scan_max_sequence_recursive(wal_dir)
+        .with_context(|| format!("scanning WAL dirs in {:?}", wal_dir))?;
+    let sfst_max = sfst::scan_max_sequence_recursive(index_dir)
+        .with_context(|| format!("scanning SFST dirs in {:?}", index_dir))?;
+    let catalog_max = otel_catalog::scan_max_sequence(catalog_dir)
+        .with_context(|| format!("scanning catalog dirs in {:?}", catalog_dir))?;
+    Ok(DirScan {
         wal_max,
         sfst_max,
         catalog_max,
-        highwater,
-        seed,
     })
 }
 
@@ -449,12 +438,20 @@ mod seed_tests {
         .to_filename(ext)
     }
 
+    /// The global seed = max of every signal's dir scan and the signal-neutral
+    /// high-water file. Mirrors `create_shared_writer_state` for one signal.
+    fn combined_seed(scan: &DirScan, highwater: Option<u64>) -> u64 {
+        scan.max().max(highwater.unwrap_or(0))
+    }
+
     #[test]
     fn seed_is_max_of_scans_and_highwater() {
         let tmp = tempfile::tempdir().unwrap();
         let wal_dir = tmp.path().join("wal");
         let index_dir = tmp.path().join("index");
         let catalog_dir = tmp.path().join("catalog");
+        // The high-water file is signal-neutral, under {base}/shared/.
+        let highwater_path = tmp.path().join("shared").join("seq_highwater");
 
         // WAL max 3 < SFST max 10 < catalog max 25 < high-water 40.
         std::fs::create_dir_all(wal_dir.join("tenant-a")).unwrap();
@@ -478,22 +475,20 @@ mod seed_tests {
             b"",
         )
         .unwrap();
-        wal::write_seq_highwater(&seq_highwater_path(&index_dir), 40).unwrap();
+        wal::write_seq_highwater(&highwater_path, 40).unwrap();
 
-        let seed = compute_seq_seed(&wal_dir, &index_dir, &catalog_dir).unwrap();
-        assert_eq!(seed.wal_max, 3);
-        assert_eq!(seed.sfst_max, 10);
-        assert_eq!(seed.catalog_max, 25);
-        assert_eq!(seed.highwater, Some(40));
-        assert_eq!(seed.seed, 40);
+        let scan = scan_seq_dirs(&wal_dir, &index_dir, &catalog_dir).unwrap();
+        assert_eq!(scan.wal_max, 3);
+        assert_eq!(scan.sfst_max, 10);
+        assert_eq!(scan.catalog_max, 25);
+        let highwater = wal::read_seq_highwater(&highwater_path);
+        assert_eq!(highwater, Some(40));
+        let seed = combined_seed(&scan, highwater);
+        assert_eq!(seed, 40);
 
         // The first seq the allocator hands out is above every input.
-        let alloc = wal::SeqAllocator::durable(
-            seq_highwater_path(&index_dir),
-            seed.seed,
-            wal::DEFAULT_RESERVE_BATCH,
-        )
-        .unwrap();
+        let alloc =
+            wal::SeqAllocator::durable(highwater_path, seed, wal::DEFAULT_RESERVE_BATCH).unwrap();
         assert_eq!(alloc.next().unwrap(), 41);
     }
 
@@ -503,6 +498,7 @@ mod seed_tests {
         let wal_dir = tmp.path().join("wal");
         let index_dir = tmp.path().join("index");
         let catalog_dir = tmp.path().join("catalog");
+        let highwater_path = tmp.path().join("shared").join("seq_highwater");
 
         // Catalog is the only survivor; the high-water file is corrupt
         // garbage. Startup must not fail and the catalog bounds the seed.
@@ -519,11 +515,12 @@ mod seed_tests {
             b"",
         )
         .unwrap();
-        std::fs::create_dir_all(&index_dir).unwrap();
-        std::fs::write(seq_highwater_path(&index_dir), b"garbage").unwrap();
+        std::fs::create_dir_all(highwater_path.parent().unwrap()).unwrap();
+        std::fs::write(&highwater_path, b"garbage").unwrap();
 
-        let seed = compute_seq_seed(&wal_dir, &index_dir, &catalog_dir).unwrap();
-        assert_eq!(seed.highwater, None);
-        assert_eq!(seed.seed, 7);
+        let scan = scan_seq_dirs(&wal_dir, &index_dir, &catalog_dir).unwrap();
+        let highwater = wal::read_seq_highwater(&highwater_path);
+        assert_eq!(highwater, None);
+        assert_eq!(combined_seed(&scan, highwater), 7);
     }
 }

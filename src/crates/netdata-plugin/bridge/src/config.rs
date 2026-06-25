@@ -15,15 +15,89 @@ use serde::{Deserialize, Serialize};
 ///
 /// Parsed once from YAML by the supervisor and sent to each worker.
 /// Each worker reads the fields it needs.
+///
+/// Directory layout is derived, not configured per signal: one mandatory
+/// [`base_dir`](Self::base_dir) roots everything, and each signal's WAL, index,
+/// catalog, and remote-read cache live under `{base_dir}/{signal}/...`
+/// (see [`lifecycle_for`](Self::lifecycle_for)). Remote storage and tenant auth
+/// are global (one policy for the process); only rotation/retention/crc tuning
+/// is per signal.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PluginConfig {
     pub endpoint: EndpointConfig,
     pub metrics: MetricsConfig,
-    pub logs: LogsConfig,
+    /// Single mandatory root for all signal storage. The plugin derives each
+    /// signal's subtree as `{base_dir}/{signal}/{wal,index,catalog}` plus the
+    /// per-signal remote-read cache `{base_dir}/{signal}/remote-read`;
+    /// cross-signal state (the seq high-water file) lives under
+    /// `{base_dir}/shared/`.
+    pub base_dir: PathBuf,
+    /// Remote object storage — global across signals (one on/off + one
+    /// backend). Each signal uploads under its own `v1/{signal}/...` prefix.
+    pub storage: StorageConfig,
+    /// Tenant authentication — global across signals (one gRPC tenant policy
+    /// for the process).
+    #[serde(default)]
+    pub auth: AuthConfig,
+    /// Per-signal tuning for logs (rotation, retention, catalog rotation count,
+    /// crc/compression). Carries no dirs (derived from `base_dir`) and no
+    /// storage (global).
+    pub logs: SignalConfig,
+    /// Per-signal tuning for traces. Same shape as `logs`. The traces pipeline
+    /// is always built, so this is mandatory like `logs`.
+    pub traces: SignalConfig,
     /// Socket path for WAL event IPC between ingestor and ledger.
     /// Set by the supervisor at runtime, not present in YAML config.
     #[serde(default)]
     pub writer_socket_path: String,
+}
+
+impl PluginConfig {
+    /// The signal-neutral file-lifecycle view for one signal: the WAL, index,
+    /// catalog, and remote-storage settings the content-agnostic ledger
+    /// substrate consumes. This is the single point where the derived directory
+    /// layout (`{base_dir}/{signal}/...`) and the global storage settings are
+    /// combined with the per-signal tuning. `auth` is excluded — it is global
+    /// and tenant-scoped, not a per-signal file-lifecycle concern.
+    ///
+    /// Panics on an unknown signal name: callers pass the
+    /// [`signals`](crate::signals) constants, so an unmatched name is a
+    /// programmer error, not operator input.
+    pub fn lifecycle_for(&self, signal: &str) -> LifecycleConfig {
+        let tuning = if signal == crate::signals::LOGS_SIGNAL {
+            &self.logs
+        } else if signal == crate::signals::TRACES_SIGNAL {
+            &self.traces
+        } else {
+            panic!("lifecycle_for: unknown signal {signal:?}");
+        };
+        let root = self.base_dir.join(signal);
+        LifecycleConfig {
+            wal: WalConfig {
+                dir: root.join("wal"),
+                crc_enabled: tuning.wal.crc_enabled,
+                compression_enabled: tuning.wal.compression_enabled,
+                rotation: tuning.wal.rotation.clone(),
+            },
+            index: IndexConfig {
+                dir: root.join("index"),
+                retention: tuning.index.retention.clone(),
+            },
+            catalog: CatalogConfig {
+                dir: root.join("catalog"),
+                rotation_count: tuning.catalog.rotation_count,
+            },
+            storage: self.storage.clone(),
+            read_cache_dir: root.join("remote-read"),
+        }
+    }
+
+    /// Canonical location of the signal-neutral seq high-water file. Lives under
+    /// `{base_dir}/shared/` so global seq durability does not depend on any one
+    /// signal's directory.
+    pub fn seq_highwater_path(&self) -> PathBuf {
+        self.base_dir.join("shared").join("seq_highwater")
+    }
 }
 
 /// Configuration for the read-only legacy OTel logs viewer worker.
@@ -99,79 +173,85 @@ pub struct MetricsConfig {
     pub max_new_charts_per_request: usize,
 }
 
-/// Logs ingestion configuration.
+/// Per-signal tuning, operator-facing. Carries no directories (they are derived
+/// from [`PluginConfig::base_dir`]) and no storage (global). The same shape is
+/// used for every signal (logs, traces); [`PluginConfig::lifecycle_for`] turns
+/// it into a runtime [`LifecycleConfig`] by injecting the derived dirs and the
+/// global storage settings.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LogsConfig {
-    /// WAL file configuration (rotation, storage).
-    pub wal: WalConfig,
-    /// Index file configuration (storage dir, retention).
-    pub index: IndexConfig,
-    /// Catalog file configuration.
-    pub catalog: CatalogConfig,
-    /// Remote object storage configuration.
-    pub storage: StorageConfig,
-    /// Tenant authentication configuration.
+pub struct SignalConfig {
+    /// WAL tuning (crc/compression, rotation) — no dir.
+    pub wal: WalTuning,
+    /// Index tuning (retention) — no dir.
+    pub index: IndexTuning,
+    /// Catalog tuning (rotation count) — no dir.
     #[serde(default)]
-    pub auth: AuthConfig,
+    pub catalog: CatalogTuning,
 }
 
-impl LogsConfig {
-    /// The signal-neutral file-lifecycle view of this config: the WAL, index,
-    /// catalog, and storage settings that the content-agnostic ledger substrate
-    /// consumes per signal. `auth` is excluded — it is tenant-scoped, not a
-    /// per-signal file-lifecycle concern. A second signal (traces) builds its
-    /// own [`LifecycleConfig`] the same way from its own config.
-    pub fn lifecycle(&self) -> LifecycleConfig {
-        LifecycleConfig {
-            wal: self.wal.clone(),
-            index: self.index.clone(),
-            catalog: self.catalog.clone(),
-            storage: self.storage.clone(),
-        }
-    }
+/// WAL tuning for one signal (the dir is derived, not configured).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WalTuning {
+    /// Whether to compute CRC32 checksums per frame.
+    #[serde(default = "default_true")]
+    pub crc_enabled: bool,
+    /// Whether to LZ4-compress frame payloads.
+    #[serde(default = "default_true")]
+    pub compression_enabled: bool,
+    /// Per-tenant rotation policies, keyed by tenant name.
+    /// The `"default"` key is required and used as the fallback.
+    pub rotation: HashMap<String, RotationEntry>,
+}
 
-    /// PROOF SCAFFOLD (traces-proof SOW; revert with the skeleton): the
-    /// signal-neutral lifecycle config for a skeletal second ("traces") pipeline.
-    ///
-    /// Derived from the logs config by relocating each dir to a `*-traces`
-    /// sibling (`/x/wal` → `/x/wal-traces`) and cloning everything else
-    /// (rotation/retention/storage). Both the ingestor (traces WAL write + seq
-    /// scan) and the ledger (`build_traces_pipeline`) call this so they agree on
-    /// the traces dirs without a real per-signal config. The real traces feature
-    /// (Stage 6) replaces this with operator-facing traces config.
-    pub fn traces_proof_lifecycle(&self) -> LifecycleConfig {
-        fn sibling(dir: &std::path::Path) -> PathBuf {
-            let name = dir
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_else(|| "wal".to_string());
-            dir.with_file_name(format!("{name}-traces"))
+/// Index tuning for one signal (the dir is derived, not configured).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IndexTuning {
+    /// Per-tenant retention policies for SFST files, keyed by tenant name.
+    /// The `"default"` key is required and used as the fallback.
+    pub retention: HashMap<String, RetentionEntry>,
+}
+
+/// Catalog tuning for one signal (the dir is derived, not configured).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CatalogTuning {
+    /// Number of SFST entries accumulated before the catalog builder
+    /// rotates an in-memory accumulator to an immutable catalog file.
+    #[serde(default = "default_catalog_rotation_count")]
+    pub rotation_count: usize,
+}
+
+impl Default for CatalogTuning {
+    fn default() -> Self {
+        Self {
+            rotation_count: default_catalog_rotation_count(),
         }
-        let mut lc = self.lifecycle();
-        lc.wal.dir = sibling(&self.wal.dir);
-        lc.index.dir = sibling(&self.index.dir);
-        lc.catalog.dir = sibling(&self.catalog.dir);
-        lc
     }
 }
 
 /// Signal-neutral file-lifecycle configuration: the per-signal WAL, index,
 /// catalog, and remote-storage settings the ledger substrate needs to manage a
-/// signal's file lifecycle. Built from a signal's own config (for logs, via
-/// [`LogsConfig::lifecycle`]); the substrate ascribes no signal meaning to it.
+/// signal's file lifecycle. Built by [`PluginConfig::lifecycle_for`] (derived
+/// dirs + global storage + per-signal tuning); the substrate ascribes no signal
+/// meaning to it. Runtime-only — never serialized.
 #[derive(Debug, Clone)]
 pub struct LifecycleConfig {
-    /// WAL file configuration (dir, rotation, crc/compression).
+    /// WAL file configuration (derived dir, rotation, crc/compression).
     pub wal: WalConfig,
-    /// Index (SFST) file configuration (dir, retention).
+    /// Index (SFST) file configuration (derived dir, retention).
     pub index: IndexConfig,
-    /// Catalog file configuration (dir, rotation count).
+    /// Catalog file configuration (derived dir, rotation count).
     pub catalog: CatalogConfig,
-    /// Remote object-storage configuration.
+    /// Remote object-storage configuration (global, shared across signals).
     pub storage: StorageConfig,
+    /// Derived local directory for this signal's remote-read cache
+    /// (`{base_dir}/{signal}/remote-read`). Only used when `storage.enabled`.
+    pub read_cache_dir: PathBuf,
 }
 
-/// Remote object storage configuration.
+/// Remote object storage configuration. Global across signals: one on/off and
+/// one backend for the whole process. The per-signal remote-read cache
+/// directory is derived (`{base_dir}/{signal}/remote-read`), not configured here
+/// (see [`LifecycleConfig::read_cache_dir`]).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StorageConfig {
     /// Whether remote storage is enabled.
@@ -180,11 +260,6 @@ pub struct StorageConfig {
     /// OpenDAL URI for the remote storage backend.
     /// Examples: "fs:///tmp/otel-remote", "s3://bucket/?region=us-east-1"
     pub uri: String,
-    /// Local directory for the remote-read cache (objects fetched back from
-    /// remote storage to answer queries). When unset, derived next to the index
-    /// directory. Only used when `enabled`.
-    #[serde(default)]
-    pub read_cache_dir: Option<PathBuf>,
     /// Hard byte cap for the remote-read cache on disk. Default 4 GiB.
     #[serde(default = "default_read_cache_max_size")]
     pub read_cache_max_size: ByteSize,
@@ -374,6 +449,140 @@ mod opt_bytesize {
         } else {
             Option::<u64>::deserialize(d).map(|opt| opt.map(ByteSize::b))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::signals::{LOGS_SIGNAL, TRACES_SIGNAL};
+
+    /// A full plugin config in the new schema: one base dir, global storage +
+    /// auth, per-signal tuning for logs and traces (different rotation/retention
+    /// so the derivation per signal is observable).
+    const FULL_YAML: &str = r#"
+endpoint:
+  path: "127.0.0.1:4317"
+metrics:
+  max_new_charts_per_request: 100
+base_dir: /var/lib/netdata/otel
+storage:
+  enabled: true
+  uri: "fs:///var/lib/netdata/otel/remote"
+  read_cache_max_size: "2GiB"
+auth:
+  enabled: true
+logs:
+  wal:
+    crc_enabled: true
+    compression_enabled: false
+    rotation:
+      default:
+        max_file_size: "100MB"
+        max_log_entries: 50000
+        max_file_duration: "2 hours"
+  index:
+    retention:
+      default:
+        max_files: 10
+        max_total_size: "1GB"
+        max_age: "7 days"
+  catalog:
+    rotation_count: 7
+traces:
+  wal:
+    rotation:
+      default:
+        max_file_size: "10MB"
+        max_log_entries: 1000
+        max_file_duration: "30 minutes"
+  index:
+    retention:
+      default:
+        max_files: 5
+        max_total_size: "256MB"
+        max_age: "2 days"
+"#;
+
+    fn full_config() -> PluginConfig {
+        serde_yaml::from_str(FULL_YAML).unwrap()
+    }
+
+    #[test]
+    fn full_yaml_parses_global_and_per_signal() {
+        let c = full_config();
+        assert_eq!(c.base_dir, PathBuf::from("/var/lib/netdata/otel"));
+        // Global storage + auth.
+        assert!(c.storage.enabled);
+        assert_eq!(c.storage.uri, "fs:///var/lib/netdata/otel/remote");
+        assert_eq!(c.storage.read_cache_max_size, ByteSize::gib(2));
+        assert!(c.auth.enabled);
+        // Per-signal tuning differs between logs and traces.
+        assert!(c.logs.wal.crc_enabled);
+        assert!(!c.logs.wal.compression_enabled);
+        assert_eq!(c.logs.catalog.rotation_count, 7);
+        // traces.catalog omitted → default rotation count.
+        assert_eq!(c.traces.catalog.rotation_count, default_catalog_rotation_count());
+        assert!(c.traces.wal.crc_enabled); // default_true when omitted
+    }
+
+    #[test]
+    fn lifecycle_for_derives_dirs_and_injects_global_storage() {
+        let c = full_config();
+
+        let logs = c.lifecycle_for(LOGS_SIGNAL);
+        assert_eq!(logs.wal.dir, PathBuf::from("/var/lib/netdata/otel/logs/wal"));
+        assert_eq!(
+            logs.index.dir,
+            PathBuf::from("/var/lib/netdata/otel/logs/index")
+        );
+        assert_eq!(
+            logs.catalog.dir,
+            PathBuf::from("/var/lib/netdata/otel/logs/catalog")
+        );
+        assert_eq!(
+            logs.read_cache_dir,
+            PathBuf::from("/var/lib/netdata/otel/logs/remote-read")
+        );
+        // Tuning carried from the logs section.
+        assert!(!logs.wal.compression_enabled);
+        assert_eq!(logs.catalog.rotation_count, 7);
+        // Global storage injected verbatim.
+        assert!(logs.storage.enabled);
+        assert_eq!(logs.storage.uri, c.storage.uri);
+
+        let traces = c.lifecycle_for(TRACES_SIGNAL);
+        assert_eq!(
+            traces.wal.dir,
+            PathBuf::from("/var/lib/netdata/otel/traces/wal")
+        );
+        assert_eq!(
+            traces.read_cache_dir,
+            PathBuf::from("/var/lib/netdata/otel/traces/remote-read")
+        );
+        // Same global storage as logs (one backend for the process).
+        assert!(traces.storage.enabled);
+        assert_eq!(traces.storage.uri, logs.storage.uri);
+        // Per-signal tuning is the traces section, not logs'.
+        let traces_rot =
+            RotationConfig::resolve(&traces.wal.rotation, "default");
+        assert_eq!(traces_rot.max_log_entries, 1000);
+    }
+
+    #[test]
+    fn seq_highwater_path_is_under_base_shared() {
+        let c = full_config();
+        assert_eq!(
+            c.seq_highwater_path(),
+            PathBuf::from("/var/lib/netdata/otel/shared/seq_highwater")
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "unknown signal")]
+    fn lifecycle_for_unknown_signal_panics() {
+        let c = full_config();
+        let _ = c.lifecycle_for("metrics");
     }
 }
 

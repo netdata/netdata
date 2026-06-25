@@ -46,19 +46,17 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
         }
     };
 
-    // `Ledger::new` runs the full supervisor handshake; see its docs
-    // for the step order and what `Ready` claims. The logs pipeline's
-    // lifecycle config is carved out of `LogsConfig`; a second signal would
-    // build its own `LifecycleConfig` the same way from its own config.
-    // PROOF SCAFFOLD (traces-proof SOW): derive the skeletal traces pipeline's
-    // lifecycle config alongside logs, from the same `LogsConfig`, so the two
-    // signals agree on the `*-traces` sibling dirs (the ingestor's traces WAL
-    // writer derives them the same way).
+    // `Ledger::new` runs the full supervisor handshake; see its docs for the
+    // step order and what `Ready` claims. Each signal's lifecycle config is
+    // derived from the shared `PluginConfig` via `lifecycle_for` (one base dir
+    // → `{base}/{signal}/...`, plus the global storage settings). The ingestor's
+    // per-signal WAL writers derive their dirs the same way, so the two
+    // processes agree on where each signal's files live.
     let mut ledger = Ledger::new(
         supervisor,
         &config.writer_socket_path,
-        &config.logs.lifecycle(),
-        &config.logs.traces_proof_lifecycle(),
+        &config.lifecycle_for(LOGS_SIGNAL),
+        &config.lifecycle_for(TRACES_SIGNAL),
     )
     .await
     .context("failed to initialize ledger")?;

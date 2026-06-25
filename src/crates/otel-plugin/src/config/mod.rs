@@ -7,8 +7,8 @@
 
 mod endpoint;
 mod env;
-mod logs;
 mod metrics;
+mod signal;
 
 use std::path::{Path, PathBuf};
 
@@ -17,8 +17,8 @@ use bridge::config::PluginConfig;
 use serde::Deserialize;
 
 use endpoint::EndpointOverride;
-use logs::LogsOverride;
 use metrics::MetricsOverride;
+use signal::{AuthOverride, SignalOverride, StorageOverride};
 
 /// Standard-install fallback when the agent's log directory is unknown.
 const LEGACY_DEFAULT_JOURNAL_DIR: &str = "/var/log/netdata/otel/v1";
@@ -151,6 +151,10 @@ fn log_config(source: &str, config: &PluginConfig) {
 }
 
 fn validate(config: &PluginConfig) -> Result<()> {
+    if config.base_dir.as_os_str().is_empty() {
+        anyhow::bail!("base_dir must be set (the mandatory root for all signal storage)");
+    }
+
     if !config.endpoint.path.contains(':') {
         anyhow::bail!(
             "endpoint must be in format host:port, got: {}",
@@ -199,12 +203,26 @@ pub(crate) struct ConfigOverride {
     #[serde(default)]
     metrics: Option<MetricsOverride>,
     #[serde(default)]
-    logs: Option<LogsOverride>,
+    base_dir: Option<PathBuf>,
+    #[serde(default)]
+    storage: Option<StorageOverride>,
+    #[serde(default)]
+    auth: Option<AuthOverride>,
+    #[serde(default)]
+    logs: Option<SignalOverride>,
+    #[serde(default)]
+    traces: Option<SignalOverride>,
 }
 
 impl ConfigOverride {
     fn has_any(&self) -> bool {
-        self.endpoint.is_some() || self.metrics.is_some() || self.logs.is_some()
+        self.endpoint.is_some()
+            || self.metrics.is_some()
+            || self.base_dir.is_some()
+            || self.storage.is_some()
+            || self.auth.is_some()
+            || self.logs.is_some()
+            || self.traces.is_some()
     }
 }
 
@@ -215,8 +233,20 @@ fn apply_overrides(config: &mut PluginConfig, o: &ConfigOverride) {
     if let Some(m) = &o.metrics {
         metrics::apply(&mut config.metrics, m);
     }
+    if let Some(b) = &o.base_dir {
+        config.base_dir = b.clone();
+    }
+    if let Some(s) = &o.storage {
+        signal::apply_storage(&mut config.storage, s);
+    }
+    if let Some(a) = &o.auth {
+        signal::apply_auth(&mut config.auth, a);
+    }
     if let Some(l) = &o.logs {
-        logs::apply(&mut config.logs, l);
+        signal::apply_signal(&mut config.logs, l);
+    }
+    if let Some(t) = &o.traces {
+        signal::apply_signal(&mut config.traces, t);
     }
 }
 
@@ -257,9 +287,14 @@ metrics:
   grace_period_secs: 60
   expiry_duration_secs: 900
   max_new_charts_per_request: 100
+base_dir: /var/log/netdata/otel/v1
+storage:
+  enabled: false
+  uri: "fs:///var/log/netdata/otel/v1/remote"
+auth:
+  enabled: false
 logs:
   wal:
-    dir: /var/log/netdata/otel/v1/wal
     crc_enabled: true
     compression_enabled: true
     rotation:
@@ -268,18 +303,28 @@ logs:
         max_log_entries: 50000
         max_file_duration: "2 hours"
   index:
-    dir: /var/log/netdata/otel/v1/index
     retention:
       default:
         max_files: 10
         max_total_size: "1GB"
         max_age: "7 days"
   catalog:
-    dir: /var/log/netdata/otel/v1/catalog
     rotation_count: 10
-  storage:
-    enabled: false
-    uri: "fs:///var/log/netdata/otel/v1/remote"
+traces:
+  wal:
+    rotation:
+      default:
+        max_file_size: "100MB"
+        max_log_entries: 50000
+        max_file_duration: "2 hours"
+  index:
+    retention:
+      default:
+        max_files: 10
+        max_total_size: "1GB"
+        max_age: "7 days"
+  catalog:
+    rotation_count: 10
 "#;
 
     fn stock_config() -> PluginConfig {
@@ -302,11 +347,35 @@ logs:
     }
 
     #[test]
-    fn stock_yaml_logs_parsed() {
+    fn stock_yaml_base_dir_and_globals_parsed() {
         let config = stock_config();
         assert_eq!(
-            config.logs.wal.dir,
-            std::path::Path::new("/var/log/netdata/otel/v1/wal")
+            config.base_dir,
+            std::path::Path::new("/var/log/netdata/otel/v1")
+        );
+        // Storage + auth are global.
+        assert!(!config.storage.enabled);
+        assert_eq!(config.storage.uri, "fs:///var/log/netdata/otel/v1/remote");
+        assert_eq!(config.storage.read_cache_max_size, ByteSize::gib(4));
+        assert!(!config.auth.enabled);
+    }
+
+    #[test]
+    fn stock_yaml_logs_tuning_parsed() {
+        let config = stock_config();
+        // Dirs are derived from base_dir, not configured per signal.
+        let logs = config.lifecycle_for(bridge::signals::LOGS_SIGNAL);
+        assert_eq!(
+            logs.wal.dir,
+            std::path::Path::new("/var/log/netdata/otel/v1/logs/wal")
+        );
+        assert_eq!(
+            logs.index.dir,
+            std::path::Path::new("/var/log/netdata/otel/v1/logs/index")
+        );
+        assert_eq!(
+            logs.catalog.dir,
+            std::path::Path::new("/var/log/netdata/otel/v1/logs/catalog")
         );
         let rotation =
             bridge::config::RotationConfig::resolve(&config.logs.wal.rotation, "default");
@@ -320,6 +389,21 @@ logs:
         assert_eq!(retention.max_files, 10);
         assert_eq!(retention.max_total_size, ByteSize::gb(1));
         assert_eq!(retention.max_age, Duration::from_secs(7 * 24 * 3600));
+    }
+
+    #[test]
+    fn stock_yaml_traces_tuning_parsed() {
+        let config = stock_config();
+        let traces = config.lifecycle_for(bridge::signals::TRACES_SIGNAL);
+        assert_eq!(
+            traces.wal.dir,
+            std::path::Path::new("/var/log/netdata/otel/v1/traces/wal")
+        );
+        // Traces uses the global storage (one backend for the process).
+        assert_eq!(traces.storage.uri, config.storage.uri);
+        let rotation =
+            bridge::config::RotationConfig::resolve(&config.traces.wal.rotation, "default");
+        assert_eq!(rotation.max_log_entries, 50000);
     }
 
     #[test]
@@ -388,31 +472,68 @@ logs:
         let rotation =
             bridge::config::RotationConfig::resolve(&config.logs.wal.rotation, "default");
         assert_eq!(rotation.max_log_entries, 100000);
-        assert_eq!(
-            config.logs.wal.dir,
-            std::path::Path::new("/var/log/netdata/otel/v1/wal")
-        );
+        // Untouched stock fields survive the partial override.
         assert_eq!(rotation.max_file_size, ByteSize::mb(100));
     }
 
     #[test]
-    fn override_logs_catalog_fields() {
+    fn override_logs_catalog_rotation_count() {
         let mut config = stock_config();
         let o: ConfigOverride = serde_yaml::from_str(
             r#"
 logs:
   catalog:
-    dir: /custom/catalog
     rotation_count: 2
 "#,
         )
         .unwrap();
         apply_overrides(&mut config, &o);
         assert_eq!(config.logs.catalog.rotation_count, 2);
-        assert_eq!(
-            config.logs.catalog.dir,
-            std::path::Path::new("/custom/catalog")
-        );
+        // Traces is independent — its rotation count is untouched.
+        assert_eq!(config.traces.catalog.rotation_count, 10);
+    }
+
+    #[test]
+    fn override_base_dir() {
+        let mut config = stock_config();
+        let o: ConfigOverride = serde_yaml::from_str("base_dir: /data/otel").unwrap();
+        apply_overrides(&mut config, &o);
+        assert_eq!(config.base_dir, std::path::Path::new("/data/otel"));
+        // Derived dirs follow the new base.
+        let logs = config.lifecycle_for(bridge::signals::LOGS_SIGNAL);
+        assert_eq!(logs.wal.dir, std::path::Path::new("/data/otel/logs/wal"));
+    }
+
+    #[test]
+    fn override_global_auth() {
+        let mut config = stock_config();
+        assert!(!config.auth.enabled);
+        let o: ConfigOverride = serde_yaml::from_str("auth:\n  enabled: true").unwrap();
+        apply_overrides(&mut config, &o);
+        assert!(config.auth.enabled);
+    }
+
+    #[test]
+    fn override_traces_tuning_independent_of_logs() {
+        let mut config = stock_config();
+        let o: ConfigOverride = serde_yaml::from_str(
+            r#"
+traces:
+  wal:
+    rotation:
+      default:
+        max_log_entries: 999
+"#,
+        )
+        .unwrap();
+        apply_overrides(&mut config, &o);
+        let traces_rot =
+            bridge::config::RotationConfig::resolve(&config.traces.wal.rotation, "default");
+        assert_eq!(traces_rot.max_log_entries, 999);
+        // Logs is untouched.
+        let logs_rot =
+            bridge::config::RotationConfig::resolve(&config.logs.wal.rotation, "default");
+        assert_eq!(logs_rot.max_log_entries, 50000);
     }
 
     #[test]
@@ -468,26 +589,38 @@ logs:
     }
 
     #[test]
-    fn override_storage_read_cache() {
+    fn override_global_storage() {
         let mut config = stock_config();
-        // Stock omits both read-cache fields: dir defaults to None, size to 4 GiB.
-        assert!(config.logs.storage.read_cache_dir.is_none());
-        assert_eq!(config.logs.storage.read_cache_max_size, ByteSize::gib(4));
+        // Stock omits the read-cache size → defaults to 4 GiB; storage off.
+        assert!(!config.storage.enabled);
+        assert_eq!(config.storage.read_cache_max_size, ByteSize::gib(4));
         let o: ConfigOverride = serde_yaml::from_str(
             r#"
-logs:
-  storage:
-    read_cache_dir: /var/cache/otel-rr
-    read_cache_max_size: "2GiB"
+storage:
+  enabled: true
+  uri: "fs:///data/remote"
+  read_cache_max_size: "2GiB"
 "#,
         )
         .unwrap();
         apply_overrides(&mut config, &o);
+        assert!(config.storage.enabled);
+        assert_eq!(config.storage.uri, "fs:///data/remote");
+        assert_eq!(config.storage.read_cache_max_size, ByteSize::gib(2));
+        // The global storage flows to every signal's derived lifecycle.
+        let logs = config.lifecycle_for(bridge::signals::LOGS_SIGNAL);
+        let traces = config.lifecycle_for(bridge::signals::TRACES_SIGNAL);
+        assert!(logs.storage.enabled);
+        assert!(traces.storage.enabled);
+        // Read-cache dir is derived per signal, never configured.
         assert_eq!(
-            config.logs.storage.read_cache_dir.as_deref(),
-            Some(std::path::Path::new("/var/cache/otel-rr"))
+            logs.read_cache_dir,
+            std::path::Path::new("/var/log/netdata/otel/v1/logs/remote-read")
         );
-        assert_eq!(config.logs.storage.read_cache_max_size, ByteSize::gib(2));
+        assert_eq!(
+            traces.read_cache_dir,
+            std::path::Path::new("/var/log/netdata/otel/v1/traces/remote-read")
+        );
     }
 
     // -- Cross-section overrides --
@@ -544,6 +677,13 @@ endpoint:
     }
 
     // -- Validation --
+
+    #[test]
+    fn validation_rejects_empty_base_dir() {
+        let mut c = stock_config();
+        c.base_dir = std::path::PathBuf::new();
+        assert!(validate(&c).is_err());
+    }
 
     #[test]
     fn validation_rejects_invalid_endpoint() {
@@ -674,27 +814,55 @@ logs:
     }
 
     #[test]
-    fn env_override_storage_read_cache() {
+    fn env_override_global_storage() {
         with_env_vars(
             &[
-                (
-                    "NETDATA_OTEL_LOGS_STORAGE_READ_CACHE_DIR",
-                    "/var/cache/otel-rr",
-                ),
-                ("NETDATA_OTEL_LOGS_STORAGE_READ_CACHE_MAX_SIZE", "2GiB"),
+                ("NETDATA_OTEL_STORAGE_ENABLED", "yes"),
+                ("NETDATA_OTEL_STORAGE_URI", "fs:///data/remote"),
+                ("NETDATA_OTEL_STORAGE_READ_CACHE_MAX_SIZE", "2GiB"),
             ],
             || {
                 let o = ConfigOverride::from_env().unwrap();
-                // Guard against a future refactor dropping the new fields from
+                // Guard against a future refactor dropping a field from
                 // `StorageOverride::has_any()` — that would silently discard the
                 // override (a set-but-not-applied footgun) while still parsing.
                 assert!(o.has_any());
-                let storage = o.logs.as_ref().unwrap().storage.as_ref().unwrap();
-                assert_eq!(
-                    storage.read_cache_dir.as_deref(),
-                    Some(std::path::Path::new("/var/cache/otel-rr"))
-                );
+                let storage = o.storage.as_ref().unwrap();
+                assert_eq!(storage.enabled, Some(true));
+                assert_eq!(storage.uri.as_deref(), Some("fs:///data/remote"));
                 assert_eq!(storage.read_cache_max_size, Some(ByteSize::gib(2)));
+            },
+        );
+    }
+
+    #[test]
+    fn env_override_base_dir_and_auth() {
+        with_env_vars(
+            &[
+                ("NETDATA_OTEL_BASE_DIR", "/data/otel"),
+                ("NETDATA_OTEL_AUTH_ENABLED", "true"),
+            ],
+            || {
+                let o = ConfigOverride::from_env().unwrap();
+                assert!(o.has_any());
+                assert_eq!(o.base_dir.as_deref(), Some(std::path::Path::new("/data/otel")));
+                assert_eq!(o.auth.as_ref().unwrap().enabled, Some(true));
+            },
+        );
+    }
+
+    #[test]
+    fn env_override_traces_tuning_separate_from_logs() {
+        with_env_vars(
+            &[("NETDATA_OTEL_TRACES_WAL_MAX_LOG_ENTRIES", "777")],
+            || {
+                let o = ConfigOverride::from_env().unwrap();
+                // The traces section is populated; logs is not.
+                assert!(o.traces.is_some());
+                assert!(o.logs.is_none());
+                let wal = o.traces.as_ref().unwrap().wal.as_ref().unwrap();
+                let entry = wal.rotation.as_ref().unwrap().get("default").unwrap();
+                assert_eq!(entry.max_log_entries, Some(777));
             },
         );
     }
@@ -717,7 +885,7 @@ logs:
     #[test]
     fn env_override_invalid_bytesize_rejected() {
         with_env_vars(
-            &[("NETDATA_OTEL_LOGS_STORAGE_READ_CACHE_MAX_SIZE", "not-a-size")],
+            &[("NETDATA_OTEL_STORAGE_READ_CACHE_MAX_SIZE", "not-a-size")],
             || assert!(ConfigOverride::from_env().is_err()),
         );
     }

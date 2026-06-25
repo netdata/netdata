@@ -30,4 +30,5 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [dev-dependencies]
 console-subscriber = { workspace = true }
+serde_yaml = { workspace = true }
 

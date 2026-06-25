@@ -138,10 +138,10 @@ impl Ledger {
         writer_socket_path: &str,
         lifecycle: &LifecycleConfig,
         // PROOF SCAFFOLD (traces-proof SOW): the skeletal traces pipeline's
-        // lifecycle config (sibling `*-traces` dirs, derived by
-        // `LogsConfig::traces_proof_lifecycle`). The N-signal generalization
-        // (a signal list instead of two explicit args) is a real-traces-SOW
-        // finding, deliberately not done for the proof.
+        // lifecycle config, derived by `PluginConfig::lifecycle_for("traces")`
+        // (its own `{base}/traces/...` dirs + the global storage settings). The
+        // N-signal generalization (a signal list instead of two explicit args)
+        // is a real-traces-SOW finding, deliberately not done for the proof.
         traces_lifecycle: &LifecycleConfig,
     ) -> anyhow::Result<Self> {
         let cancel = CancellationToken::new();
@@ -191,16 +191,10 @@ impl Ledger {
 
             // Local read-through cache for fetching SFSTs back from remote
             // storage to answer queries after local retention evicted them. The
-            // directory defaults to a sibling of the index dir; the byte cap comes
-            // from config. Opening it recovers any previously-cached files.
-            let cache_dir = lifecycle.storage.read_cache_dir.clone().unwrap_or_else(|| {
-                lifecycle
-                    .index
-                    .dir
-                    .parent()
-                    .map(|p| p.join("remote-read"))
-                    .unwrap_or_else(|| lifecycle.index.dir.join("remote-read"))
-            });
+            // directory is derived per signal (`{base}/{signal}/remote-read`);
+            // the byte cap is the global storage setting. Opening it recovers any
+            // previously-cached files.
+            let cache_dir = lifecycle.read_cache_dir.clone();
             let read_cache = file_cache::FileCache::open(
                 &cache_dir,
                 lifecycle.storage.read_cache_max_size.as_u64(),
@@ -245,9 +239,9 @@ impl Ledger {
 
         // PROOF SCAFFOLD (traces-proof SOW): the skeletal traces pipeline,
         // sharing the same cleaner/uploader/storage but with its own
-        // `*-traces` dirs, a content-light seal, and a stub query handler.
-        // This is the whole point of the proof — a second signal plugs in with
-        // another `build_*_pipeline` call, no shell edits.
+        // `{base}/traces/...` dirs, a content-light seal, and a stub query
+        // handler. This is the whole point of the proof — a second signal plugs
+        // in with another `build_*_pipeline` call, no shell edits.
         let traces = traces_pipeline::build_traces_pipeline(
             TRACES_PIPELINE_ID,
             crate::TRACES_SIGNAL,
