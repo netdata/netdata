@@ -23,7 +23,7 @@ func methodConfig() funcapi.MethodConfig {
 		Help:         "SNMP Layer-2 topology and neighbor discovery data",
 		RequireCloud: true,
 		ResponseType: topologyv1.ResponseType,
-		AgentWide:    true,
+		Scope:        funcapi.MethodScopeAgent,
 		RequiredParams: []funcapi.ParamConfig{
 			nodesIdentityParamConfig(),
 			mapTypeParamConfig(),

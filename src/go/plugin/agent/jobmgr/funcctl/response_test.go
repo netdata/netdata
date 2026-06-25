@@ -52,7 +52,7 @@ func TestRespondWithParams_MethodTypeFallback(t *testing.T) {
 	assert.Equal(t, "topology", (*resp)["type"])
 }
 
-func TestRespondWithParams_AgentWideOmitsJobParam(t *testing.T) {
+func TestRespondWithParams_AgentScopeOmitsJobParam(t *testing.T) {
 	controller, resp := newTestControllerWithCapture(t)
 
 	dataResp := &funcapi.FunctionResponse{
@@ -95,7 +95,7 @@ func TestHandleMethodFuncInfo_UsesResponseType(t *testing.T) {
 	assert.Equal(t, "topology", (*resp)["type"])
 }
 
-func TestHandleMethodFuncInfo_AgentWideOmitsJobParam(t *testing.T) {
+func TestHandleMethodFuncInfo_AgentScopeOmitsJobParam(t *testing.T) {
 	controller, resp := newTestControllerWithCapture(t)
 
 	controller.registry.registerModule("snmp", collectorapi.Creator{
@@ -103,7 +103,7 @@ func TestHandleMethodFuncInfo_AgentWideOmitsJobParam(t *testing.T) {
 			return []funcapi.MethodConfig{{
 				ID:           "topology:snmp",
 				ResponseType: "topology",
-				AgentWide:    true,
+				Scope:        funcapi.MethodScopeAgent,
 				RequiredParams: []funcapi.ParamConfig{{
 					ID:        "topology_view",
 					Name:      "Topology View",

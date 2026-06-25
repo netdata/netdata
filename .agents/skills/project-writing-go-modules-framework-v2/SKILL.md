@@ -67,7 +67,7 @@ source files for evidence.
 - If Functions exist, isolate them in a `<name>func/` subpackage with a narrow
   `Deps` interface declared there. The Function package MUST NOT import the
   collector package or hold `*Collector`.
-- If a single-instance collector exposes `AgentWide` module `Methods`, its
+- If a single-instance collector exposes `MethodScopeAgent` module `Methods`, its
   `MethodHandler(job)` receives the running canonical runtime job. Use
   `job.Collector()` to bind the Function handler to collector-owned state; do
   not add a `__job` parameter or introduce a package-global registry to bridge

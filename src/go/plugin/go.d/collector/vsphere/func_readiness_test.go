@@ -45,7 +45,7 @@ func TestVSphereMethods(t *testing.T) {
 			require.Equal(t, tc.wantName, method.Name)
 			require.Equal(t, 30, method.UpdateEvery)
 			require.True(t, method.RequireCloud)
-			require.False(t, method.AgentWide)
+			require.Equal(t, funcapi.MethodScopeInstance, method.Scope)
 			if tc.alias != "" {
 				require.Contains(t, method.Aliases, tc.alias)
 			}

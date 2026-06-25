@@ -13,6 +13,7 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/require"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cato_networks/catofunc"
 )
@@ -45,7 +46,7 @@ func TestTopologyFunction(t *testing.T) {
 		"requires job selection": {
 			check: func(t *testing.T, _ *Collector) {
 				cfg := catofunc.Methods(defaultUpdateEvery)[0]
-				require.False(t, cfg.AgentWide)
+				require.Equal(t, funcapi.MethodScopeInstance, cfg.Scope)
 			},
 		},
 	}

@@ -668,14 +668,14 @@ func TestRun_DoesNotRegisterJobBoundModuleMethodsBeforeAnyJobStarts(t *testing.T
 	assert.Empty(t, fnReg.registeredNames(), "static methods must not be registered before first started job")
 }
 
-func TestRun_RegistersAgentWideModuleMethodsBeforeAnyJobStarts(t *testing.T) {
+func TestRun_RegistersAgentScopeModuleMethodsBeforeAnyJobStarts(t *testing.T) {
 	fnReg := &recordingFunctionRegistry{}
 	mgr := New(Config{PluginName: testPluginName, FnReg: fnReg})
 
 	mgr.modules = collectorapi.Registry{
 		"mod": collectorapi.Creator{
 			Methods: func() []funcapi.MethodConfig {
-				return []funcapi.MethodConfig{{ID: "a", AgentWide: true}}
+				return []funcapi.MethodConfig{{ID: "a", Scope: funcapi.MethodScopeAgent}}
 			},
 		},
 	}

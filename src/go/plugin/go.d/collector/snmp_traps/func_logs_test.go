@@ -37,7 +37,7 @@ func TestSNMPTrapsMethodsExposeLogsOnly(t *testing.T) {
 	assert.Equal(t, "logs", logs.ResponseType)
 	assert.True(t, logs.RawRequest)
 	assert.True(t, logs.RequireCloud)
-	assert.True(t, logs.AgentWide)
+	assert.Equal(t, funcapi.MethodScopeAgent, logs.Scope)
 	assert.NotNil(t, logs.Available)
 }
 
