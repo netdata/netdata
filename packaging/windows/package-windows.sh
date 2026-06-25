@@ -1,6 +1,9 @@
 #!/bin/bash
 
 repo_root="$(dirname "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null && pwd -P)")")"
+# win-build-dir.sh references ${REPO_ROOT} (uppercase); set it here so the
+# build directory resolves correctly when BUILD_DIR is not explicitly provided.
+REPO_ROOT="${repo_root}"
 
 # shellcheck source=./win-build-dir.sh
 . "${repo_root}/packaging/windows/win-build-dir.sh"

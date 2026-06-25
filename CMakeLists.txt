@@ -2585,7 +2585,7 @@ if(OS_WINDOWS)
                         # ETW method also supports WEL
                         # but it requires Microsoft tools mc, rc, and link
                         add_custom_command(
-                                OUTPUT "${WEVT_MC_H_FILE}" "${WEVT_MAN_H_FILE}" "${WEVT_DLL_FILE}"
+                                OUTPUT "${WEVT_MC_H_FILE}" "${WEVT_MAN_H_FILE}" "${WEVT_MAN_FILE}" "${WEVT_DLL_FILE}"
                                 COMMAND "${CMAKE_C_COMPILER}" -o "${WEVT_GEN_BIN_FILE}" "${WEVT_GEN_SRC_C_FILE}"
                                 COMMAND "${WEVT_GEN_BIN_FILE}" >"${WEVT_MC_FILE}"
                                 COMMAND "${WEVT_GEN_BIN_FILE}" --manifest >"${WEVT_MAN_FILE}"
@@ -2601,7 +2601,7 @@ if(OS_WINDOWS)
                         # because windmc does not emit a trailing newline, causing the appended
                         # text to merge with the last .rc line ("MSG00409.bin1 2004...").
                         add_custom_command(
-                                OUTPUT "${WEVT_MC_H_FILE}" "${WEVT_DLL_FILE}"
+                                OUTPUT "${WEVT_MC_H_FILE}" "${WEVT_MAN_FILE}" "${WEVT_DLL_FILE}"
                                 COMMAND "${CMAKE_C_COMPILER}" -o "${WEVT_GEN_BIN_FILE}" "${WEVT_GEN_SRC_C_FILE}"
                                 COMMAND "${WEVT_GEN_BIN_FILE}" >"${WEVT_MC_FILE}"
                                 COMMAND "${WEVT_GEN_BIN_FILE}" --manifest >"${WEVT_MAN_FILE}"
