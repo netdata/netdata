@@ -79,7 +79,7 @@ func (c *Controller) executeMethodRequest(parent context.Context, in methodExecu
 	handler := creator.MethodHandler(in.job)
 	if handler == nil {
 		if in.job == nil {
-			c.respondError(in.fn, 500, "module '%s' returned nil handler for agent-wide method '%s'", in.moduleName, in.methodID)
+			c.respondError(in.fn, 500, "module '%s' returned nil handler for agent-scope method '%s'", in.moduleName, in.methodID)
 			return
 		}
 		c.respondError(in.fn, 500, "module '%s' returned nil handler for job '%s'", in.moduleName, in.jobName)
