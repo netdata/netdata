@@ -185,27 +185,6 @@ We provide detailed configuration guides for popular web servers:
 
 ## Firewall and Egress Requirements for Cloud Connectivity
 
-The security measures above concern **inbound** access to your Agent's local dashboard (port `19999`). Claimed Agents and Parents also require **outbound** network access to Netdata Cloud over the encrypted Agent-Cloud Link ([ACLK](/src/aclk/README.md)).
+The security measures above concern **inbound** access to your Agent's local dashboard (port `19999`). Claimed Agents and Parents also require **outbound** access to Netdata Cloud over the encrypted Agent-Cloud Link ([ACLK](/src/aclk/README.md)) — an outbound WebSocket Secure (WSS) connection on TCP port `443`.
 
-The ACLK uses outgoing secure WebSocket (WSS) on TCP port `443`. Ensure your firewall allows outbound connections on port `443` to the following Netdata Cloud domains:
-
-| Direction | Required Access                                                            |
-|-----------|----------------------------------------------------------------------------|
-| Outbound  | • `app.netdata.cloud`<br/>• `api.netdata.cloud`<br/>• `mqtt.netdata.cloud` |
-
-:::warning
-
-IP addresses can change without notice and vary based on your geographic location due to CDN-edge servers. **Always prefer domain allowlisting** over IP-based allowlisting. Netdata does not publish static CIDR ranges. If you must use IP addresses, you will need to regularly verify the IP addresses specific to your region.
-
-:::
-
-:::note
-
-The two connection phases use different libraries but the same outbound domains and port `443`:
-
-- **Claiming** uses libcurl to reach `app.netdata.cloud`.
-- **Live Cloud connection** uses MQTT-over-WebSocket-over-TLS (the MQTToWSoHTTPS library) to `mqtt.netdata.cloud`.
-
-:::
-
-If your Agent requires a proxy to reach the internet, see [proxy configuration](/src/claim/README.md#proxy-configuration). For full ACLK details, see the [ACLK reference](/src/aclk/README.md).
+Netdata does not publish static CIDR ranges: IP addresses vary by region and change without notice, so **always prefer domain-based allowlisting**. For the complete list of required domains and ports (inbound and outbound), see [Required endpoints and ports](/docs/netdata-agent/configure-netdata-for-cybersecurity-platforms.md#required-endpoints-and-ports). If your Agent requires a proxy to reach the internet, see [proxy configuration](/src/claim/README.md#proxy-configuration).
