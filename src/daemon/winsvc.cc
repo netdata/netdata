@@ -248,6 +248,14 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    // Derive the install prefix from the binary location and override
+    // all netdata_configured_* path globals with the real installed
+    // paths before netdata_main() or StartServiceCtrlDispatcher() runs.
+    // Without this, compile-time POSIX staging paths (/opt/netdata/...)
+    // would be used, which UCRT64 resolves as C:\opt\netdata\... —
+    // a path that never exists on a target machine.
+    nd_windows_detect_prefix_and_override_paths();
+
     SERVICE_TABLE_ENTRY serviceTable[] = {
         { strdupz("Netdata"), ServiceMain },
         { nullptr, nullptr }
