@@ -349,10 +349,13 @@ pub struct NetdataLogsService {
     /// `time_unix_nano` and `observed_time_unix_nano`. Sharing a single
     /// clock across all tenants and streams keeps `ingestion_ns`
     /// monotonic globally within this process.
-    clock: Mutex<MonotonicClock>,
+    /// Process-wide monotonic clock, shared across signals (the WAL writer's
+    /// doc requires a single clock so per-frame `ingestion_ns` is consistent
+    /// across every stream/signal).
+    clock: Arc<Mutex<MonotonicClock>>,
     /// Shared with the traces ingestion service: the writer → ledger IPC accepts
-    /// exactly one connection and the ledger gap-checks one global `frame_seq`
-    /// stream, so every signal's events MUST funnel through one sender.
+    /// exactly one connection (the ledger gap-checks frame sequences per signal),
+    /// so every signal's events MUST funnel through one sender.
     sender: Arc<LedgerSender>,
     wal_base_dir: PathBuf,
     wal_config: bridge::config::WalConfig,
@@ -366,12 +369,13 @@ impl NetdataLogsService {
         wal_base_dir: PathBuf,
         wal_config: bridge::config::WalConfig,
         seq: Arc<wal::SeqAllocator>,
+        clock: Arc<Mutex<MonotonicClock>>,
         auth: AuthConfig,
     ) -> Self {
         Self {
             writers: Mutex::new(HashMap::new()),
             canonical: Mutex::new(HashMap::new()),
-            clock: Mutex::new(MonotonicClock::new()),
+            clock,
             sender,
             wal_base_dir,
             wal_config,
@@ -944,6 +948,7 @@ mod tests {
             wal_dir,
             wal_config,
             Arc::new(wal::SeqAllocator::ephemeral(0)),
+            Arc::new(Mutex::new(MonotonicClock::new())),
             bridge::config::AuthConfig::default(),
         )
     }

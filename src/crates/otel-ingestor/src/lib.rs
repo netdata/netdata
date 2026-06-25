@@ -158,9 +158,17 @@ async fn run_ingestor(
     // single writer connection and gap-checks one global `frame_seq`, and file
     // `seq` must be globally unique across signals.
     let (sender, seq) = create_shared_writer_state(&config.logs, &config.writer_socket_path)?;
-    let logs_service =
-        create_logs_service(&config.logs, Arc::clone(&sender), Arc::clone(&seq));
-    let traces_service = create_traces_service(&config.logs, sender, seq);
+    // One process-wide monotonic clock, shared across signals — the WAL writer's
+    // contract is that all per-frame `ingestion_ns` come from a single clock so
+    // frame-level ordering is consistent across every stream/signal.
+    let clock = Arc::new(std::sync::Mutex::new(file_registry::MonotonicClock::new()));
+    let logs_service = create_logs_service(
+        &config.logs,
+        Arc::clone(&sender),
+        Arc::clone(&seq),
+        Arc::clone(&clock),
+    );
+    let traces_service = create_traces_service(&config.logs, sender, seq, clock);
 
     // Parse gRPC endpoint address
     let addr =
@@ -326,12 +334,14 @@ fn create_logs_service(
     logs_config: &LogsConfig,
     sender: Arc<ledger_sender::LedgerSender>,
     seq: Arc<wal::SeqAllocator>,
+    clock: Arc<std::sync::Mutex<file_registry::MonotonicClock>>,
 ) -> NetdataLogsService {
     NetdataLogsService::new(
         sender,
         logs_config.wal.dir.clone(),
         logs_config.wal.clone(),
         seq,
+        clock,
         logs_config.auth.clone(),
     )
 }
@@ -344,6 +354,7 @@ fn create_traces_service(
     logs_config: &LogsConfig,
     sender: Arc<ledger_sender::LedgerSender>,
     seq: Arc<wal::SeqAllocator>,
+    clock: Arc<std::sync::Mutex<file_registry::MonotonicClock>>,
 ) -> NetdataTracesService {
     let traces_lc = logs_config.traces_proof_lifecycle();
     tracing::info!(
@@ -355,6 +366,7 @@ fn create_traces_service(
         traces_lc.wal.dir.clone(),
         traces_lc.wal.clone(),
         seq,
+        clock,
         logs_config.auth.clone(),
     )
 }

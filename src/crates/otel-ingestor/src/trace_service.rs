@@ -44,9 +44,11 @@ const TRACES_CONTENT_META: &[u8] = b"traces:v0";
 
 pub struct NetdataTracesService {
     writers: Mutex<HashMap<TenantId, wal::Writer>>,
-    clock: Mutex<MonotonicClock>,
-    /// Shared with the logs service — one writer→ledger connection, one global
-    /// `frame_seq` stream.
+    /// Process-wide monotonic clock, shared with the logs service (one clock per
+    /// process keeps per-frame `ingestion_ns` consistent across signals).
+    clock: Arc<Mutex<MonotonicClock>>,
+    /// Shared with the logs service — one writer→ledger connection, with a
+    /// per-signal `frame_seq` stream.
     sender: Arc<LedgerSender>,
     wal_base_dir: PathBuf,
     wal_config: bridge::config::WalConfig,
@@ -61,11 +63,12 @@ impl NetdataTracesService {
         wal_base_dir: PathBuf,
         wal_config: bridge::config::WalConfig,
         seq: Arc<wal::SeqAllocator>,
+        clock: Arc<Mutex<MonotonicClock>>,
         auth: AuthConfig,
     ) -> Self {
         Self {
             writers: Mutex::new(HashMap::new()),
-            clock: Mutex::new(MonotonicClock::new()),
+            clock,
             sender,
             wal_base_dir,
             wal_config,
