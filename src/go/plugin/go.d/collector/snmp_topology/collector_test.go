@@ -20,15 +20,14 @@ func TestSNMPTopologyCreatorOwnsTopologyFunction(t *testing.T) {
 	require.NotNil(t, creator.CreateV2)
 	require.Equal(t, collectorapi.InstancePolicySingle, creator.InstancePolicy)
 	require.False(t, creator.FunctionOnly)
-	require.NotNil(t, creator.Methods)
+	require.NotNil(t, creator.SharedFunctions)
 	require.NotNil(t, creator.MethodHandler)
 	require.Implements(t, (*collectorapi.CollectorV2Runner)(nil), creator.CreateV2())
 
-	methods := creator.Methods()
+	methods := creator.SharedFunctions()
 	require.Len(t, methods, 1)
 	require.Equal(t, snmptopologyfunc.MethodID, methods[0].ID)
 	require.Equal(t, snmptopologyfunc.FunctionName, methods[0].FunctionName)
-	require.Equal(t, funcapi.MethodScopeAgent, methods[0].Scope)
 	require.NotNil(t, methods[0].Available)
 	require.False(t, methods[0].Available())
 
@@ -68,7 +67,7 @@ func TestSNMPTopologyCreatorRequiresSharedDependencies(t *testing.T) {
 
 func TestSNMPTopologyFunctionAvailabilityBecomesReadyAfterRenderableObservation(t *testing.T) {
 	creator := newCreator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle())
-	methods := creator.Methods()
+	methods := creator.SharedFunctions()
 	require.Len(t, methods, 1)
 	require.NotNil(t, methods[0].Available)
 	require.False(t, methods[0].Available())
@@ -82,12 +81,12 @@ func TestSNMPTopologyFunctionAvailabilityBecomesReadyAfterRenderableObservation(
 	coll.updateFunctionAvailability()
 
 	require.True(t, methods[0].Available())
-	require.True(t, creator.Methods()[0].Available())
+	require.True(t, creator.SharedFunctions()[0].Available())
 }
 
 func TestSNMPTopologyFunctionAvailabilityResetsWhenReplacementCollectorRuns(t *testing.T) {
 	creator := newCreator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle())
-	methods := creator.Methods()
+	methods := creator.SharedFunctions()
 	require.Len(t, methods, 1)
 	require.NotNil(t, methods[0].Available)
 

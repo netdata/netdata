@@ -454,13 +454,12 @@ func TestSnmpTrapsMethods(t *testing.T) {
 	methods := snmpTrapsMethods()
 	require.Len(t, methods, 1)
 
-	byID := make(map[string]funcapi.MethodConfig, len(methods))
+	byID := make(map[string]funcapi.FunctionConfig, len(methods))
 	for _, method := range methods {
 		byID[method.ID] = method
 	}
 
 	logs := byID[snmpTrapsLogsMethodID]
-	assert.Equal(t, funcapi.MethodScopeAgent, logs.Scope)
 	assert.Equal(t, snmpTrapsFunctionName, logs.FunctionName)
 	assert.True(t, logs.RawRequest)
 	assert.Equal(t, "logs", logs.ResponseType)

@@ -11,12 +11,12 @@ import (
 
 // mockHandler implements MethodHandler for testing.
 type mockHandler struct {
-	methods      []MethodConfig
+	methods      []FunctionConfig
 	methodParams []ParamConfig
 	response     *FunctionResponse
 }
 
-func (m *mockHandler) Methods() []MethodConfig {
+func (m *mockHandler) Methods() []FunctionConfig {
 	return m.methods
 }
 
@@ -35,7 +35,7 @@ func TestMethodHandler_Interface(t *testing.T) {
 	var _ MethodHandler = &mockHandler{}
 
 	h := &mockHandler{
-		methods:  []MethodConfig{{ID: "test", Name: "Test"}},
+		methods:  []FunctionConfig{{ID: "test", Name: "Test"}},
 		response: &FunctionResponse{Status: 200},
 	}
 

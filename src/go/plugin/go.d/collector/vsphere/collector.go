@@ -36,10 +36,10 @@ func init() {
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 20,
 		},
-		CreateV2:      func() collectorapi.CollectorV2 { return New() },
-		Config:        func() any { return &Config{} },
-		Methods:       vsphereMethods,
-		MethodHandler: vsphereMethodHandler,
+		CreateV2:        func() collectorapi.CollectorV2 { return New() },
+		Config:          func() any { return &Config{} },
+		SharedFunctions: vsphereMethods,
+		MethodHandler:   vsphereMethodHandler,
 	})
 }
 

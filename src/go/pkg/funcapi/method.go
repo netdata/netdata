@@ -4,17 +4,17 @@ package funcapi
 
 import "fmt"
 
-// MethodFunctionName returns the primary public Function name for a module method.
-func MethodFunctionName(moduleName string, method MethodConfig) string {
+// FunctionName returns the primary public Function name for a module method.
+func FunctionName(moduleName string, method FunctionConfig) string {
 	if method.FunctionName != "" {
 		return method.FunctionName
 	}
 	return fmt.Sprintf("%s:%s", moduleName, method.ID)
 }
 
-// MethodFunctionNames returns the primary public Function name plus aliases.
-func MethodFunctionNames(moduleName string, method MethodConfig) []string {
-	funcName := MethodFunctionName(moduleName, method)
+// FunctionNames returns the primary public Function name plus aliases.
+func FunctionNames(moduleName string, method FunctionConfig) []string {
+	funcName := FunctionName(moduleName, method)
 	funcNames := []string{funcName}
 	seen := map[string]struct{}{funcName: {}}
 

@@ -18,7 +18,7 @@ func TestVSphereMethods(t *testing.T) {
 	methods := vsphereMethods()
 
 	require.Len(t, methods, 2)
-	byID := make(map[string]funcapi.MethodConfig, len(methods))
+	byID := make(map[string]funcapi.FunctionConfig, len(methods))
 	for _, method := range methods {
 		byID[method.ID] = method
 	}
@@ -45,7 +45,6 @@ func TestVSphereMethods(t *testing.T) {
 			require.Equal(t, tc.wantName, method.Name)
 			require.Equal(t, 30, method.UpdateEvery)
 			require.True(t, method.RequireCloud)
-			require.Equal(t, funcapi.MethodScopeInstance, method.Scope)
 			if tc.alias != "" {
 				require.Contains(t, method.Aliases, tc.alias)
 			}

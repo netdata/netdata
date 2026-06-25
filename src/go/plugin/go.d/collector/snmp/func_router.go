@@ -94,11 +94,11 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 	}
 }
 
-func snmpBaseMethods() []funcapi.MethodConfig {
-	methods := []funcapi.MethodConfig{
-		ifacesMethodConfig(),
+func snmpBaseMethods() []funcapi.FunctionConfig {
+	methods := []funcapi.FunctionConfig{
+		ifacesFunctionConfig(),
 	}
-	methods = append(methods, collectorSpecificMethodConfigs()...)
+	methods = append(methods, collectorSpecificFunctionConfigs()...)
 	return methods
 }
 

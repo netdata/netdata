@@ -135,8 +135,8 @@ func TestRunNotifyRunningJobs_ReconcilesLateAvailableModuleMethods(t *testing.T)
 		FnReg:      reg,
 		Modules: collectorapi.Registry{
 			"mod": collectorapi.Creator{
-				Methods: func() []funcapi.MethodConfig {
-					return []funcapi.MethodConfig{{
+				SharedFunctions: func() []funcapi.FunctionConfig {
+					return []funcapi.FunctionConfig{{
 						ID:        "late",
 						Available: func() bool { return available },
 					}}
@@ -201,8 +201,8 @@ func TestRunNotifyRunningJobs_DeduplicatesFunctionReconcileByModule(t *testing.T
 		FnReg:      reg,
 		Modules: collectorapi.Registry{
 			"mod": collectorapi.Creator{
-				Methods: func() []funcapi.MethodConfig {
-					return []funcapi.MethodConfig{{
+				SharedFunctions: func() []funcapi.FunctionConfig {
+					return []funcapi.FunctionConfig{{
 						ID: "late",
 						Available: func() bool {
 							if available {
@@ -270,8 +270,8 @@ func TestRunNotifyRunningJobs_DoesNotPublishDirectly(t *testing.T) {
 		FnReg:      reg,
 		Modules: collectorapi.Registry{
 			"mod": collectorapi.Creator{
-				Methods: func() []funcapi.MethodConfig {
-					return []funcapi.MethodConfig{{
+				SharedFunctions: func() []funcapi.FunctionConfig {
+					return []funcapi.FunctionConfig{{
 						ID:        "late",
 						Available: func() bool { return available },
 					}}
@@ -331,8 +331,8 @@ func TestRequestFunctionReconcile_DroppedRequestCanBeRetried(t *testing.T) {
 		FnReg:      reg,
 		Modules: collectorapi.Registry{
 			"mod": collectorapi.Creator{
-				Methods: func() []funcapi.MethodConfig {
-					return []funcapi.MethodConfig{{
+				SharedFunctions: func() []funcapi.FunctionConfig {
+					return []funcapi.FunctionConfig{{
 						ID:        "late",
 						Available: func() bool { return available },
 					}}
@@ -402,8 +402,8 @@ func TestRunWaitDecisionStep(t *testing.T) {
 					FnReg:      reg,
 					Modules: collectorapi.Registry{
 						"mod": collectorapi.Creator{
-							Methods: func() []funcapi.MethodConfig {
-								return []funcapi.MethodConfig{{
+							SharedFunctions: func() []funcapi.FunctionConfig {
+								return []funcapi.FunctionConfig{{
 									ID:        "late",
 									Available: func() bool { return available },
 								}}
@@ -484,8 +484,8 @@ func TestFunctionReconcileFunnelConcurrentLifecycle(t *testing.T) {
 		FnReg:      reg,
 		Modules: collectorapi.Registry{
 			"mod": collectorapi.Creator{
-				Methods: func() []funcapi.MethodConfig {
-					return []funcapi.MethodConfig{{
+				SharedFunctions: func() []funcapi.FunctionConfig {
+					return []funcapi.FunctionConfig{{
 						ID:        "late",
 						Available: available.Load,
 					}}
@@ -636,8 +636,8 @@ func TestRun_DoesNotRegisterJobBoundModuleMethodsBeforeAnyJobStarts(t *testing.T
 
 	mgr.modules = collectorapi.Registry{
 		"mod": collectorapi.Creator{
-			Methods: func() []funcapi.MethodConfig {
-				return []funcapi.MethodConfig{{ID: "a"}}
+			SharedFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "a"}}
 			},
 		},
 	}
@@ -674,8 +674,8 @@ func TestRun_RegistersAgentScopeModuleMethodsBeforeAnyJobStarts(t *testing.T) {
 
 	mgr.modules = collectorapi.Registry{
 		"mod": collectorapi.Creator{
-			Methods: func() []funcapi.MethodConfig {
-				return []funcapi.MethodConfig{{ID: "a", Scope: funcapi.MethodScopeAgent}}
+			AgentFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "a"}}
 			},
 		},
 	}
@@ -710,8 +710,8 @@ func TestStartRunningJob_RegistersModuleMethodsOnFirstStartedJob(t *testing.T) {
 	fnReg := &recordingFunctionRegistry{}
 	mgr := New(Config{PluginName: testPluginName, FnReg: fnReg})
 	creator := collectorapi.Creator{
-		Methods: func() []funcapi.MethodConfig {
-			return []funcapi.MethodConfig{{ID: "a"}, {ID: "b"}}
+		SharedFunctions: func() []funcapi.FunctionConfig {
+			return []funcapi.FunctionConfig{{ID: "a"}, {ID: "b"}}
 		},
 	}
 	mgr.modules = collectorapi.Registry{"mod": creator}
@@ -727,8 +727,8 @@ func TestStartRunningJob_DoesNotReregisterModuleMethods(t *testing.T) {
 	fnReg := &recordingFunctionRegistry{}
 	mgr := New(Config{PluginName: testPluginName, FnReg: fnReg})
 	creator := collectorapi.Creator{
-		Methods: func() []funcapi.MethodConfig {
-			return []funcapi.MethodConfig{{ID: "a"}, {ID: "b"}}
+		SharedFunctions: func() []funcapi.FunctionConfig {
+			return []funcapi.FunctionConfig{{ID: "a"}, {ID: "b"}}
 		},
 	}
 	mgr.modules = collectorapi.Registry{"mod": creator}

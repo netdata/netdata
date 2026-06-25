@@ -25,7 +25,7 @@ func TestSNMPTrapsMethodsExposeLogsOnly(t *testing.T) {
 	methods := snmpTrapsMethods()
 	require.Len(t, methods, 1)
 
-	byID := make(map[string]funcapi.MethodConfig, len(methods))
+	byID := make(map[string]funcapi.FunctionConfig, len(methods))
 	for _, method := range methods {
 		byID[method.ID] = method
 	}
@@ -37,7 +37,6 @@ func TestSNMPTrapsMethodsExposeLogsOnly(t *testing.T) {
 	assert.Equal(t, "logs", logs.ResponseType)
 	assert.True(t, logs.RawRequest)
 	assert.True(t, logs.RequireCloud)
-	assert.Equal(t, funcapi.MethodScopeAgent, logs.Scope)
 	assert.NotNil(t, logs.Available)
 }
 

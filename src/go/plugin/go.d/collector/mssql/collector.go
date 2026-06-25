@@ -28,10 +28,10 @@ func init() {
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 10,
 		},
-		Create:        func() collectorapi.CollectorV1 { return New() },
-		Config:        func() any { return &Config{} },
-		Methods:       mssqlMethods,
-		MethodHandler: mssqlFunctionHandler,
+		Create:          func() collectorapi.CollectorV1 { return New() },
+		Config:          func() any { return &Config{} },
+		SharedFunctions: mssqlMethods,
+		MethodHandler:   mssqlFunctionHandler,
 	})
 }
 
