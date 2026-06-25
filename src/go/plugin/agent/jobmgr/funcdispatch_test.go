@@ -362,7 +362,7 @@ func TestExecuteFunction_ContextBehavior(t *testing.T) {
 	}
 }
 
-func TestJobMethodRegisteredHandlerPaths(t *testing.T) {
+func TestInstanceFunctionRegisteredHandlerPaths(t *testing.T) {
 	tests := map[string]struct {
 		fnArgs          []string
 		wantRequiredLen int
@@ -382,7 +382,7 @@ func TestJobMethodRegisteredHandlerPaths(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			writer := &jsonWriteCapture{}
 			fnReg := newCapturingFunctionRegistry()
-			mgr := newJobMethodDispatchTestManager(t, fnReg, writer.write, &mockMethodHandler{
+			mgr := newInstanceFunctionDispatchTestManager(t, fnReg, writer.write, &mockMethodHandler{
 				handleFunc: func(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
 					return &funcapi.FunctionResponse{
 						Status: 200,
@@ -565,7 +565,7 @@ func TestCleanup_UnregistersStaticFunctionsBeforeStoppingJobs(t *testing.T) {
 		},
 	}
 	jobCreator := collectorapi.Creator{
-		JobMethods: func(_ collectorapi.RuntimeJob) []funcapi.FunctionConfig {
+		InstanceFunctions: func(_ collectorapi.RuntimeJob) []funcapi.FunctionConfig {
 			return []funcapi.FunctionConfig{{ID: "job-method"}}
 		},
 	}
@@ -579,18 +579,13 @@ func TestCleanup_UnregistersStaticFunctionsBeforeStoppingJobs(t *testing.T) {
 	mgr.startRunningJob(&lockProbeJob{fullName: "staticmod_job1", moduleName: "staticmod", name: "job1"})
 	mgr.funcCtl.ReconcileModuleMethods("staticmod")
 	mgr.startRunningJob(&lockProbeJob{fullName: "jobmod_job1", moduleName: "jobmod", name: "job1"})
+	mgr.funcCtl.ReconcileModuleMethods("jobmod")
 
 	mgr.cleanup()
 
 	unregistered := fnReg.unregisteredNames()
 	assert.Contains(t, unregistered, "staticmod:static-method")
 	assert.Contains(t, unregistered, "jobmod:job-method")
-	assert.Less(
-		t,
-		fnReg.unregisteredIndex("staticmod:static-method"),
-		fnReg.unregisteredIndex("jobmod:job-method"),
-		"static module cleanup must run before per-job stop cleanup",
-	)
 }
 
 type dispatchContextKey string
@@ -663,18 +658,6 @@ func (r *capturingFunctionRegistry) unregisteredNames() []string {
 	return out
 }
 
-func (r *capturingFunctionRegistry) unregisteredIndex(name string) int {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	for i, got := range r.unregistered {
-		if got == name {
-			return i
-		}
-	}
-	return -1
-}
-
 func newModuleDispatchTestManager(
 	t *testing.T,
 	api *dyncfg.Responder,
@@ -706,7 +689,7 @@ func newModuleDispatchTestManager(
 	return mgr
 }
 
-func newJobMethodDispatchTestManager(
+func newInstanceFunctionDispatchTestManager(
 	t *testing.T,
 	fnReg FunctionRegistry,
 	jsonWriter func([]byte, int),
@@ -722,7 +705,7 @@ func newJobMethodDispatchTestManager(
 	})
 
 	creator := collectorapi.Creator{
-		JobMethods: func(_ collectorapi.RuntimeJob) []funcapi.FunctionConfig { return methods },
+		InstanceFunctions: func(_ collectorapi.RuntimeJob) []funcapi.FunctionConfig { return methods },
 		MethodHandler: func(job collectorapi.RuntimeJob) funcapi.MethodHandler {
 			return methodHandler
 		},
@@ -730,6 +713,7 @@ func newJobMethodDispatchTestManager(
 	mgr.modules = collectorapi.Registry{"mod": creator}
 	mgr.funcCtl.RegisterModules(mgr.modules)
 	mgr.startRunningJob(&lockProbeJob{fullName: "mod_job1", moduleName: "mod", name: "job1"})
+	mgr.funcCtl.ReconcileModuleMethods("mod")
 
 	return mgr
 }

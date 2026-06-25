@@ -96,7 +96,7 @@ func (f *jobFactory) create(cfg confgroup.Config) (runtimeJob, error) {
 	}
 
 	functionOnly := creator.FunctionOnly || cfg.FunctionOnly()
-	if cfg.FunctionOnly() && creator.SharedFunctions == nil && creator.AgentFunctions == nil && creator.JobMethods == nil {
+	if cfg.FunctionOnly() && creator.SharedFunctions == nil && creator.AgentFunctions == nil && creator.InstanceFunctions == nil {
 		return nil, fmt.Errorf("function_only is set but %s module has no functions defined", cfg.Module())
 	}
 

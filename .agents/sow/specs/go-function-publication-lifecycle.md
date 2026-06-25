@@ -7,7 +7,8 @@ This spec applies to go.d Functions registered through:
 - `collectorapi.Creator.SharedFunctions` for static shared job-backed
   Functions.
 - `collectorapi.Creator.AgentFunctions` for static true-agent Functions.
-- `collectorapi.Creator.JobMethods` for per-job methods.
+- `collectorapi.Creator.InstanceFunctions` for instance Functions owned by
+  one runtime job.
 - `funcapi.FunctionConfig.Available` for true-agent Function publication
   gating.
 - `collectorapi.FunctionAvailability` for running-job availability of
@@ -39,15 +40,14 @@ publication stream emitted by go.d.
   Function, and therefore may not emit a matching withdrawal for that Function.
 - Function withdrawal is emitted through `FUNCTION_DEL GLOBAL`. Parents that do
   not advertise `STREAM_CAP_FUNCTION_DEL` can retain stale streamed Function
-  entries even after the child unregisters them locally.
+  entries even after the child unregisters shared or instance Functions locally.
 - Shared single-instance Functions still use `SharedFunctions`.
   `InstancePolicySingle` removes the public `__job` selector but does not make
   the Function true-agent; publication still depends on the canonical singleton
   job being running and available.
-- funcctl MAY recheck shared Function availability while jobs are running. jobmgr
-  currently performs this recheck from the running-job tick loop and on job
-  stop; agent/process-backed Function availability may still be checked at job
-  start.
+- funcctl MAY recheck job-backed Function availability while jobs are running.
+  jobmgr currently requests this recheck from the running-job tick loop and
+  immediately after job stop.
 - `AgentFunctions` are true-agent declarations and are not processed by shared
   job availability reconciliation.
 - Rechecks MUST reuse the normal funcctl publication path so public names,
@@ -57,11 +57,12 @@ publication stream emitted by go.d.
 ## Job-Backed Function Availability Contract
 
 - Collectors MAY implement `collectorapi.FunctionAvailability` when a
-  running job can serve only some shared Functions, or when a shared Function
-  should appear only after collector-owned runtime state is ready.
+  running job can serve only some shared or instance Functions, or when a
+  job-backed Function should appear only after collector-owned runtime state is
+  ready.
 - `FunctionAvailable(functionID)` MUST be cheap and non-blocking.
 - If a collector does not implement `FunctionAvailability`, every running job is
-  available for every shared Function declared by the module.
+  available for every shared or instance Function declared by the module.
 - Availability is pull-based. Collectors update their own state from normal
   runtime paths; funcctl reads that state during reconciliation.
 - Availability changes are reflected after the next reconcile pass. Rapidly
@@ -80,12 +81,28 @@ publication stream emitted by go.d.
 - `Available` SHOULD match the Function's user-visible not-ready boundary for
   true-agent Functions.
 
-## Job Methods
+## Instance Functions
 
-- Per-job methods remain tied to job lifecycle.
-- `collectorapi.Creator.JobMethods` methods are registered for a job on job
-  start and unregistered on job stop.
-- This spec does not add late-publication or monotonic behavior to job methods.
+- Instance Functions are job-owned declarations returned by
+  `collectorapi.Creator.InstanceFunctions(job)`.
+- Instance Functions are declared once for one runtime job on job start and
+  unregistered on job stop.
+- `InstanceFunctions(job)` MUST NOT be called from reconcile/tick paths.
+- Instance Functions are published under the existing function name construction
+  for their returned Function IDs.
+- Instance Function publication uses the same job-backed
+  `collectorapi.FunctionAvailability` hook as Shared Functions:
+  - if the owning collector implements `FunctionAvailability`, publish only
+    currently available stored declarations;
+  - withdraw a concrete instance Function when its owning job becomes
+    unavailable for that Function ID;
+  - republish the concrete instance Function when availability returns;
+  - if the owning collector does not implement `FunctionAvailability`, every
+    stored instance Function is available while the job runs.
+- Instance Function withdrawal is asynchronous with job stop. After a job stops,
+  its concrete instance Function can remain briefly listed until the reconcile
+  worker processes the stop-triggered request, but dispatch MUST reject the
+  stopped job instead of serving stale collector state.
 
 ## Validation Guidance
 

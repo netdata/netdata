@@ -130,15 +130,15 @@ func TestHandleMethodFuncInfo_AgentScopeOmitsJobParam(t *testing.T) {
 	assert.Equal(t, "topology_view", req0["id"])
 }
 
-func TestHandleJobMethodFuncInfo_UsesResponseType(t *testing.T) {
+func TestHandleInstanceFunctionInfo_UsesResponseType(t *testing.T) {
 	controller, resp := newTestControllerWithCapture(t)
 
 	controller.registry.registerModule("netflow", collectorapi.Creator{})
-	controller.registry.registerJobMethods("netflow", "job1", []funcapi.FunctionConfig{
+	controller.registry.registerInstanceFunctions("netflow", "job1", []funcapi.FunctionConfig{
 		{ID: "flows:netflow", ResponseType: "flows"},
 	})
 
-	controller.handleJobMethodFuncInfo("netflow", "job1", "flows:netflow", functions.Function{})
+	controller.handleInstanceFunctionInfo("netflow", "job1", "flows:netflow", functions.Function{})
 
 	assert.Equal(t, "flows", (*resp)["type"])
 }

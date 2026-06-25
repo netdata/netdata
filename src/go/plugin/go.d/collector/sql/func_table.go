@@ -23,10 +23,10 @@ func newFuncTable(c *Collector) *funcTable {
 
 var _ funcapi.MethodHandler = (*funcTable)(nil)
 
-// sqlJobMethods returns method configs for a specific SQL job.
-// Each configured function becomes a separate method: "jobName:functionID"
-// This results in functions like "sql:postgres_test:active-queries"
-func sqlJobMethods(job collectorapi.RuntimeJob) []funcapi.FunctionConfig {
+// sqlInstanceFunctions returns Function configs for a specific SQL job.
+// Each configured query becomes "jobName:functionID", producing names like
+// "sql:postgres_test:active-queries" after framework publication.
+func sqlInstanceFunctions(job collectorapi.RuntimeJob) []funcapi.FunctionConfig {
 	c, ok := job.Collector().(*Collector)
 	if !ok || len(c.Config.Functions) == 0 {
 		return nil
