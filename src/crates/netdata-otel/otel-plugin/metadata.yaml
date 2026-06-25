@@ -244,8 +244,8 @@ modules:
           - name: 'Failed to write log entry: failed to create journal file'
             description: |
               When the plugin receives OTLP logs it stores them in journal files under the directory set by
-              `logs.journal_dir`. If that path is rejected, the Agent logs the following error for every
-              incoming log entry:
+              `logs.journal_dir`. If it cannot create a journal file there, the Agent logs the following error
+              for every incoming log entry:
 
               `Failed to write log entry: failed to create journal file: failed to create journal file in <journal_dir>/<machine_id>`
 
@@ -253,10 +253,12 @@ modules:
               with no hyphens (for example `0123456789abcdef0123456789abcdef`). The error repeats for each OTLP
               log entry, so no logs are stored until the cause is resolved.
 
-              This message is produced when the journal file path is **not absolute**. The journal registry
-              only accepts paths that begin with `/`, so a **relative** `logs.journal_dir` — for example
-              `otel/v1` instead of `/var/log/netdata/otel/v1` — is rejected. A missing or unwritable directory
-              typically surfaces at startup (see the next entry) rather than as this message.
+              This message means Netdata could not create the journal file it writes incoming logs to, at
+              `<journal_dir>/<machine_id>`. The usual cause is a `logs.journal_dir` that is relative rather
+              than an absolute path beginning with `/`, or a directory the `netdata` user cannot write to.
+              On current builds a relative `journal_dir` is caught at startup (see the next entry), so this
+              message most often appears on builds that do not perform that startup check; the diagnosis and
+              fix are the same.
 
               Set `logs.journal_dir` in `otel.yaml` to an absolute path, then make sure the directory exists
               and is owned by the `netdata` user:
@@ -276,6 +278,9 @@ modules:
 
               Common causes:
 
+              - `logs.journal_dir` is relative rather than an absolute path. The value must begin with `/`
+                (for example `/var/log/netdata/otel/v1`, not `otel/v1`); a relative value is rejected before
+                the plugin starts.
               - `logs.journal_dir` exists but is not a directory.
               - The `netdata` user cannot create or read the directory (permission denied).
               - The host machine ID cannot be read from `/etc/machine-id`.
