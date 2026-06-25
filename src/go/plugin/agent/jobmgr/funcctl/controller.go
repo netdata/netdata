@@ -85,7 +85,7 @@ func (c *Controller) RegisterModules(modules collectorapi.Registry) {
 	plannedPublicNames := make(map[string]string)
 	for _, name := range names {
 		creator := modules[name]
-		if creator.SharedFunctions == nil && creator.AgentFunctions == nil && creator.JobMethods == nil {
+		if creator.SharedFunctions == nil && creator.AgentFunctions == nil && creator.InstanceFunctions == nil {
 			continue
 		}
 		functions := moduleFunctionDeclarations(creator)
@@ -166,13 +166,13 @@ func (c *Controller) OnJobStart(job collectorapi.RuntimeJob) {
 	c.registerAvailableAgentFunctions(job.ModuleName(), c.registry.getMethods(job.ModuleName()))
 
 	creator, ok := c.registry.getCreator(job.ModuleName())
-	if !ok || creator.JobMethods == nil {
+	if !ok || creator.InstanceFunctions == nil {
 		return
 	}
 
-	methods := creator.JobMethods(job)
+	methods := creator.InstanceFunctions(job)
 	if len(methods) > 0 {
-		c.registerJobMethods(job, methods)
+		c.registerInstanceFunctions(job, methods)
 	}
 }
 
@@ -197,7 +197,7 @@ func (c *Controller) OnJobStop(job collectorapi.RuntimeJob) {
 		return
 	}
 
-	c.unregisterJobMethods(job)
+	c.unregisterInstanceFunctions(job)
 	c.registry.removeJob(job.ModuleName(), job.Name())
 	c.reconcileSharedModuleFunctions(job.ModuleName())
 }
@@ -446,36 +446,36 @@ func (c *Controller) registerFunction(name string, handler functions.Handler) {
 	})
 }
 
-func (c *Controller) registerJobMethods(job collectorapi.RuntimeJob, methods []funcapi.FunctionConfig) {
+func (c *Controller) registerInstanceFunctions(job collectorapi.RuntimeJob, methods []funcapi.FunctionConfig) {
 	planned := make(map[string]struct{}, len(methods))
 
 	for _, method := range methods {
 		if method.ID == "" {
-			c.Warningf("skipping job method registration for %s[%s]: empty method ID", job.ModuleName(), job.Name())
+			c.Warningf("skipping instance function registration for %s[%s]: empty method ID", job.ModuleName(), job.Name())
 			continue
 		}
 		if method.FunctionName != "" || len(method.Aliases) != 0 {
-			c.Errorf("job method registration aborted for %s[%s]: method '%s' uses public FunctionName or Aliases, which are supported only for module methods", job.ModuleName(), job.Name(), method.ID)
+			c.Errorf("instance function registration aborted for %s[%s]: method '%s' uses public FunctionName or Aliases, which are supported only for static Functions", job.ModuleName(), job.Name(), method.ID)
 			return
 		}
 
 		funcName := fmt.Sprintf("%s:%s", job.ModuleName(), method.ID)
 		if _, exists := planned[method.ID]; exists {
-			c.Errorf("job method registration aborted for %s[%s]: duplicate method ID in batch ('%s')", job.ModuleName(), job.Name(), funcName)
+			c.Errorf("instance function registration aborted for %s[%s]: duplicate method ID in batch ('%s')", job.ModuleName(), job.Name(), funcName)
 			return
 		}
 		planned[method.ID] = struct{}{}
 
 		if collision, exists := c.registry.findMethodCollision(job.ModuleName(), job.Name(), method.ID); exists {
-			c.Errorf("job method registration aborted for %s[%s]: collision on '%s' (%s)", job.ModuleName(), job.Name(), funcName, collision)
+			c.Errorf("instance function registration aborted for %s[%s]: collision on '%s' (%s)", job.ModuleName(), job.Name(), funcName, collision)
 			return
 		}
 	}
 
 	// Record methods before publishing handlers so startup-time calls do not race a false 404.
-	c.registry.registerJobMethods(job.ModuleName(), job.Name(), methods)
+	c.registry.registerInstanceFunctions(job.ModuleName(), job.Name(), methods)
 
-	publishes := c.collectJobMethodPublishes(job, methods)
+	publishes := c.collectInstanceFunctionPublishes(job, methods)
 
 	for _, publish := range publishes {
 		c.registerFunction(publish.name, publish.handler)
@@ -483,11 +483,11 @@ func (c *Controller) registerJobMethods(job collectorapi.RuntimeJob, methods []f
 			c.api.FunctionGlobal(publish.opts)
 		}
 
-		c.Debugf("registered job method: %s for job %s[%s]", publish.name, job.ModuleName(), job.Name())
+		c.Debugf("registered instance function: %s for job %s[%s]", publish.name, job.ModuleName(), job.Name())
 	}
 }
 
-func (c *Controller) collectJobMethodPublishes(job collectorapi.RuntimeJob, methods []funcapi.FunctionConfig) []functionPublish {
+func (c *Controller) collectInstanceFunctionPublishes(job collectorapi.RuntimeJob, methods []funcapi.FunctionConfig) []functionPublish {
 	c.publishedMu.Lock()
 	defer c.publishedMu.Unlock()
 
@@ -502,7 +502,7 @@ func (c *Controller) collectJobMethodPublishes(job collectorapi.RuntimeJob, meth
 			continue
 		}
 
-		record, _ := c.publishedFns.add(funcName, jobMethodOwner(job.ModuleName(), job.Name(), method.ID))
+		record, _ := c.publishedFns.add(funcName, instanceFunctionOwner(job.ModuleName(), job.Name(), method.ID))
 
 		help := method.Help
 		if help == "" {
@@ -517,7 +517,7 @@ func (c *Controller) collectJobMethodPublishes(job collectorapi.RuntimeJob, meth
 
 		publishes = append(publishes, functionPublish{
 			name:    funcName,
-			handler: c.makePublishedJobMethodFuncHandler(funcName, record.generation, job.ModuleName(), job.Name(), method.ID),
+			handler: c.makePublishedInstanceFunctionHandler(funcName, record.generation, job.ModuleName(), job.Name(), method.ID),
 			opts: netdataapi.FunctionGlobalOpts{
 				Name:     funcName,
 				Timeout:  60,
@@ -532,8 +532,8 @@ func (c *Controller) collectJobMethodPublishes(job collectorapi.RuntimeJob, meth
 	return publishes
 }
 
-func (c *Controller) unregisterJobMethods(job collectorapi.RuntimeJob) {
-	methods := c.registry.getJobMethods(job.ModuleName(), job.Name())
+func (c *Controller) unregisterInstanceFunctions(job collectorapi.RuntimeJob) {
+	methods := c.registry.getInstanceFunctions(job.ModuleName(), job.Name())
 	if len(methods) == 0 {
 		return
 	}
@@ -544,7 +544,7 @@ func (c *Controller) unregisterJobMethods(job collectorapi.RuntimeJob) {
 		if method.ID == "" {
 			continue
 		}
-		names = append(names, c.publishedFns.removeOwner(jobMethodOwner(job.ModuleName(), job.Name(), method.ID))...)
+		names = append(names, c.publishedFns.removeOwner(instanceFunctionOwner(job.ModuleName(), job.Name(), method.ID))...)
 	}
 	c.publishedMu.Unlock()
 
@@ -554,10 +554,10 @@ func (c *Controller) unregisterJobMethods(job collectorapi.RuntimeJob) {
 		if c.api != nil {
 			c.api.FunctionRemove(funcName)
 		}
-		c.Debugf("unregistered job method: %s for job %s[%s]", funcName, job.ModuleName(), job.Name())
+		c.Debugf("unregistered instance function: %s for job %s[%s]", funcName, job.ModuleName(), job.Name())
 	}
 
-	c.registry.unregisterJobMethods(job.ModuleName(), job.Name())
+	c.registry.unregisterInstanceFunctions(job.ModuleName(), job.Name())
 }
 
 func (c *Controller) baseContext() context.Context {

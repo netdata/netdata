@@ -29,13 +29,13 @@ type methodRoute struct {
 }
 
 type moduleFunc struct {
-	creator        collectorapi.Creator
-	methods        []funcapi.FunctionConfig
-	methodsByID    map[string]funcapi.FunctionConfig
-	methodKinds    map[string]moduleFunctionKind
-	jobs           map[string]*jobEntry
-	nextGeneration uint64
-	jobMethods     map[string][]funcapi.FunctionConfig
+	creator           collectorapi.Creator
+	methods           []funcapi.FunctionConfig
+	methodsByID       map[string]funcapi.FunctionConfig
+	methodKinds       map[string]moduleFunctionKind
+	jobs              map[string]*jobEntry
+	nextGeneration    uint64
+	instanceFunctions map[string][]funcapi.FunctionConfig
 }
 
 type jobEntry struct {
@@ -77,12 +77,12 @@ func (r *moduleFuncRegistry) registerModuleWithDeclarations(name string, creator
 	collectModuleFunctionNames(name, functions.configs, affectedRoutes)
 
 	r.modules[name] = &moduleFunc{
-		creator:     creator,
-		methods:     functions.configs,
-		methodsByID: indexMethods(functions.configs),
-		methodKinds: functions.kinds,
-		jobs:        make(map[string]*jobEntry),
-		jobMethods:  make(map[string][]funcapi.FunctionConfig),
+		creator:           creator,
+		methods:           functions.configs,
+		methodsByID:       indexMethods(functions.configs),
+		methodKinds:       functions.kinds,
+		jobs:              make(map[string]*jobEntry),
+		instanceFunctions: make(map[string][]funcapi.FunctionConfig),
 	}
 	r.refreshModuleMethodRoutesLocked(affectedRoutes)
 }
@@ -323,7 +323,7 @@ func (r *moduleFuncRegistry) isModuleRegistered(moduleName string) bool {
 	return ok
 }
 
-func (r *moduleFuncRegistry) registerJobMethods(moduleName, jobName string, methods []funcapi.FunctionConfig) {
+func (r *moduleFuncRegistry) registerInstanceFunctions(moduleName, jobName string, methods []funcapi.FunctionConfig) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -331,10 +331,10 @@ func (r *moduleFuncRegistry) registerJobMethods(moduleName, jobName string, meth
 	if !ok {
 		return
 	}
-	module.jobMethods[jobName] = methods
+	module.instanceFunctions[jobName] = methods
 }
 
-func (r *moduleFuncRegistry) unregisterJobMethods(moduleName, jobName string) {
+func (r *moduleFuncRegistry) unregisterInstanceFunctions(moduleName, jobName string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -342,10 +342,10 @@ func (r *moduleFuncRegistry) unregisterJobMethods(moduleName, jobName string) {
 	if !ok {
 		return
 	}
-	delete(module.jobMethods, jobName)
+	delete(module.instanceFunctions, jobName)
 }
 
-func (r *moduleFuncRegistry) getJobMethods(moduleName, jobName string) []funcapi.FunctionConfig {
+func (r *moduleFuncRegistry) getInstanceFunctions(moduleName, jobName string) []funcapi.FunctionConfig {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -353,10 +353,10 @@ func (r *moduleFuncRegistry) getJobMethods(moduleName, jobName string) []funcapi
 	if !ok {
 		return nil
 	}
-	return module.jobMethods[jobName]
+	return module.instanceFunctions[jobName]
 }
 
-func (r *moduleFuncRegistry) getJobMethod(moduleName, jobName, methodID string) (*funcapi.FunctionConfig, bool) {
+func (r *moduleFuncRegistry) getInstanceFunction(moduleName, jobName, methodID string) (*funcapi.FunctionConfig, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -364,7 +364,7 @@ func (r *moduleFuncRegistry) getJobMethod(moduleName, jobName, methodID string) 
 	if !ok {
 		return nil, false
 	}
-	methods, ok := module.jobMethods[jobName]
+	methods, ok := module.instanceFunctions[jobName]
 	if !ok {
 		return nil, false
 	}
@@ -391,13 +391,13 @@ func (r *moduleFuncRegistry) findMethodCollision(moduleName, jobName, methodID s
 		}
 	}
 
-	for ownerJob, methods := range module.jobMethods {
+	for ownerJob, methods := range module.instanceFunctions {
 		if ownerJob == jobName {
 			continue
 		}
 		for _, method := range methods {
 			if method.ID == methodID {
-				return "job method on " + ownerJob, true
+				return "instance function on " + ownerJob, true
 			}
 		}
 	}

@@ -7,7 +7,8 @@ This spec applies to go.d Functions registered through:
 - `collectorapi.Creator.SharedFunctions` for static shared job-backed
   Functions.
 - `collectorapi.Creator.AgentFunctions` for static true-agent Functions.
-- `collectorapi.Creator.JobMethods` for per-job methods.
+- `collectorapi.Creator.InstanceFunctions` for instance Functions owned by
+  one runtime job.
 - `funcapi.FunctionConfig.Available` for true-agent Function publication
   gating.
 - `collectorapi.FunctionAvailability` for running-job availability of
@@ -80,12 +81,16 @@ publication stream emitted by go.d.
 - `Available` SHOULD match the Function's user-visible not-ready boundary for
   true-agent Functions.
 
-## Job Methods
+## Instance Functions
 
-- Per-job methods remain tied to job lifecycle.
-- `collectorapi.Creator.JobMethods` methods are registered for a job on job
-  start and unregistered on job stop.
-- This spec does not add late-publication or monotonic behavior to job methods.
+- Instance Functions are job-owned declarations returned by
+  `collectorapi.Creator.InstanceFunctions(job)`.
+- Instance Functions are registered for one runtime job on job start and
+  unregistered on job stop.
+- Instance Functions are published under the existing function name construction
+  for their returned Function IDs.
+- This spec does not add late-publication or availability-driven withdrawal to
+  instance Functions.
 
 ## Validation Guidance
 

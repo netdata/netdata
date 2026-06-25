@@ -29,15 +29,15 @@ func (c *Controller) respondWithParams(fn functions.Function, moduleName, method
 	)
 }
 
-func (c *Controller) respondJobMethodWithParams(fn functions.Function, dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int, methodType string) {
+func (c *Controller) respondInstanceFunctionWithParams(fn functions.Function, dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int, methodType string) {
 	c.respondMethodDataWithParams(
 		fn,
 		dataResp,
 		methodParams,
 		updateEvery,
 		methodType,
-		buildJobMethodAcceptedParams,
-		buildJobMethodRequiredParams,
+		buildInstanceFunctionAcceptedParams,
+		buildInstanceFunctionRequiredParams,
 	)
 }
 

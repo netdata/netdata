@@ -362,7 +362,7 @@ func TestExecuteFunction_ContextBehavior(t *testing.T) {
 	}
 }
 
-func TestJobMethodRegisteredHandlerPaths(t *testing.T) {
+func TestInstanceFunctionRegisteredHandlerPaths(t *testing.T) {
 	tests := map[string]struct {
 		fnArgs          []string
 		wantRequiredLen int
@@ -382,7 +382,7 @@ func TestJobMethodRegisteredHandlerPaths(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			writer := &jsonWriteCapture{}
 			fnReg := newCapturingFunctionRegistry()
-			mgr := newJobMethodDispatchTestManager(t, fnReg, writer.write, &mockMethodHandler{
+			mgr := newInstanceFunctionDispatchTestManager(t, fnReg, writer.write, &mockMethodHandler{
 				handleFunc: func(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
 					return &funcapi.FunctionResponse{
 						Status: 200,
@@ -565,7 +565,7 @@ func TestCleanup_UnregistersStaticFunctionsBeforeStoppingJobs(t *testing.T) {
 		},
 	}
 	jobCreator := collectorapi.Creator{
-		JobMethods: func(_ collectorapi.RuntimeJob) []funcapi.FunctionConfig {
+		InstanceFunctions: func(_ collectorapi.RuntimeJob) []funcapi.FunctionConfig {
 			return []funcapi.FunctionConfig{{ID: "job-method"}}
 		},
 	}
@@ -706,7 +706,7 @@ func newModuleDispatchTestManager(
 	return mgr
 }
 
-func newJobMethodDispatchTestManager(
+func newInstanceFunctionDispatchTestManager(
 	t *testing.T,
 	fnReg FunctionRegistry,
 	jsonWriter func([]byte, int),
@@ -722,7 +722,7 @@ func newJobMethodDispatchTestManager(
 	})
 
 	creator := collectorapi.Creator{
-		JobMethods: func(_ collectorapi.RuntimeJob) []funcapi.FunctionConfig { return methods },
+		InstanceFunctions: func(_ collectorapi.RuntimeJob) []funcapi.FunctionConfig { return methods },
 		MethodHandler: func(job collectorapi.RuntimeJob) funcapi.MethodHandler {
 			return methodHandler
 		},

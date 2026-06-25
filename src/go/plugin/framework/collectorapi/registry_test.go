@@ -45,18 +45,18 @@ func TestRegister_FunctionOnlyWithoutFunctions(t *testing.T) {
 		})
 }
 
-func TestRegisterPanicOnStaticFunctionsAndJobMethodsConflict(t *testing.T) {
+func TestRegisterPanicOnStaticFunctionsAndInstanceFunctionsConflict(t *testing.T) {
 	tests := map[string]struct {
 		name    string
 		creator Creator
 	}{
-		"panic when both static functions and job methods are set": {
+		"panic when both static functions and instance functions are set": {
 			name: "conflict",
 			creator: Creator{
 				SharedFunctions: func() []funcapi.FunctionConfig {
 					return nil
 				},
-				JobMethods: func(RuntimeJob) []funcapi.FunctionConfig {
+				InstanceFunctions: func(RuntimeJob) []funcapi.FunctionConfig {
 					return nil
 				},
 			},
@@ -69,7 +69,7 @@ func TestRegisterPanicOnStaticFunctionsAndJobMethodsConflict(t *testing.T) {
 
 			assert.PanicsWithValue(
 				t,
-				"conflict has both static Functions and JobMethods defined (mutually exclusive)",
+				"conflict has both static Functions and InstanceFunctions defined (mutually exclusive)",
 				func() { registry.Register(tc.name, tc.creator) },
 			)
 		})

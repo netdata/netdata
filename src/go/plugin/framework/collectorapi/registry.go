@@ -83,11 +83,12 @@ type (
 		// When nil, methods are disabled for this module.
 		MethodHandler func(job RuntimeJob) funcapi.MethodHandler
 
-		// Optional: JobMethods returns Function declarations to register when a job starts.
-		// Each Function is registered as "moduleName:methodID" and unregistered when the job stops.
-		// This enables per-job function registration instead of static module-level functions.
-		// If nil, no per-job methods are registered.
-		JobMethods func(job RuntimeJob) []funcapi.FunctionConfig
+		// Optional: InstanceFunctions returns Function declarations to register when a job starts.
+		// Each returned Function ID is published as "moduleName:functionID" and unregistered
+		// when the owning job stops.
+		// This enables instance Function registration instead of static module-level Functions.
+		// If nil, no instance Functions are registered.
+		InstanceFunctions func(job RuntimeJob) []funcapi.FunctionConfig
 
 		// FunctionOnly indicates this module provides only functions, no metrics.
 		// Jobs created from this module skip data collection and chart creation.
@@ -114,14 +115,14 @@ func (r Registry) Register(name string, creator Creator) {
 	if !creator.InstancePolicy.valid() {
 		panic(fmt.Sprintf("%s has invalid InstancePolicy %d", name, creator.InstancePolicy))
 	}
-	if (creator.SharedFunctions != nil || creator.AgentFunctions != nil) && creator.JobMethods != nil {
-		panic(fmt.Sprintf("%s has both static Functions and JobMethods defined (mutually exclusive)", name))
+	if (creator.SharedFunctions != nil || creator.AgentFunctions != nil) && creator.InstanceFunctions != nil {
+		panic(fmt.Sprintf("%s has both static Functions and InstanceFunctions defined (mutually exclusive)", name))
 	}
 	if id, ok := duplicateStaticFunctionID(creator); ok {
 		panic(fmt.Sprintf("%s has duplicate static Function ID %q", name, id))
 	}
-	if creator.FunctionOnly && creator.SharedFunctions == nil && creator.AgentFunctions == nil && creator.JobMethods == nil {
-		panic(fmt.Sprintf("%s is FunctionOnly but has no Functions or JobMethods defined", name))
+	if creator.FunctionOnly && creator.SharedFunctions == nil && creator.AgentFunctions == nil && creator.InstanceFunctions == nil {
+		panic(fmt.Sprintf("%s is FunctionOnly but has no Functions or InstanceFunctions defined", name))
 	}
 	r[name] = creator
 }

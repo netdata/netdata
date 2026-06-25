@@ -6,7 +6,7 @@ type publishedFunctionKind uint8
 
 const (
 	publishedFunctionModuleMethod publishedFunctionKind = iota + 1
-	publishedFunctionJobMethod
+	publishedFunctionInstance
 )
 
 type publishedFunctionOwner struct {
@@ -24,9 +24,9 @@ func moduleMethodOwner(moduleName, methodID string) publishedFunctionOwner {
 	}
 }
 
-func jobMethodOwner(moduleName, jobName, methodID string) publishedFunctionOwner {
+func instanceFunctionOwner(moduleName, jobName, methodID string) publishedFunctionOwner {
 	return publishedFunctionOwner{
-		kind:       publishedFunctionJobMethod,
+		kind:       publishedFunctionInstance,
 		moduleName: moduleName,
 		jobName:    jobName,
 		methodID:   methodID,
