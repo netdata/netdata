@@ -53,8 +53,8 @@ pub struct Args {
     #[arg(long, value_name = "DIR")]
     wal_dir: Option<PathBuf>,
 
-    /// Explicit SFST directory; maps to otel.yaml `logs.index.dir`
-    /// (overrides config for the SFST dir only).
+    /// Explicit SFST directory; otherwise derived from otel.yaml `base_dir` as
+    /// `{base_dir}/logs/index` (overrides config for the SFST dir only).
     #[arg(long, value_name = "DIR")]
     sfst_dir: Option<PathBuf>,
 

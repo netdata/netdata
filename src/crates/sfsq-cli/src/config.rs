@@ -5,41 +5,36 @@
 //! config (mirroring the agent's own stock→user override order). An
 //! unresolved dir is a hard error.
 //!
-//! The agent's `otel.yaml` is typically partial ("Only include the fields you
-//! want to change"), so we parse with a minimal struct that extracts only the
-//! two dirs and ignores every other field — reusing the full plugin config
-//! type would fail on unrelated missing mandatory fields.
+//! The agent's `otel.yaml` no longer configures per-signal dirs: it sets one
+//! `base_dir` and the plugin derives `{base_dir}/{signal}/{wal,index,catalog}`
+//! (see `PluginConfig::lifecycle_for`). This is a logs query tool, so we derive
+//! the logs dirs `{base_dir}/logs/wal` and `{base_dir}/logs/index`. We parse with
+//! a minimal struct that extracts only `base_dir` and ignores every other field —
+//! reusing the full plugin config type would fail on unrelated missing mandatory
+//! fields. Per-dir overrides are still available via the `--wal-dir`/`--sfst-dir`
+//! flags.
 
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use serde::Deserialize;
 
-/// Minimal view of `otel.yaml`: only the dirs we need. Unknown fields are
-/// ignored; missing sections deserialize to `None` (serde treats `Option`
+/// Minimal view of `otel.yaml`: only the base dir we need. Unknown fields are
+/// ignored; a missing `base_dir` deserializes to `None` (serde treats `Option`
 /// fields as optional).
 #[derive(Debug, Default, Deserialize)]
 struct OtelYaml {
-    logs: Option<LogsSection>,
-}
-
-#[derive(Debug, Default, Deserialize)]
-struct LogsSection {
-    wal: Option<DirOnly>,
-    index: Option<DirOnly>,
-}
-
-#[derive(Debug, Default, Deserialize)]
-struct DirOnly {
-    dir: Option<PathBuf>,
+    base_dir: Option<PathBuf>,
 }
 
 impl OtelYaml {
+    /// Logs WAL dir derived from `base_dir`, matching `lifecycle_for("logs")`.
     fn wal_dir(&self) -> Option<PathBuf> {
-        self.logs.as_ref()?.wal.as_ref()?.dir.clone()
+        self.base_dir.as_ref().map(|b| b.join("logs").join("wal"))
     }
+    /// Logs SFST/index dir derived from `base_dir`.
     fn sfst_dir(&self) -> Option<PathBuf> {
-        self.logs.as_ref()?.index.as_ref()?.dir.clone()
+        self.base_dir.as_ref().map(|b| b.join("logs").join("index"))
     }
 }
 
@@ -78,7 +73,7 @@ pub fn resolve_dirs(inputs: &DirInputs) -> Result<Dirs> {
         stock.as_ref().and_then(OtelYaml::wal_dir),
     )
     .context(
-        "WAL dir unresolved: pass --wal-dir, or a --config/--stock-config that sets logs.wal.dir",
+        "WAL dir unresolved: pass --wal-dir, or a --config/--stock-config that sets base_dir",
     )?;
 
     let sfst = pick(
@@ -87,7 +82,7 @@ pub fn resolve_dirs(inputs: &DirInputs) -> Result<Dirs> {
         stock.as_ref().and_then(OtelYaml::sfst_dir),
     )
     .context(
-        "SFST dir unresolved: pass --sfst-dir, or a --config/--stock-config that sets logs.index.dir",
+        "SFST dir unresolved: pass --sfst-dir, or a --config/--stock-config that sets base_dir",
     )?;
 
     Ok(Dirs { wal, sfst })
@@ -111,20 +106,12 @@ mod tests {
     }
 
     #[test]
-    fn per_dir_precedence_flag_over_user_over_stock() {
+    fn dirs_derived_from_base_dir_flag_over_user_over_stock() {
         let tmp = tempfile::tempdir().unwrap();
-        let stock = write(
-            tmp.path(),
-            "stock.yaml",
-            "logs:\n  wal:\n    dir: /stock/wal\n  index:\n    dir: /stock/idx\n",
-        );
-        let user = write(
-            tmp.path(),
-            "user.yaml",
-            "logs:\n  wal:\n    dir: /user/wal\n",
-        );
+        let stock = write(tmp.path(), "stock.yaml", "base_dir: /stock/otel\n");
+        let user = write(tmp.path(), "user.yaml", "base_dir: /user/otel\n");
 
-        // wal: flag wins; sfst: user has none, falls to stock.
+        // wal: explicit flag wins; sfst: derived from the user base_dir.
         let dirs = resolve_dirs(&DirInputs {
             stock_config: Some(&stock),
             config: Some(&user),
@@ -133,9 +120,9 @@ mod tests {
         })
         .unwrap();
         assert_eq!(dirs.wal, PathBuf::from("/flag/wal"));
-        assert_eq!(dirs.sfst, PathBuf::from("/stock/idx"));
+        assert_eq!(dirs.sfst, PathBuf::from("/user/otel/logs/index"));
 
-        // No flag: user wal wins over stock; sfst still from stock.
+        // No flags: both dirs derive from the user base_dir (wins over stock).
         let dirs = resolve_dirs(&DirInputs {
             stock_config: Some(&stock),
             config: Some(&user),
@@ -143,14 +130,31 @@ mod tests {
             sfst_dir: None,
         })
         .unwrap();
-        assert_eq!(dirs.wal, PathBuf::from("/user/wal"));
-        assert_eq!(dirs.sfst, PathBuf::from("/stock/idx"));
+        assert_eq!(dirs.wal, PathBuf::from("/user/otel/logs/wal"));
+        assert_eq!(dirs.sfst, PathBuf::from("/user/otel/logs/index"));
+    }
+
+    #[test]
+    fn base_dir_falls_back_to_stock_when_user_omits_it() {
+        let tmp = tempfile::tempdir().unwrap();
+        let stock = write(tmp.path(), "stock.yaml", "base_dir: /stock/otel\n");
+        // A partial user config without base_dir → derive from stock.
+        let user = write(tmp.path(), "user.yaml", "endpoint:\n  path: '127.0.0.1:4317'\n");
+        let dirs = resolve_dirs(&DirInputs {
+            stock_config: Some(&stock),
+            config: Some(&user),
+            wal_dir: None,
+            sfst_dir: None,
+        })
+        .unwrap();
+        assert_eq!(dirs.wal, PathBuf::from("/stock/otel/logs/wal"));
+        assert_eq!(dirs.sfst, PathBuf::from("/stock/otel/logs/index"));
     }
 
     #[test]
     fn unresolved_dir_is_an_error() {
         let tmp = tempfile::tempdir().unwrap();
-        // A partial user config with no dirs and no stock/flags → error.
+        // A partial user config with no base_dir and no stock/flags → error.
         let user = write(
             tmp.path(),
             "user.yaml",

@@ -108,6 +108,31 @@ args→payload `arg_shim`.
   substrate) is deferred to when a second signal (traces) provides the real
   second consumer to design the seam against.
 
+## Operator config & derived on-disk layout
+
+The operator-facing config model (in `netdata-plugin/bridge` `PluginConfig`,
+resolved by `otel-plugin` `config/{mod,signal,env}.rs`, consumed by both workers):
+
+- **One mandatory `base_dir`.** The plugin derives every per-signal directory
+  from it — there is no per-signal dir config. `PluginConfig::lifecycle_for(signal)`
+  is the single derivation point, producing the runtime `LifecycleConfig`:
+  - `{base_dir}/{signal}/wal`, `{base_dir}/{signal}/index`,
+    `{base_dir}/{signal}/catalog` — the signal's WAL / SFST / catalog dirs;
+  - `{base_dir}/{signal}/remote-read` — the signal's remote-read cache
+    (`LifecycleConfig::read_cache_dir`);
+  - `{base_dir}/shared/seq_highwater` — the **signal-neutral** seq high-water
+    file (`PluginConfig::seq_highwater_path`). Global seq durability does not
+    depend on any one signal's directory; the ingestor seeds the shared
+    `SeqAllocator` from `max(per-signal dir scans, this file)`.
+- **Global storage and auth** (one `storage` + one `auth` section for the whole
+  plugin), combined into each signal's `LifecycleConfig` by `lifecycle_for`. See
+  [otel-remote-storage-config.md](otel-remote-storage-config.md).
+- **Per-signal tuning only** (`SignalConfig`: wal crc/compression/rotation, index
+  retention, catalog rotation_count) — no dirs, no storage. The schema mirrors a
+  `logs:` and a `traces:` section (both mandatory; the traces pipeline is always
+  built). Each signal's tuning is independent (e.g. a small logs WAL rotation
+  threshold does not affect traces, which keeps its own).
+
 ## Invariants
 
 - No on-disk format is owned here that the substrate decodes by content: WAL

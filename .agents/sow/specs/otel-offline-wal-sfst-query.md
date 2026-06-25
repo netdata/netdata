@@ -37,13 +37,16 @@ has two front doors over one shared code path (see below).
 
 ## Directory resolution
 
-- Two directories are needed: the WAL dir (`logs.wal.dir`) and the SFST/index dir
-  (`logs.index.dir`).
+- Two directories are needed: the WAL dir and the SFST/index dir. `otel.yaml` no
+  longer configures per-signal dirs — it sets one `base_dir`, and this logs query
+  tool derives `{base_dir}/logs/wal` and `{base_dir}/logs/index` (matching
+  `PluginConfig::lifecycle_for("logs")`).
 - Per-dir precedence, resolved independently for each: an explicit
-  `--wal-dir`/`--sfst-dir` flag wins, else `--config` (user `otel.yaml`), else
-  `--stock-config` (stock `otel.yaml`) — mirroring the agent's stock→user order.
-- `otel.yaml` is parsed with a minimal struct that extracts only those two dirs
-  and ignores all other fields (the agent's config is typically partial).
+  `--wal-dir`/`--sfst-dir` flag wins, else the dir derived from `--config` (user
+  `otel.yaml`) `base_dir`, else from `--stock-config` (stock `otel.yaml`)
+  `base_dir` — mirroring the agent's stock→user order.
+- `otel.yaml` is parsed with a minimal struct that extracts only `base_dir` and
+  ignores all other fields (the agent's config is typically partial).
 - Files are read from `{dir}/{tenant}`; tenant defaults to `default`. The tenant
   must be a single benign path segment (not empty, `.`, `..`, or containing
   `/`, `\`, NUL) so a typo cannot point at a sibling directory.

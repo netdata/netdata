@@ -3,18 +3,26 @@
 Scope: how the OTel plugin configures a remote object-storage backend for SFST +
 catalog upload, how credentials are supplied, and the startup reachability probe.
 Owner surfaces: `otel-ledger` (`storage.rs`, `ledger/mod.rs`), `otel-plugin`
-config (`config/logs.rs`, `config/env.rs`), `netdata-plugin/bridge` config
-(`StorageConfig`), and `otel.yaml`.
+config (`config/signal.rs`, `config/env.rs`), `netdata-plugin/bridge` config
+(`StorageConfig`, `PluginConfig::lifecycle_for`), and `otel.yaml`.
 
 ## Configuration contract
 
-- `StorageConfig` (`netdata-plugin/bridge/src/config.rs`) has four fields:
-  `enabled: bool`, `uri: String`, and the read-cache pair `read_cache_dir:
-  Option<PathBuf>` + `read_cache_max_size: ByteSize` (default `4 GiB`). All four are
-  env-overridable: `NETDATA_OTEL_LOGS_STORAGE_ENABLED`, `_URI`,
-  `_READ_CACHE_DIR`, and `_READ_CACHE_MAX_SIZE` (parsed as `ByteSize`). Env
-  overrides apply on top of `otel.yaml` (env wins), via the shared
-  `StorageOverride` path in `config/{logs,env}.rs`.
+- Remote storage is **global** (one switch + one backend for the whole plugin),
+  not per signal. `StorageConfig` (`netdata-plugin/bridge/src/config.rs`) is a
+  top-level `otel.yaml` section with three fields: `enabled: bool`, `uri: String`,
+  and `read_cache_max_size: ByteSize` (default `4 GiB`). All three are
+  env-overridable: `NETDATA_OTEL_STORAGE_ENABLED`, `_URI`, and
+  `_READ_CACHE_MAX_SIZE` (parsed as `ByteSize`). Env overrides apply on top of
+  `otel.yaml` (env wins), via the shared `StorageOverride` path in
+  `config/{signal,env}.rs`.
+- There is **no** `read_cache_dir` config knob. The read-cache directory is
+  **derived per signal** as `{base_dir}/{signal}/remote-read` and surfaced on the
+  runtime `LifecycleConfig::read_cache_dir` by `PluginConfig::lifecycle_for`. See
+  [otel-storage-substrate.md](otel-storage-substrate.md) for the base-dir /
+  derived-layout contract.
+- Each signal uploads under its own remote-key segment `v1/{signal}/...` (e.g.
+  `v1/logs/...`, `v1/traces/...`), so one backend cleanly holds every signal.
 - `uri` is a single **OpenDAL URI**. The scheme selects the backend
   (`fs://`, `s3://`, …); all **non-secret** backend options are URI query params
   (`s3://bucket/prefix?region=…&endpoint=…`). OpenDAL owns the per-backend option
@@ -73,9 +81,10 @@ config (`config/logs.rs`, `config/env.rs`), `netdata-plugin/bridge` config
 ## Read-through cache (query path)
 
 - When `storage.enabled`, `Ledger::new` opens a bounded local read-through cache
-  (the `file-cache` crate) at `read_cache_dir` (default: a `remote-read` directory
-  beside the index dir), capped at `read_cache_max_size`. The directory MUST be
-  local, owner-private storage; it is created `0700` and recovered on open.
+  (the `file-cache` crate) at the per-signal derived `read_cache_dir`
+  (`{base_dir}/{signal}/remote-read`), capped at `read_cache_max_size`. The
+  directory MUST be local, owner-private storage; it is created `0700` and
+  recovered on open.
 - A log query answers over SFSTs that local retention evicted but that a catalog
   records on remote. `Registry::remote_candidates(q)` returns the catalog entries
   whose seq is absent locally (no local SFST and no durable-prefix WAL), deduped by
