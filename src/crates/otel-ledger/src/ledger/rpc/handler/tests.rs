@@ -1097,7 +1097,7 @@ async fn remote_only_sfst_is_fetched_and_served() {
 
     // Place the object in an fs:// remote backend at its catalog remote_key.
     let remote_dir = tempfile::tempdir().unwrap().keep();
-    let remote_key = "v1/tenants/default/sfst/seq1.sfst";
+    let remote_key = "v1/logs/tenants/default/sfst/seq1.sfst";
     let obj_path = remote_dir.join(remote_key);
     std::fs::create_dir_all(obj_path.parent().unwrap()).unwrap();
     std::fs::write(&obj_path, &sfst_bytes).unwrap();

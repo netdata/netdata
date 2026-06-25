@@ -343,6 +343,11 @@ fn stream_required_params_builds_all_default_selected_selector() {
             assert_eq!(ms.id, "__streams");
             assert_eq!(ms.type_, "multiselect");
             assert_eq!(ms.options.len(), 2);
+            // Options are sorted by (namespace, name): the absent-namespace
+            // ("","") stream sorts before ("prod","api"). This guards the decode
+            // + sort the adapter performs over the substrate's part_key-ordered fold.
+            assert_eq!(ms.options[0].name, "(unattributed)");
+            assert_eq!(ms.options[1].name, "prod/api");
             // Every option pre-selected so the default view spans all streams.
             assert!(ms.options.iter().all(|o| o.default_selected));
             // Option id is the ns_hash as 16-digit lowercase hex.

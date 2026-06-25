@@ -100,6 +100,13 @@ pub fn catalog(
 /// Returns `None` if the key doesn't match this shape. The `{signal}`
 /// segment is skipped — callers already know the signal from the LIST
 /// prefix they issued.
+///
+/// This is the tested inverse of [`sfst`], kept in sync with it per this
+/// module's contract. The live recovery LIST path extracts the date via
+/// `FileId::parse` on the trailing filename instead, so this helper currently
+/// has no production caller; it remains the canonical, format-pinned inverse
+/// (and its tests pin the layout, including rejection of the old segment-less
+/// shape).
 pub fn parse_sfst_date(key: &str) -> Option<NaiveDate> {
     let mut parts = key.split('/');
     if parts.next()? != SCHEMA_VERSION {

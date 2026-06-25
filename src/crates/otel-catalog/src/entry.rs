@@ -21,9 +21,11 @@ pub struct CatalogEntry {
     pub uploaded_at_ns: TimestampNs,
     /// Remote object validator (the S3 ETag, when the backend returns one)
     /// captured at upload time. An opaque token for later integrity/scrub
-    /// checks; `None` for entries reconstructed from a remote LIST or read from
-    /// pre-existing catalogs. `#[serde(default)]` keeps older catalog files —
-    /// written before this field existed — readable.
+    /// checks; `None` for entries reconstructed from a remote LIST. `#[serde(default)]`
+    /// defaults the field to `None` when a same-version catalog omits it (e.g. an
+    /// entry rebuilt from a LIST). It is NOT a cross-version compat mechanism —
+    /// older-version catalogs are hard-rejected by the `FORMAT_VERSION` check
+    /// before any field is deserialized.
     #[serde(default)]
     pub remote_etag: Option<String>,
 }
