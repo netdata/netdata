@@ -221,6 +221,7 @@ otel-normalize = { path = "otel-normalize" }
 
 # Ledger
 otel-ledger = { path = "otel-ledger" }
+file-lifecycle = { path = "file-lifecycle" }
 otel-ingestor = { path = "otel-ingestor" }
 otel-catalog = { path = "otel-catalog" }
 file-cache = { path = "file-cache" }

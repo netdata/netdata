@@ -19,7 +19,7 @@ bridge = { path = "../netdata-plugin/bridge" }
 chrono = { workspace = true }
 ferryboat = { workspace = true }
 file-cache = { workspace = true }
-file-lifecycle = { path = "../file-lifecycle" }
+file-lifecycle = { workspace = true }
 file-registry = { workspace = true }
 netdata-plugin-error = { path = "../netdata-plugin/error" }
 netdata-plugin-protocol = { path = "../netdata-plugin/protocol" }

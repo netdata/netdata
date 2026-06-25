@@ -12,8 +12,11 @@ name = "file_lifecycle"
 path = "src/lib.rs"
 
 # Content-agnostic file-lifecycle substrate (registry, rotation/retention,
-# catalog manifest, remote upload/download, local read-through cache, recovery,
-# the per-signal `Pipeline` shell). It MUST NOT depend on the three log-content
+# catalog manifest, remote upload/download, query-time chunk cache, recovery,
+# the per-signal `Pipeline` shell). The remote read-through cache (`RemoteRead` +
+# `file-cache`) is part of the per-signal query path and stays in the content
+# binding (`otel-ledger`) for now; it moves here with the traces work. The crate
+# MUST NOT depend on the three log-content
 # crates — `sfsq`, `sfst-indexer`, `otel-logs-identity` — so a second signal
 # (traces) can reuse it. The omission below is the hard dependency guard
 # (cargo makes importing an undeclared crate impossible); a manifest assertion

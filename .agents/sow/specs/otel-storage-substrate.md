@@ -94,8 +94,10 @@ args→payload `arg_shim`.
 - Fields are **private**; consumers read them only through accessors
   (`pipeline_id()`, `signal()`, `config()`, `registries()`, `indexer_tx()`,
   `catalog_builder_tx()`, `handler()`, `declaration()`, `arg_shim()`,
-  `function_name()`, `storage_enabled()`), so per-signal state cannot be mutated
-  outside the substrate's lifecycle paths.
+  `function_name()`, `storage_enabled()`). This encapsulates the struct's layout
+  and construction — a consumer cannot replace a field or skip `Pipeline::new` —
+  not the mutability of the state it owns: `registries()` and the worker-sender
+  accessors hand back the live handles the coordinator drives.
 - A consumer assembles a pipeline with the public `Pipeline::new(...)` from inside
   its `build_*_pipeline`.
 - The seal step is NOT yet an injected provision: for the single logs consumer
