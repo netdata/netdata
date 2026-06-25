@@ -276,6 +276,8 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 
 	wg.Go(func() { m.runNotifyRunningJobs() })
 
+	wg.Go(func() { m.runFunctionReconciler() })
+
 	close(m.started)
 
 	wg.Wait()
@@ -343,8 +345,6 @@ func (m *Manager) run() {
 				m.removeConfig(cfg)
 			case fn := <-m.dyncfgCh:
 				m.dyncfgSeqExec(fn)
-			case moduleName := <-m.funcReconCh:
-				m.funcCtl.ReconcileModuleMethods(moduleName)
 			}
 		}
 	}
@@ -397,8 +397,6 @@ func (m *Manager) runWaitDecisionStep() bool {
 			return false
 		case fn := <-m.dyncfgCh:
 			m.dyncfgSeqExec(fn)
-		case moduleName := <-m.funcReconCh:
-			m.funcCtl.ReconcileModuleMethods(moduleName)
 		}
 		return true
 	}
@@ -418,12 +416,21 @@ func (m *Manager) runWaitDecisionStep() bool {
 		return false
 	case fn := <-m.dyncfgCh:
 		m.dyncfgSeqExec(fn)
-	case moduleName := <-m.funcReconCh:
-		m.funcCtl.ReconcileModuleMethods(moduleName)
 	case <-timer.C:
 		m.collectorHandler.ExpireWaitDecision()
 	}
 	return true
+}
+
+func (m *Manager) runFunctionReconciler() {
+	for {
+		select {
+		case <-m.ctx.Done():
+			return
+		case moduleName := <-m.funcReconCh:
+			m.funcCtl.ReconcileModuleMethods(moduleName)
+		}
+	}
 }
 
 func (m *Manager) removeConfig(cfg confgroup.Config) {
@@ -491,6 +498,7 @@ func (m *Manager) startRunningJob(job runtimeJob) {
 	m.secretStoreDeps.setRunning(job.FullName(), true)
 
 	m.funcCtl.OnJobStart(job)
+	m.requestFunctionReconcile(job.ModuleName())
 }
 
 func (m *Manager) stopRunningJob(name string) {

@@ -136,7 +136,7 @@ func (s *runSim) run(t *testing.T) {
 			skipNextEmpty = false
 			continue
 		}
-		if strings.HasPrefix(s, "FUNCTION GLOBAL") {
+		if strings.HasPrefix(s, "FUNCTION GLOBAL") || strings.HasPrefix(s, "FUNCTION_DEL") {
 			skipNextEmpty = true
 			continue
 		}

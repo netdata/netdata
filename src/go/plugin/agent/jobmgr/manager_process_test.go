@@ -128,8 +128,8 @@ func TestRunNotifyRunningJobs_TickOutsideLock(t *testing.T) {
 func TestRunNotifyRunningJobs_ReconcilesLateAvailableModuleMethods(t *testing.T) {
 	reg := &recordingFunctionRegistry{}
 	var out bytes.Buffer
-	available := false
-	availability := managerFunctionAvailability{fn: func(string) bool { return available }}
+	var available atomic.Bool
+	availability := managerFunctionAvailability{fn: func(string) bool { return available.Load() }}
 	mgr := New(Config{
 		PluginName: testPluginName,
 		Out:        &out,
@@ -148,10 +148,10 @@ func TestRunNotifyRunningJobs_ReconcilesLateAvailableModuleMethods(t *testing.T)
 	mgr.ctx = ctx
 	mgr.funcCtl.Init(ctx)
 	mgr.funcCtl.RegisterModules(mgr.modules)
-	runDone := make(chan struct{})
+	reconcileDone := make(chan struct{})
 	go func() {
-		mgr.run()
-		close(runDone)
+		mgr.runFunctionReconciler()
+		close(reconcileDone)
 	}()
 
 	job := &tickProbeJob{
@@ -166,7 +166,7 @@ func TestRunNotifyRunningJobs_ReconcilesLateAvailableModuleMethods(t *testing.T)
 	mgr.runningJobs.add(job.FullName(), job)
 	mgr.runningJobs.unlock()
 
-	available = true
+	available.Store(true)
 	done := make(chan struct{})
 	go func() {
 		mgr.runNotifyRunningJobs()
@@ -179,9 +179,9 @@ func TestRunNotifyRunningJobs_ReconcilesLateAvailableModuleMethods(t *testing.T)
 
 	cancel()
 	select {
-	case <-runDone:
+	case <-reconcileDone:
 	case <-time.After(2 * time.Second):
-		t.Fatal("run did not stop")
+		t.Fatal("runFunctionReconciler did not stop")
 	}
 	assert.NotContains(t, out.String(), "FUNCTION_DEL")
 	select {
@@ -193,13 +193,13 @@ func TestRunNotifyRunningJobs_ReconcilesLateAvailableModuleMethods(t *testing.T)
 
 func TestRunNotifyRunningJobs_DeduplicatesFunctionReconcileByModule(t *testing.T) {
 	reg := &recordingFunctionRegistry{}
-	available := false
 	var availableCalls atomic.Int32
+	var available atomic.Bool
 	availability := managerFunctionAvailability{fn: func(string) bool {
-		if available {
+		if available.Load() {
 			availableCalls.Add(1)
 		}
-		return available
+		return available.Load()
 	}}
 	mgr := New(Config{
 		PluginName: testPluginName,
@@ -218,10 +218,10 @@ func TestRunNotifyRunningJobs_DeduplicatesFunctionReconcileByModule(t *testing.T
 	mgr.ctx = ctx
 	mgr.funcCtl.Init(ctx)
 	mgr.funcCtl.RegisterModules(mgr.modules)
-	runDone := make(chan struct{})
+	reconcileDone := make(chan struct{})
 	go func() {
-		mgr.run()
-		close(runDone)
+		mgr.runFunctionReconciler()
+		close(reconcileDone)
 	}()
 
 	job1 := &tickProbeJob{fullName: "mod_job1", moduleName: "mod", name: "job1", collector: availability}
@@ -234,7 +234,7 @@ func TestRunNotifyRunningJobs_DeduplicatesFunctionReconcileByModule(t *testing.T
 	mgr.runningJobs.unlock()
 
 	availableCalls.Store(0)
-	available = true
+	available.Store(true)
 	notifyDone := make(chan struct{})
 	go func() {
 		mgr.runNotifyRunningJobs()
@@ -248,9 +248,9 @@ func TestRunNotifyRunningJobs_DeduplicatesFunctionReconcileByModule(t *testing.T
 
 	cancel()
 	select {
-	case <-runDone:
+	case <-reconcileDone:
 	case <-time.After(2 * time.Second):
-		t.Fatal("run did not stop")
+		t.Fatal("runFunctionReconciler did not stop")
 	}
 	select {
 	case <-notifyDone:
@@ -261,8 +261,8 @@ func TestRunNotifyRunningJobs_DeduplicatesFunctionReconcileByModule(t *testing.T
 
 func TestRunNotifyRunningJobs_DoesNotPublishDirectly(t *testing.T) {
 	reg := &recordingFunctionRegistry{}
-	available := false
-	availability := managerFunctionAvailability{fn: func(string) bool { return available }}
+	var available atomic.Bool
+	availability := managerFunctionAvailability{fn: func(string) bool { return available.Load() }}
 	mgr := New(Config{
 		PluginName: testPluginName,
 		FnReg:      reg,
@@ -305,7 +305,7 @@ func TestRunNotifyRunningJobs_DoesNotPublishDirectly(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("tick did not start")
 	}
-	available = true
+	available.Store(true)
 	close(job.tickRelease)
 
 	time.Sleep(50 * time.Millisecond)
@@ -321,8 +321,8 @@ func TestRunNotifyRunningJobs_DoesNotPublishDirectly(t *testing.T) {
 
 func TestRequestFunctionReconcile_DroppedRequestCanBeRetried(t *testing.T) {
 	reg := &recordingFunctionRegistry{}
-	available := false
-	availability := managerFunctionAvailability{fn: func(string) bool { return available }}
+	var available atomic.Bool
+	availability := managerFunctionAvailability{fn: func(string) bool { return available.Load() }}
 	mgr := New(Config{
 		PluginName: testPluginName,
 		FnReg:      reg,
@@ -345,7 +345,7 @@ func TestRequestFunctionReconcile_DroppedRequestCanBeRetried(t *testing.T) {
 	for i := 0; i < cap(mgr.funcReconCh); i++ {
 		mgr.funcReconCh <- "other"
 	}
-	available = true
+	available.Store(true)
 
 	requestDone := make(chan struct{})
 	go func() {
@@ -366,7 +366,7 @@ func TestRequestFunctionReconcile_DroppedRequestCanBeRetried(t *testing.T) {
 
 	runDone := make(chan struct{})
 	go func() {
-		mgr.run()
+		mgr.runFunctionReconciler()
 		close(runDone)
 	}()
 	mgr.requestFunctionReconcile("mod")
@@ -379,7 +379,7 @@ func TestRequestFunctionReconcile_DroppedRequestCanBeRetried(t *testing.T) {
 	select {
 	case <-runDone:
 	case <-time.After(2 * time.Second):
-		t.Fatal("run did not stop")
+		t.Fatal("runFunctionReconciler did not stop")
 	}
 }
 
@@ -387,38 +387,6 @@ func TestRunWaitDecisionStep(t *testing.T) {
 	tests := map[string]struct {
 		run func(t *testing.T)
 	}{
-		"drains function reconcile while waiting": {
-			run: func(t *testing.T) {
-				reg := &recordingFunctionRegistry{}
-				available := false
-				availability := managerFunctionAvailability{fn: func(string) bool { return available }}
-				mgr := New(Config{
-					PluginName: testPluginName,
-					FnReg:      reg,
-					Modules: collectorapi.Registry{
-						"mod": collectorapi.Creator{
-							SharedFunctions: func() []funcapi.FunctionConfig {
-								return []funcapi.FunctionConfig{{ID: "late"}}
-							},
-						},
-					},
-				})
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-				mgr.ctx = ctx
-				mgr.funcCtl.Init(ctx)
-				mgr.funcCtl.RegisterModules(mgr.modules)
-				job := &tickProbeJob{fullName: "mod_job1", moduleName: "mod", name: "job1", collector: availability}
-				mgr.funcCtl.OnJobStart(job)
-				available = true
-
-				mgr.collectorHandler.WaitForDecision(prepareUserCfg("other", "job"))
-				mgr.funcReconCh <- "mod"
-
-				require.True(t, mgr.runWaitDecisionStep())
-				assert.Equal(t, []string{"mod:late"}, reg.registeredNames())
-			},
-		},
 		"executes dyncfg command while waiting": {
 			run: func(t *testing.T) {
 				var out bytes.Buffer
@@ -468,6 +436,78 @@ func TestRunWaitDecisionStep(t *testing.T) {
 	}
 }
 
+func TestRunFunctionReconciler_DoesNotBlockManagerControlLoop(t *testing.T) {
+	reg := &recordingFunctionRegistry{}
+	var out simOutput
+	availabilityStarted := make(chan struct{})
+	availabilityRelease := make(chan struct{})
+	availability := managerFunctionAvailability{fn: func(string) bool {
+		close(availabilityStarted)
+		<-availabilityRelease
+		return true
+	}}
+	mgr := New(Config{
+		PluginName: testPluginName,
+		Out:        &out,
+		FnReg:      reg,
+		Modules: collectorapi.Registry{
+			"mod": collectorapi.Creator{
+				SharedFunctions: func() []funcapi.FunctionConfig {
+					return []funcapi.FunctionConfig{{ID: "late"}}
+				},
+			},
+		},
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	mgr.ctx = ctx
+	mgr.funcCtl.Init(ctx)
+	mgr.funcCtl.RegisterModules(mgr.modules)
+	mgr.funcCtl.OnJobStart(&tickProbeJob{fullName: "mod_job1", moduleName: "mod", name: "job1", collector: availability})
+
+	reconcileDone := make(chan struct{})
+	go func() {
+		mgr.runFunctionReconciler()
+		close(reconcileDone)
+	}()
+	mgr.requestFunctionReconcile("mod")
+
+	select {
+	case <-availabilityStarted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("function availability check did not start")
+	}
+
+	runDone := make(chan struct{})
+	go func() {
+		mgr.run()
+		close(runDone)
+	}()
+	mgr.dyncfgCh <- dyncfg.NewFunction(functions.Function{
+		UID:  "unknown",
+		Name: "config",
+		Args: []string{"unknown", string(dyncfg.CommandSchema)},
+	})
+
+	require.Eventually(t, func() bool {
+		return strings.Contains(out.String(), "unknown function")
+	}, 2*time.Second, 10*time.Millisecond)
+
+	close(availabilityRelease)
+	cancel()
+	select {
+	case <-reconcileDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("runFunctionReconciler did not stop")
+	}
+	select {
+	case <-runDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("run did not stop")
+	}
+}
+
 func TestFunctionReconcileFunnelConcurrentLifecycle(t *testing.T) {
 	reg := &recordingFunctionRegistry{}
 	var available atomic.Bool
@@ -490,10 +530,10 @@ func TestFunctionReconcileFunnelConcurrentLifecycle(t *testing.T) {
 	mgr.funcCtl.Init(ctx)
 	mgr.funcCtl.RegisterModules(mgr.modules)
 
-	runDone := make(chan struct{})
+	reconcileDone := make(chan struct{})
 	go func() {
-		mgr.run()
-		close(runDone)
+		mgr.runFunctionReconciler()
+		close(reconcileDone)
 	}()
 	notifyDone := make(chan struct{})
 	go func() {
@@ -527,9 +567,9 @@ func TestFunctionReconcileFunnelConcurrentLifecycle(t *testing.T) {
 
 	cancel()
 	select {
-	case <-runDone:
+	case <-reconcileDone:
 	case <-time.After(2 * time.Second):
-		t.Fatal("run did not stop")
+		t.Fatal("runFunctionReconciler did not stop")
 	}
 	select {
 	case <-notifyDone:

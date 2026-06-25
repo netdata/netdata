@@ -394,6 +394,14 @@ func jobBackedFunctionAvailable(job collectorapi.RuntimeJob, methodID string) bo
 	return availability.FunctionAvailable(methodID)
 }
 
+func jobUsesFunctionAvailability(job collectorapi.RuntimeJob) bool {
+	if job == nil {
+		return false
+	}
+	availability, ok := job.Collector().(collectorapi.FunctionAvailability)
+	return ok && availability != nil
+}
+
 func (c *Controller) allFunctionNamesPublishedLocked(moduleName string, method funcapi.FunctionConfig) bool {
 	names := funcapi.FunctionNames(moduleName, method)
 	return c.publishedFns.all(names)
@@ -473,6 +481,10 @@ func (c *Controller) registerInstanceFunctions(job collectorapi.RuntimeJob, meth
 	// Record methods before publishing handlers so startup-time calls do not race a false 404.
 	c.registry.registerInstanceFunctions(job.ModuleName(), job.Name(), methods)
 
+	if jobUsesFunctionAvailability(job) {
+		return
+	}
+
 	publishes := c.collectInstanceFunctionPublishes(job, methods)
 
 	for _, publish := range publishes {
@@ -486,21 +498,14 @@ func (c *Controller) registerInstanceFunctions(job collectorapi.RuntimeJob, meth
 }
 
 func (c *Controller) collectInstanceFunctionPublishes(job collectorapi.RuntimeJob, methods []funcapi.FunctionConfig) []functionPublish {
-	availableMethods := make([]funcapi.FunctionConfig, 0, len(methods))
-	for _, method := range methods {
-		if method.ID == "" {
-			continue
-		}
-		if jobBackedFunctionAvailable(job, method.ID) {
-			availableMethods = append(availableMethods, method)
-		}
-	}
-
 	c.publishedMu.Lock()
 	defer c.publishedMu.Unlock()
 
 	var publishes []functionPublish
-	for _, method := range availableMethods {
+	for _, method := range methods {
+		if method.ID == "" {
+			continue
+		}
 		funcName := fmt.Sprintf("%s:%s", job.ModuleName(), method.ID)
 		if c.publishedFns.has(funcName) {
 			continue

@@ -1317,6 +1317,33 @@ func TestControllerInstanceFunctionsUseJobBackedAvailability(t *testing.T) {
 
 			assert.Equal(t, []string{"mod:a"}, reg.registeredNames())
 		},
+		"FunctionAvailability is not called synchronously on job start": func(t *testing.T) {
+			reg := newTestFunctionRegistry()
+			var availabilityCalls atomic.Int32
+			job := newTestRuntimeJob("mod", "job1", true)
+			job.collector = &testFunctionAvailability{fn: func(string) bool {
+				availabilityCalls.Add(1)
+				return true
+			}}
+			controller := New(Options{FnReg: reg})
+			controller.RegisterModules(collectorapi.Registry{
+				"mod": collectorapi.Creator{
+					InstanceFunctions: func(collectorapi.RuntimeJob) []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{ID: "a"}}
+					},
+				},
+			})
+
+			controller.OnJobStart(job)
+
+			assert.Equal(t, int32(0), availabilityCalls.Load())
+			assert.Empty(t, reg.registeredNames())
+
+			controller.ReconcileModuleMethods("mod")
+
+			assert.Equal(t, int32(1), availabilityCalls.Load())
+			assert.Equal(t, []string{"mod:a"}, reg.registeredNames())
+		},
 	}
 
 	for name, run := range tests {
