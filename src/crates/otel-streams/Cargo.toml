@@ -23,6 +23,11 @@ path = "src/bin/synth.rs"
 name = "jetstream"
 path = "src/bin/jetstream.rs"
 
+# PROOF SCAFFOLD (otel traces-proof SOW; revert with the skeleton).
+[[bin]]
+name = "synth-traces"
+path = "src/bin/synth-traces.rs"
+
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
