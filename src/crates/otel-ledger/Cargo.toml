@@ -21,12 +21,9 @@ ferryboat = { workspace = true }
 file-cache = { workspace = true }
 file-lifecycle = { path = "../file-lifecycle" }
 file-registry = { workspace = true }
-futures = { workspace = true }
-moka = { workspace = true }
 netdata-plugin-error = { path = "../netdata-plugin/error" }
 netdata-plugin-protocol = { path = "../netdata-plugin/protocol" }
 netdata-plugin-types = { path = "../netdata-plugin/types" }
-opendal = { workspace = true }
 otel-catalog = { workspace = true }
 sfst = { workspace = true }
 sfst-indexer = { workspace = true }
@@ -42,7 +39,6 @@ tokio-util = { workspace = true }
 uuid = { workspace = true }
 wal = { workspace = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 [dev-dependencies]
 bytesize = { workspace = true }

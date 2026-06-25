@@ -32,19 +32,25 @@ pub(crate) fn encode_opaque(namespace: &str, name: &str) -> Vec<u8> {
     out
 }
 
-/// Inverse of [`encode_opaque`]; returns `("", "")` for empty bytes (mirroring
-/// the production decode's absent-identity fallback).
+/// Inverse of [`encode_opaque`]. Tolerant: any input that is not a complete
+/// `encode_opaque` payload (empty, truncated, or non-UTF-8) decodes to the empty
+/// identity `("", "")` rather than panicking, so a future test author who hands
+/// it a crafted slice gets a clear result instead of a slice/UTF-8 panic. Real
+/// inputs come from [`encode_opaque`] and round-trip exactly.
 pub(crate) fn decode_opaque(bytes: &[u8]) -> (String, String) {
-    if bytes.is_empty() {
-        return (String::new(), String::new());
+    fn read_at(bytes: &[u8], at: usize) -> Option<(String, usize)> {
+        let body = at.checked_add(4)?;
+        let len = u32::from_le_bytes(bytes.get(at..body)?.try_into().ok()?) as usize;
+        let end = body.checked_add(len)?;
+        let s = String::from_utf8(bytes.get(body..end)?.to_vec()).ok()?;
+        Some((s, end))
     }
-    let read_at = |at: usize| -> (String, usize) {
-        let len = u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap()) as usize;
-        let s = String::from_utf8(bytes[at + 4..at + 4 + len].to_vec()).unwrap();
-        (s, at + 4 + len)
+    let Some((ns, next)) = read_at(bytes, 0) else {
+        return (String::new(), String::new());
     };
-    let (ns, next) = read_at(0);
-    let (name, _) = read_at(next);
+    let Some((name, _)) = read_at(bytes, next) else {
+        return (String::new(), String::new());
+    };
     (ns, name)
 }
 

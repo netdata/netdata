@@ -14,23 +14,30 @@ const FORBIDDEN: &[&str] = &["sfsq", "sfst-indexer", "otel-logs-identity"];
 
 #[test]
 fn manifest_declares_no_content_crate() {
+    // Strip comments first, then check the forbidden names against the remaining
+    // text. The doc comment above this crate's `[dependencies]` deliberately
+    // names all three, so we must ignore comments — but we must NOT rely on a
+    // single declaration shape, because Cargo accepts several:
+    //   `sfsq = ...`            (key form)
+    //   `[dependencies.sfsq]`   (table-header form)
+    //   `x = { package = "sfsq", path = "../sfsq" }`  (rename / path form)
+    // After stripping comments, the only way any of these exact crate names
+    // appears anywhere in the manifest is a real dependency edge — the allowed
+    // deps (`sfst`, `otel-catalog`, …) do not contain them as substrings — so a
+    // plain substring check over the comment-free text catches every form.
     let manifest = include_str!("../Cargo.toml");
+    let code: String = manifest
+        .lines()
+        .map(|line| line.split('#').next().unwrap_or(""))
+        .collect::<Vec<_>>()
+        .join("\n");
+
     for name in FORBIDDEN {
-        // A Cargo dependency is declared as a table key at the start of a line:
-        // `name = ...` or `name.workspace = ...`. Match exactly that shape so a
-        // comment mentioning the crate, or a different crate sharing a prefix
-        // (e.g. `sfst` vs `sfst-indexer`), never false-triggers.
-        let declared = manifest.lines().any(|line| {
-            line.trim_start().strip_prefix(name).is_some_and(|rest| {
-                let rest = rest.trim_start();
-                rest.starts_with('=') || rest.starts_with('.')
-            })
-        });
         assert!(
-            !declared,
-            "file-lifecycle must stay content-agnostic, but its Cargo.toml declares \
-             the log-content crate `{name}`. Remove it: the substrate is reused by \
-             other signals (traces) that must not compile logs."
+            !code.contains(name),
+            "file-lifecycle must stay content-agnostic, but its Cargo.toml references \
+             the log-content crate `{name}` outside a comment. Remove it: the substrate \
+             is reused by other signals (traces) that must not compile logs."
         );
     }
 }

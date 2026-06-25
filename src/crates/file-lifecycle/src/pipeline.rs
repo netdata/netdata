@@ -8,11 +8,14 @@
 //! query handler. The substrate-shared workers (cleaner, uploader, chunk cache)
 //! live on the shell.
 //!
-//! Fields are private; the shell reads them through the accessors below so the
-//! per-signal state can only be mutated through the substrate's lifecycle paths,
-//! not by any future crate that depends on `file-lifecycle`. The per-signal
-//! assembly (spawning the workers, running recovery, building the handler) lives
-//! in the consumer's `build_*_pipeline`, which constructs the result via
+//! Fields are private and reached only through the accessors below, so the
+//! struct layout stays internal and a consumer cannot replace a field or skip
+//! [`Pipeline::new`] to fabricate one. The accessors intentionally hand back the
+//! live registry handle and worker senders — the coordinator drives the pipeline
+//! through them — so this encapsulates the struct's shape and construction, not
+//! the mutability of the per-signal state it owns. The per-signal assembly
+//! (spawning the workers, running recovery, building the handler) lives in the
+//! consumer's `build_*_pipeline`, which constructs the result via
 //! [`Pipeline::new`].
 
 use std::sync::Arc;
@@ -65,9 +68,12 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
-    /// Assemble a pipeline from its per-signal provisions. Called by a consumer's
-    /// `build_*_pipeline` after it has spawned the per-signal workers, run
-    /// recovery, and built the query handler.
+    /// Assemble a pipeline from its per-signal provisions, after the caller has
+    /// spawned the per-signal workers, run recovery, and built the query handler.
+    /// Today the sole caller is
+    /// `otel-ledger::ledger::pipeline::build_logs_pipeline`; a second signal
+    /// (traces) adds its own `build_*_pipeline` that constructs the result here
+    /// the same way.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         pipeline_id: u16,
