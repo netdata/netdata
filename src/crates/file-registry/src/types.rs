@@ -188,9 +188,10 @@ impl fmt::Display for ByteSize {
 pub struct FileId {
     pub machine_id: Uuid,
     pub boot_id: Uuid,
-    /// Opaque pipeline/signal discriminator assigned by the integration layer.
-    /// Today there is a single pipeline ([`FileId::DEFAULT_PIPELINE`]); distinct
-    /// ids per signal are assigned in a later restructure stage.
+    /// Opaque pipeline/signal discriminator assigned by the integration layer
+    /// (the signal↔id mapping is the integration layer's, e.g. `bridge::signals`;
+    /// `file-registry` ascribes no meaning to the value beyond
+    /// [`FileId::DEFAULT_PIPELINE`] being the default).
     pub pipeline_id: u16,
     pub seq: u64,
     /// Opaque partition key; the content plane derives it.
@@ -198,9 +199,9 @@ pub struct FileId {
 }
 
 impl FileId {
-    /// The default (and currently only) pipeline. The integration layer will
-    /// assign distinct pipeline ids per signal in a later restructure stage;
-    /// `file-registry` ascribes no meaning to the value.
+    /// The default pipeline (logs). The integration layer assigns distinct
+    /// pipeline ids per signal (see `bridge::signals`); `file-registry` ascribes
+    /// no meaning to the value.
     pub const DEFAULT_PIPELINE: u16 = 0;
 
     /// Construct a `FileId` in the [`DEFAULT_PIPELINE`](Self::DEFAULT_PIPELINE).

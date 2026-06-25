@@ -12,8 +12,8 @@
 //!   frame payload is the prost-encoded request — opaque to the substrate, never
 //!   decoded by the traces seal);
 //! - funnels the resulting `FileEvent`s through the SHARED `LedgerSender` (the
-//!   writer→ledger IPC accepts one connection; the ledger gap-checks one global
-//!   `frame_seq`, so every signal shares one sender + one `seq` allocator).
+//!   writer→ledger IPC accepts one connection, with a per-signal `frame_seq`
+//!   stream, so every signal shares one sender + one `seq` allocator).
 //!
 //! Fakes the real traces feature must replace: a single fixed partition key (no
 //! per-service-name streams), a fixed `content_meta`, and ingestion-time frame
