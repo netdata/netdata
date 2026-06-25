@@ -490,10 +490,6 @@ func (m *Manager) startRunningJob(job runtimeJob) {
 	m.runningJobs.unlock()
 	m.secretStoreDeps.setRunning(job.FullName(), true)
 
-	// Known behavior: Start runs asynchronously, so function handlers may be
-	// published before the job flips its running flag. Immediate function calls
-	// can transiently return 503; this is accepted for now to avoid adding a
-	// broader runtime readiness contract.
 	m.funcCtl.OnJobStart(job)
 }
 

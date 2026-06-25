@@ -129,6 +129,7 @@ func TestRunNotifyRunningJobs_ReconcilesLateAvailableModuleMethods(t *testing.T)
 	reg := &recordingFunctionRegistry{}
 	var out bytes.Buffer
 	available := false
+	availability := managerFunctionAvailability{fn: func(string) bool { return available }}
 	mgr := New(Config{
 		PluginName: testPluginName,
 		Out:        &out,
@@ -136,10 +137,7 @@ func TestRunNotifyRunningJobs_ReconcilesLateAvailableModuleMethods(t *testing.T)
 		Modules: collectorapi.Registry{
 			"mod": collectorapi.Creator{
 				SharedFunctions: func() []funcapi.FunctionConfig {
-					return []funcapi.FunctionConfig{{
-						ID:        "late",
-						Available: func() bool { return available },
-					}}
+					return []funcapi.FunctionConfig{{ID: "late"}}
 				},
 			},
 		},
@@ -160,6 +158,7 @@ func TestRunNotifyRunningJobs_ReconcilesLateAvailableModuleMethods(t *testing.T)
 		fullName:   "mod_job1",
 		moduleName: "mod",
 		name:       "job1",
+		collector:  availability,
 	}
 	mgr.funcCtl.OnJobStart(job)
 
@@ -196,21 +195,19 @@ func TestRunNotifyRunningJobs_DeduplicatesFunctionReconcileByModule(t *testing.T
 	reg := &recordingFunctionRegistry{}
 	available := false
 	var availableCalls atomic.Int32
+	availability := managerFunctionAvailability{fn: func(string) bool {
+		if available {
+			availableCalls.Add(1)
+		}
+		return available
+	}}
 	mgr := New(Config{
 		PluginName: testPluginName,
 		FnReg:      reg,
 		Modules: collectorapi.Registry{
 			"mod": collectorapi.Creator{
 				SharedFunctions: func() []funcapi.FunctionConfig {
-					return []funcapi.FunctionConfig{{
-						ID: "late",
-						Available: func() bool {
-							if available {
-								availableCalls.Add(1)
-							}
-							return available
-						},
-					}}
+					return []funcapi.FunctionConfig{{ID: "late"}}
 				},
 			},
 		},
@@ -227,8 +224,8 @@ func TestRunNotifyRunningJobs_DeduplicatesFunctionReconcileByModule(t *testing.T
 		close(runDone)
 	}()
 
-	job1 := &tickProbeJob{fullName: "mod_job1", moduleName: "mod", name: "job1"}
-	job2 := &tickProbeJob{fullName: "mod_job2", moduleName: "mod", name: "job2"}
+	job1 := &tickProbeJob{fullName: "mod_job1", moduleName: "mod", name: "job1", collector: availability}
+	job2 := &tickProbeJob{fullName: "mod_job2", moduleName: "mod", name: "job2", collector: availability}
 	mgr.funcCtl.OnJobStart(job1)
 	mgr.funcCtl.OnJobStart(job2)
 	mgr.runningJobs.lock()
@@ -247,7 +244,7 @@ func TestRunNotifyRunningJobs_DeduplicatesFunctionReconcileByModule(t *testing.T
 	require.Eventually(t, func() bool {
 		return slices.Contains(reg.registeredNames(), "mod:late")
 	}, 2*time.Second, 10*time.Millisecond)
-	assert.Equal(t, int32(1), availableCalls.Load())
+	assert.Equal(t, int32(2), availableCalls.Load())
 
 	cancel()
 	select {
@@ -265,16 +262,14 @@ func TestRunNotifyRunningJobs_DeduplicatesFunctionReconcileByModule(t *testing.T
 func TestRunNotifyRunningJobs_DoesNotPublishDirectly(t *testing.T) {
 	reg := &recordingFunctionRegistry{}
 	available := false
+	availability := managerFunctionAvailability{fn: func(string) bool { return available }}
 	mgr := New(Config{
 		PluginName: testPluginName,
 		FnReg:      reg,
 		Modules: collectorapi.Registry{
 			"mod": collectorapi.Creator{
 				SharedFunctions: func() []funcapi.FunctionConfig {
-					return []funcapi.FunctionConfig{{
-						ID:        "late",
-						Available: func() bool { return available },
-					}}
+					return []funcapi.FunctionConfig{{ID: "late"}}
 				},
 			},
 		},
@@ -290,6 +285,7 @@ func TestRunNotifyRunningJobs_DoesNotPublishDirectly(t *testing.T) {
 		fullName:    "mod_job1",
 		moduleName:  "mod",
 		name:        "job1",
+		collector:   availability,
 		tickStarted: make(chan struct{}),
 		tickRelease: make(chan struct{}),
 	}
@@ -326,16 +322,14 @@ func TestRunNotifyRunningJobs_DoesNotPublishDirectly(t *testing.T) {
 func TestRequestFunctionReconcile_DroppedRequestCanBeRetried(t *testing.T) {
 	reg := &recordingFunctionRegistry{}
 	available := false
+	availability := managerFunctionAvailability{fn: func(string) bool { return available }}
 	mgr := New(Config{
 		PluginName: testPluginName,
 		FnReg:      reg,
 		Modules: collectorapi.Registry{
 			"mod": collectorapi.Creator{
 				SharedFunctions: func() []funcapi.FunctionConfig {
-					return []funcapi.FunctionConfig{{
-						ID:        "late",
-						Available: func() bool { return available },
-					}}
+					return []funcapi.FunctionConfig{{ID: "late"}}
 				},
 			},
 		},
@@ -346,7 +340,7 @@ func TestRequestFunctionReconcile_DroppedRequestCanBeRetried(t *testing.T) {
 	mgr.ctx = ctx
 	mgr.funcCtl.Init(ctx)
 	mgr.funcCtl.RegisterModules(mgr.modules)
-	mgr.funcCtl.OnJobStart(&tickProbeJob{fullName: "mod_job1", moduleName: "mod", name: "job1"})
+	mgr.funcCtl.OnJobStart(&tickProbeJob{fullName: "mod_job1", moduleName: "mod", name: "job1", collector: availability})
 
 	for i := 0; i < cap(mgr.funcReconCh); i++ {
 		mgr.funcReconCh <- "other"
@@ -397,16 +391,14 @@ func TestRunWaitDecisionStep(t *testing.T) {
 			run: func(t *testing.T) {
 				reg := &recordingFunctionRegistry{}
 				available := false
+				availability := managerFunctionAvailability{fn: func(string) bool { return available }}
 				mgr := New(Config{
 					PluginName: testPluginName,
 					FnReg:      reg,
 					Modules: collectorapi.Registry{
 						"mod": collectorapi.Creator{
 							SharedFunctions: func() []funcapi.FunctionConfig {
-								return []funcapi.FunctionConfig{{
-									ID:        "late",
-									Available: func() bool { return available },
-								}}
+								return []funcapi.FunctionConfig{{ID: "late"}}
 							},
 						},
 					},
@@ -416,7 +408,7 @@ func TestRunWaitDecisionStep(t *testing.T) {
 				mgr.ctx = ctx
 				mgr.funcCtl.Init(ctx)
 				mgr.funcCtl.RegisterModules(mgr.modules)
-				job := &tickProbeJob{fullName: "mod_job1", moduleName: "mod", name: "job1"}
+				job := &tickProbeJob{fullName: "mod_job1", moduleName: "mod", name: "job1", collector: availability}
 				mgr.funcCtl.OnJobStart(job)
 				available = true
 
@@ -479,16 +471,14 @@ func TestRunWaitDecisionStep(t *testing.T) {
 func TestFunctionReconcileFunnelConcurrentLifecycle(t *testing.T) {
 	reg := &recordingFunctionRegistry{}
 	var available atomic.Bool
+	availability := managerFunctionAvailability{fn: func(string) bool { return available.Load() }}
 	mgr := New(Config{
 		PluginName: testPluginName,
 		FnReg:      reg,
 		Modules: collectorapi.Registry{
 			"mod": collectorapi.Creator{
 				SharedFunctions: func() []funcapi.FunctionConfig {
-					return []funcapi.FunctionConfig{{
-						ID:        "late",
-						Available: available.Load,
-					}}
+					return []funcapi.FunctionConfig{{ID: "late"}}
 				},
 			},
 		},
@@ -511,7 +501,7 @@ func TestFunctionReconcileFunnelConcurrentLifecycle(t *testing.T) {
 		close(notifyDone)
 	}()
 
-	stable := &tickProbeJob{fullName: "mod_stable", moduleName: "mod", name: "stable"}
+	stable := &tickProbeJob{fullName: "mod_stable", moduleName: "mod", name: "stable", collector: availability}
 	mgr.startRunningJob(stable)
 	available.Store(true)
 
@@ -523,7 +513,7 @@ func TestFunctionReconcileFunnelConcurrentLifecycle(t *testing.T) {
 			for i := range 20 {
 				name := fmt.Sprintf("churn-%d-%d", worker, i)
 				fullName := fmt.Sprintf("mod_%s", name)
-				job := &tickProbeJob{fullName: fullName, moduleName: "mod", name: name}
+				job := &tickProbeJob{fullName: fullName, moduleName: "mod", name: name, collector: availability}
 				mgr.startRunningJob(job)
 				mgr.stopRunningJob(fullName)
 			}
@@ -706,7 +696,7 @@ func TestRun_RegistersAgentScopeModuleMethodsBeforeAnyJobStarts(t *testing.T) {
 	assert.Equal(t, []string{"mod:a"}, fnReg.registeredNames())
 }
 
-func TestStartRunningJob_RegistersModuleMethodsOnFirstStartedJob(t *testing.T) {
+func TestStartRunningJob_RegistersModuleMethodsAfterReconcile(t *testing.T) {
 	fnReg := &recordingFunctionRegistry{}
 	mgr := New(Config{PluginName: testPluginName, FnReg: fnReg})
 	creator := collectorapi.Creator{
@@ -720,10 +710,14 @@ func TestStartRunningJob_RegistersModuleMethodsOnFirstStartedJob(t *testing.T) {
 	job := &lockProbeJob{fullName: "mod_job1", moduleName: "mod", name: "job1"}
 	mgr.startRunningJob(job)
 
+	assert.Empty(t, fnReg.registeredNames())
+
+	mgr.funcCtl.ReconcileModuleMethods("mod")
+
 	assert.ElementsMatch(t, []string{"mod:a", "mod:b"}, fnReg.registeredNames())
 }
 
-func TestStartRunningJob_DoesNotReregisterModuleMethods(t *testing.T) {
+func TestStartRunningJob_ReconcileDoesNotReregisterModuleMethods(t *testing.T) {
 	fnReg := &recordingFunctionRegistry{}
 	mgr := New(Config{PluginName: testPluginName, FnReg: fnReg})
 	creator := collectorapi.Creator{
@@ -736,9 +730,11 @@ func TestStartRunningJob_DoesNotReregisterModuleMethods(t *testing.T) {
 
 	job1 := &lockProbeJob{fullName: "mod_job1", moduleName: "mod", name: "job1"}
 	mgr.startRunningJob(job1)
+	mgr.funcCtl.ReconcileModuleMethods("mod")
 
 	job2 := &lockProbeJob{fullName: "mod_job2", moduleName: "mod", name: "job2"}
 	mgr.startRunningJob(job2)
+	mgr.funcCtl.ReconcileModuleMethods("mod")
 
 	registered := fnReg.registeredNames()
 	assert.Len(t, registered, 2)
@@ -874,6 +870,7 @@ type lockProbeJob struct {
 	fullName   string
 	moduleName string
 	name       string
+	collector  any
 
 	tickOnce    sync.Once
 	stopOnce    sync.Once
@@ -884,7 +881,7 @@ type lockProbeJob struct {
 func (j *lockProbeJob) FullName() string   { return j.fullName }
 func (j *lockProbeJob) ModuleName() string { return j.moduleName }
 func (j *lockProbeJob) Name() string       { return j.name }
-func (j *lockProbeJob) Collector() any     { return nil }
+func (j *lockProbeJob) Collector() any     { return j.collector }
 func (j *lockProbeJob) Start()             {}
 func (j *lockProbeJob) Stop()              { j.stopOnce.Do(func() {}) }
 func (j *lockProbeJob) Tick(_ int) {
@@ -906,12 +903,13 @@ type tickProbeJob struct {
 	fullName   string
 	moduleName string
 	name       string
+	collector  any
 }
 
 func (j *tickProbeJob) FullName() string                  { return j.fullName }
 func (j *tickProbeJob) ModuleName() string                { return j.moduleName }
 func (j *tickProbeJob) Name() string                      { return j.name }
-func (j *tickProbeJob) Collector() any                    { return nil }
+func (j *tickProbeJob) Collector() any                    { return j.collector }
 func (j *tickProbeJob) Start()                            {}
 func (j *tickProbeJob) Stop()                             {}
 func (j *tickProbeJob) Tick(int)                          {}
@@ -923,6 +921,17 @@ func (j *tickProbeJob) IsRunning() bool                   { return true }
 func (j *tickProbeJob) Panicked() bool                    { return false }
 func (j *tickProbeJob) Vnode() vnodes.VirtualNode         { return vnodes.VirtualNode{} }
 func (j *tickProbeJob) UpdateVnode(_ *vnodes.VirtualNode) {}
+
+type managerFunctionAvailability struct {
+	fn func(string) bool
+}
+
+func (a managerFunctionAvailability) FunctionAvailable(functionID string) bool {
+	if a.fn == nil {
+		return true
+	}
+	return a.fn(functionID)
+}
 
 type recordingFunctionRegistry struct {
 	mu         sync.Mutex

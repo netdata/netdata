@@ -43,6 +43,11 @@ type jobEntry struct {
 	generation uint64
 }
 
+type jobSnapshot struct {
+	name string
+	job  collectorapi.RuntimeJob
+}
+
 func newModuleFuncRegistry() *moduleFuncRegistry {
 	return &moduleFuncRegistry{
 		modules:      make(map[string]*moduleFunc),
@@ -103,9 +108,7 @@ func indexModuleFunctionKinds(shared, agent []funcapi.FunctionConfig) map[string
 		idx = make(map[string]moduleFunctionKind, len(agent))
 	}
 	for _, method := range agent {
-		if method.ID != "" {
-			idx[method.ID] = moduleFunctionAgent
-		}
+		idx[method.ID] = moduleFunctionAgent
 	}
 	if len(idx) == 0 {
 		return nil
@@ -119,9 +122,7 @@ func indexFunctionKinds(methods []funcapi.FunctionConfig, kind moduleFunctionKin
 	}
 	idx := make(map[string]moduleFunctionKind)
 	for _, method := range methods {
-		if method.ID != "" {
-			idx[method.ID] = kind
-		}
+		idx[method.ID] = kind
 	}
 	return idx
 }
@@ -248,6 +249,28 @@ func (r *moduleFuncRegistry) getJobNames(moduleName string) []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+func (r *moduleFuncRegistry) getJobSnapshots(moduleName string) []jobSnapshot {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	module, ok := r.modules[moduleName]
+	if !ok {
+		return nil
+	}
+
+	snapshots := make([]jobSnapshot, 0, len(module.jobs))
+	for name, entry := range module.jobs {
+		snapshots = append(snapshots, jobSnapshot{
+			name: name,
+			job:  entry.job,
+		})
+	}
+	sort.Slice(snapshots, func(i, j int) bool {
+		return snapshots[i].name < snapshots[j].name
+	})
+	return snapshots
 }
 
 func (r *moduleFuncRegistry) hasRunningJob(moduleName string) bool {

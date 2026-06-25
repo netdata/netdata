@@ -38,6 +38,10 @@ type methodExecutionInput struct {
 }
 
 func (c *Controller) ExecuteFunction(functionName string, fn functions.Function) {
+	if !c.publishedFunctionExists(functionName) {
+		c.respondError(fn, 404, "unknown function '%s'", functionName)
+		return
+	}
 	if moduleName, methodID, ok := c.registry.resolveMethodRoute(functionName); ok {
 		c.makeMethodFuncHandler(moduleName, methodID)(c.baseContext(), fn)
 		return
@@ -50,6 +54,12 @@ func (c *Controller) ExecuteFunction(functionName string, fn functions.Function)
 	}
 
 	c.makeMethodFuncHandler(moduleName, methodID)(c.baseContext(), fn)
+}
+
+func (c *Controller) publishedFunctionExists(functionName string) bool {
+	c.publishedMu.Lock()
+	defer c.publishedMu.Unlock()
+	return c.publishedFns.has(functionName)
 }
 
 func (c *Controller) publishedFunctionGenerationMatches(functionName string, generation uint64) bool {
@@ -181,7 +191,7 @@ func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) function
 		includeJobParam := c.methodRequiresJobParam(moduleName, kind)
 
 		if !includeJobParam {
-			job, jobName, jobGen, ok := c.resolveNoJobMethodJob(fn, moduleName, kind)
+			job, jobName, jobGen, ok := c.resolveNoJobMethodJob(fn, moduleName, methodID, kind)
 			if !ok {
 				return
 			}
@@ -202,15 +212,15 @@ func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) function
 					return c.resolveModuleMethodParams(ctx, methodCfg, handler, methodID)
 				},
 				respond: func(dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int) {
-					c.respondWithParams(fn, moduleName, dataResp, methodParams, updateEvery, methodCfg.ResponseType, false)
+					c.respondWithParams(fn, moduleName, methodID, dataResp, methodParams, updateEvery, methodCfg.ResponseType, false)
 				},
 			})
 			return
 		}
 
-		jobs := c.registry.getJobNames(moduleName)
+		jobs := c.availableSharedJobNames(moduleName, methodID)
 		if len(jobs) == 0 {
-			c.respondError(fn, 422, "no %s instances configured", moduleName)
+			c.respondError(fn, 404, "no %s instances available", moduleName)
 			return
 		}
 
@@ -258,13 +268,13 @@ func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) function
 				resolvedParams[paramJob] = resolvedJob
 			},
 			respond: func(dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int) {
-				c.respondWithParams(fn, moduleName, dataResp, methodParams, updateEvery, methodCfg.ResponseType, includeJobParam)
+				c.respondWithParams(fn, moduleName, methodID, dataResp, methodParams, updateEvery, methodCfg.ResponseType, includeJobParam)
 			},
 		})
 	}
 }
 
-func (c *Controller) resolveNoJobMethodJob(fn functions.Function, moduleName string, kind moduleFunctionKind) (collectorapi.RuntimeJob, string, uint64, bool) {
+func (c *Controller) resolveNoJobMethodJob(fn functions.Function, moduleName, methodID string, kind moduleFunctionKind) (collectorapi.RuntimeJob, string, uint64, bool) {
 	if kind == moduleFunctionAgent {
 		return nil, "", 0, true
 	}
@@ -278,6 +288,14 @@ func (c *Controller) resolveNoJobMethodJob(fn functions.Function, moduleName str
 	job, jobGen := c.registry.getJobWithGeneration(moduleName, jobName)
 	if job == nil {
 		c.respondError(fn, 503, "module '%s' is not running", moduleName)
+		return nil, "", 0, false
+	}
+	if !job.IsRunning() {
+		c.respondError(fn, 503, "module '%s' is not running", moduleName)
+		return nil, "", 0, false
+	}
+	if !sharedFunctionJobAvailable(job, methodID) {
+		c.respondError(fn, 404, "unknown function '%s:%s'", moduleName, methodID)
 		return nil, "", 0, false
 	}
 
@@ -308,7 +326,7 @@ func (c *Controller) handleMethodFuncInfo(moduleName, methodID string, fn functi
 		"has_history":     false,
 		"help":            help,
 		"accepted_params": buildAcceptedParams(methodParams, includeJobParam),
-		"required_params": c.buildRequiredParams(moduleName, methodParams, includeJobParam),
+		"required_params": c.buildRequiredParams(moduleName, methodID, methodParams, includeJobParam),
 	}
 
 	if presentation := methodCfg.Presentation(); presentation != nil {
@@ -318,10 +336,10 @@ func (c *Controller) handleMethodFuncInfo(moduleName, methodID string, fn functi
 	c.respondJSON(fn, resp)
 }
 
-func (c *Controller) buildRequiredParams(moduleName string, methodParams []funcapi.ParamConfig, includeJobParam bool) []map[string]any {
+func (c *Controller) buildRequiredParams(moduleName, methodID string, methodParams []funcapi.ParamConfig, includeJobParam bool) []map[string]any {
 	paramConfigs := make([]funcapi.ParamConfig, 0, len(methodParams)+1)
 	if includeJobParam {
-		jobs := c.registry.getJobNames(moduleName)
+		jobs := c.availableSharedJobNames(moduleName, methodID)
 		paramConfigs = append(paramConfigs, buildJobParamConfig(jobs))
 	}
 	paramConfigs = append(paramConfigs, methodParams...)

@@ -35,7 +35,7 @@ func TestRespondWithParams_ResponseType(t *testing.T) {
 		ResponseType: "topology",
 	}
 
-	controller.respondWithParams(functions.Function{}, "snmp", dataResp, nil, 1, "", true)
+	controller.respondWithParams(functions.Function{}, "snmp", "topology", dataResp, nil, 1, "", true)
 
 	assert.Equal(t, "topology", (*resp)["type"])
 }
@@ -47,7 +47,7 @@ func TestRespondWithParams_MethodTypeFallback(t *testing.T) {
 		Status: 200,
 	}
 
-	controller.respondWithParams(functions.Function{}, "snmp", dataResp, nil, 1, "topology", true)
+	controller.respondWithParams(functions.Function{}, "snmp", "topology", dataResp, nil, 1, "topology", true)
 
 	assert.Equal(t, "topology", (*resp)["type"])
 }
@@ -67,7 +67,7 @@ func TestRespondWithParams_AgentScopeOmitsJobParam(t *testing.T) {
 		}},
 	}
 
-	controller.respondWithParams(functions.Function{}, "snmp", dataResp, nil, 1, "topology", false)
+	controller.respondWithParams(functions.Function{}, "snmp", "topology", dataResp, nil, 1, "topology", false)
 
 	accepted, ok := (*resp)["accepted_params"].([]any)
 	assert.True(t, ok)
