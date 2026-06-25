@@ -13,7 +13,7 @@ endmeta-->
 # Ciscosystems SNMP Traps
 
 
-<img src="https://netdata.cloud/img/SNMP.png" width="150"/>
+<img src="https://netdata.cloud/img/cisco.svg" width="150"/>
 
 
 Plugin: go.d.plugin

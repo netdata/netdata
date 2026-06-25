@@ -13,7 +13,7 @@ endmeta-->
 # Juniper Networks Funk Software SNMP Traps
 
 
-<img src="https://netdata.cloud/img/SNMP.png" width="150"/>
+<img src="https://netdata.cloud/img/juniper.png" width="150"/>
 
 
 Plugin: go.d.plugin

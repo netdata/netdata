@@ -13,7 +13,7 @@ endmeta-->
 # Juniper SRX
 
 
-<img src="https://netdata.cloud/img/juniper.svg" width="150"/>
+<img src="https://netdata.cloud/img/juniper.png" width="150"/>
 
 
 Plugin: go.d.plugin

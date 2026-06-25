@@ -13,7 +13,7 @@ endmeta-->
 # Mikrotik SNMP Traps
 
 
-<img src="https://netdata.cloud/img/mikrotik.svg" width="150"/>
+<img src="https://netdata.cloud/img/mikrotik.png" width="150"/>
 
 
 Plugin: go.d.plugin

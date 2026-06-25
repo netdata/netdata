@@ -13,7 +13,7 @@ endmeta-->
 # Arista Switch
 
 
-<img src="https://netdata.cloud/img/arista.svg" width="150"/>
+<img src="https://netdata.cloud/img/SNMP.png" width="150"/>
 
 
 Plugin: go.d.plugin
