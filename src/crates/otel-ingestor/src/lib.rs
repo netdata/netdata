@@ -35,6 +35,13 @@ use logs_service::NetdataLogsService;
 use metrics_service::{ChartManager, NetdataMetricsService};
 use trace_service::NetdataTracesService;
 
+// The logs WAL writer stamps `FileId::DEFAULT_PIPELINE`; pin it to the shared
+// `LOGS_PIPELINE_ID` on the ingestor side too (the ledger pins the same invariant
+// on its side) so a future change to either can't silently mis-route logs.
+const _: () = assert!(
+    bridge::signals::LOGS_PIPELINE_ID == file_registry::FileId::DEFAULT_PIPELINE
+);
+
 /// Ingestor worker entry point.
 ///
 /// Connects to the supervisor's IPC socket, performs the Configure → Ready

@@ -170,5 +170,9 @@ fn seal_summary_only(wal_path: &Path, sfst_path: &Path) -> anyhow::Result<(sfst:
     // partial SFST that recovery would treat as a valid sealed file.
     let buf = sfst::write_summary_only(std::io::Cursor::new(Vec::new()), &summary)?.into_inner();
     file_registry::durable::write_atomic(sfst_path, &buf)?;
-    Ok((summary, buf.len() as u64))
+    // Read the size back from disk (rather than `buf.len()`), matching the logs
+    // indexer — so the tracked size always reflects the on-disk file even if the
+    // atomic-write path ever adds framing of its own.
+    let size = std::fs::metadata(sfst_path)?.len();
+    Ok((summary, size))
 }

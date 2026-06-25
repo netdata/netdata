@@ -37,6 +37,7 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use bridge::config::LifecycleConfig;
+use bridge::signals::{LOGS_PIPELINE_ID, TRACES_PIPELINE_ID};
 use bridge::{LedgerRequest, LedgerResponse};
 use ferryboat::Connection;
 use file_registry::FileId;
@@ -61,11 +62,10 @@ const CHUNK_CACHE_BYTES: u64 = 256 * 1024 * 1024;
 /// rest of upload governance if tuning proves necessary.
 const UPLOAD_CONCURRENCY: usize = 8;
 
-/// Signal axes, from the single source of truth in `bridge::signals` (shared
-/// with the ingestor's WAL stamping). `LOGS_PIPELINE_ID` MUST equal the `FileId`
-/// default pipeline (the WAL producer stamps it for logs) — pinned here, where
-/// both constants are visible, since `bridge` does not depend on `file-registry`.
-use bridge::signals::{LOGS_PIPELINE_ID, TRACES_PIPELINE_ID};
+// The signal axes come from the single source of truth in `bridge::signals`
+// (shared with the ingestor's WAL stamping). `LOGS_PIPELINE_ID` MUST equal the
+// `FileId` default pipeline (the WAL producer stamps it for logs) — pinned here,
+// where both constants are visible, since `bridge` does not depend on `file-registry`.
 const _: () = assert!(LOGS_PIPELINE_ID == FileId::DEFAULT_PIPELINE);
 
 pub struct Ledger {
