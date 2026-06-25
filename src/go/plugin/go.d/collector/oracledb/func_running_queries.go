@@ -17,8 +17,8 @@ const (
 	runningQueriesMaxTextLength = 4096
 )
 
-func runningQueriesMethodConfig() funcapi.MethodConfig {
-	return funcapi.MethodConfig{
+func runningQueriesFunctionConfig() funcapi.FunctionConfig {
+	return funcapi.FunctionConfig{
 		ID:             runningQueriesMethodID,
 		Name:           "Running Queries",
 		UpdateEvery:    10,

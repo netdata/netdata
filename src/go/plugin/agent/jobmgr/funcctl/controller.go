@@ -85,34 +85,58 @@ func (c *Controller) RegisterModules(modules collectorapi.Registry) {
 	plannedPublicNames := make(map[string]string)
 	for _, name := range names {
 		creator := modules[name]
-		if creator.Methods == nil && creator.JobMethods == nil {
+		if creator.SharedFunctions == nil && creator.AgentFunctions == nil && creator.JobMethods == nil {
 			continue
 		}
-		methods := moduleMethods(creator)
-		if functionName, owner, collides := c.moduleMethodPublicNameCollision(name, methods, plannedPublicNames); collides {
+		functions := moduleFunctionDeclarations(creator)
+		if functionName, owner, collides := c.moduleMethodPublicNameCollision(name, functions.configs, plannedPublicNames); collides {
 			c.Errorf("skipping function registration for module '%s': public function name '%s' collides with %s", name, functionName, owner)
 			continue
 		}
-		c.registry.registerModuleWithMethods(name, creator, methods)
-		c.registerAvailableModuleMethods(name, methods, true)
+		c.registry.registerModuleWithDeclarations(name, creator, functions)
+		c.registerAvailableModuleMethods(name, functions.configs, true)
 	}
 }
 
-func moduleMethods(creator collectorapi.Creator) []funcapi.MethodConfig {
-	if creator.Methods == nil {
+type moduleFunctionDecls struct {
+	configs []funcapi.FunctionConfig
+	kinds   map[string]moduleFunctionKind
+}
+
+func moduleFunctionDeclarations(creator collectorapi.Creator) moduleFunctionDecls {
+	shared := moduleSharedFunctions(creator)
+	agent := moduleAgentFunctions(creator)
+	configs := make([]funcapi.FunctionConfig, 0, len(shared)+len(agent))
+	configs = append(configs, shared...)
+	configs = append(configs, agent...)
+	return moduleFunctionDecls{
+		configs: configs,
+		kinds:   indexModuleFunctionKinds(shared, agent),
+	}
+}
+
+func moduleSharedFunctions(creator collectorapi.Creator) []funcapi.FunctionConfig {
+	if creator.SharedFunctions == nil {
 		return nil
 	}
-	return creator.Methods()
+	return creator.SharedFunctions()
 }
 
-func (c *Controller) moduleMethodPublicNameCollision(moduleName string, methods []funcapi.MethodConfig, planned map[string]string) (string, string, bool) {
+func moduleAgentFunctions(creator collectorapi.Creator) []funcapi.FunctionConfig {
+	if creator.AgentFunctions == nil {
+		return nil
+	}
+	return creator.AgentFunctions()
+}
+
+func (c *Controller) moduleMethodPublicNameCollision(moduleName string, methods []funcapi.FunctionConfig, planned map[string]string) (string, string, bool) {
 	modulePlanned := make(map[string]string)
 	for _, method := range methods {
 		if method.ID == "" {
 			continue
 		}
 		owner := fmt.Sprintf("%s:%s", moduleName, method.ID)
-		for _, functionName := range funcapi.MethodFunctionNames(moduleName, method) {
+		for _, functionName := range funcapi.FunctionNames(moduleName, method) {
 			if routeModule, routeMethod, ok := c.registry.resolveMethodRoute(functionName); ok {
 				return functionName, fmt.Sprintf("%s:%s", routeModule, routeMethod), true
 			}
@@ -199,7 +223,7 @@ func (c *Controller) registerModuleMethodsOnJobStart(moduleName string) {
 	c.registerAvailableModuleMethods(moduleName, methods, false)
 }
 
-func (c *Controller) registerAvailableModuleMethods(moduleName string, methods []funcapi.MethodConfig, agentScopeOnly bool) {
+func (c *Controller) registerAvailableModuleMethods(moduleName string, methods []funcapi.FunctionConfig, agentScopeOnly bool) {
 	publishes := c.collectAvailableModuleMethodPublishes(moduleName, methods, agentScopeOnly)
 	for _, publish := range publishes {
 		c.registerFunction(publish.name, publish.handler)
@@ -212,16 +236,17 @@ func (c *Controller) registerAvailableModuleMethods(moduleName string, methods [
 	}
 }
 
-func (c *Controller) collectAvailableModuleMethodPublishes(moduleName string, methods []funcapi.MethodConfig, agentScopeOnly bool) []functionPublish {
+func (c *Controller) collectAvailableModuleMethodPublishes(moduleName string, methods []funcapi.FunctionConfig, agentScopeOnly bool) []functionPublish {
 	c.publishedMu.Lock()
 	defer c.publishedMu.Unlock()
 
 	var publishes []functionPublish
 	for i, method := range methods {
-		if agentScopeOnly && method.Scope != funcapi.MethodScopeAgent {
+		kind := c.registry.getModuleFunctionKind(moduleName, method.ID)
+		if agentScopeOnly && c.methodRequiresJobParam(moduleName, kind) {
 			continue
 		}
-		if method.ID != "" && c.allMethodFunctionNamesPublishedLocked(moduleName, method) {
+		if method.ID != "" && c.allFunctionNamesPublishedLocked(moduleName, method) {
 			continue
 		}
 		if !methodAvailable(method) {
@@ -245,7 +270,7 @@ func (c *Controller) collectAvailableModuleMethodPublishes(moduleName string, me
 		}
 
 		if c.api != nil {
-			for _, funcName := range funcapi.MethodFunctionNames(moduleName, method) {
+			for _, funcName := range funcapi.FunctionNames(moduleName, method) {
 				if c.publishedFns.has(funcName) {
 					continue
 				}
@@ -267,7 +292,7 @@ func (c *Controller) collectAvailableModuleMethodPublishes(moduleName string, me
 			continue
 		}
 
-		for _, funcName := range funcapi.MethodFunctionNames(moduleName, method) {
+		for _, funcName := range funcapi.FunctionNames(moduleName, method) {
 			if c.publishedFns.has(funcName) {
 				continue
 			}
@@ -281,19 +306,19 @@ func (c *Controller) collectAvailableModuleMethodPublishes(moduleName string, me
 	return publishes
 }
 
-func (c *Controller) allMethodFunctionNamesPublishedLocked(moduleName string, method funcapi.MethodConfig) bool {
-	names := funcapi.MethodFunctionNames(moduleName, method)
+func (c *Controller) allFunctionNamesPublishedLocked(moduleName string, method funcapi.FunctionConfig) bool {
+	names := funcapi.FunctionNames(moduleName, method)
 	return c.publishedFns.all(names)
 }
 
-func methodTags(method funcapi.MethodConfig) string {
+func methodTags(method funcapi.FunctionConfig) string {
 	if method.Tags != "" {
 		return method.Tags
 	}
 	return "top"
 }
 
-func methodAvailable(method funcapi.MethodConfig) bool {
+func methodAvailable(method funcapi.FunctionConfig) bool {
 	return method.Available == nil || method.Available()
 }
 
@@ -308,7 +333,7 @@ func (c *Controller) registerFunction(name string, handler functions.Handler) {
 	})
 }
 
-func (c *Controller) registerJobMethods(job collectorapi.RuntimeJob, methods []funcapi.MethodConfig) {
+func (c *Controller) registerJobMethods(job collectorapi.RuntimeJob, methods []funcapi.FunctionConfig) {
 	planned := make(map[string]struct{}, len(methods))
 
 	for _, method := range methods {
@@ -349,7 +374,7 @@ func (c *Controller) registerJobMethods(job collectorapi.RuntimeJob, methods []f
 	}
 }
 
-func (c *Controller) collectJobMethodPublishes(job collectorapi.RuntimeJob, methods []funcapi.MethodConfig) []functionPublish {
+func (c *Controller) collectJobMethodPublishes(job collectorapi.RuntimeJob, methods []funcapi.FunctionConfig) []functionPublish {
 	c.publishedMu.Lock()
 	defer c.publishedMu.Unlock()
 

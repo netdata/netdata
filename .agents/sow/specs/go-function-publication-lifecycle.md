@@ -4,31 +4,36 @@
 
 This spec applies to go.d Functions registered through:
 
-- `collectorapi.Creator.Methods` for module/static methods.
+- `collectorapi.Creator.SharedFunctions` for static shared job-backed
+  Functions.
+- `collectorapi.Creator.AgentFunctions` for static true-agent Functions.
 - `collectorapi.Creator.JobMethods` for per-job methods.
-- `funcapi.MethodConfig.Available` for first-publication gating.
+- `funcapi.FunctionConfig.Available` for first-publication gating.
 
 It does not define Netdata Cloud discovery behavior beyond the Agent-side
 publication stream emitted by go.d.
 
-## Module And Static Methods
+## Static Functions
 
-- Module/static methods MUST be declared through `collectorapi.Creator.Methods`.
-- funcctl owns module/static Function publication. Collectors MUST NOT publish
-  their module/static Functions by calling `funcctl`, `dyncfg.Responder`,
+- Static shared job-backed Functions MUST be declared through
+  `collectorapi.Creator.SharedFunctions`.
+- Static true-agent Functions MUST be declared through
+  `collectorapi.Creator.AgentFunctions`.
+- funcctl owns static Function publication. Collectors MUST NOT publish
+  their static Functions by calling `funcctl`, `dyncfg.Responder`,
   `netdataapi`, or plugins.d `FUNCTION` commands directly.
 - `Available == nil` means the method is available for publication.
 - `Available != nil` gates first publication only.
-- funcctl MAY recheck unpublished module/static methods while jobs are running.
+- funcctl MAY recheck unpublished static Functions while jobs are running.
   jobmgr currently performs this recheck from the running-job tick loop.
 - Publication is monotonic:
-  - once funcctl publishes a module/static Function, later `Available == false`
+  - once funcctl publishes a static Function, later `Available == false`
     results MUST NOT withdraw it;
   - the Function remains published until go.d cleanup or restart;
   - withdrawal-on-empty requires a separate explicit lifecycle design.
 - Rechecks MUST reuse the normal funcctl publication path so public names,
-  aliases, tags, `RequireCloud`, `MethodScope`, handler wiring, and collision
-  behavior stay consistent.
+  aliases, tags, `RequireCloud`, handler wiring, and collision behavior stay
+  consistent.
 
 ## `Available` Predicate Contract
 
@@ -51,7 +56,7 @@ publication stream emitted by go.d.
 
 ## Validation Guidance
 
-- Tests for a module/static method with `Available` SHOULD cover:
+- Tests for a static Function with `Available` SHOULD cover:
   - not published at module registration or job start while unavailable;
   - published after a running-job recheck when availability turns true;
   - not duplicated after publication;

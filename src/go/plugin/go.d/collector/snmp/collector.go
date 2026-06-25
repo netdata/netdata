@@ -37,10 +37,10 @@ func newCreator(store *ddsnmp.DeviceStore) collectorapi.Creator {
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 10,
 		},
-		Create:        func() collectorapi.CollectorV1 { return New(store) },
-		Config:        func() any { return &Config{} },
-		Methods:       snmpMethods,
-		MethodHandler: snmpFunctionHandler,
+		Create:          func() collectorapi.CollectorV1 { return New(store) },
+		Config:          func() any { return &Config{} },
+		SharedFunctions: snmpMethods,
+		MethodHandler:   snmpFunctionHandler,
 	}
 }
 

@@ -26,13 +26,13 @@ var _ funcapi.MethodHandler = (*funcTable)(nil)
 // sqlJobMethods returns method configs for a specific SQL job.
 // Each configured function becomes a separate method: "jobName:functionID"
 // This results in functions like "sql:postgres_test:active-queries"
-func sqlJobMethods(job collectorapi.RuntimeJob) []funcapi.MethodConfig {
+func sqlJobMethods(job collectorapi.RuntimeJob) []funcapi.FunctionConfig {
 	c, ok := job.Collector().(*Collector)
 	if !ok || len(c.Config.Functions) == 0 {
 		return nil
 	}
 
-	methods := make([]funcapi.MethodConfig, 0, len(c.Config.Functions))
+	methods := make([]funcapi.FunctionConfig, 0, len(c.Config.Functions))
 	for _, fn := range c.Config.Functions {
 		// Method ID format: "jobName:functionID" (e.g., "postgres_test:active-queries")
 		// Full function name will be: "sql:postgres_test:active-queries"
@@ -44,7 +44,7 @@ func sqlJobMethods(job collectorapi.RuntimeJob) []funcapi.MethodConfig {
 			help = "Execute SQL query: " + fn.ID
 		}
 
-		methods = append(methods, funcapi.MethodConfig{
+		methods = append(methods, funcapi.FunctionConfig{
 			ID:           methodID,
 			Name:         methodName,
 			Help:         help,

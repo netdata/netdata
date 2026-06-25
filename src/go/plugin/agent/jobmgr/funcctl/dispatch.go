@@ -18,7 +18,7 @@ const (
 	paramJob = "__job"
 )
 
-type methodParamResolver func(ctx context.Context, methodCfg *funcapi.MethodConfig, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, error)
+type methodParamResolver func(ctx context.Context, methodCfg *funcapi.FunctionConfig, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, error)
 
 type methodExecutionInput struct {
 	fn            functions.Function
@@ -26,7 +26,7 @@ type methodExecutionInput struct {
 	jobName       string
 	jobLabel      string
 	methodID      string
-	methodCfg     *funcapi.MethodConfig
+	methodCfg     *funcapi.FunctionConfig
 	job           collectorapi.RuntimeJob
 	jobGen        uint64
 	info          bool
@@ -165,7 +165,7 @@ func (c *Controller) makePublishedMethodFuncHandler(functionName string, generat
 
 func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) functions.Handler {
 	return func(ctx context.Context, fn functions.Function) {
-		methodCfg, ok := c.registry.getMethod(moduleName, methodID)
+		methodCfg, kind, ok := c.registry.getMethod(moduleName, methodID)
 		if !ok {
 			c.respondError(fn, 404, "unknown method '%s' for module '%s'", methodID, moduleName)
 			return
@@ -178,10 +178,10 @@ func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) function
 
 		payload := parsePayload(fn.Payload)
 		argValues := parseArgsParams(fn.Args)
-		includeJobParam := methodRequiresJobParam(methodCfg)
+		includeJobParam := c.methodRequiresJobParam(moduleName, kind)
 
 		if !includeJobParam {
-			job, jobName, jobGen, ok := c.resolveAgentScopeMethodJob(fn, moduleName)
+			job, jobName, jobGen, ok := c.resolveNoJobMethodJob(fn, moduleName, kind)
 			if !ok {
 				return
 			}
@@ -198,7 +198,7 @@ func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) function
 				info:       info,
 				payload:    payload,
 				argValues:  argValues,
-				resolveParams: func(ctx context.Context, methodCfg *funcapi.MethodConfig, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, error) {
+				resolveParams: func(ctx context.Context, methodCfg *funcapi.FunctionConfig, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, error) {
 					return c.resolveModuleMethodParams(ctx, methodCfg, handler, methodID)
 				},
 				respond: func(dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int) {
@@ -251,7 +251,7 @@ func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) function
 			info:       info,
 			payload:    payload,
 			argValues:  argValues,
-			resolveParams: func(ctx context.Context, methodCfg *funcapi.MethodConfig, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, error) {
+			resolveParams: func(ctx context.Context, methodCfg *funcapi.FunctionConfig, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, error) {
 				return c.resolveModuleMethodParams(ctx, methodCfg, handler, methodID)
 			},
 			augmentParams: func(resolvedParams funcapi.ResolvedParams) {
@@ -264,7 +264,11 @@ func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) function
 	}
 }
 
-func (c *Controller) resolveAgentScopeMethodJob(fn functions.Function, moduleName string) (collectorapi.RuntimeJob, string, uint64, bool) {
+func (c *Controller) resolveNoJobMethodJob(fn functions.Function, moduleName string, kind moduleFunctionKind) (collectorapi.RuntimeJob, string, uint64, bool) {
+	if kind == moduleFunctionAgent {
+		return nil, "", 0, true
+	}
+
 	creator, ok := c.registry.getCreator(moduleName)
 	if !ok || creator.InstancePolicy != collectorapi.InstancePolicySingle {
 		return nil, "", 0, true
@@ -281,14 +285,14 @@ func (c *Controller) resolveAgentScopeMethodJob(fn functions.Function, moduleNam
 }
 
 func (c *Controller) handleMethodFuncInfo(moduleName, methodID string, fn functions.Function) {
-	methodCfg, ok := c.registry.getMethod(moduleName, methodID)
+	methodCfg, kind, ok := c.registry.getMethod(moduleName, methodID)
 	if !ok {
 		c.respondError(fn, 404, "unknown method '%s' for module '%s'", methodID, moduleName)
 		return
 	}
 
 	methodParams := methodCfg.RequiredParams
-	includeJobParam := methodRequiresJobParam(methodCfg)
+	includeJobParam := c.methodRequiresJobParam(moduleName, kind)
 	help := methodCfg.Help
 	if help == "" {
 		help = fmt.Sprintf("%s %s data function", moduleName, methodID)
@@ -329,7 +333,7 @@ func (c *Controller) buildRequiredParams(moduleName string, methodParams []funca
 	return required
 }
 
-func (c *Controller) resolveModuleMethodParams(ctx context.Context, methodCfg *funcapi.MethodConfig, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, error) {
+func (c *Controller) resolveModuleMethodParams(ctx context.Context, methodCfg *funcapi.FunctionConfig, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, error) {
 	methodParams := methodCfg.RequiredParams
 
 	handlerParams, err := handler.MethodParams(ctx, methodID)
@@ -526,8 +530,15 @@ func buildAcceptedParams(methodParams []funcapi.ParamConfig, includeJobParam boo
 	return accepted
 }
 
-func methodRequiresJobParam(cfg *funcapi.MethodConfig) bool {
-	return cfg == nil || cfg.Scope != funcapi.MethodScopeAgent
+func (c *Controller) methodRequiresJobParam(moduleName string, kind moduleFunctionKind) bool {
+	if kind == moduleFunctionAgent {
+		return false
+	}
+	creator, ok := c.registry.getCreator(moduleName)
+	if !ok {
+		return true
+	}
+	return creator.InstancePolicy != collectorapi.InstancePolicySingle
 }
 
 func (c *Controller) makePublishedJobMethodFuncHandler(functionName string, generation uint64, moduleName, jobName, methodID string) functions.Handler {
@@ -575,7 +586,7 @@ func (c *Controller) makeJobMethodFuncHandler(moduleName, jobName, methodID stri
 			info:       info,
 			payload:    payload,
 			argValues:  argValues,
-			resolveParams: func(ctx context.Context, methodCfg *funcapi.MethodConfig, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, error) {
+			resolveParams: func(ctx context.Context, methodCfg *funcapi.FunctionConfig, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, error) {
 				return c.resolveJobMethodParams(ctx, methodCfg, handler, methodID)
 			},
 			respond: func(dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int) {
@@ -618,7 +629,7 @@ func (c *Controller) handleJobMethodFuncInfo(moduleName, jobName, methodID strin
 	c.respondJSON(fn, resp)
 }
 
-func (c *Controller) resolveJobMethodParams(ctx context.Context, methodCfg *funcapi.MethodConfig, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, error) {
+func (c *Controller) resolveJobMethodParams(ctx context.Context, methodCfg *funcapi.FunctionConfig, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, error) {
 	methodParams := methodCfg.RequiredParams
 
 	jobParams, err := handler.MethodParams(ctx, methodID)

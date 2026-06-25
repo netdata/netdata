@@ -1997,7 +1997,7 @@ func TestManager_Run_FunctionOnly(t *testing.T) {
 CONFIG test:collector:nofuncs:test create accepted job /collectors/test/Jobs user 'type=user,module=nofuncs,job=test' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 1-enable 400 application/json
-{"status":400,"errorMessage":"invalid configuration: failed to apply configuration: function_only is set but nofuncs module has no methods defined"}
+{"status":400,"errorMessage":"invalid configuration: failed to apply configuration: function_only is set but nofuncs module has no functions defined"}
 FUNCTION_RESULT_END
 
 CONFIG test:collector:nofuncs:test status failed

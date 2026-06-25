@@ -20,7 +20,7 @@ func (a funcDepsAdapter) CurrentTopology() (*topologyv1.Data, bool) {
 	return a.store.CurrentTopology()
 }
 
-func catoMethods() []funcapi.MethodConfig {
+func catoMethods() []funcapi.FunctionConfig {
 	return catofunc.Methods(defaultUpdateEvery)
 }
 

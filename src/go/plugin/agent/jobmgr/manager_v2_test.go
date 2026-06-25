@@ -90,7 +90,7 @@ func TestManagerCreateCollectorJobV2Branching(t *testing.T) {
 				CreateV2: func() collectorapi.CollectorV2 {
 					return &testV2Module{store: metrix.NewCollectorStore()}
 				},
-				JobMethods: func(_ collectorapi.RuntimeJob) []funcapi.MethodConfig { return nil },
+				JobMethods: func(_ collectorapi.RuntimeJob) []funcapi.FunctionConfig { return nil },
 			},
 			wantV2: true,
 		},
@@ -99,7 +99,7 @@ func TestManagerCreateCollectorJobV2Branching(t *testing.T) {
 				CreateV2: func() collectorapi.CollectorV2 {
 					return &testV2Module{store: metrix.NewCollectorStore()}
 				},
-				JobMethods: func(_ collectorapi.RuntimeJob) []funcapi.MethodConfig { return nil },
+				JobMethods: func(_ collectorapi.RuntimeJob) []funcapi.FunctionConfig { return nil },
 			},
 			wantV2: true,
 		},
@@ -108,7 +108,7 @@ func TestManagerCreateCollectorJobV2Branching(t *testing.T) {
 				CreateV2: func() collectorapi.CollectorV2 {
 					return &testV2Module{store: nil}
 				},
-				JobMethods: func(_ collectorapi.RuntimeJob) []funcapi.MethodConfig { return nil },
+				JobMethods: func(_ collectorapi.RuntimeJob) []funcapi.FunctionConfig { return nil },
 			},
 			functionOnly: true,
 			wantV2:       true,
@@ -147,7 +147,7 @@ func TestManagerCreateCollectorJobSingleInstancePolicyAllowsV2FunctionOnly(t *te
 		"testmod": {
 			InstancePolicy: collectorapi.InstancePolicySingle,
 			CreateV2:       func() collectorapi.CollectorV2 { return mod },
-			JobMethods:     func(_ collectorapi.RuntimeJob) []funcapi.MethodConfig { return nil },
+			JobMethods:     func(_ collectorapi.RuntimeJob) []funcapi.FunctionConfig { return nil },
 		},
 	}
 

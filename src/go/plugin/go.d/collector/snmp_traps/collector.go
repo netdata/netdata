@@ -59,10 +59,10 @@ func newCreator(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 1,
 		},
-		CreateV2:      func() collectorapi.CollectorV2 { return New(deviceStore, topologyEnricher) },
-		Config:        func() any { return &Config{} },
-		Methods:       snmpTrapsMethods,
-		MethodHandler: snmpTrapsMethodHandler,
+		CreateV2:       func() collectorapi.CollectorV2 { return New(deviceStore, topologyEnricher) },
+		Config:         func() any { return &Config{} },
+		AgentFunctions: snmpTrapsMethods,
+		MethodHandler:  snmpTrapsMethodHandler,
 	}
 }
 

@@ -85,8 +85,8 @@ func TestHandleMethodFuncInfo_UsesResponseType(t *testing.T) {
 	controller, resp := newTestControllerWithCapture(t)
 
 	controller.registry.registerModule("snmp", collectorapi.Creator{
-		Methods: func() []funcapi.MethodConfig {
-			return []funcapi.MethodConfig{{ID: "topology:snmp", ResponseType: "topology"}}
+		SharedFunctions: func() []funcapi.FunctionConfig {
+			return []funcapi.FunctionConfig{{ID: "topology:snmp", ResponseType: "topology"}}
 		},
 	})
 
@@ -99,11 +99,10 @@ func TestHandleMethodFuncInfo_AgentScopeOmitsJobParam(t *testing.T) {
 	controller, resp := newTestControllerWithCapture(t)
 
 	controller.registry.registerModule("snmp", collectorapi.Creator{
-		Methods: func() []funcapi.MethodConfig {
-			return []funcapi.MethodConfig{{
+		AgentFunctions: func() []funcapi.FunctionConfig {
+			return []funcapi.FunctionConfig{{
 				ID:           "topology:snmp",
 				ResponseType: "topology",
-				Scope:        funcapi.MethodScopeAgent,
 				RequiredParams: []funcapi.ParamConfig{{
 					ID:        "topology_view",
 					Name:      "Topology View",
@@ -135,7 +134,7 @@ func TestHandleJobMethodFuncInfo_UsesResponseType(t *testing.T) {
 	controller, resp := newTestControllerWithCapture(t)
 
 	controller.registry.registerModule("netflow", collectorapi.Creator{})
-	controller.registry.registerJobMethods("netflow", "job1", []funcapi.MethodConfig{
+	controller.registry.registerJobMethods("netflow", "job1", []funcapi.FunctionConfig{
 		{ID: "flows:netflow", ResponseType: "flows"},
 	})
 
@@ -148,9 +147,9 @@ func TestHandleMethodFuncInfo_IncludesPresentation(t *testing.T) {
 	controller, resp := newTestControllerWithCapture(t)
 
 	controller.registry.registerModule("snmp", collectorapi.Creator{
-		Methods: func() []funcapi.MethodConfig {
-			return []funcapi.MethodConfig{
-				funcapi.MethodConfig{
+		SharedFunctions: func() []funcapi.FunctionConfig {
+			return []funcapi.FunctionConfig{
+				funcapi.FunctionConfig{
 					ID:           "topology:snmp",
 					ResponseType: "topology",
 				}.WithPresentation(map[string]any{

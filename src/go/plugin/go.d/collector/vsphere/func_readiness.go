@@ -108,14 +108,14 @@ type funcReadiness struct {
 
 var _ funcapi.MethodHandler = (*funcReadiness)(nil)
 
-func vsphereMethods() []funcapi.MethodConfig {
-	return []funcapi.MethodConfig{{
+func vsphereMethods() []funcapi.FunctionConfig {
+	return []funcapi.FunctionConfig{{
 		ID:           readinessMethodID,
 		Name:         "vSphere Readiness",
 		UpdateEvery:  30,
 		Help:         readinessMethodHelp,
 		RequireCloud: true,
-	}, vsphereTopologyMethodConfig()}
+	}, vsphereTopologyFunctionConfig()}
 }
 
 func vsphereMethodHandler(job collectorapi.RuntimeJob) funcapi.MethodHandler {

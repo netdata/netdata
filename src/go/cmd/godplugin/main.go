@@ -271,7 +271,7 @@ func resolveFunctionCLIRequest(functionName string, registry collectorapi.Regist
 			err:    fmt.Errorf("unknown module '%s'", splitModuleName),
 		}
 	}
-	if creator.Methods == nil {
+	if len(functionCLIStaticFunctions(creator)) == 0 {
 		return "", "", collectorapi.Creator{}, functionCLIResolutionError{
 			status: 404,
 			err:    fmt.Errorf("module '%s' does not expose functions", splitModuleName),
@@ -289,19 +289,27 @@ func resolveFunctionCLIRequestByPublicName(functionName string, registry collect
 
 	for _, moduleName := range moduleNames {
 		creator := registry[moduleName]
-		if creator.Methods == nil {
-			continue
-		}
-		for _, method := range creator.Methods() {
+		for _, method := range functionCLIStaticFunctions(creator) {
 			if method.ID == "" {
 				continue
 			}
-			if slices.Contains(funcapi.MethodFunctionNames(moduleName, method), functionName) {
+			if slices.Contains(funcapi.FunctionNames(moduleName, method), functionName) {
 				return moduleName, method.ID, creator, true
 			}
 		}
 	}
 	return "", "", collectorapi.Creator{}, false
+}
+
+func functionCLIStaticFunctions(creator collectorapi.Creator) []funcapi.FunctionConfig {
+	var functions []funcapi.FunctionConfig
+	if creator.SharedFunctions != nil {
+		functions = append(functions, creator.SharedFunctions()...)
+	}
+	if creator.AgentFunctions != nil {
+		functions = append(functions, creator.AgentFunctions()...)
+	}
+	return functions
 }
 
 func readFunctionPayload(raw string) ([]byte, time.Duration, error) {

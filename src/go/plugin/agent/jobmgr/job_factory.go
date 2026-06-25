@@ -96,8 +96,8 @@ func (f *jobFactory) create(cfg confgroup.Config) (runtimeJob, error) {
 	}
 
 	functionOnly := creator.FunctionOnly || cfg.FunctionOnly()
-	if cfg.FunctionOnly() && creator.Methods == nil && creator.JobMethods == nil {
-		return nil, fmt.Errorf("function_only is set but %s module has no methods defined", cfg.Module())
+	if cfg.FunctionOnly() && creator.SharedFunctions == nil && creator.AgentFunctions == nil && creator.JobMethods == nil {
+		return nil, fmt.Errorf("function_only is set but %s module has no functions defined", cfg.Module())
 	}
 
 	var vnode *vnodes.VirtualNode

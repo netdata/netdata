@@ -22,7 +22,8 @@ func TestSNMPFamilyRegistrationUsesSharedDependencies(t *testing.T) {
 	assert.NotNil(t, snmpCreator.Create)
 	assert.Nil(t, snmpCreator.CreateV2)
 	assert.NotNil(t, snmpCreator.Config)
-	assert.NotNil(t, snmpCreator.Methods)
+	assert.NotNil(t, snmpCreator.SharedFunctions)
+	assert.Nil(t, snmpCreator.AgentFunctions)
 	assert.NotNil(t, snmpCreator.MethodHandler)
 	assert.Equal(t, 10, snmpCreator.Defaults.UpdateEvery)
 
@@ -30,13 +31,15 @@ func TestSNMPFamilyRegistrationUsesSharedDependencies(t *testing.T) {
 	assert.NotNil(t, topologyCreator.CreateV2)
 	assert.Equal(t, collectorapi.InstancePolicySingle, topologyCreator.InstancePolicy)
 	assert.False(t, topologyCreator.FunctionOnly)
-	assert.NotNil(t, topologyCreator.Methods)
+	assert.NotNil(t, topologyCreator.SharedFunctions)
+	assert.Nil(t, topologyCreator.AgentFunctions)
 	assert.NotNil(t, topologyCreator.MethodHandler)
 	assert.Equal(t, 60, topologyCreator.Defaults.UpdateEvery)
 
 	assert.Nil(t, trapsCreator.Create)
 	assert.NotNil(t, trapsCreator.CreateV2)
-	assert.NotNil(t, trapsCreator.Methods)
+	assert.Nil(t, trapsCreator.SharedFunctions)
+	assert.NotNil(t, trapsCreator.AgentFunctions)
 	assert.NotNil(t, trapsCreator.MethodHandler)
 	assert.Equal(t, 1, trapsCreator.Defaults.UpdateEvery)
 

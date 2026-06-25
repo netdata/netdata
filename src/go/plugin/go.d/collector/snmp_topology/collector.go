@@ -43,11 +43,11 @@ func newCreator(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentH
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 60,
 		},
-		CreateV2:       func() collectorapi.CollectorV2 { return newCollector(deviceStore, trapEnrichment, availability) },
-		Config:         func() any { return &Config{} },
-		InstancePolicy: collectorapi.InstancePolicySingle,
-		Methods:        func() []funcapi.MethodConfig { return topologyMethods(availability) },
-		MethodHandler:  topologyFunctionHandler,
+		CreateV2:        func() collectorapi.CollectorV2 { return newCollector(deviceStore, trapEnrichment, availability) },
+		Config:          func() any { return &Config{} },
+		InstancePolicy:  collectorapi.InstancePolicySingle,
+		SharedFunctions: func() []funcapi.FunctionConfig { return topologyMethods(availability) },
+		MethodHandler:   topologyFunctionHandler,
 	}
 }
 

@@ -44,7 +44,7 @@ func (m *mockMethodHandler) Cleanup(context.Context) {}
 
 func TestExecuteFunction_ModuleMethodPaths(t *testing.T) {
 	tests := map[string]struct {
-		methods           []funcapi.MethodConfig
+		methods           []funcapi.FunctionConfig
 		fnArgs            []string
 		fnPayload         map[string]any
 		generationRace    bool
@@ -57,7 +57,7 @@ func TestExecuteFunction_ModuleMethodPaths(t *testing.T) {
 		wantErrorContains string
 	}{
 		"success with __job resolution": {
-			methods:         []funcapi.MethodConfig{{ID: "details", Help: "details help"}},
+			methods:         []funcapi.FunctionConfig{{ID: "details", Help: "details help"}},
 			fnArgs:          []string{"__job:job1"},
 			wantStatus:      200,
 			wantHelp:        "details help",
@@ -67,7 +67,7 @@ func TestExecuteFunction_ModuleMethodPaths(t *testing.T) {
 			wantResolvedJob: "job1",
 		},
 		"info response includes module and method params": {
-			methods: []funcapi.MethodConfig{{
+			methods: []funcapi.FunctionConfig{{
 				ID:   "details",
 				Help: "details help",
 				RequiredParams: []funcapi.ParamConfig{{
@@ -84,26 +84,26 @@ func TestExecuteFunction_ModuleMethodPaths(t *testing.T) {
 			wantRequiredIDs: []string{"__job", "scope"},
 		},
 		"generation race returns 503": {
-			methods:           []funcapi.MethodConfig{{ID: "details"}},
+			methods:           []funcapi.FunctionConfig{{ID: "details"}},
 			fnArgs:            []string{"__job:job1"},
 			generationRace:    true,
 			wantStatus:        503,
 			wantErrorContains: "replaced during request",
 		},
 		"explicit unknown __job in args returns 404": {
-			methods:           []funcapi.MethodConfig{{ID: "details"}},
+			methods:           []funcapi.FunctionConfig{{ID: "details"}},
 			fnArgs:            []string{"__job:missing"},
 			wantStatus:        404,
 			wantErrorContains: "unknown job 'missing'",
 		},
 		"explicit unknown __job in payload returns 404": {
-			methods:           []funcapi.MethodConfig{{ID: "details"}},
+			methods:           []funcapi.FunctionConfig{{ID: "details"}},
 			fnPayload:         map[string]any{"__job": "missing"},
 			wantStatus:        404,
 			wantErrorContains: "unknown job 'missing'",
 		},
 		"multiple __job values return 400": {
-			methods:           []funcapi.MethodConfig{{ID: "details"}},
+			methods:           []funcapi.FunctionConfig{{ID: "details"}},
 			fnPayload:         map[string]any{"__job": []string{"job1", "job2"}},
 			wantStatus:        400,
 			wantErrorContains: "parameter '__job' expects a single value",
@@ -187,7 +187,7 @@ func TestExecuteFunction_ModuleMethodPublicFunctionName(t *testing.T) {
 			gotMethod = method
 			return &funcapi.FunctionResponse{Status: 200, Help: "trap logs"}
 		},
-	}, []funcapi.MethodConfig{{
+	}, []funcapi.FunctionConfig{{
 		ID:           "logs",
 		FunctionName: "snmp:traps",
 	}})
@@ -227,12 +227,11 @@ func TestExecuteFunction_AgentScopeModuleMethodDoesNotRequireRunningJob(t *testi
 			})
 			mgr.modules = collectorapi.Registry{
 				"snmp_topology": collectorapi.Creator{
-					Methods: func() []funcapi.MethodConfig {
-						return []funcapi.MethodConfig{{
+					AgentFunctions: func() []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{
 							ID:           "topology:snmp",
 							FunctionName: "snmp:topology:snmp",
 							Aliases:      []string{"topology:snmp"},
-							Scope:        funcapi.MethodScopeAgent,
 							RequiredParams: []funcapi.ParamConfig{{
 								ID:        "scope",
 								Name:      "Scope",
@@ -280,10 +279,9 @@ func TestExecuteFunction_AgentScopeModuleMethodValidationErrorOmitsJob(t *testin
 	})
 	mgr.modules = collectorapi.Registry{
 		"mod": collectorapi.Creator{
-			Methods: func() []funcapi.MethodConfig {
-				return []funcapi.MethodConfig{{
-					ID:    "logs",
-					Scope: funcapi.MethodScopeAgent,
+			AgentFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{
+					ID: "logs",
 					RequiredParams: []funcapi.ParamConfig{{
 						ID:        "scope",
 						Name:      "Scope",
@@ -347,7 +345,7 @@ func TestExecuteFunction_ContextBehavior(t *testing.T) {
 					}
 					return &funcapi.FunctionResponse{Status: 200}
 				},
-			}, []funcapi.MethodConfig{{ID: "details"}})
+			}, []funcapi.FunctionConfig{{ID: "details"}})
 			if tc.managerCtx != nil {
 				mgr.funcCtl.Init(tc.managerCtx)
 			}
@@ -395,7 +393,7 @@ func TestJobMethodRegisteredHandlerPaths(t *testing.T) {
 						Data: [][]any{{"job1"}},
 					}
 				},
-			}, []funcapi.MethodConfig{{ID: "job-details", Help: "job details help"}})
+			}, []funcapi.FunctionConfig{{ID: "job-details", Help: "job details help"}})
 
 			handler := fnReg.requireHandler(t, "mod:job-details")
 			handler(functions.Function{
@@ -478,7 +476,7 @@ func TestFunctionDispatch_ResponsePaths(t *testing.T) {
 				writer := &jsonWriteCapture{}
 				var responderOut bytes.Buffer
 
-				mgr := newModuleDispatchTestManager(t, dyncfg.NewResponder(netdataapi.New(safewriter.New(&responderOut))), writer.write, handler, []funcapi.MethodConfig{{ID: "details"}})
+				mgr := newModuleDispatchTestManager(t, dyncfg.NewResponder(netdataapi.New(safewriter.New(&responderOut))), writer.write, handler, []funcapi.FunctionConfig{{ID: "details"}})
 				mgr.ExecuteFunction("mod:details", functions.Function{
 					UID:     tc.wantResponderUID,
 					Timeout: time.Second,
@@ -498,7 +496,7 @@ func TestFunctionDispatch_ResponsePaths(t *testing.T) {
 				var firstOut bytes.Buffer
 				var secondOut bytes.Buffer
 
-				mgr := newModuleDispatchTestManager(t, dyncfg.NewResponder(netdataapi.New(safewriter.New(&firstOut))), nil, handler, []funcapi.MethodConfig{{ID: "details"}})
+				mgr := newModuleDispatchTestManager(t, dyncfg.NewResponder(netdataapi.New(safewriter.New(&firstOut))), nil, handler, []funcapi.FunctionConfig{{ID: "details"}})
 				mgr.ExecuteFunction("mod:details", functions.Function{
 					UID:     tc.wantFirstUID,
 					Timeout: time.Second,
@@ -521,7 +519,7 @@ func TestFunctionDispatch_ResponsePaths(t *testing.T) {
 			if tc.nilRebindResponder {
 				var responderOut bytes.Buffer
 
-				mgr := newModuleDispatchTestManager(t, dyncfg.NewResponder(netdataapi.New(safewriter.New(&responderOut))), nil, handler, []funcapi.MethodConfig{{ID: "details"}})
+				mgr := newModuleDispatchTestManager(t, dyncfg.NewResponder(netdataapi.New(safewriter.New(&responderOut))), nil, handler, []funcapi.FunctionConfig{{ID: "details"}})
 				mgr.ExecuteFunction("mod:details", functions.Function{
 					UID:     tc.wantFirstUID,
 					Timeout: time.Second,
@@ -541,7 +539,7 @@ func TestFunctionDispatch_ResponsePaths(t *testing.T) {
 			}
 
 			var responderOut bytes.Buffer
-			mgr := newModuleDispatchTestManager(t, dyncfg.NewResponder(netdataapi.New(safewriter.New(&responderOut))), nil, handler, []funcapi.MethodConfig{{ID: "details"}})
+			mgr := newModuleDispatchTestManager(t, dyncfg.NewResponder(netdataapi.New(safewriter.New(&responderOut))), nil, handler, []funcapi.FunctionConfig{{ID: "details"}})
 			mgr.ExecuteFunction("mod:details", functions.Function{
 				UID:     tc.wantResponderUID,
 				Timeout: time.Second,
@@ -562,13 +560,13 @@ func TestCleanup_UnregistersStaticFunctionsBeforeStoppingJobs(t *testing.T) {
 	mgr := New(Config{PluginName: testPluginName, FnReg: fnReg})
 
 	staticCreator := collectorapi.Creator{
-		Methods: func() []funcapi.MethodConfig {
-			return []funcapi.MethodConfig{{ID: "static-method"}}
+		SharedFunctions: func() []funcapi.FunctionConfig {
+			return []funcapi.FunctionConfig{{ID: "static-method"}}
 		},
 	}
 	jobCreator := collectorapi.Creator{
-		JobMethods: func(_ collectorapi.RuntimeJob) []funcapi.MethodConfig {
-			return []funcapi.MethodConfig{{ID: "job-method"}}
+		JobMethods: func(_ collectorapi.RuntimeJob) []funcapi.FunctionConfig {
+			return []funcapi.FunctionConfig{{ID: "job-method"}}
 		},
 	}
 
@@ -681,7 +679,7 @@ func newModuleDispatchTestManager(
 	api *dyncfg.Responder,
 	jsonWriter func([]byte, int),
 	methodHandler funcapi.MethodHandler,
-	methods []funcapi.MethodConfig,
+	methods []funcapi.FunctionConfig,
 ) *Manager {
 	t.Helper()
 
@@ -694,7 +692,7 @@ func newModuleDispatchTestManager(
 	}
 
 	creator := collectorapi.Creator{
-		Methods: func() []funcapi.MethodConfig { return methods },
+		SharedFunctions: func() []funcapi.FunctionConfig { return methods },
 		MethodHandler: func(job collectorapi.RuntimeJob) funcapi.MethodHandler {
 			return methodHandler
 		},
@@ -711,7 +709,7 @@ func newJobMethodDispatchTestManager(
 	fnReg FunctionRegistry,
 	jsonWriter func([]byte, int),
 	methodHandler funcapi.MethodHandler,
-	methods []funcapi.MethodConfig,
+	methods []funcapi.FunctionConfig,
 ) *Manager {
 	t.Helper()
 
@@ -722,7 +720,7 @@ func newJobMethodDispatchTestManager(
 	})
 
 	creator := collectorapi.Creator{
-		JobMethods: func(_ collectorapi.RuntimeJob) []funcapi.MethodConfig { return methods },
+		JobMethods: func(_ collectorapi.RuntimeJob) []funcapi.FunctionConfig { return methods },
 		MethodHandler: func(job collectorapi.RuntimeJob) funcapi.MethodHandler {
 			return methodHandler
 		},

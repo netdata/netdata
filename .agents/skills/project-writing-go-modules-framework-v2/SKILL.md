@@ -67,13 +67,13 @@ source files for evidence.
 - If Functions exist, isolate them in a `<name>func/` subpackage with a narrow
   `Deps` interface declared there. The Function package MUST NOT import the
   collector package or hold `*Collector`.
-- If a single-instance collector exposes `MethodScopeAgent` module `Methods`, its
-  `MethodHandler(job)` receives the running canonical runtime job. Use
-  `job.Collector()` to bind the Function handler to collector-owned state; do
-  not add a `__job` parameter or introduce a package-global registry to bridge
-  Function dispatch. During method execution, when the singleton job is not
-  running, the framework returns an unavailable response before calling
-  `MethodHandler`.
+- If a single-instance collector exposes `Creator.SharedFunctions`, its
+  `MethodHandler(job)` receives the running canonical runtime job and the public
+  Function shape has no `__job` parameter. Use `job.Collector()` to bind the
+  Function handler to collector-owned state; do not add a package-global
+  registry to bridge Function dispatch. During method execution, when the
+  singleton job is not running, the framework returns an unavailable response
+  before calling `MethodHandler`.
 - `collectorapi.Creator.InstancePolicy` defaults to
   `InstancePolicyPerJob`. Use `InstancePolicySingle` only for collectors that
   are intentionally one canonical job per agent. Single-instance configs MUST

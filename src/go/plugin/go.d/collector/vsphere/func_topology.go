@@ -41,8 +41,8 @@ type funcTopology struct {
 
 var _ funcapi.MethodHandler = (*funcTopology)(nil)
 
-func vsphereTopologyMethodConfig() funcapi.MethodConfig {
-	return funcapi.MethodConfig{
+func vsphereTopologyFunctionConfig() funcapi.FunctionConfig {
+	return funcapi.FunctionConfig{
 		ID:           topologyMethodID,
 		Aliases:      []string{topologyMethodID},
 		Name:         "vSphere Topology",
