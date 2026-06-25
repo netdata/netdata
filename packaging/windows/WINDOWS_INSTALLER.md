@@ -14,15 +14,6 @@ Older Windows and Windows Server releases are end-of-life and are more likely to
 
 :::
 
-### Will it run on Windows Server 2008?
-
-Windows Server 2008 (pre-R2) is the oldest Windows generation the installer targets, so the Agent **may run** on it. It is **not a tested or supported target**:
-
-- Microsoft ended extended support for Windows Server 2008 and 2008 R2 on January 14, 2020; Extended Security Updates (ESU) ended January 2023 for on-premises deployments (extended through January 9, 2024 only for Azure-hosted instances).
-- On Windows Server versions earlier than 2019, the automated MSI-download commands in this guide can fail due to TLS compatibility — use the [Graphical Installation (GUI)](#graphical-installation-gui) or a [pre-downloaded MSI](#offline-air-gapped-installation) instead (see also [Silent Installation](#silent-installation-command-line)).
-
-For the best experience, use **Windows Server 2019 or newer**.
-
 ### Requirements
 
 - **64-bit (x64) Windows.** The installer ships only as `netdata-x64.msi`.
@@ -266,3 +257,14 @@ On Windows, `edit-config` opens files with the `nano` editor.
 
 - [Service Control](/docs/netdata-agent/start-stop-restart.md#windows) — Start, stop, restart, and check status of the Netdata Agent
 - [Switching Install Types and Release Channels on Windows](/docs/install/windows-release-channels.md)
+
+## FAQ
+
+### Will it run on Windows Server 2008?
+
+Windows Server 2008 (pre-R2) is the oldest Windows generation the installer targets, so the Agent **may run** on it. It is **not a tested or supported target**:
+
+- Microsoft ended extended support for Windows Server 2008 and 2008 R2 on January 14, 2020; Extended Security Updates (ESU) ended January 2023 for on-premises deployments (extended through January 9, 2024 only for Azure-hosted instances).
+- On Windows Server versions earlier than 2019, the automated MSI-download commands in this guide can fail due to TLS compatibility — use the [Graphical Installation (GUI)](#graphical-installation-gui) or a [pre-downloaded MSI](#offline-air-gapped-installation) instead (see also [Silent Installation](#silent-installation-command-line)).
+
+For the best experience, use **Windows Server 2019 or newer**.
