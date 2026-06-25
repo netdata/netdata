@@ -176,20 +176,18 @@ func (c *Controller) OnJobStart(job collectorapi.RuntimeJob) {
 	}
 }
 
-// ReconcileModuleMethods rechecks module/static method availability for modules
+// ReconcileModuleMethods rechecks static and instance Function availability for modules
 // with at least one registered running job.
 func (c *Controller) ReconcileModuleMethods(moduleName string) {
 	if moduleName == "" {
 		return
 	}
 	methods := c.registry.getMethods(moduleName)
-	if len(methods) == 0 {
-		return
-	}
 	if c.registry.hasRunningJob(moduleName) {
 		c.registerAvailableAgentFunctions(moduleName, methods)
 	}
 	c.reconcileSharedModuleFunctions(moduleName)
+	c.reconcileInstanceFunctions(moduleName)
 }
 
 func (c *Controller) OnJobStop(job collectorapi.RuntimeJob) {
@@ -378,14 +376,14 @@ func (c *Controller) availableSharedJobNames(moduleName, methodID string) []stri
 
 	names := make([]string, 0, len(snapshots))
 	for _, snapshot := range snapshots {
-		if sharedFunctionJobAvailable(snapshot.job, methodID) {
+		if jobBackedFunctionAvailable(snapshot.job, methodID) {
 			names = append(names, snapshot.name)
 		}
 	}
 	return names
 }
 
-func sharedFunctionJobAvailable(job collectorapi.RuntimeJob, methodID string) bool {
+func jobBackedFunctionAvailable(job collectorapi.RuntimeJob, methodID string) bool {
 	if job == nil || !job.IsRunning() {
 		return false
 	}
@@ -488,15 +486,21 @@ func (c *Controller) registerInstanceFunctions(job collectorapi.RuntimeJob, meth
 }
 
 func (c *Controller) collectInstanceFunctionPublishes(job collectorapi.RuntimeJob, methods []funcapi.FunctionConfig) []functionPublish {
-	c.publishedMu.Lock()
-	defer c.publishedMu.Unlock()
-
-	var publishes []functionPublish
+	availableMethods := make([]funcapi.FunctionConfig, 0, len(methods))
 	for _, method := range methods {
 		if method.ID == "" {
 			continue
 		}
+		if jobBackedFunctionAvailable(job, method.ID) {
+			availableMethods = append(availableMethods, method)
+		}
+	}
 
+	c.publishedMu.Lock()
+	defer c.publishedMu.Unlock()
+
+	var publishes []functionPublish
+	for _, method := range availableMethods {
 		funcName := fmt.Sprintf("%s:%s", job.ModuleName(), method.ID)
 		if c.publishedFns.has(funcName) {
 			continue
@@ -530,6 +534,58 @@ func (c *Controller) collectInstanceFunctionPublishes(job collectorapi.RuntimeJo
 		})
 	}
 	return publishes
+}
+
+func (c *Controller) reconcileInstanceFunctions(moduleName string) {
+	publishes, withdraws := c.collectInstanceFunctionChanges(moduleName)
+	for _, name := range withdraws {
+		c.fnReg.Unregister(name)
+		if c.api != nil {
+			c.api.FunctionRemove(name)
+		}
+	}
+	for _, publish := range publishes {
+		c.registerFunction(publish.name, publish.handler)
+	}
+	if c.api == nil {
+		return
+	}
+	for _, publish := range publishes {
+		c.api.FunctionGlobal(publish.opts)
+	}
+}
+
+func (c *Controller) collectInstanceFunctionChanges(moduleName string) ([]functionPublish, []string) {
+	var publishes []functionPublish
+	var withdraws []string
+
+	for _, snapshot := range c.registry.getInstanceFunctionSnapshots(moduleName) {
+		var availableMethods []funcapi.FunctionConfig
+		for _, method := range snapshot.methods {
+			if method.ID == "" {
+				continue
+			}
+			if jobBackedFunctionAvailable(snapshot.job, method.ID) {
+				availableMethods = append(availableMethods, method)
+				continue
+			}
+			withdraws = append(withdraws, c.collectInstanceFunctionWithdraws(snapshot.job, method.ID)...)
+		}
+		publishes = append(publishes, c.collectInstanceFunctionPublishes(snapshot.job, availableMethods)...)
+	}
+
+	sort.Strings(withdraws)
+	return publishes, withdraws
+}
+
+func (c *Controller) collectInstanceFunctionWithdraws(job collectorapi.RuntimeJob, methodID string) []string {
+	if job == nil {
+		return nil
+	}
+	c.publishedMu.Lock()
+	names := c.publishedFns.removeOwner(instanceFunctionOwner(job.ModuleName(), job.Name(), methodID))
+	c.publishedMu.Unlock()
+	return names
 }
 
 func (c *Controller) unregisterInstanceFunctions(job collectorapi.RuntimeJob) {

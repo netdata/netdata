@@ -1237,6 +1237,93 @@ func TestControllerRegisterInstanceFunctions(t *testing.T) {
 	}
 }
 
+func TestControllerInstanceFunctionsUseJobBackedAvailability(t *testing.T) {
+	tests := map[string]func(*testing.T){
+		"publish withdraw and republish stored declarations": func(t *testing.T) {
+			available := map[string]bool{"a": false}
+			job := newTestRuntimeJob("mod", "job1", true)
+			job.collector = &testFunctionAvailability{available: available}
+
+			var gotCode int
+			var gotResp map[string]any
+			reg := newTestFunctionRegistry()
+			declareCalls := 0
+			controller := New(Options{
+				FnReg: reg,
+				JSONWriter: func(data []byte, code int) {
+					gotCode = code
+					require.NoError(t, json.Unmarshal(data, &gotResp))
+				},
+			})
+			controller.RegisterModules(collectorapi.Registry{
+				"mod": collectorapi.Creator{
+					InstanceFunctions: func(collectorapi.RuntimeJob) []funcapi.FunctionConfig {
+						declareCalls++
+						return []funcapi.FunctionConfig{{ID: "a"}}
+					},
+					MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+						return &tableTestHandler{}
+					},
+				},
+			})
+
+			controller.OnJobStart(job)
+
+			assert.Equal(t, 1, declareCalls)
+			assert.Empty(t, reg.registeredNames())
+			assert.Len(t, controller.registry.getInstanceFunctions("mod", "job1"), 1)
+
+			available["a"] = true
+			controller.ReconcileModuleMethods("mod")
+
+			assert.Equal(t, 1, declareCalls)
+			assert.Equal(t, []string{"mod:a"}, reg.registeredNames())
+			stale := reg.handlers["mod:a"]
+			require.NotNil(t, stale)
+
+			available["a"] = false
+			controller.ReconcileModuleMethods("mod")
+
+			assert.Equal(t, []string{"mod:a"}, reg.unregisteredNames())
+			stale(functions.Function{UID: "withdrawn", Timeout: time.Second})
+			assert.Equal(t, 404, gotCode)
+			assert.Equal(t, float64(404), gotResp["status"])
+
+			available["a"] = true
+			controller.ReconcileModuleMethods("mod")
+
+			assert.Equal(t, 1, declareCalls)
+			assert.Equal(t, []string{"mod:a", "mod:a"}, reg.registeredNames())
+			stale(functions.Function{UID: "stale-after-republish", Timeout: time.Second})
+			assert.Equal(t, 404, gotCode)
+			assert.Equal(t, float64(404), gotResp["status"])
+
+			reg.handlers["mod:a"](functions.Function{UID: "republished", Timeout: time.Second})
+			assert.Equal(t, 200, gotCode)
+			assert.Equal(t, float64(200), gotResp["status"])
+		},
+		"missing FunctionAvailability preserves immediate publication": func(t *testing.T) {
+			reg := newTestFunctionRegistry()
+			controller := New(Options{FnReg: reg})
+			controller.RegisterModules(collectorapi.Registry{
+				"mod": collectorapi.Creator{
+					InstanceFunctions: func(collectorapi.RuntimeJob) []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{ID: "a"}}
+					},
+				},
+			})
+
+			controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+
+			assert.Equal(t, []string{"mod:a"}, reg.registeredNames())
+		},
+	}
+
+	for name, run := range tests {
+		t.Run(name, run)
+	}
+}
+
 func TestControllerPublishedFunctionWrapperConcurrentMutation(t *testing.T) {
 	tests := map[string]struct {
 		setup  func(*Controller)

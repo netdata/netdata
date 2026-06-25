@@ -85,12 +85,20 @@ publication stream emitted by go.d.
 
 - Instance Functions are job-owned declarations returned by
   `collectorapi.Creator.InstanceFunctions(job)`.
-- Instance Functions are registered for one runtime job on job start and
+- Instance Functions are declared once for one runtime job on job start and
   unregistered on job stop.
+- `InstanceFunctions(job)` MUST NOT be called from reconcile/tick paths.
 - Instance Functions are published under the existing function name construction
   for their returned Function IDs.
-- This spec does not add late-publication or availability-driven withdrawal to
-  instance Functions.
+- Instance Function publication uses the same job-backed
+  `collectorapi.FunctionAvailability` hook as Shared Functions:
+  - if the owning collector implements `FunctionAvailability`, publish only
+    currently available stored declarations;
+  - withdraw a concrete instance Function when its owning job becomes
+    unavailable for that Function ID;
+  - republish the concrete instance Function when availability returns;
+  - if the owning collector does not implement `FunctionAvailability`, every
+    stored instance Function is available while the job runs.
 
 ## Validation Guidance
 

@@ -48,6 +48,12 @@ type jobSnapshot struct {
 	job  collectorapi.RuntimeJob
 }
 
+type instanceFunctionSnapshot struct {
+	jobName string
+	job     collectorapi.RuntimeJob
+	methods []funcapi.FunctionConfig
+}
+
 func newModuleFuncRegistry() *moduleFuncRegistry {
 	return &moduleFuncRegistry{
 		modules:      make(map[string]*moduleFunc),
@@ -354,6 +360,33 @@ func (r *moduleFuncRegistry) getInstanceFunctions(moduleName, jobName string) []
 		return nil
 	}
 	return module.instanceFunctions[jobName]
+}
+
+func (r *moduleFuncRegistry) getInstanceFunctionSnapshots(moduleName string) []instanceFunctionSnapshot {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	module, ok := r.modules[moduleName]
+	if !ok {
+		return nil
+	}
+
+	snapshots := make([]instanceFunctionSnapshot, 0, len(module.instanceFunctions))
+	for jobName, methods := range module.instanceFunctions {
+		entry, ok := module.jobs[jobName]
+		if !ok {
+			continue
+		}
+		snapshots = append(snapshots, instanceFunctionSnapshot{
+			jobName: jobName,
+			job:     entry.job,
+			methods: append([]funcapi.FunctionConfig(nil), methods...),
+		})
+	}
+	sort.Slice(snapshots, func(i, j int) bool {
+		return snapshots[i].jobName < snapshots[j].jobName
+	})
+	return snapshots
 }
 
 func (r *moduleFuncRegistry) getInstanceFunction(moduleName, jobName, methodID string) (*funcapi.FunctionConfig, bool) {

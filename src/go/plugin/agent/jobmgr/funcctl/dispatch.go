@@ -294,7 +294,7 @@ func (c *Controller) resolveMethodJobWithoutJobParam(fn functions.Function, modu
 		c.respondError(fn, 503, "module '%s' is not running", moduleName)
 		return nil, "", 0, false
 	}
-	if !sharedFunctionJobAvailable(job, methodID) {
+	if !jobBackedFunctionAvailable(job, methodID) {
 		c.respondError(fn, 404, "unknown function '%s:%s'", moduleName, methodID)
 		return nil, "", 0, false
 	}
