@@ -396,7 +396,7 @@ Manage database settings for data storage and retention.
 The `update every` setting controls the collection granularity of the metrics **this node collects locally** (its tier-0 resolution). In a Parent-Child streaming setup, the Parent's `[db] update every` and a Child's `update every` are independent — they do **not** need to match:
 
 - The Parent's `update every` governs only the metrics the Parent collects from its **own** host (the Parent's localhost tier-0 data).
-- A Child sends its own `update every` to the Parent over the streaming protocol — once as a host-level value when the connection is established, and then attached to **each chart** it streams (in every chart definition and in each data update). The Parent stores each Child's metrics at the Child's own collection frequency, regardless of the Parent's `update every`.
+- A streaming Child automatically sends its own `update every` to the Parent, and the Parent stores that Child's metrics at the Child's collection frequency — regardless of the Parent's `update every`.
 - Each streaming Child is a separate host on the Parent, each keeping its own `update every`.
 
 Configuring both nodes with the same value is neither required nor beneficial — if they happen to be equal, it is coincidental and has no effect on correctness. Set each node's `update every` based on the collection granularity you want for that node's own data.
@@ -684,6 +684,17 @@ You can enable SSL in the destination setting by adding `:SSL` at the end. Confi
 <br/>
 
 Yes, you need to configure each Child node with its own streaming configuration. However, you can use configuration management tools to deploy a standard configuration across your infrastructure, making this process more efficient.
+
+</details>
+
+<details>
+<summary><strong>Do the Parent and Child need the same update every setting?</strong></summary>
+<br/>
+
+No. Each Child automatically sends its own `update every` to the Parent when it streams. The Parent stores that Child's metrics at the Child's collection frequency (its tier-0 data), regardless of the Parent's `update every`. The Parent's `[db] update every` setting only affects the metrics the Parent collects from its own host.
+
+Set each node's `update every` based on the collection granularity you want for that node's own data. Matching the two values is neither required nor beneficial — if they happen to be equal, it is coincidental and has no effect on correctness.
+
 </details>
 
 ## Step-by-Step Setup Guide
