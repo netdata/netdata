@@ -9,25 +9,24 @@ impl Ledger {
         fields(tenant = %msg.tenant_id, frame_seq = msg.frame_seq, event = ?msg.event),
     )]
     pub(super) async fn handle_ingestor_msg(&mut self, msg: wal::Message) {
-        // Check consistency of frame sequence numbers. The writer is a single
-        // process feeding every signal, so this gap-check stays global (Fork
-        // I=A: one global frame-seq counter) — it runs before routing.
-        if msg.frame_seq != self.expected_frame_seq {
+        // The owning signal: the writer assigns a per-signal `frame_seq` and the
+        // ledger routes the event to the pipeline by this `pipeline_id`.
+        let pipeline_id = msg.event.pipeline_id();
+
+        // Per-signal frame-sequence gap-check. Each signal has its own monotonic
+        // `frame_seq` stream, so a gap here is a real lost FileEvent for THIS
+        // signal — inter-signal interleaving can no longer trigger (or mask) it.
+        let expected = self.expected_frame_seq.entry(pipeline_id).or_insert(1);
+        if msg.frame_seq != *expected {
             tracing::error!(
-                "ingestor frame gap: expected={} missed={}",
-                self.expected_frame_seq,
-                msg.frame_seq - self.expected_frame_seq,
+                pipeline_id,
+                "ingestor frame gap: expected={} got={}",
+                *expected,
+                msg.frame_seq,
             );
         }
-        self.expected_frame_seq = msg.frame_seq + 1;
+        *expected = msg.frame_seq + 1;
 
-        // Route to the owning pipeline by the `pipeline_id` carried in the
-        // event's `FileId` (every `FileEvent` variant carries one).
-        let pipeline_id = match &msg.event {
-            wal::FileEvent::Created { file_id, .. }
-            | wal::FileEvent::Synced { file_id, .. }
-            | wal::FileEvent::Closed { file_id, .. } => file_id.pipeline_id,
-        };
         let Some(pipeline) = self.pipelines.get(&pipeline_id) else {
             tracing::error!(pipeline_id, "WAL event for unknown pipeline; dropping");
             return;

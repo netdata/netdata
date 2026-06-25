@@ -91,9 +91,11 @@ pub struct Ledger {
     /// global byte budget), keyed by the global `seq`. A pipeline drops a WAL's
     /// chunks here when its authoritative SFST is registered.
     chunk_cache: Arc<ChunkCache>,
-    /// Global frame-sequence gap-check across the single writer's stream (one
-    /// writer process feeds every signal — Fork I=A: one global seq counter).
-    expected_frame_seq: u64,
+    /// Per-signal frame-sequence gap-check. The single writer process feeds every
+    /// signal over one connection, but assigns a separate monotonic `frame_seq`
+    /// per `pipeline_id`, so the next-expected seq is tracked per signal — a gap
+    /// is then a real lost event for that signal, not inter-signal interleaving.
+    expected_frame_seq: HashMap<u16, u64>,
     pub(crate) cancel: CancellationToken,
 
     /// Sender side of the outbound funnel. Spawned function-handler
@@ -312,7 +314,7 @@ impl Ledger {
             upload_retry: file_lifecycle::upload_retry::UploadRetry::default(),
             retry_timer,
             chunk_cache,
-            expected_frame_seq: 1,
+            expected_frame_seq: HashMap::new(),
             cancel,
             outbound_tx,
             outbound_rx,

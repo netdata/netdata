@@ -185,6 +185,20 @@ pub enum FileEvent {
     },
 }
 
+impl FileEvent {
+    /// The signal axis (`pipeline_id`) of the file this event concerns. Every
+    /// variant carries a [`FileId`], which carries the pipeline. The writer
+    /// assigns a per-signal frame sequence by this value, and the ledger routes
+    /// the event to the owning pipeline by it.
+    pub fn pipeline_id(&self) -> u16 {
+        match self {
+            FileEvent::Created { file_id, .. }
+            | FileEvent::Synced { file_id, .. }
+            | FileEvent::Closed { file_id, .. } => file_id.pipeline_id,
+        }
+    }
+}
+
 /// A sequenced file event sent over IPC.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {

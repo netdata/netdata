@@ -1,4 +1,5 @@
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::collections::HashMap;
+use std::sync::Mutex;
 
 use ferryboat::{Connection, Endpoint};
 use file_registry::TenantId;
@@ -7,9 +8,13 @@ use tokio::sync::mpsc;
 /// Sends WAL events to the ledger over a direct ferryboat IPC socket.
 ///
 /// Messages are fire-and-forget: silently dropped if the connection is lost.
+/// Shared across signals (the writer→ledger IPC is one connection), so the frame
+/// sequence is kept PER SIGNAL (keyed by `pipeline_id`): each signal gets its own
+/// monotonic stream, so the ledger's gap-check stays meaningful per signal and
+/// inter-signal interleaving cannot mask a real lost event.
 pub struct LedgerSender {
     tx: mpsc::UnboundedSender<wal::Message>,
-    frame_seq: AtomicU64,
+    frame_seq: Mutex<HashMap<u16, u64>>,
 }
 
 impl LedgerSender {
@@ -19,16 +24,17 @@ impl LedgerSender {
         tokio::spawn(sender_task(rx, socket_path.to_string()));
         Self {
             tx,
-            frame_seq: AtomicU64::new(1),
+            frame_seq: Mutex::new(HashMap::new()),
         }
     }
 
     /// Sends all events from a [`wal::FileEvent`] slice (as returned by
-    /// [`WalWriter::take_events`]), tagged with the given tenant ID.
+    /// [`WalWriter::take_events`]), tagged with the given tenant ID. Each event's
+    /// frame sequence is drawn from its own signal's counter (`event.pipeline_id`).
     pub fn send_events(&self, tenant_id: TenantId, events: Vec<wal::FileEvent>) {
         for event in events {
             let msg = wal::Message {
-                frame_seq: self.next_frame_seq(),
+                frame_seq: self.next_frame_seq(event.pipeline_id()),
                 tenant_id: tenant_id.clone(),
                 event,
             };
@@ -36,8 +42,12 @@ impl LedgerSender {
         }
     }
 
-    fn next_frame_seq(&self) -> u64 {
-        self.frame_seq.fetch_add(1, Ordering::Relaxed)
+    fn next_frame_seq(&self, pipeline_id: u16) -> u64 {
+        let mut counters = self.frame_seq.lock().unwrap();
+        let counter = counters.entry(pipeline_id).or_insert(1);
+        let seq = *counter;
+        *counter += 1;
+        seq
     }
 }
 
