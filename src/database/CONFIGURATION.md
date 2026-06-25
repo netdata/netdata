@@ -25,15 +25,13 @@ The amount of history available depends on both `retention` and `update every`:
 | `3600`      | `1`            | ~1 hour (3 600 s)    |
 | `3600`      | `10`           | ~10 hours (36 000 s) |
 
-To target a specific history window, set `retention = target_seconds / update_every`. For roughly 1 hour of history at `update every = 10`, use `retention = 360`.
 
 :::note
 
-These `[db]` settings are read at Agent startup — changing `mode`, `retention`, or `update every` takes effect only after restarting the Agent. `netdatacli reload-health` reloads health configuration only and does not apply `[db]` changes.
+Configuration is read only at Agent startup. Any configuration changes require restarting the Agent.
 
 :::
 
-In a Parent–Child streaming setup, a `ram`-mode Child keeps only this short local buffer while the Parent persists long-term history in `dbengine`. Child and Parent storage are independent — see [Tiers](#tiers).
 
 ## Tiers
 
