@@ -2,6 +2,17 @@
 
 package funcapi
 
+// MethodScope controls the public API shape for creator-level module methods.
+type MethodScope uint8
+
+const (
+	// MethodScopeInstance exposes a shared module method selected by __job.
+	MethodScopeInstance MethodScope = iota
+
+	// MethodScopeAgent exposes one agent/module method without __job.
+	MethodScopeAgent
+)
+
 // MethodConfig describes a function method provided by a module.
 type MethodConfig struct {
 	ID string // Method ID (e.g., "top-queries")
@@ -23,10 +34,8 @@ type MethodConfig struct {
 	Available func() bool
 	// RawRequest routes the complete Function request to a RawMethodHandler.
 	// Use this for Function APIs that need raw payloads, args, or full response envelopes.
-	RawRequest bool
-	// AgentWide marks a module/static method as agent-level: funcctl omits
-	// __job from the public API and dispatches the method without a RuntimeJob.
-	AgentWide      bool          // Method is agent-wide (does not require __job selector)
+	RawRequest     bool
+	Scope          MethodScope   // Public module method scope; zero value requires __job selector.
 	RequiredParams []ParamConfig // Required parameters for this method (including __sort if used)
 	// FIXME: Presentation is intentionally untyped here, while the shared UI schema
 	// currently defines only topology-specific presentation payloads.

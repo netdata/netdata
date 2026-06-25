@@ -203,7 +203,7 @@ func TestExecuteFunction_ModuleMethodPublicFunctionName(t *testing.T) {
 	assert.Equal(t, "logs", gotMethod)
 }
 
-func TestExecuteFunction_AgentWideModuleMethodDoesNotRequireRunningJob(t *testing.T) {
+func TestExecuteFunction_AgentScopeModuleMethodDoesNotRequireRunningJob(t *testing.T) {
 	tests := map[string]struct {
 		functionName string
 	}{
@@ -232,7 +232,7 @@ func TestExecuteFunction_AgentWideModuleMethodDoesNotRequireRunningJob(t *testin
 							ID:           "topology:snmp",
 							FunctionName: "snmp:topology:snmp",
 							Aliases:      []string{"topology:snmp"},
-							AgentWide:    true,
+							Scope:        funcapi.MethodScopeAgent,
 							RequiredParams: []funcapi.ParamConfig{{
 								ID:        "scope",
 								Name:      "Scope",
@@ -257,7 +257,7 @@ func TestExecuteFunction_AgentWideModuleMethodDoesNotRequireRunningJob(t *testin
 			mgr.funcCtl.RegisterModules(mgr.modules)
 
 			mgr.ExecuteFunction(tc.functionName, functions.Function{
-				UID:     "agent-wide-public-name",
+				UID:     "agent-scope-public-name",
 				Timeout: time.Second,
 				Args:    []string{"scope:all"},
 			})
@@ -271,7 +271,7 @@ func TestExecuteFunction_AgentWideModuleMethodDoesNotRequireRunningJob(t *testin
 	}
 }
 
-func TestExecuteFunction_AgentWideModuleMethodValidationErrorOmitsJob(t *testing.T) {
+func TestExecuteFunction_AgentScopeModuleMethodValidationErrorOmitsJob(t *testing.T) {
 	writer := &jsonWriteCapture{}
 
 	mgr := New(Config{
@@ -282,8 +282,8 @@ func TestExecuteFunction_AgentWideModuleMethodValidationErrorOmitsJob(t *testing
 		"mod": collectorapi.Creator{
 			Methods: func() []funcapi.MethodConfig {
 				return []funcapi.MethodConfig{{
-					ID:        "logs",
-					AgentWide: true,
+					ID:    "logs",
+					Scope: funcapi.MethodScopeAgent,
 					RequiredParams: []funcapi.ParamConfig{{
 						ID:        "scope",
 						Name:      "Scope",
@@ -303,7 +303,7 @@ func TestExecuteFunction_AgentWideModuleMethodValidationErrorOmitsJob(t *testing
 	mgr.funcCtl.RegisterModules(mgr.modules)
 
 	mgr.ExecuteFunction("mod:logs", functions.Function{
-		UID:     "agent-wide-validation",
+		UID:     "agent-scope-validation",
 		Timeout: time.Second,
 		Args:    []string{"scope:a,b"},
 	})

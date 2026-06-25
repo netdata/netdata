@@ -28,7 +28,7 @@ func TestSNMPTopologyCreatorOwnsTopologyFunction(t *testing.T) {
 	require.Len(t, methods, 1)
 	require.Equal(t, snmptopologyfunc.MethodID, methods[0].ID)
 	require.Equal(t, snmptopologyfunc.FunctionName, methods[0].FunctionName)
-	require.True(t, methods[0].AgentWide)
+	require.Equal(t, funcapi.MethodScopeAgent, methods[0].Scope)
 	require.NotNil(t, methods[0].Available)
 	require.False(t, methods[0].Available())
 

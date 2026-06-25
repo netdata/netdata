@@ -199,8 +199,8 @@ func (c *Controller) registerModuleMethodsOnJobStart(moduleName string) {
 	c.registerAvailableModuleMethods(moduleName, methods, false)
 }
 
-func (c *Controller) registerAvailableModuleMethods(moduleName string, methods []funcapi.MethodConfig, agentWideOnly bool) {
-	publishes := c.collectAvailableModuleMethodPublishes(moduleName, methods, agentWideOnly)
+func (c *Controller) registerAvailableModuleMethods(moduleName string, methods []funcapi.MethodConfig, agentScopeOnly bool) {
+	publishes := c.collectAvailableModuleMethodPublishes(moduleName, methods, agentScopeOnly)
 	for _, publish := range publishes {
 		c.registerFunction(publish.name, publish.handler)
 	}
@@ -212,13 +212,13 @@ func (c *Controller) registerAvailableModuleMethods(moduleName string, methods [
 	}
 }
 
-func (c *Controller) collectAvailableModuleMethodPublishes(moduleName string, methods []funcapi.MethodConfig, agentWideOnly bool) []functionPublish {
+func (c *Controller) collectAvailableModuleMethodPublishes(moduleName string, methods []funcapi.MethodConfig, agentScopeOnly bool) []functionPublish {
 	c.publishedMu.Lock()
 	defer c.publishedMu.Unlock()
 
 	var publishes []functionPublish
 	for i, method := range methods {
-		if agentWideOnly && !method.AgentWide {
+		if agentScopeOnly && method.Scope != funcapi.MethodScopeAgent {
 			continue
 		}
 		if method.ID != "" && c.allMethodFunctionNamesPublishedLocked(moduleName, method) {

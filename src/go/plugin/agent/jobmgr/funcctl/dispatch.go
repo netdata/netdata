@@ -79,7 +79,7 @@ func (c *Controller) executeMethodRequest(parent context.Context, in methodExecu
 	handler := creator.MethodHandler(in.job)
 	if handler == nil {
 		if in.job == nil {
-			c.respondError(in.fn, 500, "module '%s' returned nil handler for agent-wide method '%s'", in.moduleName, in.methodID)
+			c.respondError(in.fn, 500, "module '%s' returned nil handler for agent-scope method '%s'", in.moduleName, in.methodID)
 			return
 		}
 		c.respondError(in.fn, 500, "module '%s' returned nil handler for job '%s'", in.moduleName, in.jobName)
@@ -181,7 +181,7 @@ func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) function
 		includeJobParam := methodRequiresJobParam(methodCfg)
 
 		if !includeJobParam {
-			job, jobName, jobGen, ok := c.resolveAgentWideMethodJob(fn, moduleName)
+			job, jobName, jobGen, ok := c.resolveAgentScopeMethodJob(fn, moduleName)
 			if !ok {
 				return
 			}
@@ -264,7 +264,7 @@ func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) function
 	}
 }
 
-func (c *Controller) resolveAgentWideMethodJob(fn functions.Function, moduleName string) (collectorapi.RuntimeJob, string, uint64, bool) {
+func (c *Controller) resolveAgentScopeMethodJob(fn functions.Function, moduleName string) (collectorapi.RuntimeJob, string, uint64, bool) {
 	creator, ok := c.registry.getCreator(moduleName)
 	if !ok || creator.InstancePolicy != collectorapi.InstancePolicySingle {
 		return nil, "", 0, true
@@ -527,7 +527,7 @@ func buildAcceptedParams(methodParams []funcapi.ParamConfig, includeJobParam boo
 }
 
 func methodRequiresJobParam(cfg *funcapi.MethodConfig) bool {
-	return cfg == nil || !cfg.AgentWide
+	return cfg == nil || cfg.Scope != funcapi.MethodScopeAgent
 }
 
 func (c *Controller) makePublishedJobMethodFuncHandler(functionName string, generation uint64, moduleName, jobName, methodID string) functions.Handler {

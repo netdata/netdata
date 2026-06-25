@@ -50,7 +50,7 @@ func LogsMethodConfig(available func() bool) funcapi.MethodConfig {
 		ResponseType: "logs",
 		Available:    available,
 		RawRequest:   true,
-		AgentWide:    true,
+		Scope:        funcapi.MethodScopeAgent,
 	}
 }
 

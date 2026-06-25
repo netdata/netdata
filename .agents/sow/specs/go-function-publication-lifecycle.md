@@ -27,7 +27,7 @@ publication stream emitted by go.d.
   - the Function remains published until go.d cleanup or restart;
   - withdrawal-on-empty requires a separate explicit lifecycle design.
 - Rechecks MUST reuse the normal funcctl publication path so public names,
-  aliases, tags, `RequireCloud`, `AgentWide`, handler wiring, and collision
+  aliases, tags, `RequireCloud`, `MethodScope`, handler wiring, and collision
   behavior stay consistent.
 
 ## `Available` Predicate Contract
