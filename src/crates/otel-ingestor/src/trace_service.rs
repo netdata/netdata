@@ -33,12 +33,7 @@ use tonic::{Request, Response, Status};
 
 use crate::ledger_sender::LedgerSender;
 use bridge::config::AuthConfig;
-
-/// Signal axis stamped into every traces `FileId`. MUST match
-/// `otel_ledger::ledger`'s `TRACES_PIPELINE_ID` so the ledger routes these
-/// events to the traces pipeline. (Duplicated as a documented constant for the
-/// proof; the real feature should centralize the signal/pipeline-id mapping.)
-const TRACES_PIPELINE_ID: u16 = 1;
+use bridge::signals::TRACES_PIPELINE_ID;
 
 /// The single fixed partition key all proof traces share (one WAL stream per
 /// tenant). Opaque to the substrate; the real feature derives per-service keys.

@@ -14,6 +14,7 @@
 
 pub mod config;
 pub mod function;
+pub mod signals;
 
 use netdata_plugin_types::{FunctionDeclaration, FunctionResult};
 use serde::{Deserialize, Serialize};

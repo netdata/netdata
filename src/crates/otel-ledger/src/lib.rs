@@ -14,16 +14,9 @@ pub mod traces_indexer;
 
 pub use ledger::Ledger;
 
-/// Signal segment for the logs pipeline's remote-storage keys
-/// (`v1/{signal}/...`). Stage 4 prep: logs call sites pass this constant; the
-/// flip commit moves it into the logs pipeline's seam provision so a second
-/// signal (traces) supplies its own.
-pub(crate) const LOGS_SIGNAL: &str = "logs";
-
-/// PROOF SCAFFOLD (traces-proof SOW): signal segment for the skeletal traces
-/// pipeline's remote-storage keys (`v1/traces/...`). The real traces feature
-/// keeps a constant like this; the rest of the traces binding is throwaway.
-pub(crate) const TRACES_SIGNAL: &str = "traces";
+/// Signal remote-key segments (`v1/{signal}/...`) — re-exported from the single
+/// source of truth in `bridge::signals` so the ingestor and ledger agree.
+pub(crate) use bridge::signals::{LOGS_SIGNAL, TRACES_SIGNAL};
 
 use anyhow::{Context, Result};
 use bridge::{LedgerRequest, LedgerResponse};

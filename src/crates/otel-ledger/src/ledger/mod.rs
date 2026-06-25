@@ -61,14 +61,12 @@ const CHUNK_CACHE_BYTES: u64 = 256 * 1024 * 1024;
 /// rest of upload governance if tuning proves necessary.
 const UPLOAD_CONCURRENCY: usize = 8;
 
-/// The logs pipeline's signal axis; matches the `pipeline_id` carried in
-/// logs `FileId`s (the writer stamps [`FileId::DEFAULT_PIPELINE`]).
-const LOGS_PIPELINE_ID: u16 = FileId::DEFAULT_PIPELINE;
-
-/// PROOF SCAFFOLD (traces-proof SOW): the skeletal traces pipeline's signal
-/// axis; matches the `pipeline_id` the ingestor's traces WAL writer stamps
-/// (`wal::Writer::with_pipeline(..., TRACES_PIPELINE_ID)`).
-const TRACES_PIPELINE_ID: u16 = 1;
+/// Signal axes, from the single source of truth in `bridge::signals` (shared
+/// with the ingestor's WAL stamping). `LOGS_PIPELINE_ID` MUST equal the `FileId`
+/// default pipeline (the WAL producer stamps it for logs) — pinned here, where
+/// both constants are visible, since `bridge` does not depend on `file-registry`.
+use bridge::signals::{LOGS_PIPELINE_ID, TRACES_PIPELINE_ID};
+const _: () = assert!(LOGS_PIPELINE_ID == FileId::DEFAULT_PIPELINE);
 
 pub struct Ledger {
     supervisor: Connection<LedgerResponse, LedgerRequest>,
