@@ -66,6 +66,10 @@ pub fn sfst_prefix(signal: &str, tenant_id: &TenantId, date: NaiveDate) -> Strin
 }
 
 /// Remote key for a rotated catalog file, scoped to `signal`.
+// The key is built from the signal, the date, the tenant, and the five
+// catalog-file identity components — all distinct primitives that belong in the
+// key, so grouping them into a one-off struct would add indirection, not clarity.
+#[allow(clippy::too_many_arguments)]
 pub fn catalog(
     signal: &str,
     date: NaiveDate,

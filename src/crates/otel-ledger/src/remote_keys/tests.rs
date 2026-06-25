@@ -74,6 +74,10 @@ fn parse_sfst_date_rejects_unknown_shapes() {
     assert!(parse_sfst_date("v2/logs/tenants/tenant1/sfst/2026-04-17/x").is_none());
     // Missing tenants umbrella (signal present, but no `tenants` segment).
     assert!(parse_sfst_date("v1/logs/tenant1/sfst/2026-04-17/x").is_none());
+    // Old segment-less layout (pre-signal-segment): `tenants` is consumed as the
+    // signal slot, so `tenant1` is read where the `tenants` umbrella is expected
+    // → rejected. The old layout no longer parses as a valid SFST key.
+    assert!(parse_sfst_date("v1/tenants/tenant1/sfst/2026-04-17/x.sfst").is_none());
     // Catalog key shape (not an SFST key).
     assert!(parse_sfst_date("v1/logs/catalog/2026-04-17/tenant1/x").is_none());
     // Truncated.

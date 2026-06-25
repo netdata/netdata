@@ -23,7 +23,13 @@ pub use registry::{File, Registry, filename, scan_max_sequence};
 ///
 /// v3 drops the top-level `part_key` from `CatalogEntry` — the partition key
 /// lives only in `entry.id` (the `FileId`), the single source of truth.
-pub const FORMAT_VERSION: u32 = 3;
+///
+/// v4: each entry's `remote_key` now embeds the per-signal path segment
+/// (`v1/{signal}/...`). A pre-v4 catalog references the old segment-less layout
+/// (`v1/tenants/...`), so it is rejected on recovery rather than reused — this
+/// prevents a stale catalog from republishing remote keys that point at the
+/// now-orphaned old layout. There is no migration (experimental feature).
+pub const FORMAT_VERSION: u32 = 4;
 
 /// Magic bytes of the on-disk catalog container.
 pub const CONTAINER_MAGIC: [u8; 4] = *b"NCAT";

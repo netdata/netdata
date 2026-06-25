@@ -67,8 +67,11 @@ a file. The content plane is its sole codec:
   returns `None` so an over-long, attacker-controlled identity is rejected at the
   write path rather than panicking. The ingestor drops such a frame.
 - The substrate stores these bytes verbatim and never parses them; only the
-  content plane does. The query layer decodes them for display
-  (`StreamId`/`StreamStat`) and the stream selector.
+  content plane does. For the row/record path the query layer decodes them into a
+  `StreamId` for display. For the stream selector the substrate folds candidates
+  into a neutral `registry::PartitionStat` (carrying the opaque `content_meta`),
+  and the logs rpc adapter decodes each into its display-typed `StreamStat` —
+  keeping the substrate registry free of the content plane.
 
 ## Partition-key authority
 
@@ -132,10 +135,18 @@ The substrate stores the opaque `content_meta` (display identity) but **not** th
   frames — see the stream selector). v4 dropped the 8-byte `part_key` slot from
   the header (`content_meta_len` shifted to offset 16); v2 had replaced the typed
   stream String pairs with the opaque blob.
-- **Catalog** (`otel-catalog` `FORMAT_VERSION = 3`): each `CatalogEntry` carries
-  `content_meta`; v3 dropped the top-level `part_key` (it lives in `entry.id`).
-- **Remote object keys** (`otel-ledger` `SCHEMA_VERSION = "v1"`): unchanged;
-  embed the `part_key` via `FileId`.
+- **Catalog** (`otel-catalog` `FORMAT_VERSION = 4`): each `CatalogEntry` carries
+  `content_meta`; v3 dropped the top-level `part_key` (it lives in `entry.id`); v4
+  marks the per-signal remote-key layout below — a pre-v4 catalog's entries embed
+  the old segment-less `remote_key`, so it is rejected on recovery (per the
+  no-back-compat rule below) rather than republished with stale keys.
+- **Remote object keys** (`otel-ledger` `remote_keys`, `SCHEMA_VERSION = "v1"`):
+  signal-scoped — `v1/{signal}/tenants/{tenant}/sfst/{date}/{file}.sfst` and
+  `v1/{signal}/catalog/{date}/{tenant}/{file}.catalog`. The `{signal}` segment is
+  the per-signal storage separator (the decided design: signals live in distinct
+  paths, not disambiguated by the filename); the `part_key` is still embedded via
+  the `FileId` in the SFST filename. Each pipeline supplies its own signal name
+  (logs = `"logs"`).
 
 There is **no back-compat** at any tier — every reader hard-rejects an older
 version (`UnsupportedVersion`) before deserializing the payload, so an unsealed

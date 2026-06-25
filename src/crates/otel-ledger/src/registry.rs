@@ -551,17 +551,18 @@ impl Registry {
             .collect()
     }
 
-    /// Window-scoped per-stream selector stats: folds the in-window local SFST/WAL
-    /// candidates and the pre-parsed in-window `catalog` (remote-only streams),
-    /// keyed on the stream's `ns_hash`. SFST-wins over WAL over catalog per seq;
-    /// sorted by `(namespace, name)`. Dedup keys on the seqs actually folded from a
-    /// local file, so a catalog entry whose seq has any local file (even an unsynced
+    /// Window-scoped per-partition selector stats: folds the in-window local SFST/WAL
+    /// candidates and the pre-parsed in-window `catalog` (remote-only partitions),
+    /// keyed on `part_key`. SFST-wins over WAL over catalog per seq; sorted by
+    /// `part_key` (the signal's query layer decodes `content_meta` and re-sorts for
+    /// display). Dedup keys on the seqs actually folded from a local file, so a
+    /// catalog entry whose seq has any local file (even an unsynced
     /// `valid_up_to == 0` WAL) is skipped — no double-count.
     ///
-    /// Only `q.time_range` is used: the stream filter is forced empty internally, so
-    /// the selector always lists EVERY in-window stream regardless of the caller's
-    /// `q.partition_keys`. The caller must pass the in-window catalog entries (e.g.
-    /// from [`TenantRegistries::catalog_entries_in_window`]); they are folded as-is.
+    /// Only `q.time_range` is used: the partition filter is forced empty internally,
+    /// so the selector always lists EVERY in-window partition regardless of the
+    /// caller's `q.partition_keys`. The caller must pass the in-window catalog entries
+    /// (e.g. from [`TenantRegistries::catalog_entries_in_window`]); folded as-is.
     pub fn enumerate_streams_from(
         &self,
         q: &file_registry::Query,
