@@ -577,6 +577,7 @@ func TestCleanup_UnregistersStaticFunctionsBeforeStoppingJobs(t *testing.T) {
 	mgr.funcCtl.RegisterModules(mgr.modules)
 
 	mgr.startRunningJob(&lockProbeJob{fullName: "staticmod_job1", moduleName: "staticmod", name: "job1"})
+	mgr.funcCtl.ReconcileModuleMethods("staticmod")
 	mgr.startRunningJob(&lockProbeJob{fullName: "jobmod_job1", moduleName: "jobmod", name: "job1"})
 
 	mgr.cleanup()
@@ -700,6 +701,7 @@ func newModuleDispatchTestManager(
 	mgr.modules = collectorapi.Registry{"mod": creator}
 	mgr.funcCtl.RegisterModules(mgr.modules)
 	mgr.funcCtl.OnJobStart(&lockProbeJob{fullName: "mod_job1", moduleName: "mod", name: "job1"})
+	mgr.funcCtl.ReconcileModuleMethods("mod")
 
 	return mgr
 }
