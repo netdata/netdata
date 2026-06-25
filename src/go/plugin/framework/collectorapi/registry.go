@@ -83,11 +83,10 @@ type (
 		// When nil, methods are disabled for this module.
 		MethodHandler func(job RuntimeJob) funcapi.MethodHandler
 
-		// Optional: InstanceFunctions returns Function declarations to register when a job starts.
-		// Each returned Function ID is published as "moduleName:functionID" and unregistered
-		// when the owning job stops.
-		// This enables instance Function registration instead of static module-level Functions.
-		// If nil, no instance Functions are registered.
+		// Optional: InstanceFunctions returns Function declarations owned by one
+		// runtime job. Each returned Function ID is published as "moduleName:functionID"
+		// while the owning job is running and available. If nil, no instance Functions
+		// are declared.
 		InstanceFunctions func(job RuntimeJob) []funcapi.FunctionConfig
 
 		// FunctionOnly indicates this module provides only functions, no metrics.

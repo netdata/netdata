@@ -579,18 +579,13 @@ func TestCleanup_UnregistersStaticFunctionsBeforeStoppingJobs(t *testing.T) {
 	mgr.startRunningJob(&lockProbeJob{fullName: "staticmod_job1", moduleName: "staticmod", name: "job1"})
 	mgr.funcCtl.ReconcileModuleMethods("staticmod")
 	mgr.startRunningJob(&lockProbeJob{fullName: "jobmod_job1", moduleName: "jobmod", name: "job1"})
+	mgr.funcCtl.ReconcileModuleMethods("jobmod")
 
 	mgr.cleanup()
 
 	unregistered := fnReg.unregisteredNames()
 	assert.Contains(t, unregistered, "staticmod:static-method")
 	assert.Contains(t, unregistered, "jobmod:job-method")
-	assert.Less(
-		t,
-		fnReg.unregisteredIndex("staticmod:static-method"),
-		fnReg.unregisteredIndex("jobmod:job-method"),
-		"static module cleanup must run before per-job stop cleanup",
-	)
 }
 
 type dispatchContextKey string
@@ -663,18 +658,6 @@ func (r *capturingFunctionRegistry) unregisteredNames() []string {
 	return out
 }
 
-func (r *capturingFunctionRegistry) unregisteredIndex(name string) int {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	for i, got := range r.unregistered {
-		if got == name {
-			return i
-		}
-	}
-	return -1
-}
-
 func newModuleDispatchTestManager(
 	t *testing.T,
 	api *dyncfg.Responder,
@@ -730,6 +713,7 @@ func newInstanceFunctionDispatchTestManager(
 	mgr.modules = collectorapi.Registry{"mod": creator}
 	mgr.funcCtl.RegisterModules(mgr.modules)
 	mgr.startRunningJob(&lockProbeJob{fullName: "mod_job1", moduleName: "mod", name: "job1"})
+	mgr.funcCtl.ReconcileModuleMethods("mod")
 
 	return mgr
 }

@@ -45,10 +45,9 @@ publication stream emitted by go.d.
   `InstancePolicySingle` removes the public `__job` selector but does not make
   the Function true-agent; publication still depends on the canonical singleton
   job being running and available.
-- funcctl MAY recheck shared Function availability while jobs are running. jobmgr
-  currently performs this recheck from the running-job tick loop and on job
-  stop; agent/process-backed Function availability may still be checked at job
-  start.
+- funcctl MAY recheck job-backed Function availability while jobs are running.
+  jobmgr currently requests this recheck from the running-job tick loop and
+  immediately after job stop.
 - `AgentFunctions` are true-agent declarations and are not processed by shared
   job availability reconciliation.
 - Rechecks MUST reuse the normal funcctl publication path so public names,
@@ -58,11 +57,12 @@ publication stream emitted by go.d.
 ## Job-Backed Function Availability Contract
 
 - Collectors MAY implement `collectorapi.FunctionAvailability` when a
-  running job can serve only some shared Functions, or when a shared Function
-  should appear only after collector-owned runtime state is ready.
+  running job can serve only some shared or instance Functions, or when a
+  job-backed Function should appear only after collector-owned runtime state is
+  ready.
 - `FunctionAvailable(functionID)` MUST be cheap and non-blocking.
 - If a collector does not implement `FunctionAvailability`, every running job is
-  available for every shared Function declared by the module.
+  available for every shared or instance Function declared by the module.
 - Availability is pull-based. Collectors update their own state from normal
   runtime paths; funcctl reads that state during reconciliation.
 - Availability changes are reflected after the next reconcile pass. Rapidly

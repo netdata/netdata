@@ -507,6 +507,7 @@ func TestControllerLifecycleHooks(t *testing.T) {
 			available = true
 			controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
 			controller.OnJobStart(newTestRuntimeJob("mod", "job2", true))
+			controller.ReconcileModuleMethods("mod")
 
 			assert.Equal(t, []string{"mod:logs"}, reg.registeredNames())
 		},
@@ -696,7 +697,10 @@ func TestControllerLifecycleHooks(t *testing.T) {
 
 			job := newTestRuntimeJob("mod", "job1", true)
 			controller.OnJobStart(job)
+			controller.ReconcileModuleMethods("mod")
 			controller.OnJobStop(job)
+			assert.Empty(t, reg.unregisteredNames())
+			controller.ReconcileModuleMethods("mod")
 
 			assert.Contains(t, reg.unregisteredNames(), "mod:job-method")
 		},
@@ -817,6 +821,8 @@ func TestControllerSharedFunctionWithdrawsWhenLastDefaultJobStops(t *testing.T) 
 	assert.NotContains(t, buf.String(), "FUNCTION_DEL GLOBAL \"mod:logs\"")
 
 	controller.OnJobStop(job2)
+	assert.Empty(t, reg.unregisteredNames())
+	controller.ReconcileModuleMethods("mod")
 
 	assert.Equal(t, []string{"mod:logs"}, reg.unregisteredNames())
 	assert.Contains(t, buf.String(), "FUNCTION_DEL GLOBAL \"mod:logs\"")
@@ -950,6 +956,7 @@ func TestControllerSharedFunctionRepublishesWithNewGeneration(t *testing.T) {
 	require.NotNil(t, firstHandler)
 
 	controller.OnJobStop(job1)
+	controller.ReconcileModuleMethods("mod")
 	firstHandler(context.Background(), functions.Function{
 		UID:     "stale-generation",
 		Timeout: time.Second,
@@ -1193,31 +1200,14 @@ func TestControllerRegisterInstanceFunctions(t *testing.T) {
 			assert.Empty(t, reg.registeredNames())
 			assert.Empty(t, controller.registry.getInstanceFunctions("mod", "job1"))
 		},
-		"registry is populated before handlers are callable": func(t *testing.T) {
-			var gotCode int
-			var gotResp map[string]any
-
+		"success stores declarations without publishing handlers": func(t *testing.T) {
 			reg := newTestFunctionRegistry()
-			reg.onRegister = func(_ string, fn func(functions.Function)) {
-				fn(functions.Function{
-					UID:  "during-register",
-					Args: []string{"info"},
-				})
-			}
-			controller := New(Options{
-				FnReg: reg,
-				JSONWriter: func(data []byte, code int) {
-					gotCode = code
-					require.NoError(t, json.Unmarshal(data, &gotResp))
-				},
-			})
+			controller := New(Options{FnReg: reg})
 			controller.registry.registerModule("mod", collectorapi.Creator{})
 
 			controller.registerInstanceFunctions(newTestRuntimeJob("mod", "job1", true), []funcapi.FunctionConfig{{ID: "a", Help: "instance function help"}})
 
-			assert.Equal(t, 200, gotCode)
-			assert.Equal(t, float64(200), gotResp["status"])
-			assert.Equal(t, "instance function help", gotResp["help"])
+			assert.Empty(t, reg.registeredNames())
 			assert.Len(t, controller.registry.getInstanceFunctions("mod", "job1"), 1)
 		},
 		"success commits all methods": func(t *testing.T) {
@@ -1227,7 +1217,7 @@ func TestControllerRegisterInstanceFunctions(t *testing.T) {
 
 			controller.registerInstanceFunctions(newTestRuntimeJob("mod", "job1", true), []funcapi.FunctionConfig{{ID: "a"}, {ID: "b"}})
 
-			assert.ElementsMatch(t, []string{"mod:a", "mod:b"}, reg.registeredNames())
+			assert.Empty(t, reg.registeredNames())
 			assert.Len(t, controller.registry.getInstanceFunctions("mod", "job1"), 2)
 		},
 	}
@@ -1302,7 +1292,7 @@ func TestControllerInstanceFunctionsUseJobBackedAvailability(t *testing.T) {
 			assert.Equal(t, 200, gotCode)
 			assert.Equal(t, float64(200), gotResp["status"])
 		},
-		"missing FunctionAvailability preserves immediate publication": func(t *testing.T) {
+		"missing FunctionAvailability publishes on reconcile": func(t *testing.T) {
 			reg := newTestFunctionRegistry()
 			controller := New(Options{FnReg: reg})
 			controller.RegisterModules(collectorapi.Registry{
@@ -1314,6 +1304,8 @@ func TestControllerInstanceFunctionsUseJobBackedAvailability(t *testing.T) {
 			})
 
 			controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+			assert.Empty(t, reg.registeredNames())
+			controller.ReconcileModuleMethods("mod")
 
 			assert.Equal(t, []string{"mod:a"}, reg.registeredNames())
 		},
@@ -1392,6 +1384,7 @@ func TestControllerPublishedFunctionWrapperConcurrentMutation(t *testing.T) {
 					},
 				})
 				controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+				controller.ReconcileModuleMethods("mod")
 			},
 			mutate: func(controller *Controller) {
 				job := newTestRuntimeJob("mod", "job1", true)
@@ -1480,7 +1473,9 @@ func TestControllerPublishedFunctionGenerationInvalidatesStaleHandlers(t *testin
 				})
 				job := newTestRuntimeJob("mod", "job1", true)
 				controller.OnJobStart(job)
+				controller.ReconcileModuleMethods("mod")
 				controller.OnJobStop(job)
+				controller.ReconcileModuleMethods("mod")
 			},
 		},
 	}
@@ -1543,6 +1538,7 @@ func runRawControllerMethodCase(t *testing.T, tc rawControllerMethodCase, creato
 	}
 	controller.RegisterModules(collectorapi.Registry{"mod": creator})
 	controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+	controller.ReconcileModuleMethods("mod")
 
 	call := reg.handlers[callName]
 	require.NotNil(t, call)
@@ -1817,7 +1813,9 @@ func TestControllerSingleInstanceAgentScopeModuleMethodRequiresPublishedAvailabl
 			setup: func(controller *Controller) {
 				job := newTestRuntimeJob("mod", "mod", true)
 				controller.OnJobStart(job)
+				controller.ReconcileModuleMethods("mod")
 				controller.OnJobStop(job)
+				controller.ReconcileModuleMethods("mod")
 			},
 			message: "unknown function 'mod:status'",
 		},
@@ -2021,6 +2019,7 @@ func TestControllerRawInstanceFunctionRequiresRawHandler(t *testing.T) {
 		},
 	})
 	controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+	controller.ReconcileModuleMethods("mod")
 
 	reg.handlers["mod:job1:logs"](functions.Function{
 		UID:     "missing-raw-handler",

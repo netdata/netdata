@@ -2,10 +2,13 @@
 
 package funcctl
 
+import "sort"
+
 type publishedFunctionKind uint8
 
 const (
-	publishedFunctionModuleMethod publishedFunctionKind = iota + 1
+	publishedFunctionShared publishedFunctionKind = iota + 1
+	publishedFunctionAgent
 	publishedFunctionInstance
 )
 
@@ -16,9 +19,17 @@ type publishedFunctionOwner struct {
 	methodID   string
 }
 
-func moduleMethodOwner(moduleName, methodID string) publishedFunctionOwner {
+func sharedFunctionOwner(moduleName, methodID string) publishedFunctionOwner {
 	return publishedFunctionOwner{
-		kind:       publishedFunctionModuleMethod,
+		kind:       publishedFunctionShared,
+		moduleName: moduleName,
+		methodID:   methodID,
+	}
+}
+
+func agentFunctionOwner(moduleName, methodID string) publishedFunctionOwner {
+	return publishedFunctionOwner{
+		kind:       publishedFunctionAgent,
 		moduleName: moduleName,
 		methodID:   methodID,
 	}
@@ -41,11 +52,13 @@ type publishedFunctionRecord struct {
 type publishedFunctionStore struct {
 	nextGeneration uint64
 	byName         map[string]publishedFunctionRecord
+	byModule       map[string]map[string]struct{}
 }
 
 func newPublishedFunctionStore() *publishedFunctionStore {
 	return &publishedFunctionStore{
-		byName: make(map[string]publishedFunctionRecord),
+		byName:   make(map[string]publishedFunctionRecord),
+		byModule: make(map[string]map[string]struct{}),
 	}
 }
 
@@ -76,6 +89,10 @@ func (s *publishedFunctionStore) add(name string, owner publishedFunctionOwner) 
 		generation: s.nextGeneration,
 	}
 	s.byName[name] = record
+	if s.byModule[owner.moduleName] == nil {
+		s.byModule[owner.moduleName] = make(map[string]struct{})
+	}
+	s.byModule[owner.moduleName][name] = struct{}{}
 	return record, true
 }
 
@@ -84,24 +101,41 @@ func (s *publishedFunctionStore) generationMatches(name string, generation uint6
 	return ok && record.generation == generation
 }
 
-func (s *publishedFunctionStore) removeOwner(owner publishedFunctionOwner) []string {
+func (s *publishedFunctionStore) removeKinds(kinds ...publishedFunctionKind) []string {
+	allowed := make(map[publishedFunctionKind]struct{}, len(kinds))
+	for _, kind := range kinds {
+		allowed[kind] = struct{}{}
+	}
+
 	var names []string
 	for name, record := range s.byName {
-		if record.owner == owner {
+		if _, ok := allowed[record.owner.kind]; ok {
 			names = append(names, name)
-			delete(s.byName, name)
+			s.removeName(name)
 		}
 	}
+	sort.Strings(names)
 	return names
 }
 
-func (s *publishedFunctionStore) removeKind(kind publishedFunctionKind) []string {
-	var names []string
-	for name, record := range s.byName {
-		if record.owner.kind == kind {
-			names = append(names, name)
-			delete(s.byName, name)
+func (s *publishedFunctionStore) moduleRecords(moduleName string) map[string]publishedFunctionRecord {
+	records := make(map[string]publishedFunctionRecord)
+	for name := range s.byModule[moduleName] {
+		records[name] = s.byName[name]
+	}
+	return records
+}
+
+func (s *publishedFunctionStore) removeName(name string) {
+	record, ok := s.byName[name]
+	if !ok {
+		return
+	}
+	delete(s.byName, name)
+	if names := s.byModule[record.owner.moduleName]; names != nil {
+		delete(names, name)
+		if len(names) == 0 {
+			delete(s.byModule, record.owner.moduleName)
 		}
 	}
-	return names
 }
