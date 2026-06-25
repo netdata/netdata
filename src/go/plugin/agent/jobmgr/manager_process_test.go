@@ -321,8 +321,7 @@ func TestRunNotifyRunningJobs_DoesNotPublishDirectly(t *testing.T) {
 
 func TestRequestFunctionReconcile_CoalescesPendingModules(t *testing.T) {
 	mgr := New(Config{PluginName: testPluginName})
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	mgr.ctx = ctx
 
 	mgr.requestFunctionReconcile("bbb")
