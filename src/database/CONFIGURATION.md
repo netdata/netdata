@@ -9,8 +9,10 @@ Use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configurati
 ```text
 [db]
   # dbengine, ram, none
-  mode = dbengine
+  db = dbengine
 ```
+
+`mode` is also accepted for backwards compatibility.
 
 ## Tiers
 
@@ -47,7 +49,7 @@ You can change these limits using [`edit-config`](/docs/netdata-agent/configurat
 
 ```text
 [db]
-    mode = dbengine
+    db = dbengine
     storage tiers = 3
 
     # Tier 0, per second data. Set to 0 for no limit.
