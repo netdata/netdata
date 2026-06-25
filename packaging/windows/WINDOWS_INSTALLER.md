@@ -4,37 +4,29 @@ Netdata provides a simple Windows installer for quick setup.
 
 ## Supported Windows Versions and Requirements
 
-The Netdata Windows Agent is a **64-bit (x64)** application. Its application manifest (`packaging/windows/resources/netdata.manifest.in`) declares compatibility targeting from **Windows Vista (NT 6.0) through Windows 11**, which sets the lowest kernel baseline the installer is built to run on. This is an application-compatibility declaration, not a per-version quality-assurance guarantee — Netdata does not publish a per-version QA matrix for Windows.
+The Netdata Windows Agent is a **64-bit (x64)** application. We recommend **Windows 10 / 11 or Windows Server 2019 or newer** as the supported baseline.
 
-The Windows client and server families share kernels by generation, so the manifest's desktop targets map to Windows Server editions as follows:
-
-| Manifest compatibility target | Windows client | Windows Server (shared kernel) |
-|-------------------------------|----------------|--------------------------------|
-| Windows Vista (NT 6.0)        | Vista          | Server 2008                    |
-| Windows 7 (NT 6.1)            | 7              | Server 2008 R2                 |
-| Windows 8 (NT 6.2)            | 8              | Server 2012                    |
-| Windows 8.1 (NT 6.3)          | 8.1            | Server 2012 R2                 |
-| Windows 10 / 11 (NT 10.0)     | 10 / 11        | Server 2016 and newer          |
+The installer is built to run on older 64-bit Windows editions as far back as Windows Vista and Windows Server 2008, but those versions are not tested or officially supported, and several have reached end-of-life.
 
 :::note
 
-We recommend **Windows 7 / Server 2008 R2 or newer (64-bit)** as the practical minimum. Older releases sit on legacy NT kernels and are more likely to hit the download/TLS limitations described below.
+Older Windows and Windows Server releases are end-of-life and are more likely to encounter the download/TLS limitations described below. For the oldest versions, see [Will it run on Windows Server 2008?](#will-it-run-on-windows-server-2008).
 
 :::
 
 ### Will it run on Windows Server 2008?
 
-Windows Server 2008 (pre-R2) shares the **Windows Vista / NT 6.0** kernel, which is the lowest baseline the manifest targets, so the Agent **may run** on it. It is **not a tested or supported target**:
+Windows Server 2008 (pre-R2) is the oldest Windows generation the installer targets, so the Agent **may run** on it. It is **not a tested or supported target**:
 
 - Microsoft ended extended support for Windows Server 2008 and 2008 R2 on January 14, 2020; Extended Security Updates (ESU) ended January 2023 for on-premises deployments (extended through January 9, 2024 only for Azure-hosted instances).
 - On Windows Server versions earlier than 2019, the automated MSI-download commands in this guide can fail due to TLS compatibility — use the [Graphical Installation (GUI)](#graphical-installation-gui) or a [pre-downloaded MSI](#offline-air-gapped-installation) instead (see also [Silent Installation](#silent-installation-command-line)).
 
-For the best experience, use **Windows Server 2008 R2 or newer**.
+For the best experience, use **Windows Server 2019 or newer**.
 
 ### Requirements
 
 - **64-bit (x64) Windows.** The installer ships only as `netdata-x64.msi`.
-- **Administrator rights.** The Agent manifest requests `requireAdministrator`, so installation and the running service require elevated privileges.
+- **Administrator rights.** Installation and the running service require elevated (Administrator) privileges.
 - **Network access for download.** On Server editions earlier than 2019, fetch the MSI on another machine or use the GUI installer (TLS limitation noted above).
 
 ## Access and Limitations
