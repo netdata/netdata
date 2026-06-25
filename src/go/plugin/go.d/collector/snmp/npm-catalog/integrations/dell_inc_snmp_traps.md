@@ -13,7 +13,7 @@ endmeta-->
 # Dell Inc SNMP Traps
 
 
-<img src="https://netdata.cloud/img/SNMP.png" width="150"/>
+<img src="https://netdata.cloud/img/dell.svg" width="150"/>
 
 
 Plugin: go.d.plugin
