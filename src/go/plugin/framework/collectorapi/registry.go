@@ -86,7 +86,8 @@ type (
 		// Optional: InstanceFunctions returns Function declarations owned by one
 		// runtime job. Each returned Function ID is published as "moduleName:functionID"
 		// while the owning job is running and available. If nil, no instance Functions
-		// are declared.
+		// are declared. A collector can implement FunctionAvailability to gate
+		// publication for each returned Function ID.
 		InstanceFunctions func(job RuntimeJob) []funcapi.FunctionConfig
 
 		// FunctionOnly indicates this module provides only functions, no metrics.

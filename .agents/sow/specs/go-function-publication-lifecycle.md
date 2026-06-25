@@ -40,7 +40,7 @@ publication stream emitted by go.d.
   Function, and therefore may not emit a matching withdrawal for that Function.
 - Function withdrawal is emitted through `FUNCTION_DEL GLOBAL`. Parents that do
   not advertise `STREAM_CAP_FUNCTION_DEL` can retain stale streamed Function
-  entries even after the child unregisters them locally.
+  entries even after the child unregisters shared or instance Functions locally.
 - Shared single-instance Functions still use `SharedFunctions`.
   `InstancePolicySingle` removes the public `__job` selector but does not make
   the Function true-agent; publication still depends on the canonical singleton
@@ -99,6 +99,10 @@ publication stream emitted by go.d.
   - republish the concrete instance Function when availability returns;
   - if the owning collector does not implement `FunctionAvailability`, every
     stored instance Function is available while the job runs.
+- Instance Function withdrawal is asynchronous with job stop. After a job stops,
+  its concrete instance Function can remain briefly listed until the reconcile
+  worker processes the stop-triggered request, but dispatch MUST reject the
+  stopped job instead of serving stale collector state.
 
 ## Validation Guidance
 
