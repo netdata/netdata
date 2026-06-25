@@ -132,6 +132,12 @@ resolved by `otel-plugin` `config/{mod,signal,env}.rs`, consumed by both workers
   `logs:` and a `traces:` section (both mandatory; the traces pipeline is always
   built). Each signal's tuning is independent (e.g. a small logs WAL rotation
   threshold does not affect traces, which keeps its own).
+- **Migration note (flat → nested):** before this model, logs files lived directly
+  at `{base}/{wal,index,catalog}` and the seq high-water at `{base}/index/.seq_highwater`.
+  The derived layout adds a `{signal}/` segment (`{base}/logs/wal`, …) and moves the
+  seq file to `{base}/shared/seq_highwater`. otel-logs is experimental (never GA), so
+  old data is **orphaned, not migrated** — it stays on disk but is not read. Recover
+  with `sfsq-cli --wal-dir/--sfst-dir` pointed at the old paths, or relocate the dirs.
 
 ## Invariants
 

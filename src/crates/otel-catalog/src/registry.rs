@@ -72,7 +72,8 @@ impl File {
 }
 
 pub struct Registry {
-    /// Shared base directory (typically `logs_config.catalog.dir`). Per-tenant
+    /// Shared base directory (the signal's derived catalog dir,
+    /// `{base_dir}/{signal}/catalog`). Per-tenant
     /// catalog files live under `{base_dir}/{date}/{tenant_id}/` — matching
     /// the flat-per-tenant convention used for WAL and SFST files. The
     /// remote key layout adds a `catalog/` segment to discriminate artifact

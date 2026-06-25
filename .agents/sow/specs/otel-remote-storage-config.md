@@ -23,6 +23,21 @@ config (`config/signal.rs`, `config/env.rs`), `netdata-plugin/bridge` config
   derived-layout contract.
 - Each signal uploads under its own remote-key segment `v1/{signal}/...` (e.g.
   `v1/logs/...`, `v1/traces/...`), so one backend cleanly holds every signal.
+
+### Operator migration (storage moved global)
+
+The storage/auth config moved from per-signal (`logs.storage.*`) to global, with
+renamed env vars. otel-logs is experimental (never GA), so this is a hard break
+with no shim:
+
+- `NETDATA_OTEL_LOGS_STORAGE_{ENABLED,URI,READ_CACHE_MAX_SIZE}` →
+  `NETDATA_OTEL_STORAGE_{ENABLED,URI,READ_CACHE_MAX_SIZE}`.
+- `NETDATA_OTEL_LOGS_AUTH_ENABLED` → `NETDATA_OTEL_AUTH_ENABLED`.
+- `NETDATA_OTEL_LOGS_STORAGE_READ_CACHE_DIR` is **removed** with no replacement —
+  the read-cache dir is now derived per signal (`{base_dir}/{signal}/remote-read`).
+- The old names are not read and not warned about; an operator using them must
+  update their environment file. The per-signal WAL/index/catalog tuning env vars
+  keep their `NETDATA_OTEL_{LOGS,TRACES}_*` namespaces.
 - `uri` is a single **OpenDAL URI**. The scheme selects the backend
   (`fs://`, `s3://`, …); all **non-secret** backend options are URI query params
   (`s3://bucket/prefix?region=…&endpoint=…`). OpenDAL owns the per-backend option

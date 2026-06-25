@@ -270,8 +270,9 @@ fn default_read_cache_max_size() -> ByteSize {
     ByteSize::gib(4)
 }
 
-/// Index file configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Index file configuration (runtime-only; lives in [`LifecycleConfig`], built by
+/// [`PluginConfig::lifecycle_for`] — never serialized).
+#[derive(Debug, Clone)]
 pub struct IndexConfig {
     /// Directory for SFST index file storage. Layout: `{dir}/{tenant}/*.sfst`.
     pub dir: PathBuf,
@@ -280,14 +281,13 @@ pub struct IndexConfig {
     pub retention: HashMap<String, RetentionEntry>,
 }
 
-/// Catalog file configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Catalog file configuration (runtime-only; see [`IndexConfig`]).
+#[derive(Debug, Clone)]
 pub struct CatalogConfig {
     /// Directory for catalog file storage. Layout: `{dir}/{date}/{tenant}/*.catalog`.
     pub dir: PathBuf,
     /// Number of SFST entries accumulated before the catalog builder
     /// rotates an in-memory accumulator to an immutable catalog file.
-    #[serde(default = "default_catalog_rotation_count")]
     pub rotation_count: usize,
 }
 
@@ -295,16 +295,14 @@ fn default_catalog_rotation_count() -> usize {
     10
 }
 
-/// WAL file configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// WAL file configuration (runtime-only; see [`IndexConfig`]).
+#[derive(Debug, Clone)]
 pub struct WalConfig {
     /// Directory for WAL file storage.
     pub dir: PathBuf,
     /// Whether to compute CRC32 checksums per frame.
-    #[serde(default = "default_true")]
     pub crc_enabled: bool,
     /// Whether to LZ4-compress frame payloads.
-    #[serde(default = "default_true")]
     pub compression_enabled: bool,
     /// Per-tenant rotation policies, keyed by tenant name.
     /// The `"default"` key is required and used as the fallback.

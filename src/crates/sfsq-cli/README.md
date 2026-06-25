@@ -17,12 +17,15 @@ It needs the WAL directory and the SFST (index) directory. Each is resolved
 independently, first match wins:
 
 1. an explicit `--wal-dir` / `--sfst-dir`,
-2. `--config <user otel.yaml>` (`logs.wal.dir` / `logs.index.dir`),
-3. `--stock-config <stock otel.yaml>`.
+2. `--config <user otel.yaml>` — derived from `base_dir` as
+   `{base_dir}/logs/wal` and `{base_dir}/logs/index`,
+3. `--stock-config <stock otel.yaml>` — same `base_dir` derivation.
 
-Logs are read from `{dir}/{tenant}` (`--tenant`, default `default`). A relative
-`logs.wal.dir`/`logs.index.dir` in a `--config` file resolves against the current
-working directory (the stock config uses absolute paths).
+`otel.yaml` no longer configures per-signal dirs: it sets one `base_dir` and the
+plugin derives `{base_dir}/{signal}/{wal,index,catalog}`. This is a logs tool, so
+it reads the `logs/` subtree. Logs are read from `{dir}/{tenant}` (`--tenant`,
+default `default`). A relative `base_dir` in a `--config` file resolves against
+the current working directory (the stock config uses an absolute path).
 
 ## Usage
 
@@ -76,7 +79,7 @@ sfsq-cli --config /etc/netdata/otel.yaml \
 
 # A fixed UTC window, oldest-first, only two fields, as NDJSON.
 # --fields selects from the `fields` array; timestamp_ns is always emitted.
-sfsq-cli --wal-dir /var/lib/netdata/otel/wal --sfst-dir /var/lib/netdata/otel/index \
+sfsq-cli --wal-dir /var/lib/netdata/otel/logs/wal --sfst-dir /var/lib/netdata/otel/logs/index \
   --since '2026-06-16 09:00:00' --until '2026-06-16 10:00:00' \
   --reverse --fields body,host
 

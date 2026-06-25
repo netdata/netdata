@@ -154,6 +154,20 @@ fn validate(config: &PluginConfig) -> Result<()> {
     if config.base_dir.as_os_str().is_empty() {
         anyhow::bail!("base_dir must be set (the mandatory root for all signal storage)");
     }
+    // Derived per-signal dirs join onto base_dir; a relative base_dir would make
+    // the on-disk layout depend on the process CWD (which the agent does not
+    // pin). Match the journal-writer contract: storage roots must be absolute.
+    if !config.base_dir.is_absolute() {
+        anyhow::bail!(
+            "base_dir must be an absolute path, got: {}",
+            config.base_dir.display()
+        );
+    }
+    // When storage is on, the URI is consumed by OpenDAL; an empty URI would
+    // only fail later at backend construction. Surface it at config load.
+    if config.storage.enabled && config.storage.uri.is_empty() {
+        anyhow::bail!("storage.uri must be set when storage.enabled is true");
+    }
 
     if !config.endpoint.path.contains(':') {
         anyhow::bail!(
@@ -683,6 +697,24 @@ endpoint:
         let mut c = stock_config();
         c.base_dir = std::path::PathBuf::new();
         assert!(validate(&c).is_err());
+    }
+
+    #[test]
+    fn validation_rejects_relative_base_dir() {
+        let mut c = stock_config();
+        c.base_dir = std::path::PathBuf::from("relative/otel");
+        assert!(validate(&c).is_err());
+    }
+
+    #[test]
+    fn validation_rejects_enabled_storage_without_uri() {
+        let mut c = stock_config();
+        c.storage.enabled = true;
+        c.storage.uri = String::new();
+        assert!(validate(&c).is_err());
+        // Disabled storage with an empty uri is fine (uri unused).
+        c.storage.enabled = false;
+        assert!(validate(&c).is_ok());
     }
 
     #[test]

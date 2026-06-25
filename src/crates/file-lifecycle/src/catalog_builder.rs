@@ -183,8 +183,9 @@ async fn handle_request(
 /// Full on-disk path for a catalog file.
 ///
 /// Layout: `{base}/{YYYY-MM-DD}/{tenant_id}/{machine}-{boot}-{max_seq}-{min_ts}-{max_ts}.catalog`.
-/// The base directory (`logs_config.catalog.dir`) is dedicated to catalog
-/// files, so there's no `catalog/` subdir — same convention as WAL and SFST.
+/// The base directory (the signal's derived catalog dir,
+/// `{base_dir}/{signal}/catalog`) is dedicated to catalog files, so there's no
+/// `catalog/` subdir — same convention as WAL and SFST.
 ///
 /// `tenant_id` is expected to be pre-validated by
 /// [`TenantId::validate_ingest`].
