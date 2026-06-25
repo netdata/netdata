@@ -111,7 +111,7 @@ pub use schema::{
     BitmapValue, DEFAULT_CARDINALITY_THRESHOLD, FieldEntry, FieldTable, FieldTier, HighField,
     Histogram, IdRanges, KvId, Metadata, StreamBatch, Summary,
 };
-pub use writer::{ChunkCounts, StreamWriter};
+pub use writer::{ChunkCounts, StreamWriter, write_summary_only};
 
 // ── Format constants ─────────────────────────────────────────────
 //

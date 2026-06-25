@@ -25,6 +25,29 @@ fn summary() -> Summary {
     }
 }
 
+#[test]
+fn write_summary_only_round_trips_through_reader() {
+    // A content-light SFST (the traces-style seal): only the SUMR chunk, none of
+    // the logs-shaped chunks StreamWriter mandates. The shared reader/registry
+    // must still recover its summary so the lifecycle tracks it like any file.
+    let s = Summary {
+        min_timestamp_s: 100,
+        max_timestamp_s: 200,
+        record_count: 7,
+        content_meta: vec![1, 2, 3, 4],
+    };
+    let buf = crate::write_summary_only(Cursor::new(Vec::new()), &s)
+        .unwrap()
+        .into_inner();
+
+    let reader = crate::Reader::open(&buf).unwrap();
+    let got = reader.summary().unwrap();
+    assert_eq!(got.min_timestamp_s, s.min_timestamp_s);
+    assert_eq!(got.max_timestamp_s, s.max_timestamp_s);
+    assert_eq!(got.record_count, s.record_count);
+    assert_eq!(got.content_meta, s.content_meta);
+}
+
 fn metadata(fields: Vec<FieldEntry>) -> Metadata {
     Metadata {
         histogram: Histogram {

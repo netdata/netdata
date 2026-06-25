@@ -55,6 +55,11 @@ struct Stream {
     dir: Arc<FileDir>,
     machine_id: Uuid,
     boot_id: Uuid,
+    /// Opaque signal axis stamped into every `FileId` this stream writes
+    /// (logs = [`FileId::DEFAULT_PIPELINE`]; a second signal, e.g. traces,
+    /// uses its own). Lets one writer process feed multiple signals while the
+    /// ledger routes by `pipeline_id`.
+    pipeline_id: u16,
     config: Config,
     active: Option<ActiveFile>,
     seq: SeqCounter,
@@ -68,10 +73,12 @@ struct Stream {
 }
 
 impl Stream {
+    #[allow(clippy::too_many_arguments)]
     fn new(
         dir: Arc<FileDir>,
         machine_id: Uuid,
         boot_id: Uuid,
+        pipeline_id: u16,
         config: Config,
         seq: SeqCounter,
         part_key: u64,
@@ -81,6 +88,7 @@ impl Stream {
             dir,
             machine_id,
             boot_id,
+            pipeline_id,
             config,
             active: None,
             seq,
@@ -90,9 +98,15 @@ impl Stream {
         }
     }
 
-    /// Create a [`FileId`] stamped with this stream's partition key.
+    /// Create a [`FileId`] stamped with this stream's pipeline + partition key.
     fn file_id(&self, seq: u64) -> FileId {
-        FileId::new(self.machine_id, self.boot_id, seq, self.part_key)
+        FileId::with_pipeline(
+            self.machine_id,
+            self.boot_id,
+            self.pipeline_id,
+            seq,
+            self.part_key,
+        )
     }
 
     fn write_frame(
@@ -326,18 +340,33 @@ pub struct Writer {
     dir: Arc<FileDir>,
     machine_id: Uuid,
     boot_id: Uuid,
+    /// Signal axis stamped into every `FileId` this writer produces. One writer
+    /// process serves one signal; the ledger routes by this `pipeline_id`.
+    pipeline_id: u16,
     config: Config,
     seq: Arc<SeqAllocator>,
     streams: HashMap<u64, Stream>,
 }
 
 impl Writer {
-    /// Create a new writer.
+    /// Create a new writer in the [`FileId::DEFAULT_PIPELINE`] (logs).
     ///
     /// Machine and boot IDs are loaded from the system. The caller provides
     /// a shared sequence counter (e.g., shared across per-tenant writers).
     /// The directory is created if it doesn't exist.
     pub fn new(path: &Path, config: Config, seq: Arc<SeqAllocator>) -> Result<Self> {
+        Self::with_pipeline(path, config, seq, FileId::DEFAULT_PIPELINE)
+    }
+
+    /// Like [`new`](Self::new) but stamps files with an explicit `pipeline_id`,
+    /// for a second signal (e.g. traces) whose files must route to its own
+    /// pipeline. Mirrors [`FileId::with_pipeline`].
+    pub fn with_pipeline(
+        path: &Path,
+        config: Config,
+        seq: Arc<SeqAllocator>,
+        pipeline_id: u16,
+    ) -> Result<Self> {
         let machine_id = journal_common::load_machine_id().map_err(|e| crate::Error::Io(e))?;
         let boot_id = journal_common::load_boot_id().map_err(|e| crate::Error::Io(e))?;
         let dir = Arc::new(FileDir::new(path, WAL_EXT));
@@ -346,6 +375,7 @@ impl Writer {
             dir,
             machine_id,
             boot_id,
+            pipeline_id,
             config,
             seq,
             streams: HashMap::new(),
@@ -409,6 +439,7 @@ impl Writer {
                 Arc::clone(&self.dir),
                 self.machine_id,
                 self.boot_id,
+                self.pipeline_id,
                 self.config.clone(),
                 SeqCounter(Arc::clone(&self.seq)),
                 part_key,
