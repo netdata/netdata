@@ -668,7 +668,7 @@ func TestRun_DoesNotRegisterJobBoundModuleMethodsBeforeAnyJobStarts(t *testing.T
 	assert.Empty(t, fnReg.registeredNames(), "static methods must not be registered before first started job")
 }
 
-func TestRun_RegistersAgentWideModuleMethodsBeforeAnyJobStarts(t *testing.T) {
+func TestRun_DoesNotRegisterAgentWideModuleMethodsBeforeAnyJobStarts(t *testing.T) {
 	fnReg := &recordingFunctionRegistry{}
 	mgr := New(Config{PluginName: testPluginName, FnReg: fnReg})
 
@@ -703,7 +703,7 @@ func TestRun_RegistersAgentWideModuleMethodsBeforeAnyJobStarts(t *testing.T) {
 		t.Fatal("manager did not stop after cancel")
 	}
 
-	assert.Equal(t, []string{"mod:a"}, fnReg.registeredNames())
+	assert.Empty(t, fnReg.registeredNames(), "agent-wide module methods still need a running provider job")
 }
 
 func TestStartRunningJob_RegistersModuleMethodsOnFirstStartedJob(t *testing.T) {

@@ -39,17 +39,26 @@ type methodExecutionInput struct {
 
 func (c *Controller) ExecuteFunction(functionName string, fn functions.Function) {
 	if moduleName, methodID, ok := c.registry.resolveMethodRoute(functionName); ok {
+		if !c.publishedFunctionNameExists(functionName) {
+			c.respondError(fn, 404, "unknown function '%s'", functionName)
+			return
+		}
 		c.makeMethodFuncHandler(moduleName, methodID)(c.baseContext(), fn)
 		return
 	}
 
-	moduleName, methodID, err := functions.SplitFunctionName(functionName)
-	if err != nil {
+	if _, _, err := functions.SplitFunctionName(functionName); err != nil {
 		c.respondError(fn, 400, "%v", err)
 		return
 	}
 
-	c.makeMethodFuncHandler(moduleName, methodID)(c.baseContext(), fn)
+	c.respondError(fn, 404, "unknown function '%s'", functionName)
+}
+
+func (c *Controller) publishedFunctionNameExists(functionName string) bool {
+	c.publishedMu.Lock()
+	defer c.publishedMu.Unlock()
+	return c.publishedFns.has(functionName)
 }
 
 func (c *Controller) publishedFunctionGenerationMatches(functionName string, generation uint64) bool {

@@ -43,6 +43,10 @@ type functionPublish struct {
 	opts    netdataapi.FunctionGlobalOpts
 }
 
+type functionWithdraw struct {
+	name string
+}
+
 func New(opts Options) *Controller {
 	log := opts.Logger
 	if log == nil {
@@ -94,7 +98,6 @@ func (c *Controller) RegisterModules(modules collectorapi.Registry) {
 			continue
 		}
 		c.registry.registerModuleWithMethods(name, creator, methods)
-		c.registerAvailableModuleMethods(name, methods, true)
 	}
 }
 
@@ -139,7 +142,7 @@ func (c *Controller) OnJobStart(job collectorapi.RuntimeJob) {
 	}
 
 	c.registry.addJob(job.ModuleName(), job.Name(), job)
-	c.registerModuleMethodsOnJobStart(job.ModuleName())
+	c.ReconcileModuleMethods(job.ModuleName())
 
 	creator, ok := c.registry.getCreator(job.ModuleName())
 	if !ok || creator.JobMethods == nil {
@@ -153,16 +156,17 @@ func (c *Controller) OnJobStart(job collectorapi.RuntimeJob) {
 }
 
 // ReconcileModuleMethods rechecks module/static method availability for modules
-// with at least one registered running job.
+// and publishes or withdraws them to match current provider and availability
+// state.
 func (c *Controller) ReconcileModuleMethods(moduleName string) {
-	if moduleName == "" || !c.registry.hasRunningJob(moduleName) {
+	if moduleName == "" {
 		return
 	}
 	methods := c.registry.getMethods(moduleName)
 	if len(methods) == 0 {
 		return
 	}
-	c.registerAvailableModuleMethods(moduleName, methods, false)
+	c.reconcileModuleMethods(moduleName, methods, c.registry.hasRunningJob(moduleName))
 }
 
 func (c *Controller) OnJobStop(job collectorapi.RuntimeJob) {
@@ -172,6 +176,7 @@ func (c *Controller) OnJobStop(job collectorapi.RuntimeJob) {
 
 	c.unregisterJobMethods(job)
 	c.registry.removeJob(job.ModuleName(), job.Name())
+	c.ReconcileModuleMethods(job.ModuleName())
 }
 
 func (c *Controller) Cleanup() {
@@ -190,17 +195,16 @@ func (c *Controller) Cleanup() {
 	}
 }
 
-func (c *Controller) registerModuleMethodsOnJobStart(moduleName string) {
-	methods := c.registry.getMethods(moduleName)
-	if len(methods) == 0 {
-		return
+func (c *Controller) reconcileModuleMethods(moduleName string, methods []funcapi.MethodConfig, hasProvider bool) {
+	publishes, withdraws := c.collectModuleMethodLifecycleChanges(moduleName, methods, hasProvider)
+	for _, withdraw := range withdraws {
+		c.fnReg.Unregister(withdraw.name)
 	}
-
-	c.registerAvailableModuleMethods(moduleName, methods, false)
-}
-
-func (c *Controller) registerAvailableModuleMethods(moduleName string, methods []funcapi.MethodConfig, agentWideOnly bool) {
-	publishes := c.collectAvailableModuleMethodPublishes(moduleName, methods, agentWideOnly)
+	if c.api != nil {
+		for _, withdraw := range withdraws {
+			c.api.FunctionRemove(withdraw.name)
+		}
+	}
 	for _, publish := range publishes {
 		c.registerFunction(publish.name, publish.handler)
 	}
@@ -212,19 +216,24 @@ func (c *Controller) registerAvailableModuleMethods(moduleName string, methods [
 	}
 }
 
-func (c *Controller) collectAvailableModuleMethodPublishes(moduleName string, methods []funcapi.MethodConfig, agentWideOnly bool) []functionPublish {
+func (c *Controller) collectModuleMethodLifecycleChanges(moduleName string, methods []funcapi.MethodConfig, hasProvider bool) ([]functionPublish, []functionWithdraw) {
 	c.publishedMu.Lock()
 	defer c.publishedMu.Unlock()
 
 	var publishes []functionPublish
+	var withdraws []functionWithdraw
 	for i, method := range methods {
-		if agentWideOnly && !method.AgentWide {
+		available := hasProvider && methodAvailable(method)
+		if method.ID != "" && !available {
+			for _, funcName := range c.publishedFns.removeOwner(moduleMethodOwner(moduleName, method.ID)) {
+				withdraws = append(withdraws, functionWithdraw{name: funcName})
+			}
 			continue
 		}
 		if method.ID != "" && c.allMethodFunctionNamesPublishedLocked(moduleName, method) {
 			continue
 		}
-		if !methodAvailable(method) {
+		if !available {
 			continue
 		}
 		if method.ID == "" {
@@ -244,29 +253,6 @@ func (c *Controller) collectAvailableModuleMethodPublishes(moduleName string, me
 			access = cloudAccess
 		}
 
-		if c.api != nil {
-			for _, funcName := range funcapi.MethodFunctionNames(moduleName, method) {
-				if c.publishedFns.has(funcName) {
-					continue
-				}
-				record, _ := c.publishedFns.add(funcName, moduleMethodOwner(moduleName, method.ID))
-				publishes = append(publishes, functionPublish{
-					name:    funcName,
-					handler: c.makePublishedMethodFuncHandler(funcName, record.generation, moduleName, method.ID),
-					opts: netdataapi.FunctionGlobalOpts{
-						Name:     funcName,
-						Timeout:  60,
-						Help:     help,
-						Tags:     methodTags(method),
-						Access:   access,
-						Priority: 100,
-						Version:  3,
-					},
-				})
-			}
-			continue
-		}
-
 		for _, funcName := range funcapi.MethodFunctionNames(moduleName, method) {
 			if c.publishedFns.has(funcName) {
 				continue
@@ -275,10 +261,20 @@ func (c *Controller) collectAvailableModuleMethodPublishes(moduleName string, me
 			publishes = append(publishes, functionPublish{
 				name:    funcName,
 				handler: c.makePublishedMethodFuncHandler(funcName, record.generation, moduleName, method.ID),
+				opts: netdataapi.FunctionGlobalOpts{
+					Name:     funcName,
+					Timeout:  60,
+					Help:     help,
+					Tags:     methodTags(method),
+					Access:   access,
+					Priority: 100,
+					Version:  3,
+				},
 			})
 		}
 	}
-	return publishes
+	sort.Slice(withdraws, func(i, j int) bool { return withdraws[i].name < withdraws[j].name })
+	return publishes, withdraws
 }
 
 func (c *Controller) allMethodFunctionNamesPublishedLocked(moduleName string, method funcapi.MethodConfig) bool {

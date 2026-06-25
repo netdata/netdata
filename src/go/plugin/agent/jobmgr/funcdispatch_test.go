@@ -203,7 +203,7 @@ func TestExecuteFunction_ModuleMethodPublicFunctionName(t *testing.T) {
 	assert.Equal(t, "logs", gotMethod)
 }
 
-func TestExecuteFunction_AgentWideModuleMethodDoesNotRequireRunningJob(t *testing.T) {
+func TestExecuteFunction_AgentWideModuleMethodDoesNotReceiveRuntimeJob(t *testing.T) {
 	tests := map[string]struct {
 		functionName string
 	}{
@@ -255,6 +255,7 @@ func TestExecuteFunction_AgentWideModuleMethodDoesNotRequireRunningJob(t *testin
 				},
 			}
 			mgr.funcCtl.RegisterModules(mgr.modules)
+			mgr.funcCtl.OnJobStart(&lockProbeJob{fullName: "snmp_topology_job1", moduleName: "snmp_topology", name: "job1"})
 
 			mgr.ExecuteFunction(tc.functionName, functions.Function{
 				UID:     "agent-wide-public-name",
@@ -301,6 +302,7 @@ func TestExecuteFunction_AgentWideModuleMethodValidationErrorOmitsJob(t *testing
 		},
 	}
 	mgr.funcCtl.RegisterModules(mgr.modules)
+	mgr.funcCtl.OnJobStart(&lockProbeJob{fullName: "mod_job1", moduleName: "mod", name: "job1"})
 
 	mgr.ExecuteFunction("mod:logs", functions.Function{
 		UID:     "agent-wide-validation",

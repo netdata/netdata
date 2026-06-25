@@ -140,6 +140,10 @@ func (s *runSim) run(t *testing.T) {
 			skipNextEmpty = true
 			continue
 		}
+		if strings.HasPrefix(s, "FUNCTION_DEL GLOBAL") {
+			skipNextEmpty = true
+			continue
+		}
 		if skipNextEmpty && s == "" {
 			skipNextEmpty = false
 			continue
