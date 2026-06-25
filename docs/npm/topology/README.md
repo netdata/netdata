@@ -12,6 +12,10 @@ endmeta-->
 
 Netdata shows you how your network is connected — which device links to which, and where each part of your infrastructure sits — built automatically from the devices you already monitor.
 
+![Network topology overview](https://www.netdata.cloud/img/network/snmp-topology-overview.png)
+
+The topology view, assembled automatically from the devices you already monitor — Layer 2 and Layer 3 links, kept current as devices come and go.
+
 ## Built from your devices
 
 When Netdata monitors your SNMP devices, it reads what they already know about their neighbors and assembles the topology, with no extra setup:
@@ -40,6 +44,10 @@ The same topology view brings in other infrastructure, each in the same form so 
 - **Cato Networks** — Cato SASE sites, devices, POPs, and BGP peers (`topology:cato_networks`).
 
 The device fabric (`topology:snmp`), live connections, and streaming come up automatically; vSphere and Cato come from their own collectors, configured separately.
+
+![Live network connections function](https://www.netdata.cloud/img/dashboard-screens/functions-network-connections.png)
+
+Live host and service connections (`topology:network-connections`) appear in the same topology view, alongside your device fabric.
 
 ## Where to start
 

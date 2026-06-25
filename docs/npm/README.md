@@ -12,6 +12,10 @@ endmeta-->
 
 Network Performance Monitoring (NPM) in Netdata covers your network devices and the traffic between them — metrics, topology, flows, events, and logs — collected by the Netdata Agent and visualized per second in Netdata dashboards and Netdata Cloud.
 
+![Netdata Network Monitor dashboard](https://www.netdata.cloud/img/network/network-monitor-dashboard.png)
+
+The Network Monitor dashboard brings devices, topology, flows, and trap events together on one page in Netdata Cloud.
+
 ## What you can monitor
 
 - **Device metrics (SNMP)** — poll routers, switches, firewalls, access points, UPSs, and PDUs. Netdata matches each device to a vendor profile by its `sysObjectID` and collects interfaces (traffic, errors, discards, operational state), system and host resources, and vendor-specific hardware, environmental, and protocol metrics. Every metric is a chart you can alert on, with interactive per-interface and per-device tables.
