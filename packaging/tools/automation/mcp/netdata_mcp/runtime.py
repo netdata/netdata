@@ -123,12 +123,13 @@ class OtelConfig:
 
     Every field is optional: ``None`` means "leave the plugin default" and the
     key is omitted from the generated otel.yaml (which the plugin partial-merges
-    over its own defaults). The storage dirs (wal/index) are not exposed — they
-    are always pinned under the run dir for per-agent isolation. The
-    rotation/retention knobs are the edge-case drivers (tiny thresholds force
-    multi-file splits and evictions over small, deterministic corpora).
-    ``journal_dir`` is the one exception: a caller-supplied, *not* run-dir-pinned
-    path the plugin only reads (the read-only legacy viewer's fixture).
+    over its own stock defaults). The directory layout is not exposed — the
+    plugin derives every per-signal dir from a single ``base_dir`` that is always
+    pinned under the run dir for per-agent isolation. The rotation/retention
+    knobs are the edge-case drivers (tiny thresholds force multi-file splits and
+    evictions over small, deterministic corpora). ``journal_dir`` is the one
+    exception: a caller-supplied, *not* run-dir-pinned path the plugin only reads
+    (the read-only legacy viewer's fixture).
     """
 
     otlp_endpoint: str | None = None          # endpoint.path; None → auto free loopback port
@@ -140,20 +141,24 @@ class OtelConfig:
     index_max_files: int | None = None         # logs.index.retention.default.max_files
     index_max_total_size: str | None = None    # logs.index.retention.default.max_total_size
     catalog_rotation_count: int | None = None  # logs.catalog.rotation_count; entries per catalog before it rotates+uploads
-    storage_enabled: bool | None = None        # logs.storage.enabled; remote object-storage upload of SFST + catalog files
-    storage_uri: str | None = None             # logs.storage.uri; opendal URI (default: per-agent fs:// dir under the run dir)
+    storage_enabled: bool | None = None        # storage.enabled (GLOBAL); remote object-storage upload of SFST + catalog files
+    storage_uri: str | None = None             # storage.uri (GLOBAL); opendal URI (default: per-agent fs:// dir under the run dir)
     journal_dir: str | None = None             # logs.journal_dir; former-plugin journal files for the read-only legacy-otel-logs viewer
 
 
 def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str) -> dict:
-    """The otel.yaml document: pinned per-agent storage + endpoint, plus any set knobs.
+    """The otel.yaml override document: pinned per-agent base_dir + endpoint, plus any set knobs.
 
-    Only fields the caller set are emitted; the plugin keeps its defaults for the
-    rest. ``logs.wal.dir`` / ``logs.index.dir`` are always under the run dir so
-    each agent's WAL/index are isolated.
+    Only fields the caller set are emitted; the plugin keeps its stock defaults
+    for the rest. ``base_dir`` is always pinned under the run dir, so every
+    derived per-signal dir (``{base_dir}/{logs,traces}/{wal,index,catalog}``,
+    ``{base_dir}/{signal}/remote-read``, ``{base_dir}/shared/seq_highwater``)
+    lands in isolation — one pin isolates both signals.
     """
-    wal: dict = {"dir": str(rd / "lib" / "otel" / "wal")}
-    index: dict = {"dir": str(rd / "lib" / "otel" / "index")}
+    base_dir = str(rd / "lib" / "otel")
+
+    # Per-signal tuning for logs (dirs are derived from base_dir, not set here).
+    wal: dict = {}
     if cfg.wal_crc_enabled is not None:
         wal["crc_enabled"] = cfg.wal_crc_enabled
     if cfg.wal_compression_enabled is not None:
@@ -169,6 +174,7 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str) -> dict:
     }
     if rotation:
         wal["rotation"] = {"default": rotation}
+    index: dict = {}
     retention = {
         k: v
         for k, v in (
@@ -179,19 +185,22 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str) -> dict:
     }
     if retention:
         index["retention"] = {"default": retention}
-    # Pin the catalog dir under the run dir too (like wal/index) so an agent with
-    # remote storage enabled writes its catalog files in isolation rather than
-    # the stock /var/log path. Harmless when storage is disabled — no catalog
-    # files are produced then (catalogs only rotate on upload success).
-    catalog: dict = {"dir": str(rd / "lib" / "otel" / "catalog")}
+    catalog: dict = {}
     if cfg.catalog_rotation_count is not None:
         catalog["rotation_count"] = cfg.catalog_rotation_count
-    logs: dict = {"wal": wal, "index": index, "catalog": catalog}
+    logs: dict = {}
+    if wal:
+        logs["wal"] = wal
+    if index:
+        logs["index"] = index
+    if catalog:
+        logs["catalog"] = catalog
 
-    # Remote object-storage upload of SFST + catalog files. When enabled without
-    # an explicit URI, default to a per-agent fs:// directory under the run dir
-    # (opendal fs = `fs://` + absolute path), isolated like the local dirs, so
-    # the upload path can be exercised end-to-end without external storage.
+    # Remote object-storage upload is GLOBAL (one switch + backend for the
+    # plugin). When enabled without an explicit URI, default to a per-agent
+    # fs:// directory under the run dir (opendal fs = `fs://` + absolute path),
+    # isolated like the local dirs, so the upload path can be exercised
+    # end-to-end without external storage.
     storage: dict = {}
     if cfg.storage_enabled is not None:
         storage["enabled"] = cfg.storage_enabled
@@ -199,18 +208,20 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str) -> dict:
         storage["uri"] = cfg.storage_uri
     elif cfg.storage_enabled:
         storage["uri"] = f"fs://{rd / 'lib' / 'otel' / 'remote'}"
-    if storage:
-        logs["storage"] = storage
 
     # Read-only legacy viewer: point it at the former plugin's journal files.
-    # Distinct from wal/index (which stay pinned under the run dir); the plugin
-    # only reads this directory. Truthy check: omit when unset or empty.
+    # This is the FORMER schema's `logs.journal_dir`, read by a separate tolerant
+    # probe (the current `logs` SignalConfig ignores it). The plugin only reads
+    # this directory. Truthy check: omit when unset or empty.
     if cfg.journal_dir:
         logs["journal_dir"] = cfg.journal_dir
-    return {
-        "endpoint": {"path": otlp_endpoint},
-        "logs": logs,
-    }
+
+    doc: dict = {"endpoint": {"path": otlp_endpoint}, "base_dir": base_dir}
+    if storage:
+        doc["storage"] = storage
+    if logs:
+        doc["logs"] = logs
+    return doc
 
 
 def _ini_safe(s: str) -> str:

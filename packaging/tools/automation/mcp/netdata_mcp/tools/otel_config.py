@@ -50,7 +50,7 @@ _StorageEnabled = Annotated[bool | None, Field(description="Remote object-storag
 _StorageUri = Annotated[str | None, Field(description="opendal storage URI (e.g. 'fs:///abs/path', 's3://bucket/prefix'). Omit while storage is enabled to default to an isolated per-agent 'fs://' directory under the run dir.")]
 _JournalDir = Annotated[
     str | None,
-    Field(description="Read-only legacy viewer: directory of journal files written by the FORMER otel plugin, exposed via the 'legacy-otel-logs' function. The plugin only reads it (never writes/prunes). Unlike wal/index, it is NOT pinned under the run dir."),
+    Field(description="Read-only legacy viewer: directory of journal files written by the FORMER otel plugin, exposed via the 'legacy-otel-logs' function. The plugin only reads it (never writes/prunes). Unlike base_dir, it is NOT pinned under the run dir."),
 ]
 
 
