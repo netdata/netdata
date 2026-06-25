@@ -18,7 +18,7 @@ Older Windows and Windows Server releases are end-of-life and are more likely to
 
 - **64-bit (x64) Windows.** The installer ships only as `netdata-x64.msi`.
 - **Administrator rights.** Installation and the running service require elevated (Administrator) privileges.
-- **Network access for download.** On Server editions earlier than 2019, fetch the MSI on another machine or use the GUI installer (TLS limitation noted above).
+- **Network access for download.**
 
 ## Access and Limitations
 
