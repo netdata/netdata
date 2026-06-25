@@ -12,7 +12,7 @@ use crate::registry::Registry;
 /// outside the representable chrono range. Callers fall back to the
 /// current date when `None` — encoded once at each call site rather than
 /// hidden inside this helper, so the fallback is visible.
-pub(crate) fn date_from_summary(summary: &sfst::Summary) -> Option<chrono::NaiveDate> {
+pub fn date_from_summary(summary: &sfst::Summary) -> Option<chrono::NaiveDate> {
     if summary.record_count == 0 {
         return None;
     }
@@ -23,7 +23,7 @@ pub(crate) fn date_from_summary(summary: &sfst::Summary) -> Option<chrono::Naive
 /// retention policy. Ceiling division so a non-integer `max_age` in days
 /// doesn't trim catalog coverage below SFST coverage. There is no
 /// independent knob — this is the single source of truth.
-pub(crate) fn catalog_retention_days(retention: &bridge::config::RetentionConfig) -> u32 {
+pub fn catalog_retention_days(retention: &bridge::config::RetentionConfig) -> u32 {
     retention
         .max_age
         .as_secs()
@@ -35,7 +35,7 @@ pub(crate) fn catalog_retention_days(retention: &bridge::config::RetentionConfig
 /// Lower a resolved per-tenant retention config onto sfst's plain
 /// [`RetentionPolicy`](sfst::RetentionPolicy) — the boundary where the
 /// config framework's types stop and the format crate's begin.
-pub(crate) fn sfst_retention_policy(
+pub fn sfst_retention_policy(
     retention: &bridge::config::RetentionConfig,
 ) -> sfst::RetentionPolicy {
     sfst::RetentionPolicy {
@@ -50,7 +50,7 @@ pub(crate) fn sfst_retention_policy(
 /// All summary fields come from `sfst_file.summary`, which the registry
 /// populated either at indexing time (`Registry::track`) or at recovery time
 /// (`Registry::recover`). No reads against the SFST file itself.
-pub(crate) fn build_catalog_entry(
+pub fn build_catalog_entry(
     sfst_file: &sfst::File,
     remote_key: String,
     uploaded_at_ns: TimestampNs,
@@ -77,7 +77,7 @@ pub(crate) fn build_catalog_entry(
 /// `signal` is the owning pipeline's remote-key segment (`logs`, later
 /// `traces`); the request's `pipeline_id` comes from the file's own `FileId`,
 /// the single source of truth for which pipeline owns the file.
-pub(crate) fn sfst_upload_request(
+pub fn sfst_upload_request(
     registry: &Registry,
     signal: &str,
     tenant_id: &TenantId,

@@ -7,7 +7,7 @@
 //! cleaner echoes each request's `pipeline_id` onto the response so the run-loop
 //! routes the mutation to the right pipeline.
 
-use crate::ipc::CleanerResponse;
+use file_lifecycle::ipc::CleanerResponse;
 
 use super::Ledger;
 
@@ -26,7 +26,7 @@ impl Ledger {
             return;
         };
 
-        let mut registries = pipeline.registries.write().await;
+        let mut registries = pipeline.registries().write().await;
         match resp {
             CleanerResponse::WalFileDeleted { sequence, .. } => {
                 if let Some((_, registry)) = registries.for_seq_mut(sequence) {

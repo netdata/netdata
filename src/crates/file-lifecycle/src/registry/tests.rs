@@ -105,9 +105,8 @@ fn query_snapshot_is_scoped_to_one_tenant() {
         catalog_base.path().to_path_buf(),
     );
 
-    let stream = otel_logs_identity::ServiceStream::new("ns", "svc");
-    let part_key = stream.ns_hash();
-    let summary = crate::test_helpers::summary_for(&stream, 1, 100, 200);
+    let part_key = crate::test_helpers::opaque_part_key("ns", "svc");
+    let summary = crate::test_helpers::summary_for("ns", "svc", 1, 100, 200);
     let tenant_a = TenantId::from("tenant-a");
     let tenant_b = TenantId::from("tenant-b");
     tr.get_or_create(&tenant_a).sfst.track(
@@ -148,7 +147,6 @@ fn query_snapshot_is_scoped_to_one_tenant() {
 #[test]
 fn enumerate_streams_dedups_and_aggregates_sfst_and_unsealed_wal() {
     use file_registry::TimestampNs;
-    use otel_logs_identity::ServiceStream;
     use wal::FileEvent;
     const NS: u64 = 1_000_000_000;
 
@@ -163,31 +161,35 @@ fn enumerate_streams_dedups_and_aggregates_sfst_and_unsealed_wal() {
     let tenant = TenantId::from("t");
     let mid = Uuid::from_u128(1);
     let bid = Uuid::from_u128(2);
-    let api = ServiceStream::new("prod", "api");
-    let db = ServiceStream::new("", "db"); // absent namespace, unsealed-only
+    // Logical streams as opaque `(namespace, name)` tuples; the substrate keys
+    // them by an opaque `part_key` and never decodes the identity.
+    let api = ("prod", "api");
+    let db = ("", "db"); // absent namespace, unsealed-only
+    let pk = |(ns, name): (&str, &str)| crate::test_helpers::opaque_part_key(ns, name);
 
-    let sfst_sum =
-        |min, max, stream: &ServiceStream| crate::test_helpers::summary_for(stream, 1, min, max);
+    let sfst_sum = |min, max, (ns, name): (&str, &str)| {
+        crate::test_helpers::summary_for(ns, name, 1, min, max)
+    };
     {
         let r = tr.get_or_create(&tenant);
         // Two SFSTs on the same stream → aggregated into one entry.
         r.sfst.track(
-            FileId::new(mid, bid, 1, api.ns_hash()),
+            FileId::new(mid, bid, 1, pk(api)),
             ByteSize(1000),
-            sfst_sum(100, 200, &api),
+            sfst_sum(100, 200, api),
         );
         r.sfst.track(
-            FileId::new(mid, bid, 2, api.ns_hash()),
+            FileId::new(mid, bid, 2, pk(api)),
             ByteSize(500),
-            sfst_sum(200, 300, &api),
+            sfst_sum(200, 300, api),
         );
         // An unsealed WAL-only stream — named from the header (the Stage A
         // enabler), so it appears even with no SFST summary. Modeled as an
         // active, synced WAL: `Synced` sets the durable byte count and the
         // range but NOT `File.size` (that lands on close), so this also
         // exercises the `valid_up_to` size proxy in `enumerate_streams`.
-        let db_id = FileId::new(mid, bid, 3, db.ns_hash());
-        let (_, db_content_meta) = crate::test_helpers::identity_for(&db);
+        let db_id = FileId::new(mid, bid, 3, pk(db));
+        let (_, db_content_meta) = crate::test_helpers::identity_for(db.0, db.1);
         r.wal
             .apply_event(&FileEvent::Created {
                 file_id: db_id,
@@ -207,8 +209,8 @@ fn enumerate_streams_dedups_and_aggregates_sfst_and_unsealed_wal() {
             .unwrap();
         // A WAL shadow of SFST seq=1 (post-index/pre-delete window). SFST
         // wins by seq, so its huge size must NOT double-count.
-        let shadow = FileId::new(mid, bid, 1, api.ns_hash());
-        let (_, api_content_meta) = crate::test_helpers::identity_for(&api);
+        let shadow = FileId::new(mid, bid, 1, pk(api));
+        let (_, api_content_meta) = crate::test_helpers::identity_for(api.0, api.1);
         r.wal
             .apply_event(&FileEvent::Created {
                 file_id: shadow,
@@ -237,22 +239,20 @@ fn enumerate_streams_dedups_and_aggregates_sfst_and_unsealed_wal() {
     // decode + sort by `(namespace, name)` the way the rpc adapter does for display.
     let mut streams = tr.enumerate_streams(&tenant, &full);
     let sid = |p: &crate::registry::PartitionStat| {
-        otel_logs_identity::decode_content_meta_or_empty(&p.content_meta)
+        crate::test_helpers::decode_opaque(&p.content_meta)
     };
-    streams.sort_by_key(|p| {
-        let s = sid(p);
-        (s.namespace, s.name)
-    });
+    let ss = |(ns, name): (&str, &str)| (ns.to_owned(), name.to_owned());
+    streams.sort_by_key(sid);
     assert_eq!(streams.len(), 2);
     // Sorted by (namespace, name): "" < "prod" → the absent-namespace
     // db stream comes first.
-    assert_eq!(sid(&streams[0]), db);
+    assert_eq!(sid(&streams[0]), ss(db));
     assert_eq!(streams[0].file_count, 1);
     assert_eq!(streams[0].total_size, 200);
     assert_eq!(streams[0].min_timestamp_s, Some(400));
     assert_eq!(streams[0].max_timestamp_s, Some(460));
 
-    assert_eq!(sid(&streams[1]), api);
+    assert_eq!(sid(&streams[1]), ss(api));
     // The WAL shadow of seq=1 is excluded; only the two SFSTs are counted.
     assert_eq!(streams[1].file_count, 2);
     assert_eq!(streams[1].total_size, 1500);

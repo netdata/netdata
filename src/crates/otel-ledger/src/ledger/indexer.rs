@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use file_registry::{FileId, TenantId};
 
-use crate::ipc::{CleanerRequest, IndexerResponse, UploaderRequest};
+use file_lifecycle::ipc::{CleanerRequest, IndexerResponse, UploaderRequest};
 
 use super::Ledger;
 
@@ -54,9 +54,9 @@ impl Ledger {
             tracing::error!(pipeline_id, "indexed for unknown pipeline; dropping");
             return;
         };
-        let signal = pipeline.signal;
+        let signal = pipeline.signal();
         let storage_enabled = pipeline.storage_enabled();
-        let registries = pipeline.registries.clone();
+        let registries = pipeline.registries().clone();
 
         // Decide everything under the registry write lock — including building
         // the upload request — then act after the guard is dropped. Building
@@ -94,7 +94,7 @@ impl Ledger {
                 registry.sfst.track(file_id, size, summary);
 
                 let upload = if storage_enabled {
-                    super::sfst_upload_request(registry, signal, &tenant_id, file_id)
+                    file_lifecycle::helpers::sfst_upload_request(registry, signal, &tenant_id, file_id)
                 } else {
                     None
                 };

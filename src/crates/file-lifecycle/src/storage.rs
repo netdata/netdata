@@ -16,7 +16,7 @@ use std::future::Future;
 use std::time::Duration;
 
 /// Metadata returned by a successful [`Storage::write`].
-pub(crate) struct WriteMeta {
+pub struct WriteMeta {
     /// Size the backend reports for the written object. Some backends report
     /// `0` (unknown); callers must treat only a non-zero mismatch as a failure.
     pub content_length: u64,
@@ -34,7 +34,7 @@ pub(crate) struct WriteMeta {
 /// `Debug` is derived (not delegated to `Display`) so `{:?}` on an `Other`
 /// preserves the full `anyhow` source chain.
 #[derive(Debug)]
-pub(crate) enum StorageError {
+pub enum StorageError {
     NotFound,
     Other(anyhow::Error),
 }
@@ -50,7 +50,7 @@ impl std::fmt::Display for StorageError {
 
 /// Abstraction over the remote object store. Implemented for opendal by
 /// [`OpendalStorage`]; mocked in tests.
-pub(crate) trait Storage: Send + Sync + 'static {
+pub trait Storage: Send + Sync + 'static {
     /// Write `data` to `key` and return the backend's reported metadata.
     fn write(
         &self,
@@ -88,7 +88,7 @@ const STORAGE_PROBE_KEY: &str = ".netdata-otel-storage-probe";
 /// failures (auth, missing bucket) are not retried by opendal and surface
 /// immediately. Because that retry window can be minutes, callers MUST run this
 /// off the startup path (see `Ledger::new`, which spawns it).
-pub(crate) async fn probe_reachable<S: Storage>(storage: &S) -> Result<(), StorageError> {
+pub async fn probe_reachable<S: Storage>(storage: &S) -> Result<(), StorageError> {
     match storage.stat(STORAGE_PROBE_KEY).await {
         Ok(()) | Err(StorageError::NotFound) => Ok(()),
         Err(other) => Err(other),
@@ -97,7 +97,7 @@ pub(crate) async fn probe_reachable<S: Storage>(storage: &S) -> Result<(), Stora
 
 /// opendal-backed [`Storage`]. Owns the `Operator` construction and retry layer.
 #[derive(Clone)]
-pub(crate) struct OpendalStorage {
+pub struct OpendalStorage {
     op: opendal::Operator,
 }
 
@@ -106,7 +106,7 @@ impl OpendalStorage {
     /// URI here (not at `Ledger::new`) keeps opendal out of the ledger; the
     /// caller still gates construction on `storage.enabled` so a malformed URI
     /// can't abort a local-only deployment.
-    pub(crate) fn new(uri: &str) -> std::io::Result<Self> {
+    pub fn new(uri: &str) -> std::io::Result<Self> {
         let retry_layer = opendal::layers::RetryLayer::new()
             .with_min_delay(Duration::from_secs(1))
             .with_max_delay(Duration::from_secs(30))
@@ -128,7 +128,7 @@ impl OpendalStorage {
     /// Wrap an existing operator without a retry layer — for tests that drive a
     /// real `Fs` backend and want deterministic fast failures.
     #[cfg(test)]
-    pub(crate) fn from_operator(op: opendal::Operator) -> Self {
+    pub fn from_operator(op: opendal::Operator) -> Self {
         Self { op }
     }
 }

@@ -27,6 +27,7 @@ members = [
     # Netdata OTEL workspace members
     "otel-plugin",
     "otel-ledger",
+    "file-lifecycle",
     "otel-catalog",
     "otel-logs-identity",
     "file-cache",

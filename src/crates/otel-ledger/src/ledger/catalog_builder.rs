@@ -6,7 +6,7 @@
 //! when storage is enabled. The `pipeline_id` arrives tagged by the forwarder
 //! that funnels this pipeline's catalog-builder responses into the run-loop.
 
-use crate::ipc::{CatalogBuilderResponse, UploaderRequest};
+use file_lifecycle::ipc::{CatalogBuilderResponse, UploaderRequest};
 
 use super::Ledger;
 
@@ -43,10 +43,10 @@ impl Ledger {
                     tracing::error!(pipeline_id, "catalog rotation for unknown pipeline; dropping");
                     return;
                 };
-                let registries = pipeline.registries.clone();
+                let registries = pipeline.registries().clone();
 
-                let remote_key = crate::remote_keys::catalog(
-                    pipeline.signal,
+                let remote_key = file_lifecycle::remote_keys::catalog(
+                    pipeline.signal(),
                     date,
                     &tenant_id,
                     machine_id,

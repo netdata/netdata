@@ -1,19 +1,15 @@
-pub mod catalog_builder;
-pub mod chunk;
-pub mod cleaner;
-pub mod component;
+//! OTel-logs ledger: the logs content binding over the content-agnostic
+//! [`file_lifecycle`] substrate. It owns the `Ledger` coordinator (run-loop,
+//! supervisor/writer IPC, shared workers), the logs query handler + engine
+//! adapter (`ledger::rpc`), and the logs seal step (`indexer`, which calls
+//! `sfst_indexer`). The reusable machinery (registry, catalog, upload/download,
+//! cache, recovery, the per-signal `Pipeline` shell) lives in `file-lifecycle`.
+
 pub mod event;
 pub mod indexer;
-pub mod ipc;
 mod ledger;
-pub mod query;
-mod recovery;
-pub mod registry;
-pub mod remote_keys;
-mod storage;
 #[cfg(test)]
 pub(crate) mod test_helpers;
-pub mod uploader;
 
 pub use ledger::Ledger;
 

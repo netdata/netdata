@@ -23,7 +23,7 @@ const BASE_BACKOFF: Duration = Duration::from_secs(30);
 const MAX_BACKOFF: Duration = Duration::from_secs(600);
 /// Attempt count past which the remote is treated as persistently unreachable
 /// and the per-tick log escalates from `warn` to `error`.
-pub(super) const PERSISTENT_FAILURE_ATTEMPTS: u32 = 5;
+pub const PERSISTENT_FAILURE_ATTEMPTS: u32 = 5;
 
 #[derive(PartialEq, Eq, Hash, Clone)]
 enum Key {
@@ -43,7 +43,7 @@ struct Item {
 /// Re-issue queue for failed uploads, keyed so repeated failures of the same
 /// file coalesce (bumping its backoff) instead of accumulating duplicates.
 #[derive(Default)]
-pub(super) struct UploadRetry {
+pub struct UploadRetry {
     items: HashMap<Key, Item>,
 }
 

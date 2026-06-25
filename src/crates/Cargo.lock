@@ -1430,6 +1430,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "file-lifecycle"
+version = "0.1.3"
+dependencies = [
+ "anyhow",
+ "bridge",
+ "bytesize",
+ "chrono",
+ "ferryboat",
+ "file-cache",
+ "file-registry",
+ "futures",
+ "moka",
+ "netdata-plugin-protocol",
+ "netdata-plugin-types",
+ "opendal",
+ "otel-catalog",
+ "sfst",
+ "tempfile",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "uuid",
+ "wal",
+]
+
+[[package]]
 name = "file-registry"
 version = "0.1.3"
 dependencies = [
@@ -3776,6 +3802,7 @@ dependencies = [
  "chrono",
  "ferryboat",
  "file-cache",
+ "file-lifecycle",
  "file-registry",
  "fst-index",
  "futures",

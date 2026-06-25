@@ -1,37 +1,35 @@
-//! A single signal's pipeline.
+//! The logs pipeline builder.
 //!
-//! The [`Ledger`](super::Ledger) shell owns one [`Pipeline`] per signal (today
-//! only logs) and routes events to it by `pipeline_id`. A `Pipeline` carries
-//! the per-signal state the shell does not: its tenant registries, lifecycle
-//! config, remote-key segment, per-signal seal/index and catalog-builder
-//! workers, and its query handler. The substrate-shared workers (cleaner,
-//! uploader, chunk cache) live on the shell and are injected here at
-//! construction.
+//! Assembles the logs [`file_lifecycle::Pipeline`]: it sets up the per-signal
+//! disk dirs and tenant registries, spawns the logs seal/index ([`Indexer`],
+//! which calls `sfst_indexer`) and catalog-builder workers, runs startup
+//! recovery over the substrate-shared cleaner/uploader/storage, builds the logs
+//! query handler, and detaches the per-pipeline worker response streams into
+//! pid-tagged forwarders feeding the coordinator's merged channel. The reusable
+//! `Pipeline` shell and the lifecycle machinery it composes live in
+//! `file-lifecycle`; this module is the logs-specific binding.
 
 use std::sync::Arc;
 
 use bridge::config::LifecycleConfig;
 use bridge::function::{FunctionHandler, HandlerAdapter, RawFunctionHandler};
 use file_registry::TenantId;
-use netdata_plugin_protocol::FunctionDeclaration;
 use tokio::sync::{RwLock, mpsc};
 use tokio_util::sync::CancellationToken;
 
-use crate::catalog_builder::{CatalogBuilder, CatalogBuilderArgs};
-use crate::chunk::ChunkCache;
-use crate::component::ComponentHandle;
 use crate::event::PipelineResp;
 use crate::indexer::Indexer;
-use crate::ipc::{
-    CatalogBuilderRequest, CleanerRequest, CleanerResponse, IndexerRequest, UploaderRequest,
-    UploaderResponse,
-};
-use crate::recovery::{
+use file_lifecycle::Pipeline;
+use file_lifecycle::catalog_builder::{CatalogBuilder, CatalogBuilderArgs};
+use file_lifecycle::chunk::ChunkCache;
+use file_lifecycle::component::ComponentHandle;
+use file_lifecycle::ipc::{CleanerRequest, CleanerResponse, UploaderRequest, UploaderResponse};
+use file_lifecycle::recovery::{
     drain_wal_deletes, recover_orphaned_wals, recover_retention, recover_unindexed,
     recover_unuploaded,
 };
-use crate::registry::TenantRegistries;
-use crate::storage::OpendalStorage;
+use file_lifecycle::registry::TenantRegistries;
+use file_lifecycle::storage::OpendalStorage;
 
 use super::{OtelLogsHandler, RemoteRead};
 
@@ -45,56 +43,6 @@ const CHUNK_MIN_ENTRIES: u64 = 16_384;
 /// (local upload recovery still runs fire-and-forget, and eviction stays
 /// deferred until a later reconcile confirms the remote, so nothing is at risk).
 const STARTUP_REMOTE_BUDGET: std::time::Duration = std::time::Duration::from_secs(10);
-
-/// Pre-handler argument shim: maps a function call's positional `args` into a
-/// request `payload` for the signal's handler. A per-signal provision so the
-/// run-loop's dispatcher stays signal-neutral (it routes by function name and
-/// applies the owning pipeline's shim).
-type ArgShim = fn(&[String], Option<&[u8]>) -> Option<Vec<u8>>;
-
-/// One signal's pipeline: its registries, lifecycle config, per-signal workers,
-/// and query handler. Behavior for a single pipeline is identical to the
-/// pre-carve monolithic ledger; the shell routes to it by `pipeline_id`.
-pub(crate) struct Pipeline {
-    /// Opaque signal axis; matches the `pipeline_id` carried in this signal's
-    /// `FileId`s and used as the shell's routing key.
-    pub pipeline_id: u16,
-    /// Remote-key segment for this signal (`logs`, later `traces`).
-    pub signal: &'static str,
-    /// Per-signal lifecycle config (wal/index/catalog dirs, rotation, retention,
-    /// storage flag). The shared storage backend is built once on the shell from
-    /// the (single) pipeline's `storage` config; `storage.enabled` here still
-    /// drives this pipeline's upload/retention decisions.
-    pub config: LifecycleConfig,
-    /// This signal's tenant registries, shared (read) with the query handler.
-    pub registries: Arc<RwLock<TenantRegistries>>,
-    /// Request sender for the per-pipeline seal/index worker. Its response
-    /// stream is forwarded (pid-tagged) into the shell's merged channel.
-    pub indexer_tx: mpsc::UnboundedSender<IndexerRequest>,
-    /// Request sender for the per-pipeline catalog builder. Its response stream
-    /// is forwarded (pid-tagged) into the shell's merged channel.
-    pub catalog_builder_tx: mpsc::UnboundedSender<CatalogBuilderRequest>,
-    /// This signal's function handler, boxed so the shell holds heterogeneous
-    /// per-signal handlers uniformly and dispatches by function name.
-    pub handler: Arc<dyn RawFunctionHandler>,
-    /// Capability declaration advertised to the supervisor at Ready; its `name`
-    /// is the function-dispatch key.
-    pub declaration: FunctionDeclaration,
-    /// Per-signal args→payload shim applied before this pipeline's handler runs.
-    pub arg_shim: ArgShim,
-}
-
-impl Pipeline {
-    /// The function name this pipeline answers (the dispatch key).
-    pub fn function_name(&self) -> &str {
-        &self.declaration.name
-    }
-
-    /// Whether remote object storage is enabled for this signal.
-    pub fn storage_enabled(&self) -> bool {
-        self.config.storage.enabled
-    }
-}
 
 /// Build the logs pipeline: set up per-signal disk dirs, discover tenants,
 /// spawn the per-pipeline seal/index and catalog-builder workers, run startup
@@ -164,7 +112,7 @@ pub(crate) async fn build_logs_pipeline(
         recover_unindexed(registry, &mut indexer, cleaner).await?;
         drain_wal_deletes(registry, cleaner).await?;
 
-        crate::recovery::seed_from_catalog_files(registry);
+        file_lifecycle::recovery::seed_from_catalog_files(registry);
 
         // Remote-storage recovery runs only when storage is enabled (the
         // storage client + uploader exist). The remote LIST reconcile can fail if
@@ -185,7 +133,7 @@ pub(crate) async fn build_logs_pipeline(
             // reconcile confirms the remote — nothing is at risk.
             let remote_ok = match tokio::time::timeout(
                 STARTUP_REMOTE_BUDGET,
-                crate::recovery::reconcile_remote_uploads(
+                file_lifecycle::recovery::reconcile_remote_uploads(
                     registry,
                     signal,
                     &mut catalog_builder,
@@ -225,7 +173,7 @@ pub(crate) async fn build_logs_pipeline(
             if remote_ok {
                 match tokio::time::timeout(
                     STARTUP_REMOTE_BUDGET,
-                    crate::recovery::reconcile_local_catalog_uploads(
+                    file_lifecycle::recovery::reconcile_local_catalog_uploads(
                         registry, pipeline_id, signal, uploader, storage, tenant_id, &retention,
                     ),
                 )
@@ -308,17 +256,17 @@ pub(crate) async fn build_logs_pipeline(
         PipelineResp::CatalogBuilder,
     );
 
-    Ok(Pipeline {
+    Ok(Pipeline::new(
         pipeline_id,
         signal,
-        config: config.clone(),
+        config.clone(),
         registries,
         indexer_tx,
         catalog_builder_tx,
         handler,
         declaration,
-        arg_shim: super::rpc::patch_args_into_payload,
-    })
+        super::rpc::patch_args_into_payload,
+    ))
 }
 
 /// Forward a per-pipeline worker's responses into the shell's merged channel,

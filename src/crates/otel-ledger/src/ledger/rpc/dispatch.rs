@@ -126,8 +126,8 @@ impl Ledger {
             let _ = self.outbound_tx.send(LedgerResponse::Result(result));
             return;
         };
-        let handler = pipeline.handler.clone();
-        let arg_shim = pipeline.arg_shim;
+        let handler = pipeline.handler().clone();
+        let arg_shim = pipeline.arg_shim();
 
         let payload = arg_shim(&args, payload.as_deref()).or(payload);
 

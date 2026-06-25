@@ -21,19 +21,14 @@
 
 mod catalog_builder;
 mod cleaner;
-mod helpers;
 mod indexer;
 mod ingestor;
 mod pipeline;
 mod retention;
 mod rpc;
-mod upload_retry;
 mod uploader;
 
-pub(crate) use helpers::{
-    build_catalog_entry, catalog_retention_days, sfst_retention_policy, sfst_upload_request,
-};
-pub(crate) use pipeline::Pipeline;
+use file_lifecycle::Pipeline;
 pub(crate) use rpc::{OtelLogsHandler, RemoteRead};
 
 use std::collections::HashMap;
@@ -47,13 +42,13 @@ use file_registry::FileId;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use crate::chunk::ChunkCache;
-use crate::cleaner::Cleaner;
-use crate::component::ComponentHandle;
+use file_lifecycle::chunk::ChunkCache;
+use file_lifecycle::cleaner::Cleaner;
+use file_lifecycle::component::ComponentHandle;
 use crate::event::{LedgerEvent, PipelineResp};
-use crate::ipc::{CleanerRequest, CleanerResponse, UploaderRequest, UploaderResponse};
-use crate::storage::OpendalStorage;
-use crate::uploader::{Uploader, UploaderArgs};
+use file_lifecycle::ipc::{CleanerRequest, CleanerResponse, UploaderRequest, UploaderResponse};
+use file_lifecycle::storage::OpendalStorage;
+use file_lifecycle::uploader::{Uploader, UploaderArgs};
 
 /// Byte budget for the query-time chunk cache (LRU eviction above it). Shared
 /// across pipelines (one global memory budget) and keyed by the global `seq`.
@@ -85,7 +80,7 @@ pub struct Ledger {
     /// Re-issue queue for failed uploads, drained by `retry_timer`. Shared
     /// across pipelines (the uploader is shared); keyed by seq/remote-key, both
     /// globally unique, so no per-pipeline partitioning is needed.
-    upload_retry: upload_retry::UploadRetry,
+    upload_retry: file_lifecycle::upload_retry::UploadRetry,
     /// Fires periodically to re-drive `upload_retry`.
     retry_timer: tokio::time::Interval,
     /// Query-time chunk SFSTs of active WALs; shared across pipelines (one
@@ -165,7 +160,7 @@ impl Ledger {
             let probe_storage = storage.clone();
             tracing::info!("probing remote storage reachability");
             tokio::spawn(async move {
-                match crate::storage::probe_reachable(&probe_storage).await {
+                match file_lifecycle::storage::probe_reachable(&probe_storage).await {
                     Ok(()) => tracing::info!("remote storage reachable and credentials accepted"),
                     Err(e) => {
                         tracing::error!("remote storage enabled but unreachable or misconfigured: {e}")
@@ -248,9 +243,9 @@ impl Ledger {
             let mut seen_names = std::collections::HashSet::new();
             for p in &built {
                 assert!(
-                    seen_ids.insert(p.pipeline_id),
+                    seen_ids.insert(p.pipeline_id()),
                     "duplicate pipeline_id {}",
-                    p.pipeline_id,
+                    p.pipeline_id(),
                 );
                 assert!(
                     seen_names.insert(p.function_name().to_owned()),
@@ -263,14 +258,14 @@ impl Ledger {
         // Signal Ready (with every pipeline's declaration) between pipeline
         // construction and the ingestor accept; see the method docstring for the
         // full ordering rationale.
-        let declarations: Vec<_> = built.iter().map(|p| p.declaration.clone()).collect();
+        let declarations: Vec<_> = built.iter().map(|p| p.declaration().clone()).collect();
         supervisor
             .send(LedgerResponse::Ready { declarations })
             .await
             .context("failed to signal ready to supervisor")?;
         tracing::info!("signaled ready to supervisor");
 
-        let ingestor = crate::ipc::accept_writer(writer_socket_path).await?;
+        let ingestor = file_lifecycle::ipc::accept_writer(writer_socket_path).await?;
         tracing::info!("ingestor connected");
 
         // Drives the upload-retry queue. Skip missed ticks (don't fire a burst
@@ -280,14 +275,14 @@ impl Ledger {
         retry_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
         let pipelines: HashMap<u16, Pipeline> =
-            built.into_iter().map(|p| (p.pipeline_id, p)).collect();
+            built.into_iter().map(|p| (p.pipeline_id(), p)).collect();
 
         Ok(Self {
             supervisor,
             ingestor,
             cleaner,
             uploader,
-            upload_retry: upload_retry::UploadRetry::default(),
+            upload_retry: file_lifecycle::upload_retry::UploadRetry::default(),
             retry_timer,
             chunk_cache,
             expected_frame_seq: 1,

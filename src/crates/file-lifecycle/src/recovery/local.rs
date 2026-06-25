@@ -190,7 +190,7 @@ pub async fn recover_orphaned_wals(
 /// SFST retention uses the three-knob policy (`max_files` /
 /// `max_total_size` / `max_age`). Catalog retention is derived from the
 /// tenant's SFST `max_age` — see
-/// [`crate::ledger::catalog_retention_days`].
+/// [`crate::helpers::catalog_retention_days`].
 pub async fn recover_retention(
     registry: &mut Registry,
     pipeline_id: u16,
@@ -201,7 +201,7 @@ pub async fn recover_retention(
     // SFST pass.
     let to_evict_sfst = registry
         .sfst
-        .evaluate_retention(&crate::ledger::sfst_retention_policy(retention), now_ns());
+        .evaluate_retention(&crate::helpers::sfst_retention_policy(retention), now_ns());
     // Defer eviction when remote storage is enabled and the SFST's catalog
     // entry isn't yet confirmed present on the remote (see the identical guard
     // in `evaluate_retention`). Holding the local SFST until its catalog is
@@ -216,7 +216,7 @@ pub async fn recover_retention(
     }
 
     // Catalog pass. Day-count derived from SFST max_age.
-    let catalog_days = crate::ledger::catalog_retention_days(retention);
+    let catalog_days = crate::helpers::catalog_retention_days(retention);
     let today = chrono::Utc::now().date_naive();
     let evictable_catalog = registry
         .catalog_files

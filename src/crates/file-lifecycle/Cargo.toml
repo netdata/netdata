@@ -1,5 +1,5 @@
 [package]
-name = "otel-ledger"
+name = "file-lifecycle"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,44 +8,36 @@ rust-version.workspace = true
 workspace = true
 
 [lib]
-name = "otel_ledger"
+name = "file_lifecycle"
 path = "src/lib.rs"
 
+# Content-agnostic file-lifecycle substrate (registry, rotation/retention,
+# catalog manifest, remote upload/download, local read-through cache, recovery,
+# the per-signal `Pipeline` shell). It MUST NOT depend on the three log-content
+# crates — `sfsq`, `sfst-indexer`, `otel-logs-identity` — so a second signal
+# (traces) can reuse it. The omission below is the hard dependency guard
+# (cargo makes importing an undeclared crate impossible); a manifest assertion
+# in `tests/` backstops it.
 [dependencies]
-otel-logs-identity = { workspace = true }
 anyhow = { workspace = true }
-async-trait = { workspace = true }
 bridge = { path = "../netdata-plugin/bridge" }
 chrono = { workspace = true }
 ferryboat = { workspace = true }
 file-cache = { workspace = true }
-file-lifecycle = { path = "../file-lifecycle" }
 file-registry = { workspace = true }
 futures = { workspace = true }
 moka = { workspace = true }
-netdata-plugin-error = { path = "../netdata-plugin/error" }
 netdata-plugin-protocol = { path = "../netdata-plugin/protocol" }
 netdata-plugin-types = { path = "../netdata-plugin/types" }
 opendal = { workspace = true }
 otel-catalog = { workspace = true }
 sfst = { workspace = true }
-sfst-indexer = { workspace = true }
-sfsq = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-# preserve_order: the log-table `columns` object must serialize in insertion
-# (index) order — the Netdata UI orders columns by their JSON key position.
-# Declared here so otel-ledger is correct on its own, not by relying on a
-# sibling crate enabling the feature and Cargo unifying it into the binary.
-serde_json = { workspace = true, features = ["preserve_order"] }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 uuid = { workspace = true }
 wal = { workspace = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 [dev-dependencies]
 bytesize = { workspace = true }
-fst-index = { workspace = true, features = ["serde"] }
 tempfile = { workspace = true }
-treight = { workspace = true }

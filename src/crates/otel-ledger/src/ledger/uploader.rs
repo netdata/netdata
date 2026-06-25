@@ -12,11 +12,11 @@
 use file_registry::TimestampNs;
 use tokio::time::Instant;
 
-use crate::ipc::{CatalogBuilderRequest, UploaderRequest, UploaderResponse};
-use crate::recovery::now_ns;
+use file_lifecycle::ipc::{CatalogBuilderRequest, UploaderRequest, UploaderResponse};
+use file_lifecycle::recovery::now_ns;
 
 use super::Ledger;
-use super::helpers::{build_catalog_entry, date_from_summary};
+use file_lifecycle::helpers::{build_catalog_entry, date_from_summary};
 
 impl Ledger {
     pub(super) async fn handle_uploader_resp(&mut self, resp: UploaderResponse) {
@@ -32,8 +32,8 @@ impl Ledger {
         };
         // Snapshot the pipeline's registries handle + catalog-builder sender so
         // the shared `upload_retry` (a `&mut self` field) stays freely borrowable.
-        let registries = pipeline.registries.clone();
-        let catalog_builder_tx = pipeline.catalog_builder_tx.clone();
+        let registries = pipeline.registries().clone();
+        let catalog_builder_tx = pipeline.catalog_builder_tx().clone();
 
         match resp {
             UploaderResponse::Uploaded {
@@ -190,7 +190,7 @@ impl Ledger {
             }
         }
 
-        if max_attempts >= super::upload_retry::PERSISTENT_FAILURE_ATTEMPTS {
+        if max_attempts >= file_lifecycle::upload_retry::PERSISTENT_FAILURE_ATTEMPTS {
             tracing::error!(
                 pending,
                 max_attempts,

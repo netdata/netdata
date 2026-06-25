@@ -26,7 +26,7 @@ use netdata_plugin_types::HttpAccess;
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 
-use crate::storage::{Storage, StorageError};
+use file_lifecycle::storage::{Storage, StorageError};
 use sfsq::logs::{LogSource, SfstCandidate, Source, WalTail, run};
 
 use super::adapter::{stream_required_params, to_result, window_secs};
@@ -34,10 +34,10 @@ use super::wire::{
     CatalogFileEntry, FilesResponse, InfoResponse, LogsResult, OtelLogsRequest, OtelLogsResponse,
     SfstFileEntry, StreamId, TenantFiles, WalFileEntry,
 };
-use crate::chunk::ChunkCache;
+use file_lifecycle::chunk::ChunkCache;
 use wal::prefix::{chunk_boundaries, tail_start};
 use wal::registry::FileStatus;
-use crate::registry::{TenantRegistries, WalDesc};
+use file_lifecycle::registry::{TenantRegistries, WalDesc};
 
 /// Decode a file's opaque `content_meta` blob into the wire `StreamId`
 /// shown by the `files: true` inventory. Falls back to empty namespace/name
@@ -136,13 +136,13 @@ fn build_files_response(tr: &TenantRegistries) -> FilesResponse {
 /// disk. Present only when `storage.enabled`.
 #[derive(Clone)]
 pub(crate) struct RemoteRead {
-    storage: crate::storage::OpendalStorage,
+    storage: file_lifecycle::storage::OpendalStorage,
     cache: file_cache::FileCache,
 }
 
 impl RemoteRead {
     pub(crate) fn new(
-        storage: crate::storage::OpendalStorage,
+        storage: file_lifecycle::storage::OpendalStorage,
         cache: file_cache::FileCache,
     ) -> Self {
         Self { storage, cache }

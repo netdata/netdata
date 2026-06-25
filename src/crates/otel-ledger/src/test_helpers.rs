@@ -32,10 +32,3 @@ pub(crate) fn summary_for(
             .expect("test service identity encodes within content_meta limits"),
     }
 }
-
-/// A `Summary` populated with zero-valued fields and an empty stream
-/// identity. Used by registry/recovery tests that need to call
-/// `Registry::track` without caring about the summary's contents.
-pub(crate) fn empty_summary() -> sfst::Summary {
-    summary_for(&otel_logs_identity::ServiceStream::new("", ""), 0, 0, 0)
-}

@@ -1,8 +1,13 @@
 use super::*;
 use file_registry::{ByteSize, FileId, TenantId, TimestampNs};
-use otel_logs_identity::ServiceStream;
 use uuid::Uuid;
 use wal::FileEvent;
+
+/// A logical stream identity as an owned `(namespace, name)` tuple, for
+/// assertions against [`decode_opaque`]-decoded `content_meta`.
+fn ss(namespace: &str, name: &str) -> (String, String) {
+    (namespace.to_owned(), name.to_owned())
+}
 
 fn machine() -> Uuid {
     Uuid::from_u128(0x0011_2233_4455_6677_8899_aabb_ccdd_eeff)
@@ -29,8 +34,7 @@ fn make_registry() -> Registry {
 /// `Archived` status (post-Closed).
 fn track_wal(reg: &mut Registry, seq: u64, min_s: u32, max_s: u32) {
     const NS: u64 = 1_000_000_000;
-    let stream = ServiceStream::new("ns", "svc");
-    let (part_key, content_meta) = crate::test_helpers::identity_for(&stream);
+    let (part_key, content_meta) = crate::test_helpers::identity_for("ns", "svc");
     let id = fid(seq, part_key);
     reg.wal
         .apply_event(&FileEvent::Created {
@@ -52,12 +56,11 @@ fn track_wal(reg: &mut Registry, seq: u64, min_s: u32, max_s: u32) {
 
 /// Track an SFST file with the given range and stream.
 fn track_sfst(reg: &mut Registry, seq: u64, min_s: u32, max_s: u32) {
-    let stream = ServiceStream::new("ns", "a");
-    let id = fid(seq, stream.ns_hash());
+    let id = fid(seq, crate::test_helpers::opaque_part_key("ns", "a"));
     reg.sfst.track(
         id,
         ByteSize(1),
-        crate::test_helpers::summary_for(&stream, 1, min_s, max_s),
+        crate::test_helpers::summary_for("ns", "a", 1, min_s, max_s),
     );
 }
 
@@ -65,16 +68,16 @@ fn track_sfst(reg: &mut Registry, seq: u64, min_s: u32, max_s: u32) {
 /// register it with the catalog registry. The entry's stream is
 /// always `("ns", "a")` to match `track_sfst`'s default.
 fn track_remote(reg: &mut Registry, seq: u64, min_s: u32, max_s: u32) {
-    track_remote_as(reg, seq, ServiceStream::new("ns", "a"), min_s, max_s);
+    track_remote_as(reg, seq, "ns", "a", min_s, max_s);
 }
 
 /// Like [`track_remote`] but with a caller-chosen stream. The catalog entry's
-/// `id.part_key` matches the stream's hash, as production `build_catalog_entry`
-/// guarantees (it copies both `id` and `stream` from the same SFST).
-fn track_remote_as(reg: &mut Registry, seq: u64, stream: ServiceStream, min_s: u32, max_s: u32) {
+/// `id.part_key` matches the stream's key, as production `build_catalog_entry`
+/// guarantees (it copies both `id` and identity from the same SFST).
+fn track_remote_as(reg: &mut Registry, seq: u64, ns: &str, name: &str, min_s: u32, max_s: u32) {
     use chrono::NaiveDate;
     let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
-    let (part_key, content_meta) = crate::test_helpers::identity_for(&stream);
+    let (part_key, content_meta) = crate::test_helpers::identity_for(ns, name);
     let entry = otel_catalog::CatalogEntry {
         id: fid(seq, part_key),
         remote_key: format!("k{seq}"),
@@ -184,16 +187,13 @@ fn remote_candidates_empty_registry() {
 fn enumerate(reg: &Registry, q: &Query) -> Vec<crate::registry::PartitionStat> {
     let catalog: Vec<otel_catalog::CatalogEntry> = reg.catalog_files.candidates(q).collect();
     let mut parts = reg.enumerate_streams_from(q, &catalog);
-    parts.sort_by_key(|p| {
-        let s = otel_logs_identity::decode_content_meta_or_empty(&p.content_meta);
-        (s.namespace, s.name)
-    });
+    parts.sort_by_key(|p| crate::test_helpers::decode_opaque(&p.content_meta));
     parts
 }
 
 /// The decoded `(namespace, name)` identity of a folded partition.
-fn sid(p: &crate::registry::PartitionStat) -> ServiceStream {
-    otel_logs_identity::decode_content_meta_or_empty(&p.content_meta)
+fn sid(p: &crate::registry::PartitionStat) -> (String, String) {
+    crate::test_helpers::decode_opaque(&p.content_meta)
 }
 
 fn window(after: u32, before: u32) -> Query {
@@ -220,7 +220,7 @@ fn enumerate_streams_includes_remote_only_stream() {
     track_remote(&mut reg, 2, 100, 200);
     let streams = enumerate(&reg, &window(50, 250));
     assert_eq!(streams.len(), 1);
-    assert_eq!(sid(&streams[0]), ServiceStream::new("ns", "a"));
+    assert_eq!(sid(&streams[0]), ss("ns", "a"));
     assert_eq!(streams[0].file_count, 1);
 }
 
@@ -228,12 +228,12 @@ fn enumerate_streams_includes_remote_only_stream() {
 fn enumerate_streams_lists_local_and_remote_only_together() {
     let mut reg = make_registry();
     track_sfst(&mut reg, 1, 100, 200); // local stream ns/a
-    track_remote_as(&mut reg, 2, ServiceStream::new("ns", "b"), 100, 200); // remote-only ns/b
+    track_remote_as(&mut reg, 2, "ns", "b", 100, 200); // remote-only ns/b
     let streams = enumerate(&reg, &window(50, 250));
     assert_eq!(streams.len(), 2);
     // Sorted by (namespace, name): a before b.
-    assert_eq!(sid(&streams[0]), ServiceStream::new("ns", "a"));
-    assert_eq!(sid(&streams[1]), ServiceStream::new("ns", "b"));
+    assert_eq!(sid(&streams[0]), ss("ns", "a"));
+    assert_eq!(sid(&streams[1]), ss("ns", "b"));
 }
 
 #[test]
@@ -258,9 +258,9 @@ fn enumerate_streams_dedups_wal_and_remote_same_seq() {
     // lifecycle makes this WAL/catalog pairing unreachable in production. On the
     // old servable-mask dedup this would double-count to file_count == 2.)
     track_wal(&mut reg, 2, 100, 200);
-    track_remote_as(&mut reg, 2, ServiceStream::new("ns", "svc"), 100, 200);
+    track_remote_as(&mut reg, 2, "ns", "svc", 100, 200);
     let streams = enumerate(&reg, &window(50, 250));
     assert_eq!(streams.len(), 1);
-    assert_eq!(sid(&streams[0]), ServiceStream::new("ns", "svc"));
+    assert_eq!(sid(&streams[0]), ss("ns", "svc"));
     assert_eq!(streams[0].file_count, 1);
 }

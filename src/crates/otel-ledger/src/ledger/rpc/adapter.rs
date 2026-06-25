@@ -19,7 +19,7 @@ use super::wire::{
     MultiSelection, MultiSelectionOption, OtelLogsRequest, Pagination, RequiredParam,
     STREAM_SELECTION_PARAM, Version,
 };
-use crate::registry::PartitionStat;
+use file_lifecycle::registry::PartitionStat;
 use otel_logs_identity::ServiceStream;
 
 /// The logs view of one selector partition: the substrate's neutral

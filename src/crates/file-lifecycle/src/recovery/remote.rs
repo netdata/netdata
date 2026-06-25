@@ -45,7 +45,7 @@ pub fn recover_unuploaded(
     );
 
     for id in unuploaded {
-        let Some(req) = crate::ledger::sfst_upload_request(registry, signal, tenant_id, id) else {
+        let Some(req) = crate::helpers::sfst_upload_request(registry, signal, tenant_id, id) else {
             continue;
         };
         if let Err(e) = uploader.send(req) {
@@ -90,7 +90,7 @@ pub async fn reconcile_remote_uploads<S: Storage>(
     retention: &bridge::config::RetentionConfig,
 ) -> Result<(), StorageError> {
     let today = chrono::Utc::now().date_naive();
-    let max_days = crate::ledger::catalog_retention_days(retention).min(MAX_RECONCILE_DAYS);
+    let max_days = crate::helpers::catalog_retention_days(retention).min(MAX_RECONCILE_DAYS);
     let uploaded_at_ns = file_registry::TimestampNs(now_ns());
 
     // Build the date-and-prefix list, then issue all LIST calls in
@@ -142,7 +142,7 @@ pub async fn reconcile_remote_uploads<S: Storage>(
 
             // Registry already has summary fields; no SFST re-read.
             let catalog_entry =
-                crate::ledger::build_catalog_entry(sfst_entry, path, uploaded_at_ns, None);
+                crate::helpers::build_catalog_entry(sfst_entry, path, uploaded_at_ns, None);
             let req = CatalogBuilderRequest::AddEntry {
                 tenant_id: tenant_id.clone(),
                 date: *date,
@@ -192,7 +192,7 @@ pub async fn reconcile_local_catalog_uploads<S: Storage>(
     retention: &bridge::config::RetentionConfig,
 ) -> Result<(), StorageError> {
     let today = chrono::Utc::now().date_naive();
-    let max_days = crate::ledger::catalog_retention_days(retention);
+    let max_days = crate::helpers::catalog_retention_days(retention);
     // Files strictly older than `cutoff` will be evicted by the
     // subsequent retention pass. Re-uploading them is pointless and
     // also unsafe: the spawned upload task reads the local file via

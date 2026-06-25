@@ -30,7 +30,7 @@ mod remote;
 pub use local::*;
 pub use remote::*;
 
-pub(crate) fn now_ns() -> u64 {
+pub fn now_ns() -> u64 {
     // `Duration::as_nanos()` returns `u128`; the `u64` cast is safe until
     // year 2554 (current nanos are ~1.7e18, `u64::MAX` is ~1.8e19).
     SystemTime::now()

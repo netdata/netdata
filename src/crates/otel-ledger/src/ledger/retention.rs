@@ -2,11 +2,11 @@
 
 use file_registry::TenantId;
 
-use crate::ipc::CleanerRequest;
-use crate::recovery::now_ns;
+use file_lifecycle::ipc::CleanerRequest;
+use file_lifecycle::recovery::now_ns;
 
 use super::Ledger;
-use super::helpers::{catalog_retention_days, sfst_retention_policy};
+use file_lifecycle::helpers::{catalog_retention_days, sfst_retention_policy};
 
 impl Ledger {
     /// Cancel-safety invariant: the mark-then-send-then-clear-on-failure
@@ -26,11 +26,11 @@ impl Ledger {
             return;
         };
         let retention = bridge::config::RetentionConfig::resolve(
-            &pipeline.config.index.retention,
+            &pipeline.config().index.retention,
             tenant_id.as_str(),
         );
         let storage_enabled = pipeline.storage_enabled();
-        let registries = pipeline.registries.clone();
+        let registries = pipeline.registries().clone();
 
         let catalog_days = catalog_retention_days(&retention);
         let today = chrono::Utc::now().date_naive();

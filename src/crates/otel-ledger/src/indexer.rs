@@ -9,8 +9,8 @@ use tokio::sync::mpsc;
 use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 
-use crate::component::Component;
-use crate::ipc::{IndexerRequest, IndexerResponse};
+use file_lifecycle::component::Component;
+use file_lifecycle::ipc::{IndexerRequest, IndexerResponse};
 
 /// Tracks a single in-flight indexing operation.
 struct IndexerTask {

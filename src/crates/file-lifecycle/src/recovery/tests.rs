@@ -1,5 +1,4 @@
 use super::*;
-use otel_logs_identity::ServiceStream;
 
 fn machine() -> uuid::Uuid {
     uuid::Uuid::from_u128(0x0011_2233_4455_6677_8899_aabb_ccdd_eeff)
@@ -12,17 +11,16 @@ fn boot() -> uuid::Uuid {
 use crate::test_helpers::empty_summary;
 
 fn make_entry(seq: u64) -> otel_catalog::CatalogEntry {
-    let stream = ServiceStream::new("prod", "api");
-    let part_key = stream.ns_hash();
+    let (part_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
     let id = file_registry::FileId::new(machine(), boot(), seq, part_key);
     let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
     otel_catalog::CatalogEntry {
         id,
-        remote_key: crate::remote_keys::sfst(crate::LOGS_SIGNAL, &TenantId::from("tenant1"), date, id),
+        remote_key: crate::remote_keys::sfst("logs", &TenantId::from("tenant1"), date, id),
         min_timestamp_s: 1_700_000_000,
         max_timestamp_s: 1_700_003_600,
         record_count: 10,
-        content_meta: otel_logs_identity::encode_content_meta(&stream).unwrap(),
+        content_meta,
         size: ByteSize(1024),
         uploaded_at_ns: file_registry::TimestampNs(2_000_000_000),
         remote_etag: None,
@@ -253,7 +251,7 @@ async fn reconcile_local_catalog_uploads_re_uploads_missing_files() {
     reconcile_local_catalog_uploads(
         &mut reg,
         0,
-        crate::LOGS_SIGNAL,
+        "logs",
         &mut uploader,
         &storage,
         &TenantId::from("tenant1"),
@@ -268,7 +266,7 @@ async fn reconcile_local_catalog_uploads_re_uploads_missing_files() {
 
     // Remote now has the file.
     let expected_remote = crate::remote_keys::catalog(
-        crate::LOGS_SIGNAL,
+        "logs",
         date,
         &TenantId::from("tenant1"),
         machine(),
@@ -299,7 +297,7 @@ async fn reconcile_local_catalog_uploads_skips_existing_files() {
     let storage = crate::storage::OpendalStorage::from_operator(op.clone());
     // Pre-populate the remote so reconcile finds it already present.
     let remote_key = crate::remote_keys::catalog(
-        crate::LOGS_SIGNAL,
+        "logs",
         date,
         &TenantId::from("tenant1"),
         machine(),
@@ -326,7 +324,7 @@ async fn reconcile_local_catalog_uploads_skips_existing_files() {
     reconcile_local_catalog_uploads(
         &mut reg,
         0,
-        crate::LOGS_SIGNAL,
+        "logs",
         &mut uploader,
         &storage,
         &TenantId::from("tenant1"),
@@ -385,7 +383,7 @@ async fn reconcile_local_catalog_uploads_skips_past_retention_files() {
     reconcile_local_catalog_uploads(
         &mut reg,
         0,
-        crate::LOGS_SIGNAL,
+        "logs",
         &mut uploader,
         &storage,
         &TenantId::from("tenant1"),
@@ -425,7 +423,7 @@ async fn reconcile_local_catalog_uploads_skips_pending_deletion_files() {
     reconcile_local_catalog_uploads(
         &mut reg,
         0,
-        crate::LOGS_SIGNAL,
+        "logs",
         &mut uploader,
         &storage,
         &TenantId::from("tenant1"),
@@ -437,7 +435,7 @@ async fn reconcile_local_catalog_uploads_skips_pending_deletion_files() {
     // Pending-deletion files are skipped: nothing was uploaded.
     assert_eq!(uploader.pending(), 0);
     let remote_key = crate::remote_keys::catalog(
-        crate::LOGS_SIGNAL,
+        "logs",
         date,
         &TenantId::from("tenant1"),
         machine(),
@@ -485,7 +483,7 @@ async fn reconcile_local_catalog_uploads_skips_on_transient_stat_error() {
     reconcile_local_catalog_uploads(
         &mut reg,
         0,
-        crate::LOGS_SIGNAL,
+        "logs",
         &mut uploader,
         &storage,
         &TenantId::from("tenant1"),
@@ -535,7 +533,7 @@ async fn reconcile_local_catalog_uploads_confirms_present_via_mock() {
     reconcile_local_catalog_uploads(
         &mut reg,
         0,
-        crate::LOGS_SIGNAL,
+        "logs",
         &mut uploader,
         &storage,
         &TenantId::from("tenant1"),
@@ -591,7 +589,7 @@ fn spawn_idle_catalog_builder(
 fn remote_sfst_key(seq: u64) -> (file_registry::FileId, String) {
     let id = file_registry::FileId::new(machine(), boot(), seq, 0);
     let today = chrono::Utc::now().date_naive();
-    (id, crate::remote_keys::sfst(crate::LOGS_SIGNAL, &TenantId::from("tenant1"), today, id))
+    (id, crate::remote_keys::sfst("logs", &TenantId::from("tenant1"), today, id))
 }
 
 #[tokio::test]
@@ -612,7 +610,7 @@ async fn reconcile_remote_uploads_marks_uploaded_and_enqueues_add_entry() {
 
     reconcile_remote_uploads(
         &mut reg,
-        crate::LOGS_SIGNAL,
+        "logs",
         &mut catalog_builder,
         &storage,
         &TenantId::from("tenant1"),
@@ -649,7 +647,7 @@ async fn reconcile_remote_uploads_skips_already_rotated() {
 
     reconcile_remote_uploads(
         &mut reg,
-        crate::LOGS_SIGNAL,
+        "logs",
         &mut catalog_builder,
         &storage,
         &TenantId::from("tenant1"),
@@ -685,7 +683,7 @@ async fn reconcile_remote_uploads_skips_when_local_sfst_missing() {
 
     reconcile_remote_uploads(
         &mut reg,
-        crate::LOGS_SIGNAL,
+        "logs",
         &mut catalog_builder,
         &storage,
         &TenantId::from("tenant1"),
@@ -723,7 +721,7 @@ async fn reconcile_remote_uploads_propagates_list_error() {
 
     let result = reconcile_remote_uploads(
         &mut reg,
-        crate::LOGS_SIGNAL,
+        "logs",
         &mut catalog_builder,
         &storage,
         &TenantId::from("tenant1"),
@@ -750,7 +748,7 @@ async fn reconcile_remote_uploads_skips_unparseable_key() {
     let today = chrono::Utc::now().date_naive();
     let bad_key = format!(
         "{}not-a-valid-file-id",
-        crate::remote_keys::sfst_prefix(crate::LOGS_SIGNAL, &TenantId::from("tenant1"), today)
+        crate::remote_keys::sfst_prefix("logs", &TenantId::from("tenant1"), today)
     );
     let storage = crate::storage::MockStorage {
         list_response: vec![bad_key],
@@ -761,7 +759,7 @@ async fn reconcile_remote_uploads_skips_unparseable_key() {
 
     reconcile_remote_uploads(
         &mut reg,
-        crate::LOGS_SIGNAL,
+        "logs",
         &mut catalog_builder,
         &storage,
         &TenantId::from("tenant1"),

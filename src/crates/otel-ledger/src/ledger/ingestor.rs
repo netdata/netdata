@@ -1,7 +1,7 @@
 //! WAL message handling.
 
 use super::Ledger;
-use crate::ipc::IndexerRequest;
+use file_lifecycle::ipc::IndexerRequest;
 
 impl Ledger {
     #[tracing::instrument(
@@ -34,7 +34,7 @@ impl Ledger {
         };
 
         let req = {
-            let mut registries = pipeline.registries.write().await;
+            let mut registries = pipeline.registries().write().await;
 
             if let Err(e) = registries.apply_wal_event(&msg.tenant_id, &msg.event) {
                 tracing::error!("failed to apply WAL event: {e}");
@@ -57,7 +57,7 @@ impl Ledger {
         };
 
         if let Some(req) = req
-            && let Err(e) = pipeline.indexer_tx.send(req)
+            && let Err(e) = pipeline.indexer_tx().send(req)
         {
             tracing::error!("failed to send to indexer: {e}");
         }

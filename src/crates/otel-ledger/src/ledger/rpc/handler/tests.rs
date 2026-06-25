@@ -19,7 +19,7 @@ fn make_tenant_registries() -> TenantRegistries {
 fn make_handler(tr: TenantRegistries) -> OtelLogsHandler {
     OtelLogsHandler::new(
         Arc::new(RwLock::new(tr)),
-        Arc::new(crate::chunk::ChunkCache::new(64 * 1024 * 1024)),
+        Arc::new(file_lifecycle::chunk::ChunkCache::new(64 * 1024 * 1024)),
         16_384,
         None,
     )
@@ -1068,7 +1068,7 @@ fn track_remote_catalog(
 fn make_handler_with_remote(tr: TenantRegistries, remote: RemoteRead) -> OtelLogsHandler {
     OtelLogsHandler::new(
         Arc::new(RwLock::new(tr)),
-        Arc::new(crate::chunk::ChunkCache::new(64 * 1024 * 1024)),
+        Arc::new(file_lifecycle::chunk::ChunkCache::new(64 * 1024 * 1024)),
         16_384,
         Some(remote),
     )
@@ -1105,7 +1105,7 @@ async fn remote_only_sfst_is_fetched_and_served() {
     track_remote_catalog(&mut tr, "default", id, remote_key, min_s, min_s + 5, sfst_bytes.len() as u64);
 
     let storage =
-        crate::storage::OpendalStorage::new(&format!("fs://{}", remote_dir.display())).unwrap();
+        file_lifecycle::storage::OpendalStorage::new(&format!("fs://{}", remote_dir.display())).unwrap();
     let cache =
         file_cache::FileCache::open(tempfile::tempdir().unwrap().keep(), 64 * 1024 * 1024).unwrap();
     let h = make_handler_with_remote(tr, RemoteRead::new(storage, cache));
@@ -1167,7 +1167,7 @@ async fn remote_fetch_failure_degrades() {
     track_remote_catalog(&mut tr, "default", id, "missing/object.sfst", min_s, min_s + 5, 10);
 
     let storage =
-        crate::storage::OpendalStorage::new(&format!("fs://{}", remote_dir.display())).unwrap();
+        file_lifecycle::storage::OpendalStorage::new(&format!("fs://{}", remote_dir.display())).unwrap();
     let cache =
         file_cache::FileCache::open(tempfile::tempdir().unwrap().keep(), 64 * 1024 * 1024).unwrap();
     let h = make_handler_with_remote(tr, RemoteRead::new(storage, cache));

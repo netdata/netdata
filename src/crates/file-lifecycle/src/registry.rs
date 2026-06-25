@@ -308,7 +308,7 @@ impl TenantRegistries {
     /// Get or lazily create the `Registry` for a tenant. The new registry
     /// is **not** recovered from disk — callers that need on-disk state
     /// must call `Registry::recover` themselves.
-    pub(crate) fn get_or_create(&mut self, tenant_id: &TenantId) -> &mut Registry {
+    pub fn get_or_create(&mut self, tenant_id: &TenantId) -> &mut Registry {
         if !self.tenants.contains_key(tenant_id) {
             let wal_dir = self.wal_base_dir.join(tenant_id.as_str());
             let index_dir = self.index_base_dir.join(tenant_id.as_str());

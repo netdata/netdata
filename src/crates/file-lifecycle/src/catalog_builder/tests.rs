@@ -2,7 +2,6 @@ use super::*;
 use crate::component::ComponentHandle;
 use file_registry::FileId;
 use otel_catalog::CatalogEntry;
-use otel_logs_identity::ServiceStream;
 
 fn machine() -> Uuid {
     Uuid::from_u128(0x0011_2233_4455_6677_8899_aabb_ccdd_eeff)
@@ -17,15 +16,14 @@ fn date() -> NaiveDate {
 }
 
 fn entry_for(seq: u64) -> CatalogEntry {
-    let stream = ServiceStream::new("prod", "api");
-    let part_key = stream.ns_hash();
+    let (part_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
     CatalogEntry {
         id: FileId::new(machine(), boot(), seq, part_key),
         remote_key: format!("tenant1/sfst/2026-04-17/{seq}.sfst"),
         min_timestamp_s: 1_700_000_000,
         max_timestamp_s: 1_700_003_600,
         record_count: 100,
-        content_meta: otel_logs_identity::encode_content_meta(&stream).unwrap(),
+        content_meta,
         size: ByteSize(1024),
         uploaded_at_ns: file_registry::TimestampNs(2_000_000_000),
         remote_etag: None,
