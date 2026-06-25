@@ -2,8 +2,6 @@
 
 package funcctl
 
-import "sort"
-
 type publishedFunctionKind uint8
 
 const (
@@ -114,7 +112,6 @@ func (s *publishedFunctionStore) removeKinds(kinds ...publishedFunctionKind) []s
 			s.removeName(name)
 		}
 	}
-	sort.Strings(names)
 	return names
 }
 
