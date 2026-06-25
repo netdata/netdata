@@ -164,8 +164,11 @@ fn seal_summary_only(wal_path: &Path, sfst_path: &Path) -> anyhow::Result<(sfst:
         content_meta,
     };
 
-    let file = std::fs::File::create(sfst_path)?;
-    sfst::write_summary_only(file, &summary)?;
-    let size = std::fs::metadata(sfst_path)?.len();
-    Ok((summary, size))
+    // Write atomically (build in memory, then fsync+rename), matching the logs
+    // indexer (`sfst_indexer` uses `durable::AtomicFile`). A summary-only SFST is
+    // tiny, so the in-memory buffer is cheap; a crash mid-write then leaves no
+    // partial SFST that recovery would treat as a valid sealed file.
+    let buf = sfst::write_summary_only(std::io::Cursor::new(Vec::new()), &summary)?.into_inner();
+    file_registry::durable::write_atomic(sfst_path, &buf)?;
+    Ok((summary, buf.len() as u64))
 }
