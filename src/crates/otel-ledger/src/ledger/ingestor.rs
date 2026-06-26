@@ -1,6 +1,7 @@
 //! WAL message handling.
 
 use super::Ledger;
+use bridge::signals::Signal;
 use file_lifecycle::ipc::IndexerRequest;
 
 impl Ledger {
@@ -9,14 +10,22 @@ impl Ledger {
         fields(tenant = %msg.tenant_id, frame_seq = msg.frame_seq, event = ?msg.event),
     )]
     pub(super) async fn handle_ingestor_msg(&mut self, msg: wal::Message) {
-        // The owning signal: the writer assigns a per-signal `frame_seq` and the
-        // ledger routes the event to the pipeline by this `pipeline_id`.
+        // The WAL event carries the raw numeric axis stamped by the writer (another
+        // process). Decode it to a `Signal` here — this is the sole boundary where
+        // an unknown id can appear; after it, routing is total.
         let pipeline_id = msg.event.pipeline_id();
+        let signal = match Signal::try_from(pipeline_id) {
+            Ok(signal) => signal,
+            Err(e) => {
+                tracing::error!(%e, "WAL event for unknown signal; dropping");
+                return;
+            }
+        };
 
         // Per-signal frame-sequence gap-check. Each signal has its own monotonic
         // `frame_seq` stream, so a gap here is a real lost FileEvent for THIS
         // signal — inter-signal interleaving can no longer trigger (or mask) it.
-        let expected = self.expected_frame_seq.entry(pipeline_id).or_insert(1);
+        let expected = self.expected_frame_seq.get_mut(signal);
         if msg.frame_seq != *expected {
             tracing::error!(
                 pipeline_id,
@@ -27,10 +36,7 @@ impl Ledger {
         }
         *expected = msg.frame_seq + 1;
 
-        let Some(pipeline) = self.pipelines.get(&pipeline_id) else {
-            tracing::error!(pipeline_id, "WAL event for unknown pipeline; dropping");
-            return;
-        };
+        let pipeline = self.pipelines.get(signal);
 
         let req = {
             let mut registries = pipeline.registries().write().await;

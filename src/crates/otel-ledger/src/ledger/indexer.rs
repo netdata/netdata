@@ -2,6 +2,7 @@
 
 use std::path::PathBuf;
 
+use bridge::signals::Signal;
 use file_registry::{FileId, TenantId};
 
 use file_lifecycle::ipc::{CleanerRequest, IndexerResponse, UploaderRequest};
@@ -35,7 +36,7 @@ enum Indexed {
 
 impl Ledger {
     #[tracing::instrument(skip_all)]
-    pub(super) async fn handle_indexer_resp(&mut self, pipeline_id: u16, resp: IndexerResponse) {
+    pub(super) async fn handle_indexer_resp(&mut self, signal: Signal, resp: IndexerResponse) {
         let (seq, summary, size) = match resp {
             IndexerResponse::IndexFailed { path, error } => {
                 tracing::error!(path = %path.display(), "indexing failed: {error}");
@@ -52,11 +53,8 @@ impl Ledger {
         // uploader. Snapshot it before borrowing the pipeline for its per-signal
         // seam provisions (signal segment + registries handle).
         let storage_enabled = self.uploader.is_some();
-        let Some(pipeline) = self.pipelines.get(&pipeline_id) else {
-            tracing::error!(pipeline_id, "indexed for unknown pipeline; dropping");
-            return;
-        };
-        let signal = pipeline.signal();
+        let pipeline = self.pipelines.get(signal);
+        let segment = pipeline.signal();
         let registries = pipeline.registries().clone();
 
         // Decide everything under the registry write lock — including building
@@ -96,7 +94,7 @@ impl Ledger {
 
                 let upload = if storage_enabled {
                     file_lifecycle::helpers::sfst_upload_request(
-                        registry, signal, &tenant_id, file_id,
+                        registry, segment, &tenant_id, file_id,
                     )
                 } else {
                     None
@@ -147,7 +145,7 @@ impl Ledger {
                 // No new SFST was tracked, but keep retention on the same
                 // per-response cadence (e.g. age-based eviction while a stream
                 // is idle and only producing empty WAL rotations).
-                self.evaluate_retention(pipeline_id, &tenant_id).await;
+                self.evaluate_retention(signal, &tenant_id).await;
             }
             Indexed::Tracked {
                 tenant_id,
@@ -180,7 +178,7 @@ impl Ledger {
                     }
                 }
 
-                self.evaluate_retention(pipeline_id, &tenant_id).await;
+                self.evaluate_retention(signal, &tenant_id).await;
             }
         }
     }

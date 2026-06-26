@@ -28,7 +28,7 @@ struct OtelYaml {
 }
 
 impl OtelYaml {
-    /// Logs WAL dir derived from `base_dir`, matching `lifecycle_for("logs")`.
+    /// Logs WAL dir derived from `base_dir`, matching `lifecycle_for(Signal::Logs)`.
     fn wal_dir(&self) -> Option<PathBuf> {
         self.base_dir.as_ref().map(|b| b.join("logs").join("wal"))
     }

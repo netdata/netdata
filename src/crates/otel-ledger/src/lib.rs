@@ -14,9 +14,7 @@ pub mod traces_indexer;
 
 pub use ledger::Ledger;
 
-/// Signal remote-key segments (`v1/{signal}/...`) — re-exported from the single
-/// source of truth in `bridge::signals` so the ingestor and ledger agree.
-pub(crate) use bridge::signals::{LOGS_SIGNAL, TRACES_SIGNAL};
+use bridge::signals::Signal;
 
 use anyhow::{Context, Result};
 use bridge::{LedgerRequest, LedgerResponse};
@@ -56,8 +54,8 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
     let mut ledger = Ledger::new(
         supervisor,
         &config.writer_socket_path,
-        &config.lifecycle_for(LOGS_SIGNAL),
-        &config.lifecycle_for(TRACES_SIGNAL),
+        &config.lifecycle_for(Signal::Logs),
+        &config.lifecycle_for(Signal::Traces),
         &config.storage,
     )
     .await

@@ -1,8 +1,9 @@
 //! A single signal's pipeline.
 //!
 //! The substrate's coordinator (the `otel-ledger` `Ledger` shell) owns one
-//! [`Pipeline`] per signal (today only logs) and routes events to it by
-//! `pipeline_id`. A `Pipeline` carries the per-signal state the shell does not:
+//! [`Pipeline`] per signal (today logs + the skeletal traces proof) and routes
+//! events to it by `pipeline_id`. A `Pipeline` carries the per-signal state the
+//! shell does not:
 //! its tenant registries, lifecycle config, remote-key segment, the request
 //! senders of its per-signal seal/index and catalog-builder workers, and its
 //! query handler. The substrate-shared workers (cleaner, uploader, chunk cache)
@@ -22,6 +23,7 @@ use std::sync::Arc;
 
 use bridge::config::LifecycleConfig;
 use bridge::function::RawFunctionHandler;
+use bridge::signals::SignalSpec;
 use netdata_plugin_protocol::FunctionDeclaration;
 use tokio::sync::{RwLock, mpsc};
 
@@ -39,11 +41,12 @@ pub type ArgShim = fn(&[String], Option<&[u8]>) -> Option<Vec<u8>>;
 /// identical to the pre-carve monolithic ledger; the shell routes to it by
 /// `pipeline_id`.
 pub struct Pipeline {
-    /// Opaque signal axis; matches the `pipeline_id` carried in this signal's
-    /// `FileId`s and used as the shell's routing key.
-    pipeline_id: u16,
-    /// Remote-key segment for this signal (`logs`, later `traces`).
-    signal: &'static str,
+    /// Opaque signal identity handed down by the signal-aware layer: the
+    /// `pipeline_id` (matches the axis carried in this signal's `FileId`s and used
+    /// as the shell's routing key) and the remote-key segment (`logs`, `traces`),
+    /// bundled so the two cannot be set separately and mismatched. The substrate
+    /// never interprets it beyond echoing the id and using the segment as a key.
+    spec: SignalSpec,
     /// Per-signal lifecycle config (wal/index/catalog dirs, rotation, retention).
     /// Remote storage is process-global and owned by the coordinator shell — it is
     /// NOT carried here; the shell decides upload/retention gating from whether it
@@ -75,8 +78,7 @@ impl Pipeline {
     /// `build_*_pipeline` binding delegates to.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        pipeline_id: u16,
-        signal: &'static str,
+        spec: SignalSpec,
         config: LifecycleConfig,
         registries: Arc<RwLock<TenantRegistries>>,
         indexer_tx: mpsc::UnboundedSender<IndexerRequest>,
@@ -86,8 +88,7 @@ impl Pipeline {
         arg_shim: ArgShim,
     ) -> Self {
         Self {
-            pipeline_id,
-            signal,
+            spec,
             config,
             registries,
             indexer_tx,
@@ -100,12 +101,12 @@ impl Pipeline {
 
     /// The opaque signal axis; the shell's routing key.
     pub fn pipeline_id(&self) -> u16 {
-        self.pipeline_id
+        self.spec.pipeline_id()
     }
 
     /// The remote-key segment for this signal.
     pub fn signal(&self) -> &'static str {
-        self.signal
+        self.spec.segment()
     }
 
     /// This pipeline's lifecycle config.

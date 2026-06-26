@@ -5,7 +5,7 @@
 //! worker, runs startup recovery over the substrate-shared
 //! cleaner/uploader/storage, wires the per-signal query handler (provided by the
 //! caller's `make_handler` closure), and detaches the per-pipeline worker
-//! response streams into pid-tagged forwarders feeding the coordinator's merged
+//! response streams into Signal-tagged forwarders feeding the coordinator's merged
 //! channel. The caller pre-spawns the per-signal seal/index worker (it owns the
 //! concrete [`Component`](file_lifecycle::component::Component) type) and hands
 //! its handle in.
@@ -20,6 +20,7 @@ use std::sync::Arc;
 
 use bridge::config::LifecycleConfig;
 use bridge::function::{HandlerAdapter, RawFunctionHandler};
+use bridge::signals::Signal;
 use file_registry::TenantId;
 use tokio::sync::{RwLock, mpsc};
 use tokio_util::sync::CancellationToken;
@@ -71,20 +72,25 @@ const STARTUP_REMOTE_BUDGET: std::time::Duration = std::time::Duration::from_sec
 /// function owns only the per-signal catalog builder.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn build_pipeline<F>(
-    pipeline_id: u16,
-    signal: &'static str,
+    signal: Signal,
     config: &LifecycleConfig,
     cancel: &CancellationToken,
     cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
     mut uploader: Option<&mut ComponentHandle<UploaderRequest, UploaderResponse>>,
     storage: Option<&OpendalStorage>,
     mut indexer: ComponentHandle<IndexerRequest, IndexerResponse>,
-    pipeline_tx: &mpsc::UnboundedSender<(u16, PipelineResp)>,
+    pipeline_tx: &mpsc::UnboundedSender<(Signal, PipelineResp)>,
     make_handler: F,
 ) -> anyhow::Result<Pipeline>
 where
     F: FnOnce(Arc<RwLock<TenantRegistries>>) -> (Arc<dyn RawFunctionHandler>, ArgShim),
 {
+    // The numeric axis (stamped into IPC requests + recovery) and the remote-key
+    // segment (recovery keys + log lines) of this signal; the agnostic substrate
+    // helpers below take these primitives, not the `Signal` enum.
+    let pipeline_id = signal.pipeline_id();
+    let segment = signal.segment();
+
     let wal_base_dir = config.wal.dir.clone();
     let index_base_dir = config.index.dir.clone();
     let catalog_base_dir = config.catalog.dir.clone();
@@ -100,7 +106,7 @@ where
     // The seal/index worker was spawned by the caller (it owns the concrete
     // Component type); the catalog builder is signal-neutral, so it is spawned
     // here. The `signal` field on each line disambiguates logs vs traces.
-    tracing::info!(signal, "indexer spawned");
+    tracing::info!(signal = segment, "indexer spawned");
 
     let mut catalog_builder = ComponentHandle::spawn::<CatalogBuilder>(
         CatalogBuilderArgs {
@@ -109,7 +115,7 @@ where
         },
         cancel.child_token(),
     );
-    tracing::info!(signal, "catalog builder spawned");
+    tracing::info!(signal = segment, "catalog builder spawned");
 
     // Populate routing and run recovery per tenant.
     //
@@ -154,7 +160,7 @@ where
                 STARTUP_REMOTE_BUDGET,
                 file_lifecycle::recovery::reconcile_remote_uploads(
                     registry,
-                    signal,
+                    segment,
                     &mut catalog_builder,
                     storage,
                     tenant_id,
@@ -185,7 +191,7 @@ where
             // reachability — fire-and-forget, so it never blocks startup;
             // responses (and any failures → the retry queue) are handled
             // once the run loop starts.
-            recover_unuploaded(registry, signal, uploader, tenant_id);
+            recover_unuploaded(registry, segment, uploader, tenant_id);
 
             // Catalog re-upload probes the remote per file (`stat`), so it
             // only makes sense when the remote is reachable.
@@ -195,7 +201,7 @@ where
                     file_lifecycle::recovery::reconcile_local_catalog_uploads(
                         registry,
                         pipeline_id,
-                        signal,
+                        segment,
                         uploader,
                         storage,
                         tenant_id,
@@ -235,7 +241,7 @@ where
         .await?;
     }
 
-    tracing::info!(signal, "recovery complete");
+    tracing::info!(signal = segment, "recovery complete");
 
     for (seq, tenant_id) in seq_routes {
         registries.route_seq_to(seq, tenant_id);
@@ -270,22 +276,21 @@ where
     let (catalog_builder_tx, catalog_builder_rx) = catalog_builder.into_parts();
     spawn_forwarder(
         indexer_rx,
-        pipeline_id,
+        signal,
         pipeline_tx.clone(),
         "indexer",
         PipelineResp::Indexer,
     );
     spawn_forwarder(
         catalog_builder_rx,
-        pipeline_id,
+        signal,
         pipeline_tx.clone(),
         "catalog-builder",
         PipelineResp::CatalogBuilder,
     );
 
     Ok(Pipeline::new(
-        pipeline_id,
-        signal,
+        signal.spec(),
         config.clone(),
         registries,
         indexer_tx,
@@ -302,8 +307,7 @@ where
 /// remote-read cache) and the logs args→payload shim.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn build_logs_pipeline(
-    pipeline_id: u16,
-    signal: &'static str,
+    signal: Signal,
     config: &LifecycleConfig,
     cancel: &CancellationToken,
     cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
@@ -311,7 +315,7 @@ pub(crate) async fn build_logs_pipeline(
     storage: Option<&OpendalStorage>,
     read_cache: Option<&file_cache::FileCache>,
     chunk_cache: Arc<ChunkCache>,
-    pipeline_tx: &mpsc::UnboundedSender<(u16, PipelineResp)>,
+    pipeline_tx: &mpsc::UnboundedSender<(Signal, PipelineResp)>,
 ) -> anyhow::Result<Pipeline> {
     let indexer = ComponentHandle::spawn::<Indexer>((), cancel.child_token());
 
@@ -322,7 +326,6 @@ pub(crate) async fn build_logs_pipeline(
     let remote_cache = read_cache.cloned();
 
     build_pipeline(
-        pipeline_id,
         signal,
         config,
         cancel,
@@ -349,22 +352,22 @@ pub(crate) async fn build_logs_pipeline(
 }
 
 /// Forward a per-pipeline worker's responses into the shell's merged channel,
-/// tagging each with `pipeline_id`. On source-channel close (the worker task
+/// tagging each with the owning `Signal`. On source-channel close (the worker task
 /// ended) it emits one [`PipelineResp::WorkerGone`] so the run-loop can treat a
 /// dead worker as fatal, then exits.
 fn spawn_forwarder<T: Send + 'static>(
     mut rx: mpsc::UnboundedReceiver<T>,
-    pipeline_id: u16,
-    tx: mpsc::UnboundedSender<(u16, PipelineResp)>,
+    signal: Signal,
+    tx: mpsc::UnboundedSender<(Signal, PipelineResp)>,
     kind: &'static str,
     wrap: fn(T) -> PipelineResp,
 ) {
     tokio::spawn(async move {
         while let Some(item) = rx.recv().await {
-            if tx.send((pipeline_id, wrap(item))).is_err() {
+            if tx.send((signal, wrap(item))).is_err() {
                 return;
             }
         }
-        let _ = tx.send((pipeline_id, PipelineResp::WorkerGone { kind }));
+        let _ = tx.send((signal, PipelineResp::WorkerGone { kind }));
     });
 }

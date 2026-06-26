@@ -85,13 +85,45 @@ The substrate owns the machinery that operates only on neutral types
   length-prefixed `content_meta` codec), never a content-plane identity codec, so
   no content dev-dependency leaks in.
 
+## Signal axis typing
+
+The signal axis (which OTel signal a file/event/pipeline belongs to) is modeled
+by `bridge::signals` as the single source of truth:
+
+- `Signal { Logs, Traces }` — the closed enum of business signals. It owns the
+  mapping: `pipeline_id() -> u16` (Logs=0, Traces=1), `segment() -> &'static str`
+  (`"logs"`/`"traces"`, the `v1/{segment}/` remote-key segment), `spec() ->
+  SignalSpec`, and `TryFrom<u16>` (the wire/disk decode).
+- `SignalSpec { pipeline_id, segment }` — opaque, private fields, constructible
+  only via `Signal::spec()`. It is the typed pair handed DOWN to the
+  content-agnostic substrate (`file-lifecycle`), so the substrate carries one
+  value that cannot be internally inconsistent, without learning the signal set.
+- **Wire/disk stays `u16`.** `FileId.pipeline_id` is `u16` (serialized into
+  filenames `…-{pipeline_id:05}-…` and WAL frames — byte format unchanged). The
+  numeric axis is decoded to a `Signal` exactly at the boundaries where raw bytes
+  re-enter signal-aware code: the ingestor WAL-event handler, and the agnostic-IPC
+  cleaner/uploader response echoes (`Signal::try_from`). An unknown id there is a
+  logged drop (it can arrive from a persisted file or another process), never a
+  panic. Above those boundaries routing is total.
+- **Signal-aware layers** (`bridge`, `otel-ledger`, `otel-ingestor`) carry
+  `Signal`; the substrate (`file-lifecycle`, `file-registry`, `wal`) carries only
+  the opaque `pipeline_id`/`SignalSpec`. The ledger holds its pipelines and
+  per-signal frame-seq gap-check in a fixed `Signal`-indexed structure (not a
+  `HashMap<u16, _>`), so routing to a known signal cannot miss. Both WAL writers
+  stamp their axis explicitly via `Writer::with_pipeline(Signal::_.pipeline_id())`
+  (no reliance on `Writer::new`'s `DEFAULT_PIPELINE` defaulting), so no cross-crate
+  `pipeline_id == DEFAULT_PIPELINE` compile-time assert is needed.
+
 ## `Pipeline` seam
 
 `pipeline::Pipeline` is the per-signal state a coordinator routes to, keyed by
-`pipeline_id`. It carries: `pipeline_id`, the remote-key `signal` segment, the
-`LifecycleConfig`, the tenant `registries`, the seal-index and catalog-builder
-request senders, the query `handler` + its `declaration`, and the per-signal
-args→payload `arg_shim`.
+`pipeline_id`. It carries: one opaque `bridge::signals::SignalSpec` (the
+`pipeline_id` + remote-key segment as a single value, so the two cannot be set
+separately and mismatched), the `LifecycleConfig`, the tenant `registries`, the
+seal-index and catalog-builder request senders, the query `handler` + its
+`declaration`, and the per-signal args→payload `arg_shim`. The substrate stores
+the `SignalSpec` opaquely — it never names "logs"/"traces" (the `Signal` enum
+stays out of `file-lifecycle`, preserving the dep_guard boundary).
 
 - Fields are **private**; consumers read them only through accessors
   (`pipeline_id()`, `signal()`, `config()`, `registries()`, `indexer_tx()`,
@@ -123,8 +155,9 @@ The operator-facing config model (in `netdata-plugin/bridge` `PluginConfig`,
 resolved by `otel-plugin` `config/{mod,signal,env}.rs`, consumed by both workers):
 
 - **One mandatory `base_dir`.** The plugin derives every per-signal directory
-  from it — there is no per-signal dir config. `PluginConfig::lifecycle_for(signal)`
-  is the single derivation point, producing the runtime `LifecycleConfig`:
+  from it — there is no per-signal dir config. `PluginConfig::lifecycle_for(Signal)`
+  is the single derivation point (a total `match` over the signal enum, no
+  string compare / panic), producing the runtime `LifecycleConfig`:
   - `{base_dir}/{signal}/wal`, `{base_dir}/{signal}/index`,
     `{base_dir}/{signal}/catalog` — the signal's WAL / SFST / catalog dirs;
   - `{base_dir}/{signal}/remote-read` — the signal's remote-read cache

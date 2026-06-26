@@ -1,5 +1,6 @@
 //! Steady-state retention pass.
 
+use bridge::signals::Signal;
 use file_registry::TenantId;
 
 use file_lifecycle::ipc::CleanerRequest;
@@ -18,13 +19,10 @@ impl Ledger {
     /// `pending_deletion: true` and no in-flight cleaner request.
     /// Restructure to do mark + send under one lock guard, or thread
     /// a deferred-rollback helper.
-    pub(super) async fn evaluate_retention(&mut self, pipeline_id: u16, tenant_id: &TenantId) {
+    pub(super) async fn evaluate_retention(&mut self, signal: Signal, tenant_id: &TenantId) {
         // Resolve the owning pipeline's retention config + registries handle
         // up front so the shared cleaner (a `&mut self` field) stays borrowable.
-        let Some(pipeline) = self.pipelines.get(&pipeline_id) else {
-            tracing::error!(pipeline_id, "retention for unknown pipeline; skipping");
-            return;
-        };
+        let pipeline = self.pipelines.get(signal);
         let retention = pipeline.config().index.retention.resolve(tenant_id.as_str());
         // Remote storage is process-global: enabled iff the shell built an uploader.
         let storage_enabled = self.uploader.is_some();
@@ -106,7 +104,10 @@ impl Ledger {
             for path in to_evict_catalog {
                 registry.catalog_files.mark_pending_deletion(&path);
                 tracing::info!("retention: evicting catalog path={}", path.display());
-                reqs.push(CleanerRequest::DeleteCatalogFile { pipeline_id, path });
+                reqs.push(CleanerRequest::DeleteCatalogFile {
+                    pipeline_id: signal.pipeline_id(),
+                    path,
+                });
             }
             reqs
         };

@@ -21,6 +21,7 @@
 use async_trait::async_trait;
 use bridge::config::LifecycleConfig;
 use bridge::function::{FunctionCallContext, FunctionHandler, HandlerAdapter, RawFunctionHandler};
+use bridge::signals::Signal;
 use netdata_plugin_error::Result as PluginResult;
 use netdata_plugin_protocol::FunctionDeclaration;
 use serde_json::{Value, json};
@@ -72,19 +73,17 @@ fn traces_arg_shim(_args: &[String], _payload: Option<&[u8]>) -> Option<Vec<u8>>
 /// ignores the registries and needs neither chunk cache nor remote-read cache.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn build_traces_pipeline(
-    pipeline_id: u16,
-    signal: &'static str,
+    signal: Signal,
     config: &LifecycleConfig,
     cancel: &CancellationToken,
     cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
     uploader: Option<&mut ComponentHandle<UploaderRequest, UploaderResponse>>,
     storage: Option<&OpendalStorage>,
-    pipeline_tx: &mpsc::UnboundedSender<(u16, PipelineResp)>,
+    pipeline_tx: &mpsc::UnboundedSender<(Signal, PipelineResp)>,
 ) -> anyhow::Result<Pipeline> {
     let indexer = ComponentHandle::spawn::<TracesIndexer>((), cancel.child_token());
 
     super::pipeline::build_pipeline(
-        pipeline_id,
         signal,
         config,
         cancel,

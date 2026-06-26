@@ -11,6 +11,8 @@ use std::time::Duration;
 use bytesize::ByteSize;
 use serde::{Deserialize, Serialize};
 
+use crate::signals::Signal;
+
 /// Shared configuration for all otel-plugin workers.
 ///
 /// Parsed once from YAML by the supervisor and sent to each worker.
@@ -60,18 +62,15 @@ impl PluginConfig {
     /// both are global to the process (the coordinator shell owns remote storage;
     /// auth is tenant-scoped), not per-signal file-lifecycle concerns.
     ///
-    /// Panics on an unknown signal name: callers pass the
-    /// [`signals`](crate::signals) constants, so an unmatched name is a
-    /// programmer error, not operator input.
-    pub fn lifecycle_for(&self, signal: &str) -> LifecycleConfig {
-        let tuning = if signal == crate::signals::LOGS_SIGNAL {
-            &self.logs
-        } else if signal == crate::signals::TRACES_SIGNAL {
-            &self.traces
-        } else {
-            panic!("lifecycle_for: unknown signal {signal:?}");
+    /// Total over [`Signal`]: the signal axis is a closed enum, so there is no
+    /// unknown-signal error path here (a bad numeric `pipeline_id` is rejected
+    /// earlier, at the [`Signal::try_from`](crate::signals::Signal) boundary).
+    pub fn lifecycle_for(&self, signal: Signal) -> LifecycleConfig {
+        let tuning = match signal {
+            Signal::Logs => &self.logs,
+            Signal::Traces => &self.traces,
         };
-        let root = self.base_dir.join(signal);
+        let root = self.base_dir.join(signal.segment());
         LifecycleConfig {
             wal: WalConfig {
                 dir: root.join("wal"),
@@ -606,7 +605,7 @@ mod opt_bytesize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::signals::{LOGS_SIGNAL, TRACES_SIGNAL};
+    use crate::signals::Signal;
 
     /// A full plugin config in the new schema: one base dir, global storage +
     /// auth, per-signal tuning for logs and traces (different rotation/retention
@@ -684,7 +683,7 @@ traces:
     fn lifecycle_for_derives_dirs_and_tuning() {
         let c = full_config();
 
-        let logs = c.lifecycle_for(LOGS_SIGNAL);
+        let logs = c.lifecycle_for(Signal::Logs);
         assert_eq!(
             logs.wal.dir,
             PathBuf::from("/var/lib/netdata/otel/logs/wal")
@@ -707,7 +706,7 @@ traces:
         // Storage is NOT carried per-signal — it is global on PluginConfig, owned
         // by the coordinator shell (see the storage-redundancy SOW).
 
-        let traces = c.lifecycle_for(TRACES_SIGNAL);
+        let traces = c.lifecycle_for(Signal::Traces);
         assert_eq!(
             traces.wal.dir,
             PathBuf::from("/var/lib/netdata/otel/traces/wal")
@@ -730,12 +729,6 @@ traces:
         );
     }
 
-    #[test]
-    #[should_panic(expected = "unknown signal")]
-    fn lifecycle_for_unknown_signal_panics() {
-        let c = full_config();
-        let _ = c.lifecycle_for("metrics");
-    }
 }
 
 mod opt_duration {

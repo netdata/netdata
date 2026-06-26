@@ -6,6 +6,7 @@
 //! when storage is enabled. The `pipeline_id` arrives tagged by the forwarder
 //! that funnels this pipeline's catalog-builder responses into the run-loop.
 
+use bridge::signals::Signal;
 use file_lifecycle::ipc::{CatalogBuilderResponse, UploaderRequest};
 
 use super::Ledger;
@@ -13,7 +14,7 @@ use super::Ledger;
 impl Ledger {
     pub(super) async fn handle_catalog_builder_resp(
         &mut self,
-        pipeline_id: u16,
+        signal: Signal,
         resp: CatalogBuilderResponse,
     ) {
         match resp {
@@ -39,13 +40,7 @@ impl Ledger {
                     "catalog rotated",
                 );
 
-                let Some(pipeline) = self.pipelines.get(&pipeline_id) else {
-                    tracing::error!(
-                        pipeline_id,
-                        "catalog rotation for unknown pipeline; dropping"
-                    );
-                    return;
-                };
+                let pipeline = self.pipelines.get(signal);
                 let registries = pipeline.registries().clone();
 
                 let remote_key = file_lifecycle::remote_keys::catalog(
@@ -78,7 +73,7 @@ impl Ledger {
 
                 if let Some(uploader) = self.uploader.as_mut() {
                     let req = UploaderRequest::UploadCatalog {
-                        pipeline_id,
+                        pipeline_id: signal.pipeline_id(),
                         local_path: path,
                         remote_key,
                         seqs,

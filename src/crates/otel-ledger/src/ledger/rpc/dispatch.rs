@@ -114,7 +114,7 @@ impl Ledger {
         // Route by declared function name to the owning pipeline. Each pipeline
         // owns its handler and its pre-handler args→payload shim (a per-signal
         // provision), so this dispatcher stays signal-neutral.
-        let Some(pipeline) = self.pipelines.values().find(|p| p.function_name() == name) else {
+        let Some(pipeline) = self.pipelines.iter().find(|p| p.function_name() == name) else {
             // No pipeline answers this name; emit a 404 directly.
             let result = netdata_plugin_types::FunctionResult {
                 transaction: transaction.clone(),

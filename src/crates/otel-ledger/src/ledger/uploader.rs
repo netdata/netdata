@@ -9,6 +9,7 @@
 //! gates their eviction). Both `*Failed` responses are recorded in the upload
 //! retry queue so they're re-issued with backoff rather than dropped.
 
+use bridge::signals::Signal;
 use file_registry::TimestampNs;
 use tokio::time::Instant;
 
@@ -26,13 +27,16 @@ impl Ledger {
             | UploaderResponse::CatalogUploaded { pipeline_id, .. }
             | UploaderResponse::CatalogUploadFailed { pipeline_id, .. } => *pipeline_id,
         };
-        let Some(pipeline) = self.pipelines.get(&pipeline_id) else {
-            tracing::error!(
-                pipeline_id,
-                "uploader response for unknown pipeline; dropping"
-            );
-            return;
+        // The uploader echoes back the raw `pipeline_id` it was handed (agnostic
+        // IPC — it never learns the signal). Decode it at this boundary.
+        let signal = match Signal::try_from(pipeline_id) {
+            Ok(signal) => signal,
+            Err(e) => {
+                tracing::error!(%e, "uploader response for unknown signal; dropping");
+                return;
+            }
         };
+        let pipeline = self.pipelines.get(signal);
         // Snapshot the pipeline's registries handle + catalog-builder sender so
         // the shared `upload_retry` (a `&mut self` field) stays freely borrowable.
         let registries = pipeline.registries().clone();

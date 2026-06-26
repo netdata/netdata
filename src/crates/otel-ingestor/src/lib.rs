@@ -6,7 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
 use bridge::config::{AuthConfig, LifecycleConfig, PluginConfig};
-use bridge::signals::{LOGS_SIGNAL, TRACES_SIGNAL};
+use bridge::signals::Signal;
 use bridge::{IngestorRequest, IngestorResponse};
 use ferryboat::{Connection, Endpoint};
 use opentelemetry_proto::tonic::collector::logs::v1::logs_service_server::LogsServiceServer;
@@ -35,11 +35,6 @@ use chart_config::ChartConfigManager;
 use logs_service::NetdataLogsService;
 use metrics_service::{ChartManager, NetdataMetricsService};
 use trace_service::NetdataTracesService;
-
-// The logs WAL writer stamps `FileId::DEFAULT_PIPELINE`; pin it to the shared
-// `LOGS_PIPELINE_ID` on the ingestor side too (the ledger pins the same invariant
-// on its side) so a future change to either can't silently mis-route logs.
-const _: () = assert!(bridge::signals::LOGS_PIPELINE_ID == file_registry::FileId::DEFAULT_PIPELINE);
 
 /// Ingestor worker entry point.
 ///
@@ -168,8 +163,8 @@ async fn run_ingestor(
     // contract is that all per-frame `ingestion_ns` come from a single clock so
     // frame-level ordering is consistent across every stream/signal.
     let clock = Arc::new(std::sync::Mutex::new(file_registry::MonotonicClock::new()));
-    let logs_lifecycle = config.lifecycle_for(LOGS_SIGNAL);
-    let traces_lifecycle = config.lifecycle_for(TRACES_SIGNAL);
+    let logs_lifecycle = config.lifecycle_for(Signal::Logs);
+    let traces_lifecycle = config.lifecycle_for(Signal::Traces);
     let logs_service = create_logs_service(
         &logs_lifecycle,
         &config.auth,
@@ -301,8 +296,8 @@ fn create_shared_writer_state(
     config: &PluginConfig,
     writer_socket_path: &str,
 ) -> Result<(Arc<ledger_sender::LedgerSender>, Arc<wal::SeqAllocator>)> {
-    let logs_lc = config.lifecycle_for(LOGS_SIGNAL);
-    let traces_lc = config.lifecycle_for(TRACES_SIGNAL);
+    let logs_lc = config.lifecycle_for(Signal::Logs);
+    let traces_lc = config.lifecycle_for(Signal::Traces);
     let highwater_path = config.seq_highwater_path();
 
     let logs_scan = scan_seq_dirs(&logs_lc.wal.dir, &logs_lc.index.dir, &logs_lc.catalog.dir)?;

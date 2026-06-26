@@ -1,3 +1,4 @@
+use bridge::signals::Signal;
 use bridge::{LedgerRequest, LedgerResponse};
 
 use file_lifecycle::ipc::{
@@ -10,10 +11,10 @@ pub enum LedgerEvent {
     /// `event.file_id.pipeline_id`).
     WalMsg(wal::Message),
     /// A response from a per-pipeline worker (indexer or catalog builder),
-    /// tagged with the owning pipeline id by its forwarder task. The shared
+    /// tagged with the owning `Signal` by its forwarder task. The shared
     /// workers (cleaner, uploader) have their own arms because their responses
     /// carry the pipeline id inline.
-    PipelineResp(u16, PipelineResp),
+    PipelineResp(Signal, PipelineResp),
     /// A response from the (shared) cleaner; carries its owning pipeline id.
     CleanerResp(CleanerResponse),
     /// A response from the (shared) uploader; carries its owning pipeline id.
@@ -35,7 +36,7 @@ pub enum LedgerEvent {
 /// The indexer and catalog builder are per-pipeline, so their channel set is
 /// dynamic across N pipelines — a thing a static `tokio::select!` cannot
 /// express. Each per-pipeline worker's response stream is forwarded into one
-/// shared channel, tagged with the owning `pipeline_id`, which the run-loop
+/// shared channel, tagged with the owning `Signal`, which the run-loop
 /// selects on. The shared cleaner/uploader keep their own channels because
 /// there is exactly one of each.
 pub enum PipelineResp {

@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use bridge::config::AuthConfig;
+use bridge::signals::Signal;
 use file_registry::{MonotonicClock, TenantId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
@@ -531,7 +532,16 @@ impl LogsService for NetdataLogsService {
         } else {
             let path = self.wal_base_dir.join(tenant_id.as_str());
             let wal_config = self.resolve_wal_config(tenant_id.as_str());
-            let w = wal::Writer::new(&path, wal_config, Arc::clone(&self.seq)).map_err(|e| {
+            // Stamp the logs signal axis explicitly (matching the traces writer)
+            // so the WAL producer no longer relies on `Writer::new`'s
+            // `DEFAULT_PIPELINE` defaulting to coincide with the logs id.
+            let w = wal::Writer::with_pipeline(
+                &path,
+                wal_config,
+                Arc::clone(&self.seq),
+                Signal::Logs.pipeline_id(),
+            )
+            .map_err(|e| {
                 tracing::error!(%e, tenant = %tenant_id, "failed to create WAL writer");
                 Status::internal("WAL writer creation failed")
             })?;

@@ -7,6 +7,7 @@
 //! cleaner echoes each request's `pipeline_id` onto the response so the run-loop
 //! routes the mutation to the right pipeline.
 
+use bridge::signals::Signal;
 use file_lifecycle::ipc::CleanerResponse;
 
 use super::Ledger;
@@ -21,15 +22,17 @@ impl Ledger {
             | CleanerResponse::IndexFileFailed { pipeline_id, .. }
             | CleanerResponse::CatalogFileFailed { pipeline_id, .. } => *pipeline_id,
         };
-        let Some(pipeline) = self.pipelines.get(&pipeline_id) else {
-            tracing::error!(
-                pipeline_id,
-                "cleaner response for unknown pipeline; dropping"
-            );
-            return;
+        // The cleaner echoes back the raw `pipeline_id` it was handed (agnostic
+        // IPC — it never learns the signal). Decode it at this boundary.
+        let signal = match Signal::try_from(pipeline_id) {
+            Ok(signal) => signal,
+            Err(e) => {
+                tracing::error!(%e, "cleaner response for unknown signal; dropping");
+                return;
+            }
         };
 
-        let mut registries = pipeline.registries().write().await;
+        let mut registries = self.pipelines.get(signal).registries().write().await;
         match resp {
             CleanerResponse::WalFileDeleted { sequence, .. } => {
                 if let Some((_, registry)) = registries.for_seq_mut(sequence) {

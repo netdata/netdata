@@ -8,7 +8,7 @@
 //! What it does on each export:
 //! - counts the spans in the request (the only content-derived number it needs:
 //!   the WAL frame's `entry_count`, which the seal sums into `record_count`);
-//! - writes ONE opaque WAL frame stamped `pipeline_id = TRACES_PIPELINE_ID` (the
+//! - writes ONE opaque WAL frame stamped `pipeline_id = Signal::Traces` (the
 //!   frame payload is the prost-encoded request — opaque to the substrate, never
 //!   decoded by the traces seal);
 //! - funnels the resulting `FileEvent`s through the SHARED `LedgerSender` (the
@@ -32,7 +32,7 @@ use tonic::{Request, Response, Status};
 
 use crate::ledger_sender::LedgerSender;
 use bridge::config::AuthConfig;
-use bridge::signals::TRACES_PIPELINE_ID;
+use bridge::signals::Signal;
 
 /// The single fixed partition key all proof traces share (one WAL stream per
 /// tenant). Opaque to the substrate; the real feature derives per-service keys.
@@ -151,7 +151,7 @@ impl TraceService for NetdataTracesService {
                 &path,
                 wal_config,
                 Arc::clone(&self.seq),
-                TRACES_PIPELINE_ID,
+                Signal::Traces.pipeline_id(),
             )
             .map_err(|e| {
                 tracing::error!(%e, tenant = %tenant_id, "failed to create traces WAL writer");

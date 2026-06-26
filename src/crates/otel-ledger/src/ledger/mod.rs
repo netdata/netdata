@@ -6,9 +6,9 @@
 //! response funnel, and the `select!` run-loop that dispatches every event. The
 //! per-signal state — tenant registries, lifecycle config, the seal/index and
 //! catalog-builder workers, and the query handler — lives in a [`Pipeline`] per
-//! signal, keyed by `pipeline_id`. Today there is exactly one pipeline (logs);
-//! a second signal (traces) plugs in by inserting another `Pipeline`, not by
-//! editing the shell.
+//! signal, decoded from the wire `pipeline_id` to a `Signal` at the boundary and
+//! held in a `PerSignal` structure (today logs + the skeletal traces proof). A
+//! further signal plugs in by adding a `Pipeline`, not by editing the shell.
 //!
 //! Routing:
 //! - writer events → `pipelines[event.file_id.pipeline_id]` (after the global
@@ -37,10 +37,9 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use bridge::config::{LifecycleConfig, StorageConfig};
-use bridge::signals::{LOGS_PIPELINE_ID, TRACES_PIPELINE_ID};
+use bridge::signals::Signal;
 use bridge::{LedgerRequest, LedgerResponse};
 use ferryboat::Connection;
-use file_registry::FileId;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
@@ -62,11 +61,37 @@ const CHUNK_CACHE_BYTES: u64 = 256 * 1024 * 1024;
 /// rest of upload governance if tuning proves necessary.
 const UPLOAD_CONCURRENCY: usize = 8;
 
-// The signal axes come from the single source of truth in `bridge::signals`
-// (shared with the ingestor's WAL stamping). `LOGS_PIPELINE_ID` MUST equal the
-// `FileId` default pipeline (the WAL producer stamps it for logs) — pinned here,
-// where both constants are visible, since `bridge` does not depend on `file-registry`.
-const _: () = assert!(LOGS_PIPELINE_ID == FileId::DEFAULT_PIPELINE);
+/// A value held once per signal. The signal axis is a closed enum, so a fixed
+/// pair (not a `HashMap<u16, _>`) is the total, exhaustive container: every signal
+/// is always present and `get`/`get_mut` cannot miss. The only place an out-of-set
+/// id can appear is decoding a raw `pipeline_id` off the wire/disk, which is a
+/// `Signal::try_from` at that boundary — after which routing is total.
+struct PerSignal<T> {
+    logs: T,
+    traces: T,
+}
+
+impl<T> PerSignal<T> {
+    fn get(&self, signal: Signal) -> &T {
+        match signal {
+            Signal::Logs => &self.logs,
+            Signal::Traces => &self.traces,
+        }
+    }
+
+    fn get_mut(&mut self, signal: Signal) -> &mut T {
+        match signal {
+            Signal::Logs => &mut self.logs,
+            Signal::Traces => &mut self.traces,
+        }
+    }
+
+    /// Both values, logs first. Used for the per-pipeline declaration scan and the
+    /// function-name dispatch lookup.
+    fn iter(&self) -> impl Iterator<Item = &T> {
+        [&self.logs, &self.traces].into_iter()
+    }
+}
 
 pub struct Ledger {
     supervisor: Connection<LedgerResponse, LedgerRequest>,
@@ -93,9 +118,9 @@ pub struct Ledger {
     chunk_cache: Arc<ChunkCache>,
     /// Per-signal frame-sequence gap-check. The single writer process feeds every
     /// signal over one connection, but assigns a separate monotonic `frame_seq`
-    /// per `pipeline_id`, so the next-expected seq is tracked per signal — a gap
-    /// is then a real lost event for that signal, not inter-signal interleaving.
-    expected_frame_seq: HashMap<u16, u64>,
+    /// per signal, so the next-expected seq is tracked per signal — a gap is then a
+    /// real lost event for that signal, not inter-signal interleaving.
+    expected_frame_seq: PerSignal<u64>,
     pub(crate) cancel: CancellationToken,
 
     /// Sender side of the outbound funnel. Spawned function-handler
@@ -109,15 +134,15 @@ pub struct Ledger {
     /// `LedgerResponse::Result`.
     transactions: HashMap<String, CancellationToken>,
 
-    /// Per-signal pipelines, keyed by `pipeline_id`. Today only logs.
-    pipelines: HashMap<u16, Pipeline>,
-    /// Receiver of the merged, pid-tagged per-pipeline worker responses
+    /// The pipelines, one per signal (logs + traces).
+    pipelines: PerSignal<Pipeline>,
+    /// Receiver of the merged, signal-tagged per-pipeline worker responses
     /// (indexer + catalog builder of every pipeline).
-    pipeline_rx: mpsc::UnboundedReceiver<(u16, PipelineResp)>,
+    pipeline_rx: mpsc::UnboundedReceiver<(Signal, PipelineResp)>,
     /// Retained sender clone of the merged channel. Kept so the channel never
     /// closes while the shell lives (worker death is signaled explicitly via
     /// `PipelineResp::WorkerGone`), and handed to each new pipeline's forwarders.
-    _pipeline_tx: mpsc::UnboundedSender<(u16, PipelineResp)>,
+    _pipeline_tx: mpsc::UnboundedSender<(Signal, PipelineResp)>,
 }
 
 impl Ledger {
@@ -138,7 +163,7 @@ impl Ledger {
         writer_socket_path: &str,
         lifecycle: &LifecycleConfig,
         // PROOF SCAFFOLD (traces-proof SOW): the skeletal traces pipeline's
-        // lifecycle config, derived by `PluginConfig::lifecycle_for("traces")`
+        // lifecycle config, derived by `PluginConfig::lifecycle_for(Signal::Traces)`
         // (its own `{base}/traces/...` dirs). The N-signal generalization (a signal
         // list instead of two explicit args) is a real-traces-SOW finding,
         // deliberately not done for the proof.
@@ -230,8 +255,7 @@ impl Ledger {
         // (using the shared cleaner/uploader/storage). Adding a second signal is
         // another `build_*_pipeline` call here.
         let logs = pipeline::build_logs_pipeline(
-            LOGS_PIPELINE_ID,
-            crate::LOGS_SIGNAL,
+            Signal::Logs,
             lifecycle,
             &cancel,
             &mut cleaner,
@@ -249,8 +273,7 @@ impl Ledger {
         // handler. This is the whole point of the proof — a second signal plugs
         // in with another `build_*_pipeline` call, no shell edits.
         let traces = traces_pipeline::build_traces_pipeline(
-            TRACES_PIPELINE_ID,
-            crate::TRACES_SIGNAL,
+            Signal::Traces,
             traces_lifecycle,
             &cancel,
             &mut cleaner,
@@ -260,34 +283,26 @@ impl Ledger {
         )
         .await?;
 
-        // All pipelines (logs + the skeletal traces proof). Both routing keys MUST be unique:
-        // `pipeline_id` keys the `pipelines` map (writer-event + worker-response
-        // routing) and the function name is the call-dispatch key
-        // (`rpc::dispatch`). A duplicate of either would silently route to
-        // whichever entry the map/scan yields first, so fail loudly at startup
-        // — these are hardcoded by us, so a clash is a programming error.
-        let built = vec![logs, traces];
-        {
-            let mut seen_ids = std::collections::HashSet::new();
-            let mut seen_names = std::collections::HashSet::new();
-            for p in &built {
-                assert!(
-                    seen_ids.insert(p.pipeline_id()),
-                    "duplicate pipeline_id {}",
-                    p.pipeline_id(),
-                );
-                assert!(
-                    seen_names.insert(p.function_name().to_owned()),
-                    "duplicate pipeline function name {:?}",
-                    p.function_name(),
-                );
-            }
-        }
+        // The pipelines, one per signal. `pipeline_id` is fixed and distinct per
+        // `Signal` (so the old duplicate-id check is structurally impossible), but
+        // the function name is the call-dispatch key (`rpc::dispatch`) and is set
+        // independently per handler — a clash there would route to whichever the
+        // scan yields first, so fail loudly at startup. Hardcoded by us, so a
+        // clash is a programming error.
+        let pipelines = PerSignal {
+            logs,
+            traces,
+        };
+        assert!(
+            pipelines.logs.function_name() != pipelines.traces.function_name(),
+            "duplicate pipeline function name {:?}",
+            pipelines.logs.function_name(),
+        );
 
         // Signal Ready (with every pipeline's declaration) between pipeline
         // construction and the ingestor accept; see the method docstring for the
         // full ordering rationale.
-        let declarations: Vec<_> = built.iter().map(|p| p.declaration().clone()).collect();
+        let declarations: Vec<_> = pipelines.iter().map(|p| p.declaration().clone()).collect();
         supervisor
             .send(LedgerResponse::Ready { declarations })
             .await
@@ -303,9 +318,6 @@ impl Ledger {
         let mut retry_timer = tokio::time::interval(std::time::Duration::from_secs(30));
         retry_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
-        let pipelines: HashMap<u16, Pipeline> =
-            built.into_iter().map(|p| (p.pipeline_id(), p)).collect();
-
         Ok(Self {
             supervisor,
             ingestor,
@@ -314,7 +326,9 @@ impl Ledger {
             upload_retry: file_lifecycle::upload_retry::UploadRetry::default(),
             retry_timer,
             chunk_cache,
-            expected_frame_seq: HashMap::new(),
+            // Each signal's frame_seq stream starts at 1 (the ingestor's first
+            // assigned frame_seq), so the gap-check's next-expected seeds to 1.
+            expected_frame_seq: PerSignal { logs: 1, traces: 1 },
             cancel,
             outbound_tx,
             outbound_rx,
@@ -337,9 +351,9 @@ impl Ledger {
                     |e| tracing::error!("writer-socket recv failed: {e}"),
                 )?),
                 // Merged per-pipeline worker responses (indexer + catalog
-                // builder of every pipeline), tagged with the owning pipeline id.
+                // builder of every pipeline), tagged with the owning `Signal`.
                 resp = self.pipeline_rx.recv() => match resp {
-                    Some((pid, r)) => LedgerEvent::PipelineResp(pid, r),
+                    Some((signal, r)) => LedgerEvent::PipelineResp(signal, r),
                     None => {
                         // The shell retains a sender clone, so this only fires at
                         // teardown. Treat as a clean exit.
@@ -377,16 +391,15 @@ impl Ledger {
 
             match event {
                 LedgerEvent::WalMsg(msg) => self.handle_ingestor_msg(msg).await,
-                LedgerEvent::PipelineResp(pid, resp) => match resp {
-                    PipelineResp::Indexer(r) => self.handle_indexer_resp(pid, r).await,
+                LedgerEvent::PipelineResp(signal, resp) => match resp {
+                    PipelineResp::Indexer(r) => self.handle_indexer_resp(signal, r).await,
                     PipelineResp::CatalogBuilder(r) => {
-                        self.handle_catalog_builder_resp(pid, r).await
+                        self.handle_catalog_builder_resp(signal, r).await
                     }
                     PipelineResp::WorkerGone { kind } => {
-                        let signal = self.pipelines.get(&pid).map(|p| p.signal()).unwrap_or("?");
                         tracing::error!(
-                            pipeline_id = pid,
-                            signal,
+                            signal = signal.segment(),
+                            pipeline_id = signal.pipeline_id(),
                             "{kind} worker channel closed unexpectedly, exiting event loop"
                         );
                         return Ok(());
@@ -410,5 +423,24 @@ impl Ledger {
                 LedgerEvent::RetryTick => self.handle_retry_tick().await,
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `PerSignal::iter()` backs the declaration scan and function-name dispatch,
+    /// so pin that it yields every signal (in the fixed logs→traces order) and
+    /// that `get`/`get_mut` address the matching slot. Unlike the `get`/`get_mut`
+    /// matches, `iter()`'s hand-written array is not compiler-checked against the
+    /// `Signal` variant set, so this test is the guard if a variant is added.
+    #[test]
+    fn per_signal_get_and_iter_cover_every_signal() {
+        let mut ps = PerSignal { logs: 1u8, traces: 2u8 };
+        assert_eq!(*ps.get(Signal::Logs), 1);
+        assert_eq!(*ps.get(Signal::Traces), 2);
+        *ps.get_mut(Signal::Traces) = 9;
+        assert_eq!(ps.iter().copied().collect::<Vec<_>>(), vec![1, 9]);
     }
 }

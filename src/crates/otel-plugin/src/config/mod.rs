@@ -398,7 +398,7 @@ traces:
     fn stock_yaml_logs_tuning_parsed() {
         let config = stock_config();
         // Dirs are derived from base_dir, not configured per signal.
-        let logs = config.lifecycle_for(bridge::signals::LOGS_SIGNAL);
+        let logs = config.lifecycle_for(bridge::signals::Signal::Logs);
         assert_eq!(
             logs.wal.dir,
             std::path::Path::new("/var/log/netdata/otel/v1/logs/wal")
@@ -428,7 +428,7 @@ traces:
     #[test]
     fn stock_yaml_traces_tuning_parsed() {
         let config = stock_config();
-        let traces = config.lifecycle_for(bridge::signals::TRACES_SIGNAL);
+        let traces = config.lifecycle_for(bridge::signals::Signal::Traces);
         assert_eq!(
             traces.wal.dir,
             std::path::Path::new("/var/log/netdata/otel/v1/traces/wal")
@@ -532,7 +532,7 @@ logs:
         apply_overrides(&mut config, &o);
         assert_eq!(config.base_dir, std::path::Path::new("/data/otel"));
         // Derived dirs follow the new base.
-        let logs = config.lifecycle_for(bridge::signals::LOGS_SIGNAL);
+        let logs = config.lifecycle_for(bridge::signals::Signal::Logs);
         assert_eq!(logs.wal.dir, std::path::Path::new("/data/otel/logs/wal"));
     }
 
@@ -641,8 +641,8 @@ storage:
         assert_eq!(config.storage.read_cache_max_size, ByteSize::gib(2));
         // Storage is global on PluginConfig (asserted above), not carried in the
         // per-signal lifecycle. Read-cache dir, by contrast, is derived per signal.
-        let logs = config.lifecycle_for(bridge::signals::LOGS_SIGNAL);
-        let traces = config.lifecycle_for(bridge::signals::TRACES_SIGNAL);
+        let logs = config.lifecycle_for(bridge::signals::Signal::Logs);
+        let traces = config.lifecycle_for(bridge::signals::Signal::Traces);
         assert_eq!(
             logs.read_cache_dir,
             std::path::Path::new("/var/log/netdata/otel/v1/logs/remote-read")

@@ -40,7 +40,7 @@ has two front doors over one shared code path (see below).
 - Two directories are needed: the WAL dir and the SFST/index dir. `otel.yaml` no
   longer configures per-signal dirs — it sets one `base_dir`, and this logs query
   tool derives `{base_dir}/logs/wal` and `{base_dir}/logs/index` (matching
-  `PluginConfig::lifecycle_for("logs")`).
+  `PluginConfig::lifecycle_for(Signal::Logs)`).
 - Per-dir precedence, resolved independently for each: an explicit
   `--wal-dir`/`--sfst-dir` flag wins, else the dir derived from `--config` (user
   `otel.yaml`) `base_dir`, else from `--stock-config` (stock `otel.yaml`)
