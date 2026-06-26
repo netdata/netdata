@@ -1206,10 +1206,20 @@ int rrdeng_init(
     ctx->atomic.metrics = 0;
     ctx->atomic.samples = 0;
 
-    if (rrdeng_dbengine_spawn(ctx) && !init_rrd_files(ctx)) {
-        // success - we run this ctx too
-        rrdeng_populate_mrg(ctx);
-        return 0;
+    nd_win_trace("rrdeng_init: tier=%d rrdeng_dbengine_spawn...", (int)tier);
+    bool spawn_ok = rrdeng_dbengine_spawn(ctx);
+    nd_win_trace("rrdeng_init: tier=%d rrdeng_dbengine_spawn done, ok=%d", (int)tier, (int)spawn_ok);
+    if (spawn_ok) {
+        nd_win_trace("rrdeng_init: tier=%d init_rrd_files('%s')...", (int)tier, dbfiles_path);
+        int files_ret = init_rrd_files(ctx);
+        nd_win_trace("rrdeng_init: tier=%d init_rrd_files done, ret=%d", (int)tier, files_ret);
+        if (!files_ret) {
+            // success - we run this ctx too
+            nd_win_trace("rrdeng_init: tier=%d rrdeng_populate_mrg...", (int)tier);
+            rrdeng_populate_mrg(ctx);
+            nd_win_trace("rrdeng_init: tier=%d rrdeng_populate_mrg enqueued", (int)tier);
+            return 0;
+        }
     }
 
     if (unittest_running) {
