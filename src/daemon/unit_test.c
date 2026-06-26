@@ -1615,9 +1615,57 @@ static int test_rrdmetric_algorithm_follows_rrddim(void) {
     return rc;
 }
 
+#if defined(OS_WINDOWS)
+static int check_nd_env_normalize_dir_path(void) {
+    struct {
+        const char *input;
+        const char *expected;
+    } cases[] = {
+        // POSIX form
+        { "/c/Program Files/Netdata", "C:/Program Files/Netdata" },
+        { "/c/netdata/var/cache",     "C:/netdata/var/cache"     },
+        { "/c",                       "C:/"                      },
+        // Windows-native with backslashes
+        { "C:\\Program Files\\Netdata", "C:/Program Files/Netdata" },
+        { "C:\\netdata\\var\\cache",    "C:/netdata/var/cache"     },
+        { "C:\\",                       "C:/"                      },
+        { "C:",                         "C:/"                      },
+        // Windows-native with forward slashes (already normalised)
+        { "C:/Program Files/Netdata",  "C:/Program Files/Netdata" },
+        { "C:/netdata/var/cache",      "C:/netdata/var/cache"     },
+        { "C:/",                       "C:/"                      },
+        // Lowercase drive letter must be upper-cased
+        { "c:\\windows\\system32",     "C:/windows/system32"      },
+        { "/d/data",                   "D:/data"                  },
+        // UNC or unrecognised form: copied verbatim
+        { "//server/share",            "//server/share"           },
+        { NULL, NULL }
+    };
+
+    int rc = 0;
+    for (int i = 0; cases[i].input; i++) {
+        char out[FILENAME_MAX + 1];
+        nd_env_normalize_dir_path(cases[i].input, out, sizeof(out));
+        if (strcmp(out, cases[i].expected) != 0) {
+            fprintf(stderr,
+                    "nd_env_normalize_dir_path('%s'): expected '%s', got '%s'\n",
+                    cases[i].input, cases[i].expected, out);
+            rc = 1;
+        }
+    }
+    return rc;
+}
+#endif
+
 int run_all_mockup_tests(void)
 {
     fprintf(stderr, "%s() running...\n", __FUNCTION__ );
+
+#if defined(OS_WINDOWS)
+    if (check_nd_env_normalize_dir_path())
+        return 1;
+#endif
+
     if(check_strdupz_path_subpath())
         return 1;
 
