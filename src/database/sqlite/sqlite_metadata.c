@@ -594,8 +594,14 @@ done:
 
 static void recover_database(const char *sqlite_database, const char *new_sqlite_database)
 {
+    // UCRT64 SQLite and rename() both require native Windows paths.
+    char native_src[FILENAME_MAX + 1];
+    char native_dst[FILENAME_MAX + 1];
+    os_translate_path(native_src, sqlite_database, sizeof(native_src));
+    os_translate_path(native_dst, new_sqlite_database, sizeof(native_dst));
+
     sqlite3 *database;
-    int rc = sqlite3_open(sqlite_database, &database);
+    int rc = sqlite3_open(native_src, &database);
     if (rc != SQLITE_OK)
         return;
 
@@ -605,7 +611,7 @@ static void recover_database(const char *sqlite_database, const char *new_sqlite
     // This will remove the -shm and -wal files when we close the database
     (void)db_execute(database, "select count(*) from sqlite_master limit 0", NULL);
 
-    sqlite3_recover *recover = sqlite3_recover_init(database, "main", new_sqlite_database);
+    sqlite3_recover *recover = sqlite3_recover_init(database, "main", native_dst);
     if (recover) {
 
         rc = sqlite3_recover_run(recover);
@@ -620,7 +626,7 @@ static void recover_database(const char *sqlite_database, const char *new_sqlite
         (void) sqlite3_close_v2(database);
 
         if (rc == SQLITE_OK) {
-            rc = rename(new_sqlite_database, sqlite_database);
+            rc = rename(native_dst, native_src);
             if (rc == 0) {
                 netdata_log_info("Renamed %s", new_sqlite_database);
                 netdata_log_info("     to %s", sqlite_database);
@@ -740,7 +746,10 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
     else
         strncpyz(sqlite_database, ":memory:", sizeof(sqlite_database) - 1);
 
-    rc = sqlite3_open(sqlite_database, &db_meta);
+    // UCRT64 SQLite uses Win32 CreateFile, which requires native Windows paths.
+    char native_meta_db[FILENAME_MAX + 1];
+    os_translate_path(native_meta_db, sqlite_database, sizeof(native_meta_db));
+    rc = sqlite3_open(native_meta_db, &db_meta);
     if (rc != SQLITE_OK) {
         error_report("Failed to initialize database at %s, due to \"%s\"", sqlite_database, sqlite3_errstr(rc));
         char *error_str = get_database_extented_error(db_meta, 0, "meta_open");
@@ -1859,13 +1868,16 @@ static void restore_host_context(void *arg)
             db_context_thread = hclt->db_context_thread;
         } else {
             char sqlite_database[FILENAME_MAX + 1];
+            char native_db[FILENAME_MAX + 1];
             snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/netdata-meta.db", netdata_configured_cache_dir);
-            int rc = sqlite3_open_v2(sqlite_database, &db_meta_thread, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
+            os_translate_path(native_db, sqlite_database, sizeof(native_db));
+            int rc = sqlite3_open_v2(native_db, &db_meta_thread, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
             if (rc != SQLITE_OK)
                 sql_close_thread_db_safe(&db_meta_thread);
 
             snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/context-meta.db", netdata_configured_cache_dir);
-            rc = sqlite3_open_v2(sqlite_database, &db_context_thread, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
+            os_translate_path(native_db, sqlite_database, sizeof(native_db));
+            rc = sqlite3_open_v2(native_db, &db_context_thread, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
             if (rc != SQLITE_OK)
                 sql_close_thread_db_safe(&db_context_thread);
 
@@ -2080,7 +2092,9 @@ size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, 
 
     char sqlite_database[FILENAME_MAX + 1];
     snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/netdata-meta.db", netdata_configured_cache_dir);
-    int rc = sqlite3_open_v2(sqlite_database, &local_meta_db, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
+    char native_meta_path[FILENAME_MAX + 1];
+    os_translate_path(native_meta_path, sqlite_database, sizeof(native_meta_path));
+    int rc = sqlite3_open_v2(native_meta_path, &local_meta_db, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
     if (rc != SQLITE_OK) {
         sqlite3_close_v2(local_meta_db);
         local_meta_db = NULL;
