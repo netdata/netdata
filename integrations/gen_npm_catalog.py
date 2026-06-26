@@ -71,22 +71,31 @@ LICENSE_RE = re.compile(r'licens', re.IGNORECASE)
 
 # Vendors whose logo is published at netdata.cloud/img/<icon>. Anything not
 # listed falls back to the generic SNMP icon. Keep this conservative: a wrong
-# icon name renders a broken image, the SNMP fallback never does.
+# icon name renders a broken image, the SNMP fallback never does. Every entry
+# is verified to exist on the CDN, and .png vs .svg matters (only some logos
+# are vector). Keys are a short device-vendor name ('juniper') or a normalized
+# IANA enterprise slug ('hewlettpackard'); icon_for() also matches the longest
+# brand prefix so trap slugs like 'junipernetworksinc' resolve to the brand.
 VENDOR_ICONS = {
     'cisco': 'cisco.svg',
-    'juniper': 'juniper.svg',
-    'arista': 'arista.svg',
+    'juniper': 'juniper.png',
     'huawei': 'huawei.svg',
     'fortinet': 'fortinet.svg',
-    'mikrotik': 'mikrotik.svg',
-    'paloaltonetworks': 'paloalto.svg',
+    'mikrotik': 'mikrotik.png',
+    'paloalto': 'paloalto.png',
+    'paloaltonetworks': 'paloalto.png',
     'netapp': 'netapp.svg',
     'vmware': 'vmware.svg',
     'nvidia': 'nvidia.svg',
     'dell': 'dell.svg',
     'hp': 'hp.svg',
-    'hpe': 'hpe.svg',
+    'hewlettpackard': 'hp.svg',
+    'hpe': 'hpe.png',
+    'hewlettpackardenterprise': 'hpe.png',
     'ibm': 'ibm.svg',
+    # 'arista': pending a usable logo on the CDN (only white-on-transparent
+    # variants exist today); falls back to the SNMP icon until netdata/website
+    # ships a visible arista.png.
 }
 FALLBACK_ICON = 'SNMP.png'
 
@@ -173,7 +182,23 @@ def collect_vendors(profiles):
 
 
 def icon_for(vendor_key):
-    return VENDOR_ICONS.get(re.sub(r'[^a-z0-9]', '', vendor_key), FALLBACK_ICON)
+    """Resolve a brand icon from a vendor name or IANA enterprise slug.
+
+    Device profiles pass a short vendor name ('juniper'); the trap catalogue
+    passes the IANA slug ('juniper-networks-inc', 'ibm-eserver-x'). Match exact
+    first, then the longest brand prefix. Prefix matching is restricted to keys
+    >= 3 chars: that excludes only the 2-char 'hp' key (too ambiguous to prefix
+    on; HP is still resolved by its exact entry and the 'hewlettpackard' alias),
+    while distinctive 3-char brands like 'ibm'/'hpe' still brand their slugs."""
+    k = re.sub(r'[^a-z0-9]', '', (vendor_key or '').lower())
+    if not k:
+        return FALLBACK_ICON
+    if k in VENDOR_ICONS:
+        return VENDOR_ICONS[k]
+    for token in sorted((t for t in VENDOR_ICONS if len(t) >= 3), key=len, reverse=True):
+        if k.startswith(token):
+            return VENDOR_ICONS[token]
+    return FALLBACK_ICON
 
 
 def humanize_vendor(slug):

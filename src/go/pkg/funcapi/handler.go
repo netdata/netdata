@@ -8,8 +8,8 @@ import (
 	"time"
 )
 
-// MethodHandler defines the interface for handling method requests.
-// Methods are defined in Creator.Methods(); this interface handles the requests.
+// MethodHandler defines the interface for handling Function method requests.
+// Functions are declared by collector creators; this interface handles requests.
 //
 // Example implementation:
 //
@@ -26,7 +26,7 @@ import (
 //	}
 type MethodHandler interface {
 	// MethodParams returns dynamic params for a method.
-	// Return nil to use static params from MethodConfig.RequiredParams.
+	// Return nil to use static params from FunctionConfig.RequiredParams.
 	// The context should be used for timeout/cancellation of database queries.
 	MethodParams(ctx context.Context, method string) ([]ParamConfig, error)
 

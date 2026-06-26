@@ -20,19 +20,18 @@ func TestSNMPTopologyCreatorOwnsTopologyFunction(t *testing.T) {
 	require.NotNil(t, creator.CreateV2)
 	require.Equal(t, collectorapi.InstancePolicySingle, creator.InstancePolicy)
 	require.False(t, creator.FunctionOnly)
-	require.NotNil(t, creator.Methods)
+	require.NotNil(t, creator.SharedFunctions)
 	require.NotNil(t, creator.MethodHandler)
 	require.Implements(t, (*collectorapi.CollectorV2Runner)(nil), creator.CreateV2())
 
-	methods := creator.Methods()
+	methods := creator.SharedFunctions()
 	require.Len(t, methods, 1)
 	require.Equal(t, snmptopologyfunc.MethodID, methods[0].ID)
 	require.Equal(t, snmptopologyfunc.FunctionName, methods[0].FunctionName)
-	require.True(t, methods[0].AgentWide)
-	require.NotNil(t, methods[0].Available)
-	require.False(t, methods[0].Available())
+	require.Nil(t, methods[0].Available)
 
 	coll := newTestSNMPTopologyCollector()
+	require.Implements(t, (*collectorapi.FunctionAvailability)(nil), coll)
 	handler := creator.MethodHandler(&topologyRuntimeJobForTest{collector: coll})
 	require.Implements(t, (*funcapi.MethodHandler)(nil), handler)
 	require.Nil(t, creator.MethodHandler(nil))
@@ -68,49 +67,43 @@ func TestSNMPTopologyCreatorRequiresSharedDependencies(t *testing.T) {
 
 func TestSNMPTopologyFunctionAvailabilityBecomesReadyAfterRenderableObservation(t *testing.T) {
 	creator := newCreator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle())
-	methods := creator.Methods()
+	methods := creator.SharedFunctions()
 	require.Len(t, methods, 1)
-	require.NotNil(t, methods[0].Available)
-	require.False(t, methods[0].Available())
+	require.Nil(t, methods[0].Available)
 
 	coll, ok := creator.CreateV2().(*Collector)
 	require.True(t, ok)
+	require.False(t, coll.FunctionAvailable(snmptopologyfunc.MethodID))
 	cache := newTopologyCache()
 	seedPublishedEndpointSnapshot(cache)
 	coll.topologyRegistry.register(cache)
 
 	coll.updateFunctionAvailability()
 
-	require.True(t, methods[0].Available())
-	require.True(t, creator.Methods()[0].Available())
+	require.True(t, coll.FunctionAvailable(snmptopologyfunc.MethodID))
 }
 
-func TestSNMPTopologyFunctionAvailabilityResetsWhenReplacementCollectorRuns(t *testing.T) {
+func TestSNMPTopologyFunctionAvailabilityResetsWhenCollectorRuns(t *testing.T) {
 	creator := newCreator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle())
-	methods := creator.Methods()
+	methods := creator.SharedFunctions()
 	require.Len(t, methods, 1)
-	require.NotNil(t, methods[0].Available)
+	require.Nil(t, methods[0].Available)
 
 	coll, ok := creator.CreateV2().(*Collector)
 	require.True(t, ok)
-	cache := newTopologyCache()
-	seedPublishedEndpointSnapshot(cache)
-	coll.topologyRegistry.register(cache)
-	coll.updateFunctionAvailability()
-	require.True(t, methods[0].Available())
+	coll.functionAvailability.Store(true)
+	require.True(t, coll.FunctionAvailable(snmptopologyfunc.MethodID))
 
-	replacement, ok := creator.CreateV2().(*Collector)
-	require.True(t, ok)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- replacement.Run(ctx)
+		errCh <- coll.Run(ctx)
 	}()
 
 	require.Eventually(t, func() bool {
-		return !methods[0].Available()
+		return !coll.FunctionAvailable(snmptopologyfunc.MethodID)
 	}, time.Second, 10*time.Millisecond)
 
 	cancel()
@@ -118,7 +111,7 @@ func TestSNMPTopologyFunctionAvailabilityResetsWhenReplacementCollectorRuns(t *t
 	case err := <-errCh:
 		require.NoError(t, err)
 	case <-time.After(time.Second):
-		t.Fatal("replacement collector did not stop")
+		t.Fatal("collector did not stop")
 	}
 }
 

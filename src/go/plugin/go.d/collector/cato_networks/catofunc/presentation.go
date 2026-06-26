@@ -7,8 +7,8 @@ import (
 	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 )
 
-func topologyMethodConfig(updateEvery int) funcapi.MethodConfig {
-	return funcapi.MethodConfig{
+func topologyFunctionConfig(updateEvery int) funcapi.FunctionConfig {
+	return funcapi.FunctionConfig{
 		ID:           TopologyMethodID,
 		Aliases:      []string{TopologyMethodID},
 		Name:         "Topology (Cato Networks)",

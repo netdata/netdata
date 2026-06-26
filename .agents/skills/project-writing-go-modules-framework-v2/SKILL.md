@@ -67,13 +67,20 @@ source files for evidence.
 - If Functions exist, isolate them in a `<name>func/` subpackage with a narrow
   `Deps` interface declared there. The Function package MUST NOT import the
   collector package or hold `*Collector`.
-- If a single-instance collector exposes `AgentWide` module `Methods`, its
-  `MethodHandler(job)` receives the running canonical runtime job. Use
-  `job.Collector()` to bind the Function handler to collector-owned state; do
-  not add a `__job` parameter or introduce a package-global registry to bridge
-  Function dispatch. During method execution, when the singleton job is not
-  running, the framework returns an unavailable response before calling
-  `MethodHandler`.
+- If a single-instance collector exposes `Creator.SharedFunctions`, its
+  `MethodHandler(job)` receives the running canonical runtime job and the public
+  Function shape has no `__job` parameter. Use `job.Collector()` to bind the
+  Function handler to collector-owned state; do not add a package-global
+  registry to bridge Function dispatch. The Function is still job-backed:
+  publication waits for the canonical job to be running and available, and
+  dispatch rejects unavailable jobs before calling `MethodHandler`.
+- Shared and instance job-backed Functions are published only while their
+  backing running jobs are available. By default, every running job is available
+  for every shared or instance Function. If a collector needs runtime readiness
+  gating per job-backed Function, implement `collectorapi.FunctionAvailability`;
+  keep `FunctionAvailable(functionID)` cheap and non-blocking.
+  `funcapi.FunctionConfig.Available` applies to `AgentFunctions`, not
+  job-backed `SharedFunctions` or `InstanceFunctions`.
 - `collectorapi.Creator.InstancePolicy` defaults to
   `InstancePolicyPerJob`. Use `InstancePolicySingle` only for collectors that
   are intentionally one canonical job per agent. Single-instance configs MUST

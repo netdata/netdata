@@ -648,7 +648,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.device-metrics
-        icon_filename: arista.svg
+        icon_filename: SNMP.png
       keywords:
         - arista
         - switch
@@ -696,7 +696,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.device-metrics
-        icon_filename: arista.svg
+        icon_filename: SNMP.png
       keywords:
         - arista
         - snmp
@@ -5709,7 +5709,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.device-metrics
-        icon_filename: juniper.svg
+        icon_filename: juniper.png
       keywords:
         - juniper
         - ex
@@ -5763,7 +5763,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.device-metrics
-        icon_filename: juniper.svg
+        icon_filename: juniper.png
       keywords:
         - juniper
         - mx
@@ -5815,7 +5815,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.device-metrics
-        icon_filename: juniper.svg
+        icon_filename: juniper.png
       keywords:
         - juniper
         - pulse
@@ -5865,7 +5865,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.device-metrics
-        icon_filename: juniper.svg
+        icon_filename: juniper.png
       keywords:
         - juniper
         - qfx
@@ -5916,7 +5916,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.device-metrics
-        icon_filename: juniper.svg
+        icon_filename: juniper.png
       keywords:
         - juniper
         - srx
@@ -5968,7 +5968,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.device-metrics
-        icon_filename: juniper.svg
+        icon_filename: juniper.png
       keywords:
         - juniper
         - snmp
@@ -6255,7 +6255,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.device-metrics
-        icon_filename: mikrotik.svg
+        icon_filename: mikrotik.png
       keywords:
         - mikrotik
         - router
@@ -7028,7 +7028,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.device-metrics
-        icon_filename: paloalto.svg
+        icon_filename: paloalto.png
       keywords:
         - palo
         - alto
@@ -7077,7 +7077,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.device-metrics
-        icon_filename: paloalto.svg
+        icon_filename: paloalto.png
       keywords:
         - palo
         - alto
@@ -8692,7 +8692,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.bgp
-        icon_filename: arista.svg
+        icon_filename: SNMP.png
       keywords:
         - arista
         - bgp
@@ -8902,7 +8902,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.bgp
-        icon_filename: juniper.svg
+        icon_filename: juniper.png
       keywords:
         - juniper
         - bgp
@@ -9242,7 +9242,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.licensing
-        icon_filename: mikrotik.svg
+        icon_filename: mikrotik.png
       keywords:
         - mikrotik
         - license
@@ -17577,7 +17577,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.traps
-        icon_filename: SNMP.png
+        icon_filename: cisco.svg
       keywords:
         - ciscosystems
         - snmp
@@ -20472,7 +20472,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.traps
-        icon_filename: SNMP.png
+        icon_filename: dell.svg
       keywords:
         - dell-inc
         - snmp
@@ -24441,7 +24441,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.traps
-        icon_filename: SNMP.png
+        icon_filename: fortinet.svg
       keywords:
         - fortinet-inc
         - snmp
@@ -25814,7 +25814,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.traps
-        icon_filename: SNMP.png
+        icon_filename: hp.svg
       keywords:
         - hewlett-packard
         - snmp
@@ -25864,7 +25864,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.traps
-        icon_filename: SNMP.png
+        icon_filename: hpe.png
       keywords:
         - hewlett-packard-enterprise
         - snmp
@@ -25962,7 +25962,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.traps
-        icon_filename: SNMP.png
+        icon_filename: huawei.svg
       keywords:
         - huawei-symantec-technologies-co-ltd
         - snmp
@@ -26011,7 +26011,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.traps
-        icon_filename: SNMP.png
+        icon_filename: huawei.svg
       keywords:
         - huawei-technology-co-ltd
         - snmp
@@ -26210,7 +26210,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.traps
-        icon_filename: SNMP.png
+        icon_filename: ibm.svg
       keywords:
         - ibm-eserver-x
         - snmp
@@ -26259,7 +26259,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.traps
-        icon_filename: SNMP.png
+        icon_filename: ibm.svg
       keywords:
         - ibm-https-w3-ibm-com-standards
         - snmp
@@ -28219,7 +28219,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.traps
-        icon_filename: SNMP.png
+        icon_filename: juniper.png
       keywords:
         - juniper-networks-funk-software
         - snmp
@@ -28268,7 +28268,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.traps
-        icon_filename: SNMP.png
+        icon_filename: juniper.png
       keywords:
         - juniper-networks-inc
         - snmp
@@ -28317,7 +28317,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.traps
-        icon_filename: SNMP.png
+        icon_filename: juniper.png
       keywords:
         - juniper-networks-unisphere
         - snmp
@@ -31453,7 +31453,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.traps
-        icon_filename: mikrotik.svg
+        icon_filename: mikrotik.png
       keywords:
         - mikrotik
         - snmp
@@ -36060,7 +36060,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.traps
-        icon_filename: paloalto.svg
+        icon_filename: paloalto.png
       keywords:
         - palo-alto-networks
         - snmp
@@ -47233,7 +47233,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.traps
-        icon_filename: SNMP.png
+        icon_filename: vmware.svg
       keywords:
         - vmware-inc
         - snmp

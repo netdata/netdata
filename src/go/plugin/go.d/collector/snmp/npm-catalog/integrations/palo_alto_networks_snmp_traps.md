@@ -13,7 +13,7 @@ endmeta-->
 # Palo Alto Networks SNMP Traps
 
 
-<img src="https://netdata.cloud/img/paloalto.svg" width="150"/>
+<img src="https://netdata.cloud/img/paloalto.png" width="150"/>
 
 
 Plugin: go.d.plugin

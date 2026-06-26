@@ -24,10 +24,10 @@ func init() {
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 5,
 		},
-		Create:        func() collectorapi.CollectorV1 { return New() },
-		Config:        func() any { return &Config{} },
-		Methods:       couchbaseMethods,
-		MethodHandler: couchbaseFunctionHandler,
+		Create:          func() collectorapi.CollectorV1 { return New() },
+		Config:          func() any { return &Config{} },
+		SharedFunctions: couchbaseMethods,
+		MethodHandler:   couchbaseFunctionHandler,
 	})
 }
 

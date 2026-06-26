@@ -84,22 +84,22 @@ func TestManagerCreateCollectorJobV2Branching(t *testing.T) {
 			},
 			wantV2: true,
 		},
-		"prefer v2 when job methods are configured": {
+		"prefer v2 when instance functions are configured": {
 			creator: collectorapi.Creator{
 				Create: func() collectorapi.CollectorV1 { return &testV1Module{} },
 				CreateV2: func() collectorapi.CollectorV2 {
 					return &testV2Module{store: metrix.NewCollectorStore()}
 				},
-				JobMethods: func(_ collectorapi.RuntimeJob) []funcapi.MethodConfig { return nil },
+				InstanceFunctions: func(_ collectorapi.RuntimeJob) []funcapi.FunctionConfig { return nil },
 			},
 			wantV2: true,
 		},
-		"allow v2 only creator when job methods are configured": {
+		"allow v2 only creator when instance functions are configured": {
 			creator: collectorapi.Creator{
 				CreateV2: func() collectorapi.CollectorV2 {
 					return &testV2Module{store: metrix.NewCollectorStore()}
 				},
-				JobMethods: func(_ collectorapi.RuntimeJob) []funcapi.MethodConfig { return nil },
+				InstanceFunctions: func(_ collectorapi.RuntimeJob) []funcapi.FunctionConfig { return nil },
 			},
 			wantV2: true,
 		},
@@ -108,7 +108,7 @@ func TestManagerCreateCollectorJobV2Branching(t *testing.T) {
 				CreateV2: func() collectorapi.CollectorV2 {
 					return &testV2Module{store: nil}
 				},
-				JobMethods: func(_ collectorapi.RuntimeJob) []funcapi.MethodConfig { return nil },
+				InstanceFunctions: func(_ collectorapi.RuntimeJob) []funcapi.FunctionConfig { return nil },
 			},
 			functionOnly: true,
 			wantV2:       true,
@@ -145,9 +145,9 @@ func TestManagerCreateCollectorJobSingleInstancePolicyAllowsV2FunctionOnly(t *te
 	mgr := New(Config{PluginName: testPluginName})
 	mgr.modules = collectorapi.Registry{
 		"testmod": {
-			InstancePolicy: collectorapi.InstancePolicySingle,
-			CreateV2:       func() collectorapi.CollectorV2 { return mod },
-			JobMethods:     func(_ collectorapi.RuntimeJob) []funcapi.MethodConfig { return nil },
+			InstancePolicy:    collectorapi.InstancePolicySingle,
+			CreateV2:          func() collectorapi.CollectorV2 { return mod },
+			InstanceFunctions: func(_ collectorapi.RuntimeJob) []funcapi.FunctionConfig { return nil },
 		},
 	}
 

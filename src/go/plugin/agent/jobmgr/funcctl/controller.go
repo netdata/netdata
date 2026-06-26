@@ -43,6 +43,14 @@ type functionPublish struct {
 	opts    netdataapi.FunctionGlobalOpts
 }
 
+type desiredFunctionPublication struct {
+	name       string
+	owner      publishedFunctionOwner
+	moduleName string
+	jobName    string
+	method     funcapi.FunctionConfig
+}
+
 func New(opts Options) *Controller {
 	log := opts.Logger
 	if log == nil {
@@ -85,34 +93,58 @@ func (c *Controller) RegisterModules(modules collectorapi.Registry) {
 	plannedPublicNames := make(map[string]string)
 	for _, name := range names {
 		creator := modules[name]
-		if creator.Methods == nil && creator.JobMethods == nil {
+		if creator.SharedFunctions == nil && creator.AgentFunctions == nil && creator.InstanceFunctions == nil {
 			continue
 		}
-		methods := moduleMethods(creator)
-		if functionName, owner, collides := c.moduleMethodPublicNameCollision(name, methods, plannedPublicNames); collides {
+		functions := moduleFunctionDeclarations(creator)
+		if functionName, owner, collides := c.moduleMethodPublicNameCollision(name, functions.configs, plannedPublicNames); collides {
 			c.Errorf("skipping function registration for module '%s': public function name '%s' collides with %s", name, functionName, owner)
 			continue
 		}
-		c.registry.registerModuleWithMethods(name, creator, methods)
-		c.registerAvailableModuleMethods(name, methods, true)
+		c.registry.registerModuleWithDeclarations(name, creator, functions)
+		c.registerAvailableAgentFunctions(name, functions.configs)
 	}
 }
 
-func moduleMethods(creator collectorapi.Creator) []funcapi.MethodConfig {
-	if creator.Methods == nil {
+type moduleFunctionDecls struct {
+	configs []funcapi.FunctionConfig
+	kinds   map[string]moduleFunctionKind
+}
+
+func moduleFunctionDeclarations(creator collectorapi.Creator) moduleFunctionDecls {
+	shared := moduleSharedFunctions(creator)
+	agent := moduleAgentFunctions(creator)
+	configs := make([]funcapi.FunctionConfig, 0, len(shared)+len(agent))
+	configs = append(configs, shared...)
+	configs = append(configs, agent...)
+	return moduleFunctionDecls{
+		configs: configs,
+		kinds:   indexModuleFunctionKinds(shared, agent),
+	}
+}
+
+func moduleSharedFunctions(creator collectorapi.Creator) []funcapi.FunctionConfig {
+	if creator.SharedFunctions == nil {
 		return nil
 	}
-	return creator.Methods()
+	return creator.SharedFunctions()
 }
 
-func (c *Controller) moduleMethodPublicNameCollision(moduleName string, methods []funcapi.MethodConfig, planned map[string]string) (string, string, bool) {
+func moduleAgentFunctions(creator collectorapi.Creator) []funcapi.FunctionConfig {
+	if creator.AgentFunctions == nil {
+		return nil
+	}
+	return creator.AgentFunctions()
+}
+
+func (c *Controller) moduleMethodPublicNameCollision(moduleName string, methods []funcapi.FunctionConfig, planned map[string]string) (string, string, bool) {
 	modulePlanned := make(map[string]string)
 	for _, method := range methods {
 		if method.ID == "" {
 			continue
 		}
 		owner := fmt.Sprintf("%s:%s", moduleName, method.ID)
-		for _, functionName := range funcapi.MethodFunctionNames(moduleName, method) {
+		for _, functionName := range funcapi.FunctionNames(moduleName, method) {
 			if routeModule, routeMethod, ok := c.registry.resolveMethodRoute(functionName); ok {
 				return functionName, fmt.Sprintf("%s:%s", routeModule, routeMethod), true
 			}
@@ -139,30 +171,29 @@ func (c *Controller) OnJobStart(job collectorapi.RuntimeJob) {
 	}
 
 	c.registry.addJob(job.ModuleName(), job.Name(), job)
-	c.registerModuleMethodsOnJobStart(job.ModuleName())
 
 	creator, ok := c.registry.getCreator(job.ModuleName())
-	if !ok || creator.JobMethods == nil {
+	if !ok || creator.InstanceFunctions == nil {
 		return
 	}
 
-	methods := creator.JobMethods(job)
+	methods := creator.InstanceFunctions(job)
 	if len(methods) > 0 {
-		c.registerJobMethods(job, methods)
+		c.registerInstanceFunctions(job, methods)
 	}
 }
 
-// ReconcileModuleMethods rechecks module/static method availability for modules
+// ReconcileModuleMethods rechecks static and instance Function availability for modules
 // with at least one registered running job.
 func (c *Controller) ReconcileModuleMethods(moduleName string) {
-	if moduleName == "" || !c.registry.hasRunningJob(moduleName) {
+	if moduleName == "" {
 		return
 	}
 	methods := c.registry.getMethods(moduleName)
-	if len(methods) == 0 {
-		return
+	if c.registry.hasRunningJob(moduleName) {
+		c.registerAvailableAgentFunctions(moduleName, methods)
 	}
-	c.registerAvailableModuleMethods(moduleName, methods, false)
+	c.reconcileModuleFunctions(moduleName, methods)
 }
 
 func (c *Controller) OnJobStop(job collectorapi.RuntimeJob) {
@@ -170,13 +201,13 @@ func (c *Controller) OnJobStop(job collectorapi.RuntimeJob) {
 		return
 	}
 
-	c.unregisterJobMethods(job)
+	c.unregisterInstanceFunctions(job)
 	c.registry.removeJob(job.ModuleName(), job.Name())
 }
 
 func (c *Controller) Cleanup() {
 	c.publishedMu.Lock()
-	names := c.publishedFns.removeKind(publishedFunctionModuleMethod)
+	names := c.publishedFns.removeKinds(publishedFunctionShared, publishedFunctionAgent, publishedFunctionInstance)
 	c.publishedMu.Unlock()
 
 	sort.Strings(names)
@@ -190,17 +221,8 @@ func (c *Controller) Cleanup() {
 	}
 }
 
-func (c *Controller) registerModuleMethodsOnJobStart(moduleName string) {
-	methods := c.registry.getMethods(moduleName)
-	if len(methods) == 0 {
-		return
-	}
-
-	c.registerAvailableModuleMethods(moduleName, methods, false)
-}
-
-func (c *Controller) registerAvailableModuleMethods(moduleName string, methods []funcapi.MethodConfig, agentWideOnly bool) {
-	publishes := c.collectAvailableModuleMethodPublishes(moduleName, methods, agentWideOnly)
+func (c *Controller) registerAvailableAgentFunctions(moduleName string, methods []funcapi.FunctionConfig) {
+	publishes := c.collectAvailableAgentFunctionPublishes(moduleName, methods)
 	for _, publish := range publishes {
 		c.registerFunction(publish.name, publish.handler)
 	}
@@ -212,16 +234,11 @@ func (c *Controller) registerAvailableModuleMethods(moduleName string, methods [
 	}
 }
 
-func (c *Controller) collectAvailableModuleMethodPublishes(moduleName string, methods []funcapi.MethodConfig, agentWideOnly bool) []functionPublish {
-	c.publishedMu.Lock()
-	defer c.publishedMu.Unlock()
-
-	var publishes []functionPublish
+func (c *Controller) collectAvailableAgentFunctionPublishes(moduleName string, methods []funcapi.FunctionConfig) []functionPublish {
+	var available []funcapi.FunctionConfig
 	for i, method := range methods {
-		if agentWideOnly && !method.AgentWide {
-			continue
-		}
-		if method.ID != "" && c.allMethodFunctionNamesPublishedLocked(moduleName, method) {
+		kind := c.registry.getModuleFunctionKind(moduleName, method.ID)
+		if kind != moduleFunctionAgent {
 			continue
 		}
 		if !methodAvailable(method) {
@@ -232,46 +249,37 @@ func (c *Controller) collectAvailableModuleMethodPublishes(moduleName string, me
 				Warningf("skipping function registration for module '%s': empty method ID", moduleName)
 			continue
 		}
+		available = append(available, method)
+	}
 
-		help := method.Help
-		if help == "" {
-			help = fmt.Sprintf("%s %s data function", moduleName, method.ID)
+	c.publishedMu.Lock()
+	defer c.publishedMu.Unlock()
+
+	var publishes []functionPublish
+	for _, method := range available {
+		if c.allFunctionNamesPublishedLocked(moduleName, method) {
+			continue
 		}
-
-		const cloudAccess = "0x0013"
-		access := "0x0000"
-		if method.RequireCloud {
-			access = cloudAccess
-		}
-
 		if c.api != nil {
-			for _, funcName := range funcapi.MethodFunctionNames(moduleName, method) {
+			for _, funcName := range funcapi.FunctionNames(moduleName, method) {
 				if c.publishedFns.has(funcName) {
 					continue
 				}
-				record, _ := c.publishedFns.add(funcName, moduleMethodOwner(moduleName, method.ID))
+				record, _ := c.publishedFns.add(funcName, agentFunctionOwner(moduleName, method.ID))
 				publishes = append(publishes, functionPublish{
 					name:    funcName,
 					handler: c.makePublishedMethodFuncHandler(funcName, record.generation, moduleName, method.ID),
-					opts: netdataapi.FunctionGlobalOpts{
-						Name:     funcName,
-						Timeout:  60,
-						Help:     help,
-						Tags:     methodTags(method),
-						Access:   access,
-						Priority: 100,
-						Version:  3,
-					},
+					opts:    c.functionGlobalOpts(moduleName, method, funcName),
 				})
 			}
 			continue
 		}
 
-		for _, funcName := range funcapi.MethodFunctionNames(moduleName, method) {
+		for _, funcName := range funcapi.FunctionNames(moduleName, method) {
 			if c.publishedFns.has(funcName) {
 				continue
 			}
-			record, _ := c.publishedFns.add(funcName, moduleMethodOwner(moduleName, method.ID))
+			record, _ := c.publishedFns.add(funcName, agentFunctionOwner(moduleName, method.ID))
 			publishes = append(publishes, functionPublish{
 				name:    funcName,
 				handler: c.makePublishedMethodFuncHandler(funcName, record.generation, moduleName, method.ID),
@@ -281,19 +289,188 @@ func (c *Controller) collectAvailableModuleMethodPublishes(moduleName string, me
 	return publishes
 }
 
-func (c *Controller) allMethodFunctionNamesPublishedLocked(moduleName string, method funcapi.MethodConfig) bool {
-	names := funcapi.MethodFunctionNames(moduleName, method)
+func (c *Controller) reconcileModuleFunctions(moduleName string, methods []funcapi.FunctionConfig) {
+	desired := c.desiredModuleFunctions(moduleName, methods)
+	publishes, withdraws := c.collectModuleFunctionChanges(moduleName, desired)
+	for _, name := range withdraws {
+		c.fnReg.Unregister(name)
+		if c.api != nil {
+			c.api.FunctionRemove(name)
+		}
+	}
+	for _, publish := range publishes {
+		c.registerFunction(publish.name, publish.handler)
+	}
+	if c.api == nil {
+		return
+	}
+	for _, publish := range publishes {
+		c.api.FunctionGlobal(publish.opts)
+	}
+}
+
+func (c *Controller) desiredModuleFunctions(moduleName string, methods []funcapi.FunctionConfig) map[string]desiredFunctionPublication {
+	desired := make(map[string]desiredFunctionPublication)
+
+	for i, method := range methods {
+		kind := c.registry.getModuleFunctionKind(moduleName, method.ID)
+		if kind != moduleFunctionShared {
+			continue
+		}
+		if method.ID == "" {
+			c.Once(fmt.Sprintf("funcctl:static-method:%s:%d:empty-id", moduleName, i)).
+				Warningf("skipping function registration for module '%s': empty method ID", moduleName)
+			continue
+		}
+
+		availableJobs := c.availableSharedJobNames(moduleName, method.ID)
+		if len(availableJobs) == 0 {
+			continue
+		}
+
+		for _, funcName := range funcapi.FunctionNames(moduleName, method) {
+			desired[funcName] = desiredFunctionPublication{
+				name:       funcName,
+				owner:      sharedFunctionOwner(moduleName, method.ID),
+				moduleName: moduleName,
+				method:     method,
+			}
+		}
+	}
+
+	for _, snapshot := range c.registry.getInstanceFunctionSnapshots(moduleName) {
+		for _, method := range snapshot.methods {
+			if method.ID == "" {
+				continue
+			}
+			if !jobBackedFunctionAvailable(snapshot.job, method.ID) {
+				continue
+			}
+			funcName := fmt.Sprintf("%s:%s", snapshot.job.ModuleName(), method.ID)
+			desired[funcName] = desiredFunctionPublication{
+				name:       funcName,
+				owner:      instanceFunctionOwner(snapshot.job.ModuleName(), snapshot.job.Name(), method.ID),
+				moduleName: snapshot.job.ModuleName(),
+				jobName:    snapshot.job.Name(),
+				method:     method,
+			}
+		}
+	}
+
+	return desired
+}
+
+func (c *Controller) collectModuleFunctionChanges(moduleName string, desired map[string]desiredFunctionPublication) ([]functionPublish, []string) {
+	c.publishedMu.Lock()
+	defer c.publishedMu.Unlock()
+
+	var withdraws []string
+	for name, record := range c.publishedFns.moduleRecords(moduleName) {
+		if record.owner.kind != publishedFunctionShared && record.owner.kind != publishedFunctionInstance {
+			continue
+		}
+		want, ok := desired[name]
+		if ok && want.owner == record.owner {
+			continue
+		}
+		c.publishedFns.removeName(name)
+		withdraws = append(withdraws, name)
+	}
+
+	var publishes []functionPublish
+	for _, want := range desired {
+		if c.publishedFns.has(want.name) {
+			continue
+		}
+		record, _ := c.publishedFns.add(want.name, want.owner)
+		publishes = append(publishes, c.makeFunctionPublish(want, record.generation))
+	}
+
+	sort.Slice(publishes, func(i, j int) bool {
+		return publishes[i].name < publishes[j].name
+	})
+	sort.Strings(withdraws)
+	return publishes, withdraws
+}
+
+func (c *Controller) makeFunctionPublish(want desiredFunctionPublication, generation uint64) functionPublish {
+	if want.owner.kind == publishedFunctionInstance {
+		return functionPublish{
+			name:    want.name,
+			handler: c.makePublishedInstanceFunctionHandler(want.name, generation, want.moduleName, want.jobName, want.method.ID),
+			opts:    c.functionGlobalOpts(want.moduleName, want.method, want.name),
+		}
+	}
+
+	return functionPublish{
+		name:    want.name,
+		handler: c.makePublishedMethodFuncHandler(want.name, generation, want.moduleName, want.method.ID),
+		opts:    c.functionGlobalOpts(want.moduleName, want.method, want.name),
+	}
+}
+
+func (c *Controller) availableSharedJobNames(moduleName, methodID string) []string {
+	snapshots := c.registry.getJobSnapshots(moduleName)
+	if len(snapshots) == 0 {
+		return nil
+	}
+
+	names := make([]string, 0, len(snapshots))
+	for _, snapshot := range snapshots {
+		if jobBackedFunctionAvailable(snapshot.job, methodID) {
+			names = append(names, snapshot.name)
+		}
+	}
+	return names
+}
+
+func jobBackedFunctionAvailable(job collectorapi.RuntimeJob, methodID string) bool {
+	if job == nil || !job.IsRunning() {
+		return false
+	}
+	availability, ok := job.Collector().(collectorapi.FunctionAvailability)
+	if !ok || availability == nil {
+		return true
+	}
+	return availability.FunctionAvailable(methodID)
+}
+
+func (c *Controller) allFunctionNamesPublishedLocked(moduleName string, method funcapi.FunctionConfig) bool {
+	names := funcapi.FunctionNames(moduleName, method)
 	return c.publishedFns.all(names)
 }
 
-func methodTags(method funcapi.MethodConfig) string {
+func (c *Controller) functionGlobalOpts(moduleName string, method funcapi.FunctionConfig, funcName string) netdataapi.FunctionGlobalOpts {
+	help := method.Help
+	if help == "" {
+		help = fmt.Sprintf("%s %s data function", moduleName, method.ID)
+	}
+
+	const cloudAccess = "0x0013"
+	access := "0x0000"
+	if method.RequireCloud {
+		access = cloudAccess
+	}
+
+	return netdataapi.FunctionGlobalOpts{
+		Name:     funcName,
+		Timeout:  60,
+		Help:     help,
+		Tags:     methodTags(method),
+		Access:   access,
+		Priority: 100,
+		Version:  3,
+	}
+}
+
+func methodTags(method funcapi.FunctionConfig) string {
 	if method.Tags != "" {
 		return method.Tags
 	}
 	return "top"
 }
 
-func methodAvailable(method funcapi.MethodConfig) bool {
+func methodAvailable(method funcapi.FunctionConfig) bool {
 	return method.Available == nil || method.Available()
 }
 
@@ -308,118 +485,37 @@ func (c *Controller) registerFunction(name string, handler functions.Handler) {
 	})
 }
 
-func (c *Controller) registerJobMethods(job collectorapi.RuntimeJob, methods []funcapi.MethodConfig) {
+func (c *Controller) registerInstanceFunctions(job collectorapi.RuntimeJob, methods []funcapi.FunctionConfig) {
 	planned := make(map[string]struct{}, len(methods))
 
 	for _, method := range methods {
 		if method.ID == "" {
-			c.Warningf("skipping job method registration for %s[%s]: empty method ID", job.ModuleName(), job.Name())
+			c.Warningf("skipping instance function registration for %s[%s]: empty method ID", job.ModuleName(), job.Name())
 			continue
 		}
 		if method.FunctionName != "" || len(method.Aliases) != 0 {
-			c.Errorf("job method registration aborted for %s[%s]: method '%s' uses public FunctionName or Aliases, which are supported only for module methods", job.ModuleName(), job.Name(), method.ID)
+			c.Errorf("instance function registration aborted for %s[%s]: method '%s' uses public FunctionName or Aliases, which are supported only for static Functions", job.ModuleName(), job.Name(), method.ID)
 			return
 		}
 
 		funcName := fmt.Sprintf("%s:%s", job.ModuleName(), method.ID)
 		if _, exists := planned[method.ID]; exists {
-			c.Errorf("job method registration aborted for %s[%s]: duplicate method ID in batch ('%s')", job.ModuleName(), job.Name(), funcName)
+			c.Errorf("instance function registration aborted for %s[%s]: duplicate method ID in batch ('%s')", job.ModuleName(), job.Name(), funcName)
 			return
 		}
 		planned[method.ID] = struct{}{}
 
 		if collision, exists := c.registry.findMethodCollision(job.ModuleName(), job.Name(), method.ID); exists {
-			c.Errorf("job method registration aborted for %s[%s]: collision on '%s' (%s)", job.ModuleName(), job.Name(), funcName, collision)
+			c.Errorf("instance function registration aborted for %s[%s]: collision on '%s' (%s)", job.ModuleName(), job.Name(), funcName, collision)
 			return
 		}
 	}
 
-	// Record methods before publishing handlers so startup-time calls do not race a false 404.
-	c.registry.registerJobMethods(job.ModuleName(), job.Name(), methods)
-
-	publishes := c.collectJobMethodPublishes(job, methods)
-
-	for _, publish := range publishes {
-		c.registerFunction(publish.name, publish.handler)
-		if c.api != nil {
-			c.api.FunctionGlobal(publish.opts)
-		}
-
-		c.Debugf("registered job method: %s for job %s[%s]", publish.name, job.ModuleName(), job.Name())
-	}
+	c.registry.registerInstanceFunctions(job.ModuleName(), job.Name(), methods)
 }
 
-func (c *Controller) collectJobMethodPublishes(job collectorapi.RuntimeJob, methods []funcapi.MethodConfig) []functionPublish {
-	c.publishedMu.Lock()
-	defer c.publishedMu.Unlock()
-
-	var publishes []functionPublish
-	for _, method := range methods {
-		if method.ID == "" {
-			continue
-		}
-
-		funcName := fmt.Sprintf("%s:%s", job.ModuleName(), method.ID)
-		if c.publishedFns.has(funcName) {
-			continue
-		}
-
-		record, _ := c.publishedFns.add(funcName, jobMethodOwner(job.ModuleName(), job.Name(), method.ID))
-
-		help := method.Help
-		if help == "" {
-			help = fmt.Sprintf("%s %s data function", job.ModuleName(), method.ID)
-		}
-
-		const cloudAccess = "0x0013"
-		access := "0x0000"
-		if method.RequireCloud {
-			access = cloudAccess
-		}
-
-		publishes = append(publishes, functionPublish{
-			name:    funcName,
-			handler: c.makePublishedJobMethodFuncHandler(funcName, record.generation, job.ModuleName(), job.Name(), method.ID),
-			opts: netdataapi.FunctionGlobalOpts{
-				Name:     funcName,
-				Timeout:  60,
-				Help:     help,
-				Tags:     methodTags(method),
-				Access:   access,
-				Priority: 100,
-				Version:  3,
-			},
-		})
-	}
-	return publishes
-}
-
-func (c *Controller) unregisterJobMethods(job collectorapi.RuntimeJob) {
-	methods := c.registry.getJobMethods(job.ModuleName(), job.Name())
-	if len(methods) == 0 {
-		return
-	}
-
-	var names []string
-	c.publishedMu.Lock()
-	for _, method := range methods {
-		if method.ID == "" {
-			continue
-		}
-		names = append(names, c.publishedFns.removeOwner(jobMethodOwner(job.ModuleName(), job.Name(), method.ID))...)
-	}
-	c.publishedMu.Unlock()
-
-	sort.Strings(names)
-	for _, funcName := range names {
-		c.fnReg.Unregister(funcName)
-		if c.api != nil {
-			c.api.FunctionRemove(funcName)
-		}
-		c.Debugf("unregistered job method: %s for job %s[%s]", funcName, job.ModuleName(), job.Name())
-	}
-
-	c.registry.unregisterJobMethods(job.ModuleName(), job.Name())
+func (c *Controller) unregisterInstanceFunctions(job collectorapi.RuntimeJob) {
+	c.registry.unregisterInstanceFunctions(job.ModuleName(), job.Name())
 }
 
 func (c *Controller) baseContext() context.Context {

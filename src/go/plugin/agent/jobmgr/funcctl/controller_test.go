@@ -50,8 +50,8 @@ func TestModuleFuncRegistry_RegisterModule(t *testing.T) {
 
 			for _, module := range tc.modules {
 				r.registerModule(module, collectorapi.Creator{
-					Methods: func() []funcapi.MethodConfig {
-						return []funcapi.MethodConfig{{ID: "test"}}
+					SharedFunctions: func() []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{ID: "test"}}
 					},
 				})
 			}
@@ -144,9 +144,9 @@ func TestModuleFuncRegistry_Operations(t *testing.T) {
 		},
 		"get methods": {
 			run: func(t *testing.T, r *moduleFuncRegistry) {
-				expectedMethods := []funcapi.MethodConfig{{ID: "top-queries", Name: "Top Queries"}}
+				expectedMethods := []funcapi.FunctionConfig{{ID: "top-queries", Name: "Top Queries"}}
 				r.registerModule("postgres", collectorapi.Creator{
-					Methods: func() []funcapi.MethodConfig { return expectedMethods },
+					SharedFunctions: func() []funcapi.FunctionConfig { return expectedMethods },
 				})
 
 				assert.Equal(t, expectedMethods, r.getMethods("postgres"))
@@ -203,8 +203,8 @@ func TestModuleFuncRegistry_Operations(t *testing.T) {
 func TestModuleFuncRegistry_Concurrency(t *testing.T) {
 	r := newModuleFuncRegistry()
 	r.registerModule("postgres", collectorapi.Creator{
-		Methods: func() []funcapi.MethodConfig {
-			return []funcapi.MethodConfig{{ID: "test"}}
+		SharedFunctions: func() []funcapi.FunctionConfig {
+			return []funcapi.FunctionConfig{{ID: "test"}}
 		},
 	})
 
@@ -234,11 +234,11 @@ func TestModuleFuncRegistry_Concurrency(t *testing.T) {
 
 func TestModuleFuncRegistry_MethodRouteCollisionUsesDeterministicOwner(t *testing.T) {
 	r := newModuleFuncRegistry()
-	r.registerModuleWithMethods("bbb", collectorapi.Creator{}, []funcapi.MethodConfig{{
+	r.registerModuleWithMethods("bbb", collectorapi.Creator{}, []funcapi.FunctionConfig{{
 		ID:           "logs",
 		FunctionName: "shared:logs",
 	}})
-	r.registerModuleWithMethods("aaa", collectorapi.Creator{}, []funcapi.MethodConfig{{
+	r.registerModuleWithMethods("aaa", collectorapi.Creator{}, []funcapi.FunctionConfig{{
 		ID:           "logs",
 		FunctionName: "shared:logs",
 	}})
@@ -251,11 +251,11 @@ func TestModuleFuncRegistry_MethodRouteCollisionUsesDeterministicOwner(t *testin
 
 func TestModuleFuncRegistry_MethodRouteRefreshesAffectedNames(t *testing.T) {
 	r := newModuleFuncRegistry()
-	r.registerModuleWithMethods("bbb", collectorapi.Creator{}, []funcapi.MethodConfig{{
+	r.registerModuleWithMethods("bbb", collectorapi.Creator{}, []funcapi.FunctionConfig{{
 		ID:           "logs",
 		FunctionName: "shared:logs",
 	}})
-	r.registerModuleWithMethods("aaa", collectorapi.Creator{}, []funcapi.MethodConfig{{
+	r.registerModuleWithMethods("aaa", collectorapi.Creator{}, []funcapi.FunctionConfig{{
 		ID:           "logs",
 		FunctionName: "shared:logs",
 	}})
@@ -345,8 +345,8 @@ func TestBuildRequiredParamsUsesSelectType(t *testing.T) {
 	controller := New(Options{})
 	controller.RegisterModules(collectorapi.Registry{
 		"postgres": collectorapi.Creator{
-			Methods: func() []funcapi.MethodConfig {
-				return []funcapi.MethodConfig{{ID: "top-queries", Name: "Top Queries"}}
+			SharedFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "top-queries", Name: "Top Queries"}}
 			},
 		},
 	})
@@ -361,7 +361,7 @@ func TestBuildRequiredParamsUsesSelectType(t *testing.T) {
 			{ID: "total_time", Name: "By Total Time", Default: true},
 		},
 	}}
-	params := controller.buildRequiredParams("postgres", methodParams, true)
+	params := controller.buildRequiredParams("postgres", "top-queries", methodParams, true)
 
 	assert.Len(t, params, 2)
 	for _, param := range params {
@@ -380,12 +380,12 @@ func TestBuildRequiredParamsUsesSelectType(t *testing.T) {
 	assert.Equal(t, "__sort", params[1]["id"])
 }
 
-func TestBuildRequiredParamsAgentWideOmitsJob(t *testing.T) {
+func TestBuildRequiredParamsAgentScopeOmitsJob(t *testing.T) {
 	controller := New(Options{})
 	controller.RegisterModules(collectorapi.Registry{
 		"snmp": collectorapi.Creator{
-			Methods: func() []funcapi.MethodConfig {
-				return []funcapi.MethodConfig{{ID: "topology:snmp", AgentWide: true}}
+			AgentFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "topology:snmp"}}
 			},
 		},
 	})
@@ -399,7 +399,7 @@ func TestBuildRequiredParamsAgentWideOmitsJob(t *testing.T) {
 			{ID: "l2", Name: "L2", Default: true},
 		},
 	}}
-	params := controller.buildRequiredParams("snmp", methodParams, false)
+	params := controller.buildRequiredParams("snmp", "topology", methodParams, false)
 
 	assert.Len(t, params, 1)
 	assert.Equal(t, "topology_view", params[0]["id"])
@@ -436,69 +436,66 @@ func TestControllerLifecycleHooks(t *testing.T) {
 			controller, reg := newController()
 			controller.RegisterModules(collectorapi.Registry{
 				"mod": collectorapi.Creator{
-					Methods: func() []funcapi.MethodConfig { return []funcapi.MethodConfig{{ID: "a"}} },
+					SharedFunctions: func() []funcapi.FunctionConfig { return []funcapi.FunctionConfig{{ID: "a"}} },
 				},
 			})
 
 			assert.Empty(t, reg.registeredNames())
 		},
-		"register modules registers available agent-wide methods": func(t *testing.T) {
+		"register modules registers available agent-scope methods": func(t *testing.T) {
 			controller, reg := newController()
 			controller.RegisterModules(collectorapi.Registry{
 				"mod": collectorapi.Creator{
-					Methods: func() []funcapi.MethodConfig {
-						return []funcapi.MethodConfig{{ID: "logs", AgentWide: true}}
+					AgentFunctions: func() []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{ID: "logs"}}
 					},
 				},
 			})
 
 			assert.Equal(t, []string{"mod:logs"}, reg.registeredNames())
 		},
-		"first job start registers static methods once": func(t *testing.T) {
+		"reconcile after job start registers static methods once": func(t *testing.T) {
 			controller, reg := newController()
 			controller.RegisterModules(collectorapi.Registry{
 				"mod": collectorapi.Creator{
-					Methods: func() []funcapi.MethodConfig { return []funcapi.MethodConfig{{ID: "a"}} },
+					SharedFunctions: func() []funcapi.FunctionConfig { return []funcapi.FunctionConfig{{ID: "a"}} },
 				},
 			})
 
 			controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
 			controller.OnJobStart(newTestRuntimeJob("mod", "job2", true))
+			controller.ReconcileModuleMethods("mod")
+			controller.ReconcileModuleMethods("mod")
 
 			assert.Equal(t, []string{"mod:a"}, reg.registeredNames())
 		},
-		"availability-gated static method registers when available": func(t *testing.T) {
+		"function-availability-gated shared method registers when available": func(t *testing.T) {
 			controller, reg := newController()
-			available := false
+			available := &testFunctionAvailability{available: map[string]bool{"logs": false}}
 			controller.RegisterModules(collectorapi.Registry{
 				"mod": collectorapi.Creator{
-					Methods: func() []funcapi.MethodConfig {
-						return []funcapi.MethodConfig{{
-							ID:        "logs",
-							Available: func() bool { return available },
-						}}
+					SharedFunctions: func() []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{ID: "logs"}}
 					},
 				},
 			})
 
-			controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+			controller.OnJobStart(&testRuntimeJob{fullName: "mod_job1", moduleName: "mod", name: "job1", running: true, collector: available})
 			assert.Empty(t, reg.registeredNames())
 
-			available = true
-			controller.OnJobStart(newTestRuntimeJob("mod", "job2", true))
-			controller.OnJobStart(newTestRuntimeJob("mod", "job3", true))
+			available.available["logs"] = true
+			controller.ReconcileModuleMethods("mod")
 
 			assert.Equal(t, []string{"mod:logs"}, reg.registeredNames())
 		},
-		"availability-gated agent-wide method registers when available": func(t *testing.T) {
+		"availability-gated agent-scope method registers when available": func(t *testing.T) {
 			controller, reg := newController()
 			available := false
 			controller.RegisterModules(collectorapi.Registry{
 				"mod": collectorapi.Creator{
-					Methods: func() []funcapi.MethodConfig {
-						return []funcapi.MethodConfig{{
+					AgentFunctions: func() []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{
 							ID:        "logs",
-							AgentWide: true,
 							Available: func() bool { return available },
 						}}
 					},
@@ -510,18 +507,18 @@ func TestControllerLifecycleHooks(t *testing.T) {
 			available = true
 			controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
 			controller.OnJobStart(newTestRuntimeJob("mod", "job2", true))
+			controller.ReconcileModuleMethods("mod")
 
 			assert.Equal(t, []string{"mod:logs"}, reg.registeredNames())
 		},
-		"reconcile registers late available static method": func(t *testing.T) {
+		"shared method ignores FunctionConfig availability": func(t *testing.T) {
 			controller, reg := newController()
-			available := false
 			controller.RegisterModules(collectorapi.Registry{
 				"mod": collectorapi.Creator{
-					Methods: func() []funcapi.MethodConfig {
-						return []funcapi.MethodConfig{{
+					SharedFunctions: func() []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{
 							ID:        "logs",
-							Available: func() bool { return available },
+							Available: func() bool { return false },
 						}}
 					},
 				},
@@ -529,23 +526,16 @@ func TestControllerLifecycleHooks(t *testing.T) {
 
 			job := newTestRuntimeJob("mod", "job1", true)
 			controller.OnJobStart(job)
-			assert.Empty(t, reg.registeredNames())
-
-			available = true
 			controller.ReconcileModuleMethods(job.ModuleName())
 
 			assert.Equal(t, []string{"mod:logs"}, reg.registeredNames())
 		},
 		"reconcile ignores module with no running job": func(t *testing.T) {
 			controller, reg := newController()
-			available := true
 			controller.RegisterModules(collectorapi.Registry{
 				"mod": collectorapi.Creator{
-					Methods: func() []funcapi.MethodConfig {
-						return []funcapi.MethodConfig{{
-							ID:        "logs",
-							Available: func() bool { return available },
-						}}
+					SharedFunctions: func() []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{ID: "logs"}}
 					},
 				},
 			})
@@ -556,58 +546,49 @@ func TestControllerLifecycleHooks(t *testing.T) {
 		},
 		"reconcile does not duplicate published static method": func(t *testing.T) {
 			controller, reg := newController()
-			availableCalls := 0
+			available := &testFunctionAvailability{available: map[string]bool{"logs": true}}
 			controller.RegisterModules(collectorapi.Registry{
 				"mod": collectorapi.Creator{
-					Methods: func() []funcapi.MethodConfig {
-						return []funcapi.MethodConfig{{
-							ID: "logs",
-							Available: func() bool {
-								availableCalls++
-								return true
-							},
-						}}
+					SharedFunctions: func() []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{ID: "logs"}}
 					},
 				},
 			})
 
-			job := newTestRuntimeJob("mod", "job1", true)
+			job := &testRuntimeJob{fullName: "mod_job1", moduleName: "mod", name: "job1", running: true, collector: available}
 			controller.OnJobStart(job)
 			controller.ReconcileModuleMethods(job.ModuleName())
 			controller.ReconcileModuleMethods(job.ModuleName())
 
 			assert.Equal(t, []string{"mod:logs"}, reg.registeredNames())
-			assert.Equal(t, 1, availableCalls)
 		},
-		"reconcile does not withdraw published static method": func(t *testing.T) {
+		"reconcile withdraws shared method when last job becomes unavailable": func(t *testing.T) {
 			reg := newTestFunctionRegistry()
 			var buf bytes.Buffer
-			available := true
+			available := &testFunctionAvailability{available: map[string]bool{"logs": true}}
 			controller := New(Options{
 				FnReg: reg,
 				API:   dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))),
 			})
 			controller.RegisterModules(collectorapi.Registry{
 				"mod": collectorapi.Creator{
-					Methods: func() []funcapi.MethodConfig {
-						return []funcapi.MethodConfig{{
-							ID:        "logs",
-							Available: func() bool { return available },
-						}}
+					SharedFunctions: func() []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{ID: "logs"}}
 					},
 				},
 			})
 
-			job := newTestRuntimeJob("mod", "job1", true)
+			job := &testRuntimeJob{fullName: "mod_job1", moduleName: "mod", name: "job1", running: true, collector: available}
 			controller.OnJobStart(job)
+			controller.ReconcileModuleMethods(job.ModuleName())
 			assert.Contains(t, buf.String(), "FUNCTION GLOBAL \"mod:logs\"")
 
-			available = false
+			available.available["logs"] = false
 			controller.ReconcileModuleMethods(job.ModuleName())
 
 			assert.Equal(t, []string{"mod:logs"}, reg.registeredNames())
-			assert.Empty(t, reg.unregisteredNames())
-			assert.NotContains(t, buf.String(), "FUNCTION_DEL")
+			assert.Equal(t, []string{"mod:logs"}, reg.unregisteredNames())
+			assert.Contains(t, buf.String(), "FUNCTION_DEL GLOBAL \"mod:logs\"")
 		},
 		"reconcile logs empty static method ID once": func(t *testing.T) {
 			reg := newTestFunctionRegistry()
@@ -618,8 +599,8 @@ func TestControllerLifecycleHooks(t *testing.T) {
 			})
 			controller.RegisterModules(collectorapi.Registry{
 				"mod": collectorapi.Creator{
-					Methods: func() []funcapi.MethodConfig {
-						return []funcapi.MethodConfig{{Name: "invalid"}}
+					SharedFunctions: func() []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{Name: "invalid"}}
 					},
 				},
 			})
@@ -637,19 +618,21 @@ func TestControllerLifecycleHooks(t *testing.T) {
 			controller, reg := newController()
 			controller.RegisterModules(collectorapi.Registry{
 				"aaa": collectorapi.Creator{
-					Methods: func() []funcapi.MethodConfig {
-						return []funcapi.MethodConfig{{ID: "logs", FunctionName: "shared:logs"}}
+					SharedFunctions: func() []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{ID: "logs", FunctionName: "shared:logs"}}
 					},
 				},
 				"bbb": collectorapi.Creator{
-					Methods: func() []funcapi.MethodConfig {
-						return []funcapi.MethodConfig{{ID: "logs", FunctionName: "shared:logs"}}
+					SharedFunctions: func() []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{ID: "logs", FunctionName: "shared:logs"}}
 					},
 				},
 			})
 
 			controller.OnJobStart(newTestRuntimeJob("aaa", "job1", true))
 			controller.OnJobStart(newTestRuntimeJob("bbb", "job1", true))
+			controller.ReconcileModuleMethods("aaa")
+			controller.ReconcileModuleMethods("bbb")
 
 			assert.Equal(t, []string{"shared:logs"}, reg.registeredNames())
 			assert.True(t, controller.registry.isModuleRegistered("aaa"))
@@ -659,22 +642,24 @@ func TestControllerLifecycleHooks(t *testing.T) {
 			controller, reg := newController()
 			controller.RegisterModules(collectorapi.Registry{
 				"aaa": collectorapi.Creator{
-					Methods: func() []funcapi.MethodConfig {
-						return []funcapi.MethodConfig{
+					SharedFunctions: func() []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{
 							{ID: "first", FunctionName: "later:logs"},
 							{ID: "second", FunctionName: "later:logs"},
 						}
 					},
 				},
 				"ccc": collectorapi.Creator{
-					Methods: func() []funcapi.MethodConfig {
-						return []funcapi.MethodConfig{{ID: "logs", FunctionName: "later:logs"}}
+					SharedFunctions: func() []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{ID: "logs", FunctionName: "later:logs"}}
 					},
 				},
 			})
 
 			controller.OnJobStart(newTestRuntimeJob("aaa", "job1", true))
 			controller.OnJobStart(newTestRuntimeJob("ccc", "job1", true))
+			controller.ReconcileModuleMethods("aaa")
+			controller.ReconcileModuleMethods("ccc")
 
 			assert.False(t, controller.registry.isModuleRegistered("aaa"))
 			assert.True(t, controller.registry.isModuleRegistered("ccc"))
@@ -684,12 +669,11 @@ func TestControllerLifecycleHooks(t *testing.T) {
 			controller, reg := newController()
 			controller.RegisterModules(collectorapi.Registry{
 				"snmp_topology": collectorapi.Creator{
-					Methods: func() []funcapi.MethodConfig {
-						return []funcapi.MethodConfig{{
+					AgentFunctions: func() []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{
 							ID:           "topology:snmp",
 							FunctionName: "snmp:topology:snmp",
 							Aliases:      []string{"topology:snmp"},
-							AgentWide:    true,
 						}}
 					},
 				},
@@ -701,19 +685,22 @@ func TestControllerLifecycleHooks(t *testing.T) {
 
 			assert.ElementsMatch(t, []string{"snmp:topology:snmp", "topology:snmp"}, reg.unregisteredNames())
 		},
-		"job stop unregisters job methods": func(t *testing.T) {
+		"job stop unregisters instance functions": func(t *testing.T) {
 			controller, reg := newController()
 			controller.RegisterModules(collectorapi.Registry{
 				"mod": collectorapi.Creator{
-					JobMethods: func(_ collectorapi.RuntimeJob) []funcapi.MethodConfig {
-						return []funcapi.MethodConfig{{ID: "job-method"}}
+					InstanceFunctions: func(_ collectorapi.RuntimeJob) []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{ID: "job-method"}}
 					},
 				},
 			})
 
 			job := newTestRuntimeJob("mod", "job1", true)
 			controller.OnJobStart(job)
+			controller.ReconcileModuleMethods("mod")
 			controller.OnJobStop(job)
+			assert.Empty(t, reg.unregisteredNames())
+			controller.ReconcileModuleMethods("mod")
 
 			assert.Contains(t, reg.unregisteredNames(), "mod:job-method")
 		},
@@ -721,21 +708,22 @@ func TestControllerLifecycleHooks(t *testing.T) {
 			controller, reg := newController()
 			controller.RegisterModules(collectorapi.Registry{
 				"mod": collectorapi.Creator{
-					Methods: func() []funcapi.MethodConfig { return []funcapi.MethodConfig{{ID: "a"}} },
+					SharedFunctions: func() []funcapi.FunctionConfig { return []funcapi.FunctionConfig{{ID: "a"}} },
 				},
 			})
 
 			controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+			controller.ReconcileModuleMethods("mod")
 			controller.Cleanup()
 
 			assert.Contains(t, reg.unregisteredNames(), "mod:a")
 		},
-		"cleanup ignores unavailable static methods": func(t *testing.T) {
+		"cleanup ignores unavailable agent methods": func(t *testing.T) {
 			controller, reg := newController()
 			controller.RegisterModules(collectorapi.Registry{
 				"mod": collectorapi.Creator{
-					Methods: func() []funcapi.MethodConfig {
-						return []funcapi.MethodConfig{{
+					AgentFunctions: func() []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{
 							ID:        "logs",
 							Available: func() bool { return false },
 						}}
@@ -758,11 +746,12 @@ func TestControllerLifecycleHooks(t *testing.T) {
 			})
 			controller.RegisterModules(collectorapi.Registry{
 				"mod": collectorapi.Creator{
-					Methods: func() []funcapi.MethodConfig { return []funcapi.MethodConfig{{ID: "a"}} },
+					SharedFunctions: func() []funcapi.FunctionConfig { return []funcapi.FunctionConfig{{ID: "a"}} },
 				},
 			})
 
 			controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+			controller.ReconcileModuleMethods("mod")
 			assert.Contains(t, buf.String(), "FUNCTION GLOBAL \"mod:a\"")
 
 			controller.Cleanup()
@@ -778,8 +767,8 @@ func TestControllerLifecycleHooks(t *testing.T) {
 			})
 			controller.RegisterModules(collectorapi.Registry{
 				"mod": collectorapi.Creator{
-					Methods: func() []funcapi.MethodConfig {
-						return []funcapi.MethodConfig{{
+					SharedFunctions: func() []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{
 							ID:           "logs",
 							FunctionName: "snmp:traps",
 							Tags:         "logs",
@@ -789,6 +778,7 @@ func TestControllerLifecycleHooks(t *testing.T) {
 			})
 
 			controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+			controller.ReconcileModuleMethods("mod")
 
 			assert.Contains(t, reg.registeredNames(), "snmp:traps")
 			assert.NotContains(t, reg.registeredNames(), "mod:logs")
@@ -801,6 +791,224 @@ func TestControllerLifecycleHooks(t *testing.T) {
 	for name, run := range tests {
 		t.Run(name, run)
 	}
+}
+
+func TestControllerSharedFunctionWithdrawsWhenLastDefaultJobStops(t *testing.T) {
+	reg := newTestFunctionRegistry()
+	var buf bytes.Buffer
+	controller := New(Options{
+		FnReg: reg,
+		API:   dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))),
+	})
+	controller.RegisterModules(collectorapi.Registry{
+		"mod": collectorapi.Creator{
+			SharedFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "logs"}}
+			},
+		},
+	})
+
+	job1 := newTestRuntimeJob("mod", "job1", true)
+	job2 := newTestRuntimeJob("mod", "job2", true)
+	controller.OnJobStart(job1)
+	controller.OnJobStart(job2)
+	controller.ReconcileModuleMethods("mod")
+	controller.OnJobStop(job1)
+
+	assert.Equal(t, []string{"mod:logs"}, reg.registeredNames())
+	assert.Empty(t, reg.unregisteredNames())
+	assert.Contains(t, buf.String(), "FUNCTION GLOBAL \"mod:logs\"")
+	assert.NotContains(t, buf.String(), "FUNCTION_DEL GLOBAL \"mod:logs\"")
+
+	controller.OnJobStop(job2)
+	assert.Empty(t, reg.unregisteredNames())
+	controller.ReconcileModuleMethods("mod")
+
+	assert.Equal(t, []string{"mod:logs"}, reg.unregisteredNames())
+	assert.Contains(t, buf.String(), "FUNCTION_DEL GLOBAL \"mod:logs\"")
+}
+
+func TestControllerSharedFunctionReconcileDoesNotWithdrawAgentFunctions(t *testing.T) {
+	reg := newTestFunctionRegistry()
+	var buf bytes.Buffer
+	controller := New(Options{
+		FnReg: reg,
+		API:   dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))),
+	})
+	controller.RegisterModules(collectorapi.Registry{
+		"mod": collectorapi.Creator{
+			AgentFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "agent"}}
+			},
+			SharedFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "shared"}}
+			},
+		},
+	})
+
+	job := newTestRuntimeJob("mod", "job1", true)
+	controller.OnJobStart(job)
+	controller.ReconcileModuleMethods("mod")
+	controller.OnJobStop(job)
+	controller.ReconcileModuleMethods("mod")
+
+	assert.Contains(t, reg.registeredNames(), "mod:agent")
+	assert.Contains(t, reg.registeredNames(), "mod:shared")
+	assert.Contains(t, reg.unregisteredNames(), "mod:shared")
+	assert.NotContains(t, reg.unregisteredNames(), "mod:agent")
+	assert.NotContains(t, buf.String(), "FUNCTION_DEL GLOBAL \"mod:agent\"")
+	assert.Contains(t, buf.String(), "FUNCTION_DEL GLOBAL \"mod:shared\"")
+}
+
+func TestControllerSharedFunctionAvailableJobsOnly(t *testing.T) {
+	var gotCode int
+	var gotResp map[string]any
+	var dispatches int
+	reg := newTestFunctionRegistry()
+	controller := New(Options{
+		FnReg: reg,
+		JSONWriter: func(data []byte, code int) {
+			gotCode = code
+			require.NoError(t, json.Unmarshal(data, &gotResp))
+		},
+	})
+	controller.RegisterModules(collectorapi.Registry{
+		"mod": collectorapi.Creator{
+			SharedFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "logs"}}
+			},
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+				dispatches++
+				return &tableTestHandler{}
+			},
+		},
+	})
+	available := &testFunctionAvailability{available: map[string]bool{"logs": true}}
+	unavailable := &testFunctionAvailability{available: map[string]bool{"logs": false}}
+	controller.OnJobStart(&testRuntimeJob{fullName: "mod_job1", moduleName: "mod", name: "job1", running: true, collector: available})
+	controller.OnJobStart(&testRuntimeJob{fullName: "mod_job2", moduleName: "mod", name: "job2", running: true, collector: unavailable})
+	controller.ReconcileModuleMethods("mod")
+
+	reg.call("mod:logs", context.Background(), functions.Function{
+		UID:     "shared-info",
+		Args:    []string{"info"},
+		Timeout: time.Second,
+	})
+
+	required, ok := gotResp["required_params"].([]any)
+	require.True(t, ok)
+	require.NotEmpty(t, required)
+	jobParam, ok := required[0].(map[string]any)
+	require.True(t, ok)
+	options, ok := jobParam["options"].([]any)
+	require.True(t, ok)
+	require.Len(t, options, 1)
+	option, ok := options[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "job1", option["id"])
+
+	reg.call("mod:logs", context.Background(), functions.Function{
+		UID:     "shared-unavailable-job",
+		Timeout: time.Second,
+		Payload: []byte(`{"__job":"job2"}`),
+	})
+
+	assert.Equal(t, 404, gotCode)
+	assert.Equal(t, float64(404), gotResp["status"])
+	assert.Contains(t, gotResp["errorMessage"], "unknown job 'job2'")
+	assert.Zero(t, dispatches)
+}
+
+func TestControllerSharedFunctionRepublishesWithNewGeneration(t *testing.T) {
+	reg := newTestFunctionRegistry()
+	var firstHandler functions.Handler
+	reg.onRegister = func(name string, _ func(functions.Function)) {
+		if name != "mod:logs" || firstHandler != nil {
+			return
+		}
+		reg.mu.Lock()
+		firstHandler = reg.contextHandlers[name]
+		reg.mu.Unlock()
+	}
+	var gotCode int
+	var gotResp map[string]any
+	controller := New(Options{
+		FnReg: reg,
+		JSONWriter: func(data []byte, code int) {
+			gotCode = code
+			require.NoError(t, json.Unmarshal(data, &gotResp))
+		},
+	})
+	controller.RegisterModules(collectorapi.Registry{
+		"mod": collectorapi.Creator{
+			SharedFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "logs"}}
+			},
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+				return &tableTestHandler{}
+			},
+		},
+	})
+
+	job1 := newTestRuntimeJob("mod", "job1", true)
+	controller.OnJobStart(job1)
+	controller.ReconcileModuleMethods("mod")
+	require.NotNil(t, firstHandler)
+
+	controller.OnJobStop(job1)
+	controller.ReconcileModuleMethods("mod")
+	firstHandler(context.Background(), functions.Function{
+		UID:     "stale-generation",
+		Timeout: time.Second,
+	})
+	assert.Equal(t, 404, gotCode)
+	assert.Equal(t, float64(404), gotResp["status"])
+	assert.Equal(t, "unknown function 'mod:logs'", gotResp["errorMessage"])
+
+	job2 := newTestRuntimeJob("mod", "job2", true)
+	controller.OnJobStart(job2)
+	controller.ReconcileModuleMethods("mod")
+
+	assert.Equal(t, []string{"mod:logs", "mod:logs"}, reg.registeredNames())
+	assert.Equal(t, []string{"mod:logs"}, reg.unregisteredNames())
+}
+
+func TestControllerSharedSingleFunctionUsesAvailableCanonicalJob(t *testing.T) {
+	reg := newTestFunctionRegistry()
+	controller := New(Options{FnReg: reg})
+	controller.RegisterModules(collectorapi.Registry{
+		"mod": collectorapi.Creator{
+			InstancePolicy: collectorapi.InstancePolicySingle,
+			SharedFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "status"}}
+			},
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+				return &tableTestHandler{}
+			},
+		},
+	})
+
+	controller.OnJobStart(&testRuntimeJob{
+		fullName:   "mod_mod",
+		moduleName: "mod",
+		name:       "mod",
+		running:    true,
+		collector:  &testFunctionAvailability{available: map[string]bool{"status": false}},
+	})
+	controller.ReconcileModuleMethods("mod")
+
+	assert.Empty(t, reg.registeredNames())
+
+	controller.OnJobStart(&testRuntimeJob{
+		fullName:   "mod_mod",
+		moduleName: "mod",
+		name:       "mod",
+		running:    true,
+		collector:  &testFunctionAvailability{available: map[string]bool{"status": true}},
+	})
+	controller.ReconcileModuleMethods("mod")
+
+	assert.Equal(t, []string{"mod:status"}, reg.registeredNames())
 }
 
 func TestControllerReconcileModuleMethodsConcurrentLifecycle(t *testing.T) {
@@ -822,20 +1030,10 @@ func TestControllerReconcileModuleMethodsConcurrentLifecycle(t *testing.T) {
 
 	controller.RegisterModules(collectorapi.Registry{
 		"mod": collectorapi.Creator{
-			Methods: func() []funcapi.MethodConfig {
-				return []funcapi.MethodConfig{{
+			SharedFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{
 					ID:      "late",
 					Aliases: aliases,
-					Available: func() bool {
-						if !enabled.Load() {
-							return false
-						}
-						if availableCalls.Add(1) == 1 {
-							firstAvailable.Do(func() { close(firstAvailableCalled) })
-						}
-						<-releaseAvailable
-						return true
-					},
 				}}
 			},
 		},
@@ -845,6 +1043,16 @@ func TestControllerReconcileModuleMethodsConcurrentLifecycle(t *testing.T) {
 	jobs := make([]collectorapi.RuntimeJob, 0, seedJobs)
 	for i := range seedJobs {
 		job := newTestRuntimeJob("mod", fmt.Sprintf("seed-%02d", i), true)
+		job.collector = &testFunctionAvailability{fn: func(string) bool {
+			if !enabled.Load() {
+				return false
+			}
+			if availableCalls.Add(1) == 1 {
+				firstAvailable.Do(func() { close(firstAvailableCalled) })
+			}
+			<-releaseAvailable
+			return true
+		}}
 		controller.OnJobStart(job)
 		jobs = append(jobs, job)
 	}
@@ -873,6 +1081,7 @@ func TestControllerReconcileModuleMethodsConcurrentLifecycle(t *testing.T) {
 			<-start
 			for n := range iterations {
 				job := newTestRuntimeJob("mod", fmt.Sprintf("runtime-%02d-%02d", worker, n), true)
+				job.collector = &testFunctionAvailability{available: map[string]bool{"late": true}}
 				controller.OnJobStart(job)
 				controller.OnJobStop(job)
 			}
@@ -906,10 +1115,9 @@ func TestControllerStaticPublicationDoesNotHoldLockDuringFunctionGlobal(t *testi
 	go func() {
 		controller.RegisterModules(collectorapi.Registry{
 			"mod": collectorapi.Creator{
-				Methods: func() []funcapi.MethodConfig {
-					return []funcapi.MethodConfig{{
-						ID:        "late",
-						AgentWide: true,
+				AgentFunctions: func() []funcapi.FunctionConfig {
+					return []funcapi.FunctionConfig{{
+						ID: "late",
 					}}
 				},
 			},
@@ -943,66 +1151,93 @@ func TestControllerStaticPublicationDoesNotHoldLockDuringFunctionGlobal(t *testi
 	}
 }
 
-func TestControllerRegisterJobMethods(t *testing.T) {
+func TestControllerRegisterInstanceFunctions(t *testing.T) {
 	tests := map[string]func(*testing.T){
 		"fail fast on collision with static method": func(t *testing.T) {
 			reg := newTestFunctionRegistry()
 			controller := New(Options{FnReg: reg})
 			controller.RegisterModules(collectorapi.Registry{
 				"mod": collectorapi.Creator{
-					Methods: func() []funcapi.MethodConfig { return []funcapi.MethodConfig{{ID: "dup"}} },
+					SharedFunctions: func() []funcapi.FunctionConfig { return []funcapi.FunctionConfig{{ID: "dup"}} },
 				},
 			})
 
-			controller.registerJobMethods(newTestRuntimeJob("mod", "job1", true), []funcapi.MethodConfig{{ID: "dup"}})
+			controller.registerInstanceFunctions(newTestRuntimeJob("mod", "job1", true), []funcapi.FunctionConfig{{ID: "dup"}})
 
 			assert.Empty(t, reg.registeredNames())
-			assert.Empty(t, controller.registry.getJobMethods("mod", "job1"))
+			assert.Empty(t, controller.registry.getInstanceFunctions("mod", "job1"))
 		},
 		"fail fast on collision with other job": func(t *testing.T) {
 			reg := newTestFunctionRegistry()
 			controller := New(Options{FnReg: reg})
 			controller.registry.registerModule("mod", collectorapi.Creator{})
-			controller.registry.registerJobMethods("mod", "jobA", []funcapi.MethodConfig{{ID: "dup"}})
+			controller.registry.registerInstanceFunctions("mod", "jobA", []funcapi.FunctionConfig{{ID: "dup"}})
 
-			controller.registerJobMethods(newTestRuntimeJob("mod", "jobB", true), []funcapi.MethodConfig{{ID: "dup"}})
+			controller.registerInstanceFunctions(newTestRuntimeJob("mod", "jobB", true), []funcapi.FunctionConfig{{ID: "dup"}})
 
 			assert.Empty(t, reg.registeredNames())
-			assert.Empty(t, controller.registry.getJobMethods("mod", "jobB"))
+			assert.Empty(t, controller.registry.getInstanceFunctions("mod", "jobB"))
 		},
 		"fail fast on duplicate within batch": func(t *testing.T) {
 			reg := newTestFunctionRegistry()
 			controller := New(Options{FnReg: reg})
 			controller.registry.registerModule("mod", collectorapi.Creator{})
 
-			controller.registerJobMethods(newTestRuntimeJob("mod", "job1", true), []funcapi.MethodConfig{{ID: "dup"}, {ID: "dup"}})
+			controller.registerInstanceFunctions(newTestRuntimeJob("mod", "job1", true), []funcapi.FunctionConfig{{ID: "dup"}, {ID: "dup"}})
 
 			assert.Empty(t, reg.registeredNames())
-			assert.Empty(t, controller.registry.getJobMethods("mod", "job1"))
+			assert.Empty(t, controller.registry.getInstanceFunctions("mod", "job1"))
 		},
-		"fail fast on job method public names": func(t *testing.T) {
+		"fail fast on instance function public names": func(t *testing.T) {
 			reg := newTestFunctionRegistry()
 			controller := New(Options{FnReg: reg})
 			controller.registry.registerModule("mod", collectorapi.Creator{})
 
-			controller.registerJobMethods(newTestRuntimeJob("mod", "job1", true), []funcapi.MethodConfig{
+			controller.registerInstanceFunctions(newTestRuntimeJob("mod", "job1", true), []funcapi.FunctionConfig{
 				{ID: "logs", FunctionName: "public:logs", Aliases: []string{"public:alias"}},
 			})
 
 			assert.Empty(t, reg.registeredNames())
-			assert.Empty(t, controller.registry.getJobMethods("mod", "job1"))
+			assert.Empty(t, controller.registry.getInstanceFunctions("mod", "job1"))
 		},
-		"registry is populated before handlers are callable": func(t *testing.T) {
+		"success stores declarations without publishing handlers": func(t *testing.T) {
+			reg := newTestFunctionRegistry()
+			controller := New(Options{FnReg: reg})
+			controller.registry.registerModule("mod", collectorapi.Creator{})
+
+			controller.registerInstanceFunctions(newTestRuntimeJob("mod", "job1", true), []funcapi.FunctionConfig{{ID: "a", Help: "instance function help"}})
+
+			assert.Empty(t, reg.registeredNames())
+			assert.Len(t, controller.registry.getInstanceFunctions("mod", "job1"), 1)
+		},
+		"success commits all methods": func(t *testing.T) {
+			reg := newTestFunctionRegistry()
+			controller := New(Options{FnReg: reg})
+			controller.registry.registerModule("mod", collectorapi.Creator{})
+
+			controller.registerInstanceFunctions(newTestRuntimeJob("mod", "job1", true), []funcapi.FunctionConfig{{ID: "a"}, {ID: "b"}})
+
+			assert.Empty(t, reg.registeredNames())
+			assert.Len(t, controller.registry.getInstanceFunctions("mod", "job1"), 2)
+		},
+	}
+
+	for name, run := range tests {
+		t.Run(name, run)
+	}
+}
+
+func TestControllerInstanceFunctionsUseJobBackedAvailability(t *testing.T) {
+	tests := map[string]func(*testing.T){
+		"publish withdraw and republish stored declarations": func(t *testing.T) {
+			available := map[string]bool{"a": false}
+			job := newTestRuntimeJob("mod", "job1", true)
+			job.collector = &testFunctionAvailability{available: available}
+
 			var gotCode int
 			var gotResp map[string]any
-
 			reg := newTestFunctionRegistry()
-			reg.onRegister = func(_ string, fn func(functions.Function)) {
-				fn(functions.Function{
-					UID:  "during-register",
-					Args: []string{"info"},
-				})
-			}
+			declareCalls := 0
 			controller := New(Options{
 				FnReg: reg,
 				JSONWriter: func(data []byte, code int) {
@@ -1010,24 +1245,96 @@ func TestControllerRegisterJobMethods(t *testing.T) {
 					require.NoError(t, json.Unmarshal(data, &gotResp))
 				},
 			})
-			controller.registry.registerModule("mod", collectorapi.Creator{})
+			controller.RegisterModules(collectorapi.Registry{
+				"mod": collectorapi.Creator{
+					InstanceFunctions: func(collectorapi.RuntimeJob) []funcapi.FunctionConfig {
+						declareCalls++
+						return []funcapi.FunctionConfig{{ID: "a"}}
+					},
+					MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+						return &tableTestHandler{}
+					},
+				},
+			})
 
-			controller.registerJobMethods(newTestRuntimeJob("mod", "job1", true), []funcapi.MethodConfig{{ID: "a", Help: "job method help"}})
+			controller.OnJobStart(job)
 
+			assert.Equal(t, 1, declareCalls)
+			assert.Empty(t, reg.registeredNames())
+			assert.Len(t, controller.registry.getInstanceFunctions("mod", "job1"), 1)
+
+			available["a"] = true
+			controller.ReconcileModuleMethods("mod")
+
+			assert.Equal(t, 1, declareCalls)
+			assert.Equal(t, []string{"mod:a"}, reg.registeredNames())
+			stale := reg.handlers["mod:a"]
+			require.NotNil(t, stale)
+
+			available["a"] = false
+			controller.ReconcileModuleMethods("mod")
+
+			assert.Equal(t, []string{"mod:a"}, reg.unregisteredNames())
+			stale(functions.Function{UID: "withdrawn", Timeout: time.Second})
+			assert.Equal(t, 404, gotCode)
+			assert.Equal(t, float64(404), gotResp["status"])
+
+			available["a"] = true
+			controller.ReconcileModuleMethods("mod")
+
+			assert.Equal(t, 1, declareCalls)
+			assert.Equal(t, []string{"mod:a", "mod:a"}, reg.registeredNames())
+			stale(functions.Function{UID: "stale-after-republish", Timeout: time.Second})
+			assert.Equal(t, 404, gotCode)
+			assert.Equal(t, float64(404), gotResp["status"])
+
+			reg.handlers["mod:a"](functions.Function{UID: "republished", Timeout: time.Second})
 			assert.Equal(t, 200, gotCode)
 			assert.Equal(t, float64(200), gotResp["status"])
-			assert.Equal(t, "job method help", gotResp["help"])
-			assert.Len(t, controller.registry.getJobMethods("mod", "job1"), 1)
 		},
-		"success commits all methods": func(t *testing.T) {
+		"missing FunctionAvailability publishes on reconcile": func(t *testing.T) {
 			reg := newTestFunctionRegistry()
 			controller := New(Options{FnReg: reg})
-			controller.registry.registerModule("mod", collectorapi.Creator{})
+			controller.RegisterModules(collectorapi.Registry{
+				"mod": collectorapi.Creator{
+					InstanceFunctions: func(collectorapi.RuntimeJob) []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{ID: "a"}}
+					},
+				},
+			})
 
-			controller.registerJobMethods(newTestRuntimeJob("mod", "job1", true), []funcapi.MethodConfig{{ID: "a"}, {ID: "b"}})
+			controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+			assert.Empty(t, reg.registeredNames())
+			controller.ReconcileModuleMethods("mod")
 
-			assert.ElementsMatch(t, []string{"mod:a", "mod:b"}, reg.registeredNames())
-			assert.Len(t, controller.registry.getJobMethods("mod", "job1"), 2)
+			assert.Equal(t, []string{"mod:a"}, reg.registeredNames())
+		},
+		"FunctionAvailability is not called synchronously on job start": func(t *testing.T) {
+			reg := newTestFunctionRegistry()
+			var availabilityCalls atomic.Int32
+			job := newTestRuntimeJob("mod", "job1", true)
+			job.collector = &testFunctionAvailability{fn: func(string) bool {
+				availabilityCalls.Add(1)
+				return true
+			}}
+			controller := New(Options{FnReg: reg})
+			controller.RegisterModules(collectorapi.Registry{
+				"mod": collectorapi.Creator{
+					InstanceFunctions: func(collectorapi.RuntimeJob) []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{ID: "a"}}
+					},
+				},
+			})
+
+			controller.OnJobStart(job)
+
+			assert.Equal(t, int32(0), availabilityCalls.Load())
+			assert.Empty(t, reg.registeredNames())
+
+			controller.ReconcileModuleMethods("mod")
+
+			assert.Equal(t, int32(1), availabilityCalls.Load())
+			assert.Equal(t, []string{"mod:a"}, reg.registeredNames())
 		},
 	}
 
@@ -1045,8 +1352,8 @@ func TestControllerPublishedFunctionWrapperConcurrentMutation(t *testing.T) {
 			setup: func(controller *Controller) {
 				controller.RegisterModules(collectorapi.Registry{
 					"mod": collectorapi.Creator{
-						Methods: func() []funcapi.MethodConfig {
-							return []funcapi.MethodConfig{{ID: "a"}}
+						SharedFunctions: func() []funcapi.FunctionConfig {
+							return []funcapi.FunctionConfig{{ID: "a"}}
 						},
 						MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
 							return &tableTestHandler{}
@@ -1054,11 +1361,13 @@ func TestControllerPublishedFunctionWrapperConcurrentMutation(t *testing.T) {
 					},
 				})
 				controller.OnJobStart(newTestRuntimeJob("mod", "job0", true))
+				controller.ReconcileModuleMethods("mod")
 			},
 			mutate: func(controller *Controller) {
 				for i := range 100 {
 					controller.Cleanup()
 					controller.OnJobStart(newTestRuntimeJob("mod", fmt.Sprintf("job%d", i+1), true))
+					controller.ReconcileModuleMethods("mod")
 				}
 			},
 		},
@@ -1066,8 +1375,8 @@ func TestControllerPublishedFunctionWrapperConcurrentMutation(t *testing.T) {
 			setup: func(controller *Controller) {
 				controller.RegisterModules(collectorapi.Registry{
 					"mod": collectorapi.Creator{
-						JobMethods: func(collectorapi.RuntimeJob) []funcapi.MethodConfig {
-							return []funcapi.MethodConfig{{ID: "a"}}
+						InstanceFunctions: func(collectorapi.RuntimeJob) []funcapi.FunctionConfig {
+							return []funcapi.FunctionConfig{{ID: "a"}}
 						},
 						MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
 							return &tableTestHandler{}
@@ -1075,6 +1384,7 @@ func TestControllerPublishedFunctionWrapperConcurrentMutation(t *testing.T) {
 					},
 				})
 				controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+				controller.ReconcileModuleMethods("mod")
 			},
 			mutate: func(controller *Controller) {
 				job := newTestRuntimeJob("mod", "job1", true)
@@ -1136,8 +1446,8 @@ func TestControllerPublishedFunctionGenerationInvalidatesStaleHandlers(t *testin
 			setup: func(controller *Controller) {
 				controller.RegisterModules(collectorapi.Registry{
 					"mod": collectorapi.Creator{
-						Methods: func() []funcapi.MethodConfig {
-							return []funcapi.MethodConfig{{ID: "a"}}
+						SharedFunctions: func() []funcapi.FunctionConfig {
+							return []funcapi.FunctionConfig{{ID: "a"}}
 						},
 						MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
 							return &tableTestHandler{}
@@ -1145,15 +1455,16 @@ func TestControllerPublishedFunctionGenerationInvalidatesStaleHandlers(t *testin
 					},
 				})
 				controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+				controller.ReconcileModuleMethods("mod")
 				controller.Cleanup()
 			},
 		},
-		"job method after job stop": {
+		"instance function after job stop": {
 			setup: func(controller *Controller) {
 				controller.RegisterModules(collectorapi.Registry{
 					"mod": collectorapi.Creator{
-						JobMethods: func(collectorapi.RuntimeJob) []funcapi.MethodConfig {
-							return []funcapi.MethodConfig{{ID: "a"}}
+						InstanceFunctions: func(collectorapi.RuntimeJob) []funcapi.FunctionConfig {
+							return []funcapi.FunctionConfig{{ID: "a"}}
 						},
 						MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
 							return &tableTestHandler{}
@@ -1162,7 +1473,9 @@ func TestControllerPublishedFunctionGenerationInvalidatesStaleHandlers(t *testin
 				})
 				job := newTestRuntimeJob("mod", "job1", true)
 				controller.OnJobStart(job)
+				controller.ReconcileModuleMethods("mod")
 				controller.OnJobStop(job)
+				controller.ReconcileModuleMethods("mod")
 			},
 		},
 	}
@@ -1225,6 +1538,7 @@ func runRawControllerMethodCase(t *testing.T, tc rawControllerMethodCase, creato
 	}
 	controller.RegisterModules(collectorapi.Registry{"mod": creator})
 	controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+	controller.ReconcileModuleMethods("mod")
 
 	call := reg.handlers[callName]
 	require.NotNil(t, call)
@@ -1317,11 +1631,10 @@ func TestControllerRawModuleMethodRequest(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			runRawControllerMethodCase(t, tc, collectorapi.Creator{
-				Methods: func() []funcapi.MethodConfig {
-					return []funcapi.MethodConfig{{
+				AgentFunctions: func() []funcapi.FunctionConfig {
+					return []funcapi.FunctionConfig{{
 						ID:         "logs",
 						RawRequest: true,
-						AgentWide:  true,
 					}}
 				},
 			}, "mod:logs")
@@ -1329,7 +1642,7 @@ func TestControllerRawModuleMethodRequest(t *testing.T) {
 	}
 }
 
-func TestControllerRawAgentWideModuleMethodDoesNotRequireRunningJob(t *testing.T) {
+func TestControllerRawAgentScopeModuleMethodDoesNotRequireRunningJob(t *testing.T) {
 	var gotCode int
 	var gotResp map[string]any
 	var gotJob collectorapi.RuntimeJob
@@ -1344,11 +1657,10 @@ func TestControllerRawAgentWideModuleMethodDoesNotRequireRunningJob(t *testing.T
 
 	controller.RegisterModules(collectorapi.Registry{
 		"mod": collectorapi.Creator{
-			Methods: func() []funcapi.MethodConfig {
-				return []funcapi.MethodConfig{{
+			AgentFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{
 					ID:         "logs",
 					RawRequest: true,
-					AgentWide:  true,
 				}}
 			},
 			MethodHandler: func(job collectorapi.RuntimeJob) funcapi.MethodHandler {
@@ -1367,7 +1679,7 @@ func TestControllerRawAgentWideModuleMethodDoesNotRequireRunningJob(t *testing.T
 	})
 
 	reg.call("mod:logs", context.Background(), functions.Function{
-		UID:     "raw-agent-wide",
+		UID:     "raw-agent-scope",
 		Timeout: time.Second,
 	})
 
@@ -1376,7 +1688,7 @@ func TestControllerRawAgentWideModuleMethodDoesNotRequireRunningJob(t *testing.T
 	assert.Nil(t, gotJob)
 }
 
-func TestControllerRawSingleInstanceAgentWideModuleMethodUsesRunningJob(t *testing.T) {
+func TestControllerRawSingleInstanceAgentScopeModuleMethodUsesRunningJob(t *testing.T) {
 	var gotCode int
 	var gotResp map[string]any
 	var gotJob collectorapi.RuntimeJob
@@ -1391,11 +1703,10 @@ func TestControllerRawSingleInstanceAgentWideModuleMethodUsesRunningJob(t *testi
 	controller.RegisterModules(collectorapi.Registry{
 		"mod": collectorapi.Creator{
 			InstancePolicy: collectorapi.InstancePolicySingle,
-			Methods: func() []funcapi.MethodConfig {
-				return []funcapi.MethodConfig{{
+			SharedFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{
 					ID:         "logs",
 					RawRequest: true,
-					AgentWide:  true,
 				}}
 			},
 			MethodHandler: func(job collectorapi.RuntimeJob) funcapi.MethodHandler {
@@ -1414,9 +1725,10 @@ func TestControllerRawSingleInstanceAgentWideModuleMethodUsesRunningJob(t *testi
 	})
 	job := newTestRuntimeJob("mod", "mod", true)
 	controller.OnJobStart(job)
+	controller.ReconcileModuleMethods("mod")
 
 	reg.call("mod:logs", context.Background(), functions.Function{
-		UID:     "raw-single-agent-wide",
+		UID:     "raw-single-agent-scope",
 		Timeout: time.Second,
 	})
 
@@ -1425,7 +1737,7 @@ func TestControllerRawSingleInstanceAgentWideModuleMethodUsesRunningJob(t *testi
 	assert.Same(t, job, gotJob)
 }
 
-func TestControllerSingleInstanceAgentWideModuleMethodUsesRunningJob(t *testing.T) {
+func TestControllerSingleInstanceAgentScopeModuleMethodUsesRunningJob(t *testing.T) {
 	var gotCode int
 	var gotResp map[string]any
 	var gotJob collectorapi.RuntimeJob
@@ -1440,10 +1752,9 @@ func TestControllerSingleInstanceAgentWideModuleMethodUsesRunningJob(t *testing.
 	controller.RegisterModules(collectorapi.Registry{
 		"mod": collectorapi.Creator{
 			InstancePolicy: collectorapi.InstancePolicySingle,
-			Methods: func() []funcapi.MethodConfig {
-				return []funcapi.MethodConfig{{
-					ID:        "status",
-					AgentWide: true,
+			SharedFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{
+					ID: "status",
 				}}
 			},
 			MethodHandler: func(job collectorapi.RuntimeJob) funcapi.MethodHandler {
@@ -1476,9 +1787,10 @@ func TestControllerSingleInstanceAgentWideModuleMethodUsesRunningJob(t *testing.
 	})
 	job := newTestRuntimeJob("mod", "mod", true)
 	controller.OnJobStart(job)
+	controller.ReconcileModuleMethods("mod")
 
 	reg.call("mod:status", context.Background(), functions.Function{
-		UID:     "single-agent-wide",
+		UID:     "single-agent-scope",
 		Timeout: time.Second,
 		Payload: []byte(`{"scope":"all"}`),
 	})
@@ -1489,27 +1801,29 @@ func TestControllerSingleInstanceAgentWideModuleMethodUsesRunningJob(t *testing.
 	assert.Equal(t, []any{"scope"}, gotResp["accepted_params"])
 }
 
-func TestControllerSingleInstanceAgentWideModuleMethodRequiresRunningJob(t *testing.T) {
+func TestControllerSingleInstanceAgentScopeModuleMethodRequiresPublishedAvailableJob(t *testing.T) {
 	tests := map[string]struct {
 		setup   func(*Controller)
 		message string
 	}{
 		"before start": {
-			message: "module 'mod' is not running",
+			message: "unknown function 'mod:status'",
 		},
 		"after stop": {
 			setup: func(controller *Controller) {
 				job := newTestRuntimeJob("mod", "mod", true)
 				controller.OnJobStart(job)
+				controller.ReconcileModuleMethods("mod")
 				controller.OnJobStop(job)
+				controller.ReconcileModuleMethods("mod")
 			},
-			message: "module 'mod' is not running",
+			message: "unknown function 'mod:status'",
 		},
 		"registered but not running": {
 			setup: func(controller *Controller) {
 				controller.OnJobStart(newTestRuntimeJob("mod", "mod", false))
 			},
-			message: "job 'mod' is no longer running",
+			message: "unknown function 'mod:status'",
 		},
 	}
 
@@ -1529,10 +1843,9 @@ func TestControllerSingleInstanceAgentWideModuleMethodRequiresRunningJob(t *test
 			controller.RegisterModules(collectorapi.Registry{
 				"mod": collectorapi.Creator{
 					InstancePolicy: collectorapi.InstancePolicySingle,
-					Methods: func() []funcapi.MethodConfig {
-						return []funcapi.MethodConfig{{
-							ID:        "status",
-							AgentWide: true,
+					SharedFunctions: func() []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{
+							ID: "status",
 						}}
 					},
 					MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
@@ -1545,13 +1858,13 @@ func TestControllerSingleInstanceAgentWideModuleMethodRequiresRunningJob(t *test
 				tc.setup(controller)
 			}
 
-			reg.call("mod:status", context.Background(), functions.Function{
-				UID:     "single-agent-wide-missing-job",
+			controller.ExecuteFunction("mod:status", functions.Function{
+				UID:     "single-agent-scope-missing-job",
 				Timeout: time.Second,
 			})
 
-			assert.Equal(t, 503, gotCode)
-			assert.Equal(t, float64(503), gotResp["status"])
+			assert.Equal(t, 404, gotCode)
+			assert.Equal(t, float64(404), gotResp["status"])
 			assert.Equal(t, tc.message, gotResp["errorMessage"])
 			assert.False(t, gotHandler)
 		})
@@ -1574,8 +1887,8 @@ func TestControllerModuleMethodRequestContextCancellation(t *testing.T) {
 	})
 	controller.RegisterModules(collectorapi.Registry{
 		"mod": collectorapi.Creator{
-			Methods: func() []funcapi.MethodConfig {
-				return []funcapi.MethodConfig{{ID: "query"}}
+			SharedFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "query"}}
 			},
 			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
 				return &rawTestHandler{
@@ -1588,6 +1901,7 @@ func TestControllerModuleMethodRequestContextCancellation(t *testing.T) {
 		},
 	})
 	controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+	controller.ReconcileModuleMethods("mod")
 
 	reg.call("mod:query", ctx, functions.Function{
 		UID:     "normal-cancel",
@@ -1599,7 +1913,7 @@ func TestControllerModuleMethodRequestContextCancellation(t *testing.T) {
 	assert.Equal(t, "Request cancelled.", gotResp["errorMessage"])
 }
 
-func TestControllerRawJobMethodRequest(t *testing.T) {
+func TestControllerRawInstanceFunctionRequest(t *testing.T) {
 	tests := map[string]rawControllerMethodCase{
 		"raw query response is passed through": {
 			fn: functions.Function{
@@ -1672,8 +1986,8 @@ func TestControllerRawJobMethodRequest(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			runRawControllerMethodCase(t, tc, collectorapi.Creator{
-				JobMethods: func(job collectorapi.RuntimeJob) []funcapi.MethodConfig {
-					return []funcapi.MethodConfig{{
+				InstanceFunctions: func(job collectorapi.RuntimeJob) []funcapi.FunctionConfig {
+					return []funcapi.FunctionConfig{{
 						ID:         job.Name() + ":logs",
 						RawRequest: true,
 					}}
@@ -1683,7 +1997,7 @@ func TestControllerRawJobMethodRequest(t *testing.T) {
 	}
 }
 
-func TestControllerRawJobMethodRequiresRawHandler(t *testing.T) {
+func TestControllerRawInstanceFunctionRequiresRawHandler(t *testing.T) {
 	var gotCode int
 	var gotResp map[string]any
 	reg := newTestFunctionRegistry()
@@ -1696,8 +2010,8 @@ func TestControllerRawJobMethodRequiresRawHandler(t *testing.T) {
 	})
 	controller.RegisterModules(collectorapi.Registry{
 		"mod": collectorapi.Creator{
-			JobMethods: func(job collectorapi.RuntimeJob) []funcapi.MethodConfig {
-				return []funcapi.MethodConfig{{ID: job.Name() + ":logs", RawRequest: true}}
+			InstanceFunctions: func(job collectorapi.RuntimeJob) []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: job.Name() + ":logs", RawRequest: true}}
 			},
 			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
 				return &tableTestHandler{}
@@ -1705,6 +2019,7 @@ func TestControllerRawJobMethodRequiresRawHandler(t *testing.T) {
 		},
 	})
 	controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+	controller.ReconcileModuleMethods("mod")
 
 	reg.handlers["mod:job1:logs"](functions.Function{
 		UID:     "missing-raw-handler",
@@ -1721,6 +2036,7 @@ type testRuntimeJob struct {
 	moduleName string
 	name       string
 	running    bool
+	collector  any
 }
 
 func newTestRuntimeJob(moduleName, name string, running bool) *testRuntimeJob {
@@ -1736,7 +2052,19 @@ func (j *testRuntimeJob) FullName() string   { return j.fullName }
 func (j *testRuntimeJob) ModuleName() string { return j.moduleName }
 func (j *testRuntimeJob) Name() string       { return j.name }
 func (j *testRuntimeJob) IsRunning() bool    { return j.running }
-func (j *testRuntimeJob) Collector() any     { return nil }
+func (j *testRuntimeJob) Collector() any     { return j.collector }
+
+type testFunctionAvailability struct {
+	available map[string]bool
+	fn        func(string) bool
+}
+
+func (a *testFunctionAvailability) FunctionAvailable(functionID string) bool {
+	if a.fn != nil {
+		return a.fn(functionID)
+	}
+	return a.available[functionID]
+}
 
 type rawTestHandler struct {
 	params func(context.Context, string) ([]funcapi.ParamConfig, error)

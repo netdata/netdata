@@ -167,9 +167,9 @@ func collectorSpecificFunctionHandlers() []registeredSNMPFunction {
 	}}
 }
 
-func collectorSpecificMethodConfigs() []funcapi.MethodConfig {
-	return []funcapi.MethodConfig{
-		bgpPeersMethodConfig(),
+func collectorSpecificFunctionConfigs() []funcapi.FunctionConfig {
+	return []funcapi.FunctionConfig{
+		bgpPeersFunctionConfig(),
 	}
 }
 
