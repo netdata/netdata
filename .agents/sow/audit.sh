@@ -9,14 +9,12 @@ if [ -t 1 ]; then
   GREEN=$'\033[0;32m'
   YELLOW=$'\033[1;33m'
   BLUE=$'\033[0;34m'
-  GRAY=$'\033[0;90m'
   NC=$'\033[0m'
 else
   RED=""
   GREEN=""
   YELLOW=""
   BLUE=""
-  GRAY=""
   NC=""
 fi
 
@@ -109,15 +107,16 @@ else
 fi
 
 section "SOW layout"
-for path in .agents/sow/active .agents/sow/specs; do
+for path in .agents/sow/q .agents/sow/specs; do
   if [ -d "$path" ]; then
     ok "$path exists"
   else
-    fail "$path is missing"
+    fail "$path is missing (run .agents/sow/worktree-link.sh)"
   fi
 done
 
-for path in .agents/sow/SOW.template.md .agents/sow/audit.sh .agents/sow/scan-sensitive.sh .agents/sow/specs/README.md; do
+# Committed framework files (everything else under .agents/sow/ is local-only).
+for path in .agents/sow/SOW.template.md .agents/sow/audit.sh .agents/sow/scan-sensitive.sh .agents/sow/worktree-link.sh; do
   if [ -f "$path" ]; then
     ok "$path exists"
   else
@@ -125,17 +124,46 @@ for path in .agents/sow/SOW.template.md .agents/sow/audit.sh .agents/sow/scan-se
   fi
 done
 
-for legacy_dir in .agents/sow/pending .agents/sow/current .agents/sow/done; do
-  if [ -e "$legacy_dir" ]; then
-    fail "$legacy_dir must not exist in the active-only SOW model"
+for q in pending current active "done"; do
+  if [ -d ".agents/sow/q/$q" ]; then
+    ok ".agents/sow/q/$q exists"
   else
-    ok "$legacy_dir absent"
+    warn ".agents/sow/q/$q missing (run .agents/sow/worktree-link.sh)"
   fi
 done
 
-section "active SOW files"
+section "tracking invariants"
+for f in .agents/sow/SOW.template.md .agents/sow/audit.sh .agents/sow/scan-sensitive.sh .agents/sow/worktree-link.sh; do
+  if git ls-files --error-unmatch "$f" >/dev/null 2>&1; then
+    ok "$f is tracked"
+  else
+    fail "$f is not tracked (framework files must be committed)"
+  fi
+done
+for p in .agents/sow/q .agents/sow/specs; do
+  if git check-ignore -q "$p" 2>/dev/null; then
+    ok "$p is gitignored"
+  else
+    fail "$p is NOT gitignored (SOW working memory must be local-only)"
+  fi
+done
+tracked_local=$(git ls-files .agents/sow/q .agents/sow/specs 2>/dev/null)
+if [ -z "$tracked_local" ]; then
+  ok "no committed SOW/spec working files"
+else
+  printf '%s\n' "$tracked_local"
+  fail "SOW/spec working files are committed (must be local-only)"
+fi
+
+section "SOW files (local-only)"
+total_sows=0
+[ -d .agents/sow/q ] && total_sows=$(find -L .agents/sow/q -type f -name 'SOW-*.md' 2>/dev/null | wc -l | tr -d ' ')
+ok "$total_sows local SOW working file(s) under .agents/sow/q (local-only, never committed)"
+
+# Structural completeness is advisory and checked only for in-flight SOWs in the
+# active queue; pending stubs and completed (done/) history are exempt.
 active_count=0
-if [ -d .agents/sow/active ]; then
+if [ -d .agents/sow/q/active ]; then
   while IFS= read -r sow; do
     [ -n "$sow" ] || continue
     active_count=$((active_count + 1))
@@ -163,16 +191,14 @@ if [ -d .agents/sow/active ]; then
       if grep -qF "$needle" "$sow"; then
         ok "$sow contains $needle"
       else
-        fail "$sow is missing $needle"
+        warn "$sow is missing $needle"
       fi
     done
-  done < <(find .agents/sow/active -maxdepth 1 -type f -name 'SOW-*.md' 2>/dev/null | sort)
+  done < <(find -L .agents/sow/q/active -type f -name 'SOW-*.md' 2>/dev/null | sort)
 fi
 
 if [ "$active_count" -eq 0 ]; then
-  ok "no active branch-local SOW files"
-else
-  warn "$active_count active branch-local SOW file(s); they must be deleted before merge"
+  ok "no in-flight SOWs in .agents/sow/q/active"
 fi
 
 section "spec index"
@@ -183,7 +209,7 @@ if [ -f .agents/sow/specs/README.md ]; then
     if grep -qF "]($rel)" .agents/sow/specs/README.md; then
       ok "$rel is listed in specs/README.md"
     else
-      fail "$rel is missing from specs/README.md"
+      warn "$rel is missing from specs/README.md (specs are local-only; index is advisory)"
     fi
   done < <(find .agents/sow/specs -maxdepth 1 -type f -name '*.md' ! -name README.md 2>/dev/null | sort)
 
@@ -192,7 +218,7 @@ if [ -f .agents/sow/specs/README.md ]; then
     if [ -f ".agents/sow/specs/$link" ]; then
       ok "spec index link resolves: $link"
     else
-      fail "spec index link is broken: $link"
+      warn "spec index link is broken: $link (specs are local-only; index is advisory)"
     fi
   done < <(grep -oE '\]\([A-Za-z0-9._-]+\.md\)' .agents/sow/specs/README.md 2>/dev/null | sed 's/^](//; s/)$//' | sort -u)
 else
@@ -225,7 +251,8 @@ if command -v rg >/dev/null 2>&1; then
     -g '*.md' -g 'SKILL.md' -g '*.sh' -g '*.yml' \
     -g '!TODO*.md' \
     -g '!**/TODO*.md' \
-    -g '!**/.agents/sow/active/SOW-*.md' \
+    -g '!**/.agents/sow/q/**' \
+    -g '!**/.agents/sow/specs/**' \
     2>/dev/null || true)
 
   if [ -n "$legacy_refs" ]; then
@@ -241,21 +268,14 @@ fi
 section "sensitive data"
 scan_files=()
 
-for path in AGENTS.md CLAUDE.md GEMINI.md .agents/ENV.md .agents/sow/SOW.template.md .agents/sow/specs/README.md; do
+# Scan only committed durable artifacts. SOW working files (.agents/sow/q) and
+# specs (.agents/sow/specs) are local-only and never committed, so — like
+# .local/ — they are not durable artifacts and are not part of this hard gate.
+for path in AGENTS.md CLAUDE.md GEMINI.md .agents/ENV.md \
+            .agents/sow/SOW.template.md .agents/sow/audit.sh \
+            .agents/sow/scan-sensitive.sh .agents/sow/worktree-link.sh; do
   [ -f "$path" ] && scan_files+=("$path")
 done
-
-if [ -d .agents/sow/specs ]; then
-  while IFS= read -r file; do
-    scan_files+=("$file")
-  done < <(find .agents/sow/specs -type f -name '*.md' 2>/dev/null | sort)
-fi
-
-if [ -d .agents/sow/active ]; then
-  while IFS= read -r file; do
-    scan_files+=("$file")
-  done < <(find .agents/sow/active -type f -name '*.md' 2>/dev/null | sort)
-fi
 
 if [ -d .agents/skills ]; then
   while IFS= read -r file; do
