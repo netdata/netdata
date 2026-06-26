@@ -20,7 +20,9 @@ use otel_streams::synth_traces::{SynthTraceParams, build_request, generate};
 
 #[derive(Parser)]
 #[command(name = "synth-traces")]
-#[command(about = "Send a deterministic synthetic batch of OTLP traces to an endpoint (proof scaffold)")]
+#[command(
+    about = "Send a deterministic synthetic batch of OTLP traces to an endpoint (proof scaffold)"
+)]
 struct Args {
     #[command(flatten)]
     common: CommonArgs,
@@ -117,7 +119,9 @@ async fn main() -> anyhow::Result<()> {
         );
         let mut request = tonic::Request::new(export);
         if let Some(ref value) = tenant_header {
-            request.metadata_mut().insert("x-scope-orgid", value.clone());
+            request
+                .metadata_mut()
+                .insert("x-scope-orgid", value.clone());
         }
         client
             .export(request)

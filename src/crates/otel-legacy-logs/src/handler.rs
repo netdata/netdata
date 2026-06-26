@@ -382,7 +382,11 @@ impl FunctionHandler for LegacyLogsHandler {
             .map_err(|e| netdata_plugin_error::NetdataPluginError::Other {
                 message: format!("[{}] failed to find files in range: {}", transaction, e),
             })?;
-        trace!("[{}] found {} files in time range", transaction, files.len());
+        trace!(
+            "[{}] found {} files in time range",
+            transaction,
+            files.len()
+        );
 
         let filter_expr = build_filter_from_selections(&request.selections);
         let facets = Facets::new(&request.facets);

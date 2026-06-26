@@ -174,7 +174,13 @@ pub(crate) async fn build_logs_pipeline(
                 match tokio::time::timeout(
                     STARTUP_REMOTE_BUDGET,
                     file_lifecycle::recovery::reconcile_local_catalog_uploads(
-                        registry, pipeline_id, signal, uploader, storage, tenant_id, &retention,
+                        registry,
+                        pipeline_id,
+                        signal,
+                        uploader,
+                        storage,
+                        tenant_id,
+                        &retention,
                     ),
                 )
                 .await
@@ -199,8 +205,14 @@ pub(crate) async fn build_logs_pipeline(
 
         let retention =
             bridge::config::RetentionConfig::resolve(&config.index.retention, tenant_id.as_str());
-        recover_retention(registry, pipeline_id, cleaner, &retention, config.storage.enabled)
-            .await?;
+        recover_retention(
+            registry,
+            pipeline_id,
+            cleaner,
+            &retention,
+            config.storage.enabled,
+        )
+        .await?;
     }
 
     tracing::info!(signal, "recovery complete");

@@ -114,14 +114,15 @@ impl Registry {
         min_timestamp_s: u32,
         max_timestamp_s: u32,
     ) -> PathBuf {
-        file_registry::layout::date_tenant_dir(&self.base_dir, date, self.tenant_id.as_str())
-            .join(filename(
+        file_registry::layout::date_tenant_dir(&self.base_dir, date, self.tenant_id.as_str()).join(
+            filename(
                 machine_id,
                 boot_id,
                 max_seq,
                 min_timestamp_s,
                 max_timestamp_s,
-            ))
+            ),
+        )
     }
 
     /// Register a catalog file that has been written to disk.
@@ -647,15 +648,24 @@ mod tests {
 
         // Several dates and tenants; bodies are garbage on purpose —
         // the scan must never read them.
-        write_catalog_at(&tmp.path().join("2026-04-17").join("tenant-a").join(
-            filename(machine(), boot(), 42, 100, 200),
-        ));
-        write_catalog_at(&tmp.path().join("2026-04-17").join("tenant-b").join(
-            filename(machine(), boot(), 99, 100, 200),
-        ));
-        write_catalog_at(&tmp.path().join("2026-04-18").join("tenant-a").join(
-            filename(machine(), boot(), 7, 100, 200),
-        ));
+        write_catalog_at(
+            &tmp.path()
+                .join("2026-04-17")
+                .join("tenant-a")
+                .join(filename(machine(), boot(), 42, 100, 200)),
+        );
+        write_catalog_at(
+            &tmp.path()
+                .join("2026-04-17")
+                .join("tenant-b")
+                .join(filename(machine(), boot(), 99, 100, 200)),
+        );
+        write_catalog_at(
+            &tmp.path()
+                .join("2026-04-18")
+                .join("tenant-a")
+                .join(filename(machine(), boot(), 7, 100, 200)),
+        );
         // Non-date subdir and unparseable filename: ignored.
         std::fs::create_dir_all(tmp.path().join("not-a-date").join("tenant-a")).unwrap();
         write_catalog_at(
@@ -828,16 +838,8 @@ mod tests {
     fn candidates_aggregates_across_catalog_files() {
         let tmp = tempfile::tempdir().unwrap();
         let mut reg = Registry::new(tmp.path(), TenantId::from(TENANT));
-        write_catalog_file(
-            &mut reg,
-            10,
-            vec![entry_at(1, 100, 200, "ns", "a")],
-        );
-        write_catalog_file(
-            &mut reg,
-            20,
-            vec![entry_at(2, 300, 400, "ns", "a")],
-        );
+        write_catalog_file(&mut reg, 10, vec![entry_at(1, 100, 200, "ns", "a")]);
+        write_catalog_file(&mut reg, 20, vec![entry_at(2, 300, 400, "ns", "a")]);
 
         let q = Query {
             time_range: 0..1000,
@@ -870,16 +872,8 @@ mod tests {
     fn candidates_skips_pending_deletion_files() {
         let tmp = tempfile::tempdir().unwrap();
         let mut reg = Registry::new(tmp.path(), TenantId::from(TENANT));
-        let live = write_catalog_file(
-            &mut reg,
-            10,
-            vec![entry_at(1, 100, 200, "ns", "a")],
-        );
-        let evicting = write_catalog_file(
-            &mut reg,
-            20,
-            vec![entry_at(2, 100, 200, "ns", "a")],
-        );
+        let live = write_catalog_file(&mut reg, 10, vec![entry_at(1, 100, 200, "ns", "a")]);
+        let evicting = write_catalog_file(&mut reg, 20, vec![entry_at(2, 100, 200, "ns", "a")]);
         reg.mark_pending_deletion(&evicting);
         // `live` stays in normal state.
         let _ = live;
@@ -897,11 +891,7 @@ mod tests {
         let mut reg = Registry::new(tmp.path(), TenantId::from(TENANT));
 
         // Good catalog with one entry.
-        write_catalog_file(
-            &mut reg,
-            10,
-            vec![entry_at(1, 100, 200, "ns", "a")],
-        );
+        write_catalog_file(&mut reg, 10, vec![entry_at(1, 100, 200, "ns", "a")]);
 
         // Corrupt catalog: file exists but contains garbage. The registry
         // tracks it; candidates() should log+skip it without poisoning
@@ -930,11 +920,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let mut reg = Registry::new(tmp.path(), TenantId::from(TENANT));
 
-        write_catalog_file(
-            &mut reg,
-            10,
-            vec![entry_at(1, 100, 200, "ns", "a")],
-        );
+        write_catalog_file(&mut reg, 10, vec![entry_at(1, 100, 200, "ns", "a")]);
 
         // Out-of-window catalog with corrupt body — would error if parsed.
         let oo_path = reg.file_path(date(), machine(), boot(), 20, 1000, 2000);

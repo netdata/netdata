@@ -110,7 +110,11 @@ mod tests {
             assert!(w[1].start_time_unix_nano > w[0].start_time_unix_nano);
         }
         // Ids are the right widths and unique per span.
-        assert!(spans.iter().all(|s| s.trace_id.len() == 16 && s.span_id.len() == 8));
+        assert!(
+            spans
+                .iter()
+                .all(|s| s.trace_id.len() == 16 && s.span_id.len() == 8)
+        );
         let ids: std::collections::BTreeSet<_> = spans.iter().map(|s| s.span_id.clone()).collect();
         assert_eq!(ids.len(), 5);
     }

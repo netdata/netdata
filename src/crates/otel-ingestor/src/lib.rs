@@ -39,9 +39,7 @@ use trace_service::NetdataTracesService;
 // The logs WAL writer stamps `FileId::DEFAULT_PIPELINE`; pin it to the shared
 // `LOGS_PIPELINE_ID` on the ingestor side too (the ledger pins the same invariant
 // on its side) so a future change to either can't silently mis-route logs.
-const _: () = assert!(
-    bridge::signals::LOGS_PIPELINE_ID == file_registry::FileId::DEFAULT_PIPELINE
-);
+const _: () = assert!(bridge::signals::LOGS_PIPELINE_ID == file_registry::FileId::DEFAULT_PIPELINE);
 
 /// Ingestor worker entry point.
 ///
@@ -179,8 +177,7 @@ async fn run_ingestor(
         Arc::clone(&seq),
         Arc::clone(&clock),
     );
-    let traces_service =
-        create_traces_service(&traces_lifecycle, &config.auth, sender, seq, clock);
+    let traces_service = create_traces_service(&traces_lifecycle, &config.auth, sender, seq, clock);
 
     // Parse gRPC endpoint address
     let addr =
@@ -309,8 +306,11 @@ fn create_shared_writer_state(
     let highwater_path = config.seq_highwater_path();
 
     let logs_scan = scan_seq_dirs(&logs_lc.wal.dir, &logs_lc.index.dir, &logs_lc.catalog.dir)?;
-    let traces_scan =
-        scan_seq_dirs(&traces_lc.wal.dir, &traces_lc.index.dir, &traces_lc.catalog.dir)?;
+    let traces_scan = scan_seq_dirs(
+        &traces_lc.wal.dir,
+        &traces_lc.index.dir,
+        &traces_lc.catalog.dir,
+    )?;
     let highwater = wal::read_seq_highwater(&highwater_path);
     let seed = logs_scan
         .max()

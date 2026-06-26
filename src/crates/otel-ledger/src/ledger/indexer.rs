@@ -94,7 +94,9 @@ impl Ledger {
                 registry.sfst.track(file_id, size, summary);
 
                 let upload = if storage_enabled {
-                    file_lifecycle::helpers::sfst_upload_request(registry, signal, &tenant_id, file_id)
+                    file_lifecycle::helpers::sfst_upload_request(
+                        registry, signal, &tenant_id, file_id,
+                    )
                 } else {
                     None
                 };

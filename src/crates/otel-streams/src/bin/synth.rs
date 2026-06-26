@@ -100,17 +100,19 @@ async fn main() -> anyhow::Result<()> {
     };
     // Bound the connect: the shared Sender retries forever (right for live
     // streams), but this one-shot tool must fail fast on a bad/unready endpoint.
-    let mut sender =
-        match time::timeout(Duration::from_secs(args.connect_timeout_secs), Sender::new(config, rx))
-            .await
-        {
-            Ok(res) => res?,
-            Err(_) => anyhow::bail!(
-                "timed out after {}s connecting to {}",
-                args.connect_timeout_secs,
-                args.common.otel_endpoint
-            ),
-        };
+    let mut sender = match time::timeout(
+        Duration::from_secs(args.connect_timeout_secs),
+        Sender::new(config, rx),
+    )
+    .await
+    {
+        Ok(res) => res?,
+        Err(_) => anyhow::bail!(
+            "timed out after {}s connecting to {}",
+            args.connect_timeout_secs,
+            args.common.otel_endpoint
+        ),
+    };
     let handle = tokio::spawn(async move { sender.run().await });
 
     for record in records {
@@ -121,7 +123,10 @@ async fn main() -> anyhow::Result<()> {
     drop(tx); // closes the channel → sender flushes the remainder and returns
     let failures = handle.await?;
     if failures > 0 {
-        anyhow::bail!("{failures} batch(es) failed to export to {}", args.common.otel_endpoint);
+        anyhow::bail!(
+            "{failures} batch(es) failed to export to {}",
+            args.common.otel_endpoint
+        );
     }
 
     info!(count = total, endpoint = %args.common.otel_endpoint, "synthetic logs sent");

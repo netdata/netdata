@@ -23,13 +23,13 @@ use std::io::{Seek, Write};
 use std::path::Path;
 use std::time::Instant;
 
-use sfst::{ChunkCounts, StreamWriter};
 use roaring::RoaringBitmap;
+use sfst::{ChunkCounts, StreamWriter};
 use treight::Bitmap;
 
 use super::bitset::Bitset;
 use super::kv_interner::KvSlot;
-use super::row_index::{TimeOrder, RowIndex};
+use super::row_index::{RowIndex, TimeOrder};
 use crate::IndexError;
 use otel_logs_identity::ServiceStream;
 use sfst::{BitmapValue, FieldEntry, FieldTier, IdRanges, KvId, Metadata};
@@ -185,7 +185,6 @@ fn build_mid_card_chunks<W: Write + Seek>(
 
     Ok(())
 }
-
 
 /// Build high-cardinality field chunks (bincode + zstd).
 ///

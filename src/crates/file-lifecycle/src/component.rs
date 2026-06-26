@@ -92,12 +92,7 @@ impl<Req: Send + 'static, Resp: Send + 'static> ComponentHandle<Req, Resp> {
     /// hands them to the run-loop. The `pending` counter is only meaningful for
     /// the synchronous recovery drains (`batch_recover` / `drain_pending`);
     /// steady-state routing does not consult it.
-    pub fn into_parts(
-        self,
-    ) -> (
-        mpsc::UnboundedSender<Req>,
-        mpsc::UnboundedReceiver<Resp>,
-    ) {
+    pub fn into_parts(self) -> (mpsc::UnboundedSender<Req>, mpsc::UnboundedReceiver<Resp>) {
         (self.tx, self.rx)
     }
 }

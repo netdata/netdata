@@ -40,7 +40,10 @@ impl Ledger {
                 );
 
                 let Some(pipeline) = self.pipelines.get(&pipeline_id) else {
-                    tracing::error!(pipeline_id, "catalog rotation for unknown pipeline; dropping");
+                    tracing::error!(
+                        pipeline_id,
+                        "catalog rotation for unknown pipeline; dropping"
+                    );
                     return;
                 };
                 let registries = pipeline.registries().clone();

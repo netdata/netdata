@@ -11,10 +11,10 @@
 //!    time-sort remap and sparse histogram.
 
 use crate::IndexError;
-use sfst::Histogram;
 use bumpalo::Bump;
 use otel_logs_identity::ServiceStream;
 use roaring::RoaringBitmap;
+use sfst::Histogram;
 
 use super::kv_interner::{KeyValueInterner, KvSlot};
 

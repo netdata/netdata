@@ -44,10 +44,10 @@ use file_registry::FileId;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
+use crate::event::{LedgerEvent, PipelineResp};
 use file_lifecycle::chunk::ChunkCache;
 use file_lifecycle::cleaner::Cleaner;
 use file_lifecycle::component::ComponentHandle;
-use crate::event::{LedgerEvent, PipelineResp};
 use file_lifecycle::ipc::{CleanerRequest, CleanerResponse, UploaderRequest, UploaderResponse};
 use file_lifecycle::storage::OpendalStorage;
 use file_lifecycle::uploader::{Uploader, UploaderArgs};
@@ -175,7 +175,9 @@ impl Ledger {
                 match file_lifecycle::storage::probe_reachable(&probe_storage).await {
                     Ok(()) => tracing::info!("remote storage reachable and credentials accepted"),
                     Err(e) => {
-                        tracing::error!("remote storage enabled but unreachable or misconfigured: {e}")
+                        tracing::error!(
+                            "remote storage enabled but unreachable or misconfigured: {e}"
+                        )
                     }
                 }
             });

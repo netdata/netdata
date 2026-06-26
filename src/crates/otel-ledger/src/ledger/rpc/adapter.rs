@@ -172,7 +172,10 @@ pub fn stream_required_params(partitions: Vec<PartitionStat>) -> Vec<RequiredPar
     }
     // Decode each partition's opaque identity, then sort by `(namespace, name)`
     // for display (the substrate yields them ordered by opaque `part_key`).
-    let mut stats: Vec<StreamStat> = partitions.into_iter().map(StreamStat::from_partition).collect();
+    let mut stats: Vec<StreamStat> = partitions
+        .into_iter()
+        .map(StreamStat::from_partition)
+        .collect();
     stats.sort_by(|a, b| {
         (&a.stream.namespace, &a.stream.name).cmp(&(&b.stream.namespace, &b.stream.name))
     });

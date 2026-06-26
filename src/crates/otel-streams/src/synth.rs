@@ -87,7 +87,10 @@ mod tests {
         let recs = generate(&params(5, 10));
         assert_eq!(recs.len(), 5);
         for w in recs.windows(2) {
-            assert!(w[1].time_unix_nano > w[0].time_unix_nano, "timestamps ascend");
+            assert!(
+                w[1].time_unix_nano > w[0].time_unix_nano,
+                "timestamps ascend"
+            );
         }
         assert_eq!(recs[0].time_unix_nano, 1_000_000_000_000);
         assert_eq!(recs[1].time_unix_nano, 1_000_000_000_000 + 1_000_000_000);
@@ -122,6 +125,10 @@ mod tests {
             .filter(|a| a.key == "seq")
             .map(|a| format!("{:?}", a.value))
             .collect();
-        assert_eq!(seqs.len(), 20, "seq is high-cardinality (unique per record)");
+        assert_eq!(
+            seqs.len(),
+            20,
+            "seq is high-cardinality (unique per record)"
+        );
     }
 }

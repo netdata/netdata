@@ -100,7 +100,8 @@ impl FileHeader {
         buf[8..16].copy_from_slice(&self.created_at.to_le_bytes());
 
         let len = self.content_meta.len();
-        buf[CONTENT_META_OFFSET - 2..CONTENT_META_OFFSET].copy_from_slice(&(len as u16).to_le_bytes());
+        buf[CONTENT_META_OFFSET - 2..CONTENT_META_OFFSET]
+            .copy_from_slice(&(len as u16).to_le_bytes());
         buf[CONTENT_META_OFFSET..CONTENT_META_OFFSET + len].copy_from_slice(&self.content_meta);
         buf
     }
@@ -126,13 +127,15 @@ impl FileHeader {
         let created_at = u64::from_le_bytes(buf[8..16].try_into().unwrap());
 
         let content_meta_len =
-            u16::from_le_bytes([buf[CONTENT_META_OFFSET - 2], buf[CONTENT_META_OFFSET - 1]]) as usize;
+            u16::from_le_bytes([buf[CONTENT_META_OFFSET - 2], buf[CONTENT_META_OFFSET - 1]])
+                as usize;
         if content_meta_len > MAX_CONTENT_META_BYTES {
             return Err(crate::Error::InvalidHeader(format!(
                 "content_meta length {content_meta_len} exceeds {MAX_CONTENT_META_BYTES}"
             )));
         }
-        let content_meta = buf[CONTENT_META_OFFSET..CONTENT_META_OFFSET + content_meta_len].to_vec();
+        let content_meta =
+            buf[CONTENT_META_OFFSET..CONTENT_META_OFFSET + content_meta_len].to_vec();
 
         Ok(Self {
             version,
@@ -267,8 +270,7 @@ mod tests {
         let mut buf = [0u8; HEADER_SIZE];
         buf[0..4].copy_from_slice(&MAGIC);
         buf[4..6].copy_from_slice(&3u16.to_le_bytes());
-        buf[CONTENT_META_OFFSET - 2..CONTENT_META_OFFSET]
-            .copy_from_slice(&u16::MAX.to_le_bytes());
+        buf[CONTENT_META_OFFSET - 2..CONTENT_META_OFFSET].copy_from_slice(&u16::MAX.to_le_bytes());
         let err = FileHeader::from_bytes(&buf).unwrap_err();
         assert!(matches!(err, crate::Error::UnsupportedVersion(3)));
     }

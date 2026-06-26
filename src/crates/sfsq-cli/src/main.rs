@@ -51,8 +51,19 @@ mod tests {
     #[test]
     fn accepts_leading_dash_relative_times() {
         let cli = Cli::try_parse_from([
-            "sfsq-cli", "--wal-dir", "/x", "--sfst-dir", "/y", "--since", "-1h", "--until", "+30m",
+            "sfsq-cli",
+            "--wal-dir",
+            "/x",
+            "--sfst-dir",
+            "/y",
+            "--since",
+            "-1h",
+            "--until",
+            "+30m",
         ]);
-        assert!(cli.is_ok(), "expected `--since -1h --until +30m` to parse: {cli:?}");
+        assert!(
+            cli.is_ok(),
+            "expected `--since -1h --until +30m` to parse: {cli:?}"
+        );
     }
 }

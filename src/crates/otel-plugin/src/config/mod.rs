@@ -715,8 +715,14 @@ endpoint:
     #[test]
     fn redact_uri_keeps_scheme_only() {
         // Host/path/query (where a misplaced secret would sit) are dropped.
-        assert_eq!(redact_uri("s3://bucket/prefix?key=secret"), "s3://[redacted]");
-        assert_eq!(redact_uri("fs:///var/lib/netdata/otel/remote"), "fs://[redacted]");
+        assert_eq!(
+            redact_uri("s3://bucket/prefix?key=secret"),
+            "s3://[redacted]"
+        );
+        assert_eq!(
+            redact_uri("fs:///var/lib/netdata/otel/remote"),
+            "fs://[redacted]"
+        );
         // Schemeless / empty inputs.
         assert_eq!(redact_uri("weird-no-scheme"), "[redacted]");
         assert_eq!(redact_uri(""), "");
@@ -907,7 +913,10 @@ logs:
             || {
                 let o = ConfigOverride::from_env().unwrap();
                 assert!(o.has_any());
-                assert_eq!(o.base_dir.as_deref(), Some(std::path::Path::new("/data/otel")));
+                assert_eq!(
+                    o.base_dir.as_deref(),
+                    Some(std::path::Path::new("/data/otel"))
+                );
                 assert_eq!(o.auth.as_ref().unwrap().enabled, Some(true));
             },
         );
@@ -992,7 +1001,8 @@ logs:
     fn journal_dir_from_yaml_tolerates_superset_schema() {
         // The current schema's logs.wal/index fields coexist with the former
         // logs.journal_dir; unknown fields must not prevent extraction.
-        let yaml = "logs:\n  journal_dir: /data/otel/v1\n  wal:\n    dir: /x\n  index:\n    dir: /y\n";
+        let yaml =
+            "logs:\n  journal_dir: /data/otel/v1\n  wal:\n    dir: /x\n  index:\n    dir: /y\n";
         let dir = journal_dir_from_yaml(yaml).expect("valid yaml parses");
         assert_eq!(dir.as_deref(), Some(Path::new("/data/otel/v1")));
     }
@@ -1000,8 +1010,14 @@ logs:
     #[test]
     fn journal_dir_from_yaml_none_when_absent() {
         // logs present but no journal_dir, and no logs section at all → no override.
-        assert_eq!(journal_dir_from_yaml("logs:\n  wal:\n    dir: /x\n").unwrap(), None);
-        assert_eq!(journal_dir_from_yaml("endpoint:\n  path: x\n").unwrap(), None);
+        assert_eq!(
+            journal_dir_from_yaml("logs:\n  wal:\n    dir: /x\n").unwrap(),
+            None
+        );
+        assert_eq!(
+            journal_dir_from_yaml("endpoint:\n  path: x\n").unwrap(),
+            None
+        );
         assert_eq!(journal_dir_from_yaml("").unwrap(), None);
     }
 

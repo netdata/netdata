@@ -1,15 +1,14 @@
 mod config;
 mod error;
 mod format;
-mod reader;
 pub mod prefix;
+mod reader;
 pub mod registry;
 mod seq;
 mod writer;
 
 pub use config::{Config, RotationConfig};
 pub use error::{Error, Result};
-pub use seq::{DEFAULT_RESERVE_BATCH, SeqAllocator, read_seq_highwater, write_seq_highwater};
 /// Byte offset of the first frame — the lower bound for
 /// [`Reader::open_range`] `start` and the start of a whole-prefix read.
 pub use format::HEADER_SIZE;
@@ -23,6 +22,7 @@ pub use format::MAX_CONTENT_META_BYTES;
 pub use format::{FileEvent, Message};
 pub use reader::{Frame, FrameBoundary, FrameRange, Reader, scan_frame_boundaries};
 pub use registry::{File, Registry};
+pub use seq::{DEFAULT_RESERVE_BATCH, SeqAllocator, read_seq_highwater, write_seq_highwater};
 pub use writer::Writer;
 
 /// Deterministic opaque partition key for tests. The WAL treats `part_key` as

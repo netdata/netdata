@@ -520,7 +520,10 @@ traces:
         assert!(!c.logs.wal.compression_enabled);
         assert_eq!(c.logs.catalog.rotation_count, 7);
         // traces.catalog omitted → default rotation count.
-        assert_eq!(c.traces.catalog.rotation_count, default_catalog_rotation_count());
+        assert_eq!(
+            c.traces.catalog.rotation_count,
+            default_catalog_rotation_count()
+        );
         assert!(c.traces.wal.crc_enabled); // default_true when omitted
     }
 
@@ -529,7 +532,10 @@ traces:
         let c = full_config();
 
         let logs = c.lifecycle_for(LOGS_SIGNAL);
-        assert_eq!(logs.wal.dir, PathBuf::from("/var/lib/netdata/otel/logs/wal"));
+        assert_eq!(
+            logs.wal.dir,
+            PathBuf::from("/var/lib/netdata/otel/logs/wal")
+        );
         assert_eq!(
             logs.index.dir,
             PathBuf::from("/var/lib/netdata/otel/logs/index")
@@ -562,8 +568,7 @@ traces:
         assert!(traces.storage.enabled);
         assert_eq!(traces.storage.uri, logs.storage.uri);
         // Per-signal tuning is the traces section, not logs'.
-        let traces_rot =
-            RotationConfig::resolve(&traces.wal.rotation, "default");
+        let traces_rot = RotationConfig::resolve(&traces.wal.rotation, "default");
         assert_eq!(traces_rot.max_log_entries, 1000);
     }
 

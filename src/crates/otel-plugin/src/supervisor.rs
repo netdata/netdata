@@ -188,7 +188,8 @@ impl Supervisor {
     fn disable_legacy(&mut self) {
         self.legacy_alive = false;
         self.routing.retain(|_, w| !matches!(w, Worker::LegacyLogs));
-        self.transactions.retain(|_, w| !matches!(w, Worker::LegacyLogs));
+        self.transactions
+            .retain(|_, w| !matches!(w, Worker::LegacyLogs));
     }
 
     /// Route a function call from the agent to the appropriate worker.
@@ -635,8 +636,7 @@ pub async fn run() -> anyhow::Result<()> {
     let (ledger_conn, ledger_child) = spawn_worker(&self_exe, &ledger_sock, "ledger").await?;
     let (ingestor_conn, ingestor_child) =
         spawn_worker(&self_exe, &ingestor_sock, "ingestor").await?;
-    let (legacy_conn, legacy_child) =
-        spawn_worker(&self_exe, &legacy_sock, "legacy-logs").await?;
+    let (legacy_conn, legacy_child) = spawn_worker(&self_exe, &legacy_sock, "legacy-logs").await?;
 
     let mut supervisor = Supervisor {
         ingestor: ingestor_conn,

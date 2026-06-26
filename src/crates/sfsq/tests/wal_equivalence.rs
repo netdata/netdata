@@ -1177,7 +1177,10 @@ fn wal_data_rows_match_whole_file_index() {
             sources(live_candidates_clone(&live), tails_clone(&tails)),
             q.clone(),
         ));
-        let whole_rows = rows_of(&run_plain(vec![LogSource::Sfst(clone_candidate(&whole))], q));
+        let whole_rows = rows_of(&run_plain(
+            vec![LogSource::Sfst(clone_candidate(&whole))],
+            q,
+        ));
         assert!(!live_rows.is_empty(), "q={qlabel}: no rows");
         assert_eq!(
             live_rows, whole_rows,

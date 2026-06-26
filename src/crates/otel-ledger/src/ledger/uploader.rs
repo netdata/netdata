@@ -27,7 +27,10 @@ impl Ledger {
             | UploaderResponse::CatalogUploadFailed { pipeline_id, .. } => *pipeline_id,
         };
         let Some(pipeline) = self.pipelines.get(&pipeline_id) else {
-            tracing::error!(pipeline_id, "uploader response for unknown pipeline; dropping");
+            tracing::error!(
+                pipeline_id,
+                "uploader response for unknown pipeline; dropping"
+            );
             return;
         };
         // Snapshot the pipeline's registries handle + catalog-builder sender so

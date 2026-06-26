@@ -264,9 +264,7 @@ impl Registry {
             .values()
             .filter(|f| f.min_timestamp_ns != TimestampNs::ZERO)
             .filter(move |f| range_overlaps_ns(f, q_min_ns, q_max_ns))
-            .filter(move |f| {
-                partition_keys.is_empty() || partition_keys.contains(&f.id.part_key)
-            })
+            .filter(move |f| partition_keys.is_empty() || partition_keys.contains(&f.id.part_key))
     }
 
     pub fn len(&self) -> usize {
@@ -328,7 +326,9 @@ mod tests {
         for &count in entry_counts {
             for i in 0..count {
                 writer
-                    .write_frame(crate::opaque_part_key("ns", "svc"), &[],
+                    .write_frame(
+                        crate::opaque_part_key("ns", "svc"),
+                        &[],
                         &(i as u32).to_le_bytes(),
                         1,
                         TimestampNs(i as u64 + 1),
@@ -701,7 +701,14 @@ mod tests {
         let api = crate::opaque_part_key("prod", "api");
         let worker = crate::opaque_part_key("prod", "worker");
         track(&mut reg, 1, api, 100 * NS, 200 * NS, FileStatus::Archived);
-        track(&mut reg, 2, worker, 100 * NS, 200 * NS, FileStatus::Archived);
+        track(
+            &mut reg,
+            2,
+            worker,
+            100 * NS,
+            200 * NS,
+            FileStatus::Archived,
+        );
         track(&mut reg, 3, api, 100 * NS, 200 * NS, FileStatus::Active);
 
         let q = Query {

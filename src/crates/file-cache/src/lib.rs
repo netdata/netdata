@@ -156,7 +156,11 @@ impl Drop for CachedFile {
         {
             let mut inner = self.shared.lock();
             if let Some(e) = inner.entries.get_mut(&self.filename) {
-                debug_assert!(e.pins > 0, "file-cache: pin underflow for {}", self.filename);
+                debug_assert!(
+                    e.pins > 0,
+                    "file-cache: pin underflow for {}",
+                    self.filename
+                );
                 e.pins = e.pins.saturating_sub(1);
             }
         }
@@ -276,10 +280,7 @@ impl State {
     fn try_admit(&mut self, items: &[Want], dir: &Path) -> Admit {
         // Saturating so a pathological/overflowing footprint reads as huge and is
         // rejected, rather than wrapping near zero and falsely "fitting".
-        let footprint: u64 = items
-            .iter()
-            .map(|w| w.size)
-            .fold(0u64, u64::saturating_add);
+        let footprint: u64 = items.iter().map(|w| w.size).fold(0u64, u64::saturating_add);
         if footprint > self.capacity {
             return Admit::TooLarge {
                 footprint,
@@ -325,7 +326,11 @@ impl State {
             .filter(|(name, e)| e.pins > 0 || hit_set.contains(*name))
             .map(|(_, e)| e.size)
             .fold(0u64, u64::saturating_add);
-        if protected_total.saturating_add(self.reserved).saturating_add(need) > self.capacity {
+        if protected_total
+            .saturating_add(self.reserved)
+            .saturating_add(need)
+            > self.capacity
+        {
             return Admit::Wait;
         }
 
@@ -459,10 +464,7 @@ impl FileCache {
         {
             use std::os::unix::fs::PermissionsExt;
             if let Err(e) = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)) {
-                tracing::warn!(
-                    "file-cache: could not set 0700 on {}: {e}",
-                    dir.display()
-                );
+                tracing::warn!("file-cache: could not set 0700 on {}: {e}", dir.display());
             }
         }
 
@@ -648,8 +650,14 @@ impl FileCache {
 
                 match self.shared.lock().try_admit(&pending, &self.shared.dir) {
                     Admit::Ready(plan) => break plan,
-                    Admit::TooLarge { footprint, capacity } => {
-                        return Err(CacheError::TooLarge { footprint, capacity });
+                    Admit::TooLarge {
+                        footprint,
+                        capacity,
+                    } => {
+                        return Err(CacheError::TooLarge {
+                            footprint,
+                            capacity,
+                        });
                     }
                     Admit::EvictionFailed => return Err(CacheError::EvictionFailed),
                     Admit::Wait => {}
@@ -944,14 +952,20 @@ mod tests {
         let (calls, fetch) = counting_fetch(10);
         let cancel = CancellationToken::new();
 
-        let files = cache.acquire(&[want("a", 10)], &fetch, &cancel).await.unwrap();
+        let files = cache
+            .acquire(&[want("a", 10)], &fetch, &cancel)
+            .await
+            .unwrap();
         assert_eq!(files.len(), 1);
         assert_eq!(std::fs::read(files[0].path()).unwrap(), vec![b'x'; 10]);
         assert_eq!(calls.load(Ordering::SeqCst), 1);
         drop(files);
 
         // Second acquire is a hit — fetch not called again.
-        let files = cache.acquire(&[want("a", 10)], &fetch, &cancel).await.unwrap();
+        let files = cache
+            .acquire(&[want("a", 10)], &fetch, &cancel)
+            .await
+            .unwrap();
         assert_eq!(files.len(), 1);
         assert_eq!(calls.load(Ordering::SeqCst), 1);
         assert_eq!(cache.total_bytes(), 10);
@@ -965,13 +979,22 @@ mod tests {
         let cancel = CancellationToken::new();
 
         // Pin A (hold its handle), then cache B (drop handle → unpinned).
-        let a = cache.acquire(&[want("a", 10)], &fetch, &cancel).await.unwrap();
-        let b = cache.acquire(&[want("b", 10)], &fetch, &cancel).await.unwrap();
+        let a = cache
+            .acquire(&[want("a", 10)], &fetch, &cancel)
+            .await
+            .unwrap();
+        let b = cache
+            .acquire(&[want("b", 10)], &fetch, &cancel)
+            .await
+            .unwrap();
         drop(b);
         assert_eq!(cache.total_bytes(), 20);
 
         // C needs 10 bytes; A is pinned, B is not → B is evicted, A survives.
-        let _c = cache.acquire(&[want("c", 10)], &fetch, &cancel).await.unwrap();
+        let _c = cache
+            .acquire(&[want("c", 10)], &fetch, &cancel)
+            .await
+            .unwrap();
         assert!(cache.is_cached("a"), "pinned A must survive");
         assert!(!cache.is_cached("b"), "unpinned LRU B must be evicted");
         assert!(cache.is_cached("c"));
@@ -1010,7 +1033,11 @@ mod tests {
         let (f1, f2) = tokio::join!(tokio::spawn(mk()), tokio::spawn(mk()));
         assert_eq!(f1.unwrap().len(), 1);
         assert_eq!(f2.unwrap().len(), 1);
-        assert_eq!(calls.load(Ordering::SeqCst), 1, "exactly one fetch for two callers");
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            1,
+            "exactly one fetch for two callers"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -1021,8 +1048,14 @@ mod tests {
         let cancel = CancellationToken::new();
 
         // Fill and pin the whole budget with A and B.
-        let a = cache.acquire(&[want("a", 10)], &fetch, &cancel).await.unwrap();
-        let b = cache.acquire(&[want("b", 10)], &fetch, &cancel).await.unwrap();
+        let a = cache
+            .acquire(&[want("a", 10)], &fetch, &cancel)
+            .await
+            .unwrap();
+        let b = cache
+            .acquire(&[want("b", 10)], &fetch, &cancel)
+            .await
+            .unwrap();
 
         // C cannot be admitted until a pin releases; run it concurrently.
         let task = {
@@ -1030,7 +1063,10 @@ mod tests {
             let cancel = cancel.clone();
             let (_c2, fetch2) = counting_fetch(10);
             tokio::spawn(async move {
-                cache.acquire(&[want("c", 10)], &fetch2, &cancel).await.unwrap()
+                cache
+                    .acquire(&[want("c", 10)], &fetch2, &cancel)
+                    .await
+                    .unwrap()
             })
         };
 
@@ -1038,7 +1074,10 @@ mod tests {
         for _ in 0..8 {
             tokio::task::yield_now().await;
         }
-        assert!(!task.is_finished(), "C must wait while budget is fully pinned");
+        assert!(
+            !task.is_finished(),
+            "C must wait while budget is fully pinned"
+        );
         drop(b);
 
         let c = task.await.unwrap();
@@ -1120,7 +1159,13 @@ mod tests {
             .acquire(&[want("a", 10), want("b", 10)], &fetch, &cancel)
             .await
             .unwrap_err();
-        assert!(matches!(err, CacheError::TooLarge { footprint: 20, capacity: 15 }));
+        assert!(matches!(
+            err,
+            CacheError::TooLarge {
+                footprint: 20,
+                capacity: 15
+            }
+        ));
     }
 
     #[tokio::test]
@@ -1146,7 +1191,10 @@ mod tests {
         let (_c, fetch) = counting_fetch(10);
 
         // Pin the whole budget so a second query must wait in Phase 1 admission.
-        let a = cache.acquire(&[want("a", 10)], &fetch, &CancellationToken::new()).await.unwrap();
+        let a = cache
+            .acquire(&[want("a", 10)], &fetch, &CancellationToken::new())
+            .await
+            .unwrap();
 
         let cancel = CancellationToken::new();
         let task = {
@@ -1160,7 +1208,10 @@ mod tests {
         }
         assert!(!task.is_finished(), "B must be waiting for room");
         cancel.cancel();
-        assert!(matches!(task.await.unwrap().unwrap_err(), CacheError::Cancelled));
+        assert!(matches!(
+            task.await.unwrap().unwrap_err(),
+            CacheError::Cancelled
+        ));
         drop(a);
     }
 
@@ -1190,11 +1241,7 @@ mod tests {
         // Path-traversal / multi-component names degrade; only the safe one lands.
         let files = cache
             .acquire(
-                &[
-                    want("../escape", 10),
-                    want("sub/dir", 10),
-                    want("ok", 10),
-                ],
+                &[want("../escape", 10), want("sub/dir", 10), want("ok", 10)],
                 &fetch,
                 &cancel,
             )
@@ -1274,7 +1321,11 @@ mod tests {
         }
         proceed.notify_one(); // owner fails now
 
-        assert_eq!(owner.await.unwrap().len(), 0, "owner degrades on its own failure");
+        assert_eq!(
+            owner.await.unwrap().len(),
+            0,
+            "owner degrades on its own failure"
+        );
         let awaited = awaiter.await.unwrap();
         (awaited, cache, dir)
     }
@@ -1308,7 +1359,10 @@ mod tests {
             let cache = FileCache::open(dir.path(), 1024).unwrap();
             let (_c, fetch) = counting_fetch(10);
             let cancel = CancellationToken::new();
-            let files = cache.acquire(&[want("a", 10)], &fetch, &cancel).await.unwrap();
+            let files = cache
+                .acquire(&[want("a", 10)], &fetch, &cancel)
+                .await
+                .unwrap();
             drop(files); // unpin so it survives as plain cached data
         }
         // Stray temp file from a hypothetical torn write.
@@ -1328,7 +1382,12 @@ mod tests {
             let (_c, fetch) = counting_fetch(10);
             let cancel = CancellationToken::new();
             for n in ["a", "b", "c"] {
-                drop(cache.acquire(&[want(n, 10)], &fetch, &cancel).await.unwrap());
+                drop(
+                    cache
+                        .acquire(&[want(n, 10)], &fetch, &cancel)
+                        .await
+                        .unwrap(),
+                );
             }
             assert_eq!(cache.total_bytes(), 30);
         }
@@ -1344,12 +1403,18 @@ mod tests {
         let cancel = CancellationToken::new();
         let fetch = |_: &str| async { anyhow::Ok(Vec::new()) };
 
-        let files = cache.acquire(&[want("a", 0)], &fetch, &cancel).await.unwrap();
+        let files = cache
+            .acquire(&[want("a", 0)], &fetch, &cancel)
+            .await
+            .unwrap();
         assert_eq!(files.len(), 1);
         assert_eq!(std::fs::read(files[0].path()).unwrap(), b"");
         assert_eq!(cache.total_bytes(), 0);
 
-        let err = cache.acquire(&[want("b", 1)], &fetch, &cancel).await.unwrap_err();
+        let err = cache
+            .acquire(&[want("b", 1)], &fetch, &cancel)
+            .await
+            .unwrap_err();
         assert!(matches!(err, CacheError::TooLarge { .. }));
     }
 
@@ -1369,14 +1434,22 @@ mod tests {
 
         // Fill the budget with two unpinned files.
         for n in ["a", "b"] {
-            drop(cache.acquire(&[want(n, 10)], &fetch, &cancel).await.unwrap());
+            drop(
+                cache
+                    .acquire(&[want(n, 10)], &fetch, &cancel)
+                    .await
+                    .unwrap(),
+            );
         }
         assert_eq!(cache.total_bytes(), 20);
 
         // Read-only dir ⇒ unlink inside it fails ⇒ eviction cannot free room.
         std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o500)).unwrap();
 
-        let err = cache.acquire(&[want("c", 10)], &fetch, &cancel).await.unwrap_err();
+        let err = cache
+            .acquire(&[want("c", 10)], &fetch, &cancel)
+            .await
+            .unwrap_err();
         assert!(matches!(err, CacheError::EvictionFailed), "got {err:?}");
         assert_eq!(cache.total_bytes(), 20, "cap not breached");
 

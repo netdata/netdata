@@ -49,9 +49,8 @@ impl IngestService {
                             if let Some(value) =
                                 payload.strip_prefix(b"_SOURCE_REALTIME_TIMESTAMP=")
                             {
-                                source_ts = std::str::from_utf8(value)
-                                    .ok()
-                                    .and_then(|v| v.parse().ok());
+                                source_ts =
+                                    std::str::from_utf8(value).ok().and_then(|v| v.parse().ok());
                             }
                             Ok(())
                         },

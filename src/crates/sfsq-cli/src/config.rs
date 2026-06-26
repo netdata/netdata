@@ -139,7 +139,11 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let stock = write(tmp.path(), "stock.yaml", "base_dir: /stock/otel\n");
         // A partial user config without base_dir → derive from stock.
-        let user = write(tmp.path(), "user.yaml", "endpoint:\n  path: '127.0.0.1:4317'\n");
+        let user = write(
+            tmp.path(),
+            "user.yaml",
+            "endpoint:\n  path: '127.0.0.1:4317'\n",
+        );
         let dirs = resolve_dirs(&DirInputs {
             stock_config: Some(&stock),
             config: Some(&user),

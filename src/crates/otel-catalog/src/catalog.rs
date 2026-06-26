@@ -68,9 +68,7 @@ impl Catalog {
         self.entries
             .values()
             .filter(move |e| range_overlaps(e, &q_range))
-            .filter(move |e| {
-                partition_keys.is_empty() || partition_keys.contains(&e.id.part_key)
-            })
+            .filter(move |e| partition_keys.is_empty() || partition_keys.contains(&e.id.part_key))
     }
 
     /// Serialize to the on-disk container: magic `NCAT` + framing
@@ -241,9 +239,7 @@ mod tests {
         let mut wrong_version = clean;
         wrong_version[4..8].copy_from_slice(&99u32.to_le_bytes());
         match Catalog::from_container_bytes(&wrong_version) {
-            Err(Error::Container(
-                chunk_file::container::Error::UnsupportedVersion(99),
-            )) => {}
+            Err(Error::Container(chunk_file::container::Error::UnsupportedVersion(99))) => {}
             other => panic!("expected UnsupportedVersion, got {other:?}"),
         }
     }

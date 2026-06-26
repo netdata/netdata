@@ -310,7 +310,10 @@ mod tests {
     fn run_err(argv: &[&str]) -> String {
         let args = args_from(argv);
         let mut out = Vec::new();
-        format!("{:#}", run(&args, &mut out).expect_err("expected run to reject"))
+        format!(
+            "{:#}",
+            run(&args, &mut out).expect_err("expected run to reject")
+        )
     }
 
     #[test]
@@ -331,7 +334,15 @@ mod tests {
 
     #[test]
     fn run_rejects_namespace_without_name() {
-        let e = run_err(&["x", "--wal-dir", "/x", "--sfst-dir", "/y", "--namespace", "ns"]);
+        let e = run_err(&[
+            "x",
+            "--wal-dir",
+            "/x",
+            "--sfst-dir",
+            "/y",
+            "--namespace",
+            "ns",
+        ]);
         assert!(e.contains("--namespace requires --name"), "{e}");
     }
 
@@ -344,7 +355,15 @@ mod tests {
     #[test]
     fn run_rejects_empty_window() {
         let e = run_err(&[
-            "x", "--wal-dir", "/x", "--sfst-dir", "/y", "--since", "100", "--until", "100",
+            "x",
+            "--wal-dir",
+            "/x",
+            "--sfst-dir",
+            "/y",
+            "--since",
+            "100",
+            "--until",
+            "100",
         ]);
         assert!(e.contains("empty window"), "{e}");
     }

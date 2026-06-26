@@ -5,13 +5,13 @@ use std::sync::{Arc, Mutex};
 
 use bridge::config::AuthConfig;
 use file_registry::{MonotonicClock, TenantId};
-use otel_logs_identity::ServiceStream;
 use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
     logs_service_server::LogsService,
 };
 use opentelemetry_proto::tonic::common::v1::any_value::Value;
 use opentelemetry_proto::tonic::logs::v1::ResourceLogs;
+use otel_logs_identity::ServiceStream;
 use tonic::{Request, Response, Status};
 
 use crate::arrow_bridge;
@@ -484,8 +484,8 @@ impl LogsService for NetdataLogsService {
         let mut content_meta_by_stream: HashMap<ServiceStream, Vec<u8>> = HashMap::new();
         let storable: HashMap<ServiceStream, StreamGroup> = groups
             .into_iter()
-            .filter_map(
-                |(stream, group)| match encode_identity_or_drop(&stream, group.log_record_count) {
+            .filter_map(|(stream, group)| {
+                match encode_identity_or_drop(&stream, group.log_record_count) {
                     Ok(content_meta) => {
                         content_meta_by_stream.insert(stream.clone(), content_meta);
                         Some((stream, group))
@@ -494,8 +494,8 @@ impl LogsService for NetdataLogsService {
                         oversized.push(drop);
                         None
                     }
-                },
-            )
+                }
+            })
             .collect();
 
         // Run the collision check only over storable streams.
@@ -560,7 +560,15 @@ impl LogsService for NetdataLogsService {
             })?;
 
             writer
-                .write_frame(part_key, content_meta, &data, count, ingestion_ns, log_min_ts, log_max_ts)
+                .write_frame(
+                    part_key,
+                    content_meta,
+                    &data,
+                    count,
+                    ingestion_ns,
+                    log_min_ts,
+                    log_max_ts,
+                )
                 .map_err(|e| {
                     tracing::error!(%e, "failed to write WAL entry");
                     Status::internal("WAL write error")
@@ -892,10 +900,7 @@ mod tests {
 
         let _ = check_collisions(&mut canonical, &tenant(), groups);
         // The original canonical stream must remain unchanged.
-        assert_eq!(
-            canonical.get(&(tenant(), hash)).unwrap(),
-            &canonical_stream
-        );
+        assert_eq!(canonical.get(&(tenant(), hash)).unwrap(), &canonical_stream);
     }
 
     #[test]
@@ -1124,7 +1129,11 @@ mod tests {
             .filter_map(|e| e.ok())
             .filter(|e| e.path().extension().is_some_and(|x| x == "wal"))
             .collect();
-        assert_eq!(wal_files.len(), 1, "only the well-formed stream may produce a WAL file");
+        assert_eq!(
+            wal_files.len(),
+            1,
+            "only the well-formed stream may produce a WAL file"
+        );
     }
 
     #[test]

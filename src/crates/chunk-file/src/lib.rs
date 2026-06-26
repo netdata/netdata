@@ -430,7 +430,11 @@ impl TocWriter {
     /// is being written (0 for a bare TOC file; the header size when a
     /// header precedes it). Entry offsets are absolute: the first
     /// chunk's data begins at `base_offset + toc_byte_size()`.
-    pub fn write_toc<W: Write>(self, mut out: W, base_offset: u64) -> Result<ChunkWriter<W>, Error> {
+    pub fn write_toc<W: Write>(
+        self,
+        mut out: W,
+        base_offset: u64,
+    ) -> Result<ChunkWriter<W>, Error> {
         let toc_size = self.toc_byte_size();
         let mut current_offset = base_offset + toc_size as u64;
 
@@ -678,7 +682,10 @@ mod tests {
         {
             file.extend_from_slice(IntoBytes::as_bytes(&TocEntry::new(id, toc_size + k as u64)));
         }
-        file.extend_from_slice(IntoBytes::as_bytes(&TocEntry::new(END_MARKER_ID, toc_size + 4)));
+        file.extend_from_slice(IntoBytes::as_bytes(&TocEntry::new(
+            END_MARKER_ID,
+            toc_size + 4,
+        )));
         file.extend_from_slice(b"wxyz");
 
         assert!(matches!(
@@ -709,8 +716,14 @@ mod tests {
         let mut file = Vec::new();
         let toc_size = Toc::byte_size(2) as u64;
         file.extend_from_slice(IntoBytes::as_bytes(&TocEntry::new(*b"AAAA", toc_size)));
-        file.extend_from_slice(IntoBytes::as_bytes(&TocEntry::new(END_MARKER_ID, toc_size + 1)));
-        file.extend_from_slice(IntoBytes::as_bytes(&TocEntry::new(END_MARKER_ID, toc_size + 2)));
+        file.extend_from_slice(IntoBytes::as_bytes(&TocEntry::new(
+            END_MARKER_ID,
+            toc_size + 1,
+        )));
+        file.extend_from_slice(IntoBytes::as_bytes(&TocEntry::new(
+            END_MARKER_ID,
+            toc_size + 2,
+        )));
         file.extend_from_slice(b"xy");
 
         assert!(matches!(

@@ -162,8 +162,16 @@ mod tests {
     // The agent may pass both (`otel-plugin 1 logs …`); both must be consumed.
     #[test]
     fn numeric_then_logs_both_parse() {
-        let cli =
-            parse(&["otel-plugin", "1", "logs", "--wal-dir", "/x", "--sfst-dir", "/y"]).unwrap();
+        let cli = parse(&[
+            "otel-plugin",
+            "1",
+            "logs",
+            "--wal-dir",
+            "/x",
+            "--sfst-dir",
+            "/y",
+        ])
+        .unwrap();
         assert_eq!(cli._update_every, Some(1));
         assert!(matches!(cli.command, Some(CliCommand::Logs(_))));
     }
@@ -179,8 +187,16 @@ mod tests {
     #[test]
     fn logs_accepts_leading_dash_relative_times() {
         let parsed = parse(&[
-            "otel-plugin", "logs", "--wal-dir", "/x", "--sfst-dir", "/y", "--since", "-1h",
-            "--until", "+30m",
+            "otel-plugin",
+            "logs",
+            "--wal-dir",
+            "/x",
+            "--sfst-dir",
+            "/y",
+            "--since",
+            "-1h",
+            "--until",
+            "+30m",
         ])
         .is_ok();
         assert!(parsed, "expected `--since -1h --until +30m` to parse");
@@ -193,7 +209,14 @@ mod tests {
     #[test]
     fn logs_rejects_tenant_traversal_through_flattened_path() {
         let cli = parse(&[
-            "otel-plugin", "logs", "--wal-dir", "/x", "--sfst-dir", "/y", "--tenant", "..",
+            "otel-plugin",
+            "logs",
+            "--wal-dir",
+            "/x",
+            "--sfst-dir",
+            "/y",
+            "--tenant",
+            "..",
         ])
         .unwrap();
         let Some(CliCommand::Logs(args)) = cli.command else {

@@ -3,8 +3,8 @@
 //! full equivalence against the SFST engine over identical frames are
 //! covered by the property harness in `wal_equivalence.rs`.
 
-use wal_otap::KvSink;
 use sfst::{FieldTier, Filter, Grid};
+use wal_otap::KvSink;
 
 use super::{ScanSink, WalScan};
 use crate::logs::{LogsQuery, LogsQueryBuilder};

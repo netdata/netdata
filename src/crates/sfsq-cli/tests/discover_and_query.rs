@@ -16,10 +16,10 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use file_registry::{FileId, TimestampNs};
-use otel_logs_identity::{ServiceStream, compute_ns_hash};
 use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value::Value};
 use opentelemetry_proto::tonic::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
 use opentelemetry_proto::tonic::resource::v1::Resource;
+use otel_logs_identity::{ServiceStream, compute_ns_hash};
 use sfst::Filter;
 
 use sfsq_cli::config::Dirs;

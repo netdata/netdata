@@ -79,7 +79,10 @@ impl FixtureWriter {
     /// asserted — fixtures below that bar build raw containers via
     /// `chunk_file` directly.
     pub fn write_to<W: Write>(&self, w: &mut W) -> Result<(), Error> {
-        let primary = self.primary.as_ref().expect("fixture needs a primary chunk");
+        let primary = self
+            .primary
+            .as_ref()
+            .expect("fixture needs a primary chunk");
         let timestamps = self
             .timestamps
             .as_ref()

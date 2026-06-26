@@ -301,7 +301,10 @@ fn take_partition_keys_decodes_hex_skips_garbage_and_removes_key() {
     // The reserved key is consumed so the engine never sees it as a facet;
     // a genuine facet selection is left intact.
     assert!(!req.selections.contains_key("__streams"));
-    assert_eq!(req.selections.get("level"), Some(&vec!["error".to_string()]));
+    assert_eq!(
+        req.selections.get("level"),
+        Some(&vec!["error".to_string()])
+    );
 }
 
 #[test]
@@ -356,7 +359,11 @@ fn stream_required_params_builds_all_default_selected_selector() {
             assert_eq!(api.pill, "2.0 KiB");
             assert_eq!(api.info, "2 files · spans 1m");
             // An all-empty stream renders explicitly, not as a blank label.
-            let empty = ms.options.iter().find(|o| o.id == "0000000000000000").unwrap();
+            let empty = ms
+                .options
+                .iter()
+                .find(|o| o.id == "0000000000000000")
+                .unwrap();
             assert_eq!(empty.name, "(unattributed)");
             assert_eq!(empty.info, "1 file");
         }

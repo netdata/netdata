@@ -166,7 +166,11 @@ impl Storage for OpendalStorage {
     }
 
     async fn stat(&self, key: &str) -> Result<(), StorageError> {
-        self.op.stat(key).await.map(|_| ()).map_err(StorageError::from)
+        self.op
+            .stat(key)
+            .await
+            .map(|_| ())
+            .map_err(StorageError::from)
     }
 }
 
@@ -325,6 +329,9 @@ mod storage_tests {
             read_not_found: true,
             ..Default::default()
         };
-        assert!(matches!(s.read("any/key").await, Err(StorageError::NotFound)));
+        assert!(matches!(
+            s.read("any/key").await,
+            Err(StorageError::NotFound)
+        ));
     }
 }

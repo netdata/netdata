@@ -17,9 +17,7 @@
 
 use async_trait::async_trait;
 use bridge::config::LifecycleConfig;
-use bridge::function::{
-    FunctionCallContext, FunctionHandler, HandlerAdapter, RawFunctionHandler,
-};
+use bridge::function::{FunctionCallContext, FunctionHandler, HandlerAdapter, RawFunctionHandler};
 use file_registry::TenantId;
 use netdata_plugin_error::Result as PluginResult;
 use netdata_plugin_protocol::FunctionDeclaration;
@@ -54,11 +52,7 @@ impl FunctionHandler for OtelTracesHandler {
     type Request = Value;
     type Response = Value;
 
-    async fn on_call(
-        &self,
-        _ctx: FunctionCallContext,
-        _request: Value,
-    ) -> PluginResult<Value> {
+    async fn on_call(&self, _ctx: FunctionCallContext, _request: Value) -> PluginResult<Value> {
         Ok(json!({
             "status": "not_implemented",
             "message": "otel_traces query is a proof-scaffold stub; no traces query engine yet",
@@ -178,7 +172,13 @@ pub(crate) async fn build_traces_pipeline(
                 match tokio::time::timeout(
                     STARTUP_REMOTE_BUDGET,
                     file_lifecycle::recovery::reconcile_local_catalog_uploads(
-                        registry, pipeline_id, signal, uploader, storage, tenant_id, &retention,
+                        registry,
+                        pipeline_id,
+                        signal,
+                        uploader,
+                        storage,
+                        tenant_id,
+                        &retention,
                     ),
                 )
                 .await
@@ -203,8 +203,14 @@ pub(crate) async fn build_traces_pipeline(
 
         let retention =
             bridge::config::RetentionConfig::resolve(&config.index.retention, tenant_id.as_str());
-        recover_retention(registry, pipeline_id, cleaner, &retention, config.storage.enabled)
-            .await?;
+        recover_retention(
+            registry,
+            pipeline_id,
+            cleaner,
+            &retention,
+            config.storage.enabled,
+        )
+        .await?;
     }
 
     tracing::info!(signal, "traces recovery complete");

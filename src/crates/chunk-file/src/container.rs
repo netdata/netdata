@@ -494,13 +494,9 @@ mod tests {
     }
 
     fn stream(chunks: &[(ChunkId, &[u8])]) -> Vec<u8> {
-        let mut w = StreamingWriter::new(
-            Cursor::new(Vec::new()),
-            MAGIC,
-            VERSION,
-            chunks.len() as u32,
-        )
-        .unwrap();
+        let mut w =
+            StreamingWriter::new(Cursor::new(Vec::new()), MAGIC, VERSION, chunks.len() as u32)
+                .unwrap();
         for (id, payload) in chunks {
             w.write_chunk(*id, payload).unwrap();
         }

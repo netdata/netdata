@@ -125,7 +125,10 @@ fn remote_candidates_returns_catalog_only_entries() {
     track_remote(&mut reg, 1, 100, 200);
     track_remote(&mut reg, 2, 300, 400);
 
-    assert_eq!(seqs(&reg.remote_candidates(&full_range_query())), vec![1, 2]);
+    assert_eq!(
+        seqs(&reg.remote_candidates(&full_range_query())),
+        vec![1, 2]
+    );
 }
 
 #[test]

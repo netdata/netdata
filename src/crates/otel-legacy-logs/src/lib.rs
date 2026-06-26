@@ -110,9 +110,7 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
 
 /// Idle loop used when the journal directory is absent: nothing is registered,
 /// so the worker only needs to react to a graceful Shutdown.
-async fn run_idle(
-    mut supervisor: Connection<LegacyLogsResponse, LegacyLogsRequest>,
-) -> Result<()> {
+async fn run_idle(mut supervisor: Connection<LegacyLogsResponse, LegacyLogsRequest>) -> Result<()> {
     loop {
         match supervisor.recv().await.context("supervisor recv failed")? {
             LegacyLogsRequest::Shutdown => {
@@ -272,7 +270,8 @@ impl LegacyLogs {
         let payload = handler::patch_args_into_payload(&args, payload.as_deref()).or(payload);
 
         let cancel = CancellationToken::new();
-        self.transactions.insert(transaction.clone(), cancel.clone());
+        self.transactions
+            .insert(transaction.clone(), cancel.clone());
 
         // Per-call message channel: the engine writes progress here; the
         // bridge task translates each into a Progress response.

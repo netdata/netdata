@@ -6,9 +6,7 @@ use file_registry::ByteSize;
 use otel_catalog::Catalog;
 
 use crate::component::{ComponentHandle, batch_recover, drain_pending};
-use crate::ipc::{
-    CleanerRequest, CleanerResponse, IndexerRequest, IndexerResponse,
-};
+use crate::ipc::{CleanerRequest, CleanerResponse, IndexerRequest, IndexerResponse};
 use crate::registry::Registry;
 
 use super::now_ns;

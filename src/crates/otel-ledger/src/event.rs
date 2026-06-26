@@ -1,6 +1,8 @@
 use bridge::{LedgerRequest, LedgerResponse};
 
-use file_lifecycle::ipc::{CatalogBuilderResponse, CleanerResponse, IndexerResponse, UploaderResponse};
+use file_lifecycle::ipc::{
+    CatalogBuilderResponse, CleanerResponse, IndexerResponse, UploaderResponse,
+};
 
 /// A unified event from any of the ledger's input sources.
 pub enum LedgerEvent {

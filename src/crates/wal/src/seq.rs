@@ -86,10 +86,7 @@ pub fn read_seq_highwater(path: &Path) -> Option<u64> {
 
 fn parse_envelope(bytes: &[u8]) -> std::result::Result<u64, String> {
     if bytes.len() != ENVELOPE_LEN {
-        return Err(format!(
-            "length {} (expected {ENVELOPE_LEN})",
-            bytes.len()
-        ));
+        return Err(format!("length {} (expected {ENVELOPE_LEN})", bytes.len()));
     }
     if &bytes[0..4] != MAGIC {
         return Err("bad magic".to_string());

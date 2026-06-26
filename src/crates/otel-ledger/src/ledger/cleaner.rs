@@ -22,7 +22,10 @@ impl Ledger {
             | CleanerResponse::CatalogFileFailed { pipeline_id, .. } => *pipeline_id,
         };
         let Some(pipeline) = self.pipelines.get(&pipeline_id) else {
-            tracing::error!(pipeline_id, "cleaner response for unknown pipeline; dropping");
+            tracing::error!(
+                pipeline_id,
+                "cleaner response for unknown pipeline; dropping"
+            );
             return;
         };
 
@@ -41,10 +44,14 @@ impl Ledger {
                 registries.forget_seq(sequence);
                 tracing::info!("index file evicted seq={sequence}");
             }
-            CleanerResponse::WalFileFailed { sequence, error, .. } => {
+            CleanerResponse::WalFileFailed {
+                sequence, error, ..
+            } => {
                 tracing::error!("WAL file deletion failed seq={sequence} error={error}");
             }
-            CleanerResponse::IndexFileFailed { sequence, error, .. } => {
+            CleanerResponse::IndexFileFailed {
+                sequence, error, ..
+            } => {
                 tracing::error!("index file deletion failed seq={sequence} error={error}");
                 if let Some((_, registry)) = registries.for_seq_mut(sequence) {
                     registry.sfst.clear_pending_deletion(sequence);

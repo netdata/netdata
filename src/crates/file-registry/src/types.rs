@@ -422,7 +422,6 @@ mod tests {
         let p1 = FileId::with_pipeline(test_machine_id(), test_boot_id(), 1, 1, 0);
         assert!(p0 < p1);
     }
-
 }
 
 #[cfg(test)]

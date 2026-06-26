@@ -499,13 +499,37 @@ mod tests {
         let data = b"test payload";
 
         writer
-            .write_frame(pk(1), &[], data, 1, TimestampNs(1), TimestampNs::ZERO, TimestampNs::ZERO)
+            .write_frame(
+                pk(1),
+                &[],
+                data,
+                1,
+                TimestampNs(1),
+                TimestampNs::ZERO,
+                TimestampNs::ZERO,
+            )
             .unwrap();
         writer
-            .write_frame(pk(2), &[], data, 1, TimestampNs(2), TimestampNs::ZERO, TimestampNs::ZERO)
+            .write_frame(
+                pk(2),
+                &[],
+                data,
+                1,
+                TimestampNs(2),
+                TimestampNs::ZERO,
+                TimestampNs::ZERO,
+            )
             .unwrap();
         writer
-            .write_frame(pk(1), &[], data, 1, TimestampNs(3), TimestampNs::ZERO, TimestampNs::ZERO)
+            .write_frame(
+                pk(1),
+                &[],
+                data,
+                1,
+                TimestampNs(3),
+                TimestampNs::ZERO,
+                TimestampNs::ZERO,
+            )
             .unwrap();
 
         writer.sync_all().unwrap();
@@ -537,13 +561,37 @@ mod tests {
 
         // Three frames with growing & overlapping ranges.
         writer
-            .write_frame(pk(1), &[], data, 1, TimestampNs(1), TimestampNs(200), TimestampNs(300))
+            .write_frame(
+                pk(1),
+                &[],
+                data,
+                1,
+                TimestampNs(1),
+                TimestampNs(200),
+                TimestampNs(300),
+            )
             .unwrap();
         writer
-            .write_frame(pk(1), &[], data, 1, TimestampNs(2), TimestampNs(150), TimestampNs(250))
+            .write_frame(
+                pk(1),
+                &[],
+                data,
+                1,
+                TimestampNs(2),
+                TimestampNs(150),
+                TimestampNs(250),
+            )
             .unwrap();
         writer
-            .write_frame(pk(1), &[], data, 1, TimestampNs(3), TimestampNs(180), TimestampNs(400))
+            .write_frame(
+                pk(1),
+                &[],
+                data,
+                1,
+                TimestampNs(3),
+                TimestampNs(180),
+                TimestampNs(400),
+            )
             .unwrap();
 
         writer.sync_all().unwrap();
@@ -584,14 +632,30 @@ mod tests {
         let data = b"x";
 
         writer
-            .write_frame(pk(1), &[], data, 1, TimestampNs(1), TimestampNs(500), TimestampNs(600))
+            .write_frame(
+                pk(1),
+                &[],
+                data,
+                1,
+                TimestampNs(1),
+                TimestampNs(500),
+                TimestampNs(600),
+            )
             .unwrap();
         // Frame whose logs all lacked time/observed timestamps — must
         // not regress the accumulator. (In production the ingestor would
         // synthesize a fallback range; this test exercises the defense-
         // in-depth ZERO/ZERO skip.)
         writer
-            .write_frame(pk(1), &[], data, 1, TimestampNs(2), TimestampNs::ZERO, TimestampNs::ZERO)
+            .write_frame(
+                pk(1),
+                &[],
+                data,
+                1,
+                TimestampNs(2),
+                TimestampNs::ZERO,
+                TimestampNs::ZERO,
+            )
             .unwrap();
 
         writer.sync_all().unwrap();
@@ -617,10 +681,26 @@ mod tests {
 
         let data = b"test payload";
         writer
-            .write_frame(pk(10), &[], data, 1, TimestampNs(1), TimestampNs::ZERO, TimestampNs::ZERO)
+            .write_frame(
+                pk(10),
+                &[],
+                data,
+                1,
+                TimestampNs(1),
+                TimestampNs::ZERO,
+                TimestampNs::ZERO,
+            )
             .unwrap();
         writer
-            .write_frame(pk(20), &[], data, 1, TimestampNs(2), TimestampNs::ZERO, TimestampNs::ZERO)
+            .write_frame(
+                pk(20),
+                &[],
+                data,
+                1,
+                TimestampNs(2),
+                TimestampNs::ZERO,
+                TimestampNs::ZERO,
+            )
             .unwrap();
 
         writer.sync_all().unwrap();

@@ -1195,7 +1195,6 @@ impl<R: AsyncRead + Unpin + Send, W: AsyncWrite + Unpin + Send> PluginRuntime<R,
                 let payload = serde_json::to_vec(&json).unwrap();
                 function_call.payload = Some(payload);
             }
-
         }
 
         // Get handler

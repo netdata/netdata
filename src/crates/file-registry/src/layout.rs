@@ -149,7 +149,11 @@ mod tests {
         );
 
         // Missing base: empty, not an error.
-        assert!(date_tenant_dirs(&tmp.path().join("nope")).unwrap().is_empty());
+        assert!(
+            date_tenant_dirs(&tmp.path().join("nope"))
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[cfg(unix)]

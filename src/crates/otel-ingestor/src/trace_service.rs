@@ -25,8 +25,7 @@ use std::sync::{Arc, Mutex};
 
 use file_registry::{MonotonicClock, TenantId, TimestampNs};
 use opentelemetry_proto::tonic::collector::trace::v1::{
-    ExportTraceServiceRequest, ExportTraceServiceResponse,
-    trace_service_server::TraceService,
+    ExportTraceServiceRequest, ExportTraceServiceResponse, trace_service_server::TraceService,
 };
 use prost::Message;
 use tonic::{Request, Response, Status};

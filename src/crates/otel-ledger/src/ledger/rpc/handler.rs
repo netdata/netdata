@@ -35,9 +35,9 @@ use super::wire::{
     SfstFileEntry, StreamId, TenantFiles, WalFileEntry,
 };
 use file_lifecycle::chunk::ChunkCache;
+use file_lifecycle::registry::{TenantRegistries, WalDesc};
 use wal::prefix::{chunk_boundaries, tail_start};
 use wal::registry::FileStatus;
-use file_lifecycle::registry::{TenantRegistries, WalDesc};
 
 /// Decode a file's opaque `content_meta` blob into the wire `StreamId`
 /// shown by the `files: true` inventory. Falls back to empty namespace/name
@@ -162,8 +162,13 @@ impl RemoteRead {
         entries: Vec<otel_catalog::CatalogEntry>,
         cancel: &CancellationToken,
         progress: Arc<AtomicUsize>,
-    ) -> Result<(Vec<file_registry::SelectedFile>, Vec<file_cache::CachedFile>), file_cache::CacheError>
-    {
+    ) -> Result<
+        (
+            Vec<file_registry::SelectedFile>,
+            Vec<file_cache::CachedFile>,
+        ),
+        file_cache::CacheError,
+    > {
         // filename → entry (carries the catalog summary + remote key + size).
         let mut by_name: std::collections::HashMap<String, otel_catalog::CatalogEntry> =
             std::collections::HashMap::with_capacity(entries.len());
@@ -326,7 +331,9 @@ impl OtelLogsHandler {
             // check open_range defers). Runs once per (seq, index) under
             // singleflight; skipped entirely on a cache hit.
             let init = async move {
-                match tokio::task::spawn_blocking(move || sfst_indexer::index_range(&path, range)).await {
+                match tokio::task::spawn_blocking(move || sfst_indexer::index_range(&path, range))
+                    .await
+                {
                     Ok(Ok((summary, bytes))) => {
                         if u64::from(summary.record_count) != expected {
                             Err(format!(
@@ -466,9 +473,8 @@ impl FunctionHandler for OtelLogsHandler {
             };
             // The selector folds the local candidates + the (remote-only) catalog and
             // computes its own per-seq dedup internally — it needs no servable mask.
-            let required_params = stream_required_params(
-                guard.enumerate_streams_from(&tenant, &stream_q, &catalog),
-            );
+            let required_params =
+                stream_required_params(guard.enumerate_streams_from(&tenant, &stream_q, &catalog));
             // The remote fetch masks the catalog by the servable-local seqs. Compute
             // that mask only when remote is enabled (its sole consumer); a single
             // time-only mask is sound to reuse for the stream-filtered fetch because
@@ -539,7 +545,10 @@ impl FunctionHandler for OtelLogsHandler {
                     stub.required_params = required_params;
                     return Ok(OtelLogsResponse::Logs(stub));
                 }
-                Err(file_cache::CacheError::TooLarge { footprint, capacity }) => {
+                Err(file_cache::CacheError::TooLarge {
+                    footprint,
+                    capacity,
+                }) => {
                     return Err(netdata_plugin_error::NetdataPluginError::FunctionHandler {
                         message: format!(
                             "this query needs {footprint} bytes of remote log data, more than the \

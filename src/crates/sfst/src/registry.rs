@@ -198,9 +198,7 @@ impl Registry {
             .values()
             .filter(|f| !f.pending_deletion)
             .filter(move |f| range_overlaps(&f.summary, &q_range))
-            .filter(move |f| {
-                partition_keys.is_empty() || partition_keys.contains(&f.id.part_key)
-            })
+            .filter(move |f| partition_keys.is_empty() || partition_keys.contains(&f.id.part_key))
     }
 
     /// Number of tracked files (including pending-deletion entries).

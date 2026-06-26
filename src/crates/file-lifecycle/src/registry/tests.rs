@@ -127,16 +127,10 @@ fn query_snapshot_is_scoped_to_one_tenant() {
 
     // Each tenant sees exactly its own candidate — never the union.
     let (sfsts, wals) = tr.query_snapshot(&tenant_a, &q);
-    assert_eq!(
-        sfsts.iter().map(|c| c.id.seq).collect::<Vec<_>>(),
-        vec![1]
-    );
+    assert_eq!(sfsts.iter().map(|c| c.id.seq).collect::<Vec<_>>(), vec![1]);
     assert!(wals.is_empty());
     let (sfsts, _) = tr.query_snapshot(&tenant_b, &q);
-    assert_eq!(
-        sfsts.iter().map(|c| c.id.seq).collect::<Vec<_>>(),
-        vec![2]
-    );
+    assert_eq!(sfsts.iter().map(|c| c.id.seq).collect::<Vec<_>>(), vec![2]);
 
     // Unknown tenant: empty, not a panic or an all-tenant union.
     let (sfsts, wals) = tr.query_snapshot(&TenantId::from("nope"), &q);
@@ -238,9 +232,8 @@ fn enumerate_streams_dedups_and_aggregates_sfst_and_unsealed_wal() {
     // The substrate yields neutral `PartitionStat`s ordered by opaque `part_key`;
     // decode + sort by `(namespace, name)` the way the rpc adapter does for display.
     let mut streams = tr.enumerate_streams(&tenant, &full);
-    let sid = |p: &crate::registry::PartitionStat| {
-        crate::test_helpers::decode_opaque(&p.content_meta)
-    };
+    let sid =
+        |p: &crate::registry::PartitionStat| crate::test_helpers::decode_opaque(&p.content_meta);
     let ss = |(ns, name): (&str, &str)| (ns.to_owned(), name.to_owned());
     streams.sort_by_key(sid);
     assert_eq!(streams.len(), 2);
@@ -260,5 +253,8 @@ fn enumerate_streams_dedups_and_aggregates_sfst_and_unsealed_wal() {
     assert_eq!(streams[1].max_timestamp_s, Some(300));
 
     // Unknown tenant → empty list, never a panic.
-    assert!(tr.enumerate_streams(&TenantId::from("nope"), &full).is_empty());
+    assert!(
+        tr.enumerate_streams(&TenantId::from("nope"), &full)
+            .is_empty()
+    );
 }

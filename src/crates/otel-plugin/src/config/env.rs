@@ -196,7 +196,11 @@ impl SignalOverride {
         Ok(Self {
             wal: if wal.has_any() { Some(wal) } else { None },
             index: if index.has_any() { Some(index) } else { None },
-            catalog: if catalog.has_any() { Some(catalog) } else { None },
+            catalog: if catalog.has_any() {
+                Some(catalog)
+            } else {
+                None
+            },
         })
     }
 }

@@ -264,7 +264,10 @@ mod tests {
     #[test]
     fn encode_rejects_oversize_field() {
         let huge = "x".repeat(MAX_FIELD_BYTES + 1);
-        assert_eq!(encode_content_meta(&ServiceStream::new(huge.clone(), "api")), None);
+        assert_eq!(
+            encode_content_meta(&ServiceStream::new(huge.clone(), "api")),
+            None
+        );
         assert_eq!(encode_content_meta(&ServiceStream::new("prod", huge)), None);
         // Exactly at the limit still encodes.
         let max = "x".repeat(MAX_FIELD_BYTES);
@@ -329,7 +332,10 @@ mod tests {
 
     #[test]
     fn service_stream_serde_roundtrip() {
-        for s in [ServiceStream::new("prod", "api"), ServiceStream::new("", "")] {
+        for s in [
+            ServiceStream::new("prod", "api"),
+            ServiceStream::new("", ""),
+        ] {
             let json = serde_json::to_string(&s).unwrap();
             let parsed: ServiceStream = serde_json::from_str(&json).unwrap();
             assert_eq!(parsed, s);
@@ -345,7 +351,11 @@ mod tests {
     fn ns_hash_with_namespace_only() {
         let h = compute_ns_hash(Some("prod"), None);
         assert_ne!(h, 0);
-        assert_eq!(h, compute_ns_hash(Some("prod"), None), "must be deterministic");
+        assert_eq!(
+            h,
+            compute_ns_hash(Some("prod"), None),
+            "must be deterministic"
+        );
     }
 
     #[test]

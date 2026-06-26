@@ -1,7 +1,7 @@
 use super::*;
 use file_registry::{ByteSize, FileId, TenantId, TimestampNs};
-use otel_logs_identity::ServiceStream;
 use fst_index::FstIndex;
+use otel_logs_identity::ServiceStream;
 use serde_json::Value;
 use sfst::BitmapValue;
 use std::collections::HashMap;
@@ -479,8 +479,10 @@ async fn empty_payload_defaults_to_data_request() {
 #[tokio::test]
 async fn no_sfst_yields_empty_envelope() {
     let h = make_handler(make_tenant_registries());
-    let req: OtelLogsRequest =
-        serde_json::from_slice(br#"{"info": false, "tenant": "tenant-a", "after": 100, "before": 200}"#).unwrap();
+    let req: OtelLogsRequest = serde_json::from_slice(
+        br#"{"info": false, "tenant": "tenant-a", "after": 100, "before": 200}"#,
+    )
+    .unwrap();
     let resp = h.on_call(make_ctx("t1"), req).await.unwrap();
     let v = serde_json::to_value(&resp).unwrap();
     assert_eq!(v["status"], 200);
@@ -495,8 +497,10 @@ async fn non_overlapping_window_yields_empty_envelope() {
     let h = make_handler(tr);
 
     // Request window is 1900..2000 — nowhere near the file's 1.7e9 span.
-    let req: OtelLogsRequest =
-        serde_json::from_slice(br#"{"info": false, "tenant": "tenant-a", "after": 1900, "before": 2000}"#).unwrap();
+    let req: OtelLogsRequest = serde_json::from_slice(
+        br#"{"info": false, "tenant": "tenant-a", "after": 1900, "before": 2000}"#,
+    )
+    .unwrap();
     let resp = h.on_call(make_ctx("t1"), req).await.unwrap();
     let v = serde_json::to_value(&resp).unwrap();
     assert!(v["facets"].as_array().unwrap().is_empty());
@@ -640,9 +644,10 @@ async fn only_overlapping_file_contributes() {
     install_sfst(&mut tr, "tenant-a", 99, 1_700_000_000);
     let h = make_handler(tr);
 
-    let req: OtelLogsRequest =
-        serde_json::from_slice(br#"{"info": false, "tenant": "tenant-a", "after": 1700000000, "before": 1700000100}"#)
-            .unwrap();
+    let req: OtelLogsRequest = serde_json::from_slice(
+        br#"{"info": false, "tenant": "tenant-a", "after": 1700000000, "before": 1700000100}"#,
+    )
+    .unwrap();
     let resp = h.on_call(make_ctx("t1"), req).await.unwrap();
     let v = serde_json::to_value(&resp).unwrap();
     // Only the new file's 6 logs overlap the window.
@@ -776,7 +781,8 @@ async fn no_time_bound_falls_back_to_recent_window() {
     install_sfst(&mut tr, "tenant-a", 1, recent);
     let h = make_handler(tr);
 
-    let req: OtelLogsRequest = serde_json::from_slice(br#"{"info": false, "tenant": "tenant-a"}"#).unwrap();
+    let req: OtelLogsRequest =
+        serde_json::from_slice(br#"{"info": false, "tenant": "tenant-a"}"#).unwrap();
     let resp = h.on_call(make_ctx("t1"), req).await.unwrap();
     let v = serde_json::to_value(&resp).unwrap();
     // Fixture has 6 logs — all should match (the file's range
@@ -795,7 +801,8 @@ async fn no_time_bound_with_only_stale_data_yields_empty_envelope() {
     install_sfst(&mut tr, "tenant-a", 1, file_min_s);
     let h = make_handler(tr);
 
-    let req: OtelLogsRequest = serde_json::from_slice(br#"{"info": false, "tenant": "tenant-a"}"#).unwrap();
+    let req: OtelLogsRequest =
+        serde_json::from_slice(br#"{"info": false, "tenant": "tenant-a"}"#).unwrap();
     let resp = h.on_call(make_ctx("t1"), req).await.unwrap();
     let v = serde_json::to_value(&resp).unwrap();
     assert_eq!(v["items"]["matched"], 0);
@@ -825,8 +832,10 @@ async fn backward_pagination_pages_without_overlap_or_gap() {
     let win = format!(r#""after": {}, "before": {}"#, min_s, min_s + 60);
 
     // Page 1: no anchor, backward → newest 3 (pos 5,4,3), newest-first.
-    let p1: OtelLogsRequest =
-        serde_json::from_slice(format!(r#"{{"info":false,"tenant":"tenant-a",{win},"last":3}}"#).as_bytes()).unwrap();
+    let p1: OtelLogsRequest = serde_json::from_slice(
+        format!(r#"{{"info":false,"tenant":"tenant-a",{win},"last":3}}"#).as_bytes(),
+    )
+    .unwrap();
     let v1 = serde_json::to_value(&h.on_call(make_ctx("t1"), p1).await.unwrap()).unwrap();
     let d1 = v1["data"].as_array().unwrap();
     assert_eq!(d1.len(), 3);
@@ -1102,10 +1111,19 @@ async fn remote_only_sfst_is_fetched_and_served() {
     std::fs::create_dir_all(obj_path.parent().unwrap()).unwrap();
     std::fs::write(&obj_path, &sfst_bytes).unwrap();
 
-    track_remote_catalog(&mut tr, "default", id, remote_key, min_s, min_s + 5, sfst_bytes.len() as u64);
+    track_remote_catalog(
+        &mut tr,
+        "default",
+        id,
+        remote_key,
+        min_s,
+        min_s + 5,
+        sfst_bytes.len() as u64,
+    );
 
     let storage =
-        file_lifecycle::storage::OpendalStorage::new(&format!("fs://{}", remote_dir.display())).unwrap();
+        file_lifecycle::storage::OpendalStorage::new(&format!("fs://{}", remote_dir.display()))
+            .unwrap();
     let cache =
         file_cache::FileCache::open(tempfile::tempdir().unwrap().keep(), 64 * 1024 * 1024).unwrap();
     let h = make_handler_with_remote(tr, RemoteRead::new(storage, cache));
@@ -1122,7 +1140,8 @@ async fn remote_only_sfst_is_fetched_and_served() {
     // Keep a handle to the progress state so we can assert the fetch phase
     // advanced it. Build the context inline (make_ctx hides its ProgressState).
     let progress = bridge::function::ProgressState::new();
-    let ctx = FunctionCallContext::new("t1".to_string(), progress.clone(), CancellationToken::new());
+    let ctx =
+        FunctionCallContext::new("t1".to_string(), progress.clone(), CancellationToken::new());
     let v = serde_json::to_value(&h.on_call(ctx, req).await.unwrap()).unwrap();
     assert_eq!(
         v["items"]["matched"], 6,
@@ -1147,7 +1166,10 @@ async fn remote_only_sfst_is_fetched_and_served() {
     // fetch-phase progress, `done` would only reach 1.
     let (done, total) = progress.load();
     assert_eq!(total, 2, "fetch + scan phases sized into total");
-    assert_eq!(done, 2, "fetch phase advanced done, then the scan completed it");
+    assert_eq!(
+        done, 2,
+        "fetch phase advanced done, then the scan completed it"
+    );
 }
 
 /// When the remote object cannot be read, the query degrades gracefully (no
@@ -1164,10 +1186,19 @@ async fn remote_fetch_failure_degrades() {
     let min_s = 1_700_000_000u32;
     // Catalog entry points at a remote_key that does not exist in the backend.
     let remote_dir = tempfile::tempdir().unwrap().keep();
-    track_remote_catalog(&mut tr, "default", id, "missing/object.sfst", min_s, min_s + 5, 10);
+    track_remote_catalog(
+        &mut tr,
+        "default",
+        id,
+        "missing/object.sfst",
+        min_s,
+        min_s + 5,
+        10,
+    );
 
     let storage =
-        file_lifecycle::storage::OpendalStorage::new(&format!("fs://{}", remote_dir.display())).unwrap();
+        file_lifecycle::storage::OpendalStorage::new(&format!("fs://{}", remote_dir.display()))
+            .unwrap();
     let cache =
         file_cache::FileCache::open(tempfile::tempdir().unwrap().keep(), 64 * 1024 * 1024).unwrap();
     let h = make_handler_with_remote(tr, RemoteRead::new(storage, cache));
@@ -1183,5 +1214,8 @@ async fn remote_fetch_failure_degrades() {
     .unwrap();
     // Degrades: the unreadable remote source is omitted, the query still answers.
     let v = serde_json::to_value(&h.on_call(make_ctx("t1"), req).await.unwrap()).unwrap();
-    assert_eq!(v["items"]["matched"], 0, "unreadable remote source is omitted: {v:#}");
+    assert_eq!(
+        v["items"]["matched"], 0,
+        "unreadable remote source is omitted: {v:#}"
+    );
 }

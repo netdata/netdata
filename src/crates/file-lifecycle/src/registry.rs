@@ -456,11 +456,7 @@ impl TenantRegistries {
     /// Seqs in `q`'s window with a servable local copy — the mask that hides a
     /// remote catalog entry already served locally. See
     /// [`Registry::local_servable_seqs`]. An unknown tenant yields empty.
-    pub fn local_servable_seqs(
-        &self,
-        tenant: &TenantId,
-        q: &file_registry::Query,
-    ) -> HashSet<u64> {
+    pub fn local_servable_seqs(&self, tenant: &TenantId, q: &file_registry::Query) -> HashSet<u64> {
         self.tenants
             .get(tenant)
             .map(|r| r.local_servable_seqs(q))
@@ -588,8 +584,14 @@ impl Registry {
             folded.insert(f.id.seq);
             by_part
                 .entry(f.id.part_key)
-                .or_insert_with(|| PartitionStat::new(f.id.part_key, f.summary.content_meta.clone()))
-                .add(f.size.0, f.summary.min_timestamp_s, f.summary.max_timestamp_s);
+                .or_insert_with(|| {
+                    PartitionStat::new(f.id.part_key, f.summary.content_meta.clone())
+                })
+                .add(
+                    f.size.0,
+                    f.summary.min_timestamp_s,
+                    f.summary.max_timestamp_s,
+                );
         }
         for f in self.wal.candidates(q) {
             // SFST-wins over its own WAL in the post-index/pre-delete window.

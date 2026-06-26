@@ -35,9 +35,7 @@ pub fn catalog_retention_days(retention: &bridge::config::RetentionConfig) -> u3
 /// Lower a resolved per-tenant retention config onto sfst's plain
 /// [`RetentionPolicy`](sfst::RetentionPolicy) — the boundary where the
 /// config framework's types stop and the format crate's begin.
-pub fn sfst_retention_policy(
-    retention: &bridge::config::RetentionConfig,
-) -> sfst::RetentionPolicy {
+pub fn sfst_retention_policy(retention: &bridge::config::RetentionConfig) -> sfst::RetentionPolicy {
     sfst::RetentionPolicy {
         max_files: retention.max_files,
         max_total_size: file_registry::ByteSize(retention.max_total_size.as_u64()),

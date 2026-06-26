@@ -162,7 +162,10 @@ async fn recover_retention_evicts_only_remote_cataloged() {
         reg.sfst.get(2).is_none(),
         "remote-cataloged seq must be evicted"
     );
-    assert!(!reg.is_remote_cataloged(2), "evict_seq must clear remote_cataloged");
+    assert!(
+        !reg.is_remote_cataloged(2),
+        "evict_seq must clear remote_cataloged"
+    );
 }
 
 #[tokio::test]
@@ -214,7 +217,8 @@ fn place_local_catalog(
 
     // Write a real catalog container so reconcile can read its SFST seqs; the
     // single entry's seq is `max_seq`.
-    let mut catalog = otel_catalog::Catalog::new(TenantId::from("tenant1"), date, machine(), boot());
+    let mut catalog =
+        otel_catalog::Catalog::new(TenantId::from("tenant1"), date, machine(), boot());
     catalog.add(make_entry(max_seq));
     let bytes = catalog.to_container_bytes().unwrap();
     std::fs::write(&path, &bytes).unwrap();
@@ -470,15 +474,14 @@ async fn reconcile_local_catalog_uploads_skips_on_transient_stat_error() {
         ..MockStorage::default()
     };
     let cancel = tokio_util::sync::CancellationToken::new();
-    let mut uploader = crate::component::ComponentHandle::spawn::<
-        crate::uploader::Uploader<MockStorage>,
-    >(
-        crate::uploader::UploaderArgs {
-            storage: storage.clone(),
-            max_concurrent: 4,
-        },
-        cancel.child_token(),
-    );
+    let mut uploader =
+        crate::component::ComponentHandle::spawn::<crate::uploader::Uploader<MockStorage>>(
+            crate::uploader::UploaderArgs {
+                storage: storage.clone(),
+                max_concurrent: 4,
+            },
+            cancel.child_token(),
+        );
 
     reconcile_local_catalog_uploads(
         &mut reg,
@@ -520,15 +523,14 @@ async fn reconcile_local_catalog_uploads_confirms_present_via_mock() {
         ..MockStorage::default()
     };
     let cancel = tokio_util::sync::CancellationToken::new();
-    let mut uploader = crate::component::ComponentHandle::spawn::<
-        crate::uploader::Uploader<MockStorage>,
-    >(
-        crate::uploader::UploaderArgs {
-            storage: storage.clone(),
-            max_concurrent: 4,
-        },
-        cancel.child_token(),
-    );
+    let mut uploader =
+        crate::component::ComponentHandle::spawn::<crate::uploader::Uploader<MockStorage>>(
+            crate::uploader::UploaderArgs {
+                storage: storage.clone(),
+                max_concurrent: 4,
+            },
+            cancel.child_token(),
+        );
 
     reconcile_local_catalog_uploads(
         &mut reg,
@@ -589,7 +591,10 @@ fn spawn_idle_catalog_builder(
 fn remote_sfst_key(seq: u64) -> (file_registry::FileId, String) {
     let id = file_registry::FileId::new(machine(), boot(), seq, 0);
     let today = chrono::Utc::now().date_naive();
-    (id, crate::remote_keys::sfst("logs", &TenantId::from("tenant1"), today, id))
+    (
+        id,
+        crate::remote_keys::sfst("logs", &TenantId::from("tenant1"), today, id),
+    )
 }
 
 #[tokio::test]
@@ -733,7 +738,11 @@ async fn reconcile_remote_uploads_propagates_list_error() {
         matches!(result, Err(crate::storage::StorageError::Other(_))),
         "a LIST failure must surface as Err(Other), got {result:?}"
     );
-    assert_eq!(catalog_builder.pending(), 0, "nothing enqueued on a failed LIST");
+    assert_eq!(
+        catalog_builder.pending(),
+        0,
+        "nothing enqueued on a failed LIST"
+    );
 
     cancel.cancel();
 }

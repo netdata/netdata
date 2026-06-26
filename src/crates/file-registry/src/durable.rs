@@ -137,7 +137,10 @@ pub fn remove_stale_tmp(path: &Path) {
         Ok(()) => tracing::info!("removed stale tmp file path={}", path.display()),
         Err(e) if e.kind() == io::ErrorKind::NotFound => {}
         Err(e) => {
-            tracing::warn!("failed to remove stale tmp file path={}: {e}", path.display())
+            tracing::warn!(
+                "failed to remove stale tmp file path={}: {e}",
+                path.display()
+            )
         }
     }
 }

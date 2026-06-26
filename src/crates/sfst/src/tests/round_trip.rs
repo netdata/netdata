@@ -501,10 +501,7 @@ fn corrupt_payload_byte_fails_crc_on_access() {
     let mut buf = clean;
     buf[offset] ^= 0x01;
     let reader = Reader::open(&buf).unwrap();
-    assert!(matches!(
-        reader.primary_raw(),
-        Err(Error::CorruptIndex(_))
-    ));
+    assert!(matches!(reader.primary_raw(), Err(Error::CorruptIndex(_))));
     // Other chunks are unaffected.
     assert!(reader.stream_batch(0).is_ok());
 }
