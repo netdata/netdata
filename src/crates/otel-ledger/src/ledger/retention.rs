@@ -23,7 +23,11 @@ impl Ledger {
         // Resolve the owning pipeline's retention config + registries handle
         // up front so the shared cleaner (a `&mut self` field) stays borrowable.
         let pipeline = self.pipelines.get(signal);
-        let retention = pipeline.config().index.retention.resolve(tenant_id.as_str());
+        let retention = pipeline
+            .config()
+            .index
+            .retention
+            .resolve(tenant_id.as_str());
         // Remote storage is process-global: enabled iff the shell built an uploader.
         let storage_enabled = self.uploader.is_some();
         let registries = pipeline.registries().clone();

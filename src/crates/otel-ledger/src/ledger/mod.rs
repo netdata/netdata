@@ -289,10 +289,7 @@ impl Ledger {
         // independently per handler — a clash there would route to whichever the
         // scan yields first, so fail loudly at startup. Hardcoded by us, so a
         // clash is a programming error.
-        let pipelines = PerSignal {
-            logs,
-            traces,
-        };
+        let pipelines = PerSignal { logs, traces };
         assert!(
             pipelines.logs.function_name() != pipelines.traces.function_name(),
             "duplicate pipeline function name {:?}",
@@ -437,7 +434,10 @@ mod tests {
     /// `Signal` variant set, so this test is the guard if a variant is added.
     #[test]
     fn per_signal_get_and_iter_cover_every_signal() {
-        let mut ps = PerSignal { logs: 1u8, traces: 2u8 };
+        let mut ps = PerSignal {
+            logs: 1u8,
+            traces: 2u8,
+        };
         assert_eq!(*ps.get(Signal::Logs), 1);
         assert_eq!(*ps.get(Signal::Traces), 2);
         *ps.get_mut(Signal::Traces) = 9;

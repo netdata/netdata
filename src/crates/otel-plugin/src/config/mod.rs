@@ -411,15 +411,13 @@ traces:
             logs.catalog.dir,
             std::path::Path::new("/var/log/netdata/otel/v1/logs/catalog")
         );
-        let rotation =
-            config.logs.wal.rotation.resolve("default");
+        let rotation = config.logs.wal.rotation.resolve("default");
         assert_eq!(rotation.max_file_size, ByteSize::mb(100));
         assert_eq!(rotation.max_log_entries, 50000);
         assert_eq!(rotation.max_file_duration, Duration::from_secs(2 * 3600));
         assert!(config.logs.wal.crc_enabled);
         assert!(config.logs.wal.compression_enabled);
-        let retention =
-            config.logs.index.retention.resolve("default");
+        let retention = config.logs.index.retention.resolve("default");
         assert_eq!(retention.max_files, 10);
         assert_eq!(retention.max_total_size, ByteSize::gb(1));
         assert_eq!(retention.max_age, Duration::from_secs(7 * 24 * 3600));
@@ -433,8 +431,7 @@ traces:
             traces.wal.dir,
             std::path::Path::new("/var/log/netdata/otel/v1/traces/wal")
         );
-        let rotation =
-            config.traces.wal.rotation.resolve("default");
+        let rotation = config.traces.wal.rotation.resolve("default");
         assert_eq!(rotation.max_log_entries, 50000);
     }
 
@@ -501,8 +498,7 @@ logs:
         )
         .unwrap();
         apply_overrides(&mut config, &o);
-        let rotation =
-            config.logs.wal.rotation.resolve("default");
+        let rotation = config.logs.wal.rotation.resolve("default");
         assert_eq!(rotation.max_log_entries, 100000);
         // Untouched stock fields survive the partial override.
         assert_eq!(rotation.max_file_size, ByteSize::mb(100));
@@ -559,12 +555,10 @@ traces:
         )
         .unwrap();
         apply_overrides(&mut config, &o);
-        let traces_rot =
-            config.traces.wal.rotation.resolve("default");
+        let traces_rot = config.traces.wal.rotation.resolve("default");
         assert_eq!(traces_rot.max_log_entries, 999);
         // Logs is untouched.
-        let logs_rot =
-            config.logs.wal.rotation.resolve("default");
+        let logs_rot = config.logs.wal.rotation.resolve("default");
         assert_eq!(logs_rot.max_log_entries, 50000);
     }
 
@@ -586,11 +580,9 @@ logs:
         )
         .unwrap();
         apply_overrides(&mut config, &o);
-        let rotation =
-            config.logs.wal.rotation.resolve("default");
+        let rotation = config.logs.wal.rotation.resolve("default");
         assert_eq!(rotation.max_file_size, ByteSize::mb(200));
-        let retention =
-            config.logs.index.retention.resolve("default");
+        let retention = config.logs.index.retention.resolve("default");
         assert_eq!(retention.max_total_size, ByteSize::gb(2));
     }
 
@@ -612,11 +604,9 @@ logs:
         )
         .unwrap();
         apply_overrides(&mut config, &o);
-        let retention =
-            config.logs.index.retention.resolve("default");
+        let retention = config.logs.index.retention.resolve("default");
         assert_eq!(retention.max_age, Duration::from_secs(14 * 24 * 3600));
-        let rotation =
-            config.logs.wal.rotation.resolve("default");
+        let rotation = config.logs.wal.rotation.resolve("default");
         assert_eq!(rotation.max_file_duration, Duration::from_secs(4 * 3600));
     }
 
@@ -676,8 +666,7 @@ logs:
         assert_eq!(config.endpoint.path, "0.0.0.0:9999");
         assert_eq!(config.metrics.expiry_duration_secs, Some(1800));
         assert_eq!(config.metrics.interval_secs, Some(10));
-        let retention =
-            config.logs.index.retention.resolve("default");
+        let retention = config.logs.index.retention.resolve("default");
         assert_eq!(retention.max_files, 20);
     }
 

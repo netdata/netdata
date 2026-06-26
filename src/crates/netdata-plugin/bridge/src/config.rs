@@ -475,7 +475,9 @@ impl RetentionPolicy {
     pub fn resolve(&self, tenant_id: &str) -> RetentionConfig {
         let t = self.tenants.get(tenant_id);
         RetentionConfig {
-            max_files: t.and_then(|e| e.max_files).unwrap_or(self.default.max_files),
+            max_files: t
+                .and_then(|e| e.max_files)
+                .unwrap_or(self.default.max_files),
             max_total_size: t
                 .and_then(|e| e.max_total_size)
                 .unwrap_or(self.default.max_total_size),
@@ -728,7 +730,6 @@ traces:
             PathBuf::from("/var/lib/netdata/otel/shared/seq_highwater")
         );
     }
-
 }
 
 mod opt_duration {

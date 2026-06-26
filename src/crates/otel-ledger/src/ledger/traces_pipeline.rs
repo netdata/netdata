@@ -93,7 +93,8 @@ pub(crate) async fn build_traces_pipeline(
         indexer,
         pipeline_tx,
         |_registries| {
-            let handler: Arc<dyn RawFunctionHandler> = Arc::new(HandlerAdapter::new(OtelTracesHandler));
+            let handler: Arc<dyn RawFunctionHandler> =
+                Arc::new(HandlerAdapter::new(OtelTracesHandler));
             (handler, traces_arg_shim as ArgShim)
         },
     )
