@@ -6,15 +6,22 @@ import (
 	"testing"
 )
 
-// parseTempConfig writes content to a named temp file, parses it, and fails
-// the test on any error or missing-file result.
-func parseTempConfig(t *testing.T, filename, content string) pluginConfigFile {
+// writeTempConfig writes content to a named temp file and returns its path.
+func writeTempConfig(t *testing.T, filename, content string) string {
 	t.Helper()
 	dir := t.TempDir()
 	path := filepath.Join(dir, filename)
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
+	return path
+}
+
+// parseTempConfig writes content to a named temp file, parses it, and fails
+// the test on any error or missing-file result.
+func parseTempConfig(t *testing.T, filename, content string) pluginConfigFile {
+	t.Helper()
+	path := writeTempConfig(t, filename, content)
 	cfg, ok, err := parsePluginConfigFile(path)
 	if err != nil {
 		t.Fatalf("parse config: %v", err)
@@ -157,11 +164,7 @@ func TestParsePluginConfigFile(t *testing.T) {
 }
 
 func TestParsePluginConfigFileCollectPidInvalid(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "ebpf.d.conf")
-	if err := os.WriteFile(path, []byte("[global]\ncollect pid = invalid\n"), 0o600); err != nil {
-		t.Fatalf("write config: %v", err)
-	}
+	path := writeTempConfig(t, "ebpf.d.conf", "[global]\ncollect pid = invalid\n")
 	_, _, err := parsePluginConfigFile(path)
 	if err == nil {
 		t.Fatal("expected parse error for invalid collect pid, got nil")
