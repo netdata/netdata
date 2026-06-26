@@ -93,13 +93,17 @@ with no shim:
   after a single request — though that one request still costs the backend's own
   connect/read timeout, so "fast" is relative to the multi-minute temporary case,
   not instant.
-- The **configured URI is never logged verbatim**, so a misplaced secret in it
-  cannot leak into the journal. The startup probe logs only the opendal error
-  (operation/backend/endpoint, not URI query-string credentials), and the
-  startup config dump (`otel-plugin` `config::log_config`) redacts
-  `storage.uri` to its scheme (`s3://[redacted]`) via `redact_uri` before
-  serializing — the redaction is logging-only, so the verbatim URI still crosses
-  the supervisor→worker IPC intact.
+- The plugin **redacts the URI in its own log messages**: the startup config
+  dump (`otel-plugin` `config::log_config` via `redact_uri`) logs `storage.uri`
+  as its scheme only (`s3://[redacted]`). The redaction is logging-only — the
+  verbatim URI still crosses the supervisor→worker IPC intact.
+- The plugin does **not** sanitize errors raised by OpenDAL itself: a
+  `from_uri` parse failure (`OpendalStorage::new`) or a probe/operation error may
+  quote the URI or endpoint, and the plugin logs those errors as-is. This is
+  acceptable by design — the guarantee is only that *plugin-authored* messages
+  don't echo the URI. Credentials therefore MUST NOT appear in the URI (the
+  credential contract above); a misplaced secret could surface through an
+  OpenDAL error.
 - Logs land in systemd-journal under `otel-plugin/ledger` (query via the MCP
   `netdata_agent_logs` tool, component `ledger`).
 
