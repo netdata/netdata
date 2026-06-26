@@ -379,8 +379,10 @@ impl Ledger {
                         self.handle_catalog_builder_resp(pid, r).await
                     }
                     PipelineResp::WorkerGone { kind } => {
+                        let signal = self.pipelines.get(&pid).map(|p| p.signal()).unwrap_or("?");
                         tracing::error!(
                             pipeline_id = pid,
+                            signal,
                             "{kind} worker channel closed unexpectedly, exiting event loop"
                         );
                         return Ok(());

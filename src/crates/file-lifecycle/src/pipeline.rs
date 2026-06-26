@@ -70,10 +70,9 @@ pub struct Pipeline {
 impl Pipeline {
     /// Assemble a pipeline from its per-signal provisions, after the caller has
     /// spawned the per-signal workers, run recovery, and built the query handler.
-    /// Today the sole caller is
-    /// `otel-ledger::ledger::pipeline::build_logs_pipeline`; a second signal
-    /// (traces) adds its own `build_*_pipeline` that constructs the result here
-    /// the same way.
+    /// The sole caller is the consumer's shared
+    /// `otel-ledger::ledger::pipeline::build_pipeline`, which each signal's thin
+    /// `build_*_pipeline` binding delegates to.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         pipeline_id: u16,

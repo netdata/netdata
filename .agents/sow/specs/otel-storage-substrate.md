@@ -65,9 +65,10 @@ The substrate owns the machinery that operates only on neutral types
   the build impl is the content binding's.
 - The logs identity decode for the selector
   (`otel_logs_identity::decode_content_meta_or_empty`).
-- `build_logs_pipeline` (the logs assembly that composes substrate helpers,
-  spawns the logs Indexer + catalog builder, runs recovery, builds the handler,
-  and constructs the `Pipeline`).
+- `build_logs_pipeline` (the thin logs binding: spawns the logs Indexer and
+  passes a `make_handler` closure to the shared `build_pipeline`, which composes
+  substrate helpers, spawns the catalog builder, runs recovery, and constructs
+  the `Pipeline`).
 
 ## Dependency boundary (hard contract)
 
@@ -100,13 +101,21 @@ args→payload `arg_shim`.
   not the mutability of the state it owns: `registries()` and the worker-sender
   accessors hand back the live handles the coordinator drives.
 - A consumer assembles a pipeline with the public `Pipeline::new(...)` from inside
-  its `build_*_pipeline`.
-- The seal step is NOT yet an injected provision: for the single logs consumer
-  both the seal `Indexer` and `build_logs_pipeline` live in `otel-ledger`, so the
-  `sfst_indexer` call never crosses into the substrate. Promoting the seal step
-  to an injected provision (and relocating the `Ledger` coordinator into the
-  substrate) is deferred to when a second signal (traces) provides the real
-  second consumer to design the seam against.
+  its `build_*_pipeline`. In `otel-ledger` the shared, signal-neutral
+  `ledger::pipeline::build_pipeline` holds the one assembly recipe (dirs,
+  registries, recovery, forwarders, `Pipeline::new`); each signal's thin
+  `build_logs_pipeline`/`build_traces_pipeline` pre-spawns its seal worker and
+  passes a `make_handler` closure. Assembly stays consumer-side (it names the
+  coordinator's `PipelineResp` merge vocabulary); the substrate is not the
+  assembler.
+- The seal step is NOT yet an injected provision: every seal worker (the logs
+  `Indexer` and the content-light traces `TracesIndexer`) and both
+  `build_*_pipeline` bindings live in `otel-ledger`, so the `sfst_indexer` call
+  never crosses into the substrate. The traces pipeline is a content-light proof
+  scaffold (a `SUMR`-only seal + stub query handler), not a real content-decoding
+  consumer, so it does not yet justify promoting the seal step to an injected
+  provision (or relocating the `Ledger` coordinator into the substrate); that is
+  deferred to when a real second signal exercises the seam.
 
 ## Operator config & derived on-disk layout
 

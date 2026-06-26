@@ -1,29 +1,40 @@
-//! The logs pipeline builder.
+//! The shared pipeline builder and the logs binding.
 //!
-//! Assembles the logs [`file_lifecycle::Pipeline`]: it sets up the per-signal
-//! disk dirs and tenant registries, spawns the logs seal/index ([`Indexer`],
-//! which calls `sfst_indexer`) and catalog-builder workers, runs startup
-//! recovery over the substrate-shared cleaner/uploader/storage, builds the logs
-//! query handler, and detaches the per-pipeline worker response streams into
-//! pid-tagged forwarders feeding the coordinator's merged channel. The reusable
-//! `Pipeline` shell and the lifecycle machinery it composes live in
-//! `file-lifecycle`; this module is the logs-specific binding.
+//! [`build_pipeline`] is the signal-neutral assembly recipe: it sets up the
+//! per-signal disk dirs and tenant registries, spawns the catalog-builder
+//! worker, runs startup recovery over the substrate-shared
+//! cleaner/uploader/storage, wires the per-signal query handler (provided by the
+//! caller's `make_handler` closure), and detaches the per-pipeline worker
+//! response streams into pid-tagged forwarders feeding the coordinator's merged
+//! channel. The caller pre-spawns the per-signal seal/index worker (it owns the
+//! concrete [`Component`](file_lifecycle::component::Component) type) and hands
+//! its handle in.
+//!
+//! [`build_logs_pipeline`] is the thin logs binding: it spawns the logs
+//! [`Indexer`], builds the logs [`OtelLogsHandler`], and delegates to
+//! [`build_pipeline`]. The traces binding lives in [`super::traces_pipeline`].
+//! The reusable `Pipeline` shell and the lifecycle machinery live in
+//! `file-lifecycle`.
 
 use std::sync::Arc;
 
 use bridge::config::LifecycleConfig;
-use bridge::function::{FunctionHandler, HandlerAdapter, RawFunctionHandler};
+use bridge::function::{HandlerAdapter, RawFunctionHandler};
 use file_registry::TenantId;
 use tokio::sync::{RwLock, mpsc};
 use tokio_util::sync::CancellationToken;
 
 use crate::event::PipelineResp;
 use crate::indexer::Indexer;
+use file_lifecycle::ArgShim;
 use file_lifecycle::Pipeline;
 use file_lifecycle::catalog_builder::{CatalogBuilder, CatalogBuilderArgs};
 use file_lifecycle::chunk::ChunkCache;
 use file_lifecycle::component::ComponentHandle;
-use file_lifecycle::ipc::{CleanerRequest, CleanerResponse, UploaderRequest, UploaderResponse};
+use file_lifecycle::ipc::{
+    CleanerRequest, CleanerResponse, IndexerRequest, IndexerResponse, UploaderRequest,
+    UploaderResponse,
+};
 use file_lifecycle::recovery::{
     drain_wal_deletes, recover_orphaned_wals, recover_retention, recover_unindexed,
     recover_unuploaded,
@@ -35,7 +46,7 @@ use super::{OtelLogsHandler, RemoteRead};
 
 /// Minimum records per chunk when indexing an active WAL's prefix at
 /// query time. A fixed default for now; made configurable with the rest
-/// of chunk-cache governance.
+/// of chunk-cache governance. Logs-only (the traces stub has no query path).
 const CHUNK_MIN_ENTRIES: u64 = 16_384;
 /// Maximum time startup waits on remote object storage (LIST/stat
 /// reconciliation) per tenant before proceeding to Ready. A slow/unreachable
@@ -44,16 +55,22 @@ const CHUNK_MIN_ENTRIES: u64 = 16_384;
 /// deferred until a later reconcile confirms the remote, so nothing is at risk).
 const STARTUP_REMOTE_BUDGET: std::time::Duration = std::time::Duration::from_secs(10);
 
-/// Build the logs pipeline: set up per-signal disk dirs, discover tenants,
-/// spawn the per-pipeline seal/index and catalog-builder workers, run startup
-/// recovery (using the shared cleaner/uploader/storage), construct the query
-/// handler, and detach the per-pipeline workers' response streams into
-/// pid-tagged forwarders feeding the shell's merged channel.
+/// Assemble a pipeline for any signal: set up per-signal disk dirs, discover
+/// tenants, spawn the catalog-builder worker, run startup recovery (using the
+/// shared cleaner/uploader/storage), wire the query handler from `make_handler`,
+/// and detach the per-pipeline workers' response streams into pid-tagged
+/// forwarders feeding the shell's merged channel.
 ///
-/// The shared workers (`cleaner`, `uploader`, `storage`, `read_cache`,
-/// `chunk_cache`) are injected; this function owns only the per-signal workers.
+/// The caller pre-spawns the per-signal seal/index worker — it owns the concrete
+/// `Component` type, which is erased the instant it is spawned to
+/// `ComponentHandle<IndexerRequest, IndexerResponse>` — and hands the handle in.
+/// `make_handler` is invoked once with the wrapped registries to produce the
+/// signal's `(handler, arg_shim)`; the declaration is derived from the handler.
+///
+/// The shared workers (`cleaner`, `uploader`, `storage`) are injected; this
+/// function owns only the per-signal catalog builder.
 #[allow(clippy::too_many_arguments)]
-pub(crate) async fn build_logs_pipeline(
+pub(crate) async fn build_pipeline<F>(
     pipeline_id: u16,
     signal: &'static str,
     config: &LifecycleConfig,
@@ -61,10 +78,13 @@ pub(crate) async fn build_logs_pipeline(
     cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
     mut uploader: Option<&mut ComponentHandle<UploaderRequest, UploaderResponse>>,
     storage: Option<&OpendalStorage>,
-    read_cache: Option<&file_cache::FileCache>,
-    chunk_cache: Arc<ChunkCache>,
+    mut indexer: ComponentHandle<IndexerRequest, IndexerResponse>,
     pipeline_tx: &mpsc::UnboundedSender<(u16, PipelineResp)>,
-) -> anyhow::Result<Pipeline> {
+    make_handler: F,
+) -> anyhow::Result<Pipeline>
+where
+    F: FnOnce(Arc<RwLock<TenantRegistries>>) -> (Arc<dyn RawFunctionHandler>, ArgShim),
+{
     let wal_base_dir = config.wal.dir.clone();
     let index_base_dir = config.index.dir.clone();
     let catalog_base_dir = config.catalog.dir.clone();
@@ -77,7 +97,9 @@ pub(crate) async fn build_logs_pipeline(
         TenantRegistries::new(wal_base_dir, index_base_dir, catalog_base_dir.clone());
     registries.discover_tenants();
 
-    let mut indexer = ComponentHandle::spawn::<Indexer>((), cancel.child_token());
+    // The seal/index worker was spawned by the caller (it owns the concrete
+    // Component type); the catalog builder is signal-neutral, so it is spawned
+    // here. The `signal` field on each line disambiguates logs vs traces.
     tracing::info!(signal, "indexer spawned");
 
     let mut catalog_builder = ComponentHandle::spawn::<CatalogBuilder>(
@@ -227,16 +249,11 @@ pub(crate) async fn build_logs_pipeline(
     // a Call arrives.
     let registries = Arc::new(RwLock::new(registries));
 
-    // Remote-read capability for the query path: present only when storage is
-    // enabled (so the handler can fetch evicted SFSTs back through the cache).
-    let remote = match (storage, read_cache) {
-        (Some(s), Some(c)) => Some(RemoteRead::new(s.clone(), c.clone())),
-        _ => None,
-    };
-    let otel_handler =
-        OtelLogsHandler::new(registries.clone(), chunk_cache, CHUNK_MIN_ENTRIES, remote);
-    let declaration = otel_handler.declaration();
-    let handler: Arc<dyn RawFunctionHandler> = Arc::new(HandlerAdapter::new(otel_handler));
+    // The caller's closure builds the signal's handler (capturing whatever it
+    // needs — e.g. the logs chunk/remote-read caches) and supplies the
+    // args→payload shim; the declaration is read back off the boxed handler.
+    let (handler, arg_shim) = make_handler(registries.clone());
+    let declaration = handler.declaration();
 
     // Detach the per-pipeline workers' response streams into pid-tagged
     // forwarders feeding the run-loop's single merged channel. The indexer is
@@ -277,15 +294,67 @@ pub(crate) async fn build_logs_pipeline(
         catalog_builder_tx,
         handler,
         declaration,
-        super::rpc::patch_args_into_payload,
+        arg_shim,
     ))
+}
+
+/// Build the logs pipeline: spawn the logs [`Indexer`], then delegate to
+/// [`build_pipeline`] with a closure that constructs the logs
+/// [`OtelLogsHandler`] (with the chunk cache and, when storage is enabled, the
+/// remote-read cache) and the logs args→payload shim.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn build_logs_pipeline(
+    pipeline_id: u16,
+    signal: &'static str,
+    config: &LifecycleConfig,
+    cancel: &CancellationToken,
+    cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
+    uploader: Option<&mut ComponentHandle<UploaderRequest, UploaderResponse>>,
+    storage: Option<&OpendalStorage>,
+    read_cache: Option<&file_cache::FileCache>,
+    chunk_cache: Arc<ChunkCache>,
+    pipeline_tx: &mpsc::UnboundedSender<(u16, PipelineResp)>,
+) -> anyhow::Result<Pipeline> {
+    let indexer = ComponentHandle::spawn::<Indexer>((), cancel.child_token());
+
+    // Owned clones for the handler closure: the builder body borrows `storage`
+    // for recovery, while the handler needs its own `RemoteRead` (storage +
+    // read cache). Both are cheap Arc-backed clones.
+    let remote_storage = storage.cloned();
+    let remote_cache = read_cache.cloned();
+
+    build_pipeline(
+        pipeline_id,
+        signal,
+        config,
+        cancel,
+        cleaner,
+        uploader,
+        storage,
+        indexer,
+        pipeline_tx,
+        move |registries| {
+            // Remote-read capability for the query path: present only when
+            // storage is enabled (so the handler can fetch evicted SFSTs back
+            // through the cache).
+            let remote = match (remote_storage, remote_cache) {
+                (Some(s), Some(c)) => Some(RemoteRead::new(s, c)),
+                _ => None,
+            };
+            let otel_handler =
+                OtelLogsHandler::new(registries, chunk_cache, CHUNK_MIN_ENTRIES, remote);
+            let handler: Arc<dyn RawFunctionHandler> = Arc::new(HandlerAdapter::new(otel_handler));
+            (handler, super::rpc::patch_args_into_payload as ArgShim)
+        },
+    )
+    .await
 }
 
 /// Forward a per-pipeline worker's responses into the shell's merged channel,
 /// tagging each with `pipeline_id`. On source-channel close (the worker task
 /// ended) it emits one [`PipelineResp::WorkerGone`] so the run-loop can treat a
 /// dead worker as fatal, then exits.
-pub(super) fn spawn_forwarder<T: Send + 'static>(
+fn spawn_forwarder<T: Send + 'static>(
     mut rx: mpsc::UnboundedReceiver<T>,
     pipeline_id: u16,
     tx: mpsc::UnboundedSender<(u16, PipelineResp)>,
