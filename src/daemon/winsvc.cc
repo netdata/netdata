@@ -212,7 +212,6 @@ void WINAPI ServiceMain(DWORD argc, LPSTR* argv)
     // Run the agent
     netdata_service_log("Running the agent...");
     netdata_main(argc, argv);
-
     netdata_service_log("Agent has been started...");
 }
 
