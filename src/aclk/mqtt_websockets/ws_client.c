@@ -55,9 +55,26 @@ void ws_client_free_headers(ws_client *client)
     client->hs.hdr_count = 0;
 }
 
+static void ws_client_rx_free_specific_data(ws_client *client)
+{
+    switch (client->rx.opcode) {
+        case WS_OP_CONNECTION_CLOSE:
+            freez(client->rx.specific_data.op_close.reason);
+            client->rx.specific_data.op_close.reason = NULL;
+            break;
+        case WS_OP_PING:
+            freez(client->rx.specific_data.ping_msg);
+            client->rx.specific_data.ping_msg = NULL;
+            break;
+        default:
+            break;
+    }
+}
+
 void ws_client_destroy(ws_client *client)
 {
     ws_client_free_headers(client);
+    ws_client_rx_free_specific_data(client);
     freez(client->hs.nonce_reply);
     freez(client->hs.http_reply_msg);
     rbuf_free(client->buf_read);
@@ -69,6 +86,7 @@ void ws_client_destroy(ws_client *client)
 void ws_client_reset(ws_client *client)
 {
     ws_client_free_headers(client);
+    ws_client_rx_free_specific_data(client);
     freez(client->hs.nonce_reply);
     client->hs.nonce_reply = NULL;
 
@@ -624,6 +642,7 @@ int ws_client_process_rx_ws(ws_client *client)
             // TODO schedule this instead of sending right away
             // then attempt to send as soon as buffer space clears up
             size = ws_client_send(client, WS_OP_PONG, client->rx.specific_data.ping_msg, client->rx.payload_length);
+            ws_client_rx_free_specific_data(client);
             if (size != client->rx.payload_length) {
                 nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Unable to send the PONG as one packet back. Closing connection.");
                 return WS_CLIENT_PROTOCOL_ERROR;

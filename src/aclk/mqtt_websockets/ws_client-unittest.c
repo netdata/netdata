@@ -53,6 +53,13 @@ static size_t ws_client_unittest_binary_header(char *dst, size_t payload_len)
     return 2 + sizeof(len);
 }
 
+static size_t ws_client_unittest_control_header(char *dst, enum websocket_opcode opcode, size_t payload_len)
+{
+    dst[0] = (char)(0x80 | opcode);
+    dst[1] = (char)payload_len;
+    return 2;
+}
+
 static int ws_client_unittest_process_frame(ws_client *client, size_t payload_len)
 {
     char header[10];
@@ -195,6 +202,78 @@ static int ws_client_unittest_cap_hit(void)
     return errors;
 }
 
+static int ws_client_unittest_reset_frees_partial_close_reason(void)
+{
+    int errors = 0;
+    char frame[4];
+    size_t header_len = ws_client_unittest_control_header(frame, WS_OP_CONNECTION_CLOSE, 5);
+    uint16_t close_code = htobe16(1000);
+    memcpy(&frame[header_len], &close_code, sizeof(close_code));
+
+    ws_client client = {
+        .state = WS_ESTABLISHED,
+        .rx.parse_state = WS_FIRST_2BYTES,
+        .buf_read = rbuf_create(64, 64),
+        .buf_write = rbuf_create(1024, 1024),
+        .buf_to_mqtt = rbuf_create(1024, 1024),
+    };
+
+    WS_TEST(rbuf_push(client.buf_read, frame, sizeof(frame)) == sizeof(frame), "push partial close frame");
+
+    int ret;
+    do {
+        ret = ws_client_process_rx_ws(&client);
+    } while (ret == 0);
+
+    WS_TEST(ret == WS_CLIENT_NEED_MORE_BYTES, "partial close reason needs more bytes");
+    WS_TEST(client.rx.specific_data.op_close.reason != NULL, "partial close reason allocated");
+
+    ws_client_reset(&client);
+
+    WS_TEST(client.rx.specific_data.op_close.reason == NULL, "reset frees partial close reason");
+    WS_TEST(client.rx.payload_processed == 0, "reset clears close payload progress");
+
+    rbuf_free(client.buf_read);
+    rbuf_free(client.buf_write);
+    rbuf_free(client.buf_to_mqtt);
+    return errors;
+}
+
+static int ws_client_unittest_ping_payload_cleanup(void)
+{
+    int errors = 0;
+    const char payload[] = "abc";
+    char frame[2 + sizeof(payload) - 1];
+    size_t header_len = ws_client_unittest_control_header(frame, WS_OP_PING, sizeof(payload) - 1);
+    memcpy(&frame[header_len], payload, sizeof(payload) - 1);
+
+    ws_client client = {
+        .state = WS_ESTABLISHED,
+        .rx.parse_state = WS_FIRST_2BYTES,
+        .buf_read = rbuf_create(64, 64),
+        .buf_write = rbuf_create(1024, 1024),
+        .buf_to_mqtt = rbuf_create(1024, 1024),
+    };
+
+    WS_TEST(rbuf_push(client.buf_read, frame, sizeof(frame)) == sizeof(frame), "push ping frame");
+
+    int ret;
+    do {
+        ret = ws_client_process_rx_ws(&client);
+    } while (ret == 0);
+
+    WS_TEST(ret == WS_CLIENT_PARSING_DONE, "ping frame parses");
+    WS_TEST(client.rx.specific_data.ping_msg == NULL, "ping payload released after PONG generation");
+    WS_TEST(rbuf_bytes_available(client.buf_write) > 0, "PONG queued");
+
+    ws_client_reset(&client);
+
+    rbuf_free(client.buf_read);
+    rbuf_free(client.buf_write);
+    rbuf_free(client.buf_to_mqtt);
+    return errors;
+}
+
 int ws_client_unittest(void)
 {
     int errors = 0;
@@ -205,6 +284,8 @@ int ws_client_unittest(void)
     errors += ws_client_unittest_clamps_mqtt_input_initial_size();
     errors += ws_client_unittest_observed_size_payload();
     errors += ws_client_unittest_cap_hit();
+    errors += ws_client_unittest_reset_frees_partial_close_reason();
+    errors += ws_client_unittest_ping_payload_cleanup();
 
     if (errors)
         fprintf(stderr, "ws_client unittest: %d ERROR(S)\n", errors);
