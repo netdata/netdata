@@ -29,6 +29,45 @@ static void nd_win_trace(const char *fmt, ...) {
 #define nd_win_trace(fmt, ...) do {} while(0)
 #endif
 
+// Normalize a directory path for Win32/UCRT64 API use.
+// Accepts both POSIX form (/c/...) and Windows-native form (C:\... or C:/...);
+// output is always C:/... with forward slashes.  Non-Windows: straight copy.
+void nd_env_normalize_dir_path(const char *src, char *dst, size_t dst_size) {
+    if (!src || !dst || !dst_size) return;
+
+#if defined(OS_WINDOWS)
+    if (isalpha((unsigned char)src[0]) && src[1] == ':') {
+        // Windows-native: upper-case drive, \ → /
+        if (dst_size < 4) { dst[0] = '\0'; return; }
+        dst[0] = (char)toupper((unsigned char)src[0]);
+        dst[1] = ':';
+        if (src[2] == '\0') {
+            // Bare "C:" → "C:/" (drive-relative otherwise)
+            dst[2] = '/'; dst[3] = '\0';
+        } else {
+            size_t i = 2, j = 2;
+            for (; src[i] && j < dst_size - 1; i++, j++)
+                dst[j] = (src[i] == '\\') ? '/' : src[i];
+            dst[j] = '\0';
+        }
+    } else if (src[1] && isalpha((unsigned char)src[1]) && (src[2] == '/' || src[2] == '\0')) {
+        // POSIX (/c/... or bare /c): extract drive letter, keep forward slashes.
+        if (dst_size < 4) { dst[0] = '\0'; return; }
+        dst[0] = (char)toupper((unsigned char)src[1]);
+        dst[1] = ':';
+        if (src[2] == '\0') {
+            dst[2] = '/'; dst[3] = '\0';
+        } else {
+            strncpyz(dst + 2, src + 2, dst_size - 2);
+        }
+    } else {
+        strncpyz(dst, src, dst_size);
+    }
+#else
+    strncpyz(dst, src, dst_size);
+#endif
+}
+
 #if defined(OS_WINDOWS)
 // mkdir -p for Windows native paths (C:/foo/bar/baz).
 // Walk every '/' separator and create each prefix, ignoring failures
@@ -57,21 +96,23 @@ static void mkdir_recursive(const char *native_path, int perms) {
 void verify_required_directory(const char *env, const char *dir, bool create_it, int perms) {
     errno_clear();
 
-    if (!dir || *dir != '/')
+#if defined(OS_WINDOWS)
+    // Accept both POSIX form (/c/...) and Windows-native form (C:\... or C:/...).
+    // A bare "C:" (no trailing separator) is drive-relative on Windows — treat it
+    // as the root by requiring at least a separator or end-of-string after "X:".
+    bool is_absolute_path =
+        (dir && dir[0] == '/') ||
+        (dir && isalpha((unsigned char)dir[0]) && dir[1] == ':' &&
+         (dir[2] == '\\' || dir[2] == '/' || dir[2] == '\0'));
+#else
+    bool is_absolute_path = (dir && dir[0] == '/');
+#endif
+    if (!dir || !is_absolute_path)
         fatal("Invalid directory path (must be an absolute path): '%s' (%s)", dir, env?env:"");
 
 #if defined(OS_WINDOWS)
-    // UCRT64's CRT treats /c/... as \c\... (current-drive-relative), not C:\...
-    // Convert /c/... → C:/... keeping forward slashes so the '/' component-walk
-    // below keeps working and UCRT64 CRT accepts the path.
     char win_dir[FILENAME_MAX + 1];
-    if (isalpha((unsigned char)dir[1]) && (dir[2] == '/' || dir[2] == '\0')) {
-        win_dir[0] = (char)toupper((unsigned char)dir[1]);
-        win_dir[1] = ':';
-        strncpyz(win_dir + 2, dir + 2, FILENAME_MAX - 2);
-    } else {
-        strncpyz(win_dir, dir, FILENAME_MAX);
-    }
+    nd_env_normalize_dir_path(dir, win_dir, sizeof(win_dir));
     const char *native_dir = win_dir;
 #else
     const char *native_dir = dir;
