@@ -2,6 +2,58 @@
 
 #include "common.h"
 
+// Windows-only trace: append timestamped messages to %TEMP%\netdata-trace.log.
+// Same file as nd_win_trace() in main.c — both functions are file-local statics
+// that write to the same path, giving one unified trace stream.
+#if defined(OS_WINDOWS)
+__attribute__((format(printf, 1, 2)))
+static void nd_win_trace(const char *fmt, ...) {
+    char path[MAX_PATH + 1];
+    DWORD len = GetTempPathA(MAX_PATH, path);
+    if (!len || len >= (DWORD)(MAX_PATH - 22)) return;
+    strcat(path, "netdata-trace.log");
+    FILE *f = fopen(path, "a");
+    if (!f) return;
+    SYSTEMTIME t;
+    GetSystemTime(&t);
+    fprintf(f, "%02d:%02d:%02d.%03d - ", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
+    va_list args;
+    va_start(args, fmt);
+    vfprintf(f, fmt, args);
+    va_end(args);
+    fputc('\n', f);
+    fflush(f);
+    fclose(f);
+}
+#else
+#define nd_win_trace(fmt, ...) do {} while(0)
+#endif
+
+#if defined(OS_WINDOWS)
+// mkdir -p for Windows native paths (C:/foo/bar/baz).
+// Walk every '/' separator and create each prefix, ignoring failures
+// (the parent may already exist).  The drive root "X:" is skipped
+// because mkdir on a bare drive letter always fails.
+static void mkdir_recursive(const char *native_path, int perms) {
+    char tmp[FILENAME_MAX + 1];
+    strncpyz(tmp, native_path, FILENAME_MAX);
+
+    // Start after the drive root ("X:/") so we never call mkdir on "X:".
+    char *walk_start = tmp;
+    if (isalpha((unsigned char)tmp[0]) && tmp[1] == ':' && (tmp[2] == '/' || tmp[2] == '\0'))
+        walk_start = tmp + 2;
+
+    for (char *p = walk_start + 1; *p; p++) {
+        if (*p == '/') {
+            char saved = *p;
+            *p = '\0';
+            mkdir(tmp, perms);  // ignore failure — may already exist
+            *p = saved;
+        }
+    }
+}
+#endif
+
 void verify_required_directory(const char *env, const char *dir, bool create_it, int perms) {
     errno_clear();
 
@@ -32,7 +84,19 @@ void verify_required_directory(const char *env, const char *dir, bool create_it,
     }
 
     if(create_it) {
+#if defined(OS_WINDOWS)
+        // On Windows, the WiX installer only creates static content directories;
+        // runtime directories like var/log/ may have no parent.  Create all
+        // intermediate components before attempting the final mkdir.
+        mkdir_recursive(native_dir, perms);
+#endif
         if(mkdir(native_dir, perms) == 0) {
+            if(env)
+                nd_setenv(env, dir, 1);
+            return;
+        }
+        // Accept the case where mkdir_recursive already created the leaf.
+        if(chdir(native_dir) == 0) {
             if(env)
                 nd_setenv(env, dir, 1);
             return;
@@ -49,31 +113,48 @@ void verify_required_directory(const char *env, const char *dir, bool create_it,
             *p = '\0';
 
             errno_clear();
-            if (stat(path, &st) == -1)
+            if (stat(path, &st) == -1) {
+                nd_win_trace("verify_required_directory FATAL: missing component '%s' of '%s' (env=%s)",
+                             path, dir, env?env:"");
                 fatal("Required directory: '%s' (%s) - Missing or inaccessible component: '%s'",
                       dir, env?env:"", path);
+            }
 
-            if (!S_ISDIR(st.st_mode))
+            if (!S_ISDIR(st.st_mode)) {
+                nd_win_trace("verify_required_directory FATAL: component '%s' not a dir (env=%s)",
+                             path, env?env:"");
                 fatal("Required directory: '%s' (%s) - Component '%s' exists but is not a directory.",
                       dir, env?env:"", path);
+            }
 
             *p = '/';
         }
         p++;
     }
 
-    if (stat(native_dir, &st) == -1)
+    if (stat(native_dir, &st) == -1) {
+        nd_win_trace("verify_required_directory FATAL: dir '%s' not found (env=%s, native='%s')",
+                     dir, env?env:"", native_dir);
         fatal("Required directory: '%s' (%s) - Missing or inaccessible: '%s'",
               dir, env?env:"", native_dir);
+    }
 
-    if (!S_ISDIR(st.st_mode))
+    if (!S_ISDIR(st.st_mode)) {
+        nd_win_trace("verify_required_directory FATAL: '%s' not a dir (env=%s)",
+                     native_dir, env?env:"");
         fatal("Required directory: '%s' (%s) - '%s' exists but is not a directory.",
               dir, env?env:"", native_dir);
+    }
 
-    if (access(native_dir, R_OK | X_OK) == -1)
+    if (access(native_dir, R_OK | X_OK) == -1) {
+        nd_win_trace("verify_required_directory FATAL: '%s' no read/exec access (env=%s)",
+                     native_dir, env?env:"");
         fatal("Required directory: '%s' (%s) - Insufficient permissions for: '%s'",
               dir, env?env:"", native_dir);
+    }
 
+    nd_win_trace("verify_required_directory FATAL: '%s' unknown failure (env=%s)",
+                 native_dir, env?env:"");
     fatal("Required directory: '%s' (%s) - Failed",
           dir, env?env:"");
 }
@@ -89,16 +170,27 @@ void set_environment_for_plugins_and_scripts(void) {
     nd_setenv("NETDATA_HOSTNAME", netdata_configured_hostname, 1);
     nd_setenv("NETDATA_HOST_PREFIX", netdata_configured_host_prefix, 1);
 
+    nd_win_trace("verify NETDATA_CONFIG_DIR: '%s'", netdata_configured_user_config_dir);
     verify_required_directory("NETDATA_CONFIG_DIR", netdata_configured_user_config_dir, false, 0);
+    nd_win_trace("verify NETDATA_USER_CONFIG_DIR: '%s'", netdata_configured_user_config_dir);
     verify_required_directory("NETDATA_USER_CONFIG_DIR", netdata_configured_user_config_dir, false, 0);
+    nd_win_trace("verify NETDATA_STOCK_CONFIG_DIR: '%s'", netdata_configured_stock_config_dir);
     verify_required_directory("NETDATA_STOCK_CONFIG_DIR", netdata_configured_stock_config_dir, false, 0);
+    nd_win_trace("verify NETDATA_STOCK_DATA_DIR: '%s'", netdata_configured_stock_data_dir);
     verify_required_directory("NETDATA_STOCK_DATA_DIR", netdata_configured_stock_data_dir, false, 0);
+    nd_win_trace("verify NETDATA_PLUGINS_DIR: '%s'", netdata_configured_primary_plugins_dir);
     verify_required_directory("NETDATA_PLUGINS_DIR", netdata_configured_primary_plugins_dir, false, 0);
+    nd_win_trace("verify NETDATA_WEB_DIR: '%s'", netdata_configured_web_dir);
     verify_required_directory("NETDATA_WEB_DIR", netdata_configured_web_dir, false, 0);
+    nd_win_trace("verify NETDATA_CACHE_DIR: '%s'", netdata_configured_cache_dir);
     verify_required_directory("NETDATA_CACHE_DIR", netdata_configured_cache_dir, true, 0775);
+    nd_win_trace("verify NETDATA_LIB_DIR: '%s'", netdata_configured_varlib_dir);
     verify_required_directory("NETDATA_LIB_DIR", netdata_configured_varlib_dir, true, 0775);
+    nd_win_trace("verify NETDATA_LOG_DIR: '%s'", netdata_configured_log_dir);
     verify_required_directory("NETDATA_LOG_DIR", netdata_configured_log_dir, true, 0775);
+    nd_win_trace("verify CLAIMING_DIR: '%s'", netdata_configured_cloud_dir);
     verify_required_directory("CLAIMING_DIR", netdata_configured_cloud_dir, true, 0770);
+    nd_win_trace("all directory checks passed");
 
     {
         BUFFER *user_plugins_dirs = buffer_create(FILENAME_MAX, NULL);
