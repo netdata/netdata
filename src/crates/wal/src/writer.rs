@@ -348,9 +348,10 @@ pub struct Writer {
 }
 
 impl Writer {
-    /// Create a new writer that stamps every file it produces with `pipeline_id`
-    /// (the signal axis the ledger routes by — chosen explicitly by the caller;
-    /// there is no default).
+    /// Create a new writer that stamps every file it produces with `pipeline_id`,
+    /// the opaque signal axis the ledger routes by. The caller's integration layer
+    /// assigns it (one id per OTel signal); the WAL ascribes no meaning to the
+    /// value and there is no default — construction always names the axis.
     ///
     /// Machine and boot IDs are loaded from the system. The caller provides
     /// a shared sequence counter (e.g., shared across per-tenant writers).

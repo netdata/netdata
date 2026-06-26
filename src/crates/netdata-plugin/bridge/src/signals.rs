@@ -19,7 +19,7 @@ use std::fmt;
 /// for the (signal ↔ pipeline_id ↔ remote-key segment) mapping.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Signal {
-    /// Logs — the default pipeline.
+    /// Logs.
     Logs,
     /// Traces. PROOF SCAFFOLD (traces-proof SOW): the skeletal traces signal.
     Traces,

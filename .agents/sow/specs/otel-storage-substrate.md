@@ -110,9 +110,10 @@ by `bridge::signals` as the single source of truth:
   the opaque `pipeline_id`/`SignalSpec`. The ledger holds its pipelines and
   per-signal frame-seq gap-check in a fixed `Signal`-indexed structure (not a
   `HashMap<u16, _>`), so routing to a known signal cannot miss. Both WAL writers
-  stamp their axis explicitly via `Writer::with_pipeline(Signal::_.pipeline_id())`
-  (no reliance on `Writer::new`'s `DEFAULT_PIPELINE` defaulting), so no cross-crate
-  `pipeline_id == DEFAULT_PIPELINE` compile-time assert is needed.
+  stamp their axis explicitly via `Writer::new(path, config, seq, Signal::_.pipeline_id())`
+  — there is no default pipeline at any layer (`FileId`/`Writer` construction always
+  takes an explicit `pipeline_id`), so an axis mismatch is a call-site error, never
+  silently swallowed by a defaulted constructor.
 
 ## `Pipeline` seam
 

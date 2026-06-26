@@ -531,8 +531,6 @@ impl LogsService for NetdataLogsService {
         } else {
             let path = self.wal_base_dir.join(tenant_id.as_str());
             let wal_config = self.resolve_wal_config(tenant_id.as_str());
-            // Stamp the logs signal axis explicitly (the WAL writer always takes
-            // its pipeline id — there is no default).
             let w = wal::Writer::new(
                 &path,
                 wal_config,
