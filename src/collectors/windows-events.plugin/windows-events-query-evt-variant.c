@@ -39,18 +39,50 @@ static inline void append_utf16(BUFFER *b, LPCWSTR utf16Str, const char *separat
     }
 }
 
+static inline void append_ansi(BUFFER *b, LPCSTR ansiStr, const char *separator) {
+    if (!ansiStr || !*ansiStr) return;
+
+    wchar_t wide_stack[1024];
+    for(size_t ansi_len = 0; ansi_len < _countof(wide_stack); ansi_len++) {
+        if(!ansiStr[ansi_len]) {
+            if(any_to_utf16(CP_ACP, wide_stack, _countof(wide_stack), ansiStr, (int)ansi_len, NULL))
+                append_utf16(b, wide_stack, separator);
+
+            return;
+        }
+    }
+
+    size_t wide_len = any_to_utf16(CP_ACP, NULL, 0, ansiStr, -1, NULL);
+    if (!wide_len || wide_len > SIZE_MAX / sizeof(wchar_t))
+        return;
+
+    wchar_t *wide = mallocz(wide_len * sizeof(wchar_t));
+    wide_len = any_to_utf16(CP_ACP, wide, wide_len, ansiStr, -1, NULL);
+    if (wide_len)
+        append_utf16(b, wide, separator);
+
+    freez(wide);
+}
+
 // Function to append binary data to the buffer
 static inline void append_binary(BUFFER *b, PBYTE data, DWORD size, const char *separator) {
     if (data == NULL || size == 0) return;
 
+#if SIZE_MAX <= UINT32_MAX
+    if ((size_t)size > (SIZE_MAX - 1) / 2) return;
+#endif
+    size_t needed = (size_t)size * 2 + 1;
+
     append_separator_if_needed(b, separator);
 
-    buffer_need_bytes(b, size * 4);
+    buffer_need_bytes(b, needed);
     for (DWORD i = 0; i < size; i++) {
         uint8_t value = data[i];
         b->buffer[b->len++] = hex_digits[(value & 0xf0) >> 4];
         b->buffer[b->len++] = hex_digits[(value & 0x0f)];
     }
+
+    b->buffer[b->len] = '\0';
 }
 
 // Function to append size_t to the buffer
@@ -89,6 +121,7 @@ static inline void append_double(BUFFER *b, double n, const char *separator) {
 
 static inline void append_guid(BUFFER *b, GUID *guid, const char *separator) {
     fatal_assert(sizeof(GUID) == sizeof(nd_uuid_t));
+    if (!guid) return;
 
     append_separator_if_needed(b, separator);
 
@@ -102,18 +135,33 @@ static inline void append_guid(BUFFER *b, GUID *guid, const char *separator) {
 }
 
 static inline void append_systime(BUFFER *b, SYSTEMTIME *st, const char *separator) {
+    if (!st) return;
+
     append_separator_if_needed(b, separator);
     buffer_sprintf(b, "%04d-%02d-%02d %02d:%02d:%02d",
                    st->wYear, st->wMonth, st->wDay, st->wHour, st->wMinute, st->wSecond);
 }
 
 static inline void append_filetime(BUFFER *b, FILETIME *ft, const char *separator) {
+    if (!ft) return;
+
     SYSTEMTIME st;
     if (FileTimeToSystemTime(ft, &st))
         append_systime(b, &st, separator);
 }
 
+static inline void append_filetime_value(BUFFER *b, ULONGLONG ft, const char *separator) {
+    FILETIME filetime = {
+        .dwLowDateTime = (DWORD)ft,
+        .dwHighDateTime = (DWORD)(ft >> 32),
+    };
+
+    append_filetime(b, &filetime, separator);
+}
+
 static inline void append_sid(BUFFER *b, PSID sid, const char *separator) {
+    if (!sid) return;
+
     cached_sid_to_buffer_append(sid, b, separator);
 }
 
@@ -159,19 +207,92 @@ static inline void append_evt_xml(BUFFER *b, LPCWSTR xmlData, const char *separa
 }
 
 void evt_variant_to_buffer(BUFFER *b, EVT_VARIANT *ev, const char *separator) {
-    if(ev->Type == EvtVarTypeNull) return;
+    if(!ev)
+        return;
+
+    DWORD type = ev->Type & EVT_VARIANT_TYPE_MASK;
+
+    if(type == EvtVarTypeNull) return;
 
     if (ev->Type & EVT_VARIANT_TYPE_ARRAY) {
+        if(!ev->Count)
+            return;
+
+        switch (type) {
+            case EvtVarTypeString:
+                if(!ev->StringArr) return;
+                break;
+            case EvtVarTypeAnsiString:
+                if(!ev->AnsiStringArr) return;
+                break;
+            case EvtVarTypeSByte:
+                if(!ev->SByteArr) return;
+                break;
+            case EvtVarTypeByte:
+                if(!ev->ByteArr) return;
+                break;
+            case EvtVarTypeInt16:
+                if(!ev->Int16Arr) return;
+                break;
+            case EvtVarTypeUInt16:
+                if(!ev->UInt16Arr) return;
+                break;
+            case EvtVarTypeInt32:
+                if(!ev->Int32Arr) return;
+                break;
+            case EvtVarTypeUInt32:
+            case EvtVarTypeHexInt32:
+                if(!ev->UInt32Arr) return;
+                break;
+            case EvtVarTypeInt64:
+                if(!ev->Int64Arr) return;
+                break;
+            case EvtVarTypeUInt64:
+            case EvtVarTypeHexInt64:
+                if(!ev->UInt64Arr) return;
+                break;
+            case EvtVarTypeSingle:
+                if(!ev->SingleArr) return;
+                break;
+            case EvtVarTypeDouble:
+                if(!ev->DoubleArr) return;
+                break;
+            case EvtVarTypeBoolean:
+                if(!ev->BooleanArr) return;
+                break;
+            case EvtVarTypeGuid:
+                if(!ev->GuidArr) return;
+                break;
+            case EvtVarTypeFileTime:
+                if(!ev->FileTimeArr) return;
+                break;
+            case EvtVarTypeSysTime:
+                if(!ev->SysTimeArr) return;
+                break;
+            case EvtVarTypeSid:
+                if(!ev->SidArr) return;
+                break;
+            case EvtVarTypeSizeT:
+                if(!ev->SizeTArr) return;
+                break;
+            case EvtVarTypeEvtXml:
+                if(!ev->XmlValArr) return;
+                break;
+            case EvtVarTypeBinary:
+            case EvtVarTypeEvtHandle:
+                return;
+            default:
+                return;
+        }
+
         for (DWORD i = 0; i < ev->Count; i++) {
-            switch (ev->Type & EVT_VARIANT_TYPE_MASK) {
+            switch (type) {
                 case EvtVarTypeString:
                     append_utf16(b, ev->StringArr[i], separator);
                     break;
 
                 case EvtVarTypeAnsiString:
-                    if (ev->AnsiStringArr[i] != NULL) {
-                        append_utf16(b, (LPCWSTR)ev->AnsiStringArr[i], separator);
-                    }
+                    append_ansi(b, ev->AnsiStringArr[i], separator);
                     break;
 
                 case EvtVarTypeSByte:
@@ -214,6 +335,11 @@ void evt_variant_to_buffer(BUFFER *b, EVT_VARIANT *ev, const char *separator) {
                     append_double(b, ev->DoubleArr[i], separator);
                     break;
 
+                case EvtVarTypeBoolean:
+                    append_separator_if_needed(b, separator);
+                    buffer_strcat(b, ev->BooleanArr[i] ? "true" : "false");
+                    break;
+
                 case EvtVarTypeGuid:
                     append_guid(b, &ev->GuidArr[i], separator);
                     break;
@@ -231,7 +357,6 @@ void evt_variant_to_buffer(BUFFER *b, EVT_VARIANT *ev, const char *separator) {
                     break;
 
                 case EvtVarTypeBinary:
-                    append_binary(b, ev->BinaryVal, ev->Count, separator);
                     break;
 
                 case EvtVarTypeSizeT:
@@ -247,7 +372,6 @@ void evt_variant_to_buffer(BUFFER *b, EVT_VARIANT *ev, const char *separator) {
                     break;
 
                 case EvtVarTypeEvtHandle:
-                    append_evt_handle(b, ev->EvtHandleVal, separator);
                     break;
 
                 case EvtVarTypeEvtXml:
@@ -260,7 +384,7 @@ void evt_variant_to_buffer(BUFFER *b, EVT_VARIANT *ev, const char *separator) {
             }
         }
     } else {
-        switch (ev->Type & EVT_VARIANT_TYPE_MASK) {
+        switch (type) {
             case EvtVarTypeNull:
                 // Do nothing for null types
                 break;
@@ -270,7 +394,7 @@ void evt_variant_to_buffer(BUFFER *b, EVT_VARIANT *ev, const char *separator) {
                 break;
 
             case EvtVarTypeAnsiString:
-                append_utf16(b, (LPCWSTR)ev->AnsiStringVal, separator);
+                append_ansi(b, ev->AnsiStringVal, separator);
                 break;
 
             case EvtVarTypeSByte:
@@ -320,6 +444,18 @@ void evt_variant_to_buffer(BUFFER *b, EVT_VARIANT *ev, const char *separator) {
 
             case EvtVarTypeGuid:
                 append_guid(b, ev->GuidVal, separator);
+                break;
+
+            case EvtVarTypeFileTime:
+                append_filetime_value(b, ev->FileTimeVal, separator);
+                break;
+
+            case EvtVarTypeSysTime:
+                append_systime(b, ev->SysTimeVal, separator);
+                break;
+
+            case EvtVarTypeSid:
+                append_sid(b, ev->SidVal, separator);
                 break;
 
             case EvtVarTypeBinary:
