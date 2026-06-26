@@ -754,6 +754,9 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
         case WS_CLIENT_CONNECTION_CLOSED:
             return MQTT_WSS_ERR_CONN_DROP;
 
+        case WS_CLIENT_BUFFER_FULL:
+            return MQTT_WSS_ERR_MSG_TOO_BIG;
+
         default:
             return MQTT_WSS_ERR_PROTO_WS;
     }

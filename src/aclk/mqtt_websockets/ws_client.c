@@ -18,6 +18,7 @@ const char *websocket_upgrage_hdr = "GET /mqtt HTTP/1.1\x0D\x0A"
 const char *mqtt_protoid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
 #define DEFAULT_RINGBUFFER_SIZE (1024*128)
+#define MAX_MQTT_INPUT_BUFFER_SIZE (16*1024*1024)
 
 ws_client *ws_client_new(size_t buf_size, char **host)
 {
@@ -26,9 +27,14 @@ ws_client *ws_client_new(size_t buf_size, char **host)
 
     ws_client *client = callocz(1, sizeof(ws_client));
     client->host = host;
-    client->buf_read = rbuf_create(buf_size ? buf_size : DEFAULT_RINGBUFFER_SIZE);
-    client->buf_write = rbuf_create(buf_size ? buf_size : DEFAULT_RINGBUFFER_SIZE);
-    client->buf_to_mqtt = rbuf_create(buf_size ? buf_size : DEFAULT_RINGBUFFER_SIZE);
+
+    size_t size = buf_size ? buf_size : DEFAULT_RINGBUFFER_SIZE;
+
+    // Fixed: raw WebSocket read staging; dynamic growth is only needed after payload decoding.
+    client->buf_read = rbuf_create(size, size);
+    // Fixed: the send path masks buffered bytes in-place after rbuf_bump_head().
+    client->buf_write = rbuf_create(size, size);
+    client->buf_to_mqtt = rbuf_create(size, MAX_MQTT_INPUT_BUFFER_SIZE);
 
     return client;
 }
@@ -74,8 +80,12 @@ void ws_client_reset(ws_client *client)
 
     client->state = WS_RAW;
     client->hs.hdr_state = WS_HDR_HTTP;
+    // Reconnect can happen mid-frame, so clear partial RX frame state too.
     client->rx.parse_state = WS_FIRST_2BYTES;
+    client->rx.opcode = 0;
     client->rx.remote_closed = false;
+    client->rx.payload_length = 0;
+    client->rx.payload_processed = 0;
 }
 
 #define MAX_HTTP_HDR_COUNT 128
@@ -527,8 +537,11 @@ int ws_client_process_rx_ws(ws_client *client)
                     return WS_CLIENT_NEED_MORE_BYTES;
                 char *insert = rbuf_get_linear_insert_range(client->buf_to_mqtt, &size);
                 if (!insert) {
-                    nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: WebSocket buffer full! Cannot process payload of %"PRIu64" bytes (processed %"PRIu64"/%"PRIu64"). Buffer capacity: %zu bytes",
-                           remaining, client->rx.payload_processed, client->rx.payload_length, rbuf_get_capacity(client->buf_to_mqtt));
+                    nd_log(NDLS_DAEMON, NDLP_ERR,
+                           "ACLK: inbound WebSocket MQTT buffer full! Cannot process payload of %"PRIu64" bytes "
+                           "(processed %"PRIu64"/%"PRIu64"). Buffer capacity: %zu bytes, max capacity: %zu bytes",
+                           remaining, client->rx.payload_processed, client->rx.payload_length,
+                           rbuf_get_capacity(client->buf_to_mqtt), rbuf_get_max_capacity(client->buf_to_mqtt));
                     return WS_CLIENT_BUFFER_FULL;
                 }
                 size = (size > remaining) ? remaining : size;
