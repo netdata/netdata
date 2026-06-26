@@ -2,42 +2,7 @@
 
 #include "common.h"
 
-// Windows-only trace: append timestamped messages to %TEMP%\netdata-trace.log.
-// Same file as nd_win_trace() in main.c — both functions are file-local statics
-// that write to the same path, giving one unified trace stream.
-#if defined(OS_WINDOWS)
-__attribute__((format(printf, 1, 2)))
-static void nd_win_trace(const char *fmt, ...) {
-    char path[MAX_PATH + 1];
-    DWORD len = GetTempPathA(MAX_PATH, path);
-    if (!len || len >= (DWORD)(MAX_PATH - 22)) return;
-    snprintfz(path + len, sizeof(path) - len, "netdata-trace.log");
-    // FILE_FLAG_OPEN_REPARSE_POINT: open the reparse point itself, not its target,
-    // so a symlink/junction planted at this path cannot redirect writes to another file.
-    HANDLE h = CreateFileA(path, FILE_APPEND_DATA,
-                           FILE_SHARE_READ | FILE_SHARE_WRITE,
-                           NULL, OPEN_ALWAYS,
-                           FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT,
-                           NULL);
-    if (h == INVALID_HANDLE_VALUE) return;
-    int fd = _open_osfhandle((intptr_t)h, _O_APPEND | _O_WRONLY | _O_TEXT);
-    if (fd < 0) { CloseHandle(h); return; }
-    FILE *f = _fdopen(fd, "a");
-    if (!f) { _close(fd); return; }
-    SYSTEMTIME t;
-    GetSystemTime(&t);
-    fprintf(f, "%02d:%02d:%02d.%03d - ", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
-    va_list args;
-    va_start(args, fmt);
-    vfprintf(f, fmt, args);
-    va_end(args);
-    fputc('\n', f);
-    fflush(f);
-    fclose(f);
-}
-#else
-#define nd_win_trace(fmt, ...) do {} while(0)
-#endif
+// nd_win_trace() is declared in libnetdata/os/os.h (Windows) / macro no-op (non-Windows).
 
 // Normalize a directory path for Win32/UCRT64 API use.
 // Accepts both POSIX form (/c/...) and Windows-native form (C:\... or C:/...);
@@ -128,30 +93,24 @@ void verify_required_directory(const char *env, const char *dir, bool create_it,
     const char *native_dir = dir;
 #endif
 
-    if (chdir(native_dir) == 0) {
-        if(env)
-            nd_setenv(env, dir, 1);
-        return;
-    }
+    bool dir_ok = (chdir(native_dir) == 0);
 
-    if(create_it) {
+    if (!dir_ok && create_it) {
 #if defined(OS_WINDOWS)
         // On Windows, the WiX installer only creates static content directories;
         // runtime directories like var/log/ may have no parent.  Create all
         // intermediate components before attempting the final mkdir.
         mkdir_recursive(native_dir, perms);
 #endif
-        if(mkdir(native_dir, perms) == 0) {
-            if(env)
-                nd_setenv(env, dir, 1);
-            return;
-        }
         // Accept the case where mkdir_recursive already created the leaf.
-        if(chdir(native_dir) == 0) {
-            if(env)
-                nd_setenv(env, dir, 1);
-            return;
-        }
+        if (mkdir(native_dir, perms) == 0 || chdir(native_dir) == 0)
+            dir_ok = true;
+    }
+
+    if (dir_ok) {
+        if(env)
+            nd_setenv(env, dir, 1);
+        return;
     }
 
     char path[PATH_MAX];
@@ -221,10 +180,9 @@ void set_environment_for_plugins_and_scripts(void) {
     nd_setenv("NETDATA_HOSTNAME", netdata_configured_hostname, 1);
     nd_setenv("NETDATA_HOST_PREFIX", netdata_configured_host_prefix, 1);
 
-    nd_win_trace("verify NETDATA_CONFIG_DIR: '%s'", netdata_configured_user_config_dir);
+    nd_win_trace("verify NETDATA_CONFIG_DIR / NETDATA_USER_CONFIG_DIR: '%s'", netdata_configured_user_config_dir);
     verify_required_directory("NETDATA_CONFIG_DIR", netdata_configured_user_config_dir, false, 0);
-    nd_win_trace("verify NETDATA_USER_CONFIG_DIR: '%s'", netdata_configured_user_config_dir);
-    verify_required_directory("NETDATA_USER_CONFIG_DIR", netdata_configured_user_config_dir, false, 0);
+    nd_setenv("NETDATA_USER_CONFIG_DIR", netdata_configured_user_config_dir, 1);
     nd_win_trace("verify NETDATA_STOCK_CONFIG_DIR: '%s'", netdata_configured_stock_config_dir);
     verify_required_directory("NETDATA_STOCK_CONFIG_DIR", netdata_configured_stock_config_dir, false, 0);
     nd_win_trace("verify NETDATA_STOCK_DATA_DIR: '%s'", netdata_configured_stock_data_dir);

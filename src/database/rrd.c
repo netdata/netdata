@@ -3,41 +3,7 @@
 #define RRDHOST_INTERNALS
 #include "rrd.h"
 
-// Windows-only: append timestamped messages to %TEMP%\netdata-trace.log.
-// File-local static; same destination as nd_win_trace() in main.c and environment.c.
-#if defined(OS_WINDOWS)
-__attribute__((format(printf, 1, 2)))
-static void nd_win_trace_rrd(const char *fmt, ...) {
-    char path[MAX_PATH + 1];
-    DWORD len = GetTempPathA(MAX_PATH, path);
-    if (!len || len >= (DWORD)(MAX_PATH - 22)) return;
-    snprintfz(path + len, sizeof(path) - len, "netdata-trace.log");
-    // FILE_FLAG_OPEN_REPARSE_POINT: open the reparse point itself, not its target,
-    // so a symlink/junction planted at this path cannot redirect writes to another file.
-    HANDLE h = CreateFileA(path, FILE_APPEND_DATA,
-                           FILE_SHARE_READ | FILE_SHARE_WRITE,
-                           NULL, OPEN_ALWAYS,
-                           FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT,
-                           NULL);
-    if (h == INVALID_HANDLE_VALUE) return;
-    int fd = _open_osfhandle((intptr_t)h, _O_APPEND | _O_WRONLY | _O_TEXT);
-    if (fd < 0) { CloseHandle(h); return; }
-    FILE *f = _fdopen(fd, "a");
-    if (!f) { _close(fd); return; }
-    SYSTEMTIME t;
-    GetSystemTime(&t);
-    fprintf(f, "%02d:%02d:%02d.%03d - ", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
-    va_list args;
-    va_start(args, fmt);
-    vfprintf(f, fmt, args);
-    va_end(args);
-    fputc('\n', f);
-    fflush(f);
-    fclose(f);
-}
-#else
-#define nd_win_trace_rrd(fmt, ...) do {} while(0)
-#endif
+// nd_win_trace() is declared in libnetdata/os/os.h (Windows) / macro no-op (non-Windows).
 
 // --------------------------------------------------------------------------------------------------------------------
 // globals
@@ -119,28 +85,28 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
     nd_thread_register_cleanup(rrdset_thread_rda_free);
     nd_thread_register_cleanup(query_target_free);
 
-    nd_win_trace_rrd("rrd_init: rrdhost_init...");
+    nd_win_trace("rrd_init: rrdhost_init...");
     rrdhost_init();
-    nd_win_trace_rrd("rrd_init: rrdhost_init done");
+    nd_win_trace("rrd_init: rrdhost_init done");
 
-    nd_win_trace_rrd("rrd_init: sql_init_meta_database...");
+    nd_win_trace("rrd_init: sql_init_meta_database...");
     if (unlikely(sql_init_meta_database(DB_CHECK_NONE, system_info ? 0 : 1))) {
         if (default_rrd_memory_mode == RRD_DB_MODE_DBENGINE) {
             set_late_analytics_variables(system_info);
-            nd_win_trace_rrd("rrd_init: sql_init_meta_database FAILED (dbengine mode), calling fatal");
+            nd_win_trace("rrd_init: sql_init_meta_database FAILED (dbengine mode), calling fatal");
             fatal("Failed to initialize SQLite");
         }
 
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "Skipping SQLITE metadata initialization since memory mode is not dbengine");
     }
-    nd_win_trace_rrd("rrd_init: sql_init_meta_database done");
+    nd_win_trace("rrd_init: sql_init_meta_database done");
 
-    nd_win_trace_rrd("rrd_init: sql_init_context_database...");
+    nd_win_trace("rrd_init: sql_init_context_database...");
     if (unlikely(sql_init_context_database(system_info ? 0 : 1))) {
         error_report("Failed to initialize context metadata database");
     }
-    nd_win_trace_rrd("rrd_init: sql_init_context_database done");
+    nd_win_trace("rrd_init: sql_init_context_database done");
 
     if (unlikely(unittest)) {
         dbengine_enabled = true;
@@ -150,9 +116,9 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
                    "DBENGINE: Initializing ...");
 
-            nd_win_trace_rrd("rrd_init: netdata_conf_dbengine_init...");
+            nd_win_trace("rrd_init: netdata_conf_dbengine_init...");
             netdata_conf_dbengine_init(hostname);
-            nd_win_trace_rrd("rrd_init: netdata_conf_dbengine_init done, dbengine_enabled=%d", (int)dbengine_enabled);
+            nd_win_trace("rrd_init: netdata_conf_dbengine_init done, dbengine_enabled=%d", (int)dbengine_enabled);
         }
         else
             nd_profile.storage_tiers = 1;
@@ -177,15 +143,15 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
     }
 
     if(!unittest) {
-        nd_win_trace_rrd("rrd_init: metadata_sync_init...");
+        nd_win_trace("rrd_init: metadata_sync_init...");
         metadata_sync_init();
-        nd_win_trace_rrd("rrd_init: metadata_sync_init done");
-        nd_win_trace_rrd("rrd_init: health_load_config_defaults...");
+        nd_win_trace("rrd_init: metadata_sync_init done");
+        nd_win_trace("rrd_init: health_load_config_defaults...");
         health_load_config_defaults();
-        nd_win_trace_rrd("rrd_init: health_load_config_defaults done");
+        nd_win_trace("rrd_init: health_load_config_defaults done");
     }
 
-    nd_win_trace_rrd("rrd_init: rrdhost_create('%s')...", hostname);
+    nd_win_trace("rrd_init: rrdhost_create('%s')...", hostname);
     SYSTEM_TZ tz = system_tz_get();
     localhost = rrdhost_create(
         hostname
@@ -213,7 +179,7 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
     );
     system_tz_free(&tz);
     rrdhost_system_info_free(system_info);
-    nd_win_trace_rrd("rrd_init: rrdhost_create done, localhost=%p", (void *)localhost);
+    nd_win_trace("rrd_init: rrdhost_create done, localhost=%p", (void *)localhost);
 
     if (unlikely(!localhost))
         return 1;
@@ -236,6 +202,6 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
         api_v1_management_init();
     }
 
-    nd_win_trace_rrd("rrd_init: complete, returning 0");
+    nd_win_trace("rrd_init: complete, returning 0");
     return 0;
 }

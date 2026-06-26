@@ -66,7 +66,10 @@ char *os_translate_path(char *dst, const char *src, size_t dst_size);
 char *os_translate_msys_to_windows_path(const char *src);
 // Returns newly allocated POSIX-style storage; caller must free.
 char *os_translate_windows_to_msys_path(const char *src);
+// Append a timestamped line to %TEMP%\netdata-trace.log (early-startup diagnostics).
+void nd_win_trace(const char *fmt, ...) PRINTFLIKE(1, 2);
 #else
+#define nd_win_trace(fmt, ...) do {} while(0)
 // No translation needed on non-Windows; copy src into dst for consistent semantics.
 static inline char *os_translate_path(char *dst, const char *src, size_t dst_size) {
     if (!dst || !dst_size)
