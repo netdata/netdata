@@ -157,4 +157,35 @@ char *os_translate_windows_to_msys_path(const char *src) {
     converted_path[j] = '\0';
     return converted_path;
 }
+
+// Append a timestamped diagnostic line to %TEMP%\netdata-trace.log.
+// Used during early Windows startup before the nd_log subsystem is ready.
+// FILE_FLAG_OPEN_REPARSE_POINT: open the reparse point itself, not its target,
+// so a symlink/junction planted at this path cannot redirect writes to another file.
+void nd_win_trace(const char *fmt, ...) {
+    char path[MAX_PATH + 1];
+    DWORD len = GetTempPathA(MAX_PATH, path);
+    if (!len || len >= (DWORD)(MAX_PATH - 22)) return;
+    snprintfz(path + len, sizeof(path) - len, "netdata-trace.log");
+    HANDLE h = CreateFileA(path, FILE_APPEND_DATA,
+                           FILE_SHARE_READ | FILE_SHARE_WRITE,
+                           NULL, OPEN_ALWAYS,
+                           FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT,
+                           NULL);
+    if (h == INVALID_HANDLE_VALUE) return;
+    int fd = _open_osfhandle((intptr_t)h, _O_APPEND | _O_WRONLY | _O_TEXT);
+    if (fd < 0) { CloseHandle(h); return; }
+    FILE *f = _fdopen(fd, "a");
+    if (!f) { _close(fd); return; }
+    SYSTEMTIME t;
+    GetSystemTime(&t);
+    fprintf(f, "%02d:%02d:%02d.%03d - ", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
+    va_list args;
+    va_start(args, fmt);
+    vfprintf(f, fmt, args);
+    va_end(args);
+    fputc('\n', f);
+    fflush(f);
+    fclose(f);
+}
 #endif

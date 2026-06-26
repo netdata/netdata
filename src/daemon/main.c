@@ -258,42 +258,7 @@ static void fatal_status_file_save(void) {
     exit(1);
 }
 
-#ifdef OS_WINDOWS
-// Append a timestamped line to %TEMP%\netdata-trace.log so we can find
-// the exact step where netdata_main() crashes on Windows when the normal
-// nd_log subsystem is not yet initialised (or is writing to a POSIX path
-// that UCRT64 cannot resolve).
-static void nd_win_trace(const char *fmt, ...) {
-    char path[MAX_PATH + 1];
-    DWORD len = GetTempPathA(MAX_PATH, path);
-    if (!len || len >= (DWORD)(MAX_PATH - 22)) return;
-    snprintfz(path + len, sizeof(path) - len, "netdata-trace.log");
-    // FILE_FLAG_OPEN_REPARSE_POINT: open the reparse point itself, not its target,
-    // so a symlink/junction planted at this path cannot redirect writes to another file.
-    HANDLE h = CreateFileA(path, FILE_APPEND_DATA,
-                           FILE_SHARE_READ | FILE_SHARE_WRITE,
-                           NULL, OPEN_ALWAYS,
-                           FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT,
-                           NULL);
-    if (h == INVALID_HANDLE_VALUE) return;
-    int fd = _open_osfhandle((intptr_t)h, _O_APPEND | _O_WRONLY | _O_TEXT);
-    if (fd < 0) { CloseHandle(h); return; }
-    FILE *f = _fdopen(fd, "a");
-    if (!f) { _close(fd); return; }
-    SYSTEMTIME t;
-    GetSystemTime(&t);
-    fprintf(f, "%02d:%02d:%02d.%03d - ", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
-    va_list args;
-    va_start(args, fmt);
-    vfprintf(f, fmt, args);
-    va_end(args);
-    fputc('\n', f);
-    fflush(f);
-    fclose(f);
-}
-#else
-#define nd_win_trace(fmt, ...) do {} while(0)
-#endif
+// nd_win_trace() is declared in libnetdata/os/os.h (Windows) / macro no-op (non-Windows).
 
 int netdata_main(int argc, char **argv) {
     nd_win_trace("netdata_main() entered, argc=%d", argc);
@@ -1247,11 +1212,12 @@ int netdata_main(int argc, char **argv) {
     set_late_analytics_variables(system_info);
 
     // ----------------------------------------------------------------------------------------------------------------
-    delta_startup_time("RRD structures");
-
     delta_startup_time("commands liveness support");
 
     commands_init();
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("RRD structures");
 
     nd_win_trace("rrd_init('%s')...", netdata_configured_hostname);
     abort_on_fatal_disable();
