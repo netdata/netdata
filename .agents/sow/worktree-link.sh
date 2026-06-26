@@ -127,10 +127,10 @@ selfheal_specs() {
 link_one() {
   local rel="$1" target="$2"
   local here="$top/$rel"
-  # A resolvable symlink is already set up; a broken one (origin moved/renamed)
-  # is removed and re-pointed below.
+  # A symlink already pointing at the right target is fine; a broken one or one
+  # pointing elsewhere (origin moved/renamed) is removed and re-pointed below.
   if [ -L "$here" ]; then
-    [ -e "$here" ] && return 0
+    [ "$(readlink "$here")" = "$target" ] && return 0
     run rm -f "$here"
   fi
   if [ -e "$here" ]; then

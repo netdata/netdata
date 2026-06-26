@@ -228,18 +228,20 @@ fi
 # Specs relocated out of the local-only specs dir into committed homes. A
 # committed reference to their old .agents/sow/specs/ path is a dangling ref and
 # must be repointed (vs the unreferenced bulk, which is genuinely local-only).
-relocated_specs="sensitive-data-discipline.md go-v2-host-scope.md topology-function-schema.md topology-modes-correlation-aggregation.md taxonomy.md netdata.md trap-metrics-profiles.md netdata-snmp-hub-architecture.md pipeline-internals.md 0001-go-process-and-trapwriter.md"
+# Listed as paths relative to .agents/sow/specs/ (not basenames) so a nested
+# local spec that happens to share a filename is not misflagged.
+relocated_specs="sensitive-data-discipline.md go-v2-host-scope.md topology-function-schema.md topology-modes-correlation-aggregation.md taxonomy.md snmp-traps/netdata.md snmp-traps/trap-metrics-profiles.md snmp-traps/netdata-snmp-hub-architecture.md snmp-traps/pipeline-internals.md snmp-traps/decisions/0001-go-process-and-trapwriter.md"
 
 section "spec references"
 if command -v rg >/dev/null 2>&1; then
   while IFS= read -r ref; do
     [ -n "$ref" ] || continue
-    refbase=$(basename "$ref")
+    refrel=${ref#.agents/sow/specs/}
     if [ -f "$ref" ]; then
       ok "spec reference resolves: $ref"
     else
       case " $relocated_specs " in
-        *" $refbase "*) fail "reference to a relocated spec — repoint to its committed home: $ref" ;;
+        *" $refrel "*) fail "reference to a relocated spec — repoint to its committed home: $ref" ;;
         *) warn "spec reference unresolved (specs are local-only; may be absent here): $ref" ;;
       esac
     fi
