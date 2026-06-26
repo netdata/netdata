@@ -227,7 +227,7 @@ Soft warnings (Phase 2 skipped, Phase 1 still runs):
 ## Path discipline
 
 This skill follows
-`<repo>/.agents/sow/specs/sensitive-data-discipline.md`:
+`<repo>/.agents/sensitive-data-discipline.md`:
 
 - All references to the mirror directory go through
   `${NETDATA_REPOS_DIR}` (the env key from `.env`).

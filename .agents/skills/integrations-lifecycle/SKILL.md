@@ -142,7 +142,7 @@ repeats the analysis from scratch.
 ## Path discipline
 
 This skill follows
-`<repo>/.agents/sow/specs/sensitive-data-discipline.md`:
+`<repo>/.agents/sensitive-data-discipline.md`:
 
 - Files in this repo: repo-relative
   (`integrations/gen_integrations.py`,
