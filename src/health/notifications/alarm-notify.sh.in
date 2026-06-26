@@ -507,6 +507,10 @@ OPSGENIE_API_KEY=
 # signl4 configs
 SIGNL4_WEBHOOK_URL=
 
+# flowtriq configs
+FLOWTRIQ_WEBHOOK_URL=
+FLOWTRIQ_API_KEY=
+
 # load the stock and user configuration files
 # these will overwrite the variables above
 
@@ -787,6 +791,9 @@ fi
 # check signl4
 [ -z "${SIGNL4_WEBHOOK_URL}" ] && SEND_SIGNL4="NO"
 
+# check flowtriq
+[ -z "${FLOWTRIQ_WEBHOOK_URL}" ] && SEND_FLOWTRIQ="NO"
+
 # -----------------------------------------------------------------------------
 # check the availability of targets
 
@@ -819,7 +826,8 @@ check_supported_targets() {
     [ "${SEND_GOTIFY}" = "YES" ] ||
     [ "${SEND_NTFY}" = "YES" ] ||
     [ "${SEND_ILERT}" = "YES" ] ||
-    [ "${SEND_SIGNL4}" = "YES" ]; then
+    [ "${SEND_SIGNL4}" = "YES" ] ||
+    [ "${SEND_FLOWTRIQ}" = "YES" ]; then
     # if we need curl, check for the curl command
     if [ -z "${curl}" ]; then
       curl="$(command -v curl 2>/dev/null)"
@@ -852,6 +860,7 @@ check_supported_targets() {
       SEND_NTFY="NO"
       SEND_ILERT="NO"
       SEND_SIGNL4="NO"
+      SEND_FLOWTRIQ="NO"
     fi
   fi
 
@@ -1010,7 +1019,8 @@ for method in "${SEND_EMAIL}" \
   "${SEND_GOTIFY}" \
   "${SEND_NTFY}" \
   "${SEND_ILERT}" \
-  "${SEND_SIGNL4}" ; do
+  "${SEND_SIGNL4}" \
+  "${SEND_FLOWTRIQ}" ; do
 
   if [ "${method}" == "YES" ]; then
     proceed=1
@@ -2618,6 +2628,56 @@ EOF
 }
 
 # -----------------------------------------------------------------------------
+# flowtriq sender
+
+send_flowtriq() {
+  local payload httpcode
+  [ "${SEND_FLOWTRIQ}" != "YES" ] && return 1
+
+  if [ -z "${FLOWTRIQ_WEBHOOK_URL}" ]; then
+    info "Can't send Flowtriq notification, because FLOWTRIQ_WEBHOOK_URL is not defined"
+    return 1
+  fi
+
+  payload=$(cat <<EOF
+  {
+    "source" : "netdata",
+    "host" : "${host}",
+    "status" : "${status}",
+    "chart" : "${chart}",
+    "name" : "${name}",
+    "value" : "${value_string}",
+    "old_value" : "${old_value_string}",
+    "message" : "${status_message}",
+    "alarm_id" : "${alarm_id}",
+    "date" : "${when}",
+    "duration" : "${duration_txt}",
+    "info" : "${info}",
+    "total_critical" : "${total_critical}",
+    "total_warnings" : "${total_warnings}",
+    "alert_url" : "${goto_url}"
+  }
+EOF
+)
+
+  # build curl headers
+  local flowtriq_headers=(-H "Content-Type: application/json")
+  if [ -n "${FLOWTRIQ_API_KEY}" ]; then
+    flowtriq_headers+=(-H "X-API-Key: ${FLOWTRIQ_API_KEY}")
+  fi
+
+  httpcode=$(docurl -X POST "${flowtriq_headers[@]}" -d "${payload}" "${FLOWTRIQ_WEBHOOK_URL}")
+  if [ "${httpcode}" = "200" ] || [ "${httpcode}" = "201" ] || [ "${httpcode}" = "202" ]; then
+    info "sent flowtriq event for ${notification_description}"
+  else
+    error "failed to send flowtriq event for ${notification_description}, with HTTP response status code ${httpcode}."
+    return 1
+  fi
+
+  return 0
+}
+
+# -----------------------------------------------------------------------------
 # prepare the content of the notification
 
 # the url to send the user on click
@@ -3810,6 +3870,11 @@ send_signl4
 SENT_SIGNL4=$?
 
 # -----------------------------------------------------------------------------
+# send messages to flowtriq
+send_flowtriq
+SENT_FLOWTRIQ=$?
+
+# -----------------------------------------------------------------------------
 # let netdata know
 for state in "${SENT_EMAIL}" \
   "${SENT_PUSHOVER}" \
@@ -3841,7 +3906,8 @@ for state in "${SENT_EMAIL}" \
   "${SENT_GOTIFY}" \
   "${SENT_NTFY}" \
   "${SENT_ILERT}" \
-  "${SENT_SIGNL4}"; do
+  "${SENT_SIGNL4}" \
+  "${SENT_FLOWTRIQ}" ; do
   if [ "${state}" -eq 0 ]; then
     # we sent something
     exit 0
