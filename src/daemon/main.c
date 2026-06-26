@@ -274,12 +274,12 @@ static void nd_win_trace(const char *fmt, ...) {
     DWORD len = GetTempPathA(MAX_PATH, path);
     if (!len || len >= (DWORD)(MAX_PATH - 22)) return;
     snprintfz(path + len, sizeof(path) - len, "netdata-trace.log");
-    // FILE_FLAG_NO_REPARSE_POINT: fail if the target is a symlink or junction
-    // rather than following it — the service runs with elevated privileges.
+    // FILE_FLAG_OPEN_REPARSE_POINT: open the reparse point itself, not its target,
+    // so a symlink/junction planted at this path cannot redirect writes to another file.
     HANDLE h = CreateFileA(path, FILE_APPEND_DATA,
                            FILE_SHARE_READ | FILE_SHARE_WRITE,
                            NULL, OPEN_ALWAYS,
-                           FILE_ATTRIBUTE_NORMAL | FILE_FLAG_NO_REPARSE_POINT,
+                           FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT,
                            NULL);
     if (h == INVALID_HANDLE_VALUE) return;
     int fd = _open_osfhandle((intptr_t)h, _O_APPEND | _O_WRONLY | _O_TEXT);
