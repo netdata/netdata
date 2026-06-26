@@ -469,6 +469,13 @@
 - Update systemd journal SDK to 0.7.5 ([#22859](https://github.com/netdata/netdata/issues/22859))
 - Fix(integrations): correct NPM catalog brand icons + brand SNMP-trap tiles ([#22860](https://github.com/netdata/netdata/issues/22860))
 - Regenerate integrations docs ([#22861](https://github.com/netdata/netdata/issues/22861))
+- Docs: Clarify parent-child update_every relationship in streaming README ([#22761](https://github.com/netdata/netdata/issues/22761))
+- Docs(npm): add screenshots to Network Performance Monitoring pages ([#22863](https://github.com/netdata/netdata/issues/22863))
+- Docs: Document supported Windows versions for Windows Agent installer ([#22759](https://github.com/netdata/netdata/issues/22759))
+- Refactor(go.d): replace AgentWide with MethodScope ([#22868](https://github.com/netdata/netdata/issues/22868))
+- Refactor(go.d): split function declaration API ([#22869](https://github.com/netdata/netdata/issues/22869))
+- Feat(go.d): withdraw unavailable shared functions ([#22870](https://github.com/netdata/netdata/issues/22870))
+- Feat(go.d): reconcile instance function availability ([#22871](https://github.com/netdata/netdata/issues/22871))
 
 ## [2.10.0] - 2026-04-09
 
