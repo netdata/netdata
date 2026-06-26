@@ -274,8 +274,18 @@ static void nd_win_trace(const char *fmt, ...) {
     DWORD len = GetTempPathA(MAX_PATH, path);
     if (!len || len >= (DWORD)(MAX_PATH - 22)) return;
     strcat(path, "netdata-trace.log");
-    FILE *f = fopen(path, "a");
-    if (!f) return;
+    // FILE_FLAG_NO_REPARSE_POINT: fail if the target is a symlink or junction
+    // rather than following it — the service runs with elevated privileges.
+    HANDLE h = CreateFileA(path, FILE_APPEND_DATA,
+                           FILE_SHARE_READ | FILE_SHARE_WRITE,
+                           NULL, OPEN_ALWAYS,
+                           FILE_ATTRIBUTE_NORMAL | FILE_FLAG_NO_REPARSE_POINT,
+                           NULL);
+    if (h == INVALID_HANDLE_VALUE) return;
+    int fd = _open_osfhandle((intptr_t)h, _O_APPEND | _O_WRONLY | _O_TEXT);
+    if (fd < 0) { CloseHandle(h); return; }
+    FILE *f = _fdopen(fd, "a");
+    if (!f) { _close(fd); return; }
     SYSTEMTIME t;
     GetSystemTime(&t);
     fprintf(f, "%02d:%02d:%02d.%03d - ", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
