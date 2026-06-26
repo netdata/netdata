@@ -40,7 +40,7 @@ agents_query_agent \
     --host "$AGENT_EVENTS_HOSTNAME:19999" \
     --machine-guid "$AGENT_EVENTS_MACHINE_GUID" \
     POST '/api/v3/function?function=systemd-journal' \
-    '{"after":-3600,"before":0,"last":50,"direction":"backward","__logs_sources":"agent-events"}'
+    '{"after":-3600,"before":0,"last":50,"direction":"backward","selections":{"__logs_sources":["agent-events"]}}'
 ```
 
 The wrapper minted/cached the bearer internally; stdout is the
@@ -59,17 +59,23 @@ agents_query_agent \
 ```
 
 Reads the `info=true` response and lists the `__logs_sources`
-widget options the agent currently exposes. The `name`+`id` of
-each option is what you pass back as the `__logs_sources` value.
+widget options the agent currently exposes. Pass the `id` of each
+option you want back inside the `selections` object as an array --
+`{"selections":{"__logs_sources":["<id>", ...]}}`. A top-level
+`__logs_sources` key is silently ignored by the agent's JSON
+parser (see the Cloud doc's "Selecting log sources" section).
 
 ## Limits and gotchas (single-agent-specific)
 
 - **Single-host only.** The agent answers for itself; for fleet
   queries, use the Cloud-side path or aggregate per-agent
   responses client-side.
-- **Time bounds**: negative values are seconds-relative-to-now.
-  Positive values are unix-microseconds (NOT seconds, NOT
-  milliseconds). Mixing units is the most common bug.
+- **Time bounds**: `after`/`before` are in **seconds** (the agent
+  parses them into `after_s`/`before_s`). Negative = relative
+  seconds from now; positive = absolute Unix seconds. `anchor` and
+  the row timestamps are in **microseconds** -- a different unit, so
+  do not reuse a row timestamp as a positive `after`/`before`.
+  Mixing the two units is the most common bug.
 - **Slow queries**: large windows + wide facets can take seconds.
   Bump `timeout` in the body to 60000 or higher when the default
   10-second cloud-proxy default isn't relevant (the agent itself
