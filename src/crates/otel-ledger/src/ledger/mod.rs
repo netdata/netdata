@@ -36,7 +36,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::Context;
-use bridge::config::LifecycleConfig;
+use bridge::config::{LifecycleConfig, StorageConfig};
 use bridge::signals::{LOGS_PIPELINE_ID, TRACES_PIPELINE_ID};
 use bridge::{LedgerRequest, LedgerResponse};
 use ferryboat::Connection;
@@ -139,10 +139,14 @@ impl Ledger {
         lifecycle: &LifecycleConfig,
         // PROOF SCAFFOLD (traces-proof SOW): the skeletal traces pipeline's
         // lifecycle config, derived by `PluginConfig::lifecycle_for("traces")`
-        // (its own `{base}/traces/...` dirs + the global storage settings). The
-        // N-signal generalization (a signal list instead of two explicit args)
-        // is a real-traces-SOW finding, deliberately not done for the proof.
+        // (its own `{base}/traces/...` dirs). The N-signal generalization (a signal
+        // list instead of two explicit args) is a real-traces-SOW finding,
+        // deliberately not done for the proof.
         traces_lifecycle: &LifecycleConfig,
+        // Process-global remote storage (one backend for every signal). The shell
+        // owns it: it builds the storage handle / uploader / read cache from this
+        // and decides upload+retention gating from whether that handle exists.
+        storage_config: &StorageConfig,
     ) -> anyhow::Result<Self> {
         let cancel = CancellationToken::new();
 
@@ -153,8 +157,8 @@ impl Ledger {
         // is enabled. `OpendalStorage::new` parses `storage.uri` (and applies the
         // retry layer); deferring it behind the flag means a malformed URI cannot
         // abort startup for a local-only (storage.enabled = false) deployment.
-        let (storage, mut uploader, read_cache) = if lifecycle.storage.enabled {
-            let storage = OpendalStorage::new(lifecycle.storage.uri.as_str())?;
+        let (storage, mut uploader, read_cache) = if storage_config.enabled {
+            let storage = OpendalStorage::new(storage_config.uri.as_str())?;
 
             // Non-blocking startup reachability probe: confirm the backend is
             // reachable and the credentials are accepted, logging a clear error
@@ -199,11 +203,11 @@ impl Ledger {
             let cache_dir = lifecycle.read_cache_dir.clone();
             let read_cache = file_cache::FileCache::open(
                 &cache_dir,
-                lifecycle.storage.read_cache_max_size.as_u64(),
+                storage_config.read_cache_max_size.as_u64(),
             )?;
             tracing::info!(
                 dir = %cache_dir.display(),
-                capacity = lifecycle.storage.read_cache_max_size.as_u64(),
+                capacity = storage_config.read_cache_max_size.as_u64(),
                 "remote-read cache opened"
             );
 

@@ -348,6 +348,13 @@ async fn reconcile_local_catalog_uploads_skips_existing_files() {
         reg.is_remote_cataloged(10),
         "confirmed-present catalog must seed remote_cataloged"
     );
+    // Integration check: this seq was never separately `mark_rotated` (the setup
+    // only places a local catalog), yet remote-cataloging it through the real
+    // reconcile caller makes it report rotated — the structural subsumption.
+    assert!(
+        reg.is_rotated(10),
+        "remote-cataloged via reconcile must imply rotated (Remote subsumes RotatedLocal)"
+    );
 
     cancel.cancel();
 }
@@ -548,6 +555,12 @@ async fn reconcile_local_catalog_uploads_confirms_present_via_mock() {
     assert!(
         reg.is_remote_cataloged(10),
         "present catalog must seed remote_cataloged"
+    );
+    // Same subsumption check at the integration boundary: never separately
+    // mark_rotated, yet remote-cataloging via reconcile makes it report rotated.
+    assert!(
+        reg.is_rotated(10),
+        "remote-cataloged via reconcile must imply rotated (Remote subsumes RotatedLocal)"
     );
 
     cancel.cancel();

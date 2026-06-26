@@ -386,7 +386,7 @@ impl NetdataLogsService {
 
     fn resolve_wal_config(&self, tenant_id: &str) -> wal::Config {
         let rotation =
-            bridge::config::RotationConfig::resolve(&self.wal_config.rotation, tenant_id);
+            self.wal_config.rotation.resolve(tenant_id);
         wal::Config {
             rotation: wal::RotationConfig {
                 max_log_entries: rotation.max_log_entries,
@@ -945,7 +945,8 @@ mod tests {
             dir: wal_dir.clone(),
             crc_enabled: true,
             compression_enabled: true,
-            rotation,
+            rotation: bridge::config::RotationPolicy::try_from(rotation)
+                .expect("test rotation has a complete default"),
         };
 
         NetdataLogsService::new(

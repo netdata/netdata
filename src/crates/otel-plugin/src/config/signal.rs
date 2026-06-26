@@ -108,35 +108,12 @@ pub(super) fn apply_signal(config: &mut SignalConfig, o: &SignalOverride) {
             config.wal.compression_enabled = v;
         }
         if let Some(r) = &w.rotation {
-            for (tenant, entry) in r {
-                let target = config.wal.rotation.entry(tenant.clone()).or_default();
-                if let Some(v) = entry.max_file_size {
-                    target.max_file_size = Some(v);
-                }
-                if let Some(v) = entry.max_log_entries {
-                    target.max_log_entries = Some(v);
-                }
-                if let Some(v) = entry.max_file_duration {
-                    target.max_file_duration = Some(v);
-                }
-            }
+            config.wal.rotation.apply_overrides(r);
         }
     }
     if let Some(i) = &o.index {
         if let Some(r) = &i.retention {
-            // Merge per-tenant entries: override fields replace stock fields.
-            for (tenant, entry) in r {
-                let target = config.index.retention.entry(tenant.clone()).or_default();
-                if let Some(v) = entry.max_files {
-                    target.max_files = Some(v);
-                }
-                if let Some(v) = entry.max_total_size {
-                    target.max_total_size = Some(v);
-                }
-                if let Some(v) = entry.max_age {
-                    target.max_age = Some(v);
-                }
-            }
+            config.index.retention.apply_overrides(r);
         }
     }
     if let Some(c) = &o.catalog {

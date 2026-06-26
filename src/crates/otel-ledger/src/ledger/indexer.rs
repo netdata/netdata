@@ -48,14 +48,15 @@ impl Ledger {
 
         tracing::info!(seq, record_count = summary.record_count, "indexed");
 
-        // Snapshot the owning pipeline's seam provisions (signal segment + the
-        // storage flag) and its registries handle before locking.
+        // Remote storage is process-global: enabled iff the shell built an
+        // uploader. Snapshot it before borrowing the pipeline for its per-signal
+        // seam provisions (signal segment + registries handle).
+        let storage_enabled = self.uploader.is_some();
         let Some(pipeline) = self.pipelines.get(&pipeline_id) else {
             tracing::error!(pipeline_id, "indexed for unknown pipeline; dropping");
             return;
         };
         let signal = pipeline.signal();
-        let storage_enabled = pipeline.storage_enabled();
         let registries = pipeline.registries().clone();
 
         // Decide everything under the registry write lock — including building

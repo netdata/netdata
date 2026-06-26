@@ -44,10 +44,10 @@ pub struct Pipeline {
     pipeline_id: u16,
     /// Remote-key segment for this signal (`logs`, later `traces`).
     signal: &'static str,
-    /// Per-signal lifecycle config (wal/index/catalog dirs, rotation, retention,
-    /// storage flag). The shared storage backend is built once on the shell from
-    /// the (single) pipeline's `storage` config; `storage.enabled` here still
-    /// drives this pipeline's upload/retention decisions.
+    /// Per-signal lifecycle config (wal/index/catalog dirs, rotation, retention).
+    /// Remote storage is process-global and owned by the coordinator shell — it is
+    /// NOT carried here; the shell decides upload/retention gating from whether it
+    /// built an uploader.
     config: LifecycleConfig,
     /// This signal's tenant registries, shared (read) with the query handler.
     registries: Arc<RwLock<TenantRegistries>>,
@@ -146,10 +146,5 @@ impl Pipeline {
     /// The function name this pipeline answers (the dispatch key).
     pub fn function_name(&self) -> &str {
         &self.declaration.name
-    }
-
-    /// Whether remote object storage is enabled for this signal.
-    pub fn storage_enabled(&self) -> bool {
-        self.config.storage.enabled
     }
 }

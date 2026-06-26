@@ -42,13 +42,47 @@ fn unuploaded_ids_is_empty_when_all_uploaded() {
 }
 
 #[test]
-fn rotated_seqs_tracks_membership() {
+fn catalog_stage_axis_ordering_and_subsumption() {
+    // ORDER MATTERS: the derived Ord must rank the stages this way — the `>=`
+    // accessors (is_rotated / is_remote_cataloged) and the monotone guard in
+    // mark_rotated all depend on it.
+    assert!(CatalogStage::NotRotated < CatalogStage::RotatedLocal);
+    assert!(CatalogStage::RotatedLocal < CatalogStage::Remote);
+
     let mut reg = make_registry();
+    // mark_rotated → rotated only; the upload axis and remote stage are untouched.
     assert!(!reg.is_rotated(1));
     reg.mark_rotated(1);
     assert!(reg.is_rotated(1));
-    reg.evict_seq(1);
-    assert!(!reg.is_rotated(1));
+    assert!(!reg.is_remote_cataloged(1));
+    assert!(!reg.is_uploaded(1));
+
+    // mark_remote_cataloged ALONE (no prior mark_rotated) makes the seq both
+    // remote-cataloged AND rotated (Remote subsumes RotatedLocal) — the
+    // "remote-cataloged implies rotated" invariant, structural rather than by
+    // caller ordering. The independent upload axis stays untouched.
+    reg.mark_remote_cataloged([2]);
+    assert!(reg.is_remote_cataloged(2));
+    assert!(reg.is_rotated(2), "Remote must subsume RotatedLocal");
+    assert!(!reg.is_uploaded(2), "catalog axis must not touch the upload axis");
+}
+
+#[test]
+fn catalog_stage_axis_is_monotone() {
+    let mut reg = make_registry();
+    // mark_rotated after Remote must NOT downgrade the stage (else the eviction
+    // gate would defer forever for a re-rotated remote-cataloged seq).
+    reg.mark_remote_cataloged([1]);
+    reg.mark_rotated(1);
+    assert!(
+        reg.is_remote_cataloged(1),
+        "mark_rotated must not downgrade a Remote seq"
+    );
+    assert!(reg.is_rotated(1));
+    // Same guarantee via the batch variant.
+    reg.mark_remote_cataloged([2]);
+    reg.mark_rotated_many([2]);
+    assert!(reg.is_remote_cataloged(2));
 }
 
 #[test]

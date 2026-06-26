@@ -49,14 +49,16 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
     // `Ledger::new` runs the full supervisor handshake; see its docs for the
     // step order and what `Ready` claims. Each signal's lifecycle config is
     // derived from the shared `PluginConfig` via `lifecycle_for` (one base dir
-    // → `{base}/{signal}/...`, plus the global storage settings). The ingestor's
-    // per-signal WAL writers derive their dirs the same way, so the two
-    // processes agree on where each signal's files live.
+    // → `{base}/{signal}/...` dirs + per-signal tuning). The ingestor's per-signal
+    // WAL writers derive their dirs the same way, so the two processes agree on
+    // where each signal's files live. Remote storage is process-global, so it is
+    // passed once (`config.storage`), not per signal.
     let mut ledger = Ledger::new(
         supervisor,
         &config.writer_socket_path,
         &config.lifecycle_for(LOGS_SIGNAL),
         &config.lifecycle_for(TRACES_SIGNAL),
+        &config.storage,
     )
     .await
     .context("failed to initialize ledger")?;

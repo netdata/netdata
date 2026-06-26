@@ -25,11 +25,9 @@ impl Ledger {
             tracing::error!(pipeline_id, "retention for unknown pipeline; skipping");
             return;
         };
-        let retention = bridge::config::RetentionConfig::resolve(
-            &pipeline.config().index.retention,
-            tenant_id.as_str(),
-        );
-        let storage_enabled = pipeline.storage_enabled();
+        let retention = pipeline.config().index.retention.resolve(tenant_id.as_str());
+        // Remote storage is process-global: enabled iff the shell built an uploader.
+        let storage_enabled = self.uploader.is_some();
         let registries = pipeline.registries().clone();
 
         let catalog_days = catalog_retention_days(&retention);

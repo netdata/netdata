@@ -221,7 +221,8 @@ pub struct SfstFileEntry {
     /// Log-data time range in unix **seconds** (from the SFST summary).
     pub min_ts_s: u32,
     pub max_ts_s: u32,
-    /// Written to a closed local catalog file.
+    /// Has a catalog entry in a closed catalog file — locally, or (subsuming
+    /// that) confirmed on remote. True whenever `remote_cataloged` is true.
     pub rotated: bool,
     /// Confirmed uploaded to remote object storage.
     pub uploaded: bool,

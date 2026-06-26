@@ -412,14 +412,14 @@ traces:
             std::path::Path::new("/var/log/netdata/otel/v1/logs/catalog")
         );
         let rotation =
-            bridge::config::RotationConfig::resolve(&config.logs.wal.rotation, "default");
+            config.logs.wal.rotation.resolve("default");
         assert_eq!(rotation.max_file_size, ByteSize::mb(100));
         assert_eq!(rotation.max_log_entries, 50000);
         assert_eq!(rotation.max_file_duration, Duration::from_secs(2 * 3600));
         assert!(config.logs.wal.crc_enabled);
         assert!(config.logs.wal.compression_enabled);
         let retention =
-            bridge::config::RetentionConfig::resolve(&config.logs.index.retention, "default");
+            config.logs.index.retention.resolve("default");
         assert_eq!(retention.max_files, 10);
         assert_eq!(retention.max_total_size, ByteSize::gb(1));
         assert_eq!(retention.max_age, Duration::from_secs(7 * 24 * 3600));
@@ -433,10 +433,8 @@ traces:
             traces.wal.dir,
             std::path::Path::new("/var/log/netdata/otel/v1/traces/wal")
         );
-        // Traces uses the global storage (one backend for the process).
-        assert_eq!(traces.storage.uri, config.storage.uri);
         let rotation =
-            bridge::config::RotationConfig::resolve(&config.traces.wal.rotation, "default");
+            config.traces.wal.rotation.resolve("default");
         assert_eq!(rotation.max_log_entries, 50000);
     }
 
@@ -504,7 +502,7 @@ logs:
         .unwrap();
         apply_overrides(&mut config, &o);
         let rotation =
-            bridge::config::RotationConfig::resolve(&config.logs.wal.rotation, "default");
+            config.logs.wal.rotation.resolve("default");
         assert_eq!(rotation.max_log_entries, 100000);
         // Untouched stock fields survive the partial override.
         assert_eq!(rotation.max_file_size, ByteSize::mb(100));
@@ -562,11 +560,11 @@ traces:
         .unwrap();
         apply_overrides(&mut config, &o);
         let traces_rot =
-            bridge::config::RotationConfig::resolve(&config.traces.wal.rotation, "default");
+            config.traces.wal.rotation.resolve("default");
         assert_eq!(traces_rot.max_log_entries, 999);
         // Logs is untouched.
         let logs_rot =
-            bridge::config::RotationConfig::resolve(&config.logs.wal.rotation, "default");
+            config.logs.wal.rotation.resolve("default");
         assert_eq!(logs_rot.max_log_entries, 50000);
     }
 
@@ -589,10 +587,10 @@ logs:
         .unwrap();
         apply_overrides(&mut config, &o);
         let rotation =
-            bridge::config::RotationConfig::resolve(&config.logs.wal.rotation, "default");
+            config.logs.wal.rotation.resolve("default");
         assert_eq!(rotation.max_file_size, ByteSize::mb(200));
         let retention =
-            bridge::config::RetentionConfig::resolve(&config.logs.index.retention, "default");
+            config.logs.index.retention.resolve("default");
         assert_eq!(retention.max_total_size, ByteSize::gb(2));
     }
 
@@ -615,10 +613,10 @@ logs:
         .unwrap();
         apply_overrides(&mut config, &o);
         let retention =
-            bridge::config::RetentionConfig::resolve(&config.logs.index.retention, "default");
+            config.logs.index.retention.resolve("default");
         assert_eq!(retention.max_age, Duration::from_secs(14 * 24 * 3600));
         let rotation =
-            bridge::config::RotationConfig::resolve(&config.logs.wal.rotation, "default");
+            config.logs.wal.rotation.resolve("default");
         assert_eq!(rotation.max_file_duration, Duration::from_secs(4 * 3600));
     }
 
@@ -641,12 +639,10 @@ storage:
         assert!(config.storage.enabled);
         assert_eq!(config.storage.uri, "fs:///data/remote");
         assert_eq!(config.storage.read_cache_max_size, ByteSize::gib(2));
-        // The global storage flows to every signal's derived lifecycle.
+        // Storage is global on PluginConfig (asserted above), not carried in the
+        // per-signal lifecycle. Read-cache dir, by contrast, is derived per signal.
         let logs = config.lifecycle_for(bridge::signals::LOGS_SIGNAL);
         let traces = config.lifecycle_for(bridge::signals::TRACES_SIGNAL);
-        assert!(logs.storage.enabled);
-        assert!(traces.storage.enabled);
-        // Read-cache dir is derived per signal, never configured.
         assert_eq!(
             logs.read_cache_dir,
             std::path::Path::new("/var/log/netdata/otel/v1/logs/remote-read")
@@ -681,7 +677,7 @@ logs:
         assert_eq!(config.metrics.expiry_duration_secs, Some(1800));
         assert_eq!(config.metrics.interval_secs, Some(10));
         let retention =
-            bridge::config::RetentionConfig::resolve(&config.logs.index.retention, "default");
+            config.logs.index.retention.resolve("default");
         assert_eq!(retention.max_files, 20);
     }
 

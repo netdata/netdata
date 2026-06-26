@@ -144,10 +144,7 @@ where
         // logs failures (the retention guard keeps the local files). Only
         // the LIST-dependent reconciles are skipped on an unreachable remote.
         if let (Some(storage), Some(uploader)) = (storage, uploader.as_deref_mut()) {
-            let retention = bridge::config::RetentionConfig::resolve(
-                &config.index.retention,
-                tenant_id.as_str(),
-            );
+            let retention = config.index.retention.resolve(tenant_id.as_str());
             // Bound the remote reconciliation so a slow/unreachable remote
             // can't delay startup (Ready) by the full opendal retry budget.
             // On timeout/error we proceed without it: local upload recovery
@@ -225,14 +222,15 @@ where
             }
         }
 
-        let retention =
-            bridge::config::RetentionConfig::resolve(&config.index.retention, tenant_id.as_str());
+        let retention = config.index.retention.resolve(tenant_id.as_str());
         recover_retention(
             registry,
             pipeline_id,
             cleaner,
             &retention,
-            config.storage.enabled,
+            // Storage is process-global: it is enabled iff the shell built a
+            // storage handle (passed in here), not a per-signal config flag.
+            storage.is_some(),
         )
         .await?;
     }

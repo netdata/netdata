@@ -78,7 +78,7 @@ impl NetdataTracesService {
 
     fn resolve_wal_config(&self, tenant_id: &str) -> wal::Config {
         let rotation =
-            bridge::config::RotationConfig::resolve(&self.wal_config.rotation, tenant_id);
+            self.wal_config.rotation.resolve(tenant_id);
         wal::Config {
             rotation: wal::RotationConfig {
                 max_log_entries: rotation.max_log_entries,

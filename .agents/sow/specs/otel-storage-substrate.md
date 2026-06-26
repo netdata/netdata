@@ -96,7 +96,7 @@ args→payload `arg_shim`.
 - Fields are **private**; consumers read them only through accessors
   (`pipeline_id()`, `signal()`, `config()`, `registries()`, `indexer_tx()`,
   `catalog_builder_tx()`, `handler()`, `declaration()`, `arg_shim()`,
-  `function_name()`, `storage_enabled()`). This encapsulates the struct's layout
+  `function_name()`). This encapsulates the struct's layout
   and construction — a consumer cannot replace a field or skip `Pipeline::new` —
   not the mutability of the state it owns: `registries()` and the worker-sender
   accessors hand back the live handles the coordinator drives.
@@ -134,19 +134,59 @@ resolved by `otel-plugin` `config/{mod,signal,env}.rs`, consumed by both workers
     depend on any one signal's directory; the ingestor seeds the shared
     `SeqAllocator` from `max(per-signal dir scans, this file)`.
 - **Global storage and auth** (one `storage` + one `auth` section for the whole
-  plugin), combined into each signal's `LifecycleConfig` by `lifecycle_for`. See
+  plugin) — NOT per-signal. Remote storage is owned by the coordinator shell:
+  `Ledger::new` takes `&StorageConfig` and builds the single storage handle /
+  uploader / read cache from it; the per-signal `LifecycleConfig` does NOT carry
+  storage (only the derived `read_cache_dir`), and runtime upload/retention gating
+  reads "did the shell build an uploader" rather than a per-pipeline flag. `auth`
+  is tenant-scoped (consumed by the ingestor), also not per-signal. See
   [otel-remote-storage-config.md](otel-remote-storage-config.md).
 - **Per-signal tuning only** (`SignalConfig`: wal crc/compression/rotation, index
   retention, catalog rotation_count) — no dirs, no storage. The schema mirrors a
   `logs:` and a `traces:` section (both mandatory; the traces pipeline is always
   built). Each signal's tuning is independent (e.g. a small logs WAL rotation
   threshold does not affect traces, which keeps its own).
+- **Rotation/retention are validated policies.** The `rotation:` / `retention:` maps
+  deserialize into `RotationPolicy` / `RetentionPolicy` (a complete `default` + partial
+  per-tenant overrides). A complete `"default"` is required and enforced at config
+  load (parse-don't-validate): malformed/missing-default config fails to start with a
+  clear error rather than panicking at first use. `resolve(tenant)` is infallible. The
+  YAML/IPC shape is unchanged (the policy round-trips to the `{ "default": {...}, ... }`
+  map).
 - **Migration note (flat → nested):** before this model, logs files lived directly
   at `{base}/{wal,index,catalog}` and the seq high-water at `{base}/index/.seq_highwater`.
   The derived layout adds a `{signal}/` segment (`{base}/logs/wal`, …) and moves the
   seq file to `{base}/shared/seq_highwater`. otel-logs is experimental (never GA), so
   old data is **orphaned, not migrated** — it stays on disk but is not read. Recover
   with `sfsq-cli --wal-dir/--sfst-dir` pointed at the old paths, or relocate the dirs.
+
+## SFST per-seq lifecycle state
+
+`Registry` (per tenant) tracks each sealed SFST's lifecycle in ONE map
+`seqs: BTreeMap<u64, SeqState>` keyed by `seq` (replacing the former three parallel
+`BTreeSet<u64>`). `SeqState` carries two **independent** axes:
+
+- **Upload** — `UploadState { NotUploaded, Uploaded }`: whether the SFST's bytes are
+  confirmed on remote object storage. Independent of the catalog axis: an SFST may be
+  uploaded before (or without) its catalog entry being rotated.
+- **Catalog** — `CatalogStage { NotRotated, RotatedLocal, Remote }`, an **ordered**
+  enum: the SFST's catalog-entry progression. `RotatedLocal` = entry in a closed local
+  catalog file (tracked so remote reconciliation skips re-`AddEntry`ing); `Remote` =
+  confirmed in a remote catalog, and subsumes `RotatedLocal`.
+
+Contracts:
+
+- **Eviction gate:** with storage enabled, a local SFST is evicted only once its seq
+  reaches `CatalogStage::Remote` (`is_remote_cataloged`), so a local file is never
+  deleted before its catalog is durably remote (else the remote SFST is orphaned).
+- **"remote-cataloged implies rotated" is structural:** `CatalogStage` is ordered and
+  `Remote > RotatedLocal`, so `is_remote_cataloged ⇒ is_rotated` always holds — not a
+  caller-ordering assumption.
+- **State may outlive a local SFST entry:** the map is separate from `self.sfst`, so a
+  remote SFST discovered at recovery (no local file) is still marked `Uploaded`.
+- **Eviction is one removal:** `evict_seq` drops the `sfst` entry and the `seqs` entry;
+  a future per-seq axis is a new `SeqState` field, with no extra cleanup site.
+- In-memory only — rebuilt by recovery on startup; never serialized.
 
 ## Invariants
 

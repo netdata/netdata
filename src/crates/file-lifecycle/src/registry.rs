@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
 
 use file_registry::{FileId, TenantId};
@@ -79,30 +79,72 @@ impl PartitionStat {
 // Composition
 // ---------------------------------------------------------------------------
 
+/// Whether an SFST's bytes are confirmed on remote object storage. An axis
+/// independent of the catalog lifecycle: an SFST can be uploaded before (or
+/// without) its catalog entry being rotated, and a remote SFST discovered at
+/// recovery is marked uploaded even when no local file exists.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+enum UploadState {
+    #[default]
+    NotUploaded,
+    Uploaded,
+}
+
+/// The catalog lifecycle of an SFST's entry, as a monotone progression. Ordered
+/// so that `Remote` subsumes `RotatedLocal`: this makes "remote-cataloged implies
+/// rotated" structurally true (a `Remote` seq always reports `is_rotated`), instead
+/// of relying on caller ordering.
+///
+/// ORDER MATTERS: the `PartialOrd`/`Ord` derive ranks variants by declaration
+/// position, and the `>=` comparisons in `is_rotated` / `is_remote_cataloged` and
+/// the monotone guard in `mark_rotated` depend on `NotRotated < RotatedLocal <
+/// Remote`. `catalog_stage_axis_*` tests pin this; do not reorder.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
+enum CatalogStage {
+    /// No catalog entry in a closed file yet.
+    #[default]
+    NotRotated,
+    /// The entry is in a closed local catalog file. Tracked so remote
+    /// reconciliation can skip re-`AddEntry`ing already-cataloged seqs; this is
+    /// NOT the eviction gate (a local catalog file is not a durable remote one).
+    RotatedLocal,
+    /// The catalog entry is confirmed present in remote object storage. When
+    /// storage is enabled, eviction is deferred until a seq reaches this stage,
+    /// so a local SFST is never deleted before its catalog is durably remote —
+    /// otherwise a failed catalog upload could orphan the remote SFST.
+    Remote,
+}
+
+/// The `CatalogStage` variant order is load-bearing — `is_rotated` /
+/// `is_remote_cataloged` compare with `>=` and `mark_rotated`'s monotone guard
+/// depends on it. Assert the discriminant order at COMPILE time so a future
+/// reorder fails the build, not merely a test.
+const _: () = assert!(
+    (CatalogStage::NotRotated as u8) < (CatalogStage::RotatedLocal as u8)
+        && (CatalogStage::RotatedLocal as u8) < (CatalogStage::Remote as u8)
+);
+
+/// Per-seq lifecycle state, held in one map keyed by SFST `seq`. Two independent
+/// axes (upload of the SFST bytes; catalog-entry progression) in one record, so
+/// `evict_seq` is a single removal and a future axis is a new field — no parallel
+/// container to keep in sync.
+#[derive(Debug, Clone, Copy, Default)]
+struct SeqState {
+    upload: UploadState,
+    catalog: CatalogStage,
+}
+
 pub struct Registry {
     pub wal: wal::Registry,
     pub sfst: sfst::Registry,
     /// Immutable catalog files present on local disk.
     pub catalog_files: otel_catalog::Registry,
-    /// SFST sequence numbers that have been successfully uploaded to remote
-    /// object storage. Gated access via [`Registry::mark_uploaded`] etc.
-    uploaded_seqs: BTreeSet<u64>,
-    /// SFST sequence numbers whose catalog entry has been written to a
-    /// closed on-disk catalog file. Retention defers SFST eviction until
-    /// this set contains the seq. NOTE: as of the remote-confirmed-eviction
-    /// change this set no longer gates eviction (a local catalog file is not a
-    /// durable remote one) — see `remote_cataloged_seqs`; it now only tracks
-    /// local-catalog membership so reconciliation can skip re-`AddEntry`ing
-    /// already-cataloged seqs. Gated access via [`Registry::mark_rotated`] etc.
-    rotated_seqs: BTreeSet<u64>,
-    /// SFST sequence numbers whose catalog entry is confirmed present in remote
-    /// object storage. When storage is enabled, eviction is deferred until this
-    /// set contains the seq, so a local SFST is never deleted before its
-    /// catalog is durably on the remote — otherwise a failed catalog upload
-    /// could leave the remote SFST orphaned (referenced by no catalog). Implies
-    /// `rotated_seqs` membership (a catalog is rotated locally before it can be
-    /// uploaded). Gated access via [`Registry::mark_remote_cataloged`] etc.
-    remote_cataloged_seqs: BTreeSet<u64>,
+    /// Per-seq lifecycle state (upload + catalog axes). Separate from `sfst`
+    /// because state legitimately outlives a local SFST entry — e.g. a remote
+    /// SFST discovered at recovery is marked uploaded with no local file. Gated
+    /// access via [`Registry::mark_uploaded`] / [`Registry::mark_rotated`] /
+    /// [`Registry::mark_remote_cataloged`] and their `is_*` readers.
+    seqs: BTreeMap<u64, SeqState>,
 }
 
 impl Registry {
@@ -115,9 +157,7 @@ impl Registry {
             wal,
             sfst,
             catalog_files,
-            uploaded_seqs: BTreeSet::new(),
-            rotated_seqs: BTreeSet::new(),
-            remote_cataloged_seqs: BTreeSet::new(),
+            seqs: BTreeMap::new(),
         }
     }
 
@@ -171,58 +211,83 @@ impl Registry {
     pub fn unuploaded_ids(&self) -> Vec<FileId> {
         self.sfst
             .values()
-            .filter(|entry| !self.uploaded_seqs.contains(&entry.id.seq))
+            .filter(|entry| !self.is_uploaded(entry.id.seq))
             .map(|entry| entry.id)
             .collect()
     }
 
+    /// The lifecycle record for `seq`, creating a default (`NotUploaded` /
+    /// `NotRotated`) one on first mark. State may exist for a seq with no local
+    /// SFST entry (e.g. a remote SFST discovered at recovery).
+    fn seq_mut(&mut self, seq: u64) -> &mut SeqState {
+        self.seqs.entry(seq).or_default()
+    }
+
     /// Mark this SFST sequence as uploaded to remote object storage.
     pub fn mark_uploaded(&mut self, seq: u64) {
-        self.uploaded_seqs.insert(seq);
+        self.seq_mut(seq).upload = UploadState::Uploaded;
     }
 
     /// Whether this SFST sequence has been uploaded.
     pub fn is_uploaded(&self, seq: u64) -> bool {
-        self.uploaded_seqs.contains(&seq)
+        self.seqs
+            .get(&seq)
+            .is_some_and(|s| s.upload == UploadState::Uploaded)
     }
 
     /// Mark this SFST sequence as written into a closed, on-disk catalog file
-    /// (local rotation). Eviction is gated on `remote_cataloged_seqs`, not this
-    /// set; this tracks local-catalog membership for reconciliation dedup.
+    /// (local rotation). Eviction is gated on the remote stage, not this one;
+    /// `RotatedLocal` tracks local-catalog membership for reconciliation dedup.
+    /// Monotone: never downgrades a seq already confirmed `Remote`.
     pub fn mark_rotated(&mut self, seq: u64) {
-        self.rotated_seqs.insert(seq);
+        let catalog = &mut self.seq_mut(seq).catalog;
+        if *catalog < CatalogStage::RotatedLocal {
+            *catalog = CatalogStage::RotatedLocal;
+        }
     }
 
     /// Mark many SFST sequences as rotated in one call.
     pub fn mark_rotated_many(&mut self, seqs: impl IntoIterator<Item = u64>) {
-        self.rotated_seqs.extend(seqs);
+        for seq in seqs {
+            self.mark_rotated(seq);
+        }
     }
 
-    /// Whether this SFST sequence's catalog entry is in a closed catalog file.
+    /// Whether this SFST sequence's catalog entry is in a closed catalog file
+    /// (locally or, subsuming that, confirmed on remote).
     pub fn is_rotated(&self, seq: u64) -> bool {
-        self.rotated_seqs.contains(&seq)
+        self.seqs
+            .get(&seq)
+            .is_some_and(|s| s.catalog >= CatalogStage::RotatedLocal)
     }
 
     /// Mark these SFST sequences as confirmed present in a remote catalog.
     /// Called when a catalog upload completes (or its remote presence is
-    /// confirmed at recovery).
+    /// confirmed at recovery). `Remote` subsumes `RotatedLocal`, so this makes
+    /// `is_rotated` true by construction — the "remote-cataloged implies rotated"
+    /// invariant is structural, not a caller-ordering assumption.
     pub fn mark_remote_cataloged(&mut self, seqs: impl IntoIterator<Item = u64>) {
-        self.remote_cataloged_seqs.extend(seqs);
+        for seq in seqs {
+            self.seq_mut(seq).catalog = CatalogStage::Remote;
+        }
     }
 
     /// Whether this SFST sequence's catalog entry is confirmed in remote
     /// storage. The eviction guard consults this before deleting a local SFST.
     pub fn is_remote_cataloged(&self, seq: u64) -> bool {
-        self.remote_cataloged_seqs.contains(&seq)
+        // `>=` (not `==`) for the "reaches Remote" semantics, mirroring
+        // `is_rotated`; equivalent today since `Remote` is the max stage, but
+        // forward-compatible if a stage above `Remote` is ever added.
+        self.seqs
+            .get(&seq)
+            .is_some_and(|s| s.catalog >= CatalogStage::Remote)
     }
 
-    /// Drop all per-seq state for this sequence. Any new per-seq state
-    /// added in the future must also be cleaned up here.
+    /// Drop all per-seq state for this sequence: one map removal, so a future
+    /// per-seq axis (a new `SeqState` field) is covered with no extra site.
     pub fn evict_seq(&mut self, seq: u64) {
         self.sfst.remove(seq);
-        self.uploaded_seqs.remove(&seq);
-        self.rotated_seqs.remove(&seq);
-        self.remote_cataloged_seqs.remove(&seq);
+        self.seqs.remove(&seq);
     }
 }
 
