@@ -8,14 +8,31 @@ void verify_required_directory(const char *env, const char *dir, bool create_it,
     if (!dir || *dir != '/')
         fatal("Invalid directory path (must be an absolute path): '%s' (%s)", dir, env?env:"");
 
-    if (chdir(dir) == 0) {
+#if defined(OS_WINDOWS)
+    // UCRT64's CRT treats /c/... as \c\... (current-drive-relative), not C:\...
+    // Convert /c/... → C:/... keeping forward slashes so the '/' component-walk
+    // below keeps working and UCRT64 CRT accepts the path.
+    char win_dir[FILENAME_MAX + 1];
+    if (isalpha((unsigned char)dir[1]) && (dir[2] == '/' || dir[2] == '\0')) {
+        win_dir[0] = (char)toupper((unsigned char)dir[1]);
+        win_dir[1] = ':';
+        strncpyz(win_dir + 2, dir + 2, FILENAME_MAX - 2);
+    } else {
+        strncpyz(win_dir, dir, FILENAME_MAX);
+    }
+    const char *native_dir = win_dir;
+#else
+    const char *native_dir = dir;
+#endif
+
+    if (chdir(native_dir) == 0) {
         if(env)
             nd_setenv(env, dir, 1);
         return;
     }
 
     if(create_it) {
-        if(mkdir(dir, perms) == 0) {
+        if(mkdir(native_dir, perms) == 0) {
             if(env)
                 nd_setenv(env, dir, 1);
             return;
@@ -23,7 +40,7 @@ void verify_required_directory(const char *env, const char *dir, bool create_it,
     }
 
     char path[PATH_MAX];
-    strncpyz(path, dir, sizeof(path) - 1);
+    strncpyz(path, native_dir, sizeof(path) - 1);
     struct stat st;
 
     char *p = path;
@@ -45,17 +62,17 @@ void verify_required_directory(const char *env, const char *dir, bool create_it,
         p++;
     }
 
-    if (stat(dir, &st) == -1)
+    if (stat(native_dir, &st) == -1)
         fatal("Required directory: '%s' (%s) - Missing or inaccessible: '%s'",
-              dir, env?env:"", dir);
+              dir, env?env:"", native_dir);
 
     if (!S_ISDIR(st.st_mode))
         fatal("Required directory: '%s' (%s) - '%s' exists but is not a directory.",
-              dir, env?env:"", dir);
+              dir, env?env:"", native_dir);
 
-    if (access(dir, R_OK | X_OK) == -1)
+    if (access(native_dir, R_OK | X_OK) == -1)
         fatal("Required directory: '%s' (%s) - Insufficient permissions for: '%s'",
-              dir, env?env:"", dir);
+              dir, env?env:"", native_dir);
 
     fatal("Required directory: '%s' (%s) - Failed",
           dir, env?env:"");
