@@ -2639,23 +2639,28 @@ send_flowtriq() {
     return 1
   fi
 
+  # escape a string for safe JSON embedding (handles backslashes, quotes, newlines, tabs)
+  flowtriq_json_escape() {
+    printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\t/\\t/g' | tr '\n' ' '
+  }
+
   payload=$(cat <<EOF
   {
     "source" : "netdata",
-    "host" : "${host}",
-    "status" : "${status}",
-    "chart" : "${chart}",
-    "name" : "${name}",
-    "value" : "${value_string}",
-    "old_value" : "${old_value_string}",
-    "message" : "${status_message}",
-    "alarm_id" : "${alarm_id}",
-    "date" : "${when}",
-    "duration" : "${duration_txt}",
-    "info" : "${info}",
-    "total_critical" : "${total_critical}",
-    "total_warnings" : "${total_warnings}",
-    "alert_url" : "${goto_url}"
+    "host" : "$(flowtriq_json_escape "${host}")",
+    "status" : "$(flowtriq_json_escape "${status}")",
+    "chart" : "$(flowtriq_json_escape "${chart}")",
+    "name" : "$(flowtriq_json_escape "${name}")",
+    "value" : "$(flowtriq_json_escape "${value_string}")",
+    "old_value" : "$(flowtriq_json_escape "${old_value_string}")",
+    "message" : "$(flowtriq_json_escape "${status_message}")",
+    "alarm_id" : "$(flowtriq_json_escape "${alarm_id}")",
+    "date" : "$(flowtriq_json_escape "${when}")",
+    "duration" : "$(flowtriq_json_escape "${duration_txt}")",
+    "info" : "$(flowtriq_json_escape "${info}")",
+    "total_critical" : "$(flowtriq_json_escape "${total_critical}")",
+    "total_warnings" : "$(flowtriq_json_escape "${total_warnings}")",
+    "alert_url" : "$(flowtriq_json_escape "${goto_url}")"
   }
 EOF
 )
