@@ -144,9 +144,29 @@ pub fn load_config() -> Result<PluginConfig> {
 }
 
 fn log_config(source: &str, config: &PluginConfig) {
-    match serde_json::to_string(config) {
+    // The whole config is logged at startup for supportability, but `storage.uri`
+    // is redacted to its scheme first: operators are told (otel.yaml.in + the
+    // remote-storage spec) the URI is not logged, so a misplaced secret in its
+    // host/path/query cannot leak to the journal. Redaction is logging-only — the
+    // real config sent to the workers over IPC keeps the verbatim URI.
+    let mut redacted = config.clone();
+    redacted.storage.uri = redact_uri(&config.storage.uri);
+    match serde_json::to_string(&redacted) {
         Ok(json) => tracing::info!("{source} config: {json}"),
         Err(e) => tracing::warn!("failed to serialize {source} config: {e}"),
+    }
+}
+
+/// Reduce a storage URI to its scheme for logging, dropping the host/path/query
+/// (which may carry a misplaced secret). `"s3://bucket/p?key=x"` → `"s3://[redacted]"`;
+/// a schemeless value → `"[redacted]"`; an empty value stays empty.
+fn redact_uri(uri: &str) -> String {
+    if uri.is_empty() {
+        return String::new();
+    }
+    match uri.split_once("://") {
+        Some((scheme, _)) => format!("{scheme}://[redacted]"),
+        None => "[redacted]".to_string(),
     }
 }
 
@@ -691,6 +711,16 @@ endpoint:
     }
 
     // -- Validation --
+
+    #[test]
+    fn redact_uri_keeps_scheme_only() {
+        // Host/path/query (where a misplaced secret would sit) are dropped.
+        assert_eq!(redact_uri("s3://bucket/prefix?key=secret"), "s3://[redacted]");
+        assert_eq!(redact_uri("fs:///var/lib/netdata/otel/remote"), "fs://[redacted]");
+        // Schemeless / empty inputs.
+        assert_eq!(redact_uri("weird-no-scheme"), "[redacted]");
+        assert_eq!(redact_uri(""), "");
+    }
 
     #[test]
     fn validation_rejects_empty_base_dir() {

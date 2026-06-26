@@ -79,8 +79,8 @@ storage:
   # systemd-journal identifier "otel-plugin/ledger", either
   #   "remote storage reachable and credentials accepted"  or
   #   "remote storage enabled but unreachable or misconfigured: <error>".
-  # The configured URI is intentionally NOT logged, so a misplaced secret in it
-  # cannot leak into the journal.
+  # Only the URI scheme is ever logged (e.g. "s3://[redacted]"), never its
+  # host/path/query, so a misplaced secret in the URI cannot leak into the journal.
   #
   # Read cache: to answer a query over SFSTs that local retention has already
   # evicted, the plugin fetches them back from remote storage into a bounded

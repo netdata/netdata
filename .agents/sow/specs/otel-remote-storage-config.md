@@ -38,6 +38,12 @@ with no shim:
 - The old names are not read and not warned about; an operator using them must
   update their environment file. The per-signal WAL/index/catalog tuning env vars
   keep their `NETDATA_OTEL_{LOGS,TRACES}_*` namespaces.
+- The same silent-drop applies to **removed YAML keys**: a user `otel.yaml`
+  carrying the old `logs.{wal,index,catalog}.dir`, `logs.storage.*`, or
+  `logs.auth.*` keys parses without error (serde ignores unknown fields) and
+  those settings are silently dropped — the plugin falls back to the derived
+  layout and the global storage/auth defaults. By decision, there is no
+  deprecation warning (experimental, no GA users); this note is the record.
 - `uri` is a single **OpenDAL URI**. The scheme selects the backend
   (`fs://`, `s3://`, …); all **non-secret** backend options are URI query params
   (`s3://bucket/prefix?region=…&endpoint=…`). OpenDAL owns the per-backend option
@@ -87,9 +93,13 @@ with no shim:
   after a single request — though that one request still costs the backend's own
   connect/read timeout, so "fast" is relative to the multi-minute temporary case,
   not instant.
-- The **configured URI is intentionally not logged** (only the opendal error,
-  which carries the operation/backend/endpoint but not URI query-string
-  credentials), so a misplaced secret in the URI cannot leak into the journal.
+- The **configured URI is never logged verbatim**, so a misplaced secret in it
+  cannot leak into the journal. The startup probe logs only the opendal error
+  (operation/backend/endpoint, not URI query-string credentials), and the
+  startup config dump (`otel-plugin` `config::log_config`) redacts
+  `storage.uri` to its scheme (`s3://[redacted]`) via `redact_uri` before
+  serializing — the redaction is logging-only, so the verbatim URI still crosses
+  the supervisor→worker IPC intact.
 - Logs land in systemd-journal under `otel-plugin/ledger` (query via the MCP
   `netdata_agent_logs` tool, component `ledger`).
 
