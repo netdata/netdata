@@ -134,9 +134,8 @@ static void wevt_lazy_loading_event_and_xml(struct wevt_bin_data *d, FACET_ROW *
                    "Event Record ID of row does not match the bin data associated with it");
 #endif
 
-    // the message needs the xml
     EvtFormatMessage_Xml_utf8(&d->log->ops.unicode, d->provider, d->hEvent, &d->log->ops.xml);
-    EvtFormatMessage_Event_utf8(&d->log->ops.unicode, d->provider, d->hEvent, &d->log->ops.event);
+    txt_utf8_empty(&d->log->ops.event);
     d->rendered = true;
 }
 
