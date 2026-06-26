@@ -29,12 +29,13 @@ ws_client *ws_client_new(size_t buf_size, char **host)
     client->host = host;
 
     size_t size = buf_size ? buf_size : DEFAULT_RINGBUFFER_SIZE;
+    size_t mqtt_input_size = (size > MAX_MQTT_INPUT_BUFFER_SIZE) ? MAX_MQTT_INPUT_BUFFER_SIZE : size;
 
     // Fixed: raw WebSocket read staging; dynamic growth is only needed after payload decoding.
     client->buf_read = rbuf_create(size, size);
     // Fixed: the send path masks buffered bytes in-place after rbuf_bump_head().
     client->buf_write = rbuf_create(size, size);
-    client->buf_to_mqtt = rbuf_create(size, MAX_MQTT_INPUT_BUFFER_SIZE);
+    client->buf_to_mqtt = rbuf_create(mqtt_input_size, MAX_MQTT_INPUT_BUFFER_SIZE);
 
     return client;
 }

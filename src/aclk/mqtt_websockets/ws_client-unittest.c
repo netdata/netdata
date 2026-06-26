@@ -118,6 +118,27 @@ static int ws_client_unittest_create_defaults(void)
     return errors;
 }
 
+static int ws_client_unittest_clamps_mqtt_input_initial_size(void)
+{
+    int errors = 0;
+    char *host = (char *)"localhost";
+    const size_t hard_cap = 16 * 1024 * 1024;
+    const size_t oversized = hard_cap + 1;
+    ws_client *client = ws_client_new(oversized, &host);
+
+    WS_TEST(client != NULL, "ws_client_new succeeds with oversized buffer request");
+    if (!client)
+        return errors;
+
+    WS_TEST(rbuf_get_capacity(client->buf_read) == oversized, "buf_read keeps requested fixed capacity");
+    WS_TEST(rbuf_get_capacity(client->buf_write) == oversized, "buf_write keeps requested fixed capacity");
+    WS_TEST(rbuf_get_capacity(client->buf_to_mqtt) == hard_cap, "buf_to_mqtt initial capacity is capped");
+    WS_TEST(rbuf_get_max_capacity(client->buf_to_mqtt) == hard_cap, "buf_to_mqtt max capacity is capped");
+
+    ws_client_destroy(client);
+    return errors;
+}
+
 static int ws_client_unittest_observed_size_payload(void)
 {
     int errors = 0;
@@ -181,6 +202,7 @@ int ws_client_unittest(void)
     fprintf(stderr, "\nrunning ws_client unittest\n");
 
     errors += ws_client_unittest_create_defaults();
+    errors += ws_client_unittest_clamps_mqtt_input_initial_size();
     errors += ws_client_unittest_observed_size_payload();
     errors += ws_client_unittest_cap_hit();
 
