@@ -18,4 +18,4 @@ mod query;
 pub use query::{Query, range_overlaps};
 
 mod registry;
-pub use registry::FileRegistry;
+pub use registry::{FileRegistry, Sequenced};

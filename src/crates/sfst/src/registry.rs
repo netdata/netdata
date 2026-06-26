@@ -57,6 +57,12 @@ impl File {
     }
 }
 
+impl file_registry::Sequenced for File {
+    fn seq(&self) -> u64 {
+        self.id.seq
+    }
+}
+
 /// The set of `.sfst` files in one directory, keyed by their sequence
 /// number (a [`FileId::seq`] is unique within a directory — see the
 /// seq-allocation rules in `wal`).
@@ -109,15 +115,12 @@ impl Registry {
                 }
             };
 
-            self.inner.insert(
-                id.seq,
-                File {
-                    id,
-                    size,
-                    summary,
-                    pending_deletion: false,
-                },
-            );
+            self.inner.insert(File {
+                id,
+                size,
+                summary,
+                pending_deletion: false,
+            });
             recovered += 1;
         }
 
@@ -127,15 +130,12 @@ impl Registry {
     /// Register a newly written file (the rotation path; recovery uses
     /// [`recover`](Self::recover)). Replaces any entry with the same seq.
     pub fn track(&mut self, id: FileId, size: ByteSize, summary: Summary) {
-        self.inner.insert(
-            id.seq,
-            File {
-                id,
-                size,
-                summary,
-                pending_deletion: false,
-            },
-        );
+        self.inner.insert(File {
+            id,
+            size,
+            summary,
+            pending_deletion: false,
+        });
     }
 
     /// Stop tracking `seq`, returning its entry if present.

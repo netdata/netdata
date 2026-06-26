@@ -66,6 +66,12 @@ pub struct File {
     pub entry_count: u64,
 }
 
+impl file_registry::Sequenced for File {
+    fn seq(&self) -> u64 {
+        self.id.seq
+    }
+}
+
 /// An ordered collection of WAL files.
 ///
 /// Files are keyed by sequence number, which provides chronological ordering.
@@ -97,29 +103,26 @@ impl Registry {
 
             let size = ByteSize(meta.len());
 
-            self.files.insert(
-                file_id.seq,
-                File {
-                    id: file_id,
-                    status: FileStatus::Archived,
-                    created_at_ns: TimestampNs(header.created_at),
-                    size,
-                    // Recovered cheaply from the header.
-                    content_meta: header.content_meta,
-                    // Recovery cannot retrieve log-data range from the
-                    // WAL file format today. Re-indexing populates the
-                    // SFST summary with the authoritative values.
-                    min_timestamp_ns: TimestampNs::ZERO,
-                    max_timestamp_ns: TimestampNs::ZERO,
-                    // Likewise unknown without event history: a crash may
-                    // have left a torn tail past the last sync, and the
-                    // file carries no durable-prefix marker. ZERO = "do
-                    // not trust a byte bound"; such files are re-indexed
-                    // whole by the existing pipeline.
-                    valid_up_to: ByteSize::ZERO,
-                    entry_count: 0,
-                },
-            );
+            self.files.insert(File {
+                id: file_id,
+                status: FileStatus::Archived,
+                created_at_ns: TimestampNs(header.created_at),
+                size,
+                // Recovered cheaply from the header.
+                content_meta: header.content_meta,
+                // Recovery cannot retrieve log-data range from the
+                // WAL file format today. Re-indexing populates the
+                // SFST summary with the authoritative values.
+                min_timestamp_ns: TimestampNs::ZERO,
+                max_timestamp_ns: TimestampNs::ZERO,
+                // Likewise unknown without event history: a crash may
+                // have left a torn tail past the last sync, and the
+                // file carries no durable-prefix marker. ZERO = "do
+                // not trust a byte bound"; such files are re-indexed
+                // whole by the existing pipeline.
+                valid_up_to: ByteSize::ZERO,
+                entry_count: 0,
+            });
         }
 
         Ok(())
@@ -150,20 +153,17 @@ impl Registry {
                 if self.files.contains(file_id.seq) {
                     return Err(Error::DuplicateSequence(file_id.seq));
                 }
-                self.files.insert(
-                    file_id.seq,
-                    File {
-                        id: *file_id,
-                        status: FileStatus::Active,
-                        created_at_ns: *created_at_ns,
-                        size: ByteSize::ZERO,
-                        content_meta: content_meta.clone(),
-                        min_timestamp_ns: TimestampNs::ZERO,
-                        max_timestamp_ns: TimestampNs::ZERO,
-                        valid_up_to: ByteSize::ZERO,
-                        entry_count: 0,
-                    },
-                );
+                self.files.insert(File {
+                    id: *file_id,
+                    status: FileStatus::Active,
+                    created_at_ns: *created_at_ns,
+                    size: ByteSize::ZERO,
+                    content_meta: content_meta.clone(),
+                    min_timestamp_ns: TimestampNs::ZERO,
+                    max_timestamp_ns: TimestampNs::ZERO,
+                    valid_up_to: ByteSize::ZERO,
+                    entry_count: 0,
+                });
                 Ok(())
             }
             FileEvent::Synced {
