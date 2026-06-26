@@ -11,7 +11,7 @@ static void nd_win_trace_rrd(const char *fmt, ...) {
     char path[MAX_PATH + 1];
     DWORD len = GetTempPathA(MAX_PATH, path);
     if (!len || len >= (DWORD)(MAX_PATH - 22)) return;
-    strcat(path, "netdata-trace.log");
+    snprintfz(path + len, sizeof(path) - len, "netdata-trace.log");
     // FILE_FLAG_NO_REPARSE_POINT: fail if the target is a symlink or junction
     // rather than following it — the service runs with elevated privileges.
     HANDLE h = CreateFileA(path, FILE_APPEND_DATA,

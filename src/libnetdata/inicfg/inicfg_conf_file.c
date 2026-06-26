@@ -178,14 +178,10 @@ int inicfg_load(struct config *root, char *filename, int overwrite_used, const c
 
     if(!filename) {
 #if defined(OS_WINDOWS)
-        const char *d = netdata_configured_user_config_dir;
-        if (isalpha((unsigned char)d[1]) && d[2] == '/') {
-            win_config_path[0] = (char)toupper((unsigned char)d[1]);
-            win_config_path[1] = ':';
-            snprintfz(win_config_path + 2, FILENAME_MAX - 2, "%s/" CONFIG_FILENAME, d + 2);
-        } else {
-            snprintfz(win_config_path, FILENAME_MAX, "%s/" CONFIG_FILENAME, d);
-        }
+        const char *d = netdata_configured_user_config_dir ? netdata_configured_user_config_dir : CONFIG_DIR;
+        char combined[FILENAME_MAX + 1];
+        snprintfz(combined, sizeof(combined), "%s/" CONFIG_FILENAME, d);
+        os_translate_path(win_config_path, combined, sizeof(win_config_path));
         filename = win_config_path;
 #else
         filename = CONFIG_DIR "/" CONFIG_FILENAME;
