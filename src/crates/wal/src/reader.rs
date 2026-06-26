@@ -391,7 +391,7 @@ mod tests {
     /// byte offset of the end of frame `i`).
     fn write_frames(dir: &Path, payloads: &[&[u8]]) -> (std::path::PathBuf, Vec<u64>) {
         let seq = Arc::new(SeqAllocator::ephemeral(0));
-        let mut writer = Writer::new(dir, Config::default(), seq).unwrap();
+        let mut writer = Writer::new(dir, Config::default(), seq, 0).unwrap();
         let mut bounds = Vec::new();
         for (i, payload) in payloads.iter().enumerate() {
             writer
@@ -576,7 +576,7 @@ mod tests {
     /// syncing after each. Returns the path and per-frame end offsets.
     fn write_counted_frames(dir: &Path, counts: &[usize]) -> (std::path::PathBuf, Vec<u64>) {
         let seq = Arc::new(SeqAllocator::ephemeral(0));
-        let mut writer = Writer::new(dir, Config::default(), seq).unwrap();
+        let mut writer = Writer::new(dir, Config::default(), seq, 0).unwrap();
         let mut bounds = Vec::new();
         for (i, &count) in counts.iter().enumerate() {
             writer

@@ -18,7 +18,7 @@ fn tenant() -> TenantId {
 
 #[test]
 fn sfst_key_and_date_roundtrip() {
-    let id = FileId::new(machine(), boot(), 42, 0);
+    let id = FileId::new(machine(), boot(), 0, 42, 0);
     let key = sfst("logs", &tenant(), sample_date(), id);
     assert!(key.starts_with("v1/logs/tenants/tenant1/sfst/2026-04-17/"));
     assert!(key.ends_with(".sfst"));
@@ -37,7 +37,7 @@ fn sfst_prefix_has_trailing_slash() {
 fn signal_segment_scopes_the_key() {
     // The signal segment is the top-level discriminator: two signals never
     // share a prefix, so per-signal LIST/lifecycle/IAM stays clean.
-    let id = FileId::new(machine(), boot(), 42, 0);
+    let id = FileId::new(machine(), boot(), 0, 42, 0);
     assert!(sfst("logs", &tenant(), sample_date(), id).starts_with("v1/logs/"));
     assert!(sfst("traces", &tenant(), sample_date(), id).starts_with("v1/traces/"));
     assert!(sfst_prefix("traces", &tenant(), sample_date()).starts_with("v1/traces/"));

@@ -119,7 +119,8 @@ fn write_wal(wal_tenant_dir: &Path, batches: &[Vec<ResourceLogs>]) -> PathBuf {
 fn write_wal_seq(wal_tenant_dir: &Path, batches: &[Vec<ResourceLogs>], seq_start: u64) -> PathBuf {
     std::fs::create_dir_all(wal_tenant_dir).unwrap();
     let seq = Arc::new(wal::SeqAllocator::ephemeral(seq_start));
-    let mut writer = wal::Writer::new(wal_tenant_dir, wal::Config::default(), seq).expect("writer");
+    let mut writer =
+        wal::Writer::new(wal_tenant_dir, wal::Config::default(), seq, 0).expect("writer");
     for (i, b) in batches.iter().enumerate() {
         let (data, count) = otel_ingestor::arrow_bridge::encode(b.clone()).expect("encode");
         let ingestion = TimestampNs((BASE_S + 500 + i as u64) * NS);
@@ -266,7 +267,7 @@ fn wal_stream_filter_matches_absent_namespace() {
     // with no service.namespace that is compute_ns_hash(None, name), exactly as
     // the ingestor.
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
-    let mut writer = wal::Writer::new(&wal_dir, wal::Config::default(), seq).expect("writer");
+    let mut writer = wal::Writer::new(&wal_dir, wal::Config::default(), seq, 0).expect("writer");
     let (data, count) =
         otel_ingestor::arrow_bridge::encode(batch_for(records(0..10), "", "api")).expect("encode");
     let stream = ServiceStream::new("", "api");

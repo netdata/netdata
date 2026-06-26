@@ -116,7 +116,7 @@ fn write_test_sfst(path: &std::path::Path, min_s: u32) {
 fn install_sfst(tr: &mut TenantRegistries, tenant: &str, seq: u64, min_s: u32) -> (Uuid, Uuid) {
     let machine = Uuid::from_u128(0x11);
     let boot = Uuid::from_u128(0x22);
-    let id = FileId::new(machine, boot, seq, 7);
+    let id = FileId::new(machine, boot, 0, seq, 7);
 
     // get_or_create initializes the tenant subdir; we then write
     // the file at the registry's computed path and track it.
@@ -189,7 +189,7 @@ fn write_service_only_sfst(path: &std::path::Path, min_s: u32) {
 
 /// Install a 3-log service-only SFST (see [`write_service_only_sfst`]).
 fn install_service_only_sfst(tr: &mut TenantRegistries, tenant: &str, seq: u64, min_s: u32) {
-    let id = FileId::new(Uuid::from_u128(0x11), Uuid::from_u128(0x22), seq, 7);
+    let id = FileId::new(Uuid::from_u128(0x11), Uuid::from_u128(0x22), 0, seq, 7);
     let reg = tr.get_or_create(&TenantId::from(tenant));
     let path = reg.sfst.file_path(id);
     write_service_only_sfst(&path, min_s);
@@ -248,7 +248,7 @@ fn write_same_ts_sfst(path: &std::path::Path, ts_s: u32, n: usize) {
 }
 
 fn install_same_ts_sfst(tr: &mut TenantRegistries, tenant: &str, seq: u64, ts_s: u32, n: usize) {
-    let id = FileId::new(Uuid::from_u128(0x11), Uuid::from_u128(0x22), seq, 7);
+    let id = FileId::new(Uuid::from_u128(0x11), Uuid::from_u128(0x22), 0, seq, 7);
     let reg = tr.get_or_create(&TenantId::from(tenant));
     let path = reg.sfst.file_path(id);
     write_same_ts_sfst(&path, ts_s, n);
@@ -363,7 +363,7 @@ async fn files_request_includes_wal_and_catalog_entries() {
     {
         let reg = tr.get_or_create(&TenantId::from("default"));
         // An active WAL: Created, then Synced sets entry_count + time range.
-        let active = FileId::new(machine, boot, 10, 0xab);
+        let active = FileId::new(machine, boot, 0, 10, 0xab);
         reg.wal
             .apply_event(&wal::FileEvent::Created {
                 file_id: active,
@@ -382,7 +382,7 @@ async fn files_request_includes_wal_and_catalog_entries() {
             })
             .unwrap();
         // An archived WAL: Created, then Closed seals it + sets size.
-        let archived = FileId::new(machine, boot, 11, 0xcd);
+        let archived = FileId::new(machine, boot, 0, 11, 0xcd);
         reg.wal
             .apply_event(&wal::FileEvent::Created {
                 file_id: archived,
@@ -1096,6 +1096,7 @@ async fn remote_only_sfst_is_fetched_and_served() {
     let id = FileId::new(
         Uuid::from_u128(0x11),
         Uuid::from_u128(0x22),
+        0,
         1,
         ServiceStream::new("ns", "svc").ns_hash(),
     );
@@ -1180,6 +1181,7 @@ async fn remote_fetch_failure_degrades() {
     let id = FileId::new(
         Uuid::from_u128(0x11),
         Uuid::from_u128(0x22),
+        0,
         1,
         ServiceStream::new("ns", "svc").ns_hash(),
     );

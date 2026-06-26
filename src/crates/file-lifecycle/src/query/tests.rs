@@ -16,7 +16,7 @@ fn boot() -> Uuid {
     Uuid::from_u128(0xaaaa_bbbb_cccc_dddd_eeee_ffff_0000_1111)
 }
 fn fid(seq: u64, part_key: u64) -> FileId {
-    FileId::new(machine(), boot(), seq, part_key)
+    FileId::new(machine(), boot(), 0, seq, part_key)
 }
 
 fn make_registry() -> Registry {

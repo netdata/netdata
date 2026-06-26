@@ -51,7 +51,7 @@ mod tests {
     #[test]
     fn catalog_entry_roundtrip() {
         let entry = CatalogEntry {
-            id: FileId::new(Uuid::nil(), Uuid::from_u128(1), 1, 42),
+            id: FileId::new(Uuid::nil(), Uuid::from_u128(1), 0, 1, 42),
             remote_key: "tenant/sfst/2026-04-17/foo.sfst".into(),
             min_timestamp_s: 1_700_000_000,
             max_timestamp_s: 1_700_003_600,

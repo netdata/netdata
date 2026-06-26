@@ -427,6 +427,7 @@ mod seed_tests {
         file_registry::FileId::new(
             uuid::Uuid::from_u128(1),
             uuid::Uuid::from_u128(2),
+            0,
             seq,
             0xabcd,
         )

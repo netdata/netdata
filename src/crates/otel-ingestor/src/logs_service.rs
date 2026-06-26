@@ -386,8 +386,7 @@ impl NetdataLogsService {
     }
 
     fn resolve_wal_config(&self, tenant_id: &str) -> wal::Config {
-        let rotation =
-            self.wal_config.rotation.resolve(tenant_id);
+        let rotation = self.wal_config.rotation.resolve(tenant_id);
         wal::Config {
             rotation: wal::RotationConfig {
                 max_log_entries: rotation.max_log_entries,
@@ -532,10 +531,9 @@ impl LogsService for NetdataLogsService {
         } else {
             let path = self.wal_base_dir.join(tenant_id.as_str());
             let wal_config = self.resolve_wal_config(tenant_id.as_str());
-            // Stamp the logs signal axis explicitly (matching the traces writer)
-            // so the WAL producer no longer relies on `Writer::new`'s
-            // `DEFAULT_PIPELINE` defaulting to coincide with the logs id.
-            let w = wal::Writer::with_pipeline(
+            // Stamp the logs signal axis explicitly (the WAL writer always takes
+            // its pipeline id — there is no default).
+            let w = wal::Writer::new(
                 &path,
                 wal_config,
                 Arc::clone(&self.seq),

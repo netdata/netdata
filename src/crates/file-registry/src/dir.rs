@@ -150,7 +150,7 @@ mod tests {
     #[test]
     fn file_path_derivation() {
         let dir = FileDir::new(Path::new("/tmp/wal"), "wal");
-        let id = FileId::new(test_machine_id(), test_boot_id(), 1, 0);
+        let id = FileId::new(test_machine_id(), test_boot_id(), 0, 1, 0);
         let path = dir.file_path(id);
         assert!(path.to_str().unwrap().ends_with(".wal"));
         assert!(path.starts_with("/tmp/wal"));
@@ -158,7 +158,7 @@ mod tests {
 
     #[test]
     fn parse_matching_extension() {
-        let id = FileId::new(test_machine_id(), test_boot_id(), 42, 0);
+        let id = FileId::new(test_machine_id(), test_boot_id(), 0, 42, 0);
         let filename = id.to_filename("sfst");
         let path = Path::new(&filename);
 
@@ -191,7 +191,7 @@ mod tests {
     /// Create an empty file named `<machine>-<boot>-<pipeline:05>-<seq:010>-<part_key:016x>.<ext>`
     /// under `dir`. Sentinel for the recursive-scan tests below.
     fn touch_file(dir: &Path, seq: u64, ext: &str) {
-        let id = FileId::new(test_machine_id(), test_boot_id(), seq, 0);
+        let id = FileId::new(test_machine_id(), test_boot_id(), 0, seq, 0);
         std::fs::File::create(dir.join(id.to_filename(ext))).unwrap();
     }
 

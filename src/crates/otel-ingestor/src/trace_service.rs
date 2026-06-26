@@ -77,8 +77,7 @@ impl NetdataTracesService {
     }
 
     fn resolve_wal_config(&self, tenant_id: &str) -> wal::Config {
-        let rotation =
-            self.wal_config.rotation.resolve(tenant_id);
+        let rotation = self.wal_config.rotation.resolve(tenant_id);
         wal::Config {
             rotation: wal::RotationConfig {
                 max_log_entries: rotation.max_log_entries,
@@ -147,7 +146,7 @@ impl TraceService for NetdataTracesService {
         } else {
             let path = self.wal_base_dir.join(tenant_id.as_str());
             let wal_config = self.resolve_wal_config(tenant_id.as_str());
-            let w = wal::Writer::with_pipeline(
+            let w = wal::Writer::new(
                 &path,
                 wal_config,
                 Arc::clone(&self.seq),

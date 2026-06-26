@@ -12,7 +12,7 @@ use crate::test_helpers::empty_summary;
 
 fn make_entry(seq: u64) -> otel_catalog::CatalogEntry {
     let (part_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
-    let id = file_registry::FileId::new(machine(), boot(), seq, part_key);
+    let id = file_registry::FileId::new(machine(), boot(), 0, seq, part_key);
     let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
     otel_catalog::CatalogEntry {
         id,
@@ -138,7 +138,7 @@ async fn recover_retention_evicts_only_remote_cataloged() {
     let mut reg = make_registry(catalog_dir.path());
 
     for seq in [1u64, 2, 3] {
-        let id = file_registry::FileId::new(machine(), boot(), seq, 0);
+        let id = file_registry::FileId::new(machine(), boot(), 0, seq, 0);
         reg.sfst.track(id, ByteSize(1), empty_summary());
     }
     // seq=2: rotated AND confirmed present on the remote -> evictable.
@@ -174,7 +174,7 @@ async fn recover_retention_evicts_all_when_storage_disabled() {
     let mut reg = make_registry(catalog_dir.path());
 
     for seq in [1u64, 2] {
-        let id = file_registry::FileId::new(machine(), boot(), seq, 0);
+        let id = file_registry::FileId::new(machine(), boot(), 0, seq, 0);
         reg.sfst.track(id, ByteSize(1), empty_summary());
     }
 
@@ -602,7 +602,7 @@ fn spawn_idle_catalog_builder(
 
 /// Remote SFST object key for `seq` under today's prefix.
 fn remote_sfst_key(seq: u64) -> (file_registry::FileId, String) {
-    let id = file_registry::FileId::new(machine(), boot(), seq, 0);
+    let id = file_registry::FileId::new(machine(), boot(), 0, seq, 0);
     let today = chrono::Utc::now().date_naive();
     (
         id,

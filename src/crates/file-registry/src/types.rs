@@ -190,8 +190,8 @@ pub struct FileId {
     pub boot_id: Uuid,
     /// Opaque pipeline/signal discriminator assigned by the integration layer
     /// (the signal↔id mapping is the integration layer's, e.g. `bridge::signals`;
-    /// `file-registry` ascribes no meaning to the value beyond
-    /// [`FileId::DEFAULT_PIPELINE`] being the default).
+    /// `file-registry` ascribes no meaning to the value). Always chosen
+    /// explicitly at construction — there is no default pipeline.
     pub pipeline_id: u16,
     pub seq: u64,
     /// Opaque partition key; the content plane derives it.
@@ -199,24 +199,10 @@ pub struct FileId {
 }
 
 impl FileId {
-    /// The default pipeline (logs). The integration layer assigns distinct
-    /// pipeline ids per signal (see `bridge::signals`); `file-registry` ascribes
-    /// no meaning to the value.
-    pub const DEFAULT_PIPELINE: u16 = 0;
-
-    /// Construct a `FileId` in the [`DEFAULT_PIPELINE`](Self::DEFAULT_PIPELINE).
-    pub fn new(machine_id: Uuid, boot_id: Uuid, seq: u64, part_key: u64) -> Self {
-        Self::with_pipeline(machine_id, boot_id, Self::DEFAULT_PIPELINE, seq, part_key)
-    }
-
-    /// Construct a `FileId` in an explicit pipeline.
-    pub fn with_pipeline(
-        machine_id: Uuid,
-        boot_id: Uuid,
-        pipeline_id: u16,
-        seq: u64,
-        part_key: u64,
-    ) -> Self {
+    /// Construct a `FileId`. The `pipeline_id` is always chosen explicitly by the
+    /// integration layer (the signal↔id mapping is its concern, e.g.
+    /// `bridge::signals`); there is no default pipeline.
+    pub fn new(machine_id: Uuid, boot_id: Uuid, pipeline_id: u16, seq: u64, part_key: u64) -> Self {
         Self {
             machine_id,
             boot_id,
@@ -351,7 +337,7 @@ mod tests {
 
     #[test]
     fn file_id_stem_roundtrip() {
-        let id = FileId::new(test_machine_id(), test_boot_id(), 42, 0xa1b2c3d4e5f60001);
+        let id = FileId::new(test_machine_id(), test_boot_id(), 0, 42, 0xa1b2c3d4e5f60001);
         let stem = id.to_stem();
         assert_eq!(
             stem,
@@ -362,8 +348,8 @@ mod tests {
     }
 
     #[test]
-    fn file_id_with_pipeline_roundtrip() {
-        let id = FileId::with_pipeline(test_machine_id(), test_boot_id(), 7, 42, 0xdeadbeef);
+    fn file_id_nonzero_pipeline_roundtrip() {
+        let id = FileId::new(test_machine_id(), test_boot_id(), 7, 42, 0xdeadbeef);
         let stem = id.to_stem();
         assert!(stem.contains("-00007-0000000042-"));
         let parsed = FileId::parse_stem(&stem).unwrap();
@@ -373,7 +359,7 @@ mod tests {
 
     #[test]
     fn file_id_filename_roundtrip() {
-        let id = FileId::new(test_machine_id(), test_boot_id(), 1, 0);
+        let id = FileId::new(test_machine_id(), test_boot_id(), 0, 1, 0);
         let filename = id.to_filename("wal");
         let path = Path::new(&filename);
         let parsed = FileId::parse(path).unwrap();
@@ -382,7 +368,7 @@ mod tests {
 
     #[test]
     fn file_id_zero_hash() {
-        let id = FileId::new(test_machine_id(), test_boot_id(), 1, 0);
+        let id = FileId::new(test_machine_id(), test_boot_id(), 0, 1, 0);
         let stem = id.to_stem();
         assert!(stem.ends_with("-0000000000000000"));
         let parsed = FileId::parse_stem(&stem).unwrap();
@@ -391,7 +377,7 @@ mod tests {
 
     #[test]
     fn file_id_max_hash() {
-        let id = FileId::new(test_machine_id(), test_boot_id(), 1, u64::MAX);
+        let id = FileId::new(test_machine_id(), test_boot_id(), 0, 1, u64::MAX);
         let stem = id.to_stem();
         assert!(stem.ends_with("-ffffffffffffffff"));
         let parsed = FileId::parse_stem(&stem).unwrap();
@@ -407,19 +393,19 @@ mod tests {
 
     #[test]
     fn file_id_ordering() {
-        let a = FileId::new(test_machine_id(), test_boot_id(), 1, 0);
-        let b = FileId::new(test_machine_id(), test_boot_id(), 2, 0);
+        let a = FileId::new(test_machine_id(), test_boot_id(), 0, 1, 0);
+        let b = FileId::new(test_machine_id(), test_boot_id(), 0, 2, 0);
         assert!(a < b);
 
         // Same seq, different part_key
-        let c = FileId::new(test_machine_id(), test_boot_id(), 1, 1);
-        let d = FileId::new(test_machine_id(), test_boot_id(), 1, 2);
+        let c = FileId::new(test_machine_id(), test_boot_id(), 0, 1, 1);
+        let d = FileId::new(test_machine_id(), test_boot_id(), 0, 1, 2);
         assert!(c < d);
 
         // pipeline_id orders ahead of seq: a lower pipeline sorts first even
         // when its seq is higher.
-        let p0 = FileId::with_pipeline(test_machine_id(), test_boot_id(), 0, 9, 0);
-        let p1 = FileId::with_pipeline(test_machine_id(), test_boot_id(), 1, 1, 0);
+        let p0 = FileId::new(test_machine_id(), test_boot_id(), 0, 9, 0);
+        let p1 = FileId::new(test_machine_id(), test_boot_id(), 1, 1, 0);
         assert!(p0 < p1);
     }
 }

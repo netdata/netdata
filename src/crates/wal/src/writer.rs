@@ -56,9 +56,8 @@ struct Stream {
     machine_id: Uuid,
     boot_id: Uuid,
     /// Opaque signal axis stamped into every `FileId` this stream writes
-    /// (logs = [`FileId::DEFAULT_PIPELINE`]; a second signal, e.g. traces,
-    /// uses its own). Lets one writer process feed multiple signals while the
-    /// ledger routes by `pipeline_id`.
+    /// (logs and traces each use their own). Lets one writer process feed
+    /// multiple signals while the ledger routes by `pipeline_id`.
     pipeline_id: u16,
     config: Config,
     active: Option<ActiveFile>,
@@ -100,7 +99,7 @@ impl Stream {
 
     /// Create a [`FileId`] stamped with this stream's pipeline + partition key.
     fn file_id(&self, seq: u64) -> FileId {
-        FileId::with_pipeline(
+        FileId::new(
             self.machine_id,
             self.boot_id,
             self.pipeline_id,
@@ -349,19 +348,14 @@ pub struct Writer {
 }
 
 impl Writer {
-    /// Create a new writer in the [`FileId::DEFAULT_PIPELINE`] (logs).
+    /// Create a new writer that stamps every file it produces with `pipeline_id`
+    /// (the signal axis the ledger routes by — chosen explicitly by the caller;
+    /// there is no default).
     ///
     /// Machine and boot IDs are loaded from the system. The caller provides
     /// a shared sequence counter (e.g., shared across per-tenant writers).
     /// The directory is created if it doesn't exist.
-    pub fn new(path: &Path, config: Config, seq: Arc<SeqAllocator>) -> Result<Self> {
-        Self::with_pipeline(path, config, seq, FileId::DEFAULT_PIPELINE)
-    }
-
-    /// Like [`new`](Self::new) but stamps files with an explicit `pipeline_id`,
-    /// for a second signal (e.g. traces) whose files must route to its own
-    /// pipeline. Mirrors [`FileId::with_pipeline`].
-    pub fn with_pipeline(
+    pub fn new(
         path: &Path,
         config: Config,
         seq: Arc<SeqAllocator>,
@@ -482,7 +476,7 @@ mod tests {
 
     fn test_writer(tmp: &std::path::Path) -> Writer {
         let seq = Arc::new(SeqAllocator::ephemeral(0));
-        Writer::new(tmp, Config::default(), seq).unwrap()
+        Writer::new(tmp, Config::default(), seq, 0).unwrap()
     }
 
     /// A distinct opaque `part_key` per label — distinct labels give distinct

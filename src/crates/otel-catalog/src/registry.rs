@@ -796,7 +796,7 @@ mod tests {
     fn entry_at(seq: u64, min_s: u32, max_s: u32, ns: &str, name: &str) -> CatalogEntry {
         let part_key = opaque_part_key(ns, name);
         CatalogEntry {
-            id: file_registry::FileId::new(machine(), boot(), seq, part_key),
+            id: file_registry::FileId::new(machine(), boot(), 0, seq, part_key),
             remote_key: format!("k{seq}"),
             min_timestamp_s: min_s,
             max_timestamp_s: max_s,
