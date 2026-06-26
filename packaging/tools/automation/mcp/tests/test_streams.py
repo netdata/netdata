@@ -5,8 +5,8 @@ from netdata_mcp import streams
 
 
 # ── command builders (pure) ─────────────────────────────────────────────────────
-def test_synth_cmd_basics():
-    cmd = streams.synth_cmd(
+def test_synth_logs_cmd_basics():
+    cmd = streams.synth_logs_cmd(
         "127.0.0.1:4317", count=25, field_cardinality=4, spacing_nanos=1_000_000_000,
         start_time_nanos=None, seed=0, tenant_id=None, batch_size=100,
         flush_interval_ms=300, connect_timeout_secs=30,
@@ -14,13 +14,14 @@ def test_synth_cmd_basics():
     assert cmd[:7] == ["cargo", "run", "--quiet", "-p", "otel-streams", "--bin", "synth"]
     assert "--otel-endpoint" in cmd and "http://127.0.0.1:4317" in cmd
     assert cmd[cmd.index("--count") + 1] == "25"
+    assert cmd[cmd.index("--field-cardinality") + 1] == "4"  # logs-only flag
     # omitted optionals stay out (synth applies its own defaults)
     assert "--start-time-nanos" not in cmd and "--tenant-id" not in cmd
     assert "--service-name" not in cmd and "--service-namespace" not in cmd
 
 
-def test_synth_cmd_includes_set_optionals():
-    cmd = streams.synth_cmd(
+def test_synth_logs_cmd_includes_set_optionals():
+    cmd = streams.synth_logs_cmd(
         "h:1", count=1, field_cardinality=1, spacing_nanos=0, start_time_nanos=123,
         seed=5, tenant_id="t1", batch_size=1, flush_interval_ms=1, connect_timeout_secs=1,
         service_name="api", service_namespace="prod",
@@ -30,6 +31,68 @@ def test_synth_cmd_includes_set_optionals():
     assert cmd[cmd.index("--seed") + 1] == "5"
     assert cmd[cmd.index("--service-name") + 1] == "api"
     assert cmd[cmd.index("--service-namespace") + 1] == "prod"
+
+
+def test_synth_traces_cmd_basics():
+    cmd = streams.synth_traces_cmd(
+        "127.0.0.1:4317", count=25, spacing_nanos=1_000_000_000, duration_nanos=5_000_000,
+        start_time_nanos=None, seed=0, tenant_id=None, batch_size=100,
+        connect_timeout_secs=30,
+    )
+    assert cmd[:7] == ["cargo", "run", "--quiet", "-p", "otel-streams", "--bin", "synth-traces"]
+    assert "--otel-endpoint" in cmd and "http://127.0.0.1:4317" in cmd
+    assert cmd[cmd.index("--count") + 1] == "25"
+    assert cmd[cmd.index("--duration-nanos") + 1] == "5000000"  # traces-only flag
+    assert "--field-cardinality" not in cmd  # logs-only flag must NOT appear
+    # synth-traces exports synchronously; the logs flush knob is not exposed/emitted
+    assert "--flush-interval-ms" not in cmd
+    assert "--start-time-nanos" not in cmd and "--tenant-id" not in cmd
+    assert "--service-name" not in cmd and "--service-namespace" not in cmd
+
+
+def test_synth_traces_cmd_includes_set_optionals():
+    cmd = streams.synth_traces_cmd(
+        "h:1", count=1, spacing_nanos=0, duration_nanos=7, start_time_nanos=123,
+        seed=5, tenant_id="t1", batch_size=1, connect_timeout_secs=1,
+        service_name="api", service_namespace="prod",
+    )
+    assert cmd[cmd.index("--start-time-nanos") + 1] == "123"
+    assert cmd[cmd.index("--tenant-id") + 1] == "t1"
+    assert cmd[cmd.index("--duration-nanos") + 1] == "7"
+    assert cmd[cmd.index("--service-name") + 1] == "api"
+    assert cmd[cmd.index("--service-namespace") + 1] == "prod"
+
+
+def test_synth_cmds_forward_explicit_empty_service_identity():
+    # An explicit "" is a present-but-empty identity (queryable empty value),
+    # distinct from omitting it — both builders must FORWARD it, not drop it.
+    # logs carries field_cardinality + flush_interval_ms; traces carries
+    # duration_nanos (no flush knob) — signal-specific args go in `extra`.
+    for builder, extra in (
+        (streams.synth_logs_cmd, {"field_cardinality": 1, "flush_interval_ms": 1}),
+        (streams.synth_traces_cmd, {"duration_nanos": 1}),
+    ):
+        cmd = builder(
+            "h:1", count=1, spacing_nanos=0, start_time_nanos=None, seed=0,
+            tenant_id=None, batch_size=1, connect_timeout_secs=1,
+            service_name="", service_namespace="", **extra,
+        )
+        assert cmd[cmd.index("--service-name") + 1] == ""
+        assert cmd[cmd.index("--service-namespace") + 1] == ""
+
+
+def test_synth_cmds_omit_service_identity_when_none():
+    # Omitted (None) → no flag → the bin applies its own default (absent ≠ empty).
+    for builder, extra in (
+        (streams.synth_logs_cmd, {"field_cardinality": 1, "flush_interval_ms": 1}),
+        (streams.synth_traces_cmd, {"duration_nanos": 1}),
+    ):
+        cmd = builder(
+            "h:1", count=1, spacing_nanos=0, start_time_nanos=None, seed=0,
+            tenant_id=None, batch_size=1, connect_timeout_secs=1,
+            service_name=None, service_namespace=None, **extra,
+        )
+        assert "--service-name" not in cmd and "--service-namespace" not in cmd
 
 
 def test_stream_cmd_certstream_url_flag():

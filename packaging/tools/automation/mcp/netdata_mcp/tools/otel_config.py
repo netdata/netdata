@@ -38,14 +38,25 @@ _Endpoint = Annotated[
     str | None,
     Field(description="OTLP/gRPC listen address 'host:port' (e.g. '127.0.0.1:4317'). Omit to auto-assign a free loopback port."),
 ]
-_MaxFileSize = Annotated[str | None, Field(description="WAL rotation: max size per WAL file (e.g. '25MB', '1.5GB'). Small values force rotation.")]
-_MaxLogEntries = Annotated[int | None, Field(description="WAL rotation: max log entries per WAL file. Tiny values (e.g. 10) force multi-file splits for edge-case tests.")]
-_MaxFileDuration = Annotated[str | None, Field(description="WAL rotation: max time span per WAL file (e.g. '2 hours', '30m').")]
-_CrcEnabled = Annotated[bool | None, Field(description="WAL: compute per-frame CRC32 checksums.")]
-_CompressionEnabled = Annotated[bool | None, Field(description="WAL: LZ4-compress frame payloads.")]
-_MaxFiles = Annotated[int | None, Field(description="Index retention: max number of SFST index files to keep. Small values force eviction.")]
-_MaxTotalSize = Annotated[str | None, Field(description="Index retention: max total size of all index files (e.g. '1GB', '500MB').")]
-_CatalogRotationCount = Annotated[int | None, Field(description="Catalog rotation: number of index entries accumulated before a catalog file rotates and uploads. Small values (e.g. 2) force catalog rotation + upload over a small corpus.")]
+# Per-signal tuning knobs come in symmetric logs_*/traces_* pairs (one call sets
+# both signals; an omitted knob keeps that signal's stock default). Storage/auth
+# are global (below), so they are NOT signal-prefixed.
+_LogsMaxFileSize = Annotated[str | None, Field(description="logs WAL rotation: max size per WAL file (e.g. '25MB', '1.5GB'). Small values force rotation.")]
+_LogsMaxLogEntries = Annotated[int | None, Field(description="logs WAL rotation: max log entries per WAL file. Tiny values (e.g. 10) force multi-file splits for edge-case tests.")]
+_LogsMaxFileDuration = Annotated[str | None, Field(description="logs WAL rotation: max time span per WAL file (e.g. '2 hours', '30m').")]
+_LogsCrcEnabled = Annotated[bool | None, Field(description="logs WAL: compute per-frame CRC32 checksums.")]
+_LogsCompressionEnabled = Annotated[bool | None, Field(description="logs WAL: LZ4-compress frame payloads.")]
+_LogsMaxFiles = Annotated[int | None, Field(description="logs index retention: max number of SFST index files to keep. Small values force eviction.")]
+_LogsMaxTotalSize = Annotated[str | None, Field(description="logs index retention: max total size of all index files (e.g. '1GB', '500MB').")]
+_LogsCatalogRotationCount = Annotated[int | None, Field(description="logs catalog rotation: number of index entries accumulated before a catalog file rotates and uploads. Small values (e.g. 2) force catalog rotation + upload over a small corpus.")]
+_TracesMaxFileSize = Annotated[str | None, Field(description="traces WAL rotation: max size per span WAL file (e.g. '25MB', '1.5GB'). Small values force rotation.")]
+_TracesMaxLogEntries = Annotated[int | None, Field(description="traces WAL rotation: max spans per WAL file. Tiny values (e.g. 10) force multi-file splits so a small trace corpus seals without a restart.")]
+_TracesMaxFileDuration = Annotated[str | None, Field(description="traces WAL rotation: max time span per WAL file (e.g. '2 hours', '30m').")]
+_TracesCrcEnabled = Annotated[bool | None, Field(description="traces WAL: compute per-frame CRC32 checksums.")]
+_TracesCompressionEnabled = Annotated[bool | None, Field(description="traces WAL: LZ4-compress frame payloads.")]
+_TracesMaxFiles = Annotated[int | None, Field(description="traces index retention: max number of SFST index files to keep. Small values force eviction.")]
+_TracesMaxTotalSize = Annotated[str | None, Field(description="traces index retention: max total size of all index files (e.g. '1GB', '500MB').")]
+_TracesCatalogRotationCount = Annotated[int | None, Field(description="traces catalog rotation: number of index entries accumulated before a catalog file rotates and uploads. Small values (e.g. 2) force catalog rotation + upload over a small corpus.")]
 _StorageEnabled = Annotated[bool | None, Field(description="Remote object-storage upload of SFST + catalog files (default off). Enable to exercise the upload path and remote-confirmed eviction. With it off, the uploader is not even constructed.")]
 _StorageUri = Annotated[str | None, Field(description="opendal storage URI (e.g. 'fs:///abs/path', 's3://bucket/prefix'). Omit while storage is enabled to default to an isolated per-agent 'fs://' directory under the run dir.")]
 _JournalDir = Annotated[
@@ -63,25 +74,38 @@ def register(mcp: FastMCP) -> None:
             "config (it does not merge): each call, pass every knob you want set — an "
             "omitted knob reverts to the plugin default, not its prior value. The "
             "local wal/index/catalog dirs are always isolated under the agent's run "
-            "dir. Set storage_enabled=true (optionally storage_uri) to exercise the "
-            "remote upload + remote-confirmed eviction path; an omitted storage_uri "
-            "defaults to an isolated per-agent fs:// dir. Use the rotation/retention "
-            "knobs with small values to force multi-file / eviction edge cases over a "
-            "known corpus."
+            "dir. Tuning is PER SIGNAL: logs_* knobs tune the logs pipeline and "
+            "traces_* knobs tune the traces pipeline independently (one call sets "
+            "both). Storage is GLOBAL (not signal-prefixed; this tool exposes no "
+            "auth knob): set storage_enabled=true (optionally storage_uri) to "
+            "exercise the remote "
+            "upload + remote-confirmed eviction path for both signals; an omitted "
+            "storage_uri defaults to an isolated per-agent fs:// dir. Use the small "
+            "rotation/retention knobs to force multi-file / eviction edge cases over a "
+            "known corpus — set traces_* (e.g. traces_wal_max_log_entries=10) so a "
+            "small trace corpus seals without a restart."
         ),
     )
     async def netdata_agent_otel_config(
         ctx: Context,
         agent_id: _AgentId,
         otlp_endpoint: _Endpoint = None,
-        wal_max_file_size: _MaxFileSize = None,
-        wal_max_log_entries: _MaxLogEntries = None,
-        wal_max_file_duration: _MaxFileDuration = None,
-        wal_crc_enabled: _CrcEnabled = None,
-        wal_compression_enabled: _CompressionEnabled = None,
-        index_max_files: _MaxFiles = None,
-        index_max_total_size: _MaxTotalSize = None,
-        catalog_rotation_count: _CatalogRotationCount = None,
+        logs_wal_max_file_size: _LogsMaxFileSize = None,
+        logs_wal_max_log_entries: _LogsMaxLogEntries = None,
+        logs_wal_max_file_duration: _LogsMaxFileDuration = None,
+        logs_wal_crc_enabled: _LogsCrcEnabled = None,
+        logs_wal_compression_enabled: _LogsCompressionEnabled = None,
+        logs_index_max_files: _LogsMaxFiles = None,
+        logs_index_max_total_size: _LogsMaxTotalSize = None,
+        logs_catalog_rotation_count: _LogsCatalogRotationCount = None,
+        traces_wal_max_file_size: _TracesMaxFileSize = None,
+        traces_wal_max_log_entries: _TracesMaxLogEntries = None,
+        traces_wal_max_file_duration: _TracesMaxFileDuration = None,
+        traces_wal_crc_enabled: _TracesCrcEnabled = None,
+        traces_wal_compression_enabled: _TracesCompressionEnabled = None,
+        traces_index_max_files: _TracesMaxFiles = None,
+        traces_index_max_total_size: _TracesMaxTotalSize = None,
+        traces_catalog_rotation_count: _TracesCatalogRotationCount = None,
         storage_enabled: _StorageEnabled = None,
         storage_uri: _StorageUri = None,
         journal_dir: _JournalDir = None,
@@ -99,14 +123,22 @@ def register(mcp: FastMCP) -> None:
             )
         cfg = OtelConfig(
             otlp_endpoint=otlp_endpoint,
-            wal_max_file_size=wal_max_file_size,
-            wal_max_log_entries=wal_max_log_entries,
-            wal_max_file_duration=wal_max_file_duration,
-            wal_crc_enabled=wal_crc_enabled,
-            wal_compression_enabled=wal_compression_enabled,
-            index_max_files=index_max_files,
-            index_max_total_size=index_max_total_size,
-            catalog_rotation_count=catalog_rotation_count,
+            logs_wal_max_file_size=logs_wal_max_file_size,
+            logs_wal_max_log_entries=logs_wal_max_log_entries,
+            logs_wal_max_file_duration=logs_wal_max_file_duration,
+            logs_wal_crc_enabled=logs_wal_crc_enabled,
+            logs_wal_compression_enabled=logs_wal_compression_enabled,
+            logs_index_max_files=logs_index_max_files,
+            logs_index_max_total_size=logs_index_max_total_size,
+            logs_catalog_rotation_count=logs_catalog_rotation_count,
+            traces_wal_max_file_size=traces_wal_max_file_size,
+            traces_wal_max_log_entries=traces_wal_max_log_entries,
+            traces_wal_max_file_duration=traces_wal_max_file_duration,
+            traces_wal_crc_enabled=traces_wal_crc_enabled,
+            traces_wal_compression_enabled=traces_wal_compression_enabled,
+            traces_index_max_files=traces_index_max_files,
+            traces_index_max_total_size=traces_index_max_total_size,
+            traces_catalog_rotation_count=traces_catalog_rotation_count,
             storage_enabled=storage_enabled,
             storage_uri=storage_uri,
             journal_dir=journal_dir,

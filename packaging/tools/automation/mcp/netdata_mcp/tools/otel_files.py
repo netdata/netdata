@@ -59,7 +59,8 @@ def register(mcp: FastMCP) -> None:
             "status that is NOT visible on disk (a locally-evicted SFST can still be cataloged "
             "on the remote). This is a storage-inventory snapshot; to read log CONTENT use "
             "netdata_agent_otel_logs. Pair with netdata_agent_otel_config's small "
-            "rotation/retention thresholds + netdata_agent_otel_push to watch rotation, "
+            "rotation/retention thresholds + netdata_agent_otel_push_logs / "
+            "netdata_agent_otel_push_traces to watch rotation, "
             "eviction, and remote upload happen. Access-gated (SIGNED_ID) like otel-logs: "
             "needs NETDATA_CLOUD_TOKEN + a claimed agent, else returns HTTP 412."
         ),

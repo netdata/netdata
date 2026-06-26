@@ -2,7 +2,7 @@
 
 The live otel-streams sources (certstream / jetstream / github) are daemons —
 they never exit on their own — so they get a start/status/stop lifecycle (like a
-launched agent), unlike the one-shot `netdata_agent_otel_push`. One source-enum
+launched agent), unlike the one-shot `netdata_agent_otel_push_logs`. One source-enum
 trio, not a tool per source: the lifecycle is identical across them; only a few
 optional params differ, and those are rejected when they don't match the source.
 """
@@ -85,7 +85,8 @@ def register(mcp: FastMCP) -> None:
             "Start a continuous real-world OTLP source feeding a ready agent's otel "
             "plugin (certstream/jetstream/github). Returns a stream_id; the source runs "
             "until netdata_agent_otel_stream_stop. For a deterministic one-shot corpus "
-            "use netdata_agent_otel_push instead. First call also builds the source (cargo)."
+            "use netdata_agent_otel_push_logs / netdata_agent_otel_push_traces instead. "
+            "First call also builds the source (cargo)."
         ),
     )
     async def netdata_agent_otel_stream_start(

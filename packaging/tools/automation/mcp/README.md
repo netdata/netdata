@@ -120,8 +120,9 @@ A dedicated surface for iterating on the OTel-logs path against a ready agent:
 
 | Tool | What |
 |------|------|
-| `netdata_agent_otel_config(agent_id, …)` | Set otel-plugin knobs (WAL rotation, index retention, endpoint) applied on the next start. REPLACES prior config. |
-| `netdata_agent_otel_push(agent_id, count, …)` | One-shot: send a deterministic synthetic OTLP corpus (`otel-streams synth`) to the agent. `service_name`/`service_namespace` set the resource identity (one stream per batch; query by literal `service.name`/`service.namespace`). `service_name` is always emitted (queryable even when `""`); an omitted `service_namespace` emits no token (not queryable — reachable via `service.name`), while `service_namespace=""` emits a queryable empty value. |
+| `netdata_agent_otel_config(agent_id, …)` | Set otel-plugin knobs applied on the next start. REPLACES prior config. Tuning is per-signal: `logs_*` (WAL rotation, index retention, catalog) and `traces_*` knobs are independent; storage is global (unprefixed; no auth knob is exposed). |
+| `netdata_agent_otel_push_logs(agent_id, count, …)` | One-shot: send a deterministic synthetic OTLP LOG corpus (`otel-streams synth`) to the agent. `service_name`/`service_namespace` set the resource identity (one stream per batch; query by literal `service.name`/`service.namespace`). `service_name` is always emitted (queryable even when `""`); an omitted `service_namespace` emits no token (not queryable — reachable via `service.name`), while `service_namespace=""` emits a queryable empty value. |
+| `netdata_agent_otel_push_traces(agent_id, count, …)` | One-shot: send a deterministic synthetic OTLP TRACE corpus (`otel-streams synth-traces`) to the agent. Like the logs push but with `duration_nanos` (per-span duration), no `field_cardinality`, and a distinct default `service.name` (`otel-streams-synth-traces`). Pair with small `traces_*` config thresholds to seal the traces pipeline without an additional restart (the thresholds applied at the prior run_start make rotation automatic). |
 | `netdata_agent_otel_stream_{start,status,stop,list}(…)` | Run a live source (`source=certstream\|jetstream\|github`) as a daemon; `list` enumerates all streams. |
 | `netdata_agent_otel_logs(agent_id, …)` | Query the `otel-logs` function (typed params; mints a Cloud bearer when `NETDATA_CLOUD_TOKEN` is set). |
 | `netdata_agent_otel_files(agent_id, …)` | List the storage files the otel-ledger is tracking (WAL / SFST / catalog) per tenant, with sizes, time ranges, record counts, and the `rotated`/`uploaded`/`remote_cataloged`/`pending_deletion` flags not visible on disk. Inventory, not content (use `netdata_agent_otel_logs` for rows). Same SIGNED_ID gate (mints a bearer). |
@@ -132,8 +133,9 @@ A dedicated surface for iterating on the OTel-logs path against a ready agent:
   receiver, so no Cloud token is needed.
 - **otel_logs** is access-gated (`SIGNED_ID`): on a claimed agent with a Cloud
   token it auto-mints a bearer; otherwise it returns 412 with a hint.
-- Typical loop: `otel_config` (tiny thresholds) → `otel_push` → `otel_logs` to
-  assert rotation/retention over a known corpus.
+- Typical loop: `otel_config` (tiny per-signal thresholds) → `otel_push_logs` /
+  `otel_push_traces` → `otel_logs` / `otel_files` to assert rotation/retention
+  over a known corpus.
 
 ## Cloud claiming
 
@@ -310,7 +312,7 @@ netdata_mcp/
     otel_config.py # netdata_agent_otel_config
     otel_logs.py   # netdata_agent_otel_logs
     otel_files.py  # netdata_agent_otel_files (storage-file inventory)
-    otel_push.py   # netdata_agent_otel_push (one-shot synth)
+    otel_push.py   # netdata_agent_otel_push_{logs,traces} (one-shot synth)
     otel_stream.py # netdata_agent_otel_stream_{start,status,stop,list}
 ```
 

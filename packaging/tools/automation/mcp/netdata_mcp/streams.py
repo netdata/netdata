@@ -44,13 +44,13 @@ def crates_dir(worktree: str) -> str:
     return str(Path(worktree) / "src" / "crates")
 
 
-def synth_cmd(
+def synth_logs_cmd(
     otel_endpoint: str, *, count: int, field_cardinality: int, spacing_nanos: int,
     start_time_nanos: int | None, seed: int, tenant_id: str | None,
     batch_size: int, flush_interval_ms: int, connect_timeout_secs: int,
     service_name: str | None = None, service_namespace: str | None = None,
 ) -> list[str]:
-    """Argv for the one-shot synth generator."""
+    """Argv for the one-shot LOGS synth generator (`--bin synth`)."""
     cmd = [
         "cargo", "run", "--quiet", "-p", "otel-streams", "--bin", "synth", "--",
         "--otel-endpoint", f"http://{otel_endpoint}",
@@ -64,13 +64,59 @@ def synth_cmd(
     ]
     if start_time_nanos is not None:
         cmd += ["--start-time-nanos", str(start_time_nanos)]
+    # tenant_id keeps truthiness (not `is not None`): an empty X-Scope-OrgID is an
+    # invalid gRPC header value (tonic rejects it), so dropping "" is protective —
+    # unlike service identity, where present-but-empty is a valid, distinct value.
     if tenant_id:
         cmd += ["--tenant-id", tenant_id]
-    # service.name/namespace key the otel-ledger storage stream; omitted leaves
-    # synth's own defaults (name "otel-streams-synth", empty namespace).
-    if service_name:
+    # service.name/namespace key the otel-ledger storage stream. Gate on
+    # `is not None` (NOT truthiness) so an explicit "" is forwarded as
+    # `--service-name ""` — an absent attribute (omitted → synth's own default)
+    # differs from a present-but-empty one (queryable empty value), per the
+    # documented OTel semantics. Omitting leaves the bin's defaults.
+    if service_name is not None:
         cmd += ["--service-name", service_name]
-    if service_namespace:
+    if service_namespace is not None:
+        cmd += ["--service-namespace", service_namespace]
+    return cmd
+
+
+def synth_traces_cmd(
+    otel_endpoint: str, *, count: int, spacing_nanos: int, duration_nanos: int,
+    start_time_nanos: int | None, seed: int, tenant_id: str | None,
+    batch_size: int, connect_timeout_secs: int,
+    service_name: str | None = None, service_namespace: str | None = None,
+) -> list[str]:
+    """Argv for the one-shot TRACES synth generator (`--bin synth-traces`).
+
+    Mirrors :func:`synth_logs_cmd` for the shared transport/identity flags. The
+    traces signal has no `field_cardinality` (a logs concept) and adds
+    `duration_nanos` (per-span duration). It also has no `flush_interval_ms`:
+    synth-traces exports synchronously in `batch_size` chunks (no flush timer),
+    so the logs `Sender`'s flush knob does not apply.
+    """
+    cmd = [
+        "cargo", "run", "--quiet", "-p", "otel-streams", "--bin", "synth-traces", "--",
+        "--otel-endpoint", f"http://{otel_endpoint}",
+        "--count", str(count),
+        "--spacing-nanos", str(spacing_nanos),
+        "--duration-nanos", str(duration_nanos),
+        "--seed", str(seed),
+        "--batch-size", str(batch_size),
+        "--connect-timeout-secs", str(connect_timeout_secs),
+    ]
+    if start_time_nanos is not None:
+        cmd += ["--start-time-nanos", str(start_time_nanos)]
+    # tenant_id keeps truthiness (not `is not None`): an empty X-Scope-OrgID is an
+    # invalid gRPC header value (tonic rejects it), so dropping "" is protective —
+    # unlike service identity, where present-but-empty is a valid, distinct value.
+    if tenant_id:
+        cmd += ["--tenant-id", tenant_id]
+    # `is not None` (not truthiness): an explicit "" is forwarded so a
+    # present-but-empty identity differs from an absent one (see synth_logs_cmd).
+    if service_name is not None:
+        cmd += ["--service-name", service_name]
+    if service_namespace is not None:
         cmd += ["--service-namespace", service_namespace]
     return cmd
 
@@ -110,14 +156,14 @@ def stream_cmd(
 
 
 async def run_synth(worktree: str, cmd: list[str], *, timeout: int) -> tuple[int | None, str, str | None]:
-    """Run a one-shot synth ``cmd`` to completion in the worktree's crates dir.
-    Returns ``(returncode, log_tail, error)`` and does not raise on a timeout or
-    spawn failure. ``rc == 0`` is authoritative end-to-end success: the synth
-    binary ``bail!``s (non-zero) if any batch failed to export, so the caller
-    needn't second-guess a zero exit.
+    """Run a one-shot generator ``cmd`` (synth or synth-traces) to completion in
+    the worktree's crates dir. Returns ``(returncode, log_tail, error)`` and does
+    not raise on a timeout or spawn failure. ``rc == 0`` is authoritative
+    end-to-end success: both generator binaries ``bail!`` (non-zero) if any batch
+    failed to export, so the caller needn't second-guess a zero exit.
 
     On timeout — or on outer cancellation — the whole process group is killed so
-    the shielded task can't leave a cargo/synth child running unobserved.
+    the shielded task can't leave a cargo/generator child running unobserved.
     """
     buffer = LogBuffer()
     holder: dict[str, asyncio.subprocess.Process] = {}
@@ -132,7 +178,7 @@ async def run_synth(worktree: str, cmd: list[str], *, timeout: int) -> tuple[int
             await task  # rejoin the killed task; proc is gone (no-op) or reaped
         except BaseException:
             pass
-        return None, buffer.tail(20), f"synth timed out after {timeout}s (first run also builds it)"
+        return None, buffer.tail(20), f"generator timed out after {timeout}s (first run also builds it)"
     except asyncio.CancelledError:
         # Outer cancel (e.g. client disconnect on http transport): shield kept
         # the task — and its cargo/synth process group — alive, so tear it down
@@ -149,7 +195,7 @@ async def run_synth(worktree: str, cmd: list[str], *, timeout: int) -> tuple[int
             pass
         raise
     except Exception as exc:  # spawn failure (e.g. cargo not found)
-        return None, buffer.tail(20), f"failed to run synth: {exc!r}"
+        return None, buffer.tail(20), f"failed to run generator: {exc!r}"
     return rc, buffer.tail(20), None
 
 

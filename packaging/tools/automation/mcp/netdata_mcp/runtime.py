@@ -133,17 +133,80 @@ class OtelConfig:
     """
 
     otlp_endpoint: str | None = None          # endpoint.path; None → auto free loopback port
-    wal_max_file_size: str | None = None      # logs.wal.rotation.default.max_file_size
-    wal_max_log_entries: int | None = None    # logs.wal.rotation.default.max_log_entries
-    wal_max_file_duration: str | None = None  # logs.wal.rotation.default.max_file_duration
-    wal_crc_enabled: bool | None = None        # logs.wal.crc_enabled
-    wal_compression_enabled: bool | None = None  # logs.wal.compression_enabled
-    index_max_files: int | None = None         # logs.index.retention.default.max_files
-    index_max_total_size: str | None = None    # logs.index.retention.default.max_total_size
-    catalog_rotation_count: int | None = None  # logs.catalog.rotation_count; entries per catalog before it rotates+uploads
+    # Per-signal tuning (dirs are derived from base_dir, not set here). Each
+    # signal has an independent set; an omitted knob keeps the plugin's stock
+    # default for that signal. logs.* and traces.* are symmetric.
+    logs_wal_max_file_size: str | None = None      # logs.wal.rotation.default.max_file_size
+    logs_wal_max_log_entries: int | None = None    # logs.wal.rotation.default.max_log_entries
+    logs_wal_max_file_duration: str | None = None  # logs.wal.rotation.default.max_file_duration
+    logs_wal_crc_enabled: bool | None = None        # logs.wal.crc_enabled
+    logs_wal_compression_enabled: bool | None = None  # logs.wal.compression_enabled
+    logs_index_max_files: int | None = None         # logs.index.retention.default.max_files
+    logs_index_max_total_size: str | None = None    # logs.index.retention.default.max_total_size
+    logs_catalog_rotation_count: int | None = None  # logs.catalog.rotation_count; entries per catalog before it rotates+uploads
+    traces_wal_max_file_size: str | None = None      # traces.wal.rotation.default.max_file_size
+    traces_wal_max_log_entries: int | None = None    # traces.wal.rotation.default.max_log_entries
+    traces_wal_max_file_duration: str | None = None  # traces.wal.rotation.default.max_file_duration
+    traces_wal_crc_enabled: bool | None = None        # traces.wal.crc_enabled
+    traces_wal_compression_enabled: bool | None = None  # traces.wal.compression_enabled
+    traces_index_max_files: int | None = None         # traces.index.retention.default.max_files
+    traces_index_max_total_size: str | None = None    # traces.index.retention.default.max_total_size
+    traces_catalog_rotation_count: int | None = None  # traces.catalog.rotation_count; entries per catalog before it rotates+uploads
     storage_enabled: bool | None = None        # storage.enabled (GLOBAL); remote object-storage upload of SFST + catalog files
     storage_uri: str | None = None             # storage.uri (GLOBAL); opendal URI (default: per-agent fs:// dir under the run dir)
     journal_dir: str | None = None             # logs.journal_dir; former-plugin journal files for the read-only legacy-otel-logs viewer
+
+
+def _signal_tuning(
+    *,
+    wal_crc_enabled: bool | None,
+    wal_compression_enabled: bool | None,
+    wal_max_file_size: str | None,
+    wal_max_log_entries: int | None,
+    wal_max_file_duration: str | None,
+    index_max_files: int | None,
+    index_max_total_size: str | None,
+    catalog_rotation_count: int | None,
+) -> dict:
+    """Build one signal's ``{wal, index, catalog}`` tuning sub-document from the
+    caller-set knobs. Returns ``{}`` when nothing was set (the plugin then keeps
+    its stock per-signal defaults). Signal-neutral: logs and traces share it.
+    """
+    wal: dict = {}
+    if wal_crc_enabled is not None:
+        wal["crc_enabled"] = wal_crc_enabled
+    if wal_compression_enabled is not None:
+        wal["compression_enabled"] = wal_compression_enabled
+    rotation = {
+        k: v
+        for k, v in (
+            ("max_file_size", wal_max_file_size),
+            ("max_log_entries", wal_max_log_entries),
+            ("max_file_duration", wal_max_file_duration),
+        )
+        if v is not None
+    }
+    if rotation:
+        wal["rotation"] = {"default": rotation}
+    index: dict = {}
+    retention = {
+        k: v
+        for k, v in (
+            ("max_files", index_max_files),
+            ("max_total_size", index_max_total_size),
+        )
+        if v is not None
+    }
+    if retention:
+        index["retention"] = {"default": retention}
+    out: dict = {}
+    if wal:
+        out["wal"] = wal
+    if index:
+        out["index"] = index
+    if catalog_rotation_count is not None:
+        out["catalog"] = {"rotation_count": catalog_rotation_count}
+    return out
 
 
 def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str) -> dict:
@@ -157,44 +220,29 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str) -> dict:
     """
     base_dir = str(rd / "lib" / "otel")
 
-    # Per-signal tuning for logs (dirs are derived from base_dir, not set here).
-    wal: dict = {}
-    if cfg.wal_crc_enabled is not None:
-        wal["crc_enabled"] = cfg.wal_crc_enabled
-    if cfg.wal_compression_enabled is not None:
-        wal["compression_enabled"] = cfg.wal_compression_enabled
-    rotation = {
-        k: v
-        for k, v in (
-            ("max_file_size", cfg.wal_max_file_size),
-            ("max_log_entries", cfg.wal_max_log_entries),
-            ("max_file_duration", cfg.wal_max_file_duration),
-        )
-        if v is not None
-    }
-    if rotation:
-        wal["rotation"] = {"default": rotation}
-    index: dict = {}
-    retention = {
-        k: v
-        for k, v in (
-            ("max_files", cfg.index_max_files),
-            ("max_total_size", cfg.index_max_total_size),
-        )
-        if v is not None
-    }
-    if retention:
-        index["retention"] = {"default": retention}
-    catalog: dict = {}
-    if cfg.catalog_rotation_count is not None:
-        catalog["rotation_count"] = cfg.catalog_rotation_count
-    logs: dict = {}
-    if wal:
-        logs["wal"] = wal
-    if index:
-        logs["index"] = index
-    if catalog:
-        logs["catalog"] = catalog
+    # Per-signal tuning (dirs are derived from base_dir, not set here). logs and
+    # traces are symmetric and independent; each emits only the knobs the caller
+    # set, leaving the plugin's stock per-signal defaults for the rest.
+    logs = _signal_tuning(
+        wal_crc_enabled=cfg.logs_wal_crc_enabled,
+        wal_compression_enabled=cfg.logs_wal_compression_enabled,
+        wal_max_file_size=cfg.logs_wal_max_file_size,
+        wal_max_log_entries=cfg.logs_wal_max_log_entries,
+        wal_max_file_duration=cfg.logs_wal_max_file_duration,
+        index_max_files=cfg.logs_index_max_files,
+        index_max_total_size=cfg.logs_index_max_total_size,
+        catalog_rotation_count=cfg.logs_catalog_rotation_count,
+    )
+    traces = _signal_tuning(
+        wal_crc_enabled=cfg.traces_wal_crc_enabled,
+        wal_compression_enabled=cfg.traces_wal_compression_enabled,
+        wal_max_file_size=cfg.traces_wal_max_file_size,
+        wal_max_log_entries=cfg.traces_wal_max_log_entries,
+        wal_max_file_duration=cfg.traces_wal_max_file_duration,
+        index_max_files=cfg.traces_index_max_files,
+        index_max_total_size=cfg.traces_index_max_total_size,
+        catalog_rotation_count=cfg.traces_catalog_rotation_count,
+    )
 
     # Remote object-storage upload is GLOBAL (one switch + backend for the
     # plugin). When enabled without an explicit URI, default to a per-agent
@@ -221,6 +269,8 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str) -> dict:
         doc["storage"] = storage
     if logs:
         doc["logs"] = logs
+    if traces:
+        doc["traces"] = traces
     return doc
 
 

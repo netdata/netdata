@@ -121,9 +121,14 @@ configure → feed (synthetic or live) → query — plus one hard constraint a 
 reader cannot infer from the code:
 
 - **Run-time otel config (`netdata_agent_otel_config`).** Sets typed otel knobs
-  (OTLP endpoint, WAL `max_file_size`/`max_log_entries`/`max_file_duration`,
-  CRC/compression, index `max_files`/`max_total_size`, and `journal_dir`) on a
-  declared agent; applied on the next `netdata_run_start`. The runtime writes
+  on a declared agent; applied on the next `netdata_run_start`. Tuning is
+  **per-signal**: `logs_*` and `traces_*` knob pairs (WAL
+  `max_file_size`/`max_log_entries`/`max_file_duration`, CRC/compression, index
+  `max_files`/`max_total_size`, catalog `rotation_count`) configure the two
+  pipelines independently in one call — an omitted knob keeps that signal's stock
+  default. `storage_enabled`/`storage_uri` and the OTLP endpoint are **global**
+  (unprefixed), mirroring the plugin's global storage + per-signal tuning model;
+  `journal_dir` is logs-only (below). The runtime writes
   them to `<run_dir>/etc/otel.yaml` and **pins `[directories] config` to
   `<run_dir>/etc`** so the otel plugin reads exactly that file. Only set fields
   are emitted; the rest take plugin defaults. The OTLP endpoint is an
@@ -141,14 +146,19 @@ reader cannot infer from the code:
     probe). A future agent-side tightening that adds `deny_unknown_fields` to the
     `logs` override would make every MCP-launched agent fail to parse its user
     `otel.yaml`; keep the `logs` override permissive, or stop emitting this key.
-- **Synthetic push (`netdata_agent_otel_push` → `otel-streams` `synth`).**
-  Generates a deterministic batch of OTLP `LogRecord`s (monotonic timestamps;
-  cycled severity as low-card `level`; `host`/`code` over `--field-cardinality`
-  as mid-card; unique `seq` as high-card) and sends them through the **same
-  production `Sender` / `build_export_request`** the live sources use.
-  Reproducible by params (no RNG, no clock). The MCP tool is **one-shot,
-  synchronous**: it resolves the agent's `otlp_endpoint`, runs synth to
-  completion, and returns records-sent / success / log tail.
+- **Synthetic push (per signal).** Two one-shot tools, one per signal:
+  - `netdata_agent_otel_push_logs` → `otel-streams` `synth`. Generates a
+    deterministic batch of OTLP `LogRecord`s (monotonic timestamps; cycled
+    severity as low-card `level`; `host`/`code` over `--field-cardinality` as
+    mid-card; unique `seq` as high-card).
+  - `netdata_agent_otel_push_traces` → `otel-streams` `synth-traces`. Generates a
+    deterministic batch of OTLP spans; carries `duration_nanos` (per-span
+    duration) instead of `field_cardinality`. Pair with small `traces_*` config
+    thresholds to rotate + seal + upload the traces pipeline **without a restart**.
+  Both send through the **same production `Sender` / `build_export_request`** the
+  live sources use, are reproducible by params (no RNG, no clock), and are
+  **one-shot, synchronous**: resolve the agent's `otlp_endpoint`, run the
+  generator to completion, return records-sent / success / log tail.
   - **Service identity (`service_name` / `service_namespace`).** The push sets
     the OTLP resource attributes `service.name` (default `otel-streams-synth`)
     and `service.namespace`. otel-ledger keys a storage **stream** on

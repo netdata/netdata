@@ -134,9 +134,9 @@ def test_generate_runtime_otel_emits_only_set_knobs(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
     cfg = runtime.OtelConfig(
         otlp_endpoint="127.0.0.1:4317",
-        wal_max_log_entries=10,
-        index_max_files=2,
-        wal_crc_enabled=False,
+        logs_wal_max_log_entries=10,
+        logs_index_max_files=2,
+        logs_wal_crc_enabled=False,
     )
     rd, _conf, otlp = runtime.generate_runtime("agent-k", otel=cfg)
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
@@ -151,6 +151,39 @@ def test_generate_runtime_otel_emits_only_set_knobs(tmp_path, monkeypatch):
     # untouched knobs stay out
     assert "max_file_size" not in doc["logs"]["wal"]["rotation"]["default"]
     assert "compression_enabled" not in doc["logs"]["wal"]
+    # only logs was tuned → no traces section
+    assert "traces" not in doc
+
+
+def test_generate_runtime_otel_tunes_traces_only(tmp_path, monkeypatch):
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    # Mirror of the logs-only test: tuning only traces emits a traces section and
+    # NO logs section (no logs knobs, no journal_dir) — proves the symmetry.
+    cfg = runtime.OtelConfig(traces_wal_max_log_entries=5, traces_index_max_files=1)
+    rd, _conf, _otlp = runtime.generate_runtime("agent-traces-only", otel=cfg)
+    doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
+    assert doc["traces"]["wal"]["rotation"]["default"] == {"max_log_entries": 5}
+    assert doc["traces"]["index"]["retention"]["default"] == {"max_files": 1}
+    assert "logs" not in doc
+
+
+def test_generate_runtime_otel_tunes_signals_independently(tmp_path, monkeypatch):
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    # logs and traces tuned independently in one config; each lands in its own
+    # section, neither leaks into the other.
+    cfg = runtime.OtelConfig(
+        logs_wal_max_log_entries=20,
+        traces_wal_max_log_entries=10,
+        traces_catalog_rotation_count=3,
+    )
+    rd, _conf, _otlp = runtime.generate_runtime("agent-sig", otel=cfg)
+    doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
+    assert doc["logs"]["wal"]["rotation"]["default"] == {"max_log_entries": 20}
+    assert "catalog" not in doc["logs"]
+    assert doc["traces"]["wal"]["rotation"]["default"] == {"max_log_entries": 10}
+    assert doc["traces"]["catalog"] == {"rotation_count": 3}
+    # storage/auth are global, not per-signal — neither section carries them
+    assert "storage" not in doc["logs"] and "storage" not in doc["traces"]
 
 
 def test_generate_runtime_otel_omits_dirs_and_storage_by_default(tmp_path, monkeypatch):
@@ -166,14 +199,14 @@ def test_generate_runtime_otel_omits_dirs_and_storage_by_default(tmp_path, monke
 
 def test_generate_runtime_otel_emits_catalog_tuning_without_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
-    rd, _conf, _otlp = runtime.generate_runtime("agent-cat2", otel=runtime.OtelConfig(catalog_rotation_count=2))
+    rd, _conf, _otlp = runtime.generate_runtime("agent-cat2", otel=runtime.OtelConfig(logs_catalog_rotation_count=2))
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
     assert doc["logs"]["catalog"] == {"rotation_count": 2}
 
 
 def test_generate_runtime_otel_enables_global_storage_with_default_fs_uri(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
-    cfg = runtime.OtelConfig(storage_enabled=True, catalog_rotation_count=2)
+    cfg = runtime.OtelConfig(storage_enabled=True, logs_catalog_rotation_count=2)
     rd, _conf, _otlp = runtime.generate_runtime("agent-store", otel=cfg)
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
     # storage is GLOBAL (top-level), not nested under logs
