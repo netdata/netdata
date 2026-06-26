@@ -689,20 +689,23 @@ static void aclk_synchronization_event_loop(void *arg)
                 worker_is_busy(opcode);
 
             // pending_queries is an accounting alias for the number of queries held in
-            // aclk_query_execute->JudyL. If it ever drifts above the real queue length, the
-            // NOOP -> ACLK_QUERY_EXECUTE rewrite below fires every iteration with nothing to
-            // drain and the inner UV_RUN_NOWAIT loop never blocks -> a permanent, silent,
-            // one-core 100% CPU spin that cannot self-recover. Reconcile the alias against the
-            // Judy array (the source of truth) before it can gate the rewrite, so any such
-            // drift heals immediately instead of becoming a lockup. The field trigger is
-            // unproven (suspected Judy/memory corruption on some runtimes); log it if seen.
-            if (opcode == ACLK_DATABASE_NOOP && pending_queries) {
+            // aclk_query_execute->JudyL. Drift in EITHER direction is harmful:
+            //  - too high: the NOOP -> ACLK_QUERY_EXECUTE rewrite below fires every iteration
+            //    with nothing to drain and the inner UV_RUN_NOWAIT loop never blocks -> a
+            //    silent one-core 100% CPU spin that cannot self-recover;
+            //  - too low (e.g. 0 while the queue still holds work): the rewrite never fires and
+            //    those queries stall until an unrelated enqueue happens to nudge execution.
+            // Reconcile the alias against the Judy array (the source of truth) on every idle
+            // pass so drift heals immediately instead of becoming a lockup or a stalled queue.
+            // The field trigger is unproven (suspected Judy/memory corruption on some
+            // runtimes); log it if seen.
+            if (opcode == ACLK_DATABASE_NOOP) {
                 size_t queued = (size_t)JudyLCount(aclk_query_execute->JudyL, 0, -1, PJE0);
                 if (unlikely(queued != pending_queries)) {
                     nd_log_limit_static_global_var(erl, 1, 0);
                     nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
                                  "ACLK: pending query counter (%zu) disagrees with the queued-query count (%zu); "
-                                 "reconciling to prevent a CPU spin (possible memory corruption)",
+                                 "reconciling to prevent a CPU spin or a stalled queue (possible memory corruption)",
                                  pending_queries, queued);
                     pending_queries = queued;
                 }
