@@ -170,7 +170,27 @@ int inicfg_load(struct config *root, char *filename, int overwrite_used, const c
 
     char buffer[CONFIG_FILE_LINE_MAX + 1], *s;
 
-    if(!filename) filename = CONFIG_DIR "/" CONFIG_FILENAME;
+#if defined(OS_WINDOWS)
+    // netdata_configured_user_config_dir is in POSIX/MSYS2 form (/c/...) on Windows.
+    // Convert to C:/... before fopen() because UCRT64's CRT has no POSIX path layer.
+    char win_config_path[FILENAME_MAX + 1];
+#endif
+
+    if(!filename) {
+#if defined(OS_WINDOWS)
+        const char *d = netdata_configured_user_config_dir;
+        if (isalpha((unsigned char)d[1]) && d[2] == '/') {
+            win_config_path[0] = (char)toupper((unsigned char)d[1]);
+            win_config_path[1] = ':';
+            snprintfz(win_config_path + 2, FILENAME_MAX - 2, "%s/" CONFIG_FILENAME, d + 2);
+        } else {
+            snprintfz(win_config_path, FILENAME_MAX, "%s/" CONFIG_FILENAME, d);
+        }
+        filename = win_config_path;
+#else
+        filename = CONFIG_DIR "/" CONFIG_FILENAME;
+#endif
+    }
 
     netdata_log_debug(D_CONFIG, "CONFIG: opening config file '%s'", filename);
 
