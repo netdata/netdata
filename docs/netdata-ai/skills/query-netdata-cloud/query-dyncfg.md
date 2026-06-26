@@ -330,5 +330,5 @@ etc.). Treat raw responses as production-sensitive:
 - Direct working output to `<repo>/.local/audits/...` (gitignored).
 - Never paste raw `get` / `userconfig` payloads into committed
   files.
-- See `<repo>/.agents/sow/specs/sensitive-data-discipline.md` for
+- See `<repo>/.agents/sensitive-data-discipline.md` for
   the full rule.

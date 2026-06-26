@@ -21,7 +21,7 @@ source files for evidence.
   `src/go/plugin/go.d/docs/migrate-v1-to-v2.md`
 - Runtime/chart lifecycle: `src/go/plugin/framework/chartengine/README.md`
 - Template format: `src/go/plugin/framework/charttpl/README.md`
-- Host scopes/vnodes: `.agents/sow/specs/go-v2-host-scope.md`
+- Host scopes/vnodes: `.agents/skills/project-writing-go-modules-framework-v2/go-v2-host-scope.md`
 - Primary modern example: `src/go/plugin/go.d/collector/cato_networks/`.
   Use focused pieces from it, not the whole collector shape.
 - Older V2 collectors can still be useful for local patterns, but review them

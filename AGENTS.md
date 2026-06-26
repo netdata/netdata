@@ -361,20 +361,27 @@ Project SOW status: initialized
 
 This project uses a local Statement of Work system.
 
-SOWs are branch-local working memory, not product artifacts. During active work,
-including draft PR and ready-for-review takeover work, a SOW may live on the
-feature branch so it preserves the root-cause model, decisions, evidence, and
-validation for PR takeover. Commit the active SOW on the feature branch when
-takeover or handoff is expected. When no takeover is expected, keeping the
-active SOW local and uncommitted is acceptable, but the SOW still MUST be used
-as working memory. Before merge, complete the SOW, transfer durable knowledge,
-and remove the active SOW file from git / the branch head. Removing it from git
-MUST NOT delete the local checkout copy unless the user explicitly asks to
-discard that local handoff artifact. `master` and the final merge head MUST
-contain no SOW working files; durable memory belongs in `.agents/sow/specs/`, project
-skills, docs, code, and tests.
+SOWs and specs are **local-only working memory, never committed**:
 
-The SOW system is self-contained in this repository. Normal SOW work must not depend on `~/.agents`, `~/.AGENTS.md`, global skills, global templates, or global scripts. Use this `AGENTS.md`, the branch-local SOW, project-local specs, and project-local skills.
+- SOW working files live under `.agents/sow/q/**` (the queue tree) and MUST NOT
+  be committed to any branch.
+- Specs live under `.agents/sow/specs/**` and are likewise local-only and
+  gitignored. They may be re-introduced to git later, reorganized, as a
+  deliberate decision; until then treat them as local memory.
+- Only the SOW framework files are committed and shared via git:
+  `.agents/sow/SOW.template.md`, `.agents/sow/audit.sh`,
+  `.agents/sow/scan-sensitive.sh`, `.agents/sow/worktree-link.sh`.
+- `.gitignore` enforces this: `/.agents/sow/q` and `/.agents/sow/specs` are
+  ignored; the framework files are tracked normally.
+- Durable knowledge that must survive a SOW belongs in project skills, docs,
+  code, and tests (and, once reorganized, specs) — not in the SOW body.
+- Worktree sharing: SOW working memory is per-developer, not per-worktree. Run
+  `.agents/sow/worktree-link.sh` after creating a git worktree (or after
+  updating an old checkout to this model) to create the queues and symlink
+  `.agents/sow/q`, `.agents/sow/specs`, `.local`, and `.env` to the origin
+  checkout. See "### SOW Locations And Naming".
+
+The SOW system is self-contained in this repository. Normal SOW work must not depend on `~/.agents`, `~/.AGENTS.md`, global skills, global templates, or global scripts. Use this `AGENTS.md`, the local SOW, project-local specs, and project-local skills.
 
 ### Roles
 
@@ -385,8 +392,8 @@ The SOW system is self-contained in this repository. Normal SOW work must not de
 
 Before non-trivial work:
 
-1. Read the current branch's SOW under `.agents/sow/active/` if one exists. Since SOWs are branch-local, discover other in-flight work through open PRs and issues, not through `master`.
-2. Read relevant specs under `.agents/sow/specs/`.
+1. Read the active SOWs under `.agents/sow/q/` (the local-only queue tree) if any exist. SOWs are local working memory; discover other in-flight work through open PRs and issues, not through `master`.
+2. Read relevant specs under `.agents/sow/specs/` (local-only memory).
 3. Inspect `.agents/skills/*/SKILL.md` if any exist, and load every runtime project skill whose trigger matches the work.
 4. Inspect legacy runtime skills listed below when the user request matches their frontmatter trigger.
 5. Inspect code, docs, tests, and existing project instructions as ground truth.
@@ -395,6 +402,17 @@ Before non-trivial work:
 ### Git Worktrees
 
 Assistants must not create git worktrees on their own. Create a git worktree only when the user explicitly asks for it or approves it.
+
+After a git worktree is created — or after an old checkout is updated to the
+local-only SOW model — run `.agents/sow/worktree-link.sh`. It builds the SOW
+queues and symlinks `.agents/sow/q`, `.agents/sow/specs`, `.local`, and `.env`
+to the origin checkout, so SOW working memory is shared per-developer rather than
+re-created per worktree. (Exception: a worktree that already has its own real
+`.env` keeps it and is not relinked, so per-worktree secrets are never
+overwritten.) The script is idempotent, never loses data on a name collision,
+re-points a symlink whose origin moved, and refuses to run in a worktree whose
+origin checkout is not yet on this model (it prints how to update the origin
+first).
 
 ### Sensitive Data In Durable Artifacts
 
@@ -457,7 +475,7 @@ Resolve `owner/repo` from the repository remote, record the checked commit, and 
 
 ### Pre-Implementation Gate
 
-Implementation must not begin until the branch-local SOW contains a concrete `## Pre-Implementation Gate` section with `Status: ready` or `Status: in-progress`. Before changing implementation files, or before continuing implementation in an existing SOW that lacks this section, fill the gate. Reaching `Status: ready` additionally requires the "Plan before non-trivial work" Human approval gate (explicit user approval of the goal and plan).
+Implementation must not begin until the local SOW contains a concrete `## Pre-Implementation Gate` section with `Status: ready` or `Status: in-progress`. Before changing implementation files, or before continuing implementation in an existing SOW that lacks this section, fill the gate. Reaching `Status: ready` additionally requires the "Plan before non-trivial work" Human approval gate (explicit user approval of the goal and plan).
 
 The gate must record the problem/root-cause model, evidence reviewed, affected contracts and surfaces, the clean-end-state target (its removed-redundant and excluded-coupled items, and the reference search where a path or contract is replaced), existing patterns to reuse, risk and blast radius, sensitive data handling plan, implementation plan, validation plan, artifact impact plan, and open decisions. The sensitive data plan must cover SOWs, specs, documentation, project skills, agent instructions, and code comments. Generic placeholders such as `TBD`, `N/A`, or "to be checked later" are invalid unless the SOW explains why the item truly does not apply. If the gate exposes an unknown that cannot be resolved by investigation, stop and ask the user before implementation.
 
@@ -491,21 +509,26 @@ When unsure, treat the work as non-trivial.
 
 ### SOW Locations And Naming
 
-- Active branch-local SOWs: `.agents/sow/active/`
-- Specs: `.agents/sow/specs/`
-- Template for new SOWs: `.agents/sow/SOW.template.md`
-- Local audit: `.agents/sow/audit.sh`
+- SOW queues (local-only): `.agents/sow/q/` with sub-queues `pending/`,
+  `current/`, `active/`, `done/`. Move a SOW file between these as its state
+  changes; the whole `q/` tree is gitignored.
+- Specs (local-only): `.agents/sow/specs/`
+- Template for new SOWs (committed): `.agents/sow/SOW.template.md`
+- Local audit (committed): `.agents/sow/audit.sh`
+- Worktree/queue setup (committed): `.agents/sow/worktree-link.sh`
 
-There is no `done/` directory and no committed pending queue. On `master`,
-`.agents/sow/active/` is empty except for `.gitkeep`; real SOW files exist only
-on feature branches. Feature branches and PRs may commit active SOW files when
-takeover or handoff is expected, but active SOW files are removed from git before
-merge. They MUST remain available in the local checkout for handoff/debugging
-unless the user explicitly approves deleting the local file contents.
+SOW working files and specs are never committed. `.gitignore` ignores
+`/.agents/sow/q` and `/.agents/sow/specs`; only the framework files above are
+tracked. The queue directories are created locally by
+`.agents/sow/worktree-link.sh`, not by committed `.gitkeep` markers, so there is
+no committed SOW layout to preserve.
+
+Worktree model: SOW working memory is shared per-developer, not per-worktree.
+In a linked worktree, `.agents/sow/worktree-link.sh` symlinks `.agents/sow/q`,
+`.agents/sow/specs`, `.local`, and `.env` to the origin checkout, and migrates
+any pre-existing top-level queue dirs into `q/` without data loss.
 
 Create new SOW files from `.agents/sow/SOW.template.md`. The template is project-local and may be customized for this repository.
-
-Empty SOW directories must contain `.gitkeep` or `.keep` so the committed repository preserves the full SOW layout after clone/checkout.
 
 ### Local SOW Parking
 
@@ -528,10 +551,9 @@ Deferred work has two valid tracking paths:
 - public or team-visible follow-up: GitHub issue;
 - private or local follow-up: `<repo-root>/.local/sow/`.
 
-Active implementation work still MUST use `.agents/sow/active/`. Active SOW
-files MAY be committed for takeover or handoff and still MUST be removed from
-git before merge. That is a git/index/branch-head operation, not permission to
-delete the local working copy.
+Active implementation work still MUST use the `.agents/sow/q/` queues. SOW
+working files are never committed (the `q/` tree is gitignored), so there is no
+commit-for-handoff and no remove-before-merge step.
 
 Destructive local deletion guard:
 
@@ -539,12 +561,10 @@ Destructive local deletion guard:
   operations, or any equivalent filesystem operation to remove a SOW working
   file from the local checkout unless the user explicitly asks to discard the
   local SOW.
-- To clear a merge guard for a tracked SOW while preserving handoff memory, use
-  a git/index operation such as `git rm --cached <path>` and leave the local file
-  available in the checkout.
-- If keeping the untracked local SOW would make future staging risky, ask the
-  user whether to park a copy under `.local/sow/`; do not silently move or delete
-  it.
+- SOW working files are local-only and gitignored, so there is no tracked SOW to
+  untrack and no merge guard to clear.
+- Moving a SOW between `.agents/sow/q/` sub-queues (for example `current/` →
+  `done/`) is normal lifecycle, not deletion.
 
 Filename:
 
@@ -561,9 +581,10 @@ SOW state lives in the file's `Status:` field:
 - `ready` - the Pre-Implementation Gate is complete and, where the goal-approval round ("Plan before non-trivial work") applies, the user has approved the goal and plan; implementation can start.
 - `in-progress` - implementation is underway.
 - `paused` - work is intentionally stopped but may resume on the branch.
-- `completed` - work is validated and durable memory has been transferred. This
-  is a transient state before removing the SOW file from git. Keep the local file
-  for handoff unless the user explicitly asks to delete it.
+- `completed` - work is validated and durable memory has been transferred. The
+  SOW file is local-only and never committed; it MAY be moved to
+  `.agents/sow/q/done/` as local history or deleted locally at the user's
+  request. Never delete it without the user asking.
 
 ### SOW Completion And Merge
 
@@ -571,37 +592,35 @@ The successful terminal SOW status is `completed`.
 
 When a SOW's work is ready to merge:
 
-1. Finish implementation, docs, specs, skills, validation, and follow-up mapping.
-2. Transfer all durable knowledge into `.agents/sow/specs/`, project skills, docs, code, and tests. After this step, the SOW body MUST hold nothing durable that is not captured elsewhere.
+1. Finish implementation, docs, skills, validation, and follow-up mapping.
+2. Transfer all durable knowledge into project skills, docs, code, and tests
+   (and specs once specs are re-introduced to git). After this step, the SOW
+   body MUST hold nothing durable that is not captured elsewhere.
 3. Update the SOW to `Status: completed`.
-4. Remove the SOW working file from git before merge, while preserving the local
-   checkout copy unless the user explicitly asks to delete it. Use git/index
-   operations such as `git rm --cached <path>` for a tracked SOW when the local
-   handoff file should remain.
 
-Draft and ready-for-review PRs MAY temporarily contain
-`.agents/sow/active/SOW-*.md` files when takeover or handoff is expected. The
-SOW CI job still rejects committed active SOW files; that red check is an
-intentional merge guard, not a sign that handoff or takeover is forbidden. The
-branch HEAD that merges MUST contain no `.agents/sow/active/SOW-*.md` file.
-Clearing that merge guard MUST NOT be done by destructively deleting the local
-SOW content unless the user explicitly approves losing the local handoff file.
+SOW working files are never committed (they live under the gitignored
+`.agents/sow/q/`), so there is no "remove SOW from git before merge" step and no
+CI merge guard to clear. A completed SOW MAY stay in `.agents/sow/q/done/` as
+local history or be deleted locally at the user's discretion — never delete a
+local SOW working file without the user's request (see the deletion guard above).
 
 ### Enforcement
 
 The SOW system is enforced by local audit tooling and CI:
 
-- `.agents/sow/audit.sh` is the local consistency audit for SOW rules, specs,
-  references, and sensitive-data scanning.
+- `.agents/sow/audit.sh` is the local consistency audit for SOW rules, the
+  local-only queue/spec layout, framework files, and sensitive-data scanning.
 - `.agents/sow/scan-sensitive.sh` is the shared sensitive-data scanner used by
   local audit and CI.
-- `.github/workflows/sow.yml` rejects pull requests that contain branch-local
-  SOW working files under `.agents/sow/active/SOW-*.md` or legacy SOW working
-  files under `.agents/sow/{pending,current,done}/SOW-*.md`. This failure is
-  expected when an active SOW is intentionally committed for takeover or
-  handoff; it MUST be cleared before merge.
-- The same workflow scans changed SOW, spec, instruction, and cross-tool
-  bridge files for raw sensitive data.
+- `.agents/sow/worktree-link.sh` builds the local queues and links a worktree's
+  SOW working memory to its origin checkout.
+- `.github/workflows/sow.yml` rejects pull requests that commit SOW working
+  files or specs — anything under `.agents/sow/q/**`, `.agents/sow/specs/**`, or
+  a stray `.agents/sow/{active,pending,current,done}/SOW-*.md`. These paths are
+  local-only and gitignored; a hit means the file was force-added and MUST be
+  removed before merge.
+- The same workflow scans changed instruction, skill, and framework files for
+  raw sensitive data.
 
 These checks are guards, not substitutes for the SOW Validation Gate. The
 assistant still owns transferring durable knowledge out of the SOW before
@@ -655,7 +674,7 @@ original claimed outcome is no longer true.
 Because completed SOWs are not retained on `master`, a regression is handled as
 new work:
 
-1. Open a new branch-local SOW under `.agents/sow/active/`.
+1. Open a new local SOW under `.agents/sow/q/active/`.
 2. In `## Requirements`, link the prior work: `Regresses: PR #NNNNN` and cite
    any known commit, spec, issue, or test evidence.
 3. Run the normal Pre-Implementation Gate and Validation for the new SOW.
@@ -676,8 +695,8 @@ A SOW cannot be completed until Validation records:
 - reviewer findings and how they were handled;
 - same-failure search results;
 - artifact maintenance gate for `AGENTS.md`, runtime project skills, specs, end-user/operator docs, end-user/operator skills, and SOW lifecycle;
-- SOW working file removed from git before merge while preserving any needed
-  local handoff copy;
+- local-only SOW layout respected: no SOW working file or spec was committed
+  (they stay under the gitignored `.agents/sow/q/` and `.agents/sow/specs/`);
 - spec update or specific reason no spec update was needed;
 - project skill update or specific reason no skill update was needed;
 - end-user/operator docs update or evidence-backed reason none were affected;
@@ -696,7 +715,7 @@ Every SOW close must explicitly record whether each durable artifact class was u
 - Specs - `.agents/sow/specs/` for WHAT the project does.
 - End-user/operator docs - README, docs site, runbooks, published guides, help text, or other human-facing documentation.
 - End-user/operator skills - output/reference skills copied or consumed outside normal repo work.
-- SOW lifecycle - branch-local active SOW, durable memory transfer, SOW deletion before merge, deferred work tracked as GitHub issues, and regressions handled as new linked SOWs.
+- SOW lifecycle - local-only SOW under `.agents/sow/q/` (never committed), durable memory transfer, deferred work tracked as GitHub issues, and regressions handled as new linked SOWs.
 
 This is an assistant responsibility. If a SOW changes behavior, docs, specs, commands, schemas, defaults, workflows, examples, or operating procedure, the assistant must update every affected artifact in the same SOW, or record the evidence-backed reason an artifact is unaffected.
 
@@ -704,7 +723,14 @@ This is an assistant responsibility. If a SOW changes behavior, docs, specs, com
 
 Specs are memory of WHAT this project does.
 
-This repository is bootstrapped incrementally. The existing source tree and public documentation remain the primary ground truth. SOW specs under `.agents/sow/specs/` should capture durable project decisions, cross-cutting behavioral rules, and area-specific contracts as they are worked.
+Specs currently live under `.agents/sow/specs/` as **local-only** memory
+(gitignored, not committed). They are being reorganized and will be
+re-introduced to git later as a deliberate decision; until then they are
+per-developer local memory, shared across worktrees by
+`.agents/sow/worktree-link.sh`. Durable contracts that must be shared with the
+team right now belong in project skills, docs, code, and tests.
+
+This repository is bootstrapped incrementally. The existing source tree and public documentation remain the primary ground truth. Specs under `.agents/sow/specs/` capture durable project decisions, cross-cutting behavioral rules, and area-specific contracts as they are worked.
 
 `.agents/sow/specs/` stays flat until scale proves hierarchy is needed. Use
 `<domain>-<topic>.md` names, one durable contract or cross-cutting rule per file,

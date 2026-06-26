@@ -231,5 +231,5 @@ identifiers. Treat fetched payloads as personal/customer data:
   to `<repo>/.local/audits/...` (gitignored) and report only
   sanitized summaries upstream.
 
-See `<repo>/.agents/sow/specs/sensitive-data-discipline.md` for the
+See `<repo>/.agents/sensitive-data-discipline.md` for the
 full rule and the pre-commit verification grep.

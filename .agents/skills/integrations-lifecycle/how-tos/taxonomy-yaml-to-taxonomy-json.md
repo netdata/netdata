@@ -203,5 +203,5 @@ Commands used during the original analysis:
 
 ```bash
 rg -n "def module_contexts|def build_metadata_indexes|def process_taxonomy_file|def emit_item|def build_taxonomy" integrations/gen_taxonomy.py
-rg -n "gen_taxonomy|check_collector_taxonomy|taxonomy.json|taxonomy.yaml" .github/workflows integrations/README.md .agents/sow/specs/taxonomy.md
+rg -n "gen_taxonomy|check_collector_taxonomy|taxonomy.json|taxonomy.yaml" .github/workflows integrations/README.md .agents/skills/integrations-lifecycle/taxonomy.md
 ```
