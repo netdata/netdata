@@ -258,6 +258,7 @@ void netdata_conf_dbengine_init(const char *hostname) {
 
     size_t created_tiers = 0;
     char dbenginepath[FILENAME_MAX + 1];
+    char native_dbenginepath[FILENAME_MAX + 1];
 
     for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
 
@@ -266,7 +267,10 @@ void netdata_conf_dbengine_init(const char *hostname) {
         else
             snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine-tier%zu", netdata_configured_cache_dir, tier);
 
-        int ret = mkdir(dbenginepath, 0775);
+        // UCRT64's mkdir() requires a native Windows path; translate once here.
+        os_translate_path(native_dbenginepath, dbenginepath, sizeof(native_dbenginepath));
+
+        int ret = mkdir(native_dbenginepath, 0775);
         if (ret != 0 && errno != EEXIST) {
             nd_log(NDLS_DAEMON, NDLP_CRIT, "DBENGINE on '%s': cannot create directory '%s'", hostname, dbenginepath);
             continue;
@@ -284,7 +288,8 @@ void netdata_conf_dbengine_init(const char *hostname) {
         tiers_init[tier].disk_space_mb = (int) disk_space_mb;
         tiers_init[tier].tier = tier;
         tiers_init[tier].retention_seconds = (size_t) storage_tiers_retention_time_s[tier];
-        strncpyz(tiers_init[tier].path, dbenginepath, FILENAME_MAX);
+        // Pass the native path so rrdeng_init() file operations also use the correct form.
+        strncpyz(tiers_init[tier].path, native_dbenginepath, FILENAME_MAX);
         tiers_init[tier].ret = 0;
 
         if(parallel_initialization) {
