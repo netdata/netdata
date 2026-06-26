@@ -28,12 +28,13 @@ else
   RED=""; GREEN=""; YELLOW=""; BLUE=""; GRAY=""; NC=""
 fi
 
-# Print a command before running it (transparency for file operations).
+# Print a command before running it, then run it; abort on failure so a
+# filesystem error never leaves a half-built layout.
 run() {
   printf >&2 "${GRAY}%s >${NC} ${YELLOW}" "$(pwd)"
   printf >&2 "%q " "$@"
   printf >&2 "${NC}\n"
-  "$@"
+  "$@" || die "command failed: $*"
 }
 
 info() { printf >&2 "%s\n" "${BLUE}$*${NC}"; }
@@ -53,10 +54,10 @@ cd "$top" || die "cannot cd to repo top: $top"
 
 # An origin checkout is "on the new SOW system" once its .gitignore carries the
 # precise queue rule. This is the marker the migration commit introduces.
-origin_is_new() { grep -q '^/\.agents/sow/q$' "$1/.gitignore" 2>/dev/null; }
+origin_is_new() { local root="$1"; grep -q '^/\.agents/sow/q$' "$root/.gitignore" 2>/dev/null; }
 
 # True if git tracks any file under the given repo-relative path.
-has_tracked_files() { [ -n "$(git ls-files -- "$1" 2>/dev/null | head -1)" ]; }
+has_tracked_files() { local path="$1"; [ -n "$(git ls-files -- "$path" 2>/dev/null | head -1)" ]; }
 
 # Collision-safe merge of an untracked directory tree into a destination.
 # $1 = source dir, $2 = destination dir. Label used to disambiguate collisions.
@@ -69,7 +70,9 @@ merge_into() {
     target="$dest/$base"
     if [ ! -e "$target" ]; then
       run mv "$f" "$target"
-    elif [ -d "$f" ] && [ -d "$target" ]; then
+    elif [ -d "$f" ] && [ ! -L "$f" ] && [ -d "$target" ] && [ ! -L "$target" ]; then
+      # Recurse only into real directories; a symlinked dir is moved as a unit
+      # below (never followed) to avoid escaping the tree or recursion loops.
       merge_into "$f" "$target" "$label"
       rmdir "$f" 2>/dev/null || true
     elif [ -f "$f" ] && [ -f "$target" ] && cmp -s "$f" "$target"; then
@@ -122,8 +125,14 @@ selfheal_specs() {
 
 # WORKTREE: merge any local content at $rel into origin, then symlink to origin.
 link_one() {
-  local rel="$1" target="$2" here="$top/$1"
-  [ -L "$here" ] && return 0                              # already linked
+  local rel="$1" target="$2"
+  local here="$top/$rel"
+  # A resolvable symlink is already set up; a broken one (origin moved/renamed)
+  # is removed and re-pointed below.
+  if [ -L "$here" ]; then
+    [ -e "$here" ] && return 0
+    run rm -f "$here"
+  fi
   if [ -e "$here" ]; then
     if [ -d "$here" ]; then
       has_tracked_files "$rel" && die "tracked files under $rel in this worktree — run the migration commit first; aborting"
@@ -151,8 +160,13 @@ Update the origin checkout first, then re-run this script:
 Aborting — no files were moved, no data lost."
   fi
   # Judgment call C: build origin's q/ if the migration commit landed but the
-  # origin setup has not run yet.
-  [ -d "$origin/$SOW_DIR/q" ] || { warn "origin has no q/ yet; building it"; ( cd "$origin" && "$origin/$SOW_DIR/worktree-link.sh" ); }
+  # origin setup has not run yet. Abort if that bootstrap fails, so we never
+  # link a worktree against a half-initialized origin.
+  if [ ! -d "$origin/$SOW_DIR/q" ]; then
+    warn "origin has no q/ yet; building it"
+    ( cd "$origin" && "$origin/$SOW_DIR/worktree-link.sh" ) \
+      || die "failed to initialize origin SOW working memory at '$origin'; aborting"
+  fi
 
   # Case 4: this worktree may still carry old-style top-level queue dirs; push
   # their contents into origin's shared q/ before linking (no data loss).

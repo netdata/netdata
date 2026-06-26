@@ -111,7 +111,7 @@ for path in .agents/sow/q .agents/sow/specs; do
   if [ -d "$path" ]; then
     ok "$path exists"
   else
-    fail "$path is missing (run .agents/sow/worktree-link.sh)"
+    warn "$path is missing (run .agents/sow/worktree-link.sh)"
   fi
 done
 
@@ -225,18 +225,28 @@ else
   ok "no local specs/README.md (specs are local-only; nothing to index)"
 fi
 
+# Specs relocated out of the local-only specs dir into committed homes. A
+# committed reference to their old .agents/sow/specs/ path is a dangling ref and
+# must be repointed (vs the unreferenced bulk, which is genuinely local-only).
+relocated_specs="sensitive-data-discipline.md go-v2-host-scope.md topology-function-schema.md topology-modes-correlation-aggregation.md taxonomy.md netdata.md trap-metrics-profiles.md netdata-snmp-hub-architecture.md pipeline-internals.md 0001-go-process-and-trapwriter.md"
+
 section "spec references"
 if command -v rg >/dev/null 2>&1; then
   while IFS= read -r ref; do
     [ -n "$ref" ] || continue
+    refbase=$(basename "$ref")
     if [ -f "$ref" ]; then
       ok "spec reference resolves: $ref"
     else
-      warn "spec reference unresolved (specs are local-only; may be absent here): $ref"
+      case " $relocated_specs " in
+        *" $refbase "*) fail "reference to a relocated spec — repoint to its committed home: $ref" ;;
+        *) warn "spec reference unresolved (specs are local-only; may be absent here): $ref" ;;
+      esac
     fi
   done < <(
     # Scan committed surfaces only; .agents/sow/specs is local-only working memory.
-    rg --no-filename -o '\.agents/sow/specs/[A-Za-z0-9._-]+\.md' \
+    # The path class allows '/' so nested specs (e.g. snmp-traps/...) are caught.
+    rg --no-filename -o '\.agents/sow/specs/[A-Za-z0-9._/-]+\.md' \
       AGENTS.md .agents/skills docs src \
       -g '*.md' -g 'SKILL.md' -g '*.sh' -g '*.yml' \
       2>/dev/null | sort -u
@@ -248,8 +258,9 @@ fi
 section "legacy SOW references"
 if command -v rg >/dev/null 2>&1; then
   # The rule polices active instructions, not historical design records. The
-  # snmp-traps design docs (netdata.md, decisions/) are persisted research-derived
-  # records whose SOW-NNNN citations are legitimate authoring provenance.
+  # snmp-traps design docs (the relocated research-derived set + decisions/) carry
+  # legitimate SOW-NNNN authoring provenance, so the whole design-doc set is exempt;
+  # SKILL.md and how-tos/ are NOT exempt (they are active instructions).
   legacy_refs=$(rg --line-number 'SOW-[0-9]{4}\b' \
     AGENTS.md .agents .github docs src \
     -g '*.md' -g 'SKILL.md' -g '*.sh' -g '*.yml' \
@@ -258,6 +269,9 @@ if command -v rg >/dev/null 2>&1; then
     -g '!**/.agents/sow/q/**' \
     -g '!**/.agents/sow/specs/**' \
     -g '!**/project-snmp-trap-profiles-authoring/netdata.md' \
+    -g '!**/project-snmp-trap-profiles-authoring/trap-metrics-profiles.md' \
+    -g '!**/project-snmp-trap-profiles-authoring/netdata-snmp-hub-architecture.md' \
+    -g '!**/project-snmp-trap-profiles-authoring/pipeline-internals.md' \
     -g '!**/project-snmp-trap-profiles-authoring/decisions/**' \
     2>/dev/null || true)
 

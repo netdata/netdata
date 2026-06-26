@@ -407,9 +407,12 @@ After a git worktree is created — or after an old checkout is updated to the
 local-only SOW model — run `.agents/sow/worktree-link.sh`. It builds the SOW
 queues and symlinks `.agents/sow/q`, `.agents/sow/specs`, `.local`, and `.env`
 to the origin checkout, so SOW working memory is shared per-developer rather than
-re-created per worktree. The script is idempotent, never loses data on a name
-collision, and refuses to run in a worktree whose origin checkout is not yet on
-this model (it prints how to update the origin first).
+re-created per worktree. (Exception: a worktree that already has its own real
+`.env` keeps it and is not relinked, so per-worktree secrets are never
+overwritten.) The script is idempotent, never loses data on a name collision,
+re-points a symlink whose origin moved, and refuses to run in a worktree whose
+origin checkout is not yet on this model (it prints how to update the origin
+first).
 
 ### Sensitive Data In Durable Artifacts
 
