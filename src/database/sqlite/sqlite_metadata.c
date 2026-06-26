@@ -2073,7 +2073,7 @@ static void after_metadata_hosts(uv_work_t *req, int status __maybe_unused)
 
 #ifdef ENABLE_DBENGINE
 #define GET_UUID_LIST  "SELECT dim_id FROM dimension"
-size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, Word_t section, nd_uuid_t *uuid))
+size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, Word_t section, size_t tier, nd_uuid_t *uuid))
 {
     sqlite3_stmt *res = NULL;
     sqlite3 *local_meta_db = NULL;
@@ -2106,7 +2106,7 @@ size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, 
             if (unlikely(!multidb_ctx[tier]))
                 continue;
 
-            populate_cb(mrg, (Word_t)multidb_ctx[tier], &uuid);
+            populate_cb(mrg, (Word_t)multidb_ctx[tier], tier, &uuid);
         }
         count++;
     }

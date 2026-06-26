@@ -1091,6 +1091,12 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
     // Calculate number of samples here and update once the file is loaded
     uint64_t journal_samples = 0;
 
+    // The prepopulation index holds the pinned metrics of the multidb tiers
+    // only (see mrg_load()); other instances (tests) take the fallback path.
+    size_t tier = (size_t)ctx->config.tier;
+    bool use_index = tier < (size_t)nd_profile.storage_tiers && multidb_ctx[tier] == ctx;
+    size_t index_hits = 0, index_misses = 0;
+
     // Protect the whole walk -- both the optional CRC check and the mrg update
     // read into the mmap'd v2 journal. If a backing page cannot be paged in
     // (file truncated, sparse hole, transient I/O error) the kernel raises
@@ -1165,15 +1171,32 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
                 time_t end_time_s = header_start_time_s + metric->delta_end_s;
                 uint32_t update_every_s = metric->update_every_s;
 
-                mrg_update_metric_retention_and_granularity_by_uuid(
-                    main_mrg,
-                    (Word_t)ctx,
-                    &local_uuid,
-                    start_time_s,
-                    end_time_s,
-                    update_every_s,
-                    now_s,
-                    &journal_samples);
+                // fast path: the metric was prepopulated from the metadata
+                // database and is pinned - a lock-free probe replaces the
+                // uuidmap + MRG lookups, and the retention is expanded
+                // directly on it
+                METRIC *m = use_index ? mrg_prepopulation_index_get(local_uuid, tier) : NULL;
+                if(likely(m)) {
+                    index_hits++;
+                    mrg_metric_update_retention_and_granularity(
+                        main_mrg, m, start_time_s, end_time_s, update_every_s, now_s, &journal_samples);
+                }
+                else {
+                    // uuid not in the metadata database (e.g. deleted
+                    // metrics still present in journal files), or no index
+                    if(use_index)
+                        index_misses++;
+
+                    mrg_update_metric_retention_and_granularity_by_uuid(
+                        main_mrg,
+                        (Word_t)ctx,
+                        &local_uuid,
+                        start_time_s,
+                        end_time_s,
+                        update_every_s,
+                        now_s,
+                        &journal_samples);
+                }
 
                 metric++;
             }
@@ -1201,6 +1224,9 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
     }
 
     journalfile_v2_data_release(journalfile);
+
+    // batched here so the per-entry loop never touches shared counters
+    mrg_prepopulation_index_account(index_hits, index_misses);
 
     if (unlikely(failed)) {
         journalfile_v2_data_unmap_permanently(journalfile);
