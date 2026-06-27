@@ -1170,7 +1170,9 @@ size_t pgc_main_nominal_page_size(void *data) {
 
 void pgc_and_mrg_initialize(void)
 {
+    nd_win_trace("pgc_and_mrg_initialize: mrg_create...");
     main_mrg = mrg_create();
+    nd_win_trace("pgc_and_mrg_initialize: mrg_create done");
 
     size_t target_cache_size = (size_t)default_rrdeng_page_cache_mb * 1024ULL * 1024ULL;
     size_t main_cache_size = (target_cache_size / 100) * 70;
@@ -1184,6 +1186,7 @@ void pgc_and_mrg_initialize(void)
 
     extent_cache_size += (size_t)(default_rrdeng_extent_cache_mb * 1024ULL * 1024ULL);
 
+    nd_win_trace("pgc_and_mrg_initialize: pgc_create MAIN_PGC...");
     main_cache = pgc_create(
             "MAIN_PGC",
             main_cache_size,
@@ -1200,7 +1203,9 @@ void pgc_and_mrg_initialize(void)
             0
     );
     pgc_set_nominal_page_size_callback(main_cache, pgc_main_nominal_page_size);
+    nd_win_trace("pgc_and_mrg_initialize: pgc_create MAIN_PGC done");
 
+    nd_win_trace("pgc_and_mrg_initialize: pgc_create OPEN_PGC...");
     open_cache = pgc_create(
             "OPEN_PGC",
             open_cache_size,
@@ -1217,7 +1222,9 @@ void pgc_and_mrg_initialize(void)
             sizeof(struct extent_io_data)
     );
     pgc_set_dynamic_target_cache_size_callback(open_cache, dynamic_open_cache_size);
+    nd_win_trace("pgc_and_mrg_initialize: pgc_create OPEN_PGC done");
 
+    nd_win_trace("pgc_and_mrg_initialize: pgc_create EXTENT_PGC...");
     extent_cache = pgc_create(
             "EXTENT_PGC",
             extent_cache_size,
@@ -1234,4 +1241,5 @@ void pgc_and_mrg_initialize(void)
             0
     );
     pgc_set_dynamic_target_cache_size_callback(extent_cache, dynamic_extent_cache_size);
+    nd_win_trace("pgc_and_mrg_initialize: pgc_create EXTENT_PGC done");
 }
