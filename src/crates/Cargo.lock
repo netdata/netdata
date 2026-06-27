@@ -3416,6 +3416,7 @@ dependencies = [
  "ng-flatten",
  "opentelemetry-proto",
  "prost",
+ "roaring 0.11.2",
  "serde",
  "tempfile",
  "thiserror 2.0.18",
