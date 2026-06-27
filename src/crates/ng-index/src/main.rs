@@ -34,10 +34,11 @@ fn main() -> ExitCode {
 
     println!("file: {}", args.r#in.display());
     println!(
-        "frames: {}  records: {}  leaves: {}  header_records: {}  consistent: {}",
+        "frames: {}  records: {}  leaves: {}  tree_nodes: {}  header_records: {}  consistent: {}",
         stats.frames,
         stats.records,
         stats.leaves,
+        stats.tree_nodes,
         stats.header_records,
         stats.consistent(),
     );
