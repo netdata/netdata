@@ -8,7 +8,9 @@ struct aral_statistics mrg_aral_statistics;
 // private helpers
 
 static MRG *mrg_create_internal(bool load_from_db) {
+    nd_win_trace("mrg_create_internal: callocz...");
     MRG *mrg = callocz(1, sizeof(MRG));
+    nd_win_trace("mrg_create_internal: aral_create loop (%zu partitions)...", _countof(mrg->index));
 
     for(size_t i = 0; i < _countof(mrg->index) ; i++) {
         rw_spinlock_init(&mrg->index[i].rw_spinlock);
@@ -19,10 +21,22 @@ static MRG *mrg_create_internal(bool load_from_db) {
         mrg->index[i].aral = aral_create(buf, sizeof(METRIC), 0, 16384, &mrg_aral_statistics, NULL, NULL,
                                          false, false, true);
     }
+    nd_win_trace("mrg_create_internal: aral_create loop done");
     pulse_aral_register_statistics(&mrg_aral_statistics, "mrg");
 
-    if(load_from_db)
+    if(load_from_db) {
+#ifndef OS_WINDOWS
+        // On Windows, db_meta is held by a background thread at this call site,
+        // so sqlite3_step blocks indefinitely. rrdeng_populate_mrg adds metrics
+        // from journal files and handles an empty MRG correctly via
+        // mrg_metric_add_and_acquire, so skipping the pre-population is safe.
+        nd_win_trace("mrg_create_internal: mrg_load...");
         mrg_load(mrg);
+        nd_win_trace("mrg_create_internal: mrg_load done");
+#else
+        nd_win_trace("mrg_create_internal: skipping mrg_load on Windows");
+#endif
+    }
 
     return mrg;
 }

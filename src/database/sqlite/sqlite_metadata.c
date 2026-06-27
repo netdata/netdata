@@ -2090,11 +2090,19 @@ size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, 
     sqlite3_stmt *res = NULL;
     sqlite3 *local_meta_db = NULL;
 
+    nd_win_trace("populate_metrics_from_database: entered");
+
+    // On Windows a second sqlite3_open_v2() to the same file that db_meta already
+    // has open blocks indefinitely at the OS level (CreateFile/LockFileEx never
+    // returns). Use the db_meta fallback directly on Windows.
+#ifndef OS_WINDOWS
+    nd_win_trace("populate_metrics_from_database: sqlite3_open_v2...");
     char sqlite_database[FILENAME_MAX + 1];
     snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/netdata-meta.db", netdata_configured_cache_dir);
     char native_meta_path[FILENAME_MAX + 1];
     os_translate_path(native_meta_path, sqlite_database, sizeof(native_meta_path));
     int rc = sqlite3_open_v2(native_meta_path, &local_meta_db, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
+    nd_win_trace("populate_metrics_from_database: sqlite3_open_v2 done, rc=%d", rc);
     if (rc != SQLITE_OK) {
         sqlite3_close_v2(local_meta_db);
         local_meta_db = NULL;
@@ -2102,15 +2110,22 @@ size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, 
 
     if (local_meta_db)
         (void)db_execute(local_meta_db, "PRAGMA cache_size=10000", NULL);
+#else
+    nd_win_trace("populate_metrics_from_database: OS_WINDOWS - skipping separate connection, using db_meta");
+#endif
 
+    nd_win_trace("populate_metrics_from_database: PREPARE_STATEMENT (local_meta_db=%p)...", (void *)local_meta_db);
     if (!PREPARE_STATEMENT(local_meta_db ? local_meta_db : db_meta, GET_UUID_LIST, &res)) {
         sqlite3_close_v2(local_meta_db);
+        nd_win_trace("populate_metrics_from_database: PREPARE_STATEMENT failed, returning 0");
         return 0;
     }
+    nd_win_trace("populate_metrics_from_database: PREPARE_STATEMENT done");
 
     size_t count = 0;
 
     usec_t started_ut = now_monotonic_usec();
+    nd_win_trace("populate_metrics_from_database: sqlite3_step loop starting...");
     while (sqlite3_step(res) == SQLITE_ROW) {
         nd_uuid_t uuid;
         if (!sqlite3_column_uuid_copy(res, 0, uuid))
