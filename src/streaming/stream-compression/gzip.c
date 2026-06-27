@@ -5,8 +5,6 @@
 
 void stream_compressor_init_gzip(struct compressor_state *state) {
     if (!state->initialized) {
-        state->initialized = true;
-
         // Initialize deflate stream
         z_stream *strm = state->stream = (z_stream *) mallocz(sizeof(z_stream));
         strm->zalloc = Z_NULL;
@@ -24,10 +22,12 @@ void stream_compressor_init_gzip(struct compressor_state *state) {
         if (r != Z_OK) {
             netdata_log_error("STREAM_COMPRESS: Failed to initialize deflate with error: %d", r);
             freez(state->stream);
+            state->stream = NULL;
             state->initialized = false;
             return;
         }
 
+        state->initialized = true;
     }
 }
 
@@ -89,8 +89,6 @@ size_t stream_compress_gzip(struct compressor_state *state, const char *data, si
 
 void stream_decompressor_init_gzip(struct decompressor_state *state) {
     if (!state->initialized) {
-        state->initialized = true;
-
         // Initialize inflate stream
         z_stream *strm = state->stream = (z_stream *)mallocz(sizeof(z_stream));
         strm->zalloc = Z_NULL;
@@ -101,11 +99,13 @@ void stream_decompressor_init_gzip(struct decompressor_state *state) {
         if (r != Z_OK) {
             netdata_log_error("STREAM_DECOMPRESS: Failed to initialize inflateInit2() with error: %d", r);
             freez(state->stream);
+            state->stream = NULL;
             state->initialized = false;
             return;
         }
 
         simple_ring_buffer_make_room(&state->output, COMPRESSION_MAX_CHUNK);
+        state->initialized = true;
     }
 }
 
