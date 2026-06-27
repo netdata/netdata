@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::Parser;
-use ng_index::{Metrics, count_wal};
+use ng_index::{Metrics, count_wal, read_rss};
 
 #[derive(Parser)]
 #[command(name = "ng-index", about = "Read a WAL file and report log stats")]
@@ -13,13 +13,36 @@ struct Args {
     /// Path to the WAL file written by `ng-ingest`.
     #[arg(long)]
     r#in: PathBuf,
+
+    /// Frames read per chunk before each parallel decode pass.
+    #[arg(long, default_value_t = 256)]
+    chunk: usize,
+
+    /// Rayon worker threads for parallel decode (0 = all available cores).
+    #[arg(long, default_value_t = 0)]
+    threads: usize,
 }
 
 fn main() -> ExitCode {
     let args = Args::parse();
 
+    if args.chunk == 0 {
+        eprintln!("error: --chunk must be >= 1");
+        return ExitCode::FAILURE;
+    }
+
+    if args.threads > 0 {
+        if let Err(e) = rayon::ThreadPoolBuilder::new()
+            .num_threads(args.threads)
+            .build_global()
+        {
+            eprintln!("error: failed to configure {} threads: {e}", args.threads);
+            return ExitCode::FAILURE;
+        }
+    }
+
     let metrics = Metrics::new();
-    let stats = match count_wal(&args.r#in, &metrics) {
+    let stats = match count_wal(&args.r#in, args.chunk, &metrics) {
         Ok(stats) => stats,
         Err(e) => {
             eprintln!("error: failed to read {}: {e}", args.r#in.display());
@@ -43,6 +66,15 @@ fn main() -> ExitCode {
     }
 
     print!("{}", metrics.report());
+
+    match read_rss() {
+        Some(rss) => println!(
+            "rss: {:.1} MiB peak ({:.1} MiB at exit)",
+            rss.peak_kb as f64 / 1024.0,
+            rss.current_kb as f64 / 1024.0,
+        ),
+        None => println!("rss: n/a (non-Linux)"),
+    }
 
     ExitCode::SUCCESS
 }

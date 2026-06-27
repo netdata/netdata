@@ -3406,6 +3406,7 @@ dependencies = [
  "file-registry",
  "opentelemetry-proto",
  "prost",
+ "rayon",
  "tempfile",
  "thiserror 2.0.18",
  "wal",
