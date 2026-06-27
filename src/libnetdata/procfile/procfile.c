@@ -407,7 +407,7 @@ static void procfile_set_separators(procfile *ff, const char *separators) {
     PF_CHAR_TYPE *ffs = ff->separators;
     const char *s = separators;
     while(*s)
-        ffs[(int)*s++] = PF_CHAR_IS_SEPARATOR;
+        ffs[(unsigned char)*s++] = PF_CHAR_IS_SEPARATOR;
 }
 
 void procfile_set_quotes(procfile *ff, const char *quotes) {
@@ -426,7 +426,7 @@ void procfile_set_quotes(procfile *ff, const char *quotes) {
     // set the quotes
     const char *s = quotes;
     while(*s)
-        ffs[(int)*s++] = PF_CHAR_IS_QUOTE;
+        ffs[(unsigned char)*s++] = PF_CHAR_IS_QUOTE;
 }
 
 void procfile_set_open_close(procfile *ff, const char *open, const char *close) {
@@ -445,12 +445,12 @@ void procfile_set_open_close(procfile *ff, const char *open, const char *close) 
     // set the openings
     const char *s = open;
     while(*s)
-        ffs[(int)*s++] = PF_CHAR_IS_OPEN;
+        ffs[(unsigned char)*s++] = PF_CHAR_IS_OPEN;
 
     // set the closings
     s = close;
     while(*s)
-        ffs[(int)*s++] = PF_CHAR_IS_CLOSE;
+        ffs[(unsigned char)*s++] = PF_CHAR_IS_CLOSE;
 }
 
 procfile *procfile_open(const char *filename, const char *separators, uint32_t flags) {
