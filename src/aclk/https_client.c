@@ -252,7 +252,7 @@ static int parse_http_hdr(rbuf_t buf, http_parse_ctx *parse_ctx)
     }
 
     char *separator = rbuf_find_bytes(buf, HTTP_KEYVAL_SEPARATOR, strlen(HTTP_KEYVAL_SEPARATOR), &idx);
-    if (!separator) {
+    if (!separator || idx >= idx_end) {
         netdata_log_error("ACLK: Missing Key/Value separator");
         return 1;
     }
