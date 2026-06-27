@@ -11,6 +11,7 @@ use std::path::Path;
 
 use bincode::serde::decode_from_slice;
 use bumpalo::Bump;
+use sfst_indexer::KvSlot;
 use sfst_indexer::build_and_write;
 use sfst_indexer::row_index::RowIndex;
 use wal_otap::KvSink;
@@ -53,6 +54,32 @@ fn record_ts(
             })
     };
     lookup(time_node).or_else(|| lookup(obs_node)).unwrap_or(fallback)
+}
+
+/// Intern a slice of entries into tokens, riding the interner's `lookup_hash` fast
+/// path (format + intern only on a miss). Computed once per resource/scope group
+/// and reused across its records, so shared attrs aren't re-probed per record.
+fn intern_entries(
+    row_index: &mut RowIndex<'_>,
+    entries: &[Entry],
+    paths: &[String],
+    kv: &mut String,
+    stats: &mut SfstStats,
+) -> Vec<KvSlot> {
+    entries
+        .iter()
+        .map(|e| match row_index.lookup_hash(e.hash) {
+            Some(token) => {
+                stats.hits += 1;
+                token
+            }
+            None => {
+                stats.misses += 1;
+                build_kv(&paths[e.node as usize], &e.value, kv);
+                row_index.intern(Some(e.hash), kv)
+            }
+        })
+        .collect()
 }
 
 /// Build an SFST index file at `out_path` from the flattened WAL in `flat_dir`.
@@ -98,28 +125,22 @@ pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result
 
         let mut records = 0u64;
         for rg in &flattened.resources {
+            // Intern resource attrs once per group and reuse across its records,
+            // instead of re-probing them for every record.
+            let resource_tokens = intern_entries(&mut row_index, &rg.resource, &paths, &mut kv, &mut stats);
             for sg in &rg.scopes {
+                let scope_tokens = intern_entries(&mut row_index, &sg.scope, &paths, &mut kv, &mut stats);
                 for record in &sg.records {
                     records += 1;
                     let ts = record_ts(record, time_node, obs_node, fallback_ts);
-                    // A record's columns = its own entries + its scope's + its resource's.
-                    let mut tokens = Vec::new();
-                    for e in rg.resource.iter().chain(sg.scope.iter()).chain(record.iter()) {
-                        // Ride the interner's lookup_hash fast path with the
-                        // pre-computed hash; only format the string on a miss.
-                        let token = match row_index.lookup_hash(e.hash) {
-                            Some(token) => {
-                                stats.hits += 1;
-                                token
-                            }
-                            None => {
-                                stats.misses += 1;
-                                build_kv(&paths[e.node as usize], &e.value, &mut kv);
-                                row_index.intern(Some(e.hash), &kv)
-                            }
-                        };
-                        tokens.push(token);
-                    }
+                    let own_tokens = intern_entries(&mut row_index, record, &paths, &mut kv, &mut stats);
+                    // A row's columns = its own + its scope's + its resource's.
+                    let mut tokens = Vec::with_capacity(
+                        resource_tokens.len() + scope_tokens.len() + own_tokens.len(),
+                    );
+                    tokens.extend_from_slice(&resource_tokens);
+                    tokens.extend_from_slice(&scope_tokens);
+                    tokens.extend_from_slice(&own_tokens);
                     row_index.row(ts, &tokens);
                 }
             }
