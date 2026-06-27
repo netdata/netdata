@@ -8,5 +8,7 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
+bincode = { workspace = true }
 opentelemetry-proto = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+twox-hash = { workspace = true, features = ["xxhash64"] }

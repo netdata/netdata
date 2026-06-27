@@ -15,17 +15,14 @@ path = "src/main.rs"
 bincode = { workspace = true }
 bumpalo = { workspace = true }
 clap = { workspace = true }
-file-registry = { workspace = true }
 ng-flatten = { workspace = true }
-opentelemetry-proto = { workspace = true }
-prost = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
 sfst = { workspace = true }
 sfst-indexer = { workspace = true }
 thiserror = { workspace = true }
-twox-hash = { workspace = true }
 wal = { workspace = true }
 wal-otap = { workspace = true }
 
 [dev-dependencies]
+file-registry = { workspace = true }
+opentelemetry-proto = { workspace = true }
 tempfile = { workspace = true }

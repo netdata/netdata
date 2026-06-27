@@ -9,14 +9,16 @@
 
 use std::path::Path;
 
-use bincode::serde::decode_from_slice;
 use bumpalo::Bump;
 use sfst_indexer::KvSlot;
 use sfst_indexer::build_and_write;
 use sfst_indexer::row_index::RowIndex;
 use wal_otap::KvSink;
 
-use crate::{Entry, Error, FlattenedRequest, Metrics, NodeId, SchemaTree, Value, build_kv, sole_wal_file};
+use crate::{
+    Entry, Error, FlattenedRequest, Metrics, NodeId, SchemaTree, Value, build_kv, decode_frame,
+    sole_wal_file,
+};
 
 /// SFST cardinality-tier threshold (mirrors `sfst`'s default of 100).
 const CARDINALITY_THRESHOLD: u32 = 100;
@@ -89,7 +91,6 @@ pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result
     let mut reader = wal::Reader::open(&path)?;
     let arena = Bump::new();
     let mut row_index = RowIndex::new(&arena, CARDINALITY_THRESHOLD);
-    let config = bincode::config::standard();
     let mut stats = SfstStats::default();
     let mut kv = String::new();
 
@@ -108,12 +109,10 @@ pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result
 
         let flattened: FlattenedRequest = {
             let _t = metrics.scope("deserialize");
-            decode_from_slice(frame.data, config)
-                .map_err(|source| Error::BincodeDecode {
-                    frame: stats.frames,
-                    source,
-                })?
-                .0
+            decode_frame(frame.data).map_err(|source| Error::BincodeDecode {
+                frame: stats.frames,
+                source,
+            })?
         };
 
         let _t = metrics.scope("index");

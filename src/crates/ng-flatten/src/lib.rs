@@ -16,11 +16,19 @@
 //! Note: the path *string* can alias across different structures (a kvlist
 //! `a:{b}` and a literal key `"a.b"` both render `a.b`), but their **nodes**
 //! differ (distinct `steps`), so index by node id and display by path.
+//!
+//! This crate also owns the on-WAL **flattened-frame format**
+//! ([`FlattenedRequest`] with [`encode_frame`]/[`decode_frame`]) and the canonical
+//! `key=value` rendering ([`build_kv`]) shared by the writer (`ng-ingest`) and the
+//! reader (`ng-index`): the bytes a producer hashes MUST match the bytes the SFST
+//! builder keys on, so there is a single source of truth here.
 
 use std::collections::HashMap;
+use std::hash::Hasher;
 
 use serde::{Deserialize, Serialize};
 
+use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::common::v1::{
     AnyValue, InstrumentationScope, KeyValue, any_value::Value as Av,
 };
@@ -407,6 +415,164 @@ impl Default for Flattener {
     fn default() -> Self {
         Self::new()
     }
+}
+
+// ---------------------------------------------------------------------------
+// Flattened-frame format: the OTLP grouping of a request's entries plus its
+// schema tree, as stored (bincode) in one WAL frame. Written by `ng-ingest` at
+// ingest, read by `ng-index` when building the SFST.
+// ---------------------------------------------------------------------------
+
+/// A flattened request: one schema tree shared by all its records, plus the OTLP
+/// grouping. Resource/scope are flattened once per group; records hold only their
+/// own entries. Every entry's `node` indexes into `tree`. This is the payload of a
+/// flattened WAL frame (bincode-encoded via [`encode_frame`]).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FlattenedRequest {
+    pub tree: SchemaTree,
+    pub resources: Vec<ResourceGroup>,
+}
+
+/// One resource and the scope groups under it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceGroup {
+    pub resource: Vec<Entry>,
+    pub scopes: Vec<ScopeGroup>,
+}
+
+/// One scope and the records under it (each record = its own entries only).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScopeGroup {
+    pub scope: Vec<Entry>,
+    pub records: Vec<Vec<Entry>>,
+}
+
+/// Flatten one decoded request INTO a shared [`Flattener`], returning the request's
+/// grouped entries. The tree stays in `flattener`, so it can span many requests.
+/// Resource is flattened once per `ResourceLogs`, scope once per `ScopeLogs`.
+pub fn flatten_into(
+    flattener: &mut Flattener,
+    request: &ExportLogsServiceRequest,
+) -> Vec<ResourceGroup> {
+    let mut resources = Vec::with_capacity(request.resource_logs.len());
+    for rl in &request.resource_logs {
+        let resource = rl
+            .resource
+            .as_ref()
+            .map(|r| flattener.flatten_resource(r))
+            .unwrap_or_default();
+        let mut scopes = Vec::with_capacity(rl.scope_logs.len());
+        for sl in &rl.scope_logs {
+            let scope = sl
+                .scope
+                .as_ref()
+                .map(|s| flattener.flatten_scope(s))
+                .unwrap_or_default();
+            let records = sl
+                .log_records
+                .iter()
+                .map(|r| flattener.flatten_record(r))
+                .collect();
+            scopes.push(ScopeGroup { scope, records });
+        }
+        resources.push(ResourceGroup { resource, scopes });
+    }
+    resources
+}
+
+/// Flatten a request into its own per-frame tree (convenience over [`flatten_into`])
+/// — the form stored in a flattened WAL frame.
+pub fn flatten_request(request: &ExportLogsServiceRequest) -> FlattenedRequest {
+    let mut flattener = Flattener::new();
+    let resources = flatten_into(&mut flattener, request);
+    FlattenedRequest {
+        tree: flattener.into_tree(),
+        resources,
+    }
+}
+
+/// Render a typed value into its `key=value` string form, appended to `out`:
+/// strings raw, ints/doubles decimal, bools `true`/`false`, bytes lowercase hex; the
+/// flatten-only empties render structurally. This is the single canonical rendering
+/// shared by hash pre-computation ([`fill_hashes`]) and the SFST build, so both
+/// agree on the exact `key=value` bytes.
+pub fn append_value(value: &Value, out: &mut String) {
+    use std::fmt::Write as _;
+    match value {
+        Value::Null => {}
+        Value::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
+        Value::Int(i) => {
+            let _ = write!(out, "{i}");
+        }
+        Value::Double(d) => {
+            let _ = write!(out, "{d}");
+        }
+        Value::Str(s) => out.push_str(s),
+        Value::Bytes(b) => {
+            for byte in b {
+                let _ = write!(out, "{byte:02x}");
+            }
+        }
+        Value::EmptyArray => out.push_str("[]"),
+        Value::EmptyKvlist => out.push_str("{}"),
+    }
+}
+
+/// Build `path=value` into `out` (cleared first).
+pub fn build_kv(path: &str, value: &Value, out: &mut String) {
+    out.clear();
+    out.push_str(path);
+    out.push('=');
+    append_value(value, out);
+}
+
+/// `xxhash64(path=value)` with seed 0 — the hash an SFST-style interner keys on.
+fn hash_kv(path: &str, value: &Value, buf: &mut String) -> u64 {
+    build_kv(path, value, buf);
+    let mut h = twox_hash::XxHash64::default();
+    h.write(buf.as_bytes());
+    h.finish()
+}
+
+/// Fill every entry's `hash` with `xxhash64(key=value)` so the index build can ride
+/// the interner's `lookup_hash` fast path instead of re-hashing per occurrence.
+/// Paths are resolved once per node.
+pub fn fill_hashes(flattened: &mut FlattenedRequest) {
+    let paths: Vec<String> = {
+        let tree = &flattened.tree;
+        (0..tree.len() as NodeId).map(|id| tree.path(id)).collect()
+    };
+    let mut buf = String::new();
+    for rg in &mut flattened.resources {
+        for e in &mut rg.resource {
+            e.hash = hash_kv(&paths[e.node as usize], &e.value, &mut buf);
+        }
+        for sg in &mut rg.scopes {
+            for e in &mut sg.scope {
+                e.hash = hash_kv(&paths[e.node as usize], &e.value, &mut buf);
+            }
+            for record in &mut sg.records {
+                for e in record {
+                    e.hash = hash_kv(&paths[e.node as usize], &e.value, &mut buf);
+                }
+            }
+        }
+    }
+}
+
+/// Bincode config for the flattened-frame payload (the standard fixed config).
+fn frame_config() -> impl bincode::config::Config {
+    bincode::config::standard()
+}
+
+/// Encode a [`FlattenedRequest`] to the bincode bytes stored in a WAL frame.
+pub fn encode_frame(req: &FlattenedRequest) -> Result<Vec<u8>, bincode::error::EncodeError> {
+    bincode::serde::encode_to_vec(req, frame_config())
+}
+
+/// Decode a flattened WAL frame's bincode payload back into a [`FlattenedRequest`].
+pub fn decode_frame(bytes: &[u8]) -> Result<FlattenedRequest, bincode::error::DecodeError> {
+    Ok(bincode::serde::decode_from_slice(bytes, frame_config())?.0)
 }
 
 #[cfg(test)]

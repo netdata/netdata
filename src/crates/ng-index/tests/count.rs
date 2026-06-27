@@ -1,18 +1,19 @@
-//! End-to-end round trip: write a protobuf WAL, convert it to a flattened WAL
-//! (`convert_wal`), then build a standard SFST index from that (`build_sfst`) and
-//! query the record count back. Exercises the bincode (de)serialization, the `wal`
-//! round trip (LZ4 on), the typed-entry interning, and the SFST emit. Frames are
-//! written here with the raw `wal::Writer`, keeping this independent of `ng-ingest`.
+//! End-to-end round trip: build OTLP requests, flatten them into a flattened-frame
+//! WAL via the shared `ng-flatten` path (the same encoding `ng-ingest` writes at
+//! ingest), then build a standard SFST index from that WAL (`build_sfst`) and query
+//! the record count back. Exercises flatten + fill_hashes + encode_frame, the `wal`
+//! round trip (LZ4 on), the typed-entry interning, and the SFST emit. Independent of
+//! `ng-ingest`: frames are written here with the raw `wal::Writer`.
 
 use std::sync::Arc;
 
 use file_registry::TimestampNs;
-use ng_index::{Metrics, build_sfst, convert_wal};
-use sfst::IndexReader;
+use ng_flatten::{encode_frame, fill_hashes, flatten_request};
+use ng_index::{Metrics, build_sfst};
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value::Value as Av};
 use opentelemetry_proto::tonic::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
-use prost::Message;
+use sfst::IndexReader;
 
 /// A batch of `n` minimal log records, each with one attribute so flattening
 /// yields entries beyond the scalar fields.
@@ -41,29 +42,20 @@ fn request(n: usize) -> ExportLogsServiceRequest {
     }
 }
 
-fn sole_wal(dir: &std::path::Path) -> std::path::PathBuf {
-    std::fs::read_dir(dir)
-        .unwrap()
-        .filter_map(|e| e.ok())
-        .map(|e| e.path())
-        .find(|p| p.extension().is_some_and(|x| x == "wal"))
-        .expect("a .wal file in the dir")
-}
-
-#[test]
-fn convert_then_build_sfst_roundtrips() {
-    // 1. Write a protobuf WAL of three batches (default config compresses frames).
-    let src = tempfile::tempdir().unwrap();
+/// Write each batch in `counts` as one flattened-frame WAL frame into `dir` — the
+/// same flatten + hash + bincode encoding `ng-ingest` performs at ingest.
+fn write_flattened_wal(dir: &std::path::Path, counts: &[usize]) {
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
-    let mut writer = wal::Writer::new(src.path(), wal::Config::default(), seq, 0).unwrap();
-    let counts = [3usize, 5, 2];
+    let mut writer = wal::Writer::new(dir, wal::Config::default(), seq, 0).unwrap();
     for (i, &n) in counts.iter().enumerate() {
-        let data = request(n).encode_to_vec();
+        let mut flattened = flatten_request(&request(n));
+        fill_hashes(&mut flattened);
+        let bytes = encode_frame(&flattened).unwrap();
         writer
             .write_frame(
                 0,
                 &[],
-                &data,
+                &bytes,
                 n,
                 TimestampNs(i as u64 + 1),
                 TimestampNs::ZERO,
@@ -72,25 +64,22 @@ fn convert_then_build_sfst_roundtrips() {
             .unwrap();
     }
     writer.shutdown_all().unwrap();
+}
 
-    // 2. Convert to a flattened WAL.
+#[test]
+fn flattened_wal_builds_and_roundtrips_an_sfst() {
+    // 1. Write a flattened WAL of three batches (10 records total).
     let flat = tempfile::tempdir().unwrap();
-    let convert = convert_wal(&sole_wal(src.path()), flat.path(), &Metrics::new()).unwrap();
-    assert_eq!(convert.frames, 3);
-    assert_eq!(convert.records, 10);
-    assert_eq!(convert.header_records, 10);
-    assert!(convert.consistent());
-    // Each record flattens to 3 leaves: time_unix_nano, severity_number, attributes.k.
-    assert_eq!(convert.leaves, 30);
+    write_flattened_wal(flat.path(), &[3, 5, 2]);
 
-    // 3. Build a standard SFST index from the flattened WAL.
+    // 2. Build a standard SFST index from it.
     let out_dir = tempfile::tempdir().unwrap();
     let out = out_dir.path().join("count.sfst");
     let sfst = build_sfst(flat.path(), &out, &Metrics::new()).unwrap();
     assert_eq!(sfst.frames, 3);
     assert_eq!(sfst.records, 10);
 
-    // 4. Re-open the SFST and confirm the record count round-trips.
+    // 3. Re-open the SFST and confirm the record count round-trips.
     let bytes = std::fs::read(&out).unwrap();
     let reader = IndexReader::open(&bytes).unwrap();
     assert_eq!(reader.total_logs(), 10);

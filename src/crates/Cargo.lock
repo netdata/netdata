@@ -3402,8 +3402,10 @@ dependencies = [
 name = "ng-flatten"
 version = "0.1.3"
 dependencies = [
+ "bincode 2.0.1",
  "opentelemetry-proto",
  "serde",
+ "twox-hash",
 ]
 
 [[package]]
@@ -3416,13 +3418,10 @@ dependencies = [
  "file-registry",
  "ng-flatten",
  "opentelemetry-proto",
- "prost",
- "serde",
  "sfst",
  "sfst-indexer",
  "tempfile",
  "thiserror 2.0.18",
- "twox-hash",
  "wal",
  "wal-otap",
 ]
@@ -3434,8 +3433,8 @@ dependencies = [
  "anyhow",
  "clap",
  "file-registry",
+ "ng-flatten",
  "opentelemetry-proto",
- "prost",
  "tempfile",
  "tokio",
  "tonic",
