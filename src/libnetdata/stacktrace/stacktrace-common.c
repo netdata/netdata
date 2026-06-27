@@ -144,6 +144,9 @@ void stacktrace_keep_first_root_cause_function(const char *function) {
 // Get the current stacktrace - public API
 NEVER_INLINE
 STACKTRACE stacktrace_get(int skip_frames) {
+    if (unlikely(skip_frames < 0 || skip_frames > INT_MAX - 2))
+        return NULL;
+
     // Make sure cache is initialized
     stacktrace_cache_init();
     
