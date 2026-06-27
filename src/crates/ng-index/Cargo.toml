@@ -24,4 +24,6 @@ thiserror = { workspace = true }
 wal = { workspace = true }
 
 [dev-dependencies]
+fst = { workspace = true }
+regex-automata = "0.4"
 tempfile = { workspace = true }
