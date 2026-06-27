@@ -66,27 +66,37 @@ pub struct Leaf {
     pub value: Value,
 }
 
-/// Flatten one log record with its resource + scope context into leaves, in
-/// document order.
-pub fn flatten_log_record(
-    resource: Option<&Resource>,
-    scope: Option<&InstrumentationScope>,
-    record: &LogRecord,
-) -> Vec<Leaf> {
+/// Flatten a resource's attributes under `resource.attributes.*`.
+///
+/// Flattened once per resource group (not per record) — see `flatten_record`.
+pub fn flatten_resource(resource: &Resource) -> Vec<Leaf> {
     let mut out = Vec::new();
+    flatten_attributes(&mut out, "resource.attributes", &resource.attributes);
+    out
+}
 
-    if let Some(r) = resource {
-        flatten_attributes(&mut out, "resource.attributes", &r.attributes);
+/// Flatten an instrumentation scope: `scope.name`, `scope.version`,
+/// `scope.attributes.*`. Flattened once per scope group (not per record).
+pub fn flatten_scope(scope: &InstrumentationScope) -> Vec<Leaf> {
+    let mut out = Vec::new();
+    if !scope.name.is_empty() {
+        out.push(leaf("scope.name", Value::Str(scope.name.clone())));
     }
-    if let Some(s) = scope {
-        if !s.name.is_empty() {
-            out.push(leaf("scope.name", Value::Str(s.name.clone())));
-        }
-        if !s.version.is_empty() {
-            out.push(leaf("scope.version", Value::Str(s.version.clone())));
-        }
-        flatten_attributes(&mut out, "scope.attributes", &s.attributes);
+    if !scope.version.is_empty() {
+        out.push(leaf("scope.version", Value::Str(scope.version.clone())));
     }
+    flatten_attributes(&mut out, "scope.attributes", &scope.attributes);
+    out
+}
+
+/// Flatten a log record's OWN fields — scalar fields, body, and attributes
+/// (`attributes.*`), in document order.
+///
+/// Resource and scope context is flattened separately ([`flatten_resource`] /
+/// [`flatten_scope`]) so it is not duplicated per record; a record's full field
+/// set is its own leaves plus its scope's and resource's.
+pub fn flatten_record(record: &LogRecord) -> Vec<Leaf> {
+    let mut out = Vec::new();
 
     // Queryable scalar record fields. OTLP uses 0/"" for unset, so those defaults
     // are treated as absent and skipped (flags / dropped_attributes_count are left
@@ -242,11 +252,13 @@ mod tests {
             ..Default::default()
         };
 
-        let leaves = flatten_log_record(Some(&resource), Some(&scope), &record);
+        let resource_leaves = flatten_resource(&resource);
+        let scope_leaves = flatten_scope(&scope);
+        let leaves = flatten_record(&record);
 
-        assert_eq!(at(&leaves, "resource.attributes.service.name"), [&Value::Str("svc".into())]);
-        assert_eq!(at(&leaves, "scope.name"), [&Value::Str("lib".into())]);
-        assert_eq!(at(&leaves, "scope.version"), [&Value::Str("1.0".into())]);
+        assert_eq!(at(&resource_leaves, "resource.attributes.service.name"), [&Value::Str("svc".into())]);
+        assert_eq!(at(&scope_leaves, "scope.name"), [&Value::Str("lib".into())]);
+        assert_eq!(at(&scope_leaves, "scope.version"), [&Value::Str("1.0".into())]);
         assert_eq!(at(&leaves, "severity_number"), [&Value::Int(9)]);
         assert_eq!(at(&leaves, "severity_text"), [&Value::Str("INFO".into())]);
         assert_eq!(at(&leaves, "trace_id"), [&Value::Bytes(vec![0xaa, 0xbb])]);
@@ -283,7 +295,7 @@ mod tests {
             ..Default::default()
         };
 
-        let leaves = flatten_log_record(None, None, &record);
+        let leaves = flatten_record(&record);
 
         assert_eq!(at(&leaves, "attributes.user.id"), [&Value::Int(7)]);
         assert_eq!(at(&leaves, "attributes.user.name"), [&Value::Str("x".into())]);
@@ -309,7 +321,7 @@ mod tests {
             ..Default::default()
         };
 
-        let leaves = flatten_log_record(None, None, &record);
+        let leaves = flatten_record(&record);
 
         assert_eq!(at(&leaves, "body"), [&Value::Str("a message".into())]);
         assert_eq!(at(&leaves, "attributes.empty_arr"), [&Value::EmptyArray]);

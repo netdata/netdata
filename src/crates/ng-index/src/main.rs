@@ -49,8 +49,21 @@ fn main() -> ExitCode {
     }
 
     for (i, record) in sample.iter().enumerate() {
-        println!("--- record {i} ({} leaves) ---", record.len());
-        for leaf in record {
+        println!("--- record {i} ---");
+        if !record.resource.is_empty() {
+            println!("  [resource]");
+            for leaf in &record.resource {
+                print_leaf(leaf);
+            }
+        }
+        if !record.scope.is_empty() {
+            println!("  [scope]");
+            for leaf in &record.scope {
+                print_leaf(leaf);
+            }
+        }
+        println!("  [record] ({} leaves)", record.own.len());
+        for leaf in &record.own {
             print_leaf(leaf);
         }
     }
@@ -81,7 +94,7 @@ fn print_leaf(leaf: &Leaf) {
         Value::EmptyArray => "[]".to_string(),
         Value::EmptyKvlist => "{}".to_string(),
     };
-    println!("  {} = {} [{:?}]", leaf.path, value, leaf.value.kind());
+    println!("    {} = {} [{:?}]", leaf.path, value, leaf.value.kind());
 }
 
 /// Short hex for small byte values (e.g. trace/span ids); a size marker otherwise.

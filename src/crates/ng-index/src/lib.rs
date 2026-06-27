@@ -4,7 +4,7 @@
 
 use std::path::Path;
 
-use ng_flatten::flatten_log_record;
+use ng_flatten::{flatten_record, flatten_resource, flatten_scope};
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use prost::Message;
 
@@ -15,6 +15,56 @@ pub use perf::{Metrics, Rss, read_rss};
 // it from `ng-index` without depending on `ng-flatten` directly.
 pub use ng_flatten::{Kind, Leaf, Value};
 
+/// Flattened OTLP request, keeping OTLP's grouping so resource/scope leaves are
+/// produced once per group rather than duplicated per record. A record's full
+/// field set is its own leaves plus its scope's and resource's.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct FlattenedRequest {
+    pub resources: Vec<ResourceGroup>,
+}
+
+/// One resource and the scope groups under it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResourceGroup {
+    pub resource: Vec<Leaf>,
+    pub scopes: Vec<ScopeGroup>,
+}
+
+/// One scope and the records under it (each record = its own leaves only).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ScopeGroup {
+    pub scope: Vec<Leaf>,
+    pub records: Vec<Vec<Leaf>>,
+}
+
+/// Flatten a decoded export request into the hierarchical [`FlattenedRequest`].
+///
+/// Defined here (not in `ng-flatten`) for now: walking the request structure is
+/// an index-side concern; `ng-flatten` owns only the per-level transforms.
+/// Resource is flattened once per `ResourceLogs`, scope once per `ScopeLogs`.
+pub fn flatten_request(request: &ExportLogsServiceRequest) -> FlattenedRequest {
+    let mut resources = Vec::with_capacity(request.resource_logs.len());
+    for rl in &request.resource_logs {
+        let resource = rl.resource.as_ref().map(flatten_resource).unwrap_or_default();
+        let mut scopes = Vec::with_capacity(rl.scope_logs.len());
+        for sl in &rl.scope_logs {
+            let scope = sl.scope.as_ref().map(flatten_scope).unwrap_or_default();
+            let records = sl.log_records.iter().map(flatten_record).collect();
+            scopes.push(ScopeGroup { scope, records });
+        }
+        resources.push(ResourceGroup { resource, scopes });
+    }
+    FlattenedRequest { resources }
+}
+
+/// A sampled record with its (cloned) resource + scope context, for `--print`.
+#[derive(Debug, Clone)]
+pub struct SampleRecord {
+    pub resource: Vec<Leaf>,
+    pub scope: Vec<Leaf>,
+    pub own: Vec<Leaf>,
+}
+
 /// Stats gathered from one WAL file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct WalStats {
@@ -22,7 +72,7 @@ pub struct WalStats {
     pub frames: u64,
     /// Total log records decoded.
     pub records: u64,
-    /// Total flattened leaves across all records.
+    /// Total flattened leaves (de-duplicated: resource/scope counted once per group).
     pub leaves: u64,
     /// Total log records claimed by the frame headers (`entry_count`). Equals
     /// `records` for an intact file; a mismatch signals corruption or an
@@ -37,25 +87,6 @@ impl WalStats {
     }
 }
 
-/// Flatten every record in a decoded export request, one `Leaf` list per record
-/// in document order (resource + scope context applied per record).
-///
-/// Defined here (not in `ng-flatten`) for now: walking the request structure is
-/// an index-side concern; `ng-flatten` owns only the per-record transform.
-pub fn flatten_request(request: &ExportLogsServiceRequest) -> Vec<Vec<Leaf>> {
-    let mut records = Vec::new();
-    for rl in &request.resource_logs {
-        let resource = rl.resource.as_ref();
-        for sl in &rl.scope_logs {
-            let scope = sl.scope.as_ref();
-            for record in &sl.log_records {
-                records.push(flatten_log_record(resource, scope, record));
-            }
-        }
-    }
-    records
-}
-
 /// Errors reading or decoding a WAL file.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -68,9 +99,10 @@ pub enum Error {
     },
 }
 
-/// Read a WAL file: decode each frame, flatten its records, and tally stats —
-/// recording per-phase timings into `metrics`. Returns the stats plus the
-/// flattened leaves of the first `sample_records` records (for inspection).
+/// Read a WAL file: decode each frame, flatten its records (hierarchically), and
+/// tally stats — recording per-phase timings into `metrics`. Returns the stats
+/// plus the first `sample_records` records with their resource/scope context (for
+/// inspection).
 ///
 /// Streaming: each frame is read (`wal::Reader` decompresses LZ4 transparently),
 /// decoded, and flattened before the next — so memory stays bounded to one frame
@@ -79,10 +111,10 @@ pub fn count_wal(
     path: &Path,
     sample_records: usize,
     metrics: &Metrics,
-) -> Result<(WalStats, Vec<Vec<Leaf>>), Error> {
+) -> Result<(WalStats, Vec<SampleRecord>), Error> {
     let mut reader = wal::Reader::open(path)?;
     let mut stats = WalStats::default();
-    let mut sample: Vec<Vec<Leaf>> = Vec::new();
+    let mut sample: Vec<SampleRecord> = Vec::new();
     loop {
         let frame = {
             let _t = metrics.scope("read");
@@ -109,16 +141,27 @@ pub fn count_wal(
             flatten_request(&req)
         };
 
-        stats.records += flattened.len() as u64;
-        stats.leaves += flattened.iter().map(|r| r.len() as u64).sum::<u64>();
-        metrics.add_records(flattened.len() as u64);
-
-        for record_leaves in flattened {
-            if sample.len() >= sample_records {
-                break;
+        // Tally + sample (outside the timed flatten phase).
+        let mut frame_records = 0u64;
+        for rg in &flattened.resources {
+            stats.leaves += rg.resource.len() as u64;
+            for sg in &rg.scopes {
+                stats.leaves += sg.scope.len() as u64;
+                for record in &sg.records {
+                    frame_records += 1;
+                    stats.leaves += record.len() as u64;
+                    if sample.len() < sample_records {
+                        sample.push(SampleRecord {
+                            resource: rg.resource.clone(),
+                            scope: sg.scope.clone(),
+                            own: record.clone(),
+                        });
+                    }
+                }
             }
-            sample.push(record_leaves);
         }
+        stats.records += frame_records;
+        metrics.add_records(frame_records);
     }
     Ok((stats, sample))
 }
