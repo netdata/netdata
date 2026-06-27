@@ -57,11 +57,6 @@ struct Args {
     /// in-flight concurrent batches may push the total slightly past the target.
     #[arg(long)]
     count: Option<u64>,
-
-    /// Compress frame payloads with LZ4. Off by default — raw protobuf is the
-    /// simplest thing for a downstream experiment to read and inspect.
-    #[arg(long)]
-    compress: bool,
 }
 
 /// The WAL writer and its ingestion clock, guarded together: `write_frame` takes
@@ -128,7 +123,7 @@ async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
-    let writer = wal::Writer::new(&args.out, one_file_config(args.compress), seq, PIPELINE_ID)
+    let writer = wal::Writer::new(&args.out, one_file_config(), seq, PIPELINE_ID)
         .with_context(|| format!("failed to create WAL writer in {}", args.out.display()))?;
 
     let sink = Arc::new(Mutex::new(Sink {
@@ -152,8 +147,7 @@ async fn main() -> anyhow::Result<()> {
         listen = %args.listen,
         out = %args.out.display(),
         count = ?args.count,
-        compress = args.compress,
-        "ng-index OTLP→WAL receiver starting"
+        "ng-index OTLP→WAL receiver starting (frames LZ4-compressed)"
     );
 
     // Stop on either the record target or Ctrl-C, then flush below.

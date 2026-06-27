@@ -94,11 +94,11 @@ fn wal_file(dir: &std::path::Path) -> std::path::PathBuf {
         .expect("a .wal file in the output dir")
 }
 
-fn roundtrip(compress: bool) {
+#[test]
+fn request_roundtrips_through_a_wal_frame() {
     let dir = tempfile::tempdir().unwrap();
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
-    let mut writer =
-        wal::Writer::new(dir.path(), one_file_config(compress), seq, PIPELINE_ID).unwrap();
+    let mut writer = wal::Writer::new(dir.path(), one_file_config(), seq, PIPELINE_ID).unwrap();
     let mut clock = MonotonicClock::new();
 
     let original = sample_request();
@@ -107,6 +107,8 @@ fn roundtrip(compress: bool) {
     assert_eq!(written, 2);
     writer.shutdown_all().unwrap();
 
+    // Frames are LZ4-compressed; `wal::Reader` decompresses transparently, so the
+    // decoded payload must still equal the original batch byte-for-byte.
     let mut reader = wal::Reader::open(&wal_file(dir.path())).unwrap();
     let frame = reader.next_frame().unwrap().expect("one frame written");
     assert_eq!(frame.entry_count as usize, written);
@@ -119,20 +121,10 @@ fn roundtrip(compress: bool) {
 }
 
 #[test]
-fn request_roundtrips_through_a_wal_frame() {
-    roundtrip(false);
-}
-
-#[test]
-fn request_roundtrips_with_compression() {
-    roundtrip(true);
-}
-
-#[test]
 fn empty_request_writes_no_frame() {
     let dir = tempfile::tempdir().unwrap();
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
-    let mut writer = wal::Writer::new(dir.path(), one_file_config(false), seq, PIPELINE_ID).unwrap();
+    let mut writer = wal::Writer::new(dir.path(), one_file_config(), seq, PIPELINE_ID).unwrap();
     let mut clock = MonotonicClock::new();
 
     // A request whose ResourceLogs carries zero log records writes nothing.

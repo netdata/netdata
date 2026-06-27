@@ -26,9 +26,11 @@ pub fn count_log_records(req: &ExportLogsServiceRequest) -> usize {
         .sum()
 }
 
-/// One WAL file, no rotation: a single `part_key` plus rotation thresholds set to
-/// effectively infinite so the writer never starts a second file.
-pub fn one_file_config(compress: bool) -> wal::Config {
+/// One WAL file, no rotation, frames always LZ4-compressed: a single `part_key`
+/// plus rotation thresholds set to effectively infinite so the writer never
+/// starts a second file. `wal::Reader` decompresses transparently, so the
+/// artifact stays directly consumable by a downstream reader.
+pub fn one_file_config() -> wal::Config {
     wal::Config {
         rotation: wal::RotationConfig {
             max_log_entries: usize::MAX,
@@ -36,7 +38,7 @@ pub fn one_file_config(compress: bool) -> wal::Config {
             max_duration: None,
         },
         crc_enabled: true,
-        compression_enabled: compress,
+        compression_enabled: true,
     }
 }
 
