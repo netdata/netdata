@@ -171,14 +171,14 @@ void buffer_jsdate(BUFFER *wb, int year, int month, int day, int hours, int minu
     buffer_need_bytes(wb, 30);
 
     char *b = &wb->buffer[wb->len], *p;
-  unsigned int *q = (unsigned int *)b;  
 
   #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    *q++ = 0x65746144;  // "Date" backwards.
+    const uint32_t date = 0x65746144;  // "Date" backwards.
   #else
-    *q++ = 0x44617465;  // "Date"
+    const uint32_t date = 0x44617465;  // "Date"
   #endif
-  p = (char *)q;
+  memcpy(b, &date, sizeof(date));
+  p = b + sizeof(date);
 
   *p++ = '(';
   *p++ = '0' + year / 1000; year %= 1000;
@@ -201,15 +201,15 @@ void buffer_jsdate(BUFFER *wb, int year, int month, int day, int hours, int minu
   *p   = '0' + seconds / 10; if (*p != '0') p++;
   *p++ = '0' + seconds % 10;
 
-  unsigned short *r = (unsigned short *)p;
-
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    *r++ = 0x0029;  // ")\0" backwards.  
+    const uint16_t terminator = 0x0029;  // ")\0" backwards.
   #else
-    *r++ = 0x2900;  // ")\0"
+    const uint16_t terminator = 0x2900;  // ")\0"
   #endif
+    memcpy(p, &terminator, sizeof(terminator));
+    p += sizeof(terminator);
 
-    wb->len += (size_t)((char *)r - b - 1);
+    wb->len += (size_t)(p - b - 1);
 
     // terminate it
     wb->buffer[wb->len] = '\0';
