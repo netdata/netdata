@@ -106,7 +106,7 @@ bool stream_compression_initialize(struct sender_state *s) {
     if(s->thread.compressor.algorithm != COMPRESSION_ALGORITHM_NONE) {
         s->thread.compressor.level = stream_send.compression.levels[s->thread.compressor.algorithm];
         stream_compressor_init(&s->thread.compressor);
-        return true;
+        return s->thread.compressor.initialized;
     }
 
     return false;
@@ -131,7 +131,7 @@ bool stream_decompression_initialize(struct receiver_state *rpt) {
 
     if(rpt->thread.compressed.decompressor.algorithm != COMPRESSION_ALGORITHM_NONE) {
         stream_decompressor_init(&rpt->thread.compressed.decompressor);
-        return true;
+        return rpt->thread.compressed.decompressor.initialized;
     }
 
     return false;

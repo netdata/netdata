@@ -8,8 +8,9 @@
 
 void stream_compressor_init_brotli(struct compressor_state *state) {
     if (!state->initialized) {
-        state->initialized = true;
         state->stream = BrotliEncoderCreateInstance(NULL, NULL, NULL);
+        if (!state->stream)
+            return;
 
         if (state->level < BROTLI_MIN_QUALITY) {
             state->level = BROTLI_MIN_QUALITY;
@@ -17,7 +18,13 @@ void stream_compressor_init_brotli(struct compressor_state *state) {
             state->level = BROTLI_MAX_QUALITY;
         }
 
-        BrotliEncoderSetParameter(state->stream, BROTLI_PARAM_QUALITY, state->level);
+        if (!BrotliEncoderSetParameter(state->stream, BROTLI_PARAM_QUALITY, state->level)) {
+            BrotliEncoderDestroyInstance(state->stream);
+            state->stream = NULL;
+            return;
+        }
+
+        state->initialized = true;
     }
 }
 
@@ -76,10 +83,12 @@ size_t stream_compress_brotli(struct compressor_state *state, const char *data, 
 
 void stream_decompressor_init_brotli(struct decompressor_state *state) {
     if (!state->initialized) {
-        state->initialized = true;
         state->stream = BrotliDecoderCreateInstance(NULL, NULL, NULL);
+        if (!state->stream)
+            return;
 
         simple_ring_buffer_make_room(&state->output, COMPRESSION_MAX_CHUNK);
+        state->initialized = true;
     }
 }
 
