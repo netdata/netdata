@@ -712,7 +712,7 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
                         local_sockets_log(ls, "cannot open file: %s\n", filename);
                     else {
                         size_t clen = strlen(comm);
-                        if(comm[clen - 1] == '\n')
+                        if(clen > 0 && comm[clen - 1] == '\n')
                             comm[clen - 1] = '\0';
                     }
                 }
