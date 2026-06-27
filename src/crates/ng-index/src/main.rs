@@ -128,6 +128,15 @@ fn run_convert(args: &Args, metrics: &Metrics) -> ExitCode {
         "frames: {}  records: {}  leaves: {}  header_records: {}  consistent: {}",
         stats.frames, stats.records, stats.leaves, stats.header_records, stats.consistent(),
     );
+    if stats.term_total > 0 {
+        println!(
+            "within-frame dedup: {} distinct / {} total terms ({:.1}% distinct → {:.1}x)",
+            stats.term_distinct,
+            stats.term_total,
+            stats.term_distinct as f64 / stats.term_total as f64 * 100.0,
+            stats.term_total as f64 / stats.term_distinct.max(1) as f64,
+        );
+    }
     if let Some(size) = flat_wal_size(&args.flat) {
         println!("flattened wal: {:.1} MiB on disk", size as f64 / (1024.0 * 1024.0));
     }

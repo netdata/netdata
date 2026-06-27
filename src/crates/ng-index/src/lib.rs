@@ -122,6 +122,12 @@ pub struct ConvertStats {
     pub leaves: u64,
     /// Records claimed by the source frame headers (`entry_count`).
     pub header_records: u64,
+    /// Total entry occurrences seen for the dedup measurement (== `leaves`).
+    pub term_total: u64,
+    /// Distinct `(node, value)` terms (by hash) summed per frame — the count a
+    /// per-frame term table would store. `term_distinct / term_total` is the
+    /// within-frame dedup ratio.
+    pub term_distinct: u64,
 }
 
 /// Stats from phase 2 (flattened WAL → global tree).
@@ -276,6 +282,33 @@ fn hash_kv(path: &str, value: &Value, buf: &mut String) -> u64 {
     h.finish()
 }
 
+/// Per-frame within-frame dedup measurement: `(total entry occurrences, distinct
+/// (node,value) terms by hash)`. Sizes how much a per-frame term table would dedup.
+/// Requires `fill_hashes` to have run.
+fn frame_dedup(flattened: &FlattenedRequest) -> (u64, u64) {
+    let mut seen = std::collections::HashSet::new();
+    let mut total = 0u64;
+    for rg in &flattened.resources {
+        for e in &rg.resource {
+            total += 1;
+            seen.insert(e.hash);
+        }
+        for sg in &rg.scopes {
+            for e in &sg.scope {
+                total += 1;
+                seen.insert(e.hash);
+            }
+            for record in &sg.records {
+                for e in record {
+                    total += 1;
+                    seen.insert(e.hash);
+                }
+            }
+        }
+    }
+    (total, seen.len() as u64)
+}
+
 /// Fill every entry's `hash` with `xxhash64(key=value)` so the index build can ride
 /// the interner's `lookup_hash` fast path instead of re-hashing per occurrence.
 /// Paths are resolved once per node.
@@ -359,6 +392,14 @@ pub fn convert_wal(
         stats.records += records;
         stats.leaves += leaves;
         metrics.add_records(records);
+
+        {
+            // One-off within-frame dedup measurement (sizes a term table's win).
+            let _t = metrics.scope("dedup_stat");
+            let (total, distinct) = frame_dedup(&flattened);
+            stats.term_total += total;
+            stats.term_distinct += distinct;
+        }
 
         let bytes = {
             let _t = metrics.scope("serialize");
