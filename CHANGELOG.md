@@ -476,6 +476,9 @@
 - Refactor(go.d): split function declaration API ([#22869](https://github.com/netdata/netdata/issues/22869))
 - Feat(go.d): withdraw unavailable shared functions ([#22870](https://github.com/netdata/netdata/issues/22870))
 - Feat(go.d): reconcile instance function availability ([#22871](https://github.com/netdata/netdata/issues/22871))
+- [codex] fix windows events row rendering crashes ([#22872](https://github.com/netdata/netdata/issues/22872))
+- Sow: make SOWs and specs local-only with per-worktree origin linking ([#22873](https://github.com/netdata/netdata/issues/22873))
+- Docs(skills): add static-binary build skill; fix Cloud log-query source filtering & time units ([#22880](https://github.com/netdata/netdata/issues/22880))
 
 ## [2.10.0] - 2026-04-09
 
