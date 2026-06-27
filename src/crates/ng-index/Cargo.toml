@@ -18,12 +18,9 @@ file-registry = { workspace = true }
 ng-flatten = { workspace = true }
 opentelemetry-proto = { workspace = true }
 prost = { workspace = true }
-roaring = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 wal = { workspace = true }
 
 [dev-dependencies]
-fst = { workspace = true }
-regex-automata = "0.4"
 tempfile = { workspace = true }

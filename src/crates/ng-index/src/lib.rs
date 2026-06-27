@@ -18,9 +18,7 @@ use file_registry::{ByteSize, TimestampNs};
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use prost::Message;
 
-mod index;
 mod perf;
-pub use index::{ColumnInfo, Index, IndexBuilder, build_index};
 pub use perf::{Metrics, Rss, read_rss};
 
 // Re-export the flattening vocabulary so the binary (and any consumer) gets it

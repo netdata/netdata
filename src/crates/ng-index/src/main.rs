@@ -8,13 +8,9 @@
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use std::time::Instant;
 
 use clap::Parser;
-use ng_index::{
-    ColumnInfo, Index, Kind, Leaf, Metrics, Value, build_global, build_index, convert_wal, read_rss,
-};
-use roaring::RoaringBitmap;
+use ng_index::{Leaf, Metrics, Value, build_global, convert_wal, read_rss};
 
 #[derive(Parser)]
 #[command(name = "ng-index", about = "Flatten a WAL of OTLP logs and build a global schema tree")]
@@ -33,12 +29,7 @@ struct Args {
     #[arg(long)]
     flat: PathBuf,
 
-    /// Build the typed inverted index from the flattened WAL and run demo queries
-    /// (instead of the merge-only global-tree pass).
-    #[arg(long)]
-    build_index: bool,
-
-    /// Print the flattened leaves of the first N records (merge mode only).
+    /// Print the flattened leaves of the first N records (index mode only).
     #[arg(long, default_value_t = 0)]
     print: usize,
 }
@@ -49,9 +40,6 @@ fn main() -> ExitCode {
 
     if args.convert {
         return run_convert(&args, &metrics);
-    }
-    if args.build_index {
-        return run_index_demo(&args, &metrics);
     }
     run_index(&args, &metrics)
 }
@@ -164,12 +152,7 @@ fn print_rss() {
 
 /// Render one leaf as `path = value [Kind]` for inspection.
 fn print_leaf(leaf: &Leaf) {
-    println!("    {} = {} [{:?}]", leaf.path, fmt_value(&leaf.value), leaf.value.kind());
-}
-
-/// Render a [`Value`] for display.
-fn fmt_value(value: &Value) -> String {
-    match value {
+    let value = match &leaf.value {
         Value::Null => "null".to_string(),
         Value::Bool(b) => b.to_string(),
         Value::Int(i) => i.to_string(),
@@ -178,114 +161,8 @@ fn fmt_value(value: &Value) -> String {
         Value::Bytes(b) => render_bytes(b),
         Value::EmptyArray => "[]".to_string(),
         Value::EmptyKvlist => "{}".to_string(),
-    }
-}
-
-/// Phase 3: build the typed inverted index and run demo queries.
-fn run_index_demo(args: &Args, metrics: &Metrics) -> ExitCode {
-    let index = match build_index(&args.flat, metrics) {
-        Ok(index) => index,
-        Err(e) => {
-            eprintln!("error: build index from {} failed: {e}", args.flat.display());
-            return ExitCode::FAILURE;
-        }
     };
-
-    println!("flat: {}", args.flat.display());
-    let mut cols = index.leaf_columns();
-    println!("index: {} records, {} leaf columns", index.records(), cols.len());
-    print!("{}", metrics.report());
-    print_rss();
-
-    cols.sort_by_key(|c| std::cmp::Reverse(c.cardinality));
-    println!("\ntop columns by cardinality:");
-    for c in cols.iter().take(15) {
-        println!("  {:>9}  {} [{:?}]", c.cardinality, c.path, c.kind);
-    }
-
-    run_demo_queries(&index, &cols);
-    ExitCode::SUCCESS
-}
-
-/// Time a query and print its predicate, match count, latency, and a few positions.
-fn run_query(label: &str, query: impl FnOnce() -> RoaringBitmap) {
-    let t = Instant::now();
-    let bm = query();
-    let dt = t.elapsed();
-    let sample: Vec<u32> = bm.iter().take(5).collect();
-    println!(
-        "{label}  ->  {} records  [{:.3} ms]  e.g. {:?}",
-        bm.len(),
-        dt.as_secs_f64() * 1000.0,
-        sample,
-    );
-}
-
-/// Auto-pick representative columns from the corpus and demonstrate the four query
-/// shapes — exact, array-any, numeric range, and AND (the last two impossible in
-/// the production SFST index).
-fn run_demo_queries(index: &Index, cols: &[ColumnInfo]) {
-    println!("\n--- demo queries ---");
-
-    let low_str = cols
-        .iter()
-        .filter(|c| c.kind == Kind::Str && !c.path.ends_with("[]") && (2..=100).contains(&c.cardinality))
-        .min_by_key(|c| c.cardinality);
-    let array_col = cols.iter().find(|c| c.path.ends_with("[]"));
-    let int_col = cols
-        .iter()
-        .filter(|c| c.kind == Kind::Int && c.cardinality >= 2)
-        .min_by_key(|c| c.cardinality);
-
-    // Exact match on a low-cardinality string column.
-    match low_str.and_then(|c| index.sample_value(c.node).map(|(v, _)| (c, v))) {
-        Some((c, value)) => run_query(
-            &format!("exact:     {} = {}", c.path, fmt_value(&value)),
-            || index.eq(c.node, &value),
-        ),
-        None => println!("exact:     (no suitable Str column found)"),
-    }
-
-    // Array-any: any element of a collapsed array column.
-    match array_col.and_then(|c| index.sample_value(c.node).map(|(v, _)| (c, v))) {
-        Some((c, value)) => run_query(
-            &format!("array-any: {} = {} (any element)", c.path, fmt_value(&value)),
-            || index.eq(c.node, &value),
-        ),
-        None => println!("array-any: (no collapsed-array column found)"),
-    }
-
-    // Numeric range over an Int column's upper half.
-    match int_col.and_then(|c| index.int_bounds(c.node).map(|b| (c, b))) {
-        Some((c, (lo, hi))) => {
-            let mid = lo + (hi - lo) / 2;
-            run_query(
-                &format!("range:     {} in [{mid}, {hi}]", c.path),
-                || index.range_int(c.node, mid, hi),
-            );
-        }
-        None => println!("range:     (no Int column found)"),
-    }
-
-    // AND of the exact string predicate and the numeric range.
-    if let (Some(sc), Some(ic)) = (low_str, int_col) {
-        if let (Some((sv, _)), Some((lo, hi))) =
-            (index.sample_value(sc.node), index.int_bounds(ic.node))
-        {
-            let mid = lo + (hi - lo) / 2;
-            let t = Instant::now();
-            let combined = &index.eq(sc.node, &sv) & &index.range_int(ic.node, mid, hi);
-            let dt = t.elapsed();
-            println!(
-                "AND:       ({} = {}) AND ({} in [{mid}, {hi}])  ->  {} records  [{:.3} ms]",
-                sc.path,
-                fmt_value(&sv),
-                ic.path,
-                combined.len(),
-                dt.as_secs_f64() * 1000.0,
-            );
-        }
-    }
+    println!("    {} = {} [{:?}]", leaf.path, value, leaf.value.kind());
 }
 
 /// Short hex for small byte values (e.g. trace/span ids); a size marker otherwise.
