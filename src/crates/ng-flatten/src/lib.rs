@@ -424,6 +424,14 @@ mod tests {
         leaves.iter().filter(|l| l.path == path).map(|l| &l.value).collect()
     }
 
+    /// The id of the first node whose collapsed path equals `path` (paths in the
+    /// test data are unambiguous).
+    fn node_for_path(tree: &SchemaTree, path: &str) -> NodeId {
+        (0..tree.len() as NodeId)
+            .find(|&id| tree.path(id) == path)
+            .unwrap_or_else(|| panic!("no node for path {path:?}"))
+    }
+
     #[test]
     fn record_fields_and_attrs_keep_their_types() {
         let record = LogRecord {
@@ -561,6 +569,111 @@ mod tests {
         assert_ne!(only_a, only_b);
         assert_eq!(gtree.path(only_a), "attributes.only_a");
         assert_eq!(gtree.path(only_b), "attributes.only_b");
+    }
+
+    #[test]
+    fn merge_tree_handles_arrays_nesting_and_schema_variety() {
+        // Two frames share a nested `user` kvlist with a `roles` array but diverge
+        // elsewhere (A: http.method, B: region). The merge must unify the shared
+        // structural columns — including the nested-kvlist leaves and the
+        // array-collapsed element — and keep the divergent ones distinct.
+        let record = |attrs: Vec<KeyValue>| LogRecord {
+            attributes: attrs,
+            ..Default::default()
+        };
+        let user = |id: i64, roles: Vec<&str>| {
+            kv(
+                "user",
+                Av::KvlistValue(KeyValueList {
+                    values: vec![
+                        kv("id", Av::IntValue(id)),
+                        kv(
+                            "roles",
+                            Av::ArrayValue(ArrayValue {
+                                values: roles.into_iter().map(|r| av(Av::StringValue(r.into()))).collect(),
+                            }),
+                        ),
+                    ],
+                }),
+            )
+        };
+
+        let mut fa = Flattener::new();
+        let a = fa.flatten_record(&record(vec![
+            kv("http.method", Av::StringValue("GET".into())),
+            user(7, vec!["admin", "ops"]),
+        ]));
+        let tree_a = fa.into_tree();
+
+        let mut fb = Flattener::new();
+        let b = fb.flatten_record(&record(vec![
+            kv("region", Av::StringValue("eu".into())),
+            user(42, vec!["viewer"]),
+        ]));
+        let tree_b = fb.into_tree();
+
+        let mut global = Flattener::new();
+        let map_a = global.merge_tree(&tree_a);
+        let map_b = global.merge_tree(&tree_b);
+        let gtree = global.into_tree();
+
+        // Shared nested + array columns collapse to ONE global node from both frames.
+        for path in ["attributes.user.id", "attributes.user.roles[]"] {
+            let ga = map_a[node_for_path(&tree_a, path) as usize];
+            let gb = map_b[node_for_path(&tree_b, path) as usize];
+            assert_eq!(ga, gb, "{path} must merge to one global node");
+            assert_eq!(gtree.path(ga), path);
+        }
+        // The shared interior kvlist node `attributes.user` also unifies.
+        assert_eq!(
+            map_a[node_for_path(&tree_a, "attributes.user") as usize],
+            map_b[node_for_path(&tree_b, "attributes.user") as usize],
+        );
+
+        // Divergent columns stay distinct and keep their paths.
+        let method = map_a[node_for_path(&tree_a, "attributes.http.method") as usize];
+        let region = map_b[node_for_path(&tree_b, "attributes.region") as usize];
+        assert_ne!(method, region);
+        assert_eq!(gtree.path(method), "attributes.http.method");
+        assert_eq!(gtree.path(region), "attributes.region");
+
+        // Array-collapse survives the merge: frame A's two role values share one
+        // local node, which maps to a single global `[]` column.
+        let a_roles: Vec<&Entry> =
+            a.iter().filter(|e| tree_a.path(e.node) == "attributes.user.roles[]").collect();
+        assert_eq!(a_roles.len(), 2, "two array elements under one node");
+        assert_eq!(a_roles[0].node, a_roles[1].node, "share one local node");
+        assert_eq!(map_a[a_roles[0].node as usize], map_a[a_roles[1].node as usize]);
+        let b_roles = b.iter().filter(|e| tree_b.path(e.node) == "attributes.user.roles[]").count();
+        assert_eq!(b_roles, 1);
+
+        // Global column space is the union: http.method (A) + region (B) +
+        // {user.id, user.roles[]} (shared) = 4 leaf columns.
+        assert_eq!(gtree.columns(), 4);
+    }
+
+    #[test]
+    fn merge_tree_handles_empty_containers() {
+        // Empty array / empty kvlist are their own leaf kinds; they must survive the
+        // merge as distinct columns carrying the right kind.
+        let mut fa = Flattener::new();
+        let _ = fa.flatten_record(&LogRecord {
+            attributes: vec![
+                kv("empty_arr", Av::ArrayValue(ArrayValue { values: vec![] })),
+                kv("empty_kv", Av::KvlistValue(KeyValueList { values: vec![] })),
+            ],
+            ..Default::default()
+        });
+        let tree_a = fa.into_tree();
+
+        let mut global = Flattener::new();
+        let map = global.merge_tree(&tree_a);
+        let gtree = global.into_tree();
+
+        let arr = map[node_for_path(&tree_a, "attributes.empty_arr") as usize];
+        let kvn = map[node_for_path(&tree_a, "attributes.empty_kv") as usize];
+        assert_eq!(gtree.node(arr).kind, Kind::EmptyArray);
+        assert_eq!(gtree.node(kvn).kind, Kind::EmptyKvlist);
     }
 
     #[test]
