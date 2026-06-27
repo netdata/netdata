@@ -13,6 +13,7 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { workspace = true }
+ng-flatten = { workspace = true }
 opentelemetry-proto = { workspace = true }
 prost = { workspace = true }
 thiserror = { workspace = true }

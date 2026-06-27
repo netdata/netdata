@@ -3411,6 +3411,7 @@ version = "0.1.3"
 dependencies = [
  "clap",
  "file-registry",
+ "ng-flatten",
  "opentelemetry-proto",
  "prost",
  "tempfile",

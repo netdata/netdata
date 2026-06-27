@@ -11,7 +11,6 @@
 //! The output shape (`Leaf`/`Value`) is intentionally provisional — it is the
 //! contract a future indexer will consume and is expected to be iterated on.
 
-use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::common::v1::{
     AnyValue, InstrumentationScope, KeyValue, any_value::Value as Av,
 };
@@ -128,22 +127,6 @@ pub fn flatten_log_record(
     out
 }
 
-/// Flatten every record in an export request, one leaf-list per record in
-/// document order (resource + scope context applied per record).
-pub fn flatten_request(request: &ExportLogsServiceRequest) -> Vec<Vec<Leaf>> {
-    let mut records = Vec::new();
-    for rl in &request.resource_logs {
-        let resource = rl.resource.as_ref();
-        for sl in &rl.scope_logs {
-            let scope = sl.scope.as_ref();
-            for record in &sl.log_records {
-                records.push(flatten_log_record(resource, scope, record));
-            }
-        }
-    }
-    records
-}
-
 fn leaf(path: &str, value: Value) -> Leaf {
     Leaf {
         path: path.to_string(),
@@ -219,7 +202,6 @@ fn join_field(prefix: &str, key: &str) -> String {
 mod tests {
     use super::*;
     use opentelemetry_proto::tonic::common::v1::{ArrayValue, KeyValueList};
-    use opentelemetry_proto::tonic::logs::v1::{ResourceLogs, ScopeLogs};
 
     fn av(v: Av) -> AnyValue {
         AnyValue { value: Some(v) }
@@ -335,30 +317,4 @@ mod tests {
         assert_eq!(at(&leaves, "attributes.no_value"), [&Value::Null]);
     }
 
-    #[test]
-    fn flatten_request_yields_one_list_per_record() {
-        let request = ExportLogsServiceRequest {
-            resource_logs: vec![ResourceLogs {
-                scope_logs: vec![ScopeLogs {
-                    log_records: vec![
-                        LogRecord {
-                            severity_number: 9,
-                            ..Default::default()
-                        },
-                        LogRecord {
-                            severity_number: 17,
-                            ..Default::default()
-                        },
-                    ],
-                    ..Default::default()
-                }],
-                ..Default::default()
-            }],
-        };
-
-        let records = flatten_request(&request);
-        assert_eq!(records.len(), 2);
-        assert_eq!(at(&records[0], "severity_number"), [&Value::Int(9)]);
-        assert_eq!(at(&records[1], "severity_number"), [&Value::Int(17)]);
-    }
 }

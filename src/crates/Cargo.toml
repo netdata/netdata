@@ -238,6 +238,7 @@ file-registry = { path = "file-registry" }
 otel-logs-identity = { path = "otel-logs-identity" }
 wal = { path = "wal" }
 wal-otap = { path = "wal-otap" }
+ng-flatten = { path = "ng-flatten" }
 
 opendal = { version = "0.55", default-features = false, features = ["services-fs", "services-s3", "executors-tokio"] }
 
