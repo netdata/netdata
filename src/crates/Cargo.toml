@@ -54,6 +54,7 @@ members = [
     "sfsq-cli",
 
     # OTLP→WAL/indexing experiment (SOW-20260627)
+    "ng-ingest",
     "ng-index",
 
     # Netdata NetFlow workspace members

@@ -1,12 +1,11 @@
-//! Proves the step-1 contract: a received OTLP batch, written as one WAL frame,
-//! reads back and decodes to the byte-identical `ExportLogsServiceRequest` —
-//! including mixed scalar types and nested kvlist/array/bytes values. This is the
-//! fidelity the later flattening step must preserve.
+//! A batch written as one WAL frame reads back and decodes to the byte-identical
+//! `ExportLogsServiceRequest`, including mixed scalar and nested
+//! kvlist/array/bytes values.
 
 use std::sync::Arc;
 
 use file_registry::MonotonicClock;
-use ng_index::{PIPELINE_ID, count_log_records, one_file_config, write_request};
+use ng_ingest::{PIPELINE_ID, count_log_records, one_file_config, write_request};
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::common::v1::{
     AnyValue, ArrayValue, InstrumentationScope, KeyValue, KeyValueList, any_value,

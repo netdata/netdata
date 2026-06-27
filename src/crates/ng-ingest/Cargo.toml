@@ -1,5 +1,5 @@
 [package]
-name = "ng-index"
+name = "ng-ingest"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,19 +8,20 @@ rust-version.workspace = true
 workspace = true
 
 [[bin]]
-name = "ng-index"
+name = "ng-ingest"
 path = "src/main.rs"
 
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }
+file-registry = { workspace = true }
 opentelemetry-proto = { workspace = true }
 prost = { workspace = true }
-thiserror = { workspace = true }
+tokio = { workspace = true }
+tonic = { workspace = true, features = ["gzip"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 wal = { workspace = true }
 
 [dev-dependencies]
-file-registry = { workspace = true }
 tempfile = { workspace = true }

@@ -1,118 +1,21 @@
-//! `ng-index`: a passive OTLP/gRPC logs receiver that freezes received batches
-//! into a single WAL file.
-//!
-//! It is experiment scaffolding (SOW-20260627), the first step toward a new
-//! type-preserving OTLP flattening + indexing approach explored outside the
-//! production substrate (`otel-ingestor` → `wal`/OTAP → `sfst-indexer` → `sfsq`).
-//! This binary does the minimum: accept OTLP logs over gRPC and write each export
-//! request to the WAL verbatim, so later steps can iterate on flattening/encoding
-//! and a new indexer against a frozen, realistic artifact.
-//!
-//! It does NOT connect to any stream itself. Feed it by pointing any OTLP log
-//! exporter at its listen address — e.g. the `otel-streams` binaries:
-//!
-//! ```text
-//! ng-index --out /tmp/ng --count 500000
-//! jetstream --otel-endpoint http://127.0.0.1:4317
-//! ```
-//!
-//! Encoding is deliberately the simplest faithful one: each frame payload is the
-//! received [`ExportLogsServiceRequest`] re-encoded as protobuf bytes
-//! (`prost::Message::encode_to_vec`). The richer, type-preserving encoding is a
-//! later step.
+//! `ng-index`: read a WAL file produced by `ng-ingest` and report log stats
+//! (frame and record counts, with a header cross-check).
 
-use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::process::ExitCode;
 
-use anyhow::Context;
 use clap::Parser;
-use file_registry::MonotonicClock;
-use ng_index::{PIPELINE_ID, one_file_config, write_request};
-use opentelemetry_proto::tonic::collector::logs::v1::logs_service_server::{
-    LogsService, LogsServiceServer,
-};
-use opentelemetry_proto::tonic::collector::logs::v1::{
-    ExportLogsServiceRequest, ExportLogsServiceResponse,
-};
-use tokio::sync::{Mutex, Notify};
-use tonic::transport::Server;
-use tonic::{Request, Response, Status};
+use ng_index::count_wal;
 
 #[derive(Parser)]
-#[command(name = "ng-index", about = "OTLP→WAL logs receiver (experiment step 1)")]
+#[command(name = "ng-index", about = "Read a WAL file and report log stats")]
 struct Args {
-    /// gRPC listen address for the OTLP LogsService (the default matches the
-    /// `otel-streams` exporters' `--otel-endpoint` default).
-    #[arg(long, default_value = "127.0.0.1:4317")]
-    listen: SocketAddr,
-
-    /// Directory the WAL file is written into (created if missing).
+    /// Path to the WAL file written by `ng-ingest`.
     #[arg(long)]
-    out: PathBuf,
-
-    /// Stop and flush after at least this many log records have been written.
-    /// Runs until Ctrl-C when omitted. The count is approximate at the boundary:
-    /// in-flight concurrent batches may push the total slightly past the target.
-    #[arg(long)]
-    count: Option<u64>,
+    r#in: PathBuf,
 }
 
-/// The WAL writer and its ingestion clock, guarded together: `write_frame` takes
-/// `&mut self` and each frame needs a coherent monotonic timestamp, so a single
-/// lock serializes concurrent gRPC handlers.
-struct Sink {
-    writer: wal::Writer,
-    clock: MonotonicClock,
-}
-
-/// The OTLP `LogsService` implementation: encode each batch to protobuf and append
-/// it as one WAL frame.
-struct Receiver {
-    sink: Arc<Mutex<Sink>>,
-    /// Total log records written so far (across all batches).
-    written: Arc<AtomicU64>,
-    /// Stop target; `None` means run until Ctrl-C.
-    target: Option<u64>,
-    /// Fired once `target` is reached, to stop the server.
-    done: Arc<Notify>,
-}
-
-#[tonic::async_trait]
-impl LogsService for Receiver {
-    async fn export(
-        &self,
-        request: Request<ExportLogsServiceRequest>,
-    ) -> Result<Response<ExportLogsServiceResponse>, Status> {
-        let req = request.into_inner();
-
-        let written = {
-            let mut sink = self.sink.lock().await;
-            let Sink { writer, clock } = &mut *sink;
-            write_request(writer, clock, &req)
-                .map_err(|e| Status::internal(format!("wal write_frame failed: {e}")))?
-        };
-
-        if written > 0 {
-            let total = self.written.fetch_add(written as u64, Ordering::Relaxed) + written as u64;
-            if let Some(target) = self.target {
-                if total >= target {
-                    // `notify_one` latches a permit, so the shutdown waiter wakes
-                    // even if it has not started awaiting yet.
-                    self.done.notify_one();
-                }
-            }
-        }
-
-        Ok(Response::new(ExportLogsServiceResponse {
-            partial_success: None,
-        }))
-    }
-}
-
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+fn main() -> ExitCode {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -122,59 +25,30 @@ async fn main() -> anyhow::Result<()> {
 
     let args = Args::parse();
 
-    let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
-    let writer = wal::Writer::new(&args.out, one_file_config(), seq, PIPELINE_ID)
-        .with_context(|| format!("failed to create WAL writer in {}", args.out.display()))?;
-
-    let sink = Arc::new(Mutex::new(Sink {
-        writer,
-        clock: MonotonicClock::new(),
-    }));
-    let written = Arc::new(AtomicU64::new(0));
-    let done = Arc::new(Notify::new());
-
-    let receiver = Receiver {
-        sink: Arc::clone(&sink),
-        written: Arc::clone(&written),
-        target: args.count,
-        done: Arc::clone(&done),
-    };
-
-    let svc = LogsServiceServer::new(receiver)
-        .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
-
-    tracing::info!(
-        listen = %args.listen,
-        out = %args.out.display(),
-        count = ?args.count,
-        "ng-index OTLP→WAL receiver starting (frames LZ4-compressed)"
-    );
-
-    // Stop on either the record target or Ctrl-C, then flush below.
-    let shutdown = async move {
-        tokio::select! {
-            _ = done.notified() => tracing::info!("record target reached; stopping"),
-            _ = tokio::signal::ctrl_c() => tracing::info!("ctrl-c received; stopping"),
+    let stats = match count_wal(&args.r#in) {
+        Ok(stats) => stats,
+        Err(e) => {
+            tracing::error!(path = %args.r#in.display(), error = %e, "failed to read WAL");
+            return ExitCode::FAILURE;
         }
     };
 
-    Server::builder()
-        .add_service(svc)
-        .serve_with_shutdown(args.listen, shutdown)
-        .await
-        .context("gRPC server error")?;
-
-    // The server has stopped accepting and all in-flight handlers have returned;
-    // flush and close the WAL file.
-    let events = {
-        let mut sink = sink.lock().await;
-        sink.writer.shutdown_all().context("WAL shutdown failed")?
-    };
     tracing::info!(
-        records = written.load(Ordering::Relaxed),
-        wal_events = events.len(),
-        "ng-index stopped; WAL file flushed and closed"
+        path = %args.r#in.display(),
+        frames = stats.frames,
+        records = stats.records,
+        header_records = stats.header_records,
+        consistent = stats.consistent(),
+        "WAL stats"
     );
 
-    Ok(())
+    if !stats.consistent() {
+        tracing::warn!(
+            decoded = stats.records,
+            header = stats.header_records,
+            "decoded record count disagrees with frame headers"
+        );
+    }
+
+    ExitCode::SUCCESS
 }
