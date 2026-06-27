@@ -1,0 +1,27 @@
+[package]
+name = "ng-index"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "ng-index"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+file-registry = { workspace = true }
+opentelemetry-proto = { workspace = true }
+prost = { workspace = true }
+tokio = { workspace = true }
+tonic = { workspace = true, features = ["gzip"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+wal = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
