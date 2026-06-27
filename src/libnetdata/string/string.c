@@ -453,18 +453,19 @@ STRING *string_2way_merge(STRING *a, STRING *b) {
         *dst1++ = *s1;
 
     *dst1 = '\0';
+    const char *prefix_end1 = s1, *prefix_end2 = s2;
 
     if(*s1 != '\0' || *s2 != '\0') {
         *dst1++ = '[';
         *dst1++ = 'x';
         *dst1++ = ']';
 
-        s1 = &(string2str(a))[alen - 1];
-        s2 = &(string2str(b))[blen - 1];
+        s1 = string2str(a) + alen;
+        s2 = string2str(b) + blen;
         char *dst2 = &buf2[length];
         *dst2 = '\0';
-        for (; *s1 && *s2 && *s1 == *s2; s1--, s2--)
-            *(--dst2) = *s1;
+        for (; s1 > prefix_end1 && s2 > prefix_end2 && s1[-1] == s2[-1]; s1--, s2--)
+            *(--dst2) = s1[-1];
 
         strcpy(dst1, dst2);
     }
