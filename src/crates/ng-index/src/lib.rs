@@ -19,7 +19,9 @@ use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use prost::Message;
 
 mod perf;
+mod sfst_build;
 pub use perf::{Metrics, Rss, read_rss};
+pub use sfst_build::{SfstStats, build_sfst};
 
 // Re-export the flattening vocabulary so the binary (and any consumer) gets it
 // from `ng-index` without depending on `ng-flatten` directly.
@@ -179,6 +181,8 @@ pub enum Error {
         frame: u64,
         source: bincode::error::DecodeError,
     },
+    #[error("sfst build failed: {0}")]
+    Sfst(#[from] sfst_indexer::IndexError),
 }
 
 /// One WAL file, no rotation, frames always LZ4-compressed — same shape as

@@ -10,7 +10,8 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::Parser;
-use ng_index::{Leaf, Metrics, Value, build_global, convert_wal, read_rss};
+use ng_index::{Leaf, Metrics, Value, build_global, build_sfst, convert_wal, read_rss};
+use sfst::IndexReader;
 
 #[derive(Parser)]
 #[command(name = "ng-index", about = "Flatten a WAL of OTLP logs and build a global schema tree")]
@@ -29,7 +30,12 @@ struct Args {
     #[arg(long)]
     flat: PathBuf,
 
-    /// Print the flattened leaves of the first N records (index mode only).
+    /// Build an SFST index file at this path from the flattened WAL (the
+    /// augment-SFST path), instead of the merge-only global-tree pass.
+    #[arg(long)]
+    sfst: Option<PathBuf>,
+
+    /// Print the flattened leaves of the first N records (merge mode only).
     #[arg(long, default_value_t = 0)]
     print: usize,
 }
@@ -41,7 +47,58 @@ fn main() -> ExitCode {
     if args.convert {
         return run_convert(&args, &metrics);
     }
+    if let Some(out) = args.sfst.clone() {
+        return run_sfst(&args, &out, &metrics);
+    }
     run_index(&args, &metrics)
+}
+
+/// Build an SFST index file from the flattened WAL, then smoke-test it: re-open and
+/// confirm the record count round-trips and that collapsed-array fields survived.
+fn run_sfst(args: &Args, out_path: &Path, metrics: &Metrics) -> ExitCode {
+    let stats = match build_sfst(&args.flat, out_path, metrics) {
+        Ok(stats) => stats,
+        Err(e) => {
+            eprintln!("error: build sfst from {} failed: {e}", args.flat.display());
+            return ExitCode::FAILURE;
+        }
+    };
+
+    println!("sfst: {} -> {}", args.flat.display(), out_path.display());
+    println!("frames: {}  records: {}", stats.frames, stats.records);
+    if let Ok(meta) = std::fs::metadata(out_path) {
+        println!("sfst size: {:.1} MiB on disk", meta.len() as f64 / (1024.0 * 1024.0));
+    }
+    print!("{}", metrics.report());
+    print_rss();
+
+    // Smoke test: re-open and confirm the round trip + array-collapse survival.
+    let bytes = match std::fs::read(out_path) {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            eprintln!("error: re-read {} failed: {e}", out_path.display());
+            return ExitCode::FAILURE;
+        }
+    };
+    let reader = match IndexReader::open(&bytes) {
+        Ok(reader) => reader,
+        Err(e) => {
+            eprintln!("error: open sfst failed: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    println!("round-trip: total_logs = {}", reader.total_logs());
+    let names: Vec<&str> = reader.field_table().names().collect();
+    let arrays: Vec<&&str> = names.iter().filter(|n| n.ends_with("[]")).collect();
+    println!(
+        "fields: {} total, {} collapsed-array (`[]`) fields",
+        names.len(),
+        arrays.len(),
+    );
+    for name in arrays.iter().take(5) {
+        println!("  array field: {name}");
+    }
+    ExitCode::SUCCESS
 }
 
 /// Phase 1: protobuf WAL → flattened WAL.
