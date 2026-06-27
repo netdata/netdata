@@ -79,7 +79,7 @@ impl LogsService for Receiver {
             let mut sink = self.sink.lock().await;
             let Sink { writer, clock } = &mut *sink;
             write_request(writer, clock, &req)
-                .map_err(|e| Status::internal(format!("wal write_frame failed: {e}")))?
+                .map_err(|e| Status::internal(format!("ingest write failed: {e}")))?
         };
 
         if written > 0 {

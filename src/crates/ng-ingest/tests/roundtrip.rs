@@ -1,10 +1,11 @@
-//! A batch written as one WAL frame reads back and decodes to the byte-identical
-//! `ExportLogsServiceRequest`, including mixed scalar and nested
-//! kvlist/array/bytes values.
+//! A batch written as one WAL frame reads back and decodes to a `FlattenedRequest`,
+//! preserving the record grouping and the typed scalar/nested/array values through
+//! the flatten + bincode + WAL round-trip.
 
 use std::sync::Arc;
 
 use file_registry::MonotonicClock;
+use ng_flatten::{FlattenedRequest, Leaf, Value, decode_frame};
 use ng_ingest::{PIPELINE_ID, count_log_records, one_file_config, write_request};
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::common::v1::{
@@ -12,7 +13,6 @@ use opentelemetry_proto::tonic::common::v1::{
 };
 use opentelemetry_proto::tonic::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
 use opentelemetry_proto::tonic::resource::v1::Resource;
-use prost::Message;
 
 fn av(v: any_value::Value) -> AnyValue {
     AnyValue { value: Some(v) }
@@ -93,6 +93,28 @@ fn wal_file(dir: &std::path::Path) -> std::path::PathBuf {
         .expect("a .wal file in the output dir")
 }
 
+/// All leaves (resource + scope + every record) of a flattened request, resolved to
+/// path+value in document order.
+fn all_leaves(flattened: &FlattenedRequest) -> Vec<Leaf> {
+    let tree = &flattened.tree;
+    let mut out = Vec::new();
+    for rg in &flattened.resources {
+        out.extend(tree.resolve(&rg.resource));
+        for sg in &rg.scopes {
+            out.extend(tree.resolve(&sg.scope));
+            for record in &sg.records {
+                out.extend(tree.resolve(record));
+            }
+        }
+    }
+    out
+}
+
+/// All values at `path`, in document order.
+fn at<'a>(leaves: &'a [Leaf], path: &str) -> Vec<&'a Value> {
+    leaves.iter().filter(|l| l.path == path).map(|l| &l.value).collect()
+}
+
 #[test]
 fn request_roundtrips_through_a_wal_frame() {
     let dir = tempfile::tempdir().unwrap();
@@ -106,14 +128,43 @@ fn request_roundtrips_through_a_wal_frame() {
     assert_eq!(written, 2);
     writer.shutdown_all().unwrap();
 
-    // Frames are LZ4-compressed; `wal::Reader` decompresses transparently, so the
-    // decoded payload must still equal the original batch byte-for-byte.
+    // Frames are LZ4-compressed; `wal::Reader` decompresses transparently. The
+    // payload is now a bincode `FlattenedRequest`, not protobuf.
     let mut reader = wal::Reader::open(&wal_file(dir.path())).unwrap();
     let frame = reader.next_frame().unwrap().expect("one frame written");
     assert_eq!(frame.entry_count as usize, written);
 
-    let decoded = ExportLogsServiceRequest::decode(frame.data).expect("payload decodes as OTLP");
-    assert_eq!(decoded, original, "the batch must round-trip byte-for-byte");
+    let flattened = decode_frame(frame.data).expect("payload decodes as a flattened frame");
+    // Grouping survives: one resource, one scope, two records.
+    assert_eq!(flattened.resources.len(), 1);
+    assert_eq!(flattened.resources[0].scopes.len(), 1);
+    assert_eq!(flattened.resources[0].scopes[0].records.len(), 2);
+
+    // Typed scalar / nested / array values survive the round-trip (two records, so
+    // each shared column appears twice; bodies differ per record).
+    let leaves = all_leaves(&flattened);
+    assert_eq!(at(&leaves, "resource.attributes.service.name"), [&Value::Str("svc".into())]);
+    assert_eq!(at(&leaves, "scope.name"), [&Value::Str("scope".into())]);
+    assert_eq!(at(&leaves, "scope.version"), [&Value::Str("1.0".into())]);
+    assert_eq!(at(&leaves, "body"), [&Value::Str("first".into()), &Value::Str("second".into())]);
+    assert_eq!(at(&leaves, "attributes.int"), [&Value::Int(42), &Value::Int(42)]);
+    assert_eq!(at(&leaves, "attributes.double"), [&Value::Double(3.5), &Value::Double(3.5)]);
+    assert_eq!(at(&leaves, "attributes.bool"), [&Value::Bool(true), &Value::Bool(true)]);
+    assert_eq!(
+        at(&leaves, "attributes.bytes"),
+        [&Value::Bytes(vec![0xde, 0xad, 0xbe, 0xef]), &Value::Bytes(vec![0xde, 0xad, 0xbe, 0xef])],
+    );
+    assert_eq!(at(&leaves, "attributes.nested.inner_int"), [&Value::Int(7), &Value::Int(7)]);
+    // Array indices collapse to `[]`: both elements per record, in order (2 records).
+    assert_eq!(
+        at(&leaves, "attributes.arr[]"),
+        [
+            &Value::Int(1),
+            &Value::Str("two".into()),
+            &Value::Int(1),
+            &Value::Str("two".into()),
+        ],
+    );
 
     // Exactly one frame for one request.
     assert!(reader.next_frame().unwrap().is_none());

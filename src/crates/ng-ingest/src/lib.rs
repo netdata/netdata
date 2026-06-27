@@ -1,9 +1,9 @@
-//! Core of the `ng-ingest` receiver: turn one OTLP export request into one WAL
-//! frame, encoding the request as protobuf bytes.
+//! Core of the `ng-ingest` receiver: flatten one OTLP export request and append it
+//! as one WAL frame in the flattened-frame format (see `ng-flatten`).
 
+use anyhow::Context as _;
 use file_registry::{ByteSize, MonotonicClock, TimestampNs};
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
-use prost::Message;
 
 /// Every frame goes to one logical stream, hence one WAL file. The WAL treats
 /// `part_key` as opaque; a single constant keeps everything in one file.
@@ -38,22 +38,27 @@ pub fn one_file_config() -> wal::Config {
     }
 }
 
-/// Encode `req` as protobuf and append it as a single WAL frame, returning the
-/// number of log records written.
+/// Flatten `req` and append it as a single WAL frame in the flattened-frame format,
+/// returning the number of log records written.
 ///
-/// `log_min/max_ts` are left `ZERO` (no per-frame time-range summary; the real
-/// timestamps remain inside each record). A request with zero log records writes
-/// no frame and returns `0`.
+/// The request is flattened into a per-frame schema tree + typed entries, each
+/// entry's `xxhash64(key=value)` is pre-computed (so the downstream SFST build rides
+/// the interner's fast path), and the result is bincode-encoded as the frame
+/// payload. `log_min/max_ts` are left `ZERO` (no per-frame time-range summary; the
+/// real timestamps remain inside each record). A request with zero log records
+/// writes no frame and returns `0`.
 pub fn write_request(
     writer: &mut wal::Writer,
     clock: &mut MonotonicClock,
     req: &ExportLogsServiceRequest,
-) -> wal::Result<usize> {
+) -> anyhow::Result<usize> {
     let entry_count = count_log_records(req);
     if entry_count == 0 {
         return Ok(0);
     }
-    let data = req.encode_to_vec();
+    let mut flattened = ng_flatten::flatten_request(req);
+    ng_flatten::fill_hashes(&mut flattened);
+    let data = ng_flatten::encode_frame(&flattened).context("encode flattened frame")?;
     let ingestion_ns = clock.now_ns();
     writer.write_frame(
         PART_KEY,
