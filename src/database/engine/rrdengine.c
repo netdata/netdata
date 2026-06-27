@@ -1996,7 +1996,10 @@ uint64_t rrdeng_target_data_file_size(struct rrdengine_instance *ctx) {
 /* return 0 on success */
 int init_rrd_files(struct rrdengine_instance *ctx)
 {
-    return init_data_files(ctx);
+    nd_win_trace("init_rrd_files: tier=%d calling init_data_files", ctx->config.tier);
+    int ret = init_data_files(ctx);
+    nd_win_trace("init_rrd_files: tier=%d init_data_files returned %d", ctx->config.tier, ret);
+    return ret;
 }
 
 void finalize_rrd_files(struct rrdengine_instance *ctx)

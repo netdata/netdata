@@ -420,6 +420,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     struct rrdengine_datafile **datafiles, *datafile;
     struct rrdengine_journalfile *journalfile;
 
+    nd_win_trace("scan_data_files[A]: tier=%d path='%s'", ctx->config.tier, ctx->config.dbfiles_path);
     ret = uv_fs_scandir(NULL, &req, ctx->config.dbfiles_path, 0, NULL);
     if (ret < 0) {
         fatal_assert(req.result < 0);
@@ -428,6 +429,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         ctx_fs_error(ctx);
         return ret;
     }
+    nd_win_trace("scan_data_files[B]: tier=%d uv_fs_scandir returned %d", ctx->config.tier, ret);
     netdata_log_info("DBENGINE: tier %d: found %d files in path %s", ctx->config.tier, ret, ctx->config.dbfiles_path);
 
     Pvoid_t datafiles_JudyL = NULL;
@@ -470,6 +472,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
             nd_log_daemon(NDLP_WARNING, "Unknown file detected : \"%s/%s\"", ctx->config.dbfiles_path, dent.name);
     }
     uv_fs_req_cleanup(&req);
+    nd_win_trace("scan_data_files[C]: tier=%d matched_files=%d", ctx->config.tier, matched_files);
 
     if (0 == matched_files) {
         freez(datafiles);
@@ -485,6 +488,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
 
     // Remove journal files that do not have a matching data file
     // by scanning the judy array of the journal files
+    nd_win_trace("scan_data_files[D]: tier=%d orphan-check validate=%d", ctx->config.tier, (int)validate_files);
     if (validate_files) {
         bool first_then_next = true;
         Word_t idx = 0;
@@ -532,18 +536,24 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     (void) JudyLFreeArray(&journafile_JudyL, NULL);
     (void) JudyLFreeArray(&datafiles_JudyL, NULL);
 
-
+    nd_win_trace("scan_data_files[E]: tier=%d orphan-check done, starting load of %d files", ctx->config.tier, matched_files);
     netdata_log_info("DBENGINE: tier %d: loading %d data/journal files...", ctx->config.tier, matched_files);
+    nd_win_trace("scan_data_files: loading %d datafile pairs from '%s'", matched_files, ctx->config.dbfiles_path);
     for (failed_to_load = 0, i = 0 ; i < matched_files ; ++i) {
         uint8_t must_delete_pair = 0;
 
         datafile = datafiles[i];
+        nd_win_trace("scan_data_files: file[%d/%d] fileno=%u: load_data_file...", i + 1, matched_files, datafile->fileno);
         ret = load_data_file(datafile);
+        nd_win_trace("scan_data_files: file[%d/%d] fileno=%u: load_data_file ret=%d", i + 1, matched_files, datafile->fileno, ret);
         if (0 != ret)
             must_delete_pair = 1;
 
         journalfile = journalfile_alloc_and_init(datafile);
+        nd_win_trace("scan_data_files: file[%d/%d] fileno=%u: journalfile_load...", i + 1, matched_files, datafile->fileno);
+        netdata_log_info("DBENGINE: tier %d: loading file %d/%d (fileno=%u)...", ctx->config.tier, i + 1, matched_files, datafile->fileno);
         ret = journalfile_load(ctx, journalfile, datafile);
+        nd_win_trace("scan_data_files: file[%d/%d] fileno=%u: journalfile_load ret=%d", i + 1, matched_files, datafile->fileno, ret);
         if (0 != ret) {
             if (!must_delete_pair) /* If datafile is still open close it */
                 close_data_file(datafile);
@@ -575,6 +585,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     }
 
     matched_files -= failed_to_load;
+    nd_win_trace("scan_data_files: done, loaded=%d failed=%d", matched_files, failed_to_load);
     freez(datafiles);
 
     return matched_files;
