@@ -4,7 +4,6 @@
 
 use std::path::Path;
 
-use ng_flatten::Flattener;
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use prost::Message;
 
@@ -13,7 +12,7 @@ pub use perf::{Metrics, Rss, read_rss};
 
 // Re-export the flattening vocabulary so the binary (and any consumer) gets it
 // from `ng-index` without depending on `ng-flatten` directly.
-pub use ng_flatten::{Entry, Kind, Leaf, NodeId, SchemaTree, Value};
+pub use ng_flatten::{Entry, Flattener, Kind, Leaf, NodeId, SchemaTree, Value};
 
 /// A flattened frame: one schema tree shared by all its records, plus the OTLP
 /// grouping. Resource/scope are flattened once per group; records hold only their
@@ -38,13 +37,17 @@ pub struct ScopeGroup {
     pub records: Vec<Vec<Entry>>,
 }
 
-/// Flatten a decoded export request into a per-frame [`FlattenedRequest`].
+/// Flatten one decoded request INTO a shared [`Flattener`], returning the
+/// request's grouped entries. The tree stays in `flattener`, so it can span many
+/// requests (e.g. an entire WAL → one global schema tree). Resource is flattened
+/// once per `ResourceLogs`, scope once per `ScopeLogs`.
 ///
 /// Defined here (not in `ng-flatten`) for now: walking the request structure is
-/// an index-side concern. One [`Flattener`] builds the shared tree; resource is
-/// flattened once per `ResourceLogs`, scope once per `ScopeLogs`.
-pub fn flatten_request(request: &ExportLogsServiceRequest) -> FlattenedRequest {
-    let mut flattener = Flattener::new();
+/// an index-side concern.
+pub fn flatten_into(
+    flattener: &mut Flattener,
+    request: &ExportLogsServiceRequest,
+) -> Vec<ResourceGroup> {
     let mut resources = Vec::with_capacity(request.resource_logs.len());
     for rl in &request.resource_logs {
         let resource = rl
@@ -68,6 +71,14 @@ pub fn flatten_request(request: &ExportLogsServiceRequest) -> FlattenedRequest {
         }
         resources.push(ResourceGroup { resource, scopes });
     }
+    resources
+}
+
+/// Flatten a request into its own per-frame tree (convenience over
+/// [`flatten_into`]).
+pub fn flatten_request(request: &ExportLogsServiceRequest) -> FlattenedRequest {
+    let mut flattener = Flattener::new();
+    let resources = flatten_into(&mut flattener, request);
     FlattenedRequest {
         tree: flattener.into_tree(),
         resources,
@@ -91,8 +102,8 @@ pub struct WalStats {
     pub records: u64,
     /// Total leaf entries across all records (one per leaf occurrence).
     pub leaves: u64,
-    /// Total schema-tree nodes built across all frames (per-frame trees summed) —
-    /// a measure of how compact the interned structure is vs `leaves`.
+    /// Schema-tree nodes built across all frames (per-frame trees summed) — the
+    /// interned typed-column structure vs the `leaves` occurrences.
     pub tree_nodes: u64,
     /// Total log records claimed by the frame headers (`entry_count`). Equals
     /// `records` for an intact file.
@@ -154,6 +165,8 @@ pub fn count_wal(
             })?
         };
 
+        // Per-frame tree (mirrors the final design: each ingested request flattens
+        // into its own tree, stored with the frame).
         let flattened = {
             let _t = metrics.scope("flatten");
             flatten_request(&req)
