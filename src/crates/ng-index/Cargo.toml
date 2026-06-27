@@ -23,4 +23,8 @@ thiserror = { workspace = true }
 wal = { workspace = true }
 
 [dev-dependencies]
+bumpalo = { workspace = true }
+sfst = { workspace = true }
+sfst-indexer = { workspace = true }
 tempfile = { workspace = true }
+wal-otap = { workspace = true }
