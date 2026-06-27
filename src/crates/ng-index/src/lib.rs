@@ -7,6 +7,9 @@ use std::path::Path;
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use prost::Message;
 
+mod perf;
+pub use perf::Metrics;
+
 /// Stats gathered from one WAL file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct WalStats {
@@ -49,21 +52,42 @@ pub enum Error {
     },
 }
 
-/// Open a WAL file and tally its frames and log records.
+/// Open a WAL file and tally its frames and log records, recording per-phase
+/// timings and throughput counters into `metrics`.
 ///
 /// `wal::Reader` decompresses LZ4 frames transparently, so each payload decodes
-/// directly as an [`ExportLogsServiceRequest`].
-pub fn count_wal(path: &Path) -> Result<WalStats, Error> {
+/// directly as an [`ExportLogsServiceRequest`]. Phases timed: `read` (frame
+/// read + decompress), `decode` (protobuf), `process` (count).
+pub fn count_wal(path: &Path, metrics: &Metrics) -> Result<WalStats, Error> {
     let mut reader = wal::Reader::open(path)?;
     let mut stats = WalStats::default();
-    while let Some(frame) = reader.next_frame()? {
+    loop {
+        let frame = {
+            let _t = metrics.scope("read");
+            match reader.next_frame()? {
+                Some(frame) => frame,
+                None => break,
+            }
+        };
         stats.frames += 1;
         stats.header_records += frame.entry_count as u64;
-        let req = ExportLogsServiceRequest::decode(frame.data).map_err(|source| Error::Decode {
-            frame: stats.frames,
-            source,
-        })?;
-        stats.records += count_log_records(&req) as u64;
+        metrics.add_frames(1);
+        metrics.add_bytes(frame.data.len() as u64);
+
+        let req = {
+            let _t = metrics.scope("decode");
+            ExportLogsServiceRequest::decode(frame.data).map_err(|source| Error::Decode {
+                frame: stats.frames,
+                source,
+            })?
+        };
+
+        let records = {
+            let _t = metrics.scope("process");
+            count_log_records(&req)
+        };
+        stats.records += records as u64;
+        metrics.add_records(records as u64);
     }
     Ok(stats)
 }

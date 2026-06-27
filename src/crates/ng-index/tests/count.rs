@@ -5,7 +5,7 @@
 use std::sync::Arc;
 
 use file_registry::TimestampNs;
-use ng_index::count_wal;
+use ng_index::{Metrics, count_wal};
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
 use prost::Message;
@@ -63,7 +63,7 @@ fn counts_frames_and_records() {
     }
     writer.shutdown_all().unwrap();
 
-    let stats = count_wal(&wal_file(dir.path())).unwrap();
+    let stats = count_wal(&wal_file(dir.path()), &Metrics::new()).unwrap();
     assert_eq!(stats.frames, 3);
     assert_eq!(stats.records, 10);
     assert_eq!(stats.header_records, 10);
@@ -73,5 +73,5 @@ fn counts_frames_and_records() {
 #[test]
 fn missing_file_is_an_error() {
     let dir = tempfile::tempdir().unwrap();
-    assert!(count_wal(&dir.path().join("nope.wal")).is_err());
+    assert!(count_wal(&dir.path().join("nope.wal"), &Metrics::new()).is_err());
 }

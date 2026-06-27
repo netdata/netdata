@@ -12,13 +12,10 @@ name = "ng-index"
 path = "src/main.rs"
 
 [dependencies]
-anyhow = { workspace = true }
 clap = { workspace = true }
 opentelemetry-proto = { workspace = true }
 prost = { workspace = true }
 thiserror = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true, features = ["env-filter"] }
 wal = { workspace = true }
 
 [dev-dependencies]
