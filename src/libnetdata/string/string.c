@@ -25,6 +25,8 @@ struct netdata_string {
     const char str[];   // the string itself, is appended to this structure
 };
 
+#define STRING_MAX_LENGTH (MIN((size_t)UINT32_MAX, (size_t)LONG_MAX - sizeof(STRING)) - 1)
+
 static struct string_partition {
     RW_SPINLOCK spinlock;       // the R/W spinlock to protect the Judy array
 
@@ -306,6 +308,9 @@ STRING *string_strdupz(const char *str) {
 
     if(unlikely(!length)) return NULL;
 
+    if(unlikely(length > STRING_MAX_LENGTH))
+        fatal("STRING: cannot index string length %zu, maximum is %zu", length, STRING_MAX_LENGTH);
+
     length++;
     uint8_t partition = string_partition_str(str);
     STRING *string = string_index_search(str, length, partition);
@@ -332,6 +337,9 @@ STRING *string_strdupz(const char *str) {
 ALWAYS_INLINE
 STRING *string_strndupz(const char *str, size_t len) {
     if(unlikely(!str || !*str || !len)) return NULL;
+
+    if(unlikely(len > STRING_MAX_LENGTH))
+        fatal("STRING: cannot index string length %zu, maximum is %zu", len, STRING_MAX_LENGTH);
 
     uint8_t partition = string_partition_str(str);
 
