@@ -3403,17 +3403,20 @@ name = "ng-flatten"
 version = "0.1.3"
 dependencies = [
  "opentelemetry-proto",
+ "serde",
 ]
 
 [[package]]
 name = "ng-index"
 version = "0.1.3"
 dependencies = [
+ "bincode 2.0.1",
  "clap",
  "file-registry",
  "ng-flatten",
  "opentelemetry-proto",
  "prost",
+ "serde",
  "tempfile",
  "thiserror 2.0.18",
  "wal",

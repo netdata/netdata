@@ -9,3 +9,4 @@ workspace = true
 
 [dependencies]
 opentelemetry-proto = { workspace = true }
+serde = { workspace = true, features = ["derive"] }

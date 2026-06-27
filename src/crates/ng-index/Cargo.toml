@@ -12,13 +12,15 @@ name = "ng-index"
 path = "src/main.rs"
 
 [dependencies]
+bincode = { workspace = true }
 clap = { workspace = true }
+file-registry = { workspace = true }
 ng-flatten = { workspace = true }
 opentelemetry-proto = { workspace = true }
 prost = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 wal = { workspace = true }
 
 [dev-dependencies]
-file-registry = { workspace = true }
 tempfile = { workspace = true }

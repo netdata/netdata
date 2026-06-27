@@ -19,6 +19,8 @@
 
 use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
+
 use opentelemetry_proto::tonic::common::v1::{
     AnyValue, InstrumentationScope, KeyValue, any_value::Value as Av,
 };
@@ -32,7 +34,7 @@ const ROOT: NodeId = 0;
 
 /// The kind (type tag) of a schema-tree node. Leaf kinds carry a value; the
 /// interior kinds [`Kind::Kvlist`]/[`Kind::Array`] have children instead.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Kind {
     Null,
     Bool,
@@ -54,7 +56,7 @@ impl Kind {
 }
 
 /// A flattened leaf value carrying its concrete OTLP-typed payload.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Value {
     Null,
     Bool(bool),
@@ -84,13 +86,13 @@ impl Value {
 /// How a node descends from its parent: a named field, or the merged array
 /// element. Distinguishing these is what makes a path unambiguous (an array index
 /// vs a key literally containing `[]`).
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Step {
     Field(String),
     ArrayElem,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct Edge {
     parent: NodeId,
     step: Step,
@@ -98,14 +100,14 @@ struct Edge {
 
 /// A schema-tree node: its [`Kind`] plus the upward edge to its parent (`None`
 /// only at the root).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Node {
     pub kind: Kind,
     edge: Option<Edge>,
 }
 
 /// One leaf occurrence: the schema node it belongs to and its value.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Entry {
     pub node: NodeId,
     pub value: Value,
@@ -121,7 +123,7 @@ pub struct Leaf {
 
 /// The merged structure of the records flattened into it: an arena of [`Node`]s,
 /// sized by structural variety, not data volume. Node id 0 is the root.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SchemaTree {
     nodes: Vec<Node>,
 }
@@ -209,6 +211,27 @@ impl Flattener {
     /// Finish building, yielding the structure (the building index is dropped).
     pub fn into_tree(self) -> SchemaTree {
         SchemaTree { nodes: self.nodes }
+    }
+
+    /// Merge a foreign per-frame [`SchemaTree`] into this builder's (global) tree,
+    /// returning a `local → global` node-id map indexed by the foreign [`NodeId`].
+    ///
+    /// This is the index-time counterpart to flattening: it rebuilds one global
+    /// column space from many stored per-frame trees. A non-root node always has a
+    /// smaller id than its children (children are interned after their parent), so
+    /// a single ascending pass sees every parent already mapped. Interning each
+    /// `(global_parent, step, kind)` reuses the same logic as flattening, so a
+    /// column shared across frames collapses to one global node. Callers renumber
+    /// entries through the returned map — an integer lookup per entry.
+    pub fn merge_tree(&mut self, foreign: &SchemaTree) -> Vec<NodeId> {
+        let mut map = vec![ROOT; foreign.len()];
+        for local in 1..foreign.len() as NodeId {
+            let node = foreign.node(local);
+            let edge = node.edge.as_ref().expect("non-root node has a parent edge");
+            let global_parent = map[edge.parent as usize];
+            map[local as usize] = self.child(global_parent, edge.step.clone(), node.kind);
+        }
+        map
     }
 
     /// Get-or-create the child of `parent` reached via `(step, kind)`.
@@ -496,6 +519,48 @@ mod tests {
         let scope_leaves = tree.resolve(&scope_entries);
         assert_eq!(at(&scope_leaves, "scope.name"), [&Value::Str("lib".into())]);
         assert_eq!(at(&scope_leaves, "scope.version"), [&Value::Str("1.0".into())]);
+    }
+
+    #[test]
+    fn merge_tree_unifies_columns_across_frames() {
+        // Two per-frame trees: an overlapping column (severity_number) plus a
+        // distinct attribute each. Merging both into one global builder must yield
+        // a single column space where the shared column is ONE node and the
+        // distinct ones survive — the index-time global-tree rebuild.
+        let mut fa = Flattener::new();
+        let a = fa.flatten_record(&LogRecord {
+            severity_number: 9,
+            attributes: vec![kv("only_a", Av::IntValue(1))],
+            ..Default::default()
+        });
+        let tree_a = fa.into_tree();
+
+        let mut fb = Flattener::new();
+        let b = fb.flatten_record(&LogRecord {
+            severity_number: 17,
+            attributes: vec![kv("only_b", Av::StringValue("x".into()))],
+            ..Default::default()
+        });
+        let tree_b = fb.into_tree();
+
+        let mut global = Flattener::new();
+        let map_a = global.merge_tree(&tree_a);
+        let map_b = global.merge_tree(&tree_b);
+        let gtree = global.into_tree();
+
+        // severity_number is each record's first entry; it must map to the SAME
+        // global node from both frames.
+        let sev_a = map_a[a[0].node as usize];
+        let sev_b = map_b[b[0].node as usize];
+        assert_eq!(sev_a, sev_b, "shared column must merge to one global node");
+        assert_eq!(gtree.path(sev_a), "severity_number");
+
+        // The distinct attributes keep their own global nodes and paths.
+        let only_a = map_a[a[1].node as usize];
+        let only_b = map_b[b[1].node as usize];
+        assert_ne!(only_a, only_b);
+        assert_eq!(gtree.path(only_a), "attributes.only_a");
+        assert_eq!(gtree.path(only_b), "attributes.only_b");
     }
 
     #[test]

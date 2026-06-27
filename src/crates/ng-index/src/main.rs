@@ -1,50 +1,101 @@
-//! `ng-index`: read a WAL file produced by `ng-ingest`, flatten its records, and
-//! report stats (frame/record/leaf counts, with a header cross-check). `--print N`
-//! dumps the flattened leaves of the first N records for inspection.
+//! `ng-index`: a two-phase experiment over a WAL of OTLP logs.
+//!
+//! - `ng-index --convert --in <protobuf-wal> --flat <dir>` — phase 1: flatten the
+//!   protobuf WAL into a flattened WAL in `<dir>`, then exit. Done ONCE.
+//! - `ng-index --flat <dir> [--print N]` — phase 2 (default): merge the flattened
+//!   WAL into one global schema tree and report the merge cost + RSS. `--print N`
+//!   dumps the first N records (resolved against the global tree).
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::Parser;
-use ng_index::{Leaf, Metrics, Value, count_wal, read_rss};
+use ng_index::{Leaf, Metrics, Value, build_global, convert_wal, read_rss};
 
 #[derive(Parser)]
-#[command(name = "ng-index", about = "Read a WAL file, flatten records, report stats")]
+#[command(name = "ng-index", about = "Flatten a WAL of OTLP logs and build a global schema tree")]
 struct Args {
-    /// Path to the WAL file written by `ng-ingest`.
+    /// Convert mode: flatten the protobuf WAL (`--in`) into the flattened WAL
+    /// (`--flat`) and exit. Without this flag, `ng-index` runs the index step
+    /// (phase 2) over an already-converted flattened WAL.
     #[arg(long)]
-    r#in: PathBuf,
+    convert: bool,
 
-    /// Print the flattened leaves of the first N records (0 = none).
+    /// Protobuf WAL file written by `ng-ingest` (required with `--convert`).
+    #[arg(long)]
+    r#in: Option<PathBuf>,
+
+    /// Directory holding the flattened WAL: written by `--convert`, read otherwise.
+    #[arg(long)]
+    flat: PathBuf,
+
+    /// Print the flattened leaves of the first N records (index mode only).
     #[arg(long, default_value_t = 0)]
     print: usize,
 }
 
 fn main() -> ExitCode {
     let args = Args::parse();
-
     let metrics = Metrics::new();
-    let (stats, sample) = match count_wal(&args.r#in, args.print, &metrics) {
-        Ok(result) => result,
+
+    if args.convert {
+        return run_convert(&args, &metrics);
+    }
+    run_index(&args, &metrics)
+}
+
+/// Phase 1: protobuf WAL → flattened WAL.
+fn run_convert(args: &Args, metrics: &Metrics) -> ExitCode {
+    let Some(in_path) = args.r#in.as_ref() else {
+        eprintln!("error: --convert requires --in <protobuf-wal>");
+        return ExitCode::FAILURE;
+    };
+
+    let stats = match convert_wal(in_path, &args.flat, metrics) {
+        Ok(stats) => stats,
         Err(e) => {
-            eprintln!("error: failed to read {}: {e}", args.r#in.display());
+            eprintln!("error: convert {} failed: {e}", in_path.display());
             return ExitCode::FAILURE;
         }
     };
 
-    println!("file: {}", args.r#in.display());
+    println!("convert: {} -> {}", in_path.display(), args.flat.display());
     println!(
-        "frames: {}  records: {}  leaves: {}  tree_nodes: {}  header_records: {}  consistent: {}",
+        "frames: {}  records: {}  leaves: {}  header_records: {}  consistent: {}",
+        stats.frames, stats.records, stats.leaves, stats.header_records, stats.consistent(),
+    );
+    if let Some(size) = flat_wal_size(&args.flat) {
+        println!("flattened wal: {:.1} MiB on disk", size as f64 / (1024.0 * 1024.0));
+    }
+    print!("{}", metrics.report());
+    print_rss();
+    ExitCode::SUCCESS
+}
+
+/// Phase 2: flattened WAL → global schema tree.
+fn run_index(args: &Args, metrics: &Metrics) -> ExitCode {
+    let (stats, sample) = match build_global(&args.flat, args.print, metrics) {
+        Ok(result) => result,
+        Err(e) => {
+            eprintln!("error: index {} failed: {e}", args.flat.display());
+            return ExitCode::FAILURE;
+        }
+    };
+
+    println!("flat: {}", args.flat.display());
+    println!(
+        "frames: {}  records: {}  leaves: {}  global_nodes: {}  global_columns: {}  header_records: {}  consistent: {}",
         stats.frames,
         stats.records,
         stats.leaves,
-        stats.tree_nodes,
+        stats.global_nodes,
+        stats.global_columns,
         stats.header_records,
         stats.consistent(),
     );
     if !stats.consistent() {
         println!(
-            "WARNING: decoded records ({}) disagree with frame headers ({})",
+            "WARNING: record count ({}) disagrees with frame headers ({})",
             stats.records, stats.header_records,
         );
     }
@@ -70,7 +121,25 @@ fn main() -> ExitCode {
     }
 
     print!("{}", metrics.report());
+    print_rss();
+    ExitCode::SUCCESS
+}
 
+/// Total size of the `.wal` file(s) in the flattened-WAL directory.
+fn flat_wal_size(dir: &Path) -> Option<u64> {
+    let mut total = 0u64;
+    let mut any = false;
+    for entry in std::fs::read_dir(dir).ok()? {
+        let path = entry.ok()?.path();
+        if path.extension().is_some_and(|x| x == "wal") {
+            total += std::fs::metadata(&path).ok()?.len();
+            any = true;
+        }
+    }
+    any.then_some(total)
+}
+
+fn print_rss() {
     match read_rss() {
         Some(rss) => println!(
             "rss: {:.1} MiB peak ({:.1} MiB at exit)",
@@ -79,8 +148,6 @@ fn main() -> ExitCode {
         ),
         None => println!("rss: n/a (non-Linux)"),
     }
-
-    ExitCode::SUCCESS
 }
 
 /// Render one leaf as `path = value [Kind]` for inspection.
