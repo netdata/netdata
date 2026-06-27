@@ -15,7 +15,6 @@ path = "src/main.rs"
 clap = { workspace = true }
 opentelemetry-proto = { workspace = true }
 prost = { workspace = true }
-rayon = { workspace = true }
 thiserror = { workspace = true }
 wal = { workspace = true }
 

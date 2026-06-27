@@ -63,8 +63,7 @@ fn counts_frames_and_records() {
     }
     writer.shutdown_all().unwrap();
 
-    // chunk = 2 over 3 frames exercises the multi-chunk path (2 then 1).
-    let stats = count_wal(&wal_file(dir.path()), 2, &Metrics::new()).unwrap();
+    let stats = count_wal(&wal_file(dir.path()), &Metrics::new()).unwrap();
     assert_eq!(stats.frames, 3);
     assert_eq!(stats.records, 10);
     assert_eq!(stats.header_records, 10);
@@ -74,5 +73,5 @@ fn counts_frames_and_records() {
 #[test]
 fn missing_file_is_an_error() {
     let dir = tempfile::tempdir().unwrap();
-    assert!(count_wal(&dir.path().join("nope.wal"), 256, &Metrics::new()).is_err());
+    assert!(count_wal(&dir.path().join("nope.wal"), &Metrics::new()).is_err());
 }

@@ -6,7 +6,6 @@ use std::path::Path;
 
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use prost::Message;
-use rayon::prelude::*;
 
 mod perf;
 pub use perf::{Metrics, Rss, read_rss};
@@ -56,71 +55,39 @@ pub enum Error {
 /// Read a WAL file and tally its frames and log records, recording per-phase
 /// timings and throughput counters into `metrics`.
 ///
-/// Pipeline: read up to `chunk_frames` frame payloads sequentially (`wal::Reader`
-/// decompresses LZ4 transparently), decode that chunk in parallel on the rayon
-/// pool, accumulate the decoded corpus, repeat; then count over the whole corpus.
-/// The rayon step does nothing but decode — all timing/counting is on the calling
-/// thread. Phases timed: `read`, `decode` (the parallel section), `process`.
-///
-/// `chunk_frames` must be >= 1.
-pub fn count_wal(path: &Path, chunk_frames: usize, metrics: &Metrics) -> Result<WalStats, Error> {
+/// Streaming: each frame is read (`wal::Reader` decompresses LZ4 transparently),
+/// decoded, counted, and dropped before the next — so memory stays flat. Phases
+/// timed: `read`, `decode`, `process`.
+pub fn count_wal(path: &Path, metrics: &Metrics) -> Result<WalStats, Error> {
     let mut reader = wal::Reader::open(path)?;
     let mut stats = WalStats::default();
-    let mut decoded: Vec<ExportLogsServiceRequest> = Vec::new();
-
     loop {
-        // Read: copy up to `chunk_frames` payloads out of the reader's reused
-        // buffer into owned bytes (required to outlive the next read / cross threads).
-        let mut chunk: Vec<Vec<u8>> = Vec::with_capacity(chunk_frames);
-        {
+        let frame = {
             let _t = metrics.scope("read");
-            while chunk.len() < chunk_frames {
-                match reader.next_frame()? {
-                    Some(frame) => {
-                        stats.frames += 1;
-                        stats.header_records += frame.entry_count as u64;
-                        metrics.add_frames(1);
-                        metrics.add_bytes(frame.data.len() as u64);
-                        chunk.push(frame.data.to_vec());
-                    }
-                    None => break,
-                }
+            match reader.next_frame()? {
+                Some(frame) => frame,
+                None => break,
             }
-        }
-        if chunk.is_empty() {
-            break;
-        }
-
-        // Decode: parallel, decode-only. The global frame index (1-based) is
-        // `base + local + 1`, preserved for error reporting.
-        let base = decoded.len() as u64;
-        let chunk_decoded: Vec<ExportLogsServiceRequest> = {
-            let _t = metrics.scope("decode");
-            chunk
-                .par_iter()
-                .enumerate()
-                .map(|(i, buf)| {
-                    ExportLogsServiceRequest::decode(buf.as_slice()).map_err(|source| {
-                        Error::Decode {
-                            frame: base + i as u64 + 1,
-                            source,
-                        }
-                    })
-                })
-                .collect::<Result<Vec<_>, Error>>()?
         };
-        decoded.extend(chunk_decoded);
-    }
+        stats.frames += 1;
+        stats.header_records += frame.entry_count as u64;
+        metrics.add_frames(1);
+        metrics.add_bytes(frame.data.len() as u64);
 
-    // Process: count over the fully-decoded corpus (sequential, off the pool).
-    {
-        let _t = metrics.scope("process");
-        for req in &decoded {
-            let records = count_log_records(req) as u64;
-            stats.records += records;
-            metrics.add_records(records);
-        }
-    }
+        let req = {
+            let _t = metrics.scope("decode");
+            ExportLogsServiceRequest::decode(frame.data).map_err(|source| Error::Decode {
+                frame: stats.frames,
+                source,
+            })?
+        };
 
+        let records = {
+            let _t = metrics.scope("process");
+            count_log_records(&req)
+        };
+        stats.records += records as u64;
+        metrics.add_records(records as u64);
+    }
     Ok(stats)
 }

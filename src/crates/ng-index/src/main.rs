@@ -13,36 +13,13 @@ struct Args {
     /// Path to the WAL file written by `ng-ingest`.
     #[arg(long)]
     r#in: PathBuf,
-
-    /// Frames read per chunk before each parallel decode pass.
-    #[arg(long, default_value_t = 256)]
-    chunk: usize,
-
-    /// Rayon worker threads for parallel decode (0 = all available cores).
-    #[arg(long, default_value_t = 0)]
-    threads: usize,
 }
 
 fn main() -> ExitCode {
     let args = Args::parse();
 
-    if args.chunk == 0 {
-        eprintln!("error: --chunk must be >= 1");
-        return ExitCode::FAILURE;
-    }
-
-    if args.threads > 0 {
-        if let Err(e) = rayon::ThreadPoolBuilder::new()
-            .num_threads(args.threads)
-            .build_global()
-        {
-            eprintln!("error: failed to configure {} threads: {e}", args.threads);
-            return ExitCode::FAILURE;
-        }
-    }
-
     let metrics = Metrics::new();
-    let stats = match count_wal(&args.r#in, args.chunk, &metrics) {
+    let stats = match count_wal(&args.r#in, &metrics) {
         Ok(stats) => stats,
         Err(e) => {
             eprintln!("error: failed to read {}: {e}", args.r#in.display());
