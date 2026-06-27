@@ -70,6 +70,7 @@ void buffer_strcat_htmlescape(BUFFER *wb, const char *txt)
         txt++;
     }
 
+    wb->buffer[wb->len] = '\0';
     buffer_overflow_check(wb);
 }
 
