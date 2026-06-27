@@ -66,6 +66,13 @@ fn run_sfst(args: &Args, out_path: &Path, metrics: &Metrics) -> ExitCode {
 
     println!("sfst: {} -> {}", args.flat.display(), out_path.display());
     println!("frames: {}  records: {}", stats.frames, stats.records);
+    let total = (stats.hits + stats.misses).max(1);
+    println!(
+        "intern: {} hits / {} misses ({:.1}% fast-path)",
+        stats.hits,
+        stats.misses,
+        stats.hits as f64 / total as f64 * 100.0,
+    );
     if let Ok(meta) = std::fs::metadata(out_path) {
         println!("sfst size: {:.1} MiB on disk", meta.len() as f64 / (1024.0 * 1024.0));
     }

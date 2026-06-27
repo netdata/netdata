@@ -111,6 +111,10 @@ pub struct Node {
 pub struct Entry {
     pub node: NodeId,
     pub value: Value,
+    /// Pre-computed `xxhash64` of this entry's `key=value` rendering, filled by the
+    /// index-feeding pipeline (`0` until then). Lets an SFST-style interner skip
+    /// re-hashing on every occurrence — the `_nd_kv_hash` fast path.
+    pub hash: u64,
 }
 
 /// A leaf resolved to its (collapsed) path string and value — the display form
@@ -263,7 +267,7 @@ impl Flattener {
     /// Emit a leaf entry under `parent` via `step`.
     fn emit(&mut self, parent: NodeId, step: Step, value: Value, out: &mut Vec<Entry>) {
         let node = self.child(parent, step, value.kind());
-        out.push(Entry { node, value });
+        out.push(Entry { node, value, hash: 0 });
     }
 
     /// Flatten one OTLP `AnyValue` reached from `parent` via `step`.

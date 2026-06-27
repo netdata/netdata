@@ -7,7 +7,6 @@
 //! proven build/query machinery while the keys/values now come from the typed,
 //! array-collapsed flattening. (Types + a schema-tree chunk come in a later step.)
 
-use std::fmt::Write as _;
 use std::path::Path;
 
 use bincode::serde::decode_from_slice;
@@ -16,7 +15,7 @@ use sfst_indexer::build_and_write;
 use sfst_indexer::row_index::RowIndex;
 use wal_otap::KvSink;
 
-use crate::{Entry, Error, FlattenedRequest, Metrics, NodeId, SchemaTree, Value, sole_wal_file};
+use crate::{Entry, Error, FlattenedRequest, Metrics, NodeId, SchemaTree, Value, build_kv, sole_wal_file};
 
 /// SFST cardinality-tier threshold (mirrors `sfst`'s default of 100).
 const CARDINALITY_THRESHOLD: u32 = 100;
@@ -26,30 +25,10 @@ const CARDINALITY_THRESHOLD: u32 = 100;
 pub struct SfstStats {
     pub frames: u64,
     pub records: u64,
-}
-
-/// Render a typed value into SFST string form, appended to `out`. Mirrors SFST's
-/// value formatting (strings raw, ints/doubles decimal, bools `true`/`false`,
-/// bytes lowercase hex); the flatten-only empties render structurally.
-fn stringify(value: &Value, out: &mut String) {
-    match value {
-        Value::Null => {}
-        Value::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
-        Value::Int(i) => {
-            let _ = write!(out, "{i}");
-        }
-        Value::Double(d) => {
-            let _ = write!(out, "{d}");
-        }
-        Value::Str(s) => out.push_str(s),
-        Value::Bytes(b) => {
-            for byte in b {
-                let _ = write!(out, "{byte:02x}");
-            }
-        }
-        Value::EmptyArray => out.push_str("[]"),
-        Value::EmptyKvlist => out.push_str("{}"),
-    }
+    /// Entries that rode the `lookup_hash` fast path (no string formatting).
+    pub hits: u64,
+    /// Entries that missed (first occurrence) and were formatted + interned.
+    pub misses: u64,
 }
 
 /// The leaf node id in `tree` whose collapsed path is `path` (first match).
@@ -126,11 +105,20 @@ pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result
                     // A record's columns = its own entries + its scope's + its resource's.
                     let mut tokens = Vec::new();
                     for e in rg.resource.iter().chain(sg.scope.iter()).chain(record.iter()) {
-                        kv.clear();
-                        kv.push_str(&paths[e.node as usize]);
-                        kv.push('=');
-                        stringify(&e.value, &mut kv);
-                        tokens.push(row_index.intern(None, &kv));
+                        // Ride the interner's lookup_hash fast path with the
+                        // pre-computed hash; only format the string on a miss.
+                        let token = match row_index.lookup_hash(e.hash) {
+                            Some(token) => {
+                                stats.hits += 1;
+                                token
+                            }
+                            None => {
+                                stats.misses += 1;
+                                build_kv(&paths[e.node as usize], &e.value, &mut kv);
+                                row_index.intern(Some(e.hash), &kv)
+                            }
+                        };
+                        tokens.push(token);
                     }
                     row_index.row(ts, &tokens);
                 }

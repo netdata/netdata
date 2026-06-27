@@ -11,6 +11,7 @@
 //!
 //! Independent of `ng-ingest`: both phases go through the `wal` crate.
 
+use std::hash::Hasher;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -233,13 +234,81 @@ fn tally(flattened: &FlattenedRequest) -> (u64, u64) {
     (records, leaves)
 }
 
+/// Render a typed value into its SFST string form, appended to `out`: strings raw,
+/// ints/doubles decimal, bools `true`/`false`, bytes lowercase hex; the flatten-only
+/// empties render structurally. Shared by hash pre-computation and the SFST build so
+/// both agree on the exact `key=value` bytes.
+pub(crate) fn append_value(value: &Value, out: &mut String) {
+    use std::fmt::Write as _;
+    match value {
+        Value::Null => {}
+        Value::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
+        Value::Int(i) => {
+            let _ = write!(out, "{i}");
+        }
+        Value::Double(d) => {
+            let _ = write!(out, "{d}");
+        }
+        Value::Str(s) => out.push_str(s),
+        Value::Bytes(b) => {
+            for byte in b {
+                let _ = write!(out, "{byte:02x}");
+            }
+        }
+        Value::EmptyArray => out.push_str("[]"),
+        Value::EmptyKvlist => out.push_str("{}"),
+    }
+}
+
+/// Build `path=value` into `out` (cleared first).
+pub(crate) fn build_kv(path: &str, value: &Value, out: &mut String) {
+    out.clear();
+    out.push_str(path);
+    out.push('=');
+    append_value(value, out);
+}
+
+/// `xxhash64(path=value)` with seed 0 — the hash `sfst-indexer`'s interner keys on.
+fn hash_kv(path: &str, value: &Value, buf: &mut String) -> u64 {
+    build_kv(path, value, buf);
+    let mut h = twox_hash::XxHash64::default();
+    h.write(buf.as_bytes());
+    h.finish()
+}
+
+/// Fill every entry's `hash` with `xxhash64(key=value)` so the index build can ride
+/// the interner's `lookup_hash` fast path instead of re-hashing per occurrence.
+/// Paths are resolved once per node.
+fn fill_hashes(flattened: &mut FlattenedRequest) {
+    let paths: Vec<String> = {
+        let tree = &flattened.tree;
+        (0..tree.len() as NodeId).map(|id| tree.path(id)).collect()
+    };
+    let mut buf = String::new();
+    for rg in &mut flattened.resources {
+        for e in &mut rg.resource {
+            e.hash = hash_kv(&paths[e.node as usize], &e.value, &mut buf);
+        }
+        for sg in &mut rg.scopes {
+            for e in &mut sg.scope {
+                e.hash = hash_kv(&paths[e.node as usize], &e.value, &mut buf);
+            }
+            for record in &mut sg.records {
+                for e in record {
+                    e.hash = hash_kv(&paths[e.node as usize], &e.value, &mut buf);
+                }
+            }
+        }
+    }
+}
+
 /// Phase 1 — flatten the protobuf WAL at `in_path` into a flattened WAL in
 /// `flat_dir`.
 ///
 /// Per frame: prost-decode → [`flatten_request`] → bincode-encode → append to the
 /// flattened WAL (carrying the source frame's ingestion timestamp + entry count).
 /// Streaming: each frame is processed and dropped before the next. Phases timed:
-/// `read` / `decode` / `flatten` / `serialize` / `write`.
+/// `read` / `decode` / `flatten` / `hash` / `serialize` / `write`.
 pub fn convert_wal(
     in_path: &Path,
     flat_dir: &Path,
@@ -274,10 +343,17 @@ pub fn convert_wal(
             })?
         };
 
-        let flattened = {
+        let mut flattened = {
             let _t = metrics.scope("flatten");
             flatten_request(&req)
         };
+
+        {
+            // Pre-compute each entry's xxhash64(key=value) so the index build rides
+            // the interner's lookup_hash fast path (the _nd_kv_hash analogue).
+            let _t = metrics.scope("hash");
+            fill_hashes(&mut flattened);
+        }
 
         let (records, leaves) = tally(&flattened);
         stats.records += records;
@@ -327,6 +403,7 @@ fn remap(entries: &[Entry], map: &[NodeId]) -> Vec<Entry> {
         .map(|e| Entry {
             node: map[e.node as usize],
             value: e.value.clone(),
+            hash: e.hash,
         })
         .collect()
 }

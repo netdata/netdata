@@ -23,6 +23,7 @@ serde = { workspace = true, features = ["derive"] }
 sfst = { workspace = true }
 sfst-indexer = { workspace = true }
 thiserror = { workspace = true }
+twox-hash = { workspace = true }
 wal = { workspace = true }
 wal-otap = { workspace = true }
 
