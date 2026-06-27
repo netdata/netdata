@@ -503,6 +503,11 @@ static int socket_write_all(https_req_ctx_t *ctx, char *data, size_t data_len) {
     ctx->poll_fd.events = POLLOUT;
 
     do {
+        // evaluate the overall request timeout every iteration, not only on a poll() timeout:
+        // otherwise a persistent poll()-ready-but-no-progress state spins the CPU unbounded
+        if (https_req_check_timedout(ctx))
+            return 2;
+
         int ret = poll(&ctx->poll_fd, 1, POLL_TO_MS);
         if (ret < 0) {
             netdata_log_error("ACLK: poll error");
@@ -533,6 +538,11 @@ static int ssl_write_all(https_req_ctx_t *ctx, char *data, size_t data_len) {
     ctx->poll_fd.events |= POLLOUT;
 
     do {
+        // evaluate the overall request timeout every iteration, not only on a poll() timeout:
+        // otherwise a persistent poll()-ready-but-no-progress state spins the CPU unbounded
+        if (https_req_check_timedout(ctx))
+            return 2;
+
         int ret = poll(&ctx->poll_fd, 1, POLL_TO_MS);
         if (ret < 0) {
             netdata_log_error("ACLK: poll error");
@@ -582,6 +592,11 @@ static https_client_resp_t read_parse_response(https_req_ctx_t *ctx) {
 
     ctx->poll_fd.events = POLLIN;
     do {
+        // evaluate the overall request timeout every iteration, not only on a poll() timeout:
+        // otherwise a persistent poll()-ready-but-no-progress state spins the CPU unbounded
+        if (https_req_check_timedout(ctx))
+            return HTTPS_CLIENT_RESP_TIMEOUT;
+
         ret = poll(&ctx->poll_fd, 1, POLL_TO_MS);
         if (ret < 0) {
             netdata_log_error("ACLK: poll error");
