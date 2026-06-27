@@ -1,15 +1,16 @@
-//! Two-phase experiment over a WAL of OTLP logs:
+//! `ng-index`: the experiment harness over a WAL of OTLP logs. Two stages, each a
+//! CLI mode (see `main.rs`):
 //!
-//! - **Phase 1 (`convert_wal`)** reads the protobuf WAL written by `ng-ingest`,
-//!   flattens each frame into a per-frame schema tree + entries (via `ng-flatten`),
-//!   bincode-encodes that, and appends it to a new *flattened WAL*. This stands in
-//!   for flattening at the ingestor: the on-disk frame already holds the flattened
-//!   form.
-//! - **Phase 2 (`build_global`)** reads the flattened WAL and merges every
-//!   per-frame tree into one *global* schema tree (node-level interning + integer
-//!   entry renumbering) — the index-time step whose cost is the open question.
+//! - **`convert_wal`** reads the protobuf WAL written by `ng-ingest`, flattens each
+//!   frame into a per-frame schema tree + entries (via `ng-flatten`), pre-computes
+//!   each entry's `xxhash64(key=value)`, bincode-encodes the result, and appends it
+//!   to a new *flattened WAL*. This stands in for flattening at the ingestor: the
+//!   on-disk frame already holds the flattened form.
+//! - **`build_sfst`** (see [`sfst_build`]) reads the flattened WAL and feeds the
+//!   typed, array-collapsed entries into the existing `sfst-indexer` to emit a
+//!   standard SFST index file — the augment-SFST path.
 //!
-//! Independent of `ng-ingest`: both phases go through the `wal` crate.
+//! Independent of `ng-ingest`: both stages go through the `wal` crate.
 
 use std::hash::Hasher;
 use std::path::{Path, PathBuf};
@@ -103,15 +104,7 @@ pub fn flatten_request(request: &ExportLogsServiceRequest) -> FlattenedRequest {
     }
 }
 
-/// A sampled record with its (resolved) resource + scope context, for `--print`.
-#[derive(Debug, Clone)]
-pub struct SampleRecord {
-    pub resource: Vec<Leaf>,
-    pub scope: Vec<Leaf>,
-    pub own: Vec<Leaf>,
-}
-
-/// Stats from phase 1 (protobuf WAL → flattened WAL).
+/// Stats from `convert_wal` (protobuf WAL → flattened WAL).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ConvertStats {
     /// Frames read (and re-written flattened).
@@ -122,41 +115,10 @@ pub struct ConvertStats {
     pub leaves: u64,
     /// Records claimed by the source frame headers (`entry_count`).
     pub header_records: u64,
-    /// Total entry occurrences seen for the dedup measurement (== `leaves`).
-    pub term_total: u64,
-    /// Distinct `(node, value)` terms (by hash) summed per frame — the count a
-    /// per-frame term table would store. `term_distinct / term_total` is the
-    /// within-frame dedup ratio.
-    pub term_distinct: u64,
-}
-
-/// Stats from phase 2 (flattened WAL → global tree).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct GlobalStats {
-    /// Frames read.
-    pub frames: u64,
-    /// Log records seen.
-    pub records: u64,
-    /// Leaf entries renumbered into the global tree.
-    pub leaves: u64,
-    /// Records claimed by the flattened-frame headers (`entry_count`).
-    pub header_records: u64,
-    /// Nodes in the merged global tree (interior + leaf) — the converged column
-    /// space across the whole WAL.
-    pub global_nodes: u64,
-    /// Leaf nodes in the global tree — distinct typed columns.
-    pub global_columns: u64,
 }
 
 impl ConvertStats {
     /// Whether the decoded record count agrees with the source frame headers.
-    pub fn consistent(&self) -> bool {
-        self.records == self.header_records
-    }
-}
-
-impl GlobalStats {
-    /// Whether the record count agrees with the flattened-frame headers.
     pub fn consistent(&self) -> bool {
         self.records == self.header_records
     }
@@ -282,33 +244,6 @@ fn hash_kv(path: &str, value: &Value, buf: &mut String) -> u64 {
     h.finish()
 }
 
-/// Per-frame within-frame dedup measurement: `(total entry occurrences, distinct
-/// (node,value) terms by hash)`. Sizes how much a per-frame term table would dedup.
-/// Requires `fill_hashes` to have run.
-fn frame_dedup(flattened: &FlattenedRequest) -> (u64, u64) {
-    let mut seen = std::collections::HashSet::new();
-    let mut total = 0u64;
-    for rg in &flattened.resources {
-        for e in &rg.resource {
-            total += 1;
-            seen.insert(e.hash);
-        }
-        for sg in &rg.scopes {
-            for e in &sg.scope {
-                total += 1;
-                seen.insert(e.hash);
-            }
-            for record in &sg.records {
-                for e in record {
-                    total += 1;
-                    seen.insert(e.hash);
-                }
-            }
-        }
-    }
-    (total, seen.len() as u64)
-}
-
 /// Fill every entry's `hash` with `xxhash64(key=value)` so the index build can ride
 /// the interner's `lookup_hash` fast path instead of re-hashing per occurrence.
 /// Paths are resolved once per node.
@@ -393,14 +328,6 @@ pub fn convert_wal(
         stats.leaves += leaves;
         metrics.add_records(records);
 
-        {
-            // One-off within-frame dedup measurement (sizes a term table's win).
-            let _t = metrics.scope("dedup_stat");
-            let (total, distinct) = frame_dedup(&flattened);
-            stats.term_total += total;
-            stats.term_distinct += distinct;
-        }
-
         let bytes = {
             let _t = metrics.scope("serialize");
             bincode::serde::encode_to_vec(&flattened, config).map_err(|source| Error::Encode {
@@ -425,124 +352,3 @@ pub fn convert_wal(
     Ok(stats)
 }
 
-/// Bump the per-global-column occurrence counter, growing it as the global tree
-/// grows. Keeps the renumber honest (the work can't be optimized away) and yields
-/// per-column cardinality for free.
-fn bump(counts: &mut Vec<u64>, global: NodeId) {
-    let idx = global as usize;
-    if idx >= counts.len() {
-        counts.resize(idx + 1, 0);
-    }
-    counts[idx] += 1;
-}
-
-/// Renumber entries through a `local → global` map (used only to materialize the
-/// first N sampled records; the hot path renumbers inline without allocating).
-fn remap(entries: &[Entry], map: &[NodeId]) -> Vec<Entry> {
-    entries
-        .iter()
-        .map(|e| Entry {
-            node: map[e.node as usize],
-            value: e.value.clone(),
-            hash: e.hash,
-        })
-        .collect()
-}
-
-/// Phase 2 — merge the flattened WAL in `flat_dir` into one global schema tree.
-///
-/// Per frame: `wal` read (LZ4 decompress) → bincode-decode `FlattenedRequest` →
-/// [`Flattener::merge_tree`] interns the frame's tree into the global tree, then
-/// every entry is renumbered (`global = map[node]`) and counted. Frame entries are
-/// dropped after counting (streaming), so RSS tracks the global tree, not the
-/// corpus. Returns the global stats plus the first `sample_records` records
-/// resolved against the global tree. Phases timed: `read` / `deserialize` /
-/// `merge`.
-pub fn build_global(
-    flat_dir: &Path,
-    sample_records: usize,
-    metrics: &Metrics,
-) -> Result<(GlobalStats, Vec<SampleRecord>), Error> {
-    let path = sole_wal_file(flat_dir)?;
-    let mut reader = wal::Reader::open(&path)?;
-    let mut flattener = Flattener::new();
-    let mut counts: Vec<u64> = Vec::new();
-    let mut stats = GlobalStats::default();
-    // Sampled records keep their renumbered (global) entries; resolved to paths
-    // once the global tree is final.
-    let mut sample: Vec<SampleRecord> = Vec::new();
-    let mut sample_entries: Vec<(Vec<Entry>, Vec<Entry>, Vec<Entry>)> = Vec::new();
-    let config = bincode::config::standard();
-
-    loop {
-        let frame = {
-            let _t = metrics.scope("read");
-            match reader.next_frame()? {
-                Some(frame) => frame,
-                None => break,
-            }
-        };
-        stats.frames += 1;
-        stats.header_records += frame.entry_count as u64;
-        metrics.add_frames(1);
-        metrics.add_bytes(frame.data.len() as u64);
-
-        let flattened: FlattenedRequest = {
-            let _t = metrics.scope("deserialize");
-            bincode::serde::decode_from_slice(frame.data, config)
-                .map_err(|source| Error::BincodeDecode {
-                    frame: stats.frames,
-                    source,
-                })?
-                .0
-        };
-
-        let mut frame_records = 0u64;
-        {
-            let _t = metrics.scope("merge");
-            let map = flattener.merge_tree(&flattened.tree);
-            for rg in &flattened.resources {
-                for e in &rg.resource {
-                    bump(&mut counts, map[e.node as usize]);
-                }
-                stats.leaves += rg.resource.len() as u64;
-                for sg in &rg.scopes {
-                    for e in &sg.scope {
-                        bump(&mut counts, map[e.node as usize]);
-                    }
-                    stats.leaves += sg.scope.len() as u64;
-                    for record in &sg.records {
-                        frame_records += 1;
-                        for e in record {
-                            bump(&mut counts, map[e.node as usize]);
-                        }
-                        stats.leaves += record.len() as u64;
-                        if sample_entries.len() < sample_records {
-                            sample_entries.push((
-                                remap(&rg.resource, &map),
-                                remap(&sg.scope, &map),
-                                remap(record, &map),
-                            ));
-                        }
-                    }
-                }
-            }
-        }
-        stats.records += frame_records;
-        metrics.add_records(frame_records);
-    }
-
-    let tree = flattener.into_tree();
-    stats.global_nodes = tree.len() as u64;
-    stats.global_columns = tree.columns() as u64;
-
-    for (resource, scope, own) in sample_entries {
-        sample.push(SampleRecord {
-            resource: tree.resolve(&resource),
-            scope: tree.resolve(&scope),
-            own: tree.resolve(&own),
-        });
-    }
-
-    Ok((stats, sample))
-}

@@ -1,13 +1,14 @@
 //! End-to-end round trip: write a protobuf WAL, convert it to a flattened WAL
-//! (phase 1), then merge that into one global schema tree (phase 2). Exercises the
-//! bincode (de)serialization, the `wal` round trip (LZ4 on), and the tree merge.
-//! Frames are written here with the raw `wal::Writer`, keeping this independent of
-//! `ng-ingest`.
+//! (`convert_wal`), then build a standard SFST index from that (`build_sfst`) and
+//! query the record count back. Exercises the bincode (de)serialization, the `wal`
+//! round trip (LZ4 on), the typed-entry interning, and the SFST emit. Frames are
+//! written here with the raw `wal::Writer`, keeping this independent of `ng-ingest`.
 
 use std::sync::Arc;
 
 use file_registry::TimestampNs;
-use ng_index::{Metrics, build_global, convert_wal};
+use ng_index::{Metrics, build_sfst, convert_wal};
+use sfst::IndexReader;
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value::Value as Av};
 use opentelemetry_proto::tonic::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
@@ -50,7 +51,7 @@ fn sole_wal(dir: &std::path::Path) -> std::path::PathBuf {
 }
 
 #[test]
-fn convert_then_build_global_roundtrips() {
+fn convert_then_build_sfst_roundtrips() {
     // 1. Write a protobuf WAL of three batches (default config compresses frames).
     let src = tempfile::tempdir().unwrap();
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
@@ -72,7 +73,7 @@ fn convert_then_build_global_roundtrips() {
     }
     writer.shutdown_all().unwrap();
 
-    // 2. Phase 1: convert to a flattened WAL.
+    // 2. Convert to a flattened WAL.
     let flat = tempfile::tempdir().unwrap();
     let convert = convert_wal(&sole_wal(src.path()), flat.path(), &Metrics::new()).unwrap();
     assert_eq!(convert.frames, 3);
@@ -82,22 +83,23 @@ fn convert_then_build_global_roundtrips() {
     // Each record flattens to 3 leaves: time_unix_nano, severity_number, attributes.k.
     assert_eq!(convert.leaves, 30);
 
-    // 3. Phase 2: merge the flattened WAL into one global tree.
-    let (global, _sample) = build_global(flat.path(), 0, &Metrics::new()).unwrap();
-    assert_eq!(global.frames, 3);
-    assert_eq!(global.records, 10);
-    assert_eq!(global.header_records, 10);
-    assert!(global.consistent());
-    // The renumber is lossless: the same leaf total as phase 1.
-    assert_eq!(global.leaves, convert.leaves);
-    // Every record shares the same schema, so the global tree converges to the
-    // three distinct columns regardless of frame count.
-    assert_eq!(global.global_columns, 3);
+    // 3. Build a standard SFST index from the flattened WAL.
+    let out_dir = tempfile::tempdir().unwrap();
+    let out = out_dir.path().join("count.sfst");
+    let sfst = build_sfst(flat.path(), &out, &Metrics::new()).unwrap();
+    assert_eq!(sfst.frames, 3);
+    assert_eq!(sfst.records, 10);
+
+    // 4. Re-open the SFST and confirm the record count round-trips.
+    let bytes = std::fs::read(&out).unwrap();
+    let reader = IndexReader::open(&bytes).unwrap();
+    assert_eq!(reader.total_logs(), 10);
 }
 
 #[test]
 fn missing_flattened_wal_is_an_error() {
     // An empty directory has no `.wal` file to read.
     let dir = tempfile::tempdir().unwrap();
-    assert!(build_global(dir.path(), 0, &Metrics::new()).is_err());
+    let out = dir.path().join("missing.sfst");
+    assert!(build_sfst(dir.path(), &out, &Metrics::new()).is_err());
 }

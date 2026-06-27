@@ -1,24 +1,24 @@
-//! `ng-index`: a two-phase experiment over a WAL of OTLP logs.
+//! `ng-index`: a two-stage experiment over a WAL of OTLP logs.
 //!
-//! - `ng-index --convert --in <protobuf-wal> --flat <dir>` — phase 1: flatten the
-//!   protobuf WAL into a flattened WAL in `<dir>`, then exit. Done ONCE.
-//! - `ng-index --flat <dir> [--print N]` — phase 2 (default): merge the flattened
-//!   WAL into one global schema tree and report the merge cost + RSS. `--print N`
-//!   dumps the first N records (resolved against the global tree).
+//! - `ng-index --convert --in <protobuf-wal> --flat <dir>` — flatten the protobuf
+//!   WAL into a flattened WAL in `<dir>`, then exit. Done ONCE.
+//! - `ng-index --flat <dir> --sfst <out>` — read the flattened WAL and build a
+//!   standard SFST index file at `<out>` (the augment-SFST path).
+//!
+//! Exactly one of `--convert` / `--sfst` must be given.
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::Parser;
-use ng_index::{Leaf, Metrics, Value, build_global, build_sfst, convert_wal, read_rss};
+use ng_index::{Metrics, build_sfst, convert_wal, read_rss};
 use sfst::IndexReader;
 
 #[derive(Parser)]
-#[command(name = "ng-index", about = "Flatten a WAL of OTLP logs and build a global schema tree")]
+#[command(name = "ng-index", about = "Flatten a WAL of OTLP logs and build an SFST index")]
 struct Args {
     /// Convert mode: flatten the protobuf WAL (`--in`) into the flattened WAL
-    /// (`--flat`) and exit. Without this flag, `ng-index` runs the index step
-    /// (phase 2) over an already-converted flattened WAL.
+    /// (`--flat`) and exit.
     #[arg(long)]
     convert: bool,
 
@@ -26,18 +26,14 @@ struct Args {
     #[arg(long)]
     r#in: Option<PathBuf>,
 
-    /// Directory holding the flattened WAL: written by `--convert`, read otherwise.
+    /// Directory holding the flattened WAL: written by `--convert`, read by `--sfst`.
     #[arg(long)]
     flat: PathBuf,
 
     /// Build an SFST index file at this path from the flattened WAL (the
-    /// augment-SFST path), instead of the merge-only global-tree pass.
+    /// augment-SFST path).
     #[arg(long)]
     sfst: Option<PathBuf>,
-
-    /// Print the flattened leaves of the first N records (merge mode only).
-    #[arg(long, default_value_t = 0)]
-    print: usize,
 }
 
 fn main() -> ExitCode {
@@ -50,7 +46,8 @@ fn main() -> ExitCode {
     if let Some(out) = args.sfst.clone() {
         return run_sfst(&args, &out, &metrics);
     }
-    run_index(&args, &metrics)
+    eprintln!("error: pass --convert (with --in) or --sfst <out>");
+    ExitCode::FAILURE
 }
 
 /// Build an SFST index file from the flattened WAL, then smoke-test it: re-open and
@@ -128,71 +125,9 @@ fn run_convert(args: &Args, metrics: &Metrics) -> ExitCode {
         "frames: {}  records: {}  leaves: {}  header_records: {}  consistent: {}",
         stats.frames, stats.records, stats.leaves, stats.header_records, stats.consistent(),
     );
-    if stats.term_total > 0 {
-        println!(
-            "within-frame dedup: {} distinct / {} total terms ({:.1}% distinct → {:.1}x)",
-            stats.term_distinct,
-            stats.term_total,
-            stats.term_distinct as f64 / stats.term_total as f64 * 100.0,
-            stats.term_total as f64 / stats.term_distinct.max(1) as f64,
-        );
-    }
     if let Some(size) = flat_wal_size(&args.flat) {
         println!("flattened wal: {:.1} MiB on disk", size as f64 / (1024.0 * 1024.0));
     }
-    print!("{}", metrics.report());
-    print_rss();
-    ExitCode::SUCCESS
-}
-
-/// Phase 2: flattened WAL → global schema tree.
-fn run_index(args: &Args, metrics: &Metrics) -> ExitCode {
-    let (stats, sample) = match build_global(&args.flat, args.print, metrics) {
-        Ok(result) => result,
-        Err(e) => {
-            eprintln!("error: index {} failed: {e}", args.flat.display());
-            return ExitCode::FAILURE;
-        }
-    };
-
-    println!("flat: {}", args.flat.display());
-    println!(
-        "frames: {}  records: {}  leaves: {}  global_nodes: {}  global_columns: {}  header_records: {}  consistent: {}",
-        stats.frames,
-        stats.records,
-        stats.leaves,
-        stats.global_nodes,
-        stats.global_columns,
-        stats.header_records,
-        stats.consistent(),
-    );
-    if !stats.consistent() {
-        println!(
-            "WARNING: record count ({}) disagrees with frame headers ({})",
-            stats.records, stats.header_records,
-        );
-    }
-
-    for (i, record) in sample.iter().enumerate() {
-        println!("--- record {i} ---");
-        if !record.resource.is_empty() {
-            println!("  [resource]");
-            for leaf in &record.resource {
-                print_leaf(leaf);
-            }
-        }
-        if !record.scope.is_empty() {
-            println!("  [scope]");
-            for leaf in &record.scope {
-                print_leaf(leaf);
-            }
-        }
-        println!("  [record] ({} leaves)", record.own.len());
-        for leaf in &record.own {
-            print_leaf(leaf);
-        }
-    }
-
     print!("{}", metrics.report());
     print_rss();
     ExitCode::SUCCESS
@@ -220,30 +155,5 @@ fn print_rss() {
             rss.current_kb as f64 / 1024.0,
         ),
         None => println!("rss: n/a (non-Linux)"),
-    }
-}
-
-/// Render one leaf as `path = value [Kind]` for inspection.
-fn print_leaf(leaf: &Leaf) {
-    let value = match &leaf.value {
-        Value::Null => "null".to_string(),
-        Value::Bool(b) => b.to_string(),
-        Value::Int(i) => i.to_string(),
-        Value::Double(d) => d.to_string(),
-        Value::Str(s) => format!("{s:?}"),
-        Value::Bytes(b) => render_bytes(b),
-        Value::EmptyArray => "[]".to_string(),
-        Value::EmptyKvlist => "{}".to_string(),
-    };
-    println!("    {} = {} [{:?}]", leaf.path, value, leaf.value.kind());
-}
-
-/// Short hex for small byte values (e.g. trace/span ids); a size marker otherwise.
-fn render_bytes(bytes: &[u8]) -> String {
-    if bytes.len() <= 16 {
-        let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
-        format!("0x{hex}")
-    } else {
-        format!("<{} bytes>", bytes.len())
     }
 }
