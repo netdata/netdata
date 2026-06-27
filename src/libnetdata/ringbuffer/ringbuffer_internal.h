@@ -18,6 +18,7 @@ struct rbuf {
     char *end;
 
     size_t size;
+    size_t max_size;
     size_t size_data;
 };
 

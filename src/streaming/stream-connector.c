@@ -149,7 +149,7 @@ static int stream_connect_upgrade_prelude(RRDHOST *host __maybe_unused, struct s
         return 1;
     }
 
-    rbuf_t buf = rbuf_create(bytes);
+    rbuf_t buf = rbuf_create(bytes, bytes);
     rbuf_push(buf, http, bytes);
 
     http_parse_ctx ctx;

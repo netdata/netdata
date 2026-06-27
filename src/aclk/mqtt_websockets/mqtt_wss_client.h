@@ -12,7 +12,7 @@
 #define MQTT_WSS_ERR_CONN_DROP      -1      // Connection was closed by remote
 #define MQTT_WSS_ERR_PROTO_MQTT     -2      // Error in MQTT protocol (e.g. malformed packet)
 #define MQTT_WSS_ERR_PROTO_WS       -3      // Error in WebSocket protocol (e.g. malformed packet)
-#define MQTT_WSS_ERR_MSG_TOO_BIG    -6      // Message size too big for server
+#define MQTT_WSS_ERR_MSG_TOO_BIG    -6      // Message size too big for server or inbound buffer
 #define MQTT_WSS_ERR_CANT_DO        -8      // if client was initialized with MQTT 3 but MQTT 5 feature
                                             // was requested by user of library
 #define MQTT_WSS_ERR_POLL_FAILED    -9

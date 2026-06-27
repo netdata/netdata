@@ -210,6 +210,9 @@ int help(int exitcode) {
     } while(0)
 
 int buffer_unittest(void);
+int ringbuffer_unittest(void);
+int ws_client_unittest(void);
+int mqtt_ng_unittest(void);
 int pgc_unittest(void);
 int mrg_unittest(void);
 int pluginsd_parser_unittest(void);
@@ -434,6 +437,9 @@ int netdata_main(int argc, char **argv) {
                             if (unit_test_buffer()) return 1;
                             if (unit_test_str2ld()) return 1;
                             if (buffer_unittest()) return 1;
+                            if (ringbuffer_unittest()) return 1;
+                            if (ws_client_unittest()) return 1;
+                            if (mqtt_ng_unittest()) return 1;
 
                             // No call to load the config file on this code-path
                             if (unittest_prepare_rrd(&user)) return 1;
@@ -537,6 +543,18 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "buffertest") == 0) {
                             unittest_running = true;
                             return buffer_unittest();
+                        }
+                        else if(strcmp(optarg, "ringbuffertest") == 0) {
+                            unittest_running = true;
+                            return ringbuffer_unittest();
+                        }
+                        else if(strcmp(optarg, "wsclienttest") == 0) {
+                            unittest_running = true;
+                            return ws_client_unittest();
+                        }
+                        else if(strcmp(optarg, "mqttngtest") == 0) {
+                            unittest_running = true;
+                            return mqtt_ng_unittest();
                         }
                         else if(strcmp(optarg, "test_cmd_pool_fifo") == 0) {
                             unittest_running = true;

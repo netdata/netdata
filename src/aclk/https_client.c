@@ -780,7 +780,7 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
     https_req_ctx_t *ctx = callocz(1, sizeof(https_req_ctx_t));
     ctx->req_start_time = now_realtime_sec();
 
-    ctx->buf_rx = rbuf_create(RX_BUFFER_SIZE);
+    ctx->buf_rx = rbuf_create(RX_BUFFER_SIZE, RX_BUFFER_SIZE);
     if (!ctx->buf_rx) {
         rc = HTTPS_CLIENT_RESP_NO_MEM;
         netdata_log_error("ACLK: couldn't allocate buffer for RX data");
