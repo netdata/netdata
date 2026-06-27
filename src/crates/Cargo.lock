@@ -3399,6 +3399,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "ng-flatten"
+version = "0.1.3"
+dependencies = [
+ "opentelemetry-proto",
+]
+
+[[package]]
 name = "ng-index"
 version = "0.1.3"
 dependencies = [
