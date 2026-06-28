@@ -467,6 +467,9 @@ NETDATA_DOUBLE holtwinters(const NETDATA_DOUBLE *series, size_t entries,
     NETDATA_DOUBLE beta,
     NETDATA_DOUBLE gamma,
     NETDATA_DOUBLE *forecast) {
+    if(unlikely(entries == 0))
+        return NAN;
+
     if(unlikely(isnan(alpha)))
         alpha = 0.3;
 
