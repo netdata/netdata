@@ -7,6 +7,9 @@ c_rhash c_rhash_new(size_t bin_count) {
     if (!bin_count)
         bin_count = 1000;
 
+    if (unlikely(bin_count > (SIZE_MAX - sizeof(struct c_rhash_s)) / sizeof(c_rhash_bin)))
+        fatal("C_RHASH: bin count is too large.");
+
     c_rhash hash = callocz(1, sizeof(struct c_rhash_s) + (bin_count * sizeof(struct bin_ll*)) );
     hash->bin_count = bin_count;
     hash->bins = (c_rhash_bin *)((char*)hash + sizeof(struct c_rhash_s));
