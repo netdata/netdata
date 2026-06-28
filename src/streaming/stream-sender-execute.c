@@ -316,6 +316,7 @@ void stream_sender_execute_commands(struct sender_state *s) {
             worker_is_busy(WORKER_SENDER_JOB_EXECUTE_META);
 
             char *keyword = get_word(s->thread.rbuf.line.words, s->thread.rbuf.line.num_words, 1);
+            if(!keyword) keyword = "";
 
             s->thread.defer.end_keyword = PLUGINSD_KEYWORD_JSON_END;
             s->thread.defer.payload = buffer_create(0, NULL);
