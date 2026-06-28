@@ -62,13 +62,10 @@ int exporting_discard_response(BUFFER *buffer, struct instance *instance) {
  */
 void simple_connector_receive_response(int *sock, struct instance *instance)
 {
-    static BUFFER *response = NULL;
-    if (!response)
-        response = buffer_create(4096, &netdata_buffers_statistics.buffers_exporters);
-
     struct stats *stats = &instance->stats;
     uint32_t options = (uint32_t)instance->config.options;
     struct simple_connector_data *connector_specific_data = instance->connector_specific_data;
+    BUFFER *response = connector_specific_data->response;
 
     if (options & EXPORTING_OPTION_USE_TLS)
         ERR_clear_error();
