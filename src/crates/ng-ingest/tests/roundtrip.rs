@@ -103,7 +103,7 @@ fn all_leaves(flattened: &FlattenedRequest) -> Vec<Leaf> {
         for sg in &rg.scopes {
             out.extend(tree.resolve(&sg.scope));
             for record in &sg.records {
-                out.extend(tree.resolve(record));
+                out.extend(tree.resolve(&record.entries));
             }
         }
     }
@@ -140,9 +140,16 @@ fn request_roundtrips_through_a_wal_frame() {
     assert_eq!(flattened.resources[0].scopes.len(), 1);
     assert_eq!(flattened.resources[0].scopes[0].records.len(), 2);
 
+    // time/observed are no longer entries — they resolve to the record's timestamp.
+    for rec in &flattened.resources[0].scopes[0].records {
+        assert_eq!(rec.ts, Some(1_700_000_000_000_000_000));
+    }
+
     // Typed scalar / nested / array values survive the round-trip (two records, so
     // each shared column appears twice; bodies differ per record).
     let leaves = all_leaves(&flattened);
+    assert!(at(&leaves, "time_unix_nano").is_empty(), "time is the row ts, not a facet");
+    assert!(at(&leaves, "observed_time_unix_nano").is_empty());
     assert_eq!(at(&leaves, "resource.attributes.service.name"), [&Value::Str("svc".into())]);
     assert_eq!(at(&leaves, "scope.name"), [&Value::Str("scope".into())]);
     assert_eq!(at(&leaves, "scope.version"), [&Value::Str("1.0".into())]);

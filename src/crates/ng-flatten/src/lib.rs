@@ -367,16 +367,9 @@ impl Flattener {
         let mut out = Vec::new();
 
         // Queryable scalar fields. OTLP uses 0/"" for unset → treated as absent.
-        if record.time_unix_nano != 0 {
-            self.scalar("time_unix_nano", Value::Int(record.time_unix_nano as i64), &mut out);
-        }
-        if record.observed_time_unix_nano != 0 {
-            self.scalar(
-                "observed_time_unix_nano",
-                Value::Int(record.observed_time_unix_nano as i64),
-                &mut out,
-            );
-        }
+        // `time_unix_nano` / `observed_time_unix_nano` are intentionally NOT emitted
+        // as entries: they resolve to the record's timestamp (see [`record_timestamp`])
+        // — used for row ordering, not as an indexed facet (matches `wal-otap`).
         if record.severity_number != 0 {
             self.scalar("severity_number", Value::Int(record.severity_number as i64), &mut out);
         }
@@ -440,11 +433,32 @@ pub struct ResourceGroup {
     pub scopes: Vec<ScopeGroup>,
 }
 
-/// One scope and the records under it (each record = its own entries only).
+/// One scope and the records under it.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScopeGroup {
     pub scope: Vec<Entry>,
-    pub records: Vec<Vec<Entry>>,
+    pub records: Vec<Record>,
+}
+
+/// One log record: its own entries plus its resolved timestamp. `ts` is
+/// `time_unix_nano` (≠0) else `observed_time_unix_nano` (≠0), resolved at flatten
+/// time; `None` means neither was set, and the consumer applies the frame's
+/// ingestion-time fallback. Time fields live here, not in `entries` (see
+/// [`record_timestamp`] and [`Flattener::flatten_record`]).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Record {
+    pub ts: Option<i64>,
+    pub entries: Vec<Entry>,
+}
+
+/// A record's timestamp: `time_unix_nano` (≠0) else `observed_time_unix_nano` (≠0),
+/// read straight from the OTLP fields. `None` if neither is set — the consumer then
+/// falls back to the frame's ingestion timestamp. Same priority as `wal-otap`.
+pub fn record_timestamp(record: &LogRecord) -> Option<i64> {
+    Some(record.time_unix_nano)
+        .filter(|&t| t != 0)
+        .or(Some(record.observed_time_unix_nano).filter(|&t| t != 0))
+        .map(|t| t as i64)
 }
 
 /// Flatten one decoded request INTO a shared [`Flattener`], returning the request's
@@ -471,7 +485,10 @@ pub fn flatten_into(
             let records = sl
                 .log_records
                 .iter()
-                .map(|r| flattener.flatten_record(r))
+                .map(|r| Record {
+                    ts: record_timestamp(r),
+                    entries: flattener.flatten_record(r),
+                })
                 .collect();
             scopes.push(ScopeGroup { scope, records });
         }
@@ -552,7 +569,7 @@ pub fn fill_hashes(flattened: &mut FlattenedRequest) {
                 e.hash = hash_kv(&paths[e.node as usize], &e.value, &mut buf);
             }
             for record in &mut sg.records {
-                for e in record {
+                for e in &mut record.entries {
                     e.hash = hash_kv(&paths[e.node as usize], &e.value, &mut buf);
                 }
             }
