@@ -55,7 +55,9 @@ fn record_ts(
                 _ => None,
             })
     };
-    lookup(time_node).or_else(|| lookup(obs_node)).unwrap_or(fallback)
+    lookup(time_node)
+        .or_else(|| lookup(obs_node))
+        .unwrap_or(fallback)
 }
 
 /// Intern a slice of entries into tokens, riding the interner's `lookup_hash` fast
@@ -93,10 +95,6 @@ pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result
     let mut row_index = RowIndex::new(&arena, CARDINALITY_THRESHOLD);
     let mut stats = SfstStats::default();
     let mut kv = String::new();
-    // Reused across all records and frames. The resource + scope prefix is identical
-    // for every record in a scope group, so it is built once per group and only the
-    // record's own tokens are swapped in per record (truncate + extend).
-    let mut tokens: Vec<KvSlot> = Vec::new();
 
     loop {
         let frame = {
@@ -126,29 +124,37 @@ pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result
         let time_node = leaf_node(tree, "time_unix_nano");
         let obs_node = leaf_node(tree, "observed_time_unix_nano");
 
+        // Collect resource, scope and record tokens
+        let mut tokens: Vec<KvSlot> = Vec::new();
+
         let mut records = 0u64;
         for rg in &flattened.resources {
             // Intern resource attrs once per group and reuse across its records,
             // instead of re-probing them for every record.
-            let resource_tokens = intern_entries(&mut row_index, &rg.resource, &paths, &mut kv, &mut stats);
+            let resource_tokens =
+                intern_entries(&mut row_index, &rg.resource, &paths, &mut kv, &mut stats);
+
+            tokens.clear();
+            tokens.extend_from_slice(&resource_tokens);
+
             for sg in &rg.scopes {
-                let scope_tokens = intern_entries(&mut row_index, &sg.scope, &paths, &mut kv, &mut stats);
-                // A row's columns = resource + scope + own. The resource+scope prefix
-                // is identical for every record in this scope group, so build it once
-                // here and, per record, truncate back to it and append only the
-                // record's own tokens — reusing one allocation across all records.
-                tokens.clear();
-                tokens.extend_from_slice(&resource_tokens);
+                let scope_tokens =
+                    intern_entries(&mut row_index, &sg.scope, &paths, &mut kv, &mut stats);
                 tokens.extend_from_slice(&scope_tokens);
-                let prefix_len = tokens.len();
+
                 for record in &sg.records {
                     records += 1;
                     let ts = record_ts(record, time_node, obs_node, fallback_ts);
-                    let own_tokens = intern_entries(&mut row_index, record, &paths, &mut kv, &mut stats);
-                    tokens.truncate(prefix_len);
-                    tokens.extend_from_slice(&own_tokens);
+
+                    let record_tokens =
+                        intern_entries(&mut row_index, record, &paths, &mut kv, &mut stats);
+                    tokens.truncate(resource_tokens.len() + scope_tokens.len());
+                    tokens.extend_from_slice(&record_tokens);
+
                     row_index.row(ts, &tokens);
                 }
+
+                tokens.truncate(resource_tokens.len());
             }
         }
         stats.records += records;
