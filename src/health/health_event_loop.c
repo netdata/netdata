@@ -812,7 +812,7 @@ static void health_event_loop(void) {
             schedule_node_state_update(localhost, 10);
         }
 
-        if (unlikely(silencers->all_alarms && silencers->stype == STYPE_DISABLE_ALARMS)) {
+        if (unlikely(health_silencers_all_alarms_disabled())) {
             static int logged=0;
             if (!logged) {
                 nd_log(NDLS_DAEMON, NDLP_DEBUG,
