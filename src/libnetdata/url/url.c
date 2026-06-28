@@ -311,7 +311,7 @@ inline char *url_find_protocol(char *s) {
         while (*s && *s != ' ') s++;
 
         // is it SPACE + "HTTP/" ?
-        if(*s && !strncmp(s, " HTTP/", 6)) break;
+        if(!*s || !strncmp(s, " HTTP/", 6)) break;
         else s++;
     }
 
