@@ -6,7 +6,7 @@
 
 ## Context
 
-The Netdata SNMP trap subsystem (design spec: `.agents/sow/specs/snmp-traps/netdata.md`) needs a concrete implementation architecture decision for three interlocking concerns:
+The Netdata SNMP trap subsystem (design spec: `.agents/skills/project-snmp-trap-profiles-authoring/netdata.md`) needs a concrete implementation architecture decision for three interlocking concerns:
 
 1. **Process model**: Where does the trap plugin live in the Netdata process tree?
 2. **Journal writer backend**: How do we write per-job journal files at `${NETDATA_LOG_DIR}/traps/{job_name}/` in Go, compatible with SDK-backed `snmp:traps` Function queries and optional `journalctl --directory=...` validation?
@@ -489,4 +489,4 @@ On `Update()`, current jobmgr behavior stops the old running job before creating
 - go.d codedError: `src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go:140-147`
 - go.d V2 collector pattern: `src/go/plugin/go.d/collector/ping/collector.go`
 - SNMP profile loader multipath pattern: `src/go/plugin/go.d/collector/snmp/ddsnmp/load.go:270-286`
-- Design spec: `.agents/sow/specs/snmp-traps/netdata.md` §5, §11, §19
+- Design spec: `.agents/skills/project-snmp-trap-profiles-authoring/netdata.md` §5, §11, §19

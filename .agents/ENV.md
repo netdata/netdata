@@ -179,7 +179,7 @@ Every value above is either:
 The committed skills, scripts, and docs reference these
 values exclusively via `${KEY}` placeholders, never literal
 values. The discipline is enforced by the spec at
-`<repo>/.agents/sow/specs/sensitive-data-discipline.md`,
+`<repo>/.agents/sensitive-data-discipline.md`,
 which includes a pre-commit grep recipe to catch
 literal-value leaks.
 

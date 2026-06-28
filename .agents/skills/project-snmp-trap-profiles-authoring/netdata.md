@@ -157,7 +157,7 @@ The configured per-job root is `${NETDATA_LOG_DIR}/traps/{job_name}/`. The plugi
 
 **Rationale**: In-process module code means no IPC for cross-plugin enrichment (SOW-0037), trivially shared profile cache (Go package-level state + refcount), and the well-understood go.d job lifecycle. A CGo bridge to libsystemd cannot set `_HOSTNAME` (journald owns trusted fields); a subprocess Rust bridge adds process management complexity. The SDK-backed writer preserves direct journal file control, creation-time failure detection, and `journalctl` compatibility without maintaining a package-local copy of the journal binary format.
 
-**Reference**: `.agents/sow/specs/snmp-traps/decisions/0001-go-process-and-trapwriter.md`
+**Reference**: `.agents/skills/project-snmp-trap-profiles-authoring/decisions/0001-go-process-and-trapwriter.md`
 
 ### Concurrency model
 
@@ -1157,7 +1157,7 @@ trap-derived state gauges; see `trap-metrics-profiles.md` and
 
 Phase B resolved most of the original questions. What remains:
 
-1. **Go process / writer backend** — **ACCEPTED (SOW-0035 M1, ADR-0001; amended 2026-05-26 for the SDK integration, 2026-05-28 for SDK `go/v0.3.0`, 2026-05-31 for SDK `go/v0.4.0`, 2026-06-08 for SDK `go/v0.5.1`, 2026-06-10 for SDK `go/v0.6.3` plus persistent-journal placement, and 2026-06-11 for SDK `go/v0.6.4` plus Netdata log directory placement)**: Standard in-process go.d collector V2 module with a thin SDK-backed Go journal adapter over `github.com/netdata/systemd-journal-sdk/go/journal` `go/v0.6.4`. No separate process, no CGo, no subprocess bridge. See `.agents/sow/specs/snmp-traps/decisions/0001-go-process-and-trapwriter.md`.
+1. **Go process / writer backend** — **ACCEPTED (SOW-0035 M1, ADR-0001; amended 2026-05-26 for the SDK integration, 2026-05-28 for SDK `go/v0.3.0`, 2026-05-31 for SDK `go/v0.4.0`, 2026-06-08 for SDK `go/v0.5.1`, 2026-06-10 for SDK `go/v0.6.3` plus persistent-journal placement, and 2026-06-11 for SDK `go/v0.6.4` plus Netdata log directory placement)**: Standard in-process go.d collector V2 module with a thin SDK-backed Go journal adapter over `github.com/netdata/systemd-journal-sdk/go/journal` `go/v0.6.4`. No separate process, no CGo, no subprocess bridge. See `.agents/skills/project-snmp-trap-profiles-authoring/decisions/0001-go-process-and-trapwriter.md`.
 
 2. **Profile YAML hot-reload mechanism — ACCEPTED (SOW-0037 M3, superseded by automatic operator-profile reload in SOW-20260610)**: operators add or edit YAML files under `/etc/netdata/go.d/snmp.trap-profiles/`; while at least one `snmp_traps` job is running, the plugin uses an internal watcher plus periodic fingerprint fallback to reload operator profiles automatically. The public manual `snmp_traps:reload-profiles` Function was rejected before first release and is not part of the shipped Function surface. Live reload rebuilds only operator profiles and carries over the existing stock route/store so Netdata upgrades do not live-load changed stock metadata without matching code. Failed automatic reloads keep the previous index active, log the profile loader error with file/path detail, increment `snmp.trap.errors.profile_load_failed`, leave the cache dirty, and make the next DynCfg test/apply/job creation fail at creation time until fixed. Profile memory is still loaded on first runnable trap job creation and released after the last runnable trap job stops. Runtime MIB compilation remains out of scope.
 
@@ -1273,7 +1273,7 @@ These limits apply per-job (each job has its own decoder thread per §5) with th
 
 The `TrapWriter` interface is the contract between the trap pipeline and the storage/transport backends. It must accommodate both the journal-direct path (§11) and the opt-in OTLP path (§11b) without retrofit.
 
-**Status: Accepted (SOW-0035 M1, ADR-0001, reviewer round 5 findings folded in).** The Go interface definition and `TrapEntry` struct are recorded in `.agents/sow/specs/snmp-traps/decisions/0001-go-process-and-trapwriter.md` §3-4. Key design decisions:
+**Status: Accepted (SOW-0035 M1, ADR-0001, reviewer round 5 findings folded in).** The Go interface definition and `TrapEntry` struct are recorded in `.agents/skills/project-snmp-trap-profiles-authoring/decisions/0001-go-process-and-trapwriter.md` §3-4. Key design decisions:
 
 - The interface is `Write(entry *TrapEntry) error`, `Flush() error`, `Close() error` — fast accept into backend-owned bounded queues, backend-internal batching
 - CWE-117 encoding is owned by the journal writer backend, not the interface
@@ -1328,6 +1328,6 @@ Semantics:
 | `SummaryCounts` | optional `{TotalSuppressed, Fingerprints, PeriodSec, ByTrap}` | Only when `ReportType=deduplication_summary`; `ByTrap` is keyed by numeric OID and the MESSAGE renderer resolves names from the profile index when available |
 | `DecodeError` | optional `{Kind, Error, PacketSize, PacketSHA256, SourceUDPPort?, Listener?, SnmpVersion?, EngineID?}` | Only when `ReportType=decode_error`; raw packet bytes are not stored |
 
-The interface contract is defined formally in `.agents/sow/specs/snmp-traps/decisions/0001-go-process-and-trapwriter.md` §3-4 (SOW-0035 M1, ADR-0001). The SOW-0038 M3 OTLP exporter implements the same interface as the SOW-0035 M4 journal writer.
+The interface contract is defined formally in `.agents/skills/project-snmp-trap-profiles-authoring/decisions/0001-go-process-and-trapwriter.md` §3-4 (SOW-0035 M1, ADR-0001). The SOW-0038 M3 OTLP exporter implements the same interface as the SOW-0035 M4 journal writer.
 
 End of design proposal.

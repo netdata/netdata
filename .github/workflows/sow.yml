@@ -22,24 +22,27 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Reject committed SOW working files
+      - name: Reject committed SOW working files and specs
         run: |
           set -euo pipefail
 
-          found=0
+          # SOW working memory and specs are local-only and gitignored. Anything
+          # tracked under these paths was force-added and must not be merged.
+          tracked=$(git ls-files -- \
+            .agents/sow/q \
+            .agents/sow/specs \
+            .agents/sow/active .agents/sow/pending .agents/sow/current .agents/sow/done \
+            || true)
 
-          while IFS= read -r file; do
-            [ -n "$file" ] || continue
-            echo "::error file=${file}::SOW working files may be committed for takeover/handoff and must be deleted before merge."
-            found=1
-          done < <(
-            {
-              find .agents/sow/active -maxdepth 1 -type f -name 'SOW-*.md' 2>/dev/null || true
-              find .agents/sow/pending .agents/sow/current .agents/sow/done -type f -name 'SOW-*.md' 2>/dev/null || true
-            } | sort
-          )
+          if [ -n "$tracked" ]; then
+            while IFS= read -r file; do
+              [ -n "$file" ] || continue
+              echo "::error file=${file}::SOW working files and specs are local-only and must not be committed (see AGENTS.md, SOW System)."
+            done <<< "$tracked"
+            exit 1
+          fi
 
-          exit "$found"
+          echo "No committed SOW working files or specs."
 
   sensitive-data:
     runs-on: ubuntu-latest

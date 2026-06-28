@@ -970,6 +970,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/buffer/functions_fields.h
         src/libnetdata/ringbuffer/ringbuffer.c
         src/libnetdata/ringbuffer/ringbuffer.h
+        src/libnetdata/ringbuffer/ringbuffer-unittest.c
         src/libnetdata/circular_buffer/circular_buffer.c
         src/libnetdata/circular_buffer/circular_buffer.h
         src/libnetdata/clocks/clocks.c
@@ -2286,6 +2287,7 @@ set(MQTT_WEBSOCKETS_FILES
         src/aclk/mqtt_websockets/mqtt_wss_client.h
         src/aclk/mqtt_websockets/ws_client.c
         src/aclk/mqtt_websockets/ws_client.h
+        src/aclk/mqtt_websockets/ws_client-unittest.c
         src/aclk/mqtt_websockets/mqtt_ng.c
         src/aclk/mqtt_websockets/mqtt_ng.h
         src/aclk/mqtt_websockets/common_public.c

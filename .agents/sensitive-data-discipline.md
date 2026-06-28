@@ -126,7 +126,7 @@ Before any commit that touches a SOW, skill, spec, or doc, run:
 ```bash
 # Helper: list of files staged for commit, excluding this spec.
 files=$(git diff --cached --name-only --diff-filter=ACMR \
-        | grep -v '^\.agents/sow/specs/sensitive-data-discipline\.md$')
+        | grep -v '^\.agents/sensitive-data-discipline\.md$')
 [ -z "$files" ] && exit 0
 
 # Run each pattern. The patterns themselves are not embedded in
@@ -134,31 +134,31 @@ files=$(git diff --cached --name-only --diff-filter=ACMR \
 # from concatenated character classes so a grep over THIS spec
 # does not flag itself for the very examples it must define.
 grep_args=(
-  --line-number --extended-regexp --binary-files=without-match
+  --line-number --extended-regexp -I
 )
 
 # Domain pattern for the org.
 domain='[A-Za-z0-9-]+\.netdata\.(cloud|io)'
-git grep "${grep_args[@]}" -- $files -- "$domain"
+git grep "${grep_args[@]}" -e "$domain" -- $files
 
 # UUID-shaped identifiers.
 uuid='[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
-git grep "${grep_args[@]}" -- $files -- "$uuid"
+git grep "${grep_args[@]}" -e "$uuid" -- $files
 
 # IPv4 literals (review hits manually for false positives).
 ipv4='([0-9]{1,3}\.){3}[0-9]{1,3}'
-git grep "${grep_args[@]}" -- $files -- "$ipv4"
+git grep "${grep_args[@]}" -e "$ipv4" -- $files
 
 # Per-user / per-install absolute paths. Documented Netdata
 # default paths (/var/lib/netdata, /etc/netdata) are intentionally
 # excluded -- they are public OSS defaults; bundled installs use
 # the NETDATA_PREFIX knob.
 abs="(~/|/$(echo op)t/baddisk|/$(echo op)t/neda|/$(echo op)t/ai-agent|/$(echo ho)me/)"
-git grep "${grep_args[@]}" -- $files -- "$abs"
+git grep "${grep_args[@]}" -e "$abs" -- $files
 
 # Long opaque tokens (40+ char base64-ish).
 tok='[A-Za-z0-9_+/=-]{40,}'
-git grep "${grep_args[@]}" -- $files -- "$tok"
+git grep "${grep_args[@]}" -e "$tok" -- $files
 ```
 
 Every match must either be removed or converted to an env-key
@@ -170,8 +170,8 @@ project reports its own data).
 
 - **This spec file itself** must list forbidden patterns and
   example regexes in order to define the rule. The verification
-  grep excludes `<repo>/.agents/sow/specs/sensitive-data-
-  discipline.md` from its scan. No other SOW, skill, or doc
+  grep excludes `<repo>/.agents/sensitive-data-discipline.md`
+  from its scan. No other SOW, skill, or doc
   qualifies for this exemption.
 - **Quoted user messages** preserved verbatim in a SOW's "User
   Request" section may include literals the user typed. Redact

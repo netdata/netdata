@@ -22,8 +22,8 @@ Read these before designing or changing topology payloads:
 | `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` | JSON Schema for production topology payloads |
 | `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md` | Human-readable topology schema contract and producer guidance |
 | `src/plugins.d/FUNCTION_TOPOLOGY_IMPLEMENTATION_SCOPE.md` | Backend/frontend/aggregator migration scope |
-| `.agents/sow/specs/topology-function-schema.md` | Durable project spec for topology semantics |
-| `.agents/sow/specs/topology-modes-correlation-aggregation.md` | Mode, correlation, aggregation, and actor modal identification contract |
+| `.agents/skills/project-create-topology/topology-function-schema.md` | Durable project spec for topology semantics |
+| `.agents/skills/project-create-topology/topology-modes-correlation-aggregation.md` | Mode, correlation, aggregation, and actor modal identification contract |
 | `src/go/pkg/topology/v1` | Go production topology payload builders and compact-table helpers |
 | `.agents/skills/project-writing-collectors/SKILL.md` | Collector quality, Function, validation, and cardinality rules |
 

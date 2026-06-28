@@ -21,7 +21,7 @@ source files for evidence.
   `src/go/plugin/go.d/docs/migrate-v1-to-v2.md`
 - Runtime/chart lifecycle: `src/go/plugin/framework/chartengine/README.md`
 - Template format: `src/go/plugin/framework/charttpl/README.md`
-- Host scopes/vnodes: `.agents/sow/specs/go-v2-host-scope.md`
+- Host scopes/vnodes: `.agents/skills/project-writing-go-modules-framework-v2/go-v2-host-scope.md`
 - Primary modern example: `src/go/plugin/go.d/collector/cato_networks/`.
   Use focused pieces from it, not the whole collector shape.
 - Older V2 collectors can still be useful for local patterns, but review them
@@ -124,6 +124,13 @@ source files for evidence.
 - To reproduce a V1 chart context in a migration, inject `context_namespace` (the
   fixed prefix, or `prefix.<app>` per job) so autogen rebuilds `prefix.<metric>` /
   `prefix.<app>.<metric>` without hand-built chart IDs.
+- When a collector builds its chart template at RUNTIME (not a static `charts.yaml`):
+  - Emit it with `charttpl.Spec.MarshalTemplate()` (runs `Validate()` only, then
+    marshals with `yaml.v2`, the decoder's library). Do NOT hand-roll `Validate()` +
+    `yaml.Marshal`, and do NOT marshal with `yaml.v3`.
+  - If you mutate a `charttpl.Group` borrowed from a shared profile/catalog, deep-copy
+    it first with `Group.Clone()` so per-job edits cannot corrupt the shared template.
+    A `Group` you decoded yourself per job is already owned and needs no clone.
 - Skip empty distributions -- e.g. a summary whose every quantile is NaN -- so a
   chart waits for real data, matching how scalar NaN values are already skipped.
 - For dynamic surfaces whose label sets churn, `metrix`'s `Vec` handle cache is
