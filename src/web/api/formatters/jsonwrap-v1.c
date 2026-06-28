@@ -78,6 +78,11 @@ static inline long query_target_metrics_latest_values(BUFFER *wb, const char *ke
 static inline size_t rrdr_dimension_view_latest_values(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options) {
     buffer_json_member_add_array(wb, key);
 
+    if(!rrdr_rows(r)) {
+        buffer_json_array_close(wb);
+        return 0;
+    }
+
     size_t c, i;
     for(c = 0, i = 0; c < r->d ; c++) {
         if(!rrdr_dimension_should_be_exposed(r->od[c], options))
