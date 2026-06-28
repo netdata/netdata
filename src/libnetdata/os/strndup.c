@@ -5,9 +5,13 @@
 
 static inline char *os_strndup( const char *s1, size_t n)
 {
-    char *copy= (char*)malloc( n+1 );
-    memcpy( copy, s1, n );
-    copy[n] = 0;
+    size_t bytes = strnlen(s1, n);
+    if (unlikely(bytes == SIZE_MAX))
+        return NULL;
+
+    char *copy= (char*)malloc( bytes+1 );
+    memcpy( copy, s1, bytes );
+    copy[bytes] = 0;
     return copy;
 };
 #endif
