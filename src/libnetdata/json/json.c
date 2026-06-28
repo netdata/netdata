@@ -181,7 +181,6 @@ static inline void json_jsonc_set_integer(JSON_ENTRY *e, char *key, int64_t valu
  */
 static inline void json_jsonc_parse_array(json_object *ptr, void *callback_data,int (*callback_function)(struct json_entry *)) {
     int end = json_object_array_length(ptr);
-    JSON_ENTRY e;
 
     if(end) {
         int i;
@@ -191,8 +190,7 @@ static inline void json_jsonc_parse_array(json_object *ptr, void *callback_data,
         do {
             json_object *jvalue =  json_object_array_get_idx(ptr, i);
             if(jvalue) {
-                e.callback_data = callback_data;
-                e.type = JSON_OBJECT;
+                JSON_ENTRY e = { .type = JSON_OBJECT, .callback_data = callback_data };
                 callback_function(&e);
                 json_object_object_foreach(jvalue, key, val) {
                     type = json_object_get_type(val);
