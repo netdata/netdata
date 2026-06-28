@@ -491,6 +491,11 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     // Remove journal files that do not have a matching data file
     // by scanning the judy array of the journal files
     nd_win_trace("scan_data_files[D]: tier=%d orphan-check validate=%d", ctx->config.tier, (int)validate_files);
+    // On Windows the vendored JudyL JudyLNext loops infinitely through the
+    // journal fileno range instead of returning NULL at end-of-array, causing
+    // a multi-minute startup hang. Since UNLINK_FILE is already a no-op on
+    // Windows (Defender scan cost), skip the entire orphan-deletion walk here.
+#ifndef OS_WINDOWS
     if (validate_files) {
         bool first_then_next = true;
         Word_t idx = 0;
@@ -551,6 +556,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         if (deleted_journals)
             netdata_log_info("DBENGINE: deleted %zu journal files without matching data files", deleted_journals);
     }
+#endif /* !OS_WINDOWS */
 
     nd_win_trace("scan_data_files[D4]: tier=%d before JudyLFreeArray", ctx->config.tier);
     (void) JudyLFreeArray(&journafile_JudyL, NULL);
