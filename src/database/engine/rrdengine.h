@@ -38,6 +38,18 @@ extern unsigned rrdeng_pages_per_extent;
         uv_fs_req_cleanup(&(_req));                                                                                   \
     } while (0)
 
+// UNLINK_FILE_DEFERRED: cleanup-only unlink that never blocks on Windows.
+// On Windows, uv_fs_unlink blocks 15-20 s per call because Windows Defender scans
+// the file content before allowing deletion. With accumulated orphaned journals this
+// causes multi-minute startup hangs. Orphaned journals (no matching .ndf) are
+// harmless, so skip deletion on Windows and let normal rotation clean them later.
+#ifdef _WIN32
+#define UNLINK_FILE_DEFERRED(ctx, path, ret_var)                                                                       \
+    do { (void)(ctx); (void)(path); (ret_var) = UV_EPERM; } while(0)
+#else
+#define UNLINK_FILE_DEFERRED(ctx, path, ret_var) UNLINK_FILE(ctx, path, ret_var)
+#endif
+
 #define CLOSE_FILE(ctx, path, file, ret_var)                                                                           \
     do {                                                                                                               \
         uv_fs_t _req;                                                                                                  \
