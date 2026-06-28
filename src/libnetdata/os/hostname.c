@@ -145,7 +145,7 @@ bool os_hostname(char *dst, size_t dst_size, const char *filesystem_root) {
 
 #ifdef HAVE_LIBICONV
     const char *locale = get_current_locale();
-    if (locale && *locale) {
+    if (original_hostname && locale && *locale) {
         char utf8_output[HOST_NAME_MAX * 4 + 1] = "";
         if(iconv_convert_to_utf8(original_hostname, get_encoding_from_locale(locale), utf8_output, sizeof(utf8_output))) {
             rrdlabels_sanitize_value(dst, trim(utf8_output), dst_size);
