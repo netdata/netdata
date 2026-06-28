@@ -1063,19 +1063,21 @@ The package exposes a small Go surface for decoding, cloning, and re-emitting te
 |------------------------------------------|------------------------------------------------------------------------------------|
 | `DecodeYAML([]byte) (*Spec, error)`      | Strict parse, apply decode-time defaults, then validate. The canonical read path.  |
 | `Group.Clone() Group`                    | Typed deep copy of a group and everything nested under it.                          |
-| `Spec.MarshalTemplate() (string, error)` | Validate (only) and serialize to YAML, ready to return from `ChartTemplateYAML()`. |
+| `Spec.MarshalTemplate() (string, error)` | Validate (only) and serialize a runtime-built template to YAML.                    |
 
 ### Building a template at runtime
 
-Assemble a `Spec` from `charttpl` types and serialize it with `MarshalTemplate`:
+`CollectorV2.ChartTemplateYAML()` returns a plain `string`, so build the template where the error can be handled — typically once during `Init` — and cache the result; `ChartTemplateYAML()` then returns the cached string. Assemble a `Spec` from `charttpl` types and serialize it with `MarshalTemplate`:
 
 ```go
-spec := charttpl.Spec{
-    Version:          charttpl.VersionV1,
-    ContextNamespace: "myapp",
-    Groups:           groups, // assembled from discovery / profiles
+func buildChartTemplate(groups []charttpl.Group) (string, error) {
+    spec := charttpl.Spec{
+        Version:          charttpl.VersionV1,
+        ContextNamespace: "myapp",
+        Groups:           groups, // assembled from discovery / profiles
+    }
+    return spec.MarshalTemplate()
 }
-return spec.MarshalTemplate()
 ```
 
 `MarshalTemplate` runs `Spec.Validate()` and marshals with `gopkg.in/yaml.v2` — the same library `DecodeYAML` parses with — so a runtime template emits and re-decodes through one consistent YAML implementation. It deliberately does **not** apply decode-time defaults: a field you leave unset stays unset in the emitted YAML, and the chart engine applies the defaults when it re-decodes the template. Treat the returned string as opaque — it is only ever re-decoded, never compared byte-for-byte.
