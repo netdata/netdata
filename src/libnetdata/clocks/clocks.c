@@ -254,7 +254,7 @@ void sleep_to_absolute_time(usec_t usec) {
                                       req.tv_nsec);
                 }
             }
-            sleep_usec(usec);
+            break;
         }
     }
 }
