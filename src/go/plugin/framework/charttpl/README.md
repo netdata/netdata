@@ -1051,3 +1051,43 @@ All rules below produce semantic validation errors unless noted:
 | Group family hierarchy + `chart.family` | Composed into `/`-separated chart family.                                                |
 | `options.multiplier = 0`                | Treated as `1`.                                                                          |
 | `options.divisor = 0`                   | Treated as `1`.                                                                          |
+
+## Programmatic API
+
+> [!NOTE]
+> Most collectors ship a static `charts.yaml` and never touch the Go API. This section is for collectors that **build a chart template at runtime** — for example from discovery results or selected profiles — and return it from `CollectorV2.ChartTemplateYAML()`.
+
+The package exposes a small Go surface for decoding, cloning, and re-emitting templates:
+
+| Function                                 | Purpose                                                                            |
+|------------------------------------------|------------------------------------------------------------------------------------|
+| `DecodeYAML([]byte) (*Spec, error)`      | Strict parse, apply decode-time defaults, then validate. The canonical read path.  |
+| `Group.Clone() Group`                    | Typed deep copy of a group and everything nested under it.                          |
+| `Spec.MarshalTemplate() (string, error)` | Validate (only) and serialize to YAML, ready to return from `ChartTemplateYAML()`. |
+
+### Building a template at runtime
+
+Assemble a `Spec` from `charttpl` types and serialize it with `MarshalTemplate`:
+
+```go
+spec := charttpl.Spec{
+    Version:          charttpl.VersionV1,
+    ContextNamespace: "myapp",
+    Groups:           groups, // assembled from discovery / profiles
+}
+return spec.MarshalTemplate()
+```
+
+`MarshalTemplate` runs `Spec.Validate()` and marshals with `gopkg.in/yaml.v2` — the same library `DecodeYAML` parses with — so a runtime template emits and re-decodes through one consistent YAML implementation. It deliberately does **not** apply decode-time defaults: a field you leave unset stays unset in the emitted YAML, and the chart engine applies the defaults when it re-decodes the template. Treat the returned string as opaque — it is only ever re-decoded, never compared byte-for-byte.
+
+### Cloning a shared template before mutating it
+
+Collectors that derive groups from a **shared catalog** (profiles loaded once and reused across jobs) must not mutate those groups in place — a per-job edit would corrupt the catalog for every other job. `Group.Clone()` returns an isolated deep copy, including nested groups, charts, dimensions, and their option pointers; mutate the clone freely:
+
+```go
+g := profile.Template.Clone()
+g.Metrics = perJobMetrics // safe: the shared catalog copy is untouched
+spec.Groups = append(spec.Groups, g)
+```
+
+`Clone()` is needed only when you mutate a group you do not own. A collector that decodes a fresh `Spec` per job (its own `DecodeYAML` result) already owns it and can mutate it directly.
