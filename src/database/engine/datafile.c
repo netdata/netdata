@@ -505,12 +505,21 @@ static int scan_data_files(struct rrdengine_instance *ctx)
                     1U,
                     (unsigned)idx);
 
+                nd_win_trace("scan_data_files[D]: orphan journal v1 fileno=%u", (unsigned)idx);
+#ifndef _WIN32
                 UNLINK_FILE(ctx, path, ret);
                 if (ret == 0) {
                     netdata_log_info("DBENGINE: deleting journal file without matching data file: %s", path);
                     __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
                     deleted_journals++;
                 }
+#else
+                // On Windows, uv_fs_unlink (DeleteFileW) triggers Windows Defender
+                // content scanning per file, blocking ~17s each. Orphaned journals
+                // (no matching .ndf) are harmless; skip deletion at startup.
+                nd_win_trace("scan_data_files[D]: skipping orphan v1 delete on Windows, fileno=%u", (unsigned)idx);
+                (void)ret;
+#endif
 
                 (void)snprintfz(
                     path,
@@ -520,12 +529,17 @@ static int scan_data_files(struct rrdengine_instance *ctx)
                     1U,
                     (unsigned)idx);
 
+                nd_win_trace("scan_data_files[D]: orphan journal v2 fileno=%u", (unsigned)idx);
+#ifndef _WIN32
                 UNLINK_FILE(ctx, path, ret);
                 if (ret == 0) {
                     netdata_log_info("DBENGINE: deleting journal file without matching data file: %s", path);
                     __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
                     deleted_journals++;
                 }
+#else
+                nd_win_trace("scan_data_files[D]: skipping orphan v2 delete on Windows, fileno=%u", (unsigned)idx);
+#endif
             }
         }
 
