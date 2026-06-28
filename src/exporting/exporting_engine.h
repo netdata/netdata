@@ -118,6 +118,7 @@ struct simple_connector_data {
 
     BUFFER *header;
     BUFFER *buffer;
+    BUFFER *response;
     size_t buffered_metrics;
     size_t buffered_bytes;
 
