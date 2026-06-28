@@ -52,7 +52,7 @@ static void bearer_token_cleanup(bool force) {
     time_t now_s = now_realtime_sec();
 
     struct bearer_token *z;
-    dfe_start_read(netdata_authorized_bearers, z) {
+    dfe_start_write(netdata_authorized_bearers, z) {
         if(z->expires_s < now_s) {
             nd_uuid_t uuid;
             if(uuid_parse_flexi(z_dfe.name, uuid) == 0)
