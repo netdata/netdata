@@ -17,8 +17,7 @@ static void status_file_io_fallback_dirs_update(void) {
 }
 
 static bool status_file_io_check(const char *directory, const char *filename, char *dst, size_t dst_size, time_t *mtime) {
-    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
-    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
+    // Used by the non-signal load path; it may probe filesystem metadata.
 
     if(!directory || !*directory || !filename || !*filename || !dst || !dst_size || !mtime)
         return false;
@@ -65,9 +64,8 @@ static void status_file_io_remove_obsolete(const char *protected_dir, const char
     errno_clear();
 }
 
-bool status_file_io_load(const char *filename, bool (*cb)(const char *, void *), void *data) {
-    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
-    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
+bool status_file_io_load(const char *filename, bool (*cb)(const char *, void *), void *data, bool log) {
+    // Do not call this from signal handlers; it probes filesystem metadata and may log.
 
     char newest[FILENAME_MAX] = "";
     char current[FILENAME_MAX];
@@ -93,7 +91,9 @@ bool status_file_io_load(const char *filename, bool (*cb)(const char *, void *),
     if(*newest && cb(newest, data))
         return true;
 
-    nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot find a status file in any location");
+    if(log)
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot find a status file in any location");
+
     return false;
 }
 
