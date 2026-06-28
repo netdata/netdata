@@ -1051,12 +1051,12 @@ done:
 #define ALARM_EVENTS_PER_CHUNK 1000
 void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
 {
-    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
-
     if (unlikely(!host)) {
-        nd_log(NDLS_ACCESS, NDLP_WARNING, "AC [%s (N/A)]: Node id not found", aclk_host_config->node_id);
+        nd_log(NDLS_ACCESS, NDLP_WARNING, "AC [N/A (N/A)]: Node id not found");
         return;
     }
+
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
 
     CLAIM_ID claim_id = claim_id_get();
     if (unlikely(!claim_id_is_set(claim_id)))
