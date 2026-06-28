@@ -27,6 +27,11 @@ extern unsigned rrdeng_pages_per_extent;
 #define BLOCK_TO_OFFSET(block) ((uint64_t)(block) << 12)
 #define OFFSET_TO_BLOCK(ofs) ((uint64_t)(ofs) >> 12)
 
+// On Windows, uv_fs_unlink (DeleteFileW) triggers Windows Defender content scanning
+// per file, blocking 15-20 s each. With accumulated journal files this causes
+// multi-minute startup hangs. Skip all synchronous deletion on Windows.
+// TODO: replace with non-blocking async deletion once the startup path is stable.
+#ifndef OS_WINDOWS
 #define UNLINK_FILE(ctx, path, ret_var)                                                                                \
     do {                                                                                                               \
         uv_fs_t _req;                                                                                                  \
@@ -37,17 +42,9 @@ extern unsigned rrdeng_pages_per_extent;
         }                                                                                                              \
         uv_fs_req_cleanup(&(_req));                                                                                   \
     } while (0)
-
-// UNLINK_FILE_DEFERRED: cleanup-only unlink that never blocks on Windows.
-// On Windows, uv_fs_unlink blocks 15-20 s per call because Windows Defender scans
-// the file content before allowing deletion. With accumulated orphaned journals this
-// causes multi-minute startup hangs. Orphaned journals (no matching .ndf) are
-// harmless, so skip deletion on Windows and let normal rotation clean them later.
-#ifdef _WIN32
-#define UNLINK_FILE_DEFERRED(ctx, path, ret_var)                                                                       \
-    do { (void)(ctx); (void)(path); (ret_var) = UV_EPERM; } while(0)
 #else
-#define UNLINK_FILE_DEFERRED(ctx, path, ret_var) UNLINK_FILE(ctx, path, ret_var)
+#define UNLINK_FILE(ctx, path, ret_var)                                                                                \
+    do { (void)(ctx); (void)(path); (ret_var) = 0; } while(0)
 #endif
 
 #define CLOSE_FILE(ctx, path, file, ret_var)                                                                           \

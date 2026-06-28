@@ -3,7 +3,7 @@
 #ifndef NETDATA_ND_LOG_COMMON_H
 #define NETDATA_ND_LOG_COMMON_H
 
-#ifndef _WIN32
+#ifndef OS_WINDOWS
 #include <syslog.h>
 #else
 // syslog.h is not available on Windows; define the standardized POSIX priority values directly.

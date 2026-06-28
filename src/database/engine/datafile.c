@@ -506,7 +506,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
                     (unsigned)idx);
 
                 nd_win_trace("scan_data_files[D]: orphan journal v1 fileno=%u", (unsigned)idx);
-#ifndef _WIN32
+#ifndef OS_WINDOWS
                 UNLINK_FILE(ctx, path, ret);
                 if (ret == 0) {
                     netdata_log_info("DBENGINE: deleting journal file without matching data file: %s", path);
@@ -530,7 +530,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
                     (unsigned)idx);
 
                 nd_win_trace("scan_data_files[D]: orphan journal v2 fileno=%u", (unsigned)idx);
-#ifndef _WIN32
+#ifndef OS_WINDOWS
                 UNLINK_FILE(ctx, path, ret);
                 if (ret == 0) {
                     netdata_log_info("DBENGINE: deleting journal file without matching data file: %s", path);

@@ -50,7 +50,7 @@ extern "C" {
 // rand_s() is a UCRT extension that requires _CRT_RAND_S before stdlib.h is processed.
 // CMake's feature-check defines it in the test code but not in the build; define it here.
 // sigset_t must be defined before <pthread.h> so MinGW's pthread_sigmask() prototype compiles.
-#ifdef _WIN32
+#ifdef OS_WINDOWS
 #ifndef _CRT_RAND_S
 #define _CRT_RAND_S
 #endif
