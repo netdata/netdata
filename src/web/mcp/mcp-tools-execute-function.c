@@ -1058,7 +1058,8 @@ static void mcp_process_table_result(MCP_FUNCTION_DATA *data, size_t max_size_th
 
     if (!json_object_object_get_ex(data->input.jobj, "data", &data_obj) ||
         !json_object_is_type(data_obj, json_type_array) ||
-        !json_object_object_get_ex(data->input.jobj, "columns", &columns_obj)) {
+        !json_object_object_get_ex(data->input.jobj, "columns", &columns_obj) ||
+        !json_object_is_type(columns_obj, json_type_object)) {
         buffer_strcat(data->output.result, json_str); // Missing required elements
         return;
     }
@@ -2288,7 +2289,8 @@ static MCP_RETURN_CODE mcp_functions_process_table(MCP_FUNCTION_DATA *data, MCP_
         
         if (!json_object_object_get_ex(data->input.jobj, "data", &data_obj) ||
             !json_object_is_type(data_obj, json_type_array) ||
-            !json_object_object_get_ex(data->input.jobj, "columns", &columns_obj)) {
+            !json_object_object_get_ex(data->input.jobj, "columns", &columns_obj) ||
+            !json_object_is_type(columns_obj, json_type_object)) {
             // Missing required fields, treat as not processable
             data->output.status = MCP_TABLE_NOT_PROCESSABLE;
             buffer_strcat(data->output.result, buffer_tostring(data->input.json));
