@@ -505,7 +505,7 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
     if (!is_empty)
         return 0;
 
-    std::vector<ml_kmeans_t> V;
+    std::vector<ml_kmeans_inlined_t> loaded_km_contexts;
 
     sqlite3_stmt *res = active_stmt ? *active_stmt : NULL;
     int rc = 0;
@@ -547,9 +547,7 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    spinlock_lock(&dim->slock);
-
-    dim->km_contexts.reserve(Cfg.num_models_to_use);
+    loaded_km_contexts.reserve(Cfg.num_models_to_use);
     while ((rc = sqlite3_step_monitored(res)) == SQLITE_ROW) {
         ml_kmeans_t km;
 
@@ -588,14 +586,17 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
         km.cluster_centers[1](4) = sqlite3_column_double(res, 14);
         km.cluster_centers[1](5) = sqlite3_column_double(res, 15);
 
-        dim->km_contexts.emplace_back(km);
+        loaded_km_contexts.emplace_back(km);
     }
 
-    if (!dim->km_contexts.empty()) {
-        dim->ts = TRAINING_STATUS_TRAINED;
+    if (rc == SQLITE_DONE && !loaded_km_contexts.empty()) {
+        spinlock_lock(&dim->slock);
+        if (dim->km_contexts.empty()) {
+            dim->km_contexts.swap(loaded_km_contexts);
+            dim->ts = TRAINING_STATUS_TRAINED;
+        }
+        spinlock_unlock(&dim->slock);
     }
-
-    spinlock_unlock(&dim->slock);
 
     step_rc = rc;
     if (unlikely(step_rc != SQLITE_DONE))
@@ -617,20 +618,13 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
     step_corrupt    = ml_db_mark_if_corrupt(step_rc);
     cleanup_corrupt = ml_db_mark_if_corrupt(rc);
 
-    // Partial step results may be polluting dim state -- roll back whenever
-    // step did NOT cleanly return SQLITE_DONE, not only on CORRUPT/NOTADB.
-    // SQLITE_BUSY-after-retries, SQLITE_IOERR, SQLITE_INTERRUPT etc. all
-    // leave a partial km_contexts behind, and the training-enqueue gate in
-    // ml_public.cc only requeues UNTRAINED dims -- so leaving ts=TRAINED
-    // with a truncated context locks the dim onto stale models until the
-    // next agent restart. Cleanup-only corruption (step=DONE, reset/
-    // finalize=CORRUPT) does NOT trigger this: step returned DONE so the
-    // rows already loaded are structurally valid; only the DB-level flag
-    // needs setting for future calls.
+    // Partial step results stay local. On failure, only repair an otherwise
+    // empty dimension's state; do not clear a model installed concurrently
+    // while SQLite was stepping.
     if (step_rc != SQLITE_DONE) {
         spinlock_lock(&dim->slock);
-        dim->km_contexts.clear();
-        dim->ts = TRAINING_STATUS_UNTRAINED;
+        if (dim->km_contexts.empty())
+            dim->ts = TRAINING_STATUS_UNTRAINED;
         spinlock_unlock(&dim->slock);
     }
 
