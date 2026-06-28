@@ -4,12 +4,14 @@ use fst_index::FstIndex;
 use treight::Bitmap;
 
 use crate::{
-    BitmapValue, ChunkCounts, Error, FieldEntry, FieldTier, HighField, Histogram, IdRanges, KvId,
-    Metadata, StreamBatch, StreamWriter, Summary,
+    BitmapValue, ChunkCounts, ColumnEntry, ColumnType, ColumnsPresent, ColumnsTable,
+    DroppedAttributeCounts, Error, FieldEntry, FieldTier, Flags, HighField, Histogram, IdRanges,
+    KvId, Metadata, ObservedTimestamps, SpanIds, StreamBatch, StreamWriter, Summary, TraceIds,
 };
 
 fn counts(mid: u16, high: u16, batches: u8) -> ChunkCounts {
     ChunkCounts {
+        columns: ColumnsPresent::default(),
         mid_fields: mid,
         high_fields: high,
         stream_batches: batches,
@@ -49,6 +51,10 @@ fn write_summary_only_round_trips_through_reader() {
 }
 
 fn metadata(fields: Vec<FieldEntry>) -> Metadata {
+    metadata_with_columns(fields, ColumnsTable::default())
+}
+
+fn metadata_with_columns(fields: Vec<FieldEntry>, columns: ColumnsTable) -> Metadata {
     Metadata {
         histogram: Histogram {
             timestamps: vec![1],
@@ -60,6 +66,7 @@ fn metadata(fields: Vec<FieldEntry>) -> Metadata {
             high_end: KvId(4),
         },
         fields: fields.into(),
+        columns,
     }
 }
 
@@ -234,4 +241,190 @@ fn finish_refuses_an_underfilled_file() {
     write_prefix(&mut w);
     w.add_stream_batch(&batch()).unwrap();
     assert!(matches!(w.finish(), Err(Error::WriterMisuse(_))));
+}
+
+/// Build all five per-row columns for `n` rows, each value tagged by its row
+/// index so the round-trip / reorder is verifiable.
+fn sample_columns(n: usize) -> (ObservedTimestamps, TraceIds, SpanIds, Flags, DroppedAttributeCounts) {
+    let observed = ObservedTimestamps((0..n as i64).map(|i| 100 + i).collect());
+    let mut trace = TraceIds::with_capacity(n);
+    let mut span = SpanIds::with_capacity(n);
+    for i in 0..n {
+        trace.push(&[i as u8; 16]);
+        span.push(&[i as u8; 8]);
+    }
+    let flags = Flags((0..n as u32).map(|i| i | 0x100).collect());
+    let drac = DroppedAttributeCounts((0..n as u32).collect());
+    (observed, trace, span, flags, drac)
+}
+
+fn present_all() -> ColumnsPresent {
+    ColumnsPresent {
+        observed_ts: true,
+        trace_id: true,
+        span_id: true,
+        flags: true,
+        dropped_attributes_count: true,
+    }
+}
+
+/// The manifest matching `present_all()` / `sample_columns`.
+fn columns_table() -> ColumnsTable {
+    ColumnsTable(vec![
+        ColumnEntry { name: ObservedTimestamps::NAME.into(), ty: ObservedTimestamps::COLUMN_TYPE },
+        ColumnEntry { name: TraceIds::NAME.into(), ty: TraceIds::COLUMN_TYPE },
+        ColumnEntry { name: SpanIds::NAME.into(), ty: SpanIds::COLUMN_TYPE },
+        ColumnEntry { name: Flags::NAME.into(), ty: Flags::COLUMN_TYPE },
+        ColumnEntry { name: DroppedAttributeCounts::NAME.into(), ty: DroppedAttributeCounts::COLUMN_TYPE },
+    ])
+}
+
+fn col_counts(columns: ColumnsPresent) -> ChunkCounts {
+    ChunkCounts { columns, mid_fields: 0, high_fields: 0, stream_batches: 1 }
+}
+
+#[test]
+fn all_per_row_columns_round_trip() {
+    // All five columns, written in the cold region after PRIM, round-trip.
+    let (observed, trace, span, flags, drac) = sample_columns(3);
+    let mut w = writer(col_counts(present_all()));
+    w.summary(&summary()).unwrap();
+    w.metadata(&metadata_with_columns(Vec::new(), columns_table())).unwrap();
+    w.timestamps(&[1, 2, 3]).unwrap();
+    w.primary(&fst()).unwrap();
+    w.observed_timestamps(&observed).unwrap();
+    w.trace_ids(&trace).unwrap();
+    w.span_ids(&span).unwrap();
+    w.flags(&flags).unwrap();
+    w.dropped_attribute_counts(&drac).unwrap();
+    w.add_stream_batch(&batch()).unwrap();
+    let buf = w.finish().unwrap().into_inner();
+
+    let reader = crate::Reader::open(&buf).unwrap();
+    assert!(reader.has_per_row_columns().unwrap());
+    assert_eq!(
+        reader.columns_table().unwrap().names().collect::<Vec<_>>(),
+        ["observed_ts", "trace_id", "span_id", "flags", "dropped_attributes_count"],
+    );
+    assert_eq!(reader.observed_timestamps().unwrap(), observed);
+    assert_eq!(reader.trace_ids().unwrap(), trace);
+    assert_eq!(reader.span_ids().unwrap(), span);
+    assert_eq!(reader.flags().unwrap(), flags);
+    assert_eq!(reader.dropped_attribute_counts().unwrap(), drac);
+}
+
+#[test]
+fn per_row_columns_are_independently_optional() {
+    // A file with ONLY trace_id — no rule that the columns appear together.
+    let (_o, trace, _s, _f, _d) = sample_columns(3);
+    let present = ColumnsPresent { trace_id: true, ..Default::default() };
+    let manifest = ColumnsTable(vec![ColumnEntry {
+        name: TraceIds::NAME.into(),
+        ty: TraceIds::COLUMN_TYPE,
+    }]);
+    let mut w = writer(col_counts(present));
+    w.summary(&summary()).unwrap();
+    w.metadata(&metadata_with_columns(Vec::new(), manifest)).unwrap();
+    w.timestamps(&[1, 2, 3]).unwrap();
+    w.primary(&fst()).unwrap();
+    w.trace_ids(&trace).unwrap();
+    w.add_stream_batch(&batch()).unwrap();
+    let buf = w.finish().unwrap().into_inner();
+
+    let reader = crate::Reader::open(&buf).unwrap();
+    assert!(reader.has_per_row_columns().unwrap());
+    assert_eq!(reader.columns_table().unwrap().names().collect::<Vec<_>>(), ["trace_id"]);
+    assert_eq!(reader.trace_ids().unwrap(), trace);
+    // The columns NOT written are absent — querying them errors.
+    assert!(reader.observed_timestamps().is_err());
+    assert!(reader.span_ids().is_err());
+    assert!(reader.flags().is_err());
+    assert!(reader.dropped_attribute_counts().is_err());
+}
+
+#[test]
+fn no_per_row_columns_is_the_default() {
+    let mut w = writer(counts(0, 0, 1));
+    write_prefix(&mut w);
+    w.add_stream_batch(&batch()).unwrap();
+    let buf = w.finish().unwrap().into_inner();
+    let reader = crate::Reader::open(&buf).unwrap();
+    assert!(!reader.has_per_row_columns().unwrap());
+    assert!(reader.trace_ids().is_err());
+}
+
+#[test]
+fn per_row_columns_misuse_is_rejected() {
+    let (observed, _t, span, _f, _d) = sample_columns(3);
+    // Declare two columns (observed + trace).
+    let present = ColumnsPresent { observed_ts: true, trace_id: true, ..Default::default() };
+    let manifest = || {
+        metadata_with_columns(
+            Vec::new(),
+            ColumnsTable(vec![
+                ColumnEntry { name: ObservedTimestamps::NAME.into(), ty: ObservedTimestamps::COLUMN_TYPE },
+                ColumnEntry { name: TraceIds::NAME.into(), ty: TraceIds::COLUMN_TYPE },
+            ]),
+        )
+    };
+
+    // Incomplete: only one of the two declared columns written before advancing.
+    let mut w = writer(col_counts(present));
+    w.summary(&summary()).unwrap();
+    w.metadata(&manifest()).unwrap();
+    w.timestamps(&[1, 2, 3]).unwrap();
+    w.primary(&fst()).unwrap();
+    w.observed_timestamps(&observed).unwrap();
+    assert!(matches!(w.add_stream_batch(&batch()), Err(Error::WriterMisuse(_))));
+
+    // A column written before PRIM (stage is not Columns yet).
+    let mut w = writer(col_counts(present));
+    w.summary(&summary()).unwrap();
+    w.metadata(&manifest()).unwrap();
+    w.timestamps(&[1, 2, 3]).unwrap();
+    assert!(matches!(w.observed_timestamps(&observed), Err(Error::WriterMisuse(_))));
+
+    // An undeclared column (span not declared) is rejected.
+    let mut w = writer(col_counts(present));
+    w.summary(&summary()).unwrap();
+    w.metadata(&manifest()).unwrap();
+    w.timestamps(&[1, 2, 3]).unwrap();
+    w.primary(&fst()).unwrap();
+    assert!(matches!(w.span_ids(&span), Err(Error::WriterMisuse(_))));
+
+    // A column written twice is rejected.
+    let mut w = writer(col_counts(present));
+    w.summary(&summary()).unwrap();
+    w.metadata(&manifest()).unwrap();
+    w.timestamps(&[1, 2, 3]).unwrap();
+    w.primary(&fst()).unwrap();
+    w.observed_timestamps(&observed).unwrap();
+    assert!(matches!(w.observed_timestamps(&observed), Err(Error::WriterMisuse(_))));
+}
+
+#[test]
+fn per_row_columns_manifest_must_match_declared() {
+    let present = ColumnsPresent { trace_id: true, ..Default::default() };
+
+    // Declared a column but the manifest is empty → metadata() rejects.
+    let mut w = writer(col_counts(present));
+    w.summary(&summary()).unwrap();
+    assert!(matches!(w.metadata(&metadata(Vec::new())), Err(Error::WriterMisuse(_))));
+
+    // Declared none but the manifest is non-empty → metadata() rejects.
+    let mut w = writer(counts(0, 0, 1));
+    w.summary(&summary()).unwrap();
+    assert!(matches!(
+        w.metadata(&metadata_with_columns(Vec::new(), columns_table())),
+        Err(Error::WriterMisuse(_)),
+    ));
+
+    // Declared trace_id but the manifest gives it the wrong type → rejects.
+    let mut w = writer(col_counts(present));
+    w.summary(&summary()).unwrap();
+    let wrong = ColumnsTable(vec![ColumnEntry { name: TraceIds::NAME.into(), ty: ColumnType::I64 }]);
+    assert!(matches!(
+        w.metadata(&metadata_with_columns(Vec::new(), wrong)),
+        Err(Error::WriterMisuse(_)),
+    ));
 }

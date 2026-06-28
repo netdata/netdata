@@ -79,6 +79,7 @@ fn write_test_sfst(path: &std::path::Path, min_s: u32) {
             },
         ]
         .into(),
+        columns: sfst::ColumnsTable::default(),
     };
     let timestamps: Vec<i64> = (0..6)
         .map(|i| (min_s as i64) * 1_000_000_000 + i * 1_000_000_000)
@@ -95,6 +96,7 @@ fn write_test_sfst(path: &std::path::Path, min_s: u32) {
     ];
 
     let counts = sfst::ChunkCounts {
+        columns: sfst::ColumnsPresent::default(),
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -159,6 +161,7 @@ fn write_service_only_sfst(path: &std::path::Path, min_s: u32) {
             tier: sfst::FieldTier::Low,
         }]
         .into(),
+        columns: sfst::ColumnsTable::default(),
     };
     let timestamps: Vec<i64> = (0..3)
         .map(|i| (min_s as i64) * 1_000_000_000 + i * 1_000_000_000)
@@ -171,6 +174,7 @@ fn write_service_only_sfst(path: &std::path::Path, min_s: u32) {
     ];
 
     let counts = sfst::ChunkCounts {
+        columns: sfst::ColumnsPresent::default(),
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -226,11 +230,13 @@ fn write_same_ts_sfst(path: &std::path::Path, ts_s: u32, n: usize) {
             tier: sfst::FieldTier::Low,
         }]
         .into(),
+        columns: sfst::ColumnsTable::default(),
     };
     let timestamps: Vec<i64> = vec![(ts_s as i64) * 1_000_000_000; n];
     let stream_entries: Vec<Vec<sfst::KvId>> = (0..n).map(|_| vec![sfst::KvId(0)]).collect();
 
     let counts = sfst::ChunkCounts {
+        columns: sfst::ColumnsPresent::default(),
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,

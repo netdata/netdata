@@ -367,9 +367,12 @@ impl Flattener {
         let mut out = Vec::new();
 
         // Queryable scalar fields. OTLP uses 0/"" for unset → treated as absent.
-        // `time_unix_nano` / `observed_time_unix_nano` are intentionally NOT emitted
-        // as entries: the record's timestamp is carried in `Record.ts` (normalized at
-        // ingest) — used for row ordering, not as an indexed facet (matches `wal-otap`).
+        // Per-row identifier/scalar fields are intentionally NOT emitted as entries —
+        // they are carried as columns on [`Record`] (normalized/copied at ingest),
+        // used for row ordering or per-row retrieval, not as indexed facets (matches
+        // `wal-otap`): `time_unix_nano`/`observed_time_unix_nano` (→ `ts`/`observed_ts`)
+        // and `trace_id`/`span_id` (near-unique identifiers). `flags` and
+        // `dropped_attributes_count` are likewise carried on the record.
         if record.severity_number != 0 {
             self.scalar("severity_number", Value::Int(record.severity_number as i64), &mut out);
         }
@@ -378,12 +381,6 @@ impl Flattener {
         }
         if !record.event_name.is_empty() {
             self.scalar("event_name", Value::Str(record.event_name.clone()), &mut out);
-        }
-        if !record.trace_id.is_empty() {
-            self.scalar("trace_id", Value::Bytes(record.trace_id.clone()), &mut out);
-        }
-        if !record.span_id.is_empty() {
-            self.scalar("span_id", Value::Bytes(record.span_id.clone()), &mut out);
         }
 
         if let Some(body) = &record.body {
@@ -414,6 +411,13 @@ impl Default for Flattener {
 // Flattened-frame format: the OTLP grouping of a request's entries plus its
 // schema tree, as stored (bincode) in one WAL frame. Written by `ng-ingest` at
 // ingest, read by `ng-index` when building the SFST.
+//
+// NOTE: the frame payload carries NO inner schema version — it is just the
+// bincode of `FlattenedRequest`. Any change to these types (e.g. new `Record`
+// fields) is a breaking change: WAL frames written by an older `ng-ingest`
+// cannot be decoded by the new `ng-index` (the new fields would consume bytes
+// from the old payload). There is no migration; drain/regenerate WAL files on
+// upgrade. Acceptable while ng-* is pre-GA (see the project SOW).
 // ---------------------------------------------------------------------------
 
 /// A flattened request: one schema tree shared by all its records, plus the OTLP
@@ -440,16 +444,35 @@ pub struct ScopeGroup {
     pub records: Vec<Record>,
 }
 
-/// One log record: its own entries plus its timestamp. `ts` is the record's
-/// `time_unix_nano`. The caller MUST normalize timestamps before flattening (see
-/// `ng-ingest::write_request`): `time_unix_nano` else `observed_time_unix_nano` else
-/// a monotonic clock. A caller that skips normalization and flattens a record with
-/// `time_unix_nano == 0` gets `ts == 0` (a year-1970 row) — so always normalize
-/// first. The time fields are not flattened into `entries` (see
-/// [`Flattener::flatten_record`]).
+/// One log record: its per-row scalar fields plus its flattened entries. The frame
+/// is **lossless** — every `LogRecord` field is carried here, either as a per-row
+/// column (the scalars below) or as flattened `entries`. What the SFST actually
+/// stores is decided later at index time (`build_sfst`), not at flatten time.
+///
+/// Per-row columns (identifiers/scalars, NOT FST facets):
+/// - `ts`: the resolved `time_unix_nano`. The caller MUST normalize timestamps before
+///   flattening (see `ng-ingest::write_request`): `time_unix_nano` else
+///   `observed_time_unix_nano` else a monotonic clock. A caller that skips
+///   normalization and flattens a record with `time_unix_nano == 0` gets `ts == 0`
+///   (a year-1970 row) — so always normalize first.
+/// - `observed_ts`: the raw `observed_time_unix_nano` (0 if unset). Carried verbatim
+///   for losslessness; `ts` is the value used for row ordering.
+/// - `trace_id` / `span_id`: raw OTLP bytes (empty if unset). Carried as columns, NOT
+///   flattened into `entries` (see [`Flattener::flatten_record`]) — they are
+///   near-unique identifiers, wrong to FST-index.
+/// - `flags` / `dropped_attributes_count`: carried for losslessness (the frame keeps
+///   them); whether the SFST stores them is an index-time choice.
+///
+/// `ts` and `observed_ts` use a saturating `u64 → i64` cast (a value past `i64::MAX`
+/// clamps rather than wrapping negative).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Record {
     pub ts: i64,
+    pub observed_ts: i64,
+    pub trace_id: Vec<u8>,
+    pub span_id: Vec<u8>,
+    pub flags: u32,
+    pub dropped_attributes_count: u32,
     pub entries: Vec<Entry>,
 }
 
@@ -485,6 +508,11 @@ pub fn flatten_into(
                     // clamps to i64::MAX rather than wrapping negative — mirrors
                     // wal-otap's cast and keeps row ordering sane.
                     ts: i64::try_from(r.time_unix_nano).unwrap_or(i64::MAX),
+                    observed_ts: i64::try_from(r.observed_time_unix_nano).unwrap_or(i64::MAX),
+                    trace_id: r.trace_id.clone(),
+                    span_id: r.span_id.clone(),
+                    flags: r.flags,
+                    dropped_attributes_count: r.dropped_attributes_count,
                     entries: flattener.flatten_record(r),
                 })
                 .collect();
@@ -642,7 +670,8 @@ mod tests {
 
         assert_eq!(at(&leaves, "severity_number"), [&Value::Int(9)]);
         assert_eq!(at(&leaves, "severity_text"), [&Value::Str("INFO".into())]);
-        assert_eq!(at(&leaves, "trace_id"), [&Value::Bytes(vec![0xaa, 0xbb])]);
+        // trace_id is a per-row column on `Record`, NOT a flattened entry.
+        assert!(at(&leaves, "trace_id").is_empty(), "trace_id is a column, not a facet");
         assert_eq!(at(&leaves, "attributes.str"), [&Value::Str("hello".into())]);
         assert_eq!(at(&leaves, "attributes.int"), [&Value::Int(42)]);
         assert_eq!(at(&leaves, "attributes.double"), [&Value::Double(3.5)]);

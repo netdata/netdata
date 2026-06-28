@@ -26,7 +26,7 @@
 //!
 //! ```
 //! use fst_index::FstIndex;
-//! use sfst::{BitmapValue, ChunkCounts, StreamBatch, StreamWriter};
+//! use sfst::{BitmapValue, ChunkCounts, ColumnsPresent, StreamBatch, StreamWriter};
 //! use treight::Bitmap;
 //!
 //! // Build a minimal primary FST with one `key=value` entry.
@@ -52,8 +52,9 @@
 //!         high_end: sfst::KvId(1),
 //!     },
 //!     fields: Default::default(),
+//!     columns: Default::default(),
 //! };
-//! let counts = ChunkCounts { mid_fields: 0, high_fields: 0, stream_batches: 1 };
+//! let counts = ChunkCounts { columns: ColumnsPresent::default(), mid_fields: 0, high_fields: 0, stream_batches: 1 };
 //! let mut w = StreamWriter::new(std::io::Cursor::new(Vec::new()), counts).unwrap();
 //! w.summary(&summary).unwrap();
 //! w.metadata(&metadata).unwrap();
@@ -108,10 +109,11 @@ pub fn scan_max_sequence_recursive(base: &std::path::Path) -> std::io::Result<u6
     file_registry::scan_max_sequence_recursive(base, registry::SFST_EXT)
 }
 pub use schema::{
-    BitmapValue, DEFAULT_CARDINALITY_THRESHOLD, FieldEntry, FieldTable, FieldTier, HighField,
-    Histogram, IdRanges, KvId, Metadata, StreamBatch, Summary,
+    BitmapValue, ColumnEntry, ColumnType, ColumnsTable, DEFAULT_CARDINALITY_THRESHOLD,
+    DroppedAttributeCounts, FieldEntry, FieldTable, FieldTier, Flags, HighField, Histogram,
+    IdRanges, KvId, Metadata, ObservedTimestamps, SpanIds, StreamBatch, Summary, TraceIds,
 };
-pub use writer::{ChunkCounts, StreamWriter, write_summary_only};
+pub use writer::{ChunkCounts, ColumnsPresent, StreamWriter, write_summary_only};
 
 // ── Format constants ─────────────────────────────────────────────
 //
@@ -139,12 +141,24 @@ const MAGIC: &[u8; 4] = b"SFST";
 //     the filename (`FileId`), never duplicated in the summary. `FileSummary` is
 //     now `{ min_timestamp_s, max_timestamp_s, record_count, content_meta }`.
 //     Incompatible bincode layout; older files rejected on open.
-const VERSION: u32 = 7;
+// v8: META gains `columns: ColumnsTable` (the per-row columns manifest) and the
+//     optional per-row column chunks `OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC` (cold region,
+//     after PRIM). Incompatible META bincode layout; older files rejected on open.
+const VERSION: u32 = 8;
 
 const CHUNK_SUMMARY: chunk_file::ChunkId = *b"SUMR";
 const CHUNK_META: chunk_file::ChunkId = *b"META";
 const CHUNK_PRIMARY: chunk_file::ChunkId = *b"PRIM";
 const CHUNK_TIMS: chunk_file::ChunkId = *b"TIMS";
+// Optional per-row column chunks (one per column), written in the COLD region
+// (after PRIM) so a query decodes a column only on demand. Each present column is
+// listed in the META `ColumnsTable`; a file with no per-row columns carries none of
+// these. Their presence is part of the v8 format (see VERSION below and FORMAT.md).
+const CHUNK_OBSERVED_TS: chunk_file::ChunkId = *b"OBTS";
+const CHUNK_TRACE_IDS: chunk_file::ChunkId = *b"TRCE";
+const CHUNK_SPAN_IDS: chunk_file::ChunkId = *b"SPAN";
+const CHUNK_FLAGS: chunk_file::ChunkId = *b"FLAG";
+const CHUNK_DROPPED_ATTRS: chunk_file::ChunkId = *b"DRAC";
 
 /// Minimum number of logs in each stream batch. Files with fewer than
 /// `MIN_LOGS_PER_BATCH` total logs use a single batch; otherwise the

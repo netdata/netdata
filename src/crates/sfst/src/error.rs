@@ -57,6 +57,12 @@ pub enum Error {
     #[error("invalid stream-batch count: {0} (expected 1..=8)")]
     InvalidStreamBatchCount(u8),
 
+    /// A per-row column accessor found the column absent from the
+    /// [`ColumnsTable`](crate::ColumnsTable), or present with a type that does not
+    /// match the accessor's expected one. Carries a describing message.
+    #[error("per-row column mismatch: {0}")]
+    ColumnMismatch(String),
+
     /// The TOC failed to parse (on open) or lay out (on write).
     /// Carries the chunk-file layer's own error message.
     #[error("TOC error: {0}")]

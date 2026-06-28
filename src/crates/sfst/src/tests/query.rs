@@ -95,6 +95,7 @@ fn build_query_fixture() -> Vec<u8> {
             },
         ]
         .into(),
+        columns: ColumnsTable::default(),
     };
     let timestamps: Vec<i64> = (0..6)
         .map(|i| 1_700_000_000i64 * 1_000_000_000 + i * 1_000_000_000)
@@ -110,6 +111,7 @@ fn build_query_fixture() -> Vec<u8> {
     ];
 
     let counts = ChunkCounts {
+        columns: ColumnsPresent::default(),
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -492,6 +494,7 @@ fn build_multivalued_fixture() -> Vec<u8> {
             },
         ]
         .into(),
+        columns: ColumnsTable::default(),
     };
     let timestamps: Vec<i64> = (0..3)
         .map(|i| 1_700_000_000i64 * 1_000_000_000 + i * 1_000_000_000)
@@ -503,6 +506,7 @@ fn build_multivalued_fixture() -> Vec<u8> {
     ];
 
     let counts = ChunkCounts {
+        columns: ColumnsPresent::default(),
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -733,6 +737,7 @@ fn build_complemented_fixture() -> Vec<u8> {
             },
         ]
         .into(),
+        columns: ColumnsTable::default(),
     };
     let timestamps: Vec<i64> = (0..6)
         .map(|i| 1_700_000_000i64 * 1_000_000_000 + i * 1_000_000_000)
@@ -747,6 +752,7 @@ fn build_complemented_fixture() -> Vec<u8> {
     ];
 
     let counts = ChunkCounts {
+        columns: ColumnsPresent::default(),
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -955,12 +961,14 @@ fn build_tiered_fixture() -> Vec<u8> {
             },
         ]
         .into(),
+        columns: ColumnsTable::default(),
     };
     let timestamps: Vec<i64> = (0..N as i64)
         .map(|i| 1_700_000_000i64 * 1_000_000_000 + i * 1_000_000_000)
         .collect();
 
     let counts = ChunkCounts {
+        columns: ColumnsPresent::default(),
         mid_fields: 1,
         high_fields: 1,
         stream_batches: 1,

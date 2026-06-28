@@ -76,4 +76,14 @@ pub enum IndexError {
          shorten the service.namespace / service.name attributes"
     )]
     IdentityTooLarge,
+
+    /// A per-row column supplied to the builder has a different length than the
+    /// row count, so it cannot be aligned per row. A caller bug (each column must
+    /// hold exactly one value per row); recoverable, not a panic.
+    #[error("per-row column {column} has {got} values, expected {expected} (one per row)")]
+    ColumnLengthMismatch {
+        column: &'static str,
+        got: usize,
+        expected: usize,
+    },
 }

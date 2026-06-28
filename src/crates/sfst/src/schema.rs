@@ -33,14 +33,20 @@ pub use file_registry::FileSummary as Summary;
 ///
 /// Holds the data a reader needs to bootstrap any query against the
 /// file: the sparse timestamp histogram, the cardinality-tier id
-/// ranges, and the field table. Readers that only need the cheap
-/// summary fields (min/max timestamp, total log count, stream) should
-/// decode [`Summary`] from the `SUMR` chunk instead.
+/// ranges, the field table, and the per-row columns manifest. Readers
+/// that only need the cheap summary fields (min/max timestamp, total log
+/// count, stream) should decode [`Summary`] from the `SUMR` chunk instead.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Metadata {
     pub histogram: Histogram,
     pub id_ranges: IdRanges,
     pub fields: FieldTable,
+    /// Manifest of the per-row column chunks this file carries
+    /// (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`), with each column's type. Empty when
+    /// the file has no per-row columns. The authoritative source for column
+    /// presence + type — readers consult it instead of probing for chunks. See
+    /// [`ColumnsTable`].
+    pub columns: ColumnsTable,
 }
 
 /// Sparse timestamp histogram: one entry per second that has at least
@@ -433,6 +439,222 @@ impl PartialEq for StreamBatch {
 }
 
 impl Eq for StreamBatch {}
+
+// ── Per-row columns (OBTS / TRCE / SPAN / FLAG / DRAC) ───────────
+
+/// On-disk type of a per-row column — its structural encoding, enough for a
+/// reader to decode the column chunk and validate it against the typed accessor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ColumnType {
+    /// One `i64` per row (e.g. `observed_ts`).
+    I64,
+    /// One `u32` per row (e.g. `flags`, `dropped_attributes_count`).
+    U32,
+    /// A fixed-stride byte arena, `n` bytes per row (e.g. `trace_id` = 16,
+    /// `span_id` = 8).
+    FixedBytes(u8),
+}
+
+/// One per-row column the file carries: its name and on-disk type.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ColumnEntry {
+    pub name: String,
+    pub ty: ColumnType,
+}
+
+/// Manifest of the per-row columns a file carries (the `columns` field of
+/// [`Metadata`]). Lists **present** columns only — membership is presence — each
+/// with its [`ColumnType`]. The authoritative source for which per-row column
+/// chunks (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`) exist and how to decode them; mirrors
+/// [`FieldTable`](crate::FieldTable) for facets. Empty ⇒ no per-row columns.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ColumnsTable(pub Vec<ColumnEntry>);
+
+impl ColumnsTable {
+    /// Number of per-row columns.
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Whether the file carries no per-row columns.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// The type of the column named `name`, or `None` if absent. O(n) scan over a
+    /// handful of columns — same tradeoff as [`FieldTable::get`](crate::FieldTable).
+    pub fn get(&self, name: &str) -> Option<ColumnType> {
+        self.0.iter().find(|c| c.name == name).map(|c| c.ty)
+    }
+
+    /// Whether this table carries a column named `name`.
+    pub fn contains(&self, name: &str) -> bool {
+        self.get(name).is_some()
+    }
+
+    /// The column names, in table order.
+    pub fn names(&self) -> impl Iterator<Item = &str> {
+        self.0.iter().map(|c| c.name.as_str())
+    }
+}
+
+impl std::ops::Deref for ColumnsTable {
+    type Target = [ColumnEntry];
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<Vec<ColumnEntry>> for ColumnsTable {
+    fn from(entries: Vec<ColumnEntry>) -> Self {
+        Self(entries)
+    }
+}
+
+impl FromIterator<ColumnEntry> for ColumnsTable {
+    fn from_iter<I: IntoIterator<Item = ColumnEntry>>(iter: I) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+
+/// Generate a scalar per-row column newtype over `Vec<$elem>` ($elem is `Copy`):
+/// one value per row, stored in the **same chronological order** as the `TIMS`
+/// chunk and the stream batches (entry `i` is global row `i`). Optional — written
+/// only when the file carries that column. Stored, never FST-indexed.
+macro_rules! scalar_column {
+    ($(#[$m:meta])* $ty:ident, $elem:ty, $name:expr, $coltype:expr) => {
+        $(#[$m])*
+        #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+        #[serde(transparent)]
+        pub struct $ty(pub Vec<$elem>);
+
+        impl $ty {
+            /// The column's manifest name + on-disk type (see [`ColumnsTable`]).
+            pub const NAME: &'static str = $name;
+            pub const COLUMN_TYPE: ColumnType = $coltype;
+
+            pub fn len(&self) -> usize {
+                self.0.len()
+            }
+            pub fn is_empty(&self) -> bool {
+                self.0.is_empty()
+            }
+            /// A copy reordered by `positions` (insertion-order indices in the
+            /// desired output order) — the build-time insertion→chronological remap.
+            pub fn reordered(&self, positions: impl Iterator<Item = usize>) -> Self {
+                $ty(positions.map(|i| self.0[i]).collect())
+            }
+        }
+    };
+}
+
+scalar_column!(
+    /// Per-row observed timestamps (`OBTS` chunk). The record's *resolved* timestamp
+    /// lives in `TIMS`; this carries the raw `observed_time_unix_nano` for losslessness.
+    ObservedTimestamps, i64, "observed_ts", ColumnType::I64
+);
+scalar_column!(
+    /// Per-row OTLP `LogRecord.flags` (`FLAG` chunk) — a `fixed32`; the W3C trace
+    /// flags occupy the low byte, the remaining 24 bits are reserved per the spec.
+    Flags, u32, "flags", ColumnType::U32
+);
+scalar_column!(
+    /// Per-row OTLP `LogRecord.dropped_attributes_count` (`DRAC` chunk).
+    DroppedAttributeCounts, u32, "dropped_attributes_count", ColumnType::U32
+);
+
+/// Per-row W3C trace ids (`TRCE` chunk): a **fixed-stride 16-byte arena** — row `i`
+/// is `bytes[i*16 .. (i+1)*16]`, in chronological row order. An all-zero id is the
+/// OTLP/W3C "unset/invalid" sentinel, so an absent id is 16 zero bytes. Fixed width
+/// (vs `Vec<Vec<u8>>`) avoids a heap allocation per row, drops the per-element length
+/// prefix, and compresses tighter — the same layout as [`StreamBatch`]/[`HighField`].
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TraceIds {
+    /// 16 bytes per row, concatenated. `serde_bytes` decodes in one bulk copy
+    /// instead of serde's per-byte `Vec<u8>` seq path; wire-identical under bincode.
+    #[serde(with = "serde_bytes")]
+    bytes: Vec<u8>,
+}
+
+/// Per-row W3C span ids (`SPAN` chunk): a fixed-stride **8-byte** arena. See
+/// [`TraceIds`] for the layout and the all-zero "unset" sentinel.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SpanIds {
+    #[serde(with = "serde_bytes")]
+    bytes: Vec<u8>,
+}
+
+/// Generate the shared fixed-stride-arena API for the id column newtypes.
+macro_rules! id_arena {
+    ($ty:ty, $width:expr, $name:expr) => {
+        impl $ty {
+            /// Bytes per id (the OTLP/W3C fixed width).
+            pub const WIDTH: usize = $width;
+
+            /// The column's manifest name + on-disk type (see [`ColumnsTable`]).
+            pub const NAME: &'static str = $name;
+            pub const COLUMN_TYPE: ColumnType = ColumnType::FixedBytes($width as u8);
+
+            /// An empty arena sized for `rows` ids.
+            pub fn with_capacity(rows: usize) -> Self {
+                Self { bytes: Vec::with_capacity(rows * Self::WIDTH) }
+            }
+
+            /// Append one id, normalized to exactly `WIDTH` bytes: a shorter or
+            /// empty id is zero-padded, a longer one truncated. Callers that want
+            /// to reject/flag malformed lengths must do so before calling (see
+            /// `ng-ingest`); this is the storage backstop.
+            pub fn push(&mut self, id: &[u8]) {
+                let start = self.bytes.len();
+                self.bytes.resize(start + Self::WIDTH, 0);
+                let n = id.len().min(Self::WIDTH);
+                self.bytes[start..start + n].copy_from_slice(&id[..n]);
+            }
+
+            /// Number of ids.
+            pub fn len(&self) -> usize {
+                self.bytes.len() / Self::WIDTH
+            }
+
+            /// Whether the arena is empty.
+            pub fn is_empty(&self) -> bool {
+                self.bytes.is_empty()
+            }
+
+            /// Whether the backing buffer is a whole number of `WIDTH`-byte ids.
+            /// A decoded chunk that fails this is malformed (truncated/corrupt) —
+            /// the reader rejects it rather than letting `get`/`iter` drop or
+            /// straddle bytes.
+            pub fn well_formed(&self) -> bool {
+                self.bytes.len() % Self::WIDTH == 0
+            }
+
+            /// The `i`-th id (`WIDTH` bytes).
+            pub fn get(&self, i: usize) -> &[u8] {
+                &self.bytes[i * Self::WIDTH..(i + 1) * Self::WIDTH]
+            }
+
+            /// Iterate ids in stored order.
+            pub fn iter(&self) -> impl Iterator<Item = &[u8]> {
+                self.bytes.chunks_exact(Self::WIDTH)
+            }
+
+            /// A copy reordered by `positions` (insertion-order indices in the
+            /// desired output order) — the build-time insertion→chronological remap.
+            pub fn reordered(&self, positions: impl Iterator<Item = usize>) -> Self {
+                let mut out = Self::with_capacity(self.len());
+                for i in positions {
+                    out.push(self.get(i));
+                }
+                out
+            }
+        }
+    };
+}
+
+id_arena!(TraceIds, 16, "trace_id");
+id_arena!(SpanIds, 8, "span_id");
 
 #[cfg(test)]
 mod tests;

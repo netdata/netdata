@@ -93,9 +93,21 @@ within its tier in the trailing bytes.
     "META"      Metadata                                      No (always emitted)
     "TIMS"      Vec<i64>  (per-log nanosecond timestamps)     Yes
     "PRIM"      FstIndex<BitmapValue>                         Yes
+    "OBTS"      Vec<i64>  (per-row observed timestamps)       No (per-row column, v8)
+    "TRCE"      16-byte arena (per-row trace ids)             No (per-row column, v8)
+    "SPAN"      8-byte arena (per-row span ids)               No (per-row column, v8)
+    "FLAG"      Vec<u32>  (per-row LogRecord.flags)           No (per-row column, v8)
+    "DRAC"      Vec<u32>  (per-row dropped_attributes_count)  No (per-row column, v8)
     "MF{hi}{lo}" FstIndex<BitmapValue>  (mid-card field)      No (one per mid field)
     "HF{hi}{lo}" HighField  (high-card field, columnar SoA)   No (one per high field)
     "SB0{N}"    StreamBatch  (stream-batch N, fixed-width arena)  Yes (at least 1)
+
+The per-row column chunks (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`) are
+**independently optional** — a file carries any subset, or none — and live in
+the **cold region after `PRIM`**, so a query decodes a column only on demand.
+A column is present iff the `META` `ColumnsTable` lists it; readers consult the
+manifest (not the chunk table) for presence + type. Each holds exactly one
+value per row, in the same chronological order as `TIMS` and the stream batches.
 
 The rows are listed in the order the canonical producer emits chunk
 bodies. This order is **not** part of the format contract — readers
@@ -223,6 +235,16 @@ Heavy query-time metadata:
         pub histogram: Histogram,
         pub id_ranges: IdRanges,
         pub fields:    Vec<FieldEntry>,
+        pub columns:   Vec<ColumnEntry>,   // per-row columns manifest (v8)
+    }
+
+    // The per-row columns manifest: one entry per present column (membership =
+    // presence), the authoritative source of column presence + type. Empty when
+    // the file carries no per-row columns.
+    pub struct ColumnEntry {
+        pub name: String,        // "observed_ts" | "trace_id" | "span_id" | "flags"
+                                 //   | "dropped_attributes_count"
+        pub ty:   ColumnType,    // I64 | U32 | FixedBytes(n)
     }
 
     pub struct Histogram {
@@ -402,7 +424,21 @@ CRC then fails to match.
 
 ## Format Version
 
-The current version is **7**.
+The current version is **8**.
+
+### v8 changelog (from v7)
+
+- **`META` gains a per-row columns manifest.** `Metadata` adds
+  `columns: Vec<ColumnEntry>` — the authoritative list of which per-row column
+  chunks the file carries and their types. Empty for files with no per-row
+  columns. Incompatible `META` bincode layout, so older files are rejected on
+  open (`Container::open` version check).
+- **New optional per-row column chunks** `OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`,
+  in the **cold region after `PRIM`**. Each is independently optional, holds one
+  value per row in chronological order, and is stored — not FST-indexed — so
+  near-unique identifiers don't explode the facet index. Producers that write no
+  per-row columns (the production logs indexer) emit none of these chunks and an
+  empty manifest.
 
 ### v7 changelog (from v6)
 

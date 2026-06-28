@@ -14,9 +14,11 @@ use fst_index::FstIndex;
 use serde::de::DeserializeOwned;
 
 use crate::{
-    BitmapValue, CHUNK_META, CHUNK_PRIMARY, CHUNK_SUMMARY, CHUNK_TIMS, Error, FieldTable,
-    FieldTier, HighField, MAGIC, MAX_STREAM_BATCHES, Metadata, StreamBatch, Summary, VERSION,
-    high_field_id, mid_field_id, num_stream_batches, stream_batch_id,
+    BitmapValue, CHUNK_DROPPED_ATTRS, CHUNK_FLAGS, CHUNK_META, CHUNK_OBSERVED_TS, CHUNK_PRIMARY,
+    CHUNK_SPAN_IDS, CHUNK_SUMMARY, CHUNK_TIMS, CHUNK_TRACE_IDS, ColumnType, ColumnsTable,
+    DroppedAttributeCounts, Error, FieldTable, FieldTier, Flags, HighField, MAGIC,
+    MAX_STREAM_BATCHES, Metadata, ObservedTimestamps, SpanIds, StreamBatch, Summary, TraceIds,
+    VERSION, high_field_id, mid_field_id, num_stream_batches, stream_batch_id,
 };
 
 /// Decompress zstd, then deserialize with bincode. Crate-internal:
@@ -128,9 +130,12 @@ impl<'a> Reader<'a> {
     }
 
     /// Byte span `(offset, len)` of the **cold suffix** — everything after
-    /// the hot prefix (`SUMR`/`META`/`TIMS`/`PRIM`): the mid/high field
-    /// chunks and the stream batches. A query keeps the hot prefix
-    /// resident in the page cache and releases this region once done.
+    /// the hot prefix (`SUMR`/`META`/`TIMS`/`PRIM`): the optional per-row column
+    /// chunks (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`, when present), the mid/high
+    /// field chunks, and the stream batches. A query keeps the hot prefix
+    /// resident in the page cache and releases this region once done. The per-row
+    /// columns sit here (not the hot prefix) so a query decodes a column only when
+    /// it actually needs it, rather than paying for it on every read.
     ///
     /// Offsets are relative to the start of the slice, so the span is
     /// usable directly with an mmap's `advise_range`. In the canonical
@@ -220,6 +225,108 @@ impl<'a> Reader<'a> {
     /// Raw compressed bytes of the timestamps chunk.
     pub fn timestamps_raw(&self) -> Result<&'a [u8], Error> {
         self.chunk_raw_by_id(CHUNK_TIMS)
+    }
+
+    // ── Per-row columns (OBTS / TRCE / SPAN) ─────────────────────────
+    //
+    // Each column is its own chunk, so a reader decodes only the one it needs.
+    // All are chronological, parallel to `timestamps` and the stream batches:
+    // entry `i` is global row `i`. Presence + type are recorded in the META
+    // `ColumnsTable` (the authoritative manifest), not by probing for chunks.
+    // Present only when the file was built with per-row columns (the typed-flatten
+    // pipeline); the production logs indexer writes none.
+
+    /// The per-row columns manifest (META `columns`): which columns this file
+    /// carries and their types. Empty when none.
+    pub fn columns_table(&self) -> Result<&ColumnsTable, Error> {
+        Ok(&self.metadata()?.columns)
+    }
+
+    /// Whether this file carries any per-row columns, per the `ColumnsTable`.
+    pub fn has_per_row_columns(&self) -> Result<bool, Error> {
+        Ok(!self.metadata()?.columns.is_empty())
+    }
+
+    /// Confirm the named column is declared with the expected type before its
+    /// chunk is decoded — the manifest is authoritative, so a missing or
+    /// mistyped entry is an [`Error::ColumnMismatch`] rather than a chunk probe.
+    fn require_column(&self, name: &str, expected: ColumnType) -> Result<(), Error> {
+        match self.metadata()?.columns.get(name) {
+            Some(ty) if ty == expected => Ok(()),
+            Some(ty) => Err(Error::ColumnMismatch(format!(
+                "column {name:?} has type {ty:?}, expected {expected:?}"
+            ))),
+            None => Err(Error::ColumnMismatch(format!("column {name:?} not present"))),
+        }
+    }
+
+    /// The file's row count (`SUMR.record_count`), used to check that each per-row
+    /// column has exactly one value per row.
+    fn record_count(&self) -> Result<usize, Error> {
+        Ok(self.summary()?.record_count as usize)
+    }
+
+    /// Reject a column whose decoded row count disagrees with `SUMR.record_count`
+    /// — a malformed (but CRC-valid) chunk that would misalign rows.
+    fn check_rows(&self, name: &str, got: usize) -> Result<(), Error> {
+        let want = self.record_count()?;
+        if got != want {
+            return Err(Error::ColumnMismatch(format!(
+                "column {name:?} has {got} rows, expected {want}"
+            )));
+        }
+        Ok(())
+    }
+
+    /// Decode the per-row observed-timestamps column (`OBTS`). Errors with
+    /// [`Error::ColumnMismatch`] if the file does not declare it or its row count
+    /// disagrees with the record count.
+    pub fn observed_timestamps(&self) -> Result<ObservedTimestamps, Error> {
+        self.require_column(ObservedTimestamps::NAME, ObservedTimestamps::COLUMN_TYPE)?;
+        let col = ObservedTimestamps(unpack(self.chunk_raw_by_id(CHUNK_OBSERVED_TS)?)?);
+        self.check_rows(ObservedTimestamps::NAME, col.len())?;
+        Ok(col)
+    }
+
+    /// Decode the per-row trace-ids column (`TRCE`), a fixed-stride 16-byte arena.
+    pub fn trace_ids(&self) -> Result<TraceIds, Error> {
+        self.require_column(TraceIds::NAME, TraceIds::COLUMN_TYPE)?;
+        let col: TraceIds = unpack(self.chunk_raw_by_id(CHUNK_TRACE_IDS)?)?;
+        if !col.well_formed() {
+            return Err(Error::ColumnMismatch("trace_id arena is not a whole number of ids".into()));
+        }
+        self.check_rows(TraceIds::NAME, col.len())?;
+        Ok(col)
+    }
+
+    /// Decode the per-row span-ids column (`SPAN`), a fixed-stride 8-byte arena.
+    pub fn span_ids(&self) -> Result<SpanIds, Error> {
+        self.require_column(SpanIds::NAME, SpanIds::COLUMN_TYPE)?;
+        let col: SpanIds = unpack(self.chunk_raw_by_id(CHUNK_SPAN_IDS)?)?;
+        if !col.well_formed() {
+            return Err(Error::ColumnMismatch("span_id arena is not a whole number of ids".into()));
+        }
+        self.check_rows(SpanIds::NAME, col.len())?;
+        Ok(col)
+    }
+
+    /// Decode the per-row flags column (`FLAG`).
+    pub fn flags(&self) -> Result<Flags, Error> {
+        self.require_column(Flags::NAME, Flags::COLUMN_TYPE)?;
+        let col = Flags(unpack(self.chunk_raw_by_id(CHUNK_FLAGS)?)?);
+        self.check_rows(Flags::NAME, col.len())?;
+        Ok(col)
+    }
+
+    /// Decode the per-row dropped-attributes-count column (`DRAC`).
+    pub fn dropped_attribute_counts(&self) -> Result<DroppedAttributeCounts, Error> {
+        self.require_column(
+            DroppedAttributeCounts::NAME,
+            DroppedAttributeCounts::COLUMN_TYPE,
+        )?;
+        let col = DroppedAttributeCounts(unpack(self.chunk_raw_by_id(CHUNK_DROPPED_ATTRS)?)?);
+        self.check_rows(DroppedAttributeCounts::NAME, col.len())?;
+        Ok(col)
     }
 
     // ── Stream-batch chunks ──────────────────────────────────────────

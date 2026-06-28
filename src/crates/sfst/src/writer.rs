@@ -13,8 +13,10 @@ use fst_index::FstIndex;
 use serde::Serialize;
 
 use crate::{
-    BitmapValue, CHUNK_META, CHUNK_PRIMARY, CHUNK_SUMMARY, CHUNK_TIMS, Error, HighField, MAGIC,
-    MAX_STREAM_BATCHES, Metadata, StreamBatch, Summary, VERSION, ZSTD_LEVEL_DEFAULT,
+    BitmapValue, CHUNK_DROPPED_ATTRS, CHUNK_FLAGS, CHUNK_META, CHUNK_OBSERVED_TS, CHUNK_PRIMARY,
+    CHUNK_SPAN_IDS, CHUNK_SUMMARY, CHUNK_TIMS, CHUNK_TRACE_IDS, ColumnsTable, ColumnType,
+    DroppedAttributeCounts, Error, Flags, HighField, MAGIC, MAX_STREAM_BATCHES, Metadata,
+    ObservedTimestamps, SpanIds, StreamBatch, Summary, TraceIds, VERSION, ZSTD_LEVEL_DEFAULT,
     ZSTD_LEVEL_FST, high_field_id, mid_field_id, stream_batch_id,
 };
 
@@ -48,11 +50,48 @@ pub fn write_summary_only<W: Write + Seek>(sink: W, summary: &Summary) -> Result
     Ok(inner.finish()?)
 }
 
-/// The chunk counts an SFST file carries beyond its four always-present
-/// chunks (SUMR, META, TIMS, PRIM). Declared up front because the
-/// writer reserves the TOC before the first chunk is written.
+/// Which optional per-row column chunks a file carries. Each column is
+/// **independently** optional (a file may have any subset, or none) — there is
+/// no "all-or-none" rule. The writer reserves one cold-region chunk per present
+/// column and the META `ColumnsTable` must list exactly these.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ColumnsPresent {
+    pub observed_ts: bool,
+    pub trace_id: bool,
+    pub span_id: bool,
+    pub flags: bool,
+    pub dropped_attributes_count: bool,
+}
+
+impl ColumnsPresent {
+    /// Number of present columns.
+    pub fn count(self) -> u32 {
+        [
+            self.observed_ts,
+            self.trace_id,
+            self.span_id,
+            self.flags,
+            self.dropped_attributes_count,
+        ]
+        .into_iter()
+        .filter(|&b| b)
+        .count() as u32
+    }
+
+    /// Whether any per-row column is present.
+    pub fn any(self) -> bool {
+        self.count() > 0
+    }
+}
+
+/// The chunk counts an SFST file carries beyond its always-present chunks
+/// (SUMR, META, TIMS, PRIM): the optional per-row columns (cold region, after
+/// PRIM) plus the mid/high field and stream-batch sections. Declared up front
+/// because the writer reserves the TOC before the first chunk is written.
 #[derive(Debug, Clone, Copy)]
 pub struct ChunkCounts {
+    /// Which per-row column chunks the file carries (independently optional).
+    pub columns: ColumnsPresent,
     /// Mid-cardinality per-field FST chunks (`MF{i}`).
     pub mid_fields: u16,
     /// High-cardinality per-field sorted-list chunks (`HF{i}`).
@@ -70,6 +109,10 @@ enum Stage {
     Metadata,
     Timestamps,
     Primary,
+    /// The optional per-row column chunks, in the cold region right after PRIM.
+    /// Present columns are written here (in any order) before the secondary
+    /// sections; skipped entirely when no columns are declared.
+    Columns,
     Secondary,
 }
 
@@ -80,6 +123,7 @@ impl Stage {
             Stage::Metadata => "metadata",
             Stage::Timestamps => "timestamps",
             Stage::Primary => "primary",
+            Stage::Columns => "a declared per-row column chunk",
             Stage::Secondary => "a mid-field, high-field, or stream-batch chunk",
         }
     }
@@ -108,6 +152,9 @@ pub struct StreamWriter<W: Write + Seek> {
     inner: StreamingWriter<W>,
     counts: ChunkCounts,
     stage: Stage,
+    /// Bitmask of per-row columns already written (one bit per column ordinal),
+    /// used to reject duplicates and to detect when the column phase is complete.
+    cols_written: u8,
     mids: u16,
     highs: u16,
     batches: u8,
@@ -124,7 +171,9 @@ impl<W: Write + Seek> StreamWriter<W> {
         if counts.stream_batches == 0 || counts.stream_batches > MAX_STREAM_BATCHES {
             return Err(Error::InvalidStreamBatchCount(counts.stream_batches));
         }
+        // One cold-region chunk per present per-row column (independently optional).
         let num_chunks = 4u32
+            + counts.columns.count()
             + u32::from(counts.mid_fields)
             + u32::from(counts.high_fields)
             + u32::from(counts.stream_batches);
@@ -133,6 +182,7 @@ impl<W: Write + Seek> StreamWriter<W> {
             inner,
             counts,
             stage: Stage::Summary,
+            cols_written: 0,
             mids: 0,
             highs: 0,
             batches: 0,
@@ -165,24 +215,138 @@ impl<W: Write + Seek> StreamWriter<W> {
     }
 
     /// Write the metadata chunk. Follows the summary.
+    ///
+    /// The per-row columns manifest ([`Metadata::columns`]) MUST list **exactly**
+    /// the columns declared in [`ChunkCounts::columns`], each with its canonical
+    /// type — no missing, extra, or mistyped entry. This keeps the META manifest and
+    /// the actual per-row column chunks from disagreeing.
     pub fn metadata(&mut self, metadata: &Metadata) -> Result<(), Error> {
+        if !self.columns_manifest_matches(&metadata.columns) {
+            return Err(Error::WriterMisuse(format!(
+                "per-row columns mismatch: ChunkCounts declares {} column(s) but \
+                 Metadata.columns = {:?}",
+                self.counts.columns.count(),
+                metadata.columns.names().collect::<Vec<_>>(),
+            )));
+        }
         let packed = pack(metadata, ZSTD_LEVEL_DEFAULT)?;
         self.prefix_chunk(Stage::Metadata, Stage::Timestamps, CHUNK_META, &packed)
     }
 
-    /// Write the per-log timestamps chunk (chronological nanosecond
-    /// timestamps, parallel-indexed to the stream batches). Follows the
-    /// metadata.
+    /// Whether `manifest` lists exactly the declared-present columns with their
+    /// canonical types (and nothing else).
+    fn columns_manifest_matches(&self, manifest: &ColumnsTable) -> bool {
+        let c = self.counts.columns;
+        let entry = |present: bool, name: &str, ty: ColumnType| {
+            if present {
+                manifest.get(name) == Some(ty)
+            } else {
+                manifest.get(name).is_none()
+            }
+        };
+        manifest.len() == c.count() as usize
+            && entry(c.observed_ts, ObservedTimestamps::NAME, ObservedTimestamps::COLUMN_TYPE)
+            && entry(c.trace_id, TraceIds::NAME, TraceIds::COLUMN_TYPE)
+            && entry(c.span_id, SpanIds::NAME, SpanIds::COLUMN_TYPE)
+            && entry(c.flags, Flags::NAME, Flags::COLUMN_TYPE)
+            && entry(
+                c.dropped_attributes_count,
+                DroppedAttributeCounts::NAME,
+                DroppedAttributeCounts::COLUMN_TYPE,
+            )
+    }
+
+    /// Write the per-log timestamps chunk (chronological nanosecond timestamps,
+    /// parallel-indexed to the stream batches). Completes the hot prefix together
+    /// with the primary; the optional per-row columns follow PRIM in the cold region.
     pub fn timestamps(&mut self, timestamps: &[i64]) -> Result<(), Error> {
         let packed = pack(timestamps, ZSTD_LEVEL_DEFAULT)?;
         self.prefix_chunk(Stage::Timestamps, Stage::Primary, CHUNK_TIMS, &packed)
     }
 
-    /// Write the primary (low-cardinality) FST chunk, completing the
-    /// hot prefix. Follows the timestamps.
+    /// Write the primary (low-cardinality) FST chunk, completing the hot prefix.
+    /// The optional per-row column chunks (when declared) come next in the cold
+    /// region, otherwise the secondary sections.
     pub fn primary(&mut self, fst: &FstIndex<BitmapValue>) -> Result<(), Error> {
         let packed = pack(fst, ZSTD_LEVEL_FST)?;
-        self.prefix_chunk(Stage::Primary, Stage::Secondary, CHUNK_PRIMARY, &packed)
+        let next = if self.counts.columns.any() {
+            Stage::Columns
+        } else {
+            Stage::Secondary
+        };
+        self.prefix_chunk(Stage::Primary, next, CHUNK_PRIMARY, &packed)
+    }
+
+    /// Write one declared per-row column chunk (cold region, after PRIM). Columns
+    /// may be written in any order; the writer rejects an undeclared or duplicate
+    /// column and advances to the secondary sections once every declared column is
+    /// written. `ordinal` is the column's bit in [`Self::cols_written`].
+    fn write_column(
+        &mut self,
+        ordinal: u8,
+        declared: bool,
+        id: chunk_file::ChunkId,
+        packed: &[u8],
+    ) -> Result<(), Error> {
+        if self.stage != Stage::Columns {
+            return Err(Error::WriterMisuse(format!(
+                "per-row column chunk out of order: the writer expects {} next",
+                self.stage.expects(),
+            )));
+        }
+        if !declared {
+            return Err(Error::WriterMisuse(
+                "per-row column chunk not declared in ChunkCounts.columns".into(),
+            ));
+        }
+        let bit = 1u8 << ordinal;
+        if self.cols_written & bit != 0 {
+            return Err(Error::WriterMisuse("per-row column written twice".into()));
+        }
+        self.inner.write_chunk(id, packed)?;
+        self.cols_written |= bit;
+        if self.cols_written.count_ones() == self.counts.columns.count() {
+            self.stage = Stage::Secondary;
+        }
+        Ok(())
+    }
+
+    /// Write the per-row observed-timestamps column (`OBTS`).
+    pub fn observed_timestamps(&mut self, observed: &ObservedTimestamps) -> Result<(), Error> {
+        let packed = pack(&observed.0, ZSTD_LEVEL_DEFAULT)?;
+        self.write_column(0, self.counts.columns.observed_ts, CHUNK_OBSERVED_TS, &packed)
+    }
+
+    /// Write the per-row trace-ids column (`TRCE`).
+    pub fn trace_ids(&mut self, trace_ids: &TraceIds) -> Result<(), Error> {
+        let packed = pack(trace_ids, ZSTD_LEVEL_DEFAULT)?;
+        self.write_column(1, self.counts.columns.trace_id, CHUNK_TRACE_IDS, &packed)
+    }
+
+    /// Write the per-row span-ids column (`SPAN`).
+    pub fn span_ids(&mut self, span_ids: &SpanIds) -> Result<(), Error> {
+        let packed = pack(span_ids, ZSTD_LEVEL_DEFAULT)?;
+        self.write_column(2, self.counts.columns.span_id, CHUNK_SPAN_IDS, &packed)
+    }
+
+    /// Write the per-row flags column (`FLAG`).
+    pub fn flags(&mut self, flags: &Flags) -> Result<(), Error> {
+        let packed = pack(&flags.0, ZSTD_LEVEL_DEFAULT)?;
+        self.write_column(3, self.counts.columns.flags, CHUNK_FLAGS, &packed)
+    }
+
+    /// Write the per-row dropped-attributes-count column (`DRAC`).
+    pub fn dropped_attribute_counts(
+        &mut self,
+        dropped: &DroppedAttributeCounts,
+    ) -> Result<(), Error> {
+        let packed = pack(&dropped.0, ZSTD_LEVEL_DEFAULT)?;
+        self.write_column(
+            4,
+            self.counts.columns.dropped_attributes_count,
+            CHUNK_DROPPED_ATTRS,
+            &packed,
+        )
     }
 
     fn check_secondary(&self, what: &str) -> Result<(), Error> {

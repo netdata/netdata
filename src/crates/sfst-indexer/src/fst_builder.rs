@@ -24,7 +24,10 @@ use std::path::Path;
 use std::time::Instant;
 
 use roaring::RoaringBitmap;
-use sfst::{ChunkCounts, StreamWriter};
+use sfst::{
+    ChunkCounts, ColumnEntry, ColumnsPresent, ColumnsTable, DroppedAttributeCounts, Flags,
+    ObservedTimestamps, SpanIds, StreamWriter, TraceIds,
+};
 use treight::Bitmap;
 
 use super::bitset::Bitset;
@@ -411,16 +414,44 @@ pub(super) fn build_into<W: Write + Seek>(
         content_meta: otel_logs_identity::encode_content_meta(&stream)
             .ok_or(IndexError::IdentityTooLarge)?,
     };
+    // Per-row columns: each is independently present iff the caller supplied it.
+    // The presence set (for the TOC) and the manifest (for META) are derived from
+    // the same `Option`s in canonical order, so they always agree with the chunks
+    // written below.
+    let columns_present = ColumnsPresent {
+        observed_ts: row_index.observed_timestamps.is_some(),
+        trace_id: row_index.trace_ids.is_some(),
+        span_id: row_index.span_ids.is_some(),
+        flags: row_index.flags.is_some(),
+        dropped_attributes_count: row_index.dropped_attribute_counts.is_some(),
+    };
+    let mut col_entries = Vec::new();
+    let mut col_entry = |present: bool, name: &str, ty| {
+        if present {
+            col_entries.push(ColumnEntry { name: name.to_string(), ty });
+        }
+    };
+    col_entry(columns_present.observed_ts, ObservedTimestamps::NAME, ObservedTimestamps::COLUMN_TYPE);
+    col_entry(columns_present.trace_id, TraceIds::NAME, TraceIds::COLUMN_TYPE);
+    col_entry(columns_present.span_id, SpanIds::NAME, SpanIds::COLUMN_TYPE);
+    col_entry(columns_present.flags, Flags::NAME, Flags::COLUMN_TYPE);
+    col_entry(
+        columns_present.dropped_attributes_count,
+        DroppedAttributeCounts::NAME,
+        DroppedAttributeCounts::COLUMN_TYPE,
+    );
     let metadata = Metadata {
         histogram,
         id_ranges,
         fields,
+        columns: ColumnsTable(col_entries),
     };
 
     // The chunk counts are known before any payload exists — one chunk
-    // per mid/high field and per stream batch — which is what lets the
-    // writer reserve the TOC up front.
+    // per present per-row column, per mid/high field, and per stream batch —
+    // which is what lets the writer reserve the TOC up front.
     let counts = ChunkCounts {
+        columns: columns_present,
         mid_fields: u16::try_from(row_index.mid_fields().len())
             .expect("mid-card field count exceeds u16::MAX"),
         high_fields: u16::try_from(row_index.high_fields().len())
@@ -442,9 +473,40 @@ pub(super) fn build_into<W: Write + Seek>(
     w.timestamps(&timestamps_chronological)?;
     drop(timestamps_chronological);
 
+    // PRIM completes the hot prefix; the per-row columns and the field/batch
+    // sections follow in the cold region.
+    build_primary_fst(row_index, &time_order, &mut w)?;
+
+    // Optional per-row columns (cold region, after PRIM), each reordered to the
+    // same chronological order as the timestamps and stream batches and written as
+    // its own chunk. Each is independent: a present column is written, an absent
+    // one skipped; a present column whose length != row count is a caller bug
+    // (checked, not panicked). The production path supplies none, so no chunks.
+    let n = total_logs as usize;
+    let by_time = || time_order.iter_by_time().map(|ins| ins as usize);
+    if let Some(c) = &row_index.observed_timestamps {
+        check_column_len(ObservedTimestamps::NAME, c.len(), n)?;
+        w.observed_timestamps(&c.reordered(by_time()))?;
+    }
+    if let Some(c) = &row_index.trace_ids {
+        check_column_len(TraceIds::NAME, c.len(), n)?;
+        w.trace_ids(&c.reordered(by_time()))?;
+    }
+    if let Some(c) = &row_index.span_ids {
+        check_column_len(SpanIds::NAME, c.len(), n)?;
+        w.span_ids(&c.reordered(by_time()))?;
+    }
+    if let Some(c) = &row_index.flags {
+        check_column_len(Flags::NAME, c.len(), n)?;
+        w.flags(&c.reordered(by_time()))?;
+    }
+    if let Some(c) = &row_index.dropped_attribute_counts {
+        check_column_len(DroppedAttributeCounts::NAME, c.len(), n)?;
+        w.dropped_attribute_counts(&c.reordered(by_time()))?;
+    }
+
     // Low/mid-cardinality FSTs, high-cardinality chunks, then the
     // stream batches — each packed, streamed, and dropped in turn.
-    build_primary_fst(row_index, &time_order, &mut w)?;
     build_mid_card_chunks(row_index, &time_order, &mut w)?;
     build_high_card_chunks(row_index, &time_order, batch_size, &mut w)?;
 
@@ -460,6 +522,15 @@ pub(super) fn build_into<W: Write + Seek>(
 
     let sink = w.finish()?;
     Ok((sink, summary, metadata))
+}
+
+/// A present per-row column must hold exactly one value per row. Returns
+/// [`IndexError::ColumnLengthMismatch`] otherwise — a caller bug, not a panic.
+fn check_column_len(column: &'static str, got: usize, expected: usize) -> Result<(), IndexError> {
+    if got != expected {
+        return Err(IndexError::ColumnLengthMismatch { column, got, expected });
+    }
+    Ok(())
 }
 
 /// Remap a single roaring bitmap from insertion order to time-sorted order,

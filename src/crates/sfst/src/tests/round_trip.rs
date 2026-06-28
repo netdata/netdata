@@ -51,6 +51,7 @@ fn sample_metadata() -> Metadata {
             high_end: KvId(8),
         },
         fields: Default::default(),
+        columns: ColumnsTable::default(),
     }
 }
 
@@ -159,6 +160,7 @@ fn round_trip_fields_and_secondary_chunks() {
             high_end: KvId(7),
         },
         fields: fields.into(),
+        columns: ColumnsTable::default(),
     };
 
     let primary = build_primary(&["level=info"]);
@@ -364,6 +366,7 @@ fn round_trip_multi_batch_stream() {
             },
         ]
         .into(),
+        columns: ColumnsTable::default(),
     };
 
     let primary = build_primary(&["level=info"]);

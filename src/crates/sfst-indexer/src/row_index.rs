@@ -14,7 +14,7 @@ use crate::IndexError;
 use bumpalo::Bump;
 use otel_logs_identity::ServiceStream;
 use roaring::RoaringBitmap;
-use sfst::Histogram;
+use sfst::{DroppedAttributeCounts, Flags, Histogram, ObservedTimestamps, SpanIds, TraceIds};
 
 use super::kv_interner::{KeyValueInterner, KvSlot};
 
@@ -32,6 +32,19 @@ pub struct RowIndex<'a> {
     pub log_entries: Vec<Vec<KvSlot>>,
     /// Nanosecond timestamp per log position (insertion order).
     pub timestamps: Vec<i64>,
+    /// Optional per-row columns in **insertion order**, parallel to `timestamps`.
+    /// Each is **independently** optional — a caller fills whichever it has, in any
+    /// combination (or none). `None` for the production logs path (rows arrive via
+    /// [`wal_otap::KvSink::row`], which sets no columns). Phase 2 reorders each
+    /// present column to chronological order and writes its chunk
+    /// (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`) in the cold region; absent columns write
+    /// no chunk and add no manifest entry. Every present column MUST have length
+    /// equal to the row count ([`IndexError::ColumnLengthMismatch`] at build).
+    pub observed_timestamps: Option<ObservedTimestamps>,
+    pub trace_ids: Option<TraceIds>,
+    pub span_ids: Option<SpanIds>,
+    pub flags: Option<Flags>,
+    pub dropped_attribute_counts: Option<DroppedAttributeCounts>,
 }
 
 impl<'a> RowIndex<'a> {
@@ -41,6 +54,11 @@ impl<'a> RowIndex<'a> {
             kv_bitmaps: Vec::new(),
             log_entries: Vec::new(),
             timestamps: Vec::new(),
+            observed_timestamps: None,
+            trace_ids: None,
+            span_ids: None,
+            flags: None,
+            dropped_attribute_counts: None,
         }
     }
 

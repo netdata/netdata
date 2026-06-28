@@ -10,6 +10,7 @@
 use std::path::Path;
 
 use bumpalo::Bump;
+use sfst::{DroppedAttributeCounts, Flags, ObservedTimestamps, SpanIds, TraceIds};
 use sfst_indexer::KvSlot;
 use sfst_indexer::build_and_write;
 use sfst_indexer::row_index::RowIndex;
@@ -67,6 +68,19 @@ pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result
     let mut stats = SfstStats::default();
     let mut kv = String::new();
 
+    // Per-row columns accumulated in insertion order, parallel to the rows fed to
+    // `row_index.row(...)`. Stored as the optional SFST column chunks
+    // (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`), not facets: identifiers/scalars retrieved
+    // per row, not FST-indexed. trace_id/span_id are no longer flattened as entries
+    // (see `ng_flatten::flatten_record`), so they never reach the interner — they live
+    // only here. The ingest boundary already validated id lengths (16/8 or empty);
+    // the arenas zero-fill empty/short ids.
+    let mut observed_ts: Vec<i64> = Vec::new();
+    let mut trace_ids = TraceIds::default();
+    let mut span_ids = SpanIds::default();
+    let mut flags: Vec<u32> = Vec::new();
+    let mut dropped_attrs: Vec<u32> = Vec::new();
+
     loop {
         let frame = {
             let _t = metrics.scope("read");
@@ -120,6 +134,14 @@ pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result
 
                     // ts resolved at ingest (time/observed/clock); always concrete.
                     row_index.row(record.ts, &tokens);
+
+                    // Per-row columns, one value pushed per row (parallel to the
+                    // row just fed) so they stay aligned for the build-time remap.
+                    observed_ts.push(record.observed_ts);
+                    trace_ids.push(&record.trace_id);
+                    span_ids.push(&record.span_id);
+                    flags.push(record.flags);
+                    dropped_attrs.push(record.dropped_attributes_count);
                 }
 
                 tokens.truncate(resource_tokens.len());
@@ -128,6 +150,17 @@ pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result
         stats.records += records;
         metrics.add_records(records);
     }
+
+    // Hand the accumulated per-row columns to the builder, which reorders each to
+    // chronological order and writes its column chunk. This pipeline supplies all
+    // five (each accumulated one value per row, so lengths equal the row count and
+    // align with the rows fed to `row.row(...)`); the columns are independently
+    // optional at the format level (see `RowIndex`), this caller just fills them all.
+    row_index.observed_timestamps = Some(ObservedTimestamps(observed_ts));
+    row_index.trace_ids = Some(trace_ids);
+    row_index.span_ids = Some(span_ids);
+    row_index.flags = Some(Flags(flags));
+    row_index.dropped_attribute_counts = Some(DroppedAttributeCounts(dropped_attrs));
 
     let _t = metrics.scope("build");
     build_and_write(&row_index, out_path)?;

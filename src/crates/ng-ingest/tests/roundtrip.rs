@@ -45,6 +45,10 @@ fn log_record(body: &str, severity: i32) -> LogRecord {
         observed_time_unix_nano: 1_700_000_000_000_000_001,
         severity_number: severity,
         severity_text: "INFO".to_string(),
+        trace_id: vec![0x11; 16],
+        span_id: vec![0x22; 8],
+        flags: 7,
+        dropped_attributes_count: 3,
         body: Some(av(any_value::Value::StringValue(body.to_string()))),
         attributes: vec![
             kv("str", any_value::Value::StringValue("hello".to_string())),
@@ -140,10 +144,16 @@ fn request_roundtrips_through_a_wal_frame() {
     assert_eq!(flattened.resources[0].scopes.len(), 1);
     assert_eq!(flattened.resources[0].scopes[0].records.len(), 2);
 
-    // time/observed are no longer entries — they resolve to the record's timestamp
+    // Per-row scalar fields survive on `Record` as columns (lossless frame), and are
+    // NOT flattened into entries. time/observed resolve to the record's timestamp
     // (a concrete i64; here time_unix_nano was set, so no clock fallback).
     for rec in &flattened.resources[0].scopes[0].records {
         assert_eq!(rec.ts, 1_700_000_000_000_000_000);
+        assert_eq!(rec.observed_ts, 1_700_000_000_000_000_001);
+        assert_eq!(rec.trace_id, vec![0x11; 16]);
+        assert_eq!(rec.span_id, vec![0x22; 8]);
+        assert_eq!(rec.flags, 7);
+        assert_eq!(rec.dropped_attributes_count, 3);
     }
 
     // Typed scalar / nested / array values survive the round-trip (two records, so
@@ -151,6 +161,8 @@ fn request_roundtrips_through_a_wal_frame() {
     let leaves = all_leaves(&flattened);
     assert!(at(&leaves, "time_unix_nano").is_empty(), "time is the row ts, not a facet");
     assert!(at(&leaves, "observed_time_unix_nano").is_empty());
+    assert!(at(&leaves, "trace_id").is_empty(), "trace_id is a column, not a facet");
+    assert!(at(&leaves, "span_id").is_empty(), "span_id is a column, not a facet");
     assert_eq!(at(&leaves, "resource.attributes.service.name"), [&Value::Str("svc".into())]);
     assert_eq!(at(&leaves, "scope.name"), [&Value::Str("scope".into())]);
     assert_eq!(at(&leaves, "scope.version"), [&Value::Str("1.0".into())]);
@@ -248,6 +260,31 @@ fn ts_falls_back_to_observed_when_time_is_zero() {
     }]);
     let records = write_and_decode_records(&mut req);
     assert_eq!(records[0].ts, observed as i64, "time==0 falls back to observed");
+}
+
+#[test]
+fn malformed_ids_are_cleared_at_ingest() {
+    // A wrong-length (non-empty) trace/span id is dropped at ingest; a conformant
+    // 16/8-byte id passes through. The frame thus carries only {spec-width | empty}.
+    let mut req = request_with(vec![
+        LogRecord {
+            trace_id: vec![1, 2, 3, 4, 5], // not 16 → cleared
+            span_id: vec![9, 9, 9],        // not 8 → cleared
+            attributes: vec![kv("k", any_value::Value::IntValue(1))],
+            ..Default::default()
+        },
+        LogRecord {
+            trace_id: vec![0xab; 16], // conformant → preserved
+            span_id: vec![0xcd; 8],
+            attributes: vec![kv("k", any_value::Value::IntValue(2))],
+            ..Default::default()
+        },
+    ]);
+    let records = write_and_decode_records(&mut req);
+    assert!(records[0].trace_id.is_empty(), "malformed trace_id cleared at ingest");
+    assert!(records[0].span_id.is_empty(), "malformed span_id cleared at ingest");
+    assert_eq!(records[1].trace_id, vec![0xab; 16], "conformant trace_id preserved");
+    assert_eq!(records[1].span_id, vec![0xcd; 8], "conformant span_id preserved");
 }
 
 #[test]
