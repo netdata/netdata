@@ -203,3 +203,68 @@ fn empty_request_writes_no_frame() {
         .count();
     assert_eq!(wal_files, 0);
 }
+
+/// A one-resource/one-scope request wrapping `log_records`, for the fallback tests.
+fn request_with(log_records: Vec<LogRecord>) -> ExportLogsServiceRequest {
+    ExportLogsServiceRequest {
+        resource_logs: vec![ResourceLogs {
+            scope_logs: vec![ScopeLogs {
+                log_records,
+                ..Default::default()
+            }],
+            ..Default::default()
+        }],
+    }
+}
+
+/// Write `req` and return the decoded flattened frame's records.
+fn write_and_decode_records(req: &mut ExportLogsServiceRequest) -> Vec<ng_flatten::Record> {
+    let dir = tempfile::tempdir().unwrap();
+    let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
+    let mut writer = wal::Writer::new(dir.path(), one_file_config(), seq, PIPELINE_ID).unwrap();
+    let mut clock = MonotonicClock::new();
+    write_request(&mut writer, &mut clock, req).unwrap();
+    writer.shutdown_all().unwrap();
+
+    let mut reader = wal::Reader::open(&wal_file(dir.path())).unwrap();
+    let frame = reader.next_frame().unwrap().expect("one frame written");
+    let flattened = decode_frame(frame.data).expect("payload decodes as a flattened frame");
+    flattened
+        .resources
+        .into_iter()
+        .flat_map(|rg| rg.scopes)
+        .flat_map(|sg| sg.records)
+        .collect()
+}
+
+#[test]
+fn ts_falls_back_to_observed_when_time_is_zero() {
+    let observed = 1_700_000_000_000_000_042;
+    let mut req = request_with(vec![LogRecord {
+        time_unix_nano: 0,
+        observed_time_unix_nano: observed,
+        attributes: vec![kv("k", any_value::Value::IntValue(1))],
+        ..Default::default()
+    }]);
+    let records = write_and_decode_records(&mut req);
+    assert_eq!(records[0].ts, observed as i64, "time==0 falls back to observed");
+}
+
+#[test]
+fn ts_falls_back_to_clock_when_both_zero() {
+    // Two records with neither timestamp: each gets a monotonic-clock ts, strictly
+    // increasing so intra-frame order is preserved.
+    let mut req = request_with(vec![
+        LogRecord {
+            attributes: vec![kv("k", any_value::Value::IntValue(1))],
+            ..Default::default()
+        },
+        LogRecord {
+            attributes: vec![kv("k", any_value::Value::IntValue(2))],
+            ..Default::default()
+        },
+    ]);
+    let records = write_and_decode_records(&mut req);
+    assert!(records[0].ts > 0, "both zero -> monotonic clock fallback");
+    assert!(records[1].ts > records[0].ts, "clock fallback is strictly increasing");
+}

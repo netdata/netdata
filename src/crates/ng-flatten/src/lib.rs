@@ -441,9 +441,11 @@ pub struct ScopeGroup {
 }
 
 /// One log record: its own entries plus its timestamp. `ts` is the record's
-/// `time_unix_nano`, which the caller is expected to have normalized at ingest (time
-/// else observed else a monotonic clock) so it is always set — see `ng-ingest`'s
-/// timestamp normalization. The time fields are not flattened into `entries` (see
+/// `time_unix_nano`. The caller MUST normalize timestamps before flattening (see
+/// `ng-ingest::write_request`): `time_unix_nano` else `observed_time_unix_nano` else
+/// a monotonic clock. A caller that skips normalization and flattens a record with
+/// `time_unix_nano == 0` gets `ts == 0` (a year-1970 row) — so always normalize
+/// first. The time fields are not flattened into `entries` (see
 /// [`Flattener::flatten_record`]).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Record {
@@ -479,7 +481,10 @@ pub fn flatten_into(
                 .log_records
                 .iter()
                 .map(|r| Record {
-                    ts: r.time_unix_nano as i64,
+                    // Saturating: a u64 past i64::MAX (year ~2262 / adversarial input)
+                    // clamps to i64::MAX rather than wrapping negative — mirrors
+                    // wal-otap's cast and keeps row ordering sane.
+                    ts: i64::try_from(r.time_unix_nano).unwrap_or(i64::MAX),
                     entries: flattener.flatten_record(r),
                 })
                 .collect();
@@ -491,7 +496,9 @@ pub fn flatten_into(
 }
 
 /// Flatten a request into its own per-frame tree (convenience over [`flatten_into`])
-/// — the form stored in a flattened WAL frame.
+/// — the form stored in a flattened WAL frame. Callers MUST normalize record
+/// timestamps first (see [`Record`]); a record with `time_unix_nano == 0` flattens
+/// to `ts == 0`.
 pub fn flatten_request(request: &ExportLogsServiceRequest) -> FlattenedRequest {
     let mut flattener = Flattener::new();
     let resources = flatten_into(&mut flattener, request);

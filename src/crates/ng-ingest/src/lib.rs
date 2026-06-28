@@ -38,10 +38,15 @@ pub fn one_file_config() -> wal::Config {
     }
 }
 
-/// Ensure every log record has a usable `time_unix_nano` before flattening: keep it
-/// if set, else fall back to `observed_time_unix_nano`, else stamp the monotonic
-/// ingestion clock. ng-ingest is the OTLP observation point, so this fulfils the
-/// spec's "this field MUST be set once the event is observed by OpenTelemetry".
+/// Ensure every log record has a usable `time_unix_nano` before flattening, applying
+/// the OTLP single-timestamp rule (time else observed) at the observation point:
+/// keep `time_unix_nano` if set, else fall back to `observed_time_unix_nano`, else
+/// stamp the monotonic ingestion clock.
+///
+/// Notes: the resolved value is written into `time_unix_nano` (not
+/// `observed_time_unix_nano`). The clock fallback is a per-record `now_ns()` —
+/// strictly increasing, so intra-frame order is preserved, but it is not `wal-otap`'s
+/// `ingestion_ns + row_offset` (a different value, same ordering guarantee).
 fn normalize_timestamps(req: &mut ExportLogsServiceRequest, clock: &mut MonotonicClock) {
     for rl in &mut req.resource_logs {
         for sl in &mut rl.scope_logs {
@@ -61,8 +66,9 @@ fn normalize_timestamps(req: &mut ExportLogsServiceRequest, clock: &mut Monotoni
 /// Normalize timestamps, flatten `req`, and append it as a single WAL frame in the
 /// flattened-frame format, returning the number of log records written.
 ///
-/// Each record's `time_unix_nano` is normalized first ([`normalize_timestamps`]),
-/// then the request is flattened into a per-frame schema tree + typed entries, each
+/// Each record's `time_unix_nano` is normalized **in place** first
+/// ([`normalize_timestamps`] mutates `req`), then the request is flattened into a
+/// per-frame schema tree + typed entries, each
 /// entry's `xxhash64(key=value)` is pre-computed (so the downstream SFST build rides
 /// the interner's fast path), and the result is bincode-encoded as the frame payload.
 /// `log_min/max_ts` are left `ZERO` (no per-frame time-range summary). A request with
