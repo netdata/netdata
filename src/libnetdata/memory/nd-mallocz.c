@@ -331,7 +331,11 @@ char *strdupz_int(const char *s, const char *file, const char *function, size_t 
 
 char *strndupz_int(const char *s, size_t len, const char *file, const char *function, size_t line) {
     struct malloc_trace *p = malloc_trace_find_or_create(file, function, line);
-    size_t size = len + 1;
+    size_t bytes = strnlen(s, len);
+    if (unlikely(bytes >= SIZE_MAX - malloc_header_size))
+        fatal("strndupz() cannot allocate %zu bytes of memory.", bytes);
+
+    size_t size = bytes + 1;
 
     size_t_atomic_count(add, p->strdup_calls, 1);
     size_t_atomic_count(add, p->allocations, 1);
@@ -348,8 +352,8 @@ char *strndupz_int(const char *s, size_t len, const char *file, const char *func
         t->padding[i] = 0xFF;
 #endif
 
-    memcpy(&t->data, s, size);
-    t->data[len] = '\0';
+    memcpy(&t->data, s, bytes);
+    t->data[bytes] = '\0';
     return (char *)&t->data;
 }
 
