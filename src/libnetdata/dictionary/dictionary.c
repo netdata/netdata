@@ -647,10 +647,19 @@ void dictionary_flush(DICTIONARY *dict) {
 
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
 
-    DICTIONARY_ITEM *item, *next = NULL;
-    for(item = dict->items.list; item ;item = next) {
-        next = item->next;
+    DICTIONARY_ITEM *item = dict->items.list;
+    while(item && !item_check_and_acquire(dict, item))
+        item = item->next;
+
+    while(item) {
         dict_item_del(dict, item_get_name(item), (ssize_t)item_get_name_len(item));
+
+        DICTIONARY_ITEM *next = item->next;
+        while(next && !item_check_and_acquire(dict, next))
+            next = next->next;
+
+        dict_item_release_and_check_if_it_is_deleted_and_can_be_removed_under_this_lock_mode(dict, item, DICTIONARY_LOCK_WRITE);
+        item = next;
     }
 
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
