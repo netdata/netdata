@@ -346,7 +346,7 @@ bool rrd_function_is_available(struct rrd_host_function *rdcf, RRDHOST *host) {
 int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size_t key_length, const DICTIONARY_ITEM **item) {
     char buffer[MAX_FUNCTION_LENGTH + 1];
     strncpyz(buffer, name, sizeof(buffer) - 1);
-    key_length = strlen(buffer);
+    key_length = strnlen(buffer, sizeof(buffer));
     char *s = NULL;
 
     OBJECT_STATE_ID state_id = object_state_id(&host->state_id);
