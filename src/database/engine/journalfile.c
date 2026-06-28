@@ -1756,7 +1756,9 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
 
     journalfile_v1_generate_path(datafile, path, sizeof(path));
 
+    nd_win_trace("journalfile_load: fileno=%u open v1='%s'...", datafile->fileno, path);
     fd = open_file_for_io(path, O_RDWR, &file, dbengine_use_direct_io);
+    nd_win_trace("journalfile_load: fileno=%u open v1 ret=%d", datafile->fileno, fd);
     if (fd < 0) {
         ctx_fs_error(ctx);
 

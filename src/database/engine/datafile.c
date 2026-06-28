@@ -366,12 +366,14 @@ static int load_data_file(struct rrdengine_datafile *datafile)
     char path[RRDENG_PATH_MAX];
 
     generate_datafilepath(datafile, path, sizeof(path));
+    nd_win_trace("load_data_file: fileno=%u open_file_for_io...", datafile->fileno);
     fd = open_file_for_io(path, O_RDWR, &file, dbengine_use_direct_io);
+    nd_win_trace("load_data_file: fileno=%u open_file_for_io ret=%d", datafile->fileno, fd);
     if (fd < 0) {
         ctx_fs_error(ctx);
         return fd;
     }
-    
+
     nd_log_daemon(NDLP_DEBUG, "DBENGINE: initializing data file \"%s\".", path);
 
     ret = check_file_properties(file, &file_size, sizeof(struct rrdeng_df_sb));
@@ -494,7 +496,9 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         Word_t idx = 0;
         Pvoid_t *PValue;
         size_t deleted_journals = 0;
+        nd_win_trace("scan_data_files[D1]: tier=%d entering orphan while-loop", ctx->config.tier);
         while ((PValue = JudyLFirstThenNext(journafile_JudyL, &idx, &first_then_next))) {
+            nd_win_trace("scan_data_files[D2]: tier=%d loop-iter fileno=%u", ctx->config.tier, (unsigned)idx);
             char path[RRDENG_PATH_MAX];
             if (unlikely(!JudyLGet(datafiles_JudyL, (Word_t)idx, PJE0))) {
                 (void)snprintfz(
@@ -542,13 +546,17 @@ static int scan_data_files(struct rrdengine_instance *ctx)
 #endif
             }
         }
+        nd_win_trace("scan_data_files[D3]: tier=%d orphan while-loop done", ctx->config.tier);
 
         if (deleted_journals)
             netdata_log_info("DBENGINE: deleted %zu journal files without matching data files", deleted_journals);
     }
 
+    nd_win_trace("scan_data_files[D4]: tier=%d before JudyLFreeArray", ctx->config.tier);
     (void) JudyLFreeArray(&journafile_JudyL, NULL);
+    nd_win_trace("scan_data_files[D5]: tier=%d after JudyLFreeArray(journal)", ctx->config.tier);
     (void) JudyLFreeArray(&datafiles_JudyL, NULL);
+    nd_win_trace("scan_data_files[D6]: tier=%d after JudyLFreeArray(data)", ctx->config.tier);
 
     nd_win_trace("scan_data_files[E]: tier=%d orphan-check done, starting load of %d files", ctx->config.tier, matched_files);
     netdata_log_info("DBENGINE: tier %d: loading %d data/journal files...", ctx->config.tier, matched_files);
