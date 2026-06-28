@@ -23,7 +23,7 @@ static inline RRDCONTEXT_QUEUE_STATUS rrdcontext_queue_add(RRDCONTEXT_QUEUE_Judy
         ret = RRDCONTEXT_QUEUE_FOUND;
     }
     else {
-        *idx = queue->id++;
+        *idx = ++queue->id;
         RRDCONTEXT_QUEUE_SET(queue, *idx, rc);
         __atomic_add_fetch(&queue->version, 1, __ATOMIC_RELAXED);
         __atomic_add_fetch(&queue->entries, 1, __ATOMIC_RELAXED);
