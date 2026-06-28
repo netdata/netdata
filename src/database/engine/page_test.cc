@@ -377,6 +377,28 @@ TEST(PGD, Roundtrip) {
     pgd_free(pg_collector);
 }
 
+TEST(PGD, RejectCorruptGorillaDiskChain) {
+    size_t slots = slots_for_page(16);
+    PGD *pg_collector = pgd_create(page_type, slots);
+
+    for (size_t i = 0; i != slots; i++)
+        pgd_append_point(pg_collector, i, i, 0, 0, 1, 1, SN_DEFAULT_FLAGS, i);
+
+    uint32_t size_in_bytes = pgd_disk_footprint(pg_collector);
+    uint32_t size_in_words = size_in_bytes / sizeof(uint32_t);
+
+    alignas(sizeof(uintptr_t)) uint32_t disk_buffer[size_in_words];
+    pgd_copy_to_extent(pg_collector, (uint8_t *) &disk_buffer[0], size_in_bytes);
+
+    void *last_gbuf = &disk_buffer[size_in_words - RRDENG_GORILLA_32BIT_BUFFER_SLOTS];
+    memcpy(last_gbuf, &last_gbuf, sizeof(last_gbuf));
+
+    PGD *pg_disk = pgd_create_from_disk_data(page_type, &disk_buffer[0], size_in_bytes);
+    EXPECT_EQ(pg_disk, PGD_EMPTY);
+
+    pgd_free(pg_collector);
+}
+
 int pgd_test(int argc, char *argv[])
 {
     // Dummy/necessary initialization stuff

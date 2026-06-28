@@ -260,24 +260,30 @@ bool gorilla_writer_serialize(const gorilla_writer_t *gw, uint8_t *dst, uint32_t
     return true;
 }
 
-uint32_t gorilla_buffer_patch(gorilla_buffer_t *gbuf) {
+bool gorilla_buffer_patch(gorilla_buffer_t *gbuf, size_t nbuffers, uint32_t *entries) {
     gorilla_buffer_t *curr_gbuf = gbuf;
     uint32_t n = curr_gbuf->header.entries;
+    size_t buffers = 1;
 
     while (curr_gbuf->header.next) {
-        uint32_t *buf = reinterpret_cast<uint32_t *>(gbuf);
-        gbuf = reinterpret_cast<gorilla_buffer_t *>(&buf[RRDENG_GORILLA_32BIT_BUFFER_SLOTS]);
+        if(unlikely(buffers == nbuffers))
+            return false;
 
-        assert(((uintptr_t) (gbuf) % sizeof(uintptr_t)) == 0 &&
+        auto *buf = static_cast<unsigned char *>(static_cast<void *>(curr_gbuf));
+        auto *next_gbuf = static_cast<gorilla_buffer_t *>(static_cast<void *>(buf + RRDENG_GORILLA_32BIT_BUFFER_SIZE));
+
+        assert(((uintptr_t) (next_gbuf) % sizeof(uintptr_t)) == 0 &&
                "Gorilla buffer not aligned to uintptr_t");
 
-        curr_gbuf->header.next = gbuf;
+        curr_gbuf->header.next = next_gbuf;
         curr_gbuf = curr_gbuf->header.next;
+        buffers++;
 
         n += curr_gbuf->header.entries;
     }
 
-    return n;
+    *entries = n;
+    return true;
 }
 
 size_t gorilla_buffer_unpatched_nbuffers(const gorilla_buffer_t *gbuf) {
@@ -286,8 +292,8 @@ size_t gorilla_buffer_unpatched_nbuffers(const gorilla_buffer_t *gbuf) {
         nbuffers++;
 
         if(gbuf->header.next) {
-            const auto *buf = reinterpret_cast<const uint32_t *>(gbuf);
-            gbuf = reinterpret_cast<const gorilla_buffer_t *>(&buf[RRDENG_GORILLA_32BIT_BUFFER_SLOTS]);
+            const auto *buf = static_cast<const unsigned char *>(static_cast<const void *>(gbuf));
+            gbuf = static_cast<const gorilla_buffer_t *>(static_cast<const void *>(buf + RRDENG_GORILLA_32BIT_BUFFER_SIZE));
         }
         else
             break;
@@ -301,8 +307,8 @@ size_t gorilla_buffer_unpatched_nbytes(const gorilla_buffer_t *gbuf) {
     while(gbuf) {
         if(gbuf->header.next) {
             nbytes += RRDENG_GORILLA_32BIT_BUFFER_SIZE;
-            const auto *buf = reinterpret_cast<const uint32_t *>(gbuf);
-            gbuf = reinterpret_cast<const gorilla_buffer_t *>(&buf[RRDENG_GORILLA_32BIT_BUFFER_SLOTS]);
+            const auto *buf = static_cast<const unsigned char *>(static_cast<const void *>(gbuf));
+            gbuf = static_cast<const gorilla_buffer_t *>(static_cast<const void *>(buf + RRDENG_GORILLA_32BIT_BUFFER_SIZE));
         }
         else {
             nbytes += gorilla_buffer_nbytes(gbuf->header.nbits);
