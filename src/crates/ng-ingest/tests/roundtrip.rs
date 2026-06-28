@@ -140,9 +140,10 @@ fn request_roundtrips_through_a_wal_frame() {
     assert_eq!(flattened.resources[0].scopes.len(), 1);
     assert_eq!(flattened.resources[0].scopes[0].records.len(), 2);
 
-    // time/observed are no longer entries — they resolve to the record's timestamp.
+    // time/observed are no longer entries — they resolve to the record's timestamp
+    // (a concrete i64; here time_unix_nano was set, so no clock fallback).
     for rec in &flattened.resources[0].scopes[0].records {
-        assert_eq!(rec.ts, Some(1_700_000_000_000_000_000));
+        assert_eq!(rec.ts, 1_700_000_000_000_000_000);
     }
 
     // Typed scalar / nested / array values survive the round-trip (two records, so

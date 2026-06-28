@@ -76,9 +76,6 @@ pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result
             }
         };
         stats.frames += 1;
-        // Per-frame ingestion timestamp, saturating (matches wal-otap); the fallback
-        // base for records with no time/observed timestamp.
-        let base_ns = i64::try_from(frame.timestamp_ns.as_u64()).unwrap_or(i64::MAX);
         metrics.add_frames(1);
         metrics.add_bytes(frame.data.len() as u64);
 
@@ -114,9 +111,6 @@ pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result
                 tokens.extend_from_slice(&scope_tokens);
 
                 for record in &sg.records {
-                    // Resolved at flatten time (time else observed); a ts-less record
-                    // falls back to the frame ts + its row offset (keeps ordering).
-                    let ts = record.ts.unwrap_or_else(|| base_ns.saturating_add(records as i64));
                     records += 1;
 
                     let record_tokens =
@@ -124,7 +118,8 @@ pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result
                     tokens.truncate(resource_tokens.len() + scope_tokens.len());
                     tokens.extend_from_slice(&record_tokens);
 
-                    row_index.row(ts, &tokens);
+                    // ts resolved at ingest (time/observed/clock); always concrete.
+                    row_index.row(record.ts, &tokens);
                 }
 
                 tokens.truncate(resource_tokens.len());

@@ -56,7 +56,9 @@ pub fn write_request(
     if entry_count == 0 {
         return Ok(0);
     }
-    let mut flattened = ng_flatten::flatten_request(req);
+    // Records with no time_unix_nano/observed_time_unix_nano get a monotonic
+    // ingestion-clock timestamp here, so every record carries a concrete ts.
+    let mut flattened = ng_flatten::flatten_request(req, || clock.now_ns().as_u64() as i64);
     ng_flatten::fill_hashes(&mut flattened);
     let data = ng_flatten::encode_frame(&flattened).context("encode flattened frame")?;
     let ingestion_ns = clock.now_ns();

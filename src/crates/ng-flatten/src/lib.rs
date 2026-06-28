@@ -441,19 +441,20 @@ pub struct ScopeGroup {
 }
 
 /// One log record: its own entries plus its resolved timestamp. `ts` is
-/// `time_unix_nano` (≠0) else `observed_time_unix_nano` (≠0), resolved at flatten
-/// time; `None` means neither was set, and the consumer applies the frame's
-/// ingestion-time fallback. Time fields live here, not in `entries` (see
-/// [`record_timestamp`] and [`Flattener::flatten_record`]).
+/// `time_unix_nano` (≠0) else `observed_time_unix_nano` (≠0), else a fallback the
+/// caller supplies at ingest (a monotonic ingestion clock) — so every record carries
+/// a concrete timestamp by the time it is flattened, with no `Option` downstream.
+/// Time fields live here, not in `entries` (see [`record_timestamp`] and
+/// [`Flattener::flatten_record`]).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Record {
-    pub ts: Option<i64>,
+    pub ts: i64,
     pub entries: Vec<Entry>,
 }
 
 /// A record's timestamp: `time_unix_nano` (≠0) else `observed_time_unix_nano` (≠0),
-/// read straight from the OTLP fields. `None` if neither is set — the consumer then
-/// falls back to the frame's ingestion timestamp. Same priority as `wal-otap`.
+/// read straight from the OTLP fields. `None` if neither is set — the caller then
+/// supplies a fallback (see [`flatten_into`]). Same priority as `wal-otap`.
 pub fn record_timestamp(record: &LogRecord) -> Option<i64> {
     Some(record.time_unix_nano)
         .filter(|&t| t != 0)
@@ -464,9 +465,14 @@ pub fn record_timestamp(record: &LogRecord) -> Option<i64> {
 /// Flatten one decoded request INTO a shared [`Flattener`], returning the request's
 /// grouped entries. The tree stays in `flattener`, so it can span many requests.
 /// Resource is flattened once per `ResourceLogs`, scope once per `ScopeLogs`.
+///
+/// `fallback` supplies a timestamp for any record with no `time_unix_nano` /
+/// `observed_time_unix_nano` (call it at ingest with a monotonic clock), so every
+/// [`Record`] gets a concrete `ts`.
 pub fn flatten_into(
     flattener: &mut Flattener,
     request: &ExportLogsServiceRequest,
+    fallback: &mut impl FnMut() -> i64,
 ) -> Vec<ResourceGroup> {
     let mut resources = Vec::with_capacity(request.resource_logs.len());
     for rl in &request.resource_logs {
@@ -485,9 +491,15 @@ pub fn flatten_into(
             let records = sl
                 .log_records
                 .iter()
-                .map(|r| Record {
-                    ts: record_timestamp(r),
-                    entries: flattener.flatten_record(r),
+                .map(|r| {
+                    let ts = match record_timestamp(r) {
+                        Some(t) => t,
+                        None => fallback(),
+                    };
+                    Record {
+                        ts,
+                        entries: flattener.flatten_record(r),
+                    }
                 })
                 .collect();
             scopes.push(ScopeGroup { scope, records });
@@ -498,10 +510,14 @@ pub fn flatten_into(
 }
 
 /// Flatten a request into its own per-frame tree (convenience over [`flatten_into`])
-/// — the form stored in a flattened WAL frame.
-pub fn flatten_request(request: &ExportLogsServiceRequest) -> FlattenedRequest {
+/// — the form stored in a flattened WAL frame. `fallback` supplies a timestamp for
+/// records lacking time/observed (see [`flatten_into`]).
+pub fn flatten_request(
+    request: &ExportLogsServiceRequest,
+    mut fallback: impl FnMut() -> i64,
+) -> FlattenedRequest {
     let mut flattener = Flattener::new();
-    let resources = flatten_into(&mut flattener, request);
+    let resources = flatten_into(&mut flattener, request, &mut fallback);
     FlattenedRequest {
         tree: flattener.into_tree(),
         resources,
