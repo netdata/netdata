@@ -4,7 +4,7 @@
 #include <ctype.h>
 #include <stdbool.h>
 #include <string.h>
-#ifdef _WIN32
+#ifdef OS_WINDOWS
 #include <io.h>
 #include <fcntl.h>
 #endif
@@ -144,7 +144,7 @@ const char *get_msg_format(MESSAGE_ID msg) {
 int main(int argc, const char **argv) {
     (void)argc; (void)argv;
 
-#ifdef _WIN32
+#ifdef OS_WINDOWS
     // All format strings contain explicit \r\n.  MinGW text-mode stdout would
     // translate \n → \r\n a second time, turning the ".\r\n" MC terminator into
     // ".\r\r\n" which windmc cannot recognise.  Binary mode disables that.
