@@ -232,24 +232,22 @@ ALWAYS_INLINE
 static bool metric_release(MRG *mrg, METRIC *metric) {
     size_t partition = metric->partition;
 
-    if (refcount_release(&metric->refcount) == 0) {
+    if (refcount_release_and_acquire_for_deletion_advanced(&metric->refcount) == REFCOUNT_DELETED) {
         // we are the last user
         if (!acquired_metric_has_retention(mrg, metric)) {
-            // This metric is eligible for deletion.
-            // Atomically check and set the 'deleted' flag.
-            // If __atomic_test_and_set returns 'true', it means the flag was already set.
-            if (!__atomic_test_and_set(&metric->deleted, __ATOMIC_ACQ_REL)) {
-                // We won the race. The flag was 'false' and we set it to 'true'.
-                // We are now responsible for deletion.
-                acquired_for_deletion_metric_delete(mrg, metric);
-                uuidmap_free(metric->uuid);
-                aral_freez(mrg->index[partition].aral, metric);
-                __atomic_sub_fetch(&mrg->index[partition].stats.entries_acquired, 1, __ATOMIC_RELAXED);
-                __atomic_sub_fetch(&mrg->index[partition].stats.current_references, 1, __ATOMIC_RELAXED);
-                return true;
-            }
-            // Another thread is already deleting it. nothing to do
+            // We claimed the last reference for deletion, so no new acquire can resurrect it.
+            acquired_for_deletion_metric_delete(mrg, metric);
+            uuidmap_free(metric->uuid);
+            aral_freez(mrg->index[partition].aral, metric);
+            __atomic_sub_fetch(&mrg->index[partition].stats.entries_acquired, 1, __ATOMIC_RELAXED);
+            __atomic_sub_fetch(&mrg->index[partition].stats.current_references, 1, __ATOMIC_RELAXED);
+            return true;
         }
+
+        REFCOUNT expected = REFCOUNT_DELETED;
+        bool restored = __atomic_compare_exchange_n(&metric->refcount, &expected, 0,
+                                                    false, __ATOMIC_RELEASE, __ATOMIC_RELAXED);
+        internal_fatal(!restored, "DBENGINE METRIC: cannot restore retained metric refcount from deletion state");
     }
 
     __atomic_sub_fetch(&mrg->index[partition].stats.current_references, 1, __ATOMIC_RELAXED);
