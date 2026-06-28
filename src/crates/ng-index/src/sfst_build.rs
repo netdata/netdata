@@ -93,6 +93,10 @@ pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result
     let mut row_index = RowIndex::new(&arena, CARDINALITY_THRESHOLD);
     let mut stats = SfstStats::default();
     let mut kv = String::new();
+    // Reused across all records and frames. The resource + scope prefix is identical
+    // for every record in a scope group, so it is built once per group and only the
+    // record's own tokens are swapped in per record (truncate + extend).
+    let mut tokens: Vec<KvSlot> = Vec::new();
 
     loop {
         let frame = {
@@ -129,16 +133,19 @@ pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result
             let resource_tokens = intern_entries(&mut row_index, &rg.resource, &paths, &mut kv, &mut stats);
             for sg in &rg.scopes {
                 let scope_tokens = intern_entries(&mut row_index, &sg.scope, &paths, &mut kv, &mut stats);
+                // A row's columns = resource + scope + own. The resource+scope prefix
+                // is identical for every record in this scope group, so build it once
+                // here and, per record, truncate back to it and append only the
+                // record's own tokens — reusing one allocation across all records.
+                tokens.clear();
+                tokens.extend_from_slice(&resource_tokens);
+                tokens.extend_from_slice(&scope_tokens);
+                let prefix_len = tokens.len();
                 for record in &sg.records {
                     records += 1;
                     let ts = record_ts(record, time_node, obs_node, fallback_ts);
                     let own_tokens = intern_entries(&mut row_index, record, &paths, &mut kv, &mut stats);
-                    // A row's columns = its own + its scope's + its resource's.
-                    let mut tokens = Vec::with_capacity(
-                        resource_tokens.len() + scope_tokens.len() + own_tokens.len(),
-                    );
-                    tokens.extend_from_slice(&resource_tokens);
-                    tokens.extend_from_slice(&scope_tokens);
+                    tokens.truncate(prefix_len);
                     tokens.extend_from_slice(&own_tokens);
                     row_index.row(ts, &tokens);
                 }
