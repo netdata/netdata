@@ -53,6 +53,112 @@ void perflibFreePerformanceData(void) {
 // a displayable counter value. Use the counter type to determine the information
 // needed to calculate the value.
 
+ALWAYS_INLINE
+static size_t getCounterDataSize(PERF_COUNTER_DEFINITION* pCounter)
+{
+    switch (pCounter->CounterType) {
+        case PERF_COUNTER_COUNTER:
+        case PERF_COUNTER_QUEUELEN_TYPE:
+        case PERF_SAMPLE_COUNTER:
+        case PERF_OBJ_TIME_TIMER:
+        case PERF_COUNTER_RAWCOUNT:
+        case PERF_COUNTER_RAWCOUNT_HEX:
+        case PERF_COUNTER_DELTA:
+        case PERF_SAMPLE_FRACTION:
+        case PERF_RAW_FRACTION:
+            return sizeof(DWORD);
+
+        case PERF_COUNTER_MULTI_TIMER:
+        case PERF_COUNTER_MULTI_TIMER_INV:
+        case PERF_100NSEC_MULTI_TIMER:
+        case PERF_100NSEC_MULTI_TIMER_INV:
+            return sizeof(ULONGLONG) +
+                ((pCounter->CounterType & PERF_MULTI_COUNTER) == PERF_MULTI_COUNTER ? sizeof(DWORD) : 0);
+
+        case PERF_COUNTER_100NS_QUEUELEN_TYPE:
+        case PERF_COUNTER_OBJ_TIME_QUEUELEN_TYPE:
+        case PERF_COUNTER_TIMER:
+        case PERF_COUNTER_TIMER_INV:
+        case PERF_COUNTER_BULK_COUNT:
+        case PERF_COUNTER_LARGE_QUEUELEN_TYPE:
+        case PERF_COUNTER_LARGE_RAWCOUNT:
+        case PERF_COUNTER_LARGE_RAWCOUNT_HEX:
+        case PERF_COUNTER_LARGE_DELTA:
+        case PERF_100NSEC_TIMER:
+        case PERF_100NSEC_TIMER_INV:
+        case PERF_LARGE_RAW_FRACTION:
+        case PERF_PRECISION_SYSTEM_TIMER:
+        case PERF_PRECISION_100NS_TIMER:
+        case PERF_PRECISION_OBJECT_TIMER:
+        case PERF_AVERAGE_TIMER:
+        case PERF_AVERAGE_BULK:
+        case PERF_ELAPSED_TIME:
+            return sizeof(ULONGLONG);
+
+        default:
+            return 0;
+    }
+}
+
+ALWAYS_INLINE
+static PVOID getCounterBlockData(
+    PERF_COUNTER_BLOCK* pCounterDataBlock,
+    PERF_COUNTER_DEFINITION* pCounter,
+    size_t size)
+{
+    if(unlikely(!pCounterDataBlock || !pCounter || !size ||
+                 size > pCounterDataBlock->ByteLength ||
+                 pCounter->CounterOffset > pCounterDataBlock->ByteLength - size))
+        return NULL;
+
+    return (PVOID)((LPBYTE)pCounterDataBlock + pCounter->CounterOffset);
+}
+
+ALWAYS_INLINE
+static PERF_COUNTER_DEFINITION *getFollowingCounterDefinition(
+    PERF_OBJECT_TYPE* pObject,
+    PERF_COUNTER_DEFINITION* pCounter)
+{
+    if(unlikely(!pObject || !pCounter ||
+                 pObject->HeaderLength > pObject->DefinitionLength ||
+                 pObject->DefinitionLength > pObject->TotalByteLength))
+        return NULL;
+
+    PBYTE object = (PBYTE)pObject;
+    PBYTE counters = object + pObject->HeaderLength;
+    PBYTE end = object + pObject->DefinitionLength;
+    PBYTE counter = (PBYTE)pCounter;
+
+    if(unlikely(counter < counters ||
+                 counter > end ||
+                 sizeof(*pCounter) > (size_t)(end - counter)))
+        return NULL;
+
+    PBYTE next = counter + sizeof(*pCounter);
+    if(unlikely(sizeof(*pCounter) > (size_t)(end - next)))
+        return NULL;
+
+    PERF_COUNTER_DEFINITION *pBaseCounter = (PERF_COUNTER_DEFINITION *)next;
+    if(unlikely(!pBaseCounter->ByteLength || pBaseCounter->ByteLength > (DWORD)(end - next)))
+        return NULL;
+
+    return pBaseCounter;
+}
+
+ALWAYS_INLINE
+static PVOID getBaseCounterBlockData(
+    PERF_OBJECT_TYPE* pObject,
+    PERF_COUNTER_BLOCK* pCounterDataBlock,
+    PERF_COUNTER_DEFINITION* pCounter,
+    size_t size)
+{
+    PERF_COUNTER_DEFINITION* pBaseCounter = getFollowingCounterDefinition(pObject, pCounter);
+    if(!pBaseCounter || (pBaseCounter->CounterType & PERF_COUNTER_BASE) != PERF_COUNTER_BASE)
+        return NULL;
+
+    return getCounterBlockData(pCounterDataBlock, pBaseCounter, size);
+}
+
 static BOOL getCounterData(
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE* pObject,
@@ -62,14 +168,20 @@ static BOOL getCounterData(
 {
     PVOID pData = NULL;
     UNALIGNED ULONGLONG* pullData = NULL;
-    PERF_COUNTER_DEFINITION* pBaseCounter = NULL;
     BOOL fSuccess = TRUE;
 
     if(!pCounterDataBlock)
         return FALSE;
 
-    //Point to the raw counter data.
-    pData = (PVOID)((LPBYTE)pCounterDataBlock + pCounter->CounterOffset);
+    size_t size = getCounterDataSize(pCounter);
+    if(size) {
+        pData = getCounterBlockData(pCounterDataBlock, pCounter, size);
+        if(!pData) {
+            pRawData->Data = 0;
+            pRawData->Time = 0;
+            return FALSE;
+        }
+    }
 
     //Now use the PERF_COUNTER_DEFINITION.CounterType value to figure out what
     //other information you need to calculate a displayable value.
@@ -167,11 +279,9 @@ static BOOL getCounterData(
         case PERF_SAMPLE_FRACTION:
         case PERF_RAW_FRACTION:
             pRawData->Data = (ULONGLONG)(*(DWORD*)pData);
-            pBaseCounter = pCounter + 1;  //Get base counter
-            if ((pBaseCounter->CounterType & PERF_COUNTER_BASE) == PERF_COUNTER_BASE) {
-                pData = (PVOID)((LPBYTE)pCounterDataBlock + pBaseCounter->CounterOffset);
+            pData = getBaseCounterBlockData(pObject, pCounterDataBlock, pCounter, sizeof(DWORD));
+            if (pData)
                 pRawData->Time = (LONGLONG)(*(DWORD*)pData);
-            }
             else
                 fSuccess = FALSE;
             break;
@@ -181,11 +291,9 @@ static BOOL getCounterData(
         case PERF_PRECISION_100NS_TIMER:
         case PERF_PRECISION_OBJECT_TIMER:
             pRawData->Data = *(UNALIGNED ULONGLONG*)pData;
-            pBaseCounter = pCounter + 1;
-            if ((pBaseCounter->CounterType & PERF_COUNTER_BASE) == PERF_COUNTER_BASE) {
-                pData = (PVOID)((LPBYTE)pCounterDataBlock + pBaseCounter->CounterOffset);
+            pData = getBaseCounterBlockData(pObject, pCounterDataBlock, pCounter, sizeof(LONGLONG));
+            if (pData)
                 pRawData->Time = *(LONGLONG*)pData;
-            }
             else
                 fSuccess = FALSE;
             break;
@@ -193,11 +301,9 @@ static BOOL getCounterData(
         case PERF_AVERAGE_TIMER:
         case PERF_AVERAGE_BULK:
             pRawData->Data = *(UNALIGNED ULONGLONG*)pData;
-            pBaseCounter = pCounter+1;
-            if ((pBaseCounter->CounterType & PERF_COUNTER_BASE) == PERF_COUNTER_BASE) {
-                pData = (PVOID)((LPBYTE)pCounterDataBlock + pBaseCounter->CounterOffset);
+            pData = getBaseCounterBlockData(pObject, pCounterDataBlock, pCounter, sizeof(DWORD));
+            if (pData)
                 pRawData->Time = *(DWORD*)pData;
-            }
             else
                 fSuccess = FALSE;
 
