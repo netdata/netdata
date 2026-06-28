@@ -246,15 +246,25 @@ impl<'a> KeyValueInterner<'a> {
     /// name; within each field, values are sorted by their resolved string.
     /// Returns three vectors of [`KvSlot`]s, one per tier.
     pub fn tier_assignment(&self) -> [Vec<KvSlot>; 3] {
-        let mut sorted: Vec<KvSlot> = Vec::new();
+        // Reusable decorate buffer of (value suffix, slot). Three things make this
+        // cheaper than sorting the slots directly by `self.strings[idx]`:
+        //   - sorting the value *suffix* (`&s[field.len()..]`) skips the `field=`
+        //     prefix every value in the field shares; the prefix is constant within
+        //     a field, so suffix order == full-string order (same result);
+        //   - the `&str` is inline in the tuple, dropping the per-compare index into
+        //     `self.strings` for both operands;
+        //   - `sort_unstable_by` avoids the stable sort's scratch allocation, and is
+        //     safe here because every value in a field is a distinct string (no ties).
+        let mut scratch: Vec<(&str, KvSlot)> = Vec::new();
 
         let mut collect_tier = |tier: &[(&str, &[KvSlot])]| -> Vec<KvSlot> {
             let mut order = Vec::new();
-            for &(_, ids) in tier {
-                sorted.clear();
-                sorted.extend_from_slice(ids);
-                sorted.sort_by(|a, b| self.strings[a.idx()].cmp(self.strings[b.idx()]));
-                order.extend_from_slice(&sorted);
+            for &(field, ids) in tier {
+                let prefix = field.len();
+                scratch.clear();
+                scratch.extend(ids.iter().map(|&id| (&self.strings[id.idx()][prefix..], id)));
+                scratch.sort_unstable_by(|a, b| a.0.cmp(b.0));
+                order.extend(scratch.iter().map(|&(_, id)| id));
             }
             order
         };
