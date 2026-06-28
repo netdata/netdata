@@ -3,6 +3,7 @@
 #include "rrd.h"
 #include "storage-engine.h"
 #include "rrddim-collection.h"
+#include "ram/rrddim_mem.h"
 
 void rrddim_metadata_updated(RRDDIM *rd) {
     rrdcontext_updated_rrddim(rd);
@@ -214,17 +215,22 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         metaqueue_delete_dimension_uuid(uuidmap_uuid_ptr(rd->uuid));
     }
 
+    bool db_data_lifetime_transferred = false;
+
     for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++) {
         spinlock_lock(&rd->tiers[tier].spinlock);
         if(rd->tiers[tier].smh) {
             STORAGE_ENGINE *eng = host->db[tier].eng;
-            eng->api.metric_release(rd->tiers[tier].smh);
+            if(rd->tiers[tier].seb == STORAGE_ENGINE_BACKEND_RRDDIM)
+                db_data_lifetime_transferred |= rrddim_metric_release_from_rrddim(rd->tiers[tier].smh, rd);
+            else
+                eng->api.metric_release(rd->tiers[tier].smh);
             rd->tiers[tier].smh = NULL;
         }
         spinlock_unlock(&rd->tiers[tier].spinlock);
     }
 
-    if(rd->db.data) {
+    if(rd->db.data && !db_data_lifetime_transferred) {
         pulse_db_rrd_memory_sub(rd->db.memsize);
 
         if(rd->rrd_memory_mode == RRD_DB_MODE_RAM)
