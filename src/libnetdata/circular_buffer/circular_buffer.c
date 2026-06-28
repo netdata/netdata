@@ -60,7 +60,7 @@ static int cbuffer_realloc_unsafe(struct circular_buffer *buf) {
         return 1;
 
     size_t old_size = buf->size;
-    size_t new_size = buf->size * 2;
+    size_t new_size = buf->size ? buf->size * 2 : 1;
     if (new_size > buf->max_size)
         new_size = buf->max_size;
 
