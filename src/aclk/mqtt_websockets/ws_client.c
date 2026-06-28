@@ -579,6 +579,11 @@ int ws_client_process_rx_ws(ws_client *client)
             // a) empty payload
             // b) 2byte reason code
             // c) 2byte reason code followed by message
+            if (client->rx.payload_length > 125) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: WebSocket CONNECTION_CLOSE payload too big! Received %"PRIu64" bytes, maximum allowed 125 bytes",
+                       client->rx.payload_length);
+                return WS_CLIENT_PROTOCOL_ERROR;
+            }
             if (client->rx.payload_length == 1) {
                 nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: WebScoket CONNECTION_CLOSE can't have payload of size 1");
                 return WS_CLIENT_PROTOCOL_ERROR;
