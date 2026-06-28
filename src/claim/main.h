@@ -13,6 +13,7 @@ extern LPWSTR proxy;
 void netdata_claim_error_exit(wchar_t *function);
 static inline void netdata_claim_convert_str(char *dst, wchar_t *src, size_t len) {
     size_t copied = wcstombs(dst, src, len);
+    if (copied == (size_t)-1) copied = 0;
     dst[copied] = '\0';
 }
 
