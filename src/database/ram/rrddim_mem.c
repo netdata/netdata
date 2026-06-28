@@ -31,6 +31,10 @@ void rrddim_metrics_group_release(STORAGE_INSTANCE *si __maybe_unused, STORAGE_M
 
 struct mem_metric_handle {
     RRDDIM *rd;
+    storage_number *data;
+    size_t memsize;
+    RRD_DB_MODE memory_mode;
+    bool indexed;
 
     size_t counter;
     size_t entries;
@@ -43,6 +47,9 @@ struct mem_metric_handle {
 };
 
 static void update_metric_handle_from_rrddim(struct mem_metric_handle *mh, RRDDIM *rd) {
+    mh->data           = rd->db.data;
+    mh->memsize        = rd->db.memsize;
+    mh->memory_mode    = rd->rrd_memory_mode;
     mh->counter        = rd->rrdset->counter;
     mh->entries        = rd->rrdset->db.entries;
     mh->current_entry  = rd->rrdset->db.current_entry;
@@ -52,43 +59,107 @@ static void update_metric_handle_from_rrddim(struct mem_metric_handle *mh, RRDDI
 
 static void check_metric_handle_from_rrddim(struct mem_metric_handle *mh) {
     RRDDIM *rd = mh->rd; (void)rd;
+    if(!rd)
+        return;
+
     internal_fatal(mh->entries != (size_t)rd->rrdset->db.entries, "RRDDIM: entries do not match");
     internal_fatal(mh->update_every_s != rd->rrdset->update_every, "RRDDIM: update every does not match");
 }
 
-STORAGE_METRIC_HANDLE *rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si) {
-    struct mem_metric_handle *mh = (struct mem_metric_handle *)rrddim_metric_get_by_id(si, rd->uuid);
-    while(!mh) {
-        netdata_rwlock_wrlock(&rrddim_Judy_rwlock);
+static int64_t rrddim_metric_remove_from_index(struct mem_metric_handle *mh) {
+    int64_t judy_mem = 0;
+
+    netdata_rwlock_wrlock(&rrddim_Judy_rwlock);
+    if(mh->indexed) {
         JudyAllocThreadPulseReset();
-        Pvoid_t *PValue = JudyLIns(&rrddim_Judy_array, rd->uuid, PJE0);
-        int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
-        mh = *PValue;
-        if(!mh) {
-            mh = callocz(1, sizeof(struct mem_metric_handle));
-            mh->rd = rd;
-            mh->uuid_id = rd->uuid;
-            mh->refcount = 1;
-            update_metric_handle_from_rrddim(mh, rd);
-            *PValue = mh;
-            pulse_db_rrd_memory_change(judy_mem + (int64_t)sizeof(struct mem_metric_handle));
-        }
-        else {
-            if(!refcount_acquire(&mh->refcount))
-                mh = NULL;
-        }
-        netdata_rwlock_wrunlock(&rrddim_Judy_rwlock);
+        JudyLDel(&rrddim_Judy_array, mh->uuid_id, PJE0);
+        judy_mem = JudyAllocThreadPulseGetAndReset();
+        mh->indexed = false;
     }
+    netdata_rwlock_wrunlock(&rrddim_Judy_rwlock);
 
-    if(unlikely(mh->rd != rd)) {
-        // this can happen when the old RRDDIM is being deleted,
-        // but the dictionary has not yet run the destructors
-        netdata_rwlock_wrlock(&rrddim_Judy_rwlock);
-        mh->rd = rd;
-        netdata_rwlock_wrunlock(&rrddim_Judy_rwlock);
+    return judy_mem;
+}
+
+static void rrddim_metric_free_data(struct mem_metric_handle *mh) {
+    if(!mh->data)
+        return;
+
+    pulse_db_rrd_memory_sub(mh->memsize);
+
+    if(mh->memory_mode == RRD_DB_MODE_RAM)
+        nd_munmap(mh->data, mh->memsize);
+    else
+        freez(mh->data);
+
+    mh->data = NULL;
+    mh->memsize = 0;
+}
+
+static void rrddim_metric_free_handle(struct mem_metric_handle *mh) {
+    int64_t judy_mem = rrddim_metric_remove_from_index(mh);
+
+    rrddim_metric_free_data(mh);
+    freez(mh);
+    pulse_db_rrd_memory_change(judy_mem - (int64_t)sizeof(struct mem_metric_handle));
+}
+
+STORAGE_METRIC_HANDLE *rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si) {
+    while(true) {
+        struct mem_metric_handle *mh;
+
+        while((mh = (struct mem_metric_handle *)rrddim_metric_get_by_id(si, rd->uuid)) == NULL) {
+            netdata_rwlock_wrlock(&rrddim_Judy_rwlock);
+            JudyAllocThreadPulseReset();
+            Pvoid_t *PValue = JudyLIns(&rrddim_Judy_array, rd->uuid, PJE0);
+            int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
+            mh = *PValue;
+            if(!mh) {
+                mh = callocz(1, sizeof(struct mem_metric_handle));
+                mh->rd = rd;
+                mh->uuid_id = rd->uuid;
+                mh->refcount = 1;
+                mh->indexed = true;
+                update_metric_handle_from_rrddim(mh, rd);
+                *PValue = mh;
+                pulse_db_rrd_memory_change(judy_mem + (int64_t)sizeof(struct mem_metric_handle));
+            }
+            else {
+                if(!refcount_acquire(&mh->refcount))
+                    mh = NULL;
+            }
+            netdata_rwlock_wrunlock(&rrddim_Judy_rwlock);
+        }
+
+        if(unlikely(mh->rd != rd)) {
+            bool retry = false;
+            int64_t judy_mem = 0;
+
+            netdata_rwlock_wrlock(&rrddim_Judy_rwlock);
+            if(mh->rd != rd) {
+                // this can happen when the old RRDDIM is being deleted,
+                // but the dictionary has not yet run the destructors
+                if(mh->indexed) {
+                    JudyAllocThreadPulseReset();
+                    JudyLDel(&rrddim_Judy_array, mh->uuid_id, PJE0);
+                    judy_mem = JudyAllocThreadPulseGetAndReset();
+                    mh->indexed = false;
+                }
+                retry = true;
+            }
+            netdata_rwlock_wrunlock(&rrddim_Judy_rwlock);
+
+            if(judy_mem)
+                pulse_db_rrd_memory_change(judy_mem);
+
+            if(retry) {
+                rrddim_metric_release((STORAGE_METRIC_HANDLE *)mh);
+                continue;
+            }
+        }
+
+        return (STORAGE_METRIC_HANDLE *)mh;
     }
-
-    return (STORAGE_METRIC_HANDLE *)mh;
 }
 
 STORAGE_METRIC_HANDLE *rrddim_metric_get_by_id(STORAGE_INSTANCE *si __maybe_unused, UUIDMAP_ID id) {
@@ -130,21 +201,36 @@ STORAGE_METRIC_HANDLE *rrddim_metric_dup(STORAGE_METRIC_HANDLE *smh) {
 void rrddim_metric_release(STORAGE_METRIC_HANDLE *smh) {
     struct mem_metric_handle *mh = (struct mem_metric_handle *)smh;
 
-    if(refcount_release_and_acquire_for_deletion(&mh->refcount)) {
-        // we can delete it
+    if(refcount_release_and_acquire_for_deletion(&mh->refcount))
+        rrddim_metric_free_handle(mh);
+}
 
-        int64_t judy_mem = 0;
-        netdata_rwlock_wrlock(&rrddim_Judy_rwlock);
-        {
+bool rrddim_metric_release_from_rrddim(STORAGE_METRIC_HANDLE *smh, RRDDIM *rd) {
+    struct mem_metric_handle *mh = (struct mem_metric_handle *)smh;
+    bool data_transferred = false;
+    int64_t judy_mem = 0;
+
+    netdata_rwlock_wrlock(&rrddim_Judy_rwlock);
+    if(mh->rd == rd) {
+        mh->rd = NULL;
+        data_transferred = (mh->data == rd->db.data);
+
+        if(mh->indexed) {
             JudyAllocThreadPulseReset();
             JudyLDel(&rrddim_Judy_array, mh->uuid_id, PJE0);
             judy_mem = JudyAllocThreadPulseGetAndReset();
+            mh->indexed = false;
         }
-        netdata_rwlock_wrunlock(&rrddim_Judy_rwlock);
-
-        freez(mh);
-        pulse_db_rrd_memory_change(judy_mem - (int64_t)sizeof(struct mem_metric_handle));
     }
+    netdata_rwlock_wrunlock(&rrddim_Judy_rwlock);
+
+    if(judy_mem)
+        pulse_db_rrd_memory_change(judy_mem);
+
+    if(refcount_release_and_acquire_for_deletion(&mh->refcount))
+        rrddim_metric_free_handle(mh);
+
+    return data_transferred;
 }
 
 bool rrddim_metric_retention_by_uuid(STORAGE_INSTANCE *si __maybe_unused, nd_uuid_t *uuid, time_t *first_entry_s, time_t *last_entry_s) {
@@ -204,12 +290,11 @@ void rrddim_store_metric_flush(STORAGE_COLLECT_HANDLE *sch) {
     struct mem_collect_handle *ch = (struct mem_collect_handle *)sch;
     struct mem_metric_handle *mh = (struct mem_metric_handle *)ch->smh;
 
-    RRDDIM *rd = mh->rd;
     size_t entries = mh->entries;
     storage_number empty = pack_storage_number(NAN, SN_FLAG_NONE);
 
     for(size_t i = 0; i < entries ;i++)
-        rd->db.data[i] = empty;
+        mh->data[i] = empty;
 
     mh->counter = 0;
     mh->last_updated_s = 0;
@@ -219,8 +304,6 @@ void rrddim_store_metric_flush(STORAGE_COLLECT_HANDLE *sch) {
 static inline void rrddim_fill_the_gap(STORAGE_COLLECT_HANDLE *sch, time_t now_collect_s) {
     struct mem_collect_handle *ch = (struct mem_collect_handle *)sch;
     struct mem_metric_handle *mh = (struct mem_metric_handle *)ch->smh;
-
-    RRDDIM *rd = mh->rd;
 
     internal_fatal(ch->rd != mh->rd, "RRDDIM: dimensions do not match");
     check_metric_handle_from_rrddim(mh);
@@ -240,7 +323,7 @@ static inline void rrddim_fill_the_gap(STORAGE_COLLECT_HANDLE *sch, time_t now_c
         // fill the dimension
         size_t c;
         for(c = 0; c < entries && now_store_s <= now_collect_s ; now_store_s += update_every_s, c++) {
-            rd->db.data[current_entry++] = empty;
+            mh->data[current_entry++] = empty;
 
             if(unlikely(current_entry >= entries))
                 current_entry = 0;
@@ -263,7 +346,6 @@ void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *sch,
     struct mem_collect_handle *ch = (struct mem_collect_handle *)sch;
     struct mem_metric_handle *mh = (struct mem_metric_handle *)ch->smh;
 
-    RRDDIM *rd = ch->rd;
     time_t point_in_time_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
 
     internal_fatal(ch->rd != mh->rd, "RRDDIM: dimensions do not match");
@@ -275,7 +357,7 @@ void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *sch,
     if(unlikely(mh->last_updated_s && point_in_time_s - mh->update_every_s > mh->last_updated_s))
         rrddim_fill_the_gap(sch, point_in_time_s);
 
-    rd->db.data[mh->current_entry] = pack_storage_number(n, flags);
+    mh->data[mh->current_entry] = pack_storage_number(n, flags);
     mh->counter++;
     mh->current_entry = (mh->current_entry + 1) >= mh->entries ? 0 : mh->current_entry + 1;
     mh->last_updated_s = point_in_time_s;
@@ -303,7 +385,6 @@ int rrddim_collect_finalize(STORAGE_COLLECT_HANDLE *sch) {
 // only valid when not using dbengine
 static inline size_t rrddim_time2slot(STORAGE_METRIC_HANDLE *smh, time_t t) {
     struct mem_metric_handle *mh = (struct mem_metric_handle *)smh;
-    RRDDIM *rd = mh->rd;
 
     size_t ret = 0;
     time_t last_entry_s  = rrddim_query_latest_time_s(smh);
@@ -331,7 +412,7 @@ static inline size_t rrddim_time2slot(STORAGE_METRIC_HANDLE *smh, time_t t) {
     }
 
     if(unlikely(ret >= entries)) {
-        netdata_log_error("INTERNAL ERROR: rrddim_time2slot() on %s returns values outside entries", rrddim_name(rd));
+        netdata_log_error("INTERNAL ERROR: rrddim_time2slot() returns values outside entries");
         ret = entries - 1;
     }
 
@@ -342,7 +423,6 @@ static inline size_t rrddim_time2slot(STORAGE_METRIC_HANDLE *smh, time_t t) {
 // only valid when not using dbengine
 static inline time_t rrddim_slot2time(STORAGE_METRIC_HANDLE *smh, size_t slot) {
     struct mem_metric_handle *mh = (struct mem_metric_handle *)smh;
-    RRDDIM *rd = mh->rd;
 
     time_t ret;
     time_t last_entry_s  = rrddim_query_latest_time_s(smh);
@@ -362,15 +442,15 @@ static inline time_t rrddim_slot2time(STORAGE_METRIC_HANDLE *smh, size_t slot) {
         ret = last_entry_s - (time_t)(update_every * (last_slot - slot));
 
     if(unlikely(ret < first_entry_s)) {
-        netdata_log_error("INTERNAL ERROR: rrddim_slot2time() on dimension '%s' of chart '%s' returned time (%ld) too far in the past (before first_entry_s %ld) for slot %zu",
-              rrddim_name(rd), rrdset_id(rd->rrdset), ret, first_entry_s, slot);
+        netdata_log_error("INTERNAL ERROR: rrddim_slot2time() returned time (%ld) too far in the past (before first_entry_s %ld) for slot %zu",
+              ret, first_entry_s, slot);
 
         ret = first_entry_s;
     }
 
     if(unlikely(ret > last_entry_s)) {
-        netdata_log_error("INTERNAL ERROR: rrddim_slot2time() on dimension '%s' of chart '%s' returned time (%ld) too far into the future (after last_entry_s %ld) for slot %zu",
-              rrddim_name(rd), rrdset_id(rd->rrdset), ret, last_entry_s, slot);
+        netdata_log_error("INTERNAL ERROR: rrddim_slot2time() returned time (%ld) too far into the future (after last_entry_s %ld) for slot %zu",
+              ret, last_entry_s, slot);
 
         ret = last_entry_s;
     }
@@ -383,8 +463,6 @@ static inline time_t rrddim_slot2time(STORAGE_METRIC_HANDLE *smh, size_t slot) {
 
 void rrddim_query_init(STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_handle *seqh, time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority __maybe_unused) {
     struct mem_metric_handle *mh = (struct mem_metric_handle *)smh;
-
-    check_metric_handle_from_rrddim(mh);
 
     seqh->start_time_s = start_time_s;
     seqh->end_time_s = end_time_s;
@@ -413,7 +491,6 @@ void rrddim_query_init(STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_h
 ALWAYS_INLINE STORAGE_POINT rrddim_query_next_metric(struct storage_engine_query_handle *seqh) {
     struct mem_query_handle* h = (struct mem_query_handle*)seqh->handle;
     struct mem_metric_handle *mh = (struct mem_metric_handle *)h->smh;
-    RRDDIM *rd = mh->rd;
 
     size_t entries = mh->entries;
     size_t slot = h->slot;
@@ -438,7 +515,7 @@ ALWAYS_INLINE STORAGE_POINT rrddim_query_next_metric(struct storage_engine_query
         return sp;
     }
 
-    storage_number n = rd->db.data[slot++];
+    storage_number n = mh->data[slot++];
     if(unlikely(slot >= entries)) slot = 0;
 
     h->slot = slot;
@@ -458,12 +535,8 @@ int rrddim_query_is_finished(struct storage_engine_query_handle *seqh) {
 
 void rrddim_query_finalize(struct storage_engine_query_handle *seqh) {
 #ifdef NETDATA_INTERNAL_CHECKS
-    struct mem_query_handle *h = (struct mem_query_handle*)seqh->handle;
-    struct mem_metric_handle *mh = (struct mem_metric_handle *)h->smh;
-
     internal_error(!rrddim_query_is_finished(seqh),
-                   "QUERY: query for chart '%s' dimension '%s' has been stopped unfinished",
-                   rrdset_id(mh->rd->rrdset), rrddim_name(mh->rd));
+                   "QUERY: query for RRDDIM storage has been stopped unfinished");
 
 #endif
     freez(seqh->handle);
