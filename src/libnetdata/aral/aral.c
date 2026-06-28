@@ -700,10 +700,10 @@ static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_
 
     if(ar->config.mmap.enabled) {
         page = callocz(1, sizeof(ARAL_PAGE));
-        ar->aral_lock.file_number++;
+        size_t file_number = __atomic_add_fetch(&ar->aral_lock.file_number, 1, __ATOMIC_RELAXED);
 
         char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s/array_alloc.mmap/%s.%zu", *ar->config.mmap.cache_dir, ar->config.mmap.filename, ar->aral_lock.file_number);
+        snprintfz(filename, FILENAME_MAX, "%s/array_alloc.mmap/%s.%zu", *ar->config.mmap.cache_dir, ar->config.mmap.filename, file_number);
         page->filename = strdupz(filename);
         page->mapped = true;
 
