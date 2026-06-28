@@ -38,27 +38,46 @@ pub fn one_file_config() -> wal::Config {
     }
 }
 
-/// Flatten `req` and append it as a single WAL frame in the flattened-frame format,
-/// returning the number of log records written.
+/// Ensure every log record has a usable `time_unix_nano` before flattening: keep it
+/// if set, else fall back to `observed_time_unix_nano`, else stamp the monotonic
+/// ingestion clock. ng-ingest is the OTLP observation point, so this fulfils the
+/// spec's "this field MUST be set once the event is observed by OpenTelemetry".
+fn normalize_timestamps(req: &mut ExportLogsServiceRequest, clock: &mut MonotonicClock) {
+    for rl in &mut req.resource_logs {
+        for sl in &mut rl.scope_logs {
+            for r in &mut sl.log_records {
+                if r.time_unix_nano == 0 {
+                    r.time_unix_nano = if r.observed_time_unix_nano != 0 {
+                        r.observed_time_unix_nano
+                    } else {
+                        clock.now_ns().as_u64()
+                    };
+                }
+            }
+        }
+    }
+}
+
+/// Normalize timestamps, flatten `req`, and append it as a single WAL frame in the
+/// flattened-frame format, returning the number of log records written.
 ///
-/// The request is flattened into a per-frame schema tree + typed entries, each
+/// Each record's `time_unix_nano` is normalized first ([`normalize_timestamps`]),
+/// then the request is flattened into a per-frame schema tree + typed entries, each
 /// entry's `xxhash64(key=value)` is pre-computed (so the downstream SFST build rides
-/// the interner's fast path), and the result is bincode-encoded as the frame
-/// payload. `log_min/max_ts` are left `ZERO` (no per-frame time-range summary; the
-/// real timestamps remain inside each record). A request with zero log records
-/// writes no frame and returns `0`.
+/// the interner's fast path), and the result is bincode-encoded as the frame payload.
+/// `log_min/max_ts` are left `ZERO` (no per-frame time-range summary). A request with
+/// zero log records writes no frame and returns `0`.
 pub fn write_request(
     writer: &mut wal::Writer,
     clock: &mut MonotonicClock,
-    req: &ExportLogsServiceRequest,
+    req: &mut ExportLogsServiceRequest,
 ) -> anyhow::Result<usize> {
     let entry_count = count_log_records(req);
     if entry_count == 0 {
         return Ok(0);
     }
-    // Records with no time_unix_nano/observed_time_unix_nano get a monotonic
-    // ingestion-clock timestamp here, so every record carries a concrete ts.
-    let mut flattened = ng_flatten::flatten_request(req, || clock.now_ns().as_u64() as i64);
+    normalize_timestamps(req, clock);
+    let mut flattened = ng_flatten::flatten_request(req);
     ng_flatten::fill_hashes(&mut flattened);
     let data = ng_flatten::encode_frame(&flattened).context("encode flattened frame")?;
     let ingestion_ns = clock.now_ns();

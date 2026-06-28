@@ -122,8 +122,8 @@ fn request_roundtrips_through_a_wal_frame() {
     let mut writer = wal::Writer::new(dir.path(), one_file_config(), seq, PIPELINE_ID).unwrap();
     let mut clock = MonotonicClock::new();
 
-    let original = sample_request();
-    let written = write_request(&mut writer, &mut clock, &original).unwrap();
+    let mut original = sample_request();
+    let written = write_request(&mut writer, &mut clock, &mut original).unwrap();
     assert_eq!(written, count_log_records(&original));
     assert_eq!(written, 2);
     writer.shutdown_all().unwrap();
@@ -186,13 +186,13 @@ fn empty_request_writes_no_frame() {
     let mut clock = MonotonicClock::new();
 
     // A request whose ResourceLogs carries zero log records writes nothing.
-    let empty = ExportLogsServiceRequest {
+    let mut empty = ExportLogsServiceRequest {
         resource_logs: vec![ResourceLogs {
             scope_logs: vec![ScopeLogs::default()],
             ..Default::default()
         }],
     };
-    assert_eq!(write_request(&mut writer, &mut clock, &empty).unwrap(), 0);
+    assert_eq!(write_request(&mut writer, &mut clock, &mut empty).unwrap(), 0);
     writer.shutdown_all().unwrap();
 
     // No file is created when no frame was written.

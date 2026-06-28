@@ -48,8 +48,7 @@ fn write_flattened_wal(dir: &std::path::Path, counts: &[usize]) {
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
     let mut writer = wal::Writer::new(dir, wal::Config::default(), seq, 0).unwrap();
     for (i, &n) in counts.iter().enumerate() {
-        // Every record sets time_unix_nano, so the fallback is never invoked.
-        let mut flattened = flatten_request(&request(n), || 0);
+        let mut flattened = flatten_request(&request(n));
         fill_hashes(&mut flattened);
         let bytes = encode_frame(&flattened).unwrap();
         writer

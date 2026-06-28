@@ -368,8 +368,8 @@ impl Flattener {
 
         // Queryable scalar fields. OTLP uses 0/"" for unset → treated as absent.
         // `time_unix_nano` / `observed_time_unix_nano` are intentionally NOT emitted
-        // as entries: they resolve to the record's timestamp (see [`record_timestamp`])
-        // — used for row ordering, not as an indexed facet (matches `wal-otap`).
+        // as entries: the record's timestamp is carried in `Record.ts` (normalized at
+        // ingest) — used for row ordering, not as an indexed facet (matches `wal-otap`).
         if record.severity_number != 0 {
             self.scalar("severity_number", Value::Int(record.severity_number as i64), &mut out);
         }
@@ -440,11 +440,10 @@ pub struct ScopeGroup {
     pub records: Vec<Record>,
 }
 
-/// One log record: its own entries plus its resolved timestamp. `ts` is
-/// `time_unix_nano` (≠0) else `observed_time_unix_nano` (≠0), else a fallback the
-/// caller supplies at ingest (a monotonic ingestion clock) — so every record carries
-/// a concrete timestamp by the time it is flattened, with no `Option` downstream.
-/// Time fields live here, not in `entries` (see [`record_timestamp`] and
+/// One log record: its own entries plus its timestamp. `ts` is the record's
+/// `time_unix_nano`, which the caller is expected to have normalized at ingest (time
+/// else observed else a monotonic clock) so it is always set — see `ng-ingest`'s
+/// timestamp normalization. The time fields are not flattened into `entries` (see
 /// [`Flattener::flatten_record`]).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Record {
@@ -452,27 +451,15 @@ pub struct Record {
     pub entries: Vec<Entry>,
 }
 
-/// A record's timestamp: `time_unix_nano` (≠0) else `observed_time_unix_nano` (≠0),
-/// read straight from the OTLP fields. `None` if neither is set — the caller then
-/// supplies a fallback (see [`flatten_into`]). Same priority as `wal-otap`.
-pub fn record_timestamp(record: &LogRecord) -> Option<i64> {
-    Some(record.time_unix_nano)
-        .filter(|&t| t != 0)
-        .or(Some(record.observed_time_unix_nano).filter(|&t| t != 0))
-        .map(|t| t as i64)
-}
-
 /// Flatten one decoded request INTO a shared [`Flattener`], returning the request's
 /// grouped entries. The tree stays in `flattener`, so it can span many requests.
 /// Resource is flattened once per `ResourceLogs`, scope once per `ScopeLogs`.
 ///
-/// `fallback` supplies a timestamp for any record with no `time_unix_nano` /
-/// `observed_time_unix_nano` (call it at ingest with a monotonic clock), so every
-/// [`Record`] gets a concrete `ts`.
+/// Each [`Record`]'s `ts` is read from `time_unix_nano`, which the caller is expected
+/// to have normalized so it is always set (see `ng-ingest`).
 pub fn flatten_into(
     flattener: &mut Flattener,
     request: &ExportLogsServiceRequest,
-    fallback: &mut impl FnMut() -> i64,
 ) -> Vec<ResourceGroup> {
     let mut resources = Vec::with_capacity(request.resource_logs.len());
     for rl in &request.resource_logs {
@@ -491,15 +478,9 @@ pub fn flatten_into(
             let records = sl
                 .log_records
                 .iter()
-                .map(|r| {
-                    let ts = match record_timestamp(r) {
-                        Some(t) => t,
-                        None => fallback(),
-                    };
-                    Record {
-                        ts,
-                        entries: flattener.flatten_record(r),
-                    }
+                .map(|r| Record {
+                    ts: r.time_unix_nano as i64,
+                    entries: flattener.flatten_record(r),
                 })
                 .collect();
             scopes.push(ScopeGroup { scope, records });
@@ -510,14 +491,10 @@ pub fn flatten_into(
 }
 
 /// Flatten a request into its own per-frame tree (convenience over [`flatten_into`])
-/// — the form stored in a flattened WAL frame. `fallback` supplies a timestamp for
-/// records lacking time/observed (see [`flatten_into`]).
-pub fn flatten_request(
-    request: &ExportLogsServiceRequest,
-    mut fallback: impl FnMut() -> i64,
-) -> FlattenedRequest {
+/// — the form stored in a flattened WAL frame.
+pub fn flatten_request(request: &ExportLogsServiceRequest) -> FlattenedRequest {
     let mut flattener = Flattener::new();
-    let resources = flatten_into(&mut flattener, request, &mut fallback);
+    let resources = flatten_into(&mut flattener, request);
     FlattenedRequest {
         tree: flattener.into_tree(),
         resources,
