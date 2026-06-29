@@ -96,7 +96,7 @@ static inline UUIDMAP_ID uuidmap_acquire_by_uuid(const nd_uuid_t uuid) {
     if(PValue && *PValue) {
         // it is found
 
-        id = *(UUIDMAP_ID *)PValue;
+        id = (UUIDMAP_ID)(uintptr_t)*PValue;
 
         PValue = JudyLGet(uuid_map.p[partition].id_to_uuid, id, PJE0);
         if (!PValue || PValue == PJERR)
@@ -161,7 +161,7 @@ UUIDMAP_ID uuidmap_create(const nd_uuid_t uuid) {
     }
 
     id = get_next_id_unsafe(&uuid_map.p[partition]);
-    *(UUIDMAP_ID *)PValue = id;
+    *PValue = (Pvoid_t)(uintptr_t)id;
 
     // Store ID -> UUID mapping
     PValue = JudyLIns(&uuid_map.p[partition].id_to_uuid, id, PJE0);
