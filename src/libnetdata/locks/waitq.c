@@ -100,6 +100,11 @@ ALWAYS_INLINE void waitq_acquire_with_trace(WAITQ *waitq, WAITQ_PRIORITY priorit
                 worker_spinlock_contention(func, spins);
                 return;
             }
+
+            spins++;
+            if ((spins % SPINS_BEFORE_DEADLOCK_CHECK) == 0)
+                spinlock_deadlock_detect(&deadlock_timestamp, "waitq", func);
+
             yield_the_processor();
         }
 
