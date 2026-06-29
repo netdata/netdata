@@ -2044,6 +2044,52 @@ static int test_parse_function_payload_empty_error_fallback(void) {
     return failed;
 }
 
+struct json_walk_boolean_names_capture {
+    size_t root_true;
+    size_t root_false;
+    size_t array_true;
+    size_t array_false;
+    size_t unexpected;
+};
+
+static int json_walk_boolean_names_callback(JSON_ENTRY *e) {
+    struct json_walk_boolean_names_capture *capture = e->callback_data;
+
+    if(e->type != JSON_BOOLEAN)
+        return 0;
+
+    if(!strcmp(e->name, "enabled") && e->data.boolean)
+        capture->root_true++;
+    else if(!strcmp(e->name, "disabled") && !e->data.boolean)
+        capture->root_false++;
+    else if(!strcmp(e->name, "array_enabled") && e->data.boolean)
+        capture->array_true++;
+    else if(!strcmp(e->name, "array_disabled") && !e->data.boolean)
+        capture->array_false++;
+    else
+        capture->unexpected++;
+
+    return 0;
+}
+
+static int test_json_walk_boolean_names(void) {
+    int failed = 0;
+    char payload[] =
+        "{\"text\":\"root\",\"enabled\":true,\"count\":1,\"disabled\":false,"
+        "\"items\":[{\"text\":\"array\",\"array_enabled\":true,\"count\":2,\"array_disabled\":false}]}";
+    struct json_walk_boolean_names_capture capture = { 0 };
+
+    int rc = json_parse(payload, &capture, json_walk_boolean_names_callback);
+    T(rc == JSON_OK, "json_walk_boolean_names: parse succeeds");
+    T(capture.root_true == 1, "json_walk_boolean_names: root true boolean keeps key");
+    T(capture.root_false == 1, "json_walk_boolean_names: root false boolean keeps key");
+    T(capture.array_true == 1, "json_walk_boolean_names: array true boolean keeps key");
+    T(capture.array_false == 1, "json_walk_boolean_names: array false boolean keeps key");
+    T(capture.unexpected == 0, "json_walk_boolean_names: no stale boolean keys");
+
+    return failed;
+}
+
 // ============================================================================
 // Entry point
 // ============================================================================
@@ -2076,6 +2122,7 @@ int json_c_parser_unittest(void) {
         { "ARRAY_ITEM_OBJECT",  test_parse_array_item_object },
         { "FUNCTION_PAYLOAD_ERROR_CAP", test_parse_function_payload_error_cap },
         { "FUNCTION_PAYLOAD_EMPTY_ERROR_FALLBACK", test_parse_function_payload_empty_error_fallback },
+        { "JSON_WALK_BOOLEAN_NAMES", test_json_walk_boolean_names },
         { NULL, NULL }
     };
 
