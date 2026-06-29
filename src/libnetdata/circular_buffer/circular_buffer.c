@@ -232,11 +232,20 @@ char *cbuffer_reserve_unsafe(struct circular_buffer *buf, size_t size) {
 // Commit the reserved space after writing to it
 // Size should be less than or equal to the size passed to cbuffer_reserve_unsafe
 void cbuffer_commit_reserved_unsafe(struct circular_buffer *buf, size_t size) {
-    if (unlikely(!buf || !buf->data || size == 0))
+    if (!buf)
         return;
 
-    // Update the write pointer
-    size_t available = buf->size - buf->write;
+    if (!buf->data || size == 0)
+        return;
+
+    size_t buffer_size = buf->size;
+    if (buffer_size == 0)
+        return;
+
+    // Valid callers commit only reserved bytes; modulo keeps the ring invariant if that contract is broken.
+    size %= buffer_size;
+
+    size_t available = buffer_size - buf->write;
     if (size >= available)
         buf->write = size - available;
     else
