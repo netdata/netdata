@@ -1972,6 +1972,8 @@ static int rrdlabels_unittest_host_chart_labels() {
     errors += rrdlabels_unittest_check_pattern_list(labels, "_hostname=*name* _hostname=*", true);
     errors += rrdlabels_unittest_check_pattern_list(labels, "_hostname=*name* _os=l*", true);
     errors += rrdlabels_unittest_check_pattern_list(labels, "_os=l* _hostname=*name*", true);
+    errors += rrdlabels_unittest_check_pattern_list(labels, "=_hostname", false);
+    errors += rrdlabels_unittest_check_pattern_list(labels, "_hostname=", true);
 
     rrdlabels_destroy(labels);
 
