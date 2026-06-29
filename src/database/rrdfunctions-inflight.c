@@ -390,7 +390,8 @@ int rrd_function_verify_access(RRDHOST *host, BUFFER *result_wb, const char *cmd
         *out_acquired = NULL;
 
     if(!host)
-        return HTTP_RESP_INTERNAL_SERVER_ERROR;
+        return rrd_call_function_error(result_wb, "No host given for routing this request to.",
+                                       HTTP_RESP_INTERNAL_SERVER_ERROR);
 
     char sanitized_cmd[PLUGINSD_LINE_MAX + 1];
     size_t sanitized_cmd_length = rrd_functions_sanitize(sanitized_cmd, cmd, sizeof(sanitized_cmd));
