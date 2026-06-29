@@ -1257,8 +1257,9 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
                  datafile->fileno, journal_v1_file_size, path_v2);
     fd = open(path_v2, O_RDONLY | O_CLOEXEC);
     if (fd < 0) {
-        nd_win_trace("journalfile_v2_load: fileno=%u open failed errno=%d (ENOENT=%d)", datafile->fileno, errno, ENOENT);
-        if (errno == ENOENT)
+        int open_errno = errno;
+        nd_win_trace("journalfile_v2_load: fileno=%u open failed errno=%d (ENOENT=%d)", datafile->fileno, open_errno, ENOENT);
+        if (open_errno == ENOENT)
             return 1;
         ctx_fs_error(ctx);
         netdata_log_error("DBENGINE: failed to open \"%s\"", path_v2);
