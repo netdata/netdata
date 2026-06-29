@@ -277,6 +277,12 @@ int api_v3_settings(RRDHOST *host, struct web_client *w, char *url) {
                     "Settings API PUT action requires a payload.",
                     HTTP_RESP_BAD_REQUEST);
 
+            if(buffer_strlen(w->payload) > MAX_SETTINGS_SIZE_BYTES)
+                return rrd_call_function_error(
+                    w->response.data,
+                    "Settings API PUT payload exceeds the maximum allowed size.",
+                    HTTP_RESP_CONTENT_TOO_LONG);
+
             return settings_put(w, file);
 
         default:
