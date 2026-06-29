@@ -122,11 +122,14 @@ int cbuffer_add_unsafe(struct circular_buffer *buf, const char *d, size_t d_len)
     return 0;
 }
 
-// Assume caller does not remove too many bytes (i.e. read will jump over write)
 ALWAYS_INLINE
 void cbuffer_remove_unsafe(struct circular_buffer *buf, size_t num) {
+    size_t used = cbuffer_used_size_unsafe(buf);
+    if (unlikely(num > used))
+        num = used;
+
     buf->read += num;
-    // Assume num < size (i.e. caller cannot remove more bytes than are in the buffer)
+    // num is now bounded by the used bytes, which cannot exceed the ring capacity.
     if (buf->read >= buf->size)
         buf->read -= buf->size;
 }
