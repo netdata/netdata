@@ -242,8 +242,9 @@ void cbuffer_commit_reserved_unsafe(struct circular_buffer *buf, size_t size) {
     if (buffer_size == 0)
         return;
 
-    // Valid callers commit only reserved bytes; modulo keeps the ring invariant if that contract is broken.
-    size %= buffer_size;
+    size_t used = cbuffer_used_size_unsafe(buf);
+    if (unlikely(used >= buffer_size || size >= buffer_size - used))
+        return;
 
     size_t available = buffer_size - buf->write;
     if (size >= available)
