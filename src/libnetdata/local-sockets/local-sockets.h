@@ -1171,6 +1171,13 @@ static inline bool local_sockets_read_proc_net_x_procfile(LS_STATE *ls, const ch
     return true;
 }
 
+static inline bool local_sockets_read_proc_net_x(LS_STATE *ls, const char *filename, uint16_t family, uint16_t protocol) {
+    if(ls->config.procfile)
+        return local_sockets_read_proc_net_x_procfile(ls, filename, family, protocol);
+
+    return local_sockets_read_proc_net_x_getline(ls, filename, family, protocol);
+}
+
 #endif // !OS_FREEBSD
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -1401,10 +1408,7 @@ static inline void local_sockets_do_family_protocol(LS_STATE *ls, const char *fi
 
     local_sockets_track_time_by_protocol(ls, false, family, protocol);
 
-    if(ls->config.procfile)
-        local_sockets_read_proc_net_x_procfile(ls, filename, family, protocol);
-    else
-        local_sockets_read_proc_net_x_getline(ls, filename, family, protocol);
+    local_sockets_read_proc_net_x(ls, filename, family, protocol);
 }
 
 static inline void local_sockets_read_all_system_sockets(LS_STATE *ls) {
