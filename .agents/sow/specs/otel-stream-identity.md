@@ -113,10 +113,15 @@ internal and never rewritten externally. See `sfst/FORMAT.md`
   of `e.id.part_key`, identically.
 - **Query planner** (`otel-ledger::query::remote_candidates_from`): membership of
   `e.id.part_key` via `Query::matches_partition`.
-- **Indexer** (`sfst-indexer::row_index::service_stream`): resolves the file's
-  single stream from interned `service.namespace=`/`service.name=` entries,
-  defaulting a missing key to `""` (already collapsed), and encodes it into
-  `content_meta`. It does **not** store the `part_key` in the summary.
+- **Indexer** (`ng-index` → `sfst-indexer::build_into`/`build_and_write`): the
+  seal/range build uses the WAL header's `content_meta` (written by the ingestor)
+  **verbatim** as the file's display identity — it does **not** re-derive identity
+  from rows in production. The row-derived fallback
+  (`sfst-indexer::row_index::service_stream`, resolving the single stream from
+  interned `service.namespace=`/`service.name=` entries, missing key → `""`)
+  remains only for a producer that supplies no header identity (currently the
+  `ng-index` spike test). The indexer does **not** store the `part_key` in the
+  summary.
 - All filter tiers (WAL, SFST, catalog, planner) match by `id.part_key`
   membership, so they agree by construction; absent and empty collapse into one
   partition at the hash.
