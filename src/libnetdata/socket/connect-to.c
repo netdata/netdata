@@ -424,7 +424,7 @@ static bool connect_to_one_of_callback(char *entry, void *data) {
     struct connect_to_one_of_data *t = data;
 
     if(t->reconnects_counter)
-        t->reconnects_counter++;
+        (*t->reconnects_counter)++;
 
     t->sock = connect_to_this(entry, t->default_port, t->timeout);
     if(t->sock != -1) {
