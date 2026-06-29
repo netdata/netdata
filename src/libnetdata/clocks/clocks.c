@@ -279,7 +279,9 @@ void heartbeat_statistics(usec_t *min_ptr, usec_t *max_ptr, usec_t *average_ptr,
     struct heartbeat_thread_statistics current[HEARTBEAT_ALIGNMENT_STATISTICS_SIZE];
     static struct heartbeat_thread_statistics old[HEARTBEAT_ALIGNMENT_STATISTICS_SIZE] = { 0 };
 
+    spinlock_lock(&heartbeat_alignment_spinlock);
     memcpy(current, heartbeat_alignment_values, sizeof(struct heartbeat_thread_statistics) * HEARTBEAT_ALIGNMENT_STATISTICS_SIZE);
+    spinlock_unlock(&heartbeat_alignment_spinlock);
 
     usec_t min = 0, max = 0, total = 0, average = 0;
     size_t i, count = 0;
@@ -362,10 +364,12 @@ inline void heartbeat_init(heartbeat_t *hb, usec_t step) {
     hb->randomness = heartbeat_randomness(hb->hash);
 
     if(hb->statistics_id < HEARTBEAT_ALIGNMENT_STATISTICS_SIZE) {
+        spinlock_lock(&heartbeat_alignment_spinlock);
         heartbeat_alignment_values[hb->statistics_id].dt = 0;
         heartbeat_alignment_values[hb->statistics_id].sequence = 0;
         heartbeat_alignment_values[hb->statistics_id].randomness = hb->randomness;
         heartbeat_alignment_values[hb->statistics_id].tid = os_gettid();
+        spinlock_unlock(&heartbeat_alignment_spinlock);
     }
 }
 
@@ -390,7 +394,6 @@ usec_t heartbeat_next(heartbeat_t *hb) {
     sleep_usec_with_now(next - now, now);
     spinlock_lock(&heartbeat_alignment_spinlock);
     now = now_realtime_usec();
-    spinlock_unlock(&heartbeat_alignment_spinlock);
 
     dt = now - hb->realtime;
 
@@ -398,6 +401,7 @@ usec_t heartbeat_next(heartbeat_t *hb) {
         heartbeat_alignment_values[hb->statistics_id].dt += now - next;
         heartbeat_alignment_values[hb->statistics_id].sequence++;
     }
+    spinlock_unlock(&heartbeat_alignment_spinlock);
 
     if(unlikely(now < next)) {
         errno_clear();
