@@ -1196,6 +1196,7 @@ int health_migrate_old_health_log_table(char *table) {
         freez(uuid_from_table);
         return 0;
     }
+    freez(uuid_from_table);
 
     int rc;
     char command[MAX_HEALTH_SQL_SIZE + 1];
@@ -1204,21 +1205,18 @@ int health_migrate_old_health_log_table(char *table) {
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to copy health log, rc = %d", rc);
-        freez(uuid_from_table);
         return 0;
     }
 
     rc = sqlite3_bind_blob(res, 1, &uuid, sizeof(uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         SQLITE_FINALIZE(res);
-        freez(uuid_from_table);
         return 0;
     }
 
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE)) {
         error_report("Failed to execute SQL_COPY_HEALTH_LOG, rc = %d", rc);
-        freez(uuid_from_table);
     }
     SQLITE_FINALIZE(res);
     res = NULL;
