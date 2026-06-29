@@ -253,10 +253,15 @@ On Windows, `edit-config` opens files with the `nano` editor.
 | Exit                  | `Ctrl + X`                                     |
 | Exit with save prompt | `Ctrl + X`, then `Y` to save or `N` to discard |
 
+## Uninstalling Netdata on Windows
+
+The MSI uninstall removes the Netdata binaries and the Windows service, but it does **not** remove your metric database, cache, or edited configuration files. To uninstall the Agent and completely delete the data it leaves behind, see [Uninstall Netdata](/packaging/installer/UNINSTALL.md).
+
 ## Related Windows documentation
 
 - [Service Control](/docs/netdata-agent/start-stop-restart.md#windows) — Start, stop, restart, and check status of the Netdata Agent
 - [Switching Install Types and Release Channels on Windows](/docs/install/windows-release-channels.md)
+- [Uninstall Netdata](/packaging/installer/UNINSTALL.md) — Remove Netdata from Windows, including the metric database and configuration the MSI uninstall leaves behind
 
 ## FAQ
 
