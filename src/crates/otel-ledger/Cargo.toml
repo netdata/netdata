@@ -27,6 +27,7 @@ netdata-plugin-types = { path = "../netdata-plugin/types" }
 otel-catalog = { workspace = true }
 sfst = { workspace = true }
 sfst-indexer = { workspace = true }
+ng-index = { workspace = true }
 sfsq = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 # preserve_order: the log-table `columns` object must serialize in insertion

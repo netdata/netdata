@@ -97,12 +97,13 @@ fn start_indexing(
     );
 
     tokio::task::spawn_blocking(move || {
-        let resp = match sfst_indexer::index(&wal_path, &sfst_path) {
-            Ok(result) => IndexerResponse::Indexed {
+        let resp = match ng_index::build_sfst_file(&wal_path, &sfst_path, &ng_index::Metrics::new())
+        {
+            Ok((summary, size)) => IndexerResponse::Indexed {
                 seq,
                 path: sfst_path,
-                summary: result.summary,
-                size: file_registry::ByteSize(result.size),
+                summary,
+                size: file_registry::ByteSize(size),
             },
             Err(e) => {
                 tracing::error!("indexing failed wal={}: {e}", wal_path.display());

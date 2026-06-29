@@ -28,6 +28,7 @@
 //! `Record.ts`).
 
 use std::path::Path;
+use std::sync::Arc;
 
 use file_registry::TimestampNs;
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
@@ -37,8 +38,11 @@ use opentelemetry_proto::tonic::common::v1::{
 use opentelemetry_proto::tonic::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
 use opentelemetry_proto::tonic::resource::v1::Resource;
 
-use sfsq::logs::{LogsQuery, LogsQueryBuilder, LogsShard, SfstCandidate, Source, WalScan};
-use sfst::{Filter, Grid, IndexReader};
+use sfsq::logs::{
+    Direction, LogSource, LogsData, LogsQuery, LogsQueryBuilder, LogsShard, SfstCandidate, Source,
+    WalScan, WalTail, run,
+};
+use sfst::{Filter, Grid, IndexReader, MaterializedRow};
 
 // ---------------------------------------------------------------------------
 // Deterministic RNG (xorshift64*) — reproducible by seed, no external dep.
@@ -612,4 +616,250 @@ fn ng_flattened_tail_matches_sealed_index() {
         total_nonzero >= 18 * 8,
         "matrix is too sparse: only {total_nonzero} matching queries across the sweep"
     );
+}
+
+// ---------------------------------------------------------------------------
+// Run-level equivalence (the live production path): chunk SFSTs built by
+// `ng_index::build_sfst_range` (fed as Source::Memory) + a row-scanned tail
+// (`scan_flattened`), folded by `run`, must match indexing the whole WAL. These
+// port the OTAP harness's `wal_data_*` tests onto the ng path — the path the
+// ledger actually drives post-cutover (build_sfst_range chunks + scan_flattened
+// tails → run).
+// ---------------------------------------------------------------------------
+
+fn run_plain(sources: Vec<LogSource>, query: LogsQuery) -> LogsData {
+    run(
+        sources,
+        query,
+        tokio_util::sync::CancellationToken::new(),
+        Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+    )
+}
+
+fn sources(candidates: Vec<SfstCandidate>, tails: Vec<WalTail>) -> Vec<LogSource> {
+    candidates
+        .into_iter()
+        .map(LogSource::Sfst)
+        .chain(tails.into_iter().map(LogSource::Tail))
+        .collect()
+}
+
+fn clone_candidate(c: &SfstCandidate) -> SfstCandidate {
+    SfstCandidate {
+        summary: c.summary.clone(),
+        file_seq: c.file_seq,
+        part: c.part,
+        source: c.source.clone(),
+    }
+}
+fn live_candidates_clone(cs: &[SfstCandidate]) -> Vec<SfstCandidate> {
+    cs.iter().map(clone_candidate).collect()
+}
+fn tails_clone(ts: &[WalTail]) -> Vec<WalTail> {
+    ts.iter()
+        .map(|t| WalTail {
+            file_seq: t.file_seq,
+            path: t.path.clone(),
+            range: t.range,
+        })
+        .collect()
+}
+
+#[test]
+fn ng_run_stats_equal_whole_file_index() {
+    // Statistics equivalence over the live path: chunk SFSTs (built by
+    // build_sfst_range, fed as Source::Memory) + a row-scanned tail, folded by
+    // `run`, must yield the same matched/facets/histogram as indexing the whole
+    // WAL. Only stats (pagination is on-disk-SFST only; chunk/whole field-table
+    // cardinality can legitimately differ under the conservative merge).
+    let header = wal::HEADER_SIZE as u64;
+    let mut any_matched = false;
+
+    for seed in 1..=8 {
+        let corpus = gen_corpus(seed);
+        let dir = tempfile::tempdir().expect("tempdir");
+        let wal_path = write_flattened_wal(dir.path(), &corpus);
+        let file_len = std::fs::metadata(&wal_path).unwrap().len();
+
+        let whole = ng_index_candidate(dir.path());
+        let total = whole.summary.record_count;
+        let start = whole.summary.min_timestamp_s as i64 * NS as i64;
+        let span =
+            ((whole.summary.max_timestamp_s - whole.summary.min_timestamp_s) as i64 + 1) * NS as i64;
+        assert!(total > 0, "seed={seed}: fixture WAL has no records");
+
+        let queries = || -> Vec<(String, LogsQuery)> {
+            let b = LogsQueryBuilder::new;
+            vec![
+                (
+                    "all".into(),
+                    b(Grid::new(start, (span + 7) / 8, 8))
+                        .histogram_field("attributes.level")
+                        .facet_fields(vec!["attributes.level".into()])
+                        .build(),
+                ),
+                (
+                    "level=error".into(),
+                    b(Grid::new(start, span, 1))
+                        .filter(Filter::new().select("attributes.level", "error"))
+                        .histogram_field("attributes.level")
+                        .facet_fields(vec!["attributes.level".into()])
+                        .build(),
+                ),
+            ]
+        };
+
+        // All-tail (no chunks → pure scan_flattened) and a small threshold
+        // (chunks + tail → the merge path), partitioned by the production rule.
+        for min_entries in [u64::MAX, 25] {
+            let chunks = wal::prefix::chunk_boundaries(
+                &wal::scan_frame_boundaries(&wal_path, wal::FrameRange::new(header, file_len))
+                    .unwrap(),
+                header,
+                min_entries,
+            );
+            if min_entries == u64::MAX {
+                assert!(chunks.is_empty(), "seed={seed}: MAX threshold should make all tail");
+            } else {
+                assert!(!chunks.is_empty(), "seed={seed}: small threshold should produce a chunk");
+            }
+
+            let mut live_candidates: Vec<SfstCandidate> = Vec::new();
+            for (i, chunk) in chunks.iter().enumerate() {
+                let (summary, bytes) = ng_index::build_sfst_range(&wal_path, chunk.range).unwrap();
+                live_candidates.push(SfstCandidate {
+                    summary,
+                    file_seq: i as u64,
+                    part: sfsq::logs::Part::Indexed(0),
+                    source: Source::Memory(Arc::new(bytes)),
+                });
+            }
+            let tail_begin = wal::prefix::tail_start(&chunks, header);
+            let tails = vec![WalTail {
+                file_seq: 9999,
+                path: wal_path.clone(),
+                range: wal::FrameRange::new(tail_begin, file_len),
+            }];
+
+            for (qlabel, q) in queries() {
+                let live = run_plain(
+                    sources(live_candidates_clone(&live_candidates), tails_clone(&tails)),
+                    q.clone(),
+                );
+                let truth = run_plain(vec![LogSource::Sfst(clone_candidate(&whole))], q);
+                let ctx = format!("seed={seed} min_entries={min_entries} q={qlabel}");
+                assert_eq!(live.matched, truth.matched, "matched [{ctx}]");
+                assert_eq!(live.facets, truth.facets, "facets [{ctx}]");
+                assert_eq!(live.histogram, truth.histogram, "histogram [{ctx}]");
+                if truth.matched > 0 {
+                    any_matched = true;
+                }
+            }
+        }
+    }
+    assert!(any_matched, "no query matched any rows across the sweep");
+}
+
+#[test]
+fn ng_run_rows_match_whole_file_index() {
+    // Row equivalence over the live path: rows served from chunk SFSTs
+    // interleaved with the scan_flattened tail (under the cursor order) must
+    // match the rows from indexing the whole WAL. Strictly-monotonic timestamps
+    // so the chunked and whole-file total orders coincide (equal-ts tie-break is
+    // the documented WAL->SFST cursor seam, out of scope).
+    let header = wal::HEADER_SIZE as u64;
+    let levels = ["info", "error", "warn"];
+    let records: Vec<LogRecord> = (0..200)
+        .map(|i| LogRecord {
+            time_unix_nano: (BASE_S + i) * NS,
+            severity_text: "INFO".to_string(),
+            attributes: vec![
+                kv("level", s(levels[(i % 3) as usize])),
+                kv("row", s(&format!("r{i:04}"))),
+            ],
+            ..LogRecord::default()
+        })
+        .collect();
+    let corpus = Corpus {
+        batches: records
+            .chunks(40)
+            .map(|chunk| {
+                vec![ResourceLogs {
+                    resource: Some(Resource {
+                        attributes: vec![kv("service.name", s("harness"))],
+                        ..Resource::default()
+                    }),
+                    scope_logs: vec![ScopeLogs {
+                        log_records: chunk.to_vec(),
+                        ..ScopeLogs::default()
+                    }],
+                    ..ResourceLogs::default()
+                }]
+            })
+            .collect(),
+    };
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let wal_path = write_flattened_wal(dir.path(), &corpus);
+    let file_len = std::fs::metadata(&wal_path).unwrap().len();
+    let whole = ng_index_candidate(dir.path());
+
+    let chunks = wal::prefix::chunk_boundaries(
+        &wal::scan_frame_boundaries(&wal_path, wal::FrameRange::new(header, file_len)).unwrap(),
+        header,
+        50,
+    );
+    assert_eq!(chunks.len(), 2, "fixture should split into 2 chunks");
+    let tail_begin = wal::prefix::tail_start(&chunks, header);
+    assert!(tail_begin < file_len, "fixture should leave a non-empty tail");
+
+    let mut live: Vec<SfstCandidate> = Vec::new();
+    for (i, chunk) in chunks.iter().enumerate() {
+        let (summary, bytes) = ng_index::build_sfst_range(&wal_path, chunk.range).unwrap();
+        live.push(SfstCandidate {
+            summary,
+            file_seq: 1,
+            part: sfsq::logs::Part::Indexed(i as u32),
+            source: Source::Memory(Arc::new(bytes)),
+        });
+    }
+    let tails = vec![WalTail {
+        file_seq: 1,
+        path: wal_path.clone(),
+        range: wal::FrameRange::new(tail_begin, file_len),
+    }];
+
+    let start = whole.summary.min_timestamp_s as i64 * NS as i64;
+    let span =
+        ((whole.summary.max_timestamp_s - whole.summary.min_timestamp_s) as i64 + 1) * NS as i64;
+
+    let rows_of = |data: &LogsData| -> Vec<MaterializedRow> {
+        data.rows.iter().map(|(_, row)| row.clone()).collect()
+    };
+
+    for (qlabel, q) in [
+        ("all", LogsQueryBuilder::new(Grid::new(start, span, 1)).limit(300).build()),
+        (
+            "level=error",
+            LogsQueryBuilder::new(Grid::new(start, span, 1))
+                .filter(Filter::new().select("attributes.level", "error"))
+                .limit(300)
+                .build(),
+        ),
+        (
+            "forward",
+            LogsQueryBuilder::new(Grid::new(start, span, 1))
+                .direction(Direction::Forward)
+                .limit(300)
+                .build(),
+        ),
+    ] {
+        let live_rows = rows_of(&run_plain(
+            sources(live_candidates_clone(&live), tails_clone(&tails)),
+            q.clone(),
+        ));
+        let whole_rows = rows_of(&run_plain(vec![LogSource::Sfst(clone_candidate(&whole))], q));
+        assert!(!live_rows.is_empty(), "q={qlabel}: no rows");
+        assert_eq!(live_rows, whole_rows, "q={qlabel}: live rows != whole-file rows");
+    }
 }

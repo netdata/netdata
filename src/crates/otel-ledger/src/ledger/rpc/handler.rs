@@ -331,7 +331,7 @@ impl OtelLogsHandler {
             // check open_range defers). Runs once per (seq, index) under
             // singleflight; skipped entirely on a cache hit.
             let init = async move {
-                match tokio::task::spawn_blocking(move || sfst_indexer::index_range(&path, range))
+                match tokio::task::spawn_blocking(move || ng_index::build_sfst_range(&path, range))
                     .await
                 {
                     Ok(Ok((summary, bytes))) => {
@@ -344,7 +344,7 @@ impl OtelLogsHandler {
                             Ok(Arc::new(bytes))
                         }
                     }
-                    Ok(Err(e)) => Err(format!("index_range: {e}")),
+                    Ok(Err(e)) => Err(format!("build_sfst_range: {e}")),
                     Err(e) => Err(format!("build task: {e}")),
                 }
             };

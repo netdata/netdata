@@ -38,74 +38,6 @@ pub fn one_file_config() -> wal::Config {
     }
 }
 
-/// OTLP/W3C fixed id widths (`opentelemetry/proto/logs/v1/logs.proto`): a
-/// `trace_id` is 16 bytes, a `span_id` is 8 bytes, each empty if unset.
-const TRACE_ID_LEN: usize = 16;
-const SPAN_ID_LEN: usize = 8;
-
-/// How many malformed ids a single export request carried (wrong-length, non-empty).
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-struct MalformedIds {
-    trace: u64,
-    span: u64,
-}
-
-impl MalformedIds {
-    fn any(self) -> bool {
-        self.trace > 0 || self.span > 0
-    }
-}
-
-/// Drop malformed trace/span ids at the ingest boundary. A non-empty id whose
-/// length is not the spec width is **cleared** (set to absent, which the SFST
-/// column later stores as the all-zero "unset/invalid" sentinel); conformant ids
-/// (16/8 bytes) and absent ids (empty) pass through untouched. Returns the counts
-/// so the caller can log one aggregated warning per request (avoids per-record
-/// log floods).
-fn normalize_ids(req: &mut ExportLogsServiceRequest) -> MalformedIds {
-    let mut bad = MalformedIds::default();
-    for rl in &mut req.resource_logs {
-        for sl in &mut rl.scope_logs {
-            for r in &mut sl.log_records {
-                if !r.trace_id.is_empty() && r.trace_id.len() != TRACE_ID_LEN {
-                    r.trace_id.clear();
-                    bad.trace += 1;
-                }
-                if !r.span_id.is_empty() && r.span_id.len() != SPAN_ID_LEN {
-                    r.span_id.clear();
-                    bad.span += 1;
-                }
-            }
-        }
-    }
-    bad
-}
-
-/// Ensure every log record has a usable `time_unix_nano` before flattening, applying
-/// the OTLP single-timestamp rule (time else observed) at the observation point:
-/// keep `time_unix_nano` if set, else fall back to `observed_time_unix_nano`, else
-/// stamp the monotonic ingestion clock.
-///
-/// Notes: the resolved value is written into `time_unix_nano` (not
-/// `observed_time_unix_nano`). The clock fallback is a per-record `now_ns()` —
-/// strictly increasing, so intra-frame order is preserved, but it is not `wal-otap`'s
-/// `ingestion_ns + row_offset` (a different value, same ordering guarantee).
-fn normalize_timestamps(req: &mut ExportLogsServiceRequest, clock: &mut MonotonicClock) {
-    for rl in &mut req.resource_logs {
-        for sl in &mut rl.scope_logs {
-            for r in &mut sl.log_records {
-                if r.time_unix_nano == 0 {
-                    r.time_unix_nano = if r.observed_time_unix_nano != 0 {
-                        r.observed_time_unix_nano
-                    } else {
-                        clock.now_ns().as_u64()
-                    };
-                }
-            }
-        }
-    }
-}
-
 /// Normalize timestamps and ids, flatten `req`, and append it as a single WAL frame
 /// in the flattened-frame format, returning the number of log records written.
 ///
@@ -126,14 +58,15 @@ pub fn write_request(
     if entry_count == 0 {
         return Ok(0);
     }
-    normalize_timestamps(req, clock);
-    let bad_ids = normalize_ids(req);
+    ng_flatten::normalize_timestamps(req, clock);
+    let bad_ids = ng_flatten::normalize_ids(req);
     if bad_ids.any() {
         tracing::warn!(
             bad_trace_ids = bad_ids.trace,
             bad_span_ids = bad_ids.span,
-            "dropped malformed trace/span ids at ingest \
-             (expected {TRACE_ID_LEN}/{SPAN_ID_LEN} bytes); stored as zero",
+            "dropped malformed trace/span ids at ingest (expected {}/{} bytes); stored as zero",
+            ng_flatten::TRACE_ID_LEN,
+            ng_flatten::SPAN_ID_LEN,
         );
     }
     let mut flattened = ng_flatten::flatten_request(req);

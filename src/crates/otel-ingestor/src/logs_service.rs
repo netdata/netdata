@@ -15,7 +15,6 @@ use opentelemetry_proto::tonic::logs::v1::ResourceLogs;
 use otel_logs_identity::ServiceStream;
 use tonic::{Request, Response, Status};
 
-use crate::arrow_bridge;
 use crate::ledger_sender::LedgerSender;
 
 /// Extract the `(service.namespace, service.name)` stream identity from a
@@ -553,16 +552,42 @@ impl LogsService for NetdataLogsService {
                 .get(&stream)
                 .expect("accepted stream was validated and its content_meta recorded");
 
-            // One clock tick per frame. The same value flows into the
-            // WAL frame header (`ingestion_ns`), into the indexer's
-            // tier-3 fallback during indexing, and into
-            // `compute_log_ts_range` so the WAL summary matches the
-            // eventual SFST summary numerically.
-            let ingestion_ns = self.clock.lock().unwrap().now_ns();
-            let (log_min_ts, log_max_ts) = compute_log_ts_range(&group.resource_logs, ingestion_ns);
-            let (data, count) = arrow_bridge::encode(group.resource_logs).map_err(|e| {
-                tracing::error!(%e, "failed to encode Arrow");
-                Status::internal("Arrow encode error")
+            // Wrap the group's logs into a request so the shared `ng-flatten`
+            // normalization runs once, in place, before flattening: timestamps are
+            // resolved (event→observed→clock) and frozen into each record's
+            // `time_unix_nano` (the SFST stores `Record.ts` straight from it), and
+            // malformed trace/span ids are cleared so the fixed-stride per-row id
+            // columns stay well-formed.
+            let count = group.log_record_count;
+            let mut request = ExportLogsServiceRequest {
+                resource_logs: group.resource_logs,
+            };
+
+            // One clock tick per frame for the WAL frame header (`ingestion_ns`) and
+            // `compute_log_ts_range` (which now matches the per-row `Record.ts`
+            // numerically). The same clock backs the timestamp fallback.
+            let ingestion_ns = {
+                let mut clock = self.clock.lock().unwrap();
+                let ts = clock.now_ns();
+                ng_flatten::normalize_timestamps(&mut request, &mut clock);
+                ts
+            };
+            let bad_ids = ng_flatten::normalize_ids(&mut request);
+            if bad_ids.any() {
+                tracing::warn!(
+                    bad_trace_ids = bad_ids.trace,
+                    bad_span_ids = bad_ids.span,
+                    "dropped malformed trace/span ids at ingest (expected {}/{} bytes); stored as zero",
+                    ng_flatten::TRACE_ID_LEN,
+                    ng_flatten::SPAN_ID_LEN,
+                );
+            }
+            let (log_min_ts, log_max_ts) = compute_log_ts_range(&request.resource_logs, ingestion_ns);
+            let mut flattened = ng_flatten::flatten_request(&request);
+            ng_flatten::fill_hashes(&mut flattened);
+            let data = ng_flatten::encode_frame(&flattened).map_err(|e| {
+                tracing::error!(%e, "failed to encode flattened frame");
+                Status::internal("flatten encode error")
             })?;
 
             writer

@@ -146,7 +146,7 @@ impl LogSource {
                 Some(m) => LogsShard::evaluate_mapped(c, m, query),
                 None => LogsShard::default(),
             },
-            LogSource::Tail(tail) => match WalScan::scan_range(&tail.path, tail.range) {
+            LogSource::Tail(tail) => match WalScan::scan_flattened_range(&tail.path, tail.range) {
                 Ok(scan) => scan.evaluate(query),
                 Err(e) => {
                     tracing::warn!(

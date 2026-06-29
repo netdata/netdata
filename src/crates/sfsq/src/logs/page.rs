@@ -459,7 +459,7 @@ fn scan_tails(
 
     let mut tail_scans: Vec<(u64, WalScan)> = Vec::new();
     for &tail in wal_tails {
-        let scan = match WalScan::scan_range(&tail.path, tail.range) {
+        let scan = match WalScan::scan_flattened_range(&tail.path, tail.range) {
             Ok(scan) => scan,
             Err(e) => {
                 tracing::warn!(

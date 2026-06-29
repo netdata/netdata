@@ -9,6 +9,7 @@ workspace = true
 
 [dependencies]
 bincode = { workspace = true }
+file-registry = { workspace = true }
 opentelemetry-proto = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 twox-hash = { workspace = true, features = ["xxhash64"] }

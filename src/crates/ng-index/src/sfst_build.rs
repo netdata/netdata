@@ -234,6 +234,26 @@ pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result
     Ok(stats)
 }
 
+/// Build an SFST index file from a single flattened WAL **file** (not a directory),
+/// returning the registry-facing [`sfst::Summary`] + the written file size. The
+/// production seal-time entry point — the ng counterpart of `sfst_indexer::index`
+/// (which `otel-ledger` calls with a concrete WAL path). Same typed tree + per-row
+/// columns as [`build_sfst`]; it just skips the `sole_wal_file` directory probe.
+pub fn build_sfst_file(
+    wal_path: &Path,
+    out_path: &Path,
+    metrics: &Metrics,
+) -> Result<(sfst::Summary, u64), Error> {
+    let mut reader = wal::Reader::open(wal_path)?;
+    let arena = Bump::new();
+    let mut row_index = RowIndex::new(&arena, CARDINALITY_THRESHOLD);
+    populate_row_index(&mut reader, &mut row_index, metrics)?;
+    let _t = metrics.scope("build");
+    let (summary, _metadata) = build_and_write(&row_index, out_path)?;
+    let size = std::fs::metadata(out_path)?.len();
+    Ok((summary, size))
+}
+
 /// Build an **in-memory** SFST over a frame-aligned `range` of an active flattened
 /// WAL, returning its [`sfst::Summary`] plus the serialized bytes (openable with
 /// [`sfst::IndexReader::open`]). The in-memory counterpart of [`build_sfst`] — the

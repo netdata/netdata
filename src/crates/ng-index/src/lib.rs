@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 mod perf;
 mod sfst_build;
 pub use perf::{Metrics, Rss, read_rss};
-pub use sfst_build::{SfstStats, build_sfst, build_sfst_range};
+pub use sfst_build::{SfstStats, build_sfst, build_sfst_file, build_sfst_range};
 
 // Re-export the flattening + frame vocabulary so the binary (and any consumer) gets
 // it from `ng-index` without depending on `ng-flatten` directly.
