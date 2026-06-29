@@ -277,6 +277,10 @@ sidebar:
             - node id
             - claimed id
             - identity
+            - vnode
+            - virtual node
+            - dyncfg
+            - dynamic configuration
       - meta:
           label: VM Templates
           edit_url: https://github.com/netdata/netdata/edit/master/docs/learn/vm-templates.md

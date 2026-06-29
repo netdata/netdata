@@ -13,6 +13,7 @@ How Netdata identifies nodes across Agents, Parents, and Cloud - and why each id
 Every node has a **lifecycle** determined by its **ephemerality** setting. By default, all nodes are **permanent** - they are expected to maintain connectivity, and disconnections trigger alerts.
 
 Ephemeral nodes are designed for dynamic infrastructure:
+
 - No alerts when they disconnect
 - Automatic cleanup after configurable timeout
 - Perfect for auto-scaling and short-lived workloads
@@ -41,12 +42,12 @@ Netdata uses several identity mechanisms to uniquely identify nodes, authenticat
 
 Every Netdata Agent has a **Machine GUID** - a UUID that uniquely identifies this specific node.
 
-| Property | Value |
-|----------|-------|
-| **File** | `/var/lib/netdata/registry/netdata.public.unique.id` |
-| **Format** | UUID (e.g., `a1b2c3d4-e5f6-7890-abcd-ef1234567890`) |
-| **Generated** | On first start, if missing |
-| **Persistence** | Permanent - never changes once created |
+| Property        | Value                                                |
+|-----------------|------------------------------------------------------|
+| **File**        | `/var/lib/netdata/registry/netdata.public.unique.id` |
+| **Format**      | UUID (e.g., `a1b2c3d4-e5f6-7890-abcd-ef1234567890`)  |
+| **Generated**   | On first start, if missing                           |
+| **Persistence** | Permanent - never changes once created               |
 
 ### Generation Behavior
 
@@ -61,13 +62,13 @@ On startup, Netdata determines the Machine GUID:
 
 The Machine GUID is also stored in status files for crash recovery:
 
-| Location | Purpose |
-|----------|---------|
-| `/var/lib/netdata/status-netdata.json` | Primary backup |
-| `/var/cache/netdata/status-netdata.json` | Fallback 1 |
-| `/tmp/status-netdata.json` | Fallback 2 |
-| `/run/status-netdata.json` | Fallback 3 |
-| `/var/run/status-netdata.json` | Fallback 4 |
+| Location                                 | Purpose        |
+|------------------------------------------|----------------|
+| `/var/lib/netdata/status-netdata.json`   | Primary backup |
+| `/var/cache/netdata/status-netdata.json` | Fallback 1     |
+| `/tmp/status-netdata.json`               | Fallback 2     |
+| `/run/status-netdata.json`               | Fallback 3     |
+| `/var/run/status-netdata.json`           | Fallback 4     |
 
 :::note
 
@@ -82,6 +83,7 @@ The Machine GUID is stored redundantly across multiple locations. If the primary
 **GUID Must Be Unique**
 
 If two Agents have the same Machine GUID:
+
 - They cannot connect to the same Parent simultaneously
 - Cloud kicks the older connection offline when the second connects
 - This causes unstable "flapping" connections
@@ -104,16 +106,17 @@ When a Netdata Agent operates as a **Parent** (receiving metrics from Children),
 
 Each metric in Netdata has a UUID. The metadata database (`netdata-meta.db`) links these UUIDs to nodes, charts, and dimensions. The dbengine stores metric samples indexed by these UUIDs.
 
-| Component | Purpose |
-|-----------|---------|
-| **Metadata** (`netdata-meta.db`) | Links metric UUIDs to node GUIDs, charts, dimensions |
-| **Dbengine** (`dbengine*` directories) | Stores actual metric samples indexed by UUID |
+| Component                              | Purpose                                              |
+|----------------------------------------|------------------------------------------------------|
+| **Metadata** (`netdata-meta.db`)       | Links metric UUIDs to node GUIDs, charts, dimensions |
+| **Dbengine** (`dbengine*` directories) | Stores actual metric samples indexed by UUID         |
 
 The metadata acts as an index - without it, metric samples in dbengine cannot be associated with their source nodes or chart definitions.
 
 ### Key Point: Metadata DB Does Not Determine Agent Identity
 
 The metadata database stores information about **all nodes** (including the Agent itself), but this data exists only to link nodes with their metrics. The Agent's identity is **not** determined by the database - it comes exclusively from:
+
 - The GUID file
 - Status file backups
 
@@ -130,11 +133,11 @@ This is normal for Parent nodes receiving data from Children, and for Agents usi
 
 **Virtual Nodes** allow Go collectors to report metrics as if they came from separate logical nodes. This is useful for monitoring remote systems, containers, or logical entities that don't run their own Netdata Agent (SNMP devices, cloud provider db instances, etc.).
 
-| Property | Value |
-|----------|-------|
-| **Directory** | `/etc/netdata/vnodes/` |
-| **Format** | YAML files (`.yaml`, `.yml`, `.conf`) |
-| **Identity** | User-defined GUID in config file |
+| Property      | Value                                 |
+|---------------|---------------------------------------|
+| **Directory** | `/etc/netdata/vnodes/`                |
+| **Format**    | YAML files (`.yaml`, `.yml`, `.conf`) |
+| **Identity**  | User-defined GUID in config file      |
 
 ### Configuration
 
@@ -149,12 +152,12 @@ Each virtual node is defined in a YAML file:
     datacenter: us-east
 ```
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `hostname` | Yes | Display name shown in dashboards and Cloud |
-| `guid` | Yes | UUID that uniquely identifies this virtual node |
-| `name` | No | Internal reference name |
-| `labels` | No | Key-value pairs for filtering and organization |
+| Field      | Required | Description                                     |
+|------------|----------|-------------------------------------------------|
+| `hostname` | Yes      | Display name shown in dashboards and Cloud      |
+| `guid`     | Yes      | UUID that uniquely identifies this virtual node |
+| `name`     | No       | Internal reference name                         |
+| `labels`   | No       | Key-value pairs for filtering and organization  |
 
 :::warning
 
@@ -166,7 +169,7 @@ Each virtual node GUID must be unique across your entire infrastructure. Using t
 
 ### Creating Virtual Nodes via the GUI (Dynamic Configuration)
 
-In addition to the YAML file method, you can create, edit, test, and remove virtual nodes directly from the Netdata UI using [dynamic configuration (dyncfg)](/docs/netdata-agent/configuration/dynamic-configuration.md). The two methods are equivalent — both produce a vnode that collectors can attach metrics to — so choose whichever fits your workflow. The GUI path is available for collectors that support dynamic configuration.
+In addition to the YAML file method, you can create, edit, test, and remove virtual nodes directly from the Netdata UI using [dynamic configuration (dyncfg)](/docs/netdata-agent/configuration/dynamic-configuration.md). Both methods produce a working vnode that collectors can attach metrics to, though field requirements differ — see the table below. The Vnodes GUI path is available under the go.d plugin's dynamic configuration view.
 
 :::note
 
@@ -178,11 +181,11 @@ The vnode dynamic configuration is exposed per plugin under the path `/collector
 
 The GUI form uses the same fields as the YAML configuration — `hostname`, `guid`, and `labels`:
 
-| Field | Required in the GUI | Description |
-|-------|---------------------|-------------|
-| `guid` | Yes | UUID that uniquely identifies this virtual node. Must be a valid UUID. |
-| `hostname` | No | Display name shown in dashboards and Cloud. If left blank, the job name you assign when creating the vnode is used as the hostname. |
-| `labels` | No | Key-value pairs for filtering and organization. |
+| Field      | Required in the GUI | Description                                                                                                                         |
+|------------|---------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| `guid`     | Yes                 | UUID that uniquely identifies this virtual node. Must be a valid UUID.                                                              |
+| `hostname` | No                  | Display name shown in dashboards and Cloud. If left blank, the job name you assign when creating the vnode is used as the hostname. |
+| `labels`   | No                  | Key-value pairs for filtering and organization.                                                                                     |
 
 Generate a `guid` with `uuidgen` on Linux/macOS, or `[guid]::NewGuid()` in PowerShell. Each `guid` must be unique across your infrastructure, as described in the GUID Uniqueness warning above. See [Does renaming a virtual node change its identity?](#does-renaming-a-virtual-node-change-its-identity) for how each field affects the vnode.
 
@@ -217,11 +220,11 @@ Virtual nodes appear in Netdata Cloud as independent nodes, with their own dashb
 
 When an Agent connects to Netdata Cloud, it receives a **Node ID** that links the Machine GUID to your Space.
 
-| Property | Value |
-|----------|-------|
-| **Assigned by** | Netdata Cloud |
-| **Stored in** | `/var/cache/netdata/netdata-meta.db` (`node_instance` table) |
-| **Purpose** | Links Machine GUID to your Cloud Space |
+| Property        | Value                                                        |
+|-----------------|--------------------------------------------------------------|
+| **Assigned by** | Netdata Cloud                                                |
+| **Stored in**   | `/var/cache/netdata/netdata-meta.db` (`node_instance` table) |
+| **Purpose**     | Links Machine GUID to your Cloud Space                       |
 
 Machine GUIDs and Cloud Node IDs map 1-to-1.
 
@@ -233,21 +236,21 @@ A single Machine GUID can have multiple **Node Instances** in Cloud when the sam
 
 The **Agent-Cloud Link (ACLK)** uses separate credentials for authentication:
 
-| File | Purpose |
-|------|---------|
-| `/var/lib/netdata/cloud.d/cloud.conf` | Cloud configuration, contains `claimed_id` |
-| `/var/lib/netdata/cloud.d/private.pem` | RSA private key |
-| `/var/lib/netdata/cloud.d/public.pem` | RSA public key |
+| File                                   | Purpose                                    |
+|----------------------------------------|--------------------------------------------|
+| `/var/lib/netdata/cloud.d/cloud.conf`  | Cloud configuration, contains `claimed_id` |
+| `/var/lib/netdata/cloud.d/private.pem` | RSA private key                            |
+| `/var/lib/netdata/cloud.d/public.pem`  | RSA public key                             |
 
 ### Claimed ID
 
 The **Claimed ID** is a random UUID generated during the claiming process. It's separate from the Machine GUID, as it uniquely identifies the link between the Agent and Cloud.
 
-| Property | Description |
-|----------|-------------|
-| **Purpose** | Authenticates the ACLK connection to Netdata Cloud |
-| **Generated** | During the claiming process |
-| **Independence** | Separate from Machine GUID - they can change independently |
+| Property         | Description                                                     |
+|------------------|-----------------------------------------------------------------|
+| **Purpose**      | Authenticates the ACLK connection to Netdata Cloud              |
+| **Generated**    | During the claiming process                                     |
+| **Independence** | Separate from Machine GUID - they can change independently      |
 | **Regeneration** | A new Claimed ID is generated each time the agent is re-claimed |
 
 :::note
@@ -255,6 +258,7 @@ The **Claimed ID** is a random UUID generated during the claiming process. It's 
 **Custom Paths**
 
 If you customized `[directories]` in `netdata.conf`:
+
 - `lib` setting affects `/var/lib/netdata/` paths
 - `cache` setting affects `/var/cache/netdata/` paths
 
