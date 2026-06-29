@@ -432,7 +432,6 @@ sidebar:
       - meta:
           label: Service Discovery
           edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/SERVICE-DISCOVERY.md
-        items: []
       - meta:
           label: StatsD
           edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/statsd.plugin/README.md
