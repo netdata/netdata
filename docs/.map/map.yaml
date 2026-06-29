@@ -432,7 +432,6 @@ sidebar:
       - meta:
           label: Service Discovery
           edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/SERVICE-DISCOVERY.md
-          description: Stop hand-writing collector jobs. Netdata's Service Discovery finds monitorable targets in your environment and turns them into collector jobs automatically.
         items: []
       - meta:
           label: StatsD
