@@ -446,7 +446,7 @@ void sleep_usec_with_now(usec_t usec, usec_t started_ut __maybe_unused) {
     Sleep(sleep_ms);
 }
 #else
-void sleep_usec_with_now(usec_t usec, usec_t started_ut) {
+void sleep_usec_with_now(usec_t usec, usec_t started_ut __maybe_unused) {
     // we expect microseconds (1.000.000 per second)
     // but timespec is nanoseconds (1.000.000.000 per second)
     struct timespec rem = { 0, 0 }, req = {
@@ -457,10 +457,7 @@ void sleep_usec_with_now(usec_t usec, usec_t started_ut) {
     // make sure errno is not EINTR
     errno_clear();
 
-    if(!started_ut)
-        started_ut = now_realtime_usec();
-
-    usec_t end_ut = started_ut + usec;
+    usec_t started_monotonic_ut = now_monotonic_usec();
 
     while (nanosleep(&req, &rem) != 0) {
         if (likely(errno == EINTR && (rem.tv_sec || rem.tv_nsec))) {
@@ -470,12 +467,13 @@ void sleep_usec_with_now(usec_t usec, usec_t started_ut) {
             // break an infinite loop
             errno_clear();
 
-            usec_t now_ut = now_realtime_usec();
-            if(now_ut >= end_ut)
+            usec_t now_ut = now_monotonic_usec();
+            usec_t elapsed_ut = now_ut > started_monotonic_ut ? now_ut - started_monotonic_ut : 0;
+            if(elapsed_ut >= usec)
                 break;
 
-            usec_t remaining_ut = (usec_t)req.tv_sec * USEC_PER_SEC + (usec_t)req.tv_nsec * NSEC_PER_USEC > usec;
-            usec_t check_ut = now_ut - started_ut;
+            usec_t remaining_ut = (usec_t)req.tv_sec * USEC_PER_SEC + (usec_t)req.tv_nsec / NSEC_PER_USEC;
+            usec_t check_ut = usec - elapsed_ut;
             if(remaining_ut > check_ut) {
                 req = (struct timespec){
                     .tv_sec = (time_t) ( check_ut / USEC_PER_SEC),
