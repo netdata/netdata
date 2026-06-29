@@ -481,6 +481,7 @@
 - Docs(skills): add static-binary build skill; fix Cloud log-query source filtering & time units ([#22880](https://github.com/netdata/netdata/issues/22880))
 - Fix(aclk): prevent unbounded one-core CPU spins in the cloud-connection loops ([#22879](https://github.com/netdata/netdata/issues/22879))
 - Aclk: grow inbound mqtt buffer on demand ([#22878](https://github.com/netdata/netdata/issues/22878))
+- Chore(go.d): add charttpl Group.Clone() and Spec.MarshalTemplate() ([#22882](https://github.com/netdata/netdata/issues/22882))
 
 ## [2.10.0] - 2026-04-09
 
