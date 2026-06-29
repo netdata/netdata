@@ -853,6 +853,32 @@ static void spawn_server_process_sigchld(void) {
     }
 }
 
+static void spawn_server_signal_all_children(int signo) {
+    for(SPAWN_REQUEST *rq = spawn_server_requests; rq ; rq = rq->next) {
+        if(kill(rq->pid, signo) != 0)
+            nd_log(NDLS_COLLECTORS, signo == SIGKILL ? NDLP_ERR : NDLP_WARNING,
+                   "SPAWN SERVER: failed to send signal %d to child pid %d (request %zu): %s",
+                   signo, rq->pid, rq->request_id, strerror(errno));
+    }
+}
+
+static bool spawn_server_wait_for_children_to_exit(usec_t timeout_ut) {
+    usec_t deadline_ut = now_monotonic_usec() + timeout_ut;
+
+    while(spawn_server_requests) {
+        spawn_server_process_sigchld();
+        if(!spawn_server_requests)
+            return true;
+
+        if(now_monotonic_usec() >= deadline_ut)
+            return false;
+
+        sleep_usec(10 * USEC_PER_MS);
+    }
+
+    return true;
+}
+
 static int spawn_server_event_loop(SPAWN_SERVER *server) {
     int pipe_fd = server->pipe[1];
     close(server->pipe[0]); server->pipe[0] = -1;
@@ -935,17 +961,18 @@ static int spawn_server_event_loop(SPAWN_SERVER *server) {
 
     // stop all children
     if(spawn_server_requests) {
-        // nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN SERVER: killing all children...");
-        size_t killed = 0;
-        for(SPAWN_REQUEST *rq = spawn_server_requests; rq ; rq = rq->next) {
-            kill(rq->pid, SIGTERM);
-            killed++;
+        spawn_server_signal_all_children(SIGTERM);
+
+        if(!spawn_server_wait_for_children_to_exit((usec_t)SPAWN_KILL_DEFAULT_GRACE_MS * USEC_PER_MS)) {
+            nd_log(NDLS_COLLECTORS, NDLP_WARNING,
+                   "SPAWN SERVER: children did not exit after SIGTERM; sending SIGKILL");
+
+            spawn_server_signal_all_children(SIGKILL);
+
+            if(!spawn_server_wait_for_children_to_exit((usec_t)SPAWN_KILL_DEFAULT_GRACE_MS * USEC_PER_MS))
+                nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                       "SPAWN SERVER: giving up waiting for children after SIGKILL");
         }
-        while(spawn_server_requests) {
-            spawn_server_process_sigchld();
-            tinysleep();
-        }
-        // nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN SERVER: all %zu children finished", killed);
     }
 
     return 0;
