@@ -217,6 +217,19 @@ Do **not** place `*` between exclusions (`!alert1 * !alert2 *` is incorrect — 
 
 You can also [edit the file where the alert is defined](#how-to-edit-health-configuration-files), comment out its definition, and [reload Netdata's health configuration](#how-to-reload-health-configuration).
 
+#### Enable Only Specific Alerts (Whitelist)
+
+**Use Case:** Enable only a chosen set of alerts and disable everything else
+
+To enable only specific alerts, list their names in `enabled alarms` **without** a trailing `*` wildcard. Only the listed alerts are loaded; every other alert is disabled.
+
+```conf
+[health]
+    enabled alarms = 10min_cpu_usage ram_in_use
+```
+
+Restart your Netdata Agent after changing `netdata.conf` (`netdatacli reload-health` reloads health configuration files, but does not reload `netdata.conf`).
+
 #### Silence Individual Alert Notifications
 
 **Use Case:** Keep monitoring active but stop notifications

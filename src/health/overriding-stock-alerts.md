@@ -9,6 +9,7 @@ This guide explains how to customize Netdata's stock alerts. User configurations
 | Change thresholds for ALL instances | Create a template with the same name |
 | Change thresholds for ONE instance  | Create an alarm with the same name   |
 | Disable an alert completely         | Use `enabled alarms` in netdata.conf |
+| Enable only specific alerts         | Use `enabled alarms` without `*`     |
 | Silence notifications only          | Set `to: silent`                     |
 
 ## Understanding Overrides
@@ -164,6 +165,15 @@ In your `netdata.conf` (edit it with `sudo ./edit-config netdata.conf`):
 ```
 
 This disables `20min_steal_cpu` and `disk_space_usage` while keeping all other alerts (`*`).
+
+**Enable only specific alerts (whitelist):** To enable only a chosen set of alerts and disable everything else, omit the trailing `*` and list only the alert names:
+
+```ini
+[health]
+    enabled alarms = 10min_cpu_usage ram_in_use
+```
+
+Only those alerts are loaded; all others are disabled. Restart your Netdata Agent after changing `netdata.conf` (`netdatacli reload-health` reloads health configuration files but does not reload `netdata.conf`). See [simple patterns](/src/libnetdata/simple_pattern/README.md) for how matching works.
 
 ### Option B: Per-Alert Disable
 
