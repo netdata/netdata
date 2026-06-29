@@ -1845,7 +1845,7 @@ static int parse_puback_varhdr(struct mqtt_ng_client *client)
 static int parse_suback_varhdr(struct mqtt_ng_client *client)
 {
     int rc;
-    size_t avail;
+    size_t avail, stored;
     struct mqtt_ng_parser *parser = &client->parser;
     struct mqtt_suback *suback = &client->parser.mqtt_packet.suback;
     switch (parser->varhdr_state) {
@@ -1873,7 +1873,11 @@ static int parse_suback_varhdr(struct mqtt_ng_client *client)
             if (avail < 1)
                 return MQTT_NG_CLIENT_NEED_MORE_BYTES;
 
-            suback->reason_codes_pending -= rbuf_pop(parser->received_data, (char*)suback->reason_codes, MIN(suback->reason_codes_pending, avail));
+            stored = suback->reason_code_count - suback->reason_codes_pending;
+            suback->reason_codes_pending -= rbuf_pop(
+                parser->received_data,
+                (char *)&suback->reason_codes[stored],
+                MIN(suback->reason_codes_pending, avail));
 
             if (!suback->reason_codes_pending)
                 return MQTT_NG_CLIENT_PARSE_DONE;
@@ -2399,6 +2403,68 @@ static int mqtt_ng_unittest_reset_after_partial_publish(void)
     return errors;
 }
 
+static int mqtt_ng_unittest_partial_suback_reason_codes(void)
+{
+    int errors = 0;
+    rbuf_t input = rbuf_create(128, 128);
+    struct mqtt_ng_init settings = {
+        .data_in = input,
+        .data_out_fnc = NULL,
+        .user_ctx = NULL,
+        .connack_callback = NULL,
+        .puback_callback = NULL,
+        .msg_callback = NULL,
+    };
+    struct mqtt_ng_client *client = mqtt_ng_init(&settings);
+
+    const char partial_suback[] = {
+        (char)(MQTT_CPT_SUBACK << 4), 5,
+        0, 1,
+        0,
+        0,
+    };
+    const char remaining_suback[] = {
+        (char)0x80,
+    };
+
+    MQTT_NG_TEST(client != NULL, "mqtt_ng_init succeeds for SUBACK parser test");
+    if (!client) {
+        rbuf_free(input);
+        return errors;
+    }
+
+    MQTT_NG_TEST(!mqtt_ng_unittest_push_bytes(input, partial_suback, sizeof(partial_suback)),
+                 "push partial SUBACK");
+
+    int rc = handle_incoming_traffic(client);
+    MQTT_NG_TEST(rc == MQTT_NG_CLIENT_NEED_MORE_BYTES, "partial SUBACK needs more bytes");
+    MQTT_NG_TEST(client->parser.state == MQTT_PARSE_VARIABLE_HEADER, "partial SUBACK stays in variable-header parser");
+    MQTT_NG_TEST(client->parser.varhdr_state == MQTT_PARSE_REASONCODES, "partial SUBACK waits for reason codes");
+    MQTT_NG_TEST(client->parser.mqtt_packet.suback.reason_code_count == 2, "partial SUBACK reason-code count");
+    MQTT_NG_TEST(client->parser.mqtt_packet.suback.reason_codes_pending == 1, "partial SUBACK pending reason code");
+    uint8_t *reason_codes = client->parser.mqtt_packet.suback.reason_codes;
+    MQTT_NG_TEST(reason_codes != NULL, "partial SUBACK owns reason-code buffer");
+    if (reason_codes)
+        MQTT_NG_TEST(reason_codes[0] == 0, "partial SUBACK stores first reason code");
+
+    MQTT_NG_TEST(!mqtt_ng_unittest_push_bytes(input, remaining_suback, sizeof(remaining_suback)),
+                 "push remaining SUBACK reason code");
+
+    rc = parse_suback_varhdr(client);
+    MQTT_NG_TEST(rc == MQTT_NG_CLIENT_PARSE_DONE, "fragmented SUBACK reason codes parse done");
+    if (reason_codes) {
+        MQTT_NG_TEST(reason_codes[0] == 0, "fragmented SUBACK preserves first reason code");
+        MQTT_NG_TEST(reason_codes[1] == 0x80, "fragmented SUBACK appends second reason code");
+    }
+    MQTT_NG_TEST(client->parser.mqtt_packet.suback.reason_codes_pending == 0, "fragmented SUBACK consumes all reason codes");
+
+    freez(client->parser.mqtt_packet.suback.reason_codes);
+    client->parser.mqtt_packet.suback.reason_codes = NULL;
+    mqtt_ng_destroy(client);
+    rbuf_free(input);
+    return errors;
+}
+
 int mqtt_ng_unittest(void)
 {
     int errors = 0;
@@ -2406,6 +2472,7 @@ int mqtt_ng_unittest(void)
     fprintf(stderr, "\nrunning mqtt_ng unittest\n");
 
     errors += mqtt_ng_unittest_reset_after_partial_publish();
+    errors += mqtt_ng_unittest_partial_suback_reason_codes();
 
     if (errors)
         fprintf(stderr, "mqtt_ng unittest: %d ERROR(S)\n", errors);
