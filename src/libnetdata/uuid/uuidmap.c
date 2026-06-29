@@ -174,18 +174,23 @@ UUIDMAP_ID uuidmap_create(const nd_uuid_t uuid) {
     return id;
 }
 
-static struct uuidmap_entry *get_entry_by_id(UUIDMAP_ID id) {
-    if(id == 0) return NULL;
-
-    uint8_t partition = uuidmap_id_to_partition(id);
-
-    rw_spinlock_read_lock(&uuid_map.p[partition].spinlock);
-
+static struct uuidmap_entry *get_entry_by_id_locked(UUIDMAP_ID id, uint8_t partition) {
     Pvoid_t *PValue = JudyLGet(uuid_map.p[partition].id_to_uuid, id, PJE0);
     if (PValue == PJERR)
         fatal("UUIDMAP: corrupted JudyL array");
 
-    struct uuidmap_entry *ue = PValue ? *PValue : NULL;
+    return PValue ? *PValue : NULL;
+}
+
+static struct uuidmap_entry *get_entry_by_id_and_acquire(UUIDMAP_ID id) {
+    if(id == 0) return NULL;
+
+    uint8_t partition = uuidmap_id_to_partition(id);
+    rw_spinlock_read_lock(&uuid_map.p[partition].spinlock);
+
+    struct uuidmap_entry *ue = get_entry_by_id_locked(id, partition);
+    if(ue && !refcount_acquire(&ue->refcount))
+        ue = NULL;
 
     rw_spinlock_read_unlock(&uuid_map.p[partition].spinlock);
 
@@ -193,12 +198,17 @@ static struct uuidmap_entry *get_entry_by_id(UUIDMAP_ID id) {
 }
 
 void uuidmap_free(UUIDMAP_ID id) {
-    struct uuidmap_entry *ue = get_entry_by_id(id);
+    if(id == 0) return;
 
+    uint8_t partition = uuidmap_id_to_partition(id);
+    struct uuidmap_entry *ue = NULL;
+    bool should_delete = false;
+
+    rw_spinlock_write_lock(&uuid_map.p[partition].spinlock);
+
+    ue = get_entry_by_id_locked(id, partition);
     if(ue && refcount_release_and_acquire_for_deletion(&ue->refcount)) {
         JudyAllocThreadPulseReset();
-        uint8_t partition = uuidmap_id_to_partition(id);
-        rw_spinlock_write_lock(&uuid_map.p[partition].spinlock);
 
         int rc;
         rc = JudyHSDel(&uuid_map.p[partition].uuid_to_id, (void *)ue->uuid, sizeof(nd_uuid_t), PJE0);
@@ -213,35 +223,53 @@ void uuidmap_free(UUIDMAP_ID id) {
         uuid_map.p[partition].entries--;
 
         uuid_map.p[partition].memory += JudyAllocThreadPulseGetAndReset();
-        rw_spinlock_write_unlock(&uuid_map.p[partition].spinlock);
-
-        aral_freez(uuid_map.ar, ue);
+        should_delete = true;
     }
+
+    rw_spinlock_write_unlock(&uuid_map.p[partition].spinlock);
+
+    if(should_delete)
+        aral_freez(uuid_map.ar, ue);
 }
 
 nd_uuid_t *uuidmap_uuid_ptr(UUIDMAP_ID id) {
-    struct uuidmap_entry *ue = get_entry_by_id(id);
-    return ue ? &ue->uuid : NULL;
+    if(id == 0) return NULL;
+
+    uint8_t partition = uuidmap_id_to_partition(id);
+    rw_spinlock_read_lock(&uuid_map.p[partition].spinlock);
+
+    struct uuidmap_entry *ue = get_entry_by_id_locked(id, partition);
+    nd_uuid_t *uuid = ue ? &ue->uuid : NULL;
+
+    rw_spinlock_read_unlock(&uuid_map.p[partition].spinlock);
+
+    return uuid;
 }
 
 nd_uuid_t *uuidmap_uuid_ptr_and_dup(UUIDMAP_ID id) {
-    struct uuidmap_entry *ue = get_entry_by_id(id);
-
-    if(ue && refcount_acquire(&ue->refcount))
-        return &ue->uuid;
-
-    return NULL;
+    struct uuidmap_entry *ue = get_entry_by_id_and_acquire(id);
+    return ue ? &ue->uuid : NULL;
 }
 
 bool uuidmap_uuid(UUIDMAP_ID id, nd_uuid_t out_uuid) {
-    nd_uuid_t *uuid = uuidmap_uuid_ptr(id);
-
-    if(!uuid) {
+    if(id == 0) {
         nd_uuid_clear(out_uuid);
         return false;
     }
 
-    uuid_copy(out_uuid, *uuid);
+    uint8_t partition = uuidmap_id_to_partition(id);
+    rw_spinlock_read_lock(&uuid_map.p[partition].spinlock);
+
+    struct uuidmap_entry *ue = get_entry_by_id_locked(id, partition);
+    if(!ue) {
+        nd_uuid_clear(out_uuid);
+        rw_spinlock_read_unlock(&uuid_map.p[partition].spinlock);
+        return false;
+    }
+
+    uuid_copy(out_uuid, ue->uuid);
+    rw_spinlock_read_unlock(&uuid_map.p[partition].spinlock);
+
     return true;
 }
 
@@ -252,9 +280,9 @@ ND_UUID uuidmap_get(UUIDMAP_ID id) {
 }
 
 UUIDMAP_ID uuidmap_dup(UUIDMAP_ID id) {
-    struct uuidmap_entry *ue = get_entry_by_id(id);
+    struct uuidmap_entry *ue = get_entry_by_id_and_acquire(id);
 
-    if(!ue || !refcount_acquire(&ue->refcount))
+    if(!ue)
         fatal("UUIDMAP: id %u does not exist, or cannot be acquired, in %s", id, __FUNCTION__ );
 
     return id;
