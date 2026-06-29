@@ -46,7 +46,13 @@ struct websocket_thread;
 // Frame size limits for protection against DoS and browser compatibility
 #define WS_MAX_INCOMING_FRAME_SIZE  (20ULL * 1024 * 1024) // 20MB max incoming frame size (browsers have ~16MiB)
 #define WS_MAX_OUTGOING_FRAME_SIZE  (4ULL * 1024 * 1024)  // 4MB max outgoing frame size for browser compatibility
-#define WS_MAX_DECOMPRESSED_SIZE    (200ULL * 1024 * 1024) // 200MB max inbound uncompressed message
+#define WS_MAX_DECOMPRESSED_SIZE    (200ULL * 1024 * 1024) // 200MB absolute cap on an inbound uncompressed message
+// Decompression-bomb guard (CWE-409): cap the decompressed size at a multiple of the
+// compressed input, so a tiny payload cannot inflate toward WS_MAX_DECOMPRESSED_SIZE.
+// WS_MIN_DECOMPRESSED_SIZE is a floor so small legitimate messages (which may have a
+// high ratio) still decompress regardless of the ratio cap.
+#define WS_MAX_DECOMPRESSION_RATIO  100ULL                 // max decompressed:compressed size ratio
+#define WS_MIN_DECOMPRESSED_SIZE    (1ULL * 1024 * 1024)   // 1MB floor for the ratio guard
 #define WS_DEBUG_DUMP_BYTES         32                     // max payload bytes captured in debug hex dumps
 
 // WebSocket timeout constants (in seconds)

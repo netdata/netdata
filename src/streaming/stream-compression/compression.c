@@ -681,8 +681,16 @@ cleanup:
     return errors;
 }
 
+#ifdef ENABLE_ZSTD
+int unittest_stream_decompress_bomb_zstd(void);
+#endif
+
 int unittest_stream_compressions(void) {
     int ret = 0;
+
+#ifdef ENABLE_ZSTD
+    ret += unittest_stream_decompress_bomb_zstd();
+#endif
 
     ret += unittest_stream_compression(COMPRESSION_ALGORITHM_ZSTD, "ZSTD");
     ret += unittest_stream_compression(COMPRESSION_ALGORITHM_LZ4, "LZ4");
