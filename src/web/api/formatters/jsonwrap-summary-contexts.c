@@ -20,7 +20,7 @@ size_t query_target_summary_contexts_v2(BUFFER *wb, QUERY_TARGET *qt, const char
         z = dictionary_set(dict, rrdcontext_acquired_id(qc->rca), NULL, sizeof(*z));
 
         z->instances.selected += qc->instances.selected;
-        z->instances.excluded += qc->instances.selected;
+        z->instances.excluded += qc->instances.excluded;
         z->instances.queried += qc->instances.queried;
         z->instances.failed += qc->instances.failed;
 
