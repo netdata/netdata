@@ -293,11 +293,13 @@ avl_t *avl_remove(avl_tree_type *tree, avl_t *item) {
 // ---------------------------
 // traversing
 
-int avl_walker(avl_t *node, int (*callback)(void * /*entry*/, void * /*data*/), void *data) {
+static int avl_walker_depth(avl_t *node, int (*callback)(void * /*entry*/, void * /*data*/), void *data, size_t depth) {
     int total = 0, ret = 0;
 
+    avl_check_descent_height(depth, "traverse");
+
     if(node->avl_link[0]) {
-        ret = avl_walker(node->avl_link[0], callback, data);
+        ret = avl_walker_depth(node->avl_link[0], callback, data, depth + 1);
         if(ret < 0) return ret;
         total += ret;
     }
@@ -307,12 +309,16 @@ int avl_walker(avl_t *node, int (*callback)(void * /*entry*/, void * /*data*/), 
     total += ret;
 
     if(node->avl_link[1]) {
-        ret = avl_walker(node->avl_link[1], callback, data);
+        ret = avl_walker_depth(node->avl_link[1], callback, data, depth + 1);
         if (ret < 0) return ret;
         total += ret;
     }
 
     return total;
+}
+
+int avl_walker(avl_t *node, int (*callback)(void * /*entry*/, void * /*data*/), void *data) {
+    return avl_walker_depth(node, callback, data, 0);
 }
 
 int avl_traverse(avl_tree_type *tree, int (*callback)(void * /*entry*/, void * /*data*/), void *data) {
