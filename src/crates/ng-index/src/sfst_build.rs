@@ -219,3 +219,68 @@ pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result
     build_and_write(&row_index, out_path)?;
     Ok(stats)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ng_flatten::flatten_request;
+    use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
+    use opentelemetry_proto::tonic::common::v1::{
+        AnyValue, ArrayValue, KeyValue, KeyValueList, any_value::Value as Av,
+    };
+    use opentelemetry_proto::tonic::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
+
+    /// One record with a nested kvlist (`obj.inner`) and an array (`tags[]`) —
+    /// exercises both `Field` and `ArrayElem` steps in the two `path()` renderers.
+    fn nested_request() -> ExportLogsServiceRequest {
+        let any = |v| Some(AnyValue { value: Some(v) });
+        let rec = LogRecord {
+            time_unix_nano: 1_700_000_000_000_000_000,
+            attributes: vec![
+                KeyValue {
+                    key: "obj".into(),
+                    value: any(Av::KvlistValue(KeyValueList {
+                        values: vec![KeyValue {
+                            key: "inner".into(),
+                            value: any(Av::IntValue(1)),
+                        }],
+                    })),
+                },
+                KeyValue {
+                    key: "tags".into(),
+                    value: any(Av::ArrayValue(ArrayValue {
+                        values: vec![AnyValue { value: Some(Av::StringValue("a".into())) }],
+                    })),
+                },
+            ],
+            ..Default::default()
+        };
+        ExportLogsServiceRequest {
+            resource_logs: vec![ResourceLogs {
+                scope_logs: vec![ScopeLogs { log_records: vec![rec], ..Default::default() }],
+                ..Default::default()
+            }],
+        }
+    }
+
+    /// `to_sfst_tree` preserves node ids and structure, so the format crate's
+    /// `path()` must render every node identically to `ng_flatten`'s. This pins
+    /// the two duplicated renderers against a divergence that would silently
+    /// drop a field from the reader's derived field table (review finding D).
+    #[test]
+    fn sfst_and_ng_flatten_path_renderers_agree() {
+        let flattened = flatten_request(&nested_request());
+        let ng_tree = &flattened.tree;
+        let sfst_tree = to_sfst_tree(ng_tree);
+
+        assert_eq!(sfst_tree.len(), ng_tree.len(), "node count must be preserved");
+        assert!(ng_tree.len() > 3, "fixture should produce a non-trivial tree");
+        let mut saw_array = false;
+        for id in 0..ng_tree.len() as NodeId {
+            let expected = ng_tree.path(id);
+            saw_array |= expected.contains("[]");
+            assert_eq!(sfst_tree.path(id), expected, "path mismatch at node {id}");
+        }
+        assert!(saw_array, "fixture must exercise an ArrayElem ([]) step");
+    }
+}

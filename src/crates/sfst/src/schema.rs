@@ -9,6 +9,8 @@
 use serde::{Deserialize, Serialize};
 use treight::Bitmap;
 
+use crate::Error;
+
 // ── SUMR ─────────────────────────────────────────────────────────
 
 /// The cheap, content-agnostic per-file summary stored in the `SUMR` chunk —
@@ -83,9 +85,11 @@ pub struct IdRanges {
     pub high_end: KvId,
 }
 
-// ── Field table (carried inside META) ────────────────────────────
+// ── Field table (derived from the schema tree at read time) ───────
 
-/// One entry in the field table carried by [`Metadata::fields`].
+/// One entry in the **derived** flat field table — the read-time view
+/// produced by [`SchemaTree::derive_field_table`] from [`Metadata::tree`]
+/// (the on-disk [`SchemaTree`], as of v9). Not stored directly anymore.
 ///
 /// The table is ordered low → mid → high, with each tier internally
 /// sorted by field name. Readers walk it to count mid-card and
@@ -258,17 +262,81 @@ pub struct SchemaEdge {
 /// arena of [`SchemaNode`]s sized by structural variety, not data volume. Node
 /// `0` is the root. Replaces the flat `FieldTable` as the on-disk field
 /// descriptor (v9); the `FieldTable` is *derived* from it on demand.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SchemaTree {
     nodes: Vec<SchemaNode>,
+}
+
+impl Default for SchemaTree {
+    /// The canonical empty descriptor: a lone `Kvlist` root node (no leaves),
+    /// which satisfies the "node 0 is the root" invariant that
+    /// [`validate`](Self::validate) enforces — unlike a zero-node tree.
+    /// [`derive_field_table`](Self::derive_field_table) /
+    /// [`derive_scalar_kinds`](Self::derive_scalar_kinds) yield empty results
+    /// from it, and it is identical to `flat(&FieldTable::default())`.
+    fn default() -> Self {
+        Self {
+            nodes: vec![SchemaNode {
+                kind: ValueKind::Kvlist,
+                edge: None,
+                leaf: None,
+            }],
+        }
+    }
 }
 
 impl SchemaTree {
     /// Build a tree from raw nodes. The caller guarantees node `0` is the root
     /// (no edge) and every non-root edge points to a smaller id (parents
     /// precede children) — the invariant the producer's flattener maintains.
+    /// A tree decoded from a file is checked at the trust boundary instead
+    /// (see [`validate`](Self::validate), run at [`crate::Reader::metadata`]).
     pub fn from_nodes(nodes: Vec<SchemaNode>) -> Self {
-        Self { nodes }
+        let tree = Self { nodes };
+        debug_assert!(
+            tree.validate().is_ok(),
+            "from_nodes: schema tree invariant violated: {:?}",
+            tree.validate(),
+        );
+        tree
+    }
+
+    /// Check the structural invariants of a tree that crossed the trust
+    /// boundary (decoded from a file): a non-empty arena whose node `0` is the
+    /// root (no edge), and every non-root node has an edge whose `parent` is a
+    /// strictly smaller id. The `parent < id` rule also guarantees acyclicity
+    /// (ids strictly decrease toward the root), so [`path`](Self::path) /
+    /// [`steps`](Self::steps) can neither loop forever nor index out of bounds.
+    ///
+    /// O(N), run once at META decode so a malformed tree degrades to
+    /// [`Error::CorruptIndex`] (the query layer's skip-the-file path) rather
+    /// than panicking on unchecked indexing or hanging the reader thread.
+    pub fn validate(&self) -> Result<(), Error> {
+        let Some(root) = self.nodes.first() else {
+            return Err(Error::CorruptIndex("schema tree has no root node".into()));
+        };
+        if root.edge.is_some() {
+            return Err(Error::CorruptIndex(
+                "schema tree root (node 0) must have no edge".into(),
+            ));
+        }
+        for (id, node) in self.nodes.iter().enumerate().skip(1) {
+            match &node.edge {
+                None => {
+                    return Err(Error::CorruptIndex(format!(
+                        "schema tree non-root node {id} has no edge"
+                    )));
+                }
+                Some(edge) if edge.parent as usize >= id => {
+                    return Err(Error::CorruptIndex(format!(
+                        "schema tree node {id} parent {} does not precede it",
+                        edge.parent
+                    )));
+                }
+                Some(_) => {}
+            }
+        }
+        Ok(())
     }
 
     /// Build a **flat** tree from a [`FieldTable`]: one `Str`-typed leaf per
@@ -322,7 +390,8 @@ impl SchemaTree {
                 )
             })
             .collect();
-        // path() borrows &self, so resolve leaf paths up front, then mutate.
+        // path() needs &self; the loop below needs &mut self. Resolve all leaf
+        // paths first so the immutable borrow is released before mutating.
         let leaf_paths: Vec<Option<String>> = (0..self.nodes.len() as NodeId)
             .map(|id| {
                 self.nodes[id as usize]
@@ -336,9 +405,25 @@ impl SchemaTree {
                 node.leaf = by_name.get(path.as_str()).copied();
             }
         }
+        // Drift guard (dev only): a fully-filled tree must derive back to the
+        // exact table it was filled from. Catches a path-renderer divergence
+        // between this crate's `path()` and the producer's (`ng_flatten`) that
+        // would silently drop a field from the derived view.
+        debug_assert_eq!(
+            self.derive_field_table(),
+            *fields,
+            "fill_field_stats: derived field table does not round-trip to its input"
+        );
     }
 
     /// The node at `id`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `id` is out of bounds. Callers must use ids from this tree
+    /// (via [`iter`](Self::iter) / [`len`](Self::len)); a tree decoded from a
+    /// file is bounds-safe because [`validate`](Self::validate) runs at
+    /// [`crate::Reader::metadata`].
     pub fn node(&self, id: NodeId) -> &SchemaNode {
         &self.nodes[id as usize]
     }

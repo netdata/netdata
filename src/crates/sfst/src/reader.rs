@@ -4,8 +4,9 @@
 //! log-index file's chunks as typed values. Decompression and
 //! deserialization happen lazily — `open` only parses the header and
 //! TOC. The metadata chunk is cached on first access since it carries
-//! the field table needed to bucket secondary chunks into mid/high
-//! subtypes.
+//! the schema tree (the field descriptor); the flat field table — used
+//! to bucket secondary chunks into mid/high subtypes — is derived from
+//! it and cached alongside.
 
 use std::cell::OnceCell;
 
@@ -34,7 +35,7 @@ pub(crate) fn unpack<T: DeserializeOwned>(data: &[u8]) -> Result<T, Error> {
 ///
 /// `open` parses only the header and TOC. Typed accessors decode their
 /// chunks on demand. The [`Metadata`] chunk (histogram, id ranges,
-/// field table) is cached after first access so the bucketing of
+/// schema tree) is cached after first access so the bucketing of
 /// secondary chunks doesn't repeatedly decompress META.
 pub struct Reader<'a> {
     data: &'a [u8],
@@ -93,6 +94,11 @@ impl<'a> Reader<'a> {
             return Ok(m);
         }
         let decoded = unpack::<Metadata>(self.metadata_raw()?)?;
+        // Validate the decoded schema tree at the trust boundary: a malformed
+        // tree (bad root, out-of-range or non-decreasing parent) must surface
+        // as CorruptIndex so the query layer skips the file, not panic/hang the
+        // unchecked path/steps walk that derives the field table.
+        decoded.tree.validate()?;
         Ok(self.metadata.get_or_init(|| decoded))
     }
 

@@ -175,6 +175,55 @@ fn scalar_coalescing_lattice() {
     );
 }
 
+/// `validate` accepts well-formed trees and rejects every malformed shape a
+/// decoded (untrusted) file could carry, so `Reader::metadata` degrades to
+/// `CorruptIndex` instead of panicking on unchecked indexing (`node`/`steps`)
+/// or hanging the parent walk. The bad trees are built via the struct literal
+/// (the `schema::tests` child module sees the private `nodes` field) to bypass
+/// `from_nodes`' debug-assert and mimic a bincode-decoded tree.
+#[test]
+fn validate_rejects_malformed_trees() {
+    use crate::Error;
+    let root = || SchemaNode { kind: ValueKind::Kvlist, edge: None, leaf: None };
+    let leaf = |parent: u32, name: &str| SchemaNode {
+        kind: ValueKind::Str,
+        edge: Some(SchemaEdge { parent, step: Step::Field(name.into()) }),
+        leaf: Some(LeafStats { cardinality: 1, tier: FieldTier::Low }),
+    };
+
+    // Well-formed: root + a child pointing back to it.
+    assert!(SchemaTree { nodes: vec![root(), leaf(0, "a")] }.validate().is_ok());
+
+    let bad = [
+        SchemaTree { nodes: vec![] },                          // no root
+        SchemaTree { nodes: vec![leaf(0, "x")] },              // node 0 has an edge
+        SchemaTree { nodes: vec![root(), leaf(99, "x")] },     // out-of-range parent
+        SchemaTree { nodes: vec![root(), leaf(1, "x")] },      // self-cycle (parent == id)
+        SchemaTree { nodes: vec![root(), leaf(2, "x"), leaf(0, "y")] }, // forward edge
+        SchemaTree {
+            nodes: vec![root(), SchemaNode { kind: ValueKind::Str, edge: None, leaf: None }],
+        }, // non-root node missing its edge
+    ];
+    for (i, tree) in bad.iter().enumerate() {
+        assert!(
+            matches!(tree.validate(), Err(Error::CorruptIndex(_))),
+            "malformed tree #{i} should be rejected as CorruptIndex"
+        );
+    }
+}
+
+/// `SchemaTree::default()` is the canonical empty descriptor — a valid root-only
+/// tree (not an empty arena), so it passes `validate`, derives an empty field
+/// table, and equals `flat(&FieldTable::default())`.
+#[test]
+fn default_tree_is_valid_root_only() {
+    let d = SchemaTree::default();
+    assert_eq!(d.len(), 1);
+    assert!(d.validate().is_ok());
+    assert_eq!(d.derive_field_table(), FieldTable::default());
+    assert_eq!(d, SchemaTree::flat(&FieldTable::default()));
+}
+
 /// A full `Metadata` carrying a typed tree round-trips through the on-disk
 /// codec (zstd + bincode via `pack`/`unpack`), and the derived field table
 /// survives.

@@ -300,6 +300,12 @@ no typed tree (the legacy `wal-otap` index path) emits a flat `Str`-typed tree
 is not stored anywhere — the tree records the *set* of kinds per path, not which
 kind each stored value was.
 
+On decode the reader validates the tree's structural invariants (non-empty arena;
+node 0 is the root with no edge; every non-root `parent` is a strictly smaller id,
+which also forbids cycles) via `SchemaTree::validate`. A file violating them is
+rejected as `CorruptIndex` (the query layer's skip-the-file path) rather than
+panicking the unchecked path walk or hanging on a cyclic edge.
+
 ### `PRIM` — Primary FST
 
 `fst_index::FstIndex<BitmapValue>` containing every low-cardinality
