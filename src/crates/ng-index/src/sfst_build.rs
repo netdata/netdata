@@ -12,11 +12,13 @@ use std::path::Path;
 use bumpalo::Bump;
 use sfst::{DroppedAttributeCounts, Flags, ObservedTimestamps, SpanIds, TraceIds};
 use sfst_indexer::KvSlot;
-use sfst_indexer::{build_and_write, build_into};
 use sfst_indexer::row_index::RowIndex;
+use sfst_indexer::{build_and_write, build_into};
 use wal_otap::KvSink;
 
-use crate::{Entry, Error, FlattenedRequest, Metrics, NodeId, build_kv, decode_frame, sole_wal_file};
+use crate::{
+    Entry, Error, FlattenedRequest, Metrics, NodeId, build_kv, decode_frame, sole_wal_file,
+};
 
 /// Map a flatten [`ng_flatten::Kind`] to the format crate's [`sfst::ValueKind`].
 /// Identical variant sets; the conversion keeps `sfst` independent of
@@ -311,7 +313,9 @@ mod tests {
                 KeyValue {
                     key: "tags".into(),
                     value: any(Av::ArrayValue(ArrayValue {
-                        values: vec![AnyValue { value: Some(Av::StringValue("a".into())) }],
+                        values: vec![AnyValue {
+                            value: Some(Av::StringValue("a".into())),
+                        }],
                     })),
                 },
             ],
@@ -319,7 +323,10 @@ mod tests {
         };
         ExportLogsServiceRequest {
             resource_logs: vec![ResourceLogs {
-                scope_logs: vec![ScopeLogs { log_records: vec![rec], ..Default::default() }],
+                scope_logs: vec![ScopeLogs {
+                    log_records: vec![rec],
+                    ..Default::default()
+                }],
                 ..Default::default()
             }],
         }
@@ -335,8 +342,15 @@ mod tests {
         let ng_tree = &flattened.tree;
         let sfst_tree = to_sfst_tree(ng_tree);
 
-        assert_eq!(sfst_tree.len(), ng_tree.len(), "node count must be preserved");
-        assert!(ng_tree.len() > 3, "fixture should produce a non-trivial tree");
+        assert_eq!(
+            sfst_tree.len(),
+            ng_tree.len(),
+            "node count must be preserved"
+        );
+        assert!(
+            ng_tree.len() > 3,
+            "fixture should produce a non-trivial tree"
+        );
         let mut saw_array = false;
         for id in 0..ng_tree.len() as NodeId {
             let expected = ng_tree.path(id);

@@ -262,7 +262,10 @@ impl<'a> KeyValueInterner<'a> {
             for &(field, ids) in tier {
                 let prefix = field.len();
                 scratch.clear();
-                scratch.extend(ids.iter().map(|&id| (&self.strings[id.idx()][prefix..], id)));
+                scratch.extend(
+                    ids.iter()
+                        .map(|&id| (&self.strings[id.idx()][prefix..], id)),
+                );
                 scratch.sort_unstable_by(|a, b| a.0.cmp(b.0));
                 order.extend(scratch.iter().map(|&(_, id)| id));
             }

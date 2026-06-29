@@ -315,8 +315,11 @@ pub fn build_and_write(
     // produced this index was already durably deleted, losing the
     // seq's data with no recovery path.
     let (guard, file) = file_registry::durable::AtomicFile::create(out_path)?;
-    let (buf, summary, metadata) =
-        build_into(row_index, std::io::BufWriter::new(file), content_meta_override)?;
+    let (buf, summary, metadata) = build_into(
+        row_index,
+        std::io::BufWriter::new(file),
+        content_meta_override,
+    )?;
     let file = buf.into_inner().map_err(|e| e.into_error())?;
     let file_size = file.metadata()?.len();
     guard.commit(file)?;
@@ -442,11 +445,22 @@ pub fn build_into<W: Write + Seek>(
     let mut col_entries = Vec::new();
     let mut col_entry = |present: bool, name: &str, ty| {
         if present {
-            col_entries.push(ColumnEntry { name: name.to_string(), ty });
+            col_entries.push(ColumnEntry {
+                name: name.to_string(),
+                ty,
+            });
         }
     };
-    col_entry(columns_present.observed_ts, ObservedTimestamps::NAME, ObservedTimestamps::COLUMN_TYPE);
-    col_entry(columns_present.trace_id, TraceIds::NAME, TraceIds::COLUMN_TYPE);
+    col_entry(
+        columns_present.observed_ts,
+        ObservedTimestamps::NAME,
+        ObservedTimestamps::COLUMN_TYPE,
+    );
+    col_entry(
+        columns_present.trace_id,
+        TraceIds::NAME,
+        TraceIds::COLUMN_TYPE,
+    );
     col_entry(columns_present.span_id, SpanIds::NAME, SpanIds::COLUMN_TYPE);
     col_entry(columns_present.flags, Flags::NAME, Flags::COLUMN_TYPE);
     col_entry(
@@ -556,7 +570,11 @@ pub fn build_into<W: Write + Seek>(
 /// [`IndexError::ColumnLengthMismatch`] otherwise — a caller bug, not a panic.
 fn check_column_len(column: &'static str, got: usize, expected: usize) -> Result<(), IndexError> {
     if got != expected {
-        return Err(IndexError::ColumnLengthMismatch { column, got, expected });
+        return Err(IndexError::ColumnLengthMismatch {
+            column,
+            got,
+            expected,
+        });
     }
     Ok(())
 }

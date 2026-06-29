@@ -580,7 +580,8 @@ impl LogsService for NetdataLogsService {
                     ng_flatten::SPAN_ID_LEN,
                 );
             }
-            let (log_min_ts, log_max_ts) = compute_log_ts_range(&request.resource_logs, ingestion_ns);
+            let (log_min_ts, log_max_ts) =
+                compute_log_ts_range(&request.resource_logs, ingestion_ns);
             let mut flattened = ng_flatten::flatten_request(&request);
             ng_flatten::fill_hashes(&mut flattened);
             let data = ng_flatten::encode_frame(&flattened).map_err(|e| {

@@ -111,7 +111,11 @@ impl Metrics {
         );
         for (name, elapsed) in self.phases.borrow().iter() {
             let phase_secs = elapsed.as_secs_f64();
-            let share = if secs > 0.0 { phase_secs / secs * 100.0 } else { 0.0 };
+            let share = if secs > 0.0 {
+                phase_secs / secs * 100.0
+            } else {
+                0.0
+            };
             // Per-phase logs/s — the key metric for tracking an optimization's
             // effect on a single stage (records processed over that phase's time).
             let logs_per_s = if phase_secs > 0.0 {

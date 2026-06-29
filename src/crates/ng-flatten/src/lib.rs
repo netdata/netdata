@@ -287,7 +287,11 @@ impl Flattener {
     /// Emit a leaf entry under `parent` via `step`.
     fn emit(&mut self, parent: NodeId, step: Step, value: Value, out: &mut Vec<Entry>) {
         let node = self.child(parent, step, value.kind());
-        out.push(Entry { node, value, hash: 0 });
+        out.push(Entry {
+            node,
+            value,
+            hash: 0,
+        });
     }
 
     /// Flatten one OTLP `AnyValue` reached from `parent` via `step`.
@@ -365,7 +369,11 @@ impl Flattener {
             );
         }
         if !scope.attributes.is_empty() {
-            let attrs = self.child(scope_node, Step::Field("attributes".to_string()), Kind::Kvlist);
+            let attrs = self.child(
+                scope_node,
+                Step::Field("attributes".to_string()),
+                Kind::Kvlist,
+            );
             for kv in &scope.attributes {
                 self.flatten_kv(attrs, kv, &mut out);
             }
@@ -386,13 +394,25 @@ impl Flattener {
         // and `trace_id`/`span_id` (near-unique identifiers). `flags` and
         // `dropped_attributes_count` are likewise carried on the record.
         if record.severity_number != 0 {
-            self.scalar("severity_number", Value::Int(record.severity_number as i64), &mut out);
+            self.scalar(
+                "severity_number",
+                Value::Int(record.severity_number as i64),
+                &mut out,
+            );
         }
         if !record.severity_text.is_empty() {
-            self.scalar("severity_text", Value::Str(record.severity_text.clone()), &mut out);
+            self.scalar(
+                "severity_text",
+                Value::Str(record.severity_text.clone()),
+                &mut out,
+            );
         }
         if !record.event_name.is_empty() {
-            self.scalar("event_name", Value::Str(record.event_name.clone()), &mut out);
+            self.scalar(
+                "event_name",
+                Value::Str(record.event_name.clone()),
+                &mut out,
+            );
         }
 
         if let Some(body) = &record.body {
@@ -727,7 +747,11 @@ mod tests {
     }
     /// All values at `path`, in document order (handles array-collapsed dups).
     fn at<'a>(leaves: &'a [Leaf], path: &str) -> Vec<&'a Value> {
-        leaves.iter().filter(|l| l.path == path).map(|l| &l.value).collect()
+        leaves
+            .iter()
+            .filter(|l| l.path == path)
+            .map(|l| &l.value)
+            .collect()
     }
 
     /// The id of the first node whose collapsed path equals `path` (paths in the
@@ -762,12 +786,18 @@ mod tests {
         assert_eq!(at(&leaves, "severity_number"), [&Value::Int(9)]);
         assert_eq!(at(&leaves, "severity_text"), [&Value::Str("INFO".into())]);
         // trace_id is a per-row column on `Record`, NOT a flattened entry.
-        assert!(at(&leaves, "trace_id").is_empty(), "trace_id is a column, not a facet");
+        assert!(
+            at(&leaves, "trace_id").is_empty(),
+            "trace_id is a column, not a facet"
+        );
         assert_eq!(at(&leaves, "attributes.str"), [&Value::Str("hello".into())]);
         assert_eq!(at(&leaves, "attributes.int"), [&Value::Int(42)]);
         assert_eq!(at(&leaves, "attributes.double"), [&Value::Double(3.5)]);
         assert_eq!(at(&leaves, "attributes.bool"), [&Value::Bool(true)]);
-        assert_eq!(at(&leaves, "attributes.bytes"), [&Value::Bytes(vec![0xde, 0xad])]);
+        assert_eq!(
+            at(&leaves, "attributes.bytes"),
+            [&Value::Bytes(vec![0xde, 0xad])]
+        );
     }
 
     #[test]
@@ -802,7 +832,10 @@ mod tests {
         let leaves = tree.resolve(&entries);
 
         assert_eq!(at(&leaves, "attributes.user.id"), [&Value::Int(7)]);
-        assert_eq!(at(&leaves, "attributes.user.name"), [&Value::Str("x".into())]);
+        assert_eq!(
+            at(&leaves, "attributes.user.name"),
+            [&Value::Str("x".into())]
+        );
         // Array indices collapse to `[]`: both elements at one path/node, in order.
         assert_eq!(
             at(&leaves, "attributes.tags[]"),
@@ -828,12 +861,18 @@ mod tests {
         let tree = f.into_tree();
 
         assert_eq!(
-            at(&tree.resolve(&resource_entries), "resource.attributes.service.name"),
+            at(
+                &tree.resolve(&resource_entries),
+                "resource.attributes.service.name"
+            ),
             [&Value::Str("svc".into())],
         );
         let scope_leaves = tree.resolve(&scope_entries);
         assert_eq!(at(&scope_leaves, "scope.name"), [&Value::Str("lib".into())]);
-        assert_eq!(at(&scope_leaves, "scope.version"), [&Value::Str("1.0".into())]);
+        assert_eq!(
+            at(&scope_leaves, "scope.version"),
+            [&Value::Str("1.0".into())]
+        );
     }
 
     #[test]
@@ -897,7 +936,10 @@ mod tests {
                         kv(
                             "roles",
                             Av::ArrayValue(ArrayValue {
-                                values: roles.into_iter().map(|r| av(Av::StringValue(r.into()))).collect(),
+                                values: roles
+                                    .into_iter()
+                                    .map(|r| av(Av::StringValue(r.into())))
+                                    .collect(),
                             }),
                         ),
                     ],
@@ -946,12 +988,20 @@ mod tests {
 
         // Array-collapse survives the merge: frame A's two role values share one
         // local node, which maps to a single global `[]` column.
-        let a_roles: Vec<&Entry> =
-            a.iter().filter(|e| tree_a.path(e.node) == "attributes.user.roles[]").collect();
+        let a_roles: Vec<&Entry> = a
+            .iter()
+            .filter(|e| tree_a.path(e.node) == "attributes.user.roles[]")
+            .collect();
         assert_eq!(a_roles.len(), 2, "two array elements under one node");
         assert_eq!(a_roles[0].node, a_roles[1].node, "share one local node");
-        assert_eq!(map_a[a_roles[0].node as usize], map_a[a_roles[1].node as usize]);
-        let b_roles = b.iter().filter(|e| tree_b.path(e.node) == "attributes.user.roles[]").count();
+        assert_eq!(
+            map_a[a_roles[0].node as usize],
+            map_a[a_roles[1].node as usize]
+        );
+        let b_roles = b
+            .iter()
+            .filter(|e| tree_b.path(e.node) == "attributes.user.roles[]")
+            .count();
         assert_eq!(b_roles, 1);
 
         // Global column space is the union: http.method (A) + region (B) +
@@ -993,7 +1043,10 @@ mod tests {
         let mut f = Flattener::new();
         let a = f.flatten_record(&make(9));
         let b = f.flatten_record(&make(17));
-        assert_eq!(a[0].node, b[0].node, "severity_number must share one column node");
+        assert_eq!(
+            a[0].node, b[0].node,
+            "severity_number must share one column node"
+        );
         let tree = f.into_tree();
         assert_eq!(tree.path(a[0].node), "severity_number");
     }
@@ -1015,13 +1068,29 @@ mod tests {
     fn normalize_timestamps_resolves_time_then_observed_then_base_offset() {
         let mut req = req_of(vec![
             // event time kept as-is
-            LogRecord { time_unix_nano: 100, observed_time_unix_nano: 50, ..Default::default() },
+            LogRecord {
+                time_unix_nano: 100,
+                observed_time_unix_nano: 50,
+                ..Default::default()
+            },
             // no event time -> observed
-            LogRecord { time_unix_nano: 0, observed_time_unix_nano: 77, ..Default::default() },
+            LogRecord {
+                time_unix_nano: 0,
+                observed_time_unix_nano: 77,
+                ..Default::default()
+            },
             // neither -> base + 1
-            LogRecord { time_unix_nano: 0, observed_time_unix_nano: 0, ..Default::default() },
+            LogRecord {
+                time_unix_nano: 0,
+                observed_time_unix_nano: 0,
+                ..Default::default()
+            },
             // neither -> base + 2 (offset increments per fallback record)
-            LogRecord { time_unix_nano: 0, observed_time_unix_nano: 0, ..Default::default() },
+            LogRecord {
+                time_unix_nano: 0,
+                observed_time_unix_nano: 0,
+                ..Default::default()
+            },
         ]);
         normalize_timestamps(&mut req, 1000);
         let ts: Vec<u64> = req.resource_logs[0].scope_logs[0]
@@ -1036,11 +1105,23 @@ mod tests {
     fn normalize_ids_clears_only_wrong_length() {
         let mut req = req_of(vec![
             // conformant widths kept
-            LogRecord { trace_id: vec![9u8; 16], span_id: vec![9u8; 8], ..Default::default() },
+            LogRecord {
+                trace_id: vec![9u8; 16],
+                span_id: vec![9u8; 8],
+                ..Default::default()
+            },
             // absent kept absent
-            LogRecord { trace_id: vec![], span_id: vec![], ..Default::default() },
+            LogRecord {
+                trace_id: vec![],
+                span_id: vec![],
+                ..Default::default()
+            },
             // wrong widths cleared
-            LogRecord { trace_id: vec![1u8; 10], span_id: vec![2u8; 3], ..Default::default() },
+            LogRecord {
+                trace_id: vec![1u8; 10],
+                span_id: vec![2u8; 3],
+                ..Default::default()
+            },
         ]);
         let bad = normalize_ids(&mut req);
         assert_eq!((bad.trace, bad.span), (1, 1));

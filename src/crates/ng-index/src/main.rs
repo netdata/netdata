@@ -12,7 +12,10 @@ use ng_index::{Metrics, build_sfst, read_rss};
 use sfst::IndexReader;
 
 #[derive(Parser)]
-#[command(name = "ng-index", about = "Build an SFST index from a flattened-frame WAL")]
+#[command(
+    name = "ng-index",
+    about = "Build an SFST index from a flattened-frame WAL"
+)]
 struct Args {
     /// Directory holding the flattened WAL written by `ng-ingest`.
     #[arg(long)]
@@ -51,7 +54,10 @@ fn run_sfst(args: &Args, out_path: &Path, metrics: &Metrics) -> ExitCode {
         stats.hits as f64 / total as f64 * 100.0,
     );
     if let Ok(meta) = std::fs::metadata(out_path) {
-        println!("sfst size: {:.1} MiB on disk", meta.len() as f64 / (1024.0 * 1024.0));
+        println!(
+            "sfst size: {:.1} MiB on disk",
+            meta.len() as f64 / (1024.0 * 1024.0)
+        );
     }
     print!("{}", metrics.report());
     print_rss();

@@ -128,8 +128,8 @@ async fn main() -> anyhow::Result<()> {
         done: Arc::clone(&done),
     };
 
-    let svc = LogsServiceServer::new(receiver)
-        .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
+    let svc =
+        LogsServiceServer::new(receiver).accept_compressed(tonic::codec::CompressionEncoding::Gzip);
 
     tracing::info!(
         listen = %args.listen,

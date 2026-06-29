@@ -55,7 +55,10 @@ fn log_record(body: &str, severity: i32) -> LogRecord {
             kv("int", any_value::Value::IntValue(42)),
             kv("double", any_value::Value::DoubleValue(3.5)),
             kv("bool", any_value::Value::BoolValue(true)),
-            kv("bytes", any_value::Value::BytesValue(vec![0xde, 0xad, 0xbe, 0xef])),
+            kv(
+                "bytes",
+                any_value::Value::BytesValue(vec![0xde, 0xad, 0xbe, 0xef]),
+            ),
             kv("nested", nested),
             kv("arr", array),
         ],
@@ -116,7 +119,11 @@ fn all_leaves(flattened: &FlattenedRequest) -> Vec<Leaf> {
 
 /// All values at `path`, in document order.
 fn at<'a>(leaves: &'a [Leaf], path: &str) -> Vec<&'a Value> {
-    leaves.iter().filter(|l| l.path == path).map(|l| &l.value).collect()
+    leaves
+        .iter()
+        .filter(|l| l.path == path)
+        .map(|l| &l.value)
+        .collect()
 }
 
 #[test]
@@ -159,22 +166,52 @@ fn request_roundtrips_through_a_wal_frame() {
     // Typed scalar / nested / array values survive the round-trip (two records, so
     // each shared column appears twice; bodies differ per record).
     let leaves = all_leaves(&flattened);
-    assert!(at(&leaves, "time_unix_nano").is_empty(), "time is the row ts, not a facet");
+    assert!(
+        at(&leaves, "time_unix_nano").is_empty(),
+        "time is the row ts, not a facet"
+    );
     assert!(at(&leaves, "observed_time_unix_nano").is_empty());
-    assert!(at(&leaves, "trace_id").is_empty(), "trace_id is a column, not a facet");
-    assert!(at(&leaves, "span_id").is_empty(), "span_id is a column, not a facet");
-    assert_eq!(at(&leaves, "resource.attributes.service.name"), [&Value::Str("svc".into())]);
+    assert!(
+        at(&leaves, "trace_id").is_empty(),
+        "trace_id is a column, not a facet"
+    );
+    assert!(
+        at(&leaves, "span_id").is_empty(),
+        "span_id is a column, not a facet"
+    );
+    assert_eq!(
+        at(&leaves, "resource.attributes.service.name"),
+        [&Value::Str("svc".into())]
+    );
     assert_eq!(at(&leaves, "scope.name"), [&Value::Str("scope".into())]);
     assert_eq!(at(&leaves, "scope.version"), [&Value::Str("1.0".into())]);
-    assert_eq!(at(&leaves, "body"), [&Value::Str("first".into()), &Value::Str("second".into())]);
-    assert_eq!(at(&leaves, "attributes.int"), [&Value::Int(42), &Value::Int(42)]);
-    assert_eq!(at(&leaves, "attributes.double"), [&Value::Double(3.5), &Value::Double(3.5)]);
-    assert_eq!(at(&leaves, "attributes.bool"), [&Value::Bool(true), &Value::Bool(true)]);
+    assert_eq!(
+        at(&leaves, "body"),
+        [&Value::Str("first".into()), &Value::Str("second".into())]
+    );
+    assert_eq!(
+        at(&leaves, "attributes.int"),
+        [&Value::Int(42), &Value::Int(42)]
+    );
+    assert_eq!(
+        at(&leaves, "attributes.double"),
+        [&Value::Double(3.5), &Value::Double(3.5)]
+    );
+    assert_eq!(
+        at(&leaves, "attributes.bool"),
+        [&Value::Bool(true), &Value::Bool(true)]
+    );
     assert_eq!(
         at(&leaves, "attributes.bytes"),
-        [&Value::Bytes(vec![0xde, 0xad, 0xbe, 0xef]), &Value::Bytes(vec![0xde, 0xad, 0xbe, 0xef])],
+        [
+            &Value::Bytes(vec![0xde, 0xad, 0xbe, 0xef]),
+            &Value::Bytes(vec![0xde, 0xad, 0xbe, 0xef])
+        ],
     );
-    assert_eq!(at(&leaves, "attributes.nested.inner_int"), [&Value::Int(7), &Value::Int(7)]);
+    assert_eq!(
+        at(&leaves, "attributes.nested.inner_int"),
+        [&Value::Int(7), &Value::Int(7)]
+    );
     // Array indices collapse to `[]`: both elements per record, in order (2 records).
     assert_eq!(
         at(&leaves, "attributes.arr[]"),
@@ -204,7 +241,10 @@ fn empty_request_writes_no_frame() {
             ..Default::default()
         }],
     };
-    assert_eq!(write_request(&mut writer, &mut clock, &mut empty).unwrap(), 0);
+    assert_eq!(
+        write_request(&mut writer, &mut clock, &mut empty).unwrap(),
+        0
+    );
     writer.shutdown_all().unwrap();
 
     // No file is created when no frame was written.
@@ -259,7 +299,10 @@ fn ts_falls_back_to_observed_when_time_is_zero() {
         ..Default::default()
     }]);
     let records = write_and_decode_records(&mut req);
-    assert_eq!(records[0].ts, observed as i64, "time==0 falls back to observed");
+    assert_eq!(
+        records[0].ts, observed as i64,
+        "time==0 falls back to observed"
+    );
 }
 
 #[test]
@@ -281,10 +324,24 @@ fn malformed_ids_are_cleared_at_ingest() {
         },
     ]);
     let records = write_and_decode_records(&mut req);
-    assert!(records[0].trace_id.is_empty(), "malformed trace_id cleared at ingest");
-    assert!(records[0].span_id.is_empty(), "malformed span_id cleared at ingest");
-    assert_eq!(records[1].trace_id, vec![0xab; 16], "conformant trace_id preserved");
-    assert_eq!(records[1].span_id, vec![0xcd; 8], "conformant span_id preserved");
+    assert!(
+        records[0].trace_id.is_empty(),
+        "malformed trace_id cleared at ingest"
+    );
+    assert!(
+        records[0].span_id.is_empty(),
+        "malformed span_id cleared at ingest"
+    );
+    assert_eq!(
+        records[1].trace_id,
+        vec![0xab; 16],
+        "conformant trace_id preserved"
+    );
+    assert_eq!(
+        records[1].span_id,
+        vec![0xcd; 8],
+        "conformant span_id preserved"
+    );
 }
 
 #[test]
@@ -303,5 +360,8 @@ fn ts_falls_back_to_clock_when_both_zero() {
     ]);
     let records = write_and_decode_records(&mut req);
     assert!(records[0].ts > 0, "both zero -> monotonic clock fallback");
-    assert!(records[1].ts > records[0].ts, "clock fallback is strictly increasing");
+    assert!(
+        records[1].ts > records[0].ts,
+        "clock fallback is strictly increasing"
+    );
 }

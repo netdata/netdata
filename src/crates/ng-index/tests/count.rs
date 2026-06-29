@@ -128,7 +128,15 @@ fn per_row_columns_roundtrip_in_chronological_order() {
     fill_hashes(&mut flattened);
     let bytes = encode_frame(&flattened).unwrap();
     writer
-        .write_frame(0, &[], &bytes, N, TimestampNs(1), TimestampNs::ZERO, TimestampNs::ZERO)
+        .write_frame(
+            0,
+            &[],
+            &bytes,
+            N,
+            TimestampNs(1),
+            TimestampNs::ZERO,
+            TimestampNs::ZERO,
+        )
         .unwrap();
     writer.shutdown_all().unwrap();
 
@@ -143,7 +151,13 @@ fn per_row_columns_roundtrip_in_chronological_order() {
     assert!(reader.has_per_row_columns().unwrap());
     assert_eq!(
         reader.columns_table().unwrap().names().collect::<Vec<_>>(),
-        ["observed_ts", "trace_id", "span_id", "flags", "dropped_attributes_count"],
+        [
+            "observed_ts",
+            "trace_id",
+            "span_id",
+            "flags",
+            "dropped_attributes_count"
+        ],
     );
     let ts = reader.timestamps().unwrap();
     let observed = reader.observed_timestamps().unwrap();
@@ -165,9 +179,17 @@ fn per_row_columns_roundtrip_in_chronological_order() {
     // source insertion index `i = N-1-p` — a range loop is the clearest form.
     #[allow(clippy::needless_range_loop)]
     for p in 0..N {
-        assert_eq!(ts[p], (BASE + (p + 1) as u64) as i64, "chronological ts at {p}");
+        assert_eq!(
+            ts[p],
+            (BASE + (p + 1) as u64) as i64,
+            "chronological ts at {p}"
+        );
         let i = N - 1 - p;
-        assert_eq!(observed.0[p], (BASE + 1000 + i as u64) as i64, "observed at {p}");
+        assert_eq!(
+            observed.0[p],
+            (BASE + 1000 + i as u64) as i64,
+            "observed at {p}"
+        );
         assert_eq!(trace.get(p), &[i as u8; 16][..], "trace_id at {p}");
         assert_eq!(span.get(p), &[i as u8; 8][..], "span_id at {p}");
         assert_eq!(flags.0[p], 0x100 | i as u32, "flags at {p}");
@@ -226,7 +248,15 @@ fn typed_tree_and_coalesced_kinds_roundtrip() {
     fill_hashes(&mut flattened);
     let bytes = encode_frame(&flattened).unwrap();
     writer
-        .write_frame(0, &[], &bytes, 4, TimestampNs(1), TimestampNs::ZERO, TimestampNs::ZERO)
+        .write_frame(
+            0,
+            &[],
+            &bytes,
+            4,
+            TimestampNs(1),
+            TimestampNs::ZERO,
+            TimestampNs::ZERO,
+        )
         .unwrap();
     writer.shutdown_all().unwrap();
 
@@ -307,9 +337,11 @@ fn build_sfst_range_whole_file_matches_file_build() {
     let (dir, wal_path) = write_multiframe_flat_wal(3);
     let file_len = std::fs::metadata(&wal_path).unwrap().len();
 
-    let (mem_summary, mem_bytes) =
-        build_sfst_range(&wal_path, wal::FrameRange::new(wal::HEADER_SIZE as u64, file_len))
-            .unwrap();
+    let (mem_summary, mem_bytes) = build_sfst_range(
+        &wal_path,
+        wal::FrameRange::new(wal::HEADER_SIZE as u64, file_len),
+    )
+    .unwrap();
 
     let out = dir.path().join("file.sfst");
     build_sfst(dir.path(), &out, &Metrics::new()).unwrap();
@@ -340,12 +372,17 @@ fn build_sfst_range_split_partitions_records() {
     assert!(frames.len() >= 2, "need multiple frames to split");
     let split = frames[frames.len() / 2 - 1].end_offset;
 
-    let (a, _) =
-        build_sfst_range(&wal_path, wal::FrameRange::new(wal::HEADER_SIZE as u64, split)).unwrap();
+    let (a, _) = build_sfst_range(
+        &wal_path,
+        wal::FrameRange::new(wal::HEADER_SIZE as u64, split),
+    )
+    .unwrap();
     let (b, _) = build_sfst_range(&wal_path, wal::FrameRange::new(split, file_len)).unwrap();
-    let (whole, _) =
-        build_sfst_range(&wal_path, wal::FrameRange::new(wal::HEADER_SIZE as u64, file_len))
-            .unwrap();
+    let (whole, _) = build_sfst_range(
+        &wal_path,
+        wal::FrameRange::new(wal::HEADER_SIZE as u64, file_len),
+    )
+    .unwrap();
 
     assert_eq!(
         a.record_count + b.record_count,

@@ -28,8 +28,12 @@ fn build_sfst(rows: &[(i64, &[&str])]) -> Vec<u8> {
 
 /// Count records matching `filter` across all time.
 fn count(reader: &IndexReader, filter: Filter) -> u64 {
-    let bf = reader.compile_filter(&filter, None).expect("compile_filter");
-    reader.matched_count(&bf, i64::MIN..i64::MAX).expect("matched_count")
+    let bf = reader
+        .compile_filter(&filter, None)
+        .expect("compile_filter");
+    reader
+        .matched_count(&bf, i64::MIN..i64::MAX)
+        .expect("matched_count")
 }
 
 #[test]
@@ -37,9 +41,18 @@ fn build_sfst_from_our_rows_and_query_back() {
     // Timestamps deliberately out of arrival order, to exercise the index-build
     // time-sort.
     let rows: &[(i64, &[&str])] = &[
-        (300, &["service=checkout", "http.method=GET", "http.status=200"]),
-        (100, &["service=checkout", "http.method=POST", "http.status=500"]),
-        (200, &["service=billing", "http.method=GET", "http.status=200"]),
+        (
+            300,
+            &["service=checkout", "http.method=GET", "http.status=200"],
+        ),
+        (
+            100,
+            &["service=checkout", "http.method=POST", "http.status=500"],
+        ),
+        (
+            200,
+            &["service=billing", "http.method=GET", "http.status=200"],
+        ),
     ];
 
     let bytes = build_sfst(rows);
@@ -49,12 +62,24 @@ fn build_sfst_from_our_rows_and_query_back() {
     assert_eq!(count(&reader, Filter::new()), 3);
 
     // Exact matches.
-    assert_eq!(count(&reader, Filter::new().select("service", "checkout")), 2);
-    assert_eq!(count(&reader, Filter::new().select("http.method", "GET")), 2);
-    assert_eq!(count(&reader, Filter::new().select("http.status", "500")), 1);
+    assert_eq!(
+        count(&reader, Filter::new().select("service", "checkout")),
+        2
+    );
+    assert_eq!(
+        count(&reader, Filter::new().select("http.method", "GET")),
+        2
+    );
+    assert_eq!(
+        count(&reader, Filter::new().select("http.status", "500")),
+        1
+    );
 
     // Full-value regex (anchored ^(?:5..)$ -> matches "500").
-    assert_eq!(count(&reader, Filter::new().select_pattern("http.status", "5..")), 1);
+    assert_eq!(
+        count(&reader, Filter::new().select_pattern("http.status", "5..")),
+        1
+    );
 
     // AND across fields: checkout AND GET -> only the ts=300 row.
     let both = Filter::new()
