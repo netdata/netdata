@@ -802,9 +802,16 @@ static inline BITMAPL_t j__udyCountBitsL(BITMAPL_t word)
 // TBD:  Perhaps use an array[32] of masks instead of calculating them.
 
 #define JU_BITPOSMASKB(BITNUM) (1L << ((BITNUM) % cJU_BITSPERSUBEXPB))
-#ifdef OS_WINDOWS
-// On Windows, `long` is 32 bits even in 64-bit builds; use BITMAPL_t (uint64_t
-// on 64-bit) so shifts into positions 32-63 work correctly.
+// On Windows LLP64 builds (MSVC, MinGW/UCRT64, etc.), `long` is 32 bits even in
+// 64-bit mode, so `(1L << N)` for N >= 32 is undefined behavior. We must use
+// the BITMAPL_t (uint64_t on 64-bit) constant shift. The guard uses the
+// compiler-defined _WIN32 instead of Netdata's OS_WINDOWS because the vendored
+// Judy sources do not include libnetdata-platform-fwd.h and thus OS_WINDOWS is
+// not defined when these TUs compile -- the previous OS_WINDOWS guard was inert
+// and the UB path ran on every Windows build, corrupting Judy bitmap leaves
+// during cascades and surfacing as STATUS_HEAP_CORRUPTION-equivalent crashes
+// inside RtlAllocateHeap.
+#ifdef _WIN32
 #define JU_BITPOSMASKL(BITNUM) ((BITMAPL_t)1 << ((BITNUM) % cJU_BITSPERSUBEXPL))
 #else
 #define JU_BITPOSMASKL(BITNUM) (1L << ((BITNUM) % cJU_BITSPERSUBEXPL))
