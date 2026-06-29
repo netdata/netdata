@@ -133,11 +133,11 @@ This is normal for Parent nodes receiving data from Children, and for Agents usi
 
 **Virtual Nodes** allow Go collectors to report metrics as if they came from separate logical nodes. This is useful for monitoring remote systems, containers, or logical entities that don't run their own Netdata Agent (SNMP devices, cloud provider db instances, etc.).
 
-| Property      | Value                                 |
-|---------------|---------------------------------------|
-| **Directory** | `/etc/netdata/vnodes/`                |
-| **Format**    | YAML files (`.yaml`, `.yml`, `.conf`) |
-| **Identity**  | User-defined GUID in config file      |
+| Property      | Value                                                                                     |
+|---------------|-------------------------------------------------------------------------------------------|
+| **Directory** | `vnodes/` in your [Netdata config directory](/docs/netdata-agent/configuration/README.md) |
+| **Format**    | YAML files (`.yaml`, `.yml`, `.conf`)                                                     |
+| **Identity**  | User-defined GUID in config file                                                          |
 
 ### Configuration
 
@@ -175,7 +175,7 @@ In addition to the YAML file method, you can create, edit, test, and remove virt
 
 **Where to find it in the GUI**
 
-The vnode dynamic configuration is exposed per plugin under the path `/collectors/{plugin}/Vnodes`. For collectors running under the **go.d** plugin this is `/collectors/go.d/Vnodes`. In the Netdata UI, open the node's dynamic configuration view and look for the **Vnodes** entry under the collector plugin. From there you can add a new vnode, edit an existing one, or test a configuration before applying it.
+In the Netdata UI, open the node's dynamic configuration view and look for the **Vnodes** entry under the **go.d** plugin (`/collectors/go.d/Vnodes`).
 
 :::
 
@@ -193,7 +193,7 @@ Generate a `guid` with `uuidgen` on Linux/macOS, or `[guid]::NewGuid()` in Power
 
 **Changes apply without an Agent restart**
 
-When you add or edit a vnode through the GUI, the change is applied to running collector jobs that reference that vnode immediately — you do not need to restart the Agent for the new or updated vnode to take effect.
+Vnode changes applied via the GUI propagate immediately to all running collector jobs that reference the vnode — no restart or reload is needed.
 
 :::
 
@@ -201,9 +201,13 @@ When you add or edit a vnode through the GUI, the change is applied to running c
 
 **Removing vnodes depends on how they were created**
 
-Virtual nodes you create through the GUI are stored with the `dyncfg` source type and can be removed from the GUI. Virtual nodes defined in YAML files under `/etc/netdata/vnodes/` have a `stock` or `user` source type and **cannot** be removed through dynamic configuration — the GUI does not expose a remove action for them, and removing a file-based vnode is rejected with an error stating that only `dyncfg` vnodes can be removed. To remove a file-based vnode, delete or edit its YAML file and [restart the Netdata Agent](/docs/netdata-agent/start-stop-restart.md).
+- Virtual nodes you create through the GUI are stored with the `dyncfg` source type and can be removed from the GUI.
 
-A vnode that is currently referenced by one or more collector jobs cannot be removed until those references are cleared; the remove action is blocked in that case.
+- A vnode that is currently referenced by one or more collector jobs cannot be removed until those references are cleared; the remove action is blocked in that case.
+
+- Virtual nodes defined in YAML files in the `vnodes/` directory of your [Netdata config directory](/docs/netdata-agent/configuration/README.md) have a `stock` or `user` source type — attempting to remove them returns an error: only `dyncfg` vnodes can be removed.
+
+- To remove a file-based vnode, delete or edit its YAML file and [restart the Netdata Agent](/docs/netdata-agent/start-stop-restart.md).
 
 :::
 
@@ -337,7 +341,7 @@ A node can be permanent or ephemeral and still have a unique identity. Changing 
 <details>
 <summary>Can I change a node's ephemerality after cloning?</summary>
 
-Yes. Edit `/etc/netdata/netdata.conf` and restart Netdata:
+Yes. Edit `netdata.conf` in your [Netdata config directory](/docs/netdata-agent/configuration/README.md) and restart Netdata:
 
 ```ini
 [global]
@@ -391,16 +395,17 @@ A virtual node's identity is determined by its **`guid`** field — not its `hos
 - **`hostname`** — This is used as the internal lookup key in the Agent and as the display name in dashboards. Changing `hostname` while keeping the same `guid` renames the display without creating a new node identity.
 - **`name`** — The Agent ignores this field. When set to a value different from `hostname`, the Agent logs a warning and overrides it with `hostname`.
 
-**To preserve data continuity when renaming a vnode**, change only the `hostname` field in the YAML config file under `/etc/netdata/vnodes/` and keep the `guid` unchanged. If a true identity change is needed, accept that historical data belongs to the old identity.
+**To preserve data continuity when renaming a vnode**, change only the `hostname` field in its YAML file in the `vnodes/` directory of your [Netdata config directory](/docs/netdata-agent/configuration/README.md) and keep the `guid` unchanged. If a true identity change is needed, accept that historical data belongs to the old identity.
 
 </details>
 
 <details>
 <summary>How do I find the UUID of my existing vnode?</summary>
 
-The GUID for each virtual node is stored in its YAML configuration file under `/etc/netdata/vnodes/`. To look it up:
+The GUID for each virtual node is stored in its YAML configuration file in the `vnodes/` directory of your [Netdata config directory](/docs/netdata-agent/configuration/README.md). To look it up:
 
 ```bash
+# Default path — adjust if your Netdata config directory differs.
 cat /etc/netdata/vnodes/*
 ```
 
