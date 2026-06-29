@@ -802,7 +802,13 @@ static inline BITMAPL_t j__udyCountBitsL(BITMAPL_t word)
 // TBD:  Perhaps use an array[32] of masks instead of calculating them.
 
 #define JU_BITPOSMASKB(BITNUM) (1L << ((BITNUM) % cJU_BITSPERSUBEXPB))
+#ifdef OS_WINDOWS
+// On Windows, `long` is 32 bits even in 64-bit builds; use BITMAPL_t (uint64_t
+// on 64-bit) so shifts into positions 32-63 work correctly.
+#define JU_BITPOSMASKL(BITNUM) ((BITMAPL_t)1 << ((BITNUM) % cJU_BITSPERSUBEXPL))
+#else
 #define JU_BITPOSMASKL(BITNUM) (1L << ((BITNUM) % cJU_BITSPERSUBEXPL))
+#endif
 
 
 // TEST/SET/CLEAR A BIT IN A BITMAP LEAF:
