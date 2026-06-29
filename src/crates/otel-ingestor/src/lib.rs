@@ -16,10 +16,6 @@ use tokio::sync::RwLock;
 use tonic::transport::{Identity, Server, ServerTlsConfig};
 
 mod aggregation;
-// Public: the OTLP→OTAP frame encoder is the producer side of the wire
-// contract consumed by `sfst_indexer` (see the `_nd_kv_hash` docs), and
-// `sfsq`'s WAL-equivalence test harness builds real frames through it.
-pub mod arrow_bridge;
 mod chart;
 mod chart_config;
 mod iter;

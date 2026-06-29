@@ -348,11 +348,11 @@ pub fn build_and_write(
 /// enforces. Peak memory beyond the `RowIndex` itself is a single
 /// packed chunk, not the whole compressed file.
 ///
-/// Shared by [`build_and_write`] (sink = the temp file) and the in-memory
-/// range index ([`index_range`](super::index_range), sink = a
-/// `Cursor<Vec<u8>>`). Public so an alternate producer (`ng-index`'s
-/// flattened-frame builder) can stream an in-memory SFST through the same
-/// machinery rather than re-implementing it.
+/// Shared by [`build_and_write`] (sink = the temp file) and in-memory range
+/// builds (sink = a `Cursor<Vec<u8>>`). Public so an alternate producer
+/// (`ng-index`'s flattened-frame builder, which owns both the seal-time file
+/// build and the on-query in-memory range build) can stream an in-memory SFST
+/// through the same machinery rather than re-implementing it.
 pub fn build_into<W: Write + Seek>(
     row_index: &RowIndex,
     sink: W,
@@ -470,8 +470,8 @@ pub fn build_into<W: Write + Seek>(
     );
     // The v9 field descriptor is the typed schema tree. A producer with typed
     // flattening (`ng-index`) supplies the structural tree; we fill its leaf
-    // stats from `fields` (matched by path). A producer with no tree (the legacy
-    // `wal-otap` index path) gets a flat `Str`-typed tree derived from `fields`,
+    // stats from `fields` (matched by path). A producer with no tree (raw
+    // `(ts, key=value)` rows) gets a flat `Str`-typed tree derived from `fields`,
     // so every v9 file carries a valid descriptor. Either way the derived field
     // table (`tree.derive_field_table()`) reproduces `fields` exactly.
     let tree = match &row_index.tree {

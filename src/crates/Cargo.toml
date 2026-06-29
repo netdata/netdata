@@ -39,14 +39,12 @@ members = [
     # IPC / RPC
     "ferryboat",
 
-    "otel-normalize",
     "otel-ingestor",
     "otel-legacy-logs",
 
     # WAL
     "file-registry",
     "wal",
-    "wal-otap",
 
     # SFST build + query
     "sfst-indexer",
@@ -222,7 +220,6 @@ rt = { path = "netdata-plugin/rt" }
 # Netdata OTEL crates
 
 flatten_otel = { path = "flatten-otel" }
-otel-normalize = { path = "otel-normalize" }
 
 # Ledger
 otel-ledger = { path = "otel-ledger" }
@@ -237,7 +234,6 @@ ferryboat = { path = "ferryboat" }
 file-registry = { path = "file-registry" }
 otel-logs-identity = { path = "otel-logs-identity" }
 wal = { path = "wal" }
-wal-otap = { path = "wal-otap" }
 ng-flatten = { path = "ng-flatten" }
 ng-index = { path = "ng-index" }
 

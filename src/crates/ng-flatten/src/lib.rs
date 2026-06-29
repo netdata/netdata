@@ -389,8 +389,8 @@ impl Flattener {
         // Queryable scalar fields. OTLP uses 0/"" for unset → treated as absent.
         // Per-row identifier/scalar fields are intentionally NOT emitted as entries —
         // they are carried as columns on [`Record`] (normalized/copied at ingest),
-        // used for row ordering or per-row retrieval, not as indexed facets (matches
-        // `wal-otap`): `time_unix_nano`/`observed_time_unix_nano` (→ `ts`/`observed_ts`)
+        // used for row ordering or per-row retrieval, not as indexed facets:
+        // `time_unix_nano`/`observed_time_unix_nano` (→ `ts`/`observed_ts`)
         // and `trace_id`/`span_id` (near-unique identifiers). `flags` and
         // `dropped_attributes_count` are likewise carried on the record.
         if record.severity_number != 0 {
@@ -537,8 +537,8 @@ pub fn flatten_into(
                 .iter()
                 .map(|r| Record {
                     // Saturating: a u64 past i64::MAX (year ~2262 / adversarial input)
-                    // clamps to i64::MAX rather than wrapping negative — mirrors
-                    // wal-otap's cast and keeps row ordering sane.
+                    // clamps to i64::MAX rather than wrapping negative — keeps row
+                    // ordering sane.
                     ts: i64::try_from(r.time_unix_nano).unwrap_or(i64::MAX),
                     observed_ts: i64::try_from(r.observed_time_unix_nano).unwrap_or(i64::MAX),
                     trace_id: r.trace_id.clone(),

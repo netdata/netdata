@@ -1,12 +1,12 @@
 //! Query-time row scan over a WAL file — the second evaluator.
 //!
 //! [`WalScan`] answers a [`LogsQuery`] over WAL-resident data without
-//! building an index: it decodes the file's frames into rows once
-//! ([`scan`](WalScan::scan)) and computes the statistics with plain
-//! per-row loops ([`evaluate`](WalScan::evaluate)). It exists for data
-//! the indexer hasn't reached yet — the sub-chunk *tail* of an active
-//! WAL file, whose bounded size is what
-//! makes re-scanning per query affordable.
+//! building an index: it decodes the file's ng-flatten frames into rows
+//! once ([`scan_flattened`](WalScan::scan_flattened)) and computes the
+//! statistics with plain per-row loops ([`evaluate`](WalScan::evaluate)).
+//! It exists for data the indexer hasn't reached yet — the sub-chunk
+//! *tail* of an active WAL file, whose bounded size is what makes
+//! re-scanning per query affordable.
 //!
 //! # Semantic equality with the SFST engine
 //!
@@ -14,8 +14,10 @@
 //! and it must agree with [`LogsShard::evaluate`] over an SFST built
 //! from the same frames — the shared guarantees:
 //!
-//! - the *rows* are identical by construction: both consumers receive
-//!   them from `wal_otap`'s one frame decode;
+//! - the *rows* are identical by construction: the tail and the sealed
+//!   `ng-index` build render every row from the **same** ng-flatten frame
+//!   through the **same** [`ng_flatten::build_kv`] renderer and order by
+//!   the **same** frozen `Record.ts`;
 //! - filter patterns anchor identically: both compile through
 //!   [`sfst::compile_pattern`] / [`sfst::compile_query`];
 //! - field tables classify identically: same distinct-pair cardinality
@@ -40,19 +42,12 @@ use super::cursor::{Cursor, Part};
 use super::page::PageShard;
 use super::query::LogsQuery;
 
-/// A scan failure: the WAL file couldn't be read or a frame couldn't
-/// be decoded — exactly [`wal_otap::ReadError`], the shared
-/// read-and-decode error. Scanning is all-or-nothing — a torn or
-/// corrupt frame fails the scan rather than silently truncating the
-/// row set (the caller decides whether to degrade, mirroring the
-/// per-file policy in [`run`](super::run)).
-pub use wal_otap::ReadError as WalScanError;
-
 /// A failure decoding a *flattened-frame* (ng-flatten) WAL during
-/// [`WalScan::scan_flattened`] — distinct from [`WalScanError`] (the OTAP
-/// path). ng-flatten frames are bincode `FlattenedRequest` payloads, a
-/// different decode than `wal-otap`'s OTAP sub-streams. Scanning is
-/// all-or-nothing, as on the OTAP path.
+/// [`WalScan::scan_flattened`]. ng-flatten frames are bincode
+/// `FlattenedRequest` payloads. Scanning is all-or-nothing — a torn or
+/// corrupt frame fails the scan rather than silently truncating the row
+/// set (the caller decides whether to degrade, mirroring the per-file
+/// policy in [`run`](super::run)).
 #[derive(Debug, thiserror::Error)]
 pub enum FlattenedScanError {
     /// The WAL container could not be read (open or frame iteration).
@@ -70,7 +65,7 @@ struct Pair {
     /// Byte offset of the `=` separator: field is `kv[..eq]`, value is
     /// `kv[eq + 1..]`. Same field-extraction rule as the indexer's
     /// interner: first `=`, or the whole string when none (cannot
-    /// arise — wal-otap's decode always emits the separator; handled
+    /// arise — `ng_flatten::build_kv` always emits the separator; handled
     /// defensively).
     eq: usize,
 }
@@ -98,8 +93,9 @@ struct Row {
 
 /// The decoded rows of one WAL file, ready to evaluate queries against.
 ///
-/// Build once with [`scan`](Self::scan), evaluate any number of queries
-/// with [`evaluate`](Self::evaluate). The pair table is deduplicated by
+/// Build once with [`scan_flattened`](Self::scan_flattened), evaluate any
+/// number of queries with [`evaluate`](Self::evaluate). The pair table is
+/// deduplicated by
 /// full string (`u32` tokens), so per-row storage and all evaluation
 /// loops work on small integers.
 pub struct WalScan {
@@ -117,29 +113,11 @@ pub struct WalScan {
 }
 
 impl WalScan {
-    /// Decode every frame of the WAL file at `path` into rows.
-    ///
-    /// Reads the whole file. To scan only the durable, not-yet-indexed
-    /// tail of an active file, use [`scan_range`](Self::scan_range).
-    pub fn scan(path: &Path) -> Result<WalScan, WalScanError> {
-        let mut sink = ScanSink::default();
-        wal_otap::decode_file(path, &mut sink)?;
-        Ok(sink.finish())
-    }
-
-    /// Decode the frames in `range` into rows — the active-WAL tail. The
-    /// range runs from a chunk-end frame boundary to the durable bound
-    /// (`valid_up_to`); see [`wal::FrameRange`] / [`wal::Reader::open_range`]
-    /// for the soundness checks. An empty range yields a zero-row scan.
-    pub fn scan_range(path: &Path, range: wal::FrameRange) -> Result<WalScan, WalScanError> {
-        let mut sink = ScanSink::default();
-        wal_otap::decode_range(path, range, &mut sink)?;
-        Ok(sink.finish())
-    }
-
     /// Decode every frame of a *flattened-frame* WAL (ng-flatten payloads, as
-    /// written by `ng-ingest`) into rows — the ng-path counterpart of
-    /// [`scan`](Self::scan), which decodes OTAP frames via `wal-otap`.
+    /// written by the production logs ingestor / `ng-ingest`) into rows.
+    ///
+    /// Reads the whole file. To scan only the durable, not-yet-indexed tail of
+    /// an active file, use [`scan_flattened_range`](Self::scan_flattened_range).
     ///
     /// Renders each typed entry to its canonical `key=value` via
     /// [`ng_flatten::build_kv`] and uses `Record.ts` as the row timestamp,
@@ -166,7 +144,6 @@ impl WalScan {
     /// per record) and `Record.ts` ordering so the rows fed here are the rows
     /// the sealed builder indexes.
     fn drain_flattened(mut reader: wal::Reader) -> Result<WalScan, FlattenedScanError> {
-        use wal_otap::KvSink;
         let mut sink = ScanSink::default();
         let mut kv = String::new();
         let mut frame_no = 0u64;
@@ -440,13 +417,11 @@ impl WalScan {
 // Scan sink
 // ---------------------------------------------------------------------------
 
-/// The [`wal_otap::KvSink`] that accumulates a [`WalScan`].
+/// The row sink that accumulates a [`WalScan`].
 ///
 /// Tokens are dense indexes into the pair table, deduplicated by full
-/// `key=value` string. No hash index is kept: `lookup_hash` always
-/// answers `None` — the always-safe escape hatch the trait documents —
-/// so every pair is formatted and deduped by string. Collision safety
-/// is therefore structural rather than maintained.
+/// `key=value` string, so collision safety is structural — every pair is
+/// formatted and deduped by string (no hash index is kept).
 #[derive(Default)]
 struct ScanSink {
     pairs: Vec<Pair>,
@@ -454,14 +429,10 @@ struct ScanSink {
     rows: Vec<Row>,
 }
 
-impl wal_otap::KvSink for ScanSink {
-    type Token = u32;
-
-    fn lookup_hash(&mut self, _hash: u64) -> Option<u32> {
-        None
-    }
-
-    fn intern(&mut self, _hash: Option<u64>, kv: &str) -> u32 {
+impl ScanSink {
+    /// Intern a rendered `key=value` pair to a dense token, deduplicating by
+    /// the full string.
+    fn intern(&mut self, kv: &str) -> u32 {
         if let Some(&t) = self.dedup.get(kv) {
             return t;
         }
@@ -474,10 +445,8 @@ impl wal_otap::KvSink for ScanSink {
         t
     }
 
-    fn reserve_rows(&mut self, additional: usize) {
-        self.rows.reserve(additional);
-    }
-
+    /// One decoded row: its timestamp and the pair tokens in stream order
+    /// (duplicates preserved).
     fn row(&mut self, ts_ns: i64, tokens: &[u32]) {
         self.rows.push(Row {
             ts_ns,
@@ -546,20 +515,19 @@ impl ScanSink {
 /// Intern a flattened-frame entry slice into [`ScanSink`] tokens, rendering each
 /// entry's `key=value` via [`ng_flatten::build_kv`] — the same renderer the sealed
 /// `ng-index` builder uses, which is what makes the pair strings (and thus the query
-/// results) match. The pre-computed `hash` is passed for symmetry with the builder's
-/// fast path; [`ScanSink`] dedups by string regardless.
+/// results) match. [`ScanSink`] dedups by full string, so the entry's pre-computed
+/// hash is not needed here (unlike the builder's `lookup_hash` fast path).
 fn intern_flattened(
     sink: &mut ScanSink,
     entries: &[ng_flatten::Entry],
     paths: &[String],
     kv: &mut String,
 ) -> Vec<u32> {
-    use wal_otap::KvSink;
     entries
         .iter()
         .map(|e| {
             ng_flatten::build_kv(&paths[e.node as usize], &e.value, kv);
-            sink.intern(Some(e.hash), kv)
+            sink.intern(kv)
         })
         .collect()
 }

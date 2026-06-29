@@ -2,10 +2,11 @@
 //!
 //! Streams the flattened WAL, stringifies each typed entry into a `key=value`
 //! pair (collapsed-array paths like `tags[]`, typed values rendered to strings),
-//! and feeds the existing `sfst-indexer` [`RowIndex`] via the `KvSink` interface in
-//! a single pass, then `build_and_write`s a standard SFST file. This reuses SFST's
-//! proven build/query machinery while the keys/values now come from the typed,
-//! array-collapsed flattening. (Types + a schema-tree chunk come in a later step.)
+//! and feeds the existing `sfst-indexer` [`RowIndex`] (interning via its
+//! `lookup_hash`/`intern` fast path, one `row` per record) in a single pass, then
+//! `build_and_write`s a standard SFST file. This reuses SFST's proven build/query
+//! machinery while the keys/values now come from the typed, array-collapsed
+//! flattening.
 
 use std::path::Path;
 
@@ -14,7 +15,6 @@ use sfst::{DroppedAttributeCounts, Flags, ObservedTimestamps, SpanIds, TraceIds}
 use sfst_indexer::KvSlot;
 use sfst_indexer::row_index::RowIndex;
 use sfst_indexer::{build_and_write, build_into};
-use wal_otap::KvSink;
 
 use crate::{
     Entry, Error, FlattenedRequest, Metrics, NodeId, build_kv, decode_frame, sole_wal_file,
@@ -242,9 +242,9 @@ pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result
 
 /// Build an SFST index file from a single flattened WAL **file** (not a directory),
 /// returning the registry-facing [`sfst::Summary`] + the written file size. The
-/// production seal-time entry point — the ng counterpart of `sfst_indexer::index`
-/// (which `otel-ledger` calls with a concrete WAL path). Same typed tree + per-row
-/// columns as [`build_sfst`]; it just skips the `sole_wal_file` directory probe.
+/// production seal-time entry point `otel-ledger` calls with a concrete WAL path.
+/// Same typed tree + per-row columns as [`build_sfst`]; it just skips the
+/// `sole_wal_file` directory probe.
 pub fn build_sfst_file(
     wal_path: &Path,
     out_path: &Path,

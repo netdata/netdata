@@ -1,8 +1,8 @@
 //! End-to-end tests over real on-disk WAL/SFST fixtures.
 //!
 //! Fixtures go through the production path: OTLP `ResourceLogs` →
-//! `otel_ingestor::arrow_bridge::encode` → `wal::Writer` →
-//! `sfst_indexer::index`. Files are FileId-named (the writer names WAL files;
+//! `ng_flatten` flatten + `encode_frame` → `wal::Writer` →
+//! `ng_index::build_sfst_file`. Files are FileId-named (the writer names WAL files;
 //! a sealed SFST reuses its source WAL's FileId, sharing the sequence — exactly
 //! the production relationship the dedup rule relies on), so the CLI's
 //! directory-scan discovery picks them up.
@@ -118,8 +118,7 @@ fn write_wal(wal_tenant_dir: &Path, batches: &[Vec<ResourceLogs>]) -> PathBuf {
 /// files (sealed separately) get distinct FileIds. The dir must hold no other
 /// `*.wal` at call time (seal + remove the previous one first).
 /// Flatten + encode a batch as one ng-flatten WAL frame payload, returning
-/// `(bytes, record_count)` — the ng counterpart of the old
-/// `otel_ingestor::arrow_bridge::encode`. Fixtures set explicit timestamps, so no
+/// `(bytes, record_count)`. Fixtures set explicit timestamps, so no
 /// timestamp normalization is needed here.
 fn encode_ng_frame(batch: Vec<ResourceLogs>) -> (Vec<u8>, usize) {
     let count: usize = batch

@@ -1,15 +1,14 @@
 //! Spike: build a real SFST index file from our OWN `(timestamp, [key=value])`
-//! rows using the existing `sfst-indexer` — bypassing `wal-otap`'s OTAP decode —
-//! then query it back. This is the feasibility brick for the augment-SFST plan: it
-//! proves the SFST builder is reusable with rows WE produce (e.g. stringified
-//! ng-flatten output), via the `KvSink` interface (`intern(&str)` + `row(ts,toks)`).
+//! rows using the existing `sfst-indexer`, then query it back. This is the
+//! feasibility brick for the augment-SFST plan: it proves the SFST builder is
+//! reusable with rows WE produce (e.g. stringified ng-flatten output), via
+//! `RowIndex`'s inherent `intern(&str)` + `row(ts, toks)`.
 
 use bumpalo::Bump;
 use sfst::IndexReader;
 use sfst::query::Filter;
 use sfst_indexer::build_and_write;
 use sfst_indexer::row_index::RowIndex;
-use wal_otap::KvSink;
 
 /// Build an SFST file from `(timestamp_ns, &[key=value])` rows; return its bytes.
 fn build_sfst(rows: &[(i64, &[&str])]) -> Vec<u8> {

@@ -4,7 +4,6 @@
 //! covered by the property harness in `wal_equivalence.rs`.
 
 use sfst::{FieldTier, Filter, Grid};
-use wal_otap::KvSink;
 
 use super::{ScanSink, WalScan};
 use crate::logs::{LogsQuery, LogsQueryBuilder};
@@ -14,7 +13,7 @@ use crate::logs::{LogsQuery, LogsQueryBuilder};
 fn scan_from(rows: &[(i64, &[&str])]) -> WalScan {
     let mut sink = ScanSink::default();
     for &(ts, pairs) in rows {
-        let tokens: Vec<u32> = pairs.iter().map(|kv| sink.intern(None, kv)).collect();
+        let tokens: Vec<u32> = pairs.iter().map(|kv| sink.intern(kv)).collect();
         sink.row(ts, &tokens);
     }
     sink.finish()

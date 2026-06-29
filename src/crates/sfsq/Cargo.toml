@@ -16,9 +16,7 @@ path = "src/lib.rs"
 sfst = { workspace = true }
 wal = { workspace = true }
 file-registry = { workspace = true }
-wal-otap = { workspace = true }
-# Active-WAL tail scan of ng-flatten frames (`WalScan::scan_flattened`), the
-# ng-path counterpart of the OTAP `wal-otap` tail decode (migration: graft).
+# Active-WAL tail scan of ng-flatten frames (`WalScan::scan_flattened`).
 ng-flatten = { workspace = true }
 thiserror = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -30,11 +28,6 @@ regex = { workspace = true }
 
 [dev-dependencies]
 clap = { workspace = true }
-# The WAL-equivalence harness (tests/wal_equivalence.rs) builds real OTAP
-# frames through the production encoder and writes real WAL files.
-otel-ingestor = { workspace = true }
-otel-logs-identity = { workspace = true }
-sfst-indexer = { workspace = true }
 opentelemetry-proto = { workspace = true }
 tempfile = { workspace = true }
 # ng-flatten tail-scan equivalence harness (tests/ng_wal_equivalence.rs): builds

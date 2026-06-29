@@ -7,9 +7,9 @@
 //! so interning avoids storing redundant copies and enables cheap ID-based
 //! bitmap operations.
 //!
-//! The producer (`otel-ingestor`) pre-computes `xxhash64("key=value")` for
+//! The producer (`ng-flatten`) pre-computes `xxhash64("key=value")` for
 //! every attribute and ships the hashes alongside the data (see
-//! `otel-ingestor/src/arrow_bridge.rs`). This interner is designed to
+//! `ng_flatten::fill_hashes`). This interner is designed to
 //! exploit those pre-computed hashes:
 //!
 //! - **[`lookup_hash`](KeyValueInterner::lookup_hash)**: Hash-only lookup.

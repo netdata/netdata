@@ -34,8 +34,8 @@ pub struct RowIndex<'a> {
     pub timestamps: Vec<i64>,
     /// Optional per-row columns in **insertion order**, parallel to `timestamps`.
     /// Each is **independently** optional — a caller fills whichever it has, in any
-    /// combination (or none). `None` for the production logs path (rows arrive via
-    /// [`wal_otap::KvSink::row`], which sets no columns). Phase 2 reorders each
+    /// combination (or none). `None` for a producer that only feeds rows via
+    /// [`row`](RowIndex::row) and sets no columns. Phase 2 reorders each
     /// present column to chronological order and writes its chunk
     /// (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`) in the cold region; absent columns write
     /// no chunk and add no manifest entry. Every present column MUST have length
@@ -48,10 +48,10 @@ pub struct RowIndex<'a> {
     /// The typed schema tree to persist as the v9 field descriptor
     /// (`Metadata.tree`). `Some` when a producer with typed flattening supplies
     /// it (the `ng-index` path) — structure + per-leaf `ValueKind`, leaf stats
-    /// filled at build from the per-field cardinality/tier. `None` for the
-    /// production `wal-otap` path, which has no typed tree; the builder then
-    /// synthesizes a flat `Str`-typed tree from the derived field table so every
-    /// v9 file carries a valid descriptor.
+    /// filled at build from the per-field cardinality/tier. `None` for a producer
+    /// that feeds only raw `(ts, key=value)` rows and supplies no typed tree; the
+    /// builder then synthesizes a flat `Str`-typed tree from the derived field
+    /// table so every v9 file carries a valid descriptor.
     pub tree: Option<sfst::SchemaTree>,
 }
 
@@ -176,29 +176,35 @@ impl<'a> RowIndex<'a> {
     }
 }
 
-/// The indexer is one consumer of the shared frame decode
-/// (`wal_otap`'s frame decode): tokens are interner
-/// slots, and each decoded row lands in the four Phase-1 structures.
-impl<'a> wal_otap::KvSink for RowIndex<'a> {
-    type Token = KvSlot;
-
-    fn lookup_hash(&mut self, hash: u64) -> Option<KvSlot> {
+/// Row ingestion: a producer interns each `key=value` pair to a [`KvSlot`]
+/// and hands the slots back per log row. Tokens are interner slots, and each
+/// row lands in the four Phase-1 structures.
+impl<'a> RowIndex<'a> {
+    /// Hash-only fast-path lookup: returns the slot a `key=value` was
+    /// interned under if the producer's `xxhash64` is unambiguous, letting
+    /// the caller skip formatting the string. Returns `None` (forcing
+    /// [`intern`](Self::intern)) for an unseen or collision-ambiguous hash —
+    /// the interner answers `None` for any hash it has seen more than one
+    /// distinct string for, so a hit is always collision-safe.
+    pub fn lookup_hash(&mut self, hash: u64) -> Option<KvSlot> {
         self.kv_interner.lookup_hash(hash)
     }
 
-    fn intern(&mut self, hash: Option<u64>, kv: &str) -> KvSlot {
+    /// Intern a `key=value` pair, deduplicating by the **full string**.
+    /// `hash` is the producer's pre-computed `xxhash64(kv)` when available
+    /// (collision-safe: a hash hit re-checks the stored string), `None`
+    /// otherwise.
+    pub fn intern(&mut self, hash: Option<u64>, kv: &str) -> KvSlot {
         match hash {
             Some(h) => self.kv_interner.intern_with_hash(h, kv),
             None => self.kv_interner.intern(kv),
         }
     }
 
-    fn reserve_rows(&mut self, additional: usize) {
-        self.log_entries.reserve(additional);
-        self.timestamps.reserve(additional);
-    }
-
-    fn row(&mut self, ts_ns: i64, tokens: &[KvSlot]) {
+    /// One log row: its timestamp and the interned slots of every
+    /// `key=value` pair it carries (duplicates allowed — a multi-valued
+    /// field emits one pair per value).
+    pub fn row(&mut self, ts_ns: i64, tokens: &[KvSlot]) {
         let log_pos = self.log_entries.len() as u32;
         self.timestamps.push(ts_ns);
         for &kv_slot in tokens {

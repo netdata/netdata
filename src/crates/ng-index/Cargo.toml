@@ -20,7 +20,6 @@ sfst = { workspace = true }
 sfst-indexer = { workspace = true }
 thiserror = { workspace = true }
 wal = { workspace = true }
-wal-otap = { workspace = true }
 
 [dev-dependencies]
 file-registry = { workspace = true }

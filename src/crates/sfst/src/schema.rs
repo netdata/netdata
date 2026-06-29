@@ -342,7 +342,7 @@ impl SchemaTree {
     /// Build a **flat** tree from a [`FieldTable`]: one `Str`-typed leaf per
     /// field directly under the root, each a single `Field(name)` step carrying
     /// the field's `(cardinality, tier)`. This is the descriptor a producer
-    /// with no typed tree emits (the legacy `wal-otap` index path) so every v9
+    /// with no typed tree emits (raw `(ts, key=value)` rows) so every v9
     /// file has a valid descriptor; `derive_field_table` round-trips it back to
     /// the same `FieldTable`. It is structurally flat and `Str`-typed (no worse
     /// than the pre-v9 untyped `FieldTable`).

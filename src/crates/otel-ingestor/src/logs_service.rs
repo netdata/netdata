@@ -63,9 +63,10 @@ fn count_log_records(rl: &ResourceLogs) -> usize {
 
 /// Compute the `(min, max)` log-data time range for a group of `ResourceLogs`.
 ///
-/// Mirrors the OTel timestamp hierarchy used by wal-otap's shared
-/// frame decode, so the WAL's accumulated range matches what the
-/// indexer will eventually compute for the file's SFST summary:
+/// Mirrors the OTel timestamp hierarchy applied at ingest by
+/// [`ng_flatten::normalize_timestamps`], so the WAL's accumulated range
+/// matches the per-row `Record.ts` the indexer will eventually fold into
+/// the file's SFST summary:
 ///
 /// 1. `time_unix_nano` (event time) when non-zero.
 /// 2. `observed_time_unix_nano` when `time_unix_nano` is zero or missing.

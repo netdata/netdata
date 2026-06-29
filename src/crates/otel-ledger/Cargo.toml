@@ -26,7 +26,6 @@ netdata-plugin-protocol = { path = "../netdata-plugin/protocol" }
 netdata-plugin-types = { path = "../netdata-plugin/types" }
 otel-catalog = { workspace = true }
 sfst = { workspace = true }
-sfst-indexer = { workspace = true }
 ng-index = { workspace = true }
 sfsq = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

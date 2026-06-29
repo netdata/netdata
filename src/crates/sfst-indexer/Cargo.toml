@@ -11,8 +11,6 @@ workspace = true
 [dependencies]
 sfst = { workspace = true }
 otel-logs-identity = { workspace = true }
-wal = { workspace = true }
-wal-otap = { workspace = true }
 
 fst-index = { workspace = true, features = ["serde"] }
 treight = { workspace = true, features = ["roaring", "serde"] }
