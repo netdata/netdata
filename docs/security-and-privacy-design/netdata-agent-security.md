@@ -112,6 +112,8 @@ The [ACLK](/src/aclk/README.md) is the channel the Agent uses to communicate wit
 - Requires outbound access to `app.netdata.cloud`, `api.netdata.cloud`, and `mqtt.netdata.cloud`.
 - Transmits only the metadata needed for coordination and access control — **raw metrics never leave your infrastructure**.
 
+For the complete firewall allowlist with ports, see [Configure Netdata for cybersecurity platforms](/docs/netdata-agent/configure-netdata-for-cybersecurity-platforms.md#required-endpoints-and-ports).
+
 ACLK is **off until you claim the Agent**. An unclaimed Agent never opens this connection.
 
 ### Installation and updates
@@ -119,7 +121,7 @@ ACLK is **off until you claim the Agent**. An unclaimed Agent never opens this c
 These connections occur at install or update time, not as continuous Agent runtime traffic:
 
 - The `kickstart.sh` installer script is downloaded from `get.netdata.cloud`.
-- Packages are fetched from `repository.netdata.cloud` (stable channel) or `repository.netdata.cloud/repos/edge` (nightly channel).
+- Packages are fetched from `repository.netdata.cloud/repos/stable` (stable channel) or `repository.netdata.cloud/repos/edge` (nightly channel).
 - **Automatic updates are enabled by default for online installations** (they are disabled automatically for offline installations). When enabled, the separate `netdata-updater.sh` script runs on a schedule (systemd timer, cron, or interval) and connects to the package repository to check for and install newer versions.
 
 Disable automatic updates with the `--no-updates` flag at install time, or by disabling the updater on an existing install. For a fully disconnected deployment, see [Install Netdata on Offline Systems](/packaging/installer/methods/offline.md).
@@ -136,13 +138,13 @@ In this state the Agent continues to collect, store, and serve metrics locally. 
 
 ### Summary
 
-| **Communication Path**            | **Default State**     | **Trigger**                              | **Destination**                                                            | **How to Disable**                                                                                                            |
-|:----------------------------------|:----------------------|:-----------------------------------------|:---------------------------------------------------------------------------|:------------------------------------------------------------------------------------------------------------------------------|
-| Anonymous telemetry (backend)     | On                    | Agent start, stop, or fatal crash        | Netdata telemetry cloud function (GCP) over HTTPS                          | Create `.opt-out-from-anonymous-statistics`, set `DISABLE_TELEMETRY=1`/`DO_NOT_TRACK=1`, or install with `--disable-telemetry` |
-| Anonymous telemetry (dashboard)   | On                    | Viewing the local Agent dashboard        | PostHog (anonymized page-view events)                                      | Same opt-out mechanism as backend telemetry                                                                                   |
-| Agent-Cloud Link (ACLK)           | Off until claimed     | Claiming/connecting a node to a Space    | `app.netdata.cloud`, `api.netdata.cloud`, `mqtt.netdata.cloud` (WSS, 443)  | Do not claim the Agent to Netdata Cloud                                                                                       |
-| Installer script download         | n/a (install time)    | Running `kickstart.sh`                   | `get.netdata.cloud`                                                        | Pre-download the script for an offline install                                                                                |
-| Package download / automatic update | On for online installs | Install, or scheduled auto-update      | `repository.netdata.cloud`                                                 | `--no-updates` at install, or disable `netdata-updater.sh`                                                                    |
+| **Communication Path**              | **Default State**      | **Trigger**                           | **Destination**                                                           | **How to Disable**                                                                                                             |
+|:------------------------------------|:-----------------------|:--------------------------------------|:--------------------------------------------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------|
+| Anonymous telemetry (backend)       | On                     | Agent start, stop, or fatal crash     | Netdata telemetry cloud function (GCP) over HTTPS                         | Create `.opt-out-from-anonymous-statistics`, set `DISABLE_TELEMETRY=1`/`DO_NOT_TRACK=1`, or install with `--disable-telemetry` |
+| Anonymous telemetry (dashboard)     | On                     | Viewing the local Agent dashboard     | PostHog (anonymized page-view events)                                     | Same opt-out mechanism as backend telemetry                                                                                    |
+| Agent-Cloud Link (ACLK)             | Off until claimed      | Claiming/connecting a node to a Space | `app.netdata.cloud`, `api.netdata.cloud`, `mqtt.netdata.cloud` (WSS, 443) | Do not claim the Agent to Netdata Cloud                                                                                        |
+| Installer script download           | n/a (install time)     | Running `kickstart.sh`                | `get.netdata.cloud`                                                       | Pre-download the script for an offline install                                                                                 |
+| Package download / automatic update | On for online installs | Install, or scheduled auto-update     | `repository.netdata.cloud`                                                | `--no-updates` at install, or disable `netdata-updater.sh`                                                                     |
 
 :::tip
 
