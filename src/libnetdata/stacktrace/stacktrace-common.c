@@ -63,7 +63,14 @@ void stacktrace_init(void) {
 
 // Allocate a new stacktrace structure with the given number of frames
 struct stacktrace *stacktrace_create(int num_frames) {
-    size_t size = sizeof(struct stacktrace) + ((num_frames - 1) * sizeof(void *));
+    if (unlikely(num_frames <= 0))
+        return NULL;
+
+    size_t extra_frames = (size_t)num_frames - 1;
+    if (unlikely(extra_frames > (SIZE_MAX - sizeof(struct stacktrace)) / sizeof(void *)))
+        return NULL;
+
+    size_t size = sizeof(struct stacktrace) + extra_frames * sizeof(void *);
     struct stacktrace *trace = callocz(1, size);
     trace->frame_count = num_frames;
     return trace;
@@ -155,7 +162,7 @@ STACKTRACE stacktrace_get(int skip_frames) {
     // Add 1 to skip_frames to also skip stacktrace_get() itself
     int num_frames = impl_stacktrace_get_frames(frames, 50, skip_frames + 1);
     
-    if (num_frames <= 0)
+    if (num_frames <= 0 || num_frames > (int)_countof(frames))
         return NULL;
     
     // Calculate hash
