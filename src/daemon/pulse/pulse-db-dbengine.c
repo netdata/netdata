@@ -309,7 +309,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
             priority++;
         }
 
-        for(size_t i = 0; i < _countof(ptrs->queues[q].rd_pgc_page_size_x) - 1 ;i++)
+        for(size_t i = 0; i < _countof(ptrs->queues[q].rd_pgc_page_size_x) ;i++)
             rrddim_set_by_pointer(ptrs->queues[q].st_pgc_page_size_heatmap, ptrs->queues[q].rd_pgc_page_size_x[i], (collected_number)pgc_stats->queues[q].size_histogram.array[i].count);
 
         rrdset_done(ptrs->queues[q].st_pgc_page_size_heatmap);
