@@ -11,6 +11,8 @@
 extern char **environ;
 #endif
 
+#define SPAWN_SERVER_MAX_DEFERRED_REAPERS 1
+
 int spawn_server_instance_read_fd(SPAWN_INSTANCE *si) { return si->read_fd; }
 int spawn_server_instance_write_fd(SPAWN_INSTANCE *si) { return si->write_fd; }
 void spawn_server_instance_read_fd_unset(SPAWN_INSTANCE *si) { si->read_fd = -1; }
@@ -21,6 +23,7 @@ static struct {
     bool sigchld_initialized;
     SPINLOCK spinlock;
     SPAWN_INSTANCE *instances;
+    uint32_t deferred_reapers;
 } spawn_globals = {
     .spinlock = SPINLOCK_INITIALIZER,
     .instances = NULL,
@@ -208,6 +211,66 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     return si;
 }
 
+static int spawn_server_waitpid(SPAWN_INSTANCE *si);
+
+static void spawn_server_instance_cleanup(SPAWN_INSTANCE *si) {
+    spinlock_lock(&spawn_globals.spinlock);
+    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(spawn_globals.instances, si, prev, next);
+    spinlock_unlock(&spawn_globals.spinlock);
+
+    freez((void *)si->cmdline);
+    freez(si);
+}
+
+static void *spawn_server_detached_waitpid_cleanup(void *ptr) {
+    SPAWN_INSTANCE *si = ptr;
+
+    (void)spawn_server_waitpid(si);
+    spawn_server_instance_cleanup(si);
+    __atomic_sub_fetch(&spawn_globals.deferred_reapers, 1, __ATOMIC_RELAXED);
+
+    return NULL;
+}
+
+static bool spawn_server_defer_waitpid_cleanup(SPAWN_INSTANCE *si) {
+    pthread_t thread;
+    pthread_attr_t attr;
+    pid_t child_pid = si->child_pid;
+    size_t request_id = si->request_id;
+
+    if(__atomic_add_fetch(&spawn_globals.deferred_reapers, 1, __ATOMIC_RELAXED) >
+        SPAWN_SERVER_MAX_DEFERRED_REAPERS) {
+        __atomic_sub_fetch(&spawn_globals.deferred_reapers, 1, __ATOMIC_RELAXED);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: deferred reaper limit reached for pid %d (request No %zu): %s",
+               child_pid, request_id, si->cmdline);
+        return false;
+    }
+
+    int rc = pthread_attr_init(&attr);
+    bool attr_initialized = rc == 0;
+    if(attr_initialized)
+        rc = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+
+    if(rc == 0)
+        rc = pthread_create(&thread, &attr, spawn_server_detached_waitpid_cleanup, si);
+
+    if(attr_initialized && pthread_attr_destroy(&attr) != 0 && rc == 0)
+        nd_log(NDLS_COLLECTORS, NDLP_WARNING,
+               "SPAWN PARENT: failed to destroy detached reaper attributes for pid %d (request No %zu)",
+               child_pid, request_id);
+
+    if(rc != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: failed to start detached reaper for pid %d: %s",
+               si->child_pid, si->cmdline);
+        __atomic_sub_fetch(&spawn_globals.deferred_reapers, 1, __ATOMIC_RELAXED);
+        return false;
+    }
+
+    return true;
+}
+
 int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms) {
     if (!si) return -1;
 
@@ -232,6 +295,16 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout
     }
     else
         return status;
+
+    if(spawn_server_exec_timedwait(server, si, SPAWN_KILL_DEFAULT_GRACE_MS, &status) == SPAWN_TIMEDWAIT_EXITED)
+        return status;
+
+    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+           "SPAWN PARENT: giving up waiting for pid %d after SIGKILL (request No %zu) - cleanup deferred",
+           si->child_pid, si->request_id);
+
+    if(spawn_server_defer_waitpid_cleanup(si))
+        return -1;
 
     return spawn_server_exec_wait(server, si);
 }
@@ -343,12 +416,7 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
                "SPAWN PARENT: child with pid %d exited with status %d (sighandler): %s",
                si->child_pid, status, si->cmdline);
 
-    spinlock_lock(&spawn_globals.spinlock);
-    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(spawn_globals.instances, si, prev, next);
-    spinlock_unlock(&spawn_globals.spinlock);
-
-    freez((void *)si->cmdline);
-    freez(si);
+    spawn_server_instance_cleanup(si);
     return status;
 }
 
