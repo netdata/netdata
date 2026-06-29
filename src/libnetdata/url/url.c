@@ -8,7 +8,8 @@
 
 /* Converts a hex character to its integer value */
 char from_hex(char ch) {
-    return (char)(isdigit(ch) ? ch - '0' : tolower(ch) - 'a' + 10);
+    uint8_t uch = (uint8_t)ch;
+    return (char)(isdigit(uch) ? uch - '0' : tolower(uch) - 'a' + 10);
 }
 
 /* Converts an integer value to its hex character*/
@@ -57,7 +58,7 @@ char *url_encode(const char *str) {
  */
 char url_percent_escape_decode(const char *s) {
     if(likely(s[1] && s[2]))
-        return (char)(from_hex(s[1]) << 4 | from_hex(s[2]));
+        return (char)(((uint8_t)from_hex(s[1]) << 4) | (uint8_t)from_hex(s[2]));
     return 0;
 }
 
