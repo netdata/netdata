@@ -2616,7 +2616,29 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
         mcp_functions_data_cleanup(&data);
         return rc;
     }
-    
+
+    // Authorize the caller BEFORE fetching or disclosing any function metadata.
+    // The function "info" path used to build required_params/options runs with elevated
+    // privileges, so without this gate an unauthorized caller could read protected metadata
+    // (log source names, file counts, sizes, coverage, timestamps) that the normal
+    // /api/v3/function path denies. Enforce the same access here (GHSA-6628-vxm3-4g8g).
+    {
+        CLEAN_BUFFER *access_error = buffer_create(0, NULL);
+        int access_code = rrd_function_verify_access(
+            data.request.host, access_error, data.request.function,
+            data.request.auth ? data.request.auth->access : HTTP_ACCESS_NONE,
+            false, NULL);
+
+        if (access_code != HTTP_RESP_OK) {
+            buffer_sprintf(mcpc->error,
+                           "You are not authorized to execute function '%s' on node '%s'.",
+                           data.request.function ? data.request.function : "(unknown)",
+                           data.request.host ? rrdhost_hostname(data.request.host) : "(unknown)");
+            mcp_functions_data_cleanup(&data);
+            return MCP_RC_ERROR;
+        }
+    }
+
     // Get function registry entry
     CLEAN_BUFFER *registry_error = buffer_create(0, NULL);
     MCP_FUNCTION_REGISTRY_ENTRY *registry_entry = mcp_functions_registry_get(data.request.host, data.request.function, registry_error);
