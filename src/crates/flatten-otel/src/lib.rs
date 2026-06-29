@@ -6,10 +6,8 @@ use opentelemetry_proto::tonic::{
     resource::v1::Resource,
 };
 
-mod logs;
 mod metrics;
 
-pub use logs::{json_from_export_logs_service_request, json_from_log_record};
 pub use metrics::flatten_metrics_request;
 
 pub fn json_from_key_value_list(kvl: &Vec<KeyValue>) -> JsonMap<String, JsonValue> {
