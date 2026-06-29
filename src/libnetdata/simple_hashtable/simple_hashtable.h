@@ -383,7 +383,7 @@ static inline SIMPLE_HASHTABLE_SLOT_NAMED *simple_hashtable_get_slot_named(
             else {
                 // the hashtable is full, but resize is false.
                 // this should never happen.
-                assert(sl != sl_started);
+                fatal("SIMPLE_HASHTABLE: lookup without resize reached a full table");
             }
         }
     }
