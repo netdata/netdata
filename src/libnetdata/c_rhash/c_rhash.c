@@ -123,6 +123,7 @@ int c_rhash_get_uint8_by_str(c_rhash hash, const char *key, uint8_t *ret_val) {
         }
         bin = bin->next;
     }
+    *ret_val = 0;
     return 1;
 }
 
