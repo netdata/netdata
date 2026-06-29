@@ -61,7 +61,7 @@ static void dyncfg_to_json(DYNCFG *df, const char *id, BUFFER *wb, bool anonymou
     buffer_json_object_close(wb);
 }
 
-static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *path, const char *id, bool anonymous) {
+static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *path, const char *id, HTTP_ACCESS user_access, bool anonymous) {
     size_t entries = 0;
     size_t used = 0;
     const DICTIONARY_ITEM **items = NULL;
@@ -94,6 +94,11 @@ static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *path, co
             df->current.status = DYNCFG_STATUS_ORPHAN;
 
         if((id && strcmp(id, df_dfe.name) != 0) && (template && df->template != template))
+            continue;
+
+        // Apply the per-node view_access policy, so the tree does not disclose entries whose
+        // direct view (schema/get/userconfig) the caller is not allowed to access
+        if(!http_access_user_has_enough_access_level_for_endpoint(user_access, df->view_access))
             continue;
 
         if(used >= entries)
@@ -211,7 +216,7 @@ static int dyncfg_config_execute_cb(struct nrpc_request *req, void *data) {
         }
 
         code = HTTP_RESP_OK;
-        dyncfg_tree_for_host(host, req->result.wb, path, id, !(req->user_access & HTTP_ACCESS_SENSITIVE_DATA));
+        dyncfg_tree_for_host(host, req->result.wb, path, id, req->user_access, !(req->user_access & HTTP_ACCESS_SENSITIVE_DATA));
     }
     else {
         const char *name = id;
