@@ -52,4 +52,4 @@ pub use engine::{LogSource, SfstCandidate, Source, WalTail, run};
 pub use page::PageShard;
 pub use query::{Anchor, Direction, LogsQuery, LogsQueryBuilder};
 pub use result::LogsData;
-pub use wal_scan::{WalScan, WalScanError};
+pub use wal_scan::{FlattenedScanError, WalScan, WalScanError};

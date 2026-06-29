@@ -48,6 +48,21 @@ use super::query::LogsQuery;
 /// per-file policy in [`run`](super::run)).
 pub use wal_otap::ReadError as WalScanError;
 
+/// A failure decoding a *flattened-frame* (ng-flatten) WAL during
+/// [`WalScan::scan_flattened`] — distinct from [`WalScanError`] (the OTAP
+/// path). ng-flatten frames are bincode `FlattenedRequest` payloads, a
+/// different decode than `wal-otap`'s OTAP sub-streams. Scanning is
+/// all-or-nothing, as on the OTAP path.
+#[derive(Debug, thiserror::Error)]
+pub enum FlattenedScanError {
+    /// The WAL container could not be read (open or frame iteration).
+    #[error("wal read: {0}")]
+    Wal(#[from] wal::Error),
+    /// A frame's bincode `FlattenedRequest` payload failed to decode.
+    #[error("frame {frame}: flattened-frame decode failed: {msg}")]
+    Decode { frame: u64, msg: String },
+}
+
 /// One distinct `key=value` pair seen during the scan.
 struct Pair {
     /// The full `key=value` string, exactly as interned by the indexer.
@@ -119,6 +134,76 @@ impl WalScan {
     pub fn scan_range(path: &Path, range: wal::FrameRange) -> Result<WalScan, WalScanError> {
         let mut sink = ScanSink::default();
         wal_otap::decode_range(path, range, &mut sink)?;
+        Ok(sink.finish())
+    }
+
+    /// Decode every frame of a *flattened-frame* WAL (ng-flatten payloads, as
+    /// written by `ng-ingest`) into rows — the ng-path counterpart of
+    /// [`scan`](Self::scan), which decodes OTAP frames via `wal-otap`.
+    ///
+    /// Renders each typed entry to its canonical `key=value` via
+    /// [`ng_flatten::build_kv`] and uses `Record.ts` as the row timestamp,
+    /// mirroring `ng-index`'s sealed build (`build_sfst`) exactly — same
+    /// resource→scope→record token assembly, same per-occurrence rendering —
+    /// so the tail and an SFST built from the same frames agree by construction.
+    pub fn scan_flattened(path: &Path) -> Result<WalScan, FlattenedScanError> {
+        Self::drain_flattened(wal::Reader::open(path)?)
+    }
+
+    /// Range counterpart of [`scan_flattened`](Self::scan_flattened) — the
+    /// active-WAL tail (a chunk-end frame boundary to the durable bound). See
+    /// [`wal::FrameRange`] / [`wal::Reader::open_range`]. An empty range yields
+    /// a zero-row scan.
+    pub fn scan_flattened_range(
+        path: &Path,
+        range: wal::FrameRange,
+    ) -> Result<WalScan, FlattenedScanError> {
+        Self::drain_flattened(wal::Reader::open_range(path, range)?)
+    }
+
+    /// Drive the shared [`ScanSink`] from a flattened-frame WAL reader. Mirrors
+    /// `ng_index::build_sfst`'s token assembly (resource ++ scope ++ record,
+    /// per record) and `Record.ts` ordering so the rows fed here are the rows
+    /// the sealed builder indexes.
+    fn drain_flattened(mut reader: wal::Reader) -> Result<WalScan, FlattenedScanError> {
+        use wal_otap::KvSink;
+        let mut sink = ScanSink::default();
+        let mut kv = String::new();
+        let mut frame_no = 0u64;
+        while let Some(frame) = reader.next_frame()? {
+            frame_no += 1;
+            let flattened = ng_flatten::decode_frame(frame.data).map_err(|e| {
+                FlattenedScanError::Decode {
+                    frame: frame_no,
+                    msg: e.to_string(),
+                }
+            })?;
+            let tree = &flattened.tree;
+            // Resolve each node's path once per frame (records reuse the nodes).
+            let paths: Vec<String> = (0..tree.len() as ng_flatten::NodeId)
+                .map(|id| tree.path(id))
+                .collect();
+
+            let mut tokens: Vec<u32> = Vec::new();
+            for rg in &flattened.resources {
+                let resource_tokens = intern_flattened(&mut sink, &rg.resource, &paths, &mut kv);
+                tokens.clear();
+                tokens.extend_from_slice(&resource_tokens);
+                for sg in &rg.scopes {
+                    let scope_tokens = intern_flattened(&mut sink, &sg.scope, &paths, &mut kv);
+                    tokens.extend_from_slice(&scope_tokens);
+                    for record in &sg.records {
+                        let record_tokens =
+                            intern_flattened(&mut sink, &record.entries, &paths, &mut kv);
+                        tokens.truncate(resource_tokens.len() + scope_tokens.len());
+                        tokens.extend_from_slice(&record_tokens);
+                        // ts resolved at ingest (time/observed/clock); concrete.
+                        sink.row(record.ts, &tokens);
+                    }
+                    tokens.truncate(resource_tokens.len());
+                }
+            }
+        }
         Ok(sink.finish())
     }
 
@@ -457,6 +542,27 @@ impl ScanSink {
             fields,
         }
     }
+}
+
+/// Intern a flattened-frame entry slice into [`ScanSink`] tokens, rendering each
+/// entry's `key=value` via [`ng_flatten::build_kv`] — the same renderer the sealed
+/// `ng-index` builder uses, which is what makes the pair strings (and thus the query
+/// results) match. The pre-computed `hash` is passed for symmetry with the builder's
+/// fast path; [`ScanSink`] dedups by string regardless.
+fn intern_flattened(
+    sink: &mut ScanSink,
+    entries: &[ng_flatten::Entry],
+    paths: &[String],
+    kv: &mut String,
+) -> Vec<u32> {
+    use wal_otap::KvSink;
+    entries
+        .iter()
+        .map(|e| {
+            ng_flatten::build_kv(&paths[e.node as usize], &e.value, kv);
+            sink.intern(Some(e.hash), kv)
+        })
+        .collect()
 }
 
 // ---------------------------------------------------------------------------

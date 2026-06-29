@@ -17,6 +17,10 @@ sfst = { workspace = true }
 wal = { workspace = true }
 file-registry = { workspace = true }
 wal-otap = { workspace = true }
+# Active-WAL tail scan of ng-flatten frames (`WalScan::scan_flattened`), the
+# ng-path counterpart of the OTAP `wal-otap` tail decode (migration: graft).
+ng-flatten = { workspace = true }
+thiserror = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 tracing = { workspace = true }
 memmap2 = { workspace = true }
@@ -33,3 +37,6 @@ otel-logs-identity = { workspace = true }
 sfst-indexer = { workspace = true }
 opentelemetry-proto = { workspace = true }
 tempfile = { workspace = true }
+# ng-flatten tail-scan equivalence harness (tests/ng_wal_equivalence.rs): builds
+# the sealed ng SFST via ng-index::build_sfst to compare against scan_flattened.
+ng-index = { workspace = true }
