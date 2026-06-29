@@ -297,8 +297,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     signal(SIGINT, netdata_claim_exit_callback);
     signal(SIGTERM, netdata_claim_exit_callback);
 
-    int argc;
+    int argc = 0;
     argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    if (!argv)
+        netdata_claim_error_exit(L"CommandLineToArgvW");
+
     if (argc)
         argc = nd_claim_parse_args(argc, argv);
 
