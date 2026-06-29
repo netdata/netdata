@@ -70,6 +70,15 @@ int test_str_uint8() {
     ASSERT_RETVAL(c_rhash_get_uint8_by_str, ==, 0, hash, KEY_1, &val);
     ASSERT_VAL_UINT8(100, val);
 
+    ASSERT_RETVAL(c_rhash_insert_str_ptr, ==, 0, hash, KEY_1, &hash);
+    val = 123;
+    ASSERT_RETVAL(c_rhash_get_uint8_by_str, !=, 0, hash, KEY_1, &val);
+    ASSERT_VAL_UINT8(0, val);
+
+    ASSERT_RETVAL(c_rhash_insert_str_uint8, ==, 0, hash, KEY_1, 42);
+    ASSERT_RETVAL(c_rhash_get_uint8_by_str, ==, 0, hash, KEY_1, &val);
+    ASSERT_VAL_UINT8(42, val);
+
     ALL_SUBTESTS_PASS();
 test_cleanup:
     c_rhash_destroy(hash);
