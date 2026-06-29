@@ -57,6 +57,12 @@ static void mkdir_recursive(const char *native_path, int perms) {
     if (isalpha((unsigned char)tmp[0]) && tmp[1] == ':' && (tmp[2] == '/' || tmp[2] == '\0'))
         walk_start = tmp + 2;
 
+    // If walk_start is already at '\0' (empty path or bare drive letter), there
+    // are no intermediate components to create.  Skip the loop entirely so that
+    // walk_start + 1 is never read — that byte is uninitialized for such inputs.
+    if (!*walk_start)
+        return;
+
     for (char *p = walk_start + 1; *p; p++) {
         if (*p == '/') {
             char saved = *p;
