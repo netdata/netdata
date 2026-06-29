@@ -8,28 +8,6 @@ How Netdata identifies nodes across Agents, Parents, and Cloud - and why each id
 
 :::
 
-## Node Lifecycle and Ephemerality
-
-Every node has a **lifecycle** determined by its **ephemerality** setting. By default, all nodes are **permanent** - they are expected to maintain connectivity, and disconnections trigger alerts.
-
-Ephemeral nodes are designed for dynamic infrastructure:
-
-- No alerts when they disconnect
-- Automatic cleanup after configurable timeout
-- Perfect for auto-scaling and short-lived workloads
-
-To change a node's ephemerality, edit `netdata.conf`:
-
-```ini
-[global]
-is ephemeral node = yes   # Ephemeral - no alerts, auto-cleanup
-is ephemeral node = no    # Permanent (default) - alerts on disconnect
-```
-
-See [Node Ephemerality](/docs/nodes-ephemerality.md) for detailed configuration options.
-
----
-
 Netdata uses several identity mechanisms to uniquely identify nodes, authenticate connections, and track metrics across your infrastructure. Understanding these identities is essential when:
 
 - Creating VM templates or golden images
@@ -91,43 +69,6 @@ If two Agents have the same Machine GUID:
 See [VM Templates](/docs/learn/vm-templates.md) for how to avoid this when cloning VMs.
 
 :::
-
-## Parent: Children Identities
-
-When a Netdata Agent operates as a **Parent** (receiving metrics from Children), it stores metadata about all nodes it has seen.
-
-| Property     | Value                                |
-|--------------|--------------------------------------|
-| **Database** | `/var/cache/netdata/netdata-meta.db` |
-| **Table**    | `node_instance`                      |
-| **Contains** | GUIDs of all Children ever connected |
-
-### Relationship Between Metadata and Metrics
-
-Each metric in Netdata has a UUID. The metadata database (`netdata-meta.db`) links these UUIDs to nodes, charts, and dimensions. The dbengine stores metric samples indexed by these UUIDs.
-
-| Component                              | Purpose                                              |
-|----------------------------------------|------------------------------------------------------|
-| **Metadata** (`netdata-meta.db`)       | Links metric UUIDs to node GUIDs, charts, dimensions |
-| **Dbengine** (`dbengine*` directories) | Stores actual metric samples indexed by UUID         |
-
-The metadata acts as an index - without it, metric samples in dbengine cannot be associated with their source nodes or chart definitions.
-
-### Key Point: Metadata DB Does Not Determine Agent Identity
-
-The metadata database stores information about **all nodes** (including the Agent itself), but this data exists only to link nodes with their metrics. The Agent's identity is **not** determined by the database - it comes exclusively from:
-
-- The GUID file
-- Status file backups
-
-### Multiple Node Identities in Database
-
-When a database contains metadata for multiple nodes (from Children or [Virtual Nodes](#virtual-nodes-vnodes)), Netdata:
-
-1. **Reports all nodes** - All known nodes are reported to Netdata Cloud
-2. **Retention persistence** - Node entries persist in Cloud until database retention expires (can be years with tiering)
-
-This is normal for Parent nodes receiving data from Children, and for Agents using Virtual Nodes. See [VM Templates](/docs/learn/vm-templates.md) for implications when cloning VMs.
 
 ## Virtual Nodes (vnodes)
 
@@ -211,14 +152,66 @@ Vnode changes applied via the GUI propagate immediately to all running collector
 
 :::
 
+### Attaching a Virtual Node to a Collector Job
+
+Defining a vnode is step 1. The vnode becomes active when a collector job references it by setting `vnode` in the job's configuration to the vnode's **hostname**:
+
+```yaml
+jobs:
+  - name: win_server1
+    vnode: win_server1
+    url: http://203.0.113.10:9182/metrics
+```
+
+The `vnode` value must exactly match the `hostname` of the vnode definition. The Agent resolves the vnode at job startup — if the referenced hostname is not registered, the job fails to start.
+
+:::note
+
+**SNMP** collectors behave differently: their `create_vnode: true` option auto-creates the vnode from the job configuration, so no separate vnode definition step is needed.
+
+:::
+
 ### How Virtual Nodes Work
 
-1. Go collector reads vnode configuration
-2. Metrics are tagged with the vnode's GUID instead of the Agent's Machine GUID
-3. Cloud sees the vnode as a separate node in your Space
-4. Parent nodes store vnode metadata alongside Children metadata
+1. Define a vnode (YAML file or GUI) with a unique `hostname` and `guid`
+2. Configure the collector job with `vnode: <hostname>` to attach it
+3. Metrics are tagged with the vnode's GUID instead of the Agent's Machine GUID
+4. Cloud sees the vnode as a separate node in your Space
+5. Parent nodes store vnode metadata alongside Children metadata
 
 Virtual nodes appear in Netdata Cloud as independent nodes, with their own dashboards and alert states.
+
+## Hostname Override
+
+By default, Netdata auto-detects the system hostname. When the system hostname is configured as an IP address (common on some cloud VMs or home servers), nodes appear in Dashboards and Netdata Cloud with that raw IP instead of a readable name.
+
+:::info
+
+This setting changes the **display name** only — it does not affect the node's identity (Machine GUID, Node ID, or Claimed ID).
+
+:::
+
+To configure a custom hostname, see [Customizing Your Node Name](/src/daemon/config/README.md#customizing-your-node-name).
+
+## Node Lifecycle and Ephemerality
+
+Every node has a **lifecycle** determined by its **ephemerality** setting. By default, all nodes are **permanent** - they are expected to maintain connectivity, and disconnections trigger alerts.
+
+Ephemeral nodes are designed for dynamic infrastructure:
+
+- No alerts when they disconnect
+- Automatic cleanup after configurable timeout
+- Perfect for auto-scaling and short-lived workloads
+
+To change a node's ephemerality, edit `netdata.conf`:
+
+```ini
+[global]
+is ephemeral node = yes   # Ephemeral - no alerts, auto-cleanup
+is ephemeral node = no    # Permanent (default) - alerts on disconnect
+```
+
+See [Node Ephemerality](/docs/nodes-ephemerality.md) for detailed configuration options.
 
 ## Cloud: Node Identity
 
@@ -268,17 +261,42 @@ If you customized `[directories]` in `netdata.conf`:
 
 :::
 
-## Hostname Override
+## Parent: Children Identities
 
-By default, Netdata auto-detects the system hostname. When the system hostname is configured as an IP address (common on some cloud VMs or home servers), nodes appear in Dashboards and Netdata Cloud with that raw IP instead of a readable name.
+When a Netdata Agent operates as a **Parent** (receiving metrics from Children), it stores metadata about all nodes it has seen.
 
-:::info
+| Property     | Value                                |
+|--------------|--------------------------------------|
+| **Database** | `/var/cache/netdata/netdata-meta.db` |
+| **Table**    | `node_instance`                      |
+| **Contains** | GUIDs of all Children ever connected |
 
-This setting changes the **display name** only — it does not affect the node's identity (Machine GUID, Node ID, or Claimed ID).
+### Relationship Between Metadata and Metrics
 
-:::
+Each metric in Netdata has a UUID. The metadata database (`netdata-meta.db`) links these UUIDs to nodes, charts, and dimensions. The dbengine stores metric samples indexed by these UUIDs.
 
-To configure a custom hostname, see [Customizing Your Node Name](/src/daemon/config/README.md#customizing-your-node-name).
+| Component                              | Purpose                                              |
+|----------------------------------------|------------------------------------------------------|
+| **Metadata** (`netdata-meta.db`)       | Links metric UUIDs to node GUIDs, charts, dimensions |
+| **Dbengine** (`dbengine*` directories) | Stores actual metric samples indexed by UUID         |
+
+The metadata acts as an index - without it, metric samples in dbengine cannot be associated with their source nodes or chart definitions.
+
+### Key Point: Metadata DB Does Not Determine Agent Identity
+
+The metadata database stores information about **all nodes** (including the Agent itself), but this data exists only to link nodes with their metrics. The Agent's identity is **not** determined by the database - it comes exclusively from:
+
+- The GUID file
+- Status file backups
+
+### Multiple Node Identities in Database
+
+When a database contains metadata for multiple nodes (from Children or [Virtual Nodes](#virtual-nodes-vnodes)), Netdata:
+
+1. **Reports all nodes** - All known nodes are reported to Netdata Cloud
+2. **Retention persistence** - Node entries persist in Cloud until database retention expires (can be years with tiering)
+
+This is normal for Parent nodes receiving data from Children, and for Agents using Virtual Nodes. See [VM Templates](/docs/learn/vm-templates.md) for implications when cloning VMs.
 
 ## FAQ
 
