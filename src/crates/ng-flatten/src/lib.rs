@@ -159,6 +159,18 @@ impl SchemaTree {
         self.nodes.iter().filter(|n| n.kind.is_leaf()).count()
     }
 
+    /// The node's upward edge as `(parent, step)`, or `None` at the root.
+    /// Exposes the parent id + immediate step so a consumer can copy the tree
+    /// node-by-node into another representation (e.g. `sfst::SchemaTree` at index
+    /// time). Nodes are interned parent-before-child, so an ascending copy sees
+    /// every parent already placed.
+    pub fn edge(&self, id: NodeId) -> Option<(NodeId, &Step)> {
+        self.nodes[id as usize]
+            .edge
+            .as_ref()
+            .map(|e| (e.parent, &e.step))
+    }
+
     /// The root-first chain of steps leading to `id`.
     pub fn steps(&self, id: NodeId) -> Vec<Step> {
         let mut steps = Vec::new();

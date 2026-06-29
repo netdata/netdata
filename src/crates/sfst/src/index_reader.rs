@@ -35,8 +35,10 @@ impl<'a> IndexReader<'a> {
     pub fn open(data: &'a [u8]) -> Result<Self, crate::Error> {
         let sfst = crate::Reader::open(data)?;
         let summary = sfst.summary()?;
-        // Force the metadata cache so subsequent accessors are infallible.
+        // Force the metadata + derived-field-table caches so subsequent
+        // accessors are infallible.
         sfst.metadata()?;
+        sfst.fields()?;
         let primary = sfst.primary()?;
         Ok(Self {
             sfst,
@@ -82,9 +84,18 @@ impl<'a> IndexReader<'a> {
 
     // ── Field table ─────────────────────────────────────────────────
 
-    /// The field table (carried inside [`Metadata`]).
+    /// The field table — the flat view derived from the schema tree
+    /// (`metadata().tree`), cached on the underlying [`crate::Reader`] (forced
+    /// at [`open`](Self::open)).
     pub fn field_table(&self) -> &crate::FieldTable {
-        &self.metadata().fields
+        self.sfst
+            .fields()
+            .expect("field table derived + cached at IndexReader::open")
+    }
+
+    /// The typed schema tree (the on-disk field descriptor).
+    pub fn tree(&self) -> &crate::SchemaTree {
+        &self.metadata().tree
     }
 
     /// Byte span of the cold suffix (mid/high field chunks + stream
@@ -589,7 +600,7 @@ impl<'a> IndexReader<'a> {
     fn locate_field(&self, field_name: &str) -> Option<FieldLocation> {
         let mut mid_idx = 0u16;
         let mut high_idx = 0u16;
-        for field in self.metadata().fields.iter() {
+        for field in self.field_table().iter() {
             if field.name == field_name {
                 return Some(match field.tier {
                     FieldTier::Low => FieldLocation::Low,
@@ -613,7 +624,7 @@ impl<'a> IndexReader<'a> {
         let id_ranges = &self.metadata().id_ranges;
         let mut kv = id_ranges.mid_end.0;
         let mut current = 0u16;
-        for field in self.metadata().fields.iter() {
+        for field in self.field_table().iter() {
             if let FieldTier::High = field.tier {
                 if current == high_idx {
                     return KvId(kv + local as u32);
@@ -787,7 +798,7 @@ impl<'a> IndexReader<'a> {
             id_ranges.high_end.0 - id_ranges.mid_end.0,
         );
         let mut combined_mask: u8 = 0;
-        for field in self.metadata().fields.iter() {
+        for field in self.field_table().iter() {
             match field.tier {
                 FieldTier::Low => {}
                 FieldTier::Mid => {

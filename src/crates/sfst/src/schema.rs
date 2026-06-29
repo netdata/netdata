@@ -33,14 +33,22 @@ pub use file_registry::FileSummary as Summary;
 ///
 /// Holds the data a reader needs to bootstrap any query against the
 /// file: the sparse timestamp histogram, the cardinality-tier id
-/// ranges, the field table, and the per-row columns manifest. Readers
-/// that only need the cheap summary fields (min/max timestamp, total log
-/// count, stream) should decode [`Summary`] from the `SUMR` chunk instead.
+/// ranges, the typed schema tree (the field descriptor), and the per-row
+/// columns manifest. Readers that only need the cheap summary fields
+/// (min/max timestamp, total log count, stream) should decode [`Summary`]
+/// from the `SUMR` chunk instead.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Metadata {
     pub histogram: Histogram,
     pub id_ranges: IdRanges,
-    pub fields: FieldTable,
+    /// The typed, array-collapsed schema tree — the on-disk field descriptor
+    /// (replaces the flat `FieldTable` as of v9). Carries structure (parent/
+    /// child, `[]` collapse) + per-leaf [`ValueKind`], and per-leaf storage
+    /// stats ([`LeafStats`]: cardinality + tier). The flat [`FieldTable`] the
+    /// tier machinery and legacy consumers use is **derived** from this tree
+    /// at read time ([`SchemaTree::derive_field_table`]); coalesced scalar
+    /// field types come from [`SchemaTree::derive_scalar_kinds`].
+    pub tree: SchemaTree,
     /// Manifest of the per-row column chunks this file carries
     /// (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`), with each column's type. Empty when
     /// the file has no per-row columns. The authoritative source for column
@@ -164,6 +172,340 @@ impl From<Vec<FieldEntry>> for FieldTable {
 impl FromIterator<FieldEntry> for FieldTable {
     fn from_iter<I: IntoIterator<Item = FieldEntry>>(iter: I) -> Self {
         Self(iter.into_iter().collect())
+    }
+}
+
+// ── Typed schema tree (carried inside META; the field descriptor) ─
+
+/// Node id within a [`SchemaTree`]'s arena. Node `0` is the root. Not to be
+/// confused with [`KvId`] (a stored `key=value` identifier).
+pub type NodeId = u32;
+
+/// The kind (type tag) of a schema-tree node. Mirrors the producer's flatten
+/// `Kind` but is **owned by the format crate** — `sfst` has no dependency on
+/// the flattening crate (it is the lower layer). Leaf kinds carry a value; the
+/// interior kinds [`ValueKind::Kvlist`]/[`ValueKind::Array`] have children.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ValueKind {
+    Null,
+    Bool,
+    Int,
+    Double,
+    Str,
+    Bytes,
+    EmptyKvlist,
+    EmptyArray,
+    Kvlist,
+    Array,
+}
+
+impl ValueKind {
+    /// True for value-bearing leaf kinds (everything but `Kvlist`/`Array`).
+    pub fn is_leaf(self) -> bool {
+        !matches!(self, ValueKind::Kvlist | ValueKind::Array)
+    }
+
+    /// True for the scalar kinds that can be a UI facet — the value-bearing
+    /// kinds excluding `Null` (absence) and the empty containers (which fold
+    /// into their non-empty container form, not a scalar). See
+    /// [`SchemaTree::derive_scalar_kinds`].
+    pub fn is_scalar(self) -> bool {
+        matches!(
+            self,
+            ValueKind::Bool | ValueKind::Int | ValueKind::Double | ValueKind::Str | ValueKind::Bytes
+        )
+    }
+}
+
+/// How a node descends from its parent: a named field, or the merged array
+/// element. Distinguishing these keeps a path unambiguous (an array index vs a
+/// key literally containing `[]`).
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Step {
+    Field(String),
+    ArrayElem,
+}
+
+/// Per-leaf storage stats: the path's distinct-value cardinality and its
+/// cardinality [`FieldTier`]. Present on leaf nodes only; a polymorphic path's
+/// sibling leaves share the same (path-level) stats.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LeafStats {
+    pub cardinality: u32,
+    pub tier: FieldTier,
+}
+
+/// A schema-tree node: its [`ValueKind`], the upward edge to its parent (`None`
+/// only at the root), and — for leaf nodes — the path's [`LeafStats`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SchemaNode {
+    pub kind: ValueKind,
+    /// `None` only at the root (node `0`).
+    pub edge: Option<SchemaEdge>,
+    /// `Some` on leaf nodes (storage stats for the path), `None` on interior
+    /// nodes (`Kvlist`/`Array`).
+    pub leaf: Option<LeafStats>,
+}
+
+/// A node's upward edge: its parent id plus the [`Step`] taken from the parent.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SchemaEdge {
+    pub parent: NodeId,
+    pub step: Step,
+}
+
+/// The typed, array-collapsed schema tree carried in [`Metadata::tree`] — an
+/// arena of [`SchemaNode`]s sized by structural variety, not data volume. Node
+/// `0` is the root. Replaces the flat `FieldTable` as the on-disk field
+/// descriptor (v9); the `FieldTable` is *derived* from it on demand.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SchemaTree {
+    nodes: Vec<SchemaNode>,
+}
+
+impl SchemaTree {
+    /// Build a tree from raw nodes. The caller guarantees node `0` is the root
+    /// (no edge) and every non-root edge points to a smaller id (parents
+    /// precede children) — the invariant the producer's flattener maintains.
+    pub fn from_nodes(nodes: Vec<SchemaNode>) -> Self {
+        Self { nodes }
+    }
+
+    /// Build a **flat** tree from a [`FieldTable`]: one `Str`-typed leaf per
+    /// field directly under the root, each a single `Field(name)` step carrying
+    /// the field's `(cardinality, tier)`. This is the descriptor a producer
+    /// with no typed tree emits (the legacy `wal-otap` index path) so every v9
+    /// file has a valid descriptor; `derive_field_table` round-trips it back to
+    /// the same `FieldTable`. It is structurally flat and `Str`-typed (no worse
+    /// than the pre-v9 untyped `FieldTable`).
+    pub fn flat(fields: &FieldTable) -> Self {
+        let mut nodes = Vec::with_capacity(fields.len() + 1);
+        // Root.
+        nodes.push(SchemaNode {
+            kind: ValueKind::Kvlist,
+            edge: None,
+            leaf: None,
+        });
+        for f in fields.iter() {
+            nodes.push(SchemaNode {
+                kind: ValueKind::Str,
+                edge: Some(SchemaEdge {
+                    parent: 0,
+                    step: Step::Field(f.name.clone()),
+                }),
+                leaf: Some(LeafStats {
+                    cardinality: f.cardinality,
+                    tier: f.tier,
+                }),
+            });
+        }
+        Self { nodes }
+    }
+
+    /// Fill each leaf node's [`LeafStats`] from `fields`, matched by collapsed
+    /// path. Used at build time to attach per-path cardinality/tier to a tree
+    /// built structurally (kinds known, stats not — the `ng-index` path). A
+    /// polymorphic path's sibling leaves all match the same field entry and so
+    /// share its stats. A leaf whose path is absent from `fields` keeps
+    /// `leaf = None` (it then drops out of [`derive_field_table`](Self::derive_field_table)).
+    pub fn fill_field_stats(&mut self, fields: &FieldTable) {
+        use std::collections::HashMap;
+        let by_name: HashMap<&str, LeafStats> = fields
+            .iter()
+            .map(|f| {
+                (
+                    f.name.as_str(),
+                    LeafStats {
+                        cardinality: f.cardinality,
+                        tier: f.tier,
+                    },
+                )
+            })
+            .collect();
+        // path() borrows &self, so resolve leaf paths up front, then mutate.
+        let leaf_paths: Vec<Option<String>> = (0..self.nodes.len() as NodeId)
+            .map(|id| {
+                self.nodes[id as usize]
+                    .kind
+                    .is_leaf()
+                    .then(|| self.path(id))
+            })
+            .collect();
+        for (node, path) in self.nodes.iter_mut().zip(leaf_paths) {
+            if let Some(path) = path {
+                node.leaf = by_name.get(path.as_str()).copied();
+            }
+        }
+    }
+
+    /// The node at `id`.
+    pub fn node(&self, id: NodeId) -> &SchemaNode {
+        &self.nodes[id as usize]
+    }
+
+    /// Total node count (interior + leaf).
+    pub fn len(&self) -> usize {
+        self.nodes.len()
+    }
+
+    /// Whether the tree has no nodes.
+    pub fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
+    }
+
+    /// Iterate `(id, node)` for every node.
+    pub fn iter(&self) -> impl Iterator<Item = (NodeId, &SchemaNode)> {
+        self.nodes
+            .iter()
+            .enumerate()
+            .map(|(i, n)| (i as NodeId, n))
+    }
+
+    /// The root-first chain of steps leading to `id`.
+    fn steps(&self, id: NodeId) -> Vec<&Step> {
+        let mut steps = Vec::new();
+        let mut cur = id;
+        while let Some(edge) = &self.nodes[cur as usize].edge {
+            steps.push(&edge.step);
+            cur = edge.parent;
+        }
+        steps.reverse();
+        steps
+    }
+
+    /// The collapsed path of `id`: `Field` steps joined with `.`, `ArrayElem`
+    /// steps rendered `[]` (no leading dot) — the same rendering the producer
+    /// uses for `key=value` keys.
+    pub fn path(&self, id: NodeId) -> String {
+        let mut path = String::new();
+        for step in self.steps(id) {
+            match step {
+                Step::Field(name) => {
+                    if !path.is_empty() {
+                        path.push('.');
+                    }
+                    path.push_str(name);
+                }
+                Step::ArrayElem => path.push_str("[]"),
+            }
+        }
+        path
+    }
+
+    /// Derive the flat [`FieldTable`] this tree describes: one [`FieldEntry`]
+    /// per distinct **leaf path** with its `(cardinality, tier)`, ordered
+    /// low → mid → high then by name — byte-identical to the table a pre-v9
+    /// producer stored. A polymorphic path (multiple leaf kinds) collapses to a
+    /// single entry (its sibling leaves share path-level stats). Leaf nodes
+    /// missing `LeafStats` are skipped defensively (a well-formed tree has
+    /// stats on every leaf).
+    pub fn derive_field_table(&self) -> FieldTable {
+        use std::collections::BTreeMap;
+        // BTreeMap keyed by (tier_rank, name) yields the canonical
+        // low→mid→high-then-by-name order directly.
+        let mut by_path: BTreeMap<(u8, String), LeafStats> = BTreeMap::new();
+        for (id, node) in self.iter() {
+            if !node.kind.is_leaf() {
+                continue;
+            }
+            let Some(stats) = node.leaf else { continue };
+            let rank = tier_rank(stats.tier);
+            by_path.entry((rank, self.path(id))).or_insert(stats);
+        }
+        by_path
+            .into_iter()
+            .map(|((_, name), stats)| FieldEntry {
+                name,
+                cardinality: stats.cardinality,
+                tier: stats.tier,
+            })
+            .collect()
+    }
+
+    /// Derive the coalesced **scalar** field view (D45–D47): for each leaf path
+    /// whose kinds include at least one scalar, the path's single coalesced
+    /// scalar [`ValueKind`]. Container-only paths (objects/arrays, including
+    /// `Null`/empty-only) yield no entry — their scalars live at child paths.
+    /// Ordered by path. Coalescing lattice: drop `Null`; fold empty containers
+    /// away; `Int ⊔ Double = Double`; any other scalar mix → `Str`.
+    pub fn derive_scalar_kinds(&self) -> Vec<(String, ValueKind)> {
+        use std::collections::BTreeMap;
+        // path -> accumulated scalar-kind flags.
+        let mut by_path: BTreeMap<String, ScalarSet> = BTreeMap::new();
+        for (id, node) in self.iter() {
+            if !node.kind.is_leaf() {
+                continue;
+            }
+            by_path
+                .entry(self.path(id))
+                .or_default()
+                .add(node.kind);
+        }
+        by_path
+            .into_iter()
+            .filter_map(|(path, set)| set.coalesce().map(|k| (path, k)))
+            .collect()
+    }
+}
+
+/// Sort rank for tier ordering (low → mid → high).
+fn tier_rank(tier: FieldTier) -> u8 {
+    match tier {
+        FieldTier::Low => 0,
+        FieldTier::Mid => 1,
+        FieldTier::High => 2,
+    }
+}
+
+/// Accumulates which scalar kinds a path's leaves carry, for coalescing.
+#[derive(Default)]
+struct ScalarSet {
+    bool_: bool,
+    int: bool,
+    double: bool,
+    str_: bool,
+    bytes: bool,
+}
+
+impl ScalarSet {
+    fn add(&mut self, kind: ValueKind) {
+        match kind {
+            ValueKind::Bool => self.bool_ = true,
+            ValueKind::Int => self.int = true,
+            ValueKind::Double => self.double = true,
+            ValueKind::Str => self.str_ = true,
+            ValueKind::Bytes => self.bytes = true,
+            // Null, empty containers, and containers contribute no scalar.
+            _ => {}
+        }
+    }
+
+    /// The coalesced scalar kind, or `None` if the path has no scalar leaves.
+    fn coalesce(&self) -> Option<ValueKind> {
+        let count = [self.bool_, self.int, self.double, self.str_, self.bytes]
+            .iter()
+            .filter(|&&b| b)
+            .count();
+        match count {
+            0 => None,
+            1 => Some(if self.bool_ {
+                ValueKind::Bool
+            } else if self.int {
+                ValueKind::Int
+            } else if self.double {
+                ValueKind::Double
+            } else if self.str_ {
+                ValueKind::Str
+            } else {
+                ValueKind::Bytes
+            }),
+            // Numeric widening is the only multi-kind join that isn't `Str`.
+            _ if self.int && self.double && !self.bool_ && !self.str_ && !self.bytes => {
+                Some(ValueKind::Double)
+            }
+            // Any other scalar mix → the universal string fallback.
+            _ => Some(ValueKind::Str),
+        }
     }
 }
 

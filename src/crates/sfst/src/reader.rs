@@ -17,8 +17,8 @@ use crate::{
     BitmapValue, CHUNK_DROPPED_ATTRS, CHUNK_FLAGS, CHUNK_META, CHUNK_OBSERVED_TS, CHUNK_PRIMARY,
     CHUNK_SPAN_IDS, CHUNK_SUMMARY, CHUNK_TIMS, CHUNK_TRACE_IDS, ColumnType, ColumnsTable,
     DroppedAttributeCounts, Error, FieldTable, FieldTier, Flags, HighField, MAGIC,
-    MAX_STREAM_BATCHES, Metadata, ObservedTimestamps, SpanIds, StreamBatch, Summary, TraceIds,
-    VERSION, high_field_id, mid_field_id, num_stream_batches, stream_batch_id,
+    MAX_STREAM_BATCHES, Metadata, ObservedTimestamps, SchemaTree, SpanIds, StreamBatch, Summary,
+    TraceIds, VERSION, high_field_id, mid_field_id, num_stream_batches, stream_batch_id,
 };
 
 /// Decompress zstd, then deserialize with bincode. Crate-internal:
@@ -43,6 +43,11 @@ pub struct Reader<'a> {
     /// method that needs it (`metadata`, `fields`, `num_mid`,
     /// `num_high`).
     metadata: OnceCell<Metadata>,
+    /// Flat [`FieldTable`] **derived** from the META schema tree
+    /// (`metadata().tree`), cached on first access. The on-disk descriptor is
+    /// the tree (v9); the tier machinery and legacy consumers read this derived
+    /// view. Same lazy-decode rationale as `metadata`.
+    fields: OnceCell<FieldTable>,
 }
 
 impl<'a> Reader<'a> {
@@ -58,6 +63,7 @@ impl<'a> Reader<'a> {
             data,
             container,
             metadata: OnceCell::new(),
+            fields: OnceCell::new(),
         })
     }
 
@@ -100,17 +106,27 @@ impl<'a> Reader<'a> {
         self.container.has_chunk(CHUNK_META)
     }
 
-    /// Field table — convenience accessor for `metadata().fields`.
+    /// The typed schema tree (META `tree`) — the on-disk field descriptor.
+    pub fn tree(&self) -> Result<&SchemaTree, Error> {
+        Ok(&self.metadata()?.tree)
+    }
+
+    /// Field table — the flat view **derived** from the schema tree
+    /// (`metadata().tree`), cached on first access. Ordered low → mid → high
+    /// then by name, identical to the table a pre-v9 file stored directly.
     pub fn fields(&self) -> Result<&FieldTable, Error> {
-        Ok(&self.metadata()?.fields)
+        if let Some(f) = self.fields.get() {
+            return Ok(f);
+        }
+        let derived = self.metadata()?.tree.derive_field_table();
+        Ok(self.fields.get_or_init(|| derived))
     }
 
     /// Number of mid-cardinality fields (one secondary chunk per mid
     /// field, sitting at positions `0..num_mid`).
     pub fn num_mid(&self) -> Result<u16, Error> {
         let count = self
-            .metadata()?
-            .fields
+            .fields()?
             .iter()
             .filter(|f| f.tier == FieldTier::Mid)
             .count();
@@ -121,8 +137,7 @@ impl<'a> Reader<'a> {
     /// field, sitting at positions `num_mid..num_mid + num_high`).
     pub fn num_high(&self) -> Result<u16, Error> {
         let count = self
-            .metadata()?
-            .fields
+            .fields()?
             .iter()
             .filter(|f| f.tier == FieldTier::High)
             .count();

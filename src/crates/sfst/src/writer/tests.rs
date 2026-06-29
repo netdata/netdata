@@ -6,7 +6,8 @@ use treight::Bitmap;
 use crate::{
     BitmapValue, ChunkCounts, ColumnEntry, ColumnType, ColumnsPresent, ColumnsTable,
     DroppedAttributeCounts, Error, FieldEntry, FieldTier, Flags, HighField, Histogram, IdRanges,
-    KvId, Metadata, ObservedTimestamps, SpanIds, StreamBatch, StreamWriter, Summary, TraceIds,
+    KvId, Metadata, ObservedTimestamps, SchemaTree, SpanIds, StreamBatch, StreamWriter, Summary,
+    TraceIds,
 };
 
 fn counts(mid: u16, high: u16, batches: u8) -> ChunkCounts {
@@ -65,7 +66,7 @@ fn metadata_with_columns(fields: Vec<FieldEntry>, columns: ColumnsTable) -> Meta
             mid_end: KvId(3),
             high_end: KvId(4),
         },
-        fields: fields.into(),
+        tree: SchemaTree::flat(&fields.into()),
         columns,
     }
 }

@@ -82,7 +82,7 @@ fn build_query_fixture() -> Vec<u8> {
             mid_end: KvId(4),
             high_end: KvId(4),
         },
-        fields: vec![
+        tree: SchemaTree::flat(&vec![
             FieldEntry {
                 name: "level".into(),
                 cardinality: 2,
@@ -94,7 +94,7 @@ fn build_query_fixture() -> Vec<u8> {
                 tier: FieldTier::Low,
             },
         ]
-        .into(),
+        .into()),
         columns: ColumnsTable::default(),
     };
     let timestamps: Vec<i64> = (0..6)
@@ -481,7 +481,7 @@ fn build_multivalued_fixture() -> Vec<u8> {
             mid_end: KvId(4),
             high_end: KvId(4),
         },
-        fields: vec![
+        tree: SchemaTree::flat(&vec![
             FieldEntry {
                 name: "lang".into(),
                 cardinality: 2,
@@ -493,7 +493,7 @@ fn build_multivalued_fixture() -> Vec<u8> {
                 tier: FieldTier::Low,
             },
         ]
-        .into(),
+        .into()),
         columns: ColumnsTable::default(),
     };
     let timestamps: Vec<i64> = (0..3)
@@ -724,7 +724,7 @@ fn build_complemented_fixture() -> Vec<u8> {
             mid_end: KvId(4),
             high_end: KvId(4),
         },
-        fields: vec![
+        tree: SchemaTree::flat(&vec![
             FieldEntry {
                 name: "lvl".into(),
                 cardinality: 2,
@@ -736,7 +736,7 @@ fn build_complemented_fixture() -> Vec<u8> {
                 tier: FieldTier::Low,
             },
         ]
-        .into(),
+        .into()),
         columns: ColumnsTable::default(),
     };
     let timestamps: Vec<i64> = (0..6)
@@ -943,7 +943,7 @@ fn build_tiered_fixture() -> Vec<u8> {
             mid_end: KvId(5),
             high_end: KvId(8),
         },
-        fields: vec![
+        tree: SchemaTree::flat(&vec![
             FieldEntry {
                 name: "level".into(),
                 cardinality: 2,
@@ -960,7 +960,7 @@ fn build_tiered_fixture() -> Vec<u8> {
                 tier: FieldTier::High,
             },
         ]
-        .into(),
+        .into()),
         columns: ColumnsTable::default(),
     };
     let timestamps: Vec<i64> = (0..N as i64)

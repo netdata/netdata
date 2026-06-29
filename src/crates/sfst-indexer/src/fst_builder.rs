@@ -440,10 +440,24 @@ pub(super) fn build_into<W: Write + Seek>(
         DroppedAttributeCounts::NAME,
         DroppedAttributeCounts::COLUMN_TYPE,
     );
+    // The v9 field descriptor is the typed schema tree. A producer with typed
+    // flattening (`ng-index`) supplies the structural tree; we fill its leaf
+    // stats from `fields` (matched by path). A producer with no tree (the legacy
+    // `wal-otap` index path) gets a flat `Str`-typed tree derived from `fields`,
+    // so every v9 file carries a valid descriptor. Either way the derived field
+    // table (`tree.derive_field_table()`) reproduces `fields` exactly.
+    let tree = match &row_index.tree {
+        Some(t) => {
+            let mut t = t.clone();
+            t.fill_field_stats(&fields);
+            t
+        }
+        None => sfst::SchemaTree::flat(&fields),
+    };
     let metadata = Metadata {
         histogram,
         id_ranges,
-        fields,
+        tree,
         columns: ColumnsTable(col_entries),
     };
 

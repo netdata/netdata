@@ -45,6 +45,14 @@ pub struct RowIndex<'a> {
     pub span_ids: Option<SpanIds>,
     pub flags: Option<Flags>,
     pub dropped_attribute_counts: Option<DroppedAttributeCounts>,
+    /// The typed schema tree to persist as the v9 field descriptor
+    /// (`Metadata.tree`). `Some` when a producer with typed flattening supplies
+    /// it (the `ng-index` path) — structure + per-leaf `ValueKind`, leaf stats
+    /// filled at build from the per-field cardinality/tier. `None` for the
+    /// production `wal-otap` path, which has no typed tree; the builder then
+    /// synthesizes a flat `Str`-typed tree from the derived field table so every
+    /// v9 file carries a valid descriptor.
+    pub tree: Option<sfst::SchemaTree>,
 }
 
 impl<'a> RowIndex<'a> {
@@ -59,6 +67,7 @@ impl<'a> RowIndex<'a> {
             span_ids: None,
             flags: None,
             dropped_attribute_counts: None,
+            tree: None,
         }
     }
 

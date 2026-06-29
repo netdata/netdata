@@ -66,7 +66,7 @@ fn write_test_sfst(path: &std::path::Path, min_s: u32) {
             mid_end: sfst::KvId(4),
             high_end: sfst::KvId(4),
         },
-        fields: vec![
+        tree: sfst::SchemaTree::flat(&vec![
             sfst::FieldEntry {
                 name: "service".into(),
                 cardinality: 2,
@@ -78,7 +78,7 @@ fn write_test_sfst(path: &std::path::Path, min_s: u32) {
                 tier: sfst::FieldTier::Low,
             },
         ]
-        .into(),
+        .into()),
         columns: sfst::ColumnsTable::default(),
     };
     let timestamps: Vec<i64> = (0..6)
@@ -155,12 +155,12 @@ fn write_service_only_sfst(path: &std::path::Path, min_s: u32) {
             mid_end: sfst::KvId(2),
             high_end: sfst::KvId(2),
         },
-        fields: vec![sfst::FieldEntry {
+        tree: sfst::SchemaTree::flat(&vec![sfst::FieldEntry {
             name: "service".into(),
             cardinality: 2,
             tier: sfst::FieldTier::Low,
         }]
-        .into(),
+        .into()),
         columns: sfst::ColumnsTable::default(),
     };
     let timestamps: Vec<i64> = (0..3)
@@ -224,12 +224,12 @@ fn write_same_ts_sfst(path: &std::path::Path, ts_s: u32, n: usize) {
             mid_end: sfst::KvId(1),
             high_end: sfst::KvId(1),
         },
-        fields: vec![sfst::FieldEntry {
+        tree: sfst::SchemaTree::flat(&vec![sfst::FieldEntry {
             name: "severity_text".into(),
             cardinality: 1,
             tier: sfst::FieldTier::Low,
         }]
-        .into(),
+        .into()),
         columns: sfst::ColumnsTable::default(),
     };
     let timestamps: Vec<i64> = vec![(ts_s as i64) * 1_000_000_000; n];

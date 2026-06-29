@@ -234,7 +234,7 @@ Heavy query-time metadata:
     pub struct Metadata {
         pub histogram: Histogram,
         pub id_ranges: IdRanges,
-        pub fields:    Vec<FieldEntry>,
+        pub tree:      SchemaTree,         // typed field descriptor (v9; replaces `fields`)
         pub columns:   Vec<ColumnEntry>,   // per-row columns manifest (v8)
     }
 
@@ -258,19 +258,47 @@ Heavy query-time metadata:
         pub high_end: KvId,
     }
 
-    pub struct FieldEntry {
+    // The typed, array-collapsed schema tree — the on-disk field descriptor
+    // (v9; replaces the flat `Vec<FieldEntry>`). An arena of nodes; node 0 is the
+    // root. A non-root node always has a smaller id than its children.
+    pub struct SchemaTree { nodes: Vec<SchemaNode> }
+
+    pub struct SchemaNode {
+        pub kind: ValueKind,            // Null|Bool|Int|Double|Str|Bytes|EmptyKvlist
+                                        //   |EmptyArray|Kvlist|Array
+        pub edge: Option<SchemaEdge>,   // None only at the root
+        pub leaf: Option<LeafStats>,    // Some on leaf nodes only (the path's stats)
+    }
+    pub struct SchemaEdge { pub parent: NodeId, pub step: Step }  // Step = Field(String)|ArrayElem
+    pub struct LeafStats  { pub cardinality: u32, pub tier: FieldTier }  // Low|Mid|High
+
+    pub struct FieldEntry {              // retained type; the *derived* flat view
         pub name:        String,
         pub cardinality: u32,
-        pub tier:        FieldTier,    // Low | Mid | High
+        pub tier:        FieldTier,      // Low | Mid | High
     }
 
 `histogram` supports time-range narrowing: binary-search `timestamps`
 for the position bounds covering a window, then clip bitmaps to that
 range. `id_ranges` tells a reader which cardinality tier a `KvId`
-belongs to (see [§ Tier-Aligned IDs](#tier-aligned-ids)). `fields`
-is ordered low → mid → high (each tier internally sorted by field
-name) and yields the count of mid-card and high-card fields, which
-in turn determines how many `MF{i}` and `HF{i}` chunks are present.
+belongs to (see [§ Tier-Aligned IDs](#tier-aligned-ids)).
+
+`tree` is the typed field descriptor: each leaf node is a typed `(path, kind)`
+column (a path collapses array indices to `[]`); interior `Kvlist`/`Array` nodes
+give structure; leaf nodes carry the path's `cardinality` + `tier`. The flat
+**`FieldTable`** the tier machinery and legacy consumers use is **derived** from
+the tree at read time (`SchemaTree::derive_field_table`): one `FieldEntry` per
+distinct leaf path, ordered low → mid → high then by name (byte-identical to the
+`Vec<FieldEntry>` a pre-v9 file stored), which yields the count of mid-card and
+high-card fields and thus how many `MF{i}`/`HF{i}` chunks are present. A
+polymorphic path (multiple leaf kinds) collapses to one `FieldEntry`; its single
+coalesced **scalar** type (for typed/UI display) comes from
+`SchemaTree::derive_scalar_kinds` (drop `Null`; empty containers contribute no
+scalar; `Int ⊔ Double = Double`; any other scalar mix → `Str`). A producer with
+no typed tree (the legacy `wal-otap` index path) emits a flat `Str`-typed tree
+(`SchemaTree::flat`) so every v9 file has a valid descriptor. Per-occurrence type
+is not stored anywhere — the tree records the *set* of kinds per path, not which
+kind each stored value was.
 
 ### `PRIM` — Primary FST
 
@@ -288,8 +316,9 @@ The bitmap records the time-sorted log positions where the
 ### `MF{i}` — Mid-card field FSTs
 
 One chunk per mid-cardinality field, in the order those fields appear
-in `Metadata::fields`. Same payload schema as `PRIM` — an
-`FstIndex<BitmapValue>` whose keys are full `key=value` strings.
+in the derived field table (`SchemaTree::derive_field_table`). Same payload
+schema as `PRIM` — an `FstIndex<BitmapValue>` whose keys are full `key=value`
+strings.
 
 ### `HF{i}` — High-card field columnar (string arena)
 
@@ -424,7 +453,24 @@ CRC then fails to match.
 
 ## Format Version
 
-The current version is **8**.
+The current version is **9**.
+
+### v9 changelog (from v8)
+
+- **`META` replaces the flat field table with a typed schema tree.** `Metadata`
+  swaps `fields: Vec<FieldEntry>` for `tree: SchemaTree` — the typed,
+  array-collapsed schema tree is now the on-disk field descriptor (per-leaf
+  `ValueKind` + parent/child structure + per-leaf `cardinality`/`tier`). The flat
+  `FieldTable` is *derived* from the tree at read time
+  (`SchemaTree::derive_field_table`), byte-identical to what a v8 file stored, so
+  the tier machinery and legacy consumers are unchanged. Coalesced scalar field
+  types come from `SchemaTree::derive_scalar_kinds`.
+- **Storage chunks are unchanged from v8.** `PRIM`/`MF{i}`/`HF{i}`/`SB{i}`/`TIMS`
+  and the per-row column chunks keep their v8 encoding — only the `META` payload
+  changed. A v9 SFST built from a given WAL has byte-identical non-`META` chunks
+  to the v8 SFST from the same WAL.
+- Incompatible `META` bincode layout, so older files are rejected on open
+  (`Container::open` version check).
 
 ### v8 changelog (from v7)
 

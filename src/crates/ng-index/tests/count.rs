@@ -161,6 +161,9 @@ fn per_row_columns_roundtrip_in_chronological_order() {
     // Every column is row-aligned with the chronological timestamps. At
     // chronological position `p` the ts is BASE+(p+1) and the source record is
     // insertion index `i = N-1-p`, so its id-tagged columns must read back as `i`.
+    // Indexes six parallel columns by chronological position and derives the
+    // source insertion index `i = N-1-p` — a range loop is the clearest form.
+    #[allow(clippy::needless_range_loop)]
     for p in 0..N {
         assert_eq!(ts[p], (BASE + (p + 1) as u64) as i64, "chronological ts at {p}");
         let i = N - 1 - p;
@@ -170,6 +173,89 @@ fn per_row_columns_roundtrip_in_chronological_order() {
         assert_eq!(flags.0[p], 0x100 | i as u32, "flags at {p}");
         assert_eq!(drac.0[p], i as u32, "dropped_attributes_count at {p}");
     }
+}
+
+/// Four records whose `poly` attribute alternates `Int`/`Str` (a polymorphic
+/// path) while `n` is always `Int` — exercises the typed tree + D45–D47
+/// coalescing end to end.
+fn request_typed() -> ExportLogsServiceRequest {
+    let log_records = (0..4)
+        .map(|i| {
+            let poly = if i % 2 == 0 {
+                Av::IntValue(i)
+            } else {
+                Av::StringValue(format!("v{i}"))
+            };
+            LogRecord {
+                time_unix_nano: 1_700_000_000_000_000_000 + i as u64,
+                severity_number: 9,
+                attributes: vec![
+                    KeyValue {
+                        key: "poly".to_string(),
+                        value: Some(AnyValue { value: Some(poly) }),
+                    },
+                    KeyValue {
+                        key: "n".to_string(),
+                        value: Some(AnyValue {
+                            value: Some(Av::IntValue(i)),
+                        }),
+                    },
+                ],
+                ..Default::default()
+            }
+        })
+        .collect();
+    ExportLogsServiceRequest {
+        resource_logs: vec![ResourceLogs {
+            scope_logs: vec![ScopeLogs {
+                log_records,
+                ..Default::default()
+            }],
+            ..Default::default()
+        }],
+    }
+}
+
+#[test]
+fn typed_tree_and_coalesced_kinds_roundtrip() {
+    // One frame of typed records.
+    let flat = tempfile::tempdir().unwrap();
+    let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
+    let mut writer = wal::Writer::new(flat.path(), wal::Config::default(), seq, 0).unwrap();
+    let mut flattened = flatten_request(&request_typed());
+    fill_hashes(&mut flattened);
+    let bytes = encode_frame(&flattened).unwrap();
+    writer
+        .write_frame(0, &[], &bytes, 4, TimestampNs(1), TimestampNs::ZERO, TimestampNs::ZERO)
+        .unwrap();
+    writer.shutdown_all().unwrap();
+
+    let out_dir = tempfile::tempdir().unwrap();
+    let out = out_dir.path().join("typed.sfst");
+    build_sfst(flat.path(), &out, &Metrics::new()).unwrap();
+    let data = std::fs::read(&out).unwrap();
+    let reader = IndexReader::open(&data).unwrap();
+
+    // The typed schema tree is persisted (structure beyond the bare root).
+    let tree = reader.tree();
+    assert!(tree.len() > 1, "tree should carry leaf nodes");
+
+    // Coalesced scalar kinds (D45–D47): the polymorphic Int+Str path → Str; the
+    // always-Int path → Int.
+    let scalars: std::collections::HashMap<String, sfst::ValueKind> =
+        tree.derive_scalar_kinds().into_iter().collect();
+    assert_eq!(scalars.get("attributes.poly"), Some(&sfst::ValueKind::Str));
+    assert_eq!(scalars.get("attributes.n"), Some(&sfst::ValueKind::Int));
+
+    // Derived field table: the polymorphic path collapses to a single entry.
+    let names: Vec<&str> = reader.field_table().names().collect();
+    assert!(names.contains(&"attributes.poly"));
+    assert!(names.contains(&"attributes.n"));
+    assert_eq!(
+        names.iter().filter(|n| **n == "attributes.poly").count(),
+        1,
+        "polymorphic path must appear once in the derived field table"
+    );
 }
 
 #[test]

@@ -50,7 +50,7 @@ fn sample_metadata() -> Metadata {
             mid_end: KvId(5),
             high_end: KvId(8),
         },
-        fields: Default::default(),
+        tree: Default::default(),
         columns: ColumnsTable::default(),
     }
 }
@@ -159,7 +159,7 @@ fn round_trip_fields_and_secondary_chunks() {
             mid_end: KvId(6),
             high_end: KvId(7),
         },
-        fields: fields.into(),
+        tree: SchemaTree::flat(&fields.into()),
         columns: ColumnsTable::default(),
     };
 
@@ -296,12 +296,14 @@ fn mid_field_out_of_range_errors() {
 fn full_file_round_trip() {
     let summary = sample_summary();
     let mut metadata = sample_metadata();
-    metadata.fields = vec![FieldEntry {
-        name: "level".into(),
-        cardinality: 3,
-        tier: FieldTier::Low,
-    }]
-    .into();
+    metadata.tree = SchemaTree::flat(
+        &vec![FieldEntry {
+            name: "level".into(),
+            cardinality: 3,
+            tier: FieldTier::Low,
+        }]
+        .into(),
+    );
     let primary = build_primary(&["level=info"]);
     let stream_entries: Vec<Vec<KvId>> = vec![vec![KvId(0)]];
     let timestamps: Vec<i64> = vec![1_700_000_000_000_000_000];
@@ -353,19 +355,21 @@ fn round_trip_multi_batch_stream() {
             mid_end: KvId(1),
             high_end: KvId(2),
         },
-        fields: vec![
-            FieldEntry {
-                name: "level".into(),
-                cardinality: 1,
-                tier: FieldTier::Low,
-            },
-            FieldEntry {
-                name: "trace_id".into(),
-                cardinality: 50_000,
-                tier: FieldTier::High,
-            },
-        ]
-        .into(),
+        tree: SchemaTree::flat(
+            &vec![
+                FieldEntry {
+                    name: "level".into(),
+                    cardinality: 1,
+                    tier: FieldTier::Low,
+                },
+                FieldEntry {
+                    name: "trace_id".into(),
+                    cardinality: 50_000,
+                    tier: FieldTier::High,
+                },
+            ]
+            .into(),
+        ),
         columns: ColumnsTable::default(),
     };
 

@@ -18,6 +18,46 @@ use wal_otap::KvSink;
 
 use crate::{Entry, Error, FlattenedRequest, Metrics, NodeId, build_kv, decode_frame, sole_wal_file};
 
+/// Map a flatten [`ng_flatten::Kind`] to the format crate's [`sfst::ValueKind`].
+/// Identical variant sets; the conversion keeps `sfst` independent of
+/// `ng-flatten` (the format crate owns its own kind enum).
+fn to_value_kind(kind: ng_flatten::Kind) -> sfst::ValueKind {
+    use ng_flatten::Kind;
+    match kind {
+        Kind::Null => sfst::ValueKind::Null,
+        Kind::Bool => sfst::ValueKind::Bool,
+        Kind::Int => sfst::ValueKind::Int,
+        Kind::Double => sfst::ValueKind::Double,
+        Kind::Str => sfst::ValueKind::Str,
+        Kind::Bytes => sfst::ValueKind::Bytes,
+        Kind::EmptyKvlist => sfst::ValueKind::EmptyKvlist,
+        Kind::EmptyArray => sfst::ValueKind::EmptyArray,
+        Kind::Kvlist => sfst::ValueKind::Kvlist,
+        Kind::Array => sfst::ValueKind::Array,
+    }
+}
+
+/// Convert the global flatten [`ng_flatten::SchemaTree`] into the format crate's
+/// [`sfst::SchemaTree`] node-by-node (ids are preserved, parents precede
+/// children). Leaf stats are left unset here — `sfst-indexer` fills them from
+/// the per-field cardinality/tier at build time.
+fn to_sfst_tree(tree: &ng_flatten::SchemaTree) -> sfst::SchemaTree {
+    let nodes = (0..tree.len() as NodeId)
+        .map(|id| sfst::SchemaNode {
+            kind: to_value_kind(tree.node(id).kind),
+            edge: tree.edge(id).map(|(parent, step)| sfst::SchemaEdge {
+                parent,
+                step: match step {
+                    ng_flatten::Step::Field(name) => sfst::Step::Field(name.clone()),
+                    ng_flatten::Step::ArrayElem => sfst::Step::ArrayElem,
+                },
+            }),
+            leaf: None,
+        })
+        .collect();
+    sfst::SchemaTree::from_nodes(nodes)
+}
+
 /// SFST cardinality-tier threshold (mirrors `sfst`'s default of 100).
 const CARDINALITY_THRESHOLD: u32 = 100;
 
@@ -67,6 +107,12 @@ pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result
     let mut row_index = RowIndex::new(&arena, CARDINALITY_THRESHOLD);
     let mut stats = SfstStats::default();
     let mut kv = String::new();
+    // Accumulates the global typed schema tree by interning every frame's
+    // per-frame tree. Persisted as the v9 field descriptor (`Metadata.tree`).
+    // The interner feed still renders `key=value` via the per-frame paths (the
+    // rendered string is identical), so this is build-only — the returned
+    // local→global map is unused.
+    let mut flattener = ng_flatten::Flattener::new();
 
     // Per-row columns accumulated in insertion order, parallel to the rows fed to
     // `row_index.row(...)`. Stored as the optional SFST column chunks
@@ -103,6 +149,9 @@ pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result
 
         let _t = metrics.scope("index");
         let tree = &flattened.tree;
+        // Intern this frame's tree into the global tree (build-only; the map is
+        // unused — paths below render identically from the per-frame tree).
+        let _ = flattener.merge_tree(tree);
         // Resolve each node's path once per frame (records reuse the same nodes).
         let paths: Vec<String> = (0..tree.len() as NodeId).map(|id| tree.path(id)).collect();
 
@@ -150,6 +199,10 @@ pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result
         stats.records += records;
         metrics.add_records(records);
     }
+
+    // Persist the global typed schema tree as the v9 field descriptor. The
+    // builder fills each leaf's cardinality/tier from the per-field stats.
+    row_index.tree = Some(to_sfst_tree(&flattener.into_tree()));
 
     // Hand the accumulated per-row columns to the builder, which reorders each to
     // chronological order and writes its column chunk. This pipeline supplies all

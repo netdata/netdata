@@ -51,7 +51,7 @@
 //!         mid_end: sfst::KvId(1),
 //!         high_end: sfst::KvId(1),
 //!     },
-//!     fields: Default::default(),
+//!     tree: Default::default(),
 //!     columns: Default::default(),
 //! };
 //! let counts = ChunkCounts { columns: ColumnsPresent::default(), mid_fields: 0, high_fields: 0, stream_batches: 1 };
@@ -111,7 +111,8 @@ pub fn scan_max_sequence_recursive(base: &std::path::Path) -> std::io::Result<u6
 pub use schema::{
     BitmapValue, ColumnEntry, ColumnType, ColumnsTable, DEFAULT_CARDINALITY_THRESHOLD,
     DroppedAttributeCounts, FieldEntry, FieldTable, FieldTier, Flags, HighField, Histogram,
-    IdRanges, KvId, Metadata, ObservedTimestamps, SpanIds, StreamBatch, Summary, TraceIds,
+    IdRanges, KvId, LeafStats, Metadata, NodeId, ObservedTimestamps, SchemaEdge, SchemaNode,
+    SchemaTree, SpanIds, Step, StreamBatch, Summary, TraceIds, ValueKind,
 };
 pub use writer::{ChunkCounts, ColumnsPresent, StreamWriter, write_summary_only};
 
@@ -144,7 +145,13 @@ const MAGIC: &[u8; 4] = b"SFST";
 // v8: META gains `columns: ColumnsTable` (the per-row columns manifest) and the
 //     optional per-row column chunks `OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC` (cold region,
 //     after PRIM). Incompatible META bincode layout; older files rejected on open.
-const VERSION: u32 = 8;
+// v9: META replaces `fields: FieldTable` with `tree: SchemaTree` — the typed,
+//     array-collapsed schema tree is now the on-disk field descriptor (carries
+//     per-leaf ValueKind + structure + per-leaf cardinality/tier). The flat
+//     FieldTable is derived from the tree at read time. Incompatible META bincode
+//     layout; older files rejected on open. Storage chunks (PRIM/MF/HF/SB/columns)
+//     are otherwise unchanged from v8.
+const VERSION: u32 = 9;
 
 const CHUNK_SUMMARY: chunk_file::ChunkId = *b"SUMR";
 const CHUNK_META: chunk_file::ChunkId = *b"META";
