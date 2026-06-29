@@ -163,6 +163,11 @@ struct response {
     z_stream zstream;                                    // zlib stream for sending compressed output to client
     size_t zsent;                                        // the compressed bytes we have sent to the client
     size_t zhave;                                        // the compressed bytes that we have received from zlib
+    size_t zchunk_header_len;                            // bytes in zchunk_header pending before zbuffer
+    size_t zchunk_header_sent;                           // chunk header bytes already sent
+    size_t zchunk_suffix_sent;                           // chunk suffix bytes already sent
+    size_t zchunk_finalize_sent;                         // final chunk marker bytes already sent
+    char zchunk_header[24];                              // hex chunk-size header plus CRLF
     Bytef zbuffer[NETDATA_WEB_RESPONSE_ZLIB_CHUNK_SIZE]; // temporary buffer for storing compressed output
 };
 
