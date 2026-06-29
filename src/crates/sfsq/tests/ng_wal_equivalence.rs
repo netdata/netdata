@@ -1,13 +1,10 @@
-//! Equivalence harness for the **ng-flatten** path: `WalScan::scan_flattened`
+//! Equivalence harness for the **ng-flatten** logs path: `WalScan::scan_flattened`
 //! (active-WAL tail) vs an SFST built from the same frames by
-//! `ng_index::build_sfst` (sealed) — the ng-path counterpart of
-//! `wal_equivalence.rs` (which proves the same for the OTAP path).
+//! `ng_index::build_sfst` (sealed).
 //!
-//! Migration de-risk (Stage 0 of the OTel-logs ng-flatten graft): the planned
-//! cutover makes the tail scanner decode ng-flatten frames instead of OTAP. This
-//! harness proves that, for any WAL of ng-flatten frames and any query, the tail
-//! row-scan's shard is indistinguishable from indexing those frames into an SFST
-//! and querying the engine — so tail and sealed results agree by construction.
+//! This harness proves that, for any WAL of ng-flatten frames and any query, the
+//! tail row-scan's shard is indistinguishable from indexing those frames into an
+//! SFST and querying the engine — so tail and sealed results agree by construction.
 //!
 //! Both sides consume the **same** ng-flatten frame through the **same**
 //! `ng_flatten::build_kv` renderer and the **same** `Record.ts`, so parity here is
@@ -127,8 +124,8 @@ struct Corpus {
 
 /// Generate a corpus for `seed`. The timestamp regime cycles with the seed so
 /// the sweep covers monotonic, shuffled, equal-run, and the observed/clock
-/// fallback tiers — but, unlike OTAP, the fallback is applied *here* (ng-flatten
-/// reads only `time_unix_nano`), mirroring `ng-ingest::normalize_timestamps`.
+/// fallback tiers — the fallback is applied *here* (ng-flatten reads only
+/// `time_unix_nano`), mirroring `ng-ingest::normalize_timestamps`.
 fn gen_corpus(seed: u64) -> Corpus {
     let mut rng = Rng::new(seed);
     let num_logs = 60 + rng.below(120);
@@ -209,7 +206,7 @@ fn gen_corpus(seed: u64) -> Corpus {
         }
         if rng.chance(25) {
             // Array-of-structs → collapsed `attributes.endpoints[].host` /
-            // `[].port` (the ng difference from OTAP's positional `.0.host`).
+            // `[].port` (collapsed, not positional `.0.host`).
             let h0 = &hosts[rng.below(hosts.len() as u64) as usize];
             let h1 = &hosts[rng.below(hosts.len() as u64) as usize];
             attributes.push(kv(
@@ -656,9 +653,8 @@ fn ng_flattened_tail_matches_sealed_index() {
 // ---------------------------------------------------------------------------
 // Run-level equivalence (the live production path): chunk SFSTs built by
 // `ng_index::build_sfst_range` (fed as Source::Memory) + a row-scanned tail
-// (`scan_flattened`), folded by `run`, must match indexing the whole WAL. These
-// port the OTAP harness's `wal_data_*` tests onto the ng path — the path the
-// ledger actually drives post-cutover (build_sfst_range chunks + scan_flattened
+// (`scan_flattened`), folded by `run`, must match indexing the whole WAL — the
+// path the ledger actually drives (build_sfst_range chunks + scan_flattened
 // tails → run).
 // ---------------------------------------------------------------------------
 
