@@ -96,6 +96,14 @@ static inline void web_client_enable_wait_from_ssl(struct web_client *w) {
     }
 }
 
+static inline void web_client_reset_zchunk_send_state(struct web_client *w) {
+    w->response.zchunk_header_len = 0;
+    w->response.zchunk_header_sent = 0;
+    w->response.zchunk_suffix_sent = 0;
+    w->response.zchunk_finalize_sent = 0;
+    w->response.zchunk_header[0] = '\0';
+}
+
 static inline char *strip_control_characters(char *url) {
     if(!url) return "";
 
@@ -180,6 +188,7 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
         deflateEnd(&w->response.zstream);
         w->response.zsent = 0;
         w->response.zhave = 0;
+        web_client_reset_zchunk_send_state(w);
         w->response.zstream.avail_in = 0;
         w->response.zstream.avail_out = 0;
         w->response.zstream.total_in = 0;
@@ -802,28 +811,26 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
 static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,size_t len, int flags)
 {
-    do {
-        errno_clear();
+    errno_clear();
 
-        ssize_t bytes;
-        if ((web_client_check_conn_tcp(w)) && (netdata_ssl_web_server_ctx)) {
-            if (SSL_connection(&w->ssl)) {
-                bytes = netdata_ssl_write(&w->ssl, buf, len);
-                web_client_enable_wait_from_ssl(w);
-            } else
-                bytes = send(w->fd, buf, len, flags);
-        } else if (web_client_check_conn_tcp(w) || web_client_check_conn_unix(w))
+    ssize_t bytes;
+    if ((web_client_check_conn_tcp(w)) && (netdata_ssl_web_server_ctx)) {
+        if (SSL_connection(&w->ssl)) {
+            bytes = netdata_ssl_write(&w->ssl, buf, len);
+            web_client_enable_wait_from_ssl(w);
+        } else
             bytes = send(w->fd, buf, len, flags);
-        else
-            bytes = -999;
+    } else if (web_client_check_conn_tcp(w) || web_client_check_conn_unix(w))
+        bytes = send(w->fd, buf, len, flags);
+    else
+        bytes = -999;
 
-        if(bytes < 0 && errno == EAGAIN) {
-            tinysleep();
-            continue;
-        }
+    if(bytes < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+        web_client_enable_wait_send(w);
+        return 0;
+    }
 
-        return bytes;
-    } while(true);
+    return bytes;
 }
 
 void web_client_build_http_header(struct web_client *w) {
@@ -1592,18 +1599,51 @@ void web_client_process_request_from_web_server(struct web_client *w) {
     }
 }
 
+static inline ssize_t web_client_send_chunk_frame(struct web_client *w, const char *buf, size_t len, size_t *sent)
+{
+    ssize_t total = 0;
+
+    while(*sent < len) {
+        ssize_t bytes = web_client_send_data(w, &buf[*sent], len - *sent, 0);
+        if(bytes > 0) {
+            *sent += bytes;
+            total += bytes;
+            w->statistics.sent_bytes += bytes;
+        }
+        else if(bytes == 0) {
+            web_client_enable_wait_send(w);
+            return total;
+        }
+        else
+            return bytes;
+    }
+
+    return total;
+}
+
 ssize_t web_client_send_chunk_header(struct web_client *w, size_t len)
 {
     netdata_log_debug(D_DEFLATE, "%llu: OPEN CHUNK of %zu bytes (hex: %zx).", w->id, len, len);
-    char buf[24];
-    ssize_t bytes;
-    bytes = (ssize_t)sprintf(buf, "%zX\r\n", len);
-    buf[bytes] = 0x00;
+    if(w->response.zchunk_header_len == 0) {
+        int bytes = snprintf(w->response.zchunk_header, sizeof(w->response.zchunk_header), "%zX\r\n", len);
+        if(bytes < 0 || (size_t)bytes >= sizeof(w->response.zchunk_header)) {
+            netdata_log_debug(D_WEB_CLIENT, "%llu: Failed to prepare chunk header.", w->id);
+            WEB_CLIENT_IS_DEAD(w);
+            return -1;
+        }
+        w->response.zchunk_header_len = (size_t)bytes;
+        w->response.zchunk_header_sent = 0;
+    }
 
-    bytes = web_client_send_data(w,buf,strlen(buf),0);
+    ssize_t bytes = web_client_send_chunk_frame(
+        w, w->response.zchunk_header, w->response.zchunk_header_len, &w->response.zchunk_header_sent);
     if(bytes > 0) {
         netdata_log_debug(D_DEFLATE, "%llu: Sent chunk header %zd bytes.", w->id, bytes);
-        w->statistics.sent_bytes += bytes;
+        if(w->response.zchunk_header_sent == w->response.zchunk_header_len) {
+            w->response.zchunk_header_len = 0;
+            w->response.zchunk_header_sent = 0;
+            w->response.zchunk_header[0] = '\0';
+        }
     }
 
     else if(bytes == 0) {
@@ -1622,10 +1662,11 @@ ssize_t web_client_send_chunk_close(struct web_client *w)
     //debug(D_DEFLATE, "%llu: CLOSE CHUNK.", w->id);
 
     ssize_t bytes;
-    bytes = web_client_send_data(w,"\r\n",2,0);
+    bytes = web_client_send_chunk_frame(w, "\r\n", 2, &w->response.zchunk_suffix_sent);
     if(bytes > 0) {
         netdata_log_debug(D_DEFLATE, "%llu: Sent chunk suffix %zd bytes.", w->id, bytes);
-        w->statistics.sent_bytes += bytes;
+        if(w->response.zchunk_suffix_sent == 2)
+            w->response.zchunk_suffix_sent = 0;
     }
 
     else if(bytes == 0) {
@@ -1644,10 +1685,11 @@ ssize_t web_client_send_chunk_finalize(struct web_client *w)
     //debug(D_DEFLATE, "%llu: FINALIZE CHUNK.", w->id);
 
     ssize_t bytes;
-    bytes = web_client_send_data(w,"\r\n0\r\n\r\n",7,0);
+    bytes = web_client_send_chunk_frame(w, "\r\n0\r\n\r\n", 7, &w->response.zchunk_finalize_sent);
     if(bytes > 0) {
         netdata_log_debug(D_DEFLATE, "%llu: Sent chunk suffix %zd bytes.", w->id, bytes);
-        w->statistics.sent_bytes += bytes;
+        if(w->response.zchunk_finalize_sent == 7)
+            w->response.zchunk_finalize_sent = 0;
     }
 
     else if(bytes == 0) {
@@ -1664,6 +1706,7 @@ ssize_t web_client_send_chunk_finalize(struct web_client *w)
 ssize_t web_client_send_deflate(struct web_client *w)
 {
     ssize_t len = 0, t = 0;
+    bool completed_pending_suffix = false;
 
     // when using compression,
     // w->response.sent is the amount of bytes passed through compression
@@ -1672,6 +1715,20 @@ ssize_t web_client_send_deflate(struct web_client *w)
         "%llu: web_client_send_deflate(): w->response.data->len = %zu, w->response.sent = %zu, w->response.zhave = %zu, w->response.zsent = %zu, w->response.zstream.avail_in = %u, w->response.zstream.avail_out = %u, w->response.zstream.total_in = %lu, w->response.zstream.total_out = %lu.",
         w->id, (size_t)w->response.data->len, w->response.sent, w->response.zhave, w->response.zsent, w->response.zstream.avail_in, w->response.zstream.avail_out, w->response.zstream.total_in, w->response.zstream.total_out);
 
+    if(w->response.zchunk_suffix_sent) {
+        t = web_client_send_chunk_close(w);
+        if(t <= 0 || w->response.zchunk_suffix_sent)
+            return t;
+
+        completed_pending_suffix = true;
+    }
+
+    if(w->response.zchunk_header_len) {
+        t = web_client_send_chunk_header(w, w->response.zhave);
+        if(t < 0 || w->response.zchunk_header_len)
+            return t;
+    }
+
     if(w->response.data->len - w->response.sent == 0 && w->response.zstream.avail_in == 0 && w->response.zhave == w->response.zsent && w->response.zstream.avail_out != 0) {
         // there is nothing to send
 
@@ -1679,8 +1736,17 @@ ssize_t web_client_send_deflate(struct web_client *w)
 
         // finalize the chunk
         if(w->response.sent != 0) {
-            t = web_client_send_chunk_finalize(w);
-            if(t < 0) return t;
+            // A pending inter-chunk suffix is also the prefix of the final marker.
+            if(completed_pending_suffix && w->response.zchunk_finalize_sent == 0)
+                w->response.zchunk_finalize_sent = 2;
+
+            ssize_t t2 = web_client_send_chunk_finalize(w);
+            if(t2 < 0)
+                return t2;
+
+            t += t2;
+            if(t2 == 0 || w->response.zchunk_finalize_sent)
+                return t;
         }
 
         if(unlikely(!web_client_has_keepalive(w))) {
@@ -1699,9 +1765,11 @@ ssize_t web_client_send_deflate(struct web_client *w)
         // compress more input data
 
         // close the previous open chunk
-        if(w->response.sent != 0) {
+        // Skip this if the pending suffix was completed at function entry.
+        if(w->response.sent != 0 && !completed_pending_suffix) {
             t = web_client_send_chunk_close(w);
-            if(t < 0) return t;
+            if(t <= 0 || w->response.zchunk_suffix_sent)
+                return t;
         }
 
         netdata_log_debug(D_DEFLATE, "%llu: Compressing %zu new bytes starting from %zu (and %u left behind).", w->id, (w->response.data->len - w->response.sent), w->response.sent, w->response.zstream.avail_in);
@@ -1748,6 +1816,8 @@ ssize_t web_client_send_deflate(struct web_client *w)
         ssize_t t2 = web_client_send_chunk_header(w, w->response.zhave);
         if(t2 < 0) return t2;
         t += t2;
+        if(w->response.zchunk_header_len)
+            return t;
     }
 
     netdata_log_debug(D_WEB_CLIENT, "%llu: Sending %zu bytes of data (+%zd of chunk header).", w->id, w->response.zhave - w->response.zsent, t);
@@ -1763,6 +1833,7 @@ ssize_t web_client_send_deflate(struct web_client *w)
         netdata_log_debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client (zhave = %zu, zsent = %zu, need to send = %zu).",
             w->id, w->response.zhave, w->response.zsent, w->response.zhave - w->response.zsent);
 
+        len += t;
     }
     else {
         netdata_log_debug(D_WEB_CLIENT, "%llu: Failed to send data to client.", w->id);

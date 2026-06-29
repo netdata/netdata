@@ -216,6 +216,12 @@ static int web_server_rcv_callback(POLLINFO *pi, nd_poll_event_t *events) {
         if(unlikely(w->fd == fd && web_client_has_wait_send(w)))
             *events |= ND_POLL_WRITE;
 
+        if(unlikely(w->fd == fd && web_client_has_ssl_wait_receive(w)))
+            *events |= ND_POLL_READ;
+
+        if(unlikely(w->fd == fd && web_client_has_ssl_wait_send(w)))
+            *events |= ND_POLL_WRITE;
+
     } else if(unlikely(bytes < 0)) {
         ret = -1;
         goto cleanup;
@@ -260,6 +266,12 @@ static int web_server_snd_callback(POLLINFO *pi, nd_poll_event_t *events) {
         *events |= ND_POLL_READ;
 
     if(unlikely(w->fd == fd && web_client_has_wait_send(w)))
+        *events |= ND_POLL_WRITE;
+
+    if(unlikely(w->fd == fd && web_client_has_ssl_wait_receive(w)))
+        *events |= ND_POLL_READ;
+
+    if(unlikely(w->fd == fd && web_client_has_ssl_wait_send(w)))
         *events |= ND_POLL_WRITE;
 
     retval = web_server_check_client_status(w);
