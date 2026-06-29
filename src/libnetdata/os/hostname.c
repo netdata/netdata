@@ -132,7 +132,7 @@ bool os_hostname(char *dst, size_t dst_size, const char *filesystem_root) {
 
     if (filesystem_root && *filesystem_root) {
         char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s/etc/hostname", netdata_configured_host_prefix);
+        snprintfz(filename, FILENAME_MAX, "%s/etc/hostname", filesystem_root);
 
         if (read_txt_file(filename, buf, sizeof(buf)))
             *buf = '\0';
