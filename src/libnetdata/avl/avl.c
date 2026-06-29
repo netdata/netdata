@@ -14,6 +14,10 @@
  * Foundation, Inc.
 */
 
+static inline void avl_check_descent_height(size_t depth, const char *operation) {
+    if (unlikely(depth >= AVL_MAX_HEIGHT))
+        fatal("AVL: %s descent exceeded maximum height %zu", operation, (size_t)AVL_MAX_HEIGHT);
+}
 
 /* Search |tree| for an item matching |item|, and return it if found.
      Otherwise return |NULL|. */
@@ -62,6 +66,7 @@ avl_t *avl_insert(avl_tree_type *tree, avl_t *item) {
 
         if (p->avl_balance != 0)
             z = q, y = p, k = 0;
+        avl_check_descent_height(k, "insert");
         da[k++] = dir = (unsigned char)(cmp > 0);
     }
 
@@ -152,6 +157,7 @@ avl_t *avl_remove(avl_tree_type *tree, avl_t *item) {
     for(cmp = -1; cmp != 0; cmp = tree->compar(item, p)) {
         unsigned char dir = (unsigned char)(cmp > 0);
 
+        avl_check_descent_height(k, "remove");
         pa[k] = p;
         da[k++] = dir;
 
@@ -169,14 +175,17 @@ avl_t *avl_remove(avl_tree_type *tree, avl_t *item) {
             r->avl_link[0] = p->avl_link[0];
             r->avl_balance = p->avl_balance;
             pa[k - 1]->avl_link[da[k - 1]] = r;
+            avl_check_descent_height(k, "remove");
             da[k] = 1;
             pa[k++] = r;
         }
         else {
             avl_t *s;
+            avl_check_descent_height(k, "remove");
             int j = k++;
 
             for (;;) {
+                avl_check_descent_height(k, "remove");
                 da[k] = 0;
                 pa[k++] = r;
                 s = r->avl_link[0];
