@@ -430,8 +430,8 @@ sidebar:
           label: Collectors configuration
           edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/REFERENCE.md
       - meta:
-          label: Service discovery
-          edit_url: https://github.com/netdata/agent-service-discovery/edit/master/README.md
+          label: Service Discovery Reference
+          edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/SERVICE-DISCOVERY.md
       - meta:
           label: StatsD
           edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/statsd.plugin/README.md
