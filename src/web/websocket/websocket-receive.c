@@ -629,6 +629,7 @@ websocket_protocol_consume_frame(WS_CLIENT *wsc, char *data, size_t length, ssiz
 
         case WS_ALLOW_DISCARD:
             // we have already logged in websocket_is_frame_allowed()
+            *bytes_processed = header.frame_size;
             return WS_FRAME_COMPLETE;
 
         default:
