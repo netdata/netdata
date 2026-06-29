@@ -43,7 +43,7 @@ typedef struct {
     size_t index;
 
     // in bits
-    size_t capacity; // FIXME: this not needed on the reader's side
+    size_t capacity;
     size_t position;
 
     uint32_t prev_number;

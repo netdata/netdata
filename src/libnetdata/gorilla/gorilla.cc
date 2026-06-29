@@ -29,6 +29,14 @@ static uint32_t gorilla_buffer_nbytes(uint32_t nbits) {
     return slots * RRDENG_GORILLA_32BIT_SLOT_BYTES;
 }
 
+static constexpr size_t gorilla_buffer_data_bits(size_t n) {
+    return (n * bit_size<uint32_t>()) - (sizeof(gorilla_header_t) * CHAR_BIT);
+}
+
+static bool gorilla_disk_buffer_has_valid_nbits(const gorilla_buffer_t *gbuf) {
+    return gbuf->header.nbits < gorilla_buffer_data_bits(RRDENG_GORILLA_32BIT_BUFFER_SLOTS);
+}
+
 static void bit_buffer_write(uint32_t *buf, size_t pos, uint32_t v, size_t nbits)
 {
     assert(nbits > 0 && nbits <= bit_size<uint32_t>());
@@ -104,7 +112,7 @@ void gorilla_writer_add_buffer(gorilla_writer_t *gw, gorilla_buffer_t *gbuf, siz
     gbuf->header.entries = 0;
     gbuf->header.nbits = 0;
 
-    uint32_t capacity = (n * bit_size<uint32_t>()) - (sizeof(gorilla_header_t) * CHAR_BIT);
+    uint32_t capacity = gorilla_buffer_data_bits(n);
 
     gw->prev_number = 0;
     gw->prev_xor_lzc = 0;
@@ -265,6 +273,9 @@ bool gorilla_buffer_patch(gorilla_buffer_t *gbuf, size_t nbuffers, uint32_t *ent
     uint32_t n = curr_gbuf->header.entries;
     size_t buffers = 1;
 
+    if(unlikely(!gorilla_disk_buffer_has_valid_nbits(curr_gbuf)))
+        return false;
+
     while (curr_gbuf->header.next) {
         if(unlikely(buffers == nbuffers))
             return false;
@@ -278,6 +289,9 @@ bool gorilla_buffer_patch(gorilla_buffer_t *gbuf, size_t nbuffers, uint32_t *ent
         curr_gbuf->header.next = next_gbuf;
         curr_gbuf = curr_gbuf->header.next;
         buffers++;
+
+        if(unlikely(!gorilla_disk_buffer_has_valid_nbits(curr_gbuf)))
+            return false;
 
         n += curr_gbuf->header.entries;
     }
@@ -355,6 +369,16 @@ gorilla_reader_t gorilla_reader_init(gorilla_buffer_t *gbuf)
     };
 }
 
+static bool gorilla_reader_read_bits(gorilla_reader_t *gr, const uint32_t *data, uint32_t *number, size_t nbits)
+{
+    if (unlikely(gr->position > gr->capacity || nbits > gr->capacity - gr->position))
+        return false;
+
+    bit_buffer_read(data, gr->position, number, nbits);
+    gr->position += nbits;
+    return true;
+}
+
 extern "C" {
     ALWAYS_INLINE_ONLY bool gorilla_reader_read(gorilla_reader_t *gr, uint32_t *number)
     {
@@ -387,18 +411,17 @@ extern "C" {
 
         // read the first number
         if (gr->index == 0) {
-            bit_buffer_read(data, gr->position, number, bit_size<uint32_t>());
-
+            if (unlikely(!gorilla_reader_read_bits(gr, data, number, bit_size<uint32_t>())))
+                return false;
             gr->index++;
-            gr->position += bit_size<uint32_t>();
             gr->prev_number = *number;
             return true;
         }
 
         // process same-number bit
         uint32_t is_same_number;
-        bit_buffer_read(data, gr->position, &is_same_number, 1);
-        gr->position++;
+        if (unlikely(!gorilla_reader_read_bits(gr, data, &is_same_number, 1)))
+            return false;
 
         if (is_same_number) {
             *number = gr->prev_number;
@@ -410,18 +433,19 @@ extern "C" {
         uint32_t xor_lzc = gr->prev_xor_lzc;
 
         uint32_t same_xor_lzc;
-        bit_buffer_read(data, gr->position, &same_xor_lzc, 1);
-        gr->position++;
+        if (unlikely(!gorilla_reader_read_bits(gr, data, &same_xor_lzc, 1)))
+            return false;
 
         if (!same_xor_lzc) {
-            bit_buffer_read(data, gr->position, &xor_lzc, (bit_size<uint32_t>() == 32) ? 5 : 6);
-            gr->position += (bit_size<uint32_t>() == 32) ? 5 : 6;
+            size_t xor_lzc_bits = (bit_size<uint32_t>() == 32) ? 5 : 6;
+            if (unlikely(!gorilla_reader_read_bits(gr, data, &xor_lzc, xor_lzc_bits)))
+                return false;
         }
 
         // process the non-lzc suffix
         uint32_t xor_value = 0;
-        bit_buffer_read(data, gr->position, &xor_value, bit_size<uint32_t>() - xor_lzc);
-        gr->position += bit_size<uint32_t>() - xor_lzc;
+        if (unlikely(!gorilla_reader_read_bits(gr, data, &xor_value, bit_size<uint32_t>() - xor_lzc)))
+            return false;
 
         *number = (gr->prev_number ^ xor_value);
 
