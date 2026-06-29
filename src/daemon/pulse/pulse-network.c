@@ -155,7 +155,7 @@ static void pulse_aclk_time_heatmap(void) {
         rds[_countof(rds) - 1] = rrddim_add(st, "+inf", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    for(size_t i = 0; i < _countof(rds) - 1 ;i++) {
+    for(size_t i = 0; i < _countof(rds) ;i++) {
         size_t old_value = 0, new_value = 0;
         __atomic_exchange(&aclk_time_heatmap.array[i].count, &new_value, &old_value, __ATOMIC_RELAXED);
         rrddim_set_by_pointer(st, rds[i], (collected_number)old_value);
