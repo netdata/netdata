@@ -288,6 +288,26 @@ size_t json_walk_primitive(char *js, jsmntok_t *t, size_t start, JSON_ENTRY *e)
     return 1;
 }
 
+static size_t json_walk_token_span(jsmntok_t *t, size_t start)
+{
+    size_t span = 1;
+
+    switch(t[start].type) {
+        case JSMN_OBJECT:
+        case JSMN_ARRAY:
+            for(int i = 0; i < t[start].size; i++)
+                span += json_walk_token_span(t, start + span);
+            break;
+
+        case JSMN_PRIMITIVE:
+        case JSMN_STRING:
+        default:
+            break;
+    }
+
+    return span;
+}
+
 /**
  * Array
  *
@@ -325,6 +345,7 @@ size_t json_walk_array(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_E
         ne.pos = i;
         if (strlen(e->name) > JSON_NAME_LEN  - 24 || strlen(e->fullname) > JSON_FULLNAME_LEN -24) {
             netdata_log_info("JSON: JSON walk_array ignoring element with name:%s fullname:%s",e->name, e->fullname);
+            start += json_walk_token_span(t, start);
             continue;
         }
         snprintfz(ne.name, JSON_NAME_LEN, "%s[%lu]", e->name, i);
