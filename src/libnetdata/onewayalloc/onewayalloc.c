@@ -18,6 +18,36 @@ size_t onewayalloc_allocated_memory(void) {
     return __atomic_load_n(&onewayalloc_total_memory, __ATOMIC_RELAXED);
 }
 
+static size_t onewayalloc_add_or_fatal(size_t size, size_t add, const char *context) {
+    if(unlikely(add > SIZE_MAX - size))
+        fatal("ONEWAYALLOC: cannot allocate %s size %zu with %zu additional bytes.", context, size, add);
+
+    return size + add;
+}
+
+static size_t onewayalloc_mul_or_fatal(size_t nmemb, size_t size, const char *context) {
+    if(unlikely(size && nmemb > SIZE_MAX / size))
+        fatal("ONEWAYALLOC: cannot allocate %s size %zu * %zu.", context, nmemb, size);
+
+    return nmemb * size;
+}
+
+static size_t onewayalloc_natural_alignment_or_fatal(size_t size) {
+    if(unlikely(size > SIZE_MAX - (SYSTEM_REQUIRED_ALIGNMENT - 1)))
+        fatal("ONEWAYALLOC: cannot naturally align allocation size %zu.", size);
+
+    return natural_alignment(size);
+}
+
+static size_t onewayalloc_page_alignment_or_fatal(size_t size, size_t page_size) {
+    size_t remainder = size % page_size;
+
+    if(remainder)
+        size = onewayalloc_add_or_fatal(size, page_size - remainder, "page aligned");
+
+    return size;
+}
+
 // Create an OWA
 // Once it is created, the caller may call the onewayalloc_mallocz()
 // any number of times, for any amount of memory.
@@ -30,7 +60,7 @@ static OWA_PAGE *onewayalloc_create_internal(OWA_PAGE *head, size_t size_hint) {
 
     // make sure the new page will fit both the requested size
     // and the OWA_PAGE structure at its beginning
-    size_hint += natural_alignment(sizeof(OWA_PAGE));
+    size_hint = onewayalloc_add_or_fatal(size_hint, natural_alignment(sizeof(OWA_PAGE)), "page");
 
     // prefer the user size if it is bigger than our size
     if(size_hint > size)
@@ -50,8 +80,7 @@ static OWA_PAGE *onewayalloc_create_internal(OWA_PAGE *head, size_t size_hint) {
     }
 
     // Make sure our allocations are always a multiple of the hardware page size
-    if(size % OWA_NATURAL_PAGE_SIZE)
-        size = size + OWA_NATURAL_PAGE_SIZE - (size % OWA_NATURAL_PAGE_SIZE);
+    size = onewayalloc_page_alignment_or_fatal(size, OWA_NATURAL_PAGE_SIZE);
 
     // Use netdata_mmap instead of mallocz
     OWA_PAGE *page = (OWA_PAGE *)nd_mmap_advanced(NULL, size, MAP_ANONYMOUS | MAP_PRIVATE, 0, false, false, NULL);
@@ -105,7 +134,7 @@ void *onewayalloc_mallocz(ONEWAYALLOC *owa, size_t size) {
     head->stats_mallocs_size += size;
 
     // make sure the size is aligned
-    size = natural_alignment(size);
+    size = onewayalloc_natural_alignment_or_fatal(size);
 
     if(unlikely(page->size - page->offset < size)) {
         // we don't have enough space to fit the data
@@ -121,7 +150,7 @@ void *onewayalloc_mallocz(ONEWAYALLOC *owa, size_t size) {
 }
 
 void *onewayalloc_callocz(ONEWAYALLOC *owa, size_t nmemb, size_t size) {
-    size_t total = nmemb * size;
+    size_t total = onewayalloc_mul_or_fatal(nmemb, size, "calloc");
     void *mem = onewayalloc_mallocz(owa, total);
     memset(mem, 0, total);
     return mem;
@@ -177,7 +206,7 @@ void onewayalloc_freez(ONEWAYALLOC *owa __maybe_unused, const void *ptr __maybe_
 }
 
 void *onewayalloc_doublesize(ONEWAYALLOC *owa, const void *src, size_t oldsize) {
-    size_t newsize = oldsize * 2;
+    size_t newsize = onewayalloc_mul_or_fatal(oldsize, 2, "doubled");
     void *dst = onewayalloc_mallocz(owa, newsize);
     memcpy(dst, src, oldsize);
     onewayalloc_freez(owa, src);
