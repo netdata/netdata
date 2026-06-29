@@ -152,7 +152,7 @@ void *nd_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
         __atomic_add_fetch(&nd_mmap_size, len, __ATOMIC_RELAXED);
 
 #ifdef NETDATA_TRACE_ALLOCATIONS
-        malloc_trace_mmap(size);
+        malloc_trace_mmap(len);
 #endif
     }
 
