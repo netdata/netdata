@@ -715,11 +715,11 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
     iov[0].iov_len = env_size;
     iov[1].iov_base = argv_encoded = mallocz(argv_size);
     iov[1].iov_len = argv_size;
-    iov[2].iov_base = data = mallocz(data_size);
+    iov[2].iov_base = data = data_size ? mallocz(data_size) : NULL;
     iov[2].iov_len = data_size;
 
     msg.msg_iov = iov;
-    msg.msg_iovlen = 3;
+    msg.msg_iovlen = data_size ? 3 : 2;
     msg.msg_control = NULL;
     msg.msg_controllen = 0;
 
