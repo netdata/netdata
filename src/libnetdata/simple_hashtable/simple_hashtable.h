@@ -485,7 +485,14 @@ static inline void simple_hashtable_resize_named(SIMPLE_HASHTABLE_NAMED *ht) {
         used++;
     }
 
-    assert(used == ht->used - ht->deleted);
+    if(unlikely(ht->deleted > ht->used))
+        fatal("SIMPLE_HASHTABLE: resize accounting invalid, deleted slots %zu exceed used slots %zu",
+              ht->deleted, ht->used);
+
+    size_t expected_used = ht->used - ht->deleted;
+    if(unlikely(used != expected_used))
+        fatal("SIMPLE_HASHTABLE: resize accounting mismatch, rehashed %zu slots, expected %zu slots (used %zu, deleted %zu)",
+              used, expected_used, ht->used, ht->deleted);
 
     ht->used = used;
     ht->deleted = 0;
