@@ -915,7 +915,6 @@ set(LIBJUDY_NEXT_FILES
 
 set(LIBJUDY_SOURCES
         src/libnetdata/libjudy/vendored/Judy.h
-        src/libnetdata/libjudy/vendored/JudyCommon/JudyMalloc.c
         src/libnetdata/libjudy/vendored/JudyCommon/JudyPrivate.h
         src/libnetdata/libjudy/vendored/JudyCommon/JudyPrivate1L.h
         src/libnetdata/libjudy/vendored/JudyCommon/JudyPrivateBranch.h
