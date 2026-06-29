@@ -179,7 +179,7 @@ The vnode dynamic configuration is exposed per plugin under the path `/collector
 
 :::
 
-The GUI form uses the same fields as the YAML configuration — `hostname`, `guid`, and `labels`:
+The GUI form exposes `hostname`, `guid`, and `labels` — the same fields as YAML, minus `name` which the Agent ignores:
 
 | Field      | Required in the GUI | Description                                                                                                                         |
 |------------|---------------------|-------------------------------------------------------------------------------------------------------------------------------------|
@@ -187,7 +187,7 @@ The GUI form uses the same fields as the YAML configuration — `hostname`, `gui
 | `hostname` | No                  | Display name shown in dashboards and Cloud. If left blank, the job name you assign when creating the vnode is used as the hostname. |
 | `labels`   | No                  | Key-value pairs for filtering and organization.                                                                                     |
 
-Generate a `guid` with `uuidgen` on Linux/macOS, or `[guid]::NewGuid()` in PowerShell. Each `guid` must be unique across your infrastructure, as described in the GUID Uniqueness warning above. See [Does renaming a virtual node change its identity?](#does-renaming-a-virtual-node-change-its-identity) for how each field affects the vnode.
+Generate a `guid` with `uuidgen` on Linux/macOS, or `[guid]::NewGuid()` in PowerShell. Each `guid` must be unique across your infrastructure, as described in the GUID Uniqueness warning above. Each `hostname` must also be unique across all vnodes — the Agent rejects a new vnode whose hostname matches an existing one. See [Does renaming a virtual node change its identity?](#does-renaming-a-virtual-node-change-its-identity) for how each field affects the vnode.
 
 :::info
 
@@ -201,7 +201,7 @@ When you add or edit a vnode through the GUI, the change is applied to running c
 
 **Removing vnodes depends on how they were created**
 
-Virtual nodes you create through the GUI are stored with the `dyncfg` source type and can be removed from the GUI. Virtual nodes defined in YAML files under `/etc/netdata/vnodes/` have a `stock` or `user` source type and **cannot** be removed through dynamic configuration — the GUI does not expose a remove action for them, and removing a file-based vnode is rejected with an error stating that only `dyncfg` vnodes can be removed. To remove a file-based vnode, delete or edit its YAML file and reload the collector.
+Virtual nodes you create through the GUI are stored with the `dyncfg` source type and can be removed from the GUI. Virtual nodes defined in YAML files under `/etc/netdata/vnodes/` have a `stock` or `user` source type and **cannot** be removed through dynamic configuration — the GUI does not expose a remove action for them, and removing a file-based vnode is rejected with an error stating that only `dyncfg` vnodes can be removed. To remove a file-based vnode, delete or edit its YAML file and [restart the Netdata Agent](/docs/netdata-agent/start-stop-restart.md).
 
 A vnode that is currently referenced by one or more collector jobs cannot be removed until those references are cleared; the remove action is blocked in that case.
 
