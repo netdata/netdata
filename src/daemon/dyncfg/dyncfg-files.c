@@ -151,7 +151,6 @@ void dyncfg_file_load(const char *d_name) {
             rc = fseek(fp, 0, SEEK_END);
             if (!rc) {
                 total_size = ftell(fp);                      // Total size of the file
-                actual_size = total_size - saved_position;   // Calculate remaining content size
                 rc = fseek(fp, saved_position, SEEK_SET);    // Reset file pointer to the beginning of the payload
             }
         }
@@ -164,6 +163,18 @@ void dyncfg_file_load(const char *d_name) {
             dyncfg_cleanup(&tmp);
             return;
         }
+
+        if (total_size < saved_position) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "DYNCFG: payload position %ld is beyond file size %ld for file '%s'. Ignoring it.",
+                   saved_position, total_size, filename);
+            fclose(fp);
+            dyncfg_cleanup(&tmp);
+            return;
+        }
+
+        actual_size = (size_t)(total_size - saved_position); // Calculate remaining content size
+
         // Use actual_size instead of content_length to handle the whole remaining file
         tmp.dyncfg.payload = buffer_create(actual_size, NULL);
         tmp.dyncfg.payload->content_type = content_type;
