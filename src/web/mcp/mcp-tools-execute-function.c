@@ -1195,8 +1195,12 @@ static void mcp_process_table_result(MCP_FUNCTION_DATA *data, size_t max_size_th
     // Copy rows for filtering/sorting, applying filters if specified
     for (size_t i = 0; i < row_count; i++) {
         struct json_object *row = json_object_array_get_idx(data_obj, i);
-        if (!row)
-            continue;
+        if (!json_object_is_type(row, json_type_array)) {
+            data->output.status = MCP_TABLE_NOT_PROCESSABLE;
+            buffer_strcat(data->output.result, json_str);
+            freez((void *)rows);
+            return;
+        }
 
         bool include_row = true;
 
