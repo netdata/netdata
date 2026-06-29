@@ -520,17 +520,20 @@ RRDDIM *rrddim_add_custom(RRDSET *st
 
     RRDDIM *rd = NULL;
     while(!rd) {
-        rd = rrddim_index_find(st, id);
-        if(rd) {
-            if(spinlock_trylock(&rd->destroy_lock)) {
-                rrddim_isnot_obsolete___safe_from_collector_thread(st, rd);
-                spinlock_unlock(&rd->destroy_lock);
+        const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(st->rrddim_root_index, id);
+        if(item) {
+            RRDDIM *existing_rd = dictionary_acquired_item_value(item);
+            if(spinlock_trylock(&existing_rd->destroy_lock)) {
+                rrddim_isnot_obsolete___safe_from_collector_thread(st, existing_rd);
+                spinlock_unlock(&existing_rd->destroy_lock);
             }
             else {
-                rd = NULL;
+                dictionary_acquired_item_release(st->rrddim_root_index, item);
                 microsleep(1 * USEC_PER_MS);
                 continue;
             }
+
+            dictionary_acquired_item_release(st->rrddim_root_index, item);
         }
 
         struct rrddim_constructor tmp = {
