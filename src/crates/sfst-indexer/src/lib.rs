@@ -32,7 +32,6 @@ pub use error::IndexError;
 pub use fst_builder::{build_and_write, build_into};
 pub use kv_interner::KvSlot;
 
-
 use std::path::Path;
 
 use bumpalo::Bump;

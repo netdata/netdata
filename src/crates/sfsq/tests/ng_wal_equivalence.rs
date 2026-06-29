@@ -135,7 +135,9 @@ fn gen_corpus(seed: u64) -> Corpus {
     let regime = seed % 6;
 
     let hosts: Vec<String> = (0..2 + rng.below(8)).map(|i| format!("host-{i}")).collect();
-    let codes: Vec<String> = (0..15 + rng.below(40)).map(|i| format!("c{i:03}")).collect();
+    let codes: Vec<String> = (0..15 + rng.below(40))
+        .map(|i| format!("c{i:03}"))
+        .collect();
     let levels = ["info", "error", "warn", "debug"];
     let tags = ["red", "green", "blue", "alpha", "beta"];
     let severities = ["", "INFO", "ERROR", "WARN"];
@@ -186,10 +188,16 @@ fn gen_corpus(seed: u64) -> Corpus {
             attributes.push(kv("level", s(levels[rng.below(4) as usize])));
         }
         if rng.chance(75) {
-            attributes.push(kv("host", s(&hosts[rng.below(hosts.len() as u64) as usize])));
+            attributes.push(kv(
+                "host",
+                s(&hosts[rng.below(hosts.len() as u64) as usize]),
+            ));
         }
         if rng.chance(55) {
-            attributes.push(kv("code", s(&codes[rng.below(codes.len() as u64) as usize])));
+            attributes.push(kv(
+                "code",
+                s(&codes[rng.below(codes.len() as u64) as usize]),
+            ));
         }
         if rng.chance(30) {
             // Multi-valued scalar array → repeated `attributes.tags[]` pairs.
@@ -216,7 +224,10 @@ fn gen_corpus(seed: u64) -> Corpus {
             // Nested kvlist → `attributes.meta.region`.
             attributes.push(kv(
                 "meta",
-                kvlist(vec![kv("region", s(if rng.chance(50) { "eu" } else { "us" }))]),
+                kvlist(vec![kv(
+                    "region",
+                    s(if rng.chance(50) { "eu" } else { "us" }),
+                )]),
             ));
         }
         if rng.chance(20) {
@@ -235,7 +246,10 @@ fn gen_corpus(seed: u64) -> Corpus {
             attributes.push(kv("blank", s(""))); // empty value
         }
         if rng.chance(40) {
-            attributes.push(kv("city", s(cities[rng.below(cities.len() as u64) as usize])));
+            attributes.push(kv(
+                "city",
+                s(cities[rng.below(cities.len() as u64) as usize]),
+            ));
         }
 
         records.push(LogRecord {
@@ -341,7 +355,10 @@ fn ng_index_candidate(wal_dir: &Path) -> SfstCandidate {
     let sfst_path = wal_dir.join("harness-ng.sfst");
     ng_index::build_sfst(wal_dir, &sfst_path, &ng_index::Metrics::new()).expect("build_sfst");
     let bytes = std::fs::read(&sfst_path).expect("read sfst");
-    let summary = IndexReader::open(&bytes).expect("open sfst").summary().clone();
+    let summary = IndexReader::open(&bytes)
+        .expect("open sfst")
+        .summary()
+        .clone();
     SfstCandidate {
         summary,
         file_seq: 1,
@@ -351,10 +368,19 @@ fn ng_index_candidate(wal_dir: &Path) -> SfstCandidate {
 }
 
 fn assert_equiv(ctx: &str, via_sfst: &LogsShard, via_scan: &LogsShard) {
-    assert_eq!(via_sfst.matched, via_scan.matched, "matched diverged [{ctx}]");
-    assert_eq!(via_sfst.fields, via_scan.fields, "field table diverged [{ctx}]");
+    assert_eq!(
+        via_sfst.matched, via_scan.matched,
+        "matched diverged [{ctx}]"
+    );
+    assert_eq!(
+        via_sfst.fields, via_scan.fields,
+        "field table diverged [{ctx}]"
+    );
     assert_eq!(via_sfst.facets, via_scan.facets, "facets diverged [{ctx}]");
-    assert_eq!(via_sfst.timeline, via_scan.timeline, "timeline diverged [{ctx}]");
+    assert_eq!(
+        via_sfst.timeline, via_scan.timeline,
+        "timeline diverged [{ctx}]"
+    );
 }
 
 /// Run every query against both ng paths and assert equivalence. Returns the
@@ -508,7 +534,10 @@ fn query_matrix(summary: &sfst::Summary) -> Vec<(String, LogsQuery)> {
             .histogram_field("attributes.mixed")
             .build(),
     ));
-    out.push(("hist-absent".into(), b(g_eight).histogram_field("nope").build()));
+    out.push((
+        "hist-absent".into(),
+        b(g_eight).histogram_field("nope").build(),
+    ));
     out.push((
         "hist-projected-severity".into(),
         b(g_wide)
@@ -538,7 +567,10 @@ fn query_matrix(summary: &sfst::Summary) -> Vec<(String, LogsQuery)> {
             .facet_fields(vec!["attributes.city".into()])
             .build(),
     ));
-    out.push(("fulltext-body".into(), b(g_eight).query("request|reset").build()));
+    out.push((
+        "fulltext-body".into(),
+        b(g_eight).query("request|reset").build(),
+    ));
     out.push((
         "negative-grid".into(),
         b(Grid::new(
@@ -609,7 +641,10 @@ fn ng_flattened_tail_matches_sealed_index() {
     }
 
     assert!(multi_frame, "no multi-frame corpus generated");
-    assert!(has_multivalued, "no multi-valued (repeated-key) field generated");
+    assert!(
+        has_multivalued,
+        "no multi-valued (repeated-key) field generated"
+    );
     assert!(has_array_of_structs, "no array-of-structs field generated");
     assert!(has_non_ascii, "no non-ASCII attribute generated");
     assert!(
@@ -684,8 +719,8 @@ fn ng_run_stats_equal_whole_file_index() {
         let whole = ng_index_candidate(dir.path());
         let total = whole.summary.record_count;
         let start = whole.summary.min_timestamp_s as i64 * NS as i64;
-        let span =
-            ((whole.summary.max_timestamp_s - whole.summary.min_timestamp_s) as i64 + 1) * NS as i64;
+        let span = ((whole.summary.max_timestamp_s - whole.summary.min_timestamp_s) as i64 + 1)
+            * NS as i64;
         assert!(total > 0, "seed={seed}: fixture WAL has no records");
 
         let queries = || -> Vec<(String, LogsQuery)> {
@@ -719,9 +754,15 @@ fn ng_run_stats_equal_whole_file_index() {
                 min_entries,
             );
             if min_entries == u64::MAX {
-                assert!(chunks.is_empty(), "seed={seed}: MAX threshold should make all tail");
+                assert!(
+                    chunks.is_empty(),
+                    "seed={seed}: MAX threshold should make all tail"
+                );
             } else {
-                assert!(!chunks.is_empty(), "seed={seed}: small threshold should produce a chunk");
+                assert!(
+                    !chunks.is_empty(),
+                    "seed={seed}: small threshold should produce a chunk"
+                );
             }
 
             let mut live_candidates: Vec<SfstCandidate> = Vec::new();
@@ -729,8 +770,11 @@ fn ng_run_stats_equal_whole_file_index() {
                 let (summary, bytes) = ng_index::build_sfst_range(&wal_path, chunk.range).unwrap();
                 live_candidates.push(SfstCandidate {
                     summary,
-                    file_seq: i as u64,
-                    part: sfsq::logs::Part::Indexed(0),
+                    // Mirror production (handler.rs): chunks of one WAL share
+                    // file_seq and differ by part, so the cursor treats them as
+                    // chunks of one file, not distinct files.
+                    file_seq: 1,
+                    part: sfsq::logs::Part::Indexed(i as u32),
                     source: Source::Memory(Arc::new(bytes)),
                 });
             }
@@ -811,7 +855,10 @@ fn ng_run_rows_match_whole_file_index() {
     );
     assert_eq!(chunks.len(), 2, "fixture should split into 2 chunks");
     let tail_begin = wal::prefix::tail_start(&chunks, header);
-    assert!(tail_begin < file_len, "fixture should leave a non-empty tail");
+    assert!(
+        tail_begin < file_len,
+        "fixture should leave a non-empty tail"
+    );
 
     let mut live: Vec<SfstCandidate> = Vec::new();
     for (i, chunk) in chunks.iter().enumerate() {
@@ -838,7 +885,12 @@ fn ng_run_rows_match_whole_file_index() {
     };
 
     for (qlabel, q) in [
-        ("all", LogsQueryBuilder::new(Grid::new(start, span, 1)).limit(300).build()),
+        (
+            "all",
+            LogsQueryBuilder::new(Grid::new(start, span, 1))
+                .limit(300)
+                .build(),
+        ),
         (
             "level=error",
             LogsQueryBuilder::new(Grid::new(start, span, 1))
@@ -858,8 +910,14 @@ fn ng_run_rows_match_whole_file_index() {
             sources(live_candidates_clone(&live), tails_clone(&tails)),
             q.clone(),
         ));
-        let whole_rows = rows_of(&run_plain(vec![LogSource::Sfst(clone_candidate(&whole))], q));
+        let whole_rows = rows_of(&run_plain(
+            vec![LogSource::Sfst(clone_candidate(&whole))],
+            q,
+        ));
         assert!(!live_rows.is_empty(), "q={qlabel}: no rows");
-        assert_eq!(live_rows, whole_rows, "q={qlabel}: live rows != whole-file rows");
+        assert_eq!(
+            live_rows, whole_rows,
+            "q={qlabel}: live rows != whole-file rows"
+        );
     }
 }

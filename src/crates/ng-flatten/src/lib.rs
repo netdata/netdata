@@ -535,10 +535,6 @@ pub fn flatten_into(
     resources
 }
 
-/// Flatten a request into its own per-frame tree (convenience over [`flatten_into`])
-/// — the form stored in a flattened WAL frame. Callers MUST normalize record
-/// timestamps first (see [`Record`]); a record with `time_unix_nano == 0` flattens
-/// to `ts == 0`.
 /// OTLP/W3C fixed id widths (`opentelemetry/proto/logs/v1/logs.proto`): a
 /// `trace_id` is 16 bytes, a `span_id` is 8 bytes, each empty if unset.
 pub const TRACE_ID_LEN: usize = 16;
@@ -618,6 +614,10 @@ pub fn normalize_timestamps(req: &mut ExportLogsServiceRequest, fallback_base_ns
     }
 }
 
+/// Flatten a request into its own per-frame tree (convenience over [`flatten_into`])
+/// — the form stored in a flattened WAL frame. Callers MUST normalize record
+/// timestamps first (see [`normalize_timestamps`] / [`Record`]); a record with
+/// `time_unix_nano == 0` flattens to `ts == 0`.
 pub fn flatten_request(request: &ExportLogsServiceRequest) -> FlattenedRequest {
     let mut flattener = Flattener::new();
     let resources = flatten_into(&mut flattener, request);
@@ -996,5 +996,59 @@ mod tests {
         assert_eq!(a[0].node, b[0].node, "severity_number must share one column node");
         let tree = f.into_tree();
         assert_eq!(tree.path(a[0].node), "severity_number");
+    }
+
+    fn req_of(records: Vec<LogRecord>) -> ExportLogsServiceRequest {
+        use opentelemetry_proto::tonic::logs::v1::{ResourceLogs, ScopeLogs};
+        ExportLogsServiceRequest {
+            resource_logs: vec![ResourceLogs {
+                scope_logs: vec![ScopeLogs {
+                    log_records: records,
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        }
+    }
+
+    #[test]
+    fn normalize_timestamps_resolves_time_then_observed_then_base_offset() {
+        let mut req = req_of(vec![
+            // event time kept as-is
+            LogRecord { time_unix_nano: 100, observed_time_unix_nano: 50, ..Default::default() },
+            // no event time -> observed
+            LogRecord { time_unix_nano: 0, observed_time_unix_nano: 77, ..Default::default() },
+            // neither -> base + 1
+            LogRecord { time_unix_nano: 0, observed_time_unix_nano: 0, ..Default::default() },
+            // neither -> base + 2 (offset increments per fallback record)
+            LogRecord { time_unix_nano: 0, observed_time_unix_nano: 0, ..Default::default() },
+        ]);
+        normalize_timestamps(&mut req, 1000);
+        let ts: Vec<u64> = req.resource_logs[0].scope_logs[0]
+            .log_records
+            .iter()
+            .map(|r| r.time_unix_nano)
+            .collect();
+        assert_eq!(ts, vec![100, 77, 1001, 1002]);
+    }
+
+    #[test]
+    fn normalize_ids_clears_only_wrong_length() {
+        let mut req = req_of(vec![
+            // conformant widths kept
+            LogRecord { trace_id: vec![9u8; 16], span_id: vec![9u8; 8], ..Default::default() },
+            // absent kept absent
+            LogRecord { trace_id: vec![], span_id: vec![], ..Default::default() },
+            // wrong widths cleared
+            LogRecord { trace_id: vec![1u8; 10], span_id: vec![2u8; 3], ..Default::default() },
+        ]);
+        let bad = normalize_ids(&mut req);
+        assert_eq!((bad.trace, bad.span), (1, 1));
+        assert!(bad.any());
+        let recs = &req.resource_logs[0].scope_logs[0].log_records;
+        assert_eq!(recs[0].trace_id.len(), 16);
+        assert_eq!(recs[0].span_id.len(), 8);
+        assert!(recs[1].trace_id.is_empty());
+        assert!(recs[2].trace_id.is_empty() && recs[2].span_id.is_empty());
     }
 }

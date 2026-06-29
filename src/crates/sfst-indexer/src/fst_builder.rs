@@ -315,7 +315,8 @@ pub fn build_and_write(
     // produced this index was already durably deleted, losing the
     // seq's data with no recovery path.
     let (guard, file) = file_registry::durable::AtomicFile::create(out_path)?;
-    let (buf, summary, metadata) = build_into(row_index, std::io::BufWriter::new(file), content_meta_override)?;
+    let (buf, summary, metadata) =
+        build_into(row_index, std::io::BufWriter::new(file), content_meta_override)?;
     let file = buf.into_inner().map_err(|e| e.into_error())?;
     let file_size = file.metadata()?.len();
     guard.commit(file)?;

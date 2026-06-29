@@ -172,12 +172,11 @@ impl WalScan {
         let mut frame_no = 0u64;
         while let Some(frame) = reader.next_frame()? {
             frame_no += 1;
-            let flattened = ng_flatten::decode_frame(frame.data).map_err(|e| {
-                FlattenedScanError::Decode {
+            let flattened =
+                ng_flatten::decode_frame(frame.data).map_err(|e| FlattenedScanError::Decode {
                     frame: frame_no,
                     msg: e.to_string(),
-                }
-            })?;
+                })?;
             let tree = &flattened.tree;
             // Resolve each node's path once per frame (records reuse the nodes).
             let paths: Vec<String> = (0..tree.len() as ng_flatten::NodeId)
