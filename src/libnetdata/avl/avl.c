@@ -23,10 +23,12 @@ static inline void avl_check_descent_height(size_t depth, const char *operation)
      Otherwise return |NULL|. */
 avl_t *avl_search(avl_tree_type *tree, avl_t *item) {
     avl_t *p;
+    size_t depth = 0;
 
     // assert (tree != NULL && item != NULL);
 
     for (p = tree->root; p != NULL; ) {
+        avl_check_descent_height(depth++, "search");
         int cmp = tree->compar(item, p);
 
         if (cmp < 0)
