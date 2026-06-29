@@ -173,24 +173,38 @@ static int netdata_claim_prepare_strings()
 
 static void netdata_claim_exit_callback(int signal)
 {
-    (void)signal;
-    if (aToken)
+    if (aToken) {
         free(aToken);
+        aToken = NULL;
+    }
 
-    if (aRoom)
+    if (aRoom) {
         free(aRoom);
+        aRoom = NULL;
+    }
 
-    if (aProxy)
+    if (aProxy) {
         free(aProxy);
+        aProxy = NULL;
+    }
 
-    if (aURL)
+    if (aURL) {
         free(aURL);
+        aURL = NULL;
+    }
 
-    if (argv)
+    if (argv) {
         LocalFree(argv);
+        argv = NULL;
+        token = NULL;
+        room = NULL;
+        proxy = NULL;
+        url = NULL;
+        extPath = NULL;
+    }
 
-    if (extPath)
-        LocalFree(extPath);
+    if (signal)
+        ExitProcess((UINT)signal);
 }
 
 static inline int netdata_claim_prepare_data(char *out, size_t length)
@@ -279,7 +293,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     signal(SIGTERM, netdata_claim_exit_callback);
 
     int argc;
-    LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     if (argc)
         argc = nd_claim_parse_args(argc, argv);
 
