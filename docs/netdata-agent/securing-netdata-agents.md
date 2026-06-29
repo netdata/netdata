@@ -185,6 +185,6 @@ We provide detailed configuration guides for popular web servers:
 
 ## Firewall and Egress Requirements for Cloud Connectivity
 
-The security measures above concern **inbound** access to your Agent's local dashboard (port `19999`). Claimed Agents and Parents also require **outbound** access to Netdata Cloud over the encrypted Agent-Cloud Link ([ACLK](/src/aclk/README.md)) — an outbound WebSocket Secure (WSS) connection on TCP port `443`.
+The security measures above concern **inbound** access to your Agent's local dashboard (port `19999`). Claimed nodes — including Parent Agents that connect to Netdata Cloud — also require **outbound** access to Netdata Cloud over the encrypted Agent-Cloud Link ([ACLK](/src/aclk/README.md)) — an outbound WebSocket Secure (WSS) connection on TCP port `443`.
 
-Netdata does not publish static CIDR ranges: IP addresses vary by region and change without notice, so **always prefer domain-based allowlisting**. For the complete list of required domains and ports (inbound and outbound), see [Required endpoints and ports](/docs/netdata-agent/configure-netdata-for-cybersecurity-platforms.md#required-endpoints-and-ports). If your Agent requires a proxy to reach the internet, see [proxy configuration](/src/claim/README.md#proxy-configuration).
+IP addresses can change without notice and vary based on your geographic location due to CDN-edge servers, so **always prefer domain-based allowlisting**. For the complete list of required domains and ports (inbound and outbound), see [Required endpoints and ports](/docs/netdata-agent/configure-netdata-for-cybersecurity-platforms.md#required-endpoints-and-ports). If your Agent requires a proxy to reach the internet, see [proxy configuration](/src/claim/README.md#proxy-configuration).
