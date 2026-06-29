@@ -542,6 +542,13 @@ int netdata_main(int argc, char **argv) {
                             rrdlabels_aral_destroy(true);
                             return rc;
                         }
+                        else if(strcmp(optarg, "rrdhostlabelstest") == 0) {
+                            unittest_running = true;
+                            rrdlabels_aral_init(true);
+                            int rc = rrdhost_labels_unittest();
+                            rrdlabels_aral_destroy(true);
+                            return rc;
+                        }
                         else if(strcmp(optarg, "buffertest") == 0) {
                             unittest_running = true;
                             return buffer_unittest();
