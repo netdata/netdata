@@ -1218,9 +1218,10 @@ int health_migrate_old_health_log_table(char *table) {
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE)) {
         error_report("Failed to execute SQL_COPY_HEALTH_LOG, rc = %d", rc);
-        SQLITE_FINALIZE(res);
         freez(uuid_from_table);
     }
+    SQLITE_FINALIZE(res);
+    res = NULL;
 
     //detail
     snprintfz(command, sizeof(command) - 1, SQL_COPY_HEALTH_LOG_DETAIL(table));
@@ -1242,6 +1243,8 @@ int health_migrate_old_health_log_table(char *table) {
         SQLITE_FINALIZE(res);
         return 0;
     }
+    SQLITE_FINALIZE(res);
+    res = NULL;
 
     //update transition ids
     rc = sqlite3_prepare_v2(db_meta, SQL_UPDATE_HEALTH_LOG_DETAIL_TRANSITION_ID, -1, &res, 0);
@@ -1256,6 +1259,8 @@ int health_migrate_old_health_log_table(char *table) {
         SQLITE_FINALIZE(res);
         return 0;
     }
+    SQLITE_FINALIZE(res);
+    res = NULL;
 
     //update health_log_id
     rc = sqlite3_prepare_v2(db_meta, SQL_UPDATE_HEALTH_LOG_DETAIL_HEALTH_LOG_ID, -1, &res, 0);
@@ -1279,8 +1284,9 @@ int health_migrate_old_health_log_table(char *table) {
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE)) {
         error_report("Failed to execute SQL_UPDATE_HEALTH_LOG_DETAIL_HEALTH_LOG_ID, rc = %d", rc);
-        SQLITE_FINALIZE(res);
     }
+    SQLITE_FINALIZE(res);
+    res = NULL;
 
     //update last transition id
     rc = sqlite3_prepare_v2(db_meta, SQL_UPDATE_HEALTH_LOG_LAST_TRANSITION_ID, -1, &res, 0);
@@ -1298,8 +1304,9 @@ int health_migrate_old_health_log_table(char *table) {
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE)) {
         error_report("Failed to execute SQL_UPDATE_HEALTH_LOG_LAST_TRANSITION_ID, rc = %d", rc);
-        SQLITE_FINALIZE(res);
     }
+    SQLITE_FINALIZE(res);
+    res = NULL;
 
     return 1;
 }
