@@ -2638,10 +2638,12 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
             false, NULL);
 
         if (access_code != HTTP_RESP_OK) {
+            // Echo back only the caller-supplied node identifier, never the resolved
+            // hostname, so the denial does not disclose node metadata to an unauthorized caller.
             buffer_sprintf(mcpc->error,
                            "You are not authorized to execute function '%s' on node '%s'.",
                            data.request.function ? data.request.function : "(unknown)",
-                           data.request.host ? rrdhost_hostname(data.request.host) : "(unknown)");
+                           data.request.node ? data.request.node : "(unknown)");
             mcp_functions_data_cleanup(&data);
             return MCP_RC_ERROR;
         }
