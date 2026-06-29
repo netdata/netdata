@@ -473,7 +473,7 @@ endmeta-->
         elif mode == "service_discovery":
             meta_yaml = integration["edit_link"].replace("blob", "edit")
             sidebar_label = integration["meta"]["name"]
-            learn_rel_path = "Collecting Metrics/Service Discovery"
+            learn_rel_path = "Collecting Metrics/Service Discovery/Discoverer"
             keywords = integration["keywords"] if "keywords" in integration else None
 
             md = f"""<!--startmeta
