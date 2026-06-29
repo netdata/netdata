@@ -22,7 +22,7 @@ fn build_sfst(rows: &[(i64, &[&str])]) -> Vec<u8> {
     }
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("spike.sfst");
-    build_and_write(&ri, &path).expect("build_and_write");
+    build_and_write(&ri, &path, None).expect("build_and_write");
     std::fs::read(&path).expect("read sfst")
 }
 

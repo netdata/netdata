@@ -28,7 +28,6 @@ use std::hash::Hasher;
 
 use serde::{Deserialize, Serialize};
 
-use file_registry::MonotonicClock;
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::common::v1::{
     AnyValue, InstrumentationScope, KeyValue, any_value::Value as Av,
@@ -588,17 +587,21 @@ pub fn normalize_ids(req: &mut ExportLogsServiceRequest) -> MalformedIds {
 }
 
 /// Ensure every log record has a usable `time_unix_nano` before flattening, applying
-/// the OTLP single-timestamp rule (time else observed) at the observation point:
-/// keep `time_unix_nano` if set, else fall back to `observed_time_unix_nano`, else
-/// stamp the monotonic ingestion clock.
+/// the OTLP single-timestamp rule at the observation point: keep `time_unix_nano` if
+/// set, else fall back to `observed_time_unix_nano`, else synthesize one from
+/// `fallback_base_ns` (typically the frame's ingestion timestamp).
 ///
-/// The resolved value is written into `time_unix_nano` (not `observed_time_unix_nano`).
-/// The clock fallback is a per-record `now_ns()` — strictly increasing, so intra-frame
-/// order is preserved, but it is not `wal-otap`'s `ingestion_ns + row_offset` (a
-/// different value, same ordering guarantee). The caller MUST run this before
-/// [`flatten_request`]; `Record.ts` is read straight from `time_unix_nano`. Shared by
-/// `ng-ingest` and the production OTel-logs ingestor.
-pub fn normalize_timestamps(req: &mut ExportLogsServiceRequest, clock: &mut MonotonicClock) {
+/// The resolved value is written into `time_unix_nano` (not `observed_time_unix_nano`);
+/// `Record.ts` is read straight from it. The synthesized fallback is
+/// `fallback_base_ns + k` for the k-th timestamp-less record — strictly increasing, so
+/// intra-frame ordering is preserved, **without** touching a shared clock per record
+/// (the caller takes a single clock tick for the base, so concurrent ingest doesn't
+/// serialize on the clock for the whole pass). These synthetic values are only used for
+/// records lacking both event and observed time; they are not globally unique across
+/// frames (acceptable — they tie-break deterministically). The caller MUST run this
+/// before [`flatten_request`]. Shared by `ng-ingest` and the production OTel-logs ingestor.
+pub fn normalize_timestamps(req: &mut ExportLogsServiceRequest, fallback_base_ns: u64) {
+    let mut fallback_offset: u64 = 0;
     for rl in &mut req.resource_logs {
         for sl in &mut rl.scope_logs {
             for r in &mut sl.log_records {
@@ -606,7 +609,8 @@ pub fn normalize_timestamps(req: &mut ExportLogsServiceRequest, clock: &mut Mono
                     r.time_unix_nano = if r.observed_time_unix_nano != 0 {
                         r.observed_time_unix_nano
                     } else {
-                        clock.now_ns().as_u64()
+                        fallback_offset += 1;
+                        fallback_base_ns.saturating_add(fallback_offset)
                     };
                 }
             }

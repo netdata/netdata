@@ -6,8 +6,8 @@
 //! (`recover_unindexed`) and the shared `handle_indexer_resp` drive it
 //! unchanged. Only the seal body differs:
 //!
-//! - logs: `sfst_indexer::index` decodes the WAL's OTAP/Arrow frames and writes
-//!   a full split-FST index;
+//! - logs: `ng_index::build_sfst_file` decodes the WAL's ng-flatten frames and
+//!   writes a full split-FST index;
 //! - traces (here): NO content decode. The WAL frame header already carries a
 //!   content-agnostic `entry_count` + per-frame `timestamp_ns`, so the seal sums
 //!   `entry_count` → `record_count`, folds frame timestamps → min/max, copies the

@@ -385,19 +385,16 @@ impl Writer {
     /// [`MAX_CONTENT_META_BYTES`](crate::format::MAX_CONTENT_META_BYTES) is
     /// rejected (the caller drops the record) rather than truncated.
     ///
-    /// `ingestion_ns` is the caller's monotonic timestamp for this frame
-    /// — stamped into the frame header on disk and used by the indexer
-    /// as the tier-3 fallback (`ingestion_ns + row_offset`) for log rows
-    /// that lack `time_unix_nano` and `observed_time_unix_nano`. Callers
-    /// should typically obtain it from a single process-wide
-    /// [`file_registry::MonotonicClock`].
+    /// `ingestion_ns` is the caller's monotonic timestamp for this frame —
+    /// stamped into the frame header on disk. Callers should typically obtain it
+    /// from a single process-wide [`file_registry::MonotonicClock`]. How a
+    /// consumer uses it is consumer-specific (the WAL is payload-agnostic).
     ///
-    /// `log_min_ts_ns` / `log_max_ts_ns` describe the OTel time range of
-    /// the log records inside `data` (per the hierarchy `time_unix_nano`
-    /// → `observed_time_unix_nano` → `ingestion_ns + row_offset`; see
-    /// the ingestor's `compute_log_ts_range`). Pass `TimestampNs::ZERO`
-    /// for both when no log row in the frame had a usable timestamp —
-    /// the writer's per-file accumulator is then left unchanged.
+    /// `log_min_ts_ns` / `log_max_ts_ns` describe the time range of the records
+    /// inside `data`, as resolved by the caller (for OTel logs the ingestor
+    /// resolves each record's timestamp at ingest; see `compute_log_ts_range`).
+    /// Pass `TimestampNs::ZERO` for both when no row in the frame had a usable
+    /// timestamp — the writer's per-file accumulator is then left unchanged.
     #[allow(clippy::too_many_arguments)]
     pub fn write_frame(
         &mut self,

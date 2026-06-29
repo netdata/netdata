@@ -35,7 +35,7 @@ use super::wal_scan::WalScan;
 ///
 /// `File` is the steady-state case — a sealed index on disk, memory-
 /// mapped lazily. `Memory` is an in-memory SFST built from a chunk of an
-/// active WAL (`sfst_indexer::index_range`); the bytes are shared (`Arc`) so a
+/// active WAL (`ng_index::build_sfst_range`); the bytes are shared (`Arc`) so a
 /// query holds them alive even if the producing cache evicts the entry
 /// mid-query.
 #[derive(Clone)]

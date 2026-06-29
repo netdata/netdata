@@ -89,7 +89,7 @@ pub fn index_with_options(
         row_index.num_logs(),
     );
 
-    let (summary, metadata) = build_and_write(&row_index, sfst_path)?;
+    let (summary, metadata) = build_and_write(&row_index, sfst_path, None)?;
     let size = std::fs::metadata(sfst_path)?.len();
 
     Ok(IndexResult {
@@ -135,7 +135,7 @@ pub fn index_range(
     // ever held — the old build-everything-then-copy model held every
     // packed chunk and then a second full copy in the output.
     let cursor = std::io::Cursor::new(Vec::new());
-    let (cursor, summary, _metadata) = build_into(&row_index, cursor)?;
+    let (cursor, summary, _metadata) = build_into(&row_index, cursor, None)?;
 
     Ok((summary, cursor.into_inner()))
 }

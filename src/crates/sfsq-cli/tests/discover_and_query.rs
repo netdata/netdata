@@ -16,6 +16,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use file_registry::{FileId, TimestampNs};
+use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value::Value};
 use opentelemetry_proto::tonic::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
 use opentelemetry_proto::tonic::resource::v1::Resource;
@@ -116,13 +117,30 @@ fn write_wal(wal_tenant_dir: &Path, batches: &[Vec<ResourceLogs>]) -> PathBuf {
 /// As [`write_wal`], but with an explicit starting sequence so multiple WAL
 /// files (sealed separately) get distinct FileIds. The dir must hold no other
 /// `*.wal` at call time (seal + remove the previous one first).
+/// Flatten + encode a batch as one ng-flatten WAL frame payload, returning
+/// `(bytes, record_count)` — the ng counterpart of the old
+/// `otel_ingestor::arrow_bridge::encode`. Fixtures set explicit timestamps, so no
+/// timestamp normalization is needed here.
+fn encode_ng_frame(batch: Vec<ResourceLogs>) -> (Vec<u8>, usize) {
+    let count: usize = batch
+        .iter()
+        .flat_map(|rl| &rl.scope_logs)
+        .map(|sl| sl.log_records.len())
+        .sum();
+    let request = ExportLogsServiceRequest { resource_logs: batch };
+    let mut flattened = ng_flatten::flatten_request(&request);
+    ng_flatten::fill_hashes(&mut flattened);
+    let data = ng_flatten::encode_frame(&flattened).expect("encode flattened frame");
+    (data, count)
+}
+
 fn write_wal_seq(wal_tenant_dir: &Path, batches: &[Vec<ResourceLogs>], seq_start: u64) -> PathBuf {
     std::fs::create_dir_all(wal_tenant_dir).unwrap();
     let seq = Arc::new(wal::SeqAllocator::ephemeral(seq_start));
     let mut writer =
         wal::Writer::new(wal_tenant_dir, wal::Config::default(), seq, 0).expect("writer");
     for (i, b) in batches.iter().enumerate() {
-        let (data, count) = otel_ingestor::arrow_bridge::encode(b.clone()).expect("encode");
+        let (data, count) = encode_ng_frame(b.clone());
         let ingestion = TimestampNs((BASE_S + 500 + i as u64) * NS);
         let stream = stream_of(&b[0]);
         let part_key = otel_logs_identity::part_key(&stream);
@@ -158,7 +176,7 @@ fn seal_to_sfst(wal_path: &Path, sfst_tenant_dir: &Path) -> PathBuf {
     std::fs::create_dir_all(sfst_tenant_dir).unwrap();
     let id = FileId::parse(wal_path).expect("wal fileid");
     let out = sfst_tenant_dir.join(id.to_filename("sfst"));
-    sfst_indexer::index(wal_path, &out).expect("index");
+    ng_index::build_sfst_file(wal_path, &out, &ng_index::Metrics::new()).expect("index");
     out
 }
 
@@ -188,7 +206,7 @@ fn tail_path_returns_records_and_filters() {
     let d = discover(&dirs, "default", None, 0..u32::MAX).unwrap();
     let q = build_query(
         0..u32::MAX,
-        Filter::new().select("level", "error"),
+        Filter::new().select("attributes.level", "error"),
         None,
         10_000,
     );
@@ -268,8 +286,7 @@ fn wal_stream_filter_matches_absent_namespace() {
     // the ingestor.
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
     let mut writer = wal::Writer::new(&wal_dir, wal::Config::default(), seq, 0).expect("writer");
-    let (data, count) =
-        otel_ingestor::arrow_bridge::encode(batch_for(records(0..10), "", "api")).expect("encode");
+    let (data, count) = encode_ng_frame(batch_for(records(0..10), "", "api"));
     let stream = ServiceStream::new("", "api");
     let part_key = otel_logs_identity::part_key(&stream);
     let content_meta = otel_logs_identity::encode_content_meta(&stream).expect("identity encodes");

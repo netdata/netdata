@@ -58,7 +58,10 @@ pub fn write_request(
     if entry_count == 0 {
         return Ok(0);
     }
-    ng_flatten::normalize_timestamps(req, clock);
+    // One clock tick for the synthetic-timestamp base; normalize then runs
+    // lock-free (base + offset for any record lacking event/observed time).
+    let fallback_base_ns = clock.now_ns().as_u64();
+    ng_flatten::normalize_timestamps(req, fallback_base_ns);
     let bad_ids = ng_flatten::normalize_ids(req);
     if bad_ids.any() {
         tracing::warn!(

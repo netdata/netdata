@@ -1,24 +1,22 @@
-//! Equivalence harness: `WalScan` vs index-then-query, over identical
-//! WAL files.
+//! Equivalence harness for the **legacy OTAP path**: `WalScan::scan` vs
+//! index-then-query, over identical OTAP WAL files.
 //!
-//! The equivalence criterion this harness enforces: for any WAL file and
-//! any query, the row-scan evaluator's output must
-//! be indistinguishable from indexing that WAL into an SFST and running
-//! the engine. Every fixture here goes through the *production* path —
-//! OTLP `ResourceLogs` → `otel_ingestor::arrow_bridge::encode` (real
-//! OTAP frames, `_nd_kv_hash` sidecars included) → `wal::Writer` →
-//! either `sfst_indexer::index` + `LogsShard::evaluate` or
-//! `WalScan::scan` + `evaluate` — and the two shards are compared
-//! component by component.
+//! The equivalence criterion this harness enforces: for any OTAP WAL file and
+//! any query, the row-scan evaluator's output must be indistinguishable from
+//! indexing that WAL into an SFST and running the engine. Every fixture here
+//! goes through the OTAP path — OTLP `ResourceLogs` →
+//! `otel_ingestor::arrow_bridge::encode` (real OTAP frames, `_nd_kv_hash`
+//! sidecars included) → `wal::Writer` → either `sfst_indexer::index` +
+//! `LogsShard::evaluate` or `WalScan::scan` + `evaluate` — and the two shards
+//! are compared component by component.
 //!
-//! Scope: this covers both the **statistics** shard (matched count,
-//! facets, timeline, field table — `wal_data_stats_equal_whole_file_index`)
-//! and the **row table** served through the live path (chunk SFSTs
-//! interleaved with the row-scanned tail under the cursor order —
-//! `wal_data_rows_match_whole_file_index`). The row test
-//! uses monotonic timestamps so the chunked and whole-file total orders
-//! coincide; equal-timestamp tie-break legitimately differs across the
-//! WAL→SFST transition (the documented cursor seam).
+//! NOTE: production logs no longer use this path (the ingest/index/tail were cut
+//! over to ng-flatten). The ng-path equivalence — including the live `run`-level
+//! tests (chunk SFSTs interleaved with the row-scanned tail under the cursor
+//! order) — lives in `ng_wal_equivalence.rs`. This harness remains as the
+//! regression guard for the OTAP format read path until it is retired (Stage 3 of
+//! the graft). It covers the **statistics** shard (matched count, facets,
+//! timeline, field table) on the OTAP `scan`/`index` paths.
 //!
 //! Corpora are generated from a seeded deterministic RNG (failures
 //! reproduce by seed), sweeping timestamp regimes (monotonic, shuffled,

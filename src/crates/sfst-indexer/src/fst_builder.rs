@@ -302,6 +302,7 @@ fn resolve_stream(row_index: &RowIndex, total_logs: u32) -> Result<ServiceStream
 pub fn build_and_write(
     row_index: &RowIndex,
     out_path: &Path,
+    content_meta_override: Option<Vec<u8>>,
 ) -> Result<(sfst::Summary, Metadata), IndexError> {
     let t_start = Instant::now();
 
@@ -314,7 +315,7 @@ pub fn build_and_write(
     // produced this index was already durably deleted, losing the
     // seq's data with no recovery path.
     let (guard, file) = file_registry::durable::AtomicFile::create(out_path)?;
-    let (buf, summary, metadata) = build_into(row_index, std::io::BufWriter::new(file))?;
+    let (buf, summary, metadata) = build_into(row_index, std::io::BufWriter::new(file), content_meta_override)?;
     let file = buf.into_inner().map_err(|e| e.into_error())?;
     let file_size = file.metadata()?.len();
     guard.commit(file)?;
@@ -351,6 +352,7 @@ pub fn build_and_write(
 pub fn build_into<W: Write + Seek>(
     row_index: &RowIndex,
     sink: W,
+    content_meta_override: Option<Vec<u8>>,
 ) -> Result<(W, sfst::Summary, Metadata), IndexError> {
     let t = Instant::now();
 
@@ -363,7 +365,6 @@ pub fn build_into<W: Write + Seek>(
     let batch_size = sfst::stream_batch_size(total_logs);
 
     let (kv_to_file, id_ranges) = build_id_translation(row_index);
-    let stream = resolve_stream(row_index, total_logs)?;
 
     // Field table, ordered low → mid → high (each tier sorted by name).
     let fields: sfst::FieldTable = row_index
@@ -407,14 +408,24 @@ pub fn build_into<W: Write + Seek>(
     // ingestor derives both from the same stream); files are never renamed
     // externally. See `FORMAT.md` ("Partition-key authority").
     //
-    // This is the transitional content-plane touch in the builder; a later
-    // stage lifts identity derivation to the caller and removes this dependency.
+    // Identity authority: when the caller passes `content_meta_override` (the WAL
+    // header's `content_meta`, written by the ingestor at the observation point), it
+    // is used verbatim — the authoritative identity. This is correct for ng-flatten
+    // files, whose rows carry `resource.attributes.service.name=…` that the row-derived
+    // `service_stream` does not recognize. The `None` arm keeps the legacy row
+    // derivation for the OTAP producer (and tests) until it is retired.
+    let content_meta = match content_meta_override {
+        Some(cm) => cm,
+        None => {
+            let stream = resolve_stream(row_index, total_logs)?;
+            otel_logs_identity::encode_content_meta(&stream).ok_or(IndexError::IdentityTooLarge)?
+        }
+    };
     let summary = sfst::Summary {
         min_timestamp_s: histogram.timestamps.first().copied().unwrap_or(0),
         max_timestamp_s: histogram.timestamps.last().copied().unwrap_or(0),
         record_count: total_logs,
-        content_meta: otel_logs_identity::encode_content_meta(&stream)
-            .ok_or(IndexError::IdentityTooLarge)?,
+        content_meta,
     };
     // Per-row columns: each is independently present iff the caller supplied it.
     // The presence set (for the TOC) and the manifest (for META) are derived from

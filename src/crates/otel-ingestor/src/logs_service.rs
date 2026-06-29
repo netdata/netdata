@@ -565,13 +565,11 @@ impl LogsService for NetdataLogsService {
 
             // One clock tick per frame for the WAL frame header (`ingestion_ns`) and
             // `compute_log_ts_range` (which now matches the per-row `Record.ts`
-            // numerically). The same clock backs the timestamp fallback.
-            let ingestion_ns = {
-                let mut clock = self.clock.lock().unwrap();
-                let ts = clock.now_ns();
-                ng_flatten::normalize_timestamps(&mut request, &mut clock);
-                ts
-            };
+            // numerically). The tick doubles as the base for any synthesized
+            // fallback timestamps, so normalization runs lock-free — concurrent
+            // ingest doesn't serialize on the process-wide clock for the whole pass.
+            let ingestion_ns = self.clock.lock().unwrap().now_ns();
+            ng_flatten::normalize_timestamps(&mut request, ingestion_ns.as_u64());
             let bad_ids = ng_flatten::normalize_ids(&mut request);
             if bad_ids.any() {
                 tracing::warn!(
