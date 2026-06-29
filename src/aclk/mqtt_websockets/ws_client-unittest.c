@@ -205,8 +205,10 @@ static int ws_client_unittest_cap_hit(void)
 static int ws_client_unittest_reset_frees_partial_close_reason(void)
 {
     int errors = 0;
-    char frame[4];
-    size_t header_len = ws_client_unittest_control_header(frame, WS_OP_CONNECTION_CLOSE, 5);
+    const size_t reason_len = 3;
+    const size_t close_payload_len = sizeof(uint16_t) + reason_len;
+    char frame[2 + sizeof(uint16_t)];
+    size_t header_len = ws_client_unittest_control_header(frame, WS_OP_CONNECTION_CLOSE, close_payload_len);
     uint16_t close_code = htobe16(1000);
     memcpy(&frame[header_len], &close_code, sizeof(close_code));
 
@@ -227,6 +229,10 @@ static int ws_client_unittest_reset_frees_partial_close_reason(void)
 
     WS_TEST(ret == WS_CLIENT_NEED_MORE_BYTES, "partial close reason needs more bytes");
     WS_TEST(client.rx.specific_data.op_close.reason != NULL, "partial close reason allocated");
+#ifdef NETDATA_TRACE_ALLOCATIONS
+    WS_TEST(mallocz_usable_size(client.rx.specific_data.op_close.reason) == reason_len + 1,
+            "partial close reason buffer fits reason plus terminator");
+#endif
 
     ws_client_reset(&client);
 

@@ -614,9 +614,10 @@ int ws_client_process_rx_ws(ws_client *client)
             }
             client->rx.parse_state = WS_PAYLOAD_CONNECTION_CLOSE_MSG;
             break;
-        case WS_PAYLOAD_CONNECTION_CLOSE_MSG:
+        case WS_PAYLOAD_CONNECTION_CLOSE_MSG: {
+            size_t close_reason_length = (size_t)(client->rx.payload_length - sizeof(uint16_t));
             if (!client->rx.specific_data.op_close.reason)
-                client->rx.specific_data.op_close.reason = mallocz(client->rx.payload_length + 1);
+                client->rx.specific_data.op_close.reason = mallocz(close_reason_length + 1);
 
             while (client->rx.payload_processed < client->rx.payload_length) {
                 if (!rbuf_bytes_available(client->buf_read))
@@ -625,7 +626,7 @@ int ws_client_process_rx_ws(ws_client *client)
                                                          &client->rx.specific_data.op_close.reason[client->rx.payload_processed - sizeof(uint16_t)],
                                                          client->rx.payload_length - client->rx.payload_processed);
             }
-            client->rx.specific_data.op_close.reason[client->rx.payload_length] = 0;
+            client->rx.specific_data.op_close.reason[close_reason_length] = 0;
             nd_log(NDLS_DAEMON, NDLP_INFO, "ACLK: WebSocket server closed the connection with EC=%d and reason \"%s\"",
                 client->rx.specific_data.op_close.ec,
                 client->rx.specific_data.op_close.reason);
@@ -634,6 +635,7 @@ int ws_client_process_rx_ws(ws_client *client)
             client->rx.specific_data.op_close.reason = NULL;
             client->rx.parse_state = WS_PACKET_DONE;
             break;
+        }
         case WS_PAYLOAD_SKIP_UNKNOWN_PAYLOAD:
             BUF_READ_CHECK_AT_LEAST(client->rx.payload_length);
             nd_log(NDLS_DAEMON, NDLP_WARNING, "ACLK: Skipping Websocket Packet of unsupported/unknown type");
