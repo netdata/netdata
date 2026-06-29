@@ -399,6 +399,56 @@ TEST(PGD, RejectCorruptGorillaDiskChain) {
     pgd_free(pg_collector);
 }
 
+TEST(PGD, StopCorruptGorillaDiskEntriesAtEncodedBits) {
+    PGD *pg_collector = pgd_create(page_type, slots_for_page(1));
+
+    uint32_t value = 666;
+    pgd_append_point(pg_collector, 0, value, 0, 0, 1, 1, SN_DEFAULT_FLAGS, 0);
+
+    uint32_t size_in_bytes = pgd_disk_footprint(pg_collector);
+    uint32_t size_in_words = size_in_bytes / sizeof(uint32_t);
+
+    alignas(sizeof(uintptr_t)) uint32_t disk_buffer[size_in_words];
+    pgd_copy_to_extent(pg_collector, (uint8_t *) &disk_buffer[0], size_in_bytes);
+
+    auto *gbuf = static_cast<gorilla_buffer_t *>(static_cast<void *>(&disk_buffer[0]));
+    gbuf->header.entries++;
+
+    PGD *pg_disk = pgd_create_from_disk_data(page_type, &disk_buffer[0], size_in_bytes);
+    EXPECT_EQ(pgd_slots_used(pg_disk), 2);
+
+    PGDC cursor;
+    pgdc_reset(&cursor, pg_disk, 0);
+
+    STORAGE_POINT sp = {};
+    EXPECT_TRUE(pgdc_get_next_point(&cursor, 0, &sp));
+    EXPECT_EQ(value, static_cast<uint32_t>(sp.min));
+    EXPECT_FALSE(pgdc_get_next_point(&cursor, 1, &sp));
+
+    pgd_free(pg_disk);
+    pgd_free(pg_collector);
+}
+
+TEST(PGD, RejectCorruptGorillaDiskNbits) {
+    PGD *pg_collector = pgd_create(page_type, slots_for_page(1));
+
+    pgd_append_point(pg_collector, 0, 666, 0, 0, 1, 1, SN_DEFAULT_FLAGS, 0);
+
+    uint32_t size_in_bytes = pgd_disk_footprint(pg_collector);
+    uint32_t size_in_words = size_in_bytes / sizeof(uint32_t);
+
+    alignas(sizeof(uintptr_t)) uint32_t disk_buffer[size_in_words];
+    pgd_copy_to_extent(pg_collector, (uint8_t *) &disk_buffer[0], size_in_bytes);
+
+    auto *gbuf = static_cast<gorilla_buffer_t *>(static_cast<void *>(&disk_buffer[0]));
+    gbuf->header.nbits = RRDENG_GORILLA_32BIT_BUFFER_SIZE * CHAR_BIT;
+
+    PGD *pg_disk = pgd_create_from_disk_data(page_type, &disk_buffer[0], size_in_bytes);
+    EXPECT_EQ(pg_disk, PGD_EMPTY);
+
+    pgd_free(pg_collector);
+}
+
 int pgd_test(int argc, char *argv[])
 {
     // Dummy/necessary initialization stuff
