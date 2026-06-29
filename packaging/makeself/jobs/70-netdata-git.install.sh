@@ -45,5 +45,6 @@ run ./netdata-installer.sh \
   --dont-scrub-cflags-even-though-it-may-break-things \
   --one-time-build \
   --enable-lto \
+  --enable-plugin-scripts \
   ${INSTALLER_ARGS:+${INSTALLER_ARGS}} \
   ${EXTRA_INSTALL_FLAGS:+${EXTRA_INSTALL_FLAGS}} \
