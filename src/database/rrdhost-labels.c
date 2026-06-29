@@ -4,18 +4,63 @@
 #include "rrdhost.h"
 #include "streaming/stream.h"
 
+// Gate hot-path events before they touch label storage.
+// The slow path re-reads the receiver count before writing.
+static SPINLOCK is_parent_label_commit_spinlock = SPINLOCK_INITIALIZER;
+static uint32_t is_parent_label_cached_state = 0;
+
+static uint32_t rrdhost_is_parent_state_from_count(uint32_t count) {
+    return count ? 1 : 0;
+}
+
+static bool rrdhost_update_is_parent_label_for_state(RRDLABELS *labels, uint32_t state) {
+    if (!labels)
+        return false;
+
+    return rrdlabels_add_changed(labels, "_is_parent", state ? "true" : "false", RRDLABEL_SRC_AUTO);
+}
+
+static uint32_t rrdhost_read_is_parent_desired_state(uint32_t (*count_reader)(void)) {
+    return rrdhost_is_parent_state_from_count(count_reader());
+}
+
+static bool rrdhost_is_parent_label_claim_transition(uint32_t desired) {
+    uint32_t cached = __atomic_load_n(&is_parent_label_cached_state, __ATOMIC_RELAXED);
+
+    while (cached != desired) {
+        if (__atomic_compare_exchange_n(
+                &is_parent_label_cached_state, &cached, desired, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+            return true;
+    }
+
+    return false;
+}
+
+static bool rrdhost_update_is_parent_label(RRDLABELS *labels, uint32_t (*count_reader)(void), bool force) {
+    if (!labels || !count_reader)
+        return false;
+
+    uint32_t desired = rrdhost_read_is_parent_desired_state(count_reader);
+
+    if (!force && !rrdhost_is_parent_label_claim_transition(desired))
+        return false;
+
+    spinlock_lock(&is_parent_label_commit_spinlock);
+    desired = rrdhost_read_is_parent_desired_state(count_reader);
+    __atomic_store_n(&is_parent_label_cached_state, desired, __ATOMIC_RELAXED);
+    bool changed = rrdhost_update_is_parent_label_for_state(labels, desired);
+    spinlock_unlock(&is_parent_label_commit_spinlock);
+
+    return changed;
+}
+
 void rrdhost_set_is_parent_label(void) {
     if (!localhost || !localhost->rrdlabels)
         return;
 
-    uint32_t count = stream_receivers_currently_connected();
+    if (rrdhost_update_is_parent_label(localhost->rrdlabels, stream_receivers_currently_connected, false)) {
+        rrdhost_flag_set(localhost, RRDHOST_FLAG_PENDING_LABEL_RECHECK);
 
-    if (count == 0 || count == 1) {
-        RRDLABELS *labels = localhost->rrdlabels;
-        if(rrdlabels_add_changed(labels, "_is_parent", (count) ? "true" : "false", RRDLABEL_SRC_AUTO))
-            rrdhost_flag_set(localhost, RRDHOST_FLAG_PENDING_LABEL_RECHECK);
-
-        // queue a node info
         aclk_queue_node_info(localhost, false);
     }
 }
@@ -166,7 +211,7 @@ static void rrdhost_load_auto_labels(void) {
     int has_unstable_connection = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_GLOBAL, "has unstable connection", CONFIG_BOOLEAN_NO);
     rrdlabels_add(labels, "_has_unstable_connection", has_unstable_connection ? "true" : "false", RRDLABEL_SRC_AUTO);
 
-    rrdlabels_add(labels, "_is_parent", (stream_receivers_currently_connected() > 0) ? "true" : "false", RRDLABEL_SRC_AUTO);
+    (void)rrdhost_update_is_parent_label(labels, stream_receivers_currently_connected, true);
 
     rrdlabels_add(labels, "_hostname", string2str(localhost->hostname), RRDLABEL_SRC_AUTO);
     rrdlabels_add(labels, "_os", string2str(localhost->os), RRDLABEL_SRC_AUTO);
@@ -223,6 +268,98 @@ static int env_expand_unittest_check(const char *src, const char *expected, cons
     fprintf(stderr, "  env_expand(%s): %s, expected '%s', got '%s'\n",
             test_name, err ? "FAILED" : "OK", expected, buf);
     return err;
+}
+
+static uint32_t is_parent_label_unittest_receiver_count = 0;
+
+static uint32_t is_parent_label_unittest_count_reader(void) {
+    return is_parent_label_unittest_receiver_count;
+}
+
+static void is_parent_label_unittest_set_cached(uint32_t state) {
+    __atomic_store_n(&is_parent_label_cached_state, rrdhost_is_parent_state_from_count(state), __ATOMIC_RELAXED);
+}
+
+static int is_parent_label_unittest_check(
+    RRDLABELS *labels, uint32_t count, bool expected_changed, const char *expected_value, const char *test_name) {
+    is_parent_label_unittest_receiver_count = count;
+    bool changed = rrdhost_update_is_parent_label(labels, is_parent_label_unittest_count_reader, false);
+
+    char value[RRDLABELS_MAX_VALUE_LENGTH + 1];
+    rrdlabels_get_value_strcpyz(labels, value, sizeof(value), "_is_parent");
+
+    int err = (changed != expected_changed) || strcmp(value, expected_value) != 0;
+    fprintf(stderr, "  _is_parent(%s): %s, expected changed=%s value='%s', got changed=%s value='%s'\n",
+            test_name,
+            err ? "FAILED" : "OK",
+            expected_changed ? "true" : "false",
+            expected_value,
+            changed ? "true" : "false",
+            value);
+
+    return err;
+}
+
+static int is_parent_label_unittest_check_force(
+    RRDLABELS *labels, uint32_t count, bool expected_changed, const char *expected_value, const char *test_name) {
+    is_parent_label_unittest_receiver_count = count;
+    bool changed = rrdhost_update_is_parent_label(labels, is_parent_label_unittest_count_reader, true);
+
+    char value[RRDLABELS_MAX_VALUE_LENGTH + 1];
+    rrdlabels_get_value_strcpyz(labels, value, sizeof(value), "_is_parent");
+
+    int err = (changed != expected_changed) || strcmp(value, expected_value) != 0;
+    fprintf(stderr, "  _is_parent(%s): %s, expected force changed=%s value='%s', got changed=%s value='%s'\n",
+            test_name,
+            err ? "FAILED" : "OK",
+            expected_changed ? "true" : "false",
+            expected_value,
+            changed ? "true" : "false",
+            value);
+
+    return err;
+}
+
+static int is_parent_label_unittest_check_refreshed_nonzero_count(RRDLABELS *labels) {
+    is_parent_label_unittest_set_cached(0);
+    is_parent_label_unittest_receiver_count = 1;
+    bool changed = rrdhost_update_is_parent_label(labels, is_parent_label_unittest_count_reader, false);
+
+    char value[RRDLABELS_MAX_VALUE_LENGTH + 1];
+    rrdlabels_get_value_strcpyz(labels, value, sizeof(value), "_is_parent");
+
+    int err = changed || strcmp(value, "true") != 0;
+    fprintf(stderr,
+            "  _is_parent(refreshed non-zero receiver count after pending false transition): %s, "
+            "cached state reset to false, current count=%u expected changed=false value='true', "
+            "got changed=%s value='%s'\n",
+            err ? "FAILED" : "OK",
+            is_parent_label_unittest_receiver_count,
+            changed ? "true" : "false",
+            value);
+
+    return err;
+}
+
+static int is_parent_label_unittest(void) {
+    int errors = 0;
+
+    RRDLABELS *labels = rrdlabels_create();
+
+    is_parent_label_unittest_set_cached(1);
+    errors += is_parent_label_unittest_check(labels, 0, true, "false", "initial zero receivers");
+    errors += is_parent_label_unittest_check(labels, 0, false, "false", "unchanged zero receivers");
+    errors += is_parent_label_unittest_check(labels, 2, true, "true", "two receivers after stale false");
+    errors += is_parent_label_unittest_check(labels, 1, false, "true", "one receiver after already true");
+    errors += is_parent_label_unittest_check_force(labels, 1, false, "true", "forced reload while already true");
+    errors += is_parent_label_unittest_check_force(labels, 0, true, "false", "forced reload from true to false");
+    errors += is_parent_label_unittest_check_force(labels, 2, true, "true", "forced reload from false to true");
+    errors += is_parent_label_unittest_check_refreshed_nonzero_count(labels);
+    errors += is_parent_label_unittest_check(labels, 0, true, "false", "last receiver disconnected");
+
+    rrdlabels_destroy(labels);
+
+    return errors;
 }
 
 int rrdhost_labels_unittest(void) {
@@ -357,6 +494,8 @@ int rrdhost_labels_unittest(void) {
     unsetenv("ND_TEST_RACK");
     unsetenv("ND_TEST_EMPTY");
     unsetenv("ND_TEST_NESTED");
+
+    errors += is_parent_label_unittest();
 
     fprintf(stderr, "%s: %d errors\n", __FUNCTION__, errors);
     return errors;
