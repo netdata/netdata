@@ -38,7 +38,7 @@ json_object *json_tokenise(char *js) {
 #else
 jsmntok_t *json_tokenise(char *js, size_t len, size_t *count)
 {
-    int n = json_tokens;
+    int n = __atomic_load_n(&json_tokens, __ATOMIC_RELAXED);
     if(!js || !len) {
         netdata_log_error("JSON: json string is empty.");
         return NULL;
@@ -75,7 +75,11 @@ jsmntok_t *json_tokenise(char *js, size_t len, size_t *count)
 
     if(count) *count = (size_t)ret;
 
-    if(json_tokens < n) json_tokens = n;
+    int cached = __atomic_load_n(&json_tokens, __ATOMIC_RELAXED);
+    while(cached < n && !__atomic_compare_exchange_n(
+              &json_tokens, &cached, n, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+        ;
+
     return tokens;
 }
 #endif
