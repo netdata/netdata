@@ -391,7 +391,7 @@ char *format_value_and_unit(char *value_string, size_t value_string_len,
             snprintfz(value_string, value_string_len, "%s", "now");
             return value_string;
         }
-        else if(isnan(value) || isinf(value)) {
+        else if(isless(value, 0.0) || isnan(value) || isinf(value)) {
             snprintfz(value_string, value_string_len, "%s", "undefined");
             return value_string;
         }
@@ -421,7 +421,7 @@ char *format_value_and_unit(char *value_string, size_t value_string_len,
             snprintfz(value_string, value_string_len, "%s", "now");
             return value_string;
         }
-        else if(isnan(value) || isinf(value)) {
+        else if(isless(value, 0.0) || isnan(value) || isinf(value)) {
             snprintfz(value_string, value_string_len, "%s", "undefined");
             return value_string;
         }
@@ -448,7 +448,7 @@ char *format_value_and_unit(char *value_string, size_t value_string_len,
             snprintfz(value_string, value_string_len, "%s", "now");
             return value_string;
         }
-        else if(isnan(value) || isinf(value)) {
+        else if(isless(value, 0.0) || isnan(value) || isinf(value)) {
             snprintfz(value_string, value_string_len, "%s", "undefined");
             return value_string;
         }
