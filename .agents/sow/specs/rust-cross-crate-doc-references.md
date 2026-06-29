@@ -14,11 +14,11 @@ identifier pointers went stale within hours of a crate split.
 - **Name only public identifiers.** A private item of another crate
   MUST NOT be named in docs or comments — it is plain text, no tool
   validates it, and it rots invisibly (the failure that motivated this
-  rule: `wal_otap::decode_frame` mentions surviving its privatization,
-  and "`RowIndex` in the `sfst` crate" surviving the move to
-  `sfst-indexer`). Describe the contract in natural language instead:
-  "wal-otap's shared frame decode", "the attribute-column value
-  formatting inside `wal-otap`".
+  rule: a private `decode_frame` of another crate named in docs
+  surviving its privatization, and "`RowIndex` in the `sfst` crate"
+  surviving the move to `sfst-indexer`). Describe the contract in
+  natural language instead — name the behavior ("the producer's shared
+  frame decode"), not a private cross-crate path.
 - **Public name, no dependency** (the crate cannot link — reverse
   dependency, or dev-dependency-only from `src/`): naming the public
   identifier as plain text is acceptable; include the owning crate

@@ -3,7 +3,7 @@ name = "sfst-indexer"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-description = "WAL to SFST index builder: decode frames, accumulate rows, emit the container"
+description = "SFST index builder: accumulate interned log rows and emit the container"
 
 [lints]
 workspace = true
@@ -23,7 +23,3 @@ twox-hash = { workspace = true, features = ["xxhash64"] }
 
 thiserror = { workspace = true }
 tracing = { workspace = true }
-
-[dev-dependencies]
-tempfile = { workspace = true }
-uuid = { workspace = true }

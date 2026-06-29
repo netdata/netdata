@@ -2,7 +2,8 @@
 //! rows using the existing `sfst-indexer`, then query it back. This is the
 //! feasibility brick for the augment-SFST plan: it proves the SFST builder is
 //! reusable with rows WE produce (e.g. stringified ng-flatten output), via
-//! `RowIndex`'s inherent `intern(&str)` + `row(ts, toks)`.
+//! `RowIndex`'s inherent `intern` + `row` methods (the spike passes `None` for the
+//! optional pre-computed hash).
 
 use bumpalo::Bump;
 use sfst::IndexReader;

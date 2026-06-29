@@ -41,8 +41,8 @@ pub fn one_file_config() -> wal::Config {
 /// Normalize timestamps and ids, flatten `req`, and append it as a single WAL frame
 /// in the flattened-frame format, returning the number of log records written.
 ///
-/// `req` is normalized **in place** first: [`normalize_timestamps`] resolves each
-/// record's `time_unix_nano`, and [`normalize_ids`] drops malformed trace/span ids
+/// `req` is normalized **in place** first: [`ng_flatten::normalize_timestamps`] resolves
+/// each record's `time_unix_nano`, and [`ng_flatten::normalize_ids`] drops malformed trace/span ids
 /// (logging one aggregated warning per request). The request is then flattened into a
 /// per-frame schema tree + typed entries, each entry's `xxhash64(key=value)` is
 /// pre-computed (so the downstream SFST build rides the interner's fast path), and the

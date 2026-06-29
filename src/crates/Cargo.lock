@@ -4540,12 +4540,10 @@ dependencies = [
  "otel-logs-identity",
  "roaring 0.11.2",
  "sfst",
- "tempfile",
  "thiserror 2.0.18",
  "tracing",
  "treight",
  "twox-hash",
- "uuid",
 ]
 
 [[package]]

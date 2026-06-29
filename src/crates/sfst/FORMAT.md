@@ -295,7 +295,7 @@ polymorphic path (multiple leaf kinds) collapses to one `FieldEntry`; its single
 coalesced **scalar** type (for typed/UI display) comes from
 `SchemaTree::derive_scalar_kinds` (drop `Null`; empty containers contribute no
 scalar; `Int ⊔ Double = Double`; any other scalar mix → `Str`). A producer with
-no typed tree (the legacy `wal-otap` index path) emits a flat `Str`-typed tree
+no typed tree (raw `(ts, key=value)` rows) emits a flat `Str`-typed tree
 (`SchemaTree::flat`) so every v9 file has a valid descriptor. Per-occurrence type
 is not stored anywhere — the tree records the *set* of kinds per path, not which
 kind each stored value was.

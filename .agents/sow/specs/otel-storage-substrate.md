@@ -59,7 +59,7 @@ The substrate owns the machinery that operates only on neutral types
   that drives the substrate through `Pipeline` accessors.
 - The logs query handler + engine adapter (`ledger::rpc`, `sfsq::logs`).
 - The logs **seal step**: the `Indexer` component (`otel-ledger::indexer`) is the
-  one production bridge into content code — it calls `sfst_indexer::index`. The
+  one production bridge into content code — it calls `ng_index::build_sfst_file`. The
   substrate orchestrates sealing only through the neutral
   `IndexerRequest{wal_path, sfst_path} → IndexerResponse{…, summary}` channel;
   the build impl is the content binding's.

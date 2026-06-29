@@ -416,8 +416,9 @@ pub fn build_into<W: Write + Seek>(
     // header's `content_meta`, written by the ingestor at the observation point), it
     // is used verbatim — the authoritative identity. This is correct for ng-flatten
     // files, whose rows carry `resource.attributes.service.name=…` that the row-derived
-    // `service_stream` does not recognize. The `None` arm keeps the legacy row
-    // derivation for the OTAP producer (and tests) until it is retired.
+    // `service_stream` does not recognize. The `None` arm derives identity from the rows
+    // (`service_stream`) — for producers that feed `RowIndex` directly without a WAL
+    // header (e.g. the `ng-index` spike test, whose rows carry `service.name=…`).
     let content_meta = match content_meta_override {
         Some(cm) => cm,
         None => {

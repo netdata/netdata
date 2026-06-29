@@ -1,7 +1,7 @@
 //! Unit tests for the row-scan evaluator's semantics. These exercise the
 //! evaluation core against hand-built row sets; the WAL-file end and the
 //! full equivalence against the SFST engine over identical frames are
-//! covered by the property harness in `wal_equivalence.rs`.
+//! covered by the property harness in `ng_wal_equivalence.rs`.
 
 use sfst::{FieldTier, Filter, Grid};
 
