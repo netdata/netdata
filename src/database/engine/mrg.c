@@ -135,7 +135,14 @@ METRIC *mrg_metric_add_and_acquire(MRG *mrg, MRG_ENTRY entry, bool *ret) {
 
 ALWAYS_INLINE
 METRIC *mrg_metric_get_and_acquire_by_uuid(MRG *mrg, nd_uuid_t *uuid, Word_t section) {
-    UUIDMAP_ID id = uuidmap_create(*uuid);
+    // Use read-only acquire: if the UUID is not in the map the metric cannot
+    // be in the MRG either, so skip the lookup entirely.
+    // uuidmap_create causes a create-then-immediately-delete cycle on every
+    // miss; on Windows the vendored JudyL Del functions claim success but
+    // leave stale entries, so the next lookup finds a freed uuidmap_entry
+    // and segfaults (use-after-free at uuidmap_acquire_by_uuid:106).
+    UUIDMAP_ID id = uuidmap_acquire(*uuid);
+    if (!id) return NULL;
     METRIC *metric = metric_get_and_acquire_by_id(mrg, id, section);
     uuidmap_free(id);
     return metric;

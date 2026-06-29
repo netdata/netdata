@@ -111,6 +111,13 @@ static inline UUIDMAP_ID uuidmap_acquire_by_uuid(const nd_uuid_t uuid) {
     return id;
 }
 
+// Public read-only counterpart to uuidmap_create(): returns the existing ID
+// (refcount incremented) or 0 if the UUID is not present. Never inserts.
+// Caller must call uuidmap_free() on the returned ID.
+UUIDMAP_ID uuidmap_acquire(const nd_uuid_t uuid) {
+    return uuidmap_acquire_by_uuid(uuid);
+}
+
 UUIDMAP_ID uuidmap_create(const nd_uuid_t uuid) {
     UUIDMAP_ID id = uuidmap_acquire_by_uuid(uuid);
     if(id != 0) return id;
