@@ -72,13 +72,15 @@ char url_percent_escape_decode(const char *s) {
  * @return It returns the length of the specific character.
  */
 char url_utf8_get_byte_length(char c) {
-    if(!IS_UTF8_BYTE(c))
+    uint8_t byte = (uint8_t)c;
+
+    if(!IS_UTF8_BYTE(byte))
         return 1;
 
     char length = 0;
-    while(likely(c & 0x80)) {
+    while(likely(byte & 0x80)) {
         length++;
-        c <<= 1;
+        byte <<= 1;
     }
     //4 byte is max size for UTF-8 char
     //10XX XXXX is not valid character -> check length == 1
