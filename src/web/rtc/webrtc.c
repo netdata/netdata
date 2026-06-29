@@ -532,7 +532,7 @@ static void myDescriptionCallback(int pc __maybe_unused, const char *sdp, const 
 
     internal_error(true, "WEBRTC[%d]: local description type '%s': %s", conn->pc, type, sdp);
     spinlock_lock(&conn->response.spinlock);
-    if(!conn->response.candidates) {
+    if(conn->response.wb && !conn->response.candidates) {
         buffer_json_member_add_string(conn->response.wb, "sdp", sdp);
         buffer_json_member_add_string(conn->response.wb, "type", type);
         conn->response.sdp = true;
@@ -549,13 +549,15 @@ static void myCandidateCallback(int pc __maybe_unused, const char *cand, const c
     internal_fatal(conn->pc != pc, "WEBRTC[%d]: pc mismatch, expected %d, got %d", conn->pc, conn->pc, pc);
 
     spinlock_lock(&conn->response.spinlock);
-    if(!conn->response.candidates) {
-        buffer_json_member_add_array(conn->response.wb, "candidates");
-        conn->response.candidates = true;
-    }
-
     internal_error(true, "WEBRTC[%d]: local candidate '%s', mid '%s'", conn->pc, cand, mid);
-    buffer_json_add_array_item_string(conn->response.wb, cand);
+    if(conn->response.wb) {
+        if(!conn->response.candidates) {
+            buffer_json_member_add_array(conn->response.wb, "candidates");
+            conn->response.candidates = true;
+        }
+
+        buffer_json_add_array_item_string(conn->response.wb, cand);
+    }
     spinlock_unlock(&conn->response.spinlock);
 }
 
@@ -708,14 +710,16 @@ int webrtc_new_connection(const char *sdp, BUFFER *wb) {
     if(logged)
         internal_error(true, "WEBRTC[%d]: Gathering finished, our answer is ready", conn->pc);
 
-    internal_fatal(!conn->response.sdp, "WEBRTC[%d]: response does not have an SDP: %s", conn->pc, buffer_tostring(conn->response.wb));
-    internal_fatal(!conn->response.candidates, "WEBRTC[%d]: response does not have candidates: %s", conn->pc, buffer_tostring(conn->response.wb));
-
     conn->max_message_size = MIN(conn->local_max_message_size, conn->remote_max_message_size);
     if(conn->max_message_size < WEBRTC_COMPRESSED_HEADER_SIZE)
         conn->max_message_size = WEBRTC_COMPRESSED_HEADER_SIZE;
 
+    spinlock_lock(&conn->response.spinlock);
+    internal_fatal(!conn->response.sdp, "WEBRTC[%d]: response does not have an SDP: %s", conn->pc, buffer_tostring(conn->response.wb));
+    internal_fatal(!conn->response.candidates, "WEBRTC[%d]: response does not have candidates: %s", conn->pc, buffer_tostring(conn->response.wb));
     buffer_json_finalize(wb);
+    conn->response.wb = NULL;
+    spinlock_unlock(&conn->response.spinlock);
 
     return HTTP_RESP_OK;
 }
