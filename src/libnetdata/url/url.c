@@ -310,14 +310,16 @@ url_is_request_complete_and_extract_payload(const char *begin, const char *end, 
  * @param s is the start of the user request.
  * @return
  */
-inline char *url_find_protocol(char *s) {
-    while(*s) {
+inline char *url_find_protocol(char *s, const char *end) {
+    while(s < end && *s) {
         // find the next space
-        while (*s && *s != ' ') s++;
+        while (s < end && *s && *s != ' ') s++;
+
+        if(s >= end || !*s) break;
 
         // is it SPACE + "HTTP/" ?
-        if(!*s || !strncmp(s, " HTTP/", 6)) break;
-        else s++;
+        if((size_t)(end - s) >= 6 && !strncmp(s, " HTTP/", 6)) break;
+        s++;
     }
 
     return s;
