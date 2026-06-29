@@ -486,6 +486,14 @@ static int web_server_static_file(struct web_client *w, char *filename) {
     char web_filename[FILENAME_MAX + 1];
     struct stat statbuf;
     if(!find_filename_to_serve(filename, web_filename, FILENAME_MAX, &statbuf, w, &is_dir)) {
+        // All stat() fallbacks inside find_filename_to_serve() failed. On UCRT64
+        // this is the most common way a translated POSIX path fails. Always-on
+        // log so a "dashboard empty" symptom on Windows leaves a fingerprint.
+        int lookup_errno = errno;
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "%llu: WEB: cannot find static file '%s' under web dir '%s' (errno=%d %s). "
+               "If the file exists on disk, UCRT64 may not have translated the POSIX path.",
+               w->id, filename, netdata_configured_web_dir, lookup_errno, strerror(lookup_errno));
         w->response.data->content_type = CT_TEXT_HTML;
         buffer_strcat(w->response.data, "File does not exist, or is not accessible: ");
         buffer_strcat_htmlescape(w->response.data, filename);
@@ -523,7 +531,11 @@ static int web_server_static_file(struct web_client *w, char *filename) {
             return HTTP_RESP_REDIR_TEMP;
         }
         else {
-            netdata_log_error("%llu: Cannot open file '%s'.", w->id, web_filename);
+            int open_errno = errno;
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "%llu: WEB: open() failed on web file '%s' (errno=%d %s). "
+                   "If the path looks right and the file exists, UCRT64 may not have translated the POSIX path.",
+                   w->id, web_filename, open_errno, strerror(open_errno));
             w->response.data->content_type = CT_TEXT_HTML;
             buffer_strcat(w->response.data, "Cannot open file: ");
             buffer_strcat_htmlescape(w->response.data, filename);
