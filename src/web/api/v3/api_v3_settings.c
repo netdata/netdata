@@ -195,6 +195,8 @@ static inline int settings_put(struct web_client *w, char *file) {
     settings_filename(filename, file, NULL);
 
     bool renamed = rename(tmp_filename, filename) == 0;
+    if(!renamed)
+        unlink(tmp_filename);
 
     rw_spinlock_write_unlock(&settings_spinlock);
 
