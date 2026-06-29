@@ -6,7 +6,6 @@
 
 void dbengine_retention_statistics(bool extended __maybe_unused) {
 
-    static bool init = false;
     static DBENGINE_TIER_STATS stats[RRD_STORAGE_TIERS];
 
     if (!localhost)
@@ -19,7 +18,7 @@ void dbengine_retention_statistics(bool extended __maybe_unused) {
         if (!eng || eng->seb != STORAGE_ENGINE_BACKEND_DBENGINE)
             continue;
 
-        if (init == false) {
+        if (unlikely(!stats[tier].st)) {
             char id[200];
             snprintfz(id, sizeof(id) - 1, "dbengine_retention_tier%zu", tier);
             stats[tier].st = rrdset_create_localhost(
@@ -79,6 +78,5 @@ void dbengine_retention_statistics(bool extended __maybe_unused) {
 
         rrdset_done(stats[tier].st);
     }
-    init = true;
 }
 #endif
