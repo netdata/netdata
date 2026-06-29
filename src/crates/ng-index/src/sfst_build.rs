@@ -12,7 +12,7 @@ use std::path::Path;
 use bumpalo::Bump;
 use sfst::{DroppedAttributeCounts, Flags, ObservedTimestamps, SpanIds, TraceIds};
 use sfst_indexer::KvSlot;
-use sfst_indexer::build_and_write;
+use sfst_indexer::{build_and_write, build_into};
 use sfst_indexer::row_index::RowIndex;
 use wal_otap::KvSink;
 
@@ -98,13 +98,16 @@ fn intern_entries(
         .collect()
 }
 
-/// Build an SFST index file at `out_path` from the flattened WAL in `flat_dir`.
-/// Single pass; phases timed: `read` / `deserialize` / `index` / `build`.
-pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result<SfstStats, Error> {
-    let path = sole_wal_file(flat_dir)?;
-    let mut reader = wal::Reader::open(&path)?;
-    let arena = Bump::new();
-    let mut row_index = RowIndex::new(&arena, CARDINALITY_THRESHOLD);
+/// Populate `row_index` from every frame `reader` yields: intern each entry
+/// (resource ++ scope ++ record), feed the per-row columns and the row `ts`, and
+/// accumulate then attach the global typed schema tree. Shared by the file build
+/// ([`build_sfst`]) and the in-memory range build ([`build_sfst_range`]) so both
+/// produce byte-identical chunks from the same frames — only the output sink differs.
+fn populate_row_index(
+    reader: &mut wal::Reader,
+    row_index: &mut RowIndex<'_>,
+    metrics: &Metrics,
+) -> Result<SfstStats, Error> {
     let mut stats = SfstStats::default();
     let mut kv = String::new();
     // Accumulates the global typed schema tree by interning every frame's
@@ -163,21 +166,21 @@ pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result
             // Intern resource attrs once per group and reuse across its records,
             // instead of re-probing them for every record.
             let resource_tokens =
-                intern_entries(&mut row_index, &rg.resource, &paths, &mut kv, &mut stats);
+                intern_entries(row_index, &rg.resource, &paths, &mut kv, &mut stats);
 
             tokens.clear();
             tokens.extend_from_slice(&resource_tokens);
 
             for sg in &rg.scopes {
                 let scope_tokens =
-                    intern_entries(&mut row_index, &sg.scope, &paths, &mut kv, &mut stats);
+                    intern_entries(row_index, &sg.scope, &paths, &mut kv, &mut stats);
                 tokens.extend_from_slice(&scope_tokens);
 
                 for record in &sg.records {
                     records += 1;
 
                     let record_tokens =
-                        intern_entries(&mut row_index, &record.entries, &paths, &mut kv, &mut stats);
+                        intern_entries(row_index, &record.entries, &paths, &mut kv, &mut stats);
                     tokens.truncate(resource_tokens.len() + scope_tokens.len());
                     tokens.extend_from_slice(&record_tokens);
 
@@ -215,9 +218,42 @@ pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result
     row_index.flags = Some(Flags(flags));
     row_index.dropped_attribute_counts = Some(DroppedAttributeCounts(dropped_attrs));
 
+    Ok(stats)
+}
+
+/// Build an SFST index file at `out_path` from the flattened WAL in `flat_dir`.
+/// Single pass; phases timed: `read` / `deserialize` / `index` / `build`.
+pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result<SfstStats, Error> {
+    let path = sole_wal_file(flat_dir)?;
+    let mut reader = wal::Reader::open(&path)?;
+    let arena = Bump::new();
+    let mut row_index = RowIndex::new(&arena, CARDINALITY_THRESHOLD);
+    let stats = populate_row_index(&mut reader, &mut row_index, metrics)?;
     let _t = metrics.scope("build");
     build_and_write(&row_index, out_path)?;
     Ok(stats)
+}
+
+/// Build an **in-memory** SFST over a frame-aligned `range` of an active flattened
+/// WAL, returning its [`sfst::Summary`] plus the serialized bytes (openable with
+/// [`sfst::IndexReader::open`]). The in-memory counterpart of [`build_sfst`] — the
+/// on-query chunk build over an active WAL's durable-unindexed prefix. Reads only the
+/// frames in `range` via [`wal::Reader::open_range`] (see [`wal::FrameRange`] for the
+/// frame-boundary / durable-prefix soundness checks); the typed tree + per-row columns
+/// are identical to the file build, so the chunks are byte-identical to a file build
+/// over the same frames. The caller cross-checks `summary.record_count` against the
+/// expected count to detect a truncated prefix (the check `open_range` defers).
+pub fn build_sfst_range(
+    wal_path: &Path,
+    range: wal::FrameRange,
+) -> Result<(sfst::Summary, Vec<u8>), Error> {
+    let mut reader = wal::Reader::open_range(wal_path, range)?;
+    let arena = Bump::new();
+    let mut row_index = RowIndex::new(&arena, CARDINALITY_THRESHOLD);
+    populate_row_index(&mut reader, &mut row_index, &Metrics::new())?;
+    let cursor = std::io::Cursor::new(Vec::new());
+    let (cursor, summary, _metadata) = build_into(&row_index, cursor)?;
+    Ok((summary, cursor.into_inner()))
 }
 
 #[cfg(test)]

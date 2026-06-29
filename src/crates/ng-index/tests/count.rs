@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use file_registry::TimestampNs;
 use ng_flatten::{encode_frame, fill_hashes, flatten_request};
-use ng_index::{Metrics, build_sfst};
+use ng_index::{Metrics, build_sfst, build_sfst_range};
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value::Value as Av};
 use opentelemetry_proto::tonic::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
@@ -264,4 +264,93 @@ fn missing_flattened_wal_is_an_error() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("missing.sfst");
     assert!(build_sfst(dir.path(), &out, &Metrics::new()).is_err());
+}
+
+/// Write `num_frames` flattened frames (each `request_typed`, 4 records) to a
+/// fresh WAL dir; returns the dir (kept alive) and the `.wal` path.
+fn write_multiframe_flat_wal(num_frames: usize) -> (tempfile::TempDir, std::path::PathBuf) {
+    let flat = tempfile::tempdir().unwrap();
+    let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
+    let mut writer = wal::Writer::new(flat.path(), wal::Config::default(), seq, 0).unwrap();
+    for i in 0..num_frames {
+        let mut flattened = flatten_request(&request_typed());
+        fill_hashes(&mut flattened);
+        let bytes = encode_frame(&flattened).unwrap();
+        writer
+            .write_frame(
+                0,
+                &[],
+                &bytes,
+                4,
+                TimestampNs((i + 1) as u64),
+                TimestampNs::ZERO,
+                TimestampNs::ZERO,
+            )
+            .unwrap();
+    }
+    writer.shutdown_all().unwrap();
+    let wal_path = std::fs::read_dir(flat.path())
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .find(|p| p.extension().is_some_and(|x| x == "wal"))
+        .unwrap();
+    (flat, wal_path)
+}
+
+/// The in-memory whole-file range build (`build_sfst_range`) is byte-identical to
+/// the on-disk file build (`build_sfst`) over the same frames — same typed tree +
+/// columns, deterministic, only the sink differs. This is the on-query/seal-time
+/// contract parity the migration's index-feed swap depends on.
+#[test]
+fn build_sfst_range_whole_file_matches_file_build() {
+    let (dir, wal_path) = write_multiframe_flat_wal(3);
+    let file_len = std::fs::metadata(&wal_path).unwrap().len();
+
+    let (mem_summary, mem_bytes) =
+        build_sfst_range(&wal_path, wal::FrameRange::new(wal::HEADER_SIZE as u64, file_len))
+            .unwrap();
+
+    let out = dir.path().join("file.sfst");
+    build_sfst(dir.path(), &out, &Metrics::new()).unwrap();
+    let file_bytes = std::fs::read(&out).unwrap();
+
+    assert_eq!(mem_summary.record_count, 12, "3 frames x 4 records");
+    assert_eq!(
+        mem_bytes, file_bytes,
+        "in-memory range build differs from the file build"
+    );
+    let reader = IndexReader::open(&mem_bytes).unwrap();
+    assert_eq!(reader.total_logs(), 12);
+}
+
+/// A frame-aligned split partitions the records exactly: the two chunk builds'
+/// record counts sum to the whole. Exercises `build_sfst_range` over interior
+/// frame ranges (the on-query active-WAL chunk case).
+#[test]
+fn build_sfst_range_split_partitions_records() {
+    let (_dir, wal_path) = write_multiframe_flat_wal(4);
+    let file_len = std::fs::metadata(&wal_path).unwrap().len();
+
+    let frames = wal::scan_frame_boundaries(
+        &wal_path,
+        wal::FrameRange::new(wal::HEADER_SIZE as u64, file_len),
+    )
+    .unwrap();
+    assert!(frames.len() >= 2, "need multiple frames to split");
+    let split = frames[frames.len() / 2 - 1].end_offset;
+
+    let (a, _) =
+        build_sfst_range(&wal_path, wal::FrameRange::new(wal::HEADER_SIZE as u64, split)).unwrap();
+    let (b, _) = build_sfst_range(&wal_path, wal::FrameRange::new(split, file_len)).unwrap();
+    let (whole, _) =
+        build_sfst_range(&wal_path, wal::FrameRange::new(wal::HEADER_SIZE as u64, file_len))
+            .unwrap();
+
+    assert_eq!(
+        a.record_count + b.record_count,
+        whole.record_count,
+        "split chunks must partition the records exactly"
+    );
+    assert_eq!(whole.record_count, 16, "4 frames x 4 records");
 }

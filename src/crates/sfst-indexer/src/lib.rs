@@ -29,10 +29,9 @@ pub mod kv_interner;
 pub mod row_index;
 
 pub use error::IndexError;
-pub use fst_builder::build_and_write;
+pub use fst_builder::{build_and_write, build_into};
 pub use kv_interner::KvSlot;
 
-use fst_builder::build_into;
 
 use std::path::Path;
 

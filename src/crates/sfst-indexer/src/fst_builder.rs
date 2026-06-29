@@ -343,10 +343,12 @@ pub fn build_and_write(
 /// enforces. Peak memory beyond the `RowIndex` itself is a single
 /// packed chunk, not the whole compressed file.
 ///
-/// Shared by [`build_and_write`] (sink = the temp file) and the
-/// in-memory range index ([`index_range`](super::index_range),
-/// sink = a `Cursor<Vec<u8>>`).
-pub(super) fn build_into<W: Write + Seek>(
+/// Shared by [`build_and_write`] (sink = the temp file) and the in-memory
+/// range index ([`index_range`](super::index_range), sink = a
+/// `Cursor<Vec<u8>>`). Public so an alternate producer (`ng-index`'s
+/// flattened-frame builder) can stream an in-memory SFST through the same
+/// machinery rather than re-implementing it.
+pub fn build_into<W: Write + Seek>(
     row_index: &RowIndex,
     sink: W,
 ) -> Result<(W, sfst::Summary, Metadata), IndexError> {
