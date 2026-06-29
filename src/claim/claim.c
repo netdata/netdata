@@ -126,11 +126,11 @@ bool claim_id_matches_any(const char *claim_id) {
     if(!UUIDiszero(having) && UUIDeq(having, this_one))
         return true;
 
-    having = localhost->aclk.claim_id_of_parent;
+    having = rrdhost_claim_id_of_parent_get(localhost);
     if(!UUIDiszero(having) && UUIDeq(having, this_one))
         return true;
 
-    having = localhost->aclk.claim_id_of_origin;
+    having = rrdhost_claim_id_of_origin_get(localhost);
     if(!UUIDiszero(having) && UUIDeq(having, this_one))
         return true;
 
