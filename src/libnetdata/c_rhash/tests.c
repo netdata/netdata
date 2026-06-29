@@ -52,7 +52,9 @@ int test_str_uint8() {
 
     TEST_START();
     // function should fail on empty hash
+    val = 123;
     ASSERT_RETVAL(c_rhash_get_uint8_by_str, !=, 0, hash, KEY_1, &val);
+    ASSERT_VAL_UINT8(0, val);
 
     ASSERT_RETVAL(c_rhash_insert_str_uint8, ==, 0, hash, KEY_1, 5);
     ASSERT_RETVAL(c_rhash_get_uint8_by_str, ==, 0, hash, KEY_1, &val);
@@ -63,7 +65,9 @@ int test_str_uint8() {
     ASSERT_VAL_UINT8(5, val);
     ASSERT_RETVAL(c_rhash_get_uint8_by_str, ==, 0, hash, KEY_2, &val);
     ASSERT_VAL_UINT8(8, val);
+    val = 123;
     ASSERT_RETVAL(c_rhash_get_uint8_by_str, !=, 0, hash, "sndnskjdf", &val);
+    ASSERT_VAL_UINT8(0, val);
 
     // test update of key
     ASSERT_RETVAL(c_rhash_insert_str_uint8, ==, 0, hash, KEY_1, 100);
