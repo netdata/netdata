@@ -65,11 +65,7 @@ FUNCTION int j__udyCreateBranchL(
 
 //	Copy from the Linear branch from splayed leaves
 	JU_COPYMEM(Pjbl->jbl_Expanse, Exp,  ExpCnt);
-#ifdef OS_WINDOWS
-	JU_COPYMEM(Pjbl->jbl_jp,      PJPs, ExpCnt * (sizeof(jp_t) / sizeof(Word_t)));
-#else
 	JU_COPYMEM(Pjbl->jbl_jp,      PJPs, ExpCnt);
-#endif
 
 //	Pass back new pointer to the Linear branch in JP
 	Pjp->jp_Addr = (Word_t) PjblRaw;
@@ -176,11 +172,7 @@ FUNCTION int j__udyCreateBranchB(
 
 // Copy the JPs to new leaf:
 
-#ifdef OS_WINDOWS
-			JU_COPYMEM(Pjp, PJPs + jj, NumJP * (sizeof(jp_t) / sizeof(Word_t)));
-#else
 			JU_COPYMEM(Pjp, PJPs + jj, NumJP);
-#endif
 
 // On to the next bitmap branch "sub" expanse:
 
@@ -266,11 +258,7 @@ FUNCTION int j__udyCreateBranchU(
 		if (BitMap == cJU_FULLBITMAPB)
 		{
 //			Copy subexpanse to the Uncompressed branch intact
-#ifdef OS_WINDOWS
-			JU_COPYMEM(PDstJP, PjpA, cJU_BITSPERSUBEXPB * (sizeof(jp_t) / sizeof(Word_t)));
-#else
 			JU_COPYMEM(PDstJP, PjpA, cJU_BITSPERSUBEXPB);
-#endif
 
 //			Bump to next subexpanse
 			PDstJP += cJU_BITSPERSUBEXPB;

@@ -287,13 +287,7 @@ static int j__udyStageJBBtoJBB(
 // advance to the next subexpanse:
 
 	    JU_JBB_PJP(Pjbb, subexp) = PjpRaw;
-#ifdef OS_WINDOWS
-	    // On Windows, long == 4 bytes but jp_t == 16 bytes (2 Words); JU_COPYMEM
-	    // counts Word_t units, so multiply by jp_t/Word_t to copy all fields.
-	    JU_COPYMEM(Pjp, PjpArray, NumJP * (sizeof(jp_t) / sizeof(Word_t)));
-#else
 	    JU_COPYMEM(Pjp, PjpArray, NumJP);
-#endif
 	    PjpArray += NumJP;
 
 	} // for each subexpanse.
