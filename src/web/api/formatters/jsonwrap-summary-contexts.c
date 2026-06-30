@@ -29,9 +29,7 @@ size_t query_target_summary_contexts_v2(BUFFER *wb, QUERY_TARGET *qt, const char
         z->metrics.queried += qc->metrics.queried;
         z->metrics.failed += qc->metrics.failed;
 
-        z->alerts.clear += qc->alerts.clear;
-        z->alerts.warning += qc->alerts.warning;
-        z->alerts.critical += qc->alerts.critical;
+        aggregate_alerts_counts(&z->alerts, &qc->alerts);
 
         storage_point_merge_to(z->query_points, qc->query_points);
     }
