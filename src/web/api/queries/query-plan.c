@@ -481,29 +481,27 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
 }
 
 
-static __thread QUERY_ENGINE_OPS *released_ops = NULL;
-
-void rrd2rrdr_query_ops_freeall(RRDR *r __maybe_unused) {
-    while(released_ops) {
-        QUERY_ENGINE_OPS *ops = released_ops;
-        released_ops = ops->next;
+void rrd2rrdr_query_ops_freeall(RRDR *r, QUERY_ENGINE_OPS_CACHE *cache) {
+    while(cache->released_ops) {
+        QUERY_ENGINE_OPS *ops = cache->released_ops;
+        cache->released_ops = ops->next;
 
         onewayalloc_freez(r->internal.owa, ops);
     }
 }
 
-void rrd2rrdr_query_ops_release(QUERY_ENGINE_OPS *ops) {
+void rrd2rrdr_query_ops_release(QUERY_ENGINE_OPS_CACHE *cache, QUERY_ENGINE_OPS *ops) {
     if(!ops) return;
 
-    ops->next = released_ops;
-    released_ops = ops;
+    ops->next = cache->released_ops;
+    cache->released_ops = ops;
 }
 
-static QUERY_ENGINE_OPS *rrd2rrdr_query_ops_get(RRDR *r) {
+static QUERY_ENGINE_OPS *rrd2rrdr_query_ops_get(RRDR *r, QUERY_ENGINE_OPS_CACHE *cache) {
     QUERY_ENGINE_OPS *ops;
-    if(released_ops) {
-        ops = released_ops;
-        released_ops = ops->next;
+    if(cache->released_ops) {
+        ops = cache->released_ops;
+        cache->released_ops = ops->next;
     }
     else {
         ops = onewayalloc_mallocz(r->internal.owa, sizeof(QUERY_ENGINE_OPS));
@@ -513,10 +511,10 @@ static QUERY_ENGINE_OPS *rrd2rrdr_query_ops_get(RRDR *r) {
     return ops;
 }
 
-QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, size_t query_metric_id) {
+QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, QUERY_ENGINE_OPS_CACHE *cache, size_t query_metric_id) {
     QUERY_TARGET *qt = r->internal.qt;
 
-    QUERY_ENGINE_OPS *ops = rrd2rrdr_query_ops_get(r);
+    QUERY_ENGINE_OPS *ops = rrd2rrdr_query_ops_get(r, cache);
     *ops = (QUERY_ENGINE_OPS) {
         .r = r,
         .qm = query_metric(qt, query_metric_id),
@@ -527,7 +525,7 @@ QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, size_t query_metric_id) {
     };
 
     if(!query_plan(ops, qt->window.after, qt->window.before, qt->window.points)) {
-        rrd2rrdr_query_ops_release(ops);
+        rrd2rrdr_query_ops_release(cache, ops);
         return NULL;
     }
 
@@ -672,6 +670,48 @@ static int query_plan_unittest_expect_activation(
             "FAILED query plan activation: %s, expected %s, got %s\n",
             name, expected ? "success" : "failure", got ? "success" : "failure");
 
+    return 1;
+}
+
+static int query_plan_unittest_expect_ops_cache_is_local(void) {
+    ONEWAYALLOC *owa_a = onewayalloc_create(1024);
+    ONEWAYALLOC *owa_b = onewayalloc_create(1024);
+
+    RRDR r_a = {
+        .internal.owa = owa_a,
+    };
+    RRDR r_b = {
+        .internal.owa = owa_b,
+    };
+
+    QUERY_ENGINE_OPS_CACHE cache_a = { 0 };
+    QUERY_ENGINE_OPS_CACHE cache_b = { 0 };
+
+    QUERY_ENGINE_OPS *a = rrd2rrdr_query_ops_get(&r_a, &cache_a);
+    rrd2rrdr_query_ops_release(&cache_a, a);
+
+    QUERY_ENGINE_OPS *a_reused = rrd2rrdr_query_ops_get(&r_a, &cache_a);
+    bool same_cache_reused = (a_reused == a);
+    rrd2rrdr_query_ops_release(&cache_a, a_reused);
+
+    QUERY_ENGINE_OPS *b = rrd2rrdr_query_ops_get(&r_b, &cache_b);
+    bool separate_cache_isolated = (b != a);
+    rrd2rrdr_query_ops_release(&cache_b, b);
+
+    rrd2rrdr_query_ops_freeall(&r_a, &cache_a);
+    rrd2rrdr_query_ops_freeall(&r_b, &cache_b);
+    onewayalloc_destroy(owa_a);
+    onewayalloc_destroy(owa_b);
+
+    if(same_cache_reused && separate_cache_isolated) {
+        fprintf(stderr, "OK query ops cache locality\n");
+        return 0;
+    }
+
+    fprintf(stderr,
+            "FAILED query ops cache locality: same_cache_reused=%s, separate_cache_isolated=%s\n",
+            same_cache_reused ? "true" : "false",
+            separate_cache_isolated ? "true" : "false");
     return 1;
 }
 
@@ -935,6 +975,8 @@ int query_plan_unittest(void) {
 
         errors += query_plan_unittest_expect_update_every(&qt, 1, 300);
     }
+
+    errors += query_plan_unittest_expect_ops_cache_is_local();
 
     nd_profile.storage_tiers = old_storage_tiers;
     nd_profile.update_every = old_update_every;
