@@ -3,6 +3,12 @@
 #include "dyncfg-internals.h"
 #include "dyncfg.h"
 
+// Upper bound for a dyncfg payload loaded from disk. Payloads are configuration
+// documents (normally a few KB); anything beyond this is treated as a corrupt or
+// oversized file. Mirrors MAX_SETTINGS_SIZE_BYTES used for settings payloads, so
+// a bad file cannot force an unbounded heap allocation (mallocz fatals on OOM).
+#define DYNCFG_MAX_PAYLOAD_SIZE (20 * 1024 * 1024)
+
 void dyncfg_file_delete(const char *id) {
     CLEAN_CHAR_P *escaped_id = dyncfg_escape_id_for_filename(id);
     char filename[FILENAME_MAX];
@@ -174,6 +180,15 @@ void dyncfg_file_load(const char *d_name) {
         }
 
         actual_size = (size_t)(total_size - saved_position); // Calculate remaining content size
+
+        if (actual_size > DYNCFG_MAX_PAYLOAD_SIZE) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "DYNCFG: payload size %zu exceeds the maximum allowed %d for file '%s'. Ignoring it.",
+                   actual_size, DYNCFG_MAX_PAYLOAD_SIZE, filename);
+            fclose(fp);
+            dyncfg_cleanup(&tmp);
+            return;
+        }
 
         // Use actual_size instead of content_length to handle the whole remaining file
         tmp.dyncfg.payload = buffer_create(actual_size, NULL);
