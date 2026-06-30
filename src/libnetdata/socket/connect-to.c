@@ -429,7 +429,7 @@ static bool connect_to_one_of_callback(char *entry, void *data) {
     t->sock = connect_to_this(entry, t->default_port, t->timeout);
     if(t->sock != -1) {
         if(t->connected_to && t->connected_to_size) {
-            strncpyz(t->connected_to, entry, t->connected_to_size);
+            strncpyz(t->connected_to, entry, t->connected_to_size - 1);
             t->connected_to[t->connected_to_size - 1] = '\0';
         }
 
