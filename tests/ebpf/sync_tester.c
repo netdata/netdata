@@ -63,7 +63,8 @@ void test_msync(char *output, char *text, size_t length)
         return;
     }
 
-    (void) strcpy( (char*) address, text);
+    (void) strncpy( (char*) address, text, pagesize - 1);
+    ((char*) address)[pagesize - 1] = '\0';
 
     if ( msync( address, pagesize, MS_SYNC) < 0 ) {
         perror("msync failed with error:");
