@@ -247,6 +247,99 @@ fn plugin_enabled_defaults_to_true() {
 }
 
 #[test]
+fn listener_defaults_include_netflow_and_sflow_ports() {
+    let expected = vec!["0.0.0.0:2055".to_string(), "0.0.0.0:6343".to_string()];
+
+    assert_eq!(PluginConfig::default().listener.listen, expected);
+    assert_eq!(
+        PluginConfig::try_parse_from(["netflow-plugin"])
+            .expect("default CLI config should parse")
+            .listener
+            .listen,
+        expected
+    );
+}
+
+#[test]
+fn listener_yaml_accepts_scalar_and_list_forms() {
+    let scalar: ListenerConfig = serde_yaml::from_str(
+        r#"
+listen: "127.0.0.1:2055"
+max_packet_size: 9216
+sync_every_entries: 0
+sync_interval: 1s
+"#,
+    )
+    .expect("scalar listener config should parse");
+    assert_eq!(scalar.listen, vec!["127.0.0.1:2055".to_string()]);
+
+    let list: ListenerConfig = serde_yaml::from_str(
+        r#"
+listen:
+  - "127.0.0.1:2055"
+  - "127.0.0.1:6343"
+max_packet_size: 9216
+sync_every_entries: 0
+sync_interval: 1s
+"#,
+    )
+    .expect("list listener config should parse");
+    assert_eq!(
+        list.listen,
+        vec!["127.0.0.1:2055".to_string(), "127.0.0.1:6343".to_string()]
+    );
+}
+
+#[test]
+fn listener_cli_accepts_repeated_listen_flags() {
+    let cfg = PluginConfig::try_parse_from([
+        "netflow-plugin",
+        "--netflow-listen",
+        "127.0.0.1:2055",
+        "--netflow-listen",
+        "127.0.0.1:6343",
+    ])
+    .expect("repeatable listener CLI should parse");
+
+    assert_eq!(
+        cfg.listener.listen,
+        vec!["127.0.0.1:2055".to_string(), "127.0.0.1:6343".to_string()]
+    );
+    cfg.validate()
+        .expect("repeatable listener CLI should validate");
+}
+
+#[test]
+fn validate_rejects_empty_duplicate_and_invalid_listeners() {
+    let mut empty = PluginConfig::default();
+    empty.listener.listen.clear();
+    let err = empty
+        .validate()
+        .expect_err("empty listener list should fail");
+    assert!(
+        err.to_string()
+            .contains("listener.listen must contain at least one address")
+    );
+
+    let mut duplicate = PluginConfig::default();
+    duplicate.listener.listen = vec!["127.0.0.1:2055".to_string(), "127.0.0.1:2055".to_string()];
+    let err = duplicate
+        .validate()
+        .expect_err("duplicate listener address should fail");
+    assert!(
+        err.to_string()
+            .contains("listener.listen contains duplicate address")
+    );
+
+    let mut invalid = PluginConfig::default();
+    invalid.listener.listen = vec!["not-a-socket".to_string()];
+    let err = invalid
+        .validate()
+        .expect_err("invalid listener address should fail");
+    assert!(err.to_string().contains("invalid listener address"));
+}
+
+#[test]
 fn memory_diagnostics_default_to_disabled_with_bounded_interval() {
     let cfg = PluginConfig::default();
 

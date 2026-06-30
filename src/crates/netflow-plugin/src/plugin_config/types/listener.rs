@@ -3,8 +3,14 @@ use super::*;
 #[derive(Debug, Parser, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ListenerConfig {
-    #[arg(long = "netflow-listen", default_value = "0.0.0.0:2055")]
-    pub(crate) listen: String,
+    #[arg(
+        long = "netflow-listen",
+        value_name = "ADDR",
+        default_values_t = default_netflow_listen()
+    )]
+    #[serde(default = "default_netflow_listen")]
+    #[serde(deserialize_with = "deserialize_listen")]
+    pub(crate) listen: Vec<String>,
 
     #[arg(long = "netflow-max-packet-size", default_value_t = 9216)]
     pub(crate) max_packet_size: usize,
@@ -30,10 +36,27 @@ pub(crate) struct ListenerConfig {
 impl Default for ListenerConfig {
     fn default() -> Self {
         Self {
-            listen: "0.0.0.0:2055".to_string(),
+            listen: default_netflow_listen(),
             max_packet_size: 9216,
             sync_every_entries: 0,
             sync_interval: Duration::from_secs(1),
         }
+    }
+}
+
+fn deserialize_listen<'de, D>(deserializer: D) -> std::result::Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum ListenValue {
+        Scalar(String),
+        List(Vec<String>),
+    }
+
+    match ListenValue::deserialize(deserializer)? {
+        ListenValue::Scalar(value) => Ok(vec![value]),
+        ListenValue::List(values) => Ok(values),
     }
 }

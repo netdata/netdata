@@ -14,8 +14,10 @@
 enabled: true
 
 listener:
-  # UDP socket for NetFlow/IPFIX/sFlow exporters.
-  listen: "0.0.0.0:2055"
+  # UDP sockets for NetFlow/IPFIX and sFlow exporters.
+  listen:
+    - "0.0.0.0:2055"
+    - "0.0.0.0:6343"
   max_packet_size: 9216
   # Periodic fsync of the active raw journal. 0 (default) disables it: data
   # reaches disk via kernel writeback, and every journal file is fully synced

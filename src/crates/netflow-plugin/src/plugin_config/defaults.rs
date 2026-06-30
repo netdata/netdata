@@ -39,6 +39,10 @@ pub(super) fn default_true() -> bool {
     true
 }
 
+pub(super) fn default_netflow_listen() -> Vec<String> {
+    vec!["0.0.0.0:2055".to_string(), "0.0.0.0:6343".to_string()]
+}
+
 pub(super) fn default_dynamic_bmp_listen() -> String {
     "0.0.0.0:10179".to_string()
 }
