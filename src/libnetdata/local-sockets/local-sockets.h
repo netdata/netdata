@@ -912,17 +912,26 @@ static inline int local_sockets_libmnl_cb_data(const struct nlmsghdr *nlh, void 
         switch (attr->rta_type) {
             case INET_DIAG_INFO: {
                 if(ls->tmp_protocol == IPPROTO_TCP) {
-                    struct tcp_info *info = (struct tcp_info *)RTA_DATA(attr);
-                    n.info.tcp = *info;
-                    ls->stats.tcp_info_received++;
+                    int payload = RTA_PAYLOAD(attr);
+                    if(payload > 0) {
+                        size_t copy_len = (size_t)payload;
+                        if(copy_len > sizeof(n.info.tcp))
+                            copy_len = sizeof(n.info.tcp);
+
+                        memcpy(&n.info.tcp, RTA_DATA(attr), copy_len);
+                        ls->stats.tcp_info_received++;
+                    }
                 }
             }
             break;
 
             case INET_DIAG_SKV6ONLY: {
-                n.ipv6ony.checked = true;
-                int ipv6only = *(int *)RTA_DATA(attr);
-                n.ipv6ony.ipv46 = !ipv6only;
+                if(RTA_PAYLOAD(attr) >= (int)sizeof(uint8_t)) {
+                    uint8_t ipv6only;
+                    memcpy(&ipv6only, RTA_DATA(attr), sizeof(ipv6only));
+                    n.ipv6ony.checked = true;
+                    n.ipv6ony.ipv46 = !ipv6only;
+                }
             }
             break;
 
