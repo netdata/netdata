@@ -84,7 +84,7 @@ This one breaks RSS down by what's mapped. Useful when you want to attribute "th
 These charts do not include:
 
 - **Per-exporter ingest counter.** No per-source rate dimension. Decoder-scope cardinality tells you how many sources, not how busy each one is.
-- **UDP socket drops.** Kernel-level drops (full receive buffer, NIC drops) are not surfaced. Use OS-level signals: `sudo ss -uamn sport = :2055` for per-socket drops, or `grep ^Udp: /proc/net/snmp` for the system-wide `RcvbufErrors` counter.
+- **UDP socket drops.** Kernel-level drops (full receive buffer, NIC drops) are not surfaced. Use OS-level signals such as `sudo ss -uamn sport = :2055` and `sudo ss -uamn sport = :6343` for per-socket drops, or `grep ^Udp: /proc/net/snmp` for the system-wide `RcvbufErrors` counter.
 - **Template cache hit ratio.** `template_errors` counts misses; there's no corresponding "hits" counter to form a ratio.
 - **GeoIP staleness signal.** No "MMDB last loaded" timestamp or version. The mapping memory dimensions tell you if a database is loaded, not how old it is.
 - **Per-tier query latency.** These charts cover ingest and storage; query-side performance isn't observable.

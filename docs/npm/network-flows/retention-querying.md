@@ -98,7 +98,7 @@ If you see the time depth in your dashboard suddenly shrink after you applied a 
 
 ## Default retention and the most common misconfiguration
 
-Each tier has its own `size_of_journal_files` and `duration_of_journal_files`. The built-in defaults are uniform — `10GB` and `7d` on every tier. That is rarely what you want; the whole point of having rollup tiers is to keep them around longer than raw.
+Each tier has its own `size_of_journal_files` and `duration_of_journal_files`. The built-in defaults are uniform: `10GB` on every tier with no time-based age limit. That is safe for first validation because disk is still capped, but production deployments should usually set tier-specific size and duration budgets; the whole point of having rollup tiers is to keep them around longer than raw.
 
 A more useful production profile:
 

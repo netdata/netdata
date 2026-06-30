@@ -44,7 +44,7 @@ The SNMP-derived bandwidth: from your SNMP monitoring (Netdata's `snmp.d`, your 
 
 **Not acceptable: more than 30% gap.** That indicates one of:
 
-- UDP drops at the kernel. Check the alert mentioned above, or run `sudo ss -uamn sport = :2055` and inspect the `d<N>` value inside the `skmem:(...)` line (the `sock_drop` counter increments on every dropped datagram). The `-n` flag keeps the port numeric in the output.
+- UDP drops at the kernel. Check the alert mentioned above, or run `sudo ss -uamn sport = :2055` / `sudo ss -uamn sport = :6343` and inspect the `d<N>` value inside the `skmem:(...)` line (the `sock_drop` counter increments on every dropped datagram). The `-n` flag keeps the port numeric in the output.
 - Sampling rate not honoured (the exporter is sampling but not communicating the rate). See "Sampling rate verification" below.
 - Wrong interfaces being exported.
 

@@ -131,6 +131,115 @@ async fn e2e_ingest_persists_enriched_fields_and_query_reads_them() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_sflow_fixture_persists_expected_raw_journal_fields_and_query_reads_them() {
+    let (cfg, metrics, _open_tiers, _tier_flow_indexes, _tmp) =
+        ingest_fixture("data-1140.pcap").await;
+
+    assert!(
+        metrics.sflow_datagrams.load(Ordering::Relaxed) > 0,
+        "expected data-1140.pcap to decode as sFlow"
+    );
+
+    let rows = raw_journal_rows(&cfg.journal.raw_tier_dir());
+    let sflow_rows = rows
+        .iter()
+        .filter(|row| row.get("FLOW_VERSION").map(String::as_str) == Some("sflow"))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        sflow_rows.len(),
+        5,
+        "expected one persisted raw journal row per decoded sFlow sample"
+    );
+
+    let primary = find_raw_row(
+        &sflow_rows,
+        &[
+            ("SRC_ADDR", "2a0c:8880:2:0:185:21:130:38"),
+            ("DST_ADDR", "2a0c:8880:2:0:185:21:130:39"),
+            ("SRC_PORT", "46026"),
+            ("DST_PORT", "22"),
+        ],
+    );
+    assert_raw_fields(
+        primary,
+        &[
+            ("FLOW_VERSION", "sflow"),
+            ("EXPORTER_IP", "172.16.0.3"),
+            ("SAMPLING_RATE", "1024"),
+            ("IN_IF", "27"),
+            ("OUT_IF", "28"),
+            ("SRC_VLAN", "100"),
+            ("DST_VLAN", "100"),
+            ("PROTOCOL", "6"),
+            ("BYTES", "1536000"),
+            ("PACKETS", "1024"),
+            ("RAW_BYTES", "1500"),
+            ("RAW_PACKETS", "1"),
+        ],
+    );
+
+    let routed = find_raw_row(
+        &sflow_rows,
+        &[
+            ("SRC_ADDR", "45.90.161.148"),
+            ("DST_ADDR", "191.87.91.27"),
+            ("SRC_PORT", "55658"),
+            ("DST_PORT", "5555"),
+        ],
+    );
+    assert_raw_fields(
+        routed,
+        &[
+            ("FLOW_VERSION", "sflow"),
+            ("SAMPLING_RATE", "1024"),
+            ("NEXT_HOP", "31.14.69.110"),
+            ("SRC_AS", "39421"),
+            ("DST_AS", "26615"),
+            ("DST_AS_PATH", "203698,6762,26615"),
+            ("BYTES", "40960"),
+            ("PACKETS", "1024"),
+            ("RAW_BYTES", "40"),
+            ("RAW_PACKETS", "1"),
+        ],
+    );
+
+    let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
+        .await
+        .expect("create query service");
+    let before = Utc::now().timestamp().max(1).saturating_add(3600);
+    let output = query_service
+        .query_flows(&query::FlowsRequest {
+            view: query::ViewMode::TableSankey,
+            after: Some(1),
+            before: Some(before),
+            selections: HashMap::from([("FLOW_VERSION".to_string(), vec!["sflow".to_string()])]),
+            group_by: vec![
+                "SRC_ADDR".to_string(),
+                "DST_ADDR".to_string(),
+                "PROTOCOL".to_string(),
+            ],
+            top_n: query::TopN::N100,
+            ..Default::default()
+        })
+        .await
+        .expect("query selected sFlow rows");
+
+    assert_eq!(
+        output.stats.get("query_matched_entries").copied(),
+        Some(5),
+        "expected query to match every persisted sFlow raw row"
+    );
+    assert!(
+        !output.flows.is_empty(),
+        "expected selected FLOW_VERSION=sflow query to return rows"
+    );
+    assert!(
+        output.metrics.get("bytes").copied().unwrap_or(0) > 0,
+        "expected selected FLOW_VERSION=sflow query to aggregate bytes"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn e2e_timestamp_source_first_switched_is_persisted_as_source_timestamp() {
     let (cfg, _metrics, open_tiers, _tier_flow_indexes, _tmp) =
         ingest_fixture_with_timestamp_source(
@@ -386,10 +495,12 @@ async fn e2e_rebuild_tolerates_torn_tier_and_raw_tails() {
 async fn e2e_ingest_bind_failure_does_not_start_tier_workers() {
     let (mut cfg, _tmp) = offline_journal_cfg();
     let occupied = StdUdpSocket::bind("127.0.0.1:0").expect("bind occupied test socket");
-    cfg.listener.listen = occupied
-        .local_addr()
-        .expect("read occupied socket address")
-        .to_string();
+    cfg.listener.listen = vec![
+        occupied
+            .local_addr()
+            .expect("read occupied socket address")
+            .to_string(),
+    ];
 
     let metrics = Arc::new(ingest::IngestMetrics::default());
     let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
@@ -403,7 +514,7 @@ async fn e2e_ingest_bind_failure_does_not_start_tier_workers() {
     .expect("create ingest service");
 
     let err = service
-        .bind_listener_and_start_workers_for_test()
+        .bind_listeners_and_start_workers_for_test()
         .await
         .expect_err("occupied UDP address must fail bind");
     assert!(
@@ -413,6 +524,95 @@ async fn e2e_ingest_bind_failure_does_not_start_tier_workers() {
     assert!(
         !service.tier_commit_workers_started_for_test(),
         "tier workers must not start when listener bind fails"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_ingest_partial_bind_failure_does_not_start_tier_workers() {
+    let (mut cfg, _tmp) = offline_journal_cfg();
+    let free = "127.0.0.1:0".to_string();
+    let occupied = StdUdpSocket::bind("127.0.0.1:0").expect("bind occupied test socket");
+    let occupied_addr = occupied
+        .local_addr()
+        .expect("read occupied socket address")
+        .to_string();
+    cfg.listener.listen = vec![free, occupied_addr.clone()];
+
+    let metrics = Arc::new(ingest::IngestMetrics::default());
+    let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
+    let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
+    let mut service = ingest::IngestService::new(
+        cfg,
+        Arc::clone(&metrics),
+        Arc::clone(&open_tiers),
+        Arc::clone(&tier_flow_indexes),
+    )
+    .expect("create ingest service");
+
+    let err = service
+        .bind_listeners_and_start_workers_for_test()
+        .await
+        .expect_err("occupied UDP address must fail bind");
+    assert!(
+        err.to_string()
+            .contains(&format!("failed to bind {occupied_addr}")),
+        "bind error should identify the failed listener: {err:#}"
+    );
+    assert!(
+        !service.tier_commit_workers_started_for_test(),
+        "tier workers must not start when any listener bind fails"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_ingest_receives_from_multiple_listeners() {
+    let tmp = tempfile::tempdir().expect("create temp dir");
+    let listen_a = reserve_udp_listen_addr();
+    let listen_b = reserve_udp_listen_addr();
+    assert_ne!(
+        listen_a, listen_b,
+        "test listeners must use different ports"
+    );
+
+    let mut cfg = plugin_config::PluginConfig::default();
+    cfg.journal.journal_dir = tmp.path().join("flows").to_string_lossy().to_string();
+    cfg.listener.listen = vec![listen_a.clone(), listen_b.clone()];
+    cfg.listener.sync_interval = Duration::from_millis(50);
+    cfg.listener.sync_every_entries = 1;
+
+    let metrics = Arc::new(ingest::IngestMetrics::default());
+    let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
+    let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
+    let service = ingest::IngestService::new(
+        cfg,
+        Arc::clone(&metrics),
+        Arc::clone(&open_tiers),
+        Arc::clone(&tier_flow_indexes),
+    )
+    .expect("create ingest service");
+
+    let shutdown = CancellationToken::new();
+    let run_shutdown = shutdown.clone();
+    let ingest_task = tokio::spawn(async move { service.run(run_shutdown).await });
+
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let payloads = fixture_udp_payloads("nfv5.pcap");
+    let expected_packets = (payloads.len() * 2) as u64;
+    replay_payloads_udp(&listen_a, &payloads).await;
+    replay_payloads_udp(&listen_b, &payloads).await;
+
+    wait_for_udp_packets(&metrics, expected_packets).await;
+    wait_for_ingest_progress(&metrics).await;
+    shutdown.cancel();
+
+    ingest_task
+        .await
+        .expect("join ingestion task")
+        .expect("ingestion run");
+
+    assert!(
+        metrics.journal_entries_written.load(Ordering::Relaxed) > 0,
+        "expected raw journal entries from multi-listener ingest"
     );
 }
 
@@ -2368,7 +2568,7 @@ async fn ingest_fixture_with_config(
     let listen = reserve_udp_listen_addr();
     let mut cfg = plugin_config::PluginConfig::default();
     cfg.journal.journal_dir = tmp.path().join("flows").to_string_lossy().to_string();
-    cfg.listener.listen = listen.clone();
+    cfg.listener.listen = vec![listen.clone()];
     cfg.listener.sync_interval = Duration::from_millis(50);
     cfg.listener.sync_every_entries = 1;
     cfg.protocols.timestamp_source = timestamp_source;
@@ -2425,16 +2625,32 @@ async fn wait_for_ingest_progress(metrics: &Arc<ingest::IngestMetrics>) {
     .expect("ingest did not write raw entries in time");
 }
 
+async fn wait_for_udp_packets(metrics: &Arc<ingest::IngestMetrics>, expected_packets: u64) {
+    tokio::time::timeout(E2E_INGEST_WAIT_TIMEOUT, async {
+        loop {
+            if metrics.udp_packets_received.load(Ordering::Relaxed) >= expected_packets {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(25)).await;
+        }
+    })
+    .await
+    .expect("ingest did not receive expected UDP packets in time");
+}
+
 async fn replay_fixture_udp(listen: &str, fixture_name: &str) {
-    let sender = UdpSocket::bind("127.0.0.1:0")
-        .await
-        .expect("bind udp sender");
     let payloads = fixture_udp_payloads(fixture_name);
     assert!(
         !payloads.is_empty(),
         "fixture {fixture_name} should contain udp payloads"
     );
+    replay_payloads_udp(listen, &payloads).await;
+}
 
+async fn replay_payloads_udp(listen: &str, payloads: &[Vec<u8>]) {
+    let sender = UdpSocket::bind("127.0.0.1:0")
+        .await
+        .expect("bind udp sender");
     for payload in payloads {
         sender
             .send_to(&payload, listen)
@@ -2554,7 +2770,7 @@ async fn bench_udp_loss_ceiling() {
 
     let mut cfg = plugin_config::PluginConfig::default();
     cfg.journal.journal_dir = tmp.path().join("flows").to_string_lossy().to_string();
-    cfg.listener.listen = listen.clone();
+    cfg.listener.listen = vec![listen.clone()];
     // Production-realistic sync behavior is the default (periodic fsync
     // disabled; files sync on rotation and shutdown). Do NOT force per-entry
     // sync, which would not reflect the real ceiling.
@@ -2716,7 +2932,7 @@ async fn bench_udp_boundary_soak() {
 
     let mut cfg = plugin_config::PluginConfig::default();
     cfg.journal.journal_dir = tmp.path().join("flows").to_string_lossy().to_string();
-    cfg.listener.listen = listen.clone();
+    cfg.listener.listen = vec![listen.clone()];
 
     let metrics = Arc::new(ingest::IngestMetrics::default());
     let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
@@ -3057,6 +3273,19 @@ fn assert_tier_dir_exists(path: &Path, tier_name: &str) {
 }
 
 fn first_raw_journal_fields(path: &Path) -> HashMap<String, String> {
+    raw_journal_rows(path)
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| {
+            panic!(
+                "expected at least one raw journal entry in {}",
+                path.display()
+            )
+        })
+}
+
+fn raw_journal_rows(path: &Path) -> Vec<HashMap<String, String>> {
+    let mut rows = Vec::new();
     for file_path in journal_files(path) {
         let repo_file =
             RepoFile::from_path(&file_path).expect("parse raw journal repository metadata");
@@ -3064,41 +3293,64 @@ fn first_raw_journal_fields(path: &Path) -> HashMap<String, String> {
             JournalFile::<Mmap>::open(&repo_file, 8 * 1024 * 1024).expect("open raw journal file");
         let mut reader = JournalReader::default();
         reader.set_location(Location::Head);
-        if !reader
-            .step(&journal, Direction::Forward)
-            .expect("step raw journal reader")
-        {
-            continue;
-        }
-
-        let mut data_offsets = Vec::<NonZeroU64>::new();
-        reader
-            .entry_data_offsets(&journal, &mut data_offsets)
-            .expect("enumerate raw journal data offsets");
-        let mut fields = HashMap::new();
         let mut decompress_buf = Vec::new();
-        query::visit_journal_payloads(
-            &journal,
-            &file_path,
-            &data_offsets,
-            &mut decompress_buf,
-            |payload| {
-                if let Some(eq_pos) = payload.iter().position(|&b| b == b'=') {
-                    let key = String::from_utf8_lossy(&payload[..eq_pos]).into_owned();
-                    let value = String::from_utf8_lossy(&payload[eq_pos + 1..]).into_owned();
-                    fields.insert(key, value);
-                }
-                Ok(())
-            },
-        )
-        .expect("read raw journal payloads");
-        return fields;
+        loop {
+            if !reader
+                .step(&journal, Direction::Forward)
+                .expect("step raw journal reader")
+            {
+                break;
+            }
+
+            let mut data_offsets = Vec::<NonZeroU64>::new();
+            reader
+                .entry_data_offsets(&journal, &mut data_offsets)
+                .expect("enumerate raw journal data offsets");
+            let mut fields = HashMap::new();
+            query::visit_journal_payloads(
+                &journal,
+                &file_path,
+                &data_offsets,
+                &mut decompress_buf,
+                |payload| {
+                    if let Some(eq_pos) = payload.iter().position(|&b| b == b'=') {
+                        let key = String::from_utf8_lossy(&payload[..eq_pos]).into_owned();
+                        let value = String::from_utf8_lossy(&payload[eq_pos + 1..]).into_owned();
+                        fields.insert(key, value);
+                    }
+                    Ok(())
+                },
+            )
+            .expect("read raw journal payloads");
+            rows.push(fields);
+        }
     }
 
-    panic!(
-        "expected at least one raw journal entry in {}",
-        path.display()
-    );
+    rows
+}
+
+fn find_raw_row<'a>(
+    rows: &'a [&HashMap<String, String>],
+    predicates: &[(&str, &str)],
+) -> &'a HashMap<String, String> {
+    rows.iter()
+        .copied()
+        .find(|row| {
+            predicates
+                .iter()
+                .all(|(key, value)| row.get(*key).map(String::as_str) == Some(*value))
+        })
+        .unwrap_or_else(|| panic!("raw journal row not found for predicates {predicates:?}"))
+}
+
+fn assert_raw_fields(row: &HashMap<String, String>, expectations: &[(&str, &str)]) {
+    for (key, expected) in expectations {
+        assert_eq!(
+            row.get(*key).map(String::as_str),
+            Some(*expected),
+            "raw journal field mismatch for {key}"
+        );
+    }
 }
 
 fn first_journal_realtime_usec(path: &Path) -> u64 {

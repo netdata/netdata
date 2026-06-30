@@ -71,7 +71,7 @@ The Netdata netflow plugin decodes:
 - **IPFIX** (RFC 7011, the IETF-standardised successor to NetFlow v9)
 - **sFlow v5** (the packet-sampling protocol most switches use)
 
-A single UDP listener (default `0.0.0.0:2055`) accepts all five. The plugin auto-detects each datagram's protocol from its header.
+By default, the plugin opens UDP listeners on `0.0.0.0:2055` for NetFlow/IPFIX exporters and `0.0.0.0:6343` for sFlow exporters. The plugin auto-detects each datagram's protocol from its header, so users do not need configuration to start receiving flows on the stock ports.
 
 Each flow record is enriched at ingestion with:
 

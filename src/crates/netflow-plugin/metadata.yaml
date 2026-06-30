@@ -38,7 +38,7 @@ modules:
           For full documentation including vendor configuration examples, sampling caveats, template
           handling and verification steps, see the [Network Flows Overview](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/).
         method_description: |
-          The plugin listens on a configurable UDP socket for NetFlow datagrams.
+          The plugin listens on configurable UDP listener sockets for NetFlow datagrams.
           NetFlow v5 and v7 records are decoded directly. NetFlow v9 records are decoded using
           dynamic templates cached from the exporter. Decoded records are enriched in-memory
           and appended to disk-backed journal tiers (raw, 1-minute, 5-minute, 1-hour rollups).
@@ -50,7 +50,7 @@ modules:
         description: ""
       default_behavior:
         auto_detection:
-          description: "The plugin starts when enabled in netflow.yaml and listens on the configured UDP port."
+          description: "The stock configuration enables the plugin and listens on the configured UDP ports."
         limits:
           description: "Operational limits are driven by sustained flow records/s, exporter batching, cardinality, retention, storage speed, and enrichment. On modern hardware with fast storage, plan around 50k-100k sustained flow records/s per well-provisioned agent for the full raw + rollup pipeline, provided the underlying disks can sustain the required journal write activity; use distributed agents for larger deployments."
         performance_impact:
@@ -73,8 +73,8 @@ modules:
             enabled: true
           list:
             - name: listener.listen
-              description: UDP endpoint for NetFlow datagrams.
-              default_value: "0.0.0.0:2055"
+              description: UDP listener endpoints for NetFlow/IPFIX and sFlow datagrams. YAML accepts either a scalar endpoint or a list of endpoints; CLI accepts repeated `--netflow-listen` flags or comma-delimited values.
+              default_value: "0.0.0.0:2055, 0.0.0.0:6343"
               required: false
             - name: protocols.v5
               description: Enable NetFlow v5 decoding.
@@ -97,8 +97,8 @@ modules:
               default_value: "10GB"
               required: false
             - name: journal.tiers.&lt;tier&gt;.duration_of_journal_files
-              description: Per-tier maximum age. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. Set to `null` for size-only retention.
-              default_value: "7d"
+              description: Per-tier maximum age. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. The default `null` disables time-based eviction; set a duration to add an age cap.
+              default_value: "null"
               required: false
         examples:
           folding:
@@ -108,11 +108,13 @@ modules:
             - name: Basic NetFlow v5/v9 collection
               folding:
                 enabled: false
-              description: Listen on Netdata's default flow listener port for v5 and v9 records.
+              description: Use Netdata's stock listener set for v5 and v9 records.
               config: |
                 enabled: true
                 listener:
-                  listen: "0.0.0.0:2055"
+                  listen:
+                    - "0.0.0.0:2055"
+                    - "0.0.0.0:6343"
                 protocols:
                   v5: true
                   v9: true
@@ -198,7 +200,7 @@ modules:
           ASA NSEL), biflow handling, sampling caveats, and verification steps, see the
           [Network Flows Overview](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/).
         method_description: |
-          The plugin listens on the same UDP socket as NetFlow. IPFIX messages are identified by
+          The plugin uses the same configurable UDP listener set as NetFlow. IPFIX messages are identified by
           version number 10 and decoded using cached templates. Decoded records are enriched and
           appended to disk-backed journal tiers.
       supported_platforms:
@@ -209,7 +211,7 @@ modules:
         description: ""
       default_behavior:
         auto_detection:
-          description: "The plugin starts when enabled in netflow.yaml and listens on the configured UDP port."
+          description: "The stock configuration enables the plugin and listens on the configured UDP ports."
         limits:
           description: "Operational limits are driven by sustained flow records/s, exporter batching, template churn, cardinality, retention, storage speed, and enrichment. On modern hardware with fast storage, plan around 50k-100k sustained flow records/s per well-provisioned agent for the full raw + rollup pipeline, provided the underlying disks can sustain the required journal write activity; use distributed agents for larger deployments."
         performance_impact:
@@ -233,8 +235,8 @@ modules:
             enabled: true
           list:
             - name: listener.listen
-              description: UDP endpoint for IPFIX datagrams.
-              default_value: "0.0.0.0:2055"
+              description: UDP listener endpoints for NetFlow/IPFIX and sFlow datagrams. YAML accepts either a scalar endpoint or a list of endpoints; CLI accepts repeated `--netflow-listen` flags or comma-delimited values.
+              default_value: "0.0.0.0:2055, 0.0.0.0:6343"
               required: false
             - name: protocols.ipfix
               description: Enable IPFIX decoding.
@@ -249,8 +251,8 @@ modules:
               default_value: "10GB"
               required: false
             - name: journal.tiers.&lt;tier&gt;.duration_of_journal_files
-              description: Per-tier maximum age. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. Set to `null` for size-only retention.
-              default_value: "7d"
+              description: Per-tier maximum age. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. The default `null` disables time-based eviction; set a duration to add an age cap.
+              default_value: "null"
               required: false
         examples:
           folding:
@@ -260,7 +262,7 @@ modules:
             - name: IPFIX collection
               folding:
                 enabled: false
-              description: Listen for IPFIX records on Netdata's default flow listener port.
+              description: Listen for IPFIX records on the common NetFlow/IPFIX port.
               config: |
                 enabled: true
                 listener:
@@ -334,7 +336,7 @@ modules:
           Ruckus, hsflowd), and the limits of sampled data, see the
           [Network Flows Overview](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/).
         method_description: |
-          The plugin listens on the same UDP socket as NetFlow. sFlow datagrams are identified by
+          The plugin uses the same configurable UDP listener set as NetFlow/IPFIX. sFlow datagrams are identified by
           their distinct header format and decoded per the sFlow v5 specification. Decoded records
           are enriched and appended to disk-backed journal tiers.
       supported_platforms:
@@ -345,7 +347,7 @@ modules:
         description: ""
       default_behavior:
         auto_detection:
-          description: "The plugin starts when enabled in netflow.yaml and listens on the configured UDP port."
+          description: "The stock configuration enables the plugin and listens on the configured UDP ports."
         limits:
           description: "Operational limits are driven by sustained samples/s, sampling rate, cardinality, retention, storage speed, and enrichment. Plan capacity from the received sample rate and the expanded byte/packet estimates."
         performance_impact:
@@ -369,8 +371,8 @@ modules:
             enabled: true
           list:
             - name: listener.listen
-              description: UDP endpoint for sFlow datagrams.
-              default_value: "0.0.0.0:2055"
+              description: UDP listener endpoints for NetFlow/IPFIX and sFlow datagrams. YAML accepts either a scalar endpoint or a list of endpoints; CLI accepts repeated `--netflow-listen` flags or comma-delimited values.
+              default_value: "0.0.0.0:2055, 0.0.0.0:6343"
               required: false
             - name: protocols.sflow
               description: Enable sFlow decoding.
@@ -385,8 +387,8 @@ modules:
               default_value: "10GB"
               required: false
             - name: journal.tiers.&lt;tier&gt;.duration_of_journal_files
-              description: Per-tier maximum age. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. Set to `null` for size-only retention.
-              default_value: "7d"
+              description: Per-tier maximum age. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. The default `null` disables time-based eviction; set a duration to add an age cap.
+              default_value: "null"
               required: false
         examples:
           folding:
@@ -396,11 +398,11 @@ modules:
             - name: sFlow collection
               folding:
                 enabled: false
-              description: Listen for sFlow v5 datagrams on Netdata's default flow listener port.
+              description: Listen for sFlow v5 datagrams on the standard sFlow port.
               config: |
                 enabled: true
                 listener:
-                  listen: "0.0.0.0:2055"
+                  listen: "0.0.0.0:6343"
                 protocols:
                   v5: false
                   v7: false
@@ -413,10 +415,14 @@ modules:
           - name: Verifying sFlow is arriving and diagnosing failures
             description: |
               See [Troubleshooting](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/troubleshooting) for
-              the full diagnostic recipe. sFlow-specific gotchas: counter samples are not surfaced
-              (only flow samples), bytes/packets are statistical estimates that won't match SNMP
-              byte-for-byte, and VLAN information comes from `ExtendedSwitch` records only -- not
-              from 802.1Q tags inside the sampled header. See also
+              the full diagnostic recipe. sFlow-specific gotchas: Netdata creates Network Flow rows
+              from sFlow flow samples (`flow_sample` / `expanded_flow_sample`) only. Counter-only
+              streams (`counters_sample` / `expanded_counters_sample`) are valid sFlow and increment
+              sFlow packet counters, but they do not contain endpoint-level source/destination flow
+              records for the Flow Explorer, Sankey, time-series, or maps. Bytes/packets are
+              statistical estimates that won't match SNMP byte-for-byte, and VLAN information comes
+              from `ExtendedSwitch` records only -- not from 802.1Q tags inside the sampled header.
+              See also
               [Validation and Data Quality](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/validation-and-data-quality)
               and the sFlow section of [Anti-patterns](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/anti-patterns).
     alerts: []

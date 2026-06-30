@@ -35,7 +35,7 @@ sudo cp /usr/lib/netdata/conf.d/netflow.yaml /etc/netdata/netflow.yaml
 
 ```yaml
 enabled: true               # global on/off
-listener: { ... }           # UDP socket and journal sync
+listener: { ... }           # UDP listener sockets and journal sync
 protocols: { ... }          # which protocols to accept; decapsulation; timestamps
 journal: { ... }            # tier directories, retention, query guardrails
 enrichment: { ... }         # GeoIP, classifiers, ASN, BMP, BioRIS, network sources
@@ -53,11 +53,13 @@ Set to `false` to turn the entire flow plugin off. The plugin still loads but do
 
 ## `listener`
 
-Controls the UDP socket and the journal write cadence.
+Controls the UDP listener sockets and the journal write cadence.
 
 ```yaml
 listener:
-  listen: "0.0.0.0:2055"
+  listen:
+    - "0.0.0.0:2055"
+    - "0.0.0.0:6343"
   max_packet_size: 9216
   sync_every_entries: 0
   sync_interval: "1s"
@@ -65,14 +67,14 @@ listener:
 
 | Key | CLI flag | Default | Notes |
 |---|---|---|---|
-| `listen` | `--netflow-listen` | `0.0.0.0:2055` | Address and port for the UDP socket. Same socket handles NetFlow v5/v7/v9, IPFIX, and sFlow. |
+| `listen` | `--netflow-listen` | `0.0.0.0:2055`, `0.0.0.0:6343` | UDP listener endpoints. Stock config needs no user edits: NetFlow/IPFIX exporters can send to `2055`, and sFlow exporters can send to `6343`. YAML accepts the preferred list form shown above and the legacy scalar form (`listen: "0.0.0.0:2055"`). CLI usage accepts repeated `--netflow-listen` flags or comma-delimited values. |
 | `max_packet_size` | `--netflow-max-packet-size` | `9216` | Maximum UDP datagram in bytes. Increase for jumbo sFlow datagrams or routers that send oversized IPFIX. |
 | `sync_every_entries` | `--netflow-sync-every-entries` | `0` | Periodic fsync of the active raw journal. `0` (default) disables it: data reaches disk via kernel writeback, and every journal file is fully synced when rotated and at shutdown. Values > 0 fsync after that many records (and at least once per `sync_interval`); at high flow rates the fsync stalls the receive path and can cause UDP drops. |
 | `sync_interval` | `--netflow-sync-interval` | `1s` | Maximum time between forced fsyncs when `sync_every_entries` > 0. Also the cadence for facet-state persistence and tier maintenance. |
 
 ### UDP buffer tuning is not in this file
 
-If you receive a high flow rate, the kernel UDP receive buffer matters more than `max_packet_size`. The plugin requests a large buffer (64 MiB) at startup via `setsockopt(SO_RCVBUF)`, but the kernel silently caps unprivileged requests at `net.core.rmem_max`, and distribution defaults are tiny (~208 KiB). Raise the cap at the kernel level:
+If you receive a high flow rate, the kernel UDP receive buffer matters more than `max_packet_size`. The plugin requests a large buffer (64 MiB) for each configured UDP listener socket at startup via `setsockopt(SO_RCVBUF)`, but the kernel silently caps unprivileged requests at `net.core.rmem_max`, and distribution defaults are tiny (~208 KiB). Raise the cap at the kernel level:
 
 ```bash
 sudo sysctl -w net.core.rmem_max=67108864
@@ -169,11 +171,11 @@ Per-tier values:
 | Key | Default per tier | Notes |
 |---|---|---|
 | `size_of_journal_files` | `10GB` | Disk budget for this tier. Minimum `100MB`. Set to `null` to disable size-based retention on this tier. |
-| `duration_of_journal_files` | `7d` | Time budget for this tier. Set to `null` to disable time-based retention on this tier. |
+| `duration_of_journal_files` | `null` | Optional time budget for this tier. The default disables time-based eviction; set a duration such as `24h` or `14d` to add an age cap. |
 
-Either limit triggers rotation. The tier expires whichever is hit first. At least one of the two must be set per tier (validation enforces this).
+Either configured limit can evict old files. The tier expires whichever configured limit is hit first. At least one of the two must be set per tier (validation enforces this).
 
-If you omit a tier entry entirely, that tier uses the built-in defaults (`10GB` / `7d`). If you provide a tier entry but omit one of the two knobs, the omitted knob falls back to its built-in default. Setting either to `null` explicitly disables that limit on that tier.
+If you omit a tier entry entirely, that tier uses the built-in defaults (`10GB` / no time limit). If you provide a tier entry but omit one of the two knobs, the omitted knob falls back to its built-in default. Setting either to `null` explicitly disables that limit on that tier.
 
 Standalone CLI runs still accept the legacy uniform retention flags:
 `--netflow-retention-size-of-journal-files` and
@@ -295,7 +297,7 @@ journal:
       duration_of_journal_files: 365d
 ```
 
-The built-in defaults (10GB / 7d on every tier) are intended for first validation and small deployments. Most production deployments should size retention from observed flow rate. This profile gives you 24 hours of full-detail forensics, 14 days of 1-minute trends, 30 days of 5-minute snapshots, and a year of hourly aggregates. Storage required scales with your flow rate — see [Sizing and Capacity Planning](/docs/npm/network-flows/sizing-capacity.md).
+The built-in defaults (10GB and no time limit on every tier) are intended for first validation and small deployments. Most production deployments should size retention from observed flow rate and add explicit time caps when they need a fixed investigation window. This profile gives you 24 hours of full-detail forensics, 14 days of 1-minute trends, 30 days of 5-minute snapshots, and a year of hourly aggregates. Storage required scales with your flow rate — see [Sizing and Capacity Planning](/docs/npm/network-flows/sizing-capacity.md).
 
 ## Things that go wrong
 

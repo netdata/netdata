@@ -1,12 +1,38 @@
 use super::super::*;
 use super::IngestService;
+use std::future::poll_fn;
+use std::task::Poll;
+use tokio::io::ReadBuf;
+
+async fn recv_from_any_listener(
+    sockets: &[UdpSocket],
+    start_index: usize,
+    buffer: &mut [u8],
+) -> std::io::Result<(usize, usize, std::net::SocketAddr)> {
+    poll_fn(|cx| {
+        for offset in 0..sockets.len() {
+            let socket_index = (start_index + offset) % sockets.len();
+            let mut read_buf = ReadBuf::new(buffer);
+            match sockets[socket_index].poll_recv_from(cx, &mut read_buf) {
+                Poll::Ready(Ok(source)) => {
+                    return Poll::Ready(Ok((socket_index, read_buf.filled().len(), source)));
+                }
+                Poll::Ready(Err(err)) => return Poll::Ready(Err(err)),
+                Poll::Pending => {}
+            }
+        }
+        Poll::Pending
+    })
+    .await
+}
 
 impl IngestService {
     pub(crate) async fn run(mut self, shutdown: CancellationToken) -> Result<()> {
         self.rebuild_materialized_from_raw().await?;
 
-        let socket = self.bind_listener_and_start_workers().await?;
+        let sockets = self.bind_listeners_and_start_workers().await?;
         let mut buffer = vec![0_u8; self.cfg.listener.max_packet_size];
+        let mut next_socket_index = 0_usize;
         let mut entries_since_sync = 0_usize;
         let mut sync_tick = tokio::time::interval(self.cfg.listener.sync_interval);
         sync_tick.set_missed_tick_behavior(MissedTickBehavior::Skip);
@@ -19,14 +45,15 @@ impl IngestService {
                 _ = sync_tick.tick() => {
                     entries_since_sync = self.handle_sync_tick(entries_since_sync);
                 }
-                recv = socket.recv_from(&mut buffer) => {
-                    let (received, source) = match recv {
+                recv = recv_from_any_listener(&sockets, next_socket_index, &mut buffer) => {
+                    let (socket_index, received, source) = match recv {
                         Ok(result) => result,
                         Err(err) => {
                             tracing::warn!("udp recv error: {}", err);
                             continue;
                         }
                     };
+                    next_socket_index = (socket_index + 1) % sockets.len();
 
                     entries_since_sync = self.handle_received_packet(
                         source,
@@ -41,14 +68,22 @@ impl IngestService {
         Ok(())
     }
 
-    async fn bind_listener_and_start_workers(&mut self) -> Result<UdpSocket> {
-        let listen = self.cfg.listener.listen.clone();
-        let socket = UdpSocket::bind(&listen)
-            .await
-            .with_context(|| format!("failed to bind {}", listen))?;
-        Self::expand_receive_buffer(&socket, &listen);
+    async fn bind_listeners_and_start_workers(&mut self) -> Result<Vec<UdpSocket>> {
+        let listens = self.cfg.listener.listen.clone();
+        if listens.is_empty() {
+            anyhow::bail!("listener.listen must contain at least one address");
+        }
+
+        let mut sockets = Vec::with_capacity(listens.len());
+        for listen in listens {
+            let socket = UdpSocket::bind(&listen)
+                .await
+                .with_context(|| format!("failed to bind {}", listen))?;
+            Self::expand_receive_buffer(&socket, &listen);
+            sockets.push(socket);
+        }
         self.spawn_tier_commit_workers();
-        Ok(socket)
+        Ok(sockets)
     }
 
     fn handle_sync_tick(&mut self, entries_since_sync: usize) -> usize {
@@ -431,8 +466,8 @@ impl IngestService {
     }
 
     #[cfg(test)]
-    pub(crate) async fn bind_listener_and_start_workers_for_test(&mut self) -> Result<()> {
-        let _socket = self.bind_listener_and_start_workers().await?;
+    pub(crate) async fn bind_listeners_and_start_workers_for_test(&mut self) -> Result<()> {
+        let _sockets = self.bind_listeners_and_start_workers().await?;
         Ok(())
     }
 
