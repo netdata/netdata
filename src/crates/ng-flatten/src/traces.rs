@@ -182,10 +182,12 @@ pub fn normalize_span_timestamps(req: &mut ExportTraceServiceRequest, fallback_b
 }
 
 /// Encode a [`FlattenedTraceRequest`] to the bincode bytes stored in a traces WAL
-/// frame — the span analog of [`crate::logs::encode_log_frame`], same codec. (Span
-/// `Entry.hash`es are left 0 unless a future hash-fill pass runs first — the span
-/// analog of [`crate::logs::fill_log_hashes`], not yet implemented; it is a
-/// seal-time fast-path optimization, not a frame validity requirement.)
+/// frame — the span analog of [`crate::logs::encode_log_frame`], same codec. Span
+/// `Entry.hash`es are left 0 here (no span analog of [`crate::logs::fill_log_hashes`]
+/// yet). The frame is valid, but a seal that consumes it MUST fill those hashes
+/// first or intern by string: feeding hash-0 entries through the interner's
+/// `lookup_hash` fast path would mis-alias distinct strings that share hash 0 (see
+/// `ng_ingest::write_trace_request` for the full contract).
 pub fn encode_trace_frame(
     req: &FlattenedTraceRequest,
 ) -> Result<Vec<u8>, bincode::error::EncodeError> {
