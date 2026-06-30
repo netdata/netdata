@@ -276,8 +276,16 @@ static int test_duration_generation(void) {
         { 31536000, "s", "1y" },
         { 9000, "s", "2h30m" },
         { 129600, "s", "1d12h" },
+#if defined(__SIZEOF_INT128__)
+        { INT64_MAX, "y", "9223372036854775807y" },
+#endif
+        { 2372, "q", "584y4q" },
         { 0, "s", "off" },
         { -300, "s", "-5m" },
+#if defined(__SIZEOF_INT128__)
+        { INT64_MIN, "y", "-9223372036854775808y" },
+#endif
+        { INT64_MIN, "ns", "-292y5mo21d23h47m16s854ms775us808ns" },
         { 0, NULL, NULL }
     };
     
