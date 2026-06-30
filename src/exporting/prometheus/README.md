@@ -9,6 +9,18 @@ Netdata exports metrics to Prometheus through two methods:
 
 Before configuring either method, understand how Netdata structures its exported metrics and available capabilities. These concepts apply to both scraping and remote write methods.
 
+:::note
+
+The metric naming rules below apply to the [remote write exporter](/src/exporting/prometheus/remote_write/README.md) as well as the scraping endpoint — both use the same prefix, context, units, and suffix rules. To preview the exact metric names that remote write will send, query the allmetrics endpoint using the same data source configured in `exporting.conf`:
+
+```
+http://your.netdata.ip:19999/api/v1/allmetrics?format=prometheus&source=as-collected&help=yes
+```
+
+Replace `as-collected` with `average` or `sum` to match your exporter's configured data source. The data source controls whether units appear in the metric name and which suffix is appended, exactly as described in [Netdata Data Source](#netdata-data-source).
+
+:::
+
 ### Understanding Netdata Metrics
 
 #### Charts
