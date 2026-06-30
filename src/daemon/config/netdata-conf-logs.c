@@ -24,6 +24,24 @@ static void debug_flags_initialize(void) {
     }
 }
 
+#if defined(OS_WINDOWS) && (defined(HAVE_WEL) || defined(HAVE_ETW))
+// Returns true when 'value' is an auto-generated default log file path: any
+// absolute path ending in /<source_name>.log.  These were written by builds
+// that pre-dated Windows Event Log support and should be upgraded to WEL/ETW.
+// User paths that use a different filename are not matched and are preserved.
+static bool nd_log_is_default_file_path(const char *value, const char *source_name) {
+    if (!value || !*value)
+        return false;
+
+    char expected[64];
+    snprintfz(expected, sizeof(expected) - 1, "/%s.log", source_name);
+
+    size_t vlen = strlen(value);
+    size_t elen = strlen(expected);
+    return vlen >= elen && strcmp(value + vlen - elen, expected) == 0;
+}
+#endif
+
 void netdata_conf_section_logs(void) {
     FUNCTION_RUN_ONCE();
 
@@ -43,6 +61,7 @@ void netdata_conf_section_logs(void) {
     nd_log_set_priority_level(inicfg_get(&netdata_config, CONFIG_SECTION_LOGS, "level", netdata_log_level));
 
     char filename[FILENAME_MAX + 1];
+    const char *s;
     char* os_default_method = NULL;
 #if defined(OS_LINUX)
     os_default_method = is_stderr_connected_to_journal() /* || nd_log_journal_socket_available() */ ? "journal" : NULL;
@@ -60,20 +79,40 @@ void netdata_conf_section_logs(void) {
 #else
     snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
 #endif
-
-    nd_log_set_user_settings(NDLS_DEBUG, inicfg_get_log_path_setting(&netdata_config, CONFIG_SECTION_LOGS, "debug", filename));
+    s = inicfg_get_log_path_setting(&netdata_config, CONFIG_SECTION_LOGS, "debug", filename);
+#if defined(OS_WINDOWS) && (defined(HAVE_WEL) || defined(HAVE_ETW))
+    if (nd_log_is_default_file_path(s, "debug")) {
+        inicfg_set(&netdata_config, CONFIG_SECTION_LOGS, "debug", os_default_method);
+        s = os_default_method;
+    }
+#endif
+    nd_log_set_user_settings(NDLS_DEBUG, s);
 
     if(os_default_method)
         snprintfz(filename, FILENAME_MAX, "%s", os_default_method);
     else
         snprintfz(filename, FILENAME_MAX, "%s/daemon.log", netdata_configured_log_dir);
-    nd_log_set_user_settings(NDLS_DAEMON, inicfg_get_log_path_setting(&netdata_config, CONFIG_SECTION_LOGS, "daemon", filename));
+    s = inicfg_get_log_path_setting(&netdata_config, CONFIG_SECTION_LOGS, "daemon", filename);
+#if defined(OS_WINDOWS) && (defined(HAVE_WEL) || defined(HAVE_ETW))
+    if (nd_log_is_default_file_path(s, "daemon")) {
+        inicfg_set(&netdata_config, CONFIG_SECTION_LOGS, "daemon", os_default_method);
+        s = os_default_method;
+    }
+#endif
+    nd_log_set_user_settings(NDLS_DAEMON, s);
 
     if(os_default_method)
         snprintfz(filename, FILENAME_MAX, "%s", os_default_method);
     else
         snprintfz(filename, FILENAME_MAX, "%s/collector.log", netdata_configured_log_dir);
-    nd_log_set_user_settings(NDLS_COLLECTORS, inicfg_get_log_path_setting(&netdata_config, CONFIG_SECTION_LOGS, "collector", filename));
+    s = inicfg_get_log_path_setting(&netdata_config, CONFIG_SECTION_LOGS, "collector", filename);
+#if defined(OS_WINDOWS) && (defined(HAVE_WEL) || defined(HAVE_ETW))
+    if (nd_log_is_default_file_path(s, "collector")) {
+        inicfg_set(&netdata_config, CONFIG_SECTION_LOGS, "collector", os_default_method);
+        s = os_default_method;
+    }
+#endif
+    nd_log_set_user_settings(NDLS_COLLECTORS, s);
 
 #if defined(OS_WINDOWS)
     // on windows, access log goes to windows events
@@ -81,13 +120,27 @@ void netdata_conf_section_logs(void) {
 #else
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
 #endif
-    nd_log_set_user_settings(NDLS_ACCESS, inicfg_get_log_path_setting(&netdata_config, CONFIG_SECTION_LOGS, "access", filename));
+    s = inicfg_get_log_path_setting(&netdata_config, CONFIG_SECTION_LOGS, "access", filename);
+#if defined(OS_WINDOWS) && (defined(HAVE_WEL) || defined(HAVE_ETW))
+    if (nd_log_is_default_file_path(s, "access")) {
+        inicfg_set(&netdata_config, CONFIG_SECTION_LOGS, "access", os_default_method);
+        s = os_default_method;
+    }
+#endif
+    nd_log_set_user_settings(NDLS_ACCESS, s);
 
     if(os_default_method)
         snprintfz(filename, FILENAME_MAX, "%s", os_default_method);
     else
         snprintfz(filename, FILENAME_MAX, "%s/health.log", netdata_configured_log_dir);
-    nd_log_set_user_settings(NDLS_HEALTH, inicfg_get_log_path_setting(&netdata_config, CONFIG_SECTION_LOGS, "health", filename));
+    s = inicfg_get_log_path_setting(&netdata_config, CONFIG_SECTION_LOGS, "health", filename);
+#if defined(OS_WINDOWS) && (defined(HAVE_WEL) || defined(HAVE_ETW))
+    if (nd_log_is_default_file_path(s, "health")) {
+        inicfg_set(&netdata_config, CONFIG_SECTION_LOGS, "health", os_default_method);
+        s = os_default_method;
+    }
+#endif
+    nd_log_set_user_settings(NDLS_HEALTH, s);
 
     aclklog_enabled = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_CLOUD, "conversation log", CONFIG_BOOLEAN_NO);
     if (aclklog_enabled) {
@@ -97,7 +150,14 @@ void netdata_conf_section_logs(void) {
 #else
         snprintfz(filename, FILENAME_MAX, "%s/aclk.log", netdata_configured_log_dir);
 #endif
-        nd_log_set_user_settings(NDLS_ACLK, inicfg_get_log_path_setting(&netdata_config, CONFIG_SECTION_CLOUD, "conversation log file", filename));
+        s = inicfg_get_log_path_setting(&netdata_config, CONFIG_SECTION_CLOUD, "conversation log file", filename);
+#if defined(OS_WINDOWS) && (defined(HAVE_WEL) || defined(HAVE_ETW))
+        if (nd_log_is_default_file_path(s, "aclk")) {
+            inicfg_set(&netdata_config, CONFIG_SECTION_CLOUD, "conversation log file", os_default_method);
+            s = os_default_method;
+        }
+#endif
+        nd_log_set_user_settings(NDLS_ACLK, s);
     }
 
     debug_flags_initialize();
