@@ -34,8 +34,10 @@ use crate::{Error, TraceId, TraceIds};
 pub struct TraceIdIndex {
     /// 256 cumulative first-byte counts. `fanout[b]` = number of indexed
     /// positions whose `trace_id[0] <= b`; `fanout[255]` == `sort_perm.len()`.
-    /// Stored as a `Vec` (serde has no `[u32; 256]` impl) with the length
-    /// invariant enforced on decode by [`TraceIdIndex::validate`].
+    /// Kept as a `Vec`: serde implements `Serialize`/`Deserialize` for arrays
+    /// only up to `[T; 32]` (verified — not const-generic), so `[u32; 256]` is
+    /// not serializable through the `bincode::serde` chunk codec. The length-256
+    /// invariant is instead enforced on decode by [`TraceIdIndex::validate`].
     fanout: Vec<u32>,
     /// Row positions sorted ascending by 16-byte `trace_id`. Length is the
     /// number of indexed (set-id) rows, `<= record_count`.
@@ -69,11 +71,19 @@ impl TraceIdIndex {
         // Enforce the index invariants at write time (debug builds + tests),
         // where a producer bug is cheap to catch at its source — rather than
         // paying to re-prove them on every read. `sort_perm` is a permutation of
-        // a filtered subset of `0..len`, so both hold by construction; the
-        // asserts guard against a future refactor regressing build().
+        // a filtered subset of `0..len`, sorted by id, so all three hold by
+        // construction; the asserts guard against a future refactor regressing
+        // build(). Sortedness is the invariant `positions()` actually relies on
+        // (its two binary searches assume a sorted bucket).
         debug_assert!(
             sort_perm.iter().all(|&p| (p as usize) < trace_ids.len()),
             "build produced an out-of-range position"
+        );
+        debug_assert!(
+            sort_perm
+                .windows(2)
+                .all(|w| trace_ids.get(w[0] as usize) <= trace_ids.get(w[1] as usize)),
+            "build produced an unsorted permutation"
         );
         debug_assert!(
             {
@@ -116,6 +126,16 @@ impl TraceIdIndex {
     /// boundary: a malformed (but CRC-valid) chunk must surface as
     /// [`Error::CorruptIndex`] so the query layer skips the file rather than
     /// indexing out of bounds or trusting a broken fanout.
+    ///
+    /// Scope is **panic-safety**: it guarantees `positions()` cannot index out
+    /// of bounds (fanout shape/monotonicity bound the bucket slice; the position
+    /// range bounds the `TRCE` access). It deliberately does NOT re-verify the
+    /// *semantic* invariants (`sort_perm` actually sorted by id, buckets
+    /// matching first-byte, positions unique) — those would cost an extra O(N)
+    /// pass on every read and are instead enforced at write time
+    /// (`build()`'s `debug_assert`s) under the CRC integrity guarantee, since the
+    /// only producer is `build()` and the bytes on disk are CRC-checked. A future
+    /// producer regressing them is caught in debug/test, not in release reads.
     pub(crate) fn validate(&self, record_count: usize) -> Result<(), Error> {
         if self.fanout.len() != 256 {
             return Err(Error::CorruptIndex(format!(

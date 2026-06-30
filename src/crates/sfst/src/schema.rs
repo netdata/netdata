@@ -1016,12 +1016,12 @@ pub struct SpanIds {
 /// OTLP/W3C "unset/invalid" sentinel ([`TraceId::is_unset`]). `Copy` + `Ord` +
 /// `Hash` so it sorts (the `trace_id` index) and keys maps (the trace tree)
 /// directly; the on-disk [`TraceIds`] column stores these as a packed byte arena.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct TraceId([u8; TraceIds::WIDTH]);
 
 /// A W3C span id: a fixed 8-byte identifier. See [`TraceId`] for the shared
 /// semantics (unset sentinel, ordering, packed [`SpanIds`] storage).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct SpanId([u8; SpanIds::WIDTH]);
 
 /// Generate the shared id-value API (`from_bytes`/`as_bytes`/`is_unset`/`UNSET`,
@@ -1064,6 +1064,14 @@ macro_rules! id_value {
                     write!(f, "{b:02x}")?;
                 }
                 Ok(())
+            }
+        }
+
+        impl std::fmt::Debug for $ty {
+            /// Hex (via [`Display`]) so panic/`{:?}`/log output is the readable
+            /// W3C id, not a decimal byte array.
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}({self})", stringify!($ty))
             }
         }
     };

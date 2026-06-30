@@ -153,6 +153,10 @@ const MAGIC: &[u8; 4] = b"SFST";
 //     FieldTable is derived from the tree at read time. Incompatible META bincode
 //     layout; older files rejected on open. Storage chunks (PRIM/MF/HF/SB/columns)
 //     are otherwise unchanged from v8.
+// v9 (additive, no bump): the optional `TIDX` trace_id index chunk (fanout +
+//     sort permutation, after the per-row columns). TOC-indexed and absent from
+//     files that don't carry it, so it changes no existing chunk and old readers
+//     ignore it — see CHUNK_TRACE_INDEX and the `trace_index` module.
 const VERSION: u32 = 9;
 
 const CHUNK_SUMMARY: chunk_file::ChunkId = *b"SUMR";

@@ -98,7 +98,7 @@ within its tier in the trailing bytes.
     "SPAN"      8-byte arena (per-row span ids)               No (per-row column, v8)
     "FLAG"      Vec<u32>  (per-row LogRecord.flags)           No (per-row column, v8)
     "DRAC"      Vec<u32>  (per-row dropped_attributes_count)  No (per-row column, v8)
-    "TIDX"      TraceIdIndex  (trace_id fanout + sort permutation)  No (optional, after per-row columns)
+    "TIDX"      TraceIdIndex  (trace_id fanout + sort permutation)  No (optional, additive v9)
     "MF{hi}{lo}" FstIndex<BitmapValue>  (mid-card field)      No (one per mid field)
     "HF{hi}{lo}" HighField  (high-card field, columnar SoA)   No (one per high field)
     "SB0{N}"    StreamBatch  (stream-batch N, fixed-width arena)  Yes (at least 1)

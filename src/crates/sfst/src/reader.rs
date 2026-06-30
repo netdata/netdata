@@ -365,6 +365,10 @@ impl<'a> Reader<'a> {
     /// on [`has_trace_id_index`](Self::has_trace_id_index); a file without the
     /// chunk surfaces the container's not-found error.
     pub fn trace_id_index(&self) -> Result<TraceIdIndex, Error> {
+        // The index resolves positions against the `TRCE` column, so the column
+        // must be present — the writer guarantees TIDX ⟹ trace_id at seal; this
+        // is the symmetric read-side guard for a file produced out-of-band.
+        self.require_column(TraceIds::NAME, TraceIds::COLUMN_TYPE)?;
         let index: TraceIdIndex = unpack(self.chunk_raw_by_id(CHUNK_TRACE_INDEX)?)?;
         index.validate(self.record_count()?)?;
         Ok(index)

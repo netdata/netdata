@@ -125,7 +125,8 @@ fn populate_row_index(
     // per row, not FST-indexed. trace_id/span_id are no longer flattened as entries
     // (see `ng_flatten::flatten_record`), so they never reach the interner — they live
     // only here. The ingest boundary already validated id lengths (16/8 or empty);
-    // the arenas zero-fill empty/short ids.
+    // the push sites map each raw id to a typed `TraceId`/`SpanId` (empty/malformed
+    // → the all-zero `UNSET`) — the arenas store exactly-width typed values.
     let mut observed_ts: Vec<i64> = Vec::new();
     let mut trace_ids = TraceIds::default();
     let mut span_ids = SpanIds::default();
