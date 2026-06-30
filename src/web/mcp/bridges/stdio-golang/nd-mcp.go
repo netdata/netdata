@@ -364,7 +364,6 @@ connectionLoop:
 
 		// Set up connection timeout
 		connectionCtx, connectionCancel := context.WithTimeout(ctx, 15*time.Second)
-		defer connectionCancel()
 
 		fmt.Fprintf(os.Stderr, "%s: Connecting to %s...\n", programName, targetURL)
 
@@ -381,6 +380,7 @@ connectionLoop:
 			CompressionMode: websocket.CompressionContextTakeover,
 			HTTPHeader:      header,
 		})
+		connectionCancel()
 
 		// Connection failed
 		if err != nil {
