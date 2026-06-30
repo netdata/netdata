@@ -1057,6 +1057,8 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
     }
 
     struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
+    if (unlikely(!aclk_host_config))
+        return;
 
     CLAIM_ID claim_id = claim_id_get();
     if (unlikely(!claim_id_is_set(claim_id)))
