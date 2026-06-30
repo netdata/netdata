@@ -5,8 +5,10 @@
 
 #include "config.h"
 
+#include <stddef.h>
+
 #ifndef HAVE_STRNDUP
-#define strndup(s, n) os_strndup(s, n)
+char *strndup(const char *s, size_t n);
 #endif
 
 #endif //STRNDUP_H
