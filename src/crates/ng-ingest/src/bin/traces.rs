@@ -90,6 +90,7 @@ impl TraceService for Receiver {
 
         if written > 0 {
             let total = self.written.fetch_add(written as u64, Ordering::Relaxed) + written as u64;
+            tracing::info!(spans = written, total, "trace export batch ingested");
             if let Some(target) = self.target {
                 if total >= target {
                     self.done.notify_one();
