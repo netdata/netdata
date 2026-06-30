@@ -2608,10 +2608,10 @@ if(OS_WINDOWS)
                                 COMPONENT wevt_netdata_dll
                                 DESTINATION "${BINDIR}")
                 else()
-                        # The manifest is always generated (both ETW and WEL paths run
-                        # --manifest). The WiX installer references it unconditionally, so
-                        # install it here too. Only the ETW install .bat script is skipped.
-                        install(FILES "${WEVT_DLL_FILE}" "${WEVT_MAN_FILE}"
+                        # WEL-only build: install DLL, manifest, and the install script.
+                        # The manifest now includes the NetdataWEL channel so wevtutil im
+                        # registers it; the script sets log sizes for both ETW and WEL channels.
+                        install(FILES "${WEVT_DLL_FILE}" "${WEVT_MAN_FILE}" "${WEVT_ETW_INSTALL_SCRIPT}"
                                 COMPONENT wevt_netdata_dll
                                 DESTINATION "${BINDIR}")
                 endif()
