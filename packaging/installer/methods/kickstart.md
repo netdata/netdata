@@ -87,66 +87,9 @@ Use these flags to customize your installation.
 | **Reinstall/Uninstall** | `--reinstall`          | Reinstall existing Netdata          |
 |                         | `--uninstall`          | Uninstall Netdata completely        |
 
-## Managing Auto-Updates After Installation
-
-`kickstart.sh` enables daily auto-updates by default (unless you pass `--no-updates` when installing). The schedule runs once per day. The installer auto-detects the scheduling method, which may be a cron entry under `/etc/cron.daily` or `/etc/periodic/daily`, the `netdata-updater.timer` systemd unit (`OnCalendar=daily`), or a crontab under `/etc/cron.d`. Use `--auto-update-status` (below) to see which method is active on your system.
-
-### Disable auto-updates
-
-The simplest method is the updater script's built-in command, which removes every supported scheduling method (systemd timer, `/etc/cron.daily`, `/etc/periodic/daily`, and `/etc/cron.d`) in one step:
-
-```bash
-sudo /usr/libexec/netdata/netdata-updater.sh --disable-auto-updates
-```
-
-This takes effect immediately — the systemd timer is stopped and any cron entries are removed, so no further automatic updates will run.
-
-If you prefer to disable the scheduler manually:
-
-- **systemd:** `sudo systemctl disable --now netdata-updater.timer` (stops and disables the timer unit).
-- **non-systemd (cron):** remove the entry your installer created. Remove whichever exists:
-  ```bash
-  sudo rm -f /etc/cron.daily/netdata-updater /etc/cron.daily/netdata-updater.sh
-  sudo rm -f /etc/periodic/daily/netdata-updater /etc/periodic/daily/netdata-updater.sh
-  sudo rm -f /etc/cron.d/netdata-updater /etc/cron.d/netdata-updater-daily
-  ```
-  Only one of these directories will contain a file; removing a non-existent path is harmless.
-
 :::note
 
-The path `/usr/libexec/netdata/netdata-updater.sh` is for a standard install with the default prefix. If you installed with `--install-prefix`, the script lives under `<your-prefix>/usr/libexec/netdata/netdata-updater.sh`.
-
-:::
-
-### Check auto-update status
-
-```bash
-sudo /usr/libexec/netdata/netdata-updater.sh --auto-update-status
-```
-
-This reports which scheduling methods are detected as enabled or disabled on your system.
-
-### Re-enable auto-updates
-
-```bash
-sudo /usr/libexec/netdata/netdata-updater.sh --enable-auto-updates
-```
-
-The script auto-detects the appropriate scheduler for your system. You can also pass an explicit type (`systemd`, `interval`, or `crontab`) if auto-detection does not pick the one you want.
-
-### Editing `netdata-updater.conf` does not disable auto-updates
-
-:::warning
-
-`netdata-updater.conf` controls **how** the updater runs, not **whether** it runs. It does not contain an option to disable the auto-update schedule, and setting variables in it will not stop auto-updates.
-
-The file only configures:
-
-- `NETDATA_UPDATER_JITTER` — random delay in seconds (default `3600`) the updater waits before running, to stagger updates across nodes.
-- `NETDATA_ACCEPT_MAJOR_VERSIONS` — which major versions the updater installs automatically without prompting.
-- `NETDATA_NO_SYSTEMD_JOURNAL` — whether the updater skips installing the optional `netdata-plugin-systemd-journal` package on supported native-package systems.
-
-To turn auto-updates off, use the disable command above — not this config file.
+**Managing auto-updates after installation:** `kickstart.sh` enables daily auto-updates by default. To disable, check, or re-enable auto-updates — including why `netdata-updater.conf` cannot disable them — see [Managing Automatic Updates](/packaging/installer/UPDATE.md#managing-automatic-updates) in the Update guide.
 
 :::
 
