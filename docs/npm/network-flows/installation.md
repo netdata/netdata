@@ -19,7 +19,7 @@ The static install (the kickstart `--static-only` path) bundles the plugin autom
 ## Prerequisites
 
 - A working Netdata Agent on the host that will receive flow data.
-- That host must be reachable on UDP from your routers and switches (default port `2055`).
+- That host must be reachable on UDP from your routers and switches. The stock plugin listens on UDP `2055` for NetFlow/IPFIX and UDP `6343` for sFlow.
 - A Netdata installation that includes `netdata-plugin-netflow`. Native Linux packages install it as a separate package; static installs bundle it automatically (except the ARMv6 build — Raspberry Pi 1 / Zero); source builds need a Rust toolchain.
 
 ## Install on Debian / Ubuntu / Mint
@@ -111,15 +111,15 @@ After installation and restart:
 sudo journalctl --namespace netdata --since "5 minutes ago" | grep -E 'netflow|listener'
 ```
 
-You should see entries indicating that the plugin loaded its config and that the UDP listener bound to its port.
+You should see entries indicating that the plugin loaded its config and that the UDP listeners bound to their ports.
 
 Quick sanity check:
 
 ```bash
-sudo ss -unlp | grep 2055
+sudo ss -unlp | grep -E ':(2055|6343)([[:space:]]|$)'
 ```
 
-A line for `netflow-plugin` confirms the listener is up.
+Lines for `netflow-plugin` confirm the stock listeners are up.
 
 ## Open Netdata to confirm
 
@@ -133,7 +133,7 @@ If Network Flows doesn't appear under Live, or the view is empty:
 
 ## Configuring flow sources
 
-Installing the plugin enables it. To actually see flow data, you need to configure a router, switch, or software exporter to send NetFlow / IPFIX / sFlow datagrams to this host's UDP port 2055.
+Installing the plugin enables it and opens the stock listener ports. To actually see flow data, configure a router, switch, or software exporter to send NetFlow/IPFIX datagrams to this host's UDP port `2055` or sFlow datagrams to UDP port `6343`.
 
 That's the next step:
 

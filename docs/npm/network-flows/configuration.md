@@ -35,7 +35,7 @@ sudo cp /usr/lib/netdata/conf.d/netflow.yaml /etc/netdata/netflow.yaml
 
 ```yaml
 enabled: true               # global on/off
-listener: { ... }           # UDP socket and journal sync
+listener: { ... }           # UDP listener sockets and journal sync
 protocols: { ... }          # which protocols to accept; decapsulation; timestamps
 journal: { ... }            # tier directories, retention, query guardrails
 enrichment: { ... }         # GeoIP, classifiers, ASN, BMP, BioRIS, network sources
@@ -53,11 +53,13 @@ Set to `false` to turn the entire flow plugin off. The plugin still loads but do
 
 ## `listener`
 
-Controls the UDP socket and the journal write cadence.
+Controls the UDP listener sockets and the journal write cadence.
 
 ```yaml
 listener:
-  listen: "0.0.0.0:2055"
+  listen:
+    - "0.0.0.0:2055"
+    - "0.0.0.0:6343"
   max_packet_size: 9216
   sync_every_entries: 0
   sync_interval: "1s"
@@ -65,14 +67,14 @@ listener:
 
 | Key | CLI flag | Default | Notes |
 |---|---|---|---|
-| `listen` | `--netflow-listen` | `0.0.0.0:2055` | Address and port for the UDP socket. Same socket handles NetFlow v5/v7/v9, IPFIX, and sFlow. |
+| `listen` | `--netflow-listen` | `0.0.0.0:2055`, `0.0.0.0:6343` | UDP listener endpoints. Stock config needs no user edits: NetFlow/IPFIX exporters can send to `2055`, and sFlow exporters can send to `6343`. YAML accepts the preferred list form shown above and the legacy scalar form (`listen: "0.0.0.0:2055"`). CLI usage accepts repeated `--netflow-listen` flags or comma-delimited values. |
 | `max_packet_size` | `--netflow-max-packet-size` | `9216` | Maximum UDP datagram in bytes. Increase for jumbo sFlow datagrams or routers that send oversized IPFIX. |
 | `sync_every_entries` | `--netflow-sync-every-entries` | `0` | Periodic fsync of the active raw journal. `0` (default) disables it: data reaches disk via kernel writeback, and every journal file is fully synced when rotated and at shutdown. Values > 0 fsync after that many records (and at least once per `sync_interval`); at high flow rates the fsync stalls the receive path and can cause UDP drops. |
 | `sync_interval` | `--netflow-sync-interval` | `1s` | Maximum time between forced fsyncs when `sync_every_entries` > 0. Also the cadence for facet-state persistence and tier maintenance. |
 
 ### UDP buffer tuning is not in this file
 
-If you receive a high flow rate, the kernel UDP receive buffer matters more than `max_packet_size`. The plugin requests a large buffer (64 MiB) at startup via `setsockopt(SO_RCVBUF)`, but the kernel silently caps unprivileged requests at `net.core.rmem_max`, and distribution defaults are tiny (~208 KiB). Raise the cap at the kernel level:
+If you receive a high flow rate, the kernel UDP receive buffer matters more than `max_packet_size`. The plugin requests a large buffer (64 MiB) for each configured UDP listener socket at startup via `setsockopt(SO_RCVBUF)`, but the kernel silently caps unprivileged requests at `net.core.rmem_max`, and distribution defaults are tiny (~208 KiB). Raise the cap at the kernel level:
 
 ```bash
 sudo sysctl -w net.core.rmem_max=67108864

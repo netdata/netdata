@@ -33,7 +33,7 @@ ASA NSEL), biflow handling, sampling caveats, and verification steps, see the
 [Network Flows Overview](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/).
 
 
-The plugin listens on the same UDP socket as NetFlow. IPFIX messages are identified by
+The plugin uses the same configurable UDP listener set as NetFlow. IPFIX messages are identified by
 version number 10 and decoded using cached templates. Decoded records are enriched and
 appended to disk-backed journal tiers.
 
@@ -47,7 +47,7 @@ This integration runs as a single instance per Netdata Agent.
 
 #### Auto-Detection
 
-The plugin starts when enabled in netflow.yaml and listens on the configured UDP port.
+The stock configuration enables the plugin and listens on the configured UDP ports.
 
 #### Limits
 
@@ -83,7 +83,7 @@ Enable IPFIX via the `protocols.ipfix` option.
 
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
-| listener.listen | UDP endpoint for IPFIX datagrams. | 0.0.0.0:2055 | no |
+| listener.listen | UDP listener endpoints for NetFlow/IPFIX and sFlow datagrams. YAML accepts either a scalar endpoint or a list of endpoints; CLI accepts repeated `--netflow-listen` flags or comma-delimited values. | 0.0.0.0:2055, 0.0.0.0:6343 | no |
 | protocols.ipfix | Enable IPFIX decoding. | yes | no |
 | journal.journal_dir | Directory for journal files (relative to NETDATA_CACHE_DIR). | flows | no |
 | journal.tiers.&lt;tier&gt;.size_of_journal_files | Per-tier hard size cap. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. Set to `null` for time-only retention. | 10GB | no |
@@ -111,7 +111,7 @@ sudo ./edit-config netflow.yaml
 
 ###### IPFIX collection
 
-Listen for IPFIX records on Netdata's default flow listener port.
+Listen for IPFIX records on the common NetFlow/IPFIX port.
 
 ```yaml
 enabled: true

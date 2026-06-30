@@ -27,7 +27,7 @@ The plugin won't come up at all, or starts and immediately exits.
 |---|---|
 | YAML typo or unknown key | `journalctl --namespace netdata --since "5 minutes ago" \| grep -E 'failed to load configuration\|netflow'`. The plugin uses strict YAML — any unknown key fails parsing. |
 | Required GeoIP DB missing (`optional: false`) | Same log search. Look for `failed to load database`. Either fix the path or set `optional: true`. |
-| Listen address conflict | Look for `failed to bind`. Another process is on the configured port (default 2055). |
+| Listen address conflict | Look for `failed to bind`. Another process is on one of the configured ports (stock defaults: `2055` and `6343`). |
 | Validation error | Look for `must be greater than 0` and similar. The plugin validates the full config at startup. |
 | `enabled: false` was set | Look for `netflow plugin disabled by config`. The plugin honours this and shuts down cleanly — looks like "not running" if you don't read the log. |
 
@@ -51,7 +51,7 @@ The plugin is running, but the Network Flows view is empty.
 **First check:** is anything reaching the plugin?
 
 ```bash
-sudo tcpdump -i any -nn -c 50 'udp port 2055'
+sudo tcpdump -i any -nn -c 50 'udp port 2055 or udp port 6343'
 ```
 
 - **No packets in 30 seconds** — exporter not sending, or firewall blocking. Check the exporter's status (`show flow exporter` on Cisco, equivalents elsewhere) and the network path. The plugin can't help here; the data isn't reaching it.
@@ -60,7 +60,7 @@ sudo tcpdump -i any -nn -c 50 'udp port 2055'
 **Second check:** is the listener bound?
 
 ```bash
-sudo ss -unlp | grep -E ':2055|netflow'
+sudo ss -unlp | grep -E ':(2055|6343)([[:space:]]|$)|netflow'
 ```
 
 If nothing matches, the plugin isn't listening. See "doesn't start" above.
@@ -72,6 +72,23 @@ Open `netflow.input_packets` on the standard Netdata charts page. The dimensions
 - `udp_received > 0`, `parsed_packets == 0` — datagrams arriving, none decoding successfully. Wrong protocol on the listener, or all datagrams malformed.
 - `udp_received > 0`, `parsed_packets > 0`, but no per-protocol counter (`netflow_v9`, `ipfix`, etc.) is moving — the protocol you're sending may be disabled in the plugin config. Check `protocols.v9`, `protocols.ipfix`, etc. in `netflow.yaml`.
 - `parse_errors` rising in lockstep with `udp_received` — datagrams aren't valid for the protocols the plugin supports. Capture a small UDP sample with `tcpdump -w` and inspect it with Wireshark.
+
+### sFlow packets arrive, but no sFlow rows appear
+
+sFlow datagrams can carry flow samples, counter samples, or both. Netdata's Network Flows view creates flow rows from sFlow flow samples only. Counter-only sFlow traffic is valid sFlow traffic, and `netflow.input_packets` can show `sflow` increasing, but there are no source/destination flow rows to display.
+
+Capture a small sample and check the sFlow sample types:
+
+```bash
+sudo tcpdump -i any -s 0 -w /tmp/sflow-check.cap -c 50 'udp port 6343 or udp port 2055'
+tshark -r /tmp/sflow-check.cap \
+  -d udp.port==6343,sflow -d udp.port==2055,sflow \
+  -T fields -e sflow_245.sampletype -e sflow_245.flow_record_format | sort | uniq -c
+```
+
+- Sample type `1` (`flow_sample`) and `3` (`expanded_flow_sample`) can produce Network Flow rows.
+- Sample type `2` (`counters_sample`) and `4` (`expanded_counters_sample`) do not contain endpoint-level flow records.
+- If you only see sample types `2` or `4`, configure the exporter or generator to send flow samples, or both flow and counter samples. For MIMIC, select `Flow` or `All`/`Both` samples and make sure the loaded SFLOW configuration file actually contains flow sample blocks.
 
 ## Partial data — some flows are dropped
 
@@ -96,6 +113,7 @@ The plugin doesn't count these. Check at the OS level:
 
 ```bash
 sudo ss -uamn sport = :2055        # inspect the d<N> field inside skmem:(...)
+sudo ss -uamn sport = :6343        # repeat for the stock sFlow listener
 grep ^Udp: /proc/net/snmp          # RcvbufErrors counter (system-wide)
 ```
 
@@ -213,13 +231,14 @@ Default retention is `10GB / 7d` per tier. The default is applied separately to 
 sudo journalctl --namespace netdata --since "10 minutes ago" | grep -iE 'netflow|geoip|bmp|bioris|network-sources'
 
 # What's arriving on the wire
-sudo tcpdump -i any -nn -c 50 'udp port 2055'
+sudo tcpdump -i any -nn -c 50 'udp port 2055 or udp port 6343'
 
 # Is the listener bound
-sudo ss -unlp | grep 2055
+sudo ss -unlp | grep -E ':(2055|6343)([[:space:]]|$)'
 
 # UDP kernel drops
 sudo ss -uamn sport = :2055
+sudo ss -uamn sport = :6343
 grep ^Udp: /proc/net/snmp
 
 # Disk usage by tier
@@ -229,7 +248,7 @@ sudo du -sh /var/cache/netdata/flows/*
 top -p $(pgrep -f netflow-plugin)
 
 # Capture a sample for offline analysis
-sudo tcpdump -w /tmp/netflow-sample.cap -c 200 'udp port 2055'
+sudo tcpdump -w /tmp/flow-sample.cap -c 200 'udp port 2055 or udp port 6343'
 ```
 
 ## When to file an issue

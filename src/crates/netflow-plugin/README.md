@@ -234,7 +234,9 @@ Example:
 enabled: true
 
 listener:
-  listen: "0.0.0.0:2055"
+  listen:
+    - "0.0.0.0:2055"
+    - "0.0.0.0:6343"
 
 protocols:
   v5: true

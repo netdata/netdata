@@ -6,7 +6,9 @@ pub(crate) struct ListenerConfig {
     #[arg(
         long = "netflow-listen",
         value_name = "ADDR",
-        default_values_t = default_netflow_listen()
+        default_values_t = default_netflow_listen(),
+        value_delimiter = ',',
+        value_parser = parse_listener_endpoint,
     )]
     #[serde(default = "default_netflow_listen")]
     #[serde(deserialize_with = "deserialize_listen")]
@@ -56,7 +58,20 @@ where
     }
 
     match ListenValue::deserialize(deserializer)? {
-        ListenValue::Scalar(value) => Ok(vec![value]),
-        ListenValue::List(values) => Ok(values),
+        ListenValue::Scalar(value) => parse_listener_endpoint(&value)
+            .map(|value| vec![value])
+            .map_err(serde::de::Error::custom),
+        ListenValue::List(values) => values
+            .into_iter()
+            .map(|value| parse_listener_endpoint(&value).map_err(serde::de::Error::custom))
+            .collect(),
     }
+}
+
+fn parse_listener_endpoint(value: &str) -> std::result::Result<String, String> {
+    let endpoint = value.trim();
+    if endpoint.is_empty() {
+        return Err("listener address must not be empty".to_string());
+    }
+    Ok(endpoint.to_string())
 }

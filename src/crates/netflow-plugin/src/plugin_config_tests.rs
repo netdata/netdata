@@ -276,7 +276,7 @@ sync_interval: 1s
     let list: ListenerConfig = serde_yaml::from_str(
         r#"
 listen:
-  - "127.0.0.1:2055"
+  - " 127.0.0.1:2055 "
   - "127.0.0.1:6343"
 max_packet_size: 9216
 sync_every_entries: 0
@@ -307,6 +307,44 @@ fn listener_cli_accepts_repeated_listen_flags() {
     );
     cfg.validate()
         .expect("repeatable listener CLI should validate");
+}
+
+#[test]
+fn listener_cli_accepts_comma_delimited_listen_values() {
+    let cfg = PluginConfig::try_parse_from([
+        "netflow-plugin",
+        "--netflow-listen",
+        " 127.0.0.1:2055 , 127.0.0.1:6343 ",
+    ])
+    .expect("comma-delimited listener CLI should parse");
+
+    assert_eq!(
+        cfg.listener.listen,
+        vec!["127.0.0.1:2055".to_string(), "127.0.0.1:6343".to_string()]
+    );
+    cfg.validate()
+        .expect("comma-delimited listener CLI should validate");
+}
+
+#[test]
+fn listener_cli_single_override_replaces_default_list() {
+    let cfg =
+        PluginConfig::try_parse_from(["netflow-plugin", "--netflow-listen", "127.0.0.1:2055"])
+            .expect("single listener CLI override should parse");
+
+    assert_eq!(cfg.listener.listen, vec!["127.0.0.1:2055".to_string()]);
+}
+
+#[test]
+fn listener_cli_rejects_empty_comma_values() {
+    let err = PluginConfig::try_parse_from(["netflow-plugin", "--netflow-listen", " , "])
+        .expect_err("empty comma-delimited listener should fail");
+
+    assert!(
+        err.to_string()
+            .contains("listener address must not be empty"),
+        "unexpected CLI parse error: {err}"
+    );
 }
 
 #[test]

@@ -32,7 +32,7 @@ For full documentation including vendor configuration examples, sampling caveats
 handling and verification steps, see the [Network Flows Overview](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/).
 
 
-The plugin listens on a configurable UDP socket for NetFlow datagrams.
+The plugin listens on configurable UDP listener sockets for NetFlow datagrams.
 NetFlow v5 and v7 records are decoded directly. NetFlow v9 records are decoded using
 dynamic templates cached from the exporter. Decoded records are enriched in-memory
 and appended to disk-backed journal tiers (raw, 1-minute, 5-minute, 1-hour rollups).
@@ -47,7 +47,7 @@ This integration runs as a single instance per Netdata Agent.
 
 #### Auto-Detection
 
-The plugin starts when enabled in netflow.yaml and listens on the configured UDP port.
+The stock configuration enables the plugin and listens on the configured UDP ports.
 
 #### Limits
 
@@ -82,7 +82,7 @@ The plugin is configured via `netflow.yaml` in the Netdata configuration directo
 
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
-| listener.listen | UDP endpoint for NetFlow datagrams. | 0.0.0.0:2055 | no |
+| listener.listen | UDP listener endpoints for NetFlow/IPFIX and sFlow datagrams. YAML accepts either a scalar endpoint or a list of endpoints; CLI accepts repeated `--netflow-listen` flags or comma-delimited values. | 0.0.0.0:2055, 0.0.0.0:6343 | no |
 | protocols.v5 | Enable NetFlow v5 decoding. | yes | no |
 | protocols.v7 | Enable NetFlow v7 decoding. | yes | no |
 | protocols.v9 | Enable NetFlow v9 decoding. | yes | no |
@@ -112,12 +112,14 @@ sudo ./edit-config netflow.yaml
 
 ###### Basic NetFlow v5/v9 collection
 
-Listen on Netdata's default flow listener port for v5 and v9 records.
+Use Netdata's stock listener set for v5 and v9 records.
 
 ```yaml
 enabled: true
 listener:
-  listen: "0.0.0.0:2055"
+  listen:
+    - "0.0.0.0:2055"
+    - "0.0.0.0:6343"
 protocols:
   v5: true
   v9: true

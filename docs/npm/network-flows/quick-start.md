@@ -17,7 +17,7 @@ Get flow monitoring running in 15 minutes. The path: install the plugin, configu
 - The Netdata Agent is running on the host that will collect flow data.
 - The [netflow plugin is installed](/docs/npm/network-flows/installation.md) on that host.
 - You can configure flow export on at least one router or switch.
-- The router can reach the agent's IP on UDP port 2055.
+- The router can reach the agent's IP on the matching UDP listener port: `2055` for NetFlow/IPFIX, or `6343` for sFlow.
 
 If the plugin isn't installed yet, follow the [Installation page](/docs/npm/network-flows/installation.md) first.
 
@@ -84,7 +84,7 @@ Notes:
 ```
 sflow run
 sflow source-interface Loopback0
-sflow destination 10.0.0.10 2055
+sflow destination 10.0.0.10 6343
 sflow polling-interval 30
 sflow sample dangerous 2000
 !
@@ -151,7 +151,7 @@ If the Sankey is empty after 60-90 seconds, work through this:
 1. **Datagrams arriving at the host.**
 
    ```bash
-   sudo tcpdump -i any -nn -c 20 'udp port 2055'
+   sudo tcpdump -i any -nn -c 20 'udp port 2055 or udp port 6343'
    ```
 
    If you see packets, the network path is fine. If not, check the router's exporter status, the firewall, and the source IP the router uses.
@@ -159,7 +159,7 @@ If the Sankey is empty after 60-90 seconds, work through this:
 2. **Listener bound on the host.**
 
    ```bash
-   sudo ss -unlp | grep 2055
+   sudo ss -unlp | grep -E ':(2055|6343)([[:space:]]|$)'
    ```
 
    Should show `netflow-plugin` listening. If not, see [Troubleshooting](/docs/npm/network-flows/troubleshooting.md).
