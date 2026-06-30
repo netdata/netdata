@@ -951,6 +951,7 @@ int netdata_main(int argc, char **argv) {
     netdata_conf_section_directories();
     nd_win_trace("netdata_conf_section_directories done");
     netdata_conf_section_logs();
+    nd_win_trace("netdata_conf_section_logs done");
     nd_log_limits_unlimited();
     nd_win_trace("nd_log_initialize...");
     nd_log_initialize();
