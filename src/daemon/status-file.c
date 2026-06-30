@@ -58,7 +58,72 @@ static DAEMON_STATUS_FILE session_status = {
     },
 };
 
+typedef struct daemon_status_fatal_snapshot {
+    char filename[sizeof(session_status.fatal.filename)];
+    char function[sizeof(session_status.fatal.function)];
+    char errno_str[sizeof(session_status.fatal.errno_str)];
+    char message[sizeof(session_status.fatal.message)];
+    char stack_trace[sizeof(session_status.fatal.stack_trace)];
+    char thread[sizeof(session_status.fatal.thread)];
+    pid_t thread_id;
+    long line;
+    uint32_t worker_job_id;
+} DAEMON_STATUS_FATAL_SNAPSHOT;
+
+static DAEMON_STATUS_FATAL_SNAPSHOT fatal_snapshot = { 0 };
+
 static void daemon_status_file_out_of_memory(void);
+
+static void fatal_snapshot_store_string(char *dst, const char *src, size_t size) {
+    if(!size)
+        return;
+
+    __atomic_store_n(&dst[0], '\0', __ATOMIC_RELEASE);
+
+    if(!src)
+        return;
+
+    size_t i = 0;
+    for(; i < size - 1 && src[i] ; i++)
+        __atomic_store_n(&dst[i], src[i], __ATOMIC_RELEASE);
+
+    __atomic_store_n(&dst[i], '\0', __ATOMIC_RELEASE);
+}
+
+static const char *fatal_snapshot_load_string(const char *src, char *dst, size_t size) {
+    if(!size)
+        return "";
+
+    size_t i = 0;
+    for(; i < size - 1 ; i++) {
+        char c = __atomic_load_n(&src[i], __ATOMIC_ACQUIRE);
+        dst[i] = c;
+
+        if(!c)
+            return dst;
+    }
+
+    dst[i] = '\0';
+    return dst;
+}
+
+static void daemon_status_file_publish_fatal_snapshot(void) {
+    fatal_snapshot_store_string(
+        fatal_snapshot.filename, session_status.fatal.filename, sizeof(fatal_snapshot.filename));
+    fatal_snapshot_store_string(
+        fatal_snapshot.function, session_status.fatal.function, sizeof(fatal_snapshot.function));
+    fatal_snapshot_store_string(
+        fatal_snapshot.message, session_status.fatal.message, sizeof(fatal_snapshot.message));
+    fatal_snapshot_store_string(
+        fatal_snapshot.errno_str, session_status.fatal.errno_str, sizeof(fatal_snapshot.errno_str));
+    fatal_snapshot_store_string(
+        fatal_snapshot.stack_trace, session_status.fatal.stack_trace, sizeof(fatal_snapshot.stack_trace));
+    fatal_snapshot_store_string(fatal_snapshot.thread, session_status.fatal.thread, sizeof(fatal_snapshot.thread));
+
+    __atomic_store_n(&fatal_snapshot.thread_id, session_status.fatal.thread_id, __ATOMIC_RELEASE);
+    __atomic_store_n(&fatal_snapshot.line, session_status.fatal.line, __ATOMIC_RELEASE);
+    __atomic_store_n(&fatal_snapshot.worker_job_id, session_status.fatal.worker_job_id, __ATOMIC_RELEASE);
+}
 
 static void copy_and_clean_thread_name_if_empty(DAEMON_STATUS_FILE *ds, const char *name) {
     if(ds->fatal.thread[0] && strcmp(ds->fatal.thread, "NO_NAME") != 0)
@@ -1355,6 +1420,7 @@ static void daemon_status_file_save_twice_if_we_can_get_stack_trace(BUFFER *wb, 
     else
 #endif
         set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "no stack trace backend available");
+    daemon_status_file_publish_fatal_snapshot();
 
     // save it without a stack trace to be sure we will have the event
     daemon_status_file_save(wb, ds, false);
@@ -1373,9 +1439,11 @@ static void daemon_status_file_save_twice_if_we_can_get_stack_trace(BUFFER *wb, 
         (!ds->fatal.function[0] || strncmp(ds->fatal.function, "thread:", 7) == 0))
         safecpy(ds->fatal.function, first_nd_fn);
 #endif
+    daemon_status_file_publish_fatal_snapshot();
 
     if(buffer_strlen(wb) > 0) {
         safecpy(ds->fatal.stack_trace, buffer_tostring(wb));
+        daemon_status_file_publish_fatal_snapshot();
 
         daemon_status_file_save(wb, ds, false);
     }
@@ -1421,6 +1489,8 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
 
     if(line)
         session_status.fatal.line = line;
+
+    daemon_status_file_publish_fatal_snapshot();
 
     spinlock_unlock(&session_status.fatal.spinlock);
     dsf_release(session_status);
@@ -1504,6 +1574,8 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
         }
     }
 
+    daemon_status_file_publish_fatal_snapshot();
+
     dsf_release(session_status);
 
     // the buffer should already be allocated, so this should normally do nothing
@@ -1566,6 +1638,7 @@ void daemon_status_file_shutdown_timeout(BUFFER *trace) {
     dsf_release(session_status);
 
     safecpy(session_status.fatal.function, "shutdown_timeout");
+    daemon_status_file_publish_fatal_snapshot();
 
     static_save_buffer_init();
     daemon_status_file_save(static_save_buffer, &session_status, false);
@@ -1585,6 +1658,8 @@ void daemon_status_file_shutdown_step(const char *step, const char *step_timings
 
     if(step_timings && *step_timings && stack_trace_is_empty(&session_status))
         safecpy(session_status.fatal.stack_trace, step_timings);
+
+    daemon_status_file_publish_fatal_snapshot();
 
     daemon_status_file_update_status(DAEMON_STATUS_EXITING);
 
@@ -1616,6 +1691,8 @@ void daemon_status_file_startup_step(const char *step) {
         safecpy(session_status.fatal.function, step);
     else
         session_status.fatal.function[0] = '\0';
+
+    daemon_status_file_publish_fatal_snapshot();
 
     daemon_status_file_update_status(DAEMON_STATUS_INITIALIZING);
 }
@@ -1672,23 +1749,28 @@ const char *daemon_status_file_get_timezone(void) {
 }
 
 const char *daemon_status_file_get_fatal_filename(void) {
-    return session_status.fatal.filename;
+    static __thread char filename[sizeof(fatal_snapshot.filename)];
+    return fatal_snapshot_load_string(fatal_snapshot.filename, filename, sizeof(filename));
 }
 
 const char *daemon_status_file_get_fatal_function(void) {
-    return session_status.fatal.function;
+    static __thread char function[sizeof(fatal_snapshot.function)];
+    return fatal_snapshot_load_string(fatal_snapshot.function, function, sizeof(function));
 }
 
 const char *daemon_status_file_get_fatal_message(void) {
-    return session_status.fatal.message;
+    static __thread char message[sizeof(fatal_snapshot.message)];
+    return fatal_snapshot_load_string(fatal_snapshot.message, message, sizeof(message));
 }
 
 const char *daemon_status_file_get_fatal_errno(void) {
-    return session_status.fatal.errno_str;
+    static __thread char errno_str[sizeof(fatal_snapshot.errno_str)];
+    return fatal_snapshot_load_string(fatal_snapshot.errno_str, errno_str, sizeof(errno_str));
 }
 
 const char *daemon_status_file_get_fatal_stack_trace(void) {
-    return session_status.fatal.stack_trace;
+    static __thread char stack_trace[sizeof(fatal_snapshot.stack_trace)];
+    return fatal_snapshot_load_string(fatal_snapshot.stack_trace, stack_trace, sizeof(stack_trace));
 }
 
 const char *daemon_status_file_get_stack_trace_backend(void) {
@@ -1696,7 +1778,8 @@ const char *daemon_status_file_get_stack_trace_backend(void) {
 }
 
 const char *daemon_status_file_get_fatal_thread(void) {
-    return session_status.fatal.thread;
+    static __thread char thread[sizeof(fatal_snapshot.thread)];
+    return fatal_snapshot_load_string(fatal_snapshot.thread, thread, sizeof(thread));
 }
 
 const char *daemon_status_file_get_sys_vendor(void) {
@@ -1712,11 +1795,11 @@ const char *daemon_status_file_get_product_type(void) {
 }
 
 pid_t daemon_status_file_get_fatal_thread_id(void) {
-    return session_status.fatal.thread_id;
+    return __atomic_load_n(&fatal_snapshot.thread_id, __ATOMIC_ACQUIRE);
 }
 
 long daemon_status_file_get_fatal_line(void) {
-    return session_status.fatal.line;
+    return __atomic_load_n(&fatal_snapshot.line, __ATOMIC_ACQUIRE);
 }
 
 DAEMON_STATUS daemon_status_file_get_status(void) {
@@ -1736,5 +1819,5 @@ ND_MACHINE_GUID daemon_status_file_get_host_id(void) {
 }
 
 size_t daemon_status_file_get_fatal_worker_job_id(void) {
-    return session_status.fatal.worker_job_id;
+    return __atomic_load_n(&fatal_snapshot.worker_job_id, __ATOMIC_ACQUIRE);
 }
