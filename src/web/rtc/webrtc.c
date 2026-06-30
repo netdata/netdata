@@ -127,6 +127,22 @@ static inline bool webrtc_dc_is_open(WEBRTC_DC *chan) {
     return __atomic_load_n(&chan->open, __ATOMIC_RELAXED);
 }
 
+static inline rtcState webrtc_conn_state(WEBRTC_CONN *conn) {
+    return __atomic_load_n(&conn->state, __ATOMIC_RELAXED);
+}
+
+static inline void webrtc_conn_set_state(WEBRTC_CONN *conn, rtcState state) {
+    __atomic_store_n(&conn->state, state, __ATOMIC_RELAXED);
+}
+
+static inline rtcGatheringState webrtc_conn_gathering_state(WEBRTC_CONN *conn) {
+    return __atomic_load_n(&conn->gathering_state, __ATOMIC_RELAXED);
+}
+
+static inline void webrtc_conn_set_gathering_state(WEBRTC_CONN *conn, rtcGatheringState state) {
+    __atomic_store_n(&conn->gathering_state, state, __ATOMIC_RELAXED);
+}
+
 static void cleanupConnections(void);
 
 static void webrtc_config_ice_servers(void) {
@@ -515,7 +531,7 @@ static WEBRTC_CONN *webrtc_connection_to_destroy_unsafe(void) {
     while(conn) {
         WEBRTC_CONN *next = conn->link.next;
 
-        if(conn->state != RTC_CLOSED) {
+        if(webrtc_conn_state(conn) != RTC_CLOSED) {
             conn = next;
             continue;
         }
@@ -611,7 +627,7 @@ static void myStateChangeCallback(int pc __maybe_unused, rtcState state, void *u
     WEBRTC_CONN *conn = user_ptr;
     internal_fatal(conn->pc != pc, "WEBRTC[%d]: pc mismatch, expected %d, got %d", conn->pc, conn->pc, pc);
 
-    conn->state = state;
+    webrtc_conn_set_state(conn, state);
 
     switch(state) {
         case RTC_NEW:
@@ -652,7 +668,7 @@ static void myGatheringStateCallback(int pc __maybe_unused, rtcGatheringState st
     WEBRTC_CONN *conn = user_ptr;
     internal_fatal(conn->pc != pc, "WEBRTC[%d]: pc mismatch, expected %d, got %d", conn->pc, conn->pc, pc);
 
-    conn->gathering_state = state;
+    webrtc_conn_set_gathering_state(conn, state);
 
     switch(state) {
         case RTC_GATHERING_NEW:
@@ -741,7 +757,7 @@ int webrtc_new_connection(const char *sdp, BUFFER *wb) {
     }
 
     bool logged = false;
-    while(conn->gathering_state != RTC_GATHERING_COMPLETE) {
+    while(webrtc_conn_gathering_state(conn) != RTC_GATHERING_COMPLETE) {
         if(!logged) {
             logged = true;
             internal_error(true, "WEBRTC[%d]: Waiting for gathering to complete", conn->pc);
