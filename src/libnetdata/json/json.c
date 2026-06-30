@@ -440,6 +440,7 @@ size_t json_walk_object(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_
                     sprintf(c,"%s%s%s", e->fullname, e->fullname[0]?".":"", ne.name);
                     if (unlikely(len>JSON_FULLNAME_LEN)) len=JSON_FULLNAME_LEN;
                     strncpy(ne.fullname, c, len);
+                    ne.fullname[len] = '\0';
                     freez(c);
                     start++;
                     key = 0;
