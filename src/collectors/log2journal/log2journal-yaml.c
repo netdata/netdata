@@ -248,18 +248,12 @@ static void yaml_print_multiline_value(const char *s, size_t depth) {
 }
 
 static bool needs_quotes_in_yaml(const char *str) {
-    // Lookup table for special YAML characters
-    static bool special_chars[256] = { false };
-    static bool table_initialized = false;
-
-    if (!table_initialized) {
-        // Initialize the lookup table
-        const char *special_chars_str = ":{}[],&*!|>'\"%@`^";
-        for (const char *c = special_chars_str; *c; ++c) {
-            special_chars[(unsigned char)*c] = true;
-        }
-        table_initialized = true;
-    }
+    static const bool special_chars[256] = {
+        [':'] = true, ['{'] = true, ['}'] = true, ['['] = true, [']'] = true,
+        [','] = true, ['&'] = true, ['*'] = true, ['!'] = true, ['|'] = true,
+        ['>'] = true, ['\''] = true, ['"'] = true, ['%'] = true, ['@'] = true,
+        ['`'] = true, ['^'] = true,
+    };
 
     while (*str) {
         if (special_chars[(unsigned char)*str]) {
