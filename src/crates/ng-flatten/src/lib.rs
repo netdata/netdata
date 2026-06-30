@@ -448,10 +448,12 @@ impl Flattener {
     ///   **int** — lossless and forward-compatible, so an unknown future enum
     ///   variant still survives and stays queryable.
     ///
-    /// The default variant is treated as absence (skipped, like logs'
-    /// `severity_number != 0`): `kind == UNSPECIFIED(0)` and `status.code ==
-    /// UNSET(0)` emit nothing. For a non-default value the raw int is always
-    /// emitted; the label only when the variant is known.
+    /// The default variant is treated as absence (skipped). Only the *skip* mirrors
+    /// logs' `severity_number != 0`; the dual label+raw-int *representation* is
+    /// span-specific (`SpanKind`/`StatusCode` are closed enums whose readable label
+    /// is worth indexing, unlike the open numeric `severity_number`). For a
+    /// non-default value the raw int is always emitted; the label only when the
+    /// variant is known.
     pub fn flatten_span(&mut self, span: &Span) -> Vec<Entry> {
         let mut out = Vec::new();
 
@@ -459,7 +461,8 @@ impl Flattener {
             self.scalar("name", Value::Str(span.name.clone()), &mut out);
         }
 
-        // kind: 0 = UNSPECIFIED ⇒ absence (default INTERNAL), skip.
+        // kind: 0 = UNSPECIFIED ⇒ absence, skip. (A consumer MAY treat UNSPECIFIED
+        // as INTERNAL; we do not synthesize INTERNAL here — we emit nothing.)
         if span.kind != 0 {
             if let Some(label) = span_kind_label(span.kind) {
                 self.scalar("kind", Value::Str(label.to_string()), &mut out);
@@ -553,6 +556,76 @@ pub struct ScopeGroup {
     pub records: Vec<Record>,
 }
 
+/// A W3C trace id: a fixed 16-byte identifier. The all-zero value is the
+/// OTLP/W3C "unset/invalid" sentinel. `Copy` + inline (no per-id heap allocation,
+/// unlike the raw OTLP `Vec<u8>`) and `Serialize`/`Deserialize` (it is carried in
+/// the WAL frame). Mirrors `sfst::TraceId`; the `ng-index` boundary converts
+/// between them (this crate has no `sfst` dependency).
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Serialize, Deserialize)]
+pub struct TraceId([u8; TRACE_ID_LEN]);
+
+/// A W3C span id: a fixed 8-byte identifier. See [`TraceId`] for the shared
+/// semantics; used for both `Span.span_id` and `Span.parent_span_id`.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Serialize, Deserialize)]
+pub struct SpanId([u8; SPAN_ID_LEN]);
+
+/// Generate the shared id API (`from_bytes`/`as_bytes`/`is_unset`/`UNSET`,
+/// `From<[u8; W]>`, hex `Display`) for the fixed-width id newtypes. Mirrors the
+/// `sfst` id types so the conversion at the `ng-index` boundary is a byte copy.
+macro_rules! id_newtype {
+    ($ty:ident, $width:expr) => {
+        impl $ty {
+            /// The all-zero "unset/invalid" id (OTLP/W3C sentinel).
+            pub const UNSET: Self = Self([0u8; $width]);
+
+            /// Parse **exactly** `$width` bytes; `None` for any other length. An
+            /// empty/wrong-length id is the caller's to map (commonly
+            /// `.unwrap_or_default()` → [`UNSET`](Self::UNSET)). Ingest normalization
+            /// ([`normalize_ids`]/[`normalize_trace_ids`]) already clears
+            /// wrong-length ids to empty, so a conformant id round-trips.
+            pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
+                <[u8; $width]>::try_from(bytes).ok().map(Self)
+            }
+
+            /// The raw fixed-width bytes.
+            pub fn as_bytes(&self) -> &[u8; $width] {
+                &self.0
+            }
+
+            /// Whether this is the all-zero unset/invalid sentinel.
+            pub fn is_unset(&self) -> bool {
+                self.0 == [0u8; $width]
+            }
+        }
+
+        impl From<[u8; $width]> for $ty {
+            fn from(bytes: [u8; $width]) -> Self {
+                Self(bytes)
+            }
+        }
+
+        impl std::fmt::Display for $ty {
+            /// Lowercase hex, the W3C trace-context text format.
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                for b in &self.0 {
+                    write!(f, "{b:02x}")?;
+                }
+                Ok(())
+            }
+        }
+
+        impl std::fmt::Debug for $ty {
+            /// Hex (via [`Display`]) so `{:?}`/log output is the readable W3C id.
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, concat!(stringify!($ty), "({})"), self)
+            }
+        }
+    };
+}
+
+id_newtype!(TraceId, TRACE_ID_LEN);
+id_newtype!(SpanId, SPAN_ID_LEN);
+
 /// One log record: its per-row scalar fields plus its flattened entries. The frame
 /// is **lossless** — every `LogRecord` field is carried here, either as a per-row
 /// column (the scalars below) or as flattened `entries`. What the SFST actually
@@ -578,8 +651,8 @@ pub struct ScopeGroup {
 pub struct Record {
     pub ts: i64,
     pub observed_ts: i64,
-    pub trace_id: Vec<u8>,
-    pub span_id: Vec<u8>,
+    pub trace_id: TraceId,
+    pub span_id: SpanId,
     pub flags: u32,
     pub dropped_attributes_count: u32,
     pub entries: Vec<Entry>,
@@ -609,8 +682,10 @@ pub struct SpanScopeGroup {
 }
 
 /// One span: its per-row columns plus its flattened entries (span analog of
-/// [`Record`]). Lossless within Stage-1 scope — `events`/`links`/`trace_state`/
-/// `status.message` are deferred (not yet carried).
+/// [`Record`]). **Not yet lossless** — deferred (not carried): `events[]`,
+/// `links[]`, `trace_state`, `status.message`, and the `dropped_events_count` /
+/// `dropped_links_count` counters (the latter two land with the events/links
+/// bodies, SOW Step 1b).
 ///
 /// Per-row columns (NOT FST facets): `ts` = the resolved `start_time_unix_nano`
 /// (the row-ordering key; callers MUST normalize first, see
@@ -623,9 +698,9 @@ pub struct SpanScopeGroup {
 pub struct SpanRecord {
     pub ts: i64,
     pub duration: i64,
-    pub trace_id: Vec<u8>,
-    pub span_id: Vec<u8>,
-    pub parent_span_id: Vec<u8>,
+    pub trace_id: TraceId,
+    pub span_id: SpanId,
+    pub parent_span_id: SpanId,
     pub flags: u32,
     pub dropped_attributes_count: u32,
     pub entries: Vec<Entry>,
@@ -664,8 +739,10 @@ pub fn flatten_into(
                     // ordering sane.
                     ts: i64::try_from(r.time_unix_nano).unwrap_or(i64::MAX),
                     observed_ts: i64::try_from(r.observed_time_unix_nano).unwrap_or(i64::MAX),
-                    trace_id: r.trace_id.clone(),
-                    span_id: r.span_id.clone(),
+                    // Ingest normalization (normalize_ids) already cleared any
+                    // wrong-length id to empty → from_bytes(empty) → UNSET.
+                    trace_id: TraceId::from_bytes(&r.trace_id).unwrap_or_default(),
+                    span_id: SpanId::from_bytes(&r.span_id).unwrap_or_default(),
                     flags: r.flags,
                     dropped_attributes_count: r.dropped_attributes_count,
                     entries: flattener.flatten_record(r),
@@ -821,7 +898,8 @@ pub fn flatten_request(request: &ExportLogsServiceRequest) -> FlattenedRequest {
 
 /// Span duration in nanoseconds (`end - start`), clamped to `0` when the end time
 /// is unset (`0`) or precedes the start (clock skew). Saturates a `u64` past
-/// `i64::MAX`. Absolute end is recoverable as `ts + duration`.
+/// `i64::MAX`. Absolute end is recoverable as `ts + duration` only when `ts` did
+/// not saturate (start ≤ `i64::MAX`).
 fn span_duration(span: &Span) -> i64 {
     if span.end_time_unix_nano == 0 || span.end_time_unix_nano < span.start_time_unix_nano {
         return 0;
@@ -859,9 +937,11 @@ pub fn flatten_trace_into(
                 .map(|sp| SpanRecord {
                     ts: i64::try_from(sp.start_time_unix_nano).unwrap_or(i64::MAX),
                     duration: span_duration(sp),
-                    trace_id: sp.trace_id.clone(),
-                    span_id: sp.span_id.clone(),
-                    parent_span_id: sp.parent_span_id.clone(),
+                    // Ingest normalization (normalize_trace_ids) already cleared any
+                    // wrong-length id to empty → from_bytes(empty) → UNSET.
+                    trace_id: TraceId::from_bytes(&sp.trace_id).unwrap_or_default(),
+                    span_id: SpanId::from_bytes(&sp.span_id).unwrap_or_default(),
+                    parent_span_id: SpanId::from_bytes(&sp.parent_span_id).unwrap_or_default(),
                     flags: sp.flags,
                     dropped_attributes_count: sp.dropped_attributes_count,
                     entries: flattener.flatten_span(sp),
@@ -1135,9 +1215,9 @@ mod tests {
         // Per-row columns.
         assert_eq!(sr.ts, 1_000);
         assert_eq!(sr.duration, 500);
-        assert_eq!(sr.trace_id, vec![0x11; 16]);
-        assert_eq!(sr.span_id, vec![0x22; 8]);
-        assert_eq!(sr.parent_span_id, vec![0x33; 8]);
+        assert_eq!(sr.trace_id, TraceId::from([0x11; 16]));
+        assert_eq!(sr.span_id, SpanId::from([0x22; 8]));
+        assert_eq!(sr.parent_span_id, SpanId::from([0x33; 8]));
         assert_eq!(sr.flags, 0x100);
         assert_eq!(sr.dropped_attributes_count, 2);
 
@@ -1186,6 +1266,68 @@ mod tests {
             req.resource_spans[0].scope_spans[0].spans[0].start_time_unix_nano,
             5_001
         );
+    }
+
+    #[test]
+    fn span_no_status_and_empty_name_emit_nothing() {
+        // status: None (vs Some(UNSET)) and an empty name → those facets absent;
+        // an unrelated facet (kind) still emits.
+        let mut f = Flattener::new();
+        let e = f.flatten_span(&Span { name: String::new(), kind: 2, status: None, ..Default::default() });
+        let l = f.into_tree().resolve(&e);
+        assert!(at(&l, "name").is_empty(), "empty name → no facet");
+        assert!(
+            at(&l, "status_code").is_empty() && at(&l, "_status_code").is_empty(),
+            "status None → no facet"
+        );
+        assert_eq!(at(&l, "kind"), [&Value::Str("SERVER".into())]);
+    }
+
+    #[test]
+    fn normalize_trace_ids_keeps_conformant() {
+        let mut req = trace_req(
+            Span {
+                trace_id: vec![1u8; 16],
+                span_id: vec![2u8; 8],
+                parent_span_id: vec![3u8; 8],
+                ..Default::default()
+            },
+            None,
+            None,
+        );
+        assert_eq!(normalize_trace_ids(&mut req), MalformedIds::default(), "conformant ids untouched");
+        let s = &req.resource_spans[0].scope_spans[0].spans[0];
+        assert_eq!((s.trace_id.len(), s.span_id.len(), s.parent_span_id.len()), (16, 8, 8));
+    }
+
+    #[test]
+    fn flatten_trace_into_shares_nodes_across_spans() {
+        // The schema tree is shared, so the same (path, kind) interns to one node
+        // across spans — not a per-span subtree.
+        let span = |name: &str| Span {
+            name: name.into(),
+            attributes: vec![kv("http.method", Av::StringValue("GET".into()))],
+            ..Default::default()
+        };
+        let req = ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                resource: None,
+                scope_spans: vec![ScopeSpans {
+                    scope: None,
+                    spans: vec![span("a"), span("b")],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        let mut f = Flattener::new();
+        let groups = flatten_trace_into(&mut f, &req);
+        let spans = &groups[0].scopes[0].spans;
+        assert_eq!(spans.len(), 2);
+        let node = |sr: &SpanRecord| {
+            sr.entries.iter().find(|e| e.value == Value::Str("GET".into())).unwrap().node
+        };
+        assert_eq!(node(&spans[0]), node(&spans[1]), "shared (path,kind) interns once across spans");
     }
 
     #[test]

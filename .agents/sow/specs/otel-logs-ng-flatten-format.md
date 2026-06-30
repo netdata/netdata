@@ -5,9 +5,15 @@
 - The on-WAL payload format for OTel **logs** and the SFST **v9** typed
   descriptor it produces, plus the field namespace, ingest normalization, and
   the seal/tail render-parity guarantee.
-- **Logs only.** Metrics and traces are different signals on the same gRPC
-  server and the same storage substrate; they do not use ng-flatten flattening
-  and are out of scope here.
+- **Logs only.** Metrics are a different signal on the same gRPC server and
+  storage substrate; they do not use ng-flatten flattening and are out of scope
+  here. **Traces update (in-flight):** a span flattening path now lives in
+  `ng-flatten` too (Decision 3A — extend the crate, not a sibling), with parallel
+  `SpanRecord`/`FlattenedTraceRequest` types that reuse the shared
+  `SchemaTree`/`Entry`/`flatten_resource`/`flatten_scope`. It is pre-graduation
+  (no producer wired yet); its durable contract will get its own spec when the
+  traces pipeline graduates. This spec remains the authority for the **logs**
+  frame + v9 descriptor.
 - Cross-references (do not duplicate): stream identity →
   [otel-stream-identity.md](otel-stream-identity.md); file lifecycle / substrate
   → [otel-storage-substrate.md](otel-storage-substrate.md); on-disk SFST chunk

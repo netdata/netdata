@@ -193,12 +193,11 @@ fn populate_row_index(
                     // Per-row columns, one value pushed per row (parallel to the
                     // row just fed) so they stay aligned for the build-time remap.
                     observed_ts.push(record.observed_ts);
-                    // Ingest already normalized ids to exactly 16/8 bytes or
-                    // empty (ng_flatten::normalize_ids); an empty/malformed id
-                    // resolves to the all-zero UNSET sentinel, preserving the
-                    // prior zero-padded behavior.
-                    trace_ids.push(TraceId::from_bytes(&record.trace_id).unwrap_or_default());
-                    span_ids.push(SpanId::from_bytes(&record.span_id).unwrap_or_default());
+                    // Convert the flattened id (already a typed, fixed-width
+                    // ng_flatten id) to the sfst column id — a byte copy across
+                    // the crate boundary (ng-flatten has no sfst dep).
+                    trace_ids.push(TraceId::from(*record.trace_id.as_bytes()));
+                    span_ids.push(SpanId::from(*record.span_id.as_bytes()));
                     flags.push(record.flags);
                     dropped_attrs.push(record.dropped_attributes_count);
                 }
