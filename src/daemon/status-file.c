@@ -1599,7 +1599,7 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
     // This can cause a deadlock when a signal is received while the lock is held.
     // The code is commented out to prevent the deadlock, at the cost of not saving the status file on a crash.
 #else
-    bool safe_to_get_stack_trace = reason != EXIT_REASON_SIGABRT || stacktrace_capture_is_async_signal_safe();
+    bool safe_to_get_stack_trace = reason != EXIT_REASON_SIGABRT && stacktrace_capture_is_async_signal_safe();
     bool get_stack_trace = stacktrace_available() && safe_to_get_stack_trace && stack_trace_is_empty(&session_status);
 
     // save it
@@ -1608,6 +1608,8 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
     else {
         if (!stacktrace_available())
             set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "no stack trace backend available");
+        else if(reason == EXIT_REASON_SIGABRT)
+            set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "fatal handler already captured the stack trace");
         else
             set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "not safe to get a stack trace for this signal using this backend");
 
