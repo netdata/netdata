@@ -49,7 +49,7 @@ func (c *Controller) dyncfgCmdAdd(fn dyncfg.Function) {
 
 	key, name, ok := c.cb.ExtractKey(fn)
 	if !ok {
-		c.api.SendCodef(fn, 400, "invalid job ID format.")
+		c.api.SendCodef(fn, 400, "invalid config ID format.")
 		return
 	}
 	if _, exists := c.lookup(key); exists {
@@ -60,8 +60,8 @@ func (c *Controller) dyncfgCmdAdd(fn dyncfg.Function) {
 		c.api.SendCodef(fn, 400, "%v", err)
 		return
 	}
-	if err := dyncfg.ValidateJobName(name); err != nil {
-		c.api.SendCodef(fn, 400, "invalid job name '%s': %v.", name, err)
+	if err := dyncfg.JobNameRuleAllowDots(name); err != nil {
+		c.api.SendCodef(fn, 400, "invalid config name '%s': %v.", name, err)
 		return
 	}
 
@@ -102,7 +102,7 @@ func (c *Controller) dyncfgCmdAdd(fn dyncfg.Function) {
 	}
 
 	c.api.SendCodef(fn, code, "%s", msg)
-	c.handler.NotifyJobCreate(cfg, entry.Status)
+	c.handler.NotifyConfigCreate(cfg, entry.Status)
 }
 
 func (c *Controller) dyncfgCmdSchema(fn dyncfg.Function) {
@@ -366,9 +366,9 @@ func secretStoreErrorCode(err error) int {
 }
 
 func secretStoreCommandCode(err error) int {
-	var ce interface{ Code() int }
+	var ce interface{ DyncfgCode() int }
 	if errors.As(err, &ce) {
-		return ce.Code()
+		return ce.DyncfgCode()
 	}
 	return secretStoreErrorCode(err)
 }

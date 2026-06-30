@@ -51,7 +51,7 @@ func (c *Controller) rememberDiscoveredConfig(cfg secretstore.Config) (*dyncfg.E
 	entry, ok := c.lookupInternal(cfg.ExposedKey())
 	if !ok {
 		entry = c.handler.AddDiscoveredConfig(cfg, dyncfg.StatusAccepted)
-		c.handler.NotifyJobCreate(cfg, dyncfg.StatusAccepted)
+		c.handler.NotifyConfigCreate(cfg, dyncfg.StatusAccepted)
 		return entry, true, nil
 	}
 
@@ -66,7 +66,7 @@ func (c *Controller) rememberDiscoveredConfig(cfg secretstore.Config) (*dyncfg.E
 	}
 
 	entry = c.handler.AddDiscoveredConfig(cfg, dyncfg.StatusAccepted)
-	c.handler.NotifyJobCreate(cfg, dyncfg.StatusAccepted)
+	c.handler.NotifyConfigCreate(cfg, dyncfg.StatusAccepted)
 	return entry, true, nil
 }
 
@@ -86,7 +86,7 @@ func (c *Controller) removeDiscoveredConfig(cfg secretstore.Config) (*dyncfg.Ent
 
 	c.cb.Stop(entry.Cfg)
 	c.cb.TakeCommandMessage()
-	c.handler.NotifyJobRemove(entry.Cfg)
+	c.handler.NotifyConfigRemove(entry.Cfg)
 	return entry, true
 }
 

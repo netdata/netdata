@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<response status="success">
+  <result>
+    <system>
+      <hostname>edge-fw-a</hostname>
+      <devicename>edge-fw-a</devicename>
+      <model>PA-850</model>
+      <serial>0123456789</serial>
+      <sw-version>11.1.2</sw-version>
+      <uptime>2 days, 03:04:05</uptime>
+      <operational-mode>normal</operational-mode>
+      <device-certificate-status>Valid</device-certificate-status>
+    </system>
+  </result>
+</response>

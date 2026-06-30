@@ -21,6 +21,14 @@
 #define PING_TIMEOUT    (60)  //Expect a ping response within this time (seconds)
 time_t ping_timeout = 0;
 
+// If mqtt_wss_service() keeps being entered with poll() reporting readiness but makes no
+// forward progress (no bytes moved and no clean poll() timeout) for this long, force a
+// reconnect. This breaks a no-progress one-core 100% CPU spin regardless of its cause (e.g.
+// a runtime poll()/SSL readiness quirk). The caller polls every ~1s and a healthy link
+// refreshes progress on every poll() timeout or byte moved, so this can only elapse during a
+// real spin, never on a quiet-but-healthy connection.
+#define MQTT_WSS_IO_WATCHDOG_SECS (2 * PING_TIMEOUT)
+
 #if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110) && (SSLEAY_VERSION_NUMBER >= OPENSSL_VERSION_097)
 #include <openssl/conf.h>
 #endif
@@ -89,6 +97,10 @@ struct mqtt_wss_client_struct {
     int write_notif_pipe[2];
     struct pollfd poll_fds[2];
 
+// monotonic time of the last forward progress (bytes moved or a clean poll() timeout);
+// drives the no-progress watchdog in mqtt_wss_service() (see MQTT_WSS_IO_WATCHDOG_SECS)
+    usec_t last_io_progress_ut;
+
     SSL_CTX *ssl_ctx;
     SSL *ssl;
     int ssl_flags;
@@ -123,6 +135,8 @@ static void mws_connack_callback_ng(void *user_ctx, int code)
     switch(code) {
         case 0:
             client->mqtt_connected = 1;
+            // (re)start the no-progress watchdog clock for this fresh connection
+            client->last_io_progress_ut = now_monotonic_usec();
             break;
 //TODO manual labor: all the CONNACK error codes with some nice error message
         default:
@@ -245,12 +259,35 @@ static int cert_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
         netdata_ssl_log_verify_error(ctx);
     }
 
-    if (!preverify_ok && err == X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT &&
-        client->ssl_flags & MQTT_WSS_SSL_ALLOW_SELF_SIGNED)
-    {
-        preverify_ok = 1;
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Self Signed Certificate Accepted as the connection was "
-                               "requested with MQTT_WSS_SSL_ALLOW_SELF_SIGNED");
+    if (!preverify_ok && (client->ssl_flags & MQTT_WSS_SSL_ALLOW_SELF_SIGNED)) {
+        // MQTT_WSS_SSL_ALLOW_SELF_SIGNED means "this connection accepts a
+        // certificate that wouldn't pass full validation". Cover the errors
+        // that on-prem deployments routinely hit:
+        //  - leaf is self-signed (no CA at all)
+        //  - cert subject does not match the configured hostname/IP
+        //    (DNS aliases, IP-only access, certs without proper SAN)
+        switch (err) {
+            case X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT:
+                preverify_ok = 1;
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "Self Signed Certificate Accepted as the connection was "
+                       "requested with MQTT_WSS_SSL_ALLOW_SELF_SIGNED");
+                break;
+            case X509_V_ERR_HOSTNAME_MISMATCH:
+                preverify_ok = 1;
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "Certificate hostname mismatch accepted as the connection "
+                       "was requested with MQTT_WSS_SSL_ALLOW_SELF_SIGNED");
+                break;
+            case X509_V_ERR_IP_ADDRESS_MISMATCH:
+                preverify_ok = 1;
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "Certificate IP address mismatch accepted as the connection "
+                       "was requested with MQTT_WSS_SSL_ALLOW_SELF_SIGNED");
+                break;
+            default:
+                break;
+        }
     }
 
     return preverify_ok;
@@ -412,6 +449,21 @@ int mqtt_wss_connect(
     if (!SSL_set_tlsext_host_name(client->ssl, client->target_host)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Error setting TLS SNI host");
         return -7;
+    }
+
+    if (!(client->ssl_flags & MQTT_WSS_SSL_DONT_CHECK_CERTS)) {
+        // target_host may be either a DNS hostname or an IP literal.
+        // X509_VERIFY_PARAM_set1_ip_asc() parses the string as an IP and
+        // matches against the cert's iPAddress SAN; it returns 0 if the
+        // string is not a valid IP. X509_VERIFY_PARAM_set1_host() matches
+        // against the dNSName SAN. Try the IP path first; if the input is
+        // not an IP literal, fall back to hostname matching.
+        X509_VERIFY_PARAM *param = SSL_get0_param(client->ssl);
+        if (!X509_VERIFY_PARAM_set1_ip_asc(param, client->target_host) &&
+            !X509_VERIFY_PARAM_set1_host(param, client->target_host, 0)) {
+            nd_log(NDLS_DAEMON, NDLP_ERR, "Error setting TLS hostname verification host");
+            return -7;
+        }
     }
 
     result = SSL_connect(client->ssl);
@@ -640,6 +692,9 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
 #endif
 
     if (ret == 0) {
+        // a clean poll() timeout means the loop blocked rather than spun: that is forward
+        // progress for the watchdog (a healthy idle link reaches here at the caller cadence)
+        client->last_io_progress_ut = now_monotonic_usec();
         time_t now = now_realtime_sec();
         if (send_keepalive) {
             // otherwise we shortened the timeout ourselves to take care of
@@ -663,6 +718,31 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
     client->stats.time_keepalive += t2 - t1;
 #endif
 
+    // Tear the connection down if the socket reports an unrecoverable error, or if we keep
+    // being re-entered with poll() reporting readiness but making no forward progress (a
+    // spin). In either case drop so the outer loop reconnects, rather than burning a core
+    // indefinitely. Guarded to an established connection (the handshake has its own timeouts).
+    if (client->mqtt_connected) {
+        // POLLERR/POLLNVAL are unrecoverable -> drop now. POLLHUP is intentionally NOT an
+        // immediate drop: it can accompany still-readable data (a graceful close carrying a
+        // final frame), so we let it fall through to SSL_read below, which drains the
+        // remaining bytes and then reports the close cleanly (SSL_ERROR_ZERO_RETURN). A dead
+        // socket that keeps signalling readiness without progress is caught by the watchdog.
+        if (unlikely(client->poll_fds[POLLFD_SOCKET].revents & (POLLERR | POLLNVAL))) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "ACLK: socket poll() reported error (revents=0x%x); dropping connection",
+                   (unsigned)client->poll_fds[POLLFD_SOCKET].revents);
+            return MQTT_WSS_ERR_CONN_DROP;
+        }
+        if (unlikely(now_monotonic_usec() - client->last_io_progress_ut >
+                     (usec_t)MQTT_WSS_IO_WATCHDOG_SECS * USEC_PER_SEC)) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "ACLK: no I/O progress for %d seconds while poll() kept reporting readiness; "
+                   "dropping connection to break a CPU spin", MQTT_WSS_IO_WATCHDOG_SECS);
+            return MQTT_WSS_ERR_CONN_DROP;
+        }
+    }
+
     client->poll_fds[POLLFD_SOCKET].events = 0;
 
     if ((ptr = rbuf_get_linear_insert_range(client->ws_client->buf_read, &size))) {
@@ -673,6 +753,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
             client->stats.bytes_rx += ret;
             spinlock_unlock(&client->stat_lock);
             rbuf_bump_head(client->ws_client->buf_read, ret);
+            client->last_io_progress_ut = now_monotonic_usec();
         } else {
             int errnobkp = errno;
             ret = SSL_get_error(client->ssl, ret);
@@ -716,6 +797,9 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
         case WS_CLIENT_CONNECTION_CLOSED:
             return MQTT_WSS_ERR_CONN_DROP;
 
+        case WS_CLIENT_BUFFER_FULL:
+            return MQTT_WSS_ERR_MSG_TOO_BIG;
+
         default:
             return MQTT_WSS_ERR_PROTO_WS;
     }
@@ -750,6 +834,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
             client->stats.bytes_tx += ret;
             spinlock_unlock(&client->stat_lock);
             rbuf_bump_tail(client->ws_client->buf_write, ret);
+            client->last_io_progress_ut = now_monotonic_usec();
         } else {
             int errnobkp = errno;
             ret = SSL_get_error(client->ssl, ret);
@@ -792,32 +877,66 @@ int mqtt_wss_publish5(mqtt_wss_client client,
                       uint8_t publish_flags,
                       uint16_t *packet_id)
 {
-    if (client->mqtt_disconnecting) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "mqtt_wss is disconnecting can't publish");
+    // topic_free is not yet supported: the rollback path inside mqtt_ng_publish
+    // can free topic asymmetrically across failure modes (see contract notes in
+    // mqtt_ng.h and the long comment below). Enforce NULL until that is fixed
+    // so callers don't silently leak a borrowed/allocated topic on failure.
+    internal_fatal(topic_free != NULL, "mqtt_wss_publish5: topic_free must be NULL until rollback ownership is made symmetric");
+
+    const char *fail_reason = NULL;
+    if (client->mqtt_disconnecting)
+        fail_reason = "mqtt_wss is disconnecting can't publish";
+    else if (!client->mqtt_connected)
+        fail_reason = "MQTT is offline. Can't send message.";
+
+    if (fail_reason) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "%s", fail_reason);
+        if (packet_id)
+            *packet_id = 0;
         if (msg_free)
             msg_free(msg);
         return 1;
     }
 
-    if (!client->mqtt_connected) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "MQTT is offline. Can't send message.");
-        if (msg_free)
-            msg_free(msg);
-        return 1;
-    }
-    uint8_t mqtt_flags = 0;
-
-    mqtt_flags = (publish_flags & MQTT_WSS_PUB_QOSMASK) << 1;
+    uint8_t mqtt_flags = (publish_flags & MQTT_WSS_PUB_QOSMASK) << 1;
     if (publish_flags & MQTT_WSS_PUB_RETAIN)
         mqtt_flags |= MQTT_PUBLISH_RETAIN;
 
+    // Failure-path ownership contract with mqtt_ng_publish:
+    //  - On MQTT_NG_MSGGEN_OK, msg is attached to a buffer fragment and the
+    //    transaction buffer will call msg_free after the message is ack'd.
+    //  - On any non-OK return, msg is never attached, so ownership stays with
+    //    us and we must call msg_free here.
+    //
+    //    Single-free invariant: msg is attached to a fragment only at the
+    //    final frag_set_external_data() inside mqtt_ng_generate_publish(),
+    //    after which the function commits unconditionally -- there is no
+    //    `goto fail_rollback` between attachment and commit. Every reachable
+    //    fail_rollback site therefore runs with msg unattached, so the
+    //    rollback walks no msg-bearing fragment and msg_free() is only ever
+    //    called by us. If a future change inserts a failure exit after
+    //    attaching msg but before commit, the rollback would also invoke
+    //    msg_free and this branch would double-free; preserve the invariant
+    //    or move responsibility entirely into mqtt_ng_publish().
+    //
+    //  - topic_free is intentionally NOT handled here. mqtt_ng_publish may
+    //    attach topic to a fragment via optimized_add() before failing, in
+    //    which case the rollback already invokes topic_free; if it fails
+    //    earlier, topic_free is never invoked at all. The current callers all
+    //    pass topic_free=NULL, so this asymmetry is harmless today.
     int rc = mqtt_ng_publish(client->mqtt, topic, topic_free, msg, msg_free, msg_len, mqtt_flags, packet_id);
-    if (rc == MQTT_NG_MSGGEN_MSG_TOO_BIG)
-        return MQTT_WSS_ERR_MSG_TOO_BIG;
+    if (rc != MQTT_NG_MSGGEN_OK) {
+        if (packet_id)
+            *packet_id = 0;
+        if (msg_free)
+            msg_free(msg);
+        if (rc == MQTT_NG_MSGGEN_MSG_TOO_BIG)
+            return MQTT_WSS_ERR_MSG_TOO_BIG;
+        return rc;
+    }
 
     mqtt_wss_wakeup(client);
-
-    return rc;
+    return MQTT_WSS_OK;
 }
 
 int mqtt_wss_subscribe(mqtt_wss_client client, char *topic, int max_qos_level)

@@ -81,8 +81,18 @@ void stream_sender_charts_and_replication_reset(struct sender_state *s) {
     // reset the state of all charts
     RRDSET *st;
     rrdset_foreach_read(st, s->host) {
+        // Decrement only when this chart actually contributed +1 to the host
+        // counter, i.e. when IN_PROGRESS was set. The previous condition
+        // (!FINISHED) over-decremented initial-state charts (no flags set, no
+        // prior +1) and relied on a force-zero safety net below to compensate.
+        // Force-zero is unsafe against concurrent claim-before-publish in
+        // stream_sender_send_rrdset_definition: a sender that has just
+        // incremented but not yet published IN_PROGRESS would be desynced from
+        // the counter we forcibly cleared. Use the precise condition instead.
+        // Pulse status is intentionally not flipped here -- the surrounding
+        // sender connect/disconnect lifecycle drives it (e.g. SND_DISCONNECTED).
         RRDSET_FLAGS old = rrdset_flag_set_and_clear(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
-        if(!(old & RRDSET_FLAG_SENDER_REPLICATION_FINISHED))
+        if(old & RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS)
             rrdhost_sender_replicating_charts_minus_one(st->rrdhost);
 
 #ifdef REPLICATION_TRACKING
@@ -100,13 +110,18 @@ void stream_sender_charts_and_replication_reset(struct sender_state *s) {
     }
     rrdset_foreach_done(st);
 
-    if(rrdhost_sender_replicating_charts(s->host) != 0) {
+    // Observability only. The per-chart loop now precisely balances
+    // contributions; a non-zero residual either reflects a concurrent
+    // claim-before-publish in flight (will resolve) or a real accounting bug
+    // worth investigating. Do NOT force-zero: that would desynchronize the
+    // counter from any in-flight sender's not-yet-published IN_PROGRESS flag.
+    size_t residual = rrdhost_sender_replicating_charts(s->host);
+    if(residual != 0) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "STREAM REPLAY ERROR: sender replicating instances counter should be zero, but it is %u"
-               " - resetting it to zero",
-               rrdhost_sender_replicating_charts(s->host));
-
-        rrdhost_sender_replicating_charts_zero(s->host);
+               "STREAM REPLAY: sender replicating-charts counter is %zu after reset "
+               "(expected 0); leaving it untouched to preserve any concurrent "
+               "claim-before-publish in flight",
+               residual);
     }
 
     stream_sender_replicating_charts_zero(s);
@@ -126,6 +141,19 @@ static void stream_sender_on_connect_and_disconnect(struct sender_state *s) {
     stream_sender_unlock(s);
 }
 
+// Record the interface the stream actually egresses on as the host's _net_default_iface label, so
+// the parent sees the real uplink. The OS-specific lookup (getsockname + getifaddrs match) lives in
+// libnetdata/os/socket_egress_interface; here we only stamp the label. This is correct under policy
+// routing / multi-WAN, where the main routing table's default route can point at a different
+// interface than the stream uses. Runs once per (re)connect and rides out with the first host-labels
+// push in on_ready_to_dispatch(); on failover the connection breaks and reconnects over the new
+// interface, so it re-evaluates automatically.
+static void stream_sender_update_egress_iface_label(struct sender_state *s) {
+    char iface[OS_IFNAME_MAX];
+    if (os_socket_egress_interface(s->sock.fd, iface, sizeof(iface)) && iface[0])
+        rrdlabels_add(s->host->rrdlabels, "_net_default_iface", iface, RRDLABEL_SRC_AUTO);
+}
+
 void stream_sender_on_connect(struct sender_state *s) {
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "STREAM SND [%s]: running on-connect hooks...",
@@ -136,6 +164,9 @@ void stream_sender_on_connect(struct sender_state *s) {
     stream_sender_on_connect_and_disconnect(s);
 
     s->thread.last_traffic_ut = now_monotonic_usec();
+
+    // record the real uplink interface before the first host-labels push
+    stream_sender_update_egress_iface_label(s);
 
     freez(s->thread.rbuf.b);
     s->thread.rbuf.size = PLUGINSD_LINE_MAX + 1;
@@ -164,6 +195,18 @@ void stream_sender_on_disconnect(struct sender_state *s) {
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "STREAM SND '%s': running on-disconnect hooks...",
            rrdhost_hostname(s->host));
+
+    // Stop new metadata pushes BEFORE the reset. New collectors that haven't
+    // yet entered stream_sender_send_rrdset_definition will fail the
+    // rrdhost_can_stream_metadata_to_parent() predicate and skip the
+    // bookkeeping entirely; in-flight collectors that already passed the
+    // predicate are caught by the post-CAS recheck in
+    // stream_sender_send_rrdset_definition (which then rolls back via atomic
+    // CAS, so the reset's per-chart accounting and the rollback do not
+    // double-decrement). The duplicate clear later in
+    // stream_sender_move_running_to_connector_or_remove_internal /
+    // stream_sender_remove is idempotent for atomic flag ops.
+    rrdhost_flag_clear(s->host, RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS);
 
     stream_sender_on_connect_and_disconnect(s);
 

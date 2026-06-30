@@ -315,6 +315,7 @@ done:
 static void commit_alert_events(RRDHOST *host)
 {
     sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res_version = NULL;
 
     if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_ALERT_TO_DUMMY, &res))
         return;
@@ -325,7 +326,6 @@ static void commit_alert_events(RRDHOST *host)
     int64_t first_sequence_id = 0;
     int64_t last_sequence_id = 0;
 
-    sqlite3_stmt *res_version = NULL;
     param = 0;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
 
@@ -349,6 +349,7 @@ static void commit_alert_events(RRDHOST *host)
 done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
+    SQLITE_FINALIZE(res_version);
 }
 
 typedef enum {
@@ -402,8 +403,8 @@ void health_alarm_log_populate(
     char *source = (char *) sqlite3_column_text(res, SOURCE);
     alarm_log->command = source ? health_edit_command_from_source(source) : strdupz("UNKNOWN=0=UNKNOWN");
 
-    alarm_log->chart = strdupz((char *) sqlite3_column_text(res, CHART));
-    alarm_log->name = strdupz((char *) sqlite3_column_text(res, NAME));
+    alarm_log->chart = sqlite3_text_strdupz_empty(res, CHART);
+    alarm_log->name = sqlite3_text_strdupz_empty(res, NAME);
 
     alarm_log->when = sqlite3_column_int64(res, WHEN_KEY);
 
@@ -426,7 +427,9 @@ void health_alarm_log_populate(
     time_t duration = sqlite3_column_int64(res, DURATION);
     alarm_log->duration =  (duration > 0) ? duration : 0;
 
-    alarm_log->non_clear_duration = sqlite3_column_int64(res, NON_CLEAR_DURATION);
+    int64_t non_clear_duration = sqlite3_column_int64(res, NON_CLEAR_DURATION);
+    alarm_log->non_clear_duration = (non_clear_duration <= 0) ? 0 :
+                                    (non_clear_duration > UINT32_MAX) ? UINT32_MAX : (uint32_t)non_clear_duration;
 
     alarm_log->status = rrdcalc_status_to_proto_enum(current_status);
     alarm_log->old_status = rrdcalc_status_to_proto_enum((RRDCALC_STATUS)sqlite3_column_int64(res, OLD_STATUS));
@@ -512,7 +515,7 @@ static void aclk_push_alert_event(RRDHOST *host, sqlite3_stmt **res, sqlite3_stm
 
     param = 0;
     RRDCALC_STATUS status;
-    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
     while (sqlite3_step_monitored(*res) == SQLITE_ROW) {
         health_alarm_log_populate(&alarm_log, *res, host, &status);
         aclk_send_alarm_log_entry(&alarm_log);
@@ -667,7 +670,7 @@ bool process_alert_pending_queue(RRDHOST *host)
         RRDCALC_STATUS new_status = sqlite3_column_int(res, 2);
         int64_t row = sqlite3_column_int64(res, 3);
 
-        struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+        struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
         if (aclk_host_config) {
             int ret = insert_alert_to_submit_queue(host, health_log_id, unique_id, new_status);
             if (ret == 0)
@@ -703,7 +706,7 @@ void aclk_push_alert_events_for_all_hosts(void)
 
         rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
 
-        struct aclk_sync_cfg_t *aclk_host_config = host->aclk_host_config;
+        struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
         if (!aclk_host_config || false == aclk_host_config->stream_alerts || rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
             (void)process_alert_pending_queue(host);
             commit_alert_events(host);
@@ -805,7 +808,7 @@ void aclk_send_alert_configuration(char *config_hash)
     if (unlikely(!config_hash))
         return;
 
-    struct aclk_sync_cfg_t *aclk_host_config = localhost->aclk_host_config;
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&localhost->aclk_host_config, __ATOMIC_ACQUIRE);
 
     if (unlikely(!aclk_host_config))
         return;
@@ -832,7 +835,7 @@ void aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_has
 
     RRDHOST *host = rrdhost_find_by_node_id(node_id);
 
-    if (!host || !(aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED))) {
+    if (!host || !(aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE))) {
         freez(config_hash);
         freez(node_id);
         return;
@@ -1049,7 +1052,7 @@ done:
 #define ALARM_EVENTS_PER_CHUNK 1000
 void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
 {
-    struct aclk_sync_cfg_t *aclk_host_config = host->aclk_host_config;
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
 
     if (unlikely(!host)) {
         nd_log(NDLS_ACCESS, NDLP_WARNING, "AC [%s (N/A)]: Node id not found", aclk_host_config->node_id);
@@ -1155,7 +1158,7 @@ void aclk_start_alert_streaming(char *node_id, uint64_t cloud_version)
     struct aclk_sync_cfg_t *aclk_host_config;
     RRDHOST *host = rrdhost_find_by_node_id(node_id);
 
-    if (!host || !(aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED))) {
+    if (!host || !(aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE))) {
         nd_log(NDLS_ACCESS, NDLP_NOTICE, "ACLK STA [%s (N/A)]: Ignoring request to stream alert state changes, invalid node.", node_id);
         return;
     }
@@ -1190,7 +1193,7 @@ void aclk_alert_version_check(char *node_id, char *claim_id, uint64_t cloud_vers
     struct aclk_sync_cfg_t *aclk_host_config;
     RRDHOST *host = rrdhost_find_by_node_id(node_id);
 
-    if (!host || !(aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED)))
+    if (!host || !(aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE)))
         nd_log(NDLS_ACCESS, NDLP_NOTICE,
                "ACLK REQ [%s (N/A)]: ALERTS CHECKPOINT VALIDATION REQUEST RECEIVED FOR INVALID NODE",
                node_id);

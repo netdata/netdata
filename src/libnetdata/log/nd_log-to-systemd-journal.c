@@ -93,10 +93,8 @@ bool nd_logger_journal_libsystemd(struct log_field *fields __maybe_unused, size_
     //
     // UPDATE ALL OF THEM FOR NEW FEATURES OR FIXES
 
-    struct iovec iov[fields_max];
+    struct iovec iov[THREAD_FIELDS_MAX];
     int iov_count = 0;
-
-    memset(iov, 0, sizeof(iov));
 
     CLEAN_BUFFER *tmp = NULL;
 
@@ -179,12 +177,8 @@ bool nd_logger_journal_libsystemd(struct log_field *fields __maybe_unused, size_
         }
     }
 
-    // Clean up allocated memory
-    for (int i = 0; i < iov_count; i++) {
-        if (iov[i].iov_base != NULL) {
-            free(iov[i].iov_base);
-        }
-    }
+    for (int i = 0; i < iov_count; i++)
+        free(iov[i].iov_base);
 
     return r == 0;
 #else

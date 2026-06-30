@@ -104,6 +104,9 @@ void ctx_get_chart_list(nd_uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, 
     param = 0;
     SQL_CHART_DATA chart_data = { 0 };
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+        if (unlikely(exit_initiated_get()))
+            break;
+
         if (unlikely(!sqlite3_column_uuid_copy(res, 0, chart_data.chart_id))) {
             error_report("CTX [%s]: Got invalid chart id in column 0. Ignoring it.", host_guid);
             continue;
@@ -127,7 +130,7 @@ done:
 }
 
 // Dimension list
-#define CTX_GET_DIMENSION_LIST  "SELECT d.dim_id, d.id, d.name, CASE WHEN INSTR(d.options,\"hidden\") > 0 THEN 1 ELSE 0 END, c.type||'.'||c.id, c.context " \
+#define CTX_GET_DIMENSION_LIST  "SELECT d.dim_id, d.id, d.name, CASE WHEN INSTR(d.options,\"hidden\") > 0 THEN 1 ELSE 0 END, c.type||'.'||c.id, c.context, d.algorithm " \
     "FROM dimension d, chart c WHERE c.host_id = @host_id AND d.chart_id = c.chart_id AND d.dim_id IS NOT NULL ORDER BY d.rowid ASC"
 void ctx_get_dimension_list(nd_uuid_t *host_uuid, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data)
 {
@@ -146,6 +149,9 @@ void ctx_get_dimension_list(nd_uuid_t *host_uuid, void (*dict_cb)(SQL_DIMENSION_
 
     param = 0;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+        if (unlikely(exit_initiated_get()))
+            break;
+
         if (unlikely(!sqlite3_column_uuid_copy(res, 0, dimension_data.dim_id))) {
             error_report("CTX [%s]: Got invalid dimension id in column 0. Ignoring it.", host_guid);
             continue;
@@ -156,6 +162,7 @@ void ctx_get_dimension_list(nd_uuid_t *host_uuid, void (*dict_cb)(SQL_DIMENSION_
         dimension_data.hidden = sqlite3_column_int(res, 3);
         dimension_data.chart_id = (char *) sqlite3_column_text(res, 4);
         dimension_data.context = (char *) sqlite3_column_text(res, 5);
+        dimension_data.algorithm = sqlite3_column_int(res, 6);
         dict_cb(&dimension_data, data);
     }
 
@@ -213,6 +220,9 @@ void ctx_get_context_list(nd_uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEX
     param = 0;
 
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+        if (unlikely(exit_initiated_get()))
+            break;
+
         context_data.id = (char *) sqlite3_column_text(res, 0);
         context_data.version = sqlite3_column_int64(res, 1);
         context_data.title = (char *) sqlite3_column_text(res, 2);

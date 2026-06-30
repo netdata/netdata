@@ -6,6 +6,9 @@
 // the queue of executed alarm notifications that haven't been waited for yet
 static ALARM_ENTRY *alarm_notifications_in_progress = NULL;
 
+// how often the notification wait loop wakes up to re-check shutdown and the deadline
+#define HEALTH_NOTIFICATION_WAIT_SLICE_MS 1000
+
 struct health_raised_summary {
     RRDHOST *host;
     DICTIONARY *rrdcalc_dict;
@@ -35,9 +38,37 @@ void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
         goto cleanup;
     }
 
-    code = spawn_popen_wait(ae->popen_instance);
+    // bound the wait so a hung notification process (seen on Windows, where msys children can
+    // wedge during startup) cannot block the single health thread - and with it all health
+    // evaluation. Each slice is always bounded; the overall wait is bounded only when a non-zero
+    // timeout is configured. timeout == 0 means "wait forever" - the loop then breaks only on
+    // child exit or shutdown. The deadline is monotonic, so a wall-clock jump cannot extend it.
+    int32_t timeout = health_globals.config.notification_execution_timeout_seconds;
+    usec_t deadline_ut = now_monotonic_usec() + (usec_t)timeout * USEC_PER_SEC;
+
+    while(true) {
+        SPAWN_TIMEDWAIT_RESULT r = spawn_popen_timedwait(ae->popen_instance, HEALTH_NOTIFICATION_WAIT_SLICE_MS, &code);
+        if(r == SPAWN_TIMEDWAIT_EXITED)
+            break;
+
+        // RUNNING: keep waiting unless we should stop. ERROR: the wait broke and must never be
+        // looped on (it would spin forever at timeout == 0), so always fall through to the kill.
+        // re-check shutdown every slice, so a slow notification cannot block agent exit.
+        bool deadline_reached = (timeout > 0 && now_monotonic_usec() >= deadline_ut);
+        if(r == SPAWN_TIMEDWAIT_ERROR || unlikely(!service_running(SERVICE_HEALTH)) || deadline_reached) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "HEALTH: alert notification '%s' (pid %d) %s - killing it",
+                   ae_name(ae), (int)spawn_popen_pid(ae->popen_instance),
+                   (r == SPAWN_TIMEDWAIT_ERROR) ? "could not be waited for (status channel error)"
+                                                : "is still running past its execution timeout");
+
+            spawn_popen_kill(ae->popen_instance, 0);
+            code = 128;
+            break;
+        }
+    }
     ae->popen_instance = NULL;
-    netdata_log_debug(D_HEALTH, "done executing command - returned with code %d", ae->exec_code);
+    netdata_log_debug(D_HEALTH, "done executing command - returned with code %d", code);
 
 cleanup:
     ae->exec_code = code;

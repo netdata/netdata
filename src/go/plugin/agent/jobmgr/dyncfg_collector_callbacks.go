@@ -4,6 +4,7 @@ package jobmgr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -39,16 +40,36 @@ func (cb *collectorCallbacks) ExtractKey(fn dyncfg.Function) (key, name string, 
 		if !ok {
 			return "", "", false
 		}
+		if cb.mgr.isSingleInstanceCollector(mn) {
+			cb.mgr.Warningf("dyncfg: %s: single-instance collector %s does not support add", fn.Command(), mn)
+			return "", "", false
+		}
 		jn = fn.JobName()
 		if jn == "" {
 			return "", "", false
 		}
 	} else {
-		// For other commands: ID contains module:job.
-		mn, jn, ok = cb.mgr.extractModuleJobName(fn.ID())
+		mn, ok = cb.mgr.extractModuleName(fn.ID())
 		if !ok {
 			return "", "", false
 		}
+		if cb.mgr.isSingleInstanceCollector(mn) {
+			if fn.ID() != cb.mgr.dyncfgModID(mn) {
+				cb.mgr.Warningf("dyncfg: %s: single-instance collector %s must use config ID %s", fn.Command(), mn, cb.mgr.dyncfgModID(mn))
+				return "", "", false
+			}
+			jn = mn
+		} else {
+			// For per-job commands: ID contains module:job.
+			mn, jn, ok = cb.mgr.extractModuleJobName(fn.ID())
+			if !ok {
+				return "", "", false
+			}
+		}
+	}
+	if err := cb.mgr.validateDyncfgCollectorIdentity(mn, jn); err != nil {
+		cb.mgr.Warningf("dyncfg: %s: %v", fn.Command(), err)
+		return "", "", false
 	}
 
 	key = mn + "_" + jn
@@ -56,6 +77,10 @@ func (cb *collectorCallbacks) ExtractKey(fn dyncfg.Function) (key, name string, 
 		key = jn
 	}
 	return key, jn, true
+}
+
+func (cb *collectorCallbacks) ValidateConfigName(name string) error {
+	return dyncfg.JobNameRuleStrict(name)
 }
 
 func (cb *collectorCallbacks) ParseAndValidate(fn dyncfg.Function, name string) (confgroup.Config, error) {
@@ -83,13 +108,24 @@ func (cb *collectorCallbacks) Start(cfg confgroup.Config) error {
 
 	job, err := cb.mgr.createCollectorJob(cfg)
 	if err != nil {
-		return &codedError{err: fmt.Errorf("invalid configuration: failed to apply configuration: %v", err), code: 400}
+		var ce dyncfg.CodedError
+		if errors.As(err, &ce) {
+			return err
+		}
+		return &codedError{err: fmt.Errorf("invalid configuration: failed to apply configuration: %w", err), code: 400}
 	}
 
 	if err := job.AutoDetection(); err != nil {
 		job.Cleanup()
+		var ce dyncfg.CodedError
+		if errors.As(err, &ce) {
+			if dyncfg.IsRetryableError(err) {
+				cb.mgr.scheduleRetryTask(cfg, job)
+			}
+			return err
+		}
 		cb.mgr.scheduleRetryTask(cfg, job)
-		return fmt.Errorf("job enable failed: %v", err)
+		return fmt.Errorf("job enable failed: %w", err)
 	}
 
 	cb.mgr.startRunningJob(job)
@@ -103,13 +139,24 @@ func (cb *collectorCallbacks) Update(oldCfg, newCfg confgroup.Config) error {
 
 	job, err := cb.mgr.createCollectorJob(newCfg)
 	if err != nil {
-		return fmt.Errorf("job update failed: %v", err)
+		var ce dyncfg.CodedError
+		if errors.As(err, &ce) {
+			return err
+		}
+		return fmt.Errorf("job update failed: %w", err)
 	}
 
 	if err := job.AutoDetection(); err != nil {
 		job.Cleanup()
+		var ce dyncfg.CodedError
+		if errors.As(err, &ce) {
+			if dyncfg.IsRetryableError(err) {
+				cb.mgr.scheduleRetryTask(newCfg, job)
+			}
+			return err
+		}
 		cb.mgr.scheduleRetryTask(newCfg, job)
-		return fmt.Errorf("job update failed: %v", err)
+		return fmt.Errorf("job update failed: %w", err)
 	}
 
 	cb.mgr.startRunningJob(job)
@@ -129,7 +176,14 @@ func (cb *collectorCallbacks) OnStatusChange(entry *dyncfg.Entry[confgroup.Confi
 }
 
 func (cb *collectorCallbacks) ConfigID(cfg confgroup.Config) string {
-	return cb.mgr.dyncfgJobID(cfg)
+	return cb.mgr.dyncfgConfigID(cfg)
+}
+
+func (cb *collectorCallbacks) ConfigType(cfg confgroup.Config) dyncfg.ConfigType {
+	if cb.mgr.isSingleInstanceCollector(cfg.Module()) {
+		return dyncfg.ConfigTypeSingle
+	}
+	return dyncfg.ConfigTypeJob
 }
 
 // codedError wraps an error with an HTTP status code for the handler.
@@ -138,6 +192,6 @@ type codedError struct {
 	code int
 }
 
-func (e *codedError) Error() string { return e.err.Error() }
-func (e *codedError) Unwrap() error { return e.err }
-func (e *codedError) Code() int     { return e.code }
+func (e *codedError) Error() string   { return e.err.Error() }
+func (e *codedError) Unwrap() error   { return e.err }
+func (e *codedError) DyncfgCode() int { return e.code }

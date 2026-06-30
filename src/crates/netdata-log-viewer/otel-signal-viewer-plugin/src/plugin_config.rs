@@ -39,11 +39,9 @@ pub struct CacheConfig {
     pub memory_capacity: usize,
 
     /// Disk cache size (total size of disk-backed cache)
-    #[serde(with = "bytesize_serde")]
     pub disk_capacity: ByteSize,
 
     /// Cache block size (size of cache blocks)
-    #[serde(with = "bytesize_serde")]
     pub block_size: ByteSize,
 
     /// Number of background workers for indexing journal files

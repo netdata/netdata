@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
+#include "web/api/formatters/rrd2json.h"
+#include "database/contexts/rrdcontext-internal.h"
+
+#if defined(OS_LINUX)
+#include "collectors/proc.plugin/plugin_proc.h"
+#endif
 
 static bool cmd_arg_sanitization_test(const char *expected, const char *src, char *dst, size_t dst_size) {
     bool ok = sanitize_command_argument_string(dst, src, dst_size);
@@ -1453,6 +1459,104 @@ int check_strdupz_path_subpath() {
     return 0;
 }
 
+static int test_incremental_sum_lookup_respects_update_every(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    const time_t update_every = 10;
+    const collected_number increment = 100;
+    const size_t samples = 6;
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    time_t old_update_every = nd_profile.update_every;
+
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+    nd_profile.update_every = update_every;
+
+    char name[101];
+    snprintfz(name, sizeof(name) - 1, "unittest-incremental-sum-lookup");
+
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", name, name, "netdata", NULL, "Unit Testing", "requests", "unittest", NULL, 1,
+        update_every, RRDSET_TYPE_LINE);
+    RRDDIM *rd = rrddim_add(st, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+    time_t first_update_s = MAX(2 * API_RELATIVE_TIME_MAX, 200000000);
+    st->last_collected_time.tv_sec = st->last_updated.tv_sec = first_update_s - update_every;
+    st->last_collected_time.tv_usec = st->last_updated.tv_usec = 0;
+    rd->collector.last_collected_time = st->last_collected_time;
+
+    for(size_t i = 0; i <= samples; i++) {
+        struct timeval now = {
+            .tv_sec = first_update_s + (time_t)(i * update_every),
+            .tv_usec = 0,
+        };
+
+        st->usec_since_last_update = update_every * USEC_PER_SEC;
+        rrddim_timed_set_by_pointer(st, rd, now, (collected_number)(i * increment));
+        rrdset_timed_done(st, now, false);
+    }
+
+    time_t before = rrdset_last_entry_s(st);
+    time_t after = before - (time_t)(samples * update_every);
+
+    ONEWAYALLOC *owa = onewayalloc_create(0);
+    NETDATA_DOUBLE value = NAN;
+    int value_is_null = 0;
+    int ret = rrdset2value_api_v1_with_owa(
+        owa, st, NULL, &value, "requests", 1, after, before, RRDR_GROUPING_SUM, NULL, 0,
+        RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_SELECTED_TIER | RRDR_OPTION_MATCH_IDS, NULL, NULL, NULL, NULL,
+        NULL, &value_is_null, NULL, 0, 0, QUERY_SOURCE_UNITTEST, STORAGE_PRIORITY_SYNCHRONOUS);
+    onewayalloc_destroy(owa);
+
+    NETDATA_DOUBLE expected = (NETDATA_DOUBLE)(samples * increment);
+    int rc = 0;
+    if(ret != HTTP_RESP_OK || value_is_null || fabsndd(value - expected) > 0.000001) {
+        fprintf(
+            stderr,
+            "incremental sum lookup failed: ret=%d, null=%d, expected " NETDATA_DOUBLE_FORMAT
+            ", got " NETDATA_DOUBLE_FORMAT "\n",
+            ret, value_is_null, expected, value);
+        rc = 1;
+    }
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    nd_profile.update_every = old_update_every;
+    return rc;
+}
+
+static int test_rrdmetric_algorithm_follows_rrddim(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", "unittest-algo-track", "unittest-algo-track", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1,
+        nd_profile.update_every, RRDSET_TYPE_LINE);
+    RRDDIM *rd = rrddim_add(st, "d", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+    int rc = 0;
+    RRDMETRIC *rm = rrdmetric_acquired_value(rd->rrdcontexts.rrdmetric);
+    if(!rm || rrdmetric_algorithm_atomic_load(rm) != RRD_ALGORITHM_INCREMENTAL) {
+        fprintf(stderr, "%s: after rrddim_add INCREMENTAL, rm->algorithm = %d (want %d)\n",
+                __FUNCTION__, rm ? (int)rrdmetric_algorithm_atomic_load(rm) : -1,
+                (int)RRD_ALGORITHM_INCREMENTAL);
+        rc = 1;
+    }
+
+    rrddim_set_algorithm(st, rd, RRD_ALGORITHM_ABSOLUTE);
+    rm = rrdmetric_acquired_value(rd->rrdcontexts.rrdmetric);
+    if(!rm || rrdmetric_algorithm_atomic_load(rm) != RRD_ALGORITHM_ABSOLUTE) {
+        fprintf(stderr, "%s: after rrddim_set_algorithm ABSOLUTE, rm->algorithm = %d (want %d)\n",
+                __FUNCTION__, rm ? (int)rrdmetric_algorithm_atomic_load(rm) : -1,
+                (int)RRD_ALGORITHM_ABSOLUTE);
+        rc = 1;
+    }
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
 int run_all_mockup_tests(void)
 {
     fprintf(stderr, "%s() running...\n", __FUNCTION__ );
@@ -1463,6 +1567,16 @@ int run_all_mockup_tests(void)
         return 1;
 
     if(check_rrdcalc_comparisons())
+        return 1;
+
+#if defined(OS_LINUX)
+    if(proc_interrupts_unittest())
+        return 1;
+#endif
+    if(test_incremental_sum_lookup_respects_update_every())
+        return 1;
+
+    if(test_rrdmetric_algorithm_follows_rrddim())
         return 1;
 
     if(!test_variable_renames())

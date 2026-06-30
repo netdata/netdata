@@ -7,6 +7,7 @@ on:
       - '**/*.mdx'
       - 'docs/**'
       - '**/metadata.yaml'
+      - '**/taxonomy.yaml'
       - 'integrations/**'
 
 concurrency:
@@ -18,13 +19,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PR branch
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           path: netdata
 
       - name: Checkout netdata/learn repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: netdata/learn
           path: learn
@@ -45,6 +46,16 @@ jobs:
         run: |
           source ./venv/bin/activate
           cd netdata && python3 integrations/gen_integrations.py
+
+      - name: Check Collector Taxonomy
+        run: |
+          source ./venv/bin/activate
+          cd netdata && python3 integrations/check_collector_taxonomy.py --pr-diff "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}"
+
+      - name: Test Collector Taxonomy Tooling
+        run: |
+          source ./venv/bin/activate
+          cd netdata && python3 -m unittest integrations.tests.test_taxonomy
 
       - name: Generate Integrations Documentation
         run: |

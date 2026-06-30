@@ -79,6 +79,8 @@ func (e *Engine) resolveAutogenRoute(
 		return nil, false, nil
 	}
 
+	namespace := e.state.cfg.autogenContextNamespace
+
 	route, ok, err := buildAutogenRoute(metricName, labels, meta, policy, e.state.cfg.autogenTypeID)
 	if err != nil {
 		return nil, false, err
@@ -112,7 +114,7 @@ func (e *Engine) resolveAutogenRoute(
 			Meta: program.ChartMeta{
 				Title:     title,
 				Family:    route.family,
-				Context:   getAutogenChartContext(route.contextName),
+				Context:   getAutogenChartContext(namespace, route.contextName),
 				Units:     route.units,
 				Algorithm: route.algorithm,
 				Type:      route.chartType,
@@ -601,10 +603,16 @@ func getAutogenChartTitle(metricName string) string {
 	return fmt.Sprintf("Metric \"%s\"", metricName)
 }
 
-func getAutogenChartContext(metricName string) string {
+// getAutogenChartContext builds an autogen chart context, prefixed by the spec's root
+// context_namespace when set ("prometheus" + "foo" -> "prometheus.foo"), matching the
+// template compiler's "." join. Empty namespace -> the bare metric name (unchanged).
+func getAutogenChartContext(namespace, metricName string) string {
 	metricName = strings.TrimSpace(metricName)
 	if metricName == "" {
-		return "metric"
+		metricName = "metric"
+	}
+	if namespace = strings.TrimSpace(namespace); namespace != "" {
+		return namespace + "." + metricName
 	}
 	return metricName
 }

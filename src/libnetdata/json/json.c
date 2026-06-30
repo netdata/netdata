@@ -38,7 +38,7 @@ json_object *json_tokenise(char *js) {
 #else
 jsmntok_t *json_tokenise(char *js, size_t len, size_t *count)
 {
-    int n = json_tokens;
+    int n = __atomic_load_n(&json_tokens, __ATOMIC_RELAXED);
     if(!js || !len) {
         netdata_log_error("JSON: json string is empty.");
         return NULL;
@@ -75,7 +75,11 @@ jsmntok_t *json_tokenise(char *js, size_t len, size_t *count)
 
     if(count) *count = (size_t)ret;
 
-    if(json_tokens < n) json_tokens = n;
+    int cached = __atomic_load_n(&json_tokens, __ATOMIC_RELAXED);
+    while(cached < n && !__atomic_compare_exchange_n(
+              &json_tokens, &cached, n, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+        ;
+
     return tokens;
 }
 #endif
@@ -103,7 +107,7 @@ int json_callback_print(JSON_ENTRY *e)
 
         case JSON_ARRAY:
             e->callback_function = json_callback_print;
-            sprintf(txt,"ARRAY[%lu]", (long unsigned int) e->data.items);
+            snprintfz(txt, sizeof(txt), "ARRAY[%lu]", (long unsigned int) e->data.items);
             buffer_strcat(wb, txt);
             break;
 
@@ -112,9 +116,7 @@ int json_callback_print(JSON_ENTRY *e)
             break;
 
         case JSON_NUMBER:
-            sprintf(txt, NETDATA_DOUBLE_FORMAT_AUTO, e->data.number);
-            buffer_strcat(wb,txt);
-
+            buffer_print_netdata_double(wb, e->data.number);
             break;
 
         case JSON_BOOLEAN:
@@ -183,7 +185,6 @@ static inline void json_jsonc_set_integer(JSON_ENTRY *e, char *key, int64_t valu
  */
 static inline void json_jsonc_parse_array(json_object *ptr, void *callback_data,int (*callback_function)(struct json_entry *)) {
     int end = json_object_array_length(ptr);
-    JSON_ENTRY e;
 
     if(end) {
         int i;
@@ -193,8 +194,7 @@ static inline void json_jsonc_parse_array(json_object *ptr, void *callback_data,
         do {
             json_object *jvalue =  json_object_array_get_idx(ptr, i);
             if(jvalue) {
-                e.callback_data = callback_data;
-                e.type = JSON_OBJECT;
+                JSON_ENTRY e = { .type = JSON_OBJECT, .callback_data = callback_data };
                 callback_function(&e);
                 json_object_object_foreach(jvalue, key, val) {
                     type = json_object_get_type(val);
@@ -443,8 +443,10 @@ size_t json_walk_object(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_
  */
 #ifdef ENABLE_JSONC
 size_t json_walk(json_object *t, void *callback_data, int (*callback_function)(struct json_entry *)) {
-    JSON_ENTRY e;
+    if (!t || json_object_get_type(t) != json_type_object)
+        return 0;
 
+    JSON_ENTRY e = { 0 };
     e.callback_data = callback_data;
     enum json_type type;
     json_object_object_foreach(t, key, val) {

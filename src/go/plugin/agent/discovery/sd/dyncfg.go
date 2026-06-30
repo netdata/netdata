@@ -83,6 +83,10 @@ func (cb *sdCallbacks) ExtractKey(fn dyncfg.Function) (key, name string, ok bool
 	return dt + ":" + name, name, true
 }
 
+func (cb *sdCallbacks) ValidateConfigName(name string) error {
+	return dyncfg.JobNameRuleAllowDots(name)
+}
+
 func (cb *sdCallbacks) ParseAndValidate(fn dyncfg.Function, name string) (sdConfig, error) {
 	dt, _, _ := cb.sd.extractDiscovererAndName(fn.ID())
 	if _, err := parseDyncfgPayload(fn.Payload(), dt, name, cb.sd.configDefaults, cb.sd.discovererRegistry(), true); err != nil {
@@ -121,6 +125,10 @@ func (cb *sdCallbacks) OnStatusChange(_ *dyncfg.Entry[sdConfig], _ dyncfg.Status
 
 func (cb *sdCallbacks) ConfigID(cfg sdConfig) string {
 	return cb.sd.dyncfgJobID(cfg.DiscovererType(), cfg.Name())
+}
+
+func (cb *sdCallbacks) ConfigType(sdConfig) dyncfg.ConfigType {
+	return dyncfg.ConfigTypeJob
 }
 
 // dyncfgConfig is the handler for dyncfg config commands.
@@ -251,7 +259,7 @@ func (d *ServiceDiscovery) dyncfgCmdTest(fn dyncfg.Function) {
 	if !isJob {
 		name = dyncfgTemplateJobName(fn)
 	}
-	if err := dyncfg.ValidateJobName(name); err != nil {
+	if err := dyncfg.JobNameRuleAllowDots(name); err != nil {
 		d.Warningf("dyncfg: test: unacceptable job name '%s' for '%s': %v", name, dt, err)
 		d.dyncfgApi.SendCodef(fn, 400, "Unacceptable job name '%s': %v.", name, err)
 		return

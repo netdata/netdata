@@ -48,6 +48,9 @@ const (
 	prioDatabaseLogFlushes
 	prioDatabaseLogFlushed
 	prioDatabaseLogGrowths
+	prioDatabaseLogFileSize
+	prioDatabaseLogPercentUsed
+	prioDatabaseLogTruncationsShrinks
 	prioDatabaseIOStall
 	prioDatabaseDeadlocks
 	prioDatabaseLockWaits
@@ -66,6 +69,10 @@ const (
 	prioWaitCount
 
 	prioJobStatus
+	prioJobLastExecutionStatus
+	prioJobLastExecutionDuration
+	prioJobLastExecutionAge
+	prioJobCurrentExecutionTime
 
 	prioReplicationStatus
 	prioReplicationLatency
@@ -541,6 +548,44 @@ var (
 			{ID: "database_%s_log_growths", Name: "growths", Algo: collectorapi.Incremental},
 		},
 	}
+	databaseLogFileSizeChartTmpl = collectorapi.Chart{
+		ID:       "database_%s_log_file_size",
+		Title:    "Transaction log file size",
+		Units:    "bytes",
+		Fam:      "db log",
+		Ctx:      "mssql.database_log_file_size",
+		Type:     collectorapi.Stacked,
+		Priority: prioDatabaseLogFileSize,
+		Dims: collectorapi.Dims{
+			{ID: "database_%s_log_size_used", Name: "used"},
+			{ID: "database_%s_log_size_free", Name: "free"},
+		},
+	}
+	databaseLogPercentUsedChartTmpl = collectorapi.Chart{
+		ID:       "database_%s_log_percent_used",
+		Title:    "Transaction log space utilization",
+		Units:    "percentage",
+		Fam:      "db log",
+		Ctx:      "mssql.database_log_percent_used",
+		Type:     collectorapi.Line,
+		Priority: prioDatabaseLogPercentUsed,
+		Dims: collectorapi.Dims{
+			{ID: "database_%s_log_percent_used", Name: "used", Div: 100},
+		},
+	}
+	databaseLogTruncationsShrinksChartTmpl = collectorapi.Chart{
+		ID:       "database_%s_log_truncations_shrinks",
+		Title:    "Transaction log truncations and shrinks",
+		Units:    "events/s",
+		Fam:      "db log",
+		Ctx:      "mssql.database_log_truncations_shrinks",
+		Type:     collectorapi.Line,
+		Priority: prioDatabaseLogTruncationsShrinks,
+		Dims: collectorapi.Dims{
+			{ID: "database_%s_log_truncations", Name: "truncations", Algo: collectorapi.Incremental},
+			{ID: "database_%s_log_shrinks", Name: "shrinks", Algo: collectorapi.Incremental},
+		},
+	}
 	databaseIOStallChartTmpl = collectorapi.Chart{
 		ID:       "database_%s_io_stall",
 		Title:    "Database I/O stall time",
@@ -675,19 +720,69 @@ var (
 	}
 )
 
-// Job status chart template
-var jobStatusChartTmpl = collectorapi.Chart{
-	ID:       "job_%s_status",
-	Title:    "Job status",
-	Units:    "status",
-	Fam:      "jobs",
-	Ctx:      "mssql.job_status",
-	Priority: prioJobStatus,
-	Dims: collectorapi.Dims{
-		{ID: "job_%s_enabled", Name: "enabled"},
-		{ID: "job_%s_disabled", Name: "disabled"},
-	},
-}
+// Job chart templates
+var (
+	jobStatusChartTmpl = collectorapi.Chart{
+		ID:       "job_%s_status",
+		Title:    "Job status",
+		Units:    "status",
+		Fam:      "jobs",
+		Ctx:      "mssql.job_status",
+		Priority: prioJobStatus,
+		Dims: collectorapi.Dims{
+			{ID: "job_%s_enabled", Name: "enabled"},
+			{ID: "job_%s_disabled", Name: "disabled"},
+		},
+	}
+	jobLastExecutionStatusChartTmpl = collectorapi.Chart{
+		ID:       "job_%s_last_execution_status",
+		Title:    "Job last execution status",
+		Units:    "status",
+		Fam:      "jobs",
+		Ctx:      "mssql.job_last_execution_status",
+		Priority: prioJobLastExecutionStatus,
+		Dims: collectorapi.Dims{
+			{ID: "job_%s_last_execution_status_unknown", Name: "unknown"},
+			{ID: "job_%s_last_execution_status_ok", Name: "ok"},
+			{ID: "job_%s_last_execution_status_warning", Name: "warning"},
+			{ID: "job_%s_last_execution_status_error", Name: "error"},
+			{ID: "job_%s_last_execution_status_canceled", Name: "canceled"},
+		},
+	}
+	jobLastExecutionDurationChartTmpl = collectorapi.Chart{
+		ID:       "job_%s_last_execution_duration",
+		Title:    "Job last execution duration",
+		Units:    "seconds",
+		Fam:      "jobs",
+		Ctx:      "mssql.job_last_execution_duration",
+		Priority: prioJobLastExecutionDuration,
+		Dims: collectorapi.Dims{
+			{ID: "job_%s_last_execution_duration", Name: "duration"},
+		},
+	}
+	jobLastExecutionAgeChartTmpl = collectorapi.Chart{
+		ID:       "job_%s_last_execution_age",
+		Title:    "Job last execution age",
+		Units:    "seconds",
+		Fam:      "jobs",
+		Ctx:      "mssql.job_last_execution_age",
+		Priority: prioJobLastExecutionAge,
+		Dims: collectorapi.Dims{
+			{ID: "job_%s_last_execution_age", Name: "age"},
+		},
+	}
+	jobCurrentExecutionTimeChartTmpl = collectorapi.Chart{
+		ID:       "job_%s_current_execution_time",
+		Title:    "Job current execution time",
+		Units:    "seconds",
+		Fam:      "jobs",
+		Ctx:      "mssql.job_current_execution_time",
+		Priority: prioJobCurrentExecutionTime,
+		Dims: collectorapi.Dims{
+			{ID: "job_%s_current_execution_time", Name: "duration"},
+		},
+	}
+)
 
 // Replication chart templates
 var (
@@ -789,6 +884,30 @@ func (c *Collector) addDatabaseCharts(dbName string) {
 	}
 }
 
+func (c *Collector) addDatabaseLogCharts(dbName string) {
+	charts := &collectorapi.Charts{
+		databaseLogFileSizeChartTmpl.Copy(),
+		databaseLogPercentUsedChartTmpl.Copy(),
+		databaseLogTruncationsShrinksChartTmpl.Copy(),
+	}
+
+	dbID := cleanDatabaseName(dbName)
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, dbID)
+		chart.Labels = []collectorapi.Label{
+			{Key: "database", Value: dbName},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, dbID)
+		}
+	}
+
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
+	}
+}
+
 func (c *Collector) addWaitTypeCharts(waitType string, waitCategory string) {
 	charts := &collectorapi.Charts{
 		waitTotalTimeChartTmpl.Copy(),
@@ -859,22 +978,90 @@ func (c *Collector) addLockStatsCharts(resourceType string) {
 	}
 }
 
-func (c *Collector) addJobCharts(jobName string) {
-	chart := jobStatusChartTmpl.Copy()
+func (c *Collector) addJobCharts(job sqlAgentJob) {
+	c.removeObsoleteJobCharts(job.chartID)
 
-	jobID := cleanJobName(jobName)
-
-	chart.ID = fmt.Sprintf(chart.ID, jobID)
-	chart.Labels = []collectorapi.Label{
-		{Key: "job_name", Value: jobName},
-	}
-	for _, dim := range chart.Dims {
-		dim.ID = fmt.Sprintf(dim.ID, jobID)
+	charts := &collectorapi.Charts{
+		jobStatusChartTmpl.Copy(),
+		jobLastExecutionStatusChartTmpl.Copy(),
+		jobLastExecutionDurationChartTmpl.Copy(),
+		jobLastExecutionAgeChartTmpl.Copy(),
+		jobCurrentExecutionTimeChartTmpl.Copy(),
 	}
 
-	if err := c.Charts().Add(chart); err != nil {
+	labels := []collectorapi.Label{
+		{Key: "job_name", Value: job.name},
+	}
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, job.chartID)
+		chart.Labels = labels
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, job.chartID)
+		}
+	}
+
+	if err := c.Charts().Add(*charts...); err != nil {
 		c.Warning(err)
 	}
+}
+
+func (c *Collector) removeObsoleteJobCharts(chartID string) {
+	for _, id := range jobChartIDs(chartID) {
+		chart := c.Charts().Get(id)
+		if chart == nil || !chart.IsRemoved() {
+			continue
+		}
+		if err := c.Charts().Remove(id); err != nil {
+			c.Warningf("remove obsolete job chart '%s': %v", id, err)
+		}
+	}
+}
+
+func (c *Collector) updateJobChartsLabels(job sqlAgentJob) {
+	labels := []collectorapi.Label{
+		{Key: "job_name", Value: job.name},
+	}
+	for _, chartID := range jobChartIDs(job.chartID) {
+		chart := c.Charts().Get(chartID)
+		if chart == nil || chart.IsRemoved() {
+			continue
+		}
+		if hasJobNameLabel(chart, job.name) {
+			continue
+		}
+		chart.Labels = labels
+		chart.MarkNotCreated()
+	}
+}
+
+func (c *Collector) removeJobCharts(chartID string) {
+	for _, id := range jobChartIDs(chartID) {
+		chart := c.Charts().Get(id)
+		if chart == nil {
+			continue
+		}
+		chart.MarkRemove()
+		chart.MarkNotCreated()
+	}
+}
+
+func jobChartIDs(chartID string) []string {
+	return []string{
+		fmt.Sprintf(jobStatusChartTmpl.ID, chartID),
+		fmt.Sprintf(jobLastExecutionStatusChartTmpl.ID, chartID),
+		fmt.Sprintf(jobLastExecutionDurationChartTmpl.ID, chartID),
+		fmt.Sprintf(jobLastExecutionAgeChartTmpl.ID, chartID),
+		fmt.Sprintf(jobCurrentExecutionTimeChartTmpl.ID, chartID),
+	}
+}
+
+func hasJobNameLabel(chart *collectorapi.Chart, jobName string) bool {
+	for _, label := range chart.Labels {
+		if label.Key == "job_name" {
+			return label.Value == jobName
+		}
+	}
+	return false
 }
 
 func (c *Collector) addReplicationCharts(pubDB, publication string) {
@@ -918,6 +1105,11 @@ func cleanResourceTypeName(name string) string {
 func cleanJobName(name string) string {
 	r := strings.NewReplacer(" ", "_", ".", "_", "-", "_")
 	return strings.ToLower(r.Replace(name))
+}
+
+func cleanJobID(id string) string {
+	r := strings.NewReplacer("-", "_", "{", "", "}", "")
+	return strings.ToLower(r.Replace(id))
 }
 
 func cleanPublicationName(pubDB, publication string) string {

@@ -34,9 +34,9 @@ type codedError struct {
 	code int
 }
 
-func (e *codedError) Error() string { return e.err.Error() }
-func (e *codedError) Unwrap() error { return e.err }
-func (e *codedError) Code() int     { return e.code }
+func (e *codedError) Error() string   { return e.err.Error() }
+func (e *codedError) Unwrap() error   { return e.err }
+func (e *codedError) DyncfgCode() int { return e.code }
 
 func newSecretStoreCallbacks(deps secretStoreCallbackDeps) *secretStoreCallbacks {
 	return &secretStoreCallbacks{deps: deps}
@@ -130,6 +130,10 @@ func (cb *secretStoreCallbacks) ExtractKey(fn dyncfg.Function) (key, name string
 		return "", "", false
 	}
 	return key, name, true
+}
+
+func (cb *secretStoreCallbacks) ValidateConfigName(name string) error {
+	return dyncfg.JobNameRuleAllowDots(name)
 }
 
 func (cb *secretStoreCallbacks) ParseAndValidate(fn dyncfg.Function, name string) (secretstore.Config, error) {
@@ -227,4 +231,8 @@ func (cb *secretStoreCallbacks) TakeCommandMessage() string {
 
 func (cb *secretStoreCallbacks) ConfigID(cfg secretstore.Config) string {
 	return cb.deps.dyncfgSecretStoreID(cfg.ExposedKey())
+}
+
+func (cb *secretStoreCallbacks) ConfigType(secretstore.Config) dyncfg.ConfigType {
+	return dyncfg.ConfigTypeJob
 }

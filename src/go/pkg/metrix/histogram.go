@@ -15,6 +15,7 @@ const HistogramBucketLabel = "le"
 type snapshotHistogramInstrument struct {
 	backend meterBackend
 	desc    *instrumentDescriptor
+	scope   HostScope
 	base    []LabelSet
 }
 
@@ -22,20 +23,23 @@ type snapshotHistogramInstrument struct {
 type statefulHistogramInstrument struct {
 	backend meterBackend
 	desc    *instrumentDescriptor
+	scope   HostScope
 	base    []LabelSet
 }
 
 // stagedHistogram holds one in-cycle histogram sample for a single series identity.
 type stagedHistogram struct {
-	key        string
-	name       string
-	labels     []Label
-	labelsKey  string
-	desc       *instrumentDescriptor
-	bounds     []float64
-	count      SampleValue
-	sum        SampleValue
-	cumulative []SampleValue
+	key          string
+	name         string
+	hostScopeKey string
+	hostScope    HostScope
+	labels       []Label
+	labelsKey    string
+	desc         *instrumentDescriptor
+	bounds       []float64
+	count        SampleValue
+	sum          SampleValue
+	cumulative   []SampleValue
 }
 
 // Histogram declares or reuses a snapshot histogram under this meter.
@@ -47,6 +51,7 @@ func (m *snapshotMeter) Histogram(name string, opts ...InstrumentOption) Snapsho
 	return &snapshotHistogramInstrument{
 		backend: m.backend,
 		desc:    desc,
+		scope:   m.scope,
 		base:    appendLabelSets(m.sets, nil),
 	}
 }
@@ -60,22 +65,23 @@ func (m *statefulMeter) Histogram(name string, opts ...InstrumentOption) Statefu
 	return &statefulHistogramInstrument{
 		backend: m.backend,
 		desc:    desc,
+		scope:   m.scope,
 		base:    appendLabelSets(m.sets, nil),
 	}
 }
 
 // ObservePoint writes one full histogram point for this collect cycle.
 func (h *snapshotHistogramInstrument) ObservePoint(p HistogramPoint, labels ...LabelSet) {
-	h.backend.recordHistogramObservePoint(h.desc, p, appendLabelSets(h.base, labels))
+	h.backend.recordHistogramObservePoint(h.desc, h.scope, p, appendLabelSets(h.base, labels))
 }
 
 // Observe adds one sample to a stateful histogram for this collect cycle.
 func (h *statefulHistogramInstrument) Observe(v SampleValue, labels ...LabelSet) {
-	h.backend.recordHistogramObserve(h.desc, v, appendLabelSets(h.base, labels))
+	h.backend.recordHistogramObserve(h.desc, h.scope, v, appendLabelSets(h.base, labels))
 }
 
 // recordHistogramObservePoint writes one full histogram point into the active frame.
-func (c *storeCore) recordHistogramObservePoint(desc *instrumentDescriptor, point HistogramPoint, sets []LabelSet) {
+func (c *storeCore) recordHistogramObservePoint(desc *instrumentDescriptor, scope HostScope, point HistogramPoint, sets []LabelSet) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -90,6 +96,10 @@ func (c *storeCore) recordHistogramObservePoint(desc *instrumentDescriptor, poin
 	if labelsContainKey(labels, HistogramBucketLabel) {
 		panic(errHistogramLabelKey)
 	}
+	scope, ok := c.prepareHostScopeForWriteLocked(scope)
+	if !ok {
+		return
+	}
 
 	schema := desc.histogram
 	if schema == nil {
@@ -99,15 +109,17 @@ func (c *storeCore) recordHistogramObservePoint(desc *instrumentDescriptor, poin
 	}
 	bounds, count, sum, cumulative := normalizeHistogramPoint(point, schema)
 
-	key := makeSeriesKey(desc.name, labelsKey)
+	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.histograms[key]
 	if !ok {
 		entry = &stagedHistogram{
-			key:       key,
-			name:      desc.name,
-			labels:    labels,
-			labelsKey: labelsKey,
-			desc:      desc,
+			key:          key,
+			name:         desc.name,
+			hostScopeKey: scope.ScopeKey,
+			hostScope:    scope,
+			labels:       labels,
+			labelsKey:    labelsKey,
+			desc:         desc,
 		}
 		c.active.histograms[key] = entry
 	}
@@ -121,7 +133,7 @@ func (c *storeCore) recordHistogramObservePoint(desc *instrumentDescriptor, poin
 }
 
 // recordHistogramObserve adds one sample to a stateful histogram in the active frame.
-func (c *storeCore) recordHistogramObserve(desc *instrumentDescriptor, value SampleValue, sets []LabelSet) {
+func (c *storeCore) recordHistogramObserve(desc *instrumentDescriptor, scope HostScope, value SampleValue, sets []LabelSet) {
 	mustFiniteSample(value)
 
 	c.mu.Lock()
@@ -143,18 +155,24 @@ func (c *storeCore) recordHistogramObserve(desc *instrumentDescriptor, value Sam
 	if labelsContainKey(labels, HistogramBucketLabel) {
 		panic(errHistogramLabelKey)
 	}
+	scope, ok := c.prepareHostScopeForWriteLocked(scope)
+	if !ok {
+		return
+	}
 
-	key := makeSeriesKey(desc.name, labelsKey)
+	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.histograms[key]
 	if !ok {
 		entry = &stagedHistogram{
-			key:        key,
-			name:       desc.name,
-			labels:     labels,
-			labelsKey:  labelsKey,
-			desc:       desc,
-			bounds:     append([]float64(nil), schema.bounds...),
-			cumulative: make([]SampleValue, len(schema.bounds)),
+			key:          key,
+			name:         desc.name,
+			hostScopeKey: scope.ScopeKey,
+			hostScope:    scope,
+			labels:       labels,
+			labelsKey:    labelsKey,
+			desc:         desc,
+			bounds:       append([]float64(nil), schema.bounds...),
+			cumulative:   make([]SampleValue, len(schema.bounds)),
 		}
 		if desc.window == WindowCumulative {
 			if existing := c.snapshot.Load().series[key]; existing != nil && existing.desc != nil && existing.desc.kind == kindHistogram {

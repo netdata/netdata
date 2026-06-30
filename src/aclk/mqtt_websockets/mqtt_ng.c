@@ -250,6 +250,9 @@ struct mqtt_ng_client {
     c_rhash rx_aliases;
 
     size_t max_msg_size;
+
+    // MQTT 5.0 server Receive Maximum (CONNACK prop 0x21); absent => 65535 default [MQTT-3.2.2.3.3]
+    uint16_t rx_maximum;
 };
 
 usec_t publish_latency;
@@ -630,6 +633,9 @@ struct mqtt_ng_client *mqtt_ng_init(struct mqtt_ng_init *settings)
     client->tx_topic_aliases.stoi_dict = TX_ALIASES_INITIALIZE();
     client->tx_topic_aliases.idx_max = UINT16_MAX;
 
+    // MQTT 5.0 default Receive Maximum when the server omits the property [MQTT-3.2.2.3.3]
+    __atomic_store_n(&client->rx_maximum, UINT16_MAX, __ATOMIC_RELAXED);
+
     // TODO just embed the struct into mqtt_ng_client
     client->parser.received_data = settings->data_in;
     client->send_fnc_ptr = settings->data_out_fnc;
@@ -649,6 +655,8 @@ static uint8_t get_control_packet_type(uint8_t first_hdr_byte)
 {
     return first_hdr_byte >> 4;
 }
+
+static void mqtt_ng_parser_reset(struct mqtt_ng_parser *parser);
 
 static void mqtt_ng_destroy_rx_alias_hash(c_rhash hash)
 {
@@ -684,6 +692,7 @@ static void destroy_timeout_monitor_list(struct mqtt_ng_client *client)
 
 void mqtt_ng_destroy(struct mqtt_ng_client *client)
 {
+    mqtt_ng_parser_reset(&client->parser);
     transaction_buffer_destroy(&client->main_buffer);
 
     mqtt_ng_destroy_tx_alias_hash(client->tx_topic_aliases.stoi_dict);
@@ -1031,7 +1040,7 @@ int mqtt_ng_connect(
     uint16_t keep_alive)
 {
     client->client_state = MQTT_STATE_RAW;
-    client->parser.state = MQTT_PARSE_FIXED_HEADER_PACKET_TYPE;
+    mqtt_ng_parser_reset(&client->parser);
 
     LOCK_HDR_BUFFER(&client->main_buffer);
     client->main_buffer.sending_frag = NULL;
@@ -1300,13 +1309,16 @@ int mqtt_ng_publish(struct mqtt_ng_client *client,
 
     if (client->max_msg_size && PUBLISH_SP_SIZE + mqtt_ng_publish_size(topic, msg_len, topic_id) > client->max_msg_size) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Message too big for server: %zu", msg_len);
-        if (msg_free)
-            msg_free(msg);
         return MQTT_NG_MSGGEN_MSG_TOO_BIG;
     }
 
+    // Ownership contract on failure: do NOT free msg or clear *packet_id here.
+    // The sole caller (mqtt_wss_publish5) owns cleanup on every non-OK return.
+    // On MQTT_NG_MSGGEN_OK, msg is attached to a buffer fragment and freed by
+    // the transaction-buffer GC after ack; *packet_id has been written by the
+    // generator. See the long comment in mqtt_wss_publish5 for the invariant.
     int rc = TRY_GENERATE_MESSAGE(mqtt_ng_generate_publish, topic, topic_free, msg, msg_free, msg_len, publish_flags, packet_id, topic_id);
-    if (rc == MQTT_NG_MSGGEN_OK)
+    if (rc == MQTT_NG_MSGGEN_OK && packet_id)
         add_packet_to_timeout_monitor_list(client, *packet_id);
     return rc;
 }
@@ -1526,6 +1538,30 @@ static void mqtt_properties_parser_ctx_reset(struct mqtt_properties_parser_ctx *
     ctx->properties_length = 0;
     ctx->bytes_consumed = 0;
     vbi_parser_reset_ctx(&ctx->vbi_parser_ctx);
+}
+
+static void mqtt_ng_parser_reset(struct mqtt_ng_parser *parser)
+{
+    rbuf_t received_data = parser->received_data;
+    uint8_t control_packet_type = get_control_packet_type(parser->mqtt_control_packet_type);
+    bool current_variable_header =
+        parser->state == MQTT_PARSE_VARIABLE_HEADER &&
+        parser->varhdr_state != MQTT_PARSE_VARHDR_INITIAL;
+
+    mqtt_properties_parser_ctx_reset(&parser->properties_parser);
+
+    // VARHDR_INITIAL may still contain stale pointers from an already handled packet.
+    // Incomplete PUBLISH state can own the topic, but payload data is allocated
+    // only after the full payload is available.
+    if (current_variable_header && control_packet_type == MQTT_CPT_PUBLISH)
+        freez(parser->mqtt_packet.publish.topic);
+
+    if (current_variable_header && control_packet_type == MQTT_CPT_SUBACK)
+        freez(parser->mqtt_packet.suback.reason_codes);
+
+    memset(parser, 0, sizeof(*parser));
+    parser->received_data = received_data;
+    parser->state = MQTT_PARSE_FIXED_HEADER_PACKET_TYPE;
 }
 
 struct mqtt_property_type {
@@ -1859,6 +1895,7 @@ static int parse_publish_varhdr(struct mqtt_ng_client *client)
         case MQTT_PARSE_VARHDR_INITIAL:
             BUF_READ_CHECK_AT_LEAST(parser->received_data, 2)
             publish->topic = NULL;
+            publish->data = NULL;
             publish->qos = ((parser->mqtt_control_packet_type >> 1) & 0x03);
             rbuf_pop(parser->received_data, (char*)&publish->topic_len, 2);
             publish->topic_len = be16toh(publish->topic_len);
@@ -2141,6 +2178,11 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
                 client->max_msg_size = prop->data.uint32;
             }
 
+            if ((prop = get_property_by_id(client->parser.properties_parser.head, MQTT_PROP_RECEIVE_MAX)) != NULL) {
+                nd_log(NDLS_DAEMON, NDLP_INFO, "ACLK: MQTT server receive maximum is %" PRIu16, prop->data.uint16);
+                __atomic_store_n(&client->rx_maximum, prop->data.uint16, __ATOMIC_RELAXED);
+            }
+
             if (client->connack_callback)
                 client->connack_callback(client->user_ctx, client->parser.mqtt_packet.connack.reason_code);
             if (!client->parser.mqtt_packet.connack.reason_code) {
@@ -2281,6 +2323,98 @@ int mqtt_ng_sync(struct mqtt_ng_client *client)
     return 0;
 }
 
+static int mqtt_ng_unittest_push_bytes(rbuf_t buffer, const char *data, size_t len)
+{
+    return rbuf_push(buffer, data, len) == len ? 0 : 1;
+}
+
+#define MQTT_NG_TEST(condition, msg) do {                                      \
+        if (!(condition)) {                                                    \
+            fprintf(stderr, "mqtt_ng unittest FAILED: %s (%s:%d)\n",          \
+                    (msg), __FUNCTION__, __LINE__);                            \
+            errors++;                                                          \
+        }                                                                      \
+    } while(0)
+
+static int mqtt_ng_unittest_reset_after_partial_publish(void)
+{
+    int errors = 0;
+    rbuf_t input = rbuf_create(128, 128);
+    struct mqtt_ng_init settings = {
+        .data_in = input,
+        .data_out_fnc = NULL,
+        .user_ctx = NULL,
+        .connack_callback = NULL,
+        .puback_callback = NULL,
+        .msg_callback = NULL,
+    };
+    struct mqtt_ng_client *client = mqtt_ng_init(&settings);
+
+    const char partial_publish[] = {
+        (char)(MQTT_CPT_PUBLISH << 4), 23,
+        0, 4, 't', 'e', 's', 't',
+        0,
+    };
+
+    MQTT_NG_TEST(client != NULL, "mqtt_ng_init succeeds");
+    if (!client) {
+        rbuf_free(input);
+        return errors;
+    }
+
+    MQTT_NG_TEST(!mqtt_ng_unittest_push_bytes(input, partial_publish, sizeof(partial_publish)),
+                 "push partial PUBLISH");
+
+    int rc = handle_incoming_traffic(client);
+    MQTT_NG_TEST(rc == MQTT_NG_CLIENT_NEED_MORE_BYTES, "partial PUBLISH needs more bytes");
+    MQTT_NG_TEST(client->parser.state == MQTT_PARSE_VARIABLE_HEADER, "partial PUBLISH stays in variable-header parser");
+    MQTT_NG_TEST(client->parser.varhdr_state == MQTT_PARSE_PAYLOAD, "partial PUBLISH waits for payload");
+    MQTT_NG_TEST(client->parser.mqtt_packet.publish.topic != NULL, "partial PUBLISH owns parsed topic");
+
+    struct mqtt_auth_properties auth = {
+        .client_id = "unit-test",
+    };
+
+    MQTT_NG_TEST(mqtt_ng_connect(client, &auth, NULL, 60) == 0, "mqtt_ng_connect resets parser");
+    MQTT_NG_TEST(client->parser.state == MQTT_PARSE_FIXED_HEADER_PACKET_TYPE, "parser state reset");
+    MQTT_NG_TEST(client->parser.mqtt_packet.publish.topic == NULL, "partial PUBLISH topic released");
+    MQTT_NG_TEST(client->parser.properties_parser.head == NULL, "partial properties released");
+
+    const char normal_publish[] = {
+        (char)(MQTT_CPT_PUBLISH << 4), 7,
+        0, 2, 'o', 'k',
+        0,
+        'h', 'i',
+    };
+
+    MQTT_NG_TEST(!mqtt_ng_unittest_push_bytes(input, normal_publish, sizeof(normal_publish)),
+                 "push normal PUBLISH after reconnect");
+
+    rc = handle_incoming_traffic(client);
+    MQTT_NG_TEST(rc == MQTT_NG_CLIENT_WANT_WRITE, "normal PUBLISH parses after reconnect reset");
+    MQTT_NG_TEST(client->parser.state == MQTT_PARSE_FIXED_HEADER_PACKET_TYPE, "parser ready after normal PUBLISH");
+
+    mqtt_ng_destroy(client);
+    rbuf_free(input);
+    return errors;
+}
+
+int mqtt_ng_unittest(void)
+{
+    int errors = 0;
+
+    fprintf(stderr, "\nrunning mqtt_ng unittest\n");
+
+    errors += mqtt_ng_unittest_reset_after_partial_publish();
+
+    if (errors)
+        fprintf(stderr, "mqtt_ng unittest: %d ERROR(S)\n", errors);
+    else
+        fprintf(stderr, "mqtt_ng unittest: OK\n");
+
+    return errors;
+}
+
 time_t mqtt_ng_last_send_time(struct mqtt_ng_client *client)
 {
     return client->time_of_last_send;
@@ -2297,6 +2431,7 @@ void mqtt_ng_get_stats(struct mqtt_ng_client *client, struct mqtt_ng_stats *stat
     stats->tx_messages_sent = __atomic_load_n(&client->stats.tx_messages_sent, __ATOMIC_RELAXED);
     stats->rx_messages_rcvd = __atomic_load_n(&client->stats.rx_messages_rcvd, __ATOMIC_RELAXED);
     stats->packets_waiting_puback = __atomic_load_n(&client->stats.packets_waiting_puback, __ATOMIC_RELAXED);
+    stats->rx_maximum = __atomic_load_n(&client->rx_maximum, __ATOMIC_RELAXED);
 
     stats->tx_bytes_queued = 0;
     stats->tx_buffer_reclaimable = 0;

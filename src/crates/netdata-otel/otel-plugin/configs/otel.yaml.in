@@ -35,6 +35,7 @@ metrics:
 
 logs:
   # Directory to store journal files for logs.
+  # Must be an absolute path; a relative value is rejected at startup.
   journal_dir: @logdir_POST@/otel/v1
 
   # Maximum file size for individual journal files (e.g., "100MB", "1.5GB").

@@ -21,7 +21,7 @@ Module: /sys/fs/cgroup
 
 ## Overview
 
-Monitor containers and virtual machines resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups.
+Monitor containers and virtual machines resource utilization — CPU, memory, disk I/O, network, and page cache activity — via Linux cgroups.
 
 
 
@@ -113,5 +113,9 @@ Metrics:
 | systemd.service.disk.queued_iops | read, write | operations/s |
 | systemd.service.disk.merged_iops | read, write | operations/s |
 | systemd.service.pids.current | pids | pids |
+| systemd.service.cachestat_ratio | ratio | % |
+| systemd.service.cachestat_dirties | dirty | page/s |
+| systemd.service.cachestat_hits | hit | hits/s |
+| systemd.service.cachestat_misses | miss | misses/s |
 
 

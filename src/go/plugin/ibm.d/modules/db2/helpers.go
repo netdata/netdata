@@ -59,7 +59,7 @@ func safeDSN(dsn string) string {
 	return masked
 }
 
-func (c *Collector) logOnce(key string, format string, args ...interface{}) {
+func (c *Collector) logOnce(key string, format string, args ...any) {
 	if c.disabledMetrics[key] || c.disabledFeatures[key] {
 		return
 	}

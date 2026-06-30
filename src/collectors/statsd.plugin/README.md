@@ -344,6 +344,46 @@ Netdata can visualize StatsD collected metrics in two ways:
 
 Private charts are controlled with `create private charts for metrics matching = *`. This setting accepts a space-separated list of [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md). By default, Netdata creates private charts for all metrics.
 
+#### Private Chart Naming Convention
+
+When querying StatsD metrics via the Netdata API, you must use the chart identifier that Netdata constructs from the metric name — not the raw metric name you sent to StatsD. The chart identifier is built as follows:
+
+- **Chart type** = `statsd_<first_word>` — where `<first_word>` is the portion of the metric name before the first `.` or `_`.
+- **Chart id** = `<remaining>_<metric_type>` — where `<remaining>` is the portion after the first `.` or `_`, and `<metric_type>` is one of: `gauge`, `counter`, `meter`, `timer`, `histogram`, `set`, or `dictionary`. If the metric name has no `.` or `_`, the chart id is just the `<metric_type>`.
+- **Full chart reference** = `<chart_type>.<chart_id>` — use this as the `chart` parameter in API queries.
+
+| Metric sent                  | Metric type | Chart type      | Chart ID            | Full chart reference                |
+|------------------------------|-------------|-----------------|---------------------|-------------------------------------|
+| `test.metric:100\|c`         | counter     | `statsd_test`   | `metric_counter`    | `statsd_test.metric_counter`       |
+| `myapp.used_memory:12345\|g` | gauge       | `statsd_myapp`  | `used_memory_gauge` | `statsd_myapp.used_memory_gauge`   |
+| `myapp.requests:50\|ms`      | timer       | `statsd_myapp`  | `requests_timer`    | `statsd_myapp.requests_timer`      |
+
+:::tip
+
+To discover the exact chart names available on your agent, run:
+
+```bash
+curl http://localhost:19999/api/v1/charts
+```
+
+Filter the results for IDs starting with `statsd_`. Use the returned chart `id` field (in `type.id` format) as the `chart` parameter in data queries.
+
+:::
+
+:::info
+
+**Troubleshooting "No metrics where matched to query":** This error typically occurs when you use the raw StatsD metric name (e.g., `statsd.test.metric`) as the `chart` parameter instead of the constructed chart reference (e.g., `statsd_test.metric_counter`). To resolve this, verify the correct chart name using `/api/v1/charts` before querying metric data.
+
+For example, after sending `test.metric:100|c` via StatsD, the correct query is:
+
+```bash
+curl "http://localhost:19999/api/v1/data?chart=statsd_test.metric_counter&after=-10&before=now"
+```
+
+The chart name `statsd_test.metric_counter` follows the `type.id` convention: type `statsd_test` (prefix + first dot-delimited word) and id `metric_counter` (remaining words + metric type).
+
+:::
+
 Example: To create charts for all `myapp.*` metrics except `myapp.*.badmetric`:
 
 ```
@@ -456,7 +496,13 @@ For example, to monitor the application `myapp` using StatsD and Netdata, create
 
 Using this configuration, `myapp` gets its own dashboard section with one chart containing two [dimensions](https://learn.netdata.cloud/docs/developer-and-contributor-corner/glossary#d).
 
-When you send metrics like `foo:10|g` and `bar:20|g`, you'll see both private charts and your synthetic chart.
+When you send metrics like `myapp.metric1:10|g` and `myapp.metric2:20|g`, you'll see both private charts and your synthetic chart. These metric names must match the pattern defined in the `[app]` section (e.g., `myapp.*`) for them to appear in your synthetic charts.
+
+:::note
+
+**Synthetic chart appears empty or is missing?** This happens when the metric names you send don't match the `metrics` pattern in your `[app]` section. StatsD matches incoming metric names against the `metrics` pattern using Netdata's [simple pattern](/src/libnetdata/simple_pattern/README.md) syntax — if a metric name doesn't match, it is never linked to the app's synthetic charts. For example, with `metrics = myapp.*`, sending bare names like `foo:10|g` creates a private chart for `foo` but never feeds the synthetic chart. To fix this, send metric names that include the prefix matching the pattern (e.g., `myapp.foo:10|g`).
+
+:::
 
 <details>
 <summary><strong>Synthetic Chart Example</strong></summary>
@@ -471,14 +517,22 @@ Example of a synthetic chart combining multiple metrics:
 
 The `[app]` section defines the application and has these options:
 
+:::warning
+
+The `[app]` section is a **namespace/container** — it groups metrics and sets defaults, but does **not** create any dashboard charts by itself. To see synthetic charts on the dashboard, you **must** add one or more chart definition sections (e.g., `[mychart]`) below the `[app]` section. If you only define an `[app]` section without chart definitions, the only visible charts will be private charts for individual metrics (if `private charts = yes` or the global default is enabled).
+
+Settings like `private charts`, `gaps when not collected`, and `history` configure how the app's metrics and charts behave — they are not chart-level settings. The `memory mode` setting under `[app]` is currently ignored. See [Chart Definitions](#chart-definitions) below for how to create charts.
+
+:::
+
 :::note
 
 - **name** - Defines the application name
 - **metrics** - [Simple pattern](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md) matching all metrics for this app
 - **private charts** - Enable/disable private charts for matched metrics (yes|no)
 - **gaps when not collected** - Show gaps when no metrics are collected (yes|no)
-- **memory mode** - Sets memory mode for application charts (optional, default is global Netdata setting)
-- **history** - Size of round-robin database (optional, only relevant with `memory mode = save`)
+- **memory mode** - Ignored in the `[app]` section; application charts use the host's default memory mode
+- **history** - Size of round-robin database for application charts (optional, minimum 5)
 
 :::
 
@@ -637,6 +691,14 @@ To rename methods automatically:
 
 This adds dimensions named `GET`, `ADD`, and `DELETE`.
 </details>
+
+### Scope of StatsD Chart Configuration
+
+All chart and dimension configuration directives in `/etc/netdata/statsd.d/*.conf` control **local agent behavior only** — they define how the local Netdata agent processes, names, and visualizes statsd metrics it receives.
+
+The dimension `TYPE` field (see [Dimension Format](#dimension-format) above) selects which computed value of a metric a single agent displays. It does **not** control how that metric is combined across multiple Netdata instances.
+
+Cross-node aggregation — how metrics from multiple agents are combined in Netdata Cloud dashboards — is governed by the Cloud query engine, not by statsd configuration files. To choose Sum, Average, or another aggregation for a chart in Netdata Cloud, use the [aggregate function](../../../docs/dashboards-and-charts/netdata-charts.md#aggregate-functions-dropdown) on that chart. There is no `aggregation = SUM` or `aggregation = AVG` directive in statsd.d configuration.
 
 ## Using StatsD with Different Languages
 
@@ -873,7 +935,6 @@ Start with this basic configuration:
     metrics = k6*
     private charts = yes
     gaps when not collected = no
-    memory mode = dbengine
 ```
 
 </details>
@@ -911,7 +972,6 @@ Here's a complete configuration for k6:
     metrics = k6*
     private charts = yes
     gaps when not collected = no
-    memory mode = dbengine
 
 [dictionary]
     http_req_blocked = Blocked HTTP Requests 

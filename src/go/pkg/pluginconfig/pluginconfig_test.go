@@ -18,6 +18,15 @@ func mkdir(t *testing.T, p string) {
 
 const testPluginName = "test.plugin"
 
+func TestReadRegistryUniqueID(t *testing.T) {
+	tmp := t.TempDir()
+	mkdir(t, filepath.Join(tmp, "registry"))
+	require.NoError(t, os.WriteFile(filepath.Join(tmp, "registry", "netdata.public.unique.id"), []byte("  test-machine-guid\n"), 0o644))
+
+	assert.Equal(t, "test-machine-guid", readRegistryUniqueID(tmp))
+	assert.Empty(t, readRegistryUniqueID(filepath.Join(tmp, "missing")))
+}
+
 func TestDirectoriesBuild(t *testing.T) {
 	tmp := t.TempDir()
 	execDir := filepath.Join(tmp, "root", "opt", "netdata", "bin")

@@ -693,11 +693,12 @@ ALWAYS_INLINE
 static void buffer_print_netdata_double_hex(BUFFER *wb, NETDATA_DOUBLE value) {
     buffer_need_bytes(wb, DOUBLE_HEX_MAX_LENGTH);
 
-    uint64_t *ptr = (uint64_t *) (&value);
+    uint64_t representation;
+    memcpy(&representation, &value, sizeof(representation));
     buffer_fast_strcat(wb, IEEE754_DOUBLE_HEX_PREFIX, sizeof(IEEE754_DOUBLE_HEX_PREFIX) - 1);
 
     char *s = &wb->buffer[wb->len];
-    char *d = print_uint64_hex_reversed(s, *ptr);
+    char *d = print_uint64_hex_reversed(s, representation);
     char_array_reverse(s, d - 1);
     *d = '\0';
     wb->len += d - s;
@@ -710,11 +711,12 @@ ALWAYS_INLINE
 static void buffer_print_netdata_double_base64(BUFFER *wb, NETDATA_DOUBLE value) {
     buffer_need_bytes(wb, DOUBLE_B64_MAX_LENGTH);
 
-    uint64_t *ptr = (uint64_t *) (&value);
+    uint64_t representation;
+    memcpy(&representation, &value, sizeof(representation));
     buffer_fast_strcat(wb, IEEE754_DOUBLE_B64_PREFIX, sizeof(IEEE754_DOUBLE_B64_PREFIX) - 1);
 
     char *s = &wb->buffer[wb->len];
-    char *d = print_uint64_base64_reversed(s, *ptr);
+    char *d = print_uint64_base64_reversed(s, representation);
     char_array_reverse(s, d - 1);
     *d = '\0';
     wb->len += d - s;

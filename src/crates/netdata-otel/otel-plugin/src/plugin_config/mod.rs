@@ -94,9 +94,8 @@ impl PluginConfig {
                 .map(|p| p.join("otel.yaml"));
 
             let mut config = match &stock_path {
-                Some(path) => Self::from_yaml_file(path).with_context(|| {
-                    format!("loading stock config from {}", path.display())
-                })?,
+                Some(path) => Self::from_yaml_file(path)
+                    .with_context(|| format!("loading stock config from {}", path.display()))?,
                 None => anyhow::bail!("no stock configuration directory available"),
             };
 
@@ -109,9 +108,7 @@ impl PluginConfig {
                 .map(|path| path.join("otel.yaml"))
             {
                 if let Some(overrides) = Self::load_overrides(&user_path)
-                    .with_context(|| {
-                        format!("loading user config from {}", user_path.display())
-                    })?
+                    .with_context(|| format!("loading user config from {}", user_path.display()))?
                 {
                     config.apply_overrides(&overrides);
                     config.log_config(ConfigSource::User);
@@ -154,10 +151,7 @@ impl PluginConfig {
         }
 
         // Validate TLS configuration
-        let tls_enabled = match (
-            &self.endpoint.tls_cert_path,
-            &self.endpoint.tls_key_path,
-        ) {
+        let tls_enabled = match (&self.endpoint.tls_cert_path, &self.endpoint.tls_key_path) {
             (Some(cert_path), Some(key_path)) => {
                 if cert_path.is_empty() {
                     anyhow::bail!("TLS certificate path cannot be empty when provided");
@@ -207,9 +201,7 @@ impl PluginConfig {
             Ok(contents) => contents,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(e) => {
-                return Err(
-                    anyhow::Error::new(e).context(format!("reading {}", path.display()))
-                );
+                return Err(anyhow::Error::new(e).context(format!("reading {}", path.display())));
             }
         };
         let overrides: PluginConfigOverride = serde_yaml::from_str(&contents)
@@ -496,13 +488,10 @@ logs:
 
     #[test]
     fn env_override_metrics_interval() {
-        with_env_vars(
-            &[("NETDATA_OTEL_METRICS_INTERVAL_SECS", "30")],
-            || {
-                let overrides = PluginConfigOverride::from_env().unwrap();
-                assert_eq!(overrides.metrics.as_ref().unwrap().interval_secs, Some(30));
-            },
-        );
+        with_env_vars(&[("NETDATA_OTEL_METRICS_INTERVAL_SECS", "30")], || {
+            let overrides = PluginConfigOverride::from_env().unwrap();
+            assert_eq!(overrides.metrics.as_ref().unwrap().interval_secs, Some(30));
+        });
     }
 
     #[test]
@@ -535,30 +524,18 @@ logs:
 
     #[test]
     fn env_override_bool_values() {
-        with_env_vars(
-            &[("NETDATA_OTEL_LOGS_STORE_OTLP_JSON", "true")],
-            || {
-                let overrides = PluginConfigOverride::from_env().unwrap();
-                assert_eq!(
-                    overrides.logs.as_ref().unwrap().store_otlp_json,
-                    Some(true)
-                );
-            },
-        );
+        with_env_vars(&[("NETDATA_OTEL_LOGS_STORE_OTLP_JSON", "true")], || {
+            let overrides = PluginConfigOverride::from_env().unwrap();
+            assert_eq!(overrides.logs.as_ref().unwrap().store_otlp_json, Some(true));
+        });
     }
 
     #[test]
     fn env_override_bool_accepts_yes_no() {
-        with_env_vars(
-            &[("NETDATA_OTEL_LOGS_STORE_OTLP_JSON", "yes")],
-            || {
-                let overrides = PluginConfigOverride::from_env().unwrap();
-                assert_eq!(
-                    overrides.logs.as_ref().unwrap().store_otlp_json,
-                    Some(true)
-                );
-            },
-        );
+        with_env_vars(&[("NETDATA_OTEL_LOGS_STORE_OTLP_JSON", "yes")], || {
+            let overrides = PluginConfigOverride::from_env().unwrap();
+            assert_eq!(overrides.logs.as_ref().unwrap().store_otlp_json, Some(true));
+        });
     }
 
     #[test]
@@ -573,12 +550,9 @@ logs:
 
     #[test]
     fn env_override_invalid_bool_is_rejected() {
-        with_env_vars(
-            &[("NETDATA_OTEL_LOGS_STORE_OTLP_JSON", "maybe")],
-            || {
-                assert!(PluginConfigOverride::from_env().is_err());
-            },
-        );
+        with_env_vars(&[("NETDATA_OTEL_LOGS_STORE_OTLP_JSON", "maybe")], || {
+            assert!(PluginConfigOverride::from_env().is_err());
+        });
     }
 
     #[test]

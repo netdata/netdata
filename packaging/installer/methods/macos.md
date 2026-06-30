@@ -57,6 +57,8 @@ If you experience issues while connecting your node, follow the steps in our [Tr
 
 ## Install Netdata via Homebrew
 
+To connect this Agent to Netdata Cloud, see [Connect a Homebrew-installed Agent to Netdata Cloud](#connect-a-homebrew-installed-agent-to-netdata-cloud) below.
+
 ### For macOS Intel
 
 To install Netdata and all its dependencies, run Homebrew using the following command:
@@ -80,6 +82,40 @@ brew install netdata
 Homebrew will place your Netdata configuration directory at `/opt/homebrew/etc/netdata/`.
 
 Use the `edit-config` script and the files in this directory to configure Netdata. For reference, you can find stock configuration files at `/opt/homebrew/Cellar/netdata/{NETDATA_VERSION}/lib/netdata/conf.d/`.
+
+### Connect a Homebrew-installed Agent to Netdata Cloud
+
+The easiest way to connect a Homebrew-installed Netdata Agent to Netdata Cloud is via the local dashboard UI, as described in [Method 1: Via UI](/src/claim/README.md#method-1-via-ui-recommended):
+
+1. Open the local dashboard in your browser at `http://localhost:19999` (or the Agent's IP address at port 19999).
+2. Sign in to your Netdata Cloud account.
+3. Click the **Connect** button and follow the on-screen instructions.
+
+For automated setups or headless machines where the UI is not accessible, you can use one of these alternatives:
+
+- **Kickstart script claiming flags** — this requires installing/reinstalling with kickstart (it installs under `/usr/local/netdata` by default, or your `--install-prefix` path) rather than adding flags to an existing Homebrew install. If you want to keep the Homebrew install, use the **Configuration file** method below. See the [kickstart claiming section](#automatically-connect-to-netdata-cloud-during-installation) above or the full [kickstart documentation](/packaging/installer/methods/kickstart.md).
+- **Configuration file** — create a `claim.conf` file in your Netdata configuration directory using the [configuration file method](/src/claim/README.md#method-2-via-configuration-file).
+
+**Configuration directory paths for `claim.conf`:**
+
+| Architecture  | Path                                   |
+|:--------------|:---------------------------------------|
+| Intel         | `/usr/local/etc/netdata/claim.conf`    |
+| Apple Silicon | `/opt/homebrew/etc/netdata/claim.conf` |
+
+:::note
+
+On macOS, Homebrew installs run under your user account and the `netdata` group does not exist. Use your own user and the `staff` group for file ownership when creating `claim.conf` manually. For full details on permissions and applying the configuration, see the [configuration file method](/src/claim/README.md#method-2-via-configuration-file).
+
+:::
+
+:::caution
+
+Do **not** run the `netdata-claim.sh` script manually. It is deprecated and will be unsupported in the near future. Instead, use one of the supported claiming methods described above: the Cloud UI, kickstart claiming flags during install/reinstall, or a `claim.conf` file.
+
+:::
+
+For the full list of claiming options and troubleshooting, see [Connect Agent to Cloud](/src/claim/README.md).
 
 ## Install Netdata from source
 

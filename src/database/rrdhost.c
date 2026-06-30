@@ -540,6 +540,12 @@ static void rrdhost_update(RRDHOST *host
 {
     UNUSED(guid);
 
+    // Streaming children may omit the User-Agent header, leaving prog_name/prog_version NULL.
+    // Match the defaults assigned on the host create path (for example in set_host_properties()/rrdhost_create())
+    // so the strcmp/string_strdupz calls below are safe.
+    if(!prog_name || !*prog_name)       prog_name = "unknown";
+    if(!prog_version || !*prog_version) prog_version = "unknown";
+
     spinlock_lock(&host->rrdhost_update_lock);
 
     host->health.enabled = (mode == RRD_DB_MODE_NONE) ? 0 : health;
@@ -800,23 +806,15 @@ void rrdhost_cleanup_data_collection_and_health(RRDHOST *host) {
            rrdhost_hostname(host));
 }
 
-void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host) {
-    if(!host) return;
-
-    nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "RRD: 'host:%s' freeing memory...",
-           rrdhost_hostname(host));
-
-    // ------------------------------------------------------------------------
-    // first remove it from the indexes, so that it will not be discoverable
-
+static void rrdhost_unlink___while_having_rrd_wrlock(RRDHOST *host) {
+    // Remove it from the indexes first, so blocking teardown cannot rediscover it.
     rrdhost_index_del_by_guid(host);
 
     if (host->prev)
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(localhost, host, prev, next);
+}
 
-    // ------------------------------------------------------------------------
-
+static void rrdhost_free_unlinked(RRDHOST *host) {
     rrdhost_cleanup_data_collection_and_health(host);
 
     // ------------------------------------------------------------------------
@@ -845,6 +843,23 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host) {
     string_freez(host->stream.snd.api_key);
     string_freez(host->stream.snd.destination);
     freez(host);
+}
+
+void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host) {
+    if(!host) return;
+
+    rrdhost_unlink___while_having_rrd_wrlock(host);
+    rrdhost_free_unlinked(host);
+}
+
+void rrdhost_free___without_having_rrd_wrlock(RRDHOST *host) {
+    if(!host) return;
+
+    rrd_wrlock();
+    rrdhost_unlink___while_having_rrd_wrlock(host);
+    rrd_wrunlock();
+
+    rrdhost_free_unlinked(host);
 }
 
 void rrdhost_free_all(void) {

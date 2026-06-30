@@ -4,6 +4,7 @@ package chartengine
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -123,9 +124,6 @@ func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uin
 	if reader == nil {
 		return Plan{}, materializedState{}, 0, 0, 0, false, fmt.Errorf("chartengine: nil metrics reader")
 	}
-	sample := planRuntimeSample{startedAt: time.Now()}
-	defer func() { e.observeBuildSample(sample) }()
-
 	out := Plan{
 		Actions:            make([]EngineAction, 0),
 		InferredDimensions: make([]InferredDimension, 0),
@@ -137,6 +135,8 @@ func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uin
 	if e.state.outstanding != 0 {
 		return Plan{}, materializedState{}, 0, 0, 0, false, ErrOutstandingPlanAttempt
 	}
+	sample := PlanRuntimeSample{startedAt: time.Now()}
+	defer func() { e.observeBuildSample(sample) }()
 	// Failed attempt must not trigger lifecycle transitions.
 	if collectMeta.LastAttemptStatus != metrix.CollectStatusSuccess {
 		sample.skippedFailed = true
@@ -370,6 +370,7 @@ func (e *Engine) scanPlanSeries(ctx *planBuildContext) error {
 			name,
 			labels,
 			meta,
+			ctx.reader,
 			ctx.index,
 			ctx.prog.Revision(),
 			buildSeq,
@@ -599,6 +600,12 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 		for _, name := range updateNames {
 			entry, ok := cs.entries[name]
 			if ok && entry != nil && entry.seenSeq == cs.currentBuildSeq {
+				if math.IsNaN(entry.value) || math.IsInf(entry.value, 0) {
+					// A non-finite value (e.g. a summary quantile with no observations this
+					// cycle) must render as a gap, not 0: emit SETEMPTY rather than carry NaN.
+					values = append(values, UpdateDimensionValue{Name: name, IsEmpty: true})
+					continue
+				}
 				values = append(values, UpdateDimensionValue{
 					Name:    name,
 					IsFloat: entry.float,

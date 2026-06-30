@@ -119,12 +119,12 @@ Netdata parses lines starting with:
 -    `CLABEL` - add a label to a chart
 -    `CLABEL_COMMIT` - commit added labels to the chart
 -    `FUNCTION` - define a function that can be called later to execute it
+- `FUNCTION_DEL` - unregister a function
 -    `BEGIN` - initialize data collection for a chart
 -    `SET` - set the value of a dimension for the initialized chart
 -    `END` - complete data collection for the initialized chart
 -    `FLUSH` - ignore the last collected values
 -    `DISABLE` - disable this plugin
--    `FUNCTION` - define functions
 -    `FUNCTION_PROGRESS` - report the progress of a function execution
 -    `FUNCTION_RESULT_BEGIN` - to initiate the transmission of function results
 -    `FUNCTION_RESULT_END` - to end the transmission of function result
@@ -162,6 +162,7 @@ available for the plugin to use.
 |:--------------------------------:|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 |    `NETDATA_USER_CONFIG_DIR`     | The directory where all Netdata-related user configuration should be stored. If the plugin requires custom user configuration, this is the place the user has saved it (normally under `/etc/netdata`).                                                |
 |    `NETDATA_STOCK_CONFIG_DIR`    | The directory where all Netdata -related stock configuration should be stored. If the plugin is shipped with configuration files, this is the place they can be found (normally under `/usr/lib/netdata/conf.d`).                                      |
+|     `NETDATA_STOCK_DATA_DIR`     | The directory where immutable Netdata stock data files are stored. Plugins can use this for packaged data assets such as MMDB files (normally under `/usr/share/netdata`).                                                                            |
 |      `NETDATA_PLUGINS_DIR`       | The directory where all Netdata plugins are stored.                                                                                                                                                                                                    |
 |   `NETDATA_USER_PLUGINS_DIRS`    | The list of directories where custom plugins are stored.                                                                                                                                                                                               |
 |        `NETDATA_WEB_DIR`         | The directory where the web files of Netdata are saved.                                                                                                                                                                                                |
@@ -488,6 +489,16 @@ Users can use a function to ask for more information from the collector. Netdata
 Both node and chart functions are exactly the same, but chart functions allow Netdata to relate functions with charts and therefore present a context-sensitive menu of functions related to the chart the user is using.
 
 Users can get a list of all the registered functions using the `/api/v1/functions` endpoint of Netdata and call functions using the `/api/v1/function` API call of Netdata.
+
+#### FUNCTION_DEL
+
+The plugin can unregister a previously registered function while continuing to run:
+
+> FUNCTION_DEL [GLOBAL] "name of the function"
+
+- Use `GLOBAL` for host-level functions (the same scope as `FUNCTION GLOBAL`).
+- Unregistered functions disappear from `/api/v1/functions` and return 503 on calls.
+- Functions can be re-registered later with a new `FUNCTION` line.
 
 Once a function is called, the plugin will receive at its standard input a command that looks like this:
 

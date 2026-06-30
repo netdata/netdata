@@ -258,6 +258,30 @@ uint16_t rrdhost_stream_path_get_host_ids(struct rrdhost *host, uint16_t from, N
     return count;
 }
 
+uint16_t rrdhost_stream_path_visit(struct rrdhost *host, uint16_t from,
+                                    stream_path_visit_cb cb, void *userdata) {
+    if(!host || !cb)
+        return 0;
+
+    uint16_t count = 0;
+    rw_spinlock_read_lock(&host->stream.path.spinlock);
+    for(uint16_t i = from; i < host->stream.path.used; i++) {
+        STREAM_PATH *p = &host->stream.path.array[i];
+        bool keep_going = cb(userdata, i,
+            p->hostname,
+            p->host_id, p->node_id, p->claim_id,
+            p->hops,
+            p->since, p->first_time_t,
+            p->start_time_ms, p->shutdown_time_ms,
+            p->capabilities,
+            (uint32_t)p->flags);
+        count++;
+        if(!keep_going) break;
+    }
+    rw_spinlock_read_unlock(&host->stream.path.spinlock);
+    return count;
+}
+
 void stream_path_child_disconnected(RRDHOST *host) {
     rrdhost_stream_path_clear(host, true);
 }

@@ -4,6 +4,7 @@ package chartemit
 
 import (
 	"bytes"
+	"math"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
@@ -240,6 +241,47 @@ END
 
 `, out)
 	assert.NotContains(t, out, "SET 'total' = 7.9")
+}
+
+func TestApplyPlanGapsNonFiniteFloatUpdate(t *testing.T) {
+	var buf bytes.Buffer
+	api := netdataapi.New(&buf)
+
+	meta := chartengine.ChartMeta{
+		Title:     "Latency",
+		Family:    "Latency",
+		Context:   "svc.latency",
+		Units:     "ms",
+		Algorithm: chartengine.AlgorithmAbsolute,
+		Type:      chartengine.ChartTypeLine,
+	}
+
+	plan := Plan{
+		Actions: []EngineAction{
+			chartengine.CreateChartAction{ChartTemplateID: "g0c0", ChartID: "svc_latency", Meta: meta},
+			chartengine.CreateDimensionAction{
+				ChartID: "svc_latency", ChartMeta: meta, Name: "value",
+				Float: true, Algorithm: chartengine.AlgorithmAbsolute, Multiplier: 1, Divisor: 1,
+			},
+			chartengine.UpdateChartAction{
+				ChartID: "svc_latency",
+				Values: []chartengine.UpdateDimensionValue{
+					{Name: "value", IsFloat: true, Float64: math.NaN()},
+				},
+			},
+		},
+	}
+
+	require.NoError(t, ApplyPlan(api, plan, EmitEnv{
+		TypeID: "collector.job", UpdateEvery: 1, Plugin: "go.d.plugin", Module: "prometheus",
+		JobName: "job01", MSSinceLast: 1,
+	}))
+
+	out := buf.String()
+	// A non-finite float dimension is emitted as a gap (empty SET), never "SET = NaN" (which the C
+	// agent would render as 0).
+	assert.NotContains(t, out, "NaN")
+	assert.Contains(t, out, "SET 'value' = \n")
 }
 
 func TestApplyPlanDimensionOnlyCreateEmitsLabelsAndCommit(t *testing.T) {
@@ -536,6 +578,59 @@ func TestApplyPlanRejectsMismatchedHostDefine(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "does not match")
 	assert.Equal(t, "", buf.String())
+}
+
+func TestPrepareHostInfoScenarios(t *testing.T) {
+	cases := map[string]struct {
+		info    netdataapi.HostInfo
+		want    netdataapi.HostInfo
+		wantErr string
+	}{
+		"rejects unsafe guid": {
+			info: netdataapi.HostInfo{
+				GUID:     "node'\nguid",
+				Hostname: "node-host",
+			},
+			wantErr: "unsupported characters",
+		},
+		"rejects unsafe hostname": {
+			info: netdataapi.HostInfo{
+				GUID:     "node-guid",
+				Hostname: "node'\nhost",
+			},
+			wantErr: "unsupported characters",
+		},
+		"normalizes labels": {
+			info: netdataapi.HostInfo{
+				GUID:     "node-guid",
+				Hostname: "node-host",
+				Labels: map[string]string{
+					"region'\n": "eu'\n",
+					" ":         "ignored",
+				},
+			},
+			want: netdataapi.HostInfo{
+				GUID:     "node-guid",
+				Hostname: "node-host",
+				Labels: map[string]string{
+					"_hostname": "node-host",
+					"region":    "eu ",
+				},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got, err := PrepareHostInfo(tc.info)
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
+	}
 }
 
 func TestApplyPlanRemoveOnlyBatchStillSelectsHost(t *testing.T) {

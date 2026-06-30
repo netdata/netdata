@@ -29,7 +29,7 @@ func (c *Controller) publishInitialConfig(rawCfg secretstore.Config) {
 	}
 
 	c.exposed.Add(entry)
-	c.handler.NotifyJobCreate(cfg, entry.Status)
+	c.handler.NotifyConfigCreate(cfg, entry.Status)
 }
 
 func (c *Controller) prepareConfigCandidate(cfg secretstore.Config) (secretstore.Config, error) {

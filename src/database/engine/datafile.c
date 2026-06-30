@@ -49,7 +49,7 @@ static struct rrdengine_datafile *datafile_alloc_and_init(struct rrdengine_insta
     datafile->users.available = true;
     datafile->users.pending_deletion = false;
 
-    spinlock_init(&datafile->users.spinlock);
+    spinlock_tracked_init(&datafile->users.spinlock);
     spinlock_init(&datafile->writers.spinlock);
     rw_spinlock_init(&datafile->extent_epdl.spinlock);
 
@@ -60,7 +60,7 @@ ALWAYS_INLINE bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQU
 {
     bool ret = false;
 
-    spinlock_lock(&df->users.spinlock);
+    spinlock_tracked_lock(&df->users.spinlock);
 
     if(df->users.available && reason < DATAFILE_ACQUIRE_MAX) {
         bool allow = true;
@@ -87,20 +87,20 @@ ALWAYS_INLINE bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQU
         }
     }
 
-    spinlock_unlock(&df->users.spinlock);
+    spinlock_tracked_unlock(&df->users.spinlock);
 
     return ret;
 }
 
 void datafile_release_with_trace(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason, const char *func) {
-    spinlock_lock(&df->users.spinlock);
+    spinlock_tracked_lock(&df->users.spinlock);
     if(!df->users.lockers)
         fatal("DBENGINE DATAFILE: cannot release datafile %u of tier %u - it is not acquired, called from %s() with reason %u",
               df->fileno, df->tier, func, reason);
 
     df->users.lockers--;
     df->users.lockers_by_reason[reason]--;
-    spinlock_unlock(&df->users.spinlock);
+    spinlock_tracked_unlock(&df->users.spinlock);
 }
 
 bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdown)
@@ -109,7 +109,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdo
     bool marked_pending = false;
     bool should_evict_open_pages = false;
 
-    spinlock_lock(&df->users.spinlock);
+    spinlock_tracked_lock(&df->users.spinlock);
 
     if(!df->users.pending_deletion) {
         df->users.pending_deletion = true;
@@ -131,7 +131,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdo
     }
     else if(df->users.lockers)
         should_evict_open_pages = true;
-    spinlock_unlock(&df->users.spinlock);
+    spinlock_tracked_unlock(&df->users.spinlock);
 
     if(marked_pending)
         netdata_log_info("DBENGINE: tier %d: " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " is pending deletion (%s)",
@@ -148,7 +148,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdo
     size_t hot_pages_in_open_cache = pgc_count_hot_pages_having_data_ptr(open_cache, (Word_t)datafile_ctx(df), df);
     time_to_scan_ut = now_monotonic_usec() - time_to_scan_ut;
 
-    spinlock_lock(&df->users.spinlock);
+    spinlock_tracked_lock(&df->users.spinlock);
 
     spinlock_lock(&df->writers.spinlock);
     writers_running = df->writers.running;
@@ -221,7 +221,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdo
                        hot_pages_in_open_cache,
                        time_to_scan_ut);
 
-    spinlock_unlock(&df->users.spinlock);
+    spinlock_tracked_unlock(&df->users.spinlock);
 
     return can_be_deleted;
 }

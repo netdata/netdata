@@ -862,7 +862,7 @@ func TestManager_Run_Dyncfg_Enable(t *testing.T) {
 					wantDyncfg: `
 
 FUNCTION_RESULT_BEGIN 1-enable 404 application/json
-{"status":404,"errorMessage":"job not found."}
+{"status":404,"errorMessage":"config not found."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -1088,7 +1088,7 @@ func TestManager_Run_Dyncfg_Disable(t *testing.T) {
 					wantDyncfg: `
 
 FUNCTION_RESULT_BEGIN 1-disable 404 application/json
-{"status":404,"errorMessage":"job not found."}
+{"status":404,"errorMessage":"config not found."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -1314,7 +1314,7 @@ func TestManager_Run_Dyncfg_Restart(t *testing.T) {
 					wantDyncfg: `
 
 FUNCTION_RESULT_BEGIN 1-restart 404 application/json
-{"status":404,"errorMessage":"job not found."}
+{"status":404,"errorMessage":"config not found."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -1560,7 +1560,7 @@ func TestManager_Run_Dyncfg_Remove(t *testing.T) {
 					wantDyncfg: `
 
 FUNCTION_RESULT_BEGIN 1-remove 404 application/json
-{"status":404,"errorMessage":"job not found."}
+{"status":404,"errorMessage":"config not found."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -1647,15 +1647,15 @@ FUNCTION_RESULT_END
 CONFIG test:collector:success:discovered status running
 
 FUNCTION_RESULT_BEGIN 1-remove 405 application/json
-{"status":405,"errorMessage":"removing jobs of type 'stock' is not supported, only 'dyncfg' jobs can be removed."}
+{"status":405,"errorMessage":"removing configurations of source type 'stock' is not supported, only 'dyncfg' configurations can be removed."}
 FUNCTION_RESULT_END
 
 FUNCTION_RESULT_BEGIN 2-remove 405 application/json
-{"status":405,"errorMessage":"removing jobs of type 'user' is not supported, only 'dyncfg' jobs can be removed."}
+{"status":405,"errorMessage":"removing configurations of source type 'user' is not supported, only 'dyncfg' configurations can be removed."}
 FUNCTION_RESULT_END
 
 FUNCTION_RESULT_BEGIN 3-remove 405 application/json
-{"status":405,"errorMessage":"removing jobs of type 'discovered' is not supported, only 'dyncfg' jobs can be removed."}
+{"status":405,"errorMessage":"removing configurations of source type 'discovered' is not supported, only 'dyncfg' configurations can be removed."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -1780,7 +1780,7 @@ func TestManager_Run_Dyncfg_Update(t *testing.T) {
 					wantDyncfg: `
 
 FUNCTION_RESULT_BEGIN 1-update 404 application/json
-{"status":404,"errorMessage":"job not found."}
+{"status":404,"errorMessage":"config not found."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -1997,7 +1997,7 @@ func TestManager_Run_FunctionOnly(t *testing.T) {
 CONFIG test:collector:nofuncs:test create accepted job /collectors/test/Jobs user 'type=user,module=nofuncs,job=test' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 1-enable 400 application/json
-{"status":400,"errorMessage":"invalid configuration: failed to apply configuration: function_only is set but nofuncs module has no methods defined"}
+{"status":400,"errorMessage":"invalid configuration: failed to apply configuration: function_only is set but nofuncs module has no functions defined"}
 FUNCTION_RESULT_END
 
 CONFIG test:collector:nofuncs:test status failed

@@ -6,6 +6,7 @@ package metrix
 type snapshotGaugeInstrument struct {
 	backend meterBackend
 	desc    *instrumentDescriptor
+	scope   HostScope
 	base    []LabelSet
 }
 
@@ -13,17 +14,20 @@ type snapshotGaugeInstrument struct {
 type statefulGaugeInstrument struct {
 	backend meterBackend
 	desc    *instrumentDescriptor
+	scope   HostScope
 	base    []LabelSet
 }
 
 // stagedGauge holds one in-cycle gauge sample for a single series identity.
 type stagedGauge struct {
-	key       string
-	name      string
-	labels    []Label
-	labelsKey string
-	desc      *instrumentDescriptor
-	value     SampleValue
+	key          string
+	name         string
+	hostScopeKey string
+	hostScope    HostScope
+	labels       []Label
+	labelsKey    string
+	desc         *instrumentDescriptor
+	value        SampleValue
 }
 
 // Gauge declares or reuses a snapshot gauge under this meter.
@@ -35,6 +39,7 @@ func (m *snapshotMeter) Gauge(name string, opts ...InstrumentOption) SnapshotGau
 	return &snapshotGaugeInstrument{
 		backend: m.backend,
 		desc:    desc,
+		scope:   m.scope,
 		base:    appendLabelSets(m.sets, nil),
 	}
 }
@@ -48,27 +53,28 @@ func (m *statefulMeter) Gauge(name string, opts ...InstrumentOption) StatefulGau
 	return &statefulGaugeInstrument{
 		backend: m.backend,
 		desc:    desc,
+		scope:   m.scope,
 		base:    appendLabelSets(m.sets, nil),
 	}
 }
 
 // Observe writes one absolute gauge value for this collect cycle.
 func (g *snapshotGaugeInstrument) Observe(v SampleValue, labels ...LabelSet) {
-	g.backend.recordGaugeSet(g.desc, v, appendLabelSets(g.base, labels))
+	g.backend.recordGaugeSet(g.desc, g.scope, v, appendLabelSets(g.base, labels))
 }
 
 // Set overwrites the staged gauge value for this collect cycle.
 func (g *statefulGaugeInstrument) Set(v SampleValue, labels ...LabelSet) {
-	g.backend.recordGaugeSet(g.desc, v, appendLabelSets(g.base, labels))
+	g.backend.recordGaugeSet(g.desc, g.scope, v, appendLabelSets(g.base, labels))
 }
 
 // Add accumulates on top of the committed baseline for this collect cycle.
 func (g *statefulGaugeInstrument) Add(delta SampleValue, labels ...LabelSet) {
-	g.backend.recordGaugeAdd(g.desc, delta, appendLabelSets(g.base, labels))
+	g.backend.recordGaugeAdd(g.desc, g.scope, delta, appendLabelSets(g.base, labels))
 }
 
 // recordGaugeSet writes one gauge sample into the active frame (last-write-wins in-cycle).
-func (c *storeCore) recordGaugeSet(desc *instrumentDescriptor, value SampleValue, sets []LabelSet) {
+func (c *storeCore) recordGaugeSet(desc *instrumentDescriptor, scope HostScope, value SampleValue, sets []LabelSet) {
 	mustFiniteSample(value)
 
 	c.mu.Lock()
@@ -82,16 +88,22 @@ func (c *storeCore) recordGaugeSet(desc *instrumentDescriptor, value SampleValue
 	if err != nil {
 		panic(err)
 	}
+	scope, ok := c.prepareHostScopeForWriteLocked(scope)
+	if !ok {
+		return
+	}
 
-	key := makeSeriesKey(desc.name, labelsKey)
+	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.gauges[key]
 	if !ok {
 		entry = &stagedGauge{
-			key:       key,
-			name:      desc.name,
-			labels:    labels,
-			labelsKey: labelsKey,
-			desc:      desc,
+			key:          key,
+			name:         desc.name,
+			hostScopeKey: scope.ScopeKey,
+			hostScope:    scope,
+			labels:       labels,
+			labelsKey:    labelsKey,
+			desc:         desc,
 		}
 		c.active.gauges[key] = entry
 	}
@@ -99,7 +111,7 @@ func (c *storeCore) recordGaugeSet(desc *instrumentDescriptor, value SampleValue
 }
 
 // recordGaugeAdd accumulates delta into the active frame using committed baseline on first write.
-func (c *storeCore) recordGaugeAdd(desc *instrumentDescriptor, delta SampleValue, sets []LabelSet) {
+func (c *storeCore) recordGaugeAdd(desc *instrumentDescriptor, scope HostScope, delta SampleValue, sets []LabelSet) {
 	mustFiniteSample(delta)
 
 	c.mu.Lock()
@@ -113,8 +125,12 @@ func (c *storeCore) recordGaugeAdd(desc *instrumentDescriptor, delta SampleValue
 	if err != nil {
 		panic(err)
 	}
+	scope, ok := c.prepareHostScopeForWriteLocked(scope)
+	if !ok {
+		return
+	}
 
-	key := makeSeriesKey(desc.name, labelsKey)
+	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.gauges[key]
 	if !ok {
 		baseline := SampleValue(0)
@@ -122,12 +138,14 @@ func (c *storeCore) recordGaugeAdd(desc *instrumentDescriptor, delta SampleValue
 			baseline = existing.value
 		}
 		entry = &stagedGauge{
-			key:       key,
-			name:      desc.name,
-			labels:    labels,
-			labelsKey: labelsKey,
-			desc:      desc,
-			value:     baseline,
+			key:          key,
+			name:         desc.name,
+			hostScopeKey: scope.ScopeKey,
+			hostScope:    scope,
+			labels:       labels,
+			labelsKey:    labelsKey,
+			desc:         desc,
+			value:        baseline,
 		}
 		c.active.gauges[key] = entry
 	}

@@ -8,7 +8,7 @@ The Windows plugin primarily collects metrics from Microsoft Windows [Performanc
 
 ## Default Configuration
 
-By default, all collector threads are enabled except for `PerflibThermalZone` and `PerflibServices`. You can enable these disabled collectors or disable any of the currently active ones by modifying the `[plugin:windows]` section in your configuration file.
+By default, all collector threads are enabled except for `PerflibSMB` and `PerflibThermalZone`. You can enable these disabled collectors or disable any of the currently active ones by modifying the `[plugin:windows]` section in your configuration file.
 
 To change a setting, remove the comment symbol (`#`) from the beginning of the line and set the value to either `yes` or `no`.
 
@@ -16,22 +16,27 @@ To change a setting, remove the comment symbol (`#`) from the beginning of the l
 [plugin:windows]
         # GetSystemUptime = yes
         # GetSystemRAM = yes
+        # GetPowerSupply = yes
+        # GetSensors = yes
+        # GetHardwareInfo = yes
+        # PerflibServices = yes
         # PerflibProcesses = yes
         # PerflibProcessor = yes
         # PerflibMemory = yes
         # PerflibStorage = yes
         # PerflibNetwork = yes
+        # PerflibSMB = no
         # PerflibObjects = yes
         # PerflibHyperV = yes
         # PerflibThermalZone = no
         # PerflibWebService = yes
-        # PerflibServices = no
         # PerflibNetFramework = yes
         # PerflibAD = yes
         # PerflibADCS = yes
         # PerflibADFS = yes
         # PerflibExchange = yes
         # PerflibNUMA = yes
+        # PerflibASP = yes
 ```
 
 ## Update Every per Thread
@@ -39,11 +44,11 @@ To change a setting, remove the comment symbol (`#`) from the beginning of the l
 When the plugin is running, most threads will collect data using Netdata's default update `every interval`. However,
 to avoid overloading the host, Netdata uses different `update every` intervals for specific threads, as shown below:
 
-| Period (seconds) | Threads                                                                          |
-|------------------|----------------------------------------------------------------------------------|
-| 5                | `PerflibHyperV`, `PerflibThermalZone`                                            |
-| 10               | `PerflibAD`, `PerflibADCS`, `PerflibADFS`, and `PerflibExchange` |
-| 30               | `PerflibServices`                                                                |
+| Period (seconds) | Threads                                                                             |
+|------------------|-------------------------------------------------------------------------------------|
+| 5                | `PerflibHyperV`, `PerflibThermalZone`                                               |
+| 10               | `GetHardwareInfo`, `PerflibAD`, `PerflibADCS`, `PerflibADFS`, and `PerflibExchange` |
+| 30               | `PerflibServices`                                                                   |
 
 To customize the update interval for a specific thread, you can set the update every value within the corresponding
 thread configuration in your `netdata.conf` file. For example, to modify the intervals for the `Object`

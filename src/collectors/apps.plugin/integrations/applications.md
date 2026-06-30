@@ -105,6 +105,10 @@ Metrics:
 | app.mem_private_usage | mem | MiB |
 | app.vmem_usage | vmem | MiB |
 | app.mem_page_faults | minor, major | pgfaults/s |
+| app.ebpf_cachestat_hit_ratio | ratio | % |
+| app.ebpf_cachestat_dirty_pages | pages | page/s |
+| app.ebpf_cachestat_access | hits | hits/s |
+| app.ebpf_cachestat_misses | misses | misses/s |
 | app.swap_usage | swap | MiB |
 | app.disk_physical_io | reads, writes | KiB/s |
 | app.disk_logical_io | reads, writes | KiB/s |
@@ -114,5 +118,23 @@ Metrics:
 | app.fds_open | files, sockets, pipes, inotifies, event, timer, signal, eventpolls, other | fds |
 | app.uptime | uptime | seconds |
 | app.uptime_summary | min, avg, max | seconds |
+
+### Per apps plugin IPC
+
+apps.plugin netipc lookup-client and lookup-server health and latency.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| netdata.collector.ipc.cgroups_lookup.client.requests | requests_sent, requests_responded, requests_timeout, requests_error | requests/s |
+| netdata.collector.ipc.cgroups_lookup.client.cache | cache_hits, cache_misses_retry, cache_misses_permanent, cache_evictions | events/s |
+| netdata.collector.ipc.cgroups_lookup.client.peer | peer_connect_attempts, peer_disconnects | events/s |
+| netdata.collector.ipc.cgroups_lookup.client.request_duration_ms | le_1ms, le_5ms, le_10ms, le_50ms, le_100ms, le_500ms, le_1000ms, gt_1000ms | requests/s |
+| netdata.collector.ipc.cgroups_lookup.client.queue_depth | queue_depth | paths |
+| netdata.collector.ipc.apps_lookup.server.requests | requests_responded, requests_error | requests/s |
+| netdata.collector.ipc.apps_lookup.server.request_duration_ms | le_1ms, le_5ms, le_10ms, le_50ms, le_100ms, le_500ms, le_1000ms, gt_1000ms | requests/s |
 
 

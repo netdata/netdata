@@ -4,7 +4,7 @@
 #define NETDATA_SQLITE_FUNCTIONS_H
 
 #include "database/rrd.h"
-#include "database/sqlite/vendored/sqlite3.h"
+#include "sqlite3.h"
 
 void analytics_set_data_str(char **name, const char *value);
 
@@ -166,6 +166,7 @@ int sqlite_library_init(void);
 void sqlite_library_shutdown(void);
 
 void sql_close_database(sqlite3 *database, const char *database_name);
+void sql_close_thread_db_safe(sqlite3 **database);
 void sqlite_close_databases(void);
 uint64_t get_total_database_space(void);
 int sqlite_release_memory(int bytes);

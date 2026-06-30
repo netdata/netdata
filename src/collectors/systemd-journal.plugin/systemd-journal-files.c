@@ -11,6 +11,29 @@ DICTIONARY *nd_journal_files_registry = NULL;
 DICTIONARY *used_hashes_registry = NULL;
 
 static usec_t systemd_journal_session = 0;
+static bool nd_journal_scan_progress_enabled = true;
+
+void nd_journal_set_scan_progress_enabled(bool enabled)
+{
+    nd_journal_scan_progress_enabled = enabled;
+}
+
+static void nd_journal_scan_progress(void)
+{
+    if (nd_journal_scan_progress_enabled)
+        send_newline_and_flush(&stdout_mutex);
+}
+
+void nd_journal_use_single_directory(const char *path)
+{
+    string_freez(journal_directories[0].path);
+    journal_directories[0].path = string_strdupz(path);
+
+    for (size_t i = 1; i < MAX_JOURNAL_DIRECTORIES; i++) {
+        string_freez(journal_directories[i].path);
+        journal_directories[i].path = NULL;
+    }
+}
 
 void buffer_json_journal_versions(BUFFER *wb)
 {
@@ -147,8 +170,8 @@ nd_journal_file_get_boot_id_annotations(NsdJournal *j __maybe_unused, struct nd_
 
     DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
 
-    NSD_JOURNAL_FOREACH_UNIQUE(j, data, data_length)
-    {
+    nsd_journal_restart_unique(j);
+    while ((r = nsd_journal_enumerate_available_unique(j, &data, &data_length)) > 0) {
         const char *key, *value;
         size_t key_length, value_length;
 
@@ -163,6 +186,16 @@ nd_journal_file_get_boot_id_annotations(NsdJournal *j __maybe_unused, struct nd_
         buf[32] = '\0';
 
         dictionary_set(dict, buf, NULL, 0);
+    }
+
+    if (r < 0) {
+        errno = -r;
+        internal_error(
+            true,
+            "JOURNAL: while enumerating the unique _BOOT_ID values, "
+            "nsd_journal_enumerate_available_unique() on file '%s' returned %d",
+            njf->filename,
+            r);
     }
 
     void *nothing;
@@ -625,8 +658,15 @@ void nd_journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, 
 
     bool existing = false;
     bool *found = dictionary_set(dirs, dirname, &existing, sizeof(existing));
-    if (*found)
+    if (unlikely(!found)) {
+        netdata_log_error("Cannot track visited directory '%s' (dictionary_set failed); stopping recursion", dirname);
+        closedir(dir);
         return;
+    }
+    if (*found) {
+        closedir(dir);
+        return;
+    }
     *found = true;
 
     // Read each entry in the directory.
@@ -637,28 +677,28 @@ void nd_journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, 
         ssize_t len = snprintfz(full_path, sizeof(full_path), "%s/%s", dirname, entry->d_name);
 
         if (entry->d_type == DT_DIR) {
-            nd_journal_directory_scan_recursively(files, dirs, full_path, depth++);
+            nd_journal_directory_scan_recursively(files, dirs, full_path, depth + 1);
         } else if (entry->d_type == DT_REG && is_journal_file(full_path, len, NULL)) {
             if (files)
                 dictionary_set(files, full_path, NULL, 0);
 
-            send_newline_and_flush(&stdout_mutex);
+            nd_journal_scan_progress();
         } else if (entry->d_type == DT_LNK) {
             struct stat info;
             if (stat(full_path, &info) == -1)
                 continue;
 
+            // Journal discovery intentionally follows symlinked journal directories.
             if (S_ISDIR(info.st_mode)) {
-                // The symbolic link points to a directory
                 char resolved_path[FILENAME_MAX + 1];
                 if (realpath(full_path, resolved_path) != NULL) {
-                    nd_journal_directory_scan_recursively(files, dirs, resolved_path, depth++);
+                    nd_journal_directory_scan_recursively(files, dirs, resolved_path, depth + 1);
                 }
             } else if (S_ISREG(info.st_mode) && is_journal_file(full_path, len, NULL)) {
                 if (files)
                     dictionary_set(files, full_path, NULL, 0);
 
-                send_newline_and_flush(&stdout_mutex);
+                nd_journal_scan_progress();
             }
         }
     }
@@ -848,13 +888,6 @@ void nd_journal_init_files_and_directories(void)
         snprintfz(path, sizeof(path), "%s/run/log/journal", netdata_configured_host_prefix);
         journal_directories[d++].path = string_strdupz(path);
     }
-
-    const char *netdata_configured_log_dir = getenv("NETDATA_LOG_DIR");
-    if (netdata_configured_log_dir != NULL) {
-        char path[PATH_MAX];
-        snprintfz(path, sizeof(path), "%s/otel", netdata_configured_host_prefix);
-        journal_directories[d++].path = string_strdupz(path);
-    };
 
     // terminate the list
     journal_directories[d].path = NULL;

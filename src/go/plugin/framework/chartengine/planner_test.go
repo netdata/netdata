@@ -3,6 +3,7 @@
 package chartengine
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -233,6 +234,10 @@ func TestBuildPlanLegacySingleScenarioCases(t *testing.T) {
 		"BuildPlanAutogenRemovalLifecycleExpiry":                       {run: runTestBuildPlanAutogenRemovalLifecycleExpiry},
 		"BuildPlanFirstWriterWinsAndAccumulatesRepeatedRoutes":         {run: runTestBuildPlanFirstWriterWinsAndAccumulatesRepeatedRoutes},
 		"BuildPlanEmptyEmissionAndScratchReusePruneAcrossCycles":       {run: runTestBuildPlanEmptyEmissionAndScratchReusePruneAcrossCycles},
+		"BuildPlanAutogenContextNamespacePrefixesContext":              {run: runTestBuildPlanAutogenContextNamespacePrefixesContext},
+		"BuildPlanAutogenContextNamespaceStubGroupOnly":                {run: runTestBuildPlanAutogenContextNamespaceStubGroupOnly},
+		"BuildPlanSummaryNaNQuantileGaps":                              {run: runTestBuildPlanSummaryNaNQuantileGaps},
+		"BuildPlanSummaryMixedFiniteNaNQuantileGaps":                   {run: runTestBuildPlanSummaryMixedFiniteNaNQuantileGaps},
 	}
 
 	for name, tc := range tests {
@@ -999,6 +1004,80 @@ groups:
 	assert.Equal(t, float64(10), update.Values[0].Float64)
 }
 
+func runTestBuildPlanAutogenContextNamespacePrefixesContext(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
+	require.NoError(t, err)
+
+	// Root context_namespace must prefix autogen (unmatched-series) chart contexts,
+	// joined with "." like the template compiler ("prometheus" + "svc.errors_total").
+	yaml := `
+version: v1
+context_namespace: prometheus
+groups:
+  - family: Service
+    metrics:
+      - svc.requests_total
+    charts:
+      - title: Requests
+        context: requests
+        units: requests/s
+        dimensions:
+          - selector: svc.requests_total
+            name: total
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("svc")
+	unmatched := sm.Counter("errors_total")
+	methodGET := sm.LabelSet(metrix.Label{Key: "method", Value: "GET"})
+
+	cc.BeginCycle()
+	unmatched.ObserveTotal(10, methodGET)
+	cc.CommitCycleSuccess()
+
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	create := findCreateChartAction(plan)
+	require.NotNil(t, create)
+	assert.Equal(t, "prometheus.svc.errors_total", create.Meta.Context)
+}
+
+// Mirrors the autogen-only collector shape: a stub group satisfies the
+// required groups[] but declares no charts, so every series is unmatched and handled by autogen,
+// with contexts prefixed by the top-level context_namespace.
+func runTestBuildPlanAutogenContextNamespaceStubGroupOnly(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+context_namespace: prometheus
+groups:
+  - family: Prometheus
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("")
+	unmatched := sm.Counter("requests_total")
+	methodGET := sm.LabelSet(metrix.Label{Key: "method", Value: "GET"})
+
+	cc.BeginCycle()
+	unmatched.ObserveTotal(10, methodGET)
+	cc.CommitCycleSuccess()
+
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	create := findCreateChartAction(plan)
+	require.NotNil(t, create)
+	assert.Equal(t, "prometheus.requests_total", create.Meta.Context)
+}
+
 func runTestBuildPlanAutogenUsesMetricMetadataForScalar(t *testing.T) {
 	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
@@ -1288,12 +1367,69 @@ groups:
 		break
 	}
 	require.NotNil(t, createdDim)
-	assert.False(t, createdDim.Float)
+	// The series is registered WithFloat, and template dims now inherit that float
+	// hint from the metric meta (as autogen does), so the dim renders at full precision.
+	assert.True(t, createdDim.Float)
 	update := findUpdateAction(plan)
 	require.NotNil(t, update)
 	require.Len(t, update.Values, 1)
-	assert.False(t, update.Values[0].IsFloat)
-	assert.Equal(t, int64(10), update.Values[0].Int64)
+	assert.True(t, update.Values[0].IsFloat)
+	assert.Equal(t, float64(10), update.Values[0].Float64)
+}
+
+// TestBuildPlanTemplateDimFloatFromMetricMeta pins the additive float contract for
+// template dimensions: a dim binding a metric the collector marked float (WithFloat)
+// renders float via meta inheritance, while a dim binding a plain metric (no WithFloat,
+// no options.float) stays int.
+func TestBuildPlanTemplateDimFloatFromMetricMeta(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: svc
+    metrics:
+      - svc.floaty_total
+      - svc.inty_total
+    charts:
+      - id: svc_mixed
+        title: Mixed
+        context: mixed
+        units: units
+        dimensions:
+          - selector: svc.floaty_total
+            name: floaty
+          - selector: svc.inty_total
+            name: inty
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("svc")
+	floaty := sm.Counter("floaty_total", metrix.WithFloat(true))
+	inty := sm.Counter("inty_total")
+	ls := sm.LabelSet(metrix.Label{Key: "id", Value: "a"})
+
+	cc.BeginCycle()
+	floaty.ObserveTotal(3, ls)
+	inty.ObserveTotal(7, ls)
+	cc.CommitCycleSuccess()
+
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	update := findUpdateAction(plan)
+	require.NotNil(t, update)
+	gotFloat := map[string]bool{}
+	for _, v := range update.Values {
+		gotFloat[v.Name] = v.IsFloat
+	}
+	require.Contains(t, gotFloat, "floaty")
+	require.Contains(t, gotFloat, "inty")
+	assert.True(t, gotFloat["floaty"], "WithFloat metric should render float via meta inheritance")
+	assert.False(t, gotFloat["inty"], "plain metric with no options.float should stay int")
 }
 
 func runTestBuildPlanAutogenStrictOverflowDrop(t *testing.T) {
@@ -2306,6 +2442,109 @@ func actionKinds(actions []EngineAction) []ActionKind {
 		out = append(out, action.Kind())
 	}
 	return out
+}
+
+// A summary scraped with NaN quantile values is still an OBSERVED point, so its quantile chart is
+// created (not skipped by the observedCount==0 path) and each NaN quantile dim renders as a gap
+// (IsEmpty → SETEMPTY), never a 0 value.
+func runTestBuildPlanSummaryNaNQuantileGaps(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
+	require.NoError(t, err)
+	require.NoError(t, e.LoadYAML([]byte(`
+version: v1
+groups:
+  - family: Service
+`), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sum := store.Write().SnapshotMeter("svc").Summary("latency", metrix.WithSummaryQuantiles(0.5, 0.9))
+
+	cc.BeginCycle()
+	sum.ObservePoint(metrix.SummaryPoint{
+		Count: 0,
+		Sum:   0,
+		Quantiles: []metrix.QuantilePoint{
+			{Quantile: 0.5, Value: metrix.SampleValue(math.NaN())},
+			{Quantile: 0.9, Value: metrix.SampleValue(math.NaN())},
+		},
+	})
+	cc.CommitCycleSuccess()
+
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	require.NotNil(t, findCreateChartActionByID(plan, "svc.latency"),
+		"summary quantile chart should be created from an observed all-NaN point")
+
+	var quantileUpdate *UpdateChartAction
+	for i := range plan.Actions {
+		if u, ok := plan.Actions[i].(UpdateChartAction); ok && u.ChartID == "svc.latency" {
+			cp := u
+			quantileUpdate = &cp
+			break
+		}
+	}
+	require.NotNil(t, quantileUpdate, "expected an update action for the quantile chart")
+	require.NotEmpty(t, quantileUpdate.Values)
+	for _, v := range quantileUpdate.Values {
+		assert.Truef(t, v.IsEmpty, "NaN quantile dim %q must gap (IsEmpty), got %+v", v.Name, v)
+	}
+}
+
+func runTestBuildPlanSummaryMixedFiniteNaNQuantileGaps(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
+	require.NoError(t, err)
+	require.NoError(t, e.LoadYAML([]byte(`
+version: v1
+groups:
+  - family: Service
+`), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sum := store.Write().SnapshotMeter("svc").Summary("latency", metrix.WithSummaryQuantiles(0.5, 0.9))
+
+	// One quantile carries a finite value, the other is NaN: the planner must gap
+	// only the NaN dimension and keep the finite one (per-dimension, same chart).
+	cc.BeginCycle()
+	sum.ObservePoint(metrix.SummaryPoint{
+		Count: 1,
+		Sum:   0.4,
+		Quantiles: []metrix.QuantilePoint{
+			{Quantile: 0.5, Value: 0.4},
+			{Quantile: 0.9, Value: metrix.SampleValue(math.NaN())},
+		},
+	})
+	cc.CommitCycleSuccess()
+
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	require.NotNil(t, findCreateChartActionByID(plan, "svc.latency"),
+		"summary quantile chart should be created")
+
+	var quantileUpdate *UpdateChartAction
+	for i := range plan.Actions {
+		if u, ok := plan.Actions[i].(UpdateChartAction); ok && u.ChartID == "svc.latency" {
+			cp := u
+			quantileUpdate = &cp
+			break
+		}
+	}
+	require.NotNil(t, quantileUpdate, "expected an update action for the quantile chart")
+	require.Len(t, quantileUpdate.Values, 2, "expected both quantile dimensions")
+
+	var empty, finite int
+	for _, v := range quantileUpdate.Values {
+		if v.IsEmpty {
+			empty++
+		} else {
+			finite++
+		}
+	}
+	assert.Equalf(t, 1, empty, "exactly the NaN quantile dim must gap, got %+v", quantileUpdate.Values)
+	assert.Equalf(t, 1, finite, "exactly the finite quantile dim must carry a value, got %+v", quantileUpdate.Values)
 }
 
 func findUpdateAction(plan Plan) *UpdateChartAction {

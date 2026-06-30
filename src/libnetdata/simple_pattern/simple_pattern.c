@@ -300,7 +300,7 @@ static SIMPLE_PATTERN_RESULT simple_pattern_matches_extract_with_length(SIMPLE_P
 }
 
 SIMPLE_PATTERN_RESULT simple_pattern_matches_buffer_extract(SIMPLE_PATTERN *list, BUFFER *str, char *wildcarded, size_t wildcarded_size) {
-    if(!list || !str || buffer_strlen(str)) return SP_NOT_MATCHED;
+    if(!list || !str || !buffer_strlen(str)) return SP_NOT_MATCHED;
     return simple_pattern_matches_extract_with_length(list, buffer_tostring(str), buffer_strlen(str), wildcarded, wildcarded_size);
 }
 

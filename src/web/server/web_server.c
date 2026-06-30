@@ -48,6 +48,7 @@ void debug_sockets() {
 		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & HTTP_ACL_MANAGEMENT) ? "management " : "");
 		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & HTTP_ACL_STREAMING) ? "streaming " : "");
 		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & HTTP_ACL_NETDATACONF) ? "netdata.conf " : "");
+		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & HTTP_ACL_MCP) ? "mcp " : "");
         netdata_log_debug(D_WEB_CLIENT, "Socket fd %d name '%s' acl_flags: %s",
 			  i,
 			  api_sockets.fds_names[i],
@@ -91,6 +92,8 @@ SIMPLE_PATTERN *web_allow_mgmt_from = NULL;
 int             web_allow_mgmt_dns;
 SIMPLE_PATTERN *web_allow_streaming_from = NULL;
 int             web_allow_streaming_dns;
+SIMPLE_PATTERN *web_allow_mcp_from = NULL;
+int             web_allow_mcp_dns;
 SIMPLE_PATTERN *web_allow_netdataconf_from = NULL;
 int             web_allow_netdataconf_dns;
 
@@ -122,6 +125,11 @@ void web_client_update_acl_matches(struct web_client *w) {
             connection_allowed(w->fd, w->user_auth.client_ip, w->client_host, sizeof(w->client_host),
                                web_allow_streaming_from, "streaming", web_allow_streaming_dns))
             w->acl |= HTTP_ACL_STREAMING;
+
+        if (!web_allow_mcp_from ||
+            connection_allowed(w->fd, w->user_auth.client_ip, w->client_host, sizeof(w->client_host),
+                               web_allow_mcp_from, "mcp", web_allow_mcp_dns))
+            w->acl |= HTTP_ACL_MCP;
 
         if (!web_allow_netdataconf_from ||
            connection_allowed(w->fd, w->user_auth.client_ip, w->client_host, sizeof(w->client_host),

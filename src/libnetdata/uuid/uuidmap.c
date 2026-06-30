@@ -7,6 +7,8 @@ struct uuidmap_entry {
     REFCOUNT refcount;
 };
 
+// each partition on its own cache line(s), so the heavily contended lock
+// words of adjacent partitions do not false-share
 struct uuidmap_partition {
     Pvoid_t uuid_to_id;         // JudyL: UUID string -> ID
     Pvoid_t id_to_uuid;         // JudyL: ID -> UUID binary
@@ -15,7 +17,7 @@ struct uuidmap_partition {
 
     int64_t memory;
     int32_t entries;
-};
+} __attribute__((aligned(64)));
 
 static struct {
     struct uuidmap_partition p[UUIDMAP_PARTITIONS];
@@ -61,9 +63,20 @@ static void uuidmap_init_aral(void) {
 
 static UUIDMAP_ID get_next_id_unsafe(struct uuidmap_partition *partition) {
     // Check if we've reached the maximum ID value
-    if (unlikely(partition->next_id >= 0x1FFFFFFF))
+    if (unlikely(partition->next_id >= UUIDMAP_ID_SEQ_MASK))
         fatal("UUIDMAP: Maximum ID limit reached for partition %u. UUIDs exhausted.",
               (unsigned int)(partition - uuid_map.p));
+
+    // IDs are never reused, so the sequence space is lifetime capacity.
+    // next_id is monotonic and only changes under the partition write lock,
+    // so the equality check fires exactly once per partition.
+    if (unlikely(partition->next_id == (UUIDMAP_ID_SEQ_MASK / 10) * 9))
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "UUIDMAP: partition %u has used 90%% of its lifetime ID space (%u of %u). "
+               "When it is exhausted, netdata will exit. Restarting netdata resets it.",
+               (unsigned int)(partition - uuid_map.p),
+               (unsigned int)partition->next_id,
+               (unsigned int)UUIDMAP_ID_SEQ_MASK);
 
     // Simply increment and return the next ID
     return uuidmap_make_id(partition - uuid_map.p, ++partition->next_id);
@@ -362,20 +375,19 @@ static void concurrent_test_thread(void *arg) {
 }
 
 static int uuidmap_concurrent_unittest(void) {
-    const int num_threads = 4;
-    const int num_seconds = 5;
-    fprintf(stderr, "\nTesting concurrent UUID Map access with %d threads for %d seconds...\n", num_threads, num_seconds);
+    enum { UUIDMAP_UNITTEST_THREADS = 4, UUIDMAP_UNITTEST_SECONDS = 5 };
+    fprintf(stderr, "\nTesting concurrent UUID Map access with %d threads for %d seconds...\n", UUIDMAP_UNITTEST_THREADS, UUIDMAP_UNITTEST_SECONDS);
     int errors = 0;
 
-    THREAD_STATS stats[num_threads];
+    THREAD_STATS stats[UUIDMAP_UNITTEST_THREADS];
     memset(stats, 0, sizeof(stats));
 
-    ND_THREAD *threads[num_threads];
+    ND_THREAD *threads[UUIDMAP_UNITTEST_THREADS];
 
     // Start threads
     __atomic_store_n(&stop_flag, false, __ATOMIC_RELAXED);
 
-    for(int i = 0; i < num_threads; i++) {
+    for(int i = 0; i < UUIDMAP_UNITTEST_THREADS; i++) {
         char thread_name[32];
         snprintf(thread_name, sizeof(thread_name), "UUID-TEST-%d", i);
         threads[i] = nd_thread_create(
@@ -386,18 +398,18 @@ static int uuidmap_concurrent_unittest(void) {
     }
 
     // Let it run for 5 seconds
-    sleep_usec(num_seconds * USEC_PER_SEC);
+    sleep_usec(UUIDMAP_UNITTEST_SECONDS * USEC_PER_SEC);
 
     // Stop threads
     __atomic_store_n(&stop_flag, true, __ATOMIC_RELEASE);
 
     // Wait for threads
-    for(int i = 0; i < num_threads; i++)
+    for(int i = 0; i < UUIDMAP_UNITTEST_THREADS; i++)
         nd_thread_join(threads[i]);
 
     // Print statistics
     size_t total_cycles = 0;
-    for(int i = 0; i < num_threads; i++) {
+    for(int i = 0; i < UUIDMAP_UNITTEST_THREADS; i++) {
         fprintf(stderr, "Thread %d stats:\n"
                         "  Cycles completed : %zu\n"
                         "  Creates         : %zu\n"

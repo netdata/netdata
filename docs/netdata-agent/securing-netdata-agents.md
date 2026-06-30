@@ -4,6 +4,8 @@ By default, your Netdata Agent exposes its local dashboard on port `19999`. If y
 
 You can protect your Agents by implementing any of these security measures:
 
+If you need to align Netdata with enterprise cybersecurity platforms such as Sophos, secure-access gateways, or corporate reverse proxies, see [Configure Netdata for cybersecurity platforms](/docs/netdata-agent/configure-netdata-for-cybersecurity-platforms.md).
+
 ## Security Approaches
 
 ### Recommended Methods
@@ -144,11 +146,14 @@ While `allow connections from` globally controls access to all Netdata services,
 [web]
     allow connections from = localhost *
     allow dashboard from = localhost *
+    allow mcp from = localhost *
     allow badges from = *
     allow streaming from = *
     allow netdata.conf from = localhost fd* 10.* 192.168.* 172.16.* 172.17.* 172.18.* 172.19.* 172.20.* 172.21.* 172.22.* 172.23.* 172.24.* 172.25.* 172.26.* 172.27.* 172.28.* 172.29.* 172.30.* 172.31.*
     allow management from = localhost
 ```
+
+When `[web].bearer token protection = yes` is enabled, MCP requests also require the local MCP API key (`Authorization: Bearer <mcp_key>`). Without the key, anonymous MCP requests are rejected.
 
 **Additional Security Options:**
 
@@ -180,3 +185,11 @@ We provide detailed configuration guides for popular web servers:
 - [H2O](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-h2o.md)
 
 </details>
+
+## Firewall and Egress Requirements
+
+The security measures above concern **inbound** access to your Agent's local dashboard (port `19999`). Connected nodes also require outbound access for the Agent-Cloud Link, anonymous telemetry, and automatic updates.
+
+For the complete reference of all default outbound connections — including which are active by default, what each connects to, and how to disable each one — see [Outbound Network Communication](/docs/security-and-privacy-design/netdata-agent-security.md#outbound-network-communication).
+
+For the domain allowlist and port table required for firewall configuration, see [Configure Netdata for cybersecurity platforms](/docs/netdata-agent/configure-netdata-for-cybersecurity-platforms.md#required-endpoints-and-ports).

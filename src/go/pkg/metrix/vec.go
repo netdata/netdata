@@ -21,14 +21,14 @@ type vecCache[T any] struct {
 	mu    sync.RWMutex
 	cache map[string]T
 
-	makeHandle func(base []LabelSet, vecSet LabelSet) T
+	makeHandle func(scope HostScope, base []LabelSet, vecSet LabelSet) T
 }
 
 func newVecCache[T any](
 	backend meterBackend,
 	base []LabelSet,
 	keys []string,
-	makeHandle func(base []LabelSet, vecSet LabelSet) T,
+	makeHandle func(scope HostScope, base []LabelSet, vecSet LabelSet) T,
 ) *vecCache[T] {
 	return &vecCache[T]{
 		backend:    backend,
@@ -39,13 +39,15 @@ func newVecCache[T any](
 	}
 }
 
-func (v *vecCache[T]) get(labelValues ...string) (T, error) {
+func (v *vecCache[T]) get(scope HostScope, labelValues ...string) (T, error) {
 	var zero T
 
 	cacheKey, err := vecSeriesCacheKey(v.keys, labelValues)
 	if err != nil {
 		return zero, err
 	}
+	scope = mustNormalizeHostScope(scope)
+	cacheKey = scopedVecCacheKey(scope.ScopeKey, cacheKey)
 
 	v.mu.RLock()
 	inst, ok := v.cache[cacheKey]
@@ -67,7 +69,7 @@ func (v *vecCache[T]) get(labelValues ...string) (T, error) {
 		return zero, err
 	}
 
-	inst = v.makeHandle(v.base, vecSet)
+	inst = v.makeHandle(scope, v.base, vecSet)
 	v.cache[cacheKey] = inst
 	return inst, nil
 }
@@ -95,71 +97,85 @@ func mustNormalizeVecLabelKeys(labelKeys []string) []string {
 // snapshotGaugeVec caches snapshot gauge series handles by vec label values.
 type snapshotGaugeVec struct {
 	cache *vecCache[*snapshotGaugeInstrument]
+	scope HostScope
 }
 
 // statefulGaugeVec caches stateful gauge series handles by vec label values.
 type statefulGaugeVec struct {
 	cache *vecCache[*statefulGaugeInstrument]
+	scope HostScope
 }
 
 // snapshotCounterVec caches snapshot counter series handles by vec label values.
 type snapshotCounterVec struct {
 	cache *vecCache[*snapshotCounterInstrument]
+	scope HostScope
 }
 
 // statefulCounterVec caches stateful counter series handles by vec label values.
 type statefulCounterVec struct {
 	cache *vecCache[*statefulCounterInstrument]
+	scope HostScope
 }
 
 // snapshotHistogramVec caches snapshot histogram series handles by vec label values.
 type snapshotHistogramVec struct {
 	cache *vecCache[*snapshotHistogramInstrument]
+	scope HostScope
 }
 
 // statefulHistogramVec caches stateful histogram series handles by vec label values.
 type statefulHistogramVec struct {
 	cache *vecCache[*statefulHistogramInstrument]
+	scope HostScope
 }
 
 // snapshotSummaryVec caches snapshot summary series handles by vec label values.
 type snapshotSummaryVec struct {
 	cache *vecCache[*snapshotSummaryInstrument]
+	scope HostScope
 }
 
 // statefulSummaryVec caches stateful summary series handles by vec label values.
 type statefulSummaryVec struct {
 	cache *vecCache[*statefulSummaryInstrument]
+	scope HostScope
 }
 
 // snapshotStateSetVec caches snapshot stateset series handles by vec label values.
 type snapshotStateSetVec struct {
 	cache *vecCache[*snapshotStateSetInstrument]
+	scope HostScope
 }
 
 // statefulStateSetVec caches stateful stateset series handles by vec label values.
 type statefulStateSetVec struct {
 	cache *vecCache[*statefulStateSetInstrument]
+	scope HostScope
 }
 
 // snapshotMeasureSetGaugeVec caches snapshot MeasureSet gauge series handles by vec label values.
 type snapshotMeasureSetGaugeVec struct {
 	cache *vecCache[*snapshotMeasureSetGaugeInstrument]
+	scope HostScope
 }
 
 // snapshotMeasureSetCounterVec caches snapshot MeasureSet counter series handles by vec label values.
 type snapshotMeasureSetCounterVec struct {
 	cache *vecCache[*snapshotMeasureSetCounterInstrument]
+	scope HostScope
 }
 
 // statefulMeasureSetGaugeVec caches stateful MeasureSet gauge series handles by vec label values.
 type statefulMeasureSetGaugeVec struct {
 	cache *vecCache[*statefulMeasureSetGaugeInstrument]
+	scope HostScope
 }
 
 // statefulMeasureSetCounterVec caches stateful MeasureSet counter series handles by vec label values.
 type statefulMeasureSetCounterVec struct {
 	cache *vecCache[*statefulMeasureSetCounterInstrument]
+	scope HostScope
 }
 
 // GaugeVec declares or reuses a snapshot gauge and exposes a label-values lookup API.
@@ -168,10 +184,12 @@ func (m *snapshotMeter) GaugeVec(name string, labelKeys []string, opts ...Instru
 	keys := mustNormalizeVecLabelKeys(labelKeys)
 	base := appendLabelSets(m.sets, nil)
 	return &snapshotGaugeVec{
-		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *snapshotGaugeInstrument {
+		scope: m.scope,
+		cache: newVecCache(m.backend, base, keys, func(scope HostScope, base []LabelSet, vecSet LabelSet) *snapshotGaugeInstrument {
 			return &snapshotGaugeInstrument{
 				backend: m.backend,
 				desc:    desc,
+				scope:   scope,
 				base:    appendVecSet(base, vecSet),
 			}
 		}),
@@ -184,10 +202,12 @@ func (m *statefulMeter) GaugeVec(name string, labelKeys []string, opts ...Instru
 	keys := mustNormalizeVecLabelKeys(labelKeys)
 	base := appendLabelSets(m.sets, nil)
 	return &statefulGaugeVec{
-		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *statefulGaugeInstrument {
+		scope: m.scope,
+		cache: newVecCache(m.backend, base, keys, func(scope HostScope, base []LabelSet, vecSet LabelSet) *statefulGaugeInstrument {
 			return &statefulGaugeInstrument{
 				backend: m.backend,
 				desc:    desc,
+				scope:   scope,
 				base:    appendVecSet(base, vecSet),
 			}
 		}),
@@ -200,10 +220,12 @@ func (m *snapshotMeter) CounterVec(name string, labelKeys []string, opts ...Inst
 	keys := mustNormalizeVecLabelKeys(labelKeys)
 	base := appendLabelSets(m.sets, nil)
 	return &snapshotCounterVec{
-		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *snapshotCounterInstrument {
+		scope: m.scope,
+		cache: newVecCache(m.backend, base, keys, func(scope HostScope, base []LabelSet, vecSet LabelSet) *snapshotCounterInstrument {
 			return &snapshotCounterInstrument{
 				backend: m.backend,
 				desc:    desc,
+				scope:   scope,
 				base:    appendVecSet(base, vecSet),
 			}
 		}),
@@ -216,10 +238,12 @@ func (m *statefulMeter) CounterVec(name string, labelKeys []string, opts ...Inst
 	keys := mustNormalizeVecLabelKeys(labelKeys)
 	base := appendLabelSets(m.sets, nil)
 	return &statefulCounterVec{
-		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *statefulCounterInstrument {
+		scope: m.scope,
+		cache: newVecCache(m.backend, base, keys, func(scope HostScope, base []LabelSet, vecSet LabelSet) *statefulCounterInstrument {
 			return &statefulCounterInstrument{
 				backend: m.backend,
 				desc:    desc,
+				scope:   scope,
 				base:    appendVecSet(base, vecSet),
 			}
 		}),
@@ -232,10 +256,12 @@ func (m *snapshotMeter) HistogramVec(name string, labelKeys []string, opts ...In
 	keys := mustNormalizeVecLabelKeys(labelKeys)
 	base := appendLabelSets(m.sets, nil)
 	return &snapshotHistogramVec{
-		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *snapshotHistogramInstrument {
+		scope: m.scope,
+		cache: newVecCache(m.backend, base, keys, func(scope HostScope, base []LabelSet, vecSet LabelSet) *snapshotHistogramInstrument {
 			return &snapshotHistogramInstrument{
 				backend: m.backend,
 				desc:    desc,
+				scope:   scope,
 				base:    appendVecSet(base, vecSet),
 			}
 		}),
@@ -248,10 +274,12 @@ func (m *statefulMeter) HistogramVec(name string, labelKeys []string, opts ...In
 	keys := mustNormalizeVecLabelKeys(labelKeys)
 	base := appendLabelSets(m.sets, nil)
 	return &statefulHistogramVec{
-		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *statefulHistogramInstrument {
+		scope: m.scope,
+		cache: newVecCache(m.backend, base, keys, func(scope HostScope, base []LabelSet, vecSet LabelSet) *statefulHistogramInstrument {
 			return &statefulHistogramInstrument{
 				backend: m.backend,
 				desc:    desc,
+				scope:   scope,
 				base:    appendVecSet(base, vecSet),
 			}
 		}),
@@ -264,10 +292,12 @@ func (m *snapshotMeter) SummaryVec(name string, labelKeys []string, opts ...Inst
 	keys := mustNormalizeVecLabelKeys(labelKeys)
 	base := appendLabelSets(m.sets, nil)
 	return &snapshotSummaryVec{
-		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *snapshotSummaryInstrument {
+		scope: m.scope,
+		cache: newVecCache(m.backend, base, keys, func(scope HostScope, base []LabelSet, vecSet LabelSet) *snapshotSummaryInstrument {
 			return &snapshotSummaryInstrument{
 				backend: m.backend,
 				desc:    desc,
+				scope:   scope,
 				base:    appendVecSet(base, vecSet),
 			}
 		}),
@@ -280,10 +310,12 @@ func (m *statefulMeter) SummaryVec(name string, labelKeys []string, opts ...Inst
 	keys := mustNormalizeVecLabelKeys(labelKeys)
 	base := appendLabelSets(m.sets, nil)
 	return &statefulSummaryVec{
-		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *statefulSummaryInstrument {
+		scope: m.scope,
+		cache: newVecCache(m.backend, base, keys, func(scope HostScope, base []LabelSet, vecSet LabelSet) *statefulSummaryInstrument {
 			return &statefulSummaryInstrument{
 				backend: m.backend,
 				desc:    desc,
+				scope:   scope,
 				base:    appendVecSet(base, vecSet),
 			}
 		}),
@@ -296,10 +328,12 @@ func (m *snapshotMeter) StateSetVec(name string, labelKeys []string, opts ...Ins
 	keys := mustNormalizeVecLabelKeys(labelKeys)
 	base := appendLabelSets(m.sets, nil)
 	return &snapshotStateSetVec{
-		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *snapshotStateSetInstrument {
+		scope: m.scope,
+		cache: newVecCache(m.backend, base, keys, func(scope HostScope, base []LabelSet, vecSet LabelSet) *snapshotStateSetInstrument {
 			return &snapshotStateSetInstrument{
 				backend: m.backend,
 				desc:    desc,
+				scope:   scope,
 				base:    appendVecSet(base, vecSet),
 			}
 		}),
@@ -312,10 +346,12 @@ func (m *statefulMeter) StateSetVec(name string, labelKeys []string, opts ...Ins
 	keys := mustNormalizeVecLabelKeys(labelKeys)
 	base := appendLabelSets(m.sets, nil)
 	return &statefulStateSetVec{
-		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *statefulStateSetInstrument {
+		scope: m.scope,
+		cache: newVecCache(m.backend, base, keys, func(scope HostScope, base []LabelSet, vecSet LabelSet) *statefulStateSetInstrument {
 			return &statefulStateSetInstrument{
 				backend: m.backend,
 				desc:    desc,
+				scope:   scope,
 				base:    appendVecSet(base, vecSet),
 			}
 		}),
@@ -328,10 +364,12 @@ func (m *snapshotMeter) MeasureSetGaugeVec(name string, labelKeys []string, opts
 	keys := mustNormalizeVecLabelKeys(labelKeys)
 	base := appendLabelSets(m.sets, nil)
 	return &snapshotMeasureSetGaugeVec{
-		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *snapshotMeasureSetGaugeInstrument {
+		scope: m.scope,
+		cache: newVecCache(m.backend, base, keys, func(scope HostScope, base []LabelSet, vecSet LabelSet) *snapshotMeasureSetGaugeInstrument {
 			return &snapshotMeasureSetGaugeInstrument{
 				backend: m.backend,
 				desc:    desc,
+				scope:   scope,
 				base:    appendVecSet(base, vecSet),
 			}
 		}),
@@ -344,10 +382,12 @@ func (m *snapshotMeter) MeasureSetCounterVec(name string, labelKeys []string, op
 	keys := mustNormalizeVecLabelKeys(labelKeys)
 	base := appendLabelSets(m.sets, nil)
 	return &snapshotMeasureSetCounterVec{
-		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *snapshotMeasureSetCounterInstrument {
+		scope: m.scope,
+		cache: newVecCache(m.backend, base, keys, func(scope HostScope, base []LabelSet, vecSet LabelSet) *snapshotMeasureSetCounterInstrument {
 			return &snapshotMeasureSetCounterInstrument{
 				backend: m.backend,
 				desc:    desc,
+				scope:   scope,
 				base:    appendVecSet(base, vecSet),
 			}
 		}),
@@ -360,10 +400,12 @@ func (m *statefulMeter) MeasureSetGaugeVec(name string, labelKeys []string, opts
 	keys := mustNormalizeVecLabelKeys(labelKeys)
 	base := appendLabelSets(m.sets, nil)
 	return &statefulMeasureSetGaugeVec{
-		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *statefulMeasureSetGaugeInstrument {
+		scope: m.scope,
+		cache: newVecCache(m.backend, base, keys, func(scope HostScope, base []LabelSet, vecSet LabelSet) *statefulMeasureSetGaugeInstrument {
 			return &statefulMeasureSetGaugeInstrument{
 				backend: m.backend,
 				desc:    desc,
+				scope:   scope,
 				base:    appendVecSet(base, vecSet),
 			}
 		}),
@@ -376,19 +418,77 @@ func (m *statefulMeter) MeasureSetCounterVec(name string, labelKeys []string, op
 	keys := mustNormalizeVecLabelKeys(labelKeys)
 	base := appendLabelSets(m.sets, nil)
 	return &statefulMeasureSetCounterVec{
-		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *statefulMeasureSetCounterInstrument {
+		scope: m.scope,
+		cache: newVecCache(m.backend, base, keys, func(scope HostScope, base []LabelSet, vecSet LabelSet) *statefulMeasureSetCounterInstrument {
 			return &statefulMeasureSetCounterInstrument{
 				backend: m.backend,
 				desc:    desc,
+				scope:   scope,
 				base:    appendVecSet(base, vecSet),
 			}
 		}),
 	}
 }
 
+func (v *snapshotGaugeVec) WithHostScope(scope HostScope) SnapshotGaugeVec {
+	return &snapshotGaugeVec{cache: v.cache, scope: mustNormalizeHostScope(scope)}
+}
+
+func (v *statefulGaugeVec) WithHostScope(scope HostScope) StatefulGaugeVec {
+	return &statefulGaugeVec{cache: v.cache, scope: mustNormalizeHostScope(scope)}
+}
+
+func (v *snapshotCounterVec) WithHostScope(scope HostScope) SnapshotCounterVec {
+	return &snapshotCounterVec{cache: v.cache, scope: mustNormalizeHostScope(scope)}
+}
+
+func (v *statefulCounterVec) WithHostScope(scope HostScope) StatefulCounterVec {
+	return &statefulCounterVec{cache: v.cache, scope: mustNormalizeHostScope(scope)}
+}
+
+func (v *snapshotHistogramVec) WithHostScope(scope HostScope) SnapshotHistogramVec {
+	return &snapshotHistogramVec{cache: v.cache, scope: mustNormalizeHostScope(scope)}
+}
+
+func (v *statefulHistogramVec) WithHostScope(scope HostScope) StatefulHistogramVec {
+	return &statefulHistogramVec{cache: v.cache, scope: mustNormalizeHostScope(scope)}
+}
+
+func (v *snapshotSummaryVec) WithHostScope(scope HostScope) SnapshotSummaryVec {
+	return &snapshotSummaryVec{cache: v.cache, scope: mustNormalizeHostScope(scope)}
+}
+
+func (v *statefulSummaryVec) WithHostScope(scope HostScope) StatefulSummaryVec {
+	return &statefulSummaryVec{cache: v.cache, scope: mustNormalizeHostScope(scope)}
+}
+
+func (v *snapshotStateSetVec) WithHostScope(scope HostScope) SnapshotStateSetVec {
+	return &snapshotStateSetVec{cache: v.cache, scope: mustNormalizeHostScope(scope)}
+}
+
+func (v *statefulStateSetVec) WithHostScope(scope HostScope) StatefulStateSetVec {
+	return &statefulStateSetVec{cache: v.cache, scope: mustNormalizeHostScope(scope)}
+}
+
+func (v *snapshotMeasureSetGaugeVec) WithHostScope(scope HostScope) SnapshotMeasureSetGaugeVec {
+	return &snapshotMeasureSetGaugeVec{cache: v.cache, scope: mustNormalizeHostScope(scope)}
+}
+
+func (v *snapshotMeasureSetCounterVec) WithHostScope(scope HostScope) SnapshotMeasureSetCounterVec {
+	return &snapshotMeasureSetCounterVec{cache: v.cache, scope: mustNormalizeHostScope(scope)}
+}
+
+func (v *statefulMeasureSetGaugeVec) WithHostScope(scope HostScope) StatefulMeasureSetGaugeVec {
+	return &statefulMeasureSetGaugeVec{cache: v.cache, scope: mustNormalizeHostScope(scope)}
+}
+
+func (v *statefulMeasureSetCounterVec) WithHostScope(scope HostScope) StatefulMeasureSetCounterVec {
+	return &statefulMeasureSetCounterVec{cache: v.cache, scope: mustNormalizeHostScope(scope)}
+}
+
 // GetWithLabelValues returns a snapshot gauge handle for the provided vec label values.
 func (v *snapshotGaugeVec) GetWithLabelValues(labelValues ...string) (SnapshotGauge, error) {
-	inst, err := v.cache.get(labelValues...)
+	inst, err := v.cache.get(v.scope, labelValues...)
 	if err != nil {
 		return nil, err
 	}
@@ -406,7 +506,7 @@ func (v *snapshotGaugeVec) WithLabelValues(labelValues ...string) SnapshotGauge 
 
 // GetWithLabelValues returns a stateful gauge handle for the provided vec label values.
 func (v *statefulGaugeVec) GetWithLabelValues(labelValues ...string) (StatefulGauge, error) {
-	inst, err := v.cache.get(labelValues...)
+	inst, err := v.cache.get(v.scope, labelValues...)
 	if err != nil {
 		return nil, err
 	}
@@ -424,7 +524,7 @@ func (v *statefulGaugeVec) WithLabelValues(labelValues ...string) StatefulGauge 
 
 // GetWithLabelValues returns a snapshot counter handle for the provided vec label values.
 func (v *snapshotCounterVec) GetWithLabelValues(labelValues ...string) (SnapshotCounter, error) {
-	inst, err := v.cache.get(labelValues...)
+	inst, err := v.cache.get(v.scope, labelValues...)
 	if err != nil {
 		return nil, err
 	}
@@ -442,7 +542,7 @@ func (v *snapshotCounterVec) WithLabelValues(labelValues ...string) SnapshotCoun
 
 // GetWithLabelValues returns a stateful counter handle for the provided vec label values.
 func (v *statefulCounterVec) GetWithLabelValues(labelValues ...string) (StatefulCounter, error) {
-	inst, err := v.cache.get(labelValues...)
+	inst, err := v.cache.get(v.scope, labelValues...)
 	if err != nil {
 		return nil, err
 	}
@@ -460,7 +560,7 @@ func (v *statefulCounterVec) WithLabelValues(labelValues ...string) StatefulCoun
 
 // GetWithLabelValues returns a snapshot histogram handle for the provided vec label values.
 func (v *snapshotHistogramVec) GetWithLabelValues(labelValues ...string) (SnapshotHistogram, error) {
-	inst, err := v.cache.get(labelValues...)
+	inst, err := v.cache.get(v.scope, labelValues...)
 	if err != nil {
 		return nil, err
 	}
@@ -478,7 +578,7 @@ func (v *snapshotHistogramVec) WithLabelValues(labelValues ...string) SnapshotHi
 
 // GetWithLabelValues returns a stateful histogram handle for the provided vec label values.
 func (v *statefulHistogramVec) GetWithLabelValues(labelValues ...string) (StatefulHistogram, error) {
-	inst, err := v.cache.get(labelValues...)
+	inst, err := v.cache.get(v.scope, labelValues...)
 	if err != nil {
 		return nil, err
 	}
@@ -496,7 +596,7 @@ func (v *statefulHistogramVec) WithLabelValues(labelValues ...string) StatefulHi
 
 // GetWithLabelValues returns a snapshot summary handle for the provided vec label values.
 func (v *snapshotSummaryVec) GetWithLabelValues(labelValues ...string) (SnapshotSummary, error) {
-	inst, err := v.cache.get(labelValues...)
+	inst, err := v.cache.get(v.scope, labelValues...)
 	if err != nil {
 		return nil, err
 	}
@@ -514,7 +614,7 @@ func (v *snapshotSummaryVec) WithLabelValues(labelValues ...string) SnapshotSumm
 
 // GetWithLabelValues returns a stateful summary handle for the provided vec label values.
 func (v *statefulSummaryVec) GetWithLabelValues(labelValues ...string) (StatefulSummary, error) {
-	inst, err := v.cache.get(labelValues...)
+	inst, err := v.cache.get(v.scope, labelValues...)
 	if err != nil {
 		return nil, err
 	}
@@ -532,7 +632,7 @@ func (v *statefulSummaryVec) WithLabelValues(labelValues ...string) StatefulSumm
 
 // GetWithLabelValues returns a snapshot stateset handle for the provided vec label values.
 func (v *snapshotStateSetVec) GetWithLabelValues(labelValues ...string) (StateSetInstrument, error) {
-	inst, err := v.cache.get(labelValues...)
+	inst, err := v.cache.get(v.scope, labelValues...)
 	if err != nil {
 		return nil, err
 	}
@@ -550,7 +650,7 @@ func (v *snapshotStateSetVec) WithLabelValues(labelValues ...string) StateSetIns
 
 // GetWithLabelValues returns a stateful stateset handle for the provided vec label values.
 func (v *statefulStateSetVec) GetWithLabelValues(labelValues ...string) (StateSetInstrument, error) {
-	inst, err := v.cache.get(labelValues...)
+	inst, err := v.cache.get(v.scope, labelValues...)
 	if err != nil {
 		return nil, err
 	}
@@ -568,7 +668,7 @@ func (v *statefulStateSetVec) WithLabelValues(labelValues ...string) StateSetIns
 
 // GetWithLabelValues returns a snapshot MeasureSet gauge handle for the provided vec label values.
 func (v *snapshotMeasureSetGaugeVec) GetWithLabelValues(labelValues ...string) (SnapshotMeasureSetGauge, error) {
-	inst, err := v.cache.get(labelValues...)
+	inst, err := v.cache.get(v.scope, labelValues...)
 	if err != nil {
 		return nil, err
 	}
@@ -586,7 +686,7 @@ func (v *snapshotMeasureSetGaugeVec) WithLabelValues(labelValues ...string) Snap
 
 // GetWithLabelValues returns a snapshot MeasureSet counter handle for the provided vec label values.
 func (v *snapshotMeasureSetCounterVec) GetWithLabelValues(labelValues ...string) (SnapshotMeasureSetCounter, error) {
-	inst, err := v.cache.get(labelValues...)
+	inst, err := v.cache.get(v.scope, labelValues...)
 	if err != nil {
 		return nil, err
 	}
@@ -604,7 +704,7 @@ func (v *snapshotMeasureSetCounterVec) WithLabelValues(labelValues ...string) Sn
 
 // GetWithLabelValues returns a stateful MeasureSet gauge handle for the provided vec label values.
 func (v *statefulMeasureSetGaugeVec) GetWithLabelValues(labelValues ...string) (StatefulMeasureSetGauge, error) {
-	inst, err := v.cache.get(labelValues...)
+	inst, err := v.cache.get(v.scope, labelValues...)
 	if err != nil {
 		return nil, err
 	}
@@ -622,7 +722,7 @@ func (v *statefulMeasureSetGaugeVec) WithLabelValues(labelValues ...string) Stat
 
 // GetWithLabelValues returns a stateful MeasureSet counter handle for the provided vec label values.
 func (v *statefulMeasureSetCounterVec) GetWithLabelValues(labelValues ...string) (StatefulMeasureSetCounter, error) {
-	inst, err := v.cache.get(labelValues...)
+	inst, err := v.cache.get(v.scope, labelValues...)
 	if err != nil {
 		return nil, err
 	}
@@ -696,4 +796,14 @@ func packVecLabelValues(values []string) string {
 		b.WriteByte('\xff')
 	}
 	return b.String()
+}
+
+func scopedVecCacheKey(scopeKey, labelsKey string) string {
+	if scopeKey == "" {
+		return labelsKey
+	}
+	if labelsKey == "" {
+		return "\xfe" + scopeKey
+	}
+	return "\xfe" + scopeKey + "\xff" + labelsKey
 }

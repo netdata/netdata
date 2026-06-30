@@ -752,6 +752,7 @@ func Test_validateEnrichVirtualMetrics(t *testing.T) {
 
 	tests := map[string]struct {
 		metrics         []MetricsConfig
+		topology        []TopologyConfig
 		virtualMetrics  []VirtualMetricConfig
 		wantErrContains []string
 	}{
@@ -967,6 +968,37 @@ func Test_validateEnrichVirtualMetrics(t *testing.T) {
 				"virtual_metrics[0]: must define sources or alternatives",
 			},
 		},
+		"reject topology source": {
+			metrics: baseMetrics,
+			topology: []TopologyConfig{
+				{
+					Kind: KindLldpRem,
+					MetricsConfig: MetricsConfig{
+						Table: SymbolConfig{
+							OID:  "1.0.8802.1.1.2.1.4.1",
+							Name: "lldpRemTable",
+						},
+						Symbols: []SymbolConfig{
+							{OID: "1.0.8802.1.1.2.1.4.1.1.6", Name: "lldpRemPortIdSubtype"},
+						},
+						MetricTags: MetricTagConfigList{
+							{Tag: "lldp_rem_index", Index: 1},
+						},
+					},
+				},
+			},
+			virtualMetrics: []VirtualMetricConfig{
+				{
+					Name: "invalidTopologyDerivedMetric",
+					Sources: []VirtualMetricSourceConfig{
+						{Metric: "lldpRemPortIdSubtype", Table: "lldpRemTable"},
+					},
+				},
+			},
+			wantErrContains: []string{
+				`virtual_metrics[0].sources[0]: topology metric source "lldpRemPortIdSubtype" cannot be used by virtual_metrics`,
+			},
+		},
 		"duplicate name conflicting with metric": {
 			metrics: baseMetrics,
 			virtualMetrics: []VirtualMetricConfig{
@@ -1026,7 +1058,7 @@ func Test_validateEnrichVirtualMetrics(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			err := validateEnrichVirtualMetrics(tt.metrics, tt.virtualMetrics)
+			err := validateEnrichVirtualMetrics(tt.metrics, tt.topology, tt.virtualMetrics)
 			if len(tt.wantErrContains) == 0 {
 				assert.NoError(t, err)
 				return
@@ -1111,6 +1143,19 @@ func Test_validateEnrichMetricTags(t *testing.T) {
 						{
 							Start:     2,
 							DropRight: 2,
+						},
+					},
+				},
+			},
+		},
+		"raw index transform to tail": {
+			wantError: false,
+			metrics: []MetricTagConfig{
+				{
+					Tag: "fdb_mac",
+					IndexTransform: []MetricIndexTransform{
+						{
+							Start: 1,
 						},
 					},
 				},
@@ -1245,6 +1290,34 @@ func Test_validateEnrichMetadata(t *testing.T) {
 				},
 			},
 		},
+		"topology device metadata fields are accepted": {
+			wantError: false,
+			metadata: MetadataConfig{
+				"device": MetadataResourceConfig{
+					Fields: map[string]MetadataField{
+						"lldp_loc_sys_name": {
+							Symbol: SymbolConfig{
+								OID:  "1.0.8802.1.1.2.1.3.3.0",
+								Name: "lldpLocSysName",
+							},
+						},
+						"bridge_base_address": {
+							Symbol: SymbolConfig{
+								OID:    "1.3.6.1.2.1.17.1.1",
+								Name:   "dot1dBaseBridgeAddress",
+								Format: "hex",
+							},
+						},
+						"vtp_version": {
+							Symbol: SymbolConfig{
+								OID:  "1.3.6.1.4.1.9.9.46.1.1.1",
+								Name: "vtpVersion",
+							},
+						},
+					},
+				},
+			},
+		},
 		"invalid resource": {
 			wantError: true,
 			metadata: MetadataConfig{
@@ -1325,6 +1398,63 @@ func Test_validateEnrichMetadata(t *testing.T) {
 			}
 			if tc.wantMetadata != nil {
 				assert.Equal(t, tc.wantMetadata, tc.metadata)
+			}
+		})
+	}
+}
+
+func Test_validateEnrichSysobjectIDMetadata(t *testing.T) {
+	tests := map[string]struct {
+		entries   []SysobjectIDMetadataEntryConfig
+		wantError bool
+	}{
+		"accepts explicit version fields": {
+			entries: []SysobjectIDMetadataEntryConfig{
+				{
+					SysobjectID: "1.3.6.1.4.1.9.1.1",
+					Metadata: map[string]MetadataField{
+						"software_version": {
+							Value: "17.9.4",
+						},
+						"firmware_version": {
+							Symbol: SymbolConfig{
+								OID:  "1.2.3",
+								Name: "firmwareVersion",
+							},
+						},
+						"hardware_version": {
+							Symbols: []SymbolConfig{
+								{
+									OID:  "1.2.4",
+									Name: "hardwareVersion",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"rejects unknown field name": {
+			entries: []SysobjectIDMetadataEntryConfig{
+				{
+					SysobjectID: "1.3.6.1.4.1.9.1.1",
+					Metadata: map[string]MetadataField{
+						"custom_firmware_build": {
+							Value: "x1",
+						},
+					},
+				},
+			},
+			wantError: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			if tc.wantError {
+				assert.Error(t, validateEnrichSysobjectIDMetadata(tc.entries))
+			} else {
+				assert.NoError(t, validateEnrichSysobjectIDMetadata(tc.entries))
 			}
 		})
 	}

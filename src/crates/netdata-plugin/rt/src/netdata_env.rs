@@ -7,10 +7,12 @@ use std::path::PathBuf;
 pub struct NetdataEnv {
     pub user_config_dir: Option<PathBuf>,
     pub stock_config_dir: Option<PathBuf>,
+    pub stock_data_dir: Option<PathBuf>,
     pub plugins_dir: Option<PathBuf>,
     pub user_plugins_dirs: Option<Vec<PathBuf>>,
     pub web_dir: Option<PathBuf>,
     pub cache_dir: Option<PathBuf>,
+    pub lib_dir: Option<PathBuf>,
     pub log_dir: Option<PathBuf>,
     pub host_prefix: Option<String>,
     pub debug_flags: Option<String>,
@@ -81,12 +83,14 @@ impl NetdataEnv {
         Self {
             user_config_dir: env::var("NETDATA_USER_CONFIG_DIR").ok().map(PathBuf::from),
             stock_config_dir: env::var("NETDATA_STOCK_CONFIG_DIR").ok().map(PathBuf::from),
+            stock_data_dir: env::var("NETDATA_STOCK_DATA_DIR").ok().map(PathBuf::from),
             plugins_dir: env::var("NETDATA_PLUGINS_DIR").ok().map(PathBuf::from),
             user_plugins_dirs: env::var("NETDATA_USER_PLUGINS_DIRS")
                 .ok()
                 .map(|s| s.split(':').map(PathBuf::from).collect()),
             web_dir: env::var("NETDATA_WEB_DIR").ok().map(PathBuf::from),
             cache_dir: env::var("NETDATA_CACHE_DIR").ok().map(PathBuf::from),
+            lib_dir: env::var("NETDATA_LIB_DIR").ok().map(PathBuf::from),
             log_dir: env::var("NETDATA_LOG_DIR").ok().map(PathBuf::from),
             host_prefix: env::var("NETDATA_HOST_PREFIX").ok(),
             debug_flags: env::var("NETDATA_DEBUG_FLAGS").ok(),

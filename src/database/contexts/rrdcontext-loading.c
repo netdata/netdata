@@ -60,6 +60,7 @@ static void rrdinstance_load_dimension_callback(SQL_DIMENSION_DATA *sd, void *da
         .id = string_strdupz(sd->id),
         .name = string_strdupz(sd->name),
         .flags = RRD_FLAG_ARCHIVED | RRD_FLAG_UPDATE_REASON_LOAD_SQL, // no need for atomic
+        .algorithm = (RRD_ALGORITHM)sd->algorithm,
     };
     if(sd->hidden) trm.flags |= RRD_FLAG_HIDDEN;
 
@@ -134,6 +135,12 @@ static void rrdcontext_load_context_callback(VERSIONED_CONTEXT_DATA *ctx_data, v
     RRDHOST *host = data;
     (void)host;
 
+    // the insert callback replaces the SQLite-owned hub string pointers with
+    // owned copies only when hub.version is set - a versionless row would
+    // keep dangling pointers, so skip it
+    if(unlikely(!ctx_data->version))
+        return;
+
     RRDCONTEXT trc = {
         .id = string_strdupz(ctx_data->id),
         .flags = RRD_FLAG_ARCHIVED | RRD_FLAG_UPDATE_REASON_LOAD_SQL, // no need for atomics
@@ -156,8 +163,16 @@ void rrdhost_load_rrdcontext_data(RRDHOST *host) {
     th_ignored_metrics = th_ignored_instances = th_zero_retention_metrics = 0;
 
     ctx_get_context_list(&host->host_id.uuid, rrdcontext_load_context_callback, host);
+    if (unlikely(exit_initiated_get()))
+        return;
+
     ctx_get_chart_list(&host->host_id.uuid, rrdinstance_load_instance_callback, host);
+    if (unlikely(exit_initiated_get()))
+        return;
+
     ctx_get_dimension_list(&host->host_id.uuid, rrdinstance_load_dimension_callback, host);
+    if (unlikely(exit_initiated_get()))
+        return;
 
     size_t ignored_metrics = th_ignored_metrics, ignored_instances = th_ignored_instances, zero_retention_metrics = th_zero_retention_metrics;
     size_t loaded_metrics = 0, loaded_instances = 0, loaded_contexts = 0;
@@ -165,6 +180,9 @@ void rrdhost_load_rrdcontext_data(RRDHOST *host) {
 
     RRDCONTEXT *rc;
     dfe_start_read(host->rrdctx.contexts, rc) {
+        if (unlikely(exit_initiated_get()))
+            break;
+
         size_t instances = 0;
 
         RRDINSTANCE *ri;

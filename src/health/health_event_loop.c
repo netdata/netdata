@@ -208,18 +208,41 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
 
     RRDSET *st;
 
-    if (!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION)) return;
-    rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+    // Atomically snapshot + clear the host pending flags. A separate check-then-clear
+    // would race with concurrent setters (e.g. label updaters in plugins/streaming),
+    // and a flag set between check and clear would be lost.
+    RRDHOST_FLAGS old_host_flags = rrdhost_flag_set_and_clear(
+        host, 0,
+        RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION | RRDHOST_FLAG_PENDING_LABEL_RECHECK);
+
+    bool host_pending_init    = old_host_flags & RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION;
+    bool host_pending_recheck = old_host_flags & RRDHOST_FLAG_PENDING_LABEL_RECHECK;
+
+    if (!host_pending_init && !host_pending_recheck) return;
 
     rrdset_foreach_reentrant(st, host) {
-        if (!rrdset_flag_check(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION))
-            continue;
+        // Same race applies per-chart: snapshot + clear atomically so a concurrent
+        // CLABEL stream commit or rrdset_update_rrdlabels() cannot have its
+        // pending-recheck request swallowed by a separate clear.
+        RRDSET_FLAGS old_st_flags = rrdset_flag_set_and_clear(
+            st, 0,
+            RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION | RRDSET_FLAG_PENDING_LABEL_RECHECK);
 
-        rrdset_flag_clear(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+        bool needs_init    = old_st_flags & RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION;
+        bool needs_recheck = host_pending_recheck || (old_st_flags & RRDSET_FLAG_PENDING_LABEL_RECHECK);
+
+        if (!needs_init && !needs_recheck)
+            continue;
 
         worker_is_busy(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET);
 
-        health_prototype_alerts_for_rrdset_incrementally(st);
+        // recheck path subsumes init: reset detaches all current alerts on the
+        // chart and reattaches by re-evaluating every prototype against the
+        // current labels, which also picks up first-attach matches.
+        if (needs_recheck)
+            health_prototype_reset_alerts_for_rrdset(st);
+        else
+            health_prototype_alerts_for_rrdset_incrementally(st);
 
         if (!service_running(SERVICE_HEALTH))
             break;
@@ -244,8 +267,8 @@ static void health_initialize_rrdhost(RRDHOST *host) {
     host->health_log.next_log_id = get_uint32_id();
     host->health_log.next_alarm_id = 0;
 
-    sql_health_alarm_log_load(host);
     rw_spinlock_init(&host->health_log.spinlock);
+    sql_health_alarm_log_load(host);
     rrdhost_flag_set(host, RRDHOST_FLAG_INITIALIZED_HEALTH);
 
 
@@ -317,7 +340,13 @@ static void do_eval_expression(
 }
 
 // returns the number of runnable alerts
-static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_delay, time_t now, time_t *next_run) {
+//
+// The caller owns `owa` and provides it so a single arena can be reused
+// across all hosts of one iteration (and, in the multi-threaded variant,
+// across all hosts a single worker processes). The arena is reset between
+// alerts inside this function, so peak memory stays bounded by one alert's
+// scratch no matter how many hosts flow through it.
+static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_delay, time_t now, time_t *next_run, ONEWAYALLOC *owa) {
     size_t runnable = 0;
     struct health_alert_status_counts status_counts = { 0 };
     bool snapshot_complete = true;
@@ -364,14 +393,27 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
 
     worker_is_busy(WORKER_HEALTH_JOB_HOST_LOCK);
     {
-        struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+        struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
         if (aclk_host_config && aclk_host_config->send_snapshot == 2)
             return;
     }
 
+    // Reuse the caller-provided arena across every alert's DB lookup. Each
+    // alert's scratch (RRDR + query state) is released via onewayalloc_reset
+    // at the top of the next iteration — trims the page list back to a
+    // single head page. Net effect: one mmap/munmap for the whole health
+    // iteration, regardless of host count or alert count.
+
     // the first loop is to lookup values from the db
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
+        // Reclaim the previous alert's query scratch before starting the
+        // next one. The arena is reused across every alert of every host in
+        // this iteration, so this reset trims trailing pages left by the
+        // previous alert (same host or prior host). No-op only on the very
+        // first alert after the arena was created.
+        onewayalloc_reset(owa);
+
         if(unlikely(!service_running(SERVICE_HEALTH) || !rrdhost_should_run_health(host))) {
             snapshot_complete = false;
             break;
@@ -464,7 +506,8 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                     break;
             }
 
-            int ret = rrdset2value_api_v1(rc->rrdset, NULL, &rc->value, rrdcalc_dimensions(rc), 1,
+            int ret = rrdset2value_api_v1_with_owa(owa,
+                                          rc->rrdset, NULL, &rc->value, rrdcalc_dimensions(rc), 1,
                                           rc->config.after, rc->config.before, rc->config.time_group, group_options,
                                           0, rc->config.options | RRDR_OPTION_SELECTED_TIER,
                                           &rc->db_after,&rc->db_before,
@@ -731,7 +774,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
         commit_alert_transitions(host);
 
     if (!__atomic_load_n(&host->health.pending_transitions, __ATOMIC_RELAXED)) {
-        struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+        struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
         if (aclk_host_config && aclk_host_config->send_snapshot == 1) {
             aclk_host_config->send_snapshot = 2;
             rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
@@ -781,14 +824,20 @@ static void health_event_loop(void) {
         worker_is_busy(WORKER_HEALTH_JOB_RRD_LOCK);
         uint64_t loop = __atomic_add_fetch(&health_evloop_iteration, 1, __ATOMIC_RELAXED);
 
+        // Single onewayalloc arena reused across every host in this iteration —
+        // one mmap/munmap pair for the whole cycle instead of per host.
+        ONEWAYALLOC *iter_owa = onewayalloc_create(0);
+
         RRDHOST *host;
         dfe_start_reentrant(rrdhost_root_index, host) {
             if(unlikely(!service_running(SERVICE_HEALTH)))
                 break;
 
-            health_event_loop_for_host(host, apply_hibernation_delay, now, &next_run);
+            health_event_loop_for_host(host, apply_hibernation_delay, now, &next_run, iter_owa);
         }
         dfe_done(host);
+
+        onewayalloc_destroy(iter_owa);
 
         if(unlikely(!service_running(SERVICE_HEALTH)))
             break;

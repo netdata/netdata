@@ -26,6 +26,10 @@ You can control what functionalities users can access in Netdata Cloud through t
 | **View-only access** - monitor specific systems without making changes                           | **Observer**         |
 | **Billing management** - handle invoices and payments without system access                      | **Billing**          |
 
+## Role Change Propagation
+
+Role changes take effect immediately. When an Admin or Manager changes a user's role, the updated permissions are applied right away by the Netdata Cloud backend.
+
 ## Quick Reference
 
 <details>
@@ -98,6 +102,12 @@ You can control what functionalities users can access in Netdata Cloud through t
 | **See all Users in a Room**            | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      |           |
 | **Invite existing user to Room**       | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |      -      |           |
 | **Remove user from Room**              | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |      -      |           |
+
+:::note
+
+The **Groups** tab under **User Management** only appears after [SCIM integration](/integrations/cloud-authentication/integrations/scim.md) is enabled. It is not shown by default, even on paid plans. Enabling SCIM requires a paid plan, a configured [Enterprise SSO (OIDC/SSO) integration](/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md), and Space Administrator access. If you don't see the **Groups** tab, set up Enterprise SSO first, then activate SCIM.
+
+:::
 
 </details>
 
@@ -224,6 +234,6 @@ Enable, Edit and Add actions over specific notification methods will only be all
 
 :::note
 
-Netdata Cloud paid subscription required for all actions except "List All" in Dynamic Configuration Manager.
+A Netdata Cloud paid plan is required for all actions except "List All" in Dynamic Configuration Manager.
 
 :::

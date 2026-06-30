@@ -25,6 +25,7 @@ type (
 		watcher      *fsnotify.Watcher
 		cache        cache
 		refreshEvery time.Duration
+		eventSettle  time.Duration
 	}
 	cache map[string]time.Time
 )
@@ -42,6 +43,7 @@ func NewWatcher(reg confgroup.Registry, paths []string) *Watcher {
 		watcher:      nil,
 		cache:        make(cache),
 		refreshEvery: time.Minute,
+		eventSettle:  100 * time.Millisecond,
 	}
 	return d
 }
@@ -86,13 +88,7 @@ func (w *Watcher) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 				// vim "backupcopy=no" case, already collected after Rename event.
 				break
 			}
-			if event.Has(fsnotify.Rename) {
-				// It is common to modify files using vim.
-				// When writing to a file a backup is made. "backupcopy" option tells how it's done.
-				// Default is "no": rename the file and write a new one.
-				// This is cheap attempt to not send empty group for the old file.
-				time.Sleep(time.Millisecond * 100)
-			}
+			w.waitFileEventSettle(event)
 			w.refresh(ctx, in)
 		case err := <-w.watcher.Errors:
 			if err != nil {
@@ -203,6 +199,17 @@ func (w *Watcher) stop() {
 	}()
 
 	_ = w.watcher.Close()
+}
+
+func (w *Watcher) waitFileEventSettle(event fsnotify.Event) {
+	if w.eventSettle <= 0 {
+		return
+	}
+	if event.Has(fsnotify.Create) || event.Has(fsnotify.Write) || event.Has(fsnotify.Rename) {
+		// Give editors and os.WriteFile() a chance to finish truncating/replacing the file
+		// before we snapshot it, otherwise transient empty reads can be cached as real updates.
+		time.Sleep(w.eventSettle)
+	}
 }
 
 func isChmodOnly(event fsnotify.Event) bool {

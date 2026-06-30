@@ -207,6 +207,18 @@ sidebar:
                   label: Bearer Token Protection
                   edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md
               - meta:
+                  label: Configure Netdata for cybersecurity platforms
+                  edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configure-netdata-for-cybersecurity-platforms.md
+                  description: Configure Netdata behind cybersecurity platforms such as Sophos, reverse proxies, firewalls, and secure-access gateways.
+                  keywords:
+                    - netdata
+                    - cybersecurity
+                    - sophos
+                    - reverse proxy
+                    - firewall
+                    - bearer token
+                    - secure access
+              - meta:
                   label: Running the Agent behind a reverse proxy
                   edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/README.md
                 items:
@@ -265,6 +277,10 @@ sidebar:
             - node id
             - claimed id
             - identity
+            - vnode
+            - virtual node
+            - dyncfg
+            - dynamic configuration
       - meta:
           label: VM Templates
           edit_url: https://github.com/netdata/netdata/edit/master/docs/learn/vm-templates.md
@@ -418,11 +434,18 @@ sidebar:
           label: Collectors configuration
           edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/REFERENCE.md
       - meta:
-          label: Service discovery
-          edit_url: https://github.com/netdata/agent-service-discovery/edit/master/README.md
+          label: Service Discovery
+          edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/SERVICE-DISCOVERY.md
+        items:
+          - type: integration_placeholder
+            integration_kind: service_discovery
       - meta:
           label: StatsD
           edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/statsd.plugin/README.md
+      - meta:
+          label: Containers and cgroups
+          edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/cgroups.plugin/README.md
+          description: Monitor containers and virtual machines via Linux cgroups, with friendly name resolution for Docker, Kubernetes, Podman, LXC, libvirt, Proxmox, and more.
       - meta:
           label: OpenTelemetry Metrics
           edit_url: https://github.com/netdata/netdata/edit/master/src/crates/netdata-otel/otel-plugin/README.md
@@ -435,10 +458,6 @@ sidebar:
         items:
           - type: integration_placeholder
             integration_kind: secretstore
-      - meta:
-          label: SNMP Profile Format
-          edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/snmp/profile-format.md
-          description: Learn how Netdata’s SNMP collector uses profiles.
       - type: integration_placeholder
         integration_kind: collectors
   # Exporting Metrics
@@ -464,6 +483,229 @@ sidebar:
       - meta:
           label: Shell Scripts
           edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/exporters/shell/README.md
+  # Network Performance Monitoring
+  - meta:
+      label: Network Performance Monitoring
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/README.md
+      description: Monitor your whole network from one Agent per site — devices, topology, flows, traps, and logs, unified in Netdata Cloud.
+    items:
+      # Device Metrics
+      - meta:
+          label: Device Metrics
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/README.md
+          description: Poll routers, switches, firewalls, and other devices over SNMP with the Netdata Agent.
+        items:
+          - meta:
+              label: Quick Start
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/quick-start.md
+              description: Get one device polling and auto-detected in a few minutes.
+          - meta:
+              label: Configuration
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/configuration.md
+              description: Credentials, SNMPv3, multiple devices, and the polling options.
+            items:
+              - meta:
+                  label: SNMP Profile Format
+                  edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/snmp/profile-format.md
+                  description: Learn how Netdata’s SNMP collector uses profiles.
+          - meta:
+              label: Sizing and Scaling
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/sizing-and-scaling.md
+              description: How many devices one Agent should poll, and how to scale with hubs and Parents.
+          - meta:
+              label: Validation
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/validation.md
+              description: Confirm profile match, 64-bit counters, and clean polling before you trust the data.
+          - meta:
+              label: Troubleshooting
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/troubleshooting.md
+              description: Timeouts, missing metrics, SNMPv3 auth, gaps, and phantom spikes.
+          - meta:
+              label: Anti-patterns
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/anti-patterns.md
+              description: The common SNMP polling mistakes and how to avoid them.
+      # Licensing Monitoring
+      - meta:
+          label: Licensing Monitoring
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/licensing/README.md
+          description: Track license state and expiry across your network devices before a feature silently stops.
+        items:
+          - meta:
+              label: Metrics and Functions
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/licensing/metrics.md
+              description: The snmp.license.* charts and the snmp:licenses function.
+      # Topologies
+      - meta:
+          label: Topologies
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/topology/README.md
+          description: See how your network is connected — Layer 2 and Layer 3 device topology, live connections, and virtual infrastructure.
+        items:
+          - meta:
+              label: Discovery Methods
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/topology/discovery-methods.md
+              description: What LLDP, CDP, FDB, ARP, STP, BGP, and OSPF each contribute to the map.
+      # BGP Monitoring
+      - meta:
+          label: BGP Monitoring
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/bgp/README.md
+          description: Monitor BGP peer state, prefixes, and session health on your routers.
+        items:
+          - meta:
+              label: Metrics and Functions
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/bgp/metrics.md
+              description: The snmp.bgp.* charts and the snmp:bgp-peers function.
+      # Network Flows
+      - meta:
+          label: Network Flows
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/README.md
+          description: Collect, enrich, and visualize NetFlow, IPFIX, and sFlow data with the Netdata Agent.
+        items:
+          - meta:
+              label: Installation
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/installation.md
+          - meta:
+              label: Quick Start
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/quick-start.md
+              description: Get network flow monitoring running in five minutes.
+          - type: integration_placeholder
+            integration_kind: flows
+          - meta:
+              label: Configuration
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/configuration.md
+              description: Full reference for netflow.yaml configuration options.
+          - meta:
+              label: Enrichment
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/enrichment.md
+              description: Order of evaluation, provider chains, MMDB shared mechanism, and the cross-cutting properties that span every enrichment method.
+          - meta:
+              label: Enrichment Intel Downloader
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/intel-downloader.md
+              description: The bundled tool that fetches IP intelligence data sources and writes MMDB files the netflow plugin reads.
+          - meta:
+              label: Field Reference
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/field-reference.md
+              description: Complete list of flow fields with per-protocol availability.
+          - meta:
+              label: Visualization
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/visualization/overview.md
+              description: How queries work, the controls every panel shares, and where each panel fits.
+            items:
+              - meta:
+                  label: Sankey and Table
+                  edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/visualization/summary-sankey.md
+              - meta:
+                  label: Time-Series
+                  edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/visualization/time-series.md
+              - meta:
+                  label: Maps and Globe
+                  edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/visualization/maps-globe.md
+              - meta:
+                  label: Filters and Facets
+                  edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/visualization/filters-facets.md
+              - meta:
+                  label: Plugin Health Charts
+                  edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/visualization/dashboard-cards.md
+          - meta:
+              label: Retention and Tiers
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/retention-querying.md
+          - meta:
+              label: Sizing and Capacity Planning
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/sizing-capacity.md
+              description: Practical scaling guide -- plugin cap, storage, memory, and distributed deployment.
+          - meta:
+              label: Validation and Data Quality
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/validation.md
+          - meta:
+              label: Investigation Playbooks
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/investigation-playbooks.md
+          - meta:
+              label: Anti-patterns
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/anti-patterns.md
+          - meta:
+              label: Troubleshooting
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/troubleshooting.md
+      - meta:
+          label: SNMP Traps
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/README.md
+          description: Receive, decode, store, query, and forward SNMP Trap and INFORM events with the Netdata Agent.
+        items:
+          - meta:
+              label: Installation
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/installation.md
+          - meta:
+              label: Quick Start
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/quick-start.md
+              description: Configure a listener, send a test trap, and prove Netdata received it.
+          - meta:
+              label: Configuration
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/configuration.md
+              description: Configure listener endpoints, SNMP versions, source controls, storage, forwarding, deduplication, and profile metrics.
+          - meta:
+              label: Trap Profiles
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/trap-profiles.md
+              description: Understand stock trap coverage, custom profiles, overrides, MIB conversion, and profile-defined metrics.
+          - meta:
+              label: SNMP Trap Profile Format
+              edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md
+              description: Reference for SNMP trap profile YAML, trap definitions, varbind metadata, rendering, and profile metric rules.
+          - meta:
+              label: Enrichment
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/enrichment.md
+              description: Understand source identity, trusted relays, reverse DNS, device identity, interface context, and enrichment audit fields.
+          - meta:
+              label: Usage and Output
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/usage-and-output.md
+              description: Read normal trap rows, decode errors, deduplication summaries, varbinds, tags, and payload fields.
+          - meta:
+              label: Field Reference
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/field-reference.md
+              description: Complete reference for journal fields, report types, enrichment fields, varbind fields, tags, and OTLP mappings.
+          - meta:
+              label: Journal and Querying
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/journal-and-querying.md
+              description: Query, export, copy, and inspect direct-journal trap data with Netdata Logs and journalctl-compatible workflows.
+          - meta:
+              label: Forwarding to SIEM
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/forwarding-to-siem.md
+              description: Forward trap events through journal-native workflows or OTLP/gRPC and map fields in downstream log systems.
+          - meta:
+              label: Metrics
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/metrics.md
+              description: Read receiver pipeline health, severity and category rates, processing errors, deduplication, and per-source metrics.
+          - meta:
+              label: Alerts
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/alerts.md
+              description: Understand, route, and silence the default SNMP trap health alerts.
+          - meta:
+              label: Sizing and Capacity Planning
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/sizing-and-capacity.md
+              description: Plan receiver capacity, output backends, retention, storm controls, profile metrics, source visibility, and validation.
+          - meta:
+              label: Validation and Data Quality
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/validation-and-data-quality.md
+              description: Prove first receipt, source identity, profile coverage, enrichment quality, backend health, retention, and downstream fields.
+          - meta:
+              label: Investigation Playbooks
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/investigation-playbooks.md
+              description: Follow operator playbooks for storms, critical traps, interface changes, restart signals, missing traps, unknown OIDs, SNMPv3 failures, and forwarding checks.
+          - meta:
+              label: Anti-patterns
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/anti-patterns.md
+              description: Avoid unsafe listeners, broad relay trust, inline secrets, high-cardinality metrics, noisy alerting, and storage blind spots.
+          - meta:
+              label: Troubleshooting
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/troubleshooting.md
+              description: Diagnose missing rows, inactive listeners, UDP delivery, allowlist drops, SNMPv3 failures, profile issues, backend failures, and retention problems.
+      # Syslog from Network Devices
+      - meta:
+          label: Syslog from Network Devices
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/syslog/README.md
+          description: Ingest syslog from network devices through the OpenTelemetry Collector and explore it in the Logs tab.
+        items:
+          - meta:
+              label: OpenTelemetry Collector Setup
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/syslog/otel-collector.md
+              description: A working syslog receiver configuration and how to make it durable.
   # Logs
   - meta:
       label: Logs
@@ -679,9 +921,6 @@ sidebar:
               - meta:
                   label: JetBrains IDEs
                   edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/jetbrains-ides.md
-              - meta:
-                  label: Netdata Web Client
-                  edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/netdata-web-client.md
               - meta:
                   label: Claude Code
                   edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/claude-code.md

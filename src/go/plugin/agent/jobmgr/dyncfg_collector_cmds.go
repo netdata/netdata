@@ -5,6 +5,7 @@ package jobmgr
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -68,18 +69,61 @@ func (m *Manager) requireModuleJob(fn dyncfg.Function) (string, string, collecto
 		m.dyncfgResponder.SendCodef(fn, 404, "The specified module '%s' is not registered.", moduleName)
 		return "", "", collectorapi.Creator{}, false
 	}
+	if err := validateCollectorInstanceIdentity(moduleName, jobName, creator.InstancePolicy); err != nil {
+		m.Warningf("dyncfg: %s: %v", cmd, err)
+		m.dyncfgResponder.SendCodef(fn, 400, "%v.", err)
+		return "", "", collectorapi.Creator{}, false
+	}
 
 	return moduleName, jobName, creator, true
 }
 
+func (m *Manager) requireSingleConfigID(fn dyncfg.Function, moduleName string, creator collectorapi.Creator) bool {
+	if creator.InstancePolicy != collectorapi.InstancePolicySingle {
+		return true
+	}
+	if fn.ID() == m.dyncfgModID(moduleName) {
+		return true
+	}
+	m.Warningf("dyncfg: %s: single-instance collector %s must use config ID %s", fn.Command(), moduleName, m.dyncfgModID(moduleName))
+	m.dyncfgResponder.SendCodef(fn, 400, "Single-instance collector %s must use config ID %s.", moduleName, m.dyncfgModID(moduleName))
+	return false
+}
+
+func (m *Manager) requireConfigModuleJob(fn dyncfg.Function) (string, string, collectorapi.Creator, bool) {
+	moduleName, creator, ok := m.requireModule(fn)
+	if !ok {
+		return "", "", collectorapi.Creator{}, false
+	}
+	if creator.InstancePolicy == collectorapi.InstancePolicySingle {
+		if !m.requireSingleConfigID(fn, moduleName, creator) {
+			return "", "", collectorapi.Creator{}, false
+		}
+		return moduleName, moduleName, creator, true
+	}
+	return m.requireModuleJob(fn)
+}
+
 func (m *Manager) dyncfgCmdUserconfig(fn dyncfg.Function) {
 	jn := fn.JobName()
-	if jn == "" {
-		jn = "test"
-	}
 
 	mn, creator, ok := m.requireTemplateModule(fn)
 	if !ok {
+		return
+	}
+	if !m.requireSingleConfigID(fn, mn, creator) {
+		return
+	}
+	if jn == "" {
+		if creator.InstancePolicy == collectorapi.InstancePolicySingle {
+			jn = mn
+		} else {
+			jn = "test"
+		}
+	}
+	if err := validateCollectorInstanceIdentity(mn, jn, creator.InstancePolicy); err != nil {
+		m.Warningf("dyncfg: %s: %v", fn.Command(), err)
+		m.dyncfgResponder.SendCodef(fn, 400, "%v.", err)
 		return
 	}
 
@@ -106,17 +150,29 @@ func (m *Manager) dyncfgCmdTest(fn dyncfg.Function) {
 	if !ok {
 		return
 	}
+	if !m.requireSingleConfigID(fn, mn, creator) {
+		return
+	}
 
 	jn := fn.JobName()
 	if jn == "" {
-		jn = "test"
+		if creator.InstancePolicy == collectorapi.InstancePolicySingle {
+			jn = mn
+		} else {
+			jn = "test"
+		}
 	}
 
 	m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, fn.User())
 
-	if err := dyncfg.ValidateJobName(jn); err != nil {
+	if err := dyncfg.JobNameRuleStrict(jn); err != nil {
 		m.Warningf("dyncfg: %s: module %s: unacceptable job name '%s': %v", cmd, mn, jn, err)
 		m.dyncfgResponder.SendCodef(fn, 400, "Unacceptable job name '%s': %v.", jn, err)
+		return
+	}
+	if err := validateCollectorInstanceIdentity(mn, jn, creator.InstancePolicy); err != nil {
+		m.Warningf("dyncfg: %s: %v", cmd, err)
+		m.dyncfgResponder.SendCodef(fn, 400, "%v.", err)
 		return
 	}
 	if !fn.HasPayload() {
@@ -175,6 +231,9 @@ func (m *Manager) runDyncfgCmdTest(task dyncfgCmdTestTask) {
 		m.dyncfgResponder.SendCodef(task.fn, 500, "Module %s instantiation failed: %v.", task.moduleName, err)
 		return
 	}
+	if named, ok := job.(jobNameSetter); ok {
+		named.SetJobName(task.cfg.Name())
+	}
 
 	cleanupCtx, cleanupCancel := context.WithTimeout(m.baseContext(), cmdTestWorkerDrainWait)
 	defer cleanupCancel()
@@ -198,15 +257,24 @@ func (m *Manager) runDyncfgCmdTest(task dyncfgCmdTestTask) {
 	)
 
 	if err := job.Init(ctx); err != nil {
-		m.dyncfgResponder.SendCodef(task.fn, 422, "Job initialization failed: %v", err)
+		m.sendDyncfgCmdTestError(task.fn, 422, "Job initialization failed: %v", err)
 		return
 	}
 	if err := job.Check(ctx); err != nil {
-		m.dyncfgResponder.SendCodef(task.fn, 422, "Job check failed: %v", err)
+		m.sendDyncfgCmdTestError(task.fn, 422, "Job check failed: %v", err)
 		return
 	}
 
 	m.dyncfgResponder.SendCodef(task.fn, 200, "")
+}
+
+func (m *Manager) sendDyncfgCmdTestError(fn dyncfg.Function, defaultCode int, format string, err error) {
+	code := defaultCode
+	var coded dyncfg.CodedError
+	if errors.As(err, &coded) {
+		code = coded.DyncfgCode()
+	}
+	m.dyncfgResponder.SendCodef(fn, code, format, err)
 }
 
 func (m *Manager) dyncfgCmdTestTimeout(fn dyncfg.Function) time.Duration {
@@ -219,6 +287,9 @@ func (m *Manager) dyncfgCmdTestTimeout(fn dyncfg.Function) time.Duration {
 func (m *Manager) dyncfgCmdSchema(fn dyncfg.Function) {
 	mn, mod, ok := m.requireModule(fn)
 	if !ok {
+		return
+	}
+	if !m.requireSingleConfigID(fn, mn, mod) {
 		return
 	}
 
@@ -236,7 +307,7 @@ func (m *Manager) dyncfgCmdSchema(fn dyncfg.Function) {
 func (m *Manager) dyncfgCmdGet(fn dyncfg.Function) {
 	cmd := fn.Command()
 
-	mn, jn, creator, ok := m.requireModuleJob(fn)
+	mn, jn, creator, ok := m.requireConfigModuleJob(fn)
 	if !ok {
 		return
 	}

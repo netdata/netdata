@@ -49,6 +49,38 @@ int rrdset2value_api_v1(
         , STORAGE_PRIORITY priority
 );
 
+// Same contract as rrdset2value_api_v1 but uses a caller-provided
+// onewayalloc arena. Lets a caller that issues many back-to-back queries
+// (e.g. evaluating all alerts on one host) amortise the mmap/munmap cost
+// of owa create/destroy across the whole burst. The caller owns the owa's
+// lifetime; between calls they should invoke onewayalloc_reset() to reclaim
+// trailing pages and keep peak memory bounded. `owa` must be non-NULL.
+int rrdset2value_api_v1_with_owa(
+        ONEWAYALLOC *owa
+        , RRDSET *st
+        , BUFFER *wb
+        , NETDATA_DOUBLE *n
+        , const char *dimensions
+        , size_t points
+        , time_t after
+        , time_t before
+        , RRDR_TIME_GROUPING group_method
+        , const char *group_options
+        , time_t resampling_time
+        , uint32_t options
+        , time_t *db_after
+        , time_t *db_before
+        , size_t *db_points_read
+        , size_t *db_points_per_tier
+        , size_t *result_points_generated
+        , int *value_is_null
+        , NETDATA_DOUBLE *anomaly_rate
+        , time_t timeout
+        , size_t tier
+        , QUERY_SOURCE query_source
+        , STORAGE_PRIORITY priority
+);
+
 static inline bool rrdr_dimension_should_be_exposed(RRDR_DIMENSION_FLAGS rrdr_dim_flags, RRDR_OPTIONS options) {
     if(unlikely((options & RRDR_OPTION_RETURN_RAW) && (rrdr_dim_flags & RRDR_DIMENSION_QUERIED)))
         return true;

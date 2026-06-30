@@ -566,14 +566,14 @@
 
       Netdata webhook integration supports 3 different authentication mechanisms:
 
-      ##### Mutual TLS authentication (recommended)
+      ##### Mutual TLS authentication
 
-      In mutual Transport Layer Security (mTLS) authentication, the client and the server authenticate each other using X.509 certificates. This ensures that the client is connecting to the intended server, and that the server is only accepting connections from authorized clients.
+      Netdata always sends a client certificate with every webhook request, regardless of which authentication method is selected in the UI. This means mTLS is available on all webhook integrations by default — no additional configuration is needed on the Netdata side to enable it.
 
-      This is the default authentication mechanism used if no other method is selected.
+      The authentication method you select (no auth, basic, or bearer) controls only whether an Authorization header is included in the request. It does not affect the client certificate behavior.
 
-      To take advantage of mutual TLS, you can configure your server to verify Netdata's client certificate. In order to achieve this, the Netdata client sending the notification supports mutual TLS (mTLS) to identify itself with a client certificate that your server can validate.
-
+      If you want to verify Netdata's client certificate on your end, configure your server to validate it using the Netdata CA certificate below.
+      
       The steps to perform this validation are as follows:
 
       - Store Netdata CA certificate on a file in your disk. The content of this file should be:

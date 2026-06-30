@@ -21,7 +21,7 @@ Module: PerflibAD
 
 ## Overview
 
-This collector monitors Active Directory IO and queries.
+This collector monitors Active Directory directory operations, replication, LDAP activity, binds, queueing, database, cleanup, security descriptor propagation, and SAM metrics.
 
 
 It queries DirectoryServices object from Perflib in order to gather the metrics.
@@ -122,19 +122,104 @@ Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
+| ad.address_book_ambiguous_name_resolution | ambiguous_name_resolution | operations/s |
+| ad.address_book_browse | browse | operations/s |
+| ad.address_book_find | find | operations/s |
+| ad.address_book_property_read | property_read | operations/s |
+| ad.address_book_search | search | operations/s |
+| ad.address_book_proxy_search | proxy_search | operations/s |
+| ad.address_book_client_sessions | sessions | sessions |
+| ad.approximate_highest_dnt | dnt | dnt |
 | ad.directory_operations | read, write, search | operations/s |
+| ad.searches_base | base | searches/s |
+| ad.searches_subtree | subtree | searches/s |
+| ad.searches_one_level | one_level | searches/s |
 | ad.name_cache_lookups | lookups | lookups/s |
+| ad.name_cache_hits | hits | hits/s |
+| ad.ldap_searches | searches | searches/s |
 | ad.dra_replication_properties_updated | inbound | properties/s |
 | ad.dra_replication_properties_filtered | inbound | properties/s |
 | ad.dra_replication_intersite_compressed_traffic | inbound, outbound | bytes/s |
-| ad.dra_replication_intrasite_compressed_traffic | inbound, outbound | bytes/s |
-| ad.dra_replication_pending_syncs | pending | syncs |
+| ad.dra_replication_intrasite_uncompressed_traffic | inbound, outbound | bytes/s |
+| ad.replication_highest_usn_committed | committed | usn/s |
+| ad.replication_highest_usn_issued | issued | usn/s |
+| ad.replication_inbound_sync_objects_remaining | remaining | objects |
+| ad.replication_inbound_link_value_updates_remaining | remaining | updates |
+| ad.replication_inbound_objects_updated | updated | objects/s |
+| ad.replication_inbound_objects_filtered | filtered | objects/s |
 | ad.dra_replication_pending_syncs | pending | syncs |
 | ad.dra_replication_sync_requests | request | requests/s |
-| ad.name_cache_hits | hits | hits/s |
+| ad.replication_pending_operations | pending | operations |
+| ad.replication_sync_requests_success | success | requests/s |
+| ad.replication_sync_requests_schema_mismatch_failure | failure | requests/s |
+| ad.name_translations_client | client | translations/s |
+| ad.name_translations_server | server | translations/s |
+| ad.change_monitors_registered | registered | monitors |
+| ad.change_monitor_updates_pending | pending | updates |
+| ad.directory_search_suboperations | suboperations | operations/s |
+| ad.security_descriptor_propagation_events | events | events/s |
+| ad.security_descriptor_propagation_events_queued | queued | events |
+| ad.security_descriptor_propagation_access_wait | wait | seconds |
+| ad.security_descriptor_propagation_items_queued | queued | items |
 | ad.ds_threads | thread | threads |
 | ad.ldap_last_bind_time | last_bind | seconds |
-| ad.ldap_searches | searches | searches/s |
+| ad.binds_digest | digest | binds/s |
+| ad.binds_ds_client | ds_client | binds/s |
+| ad.binds_ds_server | ds_server | binds/s |
+| ad.binds_external | external | binds/s |
+| ad.binds_fast | fast | binds/s |
+| ad.binds_negotiate | negotiate | binds/s |
+| ad.binds_ntlm | ntlm | binds/s |
+| ad.binds_simple | simple | binds/s |
+| ad.binds_ldap | ldap | binds/s |
+| ad.ldap_closed_connections | closed | connections/s |
+| ad.ldap_opened_connections_ldap | ldap | connections/s |
+| ad.ldap_opened_connections_ldaps | ldaps | connections/s |
+| ad.ldap_active_threads | active | threads |
+| ad.ldap_udp_operations | udp | operations/s |
+| ad.ldap_writes | writes | writes/s |
+| ad.ldap_client_sessions | sessions | sessions |
+| ad.atq_outstanding_requests | outstanding | requests |
+| ad.atq_estimated_delay | delay | seconds |
 | ad.atq_average_request_latency | time | seconds |
+| ad.atq_current_threads_ldap | ldap | threads |
+| ad.atq_current_threads_other | other | threads |
+| ad.atq_current_threads_total | total | threads |
+| ad.database_operations | add, delete, modify, recycle | operations/s |
+| ad.directory_reads | read | reads/s |
+| ad.directory_searches | search | searches/s |
+| ad.directory_writes | write | writes/s |
+| ad.replication_inbound_object_updates_remaining | remaining | updates |
+| ad.replication_inbound_values_dns_only | dns_only | values/s |
+| ad.replication_inbound_values_total | total | values/s |
+| ad.replication_outbound_objects_filtered | filtered | objects/s |
+| ad.replication_outbound_objects | objects | objects/s |
+| ad.replication_outbound_properties | properties | properties/s |
+| ad.replication_outbound_values_dns_only | dns_only | values/s |
+| ad.replication_outbound_values_total | total | values/s |
+| ad.replication_threads_getting_nc_changes | threads | threads |
+| ad.replication_threads_getting_nc_changes_holding_semaphore | threads | threads |
+| ad.transitive_operations | operations | operations/s |
+| ad.transitive_suboperations | suboperations | suboperations/s |
+| ad.replication_inbound_bytes_total | inbound | bytes/s |
+| ad.replication_outbound_bytes_total | outbound | bytes/s |
+| ad.link_values_cleaned | cleaned | values/s |
+| ad.phantom_objects_cleaned | cleaned | objects/s |
+| ad.phantom_objects_visited | visited | objects/s |
+| ad.tombstoned_objects_collected | collected | objects/s |
+| ad.tombstoned_objects_visited | visited | objects/s |
+| ad.sam_group_membership_evaluations | global, domain_local, universal | evaluations/s |
+| ad.sam_group_membership_global_catalog_evaluations | global_catalog | evaluations/s |
+| ad.sam_group_membership_evaluations_nontransitive | nontransitive | evaluations/s |
+| ad.sam_group_membership_evaluations_transitive | transitive | evaluations/s |
+| ad.sam_group_evaluation_latency | account_group, resource_group | latency |
+| ad.sam_computer_creation_requests | request | requests/s |
+| ad.sam_computer_creation_successful_requests | success | requests/s |
+| ad.sam_user_creation_requests | request | requests/s |
+| ad.sam_user_creation_successful_requests | success | requests/s |
+| ad.sam_query_display_requests | query | requests/s |
+| ad.sam_enumerations | enumeration | enumerations/s |
+| ad.sam_membership_changes | change | changes/s |
+| ad.sam_password_changes | change | changes/s |
 
 

@@ -111,7 +111,7 @@ func (c *Controller) dyncfgCmdAdd(fn dyncfg.Function) {
 		c.api.SendCodef(fn, 400, "Missing vnode name.")
 		return
 	}
-	if err := dyncfg.ValidateJobName(name); err != nil {
+	if err := dyncfg.JobNameRuleAllowDots(name); err != nil {
 		c.Warningf("dyncfg: %s: unacceptable vnode name '%s': %v", dyncfg.CommandAdd, name, err)
 		c.api.SendCodef(fn, 400, "Unacceptable vnode name '%s': %v.", name, err)
 		return

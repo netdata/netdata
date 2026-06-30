@@ -1,0 +1,20 @@
+[
+  {
+    "context": "prometheus.test_gauge_metric_keep",
+    "labels": {
+      "label1": "value1"
+    },
+    "dims": [
+      {
+        "name": "test_gauge_metric_keep",
+        "algo": "absolute",
+        "value": 11
+      }
+    ],
+    "soft": {
+      "units": "keep",
+      "family": "test_gauge",
+      "type": "line"
+    }
+  }
+]

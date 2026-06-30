@@ -47,6 +47,9 @@ void netdata_conf_backwards_compatibility(void) {
     inicfg_move(&netdata_config, CONFIG_SECTION_GLOBAL,      "stock config directory",
                 CONFIG_SECTION_DIRECTORIES, "stock config");
 
+    inicfg_move(&netdata_config, CONFIG_SECTION_GLOBAL,      "stock data directory",
+                CONFIG_SECTION_DIRECTORIES, "stock data");
+
     inicfg_move(&netdata_config, CONFIG_SECTION_GLOBAL,      "log directory",
                 CONFIG_SECTION_DIRECTORIES, "log");
 

@@ -153,7 +153,7 @@ The architecture adapts to your needs - train where you have resources, use ever
 
 - **Ephemeral systems** - Kubernetes pods, auto-scaling VMs that disappear
 - **Resource constraints** - Systems where every CPU cycle matters
-- **On-premises requirements** - Multi-node view without Cloud connectivity
+- **On-premises requirements** - Multi-node view without Cloud connectivity. For a fully self-hosted Cloud experience, consider [Netdata Cloud On-Prem](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/README.md)
 - **Network restrictions** - Agents can't reach Cloud due to firewalls/policies
 
 ### Parent Sizing Guidelines

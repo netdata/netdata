@@ -24,6 +24,7 @@
 #include "uuid_generate.h"
 #include "setenv.h"
 #include "hostname.h"
+#include "socket_egress_interface.h"
 #include "os-freebsd-wrappers.h"
 #include "os-macos-wrappers.h"
 #include "os-windows-wrappers.h"
@@ -55,5 +56,30 @@ extern const char *os_type;
 
 extern unsigned int system_hz;
 void os_get_system_HZ(void);
+
+// Forward declaration needed because this header uses strncpyz() before inlined.h is included.
+static char *strncpyz(char *dst, const char *src, size_t dst_size_minus_1);
+
+#if defined(OS_WINDOWS)
+char *os_translate_path(char *dst, const char *src, size_t dst_size);
+char *os_translate_msys_to_windows_path(const char *src);
+// Returns newly allocated POSIX-style storage; caller must free.
+char *os_translate_windows_to_msys_path(const char *src);
+#else
+// No translation needed on non-Windows; copy src into dst for consistent semantics.
+static inline char *os_translate_path(char *dst, const char *src, size_t dst_size) {
+    if (!dst || !dst_size)
+        return dst;
+    if (!src) {
+        dst[0] = '\0';
+        return dst;
+    }
+    strncpyz(dst, src, dst_size - 1);
+    return dst;
+}
+static inline char *os_translate_windows_to_msys_path(const char *src) {
+    return strdupz(src ? src : "");
+}
+#endif
 
 #endif //NETDATA_OS_H

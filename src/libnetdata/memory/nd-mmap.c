@@ -42,11 +42,15 @@ static int memory_file_open(const char *filename, size_t size) {
     return fd;
 }
 
+static inline bool madvise_log_first_failure(int *logger) {
+    return __atomic_exchange_n(logger, 0, __ATOMIC_RELAXED) > 0;
+}
+
 inline int madvise_sequential(void *mem, size_t len) {
     static int logger = 1;
     int ret = madvise(mem, len, MADV_SEQUENTIAL);
 
-    if (ret != 0 && logger-- > 0)
+    if (ret != 0 && madvise_log_first_failure(&logger))
         netdata_log_error("madvise(MADV_SEQUENTIAL) of size %zu, failed.", len);
     return ret;
 }
@@ -55,7 +59,7 @@ inline int madvise_random(void *mem, size_t len) {
     static int logger = 1;
     int ret = madvise(mem, len, MADV_RANDOM);
 
-    if (ret != 0 && logger-- > 0)
+    if (ret != 0 && madvise_log_first_failure(&logger))
         netdata_log_error("madvise(MADV_RANDOM) of size %zu, failed.", len);
     return ret;
 }
@@ -64,7 +68,7 @@ inline int madvise_dontfork(void *mem, size_t len) {
     static int logger = 1;
     int ret = madvise(mem, len, MADV_DONTFORK);
 
-    if (ret != 0 && logger-- > 0)
+    if (ret != 0 && madvise_log_first_failure(&logger))
         netdata_log_error("madvise(MADV_DONTFORK) of size %zu, failed.", len);
     return ret;
 }
@@ -73,7 +77,7 @@ inline int madvise_willneed(void *mem, size_t len) {
     static int logger = 1;
     int ret = madvise(mem, len, MADV_WILLNEED);
 
-    if (ret != 0 && logger-- > 0)
+    if (ret != 0 && madvise_log_first_failure(&logger))
         netdata_log_error("madvise(MADV_WILLNEED) of size %zu, failed.", len);
     return ret;
 }
@@ -82,7 +86,7 @@ inline int madvise_dontneed(void *mem, size_t len) {
     static int logger = 1;
     int ret = madvise(mem, len, MADV_DONTNEED);
 
-    if (ret != 0 && logger-- > 0)
+    if (ret != 0 && madvise_log_first_failure(&logger))
         netdata_log_error("madvise(MADV_DONTNEED) of size %zu, failed.", len);
     return ret;
 }
@@ -92,7 +96,7 @@ inline int madvise_dontdump(void *mem __maybe_unused, size_t len __maybe_unused)
     static int logger = 1;
     int ret = madvise(mem, len, MADV_DONTDUMP);
 
-    if (ret != 0 && logger-- > 0)
+    if (ret != 0 && madvise_log_first_failure(&logger))
         netdata_log_error("madvise(MADV_DONTDUMP) of size %zu, failed.", len);
     return ret;
 #else
@@ -105,7 +109,7 @@ inline int madvise_mergeable(void *mem __maybe_unused, size_t len __maybe_unused
     static int logger = 1;
     int ret = madvise(mem, len, MADV_MERGEABLE);
 
-    if (ret != 0 && logger-- > 0)
+    if (ret != 0 && madvise_log_first_failure(&logger))
         netdata_log_error("madvise(MADV_MERGEABLE) of size %zu, failed.", len);
     return ret;
 #else
@@ -152,7 +156,7 @@ void *nd_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
         __atomic_add_fetch(&nd_mmap_size, len, __ATOMIC_RELAXED);
 
 #ifdef NETDATA_TRACE_ALLOCATIONS
-        malloc_trace_mmap(size);
+        malloc_trace_mmap(len);
 #endif
     }
 

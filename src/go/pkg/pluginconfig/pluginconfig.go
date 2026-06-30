@@ -83,7 +83,8 @@ func MustInit(input InitInput) {
 	})
 }
 
-func EnvLogLevel() string { return env.logLevel }
+func EnvLogLevel() string      { return env.logLevel }
+func RegistryUniqueID() string { return readRegistryUniqueID(registryUniqueIDVarLibDir()) }
 
 func UserConfigDirs() multipath.MultiPath { return dirs.userConfigDirsClone() }
 func StockConfigDir() string              { return dirs.stockConfigDir }
@@ -304,6 +305,28 @@ func handleDirOnWin(base, p string, execDir string) string {
 		return p
 	}
 	return filepath.Join(base, strings.TrimPrefix(p, "/"))
+}
+
+func registryUniqueIDVarLibDir() string {
+	if dir := strings.TrimSpace(VarLibDir()); dir != "" {
+		return dir
+	}
+	if dir := strings.TrimSpace(buildinfo.VarLibDir); dir != "" {
+		return dir
+	}
+	return buildinfo.DefaultVarLibDir
+}
+
+func readRegistryUniqueID(varLibDir string) string {
+	varLibDir = strings.TrimSpace(varLibDir)
+	if varLibDir == "" {
+		return ""
+	}
+	bs, err := os.ReadFile(filepath.Join(varLibDir, "registry", "netdata.public.unique.id"))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(bs))
 }
 
 func isDirExists(dir string) bool {

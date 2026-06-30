@@ -105,7 +105,6 @@ test_cleanup:
 #define UINT64_PTR_INC_ITERATION_COUNT 5000
 int test_uint64_ptr_incremental() {
     c_rhash hash = c_rhash_new(100);
-    void *val;
 
     TEST_START();
 

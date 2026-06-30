@@ -46,6 +46,18 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
+func TestCollectorCreatorRequiresDeviceStore(t *testing.T) {
+	require.PanicsWithValue(t, "snmp Register requires a non-nil device store", func() {
+		_ = newCreator(nil)
+	})
+}
+
+func TestCollectorNewRequiresDeviceStore(t *testing.T) {
+	require.PanicsWithValue(t, "snmp New requires a non-nil device store", func() {
+		_ = New(nil)
+	})
+}
+
 func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		prepareSNMP func() *Collector
@@ -54,13 +66,13 @@ func TestCollector_Init(t *testing.T) {
 		"fail with default config": {
 			wantFail: true,
 			prepareSNMP: func() *Collector {
-				return New()
+				return newTestSNMPCollector()
 			},
 		},
 		"fail when using SNMPv3 but 'user.name' not set": {
 			wantFail: true,
 			prepareSNMP: func() *Collector {
-				collr := New()
+				collr := newTestSNMPCollector()
 				collr.Config = prepareV3Config()
 				collr.User.Name = ""
 				return collr
@@ -69,7 +81,7 @@ func TestCollector_Init(t *testing.T) {
 		"success when using SNMPv1 with valid config": {
 			wantFail: false,
 			prepareSNMP: func() *Collector {
-				collr := New()
+				collr := newTestSNMPCollector()
 				collr.Config = prepareV1Config()
 				return collr
 			},
@@ -77,7 +89,7 @@ func TestCollector_Init(t *testing.T) {
 		"success when using SNMPv2 with valid config": {
 			wantFail: false,
 			prepareSNMP: func() *Collector {
-				collr := New()
+				collr := newTestSNMPCollector()
 				collr.Config = prepareV2Config()
 				return collr
 			},
@@ -85,7 +97,7 @@ func TestCollector_Init(t *testing.T) {
 		"success when using SNMPv3 with valid config": {
 			wantFail: false,
 			prepareSNMP: func() *Collector {
-				collr := New()
+				collr := newTestSNMPCollector()
 				collr.Config = prepareV3Config()
 				return collr
 			},
@@ -108,7 +120,7 @@ func TestCollector_Init(t *testing.T) {
 func TestCollector_InitPassesSharedPingerConfig(t *testing.T) {
 	var gotCfg pinger.Config
 
-	collr := New()
+	collr := newTestSNMPCollector()
 	collr.Config = prepareV2Config()
 	collr.PingOnly = true
 	collr.Ping.Network = "ip6"
@@ -139,9 +151,14 @@ func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
 		prepareSNMP func(t *testing.T, m *snmpmock.MockHandler) *Collector
 	}{
+		"cleanup call does not panic on zero value collector": {
+			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *Collector {
+				return &Collector{}
+			},
+		},
 		"cleanup call does not panic if snmpClient not initialized": {
 			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *Collector {
-				collr := New()
+				collr := newTestSNMPCollector()
 				collr.Config = prepareV2Config()
 				collr.newSnmpClient = func() gosnmp.Handler { return m }
 				setMockClientInitExpect(m)
@@ -167,6 +184,46 @@ func TestCollector_Cleanup(t *testing.T) {
 	}
 }
 
+func TestCollector_CollectRegistersAndCleanupUnregistersDevice(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockSNMP := snmpmock.NewMockHandler(ctrl)
+	setMockClientInitExpect(mockSNMP)
+	setMockClientSysInfoExpect(mockSNMP)
+	mockSNMP.EXPECT().Close().Return(nil).AnyTimes()
+
+	deviceStore := ddsnmp.NewDeviceStore()
+	collr := New(deviceStore)
+	collr.Config = prepareV2Config()
+	collr.CreateVnode = false
+	collr.Ping.Enabled = false
+	collr.snmpProfiles = []*ddsnmp.Profile{{}}
+	collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+	collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
+		return &mockDdSnmpCollector{}
+	}
+
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+	require.Empty(t, deviceStore.Devices())
+
+	_ = collr.Collect(context.Background())
+
+	devices := deviceStore.Devices()
+	require.Len(t, devices, 1)
+	assert.Equal(t, "192.0.2.1", devices[0].Hostname)
+	assert.Equal(t, 161, devices[0].Port)
+	assert.Equal(t, gosnmp.Version2c.String(), devices[0].SNMPVersion)
+	assert.Equal(t, "mock sysName", devices[0].SysName)
+	assert.Equal(t, "mock sysDescr", devices[0].SysDescr)
+	assert.Equal(t, "mock sysContact", devices[0].SysContact)
+	assert.Equal(t, "mock sysLocation", devices[0].SysLocation)
+
+	collr.Cleanup(context.Background())
+	require.Empty(t, deviceStore.Devices())
+}
+
 func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepare func(m *snmpmock.MockHandler) *Collector
@@ -178,7 +235,7 @@ func TestCollector_Check(t *testing.T) {
 				setMockClientInitExpect(m)
 				setMockClientSysInfoExpect(m)
 
-				c := New()
+				c := newTestSNMPCollector()
 				c.Config = prepareV2Config()
 				c.CreateVnode = false
 				c.Ping.Enabled = false
@@ -193,7 +250,7 @@ func TestCollector_Check(t *testing.T) {
 				setMockClientSetterExpect(m)
 				m.EXPECT().Connect().Return(errors.New("connect failed")).AnyTimes()
 
-				c := New()
+				c := newTestSNMPCollector()
 				c.Config = prepareV2Config()
 				c.CreateVnode = false
 				c.Ping.Enabled = false
@@ -214,7 +271,7 @@ func TestCollector_Check(t *testing.T) {
 					WalkAll(gomock.Any()).
 					Return(nil, errors.New("walk failed"))
 
-				c := New()
+				c := newTestSNMPCollector()
 				c.Config = prepareV2Config()
 				c.CreateVnode = false
 				c.Ping.Enabled = false
@@ -229,7 +286,7 @@ func TestCollector_Check(t *testing.T) {
 				setMockClientInitExpect(m)
 				setMockClientSysInfoExpect(m)
 
-				c := New()
+				c := newTestSNMPCollector()
 				c.Config = prepareV2Config()
 				c.PingOnly = true
 				c.CreateVnode = false
@@ -247,7 +304,7 @@ func TestCollector_Check(t *testing.T) {
 				setMockClientInitExpect(m)
 				setMockClientSysInfoExpect(m)
 
-				c := New()
+				c := newTestSNMPCollector()
 				c.Config = prepareV2Config()
 				c.PingOnly = true
 				c.CreateVnode = false
@@ -265,7 +322,7 @@ func TestCollector_Check(t *testing.T) {
 				setMockClientInitExpect(m)
 				setMockClientSysInfoExpect(m)
 
-				c := New()
+				c := newTestSNMPCollector()
 				c.Config = prepareV2Config()
 				c.PingOnly = true
 				c.CreateVnode = false
@@ -310,7 +367,7 @@ func TestCollector_CheckPingOnlyUsesReadOnlyProbing(t *testing.T) {
 
 	pingClient := &mockPingClient{sample: pingSuccessSample("192.0.2.1")}
 
-	collr := New()
+	collr := newTestSNMPCollector()
 	collr.Config = prepareV2Config()
 	collr.PingOnly = true
 	collr.CreateVnode = false
@@ -340,7 +397,7 @@ func TestCollector_Collect(t *testing.T) {
 				setMockClientInitExpect(m)
 				setMockClientSysInfoExpect(m)
 
-				collr := New()
+				collr := newTestSNMPCollector()
 				collr.Config = prepareV2Config()
 				collr.CreateVnode = false
 				collr.Ping.Enabled = false
@@ -367,26 +424,32 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			want: map[string]int64{
 				// scalar → "snmp_device_prof_<name>"
-				"snmp_device_prof_test_stats_errors_processing_scalar": 0,
-				"snmp_device_prof_test_stats_errors_processing_table":  0,
-				"snmp_device_prof_test_stats_errors_snmp":              0,
-				"snmp_device_prof_test_stats_metrics_rows":             0,
-				"snmp_device_prof_test_stats_metrics_scalar":           0,
-				"snmp_device_prof_test_stats_metrics_table":            0,
-				"snmp_device_prof_test_stats_metrics_tables":           0,
-				"snmp_device_prof_test_stats_metrics_virtual":          0,
-				"snmp_device_prof_test_stats_snmp_get_oids":            0,
-				"snmp_device_prof_test_stats_snmp_get_requests":        0,
-				"snmp_device_prof_test_stats_snmp_tables_cached":       0,
-				"snmp_device_prof_test_stats_snmp_tables_walked":       0,
-				"snmp_device_prof_test_stats_snmp_walk_pdus":           0,
-				"snmp_device_prof_test_stats_snmp_walk_requests":       0,
-				"snmp_device_prof_test_stats_table_cache_hits":         0,
-				"snmp_device_prof_test_stats_table_cache_misses":       0,
-				"snmp_device_prof_test_stats_timings_scalar":           0,
-				"snmp_device_prof_test_stats_timings_table":            0,
-				"snmp_device_prof_test_stats_timings_virtual":          0,
-				"snmp_device_prof_uptime":                              123,
+				"snmp_device_prof_test_stats_errors_processing_scalar":    0,
+				"snmp_device_prof_test_stats_errors_processing_table":     0,
+				"snmp_device_prof_test_stats_errors_processing_licensing": 0,
+				"snmp_device_prof_test_stats_errors_processing_bgp":       0,
+				"snmp_device_prof_test_stats_errors_snmp":                 0,
+				"snmp_device_prof_test_stats_metrics_rows":                0,
+				"snmp_device_prof_test_stats_metrics_licensing":           0,
+				"snmp_device_prof_test_stats_metrics_bgp":                 0,
+				"snmp_device_prof_test_stats_metrics_scalar":              0,
+				"snmp_device_prof_test_stats_metrics_table":               0,
+				"snmp_device_prof_test_stats_metrics_tables":              0,
+				"snmp_device_prof_test_stats_metrics_virtual":             0,
+				"snmp_device_prof_test_stats_snmp_get_oids":               0,
+				"snmp_device_prof_test_stats_snmp_get_requests":           0,
+				"snmp_device_prof_test_stats_snmp_tables_cached":          0,
+				"snmp_device_prof_test_stats_snmp_tables_walked":          0,
+				"snmp_device_prof_test_stats_snmp_walk_pdus":              0,
+				"snmp_device_prof_test_stats_snmp_walk_requests":          0,
+				"snmp_device_prof_test_stats_table_cache_hits":            0,
+				"snmp_device_prof_test_stats_table_cache_misses":          0,
+				"snmp_device_prof_test_stats_timings_scalar":              0,
+				"snmp_device_prof_test_stats_timings_table":               0,
+				"snmp_device_prof_test_stats_timings_licensing":           0,
+				"snmp_device_prof_test_stats_timings_bgp":                 0,
+				"snmp_device_prof_test_stats_timings_virtual":             0,
+				"snmp_device_prof_uptime":                                 123,
 			},
 		},
 		"collects table multivalue metric": {
@@ -394,7 +457,7 @@ func TestCollector_Collect(t *testing.T) {
 				setMockClientInitExpect(m)
 				setMockClientSysInfoExpect(m)
 
-				collr := New()
+				collr := newTestSNMPCollector()
 				collr.Config = prepareV2Config()
 				collr.CreateVnode = false
 				collr.Ping.Enabled = false
@@ -425,27 +488,33 @@ func TestCollector_Collect(t *testing.T) {
 			want: map[string]int64{
 				// table key: "snmp_device_prof_<name>_<sorted tag values>_<subkey>"
 				// here tags = {"ifName":"eth0"} → key part becomes "_eth0"
-				"snmp_device_prof_test_stats_errors_processing_scalar": 0,
-				"snmp_device_prof_test_stats_errors_processing_table":  0,
-				"snmp_device_prof_test_stats_errors_snmp":              0,
-				"snmp_device_prof_test_stats_metrics_rows":             0,
-				"snmp_device_prof_test_stats_metrics_scalar":           0,
-				"snmp_device_prof_test_stats_metrics_table":            0,
-				"snmp_device_prof_test_stats_metrics_tables":           0,
-				"snmp_device_prof_test_stats_metrics_virtual":          0,
-				"snmp_device_prof_test_stats_snmp_get_oids":            0,
-				"snmp_device_prof_test_stats_snmp_get_requests":        0,
-				"snmp_device_prof_test_stats_snmp_tables_cached":       0,
-				"snmp_device_prof_test_stats_snmp_tables_walked":       0,
-				"snmp_device_prof_test_stats_snmp_walk_pdus":           0,
-				"snmp_device_prof_test_stats_snmp_walk_requests":       0,
-				"snmp_device_prof_test_stats_table_cache_hits":         0,
-				"snmp_device_prof_test_stats_table_cache_misses":       0,
-				"snmp_device_prof_test_stats_timings_scalar":           0,
-				"snmp_device_prof_test_stats_timings_table":            0,
-				"snmp_device_prof_test_stats_timings_virtual":          0,
-				"snmp_device_prof_if_octets_eth0_in":                   1,
-				"snmp_device_prof_if_octets_eth0_out":                  2,
+				"snmp_device_prof_test_stats_errors_processing_scalar":    0,
+				"snmp_device_prof_test_stats_errors_processing_table":     0,
+				"snmp_device_prof_test_stats_errors_processing_licensing": 0,
+				"snmp_device_prof_test_stats_errors_processing_bgp":       0,
+				"snmp_device_prof_test_stats_errors_snmp":                 0,
+				"snmp_device_prof_test_stats_metrics_rows":                0,
+				"snmp_device_prof_test_stats_metrics_licensing":           0,
+				"snmp_device_prof_test_stats_metrics_bgp":                 0,
+				"snmp_device_prof_test_stats_metrics_scalar":              0,
+				"snmp_device_prof_test_stats_metrics_table":               0,
+				"snmp_device_prof_test_stats_metrics_tables":              0,
+				"snmp_device_prof_test_stats_metrics_virtual":             0,
+				"snmp_device_prof_test_stats_snmp_get_oids":               0,
+				"snmp_device_prof_test_stats_snmp_get_requests":           0,
+				"snmp_device_prof_test_stats_snmp_tables_cached":          0,
+				"snmp_device_prof_test_stats_snmp_tables_walked":          0,
+				"snmp_device_prof_test_stats_snmp_walk_pdus":              0,
+				"snmp_device_prof_test_stats_snmp_walk_requests":          0,
+				"snmp_device_prof_test_stats_table_cache_hits":            0,
+				"snmp_device_prof_test_stats_table_cache_misses":          0,
+				"snmp_device_prof_test_stats_timings_scalar":              0,
+				"snmp_device_prof_test_stats_timings_table":               0,
+				"snmp_device_prof_test_stats_timings_licensing":           0,
+				"snmp_device_prof_test_stats_timings_bgp":                 0,
+				"snmp_device_prof_test_stats_timings_virtual":             0,
+				"snmp_device_prof_if_octets_eth0_in":                      1,
+				"snmp_device_prof_if_octets_eth0_out":                     2,
 			},
 		},
 	}
@@ -457,7 +526,7 @@ func TestCollector_Collect(t *testing.T) {
 			setMockClientInitExpect(m)
 			setMockClientSysInfoExpect(m)
 
-			collr := New()
+			collr := newTestSNMPCollector()
 			collr.Config = prepareV2Config()
 			collr.PingOnly = true
 			collr.CreateVnode = false
@@ -483,7 +552,7 @@ func TestCollector_Collect(t *testing.T) {
 			setMockClientInitExpect(m)
 			setMockClientSysInfoExpect(m)
 
-			collr := New()
+			collr := newTestSNMPCollector()
 			collr.Config = prepareV2Config()
 			collr.PingOnly = true
 			collr.CreateVnode = false
@@ -525,7 +594,7 @@ func TestCollector_CollectPingOnlyUsesTrackingProbing(t *testing.T) {
 
 	pingClient := &mockPingClient{sample: pingSuccessSample("192.0.2.1")}
 
-	collr := New()
+	collr := newTestSNMPCollector()
 	collr.Config = prepareV2Config()
 	collr.PingOnly = true
 	collr.CreateVnode = false
@@ -557,7 +626,7 @@ func TestCollector_CollectPingOnlyUsesTrackingProbing(t *testing.T) {
 	assert.Equal(t, "collect", calls[1].ctx.Value(collectKey{}))
 }
 
-func TestCollector_CollectMixedModeAllowsNilContext(t *testing.T) {
+func TestCollector_CollectMixedModeCollectsSNMPAndPingMetrics(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -567,7 +636,7 @@ func TestCollector_CollectMixedModeAllowsNilContext(t *testing.T) {
 
 	pingClient := &mockPingClient{sample: pingSuccessSample("192.0.2.1")}
 
-	collr := New()
+	collr := newTestSNMPCollector()
 	collr.Config = prepareV2Config()
 	collr.CreateVnode = false
 	collr.Ping.Enabled = true
@@ -597,33 +666,39 @@ func TestCollector_CollectMixedModeAllowsNilContext(t *testing.T) {
 	require.NoError(t, collr.Init(context.Background()))
 	require.NoError(t, collr.Check(context.Background()))
 
-	got := collr.Collect(nil)
+	got := collr.Collect(context.Background())
 
 	assert.Equal(t, map[string]int64{
-		"snmp_device_prof_test_stats_errors_processing_scalar": 0,
-		"snmp_device_prof_test_stats_errors_processing_table":  0,
-		"snmp_device_prof_test_stats_errors_snmp":              0,
-		"snmp_device_prof_test_stats_metrics_rows":             0,
-		"snmp_device_prof_test_stats_metrics_scalar":           0,
-		"snmp_device_prof_test_stats_metrics_table":            0,
-		"snmp_device_prof_test_stats_metrics_tables":           0,
-		"snmp_device_prof_test_stats_metrics_virtual":          0,
-		"snmp_device_prof_test_stats_snmp_get_oids":            0,
-		"snmp_device_prof_test_stats_snmp_get_requests":        0,
-		"snmp_device_prof_test_stats_snmp_tables_cached":       0,
-		"snmp_device_prof_test_stats_snmp_tables_walked":       0,
-		"snmp_device_prof_test_stats_snmp_walk_pdus":           0,
-		"snmp_device_prof_test_stats_snmp_walk_requests":       0,
-		"snmp_device_prof_test_stats_table_cache_hits":         0,
-		"snmp_device_prof_test_stats_table_cache_misses":       0,
-		"snmp_device_prof_test_stats_timings_scalar":           0,
-		"snmp_device_prof_test_stats_timings_table":            0,
-		"snmp_device_prof_test_stats_timings_virtual":          0,
-		"snmp_device_prof_uptime":                              123,
-		"ping_rtt_min":                                         (10 * time.Millisecond).Microseconds(),
-		"ping_rtt_max":                                         (20 * time.Millisecond).Microseconds(),
-		"ping_rtt_avg":                                         (15 * time.Millisecond).Microseconds(),
-		"ping_rtt_stddev":                                      (5 * time.Millisecond).Microseconds(),
+		"snmp_device_prof_test_stats_errors_processing_scalar":    0,
+		"snmp_device_prof_test_stats_errors_processing_table":     0,
+		"snmp_device_prof_test_stats_errors_processing_licensing": 0,
+		"snmp_device_prof_test_stats_errors_processing_bgp":       0,
+		"snmp_device_prof_test_stats_errors_snmp":                 0,
+		"snmp_device_prof_test_stats_metrics_rows":                0,
+		"snmp_device_prof_test_stats_metrics_licensing":           0,
+		"snmp_device_prof_test_stats_metrics_bgp":                 0,
+		"snmp_device_prof_test_stats_metrics_scalar":              0,
+		"snmp_device_prof_test_stats_metrics_table":               0,
+		"snmp_device_prof_test_stats_metrics_tables":              0,
+		"snmp_device_prof_test_stats_metrics_virtual":             0,
+		"snmp_device_prof_test_stats_snmp_get_oids":               0,
+		"snmp_device_prof_test_stats_snmp_get_requests":           0,
+		"snmp_device_prof_test_stats_snmp_tables_cached":          0,
+		"snmp_device_prof_test_stats_snmp_tables_walked":          0,
+		"snmp_device_prof_test_stats_snmp_walk_pdus":              0,
+		"snmp_device_prof_test_stats_snmp_walk_requests":          0,
+		"snmp_device_prof_test_stats_table_cache_hits":            0,
+		"snmp_device_prof_test_stats_table_cache_misses":          0,
+		"snmp_device_prof_test_stats_timings_scalar":              0,
+		"snmp_device_prof_test_stats_timings_table":               0,
+		"snmp_device_prof_test_stats_timings_licensing":           0,
+		"snmp_device_prof_test_stats_timings_bgp":                 0,
+		"snmp_device_prof_test_stats_timings_virtual":             0,
+		"snmp_device_prof_uptime":                                 123,
+		"ping_rtt_min":                                            (10 * time.Millisecond).Microseconds(),
+		"ping_rtt_max":                                            (20 * time.Millisecond).Microseconds(),
+		"ping_rtt_avg":                                            (15 * time.Millisecond).Microseconds(),
+		"ping_rtt_stddev":                                         (5 * time.Millisecond).Microseconds(),
 	}, got)
 }
 
@@ -693,13 +768,226 @@ func pingNoReplySample(host string) pinger.Sample {
 	}
 }
 
+func TestCollector_Collect_LicensingAggregation(t *testing.T) {
+	tests := map[string]struct {
+		source string
+		rows   func(time.Time) []ddsnmp.LicenseRow
+		assert func(*testing.T, map[string]int64, time.Time)
+	}{
+		"checkpoint degraded row with expiry and usage": {
+			source: "checkpoint.yaml",
+			rows: func(now time.Time) []ddsnmp.LicenseRow {
+				expiry := now.Add(48 * time.Hour).Unix()
+				return []ddsnmp.LicenseRow{
+					typedLicenseRow("17", "Application Control",
+						withState(1, "about-to-expire"),
+						withExpiry(expiry),
+						withUsage(95),
+						withCapacity(100),
+					),
+				}
+			},
+			assert: func(t *testing.T, got map[string]int64, start time.Time) {
+				assert.EqualValues(t, 0, got[metricIDLicenseStateHealthy])
+				assert.EqualValues(t, 0, got[metricIDLicenseStateInformational])
+				assert.EqualValues(t, 1, got[metricIDLicenseStateDegraded])
+				assert.EqualValues(t, 0, got[metricIDLicenseStateBroken])
+				assert.EqualValues(t, 0, got[metricIDLicenseStateIgnored])
+				assert.EqualValues(t, 95, got[metricIDLicenseUsagePercent])
+				expectedRemaining := start.Add(48*time.Hour).Unix() - start.Unix()
+				assert.GreaterOrEqual(t, got[metricIDLicenseRemainingTime], expectedRemaining-30)
+				assert.LessOrEqual(t, got[metricIDLicenseRemainingTime], expectedRemaining)
+				assert.Contains(t, got, "snmp_device_prof_checkpoint_stats_metrics_table")
+			},
+		},
+		"cisco smart partial data": {
+			source: "cisco.yaml",
+			rows: func(now time.Time) []ddsnmp.LicenseRow {
+				authExpiry := now.Add(48 * time.Hour).Unix()
+				certExpiry := now.Add(72 * time.Hour).Unix()
+				return []ddsnmp.LicenseRow{
+					typedLicenseRow("smart_authorization_state", "Smart Licensing authorization state",
+						withState(0, ""),
+					),
+					typedLicenseRow("smart_authorization_expiry", "Smart Licensing authorization",
+						func(row *ddsnmp.LicenseRow) {
+							row.Authorization.Has = true
+							row.Authorization.Timestamp = authExpiry
+							row.Authorization.SourceOID = "ciscoSlaAuthExpireTime"
+						},
+					),
+					typedLicenseRow("smart_id_certificate_expiry", "Smart Licensing ID certificate",
+						func(row *ddsnmp.LicenseRow) {
+							row.Certificate.Has = true
+							row.Certificate.Timestamp = certExpiry
+							row.Certificate.SourceOID = "ciscoSlaNextCertificateExpireTime"
+						},
+					),
+					typedLicenseRow("dna_advantage", "network-advantage",
+						withState(2, "authorization_expired"),
+						withUsage(42),
+					),
+				}
+			},
+			assert: func(t *testing.T, got map[string]int64, _ time.Time) {
+				assert.EqualValues(t, 3, got[metricIDLicenseStateHealthy])
+				assert.EqualValues(t, 0, got[metricIDLicenseStateInformational])
+				assert.EqualValues(t, 0, got[metricIDLicenseStateDegraded])
+				assert.EqualValues(t, 1, got[metricIDLicenseStateBroken])
+				assert.EqualValues(t, 0, got[metricIDLicenseStateIgnored])
+				assert.GreaterOrEqual(t, got[metricIDLicenseAuthorizationRemainingTime], int64((48*time.Hour/time.Second)-5))
+				assert.LessOrEqual(t, got[metricIDLicenseAuthorizationRemainingTime], int64(48*time.Hour/time.Second))
+				assert.GreaterOrEqual(t, got[metricIDLicenseCertificateRemainingTime], int64((72*time.Hour/time.Second)-5))
+				assert.LessOrEqual(t, got[metricIDLicenseCertificateRemainingTime], int64(72*time.Hour/time.Second))
+				assert.NotContains(t, got, metricIDLicenseRemainingTime)
+				assert.NotContains(t, got, metricIDLicenseGraceRemainingTime)
+				assert.NotContains(t, got, metricIDLicenseUsagePercent)
+			},
+		},
+		"cisco traditional usage and grace": {
+			source: "cisco.yaml",
+			rows: func(now time.Time) []ddsnmp.LicenseRow {
+				securityExpiry := now.Add(72 * time.Hour).Unix()
+				return []ddsnmp.LicenseRow{
+					typedLicenseRow("17", "SECURITYK9",
+						withRawState("in_use"),
+						withExpiry(securityExpiry),
+						withCapacity(100),
+						withAvailable(15),
+					),
+					typedLicenseRow("23", "APPXK9",
+						withState(2, "usage_count_consumed"),
+						withGraceRemaining(3600),
+						withCapacity(10),
+						withAvailable(0),
+					),
+				}
+			},
+			assert: func(t *testing.T, got map[string]int64, _ time.Time) {
+				assert.EqualValues(t, 1, got[metricIDLicenseStateHealthy])
+				assert.EqualValues(t, 0, got[metricIDLicenseStateInformational])
+				assert.EqualValues(t, 0, got[metricIDLicenseStateDegraded])
+				assert.EqualValues(t, 1, got[metricIDLicenseStateBroken])
+				assert.EqualValues(t, 0, got[metricIDLicenseStateIgnored])
+				assert.EqualValues(t, 100, got[metricIDLicenseUsagePercent])
+				assert.GreaterOrEqual(t, got[metricIDLicenseRemainingTime], int64((72*time.Hour/time.Second)-5))
+				assert.LessOrEqual(t, got[metricIDLicenseRemainingTime], int64(72*time.Hour/time.Second))
+				assert.GreaterOrEqual(t, got[metricIDLicenseGraceRemainingTime], int64((time.Hour/time.Second)-5))
+				assert.LessOrEqual(t, got[metricIDLicenseGraceRemainingTime], int64(time.Hour/time.Second))
+			},
+		},
+		"mixed rows select worst aggregate signals": {
+			source: "mixed-licensing.yaml",
+			rows: func(now time.Time) []ddsnmp.LicenseRow {
+				perpetualExpiry := now.Add(30 * time.Minute).Unix()
+				earliestRealExpiry := now.Add(6 * time.Hour).Unix()
+				authExpiry := now.Add(30 * time.Hour).Unix()
+				certExpiry := now.Add(20 * time.Hour).Unix()
+				graceExpiry := now.Add(10 * time.Hour).Unix()
+
+				return []ddsnmp.LicenseRow{
+					typedLicenseRow("perpetual", "Perpetual base",
+						withRawState("active"),
+						withExpiry(perpetualExpiry),
+						withUsage(50),
+						withCapacity(100),
+						withPerpetual(),
+					),
+					typedLicenseRow("soonest_expiring", "Threat prevention",
+						withRawState("about-to-expire"),
+						withExpiry(earliestRealExpiry),
+						withUsage(90),
+						withCapacity(100),
+					),
+					typedLicenseRow("auth", "Smart auth",
+						func(row *ddsnmp.LicenseRow) {
+							row.Authorization.Has = true
+							row.Authorization.Timestamp = authExpiry
+							row.Authorization.SourceOID = "auth_timer"
+						},
+					),
+					typedLicenseRow("cert", "Smart cert",
+						func(row *ddsnmp.LicenseRow) {
+							row.Certificate.Has = true
+							row.Certificate.Timestamp = certExpiry
+							row.Certificate.SourceOID = "cert_timer"
+						},
+					),
+					typedLicenseRow("grace", "Eval grace",
+						withRawState("evaluation"),
+						func(row *ddsnmp.LicenseRow) {
+							row.Grace.Has = true
+							row.Grace.Timestamp = graceExpiry
+						},
+					),
+					typedLicenseRow("broken", "Broken feature", withState(2, "")),
+					typedLicenseRow("unlimited", "Unlimited pool", withUsagePercent(100), withUnlimited()),
+				}
+			},
+			assert: func(t *testing.T, got map[string]int64, _ time.Time) {
+				assert.EqualValues(t, 4, got[metricIDLicenseStateHealthy])
+				assert.EqualValues(t, 0, got[metricIDLicenseStateInformational])
+				assert.EqualValues(t, 2, got[metricIDLicenseStateDegraded])
+				assert.EqualValues(t, 1, got[metricIDLicenseStateBroken])
+				assert.EqualValues(t, 0, got[metricIDLicenseStateIgnored])
+				assert.EqualValues(t, 90, got[metricIDLicenseUsagePercent])
+				assert.GreaterOrEqual(t, got[metricIDLicenseRemainingTime], int64((6*time.Hour/time.Second)-5))
+				assert.LessOrEqual(t, got[metricIDLicenseRemainingTime], int64(6*time.Hour/time.Second))
+				assert.GreaterOrEqual(t, got[metricIDLicenseAuthorizationRemainingTime], int64((30*time.Hour/time.Second)-5))
+				assert.LessOrEqual(t, got[metricIDLicenseAuthorizationRemainingTime], int64(30*time.Hour/time.Second))
+				assert.GreaterOrEqual(t, got[metricIDLicenseCertificateRemainingTime], int64((20*time.Hour/time.Second)-5))
+				assert.LessOrEqual(t, got[metricIDLicenseCertificateRemainingTime], int64(20*time.Hour/time.Second))
+				assert.GreaterOrEqual(t, got[metricIDLicenseGraceRemainingTime], int64((10*time.Hour/time.Second)-5))
+				assert.LessOrEqual(t, got[metricIDLicenseGraceRemainingTime], int64(10*time.Hour/time.Second))
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			mockCtl := gomock.NewController(t)
+			defer mockCtl.Finish()
+
+			mockSNMP := snmpmock.NewMockHandler(mockCtl)
+			setMockClientInitExpect(mockSNMP)
+			setMockClientSysInfoExpect(mockSNMP)
+
+			now := time.Now().UTC()
+			collr := newTestSNMPCollector()
+			collr.Config = prepareV2Config()
+			collr.CreateVnode = false
+			collr.Ping.Enabled = false
+			collr.snmpProfiles = []*ddsnmp.Profile{{}}
+			collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+			collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
+				pm := &ddsnmp.ProfileMetrics{
+					Source:      tc.source,
+					LicenseRows: tc.rows(now),
+				}
+				return &mockDdSnmpCollector{pms: []*ddsnmp.ProfileMetrics{pm}}
+			}
+
+			require.NoError(t, collr.Init(context.Background()))
+			_ = collr.Check(context.Background())
+
+			start := time.Now().UTC()
+			got := collr.Collect(context.Background())
+			require.NotNil(t, got)
+			tc.assert(t, got, start)
+		})
+	}
+}
+
 type mockDdSnmpCollector struct {
 	pms  []*ddsnmp.ProfileMetrics
 	meta map[string]ddsnmp.MetaTag
 	err  error
+
+	collectCalls int
 }
 
 func (m *mockDdSnmpCollector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
+	m.collectCalls++
 	return m.pms, m.err
 }
 

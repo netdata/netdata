@@ -55,7 +55,7 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
 bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length);
 struct web_buffer *run_command_and_get_output_to_buffer(const char *command, int max_line_length);
 
-extern const char *netdata_configured_host_prefix;
+#include "runtime-paths/runtime-paths.h"
 
 // safe includes before O/S specific functions
 #include "template-enum.h"
@@ -64,6 +64,11 @@ extern const char *netdata_configured_host_prefix;
 
 #include "string/string.h"
 #include "buffer/buffer.h"
+
+#include "socket/security.h"    // must be before windows.h
+
+// this may include windows.h
+#include "os/os.h"
 
 #include "uuid/uuid.h"
 #include "uuid/uuidmap.h"

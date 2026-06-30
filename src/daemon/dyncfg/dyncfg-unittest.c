@@ -446,8 +446,16 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload,
         t->expected.enabled = false;
     if(c == DYNCFG_CMD_ENABLE)
         t->expected.enabled = true;
-    if(c == DYNCFG_CMD_UPDATE)
+    if(c == DYNCFG_CMD_UPDATE) {
         memset(&t->current.value, 0, sizeof(t->current.value));
+        if(t->type == DYNCFG_TYPE_JOB) {
+            // a successful update on a job flips ownership to DYNCFG, so the
+            // node must advertise REMOVE -- we hardcode the expected change
+            // here (rather than calling dyncfg_sanitize_cmds()) so a regression
+            // in the SUT cannot mask itself by also breaking the oracle.
+            t->cmds |= DYNCFG_CMD_REMOVE;
+        }
+    }
 
     if(c & (DYNCFG_CMD_UPDATE) || (c & (DYNCFG_CMD_DISABLE|DYNCFG_CMD_ENABLE) && t->type != DYNCFG_TYPE_TEMPLATE)) {
         freez((void *)t->source);
@@ -676,6 +684,28 @@ int dyncfg_unittest(void) {
     dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:template1 add dyn2", wb, "{\"double\":3.14,\"boolean\":true}", LINE_FILE_STR);
     dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:template2 add dyn3", wb, "{\"double\":3.14,\"boolean\":true}", LINE_FILE_STR);
     dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:template2 add dyn4", wb, "{\"double\":3.14,\"boolean\":true}", LINE_FILE_STR);
+
+    // ------------------------------------------------------------------------
+    // updating an existing user/stock-style job makes it dyncfg-owned and removable
+
+    user1->expected.value.dbl = 3.14;
+    user1->expected.value.bln = true;
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:template1:user1 update", wb, "{\"double\":3.14,\"boolean\":true}", LINE_FILE_STR);
+
+    // direct, helper-free assertion that the production node really exposes
+    // REMOVE after the ownership flip -- catches regressions in dyncfg_sanitize_cmds()
+    // or the intercept-on-successful-update path independently of the harness oracle.
+    {
+        DYNCFG *df = dictionary_get(dyncfg_globals.nodes, user1->id);
+        if(!df)
+            dyncfg_unittest_register_error(user1->id, "node missing after update");
+        else {
+            if(df->current.source_type != DYNCFG_SOURCE_TYPE_DYNCFG)
+                dyncfg_unittest_register_error(user1->id, "after update, current.source_type should be DYNCFG");
+            if(!(df->cmds & DYNCFG_CMD_REMOVE))
+                dyncfg_unittest_register_error(user1->id, "after update flipping ownership to DYNCFG, cmds must include REMOVE");
+        }
+    }
 
     // ------------------------------------------------------------------------
     // saving of user_disabled

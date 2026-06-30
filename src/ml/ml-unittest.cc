@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "ml_config.h"
+#include "ml_dimension.h"
 #include "ml_features.h"
 #include "ml_kmeans.h"
+#include "ml_private.h"
 
 #include <algorithm>
 #include <cmath>
@@ -362,6 +364,110 @@ static void test_kmeans_scoring()
 
     calculated_number_t score_eq = ml_kmeans_anomaly_score(&km_equal, at_mid);
     ML_TEST_ASSERT_DOUBLE_EQ(score_eq, 0.0, 1e-9, "equal min/max should return 0");
+}
+
+// Test: converting an empty ml_kmeans_t must produce deterministic zeroed centers.
+static void test_kmeans_inlined_empty_source_is_zero_initialized()
+{
+    fprintf(stderr, "  test_kmeans_inlined_empty_source_is_zero_initialized...\n");
+
+    ml_kmeans_t empty_km;
+    empty_km.cluster_centers.clear();
+    empty_km.min_dist = 1.5;
+    empty_km.max_dist = 9.5;
+    empty_km.after = 11;
+    empty_km.before = 22;
+
+    ml_kmeans_inlined_t constructed(empty_km);
+    ML_TEST_ASSERT(constructed.after == empty_km.after, "constructed empty model should preserve 'after'");
+    ML_TEST_ASSERT(constructed.before == empty_km.before, "constructed empty model should preserve 'before'");
+    ML_TEST_ASSERT_DOUBLE_EQ(constructed.min_dist, empty_km.min_dist, 0.0, "constructed empty model should preserve min_dist");
+    ML_TEST_ASSERT_DOUBLE_EQ(constructed.max_dist, empty_km.max_dist, 0.0, "constructed empty model should preserve max_dist");
+    for (size_t center = 0; center < constructed.cluster_centers.size(); center++) {
+        ML_TEST_ASSERT(constructed.cluster_centers[center].size() == 6, "constructed empty-source centers must keep fixed-size geometry");
+        for (long i = 0; i < constructed.cluster_centers[center].size(); i++) {
+            char msg[160];
+            snprintf(msg, sizeof(msg), "constructed empty-source center[%zu](%ld) should be zero", center, i);
+            ML_TEST_ASSERT_DOUBLE_EQ(constructed.cluster_centers[center](i), 0.0, 0.0, msg);
+        }
+    }
+
+    ml_kmeans_inlined_t assigned;
+    for (int i = 0; i < 6; i++) {
+        assigned.cluster_centers[0](i) = 10.0 + i;
+        assigned.cluster_centers[1](i) = 20.0 + i;
+    }
+    assigned = empty_km;
+
+    ML_TEST_ASSERT(assigned.after == empty_km.after, "assigned empty model should preserve 'after'");
+    ML_TEST_ASSERT(assigned.before == empty_km.before, "assigned empty model should preserve 'before'");
+    ML_TEST_ASSERT_DOUBLE_EQ(assigned.min_dist, empty_km.min_dist, 0.0, "assigned empty model should preserve min_dist");
+    ML_TEST_ASSERT_DOUBLE_EQ(assigned.max_dist, empty_km.max_dist, 0.0, "assigned empty model should preserve max_dist");
+    for (size_t center = 0; center < assigned.cluster_centers.size(); center++) {
+        ML_TEST_ASSERT(assigned.cluster_centers[center].size() == 6, "empty-source centers must keep fixed-size geometry");
+        for (long i = 0; i < assigned.cluster_centers[center].size(); i++) {
+            char msg[160];
+            snprintf(msg, sizeof(msg), "empty-source center[%zu](%ld) should be zero", center, i);
+            ML_TEST_ASSERT_DOUBLE_EQ(assigned.cluster_centers[center](i), 0.0, 0.0, msg);
+        }
+    }
+}
+
+// Test: at the smallest legal input (src_n == diff_n + smooth_n + lag_n),
+// ml_features_preprocess yields exactly one feature vector. This guards the
+// preprocess boundary that triggers the <2-vectors early-return in
+// ml_dimension_train_model. Scope is intentionally limited to preprocess output:
+// ml_dimension_train_model itself depends on a live ml_dimension_t (worker, rd,
+// rrdset, host, sqlite) and is not unit-testable without significant plumbing.
+static void test_features_preprocess_below_min_for_kmeans()
+{
+    fprintf(stderr, "  test_features_preprocess_below_min_for_kmeans...\n");
+
+    const size_t diff_n = 1;
+    const size_t smooth_n = 1;
+    const size_t lag_n = 1;
+    const size_t src_n = diff_n + smooth_n + lag_n; // 3, the minimum allowed by ml_validate_features_input
+
+    calculated_number_t src[16] = {1.0, 2.0, 3.0};
+    calculated_number_t dst[16] = {0};
+
+    std::vector<DSample> pf;
+    ml_features_t features = {
+        diff_n, smooth_n, lag_n,
+        dst, src_n, src, src_n
+    };
+
+    ml_features_preprocess(&features, pf, 1.0);
+
+    // n_vectors = src_n - diff_n - smooth_n + 1 - lag_n = 3 - 1 - 1 + 1 - 1 = 1
+    ML_TEST_ASSERT(pf.size() == 1, "boundary input should yield exactly 1 feature vector");
+    ML_TEST_ASSERT(pf.size() < 2, "<2 vectors must trigger the kmeans-skip early-return in ml_dimension_train_model");
+}
+
+// Test: ml_dimension_finalize_constant_state is the shared post-cycle state
+// transition used by both the successful-training path and the undersampled
+// early-return. It sets mt = CONSTANT, ts = TRAINED, and resets suppression
+// counters. Matches the existing master behavior in ml_dimension_update_models.
+static void test_dimension_finalize_constant_state()
+{
+    fprintf(stderr, "  test_dimension_finalize_constant_state...\n");
+
+    ml_dimension_t dim = {};
+    spinlock_init(&dim.slock);
+    dim.mt = METRIC_TYPE_VARIABLE;
+    dim.ts = TRAINING_STATUS_UNTRAINED;
+    dim.suppression_anomaly_counter = 7;
+    dim.suppression_window_counter = 13;
+
+    // Match the helper's documented contract (caller holds dim->slock).
+    spinlock_lock(&dim.slock);
+    ml_dimension_finalize_constant_state(&dim);
+    spinlock_unlock(&dim.slock);
+
+    ML_TEST_ASSERT(dim.mt == METRIC_TYPE_CONSTANT, "mt must become CONSTANT");
+    ML_TEST_ASSERT(dim.ts == TRAINING_STATUS_TRAINED, "ts must become TRAINED");
+    ML_TEST_ASSERT(dim.suppression_anomaly_counter == 0, "anomaly counter must reset");
+    ML_TEST_ASSERT(dim.suppression_window_counter == 0, "window counter must reset");
 }
 
 // Test: circular buffer linearization produces the same result as std::rotate
@@ -862,6 +968,84 @@ static void test_kmeans_timestamp_rejection()
     }
 }
 
+static void test_downstream_model_short_circuit_and_requeue()
+{
+    fprintf(stderr, "  test_downstream_model_short_circuit_and_requeue...\n");
+
+    enum ml_worker_result worker_res = ML_WORKER_RESULT_OK;
+    bool should_short_circuit = ml_dimension_train_model_precheck(METRIC_TYPE_VARIABLE,
+                                                                  true,
+                                                                  false,
+                                                                  &worker_res);
+    ML_TEST_ASSERT(should_short_circuit,
+                   "downstream-supplied dimensions should short-circuit local training");
+    ML_TEST_ASSERT(worker_res == ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED,
+                   "downstream-supplied dimensions should short-circuit local training");
+    ML_TEST_ASSERT(!ml_should_requeue_create_new_model(worker_res),
+                   "downstream-supplied result should stop CREATE_NEW_MODEL requeueing");
+
+    worker_res = ML_WORKER_RESULT_OK;
+    should_short_circuit = ml_dimension_train_model_precheck(METRIC_TYPE_CONSTANT,
+                                                             true,
+                                                             false,
+                                                             &worker_res);
+    ML_TEST_ASSERT(should_short_circuit,
+                   "constant downstream-supplied dimensions should short-circuit local training");
+    ML_TEST_ASSERT(worker_res == ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED,
+                   "constant downstream-supplied dimensions should drain CREATE_NEW_MODEL items");
+    ML_TEST_ASSERT(!ml_should_requeue_create_new_model(worker_res),
+                   "constant downstream-supplied result should stop CREATE_NEW_MODEL requeueing");
+
+    worker_res = ML_WORKER_RESULT_OK;
+    should_short_circuit = ml_dimension_train_model_precheck(METRIC_TYPE_VARIABLE,
+                                                             false,
+                                                             false,
+                                                             &worker_res);
+    ML_TEST_ASSERT(!should_short_circuit,
+                   "dimensions without downstream models should continue to training");
+    ML_TEST_ASSERT(ml_should_requeue_create_new_model(ML_WORKER_RESULT_OK),
+                   "ordinary training results should keep CREATE_NEW_MODEL items requeueing");
+
+    worker_res = ML_WORKER_RESULT_OK;
+    should_short_circuit = ml_dimension_train_model_precheck(METRIC_TYPE_VARIABLE,
+                                                             false,
+                                                             true,
+                                                             &worker_res);
+    ML_TEST_ASSERT(should_short_circuit,
+                   "training-in-progress dimensions should short-circuit local training");
+    ML_TEST_ASSERT(worker_res == ML_WORKER_RESULT_TRAINING_IN_PROGRESS,
+                   "training-in-progress dimensions should report the distinct result");
+    ML_TEST_ASSERT(ml_should_requeue_create_new_model(worker_res),
+                   "training-in-progress result should keep CREATE_NEW_MODEL items requeueing "
+                   "so the dim stays in the periodic retrain cycle");
+}
+
+static void test_reset_generation_cancels_model_publish()
+{
+    fprintf(stderr, "  test_reset_generation_cancels_model_publish...\n");
+
+    bool training_in_progress = true;
+    bool should_publish = ml_should_publish_model_update(true, 8, 7, &training_in_progress);
+    ML_TEST_ASSERT(!should_publish,
+                   "generation mismatch should cancel model publication");
+    ML_TEST_ASSERT(!training_in_progress,
+                   "generation mismatch should clear training_in_progress");
+
+    training_in_progress = true;
+    should_publish = ml_should_publish_model_update(false, 7, 7, &training_in_progress);
+    ML_TEST_ASSERT(!should_publish,
+                   "stopped hosts should cancel model publication");
+    ML_TEST_ASSERT(!training_in_progress,
+                   "stopped-host cancellation should clear training_in_progress");
+
+    training_in_progress = true;
+    should_publish = ml_should_publish_model_update(true, 7, 7, &training_in_progress);
+    ML_TEST_ASSERT(should_publish,
+                   "matching generation on a running host should allow model publication");
+    ML_TEST_ASSERT(training_in_progress,
+                   "successful publication path should leave training_in_progress unchanged");
+}
+
 extern "C" int ml_unittest()
 {
     fprintf(stderr, "\nML unit tests:\n");
@@ -881,6 +1065,9 @@ extern "C" int ml_unittest()
     test_features_zero_smooth_matches_one();
     test_kmeans_scoring();
     test_full_pipeline();
+    test_kmeans_inlined_empty_source_is_zero_initialized();
+    test_features_preprocess_below_min_for_kmeans();
+    test_dimension_finalize_constant_state();
     test_circular_buffer_equivalence();
     test_same_value_uses_newest_sample();
     test_preprocess_predict_equivalence();
@@ -888,6 +1075,8 @@ extern "C" int ml_unittest()
     test_parameter_combinations();
     test_kmeans_timestamp_roundtrip();
     test_kmeans_timestamp_rejection();
+    test_downstream_model_short_circuit_and_requeue();
+    test_reset_generation_cancels_model_publish();
 
     fprintf(stderr, "\nML tests: %d run, %d failed\n", tests_run, tests_failed);
 

@@ -274,7 +274,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				)
 			},
 			expectedResult: map[string]ddsnmp.MetaTag{
-				"mac_address": {Value: "00:50:56:AB:CD:EF", IsExactMatch: false},
+				"mac_address": {Value: "00:50:56:ab:cd:ef", IsExactMatch: false},
 			},
 			expectedError: false,
 		},

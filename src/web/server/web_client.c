@@ -37,7 +37,6 @@ void web_client_reset_permissions(struct web_client *w) {
     w->user_auth.method = USER_AUTH_METHOD_NONE;
     w->user_auth.access = HTTP_ACCESS_NONE;
     w->user_auth.user_role = HTTP_USER_ROLE_NONE;
-    web_client_clear_mcp_preview_key(w);
 }
 
 void web_client_set_permissions(struct web_client *w, HTTP_ACCESS access, HTTP_USER_ROLE role, USER_AUTH_METHOD type) {
@@ -194,6 +193,7 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
     memset(&w->user_auth, 0, sizeof(w->user_auth));
 
     web_client_reset_permissions(w);
+    web_client_clear_mcp_preview_key(w);
     web_client_flag_clear(w, WEB_CLIENT_ENCODING_GZIP|WEB_CLIENT_ENCODING_DEFLATE);
     web_client_flag_clear(w, WEB_CLIENT_FLAG_ACCEPT_JSON |
                              WEB_CLIENT_FLAG_ACCEPT_SSE |
@@ -273,6 +273,13 @@ void web_client_request_done(struct web_client *w) {
     web_client_disable_donottrack(w);
     web_client_disable_tracking_required(w);
     web_client_disable_keepalive(w);
+
+    // Clear URL-derived flags between requests. PATH_IS_MCP is re-set
+    // during the next URL decode; clearing it here makes sure a keepalive
+    // connection cannot carry the previous request's classification into
+    // a new request that fails before URL decoding runs (e.g., malformed
+    // request line, unsupported method).
+    web_client_flag_clear(w, WEB_CLIENT_FLAG_PATH_IS_MCP);
 
     w->header_parse_tries = 0;
     w->header_parse_last_size = 0;
@@ -437,7 +444,15 @@ static bool find_filename_to_serve(const char *filename, char *dst, size_t dst_l
 }
 
 static int web_server_static_file(struct web_client *w, char *filename) {
-    netdata_log_debug(D_WEB_CLIENT, "%llu: Looking for file '%s/%s'", w->id, netdata_configured_web_dir, filename);
+    char web_path[FILENAME_MAX];
+    snprintfz(web_path, sizeof(web_path), "%s/%s", netdata_configured_web_dir, filename);
+#if defined(OS_WINDOWS)
+    char display_path[FILENAME_MAX];
+    netdata_log_debug(D_WEB_CLIENT, "%llu: Looking for file '%s'", w->id,
+                      os_translate_path(display_path, web_path, sizeof(display_path)));
+#else
+    netdata_log_debug(D_WEB_CLIENT, "%llu: Looking for file '%s'", w->id, web_path);
+#endif
 
     if(!http_can_access_dashboard(w))
         return web_client_permission_denied_acl(w);
@@ -860,6 +875,15 @@ void web_client_build_http_header(struct web_client *w) {
         http_header_content_type(w->response.header_output, w->response.data->content_type);
     }
 
+    // MCP-specific CORS: widen the allowlist + advertise exposed
+    // headers only for MCP transport endpoints (/mcp, /sse). The flag
+    // is set once during URL decoding; see WEB_CLIENT_FLAG_PATH_IS_MCP.
+    bool is_mcp_path = web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_IS_MCP);
+
+    if(is_mcp_path && w->mode != HTTP_REQUEST_MODE_OPTIONS)
+        buffer_strcat(w->response.header_output,
+                      "Access-Control-Expose-Headers: Mcp-Session-Id\r\n");
+
     if(unlikely(web_x_frame_options))
         buffer_sprintf(w->response.header_output, "X-Frame-Options: %s\r\n", web_x_frame_options);
 
@@ -880,10 +904,25 @@ void web_client_build_http_header(struct web_client *w) {
     }
 
     if(w->mode == HTTP_REQUEST_MODE_OPTIONS) {
+        // Methods, max-age, and the base header allowlist are identical
+        // for every OPTIONS preflight. MCP preflights append the extra
+        // request headers the SDK uses: mcp-protocol-version,
+        // mcp-session-id, last-event-id (SSE resumption), authorization
+        // (bearer tokens). DELETE is *not* advertised — the MCP handlers
+        // currently return 405 for it, and advertising it would let the
+        // preflight succeed only for the real request to fail. Add DELETE
+        // here when the handlers learn session teardown.
         buffer_strcat(w->response.header_output,
                 "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
-                        "Access-Control-Allow-Headers: accept, x-requested-with, origin, content-type, cookie, pragma, cache-control, x-auth-token, x-netdata-auth, x-transaction-id\r\n"
-                        "Access-Control-Max-Age: 1209600\r\n" // 86400 * 14
+                        "Access-Control-Allow-Headers: accept, x-requested-with, origin, content-type, cookie, pragma, cache-control, x-auth-token, x-netdata-auth, x-transaction-id");
+
+        if(is_mcp_path)
+            buffer_strcat(w->response.header_output,
+                          ", authorization, mcp-protocol-version, mcp-session-id, last-event-id");
+
+        buffer_strcat(w->response.header_output,
+                      "\r\n"
+                              "Access-Control-Max-Age: 1209600\r\n" // 86400 * 14
         );
     }
     else {
@@ -1039,15 +1078,13 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
                 //no delim found
                 return append_slash_to_url_and_redirect(w);
 
-            size_t len = strlen(url) + 2;
-            char buf[len];
-            buf[0] = '/';
-            strcpy(&buf[1], url);
-            buf[len - 1] = '\0';
-
             buffer_flush(w->url_path_decoded);
-            buffer_strcat(w->url_path_decoded, buf);
-            return func(host, w, buf);
+            buffer_strcat(w->url_path_decoded, "/");
+            buffer_strcat(w->url_path_decoded, url);
+            char *mutable_path = strdupz(buffer_tostring(w->url_path_decoded));
+            int rc = func(host, w, mutable_path);
+            freez(mutable_path);
+            return rc;
         }
     }
 
@@ -1163,12 +1200,12 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             return check_host_and_call(host, w, decoded_url_path, web_client_api_request);
         }
         else if(likely(hash == hash_mcp && strcmp(tok, "mcp") == 0)) {
-            if(unlikely(!http_can_access_dashboard(w)))
+            if(unlikely(!http_can_access_mcp(w)))
                 return web_client_permission_denied_acl(w);
             return mcp_http_handle_request(host, w);
         }
         else if(likely(hash == hash_sse && strcmp(tok, "sse") == 0)) {
-            if(unlikely(!http_can_access_dashboard(w)))
+            if(unlikely(!http_can_access_mcp(w)))
                 return web_client_permission_denied_acl(w);
             return mcp_sse_handle_request(host, w);
         }
@@ -1355,27 +1392,35 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                     return;
                 
                 case HTTP_REQUEST_MODE_WEBSOCKET:
-                    if(unlikely(!http_can_access_dashboard(w))) {
+                    // Coarse gate: allow handshake only for clients that can access at least one WebSocket surface.
+                    // websocket_handle_handshake() performs the protocol-specific ACL check (MCP vs dashboard).
+                    if(unlikely(!http_can_access_dashboard(w) && !http_can_access_mcp(w))) {
                         web_client_permission_denied_acl(w);
                         return;
                     }
-                    
-                    // Handle WebSocket handshake - this will take over the socket
-                    // similar to how stream_receiver_accept_connection works
-                    w->response.code = websocket_handle_handshake(w);
-                    
-                    // After this point the socket has been taken over
-                    // No need to send a response as the WebSocket handler
-                    // has already sent the handshake response
-                    return;
 
-                case HTTP_REQUEST_MODE_OPTIONS:
+                    w->response.code = websocket_handle_handshake(w);
+
+                    if(w->response.code == HTTP_RESP_WEBSOCKET_HANDSHAKE)
+                        // socket taken over successfully, handshake response already sent
+                        return;
+
+                    // handshake failed - fall through to send the HTTP error response
+                    break;
+
+                case HTTP_REQUEST_MODE_OPTIONS: {
+                    // Path-aware coarse pre-filter:
+                    // MCP ACL is accepted only for MCP endpoints (/mcp, /sse), not as generic API access.
+                    // Reuse the canonical classification set at URL-decode time (see
+                    // WEB_CLIENT_FLAG_PATH_IS_MCP) so the prefilter cannot drift from the dispatcher.
+                    bool mcp_route_requested = web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_IS_MCP);
                     if(unlikely(
                             !http_can_access_dashboard(w) &&
                             !http_can_access_registry(w) &&
                             !http_can_access_badges(w) &&
                             !http_can_access_mgmt(w) &&
-                            !http_can_access_netdataconf(w)
+                            !http_can_access_netdataconf(w) &&
+                            !(mcp_route_requested && http_can_access_mcp(w))
                     )) {
                         web_client_permission_denied_acl(w);
                         break;
@@ -1386,17 +1431,24 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                     buffer_strcat(w->response.data, "OK");
                     w->response.code = HTTP_RESP_OK;
                     break;
+                }
 
                 case HTTP_REQUEST_MODE_POST:
                 case HTTP_REQUEST_MODE_GET:
                 case HTTP_REQUEST_MODE_PUT:
-                case HTTP_REQUEST_MODE_DELETE:
+                case HTTP_REQUEST_MODE_DELETE: {
+                    // Path-aware coarse pre-filter:
+                    // MCP ACL may open only MCP routes, while all other routes still require their own ACL surface.
+                    // Reuse the canonical classification set at URL-decode time (see
+                    // WEB_CLIENT_FLAG_PATH_IS_MCP) so the prefilter cannot drift from the dispatcher.
+                    bool mcp_route_requested = web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_IS_MCP);
                     if(unlikely(
                             !http_can_access_dashboard(w) &&
                             !http_can_access_registry(w) &&
                             !http_can_access_badges(w) &&
                             !http_can_access_mgmt(w) &&
-                            !http_can_access_netdataconf(w)
+                            !http_can_access_netdataconf(w) &&
+                            !(mcp_route_requested && http_can_access_mcp(w))
                     )) {
                         web_client_permission_denied_acl(w);
                         break;
@@ -1430,6 +1482,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
 
                     w->response.code = (short)web_client_process_url(localhost, w, path);
                     break;
+                }
 
                 default:
                     web_client_permission_denied_acl(w);
@@ -1822,6 +1875,11 @@ void web_client_decode_path_and_query_string(struct web_client *w, const char *p
         // do not overwrite this if it is already filled
         buffer_strcat(w->url_as_received, path_and_query_string);
 
+    // PATH_IS_MCP is a function of the URL alone; clear and re-derive on
+    // every decode so keepalived connections reusing the same web_client
+    // for a different URL see a fresh value.
+    web_client_flag_clear(w, WEB_CLIENT_FLAG_PATH_IS_MCP);
+
     if(w->mode == HTTP_REQUEST_MODE_STREAM) {
         // in stream mode, there is no path
 
@@ -1850,6 +1908,20 @@ void web_client_decode_path_and_query_string(struct web_client *w, const char *p
             buffer_strcat(w->url_query_string_decoded, "");
             buffer_strcat(w->url_path_decoded, buffer);
         }
+
+        // Classify path: set PATH_IS_MCP when the URL addresses one of
+        // Netdata's MCP transport endpoints (/mcp or /sse, and their
+        // subpaths). Done here — at URL-decoding time — so the flag is
+        // available later both to the URL dispatcher and to the response
+        // header builder, including for OPTIONS preflights which bypass
+        // the dispatcher. Matching requires a path-segment boundary so a
+        // hypothetical /mcpfoo does not leak through.
+        const char *decoded_path = buffer_tostring(w->url_path_decoded);
+        size_t decoded_path_len = buffer_strlen(w->url_path_decoded);
+        if(decoded_path_len >= 4
+           && (memcmp(decoded_path, "/mcp", 4) == 0 || memcmp(decoded_path, "/sse", 4) == 0)
+           && (decoded_path_len == 4 || decoded_path[4] == '/'))
+            web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_IS_MCP);
     }
 }
 

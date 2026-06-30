@@ -14,6 +14,7 @@ typedef enum __attribute__((packed)) {
     BIB_PACKAGING_CONFIGURE_OPTIONS,
     BIB_DIR_USER_CONFIG,
     BIB_DIR_STOCK_CONFIG,
+    BIB_DIR_STOCK_DATA,
     BIB_DIR_CACHE,
     BIB_DIR_LIB,
     BIB_DIR_PLUGINS,
@@ -215,6 +216,14 @@ static struct {
                 .print = "Stock Configurations",
                 .json = "stock_config",
                 .value = LIBCONFIG_DIR,
+        },
+        [BIB_DIR_STOCK_DATA] = {
+                .category = BIC_DIRECTORIES,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Stock Data Files",
+                .json = "stock_data",
+                .value = STOCK_DATA_DIR,
         },
         [BIB_DIR_CACHE] = {
                 .category = BIC_DIRECTORIES,
@@ -1542,6 +1551,7 @@ static void populate_packaging_info() {
 static void populate_directories(void) {
     build_info_set_value(BIB_DIR_USER_CONFIG, netdata_configured_user_config_dir);
     build_info_set_value(BIB_DIR_STOCK_CONFIG, netdata_configured_stock_config_dir);
+    build_info_set_value(BIB_DIR_STOCK_DATA, netdata_configured_stock_data_dir);
     build_info_set_value(BIB_DIR_CACHE, netdata_configured_cache_dir);
     build_info_set_value(BIB_DIR_LIB, netdata_configured_varlib_dir);
     build_info_set_value(BIB_DIR_PLUGINS, netdata_configured_primary_plugins_dir);
@@ -1552,12 +1562,38 @@ static void populate_directories(void) {
 
 // ----------------------------------------------------------------------------
 
+static const char *build_info_value_for_display(size_t i, char **allocated) {
+    const char *value = BUILD_INFO[i].value;
+
+    if(allocated)
+        *allocated = NULL;
+
+#if defined(OS_WINDOWS)
+    if(BUILD_INFO[i].category == BIC_DIRECTORIES && BUILD_INFO[i].type == BIT_STRING && value) {
+        if(!allocated)
+            return value;
+
+        *allocated = os_translate_msys_to_windows_path(value);
+        return *allocated;
+    }
+#endif
+
+    return value;
+}
+
 static void print_build_info_category_to_json(BUFFER *b, BUILD_INFO_CATEGORY category, const char *key) {
     buffer_json_member_add_object(b, key);
     for(size_t i = 0; i < BIB_TERMINATOR ;i++) {
         if(BUILD_INFO[i].category == category && BUILD_INFO[i].json) {
-            if(BUILD_INFO[i].value)
-                buffer_json_member_add_string(b, BUILD_INFO[i].json, BUILD_INFO[i].value);
+#if defined(OS_WINDOWS)
+            CLEAN_CHAR_P *display_path = NULL;
+            const char *value = build_info_value_for_display(i, &display_path);
+#else
+            const char *value = build_info_value_for_display(i, NULL);
+#endif
+
+            if(value)
+                buffer_json_member_add_string(b, BUILD_INFO[i].json, value);
             else
                 buffer_json_member_add_boolean(b, BUILD_INFO[i].json, BUILD_INFO[i].status);
         }
@@ -1571,7 +1607,12 @@ static void print_build_info_category_to_console(BUILD_INFO_CATEGORY category, c
         if(BUILD_INFO[i].category == category && BUILD_INFO[i].print) {
             const char *v = BUILD_INFO[i].status ? "YES" : "NO";
             const char *k = BUILD_INFO[i].print;
-            const char *d = BUILD_INFO[i].value;
+#if defined(OS_WINDOWS)
+            CLEAN_CHAR_P *display_path = NULL;
+            const char *d = build_info_value_for_display(i, &display_path);
+#else
+            const char *d = build_info_value_for_display(i, NULL);
+#endif
 
             int padding_length = 60 - strlen(k) - 1;
             if (padding_length < 0) padding_length = 0;

@@ -1,0 +1,686 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "SNMP trap collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Framework collection interval for self-metrics. Trap packet reception is event-driven and does not depend on this interval.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this trap listener job with a Virtual Node.",
+        "type": "string"
+      },
+      "listen": {
+        "title": "Listen",
+        "description": "Network endpoints this listener binds during job creation.",
+        "type": "object",
+        "default": {
+          "receive_buffer": 4194304,
+          "endpoints": [
+            {
+              "protocol": "udp",
+              "address": "0.0.0.0",
+              "port": 162
+            }
+          ]
+        },
+        "additionalProperties": false,
+        "properties": {
+          "receive_buffer": {
+            "title": "Receive buffer",
+            "description": "UDP socket receive buffer requested during job creation, in bytes. Set 0 to keep the operating system default. The default is 4 MiB per bound endpoint.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 268435456,
+            "default": 4194304
+          },
+          "endpoints": {
+            "title": "Endpoints",
+            "type": "array",
+            "default": [
+              {
+                "protocol": "udp",
+                "address": "0.0.0.0",
+                "port": 162
+              }
+            ],
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "protocol": {
+                  "title": "Protocol",
+                  "description": "Transport protocol.",
+                  "type": "string",
+                  "enum": ["udp"],
+                  "default": "udp"
+                },
+                "address": {
+                  "title": "Address",
+                  "description": "Local IP address to bind.",
+                  "type": "string",
+                  "default": "0.0.0.0"
+                },
+                "port": {
+                  "title": "Port",
+                  "description": "UDP port number. Port 162 requires CAP_NET_BIND_SERVICE or root. Netdata packages grant this capability to go.d.plugin and allow it in netdata.service.",
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535,
+                  "default": 162
+                }
+              },
+              "required": ["protocol", "address", "port"]
+            }
+          }
+        },
+        "required": ["endpoints"]
+      },
+      "versions": {
+        "title": "SNMP versions",
+        "description": "Accepted trap protocol versions.",
+        "type": "array",
+        "default": ["v1", "v2c"],
+        "items": {
+          "type": "string",
+          "enum": ["v1", "v2c", "v3"]
+        },
+        "uniqueItems": true
+      },
+      "communities": {
+        "title": "Communities",
+        "description": "SNMPv1/v2c community allowlist. Empty accepts all communities.",
+        "type": ["array", "null"],
+        "default": [],
+        "items": {
+          "type": "string"
+        },
+        "uniqueItems": true
+      },
+      "usm_users": {
+        "title": "USM Users",
+        "description": "SNMPv3 USM users with auth and privacy protocols. Auth and privacy keys use Netdata secret references.",
+        "type": ["array", "null"],
+        "default": [],
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "username": {
+              "title": "Username",
+              "description": "SNMPv3 USM security name (user).",
+              "type": "string"
+            },
+            "engine_id": {
+              "title": "Engine ID",
+              "description": "SNMPv3 authoritative engine ID in hex (e.g. 80001f8880e5a5c0d6c7b8a9). Required for static v3 jobs. May be omitted when dynamic_engine_id_discovery is enabled; if supplied under dynamic discovery, it is validated and used as a preconfigured known pair for that user.",
+              "type": "string",
+              "pattern": "^(|[0-9A-Fa-f]{10,64})$"
+            },
+            "auth_proto": {
+              "title": "Authentication protocol",
+              "description": "SNMPv3 authentication protocol.",
+              "type": "string",
+              "enum": ["none", "md5", "sha", "sha224", "sha256", "sha384", "sha512"]
+            },
+            "auth_key": {
+              "title": "Authentication key",
+              "description": "SNMPv3 authentication passphrase (use a Netdata secret reference). Required when auth_proto is not none; minimum 8 characters.",
+              "type": "string"
+            },
+            "priv_proto": {
+              "title": "Privacy protocol",
+              "description": "SNMPv3 privacy (encryption) protocol.",
+              "type": "string",
+              "enum": ["none", "des", "aes", "aes192", "aes256", "aes192c", "aes256c"]
+            },
+            "priv_key": {
+              "title": "Privacy key",
+              "description": "SNMPv3 privacy passphrase (use a Netdata secret reference). Required when priv_proto is not none; minimum 8 characters.",
+              "type": "string"
+            }
+          },
+          "required": ["username"]
+        }
+      },
+      "engine_id_whitelist": {
+        "title": "Engine ID Whitelist",
+        "description": "Static SNMPv3 engine IDs accepted by this listener for v3 Trap PDUs (hex strings). Required when v3 is enabled and dynamic_engine_id_discovery is disabled. Must be empty when dynamic_engine_id_discovery is enabled.",
+        "type": ["array", "null"],
+        "default": [],
+        "items": {
+          "type": "string",
+          "pattern": "^[0-9A-Fa-f]{10,64}$"
+        },
+        "uniqueItems": true
+      },
+      "local_engine_id": {
+        "title": "Local engine ID",
+        "description": "Receiver-local SNMPv3 engine ID for v3 INFORM authentication (hex string, 5-32 bytes). When omitted or empty, Netdata generates and persists a stable per-job engine ID under the configured Netdata lib directory at snmp-trap/{job_name}/local-engine-id. Package installs usually use /var/lib/netdata; static installs commonly use /opt/netdata/var/lib/netdata.",
+        "type": "string",
+        "pattern": "^(|[0-9A-Fa-f]{10,64})$"
+      },
+      "dynamic_engine_id_discovery": {
+        "title": "Dynamic engine ID discovery",
+        "description": "When enabled, the listener discovers v3 Trap sender engine IDs at runtime from raw SNMPv3 context, and hot-registers new (engineID, username) pairs after the retry authenticates and decodes a v3 Trap. Static engine_id_whitelist must be empty. Dynamic registrations are in-memory, capped by dynamic_engine_id_max_pairs, and not persisted across restarts. Discovery is skipped for reportable SNMPv3 messages so confirmed-class traffic cannot enter the sender-registration path.",
+        "type": "boolean",
+        "default": false
+      },
+      "dynamic_engine_id_max_pairs": {
+        "title": "Dynamic engine ID maximum pairs",
+        "description": "Maximum in-memory dynamic (engineID, username) pairs per job. When 0 or unset, uses the default of 4096. Once the cap is full, new dynamic pairs are rejected with an unknown_engine_id counter increment while existing pairs continue to work.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 4096
+      },
+      "reverse_dns": {
+        "title": "Reverse DNS",
+        "description": "Optional source-IP PTR annotation emitted as TRAP_REVERSE_DNS. Disabled by default; cached lookup results never override authoritative identity fields.",
+        "type": "object",
+        "default": {
+          "enabled": false
+        },
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "description": "Enable best-effort reverse DNS enrichment for trap source IPs.",
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "allowlist": {
+        "title": "Allowlist",
+        "description": "Pre-decode source-IP CIDR allowlist.",
+        "type": "object",
+        "default": {
+          "source_cidrs": ["0.0.0.0/0", "::/0"]
+        },
+        "additionalProperties": false,
+        "properties": {
+          "source_cidrs": {
+            "title": "Source CIDRs",
+            "description": "Source IP CIDR allowlist matched before BER decode. Empty accepts IPv4 and IPv6 from all sources.",
+            "type": ["array", "null"],
+            "default": ["0.0.0.0/0", "::/0"],
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "source": {
+        "title": "Source attribution",
+        "description": "Controls which packet fields are allowed to identify the trap source. By default, Netdata uses the UDP peer as the authoritative source.",
+        "type": "object",
+        "default": {
+          "trusted_relays": []
+        },
+        "additionalProperties": false,
+        "properties": {
+          "trusted_relays": {
+            "title": "Trusted relays",
+            "description": "CIDR list of SNMP trap relays allowed to supply the original source through snmpTrapAddress.0. Leave empty unless the sender is a known relay that preserves original trap identity.",
+            "type": ["array", "null"],
+            "default": [],
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "rate_limit": {
+        "title": "Rate Limit",
+        "description": "Per-source token-bucket rate limiting. Default off.",
+        "type": "object",
+        "default": {
+          "enabled": false,
+          "per_source_pps": 1000,
+          "mode": "drop"
+        },
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "description": "Enable per-source rate limiting.",
+            "type": "boolean",
+            "default": false
+          },
+          "per_source_pps": {
+            "title": "Per-source PPS",
+            "description": "Maximum traps per second from a single source IP. Set 0 to use the default.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 1000
+          },
+          "mode": {
+            "title": "Mode",
+            "description": "Action when rate limit is exceeded: drop (discard trap) or sample (allow but count).",
+            "type": "string",
+            "enum": ["drop", "sample"],
+            "default": "drop"
+          }
+        }
+      },
+      "dedup": {
+        "title": "Deduplication",
+        "description": "Optional per-job trap deduplication. Disabled by default; when enabled, repeated matching traps inside the window are summarized instead of journaled individually.",
+        "type": "object",
+        "default": {
+          "enabled": false,
+          "window_sec": 5,
+          "cache_max_entries": 100000,
+          "key_varbinds": []
+        },
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean",
+            "default": false
+          },
+          "window_sec": {
+            "title": "Window seconds",
+            "description": "Deduplication window in seconds. Set to 0 or omit to use the default.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 5
+          },
+          "cache_max_entries": {
+            "title": "Cache maximum entries",
+            "description": "Maximum fingerprints kept in memory. Set to 0 or omit to use the default.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 100000
+          },
+          "key_varbinds": {
+            "title": "Key varbinds",
+            "type": ["array", "null"],
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          }
+        }
+      },
+      "journal": {
+        "title": "Direct journal output",
+        "description": "Direct Netdata journal storage for received traps. Enabled by default for explicit jobs and preflighted during job creation.",
+        "type": "object",
+        "default": {
+          "enabled": true
+        },
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "description": "Write traps to local direct journal files under the configured Netdata log directory at ${NETDATA_LOG_DIR}/traps/{job_name}/ and expose the SNMP traps logs Function. Package installs usually use /var/log/netdata; static installs commonly use /opt/netdata/var/log/netdata. Disable only when another backend, such as OTLP, is enabled.",
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "otlp": {
+        "title": "OTLP exporter",
+        "description": "Optional backend that exports traps as OTLP/gRPC LogRecords. Disabled by default. When enabled, the collector preflights the receiver at job creation time.",
+        "type": "object",
+        "default": {
+          "enabled": false,
+          "endpoint": "http://127.0.0.1:4317",
+          "headers": null,
+          "request_timeout": "5s",
+          "flush_interval": "200ms",
+          "batch_size": 512,
+          "queue_capacity": 10000
+        },
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "description": "Enable OTLP/gRPC Logs export. When enabled, traps are exported through OTLP regardless of journal.enabled; if journal.enabled is true, traps are also written to local direct journals.",
+            "type": "boolean",
+            "default": false
+          },
+          "endpoint": {
+            "title": "Endpoint",
+            "description": "OTLP/gRPC endpoint. http://host:port and bare host:port use plaintext gRPC; https://host:port uses TLS with system trust roots. Use https:// for remote collectors when trap contents should be protected in transit.",
+            "type": "string",
+            "default": "http://127.0.0.1:4317"
+          },
+          "headers": {
+            "title": "Headers",
+            "description": "Optional OTLP metadata headers. Values may use Netdata secret references. Header values are not emitted as trap attributes.",
+            "type": ["object", "null"],
+            "default": null,
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "request_timeout": {
+            "title": "Request timeout",
+            "description": "Timeout for OTLP connection preflight and export calls.",
+            "type": "string",
+            "default": "5s"
+          },
+          "flush_interval": {
+            "title": "Flush interval",
+            "description": "Maximum time to buffer OTLP records before an export attempt.",
+            "type": "string",
+            "default": "200ms"
+          },
+          "batch_size": {
+            "title": "Batch size",
+            "description": "Maximum OTLP LogRecords per export request. Set 0 or omit to use the default.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 512
+          },
+          "queue_capacity": {
+            "title": "Queue capacity",
+            "description": "Maximum OTLP records buffered per job. Set 0 or omit to use the default.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 10000
+          }
+        }
+      },
+      "retention": {
+        "title": "Retention",
+        "description": "Per-job direct journal retention and rotation policy. Ignored when journal.enabled is false.",
+        "type": "object",
+        "default": {
+          "max_size": "10GB",
+          "max_duration": null,
+          "rotation_size": null,
+          "rotation_duration": null
+        },
+        "additionalProperties": false,
+        "properties": {
+          "max_size": {
+            "title": "Maximum total size",
+            "description": "Maximum total bytes across all journal files for this job. Set to null to disable size-based eviction.",
+            "type": ["string", "null"],
+            "default": "10GB"
+          },
+          "max_duration": {
+            "title": "Maximum age",
+            "description": "Maximum age of the oldest journal file before deletion. Set to null to disable age-based eviction.",
+            "type": ["string", "null"],
+            "default": null
+          },
+          "rotation_size": {
+            "title": "Per-file rotation size",
+            "description": "Maximum size of a single journal file before rotation. Set to null for automatic calculation (max_size / 20, clamped 5MB-200MB).",
+            "type": ["string", "null"],
+            "default": null
+          },
+          "rotation_duration": {
+            "title": "Per-file rotation duration",
+            "description": "Maximum age of a single journal file before rotation. Null or 0 disables time-based rotation.",
+            "type": ["string", "null"],
+            "default": null
+          }
+        }
+      },
+      "overrides": {
+        "title": "Per-OID overrides",
+        "description": "Per-OID category, severity, and label overrides on top of profile defaults.",
+        "type": ["array", "null"],
+        "default": [],
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "oid": {
+              "title": "OID",
+              "description": "Numeric trap OID to override.",
+              "type": "string"
+            },
+            "category": {
+              "title": "Category",
+              "description": "Override profile category.",
+              "type": "string",
+              "enum": ["state_change", "config_change", "security", "auth", "license", "mobility", "diagnostic", "unknown"]
+            },
+            "severity": {
+              "title": "Severity",
+              "description": "Override profile severity.",
+              "type": "string",
+              "enum": ["emerg", "alert", "crit", "err", "warning", "notice", "info", "debug"]
+            },
+            "labels": {
+              "title": "Labels",
+              "description": "Additional labels for this OID.",
+              "type": ["object", "null"],
+              "default": {},
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "required": ["oid"]
+        }
+      },
+      "profile_metrics": {
+        "title": "Profile metrics",
+        "description": "Enable selected trap-to-metric rules defined by loaded SNMP trap profiles. Profile rules define the trap OID, filters, metric name, chart, source identity, and resource identity.",
+        "type": "object",
+        "default": {
+          "enabled": false,
+          "mode": "none"
+        },
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "description": "When true, evaluate profile-defined trap metric rules for successfully committed traps.",
+            "type": "boolean",
+            "default": false
+          },
+          "mode": {
+            "title": "Selection mode",
+            "description": "Rule selection policy. none disables profile metrics, auto enables profile rules marked auto_safe, exact enables only rules listed in include, and combined enables auto_safe plus included rules.",
+            "type": "string",
+            "enum": ["none", "auto", "exact", "combined"],
+            "default": "none"
+          },
+          "include": {
+            "title": "Included rules",
+            "description": "Profile metric rule names to enable when mode is exact or combined. This is rejected with mode none or auto.",
+            "type": ["array", "null"],
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "identity": {
+            "title": "Identity",
+            "description": "Controls where device-attributable profile metrics are emitted when vnode attribution is unavailable.",
+            "type": "object",
+            "default": {
+              "device": "source",
+              "unresolved_source": "source_label",
+              "source_id_privacy": "hash"
+            },
+            "additionalProperties": false,
+            "properties": {
+              "device": {
+                "title": "Device identity",
+                "description": "source uses vnode host scope when enrichment finds an unambiguous vnode and otherwise uses a bounded source label; source_label always uses source labels; listener is only for listener-owned rules.",
+                "type": "string",
+                "enum": ["source", "source_label", "listener"],
+                "default": "source"
+              },
+              "unresolved_source": {
+                "title": "Unresolved source",
+                "description": "source_label keeps committed traps and emits metrics with a bounded fallback source label; drop_metric_instance skips only the metric instance when source attribution cannot satisfy the rule.",
+                "type": "string",
+                "enum": ["source_label", "drop_metric_instance"],
+                "default": "source_label"
+              },
+              "source_id_privacy": {
+                "title": "Source ID privacy",
+                "description": "hash emits a stable local hash for fallback source_id labels. raw emits the selected source value and should be used only when source labels are acceptable.",
+                "type": "string",
+                "enum": ["hash", "raw"],
+                "default": "hash"
+              }
+            }
+          },
+          "limits": {
+            "title": "Limits",
+            "description": "Cardinality limits for profile-derived trap metrics.",
+            "type": "object",
+            "default": {
+              "max_rules": 500,
+              "max_sources": 2000,
+              "max_resources_per_source": 512,
+              "max_instances_per_job": 50000,
+              "overflow": "drop_and_count"
+            },
+            "additionalProperties": false,
+            "properties": {
+              "max_rules": {
+                "title": "Maximum rules",
+                "type": "integer",
+                "minimum": 0,
+                "default": 500
+              },
+              "max_sources": {
+                "title": "Maximum sources",
+                "type": "integer",
+                "minimum": 0,
+                "default": 2000
+              },
+              "max_resources_per_source": {
+                "title": "Maximum resources per source",
+                "type": "integer",
+                "minimum": 0,
+                "default": 512
+              },
+              "max_instances_per_job": {
+                "title": "Maximum instances per job",
+                "type": "integer",
+                "minimum": 0,
+                "default": 50000
+              },
+              "overflow": {
+                "title": "Overflow behavior",
+                "type": "string",
+                "description": "Only drop_and_count is supported today: over-cap metric instances are skipped, accepted traps are still committed, and diagnostics count the skipped metric instance.",
+                "enum": ["drop_and_count"],
+                "default": "drop_and_count"
+              }
+            }
+          }
+        }
+      }
+    },
+    "required": ["listen"]
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "vnode"
+          ]
+        },
+        {
+          "title": "Listener",
+          "fields": [
+            "listen"
+          ]
+        },
+        {
+          "title": "SNMP",
+          "fields": [
+            "versions",
+            "communities",
+            "usm_users",
+            "engine_id_whitelist",
+            "local_engine_id",
+            "dynamic_engine_id_discovery",
+            "dynamic_engine_id_max_pairs"
+          ]
+        },
+        {
+          "title": "Filtering",
+          "fields": [
+            "allowlist",
+            "source",
+            "rate_limit",
+            "dedup"
+          ]
+        },
+        {
+          "title": "Outputs",
+          "fields": [
+            "journal",
+            "otlp"
+          ]
+        },
+        {
+          "title": "Storage",
+          "fields": [
+            "retention"
+          ]
+        },
+        {
+          "title": "Enrichment",
+          "fields": [
+            "reverse_dns",
+            "overrides"
+          ]
+        },
+        {
+          "title": "Metrics",
+          "fields": [
+            "profile_metrics"
+          ]
+        }
+      ]
+    },
+    "listen": {
+      "endpoints": {
+        "ui:listFlavour": "list"
+      }
+    },
+    "usm_users": {
+      "ui:listFlavour": "list"
+    },
+    "dedup": {
+      "key_varbinds": {
+        "ui:listFlavour": "list"
+      }
+    },
+    "otlp": {
+      "headers": {
+        "ui:help": "Use secret references for bearer tokens or API keys where possible."
+      }
+    },
+    "overrides": {
+      "ui:listFlavour": "list"
+    },
+    "profile_metrics": {
+      "include": {
+        "ui:listFlavour": "list"
+      }
+    }
+  }
+}

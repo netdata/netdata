@@ -21,6 +21,18 @@ const (
 	jobName    = "job"
 )
 
+type retryableTestError struct {
+	error
+}
+
+func (e retryableTestError) DyncfgRetryable() bool { return true }
+
+type foreignRetryableTestError struct {
+	error
+}
+
+func (e foreignRetryableTestError) Retryable() bool { return true }
+
 func newTestJob() *Job {
 	return NewJob(
 		JobConfig{
@@ -128,6 +140,7 @@ func TestJob_AutoDetection(t *testing.T) {
 
 func TestJob_AutoDetection_FailInit(t *testing.T) {
 	job := newTestJob()
+	job.AutoDetectEvery = 1
 	m := &collectorapi.MockCollectorV1{
 		InitFunc: func(context.Context) error {
 			return errors.New("init error")
@@ -136,6 +149,37 @@ func TestJob_AutoDetection_FailInit(t *testing.T) {
 	job.module = m
 
 	assert.Error(t, job.AutoDetection())
+	assert.False(t, job.RetryAutoDetection())
+	assert.True(t, m.CleanupDone)
+}
+
+func TestJob_AutoDetection_RetryableFailInitKeepsRetry(t *testing.T) {
+	job := newTestJob()
+	job.AutoDetectEvery = 1
+	m := &collectorapi.MockCollectorV1{
+		InitFunc: func(context.Context) error {
+			return retryableTestError{error: errors.New("init error")}
+		},
+	}
+	job.module = m
+
+	assert.Error(t, job.AutoDetection())
+	assert.True(t, job.RetryAutoDetection())
+	assert.True(t, m.CleanupDone)
+}
+
+func TestJob_AutoDetection_ForeignRetryableFailInitDisablesRetry(t *testing.T) {
+	job := newTestJob()
+	job.AutoDetectEvery = 1
+	m := &collectorapi.MockCollectorV1{
+		InitFunc: func(context.Context) error {
+			return foreignRetryableTestError{error: errors.New("init error")}
+		},
+	}
+	job.module = m
+
+	assert.Error(t, job.AutoDetection())
+	assert.False(t, job.RetryAutoDetection())
 	assert.True(t, m.CleanupDone)
 }
 
@@ -381,6 +425,27 @@ func TestJob_AutoDetection_FunctionOnly_NilCharts(t *testing.T) {
 	job.module = m
 
 	assert.NoError(t, job.AutoDetection())
+}
+
+func TestJob_AutoDetection_FunctionOnlyFailCheckCleansUp(t *testing.T) {
+	job := newTestFunctionOnlyJob()
+	cleanupCalls := 0
+	m := &collectorapi.MockCollectorV1{
+		InitFunc: func(context.Context) error {
+			return nil
+		},
+		CheckFunc: func(context.Context) error {
+			return errors.New("check error")
+		},
+		CleanupFunc: func(context.Context) {
+			cleanupCalls++
+		},
+	}
+	job.module = m
+
+	assert.Error(t, job.AutoDetection())
+	assert.True(t, m.CleanupDone)
+	assert.Equal(t, 1, cleanupCalls)
 }
 
 func TestJob_Start_FunctionOnly(t *testing.T) {

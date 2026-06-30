@@ -1,0 +1,21 @@
+{
+  "jsonSchema": {
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Check interval",
+        "description": "How often to check for new or stale devices, in seconds.",
+        "type": "integer",
+        "minimum": 10,
+        "default": 60
+      },
+      "refresh_every": {
+        "title": "Refresh interval",
+        "description": "How often to refresh topology data for each device.",
+        "type": "string",
+        "pattern": "^[0-9]+(\\.[0-9]+)?(ms|s|m|h|d|w|mo|y)?$",
+        "default": "30m"
+      }
+    }
+  }
+}

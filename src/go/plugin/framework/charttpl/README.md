@@ -268,6 +268,18 @@ For example:
 | Chart `context`               | `queries`           |
 | **Resulting context**         | **`mysql.queries`** |
 
+**Autogen charts** — the **top-level** `context_namespace` also prefixes the contexts of charts
+created by `engine.autogen` (metrics not matched by any template dimension), joined with the same
+`.`. Group-level `context_namespace` does not apply to autogen, since unmatched series belong to
+no group. For example, with top-level `context_namespace: nagios`, an unmatched metric
+`check_load` autogenerates the context `nagios.check_load`.
+
+The autogen context is `context_namespace` joined with the **full metric name**, and a metric's name
+includes any `SnapshotMeter("<prefix>")` prefix (`<prefix>.<instrument>`). So a non-empty meter prefix
+**stacks after** `context_namespace` — e.g. `context_namespace: app` with `SnapshotMeter("app")` and
+instrument `foo` yields `app.app.foo`. When you set `context_namespace`, write metrics with
+`SnapshotMeter("")` so the namespace has a single source; do not also encode it in the meter prefix.
+
 ### 3. engine
 
 Template-level policy that controls metric filtering and autogeneration.
@@ -646,7 +658,7 @@ dimensions:
 | `options.multiplier` | int    | no       | `1`     | Multiply the raw value by this factor.                           |
 | `options.divisor`    | int    | no       | `1`     | Divide the raw value by this factor.                             |
 | `options.hidden`     | bool   | no       | `false` | Hide this dimension in the chart (still collected).              |
-| `options.float`      | bool   | no       | `false` | Use floating-point precision for this dimension.                 |
+| `options.float`      | bool   | no       | `false` | Force floating-point precision. A dimension also inherits the metric's float flag from the collector, so this is redundant (and harmless) when the metric is already marked float. |
 
 > [!IMPORTANT]
 > There are three ways to name a dimension — pick **exactly one**:
@@ -713,7 +725,7 @@ dimensions:
       divisor: 1000
 ```
 
-**Float precision** — for ratios or small decimal values:
+**Float precision** — for ratios or small decimal values. A dimension also inherits the metric's float flag from the collector (collectors mark float-valued metrics), so `options.float` is redundant (harmless) for those and only needed to force float on a metric the collector did not mark float:
 
 ```yaml
 dimensions:
@@ -1039,3 +1051,45 @@ All rules below produce semantic validation errors unless noted:
 | Group family hierarchy + `chart.family` | Composed into `/`-separated chart family.                                                |
 | `options.multiplier = 0`                | Treated as `1`.                                                                          |
 | `options.divisor = 0`                   | Treated as `1`.                                                                          |
+
+## Programmatic API
+
+> [!NOTE]
+> Most collectors ship a static `charts.yaml` and never touch the Go API. This section is for collectors that **build a chart template at runtime** — for example from discovery results or selected profiles — and return it from `CollectorV2.ChartTemplateYAML()`.
+
+The package exposes a small Go surface for decoding, cloning, and re-emitting templates:
+
+| Function                                 | Purpose                                                                            |
+|------------------------------------------|------------------------------------------------------------------------------------|
+| `DecodeYAML([]byte) (*Spec, error)`      | Strict parse, apply decode-time defaults, then validate. The canonical read path.  |
+| `Group.Clone() Group`                    | Typed deep copy of a group and everything nested under it.                          |
+| `Spec.MarshalTemplate() (string, error)` | Validate (only) and serialize a runtime-built template to YAML.                    |
+
+### Building a template at runtime
+
+`CollectorV2.ChartTemplateYAML()` returns a plain `string`, so build the template where the error can be handled — typically once during `Init` — and cache the result; `ChartTemplateYAML()` then returns the cached string. Assemble a `Spec` from `charttpl` types and serialize it with `MarshalTemplate`:
+
+```go
+func buildChartTemplate(groups []charttpl.Group) (string, error) {
+    spec := charttpl.Spec{
+        Version:          charttpl.VersionV1,
+        ContextNamespace: "myapp",
+        Groups:           groups, // assembled from discovery / profiles
+    }
+    return spec.MarshalTemplate()
+}
+```
+
+`MarshalTemplate` runs `Spec.Validate()` and marshals with `gopkg.in/yaml.v2` — the same library `DecodeYAML` parses with — so a runtime template emits and re-decodes through one consistent YAML implementation. It deliberately does **not** apply decode-time defaults: a field you leave unset stays unset in the emitted YAML, and the chart engine applies the defaults when it re-decodes the template. Treat the returned string as opaque — it is only ever re-decoded, never compared byte-for-byte.
+
+### Cloning a shared template before mutating it
+
+Collectors that derive groups from a **shared catalog** (profiles loaded once and reused across jobs) must not mutate those groups in place — a per-job edit would corrupt the catalog for every other job. `Group.Clone()` returns an isolated deep copy, including nested groups, charts, dimensions, and their option pointers; mutate the clone freely:
+
+```go
+g := profile.Template.Clone()
+g.Metrics = perJobMetrics // safe: the shared catalog copy is untouched
+spec.Groups = append(spec.Groups, g)
+```
+
+`Clone()` is needed only when you mutate a group you do not own. A collector that decodes a fresh `Spec` per job (its own `DecodeYAML` result) already owns it and can mutate it directly.

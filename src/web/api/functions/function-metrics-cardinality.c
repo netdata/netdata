@@ -69,8 +69,7 @@ int function_metrics_cardinality(BUFFER *wb, const char *function __maybe_unused
     // Parse function parameters
     bool by_node = false;
     {
-        char function_copy[strlen(function) + 1];
-        memcpy(function_copy, function, sizeof(function_copy));
+        char *function_copy = strdupz(function);
         char *words[1024];
         size_t num_words = quoted_strings_splitter_whitespace(function_copy, words, 1024);
         for (size_t i = 1; i < num_words; i++) {
@@ -81,9 +80,11 @@ int function_metrics_cardinality(BUFFER *wb, const char *function __maybe_unused
                 by_node = false;
             } else if (strcmp(param, "info") == 0) {
                 buffer_json_finalize(wb);
+                freez(function_copy);
                 return HTTP_RESP_OK;
             }
         }
+        freez(function_copy);
     }
 
     DICTIONARY *contexts_dict = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE);

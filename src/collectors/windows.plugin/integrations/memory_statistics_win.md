@@ -123,8 +123,17 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | mem.swap_iops | read, write | operations/s |
-| mem.swap_pages_io | read, write | pages/s |
+| mem.swapio | in, out | KiB/s |
 | mem.system_pool_size | paged, non-paged | bytes |
+| mem.system_pool_paged | resident | bytes |
+| mem.system_pool_allocs | paged, non-paged | allocations/s |
 | mem.system_page_table_entries | free | pages |
+| mem.committed | committed, limit | bytes |
+| mem.system_cache | cache, peak, resident | bytes |
+| mem.page_lists | free, modified, standby_core, standby_normal, standby_reserve | bytes |
+| mem.system_code | resident, total | bytes |
+| mem.system_drivers | resident, total | bytes |
+| mem.page_faults_breakdown | cache, demand_zero, transition, write_copies | faults/s |
+| mem.transition_repurposed | repurposed | pages/s |
 
 

@@ -1,0 +1,348 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-cato_networks
+      plugin_name: go.d.plugin
+      module_name: cato_networks
+      monitored_instance:
+        name: Cato Networks
+        link: https://www.catonetworks.com/
+        icon_filename: network-wired.svg
+        categories:
+          - network-performance-monitoring.device-metrics
+      keywords:
+        - cato
+        - cato networks
+        - sase
+        - sd-wan
+        - bgp
+        - topology
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Cato Networks accounts through the Cato GraphQL API.
+
+          It discovers sites, collects site, device, and interface status, traffic and quality metrics, collects BGP peer status, and exposes Cato site/device/PoP/BGP topology data.
+          Metrics for each selected site are emitted under a generated virtual node named after the Cato site and keyed by the Cato account ID and site ID. Site labels are still attached to metric series for grouping and aggregation.
+        method_description: |
+          The collector uses the Cato GraphQL API endpoint with an account ID and API key.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: |
+          A Cato API key with permission to read account snapshot, account metrics, entity lookup, and site BGP status data is required.
+      default_behavior:
+        auto_detection:
+          description: |
+            This collector does not auto-detect Cato accounts. Configure at least one job with `account_id` and `api_key`.
+        limits:
+          description: |
+            Site discovery is paginated and refreshed hourly. The optional `site_selector` filters sites before snapshot, metrics, BGP, topology, and generated site virtual-node creation. Account metrics use bounded concurrent one-site API requests to preserve per-Socket device and interface attribution. BGP status uses one per-site API request for each selected site that is not currently cached as having no BGP peers.
+        performance_impact:
+          description: |
+            The default interval is 60 seconds. Sites that return a successful BGP response with no peers are cached as non-BGP sites for about one hour, with deterministic per-site jitter across multiple collection cycles to avoid synchronized refresh bursts. If BGP is enabled on such a site, BGP metrics can appear after that cache expires.
+    setup:
+      prerequisites:
+        list:
+          - title: Cato API credentials
+            description: |
+              Create or obtain a Cato API key and account ID with read access to the required GraphQL API surfaces.
+      configuration:
+        file:
+          name: go.d/cato_networks.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection interval, in seconds. Must be at least 60.
+              default_value: 60
+              required: false
+              group: Collection
+            - name: autodetection_retry
+              description: Autodetection retry interval, in seconds. Set 0 to disable.
+              default_value: 0
+              required: false
+              group: Collection
+            - name: url
+              description: Cato GraphQL API endpoint. Production endpoints must use HTTPS; HTTP is accepted only for loopback test endpoints.
+              default_value: https://api.catonetworks.com/api/v1/graphql2
+              required: false
+              group: Target
+            - name: account_id
+              description: Cato account ID.
+              default_value: ""
+              required: true
+              group: Authentication
+            - name: api_key
+              description: Cato API key.
+              default_value: ""
+              required: true
+              group: Authentication
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 30
+              required: false
+              group: HTTP
+            - name: proxy_url
+              description: HTTP proxy URL. Empty value uses environment proxy variables.
+              default_value: ""
+              required: false
+              group: HTTP
+            - name: site_selector
+              description: Space-separated simple patterns matched against the Cato site name when present, otherwise the site ID. Patterns use first-match ordering; put exclusions before broad includes, for example `!lab-* *`.
+              default_value: "*"
+              required: false
+              group: Cardinality
+            - name: vnode
+              description: Associates this data collection job with a Virtual Node.
+              default_value: ""
+              required: false
+              group: Virtual Node
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: Collect Cato Networks account metrics and topology.
+              config: |
+                jobs:
+                  - name: account
+                    account_id: "12345"
+                    api_key: "replace-with-cato-api-key"
+    troubleshooting:
+      problems:
+        list:
+          - name: API rate limits
+            description: |
+              Increase `update_every` or narrow `site_selector` if the Cato API reports rate limiting.
+          - name: Connection, TLS, or proxy failures
+            description: |
+              Check DNS, firewall egress, TLS inspection, proxy settings, endpoint region, and the collector logs.
+    alerts:
+      - name: cato_networks_site_disconnected
+        metric: cato_networks.site_connectivity_status
+        info: "Cato site ${label:site_name} reports disconnected connectivity status"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cato_networks.conf
+      - name: cato_networks_site_degraded
+        metric: cato_networks.site_connectivity_status
+        info: "Cato site ${label:site_name} reports degraded connectivity status"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cato_networks.conf
+      - name: cato_networks_site_packet_loss
+        metric: cato_networks.site_packet_loss
+        info: "Cato site ${label:site_name} packet loss over the last 10 minutes"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cato_networks.conf
+      - name: cato_networks_bgp_session_down
+        metric: cato_networks.bgp_session_status
+        info: "Cato BGP session to peer ${label:peer_ip} (${label:peer_asn}) is down"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cato_networks.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: site
+          description: These metrics refer to a Cato site.
+          labels:
+            - name: site_id
+              description: Cato site ID.
+            - name: site_name
+              description: Cato site name.
+            - name: pop_name
+              description: Cato PoP name.
+          metrics:
+            - name: cato_networks.site_connectivity_status
+              description: Site connectivity status.
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: connected
+                - name: disconnected
+                - name: degraded
+                - name: unknown
+            - name: cato_networks.site_operational_status
+              description: Site operational status.
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: disabled
+                - name: locked
+                - name: unknown
+            - name: cato_networks.site_hosts
+              description: Site hosts.
+              unit: hosts
+              chart_type: line
+              dimensions:
+                - name: hosts
+            - name: cato_networks.site_traffic
+              description: Site traffic.
+              unit: bytes
+              chart_type: area
+              dimensions:
+                - name: upstream
+                - name: downstream
+            - name: cato_networks.site_packet_loss
+              description: Site packet loss.
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: upstream
+                - name: downstream
+            - name: cato_networks.site_discarded_packets
+              description: Site discarded packets.
+              unit: packets
+              chart_type: line
+              dimensions:
+                - name: upstream
+                - name: downstream
+            - name: cato_networks.site_jitter
+              description: Site jitter.
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: upstream
+                - name: downstream
+            - name: cato_networks.site_latency
+              description: Site latency.
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: rtt
+                - name: last_mile
+            - name: cato_networks.site_last_mile_packet_loss
+              description: Site last mile packet loss.
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: loss
+        - name: device
+          description: These metrics refer to a Cato Socket or vSocket attached to a site.
+          labels:
+            - name: site_id
+              description: Cato site ID.
+            - name: site_name
+              description: Cato site name.
+            - name: device_id
+              description: Cato device ID.
+            - name: device_name
+              description: Cato device name.
+          metrics:
+            - name: cato_networks.device_connection_status
+              description: Device connection status.
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: connected
+                - name: disconnected
+        - name: interface
+          description: These metrics refer to a Cato site interface.
+          labels:
+            - name: site_id
+              description: Cato site ID.
+            - name: site_name
+              description: Cato site name.
+            - name: device_id
+              description: Cato device ID when the interface owner is known.
+            - name: device_name
+              description: Cato device name when the interface owner is known.
+            - name: interface_id
+              description: Cato interface ID.
+            - name: interface_name
+              description: Interface name.
+          metrics:
+            - name: cato_networks.interface_connection_status
+              description: Interface connection status.
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: connected
+                - name: disconnected
+            - name: cato_networks.interface_tunnel_uptime
+              description: Interface tunnel uptime.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+            - name: cato_networks.interface_traffic
+              description: Interface traffic.
+              unit: bytes
+              chart_type: area
+              dimensions:
+                - name: upstream
+                - name: downstream
+            - name: cato_networks.interface_packet_loss
+              description: Interface packet loss.
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: upstream
+                - name: downstream
+            - name: cato_networks.interface_discarded_packets
+              description: Interface discarded packets.
+              unit: packets
+              chart_type: line
+              dimensions:
+                - name: upstream
+                - name: downstream
+            - name: cato_networks.interface_jitter
+              description: Interface jitter.
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: upstream
+                - name: downstream
+            - name: cato_networks.interface_latency
+              description: Interface latency.
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: rtt
+        - name: bgp peer
+          description: These metrics refer to a Cato site BGP peer.
+          labels:
+            - name: site_id
+              description: Cato site ID.
+            - name: site_name
+              description: Cato site name.
+            - name: peer_ip
+              description: BGP peer IP.
+            - name: peer_asn
+              description: BGP peer ASN.
+          metrics:
+            - name: cato_networks.bgp_session_status
+              description: BGP session status.
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: up
+                - name: down
+                - name: unknown
+            - name: cato_networks.bgp_routes
+              description: BGP route counts.
+              unit: routes
+              chart_type: line
+              dimensions:
+                - name: accepted
+                - name: limit
+                - name: rib_out
+            - name: cato_networks.bgp_routes_limit_status
+              description: BGP route limit exceeded status.
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: exceeded

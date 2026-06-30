@@ -220,6 +220,7 @@ typedef struct rrdmetric {
     STRING *name;
 
     RRDDIM *rrddim;
+    RRD_ALGORITHM algorithm;            // atomic load/store; survives RRDDIM archive so query paths don't need a live rrddim
 
     time_t first_time_s;
     time_t last_time_s;
@@ -233,6 +234,14 @@ static ALWAYS_INLINE RRDDIM *rrdmetric_rrddim_atomic_load(RRDMETRIC *rm) {
 
 static ALWAYS_INLINE void rrdmetric_rrddim_atomic_store(RRDMETRIC *rm, RRDDIM *rd) {
     __atomic_store_n(&rm->rrddim, rd, __ATOMIC_RELEASE);
+}
+
+static ALWAYS_INLINE RRD_ALGORITHM rrdmetric_algorithm_atomic_load(RRDMETRIC *rm) {
+    return __atomic_load_n(&rm->algorithm, __ATOMIC_ACQUIRE);
+}
+
+static ALWAYS_INLINE void rrdmetric_algorithm_atomic_store(RRDMETRIC *rm, RRD_ALGORITHM algorithm) {
+    __atomic_store_n(&rm->algorithm, algorithm, __ATOMIC_RELEASE);
 }
 
 static ALWAYS_INLINE RRDDIM *rrdmetric_rrddim_get_and_lock(RRDMETRIC *rm) {
@@ -437,6 +446,7 @@ static ALWAYS_INLINE void rrdmetric_release(RRDMETRIC_ACQUIRED *rma) {
 
 void rrdmetric_rrddim_is_freed(RRDDIM *rd);
 void rrdmetric_updated_rrddim_flags(RRDDIM *rd);
+void rrdmetric_updated_rrddim_algorithm(RRDDIM *rd);
 void rrdmetric_collected_rrddim(RRDDIM *rd);
 void rrdmetric_not_collected_rrddim(RRDDIM *rd);
 
@@ -528,6 +538,12 @@ void rrdcontext_delete_after_loading(RRDHOST *host, RRDCONTEXT *rc);
 void rrdcontext_initial_processing_after_loading(RRDCONTEXT *rc);
 
 RRDLABELS *rrdinstance_labels(RRDINSTANCE *ri);
+
+// Bump the dbengine-rotations counter that gates extreme-cardinality
+// protection. Called from rrdcontext_db_rotation(); the chart-cleanup
+// trigger (rrdcontext_request_full_gc) deliberately does NOT bump it,
+// so the guard activates only on real dbengine rotations as before.
+void rrdcontext_count_db_rotation(void);
 
 bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason, bool worker_jobs);
 void rrdcontext_post_process_queued_contexts(RRDHOST *host);

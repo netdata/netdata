@@ -288,7 +288,7 @@ static void ebpf_sync_exit(void *pptr)
     if (!em)
         return;
 
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
+    if (ebpf_module_enabled_get(em) == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
         netdata_mutex_lock(&lock);
         ebpf_obsolete_sync_global(em);
         netdata_mutex_unlock(&lock);
@@ -298,7 +298,7 @@ static void ebpf_sync_exit(void *pptr)
         em->functions.bpf_unload(em);
 
     netdata_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPED);
     netdata_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -360,6 +360,8 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
             if (em->load & EBPF_LOAD_LEGACY) {
                 if (ebpf_sync_load_legacy(w, em))
                     errors++;
+                else
+                    ebpf_mark_program_loaded();
 
                 em->info.thread_name = saved_name;
             }
@@ -378,6 +380,8 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
                             w->sync_obj = NULL;
                             w->enabled = false;
                             errors++;
+                        } else {
+                            ebpf_mark_program_loaded();
                         }
                     }
                 } else {

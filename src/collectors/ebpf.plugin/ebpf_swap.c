@@ -459,7 +459,7 @@ static void ebpf_swap_exit(void *pptr)
         sem_post(shm_mutex_ebpf_integration);
     }
 
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
+    if (ebpf_module_enabled_get(em) == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
         netdata_mutex_lock(&lock);
         if (em->cgroup_charts) {
             ebpf_obsolete_swap_cgroup_charts(em);
@@ -478,7 +478,7 @@ static void ebpf_swap_exit(void *pptr)
 
     if (!swap_safe_clean) {
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+        ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPED);
         netdata_mutex_unlock(&ebpf_exit_cleanup);
         return;
     }
@@ -492,7 +492,7 @@ static void ebpf_swap_exit(void *pptr)
         em->functions.bpf_unload(em);
 
     netdata_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPED);
     netdata_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -702,7 +702,7 @@ void ebpf_read_swap_thread(void *ptr)
             break;
         }
 
-        if (cgroups && shm_ebpf_cgroup.header)
+        if (cgroups && ebpf_cgroup_integration_active_get())
             ebpf_update_swap_cgroup();
 
         if (sem_post(shm_mutex_ebpf_integration)) {
@@ -1025,8 +1025,8 @@ void ebpf_swap_send_cgroup_data(int update_every)
         return;
     }
 
-    if (shm_ebpf_cgroup.header->systemd_enabled) {
-        if (send_cgroup_chart) {
+    if (ebpf_cgroup_systemd_enabled_get()) {
+        if (ebpf_send_cgroup_chart_get()) {
             ebpf_create_systemd_swap_charts(update_every);
             fflush(stdout);
         }
@@ -1101,7 +1101,7 @@ static void swap_collector(ebpf_module_t *em)
             break;
         }
 
-        if (cgroup && shm_ebpf_cgroup.header)
+        if (cgroup && ebpf_cgroup_integration_active_get())
             ebpf_swap_send_cgroup_data(update_every);
 
         netdata_mutex_unlock(&lock);
@@ -1332,6 +1332,7 @@ void ebpf_swap_thread(void *ptr)
     if (ebpf_swap_load_bpf(em)) {
         goto endswap;
     }
+    ebpf_mark_program_loaded();
 
     ebpf_swap_allocate_global_vectors();
 

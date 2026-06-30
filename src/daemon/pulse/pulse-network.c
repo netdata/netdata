@@ -335,6 +335,40 @@ void pulse_network_do(bool extended __maybe_unused) {
 
         pulse_aclk_time_heatmap();
 
+        {
+            // In-flight QoS1 messages vs the broker's MQTT 5.0 Receive Maximum.
+            // When "in flight" approaches "receive maximum" the agent is at the
+            // broker's window limit. Always available (not extended) since it is
+            // the primary signal for the MQTT 5.0 Receive Maximum behavior.
+            static RRDSET *st_aclk_inflight = NULL;
+            static RRDDIM *rd_in_flight = NULL, *rd_receive_max = NULL;
+
+            if (unlikely(!st_aclk_inflight)) {
+                st_aclk_inflight = rrdset_create_localhost(
+                    "netdata",
+                    "aclk_mqtt_inflight",
+                    NULL,
+                    PULSE_NETWORK_CHART_FAMILY,
+                    "netdata.aclk_mqtt_inflight",
+                    "Netdata ACLK MQTT In-Flight QoS1 Window",
+                    "messages",
+                    "netdata",
+                    "pulse",
+                    PULSE_NETWORK_CHART_PRIORITY + 2,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_LINE);
+
+                rrdlabels_add(st_aclk_inflight->rrdlabels, "endpoint", "aclk", RRDLABEL_SRC_AUTO);
+
+                rd_in_flight = rrddim_add(st_aclk_inflight, "in flight", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rd_receive_max = rrddim_add(st_aclk_inflight, "receive maximum", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+
+            rrddim_set_by_pointer(st_aclk_inflight, rd_in_flight, (collected_number)t.mqtt.packets_waiting_puback);
+            rrddim_set_by_pointer(st_aclk_inflight, rd_receive_max, (collected_number)t.mqtt.rx_maximum);
+            rrdset_done(st_aclk_inflight);
+        }
+
         if(extended) {
             static RRDSET *st_aclk_queue_size = NULL;
             static RRDDIM *rd_messages = NULL;

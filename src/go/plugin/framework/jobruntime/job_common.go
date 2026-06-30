@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/tickstate"
 )
 
@@ -48,6 +49,15 @@ func (c *stopController) requestStop() {
 	c.stopOnce.Do(func() { close(c.stopCh) })
 }
 
+func (c *stopController) stopRequested() bool {
+	select {
+	case <-c.stopCh:
+		return true
+	default:
+		return false
+	}
+}
+
 func (c *stopController) stopAndWait() {
 	c.requestStop()
 	if !c.started.Load() {
@@ -62,6 +72,10 @@ func retryAutoDetection(autoDetectEvery, autoDetectTries int) bool {
 
 func disableAutoDetection(autoDetectEvery *int) {
 	*autoDetectEvery = 0
+}
+
+func isRetryableError(err error) bool {
+	return dyncfg.IsRetryableError(err)
 }
 
 func consumeAutoDetectTry(autoDetectTries *int) {

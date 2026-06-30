@@ -254,12 +254,60 @@ void netdata_threads_init_for_external_plugins(size_t stacksize) {
 }
 
 // ----------------------------------------------------------------------------
+// Thread-cleanup callback registry.
+//
+// Registration is startup-only — callers register before any daemon
+// thread is created. libnetdata calls every registered callback at
+// thread-exit time, in registration order. The startup-only invariant
+// lets nd_thread_run_cleanup_callbacks read the count without holding
+// the spinlock; the __ATOMIC_RELEASE/_ACQUIRE pair handles any late
+// edge.
+//
+// Ordering: all registered callbacks run before thread_cache_destroy
+// and worker_unregister (called below). A callback that needs to
+// observe thread_cache state must do so before that destroy.
 
-void rrdset_thread_rda_free(void);
-void sender_thread_buffer_free(void);
-void query_target_free(void);
-void service_exits(void);
-void rrd_collector_finished(void);
+#define ND_THREAD_CLEANUP_MAX 16
+static struct {
+    SPINLOCK spinlock;
+    size_t count;
+    nd_thread_cleanup_fn fns[ND_THREAD_CLEANUP_MAX];
+} nd_thread_cleanup_registry = { .spinlock = SPINLOCK_INITIALIZER };
+
+void nd_thread_register_cleanup(nd_thread_cleanup_fn fn) {
+    if(!fn) return;
+
+    spinlock_lock(&nd_thread_cleanup_registry.spinlock);
+
+    // Idempotent: skip if this fn is already registered. Keeps the
+    // registry small under repeated rrd_init / unittest re-entry.
+    for(size_t i = 0; i < nd_thread_cleanup_registry.count; i++) {
+        if(nd_thread_cleanup_registry.fns[i] == fn) {
+            spinlock_unlock(&nd_thread_cleanup_registry.spinlock);
+            return;
+        }
+    }
+
+    if(nd_thread_cleanup_registry.count >= ND_THREAD_CLEANUP_MAX) {
+        spinlock_unlock(&nd_thread_cleanup_registry.spinlock);
+        fatal("nd_thread_register_cleanup: registry full (max %d)", ND_THREAD_CLEANUP_MAX);
+    }
+    nd_thread_cleanup_registry.fns[nd_thread_cleanup_registry.count] = fn;
+    __atomic_store_n(&nd_thread_cleanup_registry.count,
+                     nd_thread_cleanup_registry.count + 1,
+                     __ATOMIC_RELEASE);
+    spinlock_unlock(&nd_thread_cleanup_registry.spinlock);
+}
+
+static void nd_thread_run_cleanup_callbacks(void) {
+    size_t count = __atomic_load_n(&nd_thread_cleanup_registry.count, __ATOMIC_ACQUIRE);
+    for(size_t i = 0; i < count; i++) {
+        nd_thread_cleanup_fn fn = nd_thread_cleanup_registry.fns[i];
+        if(fn) fn();
+    }
+}
+
+// ----------------------------------------------------------------------------
 
 void nd_thread_join_threads()
 {
@@ -323,12 +371,8 @@ static void nd_thread_exit(ND_THREAD *nti) {
     if(nd_thread_status_check(nti, NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP) != NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP)
         nd_log(NDLS_DAEMON, NDLP_DEBUG, "thread with task id %d finished", nti->tid);
 
-    rrd_collector_finished();
-    sender_thread_buffer_free();
-    rrdset_thread_rda_free();
-    query_target_free();
+    nd_thread_run_cleanup_callbacks();
     thread_cache_destroy();
-    service_exits();
     worker_unregister();
 
     nd_thread_status_set(nti, NETDATA_THREAD_STATUS_FINISHED);

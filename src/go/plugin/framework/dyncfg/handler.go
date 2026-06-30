@@ -14,12 +14,16 @@ import (
 
 // Callbacks defines component-specific operations for the handler.
 type Callbacks[C Config] interface {
-	// ExtractKey parses dyncfg function ID into cache key + job name.
+	// ExtractKey parses dyncfg function ID into cache key + config name.
 	ExtractKey(fn Function) (key, name string, ok bool)
 
 	// ParseAndValidate parses payload into a config with dyncfg metadata set.
 	// Includes all validation (including heavy checks like module instantiation).
 	ParseAndValidate(fn Function, name string) (C, error)
+
+	// ValidateConfigName enforces the domain's config-name policy. Called before
+	// ParseAndValidate so cheap name-format rejections happen without parsing payload.
+	ValidateConfigName(name string) error
 
 	// Start creates a work unit and starts it. Owns the full start lifecycle
 	// including pre-start cleanup and post-fail retry scheduling.
@@ -42,12 +46,28 @@ type Callbacks[C Config] interface {
 
 	// ConfigID returns the dyncfg wire protocol ID for a config.
 	ConfigID(cfg C) string
+
+	// ConfigType returns the dyncfg type for a config.
+	ConfigType(cfg C) ConfigType
 }
 
 // CodedError allows callbacks to override the default response code.
 type CodedError interface {
 	error
-	Code() int
+	DyncfgCode() int
+}
+
+// RetryableError marks errors that should keep job auto-detection retry enabled.
+// The method name is intentionally Netdata-specific to avoid matching unrelated
+// dependency errors that happen to expose Retryable() bool.
+type RetryableError interface {
+	error
+	DyncfgRetryable() bool
+}
+
+func IsRetryableError(err error) bool {
+	var re RetryableError
+	return errors.As(err, &re) && re.DyncfgRetryable()
 }
 
 // CommandMessageSource optionally provides a success/warning message
@@ -69,7 +89,7 @@ type HandlerOpts[C Config] struct {
 	Path                    string    // dyncfg path (e.g. "/collectors/go.d/Jobs")
 	EnableFailCode          int       // response code for enable failure (jobmgr: 200, SD: 422)
 	RemoveStockOnEnableFail bool      // remove stock config from exposed on enable failure
-	JobCommands             []Command // base commands for jobs; CommandRemove is added implicitly for dyncfg configs
+	ConfigCommands          []Command // base commands for non-template configs; CommandRemove is added implicitly only for dyncfg ConfigTypeJob configs
 }
 
 // Handler implements the shared dyncfg command state machine.
@@ -84,7 +104,7 @@ type Handler[C Config] struct {
 	path                    string
 	enableFailCode          int
 	removeStockOnEnableFail bool
-	jobCommands             []Command
+	configCommands          []Command
 	waitGate                *waitGate[C]
 }
 
@@ -286,7 +306,7 @@ func NewHandler[C Config](opts HandlerOpts[C]) *Handler[C] {
 		path:                    opts.Path,
 		enableFailCode:          opts.EnableFailCode,
 		removeStockOnEnableFail: opts.RemoveStockOnEnableFail,
-		jobCommands:             opts.JobCommands,
+		configCommands:          opts.ConfigCommands,
 		waitGate:                newWaitGate(opts.WaitKey, opts.WaitTimeout),
 	}
 }
@@ -386,34 +406,39 @@ func (h *Handler[C]) SyncDecision(fn Function) {
 	h.waitGate.clearIfMatch(waitKey)
 }
 
-// NotifyJobCreate registers/updates a config in the dyncfg API (upsert).
-func (h *Handler[C]) NotifyJobCreate(cfg C, status Status) {
+// NotifyConfigCreate registers/updates a config in the dyncfg API (upsert).
+func (h *Handler[C]) NotifyConfigCreate(cfg C, status Status) {
 	isDyncfg := cfg.SourceType() == "dyncfg"
 	h.api.ConfigCreate(netdataapi.ConfigOpts{
 		ID:                h.cb.ConfigID(cfg),
 		Status:            status.String(),
-		ConfigType:        ConfigTypeJob.String(),
+		ConfigType:        h.cb.ConfigType(cfg).String(),
 		Path:              h.path,
 		SourceType:        cfg.SourceType(),
 		Source:            cfg.Source(),
-		SupportedCommands: h.jobSupportedCommands(isDyncfg),
+		SupportedCommands: h.configSupportedCommands(cfg, isDyncfg),
 	})
 }
 
-// NotifyJobStatus sends a status update for a config.
-func (h *Handler[C]) NotifyJobStatus(cfg C, status Status) {
+// NotifyConfigStatus sends a status update for a config.
+func (h *Handler[C]) NotifyConfigStatus(cfg C, status Status) {
 	h.api.ConfigStatus(h.cb.ConfigID(cfg), status)
 }
 
-// NotifyJobRemove removes a config from the dyncfg API.
-func (h *Handler[C]) NotifyJobRemove(cfg C) {
+// NotifyConfigRemove removes a config from the dyncfg API.
+func (h *Handler[C]) NotifyConfigRemove(cfg C) {
 	h.api.ConfigDelete(h.cb.ConfigID(cfg))
 }
 
-func (h *Handler[C]) jobSupportedCommands(isDyncfg bool) string {
-	cmds := make([]Command, len(h.jobCommands))
-	copy(cmds, h.jobCommands)
-	if isDyncfg {
+func (h *Handler[C]) configSupportedCommands(cfg C, isDyncfg bool) string {
+	cmds := make([]Command, 0, len(h.configCommands)+1)
+	for _, cmd := range h.configCommands {
+		if cmd == CommandAdd || cmd == CommandRemove {
+			continue
+		}
+		cmds = append(cmds, cmd)
+	}
+	if isDyncfg && h.cb.ConfigType(cfg) == ConfigTypeJob {
 		cmds = append(cmds, CommandRemove)
 	}
 	return JoinCommands(cmds...)
@@ -428,7 +453,7 @@ func (h *Handler[C]) CmdAdd(fn Function) {
 
 	key, name, ok := h.cb.ExtractKey(fn)
 	if !ok {
-		h.api.SendCodef(fn, 400, "invalid job ID format.")
+		h.api.SendCodef(fn, 400, "invalid config ID format.")
 		return
 	}
 
@@ -437,14 +462,18 @@ func (h *Handler[C]) CmdAdd(fn Function) {
 		return
 	}
 
-	if err := ValidateJobName(name); err != nil {
-		h.api.SendCodef(fn, 400, "invalid job name '%s': %v.", name, err)
+	if err := h.cb.ValidateConfigName(name); err != nil {
+		h.api.SendCodef(fn, 400, "invalid config name '%s': %v.", name, err)
 		return
 	}
 
 	newCfg, err := h.cb.ParseAndValidate(fn, name)
 	if err != nil {
 		h.api.SendCodef(fn, 400, "%v", err)
+		return
+	}
+	if h.cb.ConfigType(newCfg) != ConfigTypeJob {
+		h.api.SendCodef(fn, 405, "adding configurations of type '%s' is not supported, only 'job' configurations can be added.", h.cb.ConfigType(newCfg))
 		return
 	}
 
@@ -462,20 +491,20 @@ func (h *Handler[C]) CmdAdd(fn Function) {
 	h.exposed.Add(newEntry)
 
 	h.api.SendCodef(fn, 202, "")
-	h.NotifyJobCreate(newCfg, StatusAccepted)
+	h.NotifyConfigCreate(newCfg, StatusAccepted)
 }
 
 // CmdEnable handles the "enable" command.
 func (h *Handler[C]) CmdEnable(fn Function) {
 	key, _, ok := h.cb.ExtractKey(fn)
 	if !ok {
-		h.api.SendCodef(fn, 400, "invalid job ID format.")
+		h.api.SendCodef(fn, 400, "invalid config ID format.")
 		return
 	}
 
 	entry, ok := h.exposed.LookupByKey(key)
 	if !ok {
-		h.api.SendCodef(fn, 404, "job not found.")
+		h.api.SendCodef(fn, 404, "config not found.")
 		return
 	}
 
@@ -484,13 +513,13 @@ func (h *Handler[C]) CmdEnable(fn Function) {
 	switch entry.Status {
 	case StatusRunning:
 		h.api.SendCodef(fn, 200, "")
-		h.NotifyJobStatus(entry.Cfg, StatusRunning)
+		h.NotifyConfigStatus(entry.Cfg, StatusRunning)
 		return
 	case StatusAccepted, StatusDisabled, StatusFailed:
 		// proceed to start
 	default:
 		h.api.SendCodef(fn, 405, "enabling is not allowed in '%s' state.", entry.Status)
-		h.NotifyJobStatus(entry.Cfg, entry.Status)
+		h.NotifyConfigStatus(entry.Cfg, entry.Status)
 		return
 	}
 
@@ -502,17 +531,18 @@ func (h *Handler[C]) CmdEnable(fn Function) {
 		code := h.enableFailCode
 		var ce CodedError
 		if errors.As(err, &ce) {
-			code = ce.Code()
+			code = ce.DyncfgCode()
 		}
 		h.api.SendCodef(fn, code, "%v", err)
 
-		// Stock removal only for non-CodedError failures (runtime detection failures).
-		// CodedError = validation error (e.g. createCollectorJob → 400, no stock removal).
+		// Stock removal only for plain runtime detection failures.
+		// CodedError carries an explicit status code, so the component owns the
+		// failure semantics and whether the job should be retried.
 		if h.removeStockOnEnableFail && !isCodedError(err) && entry.Cfg.SourceType() == "stock" {
 			h.exposed.Remove(entry.Cfg)
-			h.NotifyJobRemove(entry.Cfg)
+			h.NotifyConfigRemove(entry.Cfg)
 		} else {
-			h.NotifyJobStatus(entry.Cfg, StatusFailed)
+			h.NotifyConfigStatus(entry.Cfg, StatusFailed)
 		}
 
 		h.cb.OnStatusChange(entry, oldStatus, fn)
@@ -521,7 +551,7 @@ func (h *Handler[C]) CmdEnable(fn Function) {
 
 	entry.Status = StatusRunning
 	h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
-	h.NotifyJobStatus(entry.Cfg, StatusRunning)
+	h.NotifyConfigStatus(entry.Cfg, StatusRunning)
 	h.cb.OnStatusChange(entry, oldStatus, fn)
 }
 
@@ -529,13 +559,13 @@ func (h *Handler[C]) CmdEnable(fn Function) {
 func (h *Handler[C]) CmdDisable(fn Function) {
 	key, _, ok := h.cb.ExtractKey(fn)
 	if !ok {
-		h.api.SendCodef(fn, 400, "invalid job ID format.")
+		h.api.SendCodef(fn, 400, "invalid config ID format.")
 		return
 	}
 
 	entry, ok := h.exposed.LookupByKey(key)
 	if !ok {
-		h.api.SendCodef(fn, 404, "job not found.")
+		h.api.SendCodef(fn, 404, "config not found.")
 		return
 	}
 
@@ -543,7 +573,7 @@ func (h *Handler[C]) CmdDisable(fn Function) {
 
 	if entry.Status == StatusDisabled {
 		h.api.SendCodef(fn, 200, "")
-		h.NotifyJobStatus(entry.Cfg, StatusDisabled)
+		h.NotifyConfigStatus(entry.Cfg, StatusDisabled)
 		return
 	}
 
@@ -552,7 +582,7 @@ func (h *Handler[C]) CmdDisable(fn Function) {
 
 	entry.Status = StatusDisabled
 	h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
-	h.NotifyJobStatus(entry.Cfg, StatusDisabled)
+	h.NotifyConfigStatus(entry.Cfg, StatusDisabled)
 	h.cb.OnStatusChange(entry, oldStatus, fn)
 }
 
@@ -560,18 +590,22 @@ func (h *Handler[C]) CmdDisable(fn Function) {
 func (h *Handler[C]) CmdRemove(fn Function) {
 	key, _, ok := h.cb.ExtractKey(fn)
 	if !ok {
-		h.api.SendCodef(fn, 400, "invalid job ID format.")
+		h.api.SendCodef(fn, 400, "invalid config ID format.")
 		return
 	}
 
 	entry, ok := h.exposed.LookupByKey(key)
 	if !ok {
-		h.api.SendCodef(fn, 404, "job not found.")
+		h.api.SendCodef(fn, 404, "config not found.")
 		return
 	}
 
 	if entry.Cfg.SourceType() != "dyncfg" {
-		h.api.SendCodef(fn, 405, "removing jobs of type '%s' is not supported, only 'dyncfg' jobs can be removed.", entry.Cfg.SourceType())
+		h.api.SendCodef(fn, 405, "removing configurations of source type '%s' is not supported, only 'dyncfg' configurations can be removed.", entry.Cfg.SourceType())
+		return
+	}
+	if h.cb.ConfigType(entry.Cfg) != ConfigTypeJob {
+		h.api.SendCodef(fn, 405, "removing configurations of type '%s' is not supported, only 'job' configurations can be removed.", h.cb.ConfigType(entry.Cfg))
 		return
 	}
 
@@ -580,20 +614,20 @@ func (h *Handler[C]) CmdRemove(fn Function) {
 	h.cb.Stop(entry.Cfg)
 
 	h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
-	h.NotifyJobRemove(entry.Cfg)
+	h.NotifyConfigRemove(entry.Cfg)
 }
 
 // CmdUpdate handles the "update" command.
 func (h *Handler[C]) CmdUpdate(fn Function) {
 	key, name, ok := h.cb.ExtractKey(fn)
 	if !ok {
-		h.api.SendCodef(fn, 400, "invalid job ID format.")
+		h.api.SendCodef(fn, 400, "invalid config ID format.")
 		return
 	}
 
 	entry, ok := h.exposed.LookupByKey(key)
 	if !ok {
-		h.api.SendCodef(fn, 404, "job not found.")
+		h.api.SendCodef(fn, 404, "config not found.")
 		return
 	}
 
@@ -605,7 +639,7 @@ func (h *Handler[C]) CmdUpdate(fn Function) {
 	newCfg, err := h.cb.ParseAndValidate(fn, name)
 	if err != nil {
 		h.api.SendCodef(fn, 400, "%v", err)
-		h.NotifyJobStatus(entry.Cfg, entry.Status)
+		h.NotifyConfigStatus(entry.Cfg, entry.Status)
 		return
 	}
 
@@ -614,20 +648,20 @@ func (h *Handler[C]) CmdUpdate(fn Function) {
 	// No-op: running dyncfg config with same hash.
 	if !isConversion && entry.Status == StatusRunning && entry.Cfg.Hash() == newCfg.Hash() {
 		h.api.SendCodef(fn, 200, "")
-		h.NotifyJobStatus(entry.Cfg, StatusRunning)
+		h.NotifyConfigStatus(entry.Cfg, StatusRunning)
 		return
 	}
 
 	if entry.Status == StatusAccepted {
 		h.api.SendCodef(fn, 403, "updating is not allowed in '%s' state.", entry.Status)
-		h.NotifyJobStatus(entry.Cfg, StatusAccepted)
+		h.NotifyConfigStatus(entry.Cfg, StatusAccepted)
 		return
 	}
 
 	oldStatus := entry.Status
 	oldCfg := entry.Cfg
 
-	// For conversion: stop old before cache update (matching jobmgr line 681).
+	// For conversion, stop the old work before publishing replacement config state.
 	if isConversion {
 		h.cb.Stop(oldCfg)
 	}
@@ -644,10 +678,10 @@ func (h *Handler[C]) CmdUpdate(fn Function) {
 	if oldStatus == StatusDisabled {
 		newEntry.Status = StatusDisabled
 		if isConversion {
-			h.NotifyJobCreate(newCfg, StatusDisabled)
+			h.NotifyConfigCreate(newCfg, StatusDisabled)
 		}
 		h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
-		h.NotifyJobStatus(newCfg, StatusDisabled)
+		h.NotifyConfigStatus(newCfg, StatusDisabled)
 		h.cb.OnStatusChange(newEntry, oldStatus, fn)
 		return
 	}
@@ -667,27 +701,32 @@ func (h *Handler[C]) CmdUpdate(fn Function) {
 			h.exposed.Add(entry)
 
 			h.api.SendCodef(fn, 200, "%v", err)
-			h.NotifyJobStatus(oldCfg, oldStatus)
+			h.NotifyConfigStatus(oldCfg, oldStatus)
 			// No OnStatusChange call here: effective state did not change.
 			return
 		}
 
 		newEntry.Status = StatusFailed
 		if isConversion {
-			h.NotifyJobCreate(newCfg, StatusFailed)
+			h.NotifyConfigCreate(newCfg, StatusFailed)
 		}
-		h.api.SendCodef(fn, 200, "%v", err)
-		h.NotifyJobStatus(newCfg, StatusFailed)
+		code := 200
+		var ce CodedError
+		if errors.As(err, &ce) {
+			code = ce.DyncfgCode()
+		}
+		h.api.SendCodef(fn, code, "%v", err)
+		h.NotifyConfigStatus(newCfg, StatusFailed)
 		h.cb.OnStatusChange(newEntry, oldStatus, fn)
 		return
 	}
 
 	newEntry.Status = StatusRunning
 	if isConversion {
-		h.NotifyJobCreate(newCfg, StatusRunning)
+		h.NotifyConfigCreate(newCfg, StatusRunning)
 	}
 	h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
-	h.NotifyJobStatus(newCfg, StatusRunning)
+	h.NotifyConfigStatus(newCfg, StatusRunning)
 	h.cb.OnStatusChange(newEntry, oldStatus, fn)
 }
 
@@ -697,26 +736,26 @@ func (h *Handler[C]) CmdUpdate(fn Function) {
 func (h *Handler[C]) CmdRestart(fn Function) {
 	key, _, ok := h.cb.ExtractKey(fn)
 	if !ok {
-		h.api.SendCodef(fn, 400, "invalid job ID format.")
+		h.api.SendCodef(fn, 400, "invalid config ID format.")
 		return
 	}
 
 	entry, ok := h.exposed.LookupByKey(key)
 	if !ok {
-		h.api.SendCodef(fn, 404, "job not found.")
+		h.api.SendCodef(fn, 404, "config not found.")
 		return
 	}
 
 	switch entry.Status {
 	case StatusAccepted, StatusDisabled:
 		h.api.SendCodef(fn, 405, "restarting is not allowed in '%s' state.", entry.Status)
-		h.NotifyJobStatus(entry.Cfg, entry.Status)
+		h.NotifyConfigStatus(entry.Cfg, entry.Status)
 		return
 	case StatusRunning, StatusFailed:
 		// proceed
 	default:
 		h.api.SendCodef(fn, 405, "restarting is not allowed in '%s' state.", entry.Status)
-		h.NotifyJobStatus(entry.Cfg, entry.Status)
+		h.NotifyConfigStatus(entry.Cfg, entry.Status)
 		return
 	}
 
@@ -731,17 +770,17 @@ func (h *Handler[C]) CmdRestart(fn Function) {
 		code := 422
 		var ce CodedError
 		if errors.As(err, &ce) {
-			code = ce.Code()
+			code = ce.DyncfgCode()
 		}
-		h.api.SendCodef(fn, code, "job restart failed: %v", err)
-		h.NotifyJobStatus(entry.Cfg, StatusFailed)
+		h.api.SendCodef(fn, code, "config restart failed: %v", err)
+		h.NotifyConfigStatus(entry.Cfg, StatusFailed)
 		h.cb.OnStatusChange(entry, oldStatus, fn)
 		return
 	}
 
 	entry.Status = StatusRunning
 	h.api.SendCodef(fn, 200, "")
-	h.NotifyJobStatus(entry.Cfg, StatusRunning)
+	h.NotifyConfigStatus(entry.Cfg, StatusRunning)
 	h.cb.OnStatusChange(entry, oldStatus, fn)
 }
 

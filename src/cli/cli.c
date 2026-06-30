@@ -2,7 +2,6 @@
 
 #include "daemon/pipename.h"
 #include "daemon/common.h"
-#include "libnetdata/required_dummies.h"
 
 static uv_pipe_t client_pipe;
 static uv_write_t write_req;

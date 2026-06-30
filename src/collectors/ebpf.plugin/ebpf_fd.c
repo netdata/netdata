@@ -621,7 +621,7 @@ static void ebpf_fd_exit(void *pptr)
 
     if (!fd_safe_clean) {
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+        ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPED);
         netdata_mutex_unlock(&ebpf_exit_cleanup);
         return;
     }
@@ -642,7 +642,7 @@ static void ebpf_fd_exit(void *pptr)
         sem_post(shm_mutex_ebpf_integration);
     }
 
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
+    if (ebpf_module_enabled_get(em) == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
         netdata_mutex_lock(&lock);
         if (em->cgroup_charts) {
             ebpf_obsolete_fd_cgroup_charts(em);
@@ -668,7 +668,7 @@ static void ebpf_fd_exit(void *pptr)
         em->functions.bpf_unload(em);
 
     netdata_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPED);
     netdata_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -778,6 +778,8 @@ static void ebpf_read_fd_apps_table(int maps_per_core)
         if (ebpf_plugin_stop())
             break;
 
+        key = next_key;
+
         if (bpf_map_lookup_elem(fd, &key, fv)) {
             netdata_log_error("Failed to lookup PID %u in FD map", key);
             goto end_fd_loop;
@@ -804,7 +806,6 @@ static void ebpf_read_fd_apps_table(int maps_per_core)
     end_fd_loop:
         // We are cleaning to avoid passing data read from one process to other.
         memset(fv, 0, length);
-        key = next_key;
     }
 }
 
@@ -939,7 +940,7 @@ void ebpf_read_fd_thread(void *ptr)
             break;
         }
 
-        if (cgroups && shm_ebpf_cgroup.header)
+        if (cgroups && ebpf_cgroup_integration_active_get())
             ebpf_update_fd_cgroup();
 
         if (sem_post(shm_mutex_ebpf_integration)) {
@@ -1358,8 +1359,8 @@ static void ebpf_fd_send_cgroup_data(ebpf_module_t *em)
         return;
     }
 
-    if (shm_ebpf_cgroup.header->systemd_enabled) {
-        if (send_cgroup_chart) {
+    if (ebpf_cgroup_systemd_enabled_get()) {
+        if (ebpf_send_cgroup_chart_get()) {
             ebpf_create_systemd_fd_charts(em);
         }
 
@@ -1437,7 +1438,7 @@ static void fd_collector(ebpf_module_t *em)
             break;
         }
 
-        if (cgroups && shm_ebpf_cgroup.header)
+        if (cgroups && ebpf_cgroup_integration_active_get())
             ebpf_fd_send_cgroup_data(em);
 
         netdata_mutex_unlock(&lock);
@@ -1688,6 +1689,7 @@ void ebpf_fd_thread(void *ptr)
     if (ebpf_fd_load_bpf(em)) {
         goto endfd;
     }
+    ebpf_mark_program_loaded();
 
     ebpf_fd_allocate_global_vectors();
 

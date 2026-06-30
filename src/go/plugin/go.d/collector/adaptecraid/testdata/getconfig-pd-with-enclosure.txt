@@ -1,0 +1,446 @@
+Controllers found: 1
+----------------------------------------------------------------------
+Physical Device information
+----------------------------------------------------------------------
+      Device #0
+         Device is a Hard drive
+         State                                : Online
+         Block Size                           : 512 Bytes
+         Supported                            : Yes
+         Transfer Speed                       : SATA 6.0 Gb/s
+         Reported Channel,Device(T:L)         : 0,16(16:0)
+         Reported Location                    : Enclosure 0, Slot 0( Connector Unknown )
+         Reported ESD(T:L)                    : 2,0(0:0)
+         Vendor                               : ATA
+         Model                                : INTEL SSDSC2KB019T
+         Firmware                             : SCV10111
+         Serial number                        : XXXXXXXXXXXXXXXXXX
+         Reserved Size                        : 3666200 KB
+         Used Size                            : 1827840 MB
+         Unused Size                          : 64 KB
+         Total Size                           : 1831420 MB
+         Write Cache                          : Enabled (write-back)
+         FRU                                  : None
+         S.M.A.R.T.                           : No
+         S.M.A.R.T. warnings                  : 0
+         Power State                          : Full rpm
+         Supported Power States               : Full power,Powered off
+         SSD                                  : Yes
+         Temperature                          : Not Supported
+         NCQ status                           : Enabled
+      ----------------------------------------------------------------
+      Device Phy Information
+      ----------------------------------------------------------------
+         Phy #0
+            PHY Identifier                    : 0
+            SAS Address                       : 5000
+            Attached PHY Identifier           : 12
+            Attached SAS Address              : 5000
+
+      Device #1
+         Device is a Hard drive
+         State                                : Online
+         Block Size                           : 512 Bytes
+         Supported                            : Yes
+         Transfer Speed                       : SATA 6.0 Gb/s
+         Reported Channel,Device(T:L)         : 0,17(17:0)
+         Reported Location                    : Enclosure 0, Slot 1( Connector Unknown )
+         Reported ESD(T:L)                    : 2,0(0:0)
+         Vendor                               : ATA
+         Model                                : INTEL SSDSC2KB019T
+         Firmware                             : SCV10111
+         Serial number                        : XXXXXXXXXXXXXXXXXX
+         Reserved Size                        : 3666200 KB
+         Used Size                            : 1827840 MB
+         Unused Size                          : 64 KB
+         Total Size                           : 1831420 MB
+         Write Cache                          : Enabled (write-back)
+         FRU                                  : None
+         S.M.A.R.T.                           : No
+         S.M.A.R.T. warnings                  : 0
+         Power State                          : Full rpm
+         Supported Power States               : Full power,Powered off
+         SSD                                  : Yes
+         Temperature                          : Not Supported
+         NCQ status                           : Enabled
+      ----------------------------------------------------------------
+      Device Phy Information
+      ----------------------------------------------------------------
+         Phy #0
+            PHY Identifier                    : 0
+            SAS Address                       : 5000
+            Attached PHY Identifier           : 13
+            Attached SAS Address              : 5000
+
+      Device #2
+         Device is a Hard drive
+         State                                : Online
+         Block Size                           : 512 Bytes
+         Supported                            : Yes
+         Transfer Speed                       : SATA 6.0 Gb/s
+         Reported Channel,Device(T:L)         : 0,18(18:0)
+         Reported Location                    : Enclosure 0, Slot 2( Connector Unknown )
+         Reported ESD(T:L)                    : 2,0(0:0)
+         Vendor                               : ATA
+         Model                                : INTEL SSDSC2KB019T
+         Firmware                             : SCV10111
+         Serial number                        : XXXXXXXXXXXXXXXXXX
+         Reserved Size                        : 3666200 KB
+         Used Size                            : 1827840 MB
+         Unused Size                          : 64 KB
+         Total Size                           : 1831420 MB
+         Write Cache                          : Enabled (write-back)
+         FRU                                  : None
+         S.M.A.R.T.                           : No
+         S.M.A.R.T. warnings                  : 0
+         Power State                          : Full rpm
+         Supported Power States               : Full power,Powered off
+         SSD                                  : Yes
+         Temperature                          : Not Supported
+         NCQ status                           : Enabled
+      ----------------------------------------------------------------
+      Device Phy Information
+      ----------------------------------------------------------------
+         Phy #0
+            PHY Identifier                    : 0
+            SAS Address                       : 5000
+            Attached PHY Identifier           : 14
+            Attached SAS Address              : 5000
+
+      Device #3
+         Device is a Hard drive
+         State                                : Online
+         Block Size                           : 512 Bytes
+         Supported                            : Yes
+         Transfer Speed                       : SATA 6.0 Gb/s
+         Reported Channel,Device(T:L)         : 0,19(19:0)
+         Reported Location                    : Enclosure 0, Slot 3( Connector Unknown )
+         Reported ESD(T:L)                    : 2,0(0:0)
+         Vendor                               : ATA
+         Model                                : INTEL SSDSC2KB019T
+         Firmware                             : SCV10111
+         Serial number                        : XXXXXXXXXXXXXXXXXX
+         Reserved Size                        : 3666200 KB
+         Used Size                            : 1827840 MB
+         Unused Size                          : 64 KB
+         Total Size                           : 1831420 MB
+         Write Cache                          : Enabled (write-back)
+         FRU                                  : None
+         S.M.A.R.T.                           : No
+         S.M.A.R.T. warnings                  : 0
+         Power State                          : Full rpm
+         Supported Power States               : Full power,Powered off
+         SSD                                  : Yes
+         Temperature                          : Not Supported
+         NCQ status                           : Enabled
+      ----------------------------------------------------------------
+      Device Phy Information
+      ----------------------------------------------------------------
+         Phy #0
+            PHY Identifier                    : 0
+            SAS Address                       : 5000
+            Attached PHY Identifier           : 15
+            Attached SAS Address              : 5000
+
+      Device #4
+         Device is a Hard drive
+         State                                : Online
+         Block Size                           : 512 Bytes
+         Supported                            : Yes
+         Transfer Speed                       : SATA 6.0 Gb/s
+         Reported Channel,Device(T:L)         : 0,20(20:0)
+         Reported Location                    : Enclosure 0, Slot 4( Connector Unknown )
+         Reported ESD(T:L)                    : 2,0(0:0)
+         Vendor                               : ATA
+         Model                                : INTEL SSDSC2KB019T
+         Firmware                             : SCV10111
+         Serial number                        : XXXXXXXXXXXXXXXXXX
+         Reserved Size                        : 3666200 KB
+         Used Size                            : 1827840 MB
+         Unused Size                          : 64 KB
+         Total Size                           : 1831420 MB
+         Write Cache                          : Enabled (write-back)
+         FRU                                  : None
+         S.M.A.R.T.                           : No
+         S.M.A.R.T. warnings                  : 0
+         Power State                          : Full rpm
+         Supported Power States               : Full power,Powered off
+         SSD                                  : Yes
+         Temperature                          : Not Supported
+         NCQ status                           : Enabled
+      ----------------------------------------------------------------
+      Device Phy Information
+      ----------------------------------------------------------------
+         Phy #0
+            PHY Identifier                    : 0
+            SAS Address                       : 5000
+            Attached PHY Identifier           : 16
+            Attached SAS Address              : 5000
+
+      Device #5
+         Device is a Hard drive
+         State                                : Online
+         Block Size                           : 512 Bytes
+         Supported                            : Yes
+         Transfer Speed                       : SATA 6.0 Gb/s
+         Reported Channel,Device(T:L)         : 0,21(21:0)
+         Reported Location                    : Enclosure 0, Slot 5( Connector Unknown )
+         Reported ESD(T:L)                    : 2,0(0:0)
+         Vendor                               : ATA
+         Model                                : INTEL SSDSC2KB019T
+         Firmware                             : SCV10111
+         Serial number                        : XXXXXXXXXXXXXXXXXX
+         Reserved Size                        : 3666200 KB
+         Used Size                            : 1827840 MB
+         Unused Size                          : 64 KB
+         Total Size                           : 1831420 MB
+         Write Cache                          : Enabled (write-back)
+         FRU                                  : None
+         S.M.A.R.T.                           : No
+         S.M.A.R.T. warnings                  : 0
+         Power State                          : Full rpm
+         Supported Power States               : Full power,Powered off
+         SSD                                  : Yes
+         Temperature                          : Not Supported
+         NCQ status                           : Enabled
+      ----------------------------------------------------------------
+      Device Phy Information
+      ----------------------------------------------------------------
+         Phy #0
+            PHY Identifier                    : 0
+            SAS Address                       : 5000
+            Attached PHY Identifier           : 17
+            Attached SAS Address              : 5000
+
+      Device #6
+         Device is a Hard drive
+         State                                : Online
+         Block Size                           : 512 Bytes
+         Supported                            : Yes
+         Transfer Speed                       : SATA 6.0 Gb/s
+         Reported Channel,Device(T:L)         : 0,22(22:0)
+         Reported Location                    : Enclosure 0, Slot 6( Connector Unknown )
+         Reported ESD(T:L)                    : 2,0(0:0)
+         Vendor                               : ATA
+         Model                                : INTEL SSDSC2KB019T
+         Firmware                             : SCV10111
+         Serial number                        : XXXXXXXXXXXXXXXXXX
+         Reserved Size                        : 3666200 KB
+         Used Size                            : 1827840 MB
+         Unused Size                          : 64 KB
+         Total Size                           : 1831420 MB
+         Write Cache                          : Enabled (write-back)
+         FRU                                  : None
+         S.M.A.R.T.                           : No
+         S.M.A.R.T. warnings                  : 0
+         Power State                          : Full rpm
+         Supported Power States               : Full power,Powered off
+         SSD                                  : Yes
+         Temperature                          : Not Supported
+         NCQ status                           : Enabled
+      ----------------------------------------------------------------
+      Device Phy Information
+      ----------------------------------------------------------------
+         Phy #0
+            PHY Identifier                    : 0
+            SAS Address                       : 5000
+            Attached PHY Identifier           : 18
+            Attached SAS Address              : 5000
+
+      Device #7
+         Device is a Hard drive
+         State                                : Online
+         Block Size                           : 512 Bytes
+         Supported                            : Yes
+         Transfer Speed                       : SATA 6.0 Gb/s
+         Reported Channel,Device(T:L)         : 0,23(23:0)
+         Reported Location                    : Enclosure 0, Slot 7( Connector Unknown )
+         Reported ESD(T:L)                    : 2,0(0:0)
+         Vendor                               : ATA
+         Model                                : INTEL SSDSC2KB019T
+         Firmware                             : SCV10111
+         Serial number                        : XXXXXXXXXXXXXXXXXX
+         Reserved Size                        : 3666200 KB
+         Used Size                            : 1827840 MB
+         Unused Size                          : 64 KB
+         Total Size                           : 1831420 MB
+         Write Cache                          : Enabled (write-back)
+         FRU                                  : None
+         S.M.A.R.T.                           : No
+         S.M.A.R.T. warnings                  : 0
+         Power State                          : Full rpm
+         Supported Power States               : Full power,Powered off
+         SSD                                  : Yes
+         Temperature                          : Not Supported
+         NCQ status                           : Enabled
+      ----------------------------------------------------------------
+      Device Phy Information
+      ----------------------------------------------------------------
+         Phy #0
+            PHY Identifier                    : 0
+            SAS Address                       : 5000
+            Attached PHY Identifier           : 19
+            Attached SAS Address              : 5000
+
+      Device #8
+         Device is a Hard drive
+         State                                : Online
+         Block Size                           : 512 Bytes
+         Supported                            : Yes
+         Transfer Speed                       : SATA 6.0 Gb/s
+         Reported Channel,Device(T:L)         : 0,24(24:0)
+         Reported Location                    : Enclosure 0, Slot 8( Connector Unknown )
+         Reported ESD(T:L)                    : 2,0(0:0)
+         Vendor                               : ATA
+         Model                                : INTEL SSDSC2KB019T
+         Firmware                             : SCV10111
+         Serial number                        : XXXXXXXXXXXXXXXXXX
+         Reserved Size                        : 3666200 KB
+         Used Size                            : 1827840 MB
+         Unused Size                          : 64 KB
+         Total Size                           : 1831420 MB
+         Write Cache                          : Enabled (write-back)
+         FRU                                  : None
+         S.M.A.R.T.                           : No
+         S.M.A.R.T. warnings                  : 0
+         Power State                          : Full rpm
+         Supported Power States               : Full power,Powered off
+         SSD                                  : Yes
+         Temperature                          : Not Supported
+         NCQ status                           : Enabled
+      ----------------------------------------------------------------
+      Device Phy Information
+      ----------------------------------------------------------------
+         Phy #0
+            PHY Identifier                    : 0
+            SAS Address                       : 5000
+            Attached PHY Identifier           : 20
+            Attached SAS Address              : 5000
+
+      Device #9
+         Device is a Hard drive
+         State                                : Online
+         Block Size                           : 512 Bytes
+         Supported                            : Yes
+         Transfer Speed                       : SATA 6.0 Gb/s
+         Reported Channel,Device(T:L)         : 0,25(25:0)
+         Reported Location                    : Enclosure 0, Slot 9( Connector Unknown )
+         Reported ESD(T:L)                    : 2,0(0:0)
+         Vendor                               : ATA
+         Model                                : INTEL SSDSC2KB019T
+         Firmware                             : SCV10111
+         Serial number                        : XXXXXXXXXXXXXXXXXX
+         Reserved Size                        : 3666200 KB
+         Used Size                            : 1827840 MB
+         Unused Size                          : 64 KB
+         Total Size                           : 1831420 MB
+         Write Cache                          : Enabled (write-back)
+         FRU                                  : None
+         S.M.A.R.T.                           : No
+         S.M.A.R.T. warnings                  : 0
+         Power State                          : Full rpm
+         Supported Power States               : Full power,Powered off
+         SSD                                  : Yes
+         Temperature                          : Not Supported
+         NCQ status                           : Enabled
+      ----------------------------------------------------------------
+      Device Phy Information
+      ----------------------------------------------------------------
+         Phy #0
+            PHY Identifier                    : 0
+            SAS Address                       : 5000
+            Attached PHY Identifier           : 21
+            Attached SAS Address              : 5000
+
+      Device #10
+         Device is a Hard drive
+         State                                : Global Hot-Spare
+         Block Size                           : 512 Bytes
+         Supported                            : Yes
+         Transfer Speed                       : SATA 6.0 Gb/s
+         Reported Channel,Device(T:L)         : 0,26(26:0)
+         Reported Location                    : Enclosure 0, Slot 10( Connector Unknown )
+         Reported ESD(T:L)                    : 2,0(0:0)
+         Vendor                               : ATA
+         Model                                : INTEL SSDSC2KB019T
+         Firmware                             : SCV10111
+         Serial number                        : XXXXXXXXXXXXXXXXXX
+         Reserved Size                        : 3666200 KB
+         Used Size                            : 1827840 MB
+         Unused Size                          : 64 KB
+         Total Size                           : 1831420 MB
+         Write Cache                          : Enabled (write-back)
+         FRU                                  : None
+         S.M.A.R.T.                           : No
+         S.M.A.R.T. warnings                  : 0
+         Power State                          : Full rpm
+         Supported Power States               : Full power,Powered off
+         SSD                                  : Yes
+         Temperature                          : Not Supported
+         NCQ status                           : Enabled
+      ----------------------------------------------------------------
+      Device Phy Information
+      ----------------------------------------------------------------
+         Phy #0
+            PHY Identifier                    : 0
+            SAS Address                       : 5000
+            Attached PHY Identifier           : 22
+            Attached SAS Address              : 5000
+
+      Device #11
+         Device is a Hard drive
+         State                                : Global Hot-Spare
+         Block Size                           : 512 Bytes
+         Supported                            : Yes
+         Transfer Speed                       : SATA 6.0 Gb/s
+         Reported Channel,Device(T:L)         : 0,27(27:0)
+         Reported Location                    : Enclosure 0, Slot 11( Connector Unknown )
+         Reported ESD(T:L)                    : 2,0(0:0)
+         Vendor                               : ATA
+         Model                                : INTEL SSDSC2KB019T
+         Firmware                             : SCV10111
+         Serial number                        : XXXXXXXXXXXXXXXXXX
+         Reserved Size                        : 3666200 KB
+         Used Size                            : 1827840 MB
+         Unused Size                          : 64 KB
+         Total Size                           : 1831420 MB
+         Write Cache                          : Enabled (write-back)
+         FRU                                  : None
+         S.M.A.R.T.                           : No
+         S.M.A.R.T. warnings                  : 0
+         Power State                          : Full rpm
+         Supported Power States               : Full power,Powered off
+         SSD                                  : Yes
+         Temperature                          : Not Supported
+         NCQ status                           : Enabled
+      ----------------------------------------------------------------
+      Device Phy Information
+      ----------------------------------------------------------------
+         Phy #0
+            PHY Identifier                    : 0
+            SAS Address                       : 5000
+            Attached PHY Identifier           : 23
+            Attached SAS Address              : 5000
+
+      Device #12
+         Device is an Enclosure Services Device
+         Reported Channel,Device(T:L)         : 2,0(0:0)
+         Enclosure ID                         : 0
+         Enclosure Logical Identifier         : 5000
+         Expander ID                          : 0
+         Expander SAS Address                 : 5000
+         Type                                 : SES2
+         Vendor                               : LSI CORP
+         Model                                : SAS2X28
+         Firmware                             : 0717
+         Status of Enclosure Services Device
+            Fan 1 status                      : 0 rpm (Not Installed)
+            Fan 2 status                      : 0 rpm (Not Installed)
+            Fan 3 status                      : 0 rpm (Not Installed)
+            Power supply 1 status             : Not Installed
+            Power supply 2 status             : Not Installed
+            Temperature Sensor Status 1       : 24 C/ 75 F (Normal)
+            Speaker status                    : On
+
+
+Command completed successfully.

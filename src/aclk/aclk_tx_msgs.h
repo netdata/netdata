@@ -13,6 +13,10 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
 void aclk_http_msg_v2_err(mqtt_wss_client client, const char *topic, const char *msg_id, int http_code, int ec, const char* emsg, const char *payload, size_t payload_len);
 short aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg_id, usec_t t_exec, usec_t created,
     short http_code, const char *payload, size_t payload_len);
+short aclk_http_msg_v2_direct(mqtt_wss_client client, const char *topic, const char *msg_id,
+                               usec_t t_exec, usec_t created, short http_code,
+                               const char *http_headers, size_t http_headers_len,
+                               const char *body, size_t body_len);
 
 uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable);
 char *aclk_generate_lwt(size_t *size);

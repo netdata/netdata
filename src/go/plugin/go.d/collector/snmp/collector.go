@@ -23,20 +23,32 @@ import (
 //go:embed "config_schema.json"
 var configSchema string
 
-func init() {
-	collectorapi.Register("snmp", collectorapi.Creator{
+// Register registers the SNMP collector with its shared SNMP-family device store.
+func Register(store *ddsnmp.DeviceStore) {
+	collectorapi.Register("snmp", newCreator(store))
+}
+
+func newCreator(store *ddsnmp.DeviceStore) collectorapi.Creator {
+	if store == nil {
+		panic("snmp Register requires a non-nil device store")
+	}
+	return collectorapi.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 10,
 		},
-		Create:        func() collectorapi.CollectorV1 { return New() },
-		Config:        func() any { return &Config{} },
-		Methods:       snmpMethods,
-		MethodHandler: snmpFunctionHandler,
-	})
+		Create:          func() collectorapi.CollectorV1 { return New(store) },
+		Config:          func() any { return &Config{} },
+		SharedFunctions: snmpMethods,
+		MethodHandler:   snmpFunctionHandler,
+	}
 }
 
-func New() *Collector {
+// New returns an SNMP collector using the provided SNMP-family device store.
+func New(store *ddsnmp.DeviceStore) *Collector {
+	if store == nil {
+		panic("snmp New requires a non-nil device store")
+	}
 	c := &Collector{
 		Config: Config{
 			CreateVnode:              true,
@@ -70,8 +82,10 @@ func New() *Collector {
 		seenScalarMetrics: make(map[string]bool),
 		seenTableMetrics:  make(map[string]bool),
 		seenProfiles:      make(map[string]bool),
+		deviceStore:       store,
 
 		ifaceCache: newIfaceCache(),
+		licensing:  newLicensingIntegration(),
 
 		newPinger:     pinger.New,
 		newSnmpClient: gosnmp.NewHandler,
@@ -81,6 +95,7 @@ func New() *Collector {
 	}
 
 	c.funcRouter = newFuncRouter(c.ifaceCache)
+	c.licensing.registerFunction(c.funcRouter)
 
 	return c
 }
@@ -96,9 +111,12 @@ type (
 		seenScalarMetrics map[string]bool
 		seenTableMetrics  map[string]bool
 		seenProfiles      map[string]bool
+		deviceStore       *ddsnmp.DeviceStore
 
 		ifaceCache *ifaceCache // interface metrics cache for functions
-		funcRouter *funcRouter // function router for method handlers
+		licensing  *licensingIntegration
+		bgp        *bgpIntegration // BGP metric normalization and function state
+		funcRouter *funcRouter     // function router for method handlers
 
 		pingClient pinger.Client
 		newPinger  func(pinger.Config, *logger.Logger) (pinger.Client, error)
@@ -188,6 +206,9 @@ func (c *Collector) Collect(ctx context.Context) map[string]int64 {
 func (c *Collector) Cleanup(ctx context.Context) {
 	if c.funcRouter != nil {
 		c.funcRouter.Cleanup(ctx)
+	}
+	if c.deviceStore != nil {
+		c.deviceStore.Unregister(c.deviceStoreKey())
 	}
 	if c.snmpClient != nil {
 		_ = c.snmpClient.Close()

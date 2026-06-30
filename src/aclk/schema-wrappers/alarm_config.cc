@@ -2,7 +2,7 @@
 
 #include "alarm_config.h"
 
-#include "proto/alarm/v1/config.pb.h"
+#include "alarm/v1/config.pb.h"
 
 #include "libnetdata/libnetdata.h"
 

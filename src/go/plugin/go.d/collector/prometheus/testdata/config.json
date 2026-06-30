@@ -23,7 +23,6 @@
   "force_http2": true,
   "name": "ok",
   "app": "ok",
-  "label_prefix": "ok",
   "selector": {
     "allow": [
       "ok"
@@ -31,6 +30,41 @@
     "deny": [
       "ok"
     ]
+  },
+  "relabeling": [
+    {
+      "match": "ok",
+      "metric_relabel_configs": [
+        {
+          "source_labels": [
+            "ok"
+          ],
+          "separator": "ok",
+          "regex": "ok",
+          "modulus": 123,
+          "target_label": "ok",
+          "replacement": "ok",
+          "action": "replace"
+        }
+      ]
+    }
+  ],
+  "profiles": {
+    "mode": "ok",
+    "mode_exact": {
+      "entries": [
+        {
+          "name": "ok"
+        }
+      ]
+    },
+    "mode_combined": {
+      "entries": [
+        {
+          "name": "ok"
+        }
+      ]
+    }
   },
   "expected_prefix": "ok",
   "max_time_series": 123,

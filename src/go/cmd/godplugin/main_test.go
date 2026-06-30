@@ -5,8 +5,10 @@ package main
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestModuleRegistryWithSystemdPolicy(t *testing.T) {
@@ -23,4 +25,100 @@ func TestModuleRegistryWithSystemdPolicy(t *testing.T) {
 	withoutPolicy := moduleRegistryWithSystemdPolicy(base, 250)
 	assert.False(t, withoutPolicy["logind"].Disabled)
 	assert.False(t, withoutPolicy["other"].Disabled)
+}
+
+func TestResolveFunctionCLIRequest(t *testing.T) {
+	registry := collectorapi.Registry{
+		"snmp": collectorapi.Creator{
+			SharedFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "topology:snmp", Aliases: []string{"topology:snmp"}}}
+			},
+		},
+		"snmp_traps": collectorapi.Creator{
+			AgentFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "logs", FunctionName: "snmp:traps"}}
+			},
+		},
+		"plain": collectorapi.Creator{
+			SharedFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "details"}}
+			},
+		},
+		"nofunc": collectorapi.Creator{},
+	}
+
+	tests := map[string]struct {
+		functionName string
+		wantModule   string
+		wantMethod   string
+		wantStatus   int
+		wantErr      string
+	}{
+		"canonical module method": {
+			functionName: "plain:details",
+			wantModule:   "plain",
+			wantMethod:   "details",
+		},
+		"explicit public function name": {
+			functionName: "snmp:traps",
+			wantModule:   "snmp_traps",
+			wantMethod:   "logs",
+		},
+		"alias public function name": {
+			functionName: "topology:snmp",
+			wantModule:   "snmp",
+			wantMethod:   "topology:snmp",
+		},
+		"unknown module": {
+			functionName: "missing:details",
+			wantStatus:   404,
+			wantErr:      "unknown module 'missing'",
+		},
+		"module without functions": {
+			functionName: "nofunc:details",
+			wantStatus:   404,
+			wantErr:      "module 'nofunc' does not expose functions",
+		},
+		"invalid name": {
+			functionName: "invalid",
+			wantStatus:   400,
+			wantErr:      "invalid function name",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			moduleName, methodID, _, err := resolveFunctionCLIRequest(tc.functionName, registry)
+			if tc.wantErr != "" {
+				require.Error(t, err)
+				assert.Equal(t, tc.wantStatus, functionCLIResolutionStatus(err))
+				assert.Contains(t, err.Error(), tc.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantModule, moduleName)
+			assert.Equal(t, tc.wantMethod, methodID)
+		})
+	}
+}
+
+func TestResolveFunctionCLIRequestPublicNameCollisionUsesSortedModule(t *testing.T) {
+	registry := collectorapi.Registry{
+		"bbb": collectorapi.Creator{
+			SharedFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "logs", FunctionName: "shared:logs"}}
+			},
+		},
+		"aaa": collectorapi.Creator{
+			SharedFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "logs", FunctionName: "shared:logs"}}
+			},
+		},
+	}
+
+	moduleName, methodID, _, err := resolveFunctionCLIRequest("shared:logs", registry)
+	require.NoError(t, err)
+	assert.Equal(t, "aaa", moduleName)
+	assert.Equal(t, "logs", methodID)
 }

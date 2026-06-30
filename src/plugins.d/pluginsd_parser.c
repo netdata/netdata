@@ -6,7 +6,7 @@
 
 static inline PARSER_RC pluginsd_set(char **words, size_t num_words, PARSER *parser) {
     int idx = 1;
-    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words);
+    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words, PLUGINSD_DIMENSION_SLOT_MAX);
     if(slot >= 0) idx++;
 
     char *dimension = get_word(words, num_words, idx++);
@@ -39,7 +39,7 @@ static inline PARSER_RC pluginsd_set(char **words, size_t num_words, PARSER *par
 
 static inline PARSER_RC pluginsd_begin(char **words, size_t num_words, PARSER *parser) {
     int idx = 1;
-    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words);
+    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words, PLUGINSD_CHART_SLOT_MAX);
     if(slot >= 0) idx++;
 
     char *id = get_word(words, num_words, idx++);
@@ -183,7 +183,8 @@ static inline PARSER_RC pluginsd_host_labels(char **words, size_t num_words, PAR
                                     PLUGINSD_KEYWORD_HOST_LABEL);
 }
 
-static inline void pluginsd_update_host_ephemerality(RRDHOST *host) {
+// returns true when the _is_ephemeral label was added or its value changed.
+static inline bool pluginsd_update_host_ephemerality(RRDHOST *host) {
     char value[64];
     rrdlabels_get_value_strcpyz(host->rrdlabels, value, sizeof(value), HOST_LABEL_IS_EPHEMERAL);
     if(value[0] && inicfg_test_boolean_value(value)) {
@@ -196,7 +197,7 @@ static inline void pluginsd_update_host_ephemerality(RRDHOST *host) {
     }
 
     // Set or replace current label as needed
-    rrdlabels_add(host->rrdlabels, HOST_LABEL_IS_EPHEMERAL, value, RRDLABEL_SRC_CONFIG);
+    return rrdlabels_add_changed(host->rrdlabels, HOST_LABEL_IS_EPHEMERAL, value, RRDLABEL_SRC_CONFIG);
 }
 
 #define VNODE_BASE_EPOCH (1704067200L)  // Jan 1, 2024 00:00:00 UTC
@@ -241,28 +242,33 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
     ml_host_start(host);
     pulse_host_status(host, 0, 0); // this will detect the receiver status
 
+    bool labels_changed;
     if(host->rrdlabels) {
-        rrdlabels_migrate_to_these(host->rrdlabels, parser->user.host_define.rrdlabels);
+        labels_changed = rrdlabels_migrate_to_these(host->rrdlabels, parser->user.host_define.rrdlabels);
     }
     else {
         host->rrdlabels = parser->user.host_define.rrdlabels;
         parser->user.host_define.rrdlabels = NULL;
+        labels_changed = true;
     }
 
     if(SERVING_PLUGINSD(parser)) {
-        rrdlabels_add(host->rrdlabels, "_collector_machine_guid",
+        labels_changed |= rrdlabels_add_changed(host->rrdlabels, "_collector_machine_guid",
                       localhost->machine_guid, RRDLABEL_SRC_AUTO);
     }
 
-    pluginsd_update_host_ephemerality(host);
+    labels_changed |= pluginsd_update_host_ephemerality(host);
     pluginsd_host_define_cleanup(parser);
+
+    if(labels_changed)
+        rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_LABEL_RECHECK);
 
     parser->user.host = host;
     pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_HOST_DEFINE_END, NULL);
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
     rrdcontext_host_child_connected(host);
-    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
     if (aclk_host_config)
         aclk_queue_node_info(host, true);
     else
@@ -350,7 +356,7 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
     if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
     int idx = 1;
-    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words);
+    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words, PLUGINSD_CHART_SLOT_MAX);
     if(slot >= 0) idx++;
 
     char *type = get_word(words, num_words, idx++);
@@ -467,7 +473,7 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
 
 static inline PARSER_RC pluginsd_dimension(char **words, size_t num_words, PARSER *parser) {
     int idx = 1;
-    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words);
+    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words, PLUGINSD_DIMENSION_SLOT_MAX);
     if(slot >= 0) idx++;
 
     char *id = get_word(words, num_words, idx++);
@@ -725,16 +731,18 @@ static inline PARSER_RC pluginsd_overwrite(char **words __maybe_unused, size_t n
     if(unlikely(!host->rrdlabels))
         host->rrdlabels = rrdlabels_create();
 
-    rrdlabels_migrate_to_these(host->rrdlabels, parser->user.new_host_labels);
-    pluginsd_update_host_ephemerality(host);
+    bool labels_changed = rrdlabels_migrate_to_these(host->rrdlabels, parser->user.new_host_labels);
+    labels_changed |= pluginsd_update_host_ephemerality(host);
 
     if(!rrdlabels_exist(host->rrdlabels, "_os"))
-        rrdlabels_add(host->rrdlabels, "_os", string2str(host->os), RRDLABEL_SRC_AUTO);
+        labels_changed |= rrdlabels_add_changed(host->rrdlabels, "_os", string2str(host->os), RRDLABEL_SRC_AUTO);
 
     if(!rrdlabels_exist(host->rrdlabels, "_hostname"))
-        rrdlabels_add(host->rrdlabels, "_hostname", string2str(host->hostname), RRDLABEL_SRC_AUTO);
+        labels_changed |= rrdlabels_add_changed(host->rrdlabels, "_hostname", string2str(host->hostname), RRDLABEL_SRC_AUTO);
 
     rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
+    if(labels_changed)
+        rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_LABEL_RECHECK);
 
     rrdlabels_destroy(parser->user.new_host_labels);
     parser->user.new_host_labels = NULL;
@@ -776,11 +784,16 @@ static inline PARSER_RC pluginsd_clabel_commit(char **words __maybe_unused, size
         return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
     }
 
-    rrdlabels_remove_all_unmarked(st->rrdlabels);
+    bool labels_changed = rrdlabels_remove_all_unmarked_and_changed(st->rrdlabels);
 
     rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
     rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
     rrdset_metadata_updated(st);
+
+    if(labels_changed) {
+        rrdset_flag_set(st, RRDSET_FLAG_PENDING_LABEL_RECHECK);
+        rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+    }
 
     parser->user.clabel_count = 0;
 
@@ -791,7 +804,7 @@ static ALWAYS_INLINE PARSER_RC pluginsd_begin_v2(char **words, size_t num_words,
     timing_init();
 
     int idx = 1;
-    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words);
+    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words, PLUGINSD_CHART_SLOT_MAX);
     if(slot >= 0) idx++;
 
     char *id = get_word(words, num_words, idx++);
@@ -936,7 +949,7 @@ static ALWAYS_INLINE PARSER_RC pluginsd_set_v2(char **words, size_t num_words, P
     timing_init();
 
     int idx = 1;
-    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words);
+    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words, PLUGINSD_DIMENSION_SLOT_MAX);
     if(slot >= 0) idx++;
 
     char *dimension = get_word(words, num_words, idx++);
@@ -1442,6 +1455,8 @@ ALWAYS_INLINE PARSER_RC parser_execute(PARSER *parser, const PARSER_KEYWORD *key
             return pluginsd_clabel_commit(words, num_words, parser);
         case PLUGINSD_KEYWORD_ID_FUNCTION:
             return pluginsd_function(words, num_words, parser);
+        case PLUGINSD_KEYWORD_ID_FUNCTION_DEL:
+            return pluginsd_function_del(words, num_words, parser);
         case PLUGINSD_KEYWORD_ID_FUNCTION_RESULT_BEGIN:
             return pluginsd_function_result_begin(words, num_words, parser);
         case PLUGINSD_KEYWORD_ID_FUNCTION_PROGRESS:
@@ -1500,7 +1515,72 @@ void parser_init_repertoire(PARSER *parser, PARSER_REPERTOIRE repertoire) {
     }
 }
 
+static int pluginsd_parser_unittest_slot_bounds(size_t max_slot) {
+    // The boundary cases below build "max_slot - 1", so a zero cap would underflow.
+    // All real callers pass nonzero compile-time caps; guard against misuse anyway.
+    if(max_slot < 1) {
+        netdata_log_error("PLUGINSD: slot bounds unittest requires max_slot >= 1, got %zu", max_slot);
+        return 1;
+    }
+
+    // Note on initialization: every element below is given an explicit
+    // initializer, so C zero-fills the remainder of each slot_word array. The
+    // trailing three entries start empty and are filled from max_slot at runtime.
+    struct slot_test_case {
+        char slot_word[64];
+        ssize_t expected;
+    } cases[] = {
+        { "", -1 },                                          // no SLOT word -> -1 (caller must not advance idx)
+        { PLUGINSD_KEYWORD_SLOT ":0", 0 },                   // explicit zero -> uncached
+        { PLUGINSD_KEYWORD_SLOT ":1", 1 },                   // smallest cached slot
+        { PLUGINSD_KEYWORD_SLOT ":-1", 0 },                  // negative parses as unsigned 0 -> uncached
+        { PLUGINSD_KEYWORD_SLOT ":abc", 0 },                 // malformed decimal -> 0 -> uncached
+        { PLUGINSD_KEYWORD_SLOT ":0xZZ", 0 },                // malformed hex -> 0 -> uncached
+        { PLUGINSD_KEYWORD_SLOT ":0x0AAAAAAAAAAAAAAB", 0 },  // over cap; cast stays positive, would wrap allocation
+        { PLUGINSD_KEYWORD_SLOT ":0xFFFFFFFFFFFFFFFF", 0 },  // u64 max -> over cap -> uncached
+        { PLUGINSD_KEYWORD_SLOT ":0x40000000", 0 },          // over both caps -> uncached (the reported OOM value)
+        { "", 0 },                                           // filled below: max_slot - 1 (accepted)
+        { "", 0 },                                           // filled below: max_slot     (accepted, boundary)
+        { "", 0 },                                           // filled below: max_slot + 1 (rejected, boundary)
+    };
+
+    const size_t n = _countof(cases);
+
+    snprintfz(cases[n - 3].slot_word, sizeof(cases[n - 3].slot_word),
+              PLUGINSD_KEYWORD_SLOT ":%zu", max_slot - 1);
+    cases[n - 3].expected = (ssize_t)(max_slot - 1);
+
+    snprintfz(cases[n - 2].slot_word, sizeof(cases[n - 2].slot_word),
+              PLUGINSD_KEYWORD_SLOT ":%zu", max_slot);
+    cases[n - 2].expected = (ssize_t)max_slot;
+
+    snprintfz(cases[n - 1].slot_word, sizeof(cases[n - 1].slot_word),
+              PLUGINSD_KEYWORD_SLOT ":%zu", max_slot + 1);
+    cases[n - 1].expected = 0;
+
+    for(size_t i = 0; i < _countof(cases); i++) {
+        char command[] = "DIMENSION";
+        char *words[] = { command, cases[i].slot_word[0] ? cases[i].slot_word : NULL };
+        size_t num_words = words[1] ? 2 : 1;
+
+        ssize_t slot = pluginsd_parse_rrd_slot(words, num_words, max_slot);
+        if(slot != cases[i].expected) {
+            netdata_log_error("PLUGINSD: slot parser unittest failed for '%s': expected %zd, got %zd",
+                              words[1] ? words[1] : "(unset)", cases[i].expected, slot);
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 int pluginsd_parser_unittest(void) {
+    if(pluginsd_parser_unittest_slot_bounds(PLUGINSD_DIMENSION_SLOT_MAX))
+        return 1;
+
+    if(pluginsd_parser_unittest_slot_bounds(PLUGINSD_CHART_SLOT_MAX))
+        return 1;
+
     PARSER *p = parser_init(NULL, -1, -1, PARSER_INPUT_SPLIT, NULL);
     pluginsd_keywords_init(p, PARSER_INIT_PLUGINSD | PARSER_INIT_STREAMING);
 

@@ -71,7 +71,7 @@ void mark_pending_req_cancel_all()
     spinlock_lock(&pending_req_list_lock);
     struct pending_req_list *curr = pending_req_list_head;
     while (curr) {
-        curr->canceled = 1;
+        __atomic_store_n(&curr->canceled, 1, __ATOMIC_RELAXED);
         curr = curr->next;
     }
     spinlock_unlock(&pending_req_list_lock);
@@ -86,7 +86,7 @@ int mark_pending_req_cancelled(const char *msg_id)
 
     while (curr) {
         if (curr->hash == hash && strcmp(curr->msg_id, msg_id) == 0) {
-            curr->canceled = 1;
+            __atomic_store_n(&curr->canceled, 1, __ATOMIC_RELAXED);
             spinlock_unlock(&pending_req_list_lock);
             return 0;
         }
@@ -100,7 +100,7 @@ int mark_pending_req_cancelled(const char *msg_id)
 static bool aclk_web_client_interrupt_cb(struct web_client *w __maybe_unused, void *data)
 {
     struct pending_req_list *req = (struct pending_req_list *)data;
-    return req->canceled;
+    return __atomic_load_n(&req->canceled, __ATOMIC_RELAXED);
 }
 
 int http_api_v2(mqtt_wss_client client, aclk_query_t *query)
@@ -112,7 +112,6 @@ int http_api_v2(mqtt_wss_client client, aclk_query_t *query)
     ND_LOG_STACK_PUSH(lgs);
 
     int retval = 0;
-    BUFFER *local_buffer = NULL;
     usec_t dt_ut = 0;
 
     int z_ret;
@@ -191,30 +190,18 @@ int http_api_v2(mqtt_wss_client client, aclk_query_t *query)
     }
 
     web_client_build_http_header(w);
-    local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, &netdata_buffers_statistics.buffers_aclk);
-    local_buffer->content_type = CT_APPLICATION_JSON;
 
-    buffer_strcat(local_buffer, w->response.header_output->buffer);
-
-    if (w->response.data->len) {
-        if (w->response.zinitialized) {
-            buffer_need_bytes(local_buffer, w->response.data->len);
-            memcpy(&local_buffer->buffer[local_buffer->len], w->response.data->buffer, w->response.data->len);
-            local_buffer->len += w->response.data->len;
-        } else
-            buffer_strcat(local_buffer, w->response.data->buffer);
-    }
-
-    // send msg.
-    w->response.code = (short)aclk_http_msg_v2(
+    w->response.code = (short)aclk_http_msg_v2_direct(
         client,
         query->callback_topic,
         query->msg_id,
         dt_ut,
         query->created,
         w->response.code,
-        local_buffer->buffer,
-        local_buffer->len);
+        w->response.header_output->buffer,
+        w->response.header_output->len,
+        w->response.data->buffer,
+        w->response.data->len);
 
 cleanup:
     web_client_log_completed_request(w, false);
@@ -223,7 +210,6 @@ cleanup:
     pending_req_list_rm(query->msg_id);
 
     buffer_free(z_buffer);
-    buffer_free(local_buffer);
     return retval;
 }
 

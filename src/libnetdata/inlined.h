@@ -108,9 +108,9 @@ static inline uint32_t murmur32(uint32_t k) {
 static uint64_t murmur64(uint64_t k) __attribute__((const));
 static inline uint64_t murmur64(uint64_t k) {
     k ^= k >> 33;
-    k *= 0xff51afd7ed558ccdUL;
+    k *= 0xff51afd7ed558ccdULL;
     k ^= k >> 33;
-    k *= 0xc4ceb9fe1a85ec53UL;
+    k *= 0xc4ceb9fe1a85ec53ULL;
     k ^= k >> 33;
 
     return k;
@@ -432,15 +432,17 @@ static NETDATA_DOUBLE str2ndd_encoded(const char *src, char **endptr) {
     if (*src == IEEE754_DOUBLE_B64_PREFIX[0]) {
         // double parsing from base64
         uint64_t n = str2uint64_base64(src + sizeof(IEEE754_DOUBLE_B64_PREFIX) - 1, endptr);
-        NETDATA_DOUBLE *ptr = (NETDATA_DOUBLE *) (&n);
-        return *ptr;
+        double value;
+        memcpy(&value, &n, sizeof(value));
+        return (NETDATA_DOUBLE)value;
     }
 
     if (*src == IEEE754_DOUBLE_HEX_PREFIX[0]) {
         // double parsing from hex
         uint64_t n = str2uint64_hex(src + sizeof(IEEE754_DOUBLE_HEX_PREFIX) - 1, endptr);
-        NETDATA_DOUBLE *ptr = (NETDATA_DOUBLE *) (&n);
-        return *ptr;
+        double value;
+        memcpy(&value, &n, sizeof(value));
+        return (NETDATA_DOUBLE)value;
     }
 
     double sign = 1.0;

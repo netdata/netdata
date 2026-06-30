@@ -26,8 +26,8 @@ type codedErr struct {
 	code int
 }
 
-func (e *codedErr) Error() string { return e.err.Error() }
-func (e *codedErr) Code() int     { return e.code }
+func (e *codedErr) Error() string   { return e.err.Error() }
+func (e *codedErr) DyncfgCode() int { return e.code }
 
 // mockCallbacks records all callback invocations for verification.
 type mockCallbacks struct {
@@ -38,6 +38,7 @@ type mockCallbacks struct {
 	stopFn             func(cfg testConfig)
 	onStatusChangeFn   func(entry *Entry[testConfig], oldStatus Status, fn Function)
 	configIDFn         func(cfg testConfig) string
+	configTypeFn       func(cfg testConfig) ConfigType
 
 	startCalls  []testConfig
 	updateCalls []updateCall
@@ -71,6 +72,10 @@ func (m *mockCallbacks) ParseAndValidate(fn Function, name string) (testConfig, 
 		return m.parseAndValidateFn(fn, name)
 	}
 	return testConfig{uid: "dyncfg:" + name, key: name, sourceType: "dyncfg", source: "test"}, nil
+}
+
+func (m *mockCallbacks) ValidateConfigName(name string) error {
+	return JobNameRuleStrict(name)
 }
 
 func (m *mockCallbacks) Start(cfg testConfig) error {
@@ -110,14 +115,26 @@ func (m *mockCallbacks) ConfigID(cfg testConfig) string {
 	return "test:" + cfg.ExposedKey()
 }
 
+func (m *mockCallbacks) ConfigType(cfg testConfig) ConfigType {
+	if m.configTypeFn != nil {
+		return m.configTypeFn(cfg)
+	}
+	return ConfigTypeJob
+}
+
 func newTestHandler(cb *mockCallbacks) *Handler[testConfig] {
 	return newTestHandlerWithWaitTimeout(cb, 5*time.Second)
 }
 
 func newTestHandlerWithWaitTimeout(cb *mockCallbacks, waitTimeout time.Duration) *Handler[testConfig] {
+	h, _ := newTestHandlerWithOutput(cb, waitTimeout)
+	return h
+}
+
+func newTestHandlerWithOutput(cb *mockCallbacks, waitTimeout time.Duration) (*Handler[testConfig], *bytes.Buffer) {
 	var buf bytes.Buffer
 	api := NewResponder(netdataapi.New(safewriter.New(&buf)))
-	return NewHandler(HandlerOpts[testConfig]{
+	h := NewHandler(HandlerOpts[testConfig]{
 		Logger:    logger.New(),
 		API:       api,
 		Seen:      NewSeenCache[testConfig](),
@@ -131,7 +148,7 @@ func newTestHandlerWithWaitTimeout(cb *mockCallbacks, waitTimeout time.Duration)
 		Path:                    "/test/path",
 		EnableFailCode:          200,
 		RemoveStockOnEnableFail: true,
-		JobCommands: []Command{
+		ConfigCommands: []Command{
 			CommandSchema,
 			CommandGet,
 			CommandEnable,
@@ -142,6 +159,7 @@ func newTestHandlerWithWaitTimeout(cb *mockCallbacks, waitTimeout time.Duration)
 			CommandUserconfig,
 		},
 	})
+	return h, &buf
 }
 
 func newTestFn(id, cmd, name string, payload []byte) Function {
@@ -499,7 +517,7 @@ func TestCmdAdd_NoPayload(t *testing.T) {
 	assert.Equal(t, 0, h.exposed.Count())
 }
 
-func TestCmdAdd_InvalidJobName(t *testing.T) {
+func TestCmdAdd_InvalidConfigName(t *testing.T) {
 	cb := &mockCallbacks{}
 	h := newTestHandler(cb)
 
@@ -511,6 +529,21 @@ func TestCmdAdd_InvalidJobName(t *testing.T) {
 	h.CmdAdd(fn)
 
 	assert.Equal(t, 0, h.exposed.Count())
+}
+
+func TestCmdAdd_NonJobConfigTypeRejected(t *testing.T) {
+	cb := &mockCallbacks{
+		configTypeFn: func(testConfig) ConfigType { return ConfigTypeSingle },
+	}
+	h, out := newTestHandlerWithOutput(cb, 5*time.Second)
+
+	fn := newTestFn("test:job1", "add", "job1", []byte(`{}`))
+	h.CmdAdd(fn)
+
+	assert.Equal(t, 0, h.seen.Count())
+	assert.Equal(t, 0, h.exposed.Count())
+	assert.Contains(t, out.String(), "405")
+	assert.Contains(t, out.String(), "adding configurations of type 'single' is not supported, only 'job' configurations can be added.")
 }
 
 func TestCmdAdd_ParseError(t *testing.T) {
@@ -751,6 +784,27 @@ func TestCmdRemove_NonDyncfg_Rejected(t *testing.T) {
 	// Should still be in cache — removal rejected.
 	_, ok := h.exposed.LookupByKey("job1")
 	assert.True(t, ok, "non-dyncfg config should not be removed")
+	assert.Len(t, cb.stopCalls, 0)
+}
+
+func TestCmdRemove_DyncfgSingleRejected(t *testing.T) {
+	cb := &mockCallbacks{
+		configTypeFn: func(testConfig) ConfigType { return ConfigTypeSingle },
+	}
+	h := newTestHandler(cb)
+
+	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
+	h.seen.Add(cfg)
+	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusRunning})
+
+	fn := newTestFn("test:job1", "remove", "", nil)
+	h.CmdRemove(fn)
+
+	_, ok := h.seen.LookupByUID("dyncfg:job1")
+	assert.True(t, ok, "dyncfg single should not be removed")
+
+	_, ok = h.exposed.LookupByKey("job1")
+	assert.True(t, ok, "dyncfg single should remain exposed")
 	assert.Len(t, cb.stopCalls, 0)
 }
 
@@ -1029,6 +1083,58 @@ func TestCmdUpdate_Conversion_Disabled(t *testing.T) {
 	assert.Equal(t, StatusDisabled, entry.Status)
 }
 
+func TestCmdUpdate_NonConversion_StartFails_CodedError(t *testing.T) {
+	cb := &mockCallbacks{}
+	cb.updateFn = func(_, _ testConfig) error {
+		return &codedErr{err: errors.New("bind failed"), code: 422}
+	}
+	h, out := newTestHandlerWithOutput(cb, 5*time.Second)
+
+	oldCfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg", hash: 100}
+	h.seen.Add(oldCfg)
+	h.exposed.Add(&Entry[testConfig]{Cfg: oldCfg, Status: StatusRunning})
+
+	cb.parseAndValidateFn = func(_ Function, _ string) (testConfig, error) {
+		return testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg", hash: 200}, nil
+	}
+
+	fn := newTestFn("test:job1", "update", "job1", []byte(`{}`))
+	h.CmdUpdate(fn)
+
+	entry, _ := h.exposed.LookupByKey("job1")
+	assert.Equal(t, StatusFailed, entry.Status)
+	assert.Contains(t, out.String(), `"status":422`)
+	assert.Contains(t, out.String(), "bind failed")
+}
+
+func TestCmdUpdate_Conversion_StartFails_CodedError(t *testing.T) {
+	cb := &mockCallbacks{}
+	cb.startFn = func(_ testConfig) error {
+		return &codedErr{err: errors.New("bind failed"), code: 422}
+	}
+	h, out := newTestHandlerWithOutput(cb, 5*time.Second)
+
+	oldCfg := testConfig{uid: "stock:job1", key: "job1", sourceType: "stock", hash: 100}
+	h.seen.Add(oldCfg)
+	h.exposed.Add(&Entry[testConfig]{Cfg: oldCfg, Status: StatusRunning})
+
+	cb.parseAndValidateFn = func(_ Function, name string) (testConfig, error) {
+		return testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg", hash: 200, source: "test"}, nil
+	}
+
+	fn := newTestFn("test:job1", "update", "job1", []byte(`{}`))
+	h.CmdUpdate(fn)
+
+	assert.Len(t, cb.stopCalls, 1)
+	assert.Len(t, cb.startCalls, 1)
+
+	entry, _ := h.exposed.LookupByKey("job1")
+	assert.Equal(t, StatusFailed, entry.Status)
+	assert.Equal(t, "dyncfg", entry.Cfg.SourceType())
+	assert.Contains(t, out.String(), `"status":422`)
+	assert.Contains(t, out.String(), "bind failed")
+}
+
 // --- CmdRestart Tests ---
 
 func TestCmdRestart_FromRunning(t *testing.T) {
@@ -1117,7 +1223,7 @@ func TestCmdRestart_NotFound(t *testing.T) {
 func TestCmdRestart_StartFails(t *testing.T) {
 	cb := &mockCallbacks{}
 	cb.startFn = func(_ testConfig) error { return errors.New("restart failed") }
-	h := newTestHandler(cb)
+	h, out := newTestHandlerWithOutput(cb, 5*time.Second)
 
 	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
 	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusRunning})
@@ -1130,6 +1236,8 @@ func TestCmdRestart_StartFails(t *testing.T) {
 
 	entry, _ := h.exposed.LookupByKey("job1")
 	assert.Equal(t, StatusFailed, entry.Status)
+	assert.Contains(t, out.String(), `"status":422`)
+	assert.Contains(t, out.String(), "config restart failed: restart failed")
 	require.Len(t, cb.statusCalls, 1)
 	assert.Equal(t, StatusRunning, cb.statusCalls[0].oldStatus)
 }
@@ -1139,7 +1247,7 @@ func TestCmdRestart_StartFails_CodedError(t *testing.T) {
 	cb.startFn = func(_ testConfig) error {
 		return &codedErr{err: errors.New("bad config"), code: 400}
 	}
-	h := newTestHandler(cb)
+	h, out := newTestHandlerWithOutput(cb, 5*time.Second)
 
 	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
 	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusRunning})
@@ -1149,30 +1257,37 @@ func TestCmdRestart_StartFails_CodedError(t *testing.T) {
 
 	entry, _ := h.exposed.LookupByKey("job1")
 	assert.Equal(t, StatusFailed, entry.Status)
+	assert.Contains(t, out.String(), `"status":400`)
+	assert.Contains(t, out.String(), "config restart failed: bad config")
 }
 
 // --- Notify Tests ---
 
-func TestNotifyJobCreate_SupportedCommands(t *testing.T) {
+func TestNotifyConfigCreate_SupportedCommands(t *testing.T) {
 	tests := []struct {
 		name       string
 		commands   []Command
 		sourceType string
+		configType ConfigType
 		wantRemove bool
 	}{
-		{"dyncfg with restart", []Command{CommandSchema, CommandGet, CommandRestart}, "dyncfg", true},
-		{"dyncfg no restart", []Command{CommandSchema, CommandGet}, "dyncfg", true},
-		{"stock with restart", []Command{CommandSchema, CommandGet, CommandRestart}, "stock", false},
-		{"stock no restart", []Command{CommandSchema, CommandGet}, "stock", false},
+		{"dyncfg job with restart", []Command{CommandSchema, CommandGet, CommandRestart}, "dyncfg", ConfigTypeJob, true},
+		{"dyncfg job no restart", []Command{CommandSchema, CommandGet}, "dyncfg", ConfigTypeJob, true},
+		{"stock job with restart", []Command{CommandSchema, CommandGet, CommandRestart}, "stock", ConfigTypeJob, false},
+		{"stock job no restart", []Command{CommandSchema, CommandGet}, "stock", ConfigTypeJob, false},
+		{"dyncfg single no remove", []Command{CommandSchema, CommandGet, CommandUpdate}, "dyncfg", ConfigTypeSingle, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cb := &mockCallbacks{}
+			cb := &mockCallbacks{
+				configTypeFn: func(testConfig) ConfigType { return tt.configType },
+			}
 			h := newTestHandler(cb)
-			h.jobCommands = tt.commands
+			h.configCommands = tt.commands
 
-			cmds := h.jobSupportedCommands(tt.sourceType == "dyncfg")
+			cfg := testConfig{sourceType: tt.sourceType}
+			cmds := h.configSupportedCommands(cfg, tt.sourceType == "dyncfg")
 
 			// Base commands should always be present.
 			for _, cmd := range tt.commands {
@@ -1187,31 +1302,58 @@ func TestNotifyJobCreate_SupportedCommands(t *testing.T) {
 	}
 }
 
-// --- ValidateJobName Tests ---
+// --- Job-name rule tests ---
 
-func TestValidateJobName(t *testing.T) {
-	tests := []struct {
-		name    string
+func TestJobNameRuleStrict(t *testing.T) {
+	tests := map[string]struct {
 		input   string
 		wantErr bool
 	}{
-		{"valid", "my_job", false},
-		{"valid with numbers", "job123", false},
-		{"valid with dashes", "my-job", false},
-		{"space", "my job", true},
-		{"tab", "my\tjob", true},
-		{"dot", "my.job", true},
-		{"colon", "my:job", true},
-		{"empty", "", false},
+		"valid":              {input: "my_job"},
+		"valid with numbers": {input: "job123"},
+		"valid with dashes":  {input: "my-job"},
+		"space":              {input: "my job", wantErr: true},
+		"tab":                {input: "my\tjob", wantErr: true},
+		"dot":                {input: "my.job", wantErr: true},
+		"colon":              {input: "my:job", wantErr: true},
+		"empty":              {input: ""},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateJobName(tt.input)
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := JobNameRuleStrict(tt.input)
 			if tt.wantErr {
-				assert.Error(t, err, fmt.Sprintf("ValidateJobName(%q) should fail", tt.input))
+				assert.Error(t, err, fmt.Sprintf("JobNameRuleStrict(%q) should fail", tt.input))
 			} else {
-				assert.NoError(t, err, fmt.Sprintf("ValidateJobName(%q) should pass", tt.input))
+				assert.NoError(t, err, fmt.Sprintf("JobNameRuleStrict(%q) should pass", tt.input))
+			}
+		})
+	}
+}
+
+func TestJobNameRuleAllowDots(t *testing.T) {
+	tests := map[string]struct {
+		input   string
+		wantErr bool
+	}{
+		"valid":              {input: "my_job"},
+		"valid with numbers": {input: "job123"},
+		"valid with dashes":  {input: "my-job"},
+		"dotted name":        {input: "my.job"},
+		"fqdn":               {input: "host.example.com"},
+		"space":              {input: "my job", wantErr: true},
+		"tab":                {input: "my\tjob", wantErr: true},
+		"colon":              {input: "my:job", wantErr: true},
+		"empty":              {input: ""},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := JobNameRuleAllowDots(tt.input)
+			if tt.wantErr {
+				assert.Error(t, err, fmt.Sprintf("JobNameRuleAllowDots(%q) should fail", tt.input))
+			} else {
+				assert.NoError(t, err, fmt.Sprintf("JobNameRuleAllowDots(%q) should pass", tt.input))
 			}
 		})
 	}

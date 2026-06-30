@@ -1,0 +1,268 @@
+version: v1
+context_namespace: snmp
+groups:
+  - family: traps
+    context_namespace: trap
+    metrics:
+      - snmp_trap_events_state_change
+      - snmp_trap_events_config_change
+      - snmp_trap_events_security
+      - snmp_trap_events_auth
+      - snmp_trap_events_license
+      - snmp_trap_events_mobility
+      - snmp_trap_events_diagnostic
+      - snmp_trap_events_unknown
+      - snmp_trap_severity_emerg
+      - snmp_trap_severity_alert
+      - snmp_trap_severity_crit
+      - snmp_trap_severity_err
+      - snmp_trap_severity_warning
+      - snmp_trap_severity_notice
+      - snmp_trap_severity_info
+      - snmp_trap_severity_debug
+      - snmp_trap_errors_unknown_oid
+      - snmp_trap_errors_decode_failed
+      - snmp_trap_errors_template_unresolved
+      - snmp_trap_errors_malformed_pdu
+      - snmp_trap_errors_dropped_allowlist
+      - snmp_trap_errors_rate_limited
+      - snmp_trap_errors_auth_failures
+      - snmp_trap_errors_usm_failures
+      - snmp_trap_errors_unknown_engine_id
+      - snmp_trap_errors_inform_response_failed
+      - snmp_trap_errors_binary_encoded
+      - snmp_trap_errors_profile_load_failed
+      - snmp_trap_errors_journal_write_failed
+      - snmp_trap_errors_otlp_export_failed
+      - snmp_trap_errors_listener_read_failed
+      - snmp_trap_errors_listener_buffer_degraded
+      - snmp_trap_dedup_suppressed
+      - snmp_trap_pipeline_received
+      - snmp_trap_pipeline_decoded
+      - snmp_trap_pipeline_accepted
+      - snmp_trap_pipeline_committed
+      - snmp_trap_pipeline_dedup_suppressed
+      - snmp_trap_pipeline_dropped
+      - snmp_trap_pipeline_write_failed
+      - snmp_trap_sources_active
+      - snmp_trap_source_attribution_vnode
+      - snmp_trap_source_attribution_fallback
+      - snmp_trap_source_attribution_ambiguous
+      - snmp_trap_source_attribution_failed
+      - snmp_trap_source_attribution_overflow_dropped
+      - snmp_trap_source_attribution_source_transitions
+      - snmp_trap_source_pipeline_accepted
+      - snmp_trap_source_pipeline_committed
+      - snmp_trap_source_pipeline_dedup_suppressed
+      - snmp_trap_source_pipeline_write_failed
+      - snmp_trap_source_errors_unknown_oid
+      - snmp_trap_source_errors_template_unresolved
+      - snmp_trap_source_errors_profile_load_failed
+      - snmp_trap_source_errors_journal_write_failed
+      - snmp_trap_source_errors_otlp_export_failed
+      - snmp_trap_source_last_seen_seconds
+    charts:
+      - id: pipeline
+        title: SNMP trap receiver pipeline
+        context: pipeline
+        units: events/s
+        algorithm: incremental
+        type: line
+        instances:
+          by_labels: [job_name]
+        dimensions:
+          - selector: snmp_trap_pipeline_received
+            name: received
+          - selector: snmp_trap_pipeline_decoded
+            name: decoded
+          - selector: snmp_trap_pipeline_accepted
+            name: accepted
+          - selector: snmp_trap_pipeline_committed
+            name: committed
+          - selector: snmp_trap_pipeline_dedup_suppressed
+            name: dedup_suppressed
+          - selector: snmp_trap_pipeline_dropped
+            name: dropped
+          - selector: snmp_trap_pipeline_write_failed
+            name: write_failed
+      - id: events
+        title: SNMP trap events
+        context: events
+        units: events/s
+        algorithm: incremental
+        type: stacked
+        instances:
+          by_labels: [job_name]
+        dimensions:
+          - selector: snmp_trap_events_state_change
+            name: state_change
+          - selector: snmp_trap_events_config_change
+            name: config_change
+          - selector: snmp_trap_events_security
+            name: security
+          - selector: snmp_trap_events_auth
+            name: auth
+          - selector: snmp_trap_events_license
+            name: license
+          - selector: snmp_trap_events_mobility
+            name: mobility
+          - selector: snmp_trap_events_diagnostic
+            name: diagnostic
+          - selector: snmp_trap_events_unknown
+            name: unknown
+      - id: severity
+        title: SNMP trap events by severity
+        context: severity
+        units: events/s
+        algorithm: incremental
+        type: stacked
+        instances:
+          by_labels: [job_name]
+        dimensions:
+          - selector: snmp_trap_severity_emerg
+            name: emerg
+          - selector: snmp_trap_severity_alert
+            name: alert
+          - selector: snmp_trap_severity_crit
+            name: crit
+          - selector: snmp_trap_severity_err
+            name: err
+          - selector: snmp_trap_severity_warning
+            name: warning
+          - selector: snmp_trap_severity_notice
+            name: notice
+          - selector: snmp_trap_severity_info
+            name: info
+          - selector: snmp_trap_severity_debug
+            name: debug
+      - id: errors
+        title: SNMP trap processing errors
+        context: errors
+        units: errors/s
+        algorithm: incremental
+        type: stacked
+        instances:
+          by_labels: [job_name]
+        dimensions:
+          - selector: snmp_trap_errors_unknown_oid
+            name: unknown_oid
+          - selector: snmp_trap_errors_decode_failed
+            name: decode_failed
+          - selector: snmp_trap_errors_template_unresolved
+            name: template_unresolved
+          - selector: snmp_trap_errors_malformed_pdu
+            name: malformed_pdu
+          - selector: snmp_trap_errors_dropped_allowlist
+            name: dropped_allowlist
+          - selector: snmp_trap_errors_rate_limited
+            name: rate_limited
+          - selector: snmp_trap_errors_auth_failures
+            name: auth_failures
+          - selector: snmp_trap_errors_usm_failures
+            name: usm_failures
+          - selector: snmp_trap_errors_unknown_engine_id
+            name: unknown_engine_id
+          - selector: snmp_trap_errors_inform_response_failed
+            name: inform_response_failed
+          - selector: snmp_trap_errors_binary_encoded
+            name: binary_encoded
+          - selector: snmp_trap_errors_profile_load_failed
+            name: profile_load_failed
+          - selector: snmp_trap_errors_journal_write_failed
+            name: journal_write_failed
+          - selector: snmp_trap_errors_otlp_export_failed
+            name: otlp_export_failed
+          - selector: snmp_trap_errors_listener_read_failed
+            name: listener_read_failed
+          - selector: snmp_trap_errors_listener_buffer_degraded
+            name: listener_buffer_degraded
+      - id: dedup_suppressed
+        title: SNMP trap dedup suppressed events
+        context: dedup_suppressed
+        units: events/s
+        algorithm: incremental
+        type: line
+        instances:
+          by_labels: [job_name]
+        dimensions:
+          - selector: snmp_trap_dedup_suppressed
+            name: suppressed
+      - id: sources
+        title: SNMP trap active sources
+        context: sources
+        units: sources
+        algorithm: absolute
+        type: line
+        instances:
+          by_labels: [job_name]
+        dimensions:
+          - selector: snmp_trap_sources_active
+            name: active
+      - id: source_attribution
+        title: SNMP trap source attribution
+        context: source_attribution
+        units: events/s
+        algorithm: incremental
+        type: stacked
+        instances:
+          by_labels: [job_name]
+        dimensions:
+          - selector: snmp_trap_source_attribution_vnode
+            name: vnode
+          - selector: snmp_trap_source_attribution_fallback
+            name: fallback
+          - selector: snmp_trap_source_attribution_ambiguous
+            name: ambiguous
+          - selector: snmp_trap_source_attribution_failed
+            name: failed
+          - selector: snmp_trap_source_attribution_overflow_dropped
+            name: overflow_dropped
+          - selector: snmp_trap_source_attribution_source_transitions
+            name: source_transitions
+      - id: source_pipeline
+        title: SNMP trap source pipeline
+        context: source_pipeline
+        units: events/s
+        algorithm: incremental
+        type: line
+        instances:
+          by_labels: [job_name, source_id, source_kind]
+        dimensions:
+          - selector: snmp_trap_source_pipeline_accepted
+            name: accepted
+          - selector: snmp_trap_source_pipeline_committed
+            name: committed
+          - selector: snmp_trap_source_pipeline_dedup_suppressed
+            name: dedup_suppressed
+          - selector: snmp_trap_source_pipeline_write_failed
+            name: write_failed
+      - id: source_errors
+        title: SNMP trap source-attributed errors
+        context: source_errors
+        units: errors/s
+        algorithm: incremental
+        type: stacked
+        instances:
+          by_labels: [job_name, source_id, source_kind]
+        dimensions:
+          - selector: snmp_trap_source_errors_unknown_oid
+            name: unknown_oid
+          - selector: snmp_trap_source_errors_template_unresolved
+            name: template_unresolved
+          - selector: snmp_trap_source_errors_profile_load_failed
+            name: profile_load_failed
+          - selector: snmp_trap_source_errors_journal_write_failed
+            name: journal_write_failed
+          - selector: snmp_trap_source_errors_otlp_export_failed
+            name: otlp_export_failed
+      - id: source_last_seen
+        title: SNMP trap source last seen
+        context: source_last_seen
+        units: seconds
+        algorithm: absolute
+        type: line
+        instances:
+          by_labels: [job_name, source_id, source_kind]
+        dimensions:
+          - selector: snmp_trap_source_last_seen_seconds
+            name: seconds_ago

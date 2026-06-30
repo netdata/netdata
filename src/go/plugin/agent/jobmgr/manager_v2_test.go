@@ -54,6 +54,20 @@ groups:
 `
 }
 
+type namedTestV1Module struct {
+	testV1Module
+	jobName string
+}
+
+func (m *namedTestV1Module) SetJobName(name string) { m.jobName = name }
+
+type namedTestV2Module struct {
+	testV2Module
+	jobName string
+}
+
+func (m *namedTestV2Module) SetJobName(name string) { m.jobName = name }
+
 func TestManagerCreateCollectorJobV2Branching(t *testing.T) {
 	tests := map[string]struct {
 		creator      collectorapi.Creator
@@ -70,22 +84,22 @@ func TestManagerCreateCollectorJobV2Branching(t *testing.T) {
 			},
 			wantV2: true,
 		},
-		"prefer v2 when job methods are configured": {
+		"prefer v2 when instance functions are configured": {
 			creator: collectorapi.Creator{
 				Create: func() collectorapi.CollectorV1 { return &testV1Module{} },
 				CreateV2: func() collectorapi.CollectorV2 {
 					return &testV2Module{store: metrix.NewCollectorStore()}
 				},
-				JobMethods: func(_ collectorapi.RuntimeJob) []funcapi.MethodConfig { return nil },
+				InstanceFunctions: func(_ collectorapi.RuntimeJob) []funcapi.FunctionConfig { return nil },
 			},
 			wantV2: true,
 		},
-		"allow v2 only creator when job methods are configured": {
+		"allow v2 only creator when instance functions are configured": {
 			creator: collectorapi.Creator{
 				CreateV2: func() collectorapi.CollectorV2 {
 					return &testV2Module{store: metrix.NewCollectorStore()}
 				},
-				JobMethods: func(_ collectorapi.RuntimeJob) []funcapi.MethodConfig { return nil },
+				InstanceFunctions: func(_ collectorapi.RuntimeJob) []funcapi.FunctionConfig { return nil },
 			},
 			wantV2: true,
 		},
@@ -94,7 +108,7 @@ func TestManagerCreateCollectorJobV2Branching(t *testing.T) {
 				CreateV2: func() collectorapi.CollectorV2 {
 					return &testV2Module{store: nil}
 				},
-				JobMethods: func(_ collectorapi.RuntimeJob) []funcapi.MethodConfig { return nil },
+				InstanceFunctions: func(_ collectorapi.RuntimeJob) []funcapi.FunctionConfig { return nil },
 			},
 			functionOnly: true,
 			wantV2:       true,
@@ -122,6 +136,129 @@ func TestManagerCreateCollectorJobV2Branching(t *testing.T) {
 			require.NoError(t, err)
 			_, isV2 := job.(*jobruntime.JobV2)
 			assert.Equal(t, tc.wantV2, isV2)
+		})
+	}
+}
+
+func TestManagerCreateCollectorJobSingleInstancePolicyAllowsV2FunctionOnly(t *testing.T) {
+	mod := &namedTestV2Module{}
+	mgr := New(Config{PluginName: testPluginName})
+	mgr.modules = collectorapi.Registry{
+		"testmod": {
+			InstancePolicy:    collectorapi.InstancePolicySingle,
+			CreateV2:          func() collectorapi.CollectorV2 { return mod },
+			InstanceFunctions: func(_ collectorapi.RuntimeJob) []funcapi.FunctionConfig { return nil },
+		},
+	}
+
+	job, err := mgr.createCollectorJob(prepareFunctionOnlyCfg("testmod", "testmod"))
+	require.NoError(t, err)
+	require.NotNil(t, job)
+	require.NoError(t, job.AutoDetection())
+
+	_, isV2 := job.(*jobruntime.JobV2)
+	assert.True(t, isV2)
+	assert.Same(t, mod, job.Collector())
+	assert.Equal(t, "testmod", mod.jobName)
+	assert.Equal(t, "testmod", job.FullName())
+}
+
+func TestManagerCreateCollectorJobSetsJobNameV2(t *testing.T) {
+	mod := &namedTestV2Module{testV2Module: testV2Module{store: metrix.NewCollectorStore()}}
+	mgr := New(Config{PluginName: testPluginName})
+	mgr.modules = collectorapi.Registry{
+		"testmod": {
+			CreateV2: func() collectorapi.CollectorV2 { return mod },
+		},
+	}
+
+	job, err := mgr.createCollectorJob(prepareUserCfg("testmod", "job1"))
+	require.NoError(t, err)
+	assert.Same(t, mod, job.Collector())
+	assert.Equal(t, "job1", mod.jobName)
+}
+
+func TestManagerCreateCollectorJobSetsJobNameV1(t *testing.T) {
+	mod := &namedTestV1Module{}
+	mgr := New(Config{PluginName: testPluginName})
+	mgr.modules = collectorapi.Registry{
+		"testmod": {
+			Create: func() collectorapi.CollectorV1 { return mod },
+		},
+	}
+
+	job, err := mgr.createCollectorJob(prepareUserCfg("testmod", "job1"))
+	require.NoError(t, err)
+	assert.Same(t, mod, job.Collector())
+	assert.Equal(t, "job1", mod.jobName)
+}
+
+func TestManagerCreateCollectorJobSingleInstancePolicyRequiresCanonicalName(t *testing.T) {
+	tests := map[string]struct {
+		creator func(*bool) collectorapi.Creator
+		jobName string
+		wantErr string
+	}{
+		"v1 canonical name is accepted": {
+			creator: func(created *bool) collectorapi.Creator {
+				return collectorapi.Creator{
+					InstancePolicy: collectorapi.InstancePolicySingle,
+					Create: func() collectorapi.CollectorV1 {
+						*created = true
+						return &testV1Module{}
+					},
+				}
+			},
+			jobName: "testmod",
+		},
+		"v1 non-canonical name is rejected before create": {
+			creator: func(created *bool) collectorapi.Creator {
+				return collectorapi.Creator{
+					InstancePolicy: collectorapi.InstancePolicySingle,
+					Create: func() collectorapi.CollectorV1 {
+						*created = true
+						return &testV1Module{}
+					},
+				}
+			},
+			jobName: "job1",
+			wantErr: `single-instance collector testmod must use config name "testmod", got "job1"`,
+		},
+		"v2 non-canonical name is rejected before create": {
+			creator: func(created *bool) collectorapi.Creator {
+				return collectorapi.Creator{
+					InstancePolicy: collectorapi.InstancePolicySingle,
+					CreateV2: func() collectorapi.CollectorV2 {
+						*created = true
+						return &testV2Module{store: metrix.NewCollectorStore()}
+					},
+				}
+			},
+			jobName: "job1",
+			wantErr: `single-instance collector testmod must use config name "testmod", got "job1"`,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			created := false
+			mgr := New(Config{PluginName: testPluginName})
+			mgr.modules = collectorapi.Registry{
+				"testmod": tc.creator(&created),
+			}
+
+			job, err := mgr.createCollectorJob(prepareUserCfg("testmod", tc.jobName))
+			if tc.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErr)
+				assert.False(t, created)
+				assert.Nil(t, job)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.True(t, created)
+			assert.NotNil(t, job)
 		})
 	}
 }

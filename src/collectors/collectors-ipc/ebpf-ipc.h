@@ -126,38 +126,6 @@ typedef struct netdata_socket {
     } udp;
 } netdata_socket_t;
 
-typedef struct netdata_cachestat_pid {
-    uint64_t ct;
-    uint32_t tgid;
-    uint32_t uid;
-    uint32_t gid;
-    char name[TASK_COMM_LEN];
-
-    uint32_t add_to_page_cache_lru;
-    uint32_t mark_page_accessed;
-    uint32_t account_page_dirtied;
-    uint32_t mark_buffer_dirty;
-} netdata_cachestat_pid_t;
-
-typedef struct netdata_cachestat {
-    uint32_t add_to_page_cache_lru;
-    uint32_t mark_page_accessed;
-    uint32_t account_page_dirtied;
-    uint32_t mark_buffer_dirty;
-} netdata_cachestat_t;
-
-typedef struct netdata_publish_cachestat {
-    uint64_t ct;
-
-    long long ratio;
-    long long dirty;
-    long long hit;
-    long long miss;
-
-    netdata_cachestat_t current;
-    netdata_cachestat_t prev;
-} netdata_publish_cachestat_t;
-
 typedef struct netdata_publish_dcstat_pid {
     uint64_t cache_access;
     uint64_t file_system;
@@ -322,7 +290,6 @@ typedef struct netdata_ebpf_pid_stats {
 
     ebpf_publish_process_t process;
     ebpf_socket_publish_apps_t socket;
-    netdata_publish_cachestat_t cachestat;
     netdata_publish_dcstat_t directory_cache;
     netdata_publish_swap_t swap;
     netdata_publish_vfs_t vfs;

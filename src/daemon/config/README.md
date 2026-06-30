@@ -45,7 +45,7 @@ After you modify `netdata.conf`, you need to [restart Netdata](/docs/netdata-age
 
 ## Customizing Your Node Name
 
-You can change the display name of your Netdata node by customizing the hostname setting:
+To override the auto-detected hostname and control how your node appears in Dashboards, Netdata Cloud, alert notifications, and streaming Parent nodes:
 
 1. Edit your `netdata.conf` file:
    ```bash
@@ -53,18 +53,13 @@ You can change the display name of your Netdata node by customizing the hostname
    sudo ./edit-config netdata.conf
    ```
 
-2. Add or modify the hostname in the `[global]` section:
+2. Add or modify the `hostname` in the `[global]` section:
    ```ini
    [global]
        hostname = YOUR_CUSTOM_NODE_NAME
    ```
 
-3. Restart Netdata to apply the changes:
-   ```bash
-   sudo systemctl restart netdata
-   ```
-
-The custom hostname will appear in dashboards, alerts, and when streaming to parent nodes.
+3. [Restart Netdata](/docs/netdata-agent/start-stop-restart.md) to apply the changes.
 
 ## Configuration Section Details
 
@@ -142,6 +137,7 @@ The multiplication of all the **enabled** tiers `dbengine tier N update every it
 |:-------------------:|:------------------------------------------------------------------:|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 |       config        |                           `/etc/netdata`                           | The directory configuration files are kept.                                                                                                                                        |
 |    stock config     |                     `/usr/lib/netdata/conf.d`                      |                                                                                                                                                                                    |
+|     stock data      |                      `/usr/share/netdata`                          | The directory Netdata uses for immutable stock data files shipped with the installation.                                                                                           |
 |         log         |                         `/var/log/netdata`                         | The directory in which the [log files](/src/daemon/README.md#logging) are kept.                                                                                                    |
 |         web         |                      `/usr/share/netdata/web`                      | The directory the web static files are kept.                                                                                                                                       |
 |        cache        |                        `/var/cache/netdata`                        | The directory the memory database will be stored if and when Netdata exits. Netdata will re-read the database when it will start again, to continue from the same point.           |
@@ -216,6 +212,7 @@ Specific Alerts are configured in per-collector config files under the `health.d
 |    in memory max Health log entries    |                       1000                       | Size of the Alert history held in RAM                                                                                                                                                                                                                                                                 |
 |       script to execute on alarm       | `/usr/libexec/netdata/plugins.d/alarm-notify.sh` | The script that sends Alert notifications. Note that in versions before 1.16, the plugins.d directory may be installed in a different location in certain OSs (e.g. under `/usr/lib/netdata`).                                                                                                        |
 |           run at least every           |                      `10s`                       | Controls how often all Alert conditions should be evaluated.                                                                                                                                                                                                                                          |
+|     notification execution timeout     |                      `2m`                        | How long a notification command (e.g. `alarm-notify.sh`) may run before it is killed. Protects Alert evaluation from hung notification processes. Set to `0` to wait forever.                                                                                                                         |
 | postpone alarms during hibernation for |                       `1m`                       | Prevents false Alerts. May need to be increased if you get Alerts during hibernation.                                                                                                                                                                                                                 |
 |          Health log retention          |                       `5d`                       | Specifies the history of Alert events (in seconds) kept in the Agent's sqlite database.                                                                                                                                                                                                               |
 |             enabled alarms             |                        *                         | Defines which Alerts to load from both user and stock directories. This is a [simple pattern](/src/libnetdata/simple_pattern/README.md) list of Alert or template names. Can be used to disable specific Alerts. For example, `enabled alarms =  !oom_kill *` will load all Alerts except `oom_kill`. |
@@ -253,7 +250,7 @@ By default, Netdata will enable monitoring metrics for disks, memory, and networ
 
 :::tip
 
-Use `yes` instead of `auto` in plugin configuration sections to enable these charts permanently. You can also set the `enable zero metrics` option to `yes` in the `[global]` section which enables charts with zero metrics for all internal Netdata plugins.
+Use `yes` instead of `auto` in plugin configuration sections to enable these charts permanently. You can also set the `enable zero metrics` option to `yes` in the `[db]` section which enables charts with zero metrics for all internal Netdata plugins.
 
 :::
 
@@ -263,7 +260,7 @@ External plugins will have only two options at `netdata.conf`:
 
 |     setting     |                   default                    | info                                                                                                                                                                                         |
 |:---------------:|:--------------------------------------------:|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-|  update every   | the value of `[global].update every` setting | The frequency in seconds the plugin should collect values. For more information check the [performance guide](/docs/netdata-agent/configuration/optimize-the-netdata-agents-performance.md). |
+|  update every   | the value of `[db].update every` setting | The frequency in seconds the plugin should collect values. For more information check the [performance guide](/docs/netdata-agent/configuration/optimize-the-netdata-agents-performance.md). |
 | command options |                      -                       | Additional command line options to pass to the plugin.                                                                                                                                       |
 
 External plugins that need additional configuration may support a dedicated file in `/etc/netdata`. Check their documentation.

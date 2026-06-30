@@ -149,7 +149,7 @@ static int stream_connect_upgrade_prelude(RRDHOST *host __maybe_unused, struct s
         return 1;
     }
 
-    rbuf_t buf = rbuf_create(bytes);
+    rbuf_t buf = rbuf_create(bytes, bytes);
     rbuf_push(buf, http, bytes);
 
     http_parse_ctx ctx;
@@ -693,7 +693,7 @@ bool stream_connector_init(struct sender_state *s) {
         completion_init(&sc->completion);
 
         char tag[NETDATA_THREAD_TAG_MAX + 1];
-        snprintfz(tag, NETDATA_THREAD_TAG_MAX, THREAD_TAG_STREAM_SENDER "-CN" "[%d]",
+        snprintfz(tag, NETDATA_THREAD_TAG_MAX, THREAD_TAG_STREAM_SENDER "-CN[%d]",
             sc->id);
 
         sc->thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, stream_connector_thread, sc);

@@ -98,6 +98,12 @@ void rrdhost_system_info_to_json_v2(BUFFER *wb, struct rrdhost_system_info *syst
 void rrdhost_system_info_to_url_encode_stream(BUFFER *wb, struct rrdhost_system_info *system_info);
 
 typedef int (*add_host_sysinfo_key_value_t)(const char *name, const char *value, nd_uuid_t *uuid);
+
+// Number of NETDATA_* keys emitted by rrdhost_system_info_foreach(); callers
+// compare against the cb-success count to detect partial-store failures.
+// Keep in sync with the body of rrdhost_system_info_foreach().
+#define RRDHOST_SYSTEM_INFO_KEY_COUNT 27
+
 int rrdhost_system_info_foreach(struct rrdhost_system_info *system_info, add_host_sysinfo_key_value_t cb, nd_uuid_t *uuid);
 
 struct update_node_info;

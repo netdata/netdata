@@ -618,8 +618,15 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
     int i;
     const char *saved_name = em->info.thread_name;
     uint64_t kernels = em->kernels;
+    bool loaded_any = false;
     for (i = 0; localfs[i].filesystem; i++) {
         ebpf_filesystem_partitions_t *efp = &localfs[i];
+        if (efp->flags & NETDATA_FILESYSTEM_FLAG_HAS_PARTITION)
+            loaded_any = true;
+
+        if (efp->load_failed)
+            continue;
+
         if (!efp->probe_links && efp->flags & NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM) {
             em->info.thread_name = efp->filesystem;
             em->kernels = efp->kernels;
@@ -630,34 +637,36 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
             if (em->load & EBPF_LOAD_LEGACY) {
                 efp->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &efp->objects);
                 if (!efp->probe_links) {
+                    efp->load_failed = true;
                     em->info.thread_name = saved_name;
                     em->kernels = kernels;
                     em->maps = NULL;
-                    netdata_mutex_unlock(&lock);
-                    return -1;
+                    continue;
                 }
             }
 #ifdef LIBBPF_MAJOR_VERSION
             else {
                 efp->fs_obj = filesystem_bpf__open();
                 if (!efp->fs_obj) {
+                    efp->load_failed = true;
                     em->info.thread_name = saved_name;
                     em->kernels = kernels;
                     em->maps = NULL;
-                    netdata_mutex_unlock(&lock);
-                    return -1;
+                    continue;
                 } else if (ebpf_fs_load_and_attach(em->maps, efp->fs_obj, efp->functions, NULL)) {
+                    efp->load_failed = true;
                     filesystem_bpf__destroy(efp->fs_obj);
                     efp->fs_obj = NULL;
                     em->info.thread_name = saved_name;
                     em->kernels = kernels;
                     em->maps = NULL;
-                    netdata_mutex_unlock(&lock);
-                    return -1;
+                    continue;
                 }
             }
 #endif
             efp->flags |= NETDATA_FILESYSTEM_FLAG_HAS_PARTITION;
+            loaded_any = true;
+            ebpf_mark_program_loaded();
             ebpf_update_kernel_memory(&plugin_statistics, efp->fs_maps, EBPF_ACTION_STAT_ADD);
 
             // Needed for filesystems like btrfs
@@ -682,7 +691,7 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
         filesystem_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
     }
 
-    return 0;
+    return loaded_any ? 0 : -1;
 }
 
 /**
@@ -905,12 +914,12 @@ static void ebpf_filesystem_exit(void *pptr)
     }
     if (!dimensions && !filesystem_hash_values && !has_resources) {
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+        ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPED);
         netdata_mutex_unlock(&ebpf_exit_cleanup);
         return;
     }
 
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
+    if (ebpf_module_enabled_get(em) == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
         netdata_mutex_lock(&lock);
         ebpf_obsolete_filesystem_global(em);
 
@@ -930,7 +939,7 @@ static void ebpf_filesystem_exit(void *pptr)
         em->functions.bpf_unload(em);
 
     netdata_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPED);
     netdata_mutex_unlock(&ebpf_exit_cleanup);
 }
 

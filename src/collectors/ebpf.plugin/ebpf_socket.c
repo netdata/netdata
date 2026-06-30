@@ -525,7 +525,7 @@ static inline int ebpf_socket_load_and_attach(struct socket_bpf *obj, ebpf_modul
 static void ebpf_socket_free(ebpf_module_t *em)
 {
     netdata_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPED);
     ebpf_update_stats(&plugin_statistics, em);
     netdata_mutex_unlock(&ebpf_exit_cleanup);
 
@@ -937,7 +937,7 @@ static void ebpf_socket_exit(void *pptr)
         sem_post(shm_mutex_ebpf_integration);
     }
 
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
+    if (ebpf_module_enabled_get(em) == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
         netdata_mutex_lock(&lock);
 
         if (em->cgroup_charts) {
@@ -2048,7 +2048,7 @@ void ebpf_read_socket_thread(void *ptr)
             break;
         }
 
-        if (cgroups && shm_ebpf_cgroup.header)
+        if (cgroups && ebpf_cgroup_integration_active_get())
             ebpf_update_socket_cgroup();
 
         if (sem_post(shm_mutex_ebpf_integration)) {
@@ -2803,8 +2803,8 @@ static void ebpf_socket_send_cgroup_data(int update_every)
         return;
     }
 
-    if (shm_ebpf_cgroup.header->systemd_enabled) {
-        if (send_cgroup_chart) {
+    if (ebpf_cgroup_systemd_enabled_get()) {
+        if (ebpf_send_cgroup_chart_get()) {
             ebpf_create_systemd_socket_charts(update_every);
         }
         ebpf_send_systemd_socket_charts();
@@ -2893,7 +2893,7 @@ static void socket_collector(ebpf_module_t *em)
             break;
         }
 
-        if (cgroups && shm_ebpf_cgroup.header)
+        if (cgroups && ebpf_cgroup_integration_active_get())
             ebpf_socket_send_cgroup_data(update_every);
 
         fflush(stdout);
@@ -3126,6 +3126,7 @@ void ebpf_socket_thread(void *ptr)
     if (ebpf_socket_load_bpf(em)) {
         goto endsocket;
     }
+    ebpf_mark_program_loaded();
 
     int algorithms[NETDATA_MAX_SOCKET_VECTOR] = {
         NETDATA_EBPF_ABSOLUTE_IDX,

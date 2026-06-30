@@ -210,9 +210,13 @@ int help(int exitcode) {
     } while(0)
 
 int buffer_unittest(void);
+int ringbuffer_unittest(void);
+int ws_client_unittest(void);
+int mqtt_ng_unittest(void);
 int pgc_unittest(void);
 int mrg_unittest(void);
 int pluginsd_parser_unittest(void);
+int websocket_compression_unittest(void);
 void replication_initialize(void);
 void bearer_tokens_init(void);
 int unittest_stream_compressions(void);
@@ -221,10 +225,12 @@ int progress_unittest(void);
 int dyncfg_unittest(void);
 int eval_unittest(void);
 int duration_unittest(void);
+int statistical_unittest(void);
 int health_config_unittest(void);
 int utf8_sanitizer_unittest(void);
 int yaml_unittest(void);
 int json_c_parser_unittest(void);
+int query_plan_unittest(void);
 #ifdef ENABLE_ML
 int ml_unittest(void);
 #endif
@@ -261,6 +267,13 @@ int netdata_main(int argc, char **argv) {
     string_init();
     analytics_init();
     nd_log_initialize_mutexes();
+
+    // Register the daemon's per-thread cleanup callback. Each subsystem
+    // should own the registration of its own cleanups; this one lives in
+    // the daemon because service_exits is a daemon-layer concern. The
+    // rest are currently registered together in rrd_init() and should be
+    // moved to their respective subsystems in a follow-up.
+    nd_thread_register_cleanup(service_exits);
 
     netdata_start_time = now_realtime_sec();
     usec_t started_ut = now_monotonic_usec();
@@ -421,10 +434,14 @@ int netdata_main(int argc, char **argv) {
                             rrdlabels_aral_init(false);
 
                             if (pluginsd_parser_unittest()) return 1;
+                            if (websocket_compression_unittest()) return 1;
                             if (unit_test_static_threads()) return 1;
                             if (unit_test_buffer()) return 1;
                             if (unit_test_str2ld()) return 1;
                             if (buffer_unittest()) return 1;
+                            if (ringbuffer_unittest()) return 1;
+                            if (ws_client_unittest()) return 1;
+                            if (mqtt_ng_unittest()) return 1;
 
                             // No call to load the config file on this code-path
                             if (unittest_prepare_rrd(&user)) return 1;
@@ -440,15 +457,19 @@ int netdata_main(int argc, char **argv) {
                             if (rrdlabels_unittest()) return 1;
                             if (rrdhost_labels_unittest()) return 1;
                             if (ctx_unittest()) return 1;
+                            if (query_plan_unittest()) return 1;
                             if (uuid_unittest()) return 1;
+                            if (os_socket_egress_interface_unittest()) return 1;
                             if (dyncfg_unittest()) return 1;
                             if (eval_unittest()) return 1;
                             if (duration_unittest()) return 1;
+                            if (statistical_unittest()) return 1;
                             if (utf8_sanitizer_unittest()) return 1;
                             if (health_config_unittest()) return 1;
                             if (yaml_unittest()) return 1;
                             if (json_c_parser_unittest()) return 1;
                             if (unittest_waiting_queue()) return 1;
+                            if (rw_spinlock_unittest()) return 1;
                             if (uuidmap_unittest()) return 1;
 #ifdef HAVE_LIBBACKTRACE
                             if (stacktrace_unittest()) return 1;
@@ -477,6 +498,15 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return aral_unittest(10000);
                         }
+                        else if(strcmp(optarg, "aralconcurrency") == 0) {
+                            unittest_running = true;
+#ifdef NETDATA_INTERNAL_CHECKS
+                            return aral_unittest_concurrency();
+#else
+                            fprintf(stderr, "aralconcurrency requires NETDATA_INTERNAL_CHECKS\n");
+                            return 1;
+#endif
+                        }
                         else if(strcmp(optarg, "waitqtest") == 0) {
                             unittest_running = true;
                             return unittest_waiting_queue();
@@ -493,6 +523,10 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return rwlocks_stress_test();
                         }
+                        else if(strcmp(optarg, "rwspinlocktest") == 0) {
+                            unittest_running = true;
+                            return rw_spinlock_unittest();
+                        }
                         else if(strcmp(optarg, "prd-array-stress") == 0) {
                             unittest_running = true;
                             return prd_array_stress_test();
@@ -508,9 +542,28 @@ int netdata_main(int argc, char **argv) {
                             rrdlabels_aral_destroy(true);
                             return rc;
                         }
+                        else if(strcmp(optarg, "rrdhostlabelstest") == 0) {
+                            unittest_running = true;
+                            rrdlabels_aral_init(true);
+                            int rc = rrdhost_labels_unittest();
+                            rrdlabels_aral_destroy(true);
+                            return rc;
+                        }
                         else if(strcmp(optarg, "buffertest") == 0) {
                             unittest_running = true;
                             return buffer_unittest();
+                        }
+                        else if(strcmp(optarg, "ringbuffertest") == 0) {
+                            unittest_running = true;
+                            return ringbuffer_unittest();
+                        }
+                        else if(strcmp(optarg, "wsclienttest") == 0) {
+                            unittest_running = true;
+                            return ws_client_unittest();
+                        }
+                        else if(strcmp(optarg, "mqttngtest") == 0) {
+                            unittest_running = true;
+                            return mqtt_ng_unittest();
                         }
                         else if(strcmp(optarg, "test_cmd_pool_fifo") == 0) {
                             unittest_running = true;
@@ -538,6 +591,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "utf8sanitizertest") == 0) {
                             unittest_running = true;
                             return utf8_sanitizer_unittest();
+                        }
+                        else if(strcmp(optarg, "queryplantest") == 0) {
+                            unittest_running = true;
+                            return query_plan_unittest();
                         }
 #ifdef ENABLE_DBENGINE
                         else if(strcmp(optarg, "mctest") == 0) {
@@ -568,6 +625,10 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return pluginsd_parser_unittest();
                         }
+                        else if(strcmp(optarg, "websockettest") == 0) {
+                            unittest_running = true;
+                            return websocket_compression_unittest();
+                        }
                         else if(strcmp(optarg, "stream_compressions_test") == 0) {
                             unittest_running = true;
                             return unittest_stream_compressions();
@@ -590,9 +651,18 @@ int netdata_main(int argc, char **argv) {
                         }
                         else if(strcmp(optarg, "dyncfgtest") == 0) {
                             unittest_running = true;
-                            if(unittest_prepare_rrd(&user))
+                            if(sqlite_library_init())
                                 return 1;
-                            return dyncfg_unittest();
+                            rrdlabels_aral_init(false);
+
+                            int rc = unittest_prepare_rrd(&user);
+                            if (!rc)
+                                rc = dyncfg_unittest();
+
+                            sqlite_close_databases();
+                            sqlite_library_shutdown();
+                            rrdlabels_aral_destroy(false);
+                            return rc;
                         }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
@@ -1075,10 +1145,10 @@ int netdata_main(int argc, char **argv) {
     // The "HOME" env var points to the root's home dir because Netdata starts as root. Can't use "HOME".
     struct passwd *pw = getpwuid(getuid());
     if (inicfg_exists(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home") || !pw || !pw->pw_dir) {
-        netdata_configured_home_dir = inicfg_get(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home", netdata_configured_home_dir);
+        netdata_configured_home_dir = inicfg_get_path(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home", netdata_configured_home_dir);
     }
     else
-        netdata_configured_home_dir = inicfg_get(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home", pw->pw_dir);
+        netdata_configured_home_dir = inicfg_get_path(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home", pw->pw_dir);
 
     nd_setenv("HOME", netdata_configured_home_dir, 1);
 

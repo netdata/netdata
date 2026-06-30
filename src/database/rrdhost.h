@@ -96,6 +96,17 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
 
     RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED       = (1 << 28), // set when the host has updated global functions
     RRDHOST_FLAG_RRDCONTEXT_GET_RETENTION       = (1 << 29), // set when rrdcontext needs to update the retention of the host
+
+    RRDHOST_FLAG_OBSOLETE_ALL_IN_PROGRESS       = (1 << 30), // svc_rrdhost_obsolete_all_charts() is running on this host;
+                                                             // gates rrdhost_set_receiver() so a reconnect cannot attach
+                                                             // mid-pass. Set under receiver_lock; the heavy work runs
+                                                             // without holding receiver_lock so readers stay unblocked.
+
+    RRDHOST_FLAG_PENDING_LABEL_RECHECK          = (1U << 31), // host labels changed since the last health prototype
+                                                              // evaluation; on its next pass the health thread treats
+                                                              // every chart of this host as needing a recheck, in
+                                                              // addition to charts that have RRDSET_FLAG_PENDING_LABEL_RECHECK
+                                                              // set individually (no per-chart flag fan-out).
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_get(host)                         atomic_flags_get(&((host)->flags))
@@ -241,8 +252,39 @@ struct rrdhost {
                     uint32_t charts;                // the number of charts currently being replicated from a child
                     NETDATA_DOUBLE percent;         // the % of replication completion
                 } replication;
+
+                // single-writer (the receiver thread), relaxed-atomic; read lock-free by the
+                // pulse traversal. Cumulative over the host's lifetime, never reset.
+                uint64_t bytes_in;                  // raw socket bytes received from this child (all connections)
+                uint64_t bytes_out;                 // raw socket bytes sent to this child (all connections)
+
+                // realtime second the current inbound (receiver) state was entered; reset by
+                // pulse_host_status() on every inbound state change, read by the pulse traversal
+                // to chart the age in the current state.
+                time_t state_changed_s;
+
+                // "running latched": set true once the node first reaches RCV_RUNNING after a
+                // (re)connect. While set and the node is currently running, per-chart replication
+                // ripples (a new container/service/process group briefly replicating) do NOT flip
+                // the host status back to replicating. Reset on disconnect (RCV_OFFLINE) and when a
+                // replicating transition arrives while the node is NOT currently running (i.e. the
+                // initial catch-up of a fresh connection). Note: this masks ANY replication once
+                // running until the next disconnect, not only small ripples. Maintained by
+                // pulse_host_status() (relaxed atomic).
+                bool running_latched;
+
+                // last host-label version applied to this host's per-child charts; the pulse
+                // traversal (single thread) re-applies labels + hops only when it changes, i.e. on
+                // reconnect / mid-stream label push.
+                uint32_t labels_applied_version;
             } status;
         } rcv;
+
+        // resolved combined PULSE_HOST_STATUS (basic|receiver|sender|ephemerality), maintained by
+        // pulse_host_status() lock-free (CAS) and read by the pulse traversal, which computes the
+        // streaming_inbound (basic|receiver bits) and streaming_outbound (sender bits) aggregates.
+        // Replaces the former global PHOST Judy + spinlock.
+        uint32_t pulse_state;
 
         // --- configuration ---
 
@@ -341,6 +383,18 @@ struct rrdhost {
 
 extern RRDHOST *localhost;
 
+// receiver_lock protects host->receiver and the host->stream.rcv.status fields.
+//
+// Hold time must stay short-bounded: no caller may hold receiver_lock across
+// O(charts), I/O, sends, ML stop/start, or any wait on other subsystems. The
+// obsolete-all cleanup pass (service.c) used to violate this; it now sets
+// RRDHOST_FLAG_OBSOLETE_ALL_IN_PROGRESS under the lock and runs the heavy
+// work without holding it. rrdhost_set_receiver() checks that flag under
+// the lock and returns RRDHOST_SET_RECEIVER_CLEANUP_BUSY when the cleanup
+// pass is in progress; the caller answers the child with BUSY_TRY_LATER and
+// the child reconnects via normal backoff. With cleanup off the lock, all
+// other readers (status, ACLK, capabilities, paths, event-driven sends)
+// keep blocking-lock semantics and stay truthful.
 #define rrdhost_receiver_lock(host) spinlock_lock(&(host)->receiver_lock)
 #define rrdhost_receiver_unlock(host) spinlock_unlock(&(host)->receiver_lock)
 
@@ -456,6 +510,7 @@ RRDHOST *rrdhost_find_or_create(
 void rrdhost_free_all(void);
 
 void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host);
+void rrdhost_free___without_having_rrd_wrlock(RRDHOST *host);
 void rrdhost_cleanup_data_collection_and_health(RRDHOST *host);
 
 bool rrdhost_should_be_cleaned_up(RRDHOST *host, RRDHOST *protected_host, time_t now_s);

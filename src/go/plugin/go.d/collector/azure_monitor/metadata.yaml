@@ -225,7 +225,7 @@ modules:
                 | Mode | Behavior |
                 |:-----|:---------|
                 | `filters` | Builds an Azure Resource Graph query from the structured `mode_filters.*` options (resource groups, regions, tags). This is the default. |
-                | `query` | Uses the raw KQL you provide in `discovery.mode_query.kql`. The query must project `id`, `name`, `type`, `resourceGroup`, and `location`. |
+                | `query` | Uses the raw KQL you provide in `discovery.mode_query.kql`. The query must project `id`, `name`, `type`, `resourceGroup`, and `location`. Project `tags` too when using `virtual_nodes.by_resource_tag`. |
             - name: discovery.mode_filters.resource_groups
               description: Optional list of Azure resource groups to include in `filters` mode.
               default_value: "[]"
@@ -242,7 +242,7 @@ modules:
               required: false
               group: Discovery
             - name: discovery.mode_query.kql
-              description: Custom Azure Resource Graph KQL for `query` mode. Must project `id`, `name`, `type`, `resourceGroup`, `location`.
+              description: Custom Azure Resource Graph KQL for `query` mode. Must project `id`, `name`, `type`, `resourceGroup`, `location`; project `tags` too when using `virtual_nodes.by_resource_tag`.
               default_value: ""
               required: false
               group: Discovery
@@ -260,6 +260,8 @@ modules:
                 | `resourceGroup` | Resource group name |
                 | `location` | Azure region |
 
+                If `virtual_nodes.by_resource_tag` is set, also project `tags`. Missing `tags` or non-object-shaped `tags` do not fail discovery; affected resources fall back to the default job host scope and the collector logs a warning once per successful discovery refresh.
+
                 :::info
 
                 - Returned resource `type` values should match the Azure resource types expected by the active profiles. 
@@ -273,7 +275,7 @@ modules:
                 ```
                 resources
                 | where tags.env =~ "prod"
-                | project id, name, type, resourceGroup, location
+                | project id, name, type, resourceGroup, location, tags
                 ```
             - name: profiles.mode
               description: "How profiles are selected: `auto` (discover from resources), `exact` (explicit list), or `combined` (both)."
@@ -369,6 +371,24 @@ modules:
               default_value: ""
               required: false
               group: Virtual Node
+              detailed_description: |
+                This job-level virtual node is used for metrics written to the default host scope.
+                If `virtual_nodes.by_resource_tag` is also set, resources that have a safe value for the configured tag are routed to workload virtual nodes instead. Resources without that tag, with an empty value, or with an unsafe hostname value continue to use the job-level `vnode` when configured.
+            - name: virtual_nodes.by_resource_tag
+              description: Creates workload virtual nodes from an Azure resource tag value.
+              default_value: ""
+              required: false
+              group: Virtual Node
+              detailed_description: |
+                Set this to an Azure resource tag key, for example `workload`, to route resource metrics under virtual nodes named after that tag value.
+
+                - Tag keys are matched case-insensitively; tag values keep their Azure case and are trimmed.
+                - Empty or missing tag values use the default job host scope.
+                - Unsafe hostname values use the default job host scope and are summarized in a warning once per successful discovery refresh.
+                - The virtual node GUID is deterministic from `azure_monitor:` plus the trimmed tag value, so the same Azure workload value maps to the same Azure Monitor virtual node across jobs and subscriptions.
+                - Virtual node metadata includes `_vnode_type=azure_workload`. Netdata also adds `_hostname` when emitting the virtual node definition.
+                - Workload virtual nodes increase host and alert cardinality. Health alerts defined for Azure Monitor charts attach per workload virtual node.
+                - The metrix scoped vec cache grows with observed workload scope and label cardinality during the collector runtime; keep the configured tag's cardinality bounded by operator policy.
         examples:
           folding:
             title: Config
@@ -402,6 +422,61 @@ modules:
                         tenant_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                         client_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                         client_secret: "your-client-secret"
+            - name: Workload virtual nodes from resource tags
+              description: Route resources with `tags.workload` to virtual nodes named after the workload value. Resources without the tag stay on the default job host scope.
+              config: |
+                jobs:
+                  - name: prod-workloads
+                    subscription_ids:
+                      - "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    virtual_nodes:
+                      by_resource_tag: workload
+                    discovery:
+                      mode: filters
+                    profiles:
+                      mode: auto
+                    auth:
+                      mode: service_principal
+                      mode_service_principal:
+                        tenant_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                        client_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                        client_secret: "your-client-secret"
+            - name: Custom KQL with workload virtual nodes
+              description: In `query` discovery mode, project `tags` so `virtual_nodes.by_resource_tag` can derive workload virtual nodes.
+              config: |
+                jobs:
+                  - name: prod-query-workloads
+                    subscription_ids:
+                      - "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    virtual_nodes:
+                      by_resource_tag: workload
+                    discovery:
+                      mode: query
+                      mode_query:
+                        kql: |
+                          resources
+                          | where tags.env =~ "prod"
+                          | project id, name, type, resourceGroup, location, tags
+                    profiles:
+                      mode: auto
+                    auth:
+                      mode: default
+            - name: Job virtual node plus workload virtual nodes
+              description: Use a job-level `vnode` as the default host scope while tagged resources route to workload virtual nodes.
+              config: |
+                jobs:
+                  - name: prod-with-fallback-node
+                    vnode: azure-fallback-node
+                    subscription_ids:
+                      - "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    virtual_nodes:
+                      by_resource_tag: workload
+                    discovery:
+                      mode: filters
+                    profiles:
+                      mode: auto
+                    auth:
+                      mode: managed_identity
             - name: Managed identity with exact profiles
               description: Use a managed identity (on an Azure VM, VMSS, or AKS) and monitor only SQL Database and PostgreSQL Flexible Server resources -- skip auto-discovery of other services.
               config: |
@@ -461,7 +536,7 @@ modules:
                         kql: |
                           resources
                           | where tags.env =~ "prod"
-                          | project id, name, type, resourceGroup, location
+                          | project id, name, type, resourceGroup, location, tags
                     profiles:
                       mode: auto
                     auth:
@@ -515,6 +590,18 @@ modules:
               - The collector uses `query_offset` (default: **180 seconds**) as the minimum offset for metric query windows.
               - Slower time-grain batches automatically use a larger effective offset when needed.
               - If metrics are still missing or incomplete, increase `query_offset` to **240** or **300** seconds.
+          - name: Workload virtual nodes are not created
+            description: |
+              When `virtual_nodes.by_resource_tag` is set, check the discovered resource tags:
+
+              - The configured tag key is matched case-insensitively, but the value must be non-empty after trimming.
+              - In `discovery.mode: query`, the KQL must project `tags`. If the `tags` column is missing or not an object, the collector logs a warning and affected resources use the default job host scope.
+              - Tag values must be safe Netdata hostnames. Unsafe values are summarized in a warning once per successful discovery refresh and affected resources use the default job host scope.
+              - The same Azure workload value intentionally maps to the same Azure Monitor virtual node across subscriptions and jobs. Use distinct tag values when tenants should remain separate.
+              - Azure Monitor namespaces workload GUID input with `azure_monitor:` to avoid accidental collisions with other collectors that derive virtual node GUIDs from hostnames.
+          - name: More alerts appear after enabling workload virtual nodes
+            description: |
+              Workload virtual nodes multiply the host scope of Azure Monitor charts. Health alerts attached to those charts evaluate per workload virtual node, so alert volume can increase with the number of distinct workload tag values.
           - name: Authentication errors in sovereign clouds
             description: |
               For Azure Government or Azure China clouds, set the `cloud` parameter:

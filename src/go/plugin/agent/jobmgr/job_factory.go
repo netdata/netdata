@@ -18,6 +18,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/metricsaudit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
@@ -46,10 +47,15 @@ type jobFactory struct {
 	auditDataDir  string
 
 	runtimeService runtimecomp.Service
+	vnodeRegistry  *vnoderegistry.Registry
 
 	secretResolver *secretresolver.Resolver
 	secretStoreSvc secretstore.Service
 	ctx            context.Context
+}
+
+type jobNameSetter interface {
+	SetJobName(string)
 }
 
 func newJobFactory(m *Manager) *jobFactory {
@@ -66,6 +72,7 @@ func newJobFactory(m *Manager) *jobFactory {
 		auditDataDir:  m.auditDataDir,
 
 		runtimeService: m.runtimeService,
+		vnodeRegistry:  m.vnodeRegistry,
 		secretResolver: m.secretResolver,
 		secretStoreSvc: m.secretsCtl.Service(),
 		ctx:            m.baseContext(),
@@ -84,10 +91,13 @@ func (f *jobFactory) create(cfg confgroup.Config) (runtimeJob, error) {
 	if !ok {
 		return nil, fmt.Errorf("can not find %s module", cfg.Module())
 	}
+	if err := validateCollectorConfigIdentity(cfg, creator); err != nil {
+		return nil, err
+	}
 
 	functionOnly := creator.FunctionOnly || cfg.FunctionOnly()
-	if cfg.FunctionOnly() && creator.Methods == nil && creator.JobMethods == nil {
-		return nil, fmt.Errorf("function_only is set but %s module has no methods defined", cfg.Module())
+	if cfg.FunctionOnly() && creator.SharedFunctions == nil && creator.AgentFunctions == nil && creator.InstanceFunctions == nil {
+		return nil, fmt.Errorf("function_only is set but %s module has no functions defined", cfg.Module())
 	}
 
 	var vnode *vnodes.VirtualNode
@@ -122,6 +132,9 @@ func (f *jobFactory) createV2(cfg confgroup.Config, creator collectorapi.Creator
 	if mod == nil {
 		return nil, fmt.Errorf("module %s CreateV2 returned nil", cfg.Module())
 	}
+	if named, ok := mod.(jobNameSetter); ok {
+		named.SetJobName(cfg.Name())
+	}
 	storeSnapshot := f.secretStoreSvc.Capture()
 	resolveCtx := collectorSecretResolveContext(f.ctx, f.logger, cfg)
 	if err := applyConfig(resolveCtx, cfg, mod, f.secretResolver, f.secretStoreSvc, storeSnapshot); err != nil {
@@ -143,6 +156,7 @@ func (f *jobFactory) createV2(cfg confgroup.Config, creator collectorapi.Creator
 		Module:          mod,
 		FunctionOnly:    functionOnly,
 		RuntimeService:  f.runtimeService,
+		VnodeRegistry:   f.vnodeRegistry,
 	}
 	if vnode != nil {
 		jobCfg.Vnode = *vnode.Copy()
@@ -161,6 +175,9 @@ func (f *jobFactory) createV1(cfg confgroup.Config, creator collectorapi.Creator
 	}
 
 	mod := creator.Create()
+	if named, ok := mod.(jobNameSetter); ok {
+		named.SetJobName(cfg.Name())
+	}
 	storeSnapshot := f.secretStoreSvc.Capture()
 	resolveCtx := collectorSecretResolveContext(f.ctx, f.logger, cfg)
 	if err := applyConfig(resolveCtx, cfg, mod, f.secretResolver, f.secretStoreSvc, storeSnapshot); err != nil {

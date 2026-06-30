@@ -86,12 +86,12 @@ Netdata streaming uses a **custom binary protocol over TCP**, not HTTP/HTTPS. Th
 
 ## Quick Reference
 
-| Task                                     | Configuration                             | Example                                                        |
-|------------------------------------------|-------------------------------------------|----------------------------------------------------------------|
-| Enable streaming on a Child              | Set `enabled = yes` in `[stream]` section | `[stream]`<br/>`enabled = yes`<br/>`destination = 192.168.1.5` |
+| Task                                     | Configuration                             | Example                                                               |
+|------------------------------------------|-------------------------------------------|-----------------------------------------------------------------------|
+| Enable streaming on a Child              | Set `enabled = yes` in `[stream]` section | `[stream]`<br/>`enabled = yes`<br/>`destination = 192.168.1.5`        |
 | Configure a Parent to accept connections | Create an `[API_KEY]` section             | `[API_KEY]`<br/>`type = api`<br/>`enabled = yes`<br/>`allow from = *` |
-| Set up high availability                 | Configure multiple destinations on Child  | `[stream]`<br/>`destination = parent1:19999 parent2:19999`     |
-| Filter which metrics to send             | Use `send charts matching` setting        | `send charts matching = system.* !system.uptime`               |
+| Set up high availability                 | Configure multiple destinations on Child  | `[stream]`<br/>`destination = parent1:19999 parent2:19999`            |
+| Filter which metrics to send             | Use `send charts matching` setting        | `send charts matching = system.* !system.uptime`                      |
 
 ## Configuration Overview
 
@@ -371,7 +371,6 @@ The `netdata.conf` file is the primary configuration file for the Netdata agent.
 This section defines global settings for the Netdata agent.
 
 - **hostname**: The hostname used by the agent.
-- **memory mode**: Choose the memory mode for data collection (e.g., `ram` or `swap`).
 - **error log file**: Path to the file where error logs are saved.
 
 ### [web]
@@ -382,13 +381,27 @@ Configure the web interface settings here.
 - **port**: Set the port for the web interface (default: 19999).
 - **disable SSL**: Set to `yes` to disable SSL support.
 
-### [database]
+### [db]
 
 Manage database settings for data storage and retention.
 
-- **memory mode**: Choose between in-memory or disk-based storage.
-- **data retention**: Set how long to keep historical data.
-- **compression**: Enable or disable data compression.
+- **db** (formerly `memory mode`): Choose between in-memory or disk-based storage (e.g., `dbengine`, `ram`, `none`).
+- **retention**: Set how long to keep historical data.
+- **update every**: The data collection frequency in seconds.
+
+:::note
+
+**Parent and Child `update every` do not need to match**
+
+The `update every` setting controls the collection granularity of the metrics **this node collects locally**. In a Parent-Child streaming setup, the Parent's `[db] update every` and a Child's `update every` are independent — they do **not** need to match:
+
+- The Parent's `update every` governs only the metrics the Parent collects from its **own** host.
+- A streaming Child automatically sends its own `update every` to the Parent, and the Parent stores that Child's metrics at the Child's collection frequency — regardless of the Parent's `update every`.
+- Each streaming Child is a separate host on the Parent, each keeping its own `update every`.
+
+Configuring both nodes with the same value is neither required nor beneficial — if they happen to be equal, it is coincidental and has no effect on correctness. Set each node's `update every` based on the collection granularity you want for that node's own data.
+
+:::
 
 ## Complete Configuration Examples
 
@@ -671,6 +684,17 @@ You can enable SSL in the destination setting by adding `:SSL` at the end. Confi
 <br/>
 
 Yes, you need to configure each Child node with its own streaming configuration. However, you can use configuration management tools to deploy a standard configuration across your infrastructure, making this process more efficient.
+
+</details>
+
+<details>
+<summary><strong>Do the Parent and Child need the same update every setting?</strong></summary>
+<br/>
+
+No. Each Child automatically sends its own `update every` to the Parent when it streams. The Parent stores that Child's metrics at the Child's collection frequency, regardless of the Parent's `update every`. The Parent's `[db] update every` setting only affects the metrics the Parent collects from its own host.
+
+Set each node's `update every` based on the collection granularity you want for that node's own data. Matching the two values is neither required nor beneficial — if they happen to be equal, it is coincidental and has no effect on correctness.
+
 </details>
 
 ## Step-by-Step Setup Guide

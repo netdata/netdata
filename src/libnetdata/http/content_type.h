@@ -33,6 +33,7 @@ typedef enum __attribute__ ((__packed__)) {
     CT_VIDEO_MP4,
     CT_APPLICATION_PDF,
     CT_APPLICATION_ZIP,
+    CT_APPLICATION_WASM,
     CT_TEXT_YAML,
     CT_APPLICATION_YAML,
 } HTTP_CONTENT_TYPE;

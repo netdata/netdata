@@ -14,7 +14,7 @@ import (
 )
 
 func TestCollector_AddProfileScalarMetricChart_LabelsIncludeMetricTags(t *testing.T) {
-	collr := New()
+	collr := newTestSNMPCollector()
 	collr.Hostname = "192.0.2.1"
 	collr.sysInfo = &snmputils.SysInfo{
 		Name:   "test-device",
@@ -75,6 +75,78 @@ func TestAddMetricTagLabels_PrefersUnprefixedTags(t *testing.T) {
 		"profile_tag":         "profile-value",
 		"vendor":              "device-vendor",
 	}, labels)
+}
+
+func TestLicenseChartsSkipGaps(t *testing.T) {
+	tests := map[string]struct {
+		skip bool
+	}{
+		licenseRemainingTimeChart.ID:              {skip: licenseRemainingTimeChart.SkipGaps},
+		licenseAuthorizationRemainingTimeChart.ID: {skip: licenseAuthorizationRemainingTimeChart.SkipGaps},
+		licenseCertificateRemainingTimeChart.ID:   {skip: licenseCertificateRemainingTimeChart.SkipGaps},
+		licenseGraceRemainingTimeChart.ID:         {skip: licenseGraceRemainingTimeChart.SkipGaps},
+		licenseUsagePercentChart.ID:               {skip: licenseUsagePercentChart.SkipGaps},
+		licenseStateChart.ID:                      {skip: licenseStateChart.SkipGaps},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.True(t, tc.skip, "chart %s must skip gaps to avoid empty licensing charts", name)
+		})
+	}
+}
+
+func TestCollector_AddLicenseCharts_LazyBySignalClass(t *testing.T) {
+	tests := map[string]struct {
+		agg     licenseAggregate
+		present []string
+		absent  []string
+	}{
+		"state only": {
+			agg: licenseAggregate{hasStateCounts: true},
+			present: []string{
+				licenseStateChart.ID,
+			},
+			absent: []string{
+				licenseRemainingTimeChart.ID,
+				licenseAuthorizationRemainingTimeChart.ID,
+				licenseCertificateRemainingTimeChart.ID,
+				licenseGraceRemainingTimeChart.ID,
+				licenseUsagePercentChart.ID,
+			},
+		},
+		"expiry and usage only": {
+			agg: licenseAggregate{hasRemainingTime: true, hasUsagePercent: true},
+			present: []string{
+				licenseRemainingTimeChart.ID,
+				licenseUsagePercentChart.ID,
+			},
+			absent: []string{
+				licenseAuthorizationRemainingTimeChart.ID,
+				licenseCertificateRemainingTimeChart.ID,
+				licenseGraceRemainingTimeChart.ID,
+				licenseStateChart.ID,
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			collr := newTestSNMPCollector()
+			collr.sysInfo = &snmputils.SysInfo{}
+			collr.addLicenseCharts(tc.agg)
+			collr.addLicenseCharts(tc.agg)
+
+			for _, id := range tc.present {
+				chart := collr.Charts().Get(id)
+				require.NotNil(t, chart, "expected chart %s", id)
+				assert.Equal(t, "licensing", chartLabels(chart)["component"])
+			}
+			for _, id := range tc.absent {
+				assert.Nil(t, collr.Charts().Get(id), "unexpected chart %s", id)
+			}
+		})
+	}
 }
 
 func chartLabels(chart *collectorapi.Chart) map[string]string {

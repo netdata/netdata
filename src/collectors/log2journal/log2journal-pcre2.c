@@ -24,7 +24,7 @@ static inline void copy_and_convert_key(PCRE2_STATE *pcre2, const char *key) {
     size_t remaining = sizeof(pcre2->key) - pcre2->key_start;
 
     while(remaining >= 2 && *key) {
-        *d = journal_key_characters_map[(unsigned) (*key)];
+        *d = journal_key_characters_map[(unsigned char)*key];
         remaining--;
         key++;
         d++;

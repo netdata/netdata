@@ -82,7 +82,6 @@ func TestCollector_Collect_StatsSnapshot(t *testing.T) {
 		},
 	}
 
-	handleCrossTableTagsWithoutMetrics(profile)
 	require.NoError(t, ddsnmp.CompileTransforms(profile))
 
 	collector := New(Config{
@@ -202,7 +201,6 @@ func TestCollector_Collect_PreservesHiddenMetrics(t *testing.T) {
 		},
 	}
 
-	handleCrossTableTagsWithoutMetrics(profile)
 	require.NoError(t, ddsnmp.CompileTransforms(profile))
 
 	collector := New(Config{
@@ -224,14 +222,71 @@ func TestCollector_Collect_PreservesHiddenMetrics(t *testing.T) {
 	assert.Equal(t, "privateMetric_total", pm.Metrics[0].Name)
 }
 
-func TestLongestCommonPrefix(t *testing.T) {
-	assert.Equal(t, "1.3.6.1.2.1.31.1.1.1", longestCommonPrefix([]string{
-		"1.3.6.1.2.1.31.1.1.1.1",
-		"1.3.6.1.2.1.31.1.1.1.18",
-	}))
+func TestCollector_Collect_SeparatesTopologyMetricsFromHiddenMetrics(t *testing.T) {
+	ctrl, mockHandler := setupMockHandler(t)
+	defer ctrl.Finish()
 
-	assert.Equal(t, "1.3.6.1.4.1.2636.5.1.1.2.1.1.1", longestCommonPrefix([]string{
-		"1.3.6.1.4.1.2636.5.1.1.2.1.1.1.11",
-		"1.3.6.1.4.1.2636.5.1.1.2.1.1.1.14",
-	}))
+	expectSNMPWalk(mockHandler,
+		gosnmp.Version2c,
+		"1.3.6.1.4.1.99999.1",
+		[]gosnmp.SnmpPDU{
+			createCounter32PDU("1.3.6.1.4.1.99999.1.1.1", 100),
+		},
+	)
+	expectSNMPGet(mockHandler,
+		[]string{"1.3.6.1.4.1.99999.2.0"},
+		[]gosnmp.SnmpPDU{
+			createIntegerPDU("1.3.6.1.4.1.99999.2.0", 1),
+		},
+	)
+
+	profile := &ddsnmp.Profile{
+		SourceFile: "topology-delivery-profile.yaml",
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			Metrics: []ddprofiledefinition.MetricsConfig{
+				{
+					Table: ddprofiledefinition.SymbolConfig{
+						OID:  "1.3.6.1.4.1.99999.1",
+						Name: "privateTable",
+					},
+					Symbols: []ddprofiledefinition.SymbolConfig{
+						{
+							OID:  "1.3.6.1.4.1.99999.1.1",
+							Name: "_privateMetric",
+						},
+					},
+				},
+			},
+			Topology: []ddprofiledefinition.TopologyConfig{
+				{
+					Kind: ddprofiledefinition.KindIfStatus,
+					MetricsConfig: ddprofiledefinition.MetricsConfig{
+						Symbol: ddprofiledefinition.SymbolConfig{
+							OID:  "1.3.6.1.4.1.99999.2.0",
+							Name: "if_status",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	collector := New(Config{
+		SnmpClient:  mockHandler,
+		Profiles:    []*ddsnmp.Profile{profile},
+		Log:         logger.New(),
+		SysObjectID: "",
+	})
+
+	results, err := collector.Collect()
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	pm := results[0]
+	require.Len(t, pm.HiddenMetrics, 1)
+	assert.Equal(t, "_privateMetric", pm.HiddenMetrics[0].Name)
+	require.Len(t, pm.TopologyMetrics, 1)
+	assert.Equal(t, "if_status", pm.TopologyMetrics[0].Name)
+	assert.Equal(t, ddsnmp.KindIfStatus, pm.TopologyMetrics[0].TopologyKind)
+	require.Empty(t, pm.Metrics)
 }

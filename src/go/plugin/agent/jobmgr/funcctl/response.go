@@ -13,27 +13,31 @@ import (
 
 type methodResponseWriter func(dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int)
 
-func (c *Controller) respondWithParams(fn functions.Function, moduleName string, dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int) {
+func (c *Controller) respondWithParams(fn functions.Function, moduleName, methodID string, dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int, methodType string, includeJobParam bool) {
 	c.respondMethodDataWithParams(
 		fn,
 		dataResp,
 		methodParams,
 		updateEvery,
-		buildAcceptedParams,
+		methodType,
+		func(params []funcapi.ParamConfig) []string {
+			return buildAcceptedParams(params, includeJobParam)
+		},
 		func(params []funcapi.ParamConfig) []map[string]any {
-			return c.buildRequiredParams(moduleName, params)
+			return c.buildRequiredParams(moduleName, methodID, params, includeJobParam)
 		},
 	)
 }
 
-func (c *Controller) respondJobMethodWithParams(fn functions.Function, dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int) {
+func (c *Controller) respondInstanceFunctionWithParams(fn functions.Function, dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int, methodType string) {
 	c.respondMethodDataWithParams(
 		fn,
 		dataResp,
 		methodParams,
 		updateEvery,
-		buildJobMethodAcceptedParams,
-		buildJobMethodRequiredParams,
+		methodType,
+		buildInstanceFunctionAcceptedParams,
+		buildInstanceFunctionRequiredParams,
 	)
 }
 
@@ -42,11 +46,16 @@ func (c *Controller) respondMethodDataWithParams(
 	dataResp *funcapi.FunctionResponse,
 	methodParams []funcapi.ParamConfig,
 	updateEvery int,
+	methodType string,
 	buildAccepted func([]funcapi.ParamConfig) []string,
 	buildRequired func([]funcapi.ParamConfig) []map[string]any,
 ) {
 	if dataResp == nil {
 		c.respondError(fn, 500, "internal error: module returned nil response")
+		return
+	}
+	if dataResp.RawResponse != nil {
+		c.respondJSON(fn, dataResp.RawResponse)
 		return
 	}
 	if dataResp.Status >= 400 {
@@ -63,7 +72,7 @@ func (c *Controller) respondMethodDataWithParams(
 		"v":               3,
 		"update_every":    updateEvery,
 		"status":          dataResp.Status,
-		"type":            "table",
+		"type":            resolveResponseType(dataResp.ResponseType, methodType),
 		"has_history":     false,
 		"help":            dataResp.Help,
 		"accepted_params": buildAccepted(paramsForResponse),
@@ -90,6 +99,16 @@ func (c *Controller) respondMethodDataWithParams(
 	}
 
 	c.respondJSON(fn, resp)
+}
+
+func resolveResponseType(dataType, methodType string) string {
+	if dataType != "" {
+		return dataType
+	}
+	if methodType != "" {
+		return methodType
+	}
+	return "table"
 }
 
 func (c *Controller) respondError(fn functions.Function, status int, format string, args ...any) {

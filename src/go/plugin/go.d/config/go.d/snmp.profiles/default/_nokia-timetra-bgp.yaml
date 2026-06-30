@@ -1,0 +1,293 @@
+# Vendor-native Nokia SR OS BGP visibility from TIMETRA-BGP-MIB.
+# tBgpPeerNgOperTable augments tBgpPeerNgTable, so the same row index is used
+# for configured peer attributes and operational counters.
+
+bgp:
+  - id: nokia-timos-bgp-peer
+    MIB: TIMETRA-BGP-MIB
+    kind: peer
+    table:
+      name: tBgpPeerNgTable
+      OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7
+    identity:
+      routing_instance:
+        table: vRtrConfTable
+        index_transform:
+          - start: 0
+            end: 0
+        symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.3.1.1.4, name: vRtrName }
+      neighbor:
+        index_transform:
+          - start: 3
+        name: tBgpPeerNgAddress
+        format: ip_address
+      remote_as:
+        symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.66, name: tBgpPeerNgPeerAS4Byte, format: uint32 }
+    descriptors:
+      local_address:
+        symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.13, name: tBgpPeerNgLocalAddress, format: ip_address }
+      local_as:
+        symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.65, name: tBgpPeerNgLocalAS4Byte, format: uint32 }
+      peer_identifier:
+        table: tBgpPeerNgOperTable
+        symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.181, name: bgpPeerIdentifier, format: ip_address }
+      peer_type:
+        index: 2
+        mapping:
+          0: unknown
+          1: ipv4
+          2: ipv6
+          3: ipv4z
+          4: ipv6z
+          16: dns
+      description:
+        symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.7, name: tBgpPeerNgDescription }
+    admin:
+      enabled:
+        symbol:
+          OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.6
+          name: tBgpPeerNgShutdown
+          mapping:
+            1: stop
+            2: start
+    state:
+      symbol:
+        OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.59
+        name: tBgpPeerNgConnState
+        mapping:
+          1: idle
+          2: connect
+          3: active
+          4: opensent
+          5: openconfirm
+          6: established
+    connection:
+      established_uptime:
+        table: tBgpPeerNgOperTable
+        symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.177, name: bgpPeerFsmEstablishedTime }
+      last_received_update_age:
+        table: tBgpPeerNgOperTable
+        symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.188, name: bgpPeerInUpdateElapsedTime }
+    traffic:
+      messages:
+        received:
+          table: tBgpPeerNgOperTable
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.184, name: bgpPeerInTotalMessages }
+        sent:
+          table: tBgpPeerNgOperTable
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.185, name: bgpPeerOutTotalMessages }
+      updates:
+        received:
+          table: tBgpPeerNgOperTable
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.182, name: bgpPeerInUpdates }
+        sent:
+          table: tBgpPeerNgOperTable
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.183, name: bgpPeerOutUpdates }
+      notifications:
+        received:
+          table: tBgpPeerNgOperTable
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.186, name: bgpPeerInNotifications }
+        sent:
+          table: tBgpPeerNgOperTable
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.187, name: bgpPeerOutNotifications }
+    transitions:
+      flaps:
+        table: tBgpPeerNgOperTable
+        symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.10, name: tBgpPeerNgOperFlaps }
+    timers:
+      configured:
+        connect_retry:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.8, name: tBgpPeerNgConnectRetry }
+        hold_time:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.9, name: tBgpPeerNgHoldTime }
+        keepalive_time:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.10, name: tBgpPeerNgKeepAlive }
+        min_route_advertisement_interval:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.18, name: tBgpPeerNgMinRouteAdvertisement }
+    last_error:
+      code:
+        table: tBgpPeerNgOperTable
+        symbol:
+          OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.178
+          name: bgpPeerLastErrorCode
+          format: hex
+          extract_value: '^([0-9a-f]{2})'
+      subcode:
+        table: tBgpPeerNgOperTable
+        symbol:
+          OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.178
+          name: bgpPeerLastErrorSubcode
+          format: hex
+          extract_value: '^[0-9a-f]{2}([0-9a-f]{2})'
+
+  - id: nokia-timos-bgp-peer-family-ipv4-unicast
+    MIB: TIMETRA-BGP-MIB
+    kind: peer_family
+    table: &nokia_timos_peer_oper_table
+      name: tBgpPeerNgOperTable
+      OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8
+    static_tags:
+      - { tag: address_family_name, value: ipv4 unicast }
+    identity: &nokia_timos_peer_family_identity_ipv4_unicast
+      routing_instance: &nokia_timos_routing_instance
+        table: vRtrConfTable
+        index_transform:
+          - start: 0
+            end: 0
+        symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.3.1.1.4, name: vRtrName }
+      neighbor: &nokia_timos_neighbor
+        index_transform:
+          - start: 3
+        name: tBgpPeerNgAddress
+        format: ip_address
+      remote_as: &nokia_timos_remote_as
+        table: tBgpPeerNgTable
+        symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.66, name: tBgpPeerNgPeerAS4Byte, format: uint32 }
+      address_family: { value: ipv4 }
+      subsequent_address_family: { value: unicast }
+    descriptors: &nokia_timos_peer_family_descriptors
+      local_address:
+        table: tBgpPeerNgTable
+        symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.13, name: tBgpPeerNgLocalAddress, format: ip_address }
+      local_as:
+        table: tBgpPeerNgTable
+        symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.65, name: tBgpPeerNgLocalAS4Byte, format: uint32 }
+      peer_identifier:
+        symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.181, name: bgpPeerIdentifier, format: ip_address }
+      peer_type:
+        index: 2
+        mapping:
+          0: unknown
+          1: ipv4
+          2: ipv6
+          3: ipv4z
+          4: ipv6z
+          16: dns
+      description:
+        table: tBgpPeerNgTable
+        symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.7, name: tBgpPeerNgDescription }
+    routes:
+      total:
+        received:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.5, name: tBgpPeerNgOperReceivedPrefixes }
+        advertised:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.6, name: tBgpPeerNgOperSentPrefixes }
+        rejected:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.98, name: tBgpPeerNgOperIpv4RejPfxs }
+      current:
+        active:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.7, name: tBgpPeerNgOperActivePrefixes }
+
+  - id: nokia-timos-bgp-peer-family-ipv4-vpn
+    MIB: TIMETRA-BGP-MIB
+    kind: peer_family
+    table: *nokia_timos_peer_oper_table
+    static_tags:
+      - { tag: address_family_name, value: vpnv4 unicast }
+    identity:
+      <<: *nokia_timos_peer_family_identity_ipv4_unicast
+      subsequent_address_family: { value: vpn }
+    descriptors: *nokia_timos_peer_family_descriptors
+    routes:
+      total:
+        received:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.13, name: tBgpPeerNgOperVpnRecvPrefixes }
+        advertised:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.14, name: tBgpPeerNgOperVpnSentPrefixes }
+        rejected:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.99, name: tBgpPeerNgOperVpnIpv4RejPfxs }
+      current:
+        active:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.15, name: tBgpPeerNgOperVpnActivePrefixes }
+
+  - id: nokia-timos-bgp-peer-family-ipv6-unicast
+    MIB: TIMETRA-BGP-MIB
+    kind: peer_family
+    table: *nokia_timos_peer_oper_table
+    static_tags:
+      - { tag: address_family_name, value: ipv6 unicast }
+    identity:
+      <<: *nokia_timos_peer_family_identity_ipv4_unicast
+      address_family: { value: ipv6 }
+      subsequent_address_family: { value: unicast }
+    descriptors: *nokia_timos_peer_family_descriptors
+    routes:
+      total:
+        received:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.27, name: tBgpPeerNgOperV6ReceivedPrefixes }
+        advertised:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.28, name: tBgpPeerNgOperV6SentPrefixes }
+        rejected:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.100, name: tBgpPeerNgOperIpv6RejPfxs }
+      current:
+        active:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.29, name: tBgpPeerNgOperV6ActivePrefixes }
+
+  - id: nokia-timos-bgp-peer-family-ipv6-vpn
+    MIB: TIMETRA-BGP-MIB
+    kind: peer_family
+    table: *nokia_timos_peer_oper_table
+    static_tags:
+      - { tag: address_family_name, value: vpnv6 unicast }
+    identity:
+      <<: *nokia_timos_peer_family_identity_ipv4_unicast
+      address_family: { value: ipv6 }
+      subsequent_address_family: { value: vpn }
+    descriptors: *nokia_timos_peer_family_descriptors
+    routes:
+      total:
+        received:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.40, name: tBgpPeerNgOperVpnIpv6RecvPfxs }
+        advertised:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.41, name: tBgpPeerNgOperVpnIpv6SentPfxs }
+        rejected:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.101, name: tBgpPeerNgOperVpnIpv6RejPfxs }
+      current:
+        active:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.42, name: tBgpPeerNgOperVpnIpv6ActivePfxs }
+
+  - id: nokia-timos-bgp-peer-family-l2vpn-vpls
+    MIB: TIMETRA-BGP-MIB
+    kind: peer_family
+    table: *nokia_timos_peer_oper_table
+    static_tags:
+      - { tag: address_family_name, value: l2vpn vpls }
+    identity:
+      <<: *nokia_timos_peer_family_identity_ipv4_unicast
+      address_family: { value: l2vpn }
+      subsequent_address_family: { value: vpls }
+    descriptors: *nokia_timos_peer_family_descriptors
+    routes:
+      total:
+        received:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.49, name: tBgpPeerNgOperl2VpnRecvPfxs }
+        advertised:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.50, name: tBgpPeerNgOperl2VpnSentPfxs }
+        rejected:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.103, name: tBgpPeerNgOperl2VpnRejPfxs }
+      current:
+        active:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.51, name: tBgpPeerNgOperl2VpnActivePfxs }
+
+  - id: nokia-timos-bgp-peer-family-l2vpn-evpn
+    MIB: TIMETRA-BGP-MIB
+    kind: peer_family
+    table: *nokia_timos_peer_oper_table
+    static_tags:
+      - { tag: address_family_name, value: l2vpn evpn }
+    identity:
+      <<: *nokia_timos_peer_family_identity_ipv4_unicast
+      address_family: { value: l2vpn }
+      subsequent_address_family: { value: evpn }
+    descriptors: *nokia_timos_peer_family_descriptors
+    routes:
+      total:
+        received:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.88, name: tBgpPeerNgOperEvpnRecvPfxs }
+        advertised:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.89, name: tBgpPeerNgOperEvpnSentPfxs }
+        rejected:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.112, name: tBgpPeerNgOperEvpnRejPfxs }
+      current:
+        active:
+          symbol: { OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.90, name: tBgpPeerNgOperEvpnActivePfxs }

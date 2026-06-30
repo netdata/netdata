@@ -1,0 +1,373 @@
+version: v1
+context_namespace: panos
+groups:
+  - family: system
+    metrics:
+      - system_uptime
+      - system_device_certificate_status
+      - system_operational_mode
+    charts:
+      - id: system_uptime
+        title: System Uptime
+        context: system.uptime
+        units: seconds
+        label_promotion: [hostname, model, serial, sw_version]
+        dimensions:
+          - selector: system_uptime
+            name: uptime
+      - id: system_device_certificate_status
+        title: Device Certificate Status
+        context: system.device_certificate_status
+        units: status
+        label_promotion: [hostname, model, serial, sw_version]
+        dimensions:
+          - selector: system_device_certificate_status
+      - id: system_operational_mode
+        title: Operational Mode
+        context: system.operational_mode
+        units: mode
+        label_promotion: [hostname, model, serial, sw_version]
+        dimensions:
+          - selector: system_operational_mode
+
+  - family: ha
+    metrics:
+      - ha_status
+      - ha_local_state
+      - ha_peer_state
+      - ha_peer_connection_status
+      - ha_state_sync_status
+      - ha_link_status
+    charts:
+      - id: ha_status
+        title: HA Status
+        context: ha.status
+        units: status
+        dimensions:
+          - selector: ha_status
+      - id: ha_local_state
+        title: Local HA State
+        context: ha.local.state
+        units: state
+        dimensions:
+          - selector: ha_local_state
+      - id: ha_peer_state
+        title: Peer HA State
+        context: ha.peer.state
+        units: state
+        dimensions:
+          - selector: ha_peer_state
+      - id: ha_peer_connection_status
+        title: HA Peer Connection Status
+        context: ha.peer.connection_status
+        units: status
+        dimensions:
+          - selector: ha_peer_connection_status
+      - id: ha_state_sync_status
+        title: HA State Synchronization
+        context: ha.state_sync_status
+        units: status
+        dimensions:
+          - selector: ha_state_sync_status
+      - id: ha_link_status
+        title: HA Link Status
+        context: ha.link_status
+        units: status
+        instances:
+          by_labels: [link]
+        dimensions:
+          - selector: ha_link_status
+  - family: environment temperature
+    metrics:
+      - environment_temperature
+    charts:
+      - id: environment_temperature
+        title: Environment Temperature
+        context: environment.temperature
+        units: Celsius
+        instances:
+          by_labels: [sensor_type, slot, sensor]
+        dimensions:
+          - selector: environment_temperature
+            name: temperature
+            options:
+              divisor: 1000
+
+  - family: environment fans
+    metrics:
+      - environment_fan_speed
+    charts:
+      - id: environment_fan_speed
+        title: Environment Fan Speed
+        context: environment.fan_speed
+        units: RPM
+        instances:
+          by_labels: [sensor_type, slot, sensor]
+        dimensions:
+          - selector: environment_fan_speed
+            name: speed
+
+  - family: environment voltage
+    metrics:
+      - environment_voltage
+    charts:
+      - id: environment_voltage
+        title: Environment Voltage
+        context: environment.voltage
+        units: Volts
+        instances:
+          by_labels: [sensor_type, slot, sensor]
+        dimensions:
+          - selector: environment_voltage
+            name: voltage
+            options:
+              divisor: 1000
+
+  - family: environment sensors
+    metrics:
+      - environment_sensor_alarm_status
+      - environment_power_supply_presence_status
+      - environment_power_supply_alarm_status
+    charts:
+      - id: environment_sensor_alarm_status
+        title: Environment Sensor Alarm
+        context: environment.sensor_alarm_status
+        units: status
+        instances:
+          by_labels: [sensor_type, slot, sensor]
+        dimensions:
+          - selector: environment_sensor_alarm_status
+      - id: environment_power_supply_presence_status
+        title: Power Supply Presence
+        context: environment.power_supply_presence_status
+        units: status
+        instances:
+          by_labels: [sensor_type, slot, sensor]
+        dimensions:
+          - selector: environment_power_supply_presence_status
+      - id: environment_power_supply_alarm_status
+        title: Power Supply Alarm
+        context: environment.power_supply_alarm_status
+        units: status
+        instances:
+          by_labels: [sensor_type, slot, sensor]
+        dimensions:
+          - selector: environment_power_supply_alarm_status
+
+  - family: licenses
+    metrics:
+      - license_count_total
+      - license_count_expired
+      - license_status
+      - license_time_until_expiration
+    charts:
+      - id: license_count
+        title: Licenses
+        context: license.count
+        units: licenses
+        algorithm: absolute
+        dimensions:
+          - selector: license_count_total
+            name: total
+          - selector: license_count_expired
+            name: expired
+      - id: license_status
+        title: License Status
+        context: license.status
+        units: status
+        label_promotion: [description]
+        instances:
+          by_labels: [feature]
+        dimensions:
+          - selector: license_status
+      - id: license_time_until_expiration
+        title: License Time Until Expiration
+        context: license.time_until_expiration
+        units: days
+        label_promotion: [description]
+        instances:
+          by_labels: [feature]
+        dimensions:
+          - selector: license_time_until_expiration
+            name: time_until_expiration
+
+  - family: ipsec
+    metrics:
+      - ipsec_tunnels_active
+      - ipsec_tunnel_sa_lifetime
+    charts:
+      - id: ipsec_tunnels
+        title: IPsec Tunnels
+        context: ipsec.tunnels
+        units: tunnels
+        dimensions:
+          - selector: ipsec_tunnels_active
+            name: active
+      - id: ipsec_tunnel_sa_lifetime
+        title: IPsec Tunnel SA Remaining Lifetime
+        context: ipsec.tunnel.sa_lifetime
+        units: seconds
+        label_promotion: [protocol, encryption]
+        instances:
+          by_labels: [tunnel, gateway, remote, tunnel_id]
+        dimensions:
+          - selector: ipsec_tunnel_sa_lifetime
+            name: remaining_lifetime
+
+  - family: bgp peers
+    metrics:
+      - bgp_peer_state
+      - bgp_peer_uptime
+      - bgp_peer_messages_in
+      - bgp_peer_messages_out
+      - bgp_peer_updates_in
+      - bgp_peer_updates_out
+      - bgp_peer_flaps
+      - bgp_peer_established_transitions
+    charts:
+      - id: bgp_peer_state
+        title: BGP Peer State
+        context: bgp.peer.state
+        units: state
+        label_promotion: [local_address, remote_as, peer_group]
+        instances:
+          by_labels: [vr, peer_address]
+        dimensions:
+          - selector: bgp_peer_state
+      - id: bgp_peer_uptime
+        title: BGP Peer Uptime
+        context: bgp.peer.uptime
+        units: seconds
+        label_promotion: [local_address, remote_as, peer_group]
+        instances:
+          by_labels: [vr, peer_address]
+        dimensions:
+          - selector: bgp_peer_uptime
+            name: uptime
+      - id: bgp_peer_messages
+        title: BGP Peer Messages
+        context: bgp.peer.messages
+        units: messages/s
+        algorithm: incremental
+        label_promotion: [local_address, remote_as, peer_group]
+        instances:
+          by_labels: [vr, peer_address]
+        dimensions:
+          - selector: bgp_peer_messages_in
+            name: in
+          - selector: bgp_peer_messages_out
+            name: out
+      - id: bgp_peer_updates
+        title: BGP Peer Updates
+        context: bgp.peer.updates
+        units: messages/s
+        algorithm: incremental
+        label_promotion: [local_address, remote_as, peer_group]
+        instances:
+          by_labels: [vr, peer_address]
+        dimensions:
+          - selector: bgp_peer_updates_in
+            name: in
+          - selector: bgp_peer_updates_out
+            name: out
+      - id: bgp_peer_flaps
+        title: BGP Peer Flaps
+        context: bgp.peer.flaps
+        units: flaps/s
+        algorithm: incremental
+        label_promotion: [local_address, remote_as, peer_group]
+        instances:
+          by_labels: [vr, peer_address]
+        dimensions:
+          - selector: bgp_peer_flaps
+            name: flaps
+      - id: bgp_peer_established_transitions
+        title: BGP Peer Established Transitions
+        context: bgp.peer.established_transitions
+        units: transitions/s
+        algorithm: incremental
+        label_promotion: [local_address, remote_as, peer_group]
+        instances:
+          by_labels: [vr, peer_address]
+        dimensions:
+          - selector: bgp_peer_established_transitions
+            name: established
+
+  - family: bgp prefixes
+    metrics:
+      - bgp_peer_prefixes_received_total
+      - bgp_peer_prefixes_received_accepted
+      - bgp_peer_prefixes_received_rejected
+      - bgp_peer_prefixes_advertised
+    charts:
+      - id: bgp_peer_prefixes_received
+        title: BGP Peer Received Prefixes
+        context: bgp.peer.prefixes_received
+        units: prefixes
+        algorithm: absolute
+        label_promotion: [local_address, remote_as, peer_group]
+        instances:
+          by_labels: [vr, peer_address, afi, safi]
+        dimensions:
+          - selector: bgp_peer_prefixes_received_total
+            name: total
+          - selector: bgp_peer_prefixes_received_accepted
+            name: accepted
+          - selector: bgp_peer_prefixes_received_rejected
+            name: rejected
+      - id: bgp_peer_prefixes_advertised
+        title: BGP Peer Advertised Prefixes
+        context: bgp.peer.prefixes_advertised
+        units: prefixes
+        label_promotion: [local_address, remote_as, peer_group]
+        instances:
+          by_labels: [vr, peer_address, afi, safi]
+        dimensions:
+          - selector: bgp_peer_prefixes_advertised
+            name: advertised
+
+  - family: bgp virtual routers
+    metrics:
+      - bgp_vr_peers_by_state_idle
+      - bgp_vr_peers_by_state_connect
+      - bgp_vr_peers_by_state_active
+      - bgp_vr_peers_by_state_opensent
+      - bgp_vr_peers_by_state_openconfirm
+      - bgp_vr_peers_by_state_established
+      - bgp_vr_peers_by_state_unknown
+      - bgp_vr_peers_total_configured
+      - bgp_vr_peers_total_established
+    charts:
+      - id: bgp_vr_peers_by_state
+        title: BGP Peers by State
+        context: bgp.vr.peers_by_state
+        units: peers
+        type: stacked
+        instances:
+          by_labels: [vr]
+        dimensions:
+          - selector: bgp_vr_peers_by_state_idle
+            name: idle
+          - selector: bgp_vr_peers_by_state_connect
+            name: connect
+          - selector: bgp_vr_peers_by_state_active
+            name: active
+          - selector: bgp_vr_peers_by_state_opensent
+            name: opensent
+          - selector: bgp_vr_peers_by_state_openconfirm
+            name: openconfirm
+          - selector: bgp_vr_peers_by_state_established
+            name: established
+          - selector: bgp_vr_peers_by_state_unknown
+            name: unknown
+      - id: bgp_vr_peers_total
+        title: BGP Peers Total
+        context: bgp.vr.peers_total
+        units: peers
+        instances:
+          by_labels: [vr]
+        dimensions:
+          - selector: bgp_vr_peers_total_configured
+            name: configured
+          - selector: bgp_vr_peers_total_established
+            name: established

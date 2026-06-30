@@ -1,0 +1,82 @@
+taxonomy_version: 1
+plugin_name: go.d.plugin
+module_name: panos
+placements:
+  - id: panos
+    section_id: remote-devices
+    title: Palo Alto Networks PAN-OS
+    icon: snmp
+    properties: { important: false, grouping: true }
+    items:
+      - type: group
+        id: system
+        title: System
+        items:
+          - panos.system.uptime
+          - panos.system.device_certificate_status
+          - panos.system.operational_mode
+      - type: group
+        id: high-availability
+        title: High Availability
+        short_name: HA
+        items:
+          - panos.ha.status
+          - panos.ha.local.state
+          - panos.ha.peer.state
+          - panos.ha.peer.connection_status
+          - panos.ha.state_sync_status
+          - panos.ha.link_status
+      - type: group
+        id: environment
+        title: Environment
+        items:
+          - type: group
+            id: sensors
+            title: Sensors
+            items:
+              - panos.environment.temperature
+              - panos.environment.fan_speed
+              - panos.environment.voltage
+              - panos.environment.sensor_alarm_status
+          - type: group
+            id: power-supplies
+            title: Power Supplies
+            items:
+              - panos.environment.power_supply_presence_status
+              - panos.environment.power_supply_alarm_status
+      - type: group
+        id: licenses
+        title: Licenses
+        items:
+          - panos.license.count
+          - panos.license.status
+          - panos.license.time_until_expiration
+      - type: group
+        id: ipsec
+        title: IPsec
+        items:
+          - panos.ipsec.tunnels
+          - panos.ipsec.tunnel.sa_lifetime
+      - type: group
+        id: bgp
+        title: BGP
+        items:
+          - type: group
+            id: peers
+            title: Peers
+            items:
+              - panos.bgp.peer.state
+              - panos.bgp.peer.uptime
+              - panos.bgp.peer.messages
+              - panos.bgp.peer.updates
+              - panos.bgp.peer.flaps
+              - panos.bgp.peer.established_transitions
+              - panos.bgp.peer.prefixes_received
+              - panos.bgp.peer.prefixes_advertised
+          - type: group
+            id: virtual-routers
+            title: Virtual Routers
+            short_name: VRs
+            items:
+              - panos.bgp.vr.peers_by_state
+              - panos.bgp.vr.peers_total

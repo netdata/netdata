@@ -18,7 +18,7 @@ const (
 	paramJob = "__job"
 )
 
-type methodParamResolver func(ctx context.Context, methodCfg *funcapi.MethodConfig, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, bool, error)
+type methodParamResolver func(ctx context.Context, methodCfg *funcapi.FunctionConfig, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, error)
 
 type methodExecutionInput struct {
 	fn            functions.Function
@@ -26,9 +26,10 @@ type methodExecutionInput struct {
 	jobName       string
 	jobLabel      string
 	methodID      string
-	methodCfg     *funcapi.MethodConfig
+	methodCfg     *funcapi.FunctionConfig
 	job           collectorapi.RuntimeJob
 	jobGen        uint64
+	info          bool
 	payload       map[string]any
 	argValues     map[string][]string
 	resolveParams methodParamResolver
@@ -37,20 +38,44 @@ type methodExecutionInput struct {
 }
 
 func (c *Controller) ExecuteFunction(functionName string, fn functions.Function) {
+	if !c.publishedFunctionExists(functionName) {
+		c.respondError(fn, 404, "unknown function '%s'", functionName)
+		return
+	}
+	if moduleName, methodID, ok := c.registry.resolveMethodRoute(functionName); ok {
+		c.makeMethodFuncHandler(moduleName, methodID)(c.baseContext(), fn)
+		return
+	}
+
 	moduleName, methodID, err := functions.SplitFunctionName(functionName)
 	if err != nil {
 		c.respondError(fn, 400, "%v", err)
 		return
 	}
 
-	c.makeMethodFuncHandler(moduleName, methodID)(fn)
+	c.makeMethodFuncHandler(moduleName, methodID)(c.baseContext(), fn)
 }
 
-func (c *Controller) executeMethodRequest(in methodExecutionInput) {
-	ctx, cancel := context.WithTimeout(c.baseContext(), in.fn.Timeout)
+func (c *Controller) publishedFunctionExists(functionName string) bool {
+	c.publishedMu.Lock()
+	defer c.publishedMu.Unlock()
+	return c.publishedFns.has(functionName)
+}
+
+func (c *Controller) publishedFunctionGenerationMatches(functionName string, generation uint64) bool {
+	c.publishedMu.Lock()
+	defer c.publishedMu.Unlock()
+	return c.publishedFns.generationMatches(functionName, generation)
+}
+
+func (c *Controller) executeMethodRequest(parent context.Context, in methodExecutionInput) {
+	if parent == nil {
+		parent = c.baseContext()
+	}
+	ctx, cancel := context.WithTimeout(parent, in.fn.Timeout)
 	defer cancel()
 
-	if !in.job.IsRunning() {
+	if in.job != nil && !in.job.IsRunning() {
 		c.respondError(in.fn, 503, "job '%s' is no longer running", in.jobLabel)
 		return
 	}
@@ -63,21 +88,57 @@ func (c *Controller) executeMethodRequest(in methodExecutionInput) {
 
 	handler := creator.MethodHandler(in.job)
 	if handler == nil {
+		if in.job == nil {
+			c.respondError(in.fn, 500, "module '%s' returned nil handler for agent-scope method '%s'", in.moduleName, in.methodID)
+			return
+		}
 		c.respondError(in.fn, 500, "module '%s' returned nil handler for job '%s'", in.moduleName, in.jobName)
 		return
 	}
 
-	methodParams, paramsFromJob, err := in.resolveParams(ctx, in.methodCfg, handler, in.methodID)
+	if in.methodCfg.RawRequest {
+		// Raw handlers receive the worker's request context so cancellation reaches
+		// engines that poll it while building their own response envelope.
+		rawHandler, ok := handler.(funcapi.RawMethodHandler)
+		if !ok {
+			c.respondError(in.fn, 500, "module '%s' method '%s' requires raw request handling", in.moduleName, in.methodID)
+			return
+		}
+
+		dataResp := rawHandler.HandleRaw(ctx, funcapi.RawMethodRequest{
+			Method:      in.methodID,
+			Info:        in.info,
+			Args:        append([]string(nil), in.fn.Args...),
+			Payload:     append([]byte(nil), in.fn.Payload...),
+			ContentType: in.fn.ContentType,
+			Timeout:     in.fn.Timeout,
+			Permissions: in.fn.Permissions,
+			Source:      in.fn.Source,
+		})
+
+		if in.job != nil && !c.registry.verifyJobGeneration(in.moduleName, in.jobName, in.jobGen) {
+			c.respondError(in.fn, 503, "job '%s' was replaced during request, please retry", in.jobLabel)
+			return
+		}
+
+		updateEvery := max(in.methodCfg.UpdateEvery, 1)
+		in.respond(dataResp, nil, updateEvery)
+		return
+	}
+
+	methodParams, err := in.resolveParams(ctx, in.methodCfg, handler, in.methodID)
 	if err != nil {
+		if in.job == nil {
+			c.respondError(in.fn, 503, "module '%s' method '%s' cannot provide parameters: %v", in.moduleName, in.methodID, err)
+			return
+		}
 		c.respondError(in.fn, 503, "job '%s' cannot provide parameters: %v", in.jobLabel, err)
 		return
 	}
 
-	if paramsFromJob {
-		if err := validateParamValues(methodParams, in.argValues, in.payload, in.jobName); err != nil {
-			c.respondError(in.fn, 400, "%v", err)
-			return
-		}
+	if err := validateParamValues(methodParams, in.argValues, in.payload, in.jobName); err != nil {
+		c.respondError(in.fn, 400, "%v", err)
+		return
 	}
 
 	methodParamValues := make(map[string][]string, len(methodParams))
@@ -91,7 +152,7 @@ func (c *Controller) executeMethodRequest(in methodExecutionInput) {
 
 	dataResp := handler.Handle(ctx, in.methodID, resolvedParams)
 
-	if !c.registry.verifyJobGeneration(in.moduleName, in.jobName, in.jobGen) {
+	if in.job != nil && !c.registry.verifyJobGeneration(in.moduleName, in.jobName, in.jobGen) {
 		c.respondError(in.fn, 503, "job '%s' was replaced during request, please retry", in.jobLabel)
 		return
 	}
@@ -101,35 +162,78 @@ func (c *Controller) executeMethodRequest(in methodExecutionInput) {
 	in.respond(dataResp, methodParams, updateEvery)
 }
 
-func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) func(functions.Function) {
-	return func(fn functions.Function) {
-		if slices.Contains(fn.Args, "info") {
-			c.handleMethodFuncInfo(moduleName, methodID, fn)
+func (c *Controller) makePublishedMethodFuncHandler(functionName string, generation uint64, moduleName, methodID string) functions.Handler {
+	handler := c.makeMethodFuncHandler(moduleName, methodID)
+	return func(ctx context.Context, fn functions.Function) {
+		if !c.publishedFunctionGenerationMatches(functionName, generation) {
+			c.respondError(fn, 404, "unknown function '%s'", functionName)
 			return
 		}
+		handler(ctx, fn)
+	}
+}
 
-		methodCfg, ok := c.registry.getMethod(moduleName, methodID)
+func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) functions.Handler {
+	return func(ctx context.Context, fn functions.Function) {
+		methodCfg, kind, ok := c.registry.getMethod(moduleName, methodID)
 		if !ok {
 			c.respondError(fn, 404, "unknown method '%s' for module '%s'", methodID, moduleName)
+			return
+		}
+		info := slices.Contains(fn.Args, "info")
+		if info && !methodCfg.RawRequest {
+			c.handleMethodFuncInfo(moduleName, methodID, fn)
 			return
 		}
 
 		payload := parsePayload(fn.Payload)
 		argValues := parseArgsParams(fn.Args)
+		includeJobParam := c.methodRequiresJobParam(moduleName, kind)
 
-		jobs := c.registry.getJobNames(moduleName)
-		if len(jobs) == 0 {
-			c.respondError(fn, 422, "no %s instances configured", moduleName)
+		if !includeJobParam {
+			job, jobName, jobGen, ok := c.resolveMethodJobWithoutJobParam(fn, moduleName, methodID, kind)
+			if !ok {
+				return
+			}
+
+			c.executeMethodRequest(ctx, methodExecutionInput{
+				fn:         fn,
+				moduleName: moduleName,
+				jobName:    jobName,
+				jobLabel:   moduleName,
+				methodID:   methodID,
+				methodCfg:  methodCfg,
+				job:        job,
+				jobGen:     jobGen,
+				info:       info,
+				payload:    payload,
+				argValues:  argValues,
+				resolveParams: func(ctx context.Context, methodCfg *funcapi.FunctionConfig, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, error) {
+					return c.resolveModuleMethodParams(ctx, methodCfg, handler, methodID)
+				},
+				respond: func(dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int) {
+					c.respondWithParams(fn, moduleName, methodID, dataResp, methodParams, updateEvery, methodCfg.ResponseType, false)
+				},
+			})
 			return
 		}
+
+		jobs := c.availableSharedJobNames(moduleName, methodID)
+		if len(jobs) == 0 {
+			c.respondError(fn, 404, "no %s instances available", moduleName)
+			return
+		}
+
+		jobName := jobs[0]
+		var resolvedJob funcapi.ResolvedParam
 		jobParam := buildJobParamConfig(jobs)
 		jobValues := paramValues(argValues, payload, paramJob)
 		if len(jobValues) > 1 {
 			c.respondError(fn, 400, "parameter '%s' expects a single value", paramJob)
 			return
 		}
-		resolvedJob := funcapi.ResolveParam(jobParam, jobValues)
-		jobName := resolvedJob.GetOne()
+		resolvedJob = funcapi.ResolveParam(jobParam, jobValues)
+		jobName = resolvedJob.GetOne()
 		if len(jobValues) > 0 && jobValues[0] != jobName {
 			c.respondError(fn, 404, "unknown job '%s', available: %v", jobValues[0], jobs)
 			return
@@ -145,7 +249,7 @@ func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) func(fun
 			return
 		}
 
-		c.executeMethodRequest(methodExecutionInput{
+		c.executeMethodRequest(ctx, methodExecutionInput{
 			fn:         fn,
 			moduleName: moduleName,
 			jobName:    jobName,
@@ -154,29 +258,59 @@ func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) func(fun
 			methodCfg:  methodCfg,
 			job:        job,
 			jobGen:     jobGen,
+			info:       info,
 			payload:    payload,
 			argValues:  argValues,
-			resolveParams: func(ctx context.Context, methodCfg *funcapi.MethodConfig, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, bool, error) {
-				return c.resolveMethodParamsForJob(ctx, methodCfg, job, handler, methodID)
+			resolveParams: func(ctx context.Context, methodCfg *funcapi.FunctionConfig, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, error) {
+				return c.resolveModuleMethodParams(ctx, methodCfg, handler, methodID)
 			},
 			augmentParams: func(resolvedParams funcapi.ResolvedParams) {
 				resolvedParams[paramJob] = resolvedJob
 			},
 			respond: func(dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int) {
-				c.respondWithParams(fn, moduleName, dataResp, methodParams, updateEvery)
+				c.respondWithParams(fn, moduleName, methodID, dataResp, methodParams, updateEvery, methodCfg.ResponseType, includeJobParam)
 			},
 		})
 	}
 }
 
+func (c *Controller) resolveMethodJobWithoutJobParam(fn functions.Function, moduleName, methodID string, kind moduleFunctionKind) (collectorapi.RuntimeJob, string, uint64, bool) {
+	if kind == moduleFunctionAgent {
+		return nil, "", 0, true
+	}
+
+	creator, ok := c.registry.getCreator(moduleName)
+	if !ok || creator.InstancePolicy != collectorapi.InstancePolicySingle {
+		return nil, "", 0, true
+	}
+
+	jobName := moduleName
+	job, jobGen := c.registry.getJobWithGeneration(moduleName, jobName)
+	if job == nil {
+		c.respondError(fn, 503, "module '%s' is not running", moduleName)
+		return nil, "", 0, false
+	}
+	if !job.IsRunning() {
+		c.respondError(fn, 503, "module '%s' is not running", moduleName)
+		return nil, "", 0, false
+	}
+	if !jobBackedFunctionAvailable(job, methodID) {
+		c.respondError(fn, 404, "unknown function '%s:%s'", moduleName, methodID)
+		return nil, "", 0, false
+	}
+
+	return job, jobName, jobGen, true
+}
+
 func (c *Controller) handleMethodFuncInfo(moduleName, methodID string, fn functions.Function) {
-	methodCfg, ok := c.registry.getMethod(moduleName, methodID)
+	methodCfg, kind, ok := c.registry.getMethod(moduleName, methodID)
 	if !ok {
 		c.respondError(fn, 404, "unknown method '%s' for module '%s'", methodID, moduleName)
 		return
 	}
 
 	methodParams := methodCfg.RequiredParams
+	includeJobParam := c.methodRequiresJobParam(moduleName, kind)
 	help := methodCfg.Help
 	if help == "" {
 		help = fmt.Sprintf("%s %s data function", moduleName, methodID)
@@ -184,22 +318,30 @@ func (c *Controller) handleMethodFuncInfo(moduleName, methodID string, fn functi
 
 	updateEvery := max(methodCfg.UpdateEvery, 1)
 
-	c.respondJSON(fn, map[string]any{
+	resp := map[string]any{
 		"v":               3,
 		"update_every":    updateEvery,
 		"status":          200,
-		"type":            "table",
+		"type":            resolveResponseType("", methodCfg.ResponseType),
 		"has_history":     false,
 		"help":            help,
-		"accepted_params": buildAcceptedParams(methodParams),
-		"required_params": c.buildRequiredParams(moduleName, methodParams),
-	})
+		"accepted_params": buildAcceptedParams(methodParams, includeJobParam),
+		"required_params": c.buildRequiredParams(moduleName, methodID, methodParams, includeJobParam),
+	}
+
+	if presentation := methodCfg.Presentation(); presentation != nil {
+		resp["presentation"] = presentation
+	}
+
+	c.respondJSON(fn, resp)
 }
 
-func (c *Controller) buildRequiredParams(moduleName string, methodParams []funcapi.ParamConfig) []map[string]any {
-	jobs := c.registry.getJobNames(moduleName)
-
-	paramConfigs := []funcapi.ParamConfig{buildJobParamConfig(jobs)}
+func (c *Controller) buildRequiredParams(moduleName, methodID string, methodParams []funcapi.ParamConfig, includeJobParam bool) []map[string]any {
+	paramConfigs := make([]funcapi.ParamConfig, 0, len(methodParams)+1)
+	if includeJobParam {
+		jobs := c.availableSharedJobNames(moduleName, methodID)
+		paramConfigs = append(paramConfigs, buildJobParamConfig(jobs))
+	}
 	paramConfigs = append(paramConfigs, methodParams...)
 
 	required := make([]map[string]any, 0, len(paramConfigs))
@@ -209,18 +351,18 @@ func (c *Controller) buildRequiredParams(moduleName string, methodParams []funca
 	return required
 }
 
-func (c *Controller) resolveMethodParamsForJob(ctx context.Context, methodCfg *funcapi.MethodConfig, job collectorapi.RuntimeJob, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, bool, error) {
+func (c *Controller) resolveModuleMethodParams(ctx context.Context, methodCfg *funcapi.FunctionConfig, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, error) {
 	methodParams := methodCfg.RequiredParams
 
-	jobParams, err := handler.MethodParams(ctx, methodID)
+	handlerParams, err := handler.MethodParams(ctx, methodID)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
-	if len(jobParams) == 0 {
-		return methodParams, true, nil
+	if len(handlerParams) == 0 {
+		return methodParams, nil
 	}
 
-	return funcapi.MergeParamConfigs(methodParams, jobParams), true, nil
+	return funcapi.MergeParamConfigs(methodParams, handlerParams), nil
 }
 
 func validateParamValues(methodParams []funcapi.ParamConfig, argValues map[string][]string, payload map[string]any, jobName string) error {
@@ -230,11 +372,17 @@ func validateParamValues(methodParams []funcapi.ParamConfig, argValues map[strin
 			continue
 		}
 		if cfg.Selection == funcapi.ParamSelect && len(values) > 1 {
+			if jobName == "" {
+				return fmt.Errorf("parameter '%s' expects a single value", cfg.ID)
+			}
 			return fmt.Errorf("parameter '%s' expects a single value for job '%s'", cfg.ID, jobName)
 		}
 		allowed := allowedOptions(cfg.Options)
 		for _, value := range values {
 			if !allowed[value] {
+				if jobName == "" {
+					return fmt.Errorf("parameter '%s' option '%s' is not supported", cfg.ID, value)
+				}
 				return fmt.Errorf("parameter '%s' option '%s' is not supported by job '%s'", cfg.ID, value, jobName)
 			}
 		}
@@ -276,6 +424,9 @@ func parseArgsParams(args []string) map[string][]string {
 			continue
 		}
 		parts := strings.SplitN(arg, ":", 2)
+		if len(parts) != 2 {
+			parts = strings.SplitN(arg, "=", 2)
+		}
 		if len(parts) != 2 {
 			continue
 		}
@@ -384,8 +535,11 @@ func buildJobParamConfig(jobs []string) funcapi.ParamConfig {
 	}
 }
 
-func buildAcceptedParams(methodParams []funcapi.ParamConfig) []string {
-	accepted := []string{paramJob}
+func buildAcceptedParams(methodParams []funcapi.ParamConfig, includeJobParam bool) []string {
+	accepted := make([]string, 0, len(methodParams)+1)
+	if includeJobParam {
+		accepted = append(accepted, paramJob)
+	}
 	for _, param := range methodParams {
 		if !slices.Contains(accepted, param.ID) {
 			accepted = append(accepted, param.ID)
@@ -394,16 +548,38 @@ func buildAcceptedParams(methodParams []funcapi.ParamConfig) []string {
 	return accepted
 }
 
-func (c *Controller) makeJobMethodFuncHandler(moduleName, jobName, methodID string) func(functions.Function) {
-	return func(fn functions.Function) {
-		if slices.Contains(fn.Args, "info") {
-			c.handleJobMethodFuncInfo(moduleName, jobName, methodID, fn)
+func (c *Controller) methodRequiresJobParam(moduleName string, kind moduleFunctionKind) bool {
+	if kind == moduleFunctionAgent {
+		return false
+	}
+	creator, ok := c.registry.getCreator(moduleName)
+	if !ok {
+		return true
+	}
+	return creator.InstancePolicy != collectorapi.InstancePolicySingle
+}
+
+func (c *Controller) makePublishedInstanceFunctionHandler(functionName string, generation uint64, moduleName, jobName, methodID string) functions.Handler {
+	handler := c.makeInstanceFunctionHandler(moduleName, jobName, methodID)
+	return func(ctx context.Context, fn functions.Function) {
+		if !c.publishedFunctionGenerationMatches(functionName, generation) {
+			c.respondError(fn, 404, "unknown function '%s'", functionName)
 			return
 		}
+		handler(ctx, fn)
+	}
+}
 
-		methodCfg, ok := c.registry.getJobMethod(moduleName, jobName, methodID)
+func (c *Controller) makeInstanceFunctionHandler(moduleName, jobName, methodID string) functions.Handler {
+	return func(ctx context.Context, fn functions.Function) {
+		methodCfg, ok := c.registry.getInstanceFunction(moduleName, jobName, methodID)
 		if !ok {
 			c.respondError(fn, 404, "unknown method '%s' for job '%s:%s'", methodID, moduleName, jobName)
+			return
+		}
+		info := slices.Contains(fn.Args, "info")
+		if info && !methodCfg.RawRequest {
+			c.handleInstanceFunctionInfo(moduleName, jobName, methodID, fn)
 			return
 		}
 
@@ -416,7 +592,7 @@ func (c *Controller) makeJobMethodFuncHandler(moduleName, jobName, methodID stri
 			return
 		}
 
-		c.executeMethodRequest(methodExecutionInput{
+		c.executeMethodRequest(ctx, methodExecutionInput{
 			fn:         fn,
 			moduleName: moduleName,
 			jobName:    jobName,
@@ -425,20 +601,21 @@ func (c *Controller) makeJobMethodFuncHandler(moduleName, jobName, methodID stri
 			methodCfg:  methodCfg,
 			job:        job,
 			jobGen:     jobGen,
+			info:       info,
 			payload:    payload,
 			argValues:  argValues,
-			resolveParams: func(ctx context.Context, methodCfg *funcapi.MethodConfig, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, bool, error) {
-				return c.resolveJobMethodParams(ctx, methodCfg, handler, methodID)
+			resolveParams: func(ctx context.Context, methodCfg *funcapi.FunctionConfig, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, error) {
+				return c.resolveInstanceFunctionParams(ctx, methodCfg, handler, methodID)
 			},
 			respond: func(dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int) {
-				c.respondJobMethodWithParams(fn, dataResp, methodParams, updateEvery)
+				c.respondInstanceFunctionWithParams(fn, dataResp, methodParams, updateEvery, methodCfg.ResponseType)
 			},
 		})
 	}
 }
 
-func (c *Controller) handleJobMethodFuncInfo(moduleName, jobName, methodID string, fn functions.Function) {
-	methodCfg, ok := c.registry.getJobMethod(moduleName, jobName, methodID)
+func (c *Controller) handleInstanceFunctionInfo(moduleName, jobName, methodID string, fn functions.Function) {
+	methodCfg, ok := c.registry.getInstanceFunction(moduleName, jobName, methodID)
 	if !ok {
 		c.respondError(fn, 404, "unknown method '%s' for job '%s:%s'", methodID, moduleName, jobName)
 		return
@@ -452,33 +629,38 @@ func (c *Controller) handleJobMethodFuncInfo(moduleName, jobName, methodID strin
 
 	updateEvery := max(methodCfg.UpdateEvery, 1)
 
-	c.respondJSON(fn, map[string]any{
+	resp := map[string]any{
 		"v":               3,
 		"update_every":    updateEvery,
 		"status":          200,
-		"type":            "table",
+		"type":            resolveResponseType("", methodCfg.ResponseType),
 		"has_history":     false,
 		"help":            help,
-		"accepted_params": buildJobMethodAcceptedParams(methodParams),
-		"required_params": buildJobMethodRequiredParams(methodParams),
-	})
+		"accepted_params": buildInstanceFunctionAcceptedParams(methodParams),
+		"required_params": buildInstanceFunctionRequiredParams(methodParams),
+	}
+
+	if presentation := methodCfg.Presentation(); presentation != nil {
+		resp["presentation"] = presentation
+	}
+
+	c.respondJSON(fn, resp)
 }
 
-func (c *Controller) resolveJobMethodParams(ctx context.Context, methodCfg *funcapi.MethodConfig, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, bool, error) {
+func (c *Controller) resolveInstanceFunctionParams(ctx context.Context, methodCfg *funcapi.FunctionConfig, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, error) {
 	methodParams := methodCfg.RequiredParams
 
 	jobParams, err := handler.MethodParams(ctx, methodID)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	if len(jobParams) == 0 {
-		return methodParams, true, nil
+		return methodParams, nil
 	}
 
-	return funcapi.MergeParamConfigs(methodParams, jobParams), true, nil
+	return funcapi.MergeParamConfigs(methodParams, jobParams), nil
 }
-
-func buildJobMethodAcceptedParams(methodParams []funcapi.ParamConfig) []string {
+func buildInstanceFunctionAcceptedParams(methodParams []funcapi.ParamConfig) []string {
 	accepted := make([]string, 0, len(methodParams))
 	for _, param := range methodParams {
 		if !slices.Contains(accepted, param.ID) {
@@ -488,7 +670,7 @@ func buildJobMethodAcceptedParams(methodParams []funcapi.ParamConfig) []string {
 	return accepted
 }
 
-func buildJobMethodRequiredParams(methodParams []funcapi.ParamConfig) []map[string]any {
+func buildInstanceFunctionRequiredParams(methodParams []funcapi.ParamConfig) []map[string]any {
 	required := make([]map[string]any, 0, len(methodParams))
 	for _, cfg := range methodParams {
 		required = append(required, cfg.RequiredParam())

@@ -1,0 +1,77 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package snmptopology
+
+import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+)
+
+func buildLocalTopologyDevice(dev ddsnmp.DeviceConnectionInfo) topologymodel.Device {
+	device := topologymodel.Device{
+		ManagementIP:       dev.Hostname,
+		ChartIDPrefix:      topologyProfileChartIDPrefix,
+		ChartContextPrefix: topologyProfileChartContextPrefix,
+		SysObjectID:        dev.SysObjectID,
+		SysName:            dev.SysName,
+		SysDescr:           dev.SysDescr,
+		SysContact:         dev.SysContact,
+		SysLocation:        dev.SysLocation,
+		Vendor:             dev.Vendor,
+		Model:              dev.Model,
+	}
+
+	if dev.VnodeGUID != "" {
+		device.AgentID = dev.VnodeGUID
+		device.NetdataHostID = dev.VnodeGUID
+	}
+
+	if len(dev.VnodeLabels) > 0 {
+		device.Labels = cloneTopologyLabels(dev.VnodeLabels)
+	}
+
+	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasSysDescr); value != "" && device.SysDescr == "" {
+		device.SysDescr = value
+	}
+	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasSysContact); value != "" && device.SysContact == "" {
+		device.SysContact = value
+	}
+	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasSysLocation); value != "" && device.SysLocation == "" {
+		device.SysLocation = value
+	}
+	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasVendor); value != "" && device.Vendor == "" {
+		device.Vendor = value
+	}
+	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasModel); value != "" && device.Model == "" {
+		device.Model = value
+	}
+	if value := topologyutil.NormalizeTopologyRouterID(device.Labels[tagOSPFRouterID]); value != "" {
+		device.OSPFRouterID = value
+		setTopologyMetadataLabelIfMissing(device.Labels, tagOSPFRouterID, value)
+	}
+
+	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasSysUptime); value != "" {
+		if uptime := topologyutil.ParsePositiveInt64(value); uptime > 0 {
+			device.SysUptime = uptime
+		}
+	}
+	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasSerial); value != "" {
+		device.SerialNumber = value
+		setTopologyMetadataLabelIfMissing(device.Labels, "serial_number", value)
+	}
+	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasSoftware); value != "" {
+		device.SoftwareVersion = value
+		setTopologyMetadataLabelIfMissing(device.Labels, "software_version", value)
+	}
+	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasFirmware); value != "" {
+		device.FirmwareVersion = value
+		setTopologyMetadataLabelIfMissing(device.Labels, "firmware_version", value)
+	}
+	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasHardware); value != "" {
+		device.HardwareVersion = value
+		setTopologyMetadataLabelIfMissing(device.Labels, "hardware_version", value)
+	}
+
+	return device
+}
