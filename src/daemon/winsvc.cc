@@ -56,6 +56,9 @@ static HANDLE svc_stop_event_handle = nullptr;
 
 static ND_THREAD *cleanup_thread = nullptr;
 
+// Signals the stop-pending heartbeat thread to exit.
+static HANDLE svc_heartbeat_done_event = nullptr;
+
 static bool ReportSvcStatus(DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD dwWaitHint, DWORD dwControlsAccepted)
 {
     static DWORD dwCheckPoint = 1;
@@ -100,6 +103,18 @@ static HANDLE CreateEventHandle(const char *msg)
     return h;
 }
 
+// Heartbeat thread: keeps re-sending SERVICE_STOP_PENDING every 2 s so the
+// SCM does not fire error 1053 while netdata_exit_gracefully() runs.
+// Exits when svc_heartbeat_done_event is signalled.
+static DWORD WINAPI stop_pending_heartbeat(LPVOID /*unused*/)
+{
+    // dwWaitHint of 5000 ms; heartbeat fires every 2000 ms — well within the hint.
+    while (WaitForSingleObject(svc_heartbeat_done_event, 2000) == WAIT_TIMEOUT)
+        ReportSvcStatus(SERVICE_STOP_PENDING, 0, 5000, 0);
+
+    return 0;
+}
+
 static void call_netdata_cleanup(void *arg)
 {
     DWORD controlCode = *((DWORD *)arg);
@@ -107,6 +122,14 @@ static void call_netdata_cleanup(void *arg)
     // Wait until we have to stop the service
     netdata_service_log("Cleanup thread waiting for stop event...");
     WaitForSingleObject(svc_stop_event_handle, INFINITE);
+
+    // Keep the SCM informed while cleanup runs; without periodic
+    // SERVICE_STOP_PENDING updates the SCM times out (error 1053) if
+    // netdata_exit_gracefully() takes longer than dwWaitHint (5 s).
+    svc_heartbeat_done_event = CreateEvent(NULL, TRUE, FALSE, NULL);
+    HANDLE heartbeat = nullptr;
+    if (svc_heartbeat_done_event)
+        heartbeat = CreateThread(NULL, 0, stop_pending_heartbeat, NULL, 0, NULL);
 
     // Stop the agent
     netdata_service_log("Running netdata cleanup...");
@@ -124,6 +147,17 @@ static void call_netdata_cleanup(void *arg)
             break;
     }
     netdata_exit_gracefully(reason, false);
+
+    // Stop the heartbeat before reporting SERVICE_STOPPED.
+    if (svc_heartbeat_done_event) {
+        SetEvent(svc_heartbeat_done_event);
+        if (heartbeat) {
+            WaitForSingleObject(heartbeat, 5000);
+            CloseHandle(heartbeat);
+        }
+        CloseHandle(svc_heartbeat_done_event);
+        svc_heartbeat_done_event = nullptr;
+    }
 
     // Close event handle
     netdata_service_log("Closing stop event handle...");
