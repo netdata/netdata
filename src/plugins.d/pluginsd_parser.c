@@ -307,7 +307,7 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
                 min_check_interval = MIN(min_check_interval, stale_after_seconds);
                 if (rrdhost_option_check(virtual_host, RRDHOST_OPTION_VIRTUAL_HOST)) {
                     time_t last_seen = (*Pvalue + VNODE_BASE_EPOCH);
-                    uint32_t seen_seconds_ago = (uint32_t) (now - last_seen);
+                    uint32_t seen_seconds_ago = (now > last_seen) ? (uint32_t)(now - last_seen) : 0;
 
                     if (seen_seconds_ago >= stale_after_seconds) {
                         rrdhost_option_clear(virtual_host, RRDHOST_OPTION_VIRTUAL_HOST);
