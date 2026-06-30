@@ -381,10 +381,16 @@ impl<'a> Reader<'a> {
     }
 
     /// Decode and validate the `trace_id` index (`TIDX`). Errors with
-    /// [`Error::CorruptIndex`] if the decoded fanout/permutation is internally
+    /// [`Error::CorruptIndex`] if the decoded fanout/permutation is structurally
     /// inconsistent or references a row beyond `SUMR.record_count`. Callers gate
     /// on [`has_trace_id_index`](Self::has_trace_id_index); a file without the
     /// chunk surfaces the container's not-found error.
+    ///
+    /// Validation is **panic-safety only** — it does NOT re-verify that
+    /// `sort_perm` is actually sorted by `trace_id` (a trusted-producer
+    /// invariant enforced at write time; see [`TraceIdIndex::validate`]). A
+    /// CRC-valid file from a non-conforming producer would yield wrong lookup
+    /// results, never a panic.
     pub fn trace_id_index(&self) -> Result<TraceIdIndex, Error> {
         // The index resolves positions against the `TRCE` column, so the column
         // must be present — the writer guarantees TIDX ⟹ trace_id at seal; this

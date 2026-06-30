@@ -994,8 +994,9 @@ scalar_column!(
     /// Per-row span duration in nanoseconds (`DURN` chunk) — OTLP
     /// `end_time_unix_nano - start_time_unix_nano`. The start time lives in
     /// `TIMS`, so the absolute end time is recoverable as `TIMS + duration`.
-    /// Clamped to `0` when the end time is unset (`0`) or precedes the start
-    /// (clock skew). Traces-only; logs never write it.
+    /// Producers MUST clamp to `0` when the end time is unset (`0`) or precedes
+    /// the start (clock skew); this storage type holds a raw `i64` and does not
+    /// enforce non-negativity. Traces-only; logs never write it.
     Durations, i64, "duration", ColumnType::I64
 );
 

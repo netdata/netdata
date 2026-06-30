@@ -8,8 +8,9 @@
 //! auxiliary chunk so a lookup never scans.
 //!
 //! Structure (design note `~/mo/traces-sfst.md` §5):
-//! - `sort_perm[N]` — row positions sorted by their 16-byte `trace_id` value
-//!   (a **stable** sort, so within one trace the spans stay chronological).
+//! - `sort_perm[N]` — row positions sorted by their 16-byte `trace_id` value,
+//!   with the row position as a tiebreaker, so within one trace the spans stay
+//!   chronological (structural, not reliant on sort stability — see `build`).
 //!   Only rows with a set (non-zero) id are indexed; the all-zero W3C "unset"
 //!   sentinel forms no trace and is skipped.
 //! - `fanout[256]` — cumulative count of indexed positions whose `trace_id`
@@ -46,7 +47,9 @@ pub(crate) struct Fanout([u32; 256]);
 
 impl Fanout {
     /// Build the cumulative fanout from the first byte of every indexed id.
-    /// Order-independent (it is a histogram + prefix sum).
+    /// Order-independent (it is a histogram + prefix sum). The `u32` accumulator
+    /// cannot overflow: the total is `sort_perm.len() <= record_count`, itself a
+    /// `u32` (the format's row cap).
     fn build(first_bytes: impl Iterator<Item = u8>) -> Self {
         let mut counts = [0u32; 256];
         for b in first_bytes {
@@ -314,6 +317,18 @@ mod tests {
         let t = arena(&[id(2), x, id(2)]);
         let idx = TraceIdIndex::build(&t);
         assert_eq!(idx.positions(x, &t), &[1]);
+    }
+
+    #[test]
+    fn id_hex_display_and_debug_format() {
+        // Pin the W3C lowercase-hex text contract (consumers display/parse it).
+        let mut t = [0u8; 16];
+        t[0] = 0x0a;
+        t[1] = 0xbc;
+        let t = TraceId::from(t);
+        assert_eq!(t.to_string(), "0abc0000000000000000000000000000");
+        assert_eq!(format!("{t:?}"), "TraceId(0abc0000000000000000000000000000)");
+        assert_eq!(SpanId::from([0xff, 0, 0, 0, 0, 0, 0, 1]).to_string(), "ff00000000000001");
     }
 
     #[test]

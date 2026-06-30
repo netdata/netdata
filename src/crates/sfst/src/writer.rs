@@ -169,6 +169,8 @@ pub struct StreamWriter<W: Write + Seek> {
     stage: Stage,
     /// Bitmask of per-row columns already written (one bit per column ordinal),
     /// used to reject duplicates and to detect when the column phase is complete.
+    /// A `u8` caps the format at 8 per-row columns (7 used today, ordinals 0–6);
+    /// a ninth needs a wider mask here.
     cols_written: u8,
     mids: u16,
     highs: u16,
