@@ -231,13 +231,17 @@ static void health_alarms2json_fill_alarms(RRDHOST *host, BUFFER *wb, int all, v
 }
 
 void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {
+    rw_spinlock_read_lock(&host->health_log.spinlock);
+    uint32_t latest_alarm_log_unique_id = (host->health_log.next_log_id > 0) ? (host->health_log.next_log_id - 1) : 0;
+    rw_spinlock_read_unlock(&host->health_log.spinlock);
+
     buffer_sprintf(wb, "{\n\t\"hostname\": \"%s\","
                     "\n\t\"latest_alarm_log_unique_id\": %u,"
                     "\n\t\"status\": %s,"
                     "\n\t\"now\": %lu,"
                     "\n\t\"alarms\": {\n",
                    rrdhost_hostname(host),
-                   (host->health_log.next_log_id > 0)?(host->health_log.next_log_id - 1):0,
+                   latest_alarm_log_unique_id,
                    host->health.enabled ?"true":"false",
                    (unsigned long)now_realtime_sec());
 
