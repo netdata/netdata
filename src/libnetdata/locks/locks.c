@@ -232,16 +232,20 @@ static netdata_rwlock_locker *find_rwlock_locker(const char *file __maybe_unused
 }
 
 static netdata_rwlock_locker *add_rwlock_locker(const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock, LOCKER_REQUEST lock_type) {
-    netdata_rwlock_locker *locker;
+    pid_t pid = gettid();
+    netdata_rwlock_locker *locker = NULL;
 
-    locker = find_rwlock_locker(file, function, line, rwlock);
-    if(locker) {
+    __netdata_mutex_lock(&rwlock->lockers_mutex);
+
+    Pvoid_t *PValue = JudyLGet(rwlock->lockers_pid_JudyL, pid, PJE0);
+    if(PValue && *PValue) {
+        locker = *PValue;
         locker->lock |= lock_type;
         locker->refcount++;
     }
     else {
         locker = mallocz(sizeof(netdata_rwlock_locker));
-        locker->pid = gettid();
+        locker->pid = pid;
         locker->tag = netdata_thread_tag();
         locker->refcount = 1;
         locker->lock = lock_type;
@@ -250,14 +254,13 @@ static netdata_rwlock_locker *add_rwlock_locker(const char *file, const char *fu
         locker->function = function;
         locker->line = line;
 
-        __netdata_mutex_lock(&rwlock->lockers_mutex);
         DOUBLE_LINKED_LIST_APPEND_UNSAFE(rwlock->lockers, locker, prev, next);
-        Pvoid_t *PValue = JudyLIns(&rwlock->lockers_pid_JudyL, locker->pid, PJE0);
+        PValue = JudyLIns(&rwlock->lockers_pid_JudyL, locker->pid, PJE0);
         *PValue = locker;
         if (lock_type == RWLOCK_REQUEST_READ || lock_type == RWLOCK_REQUEST_TRYREAD) rwlock->readers++;
         if (lock_type == RWLOCK_REQUEST_WRITE || lock_type == RWLOCK_REQUEST_TRYWRITE) rwlock->writers++;
-        __netdata_mutex_unlock(&rwlock->lockers_mutex);
     }
+    __netdata_mutex_unlock(&rwlock->lockers_mutex);
 
     return locker;
 }
