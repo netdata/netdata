@@ -113,6 +113,25 @@ struct rrdcalc {
 #define foreach_rrdcalc_in_rrdhost_done(rc) \
     dfe_done(rc)
 
+static inline RRDSET *rrdcalc_rrdset_read_lock(RRDCALC *rc) {
+    RRDSET *st = rc->rrdset;
+    if(unlikely(!st))
+        return NULL;
+
+    rw_spinlock_read_lock(&st->alerts.spinlock);
+    // cppcheck-suppress knownConditionTrueFalse
+    if(unlikely(rc->rrdset != st)) {
+        rw_spinlock_read_unlock(&st->alerts.spinlock);
+        return NULL;
+    }
+
+    return st;
+}
+
+static inline void rrdcalc_rrdset_read_unlock(RRDSET *st) {
+    rw_spinlock_read_unlock(&st->alerts.spinlock);
+}
+
 #define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->config.after)
 
 void rrdcalc_update_info_using_rrdset_labels(RRDCALC *rc);

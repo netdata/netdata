@@ -305,7 +305,11 @@ struct health_raised_summary *alerts_raised_summary_create(RRDHOST *host) {
 void alerts_raised_summary_populate(struct health_raised_summary *hrm) {
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(hrm->host, rc) {
-        if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec)) continue;
+        RRDSET *st = rrdcalc_rrdset_read_lock(rc);
+        if(unlikely(!st)) continue;
+        bool collected = st->last_collected_time.tv_sec;
+        rrdcalc_rrdset_read_unlock(st);
+        if(unlikely(!collected)) continue;
         health_raised_summary_add_alert(hrm, rc_dfe.item);
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
