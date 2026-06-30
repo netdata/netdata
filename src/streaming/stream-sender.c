@@ -793,25 +793,36 @@ bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, 
 bool stream_sender_receive_data(struct stream_thread *sth, struct sender_state *s, usec_t now_ut, bool process_opcodes) {
     EVLOOP_STATUS status = EVLOOP_STATUS_CONTINUE;
     while(status == EVLOOP_STATUS_CONTINUE) {
-        ssize_t rc = nd_sock_revc_nowait(&s->sock, s->thread.rbuf.b + s->thread.rbuf.read_len, s->thread.rbuf.size - s->thread.rbuf.read_len - 1);
-        if (likely(rc > 0)) {
-            s->thread.rbuf.read_len += rc;
-
-            s->thread.last_traffic_ut = now_ut;
-            sth->snd.bytes_received += rc;
-            pulse_stream_received_bytes(rc);
-
-            worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
-            stream_sender_execute_commands(s);
+        ssize_t read_len = s->thread.rbuf.read_len;
+        if(unlikely(!s->thread.rbuf.b || !s->thread.rbuf.size || read_len < 0 ||
+                    (size_t)read_len >= s->thread.rbuf.size - 1)) {
+            internal_fatal(true, "The line to read is too big! Already have %zd bytes in read_buffer.", read_len);
+            errno_clear();
+            status = EVLOOP_STATUS_SOCKET_ERROR;
         }
-        else if (rc == 0 || errno == ECONNRESET)
-            status = EVLOOP_STATUS_SOCKET_CLOSED;
+        else {
+            size_t available = s->thread.rbuf.size - (size_t)read_len - 1;
+            ssize_t rc = nd_sock_revc_nowait(&s->sock, s->thread.rbuf.b + read_len, available);
 
-        else if (rc < 0) {
-            if(errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR)
-                status = EVLOOP_STATUS_SOCKET_FULL;
-            else
-                status = EVLOOP_STATUS_SOCKET_ERROR;
+            if (likely(rc > 0)) {
+                s->thread.rbuf.read_len = read_len + rc;
+
+                s->thread.last_traffic_ut = now_ut;
+                sth->snd.bytes_received += rc;
+                pulse_stream_received_bytes(rc);
+
+                worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
+                stream_sender_execute_commands(s);
+            }
+            else if (rc == 0 || errno == ECONNRESET)
+                status = EVLOOP_STATUS_SOCKET_CLOSED;
+
+            else if (rc < 0) {
+                if(errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR)
+                    status = EVLOOP_STATUS_SOCKET_FULL;
+                else
+                    status = EVLOOP_STATUS_SOCKET_ERROR;
+            }
         }
 
         if(status == EVLOOP_STATUS_SOCKET_ERROR || status == EVLOOP_STATUS_SOCKET_CLOSED) {
