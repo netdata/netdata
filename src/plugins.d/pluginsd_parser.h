@@ -102,6 +102,7 @@ typedef struct parser_user_object {
 
     struct {
         Pvoid_t JudyL;
+        time_t last_host_stale_check;
     } vnodes;
 
 } PARSER_USER_OBJECT;
