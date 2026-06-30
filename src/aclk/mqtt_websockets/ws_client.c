@@ -539,13 +539,17 @@ int ws_client_process_rx_ws(ws_client *client)
         case WS_PAYLOAD_EXTENDED_16:
             BUF_READ_CHECK_AT_LEAST(2);
             rbuf_pop(client->buf_read, buf, 2);
-            client->rx.payload_length = be16toh(*((uint16_t *)buf));
+            uint16_t payload_length16;
+            memcpy(&payload_length16, buf, sizeof(payload_length16));
+            client->rx.payload_length = be16toh(payload_length16);
             ws_client_rx_post_hdr_state(client);
             break;
         case WS_PAYLOAD_EXTENDED_64:
             BUF_READ_CHECK_AT_LEAST(LONGEST_POSSIBLE_HDR_PART);
             rbuf_pop(client->buf_read, buf, LONGEST_POSSIBLE_HDR_PART);
-            client->rx.payload_length = be64toh(*((uint64_t *)buf));
+            uint64_t payload_length64;
+            memcpy(&payload_length64, buf, sizeof(payload_length64));
+            client->rx.payload_length = be64toh(payload_length64);
             ws_client_rx_post_hdr_state(client);
             break;
         case WS_PAYLOAD_DATA:
@@ -591,7 +595,9 @@ int ws_client_process_rx_ws(ws_client *client)
             BUF_READ_CHECK_AT_LEAST(sizeof(uint16_t));
 
             rbuf_pop(client->buf_read, buf, sizeof(uint16_t));
-            client->rx.specific_data.op_close.ec = be16toh(*((uint16_t *)buf));
+            uint16_t close_code;
+            memcpy(&close_code, buf, sizeof(close_code));
+            client->rx.specific_data.op_close.ec = be16toh(close_code);
             client->rx.payload_processed += sizeof(uint16_t);
 
             client->rx.remote_closed = true;

@@ -695,7 +695,7 @@ static int journalfile_check_superblock(uv_file file)
 
 static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile, void *buf, unsigned max_size)
 {
-    static bitmap64_t page_error_map = BITMAP64_INITIALIZER;
+    static bool page_error_map[UINT8_MAX + 1];
     unsigned i, count, payload_length, descr_size;
     struct rrdeng_jf_store_data *jf_metric_data;
 
@@ -716,9 +716,9 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
         uint8_t page_type = jf_metric_data->descr[i].type;
 
         if (page_type > RRDENG_PAGE_TYPE_MAX) {
-            if (!bitmap64_get(&page_error_map, page_type)) {
+            if (!page_error_map[page_type]) {
                 netdata_log_error("DBENGINE: unknown page type %d encountered.", page_type);
-                bitmap64_set(&page_error_map, page_type);
+                page_error_map[page_type] = true;
             }
             continue;
         }
