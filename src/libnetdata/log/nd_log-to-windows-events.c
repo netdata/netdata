@@ -224,6 +224,9 @@ static bool etw_register_provider(void) {
 #endif
 
 bool nd_log_init_windows(void) {
+    nd_win_trace("nd_log_init_windows: entered etw=%d initialized=%d",
+                 (int)nd_log.eventlog.etw, (int)nd_log.eventlog.initialized);
+
     if(nd_log.eventlog.initialized)
         return true;
 
@@ -273,13 +276,27 @@ bool nd_log_init_windows(void) {
         }
 
         if(!nd_log.eventlog.etw) {
-            if(!wel_add_to_registry(NETDATA_WEL_CHANNEL_NAME_W, sub_channel, defaultMaxSize))
+            nd_win_trace("nd_log_init_windows: wel_add_to_registry source[%zu/%s]...",
+                         i, nd_log_id2source(i));
+            if(!wel_add_to_registry(NETDATA_WEL_CHANNEL_NAME_W, sub_channel, defaultMaxSize)) {
+                nd_win_trace("nd_log_init_windows: wel_add_to_registry FAILED source[%zu/%s] err=%lu",
+                             i, nd_log_id2source(i), (unsigned long)GetLastError());
                 return false;
+            }
+            nd_win_trace("nd_log_init_windows: wel_add_to_registry ok source[%zu/%s]",
+                         i, nd_log_id2source(i));
 
             // when not using a manifest, each source is a provider
+            nd_win_trace("nd_log_init_windows: RegisterEventSourceW source[%zu/%s]...",
+                         i, nd_log_id2source(i));
             nd_log.sources[i].hEventLog = RegisterEventSourceW(NULL, sub_channel);
-            if (!nd_log.sources[i].hEventLog)
+            if (!nd_log.sources[i].hEventLog) {
+                nd_win_trace("nd_log_init_windows: RegisterEventSourceW FAILED source[%zu/%s] err=%lu",
+                             i, nd_log_id2source(i), (unsigned long)GetLastError());
                 return false;
+            }
+            nd_win_trace("nd_log_init_windows: RegisterEventSourceW ok source[%zu/%s]",
+                         i, nd_log_id2source(i));
         }
     }
 
@@ -292,6 +309,7 @@ bool nd_log_init_windows(void) {
     }
 
     nd_log.eventlog.initialized = true;
+    nd_win_trace("nd_log_init_windows: done initialized=true");
     return true;
 }
 

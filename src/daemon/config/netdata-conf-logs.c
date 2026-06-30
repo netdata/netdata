@@ -45,6 +45,7 @@ static bool nd_log_is_default_file_path(const char *value, const char *source_na
 void netdata_conf_section_logs(void) {
     FUNCTION_RUN_ONCE();
 
+    nd_win_trace("netdata_conf_section_logs...");
     netdata_conf_section_directories();
 
     nd_log_set_facility(inicfg_get(&netdata_config, CONFIG_SECTION_LOGS, "facility", "daemon"));
@@ -80,9 +81,11 @@ void netdata_conf_section_logs(void) {
     snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
 #endif
     s = inicfg_get_log_path_setting(&netdata_config, CONFIG_SECTION_LOGS, "debug", filename);
+    nd_win_trace("netdata_conf_section_logs: debug='%s'", s);
 #if defined(OS_WINDOWS) && (defined(HAVE_WEL) || defined(HAVE_ETW))
     if (nd_log_is_default_file_path(s, "debug")) {
         inicfg_set(&netdata_config, CONFIG_SECTION_LOGS, "debug", os_default_method);
+        nd_win_trace("netdata_conf_section_logs: debug migrated to '%s'", os_default_method);
         s = os_default_method;
     }
 #endif
@@ -93,9 +96,11 @@ void netdata_conf_section_logs(void) {
     else
         snprintfz(filename, FILENAME_MAX, "%s/daemon.log", netdata_configured_log_dir);
     s = inicfg_get_log_path_setting(&netdata_config, CONFIG_SECTION_LOGS, "daemon", filename);
+    nd_win_trace("netdata_conf_section_logs: daemon='%s'", s);
 #if defined(OS_WINDOWS) && (defined(HAVE_WEL) || defined(HAVE_ETW))
     if (nd_log_is_default_file_path(s, "daemon")) {
         inicfg_set(&netdata_config, CONFIG_SECTION_LOGS, "daemon", os_default_method);
+        nd_win_trace("netdata_conf_section_logs: daemon migrated to '%s'", os_default_method);
         s = os_default_method;
     }
 #endif
@@ -106,9 +111,11 @@ void netdata_conf_section_logs(void) {
     else
         snprintfz(filename, FILENAME_MAX, "%s/collector.log", netdata_configured_log_dir);
     s = inicfg_get_log_path_setting(&netdata_config, CONFIG_SECTION_LOGS, "collector", filename);
+    nd_win_trace("netdata_conf_section_logs: collector='%s'", s);
 #if defined(OS_WINDOWS) && (defined(HAVE_WEL) || defined(HAVE_ETW))
     if (nd_log_is_default_file_path(s, "collector")) {
         inicfg_set(&netdata_config, CONFIG_SECTION_LOGS, "collector", os_default_method);
+        nd_win_trace("netdata_conf_section_logs: collector migrated to '%s'", os_default_method);
         s = os_default_method;
     }
 #endif
@@ -121,9 +128,11 @@ void netdata_conf_section_logs(void) {
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
 #endif
     s = inicfg_get_log_path_setting(&netdata_config, CONFIG_SECTION_LOGS, "access", filename);
+    nd_win_trace("netdata_conf_section_logs: access='%s'", s);
 #if defined(OS_WINDOWS) && (defined(HAVE_WEL) || defined(HAVE_ETW))
     if (nd_log_is_default_file_path(s, "access")) {
         inicfg_set(&netdata_config, CONFIG_SECTION_LOGS, "access", os_default_method);
+        nd_win_trace("netdata_conf_section_logs: access migrated to '%s'", os_default_method);
         s = os_default_method;
     }
 #endif
@@ -134,9 +143,11 @@ void netdata_conf_section_logs(void) {
     else
         snprintfz(filename, FILENAME_MAX, "%s/health.log", netdata_configured_log_dir);
     s = inicfg_get_log_path_setting(&netdata_config, CONFIG_SECTION_LOGS, "health", filename);
+    nd_win_trace("netdata_conf_section_logs: health='%s'", s);
 #if defined(OS_WINDOWS) && (defined(HAVE_WEL) || defined(HAVE_ETW))
     if (nd_log_is_default_file_path(s, "health")) {
         inicfg_set(&netdata_config, CONFIG_SECTION_LOGS, "health", os_default_method);
+        nd_win_trace("netdata_conf_section_logs: health migrated to '%s'", os_default_method);
         s = os_default_method;
     }
 #endif
@@ -151,9 +162,11 @@ void netdata_conf_section_logs(void) {
         snprintfz(filename, FILENAME_MAX, "%s/aclk.log", netdata_configured_log_dir);
 #endif
         s = inicfg_get_log_path_setting(&netdata_config, CONFIG_SECTION_CLOUD, "conversation log file", filename);
+        nd_win_trace("netdata_conf_section_logs: aclk='%s'", s);
 #if defined(OS_WINDOWS) && (defined(HAVE_WEL) || defined(HAVE_ETW))
         if (nd_log_is_default_file_path(s, "aclk")) {
             inicfg_set(&netdata_config, CONFIG_SECTION_CLOUD, "conversation log file", os_default_method);
+            nd_win_trace("netdata_conf_section_logs: aclk migrated to '%s'", os_default_method);
             s = os_default_method;
         }
 #endif
@@ -162,4 +175,5 @@ void netdata_conf_section_logs(void) {
 
     debug_flags_initialize();
     aclk_config_get_query_scope();
+    nd_win_trace("netdata_conf_section_logs done");
 }
