@@ -112,6 +112,7 @@ fn build_query_fixture() -> Vec<u8> {
 
     let counts = ChunkCounts {
         columns: ColumnsPresent::default(),
+        trace_id_index: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -507,6 +508,7 @@ fn build_multivalued_fixture() -> Vec<u8> {
 
     let counts = ChunkCounts {
         columns: ColumnsPresent::default(),
+        trace_id_index: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -829,6 +831,7 @@ fn build_complemented_fixture() -> Vec<u8> {
 
     let counts = ChunkCounts {
         columns: ColumnsPresent::default(),
+        trace_id_index: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -1045,6 +1048,7 @@ fn build_tiered_fixture() -> Vec<u8> {
 
     let counts = ChunkCounts {
         columns: ColumnsPresent::default(),
+        trace_id_index: false,
         mid_fields: 1,
         high_fields: 1,
         stream_batches: 1,

@@ -54,7 +54,7 @@
 //!     tree: Default::default(),
 //!     columns: Default::default(),
 //! };
-//! let counts = ChunkCounts { columns: ColumnsPresent::default(), mid_fields: 0, high_fields: 0, stream_batches: 1 };
+//! let counts = ChunkCounts { columns: ColumnsPresent::default(), trace_id_index: false, mid_fields: 0, high_fields: 0, stream_batches: 1 };
 //! let mut w = StreamWriter::new(std::io::Cursor::new(Vec::new()), counts).unwrap();
 //! w.summary(&summary).unwrap();
 //! w.metadata(&metadata).unwrap();
@@ -74,6 +74,7 @@ mod index_reader;
 pub mod query;
 mod reader;
 mod schema;
+mod trace_index;
 mod writer;
 
 pub mod registry;
@@ -86,6 +87,7 @@ pub use query::{
 };
 pub use reader::Reader;
 pub use registry::{File, Registry, RetentionPolicy};
+pub use trace_index::TraceIdIndex;
 
 /// Deterministic opaque partition key for tests. SFST treats `part_key` as an
 /// opaque `u64` and never decodes it, so tests fabricate distinct keys per
@@ -166,6 +168,13 @@ const CHUNK_TRACE_IDS: chunk_file::ChunkId = *b"TRCE";
 const CHUNK_SPAN_IDS: chunk_file::ChunkId = *b"SPAN";
 const CHUNK_FLAGS: chunk_file::ChunkId = *b"FLAG";
 const CHUNK_DROPPED_ATTRS: chunk_file::ChunkId = *b"DRAC";
+// Optional `trace_id` index (cold region, after the per-row columns): a
+// first-byte fanout + a position permutation sorted by `trace_id`, for O(log)
+// trace-by-id lookup over the chronological `TRCE` column (see `trace_index`).
+// Additive and TOC-indexed — a file without it simply lacks the chunk, and a
+// reader that ignores it reads the rest unchanged, so its presence needs no
+// version bump.
+const CHUNK_TRACE_INDEX: chunk_file::ChunkId = *b"TIDX";
 
 /// Minimum number of logs in each stream batch. Files with fewer than
 /// `MIN_LOGS_PER_BATCH` total logs use a single batch; otherwise the

@@ -7,12 +7,13 @@ use crate::{
     BitmapValue, ChunkCounts, ColumnEntry, ColumnType, ColumnsPresent, ColumnsTable,
     DroppedAttributeCounts, Error, FieldEntry, FieldTier, Flags, HighField, Histogram, IdRanges,
     KvId, Metadata, ObservedTimestamps, SchemaTree, SpanIds, StreamBatch, StreamWriter, Summary,
-    TraceIds,
+    TraceIdIndex, TraceIds,
 };
 
 fn counts(mid: u16, high: u16, batches: u8) -> ChunkCounts {
     ChunkCounts {
         columns: ColumnsPresent::default(),
+        trace_id_index: false,
         mid_fields: mid,
         high_fields: high,
         stream_batches: batches,
@@ -281,7 +282,7 @@ fn columns_table() -> ColumnsTable {
 }
 
 fn col_counts(columns: ColumnsPresent) -> ChunkCounts {
-    ChunkCounts { columns, mid_fields: 0, high_fields: 0, stream_batches: 1 }
+    ChunkCounts { columns, trace_id_index: false, mid_fields: 0, high_fields: 0, stream_batches: 1 }
 }
 
 #[test]
@@ -428,4 +429,127 @@ fn per_row_columns_manifest_must_match_declared() {
         w.metadata(&metadata_with_columns(Vec::new(), wrong)),
         Err(Error::WriterMisuse(_)),
     ));
+}
+
+// ── trace_id index (TIDX) ────────────────────────────────────────
+
+/// Chunk counts for a file carrying the trace_id column + its index.
+fn idx_counts() -> ChunkCounts {
+    ChunkCounts {
+        columns: ColumnsPresent { trace_id: true, ..Default::default() },
+        trace_id_index: true,
+        mid_fields: 0,
+        high_fields: 0,
+        stream_batches: 1,
+    }
+}
+
+fn trace_id_manifest() -> ColumnsTable {
+    ColumnsTable(vec![ColumnEntry { name: TraceIds::NAME.into(), ty: TraceIds::COLUMN_TYPE }])
+}
+
+/// Three spans (record_count = 3): trace A at rows 0 and 2, trace B at row 1.
+fn three_span_traces() -> (TraceIds, [u8; 16], [u8; 16]) {
+    let (mut a, mut b) = ([0u8; 16], [0u8; 16]);
+    a[0] = 0xAA;
+    a[15] = 1;
+    b[0] = 0xBB;
+    b[15] = 2;
+    let mut t = TraceIds::with_capacity(3);
+    t.push(&a);
+    t.push(&b);
+    t.push(&a);
+    (t, a, b)
+}
+
+#[test]
+fn trace_id_index_round_trips_and_resolves() {
+    let (trace, a, b) = three_span_traces();
+    let index = TraceIdIndex::build(&trace);
+
+    let mut w = writer(idx_counts());
+    w.summary(&summary()).unwrap();
+    w.metadata(&metadata_with_columns(Vec::new(), trace_id_manifest())).unwrap();
+    w.timestamps(&[1, 2, 3]).unwrap();
+    w.primary(&fst()).unwrap();
+    w.trace_ids(&trace).unwrap();
+    w.trace_id_index(&index).unwrap();
+    w.add_stream_batch(&batch()).unwrap();
+    let buf = w.finish().unwrap().into_inner();
+
+    let reader = crate::Reader::open(&buf).unwrap();
+    assert!(reader.has_trace_id_index());
+    let got = reader.trace_id_index().unwrap();
+    assert_eq!(got, index, "the decoded index equals the built one");
+    // Resolve against the file's own trace_id column.
+    let col = reader.trace_ids().unwrap();
+    assert_eq!(got.positions(&a, &col), &[0, 2]);
+    assert_eq!(got.positions(&b, &col), &[1]);
+}
+
+#[test]
+fn trace_id_index_absent_by_default() {
+    // The trace_id column without a declared index → no TIDX chunk.
+    let (trace, _a, _b) = three_span_traces();
+    let mut w = writer(col_counts(ColumnsPresent { trace_id: true, ..Default::default() }));
+    w.summary(&summary()).unwrap();
+    w.metadata(&metadata_with_columns(Vec::new(), trace_id_manifest())).unwrap();
+    w.timestamps(&[1, 2, 3]).unwrap();
+    w.primary(&fst()).unwrap();
+    w.trace_ids(&trace).unwrap();
+    w.add_stream_batch(&batch()).unwrap();
+    let buf = w.finish().unwrap().into_inner();
+
+    let reader = crate::Reader::open(&buf).unwrap();
+    assert!(!reader.has_trace_id_index());
+    assert!(reader.trace_id_index().is_err());
+}
+
+#[test]
+fn trace_id_index_without_its_column_is_rejected() {
+    // Declaring the index without the trace_id column it indexes fails at new().
+    let bad = ChunkCounts {
+        columns: ColumnsPresent::default(),
+        trace_id_index: true,
+        mid_fields: 0,
+        high_fields: 0,
+        stream_batches: 1,
+    };
+    assert!(matches!(
+        StreamWriter::new(Cursor::new(Vec::new()), bad),
+        Err(Error::WriterMisuse(_)),
+    ));
+}
+
+#[test]
+fn trace_id_index_misuse_is_rejected() {
+    let (trace, _a, _b) = three_span_traces();
+    let index = TraceIdIndex::build(&trace);
+
+    // Declared but never written → finish() refuses the underfilled file.
+    let mut w = writer(idx_counts());
+    w.summary(&summary()).unwrap();
+    w.metadata(&metadata_with_columns(Vec::new(), trace_id_manifest())).unwrap();
+    w.timestamps(&[1, 2, 3]).unwrap();
+    w.primary(&fst()).unwrap();
+    w.trace_ids(&trace).unwrap();
+    assert!(matches!(w.add_stream_batch(&batch()), Err(Error::WriterMisuse(_))));
+
+    // Written before the declared column (stage is Columns, not TraceIndex).
+    let mut w = writer(idx_counts());
+    w.summary(&summary()).unwrap();
+    w.metadata(&metadata_with_columns(Vec::new(), trace_id_manifest())).unwrap();
+    w.timestamps(&[1, 2, 3]).unwrap();
+    w.primary(&fst()).unwrap();
+    assert!(matches!(w.trace_id_index(&index), Err(Error::WriterMisuse(_))));
+
+    // Written when not declared (a file with the column but no index) → stage
+    // never reaches TraceIndex, so the write is out of order.
+    let mut w = writer(col_counts(ColumnsPresent { trace_id: true, ..Default::default() }));
+    w.summary(&summary()).unwrap();
+    w.metadata(&metadata_with_columns(Vec::new(), trace_id_manifest())).unwrap();
+    w.timestamps(&[1, 2, 3]).unwrap();
+    w.primary(&fst()).unwrap();
+    w.trace_ids(&trace).unwrap();
+    assert!(matches!(w.trace_id_index(&index), Err(Error::WriterMisuse(_))));
 }

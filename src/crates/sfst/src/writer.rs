@@ -14,10 +14,10 @@ use serde::Serialize;
 
 use crate::{
     BitmapValue, CHUNK_DROPPED_ATTRS, CHUNK_FLAGS, CHUNK_META, CHUNK_OBSERVED_TS, CHUNK_PRIMARY,
-    CHUNK_SPAN_IDS, CHUNK_SUMMARY, CHUNK_TIMS, CHUNK_TRACE_IDS, ColumnsTable, ColumnType,
-    DroppedAttributeCounts, Error, Flags, HighField, MAGIC, MAX_STREAM_BATCHES, Metadata,
-    ObservedTimestamps, SpanIds, StreamBatch, Summary, TraceIds, VERSION, ZSTD_LEVEL_DEFAULT,
-    ZSTD_LEVEL_FST, high_field_id, mid_field_id, stream_batch_id,
+    CHUNK_SPAN_IDS, CHUNK_SUMMARY, CHUNK_TIMS, CHUNK_TRACE_IDS, CHUNK_TRACE_INDEX, ColumnsTable,
+    ColumnType, DroppedAttributeCounts, Error, Flags, HighField, MAGIC, MAX_STREAM_BATCHES,
+    Metadata, ObservedTimestamps, SpanIds, StreamBatch, Summary, TraceIdIndex, TraceIds, VERSION,
+    ZSTD_LEVEL_DEFAULT, ZSTD_LEVEL_FST, high_field_id, mid_field_id, stream_batch_id,
 };
 
 /// Serialize a value with bincode, then compress with zstd.
@@ -92,6 +92,10 @@ impl ColumnsPresent {
 pub struct ChunkCounts {
     /// Which per-row column chunks the file carries (independently optional).
     pub columns: ColumnsPresent,
+    /// Whether the file carries the optional `trace_id` index (`TIDX`), written
+    /// in the cold region right after the per-row columns. Built from the `TRCE`
+    /// column, so a file that sets this must also carry the `trace_id` column.
+    pub trace_id_index: bool,
     /// Mid-cardinality per-field FST chunks (`MF{i}`).
     pub mid_fields: u16,
     /// High-cardinality per-field sorted-list chunks (`HF{i}`).
@@ -113,6 +117,9 @@ enum Stage {
     /// Present columns are written here (in any order) before the secondary
     /// sections; skipped entirely when no columns are declared.
     Columns,
+    /// The optional `trace_id` index, after the per-row columns and before the
+    /// secondary sections; skipped entirely when not declared.
+    TraceIndex,
     Secondary,
 }
 
@@ -124,6 +131,7 @@ impl Stage {
             Stage::Timestamps => "timestamps",
             Stage::Primary => "primary",
             Stage::Columns => "a declared per-row column chunk",
+            Stage::TraceIndex => "the declared trace_id index chunk",
             Stage::Secondary => "a mid-field, high-field, or stream-batch chunk",
         }
     }
@@ -171,9 +179,20 @@ impl<W: Write + Seek> StreamWriter<W> {
         if counts.stream_batches == 0 || counts.stream_batches > MAX_STREAM_BATCHES {
             return Err(Error::InvalidStreamBatchCount(counts.stream_batches));
         }
-        // One cold-region chunk per present per-row column (independently optional).
+        // The trace_id index resolves positions by comparing against the `TRCE`
+        // column, so it is meaningless without it. Reject the inconsistent
+        // declaration up front rather than producing a file whose index can't be
+        // used.
+        if counts.trace_id_index && !counts.columns.trace_id {
+            return Err(Error::WriterMisuse(
+                "trace_id index declared without the trace_id column it indexes".into(),
+            ));
+        }
+        // One cold-region chunk per present per-row column (independently
+        // optional), plus the optional trace_id index.
         let num_chunks = 4u32
             + counts.columns.count()
+            + u32::from(counts.trace_id_index)
             + u32::from(counts.mid_fields)
             + u32::from(counts.high_fields)
             + u32::from(counts.stream_batches);
@@ -264,16 +283,32 @@ impl<W: Write + Seek> StreamWriter<W> {
         self.prefix_chunk(Stage::Timestamps, Stage::Primary, CHUNK_TIMS, &packed)
     }
 
-    /// Write the primary (low-cardinality) FST chunk, completing the hot prefix.
-    /// The optional per-row column chunks (when declared) come next in the cold
-    /// region, otherwise the secondary sections.
-    pub fn primary(&mut self, fst: &FstIndex<BitmapValue>) -> Result<(), Error> {
-        let packed = pack(fst, ZSTD_LEVEL_FST)?;
-        let next = if self.counts.columns.any() {
-            Stage::Columns
+    /// The stage after the per-row columns: the `trace_id` index if declared,
+    /// otherwise straight to the secondary sections.
+    fn after_columns(&self) -> Stage {
+        if self.counts.trace_id_index {
+            Stage::TraceIndex
         } else {
             Stage::Secondary
-        };
+        }
+    }
+
+    /// The stage after PRIM: the per-row columns if any are declared, else
+    /// whatever follows the (empty) column region.
+    fn after_primary(&self) -> Stage {
+        if self.counts.columns.any() {
+            Stage::Columns
+        } else {
+            self.after_columns()
+        }
+    }
+
+    /// Write the primary (low-cardinality) FST chunk, completing the hot prefix.
+    /// The optional per-row column chunks (when declared) come next in the cold
+    /// region, then the optional `trace_id` index, otherwise the secondary sections.
+    pub fn primary(&mut self, fst: &FstIndex<BitmapValue>) -> Result<(), Error> {
+        let packed = pack(fst, ZSTD_LEVEL_FST)?;
+        let next = self.after_primary();
         self.prefix_chunk(Stage::Primary, next, CHUNK_PRIMARY, &packed)
     }
 
@@ -306,7 +341,7 @@ impl<W: Write + Seek> StreamWriter<W> {
         self.inner.write_chunk(id, packed)?;
         self.cols_written |= bit;
         if self.cols_written.count_ones() == self.counts.columns.count() {
-            self.stage = Stage::Secondary;
+            self.stage = self.after_columns();
         }
         Ok(())
     }
@@ -347,6 +382,23 @@ impl<W: Write + Seek> StreamWriter<W> {
             CHUNK_DROPPED_ATTRS,
             &packed,
         )
+    }
+
+    /// Write the optional `trace_id` index chunk (`TIDX`), in the cold region
+    /// after the per-row columns and before the secondary sections. Only valid
+    /// when declared in [`ChunkCounts::trace_id_index`]; the stage machine
+    /// rejects it otherwise.
+    pub fn trace_id_index(&mut self, index: &TraceIdIndex) -> Result<(), Error> {
+        if self.stage != Stage::TraceIndex {
+            return Err(Error::WriterMisuse(format!(
+                "trace_id index chunk out of order: the writer expects {} next",
+                self.stage.expects(),
+            )));
+        }
+        let packed = pack(index, ZSTD_LEVEL_DEFAULT)?;
+        self.inner.write_chunk(CHUNK_TRACE_INDEX, &packed)?;
+        self.stage = Stage::Secondary;
+        Ok(())
     }
 
     fn check_secondary(&self, what: &str) -> Result<(), Error> {

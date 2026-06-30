@@ -16,10 +16,11 @@ use serde::de::DeserializeOwned;
 
 use crate::{
     BitmapValue, CHUNK_DROPPED_ATTRS, CHUNK_FLAGS, CHUNK_META, CHUNK_OBSERVED_TS, CHUNK_PRIMARY,
-    CHUNK_SPAN_IDS, CHUNK_SUMMARY, CHUNK_TIMS, CHUNK_TRACE_IDS, ColumnType, ColumnsTable,
-    DroppedAttributeCounts, Error, FieldTable, FieldTier, Flags, HighField, MAGIC,
+    CHUNK_SPAN_IDS, CHUNK_SUMMARY, CHUNK_TIMS, CHUNK_TRACE_IDS, CHUNK_TRACE_INDEX, ColumnType,
+    ColumnsTable, DroppedAttributeCounts, Error, FieldTable, FieldTier, Flags, HighField, MAGIC,
     MAX_STREAM_BATCHES, Metadata, ObservedTimestamps, SchemaTree, SpanIds, StreamBatch, Summary,
-    TraceIds, VERSION, high_field_id, mid_field_id, num_stream_batches, stream_batch_id,
+    TraceIdIndex, TraceIds, VERSION, high_field_id, mid_field_id, num_stream_batches,
+    stream_batch_id,
 };
 
 /// Decompress zstd, then deserialize with bincode. Crate-internal:
@@ -348,6 +349,24 @@ impl<'a> Reader<'a> {
         let col = DroppedAttributeCounts(unpack(self.chunk_raw_by_id(CHUNK_DROPPED_ATTRS)?)?);
         self.check_rows(DroppedAttributeCounts::NAME, col.len())?;
         Ok(col)
+    }
+
+    // ── TIDX (trace_id index) ────────────────────────────────────────
+
+    /// Whether this file carries the optional `trace_id` index (`TIDX`).
+    pub fn has_trace_id_index(&self) -> bool {
+        self.container.has_chunk(CHUNK_TRACE_INDEX)
+    }
+
+    /// Decode and validate the `trace_id` index (`TIDX`). Errors with
+    /// [`Error::CorruptIndex`] if the decoded fanout/permutation is internally
+    /// inconsistent or references a row beyond `SUMR.record_count`. Callers gate
+    /// on [`has_trace_id_index`](Self::has_trace_id_index); a file without the
+    /// chunk surfaces the container's not-found error.
+    pub fn trace_id_index(&self) -> Result<TraceIdIndex, Error> {
+        let index: TraceIdIndex = unpack(self.chunk_raw_by_id(CHUNK_TRACE_INDEX)?)?;
+        index.validate(self.record_count()?)?;
+        Ok(index)
     }
 
     // ── Stream-batch chunks ──────────────────────────────────────────

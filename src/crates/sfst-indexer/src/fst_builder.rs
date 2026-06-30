@@ -495,6 +495,9 @@ pub fn build_into<W: Write + Seek>(
     // which is what lets the writer reserve the TOC up front.
     let counts = ChunkCounts {
         columns: columns_present,
+        // Step 1 (SOW-20260630): the trace_id index is built only by the traces
+        // slice; the logs seal path does not emit it yet.
+        trace_id_index: false,
         mid_fields: u16::try_from(row_index.mid_fields().len())
             .expect("mid-card field count exceeds u16::MAX"),
         high_fields: u16::try_from(row_index.high_fields().len())
