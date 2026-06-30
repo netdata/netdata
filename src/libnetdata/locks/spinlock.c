@@ -45,14 +45,18 @@ static void spinlock_tracked_deadlock_detect(usec_t *timestamp, const char *func
     usec_t now = now_monotonic_usec();
     if (now - *timestamp >= SPINLOCK_DEADLOCK_TIMEOUT_SEC * USEC_PER_SEC) {
         pid_t holder = __atomic_load_n(&spinlock->holder_tid, __ATOMIC_RELAXED);
-        const char *holder_func = __atomic_load_n(&spinlock->holder_func, __ATOMIC_RELAXED);
         usec_t since = __atomic_load_n(&spinlock->holder_since_ut, __ATOMIC_RELAXED);
         int64_t waited_s = (int64_t)((now - *timestamp) / USEC_PER_SEC);
 
         if (holder)
+            // holder_func is an inline buffer in the lock's own memory; print it
+            // with a bounded "%.*s" so a corrupted (non-NUL-terminated) buffer
+            // cannot read past it, and never dereference a pointer that could be
+            // wild if the lock memory itself is corrupted.
             fatal("DEADLOCK DETECTED: spinlock in function '%s' could not be acquired for %"PRIi64" seconds "
-                  "[holder: tid=%d func='%s' held_for=%"PRIi64"s]",
-                  func, waited_s, holder, holder_func ? holder_func : "(unknown)",
+                  "[holder: tid=%d func='%.*s' held_for=%"PRIi64"s]",
+                  func, waited_s, holder,
+                  (int)sizeof(spinlock->holder_func), spinlock->holder_func,
                   since ? (int64_t)((now - since) / USEC_PER_SEC) : (int64_t)-1);
         else
             fatal("DEADLOCK DETECTED: spinlock in function '%s' could not be acquired for %"PRIi64" seconds "
@@ -65,7 +69,10 @@ static void spinlock_tracked_deadlock_detect(usec_t *timestamp, const char *func
 // Called immediately after the lock is acquired (lock and trylock paths).
 static ALWAYS_INLINE void spinlock_tracked_record_holder(SPINLOCK_TRACKED *spinlock, const char *func) {
     __atomic_store_n(&spinlock->holder_tid, gettid_cached(), __ATOMIC_RELAXED);
-    __atomic_store_n(&spinlock->holder_func, func, __ATOMIC_RELAXED);
+    // Copy the name inline (best-effort, racy-but-bounded, like the RELAXED
+    // fields around it) so the detector never has to dereference a stored
+    // pointer; see SPINLOCK_TRACKED.holder_func.
+    strncpyz(spinlock->holder_func, func ? func : "", sizeof(spinlock->holder_func) - 1);
     __atomic_store_n(&spinlock->holder_since_ut, now_monotonic_usec(), __ATOMIC_RELAXED);
 }
 
@@ -186,7 +193,10 @@ void spinlock_tracked_init_with_trace(SPINLOCK_TRACKED *spinlock, const char *fu
 
 static ALWAYS_INLINE void spinlock_tracked_record_holder(SPINLOCK_TRACKED *spinlock, const char *func) {
     __atomic_store_n(&spinlock->holder_tid, gettid_cached(), __ATOMIC_RELAXED);
-    __atomic_store_n(&spinlock->holder_func, func, __ATOMIC_RELAXED);
+    // Copy the name inline (best-effort, racy-but-bounded, like the RELAXED
+    // fields around it) so the detector never has to dereference a stored
+    // pointer; see SPINLOCK_TRACKED.holder_func.
+    strncpyz(spinlock->holder_func, func ? func : "", sizeof(spinlock->holder_func) - 1);
     __atomic_store_n(&spinlock->holder_since_ut, now_monotonic_usec(), __ATOMIC_RELAXED);
 }
 
