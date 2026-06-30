@@ -112,10 +112,12 @@ pub fn count_spans(req: &ExportTraceServiceRequest) -> usize {
 /// ([`ng_flatten::flatten_trace_request`]) and bincode-encoded as the frame payload.
 ///
 /// Unlike [`write_request`] (which calls `fill_log_hashes`), **no hash-fill pass
-/// runs** for traces — span `Entry.hash`es
-/// stay 0. That only forfeits the seal-time interner fast path (a later seal is
-/// slightly slower); it is not a frame-validity requirement. A request with zero
-/// spans writes no frame and returns `0`.
+/// runs** for traces — span `Entry.hash`es stay 0. The frame is still valid (the
+/// hash is an interner fast-path hint, not data). But a seal that consumes these
+/// frames MUST first run a `fill_trace_hashes` pass (or intern by string with no
+/// precomputed hash): feeding hash-0 entries through the interner's `lookup_hash`
+/// fast path would mis-alias distinct strings that share hash 0. A request with
+/// zero spans writes no frame and returns `0`.
 pub fn write_trace_request(
     writer: &mut wal::Writer,
     clock: &mut MonotonicClock,

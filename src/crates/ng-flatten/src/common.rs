@@ -11,7 +11,7 @@
 //! ([`Kind`]/[`Value`]), the schema tree + builder, the W3C id newtypes
 //! ([`TraceId`]/[`SpanId`]), the canonical `key=value` rendering ([`build_kv`])
 //! that the writer (`ng-ingest`) and reader (`ng-index`) must agree on, and the
-//! bincode frame codec ([`encode`]/[`decode`]) the per-signal `encode_*_frame`
+//! one bincode frame codec the per-signal `encode_log_frame`/`encode_trace_frame`
 //! wrappers delegate to. The signal-specific request/record types and entry
 //! points live in [`crate::logs`] and [`crate::traces`].
 
@@ -428,7 +428,7 @@ impl Flattener {
     /// Flatten a span's own fields — the queryable scalar facets (`name`, `kind`,
     /// `status_code`) and `attributes.*`. Identifier/timing fields (`trace_id`,
     /// `span_id`, `parent_span_id`, start/duration, `flags`,
-    /// `dropped_attributes_count`) are carried as per-row columns on [`SpanRecord`],
+    /// `dropped_attributes_count`) are carried as per-row columns on [`crate::traces::SpanRecord`],
     /// not as entries — same split as [`Flattener::flatten_record`] for logs.
     ///
     /// Enum facets (`kind`, `status_code`) store **both** the raw OTLP int and a
@@ -569,7 +569,7 @@ macro_rules! id_newtype {
         }
 
         impl std::fmt::Debug for $ty {
-            /// Hex (via [`Display`]) so `{:?}`/log output is the readable W3C id.
+            /// Hex (via [`std::fmt::Display`]) so `{:?}`/log output is the readable W3C id.
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(f, concat!(stringify!($ty), "({})"), self)
             }

@@ -280,7 +280,7 @@ fn resolve_stream(row_index: &RowIndex, total_rows: u32) -> Result<ServiceStream
         &stream.name
     };
     tracing::debug!(
-        "stream {namespace}/{name}: {} logs, {} batches",
+        "stream {namespace}/{name}: {} rows, {} batches",
         row_index.num_rows(),
         sfst::num_stream_batches(total_rows),
     );
@@ -364,7 +364,7 @@ pub fn build_into<W: Write + Seek>(
     let time_order = row_index.time_order();
     tracing::debug!("time order built: {}ms", t.elapsed().as_millis());
 
-    // Total log count drives the stream-batch partitioning.
+    // Total row count drives the stream-batch partitioning.
     let total_rows = row_index.num_rows() as u32;
     let batch_size = sfst::stream_batch_size(total_rows);
 
