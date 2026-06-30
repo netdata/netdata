@@ -344,8 +344,8 @@ void rrddim_index_destroy(RRDSET *st) {
     st->rrddim_root_index = NULL;
 }
 
-static inline RRDDIM *rrddim_index_find(RRDSET *st, const char *id) {
-    return dictionary_get(st->rrddim_root_index, id);
+static inline const DICTIONARY_ITEM *rrddim_index_find_and_acquire(RRDSET *st, const char *id) {
+    return dictionary_get_and_acquire_item(st->rrddim_root_index, id);
 }
 
 // ----------------------------------------------------------------------------
@@ -354,13 +354,16 @@ static inline RRDDIM *rrddim_index_find(RRDSET *st, const char *id) {
 inline RRDDIM *rrddim_find(RRDSET *st, const char *id, bool include_obsolete) {
     netdata_log_debug(D_RRD_CALLS, "rrddim_find() for chart %s, dimension %s", rrdset_name(st), id);
 
-    RRDDIM *rd = rrddim_index_find(st, id);
+    const DICTIONARY_ITEM *rd_item = rrddim_index_find_and_acquire(st, id);
+    RRDDIM *rd = dictionary_acquired_item_value(rd_item);
     if(rd) {
         if(!include_obsolete && rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) && !rrdset_is_discoverable(st))
-            return NULL;
-
-        rd->rrdset->last_accessed_time_s = now_realtime_sec();
+            rd = NULL;
+        else
+            rd->rrdset->last_accessed_time_s = now_realtime_sec();
     }
+
+    dictionary_acquired_item_release(st->rrddim_root_index, rd_item);
 
     return rd;
 }
