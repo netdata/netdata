@@ -94,7 +94,7 @@ int init_aws_kinesis_instance(struct instance *instance)
  *
  * @param instance_p an instance data structure.
  */
-void *aws_kinesis_connector_worker(void *instance_p)
+void aws_kinesis_connector_worker(void *instance_p)
 {
     struct instance *instance = (struct instance *)instance_p;
     struct aws_kinesis_specific_config *connector_specific_config = instance->config.connector_specific_config;
@@ -216,5 +216,4 @@ void *aws_kinesis_connector_worker(void *instance_p)
     }
 
     aws_kinesis_cleanup(instance);
-    return NULL;
 }

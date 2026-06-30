@@ -106,7 +106,6 @@ struct websocket_server_client {
     WEBSOCKET_STATE state;
     ND_SOCK sock;        // Socket with SSL abstraction
     uint32_t id;         // Unique client ID
-    size_t max_message_size;
     size_t max_outbound_frame_size;     // Maximum size of outgoing frames for this client
     time_t connected_t;  // Connection timestamp
     time_t last_activity_t; // Last activity timestamp
