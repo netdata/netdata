@@ -5,7 +5,7 @@
 use std::sync::Arc;
 
 use file_registry::MonotonicClock;
-use ng_flatten::{FlattenedRequest, Leaf, Value, decode_frame};
+use ng_flatten::{FlattenedRequest, Leaf, SpanId, TraceId, Value, decode_frame};
 use ng_ingest::{PIPELINE_ID, count_log_records, one_file_config, write_request};
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::common::v1::{
@@ -157,8 +157,8 @@ fn request_roundtrips_through_a_wal_frame() {
     for rec in &flattened.resources[0].scopes[0].records {
         assert_eq!(rec.ts, 1_700_000_000_000_000_000);
         assert_eq!(rec.observed_ts, 1_700_000_000_000_000_001);
-        assert_eq!(rec.trace_id, vec![0x11; 16]);
-        assert_eq!(rec.span_id, vec![0x22; 8]);
+        assert_eq!(rec.trace_id, TraceId::from([0x11; 16]));
+        assert_eq!(rec.span_id, SpanId::from([0x22; 8]));
         assert_eq!(rec.flags, 7);
         assert_eq!(rec.dropped_attributes_count, 3);
     }
@@ -325,21 +325,21 @@ fn malformed_ids_are_cleared_at_ingest() {
     ]);
     let records = write_and_decode_records(&mut req);
     assert!(
-        records[0].trace_id.is_empty(),
-        "malformed trace_id cleared at ingest"
+        records[0].trace_id.is_unset(),
+        "malformed trace_id cleared at ingest → UNSET"
     );
     assert!(
-        records[0].span_id.is_empty(),
-        "malformed span_id cleared at ingest"
+        records[0].span_id.is_unset(),
+        "malformed span_id cleared at ingest → UNSET"
     );
     assert_eq!(
         records[1].trace_id,
-        vec![0xab; 16],
+        TraceId::from([0xab; 16]),
         "conformant trace_id preserved"
     );
     assert_eq!(
         records[1].span_id,
-        vec![0xcd; 8],
+        SpanId::from([0xcd; 8]),
         "conformant span_id preserved"
     );
 }
@@ -363,5 +363,88 @@ fn ts_falls_back_to_clock_when_both_zero() {
     assert!(
         records[1].ts > records[0].ts,
         "clock fallback is strictly increasing"
+    );
+}
+
+#[test]
+fn trace_request_roundtrips_through_a_wal_frame() {
+    use ng_flatten::decode_trace_frame;
+    use ng_ingest::{TRACES_PIPELINE_ID, count_spans, write_trace_request};
+    use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
+    use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span, Status};
+
+    let span = Span {
+        trace_id: vec![0x11; 16],
+        span_id: vec![0x22; 8],
+        parent_span_id: vec![0x33; 8],
+        name: "GET /x".into(),
+        kind: 2, // SERVER
+        start_time_unix_nano: 1_700_000_000_000_000_000,
+        end_time_unix_nano: 1_700_000_000_000_000_500,
+        status: Some(Status { code: 2, ..Default::default() }), // ERROR
+        attributes: vec![kv("http.method", any_value::Value::StringValue("GET".into()))],
+        ..Default::default()
+    };
+    let mut req = ExportTraceServiceRequest {
+        resource_spans: vec![ResourceSpans {
+            resource: Some(Resource {
+                attributes: vec![kv(
+                    "service.name",
+                    any_value::Value::StringValue("svc".into()),
+                )],
+                ..Default::default()
+            }),
+            scope_spans: vec![ScopeSpans {
+                scope: Some(InstrumentationScope { name: "scope".into(), ..Default::default() }),
+                spans: vec![span],
+                ..Default::default()
+            }],
+            ..Default::default()
+        }],
+    };
+
+    let dir = tempfile::tempdir().unwrap();
+    let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
+    let mut writer =
+        wal::Writer::new(dir.path(), one_file_config(), seq, TRACES_PIPELINE_ID).unwrap();
+    let mut clock = MonotonicClock::new();
+    let written = write_trace_request(&mut writer, &mut clock, &mut req).unwrap();
+    assert_eq!(written, count_spans(&req));
+    assert_eq!(written, 1);
+    writer.shutdown_all().unwrap();
+
+    let mut reader = wal::Reader::open(&wal_file(dir.path())).unwrap();
+    let frame = reader.next_frame().unwrap().expect("one frame written");
+    assert_eq!(frame.entry_count as usize, written);
+
+    let flat = decode_trace_frame(frame.data).expect("payload decodes as a flattened trace frame");
+    let sr = &flat.resources[0].scopes[0].spans[0];
+    // Per-row columns survive (typed ids, start ts, computed duration).
+    assert_eq!(sr.ts, 1_700_000_000_000_000_000);
+    assert_eq!(sr.duration, 500);
+    assert_eq!(sr.trace_id, TraceId::from([0x11; 16]));
+    assert_eq!(sr.span_id, SpanId::from([0x22; 8]));
+    assert_eq!(sr.parent_span_id, SpanId::from([0x33; 8]));
+
+    // Facets survive (name + dual enum label) alongside resource/scope.
+    let mut leaves = Vec::new();
+    {
+        let tree = &flat.tree;
+        for rg in &flat.resources {
+            leaves.extend(tree.resolve(&rg.resource));
+            for sg in &rg.scopes {
+                leaves.extend(tree.resolve(&sg.scope));
+                for s in &sg.spans {
+                    leaves.extend(tree.resolve(&s.entries));
+                }
+            }
+        }
+    }
+    assert_eq!(at(&leaves, "name"), [&Value::Str("GET /x".into())]);
+    assert_eq!(at(&leaves, "kind"), [&Value::Str("SERVER".into())]);
+    assert_eq!(at(&leaves, "status_code"), [&Value::Str("ERROR".into())]);
+    assert_eq!(
+        at(&leaves, "resource.attributes.service.name"),
+        [&Value::Str("svc".into())]
     );
 }

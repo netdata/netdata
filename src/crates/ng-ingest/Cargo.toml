@@ -11,6 +11,10 @@ workspace = true
 name = "ng-ingest"
 path = "src/main.rs"
 
+[[bin]]
+name = "ng-ingest-traces"
+path = "src/bin/traces.rs"
+
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }

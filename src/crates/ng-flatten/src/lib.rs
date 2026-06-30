@@ -1050,6 +1050,23 @@ pub fn decode_frame(bytes: &[u8]) -> Result<FlattenedRequest, bincode::error::De
     Ok(bincode::serde::decode_from_slice(bytes, frame_config())?.0)
 }
 
+/// Encode a [`FlattenedTraceRequest`] to the bincode bytes stored in a traces WAL
+/// frame — the span analog of [`encode_frame`], same config. (Span `Entry.hash`es
+/// are left 0 unless a `fill_trace_hashes` pass runs first; that is a seal-time
+/// fast-path optimization, not a frame validity requirement.)
+pub fn encode_trace_frame(
+    req: &FlattenedTraceRequest,
+) -> Result<Vec<u8>, bincode::error::EncodeError> {
+    bincode::serde::encode_to_vec(req, frame_config())
+}
+
+/// Decode a traces WAL frame's bincode payload back into a [`FlattenedTraceRequest`].
+pub fn decode_trace_frame(
+    bytes: &[u8],
+) -> Result<FlattenedTraceRequest, bincode::error::DecodeError> {
+    Ok(bincode::serde::decode_from_slice(bytes, frame_config())?.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
