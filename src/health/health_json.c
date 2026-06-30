@@ -181,14 +181,21 @@ void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCAL
             STRING *tok_string = string_strdupz(tok);
 
             foreach_rrdcalc_in_rrdhost_read(host, rc) {
-                if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+                RRDSET *st = rrdcalc_rrdset_read_lock(rc);
+                if(unlikely(!st))
                     continue;
-                if (unlikely(!rrdset_is_available_for_exporting_and_alarms(rc->rrdset)))
+                if(unlikely(!st->last_collected_time.tv_sec)) {
+                    rrdcalc_rrdset_read_unlock(st);
                     continue;
-                if(unlikely(rc->rrdset
-                             && rc->rrdset->context == tok_string
+                }
+                if (unlikely(!rrdset_is_available_for_exporting_and_alarms(st))) {
+                    rrdcalc_rrdset_read_unlock(st);
+                    continue;
+                }
+                if(unlikely(st->context == tok_string
                              && ((status==RRDCALC_STATUS_RAISED)?(rc->status >= RRDCALC_STATUS_WARNING):rc->status == status)))
                     numberOfAlarms++;
+                rrdcalc_rrdset_read_unlock(st);
             }
             foreach_rrdcalc_in_rrdhost_done(rc);
 
@@ -197,12 +204,20 @@ void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCAL
     }
     else {
         foreach_rrdcalc_in_rrdhost_read(host, rc) {
-            if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+            RRDSET *st = rrdcalc_rrdset_read_lock(rc);
+            if(unlikely(!st))
                 continue;
-            if (unlikely(!rrdset_is_available_for_exporting_and_alarms(rc->rrdset)))
+            if(unlikely(!st->last_collected_time.tv_sec)) {
+                rrdcalc_rrdset_read_unlock(st);
                 continue;
+            }
+            if (unlikely(!rrdset_is_available_for_exporting_and_alarms(st))) {
+                rrdcalc_rrdset_read_unlock(st);
+                continue;
+            }
             if(unlikely((status==RRDCALC_STATUS_RAISED)?(rc->status >= RRDCALC_STATUS_WARNING):rc->status == status))
                 numberOfAlarms++;
+            rrdcalc_rrdset_read_unlock(st);
         }
         foreach_rrdcalc_in_rrdhost_done(rc);
     }
@@ -214,18 +229,28 @@ static void health_alarms2json_fill_alarms(RRDHOST *host, BUFFER *wb, int all, v
     RRDCALC *rc;
     int i = 0;
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
-        if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+        RRDSET *st = rrdcalc_rrdset_read_lock(rc);
+        if(unlikely(!st))
             continue;
+        if(unlikely(!st->last_collected_time.tv_sec)) {
+            rrdcalc_rrdset_read_unlock(st);
+            continue;
+        }
 
-        if (unlikely(!rrdset_is_available_for_exporting_and_alarms(rc->rrdset)))
+        if (unlikely(!rrdset_is_available_for_exporting_and_alarms(st))) {
+            rrdcalc_rrdset_read_unlock(st);
             continue;
+        }
 
-        if(likely(!all && !(rc->status == RRDCALC_STATUS_WARNING || rc->status == RRDCALC_STATUS_CRITICAL)))
+        if(likely(!all && !(rc->status == RRDCALC_STATUS_WARNING || rc->status == RRDCALC_STATUS_CRITICAL))) {
+            rrdcalc_rrdset_read_unlock(st);
             continue;
+        }
 
         if(likely(i)) buffer_strcat(wb, ",\n");
         fp(host, wb, rc);
         i++;
+        rrdcalc_rrdset_read_unlock(st);
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
 }
