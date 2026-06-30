@@ -255,7 +255,6 @@ Valid methods are `systemd`, `interval`, and `crontab`.
 
 :::
 
-
 ## Quick Reference
 
 ### Update Commands by Installation Type
