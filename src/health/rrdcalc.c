@@ -61,32 +61,53 @@ inline const char *rrdcalc_status2string(RRDCALC_STATUS status) {
     }
 }
 
+static ALARM_ENTRY *rrdcalc_find_alarm_entry(RRDHOST *host, STRING *chart, STRING *name, nd_uuid_t *config_hash_id) {
+    for(ALARM_ENTRY *ae = host->health_log.alarms; ae ;ae = ae->next) {
+        if(unlikely(name == ae->name && chart == ae->chart && uuid_eq(ae->config_hash_id, *config_hash_id)))
+            return ae;
+    }
+
+    return NULL;
+}
+
 uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id, nd_uuid_t *config_hash_id) {
     rw_spinlock_read_lock(&host->health_log.spinlock);
 
     // re-use old IDs, by looking them up in the alarm log
-    ALARM_ENTRY *ae = NULL;
-    for(ae = host->health_log.alarms; ae ;ae = ae->next) {
-        if(unlikely(name == ae->name && chart == ae->chart && uuid_eq(ae->config_hash_id, *config_hash_id))) {
-            if(next_event_id) *next_event_id = ae->alarm_event_id + 1;
-            break;
-        }
-    }
+    ALARM_ENTRY *ae = rrdcalc_find_alarm_entry(host, chart, name, config_hash_id);
 
-    uint32_t alarm_id;
-
-    if(ae)
-        alarm_id = ae->alarm_id;
-    else {
-        alarm_id = sql_get_alarm_id(host, chart, name, next_event_id);
-        if (!alarm_id) {
-            if (unlikely(!host->health_log.next_alarm_id))
-                host->health_log.next_alarm_id = get_uint32_id();
-            alarm_id = host->health_log.next_alarm_id++;
-        }
+    if(ae) {
+        uint32_t alarm_id = ae->alarm_id;
+        if(next_event_id) *next_event_id = ae->alarm_event_id + 1;
+        rw_spinlock_read_unlock(&host->health_log.spinlock);
+        return alarm_id;
     }
 
     rw_spinlock_read_unlock(&host->health_log.spinlock);
+
+    uint32_t sql_next_event_id = next_event_id ? *next_event_id : 0;
+    uint32_t sql_alarm_id = sql_get_alarm_id(host, chart, name, &sql_next_event_id);
+
+    rw_spinlock_write_lock(&host->health_log.spinlock);
+
+    ae = rrdcalc_find_alarm_entry(host, chart, name, config_hash_id);
+
+    uint32_t alarm_id;
+    if(ae) {
+        alarm_id = ae->alarm_id;
+        if(next_event_id) *next_event_id = ae->alarm_event_id + 1;
+    }
+    else if(sql_alarm_id) {
+        alarm_id = sql_alarm_id;
+        if(next_event_id) *next_event_id = sql_next_event_id;
+    }
+    else {
+        if (unlikely(!host->health_log.next_alarm_id))
+            host->health_log.next_alarm_id = get_uint32_id();
+        alarm_id = host->health_log.next_alarm_id++;
+    }
+
+    rw_spinlock_write_unlock(&host->health_log.spinlock);
     return alarm_id;
 }
 

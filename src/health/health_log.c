@@ -190,8 +190,6 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     if (duration < 0)
         duration = 0;
 
-    netdata_log_debug(D_HEALTH, "Health adding alarm log entry with id: %u", host->health_log.next_log_id);
-
     ALARM_ENTRY *ae = health_alarm_entry_create();
     ae->name = string_dup(name);
     ae->chart = string_dup(chart);
@@ -211,7 +209,12 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     ae->source = string_dup(source);
     ae->units = string_dup(units);
 
+    rw_spinlock_write_lock(&host->health_log.spinlock);
     ae->unique_id = host->health_log.next_log_id++;
+    rw_spinlock_write_unlock(&host->health_log.spinlock);
+
+    netdata_log_debug(D_HEALTH, "Health adding alarm log entry with id: %u", ae->unique_id);
+
     ae->alarm_id = alarm_id;
     ae->alarm_event_id = alarm_event_id;
     ae->when = when;
