@@ -157,7 +157,7 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
     rrdhost_receiver_lock(host);
     last_connected = host->stream.rcv.status.last_connected;
     last_disconnected = host->stream.rcv.status.last_disconnected;
-    connections = host->stream.rcv.status.connections;
+    connections = __atomic_load_n(&host->stream.rcv.status.connections, __ATOMIC_RELAXED);
     reason = host->stream.rcv.status.reason;
     rrdhost_receiver_unlock(host);
 
@@ -239,6 +239,7 @@ static void rrdhost_status_stream_internal(RRDHOST_STATUS *s) {
     if (!host->sender) {
         s->stream.status = RRDHOST_STREAM_STATUS_DISABLED;
         s->stream.hops = (int16_t)(s->ingest.hops + 1);
+        s->stream.id = __atomic_load_n(&host->stream.snd.status.connections, __ATOMIC_RELAXED);
     }
     else {
         stream_sender_lock(host->sender);
@@ -275,11 +276,10 @@ static void rrdhost_status_stream_internal(RRDHOST_STATUS *s) {
             s->stream.hops = (int16_t)(s->ingest.hops + 1);
         }
         s->stream.reason = host->stream.snd.status.reason;
+        s->stream.id = __atomic_load_n(&host->stream.snd.status.connections, __ATOMIC_RELAXED);
 
         stream_sender_unlock(host->sender);
     }
-
-    s->stream.id = host->stream.snd.status.connections;
 
     if(!s->stream.since)
         s->stream.since = netdata_start_time;

@@ -374,7 +374,7 @@ void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth) {
         s->thread.msg.meta = &s->thread.meta;
 
         __atomic_store_n(&s->host->stream.snd.status.tid, gettid_cached(), __ATOMIC_RELAXED);
-        s->host->stream.snd.status.connections++;
+        __atomic_add_fetch(&s->host->stream.snd.status.connections, 1, __ATOMIC_RELAXED);
         s->last_state_since_t = now_realtime_sec();
 
         s->replication.last_progress_ut = now_monotonic_usec();
