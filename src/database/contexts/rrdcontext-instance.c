@@ -263,7 +263,7 @@ void rrdinstances_destroy_from_rrdcontext(RRDCONTEXT *rc) {
 void rrdinstance_trigger_updates(RRDINSTANCE *ri, const char *function) {
     RRDSET *st = ri->rrdset;
 
-    if(likely(st)) {
+    if(st != NULL) {
         if(unlikely((unsigned int) st->priority != ri->priority)) {
             ri->priority = st->priority;
             rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
@@ -282,7 +282,7 @@ void rrdinstance_trigger_updates(RRDINSTANCE *ri, const char *function) {
 
     if(rrd_flag_is_updated(ri) || !rrd_flag_check(ri, RRD_FLAG_LIVE_RETENTION)) {
         rrd_flag_set_updated(ri->rc, RRD_FLAG_UPDATE_REASON_TRIGGERED);
-        rrdcontext_queue_for_post_processing(ri->rc, function, ri->flags);
+        rrdcontext_queue_for_post_processing(ri->rc, function, rrd_flags_get(ri));
     }
 }
 
