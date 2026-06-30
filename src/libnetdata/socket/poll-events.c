@@ -367,6 +367,11 @@ void poll_events(LISTEN_SOCKETS *sockets
         .tmr_callback = tmr_callback?tmr_callback:poll_default_tmr_callback
     };
 
+    if(unlikely(!p.ndpl)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "POLLFD: failed to create nd_poll");
+        return;
+    }
+
     size_t i;
     for(i = 0; i < sockets->opened ;i++) {
 
