@@ -114,7 +114,7 @@ pub use schema::{
     BitmapValue, ColumnEntry, ColumnType, ColumnsTable, DEFAULT_CARDINALITY_THRESHOLD,
     DroppedAttributeCounts, FieldEntry, FieldTable, FieldTier, Flags, HighField, Histogram,
     IdRanges, KvId, LeafStats, Metadata, NodeId, ObservedTimestamps, SchemaEdge, SchemaNode,
-    SchemaTree, SpanIds, Step, StreamBatch, Summary, TraceIds, ValueKind,
+    SchemaTree, SpanId, SpanIds, Step, StreamBatch, Summary, TraceId, TraceIds, ValueKind,
 };
 pub use writer::{ChunkCounts, ColumnsPresent, StreamWriter, write_summary_only};
 

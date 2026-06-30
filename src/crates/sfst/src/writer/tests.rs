@@ -6,8 +6,8 @@ use treight::Bitmap;
 use crate::{
     BitmapValue, ChunkCounts, ColumnEntry, ColumnType, ColumnsPresent, ColumnsTable,
     DroppedAttributeCounts, Error, FieldEntry, FieldTier, Flags, HighField, Histogram, IdRanges,
-    KvId, Metadata, ObservedTimestamps, SchemaTree, SpanIds, StreamBatch, StreamWriter, Summary,
-    TraceIdIndex, TraceIds,
+    KvId, Metadata, ObservedTimestamps, SchemaTree, SpanId, SpanIds, StreamBatch, StreamWriter,
+    Summary, TraceId, TraceIdIndex, TraceIds,
 };
 
 fn counts(mid: u16, high: u16, batches: u8) -> ChunkCounts {
@@ -252,8 +252,8 @@ fn sample_columns(n: usize) -> (ObservedTimestamps, TraceIds, SpanIds, Flags, Dr
     let mut trace = TraceIds::with_capacity(n);
     let mut span = SpanIds::with_capacity(n);
     for i in 0..n {
-        trace.push(&[i as u8; 16]);
-        span.push(&[i as u8; 8]);
+        trace.push(TraceId::from([i as u8; 16]));
+        span.push(SpanId::from([i as u8; 8]));
     }
     let flags = Flags((0..n as u32).map(|i| i | 0x100).collect());
     let drac = DroppedAttributeCounts((0..n as u32).collect());
@@ -449,16 +449,17 @@ fn trace_id_manifest() -> ColumnsTable {
 }
 
 /// Three spans (record_count = 3): trace A at rows 0 and 2, trace B at row 1.
-fn three_span_traces() -> (TraceIds, [u8; 16], [u8; 16]) {
+fn three_span_traces() -> (TraceIds, TraceId, TraceId) {
     let (mut a, mut b) = ([0u8; 16], [0u8; 16]);
     a[0] = 0xAA;
     a[15] = 1;
     b[0] = 0xBB;
     b[15] = 2;
+    let (a, b) = (TraceId::from(a), TraceId::from(b));
     let mut t = TraceIds::with_capacity(3);
-    t.push(&a);
-    t.push(&b);
-    t.push(&a);
+    t.push(a);
+    t.push(b);
+    t.push(a);
     (t, a, b)
 }
 
@@ -483,8 +484,8 @@ fn trace_id_index_round_trips_and_resolves() {
     assert_eq!(got, index, "the decoded index equals the built one");
     // Resolve against the file's own trace_id column.
     let col = reader.trace_ids().unwrap();
-    assert_eq!(got.positions(&a, &col), &[0, 2]);
-    assert_eq!(got.positions(&b, &col), &[1]);
+    assert_eq!(got.positions(a, &col), &[0, 2]);
+    assert_eq!(got.positions(b, &col), &[1]);
 }
 
 #[test]

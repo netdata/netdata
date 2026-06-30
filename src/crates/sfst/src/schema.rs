@@ -1012,9 +1012,70 @@ pub struct SpanIds {
     bytes: Vec<u8>,
 }
 
-/// Generate the shared fixed-stride-arena API for the id column newtypes.
+/// A W3C trace id: a fixed 16-byte identifier. The all-zero value is the
+/// OTLP/W3C "unset/invalid" sentinel ([`TraceId::is_unset`]). `Copy` + `Ord` +
+/// `Hash` so it sorts (the `trace_id` index) and keys maps (the trace tree)
+/// directly; the on-disk [`TraceIds`] column stores these as a packed byte arena.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct TraceId([u8; TraceIds::WIDTH]);
+
+/// A W3C span id: a fixed 8-byte identifier. See [`TraceId`] for the shared
+/// semantics (unset sentinel, ordering, packed [`SpanIds`] storage).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct SpanId([u8; SpanIds::WIDTH]);
+
+/// Generate the shared id-value API (`from_bytes`/`as_bytes`/`is_unset`/`UNSET`,
+/// `From<[u8; W]>`, hex `Display`) for the fixed-width id newtypes.
+macro_rules! id_value {
+    ($ty:ident, $width:expr) => {
+        impl $ty {
+            /// The all-zero "unset/invalid" id (the OTLP/W3C sentinel).
+            pub const UNSET: Self = Self([0u8; $width]);
+
+            /// Parse **exactly** `$width` bytes into an id; `None` for any other
+            /// length. This is the strict proto-boundary check — an empty or
+            /// wrong-length id is the caller's to map (commonly
+            /// `.unwrap_or_default()` → [`UNSET`](Self::UNSET)).
+            pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
+                <[u8; $width]>::try_from(bytes).ok().map(Self)
+            }
+
+            /// The raw fixed-width bytes.
+            pub fn as_bytes(&self) -> &[u8; $width] {
+                &self.0
+            }
+
+            /// Whether this is the all-zero unset/invalid sentinel.
+            pub fn is_unset(&self) -> bool {
+                self.0 == [0u8; $width]
+            }
+        }
+
+        impl From<[u8; $width]> for $ty {
+            fn from(bytes: [u8; $width]) -> Self {
+                Self(bytes)
+            }
+        }
+
+        impl std::fmt::Display for $ty {
+            /// Lowercase hex, the W3C trace-context text format.
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                for b in &self.0 {
+                    write!(f, "{b:02x}")?;
+                }
+                Ok(())
+            }
+        }
+    };
+}
+
+id_value!(TraceId, 16);
+id_value!(SpanId, 8);
+
+/// Generate the shared fixed-stride-arena API for the id column types. Each
+/// arena `$ty` stores `$value` ids (its typed element) as a packed byte buffer.
 macro_rules! id_arena {
-    ($ty:ty, $width:expr, $name:expr) => {
+    ($ty:ty, $value:ty, $width:expr, $name:expr) => {
         impl $ty {
             /// Bytes per id (the OTLP/W3C fixed width).
             pub const WIDTH: usize = $width;
@@ -1028,15 +1089,12 @@ macro_rules! id_arena {
                 Self { bytes: Vec::with_capacity(rows * Self::WIDTH) }
             }
 
-            /// Append one id, normalized to exactly `WIDTH` bytes: a shorter or
-            /// empty id is zero-padded, a longer one truncated. Callers that want
-            /// to reject/flag malformed lengths must do so before calling (see
-            /// `ng-ingest`); this is the storage backstop.
-            pub fn push(&mut self, id: &[u8]) {
-                let start = self.bytes.len();
-                self.bytes.resize(start + Self::WIDTH, 0);
-                let n = id.len().min(Self::WIDTH);
-                self.bytes[start..start + n].copy_from_slice(&id[..n]);
+            /// Append one id. The typed value already carries exactly `WIDTH`
+            /// bytes, so no normalization happens here — callers resolve a raw
+            /// OTLP byte string into the id type at the boundary
+            /// (`<id>::from_bytes(..).unwrap_or_default()`).
+            pub fn push(&mut self, id: $value) {
+                self.bytes.extend_from_slice(id.as_bytes());
             }
 
             /// Number of ids.
@@ -1057,14 +1115,21 @@ macro_rules! id_arena {
                 self.bytes.len() % Self::WIDTH == 0
             }
 
-            /// The `i`-th id (`WIDTH` bytes).
-            pub fn get(&self, i: usize) -> &[u8] {
-                &self.bytes[i * Self::WIDTH..(i + 1) * Self::WIDTH]
+            /// The `i`-th id.
+            pub fn get(&self, i: usize) -> $value {
+                let start = i * Self::WIDTH;
+                let mut buf = [0u8; $width];
+                buf.copy_from_slice(&self.bytes[start..start + Self::WIDTH]);
+                <$value>::from(buf)
             }
 
             /// Iterate ids in stored order.
-            pub fn iter(&self) -> impl Iterator<Item = &[u8]> {
-                self.bytes.chunks_exact(Self::WIDTH)
+            pub fn iter(&self) -> impl Iterator<Item = $value> + '_ {
+                self.bytes.chunks_exact(Self::WIDTH).map(|c| {
+                    let mut buf = [0u8; $width];
+                    buf.copy_from_slice(c);
+                    <$value>::from(buf)
+                })
             }
 
             /// A copy reordered by `positions` (insertion-order indices in the
@@ -1080,8 +1145,8 @@ macro_rules! id_arena {
     };
 }
 
-id_arena!(TraceIds, 16, "trace_id");
-id_arena!(SpanIds, 8, "span_id");
+id_arena!(TraceIds, TraceId, 16, "trace_id");
+id_arena!(SpanIds, SpanId, 8, "span_id");
 
 #[cfg(test)]
 mod tests;

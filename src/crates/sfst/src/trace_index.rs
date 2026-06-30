@@ -23,13 +23,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Error, TraceIds};
-
-/// Whether every byte of `id` is zero — the OTLP/W3C "unset/invalid" trace id,
-/// which belongs to no trace and is excluded from the index.
-fn is_unset(id: &[u8]) -> bool {
-    id.iter().all(|&b| b == 0)
-}
+use crate::{Error, TraceId, TraceIds};
 
 /// The `trace_id` index: a first-byte fanout over row positions sorted by their
 /// 16-byte `trace_id`. Built at seal from the `TRCE` column, read on lookup.
@@ -56,15 +50,15 @@ impl TraceIdIndex {
     /// chunk (same row order), since `sort_perm` indexes into it.
     pub fn build(trace_ids: &TraceIds) -> Self {
         let mut sort_perm: Vec<u32> = (0..trace_ids.len() as u32)
-            .filter(|&i| !is_unset(trace_ids.get(i as usize)))
+            .filter(|&i| !trace_ids.get(i as usize).is_unset())
             .collect();
         // Stable sort: equal ids keep chronological (ascending-position) order,
         // so a trace's spans come back in time order.
-        sort_perm.sort_by(|&a, &b| trace_ids.get(a as usize).cmp(trace_ids.get(b as usize)));
+        sort_perm.sort_by_key(|&a| trace_ids.get(a as usize));
 
         let mut fanout = vec![0u32; 256];
         for &p in &sort_perm {
-            fanout[trace_ids.get(p as usize)[0] as usize] += 1;
+            fanout[trace_ids.get(p as usize).as_bytes()[0] as usize] += 1;
         }
         let mut acc = 0u32;
         for slot in &mut fanout {
@@ -99,11 +93,11 @@ impl TraceIdIndex {
     ///
     /// `fanout` narrows to the first-byte bucket, then two indirect binary
     /// searches bound the equal run: `fanout + 2·log2(N/256)` comparisons.
-    pub fn positions<'s>(&'s self, needle: &[u8], trace_ids: &TraceIds) -> &'s [u32] {
-        if needle.len() != TraceIds::WIDTH || is_unset(needle) {
+    pub fn positions<'s>(&'s self, needle: TraceId, trace_ids: &TraceIds) -> &'s [u32] {
+        if needle.is_unset() {
             return &[];
         }
-        let b = needle[0] as usize;
+        let b = needle.as_bytes()[0] as usize;
         let lo = if b == 0 { 0 } else { self.fanout[b - 1] as usize };
         let hi = self.fanout[b] as usize;
         let bucket = &self.sort_perm[lo..hi];
@@ -161,28 +155,29 @@ impl TraceIdIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::SpanId;
 
-    /// Build a `TraceIds` arena from 16-byte ids.
-    fn arena(ids: &[[u8; 16]]) -> TraceIds {
+    /// Build a `TraceIds` arena from typed ids.
+    fn arena(ids: &[TraceId]) -> TraceIds {
         let mut t = TraceIds::with_capacity(ids.len());
-        for id in ids {
+        for &id in ids {
             t.push(id);
         }
         t
     }
 
-    /// A 16-byte id whose bytes are a simple pattern around `seed`.
-    fn id(seed: u8) -> [u8; 16] {
+    /// A trace id whose bytes are a simple pattern around `seed`.
+    fn id(seed: u8) -> TraceId {
         let mut a = [0u8; 16];
         a[0] = seed;
         a[15] = seed.wrapping_mul(7).wrapping_add(1);
-        a
+        TraceId::from(a)
     }
 
     /// Oracle: positions of `needle` by a plain linear scan of the arena.
-    fn linear(trace_ids: &TraceIds, needle: &[u8; 16]) -> Vec<u32> {
+    fn linear(trace_ids: &TraceIds, needle: TraceId) -> Vec<u32> {
         (0..trace_ids.len() as u32)
-            .filter(|&i| trace_ids.get(i as usize) == &needle[..])
+            .filter(|&i| trace_ids.get(i as usize) == needle)
             .collect()
     }
 
@@ -191,7 +186,7 @@ mod tests {
         let t = arena(&[]);
         let idx = TraceIdIndex::build(&t);
         assert_eq!(idx.indexed_rows(), 0);
-        assert!(idx.positions(&id(1), &t).is_empty());
+        assert!(idx.positions(id(1), &t).is_empty());
     }
 
     #[test]
@@ -199,7 +194,7 @@ mod tests {
         let a = id(0xAB);
         let t = arena(&[a, a, a, a]);
         let idx = TraceIdIndex::build(&t);
-        assert_eq!(idx.positions(&a, &t), &[0, 1, 2, 3]);
+        assert_eq!(idx.positions(a, &t), &[0, 1, 2, 3]);
     }
 
     #[test]
@@ -209,27 +204,26 @@ mod tests {
         let (a, b, c) = (id(b'A'), id(b'B'), id(b'C'));
         let t = arena(&[a, b, a, a, c, b]);
         let idx = TraceIdIndex::build(&t);
-        assert_eq!(idx.positions(&a, &t), &[0, 2, 3]);
-        assert_eq!(idx.positions(&b, &t), &[1, 5]);
-        assert_eq!(idx.positions(&c, &t), &[4]);
+        assert_eq!(idx.positions(a, &t), &[0, 2, 3]);
+        assert_eq!(idx.positions(b, &t), &[1, 5]);
+        assert_eq!(idx.positions(c, &t), &[4]);
     }
 
     #[test]
     fn absent_trace_is_empty() {
         let t = arena(&[id(1), id(2)]);
         let idx = TraceIdIndex::build(&t);
-        assert!(idx.positions(&id(99), &t).is_empty());
+        assert!(idx.positions(id(99), &t).is_empty());
     }
 
     #[test]
     fn unset_ids_are_skipped() {
-        let zero = [0u8; 16];
         let a = id(5);
-        let t = arena(&[zero, a, zero, a]);
+        let t = arena(&[TraceId::UNSET, a, TraceId::UNSET, a]);
         let idx = TraceIdIndex::build(&t);
         assert_eq!(idx.indexed_rows(), 2, "the two zero rows are not indexed");
-        assert_eq!(idx.positions(&a, &t), &[1, 3]);
-        assert!(idx.positions(&zero, &t).is_empty(), "unset id has no trace");
+        assert_eq!(idx.positions(a, &t), &[1, 3]);
+        assert!(idx.positions(TraceId::UNSET, &t).is_empty(), "unset id has no trace");
     }
 
     #[test]
@@ -238,16 +232,20 @@ mod tests {
         // skipped (only the all-zero id is the unset sentinel).
         let mut x = [0u8; 16];
         x[7] = 9;
+        let x = TraceId::from(x);
         let t = arena(&[id(2), x, id(2)]);
         let idx = TraceIdIndex::build(&t);
-        assert_eq!(idx.positions(&x, &t), &[1]);
+        assert_eq!(idx.positions(x, &t), &[1]);
     }
 
     #[test]
-    fn malformed_needle_length_is_empty() {
-        let t = arena(&[id(1)]);
-        let idx = TraceIdIndex::build(&t);
-        assert!(idx.positions(&[1, 2, 3], &t).is_empty());
+    fn from_bytes_is_strict_about_length() {
+        // The typed needle makes a wrong-length lookup unrepresentable; the
+        // strictness now lives at the parse boundary.
+        assert!(TraceId::from_bytes(&[1, 2, 3]).is_none());
+        assert!(TraceId::from_bytes(&[7u8; 16]).is_some());
+        assert!(SpanId::from_bytes(&[7u8; 16]).is_none());
+        assert!(SpanId::from_bytes(&[7u8; 8]).is_some());
     }
 
     #[test]
@@ -303,16 +301,16 @@ mod tests {
             a[0] = (state >> 56) as u8 % 12 + 1;
             a[1] = (state >> 48) as u8 % 5;
             a[15] = (state >> 8) as u8;
-            ids.push(a);
+            ids.push(TraceId::from(a));
         }
         let t = arena(&ids);
         let idx = TraceIdIndex::build(&t);
         assert!(idx.validate(t.len()).is_ok());
 
-        let mut distinct: Vec<[u8; 16]> = ids.clone();
+        let mut distinct = ids.clone();
         distinct.sort();
         distinct.dedup();
-        for needle in &distinct {
+        for &needle in &distinct {
             assert_eq!(idx.positions(needle, &t), linear(&t, needle).as_slice());
         }
     }

@@ -11,7 +11,7 @@
 use std::path::Path;
 
 use bumpalo::Bump;
-use sfst::{DroppedAttributeCounts, Flags, ObservedTimestamps, SpanIds, TraceIds};
+use sfst::{DroppedAttributeCounts, Flags, ObservedTimestamps, SpanId, SpanIds, TraceId, TraceIds};
 use sfst_indexer::KvSlot;
 use sfst_indexer::row_index::RowIndex;
 use sfst_indexer::{build_and_write, build_into};
@@ -192,8 +192,12 @@ fn populate_row_index(
                     // Per-row columns, one value pushed per row (parallel to the
                     // row just fed) so they stay aligned for the build-time remap.
                     observed_ts.push(record.observed_ts);
-                    trace_ids.push(&record.trace_id);
-                    span_ids.push(&record.span_id);
+                    // Ingest already normalized ids to exactly 16/8 bytes or
+                    // empty (ng_flatten::normalize_ids); an empty/malformed id
+                    // resolves to the all-zero UNSET sentinel, preserving the
+                    // prior zero-padded behavior.
+                    trace_ids.push(TraceId::from_bytes(&record.trace_id).unwrap_or_default());
+                    span_ids.push(SpanId::from_bytes(&record.span_id).unwrap_or_default());
                     flags.push(record.flags);
                     dropped_attrs.push(record.dropped_attributes_count);
                 }

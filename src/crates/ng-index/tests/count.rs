@@ -13,7 +13,7 @@ use ng_index::{Metrics, build_sfst, build_sfst_range};
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value::Value as Av};
 use opentelemetry_proto::tonic::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
-use sfst::{IndexReader, Reader};
+use sfst::{IndexReader, Reader, SpanId, TraceId};
 
 /// A batch of `n` minimal log records, each with one attribute so flattening
 /// yields entries beyond the scalar fields.
@@ -190,8 +190,8 @@ fn per_row_columns_roundtrip_in_chronological_order() {
             (BASE + 1000 + i as u64) as i64,
             "observed at {p}"
         );
-        assert_eq!(trace.get(p), &[i as u8; 16][..], "trace_id at {p}");
-        assert_eq!(span.get(p), &[i as u8; 8][..], "span_id at {p}");
+        assert_eq!(trace.get(p), TraceId::from([i as u8; 16]), "trace_id at {p}");
+        assert_eq!(span.get(p), SpanId::from([i as u8; 8]), "span_id at {p}");
         assert_eq!(flags.0[p], 0x100 | i as u32, "flags at {p}");
         assert_eq!(drac.0[p], i as u32, "dropped_attributes_count at {p}");
     }
