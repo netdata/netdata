@@ -1781,6 +1781,14 @@ ssize_t web_client_send_deflate(struct web_client *w)
 
         // give the compressor all the data not passed through the compressor yet
         if(w->response.data->len > w->response.sent) {
+            if(unlikely((size_t)w->response.zstream.avail_in > w->response.sent)) {
+                netdata_log_error(
+                    "%llu: Compression input state is inconsistent (sent %zu, avail_in %u). Closing down client.",
+                    w->id, w->response.sent, w->response.zstream.avail_in);
+                web_client_request_done(w);
+                return -1;
+            }
+
             w->response.zstream.next_in = (Bytef *)&w->response.data->buffer[w->response.sent - w->response.zstream.avail_in];
             w->response.zstream.avail_in += (uInt) (w->response.data->len - w->response.sent);
         }
