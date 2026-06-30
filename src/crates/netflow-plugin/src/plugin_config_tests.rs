@@ -523,10 +523,7 @@ fn journal_tier_retention_uses_built_in_tier_defaults() {
             retention.size_of_journal_files.unwrap().as_u64(),
             ByteSize::gb(10).as_u64()
         );
-        assert_eq!(
-            retention.duration_of_journal_files.unwrap(),
-            Duration::from_secs(7 * 24 * 60 * 60)
-        );
+        assert_eq!(retention.duration_of_journal_files, None);
     }
 }
 
@@ -554,10 +551,7 @@ fn journal_tier_retention_uses_per_tier_values_when_present() {
         minute_1.size_of_journal_files.unwrap().as_u64(),
         ByteSize::gb(10).as_u64()
     );
-    assert_eq!(
-        minute_1.duration_of_journal_files.unwrap(),
-        Duration::from_secs(7 * 24 * 60 * 60)
-    );
+    assert_eq!(minute_1.duration_of_journal_files, None);
 }
 
 #[test]
@@ -675,12 +669,9 @@ tiers:
         raw.duration_of_journal_files,
         Some(Duration::from_secs(24 * 60 * 60))
     );
-    // Other tiers still at the built-in 10GB / 7d defaults.
+    // Other tiers still at the built-in size-only defaults.
     assert_eq!(minute_1.size_of_journal_files, Some(ByteSize::gb(10)));
-    assert_eq!(
-        minute_1.duration_of_journal_files,
-        Some(Duration::from_secs(7 * 24 * 60 * 60))
-    );
+    assert_eq!(minute_1.duration_of_journal_files, None);
 }
 
 #[test]

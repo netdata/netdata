@@ -212,13 +212,13 @@ Note: the live (open) tier rows shown by queries refresh on a 1-second cadence, 
 sudo du -sh /var/cache/netdata/flows/*
 ```
 
-Default retention is `10GB / 7d` per tier. The default is applied separately to raw, 1m, 5m, and 1h tiers, so total can reach roughly 40 GB plus some. If your config left this default and your collector is busy, expect to hit the size cap before the time cap. See [Configuration](/docs/npm/network-flows/configuration.md) for per-tier overrides — most production deployments need them.
+Default retention is `10GB` per tier with no time-based age limit. The default is applied separately to raw, 1m, 5m, and 1h tiers, so total can reach roughly 40 GB plus some. If your config left this default and your collector is busy, expect to hit the size cap quickly; quiet collectors may keep data for longer than seven days. See [Configuration](/docs/npm/network-flows/configuration.md) for per-tier overrides — most production deployments need them.
 
 ## Things that look like bugs but aren't
 
 - **Traffic appears 2×.** When the router is configured to export both ingress + egress (common, but not universal — vendor best practice is ingress-only), the same packet is recorded once on entry and once on exit on a single router. Filter to one exporter and one interface (`Ingress Interface Name` or `Egress Interface Name`, pick one).
 - **Bidirectional conversations show twice.** A→B and B→A are real, distinct flows representing different packets going each way. Their volumes are usually asymmetric. Filter by `Source AS Name` (your network) for outbound or `Destination AS Name` (your network) for inbound to see one side.
-- **City map empty over long windows.** City + lat/lon are raw-tier-only. Default raw-tier retention is short. Use the country or state map for long ranges.
+- **City map empty over long windows.** City + lat/lon are raw-tier-only. Raw-tier retention is bounded by its size budget, so busy collectors can exhaust raw history quickly. Use the country or state map for long ranges.
 - **`__overflow__` row in results.** Your aggregation produced more groups than `query_max_groups`. Narrow the filter or reduce group-by depth.
 - **30-second query timeout.** Hard limit. Narrow time range, add filters, or reduce group-by depth.
 - **Sampled byte counts not exact.** sFlow is statistical by design; even NetFlow with sampling is an estimate. Cross-check against SNMP for sanity, accept some divergence.

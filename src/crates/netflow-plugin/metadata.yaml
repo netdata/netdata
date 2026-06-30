@@ -97,8 +97,8 @@ modules:
               default_value: "10GB"
               required: false
             - name: journal.tiers.&lt;tier&gt;.duration_of_journal_files
-              description: Per-tier maximum age. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. Set to `null` for size-only retention.
-              default_value: "7d"
+              description: Per-tier maximum age. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. The default `null` disables time-based eviction; set a duration to add an age cap.
+              default_value: "null"
               required: false
         examples:
           folding:
@@ -251,8 +251,8 @@ modules:
               default_value: "10GB"
               required: false
             - name: journal.tiers.&lt;tier&gt;.duration_of_journal_files
-              description: Per-tier maximum age. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. Set to `null` for size-only retention.
-              default_value: "7d"
+              description: Per-tier maximum age. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. The default `null` disables time-based eviction; set a duration to add an age cap.
+              default_value: "null"
               required: false
         examples:
           folding:
@@ -387,8 +387,8 @@ modules:
               default_value: "10GB"
               required: false
             - name: journal.tiers.&lt;tier&gt;.duration_of_journal_files
-              description: Per-tier maximum age. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. Set to `null` for size-only retention.
-              default_value: "7d"
+              description: Per-tier maximum age. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. The default `null` disables time-based eviction; set a duration to add an age cap.
+              default_value: "null"
               required: false
         examples:
           folding:

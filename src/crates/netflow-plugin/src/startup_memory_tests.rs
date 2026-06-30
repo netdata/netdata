@@ -277,8 +277,9 @@ fn profile_config(base_dir: &Path) -> plugin_config::PluginConfig {
     cfg.listener.listen = vec!["127.0.0.1:0".to_string()];
     cfg.listener.sync_every_entries = 1024;
     cfg.listener.sync_interval = std::time::Duration::from_secs(1);
-    // Per-tier defaults (10GB / 7d) already applied by JournalConfig::default;
-    // this call leaves them at the defaults, matching the original test intent.
+    // Per-tier defaults (10GB, no age cap) are already applied by
+    // JournalConfig::default; leave them unchanged to match the original
+    // test intent.
     cfg
 }
 

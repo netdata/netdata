@@ -362,9 +362,9 @@ traffic, not for billing or hard enforcement decisions.
 - `minute_5` (aliases: `5m`, `minute-5`, `minute5`)
 - `hour_1` (aliases: `1h`, `hour-1`, `hour1`)
 
-If a tier is omitted, it uses the built-in tier default (`10GB / 7d`). There
-are no top-level journal retention knobs; set retention on each tier you want
-to tune.
+If a tier is omitted, it uses the built-in tier default (`10GB` with no
+time-based age limit). There are no top-level journal retention knobs; set
+retention on each tier you want to tune.
 
 To make a tier time-only, set `size_of_journal_files: null`.
 To make a tier size-only, set `duration_of_journal_files: null`.

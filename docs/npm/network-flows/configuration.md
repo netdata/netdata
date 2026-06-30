@@ -171,11 +171,11 @@ Per-tier values:
 | Key | Default per tier | Notes |
 |---|---|---|
 | `size_of_journal_files` | `10GB` | Disk budget for this tier. Minimum `100MB`. Set to `null` to disable size-based retention on this tier. |
-| `duration_of_journal_files` | `7d` | Time budget for this tier. Set to `null` to disable time-based retention on this tier. |
+| `duration_of_journal_files` | `null` | Optional time budget for this tier. The default disables time-based eviction; set a duration such as `24h` or `14d` to add an age cap. |
 
-Either limit triggers rotation. The tier expires whichever is hit first. At least one of the two must be set per tier (validation enforces this).
+Either configured limit can evict old files. The tier expires whichever configured limit is hit first. At least one of the two must be set per tier (validation enforces this).
 
-If you omit a tier entry entirely, that tier uses the built-in defaults (`10GB` / `7d`). If you provide a tier entry but omit one of the two knobs, the omitted knob falls back to its built-in default. Setting either to `null` explicitly disables that limit on that tier.
+If you omit a tier entry entirely, that tier uses the built-in defaults (`10GB` / no time limit). If you provide a tier entry but omit one of the two knobs, the omitted knob falls back to its built-in default. Setting either to `null` explicitly disables that limit on that tier.
 
 Standalone CLI runs still accept the legacy uniform retention flags:
 `--netflow-retention-size-of-journal-files` and
@@ -297,7 +297,7 @@ journal:
       duration_of_journal_files: 365d
 ```
 
-The built-in defaults (10GB / 7d on every tier) are intended for first validation and small deployments. Most production deployments should size retention from observed flow rate. This profile gives you 24 hours of full-detail forensics, 14 days of 1-minute trends, 30 days of 5-minute snapshots, and a year of hourly aggregates. Storage required scales with your flow rate — see [Sizing and Capacity Planning](/docs/npm/network-flows/sizing-capacity.md).
+The built-in defaults (10GB and no time limit on every tier) are intended for first validation and small deployments. Most production deployments should size retention from observed flow rate and add explicit time caps when they need a fixed investigation window. This profile gives you 24 hours of full-detail forensics, 14 days of 1-minute trends, 30 days of 5-minute snapshots, and a year of hourly aggregates. Storage required scales with your flow rate — see [Sizing and Capacity Planning](/docs/npm/network-flows/sizing-capacity.md).
 
 ## Things that go wrong
 

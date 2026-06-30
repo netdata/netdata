@@ -107,16 +107,12 @@ pub(super) fn default_retention_size_of_journal_files() -> ByteSize {
     ByteSize::gb(10)
 }
 
-pub(super) fn default_retention_duration_of_journal_files() -> Duration {
-    Duration::from_secs(7 * 24 * 60 * 60)
-}
-
 pub(super) fn default_retention_size_of_journal_files_opt() -> Option<ByteSize> {
     Some(default_retention_size_of_journal_files())
 }
 
 pub(super) fn default_retention_duration_of_journal_files_opt() -> Option<Duration> {
-    Some(default_retention_duration_of_journal_files())
+    None
 }
 
 pub(super) fn default_rotation_duration_of_journal_file() -> Duration {

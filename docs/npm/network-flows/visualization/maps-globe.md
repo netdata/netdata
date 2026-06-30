@@ -50,7 +50,7 @@ The country map and state map can use the rollup tiers. They're cheap over long 
 The city map and the globe **need raw-tier data**. City, latitude, and longitude are dropped from the rollup tiers (1m / 5m / 1h) to keep cardinality manageable. So:
 
 - Country / state map over the last 30 days — fine, uses the 1-hour tier.
-- City map over the last 30 days — likely empty. Raw-tier retention defaults to its own 10GB / 7d limits; busy collectors often hit the raw-tier size cap before 7 days.
+- City map over the last 30 days — likely empty on busy collectors. Raw-tier retention defaults to its own 10GB size cap with no time-based age limit, so high flow volume can exhaust raw history quickly.
 
 If your city map looks empty over a long window, try the country map first to confirm data is arriving, then narrow the time range until the city map fills in.
 
