@@ -85,9 +85,11 @@ void service_signal_exit(SERVICE_TYPE service) {
         if((sth->services & service)) {
             nd_thread_signal_cancel(sth->netdata_thread);
             nd_log_daemon(NDLP_DEBUG, "SERVICE: Signal to stop : %s", sth->name);
-            if(sth->request_quit_callback) {
+            request_quit_t request_quit_callback = sth->request_quit_callback;
+            void *request_quit_data = sth->data;
+            if(request_quit_callback) {
                 spinlock_unlock(&service_globals.lock);
-                sth->request_quit_callback(sth->data);
+                request_quit_callback(request_quit_data);
                 spinlock_lock(&service_globals.lock);
             }
         }
@@ -153,9 +155,11 @@ bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
                 running++;
                 running_services |= sth->services & service;
 
-                if(sth->force_quit_callback) {
+                force_quit_t force_quit_callback = sth->force_quit_callback;
+                void *force_quit_data = sth->data;
+                if(force_quit_callback) {
                     spinlock_unlock(&service_globals.lock);
-                    sth->force_quit_callback(sth->data);
+                    force_quit_callback(force_quit_data);
                     spinlock_lock(&service_globals.lock);
                     continue;
                 }

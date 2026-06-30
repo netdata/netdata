@@ -161,6 +161,8 @@ void rrdr_options_to_buffer(BUFFER *wb, RRDR_OPTIONS options) {
 }
 
 void web_client_api_request_data_vX_options_to_string(char *buf, size_t size, RRDR_OPTIONS options) {
+    if(unlikely(!buf || !size)) return;
+
     char *write = buf;
     char *end = &buf[size - 1];
 

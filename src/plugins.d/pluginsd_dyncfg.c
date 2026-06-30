@@ -14,6 +14,7 @@ PARSER_RC pluginsd_config(char **words, size_t num_words, PARSER *parser) {
     char *id     = get_word(words, num_words, i++);
     char *action = get_word(words, num_words, i++);
 
+    if(!action) return PARSER_RC_ERROR;
     if(strcmp(action, PLUGINSD_KEYWORD_CONFIG_ACTION_CREATE) == 0) {
         char *status_str            = get_word(words, num_words, i++);
         char *type_str              = get_word(words, num_words, i++);
