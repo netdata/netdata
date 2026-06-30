@@ -16,12 +16,19 @@ static NETDATA_DOUBLE *UNUSED_FUNCTION(rrdr_line_values)(RRDR *r, long rrdr_line
 }
 
 ALWAYS_INLINE
-static long rrdr_line_init(RRDR *r __maybe_unused, time_t t __maybe_unused, long rrdr_line) {
+static long rrdr_line_next(RRDR *r __maybe_unused, long rrdr_line) {
     rrdr_line++;
 
     internal_fatal(rrdr_line >= (long)r->n,
                    "QUERY: requested to step above RRDR size for query '%s'",
                    r->internal.qt->id);
+
+    return rrdr_line;
+}
+
+ALWAYS_INLINE
+static long rrdr_line_init(RRDR *r __maybe_unused, time_t t __maybe_unused, long rrdr_line) {
+    rrdr_line = rrdr_line_next(r, rrdr_line);
 
     internal_fatal(r->t[rrdr_line] != t,
                    "QUERY: wrong timestamp at RRDR line %ld, expected %ld, got %ld, of query '%s'",
@@ -450,7 +457,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
 
     // fill the rest of the points with empty values
     while (points_added < points_wanted) {
-        rrdr_line++;
+        rrdr_line = rrdr_line_next(r, rrdr_line);
         size_t rrdr_o_v_index = rrdr_line * r->d + dim_id_in_rrdr;
         r->o[rrdr_o_v_index] = RRDR_VALUE_EMPTY;
         r->v[rrdr_o_v_index] = 0.0;
