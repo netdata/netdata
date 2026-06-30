@@ -1531,10 +1531,20 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
             bool changed = mrg_metric_set_first_time_s_if_bigger(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_s);
             if (changed) {
                 uint32_t update_every_s = mrg_metric_get_update_every_s(main_mrg, uuid_first_t_entry->metric);
-                if (update_every_s && old_first_time_s && uuid_first_t_entry->first_time_s > old_first_time_s) {
-                    uint64_t remove_samples = (uuid_first_t_entry->first_time_s - old_first_time_s) / update_every_s;
-                    __atomic_sub_fetch(&ctx->atomic.samples, remove_samples, __ATOMIC_RELAXED);
-                }
+                uint64_t remove_samples;
+                if (rrdeng_retention_samples_delta(
+                        ctx,
+                        old_first_time_s,
+                        uuid_first_t_entry->first_time_s,
+                        update_every_s,
+                        "advancing metric first retention time",
+                        &remove_samples))
+                    rrdeng_atomic_uint64_sub_saturating(
+                        ctx,
+                        &ctx->atomic.samples,
+                        remove_samples,
+                        "samples",
+                        "advancing metric first retention time");
             }
             mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
         }
@@ -1546,11 +1556,21 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
             if (!has_retention) {
                 time_t first_time_s = mrg_metric_get_first_time_s(main_mrg, uuid_first_t_entry->metric);
                 time_t last_time_s = mrg_metric_get_latest_time_s(main_mrg, uuid_first_t_entry->metric);
-                time_t update_every_s = mrg_metric_get_update_every_s(main_mrg, uuid_first_t_entry->metric);
-                if (update_every_s && first_time_s && last_time_s) {
-                    uint64_t remove_samples = (first_time_s - last_time_s) / update_every_s;
-                    __atomic_sub_fetch(&ctx->atomic.samples, remove_samples, __ATOMIC_RELAXED);
-                }
+                uint32_t update_every_s = mrg_metric_get_update_every_s(main_mrg, uuid_first_t_entry->metric);
+                uint64_t remove_samples;
+                if (rrdeng_retention_samples_delta(
+                        ctx,
+                        first_time_s,
+                        last_time_s,
+                        update_every_s,
+                        "deleting a metric with zero disk retention",
+                        &remove_samples))
+                    rrdeng_atomic_uint64_sub_saturating(
+                        ctx,
+                        &ctx->atomic.samples,
+                        remove_samples,
+                        "samples",
+                        "deleting a metric with zero disk retention");
 
                 bool deleted = mrg_metric_release_and_delete(main_mrg, uuid_first_t_entry->metric);
                 if(deleted)

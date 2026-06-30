@@ -579,9 +579,6 @@ websocket_protocol_consume_frame(WS_CLIENT *wsc, char *data, size_t length, ssiz
         return WS_FRAME_NEED_MORE_DATA;
     }
     
-    if(header.frame_size > wsc->max_message_size)
-        wsc->max_message_size = header.frame_size;
-
     // Check if we have enough data for the complete frame (header + payload)
     // If not, don't consume any bytes and wait for more data
     if (bytes + header.frame_size > length) {
@@ -879,4 +876,3 @@ ssize_t websocket_protocol_got_data(WS_CLIENT *wsc, char *data, size_t length) {
     
     return (ssize_t)processed;
 }
-

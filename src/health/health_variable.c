@@ -350,10 +350,12 @@ bool alert_variable_lookup_internal(STRING *variable, void *data, NETDATA_DOUBLE
     if (strendswith_lengths(vbd.dimension, vbd.dimension_length, "_raw", 4)) {
         vbd.dimension_length -= 4;
         vbd.dimension_selection = DIM_SELECT_RAW;
+        string_freez(vbd.dim);
         vbd.dim = string_strndupz(vbd.dimension, vbd.dimension_length);
     } else if (strendswith_lengths(vbd.dimension, vbd.dimension_length, "_last_collected_t", 17)) {
         vbd.dimension_length -= 17;
         vbd.dimension_selection = DIM_SELECT_LAST_COLLECTED;
+        string_freez(vbd.dim);
         vbd.dim = string_strndupz(vbd.dimension, vbd.dimension_length);
     }
 

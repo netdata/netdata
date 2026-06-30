@@ -263,6 +263,8 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: cannot CreateProcess() for request No %zu, command: %s",
                instance->request_id, command);
+        if(env_block)
+            FreeEnvironmentStrings(env_block);
         goto cleanup;
     }
 

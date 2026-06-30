@@ -39,6 +39,8 @@ static int bt_collect_frames_callback(void *data, uintptr_t pc) {
     return 0;
 }
 
+static void bt_collect_frames_error_handler(void *data __maybe_unused, const char *msg __maybe_unused, int errnum __maybe_unused) {}
+
 // Common function to format and add a stack frame to the buffer
 static void add_stack_frame(backtrace_data_t *bt_data, uintptr_t pc, const char *function,
                           const char *filename, int lineno) {
@@ -249,7 +251,7 @@ int impl_stacktrace_get_frames(void **frames, int max_frames, int skip_frames) {
     };
     
     // Pass 0 as skip_frames to backtrace_simple and let the callback handle skipping
-    backtrace_simple(backtrace_state, 0, bt_collect_frames_callback, bt_error_handler, &data);
+    backtrace_simple(backtrace_state, 0, bt_collect_frames_callback, bt_collect_frames_error_handler, &data);
     
     return data.num_frames;
 }

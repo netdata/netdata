@@ -603,6 +603,9 @@ static void send_command_reply(struct command_context *cmd_ctx, cmd_status_t sta
     ret = uv_write(&cmd_ctx->write_req, (uv_stream_t *)client, &write_buf, 1, pipe_write_cb);
     if (ret) {
         netdata_log_error("uv_write(): %s", uv_strerror(ret));
+        buffer_free(reply_string);
+        uv_close((uv_handle_t *)client, pipe_close_cb);
+        --clients;
     }
 }
 

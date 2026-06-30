@@ -87,6 +87,12 @@ Use these flags to customize your installation.
 | **Reinstall/Uninstall** | `--reinstall`          | Reinstall existing Netdata          |
 |                         | `--uninstall`          | Uninstall Netdata completely        |
 
+:::note
+
+**Managing auto-updates after installation:** `kickstart.sh` enables daily auto-updates by default. To disable, check, or re-enable auto-updates — including why `netdata-updater.conf` cannot disable them — see [Managing Automatic Updates](/packaging/installer/UPDATE.md#managing-automatic-updates) in the Update guide.
+
+:::
+
 ## Environment Variables
 
 These environment variables provide additional customization options (most users won't need these):

@@ -39,6 +39,10 @@ pub(super) fn default_true() -> bool {
     true
 }
 
+pub(super) fn default_netflow_listen() -> Vec<String> {
+    vec!["0.0.0.0:2055".to_string(), "0.0.0.0:6343".to_string()]
+}
+
 pub(super) fn default_dynamic_bmp_listen() -> String {
     "0.0.0.0:10179".to_string()
 }
@@ -103,16 +107,12 @@ pub(super) fn default_retention_size_of_journal_files() -> ByteSize {
     ByteSize::gb(10)
 }
 
-pub(super) fn default_retention_duration_of_journal_files() -> Duration {
-    Duration::from_secs(7 * 24 * 60 * 60)
-}
-
 pub(super) fn default_retention_size_of_journal_files_opt() -> Option<ByteSize> {
     Some(default_retention_size_of_journal_files())
 }
 
 pub(super) fn default_retention_duration_of_journal_files_opt() -> Option<Duration> {
-    Some(default_retention_duration_of_journal_files())
+    None
 }
 
 pub(super) fn default_rotation_duration_of_journal_file() -> Duration {

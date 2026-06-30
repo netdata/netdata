@@ -140,6 +140,9 @@ void *realloc(void *ptr, size_t size) {
 }
 
 void *reallocarray(void *ptr, size_t n, size_t size) {
+    if(unlikely(size && n > SIZE_MAX / size))
+        fatal("reallocarray() cannot allocate %zu members of %zu bytes.", n, size);
+
     return reallocz(ptr, n * size);
 }
 
@@ -253,6 +256,9 @@ void malloc_trace_munmap(size_t size) {
 }
 
 void *mallocz_int(size_t size, const char *file, const char *function, size_t line) {
+    if(unlikely(size > SIZE_MAX - malloc_header_size))
+        fatal("mallocz() cannot allocate %zu bytes of memory.", size);
+
     struct malloc_trace *p = malloc_trace_find_or_create(file, function, line);
 
     size_t_atomic_count(add, p->malloc_calls, 1);
@@ -274,6 +280,9 @@ void *mallocz_int(size_t size, const char *file, const char *function, size_t li
 }
 
 void *callocz_int(size_t nmemb, size_t size, const char *file, const char *function, size_t line) {
+    if(unlikely(size && nmemb > (SIZE_MAX - malloc_header_size) / size))
+        fatal("callocz() cannot allocate %zu members of %zu bytes.", nmemb, size);
+
     struct malloc_trace *p = malloc_trace_find_or_create(file, function, line);
     size = nmemb * size;
 
@@ -298,6 +307,8 @@ void *callocz_int(size_t nmemb, size_t size, const char *file, const char *funct
 char *strdupz_int(const char *s, const char *file, const char *function, size_t line) {
     struct malloc_trace *p = malloc_trace_find_or_create(file, function, line);
     size_t size = strlen(s) + 1;
+    if(unlikely(size > SIZE_MAX - malloc_header_size))
+        fatal("strdupz() cannot allocate %zu bytes of memory.", size);
 
     size_t_atomic_count(add, p->strdup_calls, 1);
     size_t_atomic_count(add, p->allocations, 1);
@@ -362,6 +373,9 @@ void *reallocz_int(void *ptr, size_t size, const char *file, const char *functio
         return libc_realloc(ptr, size);
 
     if(t->signature.size == size) return ptr;
+    if(unlikely(size > SIZE_MAX - malloc_header_size))
+        fatal("reallocz() cannot allocate %zu bytes of memory.", size);
+
     size_t_atomic_count(add, t->signature.trace->free_calls, 1);
     size_t_atomic_count(sub, t->signature.trace->allocations, 1);
     size_t_atomic_bytes(sub, t->signature.trace->bytes, t->signature.size);

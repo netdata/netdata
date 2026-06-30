@@ -377,16 +377,21 @@ static void myClosedCallback(int id __maybe_unused, void *user_ptr) {
     webrtc_set_thread_name();
 
     WEBRTC_DC *chan = user_ptr;
-    internal_fatal(chan->dc != id, "WEBRTC[%d],DC[%d]: dc mismatch, expected %d, got %d", chan->conn->pc, chan->dc, chan->dc, id);
+    WEBRTC_CONN *conn = chan->conn;
+    int pc = conn->pc;
+    int dc = chan->dc;
+    const char *label = chan->label;
+
+    internal_fatal(dc != id, "WEBRTC[%d],DC[%d]: dc mismatch, expected %d, got %d", pc, dc, dc, id);
 
     __atomic_store_n(&chan->open, false, __ATOMIC_RELAXED);
-    internal_error(true, "WEBRTC[%d],DC[%d]: data channel closed.", chan->conn->pc, chan->dc);
+    internal_error(true, "WEBRTC[%d],DC[%d]: data channel closed.", pc, dc);
 
-    spinlock_lock(&chan->conn->channels.spinlock);
-    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(chan->conn->channels.head, chan, link.prev, link.next);
-    spinlock_unlock(&chan->conn->channels.spinlock);
+    spinlock_lock(&conn->channels.spinlock);
+    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(conn->channels.head, chan, link.prev, link.next);
+    spinlock_unlock(&conn->channels.spinlock);
 
-    nd_log(NDLS_ACCESS, NDLP_DEBUG, "WEBRTC[%d],DC[%d]: %d DATA CHANNEL '%s' CLOSED", chan->conn->pc, chan->dc, gettid_cached(), chan->label);
+    nd_log(NDLS_ACCESS, NDLP_DEBUG, "WEBRTC[%d],DC[%d]: %d DATA CHANNEL '%s' CLOSED", pc, dc, gettid_cached(), label);
 
     freez(chan->label);
     freez(chan);

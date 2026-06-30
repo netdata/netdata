@@ -36,8 +36,7 @@ static procfile *cgroup_ebpfgo_open_nonempty_procs_file(char *path_buf, size_t p
                 if (read) {
                     size_t lines = procfile_lines(read);
                     if (lines > 0) {
-                        if (path_buf && path_buf_size)
-                            snprintfz(best_path, sizeof(best_path) - 1, "%s", path_buf);
+                        snprintfz(best_path, sizeof(best_path) - 1, "%s", path_buf);
                         best = read;
                     } else {
                         procfile_close(read);
@@ -49,8 +48,7 @@ static procfile *cgroup_ebpfgo_open_nonempty_procs_file(char *path_buf, size_t p
         }
 
         if (best) {
-            if (path_buf && path_buf_size)
-                snprintfz(path_buf, path_buf_size - 1, "%s", best_path);
+            snprintfz(path_buf, path_buf_size - 1, "%s", best_path);
             return best;
         }
 

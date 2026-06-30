@@ -19,6 +19,9 @@ bool stacktrace_array_add(STACKTRACE_ARRAY *array, int skip_frames) {
     if (unlikely(!array))
         return false;
 
+    if (unlikely(skip_frames < 0 || skip_frames > INT_MAX - 3))
+        return false;
+
     // Get current stacktrace
     STACKTRACE current = stacktrace_get(skip_frames + 1);  // +1 to skip this function
     if (!current)

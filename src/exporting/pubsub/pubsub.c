@@ -93,7 +93,7 @@ void clean_pubsub_instance(struct instance *instance)
  *
  * @param instance_p an instance data structure.
  */
-void *pubsub_connector_worker(void *instance_p)
+void pubsub_connector_worker(void *instance_p)
 {
     struct instance *instance = (struct instance *)instance_p;
     struct pubsub_specific_config *connector_specific_config = instance->config.connector_specific_config;
@@ -192,5 +192,4 @@ void *pubsub_connector_worker(void *instance_p)
     }
 
     clean_pubsub_instance(instance);
-    return NULL;
 }

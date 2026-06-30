@@ -17,8 +17,12 @@ extern LPWSTR room;
 extern LPWSTR proxy;
 
 void netdata_claim_error_exit(wchar_t *function);
-static inline void netdata_claim_convert_str(char *dst, wchar_t *src, size_t len) {
-    size_t copied = wcstombs(dst, src, len);
+static inline void netdata_claim_convert_str(char *dst, wchar_t *src, size_t dst_size) {
+    if (!dst_size)
+        return;
+    // reserve one byte for the NUL: wcstombs() does not terminate when it fills the buffer
+    size_t copied = wcstombs(dst, src, dst_size - 1);
+    if (copied == (size_t)-1) copied = 0;
     dst[copied] = '\0';
 }
 

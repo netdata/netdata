@@ -22,11 +22,11 @@ If you are not sure which model to use, start with the smallest exposed surface:
 
 For firewall and proxy allowlisting, your Netdata Agents need the following network access:
 
-| Direction | Port      | Protocol  | Purpose                                                |
-|-----------|-----------|-----------|--------------------------------------------------------|
-| Inbound   | 19999/TCP | TCP       | Local dashboard access and streaming from Child Agents |
-| Outbound  | 19999/TCP | TCP       | Streaming to a Parent Agent (Child Agents only)        |
-| Outbound  | 443/TCP   | WSS/HTTPS | Agent-Cloud Link (ACLK) and node claiming              |
+| Direction | Port      | Protocol  | Purpose                                                             |
+|-----------|-----------|-----------|---------------------------------------------------------------------|
+| Inbound   | 19999/TCP | TCP       | Local dashboard access and streaming from Child Agents              |
+| Outbound  | 19999/TCP | TCP       | Streaming to a Parent Agent (Child Agents only)                     |
+| Outbound  | 443/TCP   | WSS/HTTPS | Agent-Cloud Link (ACLK), anonymous telemetry, and automatic updates |
 
 :::note
 
@@ -38,19 +38,30 @@ You can disable inbound access on port `19999` by setting `mode = none` in `netd
 
 ### Outbound domain allowlist
 
-Allow the following Netdata Cloud domains through your firewall or proxy:
+Allow the following domains through your firewall or proxy. All outbound connections use port `443`.
 
-| Domain               | Purpose                   |
-|----------------------|---------------------------|
-| `app.netdata.cloud`  | Netdata Cloud application |
-| `api.netdata.cloud`  | Netdata Cloud API         |
-| `mqtt.netdata.cloud` | Agent-Cloud Link MQTT     |
+| Domain                                             | Purpose                                    | Active by default                                  | How to disable                                                                                                                |
+|----------------------------------------------------|--------------------------------------------|----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------|
+| `app.netdata.cloud`                                | Netdata Cloud application (ACLK)           | **Off** — only when a node is connected to a Space | Do not connect the Agent to Netdata Cloud                                                                                     |
+| `api.netdata.cloud`                                | Netdata Cloud API (ACLK)                   | **Off** — only when a node is connected to a Space | Do not connect the Agent to Netdata Cloud                                                                                     |
+| `mqtt.netdata.cloud`                               | Agent-Cloud Link MQTT broker               | **Off** — only when a node is connected to a Space | Do not connect the Agent to Netdata Cloud                                                                                     |
+| `us-east1-netdata-analytics-bi.cloudfunctions.net` | Anonymous telemetry (Agent daemon)         | **On**                                             | `--disable-telemetry` flag or [opt-out file](/docs/netdata-agent/configuration/anonymous-telemetry-events.md#opt-out-methods) |
+| `repository.netdata.cloud`                         | Package downloads and automatic updates    | **On** for online installs                         | `--no-updates` at install, or disable `netdata-updater.sh`                                                                    |
+| `get.netdata.cloud`                                | Installer script (`kickstart.sh`) download | **Install time only**                              | Pre-download the script for an offline install                                                                                |
+
+:::note
+
+When users open the local Agent dashboard (`http://NODE:19999`), the dashboard JavaScript sends anonymous page-view events to PostHog cloud. This traffic is **browser-initiated** — it is governed by browser-level proxy and content-filtering policies, not by host firewall rules. Use the same opt-out controls to disable it. See [Anonymous telemetry events](/docs/netdata-agent/configuration/anonymous-telemetry-events.md#opt-out-methods).
+
+:::
 
 :::important
 
 Prefer **domain-based allowlisting** over IP-based rules. IP addresses can change without notice and vary based on your geographic location due to CDN-edge servers.
 
 :::
+
+For the complete behavioral reference — including triggers, default states, and step-by-step disable instructions for each path — see [Outbound Network Communication](/docs/security-and-privacy-design/netdata-agent-security.md#outbound-network-communication).
 
 For broader firewall design principles and recommended network architecture, see [Network rules your cybersecurity platform should enforce](#network-rules-your-cybersecurity-platform-should-enforce) below.
 

@@ -1162,6 +1162,7 @@ int rrdeng_init(
 {
     struct rrdengine_instance *ctx;
     uint32_t max_open_files;
+    bool freshly_initialized_ctx = false;
 
     max_open_files = rlimit_nofile.rlim_cur / 4;
 
@@ -1181,6 +1182,7 @@ int rrdeng_init(
     if(ctxp) {
         *ctxp = ctx = mallocz(sizeof(*ctx));
         initialize_single_ctx(ctx);
+        freshly_initialized_ctx = true;
     }
     else
         ctx = multidb_ctx[tier];
@@ -1203,8 +1205,8 @@ int rrdeng_init(
     ctx->quiesce.enabled = false;
 
     ctx->atomic.first_time_s = LONG_MAX;
-    ctx->atomic.metrics = 0;
-    ctx->atomic.samples = 0;
+    // Global contexts may already have MRG prepopulation accounting from the first DBEngine spawn.
+    rrdeng_reset_accounting_if_fresh(ctx, freshly_initialized_ctx);
 
     nd_win_trace("rrdeng_init: tier=%d rrdeng_dbengine_spawn...", (int)tier);
     bool spawn_ok = rrdeng_dbengine_spawn(ctx);

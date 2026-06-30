@@ -1239,6 +1239,7 @@ static PARSER_RC pluginsd_json(char **words __maybe_unused, size_t num_words __m
     if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
     char *keyword = get_word(words, num_words, 1);
+    if(!keyword) keyword = "";
 
     parser->defer.response = buffer_create(0, NULL);
     parser->defer.end_keyword = PLUGINSD_KEYWORD_JSON_END;

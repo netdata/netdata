@@ -33,6 +33,9 @@ inline void arl_callback_ssize_t(const char *name, uint32_t hash, const char *va
 
 // create a new ARL
 ARL_BASE *arl_create(const char *name, void (*processor)(const char *, uint32_t, const char *, void *), size_t rechecks) {
+    if(unlikely(!rechecks))
+        fatal("ARL: rechecks cannot be zero");
+
     ARL_BASE *base = callocz(1, sizeof(ARL_BASE));
 
     base->name = strdupz(name);

@@ -135,7 +135,7 @@ size_t dbengine_decompress(void *dst, void *src, size_t dst_size, size_t src_siz
         case RRDENG_COMPRESSION_LZ4: {
             int rc = LZ4_decompress_safe(src, dst, (int)src_size, (int)dst_size);
             if(rc < 0) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "DBENGINE: ZSTD decompression error %d", rc);
+                nd_log(NDLS_DAEMON, NDLP_ERR, "DBENGINE: LZ4 decompression error %d", rc);
                 rc = 0;
             }
 

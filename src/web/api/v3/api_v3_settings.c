@@ -175,7 +175,7 @@ static inline int settings_put(struct web_client *w, char *file) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "cannot open/create settings file '%s'", tmp_filename);
         return rrd_call_function_error(
             w->response.data,
-            "Cannot create payload file '%s'",
+            "Cannot create payload file",
             HTTP_RESP_INTERNAL_SERVER_ERROR);
     }
     size_t len = strlen(updated_json_str);
@@ -186,7 +186,7 @@ static inline int settings_put(struct web_client *w, char *file) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "cannot save settings to file '%s'", tmp_filename);
         return rrd_call_function_error(
             w->response.data,
-            "Cannot save payload to file '%s'",
+            "Cannot save payload to file",
             HTTP_RESP_INTERNAL_SERVER_ERROR);
     }
     fclose(fp);
@@ -195,6 +195,8 @@ static inline int settings_put(struct web_client *w, char *file) {
     settings_filename(filename, file, NULL);
 
     bool renamed = rename(tmp_filename, filename) == 0;
+    if(!renamed)
+        unlink(tmp_filename);
 
     rw_spinlock_write_unlock(&settings_spinlock);
 

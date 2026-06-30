@@ -65,6 +65,9 @@ impl FlowQueryService {
     }
 
     pub(crate) fn process_notify_event(&self, event: Event) -> bool {
+        let Some(event) = journal_registry_event(event) else {
+            return false;
+        };
         let should_reconcile = event_requires_facet_reconcile(&event);
         if let Err(err) = self.registry.process_event(event) {
             tracing::warn!("failed to process netflow journal notify event: {}", err);
@@ -117,6 +120,10 @@ impl FlowQueryService {
 }
 
 fn event_requires_facet_reconcile(event: &Event) -> bool {
+    if !event.paths.iter().any(|path| is_journal_notify_path(path)) {
+        return false;
+    }
+
     matches!(
         event.kind,
         notify::EventKind::Create(_)
@@ -125,15 +132,170 @@ fn event_requires_facet_reconcile(event: &Event) -> bool {
     )
 }
 
+fn journal_registry_event(mut event: Event) -> Option<Event> {
+    match event.kind {
+        notify::EventKind::Create(_) | notify::EventKind::Remove(_) => {
+            event.paths.retain(|path| is_journal_notify_path(path));
+            (!event.paths.is_empty()).then_some(event)
+        }
+        notify::EventKind::Modify(notify::event::ModifyKind::Name(
+            notify::event::RenameMode::Both,
+        )) => event
+            .paths
+            .iter()
+            .all(|path| is_journal_notify_path(path))
+            .then_some(event),
+        notify::EventKind::Modify(notify::event::ModifyKind::Name(_)) => {
+            event.paths.retain(|path| is_journal_notify_path(path));
+            (!event.paths.is_empty()).then_some(event)
+        }
+        _ => None,
+    }
+}
+
+fn is_journal_notify_path(path: &Path) -> bool {
+    path.to_str()
+        .is_some_and(journal_registry::repository::File::is_journal_file)
+}
+
 fn scan_facet_contributions(
     files: &[FileInfo],
 ) -> Result<BTreeMap<String, crate::facet_runtime::FacetFileContribution>> {
     let mut contributions = BTreeMap::new();
     for file_info in files {
         let path = file_info.file.path().to_string();
-        let contribution = crate::facet_runtime::scan_registry_file_contribution(file_info)
-            .with_context(|| format!("failed to build facet contribution for {}", path))?;
+        let contribution = match crate::facet_runtime::scan_registry_file_contribution(file_info) {
+            Ok(contribution) => contribution,
+            Err(err) => {
+                if is_not_found_error(&err) {
+                    tracing::debug!(
+                        "skipping removed journal file {} during netflow facet contribution scan: {}",
+                        path,
+                        err
+                    );
+                } else {
+                    tracing::warn!(
+                        "skipping unreadable journal file {} during netflow facet contribution scan: {}",
+                        path,
+                        err
+                    );
+                }
+                continue;
+            }
+        };
         contributions.insert(path, contribution);
     }
     Ok(contributions)
+}
+
+fn is_not_found_error(err: &anyhow::Error) -> bool {
+    err.chain().any(|cause| {
+        cause
+            .downcast_ref::<std::io::Error>()
+            .is_some_and(|err| err.kind() == std::io::ErrorKind::NotFound)
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use notify::{
+        Event,
+        event::{CreateKind, EventKind, ModifyKind, RemoveKind, RenameMode},
+    };
+
+    fn path(value: &str) -> PathBuf {
+        PathBuf::from(value)
+    }
+
+    fn create_event(paths: &[&str]) -> Event {
+        let mut event = Event::new(EventKind::Create(CreateKind::File));
+        event.paths = paths.iter().map(|value| path(value)).collect();
+        event
+    }
+
+    fn remove_event(paths: &[&str]) -> Event {
+        let mut event = Event::new(EventKind::Remove(RemoveKind::File));
+        event.paths = paths.iter().map(|value| path(value)).collect();
+        event
+    }
+
+    fn rename_both_event(paths: &[&str]) -> Event {
+        let mut event = Event::new(EventKind::Modify(ModifyKind::Name(RenameMode::Both)));
+        event.paths = paths.iter().map(|value| path(value)).collect();
+        event
+    }
+
+    fn file_info(path: &str) -> FileInfo {
+        FileInfo {
+            file: journal_registry::repository::File::from_path(Path::new(path))
+                .expect("valid journal path"),
+            time_range: journal_registry::TimeRange::Unknown,
+        }
+    }
+
+    #[test]
+    fn facet_sidecar_temp_events_do_not_reach_journal_registry() {
+        let sidecar_tmp =
+            "/var/cache/netdata/flows/raw/system@abc-123.journal.facet.FLOW_VERSION.fst.tmp";
+        let sidecar = "/var/cache/netdata/flows/raw/system@abc-123.journal.facet.FLOW_VERSION.fst";
+
+        assert!(journal_registry_event(create_event(&[sidecar_tmp])).is_none());
+        assert!(journal_registry_event(remove_event(&[sidecar_tmp])).is_none());
+        assert!(journal_registry_event(rename_both_event(&[sidecar_tmp, sidecar])).is_none());
+    }
+
+    #[test]
+    fn journal_lifecycle_events_still_reconcile_facets() {
+        let active = "/var/cache/netdata/flows/raw/system.journal";
+        let archived =
+            "/var/cache/netdata/flows/raw/system@abc-0000000000000001-0000000000000002.journal";
+
+        let create = journal_registry_event(create_event(&[active])).expect("journal create event");
+        assert_eq!(create.paths, vec![path(active)]);
+        assert!(event_requires_facet_reconcile(&create));
+
+        let remove =
+            journal_registry_event(remove_event(&[archived])).expect("journal remove event");
+        assert_eq!(remove.paths, vec![path(archived)]);
+        assert!(event_requires_facet_reconcile(&remove));
+
+        let rename = journal_registry_event(rename_both_event(&[active, archived]))
+            .expect("journal rename event");
+        assert_eq!(rename.paths, vec![path(active), path(archived)]);
+        assert!(event_requires_facet_reconcile(&rename));
+    }
+
+    #[test]
+    fn mixed_create_events_drop_non_journal_paths() {
+        let active = "/var/cache/netdata/flows/raw/system.journal";
+        let sidecar_tmp = "/var/cache/netdata/flows/raw/system.journal.facet.PROTOCOL.fst.tmp";
+
+        let event =
+            journal_registry_event(create_event(&[sidecar_tmp, active])).expect("journal event");
+        assert_eq!(event.paths, vec![path(active)]);
+        assert!(event_requires_facet_reconcile(&event));
+    }
+
+    #[test]
+    fn missing_journal_contribution_is_skipped() {
+        let missing = "/tmp/netflow-missing-facet-test/system.journal";
+
+        let contributions =
+            scan_facet_contributions(&[file_info(missing)]).expect("missing file is skipped");
+
+        assert!(contributions.is_empty());
+    }
+
+    #[test]
+    fn not_found_errors_are_classified_through_context_layers() {
+        let not_found = anyhow::Error::new(std::io::Error::from(std::io::ErrorKind::NotFound))
+            .context("outer context");
+        let permission_denied =
+            anyhow::Error::new(std::io::Error::from(std::io::ErrorKind::PermissionDenied))
+                .context("outer context");
+
+        assert!(is_not_found_error(&not_found));
+        assert!(!is_not_found_error(&permission_denied));
+    }
 }
