@@ -641,7 +641,10 @@ ALWAYS_INLINE
 static int read_proc_cmdline(const char *filename, char *buffer, size_t size) {
     if (unlikely(!size)) return 3;
 
-    int fd = open(filename, O_RDONLY | O_CLOEXEC, 0666);
+    // O_NOFOLLOW: a real /proc/<pid>/cmdline is never a symlink. Refusing to
+    // follow one closes a symlink-based arbitrary-file-read primitive when this
+    // is reached through an untrusted /proc path.
+    int fd = open(filename, O_RDONLY | O_CLOEXEC | O_NOFOLLOW, 0666);
     if (unlikely(fd == -1)) {
         buffer[0] = '\0';
         return 1;
