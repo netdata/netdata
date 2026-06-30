@@ -530,7 +530,7 @@ async fn e2e_ingest_bind_failure_does_not_start_tier_workers() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn e2e_ingest_partial_bind_failure_does_not_start_tier_workers() {
     let (mut cfg, _tmp) = offline_journal_cfg();
-    let free = reserve_udp_listen_addr();
+    let free = "127.0.0.1:0".to_string();
     let occupied = StdUdpSocket::bind("127.0.0.1:0").expect("bind occupied test socket");
     let occupied_addr = occupied
         .local_addr()
