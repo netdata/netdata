@@ -990,6 +990,14 @@ scalar_column!(
     /// Per-row OTLP `LogRecord.dropped_attributes_count` (`DRAC` chunk).
     DroppedAttributeCounts, u32, "dropped_attributes_count", ColumnType::U32
 );
+scalar_column!(
+    /// Per-row span duration in nanoseconds (`DURN` chunk) — OTLP
+    /// `end_time_unix_nano - start_time_unix_nano`. The start time lives in
+    /// `TIMS`, so the absolute end time is recoverable as `TIMS + duration`.
+    /// Clamped to `0` when the end time is unset (`0`) or precedes the start
+    /// (clock skew). Traces-only; logs never write it.
+    Durations, i64, "duration", ColumnType::I64
+);
 
 /// Per-row W3C trace ids (`TRCE` chunk): a **fixed-stride 16-byte arena** — row `i`
 /// is `bytes[i*16 .. (i+1)*16]`, in chronological row order. An all-zero id is the
@@ -1008,6 +1016,16 @@ pub struct TraceIds {
 /// [`TraceIds`] for the layout and the all-zero "unset" sentinel.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SpanIds {
+    #[serde(with = "serde_bytes")]
+    bytes: Vec<u8>,
+}
+
+/// Per-row parent span ids (`PSPN` chunk): a fixed-stride **8-byte** arena of the
+/// OTLP `Span.parent_span_id`. Same layout as [`SpanIds`] and stores the same
+/// [`SpanId`] value type (a parent ref *is* a span id); an all-zero id is the
+/// "no parent" (root span) sentinel. Traces-only; logs never write it.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ParentSpanIds {
     #[serde(with = "serde_bytes")]
     bytes: Vec<u8>,
 }
@@ -1155,6 +1173,7 @@ macro_rules! id_arena {
 
 id_arena!(TraceIds, TraceId, 16, "trace_id");
 id_arena!(SpanIds, SpanId, 8, "span_id");
+id_arena!(ParentSpanIds, SpanId, 8, "parent_span_id");
 
 #[cfg(test)]
 mod tests;

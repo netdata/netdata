@@ -442,6 +442,10 @@ pub fn build_into<W: Write + Seek>(
         span_id: row_index.span_ids.is_some(),
         flags: row_index.flags.is_some(),
         dropped_attributes_count: row_index.dropped_attribute_counts.is_some(),
+        // Span-only columns; the logs seal path never sets them. Populated by the
+        // traces seal in a later step (SOW-20260630 Step 4).
+        parent_span_id: false,
+        duration: false,
     };
     let mut col_entries = Vec::new();
     let mut col_entry = |present: bool, name: &str, ty| {

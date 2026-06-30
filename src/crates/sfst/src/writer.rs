@@ -13,10 +13,11 @@ use fst_index::FstIndex;
 use serde::Serialize;
 
 use crate::{
-    BitmapValue, CHUNK_DROPPED_ATTRS, CHUNK_FLAGS, CHUNK_META, CHUNK_OBSERVED_TS, CHUNK_PRIMARY,
-    CHUNK_SPAN_IDS, CHUNK_SUMMARY, CHUNK_TIMS, CHUNK_TRACE_IDS, CHUNK_TRACE_INDEX, ColumnsTable,
-    ColumnType, DroppedAttributeCounts, Error, Flags, HighField, MAGIC, MAX_STREAM_BATCHES,
-    Metadata, ObservedTimestamps, SpanIds, StreamBatch, Summary, TraceIdIndex, TraceIds, VERSION,
+    BitmapValue, CHUNK_DROPPED_ATTRS, CHUNK_DURATION, CHUNK_FLAGS, CHUNK_META, CHUNK_OBSERVED_TS,
+    CHUNK_PARENT_SPAN_IDS, CHUNK_PRIMARY, CHUNK_SPAN_IDS, CHUNK_SUMMARY, CHUNK_TIMS,
+    CHUNK_TRACE_IDS, CHUNK_TRACE_INDEX, ColumnsTable, ColumnType, DroppedAttributeCounts, Durations,
+    Error, Flags, HighField, MAGIC, MAX_STREAM_BATCHES, Metadata, ObservedTimestamps,
+    ParentSpanIds, SpanIds, StreamBatch, Summary, TraceIdIndex, TraceIds, VERSION,
     ZSTD_LEVEL_DEFAULT, ZSTD_LEVEL_FST, high_field_id, mid_field_id, stream_batch_id,
 };
 
@@ -61,6 +62,10 @@ pub struct ColumnsPresent {
     pub span_id: bool,
     pub flags: bool,
     pub dropped_attributes_count: bool,
+    /// Span `parent_span_id` (traces signal) — see [`ParentSpanIds`].
+    pub parent_span_id: bool,
+    /// Span `duration` (traces signal) — see [`Durations`].
+    pub duration: bool,
 }
 
 impl ColumnsPresent {
@@ -72,6 +77,8 @@ impl ColumnsPresent {
             self.span_id,
             self.flags,
             self.dropped_attributes_count,
+            self.parent_span_id,
+            self.duration,
         ]
         .into_iter()
         .filter(|&b| b)
@@ -273,6 +280,8 @@ impl<W: Write + Seek> StreamWriter<W> {
                 DroppedAttributeCounts::NAME,
                 DroppedAttributeCounts::COLUMN_TYPE,
             )
+            && entry(c.parent_span_id, ParentSpanIds::NAME, ParentSpanIds::COLUMN_TYPE)
+            && entry(c.duration, Durations::NAME, Durations::COLUMN_TYPE)
     }
 
     /// Write the per-log timestamps chunk (chronological nanosecond timestamps,
@@ -382,6 +391,18 @@ impl<W: Write + Seek> StreamWriter<W> {
             CHUNK_DROPPED_ATTRS,
             &packed,
         )
+    }
+
+    /// Write the per-row parent-span-ids column (`PSPN`).
+    pub fn parent_span_ids(&mut self, parent_span_ids: &ParentSpanIds) -> Result<(), Error> {
+        let packed = pack(parent_span_ids, ZSTD_LEVEL_DEFAULT)?;
+        self.write_column(5, self.counts.columns.parent_span_id, CHUNK_PARENT_SPAN_IDS, &packed)
+    }
+
+    /// Write the per-row span-duration column (`DURN`).
+    pub fn durations(&mut self, durations: &Durations) -> Result<(), Error> {
+        let packed = pack(&durations.0, ZSTD_LEVEL_DEFAULT)?;
+        self.write_column(6, self.counts.columns.duration, CHUNK_DURATION, &packed)
     }
 
     /// Write the optional `trace_id` index chunk (`TIDX`), in the cold region

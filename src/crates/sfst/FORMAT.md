@@ -98,14 +98,19 @@ within its tier in the trailing bytes.
     "SPAN"      8-byte arena (per-row span ids)               No (per-row column, v8)
     "FLAG"      Vec<u32>  (per-row LogRecord.flags)           No (per-row column, v8)
     "DRAC"      Vec<u32>  (per-row dropped_attributes_count)  No (per-row column, v8)
+    "PSPN"      8-byte arena (per-row parent_span_id)         No (per-row column, additive v9)
+    "DURN"      Vec<i64>  (per-row span duration, ns)         No (per-row column, additive v9)
     "TIDX"      TraceIdIndex  (trace_id fanout + sort permutation)  No (optional, additive v9)
     "MF{hi}{lo}" FstIndex<BitmapValue>  (mid-card field)      No (one per mid field)
     "HF{hi}{lo}" HighField  (high-card field, columnar SoA)   No (one per high field)
     "SB0{N}"    StreamBatch  (stream-batch N, fixed-width arena)  Yes (at least 1)
 
-The per-row column chunks (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`) are
+The per-row column chunks (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`/`PSPN`/`DURN`) are
 **independently optional** — a file carries any subset, or none — and live in
 the **cold region after `PRIM`**, so a query decodes a column only on demand.
+`PSPN` (parent span id, 8-byte arena like `SPAN`; all-zero = root) and `DURN`
+(span duration in ns) are the **traces** signal's columns; logs files carry
+neither, traces files carry neither `OBTS` (no observed time).
 A column is present iff the `META` `ColumnsTable` lists it; readers consult the
 manifest (not the chunk table) for presence + type. Each holds exactly one
 value per row, in the same chronological order as `TIMS` and the stream batches.

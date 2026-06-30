@@ -15,12 +15,12 @@ use fst_index::FstIndex;
 use serde::de::DeserializeOwned;
 
 use crate::{
-    BitmapValue, CHUNK_DROPPED_ATTRS, CHUNK_FLAGS, CHUNK_META, CHUNK_OBSERVED_TS, CHUNK_PRIMARY,
-    CHUNK_SPAN_IDS, CHUNK_SUMMARY, CHUNK_TIMS, CHUNK_TRACE_IDS, CHUNK_TRACE_INDEX, ColumnType,
-    ColumnsTable, DroppedAttributeCounts, Error, FieldTable, FieldTier, Flags, HighField, MAGIC,
-    MAX_STREAM_BATCHES, Metadata, ObservedTimestamps, SchemaTree, SpanIds, StreamBatch, Summary,
-    TraceIdIndex, TraceIds, VERSION, high_field_id, mid_field_id, num_stream_batches,
-    stream_batch_id,
+    BitmapValue, CHUNK_DROPPED_ATTRS, CHUNK_DURATION, CHUNK_FLAGS, CHUNK_META, CHUNK_OBSERVED_TS,
+    CHUNK_PARENT_SPAN_IDS, CHUNK_PRIMARY, CHUNK_SPAN_IDS, CHUNK_SUMMARY, CHUNK_TIMS,
+    CHUNK_TRACE_IDS, CHUNK_TRACE_INDEX, ColumnType, ColumnsTable, DroppedAttributeCounts, Durations,
+    Error, FieldTable, FieldTier, Flags, HighField, MAGIC, MAX_STREAM_BATCHES, Metadata,
+    ObservedTimestamps, ParentSpanIds, SchemaTree, SpanIds, StreamBatch, Summary, TraceIdIndex,
+    TraceIds, VERSION, high_field_id, mid_field_id, num_stream_batches, stream_batch_id,
 };
 
 /// Decompress zstd, then deserialize with bincode. Crate-internal:
@@ -349,6 +349,27 @@ impl<'a> Reader<'a> {
         )?;
         let col = DroppedAttributeCounts(unpack(self.chunk_raw_by_id(CHUNK_DROPPED_ATTRS)?)?);
         self.check_rows(DroppedAttributeCounts::NAME, col.len())?;
+        Ok(col)
+    }
+
+    /// Decode the per-row parent-span-ids column (`PSPN`), a fixed-stride 8-byte arena.
+    pub fn parent_span_ids(&self) -> Result<ParentSpanIds, Error> {
+        self.require_column(ParentSpanIds::NAME, ParentSpanIds::COLUMN_TYPE)?;
+        let col: ParentSpanIds = unpack(self.chunk_raw_by_id(CHUNK_PARENT_SPAN_IDS)?)?;
+        if !col.well_formed() {
+            return Err(Error::ColumnMismatch(
+                "parent_span_id arena is not a whole number of ids".into(),
+            ));
+        }
+        self.check_rows(ParentSpanIds::NAME, col.len())?;
+        Ok(col)
+    }
+
+    /// Decode the per-row span-duration column (`DURN`).
+    pub fn durations(&self) -> Result<Durations, Error> {
+        self.require_column(Durations::NAME, Durations::COLUMN_TYPE)?;
+        let col = Durations(unpack(self.chunk_raw_by_id(CHUNK_DURATION)?)?);
+        self.check_rows(Durations::NAME, col.len())?;
         Ok(col)
     }
 

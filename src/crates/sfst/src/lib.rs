@@ -112,9 +112,10 @@ pub fn scan_max_sequence_recursive(base: &std::path::Path) -> std::io::Result<u6
 }
 pub use schema::{
     BitmapValue, ColumnEntry, ColumnType, ColumnsTable, DEFAULT_CARDINALITY_THRESHOLD,
-    DroppedAttributeCounts, FieldEntry, FieldTable, FieldTier, Flags, HighField, Histogram,
-    IdRanges, KvId, LeafStats, Metadata, NodeId, ObservedTimestamps, SchemaEdge, SchemaNode,
-    SchemaTree, SpanId, SpanIds, Step, StreamBatch, Summary, TraceId, TraceIds, ValueKind,
+    DroppedAttributeCounts, Durations, FieldEntry, FieldTable, FieldTier, Flags, HighField,
+    Histogram, IdRanges, KvId, LeafStats, Metadata, NodeId, ObservedTimestamps, ParentSpanIds,
+    SchemaEdge, SchemaNode, SchemaTree, SpanId, SpanIds, Step, StreamBatch, Summary, TraceId,
+    TraceIds, ValueKind,
 };
 pub use writer::{ChunkCounts, ColumnsPresent, StreamWriter, write_summary_only};
 
@@ -157,6 +158,10 @@ const MAGIC: &[u8; 4] = b"SFST";
 //     sort permutation, after the per-row columns). TOC-indexed and absent from
 //     files that don't carry it, so it changes no existing chunk and old readers
 //     ignore it — see CHUNK_TRACE_INDEX and the `trace_index` module.
+// v9 (additive, no bump): the traces signal's per-row columns `PSPN`
+//     (parent_span_id, 8-byte arena) and `DURN` (span duration, i64 ns). Same
+//     independently-optional cold-region treatment as the v8 columns; logs files
+//     carry neither. New `ColumnsTable` manifest entries only — no layout change.
 const VERSION: u32 = 9;
 
 const CHUNK_SUMMARY: chunk_file::ChunkId = *b"SUMR";
@@ -172,6 +177,11 @@ const CHUNK_TRACE_IDS: chunk_file::ChunkId = *b"TRCE";
 const CHUNK_SPAN_IDS: chunk_file::ChunkId = *b"SPAN";
 const CHUNK_FLAGS: chunk_file::ChunkId = *b"FLAG";
 const CHUNK_DROPPED_ATTRS: chunk_file::ChunkId = *b"DRAC";
+// Span-only per-row columns (traces signal): the parent span id and the span
+// duration. Same cold-region placement and independent-optionality as the
+// columns above; logs files carry neither.
+const CHUNK_PARENT_SPAN_IDS: chunk_file::ChunkId = *b"PSPN";
+const CHUNK_DURATION: chunk_file::ChunkId = *b"DURN";
 // Optional `trace_id` index (cold region, after the per-row columns): a
 // first-byte fanout + a position permutation sorted by `trace_id`, for O(log)
 // trace-by-id lookup over the chronological `TRCE` column (see `trace_index`).

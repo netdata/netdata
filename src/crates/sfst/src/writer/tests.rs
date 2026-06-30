@@ -5,9 +5,9 @@ use treight::Bitmap;
 
 use crate::{
     BitmapValue, ChunkCounts, ColumnEntry, ColumnType, ColumnsPresent, ColumnsTable,
-    DroppedAttributeCounts, Error, FieldEntry, FieldTier, Flags, HighField, Histogram, IdRanges,
-    KvId, Metadata, ObservedTimestamps, SchemaTree, SpanId, SpanIds, StreamBatch, StreamWriter,
-    Summary, TraceId, TraceIdIndex, TraceIds,
+    DroppedAttributeCounts, Durations, Error, FieldEntry, FieldTier, Flags, HighField, Histogram,
+    IdRanges, KvId, Metadata, ObservedTimestamps, ParentSpanIds, SchemaTree, SpanId, SpanIds,
+    StreamBatch, StreamWriter, Summary, TraceId, TraceIdIndex, TraceIds,
 };
 
 fn counts(mid: u16, high: u16, batches: u8) -> ChunkCounts {
@@ -247,17 +247,23 @@ fn finish_refuses_an_underfilled_file() {
 
 /// Build all five per-row columns for `n` rows, each value tagged by its row
 /// index so the round-trip / reorder is verifiable.
-fn sample_columns(n: usize) -> (ObservedTimestamps, TraceIds, SpanIds, Flags, DroppedAttributeCounts) {
+type SampleColumns =
+    (ObservedTimestamps, TraceIds, SpanIds, Flags, DroppedAttributeCounts, ParentSpanIds, Durations);
+
+fn sample_columns(n: usize) -> SampleColumns {
     let observed = ObservedTimestamps((0..n as i64).map(|i| 100 + i).collect());
     let mut trace = TraceIds::with_capacity(n);
     let mut span = SpanIds::with_capacity(n);
+    let mut parent = ParentSpanIds::with_capacity(n);
     for i in 0..n {
         trace.push(TraceId::from([i as u8; 16]));
         span.push(SpanId::from([i as u8; 8]));
+        parent.push(SpanId::from([i as u8 | 0x80; 8]));
     }
     let flags = Flags((0..n as u32).map(|i| i | 0x100).collect());
     let drac = DroppedAttributeCounts((0..n as u32).collect());
-    (observed, trace, span, flags, drac)
+    let durations = Durations((0..n as i64).map(|i| 1000 + i).collect());
+    (observed, trace, span, flags, drac, parent, durations)
 }
 
 fn present_all() -> ColumnsPresent {
@@ -267,6 +273,8 @@ fn present_all() -> ColumnsPresent {
         span_id: true,
         flags: true,
         dropped_attributes_count: true,
+        parent_span_id: true,
+        duration: true,
     }
 }
 
@@ -278,6 +286,8 @@ fn columns_table() -> ColumnsTable {
         ColumnEntry { name: SpanIds::NAME.into(), ty: SpanIds::COLUMN_TYPE },
         ColumnEntry { name: Flags::NAME.into(), ty: Flags::COLUMN_TYPE },
         ColumnEntry { name: DroppedAttributeCounts::NAME.into(), ty: DroppedAttributeCounts::COLUMN_TYPE },
+        ColumnEntry { name: ParentSpanIds::NAME.into(), ty: ParentSpanIds::COLUMN_TYPE },
+        ColumnEntry { name: Durations::NAME.into(), ty: Durations::COLUMN_TYPE },
     ])
 }
 
@@ -287,8 +297,8 @@ fn col_counts(columns: ColumnsPresent) -> ChunkCounts {
 
 #[test]
 fn all_per_row_columns_round_trip() {
-    // All five columns, written in the cold region after PRIM, round-trip.
-    let (observed, trace, span, flags, drac) = sample_columns(3);
+    // All seven columns, written in the cold region after PRIM, round-trip.
+    let (observed, trace, span, flags, drac, parent, durations) = sample_columns(3);
     let mut w = writer(col_counts(present_all()));
     w.summary(&summary()).unwrap();
     w.metadata(&metadata_with_columns(Vec::new(), columns_table())).unwrap();
@@ -299,6 +309,8 @@ fn all_per_row_columns_round_trip() {
     w.span_ids(&span).unwrap();
     w.flags(&flags).unwrap();
     w.dropped_attribute_counts(&drac).unwrap();
+    w.parent_span_ids(&parent).unwrap();
+    w.durations(&durations).unwrap();
     w.add_stream_batch(&batch()).unwrap();
     let buf = w.finish().unwrap().into_inner();
 
@@ -306,19 +318,29 @@ fn all_per_row_columns_round_trip() {
     assert!(reader.has_per_row_columns().unwrap());
     assert_eq!(
         reader.columns_table().unwrap().names().collect::<Vec<_>>(),
-        ["observed_ts", "trace_id", "span_id", "flags", "dropped_attributes_count"],
+        [
+            "observed_ts",
+            "trace_id",
+            "span_id",
+            "flags",
+            "dropped_attributes_count",
+            "parent_span_id",
+            "duration",
+        ],
     );
     assert_eq!(reader.observed_timestamps().unwrap(), observed);
     assert_eq!(reader.trace_ids().unwrap(), trace);
     assert_eq!(reader.span_ids().unwrap(), span);
     assert_eq!(reader.flags().unwrap(), flags);
     assert_eq!(reader.dropped_attribute_counts().unwrap(), drac);
+    assert_eq!(reader.parent_span_ids().unwrap(), parent);
+    assert_eq!(reader.durations().unwrap(), durations);
 }
 
 #[test]
 fn per_row_columns_are_independently_optional() {
     // A file with ONLY trace_id — no rule that the columns appear together.
-    let (_o, trace, _s, _f, _d) = sample_columns(3);
+    let (_o, trace, _s, _f, _d, _p, _dur) = sample_columns(3);
     let present = ColumnsPresent { trace_id: true, ..Default::default() };
     let manifest = ColumnsTable(vec![ColumnEntry {
         name: TraceIds::NAME.into(),
@@ -357,7 +379,7 @@ fn no_per_row_columns_is_the_default() {
 
 #[test]
 fn per_row_columns_misuse_is_rejected() {
-    let (observed, _t, span, _f, _d) = sample_columns(3);
+    let (observed, _t, span, _f, _d, _p, _dur) = sample_columns(3);
     // Declare two columns (observed + trace).
     let present = ColumnsPresent { observed_ts: true, trace_id: true, ..Default::default() };
     let manifest = || {
