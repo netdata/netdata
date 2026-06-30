@@ -655,4 +655,61 @@ mod tests {
         assert!(recs[1].trace_id.is_empty());
         assert!(recs[2].trace_id.is_empty() && recs[2].span_id.is_empty());
     }
+
+    #[test]
+    fn fill_trace_hashes_populates_and_dedups() {
+        // Two spans share `http.method=GET`; a resource attr is present too. After
+        // the fill, every entry (resource/scope/span) must carry a non-zero hash,
+        // identical key=value must hash the same (enables the seal fast path), and
+        // distinct key=value must differ.
+        let span = |name: &str| Span {
+            name: name.into(),
+            attributes: vec![kv("http.method", Av::StringValue("GET".into()))],
+            ..Default::default()
+        };
+        let req = ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                resource: Some(Resource {
+                    attributes: vec![kv("service.name", Av::StringValue("api".into()))],
+                    ..Default::default()
+                }),
+                scope_spans: vec![ScopeSpans {
+                    scope: None,
+                    spans: vec![span("a"), span("b")],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        let mut flat = flatten_trace_request(&req);
+        fill_trace_hashes(&mut flat);
+
+        let rg = &flat.resources[0];
+        assert!(
+            rg.resource.iter().all(|e| e.hash != 0),
+            "resource entries hashed"
+        );
+        let spans = &rg.scopes[0].spans;
+        assert!(
+            spans.iter().all(|s| s.entries.iter().all(|e| e.hash != 0)),
+            "every span entry hashed"
+        );
+        // `http.method=GET` interns to the same hash across both spans.
+        let method_hash = |sr: &SpanRecord| {
+            sr.entries
+                .iter()
+                .find(|e| e.value == Value::Str("GET".into()))
+                .unwrap()
+                .hash
+        };
+        assert_eq!(method_hash(&spans[0]), method_hash(&spans[1]));
+        // A distinct facet (the span name "a") hashes differently.
+        let name_hash = spans[0]
+            .entries
+            .iter()
+            .find(|e| e.value == Value::Str("a".into()))
+            .unwrap()
+            .hash;
+        assert_ne!(name_hash, method_hash(&spans[0]));
+    }
 }
