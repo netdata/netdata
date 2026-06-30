@@ -78,10 +78,11 @@ static inline long query_target_metrics_latest_values(BUFFER *wb, const char *ke
 static inline size_t rrdr_dimension_view_latest_values(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options) {
     buffer_json_member_add_array(wb, key);
 
-    if(!rrdr_rows(r)) {
-        buffer_json_array_close(wb);
-        return 0;
-    }
+    // with zero rows there is no latest row to read; reading it would underflow
+    // (rrdr_rows(r) - 1) on the size_t row index. still emit one empty value per
+    // exposed dimension so this array, latest_values and the dimension metadata
+    // arrays stay parallel and the returned "dimensions" count matches.
+    const bool has_rows = rrdr_rows(r) > 0;
 
     size_t c, i;
     for(c = 0, i = 0; c < r->d ; c++) {
@@ -90,18 +91,20 @@ static inline size_t rrdr_dimension_view_latest_values(BUFFER *wb, const char *k
 
         i++;
 
-        NETDATA_DOUBLE *cn = &r->v[ (rrdr_rows(r) - 1) * r->d ];
-        RRDR_VALUE_FLAGS *co = &r->o[ (rrdr_rows(r) - 1) * r->d ];
-        NETDATA_DOUBLE n = cn[c];
+        if(has_rows) {
+            NETDATA_DOUBLE *cn = &r->v[ (rrdr_rows(r) - 1) * r->d ];
+            RRDR_VALUE_FLAGS *co = &r->o[ (rrdr_rows(r) - 1) * r->d ];
 
-        if(co[c] & RRDR_VALUE_EMPTY) {
-            if(options & RRDR_OPTION_NULL2ZERO)
-                buffer_json_add_array_item_double(wb, 0.0);
-            else
-                buffer_json_add_array_item_double(wb, NAN);
+            if(!(co[c] & RRDR_VALUE_EMPTY)) {
+                buffer_json_add_array_item_double(wb, cn[c]);
+                continue;
+            }
         }
+
+        if(options & RRDR_OPTION_NULL2ZERO)
+            buffer_json_add_array_item_double(wb, 0.0);
         else
-            buffer_json_add_array_item_double(wb, n);
+            buffer_json_add_array_item_double(wb, NAN);
     }
 
     buffer_json_array_close(wb);
