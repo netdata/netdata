@@ -588,6 +588,82 @@ fn materialize_rows_resolves_timestamp_and_attributes() {
 }
 
 #[test]
+fn materialize_field_matches_materialize_rows() {
+    // Column-direct resolution must yield exactly the values the row-major
+    // path extracts for the same field, across every position.
+    let data = build_query_fixture();
+    let reader = IndexReader::open(&data).unwrap();
+    let positions: Vec<u32> = (0..reader.summary().record_count).collect();
+    let rows = reader.materialize_rows(&positions).unwrap();
+
+    for field in ["level", "service"] {
+        let direct = reader.materialize_field(field, &positions).unwrap();
+        for (i, row) in rows.iter().enumerate() {
+            let expected: Vec<String> = row
+                .fields
+                .iter()
+                .filter(|(k, _)| k == field)
+                .map(|(_, v)| v.clone())
+                .collect();
+            assert_eq!(direct[i], expected, "field {field} at position {i}");
+        }
+    }
+
+    // Absent field → all-empty (parity with materialize_rows omitting it).
+    let absent = reader.materialize_field("nope", &positions).unwrap();
+    assert!(absent.iter().all(Vec::is_empty));
+}
+
+#[test]
+fn materialize_field_multivalued() {
+    // A multi-valued field returns every value at a position; absence is empty.
+    let data = build_multivalued_fixture();
+    let reader = IndexReader::open(&data).unwrap();
+    let got = reader.materialize_field("lang", &[0, 1, 2]).unwrap();
+    // FST iteration is sorted, so en precedes fr.
+    assert_eq!(got[0], vec!["en".to_string(), "fr".to_string()]);
+    assert_eq!(got[1], vec!["en".to_string()]);
+    assert!(got[2].is_empty(), "pos 2 has no lang");
+}
+
+#[test]
+fn timeline_totals_counts_per_bucket() {
+    // 6 logs at FILE_MIN_NS + {0..5}s.
+    let data = build_query_fixture();
+    let reader = IndexReader::open(&data).unwrap();
+    let all = bf(&reader, Filter::new());
+
+    // 2-second buckets → two logs per bucket.
+    let totals = reader
+        .timeline_totals(&all, Grid::new(FILE_MIN_NS, 2 * 1_000_000_000, 3))
+        .unwrap();
+    assert_eq!(totals, vec![2, 2, 2]);
+
+    // One bucket covering everything.
+    let one = reader
+        .timeline_totals(&all, Grid::new(FILE_MIN_NS, 6 * 1_000_000_000, 1))
+        .unwrap();
+    assert_eq!(one, vec![6]);
+
+    // A grid entirely before the data yields empty buckets (natural clamp).
+    let before = reader
+        .timeline_totals(
+            &all,
+            Grid::new(FILE_MIN_NS - 6 * 1_000_000_000, 1_000_000_000, 3),
+        )
+        .unwrap();
+    assert_eq!(before, vec![0, 0, 0]);
+
+    // With a filter, the per-bucket totals still sum to the matched count.
+    let filtered = bf(&reader, Filter::new().select("service", "api"));
+    let totals = reader
+        .timeline_totals(&filtered, Grid::new(FILE_MIN_NS, 2 * 1_000_000_000, 3))
+        .unwrap();
+    let matched = reader.matched_count(&filtered, FULL_WINDOW).unwrap();
+    assert_eq!(totals.iter().sum::<u64>(), matched);
+}
+
+#[test]
 fn materialize_rows_preserves_position_order() {
     let data = build_query_fixture();
     let reader = IndexReader::open(&data).unwrap();

@@ -321,6 +321,136 @@ impl<'a> IndexReader<'a> {
         Ok(rows)
     }
 
+    /// Resolve a **single** field's values at `positions`, decoding only that
+    /// field's chunk. Thin wrapper over [`materialize_fields`](Self::materialize_fields).
+    pub fn materialize_field(
+        &self,
+        field: &str,
+        positions: &[u32],
+    ) -> Result<Vec<Vec<String>>, crate::Error> {
+        Ok(self
+            .materialize_fields(&[field], positions)?
+            .into_iter()
+            .next()
+            .expect("one field in → one column out"))
+    }
+
+    /// Resolve several fields' values at `positions`, decoding only those
+    /// fields' chunks — never the whole reverse string table.
+    ///
+    /// Returns one column per input field (same order); each column has one
+    /// entry per input position (same order). An entry is that field's value(s)
+    /// at the position: empty when the field is absent there, more than one for
+    /// a multi-valued (array-collapsed `[]`) field. This is the column-direct
+    /// counterpart to [`materialize_rows`](Self::materialize_rows): cost scales
+    /// with the projected fields, not the file's whole attribute space.
+    ///
+    /// Low/mid fields scatter from their own per-value position bitmaps;
+    /// high-card fields share a **single** stream-batch scan (the SB chunks are
+    /// read once regardless of how many high-card fields are projected). Each
+    /// field's `KvId` range comes from `META` cardinalities
+    /// ([`high_kv_id`](Self::high_kv_id)); no chunk is decoded just to locate
+    /// it. An absent field yields an all-empty column.
+    pub fn materialize_fields(
+        &self,
+        fields: &[&str],
+        positions: &[u32],
+    ) -> Result<Vec<Vec<Vec<String>>>, crate::Error> {
+        let mut out: Vec<Vec<Vec<String>>> = fields
+            .iter()
+            .map(|_| vec![Vec::new(); positions.len()])
+            .collect();
+
+        // Matched positions are a set, so each maps to exactly one output slot.
+        let slot: std::collections::HashMap<u32, usize> =
+            positions.iter().enumerate().map(|(i, &p)| (p, i)).collect();
+
+        // High-card fields are resolved together in one stream-batch scan; this
+        // collects their disjoint KvId ranges + value arenas, tagged with the
+        // output column they fill.
+        struct HighScan {
+            out_idx: usize,
+            base: u32,
+            span: u32,
+            values: Vec<String>,
+        }
+        let mut highs: Vec<HighScan> = Vec::new();
+
+        for (fp, &field) in fields.iter().enumerate() {
+            let prefix_len = field.len() + 1; // strip "field=" → the value bytes
+            match self.locate_field(field) {
+                // Absent → out[fp] stays all-empty.
+                None => {}
+                Some(FieldLocation::Low) => {
+                    let prefix = format!("{field}=");
+                    for (kv_bytes, bv) in self.primary.prefix_pairs(prefix.as_bytes()) {
+                        let value = String::from_utf8_lossy(&kv_bytes[prefix_len..]).into_owned();
+                        for p in PosSet::from_value(bv).iter() {
+                            if let Some(&i) = slot.get(&p) {
+                                out[fp][i].push(value.clone());
+                            }
+                        }
+                    }
+                }
+                Some(FieldLocation::Mid(idx)) => {
+                    // Every key in a mid chunk belongs to this one field.
+                    let chunk = self.sfst.mid_field(idx)?;
+                    chunk.for_each(|kv_bytes, bv| {
+                        let value = String::from_utf8_lossy(&kv_bytes[prefix_len..]).into_owned();
+                        for p in PosSet::from_value(bv).iter() {
+                            if let Some(&i) = slot.get(&p) {
+                                out[fp][i].push(value.clone());
+                            }
+                        }
+                    });
+                }
+                Some(FieldLocation::High(idx)) => {
+                    let hf = self.sfst.high_field(idx)?;
+                    highs.push(HighScan {
+                        out_idx: fp,
+                        base: self.high_kv_id(idx, 0).0,
+                        span: hf.len() as u32,
+                        values: hf
+                            .keys()
+                            .map(|k| String::from_utf8_lossy(&k[prefix_len..]).into_owned())
+                            .collect(),
+                    });
+                }
+            }
+        }
+
+        // One stream-batch pass resolving every projected high-card field.
+        if !highs.is_empty() {
+            let total = self.summary.record_count;
+            let batch_size = crate::stream_batch_size(total);
+            let mut loaded: Vec<Option<crate::StreamBatch>> =
+                (0..self.num_stream_batches()).map(|_| None).collect();
+
+            for (i, &p) in positions.iter().enumerate() {
+                if p >= total {
+                    continue;
+                }
+                let b = (p / batch_size) as usize;
+                if loaded[b].is_none() {
+                    loaded[b] = Some(self.sfst.stream_batch(b as u8)?);
+                }
+                let batch = loaded[b].as_ref().unwrap();
+                let local = (p % batch_size) as usize;
+                for id in batch.row(local) {
+                    // Ranges are disjoint, so the first containing field wins.
+                    for h in &highs {
+                        if id.0 >= h.base && id.0 < h.base + h.span {
+                            out[h.out_idx][i].push(h.values[(id.0 - h.base) as usize].clone());
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(out)
+    }
+
     // ── Query API ────────────────────────────────────────────────────
 
     /// Compile a [`Filter`] against this file into a [`BitmapFilter`]:
@@ -591,6 +721,26 @@ impl<'a> IndexReader<'a> {
             dimensions,
             buckets,
         })
+    }
+
+    /// Per-bucket matched counts for `grid` — the field-less timeline backing
+    /// `GROUP BY date_bin(timestamp)`. `totals[i]` is the number of logs
+    /// matching `filter` whose timestamp falls in bucket `i`; buckets past the
+    /// file's time range are zero (the grid clamps naturally). This is the
+    /// time-axis analogue of [`matched_count`](Self::matched_count) — one bucket
+    /// edge resolution, then a `range_cardinality` per bucket.
+    pub fn timeline_totals(
+        &self,
+        filter: &BitmapFilter,
+        grid: Grid,
+    ) -> Result<Vec<u64>, crate::Error> {
+        let full = filter.full();
+        Ok(self
+            .load_timestamps()?
+            .bucket_ranges(grid)
+            .into_iter()
+            .map(|(lo, hi)| full.range_cardinality(lo, hi))
+            .collect())
     }
 
     // ── Query helpers (private) ──────────────────────────────────────
