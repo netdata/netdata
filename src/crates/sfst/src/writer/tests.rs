@@ -526,7 +526,8 @@ fn trace_id_index_misuse_is_rejected() {
     let (trace, _a, _b) = three_span_traces();
     let index = TraceIdIndex::build(&trace);
 
-    // Declared but never written → finish() refuses the underfilled file.
+    // Declared but never written → the stage stays at TraceIndex, so advancing
+    // to a secondary chunk is rejected (and finish() would refuse it too).
     let mut w = writer(idx_counts());
     w.summary(&summary()).unwrap();
     w.metadata(&metadata_with_columns(Vec::new(), trace_id_manifest())).unwrap();

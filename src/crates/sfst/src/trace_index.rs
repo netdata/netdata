@@ -72,6 +72,24 @@ impl TraceIdIndex {
             *slot = acc;
         }
 
+        // Enforce the index invariants at write time (debug builds + tests),
+        // where a producer bug is cheap to catch at its source — rather than
+        // paying to re-prove them on every read. `sort_perm` is a permutation of
+        // a filtered subset of `0..len`, so both hold by construction; the
+        // asserts guard against a future refactor regressing build().
+        debug_assert!(
+            sort_perm.iter().all(|&p| (p as usize) < trace_ids.len()),
+            "build produced an out-of-range position"
+        );
+        debug_assert!(
+            {
+                let mut seen = sort_perm.clone();
+                seen.sort_unstable();
+                seen.windows(2).all(|w| w[0] != w[1])
+            },
+            "build produced duplicate positions"
+        );
+
         Self { fanout, sort_perm }
     }
 
@@ -243,6 +261,24 @@ mod tests {
     fn validate_rejects_short_fanout() {
         let idx = TraceIdIndex { fanout: vec![0u32; 10], sort_perm: vec![] };
         assert!(idx.validate(0).is_err());
+    }
+
+    #[test]
+    fn validate_rejects_non_monotonic_fanout() {
+        let mut fanout = vec![0u32; 256];
+        // A drop at byte 6 violates the cumulative (non-decreasing) invariant.
+        fanout[5] = 10;
+        fanout[6] = 5;
+        // Make the tail consistent with sort_perm len so only monotonicity fails.
+        let idx = TraceIdIndex { fanout, sort_perm: vec![] };
+        assert!(idx.validate(0).is_err(), "non-monotonic fanout must be rejected");
+    }
+
+    #[test]
+    fn validate_rejects_fanout_tail_mismatch() {
+        // All-zero fanout (fanout[255] == 0) but a non-empty permutation.
+        let idx = TraceIdIndex { fanout: vec![0u32; 256], sort_perm: vec![0] };
+        assert!(idx.validate(1).is_err(), "fanout[255] != sort_perm.len() must be rejected");
     }
 
     #[test]

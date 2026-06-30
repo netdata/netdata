@@ -98,8 +98,9 @@ impl<'a> IndexReader<'a> {
         &self.metadata().tree
     }
 
-    /// Byte span of the cold suffix (mid/high field chunks + stream
-    /// batches) a query releases from the page cache once done. See
+    /// Byte span of the cold suffix (optional per-row columns + optional
+    /// `trace_id` index + mid/high field chunks + stream batches) a query
+    /// releases from the page cache once done. See
     /// [`crate::Reader::cold_region`].
     pub fn cold_region(&self) -> Option<(usize, usize)> {
         self.sfst.cold_region()

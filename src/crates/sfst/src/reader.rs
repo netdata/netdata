@@ -153,8 +153,9 @@ impl<'a> Reader<'a> {
 
     /// Byte span `(offset, len)` of the **cold suffix** — everything after
     /// the hot prefix (`SUMR`/`META`/`TIMS`/`PRIM`): the optional per-row column
-    /// chunks (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`, when present), the mid/high
-    /// field chunks, and the stream batches. A query keeps the hot prefix
+    /// chunks (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`, when present), the optional
+    /// `trace_id` index (`TIDX`, when present), the mid/high field chunks, and
+    /// the stream batches. A query keeps the hot prefix
     /// resident in the page cache and releases this region once done. The per-row
     /// columns sit here (not the hot prefix) so a query decodes a column only when
     /// it actually needs it, rather than paying for it on every read.

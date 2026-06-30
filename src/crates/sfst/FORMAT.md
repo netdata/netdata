@@ -98,6 +98,7 @@ within its tier in the trailing bytes.
     "SPAN"      8-byte arena (per-row span ids)               No (per-row column, v8)
     "FLAG"      Vec<u32>  (per-row LogRecord.flags)           No (per-row column, v8)
     "DRAC"      Vec<u32>  (per-row dropped_attributes_count)  No (per-row column, v8)
+    "TIDX"      TraceIdIndex  (trace_id fanout + sort permutation)  No (optional, after per-row columns)
     "MF{hi}{lo}" FstIndex<BitmapValue>  (mid-card field)      No (one per mid field)
     "HF{hi}{lo}" HighField  (high-card field, columnar SoA)   No (one per high field)
     "SB0{N}"    StreamBatch  (stream-batch N, fixed-width arena)  Yes (at least 1)
@@ -108,6 +109,17 @@ the **cold region after `PRIM`**, so a query decodes a column only on demand.
 A column is present iff the `META` `ColumnsTable` lists it; readers consult the
 manifest (not the chunk table) for presence + type. Each holds exactly one
 value per row, in the same chronological order as `TIMS` and the stream batches.
+
+The optional `TIDX` chunk is the **`trace_id` index**: a 256-entry first-byte
+fanout (`fanout[256]`, cumulative count of indexed positions whose `trace_id`
+first byte is `≤ b`) plus a `sort_perm` of row positions sorted by their 16-byte
+`trace_id` (a stable sort, so a trace's spans stay chronological; the all-zero
+"unset" id is skipped). It enables O(log) trace-by-id lookup over the
+chronological `TRCE` column without scanning — all spans of one trace are a
+contiguous run in `sort_perm`. It lives in the cold region after the per-row
+columns, requires the `TRCE` column it indexes, and is detected via the TOC
+(`Reader::has_trace_id_index`), not the `ColumnsTable`. Presence is independent
+of any per-row column except its required `TRCE`.
 
 The rows are listed in the order the canonical producer emits chunk
 bodies. This order is **not** part of the format contract — readers
@@ -460,6 +472,15 @@ CRC then fails to match.
 ## Format Version
 
 The current version is **9**.
+
+### Additive within v9: the `TIDX` trace_id index
+
+The optional `TIDX` chunk (see [§ Chunk Ids](#chunk-ids)) is **additive and
+TOC-indexed**: it changes no existing chunk's bincode layout, a file without it
+simply omits it, and a reader that does not know it reads the rest unchanged.
+Its presence therefore needs **no version bump** — the same treatment the v8
+per-row column chunks received. A `TIDX` produced by this build pairs with the
+`TRCE` column in the same file.
 
 ### v9 changelog (from v8)
 
