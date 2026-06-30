@@ -624,12 +624,23 @@ static bool read_txt_file_to_buffer(const char *filename, BUFFER *wb, size_t max
     buffer_need_bytes(wb, file_size + 1);
 
     // Read the file contents into the buffer
-    ssize_t r = read(fd, &wb->buffer[wb->len], file_size);
-    if (r != (ssize_t)file_size) {
+    size_t original_len = wb->len;
+    size_t bytes_read = 0;
+    while(bytes_read < file_size) {
+        ssize_t r = read(fd, &wb->buffer[original_len + bytes_read], file_size - bytes_read);
+        if (r > 0) {
+            bytes_read += (size_t)r;
+            continue;
+        }
+
+        if (r == -1 && errno == EINTR)
+            continue;
+
         close(fd);
-        return false; // Read error
+        return false; // Read error or unexpected end of file
     }
-    wb->len = r;
+    wb->len = original_len + bytes_read;
+    wb->buffer[wb->len] = '\0';
 
     // Close the file descriptor
     close(fd);
