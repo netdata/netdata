@@ -193,6 +193,20 @@ struct malloc_header {
     uint8_t data[];
 };
 
+#define MALLOC_HEADER_MAGIC 0x0BADCAFEU
+
+static const uint8_t malloc_header_magic_salt;
+
+static uint32_t malloc_header_magic(const struct malloc_header *t) {
+    uintptr_t value = (uintptr_t)t ^ (uintptr_t)&malloc_header_magic_salt;
+
+#if UINTPTR_MAX > UINT32_MAX
+    value ^= value >> 32;
+#endif
+
+    return (uint32_t)value ^ MALLOC_HEADER_MAGIC;
+}
+
 static size_t malloc_header_size = sizeof(struct malloc_header);
 
 int malloc_trace_compare(void *A, void *B) {
@@ -267,9 +281,9 @@ void *mallocz_int(size_t size, const char *file, const char *function, size_t li
 
     struct malloc_header *t = (struct malloc_header *)libc_malloc(malloc_header_size + size);
     if (unlikely(!t)) fatal("mallocz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
-    t->signature.magic = 0x0BADCAFE;
     t->signature.trace = p;
     t->signature.size = size;
+    t->signature.magic = malloc_header_magic(t);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     for(ssize_t i = 0; i < (ssize_t)sizeof(t->padding) ;i++) // signed to avoid compiler warning when zero-padded
@@ -292,9 +306,9 @@ void *callocz_int(size_t nmemb, size_t size, const char *file, const char *funct
 
     struct malloc_header *t = (struct malloc_header *)libc_calloc(1, malloc_header_size + size);
     if (unlikely(!t)) fatal("mallocz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
-    t->signature.magic = 0x0BADCAFE;
     t->signature.trace = p;
     t->signature.size = size;
+    t->signature.magic = malloc_header_magic(t);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     for(ssize_t i = 0; i < (ssize_t)sizeof(t->padding) ;i++) // signed to avoid compiler warning when zero-padded
@@ -316,9 +330,9 @@ char *strdupz_int(const char *s, const char *file, const char *function, size_t 
 
     struct malloc_header *t = (struct malloc_header *)libc_malloc(malloc_header_size + size);
     if (unlikely(!t)) fatal("strdupz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
-    t->signature.magic = 0x0BADCAFE;
     t->signature.trace = p;
     t->signature.size = size;
+    t->signature.magic = malloc_header_magic(t);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     for(ssize_t i = 0; i < (ssize_t)sizeof(t->padding) ;i++) // signed to avoid compiler warning when zero-padded
@@ -343,9 +357,9 @@ char *strndupz_int(const char *s, size_t len, const char *file, const char *func
 
     struct malloc_header *t = (struct malloc_header *)libc_malloc(malloc_header_size + size);
     if (unlikely(!t)) fatal("strndupz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
-    t->signature.magic = 0x0BADCAFE;
     t->signature.trace = p;
     t->signature.size = size;
+    t->signature.magic = malloc_header_magic(t);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     for(ssize_t i = 0; i < (ssize_t)sizeof(t->padding) ;i++) // signed to avoid compiler warning when zero-padded
@@ -358,10 +372,13 @@ char *strndupz_int(const char *s, size_t len, const char *file, const char *func
 }
 
 static struct malloc_header *malloc_get_header(void *ptr, const char *caller, const char *file, const char *function, size_t line) {
+    if(!ptr)
+        return NULL;
+
     uint8_t *ret = (uint8_t *)ptr - malloc_header_size;
     struct malloc_header *t = (struct malloc_header *)ret;
 
-    if(t->signature.magic != 0x0BADCAFE) {
+    if(t->signature.magic != malloc_header_magic(t)) {
         netdata_log_error("pointer %p is not our pointer (called %s() from %zu@%s, %s()).", ptr, caller, line, file, function);
         return NULL;
     }
@@ -391,9 +408,9 @@ void *reallocz_int(void *ptr, size_t size, const char *file, const char *functio
 
     t = (struct malloc_header *)libc_realloc(t, malloc_header_size + size);
     if (unlikely(!t)) fatal("reallocz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
-    t->signature.magic = 0x0BADCAFE;
     t->signature.trace = p;
     t->signature.size = size;
+    t->signature.magic = malloc_header_magic(t);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     for(ssize_t i = 0; i < (ssize_t)sizeof(t->padding) ;i++) // signed to avoid compiler warning when zero-padded
