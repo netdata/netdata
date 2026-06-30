@@ -4,6 +4,8 @@
 
 #include <array>
 
+#include <dlib/error.h>
+
 #include "ad_charts.h"
 #include "sqlite3.h"
 #include "streaming/stream-control.h"
@@ -1005,7 +1007,27 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
         }
 
         ml_kmeans_init(&dim->kmeans);
-        ml_kmeans_train(&dim->kmeans, worker->training_samples, Cfg.max_kmeans_iters, training_response.query_after_t, training_response.query_before_t);
+        try {
+            ml_kmeans_train(&dim->kmeans, worker->training_samples, Cfg.max_kmeans_iters, training_response.query_after_t, training_response.query_before_t);
+        }
+        catch (const dlib::error &e) {
+            // dlib (kmeans/matrix) can throw dlib::fatal_error (and other
+            // dlib::error subtypes) on numerical edge cases. Letting it escape
+            // ml_train_main terminates the process. Skip this dimension's model
+            // for this round instead. A non-dlib std::exception such as
+            // std::bad_alloc is a genuine fatal condition, not a transient
+            // training failure, so it is intentionally left to propagate.
+            // Clear training_in_progress here (the normal path clears it via
+            // ml_dimension_update_models()); otherwise the precheck would keep
+            // returning TRAINING_IN_PROGRESS and the dimension would be stuck.
+            // Do NOT finalize constant state -- this is a transient failure and
+            // the dimension should retrain normally next round.
+            netdata_log_error("ML: KMeans training raised an exception (%s); skipping model creation for this dimension this round", e.what());
+            spinlock_lock(&dim->slock);
+            dim->training_in_progress = false;
+            spinlock_unlock(&dim->slock);
+            return ML_WORKER_RESULT_NOT_ENOUGH_COLLECTED_VALUES;
+        }
     }
 
     // update models
