@@ -372,13 +372,22 @@ static bool find_filename_to_serve(const char *filename, char *dst, size_t dst_l
 
     int fallback = 0;
 
+    // UCRT64's stat()/open() cannot resolve MSYS2 POSIX paths (/c/...) —
+    // translate to Windows form (C:\...) before any filesystem call.
+#if defined(OS_WINDOWS)
+    char win_web_dir[FILENAME_MAX + 1];
+    const char *web_dir = os_translate_path(win_web_dir, netdata_configured_web_dir, sizeof(win_web_dir));
+#else
+    const char *web_dir = netdata_configured_web_dir;
+#endif
+
     if(has_extension) {
         if(d_version == -1)
-            snprintfz(dst, dst_len, "%s/%s", netdata_configured_web_dir, filename);
+            snprintfz(dst, dst_len, "%s/%s", web_dir, filename);
         else {
             // check if the filename or directory exists
             // fallback to the same path without the dashboard version otherwise
-            snprintfz(dst, dst_len, "%s/v%d/%s", netdata_configured_web_dir, d_version, filename);
+            snprintfz(dst, dst_len, "%s/v%d/%s", web_dir, d_version, filename);
             fallback = 1;
         }
     }
@@ -386,40 +395,40 @@ static bool find_filename_to_serve(const char *filename, char *dst, size_t dst_l
         if(filename && *filename) {
             // check if the filename exists
             // fallback to /vN/index.html otherwise
-            snprintfz(dst, dst_len, "%s/%s", netdata_configured_web_dir, filename);
+            snprintfz(dst, dst_len, "%s/%s", web_dir, filename);
             fallback = 2;
         }
         else {
             if(filename && *filename)
                 web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH);
-            snprintfz(dst, dst_len, "%s/v%d", netdata_configured_web_dir, d_version);
+            snprintfz(dst, dst_len, "%s/v%d", web_dir, d_version);
         }
     }
     else {
         // check if filename exists
         // this is needed to serve {filename}/index.html, in case a user puts a html file into a directory
         // fallback to /index.html otherwise
-        snprintfz(dst, dst_len, "%s/%s", netdata_configured_web_dir, filename);
+        snprintfz(dst, dst_len, "%s/%s", web_dir, filename);
         fallback = 3;
     }
 
     if (stat(dst, statbuf) != 0) {
         if(fallback == 1) {
-            snprintfz(dst, dst_len, "%s/%s", netdata_configured_web_dir, filename);
+            snprintfz(dst, dst_len, "%s/%s", web_dir, filename);
             if (stat(dst, statbuf) != 0)
                 return false;
         }
         else if(fallback == 2) {
             if(filename && *filename)
                 web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH);
-            snprintfz(dst, dst_len, "%s/v%d", netdata_configured_web_dir, d_version);
+            snprintfz(dst, dst_len, "%s/v%d", web_dir, d_version);
             if (stat(dst, statbuf) != 0)
                 return false;
         }
         else if(fallback == 3) {
             if(filename && *filename)
                 web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH);
-            snprintfz(dst, dst_len, "%s", netdata_configured_web_dir);
+            snprintfz(dst, dst_len, "%s", web_dir);
             if (stat(dst, statbuf) != 0)
                 return false;
         }

@@ -218,7 +218,15 @@ void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
 
         case NDLM_DEVNULL:
         case NDLM_FILE: {
-            int fd = open(e->filename, O_WRONLY | O_APPEND | O_CREAT, 0664);
+            // UCRT64's open() cannot resolve MSYS2 POSIX paths (/c/...) —
+            // translate to Windows form (C:\...) so the log file is actually created.
+#if defined(OS_WINDOWS)
+            char win_log_path[FILENAME_MAX + 1];
+            const char *log_path = os_translate_path(win_log_path, e->filename, sizeof(win_log_path));
+#else
+            const char *log_path = e->filename;
+#endif
+            int fd = open(log_path, O_WRONLY | O_APPEND | O_CREAT, 0664);
             if(fd == -1) {
                 if(e->fd != STDOUT_FILENO && e->fd != STDERR_FILENO) {
                     e->fd = STDERR_FILENO;
