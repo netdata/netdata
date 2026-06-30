@@ -482,6 +482,10 @@ static bool nd_logger_windows(struct nd_log_source *source, struct log_field *fi
     if (!nd_log.eventlog.initialized)
         return false;
 
+    static int first_call = 1;
+    if(__atomic_exchange_n(&first_call, 0, __ATOMIC_RELAXED))
+        nd_win_trace("nd_logger_windows: first call source=%s", nd_log_id2source(source->source));
+
     ND_LOG_FIELD_PRIORITY priority = NDLP_INFO;
     if (fields[NDF_PRIORITY].entry.set)
         priority = (ND_LOG_FIELD_PRIORITY) fields[NDF_PRIORITY].entry.u64;
@@ -584,6 +588,11 @@ static bool nd_logger_windows(struct nd_log_source *source, struct log_field *fi
     {
         // eventID based logging - WEL
         rc = ReportEventW(source->hEventLog, wType, 0, eventID, NULL, _NDF_MAX - 1, 0, wel_messages, NULL);
+        if(!rc) {
+            DWORD err = GetLastError();
+            nd_win_trace("nd_logger_windows[%s]: ReportEventW FAILED err=%lu eventID=0x%lx",
+                         nd_log_id2source(source->source), (unsigned long)err, (unsigned long)eventID);
+        }
     }
 
     spinlock_unlock(&spinlock);
