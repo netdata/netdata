@@ -3,7 +3,7 @@
 Netdata is fully compatible with Amazon Web Services (AWS).
 You can install Netdata on cloud instances to monitor the apps/services running there, or use multiple instances in a [parent-child streaming](/src/streaming/README.md) configuration.
 
-## Monitor Amazon EKS clusters
+## Install Netdata on Amazon EKS (Kubernetes)
 
 Amazon Elastic Kubernetes Service (Amazon EKS) is AWS's managed Kubernetes service. To monitor an EKS cluster, follow the dedicated [Kubernetes installation guide](/packaging/installer/methods/kubernetes.md), which covers deploying Netdata on Kubernetes using Helm.
 
