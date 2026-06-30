@@ -7,10 +7,22 @@ void mallocz_register_out_of_memory_cb(out_of_memory_cb cb) {
     out_of_memory_callback = cb;
 }
 
+static __thread bool out_of_memory_running = false;
 
 ALWAYS_INLINE NORETURN
 void out_of_memory(const char *call, size_t size, const char *details) {
     int errno_saved = errno;
+
+    if(unlikely(out_of_memory_running)) {
+        errno = errno_saved;
+        fatal("Out of memory on %s(%zu bytes) while already handling out-of-memory.\n"
+              "Additional details: %s",
+              call, size,
+              details ? details : "none");
+    }
+
+    out_of_memory_running = true;
+
     exit_initiated_add(EXIT_REASON_OUT_OF_MEMORY);
 
     if(out_of_memory_callback)
