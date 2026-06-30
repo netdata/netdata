@@ -90,9 +90,19 @@ flowchart TD
 
 ## Outbound Network Communication
 
-An on-prem Netdata Agent initiates outbound network connections only through a small number of well-defined paths. For Cloud communication the Agent is never an inbound server — all Cloud traffic is **outbound and initiated by the Agent**.
+A Netdata Agent initiates outbound network connections only through a small number of well-defined paths. For Cloud communication the Agent is never an inbound server — all Cloud traffic is **outbound and initiated by the Agent**.
 
 Understanding each path, its default state, and how to disable it is essential when deploying the Agent in restricted or air-gapped networks. The paths below are the only default outbound connections a stock Agent makes.
+
+### Summary
+
+| **Communication Path**              | **Default State**      | **Trigger**                       | **Destination**                                                           | **How to Disable**                                                                                                             |
+|:------------------------------------|:-----------------------|:----------------------------------|:--------------------------------------------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------|
+| Anonymous telemetry (backend)       | On                     | Agent start, stop, or fatal crash | Netdata telemetry cloud function (GCP) over HTTPS                         | Create `.opt-out-from-anonymous-statistics`, set `DISABLE_TELEMETRY=1`/`DO_NOT_TRACK=1`, or install with `--disable-telemetry` |
+| Anonymous telemetry (dashboard)     | On                     | Viewing the local Agent dashboard | PostHog (anonymized page-view events)                                     | Same as above (shared opt-out controls)                                                                                        |
+| Agent-Cloud Link (ACLK)             | Off until connected    | Connecting a node to a Space      | `app.netdata.cloud`, `api.netdata.cloud`, `mqtt.netdata.cloud` (WSS, 443) | Do not connect the Agent to Netdata Cloud                                                                                      |
+| Installer script download           | n/a (install time)     | Running `kickstart.sh`            | `get.netdata.cloud`                                                       | Pre-download the script for an offline install                                                                                 |
+| Package download / automatic update | On for online installs | Install, or scheduled auto-update | `repository.netdata.cloud`                                                | `--no-updates` at install, or disable `netdata-updater.sh`                                                                     |
 
 ### Anonymous telemetry
 
@@ -108,13 +118,13 @@ Telemetry is **on by default** and carries only anonymized metadata — never ra
 The [ACLK](/src/aclk/README.md) is the channel the Agent uses to communicate with Netdata Cloud. It:
 
 - Uses an **outgoing** secure WebSocket (WSS) connection on port `443`.
-- Activates **only after you claim/connect a node** to a Netdata Cloud Space.
+- Activates **only after you connect a node** to a Netdata Cloud Space.
 - Requires outbound access to `app.netdata.cloud`, `api.netdata.cloud`, and `mqtt.netdata.cloud`.
 - Transmits only the metadata needed for coordination and access control — **raw metrics never leave your infrastructure**.
 
-For the complete firewall allowlist with ports, see [Configure Netdata for cybersecurity platforms](/docs/netdata-agent/configure-netdata-for-cybersecurity-platforms.md#required-endpoints-and-ports).
+IP addresses can change without notice and vary based on your geographic location due to CDN-edge servers, so **always prefer domain-based allowlisting**. For the complete firewall allowlist with ports, see [Configure Netdata for cybersecurity platforms](/docs/netdata-agent/configure-netdata-for-cybersecurity-platforms.md#required-endpoints-and-ports). If your Agent requires a proxy to reach the internet, see [proxy configuration](/src/claim/README.md#proxy-configuration).
 
-ACLK is **off until you claim the Agent**. An unclaimed Agent never opens this connection.
+ACLK is **off until you connect the Agent**. An unconnected Agent never opens this connection.
 
 ### Installation and updates
 
@@ -130,25 +140,15 @@ Disable automatic updates with the `--no-updates` flag at install time, or by di
 
 When all three of the following are true, the running Agent daemon makes **no outbound internet connections** and operates fully autonomously:
 
-1. The Agent is **not claimed** to Netdata Cloud (ACLK stays inactive).
+1. The Agent is **not connected** to Netdata Cloud (ACLK stays inactive).
 2. **Anonymous telemetry is disabled**.
 3. **Automatic updates are disabled** (or the host has no route to the package repository).
 
 In this state the Agent continues to collect, store, and serve metrics locally. User-configured collectors (for example, an HTTP-based collector pointed at an external endpoint) may open their own outbound connections — those are driven by your configuration, not by default Agent behavior.
 
-### Summary
-
-| **Communication Path**              | **Default State**      | **Trigger**                           | **Destination**                                                           | **How to Disable**                                                                                                             |
-|:------------------------------------|:-----------------------|:--------------------------------------|:--------------------------------------------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------|
-| Anonymous telemetry (backend)       | On                     | Agent start, stop, or fatal crash     | Netdata telemetry cloud function (GCP) over HTTPS                         | Create `.opt-out-from-anonymous-statistics`, set `DISABLE_TELEMETRY=1`/`DO_NOT_TRACK=1`, or install with `--disable-telemetry` |
-| Anonymous telemetry (dashboard)     | On                     | Viewing the local Agent dashboard     | PostHog (anonymized page-view events)                                     | Same opt-out mechanism as backend telemetry                                                                                    |
-| Agent-Cloud Link (ACLK)             | Off until claimed      | Claiming/connecting a node to a Space | `app.netdata.cloud`, `api.netdata.cloud`, `mqtt.netdata.cloud` (WSS, 443) | Do not claim the Agent to Netdata Cloud                                                                                        |
-| Installer script download           | n/a (install time)     | Running `kickstart.sh`                | `get.netdata.cloud`                                                       | Pre-download the script for an offline install                                                                                 |
-| Package download / automatic update | On for online installs | Install, or scheduled auto-update     | `repository.netdata.cloud`                                                | `--no-updates` at install, or disable `netdata-updater.sh`                                                                     |
-
 :::tip
 
-For air-gapped or strictly firewalled environments, the recommended baseline is: disable telemetry, do not claim the Agent, and disable automatic updates. With those three in place the Agent runs with no outbound internet dependencies. See [Install Netdata on Offline Systems](/packaging/installer/methods/offline.md) for a fully disconnected installation procedure.
+For air-gapped or strictly firewalled environments, the recommended baseline is: disable telemetry, do not connect the Agent to Netdata Cloud, and disable automatic updates. With those three in place the Agent runs with no outbound internet dependencies. See [Install Netdata on Offline Systems](/packaging/installer/methods/offline.md) for a fully disconnected installation procedure.
 
 :::
 
