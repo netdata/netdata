@@ -21,9 +21,81 @@
 //! no per-id dictionary or offsets stored (the `TRCE` column is the dictionary,
 //! compared indirectly).
 
-use serde::{Deserialize, Serialize};
+use std::ops::Range;
+
+use serde::de::Error as _;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{Error, TraceId, TraceIds};
+
+/// First-byte fanout over the indexed `trace_id`s (git-packfile style): 256
+/// cumulative counts where `self.0[b]` = number of indexed positions whose
+/// `trace_id` first byte is `<= b`. The bucket for byte `b` is the half-open
+/// run `[self.0[b-1], self.0[b])` ([`Fanout::bucket`]).
+///
+/// A fixed `[u32; 256]`, so the length-256 invariant is a compile-time
+/// guarantee rather than a runtime check. Every `Fanout` — whether built
+/// ([`Fanout::build`]) or decoded ([`Deserialize`]) — is **monotonic
+/// non-decreasing**: `build` produces it by cumulative sum, and `deserialize`
+/// rejects a non-monotonic encoding at the parse boundary, so [`Fanout::bucket`]
+/// can never yield an inverted (`lo > hi`) range. Serde has no `[T; 256]` impl
+/// (arrays only to `[T; 32]`), so the codec is a hand-written
+/// `&[u32]`-slice round-trip — wire-identical to a `Vec<u32>`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Fanout([u32; 256]);
+
+impl Fanout {
+    /// Build the cumulative fanout from the first byte of every indexed id.
+    /// Order-independent (it is a histogram + prefix sum).
+    fn build(first_bytes: impl Iterator<Item = u8>) -> Self {
+        let mut counts = [0u32; 256];
+        for b in first_bytes {
+            counts[b as usize] += 1;
+        }
+        let mut acc = 0u32;
+        for slot in &mut counts {
+            acc += *slot;
+            *slot = acc;
+        }
+        Fanout(counts)
+    }
+
+    /// The half-open `sort_perm` range holding the positions whose `trace_id`
+    /// first byte is `first_byte`. Never inverts: `Fanout` is always monotonic.
+    fn bucket(&self, first_byte: u8) -> Range<usize> {
+        let b = first_byte as usize;
+        let lo = if b == 0 { 0 } else { self.0[b - 1] as usize };
+        let hi = self.0[b] as usize;
+        lo..hi
+    }
+
+    /// Total indexed positions (`self.0[255]`); must equal `sort_perm.len()`.
+    fn total(&self) -> u32 {
+        self.0[255]
+    }
+}
+
+impl Serialize for Fanout {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        // Wire-identical to `Vec<u32>` under bincode (len prefix + elements).
+        self.0.as_slice().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Fanout {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let v = Vec::<u32>::deserialize(deserializer)?;
+        let arr: [u32; 256] = v
+            .try_into()
+            .map_err(|v: Vec<u32>| D::Error::invalid_length(v.len(), &"256 fanout entries"))?;
+        // Enforce monotonicity at the parse boundary so `bucket()` cannot invert
+        // (panic-safety for the `sort_perm[lo..hi]` slice). Cheap O(256).
+        if arr.windows(2).any(|w| w[0] > w[1]) {
+            return Err(D::Error::custom("fanout is not monotonic non-decreasing"));
+        }
+        Ok(Fanout(arr))
+    }
+}
 
 /// The `trace_id` index: a first-byte fanout over row positions sorted by their
 /// 16-byte `trace_id`. Built at seal from the `TRCE` column, read on lookup.
@@ -32,13 +104,8 @@ use crate::{Error, TraceId, TraceIds};
 /// `TRCE` column the index was built from (positions are indices into it).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TraceIdIndex {
-    /// 256 cumulative first-byte counts. `fanout[b]` = number of indexed
-    /// positions whose `trace_id[0] <= b`; `fanout[255]` == `sort_perm.len()`.
-    /// Kept as a `Vec`: serde implements `Serialize`/`Deserialize` for arrays
-    /// only up to `[T; 32]` (verified — not const-generic), so `[u32; 256]` is
-    /// not serializable through the `bincode::serde` chunk codec. The length-256
-    /// invariant is instead enforced on decode by [`TraceIdIndex::validate`].
-    fanout: Vec<u32>,
+    /// First-byte fanout over the indexed ids (see [`Fanout`]).
+    fanout: Fanout,
     /// Row positions sorted ascending by 16-byte `trace_id`. Length is the
     /// number of indexed (set-id) rows, `<= record_count`.
     sort_perm: Vec<u32>,
@@ -58,15 +125,8 @@ impl TraceIdIndex {
         // so a trace's spans come back in time order.
         sort_perm.sort_by_key(|&a| trace_ids.get(a as usize));
 
-        let mut fanout = vec![0u32; 256];
-        for &p in &sort_perm {
-            fanout[trace_ids.get(p as usize).as_bytes()[0] as usize] += 1;
-        }
-        let mut acc = 0u32;
-        for slot in &mut fanout {
-            acc += *slot;
-            *slot = acc;
-        }
+        let fanout =
+            Fanout::build(sort_perm.iter().map(|&p| trace_ids.get(p as usize).as_bytes()[0]));
 
         // Enforce the index invariants at write time (debug builds + tests),
         // where a producer bug is cheap to catch at its source — rather than
@@ -107,10 +167,7 @@ impl TraceIdIndex {
         if needle.is_unset() {
             return &[];
         }
-        let b = needle.as_bytes()[0] as usize;
-        let lo = if b == 0 { 0 } else { self.fanout[b - 1] as usize };
-        let hi = self.fanout[b] as usize;
-        let bucket = &self.sort_perm[lo..hi];
+        let bucket = &self.sort_perm[self.fanout.bucket(needle.as_bytes()[0])];
         // `bucket` is sorted ascending by id, so both predicates are monotonic.
         let start = bucket.partition_point(|&p| trace_ids.get(p as usize) < needle);
         let end = bucket.partition_point(|&p| trace_ids.get(p as usize) <= needle);
@@ -128,32 +185,23 @@ impl TraceIdIndex {
     /// indexing out of bounds or trusting a broken fanout.
     ///
     /// Scope is **panic-safety**: it guarantees `positions()` cannot index out
-    /// of bounds (fanout shape/monotonicity bound the bucket slice; the position
-    /// range bounds the `TRCE` access). It deliberately does NOT re-verify the
-    /// *semantic* invariants (`sort_perm` actually sorted by id, buckets
-    /// matching first-byte, positions unique) — those would cost an extra O(N)
-    /// pass on every read and are instead enforced at write time
-    /// (`build()`'s `debug_assert`s) under the CRC integrity guarantee, since the
-    /// only producer is `build()` and the bytes on disk are CRC-checked. A future
+    /// of bounds. [`Fanout`] already self-guarantees length-256 + monotonicity
+    /// (so a bucket slice never inverts); this adds the fanout↔`sort_perm`
+    /// relation (`total == sort_perm.len()`, so a bucket's `hi` never exceeds
+    /// `sort_perm`) and the position↔`record_count` range (so the `TRCE` access
+    /// is in bounds). It deliberately does NOT re-verify the *semantic*
+    /// invariants (`sort_perm` actually sorted by id, buckets matching
+    /// first-byte, positions unique) — those would cost an extra O(N) pass on
+    /// every read and are instead enforced at write time (`build()`'s
+    /// `debug_assert`s) under the CRC integrity guarantee, since the only
+    /// producer is `build()` and the bytes on disk are CRC-checked. A future
     /// producer regressing them is caught in debug/test, not in release reads.
     pub(crate) fn validate(&self, record_count: usize) -> Result<(), Error> {
-        if self.fanout.len() != 256 {
-            return Err(Error::CorruptIndex(format!(
-                "trace_id index fanout has {} entries, expected 256",
-                self.fanout.len()
-            )));
-        }
-        // Monotonic non-decreasing.
-        if self.fanout.windows(2).any(|w| w[0] > w[1]) {
-            return Err(Error::CorruptIndex(
-                "trace_id index fanout is not monotonic".into(),
-            ));
-        }
         // The last bucket must account for every permuted position.
-        if self.fanout[255] as usize != self.sort_perm.len() {
+        if self.fanout.total() as usize != self.sort_perm.len() {
             return Err(Error::CorruptIndex(format!(
-                "trace_id index fanout[255]={} != sort_perm len {}",
-                self.fanout[255],
+                "trace_id index fanout total {} != sort_perm len {}",
+                self.fanout.total(),
                 self.sort_perm.len()
             )));
         }
@@ -275,35 +323,65 @@ mod tests {
         assert!(idx.validate(t.len()).is_ok());
     }
 
-    #[test]
-    fn validate_rejects_short_fanout() {
-        let idx = TraceIdIndex { fanout: vec![0u32; 10], sort_perm: vec![] };
-        assert!(idx.validate(0).is_err());
+    /// Round-trip a `Vec<u32>` through the chunk codec and decode it as a
+    /// `Fanout` — the path a malformed on-disk fanout would take.
+    fn decode_fanout(raw: &[u32]) -> Result<Fanout, bincode::error::DecodeError> {
+        let bytes = bincode::serde::encode_to_vec(raw, bincode::config::standard()).unwrap();
+        bincode::serde::decode_from_slice(&bytes, bincode::config::standard()).map(|(f, _)| f)
     }
 
     #[test]
-    fn validate_rejects_non_monotonic_fanout() {
-        let mut fanout = vec![0u32; 256];
-        // A drop at byte 6 violates the cumulative (non-decreasing) invariant.
-        fanout[5] = 10;
-        fanout[6] = 5;
-        // Make the tail consistent with sort_perm len so only monotonicity fails.
-        let idx = TraceIdIndex { fanout, sort_perm: vec![] };
-        assert!(idx.validate(0).is_err(), "non-monotonic fanout must be rejected");
+    fn fanout_build_and_bucket() {
+        // first bytes: A(0x41)×2, B(0x42)×1 → cumulative buckets.
+        let f = Fanout::build([0x41, 0x42, 0x41].into_iter());
+        assert_eq!(f.total(), 3);
+        assert_eq!(f.bucket(0x41), 0..2);
+        assert_eq!(f.bucket(0x42), 2..3);
+        assert_eq!(f.bucket(0x00), 0..0, "empty bucket below the first id");
+        assert_eq!(f.bucket(0xFF), 3..3, "empty bucket above the last id");
+    }
+
+    #[test]
+    fn fanout_serde_round_trips() {
+        let f = Fanout::build([1u8, 1, 2, 255].into_iter());
+        assert_eq!(decode_fanout_value(&f), f);
+    }
+
+    fn decode_fanout_value(f: &Fanout) -> Fanout {
+        let bytes = bincode::serde::encode_to_vec(f, bincode::config::standard()).unwrap();
+        bincode::serde::decode_from_slice(&bytes, bincode::config::standard())
+            .map(|(f, _)| f)
+            .unwrap()
+    }
+
+    #[test]
+    fn fanout_deserialize_rejects_wrong_length() {
+        // A length-256 invariant enforced at the parse boundary (the type is
+        // `[u32; 256]`, so a short/long encoding cannot decode into it).
+        assert!(decode_fanout(&[0u32; 10]).is_err());
+        assert!(decode_fanout(&[0u32; 256]).is_ok());
+    }
+
+    #[test]
+    fn fanout_deserialize_rejects_non_monotonic() {
+        let mut raw = [0u32; 256];
+        raw[5] = 10;
+        raw[6] = 5; // a drop violates the cumulative (non-decreasing) invariant.
+        assert!(decode_fanout(&raw).is_err(), "non-monotonic fanout must be rejected on decode");
     }
 
     #[test]
     fn validate_rejects_fanout_tail_mismatch() {
-        // All-zero fanout (fanout[255] == 0) but a non-empty permutation.
-        let idx = TraceIdIndex { fanout: vec![0u32; 256], sort_perm: vec![0] };
-        assert!(idx.validate(1).is_err(), "fanout[255] != sort_perm.len() must be rejected");
+        // total() == 0 (empty fanout) but a non-empty permutation.
+        let idx = TraceIdIndex { fanout: Fanout::build(std::iter::empty()), sort_perm: vec![0] };
+        assert!(idx.validate(1).is_err(), "fanout total != sort_perm.len() must be rejected");
     }
 
     #[test]
     fn validate_rejects_out_of_range_position() {
-        let mut fanout = vec![0u32; 256];
-        fanout.fill(1);
-        let idx = TraceIdIndex { fanout, sort_perm: vec![5] };
+        // total() == 1 matches sort_perm.len() == 1 (passes the tail check), but
+        // position 5 is out of range for record_count 3.
+        let idx = TraceIdIndex { fanout: Fanout::build(std::iter::once(0u8)), sort_perm: vec![5] };
         assert!(idx.validate(3).is_err(), "position 5 >= record_count 3");
     }
 
