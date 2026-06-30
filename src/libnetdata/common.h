@@ -254,6 +254,10 @@ typedef uint32_t uid_t;
 #define O_CLOEXEC (0)
 #endif
 
+#ifndef O_NOFOLLOW
+#define O_NOFOLLOW (0)
+#endif
+
 // --------------------------------------------------------------------------------------------------------------------
 // fix for alpine linux
 
