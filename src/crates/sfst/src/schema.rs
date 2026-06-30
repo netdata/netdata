@@ -1000,6 +1000,72 @@ scalar_column!(
     Durations, i64, "duration", ColumnType::I64
 );
 
+/// One per-row column's static descriptor: its manifest [`name`](Self::name),
+/// on-disk [`ColumnType`], and writer `ordinal` (the bit position the
+/// `StreamWriter` tracks per column).
+///
+/// This is the single source of truth the *homogeneous* column sites derive from
+/// — the presence count, the META [`ColumnsTable`] manifest, and the
+/// manifest-vs-counts check all iterate [`ALL_COLUMNS`]. The *heterogeneous* parts
+/// (the typed accumulator on `RowIndex`, the typed `StreamWriter` write method)
+/// stay explicit per column, because their payload types differ. Adding a column
+/// is therefore one row here plus its typed accumulator + write method, not a
+/// multi-site lockstep edit across the presence struct, the manifest builder, and
+/// the manifest check.
+#[derive(Debug, Clone, Copy)]
+pub struct ColumnSpec {
+    /// The column's manifest name (matches the typed column's `NAME`).
+    pub name: &'static str,
+    /// The column's on-disk type (matches the typed column's `COLUMN_TYPE`).
+    pub column_type: ColumnType,
+    /// The writer ordinal — the column's bit in `StreamWriter::cols_written` and
+    /// its position in [`ALL_COLUMNS`].
+    pub ordinal: u8,
+}
+
+/// Every per-row column, in canonical (ordinal) order. The SFST format is
+/// signal-agnostic: each file carries whatever subset its producer fills.
+/// `observed_ts` is logs-only; `trace_id`/`span_id`/`flags`/
+/// `dropped_attributes_count` are written by both signals; `parent_span_id` /
+/// `duration` are traces-only.
+pub static ALL_COLUMNS: [ColumnSpec; 7] = [
+    ColumnSpec {
+        name: ObservedTimestamps::NAME,
+        column_type: ObservedTimestamps::COLUMN_TYPE,
+        ordinal: 0,
+    },
+    ColumnSpec {
+        name: TraceIds::NAME,
+        column_type: TraceIds::COLUMN_TYPE,
+        ordinal: 1,
+    },
+    ColumnSpec {
+        name: SpanIds::NAME,
+        column_type: SpanIds::COLUMN_TYPE,
+        ordinal: 2,
+    },
+    ColumnSpec {
+        name: Flags::NAME,
+        column_type: Flags::COLUMN_TYPE,
+        ordinal: 3,
+    },
+    ColumnSpec {
+        name: DroppedAttributeCounts::NAME,
+        column_type: DroppedAttributeCounts::COLUMN_TYPE,
+        ordinal: 4,
+    },
+    ColumnSpec {
+        name: ParentSpanIds::NAME,
+        column_type: ParentSpanIds::COLUMN_TYPE,
+        ordinal: 5,
+    },
+    ColumnSpec {
+        name: Durations::NAME,
+        column_type: Durations::COLUMN_TYPE,
+        ordinal: 6,
+    },
+];
+
 /// Per-row W3C trace ids (`TRCE` chunk): a **fixed-stride 16-byte arena** — row `i`
 /// is `bytes[i*16 .. (i+1)*16]`, in chronological row order. An all-zero id is the
 /// OTLP/W3C "unset/invalid" sentinel, so an absent id is 16 zero bytes. Fixed width

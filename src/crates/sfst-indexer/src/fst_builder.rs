@@ -25,8 +25,8 @@ use std::time::Instant;
 
 use roaring::RoaringBitmap;
 use sfst::{
-    ChunkCounts, ColumnEntry, ColumnsPresent, ColumnsTable, DroppedAttributeCounts, Flags,
-    ObservedTimestamps, SpanIds, StreamWriter, TraceIds,
+    ChunkCounts, ColumnEntry, ColumnsPresent, ColumnsTable, DroppedAttributeCounts, Durations,
+    Flags, ObservedTimestamps, ParentSpanIds, SpanIds, StreamWriter, TraceIdIndex, TraceIds,
 };
 use treight::Bitmap;
 
@@ -88,19 +88,19 @@ fn build_id_translation(row_index: &RowIndex) -> (Vec<KvId>, IdRanges) {
 /// slices of `batch_size` entries each, and packs each slice into its
 /// own chunk — packed by the writer, written, and dropped in turn.
 ///
-/// `total_logs == 0` is handled explicitly: a single empty batch is
+/// `total_rows == 0` is handled explicitly: a single empty batch is
 /// emitted so the file always carries at least one `SB{i}` chunk.
 fn build_stream_batches<W: Write + Seek>(
-    log_entries: &[Vec<KvSlot>],
+    row_entries: &[Vec<KvSlot>],
     time_order: &TimeOrder,
     kv_to_file: &[KvId],
-    total_logs: u32,
+    total_rows: u32,
     w: &mut StreamWriter<W>,
 ) -> Result<(), IndexError> {
     let entries: Vec<Vec<KvId>> = time_order
         .iter_by_time()
         .map(|ins| {
-            log_entries[ins as usize]
+            row_entries[ins as usize]
                 .iter()
                 .map(|&kv_slot| kv_to_file[kv_slot.idx()])
                 .collect()
@@ -112,7 +112,7 @@ fn build_stream_batches<W: Write + Seek>(
         // file's chunk layout is always valid.
         w.add_stream_batch(&sfst::StreamBatch::for_write(&[]))?;
     } else {
-        let batch_size = sfst::stream_batch_size(total_logs) as usize;
+        let batch_size = sfst::stream_batch_size(total_rows) as usize;
         for batch in entries.chunks(batch_size) {
             // The batch-size rule guarantees ≤ MAX_STREAM_BATCHES slices,
             // and the writer's declared count enforces it: one slice too
@@ -266,7 +266,7 @@ fn batch_mask(rb: &RoaringBitmap, time_order: &TimeOrder, batch_size: u32) -> u8
 /// Resolution only — the returned pair lands in the `SUMR` chunk; the
 /// stream-batch chunks themselves are emitted later by
 /// [`build_stream_batches`].
-fn resolve_stream(row_index: &RowIndex, total_logs: u32) -> Result<ServiceStream, IndexError> {
+fn resolve_stream(row_index: &RowIndex, total_rows: u32) -> Result<ServiceStream, IndexError> {
     let stream = row_index.service_stream()?;
 
     let namespace = if stream.namespace.is_empty() {
@@ -281,8 +281,8 @@ fn resolve_stream(row_index: &RowIndex, total_logs: u32) -> Result<ServiceStream
     };
     tracing::debug!(
         "stream {namespace}/{name}: {} logs, {} batches",
-        row_index.num_logs(),
-        sfst::num_stream_batches(total_logs),
+        row_index.num_rows(),
+        sfst::num_stream_batches(total_rows),
     );
 
     Ok(stream)
@@ -365,8 +365,8 @@ pub fn build_into<W: Write + Seek>(
     tracing::debug!("time order built: {}ms", t.elapsed().as_millis());
 
     // Total log count drives the stream-batch partitioning.
-    let total_logs = row_index.num_logs() as u32;
-    let batch_size = sfst::stream_batch_size(total_logs);
+    let total_rows = row_index.num_rows() as u32;
+    let batch_size = sfst::stream_batch_size(total_rows);
 
     let (kv_to_file, id_ranges) = build_id_translation(row_index);
 
@@ -422,14 +422,14 @@ pub fn build_into<W: Write + Seek>(
     let content_meta = match content_meta_override {
         Some(cm) => cm,
         None => {
-            let stream = resolve_stream(row_index, total_logs)?;
+            let stream = resolve_stream(row_index, total_rows)?;
             otel_logs_identity::encode_content_meta(&stream).ok_or(IndexError::IdentityTooLarge)?
         }
     };
     let summary = sfst::Summary {
         min_timestamp_s: histogram.timestamps.first().copied().unwrap_or(0),
         max_timestamp_s: histogram.timestamps.last().copied().unwrap_or(0),
-        record_count: total_logs,
+        record_count: total_rows,
         content_meta,
     };
     // Per-row columns: each is independently present iff the caller supplied it.
@@ -442,37 +442,21 @@ pub fn build_into<W: Write + Seek>(
         span_id: row_index.span_ids.is_some(),
         flags: row_index.flags.is_some(),
         dropped_attributes_count: row_index.dropped_attribute_counts.is_some(),
-        // Span-only columns; the logs seal path never sets them. Populated by the
-        // traces seal in a later step (SOW-20260630 Step 4).
-        parent_span_id: false,
-        duration: false,
+        // Span-only columns; the logs seal leaves these `None`, the traces seal
+        // fills them. Presence is driven straight off the `RowIndex` `Option`s.
+        parent_span_id: row_index.parent_span_ids.is_some(),
+        duration: row_index.durations.is_some(),
     };
-    let mut col_entries = Vec::new();
-    let mut col_entry = |present: bool, name: &str, ty| {
-        if present {
-            col_entries.push(ColumnEntry {
-                name: name.to_string(),
-                ty,
-            });
-        }
-    };
-    col_entry(
-        columns_present.observed_ts,
-        ObservedTimestamps::NAME,
-        ObservedTimestamps::COLUMN_TYPE,
-    );
-    col_entry(
-        columns_present.trace_id,
-        TraceIds::NAME,
-        TraceIds::COLUMN_TYPE,
-    );
-    col_entry(columns_present.span_id, SpanIds::NAME, SpanIds::COLUMN_TYPE);
-    col_entry(columns_present.flags, Flags::NAME, Flags::COLUMN_TYPE);
-    col_entry(
-        columns_present.dropped_attributes_count,
-        DroppedAttributeCounts::NAME,
-        DroppedAttributeCounts::COLUMN_TYPE,
-    );
+    // The manifest is the same presence set rendered in canonical column order —
+    // one `ALL_COLUMNS`-driven source (`ColumnsPresent::present`), so it always
+    // agrees with the chunks written below and with the writer's manifest check.
+    let col_entries: Vec<ColumnEntry> = columns_present
+        .present()
+        .map(|s| ColumnEntry {
+            name: s.name.to_string(),
+            ty: s.column_type,
+        })
+        .collect();
     // The v9 field descriptor is the typed schema tree. A producer with typed
     // flattening (`ng-index`) supplies the structural tree; we fill its leaf
     // stats from `fields` (matched by path). A producer with no tree (raw
@@ -499,14 +483,14 @@ pub fn build_into<W: Write + Seek>(
     // which is what lets the writer reserve the TOC up front.
     let counts = ChunkCounts {
         columns: columns_present,
-        // Step 1 (SOW-20260630): the trace_id index is built only by the traces
-        // slice; the logs seal path does not emit it yet.
-        trace_id_index: false,
+        // Built from the chronological `trace_id` column when the producer asks
+        // (the traces seal). The logs seal leaves `build_trace_id_index` false.
+        trace_id_index: row_index.build_trace_id_index,
         mid_fields: u16::try_from(row_index.mid_fields().len())
             .expect("mid-card field count exceeds u16::MAX"),
         high_fields: u16::try_from(row_index.high_fields().len())
             .expect("high-card field count exceeds u16::MAX"),
-        stream_batches: sfst::num_stream_batches(total_logs),
+        stream_batches: sfst::num_stream_batches(total_rows),
     };
     let mut w = StreamWriter::new(sink, counts)?;
 
@@ -532,16 +516,23 @@ pub fn build_into<W: Write + Seek>(
     // its own chunk. Each is independent: a present column is written, an absent
     // one skipped; a present column whose length != row count is a caller bug
     // (checked, not panicked). The production path supplies none, so no chunks.
-    let n = total_logs as usize;
+    let n = total_rows as usize;
     let by_time = || time_order.iter_by_time().map(|ins| ins as usize);
     if let Some(c) = &row_index.observed_timestamps {
         check_column_len(ObservedTimestamps::NAME, c.len(), n)?;
         w.observed_timestamps(&c.reordered(by_time()))?;
     }
-    if let Some(c) = &row_index.trace_ids {
-        check_column_len(TraceIds::NAME, c.len(), n)?;
-        w.trace_ids(&c.reordered(by_time()))?;
-    }
+    // The chronological `trace_id` column, kept to (optionally) build the TIDX from
+    // the exact positions the column is written under — they must align.
+    let chronological_trace_ids = match &row_index.trace_ids {
+        Some(c) => {
+            check_column_len(TraceIds::NAME, c.len(), n)?;
+            let chronological = c.reordered(by_time());
+            w.trace_ids(&chronological)?;
+            Some(chronological)
+        }
+        None => None,
+    };
     if let Some(c) = &row_index.span_ids {
         check_column_len(SpanIds::NAME, c.len(), n)?;
         w.span_ids(&c.reordered(by_time()))?;
@@ -554,6 +545,25 @@ pub fn build_into<W: Write + Seek>(
         check_column_len(DroppedAttributeCounts::NAME, c.len(), n)?;
         w.dropped_attribute_counts(&c.reordered(by_time()))?;
     }
+    if let Some(c) = &row_index.parent_span_ids {
+        check_column_len(ParentSpanIds::NAME, c.len(), n)?;
+        w.parent_span_ids(&c.reordered(by_time()))?;
+    }
+    if let Some(c) = &row_index.durations {
+        check_column_len(Durations::NAME, c.len(), n)?;
+        w.durations(&c.reordered(by_time()))?;
+    }
+
+    // Optional `trace_id` index (TIDX), after the per-row columns (the writer's
+    // TraceIndex stage). Built from the same chronological `trace_id` column just
+    // written, so its `sort_perm` positions index the rows correctly. Only the
+    // traces seal sets `build_trace_id_index`; the logs seal skips this entirely.
+    if row_index.build_trace_id_index {
+        let trace_ids = chronological_trace_ids.as_ref().expect(
+            "build_trace_id_index requires the trace_id column (StreamWriter also enforces this)",
+        );
+        w.trace_id_index(&TraceIdIndex::build(trace_ids))?;
+    }
 
     // Low/mid-cardinality FSTs, high-cardinality chunks, then the
     // stream batches — each packed, streamed, and dropped in turn.
@@ -562,10 +572,10 @@ pub fn build_into<W: Write + Seek>(
 
     let t = Instant::now();
     build_stream_batches(
-        &row_index.log_entries,
+        &row_index.row_entries,
         &time_order,
         &kv_to_file,
-        total_logs,
+        total_rows,
         &mut w,
     )?;
     tracing::debug!("stream batches built: {}ms", t.elapsed().as_millis());

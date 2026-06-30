@@ -1,14 +1,14 @@
 //! End-to-end round trip: build OTLP requests, flatten them into a flattened-frame
 //! WAL via the shared `ng-flatten` path (the same encoding `ng-ingest` writes at
 //! ingest), then build a standard SFST index from that WAL (`build_sfst`) and query
-//! the record count back. Exercises flatten + fill_hashes + encode_frame, the `wal`
+//! the record count back. Exercises flatten + fill_log_hashes + encode_log_frame, the `wal`
 //! round trip (LZ4 on), the typed-entry interning, and the SFST emit. Independent of
 //! `ng-ingest`: frames are written here with the raw `wal::Writer`.
 
 use std::sync::Arc;
 
 use file_registry::TimestampNs;
-use ng_flatten::{encode_frame, fill_hashes, flatten_request};
+use ng_flatten::{encode_log_frame, fill_log_hashes, flatten_log_request};
 use ng_index::{Metrics, build_sfst, build_sfst_range};
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value::Value as Av};
@@ -48,9 +48,9 @@ fn write_flattened_wal(dir: &std::path::Path, counts: &[usize]) {
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
     let mut writer = wal::Writer::new(dir, wal::Config::default(), seq, 0).unwrap();
     for (i, &n) in counts.iter().enumerate() {
-        let mut flattened = flatten_request(&request(n));
-        fill_hashes(&mut flattened);
-        let bytes = encode_frame(&flattened).unwrap();
+        let mut flattened = flatten_log_request(&request(n));
+        fill_log_hashes(&mut flattened);
+        let bytes = encode_log_frame(&flattened).unwrap();
         writer
             .write_frame(
                 0,
@@ -124,9 +124,9 @@ fn per_row_columns_roundtrip_in_chronological_order() {
     let flat = tempfile::tempdir().unwrap();
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
     let mut writer = wal::Writer::new(flat.path(), wal::Config::default(), seq, 0).unwrap();
-    let mut flattened = flatten_request(&request_cols(N));
-    fill_hashes(&mut flattened);
-    let bytes = encode_frame(&flattened).unwrap();
+    let mut flattened = flatten_log_request(&request_cols(N));
+    fill_log_hashes(&mut flattened);
+    let bytes = encode_log_frame(&flattened).unwrap();
     writer
         .write_frame(
             0,
@@ -244,9 +244,9 @@ fn typed_tree_and_coalesced_kinds_roundtrip() {
     let flat = tempfile::tempdir().unwrap();
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
     let mut writer = wal::Writer::new(flat.path(), wal::Config::default(), seq, 0).unwrap();
-    let mut flattened = flatten_request(&request_typed());
-    fill_hashes(&mut flattened);
-    let bytes = encode_frame(&flattened).unwrap();
+    let mut flattened = flatten_log_request(&request_typed());
+    fill_log_hashes(&mut flattened);
+    let bytes = encode_log_frame(&flattened).unwrap();
     writer
         .write_frame(
             0,
@@ -303,9 +303,9 @@ fn write_multiframe_flat_wal(num_frames: usize) -> (tempfile::TempDir, std::path
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
     let mut writer = wal::Writer::new(flat.path(), wal::Config::default(), seq, 0).unwrap();
     for i in 0..num_frames {
-        let mut flattened = flatten_request(&request_typed());
-        fill_hashes(&mut flattened);
-        let bytes = encode_frame(&flattened).unwrap();
+        let mut flattened = flatten_log_request(&request_typed());
+        fill_log_hashes(&mut flattened);
+        let bytes = encode_log_frame(&flattened).unwrap();
         writer
             .write_frame(
                 0,

@@ -46,8 +46,8 @@ pub fn one_file_config() -> wal::Config {
 /// Normalize timestamps and ids, flatten `req`, and append it as a single WAL frame
 /// in the flattened-frame format, returning the number of log records written.
 ///
-/// `req` is normalized **in place** first: [`ng_flatten::normalize_timestamps`] resolves
-/// each record's `time_unix_nano`, and [`ng_flatten::normalize_ids`] drops malformed trace/span ids
+/// `req` is normalized **in place** first: [`ng_flatten::normalize_log_timestamps`] resolves
+/// each record's `time_unix_nano`, and [`ng_flatten::normalize_log_ids`] drops malformed trace/span ids
 /// (logging one aggregated warning per request). The request is then flattened into a
 /// per-frame schema tree + typed entries, each entry's `xxhash64(key=value)` is
 /// pre-computed (so the downstream SFST build rides the interner's fast path), and the
@@ -66,8 +66,8 @@ pub fn write_request(
     // One clock tick for the synthetic-timestamp base; normalize then runs
     // lock-free (base + offset for any record lacking event/observed time).
     let fallback_base_ns = clock.now_ns().as_u64();
-    ng_flatten::normalize_timestamps(req, fallback_base_ns);
-    let bad_ids = ng_flatten::normalize_ids(req);
+    ng_flatten::normalize_log_timestamps(req, fallback_base_ns);
+    let bad_ids = ng_flatten::normalize_log_ids(req);
     if bad_ids.any() {
         tracing::warn!(
             bad_trace_ids = bad_ids.trace,
@@ -77,9 +77,9 @@ pub fn write_request(
             ng_flatten::SPAN_ID_LEN,
         );
     }
-    let mut flattened = ng_flatten::flatten_request(req);
-    ng_flatten::fill_hashes(&mut flattened);
-    let data = ng_flatten::encode_frame(&flattened).context("encode flattened frame")?;
+    let mut flattened = ng_flatten::flatten_log_request(req);
+    ng_flatten::fill_log_hashes(&mut flattened);
+    let data = ng_flatten::encode_log_frame(&flattened).context("encode flattened frame")?;
     let ingestion_ns = clock.now_ns();
     writer.write_frame(
         PART_KEY,
@@ -111,7 +111,7 @@ pub fn count_spans(req: &ExportTraceServiceRequest) -> usize {
 /// drops malformed trace/span/parent ids. The request is then flattened
 /// ([`ng_flatten::flatten_trace_request`]) and bincode-encoded as the frame payload.
 ///
-/// Unlike [`write_request`], **no `fill_hashes` pass runs** — span `Entry.hash`es
+/// Unlike [`write_request`], **no `fill_log_hashes` pass runs** — span `Entry.hash`es
 /// stay 0. That only forfeits the seal-time interner fast path (a later seal is
 /// slightly slower); it is not a frame-validity requirement. A request with zero
 /// spans writes no frame and returns `0`.

@@ -13,12 +13,12 @@ use fst_index::FstIndex;
 use serde::Serialize;
 
 use crate::{
-    BitmapValue, CHUNK_DROPPED_ATTRS, CHUNK_DURATION, CHUNK_FLAGS, CHUNK_META, CHUNK_OBSERVED_TS,
-    CHUNK_PARENT_SPAN_IDS, CHUNK_PRIMARY, CHUNK_SPAN_IDS, CHUNK_SUMMARY, CHUNK_TIMS,
-    CHUNK_TRACE_IDS, CHUNK_TRACE_INDEX, ColumnsTable, ColumnType, DroppedAttributeCounts, Durations,
-    Error, Flags, HighField, MAGIC, MAX_STREAM_BATCHES, Metadata, ObservedTimestamps,
-    ParentSpanIds, SpanIds, StreamBatch, Summary, TraceIdIndex, TraceIds, VERSION,
-    ZSTD_LEVEL_DEFAULT, ZSTD_LEVEL_FST, high_field_id, mid_field_id, stream_batch_id,
+    ALL_COLUMNS, BitmapValue, CHUNK_DROPPED_ATTRS, CHUNK_DURATION, CHUNK_FLAGS, CHUNK_META,
+    CHUNK_OBSERVED_TS, CHUNK_PARENT_SPAN_IDS, CHUNK_PRIMARY, CHUNK_SPAN_IDS, CHUNK_SUMMARY,
+    CHUNK_TIMS, CHUNK_TRACE_IDS, CHUNK_TRACE_INDEX, ColumnSpec, ColumnsTable,
+    DroppedAttributeCounts, Durations, Error, Flags, HighField, MAGIC, MAX_STREAM_BATCHES, Metadata,
+    ObservedTimestamps, ParentSpanIds, SpanIds, StreamBatch, Summary, TraceIdIndex, TraceIds,
+    VERSION, ZSTD_LEVEL_DEFAULT, ZSTD_LEVEL_FST, high_field_id, mid_field_id, stream_batch_id,
 };
 
 /// Serialize a value with bincode, then compress with zstd.
@@ -69,20 +69,31 @@ pub struct ColumnsPresent {
 }
 
 impl ColumnsPresent {
+    /// Whether the column described by `spec` is present. The single place the
+    /// named presence fields map to [`ALL_COLUMNS`] ordinal order — every other
+    /// column site iterates `ALL_COLUMNS` and asks here, so the presence struct,
+    /// the manifest, and the manifest-vs-counts check cannot drift apart.
+    pub fn has(self, spec: &ColumnSpec) -> bool {
+        match spec.ordinal {
+            0 => self.observed_ts,
+            1 => self.trace_id,
+            2 => self.span_id,
+            3 => self.flags,
+            4 => self.dropped_attributes_count,
+            5 => self.parent_span_id,
+            6 => self.duration,
+            _ => false,
+        }
+    }
+
+    /// The present columns, in canonical (ordinal) order — the manifest order.
+    pub fn present(self) -> impl Iterator<Item = &'static ColumnSpec> {
+        ALL_COLUMNS.iter().filter(move |s| self.has(s))
+    }
+
     /// Number of present columns.
     pub fn count(self) -> u32 {
-        [
-            self.observed_ts,
-            self.trace_id,
-            self.span_id,
-            self.flags,
-            self.dropped_attributes_count,
-            self.parent_span_id,
-            self.duration,
-        ]
-        .into_iter()
-        .filter(|&b| b)
-        .count() as u32
+        self.present().count() as u32
     }
 
     /// Whether any per-row column is present.
@@ -265,25 +276,14 @@ impl<W: Write + Seek> StreamWriter<W> {
     /// canonical types (and nothing else).
     fn columns_manifest_matches(&self, manifest: &ColumnsTable) -> bool {
         let c = self.counts.columns;
-        let entry = |present: bool, name: &str, ty: ColumnType| {
-            if present {
-                manifest.get(name) == Some(ty)
-            } else {
-                manifest.get(name).is_none()
-            }
-        };
         manifest.len() == c.count() as usize
-            && entry(c.observed_ts, ObservedTimestamps::NAME, ObservedTimestamps::COLUMN_TYPE)
-            && entry(c.trace_id, TraceIds::NAME, TraceIds::COLUMN_TYPE)
-            && entry(c.span_id, SpanIds::NAME, SpanIds::COLUMN_TYPE)
-            && entry(c.flags, Flags::NAME, Flags::COLUMN_TYPE)
-            && entry(
-                c.dropped_attributes_count,
-                DroppedAttributeCounts::NAME,
-                DroppedAttributeCounts::COLUMN_TYPE,
-            )
-            && entry(c.parent_span_id, ParentSpanIds::NAME, ParentSpanIds::COLUMN_TYPE)
-            && entry(c.duration, Durations::NAME, Durations::COLUMN_TYPE)
+            && ALL_COLUMNS.iter().all(|s| {
+                if c.has(s) {
+                    manifest.get(s.name) == Some(s.column_type)
+                } else {
+                    manifest.get(s.name).is_none()
+                }
+            })
     }
 
     /// Write the per-log timestamps chunk (chronological nanosecond timestamps,

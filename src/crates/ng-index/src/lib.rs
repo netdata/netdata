@@ -15,7 +15,7 @@ pub use sfst_build::{SfstStats, build_sfst, build_sfst_file, build_sfst_range};
 
 // Re-export the flattening + frame vocabulary so the binary (and any consumer) gets
 // it from `ng-index` without depending on `ng-flatten` directly.
-pub use ng_flatten::{Entry, FlattenedRequest, NodeId, SchemaTree, Value, build_kv, decode_frame};
+pub use ng_flatten::{Entry, FlattenedLogRequest, NodeId, SchemaTree, Value, build_kv, decode_log_frame};
 
 /// Errors reading a flattened WAL or building an SFST from it.
 #[derive(Debug, thiserror::Error)]

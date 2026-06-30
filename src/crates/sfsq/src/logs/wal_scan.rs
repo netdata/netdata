@@ -44,7 +44,7 @@ use super::query::LogsQuery;
 
 /// A failure decoding a *flattened-frame* (ng-flatten) WAL during
 /// [`WalScan::scan_flattened`]. ng-flatten frames are bincode
-/// `FlattenedRequest` payloads. Scanning is all-or-nothing — a torn or
+/// `FlattenedLogRequest` payloads. Scanning is all-or-nothing — a torn or
 /// corrupt frame fails the scan rather than silently truncating the row
 /// set (the caller decides whether to degrade, mirroring the per-file
 /// policy in [`run`](super::run)).
@@ -53,7 +53,7 @@ pub enum FlattenedScanError {
     /// The WAL container could not be read (open or frame iteration).
     #[error("wal read: {0}")]
     Wal(#[from] wal::Error),
-    /// A frame's bincode `FlattenedRequest` payload failed to decode.
+    /// A frame's bincode `FlattenedLogRequest` payload failed to decode.
     #[error("frame {frame}: flattened-frame decode failed: {msg}")]
     Decode { frame: u64, msg: String },
 }
@@ -150,7 +150,7 @@ impl WalScan {
         while let Some(frame) = reader.next_frame()? {
             frame_no += 1;
             let flattened =
-                ng_flatten::decode_frame(frame.data).map_err(|e| FlattenedScanError::Decode {
+                ng_flatten::decode_log_frame(frame.data).map_err(|e| FlattenedScanError::Decode {
                     frame: frame_no,
                     msg: e.to_string(),
                 })?;

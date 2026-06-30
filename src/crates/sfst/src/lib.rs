@@ -111,11 +111,11 @@ pub fn scan_max_sequence_recursive(base: &std::path::Path) -> std::io::Result<u6
     file_registry::scan_max_sequence_recursive(base, registry::SFST_EXT)
 }
 pub use schema::{
-    BitmapValue, ColumnEntry, ColumnType, ColumnsTable, DEFAULT_CARDINALITY_THRESHOLD,
-    DroppedAttributeCounts, Durations, FieldEntry, FieldTable, FieldTier, Flags, HighField,
-    Histogram, IdRanges, KvId, LeafStats, Metadata, NodeId, ObservedTimestamps, ParentSpanIds,
-    SchemaEdge, SchemaNode, SchemaTree, SpanId, SpanIds, Step, StreamBatch, Summary, TraceId,
-    TraceIds, ValueKind,
+    ALL_COLUMNS, BitmapValue, ColumnEntry, ColumnSpec, ColumnType, ColumnsTable,
+    DEFAULT_CARDINALITY_THRESHOLD, DroppedAttributeCounts, Durations, FieldEntry, FieldTable,
+    FieldTier, Flags, HighField, Histogram, IdRanges, KvId, LeafStats, Metadata, NodeId,
+    ObservedTimestamps, ParentSpanIds, SchemaEdge, SchemaNode, SchemaTree, SpanId, SpanIds, Step,
+    StreamBatch, Summary, TraceId, TraceIds, ValueKind,
 };
 pub use writer::{ChunkCounts, ColumnsPresent, StreamWriter, write_summary_only};
 

@@ -1,7 +1,7 @@
 //! End-to-end tests over real on-disk WAL/SFST fixtures.
 //!
 //! Fixtures go through the production path: OTLP `ResourceLogs` →
-//! `ng_flatten` flatten + `encode_frame` → `wal::Writer` →
+//! `ng_flatten` flatten + `encode_log_frame` → `wal::Writer` →
 //! `ng_index::build_sfst_file`. Files are FileId-named (the writer names WAL files;
 //! a sealed SFST reuses its source WAL's FileId, sharing the sequence — exactly
 //! the production relationship the dedup rule relies on), so the CLI's
@@ -129,9 +129,9 @@ fn encode_ng_frame(batch: Vec<ResourceLogs>) -> (Vec<u8>, usize) {
     let request = ExportLogsServiceRequest {
         resource_logs: batch,
     };
-    let mut flattened = ng_flatten::flatten_request(&request);
-    ng_flatten::fill_hashes(&mut flattened);
-    let data = ng_flatten::encode_frame(&flattened).expect("encode flattened frame");
+    let mut flattened = ng_flatten::flatten_log_request(&request);
+    ng_flatten::fill_log_hashes(&mut flattened);
+    let data = ng_flatten::encode_log_frame(&flattened).expect("encode flattened frame");
     (data, count)
 }
 

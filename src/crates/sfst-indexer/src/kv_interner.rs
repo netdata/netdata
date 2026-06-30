@@ -9,7 +9,7 @@
 //!
 //! The producer (`ng-flatten`) pre-computes `xxhash64("key=value")` for
 //! every attribute and ships the hashes alongside the data (see
-//! `ng_flatten::fill_hashes`). This interner is designed to
+//! `ng_flatten::fill_log_hashes`). This interner is designed to
 //! exploit those pre-computed hashes:
 //!
 //! - **[`lookup_hash`](KeyValueInterner::lookup_hash)**: Hash-only lookup.

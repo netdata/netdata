@@ -116,7 +116,7 @@ fn struct_array(items: Vec<AnyValue>) -> AnyValue {
 const BASE_S: u64 = 1_000_000;
 const NS: u64 = 1_000_000_000;
 
-/// One generated corpus: the batches (one `flatten_request` call — one WAL
+/// One generated corpus: the batches (one `flatten_log_request` call — one WAL
 /// frame — each).
 struct Corpus {
     batches: Vec<Vec<ResourceLogs>>,
@@ -125,7 +125,7 @@ struct Corpus {
 /// Generate a corpus for `seed`. The timestamp regime cycles with the seed so
 /// the sweep covers monotonic, shuffled, equal-run, and the observed/clock
 /// fallback tiers — the fallback is applied *here* (ng-flatten reads only
-/// `time_unix_nano`), mirroring `ng-ingest::normalize_timestamps`.
+/// `time_unix_nano`), mirroring `ng-ingest::normalize_log_timestamps`.
 fn gen_corpus(seed: u64) -> Corpus {
     let mut rng = Rng::new(seed);
     let num_logs = 60 + rng.below(120);
@@ -313,9 +313,9 @@ fn write_flattened_wal(dir: &Path, corpus: &Corpus) -> std::path::PathBuf {
         let request = ExportLogsServiceRequest {
             resource_logs: batch.clone(),
         };
-        let mut flattened = ng_flatten::flatten_request(&request);
-        ng_flatten::fill_hashes(&mut flattened);
-        let bytes = ng_flatten::encode_frame(&flattened).expect("encode frame");
+        let mut flattened = ng_flatten::flatten_log_request(&request);
+        ng_flatten::fill_log_hashes(&mut flattened);
+        let bytes = ng_flatten::encode_log_frame(&flattened).expect("encode frame");
         let count: usize = batch
             .iter()
             .flat_map(|rl| &rl.scope_logs)

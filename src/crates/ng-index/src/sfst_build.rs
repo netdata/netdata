@@ -17,7 +17,7 @@ use sfst_indexer::row_index::RowIndex;
 use sfst_indexer::{build_and_write, build_into};
 
 use crate::{
-    Entry, Error, FlattenedRequest, Metrics, NodeId, build_kv, decode_frame, sole_wal_file,
+    Entry, Error, FlattenedLogRequest, Metrics, NodeId, build_kv, decode_log_frame, sole_wal_file,
 };
 
 /// Map a flatten [`ng_flatten::Kind`] to the format crate's [`sfst::ValueKind`].
@@ -145,9 +145,9 @@ fn populate_row_index(
         metrics.add_frames(1);
         metrics.add_bytes(frame.data.len() as u64);
 
-        let flattened: FlattenedRequest = {
+        let flattened: FlattenedLogRequest = {
             let _t = metrics.scope("deserialize");
-            decode_frame(frame.data).map_err(|source| Error::BincodeDecode {
+            decode_log_frame(frame.data).map_err(|source| Error::BincodeDecode {
                 frame: stats.frames,
                 source,
             })?
@@ -291,7 +291,7 @@ pub fn build_sfst_range(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ng_flatten::flatten_request;
+    use ng_flatten::flatten_log_request;
     use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
     use opentelemetry_proto::tonic::common::v1::{
         AnyValue, ArrayValue, KeyValue, KeyValueList, any_value::Value as Av,
@@ -342,7 +342,7 @@ mod tests {
     /// drop a field from the reader's derived field table (review finding D).
     #[test]
     fn sfst_and_ng_flatten_path_renderers_agree() {
-        let flattened = flatten_request(&nested_request());
+        let flattened = flatten_log_request(&nested_request());
         let ng_tree = &flattened.tree;
         let sfst_tree = to_sfst_tree(ng_tree);
 

@@ -64,7 +64,7 @@ fn count_log_records(rl: &ResourceLogs) -> usize {
 /// Compute the `(min, max)` log-data time range for a group of `ResourceLogs`.
 ///
 /// Mirrors the OTel timestamp hierarchy applied at ingest by
-/// [`ng_flatten::normalize_timestamps`], so the WAL's accumulated range
+/// [`ng_flatten::normalize_log_timestamps`], so the WAL's accumulated range
 /// matches the per-row `Record.ts` the indexer will eventually fold into
 /// the file's SFST summary:
 ///
@@ -570,8 +570,8 @@ impl LogsService for NetdataLogsService {
             // fallback timestamps, so normalization runs lock-free — concurrent
             // ingest doesn't serialize on the process-wide clock for the whole pass.
             let ingestion_ns = self.clock.lock().unwrap().now_ns();
-            ng_flatten::normalize_timestamps(&mut request, ingestion_ns.as_u64());
-            let bad_ids = ng_flatten::normalize_ids(&mut request);
+            ng_flatten::normalize_log_timestamps(&mut request, ingestion_ns.as_u64());
+            let bad_ids = ng_flatten::normalize_log_ids(&mut request);
             if bad_ids.any() {
                 tracing::warn!(
                     bad_trace_ids = bad_ids.trace,
@@ -583,9 +583,9 @@ impl LogsService for NetdataLogsService {
             }
             let (log_min_ts, log_max_ts) =
                 compute_log_ts_range(&request.resource_logs, ingestion_ns);
-            let mut flattened = ng_flatten::flatten_request(&request);
-            ng_flatten::fill_hashes(&mut flattened);
-            let data = ng_flatten::encode_frame(&flattened).map_err(|e| {
+            let mut flattened = ng_flatten::flatten_log_request(&request);
+            ng_flatten::fill_log_hashes(&mut flattened);
+            let data = ng_flatten::encode_log_frame(&flattened).map_err(|e| {
                 tracing::error!(%e, "failed to encode flattened frame");
                 Status::internal("flatten encode error")
             })?;

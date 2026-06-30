@@ -1,11 +1,11 @@
-//! A batch written as one WAL frame reads back and decodes to a `FlattenedRequest`,
+//! A batch written as one WAL frame reads back and decodes to a `FlattenedLogRequest`,
 //! preserving the record grouping and the typed scalar/nested/array values through
 //! the flatten + bincode + WAL round-trip.
 
 use std::sync::Arc;
 
 use file_registry::MonotonicClock;
-use ng_flatten::{FlattenedRequest, Leaf, SpanId, TraceId, Value, decode_frame};
+use ng_flatten::{FlattenedLogRequest, Leaf, SpanId, TraceId, Value, decode_log_frame};
 use ng_ingest::{PIPELINE_ID, count_log_records, one_file_config, write_request};
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::common::v1::{
@@ -102,7 +102,7 @@ fn wal_file(dir: &std::path::Path) -> std::path::PathBuf {
 
 /// All leaves (resource + scope + every record) of a flattened request, resolved to
 /// path+value in document order.
-fn all_leaves(flattened: &FlattenedRequest) -> Vec<Leaf> {
+fn all_leaves(flattened: &FlattenedLogRequest) -> Vec<Leaf> {
     let tree = &flattened.tree;
     let mut out = Vec::new();
     for rg in &flattened.resources {
@@ -140,12 +140,12 @@ fn request_roundtrips_through_a_wal_frame() {
     writer.shutdown_all().unwrap();
 
     // Frames are LZ4-compressed; `wal::Reader` decompresses transparently. The
-    // payload is now a bincode `FlattenedRequest`, not protobuf.
+    // payload is now a bincode `FlattenedLogRequest`, not protobuf.
     let mut reader = wal::Reader::open(&wal_file(dir.path())).unwrap();
     let frame = reader.next_frame().unwrap().expect("one frame written");
     assert_eq!(frame.entry_count as usize, written);
 
-    let flattened = decode_frame(frame.data).expect("payload decodes as a flattened frame");
+    let flattened = decode_log_frame(frame.data).expect("payload decodes as a flattened frame");
     // Grouping survives: one resource, one scope, two records.
     assert_eq!(flattened.resources.len(), 1);
     assert_eq!(flattened.resources[0].scopes.len(), 1);
@@ -280,7 +280,7 @@ fn write_and_decode_records(req: &mut ExportLogsServiceRequest) -> Vec<ng_flatte
 
     let mut reader = wal::Reader::open(&wal_file(dir.path())).unwrap();
     let frame = reader.next_frame().unwrap().expect("one frame written");
-    let flattened = decode_frame(frame.data).expect("payload decodes as a flattened frame");
+    let flattened = decode_log_frame(frame.data).expect("payload decodes as a flattened frame");
     flattened
         .resources
         .into_iter()
