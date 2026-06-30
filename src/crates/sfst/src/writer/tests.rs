@@ -4,7 +4,7 @@ use fst_index::FstIndex;
 use treight::Bitmap;
 
 use crate::{
-    BitmapValue, ChunkCounts, ColumnEntry, ColumnType, ColumnsPresent, ColumnsTable,
+    ALL_COLUMNS, BitmapValue, ChunkCounts, ColumnEntry, ColumnType, ColumnsPresent, ColumnsTable,
     DroppedAttributeCounts, Durations, Error, FieldEntry, FieldTier, Flags, HighField, Histogram,
     IdRanges, KvId, Metadata, ObservedTimestamps, ParentSpanIds, SchemaTree, SpanId, SpanIds,
     StreamBatch, StreamWriter, Summary, TraceId, TraceIdIndex, TraceIds,
@@ -585,4 +585,27 @@ fn trace_id_index_misuse_is_rejected() {
     w.primary(&fst()).unwrap();
     w.trace_ids(&trace).unwrap();
     assert!(matches!(w.trace_id_index(&index), Err(Error::WriterMisuse(_))));
+}
+
+/// Guard the one remaining hand-written column map: `ColumnsPresent::has()` matches
+/// ordinals with a `_ => false` arm, so a column added to [`ALL_COLUMNS`] (and to
+/// `ColumnsPresent`) but NOT to `has()` would be silently treated as absent across
+/// presence count, the manifest, and the manifest-vs-counts check. This pins every
+/// registry entry to a real presence field and pins ordinals to array positions.
+#[test]
+fn all_columns_are_wired_into_columns_present_has() {
+    for (i, spec) in ALL_COLUMNS.iter().enumerate() {
+        assert_eq!(
+            spec.ordinal as usize, i,
+            "ALL_COLUMNS[{i}] ordinal must equal its array index (canonical order)",
+        );
+        assert!(
+            present_all().has(spec),
+            "column {} (ordinal {}) is in ALL_COLUMNS but not wired into ColumnsPresent::has()",
+            spec.name,
+            spec.ordinal,
+        );
+    }
+    assert_eq!(present_all().count() as usize, ALL_COLUMNS.len());
+    assert_eq!(present_all().present().count(), ALL_COLUMNS.len());
 }

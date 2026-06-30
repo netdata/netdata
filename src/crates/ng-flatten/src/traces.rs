@@ -183,7 +183,8 @@ pub fn normalize_span_timestamps(req: &mut ExportTraceServiceRequest, fallback_b
 
 /// Encode a [`FlattenedTraceRequest`] to the bincode bytes stored in a traces WAL
 /// frame — the span analog of [`crate::logs::encode_log_frame`], same codec. (Span
-/// `Entry.hash`es are left 0 unless a `fill_trace_hashes` pass runs first; that is a
+/// `Entry.hash`es are left 0 unless a future hash-fill pass runs first — the span
+/// analog of [`crate::logs::fill_log_hashes`], not yet implemented; it is a
 /// seal-time fast-path optimization, not a frame validity requirement.)
 pub fn encode_trace_frame(
     req: &FlattenedTraceRequest,

@@ -111,7 +111,8 @@ pub fn count_spans(req: &ExportTraceServiceRequest) -> usize {
 /// drops malformed trace/span/parent ids. The request is then flattened
 /// ([`ng_flatten::flatten_trace_request`]) and bincode-encoded as the frame payload.
 ///
-/// Unlike [`write_request`], **no `fill_log_hashes` pass runs** — span `Entry.hash`es
+/// Unlike [`write_request`] (which calls `fill_log_hashes`), **no hash-fill pass
+/// runs** for traces — span `Entry.hash`es
 /// stay 0. That only forfeits the seal-time interner fast path (a later seal is
 /// slightly slower); it is not a frame-validity requirement. A request with zero
 /// spans writes no frame and returns `0`.
