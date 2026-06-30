@@ -643,8 +643,15 @@ static int read_proc_cmdline(const char *filename, char *buffer, size_t size) {
 
     // O_NOFOLLOW: a real /proc/<pid>/cmdline is never a symlink. Refusing to
     // follow one closes a symlink-based arbitrary-file-read primitive when this
-    // is reached through an untrusted /proc path.
-    int fd = open(filename, O_RDONLY | O_CLOEXEC | O_NOFOLLOW, 0666);
+    // is reached through an untrusted /proc path. Guard the flag locally for
+    // platforms that lack it (e.g. some Windows toolchains), matching the
+    // pattern in api_v1_manage.c -- a global fallback define would defeat the
+    // #ifdef O_NOFOLLOW guards those callers rely on for their safe fallbacks.
+#ifdef O_NOFOLLOW
+    int fd = open(filename, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+#else
+    int fd = open(filename, O_RDONLY | O_CLOEXEC);
+#endif
     if (unlikely(fd == -1)) {
         buffer[0] = '\0';
         return 1;
