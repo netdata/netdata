@@ -61,9 +61,10 @@ int process_prometheus_remote_write_response(BUFFER *buffer, struct instance *in
     s++;
     len--;
 
-    if (likely(len > 4 && (!strncmp(s, "200 ", 4) || !strncmp(s, "204 ", 4))))
+    if (likely(len > 4 && (!strncmp(s, "200 ", 4) || !strncmp(s, "204 ", 4)))) {
+        buffer_flush(buffer);
         return 0;
-    else
+    } else
         return exporting_discard_response(buffer, instance);
 }
 
