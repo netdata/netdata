@@ -96,7 +96,7 @@ void nd_signal_handler(int signo, siginfo_t *info, void *context __maybe_unused)
             len = strcatz(b, len, nd_thread_tag_async_safe(), sizeof(b));
             len = strcatz(b, len, "!\n", sizeof(b));
 
-            if(write(STDERR_FILENO, b, strlen(b)) == -1) {
+            if(write(STDERR_FILENO, b, len) == -1) {
                 // nothing to do - we cannot write but there is no way to complain about it
                 ;
             }
