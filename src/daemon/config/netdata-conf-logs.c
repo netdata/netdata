@@ -153,6 +153,15 @@ void netdata_conf_section_logs(void) {
 #endif
     nd_log_set_user_settings(NDLS_HEALTH, s);
 
+    // NDLS_ACLK is statically initialized to NDLM_FILE (unlike all other sources which use
+    // NDLM_DEFAULT), so it bypasses the normal nd_log_open config path even when aclk
+    // conversation logging is disabled.  On Windows, always redirect it to the Windows event
+    // log first so that the broken compile-time LOG_DIR path is never used.
+#if defined(OS_WINDOWS) && (defined(HAVE_WEL) || defined(HAVE_ETW))
+    nd_log_set_user_settings(NDLS_ACLK, os_default_method);
+    nd_win_trace("netdata_conf_section_logs: aclk forced to '%s' (windows default)", os_default_method);
+#endif
+
     aclklog_enabled = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_CLOUD, "conversation log", CONFIG_BOOLEAN_NO);
     if (aclklog_enabled) {
 #if defined(OS_WINDOWS)
