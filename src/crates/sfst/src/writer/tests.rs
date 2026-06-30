@@ -528,7 +528,7 @@ fn trace_id_index_misuse_is_rejected() {
     let index = TraceIdIndex::build(&trace);
 
     // Declared but never written → the stage stays at TraceIndex, so advancing
-    // to a secondary chunk is rejected (and finish() would refuse it too).
+    // to a secondary chunk is rejected.
     let mut w = writer(idx_counts());
     w.summary(&summary()).unwrap();
     w.metadata(&metadata_with_columns(Vec::new(), trace_id_manifest())).unwrap();
@@ -536,6 +536,15 @@ fn trace_id_index_misuse_is_rejected() {
     w.primary(&fst()).unwrap();
     w.trace_ids(&trace).unwrap();
     assert!(matches!(w.add_stream_batch(&batch()), Err(Error::WriterMisuse(_))));
+
+    // ...and finish() refuses the underfilled file directly.
+    let mut w = writer(idx_counts());
+    w.summary(&summary()).unwrap();
+    w.metadata(&metadata_with_columns(Vec::new(), trace_id_manifest())).unwrap();
+    w.timestamps(&[1, 2, 3]).unwrap();
+    w.primary(&fst()).unwrap();
+    w.trace_ids(&trace).unwrap();
+    assert!(matches!(w.finish(), Err(Error::WriterMisuse(_))));
 
     // Written before the declared column (stage is Columns, not TraceIndex).
     let mut w = writer(idx_counts());

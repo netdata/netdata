@@ -42,7 +42,7 @@ use crate::{Error, TraceId, TraceIds};
 /// (arrays only to `[T; 32]`), so the codec is a hand-written
 /// `&[u32]`-slice round-trip — wire-identical to a `Vec<u32>`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Fanout([u32; 256]);
+pub(crate) struct Fanout([u32; 256]);
 
 impl Fanout {
     /// Build the cumulative fanout from the first byte of every indexed id.
@@ -61,7 +61,10 @@ impl Fanout {
     }
 
     /// The half-open `sort_perm` range holding the positions whose `trace_id`
-    /// first byte is `first_byte`. Never inverts: `Fanout` is always monotonic.
+    /// first byte is `first_byte`. Never inverts (`Fanout` is always monotonic),
+    /// and the `u32 → usize` casts never lose bits: `TraceIdIndex::validate`
+    /// guarantees `total() == sort_perm.len()`, so every `hi` is a valid
+    /// `sort_perm` endpoint.
     fn bucket(&self, first_byte: u8) -> Range<usize> {
         let b = first_byte as usize;
         let lo = if b == 0 { 0 } else { self.0[b - 1] as usize };
@@ -118,15 +121,22 @@ impl TraceIdIndex {
     /// The arena passed here MUST be the same one stored in the file's `TRCE`
     /// chunk (same row order), since `sort_perm` indexes into it.
     pub fn build(trace_ids: &TraceIds) -> Self {
-        let mut sort_perm: Vec<u32> = (0..trace_ids.len() as u32)
-            .filter(|&i| !trace_ids.get(i as usize).is_unset())
+        // Pair each set id with its position, then sort by `(id, position)`: the
+        // 16-byte key is read exactly once per row (not on every comparison, as
+        // `sort_by_key` would), and the position tiebreaker makes a trace's spans
+        // chronological *structurally* — not by relying on sort stability.
+        // (`record_count` is `u32`, so `trace_ids.len()` fits `u32` by the format
+        // row cap.)
+        let mut keyed: Vec<(TraceId, u32)> = (0..trace_ids.len() as u32)
+            .filter_map(|i| {
+                let id = trace_ids.get(i as usize);
+                (!id.is_unset()).then_some((id, i))
+            })
             .collect();
-        // Stable sort: equal ids keep chronological (ascending-position) order,
-        // so a trace's spans come back in time order.
-        sort_perm.sort_by_key(|&a| trace_ids.get(a as usize));
+        keyed.sort_unstable();
 
-        let fanout =
-            Fanout::build(sort_perm.iter().map(|&p| trace_ids.get(p as usize).as_bytes()[0]));
+        let fanout = Fanout::build(keyed.iter().map(|(id, _)| id.as_bytes()[0]));
+        let sort_perm: Vec<u32> = keyed.into_iter().map(|(_, p)| p).collect();
 
         // Enforce the index invariants at write time (debug builds + tests),
         // where a producer bug is cheap to catch at its source — rather than
