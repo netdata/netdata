@@ -37,6 +37,21 @@ static bool gorilla_disk_buffer_has_valid_nbits(const gorilla_buffer_t *gbuf) {
     return gbuf->header.nbits < gorilla_buffer_data_bits(RRDENG_GORILLA_32BIT_BUFFER_SLOTS);
 }
 
+static uint32_t gorilla_data_word_load(const uint32_t *word)
+{
+    return __atomic_load_n(word, __ATOMIC_RELAXED);
+}
+
+static void gorilla_data_word_store(uint32_t *word, uint32_t value)
+{
+    __atomic_store_n(word, value, __ATOMIC_RELAXED);
+}
+
+static void gorilla_data_word_or(uint32_t *word, uint32_t value)
+{
+    __atomic_fetch_or(word, value, __ATOMIC_RELAXED);
+}
+
 static void bit_buffer_write(uint32_t *buf, size_t pos, uint32_t v, size_t nbits)
 {
     assert(nbits > 0 && nbits <= bit_size<uint32_t>());
@@ -47,20 +62,20 @@ static void bit_buffer_write(uint32_t *buf, size_t pos, uint32_t v, size_t nbits
     pos += nbits;
 
     if (offset == 0) {
-        buf[index] = v;
+        gorilla_data_word_store(&buf[index], v);
     } else {
         const size_t remaining_bits = bit_size<uint32_t>() - offset;
 
         // write the lower part of the value
         const uint32_t low_bits_mask = ((uint32_t) 1 << remaining_bits) - 1;
         const uint32_t lowest_bits_in_value = v & low_bits_mask;
-        buf[index] |= (lowest_bits_in_value << offset);
+        gorilla_data_word_or(&buf[index], lowest_bits_in_value << offset);
 
         if (nbits > remaining_bits) {
             // write the upper part of the value
             const uint32_t high_bits_mask = ~low_bits_mask;
             const uint32_t highest_bits_in_value = (v & high_bits_mask) >> (remaining_bits);
-            buf[index + 1] = highest_bits_in_value;
+            gorilla_data_word_store(&buf[index + 1], highest_bits_in_value);
         }
     }
 }
@@ -75,19 +90,22 @@ static void bit_buffer_read(const uint32_t *buf, size_t pos, uint32_t *v, size_t
     pos += nbits;
 
     if (offset == 0) {
+        uint32_t word = gorilla_data_word_load(&buf[index]);
         *v = (nbits == bit_size<uint32_t>()) ?
-                    buf[index] :
-                    buf[index] & (((uint32_t) 1 << nbits) - 1);
+                    word :
+                    word & (((uint32_t) 1 << nbits) - 1);
     } else {
         const size_t remaining_bits = bit_size<uint32_t>() - offset;
 
         // extract the lower part of the value
+        uint32_t word = gorilla_data_word_load(&buf[index]);
         if (nbits < remaining_bits) {
-            *v = (buf[index] >> offset) & (((uint32_t) 1 << nbits) - 1);
+            *v = (word >> offset) & (((uint32_t) 1 << nbits) - 1);
         } else {
-            *v = (buf[index] >> offset) & (((uint32_t) 1 << remaining_bits) - 1);
+            *v = (word >> offset) & (((uint32_t) 1 << remaining_bits) - 1);
             nbits -= remaining_bits;
-            *v |= (buf[index + 1] & (((uint32_t) 1 << nbits) - 1)) << remaining_bits;
+            word = gorilla_data_word_load(&buf[index + 1]);
+            *v |= (word & (((uint32_t) 1 << nbits) - 1)) << remaining_bits;
         }
     }
 }
