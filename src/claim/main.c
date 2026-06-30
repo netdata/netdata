@@ -116,7 +116,7 @@ int nd_claim_parse_args(int argc, LPWSTR *argv)
             if (!tmp)
                 ExitProcess(1);
 
-            netdata_claim_convert_str(tmp, argv[i], length - 1);
+            netdata_claim_convert_str(tmp, argv[i], length);
             if (i < argc)
                 insecure = atoi(tmp);
             else
@@ -142,14 +142,14 @@ static int netdata_claim_prepare_strings()
     if (!aToken)
         return -1;
 
-    netdata_claim_convert_str(aToken, token, length - 1);
+    netdata_claim_convert_str(aToken, token, length);
 
     length = wcslen(room) + 1;
     aRoom = calloc(sizeof(char), length);
     if (!aRoom)
         return -1;
 
-    netdata_claim_convert_str(aRoom, room, length - 1);
+    netdata_claim_convert_str(aRoom, room, length);
 
     if (proxy) {
         length = wcslen(proxy) + 1;
@@ -157,7 +157,7 @@ static int netdata_claim_prepare_strings()
         if (!aProxy)
             return -1;
 
-        netdata_claim_convert_str(aProxy, proxy, length - 1);
+        netdata_claim_convert_str(aProxy, proxy, length);
     }
 
     if (url) {
@@ -166,7 +166,7 @@ static int netdata_claim_prepare_strings()
         if (!aURL)
             return -1;
 
-        netdata_claim_convert_str(aURL, url, length - 1);
+        netdata_claim_convert_str(aURL, url, length);
     }
     return 0;
 }
@@ -218,7 +218,7 @@ static int netdata_claim_get_path(char *path)
 	if (length >= WINDOWS_MAX_PATH) 
             return -1;
 
-        netdata_claim_convert_str(path, extPath, length - 1);
+        netdata_claim_convert_str(path, extPath, length);
 	return 0;
     }
 
