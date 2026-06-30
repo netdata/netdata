@@ -29,11 +29,13 @@ use std::hash::Hasher;
 use serde::{Deserialize, Serialize};
 
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
+use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use opentelemetry_proto::tonic::common::v1::{
     AnyValue, InstrumentationScope, KeyValue, any_value::Value as Av,
 };
 use opentelemetry_proto::tonic::logs::v1::LogRecord;
 use opentelemetry_proto::tonic::resource::v1::Resource;
+use opentelemetry_proto::tonic::trace::v1::Span;
 
 /// A node's identity within a [`SchemaTree`] — its arena index.
 pub type NodeId = u32;
@@ -431,6 +433,81 @@ impl Flattener {
     fn scalar(&mut self, name: &str, value: Value, out: &mut Vec<Entry>) {
         self.emit(ROOT, Step::Field(name.to_string()), value, out);
     }
+
+    /// Flatten a span's own fields — the queryable scalar facets (`name`, `kind`,
+    /// `status_code`) and `attributes.*`. Identifier/timing fields (`trace_id`,
+    /// `span_id`, `parent_span_id`, start/duration, `flags`,
+    /// `dropped_attributes_count`) are carried as per-row columns on [`SpanRecord`],
+    /// not as entries — same split as [`Flattener::flatten_record`] for logs.
+    ///
+    /// Enum facets (`kind`, `status_code`) store **both** the raw OTLP int and a
+    /// readable label, under a deliberate convention:
+    /// - the clean name (`kind`, `status_code`) carries the user-facing **label**
+    ///   (`SERVER`, `ERROR`, …) — what an operator queries;
+    /// - the same name with a leading `_` (`_kind`, `_status_code`) carries the raw
+    ///   **int** — lossless and forward-compatible, so an unknown future enum
+    ///   variant still survives and stays queryable.
+    ///
+    /// The default variant is treated as absence (skipped, like logs'
+    /// `severity_number != 0`): `kind == UNSPECIFIED(0)` and `status.code ==
+    /// UNSET(0)` emit nothing. For a non-default value the raw int is always
+    /// emitted; the label only when the variant is known.
+    pub fn flatten_span(&mut self, span: &Span) -> Vec<Entry> {
+        let mut out = Vec::new();
+
+        if !span.name.is_empty() {
+            self.scalar("name", Value::Str(span.name.clone()), &mut out);
+        }
+
+        // kind: 0 = UNSPECIFIED ⇒ absence (default INTERNAL), skip.
+        if span.kind != 0 {
+            if let Some(label) = span_kind_label(span.kind) {
+                self.scalar("kind", Value::Str(label.to_string()), &mut out);
+            }
+            self.scalar("_kind", Value::Int(span.kind as i64), &mut out);
+        }
+
+        // status.code: 0 = UNSET ⇒ absence, skip. (status.message is deferred.)
+        if let Some(status) = &span.status {
+            if status.code != 0 {
+                if let Some(label) = status_code_label(status.code) {
+                    self.scalar("status_code", Value::Str(label.to_string()), &mut out);
+                }
+                self.scalar("_status_code", Value::Int(status.code as i64), &mut out);
+            }
+        }
+
+        if !span.attributes.is_empty() {
+            let base = self.descend(ROOT, &["attributes"]);
+            for kv in &span.attributes {
+                self.flatten_kv(base, kv, &mut out);
+            }
+        }
+        out
+    }
+}
+
+/// Readable label for an OTLP `SpanKind`, or `None` for `UNSPECIFIED(0)` and any
+/// unknown (future) variant — the caller still stores the raw int for those.
+fn span_kind_label(kind: i32) -> Option<&'static str> {
+    match kind {
+        1 => Some("INTERNAL"),
+        2 => Some("SERVER"),
+        3 => Some("CLIENT"),
+        4 => Some("PRODUCER"),
+        5 => Some("CONSUMER"),
+        _ => None,
+    }
+}
+
+/// Readable label for an OTLP `Status.StatusCode`, or `None` for `UNSET(0)` and
+/// any unknown variant — the caller still stores the raw int for those.
+fn status_code_label(code: i32) -> Option<&'static str> {
+    match code {
+        1 => Some("OK"),
+        2 => Some("ERROR"),
+        _ => None,
+    }
 }
 
 impl Default for Flattener {
@@ -503,6 +580,52 @@ pub struct Record {
     pub observed_ts: i64,
     pub trace_id: Vec<u8>,
     pub span_id: Vec<u8>,
+    pub flags: u32,
+    pub dropped_attributes_count: u32,
+    pub entries: Vec<Entry>,
+}
+
+/// A flattened **traces** request — the span analog of [`FlattenedRequest`]. One
+/// shared schema tree plus the OTLP span grouping. Distinct types (not generics)
+/// keep the logs path untouched; resource/scope flattening is shared.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FlattenedTraceRequest {
+    pub tree: SchemaTree,
+    pub resources: Vec<SpanResourceGroup>,
+}
+
+/// One resource and the scope groups under it (span analog of [`ResourceGroup`]).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpanResourceGroup {
+    pub resource: Vec<Entry>,
+    pub scopes: Vec<SpanScopeGroup>,
+}
+
+/// One scope and the spans under it (span analog of [`ScopeGroup`]).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpanScopeGroup {
+    pub scope: Vec<Entry>,
+    pub spans: Vec<SpanRecord>,
+}
+
+/// One span: its per-row columns plus its flattened entries (span analog of
+/// [`Record`]). Lossless within Stage-1 scope — `events`/`links`/`trace_state`/
+/// `status.message` are deferred (not yet carried).
+///
+/// Per-row columns (NOT FST facets): `ts` = the resolved `start_time_unix_nano`
+/// (the row-ordering key; callers MUST normalize first, see
+/// [`normalize_span_timestamps`]); `duration` = `end - start` ns, clamped to 0 on
+/// an unset/earlier end (see [`flatten_trace_into`]); `trace_id`/`span_id`/
+/// `parent_span_id` raw OTLP bytes (empty if unset); `flags` /
+/// `dropped_attributes_count` carried verbatim. There is no `observed_ts` (spans
+/// have no observed time).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpanRecord {
+    pub ts: i64,
+    pub duration: i64,
+    pub trace_id: Vec<u8>,
+    pub span_id: Vec<u8>,
+    pub parent_span_id: Vec<u8>,
     pub flags: u32,
     pub dropped_attributes_count: u32,
     pub entries: Vec<Entry>,
@@ -634,6 +757,55 @@ pub fn normalize_timestamps(req: &mut ExportLogsServiceRequest, fallback_base_ns
     }
 }
 
+/// Drop malformed span ids at the ingest boundary — the traces analog of
+/// [`normalize_ids`]. Clears any non-empty `trace_id`/`span_id`/`parent_span_id`
+/// whose length is not the spec width (16/8/8); the SFST column later stores a
+/// cleared id as the all-zero "unset" sentinel. Malformed `parent_span_id`s are
+/// counted under `span` (both are 8-byte span ids). Callers MUST run this before
+/// [`flatten_trace_request`].
+pub fn normalize_trace_ids(req: &mut ExportTraceServiceRequest) -> MalformedIds {
+    let mut bad = MalformedIds::default();
+    for rs in &mut req.resource_spans {
+        for ss in &mut rs.scope_spans {
+            for s in &mut ss.spans {
+                if !s.trace_id.is_empty() && s.trace_id.len() != TRACE_ID_LEN {
+                    s.trace_id.clear();
+                    bad.trace += 1;
+                }
+                if !s.span_id.is_empty() && s.span_id.len() != SPAN_ID_LEN {
+                    s.span_id.clear();
+                    bad.span += 1;
+                }
+                if !s.parent_span_id.is_empty() && s.parent_span_id.len() != SPAN_ID_LEN {
+                    s.parent_span_id.clear();
+                    bad.span += 1;
+                }
+            }
+        }
+    }
+    bad
+}
+
+/// Ensure every span has a usable `start_time_unix_nano` before flattening — the
+/// traces analog of [`normalize_timestamps`]. Spans have no observed-time fallback,
+/// so a zero start is synthesized from `fallback_base_ns + k` (strictly increasing
+/// per frame, preserving intra-frame order). The resolved value is written back into
+/// `start_time_unix_nano`; `SpanRecord.ts` reads it. Callers MUST run this before
+/// [`flatten_trace_request`].
+pub fn normalize_span_timestamps(req: &mut ExportTraceServiceRequest, fallback_base_ns: u64) {
+    let mut fallback_offset: u64 = 0;
+    for rs in &mut req.resource_spans {
+        for ss in &mut rs.scope_spans {
+            for s in &mut ss.spans {
+                if s.start_time_unix_nano == 0 {
+                    fallback_offset += 1;
+                    s.start_time_unix_nano = fallback_base_ns.saturating_add(fallback_offset);
+                }
+            }
+        }
+    }
+}
+
 /// Flatten a request into its own per-frame tree (convenience over [`flatten_into`])
 /// — the form stored in a flattened WAL frame. Callers MUST normalize record
 /// timestamps first (see [`normalize_timestamps`] / [`Record`]); a record with
@@ -642,6 +814,73 @@ pub fn flatten_request(request: &ExportLogsServiceRequest) -> FlattenedRequest {
     let mut flattener = Flattener::new();
     let resources = flatten_into(&mut flattener, request);
     FlattenedRequest {
+        tree: flattener.into_tree(),
+        resources,
+    }
+}
+
+/// Span duration in nanoseconds (`end - start`), clamped to `0` when the end time
+/// is unset (`0`) or precedes the start (clock skew). Saturates a `u64` past
+/// `i64::MAX`. Absolute end is recoverable as `ts + duration`.
+fn span_duration(span: &Span) -> i64 {
+    if span.end_time_unix_nano == 0 || span.end_time_unix_nano < span.start_time_unix_nano {
+        return 0;
+    }
+    i64::try_from(span.end_time_unix_nano - span.start_time_unix_nano).unwrap_or(i64::MAX)
+}
+
+/// Flatten a decoded **traces** request INTO a shared [`Flattener`] (span analog of
+/// [`flatten_into`]). Resource is flattened once per `ResourceSpans`, scope once per
+/// `ScopeSpans`, reusing the signal-neutral [`Flattener::flatten_resource`] /
+/// [`Flattener::flatten_scope`]. Each [`SpanRecord`]'s `ts` is read from
+/// `start_time_unix_nano`, which the caller is expected to have normalized (see
+/// [`normalize_span_timestamps`]).
+pub fn flatten_trace_into(
+    flattener: &mut Flattener,
+    request: &ExportTraceServiceRequest,
+) -> Vec<SpanResourceGroup> {
+    let mut resources = Vec::with_capacity(request.resource_spans.len());
+    for rs in &request.resource_spans {
+        let resource = rs
+            .resource
+            .as_ref()
+            .map(|r| flattener.flatten_resource(r))
+            .unwrap_or_default();
+        let mut scopes = Vec::with_capacity(rs.scope_spans.len());
+        for ss in &rs.scope_spans {
+            let scope = ss
+                .scope
+                .as_ref()
+                .map(|s| flattener.flatten_scope(s))
+                .unwrap_or_default();
+            let spans = ss
+                .spans
+                .iter()
+                .map(|sp| SpanRecord {
+                    ts: i64::try_from(sp.start_time_unix_nano).unwrap_or(i64::MAX),
+                    duration: span_duration(sp),
+                    trace_id: sp.trace_id.clone(),
+                    span_id: sp.span_id.clone(),
+                    parent_span_id: sp.parent_span_id.clone(),
+                    flags: sp.flags,
+                    dropped_attributes_count: sp.dropped_attributes_count,
+                    entries: flattener.flatten_span(sp),
+                })
+                .collect();
+            scopes.push(SpanScopeGroup { scope, spans });
+        }
+        resources.push(SpanResourceGroup { resource, scopes });
+    }
+    resources
+}
+
+/// Flatten a traces request into its own per-frame tree (span analog of
+/// [`flatten_request`]). Callers MUST normalize span timestamps + ids first (see
+/// [`normalize_span_timestamps`] / [`normalize_trace_ids`]).
+pub fn flatten_trace_request(request: &ExportTraceServiceRequest) -> FlattenedTraceRequest {
+    let mut flattener = Flattener::new();
+    let resources = flatten_trace_into(&mut flattener, request);
+    FlattenedTraceRequest {
         tree: flattener.into_tree(),
         resources,
     }
@@ -735,6 +974,7 @@ pub fn decode_frame(bytes: &[u8]) -> Result<FlattenedRequest, bincode::error::De
 mod tests {
     use super::*;
     use opentelemetry_proto::tonic::common::v1::{ArrayValue, KeyValueList};
+    use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Status};
 
     fn av(v: Av) -> AnyValue {
         AnyValue { value: Some(v) }
@@ -797,6 +1037,154 @@ mod tests {
         assert_eq!(
             at(&leaves, "attributes.bytes"),
             [&Value::Bytes(vec![0xde, 0xad])]
+        );
+    }
+
+    #[test]
+    fn span_facets_carry_dual_enum_and_attributes() {
+        let span = Span {
+            name: "GET /x".into(),
+            kind: 2, // SERVER
+            trace_id: vec![0xaa; 16],
+            status: Some(Status { code: 2, ..Default::default() }), // ERROR
+            attributes: vec![kv("http.method", Av::StringValue("GET".into()))],
+            ..Default::default()
+        };
+        let mut f = Flattener::new();
+        let entries = f.flatten_span(&span);
+        let tree = f.into_tree();
+        let leaves = tree.resolve(&entries);
+
+        assert_eq!(at(&leaves, "name"), [&Value::Str("GET /x".into())]);
+        // dual representation: readable label under the clean name, raw int under `_`.
+        assert_eq!(at(&leaves, "kind"), [&Value::Str("SERVER".into())]);
+        assert_eq!(at(&leaves, "_kind"), [&Value::Int(2)]);
+        assert_eq!(at(&leaves, "status_code"), [&Value::Str("ERROR".into())]);
+        assert_eq!(at(&leaves, "_status_code"), [&Value::Int(2)]);
+        assert_eq!(at(&leaves, "attributes.http.method"), [&Value::Str("GET".into())]);
+        // trace_id is a per-row column on SpanRecord, not a facet.
+        assert!(at(&leaves, "trace_id").is_empty(), "trace_id is a column, not a facet");
+    }
+
+    #[test]
+    fn span_enum_default_skipped_unknown_keeps_raw_int() {
+        // UNSPECIFIED kind (0) + UNSET status (0) → no enum facets at all.
+        let mut f = Flattener::new();
+        let e = f.flatten_span(&Span {
+            name: "x".into(),
+            kind: 0,
+            status: Some(Status { code: 0, ..Default::default() }),
+            ..Default::default()
+        });
+        let l = f.into_tree().resolve(&e);
+        assert!(at(&l, "kind").is_empty() && at(&l, "_kind").is_empty());
+        assert!(at(&l, "status_code").is_empty() && at(&l, "_status_code").is_empty());
+
+        // Unknown future variant → raw int survives (forward-compat), no label.
+        let mut f = Flattener::new();
+        let e = f.flatten_span(&Span {
+            kind: 99,
+            status: Some(Status { code: 42, ..Default::default() }),
+            ..Default::default()
+        });
+        let l = f.into_tree().resolve(&e);
+        assert!(at(&l, "kind").is_empty(), "no label for an unknown kind");
+        assert_eq!(at(&l, "_kind"), [&Value::Int(99)]);
+        assert!(at(&l, "status_code").is_empty());
+        assert_eq!(at(&l, "_status_code"), [&Value::Int(42)]);
+    }
+
+    /// Wrap one span in a single-resource/single-scope traces request.
+    fn trace_req(span: Span, resource: Option<Resource>, scope: Option<InstrumentationScope>) -> ExportTraceServiceRequest {
+        ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                resource,
+                scope_spans: vec![ScopeSpans { scope, spans: vec![span], ..Default::default() }],
+                ..Default::default()
+            }],
+        }
+    }
+
+    #[test]
+    fn flatten_trace_request_carries_columns_and_groups() {
+        let span = Span {
+            trace_id: vec![0x11; 16],
+            span_id: vec![0x22; 8],
+            parent_span_id: vec![0x33; 8],
+            flags: 0x100,
+            name: "op".into(),
+            kind: 3, // CLIENT
+            start_time_unix_nano: 1_000,
+            end_time_unix_nano: 1_500,
+            dropped_attributes_count: 2,
+            ..Default::default()
+        };
+        let req = trace_req(
+            span,
+            Some(Resource {
+                attributes: vec![kv("service.name", Av::StringValue("api".into()))],
+                ..Default::default()
+            }),
+            Some(InstrumentationScope { name: "lib".into(), ..Default::default() }),
+        );
+        let flat = flatten_trace_request(&req);
+        let rg = &flat.resources[0];
+        let sg = &rg.scopes[0];
+        let sr = &sg.spans[0];
+
+        // Per-row columns.
+        assert_eq!(sr.ts, 1_000);
+        assert_eq!(sr.duration, 500);
+        assert_eq!(sr.trace_id, vec![0x11; 16]);
+        assert_eq!(sr.span_id, vec![0x22; 8]);
+        assert_eq!(sr.parent_span_id, vec![0x33; 8]);
+        assert_eq!(sr.flags, 0x100);
+        assert_eq!(sr.dropped_attributes_count, 2);
+
+        // Resource/scope flattening is the shared (signal-neutral) path.
+        assert_eq!(
+            at(&flat.tree.resolve(&rg.resource), "resource.attributes.service.name"),
+            [&Value::Str("api".into())]
+        );
+        assert_eq!(at(&flat.tree.resolve(&sg.scope), "scope.name"), [&Value::Str("lib".into())]);
+        assert_eq!(at(&flat.tree.resolve(&sr.entries), "kind"), [&Value::Str("CLIENT".into())]);
+    }
+
+    #[test]
+    fn span_duration_clamps_on_unset_or_skew() {
+        let dur = |start, end| {
+            let s = Span { start_time_unix_nano: start, end_time_unix_nano: end, ..Default::default() };
+            flatten_trace_request(&trace_req(s, None, None)).resources[0].scopes[0].spans[0].duration
+        };
+        assert_eq!(dur(100, 250), 150);
+        assert_eq!(dur(100, 0), 0, "unset end → 0");
+        assert_eq!(dur(250, 100), 0, "skew (end < start) → 0");
+    }
+
+    #[test]
+    fn normalize_trace_ids_and_span_timestamps() {
+        let mut req = trace_req(
+            Span {
+                trace_id: vec![0x01, 0x02], // wrong length → cleared
+                span_id: vec![0u8; 8],      // valid
+                parent_span_id: vec![0x09], // wrong length → cleared
+                start_time_unix_nano: 0,    // → synthesized
+                ..Default::default()
+            },
+            None,
+            None,
+        );
+        let bad = normalize_trace_ids(&mut req);
+        assert_eq!(bad.trace, 1);
+        assert_eq!(bad.span, 1, "malformed parent_span_id counted under span");
+        let s = &req.resource_spans[0].scope_spans[0].spans[0];
+        assert!(s.trace_id.is_empty() && s.parent_span_id.is_empty());
+        assert_eq!(s.span_id.len(), 8, "valid span_id untouched");
+
+        normalize_span_timestamps(&mut req, 5_000);
+        assert_eq!(
+            req.resource_spans[0].scope_spans[0].spans[0].start_time_unix_nano,
+            5_001
         );
     }
 
