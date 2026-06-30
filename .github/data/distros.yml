@@ -92,49 +92,18 @@ include:
 
   - &amzn
     distro: amazonlinux
-    version: "2"
+    version: "2023"
     support_type: Core
     notes: ''
     eol_check: 'amazon-linux'
     bundle_sentry: *default_sentry
     packages: &amzn_packages
       type: rpm
-      repo_distro: amazonlinux/2
+      repo_distro: amazonlinux/2023
       builder_rev: *def_builder_rev
       arches:
         - x86_64
         - aarch64
-    test: &amzn_test
-      ebpf-core: false
-      skip-local-build: true
-  - <<: *amzn
-    version: "2023"
-    packages:
-      <<: *amzn_packages
-      repo_distro: amazonlinux/2023
-    test:
-      <<: *amzn_test
-      skip-local-build: false
-
-  - distro: centos
-    version: "7"
-    base_image: "netdata/legacy:centos7"
-    support_type: Core
-    notes: ''
-    eol_check: false
-    bundle_sentry: *default_sentry
-    packages:
-      type: rpm
-      repo_distro: el/7
-      builder_rev: *def_builder_rev
-      alt_links:
-        - el/7Server
-        - el/7Client
-      arches:
-        - x86_64
-    test:
-      ebpf-core: false
-      skip-local-build: true
 
   - &centos_stream
     distro: centos-stream
@@ -386,6 +355,27 @@ include:
       <<: *ubuntu_packages
       repo_distro: ubuntu/jammy
 legacy: # Info for platforms we used to support and still need to handle packages for
+  - <<: *amzn
+    version: "2"
+    packages:
+      <<: *amzn_packages
+      repo_distro: amazonlinux/2
+  - distro: centos
+    version: "7"
+    base_image: "netdata/legacy:centos7"
+    support_type: Core
+    notes: ''
+    eol_check: false
+    bundle_sentry: *default_sentry
+    packages:
+      type: rpm
+      repo_distro: el/7
+      builder_rev: *def_builder_rev
+      alt_links:
+        - el/7Server
+        - el/7Client
+      arches:
+        - x86_64
   - <<: *debian
     version: "10"
     packages:
@@ -503,11 +493,6 @@ no_include: # Info for platforms not covered in CI
     version: "9.x"
   - <<: *rhel
     version: "8.x"
-  - <<: *rhel
-    version: "7.x"
-    packages:
-      arches:
-        - x86_64
 
   - &freebsd
     distro: freebsd
