@@ -1032,7 +1032,16 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
 
         char uuid_str[UUID_STR_LEN];
         uuid_unparse_lower(metric->uuid, uuid_str);
-        struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
+        size_t page_offset = (size_t)metric->page_offset;
+        if (page_offset > journal_v2_file_size ||
+            journal_v2_file_size - page_offset < sizeof(struct journal_page_header)) {
+            netdata_log_info(
+                "DBENGINE: verification failed invalid page list header offset -- index %u at offset %u",
+                entries, metric->page_offset);
+            return 1;
+        }
+
+        struct journal_page_header *metric_list_header = (void *) ((uint8_t *) data_start + page_offset);
         struct journal_page_header local_metric_list_header = *metric_list_header;
 
         local_metric_list_header.crc = JOURVAL_V2_MAGIC;
@@ -1042,8 +1051,17 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
         rc = crc32cmp(metric_list_header->checksum, crc);
 
         if (!rc) {
+            size_t page_list_room = journal_v2_file_size - page_offset - sizeof(struct journal_page_header);
+            if (page_list_room < sizeof(struct journal_v2_block_trailer) ||
+                (size_t)metric_list_header->entries > (page_list_room - sizeof(struct journal_v2_block_trailer)) / sizeof(struct journal_page_list)) {
+                netdata_log_info("DBENGINE: verification failed invalid page list entries -- index %u entries %u at offset %u",
+                                 entries, metric_list_header->entries, metric->page_offset);
+                return 1;
+            }
+
             struct journal_v2_block_trailer *journal_trailer =
-                (void *) data_start + metric->page_offset + sizeof(struct journal_page_header) + (metric_list_header->entries * sizeof(struct journal_page_list));
+                (void *) ((uint8_t *) data_start + page_offset + sizeof(struct journal_page_header) +
+                          (metric_list_header->entries * sizeof(struct journal_page_list)));
 
             crc = crc32(0L, Z_NULL, 0);
             crc = crc32(crc, (uint8_t *) metric_list_header + sizeof(struct journal_page_header), metric_list_header->entries * sizeof(struct journal_page_list));
