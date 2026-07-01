@@ -966,6 +966,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/aral/aral.h
         src/libnetdata/avl/avl.c
         src/libnetdata/avl/avl.h
+        src/libnetdata/avl/avl-types.h
         src/libnetdata/buffer/buffer.c
         src/libnetdata/buffer/buffer.h
         src/libnetdata/buffer/functions_fields.c
