@@ -33,7 +33,7 @@ modules:
           -  `smartctl --json --all {deviceName} --device {deviceType} --nocheck {powerMode}`
         method_description: ""
       supported_platforms:
-        include: [Linux, BSD]
+        include: [Linux, BSD, Windows]
         exclude: []
       multi_instance: false
       additional_permissions:
@@ -50,7 +50,7 @@ modules:
         list:
           - title: Install smartmontools (v7.0+)
             description: |
-              Install `smartmontools` version 7.0 or later using your distribution's package manager. Version 7.0 introduced the `--json` output mode, which is required for this collector to function properly.
+              Install `smartmontools` version 7.0 or later. Version 7.0 introduced the `--json` output mode, which is required for this collector to function properly.
           - title: For Netdata running in a Docker container
             description: |
               **Provide access to storage devices**.
