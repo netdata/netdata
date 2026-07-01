@@ -53,6 +53,7 @@ static SERVICE_STATUS_HANDLE svc_status_handle = nullptr;
 static SERVICE_STATUS svc_status = {};
 
 static HANDLE svc_stop_event_handle = nullptr;
+static DWORD svc_stop_control_code = SERVICE_CONTROL_STOP;
 
 static ND_THREAD *cleanup_thread = nullptr;
 
@@ -117,7 +118,7 @@ static DWORD WINAPI stop_pending_heartbeat(LPVOID /*unused*/)
 
 static void call_netdata_cleanup(void *arg)
 {
-    DWORD controlCode = *((DWORD *)arg);
+    UNUSED(arg);
 
     // Wait until we have to stop the service
     netdata_service_log("Cleanup thread waiting for stop event...");
@@ -134,6 +135,7 @@ static void call_netdata_cleanup(void *arg)
     // Stop the agent
     netdata_service_log("Running netdata cleanup...");
     EXIT_REASON reason;
+    DWORD controlCode = __atomic_load_n(&svc_stop_control_code, __ATOMIC_ACQUIRE);
     switch(controlCode) {
         case SERVICE_CONTROL_SHUTDOWN:
             reason = (EXIT_REASON)(EXIT_REASON_SERVICE_STOP|EXIT_REASON_SYSTEM_SHUTDOWN);
@@ -183,11 +185,13 @@ static void WINAPI ServiceControlHandler(DWORD controlCode)
             if (!ReportSvcStatus(SERVICE_STOP_PENDING, 0, 5000, 0))
                 return;
 
+            __atomic_store_n(&svc_stop_control_code, controlCode, __ATOMIC_RELEASE);
+
             // Create cleanup thread
             netdata_service_log("Creating cleanup thread...");
             char tag[NETDATA_THREAD_TAG_MAX + 1];
             snprintfz(tag, NETDATA_THREAD_TAG_MAX, "%s", "CLEANUP");
-            cleanup_thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, call_netdata_cleanup, &controlCode);
+            cleanup_thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, call_netdata_cleanup, NULL);
 
             // Signal the stop request
             netdata_service_log("Signalling the cleanup thread...");

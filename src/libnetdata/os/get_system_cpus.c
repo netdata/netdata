@@ -97,8 +97,8 @@ static inline unsigned long cpuset_str2ul(char **s) {
 
 #if defined(OS_LINUX)
 size_t os_read_cpuset_cpus(const char *filename, size_t system_cpus) {
-    static char *buf = NULL;
-    static size_t buf_size = 0;
+    static __thread char *buf = NULL;
+    static __thread size_t buf_size = 0;
 
     if(unlikely(!system_cpus))
         system_cpus = os_get_system_cpus_uncached();

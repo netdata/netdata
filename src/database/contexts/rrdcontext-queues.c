@@ -152,12 +152,12 @@ void rrdcontext_add_to_pp_queue(RRDCONTEXT *rc) {
 
     if(ret == RRDCONTEXT_QUEUE_ADDED) {
         rrd_flag_set(rc, RRD_FLAG_QUEUED_FOR_PP);
-        rc->pp.queued_flags = rc->flags;
+        rc->pp.queued_flags = rrd_flags_get(rc);
         rc->pp.queued_ut = now_realtime_usec();
     }
     else if(ret == RRDCONTEXT_QUEUE_FOUND) {
         rrd_flag_set(rc, RRD_FLAG_QUEUED_FOR_PP);
-        rc->pp.queued_flags |= rc->flags;
+        rc->pp.queued_flags |= rrd_flags_get(rc);
     }
 
     spinlock_unlock(&rc->rrdhost->rrdctx.pp_queue.spinlock);

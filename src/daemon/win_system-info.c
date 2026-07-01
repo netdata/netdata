@@ -223,7 +223,7 @@ static void netdata_windows_discover_os_version(char *os, size_t length, DWORD b
     }
 
 #define ND_WIN_VER_LENGTH 16
-    char version[ND_WIN_VER_LENGTH + 1];
+    char version[ND_WIN_VER_LENGTH + 1] = NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN;
     if (IsWindows10OrGreater()) {
         // https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information
         (void)snprintf(version, ND_WIN_VER_LENGTH, (build < 22000) ? "10" : "11");
