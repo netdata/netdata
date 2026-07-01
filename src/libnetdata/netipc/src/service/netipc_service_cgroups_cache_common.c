@@ -104,6 +104,17 @@ static bool cache_copy_str(char **dst,
     return true;
 }
 
+static size_t cache_cstr_len(const char *src)
+{
+    if (!src)
+        return 0;
+
+    const char *p = src;
+    while (*p)
+        p++;
+    return (size_t)(p - src);
+}
+
 static nipc_cgroups_cache_snapshot_t *cache_snapshot_build(
     const nipc_cgroups_resp_view_t *view,
     const nipc_service_common_cache_ops_t *ops)
@@ -217,9 +228,12 @@ static nipc_cgroups_cache_snapshot_t *cache_snapshot_build_from_items(
         snapshot->items[i].options = items[i].options;
         snapshot->items[i].enabled = items[i].enabled;
 
-        if (!cache_copy_str(&snapshot->items[i].name, name, strlen(name),
+        size_t name_len = cache_cstr_len(name);
+        size_t path_len = cache_cstr_len(path);
+
+        if (!cache_copy_str(&snapshot->items[i].name, name, name_len,
                             ops, ops->cache_item_name_fault_site) ||
-            !cache_copy_str(&snapshot->items[i].path, path, strlen(path),
+            !cache_copy_str(&snapshot->items[i].path, path, path_len,
                             ops, ops->cache_item_path_fault_site)) {
             cache_snapshot_free(snapshot);
             return NULL;
@@ -494,7 +508,7 @@ static char *cache_strdup_owned(const char *src)
 {
     if (!src)
         src = "";
-    size_t len = strlen(src);
+    size_t len = cache_cstr_len(src);
     char *dst = malloc(len + 1);
     if (!dst)
         return NULL;

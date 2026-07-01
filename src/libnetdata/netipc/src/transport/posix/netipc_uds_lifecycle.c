@@ -24,10 +24,12 @@ static int bind_owner_only_socket(int fd, const struct sockaddr_un *addr)
     }
 
     /* Bind path sockets as 0600 without a post-bind permission window. */
-    mode_t old_mask = umask(S_IXUSR | S_IRWXG | S_IRWXO); // nosemgrep
+    // Flawfinder: ignore
+    mode_t old_mask = umask(S_IXUSR | S_IRWXG | S_IRWXO); // nosemgrep // NOSONAR
     int bind_rc = bind(fd, (const struct sockaddr *)addr, sizeof(*addr));
     int saved_errno = errno;
-    umask(old_mask); // nosemgrep
+    // Flawfinder: ignore
+    umask(old_mask); // nosemgrep // NOSONAR
 
     rc = pthread_mutex_unlock(&bind_umask_lock);
     if (bind_rc < 0) {

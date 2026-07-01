@@ -197,6 +197,22 @@ static inline void ebpf_cgroup_set_target_data(ebpf_cgroup_target_t *out, const 
     out->updated = 1;
 }
 
+static inline bool ebpf_cgroup_target_matches_item(const ebpf_cgroup_target_t *target, const nipc_cgroups_item_view_t *item)
+{
+    size_t name_len = item->name.len;
+
+    if (name_len >= sizeof(target->name) || target->name[name_len] != '\0')
+        return false;
+
+    if (name_len == 0)
+        return true;
+
+    if (!item->name.ptr)
+        return false;
+
+    return memcmp(target->name, item->name.ptr, name_len) == 0;
+}
+
 /**
  * Find or create
  *
@@ -209,9 +225,7 @@ static inline void ebpf_cgroup_set_target_data(ebpf_cgroup_target_t *out, const 
 static ebpf_cgroup_target_t *ebpf_cgroup_find_or_create(const nipc_cgroups_item_view_t *item)
 {
     for (ebpf_cgroup_target_t *ect = ebpf_cgroup_pids; ect; ect = ect->next) {
-        if (ect->hash == item->hash &&
-            strlen(ect->name) == item->name.len &&
-            memcmp(ect->name, item->name.ptr, item->name.len) == 0) {
+        if (ect->hash == item->hash && ebpf_cgroup_target_matches_item(ect, item)) {
             ect->updated = 1;
             return ect;
         }

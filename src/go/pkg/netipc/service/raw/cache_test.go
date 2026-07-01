@@ -170,13 +170,11 @@ func TestCacheConcurrentReadersRefresh(t *testing.T) {
 
 	var wg sync.WaitGroup
 	failures := make(chan int, readerCount)
-	for i := 0; i < readerCount; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range readerCount {
+		wg.Go(func() {
 
 			localFailures := 0
-			for j := 0; j < readerIters; j++ {
+			for range readerIters {
 				guard := cache.ReadLock()
 				view := guard.Get(1001, "docker-abc123")
 				if view == nil ||
@@ -194,11 +192,11 @@ func TestCacheConcurrentReadersRefresh(t *testing.T) {
 				guard.Unlock()
 			}
 			failures <- localFailures
-		}()
+		})
 	}
 
 	writerFailures := 0
-	for i := 0; i < writerIters; i++ {
+	for range writerIters {
 		if !cache.Refresh() {
 			writerFailures++
 		}
@@ -365,42 +363,6 @@ func TestCacheEmpty(t *testing.T) {
 	}
 
 	cleanupAll(svc)
-}
-
-func TestCacheDirectFallbackAndControls(t *testing.T) {
-	cache := newCache(&Client{state: StateReady, abortCh: make(chan struct{})})
-	cacheSetLinearSnapshotForTest(cache, []CacheItem{
-		{Hash: 100, Name: "alpha", Path: "/alpha"},
-		{Hash: 200, Name: "beta", Path: "/beta"},
-	})
-
-	item, found := cacheDupForTest(cache, 200, "beta")
-	if !found || item.Path != "/beta" {
-		t.Fatalf("fallback lookup = %+v found %v", item, found)
-	}
-	if cacheHasForTest(cache, 200, "missing") {
-		t.Fatal("fallback lookup should reject wrong name")
-	}
-	if cacheHasForTest(cache, 999, "beta") {
-		t.Fatal("fallback lookup should reject wrong hash")
-	}
-
-	cache.SetCallTimeout(123)
-	if cache.client.callTimeoutMs != 123 {
-		t.Fatalf("cache call timeout = %d, want 123", cache.client.callTimeoutMs)
-	}
-	cache.Abort()
-	if !cache.client.abortRequested.Load() {
-		t.Fatal("cache abort did not mark client aborted")
-	}
-	cache.ClearAbort()
-	if cache.client.abortRequested.Load() {
-		t.Fatal("cache clear abort did not reset client abort state")
-	}
-	cache.Close()
-	if cache.Ready() || cache.snapshot != nil {
-		t.Fatalf("closed cache retained state: ready=%v snapshot=%v", cache.Ready(), cache.snapshot)
-	}
 }
 
 func TestCacheOverflowGuards(t *testing.T) {

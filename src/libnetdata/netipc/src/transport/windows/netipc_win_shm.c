@@ -857,7 +857,6 @@ nipc_win_shm_error_t nipc_win_shm_receive(
                     &mlen);
                 if (copy_rc > 0) {
                     InterlockedExchange(self_waiting_ptr, 0);
-                    observed = true;
                     break; /* data available */
                 }
                 if (copy_rc < 0) {
@@ -885,7 +884,6 @@ nipc_win_shm_error_t nipc_win_shm_receive(
                 copy_rc = copy_observed_message(seq_ptr, len_ptr, expected_seq,
                                                 buf, data_ptr, max_copy, &mlen);
                 if (copy_rc > 0) {
-                    observed = true;
                     break; /* data available */
                 }
                 if (copy_rc < 0)
@@ -897,7 +895,6 @@ nipc_win_shm_error_t nipc_win_shm_receive(
                         seq_ptr, len_ptr, expected_seq, buf, data_ptr, max_copy,
                         &mlen);
                     if (copy_rc > 0) {
-                        observed = true;
                         break;
                     }
                     if (copy_rc < 0)
@@ -925,7 +922,6 @@ nipc_win_shm_error_t nipc_win_shm_receive(
                     seq_ptr, len_ptr, expected_seq, buf, data_ptr, max_copy,
                     &mlen);
                 if (copy_rc > 0) {
-                    observed = true;
                     break;
                 }
                 if (copy_rc < 0)
@@ -944,7 +940,6 @@ nipc_win_shm_error_t nipc_win_shm_receive(
                         seq_ptr, len_ptr, expected_seq, buf, data_ptr, max_copy,
                         &mlen);
                     if (copy_rc > 0) {
-                        observed = true;
                         break;
                     }
                     if (copy_rc < 0)
