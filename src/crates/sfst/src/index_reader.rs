@@ -242,32 +242,28 @@ impl<'a> IndexReader<'a> {
             kv_id += 1;
         });
 
-        // Mid/high-card: iterate secondary chunks in field_table order,
-        // tracking mid- and high-relative positions independently.
-        let mut mid_index: u16 = 0;
-        let mut high_index: u16 = 0;
-        for field in field_table {
+        // Mid/high-card: iterate secondary chunks in field_table order, each at
+        // its tier-relative chunk index.
+        for (field, ti) in field_table_tiered(field_table) {
             match field.tier {
                 FieldTier::Low => continue,
                 FieldTier::Mid => {
-                    let fst = self.sfst.mid_field(mid_index)?;
+                    let fst = self.sfst.mid_field(ti)?;
                     fst.for_each(|key, _| {
                         if kv_id < table.len() {
                             table[kv_id] = String::from_utf8_lossy(key).into_owned();
                         }
                         kv_id += 1;
                     });
-                    mid_index += 1;
                 }
                 FieldTier::High => {
-                    let hf = self.sfst.high_field(high_index)?;
+                    let hf = self.sfst.high_field(ti)?;
                     for key in hf.keys() {
                         if kv_id < table.len() {
                             table[kv_id] = String::from_utf8_lossy(key).into_owned();
                         }
                         kv_id += 1;
                     }
-                    high_index += 1;
                 }
             }
         }
@@ -910,23 +906,13 @@ impl<'a> IndexReader<'a> {
     /// Locate a field by name and return its tier + tier-relative chunk
     /// index. Returns `None` if the field is absent from this file.
     fn locate_field(&self, field_name: &str) -> Option<FieldLocation> {
-        let mut mid_idx = 0u16;
-        let mut high_idx = 0u16;
-        for field in self.field_table().iter() {
-            if field.name == field_name {
-                return Some(match field.tier {
-                    FieldTier::Low => FieldLocation::Low,
-                    FieldTier::Mid => FieldLocation::Mid(mid_idx),
-                    FieldTier::High => FieldLocation::High(high_idx),
-                });
-            }
-            match field.tier {
-                FieldTier::Mid => mid_idx += 1,
-                FieldTier::High => high_idx += 1,
-                _ => {}
-            }
-        }
-        None
+        field_table_tiered(self.field_table())
+            .find(|(field, _)| field.name == field_name)
+            .map(|(field, ti)| match field.tier {
+                FieldTier::Low => FieldLocation::Low,
+                FieldTier::Mid => FieldLocation::Mid(ti),
+                FieldTier::High => FieldLocation::High(ti),
+            })
     }
 
     /// Compute the on-disk `KvId` for the `local`-th value of high-card
@@ -1053,25 +1039,7 @@ impl<'a> IndexReader<'a> {
                         }
                     }
                 }
-                if targets.is_empty() {
-                    return Ok(PosSet::empty(total));
-                }
-                let batch_size = crate::stream_batch_size(total);
-                let num_batches = crate::num_stream_batches(total);
-                let mut positions: Vec<u32> = Vec::new();
-                for b in 0..num_batches {
-                    if (combined_mask >> b) & 1 == 0 {
-                        continue;
-                    }
-                    let batch_start = u32::from(b) * batch_size;
-                    let batch = self.sfst.stream_batch(b)?;
-                    for i in 0..batch.num_rows() {
-                        if batch.row(i).any(|id| targets.contains(id)) {
-                            positions.push(batch_start + i as u32);
-                        }
-                    }
-                }
-                Ok(PosSet::from_sorted(positions, total))
+                self.scan_high_positions(&targets, combined_mask, total)
             }
         }
     }
@@ -1102,8 +1070,6 @@ impl<'a> IndexReader<'a> {
 
         // Mid-card chunks (OR bitmaps) and high-card dictionaries (gather
         // KvId targets for one stream-batch pass).
-        let mut mid_idx = 0u16;
-        let mut high_idx = 0u16;
         // Matched high-card KvIds span the whole high-card range
         // [mid_end, high_end) (this scan accumulates across all high fields).
         let id_ranges = &self.metadata().id_ranges;
@@ -1112,52 +1078,68 @@ impl<'a> IndexReader<'a> {
             id_ranges.high_end.0 - id_ranges.mid_end.0,
         );
         let mut combined_mask: u8 = 0;
-        for field in self.field_table().iter() {
+        for (field, ti) in field_table_tiered(self.field_table()) {
             match field.tier {
                 FieldTier::Low => {}
                 FieldTier::Mid => {
-                    let chunk = self.sfst.mid_field(mid_idx)?;
+                    let chunk = self.sfst.mid_field(ti)?;
                     chunk.for_each(|kv_bytes, bv| {
                         if query.is_match(kv_bytes) {
                             result.or_assign(&PosSet::from_value(bv));
                         }
                     });
-                    mid_idx += 1;
                 }
                 FieldTier::High => {
-                    let hf = self.sfst.high_field(high_idx)?;
-                    let base = self.high_kv_id(high_idx, 0).0;
+                    let hf = self.sfst.high_field(ti)?;
+                    let base = self.high_kv_id(ti, 0).0;
                     for (local, key) in hf.keys().enumerate() {
                         if query.is_match(key) {
                             targets.insert(KvId(base + local as u32));
                             combined_mask |= hf.masks[local];
                         }
                     }
-                    high_idx += 1;
                 }
             }
         }
 
         if !targets.is_empty() {
-            let batch_size = crate::stream_batch_size(total);
-            let num_batches = crate::num_stream_batches(total);
-            let mut positions: Vec<u32> = Vec::new();
-            for b in 0..num_batches {
-                if (combined_mask >> b) & 1 == 0 {
-                    continue;
-                }
-                let batch_start = u32::from(b) * batch_size;
-                let batch = self.sfst.stream_batch(b)?;
-                for i in 0..batch.num_rows() {
-                    if batch.row(i).any(|id| targets.contains(id)) {
-                        positions.push(batch_start + i as u32);
-                    }
-                }
-            }
-            result.or_assign(&PosSet::from_sorted(positions, total));
+            result.or_assign(&self.scan_high_positions(&targets, combined_mask, total)?);
         }
 
         Ok(result)
+    }
+
+    /// Positions of rows containing any KvId in `targets`, scanning only the
+    /// stream batches selected by `mask` (bit `b` set ⇒ batch `b` may hold a
+    /// target — the OR of the matched values' per-value batch masks). Empty
+    /// `targets` yields an empty set. Shared by the high-card paths of
+    /// [`field_values_or`](Self::field_values_or) and
+    /// [`query_positions`](Self::query_positions).
+    fn scan_high_positions(
+        &self,
+        targets: &KvIdSet,
+        mask: u8,
+        total: u32,
+    ) -> Result<PosSet, crate::Error> {
+        if targets.is_empty() {
+            return Ok(PosSet::empty(total));
+        }
+        let batch_size = crate::stream_batch_size(total);
+        let num_batches = crate::num_stream_batches(total);
+        let mut positions: Vec<u32> = Vec::new();
+        for b in 0..num_batches {
+            if (mask >> b) & 1 == 0 {
+                continue;
+            }
+            let batch_start = u32::from(b) * batch_size;
+            let batch = self.sfst.stream_batch(b)?;
+            for i in 0..batch.num_rows() {
+                if batch.row(i).any(|id| targets.contains(id)) {
+                    positions.push(batch_start + i as u32);
+                }
+            }
+        }
+        Ok(PosSet::from_sorted(positions, total))
     }
 
     /// Per-value `(value, count)` pairs for `field` restricted to `scope`.
@@ -1489,6 +1471,13 @@ impl KvIdSet {
 
     /// Record a matched value; `kvid` must lie in `[base, base + width)`.
     fn insert(&mut self, kvid: KvId) {
+        debug_assert!(
+            kvid.0 >= self.base && kvid.0 - self.base < self.width,
+            "KvId {} outside [{}, {})",
+            kvid.0,
+            self.base,
+            self.base + self.width
+        );
         let i = (kvid.0 - self.base) as usize;
         self.bits[i / 64] |= 1u64 << (i % 64);
     }
@@ -1505,6 +1494,34 @@ impl KvIdSet {
     fn is_empty(&self) -> bool {
         self.bits.iter().all(|&word| word == 0)
     }
+}
+
+/// Pair each field with its **tier-relative** index (0-based within its own
+/// tier). The mid/high positions are exactly the chunk indices the reader loads,
+/// so this centralizes the running-index bookkeeping the tier-dispatch sites
+/// would otherwise each repeat.
+fn field_table_tiered(fields: &[FieldEntry]) -> impl Iterator<Item = (&FieldEntry, u16)> {
+    let (mut low, mut mid, mut high) = (0u16, 0u16, 0u16);
+    fields.iter().map(move |field| {
+        let idx = match field.tier {
+            FieldTier::Low => {
+                let i = low;
+                low += 1;
+                i
+            }
+            FieldTier::Mid => {
+                let i = mid;
+                mid += 1;
+                i
+            }
+            FieldTier::High => {
+                let i = high;
+                high += 1;
+                i
+            }
+        };
+        (field, idx)
+    })
 }
 
 #[cfg(test)]

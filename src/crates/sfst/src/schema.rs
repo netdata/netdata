@@ -815,6 +815,13 @@ impl StreamBatch {
             acc += len;
             self.row_offsets.push(acc);
         }
+        // Every KvId is a fixed 4 bytes, so the buffer must hold exactly
+        // `total_ids * 4`; a mismatch means a truncated/corrupt chunk.
+        debug_assert_eq!(
+            self.kv_bytes.len(),
+            acc as usize * 4,
+            "StreamBatch kv_bytes length inconsistent with row_lens (corrupt)"
+        );
     }
 
     /// Number of log rows in this batch.
