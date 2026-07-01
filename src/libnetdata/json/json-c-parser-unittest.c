@@ -1401,6 +1401,26 @@ static int test_parse_txt2rfc3339(void) {
     T(ok && dst != 0, "txt2rfc3339: valid RFC3339");
     json_object_put(root);
 
+    root = json_object_new_object();
+    json_object_object_add(root, "k", json_object_new_string("1970-01-01T00:00:00Z"));
+    dst = 999; R(); ok = wrap_parse_txt2rfc3339(root, "k", &dst, error, JSONC_REQUIRED);
+    T(ok && dst == 0, "txt2rfc3339: valid epoch-zero RFC3339");
+    json_object_put(root);
+
+    root = json_object_new_object();
+    json_object_object_add(root, "k", json_object_new_string("not-rfc3339"));
+
+    dst = 999; R(); ok = wrap_parse_txt2rfc3339(root, "k", &dst, error, JSONC_OPTIONAL);
+    T(ok && dst == 0, "txt2rfc3339: invalid string+OPT->dst=0,ok");
+
+    dst = 999; R(); ok = wrap_parse_txt2rfc3339(root, "k", &dst, error, JSONC_REQUIRED);
+    T(!ok && dst == 0, "txt2rfc3339: invalid string+REQ->error");
+
+    dst = 999; R(); ok = wrap_parse_txt2rfc3339(root, "k", &dst, error, JSONC_STRICT);
+    T(!ok && dst == 0, "txt2rfc3339: invalid string+STRICT->error");
+
+    json_object_put(root);
+
     // --- non-string types → dst=0, flag check ---
     {
         struct { const char *name; int type_id; } types[] = {
@@ -1459,6 +1479,7 @@ static int test_format_rfc3339(void) {
     int failed = 0;
     char buffer[RFC3339_MAX_LENGTH];
     usec_t parsed;
+    bool parsed_ok;
     size_t len;
 
     len = rfc3339_datetime_ut(buffer, sizeof(buffer), 123456, 3, true);
@@ -1468,38 +1489,62 @@ static int test_format_rfc3339(void) {
     len = rfc3339_datetime_ut(buffer, sizeof(buffer), 123456, 7, true);
     T(len == strlen("1970-01-01T00:00:00.1234560Z") && strcmp(buffer, "1970-01-01T00:00:00.1234560Z") == 0,
       "format_rfc3339: 7 digits keep microseconds and pad trailing zero");
-    parsed = rfc3339_parse_ut(buffer, NULL);
-    T(parsed == 123456, "format_rfc3339: 7-digit output parses back to the same microseconds");
+    parsed = 0;
+    parsed_ok = rfc3339_parse_ut(buffer, &parsed, NULL);
+    T(parsed_ok && parsed == 123456, "format_rfc3339: 7-digit output parses back to the same microseconds");
 
     len = rfc3339_datetime_ut(buffer, sizeof(buffer), 1, 9, true);
     T(len == strlen("1970-01-01T00:00:00.000001000Z") && strcmp(buffer, "1970-01-01T00:00:00.000001000Z") == 0,
       "format_rfc3339: 9 digits preserve leading zeros and pad nanoseconds");
-    parsed = rfc3339_parse_ut(buffer, NULL);
-    T(parsed == 1, "format_rfc3339: 9-digit output parses back to the same microseconds");
+    parsed = 0;
+    parsed_ok = rfc3339_parse_ut(buffer, &parsed, NULL);
+    T(parsed_ok && parsed == 1, "format_rfc3339: 9-digit output parses back to the same microseconds");
 
-    parsed = rfc3339_parse_ut("1970-01-01T00:00:00.1Z", NULL);
-    T(parsed == 100000, "parse_rfc3339: 1 fractional digit scales to microseconds");
+    len = rfc3339_datetime_ut(buffer, sizeof(buffer), 0, 0, true);
+    T(len == strlen("1970-01-01T00:00:00Z") && strcmp(buffer, "1970-01-01T00:00:00Z") == 0,
+      "format_rfc3339: epoch zero formats without fractional seconds");
+    parsed = 999;
+    parsed_ok = rfc3339_parse_ut(buffer, &parsed, NULL);
+    T(parsed_ok && parsed == 0, "format_rfc3339: epoch-zero output parses successfully");
 
-    parsed = rfc3339_parse_ut("1970-01-01T00:00:00.999999999Z", NULL);
-    T(parsed == 999999, "parse_rfc3339: 9 fractional digits truncate to microseconds");
+    parsed = 0;
+    parsed_ok = rfc3339_parse_ut("1970-01-01T00:00:00.1Z", &parsed, NULL);
+    T(parsed_ok && parsed == 100000, "parse_rfc3339: 1 fractional digit scales to microseconds");
 
-    parsed = rfc3339_parse_ut("1970-01-01T00:00:00.Z", NULL);
-    T(parsed == 0, "parse_rfc3339: missing fractional digits fail");
+    parsed = 0;
+    parsed_ok = rfc3339_parse_ut("1970-01-01T00:00:00.999999999Z", &parsed, NULL);
+    T(parsed_ok && parsed == 999999, "parse_rfc3339: 9 fractional digits truncate to microseconds");
 
-    parsed = rfc3339_parse_ut("1970-01-01T00:00:00.1234567890Z", NULL);
-    T(parsed == 0, "parse_rfc3339: more than 9 fractional digits fail");
+    parsed = 999;
+    parsed_ok = rfc3339_parse_ut("1970-01-01T00:00:00.Z", &parsed, NULL);
+    T(!parsed_ok && parsed == 999, "parse_rfc3339: missing fractional digits fail without overwriting output");
 
-    parsed = rfc3339_parse_ut("1970-01-01T00:00:00. 123Z", NULL);
-    T(parsed == 0, "parse_rfc3339: fractional whitespace fails");
+    parsed = 999;
+    parsed_ok = rfc3339_parse_ut("1970-01-01T00:00:00.1234567890Z", &parsed, NULL);
+    T(!parsed_ok && parsed == 999, "parse_rfc3339: more than 9 fractional digits fail without overwriting output");
 
-    parsed = rfc3339_parse_ut("1970-01-01T00:00:00. +1Z", NULL);
-    T(parsed == 0, "parse_rfc3339: fractional whitespace plus sign fails");
+    parsed = 999;
+    parsed_ok = rfc3339_parse_ut("1970-01-01T00:00:00. 123Z", &parsed, NULL);
+    T(!parsed_ok && parsed == 999, "parse_rfc3339: fractional whitespace fails without overwriting output");
 
-    parsed = rfc3339_parse_ut("1970-01-01T00:00:00.+1Z", NULL);
-    T(parsed == 0, "parse_rfc3339: fractional plus sign fails");
+    parsed = 999;
+    parsed_ok = rfc3339_parse_ut("1970-01-01T00:00:00. +1Z", &parsed, NULL);
+    T(!parsed_ok && parsed == 999, "parse_rfc3339: fractional whitespace plus sign fails without overwriting output");
 
-    parsed = rfc3339_parse_ut("1970-01-01T00:00:00.-1Z", NULL);
-    T(parsed == 0, "parse_rfc3339: fractional minus sign fails");
+    parsed = 999;
+    parsed_ok = rfc3339_parse_ut("1970-01-01T00:00:00.+1Z", &parsed, NULL);
+    T(!parsed_ok && parsed == 999, "parse_rfc3339: fractional plus sign fails without overwriting output");
+
+    parsed = 999;
+    parsed_ok = rfc3339_parse_ut("1970-01-01T00:00:00.-1Z", &parsed, NULL);
+    T(!parsed_ok && parsed == 999, "parse_rfc3339: fractional minus sign fails without overwriting output");
+
+    parsed = 999;
+    parsed_ok = rfc3339_parse_ut("not-rfc3339", &parsed, NULL);
+    T(!parsed_ok && parsed == 999, "parse_rfc3339: invalid input fails without overwriting output");
+
+    parsed_ok = rfc3339_parse_ut(buffer, NULL, NULL);
+    T(!parsed_ok, "parse_rfc3339: NULL output pointer is rejected");
 
     return failed;
 }

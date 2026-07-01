@@ -610,12 +610,13 @@ time_t mcp_params_parse_time(struct json_object *params, const char *name, time_
 
         // Try to parse as RFC3339 first
         char *endptr = NULL;
-        usec_t timestamp_ut = rfc3339_parse_ut(val_str, &endptr);
+        usec_t timestamp_ut = 0;
+        bool parsed_rfc3339 = rfc3339_parse_ut(val_str, &timestamp_ut, &endptr);
 
         // Check if RFC3339 parsing was successful
         // Note: We check endptr to see if the entire string was consumed
         // We don't check timestamp_ut > 0 because dates before 1970 are valid
-        if (endptr && (*endptr == '\0' || isspace((unsigned char)*endptr))) {
+        if (parsed_rfc3339 && endptr && (*endptr == '\0' || isspace((unsigned char)*endptr))) {
             // Successfully parsed as RFC3339, convert to seconds
             return (time_t)(timestamp_ut / USEC_PER_SEC);
         }
