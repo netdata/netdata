@@ -835,9 +835,14 @@ static bool nd_logger_windows(struct nd_log_source *source, struct log_field *fi
         // eventID based logging - WEL
         rc = ReportEventW(source->hEventLog, wType, 0, eventID, NULL, _NDF_MAX - 1, 0, wel_messages, NULL);
         if(!rc) {
-            DWORD err = GetLastError();
-            nd_win_trace("nd_logger_windows[%s]: ReportEventW FAILED err=%lu eventID=0x%lx",
-                         nd_log_id2source(source->source), (unsigned long)err, (unsigned long)eventID);
+            // trace only the first failure per source — persistent failure would otherwise
+            // emit a trace line on every log call, causing unbounded trace-file growth
+            static bool first_failure[_NDLS_MAX];
+            if(source->source < _NDLS_MAX && !__atomic_exchange_n(&first_failure[source->source], true, __ATOMIC_RELAXED)) {
+                DWORD err = GetLastError();
+                nd_win_trace("nd_logger_windows[%s]: ReportEventW FAILED err=%lu eventID=0x%lx",
+                             nd_log_id2source(source->source), (unsigned long)err, (unsigned long)eventID);
+            }
         }
         else {
             // trace the first successful write per source so the log confirms events reach WEL
