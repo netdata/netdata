@@ -335,10 +335,17 @@
             </InstallExecuteSequence>
 
             <!-- Unregister any previously installed manifest before installing the new one.
-                 Scheduled Before="RemoveFiles" so the manifest XML is still in System32
-                 when wevtutil reads it — both on upgrade (old manifest is there) and on
-                 uninstall (manifest present until RemoveFiles runs it).
-                 Return=ignore because on a first-ever install nothing is registered yet. -->
+                 Two scheduling entries handle the two cases:
+                 - Uninstall (REMOVE="ALL"): manifest is still in System32; fire Before="RemoveFiles"
+                   so wevtutil can read it before it is deleted.
+                 - Upgrade (WIX_UPGRADE_DETECTED): with Schedule="afterInstallValidate" the old MSI
+                   runs RemoveExistingProducts first, which deletes the old manifest before this MSI
+                   reaches its own sequence. Fire After="InstallFiles" so the new manifest is
+                   present in System32; provider names and GUIDs are unchanged across versions so
+                   wevtutil um with the new manifest correctly unregisters the old publisher.
+                 Fresh installs: neither condition fires; nothing is registered yet so
+                 InstallManifest (wevtutil im) succeeds directly.
+                 Return=ignore because wevtutil um fails harmlessly when nothing is registered. -->
             <SetProperty
                 Id="UninstallManifest"
                 Value="&quot;[System64Folder]wevtutil.exe&quot; um &quot;[System64Folder]wevt_netdata_manifest.xml&quot;"
@@ -354,7 +361,11 @@
                 Impersonate="no"
             />
             <InstallExecuteSequence>
-                <Custom Action="UninstallManifest" Before="RemoveFiles" />
+                <!-- Pure uninstall: manifest is still on disk here. -->
+                <Custom Action="UninstallManifest" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot;" />
+                <!-- Upgrade: old manifest was deleted by RemoveExistingProducts; fire after
+                     InstallFiles has placed the new manifest in System32. -->
+                <Custom Action="UninstallManifest" After="InstallFiles" Condition="WIX_UPGRADE_DETECTED" />
             </InstallExecuteSequence>
 
             <Component Id="NetdataService" Directory="USRBINDIR">
