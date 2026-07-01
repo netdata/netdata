@@ -465,7 +465,7 @@ WEL Channels cannot include ETW Providers.
 Retention is always defined per Stream.
 
 - Retention in ETW is defined per ETW Channel (ETW Provider Stream).
-- Retention in WEL is defined per WEL Provider (each WEL Provider is a single Stream).
+- Retention in WEL is defined per Channel. Each WEL Provider writes to exactly one Channel, so retention is effectively per-provider, but the setting itself lives on the Channel.
 
 ### Messages Formatting
 
