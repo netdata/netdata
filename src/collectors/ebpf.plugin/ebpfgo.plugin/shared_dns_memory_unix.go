@@ -48,6 +48,11 @@ type ebpfgoDnsFlowRecord struct {
 	Pad         [7]uint8
 }
 
+func copyDNSDomain(dst *[256]byte, domain string) {
+	n := copy(dst[:len(dst)-1], domain)
+	dst[n] = 0
+}
+
 func assertSharedDnsMemoryLayout() {
 	if got, want := unsafe.Sizeof(ebpfgoDnsAggregate{}),
 		uintptr(C.sizeof_struct_ebpfgo_dns_aggregate); got != want {
@@ -110,10 +115,7 @@ func (p *SharedDnsMemoryPublisher) Publish(snap libbpfloader.DNSSnapshot, flows 
 			if f.TimedOut {
 				r.TimedOut = 1
 			}
-			n := copy(r.Domain[:], f.Domain)
-			if n < len(r.Domain) {
-				r.Domain[n] = 0
-			}
+			copyDNSDomain(&r.Domain, f.Domain)
 			r.ServerIP = f.ServerIP
 			r.ClientIP = f.ClientIP
 		}
