@@ -66,6 +66,8 @@ struct transaction_buffer {
     struct header_buffer state_backup;
     SPINLOCK spinlock;
     struct buffer_fragment *sending_frag;
+    // Fragment owned outside hdr_buffer that remains valid across compaction/realloc.
+    struct buffer_fragment *stable_frag;
 };
 
 enum mqtt_client_state {
@@ -239,6 +241,7 @@ struct mqtt_ng_client {
     void (*msg_callback)(const char *topic, const void *msg, size_t msglen, int qos);
 
     unsigned int ping_pending:1;
+    struct buffer_fragment ping_frag;
 
     struct mqtt_ng_stats stats;
 
@@ -258,17 +261,7 @@ struct mqtt_ng_client {
 
 usec_t publish_latency;
 
-unsigned char pingreq[] = { MQTT_CPT_PINGREQ << 4, 0x00 };
-
-struct buffer_fragment ping_frag = {
-    .data = pingreq,
-    .flags =  BUFFER_FRAG_MQTT_PACKET_HEAD | BUFFER_FRAG_MQTT_PACKET_TAIL,
-    .free_fnc = NULL,
-    .len = sizeof(pingreq),
-    .next = NULL,
-    .sent = 0,
-    .packet_id = 0
-};
+static unsigned char pingreq[] = { MQTT_CPT_PINGREQ << 4, 0x00 };
 
 int uint32_to_mqtt_vbi(uint32_t input, unsigned char *output) {
     int i = 1;
@@ -536,7 +529,7 @@ static void transaction_buffer_garbage_collect(struct transaction_buffer *buf, b
         worker_is_busy(WORKER_ACLK_RECLAIM_MEMORY);
     // Invalidate the cached sending fragment
     // as we will move data around
-    if (buf->sending_frag != &ping_frag)
+    if (buf->sending_frag != buf->stable_frag)
         buf->sending_frag = NULL;
 
     buffer_garbage_collect(&buf->hdr_buffer, main_thread);
@@ -551,7 +544,7 @@ static int transaction_buffer_grow(struct transaction_buffer *buf, float rate, s
 
     // Invalidate the cached sending fragment
     // as we will move data around
-    if (buf->sending_frag != &ping_frag)
+    if (buf->sending_frag != buf->stable_frag)
         buf->sending_frag = NULL;
 
     buf->hdr_buffer.size = (size_t)((float)buf->hdr_buffer.size * rate);
@@ -579,12 +572,27 @@ inline static void transaction_buffer_init(struct transaction_buffer *to_init, s
     to_init->hdr_buffer.data = mallocz(size);
     to_init->hdr_buffer.tail = to_init->hdr_buffer.data;
     to_init->hdr_buffer.tail_frag = NULL;
+    to_init->stable_frag = NULL;
 }
 
 static void transaction_buffer_destroy(struct transaction_buffer *to_init)
 {
     buffer_purge(&to_init->hdr_buffer);
     freez(to_init->hdr_buffer.data);
+}
+
+static void mqtt_ng_init_ping_fragment(struct mqtt_ng_client *client)
+{
+    client->ping_frag = (struct buffer_fragment){
+        .data = pingreq,
+        .flags = BUFFER_FRAG_MQTT_PACKET_HEAD | BUFFER_FRAG_MQTT_PACKET_TAIL,
+        .free_fnc = NULL,
+        .len = sizeof(pingreq),
+        .next = NULL,
+        .sent = 0,
+        .packet_id = 0,
+    };
+    client->main_buffer.stable_frag = &client->ping_frag;
 }
 
 // Creates transaction
@@ -626,6 +634,7 @@ struct mqtt_ng_client *mqtt_ng_init(struct mqtt_ng_init *settings)
                              HEADER_BUFFER_SIZE_IOT :
                              (netdata_conf_is_standalone() ? HEADER_BUFFER_SIZE_STANDALONE : HEADER_BUFFER_SIZE);
     transaction_buffer_init(&client->main_buffer, buffer_size);
+    mqtt_ng_init_ping_fragment(client);
 
     client->rx_aliases = RX_ALIASES_INITIALIZE();
 
@@ -2163,9 +2172,9 @@ static int mqtt_ng_next_to_send(struct mqtt_ng_client *client) {
 
     if ( client->ping_pending && (!frag || (frag->flags & BUFFER_FRAG_MQTT_PACKET_HEAD && frag->sent == 0)) ) {
         client->ping_pending = 0;
-        ping_frag.sent = 0;
-        ping_frag.sent_monotonic_ut = 0;
-        client->main_buffer.sending_frag = &ping_frag;
+        client->ping_frag.sent = 0;
+        client->ping_frag.sent_monotonic_ut = 0;
+        client->main_buffer.sending_frag = &client->ping_frag;
         return 0;
     }
 
@@ -2201,7 +2210,7 @@ static int send_fragment(struct mqtt_ng_client *client) {
 
     if (frag->flags & BUFFER_FRAG_MQTT_PACKET_TAIL) {
         client->time_of_last_send = time(NULL);
-        if (client->main_buffer.sending_frag != &ping_frag)
+        if (frag != &client->ping_frag)
             __atomic_fetch_sub(&client->stats.tx_messages_queued, 1, __ATOMIC_RELAXED);
         __atomic_fetch_add(&client->stats.tx_messages_sent, 1, __ATOMIC_RELAXED);
         client->main_buffer.sending_frag = NULL;
@@ -2291,8 +2300,8 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
 
         case MQTT_CPT_PINGRESP:
             worker_is_busy(WORKER_ACLK_CPT_PINGRESP);
-            usec_t latency = now_monotonic_usec() - ping_frag.sent_monotonic_ut;
-            pulse_aclk_sent_message_acked(latency, ping_frag.len);
+            usec_t latency = now_monotonic_usec() - client->ping_frag.sent_monotonic_ut;
+            pulse_aclk_sent_message_acked(latency, client->ping_frag.len);
             break;
 
         case MQTT_CPT_SUBACK:
