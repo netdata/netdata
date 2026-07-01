@@ -35,6 +35,20 @@ Additionally, the following build time features require additional dependencies:
 - Netdata Go collectors:
   - Go (the minimum required version is determined by the `go` directive in `src/go/go.mod`)
 
+:::note
+
+When protobuf is not installed on the system, the build downloads Abseil and
+Protobuf source code from GitHub and compiles them locally. This requires an
+internet connection and can take several minutes on slower connections, during
+which the build may appear to hang at messages like `Preparing bundled Abseil`
+or `Preparing bundled Protobuf`. To avoid this download step, install system
+protobuf packages before building:
+
+- Debian/Ubuntu: `libprotobuf-dev protobuf-compiler`
+- Fedora/RHEL: `protobuf-devel protobuf-compiler`
+
+:::
+
 ## Preparing the source tree
 
 Netdata uses Git submodules for some of it’s components, which must be fetched prior to building Netdata. If you
