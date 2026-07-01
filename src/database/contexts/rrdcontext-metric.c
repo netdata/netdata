@@ -232,7 +232,7 @@ void rrdmetric_trigger_updates(RRDMETRIC *rm, const char *function) {
 
     if(rrd_flag_is_updated(rm) || !rrd_flag_check(rm, RRD_FLAG_LIVE_RETENTION)) {
         rrd_flag_set_updated(rm->ri, RRD_FLAG_UPDATE_REASON_TRIGGERED);
-        rrdcontext_queue_for_post_processing(rm->ri->rc, function, rm->flags);
+        rrdcontext_queue_for_post_processing(rm->ri->rc, function, rrd_flags_get(rm));
     }
 }
 
