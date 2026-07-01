@@ -1011,7 +1011,7 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
             stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE);
             continue;
         }
-        if (probe_rc < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+        if (probe_rc < 0 && errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
             // Socket error detected (keepalive timeout, etc.)
             // Save errno immediately as subsequent calls may modify it
             int saved_errno = errno;
@@ -1035,7 +1035,7 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
             continue;
         }
         // probe_rc > 0: data available (normal)
-        // probe_rc < 0 with EAGAIN/EWOULDBLOCK: no data but connection alive
+        // probe_rc < 0 with EAGAIN/EWOULDBLOCK/EINTR: no data but connection alive
 
         spinlock_lock(&rpt->thread.send_to_child.spinlock);
         STREAM_CIRCULAR_BUFFER_STATS stats = *stream_circular_buffer_stats_unsafe(rpt->thread.send_to_child.scb);
