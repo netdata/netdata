@@ -211,6 +211,7 @@ int help(int exitcode) {
 
 int buffer_unittest(void);
 int ringbuffer_unittest(void);
+int log_stack_unittest(void);
 int clocks_unittest(void);
 int ws_client_unittest(void);
 int mqtt_ng_unittest(void);
@@ -441,6 +442,7 @@ int netdata_main(int argc, char **argv) {
                             if (unit_test_str2ld()) return 1;
                             if (buffer_unittest()) return 1;
                             if (ringbuffer_unittest()) return 1;
+                            if (log_stack_unittest()) return 1;
                             if (clocks_unittest()) return 1;
                             if (ws_client_unittest()) return 1;
                             if (mqtt_ng_unittest()) return 1;
