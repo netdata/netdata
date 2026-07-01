@@ -333,8 +333,10 @@ size_t uuidmap_destroy(void) {
         }
 
         // Free all Judy arrays
+#ifndef OS_WINDOWS
         JudyHSFreeArray(&uuid_to_id, PJE0);
         JudyLFreeArray(&id_to_uuid, PJE0);
+#endif
 
         // Reset partition data
         memset(&uuid_map.p[partition], 0, sizeof(uuid_map.p[partition]));

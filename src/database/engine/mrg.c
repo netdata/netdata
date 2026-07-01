@@ -104,10 +104,14 @@ size_t mrg_destroy(MRG *mrg) {
                 aral_freez(mrg->index[partition].aral, metric);
             }
 
+#ifndef OS_WINDOWS
             JudyLFreeArray(&sections_judy, PJE0);
+#endif
         }
 
+#ifndef OS_WINDOWS
         JudyLFreeArray(&mrg->index[partition].uuid_judy, PJE0);
+#endif
 
         // Unlock the partition
         mrg_index_write_unlock(mrg, partition);

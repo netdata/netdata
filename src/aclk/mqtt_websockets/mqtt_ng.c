@@ -694,7 +694,9 @@ static void mqtt_ng_destroy_tx_alias_hash(c_rhash hash)
 static void destroy_timeout_monitor_list(struct mqtt_ng_client *client)
 {
     spinlock_lock(&client->pending_packets.spinlock);
+#ifndef OS_WINDOWS
     (void) JudyLFreeArray(&client->pending_packets.JudyL, PJE0);
+#endif
     spinlock_unlock(&client->pending_packets.spinlock);
     __atomic_store_n(&client->stats.packets_waiting_puback, 0, __ATOMIC_RELAXED);
 }
