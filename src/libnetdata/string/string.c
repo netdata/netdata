@@ -457,9 +457,6 @@ bool string_equals_string_nocase(const STRING *a, const STRING *b) {
 static STRING *string_2way_merge_X = NULL;
 
 STRING *string_2way_merge(STRING *a, STRING *b) {
-    if(unlikely(!string_2way_merge_X))
-        string_2way_merge_X = string_strdupz("[x]");
-
     if(unlikely(a == b)) return string_dup(a);
     if(unlikely(a == string_2way_merge_X)) return string_dup(a);
     if(unlikely(b == string_2way_merge_X)) return string_dup(b);
@@ -1017,4 +1014,6 @@ void string_init(void) {
         string_base[i].JudyLPointers = NULL;
 #endif
     }
+
+    string_2way_merge_X = string_strdupz("[x]");
 }
