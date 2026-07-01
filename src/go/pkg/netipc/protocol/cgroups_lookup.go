@@ -183,21 +183,24 @@ func (v *CgroupsLookupRequestView) itemBytes(index uint32) ([]byte, []byte, erro
 			return nil, nil, ErrOverflow
 		}
 	}
-	dirOff64 := uint64(index) * uint64(LookupDirEntrySize)
-	if dirOff64 > uint64(maxIntValue()) || CgroupsLookupReqHdr > maxIntValue()-int(dirOff64) {
+	dirOff, ok := checkedInt(uint64(index) * uint64(LookupDirEntrySize))
+	if !ok || CgroupsLookupReqHdr > maxIntValue()-dirOff {
 		return nil, nil, ErrOverflow
 	}
-	base := CgroupsLookupReqHdr + int(dirOff64) // #nosec G115 -- bounded by maxIntValue above.
+	base := CgroupsLookupReqHdr + dirOff
 	if base > len(v.payload)-LookupDirEntrySize {
 		return nil, nil, ErrOutOfBounds
 	}
 	off32 := ne.Uint32(v.payload[base : base+4])
 	length32 := ne.Uint32(v.payload[base+4 : base+8])
-	if uint64(off32) > uint64(maxIntValue()) || uint64(length32) > uint64(maxIntValue()) {
+	off, ok := checkedInt(uint64(off32))
+	if !ok {
 		return nil, nil, ErrOutOfBounds
 	}
-	length := int(length32) // #nosec G115 -- bounded by maxIntValue above.
-	off := int(off32)       // #nosec G115 -- bounded by maxIntValue above.
+	length, ok := checkedInt(uint64(length32))
+	if !ok {
+		return nil, nil, ErrOutOfBounds
+	}
 	item, err := lookupPayloadSlice(v.payload, dirEnd, off, length)
 	if err != nil {
 		return nil, nil, err

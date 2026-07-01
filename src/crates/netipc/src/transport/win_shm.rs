@@ -588,17 +588,20 @@ impl WinShmContext {
         let spin = read_u32(base, OFF_SPIN_TRIES);
 
         // Validate header fields from shared memory
+        let req_end = req_off.checked_add(req_cap);
+        let resp_end = resp_off.checked_add(resp_cap);
         if req_off == 0
             || req_cap == 0
             || resp_off == 0
             || resp_cap == 0
-            || req_off % 64 != 0
-            || req_cap % 64 != 0
-            || resp_off % 64 != 0
-            || resp_cap % 64 != 0
-            || req_off
-                .checked_add(req_cap)
-                .map_or(true, |end| resp_off < end)
+            || req_off < HEADER_LEN
+            || resp_off < HEADER_LEN
+            || req_off % CACHELINE_SIZE != 0
+            || req_cap % CACHELINE_SIZE != 0
+            || resp_off % CACHELINE_SIZE != 0
+            || resp_cap % CACHELINE_SIZE != 0
+            || req_end.map_or(true, |end| resp_off < end)
+            || resp_end.is_none()
         {
             unsafe {
                 ffi::UnmapViewOfFile(base as *const _);
@@ -607,7 +610,7 @@ impl WinShmContext {
             return Err(WinShmError::BadHeader);
         }
 
-        let region_size = (resp_off as usize) + (resp_cap as usize);
+        let region_size = resp_end.unwrap() as usize;
 
         // Read current sequence numbers via interlocked
         let cur_req_seq = interlocked_read_i64(base, OFF_REQ_SEQ);
@@ -784,18 +787,10 @@ impl WinShmContext {
         let mut observed = false;
         let mut mlen: i32 = 0;
         for _ in 0..self.spin_tries {
-            let cur = interlocked_read_i64(self.base, seq_off);
-            if cur >= expected_seq {
-                mlen = interlocked_read_i32(self.base, len_off);
-                if mlen > 0 && (mlen as usize) <= max_copy {
-                    unsafe {
-                        std::ptr::copy_nonoverlapping(
-                            self.base.add(area_off as usize),
-                            buf.as_mut_ptr(),
-                            mlen as usize,
-                        );
-                    }
-                }
+            if let Some(observed_len) =
+                self.copy_observed_message(buf, seq_off, len_off, expected_seq, area_off, max_copy)?
+            {
+                mlen = observed_len;
                 observed = true;
                 break;
             }
@@ -817,8 +812,15 @@ impl WinShmContext {
                     interlocked_exchange_i32(self.base, self_waiting_off, 1);
                     std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
 
-                    let cur = interlocked_read_i64(self.base, seq_off);
-                    if cur >= expected_seq {
+                    if let Some(observed_len) = self.copy_observed_message(
+                        buf,
+                        seq_off,
+                        len_off,
+                        expected_seq,
+                        area_off,
+                        max_copy,
+                    )? {
+                        mlen = observed_len;
                         interlocked_exchange_i32(self.base, self_waiting_off, 0);
                         break; // data available
                     }
@@ -839,15 +841,29 @@ impl WinShmContext {
                     interlocked_exchange_i32(self.base, self_waiting_off, 0);
 
                     // Check sequence — data may have arrived
-                    let cur = interlocked_read_i64(self.base, seq_off);
-                    if cur >= expected_seq {
+                    if let Some(observed_len) = self.copy_observed_message(
+                        buf,
+                        seq_off,
+                        len_off,
+                        expected_seq,
+                        area_off,
+                        max_copy,
+                    )? {
+                        mlen = observed_len;
                         break; // data available
                     }
 
                     // No data — check peer close
                     if interlocked_read_i32(self.base, peer_closed_off) != 0 {
-                        let cur = interlocked_read_i64(self.base, seq_off);
-                        if cur >= expected_seq {
+                        if let Some(observed_len) = self.copy_observed_message(
+                            buf,
+                            seq_off,
+                            len_off,
+                            expected_seq,
+                            area_off,
+                            max_copy,
+                        )? {
+                            mlen = observed_len;
                             break;
                         }
                         self.advance_seq(expected_seq);
@@ -861,34 +877,20 @@ impl WinShmContext {
 
                     // Spurious wake — retry with remaining deadline
                 }
-
-                // Copy after waking
-                mlen = interlocked_read_i32(self.base, len_off);
-                if mlen > 0 && (mlen as usize) <= max_copy {
-                    unsafe {
-                        std::ptr::copy_nonoverlapping(
-                            self.base.add(area_off as usize),
-                            buf.as_mut_ptr(),
-                            mlen as usize,
-                        );
-                    }
-                }
             } else {
                 // BUSYWAIT
                 let start = unsafe { ffi::GetTickCount() };
+                let mut polls = 0;
                 loop {
-                    let cur = interlocked_read_i64(self.base, seq_off);
-                    if cur >= expected_seq {
-                        mlen = interlocked_read_i32(self.base, len_off);
-                        if mlen > 0 && (mlen as usize) <= max_copy {
-                            unsafe {
-                                std::ptr::copy_nonoverlapping(
-                                    self.base.add(area_off as usize),
-                                    buf.as_mut_ptr(),
-                                    mlen as usize,
-                                );
-                            }
-                        }
+                    if let Some(observed_len) = self.copy_observed_message(
+                        buf,
+                        seq_off,
+                        len_off,
+                        expected_seq,
+                        area_off,
+                        max_copy,
+                    )? {
+                        mlen = observed_len;
                         break;
                     }
 
@@ -900,25 +902,22 @@ impl WinShmContext {
                     }
 
                     if interlocked_read_i32(self.base, peer_closed_off) != 0 {
-                        let cur = interlocked_read_i64(self.base, seq_off);
-                        if cur >= expected_seq {
-                            mlen = interlocked_read_i32(self.base, len_off);
-                            if mlen > 0 && (mlen as usize) <= max_copy {
-                                unsafe {
-                                    std::ptr::copy_nonoverlapping(
-                                        self.base.add(area_off as usize),
-                                        buf.as_mut_ptr(),
-                                        mlen as usize,
-                                    );
-                                }
-                            }
+                        if let Some(observed_len) = self.copy_observed_message(
+                            buf,
+                            seq_off,
+                            len_off,
+                            expected_seq,
+                            area_off,
+                            max_copy,
+                        )? {
+                            mlen = observed_len;
                             break;
                         }
                         self.advance_seq(expected_seq);
                         return Err(WinShmError::Disconnected);
                     }
 
-                    cpu_relax();
+                    busywait_relax(&mut polls);
                 }
             }
         }
@@ -966,22 +965,18 @@ impl WinShmContext {
         let max_copy = std::cmp::min(buf.len(), area_cap as usize);
 
         for _ in 0..self.spin_tries {
-            let cur = interlocked_read_i64(self.base, seq_off);
-            if cur < expected_seq {
+            let Some(mlen) = self.copy_observed_message(
+                buf,
+                seq_off,
+                len_off,
+                expected_seq,
+                area_off,
+                max_copy,
+            )?
+            else {
                 cpu_relax();
                 continue;
-            }
-
-            let mlen = interlocked_read_i32(self.base, len_off);
-            if mlen > 0 && (mlen as usize) <= max_copy {
-                unsafe {
-                    std::ptr::copy_nonoverlapping(
-                        self.base.add(area_off as usize),
-                        buf.as_mut_ptr(),
-                        mlen as usize,
-                    );
-                }
-            }
+            };
 
             // Match receive(): consume the observed sequence before reporting
             // malformed or oversized messages.
@@ -996,6 +991,43 @@ impl WinShmContext {
         }
 
         Ok(None)
+    }
+
+    fn copy_observed_message(
+        &self,
+        buf: &mut [u8],
+        seq_off: usize,
+        len_off: usize,
+        expected_seq: i64,
+        area_off: u32,
+        max_copy: usize,
+    ) -> Result<Option<i32>, WinShmError> {
+        let seq_before = interlocked_read_i64(self.base, seq_off);
+        if seq_before < expected_seq {
+            return Ok(None);
+        }
+
+        let mlen = interlocked_read_i32(self.base, len_off);
+        if mlen < 0 {
+            return Err(WinShmError::BadHeader);
+        }
+        if mlen > 0 && (mlen as usize) <= max_copy {
+            unsafe {
+                std::ptr::copy_nonoverlapping(
+                    self.base.add(area_off as usize),
+                    buf.as_mut_ptr(),
+                    mlen as usize,
+                );
+            }
+        }
+
+        let len_after = interlocked_read_i32(self.base, len_off);
+        let seq_after = interlocked_read_i64(self.base, seq_off);
+        if seq_before != seq_after || mlen != len_after {
+            return Err(WinShmError::BadHeader);
+        }
+
+        Ok(Some(mlen))
     }
 
     fn advance_seq(&mut self, expected_seq: i64) {
@@ -1204,6 +1236,17 @@ fn cpu_relax() {
     #[cfg(not(any(target_arch = "x86_64", target_arch = "x86", target_arch = "aarch64")))]
     {
         std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+#[cfg(windows)]
+#[inline]
+fn busywait_relax(polls: &mut u32) {
+    *polls = polls.wrapping_add(1);
+    if (*polls & BUSYWAIT_POLL_MASK) == 0 {
+        std::thread::yield_now();
+    } else {
+        cpu_relax();
     }
 }
 

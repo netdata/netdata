@@ -224,7 +224,7 @@ unsigned __stdcall nipc_service_win_session_handler_thread(void *arg)
     nipc_np_close_session(&sctx->session);
 
     /* Mark inactive; the reap/destroy path owns removal from the array */
-    InterlockedExchange((volatile LONG *)&sctx->active, 0);
+    InterlockedExchange(&sctx->active, 0);
     return 0;
 }
 
@@ -238,7 +238,7 @@ void nipc_service_win_server_reap_sessions_locked(nipc_managed_server_t *server)
     int i = 0;
     while (i < server->session_count) {
         nipc_session_ctx_t *s = server->sessions[i];
-        if (!InterlockedCompareExchange((volatile LONG *)&s->active, 0, 0)) {
+        if (!InterlockedCompareExchange(&s->active, 0, 0)) {
             WaitForSingleObject(s->thread, INFINITE);
             CloseHandle(s->thread);
             /* Swap with last, free */

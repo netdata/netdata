@@ -222,24 +222,42 @@ nipc_error_t nipc_apps_lookup_req_decode(const void *buf, size_t buf_len,
 nipc_error_t nipc_apps_lookup_req_item(const nipc_apps_lookup_req_view_t *view,
                                        uint32_t index,
                                        nipc_apps_lookup_req_item_t *out) {
+  if (!view || !out || !view->_payload)
+    return NIPC_ERR_BAD_LAYOUT;
   if (index >= view->item_count)
     return NIPC_ERR_OUT_OF_BOUNDS;
 
   /* Decode validates this, but item accessors are public and may be
    * called with manually constructed views. */
-  if (mul_would_overflow((size_t)view->item_count, NIPC_LOOKUP_DIR_ENTRY_SIZE))
+  if (mul_would_overflow((size_t)view->item_count, NIPC_LOOKUP_DIR_ENTRY_SIZE) ||
+      mul_would_overflow((size_t)view->item_count, NIPC_APPS_LOOKUP_KEY_SIZE))
     return NIPC_ERR_BAD_ITEM_COUNT;
 
   size_t dir_size = (size_t)view->item_count * NIPC_LOOKUP_DIR_ENTRY_SIZE;
+#if SIZE_MAX <= UINT32_MAX
+  if (NIPC_APPS_LOOKUP_REQ_HDR_SIZE > SIZE_MAX - dir_size)
+    return NIPC_ERR_BAD_ITEM_COUNT;
+#endif
   size_t dir_end = NIPC_APPS_LOOKUP_REQ_HDR_SIZE + dir_size;
+  if (dir_end > view->_payload_len)
+    return NIPC_ERR_TRUNCATED;
+  size_t packed_area_len = view->_payload_len - dir_end;
   const uint8_t *dir = view->_payload + NIPC_APPS_LOOKUP_REQ_HDR_SIZE;
   const uint8_t *packed = view->_payload + dir_end;
 
   nipc_lookup_dir_entry_t entry;
   memcpy(&entry, dir + (size_t)index * NIPC_LOOKUP_DIR_ENTRY_SIZE,
          sizeof(entry));
+  if (entry.offset % NIPC_ALIGNMENT != 0)
+    return NIPC_ERR_BAD_ALIGNMENT;
+  if (entry.length != NIPC_APPS_LOOKUP_KEY_SIZE)
+    return NIPC_ERR_BAD_LAYOUT;
+  if ((uint64_t)entry.offset + entry.length > packed_area_len)
+    return NIPC_ERR_OUT_OF_BOUNDS;
   nipc_apps_lookup_key_wire_t key;
   memcpy(&key, packed + entry.offset, sizeof(key));
+  if (key.reserved != 0)
+    return NIPC_ERR_BAD_LAYOUT;
   out->pid = key.pid;
   return NIPC_OK;
 }
@@ -373,6 +391,8 @@ nipc_error_t nipc_apps_lookup_resp_decode(const void *buf, size_t buf_len,
 nipc_error_t
 nipc_apps_lookup_resp_item(const nipc_apps_lookup_resp_view_t *view,
                            uint32_t index, nipc_apps_lookup_item_view_t *out) {
+  if (!view || !out || !view->_payload)
+    return NIPC_ERR_BAD_LAYOUT;
   if (index >= view->item_count)
     return NIPC_ERR_OUT_OF_BOUNDS;
 
@@ -382,14 +402,23 @@ nipc_apps_lookup_resp_item(const nipc_apps_lookup_resp_view_t *view,
     return NIPC_ERR_BAD_ITEM_COUNT;
 
   size_t dir_size = (size_t)view->item_count * NIPC_LOOKUP_DIR_ENTRY_SIZE;
+#if SIZE_MAX <= UINT32_MAX
   if (NIPC_APPS_LOOKUP_RESP_HDR_SIZE > SIZE_MAX - dir_size)
     return NIPC_ERR_BAD_ITEM_COUNT;
+#endif
   size_t dir_end = NIPC_APPS_LOOKUP_RESP_HDR_SIZE + dir_size;
+  if (dir_end > view->_payload_len)
+    return NIPC_ERR_TRUNCATED;
+  size_t packed_area_len = view->_payload_len - dir_end;
   const uint8_t *dir = view->_payload + NIPC_APPS_LOOKUP_RESP_HDR_SIZE;
   const uint8_t *packed = view->_payload + dir_end;
   nipc_lookup_dir_entry_t entry;
   memcpy(&entry, dir + (size_t)index * NIPC_LOOKUP_DIR_ENTRY_SIZE,
          sizeof(entry));
+  if (entry.offset % NIPC_ALIGNMENT != 0)
+    return NIPC_ERR_BAD_ALIGNMENT;
+  if ((uint64_t)entry.offset + entry.length > packed_area_len)
+    return NIPC_ERR_OUT_OF_BOUNDS;
   return apps_lookup_decode_item_bytes(packed + entry.offset, entry.length,
                                        out);
 }
@@ -398,12 +427,18 @@ nipc_error_t
 nipc_apps_lookup_resp_raw_item(const nipc_apps_lookup_resp_view_t *view,
                                uint32_t index, const uint8_t **item_out,
                                uint32_t *item_len_out) {
+  if (!view || !item_out || !item_len_out || !view->_payload)
+    return NIPC_ERR_BAD_LAYOUT;
   if (index >= view->item_count)
     return NIPC_ERR_OUT_OF_BOUNDS;
   if (mul_would_overflow((size_t)view->item_count, NIPC_LOOKUP_DIR_ENTRY_SIZE))
     return NIPC_ERR_BAD_ITEM_COUNT;
 
   size_t dir_size = (size_t)view->item_count * NIPC_LOOKUP_DIR_ENTRY_SIZE;
+#if SIZE_MAX <= UINT32_MAX
+  if (NIPC_APPS_LOOKUP_RESP_HDR_SIZE > SIZE_MAX - dir_size)
+    return NIPC_ERR_BAD_ITEM_COUNT;
+#endif
   size_t dir_end = NIPC_APPS_LOOKUP_RESP_HDR_SIZE + dir_size;
   if (dir_end > view->_payload_len)
     return NIPC_ERR_TRUNCATED;
@@ -413,6 +448,8 @@ nipc_apps_lookup_resp_raw_item(const nipc_apps_lookup_resp_view_t *view,
   nipc_lookup_dir_entry_t entry;
   memcpy(&entry, dir + (size_t)index * NIPC_LOOKUP_DIR_ENTRY_SIZE,
          sizeof(entry));
+  if (entry.offset % NIPC_ALIGNMENT != 0)
+    return NIPC_ERR_BAD_ALIGNMENT;
   uint64_t end;
   if (nipc_lookup_add_u64_over_limit(entry.offset, entry.length,
                                      view->_payload_len - dir_end, &end))
@@ -432,8 +469,10 @@ nipc_error_t nipc_apps_lookup_raw_resp_encode(
 
   uint8_t *out = (uint8_t *)buf;
   size_t dir_size = (size_t)item_count * NIPC_LOOKUP_DIR_ENTRY_SIZE;
+#if SIZE_MAX <= UINT32_MAX
   if (NIPC_APPS_LOOKUP_RESP_HDR_SIZE > SIZE_MAX - dir_size)
     return NIPC_ERR_OVERFLOW;
+#endif
   size_t data_offset = NIPC_APPS_LOOKUP_RESP_HDR_SIZE + dir_size;
   if (data_offset > buf_len)
     return NIPC_ERR_OVERFLOW;
@@ -708,9 +747,11 @@ nipc_error_t nipc_dispatch_apps_lookup(const uint8_t *req, size_t req_len,
 
   uint32_t *payload_exceeded_suffix_bytes = NULL;
   if (request.item_count > 0) {
+#if SIZE_MAX <= UINT32_MAX
     if ((size_t)request.item_count >=
         ((size_t)-1) / sizeof(*payload_exceeded_suffix_bytes))
       return NIPC_ERR_OVERFLOW;
+#endif
     payload_exceeded_suffix_bytes =
         (uint32_t *)malloc(((size_t)request.item_count + 1u) *
                            sizeof(*payload_exceeded_suffix_bytes));

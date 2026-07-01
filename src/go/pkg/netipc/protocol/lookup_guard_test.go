@@ -1530,6 +1530,90 @@ func TestCgroupsSnapshotAdditionalGuardCoverage(t *testing.T) {
 		t.Fatalf("zero-item snapshot view = count/generation %d/%d", zeroView.ItemCount, zeroView.Generation)
 	}
 
+	decodeOverflowDir := func(name string, off uint32, length uint32) {
+		t.Helper()
+		buf := make([]byte, cgroupsRespHdr+cgroupsDirEntry+cgroupsItemHdr)
+		ne.PutUint16(buf[0:2], 1)
+		ne.PutUint32(buf[4:8], 1)
+		ne.PutUint32(buf[cgroupsRespHdr:cgroupsRespHdr+4], off)
+		ne.PutUint32(buf[cgroupsRespHdr+4:cgroupsRespHdr+8], length)
+		if _, err := DecodeCgroupsResponse(buf); !errors.Is(err, ErrOutOfBounds) {
+			t.Fatalf("%s = %v, want ErrOutOfBounds", name, err)
+		}
+	}
+	highAlignedU32 := ^uint32(0) - uint32(Alignment-1)
+	decodeOverflowDir("snapshot directory offset above int", highAlignedU32, cgroupsItemHdr)
+	decodeOverflowDir("snapshot directory length above int", 0, ^uint32(0))
+
+	itemView := func(item []byte) CgroupsResponseView {
+		payload := make([]byte, cgroupsRespHdr+cgroupsDirEntry+len(item))
+		ne.PutUint32(payload[cgroupsRespHdr:cgroupsRespHdr+4], 0)
+		ne.PutUint32(payload[cgroupsRespHdr+4:cgroupsRespHdr+8], uint32(len(item)))
+		copy(payload[cgroupsRespHdr+cgroupsDirEntry:], item)
+		return CgroupsResponseView{ItemCount: 1, payload: payload}
+	}
+	baseItem := func(itemLen int) []byte {
+		item := make([]byte, itemLen)
+		ne.PutUint16(item[0:2], 1)
+		return item
+	}
+	expectBadItem := func(name string, item []byte) {
+		t.Helper()
+		view := itemView(item)
+		if _, err := view.Item(0); !errors.Is(err, ErrOutOfBounds) {
+			t.Fatalf("%s = %v, want ErrOutOfBounds", name, err)
+		}
+	}
+
+	dirOffset := itemView(baseItem(cgroupsItemHdr))
+	ne.PutUint32(dirOffset.payload[cgroupsRespHdr:cgroupsRespHdr+4], highAlignedU32)
+	if _, err := dirOffset.Item(0); !errors.Is(err, ErrOutOfBounds) {
+		t.Fatalf("snapshot item directory offset above int = %v, want ErrOutOfBounds", err)
+	}
+
+	dirLength := itemView(baseItem(cgroupsItemHdr))
+	ne.PutUint32(dirLength.payload[cgroupsRespHdr+4:cgroupsRespHdr+8], ^uint32(0))
+	if _, err := dirLength.Item(0); !errors.Is(err, ErrOutOfBounds) {
+		t.Fatalf("snapshot item directory length above int = %v, want ErrOutOfBounds", err)
+	}
+
+	item := baseItem(cgroupsItemHdr)
+	ne.PutUint32(item[16:20], ^uint32(0))
+	expectBadItem("snapshot name offset above int", item)
+
+	item = baseItem(cgroupsItemHdr)
+	ne.PutUint32(item[16:20], cgroupsItemHdr)
+	ne.PutUint32(item[20:24], ^uint32(0))
+	expectBadItem("snapshot name length above int", item)
+
+	item = baseItem(cgroupsItemHdr + 1)
+	item[cgroupsItemHdr] = 0
+	ne.PutUint32(item[16:20], cgroupsItemHdr)
+	ne.PutUint32(item[20:24], 0)
+	ne.PutUint32(item[24:28], ^uint32(0))
+	expectBadItem("snapshot path offset above int", item)
+
+	item = baseItem(cgroupsItemHdr + 2)
+	item[cgroupsItemHdr] = 0
+	ne.PutUint32(item[16:20], cgroupsItemHdr)
+	ne.PutUint32(item[20:24], 0)
+	ne.PutUint32(item[24:28], cgroupsItemHdr+1)
+	ne.PutUint32(item[28:32], ^uint32(0))
+	expectBadItem("snapshot path length above int", item)
+
+	item = baseItem(cgroupsItemHdr)
+	ne.PutUint32(item[16:20], uint32(maxIntValue()))
+	ne.PutUint32(item[20:24], 1)
+	expectBadItem("snapshot name length overflow", item)
+
+	item = baseItem(cgroupsItemHdr + 1)
+	item[cgroupsItemHdr] = 0
+	ne.PutUint32(item[16:20], cgroupsItemHdr)
+	ne.PutUint32(item[20:24], 0)
+	ne.PutUint32(item[24:28], uint32(maxIntValue()))
+	ne.PutUint32(item[28:32], 1)
+	expectBadItem("snapshot path length overflow", item)
+
 	if strconv.IntSize < 64 {
 		t.Skip("synthetic snapshot overflow guards require 64-bit int")
 	}

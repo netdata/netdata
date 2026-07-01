@@ -21,11 +21,12 @@ import (
 // ---------------------------------------------------------------------------
 
 const (
-	winShmMagic         uint32 = 0x4e535748 // "NSWH"
-	winShmVersion       uint32 = 3
-	winShmHeaderLen     uint32 = 128
-	winShmCachelineSize uint32 = 64
-	winShmDefaultSpin   uint32 = 1024
+	winShmMagic            uint32 = 0x4e535748 // "NSWH"
+	winShmVersion          uint32 = 3
+	winShmHeaderLen        uint32 = 128
+	winShmCachelineSize    uint32 = 64
+	winShmDefaultSpin      uint32 = 1024
+	winShmBusywaitPollMask uint32 = 1023
 
 	WinShmProfileHybrid   uint32 = 0x02
 	WinShmProfileBusywait uint32 = 0x04
@@ -407,7 +408,30 @@ func WinShmClientAttach(runDir, serviceName string, authToken, sessionID uint64,
 	respOff := binary.NativeEndian.Uint32(data[wshOFFRespOffset:])
 	respCap := binary.NativeEndian.Uint32(data[wshOFFRespCapacity:])
 	spin := binary.NativeEndian.Uint32(data[wshOFFSpinTries:])
-	regionSize := uintptr(respOff + respCap)
+	if reqOff == 0 || reqCap == 0 || respOff == 0 || respCap == 0 ||
+		reqOff < winShmHeaderLen || respOff < winShmHeaderLen ||
+		reqOff%winShmCachelineSize != 0 || reqCap%winShmCachelineSize != 0 ||
+		respOff%winShmCachelineSize != 0 || respCap%winShmCachelineSize != 0 ||
+		reqOff > ^uint32(0)-reqCap ||
+		respOff > ^uint32(0)-respCap {
+		procUnmapViewOfFile.Call(base)
+		syscall.CloseHandle(mapping)
+		return nil, ErrWinShmBadHeader
+	}
+	reqEnd := reqOff + reqCap
+	respEnd := respOff + respCap
+	if respOff < reqEnd {
+		procUnmapViewOfFile.Call(base)
+		syscall.CloseHandle(mapping)
+		return nil, ErrWinShmBadHeader
+	}
+	regionSize64 := uint64(respEnd)
+	regionSize := uintptr(regionSize64)
+	if uint64(regionSize) != regionSize64 {
+		procUnmapViewOfFile.Call(base)
+		syscall.CloseHandle(mapping)
+		return nil, ErrWinShmBadHeader
+	}
 
 	// Now reslice to full region
 	fullData := unsafe.Slice((*byte)(unsafe.Pointer(base)), regionSize)
@@ -624,12 +648,13 @@ func (c *WinShmContext) WinShmReceive(buf []byte, timeoutMs uint32) (int, error)
 	observed := false
 	var mlen int32
 	for i := uint32(0); i < c.SpinTries; i++ {
-		cur := atomic.LoadInt64((*int64)(unsafe.Pointer(&data[seqOff])))
-		if cur >= expectedSeq {
-			mlen = atomic.LoadInt32((*int32)(unsafe.Pointer(&data[lenOff])))
-			if mlen > 0 && int(mlen) <= maxCopy {
-				copy(buf[:mlen], data[areaOff:areaOff+uint32(mlen)])
-			}
+		var ok bool
+		var err error
+		mlen, ok, err = winShmCopyObserved(data, seqOff, lenOff, expectedSeq, areaOff, maxCopy, buf)
+		if err != nil {
+			return 0, err
+		}
+		if ok {
 			observed = true
 			break
 		}
@@ -649,9 +674,16 @@ func (c *WinShmContext) WinShmReceive(buf []byte, timeoutMs uint32) (int, error)
 				atomic.StoreInt32((*int32)(unsafe.Pointer(&data[selfWaitingOff])), 1)
 				atomic.LoadInt32((*int32)(unsafe.Pointer(&data[selfWaitingOff])))
 
-				cur := atomic.LoadInt64((*int64)(unsafe.Pointer(&data[seqOff])))
-				if cur >= expectedSeq {
+				var ok bool
+				var err error
+				mlen, ok, err = winShmCopyObserved(data, seqOff, lenOff, expectedSeq, areaOff, maxCopy, buf)
+				if err != nil {
 					atomic.StoreInt32((*int32)(unsafe.Pointer(&data[selfWaitingOff])), 0)
+					return 0, err
+				}
+				if ok {
+					atomic.StoreInt32((*int32)(unsafe.Pointer(&data[selfWaitingOff])), 0)
+					observed = true
 					break
 				}
 
@@ -669,14 +701,22 @@ func (c *WinShmContext) WinShmReceive(buf []byte, timeoutMs uint32) (int, error)
 				ret, _, _ := procWaitForSingleObj.Call(uintptr(waitEvent), waitMs)
 				atomic.StoreInt32((*int32)(unsafe.Pointer(&data[selfWaitingOff])), 0)
 
-				cur = atomic.LoadInt64((*int64)(unsafe.Pointer(&data[seqOff])))
-				if cur >= expectedSeq {
+				mlen, ok, err = winShmCopyObserved(data, seqOff, lenOff, expectedSeq, areaOff, maxCopy, buf)
+				if err != nil {
+					return 0, err
+				}
+				if ok {
+					observed = true
 					break
 				}
 
 				if atomic.LoadInt32((*int32)(unsafe.Pointer(&data[peerClosedOff]))) != 0 {
-					cur = atomic.LoadInt64((*int64)(unsafe.Pointer(&data[seqOff])))
-					if cur >= expectedSeq {
+					mlen, ok, err = winShmCopyObserved(data, seqOff, lenOff, expectedSeq, areaOff, maxCopy, buf)
+					if err != nil {
+						return 0, err
+					}
+					if ok {
+						observed = true
 						break
 					}
 					c.advanceSeq(expectedSeq)
@@ -688,20 +728,19 @@ func (c *WinShmContext) WinShmReceive(buf []byte, timeoutMs uint32) (int, error)
 				}
 			}
 
-			mlen = atomic.LoadInt32((*int32)(unsafe.Pointer(&data[lenOff])))
-			if mlen > 0 && int(mlen) <= maxCopy {
-				copy(buf[:mlen], data[areaOff:areaOff+uint32(mlen)])
-			}
 		} else {
 			// BUSYWAIT
 			start, _, _ := procGetTickCount64.Call()
+			var polls uint32
 			for {
-				cur := atomic.LoadInt64((*int64)(unsafe.Pointer(&data[seqOff])))
-				if cur >= expectedSeq {
-					mlen = atomic.LoadInt32((*int32)(unsafe.Pointer(&data[lenOff])))
-					if mlen > 0 && int(mlen) <= maxCopy {
-						copy(buf[:mlen], data[areaOff:areaOff+uint32(mlen)])
-					}
+				var ok bool
+				var err error
+				mlen, ok, err = winShmCopyObserved(data, seqOff, lenOff, expectedSeq, areaOff, maxCopy, buf)
+				if err != nil {
+					return 0, err
+				}
+				if ok {
+					observed = true
 					break
 				}
 
@@ -714,19 +753,24 @@ func (c *WinShmContext) WinShmReceive(buf []byte, timeoutMs uint32) (int, error)
 				}
 
 				if atomic.LoadInt32((*int32)(unsafe.Pointer(&data[peerClosedOff]))) != 0 {
-					cur := atomic.LoadInt64((*int64)(unsafe.Pointer(&data[seqOff])))
-					if cur >= expectedSeq {
-						mlen = atomic.LoadInt32((*int32)(unsafe.Pointer(&data[lenOff])))
-						if mlen > 0 && int(mlen) <= maxCopy {
-							copy(buf[:mlen], data[areaOff:areaOff+uint32(mlen)])
-						}
+					mlen, ok, err = winShmCopyObserved(data, seqOff, lenOff, expectedSeq, areaOff, maxCopy, buf)
+					if err != nil {
+						return 0, err
+					}
+					if ok {
+						observed = true
 						break
 					}
 					c.advanceSeq(expectedSeq)
 					return 0, ErrWinShmDisconnected
 				}
 
-				spinPause()
+				polls++
+				if polls&winShmBusywaitPollMask == 0 {
+					procSwitchToThread.Call()
+				} else {
+					spinPause()
+				}
 			}
 		}
 	}
@@ -738,6 +782,30 @@ func (c *WinShmContext) WinShmReceive(buf []byte, timeoutMs uint32) (int, error)
 	}
 
 	return int(mlen), nil
+}
+
+func winShmCopyObserved(data []byte, seqOff, lenOff int, expectedSeq int64, areaOff uint32, maxCopy int, buf []byte) (int32, bool, error) {
+	seqBefore := atomic.LoadInt64((*int64)(unsafe.Pointer(&data[seqOff])))
+	if seqBefore < expectedSeq {
+		return 0, false, nil
+	}
+
+	mlen := atomic.LoadInt32((*int32)(unsafe.Pointer(&data[lenOff])))
+	if mlen < 0 {
+		return 0, false, ErrWinShmBadHeader
+	}
+	if mlen > 0 && int(mlen) <= maxCopy {
+		off := int(areaOff)
+		copy(buf[:int(mlen)], data[off:off+int(mlen)])
+	}
+
+	lenAfter := atomic.LoadInt32((*int32)(unsafe.Pointer(&data[lenOff])))
+	seqAfter := atomic.LoadInt64((*int64)(unsafe.Pointer(&data[seqOff])))
+	if seqBefore != seqAfter || mlen != lenAfter {
+		return 0, false, ErrWinShmBadHeader
+	}
+
+	return mlen, true, nil
 }
 
 func (c *WinShmContext) advanceSeq(expectedSeq int64) {

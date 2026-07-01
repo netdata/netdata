@@ -188,6 +188,15 @@ static inline void cpu_relax(void)
 #endif
 }
 
+static inline void busywait_relax(uint32_t *polls)
+{
+    (*polls)++;
+    if ((*polls & NIPC_WIN_SHM_BUSYWAIT_POLL_MASK) == 0)
+        SwitchToThread();
+    else
+        cpu_relax();
+}
+
 /* Pointer into the mapped region at a byte offset. */
 static inline void *region_ptr(const nipc_win_shm_ctx_t *ctx, uint32_t offset)
 {
@@ -198,6 +207,33 @@ static inline void *region_ptr(const nipc_win_shm_ctx_t *ctx, uint32_t offset)
 static inline nipc_win_shm_region_header_t *region_hdr(const nipc_win_shm_ctx_t *ctx)
 {
     return (nipc_win_shm_region_header_t *)ctx->base;
+}
+
+static int copy_observed_message(volatile LONG64 *seq_ptr,
+                                 volatile LONG *len_ptr,
+                                 LONG64 expected_seq,
+                                 void *buf,
+                                 const void *data_ptr,
+                                 uint32_t max_copy,
+                                 LONG *mlen_out)
+{
+    LONG64 seq_before = atomic_load_64(seq_ptr);
+    if (seq_before < expected_seq)
+        return 0;
+
+    LONG len_before = atomic_load_32(len_ptr);
+    if (len_before < 0)
+        return -1;
+    if (len_before > 0 && (size_t)len_before <= max_copy)
+        memcpy(buf, data_ptr, (size_t)len_before);
+
+    LONG len_after = atomic_load_32(len_ptr);
+    LONG64 seq_after = atomic_load_64(seq_ptr);
+    if (seq_before != seq_after || len_before != len_after)
+        return -1;
+
+    *mlen_out = len_before;
+    return 1;
 }
 
 /* ------------------------------------------------------------------ */
@@ -554,10 +590,13 @@ nipc_win_shm_error_t nipc_win_shm_client_attach(
 
     /* Validate offsets and capacities from shared memory */
     if (req_off == 0 || req_cap == 0 || resp_off == 0 || resp_cap == 0 ||
+        req_off < NIPC_WIN_SHM_HEADER_LEN || resp_off < NIPC_WIN_SHM_HEADER_LEN ||
         req_off % 64 != 0 || req_cap % 64 != 0 ||
         resp_off % 64 != 0 || resp_cap % 64 != 0 ||
         req_off > UINT32_MAX - req_cap ||
-        resp_off < req_off + req_cap) {
+        resp_off > UINT32_MAX - resp_cap ||
+        resp_off < req_off + req_cap ||
+        (size_t)resp_off > SIZE_MAX - (size_t)resp_cap) {
         UnmapViewOfFile(base);
         CloseHandle(mapping);
         return NIPC_WIN_SHM_ERR_BAD_HEADER;
@@ -790,14 +829,14 @@ nipc_win_shm_error_t nipc_win_shm_receive(
     bool observed = false;
     LONG mlen = 0;
     for (uint32_t i = 0; i < ctx->spin_tries; i++) {
-        LONG64 cur = atomic_load_64(seq_ptr);
-        if (cur >= expected_seq) {
-            mlen = atomic_load_32(len_ptr);
-            if (mlen > 0 && (size_t)mlen <= max_copy)
-                memcpy(buf, data_ptr, (size_t)mlen);
+        int copy_rc = copy_observed_message(seq_ptr, len_ptr, expected_seq,
+                                            buf, data_ptr, max_copy, &mlen);
+        if (copy_rc > 0) {
             observed = true;
             break;
         }
+        if (copy_rc < 0)
+            return NIPC_WIN_SHM_ERR_BAD_HEADER;
         cpu_relax();
     }
 
@@ -813,10 +852,17 @@ nipc_win_shm_error_t nipc_win_shm_receive(
                 MemoryBarrier();
 
                 /* Recheck after setting flag to avoid race */
-                LONG64 cur = atomic_load_64(seq_ptr);
-                if (cur >= expected_seq) {
+                int copy_rc = copy_observed_message(
+                    seq_ptr, len_ptr, expected_seq, buf, data_ptr, max_copy,
+                    &mlen);
+                if (copy_rc > 0) {
                     InterlockedExchange(self_waiting_ptr, 0);
+                    observed = true;
                     break; /* data available */
+                }
+                if (copy_rc < 0) {
+                    InterlockedExchange(self_waiting_ptr, 0);
+                    return NIPC_WIN_SHM_ERR_BAD_HEADER;
                 }
 
                 /* Compute remaining wait time */
@@ -836,15 +882,26 @@ nipc_win_shm_error_t nipc_win_shm_receive(
                 InterlockedExchange(self_waiting_ptr, 0);
 
                 /* Check sequence — data may have arrived */
-                cur = atomic_load_64(seq_ptr);
-                if (cur >= expected_seq)
+                copy_rc = copy_observed_message(seq_ptr, len_ptr, expected_seq,
+                                                buf, data_ptr, max_copy, &mlen);
+                if (copy_rc > 0) {
+                    observed = true;
                     break; /* data available */
+                }
+                if (copy_rc < 0)
+                    return NIPC_WIN_SHM_ERR_BAD_HEADER;
 
                 /* No data — check peer close */
                 if (atomic_load_32(peer_closed_ptr) != 0) {
-                    cur = atomic_load_64(seq_ptr);
-                    if (cur >= expected_seq)
+                    copy_rc = copy_observed_message(
+                        seq_ptr, len_ptr, expected_seq, buf, data_ptr, max_copy,
+                        &mlen);
+                    if (copy_rc > 0) {
+                        observed = true;
                         break;
+                    }
+                    if (copy_rc < 0)
+                        return NIPC_WIN_SHM_ERR_BAD_HEADER;
                     if (ctx->role == NIPC_WIN_SHM_ROLE_SERVER)
                         ctx->local_req_seq = expected_seq;
                     else
@@ -859,22 +916,20 @@ nipc_win_shm_error_t nipc_win_shm_receive(
                 /* Spurious wake — retry with remaining deadline */
             }
 
-            /* Copy immediately after waking */
-            mlen = atomic_load_32(len_ptr);
-            if (mlen > 0 && (size_t)mlen <= max_copy)
-                memcpy(buf, data_ptr, (size_t)mlen);
-
         } else {
             /* SHM_BUSYWAIT: spin indefinitely with periodic deadline checks */
             ULONGLONG start = GetTickCount64();
+            uint32_t polls = 0;
             for (;;) {
-                LONG64 cur = atomic_load_64(seq_ptr);
-                if (cur >= expected_seq) {
-                    mlen = atomic_load_32(len_ptr);
-                    if (mlen > 0 && (size_t)mlen <= max_copy)
-                        memcpy(buf, data_ptr, (size_t)mlen);
+                int copy_rc = copy_observed_message(
+                    seq_ptr, len_ptr, expected_seq, buf, data_ptr, max_copy,
+                    &mlen);
+                if (copy_rc > 0) {
+                    observed = true;
                     break;
                 }
+                if (copy_rc < 0)
+                    return NIPC_WIN_SHM_ERR_BAD_HEADER;
 
                 /* Periodic timeout check */
                 if (timeout_ms > 0) {
@@ -885,13 +940,15 @@ nipc_win_shm_error_t nipc_win_shm_receive(
 
                 /* Check peer close */
                 if (atomic_load_32(peer_closed_ptr) != 0) {
-                    cur = atomic_load_64(seq_ptr);
-                    if (cur >= expected_seq) {
-                        mlen = atomic_load_32(len_ptr);
-                        if (mlen > 0 && (size_t)mlen <= max_copy)
-                            memcpy(buf, data_ptr, (size_t)mlen);
+                    copy_rc = copy_observed_message(
+                        seq_ptr, len_ptr, expected_seq, buf, data_ptr, max_copy,
+                        &mlen);
+                    if (copy_rc > 0) {
+                        observed = true;
                         break;
                     }
+                    if (copy_rc < 0)
+                        return NIPC_WIN_SHM_ERR_BAD_HEADER;
                     if (ctx->role == NIPC_WIN_SHM_ROLE_SERVER)
                         ctx->local_req_seq = expected_seq;
                     else
@@ -899,7 +956,7 @@ nipc_win_shm_error_t nipc_win_shm_receive(
                     return NIPC_WIN_SHM_ERR_DISCONNECTED;
                 }
 
-                cpu_relax();
+                busywait_relax(&polls);
             }
         }
     }

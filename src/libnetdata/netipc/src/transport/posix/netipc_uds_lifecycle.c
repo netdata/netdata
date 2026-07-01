@@ -3,6 +3,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,6 +12,34 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
+
+static pthread_mutex_t bind_umask_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static int bind_owner_only_socket(int fd, const struct sockaddr_un *addr)
+{
+    int rc = pthread_mutex_lock(&bind_umask_lock);
+    if (rc != 0) {
+        errno = rc;
+        return -1;
+    }
+
+    /* Bind path sockets as 0600 without a post-bind permission window. */
+    mode_t old_mask = umask(S_IXUSR | S_IRWXG | S_IRWXO); // nosemgrep
+    int bind_rc = bind(fd, (const struct sockaddr *)addr, sizeof(*addr));
+    int saved_errno = errno;
+    umask(old_mask); // nosemgrep
+
+    rc = pthread_mutex_unlock(&bind_umask_lock);
+    if (bind_rc < 0) {
+        errno = saved_errno;
+        return -1;
+    }
+    if (rc != 0) {
+        errno = rc;
+        return -1;
+    }
+    return 0;
+}
 
 static int copy_cstr_checked(char *dst, size_t dst_size, const char *src)
 {
@@ -178,14 +207,8 @@ nipc_uds_error_t nipc_uds_listen(const char *run_dir,
         return NIPC_UDS_ERR_PATH_TOO_LONG;
     }
 
-    if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+    if (bind_owner_only_socket(fd, &addr) < 0) {
         close(fd);
-        return NIPC_UDS_ERR_SOCKET;
-    }
-
-    if (chmod(path, S_IRUSR | S_IWUSR) < 0) {
-        close(fd);
-        unlink(path);
         return NIPC_UDS_ERR_SOCKET;
     }
 

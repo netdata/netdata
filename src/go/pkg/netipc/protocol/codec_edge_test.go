@@ -607,6 +607,19 @@ func TestStringReverseDecodeMissingNul(t *testing.T) {
 	}
 }
 
+func TestStringReverseDecodeBadOffset(t *testing.T) {
+	buf := make([]byte, StringReverseHdrSize+3)
+	ne.PutUint32(buf[0:4], uint32(StringReverseHdrSize+1))
+	ne.PutUint32(buf[4:8], 1)
+	buf[StringReverseHdrSize+1] = 'x'
+	buf[StringReverseHdrSize+2] = 0
+
+	_, err := StringReverseDecode(buf)
+	if err != ErrBadLayout {
+		t.Fatalf("expected ErrBadLayout, got %v", err)
+	}
+}
+
 // ---------------------------------------------------------------------------
 //  DispatchStringReverse
 // ---------------------------------------------------------------------------
