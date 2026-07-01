@@ -154,28 +154,49 @@ bool nd_logger_journal_libsystemd(struct log_field *fields __maybe_unused, size_
         }
     }
 
-    static bool sockets_before[1024];
-    bool detect_systemd_socket = __atomic_load_n(&nd_log.journal.first_msg, __ATOMIC_RELAXED) == false;
+    static SPINLOCK first_msg_spinlock = SPINLOCK_INITIALIZER;
+    bool detection_lock_acquired = false;
+    bool detect_systemd_socket = __atomic_load_n(&nd_log.journal.first_msg, __ATOMIC_ACQUIRE) == false;
+
     if(detect_systemd_socket) {
-        for(int i = 3 ; (size_t)i < _countof(sockets_before); i++)
-            sockets_before[i] = fd_is_socket(i);
-    }
+        spinlock_lock(&first_msg_spinlock);
+        detection_lock_acquired = true;
 
-    int r = sd_journal_sendv(iov, iov_count);
-
-    if(r == 0 && detect_systemd_socket) {
-        __atomic_store_n(&nd_log.journal.first_msg, true, __ATOMIC_RELAXED);
-
-        // this is the first successful libsystemd log
-        // let's detect its fd number (we need it for the spawn server)
-
-        for(int i = 3 ; (size_t)i < _countof(sockets_before); i++) {
-            if (!sockets_before[i] && fd_is_socket(i)) {
-                nd_log.journal.fd = i;
-                break;
-            }
+        detect_systemd_socket = __atomic_load_n(&nd_log.journal.first_msg, __ATOMIC_ACQUIRE) == false;
+        if(!detect_systemd_socket) {
+            spinlock_unlock(&first_msg_spinlock);
+            detection_lock_acquired = false;
         }
     }
+
+    int r;
+    if(detect_systemd_socket) {
+        bool sockets_before[1024] = { 0 };
+
+        for(int i = 3 ; (size_t)i < _countof(sockets_before); i++)
+            sockets_before[i] = fd_is_socket(i);
+
+        r = sd_journal_sendv(iov, iov_count);
+
+        if(r == 0) {
+            // this is the first successful libsystemd log
+            // let's detect its fd number (we need it for the spawn server)
+
+            for(int i = 3 ; (size_t)i < _countof(sockets_before); i++) {
+                if (!sockets_before[i] && fd_is_socket(i)) {
+                    __atomic_store_n(&nd_log.journal.fd, i, __ATOMIC_RELEASE);
+                    break;
+                }
+            }
+
+            __atomic_store_n(&nd_log.journal.first_msg, true, __ATOMIC_RELEASE);
+        }
+    }
+    else
+        r = sd_journal_sendv(iov, iov_count);
+
+    if(detection_lock_acquired)
+        spinlock_unlock(&first_msg_spinlock);
 
     for (int i = 0; i < iov_count; i++)
         free(iov[i].iov_base);
