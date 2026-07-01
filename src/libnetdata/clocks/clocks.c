@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "../libnetdata.h"
+#include "clocks-internals.h"
 
 // defaults are for compatibility
 // call clocks_init() once, to optimize these default settings
@@ -472,18 +473,8 @@ void sleep_usec_with_now(usec_t usec, usec_t started_ut __maybe_unused) {
             errno_clear();
 
             usec_t now_ut = now_monotonic_usec();
-            usec_t elapsed_ut = now_ut > started_monotonic_ut ? now_ut - started_monotonic_ut : 0;
-            if(elapsed_ut >= usec)
+            if(!sleep_usec_prepare_retry_after_eintr(usec, started_monotonic_ut, now_ut, &req))
                 break;
-
-            usec_t remaining_ut = (usec_t)req.tv_sec * USEC_PER_SEC + (usec_t)req.tv_nsec / NSEC_PER_USEC;
-            usec_t check_ut = usec - elapsed_ut;
-            if(remaining_ut > check_ut) {
-                req = (struct timespec){
-                    .tv_sec = (time_t) ( check_ut / USEC_PER_SEC),
-                    .tv_nsec = (suseconds_t) ((check_ut % USEC_PER_SEC) * NSEC_PER_USEC)
-                };
-            }
         }
         else {
             netdata_log_error("Cannot nanosleep() for %"PRIu64" microseconds.", usec);
