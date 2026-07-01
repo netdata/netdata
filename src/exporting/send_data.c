@@ -75,6 +75,8 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
     // loop through to collect all data
     while (*sock != -1 && errno != EWOULDBLOCK) {
         ssize_t r;
+        buffer_need_bytes(response, 1);
+
         if (SSL_connection(&connector_specific_data->ssl))
             r = netdata_ssl_read(&connector_specific_data->ssl, &response->buffer[response->len],
                                  (int) (response->size - response->len));
