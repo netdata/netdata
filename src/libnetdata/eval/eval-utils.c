@@ -7,11 +7,11 @@
 // memory management
 
 EVAL_NODE *eval_node_alloc(int count) {
-    static int id = 1;
+    static int id = 0;
 
     EVAL_NODE *op = callocz(1, sizeof(EVAL_NODE) + (sizeof(EVAL_VALUE) * count));
 
-    op->id = id++;
+    op->id = __atomic_add_fetch(&id, 1, __ATOMIC_RELAXED);
     op->operator = EVAL_OPERATOR_NOP;
     op->precedence = 0;  // Will be set based on the operator
     op->count = count;
