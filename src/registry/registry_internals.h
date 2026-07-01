@@ -33,7 +33,7 @@ struct registry {
     const char *registry_domain;
     const char *hostname;
     const char *registry_to_announce;
-    const char *cloud_base_url;
+    char *cloud_base_url;
     time_t persons_expiration; // seconds to expire idle persons
     int verify_cookies_redirects;
     int enable_cookies_samesite_secure;
@@ -76,6 +76,7 @@ extern struct registry registry;
 REGISTRY_PERSON *registry_request_access(const char *person_guid, char *machine_guid, char *url, char *name, time_t when);
 REGISTRY_PERSON *registry_request_delete(const char *person_guid, char *machine_guid, char *url, char *delete_url, time_t when);
 REGISTRY_MACHINE *registry_request_machine(const char *person_guid, char *request_machine, STRING **hostname);
+void registry_cloud_base_url_free(void);
 
 // REGISTRY LOG (in registry_log.c)
 void registry_log(char action, REGISTRY_PERSON *p, REGISTRY_MACHINE *m, STRING *u, const char *name);
