@@ -280,13 +280,25 @@ usec_t rfc3339_parse_ut(const char *rfc3339, char **endptr) {
         localtime_r(&epoch_s, &local_tm);
         gmtime_r(&epoch_s, &utc_tm);
 #else
-        // If thread-safe functions are not available, use localtime() and gmtime()
+        // localtime() and gmtime() may share static storage; serialize and copy immediately.
+        static SPINLOCK time_static_buffer_spinlock = SPINLOCK_INITIALIZER;
+        spinlock_lock(&time_static_buffer_spinlock);
+
         struct tm *lt = localtime(&epoch_s);
-        struct tm *gt = gmtime(&epoch_s);
-        if (!lt || !gt)
+        if (!lt) {
+            spinlock_unlock(&time_static_buffer_spinlock);
             return 0;
+        }
         local_tm = *lt;
+
+        struct tm *gt = gmtime(&epoch_s);
+        if (!gt) {
+            spinlock_unlock(&time_static_buffer_spinlock);
+            return 0;
+        }
         utc_tm   = *gt;
+
+        spinlock_unlock(&time_static_buffer_spinlock);
 #endif
         int local_offset = (local_tm.tm_hour - utc_tm.tm_hour) * 3600 +
                            (local_tm.tm_min  - utc_tm.tm_min)  * 60;
