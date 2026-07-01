@@ -1,0 +1,178 @@
+---
+version: v1
+display_name: Amazon DocumentDB
+namespace: AWS/DocDB
+period: 300
+instance:
+  dimensions:
+    - name: DBInstanceIdentifier
+      label: db_instance_identifier
+metrics:
+  - id: cpu_utilization
+    metric_name: CPUUtilization
+    statistics: [average]
+  - id: freeable_memory
+    metric_name: FreeableMemory
+    statistics: [average]
+  - id: database_connections
+    metric_name: DatabaseConnections
+    statistics: [average]
+  - id: buffer_cache_hit_ratio
+    metric_name: BufferCacheHitRatio
+    statistics: [average]
+  - id: read_iops
+    metric_name: ReadIOPS
+    statistics: [average]
+  - id: write_iops
+    metric_name: WriteIOPS
+    statistics: [average]
+  - id: read_latency
+    metric_name: ReadLatency
+    statistics: [average]
+  - id: write_latency
+    metric_name: WriteLatency
+    statistics: [average]
+  - id: read_throughput
+    metric_name: ReadThroughput
+    statistics: [average]
+  - id: write_throughput
+    metric_name: WriteThroughput
+    statistics: [average]
+  - id: db_instance_replica_lag
+    metric_name: DBInstanceReplicaLag
+    statistics: [average]
+  - id: database_cursors_timed_out
+    metric_name: DatabaseCursorsTimedOut
+    statistics: [sum]
+    rate: true
+  # ----------------------------------------------------------------------------------------
+  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
+  # matching chart in the charts: section below. All are published at the {DBInstanceIdentifier}
+  # grain.
+  # ----------------------------------------------------------------------------------------
+  # - id: swap_usage
+  #   metric_name: SwapUsage
+  #   statistics: [average]
+  # - id: disk_queue_depth
+  #   metric_name: DiskQueueDepth
+  #   statistics: [average]
+  # - id: documents_inserted
+  #   metric_name: DocumentsInserted
+  #   statistics: [sum]
+  #   rate: true
+  # - id: documents_deleted
+  #   metric_name: DocumentsDeleted
+  #   statistics: [sum]
+  #   rate: true
+  # Opcounters (OpcountersInsert/Query/Update/Delete), transactions, and network-throughput metrics are
+  # also per-instance. Cluster-shared volume metrics use {DBClusterIdentifier} (VolumeBytesUsed,
+  # VolumeReadIOPs, ...) -- a separate profile. See:
+  # https://docs.aws.amazon.com/documentdb/latest/developerguide/cloud_watch.html
+template:
+  family: DocumentDB
+  context_namespace: docdb
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, db_instance_identifier]
+  charts:
+    - id: cw_docdb_cpu
+      context: cpu
+      title: DocumentDB CPU Utilization
+      family: CPU
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: cpu_utilization_average
+          name: cpu
+    - id: cw_docdb_memory
+      context: freeable_memory
+      title: DocumentDB Freeable Memory
+      family: Memory
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: freeable_memory_average
+          name: freeable
+    - id: cw_docdb_connections
+      context: connections
+      title: DocumentDB Connections
+      family: Connections
+      units: connections
+      algorithm: absolute
+      dimensions:
+        - selector: database_connections_average
+          name: connections
+    - id: cw_docdb_cache
+      context: buffer_cache_hit_ratio
+      title: DocumentDB Buffer Cache Hit Ratio
+      family: Cache
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: buffer_cache_hit_ratio_average
+          name: hit_ratio
+    - id: cw_docdb_iops
+      context: iops
+      title: DocumentDB Disk IOPS
+      family: Throughput
+      units: ops/s
+      algorithm: absolute
+      dimensions:
+        - selector: read_iops_average
+          name: read
+        - selector: write_iops_average
+          name: write
+    - id: cw_docdb_latency
+      context: latency
+      title: DocumentDB Disk Latency
+      family: Latency
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: read_latency_average
+          name: read
+        - selector: write_latency_average
+          name: write
+    - id: cw_docdb_throughput
+      context: throughput
+      title: DocumentDB Disk Throughput
+      family: Throughput
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: read_throughput_average
+          name: read
+        - selector: write_throughput_average
+          name: write
+    - id: cw_docdb_replica_lag
+      context: replica_lag
+      title: DocumentDB Replica Lag
+      family: Replication
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: db_instance_replica_lag_average
+          name: lag
+    - id: cw_docdb_cursors_timed_out
+      context: cursors_timed_out
+      title: DocumentDB Cursors Timed Out
+      family: Cursors
+      units: cursors/s
+      algorithm: absolute
+      dimensions:
+        - selector: database_cursors_timed_out_sum
+          name: timed_out
+    # ----------------------------------------------------------------------------------------
+    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # ----------------------------------------------------------------------------------------
+    # - id: cw_docdb_documents
+    #   context: documents
+    #   title: DocumentDB Document Operations
+    #   family: Operations
+    #   units: documents/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: documents_inserted_sum
+    #       name: inserted
+    #     - selector: documents_deleted_sum
+    #       name: deleted

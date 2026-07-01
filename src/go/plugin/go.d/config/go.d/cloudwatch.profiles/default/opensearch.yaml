@@ -1,0 +1,187 @@
+---
+version: v1
+display_name: Amazon OpenSearch Service
+namespace: AWS/ES
+period: 300
+instance:
+  dimensions:
+    - name: ClientId
+      label: client_id
+    - name: DomainName
+      label: domain_name
+metrics:
+  - id: cluster_status_green
+    metric_name: ClusterStatus.green
+    statistics: [maximum]
+  - id: cluster_status_yellow
+    metric_name: ClusterStatus.yellow
+    statistics: [maximum]
+  - id: cluster_status_red
+    metric_name: ClusterStatus.red
+    statistics: [maximum]
+  - id: nodes
+    metric_name: Nodes
+    statistics: [maximum]
+  - id: cpu_utilization
+    metric_name: CPUUtilization
+    statistics: [average]
+  - id: jvm_memory_pressure
+    metric_name: JVMMemoryPressure
+    statistics: [maximum]
+  - id: free_storage_space
+    metric_name: FreeStorageSpace
+    statistics: [average]
+  - id: cluster_index_writes_blocked
+    metric_name: ClusterIndexWritesBlocked
+    statistics: [maximum]
+  - id: search_rate
+    metric_name: SearchRate
+    statistics: [average]
+  - id: search_latency
+    metric_name: SearchLatency
+    statistics: [average]
+  - id: indexing_rate
+    metric_name: IndexingRate
+    statistics: [average]
+  - id: indexing_latency
+    metric_name: IndexingLatency
+    statistics: [average]
+  # ----------------------------------------------------------------------------------------
+  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
+  # matching chart in the charts: section below. All are published at the {ClientId, DomainName}
+  # grain. Dot-suffix metric names (Shards.active, ClusterStatus.*) are exact CloudWatch names.
+  # ----------------------------------------------------------------------------------------
+  # - id: searchable_documents
+  #   metric_name: SearchableDocuments
+  #   statistics: [maximum]
+  # - id: deleted_documents
+  #   metric_name: DeletedDocuments
+  #   statistics: [maximum]
+  # - id: old_gen_jvm_memory_pressure
+  #   metric_name: OldGenJVMMemoryPressure
+  #   statistics: [maximum]
+  # - id: shards_active
+  #   metric_name: Shards.active
+  #   statistics: [maximum]
+  # - id: shards_unassigned
+  #   metric_name: Shards.unassigned
+  #   statistics: [maximum]
+  # - id: automated_snapshot_failure
+  #   metric_name: AutomatedSnapshotFailure
+  #   statistics: [maximum]
+  # Thread-pool queues/rejections (ThreadpoolSearchQueue/Rejected, ...), EBS I/O metrics (ReadLatency,
+  # WriteThroughput, ...), and dedicated-master (Master*), UltraWarm (Warm*), cold-storage (Cold*) and
+  # per-node (NodeId) families are also available. See:
+  # https://docs.aws.amazon.com/opensearch-service/latest/developerguide/managedomains-cloudwatchmetrics.html
+template:
+  family: OpenSearch
+  context_namespace: opensearch
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, client_id, domain_name]
+  charts:
+    - id: cw_os_cluster_status
+      context: cluster_status
+      title: OpenSearch Cluster Status
+      family: Health
+      units: status
+      algorithm: absolute
+      dimensions:
+        - selector: cluster_status_green_maximum
+          name: green
+        - selector: cluster_status_yellow_maximum
+          name: yellow
+        - selector: cluster_status_red_maximum
+          name: red
+    - id: cw_os_writes_blocked
+      context: index_writes_blocked
+      title: OpenSearch Cluster Index Writes Blocked
+      family: Health
+      units: status
+      algorithm: absolute
+      dimensions:
+        - selector: cluster_index_writes_blocked_maximum
+          name: blocked
+    - id: cw_os_nodes
+      context: nodes
+      title: OpenSearch Nodes
+      family: Nodes
+      units: nodes
+      algorithm: absolute
+      dimensions:
+        - selector: nodes_maximum
+          name: nodes
+    - id: cw_os_cpu
+      context: cpu
+      title: OpenSearch CPU Utilization
+      family: CPU
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: cpu_utilization_average
+          name: cpu
+    - id: cw_os_jvm_pressure
+      context: jvm_memory_pressure
+      title: OpenSearch JVM Memory Pressure
+      family: JVM
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: jvm_memory_pressure_maximum
+          name: pressure
+    - id: cw_os_free_storage
+      context: free_storage_space
+      title: OpenSearch Free Storage Space
+      family: Storage
+      units: MiB
+      algorithm: absolute
+      dimensions:
+        - selector: free_storage_space_average
+          name: free
+    - id: cw_os_operation_rate
+      context: operation_rate
+      title: OpenSearch Search and Indexing Rate
+      family: Operations
+      units: operations/min
+      algorithm: absolute
+      dimensions:
+        - selector: search_rate_average
+          name: search
+        - selector: indexing_rate_average
+          name: indexing
+    - id: cw_os_latency
+      context: latency
+      title: OpenSearch Search and Indexing Latency
+      family: Latency
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: search_latency_average
+          name: search
+        - selector: indexing_latency_average
+          name: indexing
+    # ----------------------------------------------------------------------------------------
+    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # ----------------------------------------------------------------------------------------
+    # - id: cw_os_documents
+    #   context: documents
+    #   title: OpenSearch Documents
+    #   family: Documents
+    #   units: documents
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: searchable_documents_maximum
+    #       name: searchable
+    #     - selector: deleted_documents_maximum
+    #       name: deleted
+    # - id: cw_os_shards
+    #   context: shards
+    #   title: OpenSearch Shards
+    #   family: Shards
+    #   units: shards
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: shards_active_maximum
+    #       name: active
+    #     - selector: shards_unassigned_maximum
+    #       name: unassigned

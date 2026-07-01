@@ -1,0 +1,167 @@
+---
+version: v1
+display_name: AWS NAT Gateway
+namespace: AWS/NATGateway
+period: 300
+instance:
+  dimensions:
+    - name: NatGatewayId
+      label: nat_gateway_id
+metrics:
+  - id: active_connection_count
+    metric_name: ActiveConnectionCount
+    statistics: [maximum]
+  - id: bytes_in_from_source
+    metric_name: BytesInFromSource
+    statistics: [sum]
+    rate: true
+  - id: bytes_out_to_destination
+    metric_name: BytesOutToDestination
+    statistics: [sum]
+    rate: true
+  - id: bytes_in_from_destination
+    metric_name: BytesInFromDestination
+    statistics: [sum]
+    rate: true
+  - id: bytes_out_to_source
+    metric_name: BytesOutToSource
+    statistics: [sum]
+    rate: true
+  - id: connection_attempt_count
+    metric_name: ConnectionAttemptCount
+    statistics: [sum]
+    rate: true
+  - id: connection_established_count
+    metric_name: ConnectionEstablishedCount
+    statistics: [sum]
+    rate: true
+  - id: error_port_allocation
+    metric_name: ErrorPortAllocation
+    statistics: [sum]
+    rate: true
+  - id: packets_drop_count
+    metric_name: PacketsDropCount
+    statistics: [sum]
+    rate: true
+  - id: idle_timeout_count
+    metric_name: IdleTimeoutCount
+    statistics: [sum]
+    rate: true
+  # ----------------------------------------------------------------------------------------
+  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
+  # matching chart in the charts: section below. All are published at the {NatGatewayId} grain.
+  # ----------------------------------------------------------------------------------------
+  # - id: packets_in_from_source
+  #   metric_name: PacketsInFromSource
+  #   statistics: [sum]
+  #   rate: true
+  # - id: packets_out_to_destination
+  #   metric_name: PacketsOutToDestination
+  #   statistics: [sum]
+  #   rate: true
+  # - id: packets_in_from_destination
+  #   metric_name: PacketsInFromDestination
+  #   statistics: [sum]
+  #   rate: true
+  # - id: packets_out_to_source
+  #   metric_name: PacketsOutToSource
+  #   statistics: [sum]
+  #   rate: true
+  # - id: peak_bytes_per_second       # already per-second (gauge, not a rate)
+  #   metric_name: PeakBytesPerSecond
+  #   statistics: [maximum]
+  # - id: peak_packets_per_second     # already per-second (gauge, not a rate)
+  #   metric_name: PeakPacketsPerSecond
+  #   statistics: [maximum]
+  # Regional NAT gateways also publish these at the {NatGatewayId, AvailabilityZone} grain, which
+  # needs its own profile. See:
+  # https://docs.aws.amazon.com/vpc/latest/userguide/metrics-dimensions-nat-gateway.html
+template:
+  family: NAT Gateway
+  context_namespace: nat_gateway
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, nat_gateway_id]
+  charts:
+    - id: cw_natgw_bytes
+      context: bytes
+      title: NAT Gateway Traffic
+      family: Traffic
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: bytes_in_from_source_sum
+          name: in_from_source
+        - selector: bytes_out_to_destination_sum
+          name: out_to_destination
+        - selector: bytes_in_from_destination_sum
+          name: in_from_destination
+        - selector: bytes_out_to_source_sum
+          name: out_to_source
+    - id: cw_natgw_active_connections
+      context: active_connections
+      title: NAT Gateway Active Connections
+      family: Connections
+      units: connections
+      algorithm: absolute
+      dimensions:
+        - selector: active_connection_count_maximum
+          name: active
+    - id: cw_natgw_connection_rate
+      context: connection_rate
+      title: NAT Gateway Connection Rate
+      family: Connections
+      units: connections/s
+      algorithm: absolute
+      dimensions:
+        - selector: connection_attempt_count_sum
+          name: attempted
+        - selector: connection_established_count_sum
+          name: established
+    - id: cw_natgw_errors
+      context: errors
+      title: NAT Gateway Errors
+      family: Errors
+      units: errors/s
+      algorithm: absolute
+      dimensions:
+        - selector: error_port_allocation_sum
+          name: port_allocation
+        - selector: packets_drop_count_sum
+          name: packets_dropped
+    - id: cw_natgw_idle_timeouts
+      context: idle_timeouts
+      title: NAT Gateway Idle Timeouts
+      family: Connections
+      units: events/s
+      algorithm: absolute
+      dimensions:
+        - selector: idle_timeout_count_sum
+          name: idle_timeout
+    # ----------------------------------------------------------------------------------------
+    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # ----------------------------------------------------------------------------------------
+    # - id: cw_natgw_packets
+    #   context: packets
+    #   title: NAT Gateway Packets
+    #   family: Traffic
+    #   units: packets/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: packets_in_from_source_sum
+    #       name: in_from_source
+    #     - selector: packets_out_to_destination_sum
+    #       name: out_to_destination
+    #     - selector: packets_in_from_destination_sum
+    #       name: in_from_destination
+    #     - selector: packets_out_to_source_sum
+    #       name: out_to_source
+    # - id: cw_natgw_peak_throughput
+    #   context: peak_throughput
+    #   title: NAT Gateway Peak Throughput
+    #   family: Traffic
+    #   units: bytes/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: peak_bytes_per_second_maximum
+    #       name: peak_bytes

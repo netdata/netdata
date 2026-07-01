@@ -1,0 +1,182 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "AWS CloudWatch collector",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds. CloudWatch's minimum period is 60s.",
+        "type": "integer",
+        "minimum": 60,
+        "default": 60
+      },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "Recheck interval in seconds. Zero means no recheck.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
+      "regions": {
+        "title": "Regions",
+        "description": "AWS regions to collect from. At least one region is required (AWS is region-scoped).",
+        "type": "array",
+        "items": {
+          "title": "Region",
+          "type": "string"
+        },
+        "minItems": 1
+      },
+      "auth": {
+        "title": "Authentication",
+        "type": "object",
+        "properties": {
+          "mode": {
+            "title": "Mode",
+            "type": "string",
+            "enum": ["default", "access_key", "assume_role"],
+            "default": "default"
+          },
+          "mode_access_key": {
+            "title": "Access key",
+            "type": "object",
+            "properties": {
+              "access_key_id": {
+                "title": "Access key ID",
+                "type": "string"
+              },
+              "secret_access_key": {
+                "title": "Secret access key",
+                "type": "string",
+                "sensitive": true
+              },
+              "session_token": {
+                "title": "Session token",
+                "type": "string",
+                "sensitive": true
+              }
+            }
+          },
+          "mode_assume_role": {
+            "title": "Assume role",
+            "type": "object",
+            "properties": {
+              "roles": {
+                "title": "Roles",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "role_arn": {
+                      "title": "Role ARN",
+                      "type": "string"
+                    },
+                    "external_id": {
+                      "title": "External ID",
+                      "type": "string",
+                      "sensitive": true
+                    }
+                  },
+                  "required": ["role_arn"]
+                }
+              }
+            }
+          }
+        },
+        "required": ["mode"]
+      },
+      "namespaces": {
+        "title": "Namespaces",
+        "type": "object",
+        "properties": {
+          "mode": {
+            "title": "Mode",
+            "type": "string",
+            "description": "auto: the default service profiles; exact: only the listed namespaces; combined: the default profiles plus deep-grain (per-target-group, per-operation, per-request-filter) profiles.",
+            "enum": ["auto", "exact", "combined"],
+            "default": "auto"
+          },
+          "mode_exact": {
+            "title": "Exact namespaces",
+            "type": "object",
+            "properties": {
+              "entries": {
+                "title": "Entries",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "title": "Namespace",
+                      "type": "string"
+                    }
+                  },
+                  "required": ["name"]
+                }
+              }
+            }
+          }
+        }
+      },
+      "discovery": {
+        "title": "Discovery",
+        "type": "object",
+        "properties": {
+          "refresh_every": {
+            "title": "Refresh every",
+            "description": "How often to re-discover metrics, in seconds.",
+            "type": "integer",
+            "minimum": 60,
+            "default": 300
+          },
+          "recently_active_only": {
+            "title": "Recently active only",
+            "description": "List only metrics active in the last 3h (auto-disabled for metrics whose period exceeds 3h, e.g. daily S3 storage metrics).",
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "query_offset": {
+        "title": "Query offset",
+        "description": "Seconds subtracted from now when querying, to account for CloudWatch publish latency.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 600
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "AWS API call timeout, in seconds.",
+        "type": "number",
+        "minimum": 0,
+        "default": 30
+      }
+    },
+    "required": ["regions", "auth"]
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "auth": {
+      "mode_access_key": {
+        "secret_access_key": {
+          "ui:widget": "password"
+        },
+        "session_token": {
+          "ui:widget": "password"
+        }
+      },
+      "mode_assume_role": {
+        "roles": {
+          "items": {
+            "external_id": {
+              "ui:widget": "password"
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,157 @@
+---
+version: v1
+display_name: Amazon Redshift
+namespace: AWS/Redshift
+period: 300
+instance:
+  dimensions:
+    - name: ClusterIdentifier
+      label: cluster_identifier
+metrics:
+  - id: health_status
+    metric_name: HealthStatus
+    statistics: [minimum]
+  - id: maintenance_mode
+    metric_name: MaintenanceMode
+    statistics: [maximum]
+  - id: cpu_utilization
+    metric_name: CPUUtilization
+    statistics: [average]
+  - id: percentage_disk_space_used
+    metric_name: PercentageDiskSpaceUsed
+    statistics: [average]
+  - id: database_connections
+    metric_name: DatabaseConnections
+    statistics: [average]
+  - id: read_iops
+    metric_name: ReadIOPS
+    statistics: [average]
+  - id: write_iops
+    metric_name: WriteIOPS
+    statistics: [average]
+  - id: read_throughput
+    metric_name: ReadThroughput
+    statistics: [average]
+  - id: write_throughput
+    metric_name: WriteThroughput
+    statistics: [average]
+  - id: network_receive_throughput
+    metric_name: NetworkReceiveThroughput
+    statistics: [average]
+  - id: network_transmit_throughput
+    metric_name: NetworkTransmitThroughput
+    statistics: [average]
+  # ----------------------------------------------------------------------------------------
+  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
+  # matching chart in the charts: section below. All are published at the {ClusterIdentifier}
+  # grain.
+  # ----------------------------------------------------------------------------------------
+  # - id: read_latency
+  #   metric_name: ReadLatency
+  #   statistics: [average]
+  # - id: write_latency
+  #   metric_name: WriteLatency
+  #   statistics: [average]
+  # - id: total_table_count
+  #   metric_name: TotalTableCount
+  #   statistics: [average]
+  # - id: concurrency_scaling_seconds
+  #   metric_name: ConcurrencyScalingSeconds
+  #   statistics: [sum]
+  #   rate: true
+  # Redshift is heavily faceted; metrics at other grains need their own profile: per-node {NodeID},
+  # per-WLM-queue {wlmid / service class / QueryPriority}, per-query-latency-class {latency},
+  # per-query-stage {stage}, per-schema {Database, Schema}, per-usage-limit {FeatureType, UsageLimitId}.
+  # See: https://docs.aws.amazon.com/redshift/latest/mgmt/metrics-listing.html
+template:
+  family: Redshift
+  context_namespace: redshift
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, cluster_identifier]
+  charts:
+    - id: cw_redshift_health
+      context: health
+      title: Redshift Health
+      family: Health
+      units: status
+      algorithm: absolute
+      dimensions:
+        - selector: health_status_minimum
+          name: healthy
+        - selector: maintenance_mode_maximum
+          name: maintenance
+    - id: cw_redshift_cpu
+      context: cpu
+      title: Redshift CPU Utilization
+      family: CPU
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: cpu_utilization_average
+          name: cpu
+    - id: cw_redshift_disk
+      context: disk_space_used
+      title: Redshift Disk Space Used
+      family: Storage
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: percentage_disk_space_used_average
+          name: used
+    - id: cw_redshift_connections
+      context: connections
+      title: Redshift Database Connections
+      family: Connections
+      units: connections
+      algorithm: absolute
+      dimensions:
+        - selector: database_connections_average
+          name: connections
+    - id: cw_redshift_iops
+      context: iops
+      title: Redshift Disk IOPS
+      family: Throughput
+      units: ops/s
+      algorithm: absolute
+      dimensions:
+        - selector: read_iops_average
+          name: read
+        - selector: write_iops_average
+          name: write
+    - id: cw_redshift_throughput
+      context: throughput
+      title: Redshift Disk Throughput
+      family: Throughput
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: read_throughput_average
+          name: read
+        - selector: write_throughput_average
+          name: write
+    - id: cw_redshift_network
+      context: network
+      title: Redshift Network Throughput
+      family: Network
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: network_receive_throughput_average
+          name: received
+        - selector: network_transmit_throughput_average
+          name: transmitted
+    # ----------------------------------------------------------------------------------------
+    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # ----------------------------------------------------------------------------------------
+    # - id: cw_redshift_latency
+    #   context: latency
+    #   title: Redshift Disk Latency
+    #   family: Latency
+    #   units: seconds
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: read_latency_average
+    #       name: read
+    #     - selector: write_latency_average
+    #       name: write

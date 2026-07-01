@@ -1,0 +1,226 @@
+---
+version: v1
+display_name: AWS Application Load Balancer
+namespace: AWS/ApplicationELB
+period: 300
+instance:
+  dimensions:
+    - name: LoadBalancer
+      label: load_balancer
+metrics:
+  - id: request_count
+    metric_name: RequestCount
+    statistics: [sum]
+    rate: true
+  - id: http_code_target_2xx
+    metric_name: HTTPCode_Target_2XX_Count
+    statistics: [sum]
+    rate: true
+  - id: http_code_target_3xx
+    metric_name: HTTPCode_Target_3XX_Count
+    statistics: [sum]
+    rate: true
+  - id: http_code_target_4xx
+    metric_name: HTTPCode_Target_4XX_Count
+    statistics: [sum]
+    rate: true
+  - id: http_code_target_5xx
+    metric_name: HTTPCode_Target_5XX_Count
+    statistics: [sum]
+    rate: true
+  - id: http_code_elb_3xx
+    metric_name: HTTPCode_ELB_3XX_Count
+    statistics: [sum]
+    rate: true
+  - id: http_code_elb_4xx
+    metric_name: HTTPCode_ELB_4XX_Count
+    statistics: [sum]
+    rate: true
+  - id: http_code_elb_5xx
+    metric_name: HTTPCode_ELB_5XX_Count
+    statistics: [sum]
+    rate: true
+  - id: new_connection_count
+    metric_name: NewConnectionCount
+    statistics: [sum]
+    rate: true
+  - id: rejected_connection_count
+    metric_name: RejectedConnectionCount
+    statistics: [sum]
+    rate: true
+  - id: active_connection_count
+    metric_name: ActiveConnectionCount
+    statistics: [sum]
+  - id: processed_bytes
+    metric_name: ProcessedBytes
+    statistics: [sum]
+    rate: true
+  - id: target_response_time
+    metric_name: TargetResponseTime
+    statistics: [average]
+  - id: consumed_lcus
+    metric_name: ConsumedLCUs
+    statistics: [average]
+  # ----------------------------------------------------------------------------------------
+  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
+  # matching chart in the charts: section below, then restart the go.d process. All are
+  # published at the {LoadBalancer} grain, so no other change is needed.
+  # ----------------------------------------------------------------------------------------
+  # - id: ipv6_request_count
+  #   metric_name: IPv6RequestCount
+  #   statistics: [sum]
+  #   rate: true
+  # - id: grpc_request_count
+  #   metric_name: GrpcRequestCount
+  #   statistics: [sum]
+  #   rate: true
+  # - id: rule_evaluations
+  #   metric_name: RuleEvaluations
+  #   statistics: [sum]
+  #   rate: true
+  # - id: client_tls_negotiation_errors
+  #   metric_name: ClientTLSNegotiationErrorCount
+  #   statistics: [sum]
+  #   rate: true
+  # - id: http_redirect_count
+  #   metric_name: HTTP_Redirect_Count
+  #   statistics: [sum]
+  #   rate: true
+  # Per-target / target-group metrics {LoadBalancer, TargetGroup} (HealthyHostCount, UnHealthyHostCount,
+  # RequestCountPerTarget, TargetConnectionErrorCount, ...) are collected by the alb_target profile --
+  # enable it with namespaces.mode: combined.
+  # Also at {LoadBalancer}: HTTPCode_ELB_500/502/503/504_Count (5xx detail), and the DDoS-protection,
+  # auth (ELBAuth*), Target Optimizer (TargetControl*), and LCU-reservation (PeakLCUs/ReservedLCUs)
+  # families. See: https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html
+template:
+  family: ALB
+  context_namespace: alb
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, load_balancer]
+  charts:
+    - id: cw_alb_requests
+      context: request_count
+      title: ALB Request Count
+      family: Requests
+      units: requests/s
+      algorithm: absolute
+      dimensions:
+        - selector: request_count_sum
+          name: requests
+    - id: cw_alb_target_response_codes
+      context: target_response_codes
+      title: ALB Target Response Codes
+      family: Responses
+      units: responses/s
+      algorithm: absolute
+      dimensions:
+        - selector: http_code_target_2xx_sum
+          name: 2xx
+        - selector: http_code_target_3xx_sum
+          name: 3xx
+        - selector: http_code_target_4xx_sum
+          name: 4xx
+        - selector: http_code_target_5xx_sum
+          name: 5xx
+    - id: cw_alb_elb_response_codes
+      context: elb_response_codes
+      title: ALB Load Balancer Response Codes
+      family: Responses
+      units: responses/s
+      algorithm: absolute
+      dimensions:
+        - selector: http_code_elb_3xx_sum
+          name: 3xx
+        - selector: http_code_elb_4xx_sum
+          name: 4xx
+        - selector: http_code_elb_5xx_sum
+          name: 5xx
+    - id: cw_alb_new_connections
+      context: connection_rate
+      title: ALB Connection Rate
+      family: Connections
+      units: connections/s
+      algorithm: absolute
+      dimensions:
+        - selector: new_connection_count_sum
+          name: new
+        - selector: rejected_connection_count_sum
+          name: rejected
+    - id: cw_alb_active_connections
+      context: active_connections
+      title: ALB Active Connections
+      family: Connections
+      units: connections
+      algorithm: absolute
+      dimensions:
+        - selector: active_connection_count_sum
+          name: active
+    - id: cw_alb_processed_traffic
+      context: processed_bytes
+      title: ALB Processed Traffic
+      family: Traffic
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: processed_bytes_sum
+          name: processed
+    - id: cw_alb_target_response_time
+      context: target_response_time
+      title: ALB Target Response Time
+      family: Latency
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: target_response_time_average
+          name: response_time
+    - id: cw_alb_consumed_lcus
+      context: consumed_lcus
+      title: ALB Consumed LCUs
+      family: Capacity
+      units: LCU
+      algorithm: absolute
+      dimensions:
+        - selector: consumed_lcus_average
+          name: lcus
+    # ----------------------------------------------------------------------------------------
+    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # ----------------------------------------------------------------------------------------
+    # - id: cw_alb_extra_requests
+    #   context: extra_request_counts
+    #   title: ALB IPv6 and gRPC Requests
+    #   family: Requests
+    #   units: requests/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: ipv6_request_count_sum
+    #       name: ipv6
+    #     - selector: grpc_request_count_sum
+    #       name: grpc
+    # - id: cw_alb_rule_evaluations
+    #   context: rule_evaluations
+    #   title: ALB Rule Evaluations
+    #   family: Rules
+    #   units: evaluations/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: rule_evaluations_sum
+    #       name: evaluations
+    # - id: cw_alb_tls_errors
+    #   context: client_tls_negotiation_errors
+    #   title: ALB Client TLS Negotiation Errors
+    #   family: TLS
+    #   units: errors/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: client_tls_negotiation_errors_sum
+    #       name: errors
+    # - id: cw_alb_redirects
+    #   context: http_redirects
+    #   title: ALB HTTP Redirects
+    #   family: Requests
+    #   units: redirects/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: http_redirect_count_sum
+    #       name: redirects

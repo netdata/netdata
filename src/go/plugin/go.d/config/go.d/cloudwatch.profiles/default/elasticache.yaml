@@ -1,0 +1,176 @@
+---
+version: v1
+display_name: Amazon ElastiCache
+namespace: AWS/ElastiCache
+period: 300
+instance:
+  dimensions:
+    - name: CacheClusterId
+      label: cache_cluster_id
+    - name: CacheNodeId
+      label: cache_node_id
+metrics:
+  - id: cpu_utilization
+    metric_name: CPUUtilization
+    statistics: [average]
+  - id: engine_cpu_utilization
+    metric_name: EngineCPUUtilization
+    statistics: [average]
+  - id: freeable_memory
+    metric_name: FreeableMemory
+    statistics: [average]
+  - id: bytes_used_for_cache
+    metric_name: BytesUsedForCache
+    statistics: [average]
+  - id: database_memory_usage_percentage
+    metric_name: DatabaseMemoryUsagePercentage
+    statistics: [average]
+  - id: curr_connections
+    metric_name: CurrConnections
+    statistics: [average]
+  - id: new_connections
+    metric_name: NewConnections
+    statistics: [sum]
+    rate: true
+  - id: cache_hits
+    metric_name: CacheHits
+    statistics: [sum]
+    rate: true
+  - id: cache_misses
+    metric_name: CacheMisses
+    statistics: [sum]
+    rate: true
+  - id: evictions
+    metric_name: Evictions
+    statistics: [sum]
+    rate: true
+  - id: network_bytes_in
+    metric_name: NetworkBytesIn
+    statistics: [sum]
+    rate: true
+  - id: network_bytes_out
+    metric_name: NetworkBytesOut
+    statistics: [sum]
+    rate: true
+  # ----------------------------------------------------------------------------------------
+  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
+  # matching chart in the charts: section below. All are published at the
+  # {CacheClusterId, CacheNodeId} grain (Redis/Valkey engines).
+  # ----------------------------------------------------------------------------------------
+  # - id: swap_usage
+  #   metric_name: SwapUsage
+  #   statistics: [average]
+  # - id: replication_lag
+  #   metric_name: ReplicationLag
+  #   statistics: [average]
+  # - id: curr_items
+  #   metric_name: CurrItems
+  #   statistics: [average]
+  # - id: replication_bytes
+  #   metric_name: ReplicationBytes
+  #   statistics: [sum]
+  #   rate: true
+  # Memcached clusters expose a different engine set (CmdGet/CmdSet, GetHits/GetMisses, ...); the
+  # command-family counters (GetTypeCmds/SetTypeCmds/...), T-class CPUCredit* metrics, and data-tiering
+  # (Tier dimension) are also available. Serverless caches use the `clusterId` dimension and a reduced
+  # capacity set -- a separate profile. See:
+  # https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/CacheMetrics.HostLevel.html
+template:
+  family: ElastiCache
+  context_namespace: elasticache
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, cache_cluster_id, cache_node_id]
+  charts:
+    - id: cw_ec_cpu
+      context: cpu
+      title: ElastiCache CPU Utilization
+      family: CPU
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: cpu_utilization_average
+          name: host
+        - selector: engine_cpu_utilization_average
+          name: engine
+    - id: cw_ec_memory
+      context: memory
+      title: ElastiCache Memory
+      family: Memory
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: freeable_memory_average
+          name: freeable
+        - selector: bytes_used_for_cache_average
+          name: used_for_cache
+    - id: cw_ec_memory_usage
+      context: memory_usage
+      title: ElastiCache Database Memory Usage
+      family: Memory
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: database_memory_usage_percentage_average
+          name: used
+    - id: cw_ec_connections
+      context: connections
+      title: ElastiCache Current Connections
+      family: Connections
+      units: connections
+      algorithm: absolute
+      dimensions:
+        - selector: curr_connections_average
+          name: current
+    - id: cw_ec_new_connections
+      context: new_connections
+      title: ElastiCache New Connections
+      family: Connections
+      units: connections/s
+      algorithm: absolute
+      dimensions:
+        - selector: new_connections_sum
+          name: new
+    - id: cw_ec_hitrate
+      context: hitrate
+      title: ElastiCache Cache Hits and Misses
+      family: Keyspace
+      units: events/s
+      algorithm: absolute
+      dimensions:
+        - selector: cache_hits_sum
+          name: hits
+        - selector: cache_misses_sum
+          name: misses
+    - id: cw_ec_evictions
+      context: evictions
+      title: ElastiCache Evictions
+      family: Keyspace
+      units: keys/s
+      algorithm: absolute
+      dimensions:
+        - selector: evictions_sum
+          name: evictions
+    - id: cw_ec_network
+      context: network
+      title: ElastiCache Network Traffic
+      family: Network
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: network_bytes_in_sum
+          name: in
+        - selector: network_bytes_out_sum
+          name: out
+    # ----------------------------------------------------------------------------------------
+    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # ----------------------------------------------------------------------------------------
+    # - id: cw_ec_replication
+    #   context: replication
+    #   title: ElastiCache Replication
+    #   family: Replication
+    #   units: bytes/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: replication_bytes_sum
+    #       name: bytes

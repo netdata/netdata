@@ -1,0 +1,129 @@
+---
+version: v1
+display_name: Amazon EBS
+namespace: AWS/EBS
+period: 300
+instance:
+  dimensions:
+    - name: VolumeId
+      label: volume_id
+metrics:
+  - id: volume_read_bytes
+    metric_name: VolumeReadBytes
+    statistics: [sum]
+    rate: true
+  - id: volume_write_bytes
+    metric_name: VolumeWriteBytes
+    statistics: [sum]
+    rate: true
+  - id: volume_read_ops
+    metric_name: VolumeReadOps
+    statistics: [sum]
+    rate: true
+  - id: volume_write_ops
+    metric_name: VolumeWriteOps
+    statistics: [sum]
+    rate: true
+  - id: volume_queue_length
+    metric_name: VolumeQueueLength
+    statistics: [average]
+  - id: volume_idle_time
+    metric_name: VolumeIdleTime
+    statistics: [average]
+  - id: burst_balance
+    metric_name: BurstBalance
+    statistics: [average]
+  # ----------------------------------------------------------------------------------------
+  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
+  # matching chart in the charts: section below. All are published at the {VolumeId} grain.
+  # ----------------------------------------------------------------------------------------
+  # - id: volume_total_read_time       # total seconds of read ops; divide by read ops for latency
+  #   metric_name: VolumeTotalReadTime
+  #   statistics: [sum]
+  #   rate: true
+  # - id: volume_total_write_time
+  #   metric_name: VolumeTotalWriteTime
+  #   statistics: [sum]
+  #   rate: true
+  # - id: volume_throughput_percentage  # Provisioned IOPS SSD (io1/io2) only
+  #   metric_name: VolumeThroughputPercentage
+  #   statistics: [average]
+  # - id: volume_consumed_read_write_ops  # Provisioned IOPS SSD (io1/io2) only
+  #   metric_name: VolumeConsumedReadWriteOps
+  #   statistics: [sum]
+  #   rate: true
+  # Nitro-only per-volume metrics (VolumeAvgIOPS, VolumeAvgReadLatency, VolumeIOPSExceededCheck, ...)
+  # and instance-aggregate EBS (AWS/EC2 + InstanceId: EBSReadBytes/EBSWriteBytes/... -- see the ec2
+  # profile) are separate. See:
+  # https://docs.aws.amazon.com/ebs/latest/userguide/using_cloudwatch_ebs.html
+  # BurstBalance is emitted only for gp2/st1/sc1 volumes.
+template:
+  family: EBS
+  context_namespace: ebs
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, volume_id]
+  charts:
+    - id: cw_ebs_throughput
+      context: throughput
+      title: EBS Volume Throughput
+      family: Throughput
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: volume_read_bytes_sum
+          name: read
+        - selector: volume_write_bytes_sum
+          name: write
+    - id: cw_ebs_iops
+      context: iops
+      title: EBS Volume IOPS
+      family: Throughput
+      units: ops/s
+      algorithm: absolute
+      dimensions:
+        - selector: volume_read_ops_sum
+          name: read
+        - selector: volume_write_ops_sum
+          name: write
+    - id: cw_ebs_queue_length
+      context: queue_length
+      title: EBS Volume Queue Length
+      family: Queue
+      units: operations
+      algorithm: absolute
+      dimensions:
+        - selector: volume_queue_length_average
+          name: queued
+    - id: cw_ebs_idle_time
+      context: idle_time
+      title: EBS Volume Idle Time
+      family: Activity
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: volume_idle_time_average
+          name: idle
+    - id: cw_ebs_burst_balance
+      context: burst_balance
+      title: EBS Volume Burst Balance
+      family: Credits
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: burst_balance_average
+          name: balance
+    # ----------------------------------------------------------------------------------------
+    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # ----------------------------------------------------------------------------------------
+    # - id: cw_ebs_io_time
+    #   context: io_time
+    #   title: EBS Volume I/O Time
+    #   family: Latency
+    #   units: seconds/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: volume_total_read_time_sum
+    #       name: read
+    #     - selector: volume_total_write_time_sum
+    #       name: write

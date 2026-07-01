@@ -1,0 +1,211 @@
+---
+version: v1
+display_name: AWS RDS
+namespace: AWS/RDS
+period: 300
+instance:
+  dimensions:
+    - name: DBInstanceIdentifier
+      label: db_instance_identifier
+metrics:
+  - id: cpu_utilization
+    metric_name: CPUUtilization
+    statistics: [average]
+  - id: database_connections
+    metric_name: DatabaseConnections
+    statistics: [average]
+  - id: freeable_memory
+    metric_name: FreeableMemory
+    statistics: [average]
+  - id: free_storage_space
+    metric_name: FreeStorageSpace
+    statistics: [average]
+  - id: read_throughput
+    metric_name: ReadThroughput
+    statistics: [average]
+  - id: write_throughput
+    metric_name: WriteThroughput
+    statistics: [average]
+  - id: read_iops
+    metric_name: ReadIOPS
+    statistics: [average]
+  - id: write_iops
+    metric_name: WriteIOPS
+    statistics: [average]
+  - id: read_latency
+    metric_name: ReadLatency
+    statistics: [average]
+  - id: write_latency
+    metric_name: WriteLatency
+    statistics: [average]
+  # ----------------------------------------------------------------------------------------
+  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
+  # matching chart in the charts: section below, then restart the go.d process. All are
+  # published at the {DBInstanceIdentifier} grain, so no other change is needed.
+  # ----------------------------------------------------------------------------------------
+  # - id: disk_queue_depth
+  #   metric_name: DiskQueueDepth
+  #   statistics: [average]
+  # - id: network_receive_throughput
+  #   metric_name: NetworkReceiveThroughput
+  #   statistics: [average]
+  # - id: network_transmit_throughput
+  #   metric_name: NetworkTransmitThroughput
+  #   statistics: [average]
+  # - id: swap_usage
+  #   metric_name: SwapUsage
+  #   statistics: [average]
+  # - id: burst_balance             # gp2 storage burst credits, percent
+  #   metric_name: BurstBalance
+  #   statistics: [average]
+  # - id: replica_lag               # read replicas only, seconds
+  #   metric_name: ReplicaLag
+  #   statistics: [average]
+  # - id: cpu_credit_usage          # burstable (db.t*) instances only
+  #   metric_name: CPUCreditUsage
+  #   statistics: [average]
+  # - id: cpu_credit_balance        # burstable (db.t*) instances only
+  #   metric_name: CPUCreditBalance
+  #   statistics: [average]
+  # Engine- and storage-specific metrics are also published at {DBInstanceIdentifier} and can be
+  # added the same way: BinLogDiskUsage (MySQL/MariaDB); TempDb* and FailedSQLServerAgentJobsCount
+  # (SQL Server); MaximumUsedTransactionIDs, *ReplicationSlot*, TransactionLogs* (PostgreSQL); and
+  # the *LogVolume / *LocalStorage families. See:
+  # https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-metrics.html
+template:
+  family: RDS
+  context_namespace: rds
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, db_instance_identifier]
+  charts:
+    - id: cw_rds_cpu
+      context: cpu_utilization
+      title: RDS CPU Utilization
+      family: CPU
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: cpu_utilization_average
+          name: average
+    - id: cw_rds_connections
+      context: database_connections
+      title: RDS Database Connections
+      family: Connections
+      units: connections
+      algorithm: absolute
+      dimensions:
+        - selector: database_connections_average
+          name: connections
+    - id: cw_rds_memory
+      context: freeable_memory
+      title: RDS Freeable Memory
+      family: Memory
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: freeable_memory_average
+          name: freeable
+    - id: cw_rds_storage
+      context: free_storage_space
+      title: RDS Free Storage Space
+      family: Storage
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: free_storage_space_average
+          name: free
+    - id: cw_rds_throughput
+      context: disk_throughput
+      title: RDS Disk Throughput
+      family: Throughput
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: read_throughput_average
+          name: read
+        - selector: write_throughput_average
+          name: write
+    - id: cw_rds_iops
+      context: disk_iops
+      title: RDS Disk IOPS
+      family: Throughput
+      units: ops/s
+      algorithm: absolute
+      dimensions:
+        - selector: read_iops_average
+          name: read
+        - selector: write_iops_average
+          name: write
+    - id: cw_rds_latency
+      context: disk_latency
+      title: RDS Disk Latency
+      family: Latency
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: read_latency_average
+          name: read
+        - selector: write_latency_average
+          name: write
+    # ----------------------------------------------------------------------------------------
+    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # ----------------------------------------------------------------------------------------
+    # - id: cw_rds_queue_depth
+    #   context: disk_queue_depth
+    #   title: RDS Disk Queue Depth
+    #   family: Disk
+    #   units: operations
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: disk_queue_depth_average
+    #       name: queued
+    # - id: cw_rds_network
+    #   context: network_throughput
+    #   title: RDS Network Throughput
+    #   family: Network
+    #   units: bytes/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: network_receive_throughput_average
+    #       name: received
+    #     - selector: network_transmit_throughput_average
+    #       name: sent
+    # - id: cw_rds_swap
+    #   context: swap_usage
+    #   title: RDS Swap Usage
+    #   family: Memory
+    #   units: bytes
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: swap_usage_average
+    #       name: swap
+    # - id: cw_rds_burst_balance
+    #   context: burst_balance
+    #   title: RDS Burst Balance
+    #   family: Credits
+    #   units: percentage
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: burst_balance_average
+    #       name: balance
+    # - id: cw_rds_replica_lag
+    #   context: replica_lag
+    #   title: RDS Replica Lag
+    #   family: Replication
+    #   units: seconds
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: replica_lag_average
+    #       name: lag
+    # - id: cw_rds_cpu_credits
+    #   context: cpu_credits
+    #   title: RDS CPU Credits
+    #   family: CPU
+    #   units: credits
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: cpu_credit_usage_average
+    #       name: used
+    #     - selector: cpu_credit_balance_average
+    #       name: balance

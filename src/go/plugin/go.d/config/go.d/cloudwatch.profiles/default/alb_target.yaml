@@ -1,0 +1,147 @@
+---
+version: v1
+display_name: AWS ALB Target Groups
+namespace: AWS/ApplicationELB
+disabled: true   # deep-grain profile ({LoadBalancer, TargetGroup}); opt in with namespaces.mode: combined
+period: 300
+instance:
+  dimensions:
+    - name: LoadBalancer
+      label: load_balancer
+    - name: TargetGroup
+      label: target_group
+metrics:
+  - id: healthy_host_count
+    metric_name: HealthyHostCount
+    statistics: [average]
+  - id: unhealthy_host_count
+    metric_name: UnHealthyHostCount
+    statistics: [average]
+  - id: request_count_per_target
+    metric_name: RequestCountPerTarget
+    statistics: [sum]
+    rate: true
+  - id: target_response_time
+    metric_name: TargetResponseTime
+    statistics: [average]
+  - id: http_code_target_2xx
+    metric_name: HTTPCode_Target_2XX_Count
+    statistics: [sum]
+    rate: true
+  - id: http_code_target_3xx
+    metric_name: HTTPCode_Target_3XX_Count
+    statistics: [sum]
+    rate: true
+  - id: http_code_target_4xx
+    metric_name: HTTPCode_Target_4XX_Count
+    statistics: [sum]
+    rate: true
+  - id: http_code_target_5xx
+    metric_name: HTTPCode_Target_5XX_Count
+    statistics: [sum]
+    rate: true
+  - id: target_connection_error_count
+    metric_name: TargetConnectionErrorCount
+    statistics: [sum]
+    rate: true
+  # ----------------------------------------------------------------------------------------
+  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
+  # matching chart in the charts: section below. All are published at the
+  # {LoadBalancer, TargetGroup} grain, so no other change is needed.
+  # ----------------------------------------------------------------------------------------
+  # - id: target_tls_negotiation_errors
+  #   metric_name: TargetTLSNegotiationErrorCount
+  #   statistics: [sum]
+  #   rate: true
+  # - id: anomalous_host_count
+  #   metric_name: AnomalousHostCount
+  #   statistics: [maximum]
+  # - id: mitigated_host_count
+  #   metric_name: MitigatedHostCount
+  #   statistics: [maximum]
+  # Target-group health-state metrics (HealthyStateDNS/Routing, UnhealthyStateDNS/Routing,
+  # UnhealthyRoutingRequestCount) are also published at this grain. See:
+  # https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html
+template:
+  family: ALB Targets
+  context_namespace: alb_target
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, load_balancer, target_group]
+  charts:
+    - id: cw_alb_target_host_count
+      context: host_count
+      title: ALB Target Group Host Count
+      family: Hosts
+      units: hosts
+      algorithm: absolute
+      dimensions:
+        - selector: healthy_host_count_average
+          name: healthy
+        - selector: unhealthy_host_count_average
+          name: unhealthy
+    - id: cw_alb_target_request_count
+      context: request_count_per_target
+      title: ALB Requests Per Target
+      family: Requests
+      units: requests/s
+      algorithm: absolute
+      dimensions:
+        - selector: request_count_per_target_sum
+          name: requests
+    - id: cw_alb_target_response_time
+      context: target_response_time
+      title: ALB Target Group Response Time
+      family: Latency
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: target_response_time_average
+          name: response_time
+    - id: cw_alb_target_response_codes
+      context: target_response_codes
+      title: ALB Target Group Response Codes
+      family: Responses
+      units: responses/s
+      algorithm: absolute
+      dimensions:
+        - selector: http_code_target_2xx_sum
+          name: 2xx
+        - selector: http_code_target_3xx_sum
+          name: 3xx
+        - selector: http_code_target_4xx_sum
+          name: 4xx
+        - selector: http_code_target_5xx_sum
+          name: 5xx
+    - id: cw_alb_target_connection_errors
+      context: target_connection_errors
+      title: ALB Target Connection Errors
+      family: Errors
+      units: errors/s
+      algorithm: absolute
+      dimensions:
+        - selector: target_connection_error_count_sum
+          name: errors
+    # ----------------------------------------------------------------------------------------
+    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # ----------------------------------------------------------------------------------------
+    # - id: cw_alb_target_tls_errors
+    #   context: target_tls_negotiation_errors
+    #   title: ALB Target TLS Negotiation Errors
+    #   family: TLS
+    #   units: errors/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: target_tls_negotiation_errors_sum
+    #       name: errors
+    # - id: cw_alb_target_host_states
+    #   context: host_states
+    #   title: ALB Target Anomalous and Mitigated Hosts
+    #   family: Hosts
+    #   units: hosts
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: anomalous_host_count_maximum
+    #       name: anomalous
+    #     - selector: mitigated_host_count_maximum
+    #       name: mitigated

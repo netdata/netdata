@@ -1,0 +1,53 @@
+---
+version: v1
+display_name: AWS S3
+namespace: AWS/S3
+period: 86400
+instance:
+  dimensions:
+    - name: BucketName
+      label: bucket_name
+    - name: StorageType
+      label: storage_type
+metrics:
+  - id: bucket_size_bytes
+    metric_name: BucketSizeBytes
+    statistics: [average]
+  - id: number_of_objects
+    metric_name: NumberOfObjects
+    statistics: [average]
+  # ----------------------------------------------------------------------------------------
+  # S3 also publishes request and replication metrics, but at DIFFERENT dimension grains than
+  # this profile's {BucketName, StorageType} storage identity, so they cannot be enabled here --
+  # each needs its own profile:
+  #   - Request metrics  {BucketName, FilterId}  -- opt-in per bucket, billed at custom-metric
+  #     rates (AllRequests, GetRequests, 4xxErrors, ...). Collected by the s3_requests profile
+  #     (enable with namespaces.mode: combined).
+  #   - Replication      {SourceBucket, DestinationBucket, RuleId}  -- when S3 replication metrics
+  #     are enabled (ReplicationLatency, BytesPendingReplication, ...).
+  # See: https://docs.aws.amazon.com/AmazonS3/latest/userguide/metrics-dimensions.html
+template:
+  family: S3
+  context_namespace: s3
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, bucket_name, storage_type]
+  charts:
+    - id: cw_s3_bucket_size
+      context: bucket_size
+      title: S3 Bucket Size
+      family: Storage
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: bucket_size_bytes_average
+          name: size
+    - id: cw_s3_objects
+      context: number_of_objects
+      title: S3 Number of Objects
+      family: Storage
+      units: objects
+      algorithm: absolute
+      dimensions:
+        - selector: number_of_objects_average
+          name: objects
