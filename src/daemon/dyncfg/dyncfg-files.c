@@ -271,15 +271,37 @@ static bool dyncfg_read_file_to_buffer(const char *filename, BUFFER *dst) {
         return false;
     }
 
-    buffer_flush(dst);
-    buffer_need_bytes(dst, st.st_size + 1); // +1 for the terminating zero
-
-    ssize_t r = read(fd, (char*)dst->buffer, st.st_size);
-    if(unlikely(r == -1)) {
+    if(unlikely(st.st_size < 0 || (uintmax_t)st.st_size > UINT32_MAX - 2)) {
         close(fd);
         return false;
     }
-    dst->len = r;
+
+    size_t file_size = (size_t)st.st_size;
+
+    buffer_flush(dst);
+    buffer_need_bytes(dst, file_size + 1); // +1 for the terminating zero
+
+    size_t bytes_read = 0;
+    while(bytes_read < file_size) {
+        size_t bytes_to_read = file_size - bytes_read;
+        if(bytes_to_read > (size_t)SSIZE_MAX)
+            bytes_to_read = (size_t)SSIZE_MAX;
+
+        ssize_t r = read(fd, &dst->buffer[bytes_read], bytes_to_read);
+        if(likely(r > 0)) {
+            bytes_read += (size_t)r;
+            continue;
+        }
+
+        if(unlikely(r == -1 && errno == EINTR))
+            continue;
+
+        buffer_flush(dst);
+        close(fd);
+        return false;
+    }
+
+    dst->len = bytes_read;
     dst->buffer[dst->len] = '\0';
 
     close(fd);
