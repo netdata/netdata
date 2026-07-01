@@ -36,6 +36,9 @@ RRDHOST *rrdhost_find_by_node_id(const char *node_id) {
 }
 
 RRDHOST *rrdhost_find_by_hostname(const char *hostname) {
+    if(unlikely(!hostname))
+        return NULL;
+
     if(strcmp(hostname, "localhost") == 0)
         return localhost;
 
