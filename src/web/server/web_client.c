@@ -504,19 +504,59 @@ static int web_server_static_file(struct web_client *w, char *filename) {
     if(is_dir && !web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH))
         return append_slash_to_url_and_redirect(w);
 
-    buffer_flush(w->response.data);
-    buffer_need_bytes(w->response.data, (size_t)statbuf.st_size);
-    w->response.data->len = (size_t)statbuf.st_size;
-
     // open the file
     int fd = open(web_filename, O_RDONLY | O_CLOEXEC);
 
-    // read the file
-    if(fd != -1 && read(fd, w->response.data->buffer, statbuf.st_size) != statbuf.st_size) {
-        // cannot read the whole file
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Web server failed to read file '%s'", web_filename);
+    if(fd != -1 && fstat(fd, &statbuf) != 0) {
+        int saved_errno = errno;
         close(fd);
+        errno = saved_errno;
         fd = -1;
+    }
+
+    if(fd != -1 && unlikely(statbuf.st_size < 0 || (uintmax_t)statbuf.st_size > UINT32_MAX - 2)) {
+        close(fd);
+        errno = EFBIG;
+        fd = -1;
+    }
+
+    if(fd != -1) {
+        size_t file_size = (size_t)statbuf.st_size;
+
+        buffer_flush(w->response.data);
+        buffer_need_bytes(w->response.data, file_size + 1);
+
+        size_t bytes_read = 0;
+        while(bytes_read < file_size) {
+            size_t bytes_to_read = file_size - bytes_read;
+            if(bytes_to_read > (size_t)SSIZE_MAX)
+                bytes_to_read = (size_t)SSIZE_MAX;
+
+            ssize_t r = read(fd, &w->response.data->buffer[bytes_read], bytes_to_read);
+            if(likely(r > 0)) {
+                bytes_read += (size_t)r;
+                continue;
+            }
+
+            if(unlikely(r == -1 && errno == EINTR))
+                continue;
+
+            if(r == 0)
+                errno = EIO;
+
+            // cannot read the whole file
+            nd_log(NDLS_DAEMON, NDLP_ERR, "Web server failed to read file '%s'", web_filename);
+            int saved_errno = errno;
+            close(fd);
+            errno = saved_errno;
+            fd = -1;
+            break;
+        }
+
+        if(fd != -1) {
+            w->response.data->len = bytes_read;
+            w->response.data->buffer[w->response.data->len] = '\0';
+        }
     }
 
     // check for failures
