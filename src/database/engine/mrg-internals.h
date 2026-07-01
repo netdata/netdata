@@ -14,7 +14,6 @@ struct metric {
 
     REFCOUNT refcount;
     uint8_t partition;
-    bool deleted;
 
     uint32_t latest_update_every_s; // the latest data collection frequency
 
@@ -202,8 +201,6 @@ static void acquired_for_deletion_metric_delete(MRG *mrg, METRIC *metric) {
 
     mrg_index_write_unlock(mrg, partition);
 
-    __atomic_store_n(&metric->deleted, true, __ATOMIC_RELEASE);
-
     mrg_stats_judy_mem(mrg, partition, JudyAllocThreadPulseGetAndReset());
 }
 
@@ -212,11 +209,6 @@ static bool metric_acquire(MRG *mrg, METRIC *metric) {
     REFCOUNT rc = refcount_acquire_advanced(&metric->refcount);
     if(!REFCOUNT_ACQUIRED(rc))
         return false;
-
-    if (__atomic_load_n(&metric->deleted, __ATOMIC_ACQUIRE)) {
-        refcount_release(&metric->refcount);
-        return false;
-    }
 
     size_t partition = metric->partition;
 
@@ -307,7 +299,6 @@ static METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
     metric->latest_time_s_clean = MAX(0, entry->last_time_s);
     metric->latest_time_s_hot = 0;
     metric->latest_update_every_s = entry->latest_update_every_s;
-    metric->deleted = false;
 #ifdef NETDATA_INTERNAL_CHECKS
     metric->writer = 0;
 #endif
