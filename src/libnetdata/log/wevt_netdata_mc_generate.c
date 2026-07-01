@@ -218,13 +218,6 @@ int main(int argc, const char **argv) {
                  "                             enabled=\"true\"\r\n"
                  "                             />\r\n"
                  "\r\n"
-                 "                    <!-- WEL fallback channel (used when ETW is not available, e.g. MSYS2/UCRT64 builds) -->\r\n"
-                 "                    <channel name=\"" NETDATA_WEL_CHANNEL_NAME "\"\r\n"
-                 "                             symbol=\"CHANNEL_WEL_LEGACY\"\r\n"
-                 "                             type=\"Operational\"\r\n"
-                 "                             message=\"$(string.Channel.WEL)\"\r\n"
-                 "                             enabled=\"true\"\r\n"
-                 "                             />\r\n"
                  "                </channels>\r\n"
                  "\r\n"
                  "                <levels>\r\n"
@@ -326,7 +319,6 @@ int main(int argc, const char **argv) {
                    "                <string id=\"Channel.Access\" value=\"Access\"/>\r\n"
                    "                <string id=\"Channel.Health\" value=\"Health\"/>\r\n"
                    "                <string id=\"Channel.Aclk\" value=\"Aclk\"/>\r\n"
-                   "                <string id=\"Channel.WEL\" value=\"" NETDATA_WEL_CHANNEL_NAME "\"/>\r\n"
                    "\r\n"
                    ;
 

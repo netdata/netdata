@@ -77,15 +77,26 @@ static bool check_event_id(ND_LOG_SOURCES source __maybe_unused, ND_LOG_FIELD_PR
 // --------------------------------------------------------------------------------------------------------------------
 // initialization
 
-// Define provider names per source (only when not using ETW)
+// Define provider (source) names per source (only when not using ETW)
 static const wchar_t *wel_provider_per_source[_NDLS_MAX] = {
-        [NDLS_UNSET]        = NULL,                             // not used, linked to NDLS_DAEMON
-        [NDLS_ACCESS]       = NETDATA_WEL_PROVIDER_ACCESS_W,    //
-        [NDLS_ACLK]         = NETDATA_WEL_PROVIDER_ACLK_W,      //
-        [NDLS_COLLECTORS]   = NETDATA_WEL_PROVIDER_COLLECTORS_W,//
-        [NDLS_DAEMON]       = NETDATA_WEL_PROVIDER_DAEMON_W,    //
-        [NDLS_HEALTH]       = NETDATA_WEL_PROVIDER_HEALTH_W,    //
-        [NDLS_DEBUG]        = NULL,                             // used, linked to NDLS_DAEMON
+        [NDLS_UNSET]        = NULL,                              // not used, linked to NDLS_DAEMON
+        [NDLS_ACCESS]       = NETDATA_WEL_PROVIDER_ACCESS_W,
+        [NDLS_ACLK]         = NETDATA_WEL_PROVIDER_ACLK_W,
+        [NDLS_COLLECTORS]   = NETDATA_WEL_PROVIDER_COLLECTORS_W,
+        [NDLS_DAEMON]       = NETDATA_WEL_PROVIDER_DAEMON_W,
+        [NDLS_HEALTH]       = NETDATA_WEL_PROVIDER_HEALTH_W,
+        [NDLS_DEBUG]        = NULL,                              // used, linked to NDLS_DAEMON
+};
+
+// Classic WEL channel names per source — match ETW channel names so events appear in the same channels
+static const wchar_t *wel_channel_per_source[_NDLS_MAX] = {
+        [NDLS_UNSET]        = NULL,                              // linked to NDLS_DAEMON
+        [NDLS_ACCESS]       = NETDATA_WEL_CHANNEL_ACCESS_W,
+        [NDLS_ACLK]         = NETDATA_WEL_CHANNEL_ACLK_W,
+        [NDLS_COLLECTORS]   = NETDATA_WEL_CHANNEL_COLLECTORS_W,
+        [NDLS_DAEMON]       = NETDATA_WEL_CHANNEL_DAEMON_W,
+        [NDLS_HEALTH]       = NETDATA_WEL_CHANNEL_HEALTH_W,
+        [NDLS_DEBUG]        = NULL,                              // linked to NDLS_DAEMON
 };
 
 bool wel_replace_program_with_wevt_netdata_dll(wchar_t *str, size_t size) {
@@ -244,9 +255,6 @@ bool nd_log_init_windows(void) {
         return false;
 #endif
 
-//    if(!nd_log.eventlog.etw && !wel_add_to_registry(NETDATA_WEL_CHANNEL_NAME_W, NULL, 50 * 1024 * 1024))
-//        return false;
-
     // Loop through each source and add it to the registry
     for(size_t i = 0; i < _NDLS_MAX; i++) {
         nd_log.sources[i].source = i;
@@ -276,15 +284,16 @@ bool nd_log_init_windows(void) {
         }
 
         if(!nd_log.eventlog.etw) {
-            nd_win_trace("nd_log_init_windows: wel_add_to_registry source[%zu/%s]...",
-                         i, nd_log_id2source(i));
-            if(!wel_add_to_registry(NETDATA_WEL_CHANNEL_NAME_W, sub_channel, defaultMaxSize)) {
-                nd_win_trace("nd_log_init_windows: wel_add_to_registry FAILED source[%zu/%s] err=%lu",
-                             i, nd_log_id2source(i), (unsigned long)GetLastError());
+            const wchar_t *wel_channel = wel_channel_per_source[i];
+            nd_win_trace("nd_log_init_windows: wel_add_to_registry channel=%ls source=%ls...",
+                         wel_channel, sub_channel);
+            if(!wel_add_to_registry(wel_channel, sub_channel, defaultMaxSize)) {
+                nd_win_trace("nd_log_init_windows: wel_add_to_registry FAILED channel=%ls source=%ls err=%lu",
+                             wel_channel, sub_channel, (unsigned long)GetLastError());
                 return false;
             }
-            nd_win_trace("nd_log_init_windows: wel_add_to_registry ok source[%zu/%s]",
-                         i, nd_log_id2source(i));
+            nd_win_trace("nd_log_init_windows: wel_add_to_registry ok channel=%ls source=%ls",
+                         wel_channel, sub_channel);
 
             // when not using a manifest, each source is a provider
             nd_win_trace("nd_log_init_windows: RegisterEventSourceW source[%zu/%s]...",
@@ -309,7 +318,10 @@ bool nd_log_init_windows(void) {
     }
 
     nd_log.eventlog.initialized = true;
-    nd_win_trace("nd_log_init_windows: done initialized=true");
+    nd_win_trace("nd_log_init_windows: done initialized=true etw=%d; "
+                 "events go to Netdata/{Daemon,Collectors,Access,Health,Aclk} -- "
+                 "run wevt_netdata_install.bat to register, then view in Event Viewer",
+                 (int)nd_log.eventlog.etw);
     return true;
 }
 
@@ -482,8 +494,9 @@ static bool nd_logger_windows(struct nd_log_source *source, struct log_field *fi
     if (!nd_log.eventlog.initialized)
         return false;
 
-    static int first_call = 1;
-    if(__atomic_exchange_n(&first_call, 0, __ATOMIC_RELAXED))
+    // trace the first call from each source independently so all sources are confirmed in the log
+    static bool first_call[_NDLS_MAX];
+    if(source->source < _NDLS_MAX && !__atomic_exchange_n(&first_call[source->source], true, __ATOMIC_RELAXED))
         nd_win_trace("nd_logger_windows: first call source=%s", nd_log_id2source(source->source));
 
     ND_LOG_FIELD_PRIORITY priority = NDLP_INFO;
@@ -592,6 +605,16 @@ static bool nd_logger_windows(struct nd_log_source *source, struct log_field *fi
             DWORD err = GetLastError();
             nd_win_trace("nd_logger_windows[%s]: ReportEventW FAILED err=%lu eventID=0x%lx",
                          nd_log_id2source(source->source), (unsigned long)err, (unsigned long)eventID);
+        }
+        else {
+            // trace the first successful write per source so the log confirms events reach WEL
+            static bool first_success[_NDLS_MAX];
+            if(source->source < _NDLS_MAX && !__atomic_exchange_n(&first_success[source->source], true, __ATOMIC_RELAXED)) {
+                const wchar_t *wch = wel_channel_per_source[source->source];
+                nd_win_trace("nd_logger_windows[%s]: ReportEventW ok eventID=0x%lx -> channel=%ls",
+                             nd_log_id2source(source->source), (unsigned long)eventID,
+                             wch ? wch : NETDATA_WEL_CHANNEL_DAEMON_W);
+            }
         }
     }
 
