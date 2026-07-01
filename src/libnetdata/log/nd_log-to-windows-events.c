@@ -325,7 +325,11 @@ static void wel_ensure_manifest_installed(void) {
     // at runtime so it always matches this binary's channel layout, regardless of
     // what manifest file (if any) is on disk.
     char dllDstNarrow[MAX_PATH];
-    WideCharToMultiByte(CP_UTF8, 0, dllDst, -1, dllDstNarrow, _countof(dllDstNarrow), NULL, NULL);
+    if(!WideCharToMultiByte(CP_UTF8, 0, dllDst, -1, dllDstNarrow, _countof(dllDstNarrow), NULL, NULL)) {
+        nd_win_trace("wel_ensure_manifest_installed: WideCharToMultiByte failed err=%lu",
+                     (unsigned long)GetLastError());
+        return;
+    }
 
     char manifest[8192];
     int mlen = snprintf(manifest, sizeof(manifest), WEL_MANIFEST_XML_FMT,
