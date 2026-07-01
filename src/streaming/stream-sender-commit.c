@@ -99,7 +99,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
             s->scb, src_len * STREAM_CIRCULAR_BUFFER_ADAPT_TO_TIMES_MAX_SIZE, false))) {
         // adaptive sizing of the circular buffer
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
-               "STREAM SND '%s' [to %s]: Increased max buffer size to %u (message size %zu).",
+               "STREAM SND '%s' [to %s]: Increased max buffer size to %zu (message size %zu).",
                rrdhost_hostname(s->host), s->remote_ip, stats->bytes_max_size, src_len + 1);
     }
 
@@ -200,6 +200,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
     return;
 
 overflow_with_lock: {
+        STREAM_CIRCULAR_BUFFER_STATS stats_snapshot = *stats;
         msg = s->thread.msg;
         stream_sender_unlock(s);
         waitq_release(&s->waitq);
@@ -208,10 +209,10 @@ overflow_with_lock: {
         stream_sender_send_opcode(s, msg);
         nd_log_limit_static_global_var(erl, 1, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
-                     "STREAM SND '%s' [to %s]: buffer overflow (buffer size %u, max size %u, available %u). "
+                     "STREAM SND '%s' [to %s]: buffer overflow (buffer size %zu, max size %zu, available %zu). "
                      "Restarting connection.",
                      rrdhost_hostname(s->host), s->remote_ip,
-                     stats->bytes_size, stats->bytes_max_size, stats->bytes_available);
+                     stats_snapshot.bytes_size, stats_snapshot.bytes_max_size, stats_snapshot.bytes_available);
         return;
     }
 

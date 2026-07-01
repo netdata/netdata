@@ -283,7 +283,7 @@ void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, 
         STREAM_CIRCULAR_BUFFER_STATS stats = *stream_circular_buffer_stats_unsafe(s->scb);
         stream_sender_unlock(s);
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM SND[%zu] '%s' [to %s]: send buffer is full (buffer size %u, max %u, used %u, available %u). "
+               "STREAM SND[%zu] '%s' [to %s]: send buffer is full (buffer size %zu, max %zu, used %zu, available %zu). "
                "Restarting connection.",
                sth->id, rrdhost_hostname(s->host), s->remote_ip,
                stats.bytes_size, stats.bytes_max_size, stats.bytes_outstanding, stats.bytes_available);
