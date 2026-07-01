@@ -8,6 +8,8 @@
 #define REGISTRY_STATUS_FAILED "failed"
 #define REGISTRY_STATUS_DISABLED "disabled"
 
+static SPINLOCK registry_cloud_base_url_spinlock = SPINLOCK_INITIALIZER;
+
 bool registry_is_valid_url(const char *url) {
     return url && (*url == 'h' || *url == '*');
 }
@@ -150,12 +152,23 @@ static inline int registry_person_url_callback_verify_machine_exists(REGISTRY_PE
 
 // ----------------------------------------------------------------------------
 // dynamic update of the configuration
-// The registry does not seem to be designed to support this and I cannot see any concurrency protection
-// that could make this safe, so try to be as atomic as possible.
+// This may run before registry.lock is initialized, so protect the owned snapshot with a dedicated lock.
 
 void registry_update_cloud_base_url() {
-    registry.cloud_base_url = cloud_config_url_get();
+    char *cloud_base_url = strdupz(cloud_config_url_get());
+
+    spinlock_lock(&registry_cloud_base_url_spinlock);
+    freez(registry.cloud_base_url);
+    registry.cloud_base_url = cloud_base_url;
     nd_setenv("NETDATA_REGISTRY_CLOUD_BASE_URL", registry.cloud_base_url, 1);
+    spinlock_unlock(&registry_cloud_base_url_spinlock);
+}
+
+void registry_cloud_base_url_free(void) {
+    spinlock_lock(&registry_cloud_base_url_spinlock);
+    freez(registry.cloud_base_url);
+    registry.cloud_base_url = NULL;
+    spinlock_unlock(&registry_cloud_base_url_spinlock);
 }
 
 // ----------------------------------------------------------------------------
@@ -184,7 +197,9 @@ int registry_request_hello_json(RRDHOST *host, struct web_client *w, bool do_not
 
     CLOUD_STATUS status = cloud_status();
     buffer_json_member_add_string(w->response.data, "cloud_status", CLOUD_STATUS_2str(status));
+    spinlock_lock(&registry_cloud_base_url_spinlock);
     buffer_json_member_add_string(w->response.data, "cloud_base_url", registry.cloud_base_url);
+    spinlock_unlock(&registry_cloud_base_url_spinlock);
 
     buffer_json_member_add_string(w->response.data, "registry", registry.registry_to_announce);
     buffer_json_member_add_boolean(w->response.data, "anonymous_statistics", do_not_track ? false : netdata_anonymous_statistics_enabled);

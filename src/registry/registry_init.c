@@ -231,6 +231,8 @@ static int registry_person_del_callback(const DICTIONARY_ITEM *item __maybe_unus
 }
 
 void registry_free(void) {
+    registry_cloud_base_url_free();
+
     if(!registry.enabled) return;
     registry.enabled = false;
 
