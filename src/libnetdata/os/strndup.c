@@ -3,7 +3,7 @@
 #if !defined(HAVE_STRNDUP) && !(defined(NETDATA_TRACE_ALLOCATIONS) && defined(HAVE_DLSYM) && defined(ENABLE_DLSYM))
 #include "../libnetdata.h"
 
-char *strndup(const char *s1, size_t n) {
+char *os_strndup(const char *s1, size_t n) {
     size_t bytes = strnlen(s1, n);
     if (unlikely(bytes == SIZE_MAX)) {
         errno = ENOMEM;
