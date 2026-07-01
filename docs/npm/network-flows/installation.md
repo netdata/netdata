@@ -65,13 +65,15 @@ ls /opt/netdata/usr/libexec/netdata/plugins.d/netflow-plugin
 
 ## Source build
 
-Building from source requires a Rust toolchain (rustc + cargo, version 1.83 or later). When CMake detects Rust, the plugin is built and installed alongside the rest of Netdata.
+The netflow plugin is **disabled by default**. Building it from source requires both a Rust toolchain (rustc + cargo, version 1.85 or later) and an explicit enable flag passed to the installer:
 
 ```bash
 git clone https://github.com/netdata/netdata.git
 cd netdata
-sudo ./netdata-installer.sh
+sudo ./netdata-installer.sh --enable-plugin-netflow
 ```
+
+Without `--enable-plugin-netflow` the plugin is skipped, even when a Rust toolchain is installed.
 
 **Caveat:** source builds do **not** include the stock GeoIP / IP-intelligence database files. Packaged 32-bit installs ship the stock MMDB payload but do not include `topology-ip-intel-downloader`. The plugin starts fine without cache files, but country, city, and AS-name fields will be empty until you run the downloader once on an install that includes it:
 
