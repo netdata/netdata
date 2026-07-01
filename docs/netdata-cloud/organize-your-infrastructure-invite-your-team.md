@@ -28,9 +28,17 @@ You can create multiple Spaces, but we recommend using a single Space for most u
 ### Set Up Team Access
 
 1. Click "Invite Users" in the Space's sidebar
-2. Set appropriate access levels:
-    - Rooms
-    - User roles
+2. Assign a role to each invited user. Space-level roles determine what someone can do across the Space:
+
+    - **Admin** — full control of the Space, including managing users, Rooms, nodes, notifications, and billing, plus access to every Room. Assign **Admin** to give the invited user the same level of control over the Space that you have.
+    - **Manager** — manage users, Rooms, and most configuration, but cannot manage billing or assign the Admin role.
+    - **Troubleshooter** — investigate issues and build dashboards in the Rooms they are assigned to, without managing the Space.
+    - **Observer** — view-only access to specific Rooms.
+    - **Billing** — manage invoices and payments, without access to monitoring management.
+
+   Which roles you can assign depends on your plan. Only an existing Admin can grant the Admin role, so you must already be an Admin to assign it to someone else. Role assignments take effect immediately.
+
+   For the full permission matrix and role availability by plan, see the [role-based access model](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
 
 :::tip
 
