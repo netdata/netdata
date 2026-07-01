@@ -52,7 +52,7 @@ pub struct Metadata {
     /// field types come from [`SchemaTree::derive_scalar_kinds`].
     pub tree: SchemaTree,
     /// Manifest of the per-row column chunks this file carries
-    /// (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`), with each column's type. Empty when
+    /// (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`/`PSPN`/`DURN`), with each column's type. Empty when
     /// the file has no per-row columns. The authoritative source for column
     /// presence + type — readers consult it instead of probing for chunks. See
     /// [`ColumnsTable`].
@@ -310,7 +310,7 @@ impl SchemaTree {
     /// root (no edge), and every non-root node has an edge whose `parent` is a
     /// strictly smaller id. The `parent < id` rule also guarantees acyclicity
     /// (ids strictly decrease toward the root), so [`path`](Self::path) /
-    /// [`steps`](Self::steps) can neither loop forever nor index out of bounds.
+    /// `steps` can neither loop forever nor index out of bounds.
     ///
     /// O(N), run once at META decode so a malformed tree degrades to
     /// [`Error::CorruptIndex`] (the query layer's skip-the-file path) rather
@@ -890,7 +890,7 @@ pub struct ColumnEntry {
 /// Manifest of the per-row columns a file carries (the `columns` field of
 /// [`Metadata`]). Lists **present** columns only — membership is presence — each
 /// with its [`ColumnType`]. The authoritative source for which per-row column
-/// chunks (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`) exist and how to decode them; mirrors
+/// chunks (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`/`PSPN`/`DURN`) exist and how to decode them; mirrors
 /// [`FieldTable`](crate::FieldTable) for facets. Empty ⇒ no per-row columns.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -1151,7 +1151,7 @@ macro_rules! id_value {
         }
 
         impl std::fmt::Debug for $ty {
-            /// Hex (via [`Display`]) so panic/`{:?}`/log output is the readable
+            /// Hex (via [`std::fmt::Display`]) so panic/`{:?}`/log output is the readable
             /// W3C id, not a decimal byte array.
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(f, "{}({self})", stringify!($ty))

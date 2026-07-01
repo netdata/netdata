@@ -514,7 +514,7 @@ impl<'a> IndexReader<'a> {
     /// high-card fields share a **single** stream-batch scan (the SB chunks are
     /// read once regardless of how many high-card fields are projected). Each
     /// field's `KvId` range comes from `META` cardinalities
-    /// ([`high_kv_id`](Self::high_kv_id)); no chunk is decoded just to locate
+    /// (`high_kv_id`); no chunk is decoded just to locate
     /// it. An absent field yields an all-empty column.
     pub fn materialize_fields(
         &self,

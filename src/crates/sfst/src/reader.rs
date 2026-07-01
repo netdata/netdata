@@ -88,7 +88,7 @@ impl<'a> Reader<'a> {
 
     // ── META ─────────────────────────────────────────────────────────
 
-    /// Index metadata (histogram + id ranges + field table). Decoded on
+    /// Index metadata (histogram + id ranges + schema tree). Decoded on
     /// first access; cached for the lifetime of this `Reader`.
     pub fn metadata(&self) -> Result<&Metadata, Error> {
         if let Some(m) = self.metadata.get() {
@@ -394,7 +394,7 @@ impl<'a> Reader<'a> {
     ///
     /// Validation is **panic-safety only** — it does NOT re-verify that
     /// `sort_perm` is actually sorted by `trace_id` (a trusted-producer
-    /// invariant enforced at write time; see [`TraceIdIndex::validate`]). A
+    /// invariant enforced at write time; see `TraceIdIndex::validate`). A
     /// CRC-valid file from a non-conforming producer would yield wrong lookup
     /// results, never a panic.
     pub fn trace_id_index(&self) -> Result<TraceIdIndex, Error> {

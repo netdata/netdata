@@ -127,40 +127,8 @@ pub use writer::{ChunkCounts, ColumnsPresent, StreamWriter, write_summary_only};
 
 const MAGIC: &[u8; 4] = b"SFST";
 
-// v3: high-card chunks switched from `Vec<String>` keys to the string-arena
-//     layout (keys_blob + key_lens).
-// v4: stream-batch chunks switched from `Vec<Vec<KvId>>` to the fixed-width
-//     arena (kv_bytes + row_lens). Older files are rejected on open.
-// v5: per-chunk crc32 trailers via the shared `chunk_file::container`
-//     helper. Every chunk payload is followed by a crc32 over its stored
-//     (compressed) bytes, verified on access. Older files are rejected on
-//     open.
-// v6: SUMR payload made content-agnostic — `Summary` is now
-//     `file_registry::FileSummary { record_count, part_key, content_meta }`,
-//     replacing the typed `{ total_logs, stream: ServiceStream }`. The bincode
-//     bytes are incompatible, so older files are rejected on open rather than
-//     surfacing a decode error.
-// v7: SUMR drops `part_key` — the partition key is the single source of truth in
-//     the filename (`FileId`), never duplicated in the summary. `FileSummary` is
-//     now `{ min_timestamp_s, max_timestamp_s, record_count, content_meta }`.
-//     Incompatible bincode layout; older files rejected on open.
-// v8: META gains `columns: ColumnsTable` (the per-row columns manifest) and the
-//     optional per-row column chunks `OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC` (cold region,
-//     after PRIM). Incompatible META bincode layout; older files rejected on open.
-// v9: META replaces `fields: FieldTable` with `tree: SchemaTree` — the typed,
-//     array-collapsed schema tree is now the on-disk field descriptor (carries
-//     per-leaf ValueKind + structure + per-leaf cardinality/tier). The flat
-//     FieldTable is derived from the tree at read time. Incompatible META bincode
-//     layout; older files rejected on open. Storage chunks (PRIM/MF/HF/SB/columns)
-//     are otherwise unchanged from v8.
-// v9 (additive, no bump): the optional `TIDX` trace_id index chunk (fanout +
-//     sort permutation, after the per-row columns). TOC-indexed and absent from
-//     files that don't carry it, so it changes no existing chunk and old readers
-//     ignore it — see CHUNK_TRACE_INDEX and the `trace_index` module.
-// v9 (additive, no bump): the traces signal's per-row columns `PSPN`
-//     (parent_span_id, 8-byte arena) and `DURN` (span duration, i64 ns). Same
-//     independently-optional cold-region treatment as the v8 columns; logs files
-//     carry neither. New `ColumnsTable` manifest entries only — no layout change.
+// Current on-disk version. The v3→v9 evolution history — what each bump changed
+// and why older files are rejected on open — lives in FORMAT.md.
 const VERSION: u32 = 9;
 
 const CHUNK_SUMMARY: chunk_file::ChunkId = *b"SUMR";
