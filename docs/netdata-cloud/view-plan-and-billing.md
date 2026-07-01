@@ -83,12 +83,33 @@ Checkout is performed directly if there's an active plan.
 
 :::
 
+#### Subscribe to the Homelab Plan
+
+The Homelab plan is a **$90/year** flat-price subscription for **home users and students** who monitor personal, non-commercial infrastructure — a home lab, a home network, self-hosted services, or a learning environment. It is not intended for professional, business, or commercial use.
+
+Subscribing requires you to self-certify that your use is non-commercial and to accept our Fair Usage Policy. The plan includes unlimited metrics, unlimited custom dashboards, all alert notification integrations, and ML anomaly detection, all governed by the Fair Usage Policy.
+
+To subscribe:
+
+1. Navigate to **Space Settings** (⚙️) and select the **Plan & Billing** tab.
+2. Click **Change plan** and select Homelab.
+3. Self-certify your non-commercial eligibility and accept the Fair Usage Policy to complete checkout.
+
+For full details on what the Homelab plan includes and who it is for, see the [Netdata for Homelabs](https://netdata.cloud/homelab) page.
+
 ## FAQ
 
 <details>
 <summary>What Payment Methods are Accepted?</summary>
 
 Netdata accepts most major Credit/Debit Cards and Bank payments through Stripe and AWS, with more options coming soon.
+
+</details>
+
+<details>
+<summary>I Can't See the Homelab Plan — Why?</summary>
+
+The Homelab plan is only offered to **home users and students** for personal, non-commercial use. Subscribing requires self-certifying that your use is non-commercial and accepting our Fair Usage Policy. To subscribe, go to **Space Settings** (⚙️) > **Plan & Billing** > **Change plan** and select Homelab. For eligibility details, see the [Netdata for Homelabs](https://netdata.cloud/homelab) page.
 
 </details>
 
