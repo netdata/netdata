@@ -14,8 +14,8 @@ bool ip_to_hostname(const char *ip, char *dst, size_t dst_len) {
     if(!dst || !dst_len)
         return false;
 
-    struct sockaddr_in sa;
-    struct sockaddr_in6 sa6;
+    struct sockaddr_in sa = { 0 };
+    struct sockaddr_in6 sa6 = { 0 };
     struct sockaddr *sa_ptr;
     int sa_len;
 
