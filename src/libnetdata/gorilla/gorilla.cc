@@ -504,7 +504,44 @@ private:
     std::vector<uint32_t *> Buffers;
 };
 
+static void fuzz_disk_buffer_patch(const uint8_t *data, size_t size) {
+    if (size == 0)
+        return;
+
+    const size_t buffer_size = RRDENG_GORILLA_32BIT_BUFFER_SIZE;
+    if (size > SIZE_MAX - (buffer_size - 1))
+        return;
+
+    const size_t disk_size = ((size + buffer_size - 1) / buffer_size) * buffer_size;
+    const size_t nbuffers = disk_size / buffer_size;
+    const size_t words = disk_size / sizeof(uint32_t);
+
+    Storage S;
+    gorilla_buffer_t *disk_buffer = S.alloc_buffer(words);
+    memcpy(disk_buffer, data, size);
+
+    uint32_t entries = 0;
+    if (gorilla_buffer_patch(disk_buffer, nbuffers, &entries)) {
+        gorilla_reader_t gr = gorilla_reader_init(disk_buffer);
+
+        // entries is fuzzer-controlled, so keep this path bounded.
+        constexpr uint32_t max_reads = 16384;
+        if (entries > max_reads)
+            entries = max_reads;
+
+        for (uint32_t i = 0; i != entries; i++) {
+            uint32_t number = 0;
+            if (!gorilla_reader_read(&gr, &number))
+                break;
+        }
+    }
+
+    S.free_buffers();
+}
+
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
+    fuzz_disk_buffer_patch(Data, Size);
+
     if (Size < 4)
         return 0;
 
