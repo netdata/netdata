@@ -207,11 +207,19 @@ usec_t rfc3339_parse_ut(const char *rfc3339, char **endptr) {
 
     // Parse fractional seconds if present
     if (*s == '.') {
-        char *next;
-        usec = strtoul(s + 1, &next, 10);
-        int digits_parsed = (int)(next - (s + 1));
+        char *next = s + 1;
+        int digits_parsed = 0;
 
-        if (digits_parsed < 1 || digits_parsed > 9)
+        while (isdigit((uint8_t)*next)) {
+            if (digits_parsed == 9)
+                return 0; // Parsing error
+
+            usec = usec * 10 + (*next - '0');
+            digits_parsed++;
+            next++;
+        }
+
+        if (digits_parsed < 1)
             return 0; // Parsing error
 
         static const usec_t fix_usec[] = {
