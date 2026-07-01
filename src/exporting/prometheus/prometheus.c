@@ -83,7 +83,7 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN
 static struct prometheus_server {
     const char *server;
     uint32_t hash;
-    RRDHOST *host;
+    char machine_guid[GUID_LEN + 1];
     time_t last_access;
     struct prometheus_server *next;
 } *prometheus_server_root = NULL;
@@ -137,7 +137,9 @@ static inline time_t prometheus_server_last_access(const char *server, RRDHOST *
 
     struct prometheus_server *ps;
     for (ps = prometheus_server_root; ps; ps = ps->next) {
-        if (host == ps->host && hash == ps->hash && !strcmp(server, ps->server)) {
+        if (hash == ps->hash &&
+            !strcmp(server, ps->server) &&
+            !strcmp(host->machine_guid, ps->machine_guid)) {
             time_t last = ps->last_access;
             ps->last_access = now;
             netdata_mutex_unlock(&prometheus_server_root_mutex);
@@ -148,7 +150,7 @@ static inline time_t prometheus_server_last_access(const char *server, RRDHOST *
     ps = callocz(1, sizeof(struct prometheus_server));
     ps->server = strdupz(server);
     ps->hash = hash;
-    ps->host = host;
+    strncpyz(ps->machine_guid, host->machine_guid, sizeof(ps->machine_guid) - 1);
     ps->last_access = now;
     ps->next = prometheus_server_root;
     prometheus_server_root = ps;
