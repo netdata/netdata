@@ -3,6 +3,7 @@ extern "C" {
 #include "daemon.h"
 #include "libnetdata/libnetdata.h"
 #include "daemon/daemon-shutdown.h"
+#include "daemon/daemon-shutdown-watcher.h"
 
 int netdata_main(int argc, char *argv[]);
 void nd_process_signals(void);
@@ -104,6 +105,14 @@ static HANDLE CreateEventHandle(const char *msg)
     return h;
 }
 
+// Called by the watcher before abort() when a shutdown step times out.
+// Reports SERVICE_STOPPED so the SCM marks the service as stopped rather than
+// crashed; the process then terminates via abort() a few instructions later.
+static void svc_report_stopped_before_abort(void)
+{
+    ReportSvcStatus(SERVICE_STOPPED, 0, 0, 0);
+}
+
 // Heartbeat thread: keeps re-sending SERVICE_STOP_PENDING every 2 s so the
 // SCM does not fire error 1053 while netdata_exit_gracefully() runs.
 // Exits when svc_heartbeat_done_event is signalled.
@@ -148,7 +157,13 @@ static void call_netdata_cleanup(void *arg)
             reason = EXIT_REASON_SERVICE_STOP;
             break;
     }
+
+    // If the shutdown watcher times out and calls abort(), report SERVICE_STOPPED
+    // to the SCM first so the service is not recorded as crashed.
+    nd_register_shutdown_timeout_cb(svc_report_stopped_before_abort);
     netdata_exit_gracefully(reason, false);
+    // Cleanup completed normally — no longer need the abort callback.
+    nd_register_shutdown_timeout_cb(NULL);
 
     // Stop the heartbeat before reporting SERVICE_STOPPED.
     if (svc_heartbeat_done_event) {

@@ -166,23 +166,45 @@ char *os_translate_windows_to_msys_path(const char *src) {
 // The file is opened once and kept open across calls. Opening and closing on every
 // call triggers a Windows Defender content scan per call (~8 s each), which causes
 // multi-minute startup hangs when nd_win_trace is called in a tight loop.
+//
+// A spinlock serialises concurrent callers so that simultaneous writes from two
+// threads (e.g. CLEANUP and EXIT_WATCHER starting at the same millisecond) are
+// not interleaved, and the one-time file open races cleanly.
 void nd_win_trace(const char *fmt, ...) {
+    static volatile LONG nd_win_trace_lock = 0;
+    while (InterlockedCompareExchange(&nd_win_trace_lock, 1, 0) != 0)
+        YieldProcessor();
+
     static FILE *f = NULL;
     if (!f) {
         char path[MAX_PATH + 1];
         DWORD len = GetTempPathA(MAX_PATH, path);
-        if (!len || len >= (DWORD)(MAX_PATH - 22)) return;
+        if (!len || len >= (DWORD)(MAX_PATH - 22)) {
+            InterlockedExchange(&nd_win_trace_lock, 0);
+            return;
+        }
         snprintfz(path + len, sizeof(path) - len, "netdata-trace.log");
         HANDLE h = CreateFileA(path, FILE_APPEND_DATA,
                                FILE_SHARE_READ | FILE_SHARE_WRITE,
                                NULL, OPEN_ALWAYS,
                                FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT,
                                NULL);
-        if (h == INVALID_HANDLE_VALUE) return;
+        if (h == INVALID_HANDLE_VALUE) {
+            InterlockedExchange(&nd_win_trace_lock, 0);
+            return;
+        }
         int fd = _open_osfhandle((intptr_t)h, _O_APPEND | _O_WRONLY | _O_TEXT);
-        if (fd < 0) { CloseHandle(h); return; }
+        if (fd < 0) {
+            CloseHandle(h);
+            InterlockedExchange(&nd_win_trace_lock, 0);
+            return;
+        }
         f = _fdopen(fd, "a");
-        if (!f) { _close(fd); return; }
+        if (!f) {
+            _close(fd);
+            InterlockedExchange(&nd_win_trace_lock, 0);
+            return;
+        }
     }
     SYSTEMTIME t;
     GetSystemTime(&t);
@@ -194,5 +216,7 @@ void nd_win_trace(const char *fmt, ...) {
     fputc('\n', f);
     fflush(f);
     // File is kept open; no fclose() here.
+
+    InterlockedExchange(&nd_win_trace_lock, 0);
 }
 #endif

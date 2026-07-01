@@ -190,17 +190,23 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     nd_log_limits_unlimited();
     netdata_log_exit_reason();
 
+    nd_win_trace("cleanup begin (abnormal=%d)", (int)abnormal);
+
     watcher_thread_start();
     usec_t shutdown_start_time = now_monotonic_usec();
     watcher_shutdown_begin();
 
 #ifdef ENABLE_DBENGINE
     if(!abnormal && dbengine_enabled) {
+        nd_win_trace("cleanup: rrdeng_quiesce_all");
         rrdeng_quiesce_all();
+        nd_win_trace("cleanup: rrdeng_flush(dirty)");
         rrdeng_flush_everything_and_wait(false, false, true);
+        nd_win_trace("cleanup: rrdeng_flush(dirty) done");
     }
 #endif
 
+    nd_win_trace("cleanup: webrtc_close_all_connections");
     webrtc_close_all_connections();
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS);
 
@@ -210,9 +216,11 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
     watcher_step_complete(WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS);
 
+    nd_win_trace("cleanup: service_wait_exit(SYSTEMD, 5s)");
     service_wait_exit(SERVICE_SYSTEMD, 5 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_MAINTENANCE_THREAD);
 
+    nd_win_trace("cleanup: service_wait_exit(EXPORTERS|HEALTH|WEB, 3s)");
     service_wait_exit(SERVICE_EXPORTERS | SERVICE_HEALTH | SERVICE_WEB_SERVER | SERVICE_HTTPD, 3 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_EXPORTERS_HEALTH_AND_WEB_SERVERS_THREADS);
 
@@ -221,23 +229,31 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     // in-flight handler will not let the loop observe its cancel flag until it
     // returns. If we wait until after dbengine/metasync/workers are gone, an
     // MCP request that needs them never returns and the watchdog aborts.
+    nd_win_trace("cleanup: websocket_threads_join");
     websocket_threads_join();
     watcher_step_complete(WATCHER_STEP_ID_STOP_WEBSOCKET_THREADS);
 
+    nd_win_trace("cleanup: stream_threads_cancel");
     stream_threads_cancel();
+    nd_win_trace("cleanup: service_wait_exit(COLLECTORS|STREAMING, 20s)");
     service_wait_exit(SERVICE_COLLECTORS | SERVICE_STREAMING, 20 * USEC_PER_SEC);
     service_signal_exit(SERVICE_STREAMING_CONNECTOR);
     watcher_step_complete(WATCHER_STEP_ID_STOP_COLLECTORS_AND_STREAMING_THREADS);
 
 #ifdef ENABLE_DBENGINE
-    if(!abnormal && dbengine_enabled)
+    if(!abnormal && dbengine_enabled) {
         // flush all dirty pages now that all collectors and streaming completed
+        nd_win_trace("cleanup: rrdeng_flush(dirty) post-collectors");
         rrdeng_flush_everything_and_wait(false, false, true);
+        nd_win_trace("cleanup: rrdeng_flush(dirty) post-collectors done");
+    }
 #endif
 
+    nd_win_trace("cleanup: service_wait_exit(REPLICATION, 5s)");
     service_wait_exit(SERVICE_REPLICATION, 5 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_REPLICATION_THREADS);
 
+    nd_win_trace("cleanup: ml_stop_threads");
     ml_stop_threads();
     // ml_fini() (which closes ml_db) is deferred until after
     // metadata_sync_shutdown() drains the metasync workers below. Those
@@ -246,23 +262,29 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     // handle and triggers SIGSEGV inside sqlite3_prepare_v2 -> findElementWithHash.
     watcher_step_complete(WATCHER_STEP_ID_DISABLE_ML_DETEC_AND_TRAIN_THREADS);
 
+    nd_win_trace("cleanup: service_wait_exit(CONTEXT, 5s)");
     service_wait_exit(SERVICE_CONTEXT, 5 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_CONTEXT_THREAD);
 
+    nd_win_trace("cleanup: web_client_cache_destroy");
     web_client_cache_destroy();
     watcher_step_complete(WATCHER_STEP_ID_CLEAR_WEB_CLIENT_CACHE);
 
+    nd_win_trace("cleanup: aclk_synchronization_shutdown");
     aclk_synchronization_shutdown();
     watcher_step_complete(WATCHER_STEP_ID_STOP_ACLK_SYNC_THREAD);
 
     service_signal_exit(SERVICE_ACLK);
 
+    nd_win_trace("cleanup: service_wait_exit(ACLK, 3s)");
     service_wait_exit(SERVICE_ACLK, 3 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_ACLK_MQTT_THREAD);
 
+    nd_win_trace("cleanup: service_wait_exit(all, 20s)");
     service_wait_exit(~0, 20 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_ALL_REMAINING_WORKER_THREADS);
 
+    nd_win_trace("cleanup: cancel_main_threads");
     cancel_main_threads();
     watcher_step_complete(WATCHER_STEP_ID_CANCEL_MAIN_THREADS);
 
@@ -275,27 +297,33 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     else
     {
         // exit cleanly
+        nd_win_trace("cleanup: rrd_finalize_collection_for_all_hosts");
         rrd_finalize_collection_for_all_hosts();
         watcher_step_complete(WATCHER_STEP_ID_STOP_COLLECTION_FOR_ALL_HOSTS);
 
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
             // flush anything remaining and wait for collectors to finish
+            nd_win_trace("cleanup: rrdeng_flush(wait_collectors)");
             rrdeng_flush_everything_and_wait(true, true, false);
             watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
 
+            nd_win_trace("cleanup: nd_thread_create(rrdeng-exit)");
             ND_THREAD **th = callocz(nd_profile.storage_tiers, sizeof(*th));
             for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
                 th[tier] = nd_thread_create("rrdeng-exit", NETDATA_THREAD_OPTION_DEFAULT, rrdeng_exit_background, multidb_ctx[tier]);
 
             // flush anything remaining again - just in case
+            nd_win_trace("cleanup: rrdeng_flush(final)");
             rrdeng_flush_everything_and_wait(true, true, false);
 
+            nd_win_trace("cleanup: nd_thread_join(rrdeng-exit)");
             for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
                 nd_thread_join(th[tier]);
 
             freez(th);
 
+            nd_win_trace("cleanup: dbengine_shutdown");
             dbengine_shutdown();
             watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
         }
@@ -310,7 +338,9 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
 #endif
 
+        nd_win_trace("cleanup: metadata_sync_shutdown");
         metadata_sync_shutdown();
+        nd_win_trace("cleanup: ml_fini");
         ml_fini();
         watcher_step_complete(WATCHER_STEP_ID_STOP_METASYNC_THREADS);
     }
@@ -319,9 +349,11 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     if (!abnormal)
         add_agent_event(EVENT_AGENT_SHUTDOWN_TIME, (int64_t)(now_monotonic_usec() - shutdown_start_time));
 
+    nd_win_trace("cleanup: nd_thread_join_threads");
     nd_thread_join_threads();
     watcher_step_complete(WATCHER_STEP_ID_JOIN_STATIC_THREADS);
 
+    nd_win_trace("cleanup: sqlite_close_databases");
     sqlite_close_databases();
     sqlite_library_shutdown();
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_DATABASES);
@@ -341,11 +373,14 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
     watcher_step_complete(WATCHER_STEP_ID_REMOVE_PID_FILE);
 
+    nd_win_trace("cleanup: netdata_ssl_cleanup");
     netdata_ssl_cleanup();
     watcher_step_complete(WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES);
 
+    nd_win_trace("cleanup: watcher_shutdown_end");
     watcher_shutdown_end();
     watcher_thread_stop();
+    nd_win_trace("cleanup complete");
 
 #if defined(FSANITIZE_ADDRESS)
     fprintf(stderr, "\n");
