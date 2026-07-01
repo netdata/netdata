@@ -230,6 +230,19 @@ fn trace_by_id_cycle_surfaces_all_spans_under_a_root() {
 }
 
 #[test]
+fn trace_by_id_self_parent_is_a_root() {
+    // A span that is its own parent must be a root (not a self-child), and carry no
+    // self-edge in `children`.
+    let t = [0x9eu8; 16];
+    let s = [1u8; 8];
+    let bytes = seal(vec![req(vec![span(t, s, s, 100, 200, "self")])]);
+    let tr = IndexReader::open(&bytes).unwrap().trace_by_id(TraceId::from(t)).unwrap();
+    assert_eq!(tr.spans.len(), 1);
+    assert_eq!(tr.roots.len(), 1, "self-parent treated as root");
+    assert!(tr.children.is_empty(), "no self-edge");
+}
+
+#[test]
 fn trace_by_id_surfaces_flags_and_dropped_count() {
     // The per-row scalars (flags, dropped_attributes_count) reconstruct onto the span.
     let t = [0x8du8; 16];

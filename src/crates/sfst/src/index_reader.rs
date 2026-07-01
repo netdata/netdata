@@ -52,6 +52,12 @@ pub struct TraceSpan {
 /// can scatter across files/time (and this reader sees only one file), a span whose
 /// `parent_span_id` is unset OR absent from this set is a **root** — so a partial
 /// trace still forms a forest rather than dropping spans.
+///
+/// Normal traces are a forest. A *pathological* parent cycle (every span has an
+/// in-set parent, so there is no natural root) is handled defensively: the earliest
+/// span is surfaced as a root so no span is unreachable, but [`children`](Self::children)
+/// then still contains the cycle's edges — a walker MUST guard against revisiting a
+/// node (as the `ng-index-traces` printer does).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Trace {
     /// The trace's spans, sorted by `start_ns` (ties broken by `span_id`) — the

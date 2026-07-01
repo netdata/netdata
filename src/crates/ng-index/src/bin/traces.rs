@@ -102,17 +102,17 @@ fn sample_ids(sfst_path: &Path, limit: usize) -> ExitCode {
     let mut seen: HashSet<TraceId> = HashSet::new();
     let mut printed = 0usize;
     for i in 0..trace_ids.len() {
+        if printed >= limit {
+            break; // checked first, so `--sample 0` prints nothing
+        }
         let id = trace_ids.get(i);
         if id.is_unset() || !seen.insert(id) {
             continue;
         }
         println!("{id}");
         printed += 1;
-        if printed >= limit {
-            break;
-        }
     }
-    if printed == 0 {
+    if printed == 0 && limit > 0 {
         eprintln!("no trace ids in {}", sfst_path.display());
     }
     ExitCode::SUCCESS
