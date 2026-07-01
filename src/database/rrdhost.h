@@ -255,8 +255,9 @@ struct rrdhost {
 
                 // single-writer (the receiver thread), relaxed-atomic; read lock-free by the
                 // pulse traversal. Cumulative over the host's lifetime, never reset.
-                uint64_t bytes_in;                  // raw socket bytes received from this child (all connections)
-                uint64_t bytes_out;                 // raw socket bytes sent to this child (all connections)
+                // Keep these 8-byte aligned: 32-bit GCC may inline relaxed 64-bit access.
+                uint64_t bytes_in __attribute__((aligned(8)));  // raw socket bytes received from this child
+                uint64_t bytes_out __attribute__((aligned(8))); // raw socket bytes sent to this child
 
                 // realtime second the current inbound (receiver) state was entered; reset by
                 // pulse_host_status() on every inbound state change, read by the pulse traversal
