@@ -25,7 +25,7 @@
       },
       "regions": {
         "title": "Regions",
-        "description": "AWS regions to collect from. At least one region is required (AWS is region-scoped).",
+        "description": "AWS regions to collect from. At least one region is required (AWS is region-scoped), and all regions must belong to the same AWS partition.",
         "type": "array",
         "items": {
           "title": "Region",
@@ -39,57 +39,106 @@
         "properties": {
           "mode": {
             "title": "Mode",
+            "description": "How Netdata obtains AWS credentials: `default` uses the AWS SDK credential chain (environment, shared config, EC2 instance profile, EKS IRSA); `access_key` uses static keys; `assume_role` assumes an IAM role.",
             "type": "string",
-            "enum": ["default", "access_key", "assume_role"],
+            "enum": [
+              "default",
+              "access_key",
+              "assume_role"
+            ],
             "default": "default"
-          },
-          "mode_access_key": {
-            "title": "Access key",
-            "type": "object",
-            "properties": {
-              "access_key_id": {
-                "title": "Access key ID",
-                "type": "string"
-              },
-              "secret_access_key": {
-                "title": "Secret access key",
-                "type": "string",
-                "sensitive": true
-              },
-              "session_token": {
-                "title": "Session token",
-                "type": "string",
-                "sensitive": true
-              }
-            }
-          },
-          "mode_assume_role": {
-            "title": "Assume role",
-            "type": "object",
-            "properties": {
-              "roles": {
-                "title": "Roles",
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "role_arn": {
-                      "title": "Role ARN",
-                      "type": "string"
-                    },
-                    "external_id": {
-                      "title": "External ID",
-                      "type": "string",
-                      "sensitive": true
-                    }
-                  },
-                  "required": ["role_arn"]
-                }
-              }
-            }
           }
         },
-        "required": ["mode"]
+        "dependencies": {
+          "mode": {
+            "oneOf": [
+              {
+                "properties": {
+                  "mode": {
+                    "const": "default"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "mode": {
+                    "const": "access_key"
+                  },
+                  "mode_access_key": {
+                    "title": "Access key",
+                    "type": "object",
+                    "properties": {
+                      "access_key_id": {
+                        "title": "Access key ID",
+                        "type": "string"
+                      },
+                      "secret_access_key": {
+                        "title": "Secret access key",
+                        "type": "string",
+                        "sensitive": true
+                      },
+                      "session_token": {
+                        "title": "Session token",
+                        "type": "string",
+                        "sensitive": true
+                      }
+                    },
+                    "required": [
+                      "access_key_id",
+                      "secret_access_key"
+                    ]
+                  }
+                },
+                "required": [
+                  "mode_access_key"
+                ]
+              },
+              {
+                "properties": {
+                  "mode": {
+                    "const": "assume_role"
+                  },
+                  "mode_assume_role": {
+                    "title": "Assume role",
+                    "type": "object",
+                    "properties": {
+                      "roles": {
+                        "title": "Roles",
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "role_arn": {
+                              "title": "Role ARN",
+                              "type": "string"
+                            },
+                            "external_id": {
+                              "title": "External ID",
+                              "type": "string",
+                              "sensitive": true
+                            }
+                          },
+                          "required": [
+                            "role_arn"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "roles"
+                    ]
+                  }
+                },
+                "required": [
+                  "mode_assume_role"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "mode"
+        ]
       },
       "namespaces": {
         "title": "Namespaces",
@@ -97,30 +146,69 @@
         "properties": {
           "mode": {
             "title": "Mode",
+            "description": "Which service profiles to collect: `auto` uses the default-enabled profiles; `exact` uses only the listed namespaces; `combined` adds the deep-grain (per-target-group, per-operation, per-request-filter) profiles to the default set.",
             "type": "string",
-            "description": "auto: the default service profiles; exact: only the listed namespaces; combined: the default profiles plus deep-grain (per-target-group, per-operation, per-request-filter) profiles.",
-            "enum": ["auto", "exact", "combined"],
+            "enum": [
+              "auto",
+              "exact",
+              "combined"
+            ],
             "default": "auto"
-          },
-          "mode_exact": {
-            "title": "Exact namespaces",
-            "type": "object",
-            "properties": {
-              "entries": {
-                "title": "Entries",
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "name": {
-                      "title": "Namespace",
-                      "type": "string"
-                    }
+          }
+        },
+        "dependencies": {
+          "mode": {
+            "oneOf": [
+              {
+                "properties": {
+                  "mode": {
+                    "const": "auto"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "mode": {
+                    "const": "exact"
                   },
-                  "required": ["name"]
+                  "mode_exact": {
+                    "title": "Exact namespaces",
+                    "type": "object",
+                    "properties": {
+                      "entries": {
+                        "title": "Entries",
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "title": "Namespace",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "entries"
+                    ]
+                  }
+                },
+                "required": [
+                  "mode_exact"
+                ]
+              },
+              {
+                "properties": {
+                  "mode": {
+                    "const": "combined"
+                  }
                 }
               }
-            }
+            ]
           }
         }
       },
@@ -158,33 +246,138 @@
         "default": 30
       }
     },
-    "required": ["regions", "auth"]
+    "required": [
+      "regions",
+      "auth"
+    ]
   },
   "uiSchema": {
     "uiOptions": {
       "fullPage": true
     },
-    "vnode": {
-      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
+    "regions": {
+      "ui:listFlavour": "list",
+      "ui:help": "AWS regions to collect from. Add one region per row. At least one is required, and all regions must belong to the same AWS partition (standard, GovCloud, or China).",
+      "items": {
+        "ui:placeholder": "us-east-1"
+      }
     },
     "auth": {
+      "mode": {
+        "ui:help": "How Netdata obtains AWS credentials: `default` uses the AWS SDK credential chain, `access_key` uses static keys, and `assume_role` assumes an IAM role.",
+        "ui:widget": "radio",
+        "ui:options": {
+          "inline": true
+        }
+      },
       "mode_access_key": {
+        "access_key_id": {
+          "ui:help": "AWS access key ID.",
+          "ui:placeholder": "AKIA..."
+        },
         "secret_access_key": {
+          "ui:help": "AWS secret access key.",
           "ui:widget": "password"
         },
         "session_token": {
+          "ui:help": "Optional session token, required only for temporary credentials.",
           "ui:widget": "password"
         }
       },
       "mode_assume_role": {
         "roles": {
+          "ui:listFlavour": "list",
+          "ui:help": "The IAM role to assume. Exactly one role is supported.",
           "items": {
+            "role_arn": {
+              "ui:help": "ARN of the IAM role to assume.",
+              "ui:placeholder": "arn:aws:iam::123456789012:role/NetdataCloudWatch"
+            },
             "external_id": {
+              "ui:help": "Optional external ID required by the role's trust policy.",
               "ui:widget": "password"
             }
           }
         }
       }
+    },
+    "namespaces": {
+      "mode": {
+        "ui:help": "Which service profiles to collect: `auto` uses the default-enabled profiles, `exact` uses only the namespaces you list, and `combined` adds the deep-grain profiles to the default set.",
+        "ui:widget": "radio",
+        "ui:options": {
+          "inline": true
+        }
+      },
+      "mode_exact": {
+        "entries": {
+          "ui:listFlavour": "list",
+          "ui:help": "CloudWatch namespaces to collect (case-sensitive), one per row.",
+          "items": {
+            "name": {
+              "ui:help": "CloudWatch namespace.",
+              "ui:placeholder": "AWS/EC2"
+            }
+          }
+        }
+      }
+    },
+    "discovery": {
+      "refresh_every": {
+        "ui:help": "How often to re-run metric discovery (ListMetrics). Discovery is cheap; raise this only to cut API load on very large accounts."
+      },
+      "recently_active_only": {
+        "ui:help": "List only metrics active in the last 3h. Automatically disabled for profiles with a longer period (e.g. daily S3 storage) so those are not hidden."
+      }
+    },
+    "query_offset": {
+      "ui:help": "Seconds subtracted from now when querying, to account for CloudWatch publish latency. Increase it if you see gaps at the leading edge of charts."
+    },
+    "timeout": {
+      "ui:help": "AWS API call timeout, in seconds. Accepts decimals for sub-second granularity (for example, `0.5` for 500ms)."
+    },
+    "vnode": {
+      "ui:help": "Optional virtual node name used to group this job's charts under a specific Netdata virtual node.",
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "regions",
+            "update_every",
+            "autodetection_retry",
+            "query_offset",
+            "timeout"
+          ]
+        },
+        {
+          "title": "Auth",
+          "fields": [
+            "auth"
+          ]
+        },
+        {
+          "title": "Namespaces",
+          "fields": [
+            "namespaces"
+          ]
+        },
+        {
+          "title": "Discovery",
+          "fields": [
+            "discovery"
+          ]
+        },
+        {
+          "title": "Virtual Node",
+          "fields": [
+            "vnode"
+          ]
+        }
+      ]
     }
   }
 }
