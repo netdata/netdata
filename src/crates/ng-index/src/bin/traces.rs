@@ -8,6 +8,7 @@
 //! ```
 
 use std::collections::HashSet;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -101,6 +102,7 @@ fn sample_ids(sfst_path: &Path, limit: usize) -> ExitCode {
     };
     let mut seen: HashSet<TraceId> = HashSet::new();
     let mut printed = 0usize;
+    let mut out = std::io::stdout().lock();
     for i in 0..trace_ids.len() {
         if printed >= limit {
             break; // checked first, so `--sample 0` prints nothing
@@ -109,7 +111,11 @@ fn sample_ids(sfst_path: &Path, limit: usize) -> ExitCode {
         if id.is_unset() || !seen.insert(id) {
             continue;
         }
-        println!("{id}");
+        // Stop quietly on a broken pipe (e.g. `… --sample N | head`) instead of
+        // panicking the way `println!` would.
+        if writeln!(out, "{id}").is_err() {
+            break;
+        }
         printed += 1;
     }
     if printed == 0 && limit > 0 {

@@ -688,19 +688,24 @@ mod tests {
         fill_trace_hashes(&mut flat);
 
         let rg = &flat.resources[0];
-        assert!(
-            rg.resource.iter().all(|e| e.hash != 0),
-            "resource entries hashed"
-        );
-        assert!(
-            !rg.scopes[0].scope.is_empty() && rg.scopes[0].scope.iter().all(|e| e.hash != 0),
-            "scope entries hashed"
-        );
+        assert!(!rg.scopes[0].scope.is_empty(), "scope entries present");
+        // Every entry (resource ++ scope ++ span) carries exactly hash_kv(path,value)
+        // — the contract `fill_trace_hashes` implements. (Asserting `!= 0` would be
+        // wrong: xxhash64 can legitimately produce 0.)
+        let mut buf = String::new();
+        for e in rg
+            .resource
+            .iter()
+            .chain(rg.scopes[0].scope.iter())
+            .chain(rg.scopes[0].spans.iter().flat_map(|s| s.entries.iter()))
+        {
+            assert_eq!(
+                e.hash,
+                crate::common::hash_kv(&flat.tree.path(e.node), &e.value, &mut buf),
+                "fill sets each entry.hash = hash_kv(path, value)",
+            );
+        }
         let spans = &rg.scopes[0].spans;
-        assert!(
-            spans.iter().all(|s| s.entries.iter().all(|e| e.hash != 0)),
-            "every span entry hashed"
-        );
         // `http.method=GET` interns to the same hash across both spans.
         let method_hash = |sr: &SpanRecord| {
             sr.entries

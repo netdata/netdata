@@ -433,9 +433,13 @@ impl<'a> IndexReader<'a> {
 
         // Iterative tree build over the sorted spans: parent present in this set →
         // edge; otherwise (unset / missing / self) → root.
+        // Exclude UNSET span ids: a parent lookup below guards `!is_unset()` first, so
+        // UNSET is never queried here — indexing it would only cause a meaningless
+        // last-writer-wins overwrite when several spans lack a valid span_id.
         let idx_of: HashMap<SpanId, usize> = spans
             .iter()
             .enumerate()
+            .filter(|(_, s)| !s.span_id.is_unset())
             .map(|(i, s)| (s.span_id, i))
             .collect();
         let mut children: HashMap<SpanId, Vec<usize>> = HashMap::new();
@@ -456,12 +460,13 @@ impl<'a> IndexReader<'a> {
         // are already roots; but a pathological parent *cycle* (or a cyclic component
         // with no external entry) would leave its members reachable from no root even
         // though they are present in `spans`. Promote the earliest unreached span to a
-        // root and repeat until everything is reachable. Iterative; O(V+E) overall
-        // (`reachable` persists across rounds, so each edge is followed once).
+        // root until everything is reachable. O(V+E): each node is marked once (the
+        // `reachable` guard), each edge is followed once, and `cursor` scans the span
+        // list monotonically across all rounds.
         let mut reachable = vec![false; spans.len()];
-        let mut stack: Vec<usize> = Vec::new();
+        let mut stack: Vec<usize> = roots.clone();
+        let mut cursor = 0usize;
         loop {
-            stack.extend(roots.iter().copied().filter(|&i| !reachable[i]));
             while let Some(i) = stack.pop() {
                 if reachable[i] {
                     continue;
@@ -471,10 +476,14 @@ impl<'a> IndexReader<'a> {
                     stack.extend(kids.iter().copied().filter(|&c| !reachable[c]));
                 }
             }
-            match reachable.iter().position(|&r| !r) {
-                Some(i) => roots.push(i), // earliest (start-sorted) unreached span
-                None => break,
+            while cursor < spans.len() && reachable[cursor] {
+                cursor += 1;
             }
+            if cursor == spans.len() {
+                break;
+            }
+            roots.push(cursor); // earliest (start-sorted) unreached span
+            stack.push(cursor);
         }
 
         Ok(Trace {
