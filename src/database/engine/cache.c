@@ -592,6 +592,23 @@ static inline void atomic_set_max_int64_t(int64_t *max, int64_t desired) {
                                          false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
 }
 
+static ALWAYS_INLINE uint16_t page_accesses_get(PGC_PAGE *page) {
+    return __atomic_load_n(&page->accesses, __ATOMIC_RELAXED);
+}
+
+static ALWAYS_INLINE void page_accesses_increment(PGC_PAGE *page) {
+    uint16_t accesses = page_accesses_get(page);
+
+    // This is a queue-placement hint; wrapping to zero makes a hot page look cold.
+    while(accesses != UINT16_MAX) {
+        uint16_t wanted = accesses + 1;
+
+        if(__atomic_compare_exchange_n(&page->accesses, &accesses, wanted,
+                                       false, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+            return;
+    }
+}
+
 struct section_pages {
     SPINLOCK migration_to_v2_spinlock;
     size_t entries;
@@ -674,7 +691,8 @@ static ALWAYS_INLINE void pgc_queue_add(PGC *cache __maybe_unused, struct pgc_qu
         // - New pages created as CLEAN, always have 1 access.
         // - DIRTY pages made CLEAN, depending on their accesses may be appended (accesses > 0) or prepended (accesses = 0).
 
-        if(page->accesses || page_flag_check(page, PGC_PAGE_HAS_BEEN_ACCESSED | PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES) == PGC_PAGE_HAS_BEEN_ACCESSED) {
+        if(page_accesses_get(page) ||
+            page_flag_check(page, PGC_PAGE_HAS_BEEN_ACCESSED | PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES) == PGC_PAGE_HAS_BEEN_ACCESSED) {
             DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(q->base, page, link.prev, link.next);
             page_flag_clear(page, PGC_PAGE_HAS_BEEN_ACCESSED);
         }
@@ -774,7 +792,7 @@ static ALWAYS_INLINE void page_has_been_accessed(PGC *cache, PGC_PAGE *page) {
     PGC_PAGE_FLAGS flags = page_flag_check(page, PGC_PAGE_CLEAN | PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES);
 
     if (!(flags & PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES)) {
-        __atomic_add_fetch(&page->accesses, 1, __ATOMIC_RELAXED);
+        page_accesses_increment(page);
 
         if (flags & PGC_PAGE_CLEAN) {
             if(pgc_queue_trylock(cache, &cache->clean, PGC_QUEUE_LOCK_PRIO_EVICTORS)) {
@@ -1911,7 +1929,7 @@ static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wai
             pages_made_clean_size += tpg->assumed_size;
             pages_made_clean++;
 
-            if(!tpg->accesses)
+            if(!page_accesses_get(tpg))
                 pages_to_evict++;
 
             page_set_clean(cache, tpg, true, false, PGC_QUEUE_LOCK_PRIO_FLUSHERS);
