@@ -558,11 +558,19 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     }
 #endif /* !OS_WINDOWS */
 
+    // JudyLFreeArray triggers STATUS_HEAP_CORRUPTION (c0000374) on Windows when
+    // releasing arrays with many entries via the vendored Judy library — same
+    // root cause as the JudyLNext infinite-loop bug above. Skip the free on
+    // Windows; the arrays are process-local and reclaimed on exit anyway.
+#ifndef OS_WINDOWS
     nd_win_trace("scan_data_files[D4]: tier=%d before JudyLFreeArray", ctx->config.tier);
     (void) JudyLFreeArray(&journafile_JudyL, NULL);
     nd_win_trace("scan_data_files[D5]: tier=%d after JudyLFreeArray(journal)", ctx->config.tier);
     (void) JudyLFreeArray(&datafiles_JudyL, NULL);
     nd_win_trace("scan_data_files[D6]: tier=%d after JudyLFreeArray(data)", ctx->config.tier);
+#else
+    nd_win_trace("scan_data_files[D4]: tier=%d skipping JudyLFreeArray (Windows Judy heap bug)", ctx->config.tier);
+#endif /* !OS_WINDOWS */
 
     nd_win_trace("scan_data_files[E]: tier=%d orphan-check done, starting load of %d files", ctx->config.tier, matched_files);
     netdata_log_info("DBENGINE: tier %d: loading %d data/journal files...", ctx->config.tier, matched_files);
@@ -704,7 +712,11 @@ void cleanup_datafile_epdl_structures(struct rrdengine_datafile *datafile)
         epdl_extent_release(e);
         *PValue = NULL;
     }
+#ifndef OS_WINDOWS
     JudyLFreeArray(&datafile->extent_epdl.epdl_per_extent, PJE0);
+#else
+    datafile->extent_epdl.epdl_per_extent = NULL; // Windows Judy bug: skip free, null for safety; nodes leaked
+#endif
     rw_spinlock_write_unlock(&datafile->extent_epdl.spinlock);
 }
 

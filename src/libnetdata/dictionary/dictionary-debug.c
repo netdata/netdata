@@ -210,8 +210,10 @@ static size_t report_allocated_dictionaries(void) {
                 PValue = JudyLNext(stacktrace_dictionaries, &index, PJE0);
             }
             
+#ifndef OS_WINDOWS
             JudyLFreeArray(&stacktrace_dictionaries, PJE0);
             JudyLFreeArray(&stacktrace_counts, PJE0);
+#endif
         }
     }
     else {
@@ -279,7 +281,9 @@ void dictionary_debug_shutdown(void) {
         return;
 
     spinlock_lock(&all_dictionaries_spinlock);
+#ifndef OS_WINDOWS
     JudyLFreeArray(&all_dictionaries, PJE0);
+#endif
     spinlock_unlock(&all_dictionaries_spinlock);
 }
 

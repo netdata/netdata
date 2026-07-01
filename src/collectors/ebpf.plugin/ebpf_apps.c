@@ -812,7 +812,9 @@ void ebpf_del_pid_entry(pid_t pid)
                 netdata_socket_plus_t *socket_clean = *socket_value;
                 aral_freez(aral_socket_table, socket_clean);
             }
+#ifndef OS_WINDOWS
             JudyLFreeArray(&pid_ptr->socket_stats.JudyLArray, PJE0);
+#endif
         }
         aral_freez(ebpf_judy_pid.pid_table, pid_ptr);
         JudyLDel(&ebpf_judy_pid.index.JudyLArray, p->pid, PJE0);
