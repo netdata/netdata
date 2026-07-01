@@ -12,14 +12,10 @@ use super::signal::{
     AuthOverride, CatalogOverride, IndexOverride, SignalOverride, StorageOverride, WalOverride,
 };
 
-/// A snapshot of the `NETDATA_OTEL_*` environment (name → raw value).
-///
-/// Overrides are read from this map instead of `std::env` directly so the
-/// parse/merge pipeline is unit-testable without mutating process-global state.
-/// Values are kept as `OsString` and their UTF-8 validity is checked only when a
-/// variable is actually read ([`get_env`]) — mirroring the former per-variable
-/// `std::env::var`, so an unconsumed `NETDATA_OTEL_*` variable with a non-UTF-8
-/// value never affects loading.
+/// A snapshot of `NETDATA_OTEL_*` (name → raw value), so config resolution reads
+/// from an injected map rather than `std::env` and stays unit-testable. Values
+/// stay `OsString`; UTF-8 is checked only when a var is read ([`get_env`]), so an
+/// unconsumed non-UTF-8 var can't fail loading.
 pub(super) type EnvMap = HashMap<String, OsString>;
 
 /// Collect the `NETDATA_OTEL_*` environment into an [`EnvMap`] — the only reader

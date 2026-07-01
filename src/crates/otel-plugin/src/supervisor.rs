@@ -326,11 +326,10 @@ impl Supervisor {
     /// Forward a completed function result to the agent, unless the transaction
     /// was already retired by a Cancel.
     ///
-    /// A Cancel removes the transaction entry and tells the agent the call is
-    /// finished. A Result that races in afterwards — the worker completed
-    /// between our Cancel send and its handling — must be dropped: forwarding it
-    /// would be a second terminal message for a transaction the agent already
-    /// closed. Draining the entry here is also what keeps `transactions` bounded.
+    /// If a Cancel already removed the entry, the agent considers the call
+    /// finished; a Result that raced in after (the worker completed between our
+    /// Cancel and its handling) must be dropped, or the agent gets a second
+    /// terminal message.
     async fn forward_result(&mut self, worker: Worker, result: FunctionResult) {
         if self.transactions.remove(&result.transaction).is_none() {
             tracing::debug!(
