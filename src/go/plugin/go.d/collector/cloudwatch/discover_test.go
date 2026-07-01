@@ -331,7 +331,7 @@ func TestCollector_selectProfiles(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("auto selects enabled profiles", func(t *testing.T) {
-		c := &Collector{Config: Config{Namespaces: NamespacesConfig{Mode: namespacesModeAuto}}}
+		c := &Collector{Config: Config{Profiles: ProfilesConfig{Mode: profilesModeAuto}}}
 		got, err := c.selectProfiles(catalog)
 		require.NoError(t, err)
 		enabled := 0
@@ -345,16 +345,16 @@ func TestCollector_selectProfiles(t *testing.T) {
 	})
 
 	t.Run("combined selects all profiles", func(t *testing.T) {
-		c := &Collector{Config: Config{Namespaces: NamespacesConfig{Mode: namespacesModeCombined}}}
+		c := &Collector{Config: Config{Profiles: ProfilesConfig{Mode: profilesModeCombined}}}
 		got, err := c.selectProfiles(catalog)
 		require.NoError(t, err)
 		assert.Len(t, got, len(catalog.AllProfiles()))
 	})
 
-	t.Run("exact selects matching namespaces", func(t *testing.T) {
-		c := &Collector{Config: Config{Namespaces: NamespacesConfig{
-			Mode:      namespacesModeExact,
-			ModeExact: &NamespacesExactConfig{Entries: []NamespaceEntry{{Name: "AWS/EC2"}, {Name: "AWS/S3"}}},
+	t.Run("exact selects matching profiles by basename", func(t *testing.T) {
+		c := &Collector{Config: Config{Profiles: ProfilesConfig{
+			Mode:      profilesModeExact,
+			ModeExact: &ProfilesExactConfig{Entries: []ProfileEntry{{Name: "ec2"}, {Name: "s3"}}},
 		}}}
 		got, err := c.selectProfiles(catalog)
 		require.NoError(t, err)
@@ -364,16 +364,27 @@ func TestCollector_selectProfiles(t *testing.T) {
 	})
 
 	t.Run("exact with no match errors", func(t *testing.T) {
-		c := &Collector{Config: Config{Namespaces: NamespacesConfig{
-			Mode:      namespacesModeExact,
-			ModeExact: &NamespacesExactConfig{Entries: []NamespaceEntry{{Name: "AWS/Bogus"}}},
+		c := &Collector{Config: Config{Profiles: ProfilesConfig{
+			Mode:      profilesModeExact,
+			ModeExact: &ProfilesExactConfig{Entries: []ProfileEntry{{Name: "bogus"}}},
 		}}}
 		_, err := c.selectProfiles(catalog)
 		assert.Error(t, err)
 	})
 
+	t.Run("exact selects a default-disabled deep-grain profile by name", func(t *testing.T) {
+		c := &Collector{Config: Config{Profiles: ProfilesConfig{
+			Mode:      profilesModeExact,
+			ModeExact: &ProfilesExactConfig{Entries: []ProfileEntry{{Name: "alb_target"}}},
+		}}}
+		got, err := c.selectProfiles(catalog)
+		require.NoError(t, err)
+		require.Len(t, got, 1)
+		assert.Equal(t, "alb_target", got[0].Name, "exact selects a disabled profile by basename")
+	})
+
 	t.Run("unsupported mode errors", func(t *testing.T) {
-		c := &Collector{Config: Config{Namespaces: NamespacesConfig{Mode: "weird"}}}
+		c := &Collector{Config: Config{Profiles: ProfilesConfig{Mode: "weird"}}}
 		_, err := c.selectProfiles(catalog)
 		assert.Error(t, err)
 	})

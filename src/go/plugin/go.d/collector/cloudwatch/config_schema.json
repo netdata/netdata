@@ -140,13 +140,13 @@
           "mode"
         ]
       },
-      "namespaces": {
-        "title": "Namespaces",
+      "profiles": {
+        "title": "Profiles",
         "type": "object",
         "properties": {
           "mode": {
             "title": "Mode",
-            "description": "Which service profiles to collect: `auto` uses the default-enabled profiles; `exact` uses only the listed namespaces; `combined` adds the deep-grain (per-target-group, per-operation, per-request-filter) profiles to the default set.",
+            "description": "Which service profiles to collect: `auto` uses the default-enabled profiles; `exact` uses only the profiles you list (by basename); `combined` adds the deep-grain (per-target-group, per-operation, per-request-filter) profiles to the default set.",
             "type": "string",
             "enum": [
               "auto",
@@ -172,7 +172,7 @@
                     "const": "exact"
                   },
                   "mode_exact": {
-                    "title": "Exact namespaces",
+                    "title": "Exact profiles",
                     "type": "object",
                     "properties": {
                       "entries": {
@@ -182,8 +182,10 @@
                           "type": "object",
                           "properties": {
                             "name": {
-                              "title": "Namespace",
-                              "type": "string"
+                              "title": "Profile",
+                              "description": "Profile basename to collect (e.g. `ec2`, `alb_target`).",
+                              "type": "string",
+                              "pattern": "^[a-z][a-z0-9_]*$"
                             }
                           },
                           "required": [
@@ -301,9 +303,9 @@
         }
       }
     },
-    "namespaces": {
+    "profiles": {
       "mode": {
-        "ui:help": "Which service profiles to collect: `auto` uses the default-enabled profiles, `exact` uses only the namespaces you list, and `combined` adds the deep-grain profiles to the default set.",
+        "ui:help": "Which service profiles to collect: `auto` uses the default-enabled profiles, `exact` uses only the profiles you list (by basename), and `combined` adds the deep-grain profiles to the default set.",
         "ui:widget": "radio",
         "ui:options": {
           "inline": true
@@ -312,11 +314,11 @@
       "mode_exact": {
         "entries": {
           "ui:listFlavour": "list",
-          "ui:help": "CloudWatch namespaces to collect (case-sensitive), one per row.",
+          "ui:help": "Profiles to collect, one basename per row.",
           "items": {
             "name": {
-              "ui:help": "CloudWatch namespace.",
-              "ui:placeholder": "AWS/EC2"
+              "ui:help": "Profile basename (e.g. ec2, alb_target).",
+              "ui:placeholder": "ec2"
             }
           }
         }
@@ -360,9 +362,9 @@
           ]
         },
         {
-          "title": "Namespaces",
+          "title": "Profiles",
           "fields": [
-            "namespaces"
+            "profiles"
           ]
         },
         {

@@ -47,7 +47,7 @@ func New() *Collector {
 		Config: Config{
 			UpdateEvery:        defaultUpdateEvery,
 			AutoDetectionRetry: defaultAutoDetectRetry,
-			Namespaces:         NamespacesConfig{Mode: namespacesModeAuto},
+			Profiles:           ProfilesConfig{Mode: profilesModeAuto},
 			Discovery:          DiscoveryConfig{RefreshEvery: defaultDiscoveryRefresh},
 			QueryOffset:        defaultQueryOffset,
 			Timeout:            defaultTimeout,
@@ -79,7 +79,7 @@ type Collector struct {
 	accountID         string
 	chartTemplateYAML string
 
-	profiles  []cwprofiles.ResolvedProfile // candidate profiles selected per namespaces.mode
+	profiles  []cwprofiles.ResolvedProfile // candidate profiles selected per profiles.mode
 	clients   *clientCache                 // CloudWatch client cache, one per region
 	discovery discoverySnapshot
 

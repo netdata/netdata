@@ -129,7 +129,7 @@ func TestInjectDimensionOptions_PreservesAuthoredOptions(t *testing.T) {
 func TestEnsureProfiles_BuildsValidChartTemplate(t *testing.T) {
 	c := New()
 	c.Config.Regions = []string{"us-east-1"}
-	c.Namespaces = NamespacesConfig{Mode: namespacesModeAuto}
+	c.Profiles = ProfilesConfig{Mode: profilesModeAuto}
 	c.applyDefaults()
 	c.newCatalog = cwprofiles.LoadFromDefaultDirs
 
@@ -153,7 +153,7 @@ func TestEnsureProfiles_BuildsValidChartTemplate(t *testing.T) {
 func TestEnsureProfiles_CombinedBuildsValidChartTemplate(t *testing.T) {
 	c := New()
 	c.Config.Regions = []string{"us-east-1"}
-	c.Namespaces = NamespacesConfig{Mode: namespacesModeCombined}
+	c.Profiles = ProfilesConfig{Mode: profilesModeCombined}
 	c.applyDefaults()
 	c.newCatalog = cwprofiles.LoadFromDefaultDirs
 

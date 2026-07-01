@@ -93,11 +93,11 @@ func TestCollector_Init(t *testing.T) {
 			cfg:     Config{Regions: []string{"us-east-1"}, Auth: cloudauth.AWSAuthConfig{Mode: "bogus"}},
 			wantErr: true,
 		},
-		"namespaces exact without entries": {
+		"profiles exact without entries": {
 			cfg: Config{
-				Regions:    []string{"us-east-1"},
-				Auth:       cloudauth.AWSAuthConfig{Mode: cloudauth.AWSAuthModeDefault},
-				Namespaces: NamespacesConfig{Mode: namespacesModeExact},
+				Regions:  []string{"us-east-1"},
+				Auth:     cloudauth.AWSAuthConfig{Mode: cloudauth.AWSAuthModeDefault},
+				Profiles: ProfilesConfig{Mode: profilesModeExact},
 			},
 			wantErr: true,
 		},
@@ -125,7 +125,7 @@ func TestCollector_Init_appliesDefaults(t *testing.T) {
 	assert.Equal(t, defaultUpdateEvery, c.UpdateEvery)
 	assert.Equal(t, defaultDiscoveryRefresh, c.Discovery.RefreshEvery)
 	assert.Equal(t, defaultQueryOffset, c.QueryOffset)
-	assert.Equal(t, namespacesModeAuto, c.Namespaces.Mode)
+	assert.Equal(t, profilesModeAuto, c.Profiles.Mode)
 	assert.True(t, c.recentlyActiveOnly())
 }
 

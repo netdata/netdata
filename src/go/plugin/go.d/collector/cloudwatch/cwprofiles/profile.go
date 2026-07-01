@@ -63,9 +63,9 @@ type Profile struct {
 	Instance    InstanceSpec   `yaml:"instance" json:"instance"`
 	Metrics     []Metric       `yaml:"metrics" json:"metrics,omitempty"`
 	Template    charttpl.Group `yaml:"template" json:"template"`
-	// Disabled excludes the profile from namespaces.mode auto and exact; it is
-	// selected only by mode combined (or by a user-dir copy that drops this field).
-	// Omitted decodes to false = enabled, so no pointer is needed.
+	// Disabled excludes the profile from profiles.mode auto; it is selected by mode
+	// combined, by naming it in mode exact, or by a user-dir copy that drops this
+	// field. Omitted decodes to false = enabled, so no pointer is needed.
 	Disabled bool `yaml:"disabled,omitempty" json:"disabled,omitempty"`
 }
 

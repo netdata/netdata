@@ -64,7 +64,7 @@ The configured IAM identity requires `cloudwatch:ListMetrics`, `cloudwatch:GetMe
 
 #### Auto-Detection
 
-With `namespaces.mode: auto` (default), the collector discovers metrics for all built-in service profiles across the configured `regions` and emits charts only for services that have live metrics. Discovery is cached and refreshed every `discovery.refresh_every` seconds (default 300).
+With `profiles.mode: auto` (default), the collector discovers metrics for all built-in service profiles across the configured `regions` and emits charts only for services that have live metrics. Discovery is cached and refreshed every `discovery.refresh_every` seconds (default 300).
 
 
 #### Limits
@@ -77,7 +77,7 @@ With `namespaces.mode: auto` (default), the collector discovers metrics for all 
 
 #### Performance Impact
 
-AWS bills CloudWatch API usage. `GetMetricData` (the metric queries) is the cost driver, billed per metric requested; `ListMetrics` discovery falls under the free tier and then costs a fraction as much. As a rough anchor, `GetMetricData` is billed at roughly $0.01 per 1,000 metrics requested -- confirm current [CloudWatch pricing](https://aws.amazon.com/cloudwatch/pricing/) for your region. Each combination of instance, metric, and statistic is one billed query, run once per its own period (not once per collection cycle), so cost scales with discovered instances, metrics, statistics, and their periods -- not with `update_every`. The collector already minimizes it with curated per-service profiles, single-statistic defaults, exact dimension filtering, cached discovery, and `recently_active_only`. To reduce it further, restrict services with `namespaces.mode: exact` or narrow `regions`.
+AWS bills CloudWatch API usage. `GetMetricData` (the metric queries) is the cost driver, billed per metric requested; `ListMetrics` discovery falls under the free tier and then costs a fraction as much. As a rough anchor, `GetMetricData` is billed at roughly $0.01 per 1,000 metrics requested -- confirm current [CloudWatch pricing](https://aws.amazon.com/cloudwatch/pricing/) for your region. Each combination of instance, metric, and statistic is one billed query, run once per its own period (not once per collection cycle), so cost scales with discovered instances, metrics, statistics, and their periods -- not with `update_every`. The collector already minimizes it with curated per-service profiles, single-statistic defaults, exact dimension filtering, cached discovery, and `recently_active_only`. To reduce it further, restrict services with `profiles.mode: exact` or narrow `regions`.
 
 
 ## Setup
@@ -164,8 +164,8 @@ A user profile file with the same basename as a stock profile overrides it.
 |  | auth.mode_access_key.secret_access_key | AWS secret access key (used in `access_key` mode). |  | no |
 |  | auth.mode_access_key.session_token | Optional AWS session token for temporary credentials (used in `access_key` mode). |  | no |
 |  | auth.mode_assume_role.roles | A single-element list with the IAM role to assume (used in `assume_role` mode); each entry has `role_arn` and an optional `external_id`. Exactly one role is supported per job -- to monitor multiple accounts, run one job per account/role. |  | no |
-| **Namespaces** | namespaces.mode | Namespace selection: `auto` (default service profiles), `exact` (only the listed namespaces), or `combined` (default profiles plus deep-grain per-target-group / per-operation / per-request-filter profiles). | auto | no |
-|  | namespaces.mode_exact.entries | List of namespaces to collect (required when `namespaces.mode` is `exact`). Each entry has a `name`, e.g. `AWS/EC2`. |  | no |
+| **Profiles** | profiles.mode | Profile selection: `auto` (default service profiles), `exact` (only the profiles you list, by basename), or `combined` (default profiles plus deep-grain per-target-group / per-operation / per-request-filter profiles). | auto | no |
+|  | profiles.mode_exact.entries | List of profiles to collect by basename (required when `profiles.mode` is `exact`). Each entry has a `name`, e.g. `ec2` or `alb_target`. |  | no |
 | **Discovery** | discovery.refresh_every | How often (seconds) to re-discover metrics. Minimum 60. | 300 | no |
 |  | discovery.recently_active_only | List only metrics active in the last 3 hours. Automatically disabled for metrics whose period exceeds 3 hours (such as the daily S3 storage metrics). | yes | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
@@ -282,7 +282,7 @@ jobs:
 ```
 </details>
 
-###### Specific namespaces only
+###### Specific services only
 
 Collect only EC2 and RDS instead of auto-discovering all built-in services.
 
@@ -293,12 +293,12 @@ jobs:
   - name: ec2_rds
     regions:
       - us-east-1
-    namespaces:
+    profiles:
       mode: exact
       mode_exact:
         entries:
-          - name: AWS/EC2
-          - name: AWS/RDS
+          - name: ec2
+          - name: rds
     auth:
       mode: default
 
@@ -316,7 +316,7 @@ jobs:
   - name: combined
     regions:
       - us-east-1
-    namespaces:
+    profiles:
       mode: combined
     auth:
       mode: default
@@ -373,7 +373,7 @@ The built-in profiles ship the following charts by default. Each service links t
 
 Each profile also carries **optional metrics** that are commented out to keep cost and cardinality low; uncomment a metric and its matching chart, then **restart the Netdata Agent** (profiles are loaded once per go.d process and cached). Stock profiles are shipped at `/usr/lib/netdata/conf.d/go.d/cloudwatch.profiles/default/`. To customize a service, copy its profile into `/etc/netdata/go.d/cloudwatch.profiles/` (keep the same filename) and edit it -- a user profile fully replaces the stock one of the same name -- then restart the Agent.
 
-With `namespaces.mode: combined`, these deep-grain profiles are collected in addition to the defaults:
+With `profiles.mode: combined`, these deep-grain profiles are collected in addition to the defaults:
 
 | Profile | Metric prefix | Description |
 |:--------|:--------------|:------------|
@@ -470,7 +470,7 @@ Check the following:
 
 ### Missing metrics for some services
 
-- **Namespace mode** -- ensure `namespaces.mode: auto` (default), or that the service's namespace is listed under `namespaces.mode_exact.entries`.
+- **Profile mode** -- ensure `profiles.mode: auto` (default), or that the service's profile basename is listed under `profiles.mode_exact.entries`.
 - **Daily metrics** -- S3 storage metrics are published once per day. They are inherently delayed by about a day, and `recently_active_only` is automatically disabled for them.
 - **Resource activity** -- some metrics only appear when the resource is actively processing data.
 

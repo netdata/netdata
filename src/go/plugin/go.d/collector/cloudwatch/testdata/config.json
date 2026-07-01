@@ -21,7 +21,7 @@
       ]
     }
   },
-  "namespaces": {
+  "profiles": {
     "mode": "ok",
     "mode_exact": {
       "entries": [

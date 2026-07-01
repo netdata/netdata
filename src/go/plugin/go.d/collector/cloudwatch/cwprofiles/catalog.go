@@ -202,7 +202,7 @@ func handleProfileLoadError(spec DirSpec, path string, err error) error {
 }
 
 // AllProfiles returns every loaded profile (stock + user), sorted by basename.
-// This is the candidate set for namespaces.mode=auto.
+// This is the candidate set for profiles.mode=auto.
 func (c Catalog) AllProfiles() []ResolvedProfile {
 	out := make([]ResolvedProfile, 0, len(c.byBaseName))
 	for _, name := range c.sortedBaseNames() {
@@ -211,14 +211,15 @@ func (c Catalog) AllProfiles() []ResolvedProfile {
 	return out
 }
 
-// ProfilesForNamespaces returns the loaded profiles whose namespace matches any
-// of the given namespaces (case-sensitive, e.g. "AWS/EC2"), sorted by basename.
-// This is the candidate set for namespaces.mode=exact.
-func (c Catalog) ProfilesForNamespaces(namespaces []string) []ResolvedProfile {
-	want := make(map[string]struct{}, len(namespaces))
-	for _, ns := range namespaces {
-		if ns = strings.TrimSpace(ns); ns != "" {
-			want[ns] = struct{}{}
+// ProfilesByBaseNames returns the loaded profiles whose basename matches any of the
+// given basenames, sorted by basename. It is the candidate set for
+// profiles.mode=exact and returns matching profiles regardless of their
+// default-enabled/disabled flag, so a deep-grain profile can be selected by name.
+func (c Catalog) ProfilesByBaseNames(names []string) []ResolvedProfile {
+	want := make(map[string]struct{}, len(names))
+	for _, n := range names {
+		if n = strings.TrimSpace(n); n != "" {
+			want[n] = struct{}{}
 		}
 	}
 	if len(want) == 0 {
@@ -227,9 +228,8 @@ func (c Catalog) ProfilesForNamespaces(namespaces []string) []ResolvedProfile {
 
 	var out []ResolvedProfile
 	for _, name := range c.sortedBaseNames() {
-		prof := c.byBaseName[name]
-		if _, ok := want[strings.TrimSpace(prof.Namespace)]; ok {
-			out = append(out, ResolvedProfile{Name: name, Config: prof})
+		if _, ok := want[name]; ok {
+			out = append(out, ResolvedProfile{Name: name, Config: c.byBaseName[name]})
 		}
 	}
 	return out
@@ -242,7 +242,7 @@ func (c Catalog) sortedBaseNames() []string {
 // validateUniqueChartIDs ensures no two loaded profiles render a chart with the
 // same id. chartengine keys charts by id and, on a cross-template id collision,
 // silently keeps the first and drops the rest, so a colliding chart would simply
-// vanish (e.g. in namespaces.mode combined, where every profile is active). A
+// vanish (e.g. in profiles.mode combined, where every profile is active). A
 // collision between two stock profiles is a packaging bug and is fatal; a
 // collision involving a user profile is logged (its colliding chart is dropped).
 func (c Catalog) validateUniqueChartIDs() error {

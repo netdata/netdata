@@ -19,9 +19,9 @@ const (
 	defaultQueryOffset      = 600
 	defaultTimeout          = confopt.Duration(30 * time.Second)
 
-	namespacesModeAuto     = "auto"
-	namespacesModeExact    = "exact"
-	namespacesModeCombined = "combined"
+	profilesModeAuto     = "auto"
+	profilesModeExact    = "exact"
+	profilesModeCombined = "combined"
 )
 
 // apiConcurrency bounds concurrent AWS API calls (discovery fan-out and
@@ -40,22 +40,23 @@ type Config struct {
 	Vnode              string                  `yaml:"vnode,omitempty" json:"vnode"`
 	Regions            []string                `yaml:"regions" json:"regions"`
 	Auth               cloudauth.AWSAuthConfig `yaml:"auth" json:"auth"`
-	Namespaces         NamespacesConfig        `yaml:"namespaces" json:"namespaces"`
+	Profiles           ProfilesConfig          `yaml:"profiles" json:"profiles"`
 	Discovery          DiscoveryConfig         `yaml:"discovery" json:"discovery"`
 	QueryOffset        int                     `yaml:"query_offset,omitempty" json:"query_offset"`
 	Timeout            confopt.Duration        `yaml:"timeout,omitempty" json:"timeout"`
 }
 
-type NamespacesConfig struct {
-	Mode      string                 `yaml:"mode,omitempty" json:"mode"`
-	ModeExact *NamespacesExactConfig `yaml:"mode_exact,omitempty" json:"mode_exact,omitempty"`
+type ProfilesConfig struct {
+	Mode      string               `yaml:"mode,omitempty" json:"mode"`
+	ModeExact *ProfilesExactConfig `yaml:"mode_exact,omitempty" json:"mode_exact,omitempty"`
 }
 
-type NamespacesExactConfig struct {
-	Entries []NamespaceEntry `yaml:"entries,omitempty" json:"entries,omitempty"`
+type ProfilesExactConfig struct {
+	Entries []ProfileEntry `yaml:"entries,omitempty" json:"entries,omitempty"`
 }
 
-type NamespaceEntry struct {
+// ProfileEntry names one profile (by basename) to collect in exact mode.
+type ProfileEntry struct {
 	Name string `yaml:"name" json:"name"`
 }
 
@@ -74,8 +75,8 @@ func (c *Config) applyDefaults() {
 	if c.AutoDetectionRetry < 0 {
 		c.AutoDetectionRetry = defaultAutoDetectRetry
 	}
-	if strings.TrimSpace(c.Namespaces.Mode) == "" {
-		c.Namespaces.Mode = namespacesModeAuto
+	if strings.TrimSpace(c.Profiles.Mode) == "" {
+		c.Profiles.Mode = profilesModeAuto
 	}
 	if c.Discovery.RefreshEvery <= 0 {
 		c.Discovery.RefreshEvery = defaultDiscoveryRefresh
@@ -124,21 +125,21 @@ func (c Config) validate() error {
 		errs = append(errs, errors.New("'timeout' cannot be negative"))
 	}
 
-	switch strings.ToLower(strings.TrimSpace(c.Namespaces.Mode)) {
-	case namespacesModeAuto:
-	case namespacesModeCombined:
-	case namespacesModeExact:
-		if c.Namespaces.ModeExact == nil || len(c.Namespaces.ModeExact.Entries) == 0 {
-			errs = append(errs, fmt.Errorf("'namespaces.mode_exact.entries' must not be empty when namespaces.mode is %q", namespacesModeExact))
+	switch strings.ToLower(strings.TrimSpace(c.Profiles.Mode)) {
+	case profilesModeAuto:
+	case profilesModeCombined:
+	case profilesModeExact:
+		if c.Profiles.ModeExact == nil || len(c.Profiles.ModeExact.Entries) == 0 {
+			errs = append(errs, fmt.Errorf("'profiles.mode_exact.entries' must not be empty when profiles.mode is %q", profilesModeExact))
 		} else {
-			for i, e := range c.Namespaces.ModeExact.Entries {
+			for i, e := range c.Profiles.ModeExact.Entries {
 				if strings.TrimSpace(e.Name) == "" {
-					errs = append(errs, fmt.Errorf("'namespaces.mode_exact.entries[%d].name' must not be empty", i))
+					errs = append(errs, fmt.Errorf("'profiles.mode_exact.entries[%d].name' must not be empty", i))
 				}
 			}
 		}
 	default:
-		errs = append(errs, fmt.Errorf("'namespaces.mode' must be one of: %s, %s, %s", namespacesModeAuto, namespacesModeExact, namespacesModeCombined))
+		errs = append(errs, fmt.Errorf("'profiles.mode' must be one of: %s, %s, %s", profilesModeAuto, profilesModeExact, profilesModeCombined))
 	}
 
 	if err := c.Auth.ValidateWithPath("auth"); err != nil {

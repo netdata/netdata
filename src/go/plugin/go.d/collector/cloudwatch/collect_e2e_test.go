@@ -29,7 +29,7 @@ import (
 // GetMetricData -> observe -> metrix store, then asserts BOTH the exact produced
 // series (name, labels, value) AND chart coverage (every produced series flows into
 // a chart, every resolvable chart dimension materializes). Each scenario is scoped
-// to one namespace via exact mode, so it exercises the shipped profile it names.
+// to one profile via exact mode, so it exercises the shipped profile it names.
 //
 // Fixtures are built in-code as aws-sdk-go-v2 types. GetMetricData answers are keyed
 // on the request's MetricStat (namespace, metric, statistic, dimensions) and echoed
@@ -41,7 +41,7 @@ func TestCollect_E2E(t *testing.T) {
 
 	scenarios := map[string]e2eScenario{
 		"ec2 single dimension, rate sums stored undivided": {
-			namespaces: []string{"AWS/EC2"},
+			profiles: []string{"ec2"},
 			listMetrics: map[string][]cwtypes.Metric{
 				"AWS/EC2": {
 					mkMetric("CPUUtilization", "InstanceId", "i-1"),
@@ -70,7 +70,7 @@ func TestCollect_E2E(t *testing.T) {
 			},
 		},
 		"s3 multi-dimension identity, daily period": {
-			namespaces: []string{"AWS/S3"},
+			profiles: []string{"s3"},
 			listMetrics: map[string][]cwtypes.Metric{
 				"AWS/S3": {
 					mkMetric("BucketSizeBytes", "BucketName", "b1", "StorageType", "StandardStorage"),
@@ -88,7 +88,7 @@ func TestCollect_E2E(t *testing.T) {
 			},
 		},
 		"lambda multi-statistic fan-out": {
-			namespaces: []string{"AWS/Lambda"},
+			profiles: []string{"lambda"},
 			listMetrics: map[string][]cwtypes.Metric{
 				"AWS/Lambda": {
 					mkMetric("Invocations", "FunctionName", "fn-1"),
@@ -115,7 +115,7 @@ func TestCollect_E2E(t *testing.T) {
 			},
 		},
 		"alb multi-granularity dimension filter keeps only {LoadBalancer}": {
-			namespaces: []string{"AWS/ApplicationELB"},
+			profiles: []string{"alb"},
 			listMetrics: map[string][]cwtypes.Metric{
 				"AWS/ApplicationELB": {
 					mkMetric("RequestCount", "LoadBalancer", "app/lb1/aaa"),                                   // keep
@@ -160,7 +160,7 @@ func TestCollect_E2E(t *testing.T) {
 			},
 		},
 		"no-data: gauges gap, rate/sum metrics become zero": {
-			namespaces: []string{"AWS/EC2"},
+			profiles: []string{"ec2"},
 			listMetrics: map[string][]cwtypes.Metric{
 				"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")},
 			},
@@ -187,9 +187,9 @@ func TestCollect_E2E(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			c := New()
 			c.Config.Regions = []string{"us-east-1"}
-			c.Namespaces = NamespacesConfig{
-				Mode:      namespacesModeExact,
-				ModeExact: &NamespacesExactConfig{Entries: nsEntries(tc.namespaces)},
+			c.Profiles = ProfilesConfig{
+				Mode:      profilesModeExact,
+				ModeExact: &ProfilesExactConfig{Entries: profileEntries(tc.profiles)},
 			}
 			c.applyDefaults()
 			c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
@@ -207,16 +207,16 @@ func TestCollect_E2E(t *testing.T) {
 }
 
 type e2eScenario struct {
-	namespaces  []string
+	profiles    []string
 	listMetrics map[string][]cwtypes.Metric
 	gmd         map[string]float64 // e2eKey -> value; NaN or absent => gap
 	wantSeries  map[string]metrix.SampleValue
 }
 
-func nsEntries(namespaces []string) []NamespaceEntry {
-	out := make([]NamespaceEntry, len(namespaces))
-	for i, ns := range namespaces {
-		out[i] = NamespaceEntry{Name: ns}
+func profileEntries(names []string) []ProfileEntry {
+	out := make([]ProfileEntry, len(names))
+	for i, name := range names {
+		out[i] = ProfileEntry{Name: name}
 	}
 	return out
 }
@@ -332,7 +332,7 @@ func TestAllStockProfiles_PipelineChartComplete(t *testing.T) {
 
 	c := New()
 	c.Config.Regions = []string{region}
-	c.Namespaces = NamespacesConfig{Mode: namespacesModeCombined} // include disabled deep-grain profiles
+	c.Profiles = ProfilesConfig{Mode: profilesModeCombined} // include disabled deep-grain profiles
 	c.applyDefaults()
 	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
 	useFakeClient(c, &e2eCloudWatch{list: list, values: values, ts: time.Unix(1, 0)})
@@ -357,7 +357,7 @@ func TestCollect_MultiRegion(t *testing.T) {
 
 	c := New()
 	c.Config.Regions = []string{"us-east-1", "eu-west-1"}
-	c.Namespaces = NamespacesConfig{Mode: namespacesModeExact, ModeExact: &NamespacesExactConfig{Entries: nsEntries([]string{"AWS/EC2"})}}
+	c.Profiles = ProfilesConfig{Mode: profilesModeExact, ModeExact: &ProfilesExactConfig{Entries: profileEntries([]string{"ec2"})}}
 	c.applyDefaults()
 	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
 	useFakeClient(c, &e2eCloudWatch{
@@ -394,7 +394,7 @@ func TestCollect_DiscoveryFailSoft(t *testing.T) {
 	newBase := func(regions ...string) *Collector {
 		c := New()
 		c.Config.Regions = regions
-		c.Namespaces = NamespacesConfig{Mode: namespacesModeExact, ModeExact: &NamespacesExactConfig{Entries: nsEntries([]string{"AWS/EC2"})}}
+		c.Profiles = ProfilesConfig{Mode: profilesModeExact, ModeExact: &ProfilesExactConfig{Entries: profileEntries([]string{"ec2"})}}
 		c.applyDefaults()
 		c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
 		c.now = func() time.Time { return time.Unix(1_700_000_000, 0) }

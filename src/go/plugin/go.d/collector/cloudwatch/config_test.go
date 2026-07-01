@@ -21,7 +21,7 @@ func validBaseConfig() Config {
 		UpdateEvery: 60,
 		Regions:     []string{"us-east-1"},
 		Auth:        cloudauth.AWSAuthConfig{Mode: cloudauth.AWSAuthModeDefault},
-		Namespaces:  NamespacesConfig{Mode: namespacesModeAuto},
+		Profiles:    ProfilesConfig{Mode: profilesModeAuto},
 		Discovery:   DiscoveryConfig{RefreshEvery: 300},
 		QueryOffset: 600,
 		Timeout:     defaultTimeout,
@@ -41,8 +41,8 @@ func TestConfig_validate(t *testing.T) {
 		"refresh_every below minimum": {mutate: func(c *Config) { c.Discovery.RefreshEvery = 30 }, wantErr: true},
 		"negative query_offset":       {mutate: func(c *Config) { c.QueryOffset = -1 }, wantErr: true},
 		"negative timeout":            {mutate: func(c *Config) { c.Timeout = confopt.Duration(-time.Second) }, wantErr: true},
-		"exact mode without entries":  {mutate: func(c *Config) { c.Namespaces = NamespacesConfig{Mode: namespacesModeExact} }, wantErr: true},
-		"unsupported namespaces mode": {mutate: func(c *Config) { c.Namespaces.Mode = "weird" }, wantErr: true},
+		"exact mode without entries":  {mutate: func(c *Config) { c.Profiles = ProfilesConfig{Mode: profilesModeExact} }, wantErr: true},
+		"unsupported profiles mode":   {mutate: func(c *Config) { c.Profiles.Mode = "weird" }, wantErr: true},
 		"invalid auth mode":           {mutate: func(c *Config) { c.Auth.Mode = "bogus" }, wantErr: true},
 	}
 
@@ -85,7 +85,7 @@ func TestConfigSchema_RuntimeContract(t *testing.T) {
 
 	// Every public Config key must have a schema property (drift guard).
 	for _, key := range []string{
-		"update_every", "autodetection_retry", "vnode", "regions", "auth", "namespaces",
+		"update_every", "autodetection_retry", "vnode", "regions", "auth", "profiles",
 		"discovery", "query_offset", "timeout",
 	} {
 		assert.Contains(t, doc.JSONSchema.Properties, key, "schema property for %q", key)

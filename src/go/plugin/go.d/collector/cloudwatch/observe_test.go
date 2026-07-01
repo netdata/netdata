@@ -124,7 +124,7 @@ func TestCheck_PopulatesChartTemplateBeforeCollect(t *testing.T) {
 	// before the first Collect — so Check must leave a non-empty, valid template.
 	c := New()
 	c.Config.Regions = []string{"us-east-1"}
-	c.Namespaces = NamespacesConfig{Mode: namespacesModeAuto}
+	c.Profiles = ProfilesConfig{Mode: profilesModeAuto}
 	c.applyDefaults()
 	c.newCatalog = cwprofiles.LoadFromDefaultDirs
 	c.newAWSConfig = func(_ context.Context, _ cloudauth.AWSAuthConfig, region string) (aws.Config, error) {

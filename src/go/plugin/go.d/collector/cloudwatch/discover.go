@@ -246,7 +246,7 @@ func buildDiscoverySnapshot(results []discoveryResult, prev map[discoveryKey][]d
 // collector logs a cost-visibility warning. Collection is never truncated.
 const highInstanceCountWarn = 1000
 
-// ensureProfiles resolves the candidate profiles once, per namespaces.mode.
+// ensureProfiles resolves the candidate profiles once, per profiles.mode.
 func (c *Collector) ensureProfiles() error {
 	if c.profiles != nil {
 		return nil
@@ -276,8 +276,8 @@ func (c *Collector) ensureProfiles() error {
 	for i, p := range c.profiles {
 		names[i] = p.Name
 	}
-	c.Infof("CloudWatch: monitoring %d service profile(s) [%s] across region(s) %v (namespaces.mode=%s)",
-		len(c.profiles), strings.Join(names, ", "), c.regions(), c.Namespaces.Mode)
+	c.Infof("CloudWatch: monitoring %d service profile(s) [%s] across region(s) %v (profiles.mode=%s)",
+		len(c.profiles), strings.Join(names, ", "), c.regions(), c.Profiles.Mode)
 	c.Debugf("CloudWatch tuning: update_every=%ds, discovery.refresh_every=%ds, query_offset=%ds, recently_active_only=%v",
 		c.UpdateEvery, c.Discovery.RefreshEvery, c.QueryOffset, c.recentlyActiveOnly())
 
@@ -292,31 +292,34 @@ func (c *Collector) loadCatalog() (cwprofiles.Catalog, error) {
 }
 
 func (c *Collector) selectProfiles(catalog cwprofiles.Catalog) ([]cwprofiles.ResolvedProfile, error) {
-	switch strings.ToLower(strings.TrimSpace(c.Namespaces.Mode)) {
-	case namespacesModeAuto:
+	switch strings.ToLower(strings.TrimSpace(c.Profiles.Mode)) {
+	case profilesModeAuto:
 		return enabledProfiles(catalog.AllProfiles()), nil
-	case namespacesModeCombined:
+	case profilesModeCombined:
 		// auto plus the default-disabled (deep-grain) profiles.
 		return catalog.AllProfiles(), nil
-	case namespacesModeExact:
+	case profilesModeExact:
 		var names []string
-		if c.Namespaces.ModeExact != nil {
-			for _, e := range c.Namespaces.ModeExact.Entries {
+		if c.Profiles.ModeExact != nil {
+			for _, e := range c.Profiles.ModeExact.Entries {
 				names = append(names, e.Name)
 			}
 		}
-		profiles := enabledProfiles(catalog.ProfilesForNamespaces(names))
+		// Exact mode selects the named profiles by basename regardless of their
+		// default-enabled/disabled flag, so a deep-grain profile can be picked by name.
+		profiles := catalog.ProfilesByBaseNames(names)
 		if len(profiles) == 0 {
-			return nil, fmt.Errorf("no CloudWatch profiles match the configured namespaces: %v", names)
+			return nil, fmt.Errorf("no CloudWatch profiles match the configured names: %v", names)
 		}
 		return profiles, nil
 	default:
-		return nil, fmt.Errorf("unsupported namespaces.mode %q", c.Namespaces.Mode)
+		return nil, fmt.Errorf("unsupported profiles.mode %q", c.Profiles.Mode)
 	}
 }
 
 // enabledProfiles drops profiles marked disabled — those are selected only by
-// namespaces.mode combined (or by a user-dir override that omits the flag).
+// profiles.mode combined, by naming them in profiles.mode exact, or by a user-dir
+// override that omits the flag.
 func enabledProfiles(in []cwprofiles.ResolvedProfile) []cwprofiles.ResolvedProfile {
 	out := make([]cwprofiles.ResolvedProfile, 0, len(in))
 	for _, p := range in {
@@ -373,7 +376,7 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 
 	if n := snap.totalInstances(); n >= highInstanceCountWarn {
 		c.Limit(logKeyHighInstanceCount, 1, recurringLogEvery).
-			Warningf("CloudWatch discovered %d instances; this scales GetMetricData cost — narrow 'regions'/'namespaces' if this is unexpected", n)
+			Warningf("CloudWatch discovered %d instances; this scales GetMetricData cost — narrow 'regions'/'profiles' if this is unexpected", n)
 	}
 	return nil
 }

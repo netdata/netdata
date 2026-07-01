@@ -230,13 +230,16 @@ Load and resolution (`catalog.go`):
 - Decode is **non-strict** (unknown keys ignored) so a profile authored for a
   newer collector still loads on an older binary.
 - **Profile selection is config-driven** (`selectProfiles`), not discovery-driven.
-  `namespaces.mode: auto` (default) selects every profile in the catalog; `exact`
-  selects only profiles whose CloudWatch `namespace` matches a configured
-  `namespaces.mode_exact.entries` value (case-sensitive, e.g. `AWS/EC2`). The
-  selected set is the *candidate* set — the namespaces discovery will `ListMetrics`
-  against; a selected profile with no live instances simply produces no charts.
-  `auto` is zero-config but lists every supported service each refresh (empties
-  included, fail-soft); `exact` narrows collection to the namespaces you use.
+  `profiles.mode: auto` (default) selects every default-enabled profile in the
+  catalog; `combined` adds the default-disabled deep-grain profiles; `exact` selects
+  only the profiles named by basename in `profiles.mode_exact.entries` (e.g. `ec2`,
+  `alb_target`). Unlike `auto`, an `exact` entry selects a profile regardless of its
+  default-disabled flag, so a deep-grain profile can be picked by name. The selected
+  set is the *candidate* set — the namespaces of those profiles are what discovery
+  `ListMetrics` runs against; a selected profile with no live instances simply
+  produces no charts. `auto` is zero-config but lists every supported service each
+  refresh (empties included, fail-soft); `exact` narrows collection to the services
+  you use.
 
 Profile validation invariants (`profile.go`) — these are load-bearing:
 
@@ -292,7 +295,7 @@ The two CloudWatch APIs bill differently, and the design leans on that:
   `update_every`. Between queries, values are re-emitted from cache at zero AWS
   cost (see Observation And Metrics).
 
-Narrow the bill with `namespaces.mode: exact` (fewer services) or longer profile
+Narrow the bill with `profiles.mode: exact` (fewer services) or longer profile
 periods; discovery frequency is a minor lever. (Rates are AWS's published model —
 verify current per-region prices on the CloudWatch pricing page.)
 
@@ -311,7 +314,7 @@ verify current per-region prices on the CloudWatch pricing page.)
   failure is fatal.
 - **Single node** — AWS resources are chart instances via `by_labels`, not
   vnodes.
-- **Config minimalism** — only `regions`, `auth`, `namespaces`, `discovery`
+- **Config minimalism** — only `regions`, `auth`, `profiles`, `discovery`
   (`refresh_every`, `recently_active_only`), `query_offset`, and `timeout` (plus
   the framework's `update_every` / `autodetection_retry`) are operator-facing.
   Concurrency, batch size, and the recently-active period bound are internal
