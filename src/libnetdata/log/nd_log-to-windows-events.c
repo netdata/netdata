@@ -171,6 +171,115 @@ static bool wel_add_to_registry(const wchar_t *channel, const wchar_t *provider,
     return true;
 }
 
+#if !defined(HAVE_ETW)
+// Registry key where WINEVT stores registered publishers (providers).
+#define WINEVT_PUBLISHERS_KEY L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WINEVT\\Publishers\\"
+// GUID of the NetdataDaemon importChannel provider — only present when the current
+// manifest (the one with importChannel declarations) has been registered.
+#define WEL_DAEMON_IMPORT_GUID L"{5CA72004-9BD8-4634-81E5-000014E7DAAD}"
+
+static bool wel_manifest_is_current(void) {
+    wchar_t key[MAX_PATH];
+    swprintf(key, _countof(key), L"%ls%ls", WINEVT_PUBLISHERS_KEY, WEL_DAEMON_IMPORT_GUID);
+    HKEY hKey;
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, key, 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+        RegCloseKey(hKey);
+        return true;
+    }
+    return false;
+}
+
+static bool wel_run_silent(const wchar_t *exe, const wchar_t *params) {
+    wchar_t cmdline[MAX_PATH * 6];
+    swprintf(cmdline, _countof(cmdline), L"\"%ls\" %ls", exe, params);
+
+    STARTUPINFOW si = { .cb = sizeof(si) };
+    PROCESS_INFORMATION pi = {0};
+    if (!CreateProcessW(NULL, cmdline, NULL, NULL, FALSE,
+                        CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP,
+                        NULL, NULL, &si, &pi))
+        return false;
+
+    WaitForSingleObject(pi.hProcess, 30000);
+    DWORD exitCode = 1;
+    GetExitCodeProcess(pi.hProcess, &exitCode);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    return exitCode == 0;
+}
+
+// Mirrors wevt_netdata_install.bat in C: copies the DLL to System32, grants the
+// EventLog service read access, then registers the manifest via wevtutil im.
+// Only runs when wel_manifest_is_current() returns false, i.e. the first startup
+// after a dev build or after a version upgrade that skipped wevtutil im.
+static void wel_ensure_manifest_installed(void) {
+    if (wel_manifest_is_current()) {
+        nd_win_trace("wel_ensure_manifest_installed: importChannel providers already registered");
+        return;
+    }
+
+    nd_win_trace("wel_ensure_manifest_installed: importChannel providers not registered, installing manifest...");
+
+    // Find wevt_netdata.dll alongside netdata.exe (dev / manual-deploy path).
+    // MSI installs the DLL to System32 and runs wevtutil im itself, so if the
+    // DLL is not next to netdata.exe there is nothing for us to do here.
+    wchar_t dllPath[MAX_PATH];
+    if (!GetModuleFileNameW(NULL, dllPath, _countof(dllPath)) ||
+        !wel_replace_program_with_wevt_netdata_dll(dllPath, _countof(dllPath))) {
+        nd_win_trace("wel_ensure_manifest_installed: wevt_netdata.dll not alongside netdata.exe, skipping");
+        return;
+    }
+
+    // Build manifest path: same directory as the DLL, file wevt_netdata_manifest.xml
+    wchar_t manifestPath[MAX_PATH];
+    wchar_t *lastBackslash = wcsrchr(dllPath, L'\\');
+    if (!lastBackslash) return;
+    size_t dirLen = (size_t)(lastBackslash - dllPath);
+    wcsncpy(manifestPath, dllPath, dirLen);
+    manifestPath[dirLen] = L'\0';
+    wcsncat(manifestPath, L"\\wevt_netdata_manifest.xml", _countof(manifestPath) - dirLen - 1);
+    if (GetFileAttributesW(manifestPath) == INVALID_FILE_ATTRIBUTES) {
+        nd_win_trace("wel_ensure_manifest_installed: manifest not found at '%ls'", manifestPath);
+        return;
+    }
+
+    wchar_t system32[MAX_PATH];
+    if (!GetSystemDirectoryW(system32, _countof(system32))) return;
+
+    wchar_t dllDst[MAX_PATH];
+    swprintf(dllDst, _countof(dllDst), L"%ls\\wevt_netdata.dll", system32);
+
+    // Copy DLL to System32 so Event Viewer can resolve message strings.
+    if (!CopyFileW(dllPath, dllDst, FALSE))
+        nd_win_trace("wel_ensure_manifest_installed: CopyFile err=%lu (may already exist)", (unsigned long)GetLastError());
+
+    // Grant EventLog service read access (required for manifest-based channels).
+    wchar_t icaclsPath[MAX_PATH];
+    swprintf(icaclsPath, _countof(icaclsPath), L"%ls\\icacls.exe", system32);
+    wchar_t icaclsParams[MAX_PATH * 2];
+    swprintf(icaclsParams, _countof(icaclsParams), L"\"%ls\" /grant \"NT SERVICE\\EventLog\":R", dllDst);
+    if (!wel_run_silent(icaclsPath, icaclsParams))
+        nd_win_trace("wel_ensure_manifest_installed: icacls err=%lu", (unsigned long)GetLastError());
+
+    wchar_t wevtutil[MAX_PATH];
+    swprintf(wevtutil, _countof(wevtutil), L"%ls\\wevtutil.exe", system32);
+
+    // Unregister any previously registered manifest before installing the new one.
+    wchar_t umParams[MAX_PATH * 2];
+    swprintf(umParams, _countof(umParams), L"um \"%ls\"", manifestPath);
+    wel_run_silent(wevtutil, umParams); // ignore result — no prior manifest is normal
+
+    // Register the current manifest, pointing to the DLL in System32.
+    wchar_t imParams[MAX_PATH * 4];
+    swprintf(imParams, _countof(imParams), L"im \"%ls\" \"/mf:%ls\" \"/rf:%ls\"",
+             manifestPath, dllDst, dllDst);
+    if (wel_run_silent(wevtutil, imParams))
+        nd_win_trace("wel_ensure_manifest_installed: manifest installed successfully");
+    else
+        nd_win_trace("wel_ensure_manifest_installed: wevtutil im failed err=%lu", (unsigned long)GetLastError());
+}
+#endif // !HAVE_ETW
+
 #if defined(HAVE_ETW)
 static void etw_set_source_meta(struct nd_log_source *source, USHORT channelID, const EVENT_DESCRIPTOR *ed) {
     // It turns out that the keyword varies per only per channel!
@@ -256,6 +365,12 @@ bool nd_log_init_windows(void) {
 #endif
 
     if(!nd_log.eventlog.etw) {
+#if !defined(HAVE_ETW)
+        // Auto-install manifest with importChannel entries so classic ReportEventW events
+        // appear in the Netdata WINEVT channels without any manual setup by the user.
+        // Fast no-op when the manifest is already current (registry check only).
+        wel_ensure_manifest_installed();
+#endif
         // Remove legacy NetdataWEL registry entries. Classic WEL source lookup uses creation order,
         // so stale NetdataWEL\<source> keys would be found before the new per-channel keys, causing
         // ReportEventW to keep writing to the old channel.
@@ -330,8 +445,7 @@ bool nd_log_init_windows(void) {
 
     nd_log.eventlog.initialized = true;
     nd_win_trace("nd_log_init_windows: done initialized=true etw=%d; "
-                 "events go to Netdata/{Daemon,Collectors,Access,Health,Aclk} -- "
-                 "run wevt_netdata_install.bat to register, then view in Event Viewer",
+                 "events go to Netdata/{Daemon,Collectors,Access,Health,Aclk}",
                  (int)nd_log.eventlog.etw);
     return true;
 }
