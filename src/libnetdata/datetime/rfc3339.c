@@ -190,16 +190,22 @@ finish:
     return pos;
 }
 
-usec_t rfc3339_parse_ut(const char *rfc3339, char **endptr) {
+bool rfc3339_parse_ut(const char *rfc3339, usec_t *timestamp_ut, char **endptr) {
     struct tm tm = { 0 };
     int tz_hours = 0, tz_mins = 0;
     char *s;
     usec_t timestamp, usec = 0;
 
+    if (endptr)
+        *endptr = NULL;
+
+    if (!rfc3339 || !timestamp_ut)
+        return false;
+
     // Parse date and time (up to seconds)
     s = strptime(rfc3339, "%Y-%m-%dT%H:%M:%S", &tm);
     if (!s)
-        return 0; // Parsing error
+        return false; // Parsing error
 
     // Parse fractional seconds if present
     if (*s == '.') {
@@ -208,7 +214,7 @@ usec_t rfc3339_parse_ut(const char *rfc3339, char **endptr) {
 
         while (isdigit((uint8_t)*next)) {
             if (digits_parsed == 9)
-                return 0; // Parsing error
+                return false; // Parsing error
 
             usec = usec * 10 + (*next - '0');
             digits_parsed++;
@@ -216,7 +222,7 @@ usec_t rfc3339_parse_ut(const char *rfc3339, char **endptr) {
         }
 
         if (digits_parsed < 1)
-            return 0; // Parsing error
+            return false; // Parsing error
 
         static const usec_t fix_usec[] = {
             1000000, // 0 digits (not used)
@@ -246,7 +252,7 @@ usec_t rfc3339_parse_ut(const char *rfc3339, char **endptr) {
 
         if (!isdigit((uint8_t)s[1]) || !isdigit((uint8_t)s[2]) || s[3] != ':' ||
             !isdigit((uint8_t)s[4]) || !isdigit((uint8_t)s[5]))
-            return 0; // Parsing error
+            return false; // Parsing error
 
         char tz_sign = *s;
         tz_hours = (s[1] - '0') * 10 + (s[2] - '0');
@@ -259,7 +265,7 @@ usec_t rfc3339_parse_ut(const char *rfc3339, char **endptr) {
     else if (*s == 'Z')
         s++;
     else
-        return 0; // Invalid RFC 3339 timezone specification
+        return false; // Invalid RFC 3339 timezone specification
 
     // Convert struct tm to time_t in UTC
     time_t epoch_s;
@@ -271,7 +277,7 @@ usec_t rfc3339_parse_ut(const char *rfc3339, char **endptr) {
     // Use mktime(), which assumes tm is local time, then adjust.
     epoch_s = mktime(&tm);
     if (epoch_s == -1)
-        return 0; // Error in time conversion
+        return false; // Error in time conversion
 
 #  if defined(HAVE_TM_GMTOFF)
     // tm.tm_gmtoff is the offset (in seconds) of local time from UTC.
@@ -291,14 +297,14 @@ usec_t rfc3339_parse_ut(const char *rfc3339, char **endptr) {
         struct tm *lt = localtime(&epoch_s);
         if (!lt) {
             spinlock_unlock(&time_static_buffer_spinlock);
-            return 0;
+            return false;
         }
         local_tm = *lt;
 
         struct tm *gt = gmtime(&epoch_s);
         if (!gt) {
             spinlock_unlock(&time_static_buffer_spinlock);
-            return 0;
+            return false;
         }
         utc_tm   = *gt;
 
@@ -320,5 +326,6 @@ usec_t rfc3339_parse_ut(const char *rfc3339, char **endptr) {
     if (endptr)
         *endptr = s;
 
-    return timestamp;
+    *timestamp_ut = timestamp;
+    return true;
 }
