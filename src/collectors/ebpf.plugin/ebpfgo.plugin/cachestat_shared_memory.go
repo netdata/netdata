@@ -65,7 +65,7 @@ const (
 // activeModules is reset to 0 at the start of each Publish and re-OR'd by
 // the subsequent UpdateApps/UpdateSocketApps before the next cycle, so a
 // module that stops publishing has its bit cleared on the consumer's next
-// read.  This matches the C-side reset/OR in shared_pid_memory_publish.
+// read. The C-side publisher stores this complete bitmask directly.
 //
 // The lock is held for the duration of the C memcpy because
 // applySocketDataLocked writes s.entries[i].socket in place on the same
