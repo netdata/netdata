@@ -139,9 +139,11 @@ fn seal(wal: &Path, out: &Path) -> ExitCode {
 
 /// Parse exactly 32 hex chars (16 bytes; case-insensitive) into a [`TraceId`].
 fn parse_trace_id(hex: &str) -> Option<TraceId> {
-    // ASCII guard: byte-slicing below assumes 1 byte per char, so a 32-*byte*
-    // multibyte input would otherwise panic on a non-char-boundary slice.
-    if hex.len() != 32 || !hex.is_ascii() {
+    // Every char must be an ASCII hex digit: this rejects non-hex input (a bare
+    // `u8::from_str_radix` on a 2-char window would otherwise accept a leading `+`/`-`)
+    // and guarantees 1 byte per char, so the byte-slicing below can't split a
+    // multibyte char and panic.
+    if hex.len() != 32 || !hex.bytes().all(|b| b.is_ascii_hexdigit()) {
         return None;
     }
     let mut bytes = [0u8; 16];

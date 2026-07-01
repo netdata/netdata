@@ -53,11 +53,12 @@ pub struct TraceSpan {
 /// `parent_span_id` is unset OR absent from this set is a **root** — so a partial
 /// trace still forms a forest rather than dropping spans.
 ///
-/// Normal traces are a forest. A *pathological* parent cycle (every span has an
-/// in-set parent, so there is no natural root) is handled defensively: the earliest
-/// span is surfaced as a root so no span is unreachable, but [`children`](Self::children)
-/// then still contains the cycle's edges — a walker MUST guard against revisiting a
-/// node (as the `ng-index-traces` printer does).
+/// Normal traces are a forest. **Every span is reachable from some root** even for
+/// pathological input: a parent cycle (or a cyclic component with no external entry)
+/// has no natural root, so the earliest still-unreached span is promoted to a root
+/// until all spans are reachable. In that case [`children`](Self::children) still
+/// contains the cycle's edges, so a walker MUST guard against revisiting a node (as
+/// the `ng-index-traces` printer does).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Trace {
     /// The trace's spans, sorted by `start_ns` (ties broken by `span_id`) — the
@@ -406,7 +407,10 @@ impl<'a> IndexReader<'a> {
         let mut spans: Vec<TraceSpan> = Vec::with_capacity(positions.len());
         for (i, &pos) in positions.iter().enumerate() {
             let span_id = span_ids.get(pos as usize);
-            if !seen.insert(span_id) {
+            // Dedup real span ids (resends) to the first seen, but NEVER collapse
+            // UNSET (all-zero) ids: those are distinct spans that merely lack a valid
+            // span_id (malformed/absent), not one span sent twice.
+            if !span_id.is_unset() && !seen.insert(span_id) {
                 continue;
             }
             spans.push(TraceSpan {
@@ -447,11 +451,30 @@ impl<'a> IndexReader<'a> {
             }
         }
 
-        // Pathological guard: if every span has an in-set parent (a parent cycle),
-        // there is no natural root and a root-first walk would reach nothing. Surface
-        // the earliest span as a root so no span is silently unreachable.
-        if roots.is_empty() && !spans.is_empty() {
-            roots.push(0);
+        // Reachability guard: guarantee every span is reachable from some root, so a
+        // root-first walk visits all of them. Spans with an unset/missing/self parent
+        // are already roots; but a pathological parent *cycle* (or a cyclic component
+        // with no external entry) would leave its members reachable from no root even
+        // though they are present in `spans`. Promote the earliest unreached span to a
+        // root and repeat until everything is reachable. Iterative; O(V+E) overall
+        // (`reachable` persists across rounds, so each edge is followed once).
+        let mut reachable = vec![false; spans.len()];
+        let mut stack: Vec<usize> = Vec::new();
+        loop {
+            stack.extend(roots.iter().copied().filter(|&i| !reachable[i]));
+            while let Some(i) = stack.pop() {
+                if reachable[i] {
+                    continue;
+                }
+                reachable[i] = true;
+                if let Some(kids) = children.get(&spans[i].span_id) {
+                    stack.extend(kids.iter().copied().filter(|&c| !reachable[c]));
+                }
+            }
+            match reachable.iter().position(|&r| !r) {
+                Some(i) => roots.push(i), // earliest (start-sorted) unreached span
+                None => break,
+            }
         }
 
         Ok(Trace {

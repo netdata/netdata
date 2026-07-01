@@ -230,6 +230,56 @@ fn trace_by_id_cycle_surfaces_all_spans_under_a_root() {
 }
 
 #[test]
+fn trace_by_id_keeps_distinct_unset_span_ids() {
+    // Two spans that both lack a span_id (unset) are distinct spans, not a resend —
+    // they must NOT be collapsed by the span-id dedup.
+    let t = [0xafu8; 16];
+    let mk = |name: &str, start: u64| Span {
+        trace_id: t.to_vec(),
+        span_id: vec![],        // unset
+        parent_span_id: vec![], // root
+        start_time_unix_nano: start,
+        end_time_unix_nano: start + 10,
+        name: name.into(),
+        ..Default::default()
+    };
+    let bytes = seal(vec![req(vec![mk("a", 100), mk("b", 110)])]);
+    let tr = IndexReader::open(&bytes).unwrap().trace_by_id(TraceId::from(t)).unwrap();
+    assert_eq!(tr.spans.len(), 2, "distinct unset-span-id spans are not collapsed");
+    assert!(tr.spans.iter().all(|s| s.span_id == SpanId::UNSET));
+    assert_eq!(tr.roots.len(), 2, "both are roots (unset parent)");
+}
+
+#[test]
+fn trace_by_id_reaches_all_spans_despite_a_cyclic_component() {
+    // A valid rooted pair (R->C) coexisting with a disjoint parent cycle (X<->Y).
+    // `roots` is non-empty (R), so a naive "promote only when roots empty" guard
+    // would leave X,Y unreachable. The reachability guard must surface them.
+    let t = [0x5bu8; 16];
+    let (r, c, x, y) = ([1u8; 8], [2u8; 8], [3u8; 8], [4u8; 8]);
+    let bytes = seal(vec![req(vec![
+        span(t, r, ROOT_PARENT, 100, 200, "root"),
+        span(t, c, r, 110, 150, "child"),
+        span(t, x, y, 120, 160, "x"), // x's parent is y
+        span(t, y, x, 130, 170, "y"), // y's parent is x (cycle)
+    ])]);
+    let tr = IndexReader::open(&bytes).unwrap().trace_by_id(TraceId::from(t)).unwrap();
+    assert_eq!(tr.spans.len(), 4);
+    // A revisit-guarded walk from the roots must reach every span.
+    let mut seen: HashSet<usize> = HashSet::new();
+    let mut stack: Vec<usize> = tr.roots.clone();
+    while let Some(i) = stack.pop() {
+        if !seen.insert(i) {
+            continue;
+        }
+        if let Some(kids) = tr.children.get(&tr.spans[i].span_id) {
+            stack.extend(kids.iter().copied());
+        }
+    }
+    assert_eq!(seen.len(), 4, "every span reachable from a root");
+}
+
+#[test]
 fn trace_by_id_self_parent_is_a_root() {
     // A span that is its own parent must be a root (not a self-child), and carry no
     // self-edge in `children`.
