@@ -292,6 +292,7 @@ func main() {
 
 	// Timer for reconnection backoff
 	var timer *time.Timer
+	stdinClosedNotify := (<-chan struct{})(stdinClosedCh)
 
 	// Main connection loop
 	for {
@@ -299,10 +300,10 @@ func main() {
 		case <-doneCh:
 			// Program termination requested
 			return
-		case <-stdinClosedCh:
+		case <-stdinClosedNotify:
 			// Stdin closed, continue running until websocket disconnects
 			// and then exit on the next reconnection attempt
-			stdinClosedCh = nil // Prevent duplicate handling
+			stdinClosedNotify = nil // Prevent duplicate handling
 		case <-reconnectCh:
 			// Immediate reconnection requested (e.g. from stdin activity)
 			if timer != nil {
@@ -351,10 +352,10 @@ func main() {
 					// Program termination requested
 					timer.Stop()
 					return
-				case <-stdinClosedCh:
+				case <-stdinClosedNotify:
 					// Stdin closed
 					timer.Stop()
-					stdinClosedCh = nil
+					stdinClosedNotify = nil
 					continue
 				}
 			}
@@ -471,7 +472,6 @@ func main() {
 				return
 			case <-stdinClosedCh:
 				// Stdin closed, but keep connection active
-				stdinClosedCh = nil
 				return
 			}
 		}()
