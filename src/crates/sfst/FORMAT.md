@@ -92,7 +92,7 @@ within its tier in the trailing bytes.
     "SUMR"      Summary                                       No (always emitted)
     "META"      Metadata                                      No (always emitted)
     "TIMS"      Vec<i64>  (per-log nanosecond timestamps)     Yes
-    "PRIM"      PrefixMap<BitmapValue>                         Yes
+    "PRIM"      PrefixMap<BitmapValue>                        Yes
     "OBTS"      Vec<i64>  (per-row observed timestamps)       No (per-row column, v8)
     "TRCE"      16-byte arena (per-row trace ids)             No (per-row column, v8)
     "SPAN"      8-byte arena (per-row span ids)               No (per-row column, v8)
@@ -101,7 +101,7 @@ within its tier in the trailing bytes.
     "PSPN"      8-byte arena (per-row parent_span_id)         No (per-row column, additive v9)
     "DURN"      Vec<i64>  (per-row span duration, ns)         No (per-row column, additive v9)
     "TIDX"      TraceIdIndex  (trace_id fanout + sort permutation)  No (optional, additive v9)
-    "MF{hi}{lo}" PrefixMap<BitmapValue>  (mid-card field)      No (one per mid field)
+    "MF{hi}{lo}" PrefixMap<BitmapValue>  (mid-card field)     No (one per mid field)
     "HF{hi}{lo}" HighField  (high-card field, columnar SoA)   No (one per high field)
     "SB0{N}"    StreamBatch  (stream-batch N, fixed-width arena)  Yes (at least 1)
 
@@ -340,7 +340,7 @@ The bitmap records the time-sorted log positions where the
 
 One chunk per mid-cardinality field, in the order those fields appear
 in the derived field table (`SchemaTree::derive_field_table`). Same payload
-schema as `PRIM` — an `PrefixMap<BitmapValue>` whose keys are full `key=value`
+schema as `PRIM` — a `PrefixMap<BitmapValue>` whose keys are full `key=value`
 strings.
 
 ### `HF{i}` — High-card field columnar (string arena)

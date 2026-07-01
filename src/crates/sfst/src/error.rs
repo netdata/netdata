@@ -55,7 +55,7 @@ pub enum Error {
     /// [`StreamWriter::primary`](crate::StreamWriter::primary) /
     /// [`add_mid_field`](crate::StreamWriter::add_mid_field). A producer
     /// bug, never a data condition.
-    #[error("prefix-map build error: {0}")]
+    #[error("{0}")]
     PrefixMapBuild(String),
 
     /// [`StreamWriter::new`](crate::StreamWriter::new) was given a
