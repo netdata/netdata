@@ -1262,6 +1262,7 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
         if (open_errno == ENOENT)
             return 1;
         ctx_fs_error(ctx);
+        errno = open_errno; // nd_win_trace may have clobbered errno; netdata_log_error captures it
         netdata_log_error("DBENGINE: failed to open \"%s\"", path_v2);
         return 1;
     }
