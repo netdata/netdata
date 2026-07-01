@@ -80,6 +80,11 @@ static const char *hash_to_static_string(FACETS_HASH hash) {
 }
 
 static inline bool is_valid_string_hash(const char *s) {
+    if(!s) {
+        netdata_log_error("The user supplied key is NULL for a facets hash.");
+        return false;
+    }
+
     if(strlen(s) != FACET_STRING_HASH_SIZE - 1) {
         netdata_log_error("The user supplied key '%s' does not have the right length for a facets hash.", s);
         return false;
