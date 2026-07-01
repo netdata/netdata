@@ -812,7 +812,8 @@ bool stream_sender_receive_data(struct stream_thread *sth, struct sender_state *
                 pulse_stream_received_bytes(rc);
 
                 worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
-                stream_sender_execute_commands(s);
+                if(!stream_sender_execute_commands(s))
+                    status = EVLOOP_STATUS_SOCKET_ERROR;
             }
             else if (rc == 0 || errno == ECONNRESET)
                 status = EVLOOP_STATUS_SOCKET_CLOSED;

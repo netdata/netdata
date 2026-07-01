@@ -14,9 +14,6 @@
 // this has to be in-sync with the same at stream-thread.c
 #define WORKER_RECEIVER_JOB_REPLICATION_COMPLETION 24
 
-// this controls the max response size of a function
-#define PLUGINSD_MAX_DEFERRED_SIZE (100 * 1024 * 1024)
-
 #define PLUGINSD_MIN_RRDSET_POINTERS_CACHE 1024
 // Slots are cache indexes. Larger values are treated as uncached input to avoid sparse cache allocations.
 #define PLUGINSD_CHART_SLOT_MAX 1000000

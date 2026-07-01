@@ -142,12 +142,56 @@ static void cleanup_deferred_data(struct sender_state *s) {
     s->thread.defer.action_data = NULL;
 }
 
+static bool stream_sender_defer_is_end_keyword_prefix(struct sender_state *s, const char *line, size_t line_len) {
+    const char *end_keyword = s->thread.defer.end_keyword;
+    if(unlikely(!end_keyword))
+        return false;
+
+    size_t keyword_len = strlen(end_keyword);
+
+    return line_len <= keyword_len && memcmp(line, end_keyword, line_len) == 0;
+}
+
+static bool stream_sender_defer_is_end_keyword(struct sender_state *s, const char *line, size_t line_len) {
+    const char *end_keyword = s->thread.defer.end_keyword;
+    if(unlikely(!end_keyword))
+        return false;
+
+    size_t keyword_len = strlen(end_keyword);
+
+    return line_len == keyword_len && memcmp(line, end_keyword, line_len) == 0;
+}
+
+static bool stream_sender_defer_payload_append(struct sender_state *s, const char *line, size_t line_len, bool add_newline) {
+    size_t add_len = line_len + (add_newline ? 1 : 0);
+    size_t current_len = buffer_strlen(s->thread.defer.payload);
+
+    if(add_len > PLUGINSD_MAX_DEFERRED_SIZE || current_len > PLUGINSD_MAX_DEFERRED_SIZE - add_len) {
+        size_t attempted_len = current_len > SIZE_MAX - add_len ? SIZE_MAX : current_len + add_len;
+
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM SND '%s' [to %s]: deferred payload is too big (%zu bytes, limit %zu bytes) "
+               "while waiting for keyword '%s'. Restarting sender connection.",
+               rrdhost_hostname(s->host), s->remote_ip,
+               attempted_len,
+               (size_t)PLUGINSD_MAX_DEFERRED_SIZE,
+               s->thread.defer.end_keyword ? s->thread.defer.end_keyword : "unknown");
+        return false;
+    }
+
+    buffer_fast_strcat(s->thread.defer.payload, line, line_len);
+    if(add_newline)
+        buffer_putc(s->thread.defer.payload, '\n');
+
+    return true;
+}
+
 void stream_sender_execute_commands_cleanup(struct sender_state *s) {
     cleanup_deferred_data(s);
 }
 
 // This is just a placeholder until the gap filling state machine is inserted
-void stream_sender_execute_commands(struct sender_state *s) {
+bool stream_sender_execute_commands(struct sender_state *s) {
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &s->thread.rbuf.line),
         ND_LOG_FIELD_END(),
@@ -166,7 +210,13 @@ void stream_sender_execute_commands(struct sender_state *s) {
 
         if(!newline) {
             if(s->thread.defer.end_keyword) {
-                buffer_strcat(s->thread.defer.payload, start);
+                size_t line_len = end - start;
+                if(stream_sender_defer_is_end_keyword_prefix(s, start, line_len))
+                    break;
+
+                if(!stream_sender_defer_payload_append(s, start, line_len, false))
+                    return false;
+
                 start = end;
             }
             break;
@@ -176,7 +226,7 @@ void stream_sender_execute_commands(struct sender_state *s) {
         s->thread.rbuf.line.count++;
 
         if(s->thread.defer.end_keyword) {
-            if(strcmp(start, s->thread.defer.end_keyword) == 0) {
+            if(stream_sender_defer_is_end_keyword(s, start, newline - start)) {
 #ifdef NETDATA_LOG_STREAM_SENDER
                 buffer_strcat(s->log.received, buffer_tostring(s->thread.defer.payload));
                 buffer_strcat(s->log.received, "\n");
@@ -188,8 +238,8 @@ void stream_sender_execute_commands(struct sender_state *s) {
                 cleanup_deferred_data(s);
             }
             else {
-                buffer_strcat(s->thread.defer.payload, start);
-                buffer_putc(s->thread.defer.payload, '\n');
+                if(!stream_sender_defer_payload_append(s, start, newline - start, true))
+                    return false;
             }
 
             continue;
@@ -340,4 +390,6 @@ void stream_sender_execute_commands(struct sender_state *s) {
         s->thread.rbuf.b[0] = '\0';
         s->thread.rbuf.read_len = 0;
     }
+
+    return true;
 }
