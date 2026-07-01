@@ -131,6 +131,21 @@ func runSocketGlobalCollector(handle *SocketLegacyHandle, stop <-chan struct{}, 
 		}
 	}
 
+	clearSocketApps := func() {
+		if store == nil {
+			return
+		}
+
+		// Snapshot failures mean this cycle has no trustworthy per-PID socket
+		// data. Clear prior values so consumers see zeros, not stale activity.
+		store.UpdateSocketApps(nil)
+		if shmPublisher != nil {
+			if err := store.Publish(shmPublisher); err != nil {
+				logPluginErr("socket.publish", "socket", "shared memory publish", err)
+			}
+		}
+	}
+
 	collectAndPublish := func() {
 		// Mark the socket module active before any early return so the SOCKET
 		// SHM flag is set even when Snapshot or SnapshotPerPID fails.  Without
@@ -143,6 +158,7 @@ func runSocketGlobalCollector(handle *SocketLegacyHandle, stop <-chan struct{}, 
 		snap, err := handle.Runtime.Snapshot(handle.MapsPerCore)
 		if err != nil {
 			logPluginErr("socket.snapshot", "socket", "snapshot", err)
+			clearSocketApps()
 			return
 		}
 		if publish, ok := state.Update(snap); ok {
@@ -153,6 +169,7 @@ func runSocketGlobalCollector(handle *SocketLegacyHandle, stop <-chan struct{}, 
 			pidEntries, pidErr := handle.Runtime.SnapshotPerPID()
 			if pidErr != nil {
 				logPluginErr("socket.snapshot_per_pid", "socket", "per-PID snapshot", pidErr)
+				clearSocketApps()
 			} else {
 				store.UpdateSocketApps(pidEntries)
 				if shmPublisher != nil {

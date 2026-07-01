@@ -319,11 +319,35 @@ func (s *cachestatSharedMemoryStore) UpdateSocketApps(entries []libbpfloader.Soc
 		}
 	}
 	s.activeModules |= ebpfgoSHMFlagSocket // mark socket as an active producer
+	if len(s.socketData) == 0 {
+		s.clearSocketDataFromEntriesLocked()
+		return
+	}
 	if len(s.entries) == 0 {
 		s.buildEntriesFromSocketLocked()
 	} else {
 		s.applySocketDataLocked()
 	}
+}
+
+// clearSocketDataFromEntriesLocked removes the socket contribution from the
+// current snapshot while preserving real cachestat rows.
+func (s *cachestatSharedMemoryStore) clearSocketDataFromEntriesLocked() {
+	nextEntries := s.entries[:0]
+	for i := range s.entries {
+		s.entries[i].socket = ebpfSocketPublishApps{}
+		if entryHasCachestatData(s.entries[i]) {
+			nextEntries = append(nextEntries, s.entries[i])
+		}
+	}
+	s.entries = nextEntries
+}
+
+func entryHasCachestatData(entry ebpfPidStat) bool {
+	if entry.ppid != 0 || entry.cachestat != (netdataPublishCachestat{}) {
+		return true
+	}
+	return entry.comm != ([EBPF_MAX_COMPARE_NAME + 1]byte{})
 }
 
 // buildEntriesFromSocketLocked populates s.entries from the latest socket
