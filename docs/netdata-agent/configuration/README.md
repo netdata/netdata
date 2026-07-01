@@ -10,7 +10,7 @@ You configure your Netdata Agent using the main configuration file `netdata.conf
 
 :::note
 
-On a freshly installed system, `netdata.conf` contains only comments — instructions for how to obtain the running configuration (see [Edit Configuration Files](#edit-configuration-files) below). This is normal and expected. A comment-only file means the Agent is running with built-in defaults, and no changes are required unless you want to override those defaults.
+On a freshly installed system, `netdata.conf` contains only comments and instructions for how to obtain the running configuration see [Edit Configuration Files](#edit-configuration-files) below. This is normal and expected, a comment-only file means the Agent is running with built-in defaults, and no changes are required unless you want to override those defaults.
 
 :::
 
