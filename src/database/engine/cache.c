@@ -2609,6 +2609,7 @@ void pgc_open_cache_to_journal_v2(
             fatal("CACHE: JudyLIns(JudyL_pages_by_start_time, %ld) failed, JudyL_pages_by_start_time = %p, result = %p",
                   (long)page->start_time_s, mi->JudyL_pages_by_start_time, PValue);
 
+        bool page_queued_for_jv2_cleanup = false;
         if(!*PValue) {
             struct jv2_page_info *pi = aral_mallocz(ar_pi);
             pi->start_time_s = page->start_time_s;
@@ -2620,19 +2621,25 @@ void pgc_open_cache_to_journal_v2(
             pi->custom_data = (cache->config.additional_bytes_per_page) ? page->custom_data : NULL;
             *PValue = pi;
 
+            page_queued_for_jv2_cleanup = true;
             count_of_unique_pages++;
         }
         else {
             // impossible situation
             internal_fatal(true, "Page is already in JudyL metric pages");
-            page_flag_clear(page, PGC_PAGE_IS_BEING_MIGRATED_TO_V2);
-            page_transition_unlock(cache, page);
-            page_release(cache, page, false);
         }
 
         if (likely(false == startup))
             yield_the_processor(); // do not lock too aggressively
         pgc_queue_lock(cache, &cache->hot, PGC_QUEUE_LOCK_PRIO_LOW);
+
+        if(unlikely(!page_queued_for_jv2_cleanup)) {
+            // The loop advances through page->link.next; keep the page pinned
+            // until the hot lock protects the cursor again.
+            page_flag_clear(page, PGC_PAGE_IS_BEING_MIGRATED_TO_V2);
+            page_transition_unlock(cache, page);
+            page_release(cache, page, false);
+        }
     }
 
     spinlock_unlock(&sp->migration_to_v2_spinlock);
