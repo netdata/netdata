@@ -1080,7 +1080,7 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, time_t after, const ch
      buffer_json_initialize(wb, "\"", "\"", 0, false, BUFFER_JSON_OPTIONS_DEFAULT);
      buffer_json_member_add_array(wb, NULL);
 
-     while (sqlite3_step(stmt_query) == SQLITE_ROW) {
+     while (sqlite3_step_monitored(stmt_query) == SQLITE_ROW) {
          char old_value_string[100 + 1];
          char new_value_string[100 + 1];
 
@@ -1540,7 +1540,7 @@ run_query:;
     size_t invalid_transition_ids = 0;
 
     param = 0;
-    while (sqlite3_step(res) == SQLITE_ROW) {
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         if (unlikely(!sqlite3_column_uuid_copy(res, 0, host_id))) {
             invalid_host_ids++;
             continue;
@@ -1684,7 +1684,7 @@ int sql_get_alert_configuration(
 
     added = 0;
     int param;
-    while (sqlite3_step(res) == SQLITE_ROW) {
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         param = 0;
         if (unlikely(!sqlite3_column_uuid_copy(res, param++, config_hash_id))) {
             invalid_config_hash_ids++;
