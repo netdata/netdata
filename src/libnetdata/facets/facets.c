@@ -2277,6 +2277,10 @@ static inline void facets_reset_key(FACET_KEY *k) {
     k->key_values_selected_in_row = 0;
     k->current_value.flags = FACET_KEY_VALUE_NONE;
     k->current_value.hash = FACETS_HASH_ZERO;
+    k->current_value.raw = NULL;
+    k->current_value.raw_len = 0;
+    k->current_value.b->len = 0;
+    k->current_value.v = NULL;
 }
 
 static inline void facets_track_key_in_current_row(FACETS *facets, FACET_KEY *k) {
