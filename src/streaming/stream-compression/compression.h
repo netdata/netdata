@@ -12,12 +12,27 @@
 #endif
 
 typedef uint32_t stream_compression_signature_t;
+#define STREAM_COMPRESSION_SIGNATURE_LENGTH_BITS 14U
+#define STREAM_COMPRESSION_SIGNATURE_MAX_PAYLOAD_SIZE ((1U << STREAM_COMPRESSION_SIGNATURE_LENGTH_BITS) - 1U)
+#define STREAM_COMPRESSION_SIGNATURE_7BIT_MASK ((stream_compression_signature_t)0x7fU)
+#define STREAM_COMPRESSION_SIGNATURE_HIGH_BITS_MASK (STREAM_COMPRESSION_SIGNATURE_7BIT_MASK << 7)
+
+#if COMPRESSION_MAX_CHUNK > (STREAM_COMPRESSION_SIGNATURE_MAX_PAYLOAD_SIZE + 1U)
+#error "COMPRESSION_MAX_CHUNK exceeds stream compression signature length capacity"
+#endif
+
 #define STREAM_COMPRESSION_SIGNATURE ((stream_compression_signature_t)('z' | 0x80) | (0x80 << 8) | (0x80 << 16) | ('\n' << 24))
 #define STREAM_COMPRESSION_SIGNATURE_MASK ((stream_compression_signature_t) 0xffU | (0x80U << 8) | (0x80U << 16) | (0xffU << 24))
 #define STREAM_COMPRESSION_SIGNATURE_SIZE sizeof(stream_compression_signature_t)
 
 static inline stream_compression_signature_t stream_compress_encode_signature(size_t compressed_data_size) {
-    stream_compression_signature_t len = ((compressed_data_size & 0x7f) | 0x80 | (((compressed_data_size & (0x7f << 7)) << 1) | 0x8000)) << 8;
+    if(unlikely(compressed_data_size > STREAM_COMPRESSION_SIGNATURE_MAX_PAYLOAD_SIZE))
+        fatal("STREAM_COMPRESS: compressed data size %zu exceeds stream compression signature capacity %u",
+              compressed_data_size, STREAM_COMPRESSION_SIGNATURE_MAX_PAYLOAD_SIZE);
+
+    stream_compression_signature_t len =
+        ((((stream_compression_signature_t)compressed_data_size & STREAM_COMPRESSION_SIGNATURE_7BIT_MASK) | 0x80U |
+          ((((stream_compression_signature_t)compressed_data_size & STREAM_COMPRESSION_SIGNATURE_HIGH_BITS_MASK) << 1) | 0x8000U)) << 8);
     return len | STREAM_COMPRESSION_SIGNATURE;
 }
 
@@ -151,7 +166,8 @@ static inline size_t stream_decompress_decode_signature(const char *data, size_t
     if (unlikely((sign & STREAM_COMPRESSION_SIGNATURE_MASK) != STREAM_COMPRESSION_SIGNATURE))
         return 0;
 
-    size_t length = ((sign >> 8) & 0x7f) | ((sign >> 9) & (0x7f << 7));
+    size_t length = ((sign >> 8) & STREAM_COMPRESSION_SIGNATURE_7BIT_MASK) |
+                    ((sign >> 9) & STREAM_COMPRESSION_SIGNATURE_HIGH_BITS_MASK);
     return length;
 }
 
