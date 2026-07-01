@@ -7,12 +7,13 @@
 //! ng-index-traces trace --sfst /tmp/traces.sfst --trace-id <32-hex-chars>
 //! ```
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 use ng_index::{Metrics, build_sfst_traces_file};
-use sfst::{IndexReader, TraceId};
+use sfst::{IndexReader, Reader, TraceId};
 
 #[derive(Parser)]
 #[command(
@@ -36,22 +37,85 @@ enum Cmd {
         #[arg(long)]
         out: PathBuf,
     },
-    /// Reconstruct a trace from a sealed SFST and print its spans + parent/child tree.
+    /// Reconstruct a trace from a sealed SFST and print its spans + parent/child tree
+    /// (`--trace-id`), or list distinct trace ids present in the file (`--sample N`)
+    /// to find one to look up. Exactly one of the two is required.
     Trace {
         /// The sealed SFST index file.
         #[arg(long)]
         sfst: PathBuf,
         /// The trace id as lowercase hex (32 chars = 16 bytes).
+        #[arg(long, conflicts_with = "sample", required_unless_present = "sample")]
+        trace_id: Option<String>,
+        /// Print up to N distinct trace ids present in the file instead of a lookup.
         #[arg(long)]
-        trace_id: String,
+        sample: Option<usize>,
     },
 }
 
 fn main() -> ExitCode {
     match Args::parse().cmd {
         Cmd::Seal { input, out } => seal(&input, &out),
-        Cmd::Trace { sfst, trace_id } => reconstruct(&sfst, &trace_id),
+        Cmd::Trace {
+            sfst,
+            trace_id: Some(id),
+            ..
+        } => reconstruct(&sfst, &id),
+        Cmd::Trace {
+            sfst,
+            sample: Some(n),
+            ..
+        } => sample_ids(&sfst, n),
+        // clap's `required_unless_present`/`conflicts_with` guarantees exactly one arm
+        // above fires; this is unreachable but keeps the match total.
+        Cmd::Trace { .. } => {
+            eprintln!("provide exactly one of --trace-id or --sample");
+            ExitCode::FAILURE
+        }
     }
+}
+
+/// Print up to `limit` distinct (non-unset) trace ids present in the sealed file, in
+/// chronological first-seen order — a starting point for a `--trace-id` lookup.
+fn sample_ids(sfst_path: &Path, limit: usize) -> ExitCode {
+    let bytes = match std::fs::read(sfst_path) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("read {}: {e}", sfst_path.display());
+            return ExitCode::FAILURE;
+        }
+    };
+    let reader = match Reader::open(&bytes) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("open sfst: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let trace_ids = match reader.trace_ids() {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("file has no trace_id column (not a traces file?): {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let mut seen: HashSet<TraceId> = HashSet::new();
+    let mut printed = 0usize;
+    for i in 0..trace_ids.len() {
+        let id = trace_ids.get(i);
+        if id.is_unset() || !seen.insert(id) {
+            continue;
+        }
+        println!("{id}");
+        printed += 1;
+        if printed >= limit {
+            break;
+        }
+    }
+    if printed == 0 {
+        eprintln!("no trace ids in {}", sfst_path.display());
+    }
+    ExitCode::SUCCESS
 }
 
 fn seal(wal: &Path, out: &Path) -> ExitCode {
