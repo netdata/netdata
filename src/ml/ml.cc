@@ -1179,14 +1179,20 @@ ml_chart_is_available_for_ml(ml_chart_t *chart)
 void
 ml_chart_update_dimension(ml_chart_t *chart, ml_dimension_t *dim, bool is_anomalous)
 {
-    switch (dim->mls) {
+    spinlock_lock(&dim->slock);
+    enum ml_machine_learning_status mls = dim->mls;
+    enum ml_metric_type mt = dim->mt;
+    enum ml_training_status ts = dim->ts;
+    spinlock_unlock(&dim->slock);
+
+    switch (mls) {
         case MACHINE_LEARNING_STATUS_DISABLED_DUE_TO_EXCLUDED_CHART:
             chart->mls.num_machine_learning_status_disabled_sp++;
             return;
         case MACHINE_LEARNING_STATUS_ENABLED: {
             chart->mls.num_machine_learning_status_enabled++;
 
-            switch (dim->mt) {
+            switch (mt) {
                 case METRIC_TYPE_CONSTANT:
                     chart->mls.num_metric_type_constant++;
                     chart->mls.num_training_status_trained++;
@@ -1197,7 +1203,7 @@ ml_chart_update_dimension(ml_chart_t *chart, ml_dimension_t *dim, bool is_anomal
                     break;
             }
 
-            switch (dim->ts) {
+            switch (ts) {
                 case TRAINING_STATUS_UNTRAINED:
                     chart->mls.num_training_status_untrained++;
                     return;
