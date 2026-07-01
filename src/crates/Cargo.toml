@@ -7,7 +7,6 @@ members = [
     "journal-core",
     "journal-index",
     "chunk-file",
-    "fst-index",
     "treight",
     "sfst",
     "journal-log-writer",
@@ -204,7 +203,6 @@ journal-engine = { path = "journal-engine" }
 journal-registry = { path = "journal-registry" }
 journal-function = { path = "journal-function" }
 rdp = { path = "rdp" }
-fst-index = { path = "fst-index" }
 treight = { path = "treight" }
 sfst = { path = "sfst" }
 sfst-indexer = { path = "sfst-indexer" }

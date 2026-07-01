@@ -31,5 +31,8 @@ fn error_on_older_format_version() {
         .into_inner();
     // Header layout: magic(4) | version(4, LE) | num_chunks(4). Overwrite v9 -> v8.
     buf[4..8].copy_from_slice(&8u32.to_le_bytes());
-    assert!(matches!(Reader::open(&buf), Err(Error::UnsupportedVersion(8))));
+    assert!(matches!(
+        Reader::open(&buf),
+        Err(Error::UnsupportedVersion(8))
+    ));
 }

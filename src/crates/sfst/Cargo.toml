@@ -10,7 +10,8 @@ workspace = true
 
 [dependencies]
 # Format
-fst-index = { workspace = true, features = ["serde"] }
+fst = { workspace = true }
+bumpalo = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_bytes = { workspace = true }
 bincode = { workspace = true }
@@ -30,6 +31,7 @@ tempfile = { workspace = true }
 uuid = { workspace = true }
 clap = { workspace = true }
 chrono = { workspace = true }
+serde_json = { workspace = true }
 
 [[example]]
 name = "inspect"

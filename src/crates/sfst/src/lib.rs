@@ -1,6 +1,6 @@
 //! Container format for split-FST log indexes.
 //!
-//! An SFST file holds one **primary** [`FstIndex`](fst_index::FstIndex) of
+//! An SFST file holds one **primary** [`PrefixMap`] of
 //! low-cardinality `key=value` pairs, zero or more **secondary** chunks
 //! (mid-cardinality per-field FSTs, high-cardinality per-field sorted lists),
 //! and one stream-log-entries chunk, all keyed by a [`chunk_file`] TOC for
@@ -25,14 +25,14 @@
 //! # Example
 //!
 //! ```
-//! use fst_index::FstIndex;
+//! use sfst::PrefixMap;
 //! use sfst::{BitmapValue, ChunkCounts, ColumnsPresent, StreamBatch, StreamWriter};
 //! use treight::Bitmap;
 //!
 //! // Build a minimal primary FST with one `key=value` entry.
 //! let bm = BitmapValue { desc: Bitmap::empty(0), data: Vec::new() };
-//! let primary: FstIndex<BitmapValue> =
-//!     FstIndex::build([("level=info", bm)]).unwrap();
+//! let primary: PrefixMap<BitmapValue> =
+//!     PrefixMap::build([("level=info", bm)]).unwrap();
 //!
 //! // Write a minimal file: the four always-present chunks in their
 //! // canonical order, plus one (empty) stream batch.
@@ -71,6 +71,7 @@
 
 mod error;
 mod index_reader;
+mod prefix_map;
 pub mod query;
 mod reader;
 mod schema;
@@ -81,6 +82,7 @@ pub mod registry;
 
 pub use error::Error;
 pub use index_reader::{BitmapFilter, IndexReader, Trace, TraceSpan};
+pub use prefix_map::{BuildError, PrefixMap};
 pub use query::{
     Bucket, FacetResult, Filter, Grid, Matcher, MaterializedRow, Timeline, Timestamps,
     compile_pattern, compile_query,

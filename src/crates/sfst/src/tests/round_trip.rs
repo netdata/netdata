@@ -5,9 +5,9 @@
 //! decode to the values we put in.
 
 use super::fixture::FixtureWriter;
+use crate::PrefixMap;
 use crate::writer::pack;
 use crate::*;
-use fst_index::FstIndex;
 use treight::Bitmap;
 
 fn empty_bitmap() -> BitmapValue {
@@ -17,9 +17,9 @@ fn empty_bitmap() -> BitmapValue {
     }
 }
 
-fn build_primary(keys: &[&str]) -> FstIndex<BitmapValue> {
+fn build_primary(keys: &[&str]) -> PrefixMap<BitmapValue> {
     let entries: Vec<(&str, BitmapValue)> = keys.iter().map(|k| (*k, empty_bitmap())).collect();
-    FstIndex::build(entries).unwrap()
+    PrefixMap::build(entries).unwrap()
 }
 
 fn empty_timestamps() -> Vec<u8> {

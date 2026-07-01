@@ -304,7 +304,10 @@ mod tests {
         let idx = TraceIdIndex::build(&t);
         assert_eq!(idx.indexed_rows(), 2, "the two zero rows are not indexed");
         assert_eq!(idx.positions(a, &t), &[1, 3]);
-        assert!(idx.positions(TraceId::UNSET, &t).is_empty(), "unset id has no trace");
+        assert!(
+            idx.positions(TraceId::UNSET, &t).is_empty(),
+            "unset id has no trace"
+        );
     }
 
     #[test]
@@ -327,8 +330,14 @@ mod tests {
         t[1] = 0xbc;
         let t = TraceId::from(t);
         assert_eq!(t.to_string(), "0abc0000000000000000000000000000");
-        assert_eq!(format!("{t:?}"), "TraceId(0abc0000000000000000000000000000)");
-        assert_eq!(SpanId::from([0xff, 0, 0, 0, 0, 0, 0, 1]).to_string(), "ff00000000000001");
+        assert_eq!(
+            format!("{t:?}"),
+            "TraceId(0abc0000000000000000000000000000)"
+        );
+        assert_eq!(
+            SpanId::from([0xff, 0, 0, 0, 0, 0, 0, 1]).to_string(),
+            "ff00000000000001"
+        );
     }
 
     #[test]
@@ -392,21 +401,33 @@ mod tests {
         let mut raw = [0u32; 256];
         raw[5] = 10;
         raw[6] = 5; // a drop violates the cumulative (non-decreasing) invariant.
-        assert!(decode_fanout(&raw).is_err(), "non-monotonic fanout must be rejected on decode");
+        assert!(
+            decode_fanout(&raw).is_err(),
+            "non-monotonic fanout must be rejected on decode"
+        );
     }
 
     #[test]
     fn validate_rejects_fanout_tail_mismatch() {
         // total() == 0 (empty fanout) but a non-empty permutation.
-        let idx = TraceIdIndex { fanout: Fanout::build(std::iter::empty()), sort_perm: vec![0] };
-        assert!(idx.validate(1).is_err(), "fanout total != sort_perm.len() must be rejected");
+        let idx = TraceIdIndex {
+            fanout: Fanout::build(std::iter::empty()),
+            sort_perm: vec![0],
+        };
+        assert!(
+            idx.validate(1).is_err(),
+            "fanout total != sort_perm.len() must be rejected"
+        );
     }
 
     #[test]
     fn validate_rejects_out_of_range_position() {
         // total() == 1 matches sort_perm.len() == 1 (passes the tail check), but
         // position 5 is out of range for record_count 3.
-        let idx = TraceIdIndex { fanout: Fanout::build(std::iter::once(0u8)), sort_perm: vec![5] };
+        let idx = TraceIdIndex {
+            fanout: Fanout::build(std::iter::once(0u8)),
+            sort_perm: vec![5],
+        };
         assert!(idx.validate(3).is_err(), "position 5 >= record_count 3");
     }
 
@@ -418,7 +439,9 @@ mod tests {
         let mut ids = Vec::new();
         let mut state: u64 = 0x9E37_79B9_7F4A_7C15;
         for _ in 0..2000 {
-            state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             // Only ~12 distinct first bytes so traces share buckets and repeat.
             let mut a = [0u8; 16];
             a[0] = (state >> 56) as u8 % 12 + 1;

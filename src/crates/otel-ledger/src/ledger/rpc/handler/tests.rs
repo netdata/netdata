@@ -1,9 +1,9 @@
 use super::*;
 use file_registry::{ByteSize, FileId, TenantId, TimestampNs};
-use fst_index::FstIndex;
 use otel_logs_identity::ServiceStream;
 use serde_json::Value;
 use sfst::BitmapValue;
+use sfst::PrefixMap;
 use std::collections::HashMap;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -52,7 +52,7 @@ fn write_test_sfst(path: &std::path::Path, min_s: u32) {
         ("severity_text=error", bitmap_with(&[1, 3, 5], 6)),
         ("severity_text=info", bitmap_with(&[0, 2, 4], 6)),
     ];
-    let primary: FstIndex<BitmapValue> = FstIndex::build(primary_entries).unwrap();
+    let primary: PrefixMap<BitmapValue> = PrefixMap::build(primary_entries).unwrap();
 
     let summary =
         crate::test_helpers::summary_for(&ServiceStream::new("ns", "svc"), 6, min_s, min_s + 5);
@@ -144,7 +144,7 @@ fn write_service_only_sfst(path: &std::path::Path, min_s: u32) {
         ("service=api", bitmap_with(&[0, 1], 3)),
         ("service=worker", bitmap_with(&[2], 3)),
     ];
-    let primary: FstIndex<BitmapValue> = FstIndex::build(primary_entries).unwrap();
+    let primary: PrefixMap<BitmapValue> = PrefixMap::build(primary_entries).unwrap();
 
     let summary =
         crate::test_helpers::summary_for(&ServiceStream::new("ns", "svc"), 3, min_s, min_s + 2);
@@ -216,7 +216,7 @@ fn write_same_ts_sfst(path: &std::path::Path, ts_s: u32, n: usize) {
     let positions: Vec<u32> = (0..n as u32).collect();
     let primary_entries: Vec<(&str, BitmapValue)> =
         vec![("severity_text=info", bitmap_with(&positions, n as u32))];
-    let primary: FstIndex<BitmapValue> = FstIndex::build(primary_entries).unwrap();
+    let primary: PrefixMap<BitmapValue> = PrefixMap::build(primary_entries).unwrap();
 
     let summary =
         crate::test_helpers::summary_for(&ServiceStream::new("ns", "svc"), n as u32, ts_s, ts_s);

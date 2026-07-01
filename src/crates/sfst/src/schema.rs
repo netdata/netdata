@@ -216,7 +216,11 @@ impl ValueKind {
     pub fn is_scalar(self) -> bool {
         matches!(
             self,
-            ValueKind::Bool | ValueKind::Int | ValueKind::Double | ValueKind::Str | ValueKind::Bytes
+            ValueKind::Bool
+                | ValueKind::Int
+                | ValueKind::Double
+                | ValueKind::Str
+                | ValueKind::Bytes
         )
     }
 }
@@ -440,10 +444,7 @@ impl SchemaTree {
 
     /// Iterate `(id, node)` for every node.
     pub fn iter(&self) -> impl Iterator<Item = (NodeId, &SchemaNode)> {
-        self.nodes
-            .iter()
-            .enumerate()
-            .map(|(i, n)| (i as NodeId, n))
+        self.nodes.iter().enumerate().map(|(i, n)| (i as NodeId, n))
     }
 
     /// The root-first chain of steps leading to `id`.
@@ -521,10 +522,7 @@ impl SchemaTree {
             if !node.kind.is_leaf() {
                 continue;
             }
-            by_path
-                .entry(self.path(id))
-                .or_default()
-                .add(node.kind);
+            by_path.entry(self.path(id)).or_default().add(node.kind);
         }
         by_path
             .into_iter()
@@ -1179,7 +1177,9 @@ macro_rules! id_arena {
 
             /// An empty arena sized for `rows` ids.
             pub fn with_capacity(rows: usize) -> Self {
-                Self { bytes: Vec::with_capacity(rows * Self::WIDTH) }
+                Self {
+                    bytes: Vec::with_capacity(rows * Self::WIDTH),
+                }
             }
 
             /// Append one id. The typed value already carries exactly `WIDTH`

@@ -1,49 +1,26 @@
-//! Generic associative index backed by a finite state transducer.
+//! A prefix-searchable associative map, backed by a finite state transducer.
 //!
-//! An [`FstIndex<T>`] maps byte-string keys to associated values of type `T`,
-//! using an FST for compact key storage and a parallel `Vec<T>` for the values.
-//!
-//! The FST stores keys in sorted order and maps each key to its position in the
-//! values vector. This gives O(key_length) exact lookups and efficient prefix
-//! searches, with significantly less memory overhead than a `HashMap` for the
-//! keys.
-//!
-//! # Example
-//!
-//! ```
-//! use fst_index::FstIndex;
-//!
-//! let index: FstIndex<u32> = FstIndex::build([
-//!     ("apple", 1u32),
-//!     ("banana", 2),
-//!     ("application", 3),
-//! ]).unwrap();
-//!
-//! assert_eq!(index.get(b"banana"), Some(&2));
-//! assert_eq!(index.get(b"cherry"), None);
-//!
-//! // Prefix search: all keys starting with "app"
-//! let values = index.prefix_values(b"app");
-//! assert_eq!(values.len(), 2); // "apple" and "application"
-//! ```
+//! [`PrefixMap<T>`] maps byte-string keys to values of type `T`, using an FST
+//! for compact, sorted key storage and a parallel `Vec<T>` for the values —
+//! giving O(key_length) exact lookups and efficient prefix scans with far less
+//! key overhead than a `HashMap`.
 
 use fst::automaton::Automaton;
 use fst::{IntoStreamer, Streamer};
 
-#[cfg(feature = "serde")]
 mod serde_impl {
-    use super::FstIndex;
+    use super::PrefixMap;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     #[derive(Serialize, Deserialize)]
-    struct FstIndexHelper<T> {
+    struct PrefixMapHelper<T> {
         fst_bytes: Vec<u8>,
         values: Vec<T>,
     }
 
-    impl<T: Serialize + Clone> Serialize for FstIndex<T> {
+    impl<T: Serialize + Clone> Serialize for PrefixMap<T> {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-            let helper = FstIndexHelper {
+            let helper = PrefixMapHelper {
                 fst_bytes: self.map.as_fst().as_bytes().to_vec(),
                 values: self.values.clone(),
             };
@@ -51,13 +28,13 @@ mod serde_impl {
         }
     }
 
-    impl<'de, T: Deserialize<'de>> Deserialize<'de> for FstIndex<T> {
+    impl<'de, T: Deserialize<'de>> Deserialize<'de> for PrefixMap<T> {
         // FST value-indices are trusted in-bounds (upheld by `build`), not
         // re-validated here; an inconsistent input panics on lookup.
         fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-            let helper = FstIndexHelper::<T>::deserialize(deserializer)?;
+            let helper = PrefixMapHelper::<T>::deserialize(deserializer)?;
             let map = fst::Map::new(helper.fst_bytes).map_err(serde::de::Error::custom)?;
-            Ok(FstIndex {
+            Ok(PrefixMap {
                 map,
                 values: helper.values,
             })
@@ -65,13 +42,13 @@ mod serde_impl {
     }
 }
 
-/// Error type for FST index construction.
+/// Error building a [`PrefixMap`].
 #[derive(Debug)]
 pub struct BuildError(String);
 
 impl std::fmt::Display for BuildError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "FST build error: {}", self.0)
+        write!(f, "prefix-map build error: {}", self.0)
     }
 }
 
@@ -83,29 +60,42 @@ impl From<fst::Error> for BuildError {
     }
 }
 
-/// A generic associative index backed by a finite state transducer.
+/// A prefix-searchable associative map, backed by a finite state transducer.
 ///
-/// Maps byte-string keys to values of type `T`. Keys are stored in a
-/// compressed FST; values are stored in a `Vec<T>` ordered by sorted key.
+/// Maps byte-string keys to values of type `T`: keys live in a compressed FST,
+/// values in a `Vec<T>` ordered by sorted key. Supports exact lookup and prefix
+/// search. The key set is fixed at construction (no insert/remove), though
+/// individual values can be updated in place via [`get_mut`](Self::get_mut).
 ///
-/// Supports exact lookup by key and prefix search. The key set is fixed at
-/// construction — there is no insert/remove — though individual values can be
-/// updated in place via [`get_mut`](Self::get_mut).
-pub struct FstIndex<T> {
+/// ```
+/// use sfst::PrefixMap;
+///
+/// let m: PrefixMap<u32> = PrefixMap::build([
+///     ("apple", 1u32),
+///     ("banana", 2),
+///     ("application", 3),
+/// ])
+/// .unwrap();
+///
+/// assert_eq!(m.get(b"banana"), Some(&2));
+/// assert_eq!(m.get(b"cherry"), None);
+/// assert_eq!(m.prefix_values(b"app").len(), 2); // apple, application
+/// ```
+pub struct PrefixMap<T> {
     map: fst::Map<Vec<u8>>,
     values: Vec<T>,
 }
 
-impl<T: std::fmt::Debug> std::fmt::Debug for FstIndex<T> {
+impl<T: std::fmt::Debug> std::fmt::Debug for PrefixMap<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("FstIndex")
+        f.debug_struct("PrefixMap")
             .field("len", &self.map.len())
             .field("fst_bytes", &self.fst_bytes())
             .finish()
     }
 }
 
-impl<T: Clone> Clone for FstIndex<T> {
+impl<T: Clone> Clone for PrefixMap<T> {
     fn clone(&self) -> Self {
         let bytes = self.map.as_fst().as_bytes().to_vec();
         Self {
@@ -115,8 +105,8 @@ impl<T: Clone> Clone for FstIndex<T> {
     }
 }
 
-impl<T> FstIndex<T> {
-    /// Build an index from an unsorted iterator of `(key, value)` pairs.
+impl<T> PrefixMap<T> {
+    /// Build a map from an unsorted iterator of `(key, value)` pairs.
     ///
     /// Keys are sorted internally before FST construction. Duplicate keys
     /// are an error.
@@ -145,12 +135,12 @@ impl<T> FstIndex<T> {
         Ok(Self { map, values })
     }
 
-    /// Number of entries in the index.
+    /// Number of entries in the map.
     pub fn len(&self) -> usize {
         self.map.len()
     }
 
-    /// Returns `true` if the index contains no entries.
+    /// Returns `true` if the map contains no entries.
     pub fn is_empty(&self) -> bool {
         self.map.len() == 0
     }
@@ -176,7 +166,7 @@ impl<T> FstIndex<T> {
         self.map.get(key).map(|idx| &mut self.values[idx as usize])
     }
 
-    /// Returns `true` if the index contains the given key.
+    /// Returns `true` if the map contains the given key.
     pub fn contains_key(&self, key: &[u8]) -> bool {
         self.map.contains_key(key)
     }
@@ -221,7 +211,7 @@ impl<T> FstIndex<T> {
         }
     }
 
-    /// Call `f` for each `(key, value)` pair in the index.
+    /// Call `f` for each `(key, value)` pair in the map.
     ///
     /// Equivalent to `prefix_for_each(b"", f)` but with clearer intent.
     /// Values are visited in key-sorted order.
@@ -281,48 +271,48 @@ mod tests {
     use super::*;
 
     #[test]
-    fn empty_index() {
-        let index: FstIndex<u32> = FstIndex::build(Vec::<(&str, u32)>::new()).unwrap();
-        assert_eq!(index.len(), 0);
-        assert!(index.is_empty());
-        assert_eq!(index.get(b"anything"), None);
-        assert!(index.prefix_values(b"any").is_empty());
+    fn empty_map() {
+        let m: PrefixMap<u32> = PrefixMap::build(Vec::<(&str, u32)>::new()).unwrap();
+        assert_eq!(m.len(), 0);
+        assert!(m.is_empty());
+        assert_eq!(m.get(b"anything"), None);
+        assert!(m.prefix_values(b"any").is_empty());
     }
 
     #[test]
     fn single_entry() {
-        let index = FstIndex::build([("hello", 42u32)]).unwrap();
-        assert_eq!(index.len(), 1);
-        assert!(!index.is_empty());
-        assert_eq!(index.get(b"hello"), Some(&42));
-        assert_eq!(index.get(b"world"), None);
+        let m = PrefixMap::build([("hello", 42u32)]).unwrap();
+        assert_eq!(m.len(), 1);
+        assert!(!m.is_empty());
+        assert_eq!(m.get(b"hello"), Some(&42));
+        assert_eq!(m.get(b"world"), None);
     }
 
     #[test]
     fn exact_lookup() {
-        let index = FstIndex::build([("alpha", 1u32), ("beta", 2), ("gamma", 3)]).unwrap();
+        let m = PrefixMap::build([("alpha", 1u32), ("beta", 2), ("gamma", 3)]).unwrap();
 
-        assert_eq!(index.get(b"alpha"), Some(&1));
-        assert_eq!(index.get(b"beta"), Some(&2));
-        assert_eq!(index.get(b"gamma"), Some(&3));
-        assert_eq!(index.get(b"delta"), None);
-        assert!(index.contains_key(b"beta"));
-        assert!(!index.contains_key(b"delta"));
+        assert_eq!(m.get(b"alpha"), Some(&1));
+        assert_eq!(m.get(b"beta"), Some(&2));
+        assert_eq!(m.get(b"gamma"), Some(&3));
+        assert_eq!(m.get(b"delta"), None);
+        assert!(m.contains_key(b"beta"));
+        assert!(!m.contains_key(b"delta"));
     }
 
     #[test]
     fn get_mut() {
-        let mut index = FstIndex::build([("a", 1u32), ("b", 2)]).unwrap();
-        if let Some(v) = index.get_mut(b"a") {
+        let mut m = PrefixMap::build([("a", 1u32), ("b", 2)]).unwrap();
+        if let Some(v) = m.get_mut(b"a") {
             *v = 100;
         }
-        assert_eq!(index.get(b"a"), Some(&100));
-        assert_eq!(index.get(b"b"), Some(&2));
+        assert_eq!(m.get(b"a"), Some(&100));
+        assert_eq!(m.get(b"b"), Some(&2));
     }
 
     #[test]
     fn prefix_search() {
-        let index = FstIndex::build([
+        let m = PrefixMap::build([
             ("PRIORITY=0", 10u32),
             ("PRIORITY=3", 30),
             ("PRIORITY=6", 60),
@@ -333,33 +323,33 @@ mod tests {
         .unwrap();
 
         // Prefix matches
-        let values = index.prefix_values(b"PRIORITY=");
+        let values = m.prefix_values(b"PRIORITY=");
         assert_eq!(values, vec![&10, &30, &60]);
 
-        let values = index.prefix_values(b"SYSLOG_IDENTIFIER=");
+        let values = m.prefix_values(b"SYSLOG_IDENTIFIER=");
         assert_eq!(values, vec![&100, &200]);
 
-        let values = index.prefix_values(b"_HOSTNAME=");
+        let values = m.prefix_values(b"_HOSTNAME=");
         assert_eq!(values, vec![&300]);
 
         // No matches
-        let values = index.prefix_values(b"NONEXISTENT=");
+        let values = m.prefix_values(b"NONEXISTENT=");
         assert!(values.is_empty());
 
         // Empty prefix matches everything
-        let values = index.prefix_values(b"");
+        let values = m.prefix_values(b"");
         assert_eq!(values.len(), 6);
 
         // Full key as prefix returns just that entry
-        let values = index.prefix_values(b"PRIORITY=0");
+        let values = m.prefix_values(b"PRIORITY=0");
         assert_eq!(values, vec![&10]);
     }
 
     #[test]
     fn prefix_pairs() {
-        let index = FstIndex::build([("aa", 1u32), ("ab", 2), ("ba", 3)]).unwrap();
+        let m = PrefixMap::build([("aa", 1u32), ("ab", 2), ("ba", 3)]).unwrap();
 
-        let pairs = index.prefix_pairs(b"a");
+        let pairs = m.prefix_pairs(b"a");
         assert_eq!(pairs.len(), 2);
         assert_eq!(pairs[0].0, b"aa");
         assert_eq!(pairs[0].1, &1);
@@ -369,10 +359,10 @@ mod tests {
 
     #[test]
     fn prefix_for_each_visits_all() {
-        let index = FstIndex::build([("x1", 1u32), ("x2", 2), ("y1", 3)]).unwrap();
+        let m = PrefixMap::build([("x1", 1u32), ("x2", 2), ("y1", 3)]).unwrap();
 
         let mut collected = Vec::new();
-        index.prefix_for_each(b"x", |key, val| {
+        m.prefix_for_each(b"x", |key, val| {
             collected.push((key.to_vec(), *val));
         });
         assert_eq!(collected, vec![(b"x1".to_vec(), 1), (b"x2".to_vec(), 2)]);
@@ -380,50 +370,50 @@ mod tests {
 
     #[test]
     fn unsorted_input_is_sorted() {
-        let index = FstIndex::build([("cherry", 3u32), ("apple", 1), ("banana", 2)]).unwrap();
+        let m = PrefixMap::build([("cherry", 3u32), ("apple", 1), ("banana", 2)]).unwrap();
 
         // Values should be in key-sorted order
-        assert_eq!(index.values(), &[1, 2, 3]);
-        assert_eq!(index.get(b"apple"), Some(&1));
-        assert_eq!(index.get(b"banana"), Some(&2));
-        assert_eq!(index.get(b"cherry"), Some(&3));
+        assert_eq!(m.values(), &[1, 2, 3]);
+        assert_eq!(m.get(b"apple"), Some(&1));
+        assert_eq!(m.get(b"banana"), Some(&2));
+        assert_eq!(m.get(b"cherry"), Some(&3));
     }
 
     #[test]
     fn build_rejects_duplicate_keys() {
         // `build` sorts, then feeds strictly-increasing keys to the FST builder;
         // two equal keys break that ordering and surface as a BuildError.
-        let result = FstIndex::build([("dup", 1u32), ("dup", 2)]);
+        let result = PrefixMap::build([("dup", 1u32), ("dup", 2)]);
         assert!(result.is_err());
     }
 
     #[test]
     fn clone() {
-        let index = FstIndex::build([("key", 42u32)]).unwrap();
-        let cloned = index.clone();
+        let m = PrefixMap::build([("key", 42u32)]).unwrap();
+        let cloned = m.clone();
         assert_eq!(cloned.get(b"key"), Some(&42));
         assert_eq!(cloned.len(), 1);
     }
 
     #[test]
     fn debug_format() {
-        let index = FstIndex::build([("a", 1u32), ("b", 2)]).unwrap();
-        let debug = format!("{:?}", index);
-        assert!(debug.contains("FstIndex"));
+        let m = PrefixMap::build([("a", 1u32), ("b", 2)]).unwrap();
+        let debug = format!("{:?}", m);
+        assert!(debug.contains("PrefixMap"));
         assert!(debug.contains("len: 2"));
     }
 
     #[test]
     fn fst_bytes_is_nonzero() {
-        let index = FstIndex::build([("a", 1u32)]).unwrap();
-        assert!(index.fst_bytes() > 0);
+        let m = PrefixMap::build([("a", 1u32)]).unwrap();
+        assert!(m.fst_bytes() > 0);
     }
 
     #[test]
     fn for_each_visits_all() {
-        let index = FstIndex::build([("a", 1u32), ("b", 2), ("c", 3)]).unwrap();
+        let m = PrefixMap::build([("a", 1u32), ("b", 2), ("c", 3)]).unwrap();
         let mut collected = Vec::new();
-        index.for_each(|key, val| {
+        m.for_each(|key, val| {
             collected.push((key.to_vec(), *val));
         });
         assert_eq!(
@@ -432,13 +422,12 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "serde")]
     #[test]
     fn serde_round_trip() {
-        let index = FstIndex::build([("alpha", 1u32), ("beta", 2), ("gamma", 3)]).unwrap();
+        let m = PrefixMap::build([("alpha", 1u32), ("beta", 2), ("gamma", 3)]).unwrap();
 
-        let json = serde_json::to_string(&index).unwrap();
-        let deserialized: FstIndex<u32> = serde_json::from_str(&json).unwrap();
+        let json = serde_json::to_string(&m).unwrap();
+        let deserialized: PrefixMap<u32> = serde_json::from_str(&json).unwrap();
 
         assert_eq!(deserialized.len(), 3);
         assert_eq!(deserialized.get(b"alpha"), Some(&1));
@@ -447,13 +436,12 @@ mod tests {
         assert_eq!(deserialized.get(b"delta"), None);
     }
 
-    #[cfg(feature = "serde")]
     #[test]
     fn serde_round_trip_empty() {
-        let index: FstIndex<u32> = FstIndex::build(Vec::<(&str, u32)>::new()).unwrap();
+        let m: PrefixMap<u32> = PrefixMap::build(Vec::<(&str, u32)>::new()).unwrap();
 
-        let json = serde_json::to_string(&index).unwrap();
-        let deserialized: FstIndex<u32> = serde_json::from_str(&json).unwrap();
+        let json = serde_json::to_string(&m).unwrap();
+        let deserialized: PrefixMap<u32> = serde_json::from_str(&json).unwrap();
 
         assert_eq!(deserialized.len(), 0);
         assert!(deserialized.is_empty());

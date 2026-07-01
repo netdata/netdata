@@ -97,10 +97,26 @@ use crate::{
 #[test]
 fn derive_field_table_is_canonically_ordered() {
     let fields: FieldTable = vec![
-        FieldEntry { name: "zeta".into(), cardinality: 5, tier: FieldTier::High },
-        FieldEntry { name: "alpha".into(), cardinality: 2, tier: FieldTier::Low },
-        FieldEntry { name: "mid_b".into(), cardinality: 200, tier: FieldTier::Mid },
-        FieldEntry { name: "mid_a".into(), cardinality: 300, tier: FieldTier::Mid },
+        FieldEntry {
+            name: "zeta".into(),
+            cardinality: 5,
+            tier: FieldTier::High,
+        },
+        FieldEntry {
+            name: "alpha".into(),
+            cardinality: 2,
+            tier: FieldTier::Low,
+        },
+        FieldEntry {
+            name: "mid_b".into(),
+            cardinality: 200,
+            tier: FieldTier::Mid,
+        },
+        FieldEntry {
+            name: "mid_a".into(),
+            cardinality: 300,
+            tier: FieldTier::Mid,
+        },
     ]
     .into();
 
@@ -118,14 +134,24 @@ fn derive_field_table_is_canonically_ordered() {
 /// where one field name carries all of a path's `key=value` terms.
 #[test]
 fn derive_field_table_collapses_polymorphic_path() {
-    let stats = LeafStats { cardinality: 7, tier: FieldTier::Low };
+    let stats = LeafStats {
+        cardinality: 7,
+        tier: FieldTier::Low,
+    };
     let leaf = |name: &str, kind| SchemaNode {
         kind,
-        edge: Some(SchemaEdge { parent: 0, step: Step::Field(name.into()) }),
+        edge: Some(SchemaEdge {
+            parent: 0,
+            step: Step::Field(name.into()),
+        }),
         leaf: Some(stats),
     };
     let tree = SchemaTree::from_nodes(vec![
-        SchemaNode { kind: ValueKind::Kvlist, edge: None, leaf: None },
+        SchemaNode {
+            kind: ValueKind::Kvlist,
+            edge: None,
+            leaf: None,
+        },
         leaf("id", ValueKind::Int),
         leaf("id", ValueKind::Str),
     ]);
@@ -141,26 +167,36 @@ fn derive_field_table_collapses_polymorphic_path() {
 /// container occurrences live at child paths).
 #[test]
 fn scalar_coalescing_lattice() {
-    let stats = LeafStats { cardinality: 1, tier: FieldTier::Low };
+    let stats = LeafStats {
+        cardinality: 1,
+        tier: FieldTier::Low,
+    };
     let node = |parent: u32, name: &str, kind: ValueKind| SchemaNode {
         kind,
-        edge: Some(SchemaEdge { parent, step: Step::Field(name.into()) }),
+        edge: Some(SchemaEdge {
+            parent,
+            step: Step::Field(name.into()),
+        }),
         leaf: if kind.is_leaf() { Some(stats) } else { None },
     };
     let tree = SchemaTree::from_nodes(vec![
-        SchemaNode { kind: ValueKind::Kvlist, edge: None, leaf: None }, // 0 root
-        node(0, "nullstr", ValueKind::Null),                            // 1
-        node(0, "nullstr", ValueKind::Str),                             // 2  -> Str
-        node(0, "intdouble", ValueKind::Int),                           // 3
-        node(0, "intdouble", ValueKind::Double),                        // 4  -> Double
-        node(0, "intstr", ValueKind::Int),                              // 5
-        node(0, "intstr", ValueKind::Str),                              // 6  -> Str
-        node(0, "arr", ValueKind::EmptyArray),                          // 7  leaf
-        node(0, "arr", ValueKind::Array),                               // 8  interior -> excluded
-        node(0, "scalarobj", ValueKind::Str),                           // 9  leaf -> Str
-        node(0, "scalarobj", ValueKind::Kvlist),                        // 10 interior
-        node(0, "nullobj", ValueKind::Null),                            // 11 leaf
-        node(0, "nullobj", ValueKind::Kvlist),                          // 12 interior -> excluded
+        SchemaNode {
+            kind: ValueKind::Kvlist,
+            edge: None,
+            leaf: None,
+        }, // 0 root
+        node(0, "nullstr", ValueKind::Null),     // 1
+        node(0, "nullstr", ValueKind::Str),      // 2  -> Str
+        node(0, "intdouble", ValueKind::Int),    // 3
+        node(0, "intdouble", ValueKind::Double), // 4  -> Double
+        node(0, "intstr", ValueKind::Int),       // 5
+        node(0, "intstr", ValueKind::Str),       // 6  -> Str
+        node(0, "arr", ValueKind::EmptyArray),   // 7  leaf
+        node(0, "arr", ValueKind::Array),        // 8  interior -> excluded
+        node(0, "scalarobj", ValueKind::Str),    // 9  leaf -> Str
+        node(0, "scalarobj", ValueKind::Kvlist), // 10 interior
+        node(0, "nullobj", ValueKind::Null),     // 11 leaf
+        node(0, "nullobj", ValueKind::Kvlist),   // 12 interior -> excluded
     ]);
 
     let scalars = tree.derive_scalar_kinds();
@@ -184,24 +220,55 @@ fn scalar_coalescing_lattice() {
 #[test]
 fn validate_rejects_malformed_trees() {
     use crate::Error;
-    let root = || SchemaNode { kind: ValueKind::Kvlist, edge: None, leaf: None };
+    let root = || SchemaNode {
+        kind: ValueKind::Kvlist,
+        edge: None,
+        leaf: None,
+    };
     let leaf = |parent: u32, name: &str| SchemaNode {
         kind: ValueKind::Str,
-        edge: Some(SchemaEdge { parent, step: Step::Field(name.into()) }),
-        leaf: Some(LeafStats { cardinality: 1, tier: FieldTier::Low }),
+        edge: Some(SchemaEdge {
+            parent,
+            step: Step::Field(name.into()),
+        }),
+        leaf: Some(LeafStats {
+            cardinality: 1,
+            tier: FieldTier::Low,
+        }),
     };
 
     // Well-formed: root + a child pointing back to it.
-    assert!(SchemaTree { nodes: vec![root(), leaf(0, "a")] }.validate().is_ok());
+    assert!(
+        SchemaTree {
+            nodes: vec![root(), leaf(0, "a")]
+        }
+        .validate()
+        .is_ok()
+    );
 
     let bad = [
-        SchemaTree { nodes: vec![] },                          // no root
-        SchemaTree { nodes: vec![leaf(0, "x")] },              // node 0 has an edge
-        SchemaTree { nodes: vec![root(), leaf(99, "x")] },     // out-of-range parent
-        SchemaTree { nodes: vec![root(), leaf(1, "x")] },      // self-cycle (parent == id)
-        SchemaTree { nodes: vec![root(), leaf(2, "x"), leaf(0, "y")] }, // forward edge
+        SchemaTree { nodes: vec![] }, // no root
         SchemaTree {
-            nodes: vec![root(), SchemaNode { kind: ValueKind::Str, edge: None, leaf: None }],
+            nodes: vec![leaf(0, "x")],
+        }, // node 0 has an edge
+        SchemaTree {
+            nodes: vec![root(), leaf(99, "x")],
+        }, // out-of-range parent
+        SchemaTree {
+            nodes: vec![root(), leaf(1, "x")],
+        }, // self-cycle (parent == id)
+        SchemaTree {
+            nodes: vec![root(), leaf(2, "x"), leaf(0, "y")],
+        }, // forward edge
+        SchemaTree {
+            nodes: vec![
+                root(),
+                SchemaNode {
+                    kind: ValueKind::Str,
+                    edge: None,
+                    leaf: None,
+                },
+            ],
         }, // non-root node missing its edge
     ];
     for (i, tree) in bad.iter().enumerate() {
@@ -231,21 +298,42 @@ fn default_tree_is_valid_root_only() {
 fn metadata_tree_round_trips() {
     use crate::{Histogram, IdRanges, KvId, Metadata};
     let fields: FieldTable = vec![
-        FieldEntry { name: "host".into(), cardinality: 300, tier: FieldTier::High },
-        FieldEntry { name: "level".into(), cardinality: 2, tier: FieldTier::Low },
+        FieldEntry {
+            name: "host".into(),
+            cardinality: 300,
+            tier: FieldTier::High,
+        },
+        FieldEntry {
+            name: "level".into(),
+            cardinality: 2,
+            tier: FieldTier::Low,
+        },
     ]
     .into();
     let meta = Metadata {
-        histogram: Histogram { timestamps: vec![1], counts: vec![1] },
-        id_ranges: IdRanges { low_end: KvId(2), mid_end: KvId(2), high_end: KvId(302) },
+        histogram: Histogram {
+            timestamps: vec![1],
+            counts: vec![1],
+        },
+        id_ranges: IdRanges {
+            low_end: KvId(2),
+            mid_end: KvId(2),
+            high_end: KvId(302),
+        },
         tree: SchemaTree::flat(&fields),
         columns: Default::default(),
     };
     let packed = crate::writer::pack(&meta, 1).unwrap();
     let got: Metadata = crate::reader::unpack(&packed).unwrap();
     assert_eq!(got, meta);
-    assert_eq!(got.tree.derive_field_table(), meta.tree.derive_field_table());
-    assert_eq!(got.tree.derive_field_table().names().collect::<Vec<_>>(), vec!["level", "host"]);
+    assert_eq!(
+        got.tree.derive_field_table(),
+        meta.tree.derive_field_table()
+    );
+    assert_eq!(
+        got.tree.derive_field_table().names().collect::<Vec<_>>(),
+        vec!["level", "host"]
+    );
 }
 
 /// `fill_field_stats` attaches per-path cardinality/tier to a structurally-built
@@ -257,24 +345,47 @@ fn metadata_tree_round_trips() {
 fn fill_field_stats_then_derive_matches_fields() {
     let node = |parent: u32, name: &str, kind: ValueKind| SchemaNode {
         kind,
-        edge: Some(SchemaEdge { parent, step: Step::Field(name.into()) }),
+        edge: Some(SchemaEdge {
+            parent,
+            step: Step::Field(name.into()),
+        }),
         leaf: None, // stats unset — as ng-index supplies it
     };
     let mut tree = SchemaTree::from_nodes(vec![
-        SchemaNode { kind: ValueKind::Kvlist, edge: None, leaf: None }, // 0 root
-        node(0, "level", ValueKind::Str),                              // 1
-        node(0, "id", ValueKind::Int),                                 // 2 polymorphic
-        node(0, "id", ValueKind::Str),                                 // 3 polymorphic
-        node(0, "obj", ValueKind::Kvlist),                             // 4 interior
-        node(4, "x", ValueKind::Str),                                  // 5 -> path "obj.x"
-        node(0, "host", ValueKind::Str),                               // 6
+        SchemaNode {
+            kind: ValueKind::Kvlist,
+            edge: None,
+            leaf: None,
+        }, // 0 root
+        node(0, "level", ValueKind::Str),  // 1
+        node(0, "id", ValueKind::Int),     // 2 polymorphic
+        node(0, "id", ValueKind::Str),     // 3 polymorphic
+        node(0, "obj", ValueKind::Kvlist), // 4 interior
+        node(4, "x", ValueKind::Str),      // 5 -> path "obj.x"
+        node(0, "host", ValueKind::Str),   // 6
     ]);
 
     let fields: FieldTable = vec![
-        FieldEntry { name: "id".into(), cardinality: 7, tier: FieldTier::Low },
-        FieldEntry { name: "level".into(), cardinality: 2, tier: FieldTier::Low },
-        FieldEntry { name: "obj.x".into(), cardinality: 200, tier: FieldTier::Mid },
-        FieldEntry { name: "host".into(), cardinality: 300, tier: FieldTier::High },
+        FieldEntry {
+            name: "id".into(),
+            cardinality: 7,
+            tier: FieldTier::Low,
+        },
+        FieldEntry {
+            name: "level".into(),
+            cardinality: 2,
+            tier: FieldTier::Low,
+        },
+        FieldEntry {
+            name: "obj.x".into(),
+            cardinality: 200,
+            tier: FieldTier::Mid,
+        },
+        FieldEntry {
+            name: "host".into(),
+            cardinality: 300,
+            tier: FieldTier::High,
+        },
     ]
     .into();
 
@@ -285,5 +396,8 @@ fn fill_field_stats_then_derive_matches_fields() {
     // `obj` excluded), canonically ordered low → mid → high then by name.
     let names: Vec<&str> = derived.names().collect();
     assert_eq!(names, vec!["id", "level", "obj.x", "host"]);
-    assert_eq!(*derived, *fields, "derived table must reproduce the input fields");
+    assert_eq!(
+        *derived, *fields,
+        "derived table must reproduce the input fields"
+    );
 }

@@ -1293,16 +1293,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fst-index"
-version = "0.1.0"
-dependencies = [
- "bumpalo",
- "fst",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "funty"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3206,7 +3196,6 @@ dependencies = [
  "file-cache",
  "file-lifecycle",
  "file-registry",
- "fst-index",
  "netdata-plugin-error",
  "netdata-plugin-protocol",
  "netdata-plugin-types",
@@ -4513,15 +4502,17 @@ name = "sfst"
 version = "0.1.3"
 dependencies = [
  "bincode 2.0.1",
+ "bumpalo",
  "chrono",
  "chunk-file",
  "clap",
  "file-registry",
- "fst-index",
+ "fst",
  "memmap2",
  "regex",
  "serde",
  "serde_bytes",
+ "serde_json",
  "tempfile",
  "thiserror 2.0.18",
  "tracing",
@@ -4536,7 +4527,6 @@ version = "0.1.3"
 dependencies = [
  "bumpalo",
  "file-registry",
- "fst-index",
  "hashbrown 0.17.1",
  "otel-logs-identity",
  "roaring 0.11.2",

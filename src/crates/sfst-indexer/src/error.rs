@@ -24,7 +24,7 @@ pub enum IndexError {
     /// FST construction failed — almost always because the key set
     /// wasn't sortable into the FST's required lexicographic order.
     #[error("FST build error: {0}")]
-    FstBuild(#[from] fst_index::BuildError),
+    FstBuild(#[from] sfst::BuildError),
 
     /// The WAL contains records that resolve to more than one
     /// `(service.namespace, service.name)` pair. Each SFST file is

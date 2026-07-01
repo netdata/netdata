@@ -1,10 +1,10 @@
 use super::*;
+use crate::PrefixMap;
 use crate::tests::fixture::FixtureWriter;
 use crate::writer::pack;
-use fst_index::FstIndex;
 
 fn write_sfst_with_summary(dir: &Path, id: FileId, summary: &Summary) {
-    let primary: FstIndex<u64> = FstIndex::build([("k", 1u64)]).unwrap();
+    let primary: PrefixMap<u64> = PrefixMap::build([("k", 1u64)]).unwrap();
     // The buffer-all fixture builder permits the missing META chunk;
     // this test only exercises the SUMR round-trip.
     let mut writer = FixtureWriter::new();

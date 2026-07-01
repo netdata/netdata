@@ -8,17 +8,18 @@
 
 use std::io::{Seek, Write};
 
+use crate::PrefixMap;
 use chunk_file::container::StreamingWriter;
-use fst_index::FstIndex;
 use serde::Serialize;
 
 use crate::{
     ALL_COLUMNS, BitmapValue, CHUNK_DROPPED_ATTRS, CHUNK_DURATION, CHUNK_FLAGS, CHUNK_META,
     CHUNK_OBSERVED_TS, CHUNK_PARENT_SPAN_IDS, CHUNK_PRIMARY, CHUNK_SPAN_IDS, CHUNK_SUMMARY,
     CHUNK_TIMS, CHUNK_TRACE_IDS, CHUNK_TRACE_INDEX, ColumnSpec, ColumnsTable,
-    DroppedAttributeCounts, Durations, Error, Flags, HighField, MAGIC, MAX_STREAM_BATCHES, Metadata,
-    ObservedTimestamps, ParentSpanIds, SpanIds, StreamBatch, Summary, TraceIdIndex, TraceIds,
-    VERSION, ZSTD_LEVEL_DEFAULT, ZSTD_LEVEL_FST, high_field_id, mid_field_id, stream_batch_id,
+    DroppedAttributeCounts, Durations, Error, Flags, HighField, MAGIC, MAX_STREAM_BATCHES,
+    Metadata, ObservedTimestamps, ParentSpanIds, SpanIds, StreamBatch, Summary, TraceIdIndex,
+    TraceIds, VERSION, ZSTD_LEVEL_DEFAULT, ZSTD_LEVEL_FST, high_field_id, mid_field_id,
+    stream_batch_id,
 };
 
 /// Serialize a value with bincode, then compress with zstd.
@@ -317,7 +318,7 @@ impl<W: Write + Seek> StreamWriter<W> {
     /// Write the primary (low-cardinality) FST chunk, completing the hot prefix.
     /// The optional per-row column chunks (when declared) come next in the cold
     /// region, then the optional `trace_id` index, otherwise the secondary sections.
-    pub fn primary(&mut self, fst: &FstIndex<BitmapValue>) -> Result<(), Error> {
+    pub fn primary(&mut self, fst: &PrefixMap<BitmapValue>) -> Result<(), Error> {
         let packed = pack(fst, ZSTD_LEVEL_FST)?;
         let next = self.after_primary();
         self.prefix_chunk(Stage::Primary, next, CHUNK_PRIMARY, &packed)
@@ -360,7 +361,12 @@ impl<W: Write + Seek> StreamWriter<W> {
     /// Write the per-row observed-timestamps column (`OBTS`).
     pub fn observed_timestamps(&mut self, observed: &ObservedTimestamps) -> Result<(), Error> {
         let packed = pack(&observed.0, ZSTD_LEVEL_DEFAULT)?;
-        self.write_column(0, self.counts.columns.observed_ts, CHUNK_OBSERVED_TS, &packed)
+        self.write_column(
+            0,
+            self.counts.columns.observed_ts,
+            CHUNK_OBSERVED_TS,
+            &packed,
+        )
     }
 
     /// Write the per-row trace-ids column (`TRCE`).
@@ -398,7 +404,12 @@ impl<W: Write + Seek> StreamWriter<W> {
     /// Write the per-row parent-span-ids column (`PSPN`).
     pub fn parent_span_ids(&mut self, parent_span_ids: &ParentSpanIds) -> Result<(), Error> {
         let packed = pack(parent_span_ids, ZSTD_LEVEL_DEFAULT)?;
-        self.write_column(5, self.counts.columns.parent_span_id, CHUNK_PARENT_SPAN_IDS, &packed)
+        self.write_column(
+            5,
+            self.counts.columns.parent_span_id,
+            CHUNK_PARENT_SPAN_IDS,
+            &packed,
+        )
     }
 
     /// Write the per-row span-duration column (`DURN`).
@@ -437,7 +448,7 @@ impl<W: Write + Seek> StreamWriter<W> {
     /// Write the next mid-cardinality field FST chunk and return its
     /// index. Mid-field chunks follow the primary and precede every
     /// high-field chunk.
-    pub fn add_mid_field(&mut self, fst: &FstIndex<BitmapValue>) -> Result<u16, Error> {
+    pub fn add_mid_field(&mut self, fst: &PrefixMap<BitmapValue>) -> Result<u16, Error> {
         self.check_secondary("mid-field")?;
         if self.highs > 0 || self.batches > 0 {
             return Err(Error::WriterMisuse(

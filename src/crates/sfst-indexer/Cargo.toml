@@ -12,7 +12,6 @@ workspace = true
 sfst = { workspace = true }
 otel-logs-identity = { workspace = true }
 
-fst-index = { workspace = true, features = ["serde"] }
 treight = { workspace = true, features = ["roaring", "serde"] }
 file-registry = { workspace = true }
 

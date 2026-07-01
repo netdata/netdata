@@ -62,8 +62,7 @@ fn build_query_fixture() -> Vec<u8> {
             },
         ),
     ];
-    let primary: fst_index::FstIndex<BitmapValue> =
-        fst_index::FstIndex::build(primary_entries).unwrap();
+    let primary: crate::PrefixMap<BitmapValue> = crate::PrefixMap::build(primary_entries).unwrap();
 
     // Spread across 6 seconds for predictable bucketing.
     let summary = Summary {
@@ -82,19 +81,21 @@ fn build_query_fixture() -> Vec<u8> {
             mid_end: KvId(4),
             high_end: KvId(4),
         },
-        tree: SchemaTree::flat(&vec![
-            FieldEntry {
-                name: "level".into(),
-                cardinality: 2,
-                tier: FieldTier::Low,
-            },
-            FieldEntry {
-                name: "service".into(),
-                cardinality: 2,
-                tier: FieldTier::Low,
-            },
-        ]
-        .into()),
+        tree: SchemaTree::flat(
+            &vec![
+                FieldEntry {
+                    name: "level".into(),
+                    cardinality: 2,
+                    tier: FieldTier::Low,
+                },
+                FieldEntry {
+                    name: "service".into(),
+                    cardinality: 2,
+                    tier: FieldTier::Low,
+                },
+            ]
+            .into(),
+        ),
         columns: ColumnsTable::default(),
     };
     let timestamps: Vec<i64> = (0..6)
@@ -463,8 +464,7 @@ fn build_multivalued_fixture() -> Vec<u8> {
             },
         ),
     ];
-    let primary: fst_index::FstIndex<BitmapValue> =
-        fst_index::FstIndex::build(primary_entries).unwrap();
+    let primary: crate::PrefixMap<BitmapValue> = crate::PrefixMap::build(primary_entries).unwrap();
 
     let summary = Summary {
         min_timestamp_s: 1_700_000_000,
@@ -482,19 +482,21 @@ fn build_multivalued_fixture() -> Vec<u8> {
             mid_end: KvId(4),
             high_end: KvId(4),
         },
-        tree: SchemaTree::flat(&vec![
-            FieldEntry {
-                name: "lang".into(),
-                cardinality: 2,
-                tier: FieldTier::Low,
-            },
-            FieldEntry {
-                name: "svc".into(),
-                cardinality: 2,
-                tier: FieldTier::Low,
-            },
-        ]
-        .into()),
+        tree: SchemaTree::flat(
+            &vec![
+                FieldEntry {
+                    name: "lang".into(),
+                    cardinality: 2,
+                    tier: FieldTier::Low,
+                },
+                FieldEntry {
+                    name: "svc".into(),
+                    cardinality: 2,
+                    tier: FieldTier::Low,
+                },
+            ]
+            .into(),
+        ),
         columns: ColumnsTable::default(),
     };
     let timestamps: Vec<i64> = (0..3)
@@ -783,8 +785,7 @@ fn build_complemented_fixture() -> Vec<u8> {
             },
         ),
     ];
-    let primary: fst_index::FstIndex<BitmapValue> =
-        fst_index::FstIndex::build(primary_entries).unwrap();
+    let primary: crate::PrefixMap<BitmapValue> = crate::PrefixMap::build(primary_entries).unwrap();
 
     let summary = Summary {
         min_timestamp_s: 1_700_000_000,
@@ -802,19 +803,21 @@ fn build_complemented_fixture() -> Vec<u8> {
             mid_end: KvId(4),
             high_end: KvId(4),
         },
-        tree: SchemaTree::flat(&vec![
-            FieldEntry {
-                name: "lvl".into(),
-                cardinality: 2,
-                tier: FieldTier::Low,
-            },
-            FieldEntry {
-                name: "svc".into(),
-                cardinality: 2,
-                tier: FieldTier::Low,
-            },
-        ]
-        .into()),
+        tree: SchemaTree::flat(
+            &vec![
+                FieldEntry {
+                    name: "lvl".into(),
+                    cardinality: 2,
+                    tier: FieldTier::Low,
+                },
+                FieldEntry {
+                    name: "svc".into(),
+                    cardinality: 2,
+                    tier: FieldTier::Low,
+                },
+            ]
+            .into(),
+        ),
         columns: ColumnsTable::default(),
     };
     let timestamps: Vec<i64> = (0..6)
@@ -975,14 +978,14 @@ fn bitmap_value(positions: &[u32], universe: u32) -> BitmapValue {
 fn build_tiered_fixture() -> Vec<u8> {
     const N: u32 = 6;
 
-    let primary: fst_index::FstIndex<BitmapValue> = fst_index::FstIndex::build(vec![
+    let primary: crate::PrefixMap<BitmapValue> = crate::PrefixMap::build(vec![
         ("level=error", bitmap_value(&[1, 3, 5], N)),
         ("level=info", bitmap_value(&[0, 2, 4], N)),
     ])
     .unwrap();
 
     // Mid chunk: the `host` field's values + bitmaps (FST, lexicographic).
-    let mid_host: fst_index::FstIndex<BitmapValue> = fst_index::FstIndex::build(vec![
+    let mid_host: crate::PrefixMap<BitmapValue> = crate::PrefixMap::build(vec![
         ("host=db1", bitmap_value(&[4, 5], N)),
         ("host=web1", bitmap_value(&[0, 1], N)),
         ("host=web2", bitmap_value(&[2, 3], N)),
@@ -1022,24 +1025,26 @@ fn build_tiered_fixture() -> Vec<u8> {
             mid_end: KvId(5),
             high_end: KvId(8),
         },
-        tree: SchemaTree::flat(&vec![
-            FieldEntry {
-                name: "level".into(),
-                cardinality: 2,
-                tier: FieldTier::Low,
-            },
-            FieldEntry {
-                name: "host".into(),
-                cardinality: 3,
-                tier: FieldTier::Mid,
-            },
-            FieldEntry {
-                name: "trace".into(),
-                cardinality: 3,
-                tier: FieldTier::High,
-            },
-        ]
-        .into()),
+        tree: SchemaTree::flat(
+            &vec![
+                FieldEntry {
+                    name: "level".into(),
+                    cardinality: 2,
+                    tier: FieldTier::Low,
+                },
+                FieldEntry {
+                    name: "host".into(),
+                    cardinality: 3,
+                    tier: FieldTier::Mid,
+                },
+                FieldEntry {
+                    name: "trace".into(),
+                    cardinality: 3,
+                    tier: FieldTier::High,
+                },
+            ]
+            .into(),
+        ),
         columns: ColumnsTable::default(),
     };
     let timestamps: Vec<i64> = (0..N as i64)

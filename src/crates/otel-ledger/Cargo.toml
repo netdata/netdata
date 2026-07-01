@@ -42,6 +42,5 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 bytesize = { workspace = true }
-fst-index = { workspace = true, features = ["serde"] }
 tempfile = { workspace = true }
 treight = { workspace = true }

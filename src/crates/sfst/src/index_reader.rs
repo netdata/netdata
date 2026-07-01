@@ -10,7 +10,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use fst_index::FstIndex;
+use crate::PrefixMap;
 
 use crate::{
     BitmapValue, Bucket, FacetResult, FieldEntry, FieldTier, Filter, Grid, Histogram, IdRanges,
@@ -26,7 +26,7 @@ use crate::{
 pub struct IndexReader<'a> {
     sfst: crate::Reader<'a>,
     summary: Summary,
-    primary: FstIndex<BitmapValue>,
+    primary: PrefixMap<BitmapValue>,
 }
 
 /// One materialized span of a trace reconstructed by [`IndexReader::trace_by_id`]:
@@ -170,7 +170,7 @@ impl<'a> IndexReader<'a> {
     // ── Secondary chunk loading ─────────────────────────────────────
 
     /// Load a mid-cardinality field's FST. `mid_index` is `0..num_mid`.
-    pub fn load_mid_field(&self, mid_index: u16) -> Result<FstIndex<BitmapValue>, crate::Error> {
+    pub fn load_mid_field(&self, mid_index: u16) -> Result<PrefixMap<BitmapValue>, crate::Error> {
         self.sfst.mid_field(mid_index)
     }
 
