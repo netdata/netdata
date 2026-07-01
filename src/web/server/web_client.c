@@ -495,14 +495,18 @@ static int web_server_static_file(struct web_client *w, char *filename) {
     char web_filename[FILENAME_MAX + 1];
     struct stat statbuf;
     if(!find_filename_to_serve(filename, web_filename, FILENAME_MAX, &statbuf, w, &is_dir)) {
-        // All stat() fallbacks inside find_filename_to_serve() failed. On UCRT64
-        // this is the most common way a translated POSIX path fails. Always-on
-        // log so a "dashboard empty" symptom on Windows leaves a fingerprint.
-        int lookup_errno = errno;
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "%llu: WEB: cannot find static file '%s' under web dir '%s' (errno=%d %s). "
-               "If the file exists on disk, UCRT64 may not have translated the POSIX path.",
-               w->id, filename, netdata_configured_web_dir, lookup_errno, strerror(lookup_errno));
+        netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not accessible.", w->id, filename);
+#if defined(OS_WINDOWS)
+        // On UCRT64 a missing static file is the most common symptom of a failed
+        // POSIX-to-Windows path translation; log at WARNING so it leaves a fingerprint.
+        {
+            int lookup_errno = errno;
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "%llu: WEB: cannot find static file '%s' under web dir '%s' (errno=%d %s). "
+                   "If the file exists on disk, UCRT64 may not have translated the POSIX path.",
+                   w->id, filename, netdata_configured_web_dir, lookup_errno, strerror(lookup_errno));
+        }
+#endif
         w->response.data->content_type = CT_TEXT_HTML;
         buffer_strcat(w->response.data, "File does not exist, or is not accessible: ");
         buffer_strcat_htmlescape(w->response.data, filename);
@@ -516,8 +520,9 @@ static int web_server_static_file(struct web_client *w, char *filename) {
     buffer_need_bytes(w->response.data, (size_t)statbuf.st_size);
     w->response.data->len = (size_t)statbuf.st_size;
 
-    // open the file
+    // open the file; save errno immediately so read()/close() cannot clobber it
     int fd = open(web_filename, O_RDONLY | O_CLOEXEC);
+    int open_errno = (fd < 0) ? errno : 0;
 
     // read the file
     if(fd != -1 && read(fd, w->response.data->buffer, statbuf.st_size) != statbuf.st_size) {
@@ -531,25 +536,32 @@ static int web_server_static_file(struct web_client *w, char *filename) {
     if(fd == -1) {
         buffer_flush(w->response.data);
 
-        if(errno == EBUSY || errno == EAGAIN) {
-            netdata_log_error("%llu: File '%s' is busy, sending 307 Moved Temporarily to force retry.", w->id, web_filename);
-            w->response.data->content_type = CT_TEXT_HTML;
-            buffer_sprintf(w->response.header, "Location: /%s\r\n", filename);
-            buffer_strcat(w->response.data, "File is currently busy, please try again later: ");
-            buffer_strcat_htmlescape(w->response.data, filename);
-            return HTTP_RESP_REDIR_TEMP;
-        }
-        else {
-            int open_errno = errno;
+        if(open_errno != 0) {
+            // open() failed — open_errno is valid; errno may have been clobbered by read()/close()
+            if(open_errno == EBUSY || open_errno == EAGAIN) {
+                netdata_log_error("%llu: File '%s' is busy, sending 307 Moved Temporarily to force retry.", w->id, web_filename);
+                w->response.data->content_type = CT_TEXT_HTML;
+                buffer_sprintf(w->response.header, "Location: /%s\r\n", filename);
+                buffer_strcat(w->response.data, "File is currently busy, please try again later: ");
+                buffer_strcat_htmlescape(w->response.data, filename);
+                return HTTP_RESP_REDIR_TEMP;
+            }
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "%llu: WEB: open() failed on web file '%s' (errno=%d %s). "
-                   "If the path looks right and the file exists, UCRT64 may not have translated the POSIX path.",
+                   "%llu: Cannot open file '%s' (errno=%d %s).",
                    w->id, web_filename, open_errno, strerror(open_errno));
-            w->response.data->content_type = CT_TEXT_HTML;
-            buffer_strcat(w->response.data, "Cannot open file: ");
-            buffer_strcat_htmlescape(w->response.data, filename);
-            return HTTP_RESP_NOT_FOUND;
+#if defined(OS_WINDOWS)
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "%llu: WEB: open() failed on '%s' — if the path looks right and the file exists, "
+                   "UCRT64 may not have translated the POSIX path.",
+                   w->id, web_filename);
+#endif
         }
+        // read() failure: already logged above; open_errno == 0 so open() succeeded
+
+        w->response.data->content_type = CT_TEXT_HTML;
+        buffer_strcat(w->response.data, "Cannot open file: ");
+        buffer_strcat_htmlescape(w->response.data, filename);
+        return HTTP_RESP_NOT_FOUND;
     }
     else
         close(fd);
