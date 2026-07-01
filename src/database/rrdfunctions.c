@@ -234,8 +234,9 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
     if(st && !st->functions_view)
         st->functions_view = dictionary_create_view(host->functions);
 
-    char key[strlen(name) + 1];
-    rrd_functions_sanitize(key, name, sizeof(key));
+    size_t key_size = strlen(name) + 1;
+    CLEAN_CHAR_P *key = mallocz(key_size);
+    rrd_functions_sanitize(key, name, key_size);
 
     struct rrd_host_function tmp = {
         .collector = NULL,
@@ -264,8 +265,9 @@ bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_str
     if(unlikely(!name || !*name))
         return false;
 
-    char key[strlen(name) + 1];
-    rrd_functions_sanitize(key, name, sizeof(key));
+    size_t key_size = strlen(name) + 1;
+    CLEAN_CHAR_P *key = mallocz(key_size);
+    rrd_functions_sanitize(key, name, key_size);
 
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->functions, key);
     if(!item)
