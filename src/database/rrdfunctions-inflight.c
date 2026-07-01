@@ -410,8 +410,10 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
     char sanitized_cmd[PLUGINSD_LINE_MAX + 1];
     const DICTIONARY_ITEM *host_function_acquired = NULL;
 
-    char sanitized_source[(source ? strlen(source) : 0) + 1];
-    rrd_functions_sanitize(sanitized_source, source ? source : "", sizeof(sanitized_source));
+    const char *source_to_sanitize = source ? source : "";
+    size_t sanitized_source_size = strlen(source_to_sanitize) + 1;
+    CLEAN_CHAR_P *sanitized_source = mallocz(sanitized_source_size);
+    rrd_functions_sanitize(sanitized_source, source_to_sanitize, sanitized_source_size);
 
     // ------------------------------------------------------------------------
     // check for the host
@@ -523,7 +525,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
         .sanitized_cmd_length = sanitized_cmd_length,
         .transaction = strdupz(transaction),
         .user_access = user_access,
-        .source = strdupz(sanitized_source),
+        .source = sanitized_source,
         .payload = buffer_dup(payload),
         .timeout = timeout_s,
         .cancelled = false,
@@ -544,6 +546,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
             .data = progress_cb_data,
         },
     };
+    sanitized_source = NULL;
     uuid_copy(t.transaction_uuid, uuid);
 
     struct rrd_function_inflight *r = dictionary_set(rrd_functions_inflight_requests, transaction, &t, sizeof(t));
