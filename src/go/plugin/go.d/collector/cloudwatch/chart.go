@@ -57,11 +57,12 @@ func profileSeries(profileName string, prof cwprofiles.Profile) map[string]serie
 			if token == "" {
 				continue
 			}
-			// Rate presentation is sum-specific: only the per-period sum divides by
-			// the period to yield a per-second value. Other statistics of the same
-			// metric (average, maximum, percentiles) are absolute gauges and must not
-			// get the divisor, even when the metric sets rate: true.
-			out[cwprofiles.ExportedSeriesName(profileName, m.ID, token)] = seriesPresentation{rate: m.Rate && token == "sum", period: period}
+			// Rate applies to per-period totals: the sum (value/s) and sample_count
+			// (events/s) both divide by the period. Other statistics of the same
+			// metric (average, maximum, percentiles) are per-observation aggregates
+			// and never get the divisor, even when the metric sets rate: true.
+			isRate := m.Rate && (token == "sum" || token == "sample_count")
+			out[cwprofiles.ExportedSeriesName(profileName, m.ID, token)] = seriesPresentation{rate: isRate, period: period}
 		}
 	}
 	return out

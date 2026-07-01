@@ -30,6 +30,7 @@ type chunkJob struct {
 type chunkResult struct {
 	key     queryGroupKey
 	samples []querySample
+	noData  map[string]bool // query ids with a usable result but no datapoint (zero-fill eligible)
 	err     error
 }
 
@@ -51,9 +52,9 @@ func withTimeout(ctx context.Context, d time.Duration) (context.Context, context
 // succeed (a region client failed, or a chunk errored), so the caller advances
 // the query schedule only for groups that succeeded. An all-failed pass returns
 // an error.
-func (c *Collector) executeQueries(ctx context.Context, plan []plannedQuery, now time.Time) ([]querySample, map[queryGroupKey]bool, error) {
+func (c *Collector) executeQueries(ctx context.Context, plan []plannedQuery, now time.Time) ([]querySample, map[string]bool, map[queryGroupKey]bool, error) {
 	if len(plan) == 0 {
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 
 	byID, groups := indexPlan(plan)
@@ -64,17 +65,17 @@ func (c *Collector) executeQueries(ctx context.Context, plan []plannedQuery, now
 	jobs, failedGroups := c.buildChunkJobs(groups, regionClients, regionErrs, now, metricsPerQuery)
 	if len(jobs) == 0 {
 		if len(regionErrs) > 0 {
-			return nil, nil, fmt.Errorf("CloudWatch query: no usable region clients (%d region(s) failed)", len(regionErrs))
+			return nil, nil, nil, fmt.Errorf("CloudWatch query: no usable region clients (%d region(s) failed)", len(regionErrs))
 		}
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 
 	results := c.runChunkJobs(ctx, jobs, byID)
-	samples, allFailed := c.collectChunkResults(results, failedGroups)
+	samples, noData, allFailed := c.collectChunkResults(results, failedGroups)
 	if allFailed {
-		return nil, nil, errors.New("all CloudWatch GetMetricData calls failed")
+		return nil, nil, nil, errors.New("all CloudWatch GetMetricData calls failed")
 	}
-	return samples, failedGroups, nil
+	return samples, noData, failedGroups, nil
 }
 
 // indexPlan indexes the plan by query Id and groups the queries by
@@ -144,8 +145,8 @@ func (c *Collector) runChunkJobs(ctx context.Context, jobs []chunkJob, byID map[
 		p.Go(func() chunkResult {
 			cctx, cancel := withTimeout(ctx, c.Timeout.Duration())
 			defer cancel()
-			samples, err := c.runGetMetricData(cctx, j.client, j.chunk, j.start, j.end, byID)
-			return chunkResult{key: j.key, samples: samples, err: err}
+			samples, noData, err := c.runGetMetricData(cctx, j.client, j.chunk, j.start, j.end, byID)
+			return chunkResult{key: j.key, samples: samples, noData: noData, err: err}
 		})
 	}
 	return p.Wait()
@@ -153,7 +154,8 @@ func (c *Collector) runChunkJobs(ctx context.Context, jobs []chunkJob, byID map[
 
 // collectChunkResults aggregates successful samples and marks the groups of
 // failed jobs. It reports allFailed when every job errored.
-func (c *Collector) collectChunkResults(results []chunkResult, failedGroups map[queryGroupKey]bool) (samples []querySample, allFailed bool) {
+func (c *Collector) collectChunkResults(results []chunkResult, failedGroups map[queryGroupKey]bool) (samples []querySample, noData map[string]bool, allFailed bool) {
+	noData = make(map[string]bool)
 	failures := 0
 	for _, r := range results {
 		if r.err != nil {
@@ -164,16 +166,23 @@ func (c *Collector) collectChunkResults(results []chunkResult, failedGroups map[
 			continue
 		}
 		samples = append(samples, r.samples...)
+		for id := range r.noData {
+			noData[id] = true
+		}
 	}
-	return samples, failures == len(results)
+	return samples, noData, failures == len(results)
 }
 
 // runGetMetricData issues GetMetricData for one chunk, following NextToken to
 // completion, and maps each result back to its series. With ScanBy descending
-// the first value seen per Id is the newest. Queries that return no datapoint
-// are emitted as a gap.
-func (c *Collector) runGetMetricData(ctx context.Context, client cloudwatchClient, chunk []cwtypes.MetricDataQuery, start, end time.Time, byID map[string]plannedQuery) ([]querySample, error) {
+// the first value seen per Id is the newest. It returns the samples plus noData:
+// the query ids that got a USABLE result (Complete/PartialData) with no
+// datapoint. A per-result InternalError/Forbidden (or a missing result) is NOT
+// in noData, so observe gaps that series rather than zero-filling it — an
+// error must not read as a real 0 for nil_as_zero metrics.
+func (c *Collector) runGetMetricData(ctx context.Context, client cloudwatchClient, chunk []cwtypes.MetricDataQuery, start, end time.Time, byID map[string]plannedQuery) ([]querySample, map[string]bool, error) {
 	valueByID := make(map[string]float64, len(chunk))
+	usableByID := make(map[string]bool, len(chunk)) // saw a usable (non-error) result for this id
 	var nextToken *string
 
 	for {
@@ -185,18 +194,18 @@ func (c *Collector) runGetMetricData(ctx context.Context, client cloudwatchClien
 			NextToken:         nextToken,
 		})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		for _, r := range out.MetricDataResults {
 			if r.Id == nil {
 				continue
 			}
-			// Per-result statuses: skip caching an unreliable value, so the series
-			// gaps this period and is retried when its group is next due.
-			// InternalError is transient; Forbidden means the IAM identity cannot
-			// read this metric, so surface it (rate-limited) rather than hiding a
-			// permissions gap behind a debug line.
+			// A per-result error is NOT "no data": leave the id unusable so its
+			// series gaps (not a false 0). InternalError is transient; Forbidden
+			// means the IAM identity cannot read this metric, so surface it
+			// (rate-limited). PartialData is normal pagination (handled by the
+			// NextToken loop), so it stays usable.
 			switch r.StatusCode {
 			case cwtypes.StatusCodeInternalError:
 				c.Debugf("CloudWatch GetMetricData result %q: InternalError (transient); skipping this period", aws.ToString(r.Id))
@@ -206,11 +215,12 @@ func (c *Collector) runGetMetricData(ctx context.Context, client cloudwatchClien
 					Warningf("CloudWatch GetMetricData: access denied for one or more metrics (result Forbidden); verify the IAM identity is allowed cloudwatch:GetMetricData")
 				continue
 			}
+			usableByID[*r.Id] = true
 			if _, ok := valueByID[*r.Id]; ok || len(r.Values) == 0 {
 				continue
 			}
 			if v := r.Values[0]; !math.IsNaN(v) && !math.IsInf(v, 0) {
-				valueByID[*r.Id] = v // skip non-finite datapoints (treated as a gap)
+				valueByID[*r.Id] = v // skip non-finite datapoints (treated as no datapoint)
 			}
 		}
 
@@ -221,13 +231,18 @@ func (c *Collector) runGetMetricData(ctx context.Context, client cloudwatchClien
 	}
 
 	samples := make([]querySample, 0, len(chunk))
+	noData := make(map[string]bool)
 	for _, q := range chunk {
-		pq := byID[aws.ToString(q.Id)]
-		value, ok := valueByID[aws.ToString(q.Id)]
-		if !ok {
-			continue // missing datapoint -> gap
+		id := aws.ToString(q.Id)
+		if value, ok := valueByID[id]; ok {
+			pq := byID[id]
+			samples = append(samples, querySample{seriesName: pq.seriesName, labels: pq.labels, value: value, region: pq.region, period: pq.period})
+			continue
 		}
-		samples = append(samples, querySample{seriesName: pq.seriesName, labels: pq.labels, value: value, region: pq.region, period: pq.period})
+		if usableByID[id] {
+			noData[id] = true // usable result, no datapoint -> eligible for zero-fill
+		}
+		// else: errored or absent id -> not eligible; observe gaps the series
 	}
-	return samples, nil
+	return samples, noData, nil
 }

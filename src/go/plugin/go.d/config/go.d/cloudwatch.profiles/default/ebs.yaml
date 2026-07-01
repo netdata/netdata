@@ -29,7 +29,7 @@ metrics:
     statistics: [average]
   - id: volume_idle_time
     metric_name: VolumeIdleTime
-    statistics: [average]
+    statistics: [sum]   # total idle seconds in the period (AWS: Average is not relevant, esp. for Nitro volumes)
   - id: burst_balance
     metric_name: BurstBalance
     statistics: [average]
@@ -102,7 +102,7 @@ template:
       units: seconds
       algorithm: absolute
       dimensions:
-        - selector: volume_idle_time_average
+        - selector: volume_idle_time_sum
           name: idle
     - id: cw_ebs_burst_balance
       context: burst_balance

@@ -204,15 +204,18 @@ func (m Metric) validate(profilePrefix string, idx int) error {
 	}
 
 	seen := map[string]struct{}{}
-	hasSum := false
+	hasSum, hasSampleCount := false, false
 	for i, stat := range m.Statistics {
 		token := NormalizeStatistic(stat)
 		if token == "" {
 			errs = append(errs, fmt.Errorf("%s.statistics[%d]: %q is not a valid statistic (average|minimum|maximum|sum|sample_count|p<N>)", prefix, i, stat))
 			continue
 		}
-		if token == "sum" {
+		switch token {
+		case "sum":
 			hasSum = true
+		case "sample_count":
+			hasSampleCount = true
 		}
 		if _, ok := seen[token]; ok {
 			errs = append(errs, fmt.Errorf("%s.statistics[%d]: duplicate statistic %q", prefix, i, stat))
@@ -221,8 +224,8 @@ func (m Metric) validate(profilePrefix string, idx int) error {
 		seen[token] = struct{}{}
 	}
 
-	if m.Rate && !hasSum {
-		errs = append(errs, fmt.Errorf("%s: 'rate: true' requires a 'sum' statistic (a per-second rate divides a per-period total)", prefix))
+	if m.Rate && !hasSum && !hasSampleCount {
+		errs = append(errs, fmt.Errorf("%s: 'rate: true' requires a 'sum' or 'sample_count' statistic (a per-second rate divides a per-period total)", prefix))
 	}
 
 	return errors.Join(errs...)

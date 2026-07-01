@@ -329,28 +329,35 @@ func TestValidateUniqueChartIDs(t *testing.T) {
 	mkProfile := func(chartID string) Profile {
 		return Profile{Template: charttpl.Group{Charts: []charttpl.Chart{{ID: chartID}}}}
 	}
+	mkCatalog := func(profiles map[string]Profile, stock map[string]bool) Catalog {
+		return Catalog{byBaseName: profiles, entryIsStock: stock}
+	}
 	tests := map[string]struct {
 		catalog Catalog
 		wantErr bool
 	}{
 		"unique ids": {
-			catalog: Catalog{
-				byBaseName:            map[string]Profile{"a": mkProfile("cw_a"), "b": mkProfile("cw_b")},
-				stockProfileBaseNames: map[string]struct{}{"a": {}, "b": {}},
-			},
+			catalog: mkCatalog(
+				map[string]Profile{"a": mkProfile("cw_a"), "b": mkProfile("cw_b")},
+				map[string]bool{"a": true, "b": true}),
 		},
 		"stock-vs-stock duplicate is fatal": {
-			catalog: Catalog{
-				byBaseName:            map[string]Profile{"a": mkProfile("cw_dup"), "b": mkProfile("cw_dup")},
-				stockProfileBaseNames: map[string]struct{}{"a": {}, "b": {}},
-			},
+			catalog: mkCatalog(
+				map[string]Profile{"a": mkProfile("cw_dup"), "b": mkProfile("cw_dup")},
+				map[string]bool{"a": true, "b": true}),
 			wantErr: true,
 		},
 		"user-profile duplicate is tolerated (warned, not fatal)": {
-			catalog: Catalog{
-				byBaseName:            map[string]Profile{"a": mkProfile("cw_dup"), "b": mkProfile("cw_dup")},
-				stockProfileBaseNames: map[string]struct{}{"a": {}}, // "b" is a user profile
-			},
+			catalog: mkCatalog(
+				map[string]Profile{"a": mkProfile("cw_dup"), "b": mkProfile("cw_dup")},
+				map[string]bool{"a": true, "b": false}), // "b" is a user profile
+		},
+		"user override of a stock profile is not misclassified as stock": {
+			// "a" is a user override (effective origin user) that collides with stock
+			// "b"; a user-involved collision warns, it must not be a fatal stock dup.
+			catalog: mkCatalog(
+				map[string]Profile{"a": mkProfile("cw_dup"), "b": mkProfile("cw_dup")},
+				map[string]bool{"a": false, "b": true}),
 		},
 	}
 	for name, tc := range tests {

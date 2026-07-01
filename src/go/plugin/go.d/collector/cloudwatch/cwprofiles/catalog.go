@@ -30,6 +30,7 @@ var log = logger.New().With("component", "cloudwatch/cwprofiles")
 type Catalog struct {
 	byBaseName            map[string]Profile
 	stockProfileBaseNames map[string]struct{}
+	entryIsStock          map[string]bool // effective origin per basename (a user override of a stock profile is NOT stock)
 }
 
 // ResolvedProfile pairs a profile with its basename (the series-name prefix).
@@ -76,6 +77,7 @@ func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 	catalog := Catalog{
 		byBaseName:            make(map[string]Profile),
 		stockProfileBaseNames: make(map[string]struct{}),
+		entryIsStock:          make(map[string]bool),
 	}
 	seen := make(map[string]catalogEntry)
 
@@ -152,6 +154,7 @@ func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 
 	for baseName, entry := range seen {
 		catalog.byBaseName[baseName] = entry.Config
+		catalog.entryIsStock[baseName] = entry.IsStock
 	}
 
 	if err := catalog.validateUniqueChartIDs(); err != nil {
@@ -250,7 +253,7 @@ func (c Catalog) validateUniqueChartIDs() error {
 	seen := make(map[string]owner)
 	var errs []error
 	for _, base := range c.sortedBaseNames() {
-		_, isStock := c.stockProfileBaseNames[base]
+		isStock := c.entryIsStock[base]
 		for _, id := range chartIDs(c.byBaseName[base].Template) {
 			prev, ok := seen[id]
 			if !ok {

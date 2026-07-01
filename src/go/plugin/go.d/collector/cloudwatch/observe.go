@@ -90,13 +90,14 @@ func filterDueQueries(plan []plannedQuery, due map[queryGroupKey]bool) []planned
 // this cycle (not due, or due-but-failed) so long-period metrics stay visible.
 //
 // dueQueries is every query issued this cycle; `queried` is the subset of
-// (region, period) groups that succeeded. A due series that was queried
-// successfully but returned no datapoint is recorded as 0 when its metric opts
-// into nil-as-zero (sum/count metrics: "no activity"), otherwise its cached
-// value is dropped so it gaps until fresh data — no stale value is re-emitted.
-// A cached value otherwise survives across cycles until its instance leaves
+// (region, period) groups that succeeded; `noData` is the set of query ids that
+// got a usable result with no datapoint. A due series with no sample is recorded
+// as 0 only when it is a genuine no-data result (in noData) AND its metric opts
+// into nil-as-zero; otherwise (a gauge, or a per-result error/absent id) its
+// cached value is dropped so it gaps until fresh data — no stale value, no false
+// 0. A cached value otherwise survives across cycles until its instance leaves
 // discovery and pruneObserved drops it.
-func (o *observationStore) observe(dueQueries []plannedQuery, samples []querySample, queried map[queryGroupKey]bool) {
+func (o *observationStore) observe(dueQueries []plannedQuery, samples []querySample, noData map[string]bool, queried map[queryGroupKey]bool) {
 	meter := o.store.Write().SnapshotMeter("")
 
 	observedThisCycle := make(map[string]bool, len(samples))
@@ -112,8 +113,10 @@ func (o *observationStore) observe(dueQueries []plannedQuery, samples []querySam
 		observedThisCycle[key] = true
 	}
 
-	// Reconcile due series that were queried successfully but returned no
-	// datapoint: record 0 (nil-as-zero) or drop the cached value (gap).
+	// Reconcile due series with no sample this cycle. Zero-fill only a genuine
+	// no-datapoint result (in noData) for a nil-as-zero metric; a per-result error
+	// (InternalError/Forbidden, not in noData) or a gauge drops its cache so the
+	// series gaps rather than recording a false 0.
 	for _, pq := range dueQueries {
 		if !queried[pq.groupKey()] {
 			continue // group failed this cycle: keep cache, re-emit below, retry next cycle
@@ -122,7 +125,7 @@ func (o *observationStore) observe(dueQueries []plannedQuery, samples []querySam
 		if observedThisCycle[key] {
 			continue // had a datapoint
 		}
-		if pq.nilAsZero {
+		if pq.nilAsZero && noData[pq.id] {
 			writeSample(meter, pq.seriesName, pq.labels, 0)
 			o.lastObserved[key] = observedSeries{
 				seriesName: pq.seriesName,

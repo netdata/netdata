@@ -213,7 +213,7 @@ func TestExecuteQueries(t *testing.T) {
 			c := ec2QueryCollector([]string{"us-east-1"}, tc.instances)
 			useFakeClient(c, tc.fake)
 
-			samples, _, err := c.executeQueries(context.Background(), c.buildQueryPlan(), time.Unix(1_000_000_000, 0))
+			samples, _, _, err := c.executeQueries(context.Background(), c.buildQueryPlan(), time.Unix(1_000_000_000, 0))
 			if tc.wantErr {
 				assert.Error(t, err)
 				return
@@ -319,7 +319,7 @@ func TestExecuteQueries_PaginationAndDedup(t *testing.T) {
 	}
 	useFakeClient(c, fake)
 
-	samples, _, err := c.executeQueries(context.Background(), plan, time.Unix(1_000_000_000, 0))
+	samples, _, _, err := c.executeQueries(context.Background(), plan, time.Unix(1_000_000_000, 0))
 	require.NoError(t, err)
 	require.Len(t, samples, 3)
 	assert.Equal(t, 2, fake.calls, "followed NextToken to the second page")
@@ -369,7 +369,7 @@ func TestExecuteQueries_RegionClientFailures(t *testing.T) {
 			}
 			c.newCloudWatchClient = func(aws.Config) cloudwatchClient { return fake }
 
-			samples, _, err := c.executeQueries(context.Background(), c.buildQueryPlan(), time.Unix(1_000_000_000, 0))
+			samples, _, _, err := c.executeQueries(context.Background(), c.buildQueryPlan(), time.Unix(1_000_000_000, 0))
 			if tc.wantErr {
 				assert.Error(t, err)
 				return

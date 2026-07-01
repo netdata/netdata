@@ -148,20 +148,23 @@ func TestEnsureProfiles_CombinedBuildsValidChartTemplate(t *testing.T) {
 	collecttest.AssertChartTemplateSchema(t, c.chartTemplateYAML)
 }
 
-func TestProfileSeries_RateIsSumSpecific(t *testing.T) {
-	// A rate metric that also exposes a non-sum statistic must mark only the sum
-	// series as a rate; dividing an average/maximum by the period would be wrong.
+func TestProfileSeries_RateAppliesToPerPeriodTotals(t *testing.T) {
+	// rate applies to the per-period totals (sum, sample_count) but never to a
+	// per-observation aggregate (average/maximum/percentile).
 	prof := cwprofiles.Profile{
 		Period: 300,
 		Metrics: []cwprofiles.Metric{
 			{ID: "req", Statistics: []string{"sum", "average"}, Rate: true},
+			{ID: "evt", Statistics: []string{"sample_count"}, Rate: true},
 		},
 	}
 
 	series := profileSeries("svc", prof)
 
 	require.Contains(t, series, "svc.req_sum")
+	require.Contains(t, series, "svc.evt_sample_count")
 	require.Contains(t, series, "svc.req_average")
 	assert.True(t, series["svc.req_sum"].rate, "sum series of a rate metric is a per-second rate")
-	assert.False(t, series["svc.req_average"].rate, "non-sum series is never a rate (no period divisor)")
+	assert.True(t, series["svc.evt_sample_count"].rate, "sample_count series of a rate metric is a per-second rate")
+	assert.False(t, series["svc.req_average"].rate, "a per-observation stat is never a rate (no period divisor)")
 }

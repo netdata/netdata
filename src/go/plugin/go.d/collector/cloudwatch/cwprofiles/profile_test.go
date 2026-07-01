@@ -156,16 +156,23 @@ func TestProfile_Validate(t *testing.T) {
 			wantErr:     true,
 			errContains: "duplicate statistic",
 		},
-		"rate without sum": {
+		"rate without sum or sample_count": {
 			mutate:      func(p *Profile) { p.Metrics[0].Rate = true },
 			wantErr:     true,
-			errContains: "requires a 'sum' statistic",
+			errContains: "requires a 'sum' or 'sample_count' statistic",
 		},
 		"rate with sum is valid": {
 			mutate: func(p *Profile) {
 				p.Metrics[0].Statistics = []string{"sum"}
 				p.Metrics[0].Rate = true
 				p.Template.Charts[0].Dimensions[0].Selector = "cpu_utilization_sum"
+			},
+		},
+		"rate with sample_count is valid": {
+			mutate: func(p *Profile) {
+				p.Metrics[0].Statistics = []string{"sample_count"}
+				p.Metrics[0].Rate = true
+				p.Template.Charts[0].Dimensions[0].Selector = "cpu_utilization_sample_count"
 			},
 		},
 		"percentile statistic is valid": {

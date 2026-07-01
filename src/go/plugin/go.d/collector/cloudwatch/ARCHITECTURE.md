@@ -8,7 +8,7 @@ focused tests, not here.
 ## Short Version
 
 `cloudwatch` is a framework-V2 go.d collector that pulls AWS CloudWatch metrics
-for a curated set of services (EC2, RDS, ELB, ALB, S3, Lambda, SQS, DynamoDB)
+for a curated set of AWS services (each defined by a profile — see Profiles)
 and renders them as dynamic Netdata charts. It is **profile-driven**: each
 service is a YAML profile declaring its CloudWatch namespace, the dimension set
 that identifies one instance, the metrics/statistics to query, and a chart
@@ -140,8 +140,11 @@ Discovery then finds which *instances* of those profiles exist per region.
   each under `timeout`).
 - `runGetMetricData` calls `GetMetricData` with `ScanBy` descending (newest
   first), follows `NextToken`, and keeps the **first value per query id** (the
-  newest). `InternalError` / `Forbidden` per-result statuses are skipped;
-  `NaN` / `Inf` and no-datapoint results become **gaps, not zeros**.
+  newest). A per-result `InternalError` / `Forbidden` (or a missing result) marks
+  the query id **unusable**, so its series gaps rather than zero-filling; a usable
+  result with no datapoint (or `NaN` / `Inf`) is a clean no-data outcome that
+  `observe` resolves per the metric's `nil_as_zero` policy (0 or gap). `PartialData`
+  is normal pagination (followed via `NextToken`) and stays usable.
 - The **query window** is `[end-period, end]` where
   `end = alignedNow - max(query_offset, period)`. Aligning to the period and
   offsetting by at least one period guarantees the queried bucket is already
@@ -241,8 +244,9 @@ Profile validation invariants (`profile.go`) — these are load-bearing:
   cumulative counters; this also blocks incremental suffix inference).
 - `template.metrics` must be empty — the collector owns the visible-series list
   and fills it at build time.
-- `rate: true` requires a `sum` statistic (the per-second value divides a
-  per-period sum by the period).
+- `rate: true` requires a `sum` or `sample_count` statistic (the per-second value
+  divides a per-period total — the summed value or the observation count — by the
+  period).
 
 ## Auth And Account Identity
 
@@ -254,7 +258,7 @@ shared config, EC2 instance profile, EKS IRSA), `access_key` (static keys), and
 The AWS account id is resolved **once** via `sts:GetCallerIdentity` (from the
 first region) and stamped on every series. Because the account id and STS
 endpoint are partition-scoped, **all regions in a job must share one AWS
-partition** (aws / aws-us-gov / aws-cn / aws-iso / aws-iso-b) — validated in
+partition** (aws / aws-us-gov / aws-cn / aws-iso / aws-iso-b / aws-iso-e / aws-iso-f / aws-eusc) — validated in
 `config.go`. A mixed-partition job would mislabel metrics.
 
 ## Concurrency
