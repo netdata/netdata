@@ -11,7 +11,10 @@
 use std::path::Path;
 
 use bumpalo::Bump;
-use sfst::{DroppedAttributeCounts, Flags, ObservedTimestamps, SpanId, SpanIds, TraceId, TraceIds};
+use sfst::{
+    DroppedAttributeCounts, Durations, Flags, ObservedTimestamps, ParentSpanIds, SpanId, SpanIds,
+    TraceId, TraceIds,
+};
 use sfst_indexer::KvSlot;
 use sfst_indexer::row_index::RowIndex;
 use sfst_indexer::{build_and_write, build_into};
@@ -286,6 +289,129 @@ pub fn build_sfst_range(
     let cursor = std::io::Cursor::new(Vec::new());
     let (cursor, summary, _metadata) = build_into(&row_index, cursor, Some(content_meta))?;
     Ok((summary, cursor.into_inner()))
+}
+
+/// The traces analog of [`populate_row_index`]: decode `FlattenedTraceRequest` frames,
+/// intern each span's entries (resource ++ scope ++ span), feed one row per span keyed
+/// on the span's start `ts`, and accumulate the span per-row columns — `trace_id`,
+/// `span_id`, `parent_span_id`, `duration`, `flags`, `dropped_attributes_count`. There
+/// is no `observed_ts` (spans have none). Sets `build_trace_id_index` so the seal
+/// builds the `TIDX` index from the chronological `trace_id` column. Span entries
+/// carry ingest-filled hashes (see `ng-ingest::write_trace_request`), so the interner
+/// fast path is safe here.
+fn populate_trace_row_index(
+    reader: &mut wal::Reader,
+    row_index: &mut RowIndex<'_>,
+    metrics: &Metrics,
+) -> Result<SfstStats, Error> {
+    let mut stats = SfstStats::default();
+    let mut kv = String::new();
+    let mut flattener = ng_flatten::Flattener::new();
+
+    let mut trace_ids = TraceIds::default();
+    let mut span_ids = SpanIds::default();
+    let mut parent_span_ids = ParentSpanIds::default();
+    let mut durations: Vec<i64> = Vec::new();
+    let mut flags: Vec<u32> = Vec::new();
+    let mut dropped_attrs: Vec<u32> = Vec::new();
+
+    loop {
+        let frame = {
+            let _t = metrics.scope("read");
+            match reader.next_frame()? {
+                Some(frame) => frame,
+                None => break,
+            }
+        };
+        stats.frames += 1;
+        metrics.add_frames(1);
+        metrics.add_bytes(frame.data.len() as u64);
+
+        let flattened: ng_flatten::FlattenedTraceRequest = {
+            let _t = metrics.scope("deserialize");
+            ng_flatten::decode_trace_frame(frame.data).map_err(|source| Error::BincodeDecode {
+                frame: stats.frames,
+                source,
+            })?
+        };
+
+        let _t = metrics.scope("index");
+        let tree = &flattened.tree;
+        let _ = flattener.merge_tree(tree);
+        let paths: Vec<String> = (0..tree.len() as NodeId).map(|id| tree.path(id)).collect();
+
+        let mut tokens: Vec<KvSlot> = Vec::new();
+        let mut records = 0u64;
+        for rg in &flattened.resources {
+            let resource_tokens =
+                intern_entries(row_index, &rg.resource, &paths, &mut kv, &mut stats);
+            tokens.clear();
+            tokens.extend_from_slice(&resource_tokens);
+
+            for sg in &rg.scopes {
+                let scope_tokens =
+                    intern_entries(row_index, &sg.scope, &paths, &mut kv, &mut stats);
+                tokens.extend_from_slice(&scope_tokens);
+
+                for span in &sg.spans {
+                    records += 1;
+
+                    let span_tokens =
+                        intern_entries(row_index, &span.entries, &paths, &mut kv, &mut stats);
+                    tokens.truncate(resource_tokens.len() + scope_tokens.len());
+                    tokens.extend_from_slice(&span_tokens);
+
+                    // ts = start_time, normalized at ingest (always concrete).
+                    row_index.row(span.ts, &tokens);
+
+                    // Per-row span columns, one value per row (parallel to the row
+                    // just fed) so they stay aligned for the build-time remap. Ids
+                    // are byte-copied from the typed ng_flatten ids to the sfst ones.
+                    trace_ids.push(TraceId::from(*span.trace_id.as_bytes()));
+                    span_ids.push(SpanId::from(*span.span_id.as_bytes()));
+                    parent_span_ids.push(SpanId::from(*span.parent_span_id.as_bytes()));
+                    durations.push(span.duration);
+                    flags.push(span.flags);
+                    dropped_attrs.push(span.dropped_attributes_count);
+                }
+
+                tokens.truncate(resource_tokens.len());
+            }
+        }
+        stats.records += records;
+        metrics.add_records(records);
+    }
+
+    row_index.tree = Some(to_sfst_tree(&flattener.into_tree()));
+    row_index.trace_ids = Some(trace_ids);
+    row_index.span_ids = Some(span_ids);
+    row_index.parent_span_ids = Some(parent_span_ids);
+    row_index.durations = Some(Durations(durations));
+    row_index.flags = Some(Flags(flags));
+    row_index.dropped_attribute_counts = Some(DroppedAttributeCounts(dropped_attrs));
+    // Spans turn the index on: the builder builds TIDX from the chronological TRCE.
+    row_index.build_trace_id_index = true;
+
+    Ok(stats)
+}
+
+/// Build an SFST index file from a single flattened **traces** WAL file — the traces
+/// analog of [`build_sfst_file`]. Populates the span per-row columns and builds the
+/// `trace_id` index; returns the [`sfst::Summary`] + written file size.
+pub fn build_sfst_traces_file(
+    wal_path: &Path,
+    out_path: &Path,
+    metrics: &Metrics,
+) -> Result<(sfst::Summary, u64), Error> {
+    let mut reader = wal::Reader::open(wal_path)?;
+    let content_meta = reader.header().content_meta.clone();
+    let arena = Bump::new();
+    let mut row_index = RowIndex::new(&arena, CARDINALITY_THRESHOLD);
+    populate_trace_row_index(&mut reader, &mut row_index, metrics)?;
+    let _t = metrics.scope("build");
+    let (summary, _metadata) = build_and_write(&row_index, out_path, Some(content_meta))?;
+    let size = std::fs::metadata(out_path)?.len();
+    Ok((summary, size))
 }
 
 #[cfg(test)]

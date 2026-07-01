@@ -11,6 +11,10 @@ workspace = true
 name = "ng-index"
 path = "src/main.rs"
 
+[[bin]]
+name = "ng-index-traces"
+path = "src/bin/traces.rs"
+
 [dependencies]
 bincode = { workspace = true }
 bumpalo = { workspace = true }

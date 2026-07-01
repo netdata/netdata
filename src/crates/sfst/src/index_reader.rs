@@ -8,11 +8,13 @@
 //! 3. Load secondary chunks on demand (mid-card FST or high-card blob).
 //! 4. Load per-stream log entries for attribute resolution.
 
+use std::collections::{HashMap, HashSet};
+
 use fst_index::FstIndex;
 
 use crate::{
     BitmapValue, Bucket, FacetResult, FieldEntry, FieldTier, Filter, Grid, Histogram, IdRanges,
-    KvId, Matcher, Metadata, Summary, Timeline, Timestamps,
+    KvId, Matcher, Metadata, SpanId, Summary, Timeline, Timestamps, TraceId,
 };
 
 /// A successfully opened split-FST index.
@@ -25,6 +27,38 @@ pub struct IndexReader<'a> {
     sfst: crate::Reader<'a>,
     summary: Summary,
     primary: FstIndex<BitmapValue>,
+}
+
+/// One materialized span of a trace reconstructed by [`IndexReader::trace_by_id`]:
+/// its ids, timing, and attribute facets (`name`, `kind`, `status_code`,
+/// `attributes.*`) as flat `(key, value)` pairs.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TraceSpan {
+    pub span_id: SpanId,
+    pub parent_span_id: SpanId,
+    pub start_ns: i64,
+    pub duration_ns: i64,
+    pub fields: Vec<(String, String)>,
+}
+
+/// A trace reconstructed by [`IndexReader::trace_by_id`]: the trace's spans plus the
+/// in-memory parent/child tree over them.
+///
+/// The tree is a flat adjacency (no owned nesting, no recursion): walk from
+/// [`roots`](Self::roots) via [`children`](Self::children). Because a trace's spans
+/// can scatter across files/time (and this reader sees only one file), a span whose
+/// `parent_span_id` is unset OR absent from this set is a **root** — so a partial
+/// trace still forms a forest rather than dropping spans.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Trace {
+    /// The trace's spans, sorted by `start_ns` (ties broken by `span_id`) — the
+    /// clock-skew-safe display order. Duplicate `span_id`s (resends) are collapsed
+    /// to the first seen.
+    pub spans: Vec<TraceSpan>,
+    /// Indices into [`spans`](Self::spans) of the root spans (unset/missing/self parent).
+    pub roots: Vec<usize>,
+    /// `span_id` → indices into [`spans`](Self::spans) of its direct children.
+    pub children: HashMap<SpanId, Vec<usize>>,
 }
 
 impl<'a> IndexReader<'a> {
@@ -320,6 +354,89 @@ impl<'a> IndexReader<'a> {
             });
         }
         Ok(rows)
+    }
+
+    /// Reconstruct one trace by its `trace_id`: look up the trace's span row
+    /// positions via the `TIDX` index, materialize each span (ids + timing +
+    /// attribute facets), and rebuild the parent/child tree in memory.
+    ///
+    /// Returns an empty [`Trace`] if the id is absent. Errors if the file carries no
+    /// `trace_id` index (not a traces file) — see [`crate::Reader::trace_id_index`].
+    ///
+    /// The tree build is **iterative** and defensive (a trace's spans can be partial
+    /// or malformed): spans are sorted by start time (clock-skew-safe), duplicate
+    /// `span_id`s are collapsed, and a span whose parent is unset, self-referential,
+    /// or absent from this file becomes a root — yielding a forest, never a dropped
+    /// span or an unbounded recursion.
+    pub fn trace_by_id(&self, trace_id: TraceId) -> Result<Trace, crate::Error> {
+        let index = self.sfst.trace_id_index()?;
+        let trace_ids = self.sfst.trace_ids()?;
+        let positions = index.positions(trace_id, &trace_ids);
+        if positions.is_empty() {
+            return Ok(Trace {
+                spans: Vec::new(),
+                roots: Vec::new(),
+                children: HashMap::new(),
+            });
+        }
+
+        let span_ids = self.sfst.span_ids()?;
+        let parents = self.sfst.parent_span_ids()?;
+        let durations = self.sfst.durations()?;
+        // `materialize_rows` returns one row per position, in `positions` order.
+        let rows = self.materialize_rows(positions)?;
+
+        // Assemble spans, collapsing duplicate span_ids (resends) to the first seen.
+        // All positions share `trace_id`, so dedup by span_id == dedup by
+        // (trace_id, span_id).
+        let mut seen: HashSet<SpanId> = HashSet::new();
+        let mut spans: Vec<TraceSpan> = Vec::with_capacity(positions.len());
+        for (i, &pos) in positions.iter().enumerate() {
+            let span_id = span_ids.get(pos as usize);
+            if !seen.insert(span_id) {
+                continue;
+            }
+            spans.push(TraceSpan {
+                span_id,
+                parent_span_id: parents.get(pos as usize),
+                start_ns: rows[i].timestamp_ns,
+                duration_ns: durations.0[pos as usize],
+                fields: rows[i].fields.clone(),
+            });
+        }
+
+        // Clock-skew-safe display order; span_id breaks ties deterministically.
+        spans.sort_by(|a, b| {
+            a.start_ns
+                .cmp(&b.start_ns)
+                .then_with(|| a.span_id.cmp(&b.span_id))
+        });
+
+        // Iterative tree build over the sorted spans: parent present in this set →
+        // edge; otherwise (unset / missing / self) → root.
+        let idx_of: HashMap<SpanId, usize> = spans
+            .iter()
+            .enumerate()
+            .map(|(i, s)| (s.span_id, i))
+            .collect();
+        let mut children: HashMap<SpanId, Vec<usize>> = HashMap::new();
+        let mut roots: Vec<usize> = Vec::new();
+        for (i, s) in spans.iter().enumerate() {
+            let has_parent = !s.parent_span_id.is_unset()
+                && s.parent_span_id != s.span_id
+                && idx_of.contains_key(&s.parent_span_id);
+            if has_parent {
+                children.entry(s.parent_span_id).or_default().push(i);
+            } else {
+                roots.push(i);
+            }
+        }
+
+        Ok(Trace {
+            spans,
+            roots,
+            children,
+        })
     }
 
     /// Resolve a **single** field's values at `positions`, decoding only that

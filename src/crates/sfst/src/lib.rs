@@ -80,7 +80,7 @@ mod writer;
 pub mod registry;
 
 pub use error::Error;
-pub use index_reader::{BitmapFilter, IndexReader};
+pub use index_reader::{BitmapFilter, IndexReader, Trace, TraceSpan};
 pub use query::{
     Bucket, FacetResult, Filter, Grid, Matcher, MaterializedRow, Timeline, Timestamps,
     compile_pattern, compile_query,
