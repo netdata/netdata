@@ -35,8 +35,8 @@ static inline size_t shell_name_copy(char *d, const char *s, size_t usable) {
     for(n = 0; *s && n < usable ; d++, s++, n++) {
         register char c = *s;
 
-        if(unlikely(!isalnum(c))) *d = '_';
-        else *d = (char)toupper(c);
+        if(unlikely(!isalnum((uint8_t)c))) *d = '_';
+        else *d = (char)toupper((uint8_t)c);
     }
     *d = '\0';
 
