@@ -234,7 +234,7 @@ void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
 #else
             const char *log_path = e->filename;
 #endif
-            int fd = open(log_path, O_WRONLY | O_APPEND | O_CREAT, 0664);
+            int fd = open(log_path, O_WRONLY | O_APPEND | O_CREAT, 0640);
             nd_win_trace("nd_log_open[%s]: file open %s path=%s",
                          nd_log_id2source(source), fd == -1 ? "FAILED" : "ok", log_path);
             if(fd == -1) {
@@ -292,7 +292,7 @@ void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
 // --------------------------------------------------------------------------------------------------------------------
 
 void nd_log_stdin_init(int fd, const char *filename) {
-    int f = open(filename, O_WRONLY | O_APPEND | O_CREAT, 0664);
+    int f = open(filename, O_WRONLY | O_APPEND | O_CREAT, 0640);
     if(f == -1)
         return;
 
