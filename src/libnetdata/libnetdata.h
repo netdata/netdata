@@ -51,6 +51,8 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
 #define COMPRESSION_MAX_OVERHEAD 128
 #define COMPRESSION_MAX_MSG_SIZE (COMPRESSION_MAX_CHUNK - COMPRESSION_MAX_OVERHEAD - 1)
 #define PLUGINSD_LINE_MAX (COMPRESSION_MAX_MSG_SIZE - 768)
+// This controls the max response size of a deferred function payload.
+#define PLUGINSD_MAX_DEFERRED_SIZE (100 * 1024 * 1024)
 
 bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length);
 struct web_buffer *run_command_and_get_output_to_buffer(const char *command, int max_line_length);
