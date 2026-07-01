@@ -451,14 +451,20 @@ inline void mrg_update_metric_retention_and_granularity_by_uuid(
     if (likely(!added)) {
         uint64_t old_samples = 0;
 
-        if (update_every_s && metric->latest_update_every_s && metric->latest_time_s_clean)
-            old_samples = (metric->latest_time_s_clean - metric->first_time_s) / metric->latest_update_every_s;
+        uint32_t latest_update_every_s = __atomic_load_n(&metric->latest_update_every_s, __ATOMIC_RELAXED);
+        time_t latest_time_s_clean = __atomic_load_n(&metric->latest_time_s_clean, __ATOMIC_RELAXED);
+        time_t metric_first_time_s = __atomic_load_n(&metric->first_time_s, __ATOMIC_RELAXED);
+        if (update_every_s && latest_update_every_s && latest_time_s_clean)
+            old_samples = (latest_time_s_clean - metric_first_time_s) / latest_update_every_s;
 
         mrg_metric_expand_retention(mrg, metric, first_time_s, last_time_s, update_every_s);
 
         uint64_t new_samples = 0;
-        if (update_every_s && metric->latest_update_every_s && metric->latest_time_s_clean)
-            new_samples = (metric->latest_time_s_clean - metric->first_time_s) / metric->latest_update_every_s;
+        latest_update_every_s = __atomic_load_n(&metric->latest_update_every_s, __ATOMIC_RELAXED);
+        latest_time_s_clean = __atomic_load_n(&metric->latest_time_s_clean, __ATOMIC_RELAXED);
+        metric_first_time_s = __atomic_load_n(&metric->first_time_s, __ATOMIC_RELAXED);
+        if (update_every_s && latest_update_every_s && latest_time_s_clean)
+            new_samples = (latest_time_s_clean - metric_first_time_s) / latest_update_every_s;
 
         if (journal_samples)
             *journal_samples += (new_samples - old_samples);
