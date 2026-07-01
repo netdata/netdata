@@ -226,7 +226,7 @@ int rbuf_memcmp_n(rbuf_t buffer, const char *to_cmp, size_t to_cmp_bytes)
     return rbuf_memcmp(buffer, buffer->tail, to_cmp, to_cmp_bytes);
 }
 
-char *rbuf_find_bytes(rbuf_t buffer, const char *needle, size_t needle_bytes, int *found_idx)
+char *rbuf_find_bytes(rbuf_t buffer, const char *needle, size_t needle_bytes, size_t *found_idx)
 {
     const char *ptr = buffer->tail;
     *found_idx = 0;
