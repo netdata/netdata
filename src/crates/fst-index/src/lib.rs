@@ -52,6 +52,8 @@ mod serde_impl {
     }
 
     impl<'de, T: Deserialize<'de>> Deserialize<'de> for FstIndex<T> {
+        // FST value-indices are trusted in-bounds (upheld by `build`), not
+        // re-validated here; an inconsistent input panics on lookup.
         fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
             let helper = FstIndexHelper::<T>::deserialize(deserializer)?;
             let map = fst::Map::new(helper.fst_bytes).map_err(serde::de::Error::custom)?;
@@ -86,8 +88,9 @@ impl From<fst::Error> for BuildError {
 /// Maps byte-string keys to values of type `T`. Keys are stored in a
 /// compressed FST; values are stored in a `Vec<T>` ordered by sorted key.
 ///
-/// Supports exact lookup by key and prefix search. Immutable after
-/// construction.
+/// Supports exact lookup by key and prefix search. The key set is fixed at
+/// construction — there is no insert/remove — though individual values can be
+/// updated in place via [`get_mut`](Self::get_mut).
 pub struct FstIndex<T> {
     map: fst::Map<Vec<u8>>,
     values: Vec<T>,
@@ -128,32 +131,6 @@ impl<T> FstIndex<T> {
         let mut values = Vec::with_capacity(pairs.len());
 
         for (idx, (key, value)) in pairs.into_iter().enumerate() {
-            builder
-                .insert(key.as_ref(), idx as u64)
-                .map_err(|e| BuildError(e.to_string()))?;
-            values.push(value);
-        }
-
-        let bytes = builder
-            .into_inner()
-            .map_err(|e| BuildError(e.to_string()))?;
-        let map = fst::Map::new(bytes)?;
-
-        Ok(Self { map, values })
-    }
-
-    /// Build an index from a pre-sorted iterator of `(key, value)` pairs.
-    ///
-    /// The caller must ensure keys are in lexicographic order. This avoids
-    /// the internal sort performed by [`build`](Self::build).
-    pub fn build_from_sorted<K: AsRef<[u8]>>(
-        iter: impl IntoIterator<Item = (K, T)>,
-    ) -> Result<Self, BuildError> {
-        let bump = bumpalo::Bump::with_capacity(32 * 1024 * 1024);
-        let mut builder = fst::MapBuilder::memory(&bump);
-        let mut values = Vec::new();
-
-        for (idx, (key, value)) in iter.into_iter().enumerate() {
             builder
                 .insert(key.as_ref(), idx as u64)
                 .map_err(|e| BuildError(e.to_string()))?;
@@ -413,17 +390,10 @@ mod tests {
     }
 
     #[test]
-    fn build_from_sorted() {
-        let index = FstIndex::build_from_sorted([("a", 1u32), ("b", 2), ("c", 3)]).unwrap();
-
-        assert_eq!(index.len(), 3);
-        assert_eq!(index.get(b"a"), Some(&1));
-        assert_eq!(index.get(b"c"), Some(&3));
-    }
-
-    #[test]
-    fn build_from_sorted_rejects_unsorted() {
-        let result = FstIndex::build_from_sorted([("b", 1u32), ("a", 2)]);
+    fn build_rejects_duplicate_keys() {
+        // `build` sorts, then feeds strictly-increasing keys to the FST builder;
+        // two equal keys break that ordering and surface as a BuildError.
+        let result = FstIndex::build([("dup", 1u32), ("dup", 2)]);
         assert!(result.is_err());
     }
 
