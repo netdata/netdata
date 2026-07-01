@@ -103,7 +103,7 @@ static inline void procfile_words_free(pfwords *fw) {
 // An array of lines
 
 NEVERNULL
-static inline uint32_t *procfile_lines_add(procfile *ff) {
+static inline size_t *procfile_lines_add(procfile *ff) {
     // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   adding line %d at word %d", fl->len, first_word);
 
     pflines *fl = ff->lines;
@@ -181,7 +181,7 @@ static void procfile_parser(procfile *ff) {
     char quote = 0;                     // the quote character - only when in quoted string
     size_t opened = 0;                  // counts the number of open parenthesis
 
-    uint32_t *line_words = procfile_lines_add(ff);
+    size_t *line_words = procfile_lines_add(ff);
 
     while(s < e) {
         PF_CHAR_TYPE ct = separators[(unsigned char)(*s)];
