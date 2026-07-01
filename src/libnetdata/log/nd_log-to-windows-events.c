@@ -174,13 +174,10 @@ static bool wel_add_to_registry(const wchar_t *channel, const wchar_t *provider,
 #if !defined(HAVE_ETW)
 // Registry key where WINEVT stores registered publishers (providers).
 #define WINEVT_PUBLISHERS_KEY L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WINEVT\\Publishers\\"
-// GUID of the NetdataDaemon importChannel provider — only present when the current
-// manifest (the one with importChannel declarations) has been registered via wevtutil im.
-#define WEL_DAEMON_IMPORT_GUID L"{5CA72004-9BD8-4634-81E5-000014E7DAAD}"
 
 static bool wel_manifest_is_current(void) {
     wchar_t key[MAX_PATH];
-    swprintf(key, _countof(key), L"%ls%ls", WINEVT_PUBLISHERS_KEY, WEL_DAEMON_IMPORT_GUID);
+    swprintf(key, _countof(key), L"%ls%ls", WINEVT_PUBLISHERS_KEY, NETDATA_WEL_PROVIDER_DAEMON_GUID_STR_W);
     HKEY hKey;
     if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, key, 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
         RegCloseKey(hKey);
@@ -236,27 +233,27 @@ static bool wel_run_silent(const wchar_t *exe, const wchar_t *params) {
     "        </channels>\r\n" \
     "      </provider>\r\n" \
     "      <provider name=\"NetdataDaemon\"\r\n" \
-    "        guid=\"{5CA72004-9BD8-4634-81E5-000014E7DAAD}\"\r\n" \
+    "        guid=\"" NETDATA_WEL_PROVIDER_DAEMON_GUID_STR "\"\r\n" \
     "        resourceFileName=\"%s\" messageFileName=\"%s\">\r\n" \
     "        <channels><importChannel chid=\"IMPORT_DAEMON\" name=\"Netdata/Daemon\"/></channels>\r\n" \
     "      </provider>\r\n" \
     "      <provider name=\"NetdataCollectors\"\r\n" \
-    "        guid=\"{5CA72003-9BD8-4634-81E5-000014E7DAAC}\"\r\n" \
+    "        guid=\"" NETDATA_WEL_PROVIDER_COLLECTORS_GUID_STR "\"\r\n" \
     "        resourceFileName=\"%s\" messageFileName=\"%s\">\r\n" \
     "        <channels><importChannel chid=\"IMPORT_COLLECTORS\" name=\"Netdata/Collectors\"/></channels>\r\n" \
     "      </provider>\r\n" \
     "      <provider name=\"NetdataAccess\"\r\n" \
-    "        guid=\"{5CA72002-9BD8-4634-81E5-000014E7DAAB}\"\r\n" \
+    "        guid=\"" NETDATA_WEL_PROVIDER_ACCESS_GUID_STR "\"\r\n" \
     "        resourceFileName=\"%s\" messageFileName=\"%s\">\r\n" \
     "        <channels><importChannel chid=\"IMPORT_ACCESS\" name=\"Netdata/Access\"/></channels>\r\n" \
     "      </provider>\r\n" \
     "      <provider name=\"NetdataHealth\"\r\n" \
-    "        guid=\"{5CA72005-9BD8-4634-81E5-000014E7DAAA}\"\r\n" \
+    "        guid=\"" NETDATA_WEL_PROVIDER_HEALTH_GUID_STR "\"\r\n" \
     "        resourceFileName=\"%s\" messageFileName=\"%s\">\r\n" \
     "        <channels><importChannel chid=\"IMPORT_HEALTH\" name=\"Netdata/Health\"/></channels>\r\n" \
     "      </provider>\r\n" \
     "      <provider name=\"NetdataAclk\"\r\n" \
-    "        guid=\"{5CA72001-9BD8-4634-81E5-000014E7DAA9}\"\r\n" \
+    "        guid=\"" NETDATA_WEL_PROVIDER_ACLK_GUID_STR "\"\r\n" \
     "        resourceFileName=\"%s\" messageFileName=\"%s\">\r\n" \
     "        <channels><importChannel chid=\"IMPORT_ACLK\" name=\"Netdata/Aclk\"/></channels>\r\n" \
     "      </provider>\r\n" \
