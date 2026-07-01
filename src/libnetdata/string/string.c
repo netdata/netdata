@@ -83,17 +83,34 @@ void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_
     if (releases) *releases = 0;
 
     for(size_t i = 0; i < STRING_PARTITIONS ;i++) {
-        if (inserts)        *inserts        += string_base[i].inserts;
-        if (deletes)        *deletes        += string_base[i].deletes;
-        if (entries)        *entries        += (size_t) string_base[i].entries;
-        if (memory)         *memory         += (size_t) string_base[i].memory;
-        if (memory_index)   *memory_index   += (string_base[i].memory_index > 0) ? string_base[i].memory_index : 0;
+        rw_spinlock_read_lock(&string_base[i].spinlock);
+
+        size_t partition_inserts = string_base[i].inserts;
+        size_t partition_deletes = string_base[i].deletes;
+        long int partition_entries = string_base[i].entries;
+        long int partition_memory = string_base[i].memory;
+        long int partition_memory_index = string_base[i].memory_index;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-        if (searches)       *searches       += string_base[i].atomic.searches;
-        if (references)     *references     += (size_t) string_base[i].atomic.active_references;
-        if (duplications)   *duplications   += string_base[i].atomic.duplications;
-        if (releases)       *releases       += string_base[i].atomic.releases;
+        size_t partition_searches = __atomic_load_n(&string_base[i].atomic.searches, __ATOMIC_RELAXED);
+        long int partition_references = __atomic_load_n(&string_base[i].atomic.active_references, __ATOMIC_RELAXED);
+        size_t partition_duplications = __atomic_load_n(&string_base[i].atomic.duplications, __ATOMIC_RELAXED);
+        size_t partition_releases = __atomic_load_n(&string_base[i].atomic.releases, __ATOMIC_RELAXED);
+#endif
+
+        rw_spinlock_read_unlock(&string_base[i].spinlock);
+
+        if (inserts)        *inserts        += partition_inserts;
+        if (deletes)        *deletes        += partition_deletes;
+        if (entries)        *entries        += (size_t) partition_entries;
+        if (memory)         *memory         += (size_t) partition_memory;
+        if (memory_index)   *memory_index   += (partition_memory_index > 0) ? (size_t) partition_memory_index : 0;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        if (searches)       *searches       += partition_searches;
+        if (references)     *references     += (size_t) partition_references;
+        if (duplications)   *duplications   += partition_duplications;
+        if (releases)       *releases       += partition_releases;
 #endif
     }
 }
