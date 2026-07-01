@@ -78,48 +78,74 @@ func dimProfile(namespace string, period int, dimNames ...string) cwprofiles.Pro
 	}
 }
 
-func TestDiscoverInstances_ALBExactDimensionFilter(t *testing.T) {
-	// ALB publishes the same metric under several dimension granularities; the
-	// {LoadBalancer}-only profile must collapse them to one instance per LB and
-	// reject every multi-dimension series.
-	client := &fakeCloudWatch{pages: []*cloudwatch.ListMetricsOutput{
-		page([]cwtypes.Metric{
-			mkMetric("RequestCount", "LoadBalancer", "app/lb1/aaa"),
-			mkMetric("RequestCount", "LoadBalancer", "app/lb1/aaa", "TargetGroup", "tg/x/1"),
-			mkMetric("RequestCount", "LoadBalancer", "app/lb1/aaa", "AvailabilityZone", "us-east-1a"),
-			mkMetric("RequestCount", "LoadBalancer", "app/lb1/aaa", "TargetGroup", "tg/x/1", "AvailabilityZone", "us-east-1a"),
-			mkMetric("ProcessedBytes", "LoadBalancer", "app/lb1/aaa"), // same instance as first -> dedup
-			mkMetric("RequestCount", "LoadBalancer", "app/lb2/bbb"),   // second instance
-		}, ""),
-	}}
+func TestDiscoverInstances(t *testing.T) {
+	// discoverInstances lists one page and keeps only the metrics whose dimension-NAME
+	// set exactly equals the profile's, collapsing CloudWatch's multi-granularity
+	// fan-out to one deduped instance per identity, in list order.
+	tests := map[string]struct {
+		metrics        []cwtypes.Metric
+		namespace      string
+		period         int
+		dims           []string
+		recentlyActive bool
+		wantDimValues  [][]string
+	}{
+		"ALB exact filter collapses multi-granularity + dedups to one per {LoadBalancer}": {
+			metrics: []cwtypes.Metric{
+				mkMetric("RequestCount", "LoadBalancer", "app/lb1/aaa"),
+				mkMetric("RequestCount", "LoadBalancer", "app/lb1/aaa", "TargetGroup", "tg/x/1"),
+				mkMetric("RequestCount", "LoadBalancer", "app/lb1/aaa", "AvailabilityZone", "us-east-1a"),
+				mkMetric("RequestCount", "LoadBalancer", "app/lb1/aaa", "TargetGroup", "tg/x/1", "AvailabilityZone", "us-east-1a"),
+				mkMetric("ProcessedBytes", "LoadBalancer", "app/lb1/aaa"), // same instance as first -> dedup
+				mkMetric("RequestCount", "LoadBalancer", "app/lb2/bbb"),   // second instance
+			},
+			namespace:      "AWS/ApplicationELB",
+			period:         300,
+			dims:           []string{"LoadBalancer"},
+			recentlyActive: true,
+			wantDimValues:  [][]string{{"app/lb1/aaa"}, {"app/lb2/bbb"}},
+		},
+		"S3 two-dimension identity keeps exact {BucketName,StorageType}, rejects wrong cardinality": {
+			metrics: []cwtypes.Metric{
+				mkMetric("BucketSizeBytes", "BucketName", "b1", "StorageType", "StandardStorage"),
+				mkMetric("NumberOfObjects", "BucketName", "b1", "StorageType", "AllStorageTypes"),
+				mkMetric("BucketSizeBytes", "BucketName", "b2", "StorageType", "StandardStorage"),
+				mkMetric("BucketSizeBytes", "BucketName", "b1"), // wrong cardinality -> rejected
+			},
+			namespace:      "AWS/S3",
+			period:         86400,
+			dims:           []string{"BucketName", "StorageType"},
+			recentlyActive: false,
+			wantDimValues:  [][]string{{"b1", "StandardStorage"}, {"b1", "AllStorageTypes"}, {"b2", "StandardStorage"}},
+		},
+		"wrong dimension name rejected (exact name-set, not just cardinality)": {
+			metrics: []cwtypes.Metric{
+				mkMetric("CPUUtilization", "InstanceId", "i-1"),
+				mkMetric("CPUUtilization", "ImageId", "ami-1"), // 1 dim, wrong name -> rejected
+			},
+			namespace:      "AWS/EC2",
+			period:         300,
+			dims:           []string{"InstanceId"},
+			recentlyActive: true,
+			wantDimValues:  [][]string{{"i-1"}},
+		},
+	}
 
-	prof := dimProfile("AWS/ApplicationELB", 300, "LoadBalancer")
-	got, err := discoverInstances(context.Background(), client, prof, true)
-	require.NoError(t, err)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			client := &fakeCloudWatch{pages: []*cloudwatch.ListMetricsOutput{page(tc.metrics, "")}}
+			prof := dimProfile(tc.namespace, tc.period, tc.dims...)
 
-	require.Len(t, got, 2)
-	assert.Equal(t, []string{"app/lb1/aaa"}, got[0].DimensionValues)
-	assert.Equal(t, []string{"app/lb2/bbb"}, got[1].DimensionValues)
-}
+			got, err := discoverInstances(context.Background(), client, prof, tc.recentlyActive)
+			require.NoError(t, err)
 
-func TestDiscoverInstances_S3MultiDimension(t *testing.T) {
-	client := &fakeCloudWatch{pages: []*cloudwatch.ListMetricsOutput{
-		page([]cwtypes.Metric{
-			mkMetric("BucketSizeBytes", "BucketName", "b1", "StorageType", "StandardStorage"),
-			mkMetric("NumberOfObjects", "BucketName", "b1", "StorageType", "AllStorageTypes"),
-			mkMetric("BucketSizeBytes", "BucketName", "b2", "StorageType", "StandardStorage"),
-			mkMetric("BucketSizeBytes", "BucketName", "b1"), // wrong cardinality -> rejected
-		}, ""),
-	}}
-
-	prof := dimProfile("AWS/S3", 86400, "BucketName", "StorageType")
-	got, err := discoverInstances(context.Background(), client, prof, false)
-	require.NoError(t, err)
-
-	require.Len(t, got, 3)
-	assert.Equal(t, []string{"b1", "StandardStorage"}, got[0].DimensionValues)
-	assert.Equal(t, []string{"b1", "AllStorageTypes"}, got[1].DimensionValues)
-	assert.Equal(t, []string{"b2", "StandardStorage"}, got[2].DimensionValues)
+			gotDimValues := make([][]string, len(got))
+			for i, inst := range got {
+				gotDimValues[i] = inst.DimensionValues
+			}
+			assert.Equal(t, tc.wantDimValues, gotDimValues)
+		})
+	}
 }
 
 func TestMatchInstanceDimensions_DuplicateNameRejected(t *testing.T) {
@@ -130,24 +156,6 @@ func TestMatchInstanceDimensions_DuplicateNameRejected(t *testing.T) {
 	}
 	_, ok := matchInstanceDimensions(dims, []string{"InstanceId", "ImageId"})
 	assert.False(t, ok)
-}
-
-func TestDiscoverInstances_WrongDimensionNameRejected(t *testing.T) {
-	// Same cardinality but a different dimension name must NOT match — the filter
-	// is on the exact dimension-name set, not just the count.
-	client := &fakeCloudWatch{pages: []*cloudwatch.ListMetricsOutput{
-		page([]cwtypes.Metric{
-			mkMetric("CPUUtilization", "InstanceId", "i-1"),
-			mkMetric("CPUUtilization", "ImageId", "ami-1"), // 1 dim, wrong name -> rejected
-		}, ""),
-	}}
-
-	prof := dimProfile("AWS/EC2", 300, "InstanceId")
-	got, err := discoverInstances(context.Background(), client, prof, true)
-	require.NoError(t, err)
-
-	require.Len(t, got, 1)
-	assert.Equal(t, []string{"i-1"}, got[0].DimensionValues)
 }
 
 func TestDiscoverInstances_Pagination(t *testing.T) {
