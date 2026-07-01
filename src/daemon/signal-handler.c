@@ -91,7 +91,9 @@ void nd_signal_handler(int signo, siginfo_t *info, void *context __maybe_unused)
                 len = strcatz(b, len, ")", sizeof(b));
             }
             len = strcatz(b, len, " in thread ", sizeof(b));
-            len += print_uint64(&b[len], gettid_cached());
+            char tid[UINT64_MAX_LENGTH];
+            print_uint64(tid, gettid_cached());
+            len = strcatz(b, len, tid, sizeof(b));
             len = strcatz(b, len, " ", sizeof(b));
             len = strcatz(b, len, nd_thread_tag_async_safe(), sizeof(b));
             len = strcatz(b, len, "!\n", sizeof(b));

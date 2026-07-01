@@ -1570,7 +1570,9 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
         len = strcatz(session_status.fatal.function, len, session_status.fatal.thread, sizeof(session_status.fatal.function));
         if(session_status.fatal.worker_job_id <= WORKER_UTILIZATION_MAX_JOB_TYPES) {
             len = strcatz(session_status.fatal.function, len, ":", sizeof(session_status.fatal.function));
-            len += print_uint64(&session_status.fatal.function[len], session_status.fatal.worker_job_id);
+            char worker_job_id[UINT64_MAX_LENGTH];
+            print_uint64(worker_job_id, session_status.fatal.worker_job_id);
+            len = strcatz(session_status.fatal.function, len, worker_job_id, sizeof(session_status.fatal.function));
         }
     }
 
