@@ -136,7 +136,7 @@ func (s *runSim) run(t *testing.T) {
 			skipNextEmpty = false
 			continue
 		}
-		if strings.HasPrefix(s, "FUNCTION GLOBAL") {
+		if strings.HasPrefix(s, "FUNCTION GLOBAL") || strings.HasPrefix(s, "FUNCTION_DEL") {
 			skipNextEmpty = true
 			continue
 		}
@@ -248,8 +248,8 @@ func prepareMockRegistry() collectorapi.Registry {
 				CollectFunc: func(context.Context) map[string]int64 { return map[string]int64{"id1": 1} },
 			}
 		},
-		Methods: func() []funcapi.MethodConfig {
-			return []funcapi.MethodConfig{{ID: "test-method", Name: "Test Method"}}
+		SharedFunctions: func() []funcapi.FunctionConfig {
+			return []funcapi.FunctionConfig{{ID: "test-method", Name: "Test Method"}}
 		},
 	})
 
@@ -262,8 +262,8 @@ func prepareMockRegistry() collectorapi.Registry {
 				CollectFunc: func(context.Context) map[string]int64 { return nil },
 			}
 		},
-		Methods: func() []funcapi.MethodConfig {
-			return []funcapi.MethodConfig{{ID: "test-method", Name: "Test Method"}}
+		SharedFunctions: func() []funcapi.FunctionConfig {
+			return []funcapi.FunctionConfig{{ID: "test-method", Name: "Test Method"}}
 		},
 	})
 

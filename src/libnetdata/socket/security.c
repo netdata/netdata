@@ -821,6 +821,7 @@ int security_test_certificate(SSL *ssl) {
         ret = 0;
     }
 
+    X509_free(cert);
     return ret;
 }
 

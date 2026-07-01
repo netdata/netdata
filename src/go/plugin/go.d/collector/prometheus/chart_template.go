@@ -7,7 +7,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
-	"gopkg.in/yaml.v2"
 )
 
 // chartExpireAfterCycles mirrors V1's stale-chart removal (a chart was dropped after 10 missed
@@ -52,14 +51,14 @@ func buildChartTemplate(app string) (string, error) {
 func buildMergedChartTemplate(app string, profiles []promprofiles.Profile) (string, error) {
 	spec := newAutogenSpec(app)
 	for _, p := range profiles {
-		g := p.Template
+		g := p.Template.Clone()
 		// The profile's root context_namespace is the exporter-type segment
 		// (prometheus.<app>.<ns>.<context>). When the resolved app equals that namespace —
 		// e.g. app fell back to the profile's own app: because the job has no app set
 		// (by the user or service discovery) — drop the redundant segment so the
-		// context is prometheus.<app>.<context>, not prometheus.<app>.<app>.<context>. We
-		// overwrite only the scalar ContextNamespace on this local copy (g), so the shared
-		// catalog profile — including its slice fields — is not mutated.
+		// context is prometheus.<app>.<context>, not prometheus.<app>.<app>.<context>. g is
+		// a deep clone of the catalog profile, so clearing its ContextNamespace cannot
+		// mutate the shared catalog.
 		if g.ContextNamespace == app {
 			g.ContextNamespace = ""
 		}
@@ -69,13 +68,9 @@ func buildMergedChartTemplate(app string, profiles []promprofiles.Profile) (stri
 }
 
 func marshalChartSpec(spec charttpl.Spec) (string, error) {
-	if err := spec.Validate(); err != nil {
+	raw, err := spec.MarshalTemplate()
+	if err != nil {
 		return "", fmt.Errorf("build prometheus chart template: %w", err)
 	}
-
-	raw, err := yaml.Marshal(spec)
-	if err != nil {
-		return "", fmt.Errorf("marshal prometheus chart template: %w", err)
-	}
-	return string(raw), nil
+	return raw, nil
 }

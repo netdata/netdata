@@ -23,7 +23,6 @@ func TestMethodsIncludesSelectors(t *testing.T) {
 	assert.Equal(t, FunctionName, cfg.FunctionName)
 	assert.Equal(t, []string{MethodID}, cfg.Aliases)
 	assert.Equal(t, "topology", cfg.ResponseType)
-	assert.True(t, cfg.AgentWide)
 	require.Len(t, cfg.RequiredParams, 5)
 	require.Nil(t, cfg.Presentation())
 

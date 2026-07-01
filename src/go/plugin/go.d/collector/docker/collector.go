@@ -26,7 +26,7 @@ func init() {
 		JobConfigSchema: configSchema,
 		Create:          func() collectorapi.CollectorV1 { return New() },
 		Config:          func() any { return &Config{} },
-		Methods:         dockerfunc.Methods,
+		SharedFunctions: dockerfunc.Methods,
 		MethodHandler: func(job collectorapi.RuntimeJob) funcapi.MethodHandler {
 			c, ok := job.Collector().(*Collector)
 			if !ok {

@@ -64,14 +64,14 @@ void mcp_websocket_on_message(struct websocket_server_client *wsc, const char *m
     if (!wsc || !message || length == 0)
         return;
     
-    // Log the raw incoming message
-    netdata_log_debug(D_MCP, "RCV: %s", message);
-    
     // Only handle text messages
     if (opcode != WS_OPCODE_TEXT) {
         websocket_error(wsc, "Ignoring binary message - mcp supports only TEXT messages");
         return;
     }
+
+    // Log the raw incoming message
+    netdata_log_debug(D_MCP, "RCV: %s", message);
     
     // Silently ignore standalone "PING" messages (legacy MCP client behavior)
     if (length == 4 && strncmp(message, "PING", 4) == 0) {

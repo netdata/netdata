@@ -33,7 +33,7 @@ func init() {
 		JobConfigSchema: configSchema,
 		CreateV2:        func() collectorapi.CollectorV2 { return New() },
 		Config:          func() any { return &Config{} },
-		Methods:         mysqlfunc.Methods,
+		SharedFunctions: mysqlfunc.Methods,
 		MethodHandler: func(job collectorapi.RuntimeJob) funcapi.MethodHandler {
 			c, ok := job.Collector().(*Collector)
 			if !ok {

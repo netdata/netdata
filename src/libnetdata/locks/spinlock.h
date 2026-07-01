@@ -71,13 +71,21 @@ bool spinlock_trylock_with_trace(SPINLOCK *spinlock, const char *func __maybe_un
 // integrates a holder-aware deadlock detector into the spin loop; the
 // mutex-backed implementation (SPINLOCK_IMPL_WITH_MUTEX) only records the
 // holder fields, since it does not spin and cannot self-detect deadlocks.
+#define SPINLOCK_HOLDER_FUNC_MAX 48 // enough for any acquire-site __FUNCTION__
+
 typedef struct netdata_spinlock_tracked {
     SPINLOCK spinlock;
     // The holder fields are NOT cleared on unlock; they describe the most
     // recent holder and are overwritten by the next acquirer. The detector
     // reads them only while the lock is held, so a free lock is never reported.
     pid_t holder_tid;           // gettid_cached() of the most recent holder; 0 before first acquire
-    const char *holder_func;    // acquire-site function (rodata literal); NULL before first acquire
+    // The acquire-site function name is copied INLINE (not stored as a pointer)
+    // so the detector can format it without dereferencing a possibly-wild
+    // pointer: when the lock memory is corrupted (the case the detector exists
+    // to report), a stored pointer would be garbage and crash vsnprintf, while
+    // an inline buffer is part of the lock's own (mapped) memory and is read
+    // with a bounded "%.*s". Empty before the first acquire.
+    char holder_func[SPINLOCK_HOLDER_FUNC_MAX];
     usec_t holder_since_ut;     // monotonic time the most recent holder acquired the lock
 } SPINLOCK_TRACKED;
 

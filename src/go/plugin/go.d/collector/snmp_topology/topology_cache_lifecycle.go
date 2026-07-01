@@ -74,6 +74,27 @@ func (c *topologyCache) hasFreshSnapshotAt(now time.Time) bool {
 	return true
 }
 
+func (c *topologyCache) hasRenderableObservationAt(now time.Time) bool {
+	if c == nil {
+		return false
+	}
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if !c.hasFreshSnapshotAt(now) {
+		return false
+	}
+
+	local := normalizeTopologyDevice(c.localDevice)
+	localManagementIP := topologyutil.NormalizeIPAddress(local.ManagementIP)
+	if localManagementIP == "" {
+		localManagementIP = pickManagementIP(local.ManagementAddresses)
+	}
+	baseBridgeAddress := c.resolveLocalBaseBridgeAddress(localManagementIP)
+	return strings.TrimSpace(ensureTopologyObservationDeviceID(local, baseBridgeAddress)) != ""
+}
+
 func (c *Collector) finalizeTopologyCache(cache *topologyCache) {
 	if cache == nil {
 		return

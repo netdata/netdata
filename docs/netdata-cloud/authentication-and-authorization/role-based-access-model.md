@@ -103,6 +103,12 @@ Role changes take effect immediately. When an Admin or Manager changes a user's 
 | **Invite existing user to Room**       | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |      -      |           |
 | **Remove user from Room**              | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |      -      |           |
 
+:::note
+
+The **Groups** tab under **User Management** only appears after [SCIM integration](/integrations/cloud-authentication/integrations/scim.md) is enabled. It is not shown by default, even on paid plans. Enabling SCIM requires a paid plan, a configured [Enterprise SSO (OIDC/SSO) integration](/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md), and Space Administrator access. If you don't see the **Groups** tab, set up Enterprise SSO first, then activate SCIM.
+
+:::
+
 </details>
 
 <details>

@@ -21,7 +21,7 @@ source files for evidence.
   `src/go/plugin/go.d/docs/migrate-v1-to-v2.md`
 - Runtime/chart lifecycle: `src/go/plugin/framework/chartengine/README.md`
 - Template format: `src/go/plugin/framework/charttpl/README.md`
-- Host scopes/vnodes: `.agents/sow/specs/go-v2-host-scope.md`
+- Host scopes/vnodes: `.agents/skills/project-writing-go-modules-framework-v2/go-v2-host-scope.md`
 - Primary modern example: `src/go/plugin/go.d/collector/cato_networks/`.
   Use focused pieces from it, not the whole collector shape.
 - Older V2 collectors can still be useful for local patterns, but review them
@@ -67,13 +67,20 @@ source files for evidence.
 - If Functions exist, isolate them in a `<name>func/` subpackage with a narrow
   `Deps` interface declared there. The Function package MUST NOT import the
   collector package or hold `*Collector`.
-- If a single-instance collector exposes `AgentWide` module `Methods`, its
-  `MethodHandler(job)` receives the running canonical runtime job. Use
-  `job.Collector()` to bind the Function handler to collector-owned state; do
-  not add a `__job` parameter or introduce a package-global registry to bridge
-  Function dispatch. During method execution, when the singleton job is not
-  running, the framework returns an unavailable response before calling
-  `MethodHandler`.
+- If a single-instance collector exposes `Creator.SharedFunctions`, its
+  `MethodHandler(job)` receives the running canonical runtime job and the public
+  Function shape has no `__job` parameter. Use `job.Collector()` to bind the
+  Function handler to collector-owned state; do not add a package-global
+  registry to bridge Function dispatch. The Function is still job-backed:
+  publication waits for the canonical job to be running and available, and
+  dispatch rejects unavailable jobs before calling `MethodHandler`.
+- Shared and instance job-backed Functions are published only while their
+  backing running jobs are available. By default, every running job is available
+  for every shared or instance Function. If a collector needs runtime readiness
+  gating per job-backed Function, implement `collectorapi.FunctionAvailability`;
+  keep `FunctionAvailable(functionID)` cheap and non-blocking.
+  `funcapi.FunctionConfig.Available` applies to `AgentFunctions`, not
+  job-backed `SharedFunctions` or `InstanceFunctions`.
 - `collectorapi.Creator.InstancePolicy` defaults to
   `InstancePolicyPerJob`. Use `InstancePolicySingle` only for collectors that
   are intentionally one canonical job per agent. Single-instance configs MUST
@@ -117,6 +124,13 @@ source files for evidence.
 - To reproduce a V1 chart context in a migration, inject `context_namespace` (the
   fixed prefix, or `prefix.<app>` per job) so autogen rebuilds `prefix.<metric>` /
   `prefix.<app>.<metric>` without hand-built chart IDs.
+- When a collector builds its chart template at RUNTIME (not a static `charts.yaml`):
+  - Emit it with `charttpl.Spec.MarshalTemplate()` (runs `Validate()` only, then
+    marshals with `yaml.v2`, the decoder's library). Do NOT hand-roll `Validate()` +
+    `yaml.Marshal`, and do NOT marshal with `yaml.v3`.
+  - If you mutate a `charttpl.Group` borrowed from a shared profile/catalog, deep-copy
+    it first with `Group.Clone()` so per-job edits cannot corrupt the shared template.
+    A `Group` you decoded yourself per job is already owned and needs no clone.
 - Skip empty distributions -- e.g. a summary whose every quantile is NaN -- so a
   chart waits for real data, matching how scalar NaN values are already skipped.
 - For dynamic surfaces whose label sets churn, `metrix`'s `Vec` handle cache is

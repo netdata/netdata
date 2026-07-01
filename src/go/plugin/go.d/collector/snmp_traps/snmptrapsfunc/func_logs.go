@@ -38,8 +38,8 @@ func NewHandler(journalRoot string) *Handler {
 	}
 }
 
-func LogsMethodConfig(available func() bool) funcapi.MethodConfig {
-	return funcapi.MethodConfig{
+func LogsFunctionConfig(available func() bool) funcapi.FunctionConfig {
+	return funcapi.FunctionConfig{
 		ID:           LogsMethodID,
 		FunctionName: FunctionName,
 		Name:         "SNMP Trap Logs",
@@ -50,7 +50,6 @@ func LogsMethodConfig(available func() bool) funcapi.MethodConfig {
 		ResponseType: "logs",
 		Available:    available,
 		RawRequest:   true,
-		AgentWide:    true,
 	}
 }
 

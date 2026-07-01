@@ -58,11 +58,6 @@ void nd_signal_handler(int signo, siginfo_t *info, void *context __maybe_unused)
 
         signals_waiting[i].count++;
 
-#if defined(FSANITIZE_ADDRESS)
-        if(signals_waiting[i].action == NETDATA_SIGNAL_EXIT_NOW)
-            exit(1);
-#endif
-
         if(signals_waiting[i].action == NETDATA_SIGNAL_DEADLY) {
             bool chained_handler = original_sigactions[signo] || (original_handlers[signo] && original_handlers[signo] != SIG_IGN && original_handlers[signo] != SIG_DFL);
 
@@ -256,6 +251,12 @@ static void process_triggered_signals(void) {
                     commands_exit();
                     netdata_exit_gracefully(signals_waiting[i].reason, true);
                     break;
+
+#if defined(FSANITIZE_ADDRESS)
+                case NETDATA_SIGNAL_EXIT_NOW:
+                    exit(1);
+                    break;
+#endif
 
                 case NETDATA_SIGNAL_DEADLY:
                     _exit(1);

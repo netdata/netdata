@@ -30,18 +30,18 @@ func TestModuleRegistryWithSystemdPolicy(t *testing.T) {
 func TestResolveFunctionCLIRequest(t *testing.T) {
 	registry := collectorapi.Registry{
 		"snmp": collectorapi.Creator{
-			Methods: func() []funcapi.MethodConfig {
-				return []funcapi.MethodConfig{{ID: "topology:snmp", Aliases: []string{"topology:snmp"}}}
+			SharedFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "topology:snmp", Aliases: []string{"topology:snmp"}}}
 			},
 		},
 		"snmp_traps": collectorapi.Creator{
-			Methods: func() []funcapi.MethodConfig {
-				return []funcapi.MethodConfig{{ID: "logs", FunctionName: "snmp:traps"}}
+			AgentFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "logs", FunctionName: "snmp:traps"}}
 			},
 		},
 		"plain": collectorapi.Creator{
-			Methods: func() []funcapi.MethodConfig {
-				return []funcapi.MethodConfig{{ID: "details"}}
+			SharedFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "details"}}
 			},
 		},
 		"nofunc": collectorapi.Creator{},
@@ -106,13 +106,13 @@ func TestResolveFunctionCLIRequest(t *testing.T) {
 func TestResolveFunctionCLIRequestPublicNameCollisionUsesSortedModule(t *testing.T) {
 	registry := collectorapi.Registry{
 		"bbb": collectorapi.Creator{
-			Methods: func() []funcapi.MethodConfig {
-				return []funcapi.MethodConfig{{ID: "logs", FunctionName: "shared:logs"}}
+			SharedFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "logs", FunctionName: "shared:logs"}}
 			},
 		},
 		"aaa": collectorapi.Creator{
-			Methods: func() []funcapi.MethodConfig {
-				return []funcapi.MethodConfig{{ID: "logs", FunctionName: "shared:logs"}}
+			SharedFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "logs", FunctionName: "shared:logs"}}
 			},
 		},
 	}

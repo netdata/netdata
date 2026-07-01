@@ -322,8 +322,8 @@ github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
 github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f h1:KUppIJq7/+SVif2QVs3tOP0zanoHgBEVAwHxUSIzRqU=
 github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f/go.mod h1:qRWi+5nqEBWmkhHvq77mSJWrCKwh8bxhgT7d/eI7P4U=
-github.com/netdata/systemd-journal-sdk/go v0.7.4 h1:6YHfPZfmwh97CYbOyi141Sq6hwRMN7I7YIIhie+5h7g=
-github.com/netdata/systemd-journal-sdk/go v0.7.4/go.mod h1:A03ryRKYt5zrAhxx81HTbnwZ1W8uLq13N1VWXJvO5Zc=
+github.com/netdata/systemd-journal-sdk/go v0.7.6 h1:TB4BeVU47e6g6tum70aJ2uuZaWxrqPCAgLrOOt8ajbA=
+github.com/netdata/systemd-journal-sdk/go v0.7.6/go.mod h1:A03ryRKYt5zrAhxx81HTbnwZ1W8uLq13N1VWXJvO5Zc=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.12.0/go.mod h1:oUhWkIvk5aDxtKvDDuw8gItl8pKl42LzjC9KZE0HfGg=
@@ -363,8 +363,8 @@ github.com/prometheus/prometheus v0.302.0 h1:47EsaoBRroS2ekSyMSOPIjXwYnY/mxoFk0x
 github.com/prometheus/prometheus v0.302.0/go.mod h1:YcyCoTbUR/TM8rY3Aoeqr0AWTu/pu1Ehh+trpX3eRzg=
 github.com/prometheus/sigv4 v0.1.1 h1:UJxjOqVcXctZlwDjpUpZ2OiMWJdFijgSofwLzO1Xk0Q=
 github.com/prometheus/sigv4 v0.1.1/go.mod h1:RAmWVKqx0bwi0Qm4lrKMXFM0nhpesBcenfCtz9qRyH8=
-github.com/redis/go-redis/v9 v9.20.1 h1:sfCU6A8P3dXbKyWes02uxA2baehGux9dZHfEKtsTB1w=
-github.com/redis/go-redis/v9 v9.20.1/go.mod h1:v/M13XI1PVCDcm01VtPFOADfZtHf8YW3baQf57KlIkA=
+github.com/redis/go-redis/v9 v9.21.0 h1:FPBE4hhbAke+TLmcY3WkpbDffJEomdqPn3HYiqAtL9E=
+github.com/redis/go-redis/v9 v9.21.0/go.mod h1:v/M13XI1PVCDcm01VtPFOADfZtHf8YW3baQf57KlIkA=
 github.com/rivo/uniseg v0.1.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
 github.com/rogpeppe/go-internal v1.14.1/go.mod h1:MaRKkUm5W0goXpeCfT7UZI6fk/L7L7so1lCWt35ZSgc=
@@ -416,8 +416,8 @@ github.com/valyala/fastjson v1.6.10 h1:/yjJg8jaVQdYR3arGxPE2X5z89xrlhS0eGXdv+ADT
 github.com/valyala/fastjson v1.6.10/go.mod h1:e6FubmQouUNP73jtMLmcbxS6ydWIpOfhz34TSfO3JaE=
 github.com/vektah/gqlparser/v2 v2.5.20 h1:kPaWbhBntxoZPaNdBaIPT1Kh0i1b/onb5kXgEdP5JCo=
 github.com/vektah/gqlparser/v2 v2.5.20/go.mod h1:xMl+ta8a5M1Yo1A1Iwt/k7gSpscwSnHZdw7tfhEGfTM=
-github.com/vmware/govmomi v0.54.1 h1:K30mfqTYE/xMbka2EHLAucxL5VOXrPstMUTbHdETNIg=
-github.com/vmware/govmomi v0.54.1/go.mod h1:/1lqYPsCaC3Rf+WTgMcuvs+TqJVEvLX1O4oJ51pIw4E=
+github.com/vmware/govmomi v0.55.0 h1:b02z/onIxqdpV8gKw11OYrrGdCnSA9WoBc70Fbr+HBg=
+github.com/vmware/govmomi v0.55.0/go.mod h1:QR6UoTHdmvT5XvdomNKwyi7VPOnrE0QZxjPBJ0mWWQs=
 github.com/x448/float16 v0.8.4 h1:qLwI1I70+NjRFUR3zs1JPUCgaCXSh3SW62uAKT1mSBM=
 github.com/x448/float16 v0.8.4/go.mod h1:14CWIYCyZA/cWjXOioeEpHeN/83MdbZDRQHoFcYsOfg=
 github.com/xdg-go/pbkdf2 v1.0.0 h1:Su7DPu48wXMwC3bs7MCNG+z4FhcyEuz5dlvchbq0B0c=

@@ -47,19 +47,19 @@ where
         // turn one damaged file into a startup (rebuild) or query outage.
         // Only caller-side errors (cancellation checkpoints, the on_entry
         // closure) abort the scan.
-        let journal = match JournalFile::<Mmap>::open(&registry_file, FACET_CACHE_JOURNAL_WINDOW_SIZE)
-        {
-            Ok(journal) => journal,
-            Err(err) => {
-                tracing::warn!(
-                    "skipping unreadable journal file {} during {}: {}",
-                    file_path.display(),
-                    purpose,
-                    err
-                );
-                continue;
-            }
-        };
+        let journal =
+            match JournalFile::<Mmap>::open(&registry_file, FACET_CACHE_JOURNAL_WINDOW_SIZE) {
+                Ok(journal) => journal,
+                Err(err) => {
+                    tracing::warn!(
+                        "skipping unreadable journal file {} during {}: {}",
+                        file_path.display(),
+                        purpose,
+                        err
+                    );
+                    continue;
+                }
+            };
 
         let mut reader = JournalReader::default();
         for pair in prefilter_matches {

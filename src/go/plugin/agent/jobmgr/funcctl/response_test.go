@@ -35,7 +35,7 @@ func TestRespondWithParams_ResponseType(t *testing.T) {
 		ResponseType: "topology",
 	}
 
-	controller.respondWithParams(functions.Function{}, "snmp", dataResp, nil, 1, "", true)
+	controller.respondWithParams(functions.Function{}, "snmp", "topology", dataResp, nil, 1, "", true)
 
 	assert.Equal(t, "topology", (*resp)["type"])
 }
@@ -47,12 +47,12 @@ func TestRespondWithParams_MethodTypeFallback(t *testing.T) {
 		Status: 200,
 	}
 
-	controller.respondWithParams(functions.Function{}, "snmp", dataResp, nil, 1, "topology", true)
+	controller.respondWithParams(functions.Function{}, "snmp", "topology", dataResp, nil, 1, "topology", true)
 
 	assert.Equal(t, "topology", (*resp)["type"])
 }
 
-func TestRespondWithParams_AgentWideOmitsJobParam(t *testing.T) {
+func TestRespondWithParams_AgentScopeOmitsJobParam(t *testing.T) {
 	controller, resp := newTestControllerWithCapture(t)
 
 	dataResp := &funcapi.FunctionResponse{
@@ -67,7 +67,7 @@ func TestRespondWithParams_AgentWideOmitsJobParam(t *testing.T) {
 		}},
 	}
 
-	controller.respondWithParams(functions.Function{}, "snmp", dataResp, nil, 1, "topology", false)
+	controller.respondWithParams(functions.Function{}, "snmp", "topology", dataResp, nil, 1, "topology", false)
 
 	accepted, ok := (*resp)["accepted_params"].([]any)
 	assert.True(t, ok)
@@ -85,8 +85,8 @@ func TestHandleMethodFuncInfo_UsesResponseType(t *testing.T) {
 	controller, resp := newTestControllerWithCapture(t)
 
 	controller.registry.registerModule("snmp", collectorapi.Creator{
-		Methods: func() []funcapi.MethodConfig {
-			return []funcapi.MethodConfig{{ID: "topology:snmp", ResponseType: "topology"}}
+		SharedFunctions: func() []funcapi.FunctionConfig {
+			return []funcapi.FunctionConfig{{ID: "topology:snmp", ResponseType: "topology"}}
 		},
 	})
 
@@ -95,15 +95,14 @@ func TestHandleMethodFuncInfo_UsesResponseType(t *testing.T) {
 	assert.Equal(t, "topology", (*resp)["type"])
 }
 
-func TestHandleMethodFuncInfo_AgentWideOmitsJobParam(t *testing.T) {
+func TestHandleMethodFuncInfo_AgentScopeOmitsJobParam(t *testing.T) {
 	controller, resp := newTestControllerWithCapture(t)
 
 	controller.registry.registerModule("snmp", collectorapi.Creator{
-		Methods: func() []funcapi.MethodConfig {
-			return []funcapi.MethodConfig{{
+		AgentFunctions: func() []funcapi.FunctionConfig {
+			return []funcapi.FunctionConfig{{
 				ID:           "topology:snmp",
 				ResponseType: "topology",
-				AgentWide:    true,
 				RequiredParams: []funcapi.ParamConfig{{
 					ID:        "topology_view",
 					Name:      "Topology View",
@@ -131,15 +130,15 @@ func TestHandleMethodFuncInfo_AgentWideOmitsJobParam(t *testing.T) {
 	assert.Equal(t, "topology_view", req0["id"])
 }
 
-func TestHandleJobMethodFuncInfo_UsesResponseType(t *testing.T) {
+func TestHandleInstanceFunctionInfo_UsesResponseType(t *testing.T) {
 	controller, resp := newTestControllerWithCapture(t)
 
 	controller.registry.registerModule("netflow", collectorapi.Creator{})
-	controller.registry.registerJobMethods("netflow", "job1", []funcapi.MethodConfig{
+	controller.registry.registerInstanceFunctions("netflow", "job1", []funcapi.FunctionConfig{
 		{ID: "flows:netflow", ResponseType: "flows"},
 	})
 
-	controller.handleJobMethodFuncInfo("netflow", "job1", "flows:netflow", functions.Function{})
+	controller.handleInstanceFunctionInfo("netflow", "job1", "flows:netflow", functions.Function{})
 
 	assert.Equal(t, "flows", (*resp)["type"])
 }
@@ -148,9 +147,9 @@ func TestHandleMethodFuncInfo_IncludesPresentation(t *testing.T) {
 	controller, resp := newTestControllerWithCapture(t)
 
 	controller.registry.registerModule("snmp", collectorapi.Creator{
-		Methods: func() []funcapi.MethodConfig {
-			return []funcapi.MethodConfig{
-				funcapi.MethodConfig{
+		SharedFunctions: func() []funcapi.FunctionConfig {
+			return []funcapi.FunctionConfig{
+				funcapi.FunctionConfig{
 					ID:           "topology:snmp",
 					ResponseType: "topology",
 				}.WithPresentation(map[string]any{

@@ -15,7 +15,7 @@ typedef enum __attribute__ ((__packed__)) rrdlabel_source {
 
     RRDLABEL_FLAG_DONT_DELETE   = (1 << 29), // set when this label should never be removed (can be overwritten though)
     RRDLABEL_FLAG_OLD           = (1 << 30), // marks for rrdlabels internal use - they are not exposed outside rrdlabels
-    RRDLABEL_FLAG_NEW           = (1 << 31)  // marks for rrdlabels internal use - they are not exposed outside rrdlabels
+    RRDLABEL_FLAG_NEW           = (1U << 31) // marks for rrdlabels internal use - they are not exposed outside rrdlabels
 } RRDLABEL_SRC;
 
 #define RRDLABEL_FLAG_INTERNAL (RRDLABEL_FLAG_OLD | RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_DONT_DELETE)

@@ -315,6 +315,7 @@ done:
 static void commit_alert_events(RRDHOST *host)
 {
     sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res_version = NULL;
 
     if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_ALERT_TO_DUMMY, &res))
         return;
@@ -325,7 +326,6 @@ static void commit_alert_events(RRDHOST *host)
     int64_t first_sequence_id = 0;
     int64_t last_sequence_id = 0;
 
-    sqlite3_stmt *res_version = NULL;
     param = 0;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
 
@@ -349,6 +349,7 @@ static void commit_alert_events(RRDHOST *host)
 done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
+    SQLITE_FINALIZE(res_version);
 }
 
 typedef enum {
@@ -1051,12 +1052,14 @@ done:
 #define ALARM_EVENTS_PER_CHUNK 1000
 void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
 {
-    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
-
     if (unlikely(!host)) {
-        nd_log(NDLS_ACCESS, NDLP_WARNING, "AC [%s (N/A)]: Node id not found", aclk_host_config->node_id);
+        nd_log(NDLS_ACCESS, NDLP_WARNING, "AC [N/A (N/A)]: Node id not found");
         return;
     }
+
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
+    if (unlikely(!aclk_host_config))
+        return;
 
     CLAIM_ID claim_id = claim_id_get();
     if (unlikely(!claim_id_is_set(claim_id)))

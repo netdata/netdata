@@ -38,7 +38,7 @@ json_object *json_tokenise(char *js) {
 #else
 jsmntok_t *json_tokenise(char *js, size_t len, size_t *count)
 {
-    int n = json_tokens;
+    int n = __atomic_load_n(&json_tokens, __ATOMIC_RELAXED);
     if(!js || !len) {
         netdata_log_error("JSON: json string is empty.");
         return NULL;
@@ -75,7 +75,11 @@ jsmntok_t *json_tokenise(char *js, size_t len, size_t *count)
 
     if(count) *count = (size_t)ret;
 
-    if(json_tokens < n) json_tokens = n;
+    int cached = __atomic_load_n(&json_tokens, __ATOMIC_RELAXED);
+    while(cached < n && !__atomic_compare_exchange_n(
+              &json_tokens, &cached, n, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+        ;
+
     return tokens;
 }
 #endif
@@ -181,7 +185,6 @@ static inline void json_jsonc_set_integer(JSON_ENTRY *e, char *key, int64_t valu
  */
 static inline void json_jsonc_parse_array(json_object *ptr, void *callback_data,int (*callback_function)(struct json_entry *)) {
     int end = json_object_array_length(ptr);
-    JSON_ENTRY e;
 
     if(end) {
         int i;
@@ -191,8 +194,7 @@ static inline void json_jsonc_parse_array(json_object *ptr, void *callback_data,
         do {
             json_object *jvalue =  json_object_array_get_idx(ptr, i);
             if(jvalue) {
-                e.callback_data = callback_data;
-                e.type = JSON_OBJECT;
+                JSON_ENTRY e = { .type = JSON_OBJECT, .callback_data = callback_data };
                 callback_function(&e);
                 json_object_object_foreach(jvalue, key, val) {
                     type = json_object_get_type(val);

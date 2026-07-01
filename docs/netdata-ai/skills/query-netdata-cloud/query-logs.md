@@ -73,15 +73,15 @@ agent currently accepts.
 | Key | Type | Purpose |
 |---|---|---|
 | `info` | bool | Discovery only; do not combine with a real query |
-| `after` | int | Unix ms timestamp; lower bound. Negative = relative seconds from `before` |
-| `before` | int | Unix ms timestamp; upper bound. Negative = relative seconds from now |
+| `after` | int | Lower time bound, in **seconds** (struct field `after_s`). Positive = absolute Unix seconds; negative = relative seconds from `before`. NOT ms, NOT µs |
+| `before` | int | Upper time bound, in **seconds** (struct field `before_s`). Positive = absolute Unix seconds; negative = relative seconds from now (`0` = now) |
 | `last` | int | Page size (rows). Default 200 |
 | `direction` | string | `backward` (default; newest first) or `forward` |
-| `anchor` | int | Per-row cursor for pagination |
-| `query` | string | Free-text search across journal fields |
+| `anchor` | int | Per-row cursor for pagination, in **microseconds** (matches the row timestamp values, which are µs — a different unit from `after`/`before`) |
+| `query` | string | Free-text search (FTS) across indexed fields |
 | `facets` | string[] | Field names to group by (returns counts per value) |
 | `histogram` | string | Field name to bucket-by-time |
-| `__logs_sources` | string | Source selector. Common values: `all`, `all-local-logs`, `all-local-system-logs`, `all-local-user-logs`, `all-local-namespaces`, plus per-namespace strings like `<namespace-name>` for a specific journal namespace |
+| `selections` | object | **The only working way to filter by source or by field** in the JSON body. `{"__logs_sources":[...]}` selects sources; `{"FIELD":[...]}` filters a facet. See [Selecting log sources](#selecting-log-sources-info--selections) — passing `__logs_sources` as a top-level key is silently ignored |
 | `if_modified_since` | int | Tail mode -- skip if no new data |
 | `data_only` | bool | Skip metadata for a faster query |
 | `sampling` | int | Cap on rows scanned when search would otherwise be huge |
@@ -91,6 +91,87 @@ agent currently accepts.
 
 `info=true` returns the current authoritative list; rely on it, not
 this table, when in doubt.
+
+---
+
+## Selecting log sources (`info` → `selections`)
+
+This is the single most important mechanism for log queries, and it
+works **identically for every log Function** (`systemd-journal`,
+`windows-events`, `otel-logs`, and any other built on the shared
+libnetdata logs-query library `LQS`). Only the **source id values**
+differ per Function; the request shape is the same.
+
+The agent parses the source selector from the POST body **only** inside
+the `selections` object, as an **array**
+(`<repo>/src/libnetdata/facets/logs_query_status.h:329-410`,
+`lqs_request_parse_json_payload`). There is no top-level
+`__logs_sources` key in the JSON parser, so:
+
+```json
+{ "__logs_sources": "Netdata/Daemon" }          // ❌ silently IGNORED → queries ALL sources
+{ "selections": { "__logs_sources": ["Netdata/Daemon"] } }   // ✅ filters server-side
+```
+
+> The top-level / function-string form `source:<id>` only applies to
+> the on-agent function-string transport. Over the Cloud REST API the
+> body is JSON, so you MUST use `selections.__logs_sources` (an array).
+
+### Step 1 — discover the valid source ids with `info`
+
+The `info=true` response contains a `__logs_sources` widget. Each
+option carries the `id` you pass, plus its size, entry count, and time
+coverage (retention) — invaluable for picking the right source and
+knowing how far back data exists:
+
+```bash
+curl ... -d '{"info":true}' \
+ | jq -r '.. | objects | select(.id=="__logs_sources") | .options[]
+          | "\(.id)\t\(.info)"'
+# windows-events example output:
+#   All-Of-Netdata    4 channels, 3.08MiB, covering 3d 19h, 1.94K entries, last 2026-06-26T04:30:44Z
+#   Netdata/Daemon    1 channel, 1028KiB, covering 3d 19h, 789 entries, last 2026-06-26T04:28:37Z
+#   Netdata/Health    ...
+# systemd-journal ids look different, e.g. all, all-local-system-logs,
+# all-local-namespaces, <namespace-name> — always read them from info.
+```
+
+`__logs_sources` is a **multiselect**: pass one or more ids in the
+array; selecting any source resets the default (which is "all
+sources") so you get exactly the union you asked for
+(`logs_query_status.h:407-410`).
+
+### Step 2 — query with the source filter
+
+```bash
+read -r -d '' PAYLOAD <<'EOF'
+{
+  "after": -3600, "before": 0, "last": 200, "data_only": true,
+  "selections": { "__logs_sources": ["Netdata/Daemon"] }
+}
+EOF
+curl -sS -X POST -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $TOKEN" \
+  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=windows-events" \
+  -d "$PAYLOAD"
+```
+
+### Why server-side source filtering matters (cost + robustness)
+
+- It is **server-side**: the agent reads only the selected channels /
+  namespaces. An unfiltered query reads *everything*, so on a host
+  where one co-located source is noisy (e.g. a Windows box where
+  `Microsoft-Windows-SystemDataArchiver`/SRUM emits ~10 events/sec),
+  the result is dominated by noise — a 500-row page can span under a
+  minute, and a wide unfiltered window can **time out or make the
+  plugin exit before responding**.
+- Combine with **`data_only:true`** to skip facet-count and histogram
+  aggregation. That aggregation is the usual cause of timeouts on wide
+  windows; `data_only` makes otherwise-failing historical queries
+  succeed.
+- Net recipe for reliable historical pulls: **filter the source via
+  `selections`** + **`data_only:true`** + a bounded `last`. Then a
+  single query can cover a long window cheaply.
 
 ---
 
@@ -191,10 +272,10 @@ already-sliced subset.
 ### Reserved keys inside `selections`
 
 - `__logs_sources` (per `LQS_PARAMETER_SOURCE`,
-  `logs_query_status.h:407`) is treated as the source-type
-  filter (e.g. `all-local-namespaces`, `<namespace-name>`).
-  Using it inside `selections` is equivalent to setting the
-  top-level `__logs_sources` parameter.
+  `logs_query_status.h:407`) is the source-type filter — pass the
+  source ids from `info` as an array. This is the **only** way to
+  scope sources in the JSON body; a top-level `__logs_sources` key is
+  not parsed. See [Selecting log sources](#selecting-log-sources-info--selections).
 - `query` inside `selections` is ignored
   (`logs_query_status.h:398`); use the top-level `query`.
 
@@ -205,8 +286,8 @@ already-sliced subset.
   "after":  -86400,
   "before": 0,
   "last":   500,
-  "__logs_sources": "agent-events",
   "selections": {
+    "__logs_sources":   ["agent-events"],
     "AE_AGENT_HEALTH":  ["crash-first", "crash-loop", "crash-repeated", "crash-entered"],
     "AE_AGENT_VERSION": ["v2.10.0", "v2.10.0-135-nightly"]
   },
@@ -225,7 +306,7 @@ the substring `deadlock`. Index-friendly even on a
 {
   "after":  -604800,
   "before": 0,
-  "__logs_sources": "agent-events",
+  "selections": { "__logs_sources": ["agent-events"] },
   "query": "SIGSEGV"
 }
 ```
@@ -251,7 +332,7 @@ read -r -d '' PAYLOAD <<EOF
   "before": 0,
   "last":   50,
   "direction": "backward",
-  "__logs_sources": "${NAMESPACE}"
+  "selections": { "__logs_sources": ["${NAMESPACE}"] }
 }
 EOF
 
@@ -276,7 +357,7 @@ read -r -d '' PAYLOAD <<'EOF'
   "query":  "OOM",
   "histogram": "PRIORITY",
   "facets":    ["_SYSTEMD_UNIT", "PRIORITY"],
-  "__logs_sources": "all-local-system-logs"
+  "selections": { "__logs_sources": ["all-local-system-logs"] }
 }
 EOF
 
@@ -299,7 +380,7 @@ read -r -d '' PAYLOAD <<EOF
   "anchor":    ${ANCHOR},
   "direction": "forward",
   "last":      200,
-  "__logs_sources": "all-local-logs"
+  "selections": { "__logs_sources": ["all-local-logs"] }
 }
 EOF
 
@@ -314,16 +395,21 @@ curl -sS -X POST \
 
 ## Limits and gotchas
 
-- **Time bounds are unix-microseconds**, not seconds, when given as
-  positive integers. Negative integers are relative seconds (`-3600`
-  = "one hour ago relative to `before`"). Mixing units is the most
-  common bug.
-- **Default cloud timeout is 120 s**, but very large queries
-  (thousands of rows over weeks of data) can hit it. Narrow the
-  window or use `sampling`.
-- **`__logs_sources` is required** to scope to a specific journal
-  namespace. Without it, the query targets all-local-logs which on a
-  busy host can be hundreds of GB.
+- **`after`/`before` are in SECONDS** (struct fields `after_s` /
+  `before_s`, `logs_query_status.h:345-346`): positive = absolute Unix
+  seconds, negative = relative seconds (`before:-3600` = "one hour
+  ago"; `before:0` = now). **`anchor` and the row timestamps are in
+  microseconds** — do not reuse a row timestamp as a positive
+  `after`/`before`. Mixing the two units is the most common bug.
+- **Default cloud timeout is 120 s.** Wide windows that compute facets
+  or a histogram are the usual offenders. Add **`data_only:true`** to
+  skip that aggregation, **filter the source via `selections`**, and/or
+  use `sampling` — see [Selecting log sources](#selecting-log-sources-info--selections).
+  If a query still "exits before responding", narrow the window further.
+- **Always scope the source via `selections.__logs_sources`.** With no
+  source filter the query targets every source, which on a busy host
+  can be hundreds of GB (Linux) or dominated by a noisy channel
+  (Windows) — slow, and prone to timeouts.
 - **Permission**: the cloud token must have a role that includes
   log-read access (function tags include `logs`). `scope:all` works;
   `scope:grafana-plugin` does NOT.
@@ -334,8 +420,10 @@ curl -sS -X POST \
 
 ## Discovering a journal namespace
 
-If the host runs `journalctl --namespace=<name>`, the same name is
-the value of `__logs_sources`. The agent's `info=true` response
-enumerates all visible sources under `accepted_params._logs_sources`
-or under a `required_params` widget -- inspect that widget's
-`options[]` to learn which sources the node actually exposes.
+For `systemd-journal`, if the host runs `journalctl --namespace=<name>`,
+the same `<name>` is a valid source id you pass in
+`selections.__logs_sources`. As always, the authoritative list (with
+per-source size, entry count, and retention coverage) comes from the
+`info=true` response's `__logs_sources` widget `options[]` — see
+[Selecting log sources](#selecting-log-sources-info--selections) for
+the exact `jq` and the request shape.

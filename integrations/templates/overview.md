@@ -12,6 +12,8 @@
 [% include 'overview/logs.md' %]
 [% elif entry.integration_type == 'flows' %]
 [% include 'overview/flows.md' %]
+[% elif entry.integration_type == 'device' %]
+[% include 'overview/device.md' %]
 [% elif entry.integration_type == 'service_discovery' %]
 [% include 'overview/service_discovery.md' %]
 [% endif %]

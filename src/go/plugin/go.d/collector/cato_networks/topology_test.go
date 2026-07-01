@@ -42,12 +42,6 @@ func TestTopologyFunction(t *testing.T) {
 				require.Greater(t, data.Links.Rows, 0)
 			},
 		},
-		"requires job selection": {
-			check: func(t *testing.T, _ *Collector) {
-				cfg := catofunc.Methods(defaultUpdateEvery)[0]
-				require.False(t, cfg.AgentWide)
-			},
-		},
 	}
 
 	for name, tc := range tests {

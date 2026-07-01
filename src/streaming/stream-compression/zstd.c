@@ -142,10 +142,18 @@ size_t stream_decompress_zstd(struct decompressor_state *state, const char *comp
         return 0;
     }
 
-    if(inBuffer.pos < inBuffer.size)
-        fatal("STREAM_DECOMPRESS: ZSTD ZSTD_decompressStream() decompressed %zu bytes, "
-              "but %zu bytes of compressed data remain",
-              inBuffer.pos, inBuffer.size);
+    if(inBuffer.pos < inBuffer.size) {
+        // The peer sent a frame that decompresses to more than our output buffer.
+        // A conforming sender never does this (it compresses in <= COMPRESSION_MAX_MSG_SIZE
+        // plaintext chunks), but a malicious/compromised peer is not bound by that.
+        // Return an error (like the gzip path and the ZSTD_isError branch above) so the
+        // caller fails the stream connection, instead of fatal()-ing the whole Agent.
+        netdata_log_error("STREAM_DECOMPRESS: ZSTD_decompressStream() consumed only %zu of %zu compressed bytes "
+                          "after filling the %zu-byte output buffer (frame decompresses to more than the buffer); "
+                          "failing the connection",
+                          inBuffer.pos, inBuffer.size, outBuffer.size);
+        return 0;
+    }
 
     size_t decompressed_size = outBuffer.pos;
 
@@ -158,6 +166,76 @@ size_t stream_decompress_zstd(struct decompressor_state *state, const char *comp
     state->total_compressions++;
 
     return decompressed_size;
+}
+
+// Regression test for the decompression-bomb guard: a malicious peer can send one small
+// ZSTD frame that decompresses to far more than the receiver's fixed output buffer.
+// stream_decompress_zstd() must reject it (return 0), NOT fatal()/abort the agent.
+// (Pre-fix this aborted the process, so a regression makes this test crash, not soft-fail.)
+//
+// Each sub-case uses a fresh decompressor_state, mirroring production: on a decompress
+// failure the receiver tears down the connection, so a destroyed state is never reused.
+int unittest_stream_decompress_bomb_zstd(void) {
+    fprintf(stderr, "\nTesting ZSTD decompression-bomb guard\n");
+    int errors = 0;
+
+    // 2MB of zeros: decompresses to far more than the ~128KB output buffer, but the
+    // compressed frame is only a few dozen bytes (a conforming sender never produces this).
+    size_t plain_len = 2 * 1024 * 1024;
+    char *plain = callocz(1, plain_len);
+    size_t bound = ZSTD_compressBound(plain_len);
+    char *comp = mallocz(bound);
+    size_t comp_len = ZSTD_compress(comp, bound, plain, plain_len, 1);
+    if (ZSTD_isError(comp_len)) {
+        fprintf(stderr, "  FAILED: ZSTD_compress() error: %s\n", ZSTD_getErrorName(comp_len));
+        freez(plain); freez(comp);
+        return 1;
+    }
+
+    // (1) the bomb must be rejected gracefully (return 0), not fatal()
+    {
+        struct decompressor_state dctx = { .initialized = false, .algorithm = COMPRESSION_ALGORITHM_ZSTD };
+        stream_decompressor_init(&dctx);
+        size_t out = stream_decompress(&dctx, comp, comp_len);
+        if (out != 0) {
+            fprintf(stderr, "  FAILED: oversized frame (%zuB compressed) accepted, decompressed %zuB "
+                            "(expected rejection)\n", comp_len, out);
+            errors++;
+        }
+        else
+            fprintf(stderr, "  OK: oversized frame (%zuB compressed) rejected gracefully, no fatal()\n", comp_len);
+        stream_decompressor_destroy(&dctx);
+    }
+
+    // (2) a normal frame still decompresses correctly (fresh decompressor, as a new
+    //     connection would get) - the guard must not break legitimate traffic.
+    {
+        const char *msg = "the quick brown fox jumps over the lazy dog";
+        size_t msg_len = strlen(msg);
+        size_t cbound = ZSTD_compressBound(msg_len);
+        char *cmsg = mallocz(cbound);
+        size_t cmsg_len = ZSTD_compress(cmsg, cbound, msg, msg_len, 1);
+        if (ZSTD_isError(cmsg_len)) {
+            fprintf(stderr, "  FAILED: ZSTD_compress() error: %s\n", ZSTD_getErrorName(cmsg_len));
+            freez(cmsg); freez(plain); freez(comp);
+            return errors + 1;
+        }
+
+        struct decompressor_state dctx = { .initialized = false, .algorithm = COMPRESSION_ALGORITHM_ZSTD };
+        stream_decompressor_init(&dctx);
+        size_t dlen = stream_decompress(&dctx, cmsg, cmsg_len);
+        if (dlen != msg_len || memcmp(&dctx.output.data[dctx.output.read_pos], msg, msg_len) != 0) {
+            fprintf(stderr, "  FAILED: normal frame did not round-trip (got %zuB, expected %zuB)\n", dlen, msg_len);
+            errors++;
+        }
+        else
+            fprintf(stderr, "  OK: normal frame round-trips\n");
+        stream_decompressor_destroy(&dctx);
+        freez(cmsg);
+    }
+
+    freez(plain); freez(comp);
+    return errors;
 }
 
 #endif // ENABLE_ZSTD

@@ -190,6 +190,9 @@ unsigned char *utf8_check(unsigned char *s)
 }
 
 char *url_decode_r(char *to, const char *url, size_t size) {
+    if(unlikely(!size))
+        return NULL;
+
     const char *s = url;     // source
     char *d = to,            // destination
          *e = &to[size - 1]; // destination end

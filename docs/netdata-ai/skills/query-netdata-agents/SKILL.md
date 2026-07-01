@@ -292,5 +292,5 @@ Falls back to `--via cloud` if the direct call fails.
   contains the raw bearer; mode 0600.
 - Never paste bearer values, claim ids, machine GUIDs, or node UUIDs
   into committed files. See
-  `<repo>/.agents/sow/specs/sensitive-data-discipline.md` for the
+  `<repo>/.agents/sensitive-data-discipline.md` for the
   full rule.

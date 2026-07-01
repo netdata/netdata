@@ -114,11 +114,13 @@ func New(cfg Config) *Manager {
 		runningJobs:       newRunningJobsCache(),
 		retryingTasks:     newRetryingTasksCache(),
 
-		started:    make(chan struct{}),
-		addCh:      make(chan confgroup.Config),
-		rmCh:       make(chan confgroup.Config),
-		dyncfgCh:   make(chan dyncfg.Function, 32),
-		cmdTestSem: make(chan struct{}, cmdTestWorkerCap),
+		started:          make(chan struct{}),
+		addCh:            make(chan confgroup.Config),
+		rmCh:             make(chan confgroup.Config),
+		dyncfgCh:         make(chan dyncfg.Function, 32),
+		funcReconPending: make(map[string]struct{}),
+		funcReconWake:    make(chan struct{}, 1),
+		cmdTestSem:       make(chan struct{}, cmdTestWorkerCap),
 
 		dyncfgResponder: api,
 		runtimeService:  cfg.RuntimeService,
@@ -217,13 +219,16 @@ type Manager struct {
 	vnodesCtl          *vnodectl.Controller
 
 	// Runtime loop state.
-	ctx        context.Context
-	started    chan struct{}
-	addCh      chan confgroup.Config
-	rmCh       chan confgroup.Config
-	dyncfgCh   chan dyncfg.Function
-	cmdTestSem chan struct{}
-	cmdTestWG  sync.WaitGroup
+	ctx              context.Context
+	started          chan struct{}
+	addCh            chan confgroup.Config
+	rmCh             chan confgroup.Config
+	dyncfgCh         chan dyncfg.Function
+	funcReconMu      sync.Mutex
+	funcReconPending map[string]struct{}
+	funcReconWake    chan struct{}
+	cmdTestSem       chan struct{}
+	cmdTestWG        sync.WaitGroup
 
 	// Shared service seams.
 	dyncfgResponder *dyncfg.Responder
@@ -272,6 +277,8 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 	wg.Go(func() { m.run() })
 
 	wg.Go(func() { m.runNotifyRunningJobs() })
+
+	wg.Go(func() { m.runFunctionReconciler() })
 
 	close(m.started)
 
@@ -326,14 +333,10 @@ func (m *Manager) runProcessConfGroups(in chan []*confgroup.Group) {
 func (m *Manager) run() {
 	for {
 		if m.collectorHandler.WaitingForDecision() {
-			step, ok := m.collectorHandler.NextWaitDecisionStep(m.ctx, m.dyncfgCh)
-			if !ok {
+			if !m.runWaitDecisionStep() {
 				return
 			}
-			if step.HasCommand {
-				m.dyncfgSeqExec(step.Command)
-				continue
-			}
+			continue
 		} else {
 			select {
 			case <-m.ctx.Done():
@@ -388,6 +391,58 @@ func (m *Manager) addConfig(cfg confgroup.Config) {
 	}
 }
 
+func (m *Manager) runWaitDecisionStep() bool {
+	waitFor, hasTimeout := m.collectorHandler.WaitDecisionRemaining()
+	if !hasTimeout {
+		select {
+		case <-m.ctx.Done():
+			return false
+		case fn := <-m.dyncfgCh:
+			m.dyncfgSeqExec(fn)
+		}
+		return true
+	}
+
+	timer := time.NewTimer(waitFor)
+	defer func() {
+		if !timer.Stop() {
+			select {
+			case <-timer.C:
+			default:
+			}
+		}
+	}()
+
+	select {
+	case <-m.ctx.Done():
+		return false
+	case fn := <-m.dyncfgCh:
+		m.dyncfgSeqExec(fn)
+	case <-timer.C:
+		m.collectorHandler.ExpireWaitDecision()
+	}
+	return true
+}
+
+func (m *Manager) runFunctionReconciler() {
+	for {
+		select {
+		case <-m.ctx.Done():
+			return
+		case <-m.funcReconWake:
+			for {
+				modules := m.takePendingFunctionReconcileModules()
+				if len(modules) == 0 {
+					break
+				}
+				for _, moduleName := range modules {
+					m.funcCtl.ReconcileModuleMethods(moduleName)
+				}
+			}
+		}
+	}
+}
+
 func (m *Manager) removeConfig(cfg confgroup.Config) {
 	m.retryingTasks.remove(cfg)
 
@@ -414,11 +469,58 @@ func (m *Manager) runNotifyRunningJobs() {
 		case <-m.ctx.Done():
 			return
 		case clock := <-tk.C:
+			reconcileModules := make(map[string]struct{})
 			for _, job := range m.runningJobs.snapshot() {
 				job.Tick(clock)
+				reconcileModules[job.ModuleName()] = struct{}{}
+			}
+			for moduleName := range reconcileModules {
+				m.requestFunctionReconcile(moduleName)
 			}
 		}
 	}
+}
+
+func (m *Manager) requestFunctionReconcile(moduleName string) {
+	if moduleName == "" {
+		return
+	}
+	ctx := m.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	select {
+	case <-ctx.Done():
+		return
+	default:
+	}
+
+	m.funcReconMu.Lock()
+	m.funcReconPending[moduleName] = struct{}{}
+	m.funcReconMu.Unlock()
+
+	select {
+	case <-ctx.Done():
+	case m.funcReconWake <- struct{}{}:
+	default:
+		// A wake is already pending. The module remains queued in funcReconPending.
+	}
+}
+
+func (m *Manager) takePendingFunctionReconcileModules() []string {
+	m.funcReconMu.Lock()
+	defer m.funcReconMu.Unlock()
+
+	if len(m.funcReconPending) == 0 {
+		return nil
+	}
+	modules := make([]string, 0, len(m.funcReconPending))
+	for moduleName := range m.funcReconPending {
+		modules = append(modules, moduleName)
+	}
+	clear(m.funcReconPending)
+	slices.Sort(modules)
+	return modules
 }
 
 func (m *Manager) startRunningJob(job runtimeJob) {
@@ -431,11 +533,8 @@ func (m *Manager) startRunningJob(job runtimeJob) {
 	m.runningJobs.unlock()
 	m.secretStoreDeps.setRunning(job.FullName(), true)
 
-	// Known behavior: Start runs asynchronously, so function handlers may be
-	// published before the job flips its running flag. Immediate function calls
-	// can transiently return 503; this is accepted for now to avoid adding a
-	// broader runtime readiness contract.
 	m.funcCtl.OnJobStart(job)
+	m.requestFunctionReconcile(job.ModuleName())
 }
 
 func (m *Manager) stopRunningJob(name string) {
@@ -448,6 +547,7 @@ func (m *Manager) stopRunningJob(name string) {
 	if ok {
 		m.secretStoreDeps.setRunning(name, false)
 		m.funcCtl.OnJobStop(job)
+		m.requestFunctionReconcile(job.ModuleName())
 		job.Stop()
 	}
 }

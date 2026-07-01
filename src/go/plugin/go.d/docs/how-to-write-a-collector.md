@@ -81,7 +81,7 @@ Framework/API references:
 - `src/go/plugin/framework/chartengine/README.md`
 - `src/go/plugin/framework/functions/README.md`
 - `src/go/tools/functions-validation/README.md`
-- `.agents/sow/specs/go-v2-host-scope.md`
+- `.agents/skills/project-writing-go-modules-framework-v2/go-v2-host-scope.md`
 - `.agents/skills/integrations-lifecycle/consistency.md`
 
 ## File Layout
@@ -285,7 +285,7 @@ Rules:
 - Keep the default host scope empty unless the metric truly belongs to the
   agent/job host.
 
-Use `.agents/sow/specs/go-v2-host-scope.md` for the framework contract.
+Use `.agents/skills/project-writing-go-modules-framework-v2/go-v2-host-scope.md` for the framework contract.
 
 ## Functions
 

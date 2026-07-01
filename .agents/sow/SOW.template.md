@@ -6,9 +6,10 @@ Status: planning | ready | in-progress | paused | completed
 
 `planning` means analysis or decisions are incomplete. `ready` means the
 Pre-Implementation Gate is complete and, where the goal-approval round ("Plan
-before non-trivial work") applies, the user has approved the goal and plan. `completed` is a
-transient branch-local state before deleting this SOW working file before merge. SOW files live only under `.agents/sow/active/` on feature branches and
-MUST NOT be merged to `master`.
+before non-trivial work") applies, the user has approved the goal and plan.
+`completed` means work is validated and durable memory transferred. SOW files
+are local-only working memory under `.agents/sow/q/` (gitignored) and are never
+committed.
 
 Sub-state: <short current truth>
 
@@ -109,7 +110,7 @@ Artifact impact plan:
 - Specs: <expected update or reason likely unaffected>
 - End-user/operator docs: <expected update or reason likely unaffected>
 - End-user/operator skills: <expected update or reason likely unaffected>
-- SOW lifecycle: <branch-local working file; durable-knowledge targets (specs/skills/docs/code/tests); delete-before-merge; regression = new linked SOW; follow-up issues>
+- SOW lifecycle: <local-only working file under .agents/sow/q/ (never committed); durable-knowledge targets (skills/docs/code/tests); regression = new linked SOW; follow-up issues>
 
 Open-source reference evidence:
 
@@ -167,7 +168,7 @@ Sensitive data gate:
 - Specs: <updated .agents/sow/specs/ path or evidence-backed reason no update was needed>
 - End-user/operator docs: <updated docs/runbooks/help paths or evidence-backed reason none were affected>
 - End-user/operator skills: <updated output/reference skill paths or evidence-backed reason none were affected>
-- SOW lifecycle: <durable knowledge transferred to specs/skills/docs/code/tests; follow-ups moved to GitHub issues or rejected; `Status: completed` set; SOW working file deleted from the branch before merge so no SOW file reaches `master`; regression-as-new-SOW handling recorded>
+- SOW lifecycle: <durable knowledge transferred to skills/docs/code/tests; follow-ups moved to GitHub issues or rejected; `Status: completed` set; SOW working file is local-only under .agents/sow/q/ and never committed; regression-as-new-SOW handling recorded>
 
 Specs update:
 

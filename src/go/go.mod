@@ -44,13 +44,13 @@ require (
 	github.com/prometheus-community/pro-bing v0.9.0
 	github.com/prometheus/common v0.69.0
 	github.com/prometheus/prometheus v2.55.1+incompatible
-	github.com/redis/go-redis/v9 v9.20.1
+	github.com/redis/go-redis/v9 v9.21.0
 	github.com/sijms/go-ora/v2 v2.9.0
 	github.com/sourcegraph/conc v0.3.0
 	github.com/stretchr/testify v1.11.1
 	github.com/tidwall/gjson v1.19.0
 	github.com/valyala/fastjson v1.6.10
-	github.com/vmware/govmomi v0.54.1
+	github.com/vmware/govmomi v0.55.0
 	go.opentelemetry.io/proto/otlp v1.9.0
 	go.uber.org/automaxprocs v1.6.0
 	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba
@@ -84,7 +84,7 @@ require (
 	github.com/microsoft/go-mssqldb v1.10.0
 	github.com/moby/moby/api v1.55.0
 	github.com/moby/moby/client v0.5.0
-	github.com/netdata/systemd-journal-sdk/go v0.7.4
+	github.com/netdata/systemd-journal-sdk/go v0.7.6
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	go.mongodb.org/mongo-driver/v2 v2.7.0

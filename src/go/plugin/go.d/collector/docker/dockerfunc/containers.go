@@ -49,8 +49,8 @@ const (
 	containersColCreatedUnix = "created_unix"
 )
 
-func containersMethodConfig() funcapi.MethodConfig {
-	return funcapi.MethodConfig{
+func containersFunctionConfig() funcapi.FunctionConfig {
+	return funcapi.FunctionConfig{
 		ID:          containersMethodID,
 		Name:        "Containers",
 		UpdateEvery: 10,

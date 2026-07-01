@@ -3,8 +3,8 @@ Generate the integrations section in COLLECTORS.md from integrations/integration
 
 This script:
 - Reads category tree and integrations from integrations.js
-- Uses data-collection section categories, plus the top-level flows category,
-  as section headings
+- Uses data-collection section categories, plus the Network Performance
+  Monitoring top-level category's child sections, as section headings
 - Groups integrations by their section-level category
 - Generates markdown tables with integration name, link, and description
 """
@@ -80,9 +80,12 @@ class CategoryMapper:
                 self.id_to_title[cid] = title
 
                 # Track Monitor Anything sections. Most are children of
-                # data-collection; Network Flows is a top-level integrations
-                # category because it includes protocols and enrichment inputs.
-                if parent == 'data-collection' or (parent is None and cid == 'flows'):
+                # data-collection. Network Performance Monitoring is a top-level
+                # integrations category whose children (Device Metrics, Network
+                # Flows, SNMP Traps, BGP, Licensing, Topologies, Syslog) are
+                # sections in their own right.
+                if (parent in ('data-collection', 'network-performance-monitoring')
+                        or (parent is None and cid == 'flows')):
                     self.section_level_ids.append(cid)
 
                 # Track categories with collector_default=true
@@ -114,7 +117,7 @@ class CategoryMapper:
 
             parent = self.id_to_parent.get(cur)
 
-            if parent == 'data-collection':
+            if parent in ('data-collection', 'network-performance-monitoring'):
                 return cur
             if parent is None:
                 return None

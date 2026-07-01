@@ -8,7 +8,7 @@ modules:
         name: Palo Alto Networks PAN-OS
         link: https://www.paloaltonetworks.com/network-security
         categories:
-          - data-collection.networking
+          - network-performance-monitoring.device-metrics
         icon_filename: paloalto.svg
       related_resources:
         integrations:

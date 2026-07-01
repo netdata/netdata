@@ -87,7 +87,12 @@ func buildProbableTopologySnapshot(aggregate topologymodel.ObservationAggregate,
 
 func augmentTopologySnapshotLocals(data *topologymodel.Data, snapshots []topologymodel.ObservationSnapshot) {
 	for _, snapshot := range snapshots {
-		augmentLocalActorFromCache(data, snapshot.LocalDevice)
+		if augmentLocalActorFromCache(data, snapshot.LocalDevice) {
+			continue
+		}
+		// The default map is a managed-device map: show polled SNMP devices even
+		// when no L2 relationship emitted a local actor yet.
+		addLocalActorFromCache(data, snapshot.LocalDeviceID, snapshot.LocalDevice)
 	}
 }
 
