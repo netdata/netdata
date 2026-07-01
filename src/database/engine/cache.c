@@ -204,12 +204,44 @@ static inline void pointer_del(PGC *cache __maybe_unused, PGC_PAGE *page __maybe
 // ----------------------------------------------------------------------------
 // helpers
 
+static inline size_t page_assumed_size_overhead(PGC *cache) {
+    size_t overhead = sizeof(PGC_PAGE);
+
+    if(unlikely(__builtin_add_overflow(overhead, cache->config.additional_bytes_per_page, &overhead) ||
+                __builtin_add_overflow(overhead, sizeof(Word_t) * 3, &overhead)))
+        fatal("DBENGINE CACHE: page assumed size overhead overflow for cache '%s' (additional_bytes_per_page=%zu)",
+              cache->config.name, cache->config.additional_bytes_per_page);
+
+    if(unlikely(overhead > UINT32_MAX))
+        fatal("DBENGINE CACHE: page assumed size overhead %zu exceeds uint32_t accounting for cache '%s'",
+              overhead, cache->config.name);
+
+    return overhead;
+}
+
 static inline size_t page_assumed_size(PGC *cache, size_t size) {
-    return size + (sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page + sizeof(Word_t) * 3);
+    size_t overhead = page_assumed_size_overhead(cache);
+    size_t assumed_size;
+
+    if(unlikely(__builtin_add_overflow(size, overhead, &assumed_size)))
+        fatal("DBENGINE CACHE: page assumed size overflow for cache '%s' (size=%zu, overhead=%zu)",
+              cache->config.name, size, overhead);
+
+    if(unlikely(assumed_size > UINT32_MAX))
+        fatal("DBENGINE CACHE: page assumed size %zu exceeds uint32_t accounting for cache '%s'",
+              assumed_size, cache->config.name);
+
+    return assumed_size;
 }
 
 static inline size_t page_size_from_assumed_size(PGC *cache, size_t assumed_size) {
-    return assumed_size - (sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page + sizeof(Word_t) * 3);
+    size_t overhead = page_assumed_size_overhead(cache);
+
+    if(unlikely(assumed_size < overhead))
+        fatal("DBENGINE CACHE: page assumed size %zu is smaller than overhead %zu for cache '%s'",
+              assumed_size, overhead, cache->config.name);
+
+    return assumed_size - overhead;
 }
 
 // ----------------------------------------------------------------------------
@@ -2375,7 +2407,11 @@ void pgc_page_hot_set_end_time_s(PGC *cache __maybe_unused, PGC_PAGE *page, time
         int64_t old_assumed_size = page->assumed_size;
 
         size_t old_size = page_size_from_assumed_size(cache, old_assumed_size);
-        size_t size = old_size + additional_bytes;
+        size_t size;
+        if(unlikely(__builtin_add_overflow(old_size, additional_bytes, &size)))
+            fatal("DBENGINE CACHE: page size growth overflow for cache '%s' (old_size=%zu, additional_bytes=%zu)",
+                  cache->config.name, old_size, additional_bytes);
+
         page->assumed_size = page_assumed_size(cache, size);
 
         int64_t delta = page->assumed_size - old_assumed_size;
