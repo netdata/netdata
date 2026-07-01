@@ -1033,20 +1033,22 @@ impl<'a> IndexReader<'a> {
                 // position within increases), so they feed `from_sorted`.
                 let hf = self.sfst.high_field(idx)?;
                 // Matched KvIds for this field fall in the contiguous range
-                // [base, base + cardinality).
-                let mut targets = KvIdSet::new(self.high_kv_id(idx, 0).0, hf.len() as u32);
+                // [base, base + cardinality); `base` is fixed for the field, so
+                // resolve it once rather than per matched value.
+                let base = self.high_kv_id(idx, 0).0;
+                let mut targets = KvIdSet::new(base, hf.len() as u32);
                 let mut combined_mask: u8 = 0;
                 for value in &exacts {
                     let kv = format!("{field}={value}");
                     if let Ok(local) = hf.binary_search(kv.as_bytes()) {
-                        targets.insert(self.high_kv_id(idx, local));
+                        targets.insert(KvId(base + local as u32));
                         combined_mask |= hf.masks[local];
                     }
                 }
                 if !patterns.is_empty() {
                     for (local, key) in hf.keys().enumerate() {
                         if value_matches(key) {
-                            targets.insert(self.high_kv_id(idx, local));
+                            targets.insert(KvId(base + local as u32));
                             combined_mask |= hf.masks[local];
                         }
                     }
@@ -1124,9 +1126,10 @@ impl<'a> IndexReader<'a> {
                 }
                 FieldTier::High => {
                     let hf = self.sfst.high_field(high_idx)?;
+                    let base = self.high_kv_id(high_idx, 0).0;
                     for (local, key) in hf.keys().enumerate() {
                         if query.is_match(key) {
-                            targets.insert(self.high_kv_id(high_idx, local));
+                            targets.insert(KvId(base + local as u32));
                             combined_mask |= hf.masks[local];
                         }
                     }
