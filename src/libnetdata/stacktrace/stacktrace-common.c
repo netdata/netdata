@@ -41,13 +41,13 @@ const char *stacktrace_root_cause_function(void) {
 
 // Initialize the stacktrace cache
 void stacktrace_cache_init(void) {
-    if (cache_initialized)
+    if (likely(__atomic_load_n(&cache_initialized, __ATOMIC_ACQUIRE)))
         return;
 
     spinlock_lock(&stacktrace_lock);
-    if (!cache_initialized) {
+    if (unlikely(!__atomic_load_n(&cache_initialized, __ATOMIC_ACQUIRE))) {
         STACKTRACE_INIT(&stacktrace_cache);
-        cache_initialized = true;
+        __atomic_store_n(&cache_initialized, true, __ATOMIC_RELEASE);
     }
     spinlock_unlock(&stacktrace_lock);
 }
