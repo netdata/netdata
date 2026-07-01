@@ -24,7 +24,13 @@ modules:
       data_collection:
         metrics_description: |
           This collector monitors the health status of storage devices by analyzing S.M.A.R.T. (Self-Monitoring, Analysis, and Reporting Technology) counters.
-          It requires the [`smartctl`](https://linux.die.net/man/8/smartctl) CLI tool from [smartmontools](https://www.smartmontools.org/).
+          It relies on the [`smartctl`](https://linux.die.net/man/8/smartctl) CLI tool but avoids directly executing the binary.
+          Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
+          This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
+
+          Executed commands:
+          -  `smartctl --json --scan`
+          -  `smartctl --json --all {deviceName} --device {deviceType} --nocheck {powerMode}`
         method_description: ""
       supported_platforms:
         include: [Linux, BSD, Windows]
