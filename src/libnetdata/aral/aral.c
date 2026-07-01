@@ -802,7 +802,7 @@ static void aral_del_page___no_lock_needed(ARAL *ar, ARAL_PAGE *page TRACE_ALLOC
         nd_munmap(page->data, page->size);
 
         if (unlikely(unlink(page->filename) == -1))
-            netdata_log_error("Cannot delete file '%s'", page->filename);
+            netdata_log_error("ARAL: '%s' cannot delete file '%s'", ar->config.name, page->filename);
 
         freez((void *)page->filename);
         freez(page);
