@@ -219,13 +219,17 @@ void stacktrace_to_buffer(STACKTRACE trace, BUFFER *wb) {
     }
     
     struct stacktrace *st = (struct stacktrace *)trace;
-    
+
     // If we already have cached text representation, use it
-    if (st->text) {
-        buffer_strcat(wb, st->text);
+    spinlock_lock(&stacktrace_lock);
+    const char *text = st->text;
+    spinlock_unlock(&stacktrace_lock);
+
+    if (text) {
+        buffer_strcat(wb, text);
         return;
     }
-    
+
     // Use the implementation-specific function for conversion
     impl_stacktrace_to_buffer(trace, wb);
     
