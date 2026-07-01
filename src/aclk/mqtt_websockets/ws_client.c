@@ -245,14 +245,14 @@ exit_with_error:
 
 #define HTTP_HDR_LINE_CHECK_LIMIT(x)                                                                                   \
     if ((x) >= MAX_HTTP_LINE_LENGTH) {                                                                                 \
-        nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: HTTP line received is too long. Maximum is %d", MAX_HTTP_LINE_LENGTH);                                  \
+        nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: HTTP line received is too long. Maximum is %zu", (size_t)MAX_HTTP_LINE_LENGTH);                         \
         return WS_CLIENT_PROTOCOL_ERROR;                                                                               \
     }
 
 int ws_client_parse_handshake_resp(ws_client *client)
 {
     char buf[HTTP_SC_LENGTH];
-    int idx_crlf, idx_sep;
+    size_t idx_crlf, idx_sep;
     char *ptr;
     size_t bytes;
 
@@ -316,13 +316,13 @@ int ws_client_parse_handshake_resp(ws_client *client)
                 nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Expected HTTP hdr field key/value separator \": \" before endline in non empty HTTP header line");
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
-            if (idx_crlf == idx_sep + (int)strlen(HTTP_HDR_SEPARATOR)) {
+            if (idx_crlf == idx_sep + strlen(HTTP_HDR_SEPARATOR)) {
                 nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: HTTP Header value cannot be empty");
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
 
             if (idx_sep > HTTP_HEADER_NAME_MAX_LEN) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: HTTP header too long (%d)", idx_sep);
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: HTTP header too long (%zu)", idx_sep);
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
 
