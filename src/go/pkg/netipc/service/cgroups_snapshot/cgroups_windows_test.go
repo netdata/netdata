@@ -164,9 +164,16 @@ func TestCacheRoundTripWindows(t *testing.T) {
 	if !cache.Ready() {
 		t.Fatal("cache not ready after refresh")
 	}
-	item, ok := cache.Lookup(1001, "docker-abc123")
-	if !ok || item.Path != "/sys/fs/cgroup/docker/abc123" {
-		t.Fatalf("unexpected cache item: %+v ok=%v", item, ok)
+	guard := cache.ReadLock()
+	itemView := guard.Get(1001, "docker-abc123")
+	if itemView == nil {
+		guard.Unlock()
+		t.Fatal("lookup failed")
+	}
+	item := guard.Dup(itemView)
+	guard.Unlock()
+	if item.Path != "/sys/fs/cgroup/docker/abc123" {
+		t.Fatalf("unexpected cache item: %+v", item)
 	}
 	status1 := cache.Status()
 	if !status1.Populated || status1.ItemCount != 3 || status1.SystemdEnabled != 1 || status1.Generation != 42 || status1.RefreshSuccessCount != 1 || status1.RefreshFailureCount != 0 || status1.ConnectionState != StateReady || status1.LastRefreshTs < 0 {

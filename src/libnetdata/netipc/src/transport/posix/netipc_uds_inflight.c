@@ -10,7 +10,13 @@ int nipc_uds_inflight_add(nipc_uds_session_t *s, uint64_t id)
     }
 
     if (s->inflight_count >= s->inflight_capacity) {
+        if (s->inflight_capacity > UINT32_MAX / 2)
+            return -2;
         uint32_t new_cap = s->inflight_capacity ? s->inflight_capacity * 2 : 16;
+#if SIZE_MAX <= UINT32_MAX
+        if ((size_t)new_cap > SIZE_MAX / sizeof(uint64_t))
+            return -2;
+#endif
         uint64_t *new_ids = realloc(s->inflight_ids,
                                     (size_t)new_cap * sizeof(uint64_t));
         if (!new_ids)

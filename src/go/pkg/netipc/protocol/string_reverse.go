@@ -57,6 +57,9 @@ func StringReverseDecode(buf []byte) (StringReverseView, error) {
 	if err != nil {
 		return StringReverseView{}, err
 	}
+	if strOffset != StringReverseHdrSize {
+		return StringReverseView{}, ErrBadLayout
+	}
 	strLength, err := checkedWireU32Int(buf, 4)
 	if err != nil {
 		return StringReverseView{}, err

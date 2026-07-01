@@ -102,6 +102,8 @@ nipc_error_t nipc_cgroups_resp_decode(const void *buf, size_t buf_len,
 nipc_error_t nipc_cgroups_resp_item(const nipc_cgroups_resp_view_t *view,
                                     uint32_t index,
                                     nipc_cgroups_item_view_t *out) {
+    if (!view || !out || !view->_payload)
+        return NIPC_ERR_BAD_LAYOUT;
     if (index >= view->item_count)
         return NIPC_ERR_OUT_OF_BOUNDS;
 
@@ -112,13 +114,26 @@ nipc_error_t nipc_cgroups_resp_item(const nipc_cgroups_resp_view_t *view,
 
     size_t dir_start = NIPC_CGROUPS_RESP_HDR_SIZE;
     size_t dir_size  = (size_t)view->item_count * NIPC_CGROUPS_DIR_ENTRY_SIZE;
+#if SIZE_MAX <= UINT32_MAX
+    if (dir_start > SIZE_MAX - dir_size)
+        return NIPC_ERR_BAD_ITEM_COUNT;
+#endif
     size_t packed_area_start = dir_start + dir_size;
+    if (packed_area_start > view->_payload_len)
+        return NIPC_ERR_TRUNCATED;
+    size_t packed_area_len = view->_payload_len - packed_area_start;
 
     /* Read directory entry */
     nipc_batch_entry_t dir_entry;
     memcpy(&dir_entry,
            view->_payload + dir_start + index * sizeof(dir_entry),
            sizeof(dir_entry));
+    if (dir_entry.offset % NIPC_ALIGNMENT != 0)
+        return NIPC_ERR_BAD_ALIGNMENT;
+    if ((uint64_t)dir_entry.offset + dir_entry.length > packed_area_len)
+        return NIPC_ERR_OUT_OF_BOUNDS;
+    if (dir_entry.length < NIPC_CGROUPS_ITEM_HDR_SIZE)
+        return NIPC_ERR_TRUNCATED;
 
     const uint8_t *item = view->_payload + packed_area_start + dir_entry.offset;
     uint32_t item_len = dir_entry.length;

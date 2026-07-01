@@ -232,7 +232,7 @@ fn test_cache_round_trip_unix() {
     let service = unique_service("cache");
     let _server = TestServer::start(&service, server_config());
 
-    let mut cache = CgroupsCache::new(TEST_RUN_DIR, &service, client_config());
+    let cache = CgroupsCache::new(TEST_RUN_DIR, &service, client_config());
     let mut updated = false;
     for _ in 0..200 {
         if cache.refresh() {
@@ -244,7 +244,10 @@ fn test_cache_round_trip_unix() {
     assert!(updated);
     assert!(cache.ready());
 
-    let item = cache.lookup(1001, "docker-abc123").expect("lookup");
+    let item = {
+        let guard = cache.read_lock();
+        guard.get(1001, "docker-abc123").expect("lookup").dup()
+    };
     assert_eq!(item.path, "/sys/fs/cgroup/docker/abc123");
 
     let status = cache.status();

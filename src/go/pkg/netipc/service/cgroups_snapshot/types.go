@@ -57,5 +57,11 @@ type Handler struct {
 // CacheItem is an owned copy of a single cgroup item.
 type CacheItem = raw.CacheItem
 
+// CacheItemView is a borrowed immutable view into a locked cache snapshot.
+type CacheItemView = raw.CacheItemView
+
+// CacheReadGuard protects borrowed cache views.
+type CacheReadGuard = raw.CacheReadGuard
+
 // CacheStatus is a diagnostic snapshot for the L3 cache.
 type CacheStatus = raw.CacheStatus
