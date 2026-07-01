@@ -24,14 +24,7 @@ modules:
       data_collection:
         metrics_description: |
           This collector monitors the health status of storage devices by analyzing S.M.A.R.T. (Self-Monitoring, Analysis, and Reporting Technology) counters.
-          It relies on the [`smartctl`](https://linux.die.net/man/8/smartctl) CLI tool from [smartmontools](https://www.smartmontools.org/).
-
-          On Linux and BSD, the collector runs `smartctl` through `ndsudo`, a Netdata helper that runs privileged commands securely within the Netdata environment, eliminating the need for `sudo`.
-          On Windows, the collector executes `smartctl.exe` directly and auto-detects it in the system `PATH` or in the default smartmontools install location (`%ProgramFiles%\smartmontools\bin\`).
-
-          Executed commands:
-          -  `smartctl --json --scan`
-          -  `smartctl --json --all {deviceName} --device {deviceType} --nocheck {powerMode}`
+          It requires the [`smartctl`](https://linux.die.net/man/8/smartctl) CLI tool from [smartmontools](https://www.smartmontools.org/).
         method_description: ""
       supported_platforms:
         include: [Linux, BSD, Windows]
@@ -54,7 +47,7 @@ modules:
               Install `smartmontools` version 7.0 or later. Version 7.0 introduced the `--json` output mode, which is required for this collector to function properly.
 
               On **Linux/BSD**, use your distribution's package manager.
-              On **Windows**, install smartmontools with the default options. The collector auto-detects `smartctl.exe` in the system `PATH` or in the default install location (`%ProgramFiles%\smartmontools\bin\`).
+              On **Windows**, install smartmontools with the default options.
           - title: For Netdata running in a Docker container
             description: |
               **Provide access to storage devices**.
