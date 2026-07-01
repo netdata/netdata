@@ -172,9 +172,12 @@ Discovery then finds which *instances* of those profiles exist per region.
   due, or due-but-failed) is re-written from its last cached value — a long-period
   metric (e.g. daily S3) renders as a continuous step line instead of gaps, at no
   extra AWS cost. A series in a *successfully queried* group that returned no
-  datapoint is a genuine gap and is **not** re-emitted (the `queried` guard skips
-  it). The cache persists until the instance leaves discovery and `pruneObserved`
-  drops it; a single missed datapoint does not clear it.
+  datapoint is reconciled per the metric's no-data policy: `nil_as_zero` metrics
+  (sum/count — "no activity") record **0**; the rest **drop** the cached value so
+  the series gaps until fresh data, and a stale value is never re-emitted.
+  `nil_as_zero` defaults to the metric's `rate` flag (rate/sum counts → 0, gauges
+  → gap) and is overridable per metric. The cache otherwise persists until the
+  instance leaves discovery and `pruneObserved` drops it.
 - `pruneObserved` drops cached series absent from the current plan (a resource or
   metric went away) so removed resources stop being re-emitted.
 
@@ -207,8 +210,9 @@ alb, s3, lambda, sqs, dynamodb).
 
 A `Profile` declares: `namespace` (e.g. `AWS/EC2`), `period`, `instance`
 dimensions (the CloudWatch dimension names that identify one instance, each
-mapped to a Netdata label), `metrics` (with `statistics`, optional `rate`, and
-optional per-metric `period`), and a `charttpl.Group` `template`.
+mapped to a Netdata label), `metrics` (with `statistics`, optional `rate`,
+optional per-metric `period`, and optional `nil_as_zero` — record 0 vs gap on a
+no-datapoint result, defaulting to `rate`), and a `charttpl.Group` `template`.
 
 Load and resolution (`catalog.go`):
 
@@ -290,8 +294,10 @@ verify current per-region prices on the CloudWatch pricing page.)
   only if its dimension-name set equals the profile's exactly.
 - **Query window is a settled bucket** — offset by `max(query_offset, period)`
   with period alignment.
-- **Missing data is a gap, not a zero**; not-due / failed series are re-emitted
-  from cache so long-period metrics stay visible.
+- **No-data policy is per-metric** — a successfully-queried empty result records
+  0 (`nil_as_zero`, the default for `rate`/sum counts) or gaps (the default for
+  gauges); not-due / failed series re-emit their last value so long-period metrics
+  stay visible.
 - **Schedule advances only on success**, per (region, period).
 - **Fail-soft discovery** — carry forward on error; only a first-ever total
   failure is fatal.

@@ -124,35 +124,59 @@ func TestCollect_E2E(t *testing.T) {
 					mkMetric("RequestCount", "LoadBalancer", "app/lb2/bbb"),                                   // keep (2nd LB)
 				},
 			},
-			// Only RequestCount is served; the profile's other metrics gap.
+			// Only RequestCount is served; the profile's other rate/sum metrics
+			// record 0 (no activity) and its gauges gap. The dimension filter is
+			// proven by the keys: only {LoadBalancer} instances survive, no
+			// target_group / availability_zone fan-out.
 			gmd: map[string]float64{
 				e2eKey("AWS/ApplicationELB", "RequestCount", "Sum", "LoadBalancer", "app/lb1/aaa"): 50,
 				e2eKey("AWS/ApplicationELB", "RequestCount", "Sum", "LoadBalancer", "app/lb2/bbb"): 70,
 			},
 			wantSeries: map[string]metrix.SampleValue{
-				`alb.request_count_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`: 50,
-				`alb.request_count_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`: 70,
+				`alb.request_count_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:             50,
+				`alb.http_code_target_2xx_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:      0,
+				`alb.http_code_target_3xx_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:      0,
+				`alb.http_code_target_4xx_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:      0,
+				`alb.http_code_target_5xx_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:      0,
+				`alb.http_code_elb_3xx_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:         0,
+				`alb.http_code_elb_4xx_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:         0,
+				`alb.http_code_elb_5xx_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:         0,
+				`alb.new_connection_count_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:      0,
+				`alb.processed_bytes_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:           0,
+				`alb.rejected_connection_count_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`: 0,
+				`alb.request_count_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`:             70,
+				`alb.http_code_target_2xx_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`:      0,
+				`alb.http_code_target_3xx_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`:      0,
+				`alb.http_code_target_4xx_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`:      0,
+				`alb.http_code_target_5xx_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`:      0,
+				`alb.http_code_elb_3xx_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`:         0,
+				`alb.http_code_elb_4xx_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`:         0,
+				`alb.http_code_elb_5xx_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`:         0,
+				`alb.new_connection_count_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`:      0,
+				`alb.processed_bytes_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`:           0,
+				`alb.rejected_connection_count_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`: 0,
 			},
 		},
-		"gaps and NaN are dropped": {
+		"no-data: gauges gap, rate/sum metrics become zero": {
 			namespaces: []string{"AWS/EC2"},
 			listMetrics: map[string][]cwtypes.Metric{
 				"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")},
 			},
 			gmd: map[string]float64{
-				e2eKey("AWS/EC2", "CPUUtilization", "Average", "InstanceId", "i-1"):    math.NaN(), // returned then dropped
+				e2eKey("AWS/EC2", "CPUUtilization", "Average", "InstanceId", "i-1"):    math.NaN(), // gauge, NaN -> gap
 				e2eKey("AWS/EC2", "NetworkOut", "Sum", "InstanceId", "i-1"):            900,
 				e2eKey("AWS/EC2", "DiskReadOps", "Sum", "InstanceId", "i-1"):           10,
 				e2eKey("AWS/EC2", "DiskWriteOps", "Sum", "InstanceId", "i-1"):          20,
 				e2eKey("AWS/EC2", "StatusCheckFailed", "Maximum", "InstanceId", "i-1"): 0,
-				// NetworkIn is absent from the map -> no datapoint -> gap.
+				// NetworkIn is absent -> no datapoint -> rate/sum metric -> recorded as 0.
 			},
 			wantSeries: map[string]metrix.SampleValue{
 				`ec2.network_out_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:             900,
 				`ec2.disk_read_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:           10,
 				`ec2.disk_write_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:          20,
 				`ec2.status_check_failed_maximum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`: 0,
-				// cpu_utilization_average (NaN) and network_in_sum (no datapoint) are absent.
+				`ec2.network_in_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:              0,
+				// cpu_utilization_average (gauge, NaN) gaps; network_in_sum (rate, no data) records 0.
 			},
 		},
 	}
@@ -344,9 +368,19 @@ func TestCollect_MultiRegion(t *testing.T) {
 	series, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
 
+	// cpu is a gauge with data in both regions; the ec2 rate/sum metrics have no
+	// data and record 0 per region; status_check_failed (gauge) gaps.
 	assert.Equal(t, map[string]metrix.SampleValue{
 		`ec2.cpu_utilization_average{account_id="000000000000",instance_id="i-1",region="us-east-1"}`: 5,
 		`ec2.cpu_utilization_average{account_id="000000000000",instance_id="i-1",region="eu-west-1"}`: 5,
+		`ec2.network_in_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:          0,
+		`ec2.network_in_sum{account_id="000000000000",instance_id="i-1",region="eu-west-1"}`:          0,
+		`ec2.network_out_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:         0,
+		`ec2.network_out_sum{account_id="000000000000",instance_id="i-1",region="eu-west-1"}`:         0,
+		`ec2.disk_read_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:       0,
+		`ec2.disk_read_ops_sum{account_id="000000000000",instance_id="i-1",region="eu-west-1"}`:       0,
+		`ec2.disk_write_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:      0,
+		`ec2.disk_write_ops_sum{account_id="000000000000",instance_id="i-1",region="eu-west-1"}`:      0,
 	}, series)
 	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
 }
@@ -392,6 +426,10 @@ func TestCollect_DiscoveryFailSoft(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, map[string]metrix.SampleValue{
 			`ec2.cpu_utilization_average{account_id="000000000000",instance_id="i-1",region="us-east-1"}`: 7,
-		}, series, "the healthy region still produces its series")
+			`ec2.network_in_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:          0,
+			`ec2.network_out_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:         0,
+			`ec2.disk_read_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:       0,
+			`ec2.disk_write_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:      0,
+		}, series, "the healthy region still produces its series (rate metrics with no data record 0)")
 	})
 }

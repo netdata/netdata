@@ -362,3 +362,21 @@ func TestProfile_DimensionNames(t *testing.T) {
 	}}}
 	assert.Equal(t, []string{"BucketName", "StorageType"}, p.DimensionNames())
 }
+
+func TestMetric_EmitZeroOnNoData(t *testing.T) {
+	yes, no := true, false
+	tests := map[string]struct {
+		metric Metric
+		want   bool
+	}{
+		"rate metric defaults to zero":  {metric: Metric{Rate: true}, want: true},
+		"gauge metric defaults to gap":  {metric: Metric{Rate: false}, want: false},
+		"explicit true overrides gauge": {metric: Metric{Rate: false, NilAsZero: &yes}, want: true},
+		"explicit false overrides rate": {metric: Metric{Rate: true, NilAsZero: &no}, want: false},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, tc.metric.EmitZeroOnNoData())
+		})
+	}
+}

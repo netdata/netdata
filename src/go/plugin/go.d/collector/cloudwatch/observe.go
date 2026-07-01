@@ -85,18 +85,18 @@ func filterDueQueries(plan []plannedQuery, due map[queryGroupKey]bool) []planned
 	return out
 }
 
-// observe writes this cycle's samples to the store and re-emits cached values
-// for series whose period was NOT successfully queried this cycle (not due, or
-// due-but-failed) so they stay continuously visible. A series in a successfully
-// queried period that returned no datapoint is a genuine gap and is not
-// re-emitted this cycle. `queried` is the set of (region, period) groups that
-// succeeded this cycle.
+// observe writes this cycle's samples, reconciles due series that returned no
+// datapoint, and re-emits cached values for series whose period was NOT queried
+// this cycle (not due, or due-but-failed) so long-period metrics stay visible.
 //
-// A cached value is retained across cycles (and re-emitted on later not-due
-// cycles) until its instance disappears from discovery and pruneObserved drops
-// it; a single missed datapoint does not clear the cache. This matches
-// azure_monitor's reobserveCachedObservations behavior.
-func (o *observationStore) observe(samples []querySample, queried map[queryGroupKey]bool) {
+// dueQueries is every query issued this cycle; `queried` is the subset of
+// (region, period) groups that succeeded. A due series that was queried
+// successfully but returned no datapoint is recorded as 0 when its metric opts
+// into nil-as-zero (sum/count metrics: "no activity"), otherwise its cached
+// value is dropped so it gaps until fresh data — no stale value is re-emitted.
+// A cached value otherwise survives across cycles until its instance leaves
+// discovery and pruneObserved drops it.
+func (o *observationStore) observe(dueQueries []plannedQuery, samples []querySample, queried map[queryGroupKey]bool) {
 	meter := o.store.Write().SnapshotMeter("")
 
 	observedThisCycle := make(map[string]bool, len(samples))
@@ -110,6 +110,30 @@ func (o *observationStore) observe(samples []querySample, queried map[queryGroup
 			groupKey:   s.groupKey(),
 		}
 		observedThisCycle[key] = true
+	}
+
+	// Reconcile due series that were queried successfully but returned no
+	// datapoint: record 0 (nil-as-zero) or drop the cached value (gap).
+	for _, pq := range dueQueries {
+		if !queried[pq.groupKey()] {
+			continue // group failed this cycle: keep cache, re-emit below, retry next cycle
+		}
+		key := observedKey(pq.seriesName, pq.labels)
+		if observedThisCycle[key] {
+			continue // had a datapoint
+		}
+		if pq.nilAsZero {
+			writeSample(meter, pq.seriesName, pq.labels, 0)
+			o.lastObserved[key] = observedSeries{
+				seriesName: pq.seriesName,
+				labels:     pq.labels,
+				value:      0,
+				groupKey:   pq.groupKey(),
+			}
+			observedThisCycle[key] = true
+		} else {
+			delete(o.lastObserved, key) // genuine gap: stop re-emitting the last value
+		}
 	}
 
 	for key, obs := range o.lastObserved {

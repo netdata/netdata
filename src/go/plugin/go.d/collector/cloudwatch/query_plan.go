@@ -31,6 +31,7 @@ type plannedQuery struct {
 	period     int
 	seriesName string
 	labels     []metrix.Label
+	nilAsZero  bool // record 0 (vs a gap) when the query returns no datapoint
 	query      cwtypes.MetricDataQuery
 }
 
@@ -120,6 +121,7 @@ func (c *Collector) metricQueries(prof cwprofiles.ResolvedProfile, region string
 				period:     period,
 				seriesName: cwprofiles.ExportedSeriesName(prof.Name, m.ID, token),
 				labels:     labels,
+				nilAsZero:  m.EmitZeroOnNoData(),
 				query: cwtypes.MetricDataQuery{
 					Id: aws.String(id),
 					MetricStat: &cwtypes.MetricStat{

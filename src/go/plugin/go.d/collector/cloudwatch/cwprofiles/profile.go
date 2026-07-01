@@ -94,6 +94,21 @@ type Metric struct {
 	Rate bool `yaml:"rate,omitempty" json:"rate,omitempty"`
 	// Period optionally overrides the profile-level Period for this metric.
 	Period int `yaml:"period,omitempty" json:"period,omitempty"`
+	// NilAsZero controls how a query that returns no datapoint is recorded: as 0
+	// (true) or as a gap (false). Unset defaults to Rate — sum/count metrics read
+	// no-data as 0 ("no activity"), gauges gap — and an explicit value overrides
+	// it. Pointer so "unset" is distinguishable from an explicit false.
+	NilAsZero *bool `yaml:"nil_as_zero,omitempty" json:"nil_as_zero,omitempty"`
+}
+
+// EmitZeroOnNoData reports whether a query returning no datapoint for this metric
+// should be recorded as 0 (true) or left as a gap (false). It defaults to Rate
+// (sum/count metrics read no-data as 0; gauges gap); NilAsZero overrides it.
+func (m Metric) EmitZeroOnNoData() bool {
+	if m.NilAsZero != nil {
+		return *m.NilAsZero
+	}
+	return m.Rate
 }
 
 // Normalize rewrites chart-dimension selector shorthand (e.g. cpu_utilization_average)

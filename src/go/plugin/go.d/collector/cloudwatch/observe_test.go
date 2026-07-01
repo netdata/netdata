@@ -379,13 +379,61 @@ func TestObserve_GapInQueriedPeriodNotReEmitted(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, s2, "due+gap series are genuine gaps, not re-emitted")
 
-	// Cycle 3 at +360s: not due -> the cached value is re-emitted.
-	fake.setGap(false)
+	// Cycle 3 at +360s: not due. The due gap cleared the cached value (cpu is a
+	// gauge = gap policy), so the stale value is NOT resurrected on a not-due
+	// cycle — the series stays gapped until fresh data.
 	c.now = func() time.Time { return base.Add(360 * time.Second) }
 	s3, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
-	assert.Equal(t, metrix.SampleValue(10), seriesValue(t, s3, `ec2.cpu_utilization_average{`),
-		"not-due series re-emit the last cached value")
+	assert.Empty(t, s3, "after a due gap, a gap-policy series is not re-emitted from stale cache")
+
+	// Cycle 4 at +600s: the 300s period is due again and returns data -> recovers.
+	fake.setGap(false)
+	c.now = func() time.Time { return base.Add(600 * time.Second) }
+	s4, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, metrix.SampleValue(10), seriesValue(t, s4, `ec2.cpu_utilization_average{`),
+		"the series recovers when a later query returns data")
+}
+
+func TestObserve_RateMetricNoDataZeroFilled(t *testing.T) {
+	c := New()
+	c.Config.Regions = []string{"us-east-1"}
+	c.applyDefaults()
+	c.profiles = []cwprofiles.ResolvedProfile{{Name: "lambda", Config: cwprofiles.Profile{
+		Namespace: "AWS/Lambda",
+		Period:    300,
+		Instance:  cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{{Name: "FunctionName", Label: "function_name"}}},
+		Metrics:   []cwprofiles.Metric{{ID: "errors", MetricName: "Errors", Statistics: []string{"sum"}, Rate: true}},
+	}}}
+
+	fake := &fullCloudWatch{
+		list:     map[string][]cwtypes.Metric{"AWS/Lambda": {mkMetric("Errors", "FunctionName", "fn-1")}},
+		gmdValue: 5,
+	}
+	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: "000000000000"} }
+	useFakeClient(c, fake)
+	base := time.Unix(1_000_000_000, 0)
+
+	// Cycle 1: queried, value 5.
+	c.now = func() time.Time { return base }
+	s1, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, metrix.SampleValue(5), seriesValue(t, s1, `lambda.errors_sum{`))
+
+	// Cycle 2 at +300s: due, no datapoint. A rate/count metric defaults to
+	// nil-as-zero, so "no activity" is recorded as 0 (not a gap, not the stale 5).
+	fake.setGap(true)
+	c.now = func() time.Time { return base.Add(300 * time.Second) }
+	s2, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, metrix.SampleValue(0), seriesValue(t, s2, `lambda.errors_sum{`), "rate metric with no data records 0")
+
+	// Cycle 3 at +360s: not due -> 0 is held (re-emitted), not the stale 5.
+	c.now = func() time.Time { return base.Add(360 * time.Second) }
+	s3, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, metrix.SampleValue(0), seriesValue(t, s3, `lambda.errors_sum{`), "zero is re-emitted between queries")
 }
 
 func TestCleanup_ResetsRuntimeState(t *testing.T) {

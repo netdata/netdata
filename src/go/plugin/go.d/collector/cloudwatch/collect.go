@@ -21,7 +21,8 @@ func (c *Collector) collect(ctx context.Context) error {
 	now := c.now()
 	due := c.observations.dueGroups(plan, now)
 
-	samples, failed, err := c.executeQueries(ctx, filterDueQueries(plan, due), now)
+	dueQueries := filterDueQueries(plan, due)
+	samples, failed, err := c.executeQueries(ctx, dueQueries, now)
 	if err != nil {
 		return err
 	}
@@ -36,7 +37,7 @@ func (c *Collector) collect(ctx context.Context) error {
 		}
 	}
 	c.observations.advanceSchedule(queried, now)
-	c.observations.observe(samples, queried)
+	c.observations.observe(dueQueries, samples, queried)
 
 	c.Debugf("CloudWatch collect: %d planned quer(y/ies), %d group(s) due, %d sample(s), %d group(s) failed this cycle",
 		len(plan), len(due), len(samples), len(failed))
