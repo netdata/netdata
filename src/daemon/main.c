@@ -1263,17 +1263,22 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("localhost labels");
 
+    nd_win_trace("main: reload_host_labels");
     reload_host_labels();
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("saved bearer tokens");
 
+    nd_win_trace("main: bearer_tokens_init");
     bearer_tokens_init();
+    nd_win_trace("main: bearer_tokens_init done");
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("claiming info");
 
+    nd_win_trace("main: load_claiming_state");
     load_claiming_state();
+    nd_win_trace("main: load_claiming_state done");
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("static threads");
