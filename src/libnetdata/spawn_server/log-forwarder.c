@@ -319,7 +319,63 @@ static void log_forwarder_thread_func(void *arg) {
         spinlock_unlock(&lf->spinlock);
 
         int timeout = 200; // 200ms
-        int ret = poll(pfds, nfds, timeout);
+        int ret;
+
+#ifdef OS_WINDOWS
+        // On Windows, WSAPoll() (which poll() maps to) only accepts sockets — pipe handles
+        // return WSAENOTSOCK (10038). Use WaitForMultipleObjects with the underlying HANDLEs.
+        {
+            size_t i;
+            for(i = 0; i < nfds; i++)
+                pfds[i].revents = 0;
+
+            if(nfds <= MAXIMUM_WAIT_OBJECTS) {
+                HANDLE handles[MAXIMUM_WAIT_OBJECTS];
+                bool ok = true;
+                for(i = 0; i < nfds && ok; i++) {
+                    handles[i] = (HANDLE)_get_osfhandle(pfds[i].fd);
+                    if(handles[i] == INVALID_HANDLE_VALUE) ok = false;
+                }
+
+                if(ok) {
+                    DWORD wr = WaitForMultipleObjects((DWORD)nfds, handles, FALSE, (DWORD)timeout);
+                    if(wr == WAIT_TIMEOUT) {
+                        ret = 0;
+                    }
+                    else if(wr >= WAIT_OBJECT_0 && wr < WAIT_OBJECT_0 + (DWORD)nfds) {
+                        ret = 0;
+                        for(i = 0; i < nfds; i++) {
+                            DWORD avail = 0;
+                            if(!PeekNamedPipe(handles[i], NULL, 0, NULL, &avail, NULL))
+                                // broken pipe: for the notification pipe treat as POLLHUP so the
+                                // shutdown path fires; for entry pipes treat as POLLIN so read()
+                                // can detect EOF and mark the entry for deletion
+                                pfds[i].revents = (i == 0) ? POLLHUP : POLLIN;
+                            else if(avail > 0)
+                                pfds[i].revents = POLLIN;
+                            if(pfds[i].revents) ret++;
+                        }
+                        if(!ret) {
+                            // race: WaitFor triggered but PeekNamedPipe saw nothing yet
+                            pfds[wr - WAIT_OBJECT_0].revents = POLLIN;
+                            ret = 1;
+                        }
+                    }
+                    else {
+                        ret = -1; // WAIT_FAILED or WAIT_ABANDONED
+                    }
+                }
+                else {
+                    ret = poll(pfds, (nfds_t)nfds, timeout); // invalid handle — fall through
+                }
+            }
+            else {
+                ret = poll(pfds, (nfds_t)nfds, timeout); // too many fds — fall through
+            }
+        }
+#else
+        ret = poll(pfds, (nfds_t)nfds, timeout);
+#endif
 
         if (ret > 0) {
             // Check the notification pipe

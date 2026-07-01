@@ -255,6 +255,17 @@ bool nd_log_init_windows(void) {
         return false;
 #endif
 
+    if(!nd_log.eventlog.etw) {
+        // Remove legacy NetdataWEL registry entries. Classic WEL source lookup uses creation order,
+        // so stale NetdataWEL\<source> keys would be found before the new per-channel keys, causing
+        // ReportEventW to keep writing to the old channel.
+        wchar_t legacy_key[MAX_PATH];
+        swprintf(legacy_key, MAX_PATH,
+                 L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\NetdataWEL");
+        if(RegDeleteTreeW(HKEY_LOCAL_MACHINE, legacy_key) == ERROR_SUCCESS)
+            nd_win_trace("nd_log_init_windows: removed legacy EventLog\\NetdataWEL registry key");
+    }
+
     // Loop through each source and add it to the registry
     for(size_t i = 0; i < _NDLS_MAX; i++) {
         nd_log.sources[i].source = i;
