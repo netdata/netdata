@@ -30,14 +30,17 @@ pub struct IndexReader<'a> {
 }
 
 /// One materialized span of a trace reconstructed by [`IndexReader::trace_by_id`]:
-/// its ids, timing, and attribute facets (`name`, `kind`, `status_code`,
-/// `attributes.*`) as flat `(key, value)` pairs.
-#[derive(Debug, Clone, PartialEq)]
+/// its ids, timing, per-row scalars, and attribute facets (`name`, `kind`,
+/// `status_code`, `attributes.*`) as flat `(key, value)` pairs.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TraceSpan {
     pub span_id: SpanId,
     pub parent_span_id: SpanId,
     pub start_ns: i64,
     pub duration_ns: i64,
+    /// W3C trace flags (the low byte carries the sampled bit).
+    pub flags: u32,
+    pub dropped_attributes_count: u32,
     pub fields: Vec<(String, String)>,
 }
 
@@ -49,7 +52,7 @@ pub struct TraceSpan {
 /// can scatter across files/time (and this reader sees only one file), a span whose
 /// `parent_span_id` is unset OR absent from this set is a **root** — so a partial
 /// trace still forms a forest rather than dropping spans.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Trace {
     /// The trace's spans, sorted by `start_ns` (ties broken by `span_id`) — the
     /// clock-skew-safe display order. Duplicate `span_id`s (resends) are collapsed
@@ -383,7 +386,11 @@ impl<'a> IndexReader<'a> {
         let span_ids = self.sfst.span_ids()?;
         let parents = self.sfst.parent_span_ids()?;
         let durations = self.sfst.durations()?;
-        // `materialize_rows` returns one row per position, in `positions` order.
+        let flags = self.sfst.flags()?;
+        let dropped = self.sfst.dropped_attribute_counts()?;
+        // `materialize_rows` returns one row per position and already validated each
+        // `pos < record_count`; every per-row column has `record_count` entries (a
+        // build-time invariant, CRC-guarded), so indexing them at `pos` is in-bounds.
         let rows = self.materialize_rows(positions)?;
 
         // Assemble spans, collapsing duplicate span_ids (resends) to the first seen.
@@ -401,6 +408,8 @@ impl<'a> IndexReader<'a> {
                 parent_span_id: parents.get(pos as usize),
                 start_ns: rows[i].timestamp_ns,
                 duration_ns: durations.0[pos as usize],
+                flags: flags.0[pos as usize],
+                dropped_attributes_count: dropped.0[pos as usize],
                 fields: rows[i].fields.clone(),
             });
         }
@@ -430,6 +439,13 @@ impl<'a> IndexReader<'a> {
             } else {
                 roots.push(i);
             }
+        }
+
+        // Pathological guard: if every span has an in-set parent (a parent cycle),
+        // there is no natural root and a root-first walk would reach nothing. Surface
+        // the earliest span as a root so no span is silently unreachable.
+        if roots.is_empty() && !spans.is_empty() {
+            roots.push(0);
         }
 
         Ok(Trace {

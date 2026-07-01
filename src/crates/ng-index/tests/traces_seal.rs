@@ -213,6 +213,36 @@ fn trace_by_id_handles_large_fan_out() {
 }
 
 #[test]
+fn trace_by_id_cycle_surfaces_all_spans_under_a_root() {
+    // Pathological parent cycle A<->B: neither has an unset/absent parent, so there
+    // is no natural root. The guard must still surface a root (the earliest span) so
+    // no span is lost / unreachable.
+    let t = [0x7cu8; 16];
+    let (a, b) = ([1u8; 8], [2u8; 8]);
+    let bytes = seal(vec![req(vec![
+        span(t, a, b, 100, 200, "a"), // a's parent is b
+        span(t, b, a, 110, 190, "b"), // b's parent is a
+    ])]);
+    let tr = IndexReader::open(&bytes).unwrap().trace_by_id(TraceId::from(t)).unwrap();
+    assert_eq!(tr.spans.len(), 2);
+    assert_eq!(tr.roots.len(), 1, "cycle guard promotes the earliest span as a root");
+    assert_eq!(tr.spans[tr.roots[0]].span_id, SpanId::from(a), "earliest (start 100) is the root");
+}
+
+#[test]
+fn trace_by_id_surfaces_flags_and_dropped_count() {
+    // The per-row scalars (flags, dropped_attributes_count) reconstruct onto the span.
+    let t = [0x8du8; 16];
+    let mut s = span(t, [1u8; 8], ROOT_PARENT, 100, 200, "x");
+    s.flags = 0x1;
+    s.dropped_attributes_count = 3;
+    let bytes = seal(vec![req(vec![s])]);
+    let tr = IndexReader::open(&bytes).unwrap().trace_by_id(TraceId::from(t)).unwrap();
+    assert_eq!(tr.spans[0].flags, 0x1);
+    assert_eq!(tr.spans[0].dropped_attributes_count, 3);
+}
+
+#[test]
 fn trace_by_id_absent_is_empty() {
     let t = [0xF6u8; 16];
     let bytes = seal(vec![req(vec![span(t, [1u8; 8], ROOT_PARENT, 100, 200, "x")])]);

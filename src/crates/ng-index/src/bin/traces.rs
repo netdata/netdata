@@ -44,7 +44,7 @@ enum Cmd {
         /// The sealed SFST index file.
         #[arg(long)]
         sfst: PathBuf,
-        /// The trace id as lowercase hex (32 chars = 16 bytes).
+        /// The trace id as hex (32 chars = 16 bytes; case-insensitive).
         #[arg(long, conflicts_with = "sample", required_unless_present = "sample")]
         trace_id: Option<String>,
         /// Print up to N distinct trace ids present in the file instead of a lookup.
@@ -137,9 +137,11 @@ fn seal(wal: &Path, out: &Path) -> ExitCode {
     }
 }
 
-/// Parse exactly 32 lowercase-hex chars (16 bytes) into a [`TraceId`].
+/// Parse exactly 32 hex chars (16 bytes; case-insensitive) into a [`TraceId`].
 fn parse_trace_id(hex: &str) -> Option<TraceId> {
-    if hex.len() != 32 {
+    // ASCII guard: byte-slicing below assumes 1 byte per char, so a 32-*byte*
+    // multibyte input would otherwise panic on a non-char-boundary slice.
+    if hex.len() != 32 || !hex.is_ascii() {
         return None;
     }
     let mut bytes = [0u8; 16];
@@ -151,7 +153,7 @@ fn parse_trace_id(hex: &str) -> Option<TraceId> {
 
 fn reconstruct(sfst_path: &Path, trace_id_hex: &str) -> ExitCode {
     let Some(trace_id) = parse_trace_id(trace_id_hex) else {
-        eprintln!("invalid trace id: expected 32 lowercase hex chars (16 bytes)");
+        eprintln!("invalid trace id: expected 32 hex chars (16 bytes)");
         return ExitCode::FAILURE;
     };
     let bytes = match std::fs::read(sfst_path) {
@@ -187,8 +189,13 @@ fn reconstruct(sfst_path: &Path, trace_id_hex: &str) -> ExitCode {
     );
     // Iterative depth-first print (roots and children pushed reversed so they pop in
     // order); no recursion, so an adversarially deep trace can't overflow the stack.
+    // `visited` also stops a pathological parent cycle from looping the walk forever.
+    let mut visited: HashSet<usize> = HashSet::new();
     let mut stack: Vec<(usize, usize)> = trace.roots.iter().rev().map(|&i| (i, 0)).collect();
     while let Some((i, depth)) = stack.pop() {
+        if !visited.insert(i) {
+            continue;
+        }
         let s = &trace.spans[i];
         let name = s
             .fields

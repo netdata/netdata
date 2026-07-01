@@ -674,7 +674,10 @@ mod tests {
                     ..Default::default()
                 }),
                 scope_spans: vec![ScopeSpans {
-                    scope: None,
+                    scope: Some(InstrumentationScope {
+                        name: "lib".into(),
+                        ..Default::default()
+                    }),
                     spans: vec![span("a"), span("b")],
                     ..Default::default()
                 }],
@@ -688,6 +691,10 @@ mod tests {
         assert!(
             rg.resource.iter().all(|e| e.hash != 0),
             "resource entries hashed"
+        );
+        assert!(
+            !rg.scopes[0].scope.is_empty() && rg.scopes[0].scope.iter().all(|e| e.hash != 0),
+            "scope entries hashed"
         );
         let spans = &rg.scopes[0].spans;
         assert!(
