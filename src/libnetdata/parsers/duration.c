@@ -384,6 +384,9 @@ bool duration_parse_seconds(const char *str, int *result) {
     int64_t v;
 
     if(duration_parse_time_t(str, &v)) {
+        if(v < INT_MIN || v > INT_MAX)
+            return false;
+
         *result = (int)v;
         return true;
     }
