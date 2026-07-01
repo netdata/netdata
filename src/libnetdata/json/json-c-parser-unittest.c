@@ -1477,6 +1477,30 @@ static int test_format_rfc3339(void) {
     parsed = rfc3339_parse_ut(buffer, NULL);
     T(parsed == 1, "format_rfc3339: 9-digit output parses back to the same microseconds");
 
+    parsed = rfc3339_parse_ut("1970-01-01T00:00:00.1Z", NULL);
+    T(parsed == 100000, "parse_rfc3339: 1 fractional digit scales to microseconds");
+
+    parsed = rfc3339_parse_ut("1970-01-01T00:00:00.999999999Z", NULL);
+    T(parsed == 999999, "parse_rfc3339: 9 fractional digits truncate to microseconds");
+
+    parsed = rfc3339_parse_ut("1970-01-01T00:00:00.Z", NULL);
+    T(parsed == 0, "parse_rfc3339: missing fractional digits fail");
+
+    parsed = rfc3339_parse_ut("1970-01-01T00:00:00.1234567890Z", NULL);
+    T(parsed == 0, "parse_rfc3339: more than 9 fractional digits fail");
+
+    parsed = rfc3339_parse_ut("1970-01-01T00:00:00. 123Z", NULL);
+    T(parsed == 0, "parse_rfc3339: fractional whitespace fails");
+
+    parsed = rfc3339_parse_ut("1970-01-01T00:00:00. +1Z", NULL);
+    T(parsed == 0, "parse_rfc3339: fractional whitespace plus sign fails");
+
+    parsed = rfc3339_parse_ut("1970-01-01T00:00:00.+1Z", NULL);
+    T(parsed == 0, "parse_rfc3339: fractional plus sign fails");
+
+    parsed = rfc3339_parse_ut("1970-01-01T00:00:00.-1Z", NULL);
+    T(parsed == 0, "parse_rfc3339: fractional minus sign fails");
+
     return failed;
 }
 
