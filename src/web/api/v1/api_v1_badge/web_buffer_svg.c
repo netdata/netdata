@@ -361,6 +361,12 @@ static struct units_formatter {
         { NULL,          0, UNITS_FORMAT_NONE }
 };
 
+static inline bool badge_time_value_is_undefined(NETDATA_DOUBLE value) {
+    // The exclusive upper bound avoids rejecting exactly SIZE_MAX on long-double builds.
+    return isless(value, 0.0) || isnan(value) || isinf(value) ||
+           isgreaterequal(value, (NETDATA_DOUBLE)SIZE_MAX + (NETDATA_DOUBLE)1.0);
+}
+
 char *format_value_and_unit(char *value_string, size_t value_string_len,
     NETDATA_DOUBLE value, const char *units, int precision) {
     static int max = -1;
@@ -391,7 +397,7 @@ char *format_value_and_unit(char *value_string, size_t value_string_len,
             snprintfz(value_string, value_string_len, "%s", "now");
             return value_string;
         }
-        else if(isless(value, 0.0) || isnan(value) || isinf(value)) {
+        else if(badge_time_value_is_undefined(value)) {
             snprintfz(value_string, value_string_len, "%s", "undefined");
             return value_string;
         }
@@ -421,7 +427,7 @@ char *format_value_and_unit(char *value_string, size_t value_string_len,
             snprintfz(value_string, value_string_len, "%s", "now");
             return value_string;
         }
-        else if(isless(value, 0.0) || isnan(value) || isinf(value)) {
+        else if(badge_time_value_is_undefined(value)) {
             snprintfz(value_string, value_string_len, "%s", "undefined");
             return value_string;
         }
@@ -448,7 +454,7 @@ char *format_value_and_unit(char *value_string, size_t value_string_len,
             snprintfz(value_string, value_string_len, "%s", "now");
             return value_string;
         }
-        else if(isless(value, 0.0) || isnan(value) || isinf(value)) {
+        else if(badge_time_value_is_undefined(value)) {
             snprintfz(value_string, value_string_len, "%s", "undefined");
             return value_string;
         }
