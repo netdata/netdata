@@ -460,11 +460,6 @@ void registry_statistics(void) {
         rrddim_add(sts, "sessions",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    rrddim_set(sts, "sessions", (collected_number)registry.usages_count);
-    rrdset_done(sts);
-
-    // ------------------------------------------------------------------------
-
     if(unlikely(!stc)) {
         stc = rrdset_create_localhost(
                 "netdata"
@@ -486,14 +481,6 @@ void registry_statistics(void) {
         rrddim_add(stc, "persons_urls",   NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(stc, "machines_urls",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
-
-    rrddim_set(stc, "persons",       (collected_number)registry.persons_count);
-    rrddim_set(stc, "machines",      (collected_number)registry.machines_count);
-    rrddim_set(stc, "persons_urls",  (collected_number)registry.persons_urls_count);
-    rrddim_set(stc, "machines_urls", (collected_number)registry.machines_urls_count);
-    rrdset_done(stc);
-
-    // ------------------------------------------------------------------------
 
     if(unlikely(!stm)) {
         stm = rrdset_create_localhost(
@@ -517,17 +504,57 @@ void registry_statistics(void) {
         rrddim_add(stm, "machines_urls",  NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
     }
 
+    collected_number usages_count;
+    collected_number persons_count, machines_count, persons_urls_count, machines_urls_count;
+    collected_number persons_memory, machines_memory, persons_urls_memory, machines_urls_memory;
+
+    registry_lock();
+
+    usages_count = (collected_number)registry.usages_count;
+    persons_count = (collected_number)registry.persons_count;
+    machines_count = (collected_number)registry.machines_count;
+    persons_urls_count = (collected_number)registry.persons_urls_count;
+    machines_urls_count = (collected_number)registry.machines_urls_count;
+
     struct aral_statistics *p_aral_stats = aral_get_statistics(registry.persons_aral);
-    rrddim_set(stm, "persons",       (collected_number)p_aral_stats->structures.allocated_bytes + (collected_number)p_aral_stats->malloc.allocated_bytes + (collected_number)p_aral_stats->mmap.allocated_bytes);
+    persons_memory = (collected_number)aral_structures_bytes_from_stats(p_aral_stats) +
+                     (collected_number)aral_used_bytes_from_stats(p_aral_stats) +
+                     (collected_number)aral_free_bytes_from_stats(p_aral_stats);
 
     struct aral_statistics *m_aral_stats = aral_get_statistics(registry.machines_aral);
-    rrddim_set(stm, "machines",      (collected_number)m_aral_stats->structures.allocated_bytes + (collected_number)m_aral_stats->malloc.allocated_bytes + (collected_number)m_aral_stats->mmap.allocated_bytes);
+    machines_memory = (collected_number)aral_structures_bytes_from_stats(m_aral_stats) +
+                      (collected_number)aral_used_bytes_from_stats(m_aral_stats) +
+                      (collected_number)aral_free_bytes_from_stats(m_aral_stats);
 
     struct aral_statistics *pu_aral_stats = aral_get_statistics(registry.person_urls_aral);
-    rrddim_set(stm, "persons_urls",  (collected_number)pu_aral_stats->structures.allocated_bytes + (collected_number)pu_aral_stats->malloc.allocated_bytes + (collected_number)pu_aral_stats->mmap.allocated_bytes);
+    persons_urls_memory = (collected_number)aral_structures_bytes_from_stats(pu_aral_stats) +
+                          (collected_number)aral_used_bytes_from_stats(pu_aral_stats) +
+                          (collected_number)aral_free_bytes_from_stats(pu_aral_stats);
 
     struct aral_statistics *mu_aral_stats = aral_get_statistics(registry.machine_urls_aral);
-    rrddim_set(stm, "machines_urls", (collected_number)mu_aral_stats->structures.allocated_bytes + (collected_number)mu_aral_stats->malloc.allocated_bytes + (collected_number)mu_aral_stats->mmap.allocated_bytes);
+    machines_urls_memory = (collected_number)aral_structures_bytes_from_stats(mu_aral_stats) +
+                           (collected_number)aral_used_bytes_from_stats(mu_aral_stats) +
+                           (collected_number)aral_free_bytes_from_stats(mu_aral_stats);
+
+    registry_unlock();
+
+    rrddim_set(sts, "sessions", usages_count);
+    rrdset_done(sts);
+
+    // ------------------------------------------------------------------------
+
+    rrddim_set(stc, "persons",       persons_count);
+    rrddim_set(stc, "machines",      machines_count);
+    rrddim_set(stc, "persons_urls",  persons_urls_count);
+    rrddim_set(stc, "machines_urls", machines_urls_count);
+    rrdset_done(stc);
+
+    // ------------------------------------------------------------------------
+
+    rrddim_set(stm, "persons",       persons_memory);
+    rrddim_set(stm, "machines",      machines_memory);
+    rrddim_set(stm, "persons_urls",  persons_urls_memory);
+    rrddim_set(stm, "machines_urls", machines_urls_memory);
 
     rrdset_done(stm);
 }
