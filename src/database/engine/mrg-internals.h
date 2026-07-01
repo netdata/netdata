@@ -240,6 +240,7 @@ static bool metric_release(MRG *mrg, METRIC *metric) {
         bool restored = __atomic_compare_exchange_n(&metric->refcount, &expected, 0,
                                                     false, __ATOMIC_RELEASE, __ATOMIC_RELAXED);
         internal_fatal(!restored, "DBENGINE METRIC: cannot restore retained metric refcount from deletion state");
+        __atomic_sub_fetch(&mrg->index[partition].stats.entries_acquired, 1, __ATOMIC_RELAXED);
     }
 
     __atomic_sub_fetch(&mrg->index[partition].stats.current_references, 1, __ATOMIC_RELAXED);
