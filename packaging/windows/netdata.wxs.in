@@ -331,7 +331,30 @@
                 Impersonate="no"
             />
             <InstallExecuteSequence>
-                <Custom Action="InstallManifest" After="InstallFiles" />
+                <Custom Action="InstallManifest" After="DllPermission" />
+            </InstallExecuteSequence>
+
+            <!-- Unregister any previously installed manifest before installing the new one.
+                 Scheduled Before="RemoveFiles" so the manifest XML is still in System32
+                 when wevtutil reads it — both on upgrade (old manifest is there) and on
+                 uninstall (manifest present until RemoveFiles runs it).
+                 Return=ignore because on a first-ever install nothing is registered yet. -->
+            <SetProperty
+                Id="UninstallManifest"
+                Value="&quot;[System64Folder]wevtutil.exe&quot; um &quot;[System64Folder]wevt_netdata_manifest.xml&quot;"
+                Before="UninstallManifest"
+                Sequence="execute"
+            />
+            <CustomAction
+                Id="UninstallManifest"
+                BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+                DllEntry="WixQuietExec"
+                Execute="deferred"
+                Return="ignore"
+                Impersonate="no"
+            />
+            <InstallExecuteSequence>
+                <Custom Action="UninstallManifest" Before="RemoveFiles" />
             </InstallExecuteSequence>
 
             <Component Id="NetdataService" Directory="USRBINDIR">
