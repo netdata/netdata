@@ -41,7 +41,7 @@ int api_v1_single_chart_helper(RRDHOST *host, struct web_client *w, char *url, v
     }
 
     w->response.data->content_type = CT_APPLICATION_JSON;
-    st->last_accessed_time_s = now_realtime_sec();
+    rrdset_touch_last_accessed_time_s(st);
     callback(st, w->response.data);
     return HTTP_RESP_OK;
 

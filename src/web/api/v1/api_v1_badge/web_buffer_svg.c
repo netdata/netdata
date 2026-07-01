@@ -976,7 +976,7 @@ int api_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
         ret = HTTP_RESP_OK;
         goto cleanup;
     }
-    st->last_accessed_time_s = now_realtime_sec();
+    rrdset_touch_last_accessed_time_s(st);
 
     if(alarm) {
         rca = rrdcalc_from_rrdset_get(st, alarm);

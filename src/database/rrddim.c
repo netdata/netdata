@@ -360,7 +360,7 @@ inline RRDDIM *rrddim_find(RRDSET *st, const char *id, bool include_obsolete) {
         if(!include_obsolete && rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) && !rrdset_is_discoverable(st))
             rd = NULL;
         else
-            rd->rrdset->last_accessed_time_s = now_realtime_sec();
+            rrdset_touch_last_accessed_time_s(rd->rrdset);
     }
 
     dictionary_acquired_item_release(st->rrddim_root_index, rd_item);
@@ -379,7 +379,7 @@ inline RRDDIM_ACQUIRED *rrddim_find_and_acquire(RRDSET *st, const char *id, bool
             return NULL;
         }
 
-        rd->rrdset->last_accessed_time_s = now_realtime_sec();
+        rrdset_touch_last_accessed_time_s(rd->rrdset);
     }
 
     return rda;

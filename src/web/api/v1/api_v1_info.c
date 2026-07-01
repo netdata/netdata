@@ -21,7 +21,7 @@ static void host_collectors(RRDHOST *host, BUFFER *wb) {
         bool *set = dictionary_set(dict, name, &old, sizeof(bool));
         if(!*set) {
             *set = true;
-            st->last_accessed_time_s = now;
+            rrdset_set_last_accessed_time_s(st, now);
             buffer_json_add_array_item_object(wb);
             buffer_json_member_add_string(wb, "plugin", rrdset_plugin_name(st));
             buffer_json_member_add_string(wb, "module", rrdset_module_name(st));

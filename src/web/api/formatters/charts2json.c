@@ -69,7 +69,7 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
             buffer_json_member_add_object(wb, rrdset_id(st));
             rrdset2json(st, wb, &dimensions, &memory);
             buffer_json_object_close(wb);
-            st->last_accessed_time_s = now;
+            rrdset_set_last_accessed_time_s(st, now);
             c++;
         }
     }

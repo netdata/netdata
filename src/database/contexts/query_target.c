@@ -330,7 +330,7 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
 
     if(timeframe_matches) {
         if(ri->rrdset)
-            ri->rrdset->last_accessed_time_s = qtl->start_s;
+            rrdset_set_last_accessed_time_s(ri->rrdset, qtl->start_s);
 
         if (qt->query.used == qt->query.size) {
             size_t old_mem = qt->query.size * sizeof(*qt->query.array);
