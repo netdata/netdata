@@ -313,7 +313,7 @@
                 Impersonate="no"
             />
             <InstallExecuteSequence>
-                <Custom Action="DllPermission" After="InstallFiles" />
+                <Custom Action="DllPermission" After="InstallFiles" Condition="NOT REMOVE" />
             </InstallExecuteSequence>
 
             <SetProperty
@@ -331,7 +331,7 @@
                 Impersonate="no"
             />
             <InstallExecuteSequence>
-                <Custom Action="InstallManifest" After="DllPermission" />
+                <Custom Action="InstallManifest" After="DllPermission" Condition="NOT REMOVE" />
             </InstallExecuteSequence>
 
             <!-- Unregister any previously installed manifest before installing the new one.
