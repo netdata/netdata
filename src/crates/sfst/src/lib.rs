@@ -1,6 +1,6 @@
 //! Container format for split-FST log indexes.
 //!
-//! An SFST file holds one **primary** [`PrefixMap`] of
+//! An SFST file holds one **primary** FST of
 //! low-cardinality `key=value` pairs, zero or more **secondary** chunks
 //! (mid-cardinality per-field FSTs, high-cardinality per-field sorted lists),
 //! and one stream-log-entries chunk, all keyed by a [`chunk_file`] TOC for
@@ -25,14 +25,11 @@
 //! # Example
 //!
 //! ```
-//! use sfst::PrefixMap;
 //! use sfst::{BitmapValue, ChunkCounts, ColumnsPresent, StreamBatch, StreamWriter};
 //! use treight::Bitmap;
 //!
-//! // Build a minimal primary FST with one `key=value` entry.
+//! // One low-cardinality `key=value` entry for the primary chunk.
 //! let bm = BitmapValue { desc: Bitmap::empty(0), data: Vec::new() };
-//! let primary: PrefixMap<BitmapValue> =
-//!     PrefixMap::build([("level=info", bm)]).unwrap();
 //!
 //! // Write a minimal file: the four always-present chunks in their
 //! // canonical order, plus one (empty) stream batch.
@@ -59,14 +56,14 @@
 //! w.summary(&summary).unwrap();
 //! w.metadata(&metadata).unwrap();
 //! w.timestamps(&[]).unwrap();
-//! w.primary(&primary).unwrap();
+//! // The writer builds the primary FST from its `key=value` entries.
+//! w.primary([("level=info", bm)]).unwrap();
 //! w.add_stream_batch(&StreamBatch::for_write(&[])).unwrap();
 //! let buf = w.finish().unwrap().into_inner();
 //!
-//! // Read back
-//! let reader = sfst::Reader::open(&buf).unwrap();
-//! let primary = reader.primary().unwrap();
-//! assert!(primary.get(b"level=info").is_some());
+//! // Read back through the query API.
+//! let idx = sfst::IndexReader::open(&buf).unwrap();
+//! assert!(idx.primary_lookup(b"level=info").is_some());
 //! ```
 
 mod error;
@@ -82,7 +79,7 @@ pub mod registry;
 
 pub use error::Error;
 pub use index_reader::{BitmapFilter, IndexReader, Trace, TraceSpan};
-pub use prefix_map::{BuildError, PrefixMap};
+pub(crate) use prefix_map::{BuildError, PrefixMap};
 pub use query::{
     Bucket, FacetResult, Filter, Grid, Matcher, MaterializedRow, Timeline, Timestamps,
     compile_pattern, compile_query,

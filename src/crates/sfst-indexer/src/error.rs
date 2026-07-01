@@ -17,14 +17,11 @@ pub enum IndexError {
     Io(#[from] std::io::Error),
 
     /// The SFST format layer (writer / `pack`) failed while emitting a
-    /// chunk or assembling the on-disk container.
+    /// chunk or assembling the on-disk container. Includes FST-build failures
+    /// (e.g. duplicate keys), which the writer now surfaces as
+    /// [`sfst::Error::PrefixMapBuild`].
     #[error("SFST format error: {0}")]
     Format(#[from] Error),
-
-    /// FST construction failed — almost always because the key set
-    /// wasn't sortable into the FST's required lexicographic order.
-    #[error("FST build error: {0}")]
-    FstBuild(#[from] sfst::BuildError),
 
     /// The WAL contains records that resolve to more than one
     /// `(service.namespace, service.name)` pair. Each SFST file is

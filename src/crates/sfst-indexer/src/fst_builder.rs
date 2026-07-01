@@ -145,8 +145,7 @@ fn build_primary_fst<W: Write + Seek>(
         }
     }
 
-    let fst: sfst::PrefixMap<BitmapValue> = sfst::PrefixMap::build(entries)?;
-    w.primary(&fst)?;
+    w.primary(entries)?;
     tracing::debug!(
         "primary FST built: {} fields, {}ms",
         low.len(),
@@ -175,8 +174,7 @@ fn build_mid_card_chunks<W: Write + Seek>(
             entries.push((kv_pair, BitmapValue { desc, data }));
         }
 
-        let fst: sfst::PrefixMap<BitmapValue> = sfst::PrefixMap::build(entries.drain(..))?;
-        let idx = w.add_mid_field(&fst)?;
+        let idx = w.add_mid_field(entries.drain(..))?;
         debug_assert_eq!(idx as usize, i);
     }
 

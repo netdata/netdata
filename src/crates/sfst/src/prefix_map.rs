@@ -5,6 +5,9 @@
 //! giving O(key_length) exact lookups and efficient prefix scans with far less
 //! key overhead than a `HashMap`.
 
+// Not every accessor is used in-tree yet; the unit tests exercise the full API.
+#![allow(dead_code)]
+
 use fst::automaton::Automaton;
 use fst::{IntoStreamer, Streamer};
 
@@ -66,21 +69,6 @@ impl From<fst::Error> for BuildError {
 /// values in a `Vec<T>` ordered by sorted key. Supports exact lookup and prefix
 /// search. The key set is fixed at construction (no insert/remove), though
 /// individual values can be updated in place via [`get_mut`](Self::get_mut).
-///
-/// ```
-/// use sfst::PrefixMap;
-///
-/// let m: PrefixMap<u32> = PrefixMap::build([
-///     ("apple", 1u32),
-///     ("banana", 2),
-///     ("application", 3),
-/// ])
-/// .unwrap();
-///
-/// assert_eq!(m.get(b"banana"), Some(&2));
-/// assert_eq!(m.get(b"cherry"), None);
-/// assert_eq!(m.prefix_values(b"app").len(), 2); // apple, application
-/// ```
 pub struct PrefixMap<T> {
     map: fst::Map<Vec<u8>>,
     values: Vec<T>,
@@ -148,11 +136,6 @@ impl<T> PrefixMap<T> {
     /// Size of the serialized FST data in bytes (keys only, not values).
     pub fn fst_bytes(&self) -> usize {
         self.map.as_fst().as_bytes().len()
-    }
-
-    /// Raw FST bytes (the serialized automaton, without the values vector).
-    pub fn fst_raw_bytes(&self) -> &[u8] {
-        self.map.as_fst().as_bytes()
     }
 
     /// Look up the value associated with an exact key.

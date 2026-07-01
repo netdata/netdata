@@ -36,9 +36,9 @@ pub enum Error {
     #[error("unsupported version: {0}")]
     UnsupportedVersion(u32),
 
-    /// A chunk lookup by index found no matching id — e.g.,
-    /// [`Reader::mid_field`](crate::Reader::mid_field) called with an
-    /// index past the file's mid-card field count.
+    /// A chunk lookup by index found no matching id — e.g., a mid-card
+    /// field accessor called with an index past the file's mid-card
+    /// field count.
     #[error("chunk not found: index {0}")]
     ChunkNotFound(u16),
 
@@ -49,6 +49,14 @@ pub enum Error {
     /// a data condition; the message names the violated step.
     #[error("writer misuse: {0}")]
     WriterMisuse(String),
+
+    /// Building the primary or a mid-field FST failed — almost always a
+    /// duplicate `key=value` in the entries handed to
+    /// [`StreamWriter::primary`](crate::StreamWriter::primary) /
+    /// [`add_mid_field`](crate::StreamWriter::add_mid_field). A producer
+    /// bug, never a data condition.
+    #[error("prefix-map build error: {0}")]
+    PrefixMapBuild(String),
 
     /// [`StreamWriter::new`](crate::StreamWriter::new) was given a
     /// stream-batch count outside
@@ -141,5 +149,14 @@ impl From<chunk_file::container::Error> for Error {
             C::CrcMismatch { .. } => Error::CorruptIndex(e.to_string()),
             C::Io(io) => Error::Io(io),
         }
+    }
+}
+
+/// Surface an FST build failure as a producer-side format error. `BuildError`
+/// is crate-private, so it is stringified rather than embedded (a public enum
+/// variant cannot carry a crate-private type).
+impl From<crate::BuildError> for Error {
+    fn from(e: crate::BuildError) -> Self {
+        Error::PrefixMapBuild(e.to_string())
     }
 }

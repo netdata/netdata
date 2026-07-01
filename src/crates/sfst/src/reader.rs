@@ -184,7 +184,7 @@ impl<'a> Reader<'a> {
     // ── PRIM ─────────────────────────────────────────────────────────
 
     /// Decompress and deserialize the primary FST.
-    pub fn primary(&self) -> Result<PrefixMap<BitmapValue>, Error> {
+    pub(crate) fn primary(&self) -> Result<PrefixMap<BitmapValue>, Error> {
         unpack(self.primary_raw()?)
     }
 
@@ -196,7 +196,7 @@ impl<'a> Reader<'a> {
     // ── Mid-card per-field FSTs ──────────────────────────────────────
 
     /// Decompress and deserialize a mid-card field FST by index.
-    pub fn mid_field(&self, index: u16) -> Result<PrefixMap<BitmapValue>, Error> {
+    pub(crate) fn mid_field(&self, index: u16) -> Result<PrefixMap<BitmapValue>, Error> {
         unpack(self.mid_field_raw(index)?)
     }
 

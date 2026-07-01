@@ -167,13 +167,6 @@ impl<'a> IndexReader<'a> {
         self.primary.prefix_pairs(prefix)
     }
 
-    // ── Secondary chunk loading ─────────────────────────────────────
-
-    /// Load a mid-cardinality field's FST. `mid_index` is `0..num_mid`.
-    pub fn load_mid_field(&self, mid_index: u16) -> Result<PrefixMap<BitmapValue>, crate::Error> {
-        self.sfst.mid_field(mid_index)
-    }
-
     // ── Per-log timestamps ──────────────────────────────────────────
 
     /// Load the per-log nanosecond [`Timestamps`], chronologically ordered

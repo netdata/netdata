@@ -315,11 +315,15 @@ impl<W: Write + Seek> StreamWriter<W> {
         }
     }
 
-    /// Write the primary (low-cardinality) FST chunk, completing the hot prefix.
-    /// The optional per-row column chunks (when declared) come next in the cold
-    /// region, then the optional `trace_id` index, otherwise the secondary sections.
-    pub fn primary(&mut self, fst: &PrefixMap<BitmapValue>) -> Result<(), Error> {
-        let packed = pack(fst, ZSTD_LEVEL_FST)?;
+    /// Write the primary (low-cardinality) FST chunk from its `key=value`
+    /// entries, completing the hot prefix. The optional per-row column chunks
+    /// (when declared) come next in the cold region, then the optional
+    /// `trace_id` index, otherwise the secondary sections.
+    pub fn primary<K: Ord + AsRef<[u8]>>(
+        &mut self,
+        entries: impl IntoIterator<Item = (K, BitmapValue)>,
+    ) -> Result<(), Error> {
+        let packed = pack(&PrefixMap::build(entries)?, ZSTD_LEVEL_FST)?;
         let next = self.after_primary();
         self.prefix_chunk(Stage::Primary, next, CHUNK_PRIMARY, &packed)
     }
@@ -445,10 +449,13 @@ impl<W: Write + Seek> StreamWriter<W> {
         Ok(())
     }
 
-    /// Write the next mid-cardinality field FST chunk and return its
-    /// index. Mid-field chunks follow the primary and precede every
-    /// high-field chunk.
-    pub fn add_mid_field(&mut self, fst: &PrefixMap<BitmapValue>) -> Result<u16, Error> {
+    /// Write the next mid-cardinality field FST chunk from its `key=value`
+    /// entries and return its index. Mid-field chunks follow the primary and
+    /// precede every high-field chunk.
+    pub fn add_mid_field<K: Ord + AsRef<[u8]>>(
+        &mut self,
+        entries: impl IntoIterator<Item = (K, BitmapValue)>,
+    ) -> Result<u16, Error> {
         self.check_secondary("mid-field")?;
         if self.highs > 0 || self.batches > 0 {
             return Err(Error::WriterMisuse(
@@ -461,7 +468,7 @@ impl<W: Write + Seek> StreamWriter<W> {
                 self.counts.mid_fields,
             )));
         }
-        let packed = pack(fst, ZSTD_LEVEL_FST)?;
+        let packed = pack(&PrefixMap::build(entries)?, ZSTD_LEVEL_FST)?;
         let idx = self.mids;
         self.inner.write_chunk(mid_field_id(idx), &packed)?;
         self.mids += 1;

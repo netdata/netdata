@@ -62,7 +62,6 @@ fn build_query_fixture() -> Vec<u8> {
             },
         ),
     ];
-    let primary: crate::PrefixMap<BitmapValue> = crate::PrefixMap::build(primary_entries).unwrap();
 
     // Spread across 6 seconds for predictable bucketing.
     let summary = Summary {
@@ -122,7 +121,7 @@ fn build_query_fixture() -> Vec<u8> {
     writer.summary(&summary).unwrap();
     writer.metadata(&metadata).unwrap();
     writer.timestamps(&timestamps).unwrap();
-    writer.primary(&primary).unwrap();
+    writer.primary(primary_entries).unwrap();
     writer
         .add_stream_batch(&StreamBatch::for_write(&stream_entries))
         .unwrap();
@@ -464,7 +463,6 @@ fn build_multivalued_fixture() -> Vec<u8> {
             },
         ),
     ];
-    let primary: crate::PrefixMap<BitmapValue> = crate::PrefixMap::build(primary_entries).unwrap();
 
     let summary = Summary {
         min_timestamp_s: 1_700_000_000,
@@ -519,7 +517,7 @@ fn build_multivalued_fixture() -> Vec<u8> {
     writer.summary(&summary).unwrap();
     writer.metadata(&metadata).unwrap();
     writer.timestamps(&timestamps).unwrap();
-    writer.primary(&primary).unwrap();
+    writer.primary(primary_entries).unwrap();
     writer
         .add_stream_batch(&StreamBatch::for_write(&stream_entries))
         .unwrap();
@@ -785,7 +783,6 @@ fn build_complemented_fixture() -> Vec<u8> {
             },
         ),
     ];
-    let primary: crate::PrefixMap<BitmapValue> = crate::PrefixMap::build(primary_entries).unwrap();
 
     let summary = Summary {
         min_timestamp_s: 1_700_000_000,
@@ -843,7 +840,7 @@ fn build_complemented_fixture() -> Vec<u8> {
     writer.summary(&summary).unwrap();
     writer.metadata(&metadata).unwrap();
     writer.timestamps(&timestamps).unwrap();
-    writer.primary(&primary).unwrap();
+    writer.primary(primary_entries).unwrap();
     writer
         .add_stream_batch(&StreamBatch::for_write(&stream_entries))
         .unwrap();
@@ -978,19 +975,17 @@ fn bitmap_value(positions: &[u32], universe: u32) -> BitmapValue {
 fn build_tiered_fixture() -> Vec<u8> {
     const N: u32 = 6;
 
-    let primary: crate::PrefixMap<BitmapValue> = crate::PrefixMap::build(vec![
+    let primary_entries = vec![
         ("level=error", bitmap_value(&[1, 3, 5], N)),
         ("level=info", bitmap_value(&[0, 2, 4], N)),
-    ])
-    .unwrap();
+    ];
 
     // Mid chunk: the `host` field's values + bitmaps (FST, lexicographic).
-    let mid_host: crate::PrefixMap<BitmapValue> = crate::PrefixMap::build(vec![
+    let mid_host_entries = vec![
         ("host=db1", bitmap_value(&[4, 5], N)),
         ("host=web1", bitmap_value(&[0, 1], N)),
         ("host=web2", bitmap_value(&[2, 3], N)),
-    ])
-    .unwrap();
+    ];
 
     // High chunk: `trace` values, all in the single stream batch (bit 0).
     let high_trace = HighField::for_write(
@@ -1062,8 +1057,8 @@ fn build_tiered_fixture() -> Vec<u8> {
     writer.summary(&summary).unwrap();
     writer.metadata(&metadata).unwrap();
     writer.timestamps(&timestamps).unwrap();
-    writer.primary(&primary).unwrap();
-    writer.add_mid_field(&mid_host).unwrap();
+    writer.primary(primary_entries).unwrap();
+    writer.add_mid_field(mid_host_entries).unwrap();
     writer.add_high_field(&high_trace).unwrap();
     writer
         .add_stream_batch(&StreamBatch::for_write(&stream_entries))

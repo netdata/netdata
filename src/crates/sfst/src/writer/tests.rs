@@ -1,6 +1,5 @@
 use std::io::Cursor;
 
-use crate::PrefixMap;
 use treight::Bitmap;
 
 use crate::{
@@ -72,12 +71,12 @@ fn metadata_with_columns(fields: Vec<FieldEntry>, columns: ColumnsTable) -> Meta
     }
 }
 
-fn fst() -> PrefixMap<BitmapValue> {
+fn entries() -> Vec<(&'static str, BitmapValue)> {
     let bm = BitmapValue {
         desc: Bitmap::empty(0),
         data: Vec::new(),
     };
-    PrefixMap::build([("k=v", bm)]).unwrap()
+    vec![("k=v", bm)]
 }
 
 fn high() -> HighField {
@@ -97,7 +96,7 @@ fn write_prefix(w: &mut StreamWriter<Cursor<Vec<u8>>>) {
     w.summary(&summary()).unwrap();
     w.metadata(&metadata(Vec::new())).unwrap();
     w.timestamps(&[1, 2, 3]).unwrap();
-    w.primary(&fst()).unwrap();
+    w.primary(entries()).unwrap();
 }
 
 #[test]
@@ -120,9 +119,9 @@ fn full_file_in_canonical_order_round_trips() {
     w.summary(&summary).unwrap();
     w.metadata(&metadata).unwrap();
     w.timestamps(&[1, 2, 3]).unwrap();
-    w.primary(&fst()).unwrap();
-    assert_eq!(w.add_mid_field(&fst()).unwrap(), 0);
-    assert_eq!(w.add_mid_field(&fst()).unwrap(), 1);
+    w.primary(entries()).unwrap();
+    assert_eq!(w.add_mid_field(entries()).unwrap(), 0);
+    assert_eq!(w.add_mid_field(entries()).unwrap(), 1);
     assert_eq!(w.add_high_field(&high()).unwrap(), 0);
     assert_eq!(w.add_stream_batch(&batch()).unwrap(), 0);
     assert_eq!(w.add_stream_batch(&batch()).unwrap(), 1);
@@ -136,6 +135,22 @@ fn full_file_in_canonical_order_round_trips() {
     assert_eq!(reader.num_high().unwrap(), 1);
     assert_eq!(reader.timestamps().unwrap(), vec![1, 2, 3]);
     assert!(reader.primary().unwrap().get(b"k=v").is_some());
+}
+
+#[test]
+fn primary_rejects_duplicate_keys() {
+    // The writer builds the primary FST from entries; a duplicate key=value is
+    // a producer bug that surfaces as Error::PrefixMapBuild through the `?` chain.
+    let mut w = writer(counts(0, 0, 1));
+    w.summary(&summary()).unwrap();
+    w.metadata(&metadata(Vec::new())).unwrap();
+    w.timestamps(&[1, 2, 3]).unwrap();
+    let bm = || BitmapValue {
+        desc: Bitmap::empty(0),
+        data: Vec::new(),
+    };
+    let dup = vec![("k=v", bm()), ("k=v", bm())];
+    assert!(matches!(w.primary(dup), Err(Error::PrefixMapBuild(_))));
 }
 
 #[test]
@@ -161,13 +176,13 @@ fn rejects_prefix_chunks_out_of_order() {
     let mut w = writer(counts(0, 0, 1));
     w.summary(&summary()).unwrap();
     w.metadata(&metadata(Vec::new())).unwrap();
-    assert!(matches!(w.primary(&fst()), Err(Error::WriterMisuse(_))));
+    assert!(matches!(w.primary(entries()), Err(Error::WriterMisuse(_))));
 
     // A secondary chunk before the prefix is complete.
     let mut w = writer(counts(1, 0, 1));
     w.summary(&summary()).unwrap();
     assert!(matches!(
-        w.add_mid_field(&fst()),
+        w.add_mid_field(entries()),
         Err(Error::WriterMisuse(_))
     ));
 
@@ -182,17 +197,17 @@ fn rejects_secondary_chunks_out_of_section_order() {
     // A mid-field after a high-field.
     let mut w = writer(counts(1, 1, 1));
     write_prefix(&mut w);
-    w.add_mid_field(&fst()).unwrap();
+    w.add_mid_field(entries()).unwrap();
     w.add_high_field(&high()).unwrap();
     assert!(matches!(
-        w.add_mid_field(&fst()),
+        w.add_mid_field(entries()),
         Err(Error::WriterMisuse(_))
     ));
 
     // A high-field before all declared mid-fields.
     let mut w = writer(counts(2, 1, 1));
     write_prefix(&mut w);
-    w.add_mid_field(&fst()).unwrap();
+    w.add_mid_field(entries()).unwrap();
     assert!(matches!(
         w.add_high_field(&high()),
         Err(Error::WriterMisuse(_))
@@ -211,9 +226,9 @@ fn rejects_secondary_chunks_out_of_section_order() {
 fn rejects_chunks_beyond_declared_counts() {
     let mut w = writer(counts(1, 0, 1));
     write_prefix(&mut w);
-    w.add_mid_field(&fst()).unwrap();
+    w.add_mid_field(entries()).unwrap();
     assert!(matches!(
-        w.add_mid_field(&fst()),
+        w.add_mid_field(entries()),
         Err(Error::WriterMisuse(_))
     ));
 
@@ -338,7 +353,7 @@ fn all_per_row_columns_round_trip() {
     w.metadata(&metadata_with_columns(Vec::new(), columns_table()))
         .unwrap();
     w.timestamps(&[1, 2, 3]).unwrap();
-    w.primary(&fst()).unwrap();
+    w.primary(entries()).unwrap();
     w.observed_timestamps(&observed).unwrap();
     w.trace_ids(&trace).unwrap();
     w.span_ids(&span).unwrap();
@@ -389,7 +404,7 @@ fn per_row_columns_are_independently_optional() {
     w.metadata(&metadata_with_columns(Vec::new(), manifest))
         .unwrap();
     w.timestamps(&[1, 2, 3]).unwrap();
-    w.primary(&fst()).unwrap();
+    w.primary(entries()).unwrap();
     w.trace_ids(&trace).unwrap();
     w.add_stream_batch(&batch()).unwrap();
     let buf = w.finish().unwrap().into_inner();
@@ -449,7 +464,7 @@ fn per_row_columns_misuse_is_rejected() {
     w.summary(&summary()).unwrap();
     w.metadata(&manifest()).unwrap();
     w.timestamps(&[1, 2, 3]).unwrap();
-    w.primary(&fst()).unwrap();
+    w.primary(entries()).unwrap();
     w.observed_timestamps(&observed).unwrap();
     assert!(matches!(
         w.add_stream_batch(&batch()),
@@ -471,7 +486,7 @@ fn per_row_columns_misuse_is_rejected() {
     w.summary(&summary()).unwrap();
     w.metadata(&manifest()).unwrap();
     w.timestamps(&[1, 2, 3]).unwrap();
-    w.primary(&fst()).unwrap();
+    w.primary(entries()).unwrap();
     assert!(matches!(w.span_ids(&span), Err(Error::WriterMisuse(_))));
 
     // A column written twice is rejected.
@@ -479,7 +494,7 @@ fn per_row_columns_misuse_is_rejected() {
     w.summary(&summary()).unwrap();
     w.metadata(&manifest()).unwrap();
     w.timestamps(&[1, 2, 3]).unwrap();
-    w.primary(&fst()).unwrap();
+    w.primary(entries()).unwrap();
     w.observed_timestamps(&observed).unwrap();
     assert!(matches!(
         w.observed_timestamps(&observed),
@@ -571,7 +586,7 @@ fn trace_id_index_round_trips_and_resolves() {
     w.metadata(&metadata_with_columns(Vec::new(), trace_id_manifest()))
         .unwrap();
     w.timestamps(&[1, 2, 3]).unwrap();
-    w.primary(&fst()).unwrap();
+    w.primary(entries()).unwrap();
     w.trace_ids(&trace).unwrap();
     w.trace_id_index(&index).unwrap();
     w.add_stream_batch(&batch()).unwrap();
@@ -599,7 +614,7 @@ fn trace_id_index_absent_by_default() {
     w.metadata(&metadata_with_columns(Vec::new(), trace_id_manifest()))
         .unwrap();
     w.timestamps(&[1, 2, 3]).unwrap();
-    w.primary(&fst()).unwrap();
+    w.primary(entries()).unwrap();
     w.trace_ids(&trace).unwrap();
     w.add_stream_batch(&batch()).unwrap();
     let buf = w.finish().unwrap().into_inner();
@@ -637,7 +652,7 @@ fn trace_id_index_misuse_is_rejected() {
     w.metadata(&metadata_with_columns(Vec::new(), trace_id_manifest()))
         .unwrap();
     w.timestamps(&[1, 2, 3]).unwrap();
-    w.primary(&fst()).unwrap();
+    w.primary(entries()).unwrap();
     w.trace_ids(&trace).unwrap();
     assert!(matches!(
         w.add_stream_batch(&batch()),
@@ -650,7 +665,7 @@ fn trace_id_index_misuse_is_rejected() {
     w.metadata(&metadata_with_columns(Vec::new(), trace_id_manifest()))
         .unwrap();
     w.timestamps(&[1, 2, 3]).unwrap();
-    w.primary(&fst()).unwrap();
+    w.primary(entries()).unwrap();
     w.trace_ids(&trace).unwrap();
     assert!(matches!(w.finish(), Err(Error::WriterMisuse(_))));
 
@@ -660,7 +675,7 @@ fn trace_id_index_misuse_is_rejected() {
     w.metadata(&metadata_with_columns(Vec::new(), trace_id_manifest()))
         .unwrap();
     w.timestamps(&[1, 2, 3]).unwrap();
-    w.primary(&fst()).unwrap();
+    w.primary(entries()).unwrap();
     assert!(matches!(
         w.trace_id_index(&index),
         Err(Error::WriterMisuse(_))
@@ -676,7 +691,7 @@ fn trace_id_index_misuse_is_rejected() {
     w.metadata(&metadata_with_columns(Vec::new(), trace_id_manifest()))
         .unwrap();
     w.timestamps(&[1, 2, 3]).unwrap();
-    w.primary(&fst()).unwrap();
+    w.primary(entries()).unwrap();
     w.trace_ids(&trace).unwrap();
     assert!(matches!(
         w.trace_id_index(&index),
