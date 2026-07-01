@@ -16,6 +16,10 @@ echo Uninstalling previous manifest (if any)...
 wevtutil um "%MAN_SRC%"
 
 echo.
+echo Removing legacy NetdataWEL registry entries (if any)...
+reg delete "HKLM\SYSTEM\CurrentControlSet\Services\EventLog\NetdataWEL" /f 2>nul
+
+echo.
 echo Copying %DLL_SRC% to %DLL_DST%
 copy /y "%DLL_SRC%" "%DLL_DST%"
 if %errorlevel% neq 0 (

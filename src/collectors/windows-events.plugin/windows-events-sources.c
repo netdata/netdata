@@ -282,8 +282,8 @@ static int wevt_source_to_json_array_cb(const DICTIONARY_ITEM *item, void *entry
         return 0;
 
     bool default_selected = (s->type == wevt_source_type_channel);
-    if(default_selected && (strcmp(name, "NetdataWEL") == 0 || strcmp(name, "Netdata/Access") == 0))
-        // do not select Netdata Access logs by default
+    if(default_selected && (strcmp(name, "Netdata/Access") == 0 || strcmp(name, "Netdata/Aclk") == 0))
+        // do not select Netdata Access and Aclk logs by default (noisy / cloud-specific)
         default_selected = false;
 
     buffer_json_add_array_item_object(wb);
