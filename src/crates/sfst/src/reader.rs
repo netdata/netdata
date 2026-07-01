@@ -155,10 +155,7 @@ impl<'a> Reader<'a> {
     /// the hot prefix (`SUMR`/`META`/`TIMS`/`PRIM`): the optional per-row column
     /// chunks (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`, when present), the optional
     /// `trace_id` index (`TIDX`, when present), the mid/high field chunks, and
-    /// the stream batches. A query keeps the hot prefix
-    /// resident in the page cache and releases this region once done. The per-row
-    /// columns sit here (not the hot prefix) so a query decodes a column only when
-    /// it actually needs it, rather than paying for it on every read.
+    /// the stream batches.
     ///
     /// Offsets are relative to the start of the slice, so the span is
     /// usable directly with an mmap's `advise_range`. In the canonical
@@ -256,8 +253,7 @@ impl<'a> Reader<'a> {
     // All are chronological, parallel to `timestamps` and the stream batches:
     // entry `i` is global row `i`. Presence + type are recorded in the META
     // `ColumnsTable` (the authoritative manifest), not by probing for chunks.
-    // Present only when the file was built with per-row columns (the typed-flatten
-    // pipeline); the production logs indexer writes none.
+    // Present only when the file was built with per-row columns.
 
     /// The per-row columns manifest (META `columns`): which columns this file
     /// carries and their types. Empty when none.

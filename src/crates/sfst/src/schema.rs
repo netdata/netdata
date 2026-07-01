@@ -508,7 +508,7 @@ impl SchemaTree {
             .collect()
     }
 
-    /// Derive the coalesced **scalar** field view (D45–D47): for each leaf path
+    /// Derive the coalesced **scalar** field view: for each leaf path
     /// whose kinds include at least one scalar, the path's single coalesced
     /// scalar [`ValueKind`]. Container-only paths (objects/arrays, including
     /// `Null`/empty-only) yield no entry — their scalars live at child paths.
@@ -618,17 +618,9 @@ pub struct BitmapValue {
 /// `key_lens` (per-key byte length) and
 /// [`masks`](Self::masks) (per-key stream-batch bitmask, bit `b` set iff
 /// the value appears in batch `b` — see [`crate::num_stream_batches`]).
-/// Keys are sorted lexicographically.
-///
-/// The arena is what makes decode cheap: deserializing one `Vec<u8>` blob
-/// is a single allocation, versus one heap `String` per key (which, on a
-/// full high-card scan, dominated allocation). On disk it stores **lengths,
-/// not offsets** — lengths are small varints (≈1 B/key, like the old
-/// per-string length prefix), whereas raw `u32` offsets would varint-inflate
-/// to ≈5 B/key. The columnar layout (lengths and masks each contiguous) also
-/// compresses marginally tighter under zstd than the old interleaved form.
-/// In memory, `offsets` is the prefix-sum of `key_lens`
-/// (rebuilt on load, not serialized) so key access is O(1).
+/// Keys are sorted lexicographically. The arena keeps decode to a single
+/// allocation (vs one `String` per key). `offsets` is the prefix-sum of
+/// `key_lens`, rebuilt on load (not serialized), so key access is O(1).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HighField {
     /// All `field=value` keys concatenated, in sorted order. `serde_bytes`
@@ -776,13 +768,8 @@ impl KvId {
 /// little-endian bytes**; `row_lens[i]` is the number of `KvId`s in row
 /// `i`. Row `i`'s ids are `kv_bytes[4*off(i) .. 4*off(i+1)]`, where `off`
 /// is the prefix-sum of `row_lens` (held in `row_offsets`, in `KvId`
-/// units, rebuilt on load).
-///
-/// Fixed-width LE (vs varint `KvId`s) lets the high-card scan read ids
-/// straight from the byte buffer — no per-id deserialization, the dominant
-/// decode cost — and it's *smaller* on disk: high-card `KvId`s are large
-/// enough that varint already spends ~4 bytes, and a regular 4-byte stride
-/// compresses tighter under zstd than ragged varints.
+/// units, rebuilt on load). The fixed 4-byte stride lets the high-card scan
+/// read ids straight from the buffer with no per-id deserialization.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StreamBatch {
     /// `serde_bytes` decodes this in one bulk copy instead of serde's

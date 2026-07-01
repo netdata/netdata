@@ -7,7 +7,7 @@
 //! and every other column); this index adds the *sorted order* in a small
 //! auxiliary chunk so a lookup never scans.
 //!
-//! Structure (design note `~/mo/traces-sfst.md` §5):
+//! Structure:
 //! - `sort_perm[N]` — row positions sorted by their 16-byte `trace_id` value,
 //!   with the row position as a tiebreaker, so within one trace the spans stay
 //!   chronological (structural, not reliant on sort stability — see `build`).
@@ -34,14 +34,9 @@ use crate::{Error, TraceId, TraceIds};
 /// `trace_id` first byte is `<= b`. The bucket for byte `b` is the half-open
 /// run `[self.0[b-1], self.0[b])` ([`Fanout::bucket`]).
 ///
-/// A fixed `[u32; 256]`, so the length-256 invariant is a compile-time
-/// guarantee rather than a runtime check. Every `Fanout` — whether built
-/// ([`Fanout::build`]) or decoded ([`Deserialize`]) — is **monotonic
-/// non-decreasing**: `build` produces it by cumulative sum, and `deserialize`
-/// rejects a non-monotonic encoding at the parse boundary, so [`Fanout::bucket`]
-/// can never yield an inverted (`lo > hi`) range. Serde has no `[T; 256]` impl
-/// (arrays only to `[T; 32]`), so the codec is a hand-written
-/// `&[u32]`-slice round-trip — wire-identical to a `Vec<u32>`.
+/// Always monotonic non-decreasing — `build` sums cumulatively and `deserialize`
+/// rejects a non-monotonic encoding — so [`Fanout::bucket`] never yields an
+/// inverted (`lo > hi`) range.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Fanout([u32; 256]);
 
@@ -141,13 +136,9 @@ impl TraceIdIndex {
         let fanout = Fanout::build(keyed.iter().map(|(id, _)| id.as_bytes()[0]));
         let sort_perm: Vec<u32> = keyed.into_iter().map(|(_, p)| p).collect();
 
-        // Enforce the index invariants at write time (debug builds + tests),
-        // where a producer bug is cheap to catch at its source — rather than
-        // paying to re-prove them on every read. `sort_perm` is a permutation of
-        // a filtered subset of `0..len`, sorted by id, so all three hold by
-        // construction; the asserts guard against a future refactor regressing
-        // build(). Sortedness is the invariant `positions()` actually relies on
-        // (its two binary searches assume a sorted bucket).
+        // Write-time invariant guards (debug/test only): a producer bug is cheap
+        // to catch at its source instead of re-proving it on every read.
+        // Sortedness is what `positions()`'s binary searches rely on.
         debug_assert!(
             sort_perm.iter().all(|&p| (p as usize) < trace_ids.len()),
             "build produced an out-of-range position"
@@ -197,18 +188,11 @@ impl TraceIdIndex {
     /// [`Error::CorruptIndex`] so the query layer skips the file rather than
     /// indexing out of bounds or trusting a broken fanout.
     ///
-    /// Scope is **panic-safety**: it guarantees `positions()` cannot index out
-    /// of bounds. [`Fanout`] already self-guarantees length-256 + monotonicity
-    /// (so a bucket slice never inverts); this adds the fanout↔`sort_perm`
-    /// relation (`total == sort_perm.len()`, so a bucket's `hi` never exceeds
-    /// `sort_perm`) and the position↔`record_count` range (so the `TRCE` access
-    /// is in bounds). It deliberately does NOT re-verify the *semantic*
-    /// invariants (`sort_perm` actually sorted by id, buckets matching
-    /// first-byte, positions unique) — those would cost an extra O(N) pass on
-    /// every read and are instead enforced at write time (`build()`'s
-    /// `debug_assert`s) under the CRC integrity guarantee, since the only
-    /// producer is `build()` and the bytes on disk are CRC-checked. A future
-    /// producer regressing them is caught in debug/test, not in release reads.
+    /// Scope is **panic-safety only** — the fanout↔`sort_perm` relation
+    /// (`total == sort_perm.len()`) and the position↔`record_count` range, so
+    /// `positions()` cannot index out of bounds. The semantic invariants
+    /// (sortedness, bucket/first-byte match, uniqueness) are enforced at write
+    /// time by `build`'s `debug_assert`s, not re-checked here.
     pub(crate) fn validate(&self, record_count: usize) -> Result<(), Error> {
         // The last bucket must account for every permuted position.
         if self.fanout.total() as usize != self.sort_perm.len() {

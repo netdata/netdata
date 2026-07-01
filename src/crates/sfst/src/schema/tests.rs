@@ -161,7 +161,7 @@ fn derive_field_table_collapses_polymorphic_path() {
     assert_eq!(derived.get("id").unwrap().cardinality, 7);
 }
 
-/// The D45–D47 scalar coalescing lattice: drop `Null`; empty/non-empty
+/// The scalar coalescing lattice: drop `Null`; empty/non-empty
 /// containers contribute no scalar; `Int ⊔ Double = Double`; any other scalar
 /// mix → `Str`; a scalar-vs-container path surfaces its scalar leaf (the
 /// container occurrences live at child paths).

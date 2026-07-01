@@ -82,14 +82,9 @@ pub enum Error {
     #[error("file too short ({0} bytes, need at least {1})")]
     FileTooShort(usize, usize),
 
-    /// [`IndexReader::facets`](crate::IndexReader::facets) was passed a
-    /// field name that doesn't appear in this file's field table.
-    /// [`matched_count`](crate::IndexReader::matched_count) /
-    /// [`matched_positions`](crate::IndexReader::matched_positions) treat an
-    /// absent filter field as matching no logs, and
-    /// [`timeline`](crate::IndexReader::timeline) treats an absent
-    /// field as "every log lacks it" (all `unset`); none return
-    /// this error.
+    /// A facet/aggregation was asked for a field name that doesn't appear in
+    /// this file's field table. (Filtering treats an absent field as matching
+    /// nothing rather than erroring.)
     #[error("unknown field: {0}")]
     UnknownField(String),
 
@@ -104,9 +99,7 @@ pub enum Error {
     /// A [`Filter`](crate::Filter) carried a regex pattern matcher
     /// ([`Matcher::Pattern`](crate::Matcher)) that failed to compile. A
     /// malformed pattern is a hard failure — the whole filter fails to
-    /// compile rather than being treated as "matches nothing". Validate
-    /// patterns at the request boundary so a bad one surfaces as a clean
-    /// user error, not a per-file degrade.
+    /// compile rather than being treated as "matches nothing".
     #[error("invalid filter pattern: {0}")]
     InvalidPattern(String),
 

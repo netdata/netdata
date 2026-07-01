@@ -57,8 +57,7 @@ pub struct TraceSpan {
 /// pathological input: a parent cycle (or a cyclic component with no external entry)
 /// has no natural root, so the earliest still-unreached span is promoted to a root
 /// until all spans are reachable. In that case [`children`](Self::children) still
-/// contains the cycle's edges, so a walker MUST guard against revisiting a node (as
-/// the `ng-index-traces` printer does).
+/// contains the cycle's edges, so a walker MUST guard against revisiting a node.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Trace {
     /// The trace's spans, sorted by `start_ns` (ties broken by `span_id`) — the
@@ -195,9 +194,8 @@ impl<'a> IndexReader<'a> {
 
     /// Load and concatenate every stream-batch chunk into per-row `KvId`
     /// lists, in chronological order. Convenience for tooling and tests that
-    /// want the materialized form rather than walking [`StreamBatch`](crate::StreamBatch) rows;
-    /// it reconstructs the `Vec<Vec<KvId>>`, so the hot scan/materialize
-    /// paths use [`StreamBatch`](crate::StreamBatch) directly instead.
+    /// want the materialized `Vec<Vec<KvId>>` rather than walking
+    /// [`StreamBatch`](crate::StreamBatch) rows.
     pub fn load_all_stream_entries(&self) -> Result<Vec<Vec<KvId>>, crate::Error> {
         let n = self.num_stream_batches();
         let mut out = Vec::with_capacity(self.summary.record_count as usize);
@@ -738,8 +736,7 @@ impl<'a> IndexReader<'a> {
     /// [`timeline`](Self::timeline): `facets` *errors* on an absent
     /// field (a facet is requested per-field, so absence is a caller
     /// mistake), whereas `timeline` routes an absent field's logs to
-    /// `unset`. Callers querying a heterogeneous set of files should
-    /// pre-filter the field list to those present in each file.
+    /// `unset`.
     pub fn facets<S: AsRef<str>>(
         &self,
         fields: &[S],
@@ -1407,11 +1404,11 @@ impl PosSet {
     /// The positions set in an on-disk value bitmap. The descriptor is
     /// `Copy`; only the tree bytes are cloned.
     ///
-    /// Invariant: every value bitmap in a file is built with the same
-    /// `universe_size` (`== record_count`; see the writer's `remap_one_bitmap`),
-    /// which is what lets the resulting set combine with `range`/`full`/other
-    /// values via `and`/`or` — those require matching universes (a mismatch
-    /// is only a debug assert, so it would be silently wrong in release).
+    /// Invariant: the writer builds every value bitmap at the same
+    /// `universe_size` (`== record_count`), which is what lets the resulting set
+    /// combine with `range`/`full`/other values via `and`/`or` — those require
+    /// matching universes (a mismatch is only a debug assert, so it would be
+    /// silently wrong in release).
     fn from_value(bv: &BitmapValue) -> Self {
         Self {
             bitmap: bv.desc,

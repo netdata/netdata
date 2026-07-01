@@ -36,16 +36,12 @@ pub(crate) fn pack<T: Serialize + ?Sized>(value: &T, zstd_level: i32) -> Result<
 
 /// Write a minimal, content-light SFST containing only the `SUMR` summary chunk.
 ///
-/// [`StreamWriter`] is the logs writer: it mandates the logs-shaped chunk set
-/// (primary FST, per-log timestamps, ≥1 stream batch) and refuses an underfilled
-/// file. A second signal (e.g. traces) whose content is not logs-shaped uses this
-/// to produce a sealed file the shared registry/catalog/recovery can track by its
-/// [`Summary`] (`record_count`, timestamps, opaque `content_meta`) without those
-/// logs chunks. The file carries no queryable content; the signal's own query
-/// path owns content. [`Reader::open`](crate::Reader::open) +
-/// [`Reader::summary`](crate::Reader::summary) read it back, so
-/// `Registry::recover` tracks it like any other sealed file. `summary.record_count`
-/// must be `> 0` for the lifecycle to track rather than discard it.
+/// [`StreamWriter`] mandates the full logs-shaped chunk set (primary FST,
+/// per-log timestamps, ≥1 stream batch) and refuses an underfilled file. A
+/// signal whose content is not logs-shaped (e.g. traces) uses this to produce a
+/// sealed file that carries only its [`Summary`] (`record_count`, timestamps,
+/// opaque `content_meta`) and no queryable content. `summary.record_count` must
+/// be `> 0` to be tracked rather than discarded.
 pub fn write_summary_only<W: Write + Seek>(sink: W, summary: &Summary) -> Result<W, Error> {
     let mut inner = StreamingWriter::new(sink, *MAGIC, VERSION, 1)?;
     inner.write_chunk(CHUNK_SUMMARY, &pack(summary, ZSTD_LEVEL_DEFAULT)?)?;
@@ -171,10 +167,9 @@ impl Stage {
 ///
 /// Each payload is packed (bincode + zstd, at the level the format
 /// pairs with its chunk kind) and written immediately, so peak memory
-/// is one packed chunk — which is what the production indexer
-/// (`sfst-indexer`'s `build_into`) relies on. The TOC is reserved at
-/// [`new`](Self::new) (hence the declared [`ChunkCounts`]) and patched
-/// at [`finish`](Self::finish), which requires `Seek`.
+/// is one packed chunk. The TOC is reserved at [`new`](Self::new)
+/// (hence the declared [`ChunkCounts`]) and patched at
+/// [`finish`](Self::finish), which requires `Seek`.
 pub struct StreamWriter<W: Write + Seek> {
     inner: StreamingWriter<W>,
     counts: ChunkCounts,

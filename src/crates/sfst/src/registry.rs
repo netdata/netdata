@@ -183,15 +183,11 @@ impl Registry {
     /// included if any second is shared by both ranges.
     ///
     /// Partition filter, when non-empty, keeps files whose opaque `part_key`
-    /// is one of [`Query::partition_keys`] — there is no partial / prefix
-    /// matching, by design (each SFST holds exactly one partition). The
-    /// substrate compares the key as an opaque `u64`; the content plane
-    /// guarantees one stream per key (the ingestor's per-tenant collision
-    /// table) and supplies the query keys.
+    /// is one of [`Query::partition_keys`], compared as an opaque `u64`. There
+    /// is no partial / prefix matching — each SFST holds exactly one partition.
     pub fn candidates<'a>(&'a self, q: &Query) -> impl Iterator<Item = &'a File> + 'a {
-        // Extract q's contents upfront so the filter closures don't borrow
-        // q. This decouples the iterator's lifetime from q's, letting
-        // callers pass a temporary `Query` without binding it to a local.
+        // Copy q's fields so the returned iterator doesn't borrow q (callers
+        // may pass a temporary Query).
         let q_range = q.time_range.clone();
         let partition_keys = q.partition_keys.clone();
         self.inner

@@ -102,10 +102,7 @@ pub(crate) fn opaque_part_key(namespace: &str, name: &str) -> u64 {
 }
 
 /// Highest SFST sequence on disk across every tenant subdir of
-/// `base`. Returns `0` when `base` is missing or empty. Paired with
-/// `wal::scan_max_sequence_recursive`; the ingestor takes the max
-/// of both at startup so the seq counter stays monotonic even when
-/// WALs have been cleaned up but SFSTs remain.
+/// `base`. Returns `0` when `base` is missing or empty.
 pub fn scan_max_sequence_recursive(base: &std::path::Path) -> std::io::Result<u64> {
     file_registry::scan_max_sequence_recursive(base, registry::SFST_EXT)
 }

@@ -1,9 +1,6 @@
 //! Query primitives over an SFST index.
 //!
-//! This module defines the inputs and outputs of the reader's query API;
-//! the methods themselves ([`crate::IndexReader::facets`],
-//! [`crate::IndexReader::timeline`], and the matched-count helpers) live on
-//! the reader and consume these types.
+//! This module defines the input and output types of the query API.
 //!
 //! - [`Filter`] — a selection set (`field → allowed values`) with **OR
 //!   within a field** and **AND across fields**.
@@ -44,11 +41,8 @@ pub enum Matcher {
 
 /// Compile a [`Matcher::Pattern`] source full-value-anchored as `^(?:src)$`.
 ///
-/// The single place the anchoring is applied, so the pattern that
-/// [`Filter::validate`] accepts is byte-for-byte the one the reader resolves
-/// — and public so every other evaluator of [`Filter`] semantics (the WAL
-/// row scan in `sfsq`) anchors identically by construction.
-/// A bad source is a hard [`crate::Error::InvalidPattern`].
+/// The single place the anchoring is applied. A bad source is a hard
+/// [`crate::Error::InvalidPattern`].
 pub fn compile_pattern(src: &str) -> Result<regex::bytes::Regex, crate::Error> {
     // `bytes::Regex` matches directly against the `&[u8]` keys (sorted
     // `field=value` blobs), skipping the `str::from_utf8` validation on every
