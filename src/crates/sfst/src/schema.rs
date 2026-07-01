@@ -681,6 +681,13 @@ impl HighField {
             acc += len;
             self.offsets.push(acc);
         }
+        // `keys_blob` concatenates every key, so its length must equal the summed
+        // key lengths; a mismatch means a truncated/corrupt chunk.
+        debug_assert_eq!(
+            self.keys_blob.len(),
+            acc as usize,
+            "HighField keys_blob length inconsistent with key_lens (corrupt)"
+        );
     }
 
     /// Number of keys.

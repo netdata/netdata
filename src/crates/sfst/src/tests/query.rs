@@ -1289,3 +1289,158 @@ fn query_narrows_facet_counts() {
         vec![("error".to_string(), 2), ("info".to_string(), 2)]
     );
 }
+
+/// SFST with **two fields per mid/high tier**, so the tier-relative chunk index
+/// advances past 0 — exercises `field_table_tiered`, `high_kv_id`, and the
+/// high-card scan at index 1 (the single-field-per-tier fixtures never do).
+/// 4 logs, same time base as [`build_query_fixture`].
+///
+/// Within a tier the derived field table is name-ordered, so the chunk /
+/// KvId layout follows `host < region` (mid) and `req < trace` (high):
+///
+/// - `level`  (Low):    info @ {0,2}, error @ {1,3}
+/// - `host`   (Mid 0):  h1 @ {0,1},  h2 @ {2,3}
+/// - `region` (Mid 1):  r1 @ {0,2},  r2 @ {1,3}
+/// - `req`    (High 0): q1 @ {0,1},  q2 @ {2,3}
+/// - `trace`  (High 1): t1 @ {0,2},  t2 @ {1,3}
+fn build_two_per_tier_fixture() -> Vec<u8> {
+    const N: u32 = 4;
+
+    let primary_entries = vec![
+        ("level=error", bitmap_value(&[1, 3], N)),
+        ("level=info", bitmap_value(&[0, 2], N)),
+    ];
+    let mid_host = vec![
+        ("host=h1", bitmap_value(&[0, 1], N)),
+        ("host=h2", bitmap_value(&[2, 3], N)),
+    ];
+    let mid_region = vec![
+        ("region=r1", bitmap_value(&[0, 2], N)),
+        ("region=r2", bitmap_value(&[1, 3], N)),
+    ];
+    // High values all sit in the single stream batch (mask bit 0).
+    let high_req = HighField::for_write(&["req=q1", "req=q2"], vec![0b1, 0b1]);
+    let high_trace = HighField::for_write(&["trace=t1", "trace=t2"], vec![0b1, 0b1]);
+
+    // Tier- and name-aligned KvIds: low {error=0, info=1}; mid {h1=2, h2=3,
+    // r1=4, r2=5}; high {q1=6, q2=7, t1=8, t2=9}. `trace` (high field 1)
+    // therefore starts at KvId 8 = mid_end(6) + req's cardinality(2) — the base
+    // `high_kv_id(1, 0)` must derive.
+    let stream_entries: Vec<Vec<KvId>> = vec![
+        vec![KvId(1), KvId(2), KvId(4), KvId(6), KvId(8)], // 0: info, h1, r1, q1, t1
+        vec![KvId(0), KvId(2), KvId(5), KvId(6), KvId(9)], // 1: error, h1, r2, q1, t2
+        vec![KvId(1), KvId(3), KvId(4), KvId(7), KvId(8)], // 2: info, h2, r1, q2, t1
+        vec![KvId(0), KvId(3), KvId(5), KvId(7), KvId(9)], // 3: error, h2, r2, q2, t2
+    ];
+
+    let field = |name: &str, cardinality: u32, tier| FieldEntry {
+        name: name.into(),
+        cardinality,
+        tier,
+    };
+    let summary = Summary {
+        min_timestamp_s: 1_700_000_000,
+        max_timestamp_s: 1_700_000_003,
+        record_count: N,
+        content_meta: Vec::new(),
+    };
+    let metadata = Metadata {
+        histogram: Histogram {
+            timestamps: vec![1_700_000_000],
+            counts: vec![N],
+        },
+        id_ranges: IdRanges {
+            low_end: KvId(2),
+            mid_end: KvId(6),
+            high_end: KvId(10),
+        },
+        tree: SchemaTree::flat(
+            &vec![
+                field("level", 2, FieldTier::Low),
+                field("host", 2, FieldTier::Mid),
+                field("region", 2, FieldTier::Mid),
+                field("req", 2, FieldTier::High),
+                field("trace", 2, FieldTier::High),
+            ]
+            .into(),
+        ),
+        columns: ColumnsTable::default(),
+    };
+    let timestamps: Vec<i64> = (0..N as i64)
+        .map(|i| FILE_MIN_NS + i * 1_000_000_000)
+        .collect();
+
+    let counts = ChunkCounts {
+        columns: ColumnsPresent::default(),
+        trace_id_index: false,
+        mid_fields: 2,
+        high_fields: 2,
+        stream_batches: 1,
+    };
+    let mut w = StreamWriter::new(std::io::Cursor::new(Vec::new()), counts).unwrap();
+    w.summary(&summary).unwrap();
+    w.metadata(&metadata).unwrap();
+    w.timestamps(&timestamps).unwrap();
+    w.primary(primary_entries).unwrap();
+    // Chunks in the derived (name-sorted within tier) order.
+    w.add_mid_field(mid_host).unwrap();
+    w.add_mid_field(mid_region).unwrap();
+    w.add_high_field(&high_req).unwrap();
+    w.add_high_field(&high_trace).unwrap();
+    w.add_stream_batch(&StreamBatch::for_write(&stream_entries))
+        .unwrap();
+    w.finish().unwrap().into_inner()
+}
+
+#[test]
+fn second_chunk_per_tier_resolves() {
+    let data = build_two_per_tier_fixture();
+    let reader = IndexReader::open(&data).unwrap();
+
+    // Second MID field (region): locate_field must return Mid(1) → loads mid_field(1).
+    assert_eq!(
+        reader
+            .matched_positions(
+                &bf(&reader, Filter::new().select("region", "r2")),
+                FULL_WINDOW
+            )
+            .unwrap(),
+        vec![1, 3]
+    );
+
+    // Second HIGH field (trace): locate_field High(1); field_values_or's base is
+    // high_kv_id(1, 0) = 8 (mid_end + req's cardinality), then scan_high_positions.
+    assert_eq!(
+        reader
+            .matched_positions(
+                &bf(&reader, Filter::new().select("trace", "t2")),
+                FULL_WINDOW
+            )
+            .unwrap(),
+        vec![1, 3]
+    );
+
+    // Cross-tier AND spanning both second-of-tier chunks.
+    assert_eq!(
+        reader
+            .matched_positions(
+                &bf(
+                    &reader,
+                    Filter::new().select("region", "r1").select("trace", "t1")
+                ),
+                FULL_WINDOW
+            )
+            .unwrap(),
+        vec![0, 2]
+    );
+
+    // materialize_rows → build_string_table walks all four secondary chunks; row 3
+    // carries the second value of every field (tier index 1 for region and trace).
+    let rows = reader.materialize_rows(&[3]).unwrap();
+    let fields: std::collections::HashMap<String, String> =
+        rows[0].fields.iter().cloned().collect();
+    assert_eq!(fields.get("host").map(String::as_str), Some("h2"));
+    assert_eq!(fields.get("region").map(String::as_str), Some("r2"));
+    assert_eq!(fields.get("req").map(String::as_str), Some("q2"));
+    assert_eq!(fields.get("trace").map(String::as_str), Some("t2"));
+}
