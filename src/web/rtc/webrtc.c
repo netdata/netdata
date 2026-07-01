@@ -397,7 +397,7 @@ static void myOpenCallback(int id __maybe_unused, void *user_ptr) {
 
     nd_log(NDLS_ACCESS, NDLP_DEBUG, "WEBRTC[%d],DC[%d]: %d DATA CHANNEL '%s' OPEN", chan->conn->pc, chan->dc, gettid_cached(), chan->label);
     internal_error(true, "WEBRTC[%d],DC[%d]: data channel opened.", chan->conn->pc, chan->dc);
-    chan->open = true;
+    __atomic_store_n(&chan->open, true, __ATOMIC_RELAXED);
 }
 
 static void myClosedCallback(int id __maybe_unused, void *user_ptr) {
