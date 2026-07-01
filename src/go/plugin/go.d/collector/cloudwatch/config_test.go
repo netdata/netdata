@@ -14,7 +14,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 )
 
 func validBaseConfig() Config {
@@ -77,7 +76,7 @@ func TestConfigSchema_RuntimeContract(t *testing.T) {
 
 	// Every public Config key must have a schema property (drift guard).
 	for _, key := range []string{
-		"update_every", "autodetection_retry", "regions", "auth", "namespaces",
+		"update_every", "autodetection_retry", "vnode", "regions", "auth", "namespaces",
 		"discovery", "query_offset", "timeout",
 	} {
 		assert.Contains(t, doc.JSONSchema.Properties, key, "schema property for %q", key)
@@ -106,32 +105,4 @@ func TestRegionPartition(t *testing.T) {
 			assert.Equal(t, want, regionPartition(region))
 		})
 	}
-}
-
-func TestConfig_YAMLRoundTrip(t *testing.T) {
-	orig := Config{
-		UpdateEvery:        60,
-		AutoDetectionRetry: 30,
-		Regions:            []string{"us-east-1", "eu-west-1"},
-		Auth: cloudauth.AWSAuthConfig{
-			Mode: cloudauth.AWSAuthModeAccessKey,
-			ModeAccessKey: &cloudauth.AWSModeAccessKeyConfig{
-				AccessKeyID: "AKIAEXAMPLE", SecretAccessKey: "secret", SessionToken: "token",
-			},
-		},
-		Namespaces: NamespacesConfig{
-			Mode:      namespacesModeExact,
-			ModeExact: &NamespacesExactConfig{Entries: []NamespaceEntry{{Name: "AWS/EC2"}}},
-		},
-		Discovery:   DiscoveryConfig{RefreshEvery: 300},
-		QueryOffset: 600,
-		Timeout:     defaultTimeout,
-	}
-
-	data, err := yaml.Marshal(orig)
-	require.NoError(t, err)
-
-	var got Config
-	require.NoError(t, yaml.Unmarshal(data, &got))
-	assert.Equal(t, orig, got, "config round-trips through YAML unchanged (incl. session_token)")
 }

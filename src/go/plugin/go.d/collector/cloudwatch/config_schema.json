@@ -18,6 +18,11 @@
         "minimum": 0,
         "default": 0
       },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
+      },
       "regions": {
         "title": "Regions",
         "description": "AWS regions to collect from. At least one region is required (AWS is region-scoped).",
@@ -158,6 +163,9 @@
   "uiSchema": {
     "uiOptions": {
       "fullPage": true
+    },
+    "vnode": {
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
     },
     "auth": {
       "mode_access_key": {

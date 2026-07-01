@@ -1,0 +1,40 @@
+{
+  "vnode": "ok",
+  "update_every": 123,
+  "autodetection_retry": 123,
+  "regions": [
+    "ok"
+  ],
+  "auth": {
+    "mode": "ok",
+    "mode_access_key": {
+      "access_key_id": "ok",
+      "secret_access_key": "ok",
+      "session_token": "ok"
+    },
+    "mode_assume_role": {
+      "roles": [
+        {
+          "role_arn": "ok",
+          "external_id": "ok"
+        }
+      ]
+    }
+  },
+  "namespaces": {
+    "mode": "ok",
+    "mode_exact": {
+      "entries": [
+        {
+          "name": "ok"
+        }
+      ]
+    }
+  },
+  "discovery": {
+    "refresh_every": 123,
+    "recently_active_only": true
+  },
+  "query_offset": 123,
+  "timeout": 123.123
+}

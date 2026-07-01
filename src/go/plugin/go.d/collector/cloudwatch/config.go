@@ -37,6 +37,7 @@ const (
 type Config struct {
 	UpdateEvery        int                     `yaml:"update_every,omitempty" json:"update_every,omitempty"`
 	AutoDetectionRetry int                     `yaml:"autodetection_retry,omitempty" json:"autodetection_retry,omitempty"`
+	Vnode              string                  `yaml:"vnode,omitempty" json:"vnode"`
 	Regions            []string                `yaml:"regions" json:"regions"`
 	Auth               cloudauth.AWSAuthConfig `yaml:"auth" json:"auth"`
 	Namespaces         NamespacesConfig        `yaml:"namespaces" json:"namespaces"`

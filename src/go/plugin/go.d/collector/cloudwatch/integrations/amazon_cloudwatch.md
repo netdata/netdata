@@ -168,6 +168,7 @@ A user profile file with the same basename as a stock profile overrides it.
 |  | namespaces.mode_exact.entries | List of namespaces to collect (required when `namespaces.mode` is `exact`). Each entry has a `name`, e.g. `AWS/EC2`. |  | no |
 | **Discovery** | discovery.refresh_every | How often (seconds) to re-discover metrics. Minimum 60. | 300 | no |
 |  | discovery.recently_active_only | List only metrics active in the last 3 hours. Automatically disabled for metrics whose period exceeds 3 hours (such as the daily S3 storage metrics). | yes | no |
+| **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 <a id="option-authentication-auth-mode"></a>
 ##### auth.mode
