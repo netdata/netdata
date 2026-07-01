@@ -45,9 +45,6 @@ modules:
           - title: Install smartmontools (v7.0+)
             description: |
               Install `smartmontools` version 7.0 or later. Version 7.0 introduced the `--json` output mode, which is required for this collector to function properly.
-
-              On **Linux/BSD**, use your distribution's package manager.
-              On **Windows**, install smartmontools with the default options.
           - title: For Netdata running in a Docker container
             description: |
               **Provide access to storage devices**.
