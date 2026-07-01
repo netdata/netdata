@@ -7,8 +7,10 @@
 
 #include <stddef.h>
 
-#ifndef HAVE_STRNDUP
-char *strndup(const char *s, size_t n);
+#if !defined(HAVE_STRNDUP) && !(defined(NETDATA_TRACE_ALLOCATIONS) && defined(HAVE_DLSYM) && defined(ENABLE_DLSYM))
+char *os_strndup(const char *s, size_t n);
+#undef strndup
+#define strndup(s, n) os_strndup(s, n)
 #endif
 
 #endif //STRNDUP_H
