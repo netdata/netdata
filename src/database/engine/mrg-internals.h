@@ -64,21 +64,21 @@ struct mrg {
 };
 
 static inline void MRG_STATS_DUPLICATE_ADD(MRG *mrg, size_t partition) {
-    mrg->index[partition].stats.additions_duplicate++;
+    __atomic_add_fetch(&mrg->index[partition].stats.additions_duplicate, 1, __ATOMIC_RELAXED);
 }
 
 static inline void MRG_STATS_ADDED_METRIC(MRG *mrg, size_t partition, Word_t section) {
-    mrg->index[partition].stats.entries++;
-    mrg->index[partition].stats.additions++;
-    mrg->index[partition].stats.size += sizeof(METRIC);
+    __atomic_add_fetch(&mrg->index[partition].stats.entries, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&mrg->index[partition].stats.additions, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&mrg->index[partition].stats.size, (int64_t)sizeof(METRIC), __ATOMIC_RELAXED);
     struct rrdengine_instance *ctx = (struct rrdengine_instance *) section;
     __atomic_add_fetch(&ctx->atomic.metrics, 1, __ATOMIC_RELAXED);
 }
 
 static inline void MRG_STATS_DELETED_METRIC(MRG *mrg, size_t partition, Word_t section) {
-    mrg->index[partition].stats.entries--;
-    mrg->index[partition].stats.size -= sizeof(METRIC);
-    mrg->index[partition].stats.deletions++;
+    __atomic_sub_fetch(&mrg->index[partition].stats.entries, 1, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&mrg->index[partition].stats.size, (int64_t)sizeof(METRIC), __ATOMIC_RELAXED);
+    __atomic_add_fetch(&mrg->index[partition].stats.deletions, 1, __ATOMIC_RELAXED);
     struct rrdengine_instance *ctx = (struct rrdengine_instance *) section;
     rrdeng_atomic_uint64_sub_saturating(ctx, &ctx->atomic.metrics, 1, "metrics", "deleting an MRG metric");
 }
@@ -92,7 +92,7 @@ static inline void MRG_STATS_SEARCH_MISS(MRG *mrg, size_t partition) {
 }
 
 static inline void MRG_STATS_DELETE_MISS(MRG *mrg, size_t partition) {
-    mrg->index[partition].stats.delete_misses++;
+    __atomic_add_fetch(&mrg->index[partition].stats.delete_misses, 1, __ATOMIC_RELAXED);
 }
 
 #define mrg_index_read_lock(mrg, partition) rw_spinlock_read_lock(&(mrg)->index[partition].rw_spinlock)
