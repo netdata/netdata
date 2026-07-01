@@ -5,9 +5,19 @@
 pid_t pid_max = 4194304;
 
 pid_t os_get_system_pid_max(void) {
-    static bool read = false;
-    if(read) return pid_max;
-    read = true;
+    static bool cached = false;
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
+
+    if(__atomic_load_n(&cached, __ATOMIC_ACQUIRE))
+        return pid_max;
+
+    spinlock_lock(&spinlock);
+
+    if(__atomic_load_n(&cached, __ATOMIC_RELAXED)) {
+        pid_t cached_pid_max = pid_max;
+        spinlock_unlock(&spinlock);
+        return cached_pid_max;
+    }
 
 #if defined(OS_MACOS)
     int mib[2];
@@ -23,8 +33,6 @@ pid_t os_get_system_pid_max(void) {
     }
     else pid_max = (pid_t)maxproc;
 
-    return pid_max;
-
 #elif defined(OS_FREEBSD)
 
     int32_t tmp_pid_max;
@@ -36,8 +44,6 @@ pid_t os_get_system_pid_max(void) {
     else
         pid_max = tmp_pid_max;
 
-    return pid_max;
-
 #elif defined(OS_LINUX)
 
     char filename[FILENAME_MAX + 1];
@@ -46,26 +52,26 @@ pid_t os_get_system_pid_max(void) {
     unsigned long long max = 0;
     if(read_single_number_file(filename, &max) != 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot open file '%s'. Assuming system supports %d pids.", filename, pid_max);
-        return pid_max;
     }
-
-    if(!max) {
+    else if(!max) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot parse file '%s'. Assuming system supports %d pids.", filename, pid_max);
-        return pid_max;
     }
-
-    pid_max = (pid_t) max;
-    return pid_max;
+    else
+        pid_max = (pid_t) max;
 
 #elif defined(OS_WINDOWS)
 
     pid_max = (pid_t)0x7FFFFFFF;
-    return pid_max;
 
 #else
 
     // return the default
-    return pid_max;
 
 #endif
+
+    __atomic_store_n(&cached, true, __ATOMIC_RELEASE);
+
+    pid_t cached_pid_max = pid_max;
+    spinlock_unlock(&spinlock);
+    return cached_pid_max;
 }
