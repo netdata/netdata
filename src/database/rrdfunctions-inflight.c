@@ -39,6 +39,10 @@ struct rrd_function_inflight {
     } result;
 
     struct {
+        SPINLOCK spinlock;
+    } callbacks;
+
+    struct {
         // to be called in sync mode
         // while the function is running
         // to check if the function has been canceled
@@ -95,12 +99,18 @@ static void rrd_functions_inflight_delete_cb(const DICTIONARY_ITEM *item __maybe
     dictionary_acquired_item_release(r->host->functions, r->host_function_acquired);
 }
 
+static void rrd_functions_inflight_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct rrd_function_inflight *r = value;
+    spinlock_init(&r->callbacks.spinlock);
+}
+
 void rrd_functions_inflight_init(void) {
     if(rrd_functions_inflight_requests)
         return;
 
     rrd_functions_inflight_requests = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct rrd_function_inflight));
 
+    dictionary_register_insert_callback(rrd_functions_inflight_requests, rrd_functions_inflight_insert_cb, NULL);
     dictionary_register_delete_callback(rrd_functions_inflight_requests, rrd_functions_inflight_delete_cb, NULL);
 }
 
@@ -114,14 +124,20 @@ void rrd_functions_inflight_destroy(void) {
 
 static void rrd_inflight_async_function_register_canceller_cb(void *register_canceller_cb_data, rrd_function_cancel_cb_t canceller_cb, void *canceller_cb_data) {
     struct rrd_function_inflight *r = register_canceller_cb_data;
+
+    spinlock_lock(&r->callbacks.spinlock);
     r->canceller.cb = canceller_cb;
     r->canceller.data = canceller_cb_data;
+    spinlock_unlock(&r->callbacks.spinlock);
 }
 
 static void rrd_inflight_async_function_register_progresser_cb(void *register_progresser_cb_data, rrd_function_progresser_cb_t progresser_cb, void *progresser_cb_data) {
     struct rrd_function_inflight *r = register_progresser_cb_data;
+
+    spinlock_lock(&r->callbacks.spinlock);
     r->progresser.cb = progresser_cb;
     r->progresser.data = progresser_cb_data;
+    spinlock_unlock(&r->callbacks.spinlock);
 }
 
 // ----------------------------------------------------------------------------
@@ -642,8 +658,16 @@ static void rrd_function_cancel_inflight(struct rrd_function_inflight *r) {
         return;
     }
 
-    if(r->canceller.cb)
-        r->canceller.cb(r->canceller.data);
+    rrd_function_cancel_cb_t canceller_cb;
+    void *canceller_cb_data;
+
+    spinlock_lock(&r->callbacks.spinlock);
+    canceller_cb = r->canceller.cb;
+    canceller_cb_data = r->canceller.data;
+    spinlock_unlock(&r->callbacks.spinlock);
+
+    if(canceller_cb)
+        canceller_cb(canceller_cb_data);
 
     rrd_collector_dispatcher_release(r->rdcf->collector);
 }
@@ -684,8 +708,16 @@ void rrd_function_progress(const char *transaction) {
 
     functions_stop_monotonic_update_on_progress(&r->stop_monotonic_ut);
 
-    if(r->progresser.cb)
-        r->progresser.cb(transaction, r->progresser.data);
+    rrd_function_progresser_cb_t progresser_cb;
+    void *progresser_cb_data;
+
+    spinlock_lock(&r->callbacks.spinlock);
+    progresser_cb = r->progresser.cb;
+    progresser_cb_data = r->progresser.data;
+    spinlock_unlock(&r->callbacks.spinlock);
+
+    if(progresser_cb)
+        progresser_cb(transaction, progresser_cb_data);
 
     rrd_collector_dispatcher_release(r->rdcf->collector);
 
