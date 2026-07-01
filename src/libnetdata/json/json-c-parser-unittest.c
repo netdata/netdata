@@ -1461,6 +1461,12 @@ static int test_format_rfc3339(void) {
     usec_t parsed;
     size_t len;
 
+    char exact_fit[sizeof("1970-01-01T00:00:00Z") - 1];
+    memset(exact_fit, 'x', sizeof(exact_fit));
+    len = rfc3339_datetime_ut(exact_fit, sizeof(exact_fit), 0, 0, true);
+    T(len == strlen("1970-01-01T00:00:00") && strcmp(exact_fit, "1970-01-01T00:00:00") == 0,
+      "format_rfc3339: exact-fit buffer reserves terminator and returns visible length");
+
     len = rfc3339_datetime_ut(buffer, sizeof(buffer), 123456, 3, true);
     T(len == strlen("1970-01-01T00:00:00.123Z") && strcmp(buffer, "1970-01-01T00:00:00.123Z") == 0,
       "format_rfc3339: 3 digits truncate microseconds");
