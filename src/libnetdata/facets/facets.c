@@ -2,7 +2,7 @@
 #include "facets.h"
 
 #define FACETS_HISTOGRAM_COLUMNS 150        // the target number of points in a histogram
-#define FACETS_KEYS_WITH_VALUES_MAX 200     // the max number of keys that can be facets
+#define FACETS_KEYS_WITH_VALUES_INITIAL 200 // embedded capacity for keys that can be facets
 #define FACETS_KEYS_IN_ROW_MAX 500          // the max number of keys in a row
 
 #define FACETS_KEYS_HASHTABLE_ENTRIES 15
@@ -252,7 +252,9 @@ struct facets {
     struct {
         // this is like a stack, of the keys that are used as facets
         size_t used;
-        FACET_KEY *array[FACETS_KEYS_WITH_VALUES_MAX];
+        size_t size;
+        FACET_KEY **array;
+        FACET_KEY *initial_array[FACETS_KEYS_WITH_VALUES_INITIAL];
     } keys_with_values;
 
     struct {
@@ -629,8 +631,32 @@ static inline void facet_key_late_init(FACETS *facets, FACET_KEY *k) {
     if(facets_key_is_facet(facets, k)) {
         FACETS_VALUES_INDEX_CREATE(k);
         k->values.enabled = true;
-        if(facets->keys_with_values.used < FACETS_KEYS_WITH_VALUES_MAX)
-            facets->keys_with_values.array[facets->keys_with_values.used++] = k;
+
+        if(unlikely(facets->keys_with_values.used == facets->keys_with_values.size)) {
+            size_t new_size = facets->keys_with_values.size ?
+                              facets->keys_with_values.size * 2 :
+                              FACETS_KEYS_WITH_VALUES_INITIAL;
+
+            if(unlikely(new_size < facets->keys_with_values.size ||
+                        new_size > SIZE_MAX / sizeof(*facets->keys_with_values.array)))
+                fatal("Cannot grow facets keys_with_values array beyond %zu entries",
+                      facets->keys_with_values.size);
+
+            FACET_KEY **new_array;
+            if(facets->keys_with_values.array == facets->keys_with_values.initial_array) {
+                new_array = mallocz(new_size * sizeof(*new_array));
+                memcpy(new_array,
+                       facets->keys_with_values.initial_array,
+                       facets->keys_with_values.used * sizeof(*new_array));
+            }
+            else
+                new_array = reallocz(facets->keys_with_values.array, new_size * sizeof(*new_array));
+
+            facets->keys_with_values.array = new_array;
+            facets->keys_with_values.size = new_size;
+        }
+
+        facets->keys_with_values.array[facets->keys_with_values.used++] = k;
     }
 }
 
@@ -638,6 +664,8 @@ static inline void FACETS_KEYS_INDEX_CREATE(FACETS *facets) {
     facets->keys.ll = NULL;
     facets->keys.count = 0;
     facets->keys_with_values.used = 0;
+    facets->keys_with_values.size = FACETS_KEYS_WITH_VALUES_INITIAL;
+    facets->keys_with_values.array = facets->keys_with_values.initial_array;
 
     simple_hashtable_init_KEY(&facets->keys.ht, FACETS_KEYS_HASHTABLE_ENTRIES);
 }
@@ -657,6 +685,10 @@ static inline void FACETS_KEYS_INDEX_DESTROY(FACETS *facets) {
     facets->keys.ll = NULL;
     facets->keys.count = 0;
     facets->keys_with_values.used = 0;
+    facets->keys_with_values.size = 0;
+    if(facets->keys_with_values.array != facets->keys_with_values.initial_array)
+        freez(facets->keys_with_values.array);
+    facets->keys_with_values.array = NULL;
 
     simple_hashtable_destroy_KEY(&facets->keys.ht);
 }
