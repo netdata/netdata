@@ -51,15 +51,17 @@ func (s querySample) groupKey() queryGroupKey {
 }
 
 // queryWindow computes the GetMetricData time window for a metric of the given
-// period: effective_offset = max(query_offset, period); end = align(now, period)
-// − effective_offset; start = end − period. Aligning to a period boundary and
-// using an offset ≥ period guarantees the queried bucket is already published
-// (e.g. S3 daily reads a full, settled day rather than a partial current one).
+// period: effective_offset = max(query_offset, period); end = align(now −
+// effective_offset, period); start = end − period. Aligning the end to a period
+// boundary AFTER the offset keeps the window period-aligned even when query_offset
+// is not a multiple of the period (GetMetricData expects period-aligned bounds),
+// and an offset ≥ period keeps the queried bucket already published (e.g. S3 daily
+// reads a full, settled day rather than a partial current one).
 func queryWindow(now time.Time, period, queryOffset int) (start, end time.Time) {
 	periodSec := int64(period)
-	alignedNow := now.Unix() - (now.Unix() % periodSec)
 	effectiveOffset := max(periodSec, int64(queryOffset))
-	endSec := alignedNow - effectiveOffset
+	endSec := now.Unix() - effectiveOffset
+	endSec -= endSec % periodSec // align to a period boundary after the offset
 	return time.Unix(endSec-periodSec, 0).UTC(), time.Unix(endSec, 0).UTC()
 }
 
@@ -121,7 +123,7 @@ func (c *Collector) metricQueries(prof cwprofiles.ResolvedProfile, region string
 				period:     period,
 				seriesName: cwprofiles.ExportedSeriesName(prof.Name, m.ID, token),
 				labels:     labels,
-				nilAsZero:  m.EmitZeroOnNoData(),
+				nilAsZero:  m.EmitZeroOnNoData(token),
 				query: cwtypes.MetricDataQuery{
 					Id: aws.String(id),
 					MetricStat: &cwtypes.MetricStat{

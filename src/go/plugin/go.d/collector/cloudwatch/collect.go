@@ -26,6 +26,12 @@ func (c *Collector) collect(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	// If the parent context was canceled or timed out during discovery/query, abort
+	// the cycle instead of committing a partial/stale frame. A per-call GetMetricData
+	// timeout uses a derived context, so it does not trip this and stays fail-soft.
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 
 	// A (region, period) group is "queried" only if it was due AND nothing failed
 	// for it. Advance the schedule only for those; the rest (not due, or

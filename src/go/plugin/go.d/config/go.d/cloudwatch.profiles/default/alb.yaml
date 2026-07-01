@@ -51,6 +51,7 @@ metrics:
   - id: active_connection_count
     metric_name: ActiveConnectionCount
     statistics: [sum]
+    nil_as_zero: true   # reported only for nonzero periods; a quiet period is 0 active connections, not a gap
   - id: processed_bytes
     metric_name: ProcessedBytes
     statistics: [sum]

@@ -374,16 +374,19 @@ func TestMetric_EmitZeroOnNoData(t *testing.T) {
 	yes, no := true, false
 	tests := map[string]struct {
 		metric Metric
+		token  string
 		want   bool
 	}{
-		"rate metric defaults to zero":  {metric: Metric{Rate: true}, want: true},
-		"gauge metric defaults to gap":  {metric: Metric{Rate: false}, want: false},
-		"explicit true overrides gauge": {metric: Metric{Rate: false, NilAsZero: &yes}, want: true},
-		"explicit false overrides rate": {metric: Metric{Rate: true, NilAsZero: &no}, want: false},
+		"rate sum defaults to zero":          {metric: Metric{Rate: true}, token: "sum", want: true},
+		"rate sample_count defaults to zero": {metric: Metric{Rate: true}, token: "sample_count", want: true},
+		"rate average defaults to gap":       {metric: Metric{Rate: true}, token: "average", want: false},
+		"gauge sum defaults to gap":          {metric: Metric{Rate: false}, token: "sum", want: false},
+		"explicit true overrides (any stat)": {metric: Metric{Rate: false, NilAsZero: &yes}, token: "average", want: true},
+		"explicit false overrides rate":      {metric: Metric{Rate: true, NilAsZero: &no}, token: "sum", want: false},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tc.want, tc.metric.EmitZeroOnNoData())
+			assert.Equal(t, tc.want, tc.metric.EmitZeroOnNoData(tc.token))
 		})
 	}
 }

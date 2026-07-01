@@ -33,6 +33,7 @@ func TestQueryWindow(t *testing.T) {
 		"5m period, default offset":                  {period: 300, offset: 600, wantStart: 999_999_000, wantEnd: 999_999_300},
 		"5m period, offset below period uses period": {period: 300, offset: 120, wantStart: 999_999_300, wantEnd: 999_999_600},
 		"daily period reads a settled bucket":        {period: 86400, offset: 600, wantStart: 999_820_800, wantEnd: 999_907_200},
+		"offset not a period multiple stays aligned": {period: 300, offset: 601, wantStart: 999_999_000, wantEnd: 999_999_300},
 	}
 
 	for name, tc := range tests {
@@ -41,6 +42,7 @@ func TestQueryWindow(t *testing.T) {
 			assert.Equal(t, tc.wantStart, start.Unix(), "start")
 			assert.Equal(t, tc.wantEnd, end.Unix(), "end")
 			assert.Equal(t, int64(tc.period), end.Unix()-start.Unix(), "window length == period")
+			assert.Zero(t, end.Unix()%int64(tc.period), "end is aligned to a period boundary")
 			assert.True(t, end.Before(now), "window ends in the past")
 		})
 	}
@@ -282,13 +284,15 @@ type pagingGMD struct {
 	pages  []map[string]float64
 	tokens []string
 	calls  int
+	reqs   []*cloudwatch.GetMetricDataInput
 }
 
 func (f *pagingGMD) ListMetrics(context.Context, *cloudwatch.ListMetricsInput, ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error) {
 	return &cloudwatch.ListMetricsOutput{}, nil
 }
 
-func (f *pagingGMD) GetMetricData(_ context.Context, _ *cloudwatch.GetMetricDataInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
+func (f *pagingGMD) GetMetricData(_ context.Context, in *cloudwatch.GetMetricDataInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
+	f.reqs = append(f.reqs, in)
 	idx := f.calls
 	f.calls++
 	out := &cloudwatch.GetMetricDataOutput{}
@@ -331,6 +335,17 @@ func TestExecuteQueries_PaginationAndDedup(t *testing.T) {
 	assert.Equal(t, float64(10), byName["ec2.cpu_utilization_average"], "first (newest) value per Id wins across pages")
 	assert.Equal(t, float64(20), byName["ec2.duration_average"])
 	assert.Equal(t, float64(30), byName["ec2.duration_p90"])
+
+	// Each GetMetricData request scans newest-first over the same aligned window,
+	// and the second page carries the NextToken the first page returned.
+	require.Len(t, fake.reqs, 2)
+	for i, r := range fake.reqs {
+		assert.Equal(t, cwtypes.ScanByTimestampDescending, r.ScanBy, "req %d ScanBy", i)
+		assert.Equal(t, int64(999_999_000), aws.ToTime(r.StartTime).Unix(), "req %d start", i)
+		assert.Equal(t, int64(999_999_300), aws.ToTime(r.EndTime).Unix(), "req %d end", i)
+	}
+	assert.Nil(t, fake.reqs[0].NextToken, "first page has no NextToken")
+	assert.Equal(t, "page2", aws.ToString(fake.reqs[1].NextToken), "second page uses the returned token")
 }
 
 func TestExecuteQueries_RegionClientFailures(t *testing.T) {

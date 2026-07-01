@@ -106,3 +106,9 @@ func TestRegionPartition(t *testing.T) {
 		})
 	}
 }
+
+func TestConfig_Regions(t *testing.T) {
+	c := Config{Regions: []string{"us-east-1", " us-east-1 ", "eu-west-1", "us-east-1", ""}}
+	assert.Equal(t, []string{"us-east-1", "eu-west-1"}, c.regions(),
+		"regions are trimmed, de-duplicated (first wins), and empties dropped")
+}

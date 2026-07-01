@@ -174,7 +174,9 @@ Discovery then finds which *instances* of those profiles exist per region.
   per collect cycle, so a series whose group was **not** queried this cycle (not
   due, or due-but-failed) is re-written from its last cached value — a long-period
   metric (e.g. daily S3) renders as a continuous step line instead of gaps, at no
-  extra AWS cost. A series in a *successfully queried* group that returned no
+  extra AWS cost. (Exception: a total-failure cycle — every due query fails —
+  returns an error before `observe`, so nothing is written that cycle and the
+  schedule stays due for retry.) A series in a *successfully queried* group that returned no
   datapoint is reconciled per the metric's no-data policy: `nil_as_zero` metrics
   (sum/count — "no activity") record **0**; the rest **drop** the cached value so
   the series gaps until fresh data, and a stale value is never re-emitted.
@@ -208,8 +210,8 @@ return spec.MarshalTemplate()                # Validate + yaml.v2 marshal, then 
 ## Profiles (`cwprofiles/`)
 
 `profile.go` defines the schema; `catalog.go` loads and resolves; stock profiles
-live under `config/go.d/cloudwatch.profiles/default/` (8 today: ec2, rds, elb,
-alb, s3, lambda, sqs, dynamodb).
+live under `config/go.d/cloudwatch.profiles/default/` (one YAML per service; a
+user file with the same basename overrides its stock counterpart).
 
 A `Profile` declares: `namespace` (e.g. `AWS/EC2`), `period`, `instance`
 dimensions (the CloudWatch dimension names that identify one instance, each

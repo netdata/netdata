@@ -176,10 +176,17 @@ func regionPartition(region string) string {
 
 func (c Config) regions() []string {
 	out := make([]string, 0, len(c.Regions))
+	seen := make(map[string]struct{}, len(c.Regions))
 	for _, r := range c.Regions {
-		if v := strings.TrimSpace(r); v != "" {
-			out = append(out, v)
+		v := strings.TrimSpace(r)
+		if v == "" {
+			continue
 		}
+		if _, dup := seen[v]; dup {
+			continue // a duplicate region would double discovery/query cost
+		}
+		seen[v] = struct{}{}
+		out = append(out, v)
 	}
 	return out
 }

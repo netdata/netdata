@@ -101,14 +101,24 @@ type Metric struct {
 	NilAsZero *bool `yaml:"nil_as_zero,omitempty" json:"nil_as_zero,omitempty"`
 }
 
+// IsPerPeriodTotal reports whether a statistic is a per-period total (sum or
+// sample_count) — the statistics that divide by the period to form a per-second
+// rate, and that read a no-datapoint result as 0 rather than a gap.
+func IsPerPeriodTotal(token string) bool {
+	return token == "sum" || token == "sample_count"
+}
+
 // EmitZeroOnNoData reports whether a query returning no datapoint for this metric
-// should be recorded as 0 (true) or left as a gap (false). It defaults to Rate
-// (sum/count metrics read no-data as 0; gauges gap); NilAsZero overrides it.
-func (m Metric) EmitZeroOnNoData() bool {
+// at the given statistic should be recorded as 0 (true) or left as a gap (false).
+// An explicit NilAsZero applies to every statistic; otherwise the default is
+// per-statistic: a rate metric's per-period totals (sum/sample_count) read no-data
+// as 0 ("no activity"), while gauges and per-observation aggregates (average,
+// maximum, percentiles) gap.
+func (m Metric) EmitZeroOnNoData(token string) bool {
 	if m.NilAsZero != nil {
 		return *m.NilAsZero
 	}
-	return m.Rate
+	return m.Rate && IsPerPeriodTotal(token)
 }
 
 // Normalize rewrites chart-dimension selector shorthand (e.g. cpu_utilization_average)

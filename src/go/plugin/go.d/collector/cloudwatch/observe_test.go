@@ -30,6 +30,7 @@ type fullCloudWatch struct {
 	gmdValue  float64
 	gap       bool
 	status    cwtypes.StatusCode // when set, every GetMetricData result carries this status
+	omit      bool               // when true, GetMetricData returns no results at all
 	listCalls int
 	gmdCalls  int
 }
@@ -45,6 +46,9 @@ func (f *fullCloudWatch) GetMetricData(_ context.Context, in *cloudwatch.GetMetr
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.gmdCalls++
+	if f.omit {
+		return &cloudwatch.GetMetricDataOutput{}, nil // no results for any query
+	}
 	results := make([]cwtypes.MetricDataResult, 0, len(in.MetricDataQueries))
 	for _, q := range in.MetricDataQueries {
 		r := cwtypes.MetricDataResult{Id: q.Id}
@@ -440,32 +444,41 @@ func TestObserve_RateMetricNoDataZeroFilled(t *testing.T) {
 	assert.Equal(t, metrix.SampleValue(0), seriesValue(t, s3, `lambda.errors_sum{`), "zero is re-emitted between queries")
 }
 
-func TestObserve_RateMetricErrorGapsNotZero(t *testing.T) {
-	c := New()
-	c.Config.Regions = []string{"us-east-1"}
-	c.applyDefaults()
-	c.profiles = []cwprofiles.ResolvedProfile{{Name: "lambda", Config: cwprofiles.Profile{
-		Namespace: "AWS/Lambda",
-		Period:    300,
-		Instance:  cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{{Name: "FunctionName", Label: "function_name"}}},
-		Metrics:   []cwprofiles.Metric{{ID: "errors", MetricName: "Errors", Statistics: []string{"sum"}, Rate: true}},
-	}}}
-
-	// Every GetMetricData result carries InternalError, so the query has no usable
-	// datapoint. A nil-as-zero (rate) metric must GAP, not record a false 0 that
-	// would make an API/permission failure look like "no errors".
-	fake := &fullCloudWatch{
-		list:     map[string][]cwtypes.Metric{"AWS/Lambda": {mkMetric("Errors", "FunctionName", "fn-1")}},
-		gmdValue: 5,
-		status:   cwtypes.StatusCodeInternalError,
+func TestObserve_RateMetricNoUsableResultGaps(t *testing.T) {
+	// A nil-as-zero (rate) metric must GAP, not record a false 0, when the query
+	// yields no USABLE datapoint — a per-result error or an absent result. Zero-fill
+	// is reserved for a clean result that simply had no datapoint.
+	setups := map[string]func(*fullCloudWatch){
+		"InternalError": func(f *fullCloudWatch) { f.status = cwtypes.StatusCodeInternalError },
+		"Forbidden":     func(f *fullCloudWatch) { f.status = cwtypes.StatusCodeForbidden },
+		"absent result": func(f *fullCloudWatch) { f.omit = true },
 	}
-	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: "000000000000"} }
-	useFakeClient(c, fake)
-	c.now = func() time.Time { return time.Unix(1_000_000_000, 0) }
+	for name, setup := range setups {
+		t.Run(name, func(t *testing.T) {
+			c := New()
+			c.Config.Regions = []string{"us-east-1"}
+			c.applyDefaults()
+			c.profiles = []cwprofiles.ResolvedProfile{{Name: "lambda", Config: cwprofiles.Profile{
+				Namespace: "AWS/Lambda",
+				Period:    300,
+				Instance:  cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{{Name: "FunctionName", Label: "function_name"}}},
+				Metrics:   []cwprofiles.Metric{{ID: "errors", MetricName: "Errors", Statistics: []string{"sum"}, Rate: true}},
+			}}}
 
-	series, err := collecttest.CollectScalarSeries(c)
-	require.NoError(t, err)
-	assert.Empty(t, series, "an errored query gaps a nil-as-zero metric instead of recording 0")
+			fake := &fullCloudWatch{
+				list:     map[string][]cwtypes.Metric{"AWS/Lambda": {mkMetric("Errors", "FunctionName", "fn-1")}},
+				gmdValue: 5,
+			}
+			setup(fake)
+			c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: "000000000000"} }
+			useFakeClient(c, fake)
+			c.now = func() time.Time { return time.Unix(1_000_000_000, 0) }
+
+			series, err := collecttest.CollectScalarSeries(c)
+			require.NoError(t, err)
+			assert.Empty(t, series, "no usable result -> gap, not a false 0")
+		})
+	}
 }
 
 func TestCleanup_ResetsRuntimeState(t *testing.T) {

@@ -134,6 +134,7 @@ func TestCollect_E2E(t *testing.T) {
 			},
 			wantSeries: map[string]metrix.SampleValue{
 				`alb.request_count_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:             50,
+				`alb.active_connection_count_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:   0,
 				`alb.http_code_target_2xx_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:      0,
 				`alb.http_code_target_3xx_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:      0,
 				`alb.http_code_target_4xx_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:      0,
@@ -145,6 +146,7 @@ func TestCollect_E2E(t *testing.T) {
 				`alb.processed_bytes_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:           0,
 				`alb.rejected_connection_count_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`: 0,
 				`alb.request_count_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`:             70,
+				`alb.active_connection_count_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`:   0,
 				`alb.http_code_target_2xx_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`:      0,
 				`alb.http_code_target_3xx_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`:      0,
 				`alb.http_code_target_4xx_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`:      0,

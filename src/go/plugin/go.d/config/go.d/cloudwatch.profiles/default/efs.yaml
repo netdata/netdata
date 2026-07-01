@@ -43,6 +43,7 @@ metrics:
     metric_name: ClientConnections
     statistics: [sum]
     period: 60
+    nil_as_zero: true   # Sum count; a quiet period is 0 client connections, not a gap
   # ----------------------------------------------------------------------------------------
   # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
   # matching chart in the charts: section below. Both are published at the {FileSystemId} grain.
