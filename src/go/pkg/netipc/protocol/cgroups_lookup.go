@@ -40,6 +40,16 @@ type CgroupsLookupItemView struct {
 	labelTableOffset int
 }
 
+type cgroupsLookupItemHeader struct {
+	status       uint16
+	orchestrator uint16
+	pathOff      int
+	pathLen      int
+	nameOff      int
+	nameLen      int
+	labelCount   uint16
+}
+
 func validateCgroupsLookupSemantics(status, orchestrator uint16, pathLen, nameLen, labelCount int) error {
 	if status != CgroupLookupKnown && status != CgroupLookupUnknownRetryLater &&
 		status != CgroupLookupUnknownPermanent && status != CgroupLookupPayloadExceeded &&
@@ -53,6 +63,38 @@ func validateCgroupsLookupSemantics(status, orchestrator uint16, pathLen, nameLe
 		return ErrBadLayout
 	}
 	return nil
+}
+
+func readCgroupsLookupItemHeader(item []byte) (cgroupsLookupItemHeader, error) {
+	var header cgroupsLookupItemHeader
+	if len(item) < CgroupsLookupItemHdr {
+		return header, ErrTruncated
+	}
+
+	header.status = ne.Uint16(item[2:4])
+	header.orchestrator = ne.Uint16(item[4:6])
+	var err error
+	header.pathOff, err = checkedWireU32Int(item, 8)
+	if err != nil {
+		return header, err
+	}
+	header.pathLen, err = checkedWireU32Int(item, 12)
+	if err != nil {
+		return header, err
+	}
+	header.nameOff, err = checkedWireU32Int(item, 16)
+	if err != nil {
+		return header, err
+	}
+	header.nameLen, err = checkedWireU32Int(item, 20)
+	if err != nil {
+		return header, err
+	}
+	header.labelCount = ne.Uint16(item[24:26])
+	if ne.Uint16(item[0:2]) != 1 || ne.Uint16(item[6:8]) != 0 || ne.Uint16(item[26:28]) != 0 {
+		return header, ErrBadLayout
+	}
+	return header, nil
 }
 
 func EncodeCgroupsLookupRequest(paths [][]byte, buf []byte) (int, error) {
@@ -310,49 +352,33 @@ func EncodeCgroupsLookupRawResponse(items [][]byte, generation uint64, buf []byt
 }
 
 func validateCgroupsLookupItem(item []byte) error {
-	if len(item) < CgroupsLookupItemHdr {
-		return ErrTruncated
-	}
-	status := ne.Uint16(item[2:4])
-	orchestrator := ne.Uint16(item[4:6])
-	pathOff, err := checkedWireU32Int(item, 8)
+	header, err := readCgroupsLookupItemHeader(item)
 	if err != nil {
 		return err
 	}
-	pathLen, err := checkedWireU32Int(item, 12)
+	if err := validateCgroupsLookupSemantics(
+		header.status,
+		header.orchestrator,
+		header.pathLen,
+		header.nameLen,
+		int(header.labelCount)); err != nil {
+		return err
+	}
+	if header.status != CgroupLookupKnown {
+		return validateCgroupsLookupUnknownItem(item, header.pathOff, header.pathLen, header.nameOff)
+	}
+	pathEnd, err := lookupStringInto(item, CgroupsLookupItemHdr, header.pathOff, header.pathLen, nil)
 	if err != nil {
 		return err
 	}
-	nameOff, err := checkedWireU32Int(item, 16)
+	nameEnd, err := lookupStringInto(item, CgroupsLookupItemHdr, header.nameOff, header.nameLen, nil)
 	if err != nil {
 		return err
 	}
-	nameLen, err := checkedWireU32Int(item, 20)
-	if err != nil {
-		return err
-	}
-	labelCount := ne.Uint16(item[24:26])
-	if ne.Uint16(item[0:2]) != 1 || ne.Uint16(item[6:8]) != 0 || ne.Uint16(item[26:28]) != 0 {
+	if overlap(header.pathOff, pathEnd, header.nameOff, nameEnd) {
 		return ErrBadLayout
 	}
-	if err := validateCgroupsLookupSemantics(status, orchestrator, pathLen, nameLen, int(labelCount)); err != nil {
-		return err
-	}
-	if status != CgroupLookupKnown {
-		return validateCgroupsLookupUnknownItem(item, pathOff, pathLen, nameOff)
-	}
-	pathEnd, err := lookupStringInto(item, CgroupsLookupItemHdr, pathOff, pathLen, nil)
-	if err != nil {
-		return err
-	}
-	nameEnd, err := lookupStringInto(item, CgroupsLookupItemHdr, nameOff, nameLen, nil)
-	if err != nil {
-		return err
-	}
-	if overlap(pathOff, pathEnd, nameOff, nameEnd) {
-		return ErrBadLayout
-	}
-	_, err = validateLabels(item, CgroupsLookupItemHdr, labelCount, max(pathEnd, nameEnd))
+	_, err = validateLabels(item, CgroupsLookupItemHdr, header.labelCount, max(pathEnd, nameEnd))
 	return err
 }
 
@@ -383,61 +409,51 @@ func decodeCgroupsLookupItem(item []byte) (*CgroupsLookupItemView, error) {
 }
 
 func decodeCgroupsLookupItemInto(item []byte, out *CgroupsLookupItemView) error {
-	if len(item) < CgroupsLookupItemHdr {
-		return ErrTruncated
-	}
-	status := ne.Uint16(item[2:4])
-	orchestrator := ne.Uint16(item[4:6])
-	pathOff, err := checkedWireU32Int(item, 8)
+	header, err := readCgroupsLookupItemHeader(item)
 	if err != nil {
 		return err
 	}
-	pathLen, err := checkedWireU32Int(item, 12)
-	if err != nil {
+	if err := validateCgroupsLookupSemantics(
+		header.status,
+		header.orchestrator,
+		header.pathLen,
+		header.nameLen,
+		int(header.labelCount)); err != nil {
 		return err
 	}
-	nameOff, err := checkedWireU32Int(item, 16)
-	if err != nil {
-		return err
-	}
-	nameLen, err := checkedWireU32Int(item, 20)
-	if err != nil {
-		return err
-	}
-	labelCount := ne.Uint16(item[24:26])
-	if ne.Uint16(item[0:2]) != 1 || ne.Uint16(item[6:8]) != 0 || ne.Uint16(item[26:28]) != 0 {
-		return ErrBadLayout
-	}
-	if err := validateCgroupsLookupSemantics(status, orchestrator, pathLen, nameLen, int(labelCount)); err != nil {
-		return err
-	}
-	if status != CgroupLookupKnown {
-		return decodeCgroupsLookupUnknownItemInto(item, status, pathOff, pathLen, nameOff, out)
+	if header.status != CgroupLookupKnown {
+		return decodeCgroupsLookupUnknownItemInto(
+			item,
+			header.status,
+			header.pathOff,
+			header.pathLen,
+			header.nameOff,
+			out)
 	}
 	var path CStringView
-	pathEnd, err := lookupStringInto(item, CgroupsLookupItemHdr, pathOff, pathLen, viewOut(out, &path))
+	pathEnd, err := lookupStringInto(item, CgroupsLookupItemHdr, header.pathOff, header.pathLen, viewOut(out, &path))
 	if err != nil {
 		return err
 	}
 	var name CStringView
-	nameEnd, err := lookupStringInto(item, CgroupsLookupItemHdr, nameOff, nameLen, viewOut(out, &name))
+	nameEnd, err := lookupStringInto(item, CgroupsLookupItemHdr, header.nameOff, header.nameLen, viewOut(out, &name))
 	if err != nil {
 		return err
 	}
-	if overlap(pathOff, pathEnd, nameOff, nameEnd) {
+	if overlap(header.pathOff, pathEnd, header.nameOff, nameEnd) {
 		return ErrBadLayout
 	}
-	table, err := validateLabels(item, CgroupsLookupItemHdr, labelCount, max(pathEnd, nameEnd))
+	table, err := validateLabels(item, CgroupsLookupItemHdr, header.labelCount, max(pathEnd, nameEnd))
 	if err != nil {
 		return err
 	}
 	if out != nil {
 		*out = CgroupsLookupItemView{
-			Status:           status,
-			Orchestrator:     orchestrator,
+			Status:           header.status,
+			Orchestrator:     header.orchestrator,
 			Path:             path,
 			Name:             name,
-			LabelCount:       labelCount,
+			LabelCount:       header.labelCount,
 			item:             item,
 			labelTableOffset: table,
 		}
