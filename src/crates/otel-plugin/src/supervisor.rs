@@ -12,7 +12,7 @@ use bridge::{
 };
 use ferryboat::{Connection, Endpoint, Listener};
 use netdata_plugin_protocol::{Message, MessageReader, MessageWriter};
-use netdata_plugin_types::FunctionProgressResponse;
+use netdata_plugin_types::{FunctionDeclaration, FunctionProgressResponse, FunctionResult};
 use tokio::process::Command;
 
 /// Maximum time to wait for a worker to connect after spawning.
@@ -60,18 +60,33 @@ enum Worker {
     LegacyLogs,
 }
 
+impl Worker {
+    /// Stable name used in logs and agent-facing error contexts.
+    fn name(self) -> &'static str {
+        match self {
+            Worker::Ingestor => "ingestor",
+            Worker::Ledger => "ledger",
+            Worker::LegacyLogs => "legacy-logs",
+        }
+    }
+}
+
 struct Supervisor {
+    // Field order is load-bearing. Rust drops fields in declaration order, so
+    // each worker `Connection` is declared immediately before its `*_child`
+    // guard: on every drop path (including error unwinding) the connection
+    // closes first — signalling the worker to exit over IPC — and only then does
+    // the guard's SIGKILL fallback fire, against a worker that failed to exit.
+    // Moving a guard above its connection would SIGKILL workers before their IPC
+    // channel closes, defeating graceful shutdown.
     ingestor: Connection<IngestorRequest, IngestorResponse>,
-    /// Kills the ingestor process on drop — must outlive `ingestor`.
-    #[allow(dead_code)]
+    #[allow(dead_code)] // drop-only: SIGKILL fallback for the ingestor worker
     ingestor_child: ChildGuard,
     ledger: Connection<LedgerRequest, LedgerResponse>,
-    /// Kills the ledger process on drop — must outlive `ledger`.
-    #[allow(dead_code)]
+    #[allow(dead_code)] // drop-only: SIGKILL fallback for the ledger worker
     ledger_child: ChildGuard,
     legacy: Connection<LegacyLogsRequest, LegacyLogsResponse>,
-    /// Kills the legacy-logs process on drop — must outlive `legacy`.
-    #[allow(dead_code)]
+    #[allow(dead_code)] // drop-only: SIGKILL fallback for the legacy-logs worker
     legacy_child: ChildGuard,
     /// Whether the legacy-logs worker is usable. The legacy viewer is a
     /// best-effort backward-compat surface and is fully decoupled from the new
@@ -82,7 +97,13 @@ struct Supervisor {
     legacy_alive: bool,
     /// Maps function name → owning worker.
     routing: HashMap<String, Worker>,
-    /// Maps in-flight transaction id → owning worker.
+    /// In-flight transaction id → owning worker, so a later Cancel or Result
+    /// routes back to the right worker without fanning out to all of them.
+    /// Bounded: an entry is removed on the worker's Result, the agent's Cancel,
+    /// a failed send, or (for legacy-logs) `disable_legacy`; an ingestor/ledger
+    /// disconnect is fatal and discards the whole map. Only a worker that
+    /// accepts a Call yet never replies and is never cancelled could leak an
+    /// entry — not observed in practice.
     transactions: HashMap<String, Worker>,
     reader: MessageReader<tokio::io::Stdin>,
     writer: MessageWriter<tokio::io::Stdout>,
@@ -92,7 +113,37 @@ struct Supervisor {
 }
 
 impl Supervisor {
-    /// Send Configure to the ingestor and wait for Ready.
+    /// Record a worker's function declarations in the routing table and forward
+    /// each one to the agent. Shared by the three `configure_*` handshakes,
+    /// which differ only in their request/response/config types.
+    async fn register_declarations(
+        &mut self,
+        worker: Worker,
+        declarations: Vec<FunctionDeclaration>,
+    ) -> anyhow::Result<()> {
+        tracing::info!(
+            "{} reported ready with {} function declarations",
+            worker.name(),
+            declarations.len()
+        );
+        for decl in declarations {
+            let name = decl.name.clone();
+            self.writer
+                .send(Message::FunctionDeclaration(Box::new(decl)))
+                .await
+                .with_context(|| {
+                    format!("failed to declare {} function to agent", worker.name())
+                })?;
+            // Log + record the route only after the agent has the declaration, so a
+            // failed send never claims "registered" or leaves a route for a function
+            // the agent never received.
+            tracing::info!("registered {} function: {}", worker.name(), name);
+            self.routing.insert(name, worker);
+        }
+        Ok(())
+    }
+
+    /// Send Configure to the ingestor and register the functions it reports.
     async fn configure_ingestor(&mut self, config: PluginConfig) -> anyhow::Result<()> {
         self.ingestor
             .send(IngestorRequest::Configure(config))
@@ -101,27 +152,15 @@ impl Supervisor {
 
         match self.ingestor.recv().await.context("ingestor handshake")? {
             IngestorResponse::Ready { declarations } => {
-                tracing::info!(
-                    "ingestor reported ready with {} function declarations",
-                    declarations.len()
-                );
-                for decl in declarations {
-                    tracing::info!("registered ingestor function: {}", decl.name);
-                    self.routing.insert(decl.name.clone(), Worker::Ingestor);
-                    self.writer
-                        .send(Message::FunctionDeclaration(Box::new(decl)))
-                        .await
-                        .context("failed to declare ingestor function to agent")?;
-                }
+                self.register_declarations(Worker::Ingestor, declarations)
+                    .await?;
             }
-            other => {
-                bail!("expected Ready from ingestor, got: {other:?}");
-            }
+            other => bail!("expected Ready from ingestor, got: {other:?}"),
         }
         Ok(())
     }
 
-    /// Send Configure to the ledger and wait for Ready.
+    /// Send Configure to the ledger and register the functions it reports.
     async fn configure_ledger(&mut self, config: PluginConfig) -> anyhow::Result<()> {
         self.ledger
             .send(LedgerRequest::Configure(config))
@@ -130,27 +169,15 @@ impl Supervisor {
 
         match self.ledger.recv().await.context("ledger handshake")? {
             LedgerResponse::Ready { declarations } => {
-                tracing::info!(
-                    "ledger reported ready with {} function declarations",
-                    declarations.len()
-                );
-                for decl in declarations {
-                    tracing::info!("registered ledger function: {}", decl.name);
-                    self.routing.insert(decl.name.clone(), Worker::Ledger);
-                    self.writer
-                        .send(Message::FunctionDeclaration(Box::new(decl)))
-                        .await
-                        .context("failed to declare ledger function to agent")?;
-                }
+                self.register_declarations(Worker::Ledger, declarations)
+                    .await?;
             }
-            other => {
-                bail!("expected Ready from ledger, got: {other:?}");
-            }
+            other => bail!("expected Ready from ledger, got: {other:?}"),
         }
         Ok(())
     }
 
-    /// Send Configure to the legacy-logs worker and wait for Ready.
+    /// Send Configure to the legacy-logs worker and register the functions it reports.
     async fn configure_legacy(&mut self, config: LegacyLogsConfig) -> anyhow::Result<()> {
         self.legacy
             .send(LegacyLogsRequest::Configure(config))
@@ -159,22 +186,10 @@ impl Supervisor {
 
         match self.legacy.recv().await.context("legacy-logs handshake")? {
             LegacyLogsResponse::Ready { declarations } => {
-                tracing::info!(
-                    "legacy-logs reported ready with {} function declarations",
-                    declarations.len()
-                );
-                for decl in declarations {
-                    tracing::info!("registered legacy-logs function: {}", decl.name);
-                    self.routing.insert(decl.name.clone(), Worker::LegacyLogs);
-                    self.writer
-                        .send(Message::FunctionDeclaration(Box::new(decl)))
-                        .await
-                        .context("failed to declare legacy-logs function to agent")?;
-                }
+                self.register_declarations(Worker::LegacyLogs, declarations)
+                    .await?;
             }
-            other => {
-                bail!("expected Ready from legacy-logs, got: {other:?}");
-            }
+            other => bail!("expected Ready from legacy-logs, got: {other:?}"),
         }
         Ok(())
     }
@@ -308,41 +323,54 @@ impl Supervisor {
         }
     }
 
-    /// Handle a response from the ingestor.
+    /// Forward a completed function result to the agent, unless the transaction
+    /// was already retired by a Cancel.
+    ///
+    /// A Cancel removes the transaction entry and tells the agent the call is
+    /// finished. A Result that races in afterwards — the worker completed
+    /// between our Cancel send and its handling — must be dropped: forwarding it
+    /// would be a second terminal message for a transaction the agent already
+    /// closed. Draining the entry here is also what keeps `transactions` bounded.
+    async fn forward_result(&mut self, worker: Worker, result: FunctionResult) {
+        if self.transactions.remove(&result.transaction).is_none() {
+            tracing::debug!(
+                worker = worker.name(),
+                transaction = %result.transaction,
+                "dropping result for a cancelled or unknown transaction"
+            );
+            return;
+        }
+        if let Err(e) = self
+            .writer
+            .send(Message::FunctionResult(Box::new(result)))
+            .await
+        {
+            tracing::error!("failed to emit result: {e}");
+        }
+    }
+
+    /// Forward a running function's progress update to the agent.
+    async fn forward_progress(&mut self, transaction: String, done: usize, total: usize) {
+        let msg = Message::FunctionProgressResponse(Box::new(FunctionProgressResponse {
+            transaction,
+            done,
+            all: total,
+        }));
+        if let Err(e) = self.writer.send(msg).await {
+            tracing::error!("failed to emit progress: {e}");
+        }
+    }
+
+    /// Translate an ingestor response into agent-facing output. `ChartData` is
+    /// ingestor-only; the rest is shared with the other workers.
     async fn handle_ingestor_response(&mut self, resp: IngestorResponse) {
         match resp {
-            IngestorResponse::Result(result) => {
-                // If the transaction was already removed by a Cancel,
-                // the agent considers it done — don't forward the
-                // post-cancel Result. Otherwise drain the entry and
-                // forward.
-                if self.transactions.remove(&result.transaction).is_none() {
-                    tracing::debug!(
-                        transaction = %result.transaction,
-                        "dropping post-cancel result from ingestor"
-                    );
-                } else if let Err(e) = self
-                    .writer
-                    .send(Message::FunctionResult(Box::new(result)))
-                    .await
-                {
-                    tracing::error!("failed to emit result: {e}");
-                }
-            }
+            IngestorResponse::Result(result) => self.forward_result(Worker::Ingestor, result).await,
             IngestorResponse::Progress {
                 transaction,
                 done,
                 total,
-            } => {
-                let msg = Message::FunctionProgressResponse(Box::new(FunctionProgressResponse {
-                    transaction,
-                    done,
-                    all: total,
-                }));
-                if let Err(e) = self.writer.send(msg).await {
-                    tracing::error!("failed to emit progress: {e}");
-                }
-            }
+            } => self.forward_progress(transaction, done, total).await,
             IngestorResponse::ChartData { payload } => {
                 if let Err(e) = self.writer.write_raw(&payload).await {
                     tracing::error!("failed to emit chart data: {e}");
@@ -354,80 +382,32 @@ impl Supervisor {
         }
     }
 
-    /// Handle a response from the ledger.
+    /// Translate a ledger response into agent-facing output.
     async fn handle_ledger_response(&mut self, resp: LedgerResponse) {
         match resp {
-            LedgerResponse::Result(result) => {
-                // If the transaction was already removed by a Cancel,
-                // the agent considers it done — don't forward the
-                // post-cancel Result. Otherwise drain the entry and
-                // forward.
-                if self.transactions.remove(&result.transaction).is_none() {
-                    tracing::debug!(
-                        transaction = %result.transaction,
-                        "dropping post-cancel result from ledger"
-                    );
-                } else if let Err(e) = self
-                    .writer
-                    .send(Message::FunctionResult(Box::new(result)))
-                    .await
-                {
-                    tracing::error!("failed to emit result: {e}");
-                }
-            }
+            LedgerResponse::Result(result) => self.forward_result(Worker::Ledger, result).await,
             LedgerResponse::Progress {
                 transaction,
                 done,
                 total,
-            } => {
-                let msg = Message::FunctionProgressResponse(Box::new(FunctionProgressResponse {
-                    transaction,
-                    done,
-                    all: total,
-                }));
-                if let Err(e) = self.writer.send(msg).await {
-                    tracing::error!("failed to emit progress: {e}");
-                }
-            }
+            } => self.forward_progress(transaction, done, total).await,
             LedgerResponse::Ready { .. } => {
                 tracing::warn!("unexpected late Ready from ledger");
             }
         }
     }
 
-    /// Handle a response from the legacy-logs worker.
+    /// Translate a legacy-logs response into agent-facing output.
     async fn handle_legacy_response(&mut self, resp: LegacyLogsResponse) {
         match resp {
             LegacyLogsResponse::Result(result) => {
-                // If the transaction was already removed by a Cancel, the
-                // agent considers it done — drop the post-cancel Result.
-                if self.transactions.remove(&result.transaction).is_none() {
-                    tracing::debug!(
-                        transaction = %result.transaction,
-                        "dropping post-cancel result from legacy-logs"
-                    );
-                } else if let Err(e) = self
-                    .writer
-                    .send(Message::FunctionResult(Box::new(result)))
-                    .await
-                {
-                    tracing::error!("failed to emit result: {e}");
-                }
+                self.forward_result(Worker::LegacyLogs, result).await
             }
             LegacyLogsResponse::Progress {
                 transaction,
                 done,
                 total,
-            } => {
-                let msg = Message::FunctionProgressResponse(Box::new(FunctionProgressResponse {
-                    transaction,
-                    done,
-                    all: total,
-                }));
-                if let Err(e) = self.writer.send(msg).await {
-                    tracing::error!("failed to emit progress: {e}");
-                }
-            }
+            } => self.forward_progress(transaction, done, total).await,
             LegacyLogsResponse::Ready { .. } => {
                 tracing::warn!("unexpected late Ready from legacy-logs");
             }
@@ -534,6 +514,12 @@ impl SocketGuard {
         Self(path)
     }
 
+    /// The socket path as `&str` for ferryboat's [`Endpoint::ipc`].
+    ///
+    /// The `expect` is unreachable in practice: the path is `socket_dir()`
+    /// (`$NETDATA_RUN_DIR/otel-plugin` or `/tmp`) joined with an ASCII
+    /// `"<name>-<pid>.sock"`, so it is non-UTF-8 only if `NETDATA_RUN_DIR` is,
+    /// which the agent never sets.
     fn path(&self) -> &str {
         self.0.to_str().expect("socket path is not valid UTF-8")
     }
@@ -632,7 +618,9 @@ pub async fn run() -> anyhow::Result<()> {
         .join("otel-legacy-logs");
     let legacy_config = LegacyLogsConfig::new(legacy_journal_dir, legacy_cache_dir);
 
-    // Spawn ledger first (it must be listening before the ingestor's WriterPublisher connects).
+    // Spawn the ledger first: it listens on the writer socket, and on startup
+    // the ingestor connects to that socket to stream records to it. Reversing
+    // the order would race the ingestor against a not-yet-listening ledger.
     let (ledger_conn, ledger_child) = spawn_worker(&self_exe, &ledger_sock, "ledger").await?;
     let (ingestor_conn, ingestor_child) =
         spawn_worker(&self_exe, &ingestor_sock, "ingestor").await?;

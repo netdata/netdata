@@ -36,41 +36,19 @@ const LEGACY_DEFAULT_JOURNAL_DIR: &str = "/var/log/netdata/otel/v1";
 pub fn resolve_legacy_journal_dir() -> PathBuf {
     const CONFIG_FILENAME: &str = "otel.yaml";
 
-    let mut candidates = Vec::new();
-    if let Ok(dir) = std::env::var("NETDATA_USER_CONFIG_DIR") {
-        candidates.push(Path::new(&dir).join(CONFIG_FILENAME));
-    }
-    if let Ok(dir) = std::env::var("NETDATA_STOCK_CONFIG_DIR") {
-        candidates.push(Path::new(&dir).join(CONFIG_FILENAME));
-    }
-
-    for path in candidates {
-        let Ok(contents) = std::fs::read_to_string(&path) else {
-            continue;
-        };
-        match journal_dir_from_yaml(&contents) {
-            Ok(Some(dir)) => {
-                tracing::info!(
-                    "resolved former otel journal_dir from {}: {}",
-                    path.display(),
-                    dir.display()
-                );
-                return dir;
-            }
-            // Parsed, but no `logs.journal_dir` override here — try the next candidate.
-            Ok(None) => {}
-            // A malformed otel.yaml must not fall back to the default *silently*:
-            // the user may have set logs.journal_dir behind the syntax error, so we
-            // still fall back (next candidate, then the default) but warn loudly so
-            // the unexpected directory choice is traceable.
-            Err(e) => {
-                tracing::warn!(
-                    "could not parse {} while resolving the former otel journal_dir; \
-                     ignoring it and continuing: {e}",
-                    path.display()
-                );
+    // I/O shell: read the candidate files (user first, then stock), skipping any
+    // that don't exist or can't be read. The pure `pick_journal_dir` decides.
+    let mut candidates: Vec<(PathBuf, String)> = Vec::new();
+    for dir_var in ["NETDATA_USER_CONFIG_DIR", "NETDATA_STOCK_CONFIG_DIR"] {
+        if let Ok(dir) = std::env::var(dir_var) {
+            let path = Path::new(&dir).join(CONFIG_FILENAME);
+            if let Ok(contents) = std::fs::read_to_string(&path) {
+                candidates.push((path, contents));
             }
         }
+    }
+    if let Some(dir) = pick_journal_dir(candidates.iter().map(|(p, c)| (p.as_path(), c.as_str()))) {
+        return dir;
     }
 
     // Default to the former plugin's templated `@logdir_POST@/otel/v1`, i.e. the
@@ -81,6 +59,39 @@ pub fn resolve_legacy_journal_dir() -> PathBuf {
     }
 
     PathBuf::from(LEGACY_DEFAULT_JOURNAL_DIR)
+}
+
+/// Pure core of legacy-journal-dir resolution: return the first
+/// `logs.journal_dir` override among candidate file contents, in precedence
+/// order.
+///
+/// A malformed candidate is logged and skipped rather than aborting — a syntax
+/// error in one file must not silently hide a valid override in a later one (or
+/// mask it behind the default). Returns `None` when no candidate carries the field.
+fn pick_journal_dir<'a>(
+    candidates: impl IntoIterator<Item = (&'a Path, &'a str)>,
+) -> Option<PathBuf> {
+    for (path, contents) in candidates {
+        match journal_dir_from_yaml(contents) {
+            Ok(Some(dir)) => {
+                tracing::info!(
+                    "resolved former otel journal_dir from {}: {}",
+                    path.display(),
+                    dir.display()
+                );
+                return Some(dir);
+            }
+            Ok(None) => {}
+            Err(e) => {
+                tracing::warn!(
+                    "could not parse {} while resolving the former otel journal_dir; \
+                     ignoring it and continuing: {e}",
+                    path.display()
+                );
+            }
+        }
+    }
+    None
 }
 
 /// Extract `logs.journal_dir` from a (possibly former-schema) otel.yaml.
@@ -105,42 +116,125 @@ fn journal_dir_from_yaml(contents: &str) -> Result<Option<PathBuf>, serde_yaml::
     Ok(probe.logs.and_then(|logs| logs.journal_dir))
 }
 
-/// Load and resolve the plugin configuration.
+/// A config file identified by its path.
 ///
-/// stock config file → user overrides → env var overrides
+/// Bundles the path with the "read + parse, naming the file in any error" logic
+/// so that error context lives in one place. Reading is lazy (on parse), so
+/// tests point it at a `tempfile` rather than mutating process-global state.
+struct ConfigFile {
+    path: PathBuf,
+}
+
+impl ConfigFile {
+    fn new(path: impl Into<PathBuf>) -> Self {
+        Self { path: path.into() }
+    }
+
+    /// Read and parse a required file. A missing, unreadable, or malformed file
+    /// is an error carrying the path.
+    fn parse<T: serde::de::DeserializeOwned>(&self) -> Result<T> {
+        let contents = std::fs::read_to_string(&self.path)
+            .with_context(|| format!("reading {}", self.path.display()))?;
+        serde_yaml::from_str(&contents).with_context(|| format!("parsing {}", self.path.display()))
+    }
+
+    /// Read and parse an optional file. An absent file yields `Ok(None)`; an
+    /// unreadable or malformed one is an error carrying the path.
+    fn parse_optional<T: serde::de::DeserializeOwned>(&self) -> Result<Option<T>> {
+        match std::fs::read_to_string(&self.path) {
+            Ok(contents) => serde_yaml::from_str(&contents)
+                .map(Some)
+                .with_context(|| format!("parsing {}", self.path.display())),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(e) => {
+                Err(anyhow::Error::new(e).context(format!("reading {}", self.path.display())))
+            }
+        }
+    }
+}
+
+/// Builds the effective [`PluginConfig`] by layering config sources in a fixed
+/// precedence: stock < user < env.
+///
+/// Stock is required, supplied to [`ConfigResolver::from_stock`]; user and env
+/// are optional. The order in which the `with_*` methods are called is
+/// irrelevant — [`ConfigResolver::resolve`] always applies stock, then user,
+/// then env, then validates.
+pub(crate) struct ConfigResolver {
+    stock: ConfigFile,
+    user: Option<ConfigFile>,
+    env: ConfigOverride,
+}
+
+impl ConfigResolver {
+    /// Start from the mandatory stock config file. Stock is required by
+    /// construction — there is no way to reach [`resolve`](Self::resolve)
+    /// without it.
+    pub(crate) fn from_stock(stock_path: impl Into<PathBuf>) -> Self {
+        Self {
+            stock: ConfigFile::new(stock_path),
+            user: None,
+            env: ConfigOverride::default(),
+        }
+    }
+
+    /// Layer an optional user config file on top of stock. A user file that does
+    /// not exist on disk is skipped at resolve time.
+    pub(crate) fn with_user(mut self, user_path: impl Into<PathBuf>) -> Self {
+        self.user = Some(ConfigFile::new(user_path));
+        self
+    }
+
+    /// Set the highest-priority env-var overrides (replaces any previous call).
+    pub(crate) fn with_env(mut self, env: ConfigOverride) -> Self {
+        self.env = env;
+        self
+    }
+
+    /// Resolve to the effective config: parse stock, apply user overrides (when
+    /// a user file is present), apply env overrides, then validate. Emits
+    /// redacted config log lines — stock, then user (only when a user override
+    /// applies), then effective (only after validation succeeds).
+    pub(crate) fn resolve(self) -> Result<PluginConfig> {
+        let mut config: PluginConfig = self.stock.parse()?;
+        log_config("stock", &config);
+
+        if let Some(user) = &self.user {
+            if let Some(overrides) = user.parse_optional::<ConfigOverride>()? {
+                apply_overrides(&mut config, &overrides);
+                log_config("user", &config);
+            }
+        }
+
+        if self.env.has_any() {
+            apply_overrides(&mut config, &self.env);
+        }
+
+        validate(&config)?;
+        log_config("effective", &config);
+        Ok(config)
+    }
+}
+
+/// Load and resolve the plugin configuration, layering the stock file, the user
+/// file, then env vars (see the module-level resolution order).
+///
+/// Thin I/O shell: it resolves the config dirs and `NETDATA_OTEL_*` environment,
+/// then delegates the read/parse/merge/validate to [`ConfigResolver`].
 pub fn load_config() -> Result<PluginConfig> {
     const CONFIG_FILENAME: &str = "otel.yaml";
 
     let stock_config_dir =
         std::env::var("NETDATA_STOCK_CONFIG_DIR").context("NETDATA_STOCK_CONFIG_DIR not set")?;
-    let user_config_dir = std::env::var("NETDATA_USER_CONFIG_DIR").ok();
+    let mut resolver =
+        ConfigResolver::from_stock(Path::new(&stock_config_dir).join(CONFIG_FILENAME));
 
-    // 1. Stock config (base)
-    let stock_path = Path::new(&stock_config_dir).join(CONFIG_FILENAME);
-    let contents = std::fs::read_to_string(&stock_path)
-        .with_context(|| format!("reading {}", stock_path.display()))?;
-    let mut config: PluginConfig = serde_yaml::from_str(&contents)
-        .with_context(|| format!("parsing {}", stock_path.display()))?;
-    log_config("stock", &config);
-
-    // 2. User overrides
-    if let Some(ref dir) = user_config_dir {
-        let user_path = Path::new(dir).join(CONFIG_FILENAME);
-        if let Some(overrides) = load_overrides(&user_path)? {
-            apply_overrides(&mut config, &overrides);
-            log_config("user", &config);
-        }
+    if let Ok(user_config_dir) = std::env::var("NETDATA_USER_CONFIG_DIR") {
+        resolver = resolver.with_user(Path::new(&user_config_dir).join(CONFIG_FILENAME));
     }
 
-    // 3. Env var overrides (highest priority)
-    let env_overrides = ConfigOverride::from_env()?;
-    if env_overrides.has_any() {
-        apply_overrides(&mut config, &env_overrides);
-    }
-
-    validate(&config)?;
-    log_config("effective", &config);
-    Ok(config)
+    let env = ConfigOverride::from_map(&env::otel_env_from_process())?;
+    resolver.with_env(env).resolve()
 }
 
 fn log_config(source: &str, config: &PluginConfig) {
@@ -284,19 +378,6 @@ fn apply_overrides(config: &mut PluginConfig, o: &ConfigOverride) {
     }
 }
 
-fn load_overrides(path: &Path) -> Result<Option<ConfigOverride>> {
-    let contents = match std::fs::read_to_string(path) {
-        Ok(contents) => contents,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(e) => {
-            return Err(anyhow::Error::new(e).context(format!("reading {}", path.display())));
-        }
-    };
-    let overrides: ConfigOverride = serde_yaml::from_str(&contents)
-        .with_context(|| format!("failed to parse user config: {}", path.display()))?;
-    Ok(Some(overrides))
-}
-
 // ============================================================================
 // Tests
 // ============================================================================
@@ -361,13 +442,42 @@ traces:
     rotation_count: 10
 "#;
 
-    fn stock_config() -> PluginConfig {
-        serde_yaml::from_str(STOCK_YAML).unwrap()
+    // Test helpers: exercise config resolution through the public `ConfigResolver`
+    // rather than the private merge/validate functions. Config files go through a
+    // per-test tempdir (isolated, no process-global state); the env layer, which
+    // is an injected map rather than a file, is built with `env_map` below.
+
+    /// Write `contents` to `<dir>/<name>` and return the path.
+    fn write_file(dir: &Path, name: &str, contents: &str) -> PathBuf {
+        let path = dir.join(name);
+        std::fs::write(&path, contents).unwrap();
+        path
+    }
+
+    /// Resolve a config whose stock file holds `yaml` (via a tempfile); no user
+    /// file, no env overrides.
+    fn resolve_stock_yaml(yaml: &str) -> Result<PluginConfig> {
+        let dir = tempfile::tempdir().unwrap();
+        ConfigResolver::from_stock(write_file(dir.path(), "stock.yaml", yaml)).resolve()
+    }
+
+    /// Resolve the standard stock config plus a user override YAML (both via
+    /// tempfiles) — the public path a real user override takes.
+    fn resolve_with_user(user_yaml: &str) -> Result<PluginConfig> {
+        let dir = tempfile::tempdir().unwrap();
+        let stock = write_file(dir.path(), "stock.yaml", STOCK_YAML);
+        let user = write_file(dir.path(), "user.yaml", user_yaml);
+        ConfigResolver::from_stock(stock).with_user(user).resolve()
+    }
+
+    /// The standard stock config, resolved through the builder.
+    fn resolved_stock() -> PluginConfig {
+        resolve_stock_yaml(STOCK_YAML).unwrap()
     }
 
     #[test]
     fn stock_yaml_parses() {
-        let config = stock_config();
+        let config = resolved_stock();
         assert_eq!(config.endpoint.path, "127.0.0.1:4317");
         assert!(config.endpoint.tls_cert_path.is_none());
         assert_eq!(config.metrics.interval_secs, Some(10));
@@ -382,7 +492,7 @@ traces:
 
     #[test]
     fn stock_yaml_base_dir_and_globals_parsed() {
-        let config = stock_config();
+        let config = resolved_stock();
         assert_eq!(
             config.base_dir,
             std::path::Path::new("/var/log/netdata/otel/v1")
@@ -396,7 +506,7 @@ traces:
 
     #[test]
     fn stock_yaml_logs_tuning_parsed() {
-        let config = stock_config();
+        let config = resolved_stock();
         // Dirs are derived from base_dir, not configured per signal.
         let logs = config.lifecycle_for(bridge::signals::Signal::Logs);
         assert_eq!(
@@ -425,7 +535,7 @@ traces:
 
     #[test]
     fn stock_yaml_traces_tuning_parsed() {
-        let config = stock_config();
+        let config = resolved_stock();
         let traces = config.lifecycle_for(bridge::signals::Signal::Traces);
         assert_eq!(
             traces.wal.dir,
@@ -435,30 +545,21 @@ traces:
         assert_eq!(rotation.max_log_entries, 50000);
     }
 
-    #[test]
-    fn stock_yaml_validates() {
-        validate(&stock_config()).unwrap();
-    }
-
-    // -- Endpoint overrides --
+    // -- Overrides (applied through the resolver's user layer) --
 
     #[test]
     fn override_endpoint_path() {
-        let mut config = stock_config();
-        let o: ConfigOverride = serde_yaml::from_str("endpoint:\n  path: '0.0.0.0:4317'").unwrap();
-        apply_overrides(&mut config, &o);
+        let config = resolve_with_user("endpoint:\n  path: '0.0.0.0:4317'\n").unwrap();
         assert_eq!(config.endpoint.path, "0.0.0.0:4317");
         assert!(config.endpoint.tls_cert_path.is_none());
     }
 
     #[test]
     fn override_tls_fields() {
-        let mut config = stock_config();
-        let o: ConfigOverride = serde_yaml::from_str(
-            "endpoint:\n  tls_cert_path: /etc/ssl/cert.pem\n  tls_key_path: /etc/ssl/key.pem",
+        let config = resolve_with_user(
+            "endpoint:\n  tls_cert_path: /etc/ssl/cert.pem\n  tls_key_path: /etc/ssl/key.pem\n",
         )
         .unwrap();
-        apply_overrides(&mut config, &o);
         assert_eq!(
             config.endpoint.tls_cert_path.as_deref(),
             Some("/etc/ssl/cert.pem")
@@ -470,24 +571,17 @@ traces:
         assert_eq!(config.endpoint.path, "127.0.0.1:4317");
     }
 
-    // -- Metrics overrides --
-
     #[test]
     fn override_metrics_interval_only() {
-        let mut config = stock_config();
-        let o: ConfigOverride = serde_yaml::from_str("metrics:\n  interval_secs: 30").unwrap();
-        apply_overrides(&mut config, &o);
+        let config = resolve_with_user("metrics:\n  interval_secs: 30\n").unwrap();
         assert_eq!(config.metrics.interval_secs, Some(30));
         assert_eq!(config.metrics.grace_period_secs, Some(60));
         assert_eq!(config.metrics.max_new_charts_per_request, 100);
     }
 
-    // -- Logs overrides --
-
     #[test]
     fn override_logs_wal_field() {
-        let mut config = stock_config();
-        let o: ConfigOverride = serde_yaml::from_str(
+        let config = resolve_with_user(
             r#"
 logs:
   wal:
@@ -497,7 +591,6 @@ logs:
 "#,
         )
         .unwrap();
-        apply_overrides(&mut config, &o);
         let rotation = config.logs.wal.rotation.resolve("default");
         assert_eq!(rotation.max_log_entries, 100000);
         // Untouched stock fields survive the partial override.
@@ -506,16 +599,7 @@ logs:
 
     #[test]
     fn override_logs_catalog_rotation_count() {
-        let mut config = stock_config();
-        let o: ConfigOverride = serde_yaml::from_str(
-            r#"
-logs:
-  catalog:
-    rotation_count: 2
-"#,
-        )
-        .unwrap();
-        apply_overrides(&mut config, &o);
+        let config = resolve_with_user("logs:\n  catalog:\n    rotation_count: 2\n").unwrap();
         assert_eq!(config.logs.catalog.rotation_count, 2);
         // Traces is independent — its rotation count is untouched.
         assert_eq!(config.traces.catalog.rotation_count, 10);
@@ -523,9 +607,7 @@ logs:
 
     #[test]
     fn override_base_dir() {
-        let mut config = stock_config();
-        let o: ConfigOverride = serde_yaml::from_str("base_dir: /data/otel").unwrap();
-        apply_overrides(&mut config, &o);
+        let config = resolve_with_user("base_dir: /data/otel\n").unwrap();
         assert_eq!(config.base_dir, std::path::Path::new("/data/otel"));
         // Derived dirs follow the new base.
         let logs = config.lifecycle_for(bridge::signals::Signal::Logs);
@@ -534,17 +616,13 @@ logs:
 
     #[test]
     fn override_global_auth() {
-        let mut config = stock_config();
-        assert!(!config.auth.enabled);
-        let o: ConfigOverride = serde_yaml::from_str("auth:\n  enabled: true").unwrap();
-        apply_overrides(&mut config, &o);
+        let config = resolve_with_user("auth:\n  enabled: true\n").unwrap();
         assert!(config.auth.enabled);
     }
 
     #[test]
     fn override_traces_tuning_independent_of_logs() {
-        let mut config = stock_config();
-        let o: ConfigOverride = serde_yaml::from_str(
+        let config = resolve_with_user(
             r#"
 traces:
   wal:
@@ -554,7 +632,6 @@ traces:
 "#,
         )
         .unwrap();
-        apply_overrides(&mut config, &o);
         let traces_rot = config.traces.wal.rotation.resolve("default");
         assert_eq!(traces_rot.max_log_entries, 999);
         // Logs is untouched.
@@ -564,8 +641,7 @@ traces:
 
     #[test]
     fn override_logs_bytesize() {
-        let mut config = stock_config();
-        let o: ConfigOverride = serde_yaml::from_str(
+        let config = resolve_with_user(
             r#"
 logs:
   wal:
@@ -579,7 +655,6 @@ logs:
 "#,
         )
         .unwrap();
-        apply_overrides(&mut config, &o);
         let rotation = config.logs.wal.rotation.resolve("default");
         assert_eq!(rotation.max_file_size, ByteSize::mb(200));
         let retention = config.logs.index.retention.resolve("default");
@@ -588,8 +663,7 @@ logs:
 
     #[test]
     fn override_logs_duration() {
-        let mut config = stock_config();
-        let o: ConfigOverride = serde_yaml::from_str(
+        let config = resolve_with_user(
             r#"
 logs:
   index:
@@ -603,7 +677,6 @@ logs:
 "#,
         )
         .unwrap();
-        apply_overrides(&mut config, &o);
         let retention = config.logs.index.retention.resolve("default");
         assert_eq!(retention.max_age, Duration::from_secs(14 * 24 * 3600));
         let rotation = config.logs.wal.rotation.resolve("default");
@@ -612,11 +685,7 @@ logs:
 
     #[test]
     fn override_global_storage() {
-        let mut config = stock_config();
-        // Stock omits the read-cache size → defaults to 4 GiB; storage off.
-        assert!(!config.storage.enabled);
-        assert_eq!(config.storage.read_cache_max_size, ByteSize::gib(4));
-        let o: ConfigOverride = serde_yaml::from_str(
+        let config = resolve_with_user(
             r#"
 storage:
   enabled: true
@@ -625,12 +694,11 @@ storage:
 "#,
         )
         .unwrap();
-        apply_overrides(&mut config, &o);
         assert!(config.storage.enabled);
         assert_eq!(config.storage.uri, "fs:///data/remote");
         assert_eq!(config.storage.read_cache_max_size, ByteSize::gib(2));
-        // Storage is global on PluginConfig (asserted above), not carried in the
-        // per-signal lifecycle. Read-cache dir, by contrast, is derived per signal.
+        // Read-cache dir is derived per signal from base_dir (stock's default 4 GiB
+        // size is asserted in stock_yaml_base_dir_and_globals_parsed).
         let logs = config.lifecycle_for(bridge::signals::Signal::Logs);
         let traces = config.lifecycle_for(bridge::signals::Signal::Traces);
         assert_eq!(
@@ -643,12 +711,9 @@ storage:
         );
     }
 
-    // -- Cross-section overrides --
-
     #[test]
     fn override_across_sections() {
-        let mut config = stock_config();
-        let o: ConfigOverride = serde_yaml::from_str(
+        let config = resolve_with_user(
             r#"
 endpoint:
   path: "0.0.0.0:9999"
@@ -662,7 +727,6 @@ logs:
 "#,
         )
         .unwrap();
-        apply_overrides(&mut config, &o);
         assert_eq!(config.endpoint.path, "0.0.0.0:9999");
         assert_eq!(config.metrics.expiry_duration_secs, Some(1800));
         assert_eq!(config.metrics.interval_secs, Some(10));
@@ -672,16 +736,14 @@ logs:
 
     #[test]
     fn empty_override_changes_nothing() {
-        let mut config = stock_config();
-        let o: ConfigOverride = serde_yaml::from_str("{}").unwrap();
-        apply_overrides(&mut config, &o);
+        let config = resolve_with_user("{}\n").unwrap();
         assert_eq!(config.endpoint.path, "127.0.0.1:4317");
         assert_eq!(config.metrics.interval_secs, Some(10));
     }
 
     #[test]
     fn unknown_fields_ignored() {
-        let o: ConfigOverride = serde_yaml::from_str(
+        let config = resolve_with_user(
             r#"
 some_future_option: true
 endpoint:
@@ -690,8 +752,6 @@ endpoint:
 "#,
         )
         .unwrap();
-        let mut config = stock_config();
-        apply_overrides(&mut config, &o);
         assert_eq!(config.endpoint.path, "0.0.0.0:9999");
     }
 
@@ -715,265 +775,370 @@ endpoint:
 
     #[test]
     fn validation_rejects_empty_base_dir() {
-        let mut c = stock_config();
-        c.base_dir = std::path::PathBuf::new();
-        assert!(validate(&c).is_err());
+        assert!(resolve_with_user("base_dir: ''\n").is_err());
     }
 
     #[test]
     fn validation_rejects_relative_base_dir() {
-        let mut c = stock_config();
-        c.base_dir = std::path::PathBuf::from("relative/otel");
-        assert!(validate(&c).is_err());
+        assert!(resolve_with_user("base_dir: relative/otel\n").is_err());
     }
 
     #[test]
     fn validation_rejects_enabled_storage_without_uri() {
-        let mut c = stock_config();
-        c.storage.enabled = true;
-        c.storage.uri = String::new();
-        assert!(validate(&c).is_err());
+        assert!(resolve_with_user("storage:\n  enabled: true\n  uri: ''\n").is_err());
         // Disabled storage with an empty uri is fine (uri unused).
-        c.storage.enabled = false;
-        assert!(validate(&c).is_ok());
+        assert!(resolve_with_user("storage:\n  enabled: false\n  uri: ''\n").is_ok());
     }
 
     #[test]
     fn validation_rejects_invalid_endpoint() {
-        let mut c = stock_config();
-        c.endpoint.path = "no-port".into();
-        assert!(validate(&c).is_err());
+        assert!(resolve_with_user("endpoint:\n  path: no-port\n").is_err());
     }
 
     #[test]
     fn validation_rejects_mismatched_tls() {
-        let mut c = stock_config();
-        c.endpoint.tls_cert_path = Some("/cert.pem".into());
-        c.endpoint.tls_key_path = None;
-        assert!(validate(&c).is_err());
+        // Cert without key (stock leaves the key null) is rejected.
+        assert!(resolve_with_user("endpoint:\n  tls_cert_path: /cert.pem\n").is_err());
     }
 
     #[test]
     fn validation_rejects_ca_without_tls() {
-        let mut c = stock_config();
-        c.endpoint.tls_ca_cert_path = Some("/ca.pem".into());
-        assert!(validate(&c).is_err());
+        assert!(resolve_with_user("endpoint:\n  tls_ca_cert_path: /ca.pem\n").is_err());
     }
 
-    // -- Invalid formats rejected --
+    // -- Invalid override formats rejected (malformed user config → error) --
 
     #[test]
     fn invalid_bytesize_in_override_rejected() {
-        let r: Result<ConfigOverride, _> = serde_yaml::from_str(
-            r#"
+        assert!(
+            resolve_with_user(
+                r#"
 logs:
   wal:
     rotation:
       default:
         max_file_size: "not a size"
-"#,
+"#
+            )
+            .is_err()
         );
-        assert!(r.is_err());
     }
 
     #[test]
     fn invalid_duration_in_override_rejected() {
-        let r: Result<ConfigOverride, _> = serde_yaml::from_str(
-            r#"
+        assert!(
+            resolve_with_user(
+                r#"
 logs:
   index:
     retention:
       default:
         max_age: "not a duration"
-"#,
+"#
+            )
+            .is_err()
         );
-        assert!(r.is_err());
     }
 
-    // -- Env var tests --
+    // -- Env var tests (build an EnvMap directly; no process-env mutation) --
 
-    static ENV_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
-    fn with_env_vars<F: FnOnce()>(vars: &[(&str, &str)], f: F) {
-        let _lock = ENV_MUTEX.lock().unwrap();
-        for (key, val) in vars {
-            unsafe { std::env::set_var(key, val) };
-        }
-        f();
-        for (key, _) in vars {
-            unsafe { std::env::remove_var(key) };
-        }
+    fn env_map(pairs: &[(&str, &str)]) -> std::collections::HashMap<String, std::ffi::OsString> {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), std::ffi::OsString::from(*v)))
+            .collect()
     }
 
     #[test]
     fn env_override_endpoint_path() {
-        with_env_vars(&[("NETDATA_OTEL_ENDPOINT_PATH", "0.0.0.0:9999")], || {
-            let o = ConfigOverride::from_env().unwrap();
-            assert_eq!(
-                o.endpoint.as_ref().unwrap().path.as_deref(),
-                Some("0.0.0.0:9999")
-            );
-        });
+        let o =
+            ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_ENDPOINT_PATH", "0.0.0.0:9999")]))
+                .unwrap();
+        assert_eq!(
+            o.endpoint.as_ref().unwrap().path.as_deref(),
+            Some("0.0.0.0:9999")
+        );
     }
 
     #[test]
     fn env_override_metrics_interval() {
-        with_env_vars(&[("NETDATA_OTEL_METRICS_INTERVAL_SECS", "30")], || {
-            let o = ConfigOverride::from_env().unwrap();
-            assert_eq!(o.metrics.as_ref().unwrap().interval_secs, Some(30));
-        });
+        let o = ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_METRICS_INTERVAL_SECS", "30")]))
+            .unwrap();
+        assert_eq!(o.metrics.as_ref().unwrap().interval_secs, Some(30));
     }
 
     #[test]
     fn env_override_logs_bytesize() {
-        with_env_vars(&[("NETDATA_OTEL_LOGS_WAL_MAX_FILE_SIZE", "200MB")], || {
-            let o = ConfigOverride::from_env().unwrap();
-            let wal = o.logs.as_ref().unwrap().wal.as_ref().unwrap();
-            let rotation = wal.rotation.as_ref().unwrap();
-            let entry = rotation.get("default").unwrap();
-            assert_eq!(entry.max_file_size, Some(ByteSize::mb(200)));
-        });
+        let o = ConfigOverride::from_map(&env_map(&[(
+            "NETDATA_OTEL_LOGS_WAL_MAX_FILE_SIZE",
+            "200MB",
+        )]))
+        .unwrap();
+        let wal = o.logs.as_ref().unwrap().wal.as_ref().unwrap();
+        let rotation = wal.rotation.as_ref().unwrap();
+        let entry = rotation.get("default").unwrap();
+        assert_eq!(entry.max_file_size, Some(ByteSize::mb(200)));
     }
 
     #[test]
     fn env_override_logs_duration() {
-        with_env_vars(
-            &[("NETDATA_OTEL_LOGS_INDEX_RETENTION_MAX_AGE", "14 days")],
-            || {
-                let o = ConfigOverride::from_env().unwrap();
-                let retention_map = o
-                    .logs
-                    .as_ref()
-                    .unwrap()
-                    .index
-                    .as_ref()
-                    .unwrap()
-                    .retention
-                    .as_ref()
-                    .unwrap();
-                let entry = retention_map.get("default").unwrap();
-                assert_eq!(entry.max_age, Some(Duration::from_secs(14 * 24 * 3600)));
-            },
-        );
+        let o = ConfigOverride::from_map(&env_map(&[(
+            "NETDATA_OTEL_LOGS_INDEX_RETENTION_MAX_AGE",
+            "14 days",
+        )]))
+        .unwrap();
+        let retention_map = o
+            .logs
+            .as_ref()
+            .unwrap()
+            .index
+            .as_ref()
+            .unwrap()
+            .retention
+            .as_ref()
+            .unwrap();
+        let entry = retention_map.get("default").unwrap();
+        assert_eq!(entry.max_age, Some(Duration::from_secs(14 * 24 * 3600)));
     }
 
     #[test]
     fn env_override_logs_bool() {
-        with_env_vars(&[("NETDATA_OTEL_LOGS_WAL_CRC_ENABLED", "yes")], || {
-            let o = ConfigOverride::from_env().unwrap();
-            let wal = o.logs.as_ref().unwrap().wal.as_ref().unwrap();
-            assert_eq!(wal.crc_enabled, Some(true));
-        });
+        let o = ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_LOGS_WAL_CRC_ENABLED", "yes")]))
+            .unwrap();
+        let wal = o.logs.as_ref().unwrap().wal.as_ref().unwrap();
+        assert_eq!(wal.crc_enabled, Some(true));
     }
 
     #[test]
     fn env_override_global_storage() {
-        with_env_vars(
-            &[
-                ("NETDATA_OTEL_STORAGE_ENABLED", "yes"),
-                ("NETDATA_OTEL_STORAGE_URI", "fs:///data/remote"),
-                ("NETDATA_OTEL_STORAGE_READ_CACHE_MAX_SIZE", "2GiB"),
-            ],
-            || {
-                let o = ConfigOverride::from_env().unwrap();
-                // Guard against a future refactor dropping a field from
-                // `StorageOverride::has_any()` — that would silently discard the
-                // override (a set-but-not-applied footgun) while still parsing.
-                assert!(o.has_any());
-                let storage = o.storage.as_ref().unwrap();
-                assert_eq!(storage.enabled, Some(true));
-                assert_eq!(storage.uri.as_deref(), Some("fs:///data/remote"));
-                assert_eq!(storage.read_cache_max_size, Some(ByteSize::gib(2)));
-            },
-        );
+        let o = ConfigOverride::from_map(&env_map(&[
+            ("NETDATA_OTEL_STORAGE_ENABLED", "yes"),
+            ("NETDATA_OTEL_STORAGE_URI", "fs:///data/remote"),
+            ("NETDATA_OTEL_STORAGE_READ_CACHE_MAX_SIZE", "2GiB"),
+        ]))
+        .unwrap();
+        // Guard against a future refactor dropping a field from
+        // `StorageOverride::has_any()` — that would silently discard the
+        // override (a set-but-not-applied footgun) while still parsing.
+        assert!(o.has_any());
+        let storage = o.storage.as_ref().unwrap();
+        assert_eq!(storage.enabled, Some(true));
+        assert_eq!(storage.uri.as_deref(), Some("fs:///data/remote"));
+        assert_eq!(storage.read_cache_max_size, Some(ByteSize::gib(2)));
     }
 
     #[test]
     fn env_override_base_dir_and_auth() {
-        with_env_vars(
-            &[
-                ("NETDATA_OTEL_BASE_DIR", "/data/otel"),
-                ("NETDATA_OTEL_AUTH_ENABLED", "true"),
-            ],
-            || {
-                let o = ConfigOverride::from_env().unwrap();
-                assert!(o.has_any());
-                assert_eq!(
-                    o.base_dir.as_deref(),
-                    Some(std::path::Path::new("/data/otel"))
-                );
-                assert_eq!(o.auth.as_ref().unwrap().enabled, Some(true));
-            },
+        let o = ConfigOverride::from_map(&env_map(&[
+            ("NETDATA_OTEL_BASE_DIR", "/data/otel"),
+            ("NETDATA_OTEL_AUTH_ENABLED", "true"),
+        ]))
+        .unwrap();
+        assert!(o.has_any());
+        assert_eq!(
+            o.base_dir.as_deref(),
+            Some(std::path::Path::new("/data/otel"))
         );
+        assert_eq!(o.auth.as_ref().unwrap().enabled, Some(true));
     }
 
     #[test]
     fn env_override_traces_tuning_separate_from_logs() {
-        with_env_vars(
-            &[("NETDATA_OTEL_TRACES_WAL_MAX_LOG_ENTRIES", "777")],
-            || {
-                let o = ConfigOverride::from_env().unwrap();
-                // The traces section is populated; logs is not.
-                assert!(o.traces.is_some());
-                assert!(o.logs.is_none());
-                let wal = o.traces.as_ref().unwrap().wal.as_ref().unwrap();
-                let entry = wal.rotation.as_ref().unwrap().get("default").unwrap();
-                assert_eq!(entry.max_log_entries, Some(777));
-            },
-        );
+        let o = ConfigOverride::from_map(&env_map(&[(
+            "NETDATA_OTEL_TRACES_WAL_MAX_LOG_ENTRIES",
+            "777",
+        )]))
+        .unwrap();
+        // The traces section is populated; logs is not.
+        assert!(o.traces.is_some());
+        assert!(o.logs.is_none());
+        let wal = o.traces.as_ref().unwrap().wal.as_ref().unwrap();
+        let entry = wal.rotation.as_ref().unwrap().get("default").unwrap();
+        assert_eq!(entry.max_log_entries, Some(777));
     }
 
     #[test]
     fn env_override_invalid_number_rejected() {
-        with_env_vars(
-            &[("NETDATA_OTEL_METRICS_INTERVAL_SECS", "not_a_number")],
-            || assert!(ConfigOverride::from_env().is_err()),
+        assert!(
+            ConfigOverride::from_map(&env_map(&[(
+                "NETDATA_OTEL_METRICS_INTERVAL_SECS",
+                "not_a_number"
+            )]))
+            .is_err()
         );
     }
 
     #[test]
     fn env_override_invalid_bool_rejected() {
-        with_env_vars(&[("NETDATA_OTEL_LOGS_WAL_CRC_ENABLED", "maybe")], || {
-            assert!(ConfigOverride::from_env().is_err());
-        });
+        assert!(
+            ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_LOGS_WAL_CRC_ENABLED", "maybe")]))
+                .is_err()
+        );
     }
 
     #[test]
     fn env_override_invalid_bytesize_rejected() {
-        with_env_vars(
-            &[("NETDATA_OTEL_STORAGE_READ_CACHE_MAX_SIZE", "not-a-size")],
-            || assert!(ConfigOverride::from_env().is_err()),
+        assert!(
+            ConfigOverride::from_map(&env_map(&[(
+                "NETDATA_OTEL_STORAGE_READ_CACHE_MAX_SIZE",
+                "not-a-size"
+            )]))
+            .is_err()
         );
     }
 
     #[test]
     fn env_no_vars_produces_no_overrides() {
-        with_env_vars(&[], || {
-            assert!(!ConfigOverride::from_env().unwrap().has_any());
-        });
+        assert!(!ConfigOverride::from_map(&env_map(&[])).unwrap().has_any());
+    }
+
+    // The UTF-8 check on env values is deliberately lazy (only when a variable is
+    // consumed), mirroring the former per-variable `std::env::var`. These pin that
+    // so a future refactor can't silently regress it.
+
+    #[cfg(unix)]
+    #[test]
+    fn env_non_utf8_value_ignored_when_unconsumed() {
+        use std::ffi::OsString;
+        use std::os::unix::ffi::OsStringExt;
+        // A prefixed but unrecognized var whose value is not UTF-8 must not fail
+        // loading — it is never read.
+        let mut env: std::collections::HashMap<String, OsString> = std::collections::HashMap::new();
+        env.insert(
+            "NETDATA_OTEL_UNKNOWN_FUTURE".to_string(),
+            OsString::from_vec(vec![0xff, 0xfe]),
+        );
+        assert!(!ConfigOverride::from_map(&env).unwrap().has_any());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn env_non_utf8_value_errors_when_consumed() {
+        use std::ffi::OsString;
+        use std::os::unix::ffi::OsStringExt;
+        // A consumed var whose value is not UTF-8 must surface an error at load.
+        let mut env: std::collections::HashMap<String, OsString> = std::collections::HashMap::new();
+        env.insert(
+            "NETDATA_OTEL_ENDPOINT_PATH".to_string(),
+            OsString::from_vec(vec![0xff, 0xfe]),
+        );
+        assert!(ConfigOverride::from_map(&env).is_err());
+    }
+
+    // -- Builder mechanics + full precedence via `ConfigResolver` --
+    //
+    // Precedence was previously punted to E2E because it needed process-global
+    // env mutation; now covered here with a per-test tempdir for the config files
+    // and a built EnvMap for the env layer (helpers above).
+
+    #[test]
+    fn resolve_stock_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let stock = write_file(dir.path(), "stock.yaml", STOCK_YAML);
+        let config = ConfigResolver::from_stock(stock).resolve().unwrap();
+        assert_eq!(config.endpoint.path, "127.0.0.1:4317");
     }
 
     #[test]
-    fn env_overrides_applied_on_top_of_user() {
-        let mut config = stock_config();
-        let user: ConfigOverride =
-            serde_yaml::from_str("endpoint:\n  path: '192.168.1.1:4317'").unwrap();
-        apply_overrides(&mut config, &user);
+    fn resolve_user_overrides_stock() {
+        let dir = tempfile::tempdir().unwrap();
+        let stock = write_file(dir.path(), "stock.yaml", STOCK_YAML);
+        let user = write_file(
+            dir.path(),
+            "user.yaml",
+            "endpoint:\n  path: '192.168.1.1:4317'\n",
+        );
+        let config = ConfigResolver::from_stock(stock)
+            .with_user(user)
+            .resolve()
+            .unwrap();
         assert_eq!(config.endpoint.path, "192.168.1.1:4317");
+    }
 
-        with_env_vars(&[("NETDATA_OTEL_ENDPOINT_PATH", "0.0.0.0:4317")], || {
-            let env = ConfigOverride::from_env().unwrap();
-            apply_overrides(&mut config, &env);
-            assert_eq!(config.endpoint.path, "0.0.0.0:4317");
-        });
+    #[test]
+    fn resolve_env_overrides_user_and_stock() {
+        let dir = tempfile::tempdir().unwrap();
+        let stock = write_file(dir.path(), "stock.yaml", STOCK_YAML);
+        let user = write_file(
+            dir.path(),
+            "user.yaml",
+            "endpoint:\n  path: '192.168.1.1:4317'\n",
+        );
+        let env =
+            ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_ENDPOINT_PATH", "0.0.0.0:9999")]))
+                .unwrap();
+        let config = ConfigResolver::from_stock(stock)
+            .with_user(user)
+            .with_env(env)
+            .resolve()
+            .unwrap();
+        assert_eq!(config.endpoint.path, "0.0.0.0:9999");
+    }
+
+    #[test]
+    fn resolve_env_override_non_endpoint_field() {
+        // A non-endpoint env override must also flow through the full resolver
+        // (apply_overrides), not just parse in isolation via from_map.
+        let dir = tempfile::tempdir().unwrap();
+        let stock = write_file(dir.path(), "stock.yaml", STOCK_YAML);
+        let env = ConfigOverride::from_map(&env_map(&[(
+            "NETDATA_OTEL_LOGS_WAL_MAX_LOG_ENTRIES",
+            "12345",
+        )]))
+        .unwrap();
+        let config = ConfigResolver::from_stock(stock)
+            .with_env(env)
+            .resolve()
+            .unwrap();
+        assert_eq!(
+            config.logs.wal.rotation.resolve("default").max_log_entries,
+            12345
+        );
+        // Untouched stock field survives the env override.
+        assert_eq!(
+            config.logs.wal.rotation.resolve("default").max_file_size,
+            ByteSize::mb(100)
+        );
+    }
+
+    #[test]
+    fn resolve_missing_user_file_is_skipped() {
+        // A user path is set but no file exists there → user layer is skipped.
+        let dir = tempfile::tempdir().unwrap();
+        let stock = write_file(dir.path(), "stock.yaml", STOCK_YAML);
+        let config = ConfigResolver::from_stock(stock)
+            .with_user(dir.path().join("absent.yaml"))
+            .resolve()
+            .unwrap();
+        assert_eq!(config.endpoint.path, "127.0.0.1:4317");
+    }
+
+    #[test]
+    fn resolve_missing_stock_file_errors() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = ConfigResolver::from_stock(dir.path().join("absent.yaml")).resolve();
+        assert!(config.is_err());
+    }
+
+    #[test]
+    fn resolve_malformed_user_config_errors() {
+        let dir = tempfile::tempdir().unwrap();
+        let stock = write_file(dir.path(), "stock.yaml", STOCK_YAML);
+        let user = write_file(
+            dir.path(),
+            "user.yaml",
+            "endpoint:\n  path: [unterminated\n",
+        );
+        let config = ConfigResolver::from_stock(stock).with_user(user).resolve();
+        assert!(config.is_err());
     }
 
     // -- Legacy journal_dir resolution (former-schema otel.yaml parsing) --
     //
-    // These cover the pure extraction + the malformed-file signal. The full
-    // env/file precedence (user → stock → NETDATA_LOG_DIR → default) is exercised
-    // by the best-effort E2E rather than a unit test: it depends on process-global
-    // env vars (unsafe to mutate under edition 2024) and the host config layout.
+    // `journal_dir_from_yaml` covers per-file extraction; `pick_journal_dir`
+    // (below) covers candidate precedence (user before stock, malformed skipped).
+    // The remaining env/filesystem wiring (which dirs, NETDATA_LOG_DIR, the hard
+    // default) lives in the thin `resolve_legacy_journal_dir` shell and is E2E-covered.
 
     #[test]
     fn journal_dir_from_yaml_reads_former_field() {
@@ -1011,5 +1176,33 @@ logs:
         // A syntax error must surface as Err so the caller warns instead of
         // silently falling back to the default (which would hide a user override).
         assert!(journal_dir_from_yaml("logs:\n  journal_dir: [unterminated\n").is_err());
+    }
+
+    #[test]
+    fn pick_journal_dir_prefers_earlier_candidate() {
+        let dir = pick_journal_dir([
+            (Path::new("user"), "logs:\n  journal_dir: /from/user\n"),
+            (Path::new("stock"), "logs:\n  journal_dir: /from/stock\n"),
+        ]);
+        assert_eq!(dir.as_deref(), Some(Path::new("/from/user")));
+    }
+
+    #[test]
+    fn pick_journal_dir_skips_absent_and_malformed() {
+        // First has no journal_dir; second is malformed (warn + skip); third wins.
+        let dir = pick_journal_dir([
+            (Path::new("a"), "logs:\n  wal:\n    dir: /x\n"),
+            (Path::new("b"), "logs:\n  journal_dir: [unterminated\n"),
+            (Path::new("c"), "logs:\n  journal_dir: /good\n"),
+        ]);
+        assert_eq!(dir.as_deref(), Some(Path::new("/good")));
+    }
+
+    #[test]
+    fn pick_journal_dir_none_when_no_candidate_has_field() {
+        assert_eq!(
+            pick_journal_dir([(Path::new("a"), "endpoint:\n  path: x\n")]),
+            None
+        );
     }
 }

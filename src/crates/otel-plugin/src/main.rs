@@ -77,17 +77,12 @@ async fn run_worker(kind: WorkerKind) -> anyhow::Result<()> {
 async fn main() {
     let cli = Cli::parse();
 
-    // Each arm owns its full lifecycle (tracing init, then dispatch), so the
-    // global tracing subscriber is installed exactly once per process and the
-    // match needs no fallthrough. The `logs` arm is an offline CLI query, not the
-    // daemon: it installs the stderr `warn` subscriber instead of the daemon
-    // subscriber. The daemon subscriber targets journald or stderr (never stdout),
-    // defaults to `info`, emits a "tracing initialized" preamble, and formats for
-    // journald (thread ids, line numbers) — all of which clutter an operator's
-    // terminal, and its journald path would try to connect to journald. The
-    // `warn`/stderr subscriber keeps diagnostics clean; stdout NDJSON is safe
-    // either way since neither subscriber writes to stdout. Runs synchronously and
-    // exits before any supervisor setup.
+    // Each arm installs the global tracing subscriber exactly once, then
+    // dispatches. Stdout is reserved for protocol output — pluginsd for the
+    // daemon, NDJSON for `logs` — so no subscriber ever writes there. The `logs`
+    // arm is an offline query, not the daemon, so it uses a quiet stderr `warn`
+    // subscriber instead of the daemon's journald-formatted `info` one, which
+    // would otherwise clutter an operator's terminal (and try to reach journald).
     match cli.command {
         Some(CliCommand::Logs(args)) => {
             sfsq_cli::init_tracing();
