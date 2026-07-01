@@ -15,7 +15,8 @@ char *generate_update_agent_connection(size_t *len, const update_agent_connectio
 {
     UpdateAgentConnection connupd;
 
-    connupd.set_claim_id(data->claim_id);
+    if (data->claim_id)
+        connupd.set_claim_id(data->claim_id);
     connupd.set_reachable(data->reachable);
     connupd.set_session_id(data->session_id);
 
