@@ -15,6 +15,7 @@ import (
 	"os/signal"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -127,7 +128,8 @@ func main() {
 	var stateMu sync.Mutex
 	var messageQueueMu sync.Mutex
 	messageQueue := []string{}
-	stdinActive := true
+	var stdinActive atomic.Bool
+	stdinActive.Store(true)
 
 	// Pending requests that are waiting for connection to be established
 	var pendingMu sync.Mutex
@@ -281,7 +283,7 @@ func main() {
 		}
 
 		// Signal that stdin is closed
-		stdinActive = false
+		stdinActive.Store(false)
 		close(stdinClosedCh)
 	}()
 
@@ -320,7 +322,7 @@ connectionLoop:
 		// Calculate backoff delay with jitter
 		if attempt > 0 {
 			// Check if stdin is closed and we're disconnected - if so, exit
-			if !stdinActive {
+			if !stdinActive.Load() {
 				fmt.Fprintf(os.Stderr, "%s: Stdin closed and disconnected, exiting\n", programName)
 				return
 			}
@@ -626,7 +628,7 @@ connectionLoop:
 		hasMessages := len(messageQueue) > 0
 		messageQueueMu.Unlock()
 
-		if !stdinActive && !hasMessages {
+		if !stdinActive.Load() && !hasMessages {
 			fmt.Fprintf(os.Stderr, "%s: Stdin closed and no pending messages, exiting\n", programName)
 			return
 		}
