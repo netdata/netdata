@@ -549,8 +549,6 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
 
     loaded_km_contexts.reserve(Cfg.num_models_to_use);
     while ((rc = sqlite3_step_monitored(res)) == SQLITE_ROW) {
-        ml_kmeans_t km;
-
         sqlite3_int64 raw_after  = sqlite3_column_int64(res, 0);
         sqlite3_int64 raw_before = sqlite3_column_int64(res, 1);
         // Protect against silent truncation when time_t is narrower than int64_t
@@ -562,13 +560,14 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
             continue;
         }
 
+        loaded_km_contexts.emplace_back();
+        ml_kmeans_inlined_t &km = loaded_km_contexts.back();
+
         km.after  = (time_t) raw_after;
         km.before = (time_t) raw_before;
 
         km.min_dist = sqlite3_column_double(res, 2);
         km.max_dist = sqlite3_column_double(res, 3);
-
-        km.cluster_centers.resize(2);
 
         km.cluster_centers[0].set_size(Cfg.lag_n + 1);
         km.cluster_centers[0](0) = sqlite3_column_double(res, 4);
@@ -585,8 +584,6 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
         km.cluster_centers[1](3) = sqlite3_column_double(res, 13);
         km.cluster_centers[1](4) = sqlite3_column_double(res, 14);
         km.cluster_centers[1](5) = sqlite3_column_double(res, 15);
-
-        loaded_km_contexts.emplace_back(km);
     }
 
     if (rc == SQLITE_DONE && !loaded_km_contexts.empty()) {
