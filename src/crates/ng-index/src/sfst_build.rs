@@ -71,15 +71,19 @@ const CARDINALITY_THRESHOLD: u32 = 100;
 pub struct SfstStats {
     pub frames: u64,
     pub records: u64,
-    /// Entries that rode the `lookup_hash` fast path (no string formatting).
+    /// Entries whose precomputed hash hit AND whose interned string matched — the
+    /// fast path (no intern-map insert).
     pub hits: u64,
-    /// Entries that missed (first occurrence) and were formatted + interned.
+    /// Entries that missed the hash, or hit but whose string differed (a collision):
+    /// interned via the string path.
     pub misses: u64,
 }
 
-/// Intern a slice of entries into tokens, riding the interner's `lookup_hash` fast
-/// path (format + intern only on a miss). Computed once per resource/scope group
-/// and reused across its records, so shared attrs aren't re-probed per record.
+/// Intern a slice of entries into tokens. The `key=value` is always rendered so a
+/// `lookup_hash` hit can be verified against the interned string (guarding against a
+/// hash collision aliasing distinct strings); a verified hit skips the intern-map
+/// insert. Computed once per resource/scope group and reused across its records, so
+/// shared attrs aren't re-probed per record.
 fn intern_entries(
     row_index: &mut RowIndex<'_>,
     entries: &[Entry],
@@ -89,15 +93,26 @@ fn intern_entries(
 ) -> Vec<KvSlot> {
     entries
         .iter()
-        .map(|e| match row_index.lookup_hash(e.hash) {
-            Some(token) => {
-                stats.hits += 1;
-                token
-            }
-            None => {
-                stats.misses += 1;
-                build_kv(&paths[e.node as usize], &e.value, kv);
-                row_index.intern(Some(e.hash), kv)
+        .map(|e| {
+            // Render key=value up front so a hash hit can be *verified* against the
+            // interned string. Without this re-check, two distinct strings sharing a
+            // hash (a genuine xxhash64 collision, or an unfilled hash==0) would alias:
+            // `lookup_hash` returns the first string's slot with no string check, and
+            // the interner's collision overflow — populated only inside `intern` — is
+            // never reached, because a fast-path hit skips `intern` entirely.
+            build_kv(&paths[e.node as usize], &e.value, kv);
+            let hit = row_index.lookup_hash(e.hash);
+            match hit {
+                Some(token) if row_index.resolve(token) == kv.as_str() => {
+                    stats.hits += 1;
+                    token
+                }
+                // Unknown hash, or a hit whose string differs (a real collision):
+                // `intern` compares strings and records the collision correctly.
+                _ => {
+                    stats.misses += 1;
+                    row_index.intern(Some(e.hash), kv)
+                }
             }
         })
         .collect()
@@ -488,5 +503,34 @@ mod tests {
             assert_eq!(sfst_tree.path(id), expected, "path mismatch at node {id}");
         }
         assert!(saw_array, "fixture must exercise an ArrayElem ([]) step");
+    }
+
+    /// A hash collision must NOT alias distinct strings. Two entries carry different
+    /// values but the same (adversarially equal) precomputed hash; `intern_entries`
+    /// must re-check the string on the `lookup_hash` hit and intern them separately.
+    /// Without the re-check, the second would silently take the first's slot.
+    #[test]
+    fn intern_entries_rechecks_string_on_hash_collision() {
+        use ng_flatten::Value;
+
+        let arena = Bump::new();
+        let mut ri = RowIndex::new(&arena, CARDINALITY_THRESHOLD);
+        let paths = vec!["k".to_string()];
+        let entries = vec![
+            Entry { node: 0, value: Value::Int(1), hash: 42 },
+            Entry { node: 0, value: Value::Int(2), hash: 42 }, // distinct value, same hash
+        ];
+        let mut kv = String::new();
+        let mut stats = SfstStats::default();
+        let tokens = intern_entries(&mut ri, &entries, &paths, &mut kv, &mut stats);
+
+        assert_ne!(
+            tokens[0], tokens[1],
+            "colliding-hash distinct strings must not alias to one slot"
+        );
+        assert_eq!(ri.resolve(tokens[0]), "k=1");
+        assert_eq!(ri.resolve(tokens[1]), "k=2");
+        // First is a genuine miss; second hit the hash but failed the string re-check.
+        assert_eq!((stats.hits, stats.misses), (0, 2));
     }
 }
