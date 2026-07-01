@@ -157,9 +157,18 @@ func regionPartition(region string) string {
 		return "aws-cn"
 	case strings.HasPrefix(region, "us-isob-"):
 		return "aws-iso-b"
+	case strings.HasPrefix(region, "us-isof-"):
+		return "aws-iso-f"
 	case strings.HasPrefix(region, "us-iso-"):
 		return "aws-iso"
+	case strings.HasPrefix(region, "eu-isoe-"):
+		return "aws-iso-e"
+	case strings.HasPrefix(region, "eusc-"):
+		return "aws-eusc"
 	default:
+		// Unrecognized regions fall back to the standard partition; extend this
+		// switch as AWS ships new partitions. A wrong guess here is never worse
+		// than this fallback, which is the pre-existing behavior.
 		return "aws"
 	}
 }

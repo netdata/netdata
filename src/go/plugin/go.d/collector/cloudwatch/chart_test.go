@@ -147,3 +147,21 @@ func TestEnsureProfiles_CombinedBuildsValidChartTemplate(t *testing.T) {
 	require.NotEmpty(t, c.chartTemplateYAML)
 	collecttest.AssertChartTemplateSchema(t, c.chartTemplateYAML)
 }
+
+func TestProfileSeries_RateIsSumSpecific(t *testing.T) {
+	// A rate metric that also exposes a non-sum statistic must mark only the sum
+	// series as a rate; dividing an average/maximum by the period would be wrong.
+	prof := cwprofiles.Profile{
+		Period: 300,
+		Metrics: []cwprofiles.Metric{
+			{ID: "req", Statistics: []string{"sum", "average"}, Rate: true},
+		},
+	}
+
+	series := profileSeries("svc", prof)
+
+	require.Contains(t, series, "svc.req_sum")
+	require.Contains(t, series, "svc.req_average")
+	assert.True(t, series["svc.req_sum"].rate, "sum series of a rate metric is a per-second rate")
+	assert.False(t, series["svc.req_average"].rate, "non-sum series is never a rate (no period divisor)")
+}

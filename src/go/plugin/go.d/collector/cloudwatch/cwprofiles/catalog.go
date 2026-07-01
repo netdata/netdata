@@ -154,6 +154,10 @@ func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 		catalog.byBaseName[baseName] = entry.Config
 	}
 
+	if err := catalog.validateUniqueChartIDs(); err != nil {
+		return Catalog{}, err
+	}
+
 	return catalog, nil
 }
 
@@ -230,6 +234,37 @@ func (c Catalog) ProfilesForNamespaces(namespaces []string) []ResolvedProfile {
 
 func (c Catalog) sortedBaseNames() []string {
 	return slices.Sorted(maps.Keys(c.byBaseName))
+}
+
+// validateUniqueChartIDs ensures no two loaded profiles render a chart with the
+// same id. chartengine keys charts by id and, on a cross-template id collision,
+// silently keeps the first and drops the rest, so a colliding chart would simply
+// vanish (e.g. in namespaces.mode combined, where every profile is active). A
+// collision between two stock profiles is a packaging bug and is fatal; a
+// collision involving a user profile is logged (its colliding chart is dropped).
+func (c Catalog) validateUniqueChartIDs() error {
+	type owner struct {
+		base  string
+		stock bool
+	}
+	seen := make(map[string]owner)
+	var errs []error
+	for _, base := range c.sortedBaseNames() {
+		_, isStock := c.stockProfileBaseNames[base]
+		for _, id := range chartIDs(c.byBaseName[base].Template) {
+			prev, ok := seen[id]
+			if !ok {
+				seen[id] = owner{base: base, stock: isStock}
+				continue
+			}
+			if prev.stock && isStock {
+				errs = append(errs, fmt.Errorf("duplicate chart id %q in stock profiles %q and %q", id, prev.base, base))
+			} else {
+				log.Warningf("chart id %q in profile %q collides with profile %q; chartengine will render only one", id, base, prev.base)
+			}
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func profileBaseName(path string) string {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestAWSAuthConfig_ValidateWithPath(t *testing.T) {
@@ -132,4 +133,29 @@ func TestAWSAuthConfig_NewConfig(t *testing.T) {
 		assert.Equal(t, "us-east-1", awsCfg.Region)
 		assert.NotNil(t, awsCfg.Credentials)
 	})
+}
+
+func TestAWSAuthConfig_YAMLRoundTrip(t *testing.T) {
+	tests := map[string]AWSAuthConfig{
+		"access_key with session token": {
+			Mode:          AWSAuthModeAccessKey,
+			ModeAccessKey: &AWSModeAccessKeyConfig{AccessKeyID: "AKIAEXAMPLE", SecretAccessKey: "secret", SessionToken: "token"},
+		},
+		"assume_role with external id": {
+			Mode: AWSAuthModeAssumeRole,
+			ModeAssumeRole: &AWSModeAssumeRoleConfig{
+				Roles: []AWSAssumeRole{{RoleARN: "arn:aws:iam::000000000000:role/example", ExternalID: "ext"}},
+			},
+		},
+	}
+	for name, orig := range tests {
+		t.Run(name, func(t *testing.T) {
+			data, err := yaml.Marshal(orig)
+			require.NoError(t, err)
+
+			var got AWSAuthConfig
+			require.NoError(t, yaml.Unmarshal(data, &got))
+			assert.Equal(t, orig, got)
+		})
+	}
 }

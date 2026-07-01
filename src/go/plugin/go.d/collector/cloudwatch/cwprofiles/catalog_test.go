@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -320,5 +322,45 @@ func testCatalog(id string) Catalog {
 	return Catalog{
 		byBaseName:            map[string]Profile{id: {DisplayName: id}},
 		stockProfileBaseNames: map[string]struct{}{id: {}},
+	}
+}
+
+func TestValidateUniqueChartIDs(t *testing.T) {
+	mkProfile := func(chartID string) Profile {
+		return Profile{Template: charttpl.Group{Charts: []charttpl.Chart{{ID: chartID}}}}
+	}
+	tests := map[string]struct {
+		catalog Catalog
+		wantErr bool
+	}{
+		"unique ids": {
+			catalog: Catalog{
+				byBaseName:            map[string]Profile{"a": mkProfile("cw_a"), "b": mkProfile("cw_b")},
+				stockProfileBaseNames: map[string]struct{}{"a": {}, "b": {}},
+			},
+		},
+		"stock-vs-stock duplicate is fatal": {
+			catalog: Catalog{
+				byBaseName:            map[string]Profile{"a": mkProfile("cw_dup"), "b": mkProfile("cw_dup")},
+				stockProfileBaseNames: map[string]struct{}{"a": {}, "b": {}},
+			},
+			wantErr: true,
+		},
+		"user-profile duplicate is tolerated (warned, not fatal)": {
+			catalog: Catalog{
+				byBaseName:            map[string]Profile{"a": mkProfile("cw_dup"), "b": mkProfile("cw_dup")},
+				stockProfileBaseNames: map[string]struct{}{"a": {}}, // "b" is a user profile
+			},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := tc.catalog.validateUniqueChartIDs()
+			if tc.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
 	}
 }

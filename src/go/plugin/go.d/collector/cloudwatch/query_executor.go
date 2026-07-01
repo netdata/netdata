@@ -192,15 +192,18 @@ func (c *Collector) runGetMetricData(ctx context.Context, client cloudwatchClien
 			if r.Id == nil {
 				continue
 			}
-			// Surface per-result errors instead of silently treating them as gaps.
-			// InternalError defers to the NextToken retry; Forbidden is a denied
-			// metric. In both cases skip caching this Id's (unreliable) value.
+			// Per-result statuses: skip caching an unreliable value, so the series
+			// gaps this period and is retried when its group is next due.
+			// InternalError is transient; Forbidden means the IAM identity cannot
+			// read this metric, so surface it (rate-limited) rather than hiding a
+			// permissions gap behind a debug line.
 			switch r.StatusCode {
 			case cwtypes.StatusCodeInternalError:
-				c.Debugf("CloudWatch GetMetricData result %q: InternalError; deferring to NextToken retry", aws.ToString(r.Id))
+				c.Debugf("CloudWatch GetMetricData result %q: InternalError (transient); skipping this period", aws.ToString(r.Id))
 				continue
 			case cwtypes.StatusCodeForbidden:
-				c.Debugf("CloudWatch GetMetricData result %q: Forbidden (access denied)", aws.ToString(r.Id))
+				c.Limit(logKeyGetMetricDataForbidden, 1, recurringLogEvery).
+					Warningf("CloudWatch GetMetricData: access denied for one or more metrics (result Forbidden); verify the IAM identity is allowed cloudwatch:GetMetricData")
 				continue
 			}
 			if _, ok := valueByID[*r.Id]; ok || len(r.Values) == 0 {

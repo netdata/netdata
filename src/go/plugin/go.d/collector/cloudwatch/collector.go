@@ -20,10 +20,11 @@ import (
 const recurringLogEvery = time.Hour
 
 const (
-	logKeyDiscoveryTargetFailed = "discovery_target_failed"
-	logKeyHighInstanceCount     = "high_instance_count"
-	logKeyQueryClientFailed     = "query_client_failed"
-	logKeyGetMetricDataFailed   = "getmetricdata_failed"
+	logKeyDiscoveryTargetFailed  = "discovery_target_failed"
+	logKeyHighInstanceCount      = "high_instance_count"
+	logKeyQueryClientFailed      = "query_client_failed"
+	logKeyGetMetricDataFailed    = "getmetricdata_failed"
+	logKeyGetMetricDataForbidden = "getmetricdata_forbidden"
 )
 
 //go:embed "config_schema.json"

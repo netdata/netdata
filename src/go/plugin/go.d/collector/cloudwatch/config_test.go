@@ -14,6 +14,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func validBaseConfig() Config {
@@ -88,18 +89,49 @@ func TestConfigSchema_RuntimeContract(t *testing.T) {
 
 func TestRegionPartition(t *testing.T) {
 	tests := map[string]string{
-		"us-east-1":      "aws",
-		"eu-west-3":      "aws",
-		"cn-north-1":     "aws-cn",
-		"cn-northwest-1": "aws-cn",
-		"us-gov-east-1":  "aws-us-gov",
-		"us-gov-west-1":  "aws-us-gov",
-		"us-iso-east-1":  "aws-iso",
-		"us-isob-east-1": "aws-iso-b",
+		"us-east-1":       "aws",
+		"eu-west-3":       "aws",
+		"cn-north-1":      "aws-cn",
+		"cn-northwest-1":  "aws-cn",
+		"us-gov-east-1":   "aws-us-gov",
+		"us-gov-west-1":   "aws-us-gov",
+		"us-iso-east-1":   "aws-iso",
+		"us-isob-east-1":  "aws-iso-b",
+		"us-isof-south-1": "aws-iso-f",
+		"eu-isoe-west-1":  "aws-iso-e",
+		"eusc-de-east-1":  "aws-eusc",
 	}
 	for region, want := range tests {
 		t.Run(region, func(t *testing.T) {
 			assert.Equal(t, want, regionPartition(region))
 		})
 	}
+}
+
+func TestConfig_YAMLRoundTrip(t *testing.T) {
+	orig := Config{
+		UpdateEvery:        60,
+		AutoDetectionRetry: 30,
+		Regions:            []string{"us-east-1", "eu-west-1"},
+		Auth: cloudauth.AWSAuthConfig{
+			Mode: cloudauth.AWSAuthModeAccessKey,
+			ModeAccessKey: &cloudauth.AWSModeAccessKeyConfig{
+				AccessKeyID: "AKIAEXAMPLE", SecretAccessKey: "secret", SessionToken: "token",
+			},
+		},
+		Namespaces: NamespacesConfig{
+			Mode:      namespacesModeExact,
+			ModeExact: &NamespacesExactConfig{Entries: []NamespaceEntry{{Name: "AWS/EC2"}}},
+		},
+		Discovery:   DiscoveryConfig{RefreshEvery: 300},
+		QueryOffset: 600,
+		Timeout:     defaultTimeout,
+	}
+
+	data, err := yaml.Marshal(orig)
+	require.NoError(t, err)
+
+	var got Config
+	require.NoError(t, yaml.Unmarshal(data, &got))
+	assert.Equal(t, orig, got, "config round-trips through YAML unchanged (incl. session_token)")
 }

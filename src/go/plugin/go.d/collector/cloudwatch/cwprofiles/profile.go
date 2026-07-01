@@ -446,6 +446,22 @@ func validateTemplate(prefix, baseName string, profile Profile) error {
 	return nil
 }
 
+// chartIDs returns every chart id declared in a template group, descending into
+// nested groups. Chart ids must be globally unique across the active profile set:
+// chartengine keys charts by id and silently drops a cross-template id collision.
+func chartIDs(g charttpl.Group) []string {
+	var ids []string
+	for _, ch := range g.Charts {
+		if id := strings.TrimSpace(ch.ID); id != "" {
+			ids = append(ids, id)
+		}
+	}
+	for i := range g.Groups {
+		ids = append(ids, chartIDs(g.Groups[i])...)
+	}
+	return ids
+}
+
 // visibleSeriesForProfile is the set of fully-qualified series names a profile
 // exports: one per (metric, statistic).
 func visibleSeriesForProfile(baseName string, metrics []Metric) map[string]struct{} {

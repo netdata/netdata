@@ -69,7 +69,7 @@ template:
     instances:
       by_labels: [account_id, region, load_balancer, target_group]
   charts:
-    - id: cw_alb_target_host_count
+    - id: cw_alb_target_group_host_count
       context: host_count
       title: ALB Target Group Host Count
       family: Hosts
@@ -80,7 +80,7 @@ template:
           name: healthy
         - selector: unhealthy_host_count_average
           name: unhealthy
-    - id: cw_alb_target_request_count
+    - id: cw_alb_target_group_request_count
       context: request_count_per_target
       title: ALB Requests Per Target
       family: Requests
@@ -89,7 +89,7 @@ template:
       dimensions:
         - selector: request_count_per_target_sum
           name: requests
-    - id: cw_alb_target_response_time
+    - id: cw_alb_target_group_response_time
       context: target_response_time
       title: ALB Target Group Response Time
       family: Latency
@@ -98,7 +98,7 @@ template:
       dimensions:
         - selector: target_response_time_average
           name: response_time
-    - id: cw_alb_target_response_codes
+    - id: cw_alb_target_group_response_codes
       context: target_response_codes
       title: ALB Target Group Response Codes
       family: Responses
@@ -113,7 +113,7 @@ template:
           name: 4xx
         - selector: http_code_target_5xx_sum
           name: 5xx
-    - id: cw_alb_target_connection_errors
+    - id: cw_alb_target_group_connection_errors
       context: target_connection_errors
       title: ALB Target Connection Errors
       family: Errors
@@ -125,7 +125,7 @@ template:
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_alb_target_tls_errors
+    # - id: cw_alb_target_group_tls_errors
     #   context: target_tls_negotiation_errors
     #   title: ALB Target TLS Negotiation Errors
     #   family: TLS
@@ -134,7 +134,7 @@ template:
     #   dimensions:
     #     - selector: target_tls_negotiation_errors_sum
     #       name: errors
-    # - id: cw_alb_target_host_states
+    # - id: cw_alb_target_group_host_states
     #   context: host_states
     #   title: ALB Target Anomalous and Mitigated Hosts
     #   family: Hosts
