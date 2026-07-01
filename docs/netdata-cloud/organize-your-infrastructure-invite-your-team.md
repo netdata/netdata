@@ -87,6 +87,23 @@ Rejoining a Room depends on your role:
 
 For the full permission breakdown, see the [Room Management table in the RBAC reference](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
 
+### Delete a Room
+
+Only **Admins** and **Managers** can delete a Room. See the [Room Management table in the RBAC reference](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) for the full permissions matrix.
+
+:::warning
+
+Deleting a Room is permanent and cannot be undone. The Room and its dashboards are removed.
+
+:::
+
+The nodes in a deleted Room are not deleted — they remain available in the "All nodes" Room and any other Rooms they belong to within the Space.
+
+**Steps to delete a Room:**
+
+1. Click the ⚙️ next to the Room name to open the Room's settings.
+2. Click **Delete Room**.
+
 ### Delete a Space
 
 Only users with the **Admin** role can delete a Space. See the [role-based access model](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) for full permission details.
