@@ -264,23 +264,43 @@ static bool needs_quotes_in_yaml(const char *str) {
     return false;
 }
 
+static void yaml_print_single_quoted_value(const char *value) {
+    fputc('\'', stderr);
+
+    while(*value) {
+        if(*value == '\'')
+            fputc('\'', stderr);
+
+        fputc(*value, stderr);
+        value++;
+    }
+
+    fputc('\'', stderr);
+}
+
 static void yaml_print_node(const char *key, const char *value, size_t depth, bool dash) {
     if(depth > 10) depth = 10;
-    const char *quote = "'";
+    bool quote = true;
 
     const char *second_line = NULL;
     if(value && strchr(value, '\n')) {
         second_line = value;
         value = "|";
-        quote = "";
+        quote = false;
     }
     else if(!value || !needs_quotes_in_yaml(value))
-        quote = "";
+        quote = false;
 
-    fprintf(stderr, "%.*s%s%s%s%s%s%s\n",
+    fprintf(stderr, "%.*s%s%s%s",
             (int)(depth * 2), "                    ", dash ? "- ": "",
-            key ? key : "", key ? ": " : "",
-            quote, value ? value : "", quote);
+            key ? key : "", key ? ": " : "");
+
+    if(quote)
+        yaml_print_single_quoted_value(value ? value : "");
+    else
+        fputs(value ? value : "", stderr);
+
+    fputc('\n', stderr);
 
     if(second_line) {
         yaml_print_multiline_value(second_line, depth + 1);
