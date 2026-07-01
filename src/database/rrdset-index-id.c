@@ -282,7 +282,7 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     RRDHOST *host = st->rrdhost;
 
     st->collector_tid = gettid_cached();
-    st->last_accessed_time_s = now_realtime_sec();
+    rrdset_touch_last_accessed_time_s(st);
 
     if(ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_PLUGIN_UPDATED | RRDSET_REACT_MODULE_UPDATED)) {
         if (ctr->react_action & RRDSET_REACT_NEW) {
@@ -344,7 +344,7 @@ RRDSET *rrdset_find(RRDHOST *host, const char *id, bool include_obsolete) {
         if(!include_obsolete && !rrdset_is_discoverable(st))
             return NULL;
 
-        st->last_accessed_time_s = now_realtime_sec();
+        rrdset_touch_last_accessed_time_s(st);
     }
 
     return(st);
@@ -374,7 +374,7 @@ RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id, bool inc
                 return NULL;
             }
 
-            st->last_accessed_time_s = now_realtime_sec();
+            rrdset_touch_last_accessed_time_s(st);
         }
     }
 
