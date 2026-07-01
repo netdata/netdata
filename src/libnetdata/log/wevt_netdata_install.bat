@@ -52,8 +52,7 @@ wevtutil sl "Netdata/Daemon" /ms:104857600
 wevtutil sl "Netdata/Collectors" /ms:104857600
 wevtutil sl "Netdata/Health" /ms:104857600
 wevtutil sl "Netdata/Access" /ms:104857600
-rem WEL fallback channel (used by MSYS2/UCRT64 builds without the Windows SDK)
-wevtutil sl "NetdataWEL" /ms:52428800
+wevtutil sl "Netdata/Aclk" /ms:5242880
 
 echo.
 echo Netdata Event Tracing for Windows manifest installed successfully.
