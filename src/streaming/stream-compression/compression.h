@@ -49,14 +49,34 @@ static inline void simple_ring_buffer_reset(SIMPLE_RING_BUFFER *b) {
 }
 
 static inline void simple_ring_buffer_make_room(SIMPLE_RING_BUFFER *b, size_t size) {
-    if(b->write_pos + size > b->size) {
-        if(!b->size)
-            b->size = COMPRESSION_MAX_CHUNK;
-        else
-            b->size *= 2;
+    if(unlikely(!b))
+        fatal("STREAM_COMPRESSION: NULL simple ring buffer");
 
-        if(b->write_pos + size > b->size)
-            b->size += size;
+    size_t needed_size;
+    if(unlikely(__builtin_add_overflow(b->write_pos, size, &needed_size)))
+        fatal("STREAM_COMPRESSION: simple ring buffer size overflow (write_pos=%zu, size=%zu)",
+              b->write_pos, size);
+
+    if(needed_size > b->size) {
+        size_t new_size;
+        if(!b->size)
+            new_size = COMPRESSION_MAX_CHUNK;
+        else if(b->size > SIZE_MAX / 2)
+            new_size = needed_size;
+        else
+            new_size = b->size * 2;
+
+        if(needed_size > new_size) {
+            if(size > SIZE_MAX - new_size)
+                new_size = needed_size;
+            else
+                new_size += size;
+
+            if(new_size < needed_size)
+                new_size = needed_size;
+        }
+
+        b->size = new_size;
 
         b->data = (const char *)reallocz((void *)b->data, b->size);
     }
@@ -145,6 +165,10 @@ static inline size_t stream_decompressor_start(struct decompressor_state *state,
 static inline size_t stream_decompressed_bytes_in_buffer(struct decompressor_state *state) {
     if(unlikely(state->output.read_pos > state->output.write_pos))
         fatal("STREAM_DECOMPRESS: invalid read/write stream positions");
+    if(unlikely(state->output.write_pos > state->output.size))
+        fatal("STREAM_DECOMPRESS: invalid output buffer size");
+    if(unlikely(state->output.write_pos && !state->output.data))
+        fatal("STREAM_DECOMPRESS: missing output buffer data");
 
     return state->output.write_pos - state->output.read_pos;
 }
@@ -161,6 +185,8 @@ static inline size_t stream_decompressor_get(struct decompressor_state *state, c
     size_t bytes_to_return = size;
     if(bytes_to_return > remaining)
         bytes_to_return = remaining;
+    if(unlikely(bytes_to_return > state->output.size - state->output.read_pos))
+        fatal("STREAM_DECOMPRESS: invalid output buffer read");
 
     memcpy(dst, state->output.data + state->output.read_pos, bytes_to_return);
     state->output.read_pos += bytes_to_return;
