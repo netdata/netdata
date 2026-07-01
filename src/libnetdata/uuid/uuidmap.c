@@ -182,15 +182,21 @@ static struct uuidmap_entry *get_entry_by_id_locked(UUIDMAP_ID id, uint8_t parti
     return PValue ? *PValue : NULL;
 }
 
+static ALWAYS_INLINE struct uuidmap_entry *get_entry_by_id_locked_and_acquire(UUIDMAP_ID id, uint8_t partition) {
+    struct uuidmap_entry *ue = get_entry_by_id_locked(id, partition);
+    if(ue && !refcount_acquire(&ue->refcount))
+        ue = NULL;
+
+    return ue;
+}
+
 static struct uuidmap_entry *get_entry_by_id_and_acquire(UUIDMAP_ID id) {
     if(id == 0) return NULL;
 
     uint8_t partition = uuidmap_id_to_partition(id);
     rw_spinlock_read_lock(&uuid_map.p[partition].spinlock);
 
-    struct uuidmap_entry *ue = get_entry_by_id_locked(id, partition);
-    if(ue && !refcount_acquire(&ue->refcount))
-        ue = NULL;
+    struct uuidmap_entry *ue = get_entry_by_id_locked_and_acquire(id, partition);
 
     rw_spinlock_read_unlock(&uuid_map.p[partition].spinlock);
 
@@ -351,6 +357,135 @@ typedef struct thread_stats {
     size_t cycles;
 } THREAD_STATS;
 
+typedef struct uuidmap_delete_gate {
+    UUIDMAP_ID id;
+    uint8_t partition;
+    bool writer_blocked;
+    bool writer_unexpectedly_acquired;
+    bool allow_delete;
+    bool delete_done;
+} UUIDMAP_DELETE_GATE;
+
+static void uuidmap_deferred_free_thread(void *arg) {
+    UUIDMAP_DELETE_GATE *gate = arg;
+
+    if(rw_spinlock_trywrite_lock(&uuid_map.p[gate->partition].spinlock)) {
+        __atomic_store_n(&gate->writer_unexpectedly_acquired, true, __ATOMIC_RELEASE);
+        rw_spinlock_write_unlock(&uuid_map.p[gate->partition].spinlock);
+    }
+    else
+        __atomic_store_n(&gate->writer_blocked, true, __ATOMIC_RELEASE);
+
+    while(!__atomic_load_n(&gate->allow_delete, __ATOMIC_ACQUIRE))
+        tinysleep();
+
+    uuidmap_free(gate->id);
+    __atomic_store_n(&gate->delete_done, true, __ATOMIC_RELEASE);
+}
+
+static int uuidmap_locked_lookup_delete_interleaving_unittest(void) {
+    fprintf(stderr, "\nTesting UUID Map locked lookup/delete interleaving...\n");
+
+    nd_uuid_t test_uuid = {
+        0xf0, 0xde, 0xbc, 0x9a,
+        0x78, 0x56, 0x34, 0x12,
+        0xf0, 0xde, 0xbc, 0x9a,
+        0x78, 0x56, 0x34, 0x11
+    };
+
+    int errors = 0;
+    UUIDMAP_ID id = uuidmap_create(test_uuid);
+    if(!id) {
+        fprintf(stderr, "ERROR: Cannot create UUID for locked lookup/delete interleaving test\n");
+        return 1;
+    }
+
+    uint8_t partition = uuidmap_id_to_partition(id);
+    UUIDMAP_DELETE_GATE gate = {
+        .id = id,
+        .partition = partition,
+    };
+
+    rw_spinlock_read_lock(&uuid_map.p[partition].spinlock);
+
+    struct uuidmap_entry *ue = get_entry_by_id_locked(id, partition);
+    if(!ue) {
+        fprintf(stderr, "ERROR: Cannot find UUID after create in locked lookup/delete interleaving test\n");
+        errors++;
+    }
+
+    ND_THREAD *thread = nd_thread_create(
+        "UUID-DELETE-GATE",
+        NETDATA_THREAD_OPTION_DONT_LOG,
+        uuidmap_deferred_free_thread,
+        &gate);
+
+    usec_t deadline = now_monotonic_usec() + 5 * USEC_PER_SEC;
+    while(!__atomic_load_n(&gate.writer_blocked, __ATOMIC_ACQUIRE) &&
+          !__atomic_load_n(&gate.writer_unexpectedly_acquired, __ATOMIC_ACQUIRE) &&
+          now_monotonic_usec() < deadline)
+        tinysleep();
+
+    if(__atomic_load_n(&gate.writer_unexpectedly_acquired, __ATOMIC_ACQUIRE)) {
+        fprintf(stderr, "ERROR: UUID delete writer entered while lookup reader was locked\n");
+        errors++;
+    }
+
+    if(!__atomic_load_n(&gate.writer_blocked, __ATOMIC_ACQUIRE)) {
+        fprintf(stderr, "ERROR: UUID delete writer did not reach the blocked interleaving window\n");
+        errors++;
+    }
+
+    bool acquired_ref = false;
+    if(ue) {
+        struct uuidmap_entry *acquired = get_entry_by_id_locked_and_acquire(id, partition);
+        if(acquired != ue) {
+            fprintf(stderr, "ERROR: Locked lookup/acquire returned unexpected UUID entry\n");
+            errors++;
+        }
+        else
+            acquired_ref = true;
+    }
+
+    rw_spinlock_read_unlock(&uuid_map.p[partition].spinlock);
+
+    __atomic_store_n(&gate.allow_delete, true, __ATOMIC_RELEASE);
+    nd_thread_join(thread);
+
+    if(!__atomic_load_n(&gate.delete_done, __ATOMIC_ACQUIRE)) {
+        fprintf(stderr, "ERROR: UUID delete helper did not complete\n");
+        errors++;
+    }
+
+    if(acquired_ref) {
+        nd_uuid_t found_uuid;
+        if(!uuidmap_uuid(id, found_uuid)) {
+            fprintf(stderr, "ERROR: UUID disappeared despite locked refcount acquire\n");
+            errors++;
+        }
+        else if(uuid_compare(found_uuid, test_uuid) != 0) {
+            fprintf(stderr, "ERROR: UUID changed after locked lookup/delete interleaving\n");
+            errors++;
+        }
+
+        uuidmap_free(id);
+    }
+
+    nd_uuid_t found_uuid;
+    if(uuidmap_uuid(id, found_uuid)) {
+        fprintf(stderr, "ERROR: UUID still exists after releasing locked interleaving reference\n");
+        errors++;
+        uuidmap_free(id);
+    }
+
+    if(errors)
+        fprintf(stderr, "UUID Map locked lookup/delete interleaving test: %d ERROR(S)\n", errors);
+    else
+        fprintf(stderr, "UUID Map locked lookup/delete interleaving test: OK\n");
+
+    return errors;
+}
+
 static void concurrent_test_thread(void *arg) {
     THREAD_STATS *stats = arg;
     nd_uuid_t test_uuid = {
@@ -465,7 +600,8 @@ int uuidmap_unittest(void) {
     fprintf(stderr, "\nTesting UUID Map...\n");
 
     const size_t ENTRIES = 100000;
-    int errors = uuidmap_concurrent_unittest();
+    int errors = uuidmap_locked_lookup_delete_interleaving_unittest();
+    errors += uuidmap_concurrent_unittest();
 
     struct test_entry {
         nd_uuid_t uuid;
