@@ -479,14 +479,6 @@ bool nd_log_init_windows(void) {
         // Fast no-op when the manifest is already current (registry check only).
         wel_ensure_manifest_installed();
 #endif
-        // Remove legacy NetdataWEL registry entries. Classic WEL source lookup uses creation order,
-        // so stale NetdataWEL\<source> keys would be found before the new per-channel keys, causing
-        // ReportEventW to keep writing to the old channel.
-        wchar_t legacy_key[MAX_PATH];
-        swprintf(legacy_key, MAX_PATH,
-                 L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\NetdataWEL");
-        if(RegDeleteTreeW(HKEY_LOCAL_MACHINE, legacy_key) == ERROR_SUCCESS)
-            nd_win_trace("nd_log_init_windows: removed legacy EventLog\\NetdataWEL registry key");
     }
 
     // Loop through each source and add it to the registry
@@ -544,6 +536,20 @@ bool nd_log_init_windows(void) {
     }
 
     if(!nd_log.eventlog.etw) {
+        // Remove legacy NetdataWEL registry entries only after new per-channel sources are
+        // confirmed installed. Deleting first risks leaving neither old nor new routing
+        // working if registration subsequently fails. ERROR_FILE_NOT_FOUND is normal on a
+        // fresh install (key never existed) and is not logged.
+        wchar_t legacy_key[MAX_PATH];
+        swprintf(legacy_key, MAX_PATH,
+                 L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\NetdataWEL");
+        LSTATUS legacy_rc = RegDeleteTreeW(HKEY_LOCAL_MACHINE, legacy_key);
+        if(legacy_rc == ERROR_SUCCESS)
+            nd_win_trace("nd_log_init_windows: removed legacy EventLog\\NetdataWEL registry key");
+        else if(legacy_rc != ERROR_FILE_NOT_FOUND)
+            nd_win_trace("nd_log_init_windows: failed to remove legacy EventLog\\NetdataWEL rc=%ld",
+                         (long)legacy_rc);
+
         // Map the unset ones to NDLS_DAEMON
         for (size_t i = 0; i < _NDLS_MAX; i++) {
             if (!nd_log.sources[i].hEventLog)
