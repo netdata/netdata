@@ -25,11 +25,16 @@ static size_t onewayalloc_add_or_fatal(size_t size, size_t add, const char *cont
     return size + add;
 }
 
-static size_t onewayalloc_mul_or_fatal(size_t nmemb, size_t size, const char *context) {
+size_t onewayalloc_mul_or_fatal(size_t nmemb, size_t size, const char *context) {
     if(unlikely(size && nmemb > SIZE_MAX / size))
         fatal("ONEWAYALLOC: cannot allocate %s size %zu * %zu.", context, nmemb, size);
 
     return nmemb * size;
+}
+
+size_t onewayalloc_mul3_or_fatal(size_t nmemb1, size_t nmemb2, size_t size, const char *context) {
+    size_t nmemb = onewayalloc_mul_or_fatal(nmemb1, nmemb2, context);
+    return onewayalloc_mul_or_fatal(nmemb, size, context);
 }
 
 static size_t onewayalloc_natural_alignment_or_fatal(size_t size) {
