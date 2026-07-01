@@ -154,17 +154,28 @@ func writeSample(meter metrix.SnapshotMeter, seriesName string, labels []metrix.
 	meter.WithLabels(labels...).Gauge(seriesName, metrix.WithFloat(true)).Observe(value)
 }
 
-// pruneObserved drops cached series that are no longer in the current query plan
-// (their instance, metric, or profile is gone), so removed resources stop being
-// re-emitted.
+// pruneObserved drops both the retention-cache entries and the per-(region,
+// period) schedule entries that are no longer in the current query plan. Dropping
+// the retention cache stops a removed resource from being re-emitted. Dropping the
+// schedule ensures a (region, period) group that fully left discovery and later
+// reappears is treated as unscheduled — and so queried on its first cycle back —
+// instead of waiting for a stale nextQueryAt (up to a full period, e.g. ~24h for a
+// daily group) to expire.
 func (o *observationStore) pruneObserved(plan []plannedQuery) {
-	valid := make(map[string]struct{}, len(plan))
+	validSeries := make(map[string]struct{}, len(plan))
+	validGroups := make(map[queryGroupKey]struct{})
 	for _, pq := range plan {
-		valid[observedKey(pq.seriesName, pq.labels)] = struct{}{}
+		validSeries[observedKey(pq.seriesName, pq.labels)] = struct{}{}
+		validGroups[pq.groupKey()] = struct{}{}
 	}
 	for key := range o.lastObserved {
-		if _, ok := valid[key]; !ok {
+		if _, ok := validSeries[key]; !ok {
 			delete(o.lastObserved, key)
+		}
+	}
+	for key := range o.nextQueryAt {
+		if _, ok := validGroups[key]; !ok {
+			delete(o.nextQueryAt, key)
 		}
 	}
 }

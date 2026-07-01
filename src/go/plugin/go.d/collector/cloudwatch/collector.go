@@ -115,6 +115,7 @@ func (c *Collector) Cleanup(context.Context) {
 	c.profiles = nil
 	c.chartTemplateYAML = ""
 	c.discovery = discoverySnapshot{}
+	c.discoverySig = ""
 	c.clients.reset()
 	c.observations.reset()
 }

@@ -77,7 +77,13 @@ func injectDimensionOptions(group *charttpl.Group, series map[string]seriesPrese
 		for j := range group.Charts[i].Dimensions {
 			d := &group.Charts[i].Dimensions[j]
 			if pres, ok := series[selectorSeriesName(d.Selector)]; ok && pres.rate {
-				d.Options = &charttpl.DimensionOptions{Divisor: pres.period}
+				// Set only the rate divisor, preserving any author-defined dimension
+				// options (multiplier, hidden, float). Group.Clone deep-copies Options,
+				// so mutating it in place never touches the shared profile catalog.
+				if d.Options == nil {
+					d.Options = &charttpl.DimensionOptions{}
+				}
+				d.Options.Divisor = pres.period
 			}
 		}
 	}

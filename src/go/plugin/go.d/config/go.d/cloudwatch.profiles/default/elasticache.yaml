@@ -174,3 +174,30 @@ template:
     #   dimensions:
     #     - selector: replication_bytes_sum
     #       name: bytes
+    # - id: cw_ec_swap
+    #   context: swap_usage
+    #   title: ElastiCache Swap Usage
+    #   family: Memory
+    #   units: bytes
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: swap_usage_average
+    #       name: swap
+    # - id: cw_ec_replication_lag
+    #   context: replication_lag
+    #   title: ElastiCache Replication Lag
+    #   family: Replication
+    #   units: seconds
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: replication_lag_average
+    #       name: lag
+    # - id: cw_ec_items
+    #   context: items
+    #   title: ElastiCache Current Items
+    #   family: Keyspace
+    #   units: items
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: curr_items_average
+    #       name: items

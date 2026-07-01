@@ -340,6 +340,14 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 		return c.clients.forRegion(ctx, region)
 	}
 	results := discoverAll(ctx, newClient, c.profiles, c.regions(), c.recentlyActiveOnly(), apiConcurrency, c.Timeout.Duration())
+	// If the parent context was canceled or timed out during the fan-out, abort before
+	// committing: buildDiscoverySnapshot would otherwise carry forward instances (or
+	// accept a partial first snapshot) and advance the TTL, so the next cycle would skip
+	// discovery. A per-call GetMetricData/ListMetrics timeout uses a derived context and
+	// does not trip this, so it stays fail-soft.
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	// Failed targets carry forward their previous instances, so a transient
 	// per-region/namespace failure does not drop series (spec: keep last snapshot).
 	snap, errs := buildDiscoverySnapshot(results, c.discovery.Instances, now, c.Discovery.RefreshEvery)

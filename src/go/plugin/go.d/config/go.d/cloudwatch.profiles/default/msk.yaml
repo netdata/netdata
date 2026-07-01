@@ -66,9 +66,9 @@ metrics:
   # - id: under_min_isr_partition_count
   #   metric_name: UnderMinIsrPartitionCount
   #   statistics: [maximum]
-  # - id: client_connection_count
-  #   metric_name: ClientConnectionCount
-  #   statistics: [average]
+  # ClientConnectionCount is DEFAULT-level but AWS publishes it at {Cluster Name, Broker ID, Client
+  # Authentication} -- a third dimension -- so it does not match this {Cluster Name, Broker ID} grain
+  # and needs its own profile.
   # PER_BROKER-level latency/throttle metrics (paid), per-topic {Cluster Name, Broker ID, Topic}, and
   # consumer-group lag {Cluster Name, Consumer Group, Topic} need their own profiles / monitoring level.
   # See: https://docs.aws.amazon.com/msk/latest/developerguide/metrics-details.html
@@ -168,3 +168,12 @@ template:
     #   dimensions:
     #     - selector: under_min_isr_partition_count_maximum
     #       name: under_min_isr
+    # - id: cw_msk_cpu_io_wait
+    #   context: cpu_io_wait
+    #   title: MSK Broker CPU I/O Wait
+    #   family: CPU
+    #   units: percentage
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: cpu_io_wait_average
+    #       name: io_wait

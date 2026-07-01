@@ -132,3 +132,12 @@ template:
     #   dimensions:
     #     - selector: bytes_per_second_limit_average
     #       name: bytes_limit
+    # - id: cw_firehose_record_limits
+    #   context: record_rate_limits
+    #   title: Firehose Record Rate Limit
+    #   family: Limits
+    #   units: records/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: records_per_second_limit_average
+    #       name: records_limit

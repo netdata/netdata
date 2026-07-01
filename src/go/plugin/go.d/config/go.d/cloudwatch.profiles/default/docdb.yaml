@@ -176,3 +176,21 @@ template:
     #       name: inserted
     #     - selector: documents_deleted_sum
     #       name: deleted
+    # - id: cw_docdb_swap
+    #   context: swap_usage
+    #   title: DocumentDB Swap Usage
+    #   family: Memory
+    #   units: bytes
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: swap_usage_average
+    #       name: swap
+    # - id: cw_docdb_disk_queue
+    #   context: disk_queue_depth
+    #   title: DocumentDB Disk Queue Depth
+    #   family: Disk
+    #   units: operations
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: disk_queue_depth_average
+    #       name: queued

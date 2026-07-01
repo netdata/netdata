@@ -49,18 +49,29 @@ func TestStockProfiles_OptionalBlocksUncommentValid(t *testing.T) {
 	require.NoError(t, err, "a stock profile is invalid once its optional blocks are uncommented")
 	require.Len(t, catalog.AllProfiles(), want)
 
-	// Every chart selector must resolve to a declared metric series. Normalize
-	// leaves an unresolved shorthand selector un-qualified, so it will not be a
-	// key in the visible (fully-qualified) series set.
+	// Two-way coverage between declared metric series and chart selectors, in the
+	// fully-uncommented state:
+	//   (1) every chart selector resolves to a declared metric series (no dangling
+	//       selector); Normalize leaves an unresolved shorthand un-qualified, so it
+	//       will not be a key in the visible (fully-qualified) series set; and
+	//   (2) every declared metric series is targeted by at least one chart dimension.
+	//       An un-charted metric would still bill GetMetricData yet render nothing, so
+	//       every optional metric must ship a paired chart (the A1 pattern).
 	for _, rp := range catalog.AllProfiles() {
 		visible := visibleSeriesForProfile(rp.Name, rp.Config.Metrics)
+		selected := make(map[string]struct{})
 		for _, sel := range chartSelectors(rp.Config.Template) {
 			series, _, ok := splitSelectorSeries(sel)
 			if !assert.Truef(t, ok, "%s: unparseable chart selector %q", rp.Name, sel) {
 				continue
 			}
+			selected[series] = struct{}{}
 			_, found := visible[series]
 			assert.Truef(t, found, "%s: chart selector %q does not resolve to a declared metric series", rp.Name, sel)
+		}
+		for series := range visible {
+			_, charted := selected[series]
+			assert.Truef(t, charted, "%s: metric series %q has no chart dimension (would bill GetMetricData but render nothing)", rp.Name, series)
 		}
 	}
 }

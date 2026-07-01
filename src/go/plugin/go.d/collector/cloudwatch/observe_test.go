@@ -525,3 +525,29 @@ func TestPruneObserved(t *testing.T) {
 	assert.Contains(t, c.observations.lastObserved, observedKey(keep.seriesName, keep.labels))
 	assert.NotContains(t, c.observations.lastObserved, observedKey(drop.seriesName, drop.labels))
 }
+
+func TestPruneObserved_DropsStaleScheduleForVanishedGroup(t *testing.T) {
+	// A (region, period) group that leaves the plan must lose its schedule entry, so
+	// a later reappearance is unscheduled (immediately due) rather than blocked until
+	// a stale nextQueryAt expires.
+	c := New()
+	inPlan := queryGroupKey{region: "us-east-1", period: 300}
+	vanished := queryGroupKey{region: "us-east-1", period: 86400}
+	c.observations.nextQueryAt = map[queryGroupKey]time.Time{
+		inPlan:   time.Unix(1_000_000_300, 0),
+		vanished: time.Unix(1_000_086_400, 0),
+	}
+	labels := []metrix.Label{
+		{Key: "account_id", Value: "000000000000"},
+		{Key: "region", Value: "us-east-1"},
+		{Key: "instance_id", Value: "i-1"},
+	}
+
+	// Plan retains only the 300s group; the daily group's instances are gone.
+	c.observations.pruneObserved([]plannedQuery{
+		{seriesName: "ec2.cpu_utilization_average", labels: labels, region: "us-east-1", period: 300},
+	})
+
+	assert.Contains(t, c.observations.nextQueryAt, inPlan, "a group still in the plan keeps its schedule")
+	assert.NotContains(t, c.observations.nextQueryAt, vanished, "a group no longer in the plan loses its schedule")
+}

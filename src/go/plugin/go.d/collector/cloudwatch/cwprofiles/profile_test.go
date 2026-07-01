@@ -72,6 +72,11 @@ func TestProfile_Validate(t *testing.T) {
 			wantErr:     true,
 			errContains: "namespace",
 		},
+		"namespace with surrounding whitespace": {
+			mutate:      func(p *Profile) { p.Namespace = " AWS/EC2 " },
+			wantErr:     true,
+			errContains: "namespace",
+		},
 		"period not multiple of 60": {
 			mutate:      func(p *Profile) { p.Period = 90 },
 			wantErr:     true,
@@ -297,6 +302,28 @@ func TestProfile_Normalize_leavesUnknownSelectorUntouched(t *testing.T) {
 	require.NoError(t, p.Normalize("ec2"))
 
 	assert.Equal(t, "unknown_series", p.Template.Charts[0].Dimensions[0].Selector)
+}
+
+func TestProfile_Normalize_prefixesDecimalPercentileSelector(t *testing.T) {
+	// A decimal-percentile statistic token carries a dot (p99.9), so the exported
+	// series name (ec2.latency_p99_9-form: ec2.latency_p99.9) has two dots. The
+	// shorthand selector must still be prefixed, not mistaken for already-qualified.
+	p := validProfile()
+	p.Metrics = append(p.Metrics, Metric{ID: "latency", MetricName: "Latency", Statistics: []string{"p99.9"}})
+	p.Template.Charts[0].Dimensions[0].Selector = "latency_p99.9"
+	require.NoError(t, p.Normalize("ec2"))
+
+	assert.Equal(t, "ec2.latency_p99.9", p.Template.Charts[0].Dimensions[0].Selector)
+}
+
+func TestProfile_Normalize_leavesQualifiedSelectorUntouched(t *testing.T) {
+	// An already-qualified selector must be left unchanged: the double-prefixed
+	// candidate (ec2.ec2.cpu_utilization_average) is not a visible series.
+	p := validProfile()
+	p.Template.Charts[0].Dimensions[0].Selector = "ec2.cpu_utilization_average"
+	require.NoError(t, p.Normalize("ec2"))
+
+	assert.Equal(t, "ec2.cpu_utilization_average", p.Template.Charts[0].Dimensions[0].Selector)
 }
 
 func TestNormalizeStatistic(t *testing.T) {

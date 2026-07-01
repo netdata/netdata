@@ -10,11 +10,8 @@ instance:
 metrics:
   - id: count
     metric_name: Count
-    # Count records 1 per request, so Sum over the period is the request total
-    # (the per-second value comes from the rate flag below). AWS docs cite
-    # SampleCount as the representative statistic; it yields the same total. Sum is
-    # used because a per-second rate needs a sum statistic -- keep it as sum, not
-    # sample_count.
+    # Count is 1 per request: Sum = request total (== SampleCount). Kept as Sum to match the error/cache
+    # counters below, which must use Sum (they are 0/1 per request, so SampleCount would be total requests).
     statistics: [sum]
     rate: true
   - id: error_4xx

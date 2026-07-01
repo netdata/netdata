@@ -127,3 +127,21 @@ template:
     #       name: read
     #     - selector: volume_total_write_time_sum
     #       name: write
+    # - id: cw_ebs_throughput_percentage
+    #   context: throughput_percentage
+    #   title: EBS Volume Throughput Percentage
+    #   family: Throughput
+    #   units: percentage
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: volume_throughput_percentage_average
+    #       name: throughput
+    # - id: cw_ebs_consumed_ops
+    #   context: consumed_ops
+    #   title: EBS Volume Consumed Read/Write Ops
+    #   family: Throughput
+    #   units: ops/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: volume_consumed_read_write_ops_sum
+    #       name: consumed

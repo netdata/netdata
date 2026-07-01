@@ -448,8 +448,11 @@ func IsValidProfileName(v string) bool {
 	return reIdentityID.MatchString(strings.TrimSpace(v))
 }
 
+// IsValidNamespace validates the namespace verbatim (no trimming). Namespace is
+// used as-is as the ListMetrics filter, so surrounding whitespace must fail
+// validation as a typo rather than pass here and then silently match nothing.
 func IsValidNamespace(v string) bool {
-	return reNamespace.MatchString(strings.TrimSpace(v))
+	return reNamespace.MatchString(v)
 }
 
 func isValidPeriod(p int) bool {
@@ -529,10 +532,16 @@ func normalizeChartSelectors(baseName string, visible map[string]struct{}, chart
 
 func normalizeSelector(baseName string, visible map[string]struct{}, selector string) string {
 	seriesName, suffix, ok := splitSelectorSeries(selector)
-	if !ok || strings.Contains(seriesName, ".") {
+	if !ok {
 		return selector
 	}
 
+	// Prefix the profile basename only when the result is one of this profile's
+	// visible series. An already-qualified selector produces a double-prefixed
+	// candidate that is not visible, so it is left unchanged. Relying on the visible
+	// lookup rather than a "series name contains a dot" heuristic also lets a
+	// decimal-percentile shorthand (e.g. latency_p99.9, whose statistic token carries
+	// a dot) normalize correctly instead of being mistaken for already-qualified.
 	candidate := baseName + "." + seriesName
 	if _, ok := visible[candidate]; !ok {
 		return selector

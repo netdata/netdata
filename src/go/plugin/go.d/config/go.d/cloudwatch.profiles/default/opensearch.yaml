@@ -185,3 +185,21 @@ template:
     #       name: active
     #     - selector: shards_unassigned_maximum
     #       name: unassigned
+    # - id: cw_os_old_gen_jvm_pressure
+    #   context: old_gen_jvm_memory_pressure
+    #   title: OpenSearch Old-Gen JVM Memory Pressure
+    #   family: JVM
+    #   units: percentage
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: old_gen_jvm_memory_pressure_maximum
+    #       name: pressure
+    # - id: cw_os_snapshot_failure
+    #   context: automated_snapshot_failure
+    #   title: OpenSearch Automated Snapshot Failure
+    #   family: Health
+    #   units: status
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: automated_snapshot_failure_maximum
+    #       name: failure

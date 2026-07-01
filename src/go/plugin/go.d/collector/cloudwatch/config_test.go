@@ -60,6 +60,15 @@ func TestConfig_validate(t *testing.T) {
 	}
 }
 
+func TestConfig_validate_regionCaseHiddenPartition(t *testing.T) {
+	// An uppercase region must not slip past the mixed-partition guard: regions are
+	// lowercased before partition detection, so us-east-1 + CN-NORTH-1 is still a
+	// cross-partition (aws + aws-cn) job and must be rejected.
+	cfg := validBaseConfig()
+	cfg.Regions = []string{"us-east-1", "CN-NORTH-1"}
+	assert.Error(t, cfg.validate())
+}
+
 func TestConfigSchema_RuntimeContract(t *testing.T) {
 	data, err := os.ReadFile("config_schema.json")
 	require.NoError(t, err)
@@ -108,7 +117,7 @@ func TestRegionPartition(t *testing.T) {
 }
 
 func TestConfig_Regions(t *testing.T) {
-	c := Config{Regions: []string{"us-east-1", " us-east-1 ", "eu-west-1", "us-east-1", ""}}
+	c := Config{Regions: []string{"us-east-1", " us-east-1 ", "US-EAST-1", "EU-West-1", "eu-west-1", "us-east-1", ""}}
 	assert.Equal(t, []string{"us-east-1", "eu-west-1"}, c.regions(),
-		"regions are trimmed, de-duplicated (first wins), and empties dropped")
+		"regions are lowercased, trimmed, de-duplicated (first wins), and empties dropped")
 }

@@ -183,8 +183,10 @@ Discovery then finds which *instances* of those profiles exist per region.
   `nil_as_zero` defaults to the metric's `rate` flag (rate/sum counts → 0, gauges
   → gap) and is overridable per metric. The cache otherwise persists until the
   instance leaves discovery and `pruneObserved` drops it.
-- `pruneObserved` drops cached series absent from the current plan (a resource or
-  metric went away) so removed resources stop being re-emitted.
+- `pruneObserved` drops both cached series and per-(region, period) schedule entries
+  absent from the current plan (a resource or metric went away), so removed resources
+  stop being re-emitted and a group that later reappears is queried on its first cycle
+  back rather than waiting for a stale schedule entry to expire.
 
 ## Dynamic Charts
 
@@ -194,7 +196,7 @@ Discovery then finds which *instances* of those profiles exist per region.
 for each selected profile:
   group := profile.Template.Clone()          # typed deep copy; never mutate the catalog
   group.Metrics = sorted(visible series)     # collector-owned visible-series list
-  injectDimensionOptions(group, series)      # options.divisor = period on rate dimensions
+  injectDimensionOptions(group, series)      # sets options.divisor = period on rate dims; keeps authored options
 assemble charttpl.Spec{Version, ContextNamespace: "cloudwatch", Groups}
 return spec.MarshalTemplate()                # Validate + yaml.v2 marshal, then cached
 ```

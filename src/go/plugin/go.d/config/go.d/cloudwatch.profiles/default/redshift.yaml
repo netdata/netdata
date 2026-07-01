@@ -155,3 +155,21 @@ template:
     #       name: read
     #     - selector: write_latency_average
     #       name: write
+    # - id: cw_redshift_tables
+    #   context: total_table_count
+    #   title: Redshift Total Table Count
+    #   family: Tables
+    #   units: tables
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: total_table_count_average
+    #       name: tables
+    # - id: cw_redshift_concurrency_scaling
+    #   context: concurrency_scaling
+    #   title: Redshift Concurrency Scaling Usage
+    #   family: Concurrency Scaling
+    #   units: seconds/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: concurrency_scaling_seconds_sum
+    #       name: usage

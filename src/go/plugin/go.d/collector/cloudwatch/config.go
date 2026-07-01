@@ -178,7 +178,9 @@ func (c Config) regions() []string {
 	out := make([]string, 0, len(c.Regions))
 	seen := make(map[string]struct{}, len(c.Regions))
 	for _, r := range c.Regions {
-		v := strings.TrimSpace(r)
+		// AWS region codes are canonically lowercase, so lowercasing is loss-less and
+		// makes both dedupe and partition detection (regionPartition) case-insensitive.
+		v := strings.ToLower(strings.TrimSpace(r))
 		if v == "" {
 			continue
 		}

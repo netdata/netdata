@@ -107,6 +107,25 @@ func TestInjectDimensionOptions_NestedGroups(t *testing.T) {
 	assert.Nil(t, nestedGauge, "nested gauge dim gets no injected options (float is a metric hint)")
 }
 
+func TestInjectDimensionOptions_PreservesAuthoredOptions(t *testing.T) {
+	// A rate dimension may carry author-defined options; injecting the divisor must
+	// set only Divisor and preserve the rest, not replace the whole options struct.
+	group := charttpl.Group{
+		Charts: []charttpl.Chart{{Dimensions: []charttpl.Dimension{
+			{Selector: "ec2.network_in_sum", Options: &charttpl.DimensionOptions{Multiplier: 8, Hidden: true}},
+		}}},
+	}
+	series := map[string]seriesPresentation{"ec2.network_in_sum": {rate: true, period: 300}}
+
+	injectDimensionOptions(&group, series)
+
+	opts := group.Charts[0].Dimensions[0].Options
+	require.NotNil(t, opts)
+	assert.Equal(t, 300, opts.Divisor, "rate divisor is injected")
+	assert.Equal(t, 8, opts.Multiplier, "authored multiplier is preserved")
+	assert.True(t, opts.Hidden, "authored hidden flag is preserved")
+}
+
 func TestEnsureProfiles_BuildsValidChartTemplate(t *testing.T) {
 	c := New()
 	c.Config.Regions = []string{"us-east-1"}

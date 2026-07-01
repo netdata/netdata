@@ -165,3 +165,12 @@ template:
     #   dimensions:
     #     - selector: peak_bytes_per_second_maximum
     #       name: peak_bytes
+    # - id: cw_natgw_peak_packets
+    #   context: peak_packets
+    #   title: NAT Gateway Peak Packets
+    #   family: Traffic
+    #   units: packets/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: peak_packets_per_second_maximum
+    #       name: peak_packets
