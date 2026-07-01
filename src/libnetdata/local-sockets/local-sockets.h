@@ -304,13 +304,17 @@ static inline int local_sockets_spawn_server_callback(SPAWN_REQUEST *request);
 
 static inline void local_sockets_log(LS_STATE *ls, const char *format, ...) PRINTFLIKE(2, 3);
 static inline void local_sockets_log(LS_STATE *ls, const char *format, ...) {
-    if(ls && ++ls->stats.errors_encountered == ls->config.max_errors) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "LOCAL-SOCKETS: max number of logs reached. Not logging anymore");
-        return;
-    }
+    if(ls) {
+        size_t errors_encountered = __atomic_add_fetch(&ls->stats.errors_encountered, 1, __ATOMIC_RELAXED);
 
-    if(ls && ls->stats.errors_encountered > ls->config.max_errors)
-        return;
+        if(errors_encountered == ls->config.max_errors) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "LOCAL-SOCKETS: max number of logs reached. Not logging anymore");
+            return;
+        }
+
+        if(errors_encountered > ls->config.max_errors)
+            return;
+    }
 
     char buf[16384];
     va_list args;
