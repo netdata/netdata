@@ -1503,3 +1503,6 @@ impl KvIdSet {
         self.bits.iter().all(|&word| word == 0)
     }
 }
+
+#[cfg(test)]
+mod tests;

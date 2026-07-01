@@ -313,3 +313,39 @@ pub struct MaterializedRow {
     pub timestamp_ns: i64,
     pub fields: Vec<(String, String)>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{compile_pattern, compile_query};
+    use crate::Error;
+
+    #[test]
+    fn pattern_is_full_value_anchored() {
+        // A field-value matcher is anchored as `^(?:src)$`: it matches the whole
+        // value, not a substring.
+        let re = compile_pattern("err").unwrap();
+        assert!(re.is_match(b"err"));
+        assert!(!re.is_match(b"error"));
+        assert!(!re.is_match(b"xerr"));
+        // A substring match is the explicit `.*err.*`.
+        assert!(compile_pattern(".*err.*").unwrap().is_match(b"error"));
+    }
+
+    #[test]
+    fn query_is_unanchored_substring() {
+        // The full-text query is unanchored — a "contains" over `key=value`.
+        let re = compile_query("err").unwrap();
+        assert!(re.is_match(b"level=error"));
+        assert!(re.is_match(b"err"));
+        assert!(!re.is_match(b"level=warning"));
+    }
+
+    #[test]
+    fn bad_source_is_invalid_pattern() {
+        assert!(matches!(
+            compile_pattern("["),
+            Err(Error::InvalidPattern(_))
+        ));
+        assert!(matches!(compile_query("("), Err(Error::InvalidPattern(_))));
+    }
+}
