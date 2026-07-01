@@ -175,7 +175,7 @@ static bool wel_add_to_registry(const wchar_t *channel, const wchar_t *provider,
 // Registry key where WINEVT stores registered publishers (providers).
 #define WINEVT_PUBLISHERS_KEY L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WINEVT\\Publishers\\"
 // GUID of the NetdataDaemon importChannel provider — only present when the current
-// manifest (the one with importChannel declarations) has been registered.
+// manifest (the one with importChannel declarations) has been registered via wevtutil im.
 #define WEL_DAEMON_IMPORT_GUID L"{5CA72004-9BD8-4634-81E5-000014E7DAAD}"
 
 static bool wel_manifest_is_current(void) {
@@ -208,40 +208,86 @@ static bool wel_run_silent(const wchar_t *exe, const wchar_t *params) {
     return exitCode == 0;
 }
 
-// Mirrors wevt_netdata_install.bat in C: copies the DLL to System32, grants the
-// EventLog service read access, then registers the manifest via wevtutil im.
-// Only runs when wel_manifest_is_current() returns false, i.e. the first startup
-// after a dev build or after a version upgrade that skipped wevtutil im.
+// Minimal manifest embedded in the binary so we can register the Netdata WINEVT
+// channels and importChannel links at runtime, regardless of how netdata.exe was
+// deployed (MSI, direct copy, dev build). Each %s is replaced with the System32
+// DLL path (12 substitutions: 2 per provider × 6 providers).
+// The template omits event/template definitions — wevtutil im only needs channels
+// and providers to set up routing; the DLL handles message formatting at query time.
+#define WEL_MANIFEST_XML_FMT \
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n" \
+    "<instrumentationManifest xmlns=\"http://schemas.microsoft.com/win/2004/08/events\">\r\n" \
+    "  <instrumentation\r\n" \
+    "    xmlns:win=\"http://manifests.microsoft.com/win/2004/08/windows/events\"\r\n" \
+    "    xmlns:xs=\"http://www.w3.org/2001/XMLSchema\"\r\n" \
+    "    xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\r\n" \
+    "    <events xmlns=\"http://schemas.microsoft.com/win/2004/08/events\">\r\n" \
+    "      <provider name=\"Netdata\"\r\n" \
+    "        guid=\"{96c5ca72-9bd8-4634-81e5-000014e7da7a}\"\r\n" \
+    "        resourceFileName=\"%s\"\r\n" \
+    "        messageFileName=\"%s\"\r\n" \
+    "        symbol=\"NETDATA_ETW_PROVIDER\">\r\n" \
+    "        <channels>\r\n" \
+    "          <channel chid=\"CHANNEL_DAEMON\" name=\"Netdata/Daemon\" symbol=\"CHANNEL_DAEMON\" type=\"Operational\" enabled=\"true\"/>\r\n" \
+    "          <channel chid=\"CHANNEL_COLLECTORS\" name=\"Netdata/Collectors\" symbol=\"CHANNEL_COLLECTORS\" type=\"Operational\" enabled=\"true\"/>\r\n" \
+    "          <channel chid=\"CHANNEL_ACCESS\" name=\"Netdata/Access\" symbol=\"CHANNEL_ACCESS\" type=\"Operational\" enabled=\"true\"/>\r\n" \
+    "          <channel chid=\"CHANNEL_HEALTH\" name=\"Netdata/Health\" symbol=\"CHANNEL_HEALTH\" type=\"Operational\" enabled=\"true\"/>\r\n" \
+    "          <channel chid=\"CHANNEL_ACLK\" name=\"Netdata/Aclk\" symbol=\"CHANNEL_ACLK\" type=\"Operational\" enabled=\"true\"/>\r\n" \
+    "        </channels>\r\n" \
+    "      </provider>\r\n" \
+    "      <provider name=\"NetdataDaemon\"\r\n" \
+    "        guid=\"{5CA72004-9BD8-4634-81E5-000014E7DAAD}\"\r\n" \
+    "        resourceFileName=\"%s\" messageFileName=\"%s\">\r\n" \
+    "        <channels><importChannel chid=\"IMPORT_DAEMON\" name=\"Netdata/Daemon\"/></channels>\r\n" \
+    "      </provider>\r\n" \
+    "      <provider name=\"NetdataCollectors\"\r\n" \
+    "        guid=\"{5CA72003-9BD8-4634-81E5-000014E7DAAC}\"\r\n" \
+    "        resourceFileName=\"%s\" messageFileName=\"%s\">\r\n" \
+    "        <channels><importChannel chid=\"IMPORT_COLLECTORS\" name=\"Netdata/Collectors\"/></channels>\r\n" \
+    "      </provider>\r\n" \
+    "      <provider name=\"NetdataAccess\"\r\n" \
+    "        guid=\"{5CA72002-9BD8-4634-81E5-000014E7DAAB}\"\r\n" \
+    "        resourceFileName=\"%s\" messageFileName=\"%s\">\r\n" \
+    "        <channels><importChannel chid=\"IMPORT_ACCESS\" name=\"Netdata/Access\"/></channels>\r\n" \
+    "      </provider>\r\n" \
+    "      <provider name=\"NetdataHealth\"\r\n" \
+    "        guid=\"{5CA72005-9BD8-4634-81E5-000014E7DAAA}\"\r\n" \
+    "        resourceFileName=\"%s\" messageFileName=\"%s\">\r\n" \
+    "        <channels><importChannel chid=\"IMPORT_HEALTH\" name=\"Netdata/Health\"/></channels>\r\n" \
+    "      </provider>\r\n" \
+    "      <provider name=\"NetdataAclk\"\r\n" \
+    "        guid=\"{5CA72001-9BD8-4634-81E5-000014E7DAA9}\"\r\n" \
+    "        resourceFileName=\"%s\" messageFileName=\"%s\">\r\n" \
+    "        <channels><importChannel chid=\"IMPORT_ACLK\" name=\"Netdata/Aclk\"/></channels>\r\n" \
+    "      </provider>\r\n" \
+    "    </events>\r\n" \
+    "  </instrumentation>\r\n" \
+    "  <localization>\r\n" \
+    "    <resources culture=\"en-US\">\r\n" \
+    "      <stringTable>\r\n" \
+    "        <string id=\"ND_PROVIDER_NAME\" value=\"Netdata\"/>\r\n" \
+    "        <string id=\"Channel.Daemon\" value=\"Daemon\"/>\r\n" \
+    "        <string id=\"Channel.Collectors\" value=\"Collectors\"/>\r\n" \
+    "        <string id=\"Channel.Access\" value=\"Access\"/>\r\n" \
+    "        <string id=\"Channel.Health\" value=\"Health\"/>\r\n" \
+    "        <string id=\"Channel.Aclk\" value=\"Aclk\"/>\r\n" \
+    "      </stringTable>\r\n" \
+    "    </resources>\r\n" \
+    "  </localization>\r\n" \
+    "</instrumentationManifest>\r\n"
+
+// Runs at WEL startup when wel_manifest_is_current() returns false.
+// Works for every deployment: MSI install (DLL in System32), dev build (DLL next to
+// netdata.exe), or a bare netdata.exe copy (DLL in System32 from a prior install).
+// Generates the manifest XML from the embedded template and writes it to System32,
+// then registers it via wevtutil. No external manifest file is required.
 static void wel_ensure_manifest_installed(void) {
     if (wel_manifest_is_current()) {
         nd_win_trace("wel_ensure_manifest_installed: importChannel providers already registered");
         return;
     }
 
-    nd_win_trace("wel_ensure_manifest_installed: importChannel providers not registered, installing manifest...");
-
-    // Find wevt_netdata.dll alongside netdata.exe (dev / manual-deploy path).
-    // MSI installs the DLL to System32 and runs wevtutil im itself, so if the
-    // DLL is not next to netdata.exe there is nothing for us to do here.
-    wchar_t dllPath[MAX_PATH];
-    if (!GetModuleFileNameW(NULL, dllPath, _countof(dllPath)) ||
-        !wel_replace_program_with_wevt_netdata_dll(dllPath, _countof(dllPath))) {
-        nd_win_trace("wel_ensure_manifest_installed: wevt_netdata.dll not alongside netdata.exe, skipping");
-        return;
-    }
-
-    // Build manifest path: same directory as the DLL, file wevt_netdata_manifest.xml
-    wchar_t manifestPath[MAX_PATH];
-    wchar_t *lastBackslash = wcsrchr(dllPath, L'\\');
-    if (!lastBackslash) return;
-    size_t dirLen = (size_t)(lastBackslash - dllPath);
-    wcsncpy(manifestPath, dllPath, dirLen);
-    manifestPath[dirLen] = L'\0';
-    wcsncat(manifestPath, L"\\wevt_netdata_manifest.xml", _countof(manifestPath) - dirLen - 1);
-    if (GetFileAttributesW(manifestPath) == INVALID_FILE_ATTRIBUTES) {
-        nd_win_trace("wel_ensure_manifest_installed: manifest not found at '%ls'", manifestPath);
-        return;
-    }
+    nd_win_trace("wel_ensure_manifest_installed: installing manifest...");
 
     wchar_t system32[MAX_PATH];
     if (!GetSystemDirectoryW(system32, _countof(system32))) return;
@@ -249,11 +295,28 @@ static void wel_ensure_manifest_installed(void) {
     wchar_t dllDst[MAX_PATH];
     swprintf(dllDst, _countof(dllDst), L"%ls\\wevt_netdata.dll", system32);
 
-    // Copy DLL to System32 so Event Viewer can resolve message strings.
-    if (!CopyFileW(dllPath, dllDst, FALSE))
-        nd_win_trace("wel_ensure_manifest_installed: CopyFile err=%lu (may already exist)", (unsigned long)GetLastError());
+    // If wevt_netdata.dll exists next to netdata.exe (dev build / manual deploy),
+    // copy it to System32 so Event Viewer can resolve message strings.
+    {
+        wchar_t dllSrc[MAX_PATH];
+        if (GetModuleFileNameW(NULL, dllSrc, _countof(dllSrc)) &&
+            wel_replace_program_with_wevt_netdata_dll(dllSrc, _countof(dllSrc))) {
+            if (!CopyFileW(dllSrc, dllDst, FALSE))
+                nd_win_trace("wel_ensure_manifest_installed: CopyFile err=%lu (may already exist)",
+                             (unsigned long)GetLastError());
+            else
+                nd_win_trace("wel_ensure_manifest_installed: copied DLL to System32");
+        }
+    }
 
-    // Grant EventLog service read access (required for manifest-based channels).
+    // DLL must exist in System32 (either we just copied it or MSI put it there).
+    if (GetFileAttributesW(dllDst) == INVALID_FILE_ATTRIBUTES) {
+        nd_win_trace("wel_ensure_manifest_installed: wevt_netdata.dll not in System32 err=%lu, skipping",
+                     (unsigned long)GetLastError());
+        return;
+    }
+
+    // Grant EventLog service read access to the DLL (required for manifest channels).
     wchar_t icaclsPath[MAX_PATH];
     swprintf(icaclsPath, _countof(icaclsPath), L"%ls\\icacls.exe", system32);
     wchar_t icaclsParams[MAX_PATH * 2];
@@ -261,22 +324,67 @@ static void wel_ensure_manifest_installed(void) {
     if (!wel_run_silent(icaclsPath, icaclsParams))
         nd_win_trace("wel_ensure_manifest_installed: icacls err=%lu", (unsigned long)GetLastError());
 
+    // Build manifest content from the embedded template. The manifest is generated
+    // at runtime so it always matches this binary's channel layout, regardless of
+    // what manifest file (if any) is on disk.
+    char dllDstNarrow[MAX_PATH];
+    WideCharToMultiByte(CP_UTF8, 0, dllDst, -1, dllDstNarrow, _countof(dllDstNarrow), NULL, NULL);
+
+    char manifest[8192];
+    int mlen = snprintf(manifest, sizeof(manifest), WEL_MANIFEST_XML_FMT,
+                        dllDstNarrow, dllDstNarrow,   // Netdata provider
+                        dllDstNarrow, dllDstNarrow,   // NetdataDaemon
+                        dllDstNarrow, dllDstNarrow,   // NetdataCollectors
+                        dllDstNarrow, dllDstNarrow,   // NetdataAccess
+                        dllDstNarrow, dllDstNarrow,   // NetdataHealth
+                        dllDstNarrow, dllDstNarrow);  // NetdataAclk
+    if (mlen <= 0 || mlen >= (int)sizeof(manifest)) {
+        nd_win_trace("wel_ensure_manifest_installed: manifest buffer overflow");
+        return;
+    }
+
+    // Write manifest to System32 (same location as the MSI installer uses).
+    wchar_t manifestDst[MAX_PATH];
+    swprintf(manifestDst, _countof(manifestDst), L"%ls\\wevt_netdata_manifest.xml", system32);
+
+    HANDLE hFile = CreateFileW(manifestDst, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
+                               FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        nd_win_trace("wel_ensure_manifest_installed: cannot create manifest err=%lu",
+                     (unsigned long)GetLastError());
+        return;
+    }
+    DWORD written;
+    BOOL fileOk = WriteFile(hFile, manifest, (DWORD)mlen, &written, NULL);
+    CloseHandle(hFile);
+    if (!fileOk || written != (DWORD)mlen) {
+        nd_win_trace("wel_ensure_manifest_installed: write failed err=%lu", (unsigned long)GetLastError());
+        return;
+    }
+
     wchar_t wevtutil[MAX_PATH];
     swprintf(wevtutil, _countof(wevtutil), L"%ls\\wevtutil.exe", system32);
 
-    // Unregister any previously registered manifest before installing the new one.
-    wchar_t umParams[MAX_PATH * 2];
-    swprintf(umParams, _countof(umParams), L"um \"%ls\"", manifestPath);
-    wel_run_silent(wevtutil, umParams); // ignore result — no prior manifest is normal
+    nd_win_trace("wel_ensure_manifest_installed: manifest written to '%ls'", manifestDst);
 
-    // Register the current manifest, pointing to the DLL in System32.
+    // Unregister any previously registered manifest (ignore errors — normal on first run).
+    wchar_t umParams[MAX_PATH * 2];
+    swprintf(umParams, _countof(umParams), L"um \"%ls\"", manifestDst);
+    if (wel_run_silent(wevtutil, umParams))
+        nd_win_trace("wel_ensure_manifest_installed: wevtutil um ok");
+    else
+        nd_win_trace("wel_ensure_manifest_installed: wevtutil um failed/skipped (ok if not previously installed)");
+
+    // Register the new manifest. The /mf and /rf flags tell wevtutil where the DLL is,
+    // overriding the resourceFileName/messageFileName attributes in the XML.
     wchar_t imParams[MAX_PATH * 4];
     swprintf(imParams, _countof(imParams), L"im \"%ls\" \"/mf:%ls\" \"/rf:%ls\"",
-             manifestPath, dllDst, dllDst);
+             manifestDst, dllDst, dllDst);
     if (wel_run_silent(wevtutil, imParams))
         nd_win_trace("wel_ensure_manifest_installed: manifest installed successfully");
     else
-        nd_win_trace("wel_ensure_manifest_installed: wevtutil im failed err=%lu", (unsigned long)GetLastError());
+        nd_win_trace("wel_ensure_manifest_installed: wevtutil im failed err=%lu",
+                     (unsigned long)GetLastError());
 }
 #endif // !HAVE_ETW
 
