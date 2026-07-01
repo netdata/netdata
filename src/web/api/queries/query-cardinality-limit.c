@@ -20,7 +20,8 @@ RRDR *rrd2rrdr_cardinality_limit(RRDR *r) {
     ONEWAYALLOC *owa = r->internal.owa;
     
     // Calculate contribution of each dimension using dview statistics (sum of values)
-    NETDATA_DOUBLE *contributions = onewayalloc_mallocz(owa, r->d * sizeof(NETDATA_DOUBLE));
+    NETDATA_DOUBLE *contributions = onewayalloc_mallocz(
+        owa, onewayalloc_mul_or_fatal(r->d, sizeof(*contributions), "RRDR cardinality contributions"));
     
     // Count queried dimensions and get their contributions from dview
     size_t queried_count = 0;
@@ -60,7 +61,8 @@ RRDR *rrd2rrdr_cardinality_limit(RRDR *r) {
     struct {
         size_t dim_idx;
         NETDATA_DOUBLE contribution;
-    } *sorted_dims = onewayalloc_mallocz(owa, queried_count * sizeof(*sorted_dims));
+    } *sorted_dims = onewayalloc_mallocz(
+        owa, onewayalloc_mul_or_fatal(queried_count, sizeof(*sorted_dims), "RRDR cardinality dimensions"));
     
     size_t sorted_idx = 0;
     for (size_t d = 0; d < r->d; d++) {

@@ -253,10 +253,12 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         }
     }
 
-    int added = 0;
+    size_t added = 0;
     RRDR *first_r = NULL, *last_r = NULL;
     BUFFER *key = buffer_create(0, NULL);
-    struct rrdr_group_by_entry *entries = onewayalloc_mallocz(owa, qt->query.used * sizeof(struct rrdr_group_by_entry));
+    size_t entries_size =
+        onewayalloc_mul_or_fatal(qt->query.used, sizeof(struct rrdr_group_by_entry), "RRDR group-by entries");
+    struct rrdr_group_by_entry *entries = onewayalloc_mallocz(owa, entries_size);
     DICTIONARY *groups = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
     DICTIONARY *label_keys = NULL;
 
@@ -267,7 +269,7 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         if(group_by == RRDR_GROUP_BY_NONE)
             break;
 
-        memset(entries, 0, qt->query.used * sizeof(struct rrdr_group_by_entry));
+        memset(entries, 0, entries_size);
         dictionary_flush(groups);
         added = 0;
 
@@ -307,9 +309,9 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
             // lookup the key in the dictionary
 
-            int pos = -1;
-            int *set = dictionary_set(groups, buffer_tostring(key), &pos, sizeof(pos));
-            if (*set == -1) {
+            size_t pos = SIZE_MAX;
+            size_t *set = dictionary_set(groups, buffer_tostring(key), &pos, sizeof(pos));
+            if (*set == SIZE_MAX) {
                 // the key just added to the dictionary
 
                 *set = pos = added++;
@@ -378,7 +380,7 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         RRDR *r = rrdr_create(owa, qt, added, qt->window.points);
         if (!r) {
             internal_error(true,
-                           "QUERY: cannot create group by RRDR for %s, after=%ld, before=%ld, dimensions=%d, points=%zu",
+                           "QUERY: cannot create group by RRDR for %s, after=%ld, before=%ld, dimensions=%zu, points=%zu",
                            qt->id, qt->window.after, qt->window.before, added, qt->window.points);
             goto cleanup;
         }
@@ -413,11 +415,13 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             }
 
             if(r->n) {
-                r->gbc = onewayalloc_callocz(owa, r->n * r->d, sizeof(*r->gbc));
+                r->gbc = onewayalloc_callocz(
+                    owa, onewayalloc_mul_or_fatal(r->n, r->d, "RRDR group-by counts"), sizeof(*r->gbc));
 
                 if(hidden_dimensions && ((group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE) || (aggregation_method == RRDR_GROUP_BY_FUNCTION_PERCENTAGE)))
                     // this is where we are going to group the hidden dimensions
-                    r->vh = onewayalloc_mallocz(owa, r->n * r->d * sizeof(*r->vh));
+                    r->vh = onewayalloc_mallocz(
+                        owa, onewayalloc_mul3_or_fatal(r->n, r->d, sizeof(*r->vh), "RRDR hidden values"));
             }
         }
 
@@ -496,7 +500,7 @@ cleanup:
         }
 
         if(entries && added) {
-            for (int d = 0; d < added; d++) {
+            for (size_t d = 0; d < added; d++) {
                 string_freez(entries[d].id);
                 string_freez(entries[d].name);
                 string_freez(entries[d].units);
@@ -514,4 +518,3 @@ cleanup:
 
     return r_tmp;
 }
-
