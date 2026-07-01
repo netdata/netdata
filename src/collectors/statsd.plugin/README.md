@@ -555,7 +555,7 @@ Each chart starts with `[id]` and will be named `app_name.id`. Key settings for 
 - **family** - Controls dashboard submenu placement
 - **context** - Controls alert templates
 - **priority** - Controls chart ordering
-- **type** - Chart visualization type (line, area, stacked)
+- **type** - Chart visualization type (line, area, stacked, heatmap)
 - **units** - Chart measurement units
 
 :::
