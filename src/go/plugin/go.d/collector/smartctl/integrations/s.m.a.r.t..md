@@ -37,6 +37,7 @@ This collector is only supported on the following platforms:
 
 - Linux
 - BSD
+- Windows
 
 This collector only supports collecting metrics from a single instance of this integration.
 
@@ -76,7 +77,7 @@ UI configuration requires paid Netdata Cloud plan.
 
 #### Install smartmontools (v7.0+)
 
-Install `smartmontools` version 7.0 or later using your distribution's package manager. Version 7.0 introduced the `--json` output mode, which is required for this collector to function properly.
+Install `smartmontools` version 7.0 or later. Version 7.0 introduced the `--json` output mode, which is required for this collector to function properly.
 
 
 #### For Netdata running in a Docker container
