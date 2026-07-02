@@ -16,7 +16,7 @@ const NS_PER_S: i64 = 1_000_000_000;
 /// regex); the operator is whichever of `~` / `=` appears first, so a value may
 /// contain the other character. Repeating a field ORs its terms; different
 /// fields AND. A bare term (no `=`/`~`) is rejected — there is no field-less
-/// search (use `--query` for that). Mirrors the `sfsq` query example's grammar.
+/// search (use `--query` for that).
 pub fn parse_filter(expr: &str) -> Result<Filter> {
     let mut filter = Filter::new();
     for term in expr.split(',').map(str::trim).filter(|t| !t.is_empty()) {
