@@ -4506,7 +4506,7 @@ fn test_cache_full_round_trip() {
 
     let mut server = TestServer::start(svc, METHOD_CGROUPS_SNAPSHOT, Some(test_cgroups_dispatch()));
 
-    let mut cache = CgroupsCache::new(TEST_RUN_DIR, svc, client_config());
+    let cache = CgroupsCache::new(TEST_RUN_DIR, svc, client_config());
     assert!(!cache.ready());
 
     // Ensure monotonic epoch advances past 0ms before refresh
@@ -4518,7 +4518,7 @@ fn test_cache_full_round_trip() {
     assert!(cache.ready());
 
     // Lookup by hash + name
-    let item = cache.lookup(1001, "docker-abc123");
+    let item = cache_dup(&cache, 1001, "docker-abc123");
     assert!(item.is_some());
     let item = item.unwrap();
     assert_eq!(item.hash, 1001);
@@ -4527,7 +4527,7 @@ fn test_cache_full_round_trip() {
     assert_eq!(item.name, "docker-abc123");
     assert_eq!(item.path, "/sys/fs/cgroup/docker/abc123");
 
-    let item2 = cache.lookup(3003, "systemd-user");
+    let item2 = cache_dup(&cache, 3003, "systemd-user");
     assert!(item2.is_some());
     assert_eq!(item2.unwrap().enabled, 0);
 
@@ -4555,12 +4555,12 @@ fn test_cache_refresh_failure_preserves() {
 
     let mut server = TestServer::start(svc, METHOD_CGROUPS_SNAPSHOT, Some(test_cgroups_dispatch()));
 
-    let mut cache = CgroupsCache::new(TEST_RUN_DIR, svc, client_config());
+    let cache = CgroupsCache::new(TEST_RUN_DIR, svc, client_config());
 
     // First refresh populates cache
     assert!(cache.refresh());
     assert!(cache.ready());
-    assert!(cache.lookup(1001, "docker-abc123").is_some());
+    assert!(cache_has(&cache, 1001, "docker-abc123"));
 
     // Kill server
     server.stop();
@@ -4571,13 +4571,73 @@ fn test_cache_refresh_failure_preserves() {
     let updated = cache.refresh();
     assert!(!updated);
     assert!(cache.ready()); // still has cached data
-    assert!(cache.lookup(1001, "docker-abc123").is_some());
+    assert!(cache_has(&cache, 1001, "docker-abc123"));
 
     let status = cache.status();
     assert_eq!(status.refresh_success_count, 1);
     assert!(status.refresh_failure_count >= 1);
 
     cache.close();
+    cleanup_all(svc);
+}
+
+#[test]
+fn test_cache_concurrent_readers_refresh() {
+    let svc = "rs_cache_concurrent";
+    ensure_run_dir();
+    cleanup_all(svc);
+
+    let mut server = TestServer::start(svc, METHOD_CGROUPS_SNAPSHOT, Some(test_cgroups_dispatch()));
+    let cache = Arc::new(CgroupsCache::new(TEST_RUN_DIR, svc, client_config()));
+    assert!(cache.refresh());
+
+    const READER_COUNT: usize = 4;
+    const READER_ITERS: usize = 500;
+    const WRITER_ITERS: usize = 100;
+
+    let mut handles = Vec::new();
+    for _ in 0..READER_COUNT {
+        let cache = Arc::clone(&cache);
+        handles.push(thread::spawn(move || {
+            let mut failures = 0usize;
+            for _ in 0..READER_ITERS {
+                let guard = cache.read_lock();
+                match guard.get(1001, "docker-abc123") {
+                    Some(view)
+                        if view.hash == 1001 && view.path == "/sys/fs/cgroup/docker/abc123" =>
+                    {
+                        let copy = guard.dup(view);
+                        if copy.hash != view.hash || copy.name != view.name {
+                            failures += 1;
+                        }
+                    }
+                    _ => failures += 1,
+                }
+                thread::sleep(Duration::from_micros(100));
+            }
+            failures
+        }));
+    }
+
+    let mut writer_failures = 0usize;
+    for _ in 0..WRITER_ITERS {
+        if !cache.refresh() {
+            writer_failures += 1;
+        }
+    }
+
+    let reader_failures: usize = handles
+        .into_iter()
+        .map(|handle| handle.join().expect("reader thread"))
+        .sum();
+
+    let status = cache.status();
+    assert_eq!(writer_failures, 0);
+    assert_eq!(reader_failures, 0);
+    assert_eq!(status.refresh_success_count, 1 + WRITER_ITERS as u32);
+
+    cache.close();
+    server.stop();
     cleanup_all(svc);
 }
 
@@ -4590,7 +4650,7 @@ fn test_cache_reconnect_rebuilds() {
     let mut server1 =
         TestServer::start(svc, METHOD_CGROUPS_SNAPSHOT, Some(test_cgroups_dispatch()));
 
-    let mut cache = CgroupsCache::new(TEST_RUN_DIR, svc, client_config());
+    let cache = CgroupsCache::new(TEST_RUN_DIR, svc, client_config());
     assert!(cache.refresh());
     assert_eq!(cache.status().item_count, 3);
 
@@ -4622,17 +4682,17 @@ fn test_cache_lookup_not_found() {
 
     let mut server = TestServer::start(svc, METHOD_CGROUPS_SNAPSHOT, Some(test_cgroups_dispatch()));
 
-    let mut cache = CgroupsCache::new(TEST_RUN_DIR, svc, client_config());
+    let cache = CgroupsCache::new(TEST_RUN_DIR, svc, client_config());
     assert!(cache.refresh());
 
     // Non-existent hash
-    assert!(cache.lookup(9999, "nonexistent").is_none());
+    assert!(!cache_has(&cache, 9999, "nonexistent"));
 
     // Correct hash, wrong name
-    assert!(cache.lookup(1001, "wrong-name").is_none());
+    assert!(!cache_has(&cache, 1001, "wrong-name"));
 
     // Correct name, wrong hash
-    assert!(cache.lookup(9999, "docker-abc123").is_none());
+    assert!(!cache_has(&cache, 9999, "docker-abc123"));
 
     cache.close();
     server.stop();
@@ -4651,7 +4711,7 @@ fn test_cache_empty() {
     assert!(!cache.ready());
 
     // Lookup on empty cache returns None
-    assert!(cache.lookup(1001, "docker-abc123").is_none());
+    assert!(!cache_has(&cache, 1001, "docker-abc123"));
 
     let status = cache.status();
     assert!(!status.populated);
@@ -4713,7 +4773,7 @@ fn test_cache_large_dataset() {
         256 * N as usize,
     );
 
-    let mut cache = CgroupsCache::new(TEST_RUN_DIR, svc, cfg);
+    let cache = CgroupsCache::new(TEST_RUN_DIR, svc, cfg);
 
     assert!(cache.refresh());
     assert_eq!(cache.status().item_count, N);
@@ -4721,7 +4781,7 @@ fn test_cache_large_dataset() {
     // Verify all lookups
     for i in 0..N {
         let name = format!("cgroup-{i}");
-        let item = cache.lookup(i + 1000, &name);
+        let item = cache_dup(&cache, i + 1000, &name);
         assert!(item.is_some(), "item {i} not found");
         let item = item.unwrap();
         assert_eq!(item.hash, i + 1000);
@@ -4751,12 +4811,10 @@ fn test_cache_refresh_lossy_utf8() {
     );
 
     let mut server = TestServer::start(svc, METHOD_CGROUPS_SNAPSHOT, Some(handler));
-    let mut cache = CgroupsCache::new(TEST_RUN_DIR, svc, client_config());
+    let cache = CgroupsCache::new(TEST_RUN_DIR, svc, client_config());
 
     assert!(cache.refresh(), "cache refresh should succeed");
-    let item = cache
-        .lookup(1001, "bad-\u{FFFD}-name")
-        .expect("lossy lookup");
+    let item = cache_dup(&cache, 1001, "bad-\u{FFFD}-name").expect("lossy lookup");
     assert_eq!(item.name, "bad-\u{FFFD}-name");
     assert_eq!(item.path, "/bad/\u{FFFD}/path");
 
@@ -4772,14 +4830,11 @@ fn test_cache_refresh_preserves_old_cache_on_malformed_snapshot_item() {
     cleanup_all(svc);
 
     let mut server = TestServer::start(svc, METHOD_CGROUPS_SNAPSHOT, Some(test_cgroups_dispatch()));
-    let mut cache = CgroupsCache::new(TEST_RUN_DIR, svc, client_config());
+    let cache = CgroupsCache::new(TEST_RUN_DIR, svc, client_config());
 
     assert!(cache.refresh(), "initial refresh should succeed");
     let old_status = cache.status();
-    let old_item = cache
-        .lookup(1001, "docker-abc123")
-        .expect("existing cache item")
-        .clone();
+    let old_item = cache_dup(&cache, 1001, "docker-abc123").expect("existing cache item");
 
     server.stop();
     cleanup_all(svc);
@@ -4838,13 +4893,11 @@ fn test_cache_refresh_preserves_old_cache_on_malformed_snapshot_item() {
         status.refresh_failure_count,
         old_status.refresh_failure_count + 1
     );
-    let preserved = cache
-        .lookup(1001, "docker-abc123")
-        .expect("old cache item should remain");
+    let preserved = cache_dup(&cache, 1001, "docker-abc123").expect("old cache item should remain");
     assert_eq!(preserved.hash, old_item.hash);
     assert_eq!(preserved.path, old_item.path);
     assert!(
-        cache.lookup(9999, "new-item").is_none(),
+        !cache_has(&cache, 9999, "new-item"),
         "bad refresh must not replace the old cache"
     );
 
@@ -4867,6 +4920,16 @@ fn simple_hash(s: &str) -> u32 {
             .wrapping_add(c as u32);
     }
     hash
+}
+
+fn cache_has(cache: &CgroupsCache, hash: u32, name: &str) -> bool {
+    let guard = cache.read_lock();
+    guard.get(hash, name).is_some()
+}
+
+fn cache_dup(cache: &CgroupsCache, hash: u32, name: &str) -> Option<CgroupsCacheItem> {
+    let guard = cache.read_lock();
+    guard.get(hash, name).map(|view| guard.dup(view))
 }
 
 struct StressTestServer {
@@ -5214,7 +5277,7 @@ fn test_stress_cache_concurrent() {
     for _ in 0..NUM_CLIENTS {
         let svc_name = svc.to_string();
         let handle = thread::spawn(move || {
-            let mut cache = CgroupsCache::new(TEST_RUN_DIR, &svc_name, client_config());
+            let cache = CgroupsCache::new(TEST_RUN_DIR, &svc_name, client_config());
             let mut successes = 0usize;
 
             for _ in 0..REQUESTS_PER {
@@ -5224,7 +5287,7 @@ fn test_stress_cache_concurrent() {
                     if status.item_count != 3 {
                         continue;
                     }
-                    let item = cache.lookup(1001, "docker-abc123");
+                    let item = cache_dup(&cache, 1001, "docker-abc123");
                     if item.is_some() && item.unwrap().hash == 1001 {
                         successes += 1;
                     }
@@ -5272,7 +5335,7 @@ fn test_stress_long_running() {
         let svc_name = svc.to_string();
         let r = running.clone();
         let handle = thread::spawn(move || {
-            let mut cache = CgroupsCache::new(TEST_RUN_DIR, &svc_name, client_config());
+            let cache = CgroupsCache::new(TEST_RUN_DIR, &svc_name, client_config());
             let mut refreshes = 0u64;
             let mut errors = 0u64;
 
@@ -5685,14 +5748,14 @@ fn test_cache_close_resets() {
 
     let mut server = TestServer::start(svc, METHOD_CGROUPS_SNAPSHOT, Some(test_cgroups_dispatch()));
 
-    let mut cache = CgroupsCache::new(TEST_RUN_DIR, svc, client_config());
+    let cache = CgroupsCache::new(TEST_RUN_DIR, svc, client_config());
     assert!(cache.refresh());
     assert!(cache.ready());
     assert_eq!(cache.status().item_count, 3);
 
     cache.close();
     assert!(!cache.ready());
-    assert!(cache.lookup(1001, "docker-abc123").is_none());
+    assert!(!cache_has(&cache, 1001, "docker-abc123"));
     assert_eq!(cache.status().item_count, 0);
 
     server.stop();
@@ -5715,7 +5778,7 @@ fn test_cache_default_buf_size() {
 
     let cache = CgroupsCache::new(TEST_RUN_DIR, svc, cfg);
     assert_eq!(
-        cache.client.max_receive_message_bytes(),
+        cache.max_receive_message_bytes(),
         HEADER_SIZE + CACHE_RESPONSE_BUF_SIZE
     );
 

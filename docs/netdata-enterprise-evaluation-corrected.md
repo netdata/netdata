@@ -51,14 +51,14 @@ This design philosophy enables Netdata to monitor infrastructure at unprecedente
 
 ### Agent Requirements (Per Node)
 
-Netdata Agent is designed to be lightweight, making it suitable for deployment across entire infrastructures. Even with Machine Learning enabled, Netdata Agents typically consume less than 5% CPU of a single core. The exact figures depend on the number of metrics collected per server.
+Netdata Agent is designed to be lightweight, making it suitable for deployment across entire infrastructures. Even with Machine Learning enabled, Netdata Agents typically consume less than 5% CPU of a single core (see [CPU Requirements](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/sizing-netdata-agents/cpu-requirements.md) for default-settings sizing guidance). The exact figures depend on the number of metrics collected per server.
 
 When connected to a Netdata Parent (the agent is in `child` mode), these requirements can be significantly reduced and, in the case of storage, even eliminated (no data on local disk).
 
-| Type       | Metric/s | CPU | Memory | Network | Storage |
-|------------|---------------|-----------|---------|---------|---------|
-| standalone | 3k - 10k | 4% - 20% of single core | 150 - 500 MiB | none | varies based on retention |
-| child      | 3k - 10k | 2% - 10% of single core | 100 - 300 MiB | \<1 Mbps | none |
+| Type       | Metric/s | CPU                     | Memory        | Network  | Storage                   |
+|------------|----------|-------------------------|---------------|----------|---------------------------|
+| standalone | 3k - 10k | 4% - 20% of single core | 150 - 500 MiB | none     | varies based on retention |
+| child      | 3k - 10k | 2% - 10% of single core | 100 - 300 MiB | \<1 Mbps | none                      |
 
 For more information and ways to further reduce Agent resource utilization, see [Agent Resource Utilization](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/sizing-netdata-agents/README.md).
 
@@ -68,9 +68,9 @@ Parent nodes aggregate data from multiple child agents and require resources tha
 
 The best practice is to have a cluster of Netdata Parents for every approximately 500 monitored nodes (2M metrics/second), like this:
 
-| Monitored Nodes | Metric/s | CPU Cores | Memory | Network | Storage |
-|-----------------|----------|-----------|---------|---------|---------|
-| 500 nodes       | 2 million | 20 cores  | 80 GB | 200 Mbps | varies based on retention |
+| Monitored Nodes | Metric/s  | CPU Cores | Memory | Network  | Storage                   |
+|-----------------|-----------|-----------|--------|----------|---------------------------|
+| 500 nodes       | 2 million | 20 cores  | 80 GB  | 200 Mbps | varies based on retention |
 
 These figures include ingestion and query resources.
 
@@ -84,10 +84,10 @@ For organizations requiring complete control over their monitoring infrastructur
 
 Netdata Cloud is a Kubernetes cluster (Kubernetes 1.23+):
 
-| Monitored Nodes | CPU Cores | Memory | Storage | Notes |
-|-----------------|-----------|---------|---------|--------|
-| 2,000 nodes     | 20 cores  | 45 GB   | 500 GB  | Minimal K8s cluster |
-| 10,000 nodes    | 100 cores | 200 GB  | 2 TB    | Multi-node K8s cluster |
+| Monitored Nodes | CPU Cores | Memory | Storage | Notes                  |
+|-----------------|-----------|--------|---------|------------------------|
+| 2,000 nodes     | 20 cores  | 45 GB  | 500 GB  | Minimal K8s cluster    |
+| 10,000 nodes    | 100 cores | 200 GB | 2 TB    | Multi-node K8s cluster |
 
 For more information see [Netdata Cloud On-Prem](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/README.md) and [Installation Guide](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/installation.md).
 
@@ -115,6 +115,7 @@ For more information see [Netdata Cloud On-Prem Installation](https://github.com
 ### Updates and Backwards Compatibility
 
 Netdata maintains strong backward compatibility:
+
 - Newer Parents accept streams from older Agents
 - Configuration files remain compatible across versions
 - Breaking changes are rare and well-documented
@@ -145,6 +146,7 @@ Due to the distributed nature of the architecture (parallel independent executio
 Netdata takes the impact on monitored infrastructure extremely seriously. Netdata is committed to being a friendly and polite citizen alongside other applications and services running on the monitored systems. This philosophy drives every architectural decision.
 
 **Netdata's Commitment:**
+
 - Any negative impact on monitored applications is considered a severe bug that must be fixed
 - Continuous optimization to minimize resource consumption while maximizing observability value
 - The solution is battle-tested by a large community across diverse environments

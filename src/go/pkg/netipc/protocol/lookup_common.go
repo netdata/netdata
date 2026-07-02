@@ -31,11 +31,23 @@ func maxIntValue() int {
 	return int(^uint(0) >> 1)
 }
 
-func checkedU32Int(value int) (uint32, bool) {
-	if value < 0 || uint64(value) > uint64(^uint32(0)) {
+func maxIntUint64() uint64 {
+	return uint64(^uint(0) >> 1)
+}
+
+func nonNegativeIntUint64(value int) (uint64, bool) {
+	if value < 0 {
 		return 0, false
 	}
-	return uint32(value), true
+	return uint64(value), true // #nosec G115 -- value is checked non-negative before widening.
+}
+
+func checkedU32Int(value int) (uint32, bool) {
+	value64, ok := nonNegativeIntUint64(value)
+	if !ok || value64 > uint64(^uint32(0)) {
+		return 0, false
+	}
+	return uint32(value), true // #nosec G115 -- value is bounded by uint32 max above.
 }
 
 func checkedU16Int(value int) (uint16, bool) {
@@ -94,8 +106,7 @@ func lookupDirOffset(hdrSize int, index uint32) (int, bool) {
 }
 
 func checkedInt(value uint64) (int, bool) {
-	maxInt := uint64(maxIntValue()) // #nosec G115 -- maxIntValue is non-negative and intentionally widened for the bounds check.
-	if value > maxInt {
+	if value > maxIntUint64() {
 		return 0, false
 	}
 	return int(value), true // #nosec G115 -- value is bounded by maxInt above.
@@ -139,6 +150,11 @@ func checkedAddU32(a, b uint32) (uint32, bool) {
 		return 0, false
 	}
 	return a + b, true
+}
+
+func uint32RangeWithinInt(off, length uint32, limit int) bool {
+	limit64, ok := nonNegativeIntUint64(limit)
+	return ok && uint64(off)+uint64(length) <= limit64
 }
 
 func checkedAlign8U32(v uint32) (uint32, bool) {
@@ -198,14 +214,14 @@ func finishPayloadExceededSuffixBytes(suffixBytes []uint32) bool {
 
 func payloadExceededSuffixFits(bufLen, dataOffset int, suffixBytes []uint32, first, maxItems uint32) bool {
 	maxInt := maxIntValue()
-	if uint64(maxItems) > uint64(maxInt) {
+	if uint64(maxItems) > maxIntUint64() {
 		return true
 	}
 	maxItemsInt := int(maxItems) // #nosec G115 -- maxItems is bounded by maxInt above.
 	if maxItemsInt == maxInt || len(suffixBytes) != maxItemsInt+1 {
 		return true
 	}
-	if uint64(first) > uint64(maxInt) {
+	if uint64(first) > maxIntUint64() {
 		return false
 	}
 	if first > maxItems {
@@ -220,15 +236,16 @@ func payloadExceededSuffixFits(bufLen, dataOffset int, suffixBytes []uint32, fir
 		return false
 	}
 	suffixBytesNeeded := uint64(suffixBytes[firstInt])
-	return suffixBytesNeeded <= uint64(bufLen-itemStart)
+	remainingBytes, ok := nonNegativeIntUint64(bufLen - itemStart)
+	return ok && suffixBytesNeeded <= remainingBytes
 }
 
 func payloadExceededFixedSuffixFits(bufLen, dataOffset, itemLen int, first, maxItems uint32) bool {
 	maxInt := maxIntValue()
-	if uint64(maxItems) > uint64(maxInt) {
+	if uint64(maxItems) > maxIntUint64() {
 		return true
 	}
-	if uint64(first) > uint64(maxInt) {
+	if uint64(first) > maxIntUint64() {
 		return false
 	}
 	if first > maxItems {
@@ -249,14 +266,21 @@ func payloadExceededFixedSuffixFits(bufLen, dataOffset, itemLen int, first, maxI
 	if !ok {
 		return false
 	}
-	itemLenBytes := uint64(itemLen)
-	alignedItemBytes := uint64(alignedItemLen)
+	itemLenBytes, ok := nonNegativeIntUint64(itemLen)
+	if !ok {
+		return false
+	}
+	alignedItemBytes, ok := nonNegativeIntUint64(alignedItemLen)
+	if !ok {
+		return false
+	}
 	tailItems := remaining - 1
 	if alignedItemBytes != 0 && tailItems > (^uint64(0)-itemLenBytes)/alignedItemBytes {
 		return false
 	}
 	needed := itemLenBytes + tailItems*alignedItemBytes
-	return needed <= uint64(bufLen-itemStart)
+	remainingBytes, ok := nonNegativeIntUint64(bufLen - itemStart)
+	return ok && needed <= remainingBytes
 }
 
 func validateLookupDir(buf []byte, dirStart int, itemCount uint32, packedAreaLen int, minLen int, exactLen int) error {
@@ -284,7 +308,7 @@ func validateLookupDir(buf []byte, dirStart int, itemCount uint32, packedAreaLen
 	}
 
 	dirSize64 := uint64(itemCount) * uint64(LookupDirEntrySize)
-	if dirSize64 > uint64(maxIntValue()) {
+	if dirSize64 > maxIntUint64() {
 		return ErrBadItemCount
 	}
 	dirSize := int(dirSize64) // #nosec G115 -- bounded by maxIntValue above.
@@ -610,11 +634,10 @@ func labelLayoutPrefix(fixedEnd, labelCount int) (int, int, int, error) {
 		return 0, 0, 0, ErrOverflow
 	}
 	tableStart := Align8(fixedEnd)
-	tableBytes64 := uint64(labelCount) * uint64(LookupLabelEntrySize)
-	if tableBytes64 > uint64(maxIntValue()) {
+	tableBytes, ok := checkedMulInt(labelCount, LookupLabelEntrySize)
+	if !ok {
 		return 0, 0, 0, ErrOverflow
 	}
-	tableBytes := int(tableBytes64) // #nosec G115 -- bounded by maxIntValue above.
 	if tableStart > maxIntValue()-tableBytes {
 		return 0, 0, 0, ErrOverflow
 	}

@@ -1,0 +1,128 @@
+---
+version: v1
+display_name: AWS DynamoDB
+namespace: AWS/DynamoDB
+period: 60
+instance:
+  dimensions:
+    - name: TableName
+      label: table_name
+metrics:
+  - id: consumed_read_capacity_units
+    metric_name: ConsumedReadCapacityUnits
+    statistics: [sum]
+    rate: true
+  - id: consumed_write_capacity_units
+    metric_name: ConsumedWriteCapacityUnits
+    statistics: [sum]
+    rate: true
+  - id: provisioned_read_capacity_units
+    metric_name: ProvisionedReadCapacityUnits
+    statistics: [average]
+    period: 300
+  - id: provisioned_write_capacity_units
+    metric_name: ProvisionedWriteCapacityUnits
+    statistics: [average]
+    period: 300
+  - id: read_throttle_events
+    metric_name: ReadThrottleEvents
+    statistics: [sum]
+    rate: true
+  - id: write_throttle_events
+    metric_name: WriteThrottleEvents
+    statistics: [sum]
+    rate: true
+  # ----------------------------------------------------------------------------------------
+  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
+  # matching chart in the charts: section below, then restart the go.d process. All are
+  # published at the {TableName} grain, so no other change is needed.
+  # ----------------------------------------------------------------------------------------
+  # - id: conditional_check_failed_requests
+  #   metric_name: ConditionalCheckFailedRequests
+  #   statistics: [sum]
+  #   rate: true
+  # - id: transaction_conflict
+  #   metric_name: TransactionConflict
+  #   statistics: [sum]
+  #   rate: true
+  # - id: time_to_live_deleted_item_count
+  #   metric_name: TimeToLiveDeletedItemCount
+  #   statistics: [sum]
+  #   rate: true
+  # Per-operation metrics {TableName, Operation} (SystemErrors, ThrottledRequests, ReturnedItemCount,
+  # SuccessfulRequestLatency) are collected by the dynamodb_operation profile -- enable it with
+  # namespaces.mode: combined. Metrics at still other grains need their own profile:
+  #   - Global secondary indexes {TableName, GlobalSecondaryIndexName}; global tables
+  #     {TableName, ReceivingRegion}; change-data-capture {TableName, DelegatedOperation}.
+  # On-demand max capacity (OnDemandMaxRead/WriteRequestUnits) is also published at {TableName}. See:
+  # https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/metrics-dimensions.html
+template:
+  family: DynamoDB
+  context_namespace: dynamodb
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, table_name]
+  charts:
+    - id: cw_dynamodb_consumed_capacity
+      context: consumed_capacity
+      title: DynamoDB Consumed Capacity
+      family: Capacity
+      units: units/s
+      algorithm: absolute
+      dimensions:
+        - selector: consumed_read_capacity_units_sum
+          name: read
+        - selector: consumed_write_capacity_units_sum
+          name: write
+    - id: cw_dynamodb_provisioned_capacity
+      context: provisioned_capacity
+      title: DynamoDB Provisioned Capacity
+      family: Capacity
+      units: units
+      algorithm: absolute
+      dimensions:
+        - selector: provisioned_read_capacity_units_average
+          name: read
+        - selector: provisioned_write_capacity_units_average
+          name: write
+    - id: cw_dynamodb_throttle_events
+      context: throttle_events
+      title: DynamoDB Throttle Events
+      family: Throttling
+      units: events/s
+      algorithm: absolute
+      dimensions:
+        - selector: read_throttle_events_sum
+          name: read
+        - selector: write_throttle_events_sum
+          name: write
+    # ----------------------------------------------------------------------------------------
+    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # ----------------------------------------------------------------------------------------
+    # - id: cw_dynamodb_conditional_check_failed
+    #   context: conditional_check_failed_requests
+    #   title: DynamoDB Conditional Check Failures
+    #   family: Errors
+    #   units: requests/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: conditional_check_failed_requests_sum
+    #       name: failed
+    # - id: cw_dynamodb_transaction_conflicts
+    #   context: transaction_conflict
+    #   title: DynamoDB Transaction Conflicts
+    #   family: Errors
+    #   units: conflicts/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: transaction_conflict_sum
+    #       name: conflicts
+    # - id: cw_dynamodb_ttl_deleted
+    #   context: ttl_deleted_items
+    #   title: DynamoDB TTL Deleted Items
+    #   family: Items
+    #   units: items/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: time_to_live_deleted_item_count_sum
+    #       name: deleted

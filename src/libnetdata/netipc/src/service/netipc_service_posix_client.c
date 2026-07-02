@@ -37,9 +37,10 @@ static void client_sleep_ms(uint32_t ms)
 
 static void close_abort_pipe(nipc_client_ctx_t *ctx)
 {
-    if (!ctx->abort_pipe_valid)
+    if (!ctx->abort_pipe_lock_initialized)
         return;
 
+    pthread_mutex_lock(&ctx->abort_pipe_lock);
     if (ctx->abort_pipe[0] >= 0) {
         close(ctx->abort_pipe[0]);
         ctx->abort_pipe[0] = -1;
@@ -49,12 +50,19 @@ static void close_abort_pipe(nipc_client_ctx_t *ctx)
         ctx->abort_pipe[1] = -1;
     }
     ctx->abort_pipe_valid = false;
+    pthread_mutex_unlock(&ctx->abort_pipe_lock);
+
+    pthread_mutex_destroy(&ctx->abort_pipe_lock);
+    ctx->abort_pipe_lock_initialized = false;
 }
 
 static void drain_abort_pipe(nipc_client_ctx_t *ctx)
 {
-    if (!ctx->abort_pipe_valid || ctx->abort_pipe[0] < 0)
+    if (!ctx->abort_pipe_lock_initialized)
         return;
+    pthread_mutex_lock(&ctx->abort_pipe_lock);
+    if (!ctx->abort_pipe_valid || ctx->abort_pipe[0] < 0)
+        goto done;
 
     char buf[64];
     for (;;) {
@@ -65,6 +73,9 @@ static void drain_abort_pipe(nipc_client_ctx_t *ctx)
             continue;
         break;
     }
+
+done:
+    pthread_mutex_unlock(&ctx->abort_pipe_lock);
 }
 
 static void init_abort_pipe(nipc_client_ctx_t *ctx)
@@ -72,10 +83,18 @@ static void init_abort_pipe(nipc_client_ctx_t *ctx)
     ctx->abort_pipe[0] = -1;
     ctx->abort_pipe[1] = -1;
     ctx->abort_pipe_valid = false;
+    ctx->abort_pipe_lock_initialized = false;
+
+    if (pthread_mutex_init(&ctx->abort_pipe_lock, NULL) != 0)
+        return;
+    ctx->abort_pipe_lock_initialized = true;
 
     int fds[2];
-    if (pipe(fds) != 0)
+    if (pipe(fds) != 0) {
+        pthread_mutex_destroy(&ctx->abort_pipe_lock);
+        ctx->abort_pipe_lock_initialized = false;
         return;
+    }
 
     for (int i = 0; i < 2; i++) {
         int flags = fcntl(fds[i], F_GETFL, 0);
@@ -166,6 +185,10 @@ void nipc_client_abort(nipc_client_ctx_t *ctx)
         return;
 
     __atomic_store_n(&ctx->abort_requested, 1u, __ATOMIC_RELEASE);
+    if (!ctx->abort_pipe_lock_initialized)
+        return;
+
+    pthread_mutex_lock(&ctx->abort_pipe_lock);
     if (ctx->abort_pipe_valid && ctx->abort_pipe[1] >= 0) {
         const char b = 1;
         ssize_t n;
@@ -173,6 +196,7 @@ void nipc_client_abort(nipc_client_ctx_t *ctx)
             n = write(ctx->abort_pipe[1], &b, 1);
         } while (n < 0 && errno == EINTR);
     }
+    pthread_mutex_unlock(&ctx->abort_pipe_lock);
 }
 
 void nipc_client_clear_abort(nipc_client_ctx_t *ctx)

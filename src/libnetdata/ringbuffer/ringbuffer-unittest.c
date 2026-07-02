@@ -33,6 +33,12 @@ static int ringbuffer_fixed_size_unittest(void)
     return errors;
 }
 
+static int ringbuffer_null_free_unittest(void)
+{
+    rbuf_free(NULL);
+    return 0;
+}
+
 static int ringbuffer_linear_growth_unittest(void)
 {
     int errors = 0;
@@ -136,6 +142,7 @@ int ringbuffer_unittest(void)
     fprintf(stderr, "\nrunning ringbuffer unittest\n");
 
     errors += ringbuffer_fixed_size_unittest();
+    errors += ringbuffer_null_free_unittest();
     errors += ringbuffer_linear_growth_unittest();
     errors += ringbuffer_wrapped_growth_unittest();
     errors += ringbuffer_cap_unittest();

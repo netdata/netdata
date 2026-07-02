@@ -325,6 +325,7 @@ nipc_error_t nipc_hello_decode(const void *buf, size_t buf_len,
     if (buf_len < NIPC_HELLO_WIRE_SIZE)
         return NIPC_ERR_TRUNCATED;
 
+    memset(out, 0, sizeof(*out));
     memcpy(out, buf, NIPC_HELLO_WIRE_SIZE);
 
     if (out->layout_version != 1)

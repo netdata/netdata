@@ -21,8 +21,8 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 pub use raw::{
-    CgroupsCacheItem, CgroupsCacheStatus, ClientAbortHandle, ClientState, ClientStatus,
-    SnapshotHandler,
+    CgroupsCacheItem, CgroupsCacheItemView, CgroupsCacheReadGuard, CgroupsCacheStatus,
+    ClientAbortHandle, ClientState, ClientStatus, SnapshotHandler,
 };
 
 /// Public L2/L3 client configuration for the cgroups-snapshot service.
@@ -262,7 +262,7 @@ impl CgroupsCache {
     }
 
     /// Refresh the cache. Returns true if the cache was updated.
-    pub fn refresh(&mut self) -> bool {
+    pub fn refresh(&self) -> bool {
         self.inner.refresh()
     }
 
@@ -272,9 +272,14 @@ impl CgroupsCache {
         self.inner.ready()
     }
 
-    /// Look up a cached item by hash + name. O(1), no I/O.
-    pub fn lookup(&self, hash: u32, name: &str) -> Option<&CgroupsCacheItem> {
-        self.inner.lookup(hash, name)
+    /// Acquire a read guard for borrowed cache access.
+    pub fn read_lock(&self) -> CgroupsCacheReadGuard<'_> {
+        self.inner.read_lock()
+    }
+
+    /// Duplicate a borrowed view into an owned item.
+    pub fn item_dup(&self, view: CgroupsCacheItemView<'_>) -> CgroupsCacheItem {
+        self.inner.item_dup(view)
     }
 
     /// Fill a status snapshot for diagnostics.
@@ -283,7 +288,7 @@ impl CgroupsCache {
     }
 
     /// Set the context-level default timeout for blocking refresh calls.
-    pub fn set_call_timeout(&mut self, timeout_ms: u32) {
+    pub fn set_call_timeout(&self, timeout_ms: u32) {
         self.inner.set_call_timeout(timeout_ms);
     }
 
@@ -303,7 +308,7 @@ impl CgroupsCache {
     }
 
     /// Close the cache and underlying L2 client.
-    pub fn close(&mut self) {
+    pub fn close(&self) {
         self.inner.close();
     }
 }

@@ -146,6 +146,8 @@ typedef struct {
   nipc_shm_ctx_t *shm; /* non-NULL if SHM profile negotiated */
   int abort_pipe[2];
   bool abort_pipe_valid;
+  pthread_mutex_t abort_pipe_lock;
+  bool abort_pipe_lock_initialized;
 #endif
 
   uint32_t call_timeout_ms;
@@ -325,7 +327,11 @@ typedef struct nipc_session_ctx {
   pthread_t thread;
 #endif
   uint64_t id;
+#if defined(_WIN32) || defined(__MSYS__)
+  volatile LONG active; /* use Interlocked* for cross-thread access */
+#else
   bool active; /* use __atomic builtins for cross-thread access */
+#endif
 } nipc_session_ctx_t;
 
 struct nipc_managed_server {
@@ -355,6 +361,7 @@ struct nipc_managed_server {
 #if defined(_WIN32) || defined(__MSYS__)
   volatile LONG running;
   volatile LONG accept_loop_active;
+  volatile LONG accept_loop_thread_id;
 #else
   bool running;
 #endif
@@ -422,6 +429,11 @@ nipc_server_init_raw_for_tests(nipc_managed_server_t *server,
 #endif
                                int worker_count, uint16_t expected_method_code,
                                nipc_server_handler_fn handler, void *user);
+
+nipc_error_t nipc_apps_lookup_remaining_timeout_for_tests(
+    nipc_client_ctx_t *ctx, uint64_t deadline_ms, uint32_t *timeout_out);
+nipc_error_t nipc_cgroups_lookup_remaining_timeout_for_tests(
+    nipc_client_ctx_t *ctx, uint64_t deadline_ms, uint32_t *timeout_out);
 
 #if defined(_WIN32) || defined(__MSYS__)
 typedef enum {
@@ -504,8 +516,25 @@ void nipc_server_destroy(nipc_managed_server_t *server);
 #define NIPC_CGROUPS_CACHE_BUF_SIZE_DEFAULT 65536
 
 /*
- * Cached copy of a single cgroup item. Owns its strings.
- * Built from ephemeral L2 views during cache construction.
+ * Borrowed view of a cached cgroup item.
+ *
+ * Returned by nipc_cgroups_cache_get() and valid only while the caller holds
+ * the read guard used for that lookup. Do not store this pointer, free it, or
+ * use it after nipc_cgroups_cache_read_unlock().
+ */
+typedef struct {
+  uint32_t hash;
+  uint32_t options;
+  uint32_t enabled;
+  const char *name; /* borrowed NUL-terminated string */
+  const char *path; /* borrowed NUL-terminated string */
+} nipc_cgroups_cache_item_view_t;
+
+/*
+ * Owned copy of a single cgroup item.
+ *
+ * Returned by nipc_cgroups_cache_item_dup(). The caller owns the returned item
+ * and must release it with nipc_cgroups_cache_item_free().
  */
 typedef struct {
   uint32_t hash;
@@ -541,25 +570,17 @@ typedef struct {
  * becomes empty only if no successful refresh has ever occurred.
  */
 
-/* Hash table bucket for O(1) cache lookup */
-typedef struct {
-  uint32_t index; /* index into items[] array */
-  bool used;      /* true if this bucket is occupied */
-} nipc_cgroups_hash_bucket_t;
+typedef struct nipc_cgroups_cache_snapshot nipc_cgroups_cache_snapshot_t;
 
 typedef struct {
   nipc_client_ctx_t client;
 
-  /* Cache data (owned) */
-  nipc_cgroups_cache_item_t *items;
-  uint32_t item_count;
-  uint32_t systemd_enabled;
-  uint64_t generation;
-  bool populated;
-
-  /* Hash table for O(1) lookup (open addressing, rebuilt on refresh) */
-  nipc_cgroups_hash_bucket_t *buckets;
-  uint32_t bucket_count; /* always a power of 2 */
+  /*
+   * Opaque immutable snapshot protected by cache_lock. Readers must acquire a
+   * read guard before accessing borrowed item views. Refresh builds a new
+   * snapshot privately and swaps it under the write lock.
+   */
+  nipc_cgroups_cache_snapshot_t *snapshot;
 
   /* Counters */
   uint32_t refresh_success_count;
@@ -569,7 +590,23 @@ typedef struct {
   /* Internal: response buffer for L2 calls */
   uint8_t *response_buf;
   size_t response_buf_size;
+
+#if defined(_WIN32) || defined(__MSYS__)
+  SRWLOCK cache_lock;
+  CRITICAL_SECTION writer_lock;
+#else
+  pthread_rwlock_t cache_lock;
+  pthread_mutex_t writer_lock;
+#endif
+  bool cache_lock_initialized;
+  bool writer_lock_initialized;
 } nipc_cgroups_cache_t;
+
+typedef struct {
+  nipc_cgroups_cache_t *cache;
+  const nipc_cgroups_cache_snapshot_t *snapshot;
+  bool locked;
+} nipc_cgroups_cache_read_guard_t;
 
 /*
  * Initialize an L3 cache. Creates the underlying L2 client context.
@@ -597,26 +634,60 @@ bool nipc_cgroups_cache_refresh(nipc_cgroups_cache_t *cache);
  *
  * Note: ready means "has cached data", not "is connected."
  */
-static inline bool nipc_cgroups_cache_ready(const nipc_cgroups_cache_t *cache) {
-  return cache->populated;
-}
+bool nipc_cgroups_cache_ready(nipc_cgroups_cache_t *cache);
+
+/*
+ * Acquire a read guard for borrowed cache access.
+ *
+ * While the guard is held, refresh can build a new snapshot in the background
+ * but cannot publish and retire the current snapshot. Always release a
+ * successful guard with nipc_cgroups_cache_read_unlock().
+ */
+bool nipc_cgroups_cache_read_lock(nipc_cgroups_cache_t *cache,
+                                  nipc_cgroups_cache_read_guard_t *guard);
+
+void nipc_cgroups_cache_read_unlock(nipc_cgroups_cache_read_guard_t *guard);
 
 /*
  * Look up a cached item by hash + name. Pure in-memory, no I/O.
  *
- * Returns a pointer to the cached item, or NULL if not found or
- * cache is empty. The returned pointer is valid until the next
- * successful refresh.
+ * Returns a borrowed immutable view, or NULL if not found or cache is empty.
+ * The returned view is valid only until nipc_cgroups_cache_read_unlock() is
+ * called on the guard.
  */
-const nipc_cgroups_cache_item_t *
-nipc_cgroups_cache_lookup(const nipc_cgroups_cache_t *cache, uint32_t hash,
-                          const char *name);
+const nipc_cgroups_cache_item_view_t *
+nipc_cgroups_cache_get(const nipc_cgroups_cache_read_guard_t *guard,
+                       uint32_t hash, const char *name);
+
+/*
+ * Duplicate a borrowed view into an owned item. The caller must hold the same
+ * read guard that protected the view. The returned item survives unlock and
+ * must be freed with nipc_cgroups_cache_item_free().
+ */
+nipc_cgroups_cache_item_t *
+nipc_cgroups_cache_item_dup(const nipc_cgroups_cache_read_guard_t *guard,
+                            const nipc_cgroups_cache_item_view_t *view);
+
+void nipc_cgroups_cache_item_free(nipc_cgroups_cache_item_t *item);
 
 /*
  * Fill a status snapshot for diagnostics.
  */
-void nipc_cgroups_cache_status(const nipc_cgroups_cache_t *cache,
+void nipc_cgroups_cache_status(nipc_cgroups_cache_t *cache,
                                nipc_cgroups_cache_status_t *out);
+
+#ifdef NIPC_INTERNAL_TESTING
+/*
+ * Internal test/benchmark helper. Seeds the cache from owned copies of the
+ * supplied items and publishes the snapshot through the same write lock used by
+ * refresh. Not part of the public L3 cache contract.
+ */
+bool nipc_cgroups_cache_seed_for_tests(nipc_cgroups_cache_t *cache,
+                                       const nipc_cgroups_cache_item_t *items,
+                                       uint32_t item_count,
+                                       uint32_t systemd_enabled,
+                                       uint64_t generation);
+#endif
 
 /*
  * Close the cache: free all cached items, close the L2 client.

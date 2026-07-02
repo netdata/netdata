@@ -15,6 +15,14 @@
 #define CLIENT_CALL_RECONNECT_DRAIN_MS (SERVER_POLL_TIMEOUT_MS + 50u)
 #define CLIENT_CALL_RECONNECT_RETRIES 20u
 
+typedef struct {
+    pthread_mutex_t lock;
+    pthread_cond_t copied_cond;
+    bool copied;
+    nipc_managed_server_t *server;
+    nipc_session_ctx_t *session;
+} nipc_posix_session_start_arg_t;
+
 enum {
     NIPC_POSIX_SERVICE_TEST_FAULT_CLIENT_RESPONSE_BUF_REALLOC_INTERNAL = 1,
     NIPC_POSIX_SERVICE_TEST_FAULT_CLIENT_SEND_BUF_REALLOC_INTERNAL,

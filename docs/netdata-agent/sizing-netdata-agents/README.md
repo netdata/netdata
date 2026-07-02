@@ -62,15 +62,9 @@ Check [RAM Requirements](/docs/netdata-agent/sizing-netdata-agents/ram-requireme
 
 2. **Compact Storage Engine**
 
-   Netdata uses a custom 32-bit floating-point format tailored for efficient storage of time-series data, along with an anomaly bit. This, combined with a fixed-step database design, enables efficient storage and retrieval of data.
+   Netdata uses a custom 32-bit floating-point format tailored for efficient storage of time-series data, along with an anomaly bit. This, combined with a fixed-step database design, enables efficient storage and retrieval of data. Timestamp optimization further reduces storage overhead by storing timestamps at regular intervals.
 
-   | Tier                              | Approximate Sample Size (bytes) |
-      |-----------------------------------|---------------------------------|
-   | High-resolution tier (per-second) | 0.6                             |
-   | Mid-resolution tier (per-minute)  | 6                               |
-   | Low-resolution tier (per-hour)    | 18                              |
-
-   Timestamp optimization further reduces storage overhead by storing timestamps at regular intervals.
+   For per-tier on-disk sample sizes, see [Disk Requirements & Retention](/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md).
 
 3. **Intelligent Query Engine**
 

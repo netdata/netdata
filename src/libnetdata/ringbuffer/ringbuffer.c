@@ -21,6 +21,9 @@ rbuf_t rbuf_create(size_t size, size_t max_size)
 
 void rbuf_free(rbuf_t buffer)
 {
+    if (!buffer)
+        return;
+
     freez(buffer->data);
     freez(buffer);
 }

@@ -8,6 +8,14 @@ You can configure Netdata Agents on the fly using Netdata Cloud. Check the [Dyna
 
 You configure your Netdata Agent using the main configuration file `netdata.conf`. This guide shows you how to locate, edit, and manage this configuration file.
 
+:::note
+
+On a freshly installed system, `netdata.conf` contains only comments and instructions for how to obtain the running configuration. This is normal and expected, a comment-only file means the Agent is running with built-in defaults, and no changes are required unless you want to override those defaults.
+
+Check below for [instructions on editing configuration files](#edit-configuration-files).
+
+:::
+
 ## Locate Your Config Directory
 
 First, you need to find where your configuration files are stored. On most Linux systems, you'll find your **Netdata config directory** at `/etc/netdata/`. This directory contains:

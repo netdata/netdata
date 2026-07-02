@@ -1,0 +1,137 @@
+---
+# Amazon Bedrock runtime metrics (namespace AWS/Bedrock).
+#
+# Per foundation model ({ModelId}), covering the Converse / InvokeModel (and streaming) APIs.
+# Token and invocation counts are per-period totals (rated to per-second); latencies are gauges.
+# Bedrock emits metrics only when non-zero, so idle models show gaps recorded as 0 for the counts.
+version: v1
+display_name: Amazon Bedrock
+namespace: AWS/Bedrock
+period: 300
+instance:
+  dimensions:
+    - name: ModelId
+      label: model_id
+metrics:
+  - id: invocations
+    metric_name: Invocations
+    statistics: [sum]
+    rate: true
+  - id: invocation_client_errors
+    metric_name: InvocationClientErrors
+    statistics: [sum]
+    rate: true
+  - id: invocation_server_errors
+    metric_name: InvocationServerErrors
+    statistics: [sum]
+    rate: true
+  - id: invocation_throttles
+    metric_name: InvocationThrottles
+    statistics: [sum]
+    rate: true
+  - id: input_tokens
+    metric_name: InputTokenCount
+    statistics: [sum]
+    rate: true
+  - id: output_tokens
+    metric_name: OutputTokenCount
+    statistics: [sum]
+    rate: true
+  - id: invocation_latency
+    metric_name: InvocationLatency
+    statistics: [average]
+  - id: time_to_first_token
+    metric_name: TimeToFirstToken
+    statistics: [average]
+  # ----------------------------------------------------------------------------------------
+  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
+  # matching chart in the charts section below. All are published at the {ModelId} grain.
+  # EstimatedTPMQuotaUsage is an AWS approximation ("do not use as the sole indicator for quota
+  # use"); the cache metrics apply only when prompt caching is used.
+  # ----------------------------------------------------------------------------------------
+  # - id: estimated_tpm_quota_usage
+  #   metric_name: EstimatedTPMQuotaUsage
+  #   statistics: [sum]
+  #   rate: true
+  # - id: cache_read_input_tokens
+  #   metric_name: CacheReadInputTokens
+  #   statistics: [sum]
+  #   rate: true
+  # - id: cache_write_input_tokens
+  #   metric_name: CacheWriteInputTokens
+  #   statistics: [sum]
+  #   rate: true
+template:
+  family: Bedrock
+  context_namespace: bedrock
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, model_id]
+  charts:
+    - id: cw_bedrock_invocations
+      context: invocations
+      title: Bedrock Invocations
+      family: Invocations
+      units: invocations/s
+      algorithm: absolute
+      dimensions:
+        - selector: invocations_sum
+          name: invocations
+    - id: cw_bedrock_errors
+      context: errors
+      title: Bedrock Invocation Errors
+      family: Errors
+      units: errors/s
+      algorithm: absolute
+      dimensions:
+        - selector: invocation_client_errors_sum
+          name: client
+        - selector: invocation_server_errors_sum
+          name: server
+        - selector: invocation_throttles_sum
+          name: throttled
+    - id: cw_bedrock_tokens
+      context: tokens
+      title: Bedrock Token Throughput
+      family: Tokens
+      units: tokens/s
+      algorithm: absolute
+      dimensions:
+        - selector: input_tokens_sum
+          name: input
+        - selector: output_tokens_sum
+          name: output
+    - id: cw_bedrock_latency
+      context: latency
+      title: Bedrock Invocation Latency
+      family: Latency
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: invocation_latency_average
+          name: invocation
+        - selector: time_to_first_token_average
+          name: time_to_first_token
+    # ----------------------------------------------------------------------------------------
+    # Charts for the optional metrics above. Uncomment a chart together with its metric(s).
+    # ----------------------------------------------------------------------------------------
+    # - id: cw_bedrock_quota_usage
+    #   context: quota_usage
+    #   title: Bedrock Estimated TPM Quota Usage
+    #   family: Tokens
+    #   units: tokens/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: estimated_tpm_quota_usage_sum
+    #       name: estimated
+    # - id: cw_bedrock_cache_tokens
+    #   context: cache_tokens
+    #   title: Bedrock Prompt Cache Tokens
+    #   family: Tokens
+    #   units: tokens/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: cache_read_input_tokens_sum
+    #       name: read
+    #     - selector: cache_write_input_tokens_sum
+    #       name: write

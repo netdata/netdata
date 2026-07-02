@@ -28,9 +28,17 @@ You can create multiple Spaces, but we recommend using a single Space for most u
 ### Set Up Team Access
 
 1. Click "Invite Users" in the Space's sidebar
-2. Set appropriate access levels:
-    - Rooms
-    - User roles
+2. Assign a role to each invited user. Space-level roles determine what someone can do across the Space:
+
+    - **Admin** — full control of the Space, including managing users, Rooms, nodes, notifications, and billing, plus access to every Room. Assign **Admin** to give the invited user the same level of control over the Space that you have.
+    - **Manager** — manage users, Rooms, and most configuration, but cannot manage billing or assign the Admin role.
+    - **Troubleshooter** — investigate issues and build dashboards in the Rooms they are assigned to, without managing the Space.
+    - **Observer** — view-only access to specific Rooms.
+    - **Billing** — manage invoices and payments, without access to monitoring management.
+
+   Which roles you can assign depends on your plan. Only an existing Admin can grant the Admin role, so you must already be an Admin to assign it to someone else. Role assignments take effect immediately.
+
+   For the full permission matrix and role availability by plan, see the [role-based access model](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
 
 :::tip
 
@@ -86,6 +94,23 @@ Rejoining a Room depends on your role:
 - **Troubleshooters** and **Observers** cannot rejoin on their own and must be re-added to the Room by an Admin or Manager.
 
 For the full permission breakdown, see the [Room Management table in the RBAC reference](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
+
+### Delete a Room
+
+Only **Admins** and **Managers** can delete a Room. See the [Room Management table in the RBAC reference](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) for the full permissions matrix.
+
+:::warning
+
+Deleting a Room is permanent and cannot be undone. The Room and its dashboards are removed.
+
+:::
+
+The nodes in a deleted Room are not deleted — they remain available in the "All nodes" Room and any other Rooms they belong to within the Space.
+
+**Steps to delete a Room:**
+
+1. Click the ⚙️ next to the Room name to open the Room's settings.
+2. Click **Delete Room**.
 
 ### Delete a Space
 

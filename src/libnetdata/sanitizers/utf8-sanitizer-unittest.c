@@ -1036,6 +1036,47 @@ static void test_empty_and_special(void) {
         run_sanitize_test(&t);
     }
 
+    // NULL default is equivalent to empty fallback
+    {
+        sanitize_test_t t = {
+            .name = "null_input_with_null_default",
+            .input = NULL,
+            .dst_size = 32, .char_map = identity_char_map, .utf = true, .empty = NULL,
+            .expected_output = "", .expected_len = 0, .expected_mblen = 0
+        };
+        run_sanitize_test(&t);
+    }
+
+    {
+        sanitize_test_t t = {
+            .name = "empty_input_with_null_default",
+            .input = (unsigned char *)"",
+            .dst_size = 32, .char_map = identity_char_map, .utf = true, .empty = NULL,
+            .expected_output = "", .expected_len = 0, .expected_mblen = 0
+        };
+        run_sanitize_test(&t);
+    }
+
+    {
+        sanitize_test_t t = {
+            .name = "control_chars_with_null_default",
+            .input = (unsigned char *)"\t\n\r\v",
+            .dst_size = 32, .char_map = test_rrd_char_map, .utf = true, .empty = NULL,
+            .expected_output = "", .expected_len = 0, .expected_mblen = 0
+        };
+        run_sanitize_test(&t);
+    }
+
+    {
+        sanitize_test_t t = {
+            .name = "all_underscores_with_null_default",
+            .input = (unsigned char *)"___",
+            .dst_size = 32, .char_map = identity_char_map, .utf = true, .empty = NULL,
+            .expected_output = "", .expected_len = 0, .expected_mblen = 0
+        };
+        run_sanitize_test(&t);
+    }
+
     // Single character
     {
         sanitize_test_t t = {

@@ -146,11 +146,22 @@ server_cancel_active_session_io_locked(nipc_managed_server_t *server) {
     nipc_session_ctx_t *s = server->sessions[i];
     if (!s)
       continue;
-    if (!InterlockedCompareExchange((volatile LONG *)&s->active, 0, 0))
+    if (!InterlockedCompareExchange(&s->active, 0, 0))
       continue;
     if (s->thread == NULL || s->thread == INVALID_HANDLE_VALUE)
       continue;
     CancelSynchronousIo(s->thread);
+  }
+}
+
+static void server_wait_accept_loop_inactive(nipc_managed_server_t *server) {
+  LONG current_thread_id = (LONG)GetCurrentThreadId();
+
+  while (InterlockedCompareExchange(&server->accept_loop_active, 0, 0)) {
+    LONG owner = InterlockedCompareExchange(&server->accept_loop_thread_id, 0, 0);
+    if (owner == current_thread_id)
+      return;
+    Sleep(1);
   }
 }
 
@@ -217,6 +228,7 @@ nipc_server_init_raw_for_tests(nipc_managed_server_t *server,
 }
 
 void nipc_server_run(nipc_managed_server_t *server) {
+  InterlockedExchange(&server->accept_loop_thread_id, (LONG)GetCurrentThreadId());
   InterlockedExchange(&server->accept_loop_active, 1);
   InterlockedExchange(&server->running, 1);
 
@@ -298,7 +310,7 @@ void nipc_server_run(nipc_managed_server_t *server) {
     sctx->session = session;
     sctx->shm = shm;
     sctx->id = sid;
-    InterlockedExchange((volatile LONG *)&sctx->active, 1);
+    InterlockedExchange(&sctx->active, 1);
 
     server->sessions[server->session_count++] = sctx;
     LeaveCriticalSection(&server->sessions_lock);
@@ -329,6 +341,7 @@ void nipc_server_run(nipc_managed_server_t *server) {
   }
 
   InterlockedExchange(&server->accept_loop_active, 0);
+  InterlockedExchange(&server->accept_loop_thread_id, 0);
   nipc_np_close_listener(&server->listener);
 }
 
@@ -353,6 +366,7 @@ bool nipc_server_drain(nipc_managed_server_t *server, uint32_t timeout_ms) {
     server_wake_listener(server);
   else
     nipc_np_close_listener(&server->listener);
+  server_wait_accept_loop_inactive(server);
 
   /* 2. Wait for in-flight sessions to complete */
   bool all_drained = true;
@@ -364,8 +378,7 @@ bool nipc_server_drain(nipc_managed_server_t *server, uint32_t timeout_ms) {
       EnterCriticalSection(&server->sessions_lock);
       int active_count = 0;
       for (int i = 0; i < server->session_count; i++) {
-        if (InterlockedCompareExchange(
-                (volatile LONG *)&server->sessions[i]->active, 0, 0))
+        if (InterlockedCompareExchange(&server->sessions[i]->active, 0, 0))
           active_count++;
       }
       LeaveCriticalSection(&server->sessions_lock);
@@ -415,6 +428,7 @@ void nipc_server_destroy(nipc_managed_server_t *server) {
     server_wake_listener(server);
   else
     nipc_np_close_listener(&server->listener);
+  server_wait_accept_loop_inactive(server);
 
   /* Join all active session threads */
   if (server->sessions) {

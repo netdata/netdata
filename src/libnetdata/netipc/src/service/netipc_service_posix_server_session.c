@@ -273,8 +273,13 @@ static void server_handle_session(nipc_managed_server_t *server,
 /* Thread function: handles one client session from accept to disconnect. */
 void *nipc_service_posix_session_handler_thread(void *arg)
 {
-    nipc_session_ctx_t *sctx = (nipc_session_ctx_t *)arg;
-    nipc_managed_server_t *server = sctx->server;
+    nipc_posix_session_start_arg_t *start = (nipc_posix_session_start_arg_t *)arg;
+    pthread_mutex_lock(&start->lock);
+    nipc_session_ctx_t *sctx = start->session;
+    nipc_managed_server_t *server = start->server;
+    start->copied = true;
+    pthread_cond_signal(&start->copied_cond);
+    pthread_mutex_unlock(&start->lock);
 
     /* Allocate a per-session response buffer */
     size_t resp_size = (size_t)sctx->session.max_response_payload_bytes;

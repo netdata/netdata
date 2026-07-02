@@ -36,6 +36,8 @@ nipc_error_t nipc_string_reverse_decode(const void *buf, size_t buf_len,
     memcpy(&str_offset, p + 0, 4);
     memcpy(&str_length, p + 4, 4);
 
+    if (str_offset != NIPC_STRING_REVERSE_HDR_SIZE)
+        return NIPC_ERR_BAD_LAYOUT;
     if ((uint64_t)str_offset + str_length + 1 > buf_len)
         return NIPC_ERR_OUT_OF_BOUNDS;
 
