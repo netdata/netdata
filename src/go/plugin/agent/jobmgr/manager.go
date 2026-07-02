@@ -168,6 +168,7 @@ func New(cfg Config) *Manager {
 		RestartableAffectedJobs: mgr.restartableAffectedJobs,
 		RestartDependentJobs:    mgr.restartDependentJobs,
 	})
+	mgr.executor = newExecutor(mgr)
 
 	return mgr
 }
@@ -217,6 +218,7 @@ type Manager struct {
 	collectorCallbacks *collectorCallbacks
 	secretsCtl         *secretsctl.Controller
 	vnodesCtl          *vnodectl.Controller
+	executor           *executor
 
 	// Runtime loop state.
 	ctx              context.Context
@@ -342,11 +344,11 @@ func (m *Manager) run() {
 			case <-m.ctx.Done():
 				return
 			case cfg := <-m.addCh:
-				m.addConfig(cfg)
+				m.executor.dispatch(m.newDiscoveryAddEvent(cfg))
 			case cfg := <-m.rmCh:
-				m.removeConfig(cfg)
+				m.executor.dispatch(m.newDiscoveryRemoveEvent(cfg))
 			case fn := <-m.dyncfgCh:
-				m.dyncfgSeqExec(fn)
+				m.executor.dispatch(m.newDyncfgEvent(fn))
 			}
 		}
 	}
@@ -398,7 +400,7 @@ func (m *Manager) runWaitDecisionStep() bool {
 		case <-m.ctx.Done():
 			return false
 		case fn := <-m.dyncfgCh:
-			m.dyncfgSeqExec(fn)
+			m.executor.dispatch(m.newDyncfgEvent(fn))
 		}
 		return true
 	}
@@ -417,7 +419,7 @@ func (m *Manager) runWaitDecisionStep() bool {
 	case <-m.ctx.Done():
 		return false
 	case fn := <-m.dyncfgCh:
-		m.dyncfgSeqExec(fn)
+		m.executor.dispatch(m.newDyncfgEvent(fn))
 	case <-timer.C:
 		m.collectorHandler.ExpireWaitDecision()
 	}
