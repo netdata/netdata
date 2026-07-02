@@ -184,6 +184,9 @@ resolved by `otel-plugin` `config/{mod,signal,env}.rs`, consumed by both workers
   the shipped logs tuning while traces are under active development (the traces
   pipeline is always built). Each signal's tuning is independent (e.g. a small
   logs rotation threshold does not affect traces, which keeps its own).
+  `crc_enabled` / `compression_enabled` are hidden knobs: default `true`,
+  intentionally absent from the shipped stock file, settable per signal via a
+  user `otel.yaml` or `NETDATA_OTEL_{LOGS,TRACES}_{CRC,COMPRESSION}_ENABLED`.
 - **Rotation/retention are validated policies.** The `rotation:` / `retention:` maps
   deserialize into `RotationPolicy` / `RetentionPolicy` (a complete `default` + partial
   per-tenant overrides). A complete `"default"` is required and enforced at config

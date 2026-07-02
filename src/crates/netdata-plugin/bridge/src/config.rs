@@ -331,8 +331,9 @@ pub struct RotationConfig {
 
 /// A validated rotation policy: a complete `default` plus partial per-tenant
 /// overrides. The only constructors are the serde `TryFrom<HashMap<String,
-/// RotationEntry>>` (used at config load) and override patching, both of which keep
-/// the `default` complete — so [`RotationPolicy::resolve`] cannot panic. A malformed
+/// RotationEntry>>` (used at config load), override patching, and `Default`
+/// (the absent-signal fallback) — each keeps the `default` complete, so
+/// [`RotationPolicy::resolve`] cannot panic. A malformed
 /// or missing default is rejected at deserialize (parse-don't-validate), not at first
 /// runtime resolve. Serializes back to the `{ "default": {...}, "<tenant>": {...} }`
 /// map shape, so operator YAML, JSON logging, and IPC are unchanged.
@@ -474,7 +475,8 @@ pub struct RetentionConfig {
 
 /// A validated retention policy: a complete `default` plus partial per-tenant
 /// overrides. Constructed only via the serde `TryFrom<HashMap<String,
-/// RetentionEntry>>` (config load) or override patching, both of which keep the
+/// RetentionEntry>>` (config load), override patching, or `Default` (the
+/// absent-signal fallback) — each keeps the
 /// `default` complete — so [`RetentionPolicy::resolve`] cannot panic. A malformed or
 /// missing default is rejected at deserialize, not at first runtime resolve.
 /// Serializes back to the map shape, so operator YAML / logging / IPC are unchanged.
