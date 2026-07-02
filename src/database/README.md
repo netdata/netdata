@@ -39,6 +39,26 @@ Each tier has its own independent **space** and **time** lines on the chart:
 
 Different tiers naturally show different percentages because they have different write volumes, compression ratios, and configured limits. When either the space or time dimension reaches 100%, the oldest datafiles are rotated out as described in the [Retention Size Enforcement](#retention-size-enforcement) section below.
 
+Each tier has its own chart — `dbengine_retention_tier0`, `dbengine_retention_tier1`, `dbengine_retention_tier2`, and so on — and every chart tracks two dimensions, both shown as a percentage:
+
+- **`space`**: how much of the tier's configured disk space limit is currently consumed. For example, 9% on tier 0 means dbengine is using 9% of that tier's size quota.
+- **`time`**: how much of the tier's configured time limit the currently retained data spans. For example, if tier 0's time limit is 14 days and the oldest stored sample is 1.26 days old, the `time` dimension reads approximately 9%.
+
+The percentages are calculated as follows:
+
+| Dimension | Calculation |
+|-----------|-------------|
+| `space` | `(disk space used by this tier ÷ configured size limit) × 100` |
+| `time` | `(current data span in seconds ÷ configured time limit in seconds) × 100`, capped at 100% |
+
+> **Note**
+>
+> **When retention size is 0 (disabled):** the `space` dimension has no tier-specific quota to divide by, so it falls back to measuring the tier's disk usage against the total capacity of the partition that hosts the dbengine data directory. The denominator becomes `(free space on the partition + disk space already used by the tier)`, which is effectively the full partition size. Because the percentage is measured against the entire partition rather than a tier-specific quota, the `space` value will typically be very low — for example, 9%, 2%, or 1% across tiers on a system that has explicitly set retention size to 0.
+>
+> **When retention time is 0 (disabled):** the `time` dimension reports 0%, because there is no time limit to measure against.
+
+**Interpreting consistently low percentages:** Low `space` percentages are normal and do not indicate a problem. With the default per-tier size limits (1 GiB each), a low percentage simply means the tier has not yet filled its quota — common on systems with modest metric volume or limited uptime. If you have explicitly set a tier's `dbengine tier N retention size` to 0, the `space` dimension instead measures against total partition capacity (see the note above), which also produces low values because the tier's data is a small fraction of the disk. To determine which mode is in effect, check your retention size settings in `netdata.conf`: a value of 0 activates fallback mode, while any non-zero value (including the default 1 GiB) measures against the tier quota. See [Retention Settings](/src/database/CONFIGURATION.md#retention-settings) for configuration details.
+
 ### Retention Size Enforcement
 
 Retention size limits are **soft caps**, not hard caps. Netdata writes data unconditionally and checks limits afterwards — it does not block or reject writes when a cap is approaching.
