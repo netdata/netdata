@@ -1,0 +1,158 @@
+---
+# AWS Auto Scaling group metrics (namespace AWS/AutoScaling).
+#
+# Per Auto Scaling group ({AutoScalingGroupName}). All metrics are point-in-time gauges (instance
+# and capacity-unit counts) queried with the average — none are rates.
+#
+# NOTE: group-metrics collection is OFF by default on a plain Auto Scaling group; enable it with
+# `aws autoscaling enable-metrics-collection --granularity 1Minute` or no data is collected. EKS
+# managed node groups have it enabled by default. The capacity-unit metrics (optional below) equal
+# the instance counts unless the group uses mixed instances with per-type weights.
+version: v1
+display_name: AWS Auto Scaling
+namespace: AWS/AutoScaling
+period: 300
+instance:
+  dimensions:
+    - name: AutoScalingGroupName
+      label: auto_scaling_group_name
+metrics:
+  - id: group_min_size
+    metric_name: GroupMinSize
+    statistics: [average]
+  - id: group_max_size
+    metric_name: GroupMaxSize
+    statistics: [average]
+  - id: group_desired_capacity
+    metric_name: GroupDesiredCapacity
+    statistics: [average]
+  - id: group_total_instances
+    metric_name: GroupTotalInstances
+    statistics: [average]
+  - id: group_in_service_instances
+    metric_name: GroupInServiceInstances
+    statistics: [average]
+  - id: group_pending_instances
+    metric_name: GroupPendingInstances
+    statistics: [average]
+  - id: group_standby_instances
+    metric_name: GroupStandbyInstances
+    statistics: [average]
+  - id: group_terminating_instances
+    metric_name: GroupTerminatingInstances
+    statistics: [average]
+  # ----------------------------------------------------------------------------------------
+  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
+  # matching chart in the charts section below. All are published at the {AutoScalingGroupName}
+  # grain. The capacity-unit metrics matter only for mixed-instances groups with per-type weights;
+  # the warm-pool metrics are emitted only when the group has a warm pool.
+  # ----------------------------------------------------------------------------------------
+  # - id: group_total_capacity
+  #   metric_name: GroupTotalCapacity
+  #   statistics: [average]
+  # - id: group_in_service_capacity
+  #   metric_name: GroupInServiceCapacity
+  #   statistics: [average]
+  # - id: group_pending_capacity
+  #   metric_name: GroupPendingCapacity
+  #   statistics: [average]
+  # - id: group_standby_capacity
+  #   metric_name: GroupStandbyCapacity
+  #   statistics: [average]
+  # - id: group_terminating_capacity
+  #   metric_name: GroupTerminatingCapacity
+  #   statistics: [average]
+  # - id: warm_pool_min_size
+  #   metric_name: WarmPoolMinSize
+  #   statistics: [average]
+  # - id: warm_pool_desired_capacity
+  #   metric_name: WarmPoolDesiredCapacity
+  #   statistics: [average]
+  # - id: warm_pool_warmed_capacity
+  #   metric_name: WarmPoolWarmedCapacity
+  #   statistics: [average]
+  # - id: warm_pool_pending_capacity
+  #   metric_name: WarmPoolPendingCapacity
+  #   statistics: [average]
+  # - id: warm_pool_terminating_capacity
+  #   metric_name: WarmPoolTerminatingCapacity
+  #   statistics: [average]
+  # - id: warm_pool_total_capacity
+  #   metric_name: WarmPoolTotalCapacity
+  #   statistics: [average]
+template:
+  family: Auto Scaling
+  context_namespace: auto_scaling
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, auto_scaling_group_name]
+  charts:
+    - id: cw_autoscaling_sizing
+      context: sizing
+      title: Auto Scaling Group Sizing
+      family: Capacity
+      units: instances
+      algorithm: absolute
+      dimensions:
+        - selector: group_min_size_average
+          name: min
+        - selector: group_max_size_average
+          name: max
+        - selector: group_desired_capacity_average
+          name: desired
+        - selector: group_total_instances_average
+          name: total
+    - id: cw_autoscaling_instances
+      context: instances
+      title: Auto Scaling Group Instances by State
+      family: Instances
+      units: instances
+      algorithm: absolute
+      dimensions:
+        - selector: group_in_service_instances_average
+          name: in_service
+        - selector: group_pending_instances_average
+          name: pending
+        - selector: group_standby_instances_average
+          name: standby
+        - selector: group_terminating_instances_average
+          name: terminating
+    # ----------------------------------------------------------------------------------------
+    # Charts for the optional metrics above. Uncomment a chart together with its metric(s).
+    # ----------------------------------------------------------------------------------------
+    # - id: cw_autoscaling_capacity_units
+    #   context: capacity_units
+    #   title: Auto Scaling Group Capacity Units by State
+    #   family: Capacity
+    #   units: units
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: group_total_capacity_average
+    #       name: total
+    #     - selector: group_in_service_capacity_average
+    #       name: in_service
+    #     - selector: group_pending_capacity_average
+    #       name: pending
+    #     - selector: group_standby_capacity_average
+    #       name: standby
+    #     - selector: group_terminating_capacity_average
+    #       name: terminating
+    # - id: cw_autoscaling_warm_pool
+    #   context: warm_pool
+    #   title: Auto Scaling Warm Pool Capacity
+    #   family: Warm Pool
+    #   units: units
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: warm_pool_min_size_average
+    #       name: min
+    #     - selector: warm_pool_desired_capacity_average
+    #       name: desired
+    #     - selector: warm_pool_warmed_capacity_average
+    #       name: warmed
+    #     - selector: warm_pool_pending_capacity_average
+    #       name: pending
+    #     - selector: warm_pool_terminating_capacity_average
+    #       name: terminating
+    #     - selector: warm_pool_total_capacity_average
+    #       name: total

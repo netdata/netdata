@@ -1,0 +1,55 @@
+---
+# AWS Site-to-Site VPN connection metrics (namespace AWS/VPN).
+#
+# Per VPN connection ({VpnId}). A connection has two tunnels; at this grain TunnelState is the
+# fraction of tunnels up (1 = both up, 0.5 = one up, 0 = both down) — charted with the average.
+# TunnelDataIn/Out report bytes even while a tunnel is down (periodic status/BGP traffic), so use
+# TunnelState, not traffic, to judge tunnel health. Per-tunnel metrics ({TunnelIpAddress}) would
+# need their own profile.
+version: v1
+display_name: AWS Site-to-Site VPN
+namespace: AWS/VPN
+period: 300
+instance:
+  dimensions:
+    - name: VpnId
+      label: vpn_id
+metrics:
+  - id: tunnel_data_in
+    metric_name: TunnelDataIn
+    statistics: [sum]
+    rate: true
+  - id: tunnel_data_out
+    metric_name: TunnelDataOut
+    statistics: [sum]
+    rate: true
+  - id: tunnel_state
+    metric_name: TunnelState
+    statistics: [average]
+template:
+  family: VPN
+  context_namespace: vpn
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, vpn_id]
+  charts:
+    - id: cw_vpn_traffic
+      context: traffic
+      title: Site-to-Site VPN Traffic
+      family: Traffic
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: tunnel_data_in_sum
+          name: received
+        - selector: tunnel_data_out_sum
+          name: sent
+    - id: cw_vpn_tunnel_state
+      context: tunnel_state
+      title: Site-to-Site VPN Tunnel State
+      family: Status
+      units: status
+      algorithm: absolute
+      dimensions:
+        - selector: tunnel_state_average
+          name: up
