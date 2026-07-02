@@ -10,7 +10,6 @@ workspace = true
 
 [dependencies]
 sfst = { workspace = true }
-otel-logs-identity = { workspace = true }
 
 treight = { workspace = true, features = ["roaring", "serde"] }
 file-registry = { workspace = true }

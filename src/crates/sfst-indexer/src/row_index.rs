@@ -10,9 +10,7 @@
 //! 4. **Vec\<i64\>** — nanosecond timestamp per row position, used to build the
 //!    time-sort remap and sparse histogram.
 
-use crate::IndexError;
 use bumpalo::Bump;
-use otel_logs_identity::ServiceStream;
 use roaring::RoaringBitmap;
 use sfst::{
     DroppedAttributeCounts, Durations, Flags, Histogram, ObservedTimestamps, ParentSpanIds,
@@ -43,7 +41,7 @@ pub struct RowIndex<'a> {
     /// (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`, plus the traces-only `PSPN`/`DURN`) in
     /// the cold region; absent columns write no chunk and add no manifest entry.
     /// Every present column MUST have length equal to the row count
-    /// ([`IndexError::ColumnLengthMismatch`] at build).
+    /// ([`crate::IndexError::ColumnLengthMismatch`] at build).
     pub observed_timestamps: Option<ObservedTimestamps>,
     pub trace_ids: Option<TraceIds>,
     pub span_ids: Option<SpanIds>,
@@ -152,43 +150,6 @@ impl<'a> RowIndex<'a> {
             self.kv_bitmaps
                 .resize_with(kv_slot.idx() + 1, RoaringBitmap::new);
         }
-    }
-
-    /// Extract the file's single `(service.namespace, service.name)` stream.
-    ///
-    /// Walks the interner once for `service.name=X` and `service.namespace=Y`
-    /// entries. The ingestor partitions WAL files by `ns_hash` and rejects
-    /// writes whose `(namespace, name)` doesn't match the canonical pair
-    /// for that hash, so every WAL file should expose at most one of each.
-    /// Missing values default to the empty string (the catch-all stream).
-    ///
-    /// Returns [`IndexError::MultipleStreams`] if more than one distinct
-    /// value is found for either key — that means an `ns_hash` collision
-    /// slipped past the ingestor's check and the file has no single
-    /// stream identity to attach to the SFST.
-    pub fn service_stream(&self) -> Result<ServiceStream, IndexError> {
-        let mut namespaces: Vec<&str> = Vec::new();
-        let mut names: Vec<&str> = Vec::new();
-
-        for kv_pair in self.kv_interner.strings().iter() {
-            if let Some(name) = kv_pair.strip_prefix("service.name=") {
-                names.push(name);
-            } else if let Some(namespace) = kv_pair.strip_prefix("service.namespace=") {
-                namespaces.push(namespace);
-            }
-        }
-
-        if namespaces.len() > 1 || names.len() > 1 {
-            return Err(IndexError::MultipleStreams {
-                namespaces: namespaces.into_iter().map(String::from).collect(),
-                names: names.into_iter().map(String::from).collect(),
-            });
-        }
-
-        Ok(ServiceStream::new(
-            namespaces.first().copied().unwrap_or(""),
-            names.first().copied().unwrap_or(""),
-        ))
     }
 }
 
@@ -327,9 +288,6 @@ fn build_time_order(timestamps: &[i64]) -> TimeOrder {
         insertion_position,
     }
 }
-
-#[cfg(test)]
-mod tests;
 
 /// Build a sparse histogram from chronologically sorted row timestamps.
 ///

@@ -25,7 +25,8 @@ fn build_sfst(rows: &[(i64, &[&str])]) -> Vec<u8> {
     }
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("spike.sfst");
-    build_and_write(&ri, &path, None).expect("build_and_write");
+    // Empty content_meta: it is display-only and this test never reads it back.
+    build_and_write(&ri, &path, Vec::new()).expect("build_and_write");
     std::fs::read(&path).expect("read sfst")
 }
 
@@ -137,7 +138,7 @@ fn build_into_writes_span_columns_and_trace_id_index() {
 
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("spans.sfst");
-    build_and_write(&ri, &path, None).expect("build_and_write");
+    build_and_write(&ri, &path, Vec::new()).expect("build_and_write");
     let bytes = std::fs::read(&path).expect("read sfst");
 
     let reader = Reader::open(&bytes).expect("open sfst");

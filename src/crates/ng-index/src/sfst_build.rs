@@ -250,15 +250,14 @@ fn populate_row_index(
 pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result<SfstStats, Error> {
     let path = sole_wal_file(flat_dir)?;
     let mut reader = wal::Reader::open(&path)?;
-    // The WAL header carries the authoritative stream identity the ingestor wrote;
-    // it (not the row-derived `service.name`, now `resource.attributes.service.name`)
-    // becomes the SFST summary's content_meta.
+    // The WAL header carries the authoritative identity blob the ingestor wrote;
+    // it becomes the SFST summary's content_meta verbatim.
     let content_meta = reader.header().content_meta.clone();
     let arena = Bump::new();
     let mut row_index = RowIndex::new(&arena, CARDINALITY_THRESHOLD);
     let stats = populate_row_index(&mut reader, &mut row_index, metrics)?;
     let _t = metrics.scope("build");
-    build_and_write(&row_index, out_path, Some(content_meta))?;
+    build_and_write(&row_index, out_path, content_meta)?;
     Ok(stats)
 }
 
@@ -278,7 +277,7 @@ pub fn build_sfst_file(
     let mut row_index = RowIndex::new(&arena, CARDINALITY_THRESHOLD);
     populate_row_index(&mut reader, &mut row_index, metrics)?;
     let _t = metrics.scope("build");
-    let (summary, _metadata) = build_and_write(&row_index, out_path, Some(content_meta))?;
+    let (summary, _metadata) = build_and_write(&row_index, out_path, content_meta)?;
     let size = std::fs::metadata(out_path)?.len();
     Ok((summary, size))
 }
@@ -302,7 +301,7 @@ pub fn build_sfst_range(
     let mut row_index = RowIndex::new(&arena, CARDINALITY_THRESHOLD);
     populate_row_index(&mut reader, &mut row_index, &Metrics::new())?;
     let cursor = std::io::Cursor::new(Vec::new());
-    let (cursor, summary, _metadata) = build_into(&row_index, cursor, Some(content_meta))?;
+    let (cursor, summary, _metadata) = build_into(&row_index, cursor, content_meta)?;
     Ok((summary, cursor.into_inner()))
 }
 
@@ -424,7 +423,7 @@ pub fn build_sfst_traces_file(
     let mut row_index = RowIndex::new(&arena, CARDINALITY_THRESHOLD);
     populate_trace_row_index(&mut reader, &mut row_index, metrics)?;
     let _t = metrics.scope("build");
-    let (summary, _metadata) = build_and_write(&row_index, out_path, Some(content_meta))?;
+    let (summary, _metadata) = build_and_write(&row_index, out_path, content_meta)?;
     let size = std::fs::metadata(out_path)?.len();
     Ok((summary, size))
 }

@@ -12,11 +12,9 @@
 //!    fields → bincode + zstd blob.
 //! 4. **Tier-aligned ID assignment** — sequential file IDs in FST key order
 //!    across low → mid → high tiers.
-//! 5. **Stream derivation** — cross-join service.name / service.namespace
-//!    bitmaps to identify (namespace, name) streams.
-//! 6. **Per-stream log entries** — for each stream, translate interner IDs
-//!    to file IDs and serialize in time-sorted order.
-//! 7. **Metadata + write** — assemble field table, histogram, and write all
+//! 5. **Stream batches** — translate each row's interner IDs to file IDs and
+//!    serialize the entries in time-sorted batches.
+//! 6. **Metadata + write** — assemble field table, histogram, and write all
 //!    sections to disk.
 
 use std::io::{Seek, Write};
@@ -34,7 +32,6 @@ use super::bitset::Bitset;
 use super::kv_interner::KvSlot;
 use super::row_index::{RowIndex, TimeOrder};
 use crate::IndexError;
-use otel_logs_identity::ServiceStream;
 use sfst::{BitmapValue, FieldEntry, FieldTier, IdRanges, KvId, Metadata};
 
 /// Build tier-aligned key=value ID translation table.
@@ -252,40 +249,6 @@ fn batch_mask(rb: &RoaringBitmap, time_order: &TimeOrder, batch_size: u32) -> u8
     mask
 }
 
-/// Resolve and validate the file's single stream identity.
-///
-/// Each SFST file is required to contain exactly one `(namespace, name)`
-/// pair — the WAL writer partitions frames by `ns_hash`, and the ingestor
-/// rejects writes whose `(namespace, name)` doesn't match the canonical
-/// pair for an `ns_hash`. If multiple distinct values are seen for either
-/// key, [`RowIndex::service_stream`] surfaces the offenders via
-/// [`IndexError::MultipleStreams`] and we fail the index build.
-///
-/// Resolution only — the returned pair lands in the `SUMR` chunk; the
-/// stream-batch chunks themselves are emitted later by
-/// [`build_stream_batches`].
-fn resolve_stream(row_index: &RowIndex, total_rows: u32) -> Result<ServiceStream, IndexError> {
-    let stream = row_index.service_stream()?;
-
-    let namespace = if stream.namespace.is_empty() {
-        "<none>"
-    } else {
-        &stream.namespace
-    };
-    let name = if stream.name.is_empty() {
-        "<none>"
-    } else {
-        &stream.name
-    };
-    tracing::debug!(
-        "stream {namespace}/{name}: {} rows, {} batches",
-        row_index.num_rows(),
-        sfst::num_stream_batches(total_rows),
-    );
-
-    Ok(stream)
-}
-
 /// Build and write a split-fst index file.
 ///
 /// This is Phase 2 of the indexing pipeline. Takes the [`RowIndex`] built by
@@ -294,13 +257,16 @@ fn resolve_stream(row_index: &RowIndex, total_rows: u32) -> Result<ServiceStream
 /// stream to the temp file as they are packed (see `build_into`,
 /// crate-internal).
 ///
+/// `content_meta` is the producer's opaque identity blob, stored verbatim
+/// in the summary — the indexer never derives or inspects it.
+///
 /// Returns both the cheap-to-read [`sfst::Summary`] (which the registry
 /// stores inline) and the heavier [`Metadata`] (only needed for query
 /// planning and execution).
 pub fn build_and_write(
     row_index: &RowIndex,
     out_path: &Path,
-    content_meta_override: Option<Vec<u8>>,
+    content_meta: Vec<u8>,
 ) -> Result<(sfst::Summary, Metadata), IndexError> {
     let t_start = Instant::now();
 
@@ -313,11 +279,8 @@ pub fn build_and_write(
     // produced this index was already durably deleted, losing the
     // seq's data with no recovery path.
     let (guard, file) = file_registry::durable::AtomicFile::create(out_path)?;
-    let (buf, summary, metadata) = build_into(
-        row_index,
-        std::io::BufWriter::new(file),
-        content_meta_override,
-    )?;
+    let (buf, summary, metadata) =
+        build_into(row_index, std::io::BufWriter::new(file), content_meta)?;
     let file = buf.into_inner().map_err(|e| e.into_error())?;
     let file_size = file.metadata()?.len();
     guard.commit(file)?;
@@ -336,8 +299,8 @@ pub fn build_and_write(
 /// `sink` (positioned at offset 0), returning the sink plus the
 /// [`sfst::Summary`] / [`Metadata`] the file carries.
 ///
-/// Everything the `SUMR`/`META` chunks need (stream identity, id
-/// ranges, field table, histogram) is derivable before any chunk is
+/// Everything the `SUMR`/`META` chunks need (content identity, id
+/// ranges, field table, histogram) is available before any chunk is
 /// packed, and the chunk *count* is fixed by the field-tier
 /// classification and the stream-batch rule — so the writer reserves
 /// the TOC up front and each chunk is packed, written, and dropped in
@@ -354,7 +317,7 @@ pub fn build_and_write(
 pub fn build_into<W: Write + Seek>(
     row_index: &RowIndex,
     sink: W,
-    content_meta_override: Option<Vec<u8>>,
+    content_meta: Vec<u8>,
 ) -> Result<(W, sfst::Summary, Metadata), IndexError> {
     let t = Instant::now();
 
@@ -398,32 +361,11 @@ pub fn build_into<W: Write + Seek>(
     // derivation) and the heavy metadata.
     let histogram = row_index.sparse_histogram(&time_order);
 
-    // The indexer still derives the single stream from the rows (the
-    // one-stream-per-file `MultipleStreams` check above), then encodes it into
-    // the substrate's opaque `content_meta` (display identity). The `part_key`
-    // is NOT stored in the summary — it is the single source of truth in the
-    // filename (`FileId`), propagated from the WAL file the SFST is built from.
-    //
-    // Label authority: the partition key in the filename is trusted as-is and
-    // is deliberately NOT cross-checked against the row-derived stream here.
-    // For self-produced files the two always agree by construction (the
-    // ingestor derives both from the same stream); files are never renamed
-    // externally. See `FORMAT.md` ("Partition-key authority").
-    //
-    // Identity authority: when the caller passes `content_meta_override` (the WAL
-    // header's `content_meta`, written by the ingestor at the observation point), it
-    // is used verbatim — the authoritative identity. This is correct for ng-flatten
-    // files, whose rows carry `resource.attributes.service.name=…` that the row-derived
-    // `service_stream` does not recognize. The `None` arm derives identity from the rows
-    // (`service_stream`) — for producers that feed `RowIndex` directly without a WAL
-    // header (e.g. the `ng-index` spike test, whose rows carry `service.name=…`).
-    let content_meta = match content_meta_override {
-        Some(cm) => cm,
-        None => {
-            let stream = resolve_stream(row_index, total_rows)?;
-            otel_logs_identity::encode_content_meta(&stream).ok_or(IndexError::IdentityTooLarge)?
-        }
-    };
+    // Both identity halves are producer-supplied and opaque here: `content_meta`
+    // lands verbatim in the summary, and the `part_key` is not stored at all —
+    // the filename (`FileId`), propagated from the WAL file the SFST is built
+    // from, is its single source of truth and is deliberately not cross-checked
+    // against the rows. See `FORMAT.md` ("Partition-key authority").
     let summary = sfst::Summary {
         min_timestamp_s: histogram.timestamps.first().copied().unwrap_or(0),
         max_timestamp_s: histogram.timestamps.last().copied().unwrap_or(0),

@@ -4528,7 +4528,6 @@ dependencies = [
  "bumpalo",
  "file-registry",
  "hashbrown 0.17.1",
- "otel-logs-identity",
  "roaring 0.11.2",
  "sfst",
  "thiserror 2.0.18",
