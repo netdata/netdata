@@ -445,7 +445,7 @@ struct target {
 #if (PROCESSES_HAVE_FDS == 1)
     struct openfds openfds;
     NETDATA_DOUBLE max_open_files_percent;
-    int *target_fds;
+    uint32_t *target_fds;
     uint32_t target_fds_size;
 #endif
 
@@ -520,6 +520,9 @@ struct pid_fd {
 #define pid_stat_comm(p) (string2str((p)->comm))
 #define pid_stat_cmdline(p) (string2str((p)->cmdline))
 uint32_t all_files_len_get(void);
+#if (PROCESSES_HAVE_FDS == 1)
+void fds_generation_advance(void);
+#endif
 
 struct cgroup_lookup_entry;
 
@@ -597,6 +600,7 @@ struct pid_stat {
 #endif
     struct pid_fd *fds;             // array of fds it uses
     uint32_t fds_size;              // the size of the fds array
+    uint32_t fds_max;               // upper bound (exclusive) for iterating active entries in fds[]
 #endif
 
     uint32_t children_count;        // the number of processes directly referencing this.
