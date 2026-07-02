@@ -99,6 +99,7 @@ func TestLoadFromDefaultDirs_LoadsStockProfiles(t *testing.T) {
 		"bedrock":        "AWS/Bedrock",
 		"eventbridge":    "AWS/Events",
 		"vpn":            "AWS/VPN",
+		"eks":            "AWS/EKS",
 		// deep-grain profiles (disabled by default; profiles.mode combined)
 		"alb_target":         "AWS/ApplicationELB",
 		"dynamodb_operation": "AWS/DynamoDB",
