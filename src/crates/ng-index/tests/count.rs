@@ -48,7 +48,7 @@ fn write_flattened_wal(dir: &std::path::Path, counts: &[usize]) {
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
     let mut writer = wal::Writer::new(dir, wal::Config::default(), seq, 0).unwrap();
     for (i, &n) in counts.iter().enumerate() {
-        let (flattened, _) = flatten_log_request(&request(n));
+        let (flattened, _) = flatten_log_request(request(n));
         let bytes = encode_log_frame(&flattened).unwrap();
         writer
             .write_frame(
@@ -123,7 +123,7 @@ fn per_row_columns_roundtrip_in_chronological_order() {
     let flat = tempfile::tempdir().unwrap();
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
     let mut writer = wal::Writer::new(flat.path(), wal::Config::default(), seq, 0).unwrap();
-    let (flattened, _) = flatten_log_request(&request_cols(N));
+    let (flattened, _) = flatten_log_request(request_cols(N));
     let bytes = encode_log_frame(&flattened).unwrap();
     writer
         .write_frame(
@@ -242,7 +242,7 @@ fn typed_tree_and_coalesced_kinds_roundtrip() {
     let flat = tempfile::tempdir().unwrap();
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
     let mut writer = wal::Writer::new(flat.path(), wal::Config::default(), seq, 0).unwrap();
-    let (flattened, _) = flatten_log_request(&request_typed());
+    let (flattened, _) = flatten_log_request(request_typed());
     let bytes = encode_log_frame(&flattened).unwrap();
     writer
         .write_frame(
@@ -300,7 +300,7 @@ fn write_multiframe_flat_wal(num_frames: usize) -> (tempfile::TempDir, std::path
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
     let mut writer = wal::Writer::new(flat.path(), wal::Config::default(), seq, 0).unwrap();
     for i in 0..num_frames {
-        let (flattened, _) = flatten_log_request(&request_typed());
+        let (flattened, _) = flatten_log_request(request_typed());
         let bytes = encode_log_frame(&flattened).unwrap();
         writer
             .write_frame(
@@ -419,7 +419,7 @@ fn attribute_key_containing_eq_is_sanitized_and_queryable() {
     let flat = tempfile::tempdir().unwrap();
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
     let mut writer = wal::Writer::new(flat.path(), wal::Config::default(), seq, 0).unwrap();
-    let (flattened, sanitized) = flatten_log_request(&req);
+    let (flattened, sanitized) = flatten_log_request(req);
     assert_eq!(sanitized, 1);
     let bytes = encode_log_frame(&flattened).unwrap();
     writer

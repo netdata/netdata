@@ -314,7 +314,7 @@ fn write_flattened_wal(dir: &Path, corpus: &Corpus) -> std::path::PathBuf {
         let request = ExportLogsServiceRequest {
             resource_logs: batch.clone(),
         };
-        let (flattened, _) = ng_flatten::flatten_log_request(&request);
+        let (flattened, _) = ng_flatten::flatten_log_request(request);
         let bytes = ng_flatten::encode_log_frame(&flattened).expect("encode frame");
         let count: usize = batch
             .iter()

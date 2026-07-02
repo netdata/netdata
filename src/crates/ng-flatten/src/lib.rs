@@ -92,7 +92,7 @@ mod tests {
         };
 
         let mut f = Flattener::new();
-        let entries = f.flatten_record(&record);
+        let entries = f.flatten_record(record);
         let tree = f.into_tree();
         let leaves = tree.resolve(&entries);
 
@@ -140,7 +140,7 @@ mod tests {
                 ..Default::default()
             }],
         };
-        let (flat, sanitized) = flatten_log_request(&req);
+        let (flat, sanitized) = flatten_log_request(req);
         assert_eq!(sanitized, 4, "one per surface; multiple '='s count once");
         for path in [
             "resource.attributes.r_k",
@@ -160,12 +160,12 @@ mod tests {
             attributes: vec![kv("p=q", Av::StringValue("v".into()))],
             ..Default::default()
         };
-        let (tflat, tsanitized) = flatten_trace_request(&trace_req(span, None, None));
+        let (tflat, tsanitized) = flatten_trace_request(trace_req(span, None, None));
         assert_eq!(tsanitized, 1);
         node_for_path(&tflat.tree, "attributes.p_q");
 
         // Clean keys stay untouched and uncounted.
-        let (_, zero) = flatten_log_request(&ExportLogsServiceRequest::default());
+        let (_, zero) = flatten_log_request(ExportLogsServiceRequest::default());
         assert_eq!(zero, 0);
     }
 
@@ -175,12 +175,15 @@ mod tests {
             name: "GET /x".into(),
             kind: 2, // SERVER
             trace_id: vec![0xaa; 16],
-            status: Some(Status { code: 2, ..Default::default() }), // ERROR
+            status: Some(Status {
+                code: 2,
+                ..Default::default()
+            }), // ERROR
             attributes: vec![kv("http.method", Av::StringValue("GET".into()))],
             ..Default::default()
         };
         let mut f = Flattener::new();
-        let entries = f.flatten_span(&span);
+        let entries = f.flatten_span(span);
         let tree = f.into_tree();
         let leaves = tree.resolve(&entries);
 
@@ -190,19 +193,28 @@ mod tests {
         assert_eq!(at(&leaves, "_kind"), [&Value::Int(2)]);
         assert_eq!(at(&leaves, "status_code"), [&Value::Str("ERROR".into())]);
         assert_eq!(at(&leaves, "_status_code"), [&Value::Int(2)]);
-        assert_eq!(at(&leaves, "attributes.http.method"), [&Value::Str("GET".into())]);
+        assert_eq!(
+            at(&leaves, "attributes.http.method"),
+            [&Value::Str("GET".into())]
+        );
         // trace_id is a per-row column on SpanRecord, not a facet.
-        assert!(at(&leaves, "trace_id").is_empty(), "trace_id is a column, not a facet");
+        assert!(
+            at(&leaves, "trace_id").is_empty(),
+            "trace_id is a column, not a facet"
+        );
     }
 
     #[test]
     fn span_enum_default_skipped_unknown_keeps_raw_int() {
         // UNSPECIFIED kind (0) + UNSET status (0) → no enum facets at all.
         let mut f = Flattener::new();
-        let e = f.flatten_span(&Span {
+        let e = f.flatten_span(Span {
             name: "x".into(),
             kind: 0,
-            status: Some(Status { code: 0, ..Default::default() }),
+            status: Some(Status {
+                code: 0,
+                ..Default::default()
+            }),
             ..Default::default()
         });
         let l = f.into_tree().resolve(&e);
@@ -211,9 +223,12 @@ mod tests {
 
         // Unknown future variant → raw int survives (forward-compat), no label.
         let mut f = Flattener::new();
-        let e = f.flatten_span(&Span {
+        let e = f.flatten_span(Span {
             kind: 99,
-            status: Some(Status { code: 42, ..Default::default() }),
+            status: Some(Status {
+                code: 42,
+                ..Default::default()
+            }),
             ..Default::default()
         });
         let l = f.into_tree().resolve(&e);
@@ -224,11 +239,19 @@ mod tests {
     }
 
     /// Wrap one span in a single-resource/single-scope traces request.
-    fn trace_req(span: Span, resource: Option<Resource>, scope: Option<InstrumentationScope>) -> ExportTraceServiceRequest {
+    fn trace_req(
+        span: Span,
+        resource: Option<Resource>,
+        scope: Option<InstrumentationScope>,
+    ) -> ExportTraceServiceRequest {
         ExportTraceServiceRequest {
             resource_spans: vec![ResourceSpans {
                 resource,
-                scope_spans: vec![ScopeSpans { scope, spans: vec![span], ..Default::default() }],
+                scope_spans: vec![ScopeSpans {
+                    scope,
+                    spans: vec![span],
+                    ..Default::default()
+                }],
                 ..Default::default()
             }],
         }
@@ -254,9 +277,12 @@ mod tests {
                 attributes: vec![kv("service.name", Av::StringValue("api".into()))],
                 ..Default::default()
             }),
-            Some(InstrumentationScope { name: "lib".into(), ..Default::default() }),
+            Some(InstrumentationScope {
+                name: "lib".into(),
+                ..Default::default()
+            }),
         );
-        let (flat, _) = flatten_trace_request(&req);
+        let (flat, _) = flatten_trace_request(req);
         let rg = &flat.resources[0];
         let sg = &rg.scopes[0];
         let sr = &sg.spans[0];
@@ -272,18 +298,32 @@ mod tests {
 
         // Resource/scope flattening is the shared (signal-neutral) path.
         assert_eq!(
-            at(&flat.tree.resolve(&rg.resource), "resource.attributes.service.name"),
+            at(
+                &flat.tree.resolve(&rg.resource),
+                "resource.attributes.service.name"
+            ),
             [&Value::Str("api".into())]
         );
-        assert_eq!(at(&flat.tree.resolve(&sg.scope), "scope.name"), [&Value::Str("lib".into())]);
-        assert_eq!(at(&flat.tree.resolve(&sr.entries), "kind"), [&Value::Str("CLIENT".into())]);
+        assert_eq!(
+            at(&flat.tree.resolve(&sg.scope), "scope.name"),
+            [&Value::Str("lib".into())]
+        );
+        assert_eq!(
+            at(&flat.tree.resolve(&sr.entries), "kind"),
+            [&Value::Str("CLIENT".into())]
+        );
     }
 
     #[test]
     fn span_duration_clamps_on_unset_or_skew() {
         let dur = |start, end| {
-            let s = Span { start_time_unix_nano: start, end_time_unix_nano: end, ..Default::default() };
-            flatten_trace_request(&trace_req(s, None, None)).0.resources[0].scopes[0].spans[0].duration
+            let s = Span {
+                start_time_unix_nano: start,
+                end_time_unix_nano: end,
+                ..Default::default()
+            };
+            flatten_trace_request(trace_req(s, None, None)).0.resources[0].scopes[0].spans[0]
+                .duration
         };
         assert_eq!(dur(100, 250), 150);
         assert_eq!(dur(100, 0), 0, "unset end → 0");
@@ -322,7 +362,12 @@ mod tests {
         // status: None (vs Some(UNSET)) and an empty name → those facets absent;
         // an unrelated facet (kind) still emits.
         let mut f = Flattener::new();
-        let e = f.flatten_span(&Span { name: String::new(), kind: 2, status: None, ..Default::default() });
+        let e = f.flatten_span(Span {
+            name: String::new(),
+            kind: 2,
+            status: None,
+            ..Default::default()
+        });
         let l = f.into_tree().resolve(&e);
         assert!(at(&l, "name").is_empty(), "empty name → no facet");
         assert!(
@@ -344,9 +389,16 @@ mod tests {
             None,
             None,
         );
-        assert_eq!(normalize_trace_ids(&mut req), MalformedIds::default(), "conformant ids untouched");
+        assert_eq!(
+            normalize_trace_ids(&mut req),
+            MalformedIds::default(),
+            "conformant ids untouched"
+        );
         let s = &req.resource_spans[0].scope_spans[0].spans[0];
-        assert_eq!((s.trace_id.len(), s.span_id.len(), s.parent_span_id.len()), (16, 8, 8));
+        assert_eq!(
+            (s.trace_id.len(), s.span_id.len(), s.parent_span_id.len()),
+            (16, 8, 8)
+        );
     }
 
     #[test]
@@ -370,13 +422,21 @@ mod tests {
             }],
         };
         let mut f = Flattener::new();
-        let groups = flatten_trace_into(&mut f, &req);
+        let groups = flatten_trace_into(&mut f, req);
         let spans = &groups[0].scopes[0].spans;
         assert_eq!(spans.len(), 2);
         let node = |sr: &SpanRecord| {
-            sr.entries.iter().find(|e| e.value == Value::Str("GET".into())).unwrap().node
+            sr.entries
+                .iter()
+                .find(|e| e.value == Value::Str("GET".into()))
+                .unwrap()
+                .node
         };
-        assert_eq!(node(&spans[0]), node(&spans[1]), "shared (path,kind) interns once across spans");
+        assert_eq!(
+            node(&spans[0]),
+            node(&spans[1]),
+            "shared (path,kind) interns once across spans"
+        );
     }
 
     #[test]
@@ -406,7 +466,7 @@ mod tests {
         };
 
         let mut f = Flattener::new();
-        let entries = f.flatten_record(&record);
+        let entries = f.flatten_record(record);
         let tree = f.into_tree();
         let leaves = tree.resolve(&entries);
 
@@ -435,8 +495,8 @@ mod tests {
         };
 
         let mut f = Flattener::new();
-        let resource_entries = f.flatten_resource(&resource);
-        let scope_entries = f.flatten_scope(&scope);
+        let resource_entries = f.flatten_resource(resource);
+        let scope_entries = f.flatten_scope(scope);
         let tree = f.into_tree();
 
         assert_eq!(
@@ -461,7 +521,7 @@ mod tests {
         // a single column space where the shared column is ONE node and the
         // distinct ones survive — the index-time global-tree rebuild.
         let mut fa = Flattener::new();
-        let a = fa.flatten_record(&LogRecord {
+        let a = fa.flatten_record(LogRecord {
             severity_number: 9,
             attributes: vec![kv("only_a", Av::IntValue(1))],
             ..Default::default()
@@ -469,7 +529,7 @@ mod tests {
         let tree_a = fa.into_tree();
 
         let mut fb = Flattener::new();
-        let b = fb.flatten_record(&LogRecord {
+        let b = fb.flatten_record(LogRecord {
             severity_number: 17,
             attributes: vec![kv("only_b", Av::StringValue("x".into()))],
             ..Default::default()
@@ -527,14 +587,14 @@ mod tests {
         };
 
         let mut fa = Flattener::new();
-        let a = fa.flatten_record(&record(vec![
+        let a = fa.flatten_record(record(vec![
             kv("http.method", Av::StringValue("GET".into())),
             user(7, vec!["admin", "ops"]),
         ]));
         let tree_a = fa.into_tree();
 
         let mut fb = Flattener::new();
-        let b = fb.flatten_record(&record(vec![
+        let b = fb.flatten_record(record(vec![
             kv("region", Av::StringValue("eu".into())),
             user(42, vec!["viewer"]),
         ]));
@@ -593,7 +653,7 @@ mod tests {
         // Empty array / empty kvlist are their own leaf kinds; they must survive the
         // merge as distinct columns carrying the right kind.
         let mut fa = Flattener::new();
-        let _ = fa.flatten_record(&LogRecord {
+        let _ = fa.flatten_record(LogRecord {
             attributes: vec![
                 kv("empty_arr", Av::ArrayValue(ArrayValue { values: vec![] })),
                 kv("empty_kv", Av::KvlistValue(KeyValueList { values: vec![] })),
@@ -620,8 +680,8 @@ mod tests {
             ..Default::default()
         };
         let mut f = Flattener::new();
-        let a = f.flatten_record(&make(9));
-        let b = f.flatten_record(&make(17));
+        let a = f.flatten_record(make(9));
+        let b = f.flatten_record(make(17));
         assert_eq!(
             a[0].node, b[0].node,
             "severity_number must share one column node"
@@ -803,7 +863,7 @@ mod tests {
                 ..Default::default()
             }],
         };
-        let (flat, _) = flatten_trace_request(&req);
+        let (flat, _) = flatten_trace_request(req);
         let rg = &flat.resources[0];
         assert!(!rg.scopes[0].scope.is_empty(), "scope entries present");
         // Every entry (resource ++ scope ++ span) carries exactly hash_kv(path,value)

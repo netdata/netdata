@@ -480,7 +480,7 @@ mod tests {
     /// drop a field from the reader's derived field table (review finding D).
     #[test]
     fn sfst_and_ng_flatten_path_renderers_agree() {
-        let (flattened, _) = flatten_log_request(&nested_request());
+        let (flattened, _) = flatten_log_request(nested_request());
         let ng_tree = &flattened.tree;
         let sfst_tree = to_sfst_tree(ng_tree);
 

@@ -51,7 +51,7 @@ pub fn one_file_config() -> wal::Config {
 pub fn write_request(
     writer: &mut wal::Writer,
     clock: &mut MonotonicClock,
-    req: &mut ExportLogsServiceRequest,
+    req: ExportLogsServiceRequest,
 ) -> anyhow::Result<usize> {
     // One clock tick for the synthetic-timestamp base; normalization then runs
     // lock-free (base + offset for any record lacking event/observed time).
@@ -130,15 +130,15 @@ pub fn count_spans(req: &ExportTraceServiceRequest) -> usize {
 pub fn write_trace_request(
     writer: &mut wal::Writer,
     clock: &mut MonotonicClock,
-    req: &mut ExportTraceServiceRequest,
+    mut req: ExportTraceServiceRequest,
 ) -> anyhow::Result<usize> {
-    let span_count = count_spans(req);
+    let span_count = count_spans(&req);
     if span_count == 0 {
         return Ok(0);
     }
     let fallback_base_ns = clock.now_ns().as_u64();
-    ng_flatten::normalize_span_timestamps(req, fallback_base_ns);
-    let bad_ids = ng_flatten::normalize_trace_ids(req);
+    ng_flatten::normalize_span_timestamps(&mut req, fallback_base_ns);
+    let bad_ids = ng_flatten::normalize_trace_ids(&mut req);
     if bad_ids.any() {
         tracing::warn!(
             bad_trace_ids = bad_ids.trace,

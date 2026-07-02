@@ -490,7 +490,7 @@ impl LogsService for NetdataLogsService {
         };
 
         for s in accepted {
-            let mut request = ExportLogsServiceRequest {
+            let request = ExportLogsServiceRequest {
                 resource_logs: s.group.resource_logs,
             };
 
@@ -500,8 +500,8 @@ impl LogsService for NetdataLogsService {
             // ingest doesn't serialize on the process-wide clock for the whole
             // pass.
             let ingestion_ns = self.clock.lock().unwrap().now_ns();
-            let frame = ng_flatten::prepare_log_frame(&mut request, ingestion_ns.as_u64())
-                .map_err(|e| {
+            let frame =
+                ng_flatten::prepare_log_frame(request, ingestion_ns.as_u64()).map_err(|e| {
                     tracing::error!(%e, "failed to encode flattened frame");
                     Status::internal("flatten encode error")
                 })?;

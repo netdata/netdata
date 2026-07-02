@@ -133,9 +133,10 @@ fn request_roundtrips_through_a_wal_frame() {
     let mut writer = wal::Writer::new(dir.path(), one_file_config(), seq, PIPELINE_ID).unwrap();
     let mut clock = MonotonicClock::new();
 
-    let mut original = sample_request();
-    let written = write_request(&mut writer, &mut clock, &mut original).unwrap();
-    assert_eq!(written, count_log_records(&original));
+    let original = sample_request();
+    let expected = count_log_records(&original);
+    let written = write_request(&mut writer, &mut clock, original).unwrap();
+    assert_eq!(written, expected);
     assert_eq!(written, 2);
     let events = writer.shutdown_all().unwrap();
 
@@ -250,16 +251,13 @@ fn empty_request_writes_no_frame() {
     let mut clock = MonotonicClock::new();
 
     // A request whose ResourceLogs carries zero log records writes nothing.
-    let mut empty = ExportLogsServiceRequest {
+    let empty = ExportLogsServiceRequest {
         resource_logs: vec![ResourceLogs {
             scope_logs: vec![ScopeLogs::default()],
             ..Default::default()
         }],
     };
-    assert_eq!(
-        write_request(&mut writer, &mut clock, &mut empty).unwrap(),
-        0
-    );
+    assert_eq!(write_request(&mut writer, &mut clock, empty).unwrap(), 0);
     writer.shutdown_all().unwrap();
 
     // No file is created when no frame was written.
@@ -285,7 +283,7 @@ fn request_with(log_records: Vec<LogRecord>) -> ExportLogsServiceRequest {
 }
 
 /// Write `req` and return the decoded flattened frame's records.
-fn write_and_decode_records(req: &mut ExportLogsServiceRequest) -> Vec<ng_flatten::Record> {
+fn write_and_decode_records(req: ExportLogsServiceRequest) -> Vec<ng_flatten::Record> {
     let dir = tempfile::tempdir().unwrap();
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
     let mut writer = wal::Writer::new(dir.path(), one_file_config(), seq, PIPELINE_ID).unwrap();
@@ -307,13 +305,13 @@ fn write_and_decode_records(req: &mut ExportLogsServiceRequest) -> Vec<ng_flatte
 #[test]
 fn ts_falls_back_to_observed_when_time_is_zero() {
     let observed = 1_700_000_000_000_000_042;
-    let mut req = request_with(vec![LogRecord {
+    let req = request_with(vec![LogRecord {
         time_unix_nano: 0,
         observed_time_unix_nano: observed,
         attributes: vec![kv("k", any_value::Value::IntValue(1))],
         ..Default::default()
     }]);
-    let records = write_and_decode_records(&mut req);
+    let records = write_and_decode_records(req);
     assert_eq!(
         records[0].ts, observed as i64,
         "time==0 falls back to observed"
@@ -324,7 +322,7 @@ fn ts_falls_back_to_observed_when_time_is_zero() {
 fn malformed_ids_are_cleared_at_ingest() {
     // A wrong-length (non-empty) trace/span id is dropped at ingest; a conformant
     // 16/8-byte id passes through. The frame thus carries only {spec-width | empty}.
-    let mut req = request_with(vec![
+    let req = request_with(vec![
         LogRecord {
             trace_id: vec![1, 2, 3, 4, 5], // not 16 → cleared
             span_id: vec![9, 9, 9],        // not 8 → cleared
@@ -338,7 +336,7 @@ fn malformed_ids_are_cleared_at_ingest() {
             ..Default::default()
         },
     ]);
-    let records = write_and_decode_records(&mut req);
+    let records = write_and_decode_records(req);
     assert!(
         records[0].trace_id.is_unset(),
         "malformed trace_id cleared at ingest → UNSET"
@@ -363,7 +361,7 @@ fn malformed_ids_are_cleared_at_ingest() {
 fn ts_falls_back_to_clock_when_both_zero() {
     // Two records with neither timestamp: each gets a monotonic-clock ts, strictly
     // increasing so intra-frame order is preserved.
-    let mut req = request_with(vec![
+    let req = request_with(vec![
         LogRecord {
             attributes: vec![kv("k", any_value::Value::IntValue(1))],
             ..Default::default()
@@ -373,7 +371,7 @@ fn ts_falls_back_to_clock_when_both_zero() {
             ..Default::default()
         },
     ]);
-    let records = write_and_decode_records(&mut req);
+    let records = write_and_decode_records(req);
     assert!(records[0].ts > 0, "both zero -> monotonic clock fallback");
     assert!(
         records[1].ts > records[0].ts,
@@ -396,11 +394,17 @@ fn trace_request_roundtrips_through_a_wal_frame() {
         kind: 2, // SERVER
         start_time_unix_nano: 1_700_000_000_000_000_000,
         end_time_unix_nano: 1_700_000_000_000_000_500,
-        status: Some(Status { code: 2, ..Default::default() }), // ERROR
-        attributes: vec![kv("http.method", any_value::Value::StringValue("GET".into()))],
+        status: Some(Status {
+            code: 2,
+            ..Default::default()
+        }), // ERROR
+        attributes: vec![kv(
+            "http.method",
+            any_value::Value::StringValue("GET".into()),
+        )],
         ..Default::default()
     };
-    let mut req = ExportTraceServiceRequest {
+    let req = ExportTraceServiceRequest {
         resource_spans: vec![ResourceSpans {
             resource: Some(Resource {
                 attributes: vec![kv(
@@ -410,7 +414,10 @@ fn trace_request_roundtrips_through_a_wal_frame() {
                 ..Default::default()
             }),
             scope_spans: vec![ScopeSpans {
-                scope: Some(InstrumentationScope { name: "scope".into(), ..Default::default() }),
+                scope: Some(InstrumentationScope {
+                    name: "scope".into(),
+                    ..Default::default()
+                }),
                 spans: vec![span],
                 ..Default::default()
             }],
@@ -423,8 +430,9 @@ fn trace_request_roundtrips_through_a_wal_frame() {
     let mut writer =
         wal::Writer::new(dir.path(), one_file_config(), seq, TRACES_PIPELINE_ID).unwrap();
     let mut clock = MonotonicClock::new();
-    let written = write_trace_request(&mut writer, &mut clock, &mut req).unwrap();
-    assert_eq!(written, count_spans(&req));
+    let expected = count_spans(&req);
+    let written = write_trace_request(&mut writer, &mut clock, req).unwrap();
+    assert_eq!(written, expected);
     assert_eq!(written, 1);
     writer.shutdown_all().unwrap();
 

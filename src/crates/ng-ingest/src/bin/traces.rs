@@ -79,12 +79,12 @@ impl TraceService for Receiver {
         &self,
         request: Request<ExportTraceServiceRequest>,
     ) -> Result<Response<ExportTraceServiceResponse>, Status> {
-        let mut req = request.into_inner();
+        let req = request.into_inner();
 
         let written = {
             let mut sink = self.sink.lock().await;
             let Sink { writer, clock } = &mut *sink;
-            write_trace_request(writer, clock, &mut req)
+            write_trace_request(writer, clock, req)
                 .map_err(|e| Status::internal(format!("ingest write failed: {e}")))?
         };
 

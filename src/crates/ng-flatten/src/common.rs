@@ -15,7 +15,6 @@
 //! wrappers delegate to. The signal-specific request/record types and entry
 //! points live in [`crate::logs`] and [`crate::traces`].
 
-use std::collections::HashMap;
 use std::hash::Hasher;
 
 use serde::de::DeserializeOwned;
@@ -207,11 +206,82 @@ impl SchemaTree {
     }
 }
 
+/// Borrowed form of [`Step`] used on the flatten hot path: probing the intern
+/// map and rendering paths need no owned `String`, so the (overwhelmingly
+/// common) already-interned case allocates nothing.
+#[derive(Clone, Copy)]
+enum StepRef<'a> {
+    Field(&'a str),
+    ArrayElem,
+}
+
+impl<'a> StepRef<'a> {
+    fn of(step: &'a Step) -> Self {
+        match step {
+            Step::Field(name) => StepRef::Field(name),
+            Step::ArrayElem => StepRef::ArrayElem,
+        }
+    }
+
+    fn name(self) -> Option<&'a str> {
+        match self {
+            StepRef::Field(name) => Some(name),
+            StepRef::ArrayElem => None,
+        }
+    }
+
+    fn to_step(self) -> Step {
+        match self {
+            StepRef::Field(name) => Step::Field(name.to_string()),
+            StepRef::ArrayElem => Step::ArrayElem,
+        }
+    }
+}
+
+/// Owned intern-map key. `name == None` is `Step::ArrayElem`. The manual
+/// `Hash` MUST stay field-for-field identical to [`InternProbe`]'s so a
+/// borrowed probe finds the owned key.
+#[derive(PartialEq, Eq)]
+struct InternKey {
+    parent: NodeId,
+    kind: Kind,
+    name: Option<String>,
+}
+
+impl std::hash::Hash for InternKey {
+    fn hash<H: std::hash::Hasher>(&self, h: &mut H) {
+        self.parent.hash(h);
+        self.kind.hash(h);
+        self.name.as_deref().hash(h);
+    }
+}
+
+/// Borrowed, allocation-free probe for [`InternKey`].
+struct InternProbe<'a> {
+    parent: NodeId,
+    kind: Kind,
+    name: Option<&'a str>,
+}
+
+impl std::hash::Hash for InternProbe<'_> {
+    fn hash<H: std::hash::Hasher>(&self, h: &mut H) {
+        self.parent.hash(h);
+        self.kind.hash(h);
+        self.name.hash(h);
+    }
+}
+
+impl hashbrown::Equivalent<InternKey> for InternProbe<'_> {
+    fn equivalent(&self, key: &InternKey) -> bool {
+        self.parent == key.parent && self.kind == key.kind && self.name == key.name.as_deref()
+    }
+}
+
 /// Builds a [`SchemaTree`] while flattening a frame's resource, scope, and
 /// records into it — interning shared columns across all of them.
 pub struct Flattener {
     nodes: Vec<Node>,
-    lookup: HashMap<(NodeId, Step, Kind), NodeId>,
+    lookup: hashbrown::HashMap<InternKey, NodeId>,
     /// Collapsed path per node, built incrementally at interning time (the
     /// parent's path is always already cached) — must render exactly like
     /// [`SchemaTree::path`]. Lets [`emit`](Self::emit) hash `key=value`
@@ -231,7 +301,7 @@ impl Flattener {
                 kind: Kind::Kvlist,
                 edge: None,
             }],
-            lookup: HashMap::new(),
+            lookup: hashbrown::HashMap::new(),
             paths: vec![String::new()],
             kv_buf: String::new(),
             sanitized_keys: 0,
@@ -266,73 +336,94 @@ impl Flattener {
             let node = foreign.node(local);
             let edge = node.edge.as_ref().expect("non-root node has a parent edge");
             let global_parent = map[edge.parent as usize];
-            map[local as usize] = self.child(global_parent, edge.step.clone(), node.kind);
+            map[local as usize] = self.child(global_parent, StepRef::of(&edge.step), node.kind);
         }
         map
     }
 
-    /// Get-or-create the child of `parent` reached via `(step, kind)`.
-    fn child(&mut self, parent: NodeId, step: Step, kind: Kind) -> NodeId {
-        let key = (parent, step, kind);
-        if let Some(&id) = self.lookup.get(&key) {
+    /// Get-or-create the child of `parent` reached via `(step, kind)`. The
+    /// probe is borrowed — owned strings are allocated only when a NEW node
+    /// is interned (once per distinct column, not per occurrence).
+    fn child(&mut self, parent: NodeId, step: StepRef<'_>, kind: Kind) -> NodeId {
+        let probe = InternProbe {
+            parent,
+            kind,
+            name: step.name(),
+        };
+        if let Some(&id) = self.lookup.get(&probe) {
             return id;
         }
         let id = self.nodes.len() as NodeId;
         // Incremental path, matching `SchemaTree::path` byte-for-byte:
         // fields joined with '.', array elems appended as "[]" with no dot.
         let mut path = self.paths[parent as usize].clone();
-        match &key.1 {
-            Step::Field(name) => {
+        match step {
+            StepRef::Field(name) => {
                 if !path.is_empty() {
                     path.push('.');
                 }
                 path.push_str(name);
             }
-            Step::ArrayElem => path.push_str("[]"),
+            StepRef::ArrayElem => path.push_str("[]"),
         }
         self.paths.push(path);
         self.nodes.push(Node {
             kind,
             edge: Some(Edge {
                 parent,
-                step: key.1.clone(),
+                step: step.to_step(),
             }),
         });
-        self.lookup.insert(key, id);
+        self.lookup.insert(
+            InternKey {
+                parent,
+                kind,
+                name: step.name().map(str::to_string),
+            },
+            id,
+        );
         id
     }
 
     /// Descend a chain of (interior) field segments, returning the deepest node.
     fn descend(&mut self, mut node: NodeId, segments: &[&str]) -> NodeId {
         for &seg in segments {
-            node = self.child(node, Step::Field(seg.to_string()), Kind::Kvlist);
+            node = self.child(node, StepRef::Field(seg), Kind::Kvlist);
         }
         node
     }
 
     /// Emit a leaf entry under `parent` via `step`.
-    fn emit(&mut self, parent: NodeId, step: Step, value: Value, out: &mut Vec<Entry>) {
+    fn emit(&mut self, parent: NodeId, step: StepRef<'_>, value: Value, out: &mut Vec<Entry>) {
         let node = self.child(parent, step, value.kind());
         let hash = hash_kv(&self.paths[node as usize], &value, &mut self.kv_buf);
         out.push(Entry { node, value, hash });
     }
 
-    /// Flatten one OTLP `AnyValue` reached from `parent` via `step`.
-    fn flatten_value(&mut self, parent: NodeId, step: Step, av: &AnyValue, out: &mut Vec<Entry>) {
-        match &av.value {
-            Some(Av::StringValue(s)) => self.emit(parent, step, Value::Str(s.clone()), out),
-            Some(Av::BoolValue(b)) => self.emit(parent, step, Value::Bool(*b), out),
-            Some(Av::IntValue(i)) => self.emit(parent, step, Value::Int(*i), out),
-            Some(Av::DoubleValue(d)) => self.emit(parent, step, Value::Double(*d), out),
-            Some(Av::BytesValue(b)) => self.emit(parent, step, Value::Bytes(b.clone()), out),
+    /// Flatten one OTLP `AnyValue` reached from `parent` via `step`. Consumes
+    /// the value: string/bytes payloads are MOVED into the entry — prost
+    /// already allocated them and the caller was about to drop the request.
+    fn flatten_value(
+        &mut self,
+        parent: NodeId,
+        step: StepRef<'_>,
+        av: AnyValue,
+        out: &mut Vec<Entry>,
+    ) {
+        match av.value {
+            Some(Av::StringValue(s)) => self.emit(parent, step, Value::Str(s), out),
+            Some(Av::BoolValue(b)) => self.emit(parent, step, Value::Bool(b), out),
+            Some(Av::IntValue(i)) => self.emit(parent, step, Value::Int(i), out),
+            Some(Av::DoubleValue(d)) => self.emit(parent, step, Value::Double(d), out),
+            Some(Av::BytesValue(b)) => self.emit(parent, step, Value::Bytes(b), out),
             Some(Av::ArrayValue(arr)) => {
                 if arr.values.is_empty() {
                     self.emit(parent, step, Value::EmptyArray, out);
                 } else {
                     // Array indices collapse to one element node (`[]`).
                     let node = self.child(parent, step, Kind::Array);
-                    for v in &arr.values {
-                        self.flatten_value(node, Step::ArrayElem, v, out);
+                    for v in arr.values {
+                        self.flatten_value(node, StepRef::ArrayElem, v, out);
                     }
                 }
             }
@@ -341,7 +432,7 @@ impl Flattener {
                     self.emit(parent, step, Value::EmptyKvlist, out);
                 } else {
                     let node = self.child(parent, step, Kind::Kvlist);
-                    for kv in &kvl.values {
+                    for kv in kvl.values {
                         self.flatten_kv(node, kv, out);
                     }
                 }
@@ -350,30 +441,34 @@ impl Flattener {
         }
     }
 
-    fn flatten_kv(&mut self, parent: NodeId, kv: &KeyValue, out: &mut Vec<Entry>) {
+    fn flatten_kv(&mut self, parent: NodeId, kv: KeyValue, out: &mut Vec<Entry>) {
         // '=' is the key=value delimiter everywhere downstream (the interner's
         // field split, the WAL-tail scan, `build_kv`); a key containing it
         // would inject a false field/value boundary. Every user-controlled key
         // passes through here, so rewrite '=' to '_' at this single choke
         // point — counted, so ingest can surface the rename.
-        let step = Step::Field(if kv.key.contains('=') {
+        let sanitized;
+        let name: &str = if kv.key.contains('=') {
             self.sanitized_keys += 1;
-            kv.key.replace('=', "_")
+            sanitized = kv.key.replace('=', "_");
+            &sanitized
         } else {
-            kv.key.clone()
-        });
-        match &kv.value {
+            &kv.key
+        };
+        let step = StepRef::Field(name);
+        match kv.value {
             Some(av) => self.flatten_value(parent, step, av, out),
             None => self.emit(parent, step, Value::Null, out),
         }
     }
 
-    /// Flatten a resource's attributes under `resource.attributes.*`.
-    pub fn flatten_resource(&mut self, resource: &Resource) -> Vec<Entry> {
+    /// Flatten a resource's attributes under `resource.attributes.*`
+    /// (consuming: payloads move into the entries).
+    pub fn flatten_resource(&mut self, resource: Resource) -> Vec<Entry> {
         let mut out = Vec::new();
         if !resource.attributes.is_empty() {
             let base = self.descend(ROOT, &["resource", "attributes"]);
-            for kv in &resource.attributes {
+            for kv in resource.attributes {
                 self.flatten_kv(base, kv, &mut out);
             }
         }
@@ -382,32 +477,28 @@ impl Flattener {
 
     /// Flatten an instrumentation scope: `scope.name`, `scope.version`,
     /// `scope.attributes.*`.
-    pub fn flatten_scope(&mut self, scope: &InstrumentationScope) -> Vec<Entry> {
+    pub fn flatten_scope(&mut self, scope: InstrumentationScope) -> Vec<Entry> {
         let mut out = Vec::new();
         let scope_node = self.descend(ROOT, &["scope"]);
         if !scope.name.is_empty() {
             self.emit(
                 scope_node,
-                Step::Field("name".to_string()),
-                Value::Str(scope.name.clone()),
+                StepRef::Field("name"),
+                Value::Str(scope.name),
                 &mut out,
             );
         }
         if !scope.version.is_empty() {
             self.emit(
                 scope_node,
-                Step::Field("version".to_string()),
-                Value::Str(scope.version.clone()),
+                StepRef::Field("version"),
+                Value::Str(scope.version),
                 &mut out,
             );
         }
         if !scope.attributes.is_empty() {
-            let attrs = self.child(
-                scope_node,
-                Step::Field("attributes".to_string()),
-                Kind::Kvlist,
-            );
-            for kv in &scope.attributes {
+            let attrs = self.child(scope_node, StepRef::Field("attributes"), Kind::Kvlist);
+            for kv in scope.attributes {
                 self.flatten_kv(attrs, kv, &mut out);
             }
         }
@@ -416,7 +507,7 @@ impl Flattener {
 
     /// Flatten a log record's own fields — scalar fields, body, and attributes
     /// (`attributes.*`). Resource/scope context is flattened separately.
-    pub fn flatten_record(&mut self, record: &LogRecord) -> Vec<Entry> {
+    pub fn flatten_record(&mut self, record: LogRecord) -> Vec<Entry> {
         let mut out = Vec::new();
 
         // Queryable scalar fields. OTLP uses 0/"" for unset → treated as absent.
@@ -434,26 +525,18 @@ impl Flattener {
             );
         }
         if !record.severity_text.is_empty() {
-            self.scalar(
-                "severity_text",
-                Value::Str(record.severity_text.clone()),
-                &mut out,
-            );
+            self.scalar("severity_text", Value::Str(record.severity_text), &mut out);
         }
         if !record.event_name.is_empty() {
-            self.scalar(
-                "event_name",
-                Value::Str(record.event_name.clone()),
-                &mut out,
-            );
+            self.scalar("event_name", Value::Str(record.event_name), &mut out);
         }
 
-        if let Some(body) = &record.body {
-            self.flatten_value(ROOT, Step::Field("body".to_string()), body, &mut out);
+        if let Some(body) = record.body {
+            self.flatten_value(ROOT, StepRef::Field("body"), body, &mut out);
         }
         if !record.attributes.is_empty() {
             let base = self.descend(ROOT, &["attributes"]);
-            for kv in &record.attributes {
+            for kv in record.attributes {
                 self.flatten_kv(base, kv, &mut out);
             }
         }
@@ -462,7 +545,7 @@ impl Flattener {
 
     /// Emit a top-level scalar record field (a leaf directly under the root).
     fn scalar(&mut self, name: &str, value: Value, out: &mut Vec<Entry>) {
-        self.emit(ROOT, Step::Field(name.to_string()), value, out);
+        self.emit(ROOT, StepRef::Field(name), value, out);
     }
 
     /// Flatten a span's own fields — the queryable scalar facets (`name`, `kind`,
@@ -485,11 +568,11 @@ impl Flattener {
     /// is worth indexing, unlike the open numeric `severity_number`). For a
     /// non-default value the raw int is always emitted; the label only when the
     /// variant is known.
-    pub fn flatten_span(&mut self, span: &Span) -> Vec<Entry> {
+    pub fn flatten_span(&mut self, span: Span) -> Vec<Entry> {
         let mut out = Vec::new();
 
         if !span.name.is_empty() {
-            self.scalar("name", Value::Str(span.name.clone()), &mut out);
+            self.scalar("name", Value::Str(span.name), &mut out);
         }
 
         // kind: 0 = UNSPECIFIED ⇒ absence, skip. (A consumer MAY treat UNSPECIFIED
@@ -502,7 +585,7 @@ impl Flattener {
         }
 
         // status.code: 0 = UNSET ⇒ absence, skip. (status.message is deferred.)
-        if let Some(status) = &span.status {
+        if let Some(status) = span.status {
             if status.code != 0 {
                 if let Some(label) = status_code_label(status.code) {
                     self.scalar("status_code", Value::Str(label.to_string()), &mut out);
@@ -513,7 +596,7 @@ impl Flattener {
 
         if !span.attributes.is_empty() {
             let base = self.descend(ROOT, &["attributes"]);
-            for kv in &span.attributes {
+            for kv in span.attributes {
                 self.flatten_kv(base, kv, &mut out);
             }
         }

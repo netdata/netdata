@@ -2971,6 +2971,7 @@ version = "0.1.3"
 dependencies = [
  "bincode 2.0.1",
  "criterion",
+ "hashbrown 0.17.1",
  "lz4_flex 0.12.2",
  "opentelemetry-proto",
  "prost",

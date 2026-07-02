@@ -83,7 +83,7 @@ impl LogsService for Receiver {
         &self,
         request: Request<ExportLogsServiceRequest>,
     ) -> Result<Response<ExportLogsServiceResponse>, Status> {
-        let mut req = request.into_inner();
+        let req = request.into_inner();
 
         let written = {
             let mut sink = self.sink.lock().await;
@@ -101,7 +101,7 @@ impl LogsService for Receiver {
                         .map_err(|e| Status::internal(format!("request dump failed: {e}")))?;
                 }
             }
-            write_request(writer, clock, &mut req)
+            write_request(writer, clock, req)
                 .map_err(|e| Status::internal(format!("ingest write failed: {e}")))?
         };
 

@@ -81,28 +81,26 @@ fn span_duration(span: &Span) -> i64 {
 /// expected to have normalized (see [`normalize_span_timestamps`]).
 pub fn flatten_trace_into(
     flattener: &mut Flattener,
-    request: &ExportTraceServiceRequest,
+    request: ExportTraceServiceRequest,
 ) -> Vec<SpanResourceGroup> {
     let mut resources = Vec::with_capacity(request.resource_spans.len());
-    for rs in &request.resource_spans {
+    for rs in request.resource_spans {
         let resource = rs
             .resource
-            .as_ref()
             .map(|r| flattener.flatten_resource(r))
             .unwrap_or_default();
         let mut scopes = Vec::with_capacity(rs.scope_spans.len());
-        for ss in &rs.scope_spans {
+        for ss in rs.scope_spans {
             let scope = ss
                 .scope
-                .as_ref()
                 .map(|s| flattener.flatten_scope(s))
                 .unwrap_or_default();
             let spans = ss
                 .spans
-                .iter()
+                .into_iter()
                 .map(|sp| SpanRecord {
                     ts: i64::try_from(sp.start_time_unix_nano).unwrap_or(i64::MAX),
-                    duration: span_duration(sp),
+                    duration: span_duration(&sp),
                     // Ingest normalization (normalize_trace_ids) already cleared any
                     // wrong-length id to empty → from_bytes(empty) → UNSET.
                     trace_id: TraceId::from_bytes(&sp.trace_id).unwrap_or_default(),
@@ -127,7 +125,7 @@ pub fn flatten_trace_into(
 /// Also returns the number of attribute keys sanitized (`'='` → `'_'`, the
 /// key=value delimiter rule) so the caller can log one aggregated warning per
 /// request.
-pub fn flatten_trace_request(request: &ExportTraceServiceRequest) -> (FlattenedTraceRequest, u64) {
+pub fn flatten_trace_request(request: ExportTraceServiceRequest) -> (FlattenedTraceRequest, u64) {
     let mut flattener = Flattener::new();
     let resources = flatten_trace_into(&mut flattener, request);
     let sanitized_keys = flattener.sanitized_keys();

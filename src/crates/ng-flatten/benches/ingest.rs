@@ -114,19 +114,25 @@ fn bench(c: &mut Criterion) {
         reqs
     };
 
+    // Consuming flatten: each iteration gets a fresh owned batch (clone cost
+    // excluded via iter_batched) and the flattener moves payloads out of it.
     g.bench_function("flatten", |b| {
-        b.iter(|| {
-            let mut out = Vec::with_capacity(normalized.len());
-            for req in &normalized {
-                out.push(black_box(ng_flatten::flatten_log_request(req)));
-            }
-            out
-        })
+        b.iter_batched(
+            || normalized.clone(),
+            |reqs| {
+                let mut out = Vec::with_capacity(reqs.len());
+                for req in reqs {
+                    out.push(black_box(ng_flatten::flatten_log_request(req)));
+                }
+                out
+            },
+            BatchSize::PerIteration,
+        )
     });
 
     let flattened: Vec<ng_flatten::FlattenedLogRequest> = normalized
         .iter()
-        .map(|req| ng_flatten::flatten_log_request(req).0)
+        .map(|req| ng_flatten::flatten_log_request(req.clone()).0)
         .collect();
 
     g.bench_function("encode", |b| {
@@ -156,9 +162,9 @@ fn bench(c: &mut Criterion) {
     g.bench_function("prepare_log_frame", |b| {
         b.iter_batched(
             || pristine.clone(),
-            |mut reqs| {
+            |reqs| {
                 let mut out = Vec::with_capacity(reqs.len());
-                for req in &mut reqs {
+                for req in reqs {
                     out.push(
                         ng_flatten::prepare_log_frame(req, FALLBACK_BASE_NS).expect("prepare"),
                     );

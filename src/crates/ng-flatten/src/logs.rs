@@ -80,25 +80,23 @@ pub struct Record {
 /// to have normalized so it is always set (see `ng-ingest`).
 pub fn flatten_log_into(
     flattener: &mut Flattener,
-    request: &ExportLogsServiceRequest,
+    request: ExportLogsServiceRequest,
 ) -> Vec<LogResourceGroup> {
     let mut resources = Vec::with_capacity(request.resource_logs.len());
-    for rl in &request.resource_logs {
+    for rl in request.resource_logs {
         let resource = rl
             .resource
-            .as_ref()
             .map(|r| flattener.flatten_resource(r))
             .unwrap_or_default();
         let mut scopes = Vec::with_capacity(rl.scope_logs.len());
-        for sl in &rl.scope_logs {
+        for sl in rl.scope_logs {
             let scope = sl
                 .scope
-                .as_ref()
                 .map(|s| flattener.flatten_scope(s))
                 .unwrap_or_default();
             let records = sl
                 .log_records
-                .iter()
+                .into_iter()
                 .map(|r| Record {
                     // Saturating: a u64 past i64::MAX (year ~2262 / adversarial input)
                     // clamps to i64::MAX rather than wrapping negative — keeps row
@@ -201,7 +199,7 @@ pub fn normalize_log_request(
 /// Also returns the number of attribute keys sanitized (`'='` → `'_'`, the
 /// key=value delimiter rule) so the caller can log one aggregated warning per
 /// request.
-pub fn flatten_log_request(request: &ExportLogsServiceRequest) -> (FlattenedLogRequest, u64) {
+pub fn flatten_log_request(request: ExportLogsServiceRequest) -> (FlattenedLogRequest, u64) {
     let mut flattener = Flattener::new();
     let resources = flatten_log_into(&mut flattener, request);
     let sanitized_keys = flattener.sanitized_keys();
@@ -243,10 +241,10 @@ pub struct PreparedLogFrame {
 /// sanitized `'='` keys) — one owner for the message text too; the counts are
 /// still returned for callers that want them.
 pub fn prepare_log_frame(
-    req: &mut ExportLogsServiceRequest,
+    mut req: ExportLogsServiceRequest,
     fallback_base_ns: u64,
 ) -> Result<PreparedLogFrame, bincode::error::EncodeError> {
-    let norm = normalize_log_request(req, fallback_base_ns);
+    let norm = normalize_log_request(&mut req, fallback_base_ns);
     // Nothing to flatten or encode without records; callers skip writing
     // (`ts_range` is `None`). Recordless resource/scope attributes are
     // skipped too — same as not writing the frame.
