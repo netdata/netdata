@@ -519,6 +519,19 @@
 - Netdata fixes part 13 ([#22915](https://github.com/netdata/netdata/issues/22915))
 - Netdata fixes part 14 ([#22916](https://github.com/netdata/netdata/issues/22916))
 - NetFlow: restore sFlow visibility and listener docs ([#22925](https://github.com/netdata/netdata/issues/22925))
+- Netdata fixes part 15 ([#22917](https://github.com/netdata/netdata/issues/22917))
+- Docs: Add room deletion steps to Spaces and Rooms doc ([#22815](https://github.com/netdata/netdata/issues/22815))
+- Netdata fixes part 16 ([#22918](https://github.com/netdata/netdata/issues/22918))
+- Netdata fixes part 17 ([#22919](https://github.com/netdata/netdata/issues/22919))
+- Netdata fixes part 18 ([#22920](https://github.com/netdata/netdata/issues/22920))
+- Netdata fixes part 19 ([#22921](https://github.com/netdata/netdata/issues/22921))
+- Docs: Add heatmap to statsd chart type directive docs ([#22819](https://github.com/netdata/netdata/issues/22819))
+- Docs: Add Windows to smartctl collector supported platforms ([#22818](https://github.com/netdata/netdata/issues/22818))
+- Netdata fixes part 20 ([#22922](https://github.com/netdata/netdata/issues/22922))
+- Docs: Add co-admin role guidance to invite-team docs ([#22821](https://github.com/netdata/netdata/issues/22821))
+- Docs: Clarify netdata.conf is comment-only with built-in defaults ([#22823](https://github.com/netdata/netdata/issues/22823))
+- Docs: Add Windows free-tier dashboard lock note to access control doc ([#22824](https://github.com/netdata/netdata/issues/22824))
+- Update vendored NetIPC to 98ec474 ([#22936](https://github.com/netdata/netdata/issues/22936))
 
 ## [2.10.0] - 2026-04-09
 
