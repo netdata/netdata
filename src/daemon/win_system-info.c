@@ -387,13 +387,7 @@ static void netdata_windows_install_type(struct rrdhost_system_info *systemInfo)
 }
 
 static bool netdata_windows_str_contains_ci(const char *haystack, const char *needle) {
-    if(!haystack || !needle || !*needle) return false;
-    size_t nlen = strlen(needle);
-    for(const char *p = haystack; *p; p++) {
-        if(strncasecmp(p, needle, nlen) == 0)
-            return true;
-    }
-    return false;
+    return haystack && needle && *needle && strcasestr(haystack, needle) != NULL;
 }
 
 const char *netdata_windows_normalize_virt_string(const char *raw) {
