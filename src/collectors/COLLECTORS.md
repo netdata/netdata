@@ -316,6 +316,7 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 
 | Integration | Description |
 |-------------|-------------|
+| [Amazon CloudWatch](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/cloudwatch/integrations/amazon_cloudwatch.md) | Monitor AWS infrastructure through Amazon CloudWatch. |
 | [AWS EC2 Compute instances](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/aws_ec2_compute_instances.md) | Track AWS EC2 instances key metrics for optimized performance and cost management. |
 | [AWS Quota](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/aws_quota.md) | Monitor AWS service quotas for effective resource usage and cost management. |
 | [Azure API Management](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_api_management.md) | :::info |

@@ -46,6 +46,7 @@ All capabilities are set automatically during Netdata installation using the [of
 | [ceph](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/ceph)                             |             Ceph              |
 | [chrony](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/chrony)                         |            Chrony             |
 | [clickhouse](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/clickhouse)                 |          ClickHouse           |
+| [cloudwatch](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/cloudwatch)                 |       Amazon CloudWatch       |
 | [cockroachdb](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/cockroachdb)               |          CockroachDB          |
 | [consul](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/consul)                         |            Consul             |
 | [coredns](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/coredns)                       |            CoreDNS            |

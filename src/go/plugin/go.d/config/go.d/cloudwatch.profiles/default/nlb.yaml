@@ -1,0 +1,144 @@
+---
+version: v1
+display_name: AWS Network Load Balancer
+namespace: AWS/NetworkELB
+period: 300
+instance:
+  dimensions:
+    - name: LoadBalancer
+      label: load_balancer
+metrics:
+  - id: active_flow_count
+    metric_name: ActiveFlowCount
+    statistics: [average]
+  - id: new_flow_count
+    metric_name: NewFlowCount
+    statistics: [sum]
+    rate: true
+  - id: processed_bytes
+    metric_name: ProcessedBytes
+    statistics: [sum]
+    rate: true
+  - id: processed_packets
+    metric_name: ProcessedPackets
+    statistics: [sum]
+    rate: true
+  - id: consumed_lcus
+    metric_name: ConsumedLCUs
+    statistics: [average]
+  - id: tcp_client_reset_count
+    metric_name: TCP_Client_Reset_Count
+    statistics: [sum]
+    rate: true
+  - id: tcp_elb_reset_count
+    metric_name: TCP_ELB_Reset_Count
+    statistics: [sum]
+    rate: true
+  - id: tcp_target_reset_count
+    metric_name: TCP_Target_Reset_Count
+    statistics: [sum]
+    rate: true
+  # ----------------------------------------------------------------------------------------
+  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
+  # matching chart in the charts: section below, then restart the go.d process. All are
+  # published at the {LoadBalancer} grain, so no other change is needed.
+  # ----------------------------------------------------------------------------------------
+  # - id: client_tls_negotiation_errors
+  #   metric_name: ClientTLSNegotiationErrorCount
+  #   statistics: [sum]
+  #   rate: true
+  # - id: port_allocation_errors     # NLB with SNAT (private-IP targets)
+  #   metric_name: PortAllocationErrorCount
+  #   statistics: [sum]
+  #   rate: true
+  # Also published at {LoadBalancer}: per-protocol variants (ActiveFlowCount_TCP/_UDP/_TLS,
+  # NewFlowCount_*, ProcessedBytes_*, ConsumedLCUs_*) and TargetTLSNegotiationErrorCount. Per-target
+  # metrics (HealthyHostCount, UnHealthyHostCount, UnhealthyRoutingFlowCount) use the
+  # {LoadBalancer, TargetGroup} grain and need their own profile. See:
+  # https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-cloudwatch-metrics.html
+template:
+  family: NLB
+  context_namespace: nlb
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, load_balancer]
+  charts:
+    - id: cw_nlb_active_flows
+      context: active_flows
+      title: NLB Active Flow Count
+      family: Flows
+      units: flows
+      algorithm: absolute
+      dimensions:
+        - selector: active_flow_count_average
+          name: active
+    - id: cw_nlb_new_flows
+      context: new_flows
+      title: NLB New Flow Count
+      family: Flows
+      units: flows/s
+      algorithm: absolute
+      dimensions:
+        - selector: new_flow_count_sum
+          name: new
+    - id: cw_nlb_throughput
+      context: processed_bytes
+      title: NLB Processed Bytes
+      family: Traffic
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: processed_bytes_sum
+          name: processed
+    - id: cw_nlb_packets
+      context: processed_packets
+      title: NLB Processed Packets
+      family: Traffic
+      units: packets/s
+      algorithm: absolute
+      dimensions:
+        - selector: processed_packets_sum
+          name: processed
+    - id: cw_nlb_consumed_lcus
+      context: consumed_lcus
+      title: NLB Consumed LCUs
+      family: Capacity
+      units: LCU
+      algorithm: absolute
+      dimensions:
+        - selector: consumed_lcus_average
+          name: lcus
+    - id: cw_nlb_tcp_resets
+      context: tcp_resets
+      title: NLB TCP Resets
+      family: Resets
+      units: resets/s
+      algorithm: absolute
+      dimensions:
+        - selector: tcp_client_reset_count_sum
+          name: client
+        - selector: tcp_elb_reset_count_sum
+          name: elb
+        - selector: tcp_target_reset_count_sum
+          name: target
+    # ----------------------------------------------------------------------------------------
+    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # ----------------------------------------------------------------------------------------
+    # - id: cw_nlb_tls_errors
+    #   context: client_tls_negotiation_errors
+    #   title: NLB Client TLS Negotiation Errors
+    #   family: TLS
+    #   units: errors/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: client_tls_negotiation_errors_sum
+    #       name: errors
+    # - id: cw_nlb_port_allocation_errors
+    #   context: port_allocation_errors
+    #   title: NLB Port Allocation Errors
+    #   family: Errors
+    #   units: errors/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: port_allocation_errors_sum
+    #       name: errors

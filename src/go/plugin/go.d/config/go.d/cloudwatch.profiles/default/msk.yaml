@@ -1,0 +1,179 @@
+---
+version: v1
+display_name: Amazon MSK
+namespace: AWS/Kafka
+period: 300
+# Broker grain. The CloudWatch dimension names contain literal spaces ("Cluster Name", "Broker ID");
+# only the DEFAULT (free) monitoring level is collected here -- PER_BROKER / PER_TOPIC_* levels are
+# paid and opt-in. *PerSec metrics are already per-second rates (average, not sum).
+instance:
+  dimensions:
+    - name: Cluster Name
+      label: cluster_name
+    - name: Broker ID
+      label: broker_id
+metrics:
+  - id: bytes_in_per_sec
+    metric_name: BytesInPerSec
+    statistics: [average]
+  - id: bytes_out_per_sec
+    metric_name: BytesOutPerSec
+    statistics: [average]
+  - id: messages_in_per_sec
+    metric_name: MessagesInPerSec
+    statistics: [average]
+  - id: cpu_user
+    metric_name: CpuUser
+    statistics: [average]
+  - id: cpu_system
+    metric_name: CpuSystem
+    statistics: [average]
+  - id: cpu_idle
+    metric_name: CpuIdle
+    statistics: [average]
+  - id: kafka_data_logs_disk_used
+    metric_name: KafkaDataLogsDiskUsed
+    statistics: [average]
+  - id: root_disk_used
+    metric_name: RootDiskUsed
+    statistics: [average]
+  - id: memory_used
+    metric_name: MemoryUsed
+    statistics: [average]
+  - id: memory_free
+    metric_name: MemoryFree
+    statistics: [average]
+  - id: under_replicated_partitions
+    metric_name: UnderReplicatedPartitions
+    statistics: [maximum]
+  - id: partition_count
+    metric_name: PartitionCount
+    statistics: [maximum]
+  - id: leader_count
+    metric_name: LeaderCount
+    statistics: [maximum]
+  - id: connection_count
+    metric_name: ConnectionCount
+    statistics: [average]
+  # ----------------------------------------------------------------------------------------
+  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
+  # matching chart in the charts: section below. All are published at the {Cluster Name, Broker ID}
+  # grain (DEFAULT monitoring level).
+  # ----------------------------------------------------------------------------------------
+  # - id: cpu_io_wait
+  #   metric_name: CpuIoWait
+  #   statistics: [average]
+  # - id: under_min_isr_partition_count
+  #   metric_name: UnderMinIsrPartitionCount
+  #   statistics: [maximum]
+  # ClientConnectionCount is DEFAULT-level but AWS publishes it at {Cluster Name, Broker ID, Client
+  # Authentication} -- a third dimension -- so it does not match this {Cluster Name, Broker ID} grain
+  # and needs its own profile.
+  # PER_BROKER-level latency/throttle metrics (paid), per-topic {Cluster Name, Broker ID, Topic}, and
+  # consumer-group lag {Cluster Name, Consumer Group, Topic} need their own profiles / monitoring level.
+  # See: https://docs.aws.amazon.com/msk/latest/developerguide/metrics-details.html
+template:
+  family: MSK
+  context_namespace: msk
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, cluster_name, broker_id]
+  charts:
+    - id: cw_msk_throughput
+      context: throughput
+      title: MSK Broker Throughput
+      family: Throughput
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: bytes_in_per_sec_average
+          name: in
+        - selector: bytes_out_per_sec_average
+          name: out
+    - id: cw_msk_messages
+      context: messages
+      title: MSK Broker Messages In
+      family: Throughput
+      units: messages/s
+      algorithm: absolute
+      dimensions:
+        - selector: messages_in_per_sec_average
+          name: in
+    - id: cw_msk_cpu
+      context: cpu
+      title: MSK Broker CPU
+      family: CPU
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: cpu_user_average
+          name: user
+        - selector: cpu_system_average
+          name: system
+        - selector: cpu_idle_average
+          name: idle
+    - id: cw_msk_disk
+      context: disk_used
+      title: MSK Broker Disk Used
+      family: Disk
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: kafka_data_logs_disk_used_average
+          name: data_logs
+        - selector: root_disk_used_average
+          name: root
+    - id: cw_msk_memory
+      context: memory
+      title: MSK Broker Memory
+      family: Memory
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: memory_used_average
+          name: used
+        - selector: memory_free_average
+          name: free
+    - id: cw_msk_partitions
+      context: partitions
+      title: MSK Broker Partitions
+      family: Partitions
+      units: partitions
+      algorithm: absolute
+      dimensions:
+        - selector: partition_count_maximum
+          name: total
+        - selector: leader_count_maximum
+          name: leaders
+        - selector: under_replicated_partitions_maximum
+          name: under_replicated
+    - id: cw_msk_connections
+      context: connections
+      title: MSK Broker Connections
+      family: Connections
+      units: connections
+      algorithm: absolute
+      dimensions:
+        - selector: connection_count_average
+          name: connections
+    # ----------------------------------------------------------------------------------------
+    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # ----------------------------------------------------------------------------------------
+    # - id: cw_msk_isr
+    #   context: under_min_isr
+    #   title: MSK Under-Min-ISR Partitions
+    #   family: Partitions
+    #   units: partitions
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: under_min_isr_partition_count_maximum
+    #       name: under_min_isr
+    # - id: cw_msk_cpu_io_wait
+    #   context: cpu_io_wait
+    #   title: MSK Broker CPU I/O Wait
+    #   family: CPU
+    #   units: percentage
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: cpu_io_wait_average
+    #       name: io_wait
