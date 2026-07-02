@@ -234,8 +234,12 @@ Load and resolution (`catalog.go`):
   user profile **overrides** a stock profile with the same basename.
 - Invalid **stock** profiles are fatal; invalid **user** profiles are logged and
   skipped.
-- Decode is **non-strict** (unknown keys ignored) so a profile authored for a
-  newer collector still loads on an older binary.
+- Decode is **non-strict** (unknown keys ignored), so a profile that merely *adds*
+  optional fields a newer collector understands still loads on an older binary —
+  but only while old validation still passes. It is not a blanket guarantee: a
+  profile that relies on a newer field to validate is rejected by an older binary
+  (e.g. a dimension using `constant` omits `label`, which an older binary still
+  requires).
 - **Profile selection is config-driven** (`selectProfiles`), not discovery-driven.
   `profiles.mode: auto` (default) selects every default-enabled profile in the
   catalog; `combined` adds the default-disabled deep-grain profiles; `exact` selects

@@ -53,8 +53,11 @@ var statStrings = map[string]string{
 }
 
 // Profile is one CloudWatch namespace's curated metric+chart definition. The
-// schema is additive-only across phases; the YAML decoder is non-strict, so
-// unknown keys are ignored (forward-compat for profiles carrying newer fields).
+// schema is additive-only across phases; the YAML decoder is non-strict, so an
+// older binary tolerates unknown fields a newer profile carries — but only when
+// old validation still passes. A profile that depends on a newer field to
+// validate (e.g. a dimension using Constant in place of Label) is rejected by an
+// older binary; see InstanceDimension.
 type Profile struct {
 	Version     string         `yaml:"version" json:"version,omitempty"`
 	DisplayName string         `yaml:"display_name" json:"display_name,omitempty"`

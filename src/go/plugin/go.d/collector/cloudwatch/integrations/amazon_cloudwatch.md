@@ -459,7 +459,7 @@ docker logs netdata 2>&1 | grep cloudwatch
 Check the following:
 
 - **Permissions** -- the IAM identity allows `cloudwatch:ListMetrics`, `cloudwatch:GetMetricData`, and `sts:GetCallerIdentity` (plus `sts:AssumeRole` in `assume_role` mode).
-- **Regions** -- the `regions` list includes the regions where your resources run.
+- **Regions** -- the `regions` list includes the regions where your resources run. Some services are global and report to a single region: **Amazon CloudFront publishes its CloudWatch metrics only in `us-east-1`** (with a constant `Region=Global`), so `regions` must include `us-east-1` to collect it.
 - **Resources are active** -- confirm in the AWS CloudWatch console that the resources are publishing metrics.
 - **Collector logs** -- check for authentication or API errors:
   ```bash
