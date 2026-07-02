@@ -200,6 +200,10 @@ cd netdata
 - `--no-updates`: Prevent automatic updates of any kind.
 - `--reinstall`: If an existing install is detected, reinstall instead of trying to update it. Note that this
   cannot be used to change installation types.
+- `--use-system-protobuf`: Use a system-installed copy of `libprotobuf` instead of the bundled copy. Requires the
+  system `protobuf` and `protobuf-compiler` development packages to be installed beforehand.
+- `--disable-exporting-prometheus-remote-write`: Disable the Prometheus remote write exporting connector. Use this if
+  you do not need Prometheus remote write — it removes the need to build Protobuf entirely.
 - `--local-files`: Used for [offline installations](/packaging/installer/methods/offline.md). Pass four file paths: the Netdata
   tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force kickstart run the
   process using those files. This option conflicts with the `--stable-channel` option. If you set this _and_
@@ -219,6 +223,25 @@ Our current build process unfortunately has some issues when using certain confi
 If the installation fails with errors like `/bin/ld: externaldeps/libwebsockets/libwebsockets.a(context.c.o): relocation R_X86_64_32 against '.rodata.str1.1' can not be used when making a PIE object; recompile with -fPIC`, and you are trying to build with `clang` on Linux, you will need to build Netdata using GCC to get a fully functional install.
 
 In most cases, you can do this by running `CC=gcc ./netdata-installer.sh`.
+
+### Build appears to hang at "Preparing bundled Protobuf"
+
+During a source build, Netdata downloads Protobuf (and, on newer toolchains, its Abseil dependency) from GitHub and
+compiles it locally. On a slow or restricted network this step can appear to hang for a long time, or fail outright.
+
+If you do not need the Prometheus remote write exporter, build with `--disable-exporting-prometheus-remote-write` to
+skip the Protobuf build entirely:
+
+```sh
+./netdata-installer.sh --disable-exporting-prometheus-remote-write
+```
+
+If you have the system `protobuf` and `protobuf-compiler` development packages installed, build with
+`--use-system-protobuf` to avoid the download and use your system's copy instead:
+
+```sh
+./netdata-installer.sh --use-system-protobuf
+```
 
 ### Perform a cleanup in your netdata repo
 
