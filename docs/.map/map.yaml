@@ -175,6 +175,10 @@ sidebar:
               label: Disk & Retention
               edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md
       - meta:
+          label: Impact on Cloud VMs
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/impact-on-resources.md
+          description: Recommended VM sizing and the resource impact of running Netdata on cloud VMs (AWS, Azure, GCP).
+      - meta:
           label: Configuration
           edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/README.md
           description: Netdata is zero-configuration for most users, but complex infrastructures may require you to tweak some of the Agent's granular settings.
