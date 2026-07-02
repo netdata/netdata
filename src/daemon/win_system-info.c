@@ -413,6 +413,33 @@ const char *netdata_windows_normalize_virt_string(const char *raw) {
     return NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN;
 }
 
+static bool netdata_windows_is_unknown_virt_result(const char *virt) {
+    return virt && strcmp(virt, NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN) == 0;
+}
+
+const char *netdata_windows_resolve_virt_detection(const char *wmi, const char *smbios, const char *registry) {
+    const char *probes[] = { wmi, smbios, registry };
+    const char *unknown = NULL;
+
+    for(size_t i = 0; i < sizeof(probes) / sizeof(probes[0]); i++) {
+        const char *probe = probes[i];
+        if(!probe)
+            continue;
+
+        if(netdata_windows_is_unknown_virt_result(probe)) {
+            unknown = probe;
+            continue;
+        }
+
+        return probe;
+    }
+
+    if(unknown)
+        return unknown;
+
+    return NETDATA_WIN_VIRT_BARE_METAL;
+}
+
 static const char *netdata_windows_detect_via_wmi(void) {
     Win32ComputerSystemInfo cs;
     if(!GetWin32ComputerSystemInfo(&cs) || !cs.Populated)
@@ -481,16 +508,11 @@ static const char *netdata_windows_detect_via_registry(void) {
 }
 
 static const char *netdata_windows_detect_virt(void) {
-    const char *m = netdata_windows_detect_via_wmi();
-    if(m) return m;
+    const char *wmi = netdata_windows_detect_via_wmi();
+    const char *smbios = netdata_windows_detect_via_smbios();
+    const char *registry = netdata_windows_detect_via_registry();
 
-    m = netdata_windows_detect_via_smbios();
-    if(m) return m;
-
-    m = netdata_windows_detect_via_registry();
-    if(m) return m;
-
-    return NETDATA_WIN_VIRT_BARE_METAL;
+    return netdata_windows_resolve_virt_detection(wmi, smbios, registry);
 }
 
 static void netdata_windows_detect_virtualization(struct rrdhost_system_info *systemInfo) {

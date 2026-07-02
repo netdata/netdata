@@ -1850,4 +1850,44 @@ int unit_test_windows_virt_normalize(void) {
             sizeof(cases) / sizeof(cases[0]));
     return 0;
 }
+
+int unit_test_windows_virt_resolution(void) {
+    static const struct {
+        const char *wmi;
+        const char *smbios;
+        const char *registry;
+        const char *expected;
+    } cases[] = {
+        {"vmware", "unknown", "oracle", "vmware"},
+        {NULL, "unknown", "vmware", "vmware"},
+        {NULL, "unknown", "oracle", "oracle"},
+        {NULL, "unknown", NULL, "unknown"},
+        {NULL, "kvm", "vmware", "kvm"},
+        {NULL, NULL, "parallels", "parallels"},
+        {NULL, NULL, NULL, "none"},
+    };
+
+    int failures = 0;
+    for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        const char *got = netdata_windows_resolve_virt_detection(
+            cases[i].wmi, cases[i].smbios, cases[i].registry);
+        if(strcmp(got, cases[i].expected) != 0) {
+            fprintf(stderr,
+                    "unit_test_windows_virt_resolution: case %zu expected '%s' got '%s'\n",
+                    i,
+                    cases[i].expected,
+                    got);
+            failures++;
+        }
+    }
+
+    if(failures) {
+        fprintf(stderr, "unit_test_windows_virt_resolution: %d failure(s)\n", failures);
+        return 1;
+    }
+
+    fprintf(stderr, "unit_test_windows_virt_resolution: OK (%zu cases)\n",
+            sizeof(cases) / sizeof(cases[0]));
+    return 0;
+}
 #endif

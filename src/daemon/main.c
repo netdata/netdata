@@ -444,6 +444,7 @@ int netdata_main(int argc, char **argv) {
                             if (mqtt_ng_unittest()) return 1;
 #ifdef OS_WINDOWS
                             if (unit_test_windows_virt_normalize()) return 1;
+                            if (unit_test_windows_virt_resolution()) return 1;
 #endif
 
                             // No call to load the config file on this code-path

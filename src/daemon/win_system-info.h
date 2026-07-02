@@ -35,6 +35,7 @@
 void netdata_windows_get_system_info(struct rrdhost_system_info *system_info);
 
 const char *netdata_windows_normalize_virt_string(const char *raw);
+const char *netdata_windows_resolve_virt_detection(const char *wmi, const char *smbios, const char *registry);
 #endif
 
 #endif // _NETDATA_WIN_SYSTEM_INFO_H_
