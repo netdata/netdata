@@ -12,27 +12,27 @@
 
 use bumpalo::Bump;
 use roaring::RoaringBitmap;
-use sfst::{
+
+use crate::kv_interner::{KeyValueInterner, KvSlot};
+use crate::{
     DroppedAttributeCounts, Durations, Flags, Histogram, ObservedTimestamps, ParentSpanIds,
     SpanIds, TraceIds,
 };
-
-use super::kv_interner::{KeyValueInterner, KvSlot};
 
 /// The output of Phase 1: everything the frame loop extracts from the WAL.
 ///
 /// Bundles the four data structures described in the module doc into a single
 /// value, making the Phase 1 → Phase 2 handoff explicit.
 pub struct RowIndex<'a> {
-    pub kv_interner: KeyValueInterner<'a>,
+    pub(crate) kv_interner: KeyValueInterner<'a>,
     /// One bitmap per key=value slot. `kv_bitmaps[slot.idx()]` tracks which row
     /// positions (insertion order) contain that `key=value` pair.
-    pub kv_bitmaps: Vec<RoaringBitmap>,
+    pub(crate) kv_bitmaps: Vec<RoaringBitmap>,
     /// Per-row key=value slots: `row_entries[pos]` lists all key=value slots
     /// for that row's attributes. Used for stream-batch serialization in Phase 2.
-    pub row_entries: Vec<Vec<KvSlot>>,
+    pub(crate) row_entries: Vec<Vec<KvSlot>>,
     /// Nanosecond timestamp per row position (insertion order).
-    pub timestamps: Vec<i64>,
+    pub(crate) timestamps: Vec<i64>,
     /// Optional per-row columns in **insertion order**, parallel to `timestamps`.
     /// Each is **independently** optional — a caller fills whichever it has, in any
     /// combination (or none). `None` for a producer that only feeds rows via
@@ -41,7 +41,7 @@ pub struct RowIndex<'a> {
     /// (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`, plus the traces-only `PSPN`/`DURN`) in
     /// the cold region; absent columns write no chunk and add no manifest entry.
     /// Every present column MUST have length equal to the row count
-    /// ([`crate::IndexError::ColumnLengthMismatch`] at build).
+    /// ([`crate::Error::ColumnLengthMismatch`] at build).
     pub observed_timestamps: Option<ObservedTimestamps>,
     pub trace_ids: Option<TraceIds>,
     pub span_ids: Option<SpanIds>,
@@ -63,7 +63,7 @@ pub struct RowIndex<'a> {
     /// that feeds only raw `(ts, key=value)` rows and supplies no typed tree; the
     /// builder then synthesizes a flat `Str`-typed tree from the derived field
     /// table so every v9 file carries a valid descriptor.
-    pub tree: Option<sfst::SchemaTree>,
+    pub tree: Option<crate::SchemaTree>,
 }
 
 impl<'a> RowIndex<'a> {
@@ -95,12 +95,12 @@ impl<'a> RowIndex<'a> {
     ///
     /// All bitmaps in Phase 2 are translated from insertion order to
     /// chronological order so contiguous position ranges = contiguous time.
-    pub fn time_order(&self) -> TimeOrder {
+    pub(crate) fn time_order(&self) -> TimeOrder {
         build_time_order(&self.timestamps)
     }
 
     /// Build a sparse histogram from the timestamps in chronological order.
-    pub fn sparse_histogram(&self, time_order: &TimeOrder) -> Histogram {
+    pub(crate) fn sparse_histogram(&self, time_order: &TimeOrder) -> Histogram {
         build_sparse_histogram(&self.timestamps, time_order)
     }
 
@@ -110,37 +110,32 @@ impl<'a> RowIndex<'a> {
     }
 
     /// Get the roaring bitmap for a key=value slot.
-    pub fn bitmap(&self, slot: KvSlot) -> &RoaringBitmap {
+    pub(crate) fn bitmap(&self, slot: KvSlot) -> &RoaringBitmap {
         &self.kv_bitmaps[slot.idx()]
     }
 
     /// Low-cardinality fields (< threshold), sorted by field name.
-    pub fn low_fields(&self) -> Vec<(&str, &[KvSlot])> {
+    pub(crate) fn low_fields(&self) -> Vec<(&str, &[KvSlot])> {
         self.kv_interner.low_fields()
     }
 
     /// Mid-cardinality fields ([threshold, 10*threshold)), sorted by field name.
-    pub fn mid_fields(&self) -> Vec<(&str, &[KvSlot])> {
+    pub(crate) fn mid_fields(&self) -> Vec<(&str, &[KvSlot])> {
         self.kv_interner.mid_fields()
     }
 
     /// High-cardinality fields (>= 10*threshold), sorted by field name.
-    pub fn high_fields(&self) -> Vec<(&str, &[KvSlot])> {
+    pub(crate) fn high_fields(&self) -> Vec<(&str, &[KvSlot])> {
         self.kv_interner.high_fields()
     }
 
     /// Tier-aligned assignment of key=value IDs.
-    pub fn tier_assignment(&self) -> [Vec<KvSlot>; 3] {
+    pub(crate) fn tier_assignment(&self) -> [Vec<KvSlot>; 3] {
         self.kv_interner.tier_assignment()
     }
 
-    /// Cardinality threshold for field classification.
-    pub fn cardinality_threshold(&self) -> u32 {
-        self.kv_interner.cardinality_threshold()
-    }
-
     /// Ensure kv_bitmaps vec has an entry for the given key=value ID.
-    pub fn ensure_bitmap(&mut self, kv_slot: KvSlot) {
+    fn ensure_bitmap(&mut self, kv_slot: KvSlot) {
         if kv_slot.idx() >= self.kv_bitmaps.len() {
             self.kv_bitmaps
                 .resize_with(kv_slot.idx() + 1, RoaringBitmap::new);
@@ -209,12 +204,6 @@ impl TimeOrder {
     #[inline]
     pub fn to_sorted(&self, insertion_pos: u32) -> u32 {
         self.sorted_position[insertion_pos as usize]
-    }
-
-    /// Map a chronological position back to its insertion-order position.
-    #[inline]
-    pub fn to_insertion(&self, sorted_pos: u32) -> u32 {
-        self.insertion_position[sorted_pos as usize]
     }
 
     /// Iterate insertion-order positions in chronological order.

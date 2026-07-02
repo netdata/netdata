@@ -21,7 +21,6 @@ bumpalo = { workspace = true }
 clap = { workspace = true }
 ng-flatten = { workspace = true }
 sfst = { workspace = true }
-sfst-indexer = { workspace = true }
 thiserror = { workspace = true }
 wal = { workspace = true }
 

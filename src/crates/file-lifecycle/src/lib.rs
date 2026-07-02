@@ -19,7 +19,7 @@
 //! - [`ipc`] — the worker request/response message types;
 //! - [`pipeline::Pipeline`] — the per-signal state shell a coordinator routes to.
 //!
-//! It MUST NOT depend on the three log-content crates (`sfsq`, `sfst-indexer`,
+//! It MUST NOT depend on the log-content crates (`sfsq`,
 //! `otel-logs-identity`); see the crate manifest and `tests/dep_guard.rs`.
 
 pub mod catalog_builder;

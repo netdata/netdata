@@ -1,5 +1,5 @@
-//! Error type for SFST format operations. The WAL→SFST build
-//! pipeline's `IndexError` lives in the `sfst-indexer` crate.
+//! Error type for SFST operations — the format layer (chunk read/write)
+//! and the index build ([`IndexWriter`](crate::IndexWriter)).
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -42,28 +42,34 @@ pub enum Error {
     #[error("chunk not found: index {0}")]
     ChunkNotFound(u16),
 
-    /// [`StreamWriter`](crate::StreamWriter) was driven against the
-    /// canonical chunk order — a chunk out of order, beyond its
-    /// declared count, or [`finish`](crate::StreamWriter::finish)
-    /// before every declared chunk was written. A producer bug, never
-    /// a data condition; the message names the violated step.
+    /// The chunk writer was driven against the canonical chunk order — a
+    /// chunk out of order, beyond its declared count, or `finish` before
+    /// every declared chunk was written. A producer bug, never a data
+    /// condition; the message names the violated step.
     #[error("writer misuse: {0}")]
     WriterMisuse(String),
 
     /// Building the primary or a mid-field FST failed — almost always a
-    /// duplicate `key=value` in the entries handed to
-    /// [`StreamWriter::primary`](crate::StreamWriter::primary) /
-    /// [`add_mid_field`](crate::StreamWriter::add_mid_field). A producer
-    /// bug, never a data condition.
+    /// duplicate `key=value` in the entries handed to the chunk writer's
+    /// `primary` / `add_mid_field`. A producer bug, never a data condition.
     #[error("{0}")]
     PrefixMapBuild(String),
 
-    /// [`StreamWriter::new`](crate::StreamWriter::new) was given a
-    /// stream-batch count outside
+    /// The chunk writer was given a stream-batch count outside
     /// `1..=`[`MAX_STREAM_BATCHES`](crate::MAX_STREAM_BATCHES).
     /// Carries the actual count that was rejected.
     #[error("invalid stream-batch count: {0} (expected 1..=8)")]
     InvalidStreamBatchCount(u8),
+
+    /// A per-row column handed to the index build has a different length than
+    /// the row count, so it cannot be aligned per row. A caller bug (each
+    /// column must hold exactly one value per row); recoverable, not a panic.
+    #[error("per-row column {column} has {got} values, expected {expected} (one per row)")]
+    ColumnLengthMismatch {
+        column: &'static str,
+        got: usize,
+        expected: usize,
+    },
 
     /// A per-row column accessor found the column absent from the
     /// [`ColumnsTable`](crate::ColumnsTable), or present with a type that does not
@@ -134,7 +140,7 @@ impl From<chunk_file::container::Error> for Error {
             C::Malformed(msg) => Error::Toc(msg),
             // The container layer's Misuse is the same semantic as the
             // writer's own misuse error: a producer bug, not a data
-            // condition. Unreachable through StreamWriter (its stage
+            // condition. Unreachable through ChunkWriter (its stage
             // machine refuses the misuse before the container sees it),
             // but a relaxed guard should not surface as a TOC error.
             C::Misuse(msg) => Error::WriterMisuse(msg),

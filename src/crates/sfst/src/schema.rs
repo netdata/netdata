@@ -1,8 +1,8 @@
 //! On-disk schema for SFST log indexes.
 //!
 //! These are the typed payloads carried by an SFST file's named chunks.
-//! Producers (the WAL indexer in the `sfst-indexer` crate) construct
-//! them; consumers decode them via the typed accessors on
+//! The index build (`IndexWriter`) constructs them; consumers decode
+//! them via the typed accessors on
 //! [`crate::Reader`]. The container layout and chunk encoding are
 //! specified in `FORMAT.md`.
 
@@ -114,9 +114,9 @@ pub enum FieldTier {
 }
 
 /// Default cardinality threshold for [`FieldTier`] classification.
-/// Public so every producer of field tables — the WAL indexer in
-/// `sfst-indexer` and the WAL row scan in `sfsq` — classifies with the
-/// same boundaries unless explicitly overridden.
+/// Public so every producer of field tables — the index build here and
+/// the WAL row scan in `sfsq` — classifies with the same boundaries
+/// unless explicitly overridden.
 pub const DEFAULT_CARDINALITY_THRESHOLD: u32 = 100;
 
 impl FieldEntry {
@@ -1001,12 +1001,12 @@ scalar_column!(
 
 /// One per-row column's static descriptor: its manifest [`name`](Self::name),
 /// on-disk [`ColumnType`], and writer `ordinal` (the bit position the
-/// `StreamWriter` tracks per column).
+/// `ChunkWriter` tracks per column).
 ///
 /// This is the single source of truth the *homogeneous* column sites derive from
 /// — the presence count, the META [`ColumnsTable`] manifest, and the
 /// manifest-vs-counts check all iterate [`ALL_COLUMNS`]. The *heterogeneous* parts
-/// (the typed accumulator on `RowIndex`, the typed `StreamWriter` write method)
+/// (the typed accumulator on `RowIndex`, the typed `ChunkWriter` write method)
 /// stay explicit per column, because their payload types differ. Adding a column
 /// is therefore one row here plus its typed accumulator + write method, not a
 /// multi-site lockstep edit across the presence struct, the manifest builder, and
@@ -1017,7 +1017,7 @@ pub struct ColumnSpec {
     pub name: &'static str,
     /// The column's on-disk type (matches the typed column's `COLUMN_TYPE`).
     pub column_type: ColumnType,
-    /// The writer ordinal — the column's bit in `StreamWriter::cols_written` and
+    /// The writer ordinal — the column's bit in `ChunkWriter::cols_written` and
     /// its position in [`ALL_COLUMNS`].
     pub ordinal: u8,
 }

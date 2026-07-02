@@ -1,6 +1,6 @@
 //! SFST format writer.
 //!
-//! [`StreamWriter`] is **the** writer for the format: it owns the
+//! [`ChunkWriter`] is **the** writer for the format: it owns the
 //! container magic, version, chunk ids, the canonical hot-prefix chunk
 //! order, and the payload encoding (bincode + zstd at the level the
 //! format pairs with each chunk kind), so producers hand it typed
@@ -24,7 +24,7 @@ use crate::{
 
 /// Serialize a value with bincode, then compress with zstd.
 ///
-/// Crate-internal: producers pass typed payloads to [`StreamWriter`],
+/// Crate-internal: producers pass typed payloads to [`ChunkWriter`],
 /// which packs at the level the format pairs with each chunk kind.
 /// The `?Sized` bound lets callers pass slice references directly
 /// (e.g. `pack(batch, 1)` where `batch: &[T]`) instead of materialising
@@ -36,7 +36,7 @@ pub(crate) fn pack<T: Serialize + ?Sized>(value: &T, zstd_level: i32) -> Result<
 
 /// Write a minimal, content-light SFST containing only the `SUMR` summary chunk.
 ///
-/// [`StreamWriter`] mandates the full logs-shaped chunk set (primary FST,
+/// [`ChunkWriter`] mandates the full logs-shaped chunk set (primary FST,
 /// per-log timestamps, ≥1 stream batch) and refuses an underfilled file. A
 /// signal whose content is not logs-shaped (e.g. traces) uses this to produce a
 /// sealed file that carries only its [`Summary`] (`record_count`, timestamps,
@@ -170,7 +170,7 @@ impl Stage {
 /// is one packed chunk. The TOC is reserved at [`new`](Self::new)
 /// (hence the declared [`ChunkCounts`]) and patched at
 /// [`finish`](Self::finish), which requires `Seek`.
-pub struct StreamWriter<W: Write + Seek> {
+pub struct ChunkWriter<W: Write + Seek> {
     inner: StreamingWriter<W>,
     counts: ChunkCounts,
     stage: Stage,
@@ -184,7 +184,7 @@ pub struct StreamWriter<W: Write + Seek> {
     batches: u8,
 }
 
-impl<W: Write + Seek> StreamWriter<W> {
+impl<W: Write + Seek> ChunkWriter<W> {
     /// Start an SFST file on `sink` (positioned where the file begins):
     /// writes the header and reserves the TOC for
     /// `4 + mid_fields + high_fields + stream_batches` chunks.

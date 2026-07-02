@@ -2,9 +2,9 @@
 //!
 //! Streams the flattened WAL, stringifies each typed entry into a `key=value`
 //! pair (collapsed-array paths like `tags[]`, typed values rendered to strings),
-//! and feeds the existing `sfst-indexer` [`RowIndex`] (interning via its
-//! `lookup_hash`/`intern` fast path, one `row` per record) in a single pass, then
-//! `build_and_write`s a standard SFST file. This reuses SFST's proven build/query
+//! and feeds an [`sfst::RowIndex`] (interning via its `lookup_hash`/`intern`
+//! fast path, one `row` per record) in a single pass, then writes a standard
+//! SFST file via [`sfst::IndexWriter`]. This reuses SFST's proven build/query
 //! machinery while the keys/values now come from the typed, array-collapsed
 //! flattening.
 
@@ -15,9 +15,7 @@ use sfst::{
     DroppedAttributeCounts, Durations, Flags, ObservedTimestamps, ParentSpanIds, SpanId, SpanIds,
     TraceId, TraceIds,
 };
-use sfst_indexer::KvSlot;
-use sfst_indexer::row_index::RowIndex;
-use sfst_indexer::{build_and_write, build_into};
+use sfst::{IndexWriter, KvSlot, RowIndex};
 
 use crate::{
     Entry, Error, FlattenedLogRequest, Metrics, NodeId, build_kv, decode_log_frame, sole_wal_file,
@@ -44,8 +42,8 @@ fn to_value_kind(kind: ng_flatten::Kind) -> sfst::ValueKind {
 
 /// Convert the global flatten [`ng_flatten::SchemaTree`] into the format crate's
 /// [`sfst::SchemaTree`] node-by-node (ids are preserved, parents precede
-/// children). Leaf stats are left unset here — `sfst-indexer` fills them from
-/// the per-field cardinality/tier at build time.
+/// children). Leaf stats are left unset here — the SFST build fills them from
+/// the per-field cardinality/tier.
 fn to_sfst_tree(tree: &ng_flatten::SchemaTree) -> sfst::SchemaTree {
     let nodes = (0..tree.len() as NodeId)
         .map(|id| sfst::SchemaNode {
@@ -257,7 +255,7 @@ pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result
     let mut row_index = RowIndex::new(&arena, CARDINALITY_THRESHOLD);
     let stats = populate_row_index(&mut reader, &mut row_index, metrics)?;
     let _t = metrics.scope("build");
-    build_and_write(&row_index, out_path, content_meta)?;
+    IndexWriter::write_file(&row_index, out_path, content_meta)?;
     Ok(stats)
 }
 
@@ -277,7 +275,7 @@ pub fn build_sfst_file(
     let mut row_index = RowIndex::new(&arena, CARDINALITY_THRESHOLD);
     populate_row_index(&mut reader, &mut row_index, metrics)?;
     let _t = metrics.scope("build");
-    let (summary, _metadata) = build_and_write(&row_index, out_path, content_meta)?;
+    let (summary, _metadata) = IndexWriter::write_file(&row_index, out_path, content_meta)?;
     let size = std::fs::metadata(out_path)?.len();
     Ok((summary, size))
 }
@@ -301,7 +299,7 @@ pub fn build_sfst_range(
     let mut row_index = RowIndex::new(&arena, CARDINALITY_THRESHOLD);
     populate_row_index(&mut reader, &mut row_index, &Metrics::new())?;
     let cursor = std::io::Cursor::new(Vec::new());
-    let (cursor, summary, _metadata) = build_into(&row_index, cursor, content_meta)?;
+    let (cursor, summary, _metadata) = IndexWriter::write_into(&row_index, cursor, content_meta)?;
     Ok((summary, cursor.into_inner()))
 }
 
@@ -423,7 +421,7 @@ pub fn build_sfst_traces_file(
     let mut row_index = RowIndex::new(&arena, CARDINALITY_THRESHOLD);
     populate_trace_row_index(&mut reader, &mut row_index, metrics)?;
     let _t = metrics.scope("build");
-    let (summary, _metadata) = build_and_write(&row_index, out_path, content_meta)?;
+    let (summary, _metadata) = IndexWriter::write_file(&row_index, out_path, content_meta)?;
     let size = std::fs::metadata(out_path)?.len();
     Ok((summary, size))
 }

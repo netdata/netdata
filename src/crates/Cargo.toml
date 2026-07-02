@@ -46,7 +46,6 @@ members = [
     "wal",
 
     # SFST build + query
-    "sfst-indexer",
     "sfsq",
     "sfsq-cli",
 
@@ -205,7 +204,6 @@ journal-function = { path = "journal-function" }
 rdp = { path = "rdp" }
 treight = { path = "treight" }
 sfst = { path = "sfst" }
-sfst-indexer = { path = "sfst-indexer" }
 sfsq = { path = "sfsq" }
 sfsq-cli = { path = "sfsq-cli" }
 

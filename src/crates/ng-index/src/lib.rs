@@ -1,8 +1,8 @@
 //! `ng-index`: build a standard SFST index file from a flattened-frame WAL.
 //!
 //! The WAL of flattened frames is produced by `ng-ingest` (flatten-at-ingest). This
-//! crate reads it and feeds the typed, array-collapsed entries into the existing
-//! `sfst-indexer` to emit a standard SFST file — the augment-SFST path (see
+//! crate reads it and feeds the typed, array-collapsed entries into an
+//! `sfst::RowIndex` to emit a standard SFST file — the augment-SFST path (see
 //! [`build_sfst`]). The flattened-frame format itself (types, rendering, bincode
 //! encode/decode) lives in `ng-flatten`.
 
@@ -36,7 +36,7 @@ pub enum Error {
         source: bincode::error::DecodeError,
     },
     #[error("sfst build failed: {0}")]
-    Sfst(#[from] sfst_indexer::IndexError),
+    Sfst(#[from] sfst::Error),
 }
 
 /// The single `.wal` file inside `dir` (the flattened WAL).

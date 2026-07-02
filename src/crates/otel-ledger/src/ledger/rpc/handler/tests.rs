@@ -102,7 +102,7 @@ fn write_test_sfst(path: &std::path::Path, min_s: u32) {
         high_fields: 0,
         stream_batches: 1,
     };
-    let mut writer = sfst::StreamWriter::new(std::io::Cursor::new(Vec::new()), counts).unwrap();
+    let mut writer = sfst::ChunkWriter::new(std::io::Cursor::new(Vec::new()), counts).unwrap();
     writer.summary(&summary).unwrap();
     writer.metadata(&metadata).unwrap();
     writer.timestamps(&timestamps).unwrap();
@@ -182,7 +182,7 @@ fn write_service_only_sfst(path: &std::path::Path, min_s: u32) {
         high_fields: 0,
         stream_batches: 1,
     };
-    let mut writer = sfst::StreamWriter::new(std::io::Cursor::new(Vec::new()), counts).unwrap();
+    let mut writer = sfst::ChunkWriter::new(std::io::Cursor::new(Vec::new()), counts).unwrap();
     writer.summary(&summary).unwrap();
     writer.metadata(&metadata).unwrap();
     writer.timestamps(&timestamps).unwrap();
@@ -246,7 +246,7 @@ fn write_same_ts_sfst(path: &std::path::Path, ts_s: u32, n: usize) {
         high_fields: 0,
         stream_batches: 1,
     };
-    let mut writer = sfst::StreamWriter::new(std::io::Cursor::new(Vec::new()), counts).unwrap();
+    let mut writer = sfst::ChunkWriter::new(std::io::Cursor::new(Vec::new()), counts).unwrap();
     writer.summary(&summary).unwrap();
     writer.metadata(&metadata).unwrap();
     writer.timestamps(&timestamps).unwrap();

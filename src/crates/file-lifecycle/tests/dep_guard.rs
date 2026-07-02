@@ -7,16 +7,16 @@
 //! `[dependencies]` OR `[dev-dependencies]`. If a future edit adds one of these,
 //! this test fails loudly instead of silently re-coupling the substrate.
 
-/// The three log-content crates. The substrate may depend on the neutral
+/// The log-content crates. The substrate may depend on the neutral
 /// container/catalog crates (`sfst`, `otel-catalog`) — proven content-agnostic
 /// in earlier stages — but never on these.
-const FORBIDDEN: &[&str] = &["sfsq", "sfst-indexer", "otel-logs-identity"];
+const FORBIDDEN: &[&str] = &["sfsq", "otel-logs-identity"];
 
 #[test]
 fn manifest_declares_no_content_crate() {
     // Strip comments first, then check the forbidden names against the remaining
     // text. The doc comment above this crate's `[dependencies]` deliberately
-    // names all three, so we must ignore comments — but we must NOT rely on a
+    // names them, so we must ignore comments — but we must NOT rely on a
     // single declaration shape, because Cargo accepts several:
     //   `sfsq = ...`            (key form)
     //   `[dependencies.sfsq]`   (table-header form)

@@ -22,17 +22,17 @@ use std::path::Path;
 use std::time::Instant;
 
 use roaring::RoaringBitmap;
-use sfst::{
-    ChunkCounts, ColumnEntry, ColumnsPresent, ColumnsTable, DroppedAttributeCounts, Durations,
-    Flags, ObservedTimestamps, ParentSpanIds, SpanIds, StreamWriter, TraceIdIndex, TraceIds,
-};
 use treight::Bitmap;
 
-use super::bitset::Bitset;
-use super::kv_interner::KvSlot;
-use super::row_index::{RowIndex, TimeOrder};
-use crate::IndexError;
-use sfst::{BitmapValue, FieldEntry, FieldTier, IdRanges, KvId, Metadata};
+use crate::bitset::Bitset;
+use crate::kv_interner::KvSlot;
+use crate::row_index::{RowIndex, TimeOrder};
+use crate::writer::{ChunkCounts, ChunkWriter, ColumnsPresent};
+use crate::{
+    BitmapValue, ColumnEntry, ColumnsTable, DroppedAttributeCounts, Durations, Error, FieldEntry,
+    FieldTier, Flags, IdRanges, KvId, Metadata, ObservedTimestamps, ParentSpanIds, SpanIds,
+    TraceIdIndex, TraceIds,
+};
 
 /// Build tier-aligned key=value ID translation table.
 ///
@@ -44,14 +44,13 @@ fn build_id_translation(row_index: &RowIndex) -> (Vec<KvId>, IdRanges) {
     let total_kv_slots = low_kv_slots.len() + mid_kv_slots.len() + high_kv_slots.len();
     let mut table = vec![KvId(0); total_kv_slots];
 
-    let mut curr_id = 0u32;
-    for &kv_slot in low_kv_slots
+    for (curr_id, &kv_slot) in low_kv_slots
         .iter()
         .chain(mid_kv_slots.iter())
         .chain(high_kv_slots.iter())
+        .enumerate()
     {
-        table[kv_slot.idx()] = KvId(curr_id);
-        curr_id += 1;
+        table[kv_slot.idx()] = KvId(curr_id as u32);
     }
 
     let low_end = KvId(low_kv_slots.len() as u32);
@@ -81,7 +80,7 @@ fn build_id_translation(row_index: &RowIndex) -> (Vec<KvId>, IdRanges) {
 /// Stream the file's stream-batch chunks in chronological order.
 ///
 /// Materialises every log's `KvId` list in chronological order, splits
-/// the result into [`num_stream_batches`](sfst::num_stream_batches)
+/// the result into [`num_stream_batches`](crate::num_stream_batches)
 /// slices of `batch_size` entries each, and packs each slice into its
 /// own chunk — packed by the writer, written, and dropped in turn.
 ///
@@ -92,8 +91,8 @@ fn build_stream_batches<W: Write + Seek>(
     time_order: &TimeOrder,
     kv_to_file: &[KvId],
     total_rows: u32,
-    w: &mut StreamWriter<W>,
-) -> Result<(), IndexError> {
+    w: &mut ChunkWriter<W>,
+) -> Result<(), Error> {
     let entries: Vec<Vec<KvId>> = time_order
         .iter_by_time()
         .map(|ins| {
@@ -107,14 +106,14 @@ fn build_stream_batches<W: Write + Seek>(
     if entries.is_empty() {
         // num_stream_batches(0) == 1: emit a single empty batch so the
         // file's chunk layout is always valid.
-        w.add_stream_batch(&sfst::StreamBatch::for_write(&[]))?;
+        w.add_stream_batch(&crate::StreamBatch::for_write(&[]))?;
     } else {
-        let batch_size = sfst::stream_batch_size(total_rows) as usize;
+        let batch_size = crate::stream_batch_size(total_rows) as usize;
         for batch in entries.chunks(batch_size) {
             // The batch-size rule guarantees ≤ MAX_STREAM_BATCHES slices,
             // and the writer's declared count enforces it: one slice too
             // many is a WriterMisuse error, never an aliased chunk id.
-            w.add_stream_batch(&sfst::StreamBatch::for_write(batch))?;
+            w.add_stream_batch(&crate::StreamBatch::for_write(batch))?;
         }
     }
 
@@ -126,8 +125,8 @@ fn build_stream_batches<W: Write + Seek>(
 fn build_primary_fst<W: Write + Seek>(
     row_index: &RowIndex,
     time_order: &TimeOrder,
-    w: &mut StreamWriter<W>,
-) -> Result<(), IndexError> {
+    w: &mut ChunkWriter<W>,
+) -> Result<(), Error> {
     let t = Instant::now();
     let mut entries: Vec<(&str, BitmapValue)> = Vec::new();
 
@@ -155,8 +154,8 @@ fn build_primary_fst<W: Write + Seek>(
 fn build_mid_card_chunks<W: Write + Seek>(
     row_index: &RowIndex,
     time_order: &TimeOrder,
-    w: &mut StreamWriter<W>,
-) -> Result<(), IndexError> {
+    w: &mut ChunkWriter<W>,
+) -> Result<(), Error> {
     let t = Instant::now();
 
     let mut entries: Vec<(&str, BitmapValue)> = Vec::new();
@@ -186,7 +185,7 @@ fn build_mid_card_chunks<W: Write + Seek>(
 
 /// Build high-cardinality field chunks (bincode + zstd).
 ///
-/// Each chunk is a [`sfst::HighField`] — a string arena of sorted
+/// Each chunk is a [`crate::HighField`] — a string arena of sorted
 /// `key=value` keys plus their per-key `u8` batch-mask. Bit `b` of the mask
 /// is set iff the value appears in stream batch `b`. Batch boundaries
 /// are defined by `batch_size` over time-sorted positions;
@@ -196,8 +195,8 @@ fn build_high_card_chunks<W: Write + Seek>(
     row_index: &RowIndex,
     time_order: &TimeOrder,
     batch_size: u32,
-    w: &mut StreamWriter<W>,
-) -> Result<(), IndexError> {
+    w: &mut ChunkWriter<W>,
+) -> Result<(), Error> {
     let t = Instant::now();
 
     let mut paired: Vec<(&str, u8)> = Vec::new();
@@ -210,11 +209,11 @@ fn build_high_card_chunks<W: Write + Seek>(
             let mask = batch_mask(row_index.bitmap(slot), time_order, batch_size);
             paired.push((key, mask));
         }
-        paired.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
+        paired.sort_unstable_by_key(|&(key, _)| key);
 
         // Transpose to parallel columns, then pack as the arena layout.
         let (keys, masks): (Vec<&str>, Vec<u8>) = paired.iter().copied().unzip();
-        let high = sfst::HighField::for_write(&keys, masks);
+        let high = crate::HighField::for_write(&keys, masks);
         let idx = w.add_high_field(&high)?;
         debug_assert_eq!(idx as usize, i);
     }
@@ -243,31 +242,19 @@ fn batch_mask(rb: &RoaringBitmap, time_order: &TimeOrder, batch_size: u32) -> u8
     for ins_pos in rb.iter() {
         let sorted_pos = time_order.to_sorted(ins_pos);
         let bit = (sorted_pos / batch_size) as u8;
-        debug_assert!(bit < sfst::MAX_STREAM_BATCHES, "batch index out of range");
+        debug_assert!(bit < crate::MAX_STREAM_BATCHES, "batch index out of range");
         mask |= 1u8 << bit;
     }
     mask
 }
 
-/// Build and write a split-fst index file.
-///
-/// This is Phase 2 of the indexing pipeline. Takes the [`RowIndex`] built by
-/// Phase 1 and produces a split-fst file with: summary, metadata, primary FST,
-/// secondary chunks (mid/high-card), and per-stream log entries. Chunks
-/// stream to the temp file as they are packed (see `build_into`,
-/// crate-internal).
-///
-/// `content_meta` is the producer's opaque identity blob, stored verbatim
-/// in the summary — the indexer never derives or inspects it.
-///
-/// Returns both the cheap-to-read [`sfst::Summary`] (which the registry
-/// stores inline) and the heavier [`Metadata`] (only needed for query
-/// planning and execution).
-pub fn build_and_write(
+/// Build and write a split-fst index file — the body of
+/// [`IndexWriter::write_file`](crate::IndexWriter::write_file).
+pub(crate) fn build_and_write(
     row_index: &RowIndex,
     out_path: &Path,
     content_meta: Vec<u8>,
-) -> Result<(sfst::Summary, Metadata), IndexError> {
+) -> Result<(crate::Summary, Metadata), Error> {
     let t_start = Instant::now();
 
     let t = Instant::now();
@@ -297,7 +284,8 @@ pub fn build_and_write(
 
 /// Phase 2 proper: consume a [`RowIndex`] and **stream** the SFST into
 /// `sink` (positioned at offset 0), returning the sink plus the
-/// [`sfst::Summary`] / [`Metadata`] the file carries.
+/// [`crate::Summary`] / [`Metadata`] the file carries — the body of
+/// [`IndexWriter::write_into`](crate::IndexWriter::write_into).
 ///
 /// Everything the `SUMR`/`META` chunks need (content identity, id
 /// ranges, field table, histogram) is available before any chunk is
@@ -305,20 +293,14 @@ pub fn build_and_write(
 /// classification and the stream-batch rule — so the writer reserves
 /// the TOC up front and each chunk is packed, written, and dropped in
 /// the canonical hot-prefix order (`SUMR`, `META`, `TIMS`, `PRIM`,
-/// mid-card, high-card, stream batches), which [`sfst::StreamWriter`]
+/// mid-card, high-card, stream batches), which [`ChunkWriter`]
 /// enforces. Peak memory beyond the `RowIndex` itself is a single
 /// packed chunk, not the whole compressed file.
-///
-/// Shared by [`build_and_write`] (sink = the temp file) and in-memory range
-/// builds (sink = a `Cursor<Vec<u8>>`). Public so an alternate producer
-/// (`ng-index`'s flattened-frame builder, which owns both the seal-time file
-/// build and the on-query in-memory range build) can stream an in-memory SFST
-/// through the same machinery rather than re-implementing it.
-pub fn build_into<W: Write + Seek>(
+pub(crate) fn build_into<W: Write + Seek>(
     row_index: &RowIndex,
     sink: W,
     content_meta: Vec<u8>,
-) -> Result<(W, sfst::Summary, Metadata), IndexError> {
+) -> Result<(W, crate::Summary, Metadata), Error> {
     let t = Instant::now();
 
     // Build time order
@@ -327,12 +309,12 @@ pub fn build_into<W: Write + Seek>(
 
     // Total row count drives the stream-batch partitioning.
     let total_rows = row_index.num_rows() as u32;
-    let batch_size = sfst::stream_batch_size(total_rows);
+    let batch_size = crate::stream_batch_size(total_rows);
 
     let (kv_to_file, id_ranges) = build_id_translation(row_index);
 
     // Field table, ordered low → mid → high (each tier sorted by name).
-    let fields: sfst::FieldTable = row_index
+    let fields: crate::FieldTable = row_index
         .low_fields()
         .iter()
         .map(|(name, ids)| FieldEntry {
@@ -366,7 +348,7 @@ pub fn build_into<W: Write + Seek>(
     // the filename (`FileId`), propagated from the WAL file the SFST is built
     // from, is its single source of truth and is deliberately not cross-checked
     // against the rows. See `FORMAT.md` ("Partition-key authority").
-    let summary = sfst::Summary {
+    let summary = crate::Summary {
         min_timestamp_s: histogram.timestamps.first().copied().unwrap_or(0),
         max_timestamp_s: histogram.timestamps.last().copied().unwrap_or(0),
         record_count: total_rows,
@@ -409,7 +391,7 @@ pub fn build_into<W: Write + Seek>(
             t.fill_field_stats(&fields);
             t
         }
-        None => sfst::SchemaTree::flat(&fields),
+        None => crate::SchemaTree::flat(&fields),
     };
     let metadata = Metadata {
         histogram,
@@ -430,9 +412,9 @@ pub fn build_into<W: Write + Seek>(
             .expect("mid-card field count exceeds u16::MAX"),
         high_fields: u16::try_from(row_index.high_fields().len())
             .expect("high-card field count exceeds u16::MAX"),
-        stream_batches: sfst::num_stream_batches(total_rows),
+        stream_batches: crate::num_stream_batches(total_rows),
     };
-    let mut w = StreamWriter::new(sink, counts)?;
+    let mut w = ChunkWriter::new(sink, counts)?;
 
     // Hot prefix first — the writer enforces the canonical order.
     w.summary(&summary)?;
@@ -500,7 +482,7 @@ pub fn build_into<W: Write + Seek>(
     // traces seal sets `build_trace_id_index`; the logs seal skips this entirely.
     if row_index.build_trace_id_index {
         let trace_ids = chronological_trace_ids.as_ref().expect(
-            "build_trace_id_index requires the trace_id column (StreamWriter also enforces this)",
+            "build_trace_id_index requires the trace_id column (ChunkWriter also enforces this)",
         );
         w.trace_id_index(&TraceIdIndex::build(trace_ids))?;
     }
@@ -525,10 +507,10 @@ pub fn build_into<W: Write + Seek>(
 }
 
 /// A present per-row column must hold exactly one value per row. Returns
-/// [`IndexError::ColumnLengthMismatch`] otherwise — a caller bug, not a panic.
-fn check_column_len(column: &'static str, got: usize, expected: usize) -> Result<(), IndexError> {
+/// [`Error::ColumnLengthMismatch`] otherwise — a caller bug, not a panic.
+fn check_column_len(column: &'static str, got: usize, expected: usize) -> Result<(), Error> {
     if got != expected {
-        return Err(IndexError::ColumnLengthMismatch {
+        return Err(Error::ColumnLengthMismatch {
             column,
             got,
             expected,
@@ -546,7 +528,7 @@ fn check_column_len(column: &'static str, got: usize, expected: usize) -> Result
 fn remap_one_bitmap(rb: &RoaringBitmap, time_order: &TimeOrder) -> (Bitmap, Vec<u8>) {
     let universe_size = time_order.len();
     let half = universe_size as u64 / 2;
-    let card = rb.len() as u64;
+    let card = rb.len();
     let mut data = Vec::new();
 
     if rb.is_empty() {

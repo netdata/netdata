@@ -12,7 +12,7 @@
 //!   content-agnostic `entry_count` + per-frame `timestamp_ns`, so the seal sums
 //!   `entry_count` → `record_count`, folds frame timestamps → min/max, copies the
 //!   header's opaque `content_meta`, and writes a content-light SFST via
-//!   `sfst::write_summary_only`. That is enough for the substrate to track,
+//!   `sfst::IndexWriter::write_summary_only`. That is enough for the substrate to track,
 //!   catalog, upload, and recover the file like any other.
 //!
 //! Fakes (real traces feature must replace): timestamps are frame
@@ -165,10 +165,11 @@ fn seal_summary_only(wal_path: &Path, sfst_path: &Path) -> anyhow::Result<(sfst:
     };
 
     // Write atomically (build in memory, then fsync+rename), matching the logs
-    // indexer (`sfst_indexer` uses `durable::AtomicFile`). A summary-only SFST is
+    // indexer (`IndexWriter::write_file` uses `durable::AtomicFile`). A summary-only SFST is
     // tiny, so the in-memory buffer is cheap; a crash mid-write then leaves no
     // partial SFST that recovery would treat as a valid sealed file.
-    let buf = sfst::write_summary_only(std::io::Cursor::new(Vec::new()), &summary)?.into_inner();
+    let buf = sfst::IndexWriter::write_summary_only(std::io::Cursor::new(Vec::new()), &summary)?
+        .into_inner();
     file_registry::durable::write_atomic(sfst_path, &buf)?;
     // Read the size back from disk (rather than `buf.len()`), matching the logs
     // indexer — so the tracked size always reflects the on-disk file even if the

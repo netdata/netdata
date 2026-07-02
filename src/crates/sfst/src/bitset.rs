@@ -10,7 +10,7 @@ pub struct Bitset {
 
 impl Bitset {
     pub fn new(universe_size: u32) -> Self {
-        let num_words = (universe_size as usize + 63) / 64;
+        let num_words = (universe_size as usize).div_ceil(64);
         Self {
             words: vec![0u64; num_words],
         }

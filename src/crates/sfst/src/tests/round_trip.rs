@@ -1,6 +1,6 @@
 //! Format round-trip tests: write a file via the buffer-all
 //! [`FixtureWriter`] / [`pack`] (looser than the public
-//! [`StreamWriter`], so partial files — no SUMR, no META — can pin
+//! [`ChunkWriter`], so partial files — no SUMR, no META — can pin
 //! reader behavior), read it back via [`Reader`], assert the chunks
 //! decode to the values we put in.
 

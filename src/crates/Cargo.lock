@@ -2880,7 +2880,6 @@ dependencies = [
  "ng-flatten",
  "opentelemetry-proto",
  "sfst",
- "sfst-indexer",
  "tempfile",
  "thiserror 2.0.18",
  "wal",
@@ -4508,8 +4507,10 @@ dependencies = [
  "clap",
  "file-registry",
  "fst",
+ "hashbrown 0.17.1",
  "memmap2",
  "regex",
+ "roaring 0.11.2",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -4517,23 +4518,9 @@ dependencies = [
  "thiserror 2.0.18",
  "tracing",
  "treight",
+ "twox-hash",
  "uuid",
  "zstd",
-]
-
-[[package]]
-name = "sfst-indexer"
-version = "0.1.3"
-dependencies = [
- "bumpalo",
- "file-registry",
- "hashbrown 0.17.1",
- "roaring 0.11.2",
- "sfst",
- "thiserror 2.0.18",
- "tracing",
- "treight",
- "twox-hash",
 ]
 
 [[package]]

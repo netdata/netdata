@@ -26,7 +26,7 @@ fn error_on_older_format_version() {
         record_count: 1,
         content_meta: Vec::new(),
     };
-    let mut buf = crate::write_summary_only(std::io::Cursor::new(Vec::new()), &summary)
+    let mut buf = crate::writer::write_summary_only(std::io::Cursor::new(Vec::new()), &summary)
         .unwrap()
         .into_inner();
     // Header layout: magic(4) | version(4, LE) | num_chunks(4). Overwrite v9 -> v8.

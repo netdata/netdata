@@ -1,9 +1,9 @@
 # SFST File Format
 
 SFST is the on-disk format for one log-index file. Each file holds the
-indexed contents of one log stream (one
-`(service.namespace, service.name)` pair) and is built from one WAL
-file by the `sfst-indexer` crate. The container is chunk-based with
+indexed contents of one content stream (the producer's partition,
+opaque to this crate) and is built from one WAL file via this crate's
+`IndexWriter`. The container is chunk-based with
 a `chunk-file` table of contents; every chunk has a 4-byte id naming
 its role.
 

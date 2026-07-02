@@ -42,5 +42,8 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 bytesize = { workspace = true }
+# test-util exposes the chunk-level writer for the hand-built SFST fixtures in
+# ledger/rpc/handler/tests.rs.
+sfst = { workspace = true, features = ["test-util"] }
 tempfile = { workspace = true }
 treight = { workspace = true }

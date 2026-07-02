@@ -1,10 +1,10 @@
 //! Buffer-all fixture builder for reader tests.
 //!
-//! Deliberately looser than the public [`crate::StreamWriter`]: it can
+//! Deliberately looser than the public [`crate::ChunkWriter`]: it can
 //! emit files with chunks missing (no SUMR, no META) and accepts its
 //! chunks in any call order, so reader tests can pin behavior on
 //! partial or odd files. Test scaffolding only — production files are
-//! written through [`crate::StreamWriter`], which enforces the full
+//! written through [`crate::ChunkWriter`], which enforces the full
 //! canonical shape.
 
 use std::io::Write;

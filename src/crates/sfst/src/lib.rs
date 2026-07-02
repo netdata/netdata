@@ -4,8 +4,8 @@
 //! low-cardinality `key=value` pairs, zero or more **secondary** chunks
 //! (mid-cardinality per-field FSTs, high-cardinality per-field sorted lists),
 //! and one stream-log-entries chunk, all keyed by a [`chunk_file`] TOC for
-//! O(1) random access via mmap. Each SFST covers exactly one log stream
-//! (one `(service.namespace, service.name)` pair).
+//! O(1) random access via mmap. Each SFST covers exactly one content
+//! stream — the producer's partition, opaque to this crate.
 //!
 //! The complete on-disk specification — chunk layout, ids, encoding,
 //! version compatibility, and reader access patterns — lives in
@@ -14,63 +14,49 @@
 //!
 //! # Crate boundaries
 //!
-//! This crate owns the **format**: writing ([`StreamWriter`]), reading
-//! ([`Reader`] for raw chunk access, [`IndexReader`] for the query
-//! API), the query vocabulary ([`query`]), and the per-directory file
-//! registry ([`Registry`]). Producing an SFST *from WAL data* — frame
-//! decode, row accumulation, tier classification — lives in the
-//! `sfst-indexer` crate, so format consumers never compile the
-//! WAL/Arrow stack.
+//! This crate owns the format **and** its build: a producer fills a
+//! [`RowIndex`] with interned `(timestamp, key=value)` rows and writes
+//! through [`IndexWriter`]; reading goes through [`IndexReader`] (the
+//! query API) or [`Reader`] (raw chunk access), with the query
+//! vocabulary in [`query`] and the per-directory file registry in
+//! [`registry`]. Decoding WAL frames into rows is the producer's
+//! concern (`ng-index` is the in-tree producer), so this crate never
+//! compiles the WAL/Arrow stack. The chunk-level writer is internal —
+//! test fixtures can reach it via the `test-util` feature.
 //!
 //! # Example
 //!
 //! ```
-//! use sfst::{BitmapValue, ChunkCounts, ColumnsPresent, StreamBatch, StreamWriter};
-//! use treight::Bitmap;
+//! use bumpalo::Bump;
+//! use sfst::{IndexReader, IndexWriter, RowIndex};
 //!
-//! // One low-cardinality `key=value` entry for the primary chunk.
-//! let bm = BitmapValue { desc: Bitmap::empty(0), data: Vec::new() };
+//! // Phase 1: a producer interns rows into a RowIndex.
+//! let arena = Bump::new();
+//! let mut rows = RowIndex::new(&arena, sfst::DEFAULT_CARDINALITY_THRESHOLD);
+//! let token = rows.intern(None, "level=info");
+//! rows.row(1_700_000_000_000_000_000, &[token]);
 //!
-//! // Write a minimal file: the four always-present chunks in their
-//! // canonical order, plus one (empty) stream batch.
-//! let summary = sfst::Summary {
-//!     min_timestamp_s: 0,
-//!     max_timestamp_s: 0,
-//!     record_count: 0,
-//!     // `content_meta` is opaque to sfst — the content plane derives it.
-//!     // The partition key is NOT here; it lives in the file's `FileId`.
-//!     content_meta: Vec::new(),
-//! };
-//! let metadata = sfst::Metadata {
-//!     histogram: sfst::Histogram { timestamps: vec![], counts: vec![] },
-//!     id_ranges: sfst::IdRanges {
-//!         low_end: sfst::KvId(1),
-//!         mid_end: sfst::KvId(1),
-//!         high_end: sfst::KvId(1),
-//!     },
-//!     tree: Default::default(),
-//!     columns: Default::default(),
-//! };
-//! let counts = ChunkCounts { columns: ColumnsPresent::default(), trace_id_index: false, mid_fields: 0, high_fields: 0, stream_batches: 1 };
-//! let mut w = StreamWriter::new(std::io::Cursor::new(Vec::new()), counts).unwrap();
-//! w.summary(&summary).unwrap();
-//! w.metadata(&metadata).unwrap();
-//! w.timestamps(&[]).unwrap();
-//! // The writer builds the primary FST from its `key=value` entries.
-//! w.primary([("level=info", bm)]).unwrap();
-//! w.add_stream_batch(&StreamBatch::for_write(&[])).unwrap();
-//! let buf = w.finish().unwrap().into_inner();
+//! // Phase 2: write the SFST (content_meta is the producer's opaque
+//! // identity blob; the partition key lives in the file name, not here).
+//! let (buf, summary, _metadata) =
+//!     IndexWriter::write_into(&rows, std::io::Cursor::new(Vec::new()), Vec::new()).unwrap();
+//! assert_eq!(summary.record_count, 1);
 //!
 //! // Read back through the query API.
-//! let idx = sfst::IndexReader::open(&buf).unwrap();
+//! let idx = IndexReader::open(buf.get_ref()).unwrap();
 //! assert!(idx.primary_lookup(b"level=info").is_some());
 //! ```
 
+mod bitset;
+mod build;
 mod error;
 mod index_reader;
+mod index_writer;
+mod kv_interner;
 mod prefix_map;
 pub mod query;
 mod reader;
+mod row_index;
 mod schema;
 mod trace_index;
 mod writer;
@@ -79,6 +65,8 @@ pub mod registry;
 
 pub use error::Error;
 pub use index_reader::{BitmapFilter, IndexReader, Trace, TraceSpan};
+pub use index_writer::IndexWriter;
+pub use kv_interner::KvSlot;
 pub(crate) use prefix_map::{BuildError, PrefixMap};
 pub use query::{
     Bucket, FacetResult, Filter, Grid, Matcher, MaterializedRow, Timeline, Timestamps,
@@ -86,6 +74,7 @@ pub use query::{
 };
 pub use reader::Reader;
 pub use registry::{File, Registry, RetentionPolicy};
+pub use row_index::RowIndex;
 pub use trace_index::TraceIdIndex;
 
 /// Deterministic opaque partition key for tests. SFST treats `part_key` as an
@@ -107,18 +96,23 @@ pub fn scan_max_sequence_recursive(base: &std::path::Path) -> std::io::Result<u6
     file_registry::scan_max_sequence_recursive(base, registry::SFST_EXT)
 }
 pub use schema::{
-    ALL_COLUMNS, BitmapValue, ColumnEntry, ColumnSpec, ColumnType, ColumnsTable,
-    DEFAULT_CARDINALITY_THRESHOLD, DroppedAttributeCounts, Durations, FieldEntry, FieldTable,
-    FieldTier, Flags, HighField, Histogram, IdRanges, KvId, LeafStats, Metadata, NodeId,
-    ObservedTimestamps, ParentSpanIds, SchemaEdge, SchemaNode, SchemaTree, SpanId, SpanIds, Step,
-    StreamBatch, Summary, TraceId, TraceIds, ValueKind,
+    BitmapValue, ColumnEntry, ColumnType, ColumnsTable, DEFAULT_CARDINALITY_THRESHOLD,
+    DroppedAttributeCounts, Durations, FieldEntry, FieldTable, FieldTier, Flags, HighField,
+    Histogram, IdRanges, KvId, LeafStats, Metadata, NodeId, ObservedTimestamps, ParentSpanIds,
+    SchemaEdge, SchemaNode, SchemaTree, SpanId, SpanIds, Step, StreamBatch, Summary, TraceId,
+    TraceIds, ValueKind,
 };
-pub use writer::{ChunkCounts, ColumnsPresent, StreamWriter, write_summary_only};
+// Writer-input-only vocabulary stays crate-internal (the build owns the writer).
+pub(crate) use schema::{ALL_COLUMNS, ColumnSpec};
+
+// The chunk-level writer surface, exposed only for hand-built test fixtures.
+#[cfg(feature = "test-util")]
+pub use writer::{ChunkCounts, ChunkWriter, ColumnsPresent, write_summary_only};
 
 // ── Format constants ─────────────────────────────────────────────
 //
 // The container's magic, version, and chunk ids never leave this
-// crate: producers write through [`StreamWriter`]'s typed methods, so
+// crate: producers write through [`ChunkWriter`]'s typed methods, so
 // the canonical chunk order and the id encoding exist in exactly one
 // place. `FORMAT.md` is the source of truth for what each id carries.
 
@@ -168,7 +162,7 @@ pub const MAX_STREAM_BATCHES: u8 = 8;
 /// high-card values, stream batches, timestamps, summary, metadata.
 /// These payloads either carry random data (string columns, KvId
 /// sequences) or are small enough that higher zstd levels don't recoup
-/// their CPU cost. Private: [`StreamWriter`] owns the level-to-chunk
+/// their CPU cost. Private: [`ChunkWriter`] owns the level-to-chunk
 /// pairing.
 pub(crate) const ZSTD_LEVEL_DEFAULT: i32 = 1;
 
@@ -176,7 +170,7 @@ pub(crate) const ZSTD_LEVEL_DEFAULT: i32 = 1;
 /// mid-card). FSTs share prefix structure across many `key=value`
 /// strings; the higher level lets zstd's longer-range match search
 /// find that redundancy and pay off the extra CPU with a noticeably
-/// smaller payload. Private: [`StreamWriter`] owns the pairing.
+/// smaller payload. Private: [`ChunkWriter`] owns the pairing.
 pub(crate) const ZSTD_LEVEL_FST: i32 = 3;
 
 /// Number of stream-batch (`SB{i}`) chunks in a file with `record_count`

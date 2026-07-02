@@ -1,10 +1,11 @@
 //! Tests for `IndexReader::trace_by_id` trace reconstruction: span dedup,
 //! root detection, and the cycle -> forest reachability guard.
 
+use crate::writer::{ChunkCounts, ChunkWriter, ColumnsPresent};
 use crate::{
-    BitmapValue, ChunkCounts, ColumnEntry, ColumnsPresent, ColumnsTable, DroppedAttributeCounts,
-    Durations, Flags, Histogram, IdRanges, IndexReader, KvId, Metadata, ParentSpanIds, SpanId,
-    SpanIds, StreamBatch, StreamWriter, Summary, TraceId, TraceIdIndex, TraceIds,
+    BitmapValue, ColumnEntry, ColumnsTable, DroppedAttributeCounts, Durations, Flags, Histogram,
+    IdRanges, IndexReader, KvId, Metadata, ParentSpanIds, SpanId, SpanIds, StreamBatch, Summary,
+    TraceId, TraceIdIndex, TraceIds,
 };
 
 const TRACE: [u8; 16] = [7u8; 16];
@@ -94,7 +95,7 @@ fn trace_file(rows: &[(SpanId, SpanId)]) -> Vec<u8> {
     // One ascending timestamp per row so start-sort order == row order.
     let timestamps: Vec<i64> = (0..n as i64).collect();
 
-    let mut w = StreamWriter::new(std::io::Cursor::new(Vec::new()), counts).unwrap();
+    let mut w = ChunkWriter::new(std::io::Cursor::new(Vec::new()), counts).unwrap();
     w.summary(&summary).unwrap();
     w.metadata(&metadata).unwrap();
     w.timestamps(&timestamps).unwrap();

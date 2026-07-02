@@ -49,9 +49,9 @@ use bumpalo::Bump;
 use hashbrown::hash_map::Entry;
 use twox_hash::XxHash64;
 
-/// A unique ID assigned by [`KeyValueInterner`] to each distinct `key=value`
-/// string. Used as the index into the per-value bitmap array and as the
-/// elements in the per-log entries.
+/// A unique ID assigned by the build-side interner to each distinct
+/// `key=value` string. Used as the index into the per-value bitmap array and
+/// as the elements in the per-log entries.
 ///
 /// Not to be confused with raw log positions (array indices into the
 /// log list), which are also `u32`.
@@ -211,14 +211,6 @@ impl<'a> KeyValueInterner<'a> {
         self.strings[slot.idx()]
     }
 
-    pub fn len(&self) -> usize {
-        self.strings.len()
-    }
-
-    pub fn cardinality_threshold(&self) -> u32 {
-        self.cardinality_threshold
-    }
-
     /// Low-cardinality fields (< threshold), sorted by field name.
     pub fn low_fields(&self) -> Vec<(&str, &[KvSlot])> {
         self.fields_in_range(0, self.cardinality_threshold as usize)
@@ -290,7 +282,7 @@ impl<'a> KeyValueInterner<'a> {
 
 /// Compute xxhash64 (seed 0) of a byte slice.
 #[inline]
-pub fn xxhash64(bytes: &[u8]) -> u64 {
+fn xxhash64(bytes: &[u8]) -> u64 {
     let mut h = XxHash64::default();
     h.write(bytes);
     h.finish()

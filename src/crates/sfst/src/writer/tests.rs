@@ -2,11 +2,12 @@ use std::io::Cursor;
 
 use treight::Bitmap;
 
+use crate::writer::{ChunkCounts, ChunkWriter, ColumnsPresent, write_summary_only};
 use crate::{
-    ALL_COLUMNS, BitmapValue, ChunkCounts, ColumnEntry, ColumnType, ColumnsPresent, ColumnsTable,
-    DroppedAttributeCounts, Durations, Error, FieldEntry, FieldTier, Flags, HighField, Histogram,
-    IdRanges, KvId, Metadata, ObservedTimestamps, ParentSpanIds, SchemaTree, SpanId, SpanIds,
-    StreamBatch, StreamWriter, Summary, TraceId, TraceIdIndex, TraceIds,
+    ALL_COLUMNS, BitmapValue, ColumnEntry, ColumnType, ColumnsTable, DroppedAttributeCounts,
+    Durations, Error, FieldEntry, FieldTier, Flags, HighField, Histogram, IdRanges, KvId, Metadata,
+    ObservedTimestamps, ParentSpanIds, SchemaTree, SpanId, SpanIds, StreamBatch, Summary, TraceId,
+    TraceIdIndex, TraceIds,
 };
 
 fn counts(mid: u16, high: u16, batches: u8) -> ChunkCounts {
@@ -31,7 +32,7 @@ fn summary() -> Summary {
 #[test]
 fn write_summary_only_round_trips_through_reader() {
     // A content-light SFST (the traces-style seal): only the SUMR chunk, none of
-    // the logs-shaped chunks StreamWriter mandates. The shared reader/registry
+    // the logs-shaped chunks ChunkWriter mandates. The shared reader/registry
     // must still recover its summary so the lifecycle tracks it like any file.
     let s = Summary {
         min_timestamp_s: 100,
@@ -39,7 +40,7 @@ fn write_summary_only_round_trips_through_reader() {
         record_count: 7,
         content_meta: vec![1, 2, 3, 4],
     };
-    let buf = crate::write_summary_only(Cursor::new(Vec::new()), &s)
+    let buf = write_summary_only(Cursor::new(Vec::new()), &s)
         .unwrap()
         .into_inner();
 
@@ -87,12 +88,12 @@ fn batch() -> StreamBatch {
     StreamBatch::for_write(&[])
 }
 
-fn writer(c: ChunkCounts) -> StreamWriter<Cursor<Vec<u8>>> {
-    StreamWriter::new(Cursor::new(Vec::new()), c).unwrap()
+fn writer(c: ChunkCounts) -> ChunkWriter<Cursor<Vec<u8>>> {
+    ChunkWriter::new(Cursor::new(Vec::new()), c).unwrap()
 }
 
 /// Drive the prefix (SUMR, META, TIMS, PRIM) with minimal payloads.
-fn write_prefix(w: &mut StreamWriter<Cursor<Vec<u8>>>) {
+fn write_prefix(w: &mut ChunkWriter<Cursor<Vec<u8>>>) {
     w.summary(&summary()).unwrap();
     w.metadata(&metadata(Vec::new())).unwrap();
     w.timestamps(&[1, 2, 3]).unwrap();
@@ -157,7 +158,7 @@ fn primary_rejects_duplicate_keys() {
 fn rejects_zero_and_excess_stream_batch_counts() {
     for n in [0u8, crate::MAX_STREAM_BATCHES + 1] {
         assert!(matches!(
-            StreamWriter::new(Cursor::new(Vec::new()), counts(0, 0, n)),
+            ChunkWriter::new(Cursor::new(Vec::new()), counts(0, 0, n)),
             Err(Error::InvalidStreamBatchCount(_))
         ));
     }
@@ -635,7 +636,7 @@ fn trace_id_index_without_its_column_is_rejected() {
         stream_batches: 1,
     };
     assert!(matches!(
-        StreamWriter::new(Cursor::new(Vec::new()), bad),
+        ChunkWriter::new(Cursor::new(Vec::new()), bad),
         Err(Error::WriterMisuse(_)),
     ));
 }

@@ -8,6 +8,12 @@ description = "Container format for split FST indexes with a chunk-file TOC"
 [lints]
 workspace = true
 
+[features]
+# Expose the chunk-level writer (`ChunkWriter` + its input-only types) so
+# external tests can hand-build files chunk by chunk. Test fixtures only —
+# production producers go through `IndexWriter`.
+test-util = []
+
 [dependencies]
 # Format
 fst = { workspace = true }
@@ -20,6 +26,11 @@ chunk-file = { workspace = true }
 thiserror = { workspace = true }
 treight = { workspace = true, features = ["roaring", "serde"] }
 regex = { workspace = true }
+
+# Index build (RowIndex → IndexWriter)
+hashbrown = { workspace = true }
+roaring = { workspace = true }
+twox-hash = { workspace = true, features = ["xxhash64"] }
 
 # Registry
 file-registry = { workspace = true }

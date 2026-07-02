@@ -2,6 +2,7 @@
 //! [`IndexReader::matched_positions`], [`IndexReader::facets`], and
 //! [`IndexReader::timeline`].
 
+use crate::writer::{ChunkCounts, ChunkWriter, ColumnsPresent};
 use crate::*;
 
 /// Compile `filter` against `reader` — test convenience for the
@@ -117,7 +118,7 @@ fn build_query_fixture() -> Vec<u8> {
         high_fields: 0,
         stream_batches: 1,
     };
-    let mut writer = StreamWriter::new(std::io::Cursor::new(Vec::new()), counts).unwrap();
+    let mut writer = ChunkWriter::new(std::io::Cursor::new(Vec::new()), counts).unwrap();
     writer.summary(&summary).unwrap();
     writer.metadata(&metadata).unwrap();
     writer.timestamps(&timestamps).unwrap();
@@ -513,7 +514,7 @@ fn build_multivalued_fixture() -> Vec<u8> {
         high_fields: 0,
         stream_batches: 1,
     };
-    let mut writer = StreamWriter::new(std::io::Cursor::new(Vec::new()), counts).unwrap();
+    let mut writer = ChunkWriter::new(std::io::Cursor::new(Vec::new()), counts).unwrap();
     writer.summary(&summary).unwrap();
     writer.metadata(&metadata).unwrap();
     writer.timestamps(&timestamps).unwrap();
@@ -836,7 +837,7 @@ fn build_complemented_fixture() -> Vec<u8> {
         high_fields: 0,
         stream_batches: 1,
     };
-    let mut writer = StreamWriter::new(std::io::Cursor::new(Vec::new()), counts).unwrap();
+    let mut writer = ChunkWriter::new(std::io::Cursor::new(Vec::new()), counts).unwrap();
     writer.summary(&summary).unwrap();
     writer.metadata(&metadata).unwrap();
     writer.timestamps(&timestamps).unwrap();
@@ -1053,7 +1054,7 @@ fn build_tiered_fixture() -> Vec<u8> {
         high_fields: 1,
         stream_batches: 1,
     };
-    let mut writer = StreamWriter::new(std::io::Cursor::new(Vec::new()), counts).unwrap();
+    let mut writer = ChunkWriter::new(std::io::Cursor::new(Vec::new()), counts).unwrap();
     writer.summary(&summary).unwrap();
     writer.metadata(&metadata).unwrap();
     writer.timestamps(&timestamps).unwrap();
@@ -1377,7 +1378,7 @@ fn build_two_per_tier_fixture() -> Vec<u8> {
         high_fields: 2,
         stream_batches: 1,
     };
-    let mut w = StreamWriter::new(std::io::Cursor::new(Vec::new()), counts).unwrap();
+    let mut w = ChunkWriter::new(std::io::Cursor::new(Vec::new()), counts).unwrap();
     w.summary(&summary).unwrap();
     w.metadata(&metadata).unwrap();
     w.timestamps(&timestamps).unwrap();

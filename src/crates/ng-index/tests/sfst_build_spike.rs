@@ -1,5 +1,5 @@
 //! Spike: build a real SFST index file from our OWN `(timestamp, [key=value])`
-//! rows using the existing `sfst-indexer`, then query it back. This is the
+//! rows using `sfst`'s `RowIndex` + `IndexWriter`, then query it back. This is the
 //! feasibility brick for the augment-SFST plan: it proves the SFST builder is
 //! reusable with rows WE produce (e.g. stringified ng-flatten output), via
 //! `RowIndex`'s inherent `intern` + `row` methods (the spike passes `None` for the
@@ -11,8 +11,7 @@ use sfst::{
     DroppedAttributeCounts, Durations, Flags, IndexReader, ParentSpanIds, Reader, SpanId, SpanIds,
     TraceId, TraceIds,
 };
-use sfst_indexer::build_and_write;
-use sfst_indexer::row_index::RowIndex;
+use sfst::{IndexWriter, RowIndex};
 
 /// Build an SFST file from `(timestamp_ns, &[key=value])` rows; return its bytes.
 fn build_sfst(rows: &[(i64, &[&str])]) -> Vec<u8> {
@@ -26,7 +25,7 @@ fn build_sfst(rows: &[(i64, &[&str])]) -> Vec<u8> {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("spike.sfst");
     // Empty content_meta: it is display-only and this test never reads it back.
-    build_and_write(&ri, &path, Vec::new()).expect("build_and_write");
+    IndexWriter::write_file(&ri, &path, Vec::new()).expect("write_file");
     std::fs::read(&path).expect("read sfst")
 }
 
@@ -94,7 +93,7 @@ fn build_sfst_from_our_rows_and_query_back() {
 
 /// The span-seal wiring added for traces: `RowIndex`'s `parent_span_ids` /
 /// `durations` columns and `build_trace_id_index` flag must flow through
-/// `build_into` → write the `PSPN`/`DURN` chunks and a `TIDX` index built from the
+/// the build → write the `PSPN`/`DURN` chunks and a `TIDX` index built from the
 /// **chronological** `trace_id` column. The logs path leaves these dormant, so this
 /// is the only end-to-end cover for the new branches (locks the wiring before the
 /// Step-4 traces seal producer exists).
@@ -138,7 +137,7 @@ fn build_into_writes_span_columns_and_trace_id_index() {
 
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("spans.sfst");
-    build_and_write(&ri, &path, Vec::new()).expect("build_and_write");
+    IndexWriter::write_file(&ri, &path, Vec::new()).expect("write_file");
     let bytes = std::fs::read(&path).expect("read sfst");
 
     let reader = Reader::open(&bytes).expect("open sfst");
