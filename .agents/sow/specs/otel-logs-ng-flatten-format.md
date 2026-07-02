@@ -92,10 +92,9 @@
 
 - The ingestor writes the stream `content_meta` into the WAL header; the
   seal/range build trusts that blob **verbatim** as the file's display identity
-  (`sfst-indexer::build_into`/`build_and_write` with `content_meta_override:
-  Some(..)`). Row-derived identity (`RowIndex::service_stream`) is a dormant
-  fallback for a producer that supplies no header identity (currently only the
-  `ng-index` spike test). Full contract: [otel-stream-identity.md](otel-stream-identity.md).
+  (`sfst-indexer::build_into`/`build_and_write` take `content_meta: Vec<u8>` as a
+  required argument; the indexer never derives or inspects it). Full contract:
+  [otel-stream-identity.md](otel-stream-identity.md).
 
 ## Seal/tail render parity (correctness-critical)
 

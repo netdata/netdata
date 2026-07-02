@@ -6,7 +6,7 @@
 //! 2. **Vec\<RoaringBitmap\>** — indexed by [`KvSlot`]; each bitmap tracks which
 //!    row positions contain that `key=value` pair (insertion order).
 //! 3. **Vec\<Vec\<KvSlot\>\>** — row entries: for each row position, the list
-//!    of key=value slots it contains (needed for per-stream serialization in Phase 2).
+//!    of key=value slots it contains (needed for stream-batch serialization in Phase 2).
 //! 4. **Vec\<i64\>** — nanosecond timestamp per row position, used to build the
 //!    time-sort remap and sparse histogram.
 
@@ -29,7 +29,7 @@ pub struct RowIndex<'a> {
     /// positions (insertion order) contain that `key=value` pair.
     pub kv_bitmaps: Vec<RoaringBitmap>,
     /// Per-row key=value slots: `row_entries[pos]` lists all key=value slots
-    /// for that row's attributes. Used for per-stream serialization in Phase 2.
+    /// for that row's attributes. Used for stream-batch serialization in Phase 2.
     pub row_entries: Vec<Vec<KvSlot>>,
     /// Nanosecond timestamp per row position (insertion order).
     pub timestamps: Vec<i64>,
@@ -137,11 +137,6 @@ impl<'a> RowIndex<'a> {
     /// Cardinality threshold for field classification.
     pub fn cardinality_threshold(&self) -> u32 {
         self.kv_interner.cardinality_threshold()
-    }
-
-    /// All interned strings, ordered by KvSlot.
-    pub fn strings(&self) -> &[&str] {
-        self.kv_interner.strings()
     }
 
     /// Ensure kv_bitmaps vec has an entry for the given key=value ID.

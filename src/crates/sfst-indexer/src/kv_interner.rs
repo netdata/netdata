@@ -215,10 +215,6 @@ impl<'a> KeyValueInterner<'a> {
         self.strings.len()
     }
 
-    pub fn strings(&self) -> &[&'a str] {
-        &self.strings
-    }
-
     pub fn cardinality_threshold(&self) -> u32 {
         self.cardinality_threshold
     }
