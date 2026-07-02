@@ -43,60 +43,36 @@ pub fn one_file_config() -> wal::Config {
     }
 }
 
-/// Normalize timestamps and ids, flatten `req`, and append it as a single WAL frame
-/// in the flattened-frame format, returning the number of log records written.
-///
-/// `req` is normalized **in place** first: [`ng_flatten::normalize_log_timestamps`] resolves
-/// each record's `time_unix_nano`, and [`ng_flatten::normalize_log_ids`] drops malformed trace/span ids
-/// (logging one aggregated warning per request). The request is then flattened into a
-/// per-frame schema tree + typed entries, each entry's `xxhash64(key=value)` is
-/// pre-computed (so the downstream SFST build rides the interner's fast path), and the
-/// result is bincode-encoded as the frame payload. `log_min/max_ts` are left `ZERO`
-/// (no per-frame time-range summary). A request with zero log records writes no frame
-/// and returns `0`.
+/// Prepare `req` as a flattened frame ([`ng_flatten::prepare_log_frame`]: one
+/// normalize walk, flatten, hash pre-compute, bincode-encode) and append it as
+/// a single WAL frame, returning the number of log records written. The
+/// frame's `log_min/max_ts` carry the resolved timestamp range. A request with
+/// zero log records writes no frame and returns `0`.
 pub fn write_request(
     writer: &mut wal::Writer,
     clock: &mut MonotonicClock,
     req: &mut ExportLogsServiceRequest,
 ) -> anyhow::Result<usize> {
-    let entry_count = count_log_records(req);
-    if entry_count == 0 {
-        return Ok(0);
-    }
-    // One clock tick for the synthetic-timestamp base; normalize then runs
+    // One clock tick for the synthetic-timestamp base; normalization then runs
     // lock-free (base + offset for any record lacking event/observed time).
     let fallback_base_ns = clock.now_ns().as_u64();
-    ng_flatten::normalize_log_timestamps(req, fallback_base_ns);
-    let bad_ids = ng_flatten::normalize_log_ids(req);
-    if bad_ids.any() {
-        tracing::warn!(
-            bad_trace_ids = bad_ids.trace,
-            bad_span_ids = bad_ids.span,
-            "dropped malformed trace/span ids at ingest (expected {}/{} bytes); stored as zero",
-            ng_flatten::TRACE_ID_LEN,
-            ng_flatten::SPAN_ID_LEN,
-        );
-    }
-    let (mut flattened, sanitized_keys) = ng_flatten::flatten_log_request(req);
-    if sanitized_keys > 0 {
-        tracing::warn!(
-            sanitized_keys,
-            "rewrote '=' to '_' in attribute keys at ingest ('=' is the key=value delimiter)",
-        );
-    }
-    ng_flatten::fill_log_hashes(&mut flattened);
-    let data = ng_flatten::encode_log_frame(&flattened).context("encode flattened frame")?;
+    let frame =
+        ng_flatten::prepare_log_frame(req, fallback_base_ns).context("prepare flattened frame")?;
+    // `ts_range` is None exactly when the request has no records.
+    let Some((min_ts, max_ts)) = frame.ts_range else {
+        return Ok(0);
+    };
     let ingestion_ns = clock.now_ns();
     writer.write_frame(
         PART_KEY,
         &[],
-        &data,
-        entry_count,
+        &frame.data,
+        frame.records,
         ingestion_ns,
-        TimestampNs::ZERO,
-        TimestampNs::ZERO,
+        TimestampNs(min_ts),
+        TimestampNs(max_ts),
     )?;
-    Ok(entry_count)
+    Ok(frame.records)
 }
 
 /// Count the spans across every `ResourceSpans`/`ScopeSpans` in a batch.

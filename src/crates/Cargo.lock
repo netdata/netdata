@@ -2972,6 +2972,7 @@ dependencies = [
  "bincode 2.0.1",
  "opentelemetry-proto",
  "serde",
+ "tracing",
  "twox-hash",
 ]
 

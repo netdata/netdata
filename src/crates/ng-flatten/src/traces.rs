@@ -141,7 +141,7 @@ pub fn flatten_trace_request(request: &ExportTraceServiceRequest) -> (FlattenedT
 }
 
 /// Drop malformed span ids at the ingest boundary — the traces analog of
-/// [`crate::logs::normalize_log_ids`]. Clears any non-empty
+/// [`crate::logs::normalize_log_request`]. Clears any non-empty
 /// `trace_id`/`span_id`/`parent_span_id` whose length is not the spec width
 /// (16/8/8); the SFST column later stores a cleared id as the all-zero "unset"
 /// sentinel. Malformed `parent_span_id`s are counted under `span` (both are 8-byte
@@ -170,7 +170,7 @@ pub fn normalize_trace_ids(req: &mut ExportTraceServiceRequest) -> MalformedIds 
 }
 
 /// Ensure every span has a usable `start_time_unix_nano` before flattening — the
-/// traces analog of [`crate::logs::normalize_log_timestamps`]. Spans have no
+/// traces analog of [`crate::logs::normalize_log_request`]. Spans have no
 /// observed-time fallback, so a zero start is synthesized from `fallback_base_ns + k`
 /// (strictly increasing per frame, preserving intra-frame order). The resolved value
 /// is written back into `start_time_unix_nano`; `SpanRecord.ts` reads it. Callers

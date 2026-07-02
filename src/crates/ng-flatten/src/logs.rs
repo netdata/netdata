@@ -105,7 +105,7 @@ pub fn flatten_log_into(
                     // ordering sane.
                     ts: i64::try_from(r.time_unix_nano).unwrap_or(i64::MAX),
                     observed_ts: i64::try_from(r.observed_time_unix_nano).unwrap_or(i64::MAX),
-                    // Ingest normalization (normalize_log_ids) already cleared any
+                    // Ingest normalization (normalize_log_request) already cleared any
                     // wrong-length id to empty → from_bytes(empty) → UNSET.
                     trace_id: TraceId::from_bytes(&r.trace_id).unwrap_or_default(),
                     span_id: SpanId::from_bytes(&r.span_id).unwrap_or_default(),
@@ -121,53 +121,47 @@ pub fn flatten_log_into(
     resources
 }
 
-/// Drop malformed trace/span ids at the ingest boundary. A non-empty id whose
-/// length is not the spec width is **cleared** (set to absent, which the SFST
-/// column later stores as the all-zero "unset/invalid" sentinel); conformant ids
-/// (16/8 bytes) and absent ids (empty) pass through untouched. Returns the counts
-/// so the caller can log one aggregated warning per request (avoids per-record
-/// log floods).
-///
-/// The caller MUST run this (and [`normalize_log_timestamps`]) before
-/// [`flatten_log_request`]: trace/span ids become fixed-stride per-row SFST columns,
-/// so a wrong-length id must be cleared first. Shared by `ng-ingest` and the
-/// production OTel-logs ingestor.
-pub fn normalize_log_ids(req: &mut ExportLogsServiceRequest) -> MalformedIds {
-    let mut bad = MalformedIds::default();
-    for rl in &mut req.resource_logs {
-        for sl in &mut rl.scope_logs {
-            for r in &mut sl.log_records {
-                if !r.trace_id.is_empty() && r.trace_id.len() != TRACE_ID_LEN {
-                    r.trace_id.clear();
-                    bad.trace += 1;
-                }
-                if !r.span_id.is_empty() && r.span_id.len() != SPAN_ID_LEN {
-                    r.span_id.clear();
-                    bad.span += 1;
-                }
-            }
-        }
-    }
-    bad
+/// What one [`normalize_log_request`] walk observed and fixed across a request.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct LogNormalization {
+    /// Malformed (non-empty, wrong-length) trace/span ids cleared to absent.
+    pub bad_ids: MalformedIds,
+    /// Total log records in the request.
+    pub records: usize,
+    /// `(min, max)` of the **resolved** per-record `time_unix_nano` — the WAL
+    /// frame's log-data time range. `None` when the request has no records.
+    pub ts_range: Option<(u64, u64)>,
 }
 
-/// Ensure every log record has a usable `time_unix_nano` before flattening, applying
-/// the OTLP single-timestamp rule at the observation point: keep `time_unix_nano` if
-/// set, else fall back to `observed_time_unix_nano`, else synthesize one from
-/// `fallback_base_ns` (typically the frame's ingestion timestamp).
+/// Normalize a logs request in place before flattening — ONE walk over every
+/// record that:
 ///
-/// The resolved value is written into `time_unix_nano` (not `observed_time_unix_nano`);
-/// `Record.ts` is read straight from it. The synthesized fallback is
-/// `fallback_base_ns + k` for the k-th timestamp-less record — strictly increasing, so
-/// intra-frame ordering is preserved, **without** touching a shared clock per record
-/// (the caller takes a single clock tick for the base, so concurrent ingest doesn't
-/// serialize on the clock for the whole pass). These synthetic values are only used for
-/// records lacking both event and observed time; they are not globally unique across
-/// frames (acceptable — they tie-break deterministically). The caller MUST run this
-/// before [`flatten_log_request`]. Shared by `ng-ingest` and the production OTel-logs
-/// ingestor.
-pub fn normalize_log_timestamps(req: &mut ExportLogsServiceRequest, fallback_base_ns: u64) {
+/// 1. **Resolves timestamps** by the OTLP single-timestamp rule: keep
+///    `time_unix_nano` if set, else fall back to `observed_time_unix_nano`,
+///    else synthesize `fallback_base_ns + k` for the k-th timestamp-less
+///    record (strictly increasing, so intra-frame ordering is preserved
+///    without touching a shared clock per record; not globally unique across
+///    frames — they tie-break deterministically). The resolved value is
+///    written into `time_unix_nano`; `Record.ts` is read straight from it.
+/// 2. **Clears malformed trace/span ids**: a non-empty id whose length is not
+///    the spec width becomes absent (the SFST id columns later store it as the
+///    all-zero "unset" sentinel); conformant and absent ids pass untouched.
+///
+/// Returns [`LogNormalization`]: the cleared-id counts (for one aggregated
+/// warning per request), the record count, and the `(min, max)` of the
+/// resolved timestamps — computed here, from the same resolution the rows
+/// store, so the frame's time range can never drift from the rows' `ts`.
+///
+/// The caller MUST run this before [`flatten_log_request`]. Shared by
+/// `ng-ingest` and the production OTel-logs ingestor.
+pub fn normalize_log_request(
+    req: &mut ExportLogsServiceRequest,
+    fallback_base_ns: u64,
+) -> LogNormalization {
+    let mut out = LogNormalization::default();
     let mut fallback_offset: u64 = 0;
+    let mut min = u64::MAX;
+    let mut max = 0u64;
     for rl in &mut req.resource_logs {
         for sl in &mut rl.scope_logs {
             for r in &mut sl.log_records {
@@ -179,14 +173,29 @@ pub fn normalize_log_timestamps(req: &mut ExportLogsServiceRequest, fallback_bas
                         fallback_base_ns.saturating_add(fallback_offset)
                     };
                 }
+                if !r.trace_id.is_empty() && r.trace_id.len() != TRACE_ID_LEN {
+                    r.trace_id.clear();
+                    out.bad_ids.trace += 1;
+                }
+                if !r.span_id.is_empty() && r.span_id.len() != SPAN_ID_LEN {
+                    r.span_id.clear();
+                    out.bad_ids.span += 1;
+                }
+                out.records += 1;
+                min = min.min(r.time_unix_nano);
+                max = max.max(r.time_unix_nano);
             }
         }
     }
+    if out.records > 0 {
+        out.ts_range = Some((min, max));
+    }
+    out
 }
 
 /// Flatten a request into its own per-frame tree (convenience over [`flatten_log_into`])
 /// — the form stored in a flattened WAL frame. Callers MUST normalize record
-/// timestamps first (see [`normalize_log_timestamps`] / [`Record`]); a record with
+/// timestamps first (see [`normalize_log_request`] / [`Record`]); a record with
 /// `time_unix_nano == 0` flattens to `ts == 0`.
 ///
 /// Also returns the number of attribute keys sanitized (`'='` → `'_'`, the
@@ -203,6 +212,65 @@ pub fn flatten_log_request(request: &ExportLogsServiceRequest) -> (FlattenedLogR
         },
         sanitized_keys,
     )
+}
+
+/// A logs request fully prepared for a WAL frame — the output of
+/// [`prepare_log_frame`], everything a writer needs to append the frame.
+#[derive(Debug, Clone)]
+pub struct PreparedLogFrame {
+    /// The bincode-encoded flattened-frame payload.
+    pub data: Vec<u8>,
+    /// Total log records in the frame.
+    pub records: usize,
+    /// `(min, max)` of the resolved log timestamps — the frame's log-data
+    /// time range. `None` iff `records == 0`.
+    pub ts_range: Option<(u64, u64)>,
+    /// Malformed trace/span ids cleared during normalization (already warned).
+    pub bad_ids: MalformedIds,
+    /// Attribute keys sanitized (`'='` → `'_'`) during flattening (already
+    /// warned).
+    pub sanitized_keys: u64,
+}
+
+/// The single owner of the logs frame-payload recipe: normalize (ONE record
+/// walk — [`normalize_log_request`]) → flatten ([`flatten_log_request`]) →
+/// pre-compute entry hashes ([`fill_log_hashes`]) → bincode-encode
+/// ([`encode_log_frame`]). Shared by `ng-ingest` and the production OTel-logs
+/// ingestor so the recipe exists exactly once.
+///
+/// Logs the aggregated per-request warnings itself (cleared malformed ids,
+/// sanitized `'='` keys) — one owner for the message text too; the counts are
+/// still returned for callers that want them.
+pub fn prepare_log_frame(
+    req: &mut ExportLogsServiceRequest,
+    fallback_base_ns: u64,
+) -> Result<PreparedLogFrame, bincode::error::EncodeError> {
+    let norm = normalize_log_request(req, fallback_base_ns);
+    if norm.bad_ids.any() {
+        tracing::warn!(
+            bad_trace_ids = norm.bad_ids.trace,
+            bad_span_ids = norm.bad_ids.span,
+            "dropped malformed trace/span ids at ingest (expected {}/{} bytes); stored as zero",
+            TRACE_ID_LEN,
+            SPAN_ID_LEN,
+        );
+    }
+    let (mut flattened, sanitized_keys) = flatten_log_request(req);
+    if sanitized_keys > 0 {
+        tracing::warn!(
+            sanitized_keys,
+            "rewrote '=' to '_' in attribute keys at ingest ('=' is the key=value delimiter)",
+        );
+    }
+    fill_log_hashes(&mut flattened);
+    let data = encode_log_frame(&flattened)?;
+    Ok(PreparedLogFrame {
+        data,
+        records: norm.records,
+        ts_range: norm.ts_range,
+        bad_ids: norm.bad_ids,
+        sanitized_keys,
+    })
 }
 
 /// Fill every entry's `hash` with `xxhash64(key=value)` so the index build can ride

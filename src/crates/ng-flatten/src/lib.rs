@@ -671,13 +671,54 @@ mod tests {
                 ..Default::default()
             },
         ]);
-        normalize_log_timestamps(&mut req, 1000);
+        let norm = normalize_log_request(&mut req, 1000);
         let ts: Vec<u64> = req.resource_logs[0].scope_logs[0]
             .log_records
             .iter()
             .map(|r| r.time_unix_nano)
             .collect();
         assert_eq!(ts, vec![100, 77, 1001, 1002]);
+        assert_eq!(norm.records, 4);
+        // The frame range is min/max of the RESOLVED timestamps — the same
+        // values the rows store, by construction.
+        assert_eq!(norm.ts_range, Some((77, 1002)));
+    }
+
+    #[test]
+    fn normalize_ts_range_spans_resource_logs_and_is_none_when_empty() {
+        // Range aggregates across ResourceLogs/ScopeLogs boundaries.
+        let mut req = ExportLogsServiceRequest {
+            resource_logs: vec![
+                req_of(vec![LogRecord {
+                    time_unix_nano: 500,
+                    ..Default::default()
+                }])
+                .resource_logs
+                .remove(0),
+                req_of(vec![
+                    LogRecord {
+                        time_unix_nano: 90,
+                        ..Default::default()
+                    },
+                    LogRecord {
+                        time_unix_nano: 700,
+                        ..Default::default()
+                    },
+                ])
+                .resource_logs
+                .remove(0),
+            ],
+        };
+        let norm = normalize_log_request(&mut req, 1000);
+        assert_eq!(norm.records, 3);
+        assert_eq!(norm.ts_range, Some((90, 700)));
+
+        // No records: no range, nothing counted.
+        let mut empty = ExportLogsServiceRequest::default();
+        let norm = normalize_log_request(&mut empty, 1000);
+        assert_eq!(norm.records, 0);
+        assert_eq!(norm.ts_range, None);
+        assert!(!norm.bad_ids.any());
     }
 
     #[test]
@@ -702,7 +743,8 @@ mod tests {
                 ..Default::default()
             },
         ]);
-        let bad = normalize_log_ids(&mut req);
+        let norm = normalize_log_request(&mut req, 1000);
+        let bad = norm.bad_ids;
         assert_eq!((bad.trace, bad.span), (1, 1));
         assert!(bad.any());
         let recs = &req.resource_logs[0].scope_logs[0].log_records;

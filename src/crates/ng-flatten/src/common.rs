@@ -554,7 +554,7 @@ macro_rules! id_newtype {
             /// Parse **exactly** `$width` bytes; `None` for any other length. An
             /// empty/wrong-length id is the caller's to map (commonly
             /// `.unwrap_or_default()` → [`UNSET`](Self::UNSET)). Ingest normalization
-            /// (`normalize_log_ids`/`normalize_trace_ids`) already clears
+            /// (`normalize_log_request`/`normalize_trace_ids`) already clears
             /// wrong-length ids to empty, so a conformant id round-trips.
             pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
                 <[u8; $width]>::try_from(bytes).ok().map(Self)

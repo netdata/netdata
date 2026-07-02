@@ -137,7 +137,22 @@ fn request_roundtrips_through_a_wal_frame() {
     let written = write_request(&mut writer, &mut clock, &mut original).unwrap();
     assert_eq!(written, count_log_records(&original));
     assert_eq!(written, 2);
-    writer.shutdown_all().unwrap();
+    let events = writer.shutdown_all().unwrap();
+
+    // The frame carries the real resolved log-data time range (both sample
+    // records share one event timestamp), surfaced in the file's Closed event.
+    let ts = file_registry::TimestampNs(1_700_000_000_000_000_000);
+    assert!(
+        events.iter().any(|e| matches!(
+            e,
+            wal::FileEvent::Closed {
+                min_timestamp_ns,
+                max_timestamp_ns,
+                ..
+            } if *min_timestamp_ns == ts && *max_timestamp_ns == ts
+        )),
+        "Closed event must carry the resolved log-data range"
+    );
 
     // Frames are LZ4-compressed; `wal::Reader` decompresses transparently. The
     // payload is now a bincode `FlattenedLogRequest`, not protobuf.

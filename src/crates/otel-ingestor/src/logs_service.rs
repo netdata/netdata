@@ -61,58 +61,6 @@ fn count_log_records(rl: &ResourceLogs) -> usize {
     rl.scope_logs.iter().map(|sl| sl.log_records.len()).sum()
 }
 
-/// Compute the `(min, max)` log-data time range for a group of `ResourceLogs`.
-///
-/// Mirrors the OTel timestamp hierarchy applied at ingest by
-/// [`ng_flatten::normalize_log_timestamps`], so the WAL's accumulated range
-/// matches the per-row `Record.ts` the indexer will eventually fold into
-/// the file's SFST summary:
-///
-/// 1. `time_unix_nano` (event time) when non-zero.
-/// 2. `observed_time_unix_nano` when `time_unix_nano` is zero or missing.
-/// 3. `ingestion_ns + row_idx` as the last-resort fallback, where
-///    `row_idx` is the row's position across all `ResourceLogs` in the
-///    group. This matches the indexer's tier-3 behaviour exactly.
-///
-/// # Panics
-///
-/// Panics if `rls` carries zero log records. Callers in `export()` are
-/// guaranteed to hand in a non-empty group: `export()` filters
-/// `ResourceLogs` with no records and short-circuits when no accepted
-/// group remains, so by the time this function runs, every group has at
-/// least one row.
-fn compute_log_ts_range(
-    rls: &[ResourceLogs],
-    ingestion_ns: file_registry::TimestampNs,
-) -> (file_registry::TimestampNs, file_registry::TimestampNs) {
-    let mut min: Option<u64> = None;
-    let mut max: Option<u64> = None;
-    let mut row_idx: u64 = 0;
-
-    for rl in rls {
-        for sl in &rl.scope_logs {
-            for lr in &sl.log_records {
-                let ts = if lr.time_unix_nano != 0 {
-                    lr.time_unix_nano
-                } else if lr.observed_time_unix_nano != 0 {
-                    lr.observed_time_unix_nano
-                } else {
-                    ingestion_ns.0 + row_idx
-                };
-                row_idx += 1;
-                min = Some(min.map_or(ts, |m| m.min(ts)));
-                max = Some(max.map_or(ts, |m| m.max(ts)));
-            }
-        }
-    }
-
-    let expect_msg = "at least one log record";
-    (
-        file_registry::TimestampNs(min.expect(expect_msg)),
-        file_registry::TimestampNs(max.expect(expect_msg)),
-    )
-}
-
 /// One collision: a request group whose stream identity doesn't match the
 /// canonical stream already registered for its `ns_hash`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -130,7 +78,10 @@ struct StreamGroup {
     resource_logs: Vec<ResourceLogs>,
 }
 
-/// Group `ResourceLogs` by their [`ServiceStream`] identity.
+/// Group `ResourceLogs` by their [`ServiceStream`] identity. A `ResourceLogs`
+/// carrying zero log records contributes nothing (no group, no identity
+/// registration) — this is the single owner of the emptiness rule, so a
+/// request of only-empty `ResourceLogs` yields an empty map.
 ///
 /// In normal operation, all `ResourceLogs` in a request from a single
 /// service share the same stream. Streams whose `ns_hash` collides (a real
@@ -139,8 +90,11 @@ struct StreamGroup {
 fn group_by_stream(resource_logs: Vec<ResourceLogs>) -> HashMap<ServiceStream, StreamGroup> {
     let mut groups: HashMap<ServiceStream, StreamGroup> = HashMap::new();
     for rl in resource_logs {
-        let stream = extract_stream(&rl);
         let count = count_log_records(&rl);
+        if count == 0 {
+            continue;
+        }
+        let stream = extract_stream(&rl);
         let group = groups.entry(stream).or_insert_with(|| StreamGroup {
             log_record_count: 0,
             resource_logs: Vec::new(),
@@ -151,20 +105,31 @@ fn group_by_stream(resource_logs: Vec<ResourceLogs>) -> HashMap<ServiceStream, S
     groups
 }
 
-/// Result of running the collision check across a request's groups.
+/// One storable stream flowing through the identity → collision → write
+/// stages: the stream, its `part_key` (its `ns_hash`, computed once), the
+/// encoded `content_meta` blob, and the grouped logs. Built by the identity
+/// gate so later stages read fields instead of re-deriving or re-looking-up.
+struct StorableStream {
+    stream: ServiceStream,
+    part_key: u64,
+    content_meta: Vec<u8>,
+    group: StreamGroup,
+}
+
+/// Result of running the collision check across a request's storable streams.
 struct CollisionCheck {
-    accepted: Vec<(ServiceStream, StreamGroup)>,
+    accepted: Vec<StorableStream>,
     collisions: Vec<Collision>,
 }
 
-/// Reconcile a request's groups against the canonical-stream table.
+/// Reconcile a request's storable streams against the canonical-stream table.
 ///
-/// For each group:
-/// - If the table has no entry for `ns_hash`, register the group's stream
-///   as canonical and accept the group.
-/// - If the entry matches the group's stream, accept.
-/// - If the entry mismatches, reject the group as a collision and record
-///   it for the response's `partial_success`.
+/// For each stream (keyed by its carried `part_key`, the `ns_hash`):
+/// - If the table has no entry for the hash, register the stream as
+///   canonical and accept it.
+/// - If the entry matches the stream, accept.
+/// - If the entry mismatches, reject as a collision and record it for the
+///   response's `partial_success`.
 ///
 /// Pure with respect to the I/O of the gRPC handler — the only side
 /// effect is mutating the canonical table. Extracted from `export` so it
@@ -172,28 +137,27 @@ struct CollisionCheck {
 fn check_collisions(
     canonical: &mut HashMap<(TenantId, u64), ServiceStream>,
     tenant_id: &TenantId,
-    groups: HashMap<ServiceStream, StreamGroup>,
+    streams: Vec<StorableStream>,
 ) -> CollisionCheck {
     let mut accepted = Vec::new();
     let mut collisions = Vec::new();
 
-    for (stream, group) in groups {
-        let hash = stream.ns_hash();
-        let key = (tenant_id.clone(), hash);
+    for s in streams {
+        let key = (tenant_id.clone(), s.part_key);
         match canonical.entry(key) {
             Entry::Vacant(e) => {
-                e.insert(stream.clone());
-                accepted.push((stream, group));
+                e.insert(s.stream.clone());
+                accepted.push(s);
             }
-            Entry::Occupied(e) if *e.get() == stream => {
-                accepted.push((stream, group));
+            Entry::Occupied(e) if *e.get() == s.stream => {
+                accepted.push(s);
             }
             Entry::Occupied(e) => {
                 collisions.push(Collision {
-                    hash,
+                    hash: s.part_key,
                     canonical: e.get().clone(),
-                    rejected: stream,
-                    rejected_log_records: group.log_record_count,
+                    rejected: s.stream,
+                    rejected_log_records: s.group.log_record_count,
                 });
             }
         }
@@ -308,6 +272,16 @@ fn format_rejection_error(collisions: &[Collision], oversized: &[OversizedDrop])
     sections.join(" | ")
 }
 
+/// Max chars of an attacker-controlled identity field to echo into a
+/// drop-frame log line. `service.namespace`/`service.name` come straight from
+/// OTLP resource attributes and can be up to 64 KiB; cap the preview so a
+/// pathological identity can't inflate log volume.
+const IDENTITY_LOG_PREVIEW_CHARS: usize = 64;
+
+fn identity_preview(s: &str) -> String {
+    s.chars().take(IDENTITY_LOG_PREVIEW_CHARS).collect()
+}
+
 fn extract_tenant_id(
     metadata: &tonic::metadata::MetadataMap,
     auth: &AuthConfig,
@@ -324,16 +298,6 @@ fn extract_tenant_id(
     // The id policy (strict: becomes a directory name) lives on the
     // type; this layer only maps the reason onto the transport error.
     TenantId::validate_ingest(tenant).map_err(Status::invalid_argument)
-}
-
-/// Max chars of an attacker-controlled identity field to echo into a
-/// drop-frame log line. `service.namespace`/`service.name` come straight from
-/// OTLP resource attributes and can be up to 64 KiB; cap the preview so a
-/// pathological identity can't inflate log volume.
-const IDENTITY_LOG_PREVIEW_CHARS: usize = 64;
-
-fn identity_preview(s: &str) -> String {
-    s.chars().take(IDENTITY_LOG_PREVIEW_CHARS).collect()
 }
 
 pub struct NetdataLogsService {
@@ -450,7 +414,7 @@ fn encode_identity_or_drop(
 
 #[tonic::async_trait]
 impl LogsService for NetdataLogsService {
-    #[tracing::instrument(skip_all, fields(received_logs))]
+    #[tracing::instrument(skip_all)]
     async fn export(
         &self,
         request: Request<ExportLogsServiceRequest>,
@@ -458,20 +422,15 @@ impl LogsService for NetdataLogsService {
         let tenant_id = extract_tenant_id(request.metadata(), &self.auth)?;
         let req = request.into_inner();
 
-        // Drop ResourceLogs that carry zero log records.
-        let resource_logs: Vec<ResourceLogs> = req
-            .resource_logs
-            .into_iter()
-            .filter(|rl| count_log_records(rl) > 0)
-            .collect();
+        // Empty `ResourceLogs` contribute nothing (group_by_stream owns that
+        // rule), so an all-empty request yields no groups.
+        let groups = group_by_stream(req.resource_logs);
 
-        if resource_logs.is_empty() {
+        if groups.is_empty() {
             return Ok(Response::new(ExportLogsServiceResponse {
                 partial_success: None,
             }));
         }
-
-        let groups = group_by_stream(resource_logs);
 
         // Validate identity encodability BEFORE the collision check mutates the
         // canonical table. An oversized identity is unstorable, so it must not
@@ -479,17 +438,20 @@ impl LogsService for NetdataLogsService {
         // valid stream colliding on that hash would be rejected against a stream
         // that was never persisted. Drop+report such streams up front; this also
         // frees the (attacker-controlled) oversized strings immediately. The
-        // surviving `content_meta` blobs are reused at write time (no re-encode).
+        // surviving streams carry their `part_key` + encoded `content_meta`
+        // through the collision check to the write loop (no re-derive, no
+        // side-map).
         let mut oversized: Vec<OversizedDrop> = Vec::new();
-        let mut content_meta_by_stream: HashMap<ServiceStream, Vec<u8>> = HashMap::new();
-        let storable: HashMap<ServiceStream, StreamGroup> = groups
+        let storable: Vec<StorableStream> = groups
             .into_iter()
             .filter_map(|(stream, group)| {
                 match encode_identity_or_drop(&stream, group.log_record_count) {
-                    Ok(content_meta) => {
-                        content_meta_by_stream.insert(stream.clone(), content_meta);
-                        Some((stream, group))
-                    }
+                    Ok(content_meta) => Some(StorableStream {
+                        part_key: otel_logs_identity::part_key(&stream),
+                        stream,
+                        content_meta,
+                        group,
+                    }),
                     Err(drop) => {
                         oversized.push(drop);
                         None
@@ -544,64 +506,40 @@ impl LogsService for NetdataLogsService {
             writers.entry(tenant_id.clone()).or_insert(w)
         };
 
-        for (stream, group) in accepted {
-            // Identity was validated up front (before the collision check); reuse
-            // the `part_key` + the already-encoded `content_meta` blob recorded
-            // there. `accepted ⊆ storable`, so the lookup is always present.
-            let part_key = otel_logs_identity::part_key(&stream);
-            let content_meta = content_meta_by_stream
-                .get(&stream)
-                .expect("accepted stream was validated and its content_meta recorded");
-
-            // Wrap the group's logs into a request so the shared `ng-flatten`
-            // normalization runs once, in place, before flattening: timestamps are
-            // resolved (event→observed→clock) and frozen into each record's
-            // `time_unix_nano` (the SFST stores `Record.ts` straight from it), and
-            // malformed trace/span ids are cleared so the fixed-stride per-row id
-            // columns stay well-formed.
-            let count = group.log_record_count;
+        for s in accepted {
             let mut request = ExportLogsServiceRequest {
-                resource_logs: group.resource_logs,
+                resource_logs: s.group.resource_logs,
             };
 
-            // One clock tick per frame for the WAL frame header (`ingestion_ns`) and
-            // `compute_log_ts_range` (which now matches the per-row `Record.ts`
-            // numerically). The tick doubles as the base for any synthesized
-            // fallback timestamps, so normalization runs lock-free — concurrent
-            // ingest doesn't serialize on the process-wide clock for the whole pass.
+            // One clock tick per frame: the WAL frame header's `ingestion_ns`,
+            // doubling as the base for any synthesized fallback timestamps —
+            // so the shared frame preparation runs lock-free and concurrent
+            // ingest doesn't serialize on the process-wide clock for the whole
+            // pass.
             let ingestion_ns = self.clock.lock().unwrap().now_ns();
-            ng_flatten::normalize_log_timestamps(&mut request, ingestion_ns.as_u64());
-            let bad_ids = ng_flatten::normalize_log_ids(&mut request);
-            if bad_ids.any() {
-                tracing::warn!(
-                    bad_trace_ids = bad_ids.trace,
-                    bad_span_ids = bad_ids.span,
-                    "dropped malformed trace/span ids at ingest (expected {}/{} bytes); stored as zero",
-                    ng_flatten::TRACE_ID_LEN,
-                    ng_flatten::SPAN_ID_LEN,
-                );
-            }
-            let (log_min_ts, log_max_ts) =
-                compute_log_ts_range(&request.resource_logs, ingestion_ns);
-            let (mut flattened, sanitized_keys) = ng_flatten::flatten_log_request(&request);
-            if sanitized_keys > 0 {
-                tracing::warn!(
-                    sanitized_keys,
-                    "rewrote '=' to '_' in attribute keys at ingest ('=' is the key=value delimiter)",
-                );
-            }
-            ng_flatten::fill_log_hashes(&mut flattened);
-            let data = ng_flatten::encode_log_frame(&flattened).map_err(|e| {
-                tracing::error!(%e, "failed to encode flattened frame");
-                Status::internal("flatten encode error")
-            })?;
+            let frame = ng_flatten::prepare_log_frame(&mut request, ingestion_ns.as_u64())
+                .map_err(|e| {
+                    tracing::error!(%e, "failed to encode flattened frame");
+                    Status::internal("flatten encode error")
+                })?;
+            // Accepted groups carry at least one record (empty `ResourceLogs`
+            // are filtered before grouping), so the range is always present.
+            let (log_min_ts, log_max_ts) = frame
+                .ts_range
+                .map(|(min, max)| {
+                    (
+                        file_registry::TimestampNs(min),
+                        file_registry::TimestampNs(max),
+                    )
+                })
+                .expect("accepted group has at least one log record");
 
             writer
                 .write_frame(
-                    part_key,
-                    content_meta,
-                    &data,
-                    count,
+                    s.part_key,
+                    &s.content_meta,
+                    &frame.data,
+                    frame.records,
                     ingestion_ns,
                     log_min_ts,
                     log_max_ts,
@@ -632,23 +570,6 @@ mod tests {
     use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue};
     use opentelemetry_proto::tonic::logs::v1::{LogRecord, ScopeLogs};
     use opentelemetry_proto::tonic::resource::v1::Resource;
-
-    /// Build a `ResourceLogs` with `log_count` records, each carrying the
-    /// timestamps from the corresponding `(time_unix_nano, observed_time_unix_nano)`
-    /// pair in `tss`.
-    fn rl_with_ts(namespace: Option<&str>, name: Option<&str>, tss: &[(u64, u64)]) -> ResourceLogs {
-        let mut base = rl(namespace, name, 0);
-        let records: Vec<LogRecord> = tss
-            .iter()
-            .map(|&(t, ot)| LogRecord {
-                time_unix_nano: t,
-                observed_time_unix_nano: ot,
-                ..LogRecord::default()
-            })
-            .collect();
-        base.scope_logs[0].log_records = records;
-        base
-    }
 
     fn rl(namespace: Option<&str>, name: Option<&str>, log_count: usize) -> ResourceLogs {
         let mut attrs = Vec::new();
@@ -685,128 +606,6 @@ mod tests {
 
     fn tenant() -> TenantId {
         TenantId::from("t1")
-    }
-
-    /// All compute_log_ts_range tests use a fixed ingestion_ns far
-    /// outside the range of "real" timestamps in the fixtures so it's
-    /// easy to tell tier-3 fallback values apart from the rows' own.
-    const TEST_INGESTION_NS: u64 = 1_000_000;
-
-    fn ingestion() -> file_registry::TimestampNs {
-        file_registry::TimestampNs(TEST_INGESTION_NS)
-    }
-
-    #[test]
-    fn compute_log_ts_range_uses_time_unix_nano_first() {
-        let rls = vec![rl_with_ts(
-            Some("prod"),
-            Some("api"),
-            &[(100, 999), (200, 999), (50, 999)],
-        )];
-        let (min, max) = compute_log_ts_range(&rls, ingestion());
-        assert_eq!(min, file_registry::TimestampNs(50));
-        assert_eq!(max, file_registry::TimestampNs(200));
-    }
-
-    #[test]
-    fn compute_log_ts_range_falls_back_to_observed() {
-        let rls = vec![rl_with_ts(
-            Some("prod"),
-            Some("api"),
-            &[(0, 100), (0, 300), (0, 200)],
-        )];
-        let (min, max) = compute_log_ts_range(&rls, ingestion());
-        assert_eq!(min, file_registry::TimestampNs(100));
-        assert_eq!(max, file_registry::TimestampNs(300));
-    }
-
-    #[test]
-    fn compute_log_ts_range_synthesizes_fallback_per_row() {
-        // Two rows with explicit timestamps, two without. The two
-        // missing rows must get `ingestion_ns + row_idx` (their position
-        // across the whole iteration), exactly mirroring the indexer's
-        // tier-3 fallback. row_idx values: 0, 1, 2, 3.
-        // Rows: (0,0)→fallback at 1_000_000+0
-        //       (100,0)→100
-        //       (0,0)→fallback at 1_000_000+2
-        //       (50,0)→50
-        let rls = vec![rl_with_ts(
-            Some("prod"),
-            Some("api"),
-            &[(0, 0), (100, 0), (0, 0), (50, 0)],
-        )];
-        let (min, max) = compute_log_ts_range(&rls, ingestion());
-        assert_eq!(min, file_registry::TimestampNs(50));
-        assert_eq!(max, file_registry::TimestampNs(TEST_INGESTION_NS + 2));
-    }
-
-    #[test]
-    fn compute_log_ts_range_all_missing_uses_ingestion_plus_row_idx() {
-        // No row carries a timestamp. The synthesized fallbacks span
-        // [ingestion_ns, ingestion_ns + N - 1] for N rows.
-        let rls = vec![rl_with_ts(Some("prod"), Some("api"), &[(0, 0); 5])];
-        let (min, max) = compute_log_ts_range(&rls, ingestion());
-        assert_eq!(min, file_registry::TimestampNs(TEST_INGESTION_NS));
-        assert_eq!(max, file_registry::TimestampNs(TEST_INGESTION_NS + 4));
-    }
-
-    #[test]
-    #[should_panic(expected = "at least one log record")]
-    fn compute_log_ts_range_panics_on_empty_input() {
-        // The function's precondition is documented and codified at
-        // every call site (see the `debug_assert!` in `export()`). The
-        // panic guards against silent breakage if a future caller ever
-        // hands in an empty group.
-        let rls: Vec<ResourceLogs> = Vec::new();
-        let _ = compute_log_ts_range(&rls, ingestion());
-    }
-
-    #[test]
-    #[should_panic(expected = "at least one log record")]
-    fn compute_log_ts_range_panics_when_all_resource_logs_have_no_records() {
-        // Same precondition: a group of `ResourceLogs` whose `scope_logs`
-        // are all empty also has zero log records and must not reach
-        // this function.
-        let rls = vec![rl(Some("prod"), Some("api"), 0)];
-        let _ = compute_log_ts_range(&rls, ingestion());
-    }
-
-    #[test]
-    fn compute_log_ts_range_mixes_time_and_observed_per_row() {
-        // Row 1 uses time_unix_nano=200; row 2 falls back to observed=50.
-        let rls = vec![rl_with_ts(
-            Some("prod"),
-            Some("api"),
-            &[(200, 999), (0, 50)],
-        )];
-        let (min, max) = compute_log_ts_range(&rls, ingestion());
-        assert_eq!(min, file_registry::TimestampNs(50));
-        assert_eq!(max, file_registry::TimestampNs(200));
-    }
-
-    #[test]
-    fn compute_log_ts_range_aggregates_across_resource_logs() {
-        let rls = vec![
-            rl_with_ts(Some("a"), Some("b"), &[(100, 0), (200, 0)]),
-            rl_with_ts(Some("c"), Some("d"), &[(50, 0), (300, 0)]),
-        ];
-        let (min, max) = compute_log_ts_range(&rls, ingestion());
-        assert_eq!(min, file_registry::TimestampNs(50));
-        assert_eq!(max, file_registry::TimestampNs(300));
-    }
-
-    #[test]
-    fn compute_log_ts_range_row_idx_continues_across_resource_logs() {
-        // Indexer tier-3 increments row_idx across all rows in the
-        // group, not per-ResourceLogs. The fallback row in the second
-        // ResourceLogs must use row_idx = 2 (after two rows in rls[0]).
-        let rls = vec![
-            rl_with_ts(Some("a"), Some("b"), &[(100, 0), (200, 0)]),
-            rl_with_ts(Some("c"), Some("d"), &[(0, 0)]),
-        ];
-        let (min, max) = compute_log_ts_range(&rls, ingestion());
-        assert_eq!(min, file_registry::TimestampNs(100));
-        assert_eq!(max, file_registry::TimestampNs(TEST_INGESTION_NS + 2));
     }
 
     #[test]
@@ -852,15 +651,42 @@ mod tests {
     }
 
     #[test]
+    fn group_skips_resource_logs_with_no_records() {
+        // Emptiness is owned here: an empty ResourceLogs creates no group
+        // (and never registers a stream identity); an all-empty request
+        // grinds down to an empty map.
+        let groups = group_by_stream(vec![
+            rl(Some("prod"), Some("api"), 2),
+            rl(Some("prod"), Some("ghost"), 0),
+        ]);
+        assert_eq!(groups.len(), 1);
+        assert!(!groups.contains_key(&ServiceStream::new("prod", "ghost")));
+        assert!(group_by_stream(vec![rl(Some("p"), Some("q"), 0)]).is_empty());
+    }
+
+    /// Lift grouped streams into the storable form the collision check
+    /// consumes, mirroring the identity gate (no oversized identities in
+    /// these fixtures).
+    fn storable(groups: HashMap<ServiceStream, StreamGroup>) -> Vec<StorableStream> {
+        groups
+            .into_iter()
+            .map(|(stream, group)| StorableStream {
+                part_key: otel_logs_identity::part_key(&stream),
+                content_meta: otel_logs_identity::encode_content_meta(&stream).unwrap(),
+                stream,
+                group,
+            })
+            .collect()
+    }
+
+    #[test]
     fn first_write_establishes_canonical_pair() {
         let mut canonical = HashMap::new();
         let groups = group_by_stream(vec![rl(Some("prod"), Some("api"), 4)]);
-        let r = check_collisions(&mut canonical, &tenant(), groups);
+        let r = check_collisions(&mut canonical, &tenant(), storable(groups));
         assert_eq!(r.accepted.len(), 1);
         assert!(r.collisions.is_empty());
-        let stream = canonical
-            .get(&(tenant(), r.accepted[0].0.ns_hash()))
-            .unwrap();
+        let stream = canonical.get(&(tenant(), r.accepted[0].part_key)).unwrap();
         assert_eq!(stream, &ServiceStream::new("prod", "api"));
     }
 
@@ -870,17 +696,17 @@ mod tests {
         let r1 = check_collisions(
             &mut canonical,
             &tenant(),
-            group_by_stream(vec![rl(Some("prod"), Some("api"), 1)]),
+            storable(group_by_stream(vec![rl(Some("prod"), Some("api"), 1)])),
         );
         assert!(r1.collisions.is_empty());
         let r2 = check_collisions(
             &mut canonical,
             &tenant(),
-            group_by_stream(vec![rl(Some("prod"), Some("api"), 7)]),
+            storable(group_by_stream(vec![rl(Some("prod"), Some("api"), 7)])),
         );
         assert!(r2.collisions.is_empty());
         assert_eq!(r2.accepted.len(), 1);
-        assert_eq!(r2.accepted[0].1.log_record_count, 7);
+        assert_eq!(r2.accepted[0].group.log_record_count, 7);
     }
 
     #[test]
@@ -908,7 +734,7 @@ mod tests {
             },
         );
 
-        let r = check_collisions(&mut canonical, &tenant(), groups);
+        let r = check_collisions(&mut canonical, &tenant(), storable(groups));
         assert!(r.accepted.is_empty());
         assert_eq!(r.collisions.len(), 1);
         let c = &r.collisions[0];
@@ -935,7 +761,7 @@ mod tests {
             },
         );
 
-        let _ = check_collisions(&mut canonical, &tenant(), groups);
+        let _ = check_collisions(&mut canonical, &tenant(), storable(groups));
         // The original canonical stream must remain unchanged.
         assert_eq!(canonical.get(&(tenant(), hash)).unwrap(), &canonical_stream);
     }
@@ -946,17 +772,17 @@ mod tests {
         let t1 = TenantId::from("t1");
         let t2 = TenantId::from("t2");
         let groups_t1 = group_by_stream(vec![rl(Some("prod"), Some("api"), 1)]);
-        let r1 = check_collisions(&mut canonical, &t1, groups_t1);
+        let r1 = check_collisions(&mut canonical, &t1, storable(groups_t1));
         assert!(r1.collisions.is_empty());
 
         // The same stream (hence the same ns_hash) in a different tenant
         // must be accepted as fresh, not flagged as a collision — the
         // tenant id is part of the canonical-table key.
         let groups_t2 = group_by_stream(vec![rl(Some("prod"), Some("api"), 1)]);
-        let r2 = check_collisions(&mut canonical, &t2, groups_t2);
+        let r2 = check_collisions(&mut canonical, &t2, storable(groups_t2));
         assert!(r2.collisions.is_empty());
         assert_eq!(r2.accepted.len(), 1);
-        assert_eq!(r1.accepted[0].0, r2.accepted[0].0);
+        assert_eq!(r1.accepted[0].stream, r2.accepted[0].stream);
     }
 
     /// Build a `NetdataLogsService` rooted at `wal_dir`. The
