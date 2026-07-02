@@ -132,7 +132,7 @@ Within seconds of connection, you'll experience the power of real-time observabi
 
 **Automatic Dashboards:**
 
-- **System Overview** - Fully automated dashboard showing all your nodes
+- **[System Overview](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md#system-overview)** - Fully automated dashboard summarizing each node's core system resources
 - **Nodes Tab** - Unified view of all infrastructure with key metrics
 - **Composite Charts** - Data from multiple nodes combined intelligently
 - **Real-Time Updates** - Every metric updates with 1-second granularity
