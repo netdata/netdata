@@ -39,14 +39,18 @@ void rrdlabels_aggregated_destroy(RRDLABELS_AGGREGATED *agg) {
         }
 
         // Free the values JudyL
+#ifndef OS_WINDOWS
         JudyLFreeArray(&values_judy, PJE0);
+#endif
         
         // Free the key STRING reference
         string_freez(key_string);
     }
 
     // Free the main JudyL
+#ifndef OS_WINDOWS
     JudyLFreeArray(&agg->keys_judy, PJE0);
+#endif
     
     freez(agg);
 }

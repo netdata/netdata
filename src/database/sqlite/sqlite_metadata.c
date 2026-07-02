@@ -355,7 +355,9 @@ static void ctx_get_context_list_to_cleanup(nd_uuid_t *host_uuid, void (*cleanup
             string_freez(ctx);
         }
     }
+#ifndef OS_WINDOWS
     (void)JudyLFreeArray(&CTX_JudyL, PJE0);
+#endif
 
 done:
     REPORT_BIND_FAIL(res, param);
@@ -594,8 +596,14 @@ done:
 
 static void recover_database(const char *sqlite_database, const char *new_sqlite_database)
 {
+    // UCRT64 SQLite and rename() both require native Windows paths.
+    char native_src[FILENAME_MAX + 1];
+    char native_dst[FILENAME_MAX + 1];
+    os_translate_path(native_src, sqlite_database, sizeof(native_src));
+    os_translate_path(native_dst, new_sqlite_database, sizeof(native_dst));
+
     sqlite3 *database;
-    int rc = sqlite3_open(sqlite_database, &database);
+    int rc = sqlite3_open(native_src, &database);
     if (rc != SQLITE_OK)
         return;
 
@@ -605,7 +613,7 @@ static void recover_database(const char *sqlite_database, const char *new_sqlite
     // This will remove the -shm and -wal files when we close the database
     (void)db_execute(database, "select count(*) from sqlite_master limit 0", NULL);
 
-    sqlite3_recover *recover = sqlite3_recover_init(database, "main", new_sqlite_database);
+    sqlite3_recover *recover = sqlite3_recover_init(database, "main", native_dst);
     if (recover) {
 
         rc = sqlite3_recover_run(recover);
@@ -620,7 +628,7 @@ static void recover_database(const char *sqlite_database, const char *new_sqlite
         (void) sqlite3_close_v2(database);
 
         if (rc == SQLITE_OK) {
-            rc = rename(new_sqlite_database, sqlite_database);
+            rc = rename(native_dst, native_src);
             if (rc == 0) {
                 netdata_log_info("Renamed %s", new_sqlite_database);
                 netdata_log_info("     to %s", sqlite_database);
@@ -740,7 +748,10 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
     else
         strncpyz(sqlite_database, ":memory:", sizeof(sqlite_database) - 1);
 
-    rc = sqlite3_open(sqlite_database, &db_meta);
+    // UCRT64 SQLite uses Win32 CreateFile, which requires native Windows paths.
+    char native_meta_db[FILENAME_MAX + 1];
+    os_translate_path(native_meta_db, sqlite_database, sizeof(native_meta_db));
+    rc = sqlite3_open(native_meta_db, &db_meta);
     if (rc != SQLITE_OK) {
         error_report("Failed to initialize database at %s, due to \"%s\"", sqlite_database, sqlite3_errstr(rc));
         char *error_str = get_database_extented_error(db_meta, 0, "meta_open");
@@ -1859,13 +1870,16 @@ static void restore_host_context(void *arg)
             db_context_thread = hclt->db_context_thread;
         } else {
             char sqlite_database[FILENAME_MAX + 1];
+            char native_db[FILENAME_MAX + 1];
             snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/netdata-meta.db", netdata_configured_cache_dir);
-            int rc = sqlite3_open_v2(sqlite_database, &db_meta_thread, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
+            os_translate_path(native_db, sqlite_database, sizeof(native_db));
+            int rc = sqlite3_open_v2(native_db, &db_meta_thread, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
             if (rc != SQLITE_OK)
                 sql_close_thread_db_safe(&db_meta_thread);
 
             snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/context-meta.db", netdata_configured_cache_dir);
-            rc = sqlite3_open_v2(sqlite_database, &db_context_thread, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
+            os_translate_path(native_db, sqlite_database, sizeof(native_db));
+            rc = sqlite3_open_v2(native_db, &db_context_thread, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
             if (rc != SQLITE_OK)
                 sql_close_thread_db_safe(&db_context_thread);
 
@@ -2078,9 +2092,19 @@ size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, 
     sqlite3_stmt *res = NULL;
     sqlite3 *local_meta_db = NULL;
 
+    nd_win_trace("populate_metrics_from_database: entered");
+
+    // On Windows a second sqlite3_open_v2() to the same file that db_meta already
+    // has open blocks indefinitely at the OS level (CreateFile/LockFileEx never
+    // returns). Use the db_meta fallback directly on Windows.
+#ifndef OS_WINDOWS
+    nd_win_trace("populate_metrics_from_database: sqlite3_open_v2...");
     char sqlite_database[FILENAME_MAX + 1];
     snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/netdata-meta.db", netdata_configured_cache_dir);
-    int rc = sqlite3_open_v2(sqlite_database, &local_meta_db, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
+    char native_meta_path[FILENAME_MAX + 1];
+    os_translate_path(native_meta_path, sqlite_database, sizeof(native_meta_path));
+    int rc = sqlite3_open_v2(native_meta_path, &local_meta_db, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
+    nd_win_trace("populate_metrics_from_database: sqlite3_open_v2 done, rc=%d", rc);
     if (rc != SQLITE_OK) {
         sqlite3_close_v2(local_meta_db);
         local_meta_db = NULL;
@@ -2088,15 +2112,22 @@ size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, 
 
     if (local_meta_db)
         (void)db_execute(local_meta_db, "PRAGMA cache_size=10000", NULL);
+#else
+    nd_win_trace("populate_metrics_from_database: OS_WINDOWS - skipping separate connection, using db_meta");
+#endif
 
+    nd_win_trace("populate_metrics_from_database: PREPARE_STATEMENT (local_meta_db=%p)...", (void *)local_meta_db);
     if (!PREPARE_STATEMENT(local_meta_db ? local_meta_db : db_meta, GET_UUID_LIST, &res)) {
         sqlite3_close_v2(local_meta_db);
+        nd_win_trace("populate_metrics_from_database: PREPARE_STATEMENT failed, returning 0");
         return 0;
     }
+    nd_win_trace("populate_metrics_from_database: PREPARE_STATEMENT done");
 
     size_t count = 0;
 
     usec_t started_ut = now_monotonic_usec();
+    nd_win_trace("populate_metrics_from_database: sqlite3_step loop starting...");
     while (sqlite3_step(res) == SQLITE_ROW) {
         nd_uuid_t uuid;
         if (!sqlite3_column_uuid_copy(res, 0, uuid))
@@ -2266,7 +2297,9 @@ static void do_pending_uuid_deletion(struct meta_config_s *config, struct judy_l
 
         freez(uuid);
     }
+#ifndef OS_WINDOWS
     (void) JudyLFreeArray(&pending_uuid_deletion->JudyL, PJE0);
+#endif
     freez(pending_uuid_deletion);
 
     usec_t ended_ut = now_monotonic_usec(); (void)ended_ut;
@@ -2305,7 +2338,9 @@ static void store_ctx_cleanup_list(struct meta_config_s *config, struct judy_lis
         string_freez(ctx_cleanup->context);
         freez(ctx_cleanup);
     }
+#ifndef OS_WINDOWS
     (void) JudyLFreeArray(&pending_ctx_cleanup_list->JudyL, PJE0);
+#endif
     freez(pending_ctx_cleanup_list);
     SQLITE_FINALIZE(res);
 
@@ -2360,7 +2395,9 @@ static void store_alert_transitions(struct judy_list_t *pending_alert_list, bool
         worker_is_idle();
 
 done:
+#ifndef OS_WINDOWS
     (void) JudyLFreeArray(&pending_alert_list->JudyL, PJE0);
+#endif
     freez(pending_alert_list);
 }
 
@@ -2402,7 +2439,9 @@ static void store_sql_statements(struct judy_list_t *pending_sql_statement, bool
         sqlite3_stmt *stmt = *Pvalue;
         execute_statement(stmt, only_finalize);
     }
+#ifndef OS_WINDOWS
     (void) JudyLFreeArray(&pending_sql_statement->JudyL, PJE0);
+#endif
     freez(pending_sql_statement);
 
     COMPUTE_DURATION(report_duration, "us", started_ut, now_monotonic_usec());
@@ -2809,7 +2848,9 @@ static void metadata_event_loop(void *arg)
             string_freez(ctx_cleanup->context);
             freez(ctx_cleanup);
         }
+#ifndef OS_WINDOWS
         (void)JudyLFreeArray(&pending_ctx_cleanup_list->JudyL, PJE0);
+#endif
         freez(pending_ctx_cleanup_list);
     }
 
@@ -2823,7 +2864,9 @@ static void metadata_event_loop(void *arg)
             nd_uuid_t *uuid = *Pvalue;
             freez(uuid);
         }
+#ifndef OS_WINDOWS
         (void)JudyLFreeArray(&pending_uuid_deletion->JudyL, PJE0);
+#endif
         freez(pending_uuid_deletion);
     }
 

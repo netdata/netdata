@@ -262,11 +262,16 @@ static void fatal_status_file_save(void) {
     exit(1);
 }
 
+// nd_win_trace() is declared in libnetdata/os/os.h (Windows) / macro no-op (non-Windows).
+
 int netdata_main(int argc, char **argv) {
+    nd_win_trace("netdata_main() entered, argc=%d", argc);
     libjudy_malloc_init();
+    nd_win_trace("libjudy_malloc_init done");
     string_init();
     analytics_init();
     nd_log_initialize_mutexes();
+    nd_win_trace("string/analytics/log_mutexes done");
 
     // Register the daemon's per-thread cleanup callback. Each subsystem
     // should own the registration of its own cleanups; this one lives in
@@ -297,7 +302,9 @@ int netdata_main(int argc, char **argv) {
     // set the name for logging
     program_name = "netdata";
 
+    nd_win_trace("curl_global_init...");
     curl_global_init(CURL_GLOBAL_ALL);
+    nd_win_trace("curl_global_init done");
 
     // parse options
     {
@@ -917,19 +924,24 @@ int netdata_main(int argc, char **argv) {
     }
 
 #if !defined(FSANITIZE_ADDRESS)
+    nd_win_trace("close_open_fds...");
     if (close_open_fds == true) {
         // close all open file descriptors, except the standard ones
         // the caller may have left open files (lxc-attach has this issue)
         os_close_all_non_std_open_fds_except(NULL, 0, 0);
     }
+    nd_win_trace("close_open_fds done");
 #else
     fprintf(stderr, "Running with a Sanitizer, custom allocators are disabled.\n");
     fprintf(stderr, "Running with a Sanitizer, not closing open fds.\n");
 #endif
 
     if(!config_loaded) {
+        nd_win_trace("netdata_conf_load...");
         netdata_conf_load(NULL, 0, &user);
+        nd_win_trace("netdata_conf_load done");
         cloud_conf_load(0);
+        nd_win_trace("cloud_conf_load done");
     }
 
     // ----------------------------------------------------------------------------------------------------------------
@@ -937,15 +949,22 @@ int netdata_main(int argc, char **argv) {
     // IMPORTANT: KEEP THIS FIRST SO THAT THE REST OF NETDATA WILL LOG PROPERLY
 
     netdata_conf_section_directories();
+    nd_win_trace("netdata_conf_section_directories done");
     netdata_conf_section_logs();
+    nd_win_trace("netdata_conf_section_logs done");
     nd_log_limits_unlimited();
+    nd_win_trace("nd_log_initialize...");
     nd_log_initialize();
+    nd_win_trace("nd_log_initialize done");
 
     // ----------------------------------------------------------------------------------------------------------------
     // this MUST be before anything else - to load the old status file before saving a new one
 
+    nd_win_trace("daemon_status_file_init...");
     daemon_status_file_init(); // this loads the old file
+    nd_win_trace("daemon_status_file_init done");
     machine_guid_get(); // after loading the old daemon status file - we may need the machine guid from it
+    nd_win_trace("machine_guid_get done");
     nd_log_register_fatal_hook_cb(daemon_status_file_register_fatal);
     nd_log_register_fatal_final_cb(fatal_status_file_save);
     exit_initiated_init();
@@ -953,19 +972,27 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("signals");
 
+    nd_win_trace("signals_block_all...");
     signals_block_all_except_deadly();
     nd_initialize_signals(false); // catches deadly signals and stores them in the status file
+    nd_win_trace("signals done");
 
     // ----------------------------------------------------------------------------------------------------------------
 
+    nd_win_trace("netdata_conf_section_global...");
     netdata_conf_section_global(); // get hostname, host prefix, profile, etc
+    nd_win_trace("netdata_conf_section_global done");
+    nd_win_trace("registry_init...");
     registry_init(); // for machine_guid, must be after netdata_conf_section_global()
+    nd_win_trace("registry_init done");
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("run dir");
 
     {
+        nd_win_trace("os_run_dir...");
         const char *run_dir = os_run_dir(true);
+        nd_win_trace("os_run_dir returned: %s", run_dir ? run_dir : "(null)");
         if(!run_dir) {
             netdata_log_error("Cannot get/create a run directory.");
             exit(1);
@@ -986,29 +1013,52 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("crash reports");
 
+    nd_win_trace("daemon_status_file_check_crash...");
     daemon_status_file_check_crash();
+    nd_win_trace("daemon_status_file_check_crash done");
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("temp spawn server");
+    nd_win_trace("netdata_main_spawn_server_init(init)...");
     netdata_main_spawn_server_init("init", argc, (const char **)argv);
+    nd_win_trace("netdata_main_spawn_server_init(init) done");
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("ssl");
 
+    nd_win_trace("netdata_conf_ssl...");
     netdata_conf_ssl();
+    nd_win_trace("netdata_conf_ssl done");
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("environment for plugins");
 
     // prepare configuration environment variables for the plugins
+    nd_win_trace("set_environment_for_plugins_and_scripts...");
     set_environment_for_plugins_and_scripts();
+    nd_win_trace("set_environment_for_plugins_and_scripts done");
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("cd to user config dir");
 
     // cd into config_dir to allow the plugins refer to their config files using relative filenames
+#if defined(OS_WINDOWS)
+    // netdata_configured_user_config_dir is in POSIX/MSYS2 form (/c/...).
+    // UCRT64's chdir() calls SetCurrentDirectoryA() directly without POSIX
+    // translation — /c/... would resolve to C:\c\... which does not exist.
+    // Convert to Windows-native form first so SetCurrentDirectoryA() succeeds.
+    {
+        char win_config_dir[FILENAME_MAX + 1];
+        os_translate_path(win_config_dir, netdata_configured_user_config_dir, FILENAME_MAX);
+        nd_win_trace("chdir('%s') (from '%s')...", win_config_dir, netdata_configured_user_config_dir);
+        if(chdir(win_config_dir) == -1)
+            fatal("Cannot cd to '%s'", netdata_configured_user_config_dir);
+        nd_win_trace("chdir done");
+    }
+#else
     if(chdir(netdata_configured_user_config_dir) == -1)
         fatal("Cannot cd to '%s'", netdata_configured_user_config_dir);
+#endif
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("analytics");
@@ -1051,6 +1101,7 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("static threads");
 
+    nd_win_trace("static threads init_routines...");
     for (i = 0; static_threads[i].name != NULL ; i++) {
         struct netdata_static_thread *st = &static_threads[i];
 
@@ -1060,8 +1111,10 @@ int netdata_main(int argc, char **argv) {
         if(st->config_name)
             st->enabled = inicfg_get_boolean(&netdata_config, st->config_section, st->config_name, st->enabled);
 
-        if(st->enabled && st->init_routine)
+        if(st->enabled && st->init_routine) {
+            nd_win_trace("  init_routine for thread: %s", st->name);
             st->init_routine();
+        }
 
         if(st->env_name)
             nd_setenv(st->env_name, st->enabled?"YES":"NO", 1);
@@ -1069,25 +1122,32 @@ int netdata_main(int argc, char **argv) {
         if(st->global_variable)
             *st->global_variable = (st->enabled) ? true : false;
     }
+    nd_win_trace("static threads init_routines done");
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("web server api");
 
     // get the certificate and start security
+    nd_win_trace("web server setup...");
     netdata_conf_web_security_init();
     nd_web_api_init();
     mcp_initialize_subsystem();
     web_server_threading_selection();
 
     delta_startup_time("web server sockets");
-    if(web_server_mode != WEB_SERVER_MODE_NONE)
+    if(web_server_mode != WEB_SERVER_MODE_NONE) {
+        nd_win_trace("web_server_listen_sockets_setup...");
         web_server_listen_sockets_setup();
+        nd_win_trace("web_server_listen_sockets_setup done");
+    }
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("sqlite");
 
+    nd_win_trace("sqlite_library_init...");
     if (sqlite_library_init())
         fatal("Failed to initialize sqlite library");
+    nd_win_trace("sqlite_library_init done");
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("ML");
@@ -1184,33 +1244,41 @@ int netdata_main(int argc, char **argv) {
     set_late_analytics_variables(system_info);
 
     // ----------------------------------------------------------------------------------------------------------------
-    delta_startup_time("RRD structures");
-
     delta_startup_time("commands liveness support");
 
     commands_init();
 
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("RRD structures");
+
+    nd_win_trace("rrd_init('%s')...", netdata_configured_hostname);
     abort_on_fatal_disable();
     if (rrd_init(netdata_configured_hostname, system_info, false))
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
 
     abort_on_fatal_enable();
+    nd_win_trace("rrd_init done");
     system_info = NULL; // system_info is now freed by rrd_init
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("localhost labels");
 
+    nd_win_trace("main: reload_host_labels");
     reload_host_labels();
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("saved bearer tokens");
 
+    nd_win_trace("main: bearer_tokens_init");
     bearer_tokens_init();
+    nd_win_trace("main: bearer_tokens_init done");
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("claiming info");
 
+    nd_win_trace("main: load_claiming_state");
     load_claiming_state();
+    nd_win_trace("main: load_claiming_state done");
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("static threads");

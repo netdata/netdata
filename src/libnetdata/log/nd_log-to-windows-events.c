@@ -77,15 +77,26 @@ static bool check_event_id(ND_LOG_SOURCES source __maybe_unused, ND_LOG_FIELD_PR
 // --------------------------------------------------------------------------------------------------------------------
 // initialization
 
-// Define provider names per source (only when not using ETW)
+// Define provider (source) names per source (only when not using ETW)
 static const wchar_t *wel_provider_per_source[_NDLS_MAX] = {
-        [NDLS_UNSET]        = NULL,                             // not used, linked to NDLS_DAEMON
-        [NDLS_ACCESS]       = NETDATA_WEL_PROVIDER_ACCESS_W,    //
-        [NDLS_ACLK]         = NETDATA_WEL_PROVIDER_ACLK_W,      //
-        [NDLS_COLLECTORS]   = NETDATA_WEL_PROVIDER_COLLECTORS_W,//
-        [NDLS_DAEMON]       = NETDATA_WEL_PROVIDER_DAEMON_W,    //
-        [NDLS_HEALTH]       = NETDATA_WEL_PROVIDER_HEALTH_W,    //
-        [NDLS_DEBUG]        = NULL,                             // used, linked to NDLS_DAEMON
+        [NDLS_UNSET]        = NULL,                              // not used, linked to NDLS_DAEMON
+        [NDLS_ACCESS]       = NETDATA_WEL_PROVIDER_ACCESS_W,
+        [NDLS_ACLK]         = NETDATA_WEL_PROVIDER_ACLK_W,
+        [NDLS_COLLECTORS]   = NETDATA_WEL_PROVIDER_COLLECTORS_W,
+        [NDLS_DAEMON]       = NETDATA_WEL_PROVIDER_DAEMON_W,
+        [NDLS_HEALTH]       = NETDATA_WEL_PROVIDER_HEALTH_W,
+        [NDLS_DEBUG]        = NULL,                              // used, linked to NDLS_DAEMON
+};
+
+// Classic WEL channel names per source — match ETW channel names so events appear in the same channels
+static const wchar_t *wel_channel_per_source[_NDLS_MAX] = {
+        [NDLS_UNSET]        = NULL,                              // linked to NDLS_DAEMON
+        [NDLS_ACCESS]       = NETDATA_WEL_CHANNEL_ACCESS_W,
+        [NDLS_ACLK]         = NETDATA_WEL_CHANNEL_ACLK_W,
+        [NDLS_COLLECTORS]   = NETDATA_WEL_CHANNEL_COLLECTORS_W,
+        [NDLS_DAEMON]       = NETDATA_WEL_CHANNEL_DAEMON_W,
+        [NDLS_HEALTH]       = NETDATA_WEL_CHANNEL_HEALTH_W,
+        [NDLS_DEBUG]        = NULL,                              // linked to NDLS_DAEMON
 };
 
 bool wel_replace_program_with_wevt_netdata_dll(wchar_t *str, size_t size) {
@@ -160,6 +171,224 @@ static bool wel_add_to_registry(const wchar_t *channel, const wchar_t *provider,
     return true;
 }
 
+#if !defined(HAVE_ETW)
+// Registry key where WINEVT stores registered publishers (providers).
+#define WINEVT_PUBLISHERS_KEY L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WINEVT\\Publishers\\"
+
+static bool wel_manifest_is_current(void) {
+    wchar_t key[MAX_PATH];
+    swprintf(key, _countof(key), L"%ls%ls", WINEVT_PUBLISHERS_KEY, NETDATA_WEL_PROVIDER_DAEMON_GUID_STR_W);
+    HKEY hKey;
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, key, 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+        RegCloseKey(hKey);
+        return true;
+    }
+    return false;
+}
+
+static bool wel_run_silent(const wchar_t *exe, const wchar_t *params) {
+    wchar_t cmdline[MAX_PATH * 6];
+    swprintf(cmdline, _countof(cmdline), L"\"%ls\" %ls", exe, params);
+
+    STARTUPINFOW si = { .cb = sizeof(si) };
+    PROCESS_INFORMATION pi = {0};
+    if (!CreateProcessW(NULL, cmdline, NULL, NULL, FALSE,
+                        CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP,
+                        NULL, NULL, &si, &pi))
+        return false;
+
+    WaitForSingleObject(pi.hProcess, 30000);
+    DWORD exitCode = 1;
+    GetExitCodeProcess(pi.hProcess, &exitCode);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    return exitCode == 0;
+}
+
+// Minimal manifest embedded in the binary so we can register the Netdata WINEVT
+// channels and importChannel links at runtime, regardless of how netdata.exe was
+// deployed (MSI, direct copy, dev build). Each %s is replaced with the System32
+// DLL path (12 substitutions: 2 per provider × 6 providers).
+// The template omits event/template definitions — wevtutil im only needs channels
+// and providers to set up routing; the DLL handles message formatting at query time.
+#define WEL_MANIFEST_XML_FMT \
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n" \
+    "<instrumentationManifest xmlns=\"http://schemas.microsoft.com/win/2004/08/events\">\r\n" \
+    "  <instrumentation\r\n" \
+    "    xmlns:win=\"http://manifests.microsoft.com/win/2004/08/windows/events\"\r\n" \
+    "    xmlns:xs=\"http://www.w3.org/2001/XMLSchema\"\r\n" \
+    "    xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\r\n" \
+    "    <events xmlns=\"http://schemas.microsoft.com/win/2004/08/events\">\r\n" \
+    "      <provider name=\"Netdata\"\r\n" \
+    "        guid=\"{96c5ca72-9bd8-4634-81e5-000014e7da7a}\"\r\n" \
+    "        resourceFileName=\"%s\"\r\n" \
+    "        messageFileName=\"%s\"\r\n" \
+    "        symbol=\"NETDATA_ETW_PROVIDER\">\r\n" \
+    "        <channels>\r\n" \
+    "          <channel chid=\"CHANNEL_DAEMON\" name=\"Netdata/Daemon\" symbol=\"CHANNEL_DAEMON\" type=\"Operational\" enabled=\"true\"/>\r\n" \
+    "          <channel chid=\"CHANNEL_COLLECTORS\" name=\"Netdata/Collectors\" symbol=\"CHANNEL_COLLECTORS\" type=\"Operational\" enabled=\"true\"/>\r\n" \
+    "          <channel chid=\"CHANNEL_ACCESS\" name=\"Netdata/Access\" symbol=\"CHANNEL_ACCESS\" type=\"Operational\" enabled=\"true\"/>\r\n" \
+    "          <channel chid=\"CHANNEL_HEALTH\" name=\"Netdata/Health\" symbol=\"CHANNEL_HEALTH\" type=\"Operational\" enabled=\"true\"/>\r\n" \
+    "          <channel chid=\"CHANNEL_ACLK\" name=\"Netdata/Aclk\" symbol=\"CHANNEL_ACLK\" type=\"Operational\" enabled=\"true\"/>\r\n" \
+    "        </channels>\r\n" \
+    "      </provider>\r\n" \
+    "      <provider name=\"NetdataDaemon\"\r\n" \
+    "        guid=\"" NETDATA_WEL_PROVIDER_DAEMON_GUID_STR "\"\r\n" \
+    "        resourceFileName=\"%s\" messageFileName=\"%s\">\r\n" \
+    "        <channels><importChannel chid=\"IMPORT_DAEMON\" name=\"Netdata/Daemon\"/></channels>\r\n" \
+    "      </provider>\r\n" \
+    "      <provider name=\"NetdataCollectors\"\r\n" \
+    "        guid=\"" NETDATA_WEL_PROVIDER_COLLECTORS_GUID_STR "\"\r\n" \
+    "        resourceFileName=\"%s\" messageFileName=\"%s\">\r\n" \
+    "        <channels><importChannel chid=\"IMPORT_COLLECTORS\" name=\"Netdata/Collectors\"/></channels>\r\n" \
+    "      </provider>\r\n" \
+    "      <provider name=\"NetdataAccess\"\r\n" \
+    "        guid=\"" NETDATA_WEL_PROVIDER_ACCESS_GUID_STR "\"\r\n" \
+    "        resourceFileName=\"%s\" messageFileName=\"%s\">\r\n" \
+    "        <channels><importChannel chid=\"IMPORT_ACCESS\" name=\"Netdata/Access\"/></channels>\r\n" \
+    "      </provider>\r\n" \
+    "      <provider name=\"NetdataHealth\"\r\n" \
+    "        guid=\"" NETDATA_WEL_PROVIDER_HEALTH_GUID_STR "\"\r\n" \
+    "        resourceFileName=\"%s\" messageFileName=\"%s\">\r\n" \
+    "        <channels><importChannel chid=\"IMPORT_HEALTH\" name=\"Netdata/Health\"/></channels>\r\n" \
+    "      </provider>\r\n" \
+    "      <provider name=\"NetdataAclk\"\r\n" \
+    "        guid=\"" NETDATA_WEL_PROVIDER_ACLK_GUID_STR "\"\r\n" \
+    "        resourceFileName=\"%s\" messageFileName=\"%s\">\r\n" \
+    "        <channels><importChannel chid=\"IMPORT_ACLK\" name=\"Netdata/Aclk\"/></channels>\r\n" \
+    "      </provider>\r\n" \
+    "    </events>\r\n" \
+    "  </instrumentation>\r\n" \
+    "  <localization>\r\n" \
+    "    <resources culture=\"en-US\">\r\n" \
+    "      <stringTable>\r\n" \
+    "        <string id=\"ND_PROVIDER_NAME\" value=\"Netdata\"/>\r\n" \
+    "        <string id=\"Channel.Daemon\" value=\"Daemon\"/>\r\n" \
+    "        <string id=\"Channel.Collectors\" value=\"Collectors\"/>\r\n" \
+    "        <string id=\"Channel.Access\" value=\"Access\"/>\r\n" \
+    "        <string id=\"Channel.Health\" value=\"Health\"/>\r\n" \
+    "        <string id=\"Channel.Aclk\" value=\"Aclk\"/>\r\n" \
+    "      </stringTable>\r\n" \
+    "    </resources>\r\n" \
+    "  </localization>\r\n" \
+    "</instrumentationManifest>\r\n"
+
+// Runs at WEL startup when wel_manifest_is_current() returns false.
+// Works for every deployment: MSI install (DLL in System32), dev build (DLL next to
+// netdata.exe), or a bare netdata.exe copy (DLL in System32 from a prior install).
+// Generates the manifest XML from the embedded template and writes it to System32,
+// then registers it via wevtutil. No external manifest file is required.
+static void wel_ensure_manifest_installed(void) {
+    if (wel_manifest_is_current()) {
+        nd_win_trace("wel_ensure_manifest_installed: importChannel providers already registered");
+        return;
+    }
+
+    nd_win_trace("wel_ensure_manifest_installed: installing manifest...");
+
+    wchar_t system32[MAX_PATH];
+    if (!GetSystemDirectoryW(system32, _countof(system32))) return;
+
+    wchar_t dllDst[MAX_PATH];
+    swprintf(dllDst, _countof(dllDst), L"%ls\\wevt_netdata.dll", system32);
+
+    // If wevt_netdata.dll exists next to netdata.exe (dev build / manual deploy),
+    // copy it to System32 so Event Viewer can resolve message strings.
+    {
+        wchar_t dllSrc[MAX_PATH];
+        if (GetModuleFileNameW(NULL, dllSrc, _countof(dllSrc)) &&
+            wel_replace_program_with_wevt_netdata_dll(dllSrc, _countof(dllSrc))) {
+            if (!CopyFileW(dllSrc, dllDst, FALSE))
+                nd_win_trace("wel_ensure_manifest_installed: CopyFile err=%lu (may already exist)",
+                             (unsigned long)GetLastError());
+            else
+                nd_win_trace("wel_ensure_manifest_installed: copied DLL to System32");
+        }
+    }
+
+    // DLL must exist in System32 (either we just copied it or MSI put it there).
+    if (GetFileAttributesW(dllDst) == INVALID_FILE_ATTRIBUTES) {
+        nd_win_trace("wel_ensure_manifest_installed: wevt_netdata.dll not in System32 err=%lu, skipping",
+                     (unsigned long)GetLastError());
+        return;
+    }
+
+    // Grant EventLog service read access to the DLL (required for manifest channels).
+    wchar_t icaclsPath[MAX_PATH];
+    swprintf(icaclsPath, _countof(icaclsPath), L"%ls\\icacls.exe", system32);
+    wchar_t icaclsParams[MAX_PATH * 2];
+    swprintf(icaclsParams, _countof(icaclsParams), L"\"%ls\" /grant \"NT SERVICE\\EventLog\":R", dllDst);
+    if (!wel_run_silent(icaclsPath, icaclsParams))
+        nd_win_trace("wel_ensure_manifest_installed: icacls err=%lu", (unsigned long)GetLastError());
+
+    // Build manifest content from the embedded template. The manifest is generated
+    // at runtime so it always matches this binary's channel layout, regardless of
+    // what manifest file (if any) is on disk.
+    char dllDstNarrow[MAX_PATH];
+    if(!WideCharToMultiByte(CP_UTF8, 0, dllDst, -1, dllDstNarrow, _countof(dllDstNarrow), NULL, NULL)) {
+        nd_win_trace("wel_ensure_manifest_installed: WideCharToMultiByte failed err=%lu",
+                     (unsigned long)GetLastError());
+        return;
+    }
+
+    char manifest[8192];
+    int mlen = snprintf(manifest, sizeof(manifest), WEL_MANIFEST_XML_FMT,
+                        dllDstNarrow, dllDstNarrow,   // Netdata provider
+                        dllDstNarrow, dllDstNarrow,   // NetdataDaemon
+                        dllDstNarrow, dllDstNarrow,   // NetdataCollectors
+                        dllDstNarrow, dllDstNarrow,   // NetdataAccess
+                        dllDstNarrow, dllDstNarrow,   // NetdataHealth
+                        dllDstNarrow, dllDstNarrow);  // NetdataAclk
+    if (mlen <= 0 || mlen >= (int)sizeof(manifest)) {
+        nd_win_trace("wel_ensure_manifest_installed: manifest buffer overflow");
+        return;
+    }
+
+    // Write manifest to System32 (same location as the MSI installer uses).
+    wchar_t manifestDst[MAX_PATH];
+    swprintf(manifestDst, _countof(manifestDst), L"%ls\\wevt_netdata_manifest.xml", system32);
+
+    HANDLE hFile = CreateFileW(manifestDst, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
+                               FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        nd_win_trace("wel_ensure_manifest_installed: cannot create manifest err=%lu",
+                     (unsigned long)GetLastError());
+        return;
+    }
+    DWORD written;
+    BOOL fileOk = WriteFile(hFile, manifest, (DWORD)mlen, &written, NULL);
+    CloseHandle(hFile);
+    if (!fileOk || written != (DWORD)mlen) {
+        nd_win_trace("wel_ensure_manifest_installed: write failed err=%lu", (unsigned long)GetLastError());
+        return;
+    }
+
+    wchar_t wevtutil[MAX_PATH];
+    swprintf(wevtutil, _countof(wevtutil), L"%ls\\wevtutil.exe", system32);
+
+    nd_win_trace("wel_ensure_manifest_installed: manifest written to '%ls'", manifestDst);
+
+    // Unregister any previously registered manifest (ignore errors — normal on first run).
+    wchar_t umParams[MAX_PATH * 2];
+    swprintf(umParams, _countof(umParams), L"um \"%ls\"", manifestDst);
+    if (wel_run_silent(wevtutil, umParams))
+        nd_win_trace("wel_ensure_manifest_installed: wevtutil um ok");
+    else
+        nd_win_trace("wel_ensure_manifest_installed: wevtutil um failed/skipped (ok if not previously installed)");
+
+    // Register the new manifest. The /mf and /rf flags tell wevtutil where the DLL is,
+    // overriding the resourceFileName/messageFileName attributes in the XML.
+    wchar_t imParams[MAX_PATH * 4];
+    swprintf(imParams, _countof(imParams), L"im \"%ls\" \"/mf:%ls\" \"/rf:%ls\"",
+             manifestDst, dllDst, dllDst);
+    if (wel_run_silent(wevtutil, imParams))
+        nd_win_trace("wel_ensure_manifest_installed: manifest installed successfully");
+    else
+        nd_win_trace("wel_ensure_manifest_installed: wevtutil im failed err=%lu",
+                     (unsigned long)GetLastError());
+}
+#endif // !HAVE_ETW
+
 #if defined(HAVE_ETW)
 static void etw_set_source_meta(struct nd_log_source *source, USHORT channelID, const EVENT_DESCRIPTOR *ed) {
     // It turns out that the keyword varies per only per channel!
@@ -224,6 +453,9 @@ static bool etw_register_provider(void) {
 #endif
 
 bool nd_log_init_windows(void) {
+    nd_win_trace("nd_log_init_windows: entered etw=%d initialized=%d",
+                 (int)nd_log.eventlog.etw, (int)nd_log.eventlog.initialized);
+
     if(nd_log.eventlog.initialized)
         return true;
 
@@ -241,8 +473,14 @@ bool nd_log_init_windows(void) {
         return false;
 #endif
 
-//    if(!nd_log.eventlog.etw && !wel_add_to_registry(NETDATA_WEL_CHANNEL_NAME_W, NULL, 50 * 1024 * 1024))
-//        return false;
+    if(!nd_log.eventlog.etw) {
+#if !defined(HAVE_ETW)
+        // Auto-install manifest with importChannel entries so classic ReportEventW events
+        // appear in the Netdata WINEVT channels without any manual setup by the user.
+        // Fast no-op when the manifest is already current (registry check only).
+        wel_ensure_manifest_installed();
+#endif
+    }
 
     // Loop through each source and add it to the registry
     for(size_t i = 0; i < _NDLS_MAX; i++) {
@@ -273,17 +511,46 @@ bool nd_log_init_windows(void) {
         }
 
         if(!nd_log.eventlog.etw) {
-            if(!wel_add_to_registry(NETDATA_WEL_CHANNEL_NAME_W, sub_channel, defaultMaxSize))
+            const wchar_t *wel_channel = wel_channel_per_source[i];
+            nd_win_trace("nd_log_init_windows: wel_add_to_registry channel=%ls source=%ls...",
+                         wel_channel, sub_channel);
+            if(!wel_add_to_registry(wel_channel, sub_channel, defaultMaxSize)) {
+                nd_win_trace("nd_log_init_windows: wel_add_to_registry FAILED channel=%ls source=%ls err=%lu",
+                             wel_channel, sub_channel, (unsigned long)GetLastError());
                 return false;
+            }
+            nd_win_trace("nd_log_init_windows: wel_add_to_registry ok channel=%ls source=%ls",
+                         wel_channel, sub_channel);
 
             // when not using a manifest, each source is a provider
+            nd_win_trace("nd_log_init_windows: RegisterEventSourceW source[%zu/%s]...",
+                         i, nd_log_id2source(i));
             nd_log.sources[i].hEventLog = RegisterEventSourceW(NULL, sub_channel);
-            if (!nd_log.sources[i].hEventLog)
+            if (!nd_log.sources[i].hEventLog) {
+                nd_win_trace("nd_log_init_windows: RegisterEventSourceW FAILED source[%zu/%s] err=%lu",
+                             i, nd_log_id2source(i), (unsigned long)GetLastError());
                 return false;
+            }
+            nd_win_trace("nd_log_init_windows: RegisterEventSourceW ok source[%zu/%s]",
+                         i, nd_log_id2source(i));
         }
     }
 
     if(!nd_log.eventlog.etw) {
+        // Remove legacy NetdataWEL registry entries only after new per-channel sources are
+        // confirmed installed. Deleting first risks leaving neither old nor new routing
+        // working if registration subsequently fails. ERROR_FILE_NOT_FOUND is normal on a
+        // fresh install (key never existed) and is not logged.
+        wchar_t legacy_key[MAX_PATH];
+        swprintf(legacy_key, MAX_PATH,
+                 L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\NetdataWEL");
+        LSTATUS legacy_rc = RegDeleteTreeW(HKEY_LOCAL_MACHINE, legacy_key);
+        if(legacy_rc == ERROR_SUCCESS)
+            nd_win_trace("nd_log_init_windows: removed legacy EventLog\\NetdataWEL registry key");
+        else if(legacy_rc != ERROR_FILE_NOT_FOUND)
+            nd_win_trace("nd_log_init_windows: failed to remove legacy EventLog\\NetdataWEL rc=%ld",
+                         (long)legacy_rc);
+
         // Map the unset ones to NDLS_DAEMON
         for (size_t i = 0; i < _NDLS_MAX; i++) {
             if (!nd_log.sources[i].hEventLog)
@@ -292,6 +559,9 @@ bool nd_log_init_windows(void) {
     }
 
     nd_log.eventlog.initialized = true;
+    nd_win_trace("nd_log_init_windows: done initialized=true etw=%d; "
+                 "events go to Netdata/{Daemon,Collectors,Access,Health,Aclk}",
+                 (int)nd_log.eventlog.etw);
     return true;
 }
 
@@ -464,6 +734,11 @@ static bool nd_logger_windows(struct nd_log_source *source, struct log_field *fi
     if (!nd_log.eventlog.initialized)
         return false;
 
+    // trace the first call from each source independently so all sources are confirmed in the log
+    static bool first_call[_NDLS_MAX];
+    if(source->source < _NDLS_MAX && !__atomic_exchange_n(&first_call[source->source], true, __ATOMIC_RELAXED))
+        nd_win_trace("nd_logger_windows: first call source=%s", nd_log_id2source(source->source));
+
     ND_LOG_FIELD_PRIORITY priority = NDLP_INFO;
     if (fields[NDF_PRIORITY].entry.set)
         priority = (ND_LOG_FIELD_PRIORITY) fields[NDF_PRIORITY].entry.u64;
@@ -566,6 +841,26 @@ static bool nd_logger_windows(struct nd_log_source *source, struct log_field *fi
     {
         // eventID based logging - WEL
         rc = ReportEventW(source->hEventLog, wType, 0, eventID, NULL, _NDF_MAX - 1, 0, wel_messages, NULL);
+        if(!rc) {
+            // trace only the first failure per source — persistent failure would otherwise
+            // emit a trace line on every log call, causing unbounded trace-file growth
+            static bool first_failure[_NDLS_MAX];
+            if(source->source < _NDLS_MAX && !__atomic_exchange_n(&first_failure[source->source], true, __ATOMIC_RELAXED)) {
+                DWORD err = GetLastError();
+                nd_win_trace("nd_logger_windows[%s]: ReportEventW FAILED err=%lu eventID=0x%lx",
+                             nd_log_id2source(source->source), (unsigned long)err, (unsigned long)eventID);
+            }
+        }
+        else {
+            // trace the first successful write per source so the log confirms events reach WEL
+            static bool first_success[_NDLS_MAX];
+            if(source->source < _NDLS_MAX && !__atomic_exchange_n(&first_success[source->source], true, __ATOMIC_RELAXED)) {
+                const wchar_t *wch = wel_channel_per_source[source->source];
+                nd_win_trace("nd_logger_windows[%s]: ReportEventW ok eventID=0x%lx -> channel=%ls",
+                             nd_log_id2source(source->source), (unsigned long)eventID,
+                             wch ? wch : NETDATA_WEL_CHANNEL_DAEMON_W);
+            }
+        }
     }
 
     spinlock_unlock(&spinlock);

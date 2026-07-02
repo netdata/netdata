@@ -18,12 +18,18 @@ static inline void pluginsd_sleep(const int seconds) {
 
 inline size_t pluginsd_initialize_plugin_directories()
 {
-    char plugins_dirs[(FILENAME_MAX * 2) + 1];
+    // Two quoted paths + literal overhead: "\"%s\" \"%s/custom-plugins.d\""
+    // adds 22 chars beyond the two path lengths; +32 gives a safe margin.
+    char plugins_dirs[(FILENAME_MAX * 2) + 32];
     static char *plugins_dir_list = NULL;
 
     // Get the configuration entry
     if (likely(!plugins_dir_list)) {
-        snprintfz(plugins_dirs, FILENAME_MAX * 2, "\"%s\" \"%s/custom-plugins.d\"", PLUGINS_DIR, CONFIG_DIR);
+        // Use runtime globals instead of compile-time PLUGINS_DIR / CONFIG_DIR so that
+        // Windows path overrides (set before main() by nd_windows_detect_prefix_and_override_paths)
+        // are respected.  On all other platforms these globals equal the compile-time macros.
+        snprintfz(plugins_dirs, sizeof(plugins_dirs), "\"%s\" \"%s/custom-plugins.d\"",
+                  netdata_configured_primary_plugins_dir, netdata_configured_user_config_dir);
         plugins_dir_list = strdupz(inicfg_get_quoted_path_list(&netdata_config, CONFIG_SECTION_DIRECTORIES, "plugins", plugins_dirs));
     }
 

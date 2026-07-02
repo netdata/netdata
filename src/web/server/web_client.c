@@ -372,13 +372,22 @@ static bool find_filename_to_serve(const char *filename, char *dst, size_t dst_l
 
     int fallback = 0;
 
+    // UCRT64's stat()/open() cannot resolve MSYS2 POSIX paths (/c/...) —
+    // translate to Windows form (C:\...) before any filesystem call.
+#if defined(OS_WINDOWS)
+    char win_web_dir[FILENAME_MAX + 1];
+    const char *web_dir = os_translate_path(win_web_dir, netdata_configured_web_dir, sizeof(win_web_dir));
+#else
+    const char *web_dir = netdata_configured_web_dir;
+#endif
+
     if(has_extension) {
         if(d_version == -1)
-            snprintfz(dst, dst_len, "%s/%s", netdata_configured_web_dir, filename);
+            snprintfz(dst, dst_len, "%s/%s", web_dir, filename);
         else {
             // check if the filename or directory exists
             // fallback to the same path without the dashboard version otherwise
-            snprintfz(dst, dst_len, "%s/v%d/%s", netdata_configured_web_dir, d_version, filename);
+            snprintfz(dst, dst_len, "%s/v%d/%s", web_dir, d_version, filename);
             fallback = 1;
         }
     }
@@ -386,40 +395,40 @@ static bool find_filename_to_serve(const char *filename, char *dst, size_t dst_l
         if(filename && *filename) {
             // check if the filename exists
             // fallback to /vN/index.html otherwise
-            snprintfz(dst, dst_len, "%s/%s", netdata_configured_web_dir, filename);
+            snprintfz(dst, dst_len, "%s/%s", web_dir, filename);
             fallback = 2;
         }
         else {
             if(filename && *filename)
                 web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH);
-            snprintfz(dst, dst_len, "%s/v%d", netdata_configured_web_dir, d_version);
+            snprintfz(dst, dst_len, "%s/v%d", web_dir, d_version);
         }
     }
     else {
         // check if filename exists
         // this is needed to serve {filename}/index.html, in case a user puts a html file into a directory
         // fallback to /index.html otherwise
-        snprintfz(dst, dst_len, "%s/%s", netdata_configured_web_dir, filename);
+        snprintfz(dst, dst_len, "%s/%s", web_dir, filename);
         fallback = 3;
     }
 
     if (stat(dst, statbuf) != 0) {
         if(fallback == 1) {
-            snprintfz(dst, dst_len, "%s/%s", netdata_configured_web_dir, filename);
+            snprintfz(dst, dst_len, "%s/%s", web_dir, filename);
             if (stat(dst, statbuf) != 0)
                 return false;
         }
         else if(fallback == 2) {
             if(filename && *filename)
                 web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH);
-            snprintfz(dst, dst_len, "%s/v%d", netdata_configured_web_dir, d_version);
+            snprintfz(dst, dst_len, "%s/v%d", web_dir, d_version);
             if (stat(dst, statbuf) != 0)
                 return false;
         }
         else if(fallback == 3) {
             if(filename && *filename)
                 web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH);
-            snprintfz(dst, dst_len, "%s", netdata_configured_web_dir);
+            snprintfz(dst, dst_len, "%s", web_dir);
             if (stat(dst, statbuf) != 0)
                 return false;
         }
@@ -486,6 +495,18 @@ static int web_server_static_file(struct web_client *w, char *filename) {
     char web_filename[FILENAME_MAX + 1];
     struct stat statbuf;
     if(!find_filename_to_serve(filename, web_filename, FILENAME_MAX, &statbuf, w, &is_dir)) {
+        netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not accessible.", w->id, filename);
+#if defined(OS_WINDOWS)
+        // On UCRT64 a missing static file is the most common symptom of a failed
+        // POSIX-to-Windows path translation; log at WARNING so it leaves a fingerprint.
+        {
+            int lookup_errno = errno;
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "%llu: WEB: cannot find static file '%s' under web dir '%s' (errno=%d %s). "
+                   "If the file exists on disk, UCRT64 may not have translated the POSIX path.",
+                   w->id, filename, netdata_configured_web_dir, lookup_errno, strerror(lookup_errno));
+        }
+#endif
         w->response.data->content_type = CT_TEXT_HTML;
         buffer_strcat(w->response.data, "File does not exist, or is not accessible: ");
         buffer_strcat_htmlescape(w->response.data, filename);
@@ -499,8 +520,9 @@ static int web_server_static_file(struct web_client *w, char *filename) {
     buffer_need_bytes(w->response.data, (size_t)statbuf.st_size);
     w->response.data->len = (size_t)statbuf.st_size;
 
-    // open the file
+    // open the file; save errno immediately so read()/close() cannot clobber it
     int fd = open(web_filename, O_RDONLY | O_CLOEXEC);
+    int open_errno = (fd < 0) ? errno : 0;
 
     // read the file
     if(fd != -1 && read(fd, w->response.data->buffer, statbuf.st_size) != statbuf.st_size) {
@@ -514,21 +536,32 @@ static int web_server_static_file(struct web_client *w, char *filename) {
     if(fd == -1) {
         buffer_flush(w->response.data);
 
-        if(errno == EBUSY || errno == EAGAIN) {
-            netdata_log_error("%llu: File '%s' is busy, sending 307 Moved Temporarily to force retry.", w->id, web_filename);
-            w->response.data->content_type = CT_TEXT_HTML;
-            buffer_sprintf(w->response.header, "Location: /%s\r\n", filename);
-            buffer_strcat(w->response.data, "File is currently busy, please try again later: ");
-            buffer_strcat_htmlescape(w->response.data, filename);
-            return HTTP_RESP_REDIR_TEMP;
+        if(open_errno != 0) {
+            // open() failed — open_errno is valid; errno may have been clobbered by read()/close()
+            if(open_errno == EBUSY || open_errno == EAGAIN) {
+                netdata_log_error("%llu: File '%s' is busy, sending 307 Moved Temporarily to force retry.", w->id, web_filename);
+                w->response.data->content_type = CT_TEXT_HTML;
+                buffer_sprintf(w->response.header, "Location: /%s\r\n", filename);
+                buffer_strcat(w->response.data, "File is currently busy, please try again later: ");
+                buffer_strcat_htmlescape(w->response.data, filename);
+                return HTTP_RESP_REDIR_TEMP;
+            }
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "%llu: Cannot open file '%s' (errno=%d %s).",
+                   w->id, web_filename, open_errno, strerror(open_errno));
+#if defined(OS_WINDOWS)
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "%llu: WEB: open() failed on '%s' — if the path looks right and the file exists, "
+                   "UCRT64 may not have translated the POSIX path.",
+                   w->id, web_filename);
+#endif
         }
-        else {
-            netdata_log_error("%llu: Cannot open file '%s'.", w->id, web_filename);
-            w->response.data->content_type = CT_TEXT_HTML;
-            buffer_strcat(w->response.data, "Cannot open file: ");
-            buffer_strcat_htmlescape(w->response.data, filename);
-            return HTTP_RESP_NOT_FOUND;
-        }
+        // read() failure: already logged above; open_errno == 0 so open() succeeded
+
+        w->response.data->content_type = CT_TEXT_HTML;
+        buffer_strcat(w->response.data, "Cannot open file: ");
+        buffer_strcat_htmlescape(w->response.data, filename);
+        return HTTP_RESP_NOT_FOUND;
     }
     else
         close(fd);
@@ -540,11 +573,7 @@ static int web_server_static_file(struct web_client *w, char *filename) {
     web_client_enable_wait_send(w);
     web_client_disable_wait_receive(w);
 
-#ifdef __APPLE__
-    w->response.data->date = statbuf.st_mtimespec.tv_sec;
-#else
-    w->response.data->date = statbuf.st_mtim.tv_sec;
-#endif
+    w->response.data->date = STAT_GET_MTIME_SEC(statbuf);
     w->response.data->expires = now_realtime_sec() + 86400;
 
     buffer_cacheable(w->response.data);

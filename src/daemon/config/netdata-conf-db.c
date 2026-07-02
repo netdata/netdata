@@ -137,11 +137,14 @@ RRD_BACKFILL get_dbengine_backfill(RRD_BACKFILL backfill)
 void netdata_conf_dbengine_init(const char *hostname) {
 #ifdef ENABLE_DBENGINE
 
+    nd_win_trace("netdata_conf_dbengine_init('%s') entered", hostname);
+
     // ----------------------------------------------------------------------------------------------------------------
     // out of memory protection and use all ram for caches
 
     dbengine_out_of_memory_protection = 0; // will be calculated below
     OS_SYSTEM_MEMORY sm = os_system_memory(true);
+    nd_win_trace("netdata_conf_dbengine_init: os_system_memory done");
     if(OS_SYSTEM_MEMORY_OK(sm) && sm.ram_total_bytes > sm.ram_available_bytes) {
         // calculate the default out of memory protection size
         uint64_t keep_free = sm.ram_total_bytes / 10;
@@ -208,6 +211,8 @@ void netdata_conf_dbengine_init(const char *hostname) {
         inicfg_set_number(&netdata_config, CONFIG_SECTION_DB, "storage tiers", nd_profile.storage_tiers);
     }
 
+    nd_win_trace("netdata_conf_dbengine_init: config reads done, storage_tiers=%zu", (size_t)nd_profile.storage_tiers);
+
     new_dbengine_defaults =
         (!legacy_multihost_db_space &&
          !inicfg_exists(&netdata_config, CONFIG_SECTION_DB, "dbengine tier 1 update every iterations") &&
@@ -258,6 +263,7 @@ void netdata_conf_dbengine_init(const char *hostname) {
 
     size_t created_tiers = 0;
     char dbenginepath[FILENAME_MAX + 1];
+    char native_dbenginepath[FILENAME_MAX + 1];
 
     for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
 
@@ -266,11 +272,17 @@ void netdata_conf_dbengine_init(const char *hostname) {
         else
             snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine-tier%zu", netdata_configured_cache_dir, tier);
 
-        int ret = mkdir(dbenginepath, 0775);
+        // UCRT64's mkdir() requires a native Windows path; translate once here.
+        os_translate_path(native_dbenginepath, dbenginepath, sizeof(native_dbenginepath));
+
+        nd_win_trace("netdata_conf_dbengine_init: tier %zu mkdir '%s'", tier, native_dbenginepath);
+        int ret = mkdir(native_dbenginepath, 0775);
         if (ret != 0 && errno != EEXIST) {
             nd_log(NDLS_DAEMON, NDLP_CRIT, "DBENGINE on '%s': cannot create directory '%s'", hostname, dbenginepath);
+            nd_win_trace("netdata_conf_dbengine_init: tier %zu mkdir FAILED, skipping", tier);
             continue;
         }
+        nd_win_trace("netdata_conf_dbengine_init: tier %zu mkdir ok, path='%s'", tier, native_dbenginepath);
 
         int disk_space_mb = tier ? RRDENG_DEFAULT_TIER_DISK_SPACE_MB : default_multidb_disk_quota_mb;
         snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu retention size", tier);
@@ -284,7 +296,8 @@ void netdata_conf_dbengine_init(const char *hostname) {
         tiers_init[tier].disk_space_mb = (int) disk_space_mb;
         tiers_init[tier].tier = tier;
         tiers_init[tier].retention_seconds = (size_t) storage_tiers_retention_time_s[tier];
-        strncpyz(tiers_init[tier].path, dbenginepath, FILENAME_MAX);
+        // Pass the native path so rrdeng_init() file operations also use the correct form.
+        strncpyz(tiers_init[tier].path, native_dbenginepath, FILENAME_MAX);
         tiers_init[tier].ret = 0;
 
         if(parallel_initialization) {
@@ -292,8 +305,11 @@ void netdata_conf_dbengine_init(const char *hostname) {
             snprintfz(tag, NETDATA_THREAD_TAG_MAX, "DBENGINIT[%zu]", tier);
             tiers_init[tier].thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, dbengine_tier_init, &tiers_init[tier]);
         }
-        else
+        else {
+            nd_win_trace("netdata_conf_dbengine_init: tier %zu dbengine_tier_init starting...", tier);
             dbengine_tier_init(&tiers_init[tier]);
+            nd_win_trace("netdata_conf_dbengine_init: tier %zu dbengine_tier_init done, ret=%d", tier, tiers_init[tier].ret);
+        }
     }
 
     for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++) {
@@ -320,8 +336,11 @@ void netdata_conf_dbengine_init(const char *hostname) {
     else if(!created_tiers)
         fatal("DBENGINE on '%s', failed to initialize databases at '%s'.", hostname, netdata_configured_cache_dir);
 
-    for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++)
+    for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++) {
+        nd_win_trace("netdata_conf_dbengine_init: tier %zu rrdeng_readiness_wait...", tier);
         rrdeng_readiness_wait(multidb_ctx[tier]);
+        nd_win_trace("netdata_conf_dbengine_init: tier %zu rrdeng_readiness_wait done", tier);
+    }
 
     rrdeng_calculate_tier_disk_space_percentage();
 

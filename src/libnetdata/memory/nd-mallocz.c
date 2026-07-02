@@ -509,7 +509,14 @@ int posix_memalignz(void **memptr, size_t alignment, size_t size) {
 ALWAYS_INLINE
 void posix_memalign_freez(void *ptr) {
     workers_memory_call(WORKERS_MEMORY_CALL_LIBC_POSIX_MEMALIGN_FREE);
+    // On Windows posix_memalign maps to _aligned_malloc; _aligned_free is
+    // required to release it — free() on _aligned_malloc memory is undefined
+    // and triggers STATUS_HEAP_CORRUPTION (c0000374).
+#ifdef OS_WINDOWS
+    _aligned_free(ptr);
+#else
     free(ptr);
+#endif
 }
 #endif
 

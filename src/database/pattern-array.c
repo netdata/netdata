@@ -147,12 +147,16 @@ void pattern_array_free(struct pattern_array *pa)
             simple_pattern_free(sp);
         }
 
+#ifndef OS_WINDOWS
         JudyLFreeArray(&(pai->JudyL), PJE0);
+#endif
         string_freez((STRING *)Index);
         freez(pai);
     }
 
+#ifndef OS_WINDOWS
     JudyLFreeArray(&(pa->JudyL), PJE0);
+#endif
     freez(pa);
 }
 

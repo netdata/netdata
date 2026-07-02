@@ -366,12 +366,14 @@ static int load_data_file(struct rrdengine_datafile *datafile)
     char path[RRDENG_PATH_MAX];
 
     generate_datafilepath(datafile, path, sizeof(path));
+    nd_win_trace("load_data_file: fileno=%u open_file_for_io...", datafile->fileno);
     fd = open_file_for_io(path, O_RDWR, &file, dbengine_use_direct_io);
+    nd_win_trace("load_data_file: fileno=%u open_file_for_io ret=%d", datafile->fileno, fd);
     if (fd < 0) {
         ctx_fs_error(ctx);
         return fd;
     }
-    
+
     nd_log_daemon(NDLP_DEBUG, "DBENGINE: initializing data file \"%s\".", path);
 
     ret = check_file_properties(file, &file_size, sizeof(struct rrdeng_df_sb));
@@ -420,6 +422,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     struct rrdengine_datafile **datafiles, *datafile;
     struct rrdengine_journalfile *journalfile;
 
+    nd_win_trace("scan_data_files[A]: tier=%d path='%s'", ctx->config.tier, ctx->config.dbfiles_path);
     ret = uv_fs_scandir(NULL, &req, ctx->config.dbfiles_path, 0, NULL);
     if (ret < 0) {
         fatal_assert(req.result < 0);
@@ -428,6 +431,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         ctx_fs_error(ctx);
         return ret;
     }
+    nd_win_trace("scan_data_files[B]: tier=%d uv_fs_scandir returned %d", ctx->config.tier, ret);
     netdata_log_info("DBENGINE: tier %d: found %d files in path %s", ctx->config.tier, ret, ctx->config.dbfiles_path);
 
     Pvoid_t datafiles_JudyL = NULL;
@@ -470,6 +474,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
             nd_log_daemon(NDLP_WARNING, "Unknown file detected : \"%s/%s\"", ctx->config.dbfiles_path, dent.name);
     }
     uv_fs_req_cleanup(&req);
+    nd_win_trace("scan_data_files[C]: tier=%d matched_files=%d", ctx->config.tier, matched_files);
 
     if (0 == matched_files) {
         freez(datafiles);
@@ -485,12 +490,20 @@ static int scan_data_files(struct rrdengine_instance *ctx)
 
     // Remove journal files that do not have a matching data file
     // by scanning the judy array of the journal files
+    nd_win_trace("scan_data_files[D]: tier=%d orphan-check validate=%d", ctx->config.tier, (int)validate_files);
+    // On Windows the vendored JudyL JudyLNext loops infinitely through the
+    // journal fileno range instead of returning NULL at end-of-array, causing
+    // a multi-minute startup hang. Since UNLINK_FILE is already a no-op on
+    // Windows (Defender scan cost), skip the entire orphan-deletion walk here.
+#ifndef OS_WINDOWS
     if (validate_files) {
         bool first_then_next = true;
         Word_t idx = 0;
         Pvoid_t *PValue;
         size_t deleted_journals = 0;
+        nd_win_trace("scan_data_files[D1]: tier=%d entering orphan while-loop", ctx->config.tier);
         while ((PValue = JudyLFirstThenNext(journafile_JudyL, &idx, &first_then_next))) {
+            nd_win_trace("scan_data_files[D2]: tier=%d loop-iter fileno=%u", ctx->config.tier, (unsigned)idx);
             char path[RRDENG_PATH_MAX];
             if (unlikely(!JudyLGet(datafiles_JudyL, (Word_t)idx, PJE0))) {
                 (void)snprintfz(
@@ -501,12 +514,21 @@ static int scan_data_files(struct rrdengine_instance *ctx)
                     1U,
                     (unsigned)idx);
 
+                nd_win_trace("scan_data_files[D]: orphan journal v1 fileno=%u", (unsigned)idx);
+#ifndef OS_WINDOWS
                 UNLINK_FILE(ctx, path, ret);
                 if (ret == 0) {
                     netdata_log_info("DBENGINE: deleting journal file without matching data file: %s", path);
                     __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
                     deleted_journals++;
                 }
+#else
+                // On Windows, uv_fs_unlink (DeleteFileW) triggers Windows Defender
+                // content scanning per file, blocking ~17s each. Orphaned journals
+                // (no matching .ndf) are harmless; skip deletion at startup.
+                nd_win_trace("scan_data_files[D]: skipping orphan v1 delete on Windows, fileno=%u", (unsigned)idx);
+                (void)ret;
+#endif
 
                 (void)snprintfz(
                     path,
@@ -516,34 +538,58 @@ static int scan_data_files(struct rrdengine_instance *ctx)
                     1U,
                     (unsigned)idx);
 
+                nd_win_trace("scan_data_files[D]: orphan journal v2 fileno=%u", (unsigned)idx);
+#ifndef OS_WINDOWS
                 UNLINK_FILE(ctx, path, ret);
                 if (ret == 0) {
                     netdata_log_info("DBENGINE: deleting journal file without matching data file: %s", path);
                     __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
                     deleted_journals++;
                 }
+#else
+                nd_win_trace("scan_data_files[D]: skipping orphan v2 delete on Windows, fileno=%u", (unsigned)idx);
+#endif
             }
         }
+        nd_win_trace("scan_data_files[D3]: tier=%d orphan while-loop done", ctx->config.tier);
 
         if (deleted_journals)
             netdata_log_info("DBENGINE: deleted %zu journal files without matching data files", deleted_journals);
     }
+#endif /* !OS_WINDOWS */
 
+    // JudyLFreeArray triggers STATUS_HEAP_CORRUPTION (c0000374) on Windows when
+    // releasing arrays with many entries via the vendored Judy library — same
+    // root cause as the JudyLNext infinite-loop bug above. Skip the free on
+    // Windows; the arrays are process-local and reclaimed on exit anyway.
+#ifndef OS_WINDOWS
+    nd_win_trace("scan_data_files[D4]: tier=%d before JudyLFreeArray", ctx->config.tier);
     (void) JudyLFreeArray(&journafile_JudyL, NULL);
+    nd_win_trace("scan_data_files[D5]: tier=%d after JudyLFreeArray(journal)", ctx->config.tier);
     (void) JudyLFreeArray(&datafiles_JudyL, NULL);
+    nd_win_trace("scan_data_files[D6]: tier=%d after JudyLFreeArray(data)", ctx->config.tier);
+#else
+    nd_win_trace("scan_data_files[D4]: tier=%d skipping JudyLFreeArray (Windows Judy heap bug)", ctx->config.tier);
+#endif /* !OS_WINDOWS */
 
-
+    nd_win_trace("scan_data_files[E]: tier=%d orphan-check done, starting load of %d files", ctx->config.tier, matched_files);
     netdata_log_info("DBENGINE: tier %d: loading %d data/journal files...", ctx->config.tier, matched_files);
+    nd_win_trace("scan_data_files: loading %d datafile pairs from '%s'", matched_files, ctx->config.dbfiles_path);
     for (failed_to_load = 0, i = 0 ; i < matched_files ; ++i) {
         uint8_t must_delete_pair = 0;
 
         datafile = datafiles[i];
+        nd_win_trace("scan_data_files: file[%d/%d] fileno=%u: load_data_file...", i + 1, matched_files, datafile->fileno);
         ret = load_data_file(datafile);
+        nd_win_trace("scan_data_files: file[%d/%d] fileno=%u: load_data_file ret=%d", i + 1, matched_files, datafile->fileno, ret);
         if (0 != ret)
             must_delete_pair = 1;
 
         journalfile = journalfile_alloc_and_init(datafile);
+        nd_win_trace("scan_data_files: file[%d/%d] fileno=%u: journalfile_load...", i + 1, matched_files, datafile->fileno);
+        netdata_log_info("DBENGINE: tier %d: loading file %d/%d (fileno=%u)...", ctx->config.tier, i + 1, matched_files, datafile->fileno);
         ret = journalfile_load(ctx, journalfile, datafile);
+        nd_win_trace("scan_data_files: file[%d/%d] fileno=%u: journalfile_load ret=%d", i + 1, matched_files, datafile->fileno, ret);
         if (0 != ret) {
             if (!must_delete_pair) /* If datafile is still open close it */
                 close_data_file(datafile);
@@ -575,6 +621,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     }
 
     matched_files -= failed_to_load;
+    nd_win_trace("scan_data_files: done, loaded=%d failed=%d", matched_files, failed_to_load);
     freez(datafiles);
 
     return matched_files;
@@ -665,7 +712,11 @@ void cleanup_datafile_epdl_structures(struct rrdengine_datafile *datafile)
         epdl_extent_release(e);
         *PValue = NULL;
     }
+#ifndef OS_WINDOWS
     JudyLFreeArray(&datafile->extent_epdl.epdl_per_extent, PJE0);
+#else
+    datafile->extent_epdl.epdl_per_extent = NULL; // Windows Judy bug: skip free, null for safety; nodes leaked
+#endif
     rw_spinlock_write_unlock(&datafile->extent_epdl.spinlock);
 }
 

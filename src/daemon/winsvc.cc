@@ -3,6 +3,7 @@ extern "C" {
 #include "daemon.h"
 #include "libnetdata/libnetdata.h"
 #include "daemon/daemon-shutdown.h"
+#include "daemon/daemon-shutdown-watcher.h"
 
 int netdata_main(int argc, char *argv[]);
 void nd_process_signals(void);
@@ -17,7 +18,21 @@ static void netdata_service_log(const char *fmt, ...)
 
     FILE *fp = fopen(path, "a");
     if (fp == NULL) {
-        return;
+        // LOG_DIR is a POSIX path compiled for the staging environment
+        // (e.g. /opt/netdata/var/log/netdata).  UCRT64 binaries use the
+        // native Windows CRT directly — there is no msys-2.0.dll POSIX path
+        // translation layer — so /opt/netdata/... resolves to
+        // C:\opt\netdata\... on the target machine, which never exists.
+        // Fall back to the Windows temp directory, which is always writable
+        // by the service account (SYSTEM writes to C:\Windows\Temp\).
+        char tmp_dir[FILENAME_MAX + 1];
+        DWORD tmp_len = GetTempPathA(FILENAME_MAX, tmp_dir);
+        if (tmp_len > 0 && tmp_len < FILENAME_MAX - 24) {
+            snprintfz(path, FILENAME_MAX, "%snetdata-service.log", tmp_dir);
+            fp = fopen(path, "a");
+        }
+        if (fp == NULL)
+            return;
     }
 
     SYSTEMTIME time;
@@ -42,6 +57,9 @@ static HANDLE svc_stop_event_handle = nullptr;
 static DWORD svc_stop_control_code = SERVICE_CONTROL_STOP;
 
 static ND_THREAD *cleanup_thread = nullptr;
+
+// Signals the stop-pending heartbeat thread to exit.
+static HANDLE svc_heartbeat_done_event = nullptr;
 
 static bool ReportSvcStatus(DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD dwWaitHint, DWORD dwControlsAccepted)
 {
@@ -87,6 +105,26 @@ static HANDLE CreateEventHandle(const char *msg)
     return h;
 }
 
+// Called by the watcher before abort() when a shutdown step times out.
+// Reports SERVICE_STOPPED so the SCM marks the service as stopped rather than
+// crashed; the process then terminates via abort() a few instructions later.
+static void svc_report_stopped_before_abort(void)
+{
+    ReportSvcStatus(SERVICE_STOPPED, 0, 0, 0);
+}
+
+// Heartbeat thread: keeps re-sending SERVICE_STOP_PENDING every 2 s so the
+// SCM does not fire error 1053 while netdata_exit_gracefully() runs.
+// Exits when svc_heartbeat_done_event is signalled.
+static DWORD WINAPI stop_pending_heartbeat(LPVOID /*unused*/)
+{
+    // dwWaitHint of 5000 ms; heartbeat fires every 2000 ms — well within the hint.
+    while (WaitForSingleObject(svc_heartbeat_done_event, 2000) == WAIT_TIMEOUT)
+        ReportSvcStatus(SERVICE_STOP_PENDING, 0, 5000, 0);
+
+    return 0;
+}
+
 static void call_netdata_cleanup(void *arg)
 {
     UNUSED(arg);
@@ -94,6 +132,14 @@ static void call_netdata_cleanup(void *arg)
     // Wait until we have to stop the service
     netdata_service_log("Cleanup thread waiting for stop event...");
     WaitForSingleObject(svc_stop_event_handle, INFINITE);
+
+    // Keep the SCM informed while cleanup runs; without periodic
+    // SERVICE_STOP_PENDING updates the SCM times out (error 1053) if
+    // netdata_exit_gracefully() takes longer than dwWaitHint (5 s).
+    svc_heartbeat_done_event = CreateEvent(NULL, TRUE, FALSE, NULL);
+    HANDLE heartbeat = nullptr;
+    if (svc_heartbeat_done_event)
+        heartbeat = CreateThread(NULL, 0, stop_pending_heartbeat, NULL, 0, NULL);
 
     // Stop the agent
     netdata_service_log("Running netdata cleanup...");
@@ -111,7 +157,24 @@ static void call_netdata_cleanup(void *arg)
             reason = EXIT_REASON_SERVICE_STOP;
             break;
     }
+
+    // If the shutdown watcher times out and calls abort(), report SERVICE_STOPPED
+    // to the SCM first so the service is not recorded as crashed.
+    nd_register_shutdown_timeout_cb(svc_report_stopped_before_abort);
     netdata_exit_gracefully(reason, false);
+    // Cleanup completed normally — no longer need the abort callback.
+    nd_register_shutdown_timeout_cb(NULL);
+
+    // Stop the heartbeat before reporting SERVICE_STOPPED.
+    if (svc_heartbeat_done_event) {
+        SetEvent(svc_heartbeat_done_event);
+        if (heartbeat) {
+            WaitForSingleObject(heartbeat, 5000);
+            CloseHandle(heartbeat);
+        }
+        CloseHandle(svc_heartbeat_done_event);
+        svc_heartbeat_done_event = nullptr;
+    }
 
     // Close event handle
     netdata_service_log("Closing stop event handle...");
@@ -202,7 +265,6 @@ void WINAPI ServiceMain(DWORD argc, LPSTR* argv)
     // Run the agent
     netdata_service_log("Running the agent...");
     netdata_main(argc, argv);
-
     netdata_service_log("Agent has been started...");
 }
 
@@ -234,38 +296,47 @@ static bool update_path() {
 
 int main(int argc, char *argv[])
 {
-#if defined(OS_WINDOWS) && defined(RUN_UNDER_CLION)
-    bool tty = true;
-#else
-    bool tty = isatty(fileno(stdin)) == 1;
-#endif
-
     if (!update_path()) {
         return 1;
     }
 
-    if (tty)
-    {
-        int rc = netdata_main(argc, argv);
-        if (rc != 10)
-            return rc;
+    // Derive the install prefix from the binary location and override
+    // all netdata_configured_* path globals with the real installed
+    // paths before netdata_main() or StartServiceCtrlDispatcher() runs.
+    // Without this, compile-time POSIX staging paths (/opt/netdata/...)
+    // would be used, which UCRT64 resolves as C:\opt\netdata\... —
+    // a path that never exists on a target machine.
+    nd_windows_detect_prefix_and_override_paths();
 
-        nd_process_signals();
-        return 1;
-    }
-    else
-    {
-        SERVICE_TABLE_ENTRY serviceTable[] = {
-            { strdupz("Netdata"), ServiceMain },
-            { nullptr, nullptr }
-        };
+    SERVICE_TABLE_ENTRY serviceTable[] = {
+        { strdupz("Netdata"), ServiceMain },
+        { nullptr, nullptr }
+    };
 
-        if (!StartServiceCtrlDispatcher(serviceTable))
+    if (!StartServiceCtrlDispatcher(serviceTable))
+    {
+        DWORD err = GetLastError();
+        if (err == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT)
         {
-            netdata_service_log("@main() - StartServiceCtrlDispatcher() failed...");
+            // Not invoked by the Service Control Manager — run in CLI mode.
+            // This covers interactive terminals, GDB, PowerShell, CLion, and
+            // CI scripts.  StartServiceCtrlDispatcher() is the authoritative
+            // Windows API for detecting service context: unlike isatty(), it
+            // returns ERROR_FAILED_SERVICE_CONTROLLER_CONNECT correctly on
+            // UCRT64 even when Windows allocates an invisible console for the
+            // process (which causes isatty() to return true for service
+            // processes linked against the native CRT).
+            int rc = netdata_main(argc, argv);
+            if (rc != 10)
+                return rc;
+
+            nd_process_signals();
             return 1;
         }
 
-        return 0;
+        netdata_service_log("@main() - StartServiceCtrlDispatcher() failed (%lu)", (unsigned long)err);
+        return 1;
     }
+
+    return 0;
 }

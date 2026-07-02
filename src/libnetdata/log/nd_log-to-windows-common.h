@@ -10,11 +10,17 @@
 #define NETDATA_ETW_PROVIDER_GUID_STR       "{96c5ca72-9bd8-4634-81e5-000014e7da7a}"
 #define NETDATA_ETW_PROVIDER_GUID_STR_W     WIDEN(NETDATA_ETW_PROVIDER_GUID)
 
+// WEL importChannel provider GUIDs — must match the manifest registered by wevtutil im.
+// DAEMON_GUID_STR_W is also used as the WINEVT registry check key in wel_manifest_is_current().
+#define NETDATA_WEL_PROVIDER_DAEMON_GUID_STR        "{5CA72004-9BD8-4634-81E5-000014E7DAAD}"
+#define NETDATA_WEL_PROVIDER_DAEMON_GUID_STR_W      WIDEN(NETDATA_WEL_PROVIDER_DAEMON_GUID_STR)
+#define NETDATA_WEL_PROVIDER_COLLECTORS_GUID_STR    "{5CA72003-9BD8-4634-81E5-000014E7DAAC}"
+#define NETDATA_WEL_PROVIDER_ACCESS_GUID_STR        "{5CA72002-9BD8-4634-81E5-000014E7DAAB}"
+#define NETDATA_WEL_PROVIDER_HEALTH_GUID_STR        "{5CA72005-9BD8-4634-81E5-000014E7DAAA}"
+#define NETDATA_WEL_PROVIDER_ACLK_GUID_STR          "{5CA72001-9BD8-4634-81E5-000014E7DAA9}"
+
 #define NETDATA_CHANNEL_NAME                "Netdata"
 #define NETDATA_CHANNEL_NAME_W              WIDEN(NETDATA_CHANNEL_NAME)
-
-#define NETDATA_WEL_CHANNEL_NAME            "NetdataWEL"
-#define NETDATA_WEL_CHANNEL_NAME_W          WIDEN(NETDATA_WEL_CHANNEL_NAME)
 
 #define NETDATA_ETW_CHANNEL_NAME            "Netdata"
 #define NETDATA_ETW_CHANNEL_NAME_W          WIDEN(NETDATA_ETW_CHANNEL_NAME)
@@ -55,6 +61,13 @@
 
 #define NETDATA_ETW_SUBCHANNEL_HEALTH       "Health"
 #define NETDATA_ETW_SUBCHANNEL_HEALTH_W     WIDEN(NETDATA_ETW_SUBCHANNEL_HEALTH)
+
+// WEL channel names — match ETW channel names so classic WEL events land in the same .evtx files
+#define NETDATA_WEL_CHANNEL_ACCESS_W        L"Netdata/Access"
+#define NETDATA_WEL_CHANNEL_ACLK_W          L"Netdata/Aclk"
+#define NETDATA_WEL_CHANNEL_COLLECTORS_W    L"Netdata/Collectors"
+#define NETDATA_WEL_CHANNEL_DAEMON_W        L"Netdata/Daemon"
+#define NETDATA_WEL_CHANNEL_HEALTH_W        L"Netdata/Health"
 
 // Define shift values
 #define EVENT_ID_SEV_SHIFT          30

@@ -584,7 +584,9 @@ size_t string_destroy(void) {
             }
             
             // Free the JudyL pointers array
+#ifndef OS_WINDOWS
             JudyLFreeArray(&string_base[partition].JudyLPointers, PJE0);
+#endif
             string_base[partition].JudyLPointers = NULL;
         }
 #endif
@@ -596,7 +598,9 @@ size_t string_destroy(void) {
             referenced += string_base[partition].entries;
 
             // Free the JudyHS array
+#ifndef OS_WINDOWS
             JudyHSFreeArray(&string_base[partition].JudyHSArray, PJE0);
+#endif
             string_base[partition].JudyHSArray = NULL;
         }
 
@@ -688,8 +692,13 @@ size_t string_destroy(void) {
     
     // Clean up
     freez(entries);
-    if (string_counts)
+    if (string_counts) {
+#ifndef OS_WINDOWS
         JudyLFreeArray(&string_counts, PJE0);
+#else
+        string_counts = NULL;
+#endif
+    }
     buffer_free(wb);
 #endif
 

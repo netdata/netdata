@@ -48,6 +48,8 @@
                 <ComponentRef Id="NetdataRoot" />
                 <ComponentRef Id="NetdataVarLib" />
                 <ComponentRef Id="NetdataVarLibNetdata" />
+                <ComponentRef Id="NetdataVarLog" />
+                <ComponentRef Id="NetdataVarLogNetdata" />
                 <ComponentRef Id="NetdataEtcGo" />
                 <ComponentRef Id="NetdataEtcHealth" />
                 <ComponentRef Id="NetdataEtcPython" />
@@ -69,6 +71,9 @@
                         <Directory Id="VARCACHEDIR" Name="cache" />
                         <Directory Id="VARLIBDIR" Name="lib">
                             <Directory Id="VARLIBDIRNETDATA" Name="netdata" />
+                        </Directory>
+                        <Directory Id="VARLOGDIR" Name="log">
+                            <Directory Id="VARLOGDIRNETDATA" Name="netdata" />
                         </Directory>
                     </Directory>
                     <Directory Id="ETCDIR" Name="etc">
@@ -208,6 +213,14 @@
                 <CreateFolder />
             </Component>
 
+            <Component Id="NetdataVarLog" Directory="VARLOGDIR" Guid="a5357a5e-743f-41a1-a038-abf442af6a9b">
+                <CreateFolder />
+            </Component>
+
+            <Component Id="NetdataVarLogNetdata" Directory="VARLOGDIRNETDATA" Guid="0a09c924-e377-4e9d-b44b-34a80d468064">
+                <CreateFolder />
+            </Component>
+
             <Component Id="NetdataDevShm" Directory="DEVSHMDIR" Guid="cbe39d53-a5c8-4375-9b25-e24df4d411be">
                 <CreateFolder />
             </Component>
@@ -300,7 +313,7 @@
                 Impersonate="no"
             />
             <InstallExecuteSequence>
-                <Custom Action="DllPermission" After="InstallFiles" />
+                <Custom Action="DllPermission" After="InstallFiles" Condition="NOT REMOVE" />
             </InstallExecuteSequence>
 
             <SetProperty
@@ -318,7 +331,55 @@
                 Impersonate="no"
             />
             <InstallExecuteSequence>
-                <Custom Action="InstallManifest" After="InstallFiles" />
+                <Custom Action="InstallManifest" After="DllPermission" Condition="NOT REMOVE" />
+            </InstallExecuteSequence>
+
+            <!-- Unregister the manifest on a pure uninstall (REMOVE="ALL").
+                 Scheduled Before="RemoveFiles" so the manifest XML is still in System32
+                 when wevtutil reads it.
+                 Return=ignore because wevtutil um fails harmlessly when nothing is registered. -->
+            <SetProperty
+                Id="UninstallManifest"
+                Value="&quot;[System64Folder]wevtutil.exe&quot; um &quot;[System64Folder]wevt_netdata_manifest.xml&quot;"
+                Before="UninstallManifest"
+                Sequence="execute"
+            />
+            <CustomAction
+                Id="UninstallManifest"
+                BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+                DllEntry="WixQuietExec"
+                Execute="deferred"
+                Return="ignore"
+                Impersonate="no"
+            />
+            <InstallExecuteSequence>
+                <Custom Action="UninstallManifest" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot;" />
+            </InstallExecuteSequence>
+
+            <!-- Unregister the manifest on upgrade. With Schedule="afterInstallValidate",
+                 RemoveExistingProducts runs first and deletes the old manifest, so we must
+                 fire After="InstallFiles" when the new manifest is already in System32.
+                 Provider names and GUIDs are unchanged across versions so wevtutil um with
+                 the new manifest correctly unregisters the old publisher before wevtutil im
+                 re-registers it via InstallManifest.
+                 WiX requires a separate action identifier — a single action cannot be
+                 scheduled at two positions in the same InstallExecuteSequence. -->
+            <SetProperty
+                Id="UninstallManifestUpgrade"
+                Value="&quot;[System64Folder]wevtutil.exe&quot; um &quot;[System64Folder]wevt_netdata_manifest.xml&quot;"
+                Before="UninstallManifestUpgrade"
+                Sequence="execute"
+            />
+            <CustomAction
+                Id="UninstallManifestUpgrade"
+                BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+                DllEntry="WixQuietExec"
+                Execute="deferred"
+                Return="ignore"
+                Impersonate="no"
+            />
+            <InstallExecuteSequence>
+                <Custom Action="UninstallManifestUpgrade" After="InstallFiles" Condition="WIX_UPGRADE_DETECTED" />
             </InstallExecuteSequence>
 
             <Component Id="NetdataService" Directory="USRBINDIR">

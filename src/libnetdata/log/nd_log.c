@@ -304,7 +304,7 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
         if(src != source && src < _NDLS_MAX) {
             source = src;
             output = nd_logger_select_output(source, &fp, &fd, &mutex);
-            if(output != NDLM_FILE && output != NDLM_JOURNAL && output != NDLM_SYSLOG)
+            if(!IS_FINAL_LOG_METHOD(output))
                 return;
         }
     }

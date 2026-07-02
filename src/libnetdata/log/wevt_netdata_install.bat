@@ -16,6 +16,10 @@ echo Uninstalling previous manifest (if any)...
 wevtutil um "%MAN_SRC%"
 
 echo.
+echo Removing legacy NetdataWEL registry entries (if any)...
+reg delete "HKLM\SYSTEM\CurrentControlSet\Services\EventLog\NetdataWEL" /f 2>nul
+
+echo.
 echo Copying %DLL_SRC% to %DLL_DST%
 copy /y "%DLL_SRC%" "%DLL_DST%"
 if %errorlevel% neq 0 (
@@ -43,8 +47,7 @@ echo.
 echo Verifying Netdata Publisher for Event Tracing for Windows (ETW)...
 wevtutil gp "Netdata"
 if %errorlevel% neq 0 (
-    echo Error: Failed to get publisher Netdata.
-    exit /b 1
+    echo Warning: ETW publisher 'Netdata' not found - this is expected on WEL-only builds.
 )
 
 echo.
@@ -53,6 +56,7 @@ wevtutil sl "Netdata/Daemon" /ms:104857600
 wevtutil sl "Netdata/Collectors" /ms:104857600
 wevtutil sl "Netdata/Health" /ms:104857600
 wevtutil sl "Netdata/Access" /ms:104857600
+wevtutil sl "Netdata/Aclk" /ms:5242880
 
 echo.
 echo Netdata Event Tracing for Windows manifest installed successfully.

@@ -2112,8 +2112,11 @@ PGC *pgc_create(const char *name,
 
     // last create the eviction thread
     {
+        nd_win_trace("pgc_create(%s): completion_init...", name);
         completion_init(&cache->evictor.completion);
+        nd_win_trace("pgc_create(%s): nd_thread_create...", name);
         cache->evictor.thread = nd_thread_create(name, NETDATA_THREAD_OPTION_DEFAULT, pgc_evict_thread, cache);
+        nd_win_trace("pgc_create(%s): nd_thread_create done (thread=%p)", name, (void *)cache->evictor.thread);
     }
 
     return cache;

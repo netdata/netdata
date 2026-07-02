@@ -1,9 +1,20 @@
 #!/bin/bash
 
 repo_root="$(dirname "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null && pwd -P)")")"
+# win-build-dir.sh references ${REPO_ROOT} (uppercase); set it here so the
+# build directory resolves correctly when BUILD_DIR is not explicitly provided.
+REPO_ROOT="${repo_root}"
 
 # shellcheck source=./win-build-dir.sh
 . "${repo_root}/packaging/windows/win-build-dir.sh"
+
+# Prepend UCRT64 toolchain so cmake, ldd.exe, and other build tools resolve
+# to the UCRT64 native Windows binaries instead of the POSIX MSYS2 wrappers.
+# cmake --install must use the same cmake that generated cmake_install.cmake
+# (i.e. /ucrt64/bin/cmake); the POSIX cmake at /usr/bin/cmake treats Windows
+# absolute paths (C:/...) as relative paths and fails with path concatenation
+# errors.  This mirrors the PATH setup in compile-on-windows.sh.
+export PATH="/ucrt64/bin:/ucrt64/sbin:${PATH}"
 
 set -eu -o pipefail
 
@@ -17,8 +28,42 @@ if [ -f /opt/netdata/usr/bin/bashbug ]; then
     rm -rf /opt/netdata/usr/bin/bashbug
 fi
 
+runtime_dll_destination="/opt/netdata/usr/bin"
+mkdir -p "${runtime_dll_destination}"
+
+${GITHUB_ACTIONS+echo "::group::Staging Windows runtime DLLs"}
+# Resolve build to an absolute POSIX path so the glob expands correctly
+# regardless of CWD when the script is invoked.
+case "${build}" in
+    /*) build_abs="${build}" ;;
+    *)  build_abs="$(cd "${build}" && pwd -P)" ;;
+esac
+
+# compile-on-windows.sh already staged all transitive UCRT64 runtime DLLs
+# for netdata.exe into the build tree.  Copy them before cmake --install so
+# they land in the staging area regardless of cmake's exit status.
+for dll in "${build_abs}"/lib*.dll "${build_abs}"/zlib1.dll; do
+    [ -f "${dll}" ] || continue
+    cp "${dll}" "${runtime_dll_destination}/"
+done
+${GITHUB_ACTIONS+echo "::endgroup::"}
+
 ${GITHUB_ACTIONS+echo "::group::Installing"}
-cmake --install "${build}"
+/ucrt64/bin/cmake --install "${build}"
+${GITHUB_ACTIONS+echo "::endgroup::"}
+
+${GITHUB_ACTIONS+echo "::group::Staging plugin DLLs"}
+# Stage DLLs for plugins, which may have additional dependencies
+# beyond what netdata.exe needs.
+for runtime_executable in \
+    /opt/netdata/usr/bin/*.exe \
+    /opt/netdata/usr/libexec/netdata/plugins.d/*.exe \
+    /opt/netdata/usr/libexec/netdata/plugins.d/*.plugin \
+    /opt/netdata/usr/libexec/netdata/plugins.d/*.plugin.exe; do
+    if [ -f "${runtime_executable}" ]; then
+        "${repo_root}/packaging/windows/stage-runtime-dlls.sh" "${runtime_executable}" "${runtime_dll_destination}"
+    fi
+done
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 if [ ! -f "/msys2-latest.tar.zst" ]; then
