@@ -1,0 +1,151 @@
+---
+# Amazon EventBridge rule metrics (namespace AWS/Events).
+#
+# Per rule ({RuleName}) on the default event bus. EventBridge emits count metrics only when
+# non-zero, so idle rules show gaps that the collector records as 0 for the rate/sum metrics.
+version: v1
+display_name: Amazon EventBridge
+namespace: AWS/Events
+period: 300
+instance:
+  dimensions:
+    - name: RuleName
+      label: rule_name
+metrics:
+  - id: invocations
+    metric_name: Invocations
+    statistics: [sum]
+    rate: true
+  - id: failed_invocations
+    metric_name: FailedInvocations
+    statistics: [sum]
+    rate: true
+  - id: matched_events
+    metric_name: MatchedEvents
+    statistics: [sum]
+    rate: true
+  - id: triggered_rules
+    metric_name: TriggeredRules
+    statistics: [sum]
+    rate: true
+  - id: ingestion_to_invocation_start_latency
+    metric_name: IngestionToInvocationStartLatency
+    statistics: [average]
+  - id: ingestion_to_invocation_success_latency
+    metric_name: IngestionToInvocationSuccessLatency
+    statistics: [average]
+  - id: ingestion_to_invocation_complete_latency
+    metric_name: IngestionToInvocationCompleteLatency
+    statistics: [average]
+  # ----------------------------------------------------------------------------------------
+  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
+  # matching chart in the charts section below. All are published at the {RuleName} grain.
+  # ----------------------------------------------------------------------------------------
+  # - id: dead_letter_invocations
+  #   metric_name: DeadLetterInvocations
+  #   statistics: [sum]
+  #   rate: true
+  # - id: throttled_rules
+  #   metric_name: ThrottledRules
+  #   statistics: [sum]
+  #   rate: true
+  # - id: invocation_attempts
+  #   metric_name: InvocationAttempts
+  #   statistics: [sum]
+  #   rate: true
+  # - id: successful_invocation_attempts
+  #   metric_name: SuccessfulInvocationAttempts
+  #   statistics: [sum]
+  #   rate: true
+  # - id: retry_invocation_attempts
+  #   metric_name: RetryInvocationAttempts
+  #   statistics: [sum]
+  #   rate: true
+  # - id: invocations_sent_to_dlq
+  #   metric_name: InvocationsSentToDlq
+  #   statistics: [sum]
+  #   rate: true
+  # - id: invocations_failed_to_be_sent_to_dlq
+  #   metric_name: InvocationsFailedToBeSentToDlq
+  #   statistics: [sum]
+  #   rate: true
+template:
+  family: EventBridge
+  context_namespace: eventbridge
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, rule_name]
+  charts:
+    - id: cw_eventbridge_invocations
+      context: invocations
+      title: EventBridge Target Invocations
+      family: Invocations
+      units: invocations/s
+      algorithm: absolute
+      dimensions:
+        - selector: invocations_sum
+          name: invocations
+        - selector: failed_invocations_sum
+          name: failed
+    - id: cw_eventbridge_rule_activity
+      context: rule_activity
+      title: EventBridge Rule Activity
+      family: Rules
+      units: events/s
+      algorithm: absolute
+      dimensions:
+        - selector: matched_events_sum
+          name: matched_events
+        - selector: triggered_rules_sum
+          name: triggered_rules
+    - id: cw_eventbridge_latency
+      context: latency
+      title: EventBridge Ingestion-to-Invocation Latency
+      family: Latency
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: ingestion_to_invocation_start_latency_average
+          name: start
+        - selector: ingestion_to_invocation_success_latency_average
+          name: success
+        - selector: ingestion_to_invocation_complete_latency_average
+          name: complete
+    # ----------------------------------------------------------------------------------------
+    # Charts for the optional metrics above. Uncomment a chart together with its metric(s).
+    # ----------------------------------------------------------------------------------------
+    # - id: cw_eventbridge_dlq
+    #   context: dlq
+    #   title: EventBridge Dead-Letter Invocations
+    #   family: Invocations
+    #   units: invocations/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: dead_letter_invocations_sum
+    #       name: dead_letter
+    #     - selector: invocations_sent_to_dlq_sum
+    #       name: sent_to_dlq
+    #     - selector: invocations_failed_to_be_sent_to_dlq_sum
+    #       name: failed_to_dlq
+    # - id: cw_eventbridge_throttled
+    #   context: throttled_rules
+    #   title: EventBridge Throttled Rules
+    #   family: Rules
+    #   units: events/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: throttled_rules_sum
+    #       name: throttled
+    # - id: cw_eventbridge_attempts
+    #   context: invocation_attempts
+    #   title: EventBridge Invocation Attempts
+    #   family: Invocations
+    #   units: invocations/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: invocation_attempts_sum
+    #       name: attempts
+    #     - selector: successful_invocation_attempts_sum
+    #       name: successful
+    #     - selector: retry_invocation_attempts_sum
+    #       name: retries

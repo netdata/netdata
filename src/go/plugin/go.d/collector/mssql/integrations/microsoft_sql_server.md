@@ -29,6 +29,18 @@ It collects metrics from:
 - Per-database transaction and lock statistics
 - SQL Server Agent job status and execution history
 - Always On Availability Group health, replica states, and per-database synchronization metrics
+- Replication publication status, warnings, latency, and subscription counts
+
+All SQL Server editions are supported, including Express, Developer, Standard, Enterprise, and Web.
+On editions that lack certain features, the collector omits the unavailable metrics and continues
+collecting the rest:
+- SQL Server Express and other editions without SQL Server Agent: job metrics are not collected.
+- Editions without Always On Availability Groups (e.g., Express): AG metrics are not collected.
+- Editions without replication configured: replication metrics are not collected.
+
+Core metrics — performance counters, wait statistics, locks, per-database transactions, I/O latency,
+and memory — are collected on every edition without special configuration. The top-queries function
+is available on Express 2016 SP1 and later when Query Store is enabled.
 
 
 It connects to the SQL Server instance via TCP using the go-mssqldb driver and executes queries against:

@@ -1,0 +1,97 @@
+---
+version: v1
+display_name: Amazon SNS
+namespace: AWS/SNS
+period: 300
+instance:
+  dimensions:
+    - name: TopicName
+      label: topic_name
+metrics:
+  - id: number_of_messages_published
+    metric_name: NumberOfMessagesPublished
+    statistics: [sum]
+    rate: true
+  - id: number_of_notifications_delivered
+    metric_name: NumberOfNotificationsDelivered
+    statistics: [sum]
+    rate: true
+  - id: number_of_notifications_failed
+    metric_name: NumberOfNotificationsFailed
+    statistics: [sum]
+    rate: true
+  - id: number_of_notifications_filtered_out
+    metric_name: NumberOfNotificationsFilteredOut
+    statistics: [sum]
+    rate: true
+  - id: publish_size
+    metric_name: PublishSize
+    statistics: [average]
+  # ----------------------------------------------------------------------------------------
+  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
+  # matching chart in the charts: section below. All are published at the {TopicName} grain.
+  # ----------------------------------------------------------------------------------------
+  # - id: number_of_notifications_redriven_to_dlq
+  #   metric_name: NumberOfNotificationsRedrivenToDlq
+  #   statistics: [sum]
+  #   rate: true
+  # - id: number_of_notifications_failed_to_redrive_to_dlq
+  #   metric_name: NumberOfNotificationsFailedToRedriveToDlq
+  #   statistics: [sum]
+  #   rate: true
+  # Filtered-out breakdowns (NumberOfNotificationsFilteredOut-MessageAttributes / -MessageBody /
+  # -InvalidAttributes / -NoMessageAttributes) are also at {TopicName}. SMS (PhoneNumber grain),
+  # mobile-push (Application/Platform grains), and account-level SMS spend need their own profiles.
+  # See: https://docs.aws.amazon.com/sns/latest/dg/sns-monitoring-using-cloudwatch.html
+template:
+  family: SNS
+  context_namespace: sns
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, topic_name]
+  charts:
+    - id: cw_sns_published
+      context: messages_published
+      title: SNS Messages Published
+      family: Messages
+      units: messages/s
+      algorithm: absolute
+      dimensions:
+        - selector: number_of_messages_published_sum
+          name: published
+    - id: cw_sns_notifications
+      context: notifications
+      title: SNS Notifications
+      family: Notifications
+      units: notifications/s
+      algorithm: absolute
+      dimensions:
+        - selector: number_of_notifications_delivered_sum
+          name: delivered
+        - selector: number_of_notifications_failed_sum
+          name: failed
+        - selector: number_of_notifications_filtered_out_sum
+          name: filtered_out
+    - id: cw_sns_publish_size
+      context: publish_size
+      title: SNS Published Message Size
+      family: Messages
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: publish_size_average
+          name: size
+    # ----------------------------------------------------------------------------------------
+    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # ----------------------------------------------------------------------------------------
+    # - id: cw_sns_dlq
+    #   context: dlq_redrive
+    #   title: SNS Dead-Letter Queue Redrive
+    #   family: Notifications
+    #   units: notifications/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: number_of_notifications_redriven_to_dlq_sum
+    #       name: redriven
+    #     - selector: number_of_notifications_failed_to_redrive_to_dlq_sum
+    #       name: failed_redrive

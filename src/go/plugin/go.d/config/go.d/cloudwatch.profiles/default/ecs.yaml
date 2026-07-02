@@ -1,0 +1,68 @@
+---
+version: v1
+display_name: Amazon ECS
+namespace: AWS/ECS
+period: 300
+instance:
+  dimensions:
+    - name: ClusterName
+      label: cluster_name
+    - name: ServiceName
+      label: service_name
+metrics:
+  - id: cpu_utilization
+    metric_name: CPUUtilization
+    statistics: [average]
+  - id: memory_utilization
+    metric_name: MemoryUtilization
+    statistics: [average]
+  - id: ebs_filesystem_utilization
+    metric_name: EBSFilesystemUtilization
+    statistics: [average]
+  - id: live_task_count
+    metric_name: LiveTaskCount
+    statistics: [average]
+  # ----------------------------------------------------------------------------------------
+  # AWS/ECS free metrics at the service grain are intentionally few. Metrics at other grains
+  # need their own profile:
+  #   - Cluster-capacity reservations {ClusterName}: CPUReservation, MemoryReservation, GPUReservation.
+  #   - Service Connect {DiscoveryName, ServiceName, ClusterName}: RequestCount, TargetResponseTime, ...
+  #   - Per-task / per-container detail: the ECS/ContainerInsights namespace (opt-in, billed as custom
+  #     metrics).
+  # See: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/available-metrics.html
+template:
+  family: ECS
+  context_namespace: ecs
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, cluster_name, service_name]
+  charts:
+    - id: cw_ecs_utilization
+      context: utilization
+      title: ECS Service Utilization
+      family: Utilization
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: cpu_utilization_average
+          name: cpu
+        - selector: memory_utilization_average
+          name: memory
+    - id: cw_ecs_ebs_filesystem
+      context: ebs_filesystem_utilization
+      title: ECS EBS Filesystem Utilization
+      family: Utilization
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: ebs_filesystem_utilization_average
+          name: ebs_filesystem
+    - id: cw_ecs_tasks
+      context: live_task_count
+      title: ECS Live Task Count
+      family: Tasks
+      units: tasks
+      algorithm: absolute
+      dimensions:
+        - selector: live_task_count_average
+          name: live

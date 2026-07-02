@@ -1,0 +1,99 @@
+---
+version: v1
+display_name: AWS API Gateway
+namespace: AWS/ApiGateway
+period: 300
+instance:
+  dimensions:
+    - name: ApiName
+      label: api_name
+metrics:
+  - id: count
+    metric_name: Count
+    # Count is 1 per request: Sum = request total (== SampleCount). Kept as Sum to match the error/cache
+    # counters below, which must use Sum (they are 0/1 per request, so SampleCount would be total requests).
+    statistics: [sum]
+    rate: true
+  - id: error_4xx
+    metric_name: 4XXError
+    statistics: [sum]
+    rate: true
+  - id: error_5xx
+    metric_name: 5XXError
+    statistics: [sum]
+    rate: true
+  - id: latency
+    metric_name: Latency
+    statistics: [average]
+  - id: integration_latency
+    metric_name: IntegrationLatency
+    statistics: [average]
+  # ----------------------------------------------------------------------------------------
+  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
+  # matching chart in the charts: section below. Both are published at the {ApiName} grain and
+  # appear only when API caching is enabled on a stage.
+  # ----------------------------------------------------------------------------------------
+  # - id: cache_hit_count
+  #   metric_name: CacheHitCount
+  #   statistics: [sum]
+  #   rate: true
+  # - id: cache_miss_count
+  #   metric_name: CacheMissCount
+  #   statistics: [sum]
+  #   rate: true
+  # Metrics at other grains need their own profile: per-stage {ApiName, Stage} and per-method
+  # {ApiName, Method, Resource, Stage} (the latter requires detailed metrics, opt-in + paid).
+  # HTTP APIs (v2) use the {ApiId} dimension and 4xx/5xx metric names -- a separate profile. See:
+  # https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-metrics-and-dimensions.html
+template:
+  family: API Gateway
+  context_namespace: api_gateway
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, api_name]
+  charts:
+    - id: cw_apigw_requests
+      context: requests
+      title: API Gateway Requests
+      family: Requests
+      units: requests/s
+      algorithm: absolute
+      dimensions:
+        - selector: count_sum
+          name: requests
+    - id: cw_apigw_errors
+      context: errors
+      title: API Gateway Errors
+      family: Errors
+      units: errors/s
+      algorithm: absolute
+      dimensions:
+        - selector: error_4xx_sum
+          name: 4xx
+        - selector: error_5xx_sum
+          name: 5xx
+    - id: cw_apigw_latency
+      context: latency
+      title: API Gateway Latency
+      family: Latency
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: latency_average
+          name: total
+        - selector: integration_latency_average
+          name: integration
+    # ----------------------------------------------------------------------------------------
+    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # ----------------------------------------------------------------------------------------
+    # - id: cw_apigw_cache
+    #   context: cache
+    #   title: API Gateway Cache
+    #   family: Cache
+    #   units: events/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: cache_hit_count_sum
+    #       name: hit
+    #     - selector: cache_miss_count_sum
+    #       name: miss

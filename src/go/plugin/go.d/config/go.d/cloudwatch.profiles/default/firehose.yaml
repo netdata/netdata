@@ -1,0 +1,143 @@
+---
+version: v1
+display_name: Amazon Data Firehose
+namespace: AWS/Firehose
+period: 300
+instance:
+  dimensions:
+    - name: DeliveryStreamName
+      label: delivery_stream_name
+metrics:
+  - id: incoming_bytes
+    metric_name: IncomingBytes
+    statistics: [sum]
+    rate: true
+  - id: incoming_records
+    metric_name: IncomingRecords
+    statistics: [sum]
+    rate: true
+  - id: incoming_put_requests
+    metric_name: IncomingPutRequests
+    statistics: [sum]
+    rate: true
+  - id: throttled_records
+    metric_name: ThrottledRecords
+    statistics: [sum]
+    rate: true
+  - id: delivery_to_s3_records
+    metric_name: DeliveryToS3.Records
+    statistics: [sum]
+    rate: true
+  - id: delivery_to_s3_bytes
+    metric_name: DeliveryToS3.Bytes
+    statistics: [sum]
+    rate: true
+  - id: delivery_to_s3_data_freshness
+    metric_name: DeliveryToS3.DataFreshness
+    statistics: [maximum]
+  - id: delivery_to_s3_success
+    metric_name: DeliveryToS3.Success
+    statistics: [average]
+  # ----------------------------------------------------------------------------------------
+  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
+  # matching chart in the charts: section below. All are published at the {DeliveryStreamName}
+  # grain. NOTE: DeliveryTo* metrics only appear for the stream's configured destination.
+  # ----------------------------------------------------------------------------------------
+  # - id: bytes_per_second_limit
+  #   metric_name: BytesPerSecondLimit
+  #   statistics: [average]
+  # - id: records_per_second_limit
+  #   metric_name: RecordsPerSecondLimit
+  #   statistics: [average]
+  # Destination-conditional metric families (same {DeliveryStreamName} grain, only for the configured
+  # destination): DeliveryToAmazonOpenSearchService.*, DeliveryToRedshift.*, DeliveryToSplunk.*,
+  # DeliveryToSnowflake.*, DeliveryToHttpEndpoint.*. Also source metrics (DataReadFromKinesisStream.*,
+  # KinesisMillisBehindLatest), data-transformation (ExecuteProcessing.*, SucceedProcessing.*),
+  # and backup (BackupToS3.*). Add the ones your stream uses. See:
+  # https://docs.aws.amazon.com/firehose/latest/dev/monitoring-with-cloudwatch-metrics.html
+template:
+  family: Firehose
+  context_namespace: firehose
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, delivery_stream_name]
+  charts:
+    - id: cw_firehose_records
+      context: records
+      title: Firehose Records
+      family: Records
+      units: records/s
+      algorithm: absolute
+      dimensions:
+        - selector: incoming_records_sum
+          name: incoming
+        - selector: delivery_to_s3_records_sum
+          name: delivered_s3
+    - id: cw_firehose_bytes
+      context: bytes
+      title: Firehose Throughput
+      family: Throughput
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: incoming_bytes_sum
+          name: incoming
+        - selector: delivery_to_s3_bytes_sum
+          name: delivered_s3
+    - id: cw_firehose_put_requests
+      context: put_requests
+      title: Firehose Put Requests
+      family: Requests
+      units: requests/s
+      algorithm: absolute
+      dimensions:
+        - selector: incoming_put_requests_sum
+          name: put_requests
+    - id: cw_firehose_throttled
+      context: throttled_records
+      title: Firehose Throttled Records
+      family: Throttling
+      units: records/s
+      algorithm: absolute
+      dimensions:
+        - selector: throttled_records_sum
+          name: throttled
+    - id: cw_firehose_s3_freshness
+      context: s3_data_freshness
+      title: Firehose S3 Delivery Freshness
+      family: Delivery
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: delivery_to_s3_data_freshness_maximum
+          name: age
+    - id: cw_firehose_s3_success
+      context: s3_delivery_success
+      title: Firehose S3 Delivery Success
+      family: Delivery
+      units: ratio
+      algorithm: absolute
+      dimensions:
+        - selector: delivery_to_s3_success_average
+          name: success
+    # ----------------------------------------------------------------------------------------
+    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # ----------------------------------------------------------------------------------------
+    # - id: cw_firehose_limits
+    #   context: throughput_limits
+    #   title: Firehose Throughput Limits
+    #   family: Limits
+    #   units: bytes/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: bytes_per_second_limit_average
+    #       name: bytes_limit
+    # - id: cw_firehose_record_limits
+    #   context: record_rate_limits
+    #   title: Firehose Record Rate Limit
+    #   family: Limits
+    #   units: records/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: records_per_second_limit_average
+    #       name: records_limit

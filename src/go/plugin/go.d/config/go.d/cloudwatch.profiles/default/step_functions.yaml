@@ -1,0 +1,116 @@
+---
+version: v1
+display_name: AWS Step Functions
+namespace: AWS/States
+period: 300
+instance:
+  dimensions:
+    - name: StateMachineArn
+      label: state_machine_arn
+metrics:
+  - id: executions_started
+    metric_name: ExecutionsStarted
+    statistics: [sum]
+    rate: true
+  - id: executions_succeeded
+    metric_name: ExecutionsSucceeded
+    statistics: [sum]
+    rate: true
+  - id: executions_failed
+    metric_name: ExecutionsFailed
+    statistics: [sum]
+    rate: true
+  - id: executions_aborted
+    metric_name: ExecutionsAborted
+    statistics: [sum]
+    rate: true
+  - id: executions_timed_out
+    metric_name: ExecutionsTimedOut
+    statistics: [sum]
+    rate: true
+  - id: execution_throttled
+    metric_name: ExecutionThrottled
+    statistics: [sum]
+    rate: true
+  - id: execution_time
+    metric_name: ExecutionTime
+    statistics: [average]
+  # ----------------------------------------------------------------------------------------
+  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
+  # matching chart in the charts: section below. All are published at the {StateMachineArn}
+  # grain (redrive metrics appear only when executions are redriven).
+  # ----------------------------------------------------------------------------------------
+  # - id: executions_redriven
+  #   metric_name: ExecutionsRedriven
+  #   statistics: [sum]
+  #   rate: true
+  # - id: redriven_executions_succeeded
+  #   metric_name: RedrivenExecutionsSucceeded
+  #   statistics: [sum]
+  #   rate: true
+  # - id: redriven_executions_failed
+  #   metric_name: RedrivenExecutionsFailed
+  #   statistics: [sum]
+  #   rate: true
+  # Express Workflows publish ExpressExecutionBilledDuration/Memory at {StateMachineArn}. Metrics at
+  # other grains need their own profile: activities ({ActivityArn}), Lambda tasks ({LambdaFunctionArn}),
+  # service integrations ({ServiceIntegrationResourceArn}), and account-level (OpenExecutionCount).
+  # See: https://docs.aws.amazon.com/step-functions/latest/dg/procedure-cw-metrics.html
+template:
+  family: Step Functions
+  context_namespace: step_functions
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, state_machine_arn]
+  charts:
+    - id: cw_sfn_executions
+      context: executions
+      title: Step Functions Executions
+      family: Executions
+      units: executions/s
+      algorithm: absolute
+      dimensions:
+        - selector: executions_started_sum
+          name: started
+        - selector: executions_succeeded_sum
+          name: succeeded
+        - selector: executions_failed_sum
+          name: failed
+        - selector: executions_aborted_sum
+          name: aborted
+        - selector: executions_timed_out_sum
+          name: timed_out
+    - id: cw_sfn_throttled
+      context: execution_throttled
+      title: Step Functions Throttled Events
+      family: Throttling
+      units: events/s
+      algorithm: absolute
+      dimensions:
+        - selector: execution_throttled_sum
+          name: throttled
+    - id: cw_sfn_execution_time
+      context: execution_time
+      title: Step Functions Execution Time
+      family: Duration
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: execution_time_average
+          name: execution_time
+    # ----------------------------------------------------------------------------------------
+    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # ----------------------------------------------------------------------------------------
+    # - id: cw_sfn_redriven
+    #   context: executions_redriven
+    #   title: Step Functions Redriven Executions
+    #   family: Executions
+    #   units: executions/s
+    #   algorithm: absolute
+    #   dimensions:
+    #     - selector: executions_redriven_sum
+    #       name: redriven
+    #     - selector: redriven_executions_succeeded_sum
+    #       name: succeeded
+    #     - selector: redriven_executions_failed_sum
+    #       name: failed

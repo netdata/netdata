@@ -23,6 +23,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ceph"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/chrony"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/clickhouse"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cockroachdb"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/consul"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/coredns"
