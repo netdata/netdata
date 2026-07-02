@@ -187,7 +187,10 @@ static struct web_api_command api_commands_v3[] = {
     {
         .api = "settings",
         .hash = 0,
-        .acl = HTTP_ACL_NOCHECK,
+        // settings is a dashboard feature: gate it behind `allow dashboard from` like the rest
+        // of the dashboard, instead of HTTP_ACL_NOCHECK which bypassed the per-feature IP
+        // allowlists and exposed the anonymous state-modifying PUT remotely.
+        .acl = HTTP_ACL_DASHBOARD,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v3_settings,
         .allow_subpaths = 0
