@@ -43,6 +43,12 @@ modules:
         - cloudfront
         - cdn
         - content delivery network
+        - auto scaling
+        - autoscaling
+        - bedrock
+        - generative ai
+        - eventbridge
+        - vpn
       related_resources:
         integrations:
           list: []
@@ -77,8 +83,23 @@ modules:
           - Amazon Redshift (data warehouse)
           - Amazon MSK (Kafka streaming)
           - Amazon CloudFront (content delivery network / CDN)
+          - AWS Auto Scaling (EC2 Auto Scaling group capacity)
+          - Amazon Bedrock (foundation-model invocations and tokens)
+          - Amazon EventBridge (event rules)
+          - AWS Site-to-Site VPN (VPN connections)
 
           [Each service is defined by a profile](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default) -- a YAML file declaring its CloudWatch namespace, the metrics and statistics to collect, and a chart template -- so coverage can be extended without code changes.
+
+          :::tip Need a service that isn't listed?
+          Request a profile -- it's just a YAML file, no code change. [Open a feature request](https://github.com/netdata/netdata/issues/new/choose) and attach the service's CloudWatch metric schema, captured with this read-only command. It prints only metric and dimension **names** (no resource IDs, ARNs, or metric values), so the output is safe to share:
+
+          ```bash
+          aws cloudwatch list-metrics --namespace "AWS/<Service>" --region <your-region> --output json \
+            | jq -c '[.Metrics[] | {metric: .MetricName, dimensions: ([.Dimensions[].Name] | sort)}] | unique'
+          ```
+
+          Replace `AWS/<Service>` with the service namespace (for example `AWS/AmazonMQ`) and `<your-region>` with a Region where the service runs. The exact metrics and dimensions in the output are what we need to author a correct profile quickly.
+          :::
         method_description: |
           The collector discovers available metrics with the CloudWatch `ListMetrics` API (one paginated call per selected service profile and region; the collector then keeps only the metrics whose dimension set matches each profile's instance dimensions) and queries them in batches with the `GetMetricData` API. Account identity is resolved once at startup via `sts:GetCallerIdentity`. Authentication uses the AWS SDK default credential chain, static access keys, or an assumed IAM role.
       supported_platforms:
@@ -323,7 +344,8 @@ modules:
             description: |
               - **Profile mode** -- ensure `profiles.mode: auto` (default), or that the service's profile basename is listed under `profiles.mode_exact.entries`.
               - **Daily metrics** -- S3 storage metrics are published once per day. They are inherently delayed by about a day, and `recently_active_only` is automatically disabled for them.
-              - **Resource activity** -- some metrics only appear when the resource is actively processing data.
+              - **Resource activity** -- some metrics only appear when the resource is actively processing data (for example, EventBridge and Bedrock publish a metric only when its value is non-zero).
+              - **Auto Scaling group metrics** -- Auto Scaling group metrics (`cloudwatch.auto_scaling.*`) are not published until group-metrics collection is enabled on the group (`aws autoscaling enable-metrics-collection --granularity 1Minute`). Amazon EKS managed node groups have it enabled by default.
           - name: Charts have gaps or incomplete data
             description: |
               CloudWatch publishes metrics with a delay.
@@ -379,6 +401,10 @@ modules:
         | [Amazon Redshift](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/redshift.yaml) | `cloudwatch.redshift.*` | health, CPU utilization, disk space used, database connections, disk IOPS, throughput, network throughput |
         | [Amazon MSK](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/msk.yaml) | `cloudwatch.msk.*` | broker throughput, messages in, CPU, disk used, memory, partitions, connections |
         | [Amazon CloudFront](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/cloudfront.yaml) | `cloudwatch.cloudfront.*` | requests, downloaded and uploaded traffic, total/4xx/5xx error rates |
+        | [AWS Auto Scaling](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/auto_scaling.yaml) | `cloudwatch.auto_scaling.*` | group sizing (min/max/desired/total) and instances by state (in-service, pending, standby, terminating) |
+        | [Amazon Bedrock](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/bedrock.yaml) | `cloudwatch.bedrock.*` | invocations, invocation errors, token throughput, invocation and time-to-first-token latency |
+        | [Amazon EventBridge](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/eventbridge.yaml) | `cloudwatch.eventbridge.*` | target invocations, rule activity (matched events, triggered rules), ingestion-to-invocation latency |
+        | [AWS Site-to-Site VPN](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/vpn.yaml) | `cloudwatch.vpn.*` | tunnel traffic (in/out) and tunnel state (fraction of tunnels up) |
 
         Each profile also carries **optional metrics** that are commented out to keep cost and cardinality low; uncomment a metric and its matching chart, then **restart the Netdata Agent** (profiles are loaded once per go.d process and cached). Stock profiles are shipped at `/usr/lib/netdata/conf.d/go.d/cloudwatch.profiles/default/`. To customize a service, copy its profile into `/etc/netdata/go.d/cloudwatch.profiles/` (keep the same filename) and edit it -- a user profile fully replaces the stock one of the same name -- then restart the Agent.
 
