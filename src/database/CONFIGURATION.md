@@ -12,6 +12,27 @@ Use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configurati
   mode = dbengine
 ```
 
+## RAM and ALLOC Mode Retention
+
+When `mode` is set to `ram` or `alloc`, the Agent keeps metrics in memory only — there is no disk persistence and no storage tiers. The `dbengine tier ...` retention settings in [Tiers](#tiers) do not apply.
+
+The amount of history available depends on both `retention` and `update every`:
+
+> **Effective retention ≈ `retention` × `update every`**
+
+| `retention` | `update every` | Effective retention  |
+|:-----------:|:--------------:|:--------------------:|
+| `3600`      | `1`            | ~1 hour (3 600 s)    |
+| `3600`      | `10`           | ~10 hours (36 000 s) |
+
+
+:::note
+
+Configuration is read only at Agent startup. Any configuration changes require restarting the Agent.
+
+:::
+
+
 ## Tiers
 
 ### Retention Settings

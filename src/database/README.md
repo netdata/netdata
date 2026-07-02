@@ -7,7 +7,7 @@ Netdata stores detailed metrics at one-second granularity using its Database eng
 | Mode       | Description                                                                                                                                                                                                                                                                                                                                                             |
 |------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `dbengine` | The high performance multi-tiered time-series database of Netdata, providing superior storage efficiency (~0.5 bytes per sample on disk for high resolution per-second data), and fast long term data queries (typically 20+ times faster) by transparently utilizing all available database tiers. For details, see [Database Engine](/src/database/engine/README.md). |
-| `ram`      | Stores data entirely in memory without disk persistence. This is typically used in IoT devices or children that stream their metrics to Netdata parents, to avoid having any disk dependency on Netdata |
+| `ram`      | Stores data entirely in memory without disk persistence. This is typically used in IoT devices or children that stream their metrics to Netdata parents, to avoid having any disk dependency on Netdata. For how `retention` and `update every` interact in this mode, see [RAM and ALLOC Mode Retention](/src/database/CONFIGURATION.md#ram-and-alloc-mode-retention). |
 | `none`     | Operates without storage (metrics can only be streamed to a Netdata parent).                                                                                                                                                                                                                                                                                            |
 
 ## Tiers
@@ -36,14 +36,14 @@ These limits are fully configurable. See [Changing how long Netdata stores metri
 
 ### Monitoring Retention Utilization
 
-Netdata provides a visual representation of storage utilization for both the time and space limits across all Tiers. In the dashboard, these are the **dbengine space and time retention** charts, found under the **Netdata** section → **dbengine retention** family — there is one chart per database tier. Each chart shows exactly how your storage space (disk space limits) and time (time limits) are used for metric retention.
+The **dbengine space and time retention** chart shows how close each storage tier is to its configured retention limits.
 
-Each tier has its own independent **space** and **time** lines on the chart:
+Each tier has two dimensions:
 
-- **Space (disk utilization %)**: the percentage of the tier's allocated disk space that is currently occupied, calculated as `disk_used / disk_max × 100`. When a size limit is configured for the tier, `disk_max` is that limit. When no size limit is configured (set to 0), `disk_max` is the total available disk space at the tier's data directory (free space plus already-used space). For example, a space value of 89% means 89% of the tier's allocated or available disk space is occupied by datafiles.
-- **Time (retention time utilization %)**: the percentage of the configured retention time period that has been filled with data, calculated as `current_retention_duration / configured_time_limit × 100`. When no time limit is configured (set to 0), this dimension shows 0% and no time-based retention is enforced. For example, a time value of 61% means 61% of the configured time retention period has elapsed since the oldest sample. This value is capped at 100%.
+- **space** — percentage of the configured storage retention limit currently in use.
+- **time** — percentage of the configured time retention limit currently available.
 
-Different tiers naturally show different percentages because they have different write volumes, compression ratios, and configured limits. When either the space or time dimension reaches 100%, the oldest datafiles are rotated out as described in the [Retention Size Enforcement](#retention-size-enforcement) section below.
+When either reaches **100%**, the tier has reached its retention limit and the oldest data is removed to make room for new data.
 
 ### Retention Size Enforcement
 
