@@ -373,6 +373,7 @@ void ml_chart_delete(RRDSET *rs)
     // so concurrent readers observe either the live chart (with chart->rs
     // set) or NULL -- never the freed chart memory.
     ml_chart_t *chart = (ml_chart_t *) __atomic_exchange_n(&rs->ml_chart, (rrd_ml_chart_t *)NULL, __ATOMIC_ACQ_REL);
+
     delete chart;
 }
 
