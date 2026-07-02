@@ -16,7 +16,8 @@ typedef struct mrg_entry {
 } MRG_ENTRY;
 
 struct mrg_statistics {
-    // --- non-atomic --- under a write lock
+    // --- sampled lock-free by mrg_get_statistics() ---
+    // Writers use relaxed atomics. The padded fields below are updated on hotter reader/writer paths.
 
     size_t entries;
     int64_t size;    // total memory used, with indexing
@@ -28,7 +29,7 @@ struct mrg_statistics {
     size_t delete_having_retention_or_referenced;
     size_t delete_misses;
 
-    // --- atomic --- multiple readers / writers
+    // --- hot counters --- multiple readers / writers
 
     PAD64(ssize_t) entries_acquired;
     PAD64(ssize_t) current_references;
