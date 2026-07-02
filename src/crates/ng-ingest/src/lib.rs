@@ -75,6 +75,37 @@ pub fn write_request(
     Ok(frame.records)
 }
 
+/// Append `req` to a request-dump stream as `u32-LE length + prost bytes` —
+/// the `--dump-requests` corpus format. Requests are dumped pristine (before
+/// ingest normalization) and in frame order, so a dump captured alongside a
+/// WAL pairs with it entry-for-entry. Readers reverse this framing (the
+/// ingest bench in `ng-flatten` carries its own copy of the trivial reader).
+pub fn append_dumped_request(
+    w: &mut impl std::io::Write,
+    req: &ExportLogsServiceRequest,
+) -> std::io::Result<()> {
+    use prost::Message;
+    let bytes = req.encode_to_vec();
+    w.write_all(&(bytes.len() as u32).to_le_bytes())?;
+    w.write_all(&bytes)
+}
+
+/// Decode a whole request-dump stream (the [`append_dumped_request`] format)
+/// back into requests. Fails on a truncated tail or undecodable payload.
+pub fn read_dumped_requests(mut bytes: &[u8]) -> anyhow::Result<Vec<ExportLogsServiceRequest>> {
+    use prost::Message;
+    let mut out = Vec::new();
+    while !bytes.is_empty() {
+        anyhow::ensure!(bytes.len() >= 4, "truncated length prefix");
+        let len = u32::from_le_bytes(bytes[..4].try_into().unwrap()) as usize;
+        bytes = &bytes[4..];
+        anyhow::ensure!(bytes.len() >= len, "truncated request payload");
+        out.push(ExportLogsServiceRequest::decode(&bytes[..len])?);
+        bytes = &bytes[len..];
+    }
+    Ok(out)
+}
+
 /// Count the spans across every `ResourceSpans`/`ScopeSpans` in a batch.
 pub fn count_spans(req: &ExportTraceServiceRequest) -> usize {
     req.resource_spans
@@ -137,4 +168,36 @@ pub fn write_trace_request(
         TimestampNs::ZERO,
     )?;
     Ok(span_count)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use opentelemetry_proto::tonic::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
+
+    #[test]
+    fn dumped_requests_round_trip() {
+        let req = |n: usize| ExportLogsServiceRequest {
+            resource_logs: vec![ResourceLogs {
+                scope_logs: vec![ScopeLogs {
+                    log_records: (0..n)
+                        .map(|i| LogRecord {
+                            time_unix_nano: 1 + i as u64,
+                            ..Default::default()
+                        })
+                        .collect(),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        let mut buf = Vec::new();
+        append_dumped_request(&mut buf, &req(3)).unwrap();
+        append_dumped_request(&mut buf, &req(1)).unwrap();
+        let back = read_dumped_requests(&buf).unwrap();
+        assert_eq!(back.len(), 2);
+        assert_eq!(back[0], req(3));
+        assert_eq!(back[1], req(1));
+        assert!(read_dumped_requests(&buf[..buf.len() - 1]).is_err());
+    }
 }

@@ -21,6 +21,7 @@ clap = { workspace = true }
 file-registry = { workspace = true }
 ng-flatten = { workspace = true }
 opentelemetry-proto = { workspace = true }
+prost = { workspace = true }
 tokio = { workspace = true }
 tonic = { workspace = true, features = ["gzip"] }
 tracing = { workspace = true }

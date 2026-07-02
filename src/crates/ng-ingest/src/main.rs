@@ -17,7 +17,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use anyhow::Context;
 use clap::Parser;
 use file_registry::MonotonicClock;
-use ng_ingest::{PIPELINE_ID, one_file_config, write_request};
+use ng_ingest::{PIPELINE_ID, count_log_records, one_file_config, write_request};
 use opentelemetry_proto::tonic::collector::logs::v1::logs_service_server::{
     LogsService, LogsServiceServer,
 };
@@ -45,6 +45,13 @@ struct Args {
     /// in-flight concurrent batches may push the total slightly past the target.
     #[arg(long)]
     count: Option<u64>,
+
+    /// Also append every non-empty incoming request to this file as
+    /// `u32-LE length + prost bytes` (see `ng_ingest::append_dumped_request`),
+    /// pristine (pre-normalization) and in frame order — a corpus paired
+    /// entry-for-entry with the WAL written to `--out`.
+    #[arg(long)]
+    dump_requests: Option<PathBuf>,
 }
 
 /// The WAL writer and its ingestion clock, guarded together: `write_frame` takes
@@ -53,6 +60,9 @@ struct Args {
 struct Sink {
     writer: wal::Writer,
     clock: MonotonicClock,
+    /// `--dump-requests` stream, written under the same lock as the WAL so
+    /// dump order matches frame order.
+    dump: Option<std::io::BufWriter<std::fs::File>>,
 }
 
 /// The OTLP `LogsService` implementation: encode each batch to protobuf and append
@@ -77,7 +87,20 @@ impl LogsService for Receiver {
 
         let written = {
             let mut sink = self.sink.lock().await;
-            let Sink { writer, clock } = &mut *sink;
+            let Sink {
+                writer,
+                clock,
+                dump,
+            } = &mut *sink;
+            // Dump BEFORE write_request (which normalizes in place) so the
+            // corpus holds the pristine request; skip empties so a dumped
+            // request always pairs with a written frame.
+            if let Some(dump) = dump {
+                if count_log_records(&req) > 0 {
+                    ng_ingest::append_dumped_request(dump, &req)
+                        .map_err(|e| Status::internal(format!("request dump failed: {e}")))?;
+                }
+            }
             write_request(writer, clock, &mut req)
                 .map_err(|e| Status::internal(format!("ingest write failed: {e}")))?
         };
@@ -114,9 +137,16 @@ async fn main() -> anyhow::Result<()> {
     let writer = wal::Writer::new(&args.out, one_file_config(), seq, PIPELINE_ID)
         .with_context(|| format!("failed to create WAL writer in {}", args.out.display()))?;
 
+    let dump = args
+        .dump_requests
+        .as_ref()
+        .map(|p| std::fs::File::create(p).map(std::io::BufWriter::new))
+        .transpose()
+        .with_context(|| format!("failed to create request dump {:?}", args.dump_requests))?;
     let sink = Arc::new(Mutex::new(Sink {
         writer,
         clock: MonotonicClock::new(),
+        dump,
     }));
     let written = Arc::new(AtomicU64::new(0));
     let done = Arc::new(Notify::new());
@@ -156,6 +186,10 @@ async fn main() -> anyhow::Result<()> {
     // flush and close the WAL file.
     let events = {
         let mut sink = sink.lock().await;
+        if let Some(dump) = &mut sink.dump {
+            use std::io::Write;
+            dump.flush().context("request dump flush failed")?;
+        }
         sink.writer.shutdown_all().context("WAL shutdown failed")?
     };
     tracing::info!(
