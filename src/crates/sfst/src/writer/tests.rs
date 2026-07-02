@@ -44,7 +44,7 @@ fn write_summary_only_round_trips_through_reader() {
         .unwrap()
         .into_inner();
 
-    let reader = crate::Reader::open(&buf).unwrap();
+    let reader = crate::reader::ChunkReader::open(&buf).unwrap();
     let got = reader.summary().unwrap();
     assert_eq!(got.min_timestamp_s, s.min_timestamp_s);
     assert_eq!(got.max_timestamp_s, s.max_timestamp_s);
@@ -128,7 +128,7 @@ fn full_file_in_canonical_order_round_trips() {
     assert_eq!(w.add_stream_batch(&batch()).unwrap(), 1);
     let buf = w.finish().unwrap().into_inner();
 
-    let reader = crate::Reader::open(&buf).unwrap();
+    let reader = crate::reader::ChunkReader::open(&buf).unwrap();
     assert!(reader.has_summary());
     assert!(reader.has_metadata());
     assert_eq!(reader.summary().unwrap(), summary);
@@ -365,7 +365,7 @@ fn all_per_row_columns_round_trip() {
     w.add_stream_batch(&batch()).unwrap();
     let buf = w.finish().unwrap().into_inner();
 
-    let reader = crate::Reader::open(&buf).unwrap();
+    let reader = crate::reader::ChunkReader::open(&buf).unwrap();
     assert!(reader.has_per_row_columns().unwrap());
     assert_eq!(
         reader.columns_table().unwrap().names().collect::<Vec<_>>(),
@@ -410,7 +410,7 @@ fn per_row_columns_are_independently_optional() {
     w.add_stream_batch(&batch()).unwrap();
     let buf = w.finish().unwrap().into_inner();
 
-    let reader = crate::Reader::open(&buf).unwrap();
+    let reader = crate::reader::ChunkReader::open(&buf).unwrap();
     assert!(reader.has_per_row_columns().unwrap());
     assert_eq!(
         reader.columns_table().unwrap().names().collect::<Vec<_>>(),
@@ -430,7 +430,7 @@ fn no_per_row_columns_is_the_default() {
     write_prefix(&mut w);
     w.add_stream_batch(&batch()).unwrap();
     let buf = w.finish().unwrap().into_inner();
-    let reader = crate::Reader::open(&buf).unwrap();
+    let reader = crate::reader::ChunkReader::open(&buf).unwrap();
     assert!(!reader.has_per_row_columns().unwrap());
     assert!(reader.trace_ids().is_err());
 }
@@ -593,7 +593,7 @@ fn trace_id_index_round_trips_and_resolves() {
     w.add_stream_batch(&batch()).unwrap();
     let buf = w.finish().unwrap().into_inner();
 
-    let reader = crate::Reader::open(&buf).unwrap();
+    let reader = crate::reader::ChunkReader::open(&buf).unwrap();
     assert!(reader.has_trace_id_index());
     let got = reader.trace_id_index().unwrap();
     assert_eq!(got, index, "the decoded index equals the built one");
@@ -620,7 +620,7 @@ fn trace_id_index_absent_by_default() {
     w.add_stream_batch(&batch()).unwrap();
     let buf = w.finish().unwrap().into_inner();
 
-    let reader = crate::Reader::open(&buf).unwrap();
+    let reader = crate::reader::ChunkReader::open(&buf).unwrap();
     assert!(!reader.has_trace_id_index());
     assert!(reader.trace_id_index().is_err());
 }

@@ -25,14 +25,15 @@ pub enum Error {
     #[error("zstd error (not std::io): {0}")]
     Zstd(String),
 
-    /// [`Reader::open`](crate::Reader::open) found the first 4 bytes
-    /// aren't `"SFST"`. The byte stream is either not an SFST file or
+    /// Opening an SFST (any entry — [`read_summary`](crate::read_summary),
+    /// [`IndexReader::open`](crate::IndexReader::open)) found the first 4
+    /// bytes aren't `"SFST"`. The byte stream is either not an SFST file or
     /// has been corrupted before the header.
     #[error("invalid magic (expected \"SFST\")")]
     InvalidMagic,
 
-    /// [`Reader::open`](crate::Reader::open) found a header `version`
-    /// field this build of `sfst` doesn't recognize.
+    /// Opening an SFST found a header `version` field this build of `sfst`
+    /// doesn't recognize.
     #[error("unsupported version: {0}")]
     UnsupportedVersion(u32),
 
@@ -82,9 +83,9 @@ pub enum Error {
     #[error("TOC error: {0}")]
     Toc(String),
 
-    /// The byte slice handed to [`Reader::open`](crate::Reader::open)
-    /// is shorter than the 12-byte fixed header. First value is the
-    /// actual length, second is the required minimum.
+    /// The byte slice handed to an SFST open is shorter than the 12-byte
+    /// fixed header. First value is the actual length, second is the
+    /// required minimum.
     #[error("file too short ({0} bytes, need at least {1})")]
     FileTooShort(usize, usize),
 

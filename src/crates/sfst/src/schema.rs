@@ -3,7 +3,7 @@
 //! These are the typed payloads carried by an SFST file's named chunks.
 //! The index build (`IndexWriter`) constructs them; consumers decode
 //! them via the typed accessors on
-//! [`crate::Reader`]. The container layout and chunk encoding are
+//! [`crate::ChunkReader`]. The container layout and chunk encoding are
 //! specified in `FORMAT.md`.
 
 use serde::{Deserialize, Serialize};
@@ -294,7 +294,7 @@ impl SchemaTree {
     /// (no edge) and every non-root edge points to a smaller id (parents
     /// precede children) — the invariant the producer's flattener maintains.
     /// A tree decoded from a file is checked at the trust boundary instead
-    /// (see [`validate`](Self::validate), run at [`crate::Reader::metadata`]).
+    /// (see [`validate`](Self::validate), run when the META chunk is decoded).
     pub fn from_nodes(nodes: Vec<SchemaNode>) -> Self {
         let tree = Self { nodes };
         debug_assert!(
@@ -427,7 +427,7 @@ impl SchemaTree {
     /// Panics if `id` is out of bounds. Callers must use ids from this tree
     /// (via [`iter`](Self::iter) / [`len`](Self::len)); a tree decoded from a
     /// file is bounds-safe because [`validate`](Self::validate) runs at
-    /// [`crate::Reader::metadata`].
+    /// the META chunk is decoded.
     pub fn node(&self, id: NodeId) -> &SchemaNode {
         &self.nodes[id as usize]
     }

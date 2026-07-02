@@ -1,6 +1,6 @@
 //! SFST format reader.
 //!
-//! [`Reader`] opens a byte slice (typically an mmap) and exposes the
+//! [`ChunkReader`] opens a byte slice (typically an mmap) and exposes the
 //! log-index file's chunks as typed values. Decompression and
 //! deserialization happen lazily — `open` only parses the header and
 //! TOC. The metadata chunk is cached on first access since it carries
@@ -23,8 +23,19 @@ use crate::{
     TraceIds, VERSION, high_field_id, mid_field_id, num_stream_batches, stream_batch_id,
 };
 
+/// Read just the [`Summary`] of an SFST from its bytes.
+///
+/// Touches only the header, TOC, and `SUMR` chunk, and works on **every**
+/// SFST — including summary-only files (e.g. a content-light traces seal),
+/// which [`IndexReader::open`](crate::IndexReader::open) refuses because
+/// they carry no queryable chunks. The cheap path for recovery/registry-style
+/// scans that need identity + time range + record count without a query.
+pub fn read_summary(data: &[u8]) -> Result<Summary, Error> {
+    ChunkReader::open(data)?.summary()
+}
+
 /// Decompress zstd, then deserialize with bincode. Crate-internal:
-/// consumers read through [`Reader`]'s typed accessors.
+/// consumers read through [`ChunkReader`]'s typed accessors.
 pub(crate) fn unpack<T: DeserializeOwned>(data: &[u8]) -> Result<T, Error> {
     let decompressed = zstd::decode_all(data).map_err(|e| Error::Zstd(e.to_string()))?;
     let (val, _len) =
@@ -38,7 +49,7 @@ pub(crate) fn unpack<T: DeserializeOwned>(data: &[u8]) -> Result<T, Error> {
 /// chunks on demand. The [`Metadata`] chunk (histogram, id ranges,
 /// schema tree) is cached after first access so the bucketing of
 /// secondary chunks doesn't repeatedly decompress META.
-pub struct Reader<'a> {
+pub struct ChunkReader<'a> {
     data: &'a [u8],
     container: Container<'a>,
     /// Lazily-decoded META payload. Populated on first call to any
@@ -52,7 +63,11 @@ pub struct Reader<'a> {
     fields: OnceCell<FieldTable>,
 }
 
-impl<'a> Reader<'a> {
+// The accessor surface is intentionally wider than what the lib alone calls:
+// it serves the `test-util` consumers (fixtures, the `inspect` example) and
+// the internal format tests, so a feature-off lib build sees unused methods.
+#[cfg_attr(not(feature = "test-util"), allow(dead_code))]
+impl<'a> ChunkReader<'a> {
     /// Open an SFST file from a byte slice (typically an mmap).
     ///
     /// Header, magic, version and TOC validation — including the
@@ -89,7 +104,7 @@ impl<'a> Reader<'a> {
     // ── META ─────────────────────────────────────────────────────────
 
     /// Index metadata (histogram + id ranges + schema tree). Decoded on
-    /// first access; cached for the lifetime of this `Reader`.
+    /// first access; cached for the lifetime of this `ChunkReader`.
     pub fn metadata(&self) -> Result<&Metadata, Error> {
         if let Some(m) = self.metadata.get() {
             return Ok(m);

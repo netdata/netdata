@@ -14,7 +14,7 @@ use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 use ng_index::{Metrics, build_sfst_traces_file};
-use sfst::{IndexReader, Reader, TraceId};
+use sfst::{IndexReader, TraceId};
 
 #[derive(Parser)]
 #[command(
@@ -86,7 +86,7 @@ fn sample_ids(sfst_path: &Path, limit: usize) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let reader = match Reader::open(&bytes) {
+    let reader = match IndexReader::open(&bytes) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("open sfst: {e}");

@@ -9,9 +9,11 @@ description = "Container format for split FST indexes with a chunk-file TOC"
 workspace = true
 
 [features]
-# Expose the chunk-level writer (`ChunkWriter` + its input-only types) so
-# external tests can hand-build files chunk by chunk. Test fixtures only —
-# production producers go through `IndexWriter`. Cargo feature unification
+# Expose the chunk-level reader/writer (`ChunkReader`, `ChunkWriter` + its
+# input-only types) so external tests can hand-build files chunk by chunk and
+# the `inspect` example can dump raw chunks. Test fixtures/introspection only —
+# production goes through `IndexWriter`/`IndexReader`/`read_summary`.
+# Cargo feature unification
 # makes these visible workspace-wide under `cargo test --workspace`; a
 # per-crate test run still needs its own dev-dep enabling the feature.
 test-util = []
@@ -49,3 +51,5 @@ serde_json = { workspace = true }
 [[example]]
 name = "inspect"
 path = "examples/inspect.rs"
+# Raw-chunk introspection (byte sizes per chunk) is chunk-level surface.
+required-features = ["test-util"]

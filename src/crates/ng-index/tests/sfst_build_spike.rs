@@ -8,8 +8,8 @@
 use bumpalo::Bump;
 use sfst::query::Filter;
 use sfst::{
-    DroppedAttributeCounts, Durations, Flags, IndexReader, ParentSpanIds, Reader, SpanId, SpanIds,
-    TraceId, TraceIds,
+    DroppedAttributeCounts, Durations, Flags, IndexReader, ParentSpanIds, SpanId, SpanIds, TraceId,
+    TraceIds,
 };
 use sfst::{IndexWriter, RowIndex};
 
@@ -140,7 +140,7 @@ fn build_into_writes_span_columns_and_trace_id_index() {
     IndexWriter::write_file(&ri, &path, Vec::new()).expect("write_file");
     let bytes = std::fs::read(&path).expect("read sfst");
 
-    let reader = Reader::open(&bytes).expect("open sfst");
+    let reader = IndexReader::open(&bytes).expect("open sfst");
 
     // The span-only columns are present and row-count aligned.
     let trace_ids = reader.trace_ids().expect("trace_ids column");

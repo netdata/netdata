@@ -212,7 +212,7 @@ fn scalar_coalescing_lattice() {
 }
 
 /// `validate` accepts well-formed trees and rejects every malformed shape a
-/// decoded (untrusted) file could carry, so `Reader::metadata` degrades to
+/// decoded (untrusted) file could carry, so `ChunkReader::metadata` degrades to
 /// `CorruptIndex` instead of panicking on unchecked indexing (`node`/`steps`)
 /// or hanging the parent walk. The bad trees are built via the struct literal
 /// (the `schema::tests` child module sees the private `nodes` field) to bypass

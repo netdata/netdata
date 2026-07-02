@@ -13,7 +13,7 @@ use ng_index::{Metrics, build_sfst, build_sfst_range};
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value::Value as Av};
 use opentelemetry_proto::tonic::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
-use sfst::{IndexReader, Reader, SpanId, TraceId};
+use sfst::{IndexReader, SpanId, TraceId};
 
 /// A batch of `n` minimal log records, each with one attribute so flattening
 /// yields entries beyond the scalar fields.
@@ -145,7 +145,7 @@ fn per_row_columns_roundtrip_in_chronological_order() {
     let out = out_dir.path().join("cols.sfst");
     build_sfst(flat.path(), &out, &Metrics::new()).unwrap();
     let data = std::fs::read(&out).unwrap();
-    let reader = Reader::open(&data).unwrap();
+    let reader = IndexReader::open(&data).unwrap();
 
     // The file carries the per-row column chunks; each is decoded independently.
     assert!(reader.has_per_row_columns().unwrap());
@@ -159,7 +159,7 @@ fn per_row_columns_roundtrip_in_chronological_order() {
             "dropped_attributes_count"
         ],
     );
-    let ts = reader.timestamps().unwrap();
+    let ts = reader.load_timestamps().unwrap();
     let observed = reader.observed_timestamps().unwrap();
     let trace = reader.trace_ids().unwrap();
     let span = reader.span_ids().unwrap();
@@ -180,7 +180,7 @@ fn per_row_columns_roundtrip_in_chronological_order() {
     #[allow(clippy::needless_range_loop)]
     for p in 0..N {
         assert_eq!(
-            ts[p],
+            ts.as_slice()[p],
             (BASE + (p + 1) as u64) as i64,
             "chronological ts at {p}"
         );

@@ -12,7 +12,7 @@
 //! [`IndexReader::open`], [`IndexReader::field_table`], [`IndexReader::histogram`],
 //! [`IndexReader::build_string_table`], [`IndexReader::load_all_stream_entries`],
 //! [`IndexReader::load_timestamps`], plus the lower-level raw-chunk accessors
-//! on [`sfst::Reader`].
+//! on [`sfst::ChunkReader`].
 
 use std::mem;
 use std::path::PathBuf;
@@ -186,7 +186,7 @@ fn sections(path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let file_size = data.len();
     let reader = IndexReader::open(&data)?;
     let fields = reader.field_table();
-    let sfst = sfst::Reader::open(&data)?;
+    let sfst = sfst::ChunkReader::open(&data)?;
 
     let mut total_sections = 0usize;
 

@@ -1,4 +1,4 @@
-//! Reader for the split-FST index format.
+//! The query-plane reader for the split-FST index format.
 //!
 //! Opens an `.sfst` file (typically via mmap) and provides query methods
 //! that follow the access pattern described in `sfst/FORMAT.md`:
@@ -11,6 +11,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::PrefixMap;
+use crate::reader::ChunkReader;
 
 use crate::{
     BitmapValue, Bucket, FacetResult, FieldEntry, FieldTier, Filter, Grid, Histogram, IdRanges,
@@ -21,10 +22,10 @@ use crate::{
 ///
 /// Holds the mmap'd data, the deserialized summary, and the primary
 /// FST (both eagerly loaded on open since every query needs them).
-/// [`Metadata`] is cached on the underlying [`crate::Reader`] and
+/// [`Metadata`] is cached on the underlying chunk reader and
 /// surfaced via [`metadata`](Self::metadata).
 pub struct IndexReader<'a> {
-    sfst: crate::Reader<'a>,
+    sfst: ChunkReader<'a>,
     summary: Summary,
     primary: PrefixMap<BitmapValue>,
 }
@@ -74,9 +75,9 @@ impl<'a> IndexReader<'a> {
     /// Open a split-FST index from a byte slice (typically an mmap).
     ///
     /// Immediately deserializes the summary, metadata, and primary FST.
-    /// Metadata stays cached on the underlying [`crate::Reader`].
+    /// Metadata stays cached on the underlying chunk reader.
     pub fn open(data: &'a [u8]) -> Result<Self, crate::Error> {
-        let sfst = crate::Reader::open(data)?;
+        let sfst = ChunkReader::open(data)?;
         let summary = sfst.summary()?;
         // Force the metadata + derived-field-table caches so subsequent
         // accessors are infallible.
@@ -128,7 +129,7 @@ impl<'a> IndexReader<'a> {
     // ── Field table ─────────────────────────────────────────────────
 
     /// The field table — the flat view derived from the schema tree
-    /// (`metadata().tree`), cached on the underlying [`crate::Reader`] (forced
+    /// (`metadata().tree`), cached on the underlying chunk reader (forced
     /// at [`open`](Self::open)).
     pub fn field_table(&self) -> &crate::FieldTable {
         self.sfst
@@ -144,7 +145,7 @@ impl<'a> IndexReader<'a> {
     /// Byte span of the cold suffix (optional per-row columns + optional
     /// `trace_id` index + mid/high field chunks + stream batches) a query
     /// releases from the page cache once done. See
-    /// [`crate::Reader::cold_region`].
+    /// the chunk reader's cold-region rule.
     pub fn cold_region(&self) -> Option<(usize, usize)> {
         self.sfst.cold_region()
     }
@@ -206,6 +207,68 @@ impl<'a> IndexReader<'a> {
             }
         }
         Ok(out)
+    }
+
+    // ── Per-row columns ───────────────────────────────────────────
+    //
+    // Each column is independently optional per file (declared in the META
+    // manifest); an accessor errors when its column is absent. All columns
+    // are chronologically ordered, parallel-indexed to `load_timestamps`.
+
+    /// The per-row columns this file carries (the META manifest).
+    pub fn columns_table(&self) -> Result<&crate::ColumnsTable, crate::Error> {
+        self.sfst.columns_table()
+    }
+
+    /// Whether the file carries any per-row column chunk.
+    pub fn has_per_row_columns(&self) -> Result<bool, crate::Error> {
+        self.sfst.has_per_row_columns()
+    }
+
+    /// The per-row observed-timestamps column (`OBTS`).
+    pub fn observed_timestamps(&self) -> Result<crate::ObservedTimestamps, crate::Error> {
+        self.sfst.observed_timestamps()
+    }
+
+    /// The per-row trace-ids column (`TRCE`).
+    pub fn trace_ids(&self) -> Result<crate::TraceIds, crate::Error> {
+        self.sfst.trace_ids()
+    }
+
+    /// The per-row span-ids column (`SPAN`).
+    pub fn span_ids(&self) -> Result<crate::SpanIds, crate::Error> {
+        self.sfst.span_ids()
+    }
+
+    /// The per-row flags column (`FLAG`).
+    pub fn flags(&self) -> Result<crate::Flags, crate::Error> {
+        self.sfst.flags()
+    }
+
+    /// The per-row dropped-attributes-count column (`DRAC`).
+    pub fn dropped_attribute_counts(&self) -> Result<crate::DroppedAttributeCounts, crate::Error> {
+        self.sfst.dropped_attribute_counts()
+    }
+
+    /// The per-row parent-span-ids column (`PSPN`, traces signal).
+    pub fn parent_span_ids(&self) -> Result<crate::ParentSpanIds, crate::Error> {
+        self.sfst.parent_span_ids()
+    }
+
+    /// The per-row span-duration column (`DURN`, traces signal).
+    pub fn durations(&self) -> Result<crate::Durations, crate::Error> {
+        self.sfst.durations()
+    }
+
+    /// Whether the file carries the optional `trace_id` index (`TIDX`).
+    pub fn has_trace_id_index(&self) -> bool {
+        self.sfst.has_trace_id_index()
+    }
+
+    /// The `trace_id` index. Positions it yields index the chronological
+    /// [`trace_ids`](Self::trace_ids) column.
+    pub fn trace_id_index(&self) -> Result<crate::TraceIdIndex, crate::Error> {
+        self.sfst.trace_id_index()
     }
 
     // ── KvId resolution ───────────────────────────────────────────
@@ -358,7 +421,7 @@ impl<'a> IndexReader<'a> {
     /// attribute facets), and rebuild the parent/child tree in memory.
     ///
     /// Returns an empty [`Trace`] if the id is absent. Errors if the file carries no
-    /// `trace_id` index (not a traces file) — see [`crate::Reader::trace_id_index`].
+    /// `trace_id` index (not a traces file).
     ///
     /// The tree build is **iterative** and defensive (a trace's spans can be partial
     /// or malformed): spans are sorted by start time (clock-skew-safe), duplicate

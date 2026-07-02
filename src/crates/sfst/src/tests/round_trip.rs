@@ -1,11 +1,12 @@
 //! Format round-trip tests: write a file via the buffer-all
 //! [`FixtureWriter`] / [`pack`] (looser than the public
 //! [`ChunkWriter`], so partial files — no SUMR, no META — can pin
-//! reader behavior), read it back via [`Reader`], assert the chunks
+//! reader behavior), read it back via [`ChunkReader`], assert the chunks
 //! decode to the values we put in.
 
 use super::fixture::FixtureWriter;
 use crate::PrefixMap;
+use crate::reader::ChunkReader;
 use crate::writer::pack;
 use crate::*;
 use treight::Bitmap;
@@ -67,7 +68,7 @@ fn round_trip_primary_only() {
     let mut buf = Vec::new();
     writer.write_to(&mut buf).unwrap();
 
-    let reader = Reader::open(&buf).unwrap();
+    let reader = ChunkReader::open(&buf).unwrap();
     assert!(!reader.has_summary());
     assert!(!reader.has_metadata());
     // Reading an absent named chunk surfaces as a TOC error (the id is
@@ -96,7 +97,7 @@ fn round_trip_summary() {
     let mut buf = Vec::new();
     writer.write_to(&mut buf).unwrap();
 
-    let reader = Reader::open(&buf).unwrap();
+    let reader = ChunkReader::open(&buf).unwrap();
     assert!(reader.has_summary());
     assert!(!reader.has_metadata());
     assert_eq!(reader.summary().unwrap(), summary);
@@ -116,7 +117,7 @@ fn round_trip_metadata() {
     let mut buf = Vec::new();
     writer.write_to(&mut buf).unwrap();
 
-    let reader = Reader::open(&buf).unwrap();
+    let reader = ChunkReader::open(&buf).unwrap();
     assert!(reader.has_metadata());
 
     let read = reader.metadata().unwrap();
@@ -186,7 +187,7 @@ fn round_trip_fields_and_secondary_chunks() {
     let mut buf = Vec::new();
     writer.write_to(&mut buf).unwrap();
 
-    let reader = Reader::open(&buf).unwrap();
+    let reader = ChunkReader::open(&buf).unwrap();
     assert_eq!(reader.num_mid().unwrap(), 2);
     assert_eq!(reader.num_high().unwrap(), 1);
 
@@ -263,7 +264,7 @@ fn cold_region_is_the_stream_batch_tail_without_mid_or_high() {
     let mut buf = Vec::new();
     writer.write_to(&mut buf).unwrap();
 
-    let reader = Reader::open(&buf).unwrap();
+    let reader = ChunkReader::open(&buf).unwrap();
     assert_eq!(reader.num_mid().unwrap(), 0);
     assert_eq!(reader.num_high().unwrap(), 0);
     // [end of PRIM, EOF) — here exactly the stream-batch chunk.
@@ -287,7 +288,7 @@ fn mid_field_out_of_range_errors() {
     let mut buf = Vec::new();
     writer.write_to(&mut buf).unwrap();
 
-    let reader = Reader::open(&buf).unwrap();
+    let reader = ChunkReader::open(&buf).unwrap();
     assert!(reader.mid_field(0).is_ok());
     assert!(matches!(reader.mid_field(1), Err(Error::ChunkNotFound(1))));
 }
@@ -318,7 +319,7 @@ fn full_file_round_trip() {
     let mut buf = Vec::new();
     writer.write_to(&mut buf).unwrap();
 
-    let reader = Reader::open(&buf).unwrap();
+    let reader = ChunkReader::open(&buf).unwrap();
     assert_eq!(reader.summary().unwrap(), summary);
     assert_eq!(reader.fields().unwrap().len(), 1);
     assert_eq!(reader.num_mid().unwrap(), 0);
@@ -393,8 +394,8 @@ fn round_trip_multi_batch_stream() {
     let mut buf = Vec::new();
     writer.write_to(&mut buf).unwrap();
 
-    // Reader sees three SB chunks, each holding its expected slice.
-    let reader = Reader::open(&buf).unwrap();
+    // ChunkReader sees three SB chunks, each holding its expected slice.
+    let reader = ChunkReader::open(&buf).unwrap();
     assert_eq!(reader.num_stream_batches().unwrap(), 3);
     for i in 0..3u8 {
         let batch = reader.stream_batch(i).unwrap();
@@ -445,7 +446,7 @@ fn v4_file_is_rejected_on_open() {
     // v4 read path exists.
     buf[4..8].copy_from_slice(&4u32.to_le_bytes());
     assert!(matches!(
-        Reader::open(&buf),
+        ChunkReader::open(&buf),
         Err(Error::UnsupportedVersion(4))
     ));
 }
@@ -457,7 +458,7 @@ fn v5_file_is_rejected_on_open() {
     // at the version check, not surface a later bincode decode error.
     buf[4..8].copy_from_slice(&5u32.to_le_bytes());
     assert!(matches!(
-        Reader::open(&buf),
+        ChunkReader::open(&buf),
         Err(Error::UnsupportedVersion(5))
     ));
 }
@@ -470,7 +471,7 @@ fn v6_file_is_rejected_on_open() {
     // later bincode decode error.
     buf[4..8].copy_from_slice(&6u32.to_le_bytes());
     assert!(matches!(
-        Reader::open(&buf),
+        ChunkReader::open(&buf),
         Err(Error::UnsupportedVersion(6))
     ));
 }
@@ -485,7 +486,7 @@ fn corrupt_chunk_byte_fails_crc_on_access() {
     buf[last] ^= 0x01;
 
     // Open is lazy — header and TOC are intact.
-    let reader = Reader::open(&buf).unwrap();
+    let reader = ChunkReader::open(&buf).unwrap();
     // Untouched chunks still verify and decode.
     assert!(reader.primary().is_ok());
     // The corrupted chunk surfaces as a corrupt-index error.
@@ -498,7 +499,7 @@ fn corrupt_chunk_byte_fails_crc_on_access() {
 #[test]
 fn corrupt_payload_byte_fails_crc_on_access() {
     let clean = minimal_file();
-    let reader = Reader::open(&clean).unwrap();
+    let reader = ChunkReader::open(&clean).unwrap();
     // Locate the primary chunk's payload within the file and flip its
     // first byte.
     let payload = reader.primary_raw().unwrap();
@@ -507,7 +508,7 @@ fn corrupt_payload_byte_fails_crc_on_access() {
 
     let mut buf = clean;
     buf[offset] ^= 0x01;
-    let reader = Reader::open(&buf).unwrap();
+    let reader = ChunkReader::open(&buf).unwrap();
     assert!(matches!(reader.primary_raw(), Err(Error::CorruptIndex(_))));
     // Other chunks are unaffected.
     assert!(reader.stream_batch(0).is_ok());

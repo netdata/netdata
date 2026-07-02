@@ -17,12 +17,13 @@
 //! This crate owns the format **and** its build: a producer fills a
 //! [`RowIndex`] with interned `(timestamp, key=value)` rows and writes
 //! through [`IndexWriter`]; reading goes through [`IndexReader`] (the
-//! query API) or [`Reader`] (raw chunk access), with the query
-//! vocabulary in [`query`] and the per-directory file registry in
-//! [`registry`]. Decoding WAL frames into rows is the producer's
-//! concern (`ng-index` is the in-tree producer), so this crate never
-//! compiles the WAL/Arrow stack. The chunk-level writer is internal —
-//! test fixtures can reach it via the `test-util` feature.
+//! query API) or [`read_summary`] (the cheap scan that also serves
+//! summary-only files), with the query vocabulary in [`query`] and the
+//! per-directory file registry in [`registry`]. Decoding WAL frames
+//! into rows is the producer's concern (`ng-index` is the in-tree
+//! producer), so this crate never compiles the WAL/Arrow stack. The
+//! chunk-level writer and reader are internal — test fixtures can
+//! reach them via the `test-util` feature.
 //!
 //! # Example
 //!
@@ -72,7 +73,7 @@ pub use query::{
     Bucket, FacetResult, Filter, Grid, Matcher, MaterializedRow, Timeline, Timestamps,
     compile_pattern, compile_query,
 };
-pub use reader::Reader;
+pub use reader::read_summary;
 pub use registry::{File, Registry, RetentionPolicy};
 pub use row_index::RowIndex;
 pub use trace_index::TraceIdIndex;
@@ -105,7 +106,10 @@ pub use schema::{
 // Writer-input-only vocabulary stays crate-internal (the build owns the writer).
 pub(crate) use schema::{ALL_COLUMNS, ColumnSpec};
 
-// The chunk-level writer surface, exposed only for hand-built test fixtures.
+// The chunk-level reader/writer surface, exposed only for test fixtures and
+// raw-format introspection (the `inspect` example).
+#[cfg(feature = "test-util")]
+pub use reader::ChunkReader;
 #[cfg(feature = "test-util")]
 pub use writer::{ChunkCounts, ChunkWriter, ColumnsPresent};
 

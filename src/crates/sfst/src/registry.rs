@@ -274,7 +274,7 @@ fn range_overlaps(summary: &Summary, q: &Range<u32>) -> bool {
 /// Read the `SUMR` chunk of an SFST file and decode the summary.
 ///
 /// Used by [`Registry::recover`] to rebuild summaries on startup. Maps the
-/// file instead of reading it: `Reader::open` touches only the header + TOC
+/// file instead of reading it: `ChunkReader::open` touches only the header + TOC
 /// pages and `summary()` only the SUMR chunk's, so recovery faults in a few
 /// KB per file rather than the whole file — which, across thousands of
 /// files, turned startup into a multi-GB sequential read. `Advice::Random`
@@ -288,7 +288,7 @@ fn read_summary(path: &Path) -> Result<Summary, String> {
     // `madvise` is a POSIX API; memmap2 only exposes `advise`/`Advice` on Unix.
     #[cfg(unix)]
     let _ = mmap.advise(memmap2::Advice::Random);
-    let reader = crate::Reader::open(&mmap).map_err(|e| format!("parse: {e}"))?;
+    let reader = crate::reader::ChunkReader::open(&mmap).map_err(|e| format!("parse: {e}"))?;
     reader.summary().map_err(|e| format!("summary: {e}"))
 }
 
