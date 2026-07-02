@@ -112,9 +112,10 @@ pub struct Node {
 pub struct Entry {
     pub node: NodeId,
     pub value: Value,
-    /// Pre-computed `xxhash64` of this entry's `key=value` rendering, filled by the
-    /// index-feeding pipeline (`0` until then). Lets an SFST-style interner skip
-    /// re-hashing on every occurrence — the `_nd_kv_hash` fast path.
+    /// Pre-computed `xxhash64` of this entry's `key=value` rendering, filled at
+    /// emit time by the [`Flattener`] (an invariant, not a later fill pass).
+    /// Lets an SFST-style interner skip re-hashing on every occurrence — the
+    /// `_nd_kv_hash` fast path.
     pub hash: u64,
 }
 
@@ -211,6 +212,14 @@ impl SchemaTree {
 pub struct Flattener {
     nodes: Vec<Node>,
     lookup: HashMap<(NodeId, Step, Kind), NodeId>,
+    /// Collapsed path per node, built incrementally at interning time (the
+    /// parent's path is always already cached) — must render exactly like
+    /// [`SchemaTree::path`]. Lets [`emit`](Self::emit) hash `key=value`
+    /// while the value bytes are still cache-hot, instead of a second full
+    /// pass over the entries.
+    paths: Vec<String>,
+    /// Reused `key=value` render buffer for the emit-time hash.
+    kv_buf: String,
     sanitized_keys: u64,
 }
 
@@ -223,6 +232,8 @@ impl Flattener {
                 edge: None,
             }],
             lookup: HashMap::new(),
+            paths: vec![String::new()],
+            kv_buf: String::new(),
             sanitized_keys: 0,
         }
     }
@@ -267,6 +278,19 @@ impl Flattener {
             return id;
         }
         let id = self.nodes.len() as NodeId;
+        // Incremental path, matching `SchemaTree::path` byte-for-byte:
+        // fields joined with '.', array elems appended as "[]" with no dot.
+        let mut path = self.paths[parent as usize].clone();
+        match &key.1 {
+            Step::Field(name) => {
+                if !path.is_empty() {
+                    path.push('.');
+                }
+                path.push_str(name);
+            }
+            Step::ArrayElem => path.push_str("[]"),
+        }
+        self.paths.push(path);
         self.nodes.push(Node {
             kind,
             edge: Some(Edge {
@@ -289,11 +313,8 @@ impl Flattener {
     /// Emit a leaf entry under `parent` via `step`.
     fn emit(&mut self, parent: NodeId, step: Step, value: Value, out: &mut Vec<Entry>) {
         let node = self.child(parent, step, value.kind());
-        out.push(Entry {
-            node,
-            value,
-            hash: 0,
-        });
+        let hash = hash_kv(&self.paths[node as usize], &value, &mut self.kv_buf);
+        out.push(Entry { node, value, hash });
     }
 
     /// Flatten one OTLP `AnyValue` reached from `parent` via `step`.
@@ -620,7 +641,7 @@ impl MalformedIds {
 /// Render a typed value into its `key=value` string form, appended to `out`:
 /// strings raw, ints/doubles decimal, bools `true`/`false`, bytes lowercase hex; the
 /// flatten-only empties render structurally. This is the single canonical rendering
-/// shared by hash pre-computation (`fill_log_hashes`) and the SFST build, so both
+/// shared by the flattener's emit-time hash and the SFST build, so both
 /// agree on the exact `key=value` bytes.
 pub fn append_value(value: &Value, out: &mut String) {
     use std::fmt::Write as _;

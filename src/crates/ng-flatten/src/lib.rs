@@ -776,7 +776,7 @@ mod tests {
     }
 
     #[test]
-    fn fill_trace_hashes_populates_and_dedups() {
+    fn flatten_populates_and_dedups_entry_hashes() {
         // Two spans share `http.method=GET`; a resource attr is present too. After
         // the fill, every entry (resource/scope/span) must carry a non-zero hash,
         // identical key=value must hash the same (enables the seal fast path), and
@@ -803,13 +803,11 @@ mod tests {
                 ..Default::default()
             }],
         };
-        let (mut flat, _) = flatten_trace_request(&req);
-        fill_trace_hashes(&mut flat);
-
+        let (flat, _) = flatten_trace_request(&req);
         let rg = &flat.resources[0];
         assert!(!rg.scopes[0].scope.is_empty(), "scope entries present");
         // Every entry (resource ++ scope ++ span) carries exactly hash_kv(path,value)
-        // — the contract `fill_trace_hashes` implements. (Asserting `!= 0` would be
+        // — the emit-time contract the flattener implements. (Asserting `!= 0` would be
         // wrong: xxhash64 can legitimately produce 0.)
         let mut buf = String::new();
         for e in rg

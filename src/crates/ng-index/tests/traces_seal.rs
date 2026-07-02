@@ -69,7 +69,7 @@ fn count_spans(req: &ExportTraceServiceRequest) -> usize {
 
 /// Ingest the requests into a traces WAL, then seal it into an SFST and return the
 /// sealed bytes. Mirrors `ng-ingest::write_trace_request` inline (normalize → flatten
-/// → fill_trace_hashes → encode → WAL frame), keeping the test self-contained; the
+/// → emit-time hashes → encode → WAL frame), keeping the test self-contained; the
 /// real `write_trace_request` is exercised end-to-end by the `#[ignore]`d real-WAL
 /// oracle below.
 fn seal(reqs: Vec<ExportTraceServiceRequest>) -> Vec<u8> {
@@ -94,8 +94,7 @@ fn seal(reqs: Vec<ExportTraceServiceRequest>) -> Vec<u8> {
         let base = clock.now_ns().as_u64();
         ng_flatten::normalize_span_timestamps(&mut r, base);
         ng_flatten::normalize_trace_ids(&mut r);
-        let (mut flat, _) = ng_flatten::flatten_trace_request(&r);
-        ng_flatten::fill_trace_hashes(&mut flat);
+        let (flat, _) = ng_flatten::flatten_trace_request(&r);
         let data = ng_flatten::encode_trace_frame(&flat).unwrap();
         let ingestion_ns = clock.now_ns();
         writer

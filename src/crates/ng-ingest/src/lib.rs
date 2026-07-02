@@ -123,8 +123,8 @@ pub fn count_spans(req: &ExportTraceServiceRequest) -> usize {
 /// resolves each span's `start_time_unix_nano`, and [`ng_flatten::normalize_trace_ids`]
 /// drops malformed trace/span/parent ids. The request is then flattened
 /// ([`ng_flatten::flatten_trace_request`]), each entry's `xxhash64(key=value)` is
-/// pre-computed ([`ng_flatten::fill_trace_hashes`], exactly as the logs path runs
-/// `fill_log_hashes`), and the result is bincode-encoded as the frame payload — so
+/// pre-computed at emit time by the flattener (exactly as the logs path), and
+/// the result is bincode-encoded as the frame payload — so
 /// the seal rides the interner's fast path. A request with zero spans writes no
 /// frame and returns `0`.
 pub fn write_trace_request(
@@ -148,15 +148,15 @@ pub fn write_trace_request(
             ng_flatten::SPAN_ID_LEN,
         );
     }
-    let (mut flattened, sanitized_keys) = ng_flatten::flatten_trace_request(req);
+    let (flattened, sanitized_keys) = ng_flatten::flatten_trace_request(req);
     if sanitized_keys > 0 {
         tracing::warn!(
             sanitized_keys,
             "rewrote '=' to '_' in attribute keys at ingest ('=' is the key=value delimiter)",
         );
     }
-    ng_flatten::fill_trace_hashes(&mut flattened);
-    let data = ng_flatten::encode_trace_frame(&flattened).context("encode flattened trace frame")?;
+    let data =
+        ng_flatten::encode_trace_frame(&flattened).context("encode flattened trace frame")?;
     let ingestion_ns = clock.now_ns();
     writer.write_frame(
         PART_KEY,

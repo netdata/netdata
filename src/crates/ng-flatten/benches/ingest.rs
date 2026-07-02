@@ -4,8 +4,8 @@
 //! stage and as the aggregate production recipe:
 //!
 //! ```text
-//! prost_decode → normalize → flatten → fill_hashes → encode → lz4_compress
-//!                └────────────── prepare_log_frame ──────────┘
+//! prost_decode → normalize → flatten (incl. emit-time hashes) → encode → lz4
+//!                └──────────── prepare_log_frame ───────────┘
 //! ```
 //!
 //! Needs a request dump captured by `ng-ingest --dump-requests` (the
@@ -129,38 +129,17 @@ fn bench(c: &mut Criterion) {
         .map(|req| ng_flatten::flatten_log_request(req).0)
         .collect();
 
-    g.bench_function("fill_hashes", |b| {
-        b.iter_batched(
-            || flattened.clone(),
-            |mut frames| {
-                for f in &mut frames {
-                    ng_flatten::fill_log_hashes(f);
-                }
-                frames
-            },
-            BatchSize::PerIteration,
-        )
-    });
-
-    let hashed = {
-        let mut frames = flattened.clone();
-        for f in &mut frames {
-            ng_flatten::fill_log_hashes(f);
-        }
-        frames
-    };
-
     g.bench_function("encode", |b| {
         b.iter(|| {
-            let mut out = Vec::with_capacity(hashed.len());
-            for f in &hashed {
+            let mut out = Vec::with_capacity(flattened.len());
+            for f in &flattened {
                 out.push(black_box(ng_flatten::encode_log_frame(f).expect("encode")));
             }
             out
         })
     });
 
-    let encoded: Vec<Vec<u8>> = hashed
+    let encoded: Vec<Vec<u8>> = flattened
         .iter()
         .map(|f| ng_flatten::encode_log_frame(f).expect("encode"))
         .collect();

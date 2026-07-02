@@ -129,8 +129,7 @@ fn encode_ng_frame(batch: Vec<ResourceLogs>) -> (Vec<u8>, usize) {
     let request = ExportLogsServiceRequest {
         resource_logs: batch,
     };
-    let (mut flattened, _) = ng_flatten::flatten_log_request(&request);
-    ng_flatten::fill_log_hashes(&mut flattened);
+    let (flattened, _) = ng_flatten::flatten_log_request(&request);
     let data = ng_flatten::encode_log_frame(&flattened).expect("encode flattened frame");
     (data, count)
 }

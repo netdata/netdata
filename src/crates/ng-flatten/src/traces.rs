@@ -189,39 +189,9 @@ pub fn normalize_span_timestamps(req: &mut ExportTraceServiceRequest, fallback_b
     }
 }
 
-/// Fill every span entry's `hash` with `xxhash64(key=value)` so the seal can ride
-/// the interner's `lookup_hash` fast path instead of re-hashing per occurrence —
-/// the span analog of [`crate::logs::fill_log_hashes`]. Paths are resolved once per
-/// node. Callers (`ng-ingest`) MUST run this before [`encode_trace_frame`], exactly
-/// as the logs path fills hashes before [`crate::logs::encode_log_frame`]; a frame
-/// written without it carries `hash == 0`, which is NOT safe to feed through the
-/// fast path (distinct strings sharing hash 0 would mis-alias).
-pub fn fill_trace_hashes(flattened: &mut FlattenedTraceRequest) {
-    let paths: Vec<String> = {
-        let tree = &flattened.tree;
-        (0..tree.len() as NodeId).map(|id| tree.path(id)).collect()
-    };
-    let mut buf = String::new();
-    for rg in &mut flattened.resources {
-        for e in &mut rg.resource {
-            e.hash = hash_kv(&paths[e.node as usize], &e.value, &mut buf);
-        }
-        for sg in &mut rg.scopes {
-            for e in &mut sg.scope {
-                e.hash = hash_kv(&paths[e.node as usize], &e.value, &mut buf);
-            }
-            for span in &mut sg.spans {
-                for e in &mut span.entries {
-                    e.hash = hash_kv(&paths[e.node as usize], &e.value, &mut buf);
-                }
-            }
-        }
-    }
-}
-
 /// Encode a [`FlattenedTraceRequest`] to the bincode bytes stored in a traces WAL
 /// frame — the span analog of [`crate::logs::encode_log_frame`], same codec.
-/// Callers fill span `Entry.hash`es first via [`fill_trace_hashes`] (as the logs
+/// Span `Entry.hash`es are filled at emit time by the flattener (as the logs
 /// path does before [`crate::logs::encode_log_frame`]), so the seal rides the
 /// interner fast path.
 pub fn encode_trace_frame(

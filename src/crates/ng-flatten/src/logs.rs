@@ -235,7 +235,7 @@ pub struct PreparedLogFrame {
 
 /// The single owner of the logs frame-payload recipe: normalize (ONE record
 /// walk — [`normalize_log_request`]) → flatten ([`flatten_log_request`]) →
-/// pre-compute entry hashes ([`fill_log_hashes`]) → bincode-encode
+/// (entry hashes are filled at emit time by the flattener) → bincode-encode
 /// ([`encode_log_frame`]). Shared by `ng-ingest` and the production OTel-logs
 /// ingestor so the recipe exists exactly once.
 ///
@@ -268,14 +268,14 @@ pub fn prepare_log_frame(
             SPAN_ID_LEN,
         );
     }
-    let (mut flattened, sanitized_keys) = flatten_log_request(req);
+    let (flattened, sanitized_keys) = flatten_log_request(req);
     if sanitized_keys > 0 {
         tracing::warn!(
             sanitized_keys,
             "rewrote '=' to '_' in attribute keys at ingest ('=' is the key=value delimiter)",
         );
     }
-    fill_log_hashes(&mut flattened);
+    // Hashes are filled at emit time by the flattener; no second pass.
     let data = encode_log_frame(&flattened)?;
     Ok(PreparedLogFrame {
         data,
@@ -284,32 +284,6 @@ pub fn prepare_log_frame(
         bad_ids: norm.bad_ids,
         sanitized_keys,
     })
-}
-
-/// Fill every entry's `hash` with `xxhash64(key=value)` so the index build can ride
-/// the interner's `lookup_hash` fast path instead of re-hashing per occurrence.
-/// Paths are resolved once per node.
-pub fn fill_log_hashes(flattened: &mut FlattenedLogRequest) {
-    let paths: Vec<String> = {
-        let tree = &flattened.tree;
-        (0..tree.len() as NodeId).map(|id| tree.path(id)).collect()
-    };
-    let mut buf = String::new();
-    for rg in &mut flattened.resources {
-        for e in &mut rg.resource {
-            e.hash = hash_kv(&paths[e.node as usize], &e.value, &mut buf);
-        }
-        for sg in &mut rg.scopes {
-            for e in &mut sg.scope {
-                e.hash = hash_kv(&paths[e.node as usize], &e.value, &mut buf);
-            }
-            for record in &mut sg.records {
-                for e in &mut record.entries {
-                    e.hash = hash_kv(&paths[e.node as usize], &e.value, &mut buf);
-                }
-            }
-        }
-    }
 }
 
 /// Encode a [`FlattenedLogRequest`] to the bincode bytes stored in a WAL frame.
