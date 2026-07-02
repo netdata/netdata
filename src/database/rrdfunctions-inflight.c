@@ -382,47 +382,24 @@ static inline int rrd_call_function_async(struct rrd_function_inflight *r, bool 
 
 // ----------------------------------------------------------------------------
 
-int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
-                     HTTP_ACCESS user_access, const char *cmd,
-                     bool wait, const char *transaction,
-                     rrd_function_result_callback_t result_cb, void *result_cb_data,
-                     rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
-                     rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-                     BUFFER *payload, const char *source, bool allow_restricted) {
+int rrd_function_verify_access(RRDHOST *host, BUFFER *result_wb, const char *cmd,
+                              HTTP_ACCESS user_access, bool allow_restricted,
+                              const DICTIONARY_ITEM **out_acquired) {
 
-    int code;
+    if(out_acquired)
+        *out_acquired = NULL;
+
+    if(!host)
+        return rrd_call_function_error(result_wb, "No host given for routing this request to.",
+                                       HTTP_RESP_INTERNAL_SERVER_ERROR);
+
     char sanitized_cmd[PLUGINSD_LINE_MAX + 1];
-    const DICTIONARY_ITEM *host_function_acquired = NULL;
-
-    char sanitized_source[(source ? strlen(source) : 0) + 1];
-    rrd_functions_sanitize(sanitized_source, source ? source : "", sizeof(sanitized_source));
-
-    // ------------------------------------------------------------------------
-    // check for the host
-    if(!host) {
-        code = HTTP_RESP_INTERNAL_SERVER_ERROR;
-
-        rrd_call_function_error(result_wb, "No host given for routing this request to.", code);
-
-        if(result_cb)
-            result_cb(result_wb, code, result_cb_data);
-
-        return code;
-    }
-
-    // ------------------------------------------------------------------------
-    // find the function
-
     size_t sanitized_cmd_length = rrd_functions_sanitize(sanitized_cmd, cmd, sizeof(sanitized_cmd));
 
-    code = rrd_functions_find_by_name(host, result_wb, sanitized_cmd, sanitized_cmd_length, &host_function_acquired);
-    if(code != HTTP_RESP_OK) {
-
-        if(result_cb)
-            result_cb(result_wb, code, result_cb_data);
-
+    const DICTIONARY_ITEM *host_function_acquired = NULL;
+    int code = rrd_functions_find_by_name(host, result_wb, sanitized_cmd, sanitized_cmd_length, &host_function_acquired);
+    if(code != HTTP_RESP_OK)
         return code;
-    }
 
     struct rrd_host_function *rdcf = dictionary_acquired_item_value(host_function_acquired);
 
@@ -431,10 +408,6 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
                                        "This feature is not available via this API.",
                                        HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
         dictionary_acquired_item_release(host->functions, host_function_acquired);
-
-        if(result_cb)
-            result_cb(result_wb, code, result_cb_data);
-
         return code;
     }
 
@@ -473,12 +446,60 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
         }
 
         dictionary_acquired_item_release(host->functions, host_function_acquired);
+        return code;
+    }
+
+    if(out_acquired)
+        *out_acquired = host_function_acquired;
+    else
+        dictionary_acquired_item_release(host->functions, host_function_acquired);
+
+    return HTTP_RESP_OK;
+}
+
+int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
+                     HTTP_ACCESS user_access, const char *cmd,
+                     bool wait, const char *transaction,
+                     rrd_function_result_callback_t result_cb, void *result_cb_data,
+                     rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
+                     rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
+                     BUFFER *payload, const char *source, bool allow_restricted) {
+
+    int code;
+    char sanitized_cmd[PLUGINSD_LINE_MAX + 1];
+    const DICTIONARY_ITEM *host_function_acquired = NULL;
+
+    char sanitized_source[(source ? strlen(source) : 0) + 1];
+    rrd_functions_sanitize(sanitized_source, source ? source : "", sizeof(sanitized_source));
+
+    // ------------------------------------------------------------------------
+    // check for the host
+    if(!host) {
+        code = HTTP_RESP_INTERNAL_SERVER_ERROR;
+
+        rrd_call_function_error(result_wb, "No host given for routing this request to.", code);
 
         if(result_cb)
             result_cb(result_wb, code, result_cb_data);
 
         return code;
     }
+
+    // ------------------------------------------------------------------------
+    // find the function and verify the caller's access
+
+    size_t sanitized_cmd_length = rrd_functions_sanitize(sanitized_cmd, cmd, sizeof(sanitized_cmd));
+
+    code = rrd_function_verify_access(host, result_wb, cmd, user_access, allow_restricted, &host_function_acquired);
+    if(code != HTTP_RESP_OK) {
+
+        if(result_cb)
+            result_cb(result_wb, code, result_cb_data);
+
+        return code;
+    }
+
+    struct rrd_host_function *rdcf = dictionary_acquired_item_value(host_function_acquired);
 
     if(timeout_s <= 0)
         timeout_s = rdcf->timeout;
