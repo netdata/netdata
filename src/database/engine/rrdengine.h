@@ -177,7 +177,7 @@ struct page_details *page_details_get(void);
 
 #define pdc_page_status_check(pd, flag) (__atomic_load_n(&((pd)->status), __ATOMIC_ACQUIRE) & (flag))
 #define pdc_page_status_set(pd, flag)   __atomic_or_fetch(&((pd)->status), flag, __ATOMIC_RELEASE)
-#define pdc_page_status_clear(pd, flag) __atomic_and_fetch(&((od)->status), ~(flag), __ATOMIC_RELEASE)
+#define pdc_page_status_clear(pd, flag) __atomic_and_fetch(&((pd)->status), ~(flag), __ATOMIC_RELEASE)
 
 struct jv2_extents_info {
     uint32_t index;

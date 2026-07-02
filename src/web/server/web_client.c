@@ -96,6 +96,14 @@ static inline void web_client_enable_wait_from_ssl(struct web_client *w) {
     }
 }
 
+static inline void web_client_reset_zchunk_send_state(struct web_client *w) {
+    w->response.zchunk_header_len = 0;
+    w->response.zchunk_header_sent = 0;
+    w->response.zchunk_suffix_sent = 0;
+    w->response.zchunk_finalize_sent = 0;
+    w->response.zchunk_header[0] = '\0';
+}
+
 static inline char *strip_control_characters(char *url) {
     if(!url) return "";
 
@@ -180,6 +188,7 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
         deflateEnd(&w->response.zstream);
         w->response.zsent = 0;
         w->response.zhave = 0;
+        web_client_reset_zchunk_send_state(w);
         w->response.zstream.avail_in = 0;
         w->response.zstream.avail_out = 0;
         w->response.zstream.total_in = 0;
@@ -495,19 +504,59 @@ static int web_server_static_file(struct web_client *w, char *filename) {
     if(is_dir && !web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH))
         return append_slash_to_url_and_redirect(w);
 
-    buffer_flush(w->response.data);
-    buffer_need_bytes(w->response.data, (size_t)statbuf.st_size);
-    w->response.data->len = (size_t)statbuf.st_size;
-
     // open the file
     int fd = open(web_filename, O_RDONLY | O_CLOEXEC);
 
-    // read the file
-    if(fd != -1 && read(fd, w->response.data->buffer, statbuf.st_size) != statbuf.st_size) {
-        // cannot read the whole file
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Web server failed to read file '%s'", web_filename);
+    if(fd != -1 && fstat(fd, &statbuf) != 0) {
+        int saved_errno = errno;
         close(fd);
+        errno = saved_errno;
         fd = -1;
+    }
+
+    if(fd != -1 && unlikely(statbuf.st_size < 0 || (uintmax_t)statbuf.st_size > UINT32_MAX - 2)) {
+        close(fd);
+        errno = EFBIG;
+        fd = -1;
+    }
+
+    if(fd != -1) {
+        size_t file_size = (size_t)statbuf.st_size;
+
+        buffer_flush(w->response.data);
+        buffer_need_bytes(w->response.data, file_size + 1);
+
+        size_t bytes_read = 0;
+        while(bytes_read < file_size) {
+            size_t bytes_to_read = file_size - bytes_read;
+            if(bytes_to_read > (size_t)SSIZE_MAX)
+                bytes_to_read = (size_t)SSIZE_MAX;
+
+            ssize_t r = read(fd, &w->response.data->buffer[bytes_read], bytes_to_read);
+            if(likely(r > 0)) {
+                bytes_read += (size_t)r;
+                continue;
+            }
+
+            if(unlikely(r == -1 && errno == EINTR))
+                continue;
+
+            if(r == 0)
+                errno = EIO;
+
+            // cannot read the whole file
+            nd_log(NDLS_DAEMON, NDLP_ERR, "Web server failed to read file '%s'", web_filename);
+            int saved_errno = errno;
+            close(fd);
+            errno = saved_errno;
+            fd = -1;
+            break;
+        }
+
+        if(fd != -1) {
+            w->response.data->len = bytes_read;
+            w->response.data->buffer[w->response.data->len] = '\0';
+        }
     }
 
     // check for failures
@@ -690,12 +739,13 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
  *          in the enum HTTP_VALIDATION otherwise.
  */
 HTTP_VALIDATION http_request_validate(struct web_client *w) {
-    char *s = (char *)buffer_tostring(w->response.data), *encoded_url = NULL;
+    char *request = (char *)buffer_tostring(w->response.data), *s = request, *encoded_url = NULL;
 
     size_t last_pos = w->header_parse_last_size;
 
     w->header_parse_tries++;
     w->header_parse_last_size = buffer_strlen(w->response.data);
+    char *request_end = request + w->header_parse_last_size;
 
     int is_it_valid;
     if(w->header_parse_tries > 1) {
@@ -743,10 +793,14 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
     encoded_url = s;
 
     //we search for the position where we have " HTTP/", because it finishes the user request
-    s = url_find_protocol(s);
+    char *request_line_end = s;
+    while(request_line_end < request_end && *request_line_end && *request_line_end != '\r')
+        request_line_end++;
+
+    s = url_find_protocol(s, request_line_end);
 
     // incomplete requests
-    if(unlikely(!*s)) {
+    if(unlikely(s >= request_line_end || !*s)) {
         web_client_enable_wait_receive(w);
         return HTTP_VALIDATION_INCOMPLETE;
     }
@@ -802,28 +856,26 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
 static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,size_t len, int flags)
 {
-    do {
-        errno_clear();
+    errno_clear();
 
-        ssize_t bytes;
-        if ((web_client_check_conn_tcp(w)) && (netdata_ssl_web_server_ctx)) {
-            if (SSL_connection(&w->ssl)) {
-                bytes = netdata_ssl_write(&w->ssl, buf, len);
-                web_client_enable_wait_from_ssl(w);
-            } else
-                bytes = send(w->fd, buf, len, flags);
-        } else if (web_client_check_conn_tcp(w) || web_client_check_conn_unix(w))
+    ssize_t bytes;
+    if ((web_client_check_conn_tcp(w)) && (netdata_ssl_web_server_ctx)) {
+        if (SSL_connection(&w->ssl)) {
+            bytes = netdata_ssl_write(&w->ssl, buf, len);
+            web_client_enable_wait_from_ssl(w);
+        } else
             bytes = send(w->fd, buf, len, flags);
-        else
-            bytes = -999;
+    } else if (web_client_check_conn_tcp(w) || web_client_check_conn_unix(w))
+        bytes = send(w->fd, buf, len, flags);
+    else
+        bytes = -999;
 
-        if(bytes < 0 && errno == EAGAIN) {
-            tinysleep();
-            continue;
-        }
+    if(bytes < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+        web_client_enable_wait_send(w);
+        return 0;
+    }
 
-        return bytes;
-    } while(true);
+    return bytes;
 }
 
 void web_client_build_http_header(struct web_client *w) {
@@ -1028,13 +1080,59 @@ static inline void web_client_send_http_header(struct web_client *w) {
         w->statistics.sent_bytes += bytes;
 }
 
-static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, char *url, bool nodeid, int (*func)(RRDHOST *, struct web_client *, char *)) {
-    static uint32_t hash_localhost = 0;
+struct web_client_url_hashes {
+    uint32_t api;
+    uint32_t host;
+    uint32_t node;
+    uint32_t netdata_conf;
+    uint32_t v0;
+    uint32_t v1;
+    uint32_t v2;
+    uint32_t v3;
+    uint32_t mcp;
+    uint32_t sse;
+#ifdef NETDATA_INTERNAL_CHECKS
+    uint32_t exit;
+    uint32_t debug;
+    uint32_t mirror;
+#endif
+};
 
-    if(unlikely(!hash_localhost)) {
-        hash_localhost = simple_hash("localhost");
+static struct web_client_url_hashes web_client_url_hashes = { 0 };
+static SPINLOCK web_client_url_hashes_spinlock = SPINLOCK_INITIALIZER;
+static bool web_client_url_hashes_initialized = false;
+
+static inline const struct web_client_url_hashes *web_client_url_hashes_get(void) {
+    if(likely(__atomic_load_n(&web_client_url_hashes_initialized, __ATOMIC_ACQUIRE)))
+        return &web_client_url_hashes;
+
+    spinlock_lock(&web_client_url_hashes_spinlock);
+
+    if(unlikely(!__atomic_load_n(&web_client_url_hashes_initialized, __ATOMIC_ACQUIRE))) {
+        web_client_url_hashes.api = simple_hash("api");
+        web_client_url_hashes.host = simple_hash("host");
+        web_client_url_hashes.node = simple_hash("node");
+        web_client_url_hashes.netdata_conf = simple_hash("netdata.conf");
+        web_client_url_hashes.v0 = simple_hash("v0");
+        web_client_url_hashes.v1 = simple_hash("v1");
+        web_client_url_hashes.v2 = simple_hash("v2");
+        web_client_url_hashes.v3 = simple_hash("v3");
+        web_client_url_hashes.mcp = simple_hash("mcp");
+        web_client_url_hashes.sse = simple_hash("sse");
+#ifdef NETDATA_INTERNAL_CHECKS
+        web_client_url_hashes.exit = simple_hash("exit");
+        web_client_url_hashes.debug = simple_hash("debug");
+        web_client_url_hashes.mirror = simple_hash("mirror");
+#endif
+        __atomic_store_n(&web_client_url_hashes_initialized, true, __ATOMIC_RELEASE);
     }
 
+    spinlock_unlock(&web_client_url_hashes_spinlock);
+
+    return &web_client_url_hashes;
+}
+
+static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, char *url, bool nodeid, int (*func)(RRDHOST *, struct web_client *, char *)) {
     if(host != localhost) {
         buffer_flush(w->response.data);
         buffer_strcat(w->response.data, "Nesting of hosts is not allowed.");
@@ -1115,30 +1213,21 @@ int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client 
     if(uuid_is_null(w->transaction))
         uuid_generate_random(w->transaction);
 
-    static uint32_t
-            hash_api = 0,
-            hash_host = 0,
-            hash_node = 0;
-
-    if(unlikely(!hash_api)) {
-        hash_api = simple_hash("api");
-        hash_host = simple_hash("host");
-        hash_node = simple_hash("node");
-    }
+    const struct web_client_url_hashes *url_hashes = web_client_url_hashes_get();
 
     char *tok = strsep_skip_consecutive_separators(&decoded_url_path, "/?");
     if(likely(tok && *tok)) {
         uint32_t hash = simple_hash(tok);
 
-        if(unlikely(hash == hash_api && strcmp(tok, "api") == 0)) {
+        if(unlikely(hash == url_hashes->api && strcmp(tok, "api") == 0)) {
             // current API
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: API request ...", w->id);
             return check_host_and_call(host, w, decoded_url_path, web_client_api_request);
         }
-        else if(unlikely((hash == hash_host && strcmp(tok, "host") == 0) || (hash == hash_node && strcmp(tok, "node") == 0))) {
+        else if(unlikely((hash == url_hashes->host && strcmp(tok, "host") == 0) || (hash == url_hashes->node && strcmp(tok, "node") == 0))) {
             // host switching
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: host switch request ...", w->id);
-            return web_client_switch_host(host, w, decoded_url_path, hash == hash_node, web_client_api_request_with_node_selection);
+            return web_client_switch_host(host, w, decoded_url_path, hash == url_hashes->node, web_client_api_request_with_node_selection);
         }
     }
 
@@ -1152,39 +1241,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
     if(unlikely(!service_running(ABILITY_WEB_REQUESTS)))
         return web_client_service_unavailable(w);
 
-    static uint32_t
-            hash_api = 0,
-            hash_netdata_conf = 0,
-            hash_host = 0,
-            hash_node = 0,
-            hash_v0 = 0,
-            hash_v1 = 0,
-            hash_v2 = 0,
-            hash_v3 = 0,
-            hash_mcp = 0,
-            hash_sse = 0;
-
-#ifdef NETDATA_INTERNAL_CHECKS
-    static uint32_t hash_exit = 0, hash_debug = 0, hash_mirror = 0;
-#endif
-
-    if(unlikely(!hash_api)) {
-        hash_api = simple_hash("api");
-        hash_netdata_conf = simple_hash("netdata.conf");
-        hash_host = simple_hash("host");
-        hash_node = simple_hash("node");
-        hash_v0 = simple_hash("v0");
-        hash_v1 = simple_hash("v1");
-        hash_v2 = simple_hash("v2");
-        hash_v3 = simple_hash("v3");
-        hash_mcp = simple_hash("mcp");
-        hash_sse = simple_hash("sse");
-#ifdef NETDATA_INTERNAL_CHECKS
-        hash_exit = simple_hash("exit");
-        hash_debug = simple_hash("debug");
-        hash_mirror = simple_hash("mirror");
-#endif
-    }
+    const struct web_client_url_hashes *url_hashes = web_client_url_hashes_get();
 
     // keep a copy of the decoded path, in case we need to serve it as a filename
     char filename[FILENAME_MAX + 1];
@@ -1195,49 +1252,49 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         uint32_t hash = simple_hash(tok);
         netdata_log_debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, tok);
 
-        if(likely(hash == hash_api && strcmp(tok, "api") == 0)) {                           // current API
+        if(likely(hash == url_hashes->api && strcmp(tok, "api") == 0)) {                           // current API
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: API request ...", w->id);
             return check_host_and_call(host, w, decoded_url_path, web_client_api_request);
         }
-        else if(likely(hash == hash_mcp && strcmp(tok, "mcp") == 0)) {
+        else if(likely(hash == url_hashes->mcp && strcmp(tok, "mcp") == 0)) {
             if(unlikely(!http_can_access_mcp(w)))
                 return web_client_permission_denied_acl(w);
             return mcp_http_handle_request(host, w);
         }
-        else if(likely(hash == hash_sse && strcmp(tok, "sse") == 0)) {
+        else if(likely(hash == url_hashes->sse && strcmp(tok, "sse") == 0)) {
             if(unlikely(!http_can_access_mcp(w)))
                 return web_client_permission_denied_acl(w);
             return mcp_sse_handle_request(host, w);
         }
-        else if(unlikely((hash == hash_host && strcmp(tok, "host") == 0) || (hash == hash_node && strcmp(tok, "node") == 0))) { // host switching
+        else if(unlikely((hash == url_hashes->host && strcmp(tok, "host") == 0) || (hash == url_hashes->node && strcmp(tok, "node") == 0))) { // host switching
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: host switch request ...", w->id);
-            return web_client_switch_host(host, w, decoded_url_path, hash == hash_node, web_client_process_url);
+            return web_client_switch_host(host, w, decoded_url_path, hash == url_hashes->node, web_client_process_url);
         }
-        else if(unlikely(hash == hash_v3 && strcmp(tok, "v3") == 0)) {
+        else if(unlikely(hash == url_hashes->v3 && strcmp(tok, "v3") == 0)) {
             if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_WITH_VERSION))
                 return bad_request_multiple_dashboard_versions(w);
             web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_IS_V3);
             return web_client_process_url(host, w, decoded_url_path);
         }
-        else if(unlikely(hash == hash_v2 && strcmp(tok, "v2") == 0)) {
+        else if(unlikely(hash == url_hashes->v2 && strcmp(tok, "v2") == 0)) {
             if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_WITH_VERSION))
                 return bad_request_multiple_dashboard_versions(w);
             web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_IS_V2);
             return web_client_process_url(host, w, decoded_url_path);
         }
-        else if(unlikely(hash == hash_v1 && strcmp(tok, "v1") == 0)) {
+        else if(unlikely(hash == url_hashes->v1 && strcmp(tok, "v1") == 0)) {
             if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_WITH_VERSION))
                 return bad_request_multiple_dashboard_versions(w);
             web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_IS_V1);
             return web_client_process_url(host, w, decoded_url_path);
         }
-        else if(unlikely(hash == hash_v0 && strcmp(tok, "v0") == 0)) {
+        else if(unlikely(hash == url_hashes->v0 && strcmp(tok, "v0") == 0)) {
             if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_WITH_VERSION))
                 return bad_request_multiple_dashboard_versions(w);
             web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_IS_V0);
             return web_client_process_url(host, w, decoded_url_path);
         }
-        else if(unlikely(hash == hash_netdata_conf && strcmp(tok, "netdata.conf") == 0)) {    // netdata.conf
+        else if(unlikely(hash == url_hashes->netdata_conf && strcmp(tok, "netdata.conf") == 0)) {    // netdata.conf
             if(unlikely(!http_can_access_netdataconf(w)))
                 return web_client_permission_denied_acl(w);
 
@@ -1249,7 +1306,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             return HTTP_RESP_OK;
         }
 #ifdef NETDATA_INTERNAL_CHECKS
-        else if(unlikely(hash == hash_exit && strcmp(tok, "exit") == 0)) {
+        else if(unlikely(hash == url_hashes->exit && strcmp(tok, "exit") == 0)) {
             if(unlikely(!http_can_access_netdataconf(w)))
                 return web_client_permission_denied_acl(w);
 
@@ -1265,7 +1322,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             netdata_exit_gracefully(EXIT_REASON_API_QUIT, true);
             return HTTP_RESP_OK;
         }
-        else if(unlikely(hash == hash_debug && strcmp(tok, "debug") == 0)) {
+        else if(unlikely(hash == url_hashes->debug && strcmp(tok, "debug") == 0)) {
             if(unlikely(!http_can_access_netdataconf(w)))
                 return web_client_permission_denied_acl(w);
 
@@ -1303,7 +1360,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             buffer_strcat(w->response.data, "debug which chart?\r\n");
             return HTTP_RESP_BAD_REQUEST;
         }
-        else if(unlikely(hash == hash_mirror && strcmp(tok, "mirror") == 0)) {
+        else if(unlikely(hash == url_hashes->mirror && strcmp(tok, "mirror") == 0)) {
             if(unlikely(!http_can_access_netdataconf(w)))
                 return web_client_permission_denied_acl(w);
 
@@ -1592,18 +1649,51 @@ void web_client_process_request_from_web_server(struct web_client *w) {
     }
 }
 
+static inline ssize_t web_client_send_chunk_frame(struct web_client *w, const char *buf, size_t len, size_t *sent)
+{
+    ssize_t total = 0;
+
+    while(*sent < len) {
+        ssize_t bytes = web_client_send_data(w, &buf[*sent], len - *sent, 0);
+        if(bytes > 0) {
+            *sent += bytes;
+            total += bytes;
+            w->statistics.sent_bytes += bytes;
+        }
+        else if(bytes == 0) {
+            web_client_enable_wait_send(w);
+            return total;
+        }
+        else
+            return bytes;
+    }
+
+    return total;
+}
+
 ssize_t web_client_send_chunk_header(struct web_client *w, size_t len)
 {
     netdata_log_debug(D_DEFLATE, "%llu: OPEN CHUNK of %zu bytes (hex: %zx).", w->id, len, len);
-    char buf[24];
-    ssize_t bytes;
-    bytes = (ssize_t)sprintf(buf, "%zX\r\n", len);
-    buf[bytes] = 0x00;
+    if(w->response.zchunk_header_len == 0) {
+        int bytes = snprintf(w->response.zchunk_header, sizeof(w->response.zchunk_header), "%zX\r\n", len);
+        if(bytes < 0 || (size_t)bytes >= sizeof(w->response.zchunk_header)) {
+            netdata_log_debug(D_WEB_CLIENT, "%llu: Failed to prepare chunk header.", w->id);
+            WEB_CLIENT_IS_DEAD(w);
+            return -1;
+        }
+        w->response.zchunk_header_len = (size_t)bytes;
+        w->response.zchunk_header_sent = 0;
+    }
 
-    bytes = web_client_send_data(w,buf,strlen(buf),0);
+    ssize_t bytes = web_client_send_chunk_frame(
+        w, w->response.zchunk_header, w->response.zchunk_header_len, &w->response.zchunk_header_sent);
     if(bytes > 0) {
         netdata_log_debug(D_DEFLATE, "%llu: Sent chunk header %zd bytes.", w->id, bytes);
-        w->statistics.sent_bytes += bytes;
+        if(w->response.zchunk_header_sent == w->response.zchunk_header_len) {
+            w->response.zchunk_header_len = 0;
+            w->response.zchunk_header_sent = 0;
+            w->response.zchunk_header[0] = '\0';
+        }
     }
 
     else if(bytes == 0) {
@@ -1622,10 +1712,11 @@ ssize_t web_client_send_chunk_close(struct web_client *w)
     //debug(D_DEFLATE, "%llu: CLOSE CHUNK.", w->id);
 
     ssize_t bytes;
-    bytes = web_client_send_data(w,"\r\n",2,0);
+    bytes = web_client_send_chunk_frame(w, "\r\n", 2, &w->response.zchunk_suffix_sent);
     if(bytes > 0) {
         netdata_log_debug(D_DEFLATE, "%llu: Sent chunk suffix %zd bytes.", w->id, bytes);
-        w->statistics.sent_bytes += bytes;
+        if(w->response.zchunk_suffix_sent == 2)
+            w->response.zchunk_suffix_sent = 0;
     }
 
     else if(bytes == 0) {
@@ -1644,10 +1735,11 @@ ssize_t web_client_send_chunk_finalize(struct web_client *w)
     //debug(D_DEFLATE, "%llu: FINALIZE CHUNK.", w->id);
 
     ssize_t bytes;
-    bytes = web_client_send_data(w,"\r\n0\r\n\r\n",7,0);
+    bytes = web_client_send_chunk_frame(w, "\r\n0\r\n\r\n", 7, &w->response.zchunk_finalize_sent);
     if(bytes > 0) {
         netdata_log_debug(D_DEFLATE, "%llu: Sent chunk suffix %zd bytes.", w->id, bytes);
-        w->statistics.sent_bytes += bytes;
+        if(w->response.zchunk_finalize_sent == 7)
+            w->response.zchunk_finalize_sent = 0;
     }
 
     else if(bytes == 0) {
@@ -1664,6 +1756,7 @@ ssize_t web_client_send_chunk_finalize(struct web_client *w)
 ssize_t web_client_send_deflate(struct web_client *w)
 {
     ssize_t len = 0, t = 0;
+    bool completed_pending_suffix = false;
 
     // when using compression,
     // w->response.sent is the amount of bytes passed through compression
@@ -1672,6 +1765,20 @@ ssize_t web_client_send_deflate(struct web_client *w)
         "%llu: web_client_send_deflate(): w->response.data->len = %zu, w->response.sent = %zu, w->response.zhave = %zu, w->response.zsent = %zu, w->response.zstream.avail_in = %u, w->response.zstream.avail_out = %u, w->response.zstream.total_in = %lu, w->response.zstream.total_out = %lu.",
         w->id, (size_t)w->response.data->len, w->response.sent, w->response.zhave, w->response.zsent, w->response.zstream.avail_in, w->response.zstream.avail_out, w->response.zstream.total_in, w->response.zstream.total_out);
 
+    if(w->response.zchunk_suffix_sent) {
+        t = web_client_send_chunk_close(w);
+        if(t <= 0 || w->response.zchunk_suffix_sent)
+            return t;
+
+        completed_pending_suffix = true;
+    }
+
+    if(w->response.zchunk_header_len) {
+        t = web_client_send_chunk_header(w, w->response.zhave);
+        if(t < 0 || w->response.zchunk_header_len)
+            return t;
+    }
+
     if(w->response.data->len - w->response.sent == 0 && w->response.zstream.avail_in == 0 && w->response.zhave == w->response.zsent && w->response.zstream.avail_out != 0) {
         // there is nothing to send
 
@@ -1679,8 +1786,17 @@ ssize_t web_client_send_deflate(struct web_client *w)
 
         // finalize the chunk
         if(w->response.sent != 0) {
-            t = web_client_send_chunk_finalize(w);
-            if(t < 0) return t;
+            // A pending inter-chunk suffix is also the prefix of the final marker.
+            if(completed_pending_suffix && w->response.zchunk_finalize_sent == 0)
+                w->response.zchunk_finalize_sent = 2;
+
+            ssize_t t2 = web_client_send_chunk_finalize(w);
+            if(t2 < 0)
+                return t2;
+
+            t += t2;
+            if(t2 == 0 || w->response.zchunk_finalize_sent)
+                return t;
         }
 
         if(unlikely(!web_client_has_keepalive(w))) {
@@ -1699,15 +1815,25 @@ ssize_t web_client_send_deflate(struct web_client *w)
         // compress more input data
 
         // close the previous open chunk
-        if(w->response.sent != 0) {
+        // Skip this if the pending suffix was completed at function entry.
+        if(w->response.sent != 0 && !completed_pending_suffix) {
             t = web_client_send_chunk_close(w);
-            if(t < 0) return t;
+            if(t <= 0 || w->response.zchunk_suffix_sent)
+                return t;
         }
 
         netdata_log_debug(D_DEFLATE, "%llu: Compressing %zu new bytes starting from %zu (and %u left behind).", w->id, (w->response.data->len - w->response.sent), w->response.sent, w->response.zstream.avail_in);
 
         // give the compressor all the data not passed through the compressor yet
         if(w->response.data->len > w->response.sent) {
+            if(unlikely((size_t)w->response.zstream.avail_in > w->response.sent)) {
+                netdata_log_error(
+                    "%llu: Compression input state is inconsistent (sent %zu, avail_in %u). Closing down client.",
+                    w->id, w->response.sent, w->response.zstream.avail_in);
+                web_client_request_done(w);
+                return -1;
+            }
+
             w->response.zstream.next_in = (Bytef *)&w->response.data->buffer[w->response.sent - w->response.zstream.avail_in];
             w->response.zstream.avail_in += (uInt) (w->response.data->len - w->response.sent);
         }
@@ -1748,6 +1874,8 @@ ssize_t web_client_send_deflate(struct web_client *w)
         ssize_t t2 = web_client_send_chunk_header(w, w->response.zhave);
         if(t2 < 0) return t2;
         t += t2;
+        if(w->response.zchunk_header_len)
+            return t;
     }
 
     netdata_log_debug(D_WEB_CLIENT, "%llu: Sending %zu bytes of data (+%zd of chunk header).", w->id, w->response.zhave - w->response.zsent, t);
@@ -1763,6 +1891,7 @@ ssize_t web_client_send_deflate(struct web_client *w)
         netdata_log_debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client (zhave = %zu, zsent = %zu, need to send = %zu).",
             w->id, w->response.zhave, w->response.zsent, w->response.zhave - w->response.zsent);
 
+        len += t;
     }
     else {
         netdata_log_debug(D_WEB_CLIENT, "%llu: Failed to send data to client.", w->id);

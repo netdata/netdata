@@ -83,7 +83,7 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN
 static struct prometheus_server {
     const char *server;
     uint32_t hash;
-    RRDHOST *host;
+    char machine_guid[GUID_LEN + 1];
     time_t last_access;
     struct prometheus_server *next;
 } *prometheus_server_root = NULL;
@@ -137,7 +137,9 @@ static inline time_t prometheus_server_last_access(const char *server, RRDHOST *
 
     struct prometheus_server *ps;
     for (ps = prometheus_server_root; ps; ps = ps->next) {
-        if (host == ps->host && hash == ps->hash && !strcmp(server, ps->server)) {
+        if (hash == ps->hash &&
+            !strcmp(server, ps->server) &&
+            !strcmp(host->machine_guid, ps->machine_guid)) {
             time_t last = ps->last_access;
             ps->last_access = now;
             netdata_mutex_unlock(&prometheus_server_root_mutex);
@@ -148,7 +150,7 @@ static inline time_t prometheus_server_last_access(const char *server, RRDHOST *
     ps = callocz(1, sizeof(struct prometheus_server));
     ps->server = strdupz(server);
     ps->hash = hash;
-    ps->host = host;
+    strncpyz(ps->machine_guid, host->machine_guid, sizeof(ps->machine_guid) - 1);
     ps->last_access = now;
     ps->next = prometheus_server_root;
     prometheus_server_root = ps;
@@ -954,6 +956,24 @@ static inline time_t prometheus_preparation(
     return after;
 }
 
+static inline void prometheus_request_instance_init(
+    struct instance *request_instance,
+    RRDHOST *host,
+    const char *server)
+{
+    *request_instance = (struct instance) {
+        .config = prometheus_exporter_instance->config,
+        .before = now_realtime_sec(),
+    };
+
+    request_instance->after = prometheus_preparation(request_instance, host, server, request_instance->before);
+}
+
+static inline void prometheus_request_instance_cleanup(struct instance *request_instance)
+{
+    buffer_free(request_instance->labels_buffer);
+}
+
 /**
  * Write metrics and auxiliary information for one host to a buffer.
  *
@@ -977,22 +997,18 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
     if (unlikely(!prometheus_exporter_instance || !prometheus_exporter_instance->config.initialized))
         return;
 
-    prometheus_exporter_instance->before = now_realtime_sec();
-
-    // we start at the point we had stopped before
-    prometheus_exporter_instance->after = prometheus_preparation(
-        prometheus_exporter_instance,
-        host,
-        server,
-        prometheus_exporter_instance->before);
+    // Web requests can run concurrently; keep per-request formatting state local.
+    struct instance request_instance;
+    prometheus_request_instance_init(&request_instance, host, server);
 
     PROM_CONTEXT_OPTIONS_JudyLSet context_options;
     PROM_CONTEXT_OPTIONS_INIT(&context_options);
 
     rrd_stats_api_v1_charts_allmetrics_prometheus(
-        prometheus_exporter_instance, host, filter_string, wb, prefix, exporting_options, 0, output_options, &context_options);
+        &request_instance, host, filter_string, wb, prefix, exporting_options, 0, output_options, &context_options);
 
     PROM_CONTEXT_OPTIONS_FREE(&context_options, PROM_CONTEXT_OPTIONS_free_cb, NULL);
+    prometheus_request_instance_cleanup(&request_instance);
 }
 
 /**
@@ -1018,14 +1034,9 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
     if (unlikely(!prometheus_exporter_instance || !prometheus_exporter_instance->config.initialized))
         return;
 
-    prometheus_exporter_instance->before = now_realtime_sec();
-
-    // we start at the point we had stopped before
-    prometheus_exporter_instance->after = prometheus_preparation(
-        prometheus_exporter_instance,
-        host,
-        server,
-        prometheus_exporter_instance->before);
+    // Web requests can run concurrently; keep per-request formatting state local.
+    struct instance request_instance;
+    prometheus_request_instance_init(&request_instance, host, server);
 
     PROM_CONTEXT_OPTIONS_JudyLSet context_options;
     PROM_CONTEXT_OPTIONS_INIT(&context_options);
@@ -1033,9 +1044,10 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
     dfe_start_reentrant(rrdhost_root_index, host)
     {
         rrd_stats_api_v1_charts_allmetrics_prometheus(
-            prometheus_exporter_instance, host, filter_string, wb, prefix, exporting_options, 1, output_options, &context_options);
+            &request_instance, host, filter_string, wb, prefix, exporting_options, 1, output_options, &context_options);
     }
     dfe_done(host);
 
     PROM_CONTEXT_OPTIONS_FREE(&context_options, PROM_CONTEXT_OPTIONS_free_cb, NULL);
+    prometheus_request_instance_cleanup(&request_instance);
 }

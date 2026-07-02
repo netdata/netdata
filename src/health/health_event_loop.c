@@ -286,8 +286,14 @@ static inline int check_if_resumed_from_suspension(void) {
     // detect if monotonic and realtime have twice the difference
     // in which case we assume the system was just waken from hibernation
 
-    if(last_realtime && last_monotonic && realtime - last_realtime > 2 * (monotonic - last_monotonic))
-        ret = 1;
+    if(last_realtime && last_monotonic && realtime > last_realtime && monotonic >= last_monotonic) {
+        usec_t realtime_delta = realtime - last_realtime;
+        usec_t monotonic_delta = monotonic - last_monotonic;
+
+        // Equivalent to realtime_delta > 2 * monotonic_delta, without unsigned overflow.
+        if(realtime_delta > monotonic_delta && realtime_delta - monotonic_delta > monotonic_delta)
+            ret = 1;
+    }
 
     last_realtime = realtime;
     last_monotonic = monotonic;
@@ -812,7 +818,7 @@ static void health_event_loop(void) {
             schedule_node_state_update(localhost, 10);
         }
 
-        if (unlikely(silencers->all_alarms && silencers->stype == STYPE_DISABLE_ALARMS)) {
+        if (unlikely(health_silencers_all_alarms_disabled())) {
             static int logged=0;
             if (!logged) {
                 nd_log(NDLS_DAEMON, NDLP_DEBUG,

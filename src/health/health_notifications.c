@@ -305,7 +305,11 @@ struct health_raised_summary *alerts_raised_summary_create(RRDHOST *host) {
 void alerts_raised_summary_populate(struct health_raised_summary *hrm) {
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(hrm->host, rc) {
-        if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec)) continue;
+        RRDSET *st = rrdcalc_rrdset_read_lock(rc);
+        if(unlikely(!st)) continue;
+        bool collected = st->last_collected_time.tv_sec;
+        rrdcalc_rrdset_read_unlock(st);
+        if(unlikely(!collected)) continue;
         health_raised_summary_add_alert(hrm, rc_dfe.item);
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
@@ -538,10 +542,11 @@ bool health_alarm_log_get_global_id_and_transition_id_for_rrdcalc(RRDCALC *rc, u
 }
 
 void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health_raised_summary *hrm) {
-    uint32_t first_waiting = (host->health_log.alarms)?host->health_log.alarms->unique_id:0;
     time_t now = now_realtime_sec();
 
     rw_spinlock_read_lock(&host->health_log.spinlock);
+
+    uint32_t first_waiting = (host->health_log.alarms)?host->health_log.alarms->unique_id:0;
 
     for(ALARM_ENTRY *ae = host->health_log.alarms; ae && ae->unique_id >= host->health_last_processed_id; ae = ae->next) {
         if(unlikely(

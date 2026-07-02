@@ -57,14 +57,12 @@ ssize_t websocket_receive_data(WS_CLIENT *wsc) {
     if (!wsc->in_buffer.data || wsc->sock.fd < 0)
         return -1;
 
-    size_t available_space = WEBSOCKET_RECEIVE_BUFFER_SIZE;
-    if(wsc->next_frame_size > 0) {
-        size_t used_space = cbuffer_used_size_unsafe(&wsc->in_buffer);
-        if(used_space < wsc->next_frame_size) {
-            size_t missing_for_next_frame = wsc->next_frame_size - used_space;
-            available_space = MAX(missing_for_next_frame, WEBSOCKET_RECEIVE_BUFFER_SIZE);
-        }
+    size_t available_space = cbuffer_available_size_unsafe(&wsc->in_buffer);
+    if(available_space <= 1) {
+        websocket_error(wsc, "Not enough space in input buffer to read from client");
+        return -1;
     }
+    available_space = MIN(available_space - 1, (size_t)WEBSOCKET_RECEIVE_BUFFER_SIZE);
 
     char *buffer = cbuffer_reserve_unsafe(&wsc->in_buffer, available_space);
     if(!buffer) {
@@ -279,7 +277,7 @@ bool websocket_protocol_parse_header_from_buffer(const char *buffer, size_t leng
             return false; // Not enough data
         }
         
-        header->payload_length =
+        uint64_t payload_length =
             ((uint64_t)((unsigned char)buffer[2]) << 56) | 
             ((uint64_t)((unsigned char)buffer[3]) << 48) | 
             ((uint64_t)((unsigned char)buffer[4]) << 40) | 
@@ -288,6 +286,8 @@ bool websocket_protocol_parse_header_from_buffer(const char *buffer, size_t leng
             ((uint64_t)((unsigned char)buffer[7]) << 16) | 
             ((uint64_t)((unsigned char)buffer[8]) << 8) | 
             ((uint64_t)((unsigned char)buffer[9]));
+
+        header->payload_length = payload_length > SIZE_MAX ? SIZE_MAX : (size_t)payload_length;
         header->header_size += 8;
     }
     
@@ -304,7 +304,8 @@ bool websocket_protocol_parse_header_from_buffer(const char *buffer, size_t leng
     }
 
     header->payload = (void *)&buffer[header->header_size];
-    header->frame_size = header->header_size + header->payload_length;
+    header->frame_size = header->payload_length > SIZE_MAX - header->header_size ?
+        SIZE_MAX : header->header_size + header->payload_length;
     
     return true;
 }
@@ -578,6 +579,14 @@ websocket_protocol_consume_frame(WS_CLIENT *wsc, char *data, size_t length, ssiz
                         length);
         return WS_FRAME_NEED_MORE_DATA;
     }
+
+    if (header.payload_length > (uint64_t)WS_MAX_INCOMING_FRAME_SIZE ||
+        header.frame_size >= WEBSOCKET_IN_BUFFER_MAX_SIZE) {
+        websocket_error(wsc, "Invalid frame: Frame too large (payload=%zu bytes, frame=%zu bytes)",
+                        header.payload_length, header.frame_size);
+        websocket_protocol_exception(wsc, WS_CLOSE_MESSAGE_TOO_BIG, "Frame too large");
+        return WS_FRAME_ERROR;
+    }
     
     // Check if we have enough data for the complete frame (header + payload)
     // If not, don't consume any bytes and wait for more data
@@ -629,6 +638,7 @@ websocket_protocol_consume_frame(WS_CLIENT *wsc, char *data, size_t length, ssiz
 
         case WS_ALLOW_DISCARD:
             // we have already logged in websocket_is_frame_allowed()
+            *bytes_processed = header.frame_size;
             return WS_FRAME_COMPLETE;
 
         default:

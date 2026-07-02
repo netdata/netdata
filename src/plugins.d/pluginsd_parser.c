@@ -287,7 +287,6 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
 
 static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *parser)
 {
-    static time_t last_host_stale_check = 0;
     char *guid = get_word(words, num_words, 1);
 
     if(!guid || !*guid || strcmp(guid, "localhost") == 0) {
@@ -295,7 +294,7 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
         // Check if we need to switch any nodes to stale
         uint32_t min_check_interval = UINT_MAX;
         time_t now = now_realtime_sec();
-        if (last_host_stale_check < now) {
+        if (parser->user.vnodes.last_host_stale_check < now) {
             Word_t Index = 0;
             bool first_then_next = true;
             uint32_t *Pvalue;
@@ -308,7 +307,7 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
                 min_check_interval = MIN(min_check_interval, stale_after_seconds);
                 if (rrdhost_option_check(virtual_host, RRDHOST_OPTION_VIRTUAL_HOST)) {
                     time_t last_seen = (*Pvalue + VNODE_BASE_EPOCH);
-                    uint32_t seen_seconds_ago = (uint32_t) (now - last_seen);
+                    uint32_t seen_seconds_ago = (now > last_seen) ? (uint32_t)(now - last_seen) : 0;
 
                     if (seen_seconds_ago >= stale_after_seconds) {
                         rrdhost_option_clear(virtual_host, RRDHOST_OPTION_VIRTUAL_HOST);
@@ -322,7 +321,7 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
             if (min_check_interval == UINT_MAX)
                 min_check_interval = 60;
 
-            last_host_stale_check = now_realtime_sec() + min_check_interval;
+            parser->user.vnodes.last_host_stale_check = now_realtime_sec() + min_check_interval;
         }
         return PARSER_RC_OK;
     }

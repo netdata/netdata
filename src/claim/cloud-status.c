@@ -26,7 +26,7 @@ CLOUD_STATUS cloud_status(void) {
         rrdhost_flag_check(localhost, RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS) &&
         stream_sender_has_capabilities(localhost, STREAM_CAP_NODE_ID) &&
         !UUIDiszero(localhost->node_id) &&
-        !UUIDiszero(localhost->aclk.claim_id_of_parent))
+        !UUIDiszero(rrdhost_claim_id_of_parent_get(localhost)))
         return CLOUD_STATUS_INDIRECT;
 
     if(is_agent_claimed())

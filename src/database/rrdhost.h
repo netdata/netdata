@@ -255,8 +255,9 @@ struct rrdhost {
 
                 // single-writer (the receiver thread), relaxed-atomic; read lock-free by the
                 // pulse traversal. Cumulative over the host's lifetime, never reset.
-                uint64_t bytes_in;                  // raw socket bytes received from this child (all connections)
-                uint64_t bytes_out;                 // raw socket bytes sent to this child (all connections)
+                // Keep these 8-byte aligned: 32-bit GCC may inline relaxed 64-bit access.
+                uint64_t bytes_in __attribute__((aligned(8)));  // raw socket bytes received from this child
+                uint64_t bytes_out __attribute__((aligned(8))); // raw socket bytes sent to this child
 
                 // realtime second the current inbound (receiver) state was entered; reset by
                 // pulse_host_status() on every inbound state change, read by the pulse traversal
@@ -373,6 +374,7 @@ struct rrdhost {
     ND_UUID node_id;                                // Cloud node_id
 
     struct {
+        SPINLOCK spinlock;
         ND_UUID claim_id_of_origin;
         ND_UUID claim_id_of_parent;
     } aclk;
@@ -403,6 +405,8 @@ extern RRDHOST *localhost;
 #define rrdhost_os(host) string2str((host)->os)
 // Timezone fields are mutable at runtime (DST refresh); use rrdhost_tz_get() for thread-safe access.
 // Do NOT access host->timezone or host->abbrev_timezone directly outside of rrdhost_update_lock.
+// Host identity fields are mutable at runtime; use rrdhost_identity_acquire()
+// when their STRING references must survive concurrent host metadata updates.
 #define rrdhost_program_name(host) string2str((host)->program_name)
 #define rrdhost_program_version(host) string2str((host)->program_version)
 
@@ -523,6 +527,15 @@ void set_host_properties(
     const char *prog_name, const char *prog_version);
 
 bool rrdhost_update_timezone(RRDHOST *host, const char *timezone, const char *abbrev_timezone, int32_t utc_offset);
+
+typedef struct {
+    STRING *hostname;
+    STRING *prog_name;
+    STRING *prog_version;
+} RRDHOST_IDENTITY;
+
+RRDHOST_IDENTITY rrdhost_identity_acquire(RRDHOST *host);
+void rrdhost_identity_release(RRDHOST_IDENTITY *identity);
 
 // Thread-safe timezone snapshot from an RRDHOST.
 // The returned struct owns strdup'd copies; release with rrdhost_tz_free().

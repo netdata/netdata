@@ -307,12 +307,12 @@ void nd_log_reopen_log_files(bool log) {
 }
 
 int nd_log_systemd_journal_fd(void) {
-    return nd_log.journal.fd;
+    return __atomic_load_n(&nd_log.journal.fd, __ATOMIC_ACQUIRE);
 }
 
 void nd_log_reopen_log_files_for_spawn_server(const char *name) {
-    nd_log.fatal_hook_cb = NULL;
-    nd_log.fatal_final_cb = NULL;
+    __atomic_store_n(&nd_log.fatal_hook_cb, (log_event_t)NULL, __ATOMIC_RELEASE);
+    __atomic_store_n(&nd_log.fatal_final_cb, (fatal_event_t)NULL, __ATOMIC_RELEASE);
     nd_log.single_threaded_child = true;
 
     gettid_uncached();

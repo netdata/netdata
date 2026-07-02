@@ -93,8 +93,8 @@ void cancel_main_threads(void) {
     }
     netdata_log_info("All threads finished.");
 
-    freez(static_threads);
-    static_threads = NULL;
+    // Static threads receive pointers into this array and may still run cleanup
+    // handlers after cancellation. Keep it alive until process exit.
 }
 
 #ifdef ENABLE_DBENGINE

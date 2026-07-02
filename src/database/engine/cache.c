@@ -204,12 +204,44 @@ static inline void pointer_del(PGC *cache __maybe_unused, PGC_PAGE *page __maybe
 // ----------------------------------------------------------------------------
 // helpers
 
+static inline size_t page_assumed_size_overhead(PGC *cache) {
+    size_t overhead = sizeof(PGC_PAGE);
+
+    if(unlikely(__builtin_add_overflow(overhead, cache->config.additional_bytes_per_page, &overhead) ||
+                __builtin_add_overflow(overhead, sizeof(Word_t) * 3, &overhead)))
+        fatal("DBENGINE CACHE: page assumed size overhead overflow for cache '%s' (additional_bytes_per_page=%zu)",
+              cache->config.name, cache->config.additional_bytes_per_page);
+
+    if(unlikely(overhead > UINT32_MAX))
+        fatal("DBENGINE CACHE: page assumed size overhead %zu exceeds uint32_t accounting for cache '%s'",
+              overhead, cache->config.name);
+
+    return overhead;
+}
+
 static inline size_t page_assumed_size(PGC *cache, size_t size) {
-    return size + (sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page + sizeof(Word_t) * 3);
+    size_t overhead = page_assumed_size_overhead(cache);
+    size_t assumed_size;
+
+    if(unlikely(__builtin_add_overflow(size, overhead, &assumed_size)))
+        fatal("DBENGINE CACHE: page assumed size overflow for cache '%s' (size=%zu, overhead=%zu)",
+              cache->config.name, size, overhead);
+
+    if(unlikely(assumed_size > UINT32_MAX))
+        fatal("DBENGINE CACHE: page assumed size %zu exceeds uint32_t accounting for cache '%s'",
+              assumed_size, cache->config.name);
+
+    return assumed_size;
 }
 
 static inline size_t page_size_from_assumed_size(PGC *cache, size_t assumed_size) {
-    return assumed_size - (sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page + sizeof(Word_t) * 3);
+    size_t overhead = page_assumed_size_overhead(cache);
+
+    if(unlikely(assumed_size < overhead))
+        fatal("DBENGINE CACHE: page assumed size %zu is smaller than overhead %zu for cache '%s'",
+              assumed_size, overhead, cache->config.name);
+
+    return assumed_size - overhead;
 }
 
 // ----------------------------------------------------------------------------
@@ -592,6 +624,23 @@ static inline void atomic_set_max_int64_t(int64_t *max, int64_t desired) {
                                          false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
 }
 
+static ALWAYS_INLINE uint16_t page_accesses_get(PGC_PAGE *page) {
+    return __atomic_load_n(&page->accesses, __ATOMIC_RELAXED);
+}
+
+static ALWAYS_INLINE void page_accesses_increment(PGC_PAGE *page) {
+    uint16_t accesses = page_accesses_get(page);
+
+    // This is a queue-placement hint; wrapping to zero makes a hot page look cold.
+    while(accesses != UINT16_MAX) {
+        uint16_t wanted = accesses + 1;
+
+        if(__atomic_compare_exchange_n(&page->accesses, &accesses, wanted,
+                                       false, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+            return;
+    }
+}
+
 struct section_pages {
     SPINLOCK migration_to_v2_spinlock;
     size_t entries;
@@ -674,7 +723,8 @@ static ALWAYS_INLINE void pgc_queue_add(PGC *cache __maybe_unused, struct pgc_qu
         // - New pages created as CLEAN, always have 1 access.
         // - DIRTY pages made CLEAN, depending on their accesses may be appended (accesses > 0) or prepended (accesses = 0).
 
-        if(page->accesses || page_flag_check(page, PGC_PAGE_HAS_BEEN_ACCESSED | PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES) == PGC_PAGE_HAS_BEEN_ACCESSED) {
+        if(page_accesses_get(page) ||
+            page_flag_check(page, PGC_PAGE_HAS_BEEN_ACCESSED | PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES) == PGC_PAGE_HAS_BEEN_ACCESSED) {
             DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(q->base, page, link.prev, link.next);
             page_flag_clear(page, PGC_PAGE_HAS_BEEN_ACCESSED);
         }
@@ -774,7 +824,7 @@ static ALWAYS_INLINE void page_has_been_accessed(PGC *cache, PGC_PAGE *page) {
     PGC_PAGE_FLAGS flags = page_flag_check(page, PGC_PAGE_CLEAN | PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES);
 
     if (!(flags & PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES)) {
-        __atomic_add_fetch(&page->accesses, 1, __ATOMIC_RELAXED);
+        page_accesses_increment(page);
 
         if (flags & PGC_PAGE_CLEAN) {
             if(pgc_queue_trylock(cache, &cache->clean, PGC_QUEUE_LOCK_PRIO_EVICTORS)) {
@@ -992,7 +1042,7 @@ static inline void free_this_page(PGC *cache, PGC_PAGE *page, size_t partition _
             .metric_id = page->metric_id,
             .start_time_s = page->start_time_s,
             .end_time_s = __atomic_load_n(&page->end_time_s, __ATOMIC_RELAXED),
-            .update_every_s = page->update_every_s,
+            .update_every_s = pgc_page_update_every_s(page),
             .size = size,
             .hot = (is_page_hot(page)) ? true : false,
             .data = page->data,
@@ -1816,7 +1866,7 @@ static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wai
                             .metric_id = page->metric_id,
                             .start_time_s = page->start_time_s,
                             .end_time_s = __atomic_load_n(&page->end_time_s, __ATOMIC_RELAXED),
-                            .update_every_s = page->update_every_s,
+                            .update_every_s = pgc_page_update_every_s(page),
                             .size = page_size_from_assumed_size(cache, page->assumed_size),
                             .data = page->data,
                             .custom_data = (cache->config.additional_bytes_per_page) ? page->custom_data : NULL,
@@ -1911,7 +1961,7 @@ static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wai
             pages_made_clean_size += tpg->assumed_size;
             pages_made_clean++;
 
-            if(!tpg->accesses)
+            if(!page_accesses_get(tpg))
                 pages_to_evict++;
 
             page_set_clean(cache, tpg, true, false, PGC_QUEUE_LOCK_PRIO_FLUSHERS);
@@ -2261,14 +2311,15 @@ time_t pgc_page_end_time_s(PGC_PAGE *page) {
 }
 
 uint32_t pgc_page_update_every_s(PGC_PAGE *page) {
-    return page->update_every_s;
+    return __atomic_load_n(&page->update_every_s, __ATOMIC_RELAXED);
 }
 
 uint32_t pgc_page_fix_update_every(PGC_PAGE *page, uint32_t update_every_s) {
-    if(page->update_every_s == 0)
-        page->update_every_s = update_every_s;
+    uint32_t expected = 0;
+    __atomic_compare_exchange_n(&page->update_every_s, &expected, update_every_s,
+                                false, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
 
-    return page->update_every_s;
+    return __atomic_load_n(&page->update_every_s, __ATOMIC_RELAXED);
 }
 
 time_t pgc_page_fix_end_time_s(PGC_PAGE *page, time_t end_time_s) {
@@ -2375,7 +2426,11 @@ void pgc_page_hot_set_end_time_s(PGC *cache __maybe_unused, PGC_PAGE *page, time
         int64_t old_assumed_size = page->assumed_size;
 
         size_t old_size = page_size_from_assumed_size(cache, old_assumed_size);
-        size_t size = old_size + additional_bytes;
+        size_t size;
+        if(unlikely(__builtin_add_overflow(old_size, additional_bytes, &size)))
+            fatal("DBENGINE CACHE: page size growth overflow for cache '%s' (old_size=%zu, additional_bytes=%zu)",
+                  cache->config.name, old_size, additional_bytes);
+
         page->assumed_size = page_assumed_size(cache, size);
 
         int64_t delta = page->assumed_size - old_assumed_size;
@@ -2590,30 +2645,37 @@ void pgc_open_cache_to_journal_v2(
             fatal("CACHE: JudyLIns(JudyL_pages_by_start_time, %ld) failed, JudyL_pages_by_start_time = %p, result = %p",
                   (long)page->start_time_s, mi->JudyL_pages_by_start_time, PValue);
 
+        bool page_queued_for_jv2_cleanup = false;
         if(!*PValue) {
             struct jv2_page_info *pi = aral_mallocz(ar_pi);
             pi->start_time_s = page->start_time_s;
             pi->end_time_s = page->end_time_s;
-            pi->update_every_s = page->update_every_s;
+            pi->update_every_s = pgc_page_update_every_s(page);
             pi->page_length = page_size_from_assumed_size(cache, page->assumed_size);
             pi->page = page;
             pi->extent_index = current_extent_index_id;
             pi->custom_data = (cache->config.additional_bytes_per_page) ? page->custom_data : NULL;
             *PValue = pi;
 
+            page_queued_for_jv2_cleanup = true;
             count_of_unique_pages++;
         }
         else {
             // impossible situation
             internal_fatal(true, "Page is already in JudyL metric pages");
-            page_flag_clear(page, PGC_PAGE_IS_BEING_MIGRATED_TO_V2);
-            page_transition_unlock(cache, page);
-            page_release(cache, page, false);
         }
 
         if (likely(false == startup))
             yield_the_processor(); // do not lock too aggressively
         pgc_queue_lock(cache, &cache->hot, PGC_QUEUE_LOCK_PRIO_LOW);
+
+        if(unlikely(!page_queued_for_jv2_cleanup)) {
+            // The loop advances through page->link.next; keep the page pinned
+            // until the hot lock protects the cursor again.
+            page_flag_clear(page, PGC_PAGE_IS_BEING_MIGRATED_TO_V2);
+            page_transition_unlock(cache, page);
+            page_release(cache, page, false);
+        }
     }
 
     spinlock_unlock(&sp->migration_to_v2_spinlock);

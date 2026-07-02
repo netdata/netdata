@@ -470,6 +470,74 @@ static void test_dimension_finalize_constant_state()
     ML_TEST_ASSERT(dim.suppression_window_counter == 0, "window counter must reset");
 }
 
+static void test_chart_update_dimension_counts()
+{
+    fprintf(stderr, "  test_chart_update_dimension_counts...\n");
+
+    ml_dimension_t dim = {};
+    spinlock_init(&dim.slock);
+
+    ml_chart_t chart = {};
+
+    dim.mls = MACHINE_LEARNING_STATUS_DISABLED_DUE_TO_EXCLUDED_CHART;
+    dim.mt = METRIC_TYPE_VARIABLE;
+    dim.ts = TRAINING_STATUS_TRAINED;
+    ml_chart_update_dimension(&chart, &dim, true);
+    ML_TEST_ASSERT(chart.mls.num_machine_learning_status_disabled_sp == 1,
+                   "excluded dimensions must increment disabled status");
+    ML_TEST_ASSERT(chart.mls.num_machine_learning_status_enabled == 0,
+                   "excluded dimensions must not increment enabled status");
+
+    chart.mls = {};
+    dim.mls = MACHINE_LEARNING_STATUS_ENABLED;
+    dim.mt = METRIC_TYPE_CONSTANT;
+    dim.ts = TRAINING_STATUS_UNTRAINED;
+    ml_chart_update_dimension(&chart, &dim, true);
+    ML_TEST_ASSERT(chart.mls.num_machine_learning_status_enabled == 1,
+                   "constant dimensions must increment enabled status");
+    ML_TEST_ASSERT(chart.mls.num_metric_type_constant == 1,
+                   "constant dimensions must increment constant metric type");
+    ML_TEST_ASSERT(chart.mls.num_training_status_trained == 1,
+                   "constant dimensions are counted as trained");
+    ML_TEST_ASSERT(chart.mls.num_normal_dimensions == 1,
+                   "constant dimensions are counted as normal");
+    ML_TEST_ASSERT(chart.mls.num_anomalous_dimensions == 0,
+                   "constant dimensions must ignore anomaly input");
+
+    chart.mls = {};
+    dim.mt = METRIC_TYPE_VARIABLE;
+    dim.ts = TRAINING_STATUS_UNTRAINED;
+    ml_chart_update_dimension(&chart, &dim, true);
+    ML_TEST_ASSERT(chart.mls.num_metric_type_variable == 1,
+                   "variable untrained dimensions must increment variable metric type");
+    ML_TEST_ASSERT(chart.mls.num_training_status_untrained == 1,
+                   "variable untrained dimensions must increment untrained status");
+    ML_TEST_ASSERT(chart.mls.num_anomalous_dimensions == 0,
+                   "untrained dimensions must not count anomaly input");
+
+    chart.mls = {};
+    dim.ts = TRAINING_STATUS_TRAINED;
+    ml_chart_update_dimension(&chart, &dim, true);
+    ML_TEST_ASSERT(chart.mls.num_training_status_trained == 1,
+                   "trained dimensions must increment trained status");
+    ML_TEST_ASSERT(chart.mls.num_anomalous_dimensions == 1,
+                   "trained anomalous dimensions must increment anomalous count");
+    ML_TEST_ASSERT(chart.mls.num_normal_dimensions == 0,
+                   "trained anomalous dimensions must not increment normal count");
+
+    chart.mls = {};
+    dim.ts = TRAINING_STATUS_SILENCED;
+    ml_chart_update_dimension(&chart, &dim, false);
+    ML_TEST_ASSERT(chart.mls.num_training_status_silenced == 1,
+                   "silenced dimensions must increment silenced status");
+    ML_TEST_ASSERT(chart.mls.num_training_status_trained == 1,
+                   "silenced dimensions must also increment trained status");
+    ML_TEST_ASSERT(chart.mls.num_normal_dimensions == 1,
+                   "silenced normal dimensions must increment normal count");
+    ML_TEST_ASSERT(chart.mls.num_anomalous_dimensions == 0,
+                   "silenced normal dimensions must not increment anomalous count");
+}
+
 // Test: circular buffer linearization produces the same result as std::rotate
 static void test_circular_buffer_equivalence()
 {
@@ -1068,6 +1136,7 @@ extern "C" int ml_unittest()
     test_kmeans_inlined_empty_source_is_zero_initialized();
     test_features_preprocess_below_min_for_kmeans();
     test_dimension_finalize_constant_state();
+    test_chart_update_dimension_counts();
     test_circular_buffer_equivalence();
     test_same_value_uses_newest_sample();
     test_preprocess_predict_equivalence();

@@ -30,7 +30,7 @@ struct lqs_extension {
         uint32_t slots;
         uint32_t sampled;
         uint32_t unsampled;
-        uint32_t estimated;
+        size_t estimated;
     } samples;
 
     struct {
@@ -40,7 +40,7 @@ struct lqs_extension {
         uint32_t recalibrate;
         uint32_t sampled;
         uint32_t unsampled;
-        uint32_t estimated;
+        size_t estimated;
     } samples_per_file;
 
     struct {

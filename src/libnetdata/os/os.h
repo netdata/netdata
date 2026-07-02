@@ -23,6 +23,7 @@
 #include "sleep.h"
 #include "uuid_generate.h"
 #include "setenv.h"
+#include "strndup.h"
 #include "hostname.h"
 #include "socket_egress_interface.h"
 #include "os-freebsd-wrappers.h"

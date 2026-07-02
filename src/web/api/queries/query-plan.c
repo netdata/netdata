@@ -9,6 +9,27 @@ static bool query_metric_is_valid_tier(QUERY_METRIC *qm, size_t tier) {
     return true;
 }
 
+static bool query_plan_tier_is_valid(QUERY_METRIC *qm, size_t tier) {
+    if(tier >= nd_profile.storage_tiers || tier >= RRD_STORAGE_TIERS)
+        return false;
+
+    return query_metric_is_valid_tier(qm, tier);
+}
+
+static bool query_plan_entry_is_valid(
+    QUERY_METRIC *qm, const QUERY_PLAN_ENTRY *entry, time_t after_wanted, time_t before_wanted) {
+    if(!entry->after || !entry->before)
+        return false;
+
+    if(entry->after > entry->before)
+        return false;
+
+    if(entry->after < after_wanted || entry->before > before_wanted)
+        return false;
+
+    return query_plan_tier_is_valid(qm, entry->tier);
+}
+
 static size_t query_metric_first_working_tier(QUERY_METRIC *qm) {
     for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
 
@@ -244,14 +265,26 @@ void query_planer_finalize_remaining_plans(QUERY_ENGINE_OPS *ops) {
         query_planer_finalize_plan(ops, p);
 }
 
-static void query_planer_activate_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, time_t overwrite_after __maybe_unused) {
+static bool query_planer_plan_can_be_activated(QUERY_ENGINE_OPS *ops, size_t plan_id) {
     QUERY_METRIC *qm = ops->qm;
 
-    internal_fatal(plan_id >= qm->plan.used, "QUERY: invalid plan_id given");
-    internal_fatal(!ops->plans[plan_id].initialized, "QUERY: plan has not been initialized");
-    internal_fatal(ops->plans[plan_id].finalized, "QUERY: plan has been finalized");
+    if(plan_id >= qm->plan.used)
+        return false;
 
-    internal_fatal(qm->plan.array[plan_id].after > qm->plan.array[plan_id].before, "QUERY: flipped after/before");
+    if(!ops->plans[plan_id].initialized || ops->plans[plan_id].finalized)
+        return false;
+
+    if(!qm->plan.array[plan_id].after || !qm->plan.array[plan_id].before)
+        return false;
+
+    if(qm->plan.array[plan_id].after > qm->plan.array[plan_id].before)
+        return false;
+
+    return query_plan_tier_is_valid(qm, qm->plan.array[plan_id].tier);
+}
+
+static void query_planer_set_active_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, time_t overwrite_after __maybe_unused) {
+    QUERY_METRIC *qm = ops->qm;
 
     ops->tier = qm->plan.array[plan_id].tier;
     ops->tier_ptr = &qm->tiers[ops->tier];
@@ -265,6 +298,14 @@ static void query_planer_activate_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, ti
 
     ops->plan_expanded_after = ops->plans[plan_id].expanded_after;
     ops->plan_expanded_before = ops->plans[plan_id].expanded_before;
+}
+
+static bool query_planer_activate_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, time_t overwrite_after __maybe_unused) {
+    if(!query_planer_plan_can_be_activated(ops, plan_id))
+        return false;
+
+    query_planer_set_active_plan(ops, plan_id, overwrite_after);
+    return true;
 }
 
 bool query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t last_point_end_time) {
@@ -287,14 +328,14 @@ bool query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t last_point
         next_plan_before_time = qm->plan.array[ops->current_plan].before;
     } while(now >= next_plan_before_time || last_point_end_time >= next_plan_before_time);
 
-    if(!query_metric_is_valid_tier(qm, qm->plan.array[ops->current_plan].tier)) {
+    if(!query_planer_plan_can_be_activated(ops, ops->current_plan)) {
         ops->current_plan = old_plan;
         ops->current_plan_expire_time = ops->r->internal.qt->window.before;
         return false;
     }
 
     query_planer_finalize_plan(ops, old_plan);
-    query_planer_activate_plan(ops, ops->current_plan, MIN(now, last_point_end_time));
+    query_planer_set_active_plan(ops, ops->current_plan, MIN(now, last_point_end_time));
     return true;
 }
 
@@ -358,11 +399,13 @@ static bool query_plan_build_entries(QUERY_ENGINE_OPS *ops, time_t after_wanted,
                         .after = (tier_first_time_s < after_wanted) ? after_wanted : tier_first_time_s,
                         .before = selected_tier_first_time_s,
                     };
+
+                    if(!query_plan_entry_is_valid(qm, &t, after_wanted, before_wanted))
+                        return false;
+
                     ops->plans[qm->plan.used].initialized = false;
                     ops->plans[qm->plan.used].finalized = false;
                     qm->plan.array[qm->plan.used++] = t;
-
-                    internal_fatal(!t.after || !t.before, "QUERY: invalid plan selected");
 
                     // prepare for the tier
                     selected_tier_first_time_s = t.after;
@@ -394,14 +437,16 @@ static bool query_plan_build_entries(QUERY_ENGINE_OPS *ops, time_t after_wanted,
                         .after = selected_tier_last_time_s,
                         .before = (tier_last_time_s > before_wanted) ? before_wanted : tier_last_time_s,
                     };
+
+                    if(!query_plan_entry_is_valid(qm, &t, after_wanted, before_wanted))
+                        return false;
+
                     ops->plans[qm->plan.used].initialized = false;
                     ops->plans[qm->plan.used].finalized = false;
                     qm->plan.array[qm->plan.used++] = t;
 
                     // prepare for the tier
                     selected_tier_last_time_s = t.before;
-
-                    internal_fatal(!t.after || !t.before, "QUERY: invalid plan selected");
 
                     if (t.before >= before_wanted)
                         break;
@@ -414,16 +459,10 @@ static bool query_plan_build_entries(QUERY_ENGINE_OPS *ops, time_t after_wanted,
     if(qm->plan.used > 1)
         qsort(&qm->plan.array, qm->plan.used, sizeof(QUERY_PLAN_ENTRY), compare_query_plan_entries_on_start_time);
 
-    if(!query_metric_is_valid_tier(qm, qm->plan.array[0].tier))
-        return false;
-
-#ifdef NETDATA_INTERNAL_CHECKS
     for(size_t p = 0; p < qm->plan.used ;p++) {
-        internal_fatal(qm->plan.array[p].after > qm->plan.array[p].before, "QUERY: flipped after/before");
-        internal_fatal(qm->plan.array[p].after < after_wanted, "QUERY: too small plan first time");
-        internal_fatal(qm->plan.array[p].before > before_wanted, "QUERY: too big plan last time");
+        if(!query_plan_entry_is_valid(qm, &qm->plan.array[p], after_wanted, before_wanted))
+            return false;
     }
-#endif
 
     return true;
 }
@@ -433,35 +472,36 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
         return false;
 
     query_planer_initialize_plans(ops);
-    query_planer_activate_plan(ops, 0, 0);
+    if(!query_planer_activate_plan(ops, 0, 0)) {
+        query_planer_finalize_remaining_plans(ops);
+        return false;
+    }
 
     return true;
 }
 
 
-static __thread QUERY_ENGINE_OPS *released_ops = NULL;
-
-void rrd2rrdr_query_ops_freeall(RRDR *r __maybe_unused) {
-    while(released_ops) {
-        QUERY_ENGINE_OPS *ops = released_ops;
-        released_ops = ops->next;
+void rrd2rrdr_query_ops_freeall(RRDR *r, QUERY_ENGINE_OPS_CACHE *cache) {
+    while(cache->released_ops) {
+        QUERY_ENGINE_OPS *ops = cache->released_ops;
+        cache->released_ops = ops->next;
 
         onewayalloc_freez(r->internal.owa, ops);
     }
 }
 
-void rrd2rrdr_query_ops_release(QUERY_ENGINE_OPS *ops) {
+void rrd2rrdr_query_ops_release(QUERY_ENGINE_OPS_CACHE *cache, QUERY_ENGINE_OPS *ops) {
     if(!ops) return;
 
-    ops->next = released_ops;
-    released_ops = ops;
+    ops->next = cache->released_ops;
+    cache->released_ops = ops;
 }
 
-static QUERY_ENGINE_OPS *rrd2rrdr_query_ops_get(RRDR *r) {
+static QUERY_ENGINE_OPS *rrd2rrdr_query_ops_get(RRDR *r, QUERY_ENGINE_OPS_CACHE *cache) {
     QUERY_ENGINE_OPS *ops;
-    if(released_ops) {
-        ops = released_ops;
-        released_ops = ops->next;
+    if(cache->released_ops) {
+        ops = cache->released_ops;
+        cache->released_ops = ops->next;
     }
     else {
         ops = onewayalloc_mallocz(r->internal.owa, sizeof(QUERY_ENGINE_OPS));
@@ -471,10 +511,10 @@ static QUERY_ENGINE_OPS *rrd2rrdr_query_ops_get(RRDR *r) {
     return ops;
 }
 
-QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, size_t query_metric_id) {
+QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, QUERY_ENGINE_OPS_CACHE *cache, size_t query_metric_id) {
     QUERY_TARGET *qt = r->internal.qt;
 
-    QUERY_ENGINE_OPS *ops = rrd2rrdr_query_ops_get(r);
+    QUERY_ENGINE_OPS *ops = rrd2rrdr_query_ops_get(r, cache);
     *ops = (QUERY_ENGINE_OPS) {
         .r = r,
         .qm = query_metric(qt, query_metric_id),
@@ -485,7 +525,7 @@ QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, size_t query_metric_id) {
     };
 
     if(!query_plan(ops, qt->window.after, qt->window.before, qt->window.points)) {
-        rrd2rrdr_query_ops_release(ops);
+        rrd2rrdr_query_ops_release(cache, ops);
         return NULL;
     }
 
@@ -603,6 +643,78 @@ static int query_plan_unittest_expect_update_every(QUERY_TARGET *qt, size_t tier
     return 1;
 }
 
+static int query_plan_unittest_expect_entry_validity(
+    const char *name, QUERY_METRIC *qm, QUERY_PLAN_ENTRY entry, time_t after, time_t before, bool expected) {
+    bool got = query_plan_entry_is_valid(qm, &entry, after, before);
+    if(got == expected) {
+        fprintf(stderr, "OK query plan entry validation: %s\n", name);
+        return 0;
+    }
+
+    fprintf(stderr,
+            "FAILED query plan entry validation: %s, expected %s, got %s\n",
+            name, expected ? "valid" : "invalid", got ? "valid" : "invalid");
+
+    return 1;
+}
+
+static int query_plan_unittest_expect_activation(
+    const char *name, QUERY_ENGINE_OPS *ops, size_t plan_id, bool expected) {
+    bool got = query_planer_activate_plan(ops, plan_id, 0);
+    if(got == expected) {
+        fprintf(stderr, "OK query plan activation: %s\n", name);
+        return 0;
+    }
+
+    fprintf(stderr,
+            "FAILED query plan activation: %s, expected %s, got %s\n",
+            name, expected ? "success" : "failure", got ? "success" : "failure");
+
+    return 1;
+}
+
+static int query_plan_unittest_expect_ops_cache_is_local(void) {
+    ONEWAYALLOC *owa_a = onewayalloc_create(1024);
+    ONEWAYALLOC *owa_b = onewayalloc_create(1024);
+
+    RRDR r_a = {
+        .internal.owa = owa_a,
+    };
+    RRDR r_b = {
+        .internal.owa = owa_b,
+    };
+
+    QUERY_ENGINE_OPS_CACHE cache_a = { 0 };
+    QUERY_ENGINE_OPS_CACHE cache_b = { 0 };
+
+    QUERY_ENGINE_OPS *a = rrd2rrdr_query_ops_get(&r_a, &cache_a);
+    rrd2rrdr_query_ops_release(&cache_a, a);
+
+    QUERY_ENGINE_OPS *a_reused = rrd2rrdr_query_ops_get(&r_a, &cache_a);
+    bool same_cache_reused = (a_reused == a);
+    rrd2rrdr_query_ops_release(&cache_a, a_reused);
+
+    QUERY_ENGINE_OPS *b = rrd2rrdr_query_ops_get(&r_b, &cache_b);
+    bool separate_cache_isolated = (b != a);
+    rrd2rrdr_query_ops_release(&cache_b, b);
+
+    rrd2rrdr_query_ops_freeall(&r_a, &cache_a);
+    rrd2rrdr_query_ops_freeall(&r_b, &cache_b);
+    onewayalloc_destroy(owa_a);
+    onewayalloc_destroy(owa_b);
+
+    if(same_cache_reused && separate_cache_isolated) {
+        fprintf(stderr, "OK query ops cache locality\n");
+        return 0;
+    }
+
+    fprintf(stderr,
+            "FAILED query ops cache locality: same_cache_reused=%s, separate_cache_isolated=%s\n",
+            same_cache_reused ? "true" : "false",
+            separate_cache_isolated ? "true" : "false");
+    return 1;
+}
+
 int query_plan_unittest(void) {
     size_t old_storage_tiers = nd_profile.storage_tiers;
     time_t old_update_every = nd_profile.update_every;
@@ -610,6 +722,96 @@ int query_plan_unittest(void) {
 
     nd_profile.storage_tiers = 3;
     nd_profile.update_every = 1;
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 10, 100, 10);
+
+        errors += query_plan_unittest_expect_entry_validity(
+            "valid in-window entry", &qm, (QUERY_PLAN_ENTRY){ .tier = 0, .after = 20, .before = 80 }, 10, 100, true);
+        errors += query_plan_unittest_expect_entry_validity(
+            "zero start is invalid", &qm, (QUERY_PLAN_ENTRY){ .tier = 0, .after = 0, .before = 80 }, 10, 100, false);
+        errors += query_plan_unittest_expect_entry_validity(
+            "flipped entry is invalid", &qm, (QUERY_PLAN_ENTRY){ .tier = 0, .after = 90, .before = 80 }, 10, 100, false);
+        errors += query_plan_unittest_expect_entry_validity(
+            "entry before requested window is invalid", &qm, (QUERY_PLAN_ENTRY){ .tier = 0, .after = 9, .before = 80 }, 10, 100, false);
+        errors += query_plan_unittest_expect_entry_validity(
+            "entry after requested window is invalid", &qm, (QUERY_PLAN_ENTRY){ .tier = 0, .after = 20, .before = 101 }, 10, 100, false);
+        errors += query_plan_unittest_expect_entry_validity(
+            "out-of-range tier is invalid", &qm, (QUERY_PLAN_ENTRY){ .tier = 3, .after = 20, .before = 80 }, 10, 100, false);
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        QUERY_ENGINE_OPS ops = { .qm = &qm };
+
+        query_plan_unittest_set_tier(&qm, 0, 10, 100, 10);
+        qm.plan.used = 1;
+        qm.plan.array[0] = (QUERY_PLAN_ENTRY){ .tier = 0, .after = 10, .before = 100 };
+        ops.plans[0].initialized = true;
+
+        errors += query_plan_unittest_expect_activation("valid initialized plan", &ops, 0, true);
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        QUERY_ENGINE_OPS ops = { .qm = &qm };
+
+        query_plan_unittest_set_tier(&qm, 0, 10, 100, 10);
+        qm.plan.used = 1;
+        qm.plan.array[0] = (QUERY_PLAN_ENTRY){ .tier = 0, .after = 10, .before = 100 };
+        ops.plans[0].initialized = true;
+
+        errors += query_plan_unittest_expect_activation("invalid plan id is rejected", &ops, 1, false);
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        QUERY_ENGINE_OPS ops = { .qm = &qm };
+
+        query_plan_unittest_set_tier(&qm, 0, 10, 100, 10);
+        qm.plan.used = 1;
+        qm.plan.array[0] = (QUERY_PLAN_ENTRY){ .tier = 0, .after = 10, .before = 100 };
+
+        errors += query_plan_unittest_expect_activation("uninitialized plan is rejected", &ops, 0, false);
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        QUERY_ENGINE_OPS ops = { .qm = &qm };
+
+        query_plan_unittest_set_tier(&qm, 0, 10, 100, 10);
+        qm.plan.used = 1;
+        qm.plan.array[0] = (QUERY_PLAN_ENTRY){ .tier = 0, .after = 10, .before = 100 };
+        ops.plans[0].initialized = true;
+        ops.plans[0].finalized = true;
+
+        errors += query_plan_unittest_expect_activation("finalized plan is rejected", &ops, 0, false);
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        QUERY_ENGINE_OPS ops = { .qm = &qm };
+
+        query_plan_unittest_set_tier(&qm, 0, 10, 100, 10);
+        qm.plan.used = 1;
+        qm.plan.array[0] = (QUERY_PLAN_ENTRY){ .tier = 0, .after = 100, .before = 10 };
+        ops.plans[0].initialized = true;
+
+        errors += query_plan_unittest_expect_activation("flipped plan is rejected", &ops, 0, false);
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        QUERY_ENGINE_OPS ops = { .qm = &qm };
+
+        query_plan_unittest_set_tier(&qm, 0, 10, 100, 10);
+        qm.plan.used = 1;
+        qm.plan.array[0] = (QUERY_PLAN_ENTRY){ .tier = 3, .after = 10, .before = 100 };
+        ops.plans[0].initialized = true;
+
+        errors += query_plan_unittest_expect_activation("out-of-range tier is rejected", &ops, 0, false);
+    }
 
     {
         QUERY_METRIC qm = {0};
@@ -773,6 +975,8 @@ int query_plan_unittest(void) {
 
         errors += query_plan_unittest_expect_update_every(&qt, 1, 300);
     }
+
+    errors += query_plan_unittest_expect_ops_cache_is_local();
 
     nd_profile.storage_tiers = old_storage_tiers;
     nd_profile.update_every = old_update_every;

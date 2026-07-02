@@ -528,13 +528,21 @@ static bool api_is_name_good_with_trace(DICTIONARY *dict __maybe_unused, const c
         return false;
     }
 
+    size_t real_name_len = strnlen(name, KEY_LEN_MAX + 1);
+    if(unlikely(real_name_len > KEY_LEN_MAX)) {
+        dictionary_internal_error(true, dict,
+            "DICTIONARY: attempted to %s() with a name longer than the maximum acceptable size %zu",
+            function, (size_t)KEY_LEN_MAX);
+        return false;
+    }
+
     dictionary_internal_error(
-        name_len > 0 && name_len != (ssize_t)strlen(name), dict,
+        name_len > 0 && name_len != (ssize_t)real_name_len, dict,
         "DICTIONARY: attempted to %s() with a name of '%s', having length of %zu, "
         "but the supplied name_len = %ld",
         function,
         name,
-        strlen(name),
+        real_name_len,
         (long int) name_len);
 
     dictionary_internal_error(
@@ -543,7 +551,7 @@ static bool api_is_name_good_with_trace(DICTIONARY *dict __maybe_unused, const c
         "but the supplied name_len = %ld",
         function,
         name,
-        strlen(name),
+        real_name_len,
         (long int) name_len);
 
     return true;
@@ -647,10 +655,19 @@ void dictionary_flush(DICTIONARY *dict) {
 
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
 
-    DICTIONARY_ITEM *item, *next = NULL;
-    for(item = dict->items.list; item ;item = next) {
-        next = item->next;
+    DICTIONARY_ITEM *item = dict->items.list;
+    while(item && !item_check_and_acquire(dict, item))
+        item = item->next;
+
+    while(item) {
         dict_item_del(dict, item_get_name(item), (ssize_t)item_get_name_len(item));
+
+        DICTIONARY_ITEM *next = item->next;
+        while(next && !item_check_and_acquire(dict, next))
+            next = next->next;
+
+        dict_item_release_and_check_if_it_is_deleted_and_can_be_removed_under_this_lock_mode(dict, item, DICTIONARY_LOCK_WRITE);
+        item = next;
     }
 
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
@@ -724,6 +741,23 @@ DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIO
     if(unlikely(!api_is_name_good(dict, name, name_len)))
         return NULL;
 
+    if(name_len == -1)
+        name_len = (ssize_t)strnlen(name, KEY_LEN_MAX + 1);
+
+    if(unlikely((size_t)name_len > KEY_LEN_MAX)) {
+        dictionary_internal_error(true, dict,
+                                  "DICTIONARY: tried to index a key of size %zu, but the maximum acceptable is %zu",
+                                  (size_t)name_len, (size_t)KEY_LEN_MAX);
+        return NULL;
+    }
+
+    if(unlikely(value_len > VALUE_LEN_MAX)) {
+        dictionary_internal_error(true, dict,
+                                  "DICTIONARY: tried to add an item of size %zu, but the maximum acceptable is %zu",
+                                  value_len, (size_t)VALUE_LEN_MAX);
+        return NULL;
+    }
+
     api_internal_check(dict, NULL, false, true);
 
     if(unlikely(is_view_dictionary(dict)))
@@ -750,6 +784,16 @@ void *dictionary_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_l
 DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_view_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, DICTIONARY_ITEM *master_item) {
     if(unlikely(!api_is_name_good(dict, name, name_len)))
         return NULL;
+
+    if(name_len == -1)
+        name_len = (ssize_t)strnlen(name, KEY_LEN_MAX + 1);
+
+    if(unlikely((size_t)name_len > KEY_LEN_MAX)) {
+        dictionary_internal_error(true, dict,
+                                  "DICTIONARY: tried to index a key of size %zu, but the maximum acceptable is %zu",
+                                  (size_t)name_len, (size_t)KEY_LEN_MAX);
+        return NULL;
+    }
 
     api_internal_check(dict, NULL, false, true);
 

@@ -959,7 +959,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/aral/aral.h
         src/libnetdata/avl/avl.c
         src/libnetdata/avl/avl.h
-        src/libnetdata/bitmap/bitmap64.h
+        src/libnetdata/avl/avl-types.h
         src/libnetdata/buffer/buffer.c
         src/libnetdata/buffer/buffer.h
         src/libnetdata/buffer/functions_fields.c
@@ -971,6 +971,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/circular_buffer/circular_buffer.h
         src/libnetdata/clocks/clocks.c
         src/libnetdata/clocks/clocks.h
+        src/libnetdata/clocks/clocks-internals.h
+        src/libnetdata/clocks/clocks-unittest.c
         src/libnetdata/completion/completion.c
         src/libnetdata/completion/completion.h
         src/libnetdata/datetime/iso8601.c

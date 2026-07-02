@@ -174,18 +174,29 @@ UUIDMAP_ID uuidmap_create(const nd_uuid_t uuid) {
     return id;
 }
 
-static struct uuidmap_entry *get_entry_by_id(UUIDMAP_ID id) {
-    if(id == 0) return NULL;
-
-    uint8_t partition = uuidmap_id_to_partition(id);
-
-    rw_spinlock_read_lock(&uuid_map.p[partition].spinlock);
-
+static struct uuidmap_entry *get_entry_by_id_locked(UUIDMAP_ID id, uint8_t partition) {
     Pvoid_t *PValue = JudyLGet(uuid_map.p[partition].id_to_uuid, id, PJE0);
     if (PValue == PJERR)
         fatal("UUIDMAP: corrupted JudyL array");
 
-    struct uuidmap_entry *ue = PValue ? *PValue : NULL;
+    return PValue ? *PValue : NULL;
+}
+
+static ALWAYS_INLINE struct uuidmap_entry *get_entry_by_id_locked_and_acquire(UUIDMAP_ID id, uint8_t partition) {
+    struct uuidmap_entry *ue = get_entry_by_id_locked(id, partition);
+    if(ue && !refcount_acquire(&ue->refcount))
+        ue = NULL;
+
+    return ue;
+}
+
+static struct uuidmap_entry *get_entry_by_id_and_acquire(UUIDMAP_ID id) {
+    if(id == 0) return NULL;
+
+    uint8_t partition = uuidmap_id_to_partition(id);
+    rw_spinlock_read_lock(&uuid_map.p[partition].spinlock);
+
+    struct uuidmap_entry *ue = get_entry_by_id_locked_and_acquire(id, partition);
 
     rw_spinlock_read_unlock(&uuid_map.p[partition].spinlock);
 
@@ -193,12 +204,17 @@ static struct uuidmap_entry *get_entry_by_id(UUIDMAP_ID id) {
 }
 
 void uuidmap_free(UUIDMAP_ID id) {
-    struct uuidmap_entry *ue = get_entry_by_id(id);
+    if(id == 0) return;
 
+    uint8_t partition = uuidmap_id_to_partition(id);
+    struct uuidmap_entry *ue = NULL;
+    bool should_delete = false;
+
+    rw_spinlock_write_lock(&uuid_map.p[partition].spinlock);
+
+    ue = get_entry_by_id_locked(id, partition);
     if(ue && refcount_release_and_acquire_for_deletion(&ue->refcount)) {
         JudyAllocThreadPulseReset();
-        uint8_t partition = uuidmap_id_to_partition(id);
-        rw_spinlock_write_lock(&uuid_map.p[partition].spinlock);
 
         int rc;
         rc = JudyHSDel(&uuid_map.p[partition].uuid_to_id, (void *)ue->uuid, sizeof(nd_uuid_t), PJE0);
@@ -213,35 +229,53 @@ void uuidmap_free(UUIDMAP_ID id) {
         uuid_map.p[partition].entries--;
 
         uuid_map.p[partition].memory += JudyAllocThreadPulseGetAndReset();
-        rw_spinlock_write_unlock(&uuid_map.p[partition].spinlock);
-
-        aral_freez(uuid_map.ar, ue);
+        should_delete = true;
     }
+
+    rw_spinlock_write_unlock(&uuid_map.p[partition].spinlock);
+
+    if(should_delete)
+        aral_freez(uuid_map.ar, ue);
 }
 
 nd_uuid_t *uuidmap_uuid_ptr(UUIDMAP_ID id) {
-    struct uuidmap_entry *ue = get_entry_by_id(id);
-    return ue ? &ue->uuid : NULL;
+    if(id == 0) return NULL;
+
+    uint8_t partition = uuidmap_id_to_partition(id);
+    rw_spinlock_read_lock(&uuid_map.p[partition].spinlock);
+
+    struct uuidmap_entry *ue = get_entry_by_id_locked(id, partition);
+    nd_uuid_t *uuid = ue ? &ue->uuid : NULL;
+
+    rw_spinlock_read_unlock(&uuid_map.p[partition].spinlock);
+
+    return uuid;
 }
 
 nd_uuid_t *uuidmap_uuid_ptr_and_dup(UUIDMAP_ID id) {
-    struct uuidmap_entry *ue = get_entry_by_id(id);
-
-    if(ue && refcount_acquire(&ue->refcount))
-        return &ue->uuid;
-
-    return NULL;
+    struct uuidmap_entry *ue = get_entry_by_id_and_acquire(id);
+    return ue ? &ue->uuid : NULL;
 }
 
 bool uuidmap_uuid(UUIDMAP_ID id, nd_uuid_t out_uuid) {
-    nd_uuid_t *uuid = uuidmap_uuid_ptr(id);
-
-    if(!uuid) {
+    if(id == 0) {
         nd_uuid_clear(out_uuid);
         return false;
     }
 
-    uuid_copy(out_uuid, *uuid);
+    uint8_t partition = uuidmap_id_to_partition(id);
+    rw_spinlock_read_lock(&uuid_map.p[partition].spinlock);
+
+    struct uuidmap_entry *ue = get_entry_by_id_locked(id, partition);
+    if(!ue) {
+        nd_uuid_clear(out_uuid);
+        rw_spinlock_read_unlock(&uuid_map.p[partition].spinlock);
+        return false;
+    }
+
+    uuid_copy(out_uuid, ue->uuid);
+    rw_spinlock_read_unlock(&uuid_map.p[partition].spinlock);
+
     return true;
 }
 
@@ -252,9 +286,9 @@ ND_UUID uuidmap_get(UUIDMAP_ID id) {
 }
 
 UUIDMAP_ID uuidmap_dup(UUIDMAP_ID id) {
-    struct uuidmap_entry *ue = get_entry_by_id(id);
+    struct uuidmap_entry *ue = get_entry_by_id_and_acquire(id);
 
-    if(!ue || !refcount_acquire(&ue->refcount))
+    if(!ue)
         fatal("UUIDMAP: id %u does not exist, or cannot be acquired, in %s", id, __FUNCTION__ );
 
     return id;
@@ -322,6 +356,135 @@ typedef struct thread_stats {
     size_t frees;
     size_t cycles;
 } THREAD_STATS;
+
+typedef struct uuidmap_delete_gate {
+    UUIDMAP_ID id;
+    uint8_t partition;
+    bool writer_blocked;
+    bool writer_unexpectedly_acquired;
+    bool allow_delete;
+    bool delete_done;
+} UUIDMAP_DELETE_GATE;
+
+static void uuidmap_deferred_free_thread(void *arg) {
+    UUIDMAP_DELETE_GATE *gate = arg;
+
+    if(rw_spinlock_trywrite_lock(&uuid_map.p[gate->partition].spinlock)) {
+        __atomic_store_n(&gate->writer_unexpectedly_acquired, true, __ATOMIC_RELEASE);
+        rw_spinlock_write_unlock(&uuid_map.p[gate->partition].spinlock);
+    }
+    else
+        __atomic_store_n(&gate->writer_blocked, true, __ATOMIC_RELEASE);
+
+    while(!__atomic_load_n(&gate->allow_delete, __ATOMIC_ACQUIRE))
+        tinysleep();
+
+    uuidmap_free(gate->id);
+    __atomic_store_n(&gate->delete_done, true, __ATOMIC_RELEASE);
+}
+
+static int uuidmap_locked_lookup_delete_interleaving_unittest(void) {
+    fprintf(stderr, "\nTesting UUID Map locked lookup/delete interleaving...\n");
+
+    nd_uuid_t test_uuid = {
+        0xf0, 0xde, 0xbc, 0x9a,
+        0x78, 0x56, 0x34, 0x12,
+        0xf0, 0xde, 0xbc, 0x9a,
+        0x78, 0x56, 0x34, 0x11
+    };
+
+    int errors = 0;
+    UUIDMAP_ID id = uuidmap_create(test_uuid);
+    if(!id) {
+        fprintf(stderr, "ERROR: Cannot create UUID for locked lookup/delete interleaving test\n");
+        return 1;
+    }
+
+    uint8_t partition = uuidmap_id_to_partition(id);
+    UUIDMAP_DELETE_GATE gate = {
+        .id = id,
+        .partition = partition,
+    };
+
+    rw_spinlock_read_lock(&uuid_map.p[partition].spinlock);
+
+    struct uuidmap_entry *ue = get_entry_by_id_locked(id, partition);
+    if(!ue) {
+        fprintf(stderr, "ERROR: Cannot find UUID after create in locked lookup/delete interleaving test\n");
+        errors++;
+    }
+
+    ND_THREAD *thread = nd_thread_create(
+        "UUID-DELETE-GATE",
+        NETDATA_THREAD_OPTION_DONT_LOG,
+        uuidmap_deferred_free_thread,
+        &gate);
+
+    usec_t deadline = now_monotonic_usec() + 5 * USEC_PER_SEC;
+    while(!__atomic_load_n(&gate.writer_blocked, __ATOMIC_ACQUIRE) &&
+          !__atomic_load_n(&gate.writer_unexpectedly_acquired, __ATOMIC_ACQUIRE) &&
+          now_monotonic_usec() < deadline)
+        tinysleep();
+
+    if(__atomic_load_n(&gate.writer_unexpectedly_acquired, __ATOMIC_ACQUIRE)) {
+        fprintf(stderr, "ERROR: UUID delete writer entered while lookup reader was locked\n");
+        errors++;
+    }
+
+    if(!__atomic_load_n(&gate.writer_blocked, __ATOMIC_ACQUIRE)) {
+        fprintf(stderr, "ERROR: UUID delete writer did not reach the blocked interleaving window\n");
+        errors++;
+    }
+
+    bool acquired_ref = false;
+    if(ue) {
+        struct uuidmap_entry *acquired = get_entry_by_id_locked_and_acquire(id, partition);
+        if(acquired != ue) {
+            fprintf(stderr, "ERROR: Locked lookup/acquire returned unexpected UUID entry\n");
+            errors++;
+        }
+        else
+            acquired_ref = true;
+    }
+
+    rw_spinlock_read_unlock(&uuid_map.p[partition].spinlock);
+
+    __atomic_store_n(&gate.allow_delete, true, __ATOMIC_RELEASE);
+    nd_thread_join(thread);
+
+    if(!__atomic_load_n(&gate.delete_done, __ATOMIC_ACQUIRE)) {
+        fprintf(stderr, "ERROR: UUID delete helper did not complete\n");
+        errors++;
+    }
+
+    if(acquired_ref) {
+        nd_uuid_t found_uuid;
+        if(!uuidmap_uuid(id, found_uuid)) {
+            fprintf(stderr, "ERROR: UUID disappeared despite locked refcount acquire\n");
+            errors++;
+        }
+        else if(uuid_compare(found_uuid, test_uuid) != 0) {
+            fprintf(stderr, "ERROR: UUID changed after locked lookup/delete interleaving\n");
+            errors++;
+        }
+
+        uuidmap_free(id);
+    }
+
+    nd_uuid_t found_uuid;
+    if(uuidmap_uuid(id, found_uuid)) {
+        fprintf(stderr, "ERROR: UUID still exists after releasing locked interleaving reference\n");
+        errors++;
+        uuidmap_free(id);
+    }
+
+    if(errors)
+        fprintf(stderr, "UUID Map locked lookup/delete interleaving test: %d ERROR(S)\n", errors);
+    else
+        fprintf(stderr, "UUID Map locked lookup/delete interleaving test: OK\n");
+
+    return errors;
+}
 
 static void concurrent_test_thread(void *arg) {
     THREAD_STATS *stats = arg;
@@ -437,7 +600,8 @@ int uuidmap_unittest(void) {
     fprintf(stderr, "\nTesting UUID Map...\n");
 
     const size_t ENTRIES = 100000;
-    int errors = uuidmap_concurrent_unittest();
+    int errors = uuidmap_locked_lookup_delete_interleaving_unittest();
+    errors += uuidmap_concurrent_unittest();
 
     struct test_entry {
         nd_uuid_t uuid;

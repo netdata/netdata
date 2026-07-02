@@ -74,7 +74,7 @@ static inline size_t print_fraction(char *buffer, size_t size, usec_t fraction, 
 }
 
 size_t rfc3339_datetime_ut(char *buffer, size_t len, usec_t now_ut, size_t fractional_digits, bool utc) {
-    if (!buffer || len < 20) // Minimum size for YYYY-MM-DDThh:mm:ssZ
+    if (!buffer || len < 20) // Minimum size for YYYY-MM-DDThh:mm:ss plus terminator
         return 0;
 
     time_t t = (time_t)(now_ut / USEC_PER_SEC);
@@ -93,47 +93,47 @@ size_t rfc3339_datetime_ut(char *buffer, size_t len, usec_t now_ut, size_t fract
     size_t pos = 0;
 
     // Year (4 digits)
-    if (len - pos < 4) goto finish;
+    if (len - pos <= 4) goto finish;
     pos += print_4digit_year(&buffer[pos], len - pos, tmp->tm_year + 1900);
 
     // Month separator
-    if (len - pos < 1) goto finish;
+    if (len - pos <= 1) goto finish;
     buffer[pos++] = '-';
 
     // Month (2 digits)
-    if (len - pos < 2) goto finish;
+    if (len - pos <= 2) goto finish;
     pos += print_2digit(&buffer[pos], len - pos, tmp->tm_mon + 1);
 
     // Day separator
-    if (len - pos < 1) goto finish;
+    if (len - pos <= 1) goto finish;
     buffer[pos++] = '-';
 
     // Day (2 digits)
-    if (len - pos < 2) goto finish;
+    if (len - pos <= 2) goto finish;
     pos += print_2digit(&buffer[pos], len - pos, tmp->tm_mday);
 
     // T separator
-    if (len - pos < 1) goto finish;
+    if (len - pos <= 1) goto finish;
     buffer[pos++] = 'T';
 
     // Hour (2 digits)
-    if (len - pos < 2) goto finish;
+    if (len - pos <= 2) goto finish;
     pos += print_2digit(&buffer[pos], len - pos, tmp->tm_hour);
 
     // Minute separator
-    if (len - pos < 1) goto finish;
+    if (len - pos <= 1) goto finish;
     buffer[pos++] = ':';
 
     // Minute (2 digits)
-    if (len - pos < 2) goto finish;
+    if (len - pos <= 2) goto finish;
     pos += print_2digit(&buffer[pos], len - pos, tmp->tm_min);
 
     // Second separator
-    if (len - pos < 1) goto finish;
+    if (len - pos <= 1) goto finish;
     buffer[pos++] = ':';
 
     // Second (2 digits)
-    if (len - pos < 2) goto finish;
+    if (len - pos <= 2) goto finish;
     pos += print_2digit(&buffer[pos], len - pos, tmp->tm_sec);
 
     // Add fractional part if requested
@@ -143,7 +143,7 @@ size_t rfc3339_datetime_ut(char *buffer, size_t len, usec_t now_ut, size_t fract
 
         if (fractional_part > 0) {
             // Need space for decimal point and digits
-            if (len - pos < fractional_digits + 1) goto finish;
+            if (len - pos <= fractional_digits + 1) goto finish;
 
             buffer[pos++] = '.';
             pos += print_fraction(&buffer[pos], len - pos, fractional_part, fractional_digits);
@@ -152,7 +152,7 @@ size_t rfc3339_datetime_ut(char *buffer, size_t len, usec_t now_ut, size_t fract
 
     // Add timezone information
     if (utc) {
-        if (len - pos < 1) goto finish;
+        if (len - pos <= 1) goto finish;
         buffer[pos++] = 'Z';
     }
     else {
@@ -162,12 +162,12 @@ size_t rfc3339_datetime_ut(char *buffer, size_t len, usec_t now_ut, size_t fract
 
         // Check if timezone is UTC
         if (hours == 0 && minutes == 0) {
-            if (len - pos < 1) goto finish;
+            if (len - pos <= 1) goto finish;
             buffer[pos++] = 'Z';
         }
         else {
             // Need space for sign, hours, colon, minutes (6 chars total)
-            if (len - pos < 6) goto finish;
+            if (len - pos <= 6) goto finish;
 
             // Add timezone offset
             buffer[pos++] = (hours >= 0) ? '+' : '-';
@@ -185,34 +185,44 @@ size_t rfc3339_datetime_ut(char *buffer, size_t len, usec_t now_ut, size_t fract
     }
 
 finish:
-    // Ensure null termination
-    if (pos < len)
-        buffer[pos] = '\0';
-    else
-        buffer[len - 1] = '\0';
+    buffer[pos] = '\0';
 
     return pos;
 }
 
-usec_t rfc3339_parse_ut(const char *rfc3339, char **endptr) {
+bool rfc3339_parse_ut(const char *rfc3339, usec_t *timestamp_ut, char **endptr) {
     struct tm tm = { 0 };
     int tz_hours = 0, tz_mins = 0;
     char *s;
     usec_t timestamp, usec = 0;
 
+    if (endptr)
+        *endptr = NULL;
+
+    if (!rfc3339 || !timestamp_ut)
+        return false;
+
     // Parse date and time (up to seconds)
     s = strptime(rfc3339, "%Y-%m-%dT%H:%M:%S", &tm);
     if (!s)
-        return 0; // Parsing error
+        return false; // Parsing error
 
     // Parse fractional seconds if present
     if (*s == '.') {
-        char *next;
-        usec = strtoul(s + 1, &next, 10);
-        int digits_parsed = (int)(next - (s + 1));
+        char *next = s + 1;
+        int digits_parsed = 0;
 
-        if (digits_parsed < 1 || digits_parsed > 9)
-            return 0; // Parsing error
+        while (isdigit((uint8_t)*next)) {
+            if (digits_parsed == 9)
+                return false; // Parsing error
+
+            usec = usec * 10 + (*next - '0');
+            digits_parsed++;
+            next++;
+        }
+
+        if (digits_parsed < 1)
+            return false; // Parsing error
 
         static const usec_t fix_usec[] = {
             1000000, // 0 digits (not used)
@@ -242,7 +252,7 @@ usec_t rfc3339_parse_ut(const char *rfc3339, char **endptr) {
 
         if (!isdigit((uint8_t)s[1]) || !isdigit((uint8_t)s[2]) || s[3] != ':' ||
             !isdigit((uint8_t)s[4]) || !isdigit((uint8_t)s[5]))
-            return 0; // Parsing error
+            return false; // Parsing error
 
         char tz_sign = *s;
         tz_hours = (s[1] - '0') * 10 + (s[2] - '0');
@@ -255,7 +265,7 @@ usec_t rfc3339_parse_ut(const char *rfc3339, char **endptr) {
     else if (*s == 'Z')
         s++;
     else
-        return 0; // Invalid RFC 3339 timezone specification
+        return false; // Invalid RFC 3339 timezone specification
 
     // Convert struct tm to time_t in UTC
     time_t epoch_s;
@@ -267,7 +277,7 @@ usec_t rfc3339_parse_ut(const char *rfc3339, char **endptr) {
     // Use mktime(), which assumes tm is local time, then adjust.
     epoch_s = mktime(&tm);
     if (epoch_s == -1)
-        return 0; // Error in time conversion
+        return false; // Error in time conversion
 
 #  if defined(HAVE_TM_GMTOFF)
     // tm.tm_gmtoff is the offset (in seconds) of local time from UTC.
@@ -287,14 +297,14 @@ usec_t rfc3339_parse_ut(const char *rfc3339, char **endptr) {
         struct tm *lt = localtime(&epoch_s);
         if (!lt) {
             spinlock_unlock(&time_static_buffer_spinlock);
-            return 0;
+            return false;
         }
         local_tm = *lt;
 
         struct tm *gt = gmtime(&epoch_s);
         if (!gt) {
             spinlock_unlock(&time_static_buffer_spinlock);
-            return 0;
+            return false;
         }
         utc_tm   = *gt;
 
@@ -316,5 +326,6 @@ usec_t rfc3339_parse_ut(const char *rfc3339, char **endptr) {
     if (endptr)
         *endptr = s;
 
-    return timestamp;
+    *timestamp_ut = timestamp;
+    return true;
 }

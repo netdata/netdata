@@ -234,8 +234,9 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
     if(st && !st->functions_view)
         st->functions_view = dictionary_create_view(host->functions);
 
-    char key[strlen(name) + 1];
-    rrd_functions_sanitize(key, name, sizeof(key));
+    size_t key_size = rrd_functions_strlen_bounded(name, PLUGINSD_LINE_MAX) + 1;
+    CLEAN_CHAR_P *key = mallocz(key_size);
+    rrd_functions_sanitize(key, name, key_size);
 
     struct rrd_host_function tmp = {
         .collector = NULL,
@@ -264,8 +265,9 @@ bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_str
     if(unlikely(!name || !*name))
         return false;
 
-    char key[strlen(name) + 1];
-    rrd_functions_sanitize(key, name, sizeof(key));
+    size_t key_size = rrd_functions_strlen_bounded(name, PLUGINSD_LINE_MAX) + 1;
+    CLEAN_CHAR_P *key = mallocz(key_size);
+    rrd_functions_sanitize(key, name, key_size);
 
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->functions, key);
     if(!item)
@@ -346,6 +348,7 @@ bool rrd_function_is_available(struct rrd_host_function *rdcf, RRDHOST *host) {
 int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size_t key_length, const DICTIONARY_ITEM **item) {
     char buffer[MAX_FUNCTION_LENGTH + 1];
     strncpyz(buffer, name, sizeof(buffer) - 1);
+    key_length = strnlen(buffer, sizeof(buffer));
     char *s = NULL;
 
     OBJECT_STATE_ID state_id = object_state_id(&host->state_id);

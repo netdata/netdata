@@ -304,13 +304,17 @@ static inline int local_sockets_spawn_server_callback(SPAWN_REQUEST *request);
 
 static inline void local_sockets_log(LS_STATE *ls, const char *format, ...) PRINTFLIKE(2, 3);
 static inline void local_sockets_log(LS_STATE *ls, const char *format, ...) {
-    if(ls && ++ls->stats.errors_encountered == ls->config.max_errors) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "LOCAL-SOCKETS: max number of logs reached. Not logging anymore");
-        return;
-    }
+    if(ls) {
+        size_t errors_encountered = __atomic_add_fetch(&ls->stats.errors_encountered, 1, __ATOMIC_RELAXED);
 
-    if(ls && ls->stats.errors_encountered > ls->config.max_errors)
-        return;
+        if(errors_encountered == ls->config.max_errors) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "LOCAL-SOCKETS: max number of logs reached. Not logging anymore");
+            return;
+        }
+
+        if(errors_encountered > ls->config.max_errors)
+            return;
+    }
 
     char buf[16384];
     va_list args;
@@ -912,17 +916,26 @@ static inline int local_sockets_libmnl_cb_data(const struct nlmsghdr *nlh, void 
         switch (attr->rta_type) {
             case INET_DIAG_INFO: {
                 if(ls->tmp_protocol == IPPROTO_TCP) {
-                    struct tcp_info *info = (struct tcp_info *)RTA_DATA(attr);
-                    n.info.tcp = *info;
-                    ls->stats.tcp_info_received++;
+                    int payload = RTA_PAYLOAD(attr);
+                    if(payload > 0) {
+                        size_t copy_len = (size_t)payload;
+                        if(copy_len > sizeof(n.info.tcp))
+                            copy_len = sizeof(n.info.tcp);
+
+                        memcpy(&n.info.tcp, RTA_DATA(attr), copy_len);
+                        ls->stats.tcp_info_received++;
+                    }
                 }
             }
             break;
 
             case INET_DIAG_SKV6ONLY: {
-                n.ipv6ony.checked = true;
-                int ipv6only = *(int *)RTA_DATA(attr);
-                n.ipv6ony.ipv46 = !ipv6only;
+                if(RTA_PAYLOAD(attr) >= (int)sizeof(uint8_t)) {
+                    uint8_t ipv6only;
+                    memcpy(&ipv6only, RTA_DATA(attr), sizeof(ipv6only));
+                    n.ipv6ony.checked = true;
+                    n.ipv6ony.ipv46 = !ipv6only;
+                }
             }
             break;
 
@@ -1460,6 +1473,7 @@ static inline void local_sockets_read_all_system_sockets(LS_STATE *ls) {
 struct local_sockets_child_work {
     int fd;
     uint64_t net_ns_inode;
+    bool failed;
 };
 
 #define LOCAL_SOCKET_TERMINATOR (struct local_socket) { \
@@ -1477,9 +1491,68 @@ static inline bool local_socket_is_terminator(const struct local_socket *n) {
             n->net_ns_inode == t.net_ns_inode);
 }
 
+static inline bool local_sockets_write_exact(LS_STATE *ls, int fd, const void *data, size_t len, const char *what) {
+    const uint8_t *p = data;
+    size_t remaining = len;
+
+    while(remaining) {
+        ssize_t rc = write(fd, p, remaining);
+        if(rc > 0) {
+            p += (size_t)rc;
+            remaining -= (size_t)rc;
+            continue;
+        }
+
+        if(rc == -1 && errno == EINTR)
+            continue;
+
+        if(rc == -1) {
+            int err = errno;
+            local_sockets_log(ls, "failed to write %s to pipe: %s", what, strerror(err));
+        }
+        else
+            local_sockets_log(ls, "failed to write %s to pipe: write returned 0", what);
+
+        return false;
+    }
+
+    return true;
+}
+
+static inline bool local_sockets_read_exact(LS_STATE *ls, int fd, void *data, size_t len, const char *what) {
+    uint8_t *p = data;
+    size_t remaining = len;
+
+    while(remaining) {
+        ssize_t rc = read(fd, p, remaining);
+        if(rc > 0) {
+            p += (size_t)rc;
+            remaining -= (size_t)rc;
+            continue;
+        }
+
+        if(rc == -1 && errno == EINTR)
+            continue;
+
+        if(rc == 0)
+            local_sockets_log(ls, "unexpected end of pipe while reading %s", what);
+        else {
+            int err = errno;
+            local_sockets_log(ls, "failed to read %s from pipe: %s", what, strerror(err));
+        }
+
+        return false;
+    }
+
+    return true;
+}
+
 static inline void local_sockets_send_to_parent(struct local_socket_state *ls, const struct local_socket *n, void *data) {
     struct local_sockets_child_work *cw = data;
     int fd = cw->fd;
+
+    if(cw->failed)
+        return;
 
     if(!local_socket_is_terminator(n)) {
         ls->stats.errors_encountered = 0;
@@ -1489,16 +1562,19 @@ static inline void local_sockets_send_to_parent(struct local_socket_state *ls, c
 //            n->inode, n->net_ns_inode, ls->proc_self_net_ns_inode, ls->ns_state.net_ns_pid);
     }
 
-    if(write(fd, n, sizeof(*n)) != sizeof(*n))
-        local_sockets_log(ls, "failed to write local socket to pipe");
+    if(!local_sockets_write_exact(ls, fd, n, sizeof(*n), "local socket")) {
+        cw->failed = true;
+        return;
+    }
 
     size_t len = n->cmdline ? string_strlen(n->cmdline) + 1 : 0;
-    if(write(fd, &len, sizeof(len)) != sizeof(len))
-        local_sockets_log(ls, "failed to write cmdline length to pipe");
+    if(!local_sockets_write_exact(ls, fd, &len, sizeof(len), "cmdline length")) {
+        cw->failed = true;
+        return;
+    }
 
-    if(len)
-        if(write(fd, string2str(n->cmdline), len) != (ssize_t)len)
-            local_sockets_log(ls, "failed to write cmdline to pipe");
+    if(len && !local_sockets_write_exact(ls, fd, string2str(n->cmdline), len, "cmdline"))
+        cw->failed = true;
 }
 
 static inline int local_sockets_spawn_server_callback(SPAWN_REQUEST *request) {
@@ -1619,10 +1695,13 @@ static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, st
 
     size_t received = 0;
     struct local_socket buf;
-    while(read(spawn_server_instance_read_fd(si), &buf, sizeof(buf)) == sizeof(buf)) {
+    int read_fd = spawn_server_instance_read_fd(si);
+    while(local_sockets_read_exact(ls, read_fd, &buf, sizeof(buf), "local socket")) {
+        buf.cmdline = NULL;
+
         size_t len = 0;
-        if(read(spawn_server_instance_read_fd(si), &len, sizeof(len)) != sizeof(len))
-            local_sockets_log(ls, "failed to read cmdline length from pipe");
+        if(!local_sockets_read_exact(ls, read_fd, &len, sizeof(len), "cmdline length"))
+            break;
 
         if(len > LOCAL_SOCKETS_CMDLINE_MAX) {
             // broken pipe protocol: writer caps at LOCAL_SOCKETS_CMDLINE_MAX bytes
@@ -1632,15 +1711,12 @@ static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, st
 
         if(len) {
             CLEAN_CHAR_P *cmdline = mallocz(len + 1);
-            if(read(spawn_server_instance_read_fd(si), cmdline, len) != (ssize_t)len)
-                local_sockets_log(ls, "failed to read cmdline from pipe");
-            else {
-                cmdline[len] = '\0';
-                buf.cmdline = string_strdupz(cmdline);
-            }
+            if(!local_sockets_read_exact(ls, read_fd, cmdline, len, "cmdline"))
+                break;
+
+            cmdline[len] = '\0';
+            buf.cmdline = string_strdupz(cmdline);
         }
-        else
-            buf.cmdline = NULL;
 
         received++;
 

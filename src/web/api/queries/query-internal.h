@@ -81,15 +81,19 @@ typedef struct query_engine_ops {
     struct query_engine_ops *next;
 } QUERY_ENGINE_OPS;
 
+typedef struct query_engine_ops_cache {
+    QUERY_ENGINE_OPS *released_ops;
+} QUERY_ENGINE_OPS_CACHE;
+
 // query planner
 #define query_plan_should_switch_plan(ops, now) ((now) >= (ops)->current_plan_expire_time)
 bool query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t last_point_end_time);
 void query_planer_finalize_remaining_plans(QUERY_ENGINE_OPS *ops);
-QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, size_t query_metric_id);
-void rrd2rrdr_query_ops_release(QUERY_ENGINE_OPS *ops);
+QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, QUERY_ENGINE_OPS_CACHE *cache, size_t query_metric_id);
+void rrd2rrdr_query_ops_release(QUERY_ENGINE_OPS_CACHE *cache, QUERY_ENGINE_OPS *ops);
 time_t query_target_min_update_every_for_tier(QUERY_TARGET *qt, size_t tier);
 int query_plan_unittest(void);
-void rrd2rrdr_query_ops_freeall(RRDR *r);
+void rrd2rrdr_query_ops_freeall(RRDR *r, QUERY_ENGINE_OPS_CACHE *cache);
 
 // query execution
 void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_OPS *ops);
