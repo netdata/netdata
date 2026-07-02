@@ -15,33 +15,21 @@ use serde::Deserialize;
 #[derive(Debug, Default, Deserialize)]
 pub(super) struct SignalOverride {
     #[serde(default)]
-    pub(super) wal: Option<WalOverride>,
+    pub(super) crc_enabled: Option<bool>,
     #[serde(default)]
-    pub(super) index: Option<IndexOverride>,
+    pub(super) compression_enabled: Option<bool>,
     #[serde(default)]
-    pub(super) catalog: Option<CatalogOverride>,
-}
-
-#[derive(Debug, Default, Deserialize)]
-pub(super) struct IndexOverride {
+    pub(super) rotation: Option<HashMap<String, bridge::config::RotationEntry>>,
     #[serde(default)]
     pub(super) retention: Option<HashMap<String, RetentionEntry>>,
+    #[serde(default)]
+    pub(super) catalog: Option<CatalogOverride>,
 }
 
 #[derive(Debug, Default, Deserialize)]
 pub(super) struct CatalogOverride {
     #[serde(default)]
     pub(super) rotation_count: Option<usize>,
-}
-
-#[derive(Debug, Default, Deserialize)]
-pub(super) struct WalOverride {
-    #[serde(default)]
-    pub(super) crc_enabled: Option<bool>,
-    #[serde(default)]
-    pub(super) compression_enabled: Option<bool>,
-    #[serde(default)]
-    pub(super) rotation: Option<HashMap<String, bridge::config::RotationEntry>>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -68,8 +56,10 @@ impl AuthOverride {
 
 impl SignalOverride {
     pub(super) fn has_any(&self) -> bool {
-        self.wal.as_ref().is_some_and(|w| w.has_any())
-            || self.index.as_ref().is_some_and(|i| i.has_any())
+        self.crc_enabled.is_some()
+            || self.compression_enabled.is_some()
+            || self.rotation.is_some()
+            || self.retention.is_some()
             || self.catalog.as_ref().is_some_and(|c| c.has_any())
     }
 }
@@ -80,41 +70,25 @@ impl StorageOverride {
     }
 }
 
-impl IndexOverride {
-    pub(super) fn has_any(&self) -> bool {
-        self.retention.is_some()
-    }
-}
-
 impl CatalogOverride {
     pub(super) fn has_any(&self) -> bool {
         self.rotation_count.is_some()
     }
 }
 
-impl WalOverride {
-    pub(super) fn has_any(&self) -> bool {
-        self.crc_enabled.is_some() || self.compression_enabled.is_some() || self.rotation.is_some()
-    }
-}
-
 /// Merge a per-signal tuning override onto a [`SignalConfig`].
 pub(super) fn apply_signal(config: &mut SignalConfig, o: &SignalOverride) {
-    if let Some(w) = &o.wal {
-        if let Some(v) = w.crc_enabled {
-            config.wal.crc_enabled = v;
-        }
-        if let Some(v) = w.compression_enabled {
-            config.wal.compression_enabled = v;
-        }
-        if let Some(r) = &w.rotation {
-            config.wal.rotation.apply_overrides(r);
-        }
+    if let Some(v) = o.crc_enabled {
+        config.crc_enabled = v;
     }
-    if let Some(i) = &o.index {
-        if let Some(r) = &i.retention {
-            config.index.retention.apply_overrides(r);
-        }
+    if let Some(v) = o.compression_enabled {
+        config.compression_enabled = v;
+    }
+    if let Some(r) = &o.rotation {
+        config.rotation.apply_overrides(r);
+    }
+    if let Some(r) = &o.retention {
+        config.retention.apply_overrides(r);
     }
     if let Some(c) = &o.catalog {
         if let Some(v) = c.rotation_count {

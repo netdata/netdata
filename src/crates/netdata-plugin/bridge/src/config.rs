@@ -45,8 +45,11 @@ pub struct PluginConfig {
     /// crc/compression). Carries no dirs (derived from `base_dir`) and no
     /// storage (global).
     pub logs: SignalConfig,
-    /// Per-signal tuning for traces. Same shape as `logs`. The traces pipeline
-    /// is always built, so this is mandatory like `logs`.
+    /// Per-signal tuning for traces. Same shape as `logs`, but optional in
+    /// YAML: traces are under active development and the shipped stock config
+    /// does not list them, so an absent section falls back to code defaults
+    /// mirroring the shipped logs tuning.
+    #[serde(default)]
     pub traces: SignalConfig,
     /// Socket path for WAL event IPC between ingestor and ledger.
     /// Set by the supervisor at runtime, not present in YAML config.
@@ -74,13 +77,13 @@ impl PluginConfig {
         LifecycleConfig {
             wal: WalConfig {
                 dir: root.join("wal"),
-                crc_enabled: tuning.wal.crc_enabled,
-                compression_enabled: tuning.wal.compression_enabled,
-                rotation: tuning.wal.rotation.clone(),
+                crc_enabled: tuning.crc_enabled,
+                compression_enabled: tuning.compression_enabled,
+                rotation: tuning.rotation.clone(),
             },
             index: IndexConfig {
                 dir: root.join("index"),
-                retention: tuning.index.retention.clone(),
+                retention: tuning.retention.clone(),
             },
             catalog: CatalogConfig {
                 dir: root.join("catalog"),
@@ -179,35 +182,35 @@ pub struct MetricsConfig {
 /// here.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SignalConfig {
-    /// WAL tuning (crc/compression, rotation) — no dir.
-    pub wal: WalTuning,
-    /// Index tuning (retention) — no dir.
-    pub index: IndexTuning,
+    /// Whether to verify stored data with checksums. Hidden knob: absent from
+    /// the stock file, overridable via user file / env.
+    #[serde(default = "default_true")]
+    pub crc_enabled: bool,
+    /// Whether to compress stored data. Hidden knob, as above.
+    #[serde(default = "default_true")]
+    pub compression_enabled: bool,
+    /// Per-tenant rotation policy — when a data file rolls over (a complete
+    /// `default` + partial tenant overrides), validated at deserialize from
+    /// the `{ "default": {...}, ... }` map shape.
+    pub rotation: RotationPolicy,
+    /// Per-tenant retention policy — how much data is kept (same validated
+    /// map shape).
+    pub retention: RetentionPolicy,
     /// Catalog tuning (rotation count) — no dir.
     #[serde(default)]
     pub catalog: CatalogTuning,
 }
 
-/// WAL tuning for one signal (the dir is derived, not configured).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WalTuning {
-    /// Whether to compute CRC32 checksums per frame.
-    #[serde(default = "default_true")]
-    pub crc_enabled: bool,
-    /// Whether to LZ4-compress frame payloads.
-    #[serde(default = "default_true")]
-    pub compression_enabled: bool,
-    /// Per-tenant rotation policy (a complete `default` + partial tenant overrides),
-    /// validated at deserialize from the `{ "default": {...}, ... }` map shape.
-    pub rotation: RotationPolicy,
-}
-
-/// Index tuning for one signal (the dir is derived, not configured).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IndexTuning {
-    /// Per-tenant retention policy for SFST files (a complete `default` + partial
-    /// tenant overrides), validated at deserialize from the map shape.
-    pub retention: RetentionPolicy,
+impl Default for SignalConfig {
+    fn default() -> Self {
+        Self {
+            crc_enabled: true,
+            compression_enabled: true,
+            rotation: RotationPolicy::default(),
+            retention: RetentionPolicy::default(),
+            catalog: CatalogTuning::default(),
+        }
+    }
 }
 
 /// Catalog tuning for one signal (the dir is derived, not configured).
@@ -259,14 +262,14 @@ pub struct StorageConfig {
     /// OpenDAL URI for the remote storage backend.
     /// Examples: "fs:///tmp/otel-remote", "s3://bucket/?region=us-east-1"
     pub uri: String,
-    /// Hard byte cap for the remote-read cache on disk. Default 4 GiB.
+    /// Hard byte cap for the remote-read cache on disk. Default 4 GB.
     #[serde(default = "default_read_cache_max_size")]
     pub read_cache_max_size: ByteSize,
 }
 
-/// Default remote-read cache size: 4 GiB.
+/// Default remote-read cache size: 4 GB (decimal, like every other size here).
 fn default_read_cache_max_size() -> ByteSize {
-    ByteSize::gib(4)
+    ByteSize::gb(4)
 }
 
 /// Index file configuration (runtime-only; lives in [`LifecycleConfig`], built by
@@ -393,6 +396,22 @@ impl RotationPolicy {
     }
 }
 
+/// Code default mirroring the shipped stock logs rotation, used when a signal
+/// section is absent from YAML (traces, while under active development). The
+/// otel-plugin stock-file test pins these against the shipped values.
+impl Default for RotationPolicy {
+    fn default() -> Self {
+        Self {
+            default: RotationConfig {
+                max_file_size: ByteSize::mb(25),
+                max_log_entries: 50_000,
+                max_file_duration: Duration::from_secs(2 * 3600),
+            },
+            tenants: HashMap::new(),
+        }
+    }
+}
+
 impl TryFrom<HashMap<String, RotationEntry>> for RotationPolicy {
     type Error = String;
 
@@ -467,6 +486,21 @@ pub struct RetentionConfig {
 pub struct RetentionPolicy {
     default: RetentionConfig,
     tenants: HashMap<String, RetentionEntry>,
+}
+
+/// Code default mirroring the shipped stock logs retention — see
+/// [`RotationPolicy`]'s `Default` for the rationale.
+impl Default for RetentionPolicy {
+    fn default() -> Self {
+        Self {
+            default: RetentionConfig {
+                max_files: 1000,
+                max_total_size: ByteSize::gb(32),
+                max_age: Duration::from_secs(7 * 24 * 3600),
+            },
+            tenants: HashMap::new(),
+        }
+    }
 }
 
 impl RetentionPolicy {
@@ -625,39 +659,54 @@ storage:
 auth:
   enabled: true
 logs:
-  wal:
-    crc_enabled: true
-    compression_enabled: false
-    rotation:
-      default:
-        max_file_size: "100MB"
-        max_log_entries: 50000
-        max_file_duration: "2 hours"
-  index:
-    retention:
-      default:
-        max_files: 10
-        max_total_size: "1GB"
-        max_age: "7 days"
+  crc_enabled: true
+  compression_enabled: false
+  rotation:
+    default:
+      max_file_size: "100MB"
+      max_log_entries: 50000
+      max_file_duration: "2 hours"
+  retention:
+    default:
+      max_files: 10
+      max_total_size: "1GB"
+      max_age: "7 days"
   catalog:
     rotation_count: 7
 traces:
-  wal:
-    rotation:
-      default:
-        max_file_size: "10MB"
-        max_log_entries: 1000
-        max_file_duration: "30 minutes"
-  index:
-    retention:
-      default:
-        max_files: 5
-        max_total_size: "256MB"
-        max_age: "2 days"
+  rotation:
+    default:
+      max_file_size: "10MB"
+      max_log_entries: 1000
+      max_file_duration: "30 minutes"
+  retention:
+    default:
+      max_files: 5
+      max_total_size: "256MB"
+      max_age: "2 days"
 "#;
 
     fn full_config() -> PluginConfig {
         serde_yaml::from_str(FULL_YAML).unwrap()
+    }
+
+    #[test]
+    fn traces_section_optional_with_code_defaults() {
+        // FULL_YAML without its trailing traces section: the field defaults to
+        // the code tuning that mirrors the shipped stock logs values.
+        let yaml = FULL_YAML.split("\ntraces:").next().unwrap();
+        let config: PluginConfig = serde_yaml::from_str(yaml).unwrap();
+        assert!(config.traces.crc_enabled);
+        assert!(config.traces.compression_enabled);
+        let rotation = config.traces.rotation.resolve("default");
+        assert_eq!(rotation.max_file_size, ByteSize::mb(25));
+        assert_eq!(rotation.max_log_entries, 50_000);
+        assert_eq!(rotation.max_file_duration, Duration::from_secs(2 * 3600));
+        let retention = config.traces.retention.resolve("default");
+        assert_eq!(retention.max_files, 1000);
+        assert_eq!(retention.max_total_size, ByteSize::gb(32));
+        assert_eq!(retention.max_age, Duration::from_secs(7 * 24 * 3600));
+        assert_eq!(config.traces.catalog.rotation_count, 10);
     }
 
     #[test]
@@ -670,15 +719,15 @@ traces:
         assert_eq!(c.storage.read_cache_max_size, ByteSize::gib(2));
         assert!(c.auth.enabled);
         // Per-signal tuning differs between logs and traces.
-        assert!(c.logs.wal.crc_enabled);
-        assert!(!c.logs.wal.compression_enabled);
+        assert!(c.logs.crc_enabled);
+        assert!(!c.logs.compression_enabled);
         assert_eq!(c.logs.catalog.rotation_count, 7);
         // traces.catalog omitted → default rotation count.
         assert_eq!(
             c.traces.catalog.rotation_count,
             default_catalog_rotation_count()
         );
-        assert!(c.traces.wal.crc_enabled); // default_true when omitted
+        assert!(c.traces.crc_enabled); // default_true when omitted
     }
 
     #[test]

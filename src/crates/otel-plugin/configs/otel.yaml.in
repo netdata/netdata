@@ -36,139 +36,64 @@ metrics:
   # Limits cardinality explosion from high-cardinality label combinations.
   max_new_charts_per_request: 100
 
-# Single mandatory root directory for all signal storage. The plugin derives
-# every per-signal directory from it, so there is one place to relocate storage:
-#   {base_dir}/logs/{wal,index,catalog}     — logs WAL, index, catalog files
-#   {base_dir}/traces/{wal,index,catalog}   — traces WAL, index, catalog files
-#   {base_dir}/<signal>/remote-read         — per-signal remote-read cache
-#   {base_dir}/shared/seq_highwater         — cross-signal sequence high-water
+# Directory where all OpenTelemetry data (logs, traces) is stored.
+# Must be an absolute path.
 base_dir: @logdir_POST@/otel/v1
 
 storage:
-  # Remote object storage is GLOBAL: one on/off switch and one backend for the
-  # whole plugin. Every signal uploads to the same backend under its own
-  # v1/<signal>/... key prefix.
-
-  # Whether to upload SFST and catalog files to remote object storage.
+  # Upload data to remote object storage, in addition to keeping it on local
+  # disk. One backend is shared by logs and traces.
   enabled: false
 
-  # OpenDAL URI for the remote storage backend. The scheme selects the
-  # backend; all NON-SECRET backend options go in the query string (OpenDAL
-  # parses them — see https://docs.rs/opendal). Built-in schemes: fs, s3.
-  # Examples:
+  # Remote storage location. The scheme selects the backend (fs, s3);
+  # non-secret backend options go in the query string. Examples:
   #   fs:///var/lib/netdata/otel/remote
   #   s3://bucket/prefix?region=us-east-1
   #   s3://bucket/prefix?region=us-east-1&endpoint=https://minio.example:9000
   uri: "fs://@logdir_POST@/otel/v1/remote"
 
-  # CREDENTIALS ARE NEVER PUT IN THIS FILE. Do not place access keys, secret
-  # keys, SAS tokens, or account keys in the URI or anywhere in otel.yaml.
-  # Credentials are loaded by OpenDAL from the netdata process environment and
-  # the cloud-standard locations, exactly like any other tool on the host:
-  #   - S3:    AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (and AWS_SESSION_TOKEN),
-  #            ~/.aws/{config,credentials}, EC2 instance role / IMDS, IRSA.
-  #   - GCS:   GOOGLE_APPLICATION_CREDENTIALS (path to a service-account JSON),
-  #            gcloud well-known location, GCE VM metadata. (build with services-gcs)
-  #   - Azure: AZURE_STORAGE_ACCOUNT / _KEY / _SAS_TOKEN, managed identity.
-  #            (build with services-azblob)
-  # Set these in the environment of the netdata service (e.g. a systemd
-  # EnvironmentFile with 0600 perms) — the plugin inherits it. On a cloud VM
-  # with an attached role, nothing needs to be set at all.
-  #
-  # On startup (when enabled) the plugin probes the backend and logs, under the
-  # systemd-journal identifier "otel-plugin/ledger", either
-  #   "remote storage reachable and credentials accepted"  or
-  #   "remote storage enabled but unreachable or misconfigured: <error>".
-  # The plugin redacts the URI to its scheme (e.g. "s3://[redacted]") in its own
-  # startup config log. It does NOT sanitize errors raised by the storage library,
-  # which may quote the URI — so never put a secret in it (see credentials below).
-  #
-  # Read cache: to answer a query over SFSTs that local retention has already
-  # evicted, the plugin fetches them back from remote storage into a bounded
-  # local cache and memory-maps them like any local file. The cache lives at
-  # {base_dir}/<signal>/remote-read (derived, per signal; created 0700) on
-  # locally-attached storage and is capped by size.
-  #
-  # Hard size cap for the read cache (e.g. "4GB", "512MB"). Default "4GiB".
-  # A query whose evicted footprint exceeds this cap is rejected with a message
-  # asking to narrow the time window or stream filter.
-  # read_cache_max_size: "4GiB"
+  # NEVER put credentials in this file or in the URI. Credentials are read
+  # from the netdata process environment and the standard cloud locations —
+  # for S3: AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY, ~/.aws/credentials,
+  # or an attached instance role (nothing to configure). To pass environment
+  # variables to the netdata service, use a root-only systemd EnvironmentFile.
+
+  # Data deleted from local disk by retention but still in remote storage is
+  # fetched back into a bounded local cache when a query needs it. Cap for
+  # that cache:
+  read_cache_max_size: "4GB"
 
 auth:
-  # GLOBAL tenant policy (one for the whole plugin). Whether to require tenant
-  # identification via the X-Scope-OrgID gRPC metadata header. When false, all
-  # data routes to a "default" tenant.
+  # Require senders to identify a tenant via the X-Scope-OrgID gRPC header.
+  # When disabled, all data belongs to a single "default" tenant.
+  # Applies to logs (and traces); metrics have no tenants.
   enabled: false
 
-# Per-signal tuning. Directories are derived from base_dir; storage and auth
-# are global (above). Each signal carries only its own rotation/retention/crc
-# tuning.
 logs:
-  wal:
-    # Whether to compute CRC32 checksums per frame.
-    crc_enabled: true
+  rotation:
+    # Incoming logs are appended to a current file; a new file starts when
+    # any of these limits is reached.
+    default:
+      max_file_size: "25MB"
+      max_log_entries: 50000
+      max_file_duration: "2 hours"
 
-    # Whether to LZ4-compress frame payloads.
-    compression_enabled: true
+    # Per-tenant overrides (any subset of the fields above):
+    # my-tenant:
+    #   max_file_size: "100MB"
 
-    rotation:
-      # Default rotation policy, applied to all tenants unless overridden.
-      default:
-        # Maximum size per WAL file (e.g., "100MB", "1.5GB").
-        max_file_size: "25MB"
+  retention:
+    # How much log data to keep on local disk; the oldest files are deleted
+    # when any of these limits is exceeded.
+    default:
+      max_files: 1000
+      max_total_size: "32GB"
+      max_age: "7 days"
 
-        # Maximum log entries per WAL file.
-        max_log_entries: 50000
-
-        # Maximum time span per WAL file (e.g., "2 hours", "1h", "30m").
-        max_file_duration: "2 hours"
-
-      # Per-tenant overrides (uncomment and adjust as needed):
-      # certstream:
-      #   max_file_size: "100MB"
-      #   max_log_entries: 50000
-
-  index:
-    retention:
-      # Default retention policy, applied to all tenants unless overridden.
-      default:
-        # Maximum number of index files to retain.
-        max_files: 1000
-
-        # Maximum total size of all index files (e.g., "1GB", "500MB").
-        max_total_size: "32GB"
-
-        # Maximum age of index files (e.g., "7 days", "1 week", "168h").
-        max_age: "7 days"
-
-      # Per-tenant overrides (uncomment and adjust as needed):
-      # certstream:
-      #   max_age: "30 days"
-      #   max_total_size: "50GB"
+    # Per-tenant overrides (any subset of the fields above):
+    # my-tenant:
+    #   max_age: "30 days"
 
   catalog:
-    # Number of SFST entries accumulated in the per-tenant in-memory
-    # accumulator before it rotates into an immutable catalog file.
-    rotation_count: 10
-
-# Traces tuning (same shape as logs). The traces pipeline is always built;
-# real traces ingestion/indexing is experimental and not yet implemented.
-traces:
-  wal:
-    crc_enabled: true
-    compression_enabled: true
-    rotation:
-      default:
-        max_file_size: "25MB"
-        max_log_entries: 50000
-        max_file_duration: "2 hours"
-
-  index:
-    retention:
-      default:
-        max_files: 1000
-        max_total_size: "32GB"
-        max_age: "7 days"
-
-  catalog:
+    # Number of index files recorded per catalog file.
     rotation_count: 10

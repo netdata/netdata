@@ -8,9 +8,7 @@ use anyhow::Result;
 use super::ConfigOverride;
 use super::endpoint::EndpointOverride;
 use super::metrics::MetricsOverride;
-use super::signal::{
-    AuthOverride, CatalogOverride, IndexOverride, SignalOverride, StorageOverride, WalOverride,
-};
+use super::signal::{AuthOverride, CatalogOverride, SignalOverride, StorageOverride};
 
 /// A snapshot of `NETDATA_OTEL_*` (name → raw value), so config resolution reads
 /// from an injected map rather than `std::env` and stays unit-testable. Values
@@ -173,16 +171,27 @@ impl SignalOverride {
     /// per-signal and so have no per-signal env vars.
     fn from_map(env: &EnvMap, prefix: &str) -> Result<Self> {
         let rotation_default = bridge::config::RotationEntry {
-            max_file_size: parse_env_var(env, &var(prefix, "WAL_MAX_FILE_SIZE"))?,
-            max_log_entries: parse_env_var(env, &var(prefix, "WAL_MAX_LOG_ENTRIES"))?,
-            max_file_duration: parse_env_duration(env, &var(prefix, "WAL_MAX_FILE_DURATION"))?,
+            max_file_size: parse_env_var(env, &var(prefix, "ROTATION_MAX_FILE_SIZE"))?,
+            max_log_entries: parse_env_var(env, &var(prefix, "ROTATION_MAX_LOG_ENTRIES"))?,
+            max_file_duration: parse_env_duration(env, &var(prefix, "ROTATION_MAX_FILE_DURATION"))?,
         };
         let rotation_has_any = rotation_default.max_file_size.is_some()
             || rotation_default.max_log_entries.is_some()
             || rotation_default.max_file_duration.is_some();
-        let wal = WalOverride {
-            crc_enabled: parse_env_bool(env, &var(prefix, "WAL_CRC_ENABLED"))?,
-            compression_enabled: parse_env_bool(env, &var(prefix, "WAL_COMPRESSION_ENABLED"))?,
+        let retention_default = bridge::config::RetentionEntry {
+            max_files: parse_env_var(env, &var(prefix, "RETENTION_MAX_FILES"))?,
+            max_total_size: parse_env_var(env, &var(prefix, "RETENTION_MAX_TOTAL_SIZE"))?,
+            max_age: parse_env_duration(env, &var(prefix, "RETENTION_MAX_AGE"))?,
+        };
+        let retention_has_any = retention_default.max_files.is_some()
+            || retention_default.max_total_size.is_some()
+            || retention_default.max_age.is_some();
+        let catalog = CatalogOverride {
+            rotation_count: parse_env_var(env, &var(prefix, "CATALOG_ROTATION_COUNT"))?,
+        };
+        Ok(Self {
+            crc_enabled: parse_env_bool(env, &var(prefix, "CRC_ENABLED"))?,
+            compression_enabled: parse_env_bool(env, &var(prefix, "COMPRESSION_ENABLED"))?,
             rotation: if rotation_has_any {
                 let mut map = std::collections::HashMap::new();
                 map.insert("default".to_string(), rotation_default);
@@ -190,16 +199,6 @@ impl SignalOverride {
             } else {
                 None
             },
-        };
-        let retention_default = bridge::config::RetentionEntry {
-            max_files: parse_env_var(env, &var(prefix, "INDEX_RETENTION_MAX_FILES"))?,
-            max_total_size: parse_env_var(env, &var(prefix, "INDEX_RETENTION_MAX_TOTAL_SIZE"))?,
-            max_age: parse_env_duration(env, &var(prefix, "INDEX_RETENTION_MAX_AGE"))?,
-        };
-        let retention_has_any = retention_default.max_files.is_some()
-            || retention_default.max_total_size.is_some()
-            || retention_default.max_age.is_some();
-        let index = IndexOverride {
             retention: if retention_has_any {
                 let mut map = std::collections::HashMap::new();
                 map.insert("default".to_string(), retention_default);
@@ -207,13 +206,6 @@ impl SignalOverride {
             } else {
                 None
             },
-        };
-        let catalog = CatalogOverride {
-            rotation_count: parse_env_var(env, &var(prefix, "CATALOG_ROTATION_COUNT"))?,
-        };
-        Ok(Self {
-            wal: if wal.has_any() { Some(wal) } else { None },
-            index: if index.has_any() { Some(index) } else { None },
             catalog: if catalog.has_any() {
                 Some(catalog)
             } else {

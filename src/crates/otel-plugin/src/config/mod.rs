@@ -409,35 +409,31 @@ storage:
 auth:
   enabled: false
 logs:
-  wal:
-    crc_enabled: true
-    compression_enabled: true
-    rotation:
-      default:
-        max_file_size: "100MB"
-        max_log_entries: 50000
-        max_file_duration: "2 hours"
-  index:
-    retention:
-      default:
-        max_files: 10
-        max_total_size: "1GB"
-        max_age: "7 days"
+  crc_enabled: true
+  compression_enabled: true
+  rotation:
+    default:
+      max_file_size: "100MB"
+      max_log_entries: 50000
+      max_file_duration: "2 hours"
+  retention:
+    default:
+      max_files: 10
+      max_total_size: "1GB"
+      max_age: "7 days"
   catalog:
     rotation_count: 10
 traces:
-  wal:
-    rotation:
-      default:
-        max_file_size: "100MB"
-        max_log_entries: 50000
-        max_file_duration: "2 hours"
-  index:
-    retention:
-      default:
-        max_files: 10
-        max_total_size: "1GB"
-        max_age: "7 days"
+  rotation:
+    default:
+      max_file_size: "100MB"
+      max_log_entries: 50000
+      max_file_duration: "2 hours"
+  retention:
+    default:
+      max_files: 10
+      max_total_size: "1GB"
+      max_age: "7 days"
   catalog:
     rotation_count: 10
 "#;
@@ -500,7 +496,7 @@ traces:
         // Storage + auth are global.
         assert!(!config.storage.enabled);
         assert_eq!(config.storage.uri, "fs:///var/log/netdata/otel/v1/remote");
-        assert_eq!(config.storage.read_cache_max_size, ByteSize::gib(4));
+        assert_eq!(config.storage.read_cache_max_size, ByteSize::gb(4));
         assert!(!config.auth.enabled);
     }
 
@@ -521,13 +517,13 @@ traces:
             logs.catalog.dir,
             std::path::Path::new("/var/log/netdata/otel/v1/logs/catalog")
         );
-        let rotation = config.logs.wal.rotation.resolve("default");
+        let rotation = config.logs.rotation.resolve("default");
         assert_eq!(rotation.max_file_size, ByteSize::mb(100));
         assert_eq!(rotation.max_log_entries, 50000);
         assert_eq!(rotation.max_file_duration, Duration::from_secs(2 * 3600));
-        assert!(config.logs.wal.crc_enabled);
-        assert!(config.logs.wal.compression_enabled);
-        let retention = config.logs.index.retention.resolve("default");
+        assert!(config.logs.crc_enabled);
+        assert!(config.logs.compression_enabled);
+        let retention = config.logs.retention.resolve("default");
         assert_eq!(retention.max_files, 10);
         assert_eq!(retention.max_total_size, ByteSize::gb(1));
         assert_eq!(retention.max_age, Duration::from_secs(7 * 24 * 3600));
@@ -541,7 +537,7 @@ traces:
             traces.wal.dir,
             std::path::Path::new("/var/log/netdata/otel/v1/traces/wal")
         );
-        let rotation = config.traces.wal.rotation.resolve("default");
+        let rotation = config.traces.rotation.resolve("default");
         assert_eq!(rotation.max_log_entries, 50000);
     }
 
@@ -580,18 +576,17 @@ traces:
     }
 
     #[test]
-    fn override_logs_wal_field() {
+    fn override_logs_rotation_field() {
         let config = resolve_with_user(
             r#"
 logs:
-  wal:
-    rotation:
-      default:
-        max_log_entries: 100000
+  rotation:
+    default:
+      max_log_entries: 100000
 "#,
         )
         .unwrap();
-        let rotation = config.logs.wal.rotation.resolve("default");
+        let rotation = config.logs.rotation.resolve("default");
         assert_eq!(rotation.max_log_entries, 100000);
         // Untouched stock fields survive the partial override.
         assert_eq!(rotation.max_file_size, ByteSize::mb(100));
@@ -625,17 +620,16 @@ logs:
         let config = resolve_with_user(
             r#"
 traces:
-  wal:
-    rotation:
-      default:
-        max_log_entries: 999
+  rotation:
+    default:
+      max_log_entries: 999
 "#,
         )
         .unwrap();
-        let traces_rot = config.traces.wal.rotation.resolve("default");
+        let traces_rot = config.traces.rotation.resolve("default");
         assert_eq!(traces_rot.max_log_entries, 999);
         // Logs is untouched.
-        let logs_rot = config.logs.wal.rotation.resolve("default");
+        let logs_rot = config.logs.rotation.resolve("default");
         assert_eq!(logs_rot.max_log_entries, 50000);
     }
 
@@ -644,20 +638,18 @@ traces:
         let config = resolve_with_user(
             r#"
 logs:
-  wal:
-    rotation:
-      default:
-        max_file_size: "200MB"
-  index:
-    retention:
-      default:
-        max_total_size: "2GB"
+  rotation:
+    default:
+      max_file_size: "200MB"
+  retention:
+    default:
+      max_total_size: "2GB"
 "#,
         )
         .unwrap();
-        let rotation = config.logs.wal.rotation.resolve("default");
+        let rotation = config.logs.rotation.resolve("default");
         assert_eq!(rotation.max_file_size, ByteSize::mb(200));
-        let retention = config.logs.index.retention.resolve("default");
+        let retention = config.logs.retention.resolve("default");
         assert_eq!(retention.max_total_size, ByteSize::gb(2));
     }
 
@@ -666,20 +658,18 @@ logs:
         let config = resolve_with_user(
             r#"
 logs:
-  index:
-    retention:
-      default:
-        max_age: "14 days"
-  wal:
-    rotation:
-      default:
-        max_file_duration: "4 hours"
+  retention:
+    default:
+      max_age: "14 days"
+  rotation:
+    default:
+      max_file_duration: "4 hours"
 "#,
         )
         .unwrap();
-        let retention = config.logs.index.retention.resolve("default");
+        let retention = config.logs.retention.resolve("default");
         assert_eq!(retention.max_age, Duration::from_secs(14 * 24 * 3600));
-        let rotation = config.logs.wal.rotation.resolve("default");
+        let rotation = config.logs.rotation.resolve("default");
         assert_eq!(rotation.max_file_duration, Duration::from_secs(4 * 3600));
     }
 
@@ -697,7 +687,7 @@ storage:
         assert!(config.storage.enabled);
         assert_eq!(config.storage.uri, "fs:///data/remote");
         assert_eq!(config.storage.read_cache_max_size, ByteSize::gib(2));
-        // Read-cache dir is derived per signal from base_dir (stock's default 4 GiB
+        // Read-cache dir is derived per signal from base_dir (stock's default 4 GB
         // size is asserted in stock_yaml_base_dir_and_globals_parsed).
         let logs = config.lifecycle_for(bridge::signals::Signal::Logs);
         let traces = config.lifecycle_for(bridge::signals::Signal::Traces);
@@ -720,17 +710,16 @@ endpoint:
 metrics:
   expiry_duration_secs: 1800
 logs:
-  index:
-    retention:
-      default:
-        max_files: 20
+  retention:
+    default:
+      max_files: 20
 "#,
         )
         .unwrap();
         assert_eq!(config.endpoint.path, "0.0.0.0:9999");
         assert_eq!(config.metrics.expiry_duration_secs, Some(1800));
         assert_eq!(config.metrics.interval_secs, Some(10));
-        let retention = config.logs.index.retention.resolve("default");
+        let retention = config.logs.retention.resolve("default");
         assert_eq!(retention.max_files, 20);
     }
 
@@ -814,10 +803,9 @@ endpoint:
             resolve_with_user(
                 r#"
 logs:
-  wal:
-    rotation:
-      default:
-        max_file_size: "not a size"
+  rotation:
+    default:
+      max_file_size: "not a size"
 "#
             )
             .is_err()
@@ -830,10 +818,9 @@ logs:
             resolve_with_user(
                 r#"
 logs:
-  index:
-    retention:
-      default:
-        max_age: "not a duration"
+  retention:
+    default:
+      max_age: "not a duration"
 "#
             )
             .is_err()
@@ -870,12 +857,11 @@ logs:
     #[test]
     fn env_override_logs_bytesize() {
         let o = ConfigOverride::from_map(&env_map(&[(
-            "NETDATA_OTEL_LOGS_WAL_MAX_FILE_SIZE",
+            "NETDATA_OTEL_LOGS_ROTATION_MAX_FILE_SIZE",
             "200MB",
         )]))
         .unwrap();
-        let wal = o.logs.as_ref().unwrap().wal.as_ref().unwrap();
-        let rotation = wal.rotation.as_ref().unwrap();
+        let rotation = o.logs.as_ref().unwrap().rotation.as_ref().unwrap();
         let entry = rotation.get("default").unwrap();
         assert_eq!(entry.max_file_size, Some(ByteSize::mb(200)));
     }
@@ -883,30 +869,20 @@ logs:
     #[test]
     fn env_override_logs_duration() {
         let o = ConfigOverride::from_map(&env_map(&[(
-            "NETDATA_OTEL_LOGS_INDEX_RETENTION_MAX_AGE",
+            "NETDATA_OTEL_LOGS_RETENTION_MAX_AGE",
             "14 days",
         )]))
         .unwrap();
-        let retention_map = o
-            .logs
-            .as_ref()
-            .unwrap()
-            .index
-            .as_ref()
-            .unwrap()
-            .retention
-            .as_ref()
-            .unwrap();
+        let retention_map = o.logs.as_ref().unwrap().retention.as_ref().unwrap();
         let entry = retention_map.get("default").unwrap();
         assert_eq!(entry.max_age, Some(Duration::from_secs(14 * 24 * 3600)));
     }
 
     #[test]
     fn env_override_logs_bool() {
-        let o = ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_LOGS_WAL_CRC_ENABLED", "yes")]))
+        let o = ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_LOGS_CRC_ENABLED", "yes")]))
             .unwrap();
-        let wal = o.logs.as_ref().unwrap().wal.as_ref().unwrap();
-        assert_eq!(wal.crc_enabled, Some(true));
+        assert_eq!(o.logs.as_ref().unwrap().crc_enabled, Some(true));
     }
 
     #[test]
@@ -945,15 +921,15 @@ logs:
     #[test]
     fn env_override_traces_tuning_separate_from_logs() {
         let o = ConfigOverride::from_map(&env_map(&[(
-            "NETDATA_OTEL_TRACES_WAL_MAX_LOG_ENTRIES",
+            "NETDATA_OTEL_TRACES_ROTATION_MAX_LOG_ENTRIES",
             "777",
         )]))
         .unwrap();
         // The traces section is populated; logs is not.
         assert!(o.traces.is_some());
         assert!(o.logs.is_none());
-        let wal = o.traces.as_ref().unwrap().wal.as_ref().unwrap();
-        let entry = wal.rotation.as_ref().unwrap().get("default").unwrap();
+        let rotation = o.traces.as_ref().unwrap().rotation.as_ref().unwrap();
+        let entry = rotation.get("default").unwrap();
         assert_eq!(entry.max_log_entries, Some(777));
     }
 
@@ -971,7 +947,7 @@ logs:
     #[test]
     fn env_override_invalid_bool_rejected() {
         assert!(
-            ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_LOGS_WAL_CRC_ENABLED", "maybe")]))
+            ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_LOGS_CRC_ENABLED", "maybe")]))
                 .is_err()
         );
     }
@@ -1082,7 +1058,7 @@ logs:
         let dir = tempfile::tempdir().unwrap();
         let stock = write_file(dir.path(), "stock.yaml", STOCK_YAML);
         let env = ConfigOverride::from_map(&env_map(&[(
-            "NETDATA_OTEL_LOGS_WAL_MAX_LOG_ENTRIES",
+            "NETDATA_OTEL_LOGS_ROTATION_MAX_LOG_ENTRIES",
             "12345",
         )]))
         .unwrap();
@@ -1091,12 +1067,12 @@ logs:
             .resolve()
             .unwrap();
         assert_eq!(
-            config.logs.wal.rotation.resolve("default").max_log_entries,
+            config.logs.rotation.resolve("default").max_log_entries,
             12345
         );
         // Untouched stock field survives the env override.
         assert_eq!(
-            config.logs.wal.rotation.resolve("default").max_file_size,
+            config.logs.rotation.resolve("default").max_file_size,
             ByteSize::mb(100)
         );
     }
@@ -1149,8 +1125,8 @@ logs:
 
     #[test]
     fn journal_dir_from_yaml_tolerates_superset_schema() {
-        // The current schema's logs.wal/index fields coexist with the former
-        // logs.journal_dir; unknown fields must not prevent extraction.
+        // Former-schema fields (journal_dir plus the old wal/index subtrees)
+        // are unknown to the probe; they must not prevent extraction.
         let yaml =
             "logs:\n  journal_dir: /data/otel/v1\n  wal:\n    dir: /x\n  index:\n    dir: /y\n";
         let dir = journal_dir_from_yaml(yaml).expect("valid yaml parses");
@@ -1204,5 +1180,67 @@ logs:
             pick_journal_dir([(Path::new("a"), "endpoint:\n  path: x\n")]),
             None
         );
+    }
+
+    // -- The shipped stock file --
+    //
+    // `STOCK_YAML` above is a lookalike fixture; this parses the REAL shipped
+    // `configs/otel.yaml.in` (with the CMake placeholders substituted the way
+    // `configure_file` does at install), so drift between the shipped file,
+    // the schema, and the code defaults it relies on is caught at test time.
+
+    #[test]
+    fn shipped_stock_file_resolves_with_shipped_values() {
+        let substituted = include_str!("../../configs/otel.yaml.in")
+            .replace("@configdir_POST@", "/etc/netdata")
+            .replace("@logdir_POST@", "/var/log/netdata");
+        let config = resolve_stock_yaml(&substituted).expect("shipped stock file must resolve");
+
+        assert_eq!(config.endpoint.path, "127.0.0.1:4317");
+        assert!(config.endpoint.tls_cert_path.is_none());
+        assert!(config.endpoint.tls_key_path.is_none());
+        assert!(config.endpoint.tls_ca_cert_path.is_none());
+
+        assert_eq!(
+            config.metrics.chart_configs_dir.as_deref(),
+            Some("/etc/netdata/otel.d/v1/metrics")
+        );
+        assert_eq!(config.metrics.interval_secs, Some(10));
+        assert_eq!(config.metrics.grace_period_secs, Some(60));
+        assert_eq!(config.metrics.expiry_duration_secs, Some(900));
+        assert_eq!(config.metrics.max_new_charts_per_request, 100);
+
+        assert_eq!(config.base_dir, Path::new("/var/log/netdata/otel/v1"));
+
+        assert!(!config.storage.enabled);
+        assert_eq!(config.storage.uri, "fs:///var/log/netdata/otel/v1/remote");
+        assert_eq!(config.storage.read_cache_max_size, ByteSize::gb(4));
+        assert!(!config.auth.enabled);
+
+        // The shipped file intentionally has NO traces section (feature under
+        // active development); traces must resolve entirely from the schema's
+        // code defaults, which the shared loop below pins to the shipped logs
+        // values (the lockstep guard for the two sources of the same numbers).
+        assert!(!substituted.contains("\ntraces:"));
+        // And no internal storage vocabulary: the public schema is flat
+        // (rotation/retention/catalog directly under the signal).
+        assert!(!substituted.contains("wal:"));
+        assert!(!substituted.contains("index:"));
+
+        for signal in [&config.logs, &config.traces] {
+            // crc/compression are intentionally NOT in the shipped file; the
+            // schema's defaults (true) must cover them.
+            assert!(signal.crc_enabled);
+            assert!(signal.compression_enabled);
+            let rotation = signal.rotation.resolve("default");
+            assert_eq!(rotation.max_file_size, ByteSize::mb(25));
+            assert_eq!(rotation.max_log_entries, 50000);
+            assert_eq!(rotation.max_file_duration, Duration::from_secs(2 * 3600));
+            let retention = signal.retention.resolve("default");
+            assert_eq!(retention.max_files, 1000);
+            assert_eq!(retention.max_total_size, ByteSize::gb(32));
+            assert_eq!(retention.max_age, Duration::from_secs(7 * 24 * 3600));
+            assert_eq!(signal.catalog.rotation_count, 10);
+        }
     }
 }

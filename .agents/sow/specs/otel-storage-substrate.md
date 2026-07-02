@@ -177,11 +177,13 @@ resolved by `otel-plugin` `config/{mod,signal,env}.rs`, consumed by both workers
   reads "did the shell build an uploader" rather than a per-pipeline flag. `auth`
   is tenant-scoped (consumed by the ingestor), also not per-signal. See
   [otel-remote-storage-config.md](otel-remote-storage-config.md).
-- **Per-signal tuning only** (`SignalConfig`: wal crc/compression/rotation, index
-  retention, catalog rotation_count) — no dirs, no storage. The schema mirrors a
-  `logs:` and a `traces:` section (both mandatory; the traces pipeline is always
-  built). Each signal's tuning is independent (e.g. a small logs WAL rotation
-  threshold does not affect traces, which keeps its own).
+- **Per-signal tuning only** (`SignalConfig`, flat public shape: crc/compression
+  flags, `rotation`, `retention`, `catalog` rotation_count — the internal
+  wal/index vocabulary is not exposed in YAML) — no dirs, no storage. The schema
+  has a mandatory `logs:` section; `traces:` is optional and defaults in code to
+  the shipped logs tuning while traces are under active development (the traces
+  pipeline is always built). Each signal's tuning is independent (e.g. a small
+  logs rotation threshold does not affect traces, which keeps its own).
 - **Rotation/retention are validated policies.** The `rotation:` / `retention:` maps
   deserialize into `RotationPolicy` / `RetentionPolicy` (a complete `default` + partial
   per-tenant overrides). A complete `"default"` is required and enforced at config
