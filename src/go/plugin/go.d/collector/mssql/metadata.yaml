@@ -78,13 +78,20 @@ modules:
             By default, it tries to connect to SQL Server on localhost:1433 without authentication.
             You must configure proper credentials for monitoring.
         limits:
-          description: ""
+          description: |
+            The collector works with all SQL Server editions, including Express Edition. SQL Server Agent job metrics and Always On Availability Group metrics are available only on editions that include those features; on editions that lack them (such as Express), the collector omits those metrics without error.
         performance_impact:
           description: |
             The collector executes lightweight queries against system views.
             Most queries complete in milliseconds and have minimal impact on server performance.
       additional_permissions:
         description: |
+          The collector works with all SQL Server editions, including Express Edition.
+
+          On editions that do not include SQL Server Agent (such as Express), SQL Agent job metrics are not collected; the collector omits them without error, just as it does when `msdb` grants are missing.
+
+          On editions that do not support Always On Availability Groups (such as Express), AG metrics are not collected.
+
           The monitoring user requires the VIEW SERVER STATE permission to access DMVs.
 
           SQL Agent job metrics require access to `msdb.dbo.sysjobs`.
