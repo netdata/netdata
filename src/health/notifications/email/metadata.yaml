@@ -20,17 +20,37 @@
           description: |
             - A working sendmail command is required for email alerts to work. Almost all MTAs provide a sendmail interface. Netdata sends all emails as user netdata, so make sure your sendmail works for local users.
             - Access to the terminal where Netdata Agent is running
-            - When running Netdata with Docker Compose the emails are sent with `msmtp`, and you need a basic configuration for it to work. 
-              
+            - When running Netdata with Docker Compose the emails are sent with `msmtp`, and you need a basic configuration for it to work.
+
               - Add a [msmtprc](https://marlam.de/msmtp/msmtprc.txt) config file on your Docker root folder, and edit it according to your needs.
               - Link it into your Netdata container with this:
-              
+
                 ```yaml
                     volumes:
                       - /path/to/netdata-docker/msmtprc:/etc/msmtprc:ro
                 ```
-              
+
               - Update your container with `docker compose up -d`.
+              - Setting `SEND_EMAIL`, `DEFAULT_RECIPIENT_EMAIL`, or `EMAIL_SENDER` as Docker environment variables will **not** work. The alarm notification script sources `health_alarm_notify.conf` at runtime, which overwrites those variables with the values defined in the configuration file.
+              - To configure email alerts in a Docker container, modify `health_alarm_notify.conf` directly. Either mount a custom file into the container at `/etc/netdata/health_alarm_notify.conf`, or run `edit-config health_alarm_notify.conf` from the `/etc/netdata` directory inside the container.
+              - For the full Netdata container setup and configuration workflow, see the [Docker installation guide](/packaging/docker/README.md#configure-email-notifications).
+              - A complete Docker Compose example mounting both `msmtprc` (for SMTP transport) and a custom `health_alarm_notify.conf` (for alert routing, sender, and recipients):
+
+                ```yaml
+                    services:
+                      netdata:
+                        image: netdata/netdata
+                        volumes:
+                          - /path/to/netdata-docker/msmtprc:/etc/msmtprc:ro
+                          - /path/to/netdata-docker/health_alarm_notify.conf:/etc/netdata/health_alarm_notify.conf:ro
+                ```
+              - Create your `health_alarm_notify.conf` from the [stock configuration](https://github.com/netdata/netdata/blob/master/src/health/notifications/health_alarm_notify.conf), then set the email-specific lines:
+
+                ```text
+                EMAIL_SENDER="Netdata <user@example.com>"
+                SEND_EMAIL="YES"
+                DEFAULT_RECIPIENT_EMAIL="user@example.com"
+                ```
             - If you use Gmail as the SMTP relay and your mail client cannot use Google's OAuth-based sign-in flow, configure your `msmtprc` file with `smtp.gmail.com`, port `587`, TLS enabled, and a Gmail [App Password](https://support.google.com/accounts/answer/185833) instead of your regular account password. Set `EMAIL_SENDER` in `health_alarm_notify.conf` to the same Gmail address used in the `msmtprc` `from` field.
 
     configuration:
