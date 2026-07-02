@@ -26,6 +26,7 @@ bool command_argument_sanitization_tests();
 
 #ifdef OS_WINDOWS
 int perflibnamestest_main(void);
+int unit_test_windows_virt_normalize(void);
 #endif
 
 #endif /* NETDATA_UNIT_TEST_H */

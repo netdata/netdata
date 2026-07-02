@@ -11,11 +11,30 @@
 #define NETDATA_DEFAULT_SYSTEM_INFO_VALUE_FALSE "false"
 #define NETDATA_WIN_DETECTION_METHOD "windows-api"
 
+#define NETDATA_WIN_VIRT_KVM              "kvm"
+#define NETDATA_WIN_VIRT_QEMU             "qemu"
+#define NETDATA_WIN_VIRT_MICROSOFT        "microsoft"
+#define NETDATA_WIN_VIRT_VMWARE           "vmware"
+#define NETDATA_WIN_VIRT_ORACLE           "oracle"
+#define NETDATA_WIN_VIRT_XEN              "xen"
+#define NETDATA_WIN_VIRT_AMAZON           "amazon"
+#define NETDATA_WIN_VIRT_PARALLELS        "parallels"
+#define NETDATA_WIN_VIRT_DIGITALOCEAN     "digitalocean"
+#define NETDATA_WIN_VIRT_BARE_METAL       "none"
+
+#define NETDATA_WIN_CONTAINER_NONE                "none"
+#define NETDATA_WIN_CONTAINER_KUBERNETES          "container"
+#define NETDATA_WIN_CONTAINER_KUBERNETES_DETECT   "kubernetes"
+#define NETDATA_WIN_CONTAINER_WINDOWS             "windows-container"
+#define NETDATA_WIN_CONTAINER_WINDOWS_DETECT      "windows-api"
+
 #ifdef OS_WINDOWS
 #include "windows.h"
 #include "versionhelpers.h"
 
 void netdata_windows_get_system_info(struct rrdhost_system_info *system_info);
+
+const char *netdata_windows_normalize_virt_string(const char *raw);
 #endif
 
 #endif // _NETDATA_WIN_SYSTEM_INFO_H_

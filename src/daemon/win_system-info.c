@@ -3,6 +3,12 @@
 #include "win_system-info.h"
 #include "database/rrdhost-system-info.h"
 #include "libnetdata/os/windows-api/windows_api.h"
+#include "libnetdata/os/windows-wmi/windows-wmi.h"
+#include "libnetdata/os/windows-wmi/windows-wmi-GetSystemInfo.h"
+#include "daemon/status-file-dmi.h"
+#include "daemon/status-file-product.h"
+#include "libnetdata/os/os-windows-wrappers.h"
+#include "libnetdata/os/setenv.h"
 
 #ifdef OS_WINDOWS
 
@@ -60,19 +66,6 @@ static void netdata_windows_cpu_from_system_info(struct rrdhost_system_info *sys
 
     char *arch = netdata_windows_arch(sysInfo.wProcessorArchitecture);
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_ARCHITECTURE", arch);
-
-    (void)rrdhost_system_info_set_by_name(
-        systemInfo, "NETDATA_SYSTEM_VIRTUALIZATION", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
-
-    (void)rrdhost_system_info_set_by_name(
-        systemInfo, "NETDATA_SYSTEM_VIRT_DETECTION", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
-
-    (void)rrdhost_system_info_set_by_name(
-        systemInfo, "NETDATA_SYSTEM_CONTAINER", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
-
-    (void)rrdhost_system_info_set_by_name(
-        systemInfo, "NETDATA_SYSTEM_CONTAINER_DETECTION", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
-
 }
 
 static void netdata_windows_cpu_vendor_model(struct rrdhost_system_info *systemInfo,
@@ -393,12 +386,164 @@ static void netdata_windows_install_type(struct rrdhost_system_info *systemInfo)
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_INSTALL_TYPE", "netdata-installer.exe");
 }
 
+static bool netdata_windows_str_contains_ci(const char *haystack, const char *needle) {
+    if(!haystack || !needle || !*needle) return false;
+    size_t nlen = strlen(needle);
+    for(const char *p = haystack; *p; p++) {
+        if(_strnicmp(p, needle, nlen) == 0)
+            return true;
+    }
+    return false;
+}
+
+const char *netdata_windows_normalize_virt_string(const char *raw) {
+    if(!raw || !*raw) return NETDATA_WIN_VIRT_BARE_METAL;
+
+    if(netdata_windows_str_contains_ci(raw, "vmware")) return NETDATA_WIN_VIRT_VMWARE;
+    if(netdata_windows_str_contains_ci(raw, "virtualbox")) return NETDATA_WIN_VIRT_ORACLE;
+    if(netdata_windows_str_contains_ci(raw, "innotek") || netdata_windows_str_contains_ci(raw, "oracle corp")) return NETDATA_WIN_VIRT_ORACLE;
+    if(netdata_windows_str_contains_ci(raw, "parallels")) return NETDATA_WIN_VIRT_PARALLELS;
+    if(netdata_windows_str_contains_ci(raw, "qemu")) return NETDATA_WIN_VIRT_QEMU;
+    if(netdata_windows_str_contains_ci(raw, "kvm")) return NETDATA_WIN_VIRT_KVM;
+    if(netdata_windows_str_contains_ci(raw, "xen") || netdata_windows_str_contains_ci(raw, "domu")) return NETDATA_WIN_VIRT_XEN;
+    if(netdata_windows_str_contains_ci(raw, "amazon")) return NETDATA_WIN_VIRT_AMAZON;
+    if(netdata_windows_str_contains_ci(raw, "digitalocean")) return NETDATA_WIN_VIRT_DIGITALOCEAN;
+    if(netdata_windows_str_contains_ci(raw, "virtual machine") || netdata_windows_str_contains_ci(raw, "hyper-v")) return NETDATA_WIN_VIRT_MICROSOFT;
+
+    return NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN;
+}
+
+static const char *netdata_windows_detect_via_wmi(void) {
+    Win32ComputerSystemInfo cs;
+    if(!GetWin32ComputerSystemInfo(&cs) || !cs.Populated)
+        return NULL;
+
+    if(cs.Model[0]) {
+        const char *m = netdata_windows_normalize_virt_string(cs.Model);
+        if(strcmp(m, NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN) != 0)
+            return m;
+    }
+
+    if(cs.Manufacturer[0]) {
+        const char *m = netdata_windows_normalize_virt_string(cs.Manufacturer);
+        if(strcmp(m, NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN) != 0)
+            return m;
+    }
+
+    return NULL;
+}
+
+static const char *netdata_windows_detect_via_smbios(void) {
+    DMI_INFO dmi;
+    dmi_info_init(&dmi);
+    os_dmi_info_get(&dmi);
+
+    if(!dmi_is_virtual_machine(&dmi))
+        return NULL;
+
+    char buf[128];
+    buf[0] = '\0';
+
+    if(dmi.product.name[0]) {
+        snprintf(buf, sizeof(buf), "%s", dmi.product.name);
+    }
+    else if(dmi.product.family[0]) {
+        snprintf(buf, sizeof(buf), "%s", dmi.product.family);
+    }
+    else if(dmi.sys.vendor[0]) {
+        snprintf(buf, sizeof(buf), "%s", dmi.sys.vendor);
+    }
+    else if(dmi.board.name[0]) {
+        snprintf(buf, sizeof(buf), "%s", dmi.board.name);
+    }
+    else {
+        return NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN;
+    }
+
+    const char *m = netdata_windows_normalize_virt_string(buf);
+    if(strcmp(m, NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN) == 0)
+        return NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN;
+
+    return m;
+}
+
+static const char *netdata_windows_detect_via_registry(void) {
+    if(netdata_registry_key_exists(HKEY_LOCAL_MACHINE, "SOFTWARE\\VMware, Inc.\\VMware Tools"))
+        return NETDATA_WIN_VIRT_VMWARE;
+
+    if(netdata_registry_key_exists(HKEY_LOCAL_MACHINE, "SOFTWARE\\Oracle\\VirtualBox Guest Additions"))
+        return NETDATA_WIN_VIRT_ORACLE;
+
+    if(netdata_registry_key_exists(HKEY_LOCAL_MACHINE, "SOFTWARE\\Parallels\\Parallels Tools"))
+        return NETDATA_WIN_VIRT_PARALLELS;
+
+    return NULL;
+}
+
+static const char *netdata_windows_detect_virt(void) {
+    const char *m = netdata_windows_detect_via_wmi();
+    if(m) return m;
+
+    m = netdata_windows_detect_via_smbios();
+    if(m) return m;
+
+    m = netdata_windows_detect_via_registry();
+    if(m) return m;
+
+    return NETDATA_WIN_VIRT_BARE_METAL;
+}
+
+static void netdata_windows_detect_virtualization(struct rrdhost_system_info *systemInfo) {
+    const char *virt = netdata_windows_detect_virt();
+
+    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_VIRTUALIZATION", virt);
+    nd_setenv("NETDATA_SYSTEM_VIRTUALIZATION", virt, 1);
+
+    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_VIRT_DETECTION", NETDATA_WIN_DETECTION_METHOD);
+    nd_setenv("NETDATA_SYSTEM_VIRT_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
+}
+
+static const char *netdata_windows_detect_container(void) {
+    char *k_host = getenv("KUBERNETES_SERVICE_HOST");
+    char *k_port = getenv("KUBERNETES_SERVICE_PORT");
+    if(k_host && *k_host && k_port && *k_port)
+        return NETDATA_WIN_CONTAINER_KUBERNETES;
+
+    Win32OperatingSystemInfo os;
+    if(GetWin32OperatingSystemInfo(&os) && os.Populated && os.Caption[0]) {
+        if(netdata_windows_str_contains_ci(os.Caption, "container"))
+            return NETDATA_WIN_CONTAINER_WINDOWS;
+    }
+
+    return NETDATA_WIN_CONTAINER_NONE;
+}
+
+static void netdata_windows_detect_container_state(struct rrdhost_system_info *systemInfo) {
+    const char *container = netdata_windows_detect_container();
+
+    const char *container_detection;
+    if(strcmp(container, NETDATA_WIN_CONTAINER_KUBERNETES) == 0)
+        container_detection = NETDATA_WIN_CONTAINER_KUBERNETES_DETECT;
+    else if(strcmp(container, NETDATA_WIN_CONTAINER_WINDOWS) == 0)
+        container_detection = NETDATA_WIN_CONTAINER_WINDOWS_DETECT;
+    else
+        container_detection = NETDATA_WIN_CONTAINER_NONE;
+
+    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_CONTAINER", container);
+    nd_setenv("NETDATA_SYSTEM_CONTAINER", container, 1);
+
+    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_CONTAINER_DETECTION", container_detection);
+    nd_setenv("NETDATA_SYSTEM_CONTAINER_DETECTION", container_detection, 1);
+}
+
 void netdata_windows_get_system_info(struct rrdhost_system_info *systemInfo)
 {
     netdata_windows_cloud(systemInfo);
     netdata_windows_container(systemInfo);
     netdata_windows_host(systemInfo);
     netdata_windows_get_cpu(systemInfo);
+    netdata_windows_detect_virtualization(systemInfo);
+    netdata_windows_detect_container_state(systemInfo);
     netdata_windows_get_mem(systemInfo);
     netdata_windows_get_total_disk_size(systemInfo);
     netdata_windows_install_type(systemInfo);

@@ -557,7 +557,7 @@ int rrdhost_system_info_foreach(struct rrdhost_system_info *system_info, add_hos
     ret += cb("NETDATA_CONTAINER_OS_ID_LIKE", system_info->container_os_id_like, uuid);
     ret += cb("NETDATA_CONTAINER_OS_VERSION", system_info->container_os_version, uuid);
     ret += cb("NETDATA_CONTAINER_OS_VERSION_ID", system_info->container_os_version_id, uuid);
-    ret += cb("NETDATA_CONTAINER_OS_DETECTION", system_info->host_os_detection, uuid);
+    ret += cb("NETDATA_CONTAINER_OS_DETECTION", system_info->container_os_detection, uuid);
     ret += cb("NETDATA_HOST_OS_NAME", system_info->host_os_name, uuid);
     ret += cb("NETDATA_HOST_OS_ID", system_info->host_os_id, uuid);
     ret += cb("NETDATA_HOST_OS_ID_LIKE", system_info->host_os_id_like, uuid);

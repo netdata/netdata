@@ -3,6 +3,9 @@
 #include "common.h"
 #include "web/api/formatters/rrd2json.h"
 #include "database/contexts/rrdcontext-internal.h"
+#ifdef OS_WINDOWS
+#include "win_system-info.h"
+#endif
 
 #if defined(OS_LINUX)
 #include "collectors/proc.plugin/plugin_proc.h"
@@ -1792,3 +1795,59 @@ int test_sqlite(void) {
     (void) sqlite3_close_v2(db_mt);
     return 0;
 }
+
+#ifdef OS_WINDOWS
+int unit_test_windows_virt_normalize(void) {
+    static const struct {
+        const char *raw;
+        const char *expected;
+    } cases[] = {
+        {"VMware Virtual Platform",            "vmware"},
+        {"VMware7,1",                          "vmware"},
+        {"VirtualBox",                         "oracle"},
+        {"innotek GmbH VirtualBox",            "oracle"},
+        {"Oracle Corporation VirtualBox",      "oracle"},
+        {"Parallels Software International",   "parallels"},
+        {"QEMU",                               "qemu"},
+        {"QEMU Standard PC (i440FX + PIIX, 1995)", "qemu"},
+        {"KVM",                                "kvm"},
+        {"Standard PC (i440FX + PIIX, 1995)",  "unknown"},
+        {"HVM domU",                           "xen"},
+        {"Amazon EC2",                         "amazon"},
+        {"amazon ec2",                         "amazon"},
+        {"DigitalOcean Droplet",               "digitalocean"},
+        {"Microsoft Hv",                       "unknown"},
+        {"Virtual Machine",                    "microsoft"},
+        {"Hyper-V",                            "microsoft"},
+        {"Microsoft Corporation",              "unknown"},
+        {"Surface Laptop 5",                   "unknown"},
+        {"HP ProLiant DL380 Gen10",            "unknown"},
+        {"Linode",                             "unknown"},
+        {"OpenStack",                          "unknown"},
+        {"",                                   "none"},
+        {NULL,                                 "none"},
+    };
+
+    int failures = 0;
+    for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        const char *got = netdata_windows_normalize_virt_string(cases[i].raw);
+        if(strcmp(got, cases[i].expected) != 0) {
+            fprintf(stderr,
+                    "unit_test_windows_virt_normalize: case '%s' expected '%s' got '%s'\n",
+                    cases[i].raw ? cases[i].raw : "(NULL)",
+                    cases[i].expected,
+                    got);
+            failures++;
+        }
+    }
+
+    if(failures) {
+        fprintf(stderr, "unit_test_windows_virt_normalize: %d failure(s)\n", failures);
+        return 1;
+    }
+
+    fprintf(stderr, "unit_test_windows_virt_normalize: OK (%zu cases)\n",
+            sizeof(cases) / sizeof(cases[0]));
+    return 0;
+}
+#endif

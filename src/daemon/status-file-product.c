@@ -173,7 +173,7 @@ static void dmi_normalize_vendor_field(char *buf, size_t buf_size) {
     }
 }
 
-static bool dmi_is_virtual_machine(const DMI_INFO *dmi) {
+bool dmi_is_virtual_machine(const DMI_INFO *dmi) {
     if(!dmi) return false;
 
     const char *vm_indicators[] = {
