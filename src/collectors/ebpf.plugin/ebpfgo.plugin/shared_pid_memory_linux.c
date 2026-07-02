@@ -46,15 +46,19 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total)
      * We probe the pre-truncate size with fstat() to detect the reused
      * case: a non-zero size means the prior publisher may have left rows in
      * the segment, and the new run must clear them — the kernel only
-     * zero-fills when shm_open creates a new segment.  Clearing on the reuse
-     * path preserves the original optimisation that avoids a
-     * 17.5 MB page-fault storm on the first-publish-after-create path. */
+     * zero-fills when shm_open creates a new segment.  If fstat() cannot
+     * prove which state we opened, fail the open rather than optimistically
+     * treating unknown state as brand new.  Clearing on the reuse path
+     * preserves the original optimisation that avoids a 17.5 MB page-fault
+     * storm on the first-publish-after-create path. */
     ctx->shm_fd = shm_open(NETDATA_EBPFGO_INTEGRATION_NAME, O_CREAT | O_RDWR, 0660);
     if (ctx->shm_fd < 0)
         goto fail;
 
     struct stat pre_stat;
-    bool reused = (fstat(ctx->shm_fd, &pre_stat) == 0) && (pre_stat.st_size > 0);
+    if (fstat(ctx->shm_fd, &pre_stat) != 0)
+        goto fail;
+    bool reused = pre_stat.st_size > 0;
 
     ctx->total = total;
     size_t length = shared_pid_memory_nbytes(ctx);

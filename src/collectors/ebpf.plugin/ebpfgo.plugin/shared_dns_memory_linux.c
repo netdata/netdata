@@ -34,7 +34,9 @@ struct shared_dns_memory *shared_dns_memory_open(void)
         goto fail;
 
     struct stat pre_stat;
-    bool reused = (fstat(ctx->shm_fd, &pre_stat) == 0) && (pre_stat.st_size > 0);
+    if (fstat(ctx->shm_fd, &pre_stat) != 0)
+        goto fail;
+    bool reused = pre_stat.st_size > 0;
 
     if (ftruncate(ctx->shm_fd, (off_t)sizeof(struct ebpfgo_dns_shared)) != 0)
         goto fail;
