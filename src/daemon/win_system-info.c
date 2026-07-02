@@ -402,7 +402,9 @@ const char *netdata_windows_normalize_virt_string(const char *raw) {
     if(netdata_windows_str_contains_ci(raw, "xen") || netdata_windows_str_contains_ci(raw, "domu")) return NETDATA_WIN_VIRT_XEN;
     if(netdata_windows_str_contains_ci(raw, "amazon")) return NETDATA_WIN_VIRT_AMAZON;
     if(netdata_windows_str_contains_ci(raw, "digitalocean")) return NETDATA_WIN_VIRT_DIGITALOCEAN;
-    if(netdata_windows_str_contains_ci(raw, "virtual machine") || netdata_windows_str_contains_ci(raw, "hyper-v")) return NETDATA_WIN_VIRT_MICROSOFT;
+    if(netdata_windows_str_contains_ci(raw, "virtual machine") ||
+       netdata_windows_str_contains_ci(raw, "hyper-v") ||
+       netdata_windows_str_contains_ci(raw, "microsoft hv")) return NETDATA_WIN_VIRT_MICROSOFT;
 
     return NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN;
 }

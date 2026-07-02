@@ -1816,7 +1816,7 @@ int unit_test_windows_virt_normalize(void) {
         {"Amazon EC2",                         "amazon"},
         {"amazon ec2",                         "amazon"},
         {"DigitalOcean Droplet",               "digitalocean"},
-        {"Microsoft Hv",                       "unknown"},
+        {"Microsoft Hv",                       "microsoft"},
         {"Virtual Machine",                    "microsoft"},
         {"Hyper-V",                            "microsoft"},
         {"Microsoft Corporation",              "unknown"},
