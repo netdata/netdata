@@ -40,6 +40,9 @@ modules:
         - redshift
         - msk
         - kafka
+        - cloudfront
+        - cdn
+        - content delivery network
       related_resources:
         integrations:
           list: []
@@ -73,6 +76,7 @@ modules:
           - Amazon DocumentDB (document database)
           - Amazon Redshift (data warehouse)
           - Amazon MSK (Kafka streaming)
+          - Amazon CloudFront (content delivery network / CDN)
 
           [Each service is defined by a profile](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default) -- a YAML file declaring its CloudWatch namespace, the metrics and statistics to collect, and a chart template -- so coverage can be extended without code changes.
         method_description: |

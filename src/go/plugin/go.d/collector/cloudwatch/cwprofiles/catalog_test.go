@@ -94,6 +94,7 @@ func TestLoadFromDefaultDirs_LoadsStockProfiles(t *testing.T) {
 		"docdb":          "AWS/DocDB",
 		"redshift":       "AWS/Redshift",
 		"msk":            "AWS/Kafka",
+		"cloudfront":     "AWS/CloudFront",
 		// deep-grain profiles (disabled by default; profiles.mode combined)
 		"alb_target":         "AWS/ApplicationELB",
 		"dynamodb_operation": "AWS/DynamoDB",
