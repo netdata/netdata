@@ -9,6 +9,8 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#define EBPFGO_DNS_SHM_STALE_TIMEOUT_UT (10ULL * USEC_PER_SEC)
+
 static void netdata_ebpfgo_dns_shm_close_internal(netdata_ebpfgo_dns_shared_memory_t *ctx)
 {
     if (!ctx)
@@ -31,6 +33,14 @@ static void netdata_ebpfgo_dns_shm_close_internal(netdata_ebpfgo_dns_shared_memo
 
     ctx->shm_dev = 0;
     ctx->shm_ino = 0;
+    ctx->last_publish_ut = 0;
+}
+
+static bool netdata_ebpfgo_dns_payload_is_live(uint64_t last_publish_ut, usec_t now_ut)
+{
+    return last_publish_ut != 0 &&
+           now_ut >= last_publish_ut &&
+           (now_ut - last_publish_ut) <= EBPFGO_DNS_SHM_STALE_TIMEOUT_UT;
 }
 
 static bool netdata_ebpfgo_dns_shm_open(
@@ -110,16 +120,31 @@ bool netdata_ebpfgo_dns_shared_memory_refresh(
 
     bool locked = false;
     if (ctx->sem != SEM_FAILED) {
-        if (!ebpfgo_shm_sem_wait(ctx->sem))
+        if (!ebpfgo_shm_sem_wait(ctx->sem)) {
+            if (!netdata_ebpfgo_dns_payload_is_live(ctx->last_publish_ut, now_monotonic_usec())) {
+                netdata_ebpfgo_dns_shm_close_internal(ctx);
+                ctx->has_data = false;
+                return false;
+            }
             return ctx->has_data;
+        }
         locked = true;
     }
 
     memcpy(&ctx->data, ctx->shm, sizeof(struct ebpfgo_dns_shared));
-    ctx->has_data = true;
+    ctx->last_publish_ut = ctx->data.last_publish_ut;
 
     if (locked)
         sem_post(ctx->sem);
+
+    if (!netdata_ebpfgo_dns_payload_is_live(ctx->last_publish_ut, now_monotonic_usec())) {
+        netdata_ebpfgo_dns_shm_close_internal(ctx);
+        ctx->has_data = false;
+        memset(&ctx->data, 0, sizeof(ctx->data));
+        return false;
+    }
+
+    ctx->has_data = true;
 
     return true;
 }

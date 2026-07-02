@@ -12,6 +12,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 struct shared_dns_memory {
@@ -19,6 +20,33 @@ struct shared_dns_memory {
     int shm_fd;
     sem_t *sem;
 };
+
+static uint64_t shared_dns_memory_now_monotonic_usec(void)
+{
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
+        return 0;
+
+    return (uint64_t)ts.tv_sec * 1000000ULL + (uint64_t)ts.tv_nsec / 1000ULL;
+}
+
+static void shared_dns_memory_invalidate(struct shared_dns_memory *ctx)
+{
+    if (!ctx || !ctx->data)
+        return;
+
+    bool locked = false;
+    if (ctx->sem != SEM_FAILED) {
+        if (ebpfgo_shm_sem_wait(ctx->sem))
+            locked = true;
+    }
+
+    __atomic_store_n(&ctx->data->ring_count, 0, __ATOMIC_RELEASE);
+    __atomic_store_n(&ctx->data->last_publish_ut, 0, __ATOMIC_RELEASE);
+
+    if (locked)
+        sem_post(ctx->sem);
+}
 
 struct shared_dns_memory *shared_dns_memory_open(void)
 {
@@ -87,6 +115,7 @@ void shared_dns_memory_publish(
         memcpy(ctx->data->ring, flows, n * sizeof(struct ebpfgo_dns_flow_record));
 
     ctx->data->ring_count = n;
+    __atomic_store_n(&ctx->data->last_publish_ut, shared_dns_memory_now_monotonic_usec(), __ATOMIC_RELEASE);
 
     if (locked)
         sem_post(ctx->sem);
@@ -96,6 +125,8 @@ void shared_dns_memory_close(struct shared_dns_memory *ctx)
 {
     if (!ctx)
         return;
+
+    shared_dns_memory_invalidate(ctx);
 
     if (ctx->sem != SEM_FAILED) {
         sem_close(ctx->sem);

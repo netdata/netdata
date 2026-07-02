@@ -8,6 +8,8 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#define EBPFGO_PID_SHM_STALE_TIMEOUT_UT (10ULL * USEC_PER_SEC)
+
 /* Bytes occupied by entries[] only (no header). */
 static inline size_t ebpfgo_shm_entries_nbytes(size_t total)
 {
@@ -86,8 +88,16 @@ static void netdata_ebpfgo_shared_pid_memory_close_internal(netdata_ebpfgo_share
 
     ctx->shm_total = 0;
     ctx->shm_flags = 0;
+    ctx->last_publish_ut = 0;
     ctx->shm_dev = 0;
     ctx->shm_ino = 0;
+}
+
+static bool netdata_ebpfgo_shared_pid_snapshot_is_live(uint64_t last_publish_ut, usec_t now_ut)
+{
+    return last_publish_ut != 0 &&
+           now_ut >= last_publish_ut &&
+           (now_ut - last_publish_ut) <= EBPFGO_PID_SHM_STALE_TIMEOUT_UT;
 }
 
 static bool netdata_ebpfgo_shared_pid_memory_open(
@@ -147,6 +157,7 @@ static bool netdata_ebpfgo_shared_pid_memory_copy_snapshot(netdata_ebpfgo_shared
      * entries, both under the same semaphore hold as the caller. */
     const struct ebpfgo_shm_header *hdr = (const struct ebpfgo_shm_header *)ctx->mapping;
     ctx->shm_flags = hdr->flags;
+    ctx->last_publish_ut = hdr->last_publish_ut;
 
     memcpy(ctx->snapshot, ctx->shm, ebpfgo_shm_entries_nbytes(ctx->shm_total));
     qsort(ctx->snapshot, ctx->shm_total, sizeof(*ctx->snapshot), netdata_ebpfgo_shared_pid_memory_compare_pid);
@@ -194,6 +205,10 @@ bool netdata_ebpfgo_shared_pid_memory_refresh(
     bool locked = false;
     if (ctx->sem != SEM_FAILED) {
         if (!ebpfgo_shm_sem_wait(ctx->sem)) {
+            if (!netdata_ebpfgo_shared_pid_snapshot_is_live(ctx->last_publish_ut, now_monotonic_usec())) {
+                netdata_ebpfgo_shared_pid_memory_close_internal(ctx);
+                return false;
+            }
             return ctx->snapshot && ctx->snapshot_total;
         }
         locked = true;
@@ -203,6 +218,14 @@ bool netdata_ebpfgo_shared_pid_memory_refresh(
 
     if (locked)
         sem_post(ctx->sem);
+
+    if (!ok)
+        return false;
+
+    if (!netdata_ebpfgo_shared_pid_snapshot_is_live(ctx->last_publish_ut, now_monotonic_usec())) {
+        netdata_ebpfgo_shared_pid_memory_close_internal(ctx);
+        return false;
+    }
 
     return ok;
 }

@@ -17,13 +17,15 @@
 #define NETDATA_EBPFGO_SHM_INTEGRATION_NAME "/netdata_sem_integration_ebpfgo"
 
 /* SHM header written at byte-offset 0; the ebpf_pid_stat[] array follows
- * immediately.  sizeof == 8 so entries start on an 8-byte boundary, which
+ * immediately.  sizeof == 16 so entries start on an 8-byte boundary, which
  * satisfies the alignment of the uint64_t fields inside ebpf_pid_stat.
- * Producers set flags before calling shared_pid_memory_publish(); consumers
- * read the flags to determine which module contributed data this cycle. */
+ * Producers set flags and last_publish_ut before releasing the semaphore;
+ * consumers use them to determine which modules contributed data this cycle
+ * and whether the payload is still live. */
 struct ebpfgo_shm_header {
     uint32_t flags; /* EBPFGO_SHM_FLAG_* bits set by the active publisher(s) */
-    uint32_t _pad;  /* pad to 8 bytes to keep entries[] on a uint64_t boundary */
+    uint32_t _pad;  /* pad so last_publish_ut stays 8-byte aligned */
+    uint64_t last_publish_ut; /* CLOCK_MONOTONIC, usec; 0 means no live producer */
 };
 
 #define EBPFGO_SHM_FLAG_CACHESTAT 0x01u /* cachestat per-PID fields are valid */

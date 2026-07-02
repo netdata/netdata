@@ -8,6 +8,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 struct shared_pid_memory {
@@ -23,6 +24,33 @@ struct shared_pid_memory {
 static inline size_t shared_pid_memory_nbytes(const struct shared_pid_memory *ctx)
 {
     return sizeof(struct ebpfgo_shm_header) + ctx->total * sizeof(struct ebpf_pid_stat);
+}
+
+static uint64_t shared_pid_memory_now_monotonic_usec(void)
+{
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
+        return 0;
+
+    return (uint64_t)ts.tv_sec * 1000000ULL + (uint64_t)ts.tv_nsec / 1000ULL;
+}
+
+static void shared_pid_memory_invalidate(struct shared_pid_memory *ctx)
+{
+    if (!ctx || !ctx->header)
+        return;
+
+    bool locked = false;
+    if (ctx->sem != SEM_FAILED) {
+        if (ebpfgo_shm_sem_wait(ctx->sem))
+            locked = true;
+    }
+
+    __atomic_store_n(&ctx->header->flags, 0, __ATOMIC_RELEASE);
+    __atomic_store_n(&ctx->header->last_publish_ut, 0, __ATOMIC_RELEASE);
+
+    if (locked)
+        sem_post(ctx->sem);
 }
 
 struct shared_pid_memory *shared_pid_memory_open(size_t total)
@@ -128,6 +156,7 @@ int shared_pid_memory_publish(struct shared_pid_memory *ctx, const struct ebpf_p
                (ctx->prev_count - count) * sizeof(struct ebpf_pid_stat));
 
     ctx->prev_count = count;
+    __atomic_store_n(&ctx->header->last_publish_ut, shared_pid_memory_now_monotonic_usec(), __ATOMIC_RELEASE);
 
     if (locked)
         sem_post(ctx->sem);
@@ -139,6 +168,8 @@ void shared_pid_memory_close(struct shared_pid_memory *ctx)
 {
     if (!ctx)
         return;
+
+    shared_pid_memory_invalidate(ctx);
 
     if (ctx->sem != SEM_FAILED)
         sem_close(ctx->sem);

@@ -45,15 +45,20 @@ struct ebpfgo_dns_aggregate {
 
 /* Full SHM region: aggregate counters + flat array of live per-query records.
  *
+ * last_publish_ut is a producer liveness marker.  Producers update it after
+ * writing the current payload and clear it on close; consumers reject the SHM
+ * when it is zero or too old.
+ *
  * Writer publishes the current 20-second live set as ring[0..ring_count-1].
  * Reader copies all ring_count records under semaphore and scans them.
  * ring_count is always ≤ NETDATA_EBPFGO_DNS_FLOW_RING_CAP. */
 struct ebpfgo_dns_shared {
     struct ebpfgo_dns_aggregate agg;                              /* offset   0 size  64 */
-    uint32_t                    ring_count;                       /* offset  64 size   4 */
-    uint32_t                    _pad;                             /* offset  68 size   4 */
-    struct ebpfgo_dns_flow_record ring[NETDATA_EBPFGO_DNS_FLOW_RING_CAP]; /* offset 72 size 320000 */
+    uint64_t                    last_publish_ut;                  /* offset  64 size   8 */
+    uint32_t                    ring_count;                       /* offset  72 size   4 */
+    uint32_t                    _pad;                             /* offset  76 size   4 */
+    struct ebpfgo_dns_flow_record ring[NETDATA_EBPFGO_DNS_FLOW_RING_CAP]; /* offset 80 size 320000 */
 };
-/* sizeof(struct ebpfgo_dns_shared) == 320072 (~312 KB) */
+/* sizeof(struct ebpfgo_dns_shared) == 320080 (~312 KB) */
 
 #endif /* NETDATA_APPS_EBPF_SHARED_DNS_ROW_H */

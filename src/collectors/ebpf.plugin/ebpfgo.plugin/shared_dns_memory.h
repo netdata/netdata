@@ -14,6 +14,8 @@ void shared_dns_memory_publish(
     const struct ebpfgo_dns_aggregate *agg,
     const struct ebpfgo_dns_flow_record *flows,
     uint32_t flow_count);
+/* Close invalidates the liveness marker before releasing local handles so
+ * persistent SHM readers stop treating the last payload as live immediately. */
 
 void shared_dns_memory_close(struct shared_dns_memory *ctx);
 

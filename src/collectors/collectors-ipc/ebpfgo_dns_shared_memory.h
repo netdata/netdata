@@ -16,6 +16,7 @@ typedef struct netdata_ebpfgo_dns_shared_memory {
     struct ebpfgo_dns_shared *shm;  /* mmap pointer (read-only, kept alive) */
     struct ebpfgo_dns_shared data;  /* local copy, updated under semaphore  */
     bool has_data;
+    uint64_t last_publish_ut;
     int shm_fd;
     sem_t *sem;
     dev_t shm_dev;
