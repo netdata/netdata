@@ -70,8 +70,10 @@ type Profile struct {
 }
 
 // InstanceSpec declares the exact CloudWatch dimension-NAME set that defines an
-// instance for this profile. It is both the ListMetrics filter and the instance
-// identity key.
+// instance for this profile. The set is the ListMetrics filter and the
+// GetMetricData query dimensions; identifying dimensions (those with a label)
+// form the Netdata instance identity, while constant match-and-query-only
+// dimensions do not.
 type InstanceSpec struct {
 	Dimensions []InstanceDimension `yaml:"dimensions" json:"dimensions,omitempty"`
 }
