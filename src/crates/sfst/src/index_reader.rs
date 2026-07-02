@@ -216,13 +216,15 @@ impl<'a> IndexReader<'a> {
     // are chronologically ordered, parallel-indexed to `load_timestamps`.
 
     /// The per-row columns this file carries (the META manifest).
-    pub fn columns_table(&self) -> Result<&crate::ColumnsTable, crate::Error> {
-        self.sfst.columns_table()
+    pub fn columns_table(&self) -> &crate::ColumnsTable {
+        self.sfst
+            .columns_table()
+            .expect("metadata cached at IndexReader::open")
     }
 
     /// Whether the file carries any per-row column chunk.
-    pub fn has_per_row_columns(&self) -> Result<bool, crate::Error> {
-        self.sfst.has_per_row_columns()
+    pub fn has_per_row_columns(&self) -> bool {
+        !self.columns_table().is_empty()
     }
 
     /// The per-row observed-timestamps column (`OBTS`).

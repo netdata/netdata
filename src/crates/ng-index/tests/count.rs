@@ -148,9 +148,9 @@ fn per_row_columns_roundtrip_in_chronological_order() {
     let reader = IndexReader::open(&data).unwrap();
 
     // The file carries the per-row column chunks; each is decoded independently.
-    assert!(reader.has_per_row_columns().unwrap());
+    assert!(reader.has_per_row_columns());
     assert_eq!(
-        reader.columns_table().unwrap().names().collect::<Vec<_>>(),
+        reader.columns_table().names().collect::<Vec<_>>(),
         [
             "observed_ts",
             "trace_id",

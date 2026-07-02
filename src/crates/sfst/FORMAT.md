@@ -123,7 +123,7 @@ first byte is `≤ b`) plus a `sort_perm` of row positions sorted by their 16-by
 chronological `TRCE` column without scanning — all spans of one trace are a
 contiguous run in `sort_perm`. It lives in the cold region after the per-row
 columns, requires the `TRCE` column it indexes, and is detected via the TOC
-(`Reader::has_trace_id_index`), not the `ColumnsTable`. Presence is independent
+(`IndexReader::has_trace_id_index`), not the `ColumnsTable`. Presence is independent
 of any per-row column except its required `TRCE`.
 
 The rows are listed in the order the canonical producer emits chunk
