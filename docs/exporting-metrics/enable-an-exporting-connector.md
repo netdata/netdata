@@ -61,9 +61,10 @@ Any further configuration is optional, based on your needs and the configuration
 
 </details>
 
-## Export to Multiple Databases Simultaneously
+<details>
+<summary><strong>Export to Multiple Databases Simultaneously</strong></summary>
 
-You can export metrics to more than one external database at the same time. To do this, add a separate connector section for each destination in the same `exporting.conf` file. Every section that has `enabled = yes` exports independently to its own destination, so all enabled destinations receive the same metrics from your Agent.
+You can export metrics to more than one external database at the same time. To do this, add a separate connector section for each destination in the same `exporting.conf` file. Every section that has `enabled = yes` exports independently to its own destination, so by default all enabled destinations receive the same metrics from your Agent, unless you configure different settings per section, as described below.
 
 For example, to export to both a Graphite database and an OpenTSDB HTTP database, combine the two connector sections in a single `exporting.conf`:
 
@@ -83,3 +84,5 @@ For example, to export to both a Graphite database and an OpenTSDB HTTP database
 Replace the instance names and `destination` values with those of your own databases. [Restart your Agent](/docs/netdata-agent/start-stop-restart.md) to start exporting. As with a single connector, all enabled destinations begin receiving metrics **starting from the Agent restart time**, not the historical database.
 
 You can add as many connector sections as you need, even mixing different connector types in the same file. Each section can also define its own settings, such as its own `destination`, export interval, and metric filters. See the [exporting engine reference](/src/exporting/README.md#configuration-structure) for the full set of per-section options.
+
+</details>
