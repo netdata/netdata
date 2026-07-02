@@ -35,7 +35,7 @@ HRESULT InitializeWMI(void) {
             EOAC_NONE,
             NULL
     );
-    if (FAILED(hr)) {
+    if (FAILED(hr) && hr != RPC_E_TOO_LATE) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Failed to initialize security. Error code = 0x%X", hr);
         CleanupWMI();
         return hr;

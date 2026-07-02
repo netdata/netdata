@@ -30,7 +30,8 @@ bool GetWin32ComputerSystemInfo(Win32ComputerSystemInfo *out) {
     if(!out) return false;
     memset(out, 0, sizeof(*out));
 
-    if(InitializeWMI() != S_OK) return false;
+    HRESULT init_hr = InitializeWMI();
+    if(FAILED(init_hr) || !nd_wmi.pSvc) return false;
 
     BSTR query = SysAllocString(L"SELECT Model, Manufacturer FROM Win32_ComputerSystem");
     BSTR wql = SysAllocString(L"WQL");
@@ -71,7 +72,8 @@ bool GetWin32OperatingSystemInfo(Win32OperatingSystemInfo *out) {
     if(!out) return false;
     memset(out, 0, sizeof(*out));
 
-    if(InitializeWMI() != S_OK) return false;
+    HRESULT init_hr = InitializeWMI();
+    if(FAILED(init_hr) || !nd_wmi.pSvc) return false;
 
     BSTR query = SysAllocString(L"SELECT Caption FROM Win32_OperatingSystem");
     BSTR wql = SysAllocString(L"WQL");
