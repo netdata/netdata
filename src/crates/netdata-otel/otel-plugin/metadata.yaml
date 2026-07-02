@@ -240,7 +240,66 @@ modules:
                   journal_dir: /var/log/netdata/otel-journals
     troubleshooting:
       problems:
-        list: []
+        list:
+          - name: 'Failed to write log entry'
+            description: |
+              After the plugin starts successfully, incoming OTLP log entries are written to journal files
+              under `logs.journal_dir`. If a write fails, the Agent logs:
+
+              `Failed to write log entry: <reason>`
+
+              for each affected entry. No log data is stored until the problem is resolved.
+
+              Common causes and remediation:
+
+              - **Disk full.** The device holding `logs.journal_dir` has no space left. Free space on
+                that device, then restart the Agent if writes do not resume.
+              - **Journal directory removed after startup.** The `<journal_dir>/<machine_id>`
+                subdirectory (or its parent) was deleted while the plugin was running. Recreate the
+                directory tree and restart the Agent:
+                ```bash
+                sudo mkdir -p /var/log/netdata/otel-journals
+                sudo chown -R netdata:netdata /var/log/netdata/otel-journals
+                ```
+              - **Write permissions changed after startup.** The `netdata` user's write access to
+                `logs.journal_dir` was removed while the plugin was running. Restore access and restart.
+
+              If `logs.journal_dir` is a relative path or the directory cannot be opened at startup, the
+              plugin does not start and logs a different error — see the next entry.
+          - name: 'Failed to create journal log for directory'
+            description: |
+              At startup the plugin opens the configured journal directory. If that fails the plugin does not
+              start, and the Agent logs:
+
+              `Failed to create journal log for directory: <journal_dir>`
+
+              Common causes:
+
+              - `logs.journal_dir` is relative rather than an absolute path. The value must begin with `/`
+                (for example `/var/log/netdata/otel-journals`, not `otel-journals`); a relative value is rejected before
+                the plugin starts.
+              - `logs.journal_dir` exists but is not a directory.
+              - The `netdata` user lacks write access to `logs.journal_dir`. At startup the plugin
+                creates a `<machine_id>` subdirectory inside `journal_dir` (and `journal_dir` itself
+                if absent); if the parent path is not writable by `netdata`, that step fails.
+              - The host machine ID cannot be read from `/etc/machine-id`.
+
+              Make sure `logs.journal_dir` in `otel.yaml` is an absolute path to a directory the `netdata`
+              user can create and write to:
+
+              ```bash
+              sudo mkdir -p /var/log/netdata/otel-journals
+              sudo chown -R netdata:netdata /var/log/netdata/otel-journals
+              ```
+
+              Confirm the machine ID is available:
+
+              ```bash
+              ls -l /etc/machine-id
+              ```
+
+              If `/etc/machine-id` is missing, recreate it following your distribution's documentation, then
+              restart the Netdata Agent.
     alerts: []
     metrics:
       folding:
