@@ -181,7 +181,7 @@ func (o *observationStore) pruneObserved(plan []plannedQuery) {
 }
 
 // observedKey is the stable identity of a series: its name plus its label values
-// in declared order ({account_id, region, <instance dimensions>}).
+// in declared order ({account_id, region, <identifying dimension labels>}).
 func observedKey(seriesName string, labels []metrix.Label) string {
 	var b strings.Builder
 	b.WriteString(seriesName)

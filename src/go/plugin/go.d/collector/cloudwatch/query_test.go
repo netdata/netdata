@@ -131,6 +131,50 @@ func TestBuildQueryPlan(t *testing.T) {
 	}
 }
 
+func TestBuildQueryPlan_ConstantDimension(t *testing.T) {
+	// A constant (match-and-query-only) dimension is sent in the GetMetricData
+	// query but is not emitted as an identity label.
+	c := New()
+	c.Config.Regions = []string{"us-east-1"}
+	c.applyDefaults()
+	c.accountID = "123456789012"
+	c.profiles = []cwprofiles.ResolvedProfile{{Name: "cloudfront", Config: cwprofiles.Profile{
+		Namespace: "AWS/CloudFront",
+		Period:    300,
+		Instance: cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{
+			{Name: "DistributionId", Label: "distribution_id"},
+			{Name: "Region", Constant: aws.String("Global")},
+		}},
+		Metrics: []cwprofiles.Metric{
+			{ID: "requests", MetricName: "Requests", Statistics: []string{"sum"}, Rate: true},
+		},
+	}}}
+	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+		{Profile: "cloudfront", Region: "us-east-1"}: {{DimensionValues: []string{"E1", "Global"}}},
+	}}
+
+	plan := c.buildQueryPlan()
+	require.Len(t, plan, 1)
+	pq := plan[0]
+
+	// Identity labels are {account_id, region, distribution_id}; the constant
+	// Region dimension is NOT a label.
+	assert.Equal(t, "E1", labelValue(pq.labels, "distribution_id"))
+	assert.Len(t, pq.labels, 3)
+	for _, l := range pq.labels {
+		assert.NotEqualf(t, "Global", l.Value, "constant dimension value must not appear as label %q", l.Key)
+	}
+
+	// The query carries BOTH the identifying and the constant dimension.
+	dims := pq.query.MetricStat.Metric.Dimensions
+	require.Len(t, dims, 2)
+	got := map[string]string{}
+	for _, d := range dims {
+		got[aws.ToString(d.Name)] = aws.ToString(d.Value)
+	}
+	assert.Equal(t, map[string]string{"DistributionId": "E1", "Region": "Global"}, got)
+}
+
 func TestBuildQueryPlan_MultiRegionAndEmpty(t *testing.T) {
 	c := ec2QueryCollector([]string{"us-east-1", "us-west-2"}, map[string][][]string{
 		"us-east-1": {{"i-1"}},

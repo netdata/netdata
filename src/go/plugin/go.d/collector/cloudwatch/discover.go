@@ -69,6 +69,9 @@ func discoverInstances(ctx context.Context, client cloudwatchClient, prof cwprof
 			if !ok {
 				continue
 			}
+			if !constantDimensionsHold(prof.Instance.Dimensions, values) {
+				continue // fail-closed: a pinned constant dimension had a different value
+			}
 			key := strings.Join(values, instanceKeySep)
 			if _, dup := seen[key]; dup {
 				continue
@@ -115,6 +118,20 @@ func matchInstanceDimensions(dims []cwtypes.Dimension, dimNames []string) ([]str
 		values[i] = v
 	}
 	return values, true
+}
+
+// constantDimensionsHold reports whether every match-and-query-only (constant)
+// dimension in the profile has its pinned value in this metric's dimension values
+// (ordered to match the profile's declared dimensions). A mismatch fails the match
+// closed: a constant dimension is not emitted as a label, so admitting a differing
+// value would collapse distinct instances onto one unlabeled series.
+func constantDimensionsHold(dims []cwprofiles.InstanceDimension, values []string) bool {
+	for i, d := range dims {
+		if d.Constant != nil && values[i] != *d.Constant {
+			return false
+		}
+	}
+	return true
 }
 
 // discoveryKey identifies a discovered instance set by profile and region.
