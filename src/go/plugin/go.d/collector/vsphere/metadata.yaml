@@ -400,6 +400,19 @@ modules:
                     url      : https://203.0.113.10
                     username : admin@vsphere.local
                     password : somepassword
+            - name: With Virtual Node
+              description: |
+                Add the `vnode` option to an existing job to associate it with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+
+                Requires first defining the vnode in your Netdata config dir under `vnodes/` (for example, `/etc/netdata/vnodes/vnodes.conf`). See the [virtual node creation guide](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+                The `vnode` value in the job must match the virtual node `hostname` defined there; file-based vnode lookup uses `hostname`, not a different `name`.
+              config: |
+                jobs:
+                  - name     : vcenter1
+                    url      : https://203.0.113.1
+                    username : admin@vsphere.local
+                    password : somepassword
+                    vnode    : vcenter_host_node
     troubleshooting:
       problems:
         list:
