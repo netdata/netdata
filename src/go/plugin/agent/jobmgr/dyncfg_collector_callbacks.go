@@ -32,51 +32,61 @@ type collectorCallbacks struct {
 }
 
 func (cb *collectorCallbacks) ExtractKey(fn dyncfg.Function) (key, name string, ok bool) {
+	key, name, warnErr, ok := cb.mgr.collectorCommandKey(fn)
+	if warnErr != nil {
+		cb.mgr.Warningf("dyncfg: %s: %v", fn.Command(), warnErr)
+	}
+	return key, name, ok
+}
+
+// collectorCommandKey derives the exposed-cache key a collector dyncfg
+// command addresses. It never logs so the executor can derive keys at event
+// construction without duplicating ExtractKey's execution-time warnings:
+// warnErr, when non-nil, is the warning ExtractKey reports; malformed IDs
+// that ExtractKey rejects silently fail with a nil warnErr.
+func (m *Manager) collectorCommandKey(fn dyncfg.Function) (key, name string, warnErr error, ok bool) {
 	var mn, jn string
 
 	if fn.Command() == dyncfg.CommandAdd {
 		// For add: ID is module template, job name is in Args[2].
-		mn, ok = cb.mgr.extractModuleName(fn.ID())
+		mn, ok = m.extractModuleName(fn.ID())
 		if !ok {
-			return "", "", false
+			return "", "", nil, false
 		}
-		if cb.mgr.isSingleInstanceCollector(mn) {
-			cb.mgr.Warningf("dyncfg: %s: single-instance collector %s does not support add", fn.Command(), mn)
-			return "", "", false
+		if m.isSingleInstanceCollector(mn) {
+			return "", "", fmt.Errorf("single-instance collector %s does not support add", mn), false
 		}
 		jn = fn.JobName()
 		if jn == "" {
-			return "", "", false
+			return "", "", nil, false
 		}
 	} else {
-		mn, ok = cb.mgr.extractModuleName(fn.ID())
+		mn, ok = m.extractModuleName(fn.ID())
 		if !ok {
-			return "", "", false
+			return "", "", nil, false
 		}
-		if cb.mgr.isSingleInstanceCollector(mn) {
-			if fn.ID() != cb.mgr.dyncfgModID(mn) {
-				cb.mgr.Warningf("dyncfg: %s: single-instance collector %s must use config ID %s", fn.Command(), mn, cb.mgr.dyncfgModID(mn))
-				return "", "", false
+		if m.isSingleInstanceCollector(mn) {
+			if fn.ID() != m.dyncfgModID(mn) {
+				return "", "", fmt.Errorf("single-instance collector %s must use config ID %s", mn, m.dyncfgModID(mn)), false
 			}
 			jn = mn
 		} else {
 			// For per-job commands: ID contains module:job.
-			mn, jn, ok = cb.mgr.extractModuleJobName(fn.ID())
+			mn, jn, ok = m.extractModuleJobName(fn.ID())
 			if !ok {
-				return "", "", false
+				return "", "", nil, false
 			}
 		}
 	}
-	if err := cb.mgr.validateDyncfgCollectorIdentity(mn, jn); err != nil {
-		cb.mgr.Warningf("dyncfg: %s: %v", fn.Command(), err)
-		return "", "", false
+	if err := m.validateDyncfgCollectorIdentity(mn, jn); err != nil {
+		return "", "", err, false
 	}
 
 	key = mn + "_" + jn
 	if mn == jn {
 		key = jn
 	}
-	return key, jn, true
+	return key, jn, nil, true
 }
 
 func (cb *collectorCallbacks) ValidateConfigName(name string) error {

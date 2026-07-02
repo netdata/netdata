@@ -16,6 +16,7 @@ package functions
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -48,12 +49,7 @@ func TestCharacterization_PrefixLaneHeldUntilTerminalFinalize(t *testing.T) {
 				}
 				hasHandled := func(uid string) func() bool {
 					return func() bool {
-						for _, got := range handledUIDs() {
-							if got == uid {
-								return true
-							}
-						}
-						return false
+						return slices.Contains(handledUIDs(), uid)
 					}
 				}
 

@@ -37,6 +37,24 @@ func dyncfgVnodeJobCmds(isDyncfgJob bool) string {
 	return dyncfg.JoinCommands(cmds...)
 }
 
+// DeriveKey returns the vnode name a dyncfg command addresses. Job-scope
+// commands carry it in the config ID (`<prefix>:<name>`, the same extraction
+// the command handlers use); template-scope add/test carry it in Args[2].
+// Template-scope commands without a name (schema, userconfig) are not
+// addressable to a vnode and report !ok. It never logs and has no side
+// effects, so callers can derive keys before execution.
+func (c *Controller) DeriveKey(fn dyncfg.Function) (string, bool) {
+	if name, ok := strings.CutPrefix(fn.ID(), c.Prefix()+":"); ok && name != "" {
+		return name, true
+	}
+	if fn.ID() == c.Prefix() {
+		if name := fn.JobName(); name != "" {
+			return name, true
+		}
+	}
+	return "", false
+}
+
 func (c *Controller) SeqExec(fn dyncfg.Function) {
 	switch fn.Command() {
 	case dyncfg.CommandSchema:

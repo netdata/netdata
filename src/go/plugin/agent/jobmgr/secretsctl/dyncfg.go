@@ -17,6 +17,15 @@ func dyncfgSecretStoreTemplateCmds() string {
 	return dyncfg.JoinCommands(dyncfg.CommandAdd, dyncfg.CommandSchema, dyncfg.CommandUserconfig)
 }
 
+// DeriveKey returns the store key a dyncfg command addresses, mirroring the
+// handler callbacks' ExtractKey: template `add` keys by kind plus the name in
+// Args[2], other commands parse the store key from the config ID. It never
+// logs and has no side effects, so callers can derive keys before execution.
+func (c *Controller) DeriveKey(fn dyncfg.Function) (string, bool) {
+	key, _, ok := c.cb.ExtractKey(fn)
+	return key, ok
+}
+
 func (c *Controller) SeqExec(fn dyncfg.Function) {
 	switch fn.Command() {
 	case dyncfg.CommandSchema:
