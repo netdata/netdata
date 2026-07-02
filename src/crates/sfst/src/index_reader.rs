@@ -299,13 +299,25 @@ impl<'a> IndexReader<'a> {
         let mut table = vec![String::new(); total];
         let mut kv_id = 0usize;
 
-        // Low-card: iterate primary FST.
-        self.primary.for_each(|key, _| {
-            if kv_id < table.len() {
-                table[kv_id] = String::from_utf8_lossy(key).into_owned();
+        // Low-card: per-field prefix scans in field-table order — NOT a global
+        // FST walk. KvIds are assigned per field (fields name-sorted, values
+        // sorted within each field), and the FST's global sort diverges from
+        // that whenever one field name dot-extends another ('.' sorts before
+        // '='), which mislabeled such families before.
+        for field in field_table
+            .iter()
+            .filter(|f| matches!(f.tier, FieldTier::Low))
+        {
+            for (key, _) in self
+                .primary
+                .prefix_pairs(format!("{}=", field.name).as_bytes())
+            {
+                if kv_id < table.len() {
+                    table[kv_id] = String::from_utf8_lossy(&key).into_owned();
+                }
+                kv_id += 1;
             }
-            kv_id += 1;
-        });
+        }
 
         // Mid/high-card: iterate secondary chunks in field_table order, each at
         // its tier-relative chunk index.
@@ -336,6 +348,83 @@ impl<'a> IndexReader<'a> {
         Ok(table)
     }
 
+    /// Resolve sorted, deduplicated KvIds to their `key=value` strings,
+    /// decoding only the chunks whose fields the ids touch.
+    ///
+    /// A running cardinality sum over the field table locates each id's
+    /// field — KvIds are assigned per field in field-table order, so an id's
+    /// offset within its field indexes that field's value order directly.
+    /// Resolution deliberately walks PER FIELD: the primary FST's global sort
+    /// order diverges from the assignment order when one field name
+    /// dot-extends another ('.' sorts before '='), so a whole-FST walk cannot
+    /// label KvIds. An id no chunk covers (corrupt file) is left unresolved;
+    /// the caller renders it empty rather than failing the page.
+    fn resolve_kv_strings(&self, ids: &[u32]) -> Result<HashMap<u32, String>, crate::Error> {
+        debug_assert!(
+            ids.windows(2).all(|w| w[0] < w[1]),
+            "ids must be sorted+deduped"
+        );
+        let mut out = HashMap::with_capacity(ids.len());
+        let mut next = 0usize; // cursor into `ids`
+        let mut start = 0u32; // current field's first KvId
+        for (field, ti) in field_table_tiered(self.field_table()) {
+            if next >= ids.len() {
+                break;
+            }
+            let end = start + field.cardinality;
+            if ids[next] >= end {
+                start = end;
+                continue;
+            }
+            let lo = next;
+            while next < ids.len() && ids[next] < end {
+                next += 1;
+            }
+            let wanted = &ids[lo..next];
+            match field.tier {
+                FieldTier::Low => {
+                    let pairs = self
+                        .primary
+                        .prefix_pairs(format!("{}=", field.name).as_bytes());
+                    let mut w = 0usize;
+                    for (off, (key, _)) in pairs.iter().enumerate() {
+                        if w >= wanted.len() {
+                            break;
+                        }
+                        let id = start + off as u32;
+                        if wanted[w] == id {
+                            out.insert(id, String::from_utf8_lossy(key).into_owned());
+                            w += 1;
+                        }
+                    }
+                }
+                FieldTier::Mid => {
+                    let fst = self.sfst.mid_field(ti)?;
+                    let mut w = 0usize;
+                    let mut off = 0u32;
+                    fst.for_each(|key, _| {
+                        if w < wanted.len() && wanted[w] == start + off {
+                            out.insert(start + off, String::from_utf8_lossy(key).into_owned());
+                            w += 1;
+                        }
+                        off += 1;
+                    });
+                }
+                FieldTier::High => {
+                    let hf = self.sfst.high_field(ti)?;
+                    for &id in wanted {
+                        let off = (id - start) as usize;
+                        if off < hf.len() {
+                            out.insert(id, String::from_utf8_lossy(hf.key(off)).into_owned());
+                        }
+                    }
+                }
+            }
+            start = end;
+        }
+        Ok(out)
+    }
+
     /// Materialize full log rows for the given positions.
     ///
     /// For each position: its timestamp plus every attribute, resolved
@@ -347,16 +436,16 @@ impl<'a> IndexReader<'a> {
     /// — never a silent skip, which would misalign a caller that pairs
     /// positions with the returned rows by index.
     ///
-    /// This decompresses the timestamps chunk, all stream batches, and
-    /// the whole reverse string table **once**, regardless of how many
-    /// positions are requested — so callers should batch a page's worth
-    /// of positions into a single call rather than invoking per-row.
+    /// Decodes the timestamps chunk, only the stream batches the positions
+    /// fall in, and only the field chunks the rows' KvIds actually reference
+    /// (resolved per touched field, not via the whole table) — cost scales
+    /// with the page's content, not the file's attribute space. Callers
+    /// should still batch a page's worth of positions into one call.
     pub fn materialize_rows(
         &self,
         positions: &[u32],
     ) -> Result<Vec<crate::MaterializedRow>, crate::Error> {
         let timestamps = self.load_timestamps()?;
-        let strings = self.build_string_table(self.field_table())?;
         let total = self.summary.record_count;
         let batch_size = crate::stream_batch_size(total);
 
@@ -371,6 +460,22 @@ impl<'a> IndexReader<'a> {
                 batches[b] = Some(self.sfst.stream_batch(b as u8)?);
             }
         }
+
+        // Resolve only the KvIds these rows reference. Invalid positions are
+        // skipped here; the row loop below reports them as CorruptIndex.
+        let mut ids: Vec<u32> = Vec::new();
+        for &pos in positions {
+            let b = (pos / batch_size) as usize;
+            let local = (pos % batch_size) as usize;
+            if let Some(batch) = batches.get(b).and_then(Option::as_ref)
+                && local < batch.num_rows()
+            {
+                ids.extend(batch.row(local).map(|kv| kv.0));
+            }
+        }
+        ids.sort_unstable();
+        ids.dedup();
+        let strings = self.resolve_kv_strings(&ids)?;
 
         let mut rows = Vec::with_capacity(positions.len());
         for &pos in positions {
@@ -403,7 +508,7 @@ impl<'a> IndexReader<'a> {
             let fields = batch
                 .row(local)
                 .map(|kv| {
-                    let s = strings.get(kv.0 as usize).map(String::as_str).unwrap_or("");
+                    let s = strings.get(&kv.0).map(String::as_str).unwrap_or("");
                     match s.split_once('=') {
                         Some((k, v)) => (k.to_string(), v.to_string()),
                         None => (s.to_string(), String::new()),
