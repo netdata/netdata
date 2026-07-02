@@ -187,6 +187,7 @@ pcap-file = "2.0.0"
 atty = "0.2"
 bytesize = { version = "2.3.1", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }
+criterion = { version = "0.5" }
 humantime = "2.2"
 humantime-serde = "1.1"
 tonic = "0.14"

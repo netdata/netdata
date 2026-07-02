@@ -42,6 +42,7 @@ memmap2 = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+criterion = { workspace = true }
 tempfile = { workspace = true }
 uuid = { workspace = true }
 clap = { workspace = true }
@@ -52,4 +53,10 @@ serde_json = { workspace = true }
 name = "inspect"
 path = "examples/inspect.rs"
 # Raw-chunk introspection (byte sizes per chunk) is chunk-level surface.
+required-features = ["test-util"]
+
+[[bench]]
+name = "decode"
+harness = false
+# The zstd-only decode legs read raw chunk bytes via ChunkReader.
 required-features = ["test-util"]
