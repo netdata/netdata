@@ -941,6 +941,44 @@ func TestCmdUpdate_Accepted_Rejected(t *testing.T) {
 	assert.Equal(t, StatusAccepted, entry.Status)
 }
 
+func TestCmdUpdate_ValidationPrecedesAcceptedStateRejection(t *testing.T) {
+	tests := map[string]struct {
+		parseErr string
+	}{
+		"invalid payload against accepted entry returns 400 not 403": {
+			parseErr: "invalid payload before accepted rejection",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cb := &mockCallbacks{}
+			h, out := newTestHandlerWithOutput(cb, 5*time.Second)
+
+			oldCfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
+			h.exposed.Add(&Entry[testConfig]{Cfg: oldCfg, Status: StatusAccepted})
+
+			cb.parseAndValidateFn = func(_ Function, _ string) (testConfig, error) {
+				return testConfig{}, errors.New(tc.parseErr)
+			}
+
+			fn := newTestFn("test:job1", "update", "job1", []byte(`{}`))
+			h.CmdUpdate(fn)
+
+			output := out.String()
+			assert.Contains(t, output, `"status":400`)
+			assert.Contains(t, output, tc.parseErr)
+			assert.NotContains(t, output, `"status":403`)
+			assert.Len(t, cb.updateCalls, 0)
+			assert.Len(t, cb.startCalls, 0)
+
+			entry, ok := h.exposed.LookupByKey("job1")
+			require.True(t, ok)
+			assert.Equal(t, StatusAccepted, entry.Status)
+		})
+	}
+}
+
 func TestCmdUpdate_NotFound(t *testing.T) {
 	cb := &mockCallbacks{}
 	h := newTestHandler(cb)
