@@ -11,7 +11,7 @@ config (`config/signal.rs`, `config/env.rs`), `netdata-plugin/bridge` config
 - Remote storage is **global** (one switch + one backend for the whole plugin),
   not per signal. `StorageConfig` (`netdata-plugin/bridge/src/config.rs`) is a
   top-level `otel.yaml` section with three fields: `enabled: bool`, `uri: String`,
-  and `read_cache_max_size: ByteSize` (default `4 GB`, decimal like every
+  and `read_cache_max_size: ByteSize` (default `1 GB`, decimal like every
   other configured size). All three are
   env-overridable: `NETDATA_OTEL_STORAGE_ENABLED`, `_URI`, and
   `_READ_CACHE_MAX_SIZE` (parsed as `ByteSize`). Env overrides apply on top of

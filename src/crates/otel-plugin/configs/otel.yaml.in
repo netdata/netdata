@@ -38,30 +38,31 @@ metrics:
 
 # Directory where all OpenTelemetry data (logs, traces) is stored.
 # Must be an absolute path.
-base_dir: @logdir_POST@/otel/v1
+base_dir: @logdir_POST@/otel/v2
 
 storage:
   # Upload data to remote object storage, in addition to keeping it on local
   # disk. One backend is shared by logs and traces.
   enabled: false
 
+  # NEVER put credentials in this file or in the URI below. Credentials are
+  # read from the netdata process environment and the standard cloud
+  # locations — for S3: AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY,
+  # ~/.aws/credentials, or an attached instance role (nothing to configure).
+  # To pass environment variables to the netdata service, use a root-only
+  # systemd EnvironmentFile.
+
   # Remote storage location. The scheme selects the backend (fs, s3);
   # non-secret backend options go in the query string. Examples:
   #   fs:///var/lib/netdata/otel/remote
   #   s3://bucket/prefix?region=us-east-1
   #   s3://bucket/prefix?region=us-east-1&endpoint=https://minio.example:9000
-  uri: "fs://@logdir_POST@/otel/v1/remote"
-
-  # NEVER put credentials in this file or in the URI. Credentials are read
-  # from the netdata process environment and the standard cloud locations —
-  # for S3: AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY, ~/.aws/credentials,
-  # or an attached instance role (nothing to configure). To pass environment
-  # variables to the netdata service, use a root-only systemd EnvironmentFile.
+  uri: "fs://@logdir_POST@/otel/v2/remote"
 
   # Data deleted from local disk by retention but still in remote storage is
   # fetched back into a bounded local cache when a query needs it. Cap for
   # that cache:
-  read_cache_max_size: "4GB"
+  read_cache_max_size: "1GB"
 
 auth:
   # Require senders to identify a tenant via the X-Scope-OrgID gRPC header.
@@ -86,8 +87,8 @@ logs:
     # How much log data to keep on local disk; the oldest files are deleted
     # when any of these limits is exceeded.
     default:
-      max_files: 1000
-      max_total_size: "32GB"
+      max_files: 100000
+      max_total_size: "1GB"
       max_age: "7 days"
 
     # Per-tenant overrides (any subset of the fields above):

@@ -262,14 +262,14 @@ pub struct StorageConfig {
     /// OpenDAL URI for the remote storage backend.
     /// Examples: "fs:///tmp/otel-remote", "s3://bucket/?region=us-east-1"
     pub uri: String,
-    /// Hard byte cap for the remote-read cache on disk. Default 4 GB.
+    /// Hard byte cap for the remote-read cache on disk. Default 1 GB.
     #[serde(default = "default_read_cache_max_size")]
     pub read_cache_max_size: ByteSize,
 }
 
-/// Default remote-read cache size: 4 GB (decimal, like every other size here).
+/// Default remote-read cache size: 1 GB (decimal, like every other size here).
 fn default_read_cache_max_size() -> ByteSize {
-    ByteSize::gb(4)
+    ByteSize::gb(1)
 }
 
 /// Index file configuration (runtime-only; lives in [`LifecycleConfig`], built by
@@ -496,8 +496,8 @@ impl Default for RetentionPolicy {
     fn default() -> Self {
         Self {
             default: RetentionConfig {
-                max_files: 1000,
-                max_total_size: ByteSize::gb(32),
+                max_files: 100_000,
+                max_total_size: ByteSize::gb(1),
                 max_age: Duration::from_secs(7 * 24 * 3600),
             },
             tenants: HashMap::new(),
@@ -705,8 +705,8 @@ traces:
         assert_eq!(rotation.max_log_entries, 50_000);
         assert_eq!(rotation.max_file_duration, Duration::from_secs(2 * 3600));
         let retention = config.traces.retention.resolve("default");
-        assert_eq!(retention.max_files, 1000);
-        assert_eq!(retention.max_total_size, ByteSize::gb(32));
+        assert_eq!(retention.max_files, 100_000);
+        assert_eq!(retention.max_total_size, ByteSize::gb(1));
         assert_eq!(retention.max_age, Duration::from_secs(7 * 24 * 3600));
         assert_eq!(config.traces.catalog.rotation_count, 10);
     }

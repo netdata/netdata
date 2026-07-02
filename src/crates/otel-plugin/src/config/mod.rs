@@ -496,7 +496,8 @@ traces:
         // Storage + auth are global.
         assert!(!config.storage.enabled);
         assert_eq!(config.storage.uri, "fs:///var/log/netdata/otel/v1/remote");
-        assert_eq!(config.storage.read_cache_max_size, ByteSize::gb(4));
+        // The fixture omits read_cache_max_size → the code default (1 GB).
+        assert_eq!(config.storage.read_cache_max_size, ByteSize::gb(1));
         assert!(!config.auth.enabled);
     }
 
@@ -1210,11 +1211,11 @@ logs:
         assert_eq!(config.metrics.expiry_duration_secs, Some(900));
         assert_eq!(config.metrics.max_new_charts_per_request, 100);
 
-        assert_eq!(config.base_dir, Path::new("/var/log/netdata/otel/v1"));
+        assert_eq!(config.base_dir, Path::new("/var/log/netdata/otel/v2"));
 
         assert!(!config.storage.enabled);
-        assert_eq!(config.storage.uri, "fs:///var/log/netdata/otel/v1/remote");
-        assert_eq!(config.storage.read_cache_max_size, ByteSize::gb(4));
+        assert_eq!(config.storage.uri, "fs:///var/log/netdata/otel/v2/remote");
+        assert_eq!(config.storage.read_cache_max_size, ByteSize::gb(1));
         assert!(!config.auth.enabled);
 
         // The shipped file intentionally has NO traces section (feature under
@@ -1237,8 +1238,8 @@ logs:
             assert_eq!(rotation.max_log_entries, 50000);
             assert_eq!(rotation.max_file_duration, Duration::from_secs(2 * 3600));
             let retention = signal.retention.resolve("default");
-            assert_eq!(retention.max_files, 1000);
-            assert_eq!(retention.max_total_size, ByteSize::gb(32));
+            assert_eq!(retention.max_files, 100_000);
+            assert_eq!(retention.max_total_size, ByteSize::gb(1));
             assert_eq!(retention.max_age, Duration::from_secs(7 * 24 * 3600));
             assert_eq!(signal.catalog.rotation_count, 10);
         }
