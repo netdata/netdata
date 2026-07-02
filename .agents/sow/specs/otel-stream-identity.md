@@ -113,12 +113,11 @@ internal and never rewritten externally. See `sfst/FORMAT.md`
   of `e.id.part_key`, identically.
 - **Query planner** (`otel-ledger::query::remote_candidates_from`): membership of
   `e.id.part_key` via `Query::matches_partition`.
-- **Indexer** (`ng-index` → `sfst-indexer::build_into`/`build_and_write`): the
-  seal/range build uses the WAL header's `content_meta` (written by the ingestor)
-  **verbatim** as the file's display identity. `content_meta` is a required
-  argument — the indexer never derives or inspects identity; there is no
-  row-derived fallback. The indexer does **not** store the `part_key` in the
-  summary.
+- **Index build** (`ng-index` → `sfst::IndexWriter`): the seal/range build uses
+  the WAL header's `content_meta` (written by the ingestor) **verbatim** as the
+  file's display identity. `content_meta` is a required argument — the build
+  never derives or inspects identity; there is no row-derived fallback. The
+  build does **not** store the `part_key` in the summary.
 - All filter tiers (WAL, SFST, catalog, planner) match by `id.part_key`
   membership, so they agree by construction; absent and empty collapse into one
   partition at the hash.

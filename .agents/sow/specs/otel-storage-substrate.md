@@ -75,9 +75,11 @@ The substrate owns the machinery that operates only on neutral types
 - `file-lifecycle` MAY depend on the neutral container/catalog crates `sfst` and
   `otel-catalog` (both store opaque `content_meta`; neither imports a log crate).
 - `file-lifecycle` MUST NOT depend on any **log-content** crate: `sfsq`,
-  `sfst-indexer`, `otel-logs-identity`. The crate manifest omits them (cargo then
-  makes importing them impossible), and `file-lifecycle/tests/dep_guard.rs`
-  fails if any is ever declared in `[dependencies]` or `[dev-dependencies]`.
+  `otel-logs-identity`. The crate manifest omits them (cargo then makes
+  importing them impossible), and `file-lifecycle/tests/dep_guard.rs` fails if
+  any is ever declared in `[dependencies]` or `[dev-dependencies]`. (`sfst` is
+  allowed: its index build treats `content_meta` as an opaque required argument,
+  so depending on it leaks no content-plane knowledge.)
 - Direction is one-way: `otel-ledger → file-lifecycle`. The substrate never
   calls back into a content binding. Adding a second signal is a new crate
   depending on `file-lifecycle`, not an edit to it.
@@ -143,8 +145,8 @@ stays out of `file-lifecycle`, preserving the dep_guard boundary).
   assembler.
 - The seal step is NOT yet an injected provision: every seal worker (the logs
   `Indexer` and the content-light traces `TracesIndexer`) and both
-  `build_*_pipeline` bindings live in `otel-ledger`, so the `sfst_indexer` call
-  never crosses into the substrate. The traces pipeline is a content-light proof
+  `build_*_pipeline` bindings live in `otel-ledger`, so the index-build call
+  (`sfst::IndexWriter` via `ng-index`) never crosses into the substrate. The traces pipeline is a content-light proof
   scaffold (a `SUMR`-only seal + stub query handler), not a real content-decoding
   consumer, so it does not yet justify promoting the seal step to an injected
   provision (or relocating the `Ledger` coordinator into the substrate); that is

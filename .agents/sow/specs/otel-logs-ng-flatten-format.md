@@ -92,8 +92,8 @@
 
 - The ingestor writes the stream `content_meta` into the WAL header; the
   seal/range build trusts that blob **verbatim** as the file's display identity
-  (`sfst-indexer::build_into`/`build_and_write` take `content_meta: Vec<u8>` as a
-  required argument; the indexer never derives or inspects it). Full contract:
+  (`sfst::IndexWriter::write_file`/`write_into` take `content_meta: Vec<u8>` as
+  a required argument; the build never derives or inspects it). Full contract:
   [otel-stream-identity.md](otel-stream-identity.md).
 
 ## Seal/tail render parity (correctness-critical)
@@ -124,7 +124,7 @@
 
 ## Consumers
 
-`ng-flatten`, `ng-index`, `sfst-indexer`, `sfsq`, `otel-ingestor::logs_service`,
+`ng-flatten`, `ng-index`, `sfst` (index build), `sfsq`, `otel-ingestor::logs_service`,
 `otel-ledger` (indexer + on-query handler); operator field-namespace
 documentation / UI field pickers / saved queries before GA (the `attributes.*`
 namespace differs from the pre-migration bare keys).
