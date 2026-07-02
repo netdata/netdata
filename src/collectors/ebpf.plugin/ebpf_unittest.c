@@ -321,15 +321,15 @@ static void test_ebpf_set_ipc_value(void)
         integration_with_collectors == NETDATA_EBPF_INTEGRATION_SHM,
         "Integration should be NETDATA_EBPF_INTEGRATION_SHM");
 
-    ebpf_set_ipc_value("socket");
-    EBPF_UT_ASSERT(
-        integration_with_collectors == NETDATA_EBPF_INTEGRATION_SOCKET,
-        "Integration should be NETDATA_EBPF_INTEGRATION_SOCKET");
-
     ebpf_set_ipc_value("disabled");
     EBPF_UT_ASSERT(
         integration_with_collectors == NETDATA_EBPF_INTEGRATION_DISABLED,
         "Integration should be NETDATA_EBPF_INTEGRATION_DISABLED");
+
+    ebpf_set_ipc_value("socket");
+    EBPF_UT_ASSERT(
+        integration_with_collectors == NETDATA_EBPF_INTEGRATION_DISABLED,
+        "Removed socket integration should be treated as disabled");
 
     ebpf_set_ipc_value("invalid");
     EBPF_UT_ASSERT(

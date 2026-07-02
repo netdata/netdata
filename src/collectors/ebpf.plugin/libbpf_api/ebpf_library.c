@@ -383,8 +383,6 @@ void ebpf_set_ipc_value(const char *integration)
 {
     if (!strcmp(integration, NETDATA_EBPF_IPC_INTEGRATION_SHM))
         integration_with_collectors = NETDATA_EBPF_INTEGRATION_SHM;
-    else if (!strcmp(integration, NETDATA_EBPF_IPC_INTEGRATION_SOCKET))
-        integration_with_collectors = NETDATA_EBPF_INTEGRATION_SOCKET;
     else
         integration_with_collectors = NETDATA_EBPF_INTEGRATION_DISABLED;
 }
@@ -397,12 +395,6 @@ void ebpf_parse_ipc_section()
         NETDATA_EBPF_IPC_INTEGRATION,
         NETDATA_EBPF_IPC_INTEGRATION_DISABLED);
     ebpf_set_ipc_value(integration);
-
-    ipc_sockets.default_bind_to = inicfg_get(
-        &collector_config, NETDATA_EBPF_IPC_SECTION, NETDATA_EBPF_IPC_BIND_TO, NETDATA_EBPF_IPC_BIND_TO_DEFAULT);
-
-    ipc_sockets.backlog =
-        (int)inicfg_get_number(&collector_config, NETDATA_EBPF_IPC_SECTION, NETDATA_EBPF_IPC_BACKLOG, 20);
 }
 
 void ebpf_set_thread_mode(netdata_run_mode_t lmode)

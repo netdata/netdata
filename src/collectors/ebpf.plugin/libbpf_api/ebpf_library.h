@@ -4,7 +4,19 @@
 #define NETDATA_COLLECTOR_EBPF_LIBRARY_H 1
 
 #include <stdint.h>
-#include "../ebpf_socket_ipc.h"
+
+#define NETDATA_EBPF_IPC_SECTION "ipc"
+#define NETDATA_EBPF_IPC_INTEGRATION "integration"
+
+#define NETDATA_EBPF_IPC_INTEGRATION_SHM "shm"
+#define NETDATA_EBPF_IPC_INTEGRATION_DISABLED "disabled"
+
+enum ebpf_integration_list {
+    NETDATA_EBPF_INTEGRATION_DISABLED,
+    NETDATA_EBPF_INTEGRATION_SHM
+};
+
+#include "../ebpf.h"
 
 typedef struct netdata_publish_syscall netdata_publish_syscall_t;
 typedef struct netdata_syscall_stat netdata_syscall_stat_t;

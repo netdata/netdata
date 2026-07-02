@@ -30,7 +30,6 @@ int main_thread_id = 0;
 int process_pid_fd = -1;
 uint64_t collect_pids = 0;
 uint32_t integration_with_collectors = NETDATA_EBPF_INTEGRATION_DISABLED;
-ND_THREAD *socket_ipc = NULL;
 static size_t global_iterations_counter = 1;
 bool publish_internal_metrics = true;
 bool ebpf_program_loaded_any = false;
@@ -1997,13 +1996,7 @@ static void ebpf_initialize_data_sharing()
 {
     ebpf_validate_data_sharing_selection();
 
-    // Initialize
     switch (integration_with_collectors) {
-        case NETDATA_EBPF_INTEGRATION_SOCKET: {
-            socket_ipc =
-                nd_thread_create("ebpf_socket_ipc", NETDATA_THREAD_OPTION_DEFAULT, ebpf_socket_thread_ipc, NULL);
-            break;
-        }
         case NETDATA_EBPF_INTEGRATION_SHM:
             // All pid_map_size have the same value
             if (netdata_integration_initialize_shm(ebpf_modules[EBPF_MODULE_PROCESS_IDX].pid_map_size)) {
