@@ -117,6 +117,14 @@ struct StorableStream {
     group: StreamGroup,
 }
 
+/// One stream's frame, fully prepared lock-free (phase 1) and awaiting the
+/// serialized write+sync region (phase 2).
+struct PreparedStream {
+    part_key: u64,
+    content_meta: Vec<u8>,
+    frame: ng_flatten::PreparedLogFrame,
+}
+
 /// Result of running the collision check across a request's storable streams.
 struct CollisionCheck {
     accepted: Vec<StorableStream>,
@@ -284,7 +292,11 @@ fn identity_preview(s: &str) -> String {
 }
 
 pub struct NetdataLogsService {
-    writers: Mutex<HashMap<TenantId, wal::Writer>>,
+    /// Per-tenant WAL writers. The map mutex is held only for lookup/insert;
+    /// each request then locks ONLY its tenant's writer for the write+sync
+    /// region, so tenants ingest in parallel and same-tenant requests overlap
+    /// everything except the serialized frame writes.
+    writers: Mutex<HashMap<TenantId, Arc<Mutex<wal::Writer>>>>,
     /// Canonical [`ServiceStream`] per `(tenant, ns_hash)`. First write
     /// wins; subsequent writes whose stream doesn't match are rejected via
     /// `partial_success`. In-memory only — on restart the table is empty and
@@ -470,75 +482,97 @@ impl LogsService for NetdataLogsService {
             }));
         }
 
-        let mut writers = self.writers.lock().unwrap();
-        let writer = if let Some(w) = writers.get_mut(&tenant_id) {
-            w
-        } else {
-            let path = self.wal_base_dir.join(tenant_id.as_str());
-            let wal_config = self.resolve_wal_config(tenant_id.as_str());
-            let w = wal::Writer::new(
-                &path,
-                wal_config,
-                Arc::clone(&self.seq),
-                Signal::Logs.pipeline_id(),
-            )
-            .map_err(|e| {
-                tracing::error!(%e, tenant = %tenant_id, "failed to create WAL writer");
-                Status::internal("WAL writer creation failed")
-            })?;
-            writers.entry(tenant_id.clone()).or_insert(w)
-        };
-
+        // Phase 1 — prepare every frame WITHOUT holding any writer lock:
+        // `prepare_log_frame` consumes an owned request and needs nothing
+        // shared, so concurrent exports overlap all of this CPU work. The
+        // clock tick here is only the base for synthesized fallback
+        // timestamps; the frame header's `ingestion_ns` is ticked at write
+        // time, inside the writer lock, so it stays monotonic per file.
+        // A prepare error therefore rejects the request before ANY of its
+        // frames is written.
+        let mut prepared = Vec::with_capacity(accepted.len());
         for s in accepted {
             let request = ExportLogsServiceRequest {
                 resource_logs: s.group.resource_logs,
             };
-
-            // One clock tick per frame: the WAL frame header's `ingestion_ns`,
-            // doubling as the base for any synthesized fallback timestamps —
-            // so the shared frame preparation runs lock-free and concurrent
-            // ingest doesn't serialize on the process-wide clock for the whole
-            // pass.
-            let ingestion_ns = self.clock.lock().unwrap().now_ns();
-            let frame =
-                ng_flatten::prepare_log_frame(request, ingestion_ns.as_u64()).map_err(|e| {
-                    tracing::error!(%e, "failed to encode flattened frame");
-                    Status::internal("flatten encode error")
-                })?;
-            // Accepted groups carry at least one record (empty `ResourceLogs`
-            // are filtered before grouping), so the range is always present.
-            let (log_min_ts, log_max_ts) = frame
-                .ts_range
-                .map(|(min, max)| {
-                    (
-                        file_registry::TimestampNs(min),
-                        file_registry::TimestampNs(max),
-                    )
-                })
-                .expect("accepted group has at least one log record");
-
-            writer
-                .write_frame(
-                    s.part_key,
-                    &s.content_meta,
-                    &frame.data,
-                    frame.records,
-                    ingestion_ns,
-                    log_min_ts,
-                    log_max_ts,
-                )
-                .map_err(|e| {
-                    tracing::error!(%e, "failed to write WAL entry");
-                    Status::internal("WAL write error")
-                })?;
+            let fallback_base_ns = self.clock.lock().unwrap().now_ns().as_u64();
+            let frame = ng_flatten::prepare_log_frame(request, fallback_base_ns).map_err(|e| {
+                tracing::error!(%e, "failed to encode flattened frame");
+                Status::internal("flatten encode error")
+            })?;
+            prepared.push(PreparedStream {
+                part_key: s.part_key,
+                content_meta: s.content_meta,
+                frame,
+            });
         }
 
-        writer.sync_all().map_err(|e| {
-            tracing::error!(%e, "failed to sync WAL");
-            Status::internal("WAL sync error")
-        })?;
-
-        let events = writer.take_all_events();
+        // Phase 2 — the serialized region, under THIS TENANT's writer lock
+        // only (the map lock is held just for lookup/insert): frame writes,
+        // one durability sync (ack ⇒ synced, unchanged), event drain. All
+        // sync code — no `.await` while a guard is held.
+        let writer = {
+            let mut writers = self.writers.lock().unwrap();
+            if let Some(w) = writers.get(&tenant_id) {
+                Arc::clone(w)
+            } else {
+                let path = self.wal_base_dir.join(tenant_id.as_str());
+                let wal_config = self.resolve_wal_config(tenant_id.as_str());
+                let w = wal::Writer::new(
+                    &path,
+                    wal_config,
+                    Arc::clone(&self.seq),
+                    Signal::Logs.pipeline_id(),
+                )
+                .map_err(|e| {
+                    tracing::error!(%e, tenant = %tenant_id, "failed to create WAL writer");
+                    Status::internal("WAL writer creation failed")
+                })?;
+                Arc::clone(
+                    writers
+                        .entry(tenant_id.clone())
+                        .or_insert(Arc::new(Mutex::new(w))),
+                )
+            }
+        };
+        let events = {
+            let mut writer = writer.lock().unwrap();
+            for p in &prepared {
+                // Accepted groups carry at least one record (empty
+                // `ResourceLogs` are filtered before grouping), so the range
+                // is always present.
+                let (log_min_ts, log_max_ts) = p
+                    .frame
+                    .ts_range
+                    .map(|(min, max)| {
+                        (
+                            file_registry::TimestampNs(min),
+                            file_registry::TimestampNs(max),
+                        )
+                    })
+                    .expect("accepted group has at least one log record");
+                let ingestion_ns = self.clock.lock().unwrap().now_ns();
+                writer
+                    .write_frame(
+                        p.part_key,
+                        &p.content_meta,
+                        &p.frame.data,
+                        p.frame.records,
+                        ingestion_ns,
+                        log_min_ts,
+                        log_max_ts,
+                    )
+                    .map_err(|e| {
+                        tracing::error!(%e, "failed to write WAL entry");
+                        Status::internal("WAL write error")
+                    })?;
+            }
+            writer.sync_all().map_err(|e| {
+                tracing::error!(%e, "failed to sync WAL");
+                Status::internal("WAL sync error")
+            })?;
+            writer.take_all_events()
+        };
         self.sender.send_events(tenant_id, events);
 
         Ok(Response::new(ExportLogsServiceResponse {
@@ -826,9 +860,15 @@ mod tests {
             .await
             .unwrap();
 
-        let mut writers = service.writers.lock().unwrap();
-        let writer = writers.get_mut(&TenantId::default_tenant()).unwrap();
-        let events = writer.shutdown_all().unwrap();
+        let writer = Arc::clone(
+            service
+                .writers
+                .lock()
+                .unwrap()
+                .get(&TenantId::default_tenant())
+                .unwrap(),
+        );
+        let events = writer.lock().unwrap().shutdown_all().unwrap();
         assert!(
             events.iter().any(|e| matches!(
                 e,
