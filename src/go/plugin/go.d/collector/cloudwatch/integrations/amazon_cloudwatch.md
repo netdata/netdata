@@ -55,6 +55,7 @@ Monitored services:
 [Each service is defined by a profile](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default) -- a YAML file declaring its CloudWatch namespace, the metrics and statistics to collect, and a chart template -- so coverage can be extended without code changes.
 
 :::tip Need a service that isn't listed?
+
 Request a profile -- it's just a YAML file, no code change. [Open a feature request](https://github.com/netdata/netdata/issues/new/choose) and attach the service's CloudWatch metric schema, captured with this read-only command. It prints only metric and dimension **names** (no resource IDs, ARNs, or metric values), so the output is safe to share:
 
 ```bash
@@ -63,6 +64,7 @@ aws cloudwatch list-metrics --namespace "AWS/<Service>" --region <your-region> -
 ```
 
 Replace `AWS/<Service>` with the service namespace (for example `AWS/AmazonMQ`) and `<your-region>` with a Region where the service runs. The exact metrics and dimensions in the output are what we need to author a correct profile quickly.
+
 :::
 
 
