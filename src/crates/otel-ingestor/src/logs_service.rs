@@ -16,6 +16,7 @@ use otel_logs_identity::ServiceStream;
 use tonic::{Request, Response, Status};
 
 use crate::ledger_sender::LedgerSender;
+use crate::tenant::extract_tenant_id;
 
 /// Extract the `(service.namespace, service.name)` stream identity from a
 /// `ResourceLogs`.
@@ -280,24 +281,6 @@ const IDENTITY_LOG_PREVIEW_CHARS: usize = 64;
 
 fn identity_preview(s: &str) -> String {
     s.chars().take(IDENTITY_LOG_PREVIEW_CHARS).collect()
-}
-
-fn extract_tenant_id(
-    metadata: &tonic::metadata::MetadataMap,
-    auth: &AuthConfig,
-) -> Result<TenantId, Status> {
-    if !auth.enabled {
-        return Ok(TenantId::default_tenant());
-    }
-    let value = metadata
-        .get(AuthConfig::TENANT_HEADER)
-        .ok_or_else(|| Status::unauthenticated("missing tenant header"))?;
-    let tenant = value
-        .to_str()
-        .map_err(|_| Status::invalid_argument("tenant header must be valid UTF-8"))?;
-    // The id policy (strict: becomes a directory name) lives on the
-    // type; this layer only maps the reason onto the transport error.
-    TenantId::validate_ingest(tenant).map_err(Status::invalid_argument)
 }
 
 pub struct NetdataLogsService {

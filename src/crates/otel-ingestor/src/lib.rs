@@ -24,6 +24,7 @@ mod logs_service;
 mod metrics_service;
 mod otel;
 mod output;
+mod tenant;
 // PROOF SCAFFOLD (traces-proof SOW; revert with the skeleton).
 mod trace_service;
 
