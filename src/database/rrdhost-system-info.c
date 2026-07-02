@@ -19,7 +19,7 @@ void rrdhost_system_info_swap(struct rrdhost_system_info *a, struct rrdhost_syst
 // ----------------------------------------------------------------------------
 // RRDHOST - set system info from environment variables
 // system_info fields must be heap allocated or NULL
-int rrdhost_system_info_set_by_name(struct rrdhost_system_info *system_info, char *name, char *value) {
+int rrdhost_system_info_set_by_name(struct rrdhost_system_info *system_info, const char *name, const char *value) {
     int res = 0;
 
     if (unlikely(!name || !value))
@@ -557,7 +557,7 @@ int rrdhost_system_info_foreach(struct rrdhost_system_info *system_info, add_hos
     ret += cb("NETDATA_CONTAINER_OS_ID_LIKE", system_info->container_os_id_like, uuid);
     ret += cb("NETDATA_CONTAINER_OS_VERSION", system_info->container_os_version, uuid);
     ret += cb("NETDATA_CONTAINER_OS_VERSION_ID", system_info->container_os_version_id, uuid);
-    ret += cb("NETDATA_CONTAINER_OS_DETECTION", system_info->host_os_detection, uuid);
+    ret += cb("NETDATA_CONTAINER_OS_DETECTION", system_info->container_os_detection, uuid);
     ret += cb("NETDATA_HOST_OS_NAME", system_info->host_os_name, uuid);
     ret += cb("NETDATA_HOST_OS_ID", system_info->host_os_id, uuid);
     ret += cb("NETDATA_HOST_OS_ID_LIKE", system_info->host_os_id_like, uuid);

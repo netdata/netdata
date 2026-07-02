@@ -1,0 +1,98 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#include "windows-wmi-GetSystemInfo.h"
+
+#if defined(OS_WINDOWS)
+
+static bool wmi_get_string_property(IWbemClassObject *pclsObj, const wchar_t *prop, char *out, size_t out_size) {
+    if(!pclsObj || !out || out_size == 0) return false;
+
+    VARIANT vtProp;
+    VariantInit(&vtProp);
+    HRESULT hr = pclsObj->lpVtbl->Get(pclsObj, prop, 0, &vtProp, 0, 0);
+    if(FAILED(hr) || vtProp.vt != VT_BSTR) {
+        VariantClear(&vtProp);
+        return false;
+    }
+
+    if(wcstombs(out, vtProp.bstrVal, out_size - 1) == (size_t)-1) {
+        out[0] = '\0';
+        VariantClear(&vtProp);
+        return false;
+    }
+
+    out[out_size - 1] = '\0';
+    VariantClear(&vtProp);
+    return true;
+}
+
+static IWbemClassObject *wmi_exec_single_row_query(const wchar_t *query_text, const char *caller) {
+    HRESULT init_hr = InitializeWMI();
+    if(FAILED(init_hr) || !nd_wmi.pSvc)
+        return NULL;
+
+    BSTR query = SysAllocString(query_text);
+    BSTR wql = SysAllocString(L"WQL");
+
+    IEnumWbemClassObject *pEnumerator = NULL;
+    HRESULT hr = nd_wmi.pSvc->lpVtbl->ExecQuery(
+        nd_wmi.pSvc, wql, query,
+        WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY,
+        NULL, &pEnumerator);
+
+    SysFreeString(query);
+    SysFreeString(wql);
+
+    if(FAILED(hr) || !pEnumerator) {
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "%s WMI query failed. Error code = 0x%X", caller, hr);
+        if(pEnumerator)
+            pEnumerator->lpVtbl->Release(pEnumerator);
+        return NULL;
+    }
+
+    IWbemClassObject *pclsObj = NULL;
+    ULONG uReturn = 0;
+    hr = pEnumerator->lpVtbl->Next(pEnumerator, WBEM_INFINITE, 1, &pclsObj, &uReturn);
+    pEnumerator->lpVtbl->Release(pEnumerator);
+
+    if(FAILED(hr) || uReturn == 0 || !pclsObj)
+        return NULL;
+
+    return pclsObj;
+}
+
+bool GetWin32ComputerSystemInfo(Win32ComputerSystemInfo *out) {
+    if(!out) return false;
+    memset(out, 0, sizeof(*out));
+
+    IWbemClassObject *pclsObj = wmi_exec_single_row_query(
+        L"SELECT Model, Manufacturer FROM Win32_ComputerSystem",
+        "GetWin32ComputerSystemInfo()");
+    if(!pclsObj)
+        return false;
+
+    wmi_get_string_property(pclsObj, L"Model", out->Model, sizeof(out->Model));
+    wmi_get_string_property(pclsObj, L"Manufacturer", out->Manufacturer, sizeof(out->Manufacturer));
+    out->Populated = true;
+    pclsObj->lpVtbl->Release(pclsObj);
+    return true;
+}
+
+bool GetWin32OperatingSystemInfo(Win32OperatingSystemInfo *out) {
+    if(!out) return false;
+    memset(out, 0, sizeof(*out));
+
+    IWbemClassObject *pclsObj = wmi_exec_single_row_query(
+        L"SELECT Caption FROM Win32_OperatingSystem",
+        "GetWin32OperatingSystemInfo()");
+    if(!pclsObj)
+        return false;
+
+    wmi_get_string_property(pclsObj, L"Caption", out->Caption, sizeof(out->Caption));
+    out->Populated = true;
+    pclsObj->lpVtbl->Release(pclsObj);
+    return true;
+}
+
+#endif
