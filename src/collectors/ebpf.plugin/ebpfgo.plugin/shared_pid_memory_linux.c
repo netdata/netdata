@@ -25,12 +25,6 @@ static inline size_t shared_pid_memory_nbytes(const struct shared_pid_memory *ct
     return sizeof(struct ebpfgo_shm_header) + ctx->total * sizeof(struct ebpf_pid_stat);
 }
 
-static void shared_pid_memory_unlink_all(void)
-{
-    (void)shm_unlink(NETDATA_EBPFGO_INTEGRATION_NAME);
-    (void)sem_unlink(NETDATA_EBPFGO_SHM_INTEGRATION_NAME);
-}
-
 struct shared_pid_memory *shared_pid_memory_open(size_t total)
 {
     if (!total)
@@ -43,21 +37,17 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total)
     ctx->shm_fd = -1;
     ctx->sem = SEM_FAILED;
 
-    /* A normal Close() unlinks both objects (see shared_pid_memory_close
-     * below), so on a clean restart shm_open with O_CREAT creates a fresh
-     * segment and the kernel zero-fills it.  The "reused" branch below
-     * therefore fires only on crash-restart: the prior publisher died
-     * before its Close() could unlink, the SHM name persists in the
-     * kernel, and the new shm_open reopens the same inode.  This is
-     * preferable to the previous behaviour (unlink on every open) which
-     * deleted the SHM the previous publisher was still writing to,
-     * breaking mutual exclusion on netdata respawn.
+    /* A normal Close() only closes this process' handles; it does not unlink
+     * the SHM name.  Keeping the name present avoids a consumer refresh window
+     * where shm_open by name fails during graceful eBPFGo restarts.  The
+     * "reused" branch below fires when a prior segment still exists, either
+     * after a graceful close or after a crash.
      *
      * We probe the pre-truncate size with fstat() to detect the reused
-     * case: a non-zero size means the crashed publisher left rows in the
-     * segment, and the new run must clear them — the kernel only
-     * zero-fills when shm_open creates a new segment.  Clearing on the
-     * reuse path preserves the original optimisation that avoids a
+     * case: a non-zero size means the prior publisher may have left rows in
+     * the segment, and the new run must clear them — the kernel only
+     * zero-fills when shm_open creates a new segment.  Clearing on the reuse
+     * path preserves the original optimisation that avoids a
      * 17.5 MB page-fault storm on the first-publish-after-create path. */
     ctx->shm_fd = shm_open(NETDATA_EBPFGO_INTEGRATION_NAME, O_CREAT | O_RDWR, 0660);
     if (ctx->shm_fd < 0)
@@ -121,7 +111,7 @@ int shared_pid_memory_publish(struct shared_pid_memory *ctx, const struct ebpf_p
     /* Set per-module validity flags for this publish cycle.
      * The caller provides the complete EBPFGO_SHM_FLAG_* bitmask that should be
      * visible to consumers for the data written by this publish. */
-    ctx->header->flags = flags;
+    __atomic_store_n(&ctx->header->flags, flags, __ATOMIC_RELEASE);
 
     if (entries && count)
         memcpy(ctx->entries, entries, count * sizeof(struct ebpf_pid_stat));
@@ -154,8 +144,6 @@ void shared_pid_memory_close(struct shared_pid_memory *ctx)
 
     if (ctx->shm_fd >= 0)
         close(ctx->shm_fd);
-
-    shared_pid_memory_unlink_all();
 
     free(ctx);
 }

@@ -7315,6 +7315,11 @@ int main(int argc, char **argv) {
         __atomic_store_n(&plugin_should_exit, true, __ATOMIC_RELEASE);
         nv_apps_lookup_stop();
 
+#if defined(OS_LINUX)
+        network_viewer_ebpf_shared_memory_close();
+        network_viewer_dns_shared_memory_close();
+#endif
+
 #if defined(LOCAL_SOCKETS_USE_SETNS)
         spawn_server_destroy(spawn_srv);
         spawn_srv = NULL;
@@ -7344,6 +7349,10 @@ int main(int argc, char **argv) {
 
 #if defined(LOCAL_SOCKETS_USE_SETNS)
         spawn_server_destroy(spawn_srv);
+#endif
+#if defined(OS_LINUX)
+        network_viewer_ebpf_shared_memory_close();
+        network_viewer_dns_shared_memory_close();
 #endif
         exit(1);
     }
@@ -7443,6 +7452,11 @@ int main(int argc, char **argv) {
     functions_evloop_cancel_threads(wg);
     functions_evloop_join_threads(wg);
     nv_apps_lookup_stop();
+
+#if defined(OS_LINUX)
+    network_viewer_ebpf_shared_memory_close();
+    network_viewer_dns_shared_memory_close();
+#endif
 
 #if defined(LOCAL_SOCKETS_USE_SETNS)
     spawn_server_destroy(spawn_srv);

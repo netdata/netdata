@@ -1299,6 +1299,8 @@ static void cgroup_main_cleanup(void *pptr) {
         }
     }
 
+    cgroup_ebpfgo_shared_memory_close();
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 

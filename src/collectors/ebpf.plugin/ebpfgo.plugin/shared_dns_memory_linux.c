@@ -20,12 +20,6 @@ struct shared_dns_memory {
     sem_t *sem;
 };
 
-static void shared_dns_memory_unlink_all(void)
-{
-    (void)shm_unlink(NETDATA_EBPFGO_DNS_SHM_NAME);
-    (void)sem_unlink(NETDATA_EBPFGO_DNS_SEM_NAME);
-}
-
 struct shared_dns_memory *shared_dns_memory_open(void)
 {
     struct shared_dns_memory *ctx = calloc(1, sizeof(*ctx));
@@ -39,6 +33,9 @@ struct shared_dns_memory *shared_dns_memory_open(void)
     if (ctx->shm_fd < 0)
         goto fail;
 
+    struct stat pre_stat;
+    bool reused = (fstat(ctx->shm_fd, &pre_stat) == 0) && (pre_stat.st_size > 0);
+
     if (ftruncate(ctx->shm_fd, (off_t)sizeof(struct ebpfgo_dns_shared)) != 0)
         goto fail;
 
@@ -48,6 +45,9 @@ struct shared_dns_memory *shared_dns_memory_open(void)
         ctx->data = NULL;
         goto fail;
     }
+
+    if (reused)
+        memset(ctx->data, 0, sizeof(struct ebpfgo_dns_shared));
 
     ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT, 0660, 1);
     if (ctx->sem == SEM_FAILED)
@@ -110,6 +110,5 @@ void shared_dns_memory_close(struct shared_dns_memory *ctx)
         ctx->shm_fd = -1;
     }
 
-    shared_dns_memory_unlink_all();
     free(ctx);
 }
