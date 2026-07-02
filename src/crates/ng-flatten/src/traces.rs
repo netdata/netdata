@@ -123,13 +123,21 @@ pub fn flatten_trace_into(
 /// Flatten a traces request into its own per-frame tree (span analog of
 /// [`crate::logs::flatten_log_request`]). Callers MUST normalize span timestamps + ids
 /// first (see [`normalize_span_timestamps`] / [`normalize_trace_ids`]).
-pub fn flatten_trace_request(request: &ExportTraceServiceRequest) -> FlattenedTraceRequest {
+///
+/// Also returns the number of attribute keys sanitized (`'='` → `'_'`, the
+/// key=value delimiter rule) so the caller can log one aggregated warning per
+/// request.
+pub fn flatten_trace_request(request: &ExportTraceServiceRequest) -> (FlattenedTraceRequest, u64) {
     let mut flattener = Flattener::new();
     let resources = flatten_trace_into(&mut flattener, request);
-    FlattenedTraceRequest {
-        tree: flattener.into_tree(),
-        resources,
-    }
+    let sanitized_keys = flattener.sanitized_keys();
+    (
+        FlattenedTraceRequest {
+            tree: flattener.into_tree(),
+            resources,
+        },
+        sanitized_keys,
+    )
 }
 
 /// Drop malformed span ids at the ingest boundary — the traces analog of

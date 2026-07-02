@@ -211,6 +211,7 @@ impl SchemaTree {
 pub struct Flattener {
     nodes: Vec<Node>,
     lookup: HashMap<(NodeId, Step, Kind), NodeId>,
+    sanitized_keys: u64,
 }
 
 impl Flattener {
@@ -222,7 +223,15 @@ impl Flattener {
                 edge: None,
             }],
             lookup: HashMap::new(),
+            sanitized_keys: 0,
         }
+    }
+
+    /// How many attribute keys were sanitized (`'='` → `'_'`, the key=value
+    /// delimiter rule) so far. Callers log one aggregated warning per request
+    /// when non-zero.
+    pub fn sanitized_keys(&self) -> u64 {
+        self.sanitized_keys
     }
 
     /// Finish building, yielding the structure (the building index is dropped).
@@ -321,7 +330,17 @@ impl Flattener {
     }
 
     fn flatten_kv(&mut self, parent: NodeId, kv: &KeyValue, out: &mut Vec<Entry>) {
-        let step = Step::Field(kv.key.clone());
+        // '=' is the key=value delimiter everywhere downstream (the interner's
+        // field split, the WAL-tail scan, `build_kv`); a key containing it
+        // would inject a false field/value boundary. Every user-controlled key
+        // passes through here, so rewrite '=' to '_' at this single choke
+        // point — counted, so ingest can surface the rename.
+        let step = Step::Field(if kv.key.contains('=') {
+            self.sanitized_keys += 1;
+            kv.key.replace('=', "_")
+        } else {
+            kv.key.clone()
+        });
         match &kv.value {
             Some(av) => self.flatten_value(parent, step, av, out),
             None => self.emit(parent, step, Value::Null, out),

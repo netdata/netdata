@@ -94,7 +94,7 @@ fn seal(reqs: Vec<ExportTraceServiceRequest>) -> Vec<u8> {
         let base = clock.now_ns().as_u64();
         ng_flatten::normalize_span_timestamps(&mut r, base);
         ng_flatten::normalize_trace_ids(&mut r);
-        let mut flat = ng_flatten::flatten_trace_request(&r);
+        let (mut flat, _) = ng_flatten::flatten_trace_request(&r);
         ng_flatten::fill_trace_hashes(&mut flat);
         let data = ng_flatten::encode_trace_frame(&flat).unwrap();
         let ingestion_ns = clock.now_ns();

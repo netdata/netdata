@@ -188,13 +188,21 @@ pub fn normalize_log_timestamps(req: &mut ExportLogsServiceRequest, fallback_bas
 /// — the form stored in a flattened WAL frame. Callers MUST normalize record
 /// timestamps first (see [`normalize_log_timestamps`] / [`Record`]); a record with
 /// `time_unix_nano == 0` flattens to `ts == 0`.
-pub fn flatten_log_request(request: &ExportLogsServiceRequest) -> FlattenedLogRequest {
+///
+/// Also returns the number of attribute keys sanitized (`'='` → `'_'`, the
+/// key=value delimiter rule) so the caller can log one aggregated warning per
+/// request.
+pub fn flatten_log_request(request: &ExportLogsServiceRequest) -> (FlattenedLogRequest, u64) {
     let mut flattener = Flattener::new();
     let resources = flatten_log_into(&mut flattener, request);
-    FlattenedLogRequest {
-        tree: flattener.into_tree(),
-        resources,
-    }
+    let sanitized_keys = flattener.sanitized_keys();
+    (
+        FlattenedLogRequest {
+            tree: flattener.into_tree(),
+            resources,
+        },
+        sanitized_keys,
+    )
 }
 
 /// Fill every entry's `hash` with `xxhash64(key=value)` so the index build can ride

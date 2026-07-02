@@ -583,7 +583,13 @@ impl LogsService for NetdataLogsService {
             }
             let (log_min_ts, log_max_ts) =
                 compute_log_ts_range(&request.resource_logs, ingestion_ns);
-            let mut flattened = ng_flatten::flatten_log_request(&request);
+            let (mut flattened, sanitized_keys) = ng_flatten::flatten_log_request(&request);
+            if sanitized_keys > 0 {
+                tracing::warn!(
+                    sanitized_keys,
+                    "rewrote '=' to '_' in attribute keys at ingest ('=' is the key=value delimiter)",
+                );
+            }
             ng_flatten::fill_log_hashes(&mut flattened);
             let data = ng_flatten::encode_log_frame(&flattened).map_err(|e| {
                 tracing::error!(%e, "failed to encode flattened frame");

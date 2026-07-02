@@ -48,7 +48,7 @@ fn write_flattened_wal(dir: &std::path::Path, counts: &[usize]) {
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
     let mut writer = wal::Writer::new(dir, wal::Config::default(), seq, 0).unwrap();
     for (i, &n) in counts.iter().enumerate() {
-        let mut flattened = flatten_log_request(&request(n));
+        let (mut flattened, _) = flatten_log_request(&request(n));
         fill_log_hashes(&mut flattened);
         let bytes = encode_log_frame(&flattened).unwrap();
         writer
@@ -124,7 +124,7 @@ fn per_row_columns_roundtrip_in_chronological_order() {
     let flat = tempfile::tempdir().unwrap();
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
     let mut writer = wal::Writer::new(flat.path(), wal::Config::default(), seq, 0).unwrap();
-    let mut flattened = flatten_log_request(&request_cols(N));
+    let (mut flattened, _) = flatten_log_request(&request_cols(N));
     fill_log_hashes(&mut flattened);
     let bytes = encode_log_frame(&flattened).unwrap();
     writer
@@ -244,7 +244,7 @@ fn typed_tree_and_coalesced_kinds_roundtrip() {
     let flat = tempfile::tempdir().unwrap();
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
     let mut writer = wal::Writer::new(flat.path(), wal::Config::default(), seq, 0).unwrap();
-    let mut flattened = flatten_log_request(&request_typed());
+    let (mut flattened, _) = flatten_log_request(&request_typed());
     fill_log_hashes(&mut flattened);
     let bytes = encode_log_frame(&flattened).unwrap();
     writer
@@ -303,7 +303,7 @@ fn write_multiframe_flat_wal(num_frames: usize) -> (tempfile::TempDir, std::path
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
     let mut writer = wal::Writer::new(flat.path(), wal::Config::default(), seq, 0).unwrap();
     for i in 0..num_frames {
-        let mut flattened = flatten_log_request(&request_typed());
+        let (mut flattened, _) = flatten_log_request(&request_typed());
         fill_log_hashes(&mut flattened);
         let bytes = encode_log_frame(&flattened).unwrap();
         writer
@@ -390,4 +390,74 @@ fn build_sfst_range_split_partitions_records() {
         "split chunks must partition the records exactly"
     );
     assert_eq!(whole.record_count, 16, "4 frames x 4 records");
+}
+
+/// Regression: an OTLP attribute key containing '=' (legal) used to inject a
+/// false key=value boundary — the interner derived field `attributes.a` while
+/// the schema-tree leaf path was `attributes.a=b`, so the leaf silently
+/// dropped from the reader-derived field table (debug builds panicked on the
+/// fill_field_stats round-trip assert). Keys are now sanitized ('=' → '_') at
+/// flatten time, so the field survives sealing and is queryable.
+#[test]
+fn attribute_key_containing_eq_is_sanitized_and_queryable() {
+    let req = ExportLogsServiceRequest {
+        resource_logs: vec![ResourceLogs {
+            scope_logs: vec![ScopeLogs {
+                log_records: vec![LogRecord {
+                    time_unix_nano: 1_700_000_000_000_000_000,
+                    severity_number: 9,
+                    attributes: vec![KeyValue {
+                        key: "a=b".to_string(),
+                        value: Some(AnyValue {
+                            value: Some(Av::StringValue("x".to_string())),
+                        }),
+                    }],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+            ..Default::default()
+        }],
+    };
+
+    let flat = tempfile::tempdir().unwrap();
+    let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
+    let mut writer = wal::Writer::new(flat.path(), wal::Config::default(), seq, 0).unwrap();
+    let (mut flattened, sanitized) = flatten_log_request(&req);
+    assert_eq!(sanitized, 1);
+    fill_log_hashes(&mut flattened);
+    let bytes = encode_log_frame(&flattened).unwrap();
+    writer
+        .write_frame(
+            0,
+            &[],
+            &bytes,
+            1,
+            TimestampNs(1),
+            TimestampNs::ZERO,
+            TimestampNs::ZERO,
+        )
+        .unwrap();
+    writer.shutdown_all().unwrap();
+
+    let out_dir = tempfile::tempdir().unwrap();
+    let out = out_dir.path().join("eq.sfst");
+    let sfst = build_sfst(flat.path(), &out, &Metrics::new()).unwrap();
+    assert_eq!(sfst.records, 1);
+
+    let bytes = std::fs::read(&out).unwrap();
+    let reader = IndexReader::open(&bytes).unwrap();
+    let names: Vec<&str> = reader
+        .field_table()
+        .iter()
+        .map(|f| f.name.as_str())
+        .collect();
+    assert!(
+        names.contains(&"attributes.a_b"),
+        "sanitized field must survive sealing: {names:?}"
+    );
+    assert!(
+        !names.iter().any(|n| n.contains('=')),
+        "no '=' may survive in field names: {names:?}"
+    );
 }

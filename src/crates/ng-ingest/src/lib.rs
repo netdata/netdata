@@ -77,7 +77,13 @@ pub fn write_request(
             ng_flatten::SPAN_ID_LEN,
         );
     }
-    let mut flattened = ng_flatten::flatten_log_request(req);
+    let (mut flattened, sanitized_keys) = ng_flatten::flatten_log_request(req);
+    if sanitized_keys > 0 {
+        tracing::warn!(
+            sanitized_keys,
+            "rewrote '=' to '_' in attribute keys at ingest ('=' is the key=value delimiter)",
+        );
+    }
     ng_flatten::fill_log_hashes(&mut flattened);
     let data = ng_flatten::encode_log_frame(&flattened).context("encode flattened frame")?;
     let ingestion_ns = clock.now_ns();
@@ -135,7 +141,13 @@ pub fn write_trace_request(
             ng_flatten::SPAN_ID_LEN,
         );
     }
-    let mut flattened = ng_flatten::flatten_trace_request(req);
+    let (mut flattened, sanitized_keys) = ng_flatten::flatten_trace_request(req);
+    if sanitized_keys > 0 {
+        tracing::warn!(
+            sanitized_keys,
+            "rewrote '=' to '_' in attribute keys at ingest ('=' is the key=value delimiter)",
+        );
+    }
     ng_flatten::fill_trace_hashes(&mut flattened);
     let data = ng_flatten::encode_trace_frame(&flattened).context("encode flattened trace frame")?;
     let ingestion_ns = clock.now_ns();

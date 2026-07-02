@@ -45,7 +45,7 @@ mod tests {
     use opentelemetry_proto::tonic::common::v1::{
         AnyValue, ArrayValue, InstrumentationScope, KeyValue, KeyValueList, any_value::Value as Av,
     };
-    use opentelemetry_proto::tonic::logs::v1::LogRecord;
+    use opentelemetry_proto::tonic::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
     use opentelemetry_proto::tonic::resource::v1::Resource;
     use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span, Status};
 
@@ -111,6 +111,62 @@ mod tests {
             at(&leaves, "attributes.bytes"),
             [&Value::Bytes(vec![0xde, 0xad])]
         );
+    }
+
+    #[test]
+    fn eq_in_attribute_keys_is_sanitized_and_counted() {
+        // '=' is the key=value delimiter downstream; flatten_kv rewrites it
+        // to '_' at every surface a user-controlled key can enter.
+        let req = ExportLogsServiceRequest {
+            resource_logs: vec![ResourceLogs {
+                resource: Some(Resource {
+                    attributes: vec![kv("r=k", Av::StringValue("rv".into()))],
+                    ..Default::default()
+                }),
+                scope_logs: vec![ScopeLogs {
+                    scope: Some(InstrumentationScope {
+                        attributes: vec![kv("s=k", Av::StringValue("sv".into()))],
+                        ..Default::default()
+                    }),
+                    log_records: vec![LogRecord {
+                        attributes: vec![kv("a=b", Av::StringValue("x".into()))],
+                        body: Some(av(Av::KvlistValue(KeyValueList {
+                            values: vec![kv("n=k=2", Av::IntValue(7))],
+                        }))),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        let (flat, sanitized) = flatten_log_request(&req);
+        assert_eq!(sanitized, 4, "one per surface; multiple '='s count once");
+        for path in [
+            "resource.attributes.r_k",
+            "scope.attributes.s_k",
+            "attributes.a_b",
+            "body.n_k_2",
+        ] {
+            node_for_path(&flat.tree, path);
+        }
+        for id in 0..flat.tree.len() as NodeId {
+            let path = flat.tree.path(id);
+            assert!(!path.contains('='), "'=' survived in path {path:?}");
+        }
+
+        // Traces: span attributes go through the same choke point.
+        let span = Span {
+            attributes: vec![kv("p=q", Av::StringValue("v".into()))],
+            ..Default::default()
+        };
+        let (tflat, tsanitized) = flatten_trace_request(&trace_req(span, None, None));
+        assert_eq!(tsanitized, 1);
+        node_for_path(&tflat.tree, "attributes.p_q");
+
+        // Clean keys stay untouched and uncounted.
+        let (_, zero) = flatten_log_request(&ExportLogsServiceRequest::default());
+        assert_eq!(zero, 0);
     }
 
     #[test]
@@ -200,7 +256,7 @@ mod tests {
             }),
             Some(InstrumentationScope { name: "lib".into(), ..Default::default() }),
         );
-        let flat = flatten_trace_request(&req);
+        let (flat, _) = flatten_trace_request(&req);
         let rg = &flat.resources[0];
         let sg = &rg.scopes[0];
         let sr = &sg.spans[0];
@@ -227,7 +283,7 @@ mod tests {
     fn span_duration_clamps_on_unset_or_skew() {
         let dur = |start, end| {
             let s = Span { start_time_unix_nano: start, end_time_unix_nano: end, ..Default::default() };
-            flatten_trace_request(&trace_req(s, None, None)).resources[0].scopes[0].spans[0].duration
+            flatten_trace_request(&trace_req(s, None, None)).0.resources[0].scopes[0].spans[0].duration
         };
         assert_eq!(dur(100, 250), 150);
         assert_eq!(dur(100, 0), 0, "unset end → 0");
@@ -684,7 +740,7 @@ mod tests {
                 ..Default::default()
             }],
         };
-        let mut flat = flatten_trace_request(&req);
+        let (mut flat, _) = flatten_trace_request(&req);
         fill_trace_hashes(&mut flat);
 
         let rg = &flat.resources[0];
