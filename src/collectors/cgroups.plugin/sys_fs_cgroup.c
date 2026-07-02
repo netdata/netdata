@@ -2,6 +2,7 @@
 
 #include "cgroup-internals.h"
 #include "cgroup-netipc.h"
+#include "cgroup_ebpfgo_shared_memory.h"
 
 // main cgroups thread worker jobs
 #define WORKER_CGROUPS_LOCK 0
@@ -1065,6 +1066,7 @@ static void cgroup_update_io_pids_charts(struct cgroup *cg) {
     if (likely(cg->pids_current.updated))
         update_pids_current_chart(cg);
     cgroup_ebpfgo_cachestat_update_charts(cg);
+    cgroup_ebpfgo_socket_update_charts(cg);
 }
 
 void update_cgroup_systemd_services_charts() {
@@ -1297,6 +1299,8 @@ static void cgroup_main_cleanup(void *pptr) {
         }
     }
 
+    cgroup_ebpfgo_shared_memory_close();
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
@@ -1400,7 +1404,15 @@ void cgroups_main(void *ptr) {
             cgroups_check = 0;
         }
 
-        bool ebpf_cachestat_ready = cgroup_ebpfgo_cachestat_refresh();
+        bool shm_ready = cgroup_ebpfgo_cachestat_refresh();
+        // Independently gate each module based on which one stamped the SHM
+        // this cycle; this allows socket charts to work without cachestat and
+        // cachestat charts to work without socket.
+        uint32_t shm_flags = shm_ready ? cgroup_ebpfgo_shared_memory_flags() : 0;
+        bool cachestat_ok = shm_ready && (shm_flags & EBPFGO_SHM_FLAG_CACHESTAT);
+        bool socket_ok    = shm_ready && (shm_flags & EBPFGO_SHM_FLAG_SOCKET);
+        cgroup_ebpfgo_cachestat_set_snapshot_ready(cachestat_ok);
+        cgroup_ebpfgo_socket_set_snapshot_ready(socket_ok);
 
         worker_is_busy(WORKER_CGROUPS_LOCK);
         netdata_mutex_lock(&cgroup_root_mutex);
@@ -1413,9 +1425,10 @@ void cgroups_main(void *ptr) {
             break;
         }
 
-        if (likely(ebpf_cachestat_ready)) {
+        if (cachestat_ok)
             cgroup_ebpfgo_cachestat_update_locked();
-        }
+        if (socket_ok)
+            cgroup_ebpfgo_socket_update_locked();
 
         worker_is_busy(WORKER_CGROUPS_CHART);
 

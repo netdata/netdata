@@ -4,7 +4,19 @@
 #define NETDATA_COLLECTOR_EBPF_LIBRARY_H 1
 
 #include <stdint.h>
-#include "../ebpf_socket_ipc.h"
+
+#define NETDATA_EBPF_IPC_SECTION "ipc"
+#define NETDATA_EBPF_IPC_INTEGRATION "integration"
+
+#define NETDATA_EBPF_IPC_INTEGRATION_SHM "shm"
+#define NETDATA_EBPF_IPC_INTEGRATION_DISABLED "disabled"
+
+enum ebpf_integration_list {
+    NETDATA_EBPF_INTEGRATION_DISABLED,
+    NETDATA_EBPF_INTEGRATION_SHM
+};
+
+#include "../ebpf.h"
 
 typedef struct netdata_publish_syscall netdata_publish_syscall_t;
 typedef struct netdata_syscall_stat netdata_syscall_stat_t;
@@ -105,6 +117,7 @@ void ebpf_update_table_size();
 void ebpf_update_lifetime();
 void ebpf_set_load_mode(netdata_ebpf_load_mode_t load, netdata_ebpf_load_mode_t origin);
 void ebpf_update_load_mode(const char *str, netdata_ebpf_load_mode_t origin);
+void ebpf_update_object_flavor(const char *str, netdata_ebpf_load_mode_t origin);
 void ebpf_update_map_per_core();
 void ebpf_set_ipc_value(const char *integration);
 void ebpf_parse_ipc_section();
@@ -113,7 +126,6 @@ void ebpf_enable_chart(int idx, int disable_cgroup);
 void ebpf_enable_specific_chart(ebpf_module_t *em, int disable_cgroup);
 void read_collector_values(int *disable_cgroups, int update_every, netdata_ebpf_load_mode_t origin);
 void parse_network_viewer_section(struct config *cfg);
-void ebpf_parse_service_name_section(struct config *cfg);
 void ebpf_parse_ports(const char *ptr);
 void ebpf_parse_ips_unsafe(const char *ptr);
 void ebpf_read_local_addresses_unsafe();
@@ -177,7 +189,5 @@ uint32_t ebpf_enable_tracepoints(ebpf_tracepoint_t *tps);
  *  AUXILIARY FUNCTIONS USED DURING INITIALIZATION
  *
  *****************************************************************/
-
-void read_local_ports(char *filename, uint8_t proto);
 
 #endif /* NETDATA_COLLECTOR_EBPF_LIBRARY_H */

@@ -151,6 +151,66 @@ func TestCachestatSharedMemoryStoreUpdateApps(t *testing.T) {
 	}
 }
 
+func TestCachestatSharedMemoryStoreUpdateSocketAppsClearsMergedSocketData(t *testing.T) {
+	store := NewCachestatSharedMemoryStore()
+	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{
+		{Pid: 10, Ppid: 1, Ct: 100},
+		{Pid: 20, Ppid: 1, Ct: 200},
+	})
+	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
+		{PID: 10, BytesSent: 1000, BytesReceived: 2000, CallTCPSent: 3},
+	})
+
+	withSocket := store.Snapshot()
+	if len(withSocket) != 2 {
+		t.Fatalf("Snapshot() len = %d, want 2", len(withSocket))
+	}
+	if withSocket[0].pid != 10 || withSocket[0].socket.BytesSent != 1000 {
+		t.Fatalf("Snapshot()[0] socket data = %+v, want bytes_sent=1000 for PID 10", withSocket[0].socket)
+	}
+
+	store.UpdateSocketApps(nil)
+
+	cleared := store.Snapshot()
+	if len(cleared) != 2 {
+		t.Fatalf("Snapshot() len after clear = %d, want 2", len(cleared))
+	}
+	for _, entry := range cleared {
+		if entry.socket != (ebpfSocketPublishApps{}) {
+			t.Fatalf("PID %d socket data after clear = %+v, want zero", entry.pid, entry.socket)
+		}
+	}
+	if store.activeModules&ebpfgoSHMFlagSocket == 0 {
+		t.Fatal("UpdateSocketApps(nil) did not mark socket as active")
+	}
+}
+
+func TestCachestatSharedMemoryStoreUpdateSocketAppsClearsSocketOnlyEntries(t *testing.T) {
+	store := NewCachestatSharedMemoryStore()
+	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
+		{PID: 30, BytesSent: 3000, CallUDPSent: 4},
+		{PID: 10, BytesReceived: 1000, CallTCPReceived: 2},
+	})
+
+	withSocket := store.Snapshot()
+	if len(withSocket) != 2 {
+		t.Fatalf("Snapshot() len = %d, want 2", len(withSocket))
+	}
+	if withSocket[0].pid != 10 || withSocket[1].pid != 30 {
+		t.Fatalf("Snapshot() pids = %d,%d, want 10,30", withSocket[0].pid, withSocket[1].pid)
+	}
+
+	store.UpdateSocketApps(nil)
+
+	cleared := store.Snapshot()
+	if len(cleared) != 0 {
+		t.Fatalf("Snapshot() len after socket-only clear = %d, want 0", len(cleared))
+	}
+	if store.activeModules&ebpfgoSHMFlagSocket == 0 {
+		t.Fatal("UpdateSocketApps(nil) did not mark socket as active")
+	}
+}
+
 func BenchmarkCachestatSharedMemoryStoreUpdateAppsSorted(b *testing.B) {
 	const appsCount = 1024
 	apps := make([]libbpfloader.CachestatAppSnapshot, appsCount)

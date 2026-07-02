@@ -27,6 +27,11 @@ static SPAWN_SERVER *spawn_srv = NULL;
 #include "libnetdata/local-sockets/local-sockets.h"
 #include "libnetdata/os/system-maps/system-services.h"
 
+#if defined(OS_LINUX)
+#include "network_viewer_ebpf_shared_memory.h"
+#include "network_viewer_dns_shared_memory.h"
+#endif
+
 #define NETWORK_CONNECTIONS_VIEWER_FUNCTION "network-connections"
 #define NETWORK_CONNECTIONS_VIEWER_HELP "Shows active network connections with protocol details, states, addresses, ports, and performance metrics."
 #define NETWORK_TOPOLOGY_VIEWER_FUNCTION "topology:network-connections"
@@ -34,6 +39,8 @@ static SPAWN_SERVER *spawn_srv = NULL;
 #define NETWORK_VIEWER_RESPONSE_UPDATE_EVERY 5
 #define NETWORK_PROTOCOLS_FUNCTION      "network-protocols"
 #define NETWORK_PROTOCOLS_FUNCTION_HELP "FreeBSD TCP and UDP statistics (IPv4 and IPv6 combined)"
+#define NETWORK_DNS_QUERIES_FUNCTION      "dns-queries"
+#define NETWORK_DNS_QUERIES_FUNCTION_HELP "Linux eBPF DNS query and response statistics (UDP/TCP, IPv4/IPv6)"
 // Keep in sync with the topology schema contract used across topology producers.
 #define NETWORK_TOPOLOGY_SCHEMA_VERSION "netdata.topology.v1"
 #define NETWORK_TOPOLOGY_SOURCE "network-connections"
@@ -863,13 +870,9 @@ static bool topology_read_proc_ppid(uint64_t pid, uint64_t *ppid) {
     return true;
 }
 
-static bool topology_read_proc_starttime(uint64_t pid __maybe_unused, uint64_t *starttime) {
-    if(starttime)
-        *starttime = 0;
+#endif
 
-    return false;
-}
-#else
+#if !defined(OS_LINUX)
 static bool topology_read_proc_starttime(uint64_t pid __maybe_unused, uint64_t *starttime) {
     if(starttime)
         *starttime = 0;
@@ -1570,6 +1573,34 @@ static void local_socket_to_json_array(struct sockets_stats *st, const LOCAL_SOC
         if(st->max.tcpi_total_retrans < n->info.tcp.tcpi_total_retrans)
             st->max.tcpi_total_retrans = n->info.tcp.tcpi_total_retrans;
 #else
+        buffer_json_add_array_item_uint64(wb, 0);
+#endif
+
+        // eBPF per-PID socket counters from ebpfgo.plugin shared memory
+#if defined(OS_LINUX)
+        {
+            const struct ebpf_pid_stat *es = network_viewer_ebpf_shared_memory_lookup((pid_t)n->pid);
+            buffer_json_add_array_item_uint64(wb, es ? es->socket.bytes_sent         : 0);
+            buffer_json_add_array_item_uint64(wb, es ? es->socket.bytes_received      : 0);
+            buffer_json_add_array_item_uint64(wb, es ? es->socket.call_tcp_sent       : 0);
+            buffer_json_add_array_item_uint64(wb, es ? es->socket.call_tcp_received   : 0);
+            buffer_json_add_array_item_uint64(wb, es ? es->socket.retransmit          : 0);
+            buffer_json_add_array_item_uint64(wb, es ? es->socket.call_udp_sent       : 0);
+            buffer_json_add_array_item_uint64(wb, es ? es->socket.call_udp_received   : 0);
+            buffer_json_add_array_item_uint64(wb, es ? es->socket.call_close          : 0);
+            buffer_json_add_array_item_uint64(wb, es ? es->socket.call_tcp_v4_connection : 0);
+            buffer_json_add_array_item_uint64(wb, es ? es->socket.call_tcp_v6_connection : 0);
+        }
+#else
+        buffer_json_add_array_item_uint64(wb, 0);
+        buffer_json_add_array_item_uint64(wb, 0);
+        buffer_json_add_array_item_uint64(wb, 0);
+        buffer_json_add_array_item_uint64(wb, 0);
+        buffer_json_add_array_item_uint64(wb, 0);
+        buffer_json_add_array_item_uint64(wb, 0);
+        buffer_json_add_array_item_uint64(wb, 0);
+        buffer_json_add_array_item_uint64(wb, 0);
+        buffer_json_add_array_item_uint64(wb, 0);
         buffer_json_add_array_item_uint64(wb, 0);
 #endif
 
@@ -5938,6 +5969,11 @@ static BUFFER *network_viewer_result(char *function) {
     time_t now_s = now_realtime_sec();
     bool aggregated = false;
 
+#if defined(OS_LINUX)
+    network_viewer_ebpf_shared_memory_refresh();
+#endif
+
+    // Ownership of wb is transferred to the caller; do not use CLEAN_BUFFER here.
     BUFFER *wb = buffer_create(0, NULL);
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
@@ -6334,6 +6370,26 @@ static BUFFER *network_viewer_result(char *function) {
                                         RRDF_FIELD_OPTS_VISIBLE,
                                         NULL);
 
+            // eBPF per-PID socket counters (populated on Linux when ebpfgo.plugin is running)
+#define NV_EBPF_FIELD(id, label, unit)                                             \
+            buffer_rrdf_table_add_field(wb, field_id++, id, label,                \
+                RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE,                  \
+                RRDF_FIELD_TRANSFORM_NONE, 0, unit, NAN,                           \
+                RRDF_FIELD_SORT_DESCENDING, NULL,                                  \
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,                   \
+                RRDF_FIELD_OPTS_NONE, NULL)
+            NV_EBPF_FIELD("eBPFBytesSent",  "eBPF TCP Bytes Sent by PID",       "bytes");
+            NV_EBPF_FIELD("eBPFBytesRecv",  "eBPF TCP Bytes Received by PID",   "bytes");
+            NV_EBPF_FIELD("eBPFTCPSent",    "eBPF TCP Send Calls by PID",       "calls");
+            NV_EBPF_FIELD("eBPFTCPRecv",    "eBPF TCP Receive Calls by PID",    "calls");
+            NV_EBPF_FIELD("eBPFRetransmit", "eBPF TCP Retransmissions by PID",  "calls");
+            NV_EBPF_FIELD("eBPFUDPSent",    "eBPF UDP Send Calls by PID",       "calls");
+            NV_EBPF_FIELD("eBPFUDPRecv",    "eBPF UDP Receive Calls by PID",    "calls");
+            NV_EBPF_FIELD("eBPFClose",      "eBPF TCP Close Calls by PID",      "calls");
+            NV_EBPF_FIELD("eBPFConnV4",     "eBPF IPv4 TCP Connections by PID", "connections");
+            NV_EBPF_FIELD("eBPFConnV6",     "eBPF IPv6 TCP Connections by PID", "connections");
+#undef NV_EBPF_FIELD
+
             // Count
             buffer_rrdf_table_add_field(wb, field_id++, "Count", "Number of sockets like this",
                                         RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
@@ -6358,38 +6414,19 @@ static BUFFER *network_viewer_result(char *function) {
 
         buffer_json_member_add_object(wb, "charts");
         {
-            buffer_json_member_add_object(wb, "Count by Direction");
-            {
-                buffer_json_member_add_string(wb, "type", "stacked-bar");
-                buffer_json_member_add_array(wb, "columns");
-                {
-                    buffer_json_add_array_item_string(wb, "Direction");
-                }
-                buffer_json_array_close(wb);
-            }
-            buffer_json_object_close(wb);
-
-            buffer_json_member_add_object(wb, "Count by Process");
-            {
-                buffer_json_member_add_string(wb, "type", "stacked-bar");
-                buffer_json_member_add_array(wb, "columns");
-                {
-                    buffer_json_add_array_item_string(wb, "Process");
-                }
-                buffer_json_array_close(wb);
-            }
-            buffer_json_object_close(wb);
-
-            buffer_json_member_add_object(wb, "Count by Protocol");
-            {
-                buffer_json_member_add_string(wb, "type", "stacked-bar");
-                buffer_json_member_add_array(wb, "columns");
-                {
-                    buffer_json_add_array_item_string(wb, "Protocol");
-                }
-                buffer_json_array_close(wb);
-            }
-            buffer_json_object_close(wb);
+#define NV_STACKED_BAR_CHART(name_, col_)                                          \
+            buffer_json_member_add_object(wb, name_);                              \
+            {                                                                      \
+                buffer_json_member_add_string(wb, "type", "stacked-bar");          \
+                buffer_json_member_add_array(wb, "columns");                       \
+                { buffer_json_add_array_item_string(wb, col_); }                   \
+                buffer_json_array_close(wb);                                       \
+            }                                                                      \
+            buffer_json_object_close(wb)
+            NV_STACKED_BAR_CHART("Count by Direction", "Direction");
+            NV_STACKED_BAR_CHART("Count by Process",   "Process");
+            NV_STACKED_BAR_CHART("Count by Protocol",  "Protocol");
+#undef NV_STACKED_BAR_CHART
         }
         buffer_json_object_close(wb); // charts
 
@@ -6409,95 +6446,26 @@ static BUFFER *network_viewer_result(char *function) {
 
         buffer_json_member_add_object(wb, "group_by");
         {
-            buffer_json_member_add_object(wb, "Direction");
-            {
-                buffer_json_member_add_string(wb, "name", "Direction");
-                buffer_json_member_add_array(wb, "columns");
-                {
-                    buffer_json_add_array_item_string(wb, "Direction");
-                }
-                buffer_json_array_close(wb);
-            }
-            buffer_json_object_close(wb);
-
-            buffer_json_member_add_object(wb, "Protocol");
-            {
-                buffer_json_member_add_string(wb, "name", "Protocol");
-                buffer_json_member_add_array(wb, "columns");
-                {
-                    buffer_json_add_array_item_string(wb, "Protocol");
-                }
-                buffer_json_array_close(wb);
-            }
-            buffer_json_object_close(wb);
-
-            buffer_json_member_add_object(wb, "Namespace");
-            {
-                buffer_json_member_add_string(wb, "name", "Namespace");
-                buffer_json_member_add_array(wb, "columns");
-                {
-                    buffer_json_add_array_item_string(wb, "Namespace");
-                }
-                buffer_json_array_close(wb);
-            }
-            buffer_json_object_close(wb);
-
-            buffer_json_member_add_object(wb, "Process");
-            {
-                buffer_json_member_add_string(wb, "name", "Process");
-                buffer_json_member_add_array(wb, "columns");
-                {
-                    buffer_json_add_array_item_string(wb, "Process");
-                }
-                buffer_json_array_close(wb);
-            }
-            buffer_json_object_close(wb);
-
+#define NV_GROUP_BY_SINGLE(key_, display_name_)                                    \
+            buffer_json_member_add_object(wb, key_);                               \
+            {                                                                      \
+                buffer_json_member_add_string(wb, "name", display_name_);          \
+                buffer_json_member_add_array(wb, "columns");                       \
+                { buffer_json_add_array_item_string(wb, key_); }                   \
+                buffer_json_array_close(wb);                                       \
+            }                                                                      \
+            buffer_json_object_close(wb)
+            NV_GROUP_BY_SINGLE("Direction", "Direction");
+            NV_GROUP_BY_SINGLE("Protocol",  "Protocol");
+            NV_GROUP_BY_SINGLE("Namespace", "Namespace");
+            NV_GROUP_BY_SINGLE("Process",   "Process");
             if(!aggregated) {
-                buffer_json_member_add_object(wb, "LocalIP");
-                {
-                    buffer_json_member_add_string(wb, "name", "Local IP");
-                    buffer_json_member_add_array(wb, "columns");
-                    {
-                        buffer_json_add_array_item_string(wb, "LocalIP");
-                    }
-                    buffer_json_array_close(wb);
-                }
-                buffer_json_object_close(wb);
-
-                buffer_json_member_add_object(wb, "LocalPort");
-                {
-                    buffer_json_member_add_string(wb, "name", "Local Port");
-                    buffer_json_member_add_array(wb, "columns");
-                    {
-                        buffer_json_add_array_item_string(wb, "LocalPort");
-                    }
-                    buffer_json_array_close(wb);
-                }
-                buffer_json_object_close(wb);
-
-                buffer_json_member_add_object(wb, "RemoteIP");
-                {
-                    buffer_json_member_add_string(wb, "name", "Remote IP");
-                    buffer_json_member_add_array(wb, "columns");
-                    {
-                        buffer_json_add_array_item_string(wb, "RemoteIP");
-                    }
-                    buffer_json_array_close(wb);
-                }
-                buffer_json_object_close(wb);
-
-                buffer_json_member_add_object(wb, "RemotePort");
-                {
-                    buffer_json_member_add_string(wb, "name", "Remote Port");
-                    buffer_json_member_add_array(wb, "columns");
-                    {
-                        buffer_json_add_array_item_string(wb, "RemotePort");
-                    }
-                    buffer_json_array_close(wb);
-                }
-                buffer_json_object_close(wb);
+                NV_GROUP_BY_SINGLE("LocalIP",    "Local IP");
+                NV_GROUP_BY_SINGLE("LocalPort",  "Local Port");
+                NV_GROUP_BY_SINGLE("RemoteIP",   "Remote IP");
+                NV_GROUP_BY_SINGLE("RemotePort", "Remote Port");
             }
+#undef NV_GROUP_BY_SINGLE
         }
         buffer_json_object_close(wb); // group_by
     }
@@ -6521,6 +6489,270 @@ void network_viewer_function(
     network_viewer_emit_response(transaction, wb);
     buffer_free(wb);
 }
+
+// ----------------------------------------------------------------------------------------------------------------
+// Linux: dns-queries function (data from ebpf-go.plugin via shared memory)
+
+#if defined(OS_LINUX)
+
+/* DNS query type name (QTYPE) — most common types for fast lookup. */
+static const char *nv_dns_qtype_name(uint16_t qtype)
+{
+    switch (qtype) {
+    case   1: return "A";
+    case   2: return "NS";
+    case   5: return "CNAME";
+    case   6: return "SOA";
+    case  12: return "PTR";
+    case  15: return "MX";
+    case  16: return "TXT";
+    case  28: return "AAAA";
+    case  33: return "SRV";
+    case  65: return "HTTPS";
+    case 255: return "ANY";
+    default:  return NULL;  /* caller formats numeric string */
+    }
+}
+
+/* DNS RCODE name — RFC 2929 / RFC 6895. */
+static const char *nv_dns_rcode_name(uint16_t rcode)
+{
+    switch (rcode) {
+    case 0: return "NOERROR";
+    case 1: return "FORMERR";
+    case 2: return "SERVFAIL";
+    case 3: return "NXDOMAIN";
+    case 4: return "NOTIMP";
+    case 5: return "REFUSED";
+    case 6: return "YXDOMAIN";
+    case 7: return "YXRRSET";
+    case 8: return "NXRRSET";
+    case 9: return "NOTAUTH";
+    default: return NULL;   /* caller formats numeric string */
+    }
+}
+
+/* update_every matches the 20-second per-query ring TTL. */
+#define NV_DNS_UPDATE_EVERY 20
+
+static BUFFER *network_viewer_dns_result(void)
+{
+    network_viewer_dns_shared_memory_refresh();
+
+    const struct ebpfgo_dns_aggregate *agg = network_viewer_dns_shared_memory_get();
+    if (!agg)
+        return network_viewer_json_error_response(
+            HTTP_RESP_SERVICE_UNAVAILABLE,
+            "dns-queries: data not yet available (enable dns = yes in ebpf.d.conf)");
+
+    uint32_t flow_count = 0;
+    const struct ebpfgo_dns_flow_record *flows =
+        network_viewer_dns_shared_memory_get_flows(&flow_count);
+
+    time_t now_s = now_realtime_sec();
+    // Ownership transferred to caller; do not use CLEAN_BUFFER here.
+    BUFFER *wb = buffer_create(0, NULL);
+    wb->content_type = CT_APPLICATION_JSON;
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_string(wb, "type", "table");
+    buffer_json_member_add_time_t(wb, "update_every", NV_DNS_UPDATE_EVERY);
+    buffer_json_member_add_boolean(wb, "has_history", false);
+    buffer_json_member_add_string(wb, "help", NETWORK_DNS_QUERIES_FUNCTION_HELP);
+
+    buffer_json_member_add_array(wb, "data");
+    {
+        char ip_buf[INET6_ADDRSTRLEN];
+        char num_buf[32];
+
+        for (uint32_t i = 0; i < flow_count; i++) {
+            const struct ebpfgo_dns_flow_record *r = &flows[i];
+
+            /* Format server IP.  inet_ntop returns NULL on malformed input
+             * (e.g. ip_version lies about the family); fall back to a safe
+             * placeholder so ip_buf is never passed uninitialised to the
+             * JSON writer. */
+            const char *ip_str;
+            if (r->ip_version == 4) {
+                ip_str = inet_ntop(AF_INET, &r->server_ip[0], ip_buf, sizeof(ip_buf));
+            } else {
+                ip_str = inet_ntop(AF_INET6, r->server_ip, ip_buf, sizeof(ip_buf));
+            }
+            if (!ip_str)
+                ip_str = "(invalid)";
+
+            /* Format query type */
+            const char *qtype_name = nv_dns_qtype_name(r->query_type);
+            if (!qtype_name) {
+                snprintfz(num_buf, sizeof(num_buf), "%u", (unsigned)r->query_type);
+                qtype_name = num_buf;
+            }
+
+            /* Format rcode */
+            const char *rcode_name = nv_dns_rcode_name(r->rcode);
+            char rcode_buf[16];
+            if (!rcode_name) {
+                snprintfz(rcode_buf, sizeof(rcode_buf), "%u", (unsigned)r->rcode);
+                rcode_name = rcode_buf;
+            }
+
+            buffer_json_add_array_item_array(wb);
+            buffer_json_add_array_item_string(wb, r->domain[0] ? r->domain : "(unknown)");
+            buffer_json_add_array_item_string(wb, qtype_name);
+            buffer_json_add_array_item_string(wb, (r->protocol == 17) ? "UDP" : "TCP");
+            buffer_json_add_array_item_string(wb, (r->ip_version == 4) ? "IPv4" : "IPv6");
+            buffer_json_add_array_item_string(wb, ip_str);
+            buffer_json_add_array_item_double(wb, (double)r->latency_us / 1e6);
+            buffer_json_add_array_item_string(wb, r->timed_out ? "Timeout" : "OK");
+            buffer_json_add_array_item_string(wb, rcode_name);
+            /* Synthetic columns for chart: 1 query per row; responses = non-timed-out */
+            buffer_json_add_array_item_uint64(wb, 1);
+            buffer_json_add_array_item_uint64(wb, r->timed_out ? 0 : 1);
+            buffer_json_array_close(wb);
+        }
+    }
+    buffer_json_array_close(wb); // data
+
+    size_t field_id = 0;
+    buffer_json_member_add_object(wb, "columns");
+    {
+        buffer_rrdf_table_add_field(wb, field_id++, "Domain", "Queried Domain Name",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_FACET,
+            RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "QueryType", "DNS Query Type",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Transport", "Transport Protocol",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "IPFamily", "IP Protocol Family",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "ServerIP", "DNS Server IP Address",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Latency", "Query-to-Response Latency",
+            RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DURATION_S,
+            0, NULL, NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_MAX,
+            RRDF_FIELD_FILTER_RANGE,
+            RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Status", "Query Completion Status",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "RCode", "DNS Response Code",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        /* Synthetic columns used by the aggregate chart only — hidden from table view. */
+        buffer_rrdf_table_add_field(wb, field_id++, "Queries", "DNS Queries (count)",
+            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+            0, "queries", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_NONE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Responses", "DNS Responses (count)",
+            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+            0, "responses", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_NONE, NULL);
+    }
+    buffer_json_object_close(wb); // columns
+
+    buffer_json_member_add_string(wb, "default_sort_column", "Latency");
+
+    buffer_json_member_add_object(wb, "charts");
+    {
+        buffer_json_member_add_object(wb, "Traffic");
+        {
+            buffer_json_member_add_string(wb, "name", "Traffic");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Queries");
+                buffer_json_add_array_item_string(wb, "Responses");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb); // Traffic
+    }
+    buffer_json_object_close(wb); // charts
+
+    buffer_json_member_add_array(wb, "default_charts");
+    {
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "Traffic");
+        buffer_json_add_array_item_string(wb, "Transport");
+        buffer_json_array_close(wb);
+    }
+    buffer_json_array_close(wb); // default_charts
+
+    buffer_json_member_add_object(wb, "group_by");
+    {
+        buffer_json_member_add_object(wb, "Transport");
+        {
+            buffer_json_member_add_string(wb, "name", "Transport");
+            buffer_json_member_add_array(wb, "columns");
+            buffer_json_add_array_item_string(wb, "Transport");
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "IPFamily");
+        {
+            buffer_json_member_add_string(wb, "name", "IP Family");
+            buffer_json_member_add_array(wb, "columns");
+            buffer_json_add_array_item_string(wb, "IPFamily");
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "Status");
+        {
+            buffer_json_member_add_string(wb, "name", "Status");
+            buffer_json_member_add_array(wb, "columns");
+            buffer_json_add_array_item_string(wb, "Status");
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // group_by
+
+    network_viewer_finalize_response_buffer(wb, now_s);
+    return wb;
+}
+
+static void network_viewer_dns_function(
+    const char *transaction, char *function __maybe_unused,
+    usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
+    BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
+    const char *source __maybe_unused, void *data __maybe_unused)
+{
+    BUFFER *wb = network_viewer_dns_result();
+    network_viewer_emit_response(transaction, wb);
+    buffer_free(wb);
+}
+
+#endif /* OS_LINUX */
 
 // ----------------------------------------------------------------------------------------------------------------
 // FreeBSD: network-protocols function
@@ -7083,6 +7315,11 @@ int main(int argc, char **argv) {
         __atomic_store_n(&plugin_should_exit, true, __ATOMIC_RELEASE);
         nv_apps_lookup_stop();
 
+#if defined(OS_LINUX)
+        network_viewer_ebpf_shared_memory_close();
+        network_viewer_dns_shared_memory_close();
+#endif
+
 #if defined(LOCAL_SOCKETS_USE_SETNS)
         spawn_server_destroy(spawn_srv);
         spawn_srv = NULL;
@@ -7113,6 +7350,10 @@ int main(int argc, char **argv) {
 #if defined(LOCAL_SOCKETS_USE_SETNS)
         spawn_server_destroy(spawn_srv);
 #endif
+#if defined(OS_LINUX)
+        network_viewer_ebpf_shared_memory_close();
+        network_viewer_dns_shared_memory_close();
+#endif
         exit(1);
     }
 
@@ -7129,6 +7370,14 @@ int main(int argc, char **argv) {
         NETWORK_CONNECTIONS_VIEWER_HELP,
             (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA),
             RRDFUNCTIONS_PRIORITY_DEFAULT);
+
+#if defined(OS_LINUX)
+    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" "HTTP_ACCESS_FORMAT" %d\n",
+            NETWORK_DNS_QUERIES_FUNCTION, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT,
+            NETWORK_DNS_QUERIES_FUNCTION_HELP,
+            (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE),
+            RRDFUNCTIONS_PRIORITY_DEFAULT);
+#endif
 
 #if defined(OS_FREEBSD)
     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" "HTTP_ACCESS_FORMAT" %d\n",
@@ -7152,6 +7401,13 @@ int main(int argc, char **argv) {
                                   network_viewer_topology_function,
                                   PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT,
                                   NULL);
+
+#if defined(OS_LINUX)
+    functions_evloop_add_function(wg, NETWORK_DNS_QUERIES_FUNCTION,
+                                  network_viewer_dns_function,
+                                  PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT,
+                                  NULL);
+#endif
 
 #if defined(OS_FREEBSD)
     functions_evloop_add_function(wg, NETWORK_PROTOCOLS_FUNCTION,
@@ -7196,6 +7452,11 @@ int main(int argc, char **argv) {
     functions_evloop_cancel_threads(wg);
     functions_evloop_join_threads(wg);
     nv_apps_lookup_stop();
+
+#if defined(OS_LINUX)
+    network_viewer_ebpf_shared_memory_close();
+    network_viewer_dns_shared_memory_close();
+#endif
 
 #if defined(LOCAL_SOCKETS_USE_SETNS)
     spawn_server_destroy(spawn_srv);

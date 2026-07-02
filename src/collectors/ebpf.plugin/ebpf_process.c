@@ -976,23 +976,6 @@ static void ebpf_process_exit(void *pptr)
         sem_post(shm_mutex_ebpf_integration);
     }
 
-    if (ebpf_module_enabled_get(em) == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
-        netdata_mutex_lock(&lock);
-        if (em->cgroup_charts) {
-            ebpf_obsolete_process_cgroup_charts(em);
-            fflush(stdout);
-        }
-
-        if (em->apps_charts & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
-            ebpf_obsolete_process_apps_charts(em);
-        }
-
-        ebpf_obsolete_process_global(em);
-
-        fflush(stdout);
-        netdata_mutex_unlock(&lock);
-    }
-
     freez(process_hash_values);
     freez(process_stat_vector);
 

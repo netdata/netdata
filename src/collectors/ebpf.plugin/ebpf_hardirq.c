@@ -224,16 +224,6 @@ static void hardirq_cleanup(void *pptr)
     if (!em)
         return;
 
-    if (ebpf_module_enabled_get(em) == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
-        netdata_mutex_lock(&lock);
-
-        if (hardirq_safe_clean)
-            ebpf_obsolete_hardirq_global(em);
-
-        netdata_mutex_unlock(&lock);
-        fflush(stdout);
-    }
-
     if (!hardirq_safe_clean) {
         netdata_mutex_lock(&ebpf_exit_cleanup);
         ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPED);

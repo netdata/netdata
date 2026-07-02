@@ -11,9 +11,14 @@
 
 static bool cgroup_ebpfgo_cachestat_snapshot_ready = false;
 
+void cgroup_ebpfgo_cachestat_set_snapshot_ready(bool ready)
+{
+    cgroup_ebpfgo_cachestat_snapshot_ready = ready;
+}
+
 static procfile *cgroup_ebpfgo_open_procfile_fd(const char *path);
 
-static procfile *cgroup_ebpfgo_open_nonempty_procs_file(char *path_buf, size_t path_buf_size, const char *cg_id)
+procfile *cgroup_ebpfgo_open_nonempty_procs_file(char *path_buf, size_t path_buf_size, const char *cg_id)
 {
     struct stat buf;
     const char *bases[] = {
@@ -127,10 +132,13 @@ static procfile *cgroup_ebpfgo_open_procfile_fd(const char *path)
     return ff;
 }
 
+/* Refreshes the shared memory snapshot.  Returns true if valid data is
+ * available.  The caller (sys_fs_cgroup.c) reads the per-module flags via
+ * cgroup_ebpfgo_shared_memory_flags() and then calls
+ * cgroup_ebpfgo_cachestat_set_snapshot_ready() accordingly. */
 bool cgroup_ebpfgo_cachestat_refresh(void)
 {
-    cgroup_ebpfgo_cachestat_snapshot_ready = cgroup_ebpfgo_shared_memory_refresh();
-    return cgroup_ebpfgo_cachestat_snapshot_ready;
+    return cgroup_ebpfgo_shared_memory_refresh();
 }
 
 static inline void cgroup_ebpfgo_cachestat_initialize(struct cgroup *cg)

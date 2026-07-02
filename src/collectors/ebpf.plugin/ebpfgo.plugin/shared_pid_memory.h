@@ -10,7 +10,10 @@
 struct shared_pid_memory;
 
 struct shared_pid_memory *shared_pid_memory_open(size_t total);
-int shared_pid_memory_publish(struct shared_pid_memory *ctx, const struct ebpf_pid_stat *entries, size_t count);
+/* flags: OR of EBPFGO_SHM_FLAG_* bits; written into the SHM header under the
+ * semaphore along with last_publish_ut so consumers can tell which modules
+ * produced valid data and whether the payload is still live. */
+int shared_pid_memory_publish(struct shared_pid_memory *ctx, const struct ebpf_pid_stat *entries, size_t count, uint32_t flags);
 void shared_pid_memory_close(struct shared_pid_memory *ctx);
 
 #endif

@@ -20,19 +20,15 @@
 #include "ebpf_disk.h"
 #include "ebpf_fd.h"
 #include "ebpf_filesystem.h"
-#include "ebpf_functions.h"
 #include "ebpf_hardirq.h"
 #include "ebpf_mdflush.h"
 #include "ebpf_mount.h"
 #include "ebpf_oomkill.h"
 #include "ebpf_shm.h"
-#include "ebpf_socket.h"
 #include "ebpf_softirq.h"
 #include "ebpf_sync.h"
 #include "ebpf_swap.h"
 #include "ebpf_vfs.h"
-
-#include "ebpf_socket_ipc.h"
 
 #define EBPF_MAX_COMPARE_NAME 95
 #define EBPF_MAX_NAME 100
@@ -41,7 +37,6 @@
 
 enum ebpf_main_index {
     EBPF_MODULE_PROCESS_IDX,
-    EBPF_MODULE_SOCKET_IDX,
     EBPF_MODULE_SYNC_IDX,
     EBPF_MODULE_DCSTAT_IDX,
     EBPF_MODULE_SWAP_IDX,
