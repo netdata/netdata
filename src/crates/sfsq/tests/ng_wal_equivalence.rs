@@ -917,3 +917,49 @@ fn ng_run_rows_match_whole_file_index() {
         );
     }
 }
+
+#[test]
+fn duplicate_tail_file_seq_is_skipped_not_double_served() {
+    // Tail cursors are routed by `file_seq` alone, so each WAL must
+    // contribute at most one tail. A caller violating that invariant must not
+    // double-count stats or misroute rows: `run` drops the duplicate at its
+    // entry (with a warning) and results equal the single-tail run.
+    let records: Vec<LogRecord> = (0..20)
+        .map(|i| LogRecord {
+            time_unix_nano: (BASE_S + i) * NS,
+            attributes: vec![kv("row", s(&format!("r{i:02}")))],
+            ..LogRecord::default()
+        })
+        .collect();
+    let corpus = Corpus {
+        batches: vec![vec![ResourceLogs {
+            scope_logs: vec![ScopeLogs {
+                log_records: records,
+                ..ScopeLogs::default()
+            }],
+            ..ResourceLogs::default()
+        }]],
+    };
+    let dir = tempfile::tempdir().expect("tempdir");
+    let wal_path = write_flattened_wal(dir.path(), &corpus);
+    let file_len = std::fs::metadata(&wal_path).unwrap().len();
+    let tail_dup = || WalTail {
+        file_seq: 7,
+        path: wal_path.clone(),
+        range: wal::FrameRange::new(wal::HEADER_SIZE as u64, file_len),
+    };
+
+    let start = BASE_S as i64 * NS as i64;
+    let span = 20 * NS as i64;
+    let q = LogsQueryBuilder::new(Grid::new(start, span, 1))
+        .limit(100)
+        .build();
+
+    let single = run_plain(sources(vec![], vec![tail_dup()]), q.clone());
+    assert_eq!(single.matched, 20, "fixture sanity: all rows in the tail");
+
+    let dup = run_plain(sources(vec![], tails_clone(&[tail_dup(), tail_dup()])), q);
+    assert_eq!(dup.matched, single.matched, "duplicate tail double-counted");
+    assert_eq!(dup.rows, single.rows, "duplicate tail changed served rows");
+    assert_eq!(dup.histogram, single.histogram);
+}

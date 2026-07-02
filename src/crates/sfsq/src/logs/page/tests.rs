@@ -2,7 +2,6 @@ use super::*;
 // Explicit (not via the `use super::*` glob) so the tests don't depend on
 // `page.rs` happening to import these.
 use crate::logs::cursor::{NS_PER_S, Part};
-use crate::logs::query::LogsQueryBuilder;
 
 fn cursor_at(ts: i64) -> Cursor {
     Cursor {
@@ -15,31 +14,6 @@ fn cursor_at(ts: i64) -> Cursor {
 
 fn timestamps(cursors: &[Cursor]) -> Vec<i64> {
     cursors.iter().map(|c| c.timestamp_ns).collect()
-}
-
-// `materialize` routes tail rows by `file_seq` alone, so two tails sharing
-// one `file_seq` would silently collide (the C-5 bug). `scan_tails`'
-// `debug_assert` must reject that. The assert fires before any WAL I/O, so
-// the dummy paths are never opened. Gated to debug builds — `debug_assert`
-// is compiled out under `--release`, where the panic wouldn't fire.
-#[cfg(debug_assertions)]
-#[test]
-#[should_panic(expected = "WalTail file_seqs must be unique")]
-fn scan_tails_rejects_duplicate_file_seq() {
-    let a = WalTail {
-        file_seq: 7,
-        path: std::path::PathBuf::from("/nonexistent-a"),
-        range: wal::FrameRange::new(0, 100),
-    };
-    let b = WalTail {
-        file_seq: 7,
-        path: std::path::PathBuf::from("/nonexistent-b"),
-        range: wal::FrameRange::new(100, 200),
-    };
-    let tails = [&a, &b];
-    let query = LogsQueryBuilder::new(sfst::Grid::new(0, 1_000_000_000, 1)).build();
-    let mut merged = PageShard::default();
-    let _ = scan_tails(&tails, &query, None, None, &mut merged);
 }
 
 #[test]

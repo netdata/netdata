@@ -197,12 +197,33 @@ impl LogSource {
 /// (`sources.len()`) out of band. Callers that don't report pass a
 /// fresh `Arc::new(AtomicUsize::new(0))`.
 pub fn run(
-    sources: Vec<LogSource>,
+    mut sources: Vec<LogSource>,
     query: LogsQuery,
     cancel: CancellationToken,
     progress: Arc<AtomicUsize>,
 ) -> LogsData {
     let grid = query.grid;
+
+    // Each WAL must contribute at most one tail: tail cursors are routed by
+    // `file_seq` alone, so a duplicate would double-count the statistics
+    // pass and misroute rows at materialize. The caller guarantees
+    // uniqueness (a WAL with an un-indexable chunk is refused whole rather
+    // than split into per-range tails); a violation is dropped loudly here,
+    // at the single entry, so both passes see the same clean source set.
+    let mut tail_seqs = std::collections::HashSet::new();
+    sources.retain(|source| match source {
+        LogSource::Tail(tail) => {
+            let first = tail_seqs.insert(tail.file_seq);
+            if !first {
+                tracing::warn!(
+                    "sfsq: duplicate WAL tail for file_seq={}, skipping (one tail per WAL)",
+                    tail.file_seq
+                );
+            }
+            first
+        }
+        LogSource::Sfst(_) => true,
+    });
 
     // Map every SFST source once, up front, and share each mapping with
     // both passes. An open mapping pins the file's inode, so an SFST
