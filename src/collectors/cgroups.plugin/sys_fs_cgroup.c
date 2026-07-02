@@ -890,6 +890,43 @@ static void cgroup_read_pids_current(struct pids *pids) {
 }
 
 static inline void read_cgroup(struct cgroup *cg) {
+
+    // FIX: verify cgroup directory still exists before reading
+    {
+        char cgroup_dir_path[FILENAME_MAX + 1];
+        if ((cg->options & CGROUP_OPTIONS_IS_UNIFIED) && cgroup_unified_base) {
+            snprintfz(cgroup_dir_path, FILENAME_MAX, "%s%s", cgroup_unified_base, cg->id);
+        } else if (cgroup_cpuacct_base) {
+            snprintfz(cgroup_dir_path, FILENAME_MAX, "%s%s", cgroup_cpuacct_base, cg->id);
+        } else {
+            cgroup_dir_path[0] = 0;
+        }
+        if (cgroup_dir_path[0]) {
+            struct stat st;
+            if (stat(cgroup_dir_path, &st) != 0 || !S_ISDIR(st.st_mode)) {
+                cg->cpuacct_stat.updated = 0;
+                cg->cpuacct_usage.updated = 0;
+                cg->cpuacct_cpu_throttling.updated = 0;
+                cg->cpuacct_cpu_shares.updated = 0;
+                cg->memory.updated_detailed = 0;
+                cg->memory.updated_usage_in_bytes = 0;
+                cg->memory.updated_failcnt = 0;
+                cg->io_service_bytes.updated = 0;
+                cg->io_serviced.updated = 0;
+                cg->throttle_io_service_bytes.updated = 0;
+                cg->throttle_io_serviced.updated = 0;
+                cg->io_merged.updated = 0;
+                cg->io_queued.updated = 0;
+                cg->pids_current.updated = 0;
+                cg->cpu_pressure.updated = 0;
+                cg->io_pressure.updated = 0;
+                cg->memory_pressure.updated = 0;
+                cg->irq_pressure.updated = 0;
+                cgroups_check = 1;
+                return;
+            }
+        }
+    }
     netdata_log_debug(D_CGROUP, "reading metrics for cgroups '%s'", cg->id);
     if (!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
         cgroup_read_cpuacct_stat(&cg->cpuacct_stat);
