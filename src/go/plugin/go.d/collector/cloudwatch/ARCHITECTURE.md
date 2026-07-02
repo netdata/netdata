@@ -94,7 +94,10 @@ Discovery then finds which *instances* of those profiles exist per region.
   `matchInstanceDimensions` keeps a returned metric only if its dimension-**name**
   set exactly equals the profile's set — same names, same cardinality. This
   collapses CloudWatch's multi-granularity fan-out to the chosen instance grain
-  and dedups shared instances.
+  and dedups shared instances. A dimension pinned to a `constant` value is
+  additionally kept only when the metric's value for it equals that constant
+  (`constantDimensionsHold`, fail-closed), so a constant dimension can never merge
+  distinct instances onto one unlabeled series.
 - **Recently-active-only** is period-aware: the `ListMetrics RecentlyActive=PT3H`
   filter is applied only when every metric in the profile has a period ≤ 3h.
   PT3H is the only value CloudWatch accepts, so applying it to a daily profile
@@ -113,8 +116,9 @@ Discovery then finds which *instances* of those profiles exist per region.
 `query_plan.go` + `observe.go`.
 
 - `buildQueryPlan` emits one `plannedQuery` per `instance × metric × statistic`.
-  Identity labels are `{account_id, region}` plus one label per instance
-  dimension. The exported series name is `<profile>.<metric_id>_<statistic>`.
+  Identity labels are `{account_id, region}` plus one label per identifying
+  instance dimension (a `constant` dimension is sent in the query but not
+  labeled). The exported series name is `<profile>.<metric_id>_<statistic>`.
 - Queries are grouped by `queryGroupKey{region, period}` — the batch unit
   (shared client and time window) and the scheduling unit.
 - The `observationStore` keeps a per-(region, period) `nextQueryAt`. `dueGroups`
@@ -216,8 +220,11 @@ live under `config/go.d/cloudwatch.profiles/default/` (one YAML per service; a
 user file with the same basename overrides its stock counterpart).
 
 A `Profile` declares: `namespace` (e.g. `AWS/EC2`), `period`, `instance`
-dimensions (the CloudWatch dimension names that identify one instance, each
-mapped to a Netdata label), `metrics` (with `statistics`, optional `rate`,
+dimensions (the CloudWatch dimension names that identify one instance; each is
+either mapped to a Netdata `label`, or pinned to a `constant` value — a
+match-and-query-only dimension that is matched and queried but not emitted as a
+label, for a constant CloudWatch dimension such as CloudFront's `Region=Global`),
+`metrics` (with `statistics`, optional `rate`,
 optional per-metric `period`, and optional `nil_as_zero` — record 0 vs gap on a
 no-datapoint result, defaulting to `rate`), and a `charttpl.Group` `template`.
 
@@ -227,8 +234,12 @@ Load and resolution (`catalog.go`):
   user profile **overrides** a stock profile with the same basename.
 - Invalid **stock** profiles are fatal; invalid **user** profiles are logged and
   skipped.
-- Decode is **non-strict** (unknown keys ignored) so a profile authored for a
-  newer collector still loads on an older binary.
+- Decode is **non-strict** (unknown keys ignored), so a profile that merely *adds*
+  optional fields a newer collector understands still loads on an older binary —
+  but only while old validation still passes. It is not a blanket guarantee: a
+  profile that relies on a newer field to validate is rejected by an older binary
+  (e.g. a dimension using `constant` omits `label`, which an older binary still
+  requires).
 - **Profile selection is config-driven** (`selectProfiles`), not discovery-driven.
   `profiles.mode: auto` (default) selects every default-enabled profile in the
   catalog; `combined` adds the default-disabled deep-grain profiles; `exact` selects
@@ -244,9 +255,10 @@ Load and resolution (`catalog.go`):
 Profile validation invariants (`profile.go`) — these are load-bearing:
 
 - Every chart's `instances.by_labels` must include `account_id`, `region`, and
-  every instance-dimension label. Chart-instance identity is built solely from
-  `by_labels`; a missing label would silently merge distinct AWS resources onto
-  one chart instance.
+  every identifying instance-dimension label (a `constant` match-and-query-only
+  dimension has no label and is excluded). Chart-instance identity is built solely
+  from `by_labels`; a missing label would silently merge distinct AWS resources
+  onto one chart instance.
 - Every chart must declare `algorithm: absolute` (CloudWatch aggregates are not
   cumulative counters; this also blocks incremental suffix inference).
 - `template.metrics` must be empty — the collector owns the visible-series list

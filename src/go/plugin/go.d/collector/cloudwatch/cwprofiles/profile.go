@@ -53,8 +53,11 @@ var statStrings = map[string]string{
 }
 
 // Profile is one CloudWatch namespace's curated metric+chart definition. The
-// schema is additive-only across phases; the YAML decoder is non-strict, so
-// unknown keys are ignored (forward-compat for profiles carrying newer fields).
+// schema is additive-only across phases; the YAML decoder is non-strict, so an
+// older binary tolerates unknown fields a newer profile carries — but only when
+// old validation still passes. A profile that depends on a newer field to
+// validate (e.g. a dimension using Constant in place of Label) is rejected by an
+// older binary; see InstanceDimension.
 type Profile struct {
 	Version     string         `yaml:"version" json:"version,omitempty"`
 	DisplayName string         `yaml:"display_name" json:"display_name,omitempty"`
@@ -70,18 +73,39 @@ type Profile struct {
 }
 
 // InstanceSpec declares the exact CloudWatch dimension-NAME set that defines an
-// instance for this profile. It is both the ListMetrics filter and the instance
-// identity key.
+// instance for this profile. The set is the ListMetrics filter and the
+// GetMetricData query dimensions; identifying dimensions (those with a label)
+// form the Netdata instance identity, while constant match-and-query-only
+// dimensions do not.
 type InstanceSpec struct {
 	Dimensions []InstanceDimension `yaml:"dimensions" json:"dimensions,omitempty"`
 }
 
-// InstanceDimension maps a CloudWatch dimension name to its Netdata label key.
-// The mapping is explicit so the public label contract is unambiguous.
+// InstanceDimension is one CloudWatch dimension of a profile's instance identity.
+// It is either:
+//   - an IDENTIFYING dimension (Label set): its value is emitted as a Netdata
+//     label and is required in chart by_labels; or
+//   - a MATCH-AND-QUERY-ONLY dimension (Constant set): still part of the exact
+//     dimension-NAME-set match and the GetMetricData query, but discovery keeps
+//     only metrics whose value for it equals Constant (fail-closed), and it is NOT
+//     emitted as a label / NOT required in by_labels.
+//
+// Use Constant for a dimension that is constant across instances and so carries no
+// Netdata identity (e.g. CloudFront's Region="Global"). Exactly one of Label or
+// Constant must be set.
+//
+// Forward-compat caveat: a profile that uses Constant (omitting Label) is rejected
+// by an OLDER collector binary, whose validation still requires Label. This is
+// benign for stock profiles, which ship with their binary.
 type InstanceDimension struct {
-	Name  string `yaml:"name" json:"name,omitempty"`   // CloudWatch dimension name (ListMetrics filter + GetMetricData query)
-	Label string `yaml:"label" json:"label,omitempty"` // Netdata label key (identity + chart by_labels)
+	Name     string  `yaml:"name" json:"name,omitempty"`
+	Label    string  `yaml:"label" json:"label,omitempty"`
+	Constant *string `yaml:"constant,omitempty" json:"constant,omitempty"`
 }
+
+// IsConstant reports whether the dimension is match-and-query-only (a pinned
+// constant value) rather than an identifying label.
+func (d InstanceDimension) IsConstant() bool { return d.Constant != nil }
 
 // Metric is one CloudWatch MetricName queried at one or more statistics.
 type Metric struct {
@@ -251,18 +275,30 @@ func validateInstanceDimensions(profilePrefix string, dims []InstanceDimension) 
 	seenLabels := map[string]struct{}{}
 	for i, d := range dims {
 		prefix := fmt.Sprintf("%s.instance.dimensions[%d]", profilePrefix, i)
-		name := strings.TrimSpace(d.Name)
-		if name == "" {
-			errs = append(errs, fmt.Errorf("%s: 'name' is required", prefix))
-		} else if _, ok := seenNames[name]; ok {
+		// Name is matched against CloudWatch dimension names verbatim (DimensionNames),
+		// so a stray leading/trailing space would silently match nothing — reject it
+		// (internal spaces are legitimate, e.g. MSK's "Cluster Name").
+		if d.Name == "" || d.Name != strings.TrimSpace(d.Name) {
+			errs = append(errs, fmt.Errorf("%s: 'name' must be non-empty with no leading/trailing whitespace (it is matched against CloudWatch dimension names verbatim)", prefix))
+		} else if _, ok := seenNames[d.Name]; ok {
 			errs = append(errs, fmt.Errorf("%s: duplicate dimension name %q", prefix, d.Name))
 		} else {
-			seenNames[name] = struct{}{}
+			seenNames[d.Name] = struct{}{}
 		}
 
 		switch {
+		case d.Constant != nil && d.Label != "":
+			errs = append(errs, fmt.Errorf("%s: set exactly one of 'label' or 'constant', not both", prefix))
+		case d.Constant != nil:
+			// Match-and-query-only dimension: it has no label, so the label rules
+			// (charset, reserved, uniqueness) do not apply. It is compared verbatim
+			// to the CloudWatch dimension value at discovery, so a stray space would
+			// silently match nothing — reject empty or whitespace-padded values.
+			if c := *d.Constant; c == "" || c != strings.TrimSpace(c) {
+				errs = append(errs, fmt.Errorf("%s: 'constant' must be non-empty with no leading/trailing whitespace (it is matched against the CloudWatch dimension value verbatim)", prefix))
+			}
 		case !IsValidIdentityID(d.Label):
-			errs = append(errs, fmt.Errorf("%s: 'label' must match %q", prefix, reIdentityID.String()))
+			errs = append(errs, fmt.Errorf("%s: 'label' must match %q (or set 'constant' for a match-and-query-only dimension)", prefix, reIdentityID.String()))
 		case isReservedLabel(d.Label):
 			errs = append(errs, fmt.Errorf("%s: 'label' %q is reserved (account_id and region are collector-provided identity labels)", prefix, d.Label))
 		default:
@@ -282,14 +318,17 @@ func isReservedLabel(label string) bool {
 }
 
 // validateByLabels enforces that every chart's effective instance identity
-// (by_labels) includes account_id, region, and all of the profile's instance
-// dimension labels. chartengine builds instance identity solely from by_labels,
-// so omitting any of these would collapse distinct instances.
+// (by_labels) includes account_id, region, and all of the profile's identifying
+// dimension labels (constant match-and-query-only dimensions are excluded — they
+// carry no identity). chartengine builds instance identity solely from by_labels,
+// so omitting any required label would collapse distinct instances.
 func validateByLabels(profilePrefix string, p Profile) error {
 	required := make([]string, 0, len(p.Instance.Dimensions)+2)
 	required = append(required, "account_id", "region")
 	for _, d := range p.Instance.Dimensions {
-		required = append(required, d.Label)
+		if !d.IsConstant() { // constant dims are not labeled, so not required in by_labels
+			required = append(required, d.Label)
+		}
 	}
 
 	var errs []error

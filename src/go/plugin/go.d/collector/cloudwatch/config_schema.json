@@ -259,7 +259,7 @@
     },
     "regions": {
       "ui:listFlavour": "list",
-      "ui:help": "AWS regions to collect from. Add one region per row. At least one is required, and all regions must belong to the same AWS partition (standard, GovCloud, or China).",
+      "ui:help": "AWS regions to collect from. Add one region per row. At least one is required, and all regions must belong to the same AWS partition (standard, GovCloud, or China). Global services report to a single region -- e.g. Amazon CloudFront publishes only in us-east-1 -- so include that region to collect them.",
       "items": {
         "ui:placeholder": "us-east-1"
       }

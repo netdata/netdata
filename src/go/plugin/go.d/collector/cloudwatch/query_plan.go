@@ -88,9 +88,11 @@ func (c *Collector) buildQueryPlan() []plannedQuery {
 }
 
 // instanceLabelsAndDims builds the metrix identity labels
-// ({account_id, region, <dimension labels>}) and the CloudWatch dimensions for
-// one discovered instance. The returned label slice is shared read-only by all
-// of the instance's planned queries, so callers must not append to it.
+// ({account_id, region, <identifying dimension labels>}) and the full CloudWatch
+// dimension set for one discovered instance. Constant (match-and-query-only)
+// dimensions are included in the query dimensions but omitted from the labels. The
+// returned label slice is shared read-only by all of the instance's planned
+// queries, so callers must not append to it.
 func (c *Collector) instanceLabelsAndDims(prof cwprofiles.ResolvedProfile, region string, inst discoveredInstance) ([]metrix.Label, []cwtypes.Dimension) {
 	pdims := prof.Config.Instance.Dimensions
 	dims := make([]cwtypes.Dimension, len(pdims))
@@ -102,7 +104,9 @@ func (c *Collector) instanceLabelsAndDims(prof cwprofiles.ResolvedProfile, regio
 	for i, d := range pdims {
 		value := inst.DimensionValues[i]
 		dims[i] = cwtypes.Dimension{Name: aws.String(d.Name), Value: aws.String(value)}
-		labels = append(labels, metrix.Label{Key: d.Label, Value: value})
+		if !d.IsConstant() { // constant dims are queried but not emitted as labels
+			labels = append(labels, metrix.Label{Key: d.Label, Value: value})
+		}
 	}
 	return labels, dims
 }

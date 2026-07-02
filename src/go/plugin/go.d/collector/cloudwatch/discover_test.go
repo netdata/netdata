@@ -158,6 +158,66 @@ func TestMatchInstanceDimensions_DuplicateNameRejected(t *testing.T) {
 	assert.False(t, ok)
 }
 
+func TestConstantDimensionsHold(t *testing.T) {
+	tests := map[string]struct {
+		dims   []cwprofiles.InstanceDimension
+		values []string
+		want   bool
+	}{
+		"no constant dimensions": {
+			dims:   []cwprofiles.InstanceDimension{{Name: "InstanceId", Label: "instance_id"}},
+			values: []string{"i-1"},
+			want:   true,
+		},
+		"constant value matches": {
+			dims:   []cwprofiles.InstanceDimension{{Name: "DistributionId", Label: "distribution_id"}, {Name: "Region", Constant: aws.String("Global")}},
+			values: []string{"E1", "Global"},
+			want:   true,
+		},
+		"constant value mismatch fails closed": {
+			dims:   []cwprofiles.InstanceDimension{{Name: "DistributionId", Label: "distribution_id"}, {Name: "Region", Constant: aws.String("Global")}},
+			values: []string{"E1", "us-east-1"},
+			want:   false,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, constantDimensionsHold(tc.dims, tc.values))
+		})
+	}
+}
+
+func TestDiscoverInstances_ConstantDimensionFailClosed(t *testing.T) {
+	// A constant dimension is part of the exact NAME-set match, but only metrics
+	// whose value equals the pinned constant are kept (fail-closed). The constant
+	// value is retained in DimensionValues so it can be sent in the query.
+	prof := cwprofiles.Profile{
+		Namespace: "AWS/CloudFront",
+		Period:    300,
+		Instance: cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{
+			{Name: "DistributionId", Label: "distribution_id"},
+			{Name: "Region", Constant: aws.String("Global")},
+		}},
+	}
+	metrics := []cwtypes.Metric{
+		mkMetric("Requests", "DistributionId", "E1", "Region", "Global"),    // kept
+		mkMetric("Requests", "DistributionId", "E2", "Region", "Global"),    // kept (dedup vs E1 by identity)
+		mkMetric("Requests", "DistributionId", "E3", "Region", "us-east-1"), // dropped: constant mismatch
+		mkMetric("Requests", "DistributionId", "E4"),                        // dropped: wrong cardinality
+	}
+	client := &fakeCloudWatch{pages: []*cloudwatch.ListMetricsOutput{page(metrics, "")}}
+
+	got, err := discoverInstances(context.Background(), client, prof, false)
+	require.NoError(t, err)
+
+	gotDimValues := make([][]string, len(got))
+	for i, inst := range got {
+		gotDimValues[i] = inst.DimensionValues
+	}
+	assert.Equal(t, [][]string{{"E1", "Global"}, {"E2", "Global"}}, gotDimValues)
+}
+
 func TestDiscoverInstances_Pagination(t *testing.T) {
 	client := &fakeCloudWatch{pages: []*cloudwatch.ListMetricsOutput{
 		page([]cwtypes.Metric{mkMetric("CPUUtilization", "InstanceId", "i-1")}, "next"),

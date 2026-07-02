@@ -40,6 +40,9 @@ modules:
         - redshift
         - msk
         - kafka
+        - cloudfront
+        - cdn
+        - content delivery network
       related_resources:
         integrations:
           list: []
@@ -73,6 +76,7 @@ modules:
           - Amazon DocumentDB (document database)
           - Amazon Redshift (data warehouse)
           - Amazon MSK (Kafka streaming)
+          - Amazon CloudFront (content delivery network / CDN)
 
           [Each service is defined by a profile](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default) -- a YAML file declaring its CloudWatch namespace, the metrics and statistics to collect, and a chart template -- so coverage can be extended without code changes.
         method_description: |
@@ -93,7 +97,7 @@ modules:
             - Minimum collection interval is 60 seconds (CloudWatch's minimum metric period).
             - CloudWatch publishes metrics with a delay; the effective query offset is `max(query_offset, period)`, so long-period metrics (such as the daily S3 storage metrics) are inherently about one period behind.
             - There is no cap on discovered resources; a warning is logged at 1000 or more discovered instances (collection is never truncated).
-            - Resources are labeled by their CloudWatch dimensions (for example EC2 `instance_id`), not by their `Name` tag or other resource tags; tag-based naming and filtering are not currently supported.
+            - Resources are labeled by their identifying CloudWatch dimensions (for example EC2 `instance_id`), not by their `Name` tag or other resource tags; tag-based naming and filtering are not currently supported. (A dimension that is constant across resources, such as CloudFront's `Region=Global`, is used to match and query metrics but is not turned into a label.)
         performance_impact:
           description: |
             AWS bills CloudWatch API usage. `GetMetricData` (the metric queries) is the cost driver, billed per metric requested; `ListMetrics` discovery falls under the free tier and then costs a fraction as much. As a rough anchor, `GetMetricData` is billed at roughly $0.01 per 1,000 metrics requested -- confirm current [CloudWatch pricing](https://aws.amazon.com/cloudwatch/pricing/) for your region. Each combination of instance, metric, and statistic is one billed query, run once per its own period (not once per collection cycle), so cost scales with discovered instances, metrics, statistics, and their periods -- not with `update_every`. The collector already minimizes it with curated per-service profiles, single-statistic defaults, exact dimension filtering, cached discovery, and `recently_active_only`. To reduce it further, restrict services with `profiles.mode: exact` or narrow `regions`.
@@ -306,7 +310,7 @@ modules:
               Check the following:
 
               - **Permissions** -- the IAM identity allows `cloudwatch:ListMetrics`, `cloudwatch:GetMetricData`, and `sts:GetCallerIdentity` (plus `sts:AssumeRole` in `assume_role` mode).
-              - **Regions** -- the `regions` list includes the regions where your resources run.
+              - **Regions** -- the `regions` list includes the regions where your resources run. Some services are global and report to a single region: **Amazon CloudFront publishes its CloudWatch metrics only in `us-east-1`** (with a constant `Region=Global`), so `regions` must include `us-east-1` to collect it.
               - **Resources are active** -- confirm in the AWS CloudWatch console that the resources are publishing metrics.
               - **Collector logs** -- check for authentication or API errors:
                 ```bash
@@ -374,6 +378,7 @@ modules:
         | [Amazon DocumentDB](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/docdb.yaml) | `cloudwatch.docdb.*` | CPU utilization, freeable memory, connections, buffer cache hit ratio, disk IOPS, latency, throughput, replica lag, cursors timed out |
         | [Amazon Redshift](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/redshift.yaml) | `cloudwatch.redshift.*` | health, CPU utilization, disk space used, database connections, disk IOPS, throughput, network throughput |
         | [Amazon MSK](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/msk.yaml) | `cloudwatch.msk.*` | broker throughput, messages in, CPU, disk used, memory, partitions, connections |
+        | [Amazon CloudFront](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/cloudfront.yaml) | `cloudwatch.cloudfront.*` | requests, downloaded and uploaded traffic, total/4xx/5xx error rates |
 
         Each profile also carries **optional metrics** that are commented out to keep cost and cardinality low; uncomment a metric and its matching chart, then **restart the Netdata Agent** (profiles are loaded once per go.d process and cached). Stock profiles are shipped at `/usr/lib/netdata/conf.d/go.d/cloudwatch.profiles/default/`. To customize a service, copy its profile into `/etc/netdata/go.d/cloudwatch.profiles/` (keep the same filename) and edit it -- a user profile fully replaces the stock one of the same name -- then restart the Agent.
 

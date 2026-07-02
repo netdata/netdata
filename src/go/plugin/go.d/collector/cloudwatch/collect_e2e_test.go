@@ -314,7 +314,14 @@ func TestAllStockProfiles_PipelineChartComplete(t *testing.T) {
 
 		var dimPairs []string
 		for i, d := range prof.Instance.Dimensions {
-			dimPairs = append(dimPairs, d.Name, fmt.Sprintf("%s-%d", rp.Name, i))
+			// A constant (match-and-query-only) dimension only matches its pinned
+			// value, so the synthesized metric must carry that value or discovery
+			// would reject it (fail-closed).
+			value := fmt.Sprintf("%s-%d", rp.Name, i)
+			if d.IsConstant() {
+				value = *d.Constant
+			}
+			dimPairs = append(dimPairs, d.Name, value)
 		}
 
 		// A metric under the instance's dimensions so discovery finds it.
