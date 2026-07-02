@@ -11,7 +11,9 @@ workspace = true
 [features]
 # Expose the chunk-level writer (`ChunkWriter` + its input-only types) so
 # external tests can hand-build files chunk by chunk. Test fixtures only —
-# production producers go through `IndexWriter`.
+# production producers go through `IndexWriter`. Cargo feature unification
+# makes these visible workspace-wide under `cargo test --workspace`; a
+# per-crate test run still needs its own dev-dep enabling the feature.
 test-util = []
 
 [dependencies]

@@ -107,7 +107,7 @@ pub(crate) use schema::{ALL_COLUMNS, ColumnSpec};
 
 // The chunk-level writer surface, exposed only for hand-built test fixtures.
 #[cfg(feature = "test-util")]
-pub use writer::{ChunkCounts, ChunkWriter, ColumnsPresent, write_summary_only};
+pub use writer::{ChunkCounts, ChunkWriter, ColumnsPresent};
 
 // ── Format constants ─────────────────────────────────────────────
 //

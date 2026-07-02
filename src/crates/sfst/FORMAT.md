@@ -157,8 +157,8 @@ Indices start at 0 and are contiguous within each tier. A producer
 emitting `M` mid-card chunks uses ids `MF{0}` through `MF{M-1}`;
 similarly for `HF{i}` and `SB{i}`.
 
-`PRIM`, `TIMS`, and at least one `SB{i}` are required. The public
-writer (`sfst::StreamWriter`) enforces the full canonical shape — all
+`PRIM`, `TIMS`, and at least one `SB{i}` are required. The chunk
+writer (`ChunkWriter`, driven via `IndexWriter`) enforces the full canonical shape — all
 four named chunks plus the declared secondary counts, in order — and
 fails with `Error::WriterMisuse` / `Error::InvalidStreamBatchCount`
 on any deviation. SUMR/META are technically optional at the container
@@ -460,8 +460,8 @@ All chunk payloads go through:
     serialized = bincode::serde::encode(value, bincode::config::standard())
     payload    = zstd::encode(serialized, level)
 
-The packing is internal to the crate: producers hand typed payloads
-to `sfst::StreamWriter`, which packs FST chunks (PRIM, `MF{i}`) at an
+The packing is internal to the crate: the build hands typed payloads
+to `ChunkWriter`, which packs FST chunks (PRIM, `MF{i}`) at an
 elevated zstd level and everything else at the default level. The
 format itself does not fix the level — zstd frames are
 self-describing, so readers decode any level.

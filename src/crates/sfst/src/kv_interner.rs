@@ -141,6 +141,10 @@ impl<'a> KeyValueInterner<'a> {
     }
 
     /// Intern a string with a pre-computed xxhash64 value.
+    ///
+    /// The string-match early returns below deliberately skip `track_field`:
+    /// a slot is registered in `field_slots` exactly once, when first interned.
+    /// Re-tracking a returned slot would double-count it under its field.
     pub fn intern_with_hash(&mut self, hash: u64, s: &str) -> KvSlot {
         // The map keys on the precomputed hash with an identity hasher, so the
         // standard `entry(hash)` lands in the same slot the removed raw-entry
