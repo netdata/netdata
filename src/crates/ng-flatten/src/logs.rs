@@ -249,6 +249,8 @@ pub fn prepare_log_frame(
     // (`ts_range` is `None`). Recordless resource/scope attributes are
     // skipped too — same as not writing the frame.
     if norm.records == 0 {
+        // `bad_ids` is necessarily zero here (normalization inspects only
+        // records) — carried through so the invariant is visible, not assumed.
         return Ok(PreparedLogFrame {
             data: Vec::new(),
             records: 0,

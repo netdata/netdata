@@ -1,5 +1,6 @@
-//! `ng-ingest`: a passive OTLP/gRPC logs receiver that writes each received batch
-//! to a WAL file as protobuf bytes (one frame per batch).
+//! `ng-ingest`: a passive OTLP/gRPC logs receiver that flattens each received
+//! batch and writes it to a WAL file as one flattened-frame (one frame per
+//! batch; see `ng-flatten`).
 //!
 //! It does not connect to any source; point an OTLP exporter at its listen
 //! address, e.g.:
@@ -65,8 +66,8 @@ struct Sink {
     dump: Option<std::io::BufWriter<std::fs::File>>,
 }
 
-/// The OTLP `LogsService` implementation: encode each batch to protobuf and append
-/// it as one WAL frame.
+/// The OTLP `LogsService` implementation: prepare each batch as a flattened
+/// frame and append it to the WAL.
 struct Receiver {
     sink: Arc<Mutex<Sink>>,
     /// Total log records written so far (across all batches).
@@ -92,17 +93,27 @@ impl LogsService for Receiver {
                 clock,
                 dump,
             } = &mut *sink;
-            // Dump BEFORE write_request (which normalizes in place) so the
-            // corpus holds the pristine request; skip empties so a dumped
-            // request always pairs with a written frame.
-            if let Some(dump) = dump {
-                if count_log_records(&req) > 0 {
-                    ng_ingest::append_dumped_request(dump, &req)
+            // Capture the pristine request BEFORE write_request (which
+            // normalizes in place), but append it to the dump only AFTER the
+            // frame is written — a dumped request always pairs with a frame,
+            // even when a write fails mid-run.
+            let dump_entry = match dump {
+                Some(_) if count_log_records(&req) > 0 => {
+                    let mut buf = Vec::new();
+                    ng_ingest::append_dumped_request(&mut buf, &req)
                         .map_err(|e| Status::internal(format!("request dump failed: {e}")))?;
+                    Some(buf)
                 }
+                _ => None,
+            };
+            let written = write_request(writer, clock, req)
+                .map_err(|e| Status::internal(format!("ingest write failed: {e}")))?;
+            if let (Some(dump), Some(entry)) = (dump, dump_entry) {
+                use std::io::Write;
+                dump.write_all(&entry)
+                    .map_err(|e| Status::internal(format!("request dump failed: {e}")))?;
             }
-            write_request(writer, clock, req)
-                .map_err(|e| Status::internal(format!("ingest write failed: {e}")))?
+            written
         };
 
         if written > 0 {

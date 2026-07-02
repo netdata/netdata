@@ -29,10 +29,10 @@ use prost::Message;
 
 fn corpus_blobs() -> Option<Vec<Vec<u8>>> {
     let path = std::env::var("OTLP_BENCH_FILE").ok()?;
-    let path = path.strip_prefix("~/").map_or_else(
-        || std::path::PathBuf::from(&path),
-        |rest| std::path::PathBuf::from(std::env::var("HOME").unwrap()).join(rest),
-    );
+    let path = match (path.strip_prefix("~/"), std::env::var("HOME")) {
+        (Some(rest), Ok(home)) => std::path::PathBuf::from(home).join(rest),
+        _ => std::path::PathBuf::from(&path),
+    };
     let bytes = std::fs::read(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
     // Split the dump into per-request blobs (framing per
     // `ng_ingest::append_dumped_request`).

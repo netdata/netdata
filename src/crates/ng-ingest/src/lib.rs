@@ -44,7 +44,8 @@ pub fn one_file_config() -> wal::Config {
 }
 
 /// Prepare `req` as a flattened frame ([`ng_flatten::prepare_log_frame`]: one
-/// normalize walk, flatten, hash pre-compute, bincode-encode) and append it as
+/// normalize walk, then flatten — which hashes each entry at emit time — and
+/// bincode-encode) and append it as
 /// a single WAL frame, returning the number of log records written. The
 /// frame's `log_min/max_ts` carry the resolved timestamp range. A request with
 /// zero log records writes no frame and returns `0`.

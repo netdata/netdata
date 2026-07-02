@@ -27,9 +27,10 @@
 - Each frame is **self-contained**: a per-frame typed `ng_flatten::SchemaTree`
   plus resource → scope → record groups of typed `Entry` values, plus the
   per-record columns. No cross-frame state — any frame range decodes alone.
-- Producers MUST emit it via `ng_flatten::flatten_request` + `fill_hashes` +
-  `encode_frame`: the production ingestor (`otel-ingestor::logs_service`) and the
-  `ng-ingest` benchmark binary both do.
+- Producers MUST emit it via `ng_flatten::prepare_log_frame` (one normalize
+  walk → consuming flatten with emit-time entry hashing → bincode encode):
+  the production ingestor (`otel-ingestor::logs_service`) and the `ng-ingest`
+  benchmark binary both do.
 - The former OTAP/Arrow logs payload (the `wal-otap` crate and
   `otel-ingestor::arrow_bridge`) is **removed**. ng-flatten is the only logs
   format; do not reintroduce a second one.
@@ -50,8 +51,9 @@
 
 ## Per-frame hashing fast path
 
-- Each `Entry` carries a pre-computed `xxhash64("key=value")`
-  (`ng_flatten::fill_hashes`); the interner uses an identity hasher so the
+- Each `Entry` carries a pre-computed `xxhash64("key=value")`, filled at
+  emit time by the flattener (an invariant of flattening — there is no
+  separate fill pass); the interner uses an identity hasher so the
   pre-computed `u64` is the bucket key.
 - The seal builder rides `RowIndex::lookup_hash` — on a hash hit it skips
   `key=value` string formatting. Collision-safe: the interner answers `None` for

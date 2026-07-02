@@ -837,8 +837,8 @@ mod tests {
 
     #[test]
     fn flatten_populates_and_dedups_entry_hashes() {
-        // Two spans share `http.method=GET`; a resource attr is present too. After
-        // the fill, every entry (resource/scope/span) must carry a non-zero hash,
+        // Two spans share `http.method=GET`; a resource attr is present too. At
+        // flatten time, every entry (resource/scope/span) must carry its hash,
         // identical key=value must hash the same (enables the seal fast path), and
         // distinct key=value must differ.
         let span = |name: &str| Span {
