@@ -390,7 +390,7 @@ static bool netdata_windows_str_contains_ci(const char *haystack, const char *ne
     if(!haystack || !needle || !*needle) return false;
     size_t nlen = strlen(needle);
     for(const char *p = haystack; *p; p++) {
-        if(_strnicmp(p, needle, nlen) == 0)
+        if(strncasecmp(p, needle, nlen) == 0)
             return true;
     }
     return false;

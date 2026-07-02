@@ -8,13 +8,19 @@ static bool wmi_get_string_property(IWbemClassObject *pclsObj, const wchar_t *pr
     if(!pclsObj || !out || out_size == 0) return false;
 
     VARIANT vtProp;
+    VariantInit(&vtProp);
     HRESULT hr = pclsObj->lpVtbl->Get(pclsObj, prop, 0, &vtProp, 0, 0);
     if(FAILED(hr) || vtProp.vt != VT_BSTR) {
         VariantClear(&vtProp);
         return false;
     }
 
-    wcstombs(out, vtProp.bstrVal, out_size - 1);
+    if(wcstombs(out, vtProp.bstrVal, out_size - 1) == (size_t)-1) {
+        out[0] = '\0';
+        VariantClear(&vtProp);
+        return false;
+    }
+
     out[out_size - 1] = '\0';
     VariantClear(&vtProp);
     return true;
