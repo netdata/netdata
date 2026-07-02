@@ -134,6 +134,19 @@ func TestProfile_Validate(t *testing.T) {
 			wantErr:     true,
 			errContains: "constant",
 		},
+		"constant with surrounding whitespace is invalid": {
+			mutate: func(p *Profile) {
+				padded := "Global "
+				p.Instance.Dimensions = append(p.Instance.Dimensions, InstanceDimension{Name: "Region", Constant: &padded})
+			},
+			wantErr:     true,
+			errContains: "whitespace",
+		},
+		"dimension name with surrounding whitespace is invalid": {
+			mutate:      func(p *Profile) { p.Instance.Dimensions[0].Name = "InstanceId " },
+			wantErr:     true,
+			errContains: "whitespace",
+		},
 		"period above maximum": {
 			mutate:      func(p *Profile) { p.Period = 172800 },
 			wantErr:     true,

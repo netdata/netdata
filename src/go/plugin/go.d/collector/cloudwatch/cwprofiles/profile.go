@@ -275,13 +275,15 @@ func validateInstanceDimensions(profilePrefix string, dims []InstanceDimension) 
 	seenLabels := map[string]struct{}{}
 	for i, d := range dims {
 		prefix := fmt.Sprintf("%s.instance.dimensions[%d]", profilePrefix, i)
-		name := strings.TrimSpace(d.Name)
-		if name == "" {
-			errs = append(errs, fmt.Errorf("%s: 'name' is required", prefix))
-		} else if _, ok := seenNames[name]; ok {
+		// Name is matched against CloudWatch dimension names verbatim (DimensionNames),
+		// so a stray leading/trailing space would silently match nothing — reject it
+		// (internal spaces are legitimate, e.g. MSK's "Cluster Name").
+		if d.Name == "" || d.Name != strings.TrimSpace(d.Name) {
+			errs = append(errs, fmt.Errorf("%s: 'name' must be non-empty with no leading/trailing whitespace (it is matched against CloudWatch dimension names verbatim)", prefix))
+		} else if _, ok := seenNames[d.Name]; ok {
 			errs = append(errs, fmt.Errorf("%s: duplicate dimension name %q", prefix, d.Name))
 		} else {
-			seenNames[name] = struct{}{}
+			seenNames[d.Name] = struct{}{}
 		}
 
 		switch {
@@ -289,9 +291,11 @@ func validateInstanceDimensions(profilePrefix string, dims []InstanceDimension) 
 			errs = append(errs, fmt.Errorf("%s: set exactly one of 'label' or 'constant', not both", prefix))
 		case d.Constant != nil:
 			// Match-and-query-only dimension: it has no label, so the label rules
-			// (charset, reserved, uniqueness) do not apply; only the value matters.
-			if strings.TrimSpace(*d.Constant) == "" {
-				errs = append(errs, fmt.Errorf("%s: 'constant' must not be empty", prefix))
+			// (charset, reserved, uniqueness) do not apply. It is compared verbatim
+			// to the CloudWatch dimension value at discovery, so a stray space would
+			// silently match nothing — reject empty or whitespace-padded values.
+			if c := *d.Constant; c == "" || c != strings.TrimSpace(c) {
+				errs = append(errs, fmt.Errorf("%s: 'constant' must be non-empty with no leading/trailing whitespace (it is matched against the CloudWatch dimension value verbatim)", prefix))
 			}
 		case !IsValidIdentityID(d.Label):
 			errs = append(errs, fmt.Errorf("%s: 'label' must match %q (or set 'constant' for a match-and-query-only dimension)", prefix, reIdentityID.String()))
