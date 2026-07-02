@@ -806,6 +806,43 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn export_stamps_the_resolved_ts_range_on_the_wal() {
+        let tmp = tempfile::tempdir().unwrap();
+        let wal_dir = tmp.path().to_path_buf();
+        let service = test_service(wal_dir.clone());
+
+        // Two records with fixed event timestamps; the file's accumulated
+        // log-data range must be exactly their span — the wiring from
+        // `prepare_log_frame`'s ts_range through `write_frame` to the file.
+        const T1: u64 = 1_700_000_000_000_000_000;
+        const T2: u64 = 1_700_000_100_000_000_000;
+        let mut r = rl(Some("prod"), Some("api"), 2);
+        r.scope_logs[0].log_records[0].time_unix_nano = T1;
+        r.scope_logs[0].log_records[1].time_unix_nano = T2;
+        service
+            .export(Request::new(ExportLogsServiceRequest {
+                resource_logs: vec![r],
+            }))
+            .await
+            .unwrap();
+
+        let mut writers = service.writers.lock().unwrap();
+        let writer = writers.get_mut(&TenantId::default_tenant()).unwrap();
+        let events = writer.shutdown_all().unwrap();
+        assert!(
+            events.iter().any(|e| matches!(
+                e,
+                wal::FileEvent::Closed {
+                    min_timestamp_ns,
+                    max_timestamp_ns,
+                    ..
+                } if min_timestamp_ns.0 == T1 && max_timestamp_ns.0 == T2
+            )),
+            "Closed event must carry the resolved log-data range: {events:?}"
+        );
+    }
+
+    #[tokio::test]
     async fn empty_request_creates_no_wal_files() {
         let tmp = tempfile::tempdir().unwrap();
         let wal_dir = tmp.path().to_path_buf();

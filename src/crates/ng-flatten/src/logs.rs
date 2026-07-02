@@ -218,7 +218,8 @@ pub fn flatten_log_request(request: &ExportLogsServiceRequest) -> (FlattenedLogR
 /// [`prepare_log_frame`], everything a writer needs to append the frame.
 #[derive(Debug, Clone)]
 pub struct PreparedLogFrame {
-    /// The bincode-encoded flattened-frame payload.
+    /// The bincode-encoded flattened-frame payload; empty when
+    /// `records == 0` (nothing was flattened or encoded).
     pub data: Vec<u8>,
     /// Total log records in the frame.
     pub records: usize,
@@ -246,6 +247,18 @@ pub fn prepare_log_frame(
     fallback_base_ns: u64,
 ) -> Result<PreparedLogFrame, bincode::error::EncodeError> {
     let norm = normalize_log_request(req, fallback_base_ns);
+    // Nothing to flatten or encode without records; callers skip writing
+    // (`ts_range` is `None`). Recordless resource/scope attributes are
+    // skipped too — same as not writing the frame.
+    if norm.records == 0 {
+        return Ok(PreparedLogFrame {
+            data: Vec::new(),
+            records: 0,
+            ts_range: None,
+            bad_ids: norm.bad_ids,
+            sanitized_keys: 0,
+        });
+    }
     if norm.bad_ids.any() {
         tracing::warn!(
             bad_trace_ids = norm.bad_ids.trace,

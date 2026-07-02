@@ -91,8 +91,6 @@ impl NetdataTracesService {
     }
 }
 
-/// Tenant resolution: identical policy to the logs service (default tenant when
-/// auth is disabled, else the validated `x-scope-orgid` header).
 /// Total spans across a request's resource/scope spans — the frame's
 /// `entry_count`.
 fn count_spans(req: &ExportTraceServiceRequest) -> usize {

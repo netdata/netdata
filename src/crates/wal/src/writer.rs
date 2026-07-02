@@ -391,8 +391,9 @@ impl Writer {
     /// consumer uses it is consumer-specific (the WAL is payload-agnostic).
     ///
     /// `log_min_ts_ns` / `log_max_ts_ns` describe the time range of the records
-    /// inside `data`, as resolved by the caller (for OTel logs the ingestor
-    /// resolves each record's timestamp at ingest; see `compute_log_ts_range`).
+    /// inside `data`, as resolved by the caller (for OTel logs, ingest
+    /// normalization resolves each record's timestamp and returns the range;
+    /// see `ng_flatten::normalize_log_request`).
     /// Pass `TimestampNs::ZERO` for both when no row in the frame had a usable
     /// timestamp — the writer's per-file accumulator is then left unchanged.
     #[allow(clippy::too_many_arguments)]

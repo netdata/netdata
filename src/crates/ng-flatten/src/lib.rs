@@ -719,6 +719,27 @@ mod tests {
         assert_eq!(norm.records, 0);
         assert_eq!(norm.ts_range, None);
         assert!(!norm.bad_ids.any());
+
+        // Fallback offsets continue across ResourceLogs boundaries: the k-th
+        // timestamp-less record overall gets base + k, regardless of which
+        // ResourceLogs it sits in.
+        let no_ts = || LogRecord::default();
+        let mut req = ExportLogsServiceRequest {
+            resource_logs: vec![
+                req_of(vec![no_ts(), no_ts()]).resource_logs.remove(0),
+                req_of(vec![no_ts()]).resource_logs.remove(0),
+            ],
+        };
+        let norm = normalize_log_request(&mut req, 1000);
+        let ts: Vec<u64> = req
+            .resource_logs
+            .iter()
+            .flat_map(|rl| rl.scope_logs.iter())
+            .flat_map(|sl| sl.log_records.iter())
+            .map(|r| r.time_unix_nano)
+            .collect();
+        assert_eq!(ts, vec![1001, 1002, 1003]);
+        assert_eq!(norm.ts_range, Some((1001, 1003)));
     }
 
     #[test]

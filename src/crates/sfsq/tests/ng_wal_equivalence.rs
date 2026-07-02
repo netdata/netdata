@@ -17,8 +17,9 @@
 //! OR/AND, anchored patterns), full-text, facet/histogram field choices, and grid
 //! geometries.
 //!
-//! Note on timestamps: ng-flatten does not normalize timestamps (that lives in
-//! `ng-ingest`), so the fixture builder applies the same event→observed→clock rule
+//! Note on timestamps: this harness feeds `flatten_log_request` directly (no
+//! ingest normalization), so the fixture builder applies the same
+//! event→observed→clock rule
 //! before flattening, mirroring production. The clock fallback is a deterministic
 //! counter here (vs `ng-ingest`'s monotonic wall clock) — value differs, ordering
 //! does not, and it does not affect tail-vs-sealed parity (both read one frozen
@@ -125,7 +126,7 @@ struct Corpus {
 /// Generate a corpus for `seed`. The timestamp regime cycles with the seed so
 /// the sweep covers monotonic, shuffled, equal-run, and the observed/clock
 /// fallback tiers — the fallback is applied *here* (ng-flatten reads only
-/// `time_unix_nano`), mirroring `ng-ingest::normalize_log_timestamps`.
+/// `time_unix_nano`), mirroring `ng_flatten::normalize_log_request`.
 fn gen_corpus(seed: u64) -> Corpus {
     let mut rng = Rng::new(seed);
     let num_logs = 60 + rng.below(120);
