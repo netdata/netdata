@@ -181,7 +181,7 @@ For logs, standard systemd-journal practices apply.
 
 For alert notifications, Netdata supports PagerDuty, Slack, Teams, email (SMTP), Discord, Telegram, Jira, ServiceNow, and custom webhooks.
 
-For AI and Large Language Models, Netdata supports Model Context Protocol (MCP) — available via Netdata Cloud for infrastructure-wide access (Paid plan) and on every Agent/Parent for direct local access (free, open-source). Netdata supports AI DevOps/SRE Copilots like Claude Code and Gemini CLI, and provides an AI Chat application (access to Google, OpenAI, Anthropic LLMs is required).
+For AI and Large Language Models, Netdata supports Model Context Protocol (MCP) — available via Netdata Cloud for infrastructure-wide access (Paid plan) and on every Agent/Parent for direct local access (free, open-source). Netdata supports AI DevOps/SRE Copilots like Claude Code and Gemini CLI, and provides an AI Chat application (requires access to a cloud LLM provider such as Google, OpenAI, Anthropic, or DeepSeek, or a self-hosted provider like Ollama).
 
 ## Compliance and Security
 
