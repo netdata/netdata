@@ -168,3 +168,32 @@ When using `time_group` values other than `min`, `max`, `average`, or `sum`, you
 ```console
 curl -H 'Accept: application/json' -H "Authorization: Bearer <token>" https://app.netdata.cloud/api/v2/contexts
 ```
+
+## Troubleshooting API Permission Errors
+
+When you call a Netdata Cloud endpoint scoped to a Space (for example `/api/v3/spaces/{spaceID}/...`), the request may return:
+
+```
+missing required permission: space:Read
+```
+
+This means the API token's creator does not have read access to the Space in the request. Netdata Cloud checks access per Space using role-based permissions, and every Space member role — Admin, Manager, Troubleshooter, Observer, and Billing — includes read access to the Space. Encountering this error therefore means the token's creator is not a member of that Space.
+
+### Common causes
+
+- **Wrong Space ID in the request URL**: the `{spaceID}` in the endpoint doesn't match a Space the token creator belongs to. This is the most frequent cause — a mistyped or copied identifier points at the wrong Space.
+- **Token creator removed from the Space**: the user who generated the token was removed from the Space, or their membership was revoked. A token cannot grant access its creator does not have, so once the creator loses access to a Space, the token loses access to it too.
+
+### How to resolve it
+
+1. **Verify the Space ID.** Open the Space in the Netdata Cloud UI and copy its identifier from the browser URL, then use that exact value for `{spaceID}` in your request.
+2. **Confirm the token creator is still a Space member.** An Admin or Manager can check this under **User Management**. If the creator was removed, re-add them to the Space with an appropriate role — every Space role grants the read access the token needs.
+3. **Regenerate the token if you need broader endpoint access.** If the token should reach more than one category of endpoints, regenerate it with `scope:all`. `scope:all` only inherits the creator's permissions — it does not grant access to Spaces the creator cannot access.
+
+:::note
+
+**Token scope and Space permissions are separate layers.** A token's scope (`scope:all`, `scope:grafana-plugin`, `scope:mcp`, `scope:agent-ui`) controls which endpoint categories the token can reach. `missing required permission: space:Read` is a Space-membership error, not a scope restriction: choosing a broader scope does not grant access to a Space the creator is not a member of.
+
+:::
+
+For the full mapping of which roles grant which permissions, see [Role-Based Access Control (RBAC)](role-based-access-model.md#detailed-permissions).
