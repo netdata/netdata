@@ -122,11 +122,16 @@ reader cannot infer from the code:
 
 - **Run-time otel config (`netdata_agent_otel_config`).** Sets typed otel knobs
   on a declared agent; applied on the next `netdata_run_start`. Tuning is
-  **per-signal**: `logs_*` and `traces_*` knob pairs (WAL
-  `max_file_size`/`max_log_entries`/`max_file_duration`, CRC/compression, index
-  `max_files`/`max_total_size`, catalog `rotation_count`) configure the two
-  pipelines independently in one call — an omitted knob keeps that signal's stock
-  default. `storage_enabled`/`storage_uri` and the OTLP endpoint are **global**
+  **per-signal**: `logs_*` and `traces_*` knob pairs, matching the plugin's
+  FLAT public schema (rotation
+  `max_file_size`/`max_log_entries`/`max_file_duration`, crc/compression,
+  retention `max_files`/`max_total_size`, catalog `rotation_count` — e.g.
+  `logs_rotation_max_log_entries`, `traces_retention_max_files`) configure the
+  two pipelines independently in one call — an omitted knob keeps that signal's
+  stock default. The generated YAML MUST use the plugin's flat per-signal shape
+  (`logs.rotation`/`logs.retention`/…, NO `wal:`/`index:` nesting): serde
+  ignores unknown keys, so an old-shape emission silently no-ops instead of
+  failing. `storage_enabled`/`storage_uri` and the OTLP endpoint are **global**
   (unprefixed), mirroring the plugin's global storage + per-signal tuning model;
   `journal_dir` is logs-only (below). The runtime writes
   them to `<run_dir>/etc/otel.yaml` and **pins `[directories] config` to
@@ -137,15 +142,20 @@ reader cannot infer from the code:
   data.
   - `journal_dir` is `logs.journal_dir` for the read-only `legacy-otel-logs`
     viewer: the directory of journal files written by the **former** otel plugin.
-    Unlike WAL/index (always pinned under the run dir), it is a caller-supplied
+    Unlike the derived storage dirs (always pinned under the run dir), it is a
+    caller-supplied
     path the plugin only **reads**. It is the one knob that lets the MCP point
     the legacy viewer at a fixture for scripted verification.
-  - Coupling: emitting `journal_dir` as a sibling of `wal`/`index` under `logs`
-    relies on the otel plugin's override structs **not** using
+  - Coupling: emitting `journal_dir` as a sibling of the tuning keys under
+    `logs` relies on the otel plugin's override structs **not** using
     `serde(deny_unknown_fields)` (it reads `journal_dir` via a separate permissive
     probe). A future agent-side tightening that adds `deny_unknown_fields` to the
     `logs` override would make every MCP-launched agent fail to parse its user
     `otel.yaml`; keep the `logs` override permissive, or stop emitting this key.
+    The same permissiveness cuts the other way: a schema reshape on the plugin
+    side (like the 2026-07 wal/index flatten) does NOT break the MCP loudly —
+    stale-shape keys are silently ignored. When the plugin's public otel.yaml
+    schema changes, this tool's knob mapping MUST be updated in the same change.
 - **Synthetic push (per signal).** Two one-shot tools, one per signal:
   - `netdata_agent_otel_push_logs` → `otel-streams` `synth`. Generates a
     deterministic batch of OTLP `LogRecord`s (monotonic timestamps; cycled

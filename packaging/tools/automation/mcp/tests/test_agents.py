@@ -16,21 +16,23 @@ def test_declare_registers_and_get_returns_it():
 
 def test_set_otel_stores_config_and_unknown_returns_none():
     reg = AgentRegistry()
-    assert reg.set_otel("missing", OtelConfig(logs_wal_max_log_entries=5)) is None
+    assert reg.set_otel("missing", OtelConfig(logs_rotation_max_log_entries=5)) is None
     reg.declare("a", "/wt", "debug")
-    spec = reg.set_otel("a", OtelConfig(logs_wal_max_log_entries=5, logs_index_max_files=2))
+    spec = reg.set_otel(
+        "a", OtelConfig(logs_rotation_max_log_entries=5, logs_retention_max_files=2)
+    )
     assert spec is not None
-    assert spec.otel.logs_wal_max_log_entries == 5
-    assert spec.otel.logs_index_max_files == 2
-    assert reg.get("a").otel.logs_wal_max_log_entries == 5
+    assert spec.otel.logs_rotation_max_log_entries == 5
+    assert spec.otel.logs_retention_max_files == 2
+    assert reg.get("a").otel.logs_rotation_max_log_entries == 5
 
 
 def test_re_declare_preserves_otel_config():
     reg = AgentRegistry()
     reg.declare("a", "/wt", "debug")
-    reg.set_otel("a", OtelConfig(logs_wal_max_log_entries=10))
+    reg.set_otel("a", OtelConfig(logs_rotation_max_log_entries=10))
     reg.declare("a", "/wt2", "optimized")  # idempotent update of worktree/profile
-    assert reg.get("a").otel.logs_wal_max_log_entries == 10  # otel survived
+    assert reg.get("a").otel.logs_rotation_max_log_entries == 10  # otel survived
 
 
 def test_declare_is_idempotent_and_updates_spec():

@@ -41,22 +41,22 @@ _Endpoint = Annotated[
 # Per-signal tuning knobs come in symmetric logs_*/traces_* pairs (one call sets
 # both signals; an omitted knob keeps that signal's stock default). Storage/auth
 # are global (below), so they are NOT signal-prefixed.
-_LogsMaxFileSize = Annotated[str | None, Field(description="logs WAL rotation: max size per WAL file (e.g. '25MB', '1.5GB'). Small values force rotation.")]
-_LogsMaxLogEntries = Annotated[int | None, Field(description="logs WAL rotation: max log entries per WAL file. Tiny values (e.g. 10) force multi-file splits for edge-case tests.")]
-_LogsMaxFileDuration = Annotated[str | None, Field(description="logs WAL rotation: max time span per WAL file (e.g. '2 hours', '30m').")]
-_LogsCrcEnabled = Annotated[bool | None, Field(description="logs WAL: compute per-frame CRC32 checksums.")]
-_LogsCompressionEnabled = Annotated[bool | None, Field(description="logs WAL: LZ4-compress frame payloads.")]
-_LogsMaxFiles = Annotated[int | None, Field(description="logs index retention: max number of SFST index files to keep. Small values force eviction.")]
-_LogsMaxTotalSize = Annotated[str | None, Field(description="logs index retention: max total size of all index files (e.g. '1GB', '500MB').")]
-_LogsCatalogRotationCount = Annotated[int | None, Field(description="logs catalog rotation: number of index entries accumulated before a catalog file rotates and uploads. Small values (e.g. 2) force catalog rotation + upload over a small corpus.")]
-_TracesMaxFileSize = Annotated[str | None, Field(description="traces WAL rotation: max size per span WAL file (e.g. '25MB', '1.5GB'). Small values force rotation.")]
-_TracesMaxLogEntries = Annotated[int | None, Field(description="traces WAL rotation: max spans per WAL file. Tiny values (e.g. 10) force multi-file splits so a small trace corpus seals without a restart.")]
-_TracesMaxFileDuration = Annotated[str | None, Field(description="traces WAL rotation: max time span per WAL file (e.g. '2 hours', '30m').")]
-_TracesCrcEnabled = Annotated[bool | None, Field(description="traces WAL: compute per-frame CRC32 checksums.")]
-_TracesCompressionEnabled = Annotated[bool | None, Field(description="traces WAL: LZ4-compress frame payloads.")]
-_TracesMaxFiles = Annotated[int | None, Field(description="traces index retention: max number of SFST index files to keep. Small values force eviction.")]
-_TracesMaxTotalSize = Annotated[str | None, Field(description="traces index retention: max total size of all index files (e.g. '1GB', '500MB').")]
-_TracesCatalogRotationCount = Annotated[int | None, Field(description="traces catalog rotation: number of index entries accumulated before a catalog file rotates and uploads. Small values (e.g. 2) force catalog rotation + upload over a small corpus.")]
+_LogsRotationMaxFileSize = Annotated[str | None, Field(description="logs rotation: max size per data file (e.g. '25MB', '1.5GB'). Small values force rotation.")]
+_LogsRotationMaxLogEntries = Annotated[int | None, Field(description="logs rotation: max log entries per data file. Tiny values (e.g. 10) force multi-file splits for edge-case tests.")]
+_LogsRotationMaxFileDuration = Annotated[str | None, Field(description="logs rotation: max time span per data file (e.g. '2 hours', '30m').")]
+_LogsCrcEnabled = Annotated[bool | None, Field(description="logs: verify stored data with checksums.")]
+_LogsCompressionEnabled = Annotated[bool | None, Field(description="logs: compress stored data.")]
+_LogsRetentionMaxFiles = Annotated[int | None, Field(description="logs retention: max number of index files to keep. Small values force eviction.")]
+_LogsRetentionMaxTotalSize = Annotated[str | None, Field(description="logs retention: max total size of all index files (e.g. '1GB', '500MB').")]
+_LogsCatalogRotationCount = Annotated[int | None, Field(description="logs catalog rotation: number of index files recorded before a catalog file rotates and uploads. Small values (e.g. 2) force catalog rotation + upload over a small corpus.")]
+_TracesRotationMaxFileSize = Annotated[str | None, Field(description="traces rotation: max size per data file (e.g. '25MB', '1.5GB'). Small values force rotation.")]
+_TracesRotationMaxLogEntries = Annotated[int | None, Field(description="traces rotation: max spans per data file. Tiny values (e.g. 10) force multi-file splits so a small trace corpus seals without a restart.")]
+_TracesRotationMaxFileDuration = Annotated[str | None, Field(description="traces rotation: max time span per data file (e.g. '2 hours', '30m').")]
+_TracesCrcEnabled = Annotated[bool | None, Field(description="traces: verify stored data with checksums.")]
+_TracesCompressionEnabled = Annotated[bool | None, Field(description="traces: compress stored data.")]
+_TracesRetentionMaxFiles = Annotated[int | None, Field(description="traces retention: max number of index files to keep. Small values force eviction.")]
+_TracesRetentionMaxTotalSize = Annotated[str | None, Field(description="traces retention: max total size of all index files (e.g. '1GB', '500MB').")]
+_TracesCatalogRotationCount = Annotated[int | None, Field(description="traces catalog rotation: number of index files recorded before a catalog file rotates and uploads. Small values (e.g. 2) force catalog rotation + upload over a small corpus.")]
 _StorageEnabled = Annotated[bool | None, Field(description="Remote object-storage upload of SFST + catalog files (default off). Enable to exercise the upload path and remote-confirmed eviction. With it off, the uploader is not even constructed.")]
 _StorageUri = Annotated[str | None, Field(description="opendal storage URI (e.g. 'fs:///abs/path', 's3://bucket/prefix'). Omit while storage is enabled to default to an isolated per-agent 'fs://' directory under the run dir.")]
 _JournalDir = Annotated[
@@ -82,7 +82,7 @@ def register(mcp: FastMCP) -> None:
             "upload + remote-confirmed eviction path for both signals; an omitted "
             "storage_uri defaults to an isolated per-agent fs:// dir. Use the small "
             "rotation/retention knobs to force multi-file / eviction edge cases over a "
-            "known corpus — set traces_* (e.g. traces_wal_max_log_entries=10) so a "
+            "known corpus — set traces_* (e.g. traces_rotation_max_log_entries=10) so a "
             "small trace corpus seals without a restart."
         ),
     )
@@ -90,21 +90,21 @@ def register(mcp: FastMCP) -> None:
         ctx: Context,
         agent_id: _AgentId,
         otlp_endpoint: _Endpoint = None,
-        logs_wal_max_file_size: _LogsMaxFileSize = None,
-        logs_wal_max_log_entries: _LogsMaxLogEntries = None,
-        logs_wal_max_file_duration: _LogsMaxFileDuration = None,
-        logs_wal_crc_enabled: _LogsCrcEnabled = None,
-        logs_wal_compression_enabled: _LogsCompressionEnabled = None,
-        logs_index_max_files: _LogsMaxFiles = None,
-        logs_index_max_total_size: _LogsMaxTotalSize = None,
+        logs_rotation_max_file_size: _LogsRotationMaxFileSize = None,
+        logs_rotation_max_log_entries: _LogsRotationMaxLogEntries = None,
+        logs_rotation_max_file_duration: _LogsRotationMaxFileDuration = None,
+        logs_crc_enabled: _LogsCrcEnabled = None,
+        logs_compression_enabled: _LogsCompressionEnabled = None,
+        logs_retention_max_files: _LogsRetentionMaxFiles = None,
+        logs_retention_max_total_size: _LogsRetentionMaxTotalSize = None,
         logs_catalog_rotation_count: _LogsCatalogRotationCount = None,
-        traces_wal_max_file_size: _TracesMaxFileSize = None,
-        traces_wal_max_log_entries: _TracesMaxLogEntries = None,
-        traces_wal_max_file_duration: _TracesMaxFileDuration = None,
-        traces_wal_crc_enabled: _TracesCrcEnabled = None,
-        traces_wal_compression_enabled: _TracesCompressionEnabled = None,
-        traces_index_max_files: _TracesMaxFiles = None,
-        traces_index_max_total_size: _TracesMaxTotalSize = None,
+        traces_rotation_max_file_size: _TracesRotationMaxFileSize = None,
+        traces_rotation_max_log_entries: _TracesRotationMaxLogEntries = None,
+        traces_rotation_max_file_duration: _TracesRotationMaxFileDuration = None,
+        traces_crc_enabled: _TracesCrcEnabled = None,
+        traces_compression_enabled: _TracesCompressionEnabled = None,
+        traces_retention_max_files: _TracesRetentionMaxFiles = None,
+        traces_retention_max_total_size: _TracesRetentionMaxTotalSize = None,
         traces_catalog_rotation_count: _TracesCatalogRotationCount = None,
         storage_enabled: _StorageEnabled = None,
         storage_uri: _StorageUri = None,
@@ -123,21 +123,21 @@ def register(mcp: FastMCP) -> None:
             )
         cfg = OtelConfig(
             otlp_endpoint=otlp_endpoint,
-            logs_wal_max_file_size=logs_wal_max_file_size,
-            logs_wal_max_log_entries=logs_wal_max_log_entries,
-            logs_wal_max_file_duration=logs_wal_max_file_duration,
-            logs_wal_crc_enabled=logs_wal_crc_enabled,
-            logs_wal_compression_enabled=logs_wal_compression_enabled,
-            logs_index_max_files=logs_index_max_files,
-            logs_index_max_total_size=logs_index_max_total_size,
+            logs_rotation_max_file_size=logs_rotation_max_file_size,
+            logs_rotation_max_log_entries=logs_rotation_max_log_entries,
+            logs_rotation_max_file_duration=logs_rotation_max_file_duration,
+            logs_crc_enabled=logs_crc_enabled,
+            logs_compression_enabled=logs_compression_enabled,
+            logs_retention_max_files=logs_retention_max_files,
+            logs_retention_max_total_size=logs_retention_max_total_size,
             logs_catalog_rotation_count=logs_catalog_rotation_count,
-            traces_wal_max_file_size=traces_wal_max_file_size,
-            traces_wal_max_log_entries=traces_wal_max_log_entries,
-            traces_wal_max_file_duration=traces_wal_max_file_duration,
-            traces_wal_crc_enabled=traces_wal_crc_enabled,
-            traces_wal_compression_enabled=traces_wal_compression_enabled,
-            traces_index_max_files=traces_index_max_files,
-            traces_index_max_total_size=traces_index_max_total_size,
+            traces_rotation_max_file_size=traces_rotation_max_file_size,
+            traces_rotation_max_log_entries=traces_rotation_max_log_entries,
+            traces_rotation_max_file_duration=traces_rotation_max_file_duration,
+            traces_crc_enabled=traces_crc_enabled,
+            traces_compression_enabled=traces_compression_enabled,
+            traces_retention_max_files=traces_retention_max_files,
+            traces_retention_max_total_size=traces_retention_max_total_size,
             traces_catalog_rotation_count=traces_catalog_rotation_count,
             storage_enabled=storage_enabled,
             storage_uri=storage_uri,

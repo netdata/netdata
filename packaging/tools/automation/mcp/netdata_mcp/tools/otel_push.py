@@ -124,7 +124,7 @@ def register(mcp: FastMCP) -> None:
             "Send a deterministic synthetic OTLP TRACE corpus (spans) to a ready agent's "
             "otel plugin (one-shot; runs otel-streams `synth-traces` to completion). Use "
             "with netdata_agent_otel_config's small traces_* rotation thresholds (e.g. "
-            "traces_wal_max_log_entries=10) + netdata_agent_otel_files to watch the traces "
+            "traces_rotation_max_log_entries=10) + netdata_agent_otel_files to watch the traces "
             "pipeline rotate + seal + upload over a known corpus WITHOUT an additional "
             "restart (the small thresholds, applied at the prior run_start, make rotation "
             "automatic as data arrives). Like "
