@@ -7,7 +7,7 @@ You can install Netdata on cloud instances to monitor the apps/services running 
 
 Netdata is lightweight and runs on most cloud VM sizes. What you need to provision depends on how you use it:
 
-- **A single Agent** monitoring the instance it runs on has a small footprint — typically a fraction of a single CPU core (around 1.5-5%), roughly 150-350 MB of RAM, and about 4 GiB of disk for the default metric retention. Most general-purpose VM sizes are more than enough.
+- **A single Agent** monitoring the instance it runs on has a small footprint — typically a fraction of a single CPU core (around 1-5%), roughly 100-200 MB of RAM, and about 4 GiB of disk for the default metric retention. Most general-purpose VM sizes are more than enough.
 - **A Netdata Parent** that receives streams from many Child nodes needs more. Its resource use scales with the number of metrics collected and how long you keep them, so size the VM for your expected metric volume rather than for a single Agent.
 
 For detailed sizing guidance, see:
