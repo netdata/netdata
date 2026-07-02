@@ -3,10 +3,13 @@
 //! Run with:
 //!
 //! ```text
-//! cargo run --example inspect -- summary  path/to/file.sfst
-//! cargo run --example inspect -- dump     path/to/file.sfst [--limit N]
-//! cargo run --example inspect -- sections path/to/file.sfst
+//! cargo run --features test-util --example inspect -- summary  path/to/file.sfst
+//! cargo run --features test-util --example inspect -- dump     path/to/file.sfst [--limit N]
+//! cargo run --features test-util --example inspect -- sections path/to/file.sfst
 //! ```
+//!
+//! (`test-util` is required: the `sections` dump reads raw chunk bytes via the
+//! feature-gated [`sfst::ChunkReader`].)
 //!
 //! Together the three subcommands exercise most of sfst's public reader API:
 //! [`IndexReader::open`], [`IndexReader::field_table`], [`IndexReader::histogram`],
