@@ -314,6 +314,7 @@ Based on extensive real-world deployments and independent academic validation, N
 - Parent resources include both ingestion and query workload
 - Storage rates are for all tiers combined; actual disk usage depends on retention configuration
 - The recommended topology is having a cluster of Netdata Parents every 500 monitored nodes (2M metrics/s)
+- For default-settings sizing guidance per Agent (CPU, RAM, disk, and bandwidth), see [Resource utilization](/docs/netdata-agent/sizing-netdata-agents/README.md)
 
 :::
 
