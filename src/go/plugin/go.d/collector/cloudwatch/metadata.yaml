@@ -49,6 +49,9 @@ modules:
         - generative ai
         - eventbridge
         - vpn
+        - eks
+        - kubernetes
+        - k8s
       related_resources:
         integrations:
           list: []
@@ -87,6 +90,7 @@ modules:
           - Amazon Bedrock (foundation-model invocations and tokens)
           - Amazon EventBridge (event rules)
           - AWS Site-to-Site VPN (VPN connections)
+          - Amazon EKS (Kubernetes control plane: API server, scheduler, etcd)
 
           [Each service is defined by a profile](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default) -- a YAML file declaring its CloudWatch namespace, the metrics and statistics to collect, and a chart template -- so coverage can be extended without code changes.
 
@@ -348,6 +352,7 @@ modules:
               - **Daily metrics** -- S3 storage metrics are published once per day. They are inherently delayed by about a day, and `recently_active_only` is automatically disabled for them.
               - **Resource activity** -- some metrics only appear when the resource is actively processing data (for example, EventBridge and Bedrock publish a metric only when its value is non-zero).
               - **Auto Scaling group metrics** -- Auto Scaling group metrics (`cloudwatch.auto_scaling.*`) are not published until group-metrics collection is enabled on the group (`aws autoscaling enable-metrics-collection --granularity 1Minute`). Amazon EKS managed node groups have it enabled by default.
+              - **EKS control-plane metrics** -- EKS control-plane metrics (`cloudwatch.eks.*`) are published to the `AWS/EKS` namespace automatically, at no additional EKS charge, only for clusters running Kubernetes 1.28 or later; older clusters do not report them. These are distinct from Container Insights / the CloudWatch Observability add-on (agent-based, billed separately).
           - name: Charts have gaps or incomplete data
             description: |
               CloudWatch publishes metrics with a delay.
@@ -407,6 +412,7 @@ modules:
         | [Amazon Bedrock](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/bedrock.yaml) | `cloudwatch.bedrock.*` | invocations, invocation errors, token throughput, invocation and time-to-first-token latency |
         | [Amazon EventBridge](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/eventbridge.yaml) | `cloudwatch.eventbridge.*` | target invocations, rule activity (matched events, triggered rules), ingestion-to-invocation latency |
         | [AWS Site-to-Site VPN](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/vpn.yaml) | `cloudwatch.vpn.*` | tunnel traffic (in/out) and tunnel state (fraction of tunnels up) |
+        | [Amazon EKS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/eks.yaml) | `cloudwatch.eks.*` | control-plane health: API server request rate, errors, p99 latency, and in-flight requests; etcd database size; scheduler pending pods and scheduling attempts |
 
         Each profile also carries **optional metrics** that are commented out to keep cost and cardinality low; uncomment a metric and its matching chart, then **restart the Netdata Agent** (profiles are loaded once per go.d process and cached). Stock profiles are shipped at `/usr/lib/netdata/conf.d/go.d/cloudwatch.profiles/default/`. To customize a service, copy its profile into `/etc/netdata/go.d/cloudwatch.profiles/` (keep the same filename) and edit it -- a user profile fully replaces the stock one of the same name -- then restart the Agent.
 
