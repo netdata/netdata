@@ -41,8 +41,10 @@ type (
 	}
 
 	retryingTasks struct {
-		// retryingTasks is intentionally lock-free. All access must remain serialized
-		// through manager-owned command flow and synchronous dyncfg handler callbacks.
+		// Guarded by mu: retry scheduling and cancellation run from command
+		// effects executing off the manager loop as well as from the loop
+		// itself; per-config ordering comes from the executor's key FIFO.
+		mu sync.Mutex
 		// [cfg.UID()]
 		items map[string]*retryTask
 	}
@@ -117,15 +119,21 @@ func (c *runningJobs) snapshot() []runtimeJob {
 }
 
 func (c *retryingTasks) add(cfg confgroup.Config, retry *retryTask) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.items[cfg.UID()] = retry
 }
 func (c *retryingTasks) remove(cfg confgroup.Config) {
-	if v, ok := c.lookup(cfg); ok {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if v, ok := c.items[cfg.UID()]; ok {
 		v.cancel()
 	}
 	delete(c.items, cfg.UID())
 }
 func (c *retryingTasks) lookup(cfg confgroup.Config) (*retryTask, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	v, ok := c.items[cfg.UID()]
 	return v, ok
 }

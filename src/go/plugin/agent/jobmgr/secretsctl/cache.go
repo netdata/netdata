@@ -3,6 +3,7 @@
 package secretsctl
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -61,7 +62,7 @@ func (c *Controller) rememberDiscoveredConfig(cfg secretstore.Config) (*dyncfg.E
 	}
 
 	if entry.Status == dyncfg.StatusRunning || entry.Status == dyncfg.StatusFailed {
-		c.cb.Stop(entry.Cfg)
+		c.cb.Stop(context.Background(), entry.Cfg)
 		c.cb.TakeCommandMessage()
 	}
 
@@ -84,7 +85,7 @@ func (c *Controller) removeDiscoveredConfig(cfg secretstore.Config) (*dyncfg.Ent
 		return nil, false
 	}
 
-	c.cb.Stop(entry.Cfg)
+	c.cb.Stop(context.Background(), entry.Cfg)
 	c.cb.TakeCommandMessage()
 	c.handler.NotifyConfigRemove(entry.Cfg)
 	return entry, true
@@ -97,7 +98,7 @@ func (c *Controller) validateConfig(cfg secretstore.Config) error {
 	if c.service == nil {
 		return fmt.Errorf("secretstore service is not available")
 	}
-	return c.service.Validate(secretStoreResolveContext(c.Logger, cfg), cfg)
+	return c.service.Validate(secretStoreResolveContext(context.Background(), c.Logger, cfg), cfg)
 }
 
 func (c *Controller) validateStored(key string) error {
@@ -110,7 +111,7 @@ func (c *Controller) validateStored(key string) error {
 	}
 
 	if _, ok := c.service.GetStatus(key); ok {
-		return c.service.ValidateStored(secretStoreResolveContextForKey(c.Logger, key, entry.Cfg.Kind(), entry.Cfg.Name()), key)
+		return c.service.ValidateStored(secretStoreResolveContextForKey(context.Background(), c.Logger, key, entry.Cfg.Kind(), entry.Cfg.Name()), key)
 	}
 
 	return c.validateConfig(entry.Cfg)

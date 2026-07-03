@@ -20,22 +20,30 @@ type emissionGateway struct {
 	out        io.Writer
 	closed     bool
 	suppressed int
+	// onSuppressed, when set, is called (outside the lock) for every
+	// swallowed write so the executor metrics can count them fleet-wide.
+	onSuppressed func()
 }
 
-func newEmissionGateway(out io.Writer) *emissionGateway {
+func newEmissionGateway(out io.Writer, onSuppressed func()) *emissionGateway {
 	if out == nil {
 		out = io.Discard
 	}
-	return &emissionGateway{out: out}
+	return &emissionGateway{out: out, onSuppressed: onSuppressed}
 }
 
 func (g *emissionGateway) Write(p []byte) (int, error) {
 	g.mu.Lock()
-	defer g.mu.Unlock()
 	if g.closed {
 		g.suppressed++
+		hook := g.onSuppressed
+		g.mu.Unlock()
+		if hook != nil {
+			hook()
+		}
 		return len(p), nil
 	}
+	defer g.mu.Unlock()
 	return g.out.Write(p)
 }
 
@@ -79,6 +87,20 @@ func (s *emissionGates) remove(name string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.items, name)
+}
+
+// removeMatching removes the entry only when it still holds the given gate:
+// drop paths that run later on the loop must never evict a same-name
+// replacement's gate.
+func (s *emissionGates) removeMatching(name string, gate *emissionGateway) {
+	if gate == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.items[name] == gate {
+		delete(s.items, name)
+	}
 }
 
 func (s *emissionGates) lookup(name string) (*emissionGateway, bool) {

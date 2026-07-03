@@ -4,6 +4,7 @@ package jobmgr
 
 import (
 	"bytes"
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -39,7 +40,7 @@ func TestEmissionGateway(t *testing.T) {
 		"open gate passes writes through": {
 			run: func(t *testing.T) {
 				var buf bytes.Buffer
-				gate := newEmissionGateway(&buf)
+				gate := newEmissionGateway(&buf, nil)
 
 				n, err := gate.Write([]byte("payload"))
 
@@ -52,7 +53,7 @@ func TestEmissionGateway(t *testing.T) {
 		"closed gate suppresses and counts writes": {
 			run: func(t *testing.T) {
 				var buf bytes.Buffer
-				gate := newEmissionGateway(&buf)
+				gate := newEmissionGateway(&buf, nil)
 
 				gate.Close()
 				n, err := gate.Write([]byte("late"))
@@ -66,7 +67,7 @@ func TestEmissionGateway(t *testing.T) {
 		"close waits out an in-flight write": {
 			run: func(t *testing.T) {
 				w := &blockingTestWriter{started: make(chan struct{}), release: make(chan struct{})}
-				gate := newEmissionGateway(w)
+				gate := newEmissionGateway(w, nil)
 
 				writeDone := make(chan struct{})
 				go func() {
@@ -107,14 +108,14 @@ func TestEmissionGateway(t *testing.T) {
 				mgr := newCollectorTestManager()
 				cfg := prepareDyncfgCfg("success", "gw")
 
-				job, err := mgr.createCollectorJob(cfg)
+				job, err := mgr.createCollectorJob(context.Background(), cfg)
 				require.NoError(t, err)
 				gate, tracked := mgr.emissionGates.lookup(cfg.FullName())
 				require.True(t, tracked, "creation must register the job's gateway")
 				require.NotNil(t, gate)
 
 				mgr.startRunningJob(job)
-				mgr.stopRunningJob(cfg.FullName())
+				mgr.stopRunningJob(context.Background(), cfg.FullName())
 				_, tracked = mgr.emissionGates.lookup(cfg.FullName())
 				assert.False(t, tracked, "gateway tracking must end when the job stops")
 			},
@@ -124,7 +125,7 @@ func TestEmissionGateway(t *testing.T) {
 				mgr := newCollectorTestManager()
 				cfg := prepareDyncfgCfg("success", "gw-badcfg").Set("vnode", "no-such-vnode")
 
-				_, err := mgr.createCollectorJob(cfg)
+				_, err := mgr.createCollectorJob(context.Background(), cfg)
 
 				require.Error(t, err)
 				_, tracked := mgr.emissionGates.lookup(cfg.FullName())
@@ -137,7 +138,7 @@ func TestEmissionGateway(t *testing.T) {
 				cb := &collectorCallbacks{mgr: mgr}
 				cfg := prepareDyncfgCfg("fail", "gw-detect")
 
-				err := cb.Start(cfg)
+				err := cb.Start(context.Background(), cfg)
 
 				require.Error(t, err)
 				_, tracked := mgr.emissionGates.lookup(cfg.FullName())
@@ -149,11 +150,11 @@ func TestEmissionGateway(t *testing.T) {
 				mgr := newCollectorTestManager()
 				cfg := prepareDyncfgCfg("success", "gw-replace")
 
-				oldJob, err := mgr.createCollectorJob(cfg)
+				oldJob, err := mgr.createCollectorJob(context.Background(), cfg)
 				require.NoError(t, err)
 				mgr.startRunningJob(oldJob)
 
-				newJob, err := mgr.createCollectorJob(cfg)
+				newJob, err := mgr.createCollectorJob(context.Background(), cfg)
 				require.NoError(t, err)
 				newGate, tracked := mgr.emissionGates.lookup(cfg.FullName())
 				require.True(t, tracked)
@@ -161,7 +162,7 @@ func TestEmissionGateway(t *testing.T) {
 				// The defensive stop inside startRunningJob replaces the old
 				// same-name job; the new job's gate must survive it.
 				mgr.startRunningJob(newJob)
-				t.Cleanup(func() { mgr.stopRunningJob(cfg.FullName()) })
+				t.Cleanup(func() { mgr.stopRunningJob(context.Background(), cfg.FullName()) })
 
 				gate, tracked := mgr.emissionGates.lookup(cfg.FullName())
 				require.True(t, tracked, "replacement dropped the new job's gateway tracking")
@@ -173,7 +174,7 @@ func TestEmissionGateway(t *testing.T) {
 				mgr := newCollectorTestManager()
 				cfg := prepareDyncfgCfg("success", "gw-validate")
 
-				require.NoError(t, mgr.validateCollectorJob(cfg))
+				require.NoError(t, mgr.validateCollectorJob(context.Background(), cfg))
 
 				_, tracked := mgr.emissionGates.lookup(cfg.FullName())
 				assert.False(t, tracked, "validation-only creation must not register a gateway")

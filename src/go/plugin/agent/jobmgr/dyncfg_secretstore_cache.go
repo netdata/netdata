@@ -34,6 +34,15 @@ func (m *Manager) restartableAffectedJobs(key string) []secretstore.JobRef {
 		switch entry.Status {
 		case dyncfg.StatusRunning, dyncfg.StatusFailed:
 			refs = append(refs, job)
+		default:
+			// The exposed status lags the effect: an enable in flight may
+			// already have started the job (with the OLD resolved secret)
+			// while the entry still reads accepted. A dependent whose key
+			// has work in flight MUST be selected so the bridge reports it
+			// as skipped instead of silently missing it.
+			if m.executor.collectorKeyHasWork(entry.Cfg.ExposedKey()) {
+				refs = append(refs, job)
+			}
 		}
 	}
 	return refs

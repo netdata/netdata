@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -161,6 +162,11 @@ type Job struct {
 
 	stopCtrl stopController
 
+	// moduleCleanup guards the module's Cleanup to exactly once: it is
+	// reachable from the detection-failure defer, the main loop's tail, and
+	// Cleanup() (detected-but-never-started jobs are disposed through it).
+	moduleCleanup sync.Once
+
 	// Metrics-audit mode support.
 	auditMode     bool
 	auditAnalyzer metricsaudit.Analyzer
@@ -236,7 +242,7 @@ func (j *Job) AutoDetection(ctx context.Context) (err error) {
 			}
 		}
 		if err != nil {
-			j.module.Cleanup(context.TODO())
+			j.cleanupModule()
 		}
 	}()
 
@@ -344,7 +350,6 @@ LOOP:
 			}
 		}
 	}
-	j.module.Cleanup(context.TODO())
 	j.Cleanup()
 }
 
@@ -361,7 +366,12 @@ func (j *Job) disableAutoDetection() {
 	disableAutoDetection(&j.AutoDetectEvery)
 }
 
+func (j *Job) cleanupModule() {
+	j.moduleCleanup.Do(func() { j.module.Cleanup(context.TODO()) })
+}
+
 func (j *Job) Cleanup() {
+	j.cleanupModule()
 	j.buf.Reset()
 	if !collectorapi.ShouldObsoleteCharts() {
 		return

@@ -38,11 +38,12 @@ func jobLogSource(cfg confgroup.Config) string {
 type jobFactory struct {
 	logger *logger.Logger
 
-	pluginName  string
-	modules     collectorapi.Registry
-	vnodeLookup func(string) (*vnodes.VirtualNode, bool)
-	out         io.Writer
-	gates       *emissionGates
+	pluginName        string
+	modules           collectorapi.Registry
+	vnodeLookup       func(string) (*vnodes.VirtualNode, bool)
+	out               io.Writer
+	gates             *emissionGates
+	onSuppressedWrite func()
 
 	validationOnly bool
 
@@ -66,11 +67,12 @@ func newJobFactory(m *Manager) *jobFactory {
 	return &jobFactory{
 		logger: m.Logger,
 
-		pluginName:  m.pluginName,
-		modules:     m.modules,
-		vnodeLookup: m.vnodesCtl.Lookup,
-		out:         m.out,
-		gates:       m.emissionGates,
+		pluginName:        m.pluginName,
+		modules:           m.modules,
+		vnodeLookup:       m.vnodesCtl.Lookup,
+		out:               m.out,
+		gates:             m.emissionGates,
+		onSuppressedWrite: m.observeSuppressedWrite,
 
 		auditMode:     m.auditMode,
 		auditAnalyzer: m.auditAnalyzer,
@@ -130,7 +132,7 @@ func (f *jobFactory) create(cfg confgroup.Config) (runtimeJob, error) {
 	gatedF := *f
 	var gate *emissionGateway
 	if !f.validationOnly {
-		gate = newEmissionGateway(f.out)
+		gate = newEmissionGateway(f.out, f.onSuppressedWrite)
 		gatedF.out = gate
 	}
 

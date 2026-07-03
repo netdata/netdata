@@ -179,7 +179,7 @@ func TestDyncfgSecretStoreUpdate_DependentRestartBehavior(t *testing.T) {
 					Status: dyncfg.StatusRunning,
 				})
 				mgr.syncSecretStoreDepsForConfig(cfg)
-				require.NoError(t, mgr.collectorCallbacks.Start(cfg))
+				require.NoError(t, mgr.collectorCallbacks.Start(context.Background(), cfg))
 
 				_, running := mgr.secretStoreDeps.Impacted(key)
 				require.Len(t, running, 1)

@@ -19,7 +19,7 @@ type Callbacks[C Config] interface {
 
 	// ParseAndValidate parses payload into a config with dyncfg metadata set.
 	// Includes all validation (including heavy checks like module instantiation).
-	ParseAndValidate(fn Function, name string) (C, error)
+	ParseAndValidate(ctx context.Context, fn Function, name string) (C, error)
 
 	// ValidateConfigName enforces the domain's config-name policy. Called before
 	// ParseAndValidate so cheap name-format rejections happen without parsing payload.
@@ -29,16 +29,16 @@ type Callbacks[C Config] interface {
 	// including pre-start cleanup and post-fail retry scheduling.
 	// Return CodedError to override EnableFailCode.
 	// Used by CmdEnable and CmdUpdate (conversion only).
-	Start(cfg C) error
+	Start(ctx context.Context, cfg C) error
 
 	// Update handles non-conversion config updates (dyncfg->dyncfg).
 	// Called after caches are already updated. SD uses mgr.Restart
 	// for graceful transition; jobmgr uses Stop+Start.
-	Update(oldCfg, newCfg C) error
+	Update(ctx context.Context, oldCfg, newCfg C) error
 
 	// Stop stops all work and cleans up all component state for a config.
 	// Safe to call for non-running configs (all ops are no-ops).
-	Stop(cfg C)
+	Stop(ctx context.Context, cfg C)
 
 	// OnStatusChange is called after status transitions in enable/disable/update.
 	// Not called in CmdAdd or CmdRemove.
@@ -444,8 +444,58 @@ func (h *Handler[C]) configSupportedCommands(cfg C, isDyncfg bool) string {
 	return JoinCommands(cmds...)
 }
 
+// StepRunner executes a command's blocking phase (effect) and then its
+// commit. The synchronous runner executes both inline on the caller,
+// preserving the legacy behavior; an asynchronous runner may execute the
+// effect off-thread and the commit later, under this contract: commit runs
+// EXACTLY ONCE after the effect returns, the two closures of one command
+// never run concurrently, and a commit may invoke the runner again to chain
+// another blocking phase of the same command.
+type StepRunner func(effect func(context.Context) error, commit func(error))
+
+// RunStepSync is the synchronous StepRunner used by the legacy Cmd* methods.
+func RunStepSync(effect func(context.Context) error, commit func(error)) {
+	commit(effect(context.Background()))
+}
+
+// ErrPhaseNeverRan is committed for a blocking phase that was never executed
+// (runtime shutting down before it could run). Stop-shaped commits MUST NOT
+// publish success on it: unlike a deadline abandonment - where the stop ran,
+// wedged, and the job's output was fenced - nothing happened at all.
+var ErrPhaseNeverRan = errors.New("the operation did not run: shutting down")
+
+// ErrPhaseAbandoned is committed for a blocking phase that ran past its
+// deadline (or into shutdown) and was abandoned with the job's output
+// fenced. Stop-shaped commits publish success on it by contract - the
+// stop is guaranteed to be effective even though the call has not
+// returned. Any other stop error (e.g. a recovered panic) proves nothing
+// about the job's state and MUST commit as failed.
+var ErrPhaseAbandoned = errors.New("the operation was abandoned")
+
+// CmdAddStep is CmdAdd with a caller-supplied StepRunner.
+func (h *Handler[C]) CmdAddStep(fn Function, run StepRunner) { h.cmdAdd(fn, run) }
+
+// CmdEnableStep is CmdEnable with a caller-supplied StepRunner.
+func (h *Handler[C]) CmdEnableStep(fn Function, run StepRunner) { h.cmdEnable(fn, run) }
+
+// CmdDisableStep is CmdDisable with a caller-supplied StepRunner.
+func (h *Handler[C]) CmdDisableStep(fn Function, run StepRunner) { h.cmdDisable(fn, run) }
+
+// CmdRemoveStep is CmdRemove with a caller-supplied StepRunner.
+func (h *Handler[C]) CmdRemoveStep(fn Function, run StepRunner) { h.cmdRemove(fn, run) }
+
+// CmdUpdateStep is CmdUpdate with a caller-supplied StepRunner.
+func (h *Handler[C]) CmdUpdateStep(fn Function, run StepRunner) { h.cmdUpdate(fn, run) }
+
+// CmdRestartStep is CmdRestart with a caller-supplied StepRunner.
+func (h *Handler[C]) CmdRestartStep(fn Function, run StepRunner) { h.cmdRestart(fn, run) }
+
 // CmdAdd handles the "add" command.
 func (h *Handler[C]) CmdAdd(fn Function) {
+	h.cmdAdd(fn, RunStepSync)
+}
+
+func (h *Handler[C]) cmdAdd(fn Function, run StepRunner) {
 	if err := fn.ValidateArgs(3); err != nil {
 		h.api.SendCodef(fn, 400, "%v", err)
 		return
@@ -467,35 +517,80 @@ func (h *Handler[C]) CmdAdd(fn Function) {
 		return
 	}
 
-	newCfg, err := h.cb.ParseAndValidate(fn, name)
-	if err != nil {
-		h.api.SendCodef(fn, 400, "%v", err)
-		return
-	}
-	if h.cb.ConfigType(newCfg) != ConfigTypeJob {
-		h.api.SendCodef(fn, 405, "adding configurations of type '%s' is not supported, only 'job' configurations can be added.", h.cb.ConfigType(newCfg))
-		return
-	}
-
-	// Replace existing config at the same key, if any.
-	if existing, ok := h.exposed.LookupByKey(key); ok {
-		if _, found := h.seen.Lookup(existing.Cfg); found && existing.Cfg.SourceType() == "dyncfg" {
-			h.seen.Remove(existing.Cfg)
+	var newCfg C
+	run(func(ctx context.Context) error {
+		var err error
+		newCfg, err = h.cb.ParseAndValidate(ctx, fn, name)
+		return err
+	}, func(err error) {
+		if errors.Is(err, ErrPhaseNeverRan) {
+			h.api.SendCodef(fn, 503, "%v", err)
+			return
 		}
-		h.exposed.Remove(existing.Cfg)
-		h.cb.Stop(existing.Cfg)
-	}
+		if err != nil {
+			h.api.SendCodef(fn, 400, "%v", err)
+			return
+		}
+		if h.cb.ConfigType(newCfg) != ConfigTypeJob {
+			h.api.SendCodef(fn, 405, "adding configurations of type '%s' is not supported, only 'job' configurations can be added.", h.cb.ConfigType(newCfg))
+			return
+		}
 
-	h.seen.Add(newCfg)
-	newEntry := &Entry[C]{Cfg: newCfg, Status: StatusAccepted}
-	h.exposed.Add(newEntry)
+		finish := func() {
+			h.seen.Add(newCfg)
+			newEntry := &Entry[C]{Cfg: newCfg, Status: StatusAccepted}
+			h.exposed.Add(newEntry)
 
-	h.api.SendCodef(fn, 202, "")
-	h.NotifyConfigCreate(newCfg, StatusAccepted)
+			h.api.SendCodef(fn, 202, "")
+			h.NotifyConfigCreate(newCfg, StatusAccepted)
+		}
+
+		// Replace existing config at the same key, if any: cache removal
+		// precedes the blocking stop (remove-before-block).
+		if existing, ok := h.exposed.LookupByKey(key); ok {
+			wasSeen := false
+			if _, found := h.seen.Lookup(existing.Cfg); found && existing.Cfg.SourceType() == "dyncfg" {
+				h.seen.Remove(existing.Cfg)
+				wasSeen = true
+			}
+			existingEntry := existing
+			h.exposed.Remove(existing.Cfg)
+			run(func(ctx context.Context) error {
+				h.cb.Stop(ctx, existing.Cfg)
+				return nil
+			}, func(stopErr error) {
+				if errors.Is(stopErr, ErrPhaseNeverRan) {
+					if wasSeen {
+						h.seen.Add(existingEntry.Cfg)
+					}
+					h.exposed.Add(existingEntry)
+					h.api.SendCodef(fn, 503, "%v", stopErr)
+					return
+				}
+				if stopErr != nil && !errors.Is(stopErr, ErrPhaseAbandoned) {
+					// The old instance's stop broke (recovered panic): do not
+					// create a replacement next to a job in an unknown state.
+					if wasSeen {
+						h.seen.Add(existingEntry.Cfg)
+					}
+					h.exposed.Add(existingEntry)
+					h.api.SendCodef(fn, 500, "%v", stopErr)
+					return
+				}
+				finish()
+			})
+			return
+		}
+		finish()
+	})
 }
 
 // CmdEnable handles the "enable" command.
 func (h *Handler[C]) CmdEnable(fn Function) {
+	h.cmdEnable(fn, RunStepSync)
+}
+
+func (h *Handler[C]) cmdEnable(fn Function, run StepRunner) {
 	key, _, ok := h.cb.ExtractKey(fn)
 	if !ok {
 		h.api.SendCodef(fn, 400, "invalid config ID format.")
@@ -523,40 +618,52 @@ func (h *Handler[C]) CmdEnable(fn Function) {
 		return
 	}
 
-	err := h.cb.Start(entry.Cfg)
-
-	if err != nil {
-		entry.Status = StatusFailed
-
-		code := h.enableFailCode
-		var ce CodedError
-		if errors.As(err, &ce) {
-			code = ce.DyncfgCode()
+	run(func(ctx context.Context) error {
+		return h.cb.Start(ctx, entry.Cfg)
+	}, func(err error) {
+		if errors.Is(err, ErrPhaseNeverRan) {
+			// The start never executed (shutdown): the config is untouched -
+			// answer retryably without publishing a failed status (and
+			// without the stock-removal side effect).
+			h.api.SendCodef(fn, 503, "%v", err)
+			return
 		}
-		h.api.SendCodef(fn, code, "%v", err)
+		if err != nil {
+			entry.Status = StatusFailed
 
-		// Stock removal only for plain runtime detection failures.
-		// CodedError carries an explicit status code, so the component owns the
-		// failure semantics and whether the job should be retried.
-		if h.removeStockOnEnableFail && !isCodedError(err) && entry.Cfg.SourceType() == "stock" {
-			h.exposed.Remove(entry.Cfg)
-			h.NotifyConfigRemove(entry.Cfg)
-		} else {
-			h.NotifyConfigStatus(entry.Cfg, StatusFailed)
+			code := h.enableFailCode
+			if ce, ok2 := errors.AsType[CodedError](err); ok2 {
+				code = ce.DyncfgCode()
+			}
+			h.api.SendCodef(fn, code, "%v", err)
+
+			// Stock removal only for plain runtime detection failures.
+			// CodedError carries an explicit status code, so the component owns the
+			// failure semantics and whether the job should be retried.
+			if h.removeStockOnEnableFail && !isCodedError(err) && entry.Cfg.SourceType() == "stock" {
+				h.exposed.Remove(entry.Cfg)
+				h.NotifyConfigRemove(entry.Cfg)
+			} else {
+				h.NotifyConfigStatus(entry.Cfg, StatusFailed)
+			}
+
+			h.cb.OnStatusChange(entry, oldStatus, fn)
+			return
 		}
 
+		entry.Status = StatusRunning
+		h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
+		h.NotifyConfigStatus(entry.Cfg, StatusRunning)
 		h.cb.OnStatusChange(entry, oldStatus, fn)
-		return
-	}
-
-	entry.Status = StatusRunning
-	h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
-	h.NotifyConfigStatus(entry.Cfg, StatusRunning)
-	h.cb.OnStatusChange(entry, oldStatus, fn)
+	})
 }
 
 // CmdDisable handles the "disable" command.
 func (h *Handler[C]) CmdDisable(fn Function) {
+	h.cmdDisable(fn, RunStepSync)
+}
+
+func (h *Handler[C]) cmdDisable(fn Function, run StepRunner) {
 	key, _, ok := h.cb.ExtractKey(fn)
 	if !ok {
 		h.api.SendCodef(fn, 400, "invalid config ID format.")
@@ -578,16 +685,36 @@ func (h *Handler[C]) CmdDisable(fn Function) {
 	}
 
 	// Unconditional for all non-Disabled statuses.
-	h.cb.Stop(entry.Cfg)
-
-	entry.Status = StatusDisabled
-	h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
-	h.NotifyConfigStatus(entry.Cfg, StatusDisabled)
-	h.cb.OnStatusChange(entry, oldStatus, fn)
+	run(func(ctx context.Context) error {
+		h.cb.Stop(ctx, entry.Cfg)
+		return nil
+	}, func(stopErr error) {
+		if errors.Is(stopErr, ErrPhaseNeverRan) {
+			h.api.SendCodef(fn, 503, "%v", stopErr)
+			return
+		}
+		if stopErr != nil && !errors.Is(stopErr, ErrPhaseAbandoned) {
+			// The stop broke (recovered panic): the job's state is unknown
+			// and nothing was fenced - publishing disabled would be a lie.
+			entry.Status = StatusFailed
+			h.api.SendCodef(fn, 500, "%v", stopErr)
+			h.NotifyConfigStatus(entry.Cfg, StatusFailed)
+			h.cb.OnStatusChange(entry, oldStatus, fn)
+			return
+		}
+		entry.Status = StatusDisabled
+		h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
+		h.NotifyConfigStatus(entry.Cfg, StatusDisabled)
+		h.cb.OnStatusChange(entry, oldStatus, fn)
+	})
 }
 
 // CmdRemove handles the "remove" command.
 func (h *Handler[C]) CmdRemove(fn Function) {
+	h.cmdRemove(fn, RunStepSync)
+}
+
+func (h *Handler[C]) cmdRemove(fn Function, run StepRunner) {
 	key, _, ok := h.cb.ExtractKey(fn)
 	if !ok {
 		h.api.SendCodef(fn, 400, "invalid config ID format.")
@@ -609,16 +736,45 @@ func (h *Handler[C]) CmdRemove(fn Function) {
 		return
 	}
 
+	// Cache removal precedes the blocking stop (remove-before-block).
 	h.seen.Remove(entry.Cfg)
 	h.exposed.Remove(entry.Cfg)
-	h.cb.Stop(entry.Cfg)
-
-	h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
-	h.NotifyConfigRemove(entry.Cfg)
+	run(func(ctx context.Context) error {
+		h.cb.Stop(ctx, entry.Cfg)
+		return nil
+	}, func(stopErr error) {
+		if errors.Is(stopErr, ErrPhaseNeverRan) {
+			// Nothing was stopped: restore the stage-time cache removals and
+			// answer retryably instead of publishing a delete that is a lie.
+			h.seen.Add(entry.Cfg)
+			h.exposed.Add(entry)
+			h.api.SendCodef(fn, 503, "%v", stopErr)
+			return
+		}
+		if stopErr != nil && !errors.Is(stopErr, ErrPhaseAbandoned) {
+			// The stop broke (recovered panic): restore the caches with a
+			// failed status instead of publishing a delete for a job whose
+			// state is unknown and whose output was never fenced.
+			oldStatus := entry.Status
+			entry.Status = StatusFailed
+			h.seen.Add(entry.Cfg)
+			h.exposed.Add(entry)
+			h.api.SendCodef(fn, 500, "%v", stopErr)
+			h.NotifyConfigStatus(entry.Cfg, StatusFailed)
+			h.cb.OnStatusChange(entry, oldStatus, fn)
+			return
+		}
+		h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
+		h.NotifyConfigRemove(entry.Cfg)
+	})
 }
 
 // CmdUpdate handles the "update" command.
 func (h *Handler[C]) CmdUpdate(fn Function) {
+	h.cmdUpdate(fn, RunStepSync)
+}
+
+func (h *Handler[C]) cmdUpdate(fn Function, run StepRunner) {
 	key, name, ok := h.cb.ExtractKey(fn)
 	if !ok {
 		h.api.SendCodef(fn, 400, "invalid config ID format.")
@@ -636,104 +792,161 @@ func (h *Handler[C]) CmdUpdate(fn Function) {
 		return
 	}
 
-	newCfg, err := h.cb.ParseAndValidate(fn, name)
-	if err != nil {
-		h.api.SendCodef(fn, 400, "%v", err)
-		h.NotifyConfigStatus(entry.Cfg, entry.Status)
-		return
-	}
-
-	isConversion := entry.Cfg.SourceType() != "dyncfg"
-
-	// No-op: running dyncfg config with same hash.
-	if !isConversion && entry.Status == StatusRunning && entry.Cfg.Hash() == newCfg.Hash() {
-		h.api.SendCodef(fn, 200, "")
-		h.NotifyConfigStatus(entry.Cfg, StatusRunning)
-		return
-	}
-
-	if entry.Status == StatusAccepted {
-		h.api.SendCodef(fn, 403, "updating is not allowed in '%s' state.", entry.Status)
-		h.NotifyConfigStatus(entry.Cfg, StatusAccepted)
-		return
-	}
-
-	oldStatus := entry.Status
-	oldCfg := entry.Cfg
-
-	// For conversion, stop the old work before publishing replacement config state.
-	if isConversion {
-		h.cb.Stop(oldCfg)
-	}
-
-	// Update caches.
-	if !isConversion {
-		h.seen.Remove(oldCfg)
-	}
-	h.seen.Add(newCfg)
-	newEntry := &Entry[C]{Cfg: newCfg, Status: StatusAccepted}
-	h.exposed.Add(newEntry)
-
-	// Preserve Disabled status.
-	if oldStatus == StatusDisabled {
-		newEntry.Status = StatusDisabled
-		if isConversion {
-			h.NotifyConfigCreate(newCfg, StatusDisabled)
+	var newCfg C
+	run(func(ctx context.Context) error {
+		var err error
+		newCfg, err = h.cb.ParseAndValidate(ctx, fn, name)
+		return err
+	}, func(err error) {
+		if errors.Is(err, ErrPhaseNeverRan) {
+			h.api.SendCodef(fn, 503, "%v", err)
+			return
 		}
-		h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
-		h.NotifyConfigStatus(newCfg, StatusDisabled)
-		h.cb.OnStatusChange(newEntry, oldStatus, fn)
-		return
-	}
-
-	// Start or update.
-	if isConversion {
-		err = h.cb.Start(newCfg)
-	} else {
-		err = h.cb.Update(oldCfg, newCfg)
-	}
-
-	if err != nil {
-		if !isConversion && errors.Is(err, ErrNonDisruptiveUpdate) {
-			// Update failed before runtime disruption; rollback to old cache state.
-			h.seen.Remove(newCfg)
-			h.seen.Add(oldCfg)
-			h.exposed.Add(entry)
-
-			h.api.SendCodef(fn, 200, "%v", err)
-			h.NotifyConfigStatus(oldCfg, oldStatus)
-			// No OnStatusChange call here: effective state did not change.
+		// Validation errors win over state rejections (400 beats 403): the
+		// validation effect runs even for Accepted entries.
+		if err != nil {
+			h.api.SendCodef(fn, 400, "%v", err)
+			h.NotifyConfigStatus(entry.Cfg, entry.Status)
 			return
 		}
 
-		newEntry.Status = StatusFailed
-		if isConversion {
-			h.NotifyConfigCreate(newCfg, StatusFailed)
-		}
-		code := 200
-		var ce CodedError
-		if errors.As(err, &ce) {
-			code = ce.DyncfgCode()
-		}
-		h.api.SendCodef(fn, code, "%v", err)
-		h.NotifyConfigStatus(newCfg, StatusFailed)
-		h.cb.OnStatusChange(newEntry, oldStatus, fn)
-		return
-	}
+		isConversion := entry.Cfg.SourceType() != "dyncfg"
 
-	newEntry.Status = StatusRunning
-	if isConversion {
-		h.NotifyConfigCreate(newCfg, StatusRunning)
-	}
-	h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
-	h.NotifyConfigStatus(newCfg, StatusRunning)
-	h.cb.OnStatusChange(newEntry, oldStatus, fn)
+		// No-op: running dyncfg config with same hash.
+		if !isConversion && entry.Status == StatusRunning && entry.Cfg.Hash() == newCfg.Hash() {
+			h.api.SendCodef(fn, 200, "")
+			h.NotifyConfigStatus(entry.Cfg, StatusRunning)
+			return
+		}
+
+		if entry.Status == StatusAccepted {
+			h.api.SendCodef(fn, 403, "updating is not allowed in '%s' state.", entry.Status)
+			h.NotifyConfigStatus(entry.Cfg, StatusAccepted)
+			return
+		}
+
+		oldStatus := entry.Status
+		oldCfg := entry.Cfg
+
+		proceed := func() {
+			// Update caches.
+			if !isConversion {
+				h.seen.Remove(oldCfg)
+			}
+			h.seen.Add(newCfg)
+			newEntry := &Entry[C]{Cfg: newCfg, Status: StatusAccepted}
+			h.exposed.Add(newEntry)
+
+			// Preserve Disabled status.
+			if oldStatus == StatusDisabled {
+				newEntry.Status = StatusDisabled
+				if isConversion {
+					h.NotifyConfigCreate(newCfg, StatusDisabled)
+				}
+				h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
+				h.NotifyConfigStatus(newCfg, StatusDisabled)
+				h.cb.OnStatusChange(newEntry, oldStatus, fn)
+				return
+			}
+
+			// Start or update.
+			run(func(ctx context.Context) error {
+				if isConversion {
+					return h.cb.Start(ctx, newCfg)
+				}
+				return h.cb.Update(ctx, oldCfg, newCfg)
+			}, func(err error) {
+				if !isConversion && errors.Is(err, ErrPhaseNeverRan) {
+					// The update phase never executed (shutdown): the old
+					// instance is untouched - roll back to the old cache state
+					// and answer retryably instead of publishing failed.
+					h.seen.Remove(newCfg)
+					h.seen.Add(oldCfg)
+					h.exposed.Add(entry)
+					h.api.SendCodef(fn, 503, "%v", err)
+					h.NotifyConfigStatus(oldCfg, oldStatus)
+					return
+				}
+				if err != nil {
+					if !isConversion && errors.Is(err, ErrNonDisruptiveUpdate) {
+						// Update failed before runtime disruption; rollback to old cache state.
+						h.seen.Remove(newCfg)
+						h.seen.Add(oldCfg)
+						h.exposed.Add(entry)
+
+						h.api.SendCodef(fn, 200, "%v", err)
+						h.NotifyConfigStatus(oldCfg, oldStatus)
+						// No OnStatusChange call here: effective state did not change.
+						return
+					}
+
+					newEntry.Status = StatusFailed
+					if isConversion {
+						h.NotifyConfigCreate(newCfg, StatusFailed)
+					}
+					code := 200
+					if ce, ok2 := errors.AsType[CodedError](err); ok2 {
+						code = ce.DyncfgCode()
+					}
+					h.api.SendCodef(fn, code, "%v", err)
+					h.NotifyConfigStatus(newCfg, StatusFailed)
+					h.cb.OnStatusChange(newEntry, oldStatus, fn)
+					return
+				}
+
+				newEntry.Status = StatusRunning
+				if isConversion {
+					h.NotifyConfigCreate(newCfg, StatusRunning)
+				}
+				h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
+				h.NotifyConfigStatus(newCfg, StatusRunning)
+				h.cb.OnStatusChange(newEntry, oldStatus, fn)
+			})
+		}
+
+		// For conversion, stop the old work before publishing replacement config state.
+		if isConversion {
+			run(func(ctx context.Context) error {
+				h.cb.Stop(ctx, oldCfg)
+				return nil
+			}, func(stopErr error) {
+				if errors.Is(stopErr, ErrPhaseNeverRan) {
+					// Nothing happened at all: the old job is untouched and
+					// the caches were not swapped yet - answer retryably
+					// without marking anything failed.
+					h.api.SendCodef(fn, 503, "%v", stopErr)
+					return
+				}
+				// An abandoned or broken stop is a disruptive failure: the
+				// update fails without cache rollback and the start phase
+				// never begins.
+				if stopErr != nil {
+					entry.Status = StatusFailed
+					code := 200
+					if ce, ok2 := errors.AsType[CodedError](stopErr); ok2 {
+						code = ce.DyncfgCode()
+					}
+					h.api.SendCodef(fn, code, "%v", stopErr)
+					h.NotifyConfigStatus(oldCfg, StatusFailed)
+					h.cb.OnStatusChange(entry, oldStatus, fn)
+					return
+				}
+				proceed()
+			})
+			return
+		}
+		proceed()
+	})
 }
 
 // CmdRestart handles the "restart" command.
 // Stops the existing work and starts the same config again.
 // Only allowed for Running/Failed configs (rejects Accepted/Disabled).
 func (h *Handler[C]) CmdRestart(fn Function) {
+	h.cmdRestart(fn, RunStepSync)
+}
+
+func (h *Handler[C]) cmdRestart(fn Function, run StepRunner) {
 	key, _, ok := h.cb.ExtractKey(fn)
 	if !ok {
 		h.api.SendCodef(fn, 400, "invalid config ID format.")
@@ -761,27 +974,50 @@ func (h *Handler[C]) CmdRestart(fn Function) {
 
 	oldStatus := entry.Status
 
-	h.cb.Stop(entry.Cfg)
-
-	err := h.cb.Start(entry.Cfg)
-
-	if err != nil {
-		entry.Status = StatusFailed
-		code := 422
-		var ce CodedError
-		if errors.As(err, &ce) {
-			code = ce.DyncfgCode()
+	run(func(ctx context.Context) error {
+		h.cb.Stop(ctx, entry.Cfg)
+		return nil
+	}, func(stopErr error) {
+		if errors.Is(stopErr, ErrPhaseNeverRan) {
+			// Nothing happened at all: answer retryably without publishing a
+			// failed status for a job that is in fact untouched.
+			h.api.SendCodef(fn, 503, "%v", stopErr)
+			return
 		}
-		h.api.SendCodef(fn, code, "config restart failed: %v", err)
-		h.NotifyConfigStatus(entry.Cfg, StatusFailed)
-		h.cb.OnStatusChange(entry, oldStatus, fn)
-		return
-	}
+		// An abandoned stop (or a broken one) fails the restart and the
+		// start phase never begins (no second instance).
+		if stopErr != nil {
+			entry.Status = StatusFailed
+			code := 422
+			if ce, ok2 := errors.AsType[CodedError](stopErr); ok2 {
+				code = ce.DyncfgCode()
+			}
+			h.api.SendCodef(fn, code, "config restart failed: %v", stopErr)
+			h.NotifyConfigStatus(entry.Cfg, StatusFailed)
+			h.cb.OnStatusChange(entry, oldStatus, fn)
+			return
+		}
+		run(func(ctx context.Context) error {
+			return h.cb.Start(ctx, entry.Cfg)
+		}, func(err error) {
+			if err != nil {
+				entry.Status = StatusFailed
+				code := 422
+				if ce, ok2 := errors.AsType[CodedError](err); ok2 {
+					code = ce.DyncfgCode()
+				}
+				h.api.SendCodef(fn, code, "config restart failed: %v", err)
+				h.NotifyConfigStatus(entry.Cfg, StatusFailed)
+				h.cb.OnStatusChange(entry, oldStatus, fn)
+				return
+			}
 
-	entry.Status = StatusRunning
-	h.api.SendCodef(fn, 200, "")
-	h.NotifyConfigStatus(entry.Cfg, StatusRunning)
-	h.cb.OnStatusChange(entry, oldStatus, fn)
+			entry.Status = StatusRunning
+			h.api.SendCodef(fn, 200, "")
+			h.NotifyConfigStatus(entry.Cfg, StatusRunning)
+			h.cb.OnStatusChange(entry, oldStatus, fn)
+		})
+	})
 }
 
 func isCodedError(err error) bool {

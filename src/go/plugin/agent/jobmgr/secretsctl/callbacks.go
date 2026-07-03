@@ -93,18 +93,21 @@ func (d secretStoreCallbackDeps) secretStoreConfigFromPayload(fn dyncfg.Function
 	return payload, nil
 }
 
-func (d secretStoreCallbackDeps) validateSecretStoreConfig(cfg secretstore.Config) error {
+func (d secretStoreCallbackDeps) validateSecretStoreConfig(ctx context.Context, cfg secretstore.Config) error {
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
 	if d.service == nil {
 		return fmt.Errorf("secretstore service is not available")
 	}
-	return d.service.Validate(d.resolveContext(cfg), cfg)
+	return d.service.Validate(d.resolveContext(ctx, cfg), cfg)
 }
 
-func (d secretStoreCallbackDeps) resolveContext(cfg secretstore.Config) context.Context {
-	return secretStoreResolveContext(d.log, cfg)
+// resolveContext derives the service-call context from the caller's: the
+// domain runs loop-synchronously today (ctx is Background), but callers'
+// cancellation propagates once the domain moves onto the executor.
+func (d secretStoreCallbackDeps) resolveContext(ctx context.Context, cfg secretstore.Config) context.Context {
+	return secretStoreResolveContext(ctx, d.log, cfg)
 }
 
 func (d secretStoreCallbackDeps) dyncfgSecretStoreID(id string) string {
@@ -136,7 +139,7 @@ func (cb *secretStoreCallbacks) ValidateConfigName(name string) error {
 	return dyncfg.JobNameRuleAllowDots(name)
 }
 
-func (cb *secretStoreCallbacks) ParseAndValidate(fn dyncfg.Function, name string) (secretstore.Config, error) {
+func (cb *secretStoreCallbacks) ParseAndValidate(ctx context.Context, fn dyncfg.Function, name string) (secretstore.Config, error) {
 	var kind secretstore.StoreKind
 	if fn.Command() == dyncfg.CommandAdd {
 		var ok bool
@@ -160,13 +163,13 @@ func (cb *secretStoreCallbacks) ParseAndValidate(fn dyncfg.Function, name string
 	if err != nil {
 		return nil, err
 	}
-	if err := cb.deps.validateSecretStoreConfig(cfg); err != nil {
+	if err := cb.deps.validateSecretStoreConfig(ctx, cfg); err != nil {
 		return nil, err
 	}
 	return cfg, nil
 }
 
-func (cb *secretStoreCallbacks) Start(cfg secretstore.Config) error {
+func (cb *secretStoreCallbacks) Start(ctx context.Context, cfg secretstore.Config) error {
 	cb.commandMessage = ""
 	key := cfg.ExposedKey()
 	if cb.deps.service == nil {
@@ -174,10 +177,10 @@ func (cb *secretStoreCallbacks) Start(cfg secretstore.Config) error {
 	}
 
 	if _, ok := cb.deps.service.GetStatus(key); ok {
-		if err := cb.deps.service.Update(cb.deps.resolveContext(cfg), key, cfg); err != nil {
+		if err := cb.deps.service.Update(cb.deps.resolveContext(ctx, cfg), key, cfg); err != nil {
 			return &codedError{err: err, code: secretStoreErrorCode(err)}
 		}
-	} else if err := cb.deps.service.Add(cb.deps.resolveContext(cfg), cfg); err != nil {
+	} else if err := cb.deps.service.Add(cb.deps.resolveContext(ctx, cfg), cfg); err != nil {
 		return &codedError{err: err, code: secretStoreErrorCode(err)}
 	}
 
@@ -185,7 +188,7 @@ func (cb *secretStoreCallbacks) Start(cfg secretstore.Config) error {
 	return nil
 }
 
-func (cb *secretStoreCallbacks) Update(oldCfg, newCfg secretstore.Config) error {
+func (cb *secretStoreCallbacks) Update(ctx context.Context, oldCfg, newCfg secretstore.Config) error {
 	cb.commandMessage = ""
 	key := oldCfg.ExposedKey()
 	if cb.deps.service == nil {
@@ -193,10 +196,10 @@ func (cb *secretStoreCallbacks) Update(oldCfg, newCfg secretstore.Config) error 
 	}
 
 	if _, ok := cb.deps.service.GetStatus(key); ok {
-		if err := cb.deps.service.Update(cb.deps.resolveContext(newCfg), key, newCfg); err != nil {
+		if err := cb.deps.service.Update(cb.deps.resolveContext(ctx, newCfg), key, newCfg); err != nil {
 			return &codedError{err: err, code: secretStoreErrorCode(err)}
 		}
-	} else if err := cb.deps.service.Add(cb.deps.resolveContext(newCfg), newCfg); err != nil {
+	} else if err := cb.deps.service.Add(cb.deps.resolveContext(ctx, newCfg), newCfg); err != nil {
 		return &codedError{err: err, code: secretStoreErrorCode(err)}
 	}
 
@@ -204,7 +207,7 @@ func (cb *secretStoreCallbacks) Update(oldCfg, newCfg secretstore.Config) error 
 	return nil
 }
 
-func (cb *secretStoreCallbacks) Stop(cfg secretstore.Config) {
+func (cb *secretStoreCallbacks) Stop(_ context.Context, cfg secretstore.Config) {
 	cb.commandMessage = ""
 	key := cfg.ExposedKey()
 	if cb.deps.service == nil {
