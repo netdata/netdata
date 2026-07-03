@@ -55,22 +55,9 @@ Use the chart arrangement at the start of each section to quickly identify patte
 
 :::
 
-## System Overview
+## Overview Charts
 
-The **System Overview** is the predefined section that appears at the top of every single-node dashboard. It populates automatically as soon as a node connects — there is nothing to configure — and gives you an at-a-glance summary of the node's core resources before you scroll into the detailed, per-topic sections below. You'll also find it in the right-hand [Chart Navigation Menu](#chart-navigation-menu).
-
-The section opens with gauges and charts that summarize overall node health, including CPU utilization, memory, and network activity. Notable items include:
-
-- **Net Inbound** and **Net Outbound** — the two network gauges, showing the aggregate rate of data received and sent across all of the node's physical network interfaces. A sudden, sustained change is often the first sign of a new workload, a backup or sync job, or unexpected traffic worth investigating.
-- **CPU utilization** — how busy the node's processors are. Sustained saturation is a cue to check which processes are consuming CPU in the sections below.
-
-:::note
-
-The exact gauges and charts in the System Overview depend on what the node's hardware and enabled collectors expose, so you may see additional resource summaries beyond these.
-
-:::
-
-Use these at-a-glance indicators to decide where to dig in next: a spike in network traffic or CPU directs you to the matching detailed section for root-cause analysis.
+At the top of every single-node dashboard, an automatically populated set of charts and gauges summarizes the node's core resources — CPU, memory, disk, and network — before the detailed per-topic sections begin. For example, the **Net Inbound** and **Net Outbound** dials show the aggregate rate of data received and sent across the node's physical network interfaces. The exact charts and gauges depend on what the node's hardware and enabled collectors expose.
 
 ## Chart Navigation Menu
 
