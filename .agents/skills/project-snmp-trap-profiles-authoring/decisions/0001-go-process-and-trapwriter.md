@@ -424,7 +424,7 @@ These errors must flow through DynCfg as coded errors with the resource-specific
 
 1. Preserve an inner `CodedError` from `createCollectorJob()` instead of replacing it with hardcoded HTTP 400.
 2. If `AutoDetection(ctx)` returns a `CodedError`, call `Cleanup()` and return that error. Schedule a retry only when the error also implements `DyncfgRetryable() bool` and returns `true`; plain non-coded `AutoDetection(ctx)` errors keep the existing retry behavior for other collectors.
-3. Make `Update()` mirror `Start()` for both `createCollectorJob()` and `AutoDetection()` coded errors.
+3. Make `Update()` mirror `Start()` for both `createCollectorJob()` and `AutoDetection(ctx)` coded errors.
 4. Make the `CmdUpdate` callback error path at `src/go/plugin/framework/dyncfg/handler.go:683` honor `CodedError` response codes like `CmdEnable` does, instead of always sending HTTP 200 for `cb.Start()` / `cb.Update()` failure. Preserve the existing `ErrNonDisruptiveUpdate` rollback path at `handler.go:667-677` as HTTP 200 because the old config remains effective and runtime state did not change; trap creation-time failures must not use `ErrNonDisruptiveUpdate`.
 
 Before changing shared DynCfg behavior, M2 must run a same-failure scan (`rg 'CodedError|codedError|MarkNonDisruptiveUpdate' src/go/plugin`) and add handler/jobmgr tests proving existing plain-error retry behavior remains unchanged while coded trap creation failures surface their HTTP status.
@@ -486,7 +486,7 @@ On `Update()`, current jobmgr behavior stops the old running job before creating
 - Existing Rust journal-log-writer: `src/crates/journal-log-writer/src/log/mod.rs`
 - Existing NetFlow journal retention: `src/crates/netflow-plugin/src/plugin_config/types/journal.rs`
 - go.d DynCfg callbacks: `src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go`
-- go.d codedError: `src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go:140-147`
+- go.d codedError: `src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go` (`codedError`)
 - go.d V2 collector pattern: `src/go/plugin/go.d/collector/ping/collector.go`
 - SNMP profile loader multipath pattern: `src/go/plugin/go.d/collector/snmp/ddsnmp/load.go:270-286`
 - Design spec: `.agents/skills/project-snmp-trap-profiles-authoring/netdata.md` §5, §11, §19
