@@ -461,7 +461,7 @@ static bool nv_smb_collect(void)
 
 // Emit one network-protocols table row per SMB share.
 // Must be called under nv_collect_mutex, after nv_smb_collect().
-// Column order matches function_network_protocols:
+// Column order matches network_viewer_protocols_freebsd:
 //   Transport, Family, Share, Received, Sent, Errors,
 //   ConnActive, ConnEstablished, ConnPassive, ConnReset,
 //   SegsTotal, SegsRetransmitted, DatagramsNoPort, TreeConnects,
@@ -551,7 +551,7 @@ static void proto_emit_udp_row(BUFFER *wb, const UDP_FAMILY *udp)
     buffer_json_array_close(wb);
 }
 
-void function_network_protocols(
+void network_viewer_protocols_freebsd(
     const char *transaction, char *function __maybe_unused,
     usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled,
     BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
@@ -1320,7 +1320,7 @@ int main(int argc, char **argv)
     struct functions_evloop_globals *wg =
         functions_evloop_init(5, "NV-WIN", &stdout_mutex, &plugin_should_exit, NULL);
 
-    functions_evloop_add_function(wg, NV_WIN_FUNCTION_PROTO, function_network_protocols,
+    functions_evloop_add_function(wg, NV_WIN_FUNCTION_PROTO, network_viewer_protocols_freebsd,
                                   PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NULL);
 
     functions_evloop_add_function(wg, NV_WIN_FUNCTION_CONN, function_network_connections,

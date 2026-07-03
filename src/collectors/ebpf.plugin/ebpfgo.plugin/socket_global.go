@@ -8,20 +8,22 @@ import (
 
 // socketGlobalPublish holds the per-cycle delta values for the network-protocols function.
 //
-// TCP function/bandwidth/error charts use dimension IDs "tcp_cleanup_rbuf" and
-// "tcp_sendmsg" in the same cross-mapped order as the C plugin: the field that
-// feeds "tcp_cleanup_rbuf" carries tcp_sendmsg data and vice-versa.  This is a
-// historic naming quirk preserved for chart-ID compatibility.
+// Field names match their semantic direction (Received vs Sent) so the
+// BPF-snapshot -> publish and publish -> JSON paths are straight-line code
+// with no name swap and no sign trick. kbits values are always non-negative;
+// direction is encoded in the field name, never in the sign. The BPF
+// counter -> Received/Sent mapping is pinned by TestBuildNetworkProtocolsJSON_BPFMapping.
 type socketGlobalPublish struct {
-	// Feeds dimension "tcp_cleanup_rbuf" in tcp_functions, bandwidth, error.
-	tcpDimCleanupCalls uint64 // delta of CallsTCPSendmsg
-	tcpDimCleanupKbits int64  // -bytesToKbits(BytesTCPSendmsg)  [negative = sent]
-	tcpDimCleanupErr   uint64 // delta of ErrorTCPSendmsg
+	// TCP received path: tcp_cleanup_rbuf is invoked when the kernel cleans
+	// the receive buffer after an application read.
+	tcpDimReceivedCalls uint64 // delta of CallsTCPCleanupRbuf
+	tcpDimReceivedKbits int64  // +bytesToKbits(BytesTCPCleanupRbuf)
+	tcpDimReceivedErr   uint64 // delta of ErrorTCPCleanupRbuf
 
-	// Feeds dimension "tcp_sendmsg" in tcp_functions, bandwidth, error.
-	tcpDimSendmsgCalls uint64 // delta of CallsTCPCleanupRbuf
-	tcpDimSendmsgKbits int64  // +bytesToKbits(BytesTCPCleanupRbuf) [positive = recv]
-	tcpDimSendmsgErr   uint64 // delta of ErrorTCPCleanupRbuf
+	// TCP sent path: tcp_sendmsg is invoked when an application sends data.
+	tcpDimSentCalls uint64 // delta of CallsTCPSendmsg
+	tcpDimSentKbits int64  // +bytesToKbits(BytesTCPSendmsg)
+	tcpDimSentErr   uint64 // delta of ErrorTCPSendmsg
 
 	tcpCloseCalls uint64 // delta of CallsTCPClose
 	tcpRetransmit uint64 // delta of TCPRetransmit
@@ -30,7 +32,7 @@ type socketGlobalPublish struct {
 	udpRecvCalls  uint64 // delta of CallsUDPRecvmsg
 	udpSendCalls  uint64 // delta of CallsUDPSendmsg
 	udpRecvKbits  int64  // +bytesToKbits(BytesUDPRecvmsg)
-	udpSendKbits  int64  // -bytesToKbits(BytesUDPSendmsg)     [negative = sent]
+	udpSendKbits  int64  // +bytesToKbits(BytesUDPSendmsg)
 	udpRecvErr    uint64 // delta of ErrorUDPRecvmsg
 	udpSendErr    uint64 // delta of ErrorUDPSendmsg
 	inboundTCP    uint64 // delta of InboundConnTCP
@@ -72,26 +74,27 @@ func (s *socketGlobalState) Update(snap libbpfloader.SocketSnapshot) (socketGlob
 	prev := s.prev
 	s.prev = snap
 
-	// Cross-map: "tcp_cleanup_rbuf" dim ← sendmsg data; "tcp_sendmsg" dim ← cleanup_rbuf data.
+	// BPF counter -> semantic direction is straight: sendmsg = sent,
+	// cleanup_rbuf = received. No name swap, no sign trick.
 	return socketGlobalPublish{
-		tcpDimCleanupCalls: socketDelta(snap.CallsTCPSendmsg, prev.CallsTCPSendmsg),
-		tcpDimCleanupKbits: -kbDelta(snap.BytesTCPSendmsg, prev.BytesTCPSendmsg),
-		tcpDimCleanupErr:   socketDelta(snap.ErrorTCPSendmsg, prev.ErrorTCPSendmsg),
-		tcpDimSendmsgCalls: socketDelta(snap.CallsTCPCleanupRbuf, prev.CallsTCPCleanupRbuf),
-		tcpDimSendmsgKbits: kbDelta(snap.BytesTCPCleanupRbuf, prev.BytesTCPCleanupRbuf),
-		tcpDimSendmsgErr:   socketDelta(snap.ErrorTCPCleanupRbuf, prev.ErrorTCPCleanupRbuf),
-		tcpCloseCalls:      socketDelta(snap.CallsTCPClose, prev.CallsTCPClose),
-		tcpRetransmit:      socketDelta(snap.TCPRetransmit, prev.TCPRetransmit),
-		tcpV4Conn:          socketDelta(snap.CallsTCPConnectIPv4, prev.CallsTCPConnectIPv4),
-		tcpV6Conn:          socketDelta(snap.CallsTCPConnectIPv6, prev.CallsTCPConnectIPv6),
-		udpRecvCalls:       socketDelta(snap.CallsUDPRecvmsg, prev.CallsUDPRecvmsg),
-		udpSendCalls:       socketDelta(snap.CallsUDPSendmsg, prev.CallsUDPSendmsg),
-		udpRecvKbits:       kbDelta(snap.BytesUDPRecvmsg, prev.BytesUDPRecvmsg),
-		udpSendKbits:       -kbDelta(snap.BytesUDPSendmsg, prev.BytesUDPSendmsg),
-		udpRecvErr:         socketDelta(snap.ErrorUDPRecvmsg, prev.ErrorUDPRecvmsg),
-		udpSendErr:         socketDelta(snap.ErrorUDPSendmsg, prev.ErrorUDPSendmsg),
-		inboundTCP:         socketDelta(snap.InboundConnTCP, prev.InboundConnTCP),
-		inboundUDP:         socketDelta(snap.InboundConnUDP, prev.InboundConnUDP),
+		tcpDimReceivedCalls: socketDelta(snap.CallsTCPCleanupRbuf, prev.CallsTCPCleanupRbuf),
+		tcpDimReceivedKbits: kbDelta(snap.BytesTCPCleanupRbuf, prev.BytesTCPCleanupRbuf),
+		tcpDimReceivedErr:   socketDelta(snap.ErrorTCPCleanupRbuf, prev.ErrorTCPCleanupRbuf),
+		tcpDimSentCalls:     socketDelta(snap.CallsTCPSendmsg, prev.CallsTCPSendmsg),
+		tcpDimSentKbits:     kbDelta(snap.BytesTCPSendmsg, prev.BytesTCPSendmsg),
+		tcpDimSentErr:       socketDelta(snap.ErrorTCPSendmsg, prev.ErrorTCPSendmsg),
+		tcpCloseCalls:       socketDelta(snap.CallsTCPClose, prev.CallsTCPClose),
+		tcpRetransmit:       socketDelta(snap.TCPRetransmit, prev.TCPRetransmit),
+		tcpV4Conn:           socketDelta(snap.CallsTCPConnectIPv4, prev.CallsTCPConnectIPv4),
+		tcpV6Conn:           socketDelta(snap.CallsTCPConnectIPv6, prev.CallsTCPConnectIPv6),
+		udpRecvCalls:        socketDelta(snap.CallsUDPRecvmsg, prev.CallsUDPRecvmsg),
+		udpSendCalls:        socketDelta(snap.CallsUDPSendmsg, prev.CallsUDPSendmsg),
+		udpRecvKbits:        kbDelta(snap.BytesUDPRecvmsg, prev.BytesUDPRecvmsg),
+		udpSendKbits:        kbDelta(snap.BytesUDPSendmsg, prev.BytesUDPSendmsg),
+		udpRecvErr:          socketDelta(snap.ErrorUDPRecvmsg, prev.ErrorUDPRecvmsg),
+		udpSendErr:          socketDelta(snap.ErrorUDPSendmsg, prev.ErrorUDPSendmsg),
+		inboundTCP:          socketDelta(snap.InboundConnTCP, prev.InboundConnTCP),
+		inboundUDP:          socketDelta(snap.InboundConnUDP, prev.InboundConnUDP),
 	}, true
 }
 

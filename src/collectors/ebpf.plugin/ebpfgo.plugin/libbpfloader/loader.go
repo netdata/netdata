@@ -141,7 +141,7 @@ func (r *SocketRuntime) Close() {
 
 type DNSRuntime struct{}
 
-func NewDNSRuntime(path string, useCore bool) (*DNSRuntime, error) {
+func NewDNSRuntime(path string, useCore bool, perQuery bool) (*DNSRuntime, error) {
 	return newDisabledRuntime[DNSRuntime](path, useCore)
 }
 

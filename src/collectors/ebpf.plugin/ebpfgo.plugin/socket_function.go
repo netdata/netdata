@@ -147,14 +147,18 @@ func sendFunctionError(api *netdataapi.API, uid string, code int, msg string) {
 }
 
 // buildNetworkProtocolsJSON produces the JSON table matching the FreeBSD network-protocols schema.
+//
+// Field names are semantic: Received = cleanup_rbuf data, Sent = sendmsg data.
+// The BPF counter -> dimension mapping is pinned by
+// TestBuildNetworkProtocolsJSON_BPFMapping so a kernel ABI rename silently
+// breaks the test instead of silently flipping Sent/Received.
 func buildNetworkProtocolsJSON(p socketGlobalPublish, updateEvery int, expires int64) (string, error) {
-	// Cross-map: "tcp_cleanup_rbuf" dim carries sendmsg (sent) data; "tcp_sendmsg" dim carries cleanup_rbuf (received) data.
-	tcpReceived := p.tcpDimSendmsgCalls
-	tcpSent := p.tcpDimCleanupCalls
-	tcpErrors := p.tcpDimCleanupErr + p.tcpDimSendmsgErr
+	tcpReceived := p.tcpDimReceivedCalls
+	tcpSent := p.tcpDimSentCalls
+	tcpErrors := p.tcpDimReceivedErr + p.tcpDimSentErr
 	tcpConnActive := p.tcpV4Conn + p.tcpV6Conn
 	tcpConnPassive := p.inboundTCP
-	tcpSegsTotal := p.tcpDimSendmsgCalls + p.tcpDimCleanupCalls + p.tcpCloseCalls
+	tcpSegsTotal := p.tcpDimReceivedCalls + p.tcpDimSentCalls + p.tcpCloseCalls
 	tcpSegsRetrans := p.tcpRetransmit
 
 	udpReceived := p.udpRecvCalls

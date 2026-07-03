@@ -170,6 +170,7 @@ struct netdata_dns_runtime {
     struct bpf_object *obj;
     int sock_fd;   /* BPF-attached socket (base: carries packets; ringbuf: empty) */
     int flow_fd;   /* dedicated AF_PACKET + classic-BPF socket (ringbuf mode only) */
+    int per_query; /* when false, skip the flow socket and per-query tracking */
 #if DNS_HAS_RINGBUF
     struct ring_buffer *rb;
 #else
@@ -687,7 +688,7 @@ static void dns_drain_socket(struct netdata_dns_runtime *rt)
  * ---------------------------------------------------------------------- */
 static void dns_drain_flow_socket(struct netdata_dns_runtime *rt)
 {
-    if (rt->flow_fd < 0)
+    if (!rt->per_query || rt->flow_fd < 0)
         return;
 
     char    buf[DNS_PACKET_BUF];
@@ -797,7 +798,7 @@ static int dns_attach_filter(struct netdata_dns_runtime *rt, const char *prog_na
 /* -------------------------------------------------------------------------
  * Public API
  * ---------------------------------------------------------------------- */
-struct netdata_dns_runtime *netdata_dns_runtime_open_mode(const char *path, int use_core)
+struct netdata_dns_runtime *netdata_dns_runtime_open_mode(const char *path, int use_core, int per_query)
 {
     (void)use_core;
 
@@ -807,6 +808,7 @@ struct netdata_dns_runtime *netdata_dns_runtime_open_mode(const char *path, int 
 
     rt->sock_fd = -1;
     rt->flow_fd = -1;
+    rt->per_query = per_query ? 1 : 0;
 
     struct bpf_object *obj = bpf_object__open_file(path, NULL);
     if (!obj || libbpf_get_error(obj)) {
@@ -888,12 +890,17 @@ int netdata_dns_runtime_attach(struct netdata_dns_runtime *rt)
             return -1;
         }
 
-        /* Open a dedicated capture socket for per-query DNS payload parsing.
-         * Non-fatal: per-query tracking degrades gracefully if this fails. */
-        rt->flow_fd = dns_open_flow_socket();
-        if (rt->flow_fd < 0)
-            fprintf(stderr,
-                    "ebpf-go: dns: flow socket unavailable; per-query tracking disabled\n");
+        /* Per-query DNS payload tracking requires a dedicated AF_PACKET
+         * capture socket. The ring buffer path still emits aggregate counters
+         * regardless of this flag. When the operator (or this Go side) does
+         * not need per-query tracking, skip the flow socket entirely so the
+         * kernel does not spend CPU on a capture socket no consumer reads. */
+        if (rt->per_query) {
+            rt->flow_fd = dns_open_flow_socket();
+            if (rt->flow_fd < 0)
+                fprintf(stderr,
+                        "ebpf-go: dns: flow socket unavailable; per-query tracking disabled\n");
+        }
 #else
         fprintf(stderr,
                 "ebpf-go: dns: ring buffer variant requires libbpf >= 0.2\n");
@@ -932,7 +939,9 @@ int netdata_dns_runtime_snapshot(
 
 /* Return per-query flow records that fall within the 20-second live window.
  * Records are written into out[0..max_records-1].
- * Returns the number of records written, or -1 on error. */
+ * Returns the number of records written, or -1 on error. When the runtime
+ * was attached with per_query disabled, returns 0 (no flow socket was ever
+ * opened). */
 int netdata_dns_runtime_flow_snapshot(
     struct netdata_dns_runtime *rt,
     struct netdata_dns_flow_record *out,
@@ -940,6 +949,9 @@ int netdata_dns_runtime_flow_snapshot(
 {
     if (!rt || !out || max_records <= 0)
         return -1;
+
+    if (!rt->per_query)
+        return 0;
 
     uint64_t now_us = dns_now_us();
     int      count  = 0;

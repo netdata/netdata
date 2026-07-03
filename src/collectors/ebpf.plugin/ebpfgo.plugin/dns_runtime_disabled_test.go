@@ -13,7 +13,7 @@ import (
 // ErrDisabled in the non-libbpf build, preventing silent no-ops masking load
 // failures when libbpf is unavailable.
 func TestDNSRuntimeDisabledBuild(t *testing.T) {
-	_, err := libbpfloader.NewDNSRuntime("/dev/null", false)
+	_, err := libbpfloader.NewDNSRuntime("/dev/null", false, false)
 	if !errors.Is(err, libbpfloader.ErrDisabled) {
 		t.Fatalf("NewDNSRuntime: got %v, want ErrDisabled", err)
 	}

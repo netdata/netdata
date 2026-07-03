@@ -1,5 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Function registration ownership split:
+//   - network-connections         : all OSes, served by this plugin
+//   - topology:network-connections: all OSes, served by this plugin
+//   - dns-queries                 : Linux only, served by this plugin
+//   - network-protocols           : FreeBSD only, served by this plugin
+//                                   (on Linux, network-protocols is served by
+//                                   ebpfgo.plugin via its stdin dispatcher;
+//                                   adding a Linux registration here would
+//                                   collide at runtime. The guard below turns
+//                                   such an attempt into a compile error.)
 #include "collectors/all.h"
 #include "libnetdata/libnetdata.h"
 #include "network-viewer-apps-lookup-client.h"
@@ -6756,6 +6766,16 @@ static void network_viewer_dns_function(
 
 // ----------------------------------------------------------------------------------------------------------------
 // FreeBSD: network-protocols function
+//
+// On Linux, the `network-protocols` function is owned by ebpfgo.plugin (the
+// Go plugin reads the network-viewer SHM and serves the function via its
+// stdin dispatcher). Adding a Linux `network-protocols` registration here
+// would double-register the function and silently drop frames. The guard
+// below makes that mistake a compile error rather than a runtime collision.
+
+#if defined(OS_LINUX) && defined(NETDATA_NETVIEWER_REGISTER_NETWORK_PROTOCOLS)
+#error "network-protocols is served by ebpfgo.plugin on Linux; do not register it here"
+#endif
 
 #if defined(OS_FREEBSD)
 
@@ -6774,7 +6794,7 @@ static uint64_t nv_proto_delta(uint64_t cur, uint64_t prev, double elapsed_s) {
     return (uint64_t)((double)(cur - prev) / elapsed_s + 0.5);
 }
 
-void function_network_protocols(
+void network_viewer_protocols_freebsd(
     const char *transaction, char *function __maybe_unused,
     usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
     BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
@@ -7411,7 +7431,7 @@ int main(int argc, char **argv) {
 
 #if defined(OS_FREEBSD)
     functions_evloop_add_function(wg, NETWORK_PROTOCOLS_FUNCTION,
-                                  function_network_protocols,
+                                  network_viewer_protocols_freebsd,
                                   PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT,
                                   NULL);
 #endif

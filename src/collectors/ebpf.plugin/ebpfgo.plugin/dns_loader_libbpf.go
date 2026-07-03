@@ -12,8 +12,8 @@ import (
 
 // tryLoadDNSPlan opens, prepares, loads, and attaches a single DNS plan.
 // On any failure the partially-initialised runtime is closed before returning.
-func tryLoadDNSPlan(plan LoadPlan) (*DNSLegacyHandle, error) {
-	rt, err := libbpfloader.NewDNSRuntime(plan.ObjectPath, plan.LoadMode == LoadCore)
+func tryLoadDNSPlan(plan LoadPlan, perQuery bool) (*DNSLegacyHandle, error) {
+	rt, err := libbpfloader.NewDNSRuntime(plan.ObjectPath, plan.LoadMode == LoadCore, perQuery)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func LoadDNSLegacy(cfg DNSLegacyConfig) (*DNSLegacyHandle, error) {
 	plans := buildFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "dns", dnsMaxBaseSelector)
 	var lastErr error
 	for i, fp := range plans {
-		handle, err := tryLoadDNSPlan(fp)
+		handle, err := tryLoadDNSPlan(fp, cfg.PerQueryTracking)
 		if err == nil {
 			handle.UpdateEvery = cfg.UpdateEvery
 			handle.ConfigFound = cfg.ConfigFound

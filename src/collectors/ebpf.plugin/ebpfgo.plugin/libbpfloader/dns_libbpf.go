@@ -38,7 +38,7 @@ struct netdata_dns_flow_record {
     uint8_t  _pad[7];
 };
 
-struct netdata_dns_runtime *netdata_dns_runtime_open_mode(const char *path, int use_core);
+struct netdata_dns_runtime *netdata_dns_runtime_open_mode(const char *path, int use_core, int per_query);
 int netdata_dns_runtime_prepare(struct netdata_dns_runtime *rt);
 int netdata_dns_runtime_load(struct netdata_dns_runtime *rt);
 int netdata_dns_runtime_attach(struct netdata_dns_runtime *rt);
@@ -58,7 +58,7 @@ type DNSRuntime struct {
 	ptr *C.struct_netdata_dns_runtime
 }
 
-func NewDNSRuntime(path string, useCore bool) (*DNSRuntime, error) {
+func NewDNSRuntime(path string, useCore bool, perQuery bool) (*DNSRuntime, error) {
 	cpath := C.CString(path)
 	defer C.free(unsafe.Pointer(cpath))
 
@@ -67,7 +67,12 @@ func NewDNSRuntime(path string, useCore bool) (*DNSRuntime, error) {
 		cUseCore = 1
 	}
 
-	rt := C.netdata_dns_runtime_open_mode(cpath, cUseCore)
+	cPerQuery := C.int(0)
+	if perQuery {
+		cPerQuery = 1
+	}
+
+	rt := C.netdata_dns_runtime_open_mode(cpath, cUseCore, cPerQuery)
 	if rt == nil {
 		return nil, fmt.Errorf("open DNS object %q failed", path)
 	}
