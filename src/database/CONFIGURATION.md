@@ -9,8 +9,10 @@ Use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configurati
 ```text
 [db]
   # dbengine, ram, none
-  mode = dbengine
+  db = dbengine
 ```
+
+`mode` is also accepted for backwards compatibility.
 
 ## Tiers
 
@@ -22,7 +24,7 @@ In a Parent-Child setup, these settings control the Parent's total storage for m
 
 Child and Parent storage are independent:
 
-- A Child can keep local history based on its own `[db].mode`.
+- A Child can keep local history based on its own `[db].db`.
 - Streamed metrics can also be persisted on the Parent, in the Parent's own dbengine files.
 
 Retention size is enforced **per-tier**, not per Child, so all streaming Children share the Parent's tier quota. For Parent sizing guidance, see [Parent Retention Sizing](/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md#parent-retention-sizing).
@@ -47,7 +49,7 @@ You can change these limits using [`edit-config`](/docs/netdata-agent/configurat
 
 ```text
 [db]
-    mode = dbengine
+    db = dbengine
     storage tiers = 3
 
     # Tier 0, per second data. Set to 0 for no limit.

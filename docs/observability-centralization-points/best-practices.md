@@ -140,7 +140,7 @@ Adding 5–15% overhead for replication buffers, indexes, and metadata, plan for
 
 ```ini
 [db]
-    mode = dbengine
+    db = dbengine
     update every = 1
     storage tiers = 3
 
@@ -206,15 +206,15 @@ flowchart TB
 
 Netdata provides several benefits over other observability solutions:
 
-| Advantage                         | Description                                | Value                                                                 |
-|-----------------------------------|--------------------------------------------|-----------------------------------------------------------------------|
-| **Scalability & Flexibility**     | Multiple independent Parents               | Customized observability by region, service, or team                  |
-| **Resilience & Reliability**      | Built-in replication                       | Observability continues even if a Parent fails                        |
-| **Optimized Cost & Performance**  | Distributed workloads                      | Prevents bottlenecks and improves resource efficiency                 |
-| **Ease of Use**                   | Minimal setup and maintenance              | Reduces complexity and operational overhead                           |
-| **On-Prem Control**               | Data remains within your infrastructure    | Enhanced security and compliance, even when using Netdata Cloud. For a fully self-hosted control plane, see [Netdata Cloud On-Prem](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/README.md)       |
-| **Comprehensive Observability**   | Segmented infrastructure with unified view | Deep visibility with tailored retention, alerts, and machine learning |
-| **Predictable Capacity Planning** | Published per-metric storage cost          | Allows accurate disk and hardware sizing for Parents                  |
+| Advantage                         | Description                                | Value                                                                                                                                                                                                                               |
+|-----------------------------------|--------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Scalability & Flexibility**     | Multiple independent Parents               | Customized observability by region, service, or team                                                                                                                                                                                |
+| **Resilience & Reliability**      | Built-in replication                       | Observability continues even if a Parent fails                                                                                                                                                                                      |
+| **Optimized Cost & Performance**  | Distributed workloads                      | Prevents bottlenecks and improves resource efficiency                                                                                                                                                                               |
+| **Ease of Use**                   | Minimal setup and maintenance              | Reduces complexity and operational overhead                                                                                                                                                                                         |
+| **On-Prem Control**               | Data remains within your infrastructure    | Enhanced security and compliance, even when using Netdata Cloud. For a fully self-hosted control plane, see [Netdata Cloud On-Prem](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/README.md) |
+| **Comprehensive Observability**   | Segmented infrastructure with unified view | Deep visibility with tailored retention, alerts, and machine learning                                                                                                                                                               |
+| **Predictable Capacity Planning** | Published per-metric storage cost          | Allows accurate disk and hardware sizing for Parents                                                                                                                                                                                |
 
 :::tip
 
