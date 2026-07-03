@@ -628,11 +628,33 @@ get_os_key() {
 }
 
 get_group(){
+  group="${1:-}"
+
+  [ -z "${group}" ] && return 1
+
   if command -v getent > /dev/null 2>&1; then
-    getent group "${1:-""}"
-  else
-    grep "^${1}:" /etc/group
+    getent group "${group}" && return 0
   fi
+
+  if command -v dscl > /dev/null 2>&1; then
+    if group_record="$(dscl . read /Groups/"${group}" 2>/dev/null)"; then
+      gid="$(printf "%s\n" "${group_record}" | awk '/^PrimaryGroupID:/{print $2; exit}')"
+      members="$(printf "%s\n" "${group_record}" | awk '
+        /^GroupMembership:/ {
+          for (i = 2; i <= NF; i++) {
+            members = members ? members "," $i : $i
+          }
+        }
+        END {
+          print members
+        }
+      ')"
+      printf "%s:*:%s:%s\n" "${group}" "${gid}" "${members}"
+      return 0
+    fi
+  fi
+
+  awk -F ':' -v group="${group}" '$1 == group { print; found = 1 } END { exit !found }' /etc/group
 }
 
 issystemd() {
