@@ -5,6 +5,16 @@
 #import <Foundation/Foundation.h>
 #import <OSLog/OSLog.h>
 
+// OSLog system-store enumerations do not tolerate concurrency: two overlapping
+// OSLogEventStream enumerations explode dispatch threads (hitting the soft limit)
+// and memory, and nextObject blocks on a dispatch semaphore that never resolves,
+// wedging the worker threads. Serialize all OSLog queries on this mutex so only
+// one enumeration runs at a time.
+static netdata_mutex_t macos_logs_oslog_mutex;
+static void __attribute__((constructor)) macos_logs_oslog_init_mutex(void) {
+    netdata_mutex_init(&macos_logs_oslog_mutex);
+}
+
 static inline bool macos_logs_check_stop(const LOGS_QUERY_STATUS *lqs) {
     if(lqs->cancelled && __atomic_load_n(lqs->cancelled, __ATOMIC_RELAXED))
         return true;
@@ -185,7 +195,12 @@ MACOS_LOGS_QUERY_STATUS macos_logs_query_oslog(LOGS_QUERY_STATUS *lqs) {
     if(!macos_logs_source_selected(lqs))
         return MACOS_LOGS_QUERY_OK;
 
-    @autoreleasepool {
+    // Serialize OSLog enumerations on this mutex (see macos_logs_oslog_mutex):
+    // only one system-store enumeration may run at a time. @finally releases the
+    // lock on every return path, including the early-error ones below.
+    netdata_mutex_lock(&macos_logs_oslog_mutex);
+    @try {
+        @autoreleasepool {
         NSError *error = nil;
         OSLogStore *store = macos_logs_open_store(&error);
         if(!store) {
@@ -326,5 +341,8 @@ MACOS_LOGS_QUERY_STATUS macos_logs_query_oslog(LOGS_QUERY_STATUS *lqs) {
         lqs->c.query_finished_ut = now_monotonic_usec();
 
         return MACOS_LOGS_QUERY_OK;
+        }
+    } @finally {
+        netdata_mutex_unlock(&macos_logs_oslog_mutex);
     }
 }
