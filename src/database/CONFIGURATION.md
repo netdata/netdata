@@ -140,7 +140,7 @@ For a detailed breakdown into individual caches, the dedicated dbengine cache ch
     extended = yes
 ```
 
-Restart the Agent for the change to take effect. Once enabled, the following charts appear under the **Netdata** section:
+[Restart the Agent](/docs/netdata-agent/start-stop-restart.md) for the change to take effect. Once enabled, the following charts appear under the **Netdata** section:
 
 - In the **dbengine memory** family, the **Netdata DB Memory** chart breaks total database memory down by component: main cache, open cache, extent cache, metrics registry, buffers, and allocator bookkeeping (aral structures, aral padding, pgd padding).
 - In the **dbengine main cache**, **dbengine open cache**, and **dbengine extent cache** families:
