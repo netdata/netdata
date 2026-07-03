@@ -248,6 +248,8 @@ func (j *JobV2) Cleanup() {
 	j.clearAllScopeStateAfterCleanup()
 }
 
+// AutoDetection invokes init, check and postCheck. It handles panic.
+// ctx flows into the module's Init/Check calls and must be non-nil.
 func (j *JobV2) AutoDetection(ctx context.Context) (err error) {
 	defer func() {
 		if r := recover(); r != nil {

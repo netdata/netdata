@@ -574,6 +574,9 @@ func (m *Manager) stopRunningJob(name string) {
 			job.Stop()
 			return nil
 		})
+		// Tracking removal only: the gate is never closed on the stop path,
+		// because a stopping job's in-flight flush and cleanup/obsoletion
+		// output must reach the wire.
 		m.emissionGates.remove(name)
 	}
 }

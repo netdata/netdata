@@ -146,6 +146,9 @@ func (cb *collectorCallbacks) Start(cfg confgroup.Config) error {
 		return &codedError{err: fmt.Errorf("invalid configuration: failed to apply configuration: %w", createErr), code: 400}
 	}
 	if err != nil {
+		// Tracking removal only. The gate itself stays open by contract -
+		// closing is reserved for abandoning a wedged stop - and no writer
+		// survives here anyway: the job never started.
 		cb.mgr.emissionGates.remove(cfg.FullName())
 		if _, ok := errors.AsType[dyncfg.CodedError](err); ok {
 			if dyncfg.IsRetryableError(err) {
@@ -188,6 +191,7 @@ func (cb *collectorCallbacks) Update(oldCfg, newCfg confgroup.Config) error {
 		return fmt.Errorf("job update failed: %w", createErr)
 	}
 	if err != nil {
+		// Tracking removal only; see the identical note in Start.
 		cb.mgr.emissionGates.remove(newCfg.FullName())
 		var ce dyncfg.CodedError
 		if errors.As(err, &ce) {

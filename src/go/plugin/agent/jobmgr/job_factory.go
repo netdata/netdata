@@ -124,7 +124,9 @@ func (f *jobFactory) create(cfg confgroup.Config) (runtimeJob, error) {
 	// whole life on the normal path. Validation-only jobs never run, so they
 	// get no gate. The gate is tracked only for jobs that construct
 	// successfully; the create/detect and stop paths drop the entry when the
-	// job fails or stops.
+	// job fails or stops. A same-name replacement overwrites the previous
+	// entry here, and startRunningJob preserves the tracked gate across its
+	// defensive stop - the entry always belongs to the newest created job.
 	gatedF := *f
 	var gate *emissionGateway
 	if !f.validationOnly {

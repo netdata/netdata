@@ -222,6 +222,7 @@ func (j *Job) Vnode() vnodes.VirtualNode {
 }
 
 // AutoDetection invokes init, check and postCheck. It handles panic.
+// ctx flows into the module's Init/Check calls and must be non-nil.
 func (j *Job) AutoDetection(ctx context.Context) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
