@@ -570,6 +570,9 @@ static int test_jsonwrap_v2_partial_data_trimming_raw_metadata(void) {
     if(check_jsonwrap_v2_partial_data_trimming_case(RRDR_OPTION_RETURN_RAW, expected))
         return 1;
 
+    if(check_jsonwrap_v2_partial_data_trimming_case(RRDR_OPTION_DEBUG | RRDR_OPTION_RETURN_RAW, expected))
+        return 1;
+
     QUERY_TARGET qt = { 0 };
     qt.window.options = RRDR_OPTION_RETURN_RAW;
     if(!query_target_aggregatable(&qt)) {
