@@ -131,6 +131,22 @@ The 5-node limit on multi-node dashboards applies to both **Anonymous** and **Co
 1. **Upgrade to a paid plan** for unlimited nodes in multi-node dashboards
 2. **Select preferred nodes** in **Space Settings > Nodes** to choose which 5 nodes appear in multi-node dashboards
 
+This limit is a **display limit for the multi-node dashboard**, not a streaming or connection limit. You can stream any number of nodes to a parent and chain parents across multiple levels — both are fully supported. Every node continues collecting and storing its data, and each remains individually viewable on its own single-node dashboard. The limit only controls how many nodes appear together in the combined Metrics tab.
+
+```mermaid
+flowchart LR
+    subgraph S["Streaming — unlimited nodes"]
+        C1["Child 1"] --> P["Parent"]
+        CN["Child 2..N"] --> P
+    end
+    P --> M["Multi-node dashboard<br/>(Metrics tab)"]
+    M --> V["Up to 5 nodes<br/>shown together"]
+    classDef parent fill:#f3e8ff,stroke:#9b59b6,stroke-width:2px
+    classDef dash fill:#e8f4f8,stroke:#2196F3,stroke-width:2px
+    class P parent
+    class M,V dash
+```
+
 :::note
 
 Preferred node selection only affects Netdata Cloud dashboards. On the local Agent dashboard (accessed directly at `http://<agent-ip>:19999`), the nodes shown in multi-node views are determined by the Agent's streaming configuration and cannot be changed via preferred node settings.
