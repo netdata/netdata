@@ -60,8 +60,8 @@ The implementation language is **Go** (user decision, 2026-05-25). The journal w
 | Pattern | Source | Lines |
 |---|---|---|
 | go.d V2 collector registration + lifecycle | `src/go/plugin/go.d/collector/ping/collector.go:25-34` | `collectorapi.Register("ping", ...)` + `CreateV2` |
-| DynCfg job orchestration | `src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go:85-121` | `Start()` preflight + coded errors |
-| codedError for HTTP-422 | `src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go:140-147` | `type codedError struct` with `DyncfgCode() int` |
+| DynCfg job orchestration | `src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go` (`collectorCallbacks.Start`) | `Start()` preflight + coded errors |
+| codedError for HTTP-422 | `src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go` (`codedError`) | `type codedError struct` with `DyncfgCode() int` |
 | SNMP profile multipath+dedup loader | `src/go/plugin/go.d/collector/snmp/ddsnmp/load.go:270-286` | `multipath.MultiPath` + filename dedup |
 | chart templates (V2) | `src/go/plugin/go.d/collector/ping/charts.yaml` | YAML-driven chart definitions |
 
@@ -415,21 +415,21 @@ All job resources are validated synchronously in the go.d framework's job `Start
 
 These errors must flow through DynCfg as coded errors with the resource-specific code above. Non-retryable configuration/profile errors use HTTP-422; retryable startup/environment errors use HTTP-503 and implement `DyncfgRetryable() bool` so file-configured jobs can retry after the transient condition clears.
 
-- `src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go:88-90` wraps `Start()` `createCollectorJob()` failures as `codedError{code: 400}`, hiding any inner 422.
-- `src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go:93-96` schedules retry and returns a plain error for `Start()` `AutoDetection()` failures.
-- `src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go:108-116` returns plain errors for both `Update()` `createCollectorJob()` and `AutoDetection()` failures.
+- `src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go` (`collectorCallbacks.Start`) wraps `createCollectorJob()` failures as `codedError{code: 400}`, hiding any inner 422.
+- `src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go` (`collectorCallbacks.Start`) schedules retry and returns a plain error for `AutoDetection(ctx)` failures.
+- `src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go` (`collectorCallbacks.Update`) returns plain errors for both `createCollectorJob()` and `AutoDetection(ctx)` failures.
 - `src/go/plugin/framework/dyncfg/handler.go:506-509` honors `CodedError` for `CmdEnable`, but `CmdUpdate` callback failures currently send HTTP 200 at `handler.go:683`. Update payload parse/validation failures already return HTTP 400 before the callback path.
 
 **Framework change needed** (small jobmgr + DynCfg handler edit, scoped to SOW-0035 M2):
 
 1. Preserve an inner `CodedError` from `createCollectorJob()` instead of replacing it with hardcoded HTTP 400.
-2. If `AutoDetection()` returns a `CodedError`, call `Cleanup()` and return that error. Schedule a retry only when the error also implements `DyncfgRetryable() bool` and returns `true`; plain non-coded `AutoDetection()` errors keep the existing retry behavior for other collectors.
+2. If `AutoDetection(ctx)` returns a `CodedError`, call `Cleanup()` and return that error. Schedule a retry only when the error also implements `DyncfgRetryable() bool` and returns `true`; plain non-coded `AutoDetection(ctx)` errors keep the existing retry behavior for other collectors.
 3. Make `Update()` mirror `Start()` for both `createCollectorJob()` and `AutoDetection()` coded errors.
 4. Make the `CmdUpdate` callback error path at `src/go/plugin/framework/dyncfg/handler.go:683` honor `CodedError` response codes like `CmdEnable` does, instead of always sending HTTP 200 for `cb.Start()` / `cb.Update()` failure. Preserve the existing `ErrNonDisruptiveUpdate` rollback path at `handler.go:667-677` as HTTP 200 because the old config remains effective and runtime state did not change; trap creation-time failures must not use `ErrNonDisruptiveUpdate`.
 
 Before changing shared DynCfg behavior, M2 must run a same-failure scan (`rg 'CodedError|codedError|MarkNonDisruptiveUpdate' src/go/plugin`) and add handler/jobmgr tests proving existing plain-error retry behavior remains unchanged while coded trap creation failures surface their HTTP status.
 
-The trap plugin must still preflight all resources before it reports successful startup. `AutoDetection()` should be a no-op for traps unless a future SOW proves a cheap consistency check is needed; bind/profile/journal/writer/retention failures must be creation-time coded errors, not retry-loop events.
+The trap plugin must still preflight all resources before it reports successful startup. `AutoDetection(ctx)` should be a no-op for traps unless a future SOW proves a cheap consistency check is needed; bind/profile/journal/writer/retention failures must be creation-time coded errors, not retry-loop events.
 
 **Partial resource cleanup**: if endpoint 3 of 5 fails to bind after endpoints 1-2 succeeded, the previously bound endpoints are closed before returning the error. The job never enters the running state.
 

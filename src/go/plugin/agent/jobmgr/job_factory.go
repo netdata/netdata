@@ -31,7 +31,10 @@ func jobLogSource(cfg confgroup.Config) string {
 	return fmt.Sprintf("%s/%s", sourceType, provider)
 }
 
-// jobFactory builds runtime jobs from configs without mutating manager-owned runtime maps.
+// jobFactory builds runtime jobs from configs. It does not mutate
+// manager-owned runtime maps, with one disclosed exception: a successful
+// create registers the job's emission gateway in the manager's gate
+// registry, which carries its own lock.
 type jobFactory struct {
 	logger *logger.Logger
 

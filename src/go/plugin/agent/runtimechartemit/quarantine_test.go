@@ -107,6 +107,50 @@ func TestRuntimeMetricsJobQuarantineComponent(t *testing.T) {
 					"no output may follow the barrier for a quarantined sole component")
 			},
 		},
+		"tick mutex is held through post-write finalizers and buffer reset": {
+			run: func(t *testing.T) {
+				reg := newComponentRegistry()
+				reg.upsert(newQuarantineTestSpec("component"))
+				out := &gatedWriter{started: make(chan struct{}), release: make(chan struct{})}
+				job := newRuntimeMetricsJob(out, reg, nil)
+
+				tickDone := make(chan struct{})
+				go func() {
+					job.runOnce(1) // first emission: its commit finalizer installs the component state
+					close(tickDone)
+				}()
+
+				select {
+				case <-out.started:
+				case <-time.After(time.Second):
+					t.Fatal("tick did not reach its write")
+				}
+				require.False(t, job.tickMu.TryLock(), "tick mutex must be held while the tick writes")
+
+				close(out.release)
+
+				// The first successful acquisition happens-after runOnce's unlock;
+				// if the mutex is released before the commit finalizer and buffer
+				// reset, the state below would be observed missing.
+				deadline := time.Now().Add(5 * time.Second)
+				for !job.tickMu.TryLock() {
+					if time.Now().After(deadline) {
+						t.Fatal("tick mutex was never released")
+					}
+					time.Sleep(time.Millisecond)
+				}
+				defer job.tickMu.Unlock()
+				_, ok := job.components["component"]
+				assert.True(t, ok, "the post-write commit finalizer must run before the tick mutex is released")
+				assert.Zero(t, job.buf.Len(), "the buffer reset must happen before the tick mutex is released")
+
+				select {
+				case <-tickDone:
+				case <-time.After(time.Second):
+					t.Fatal("tick did not finish")
+				}
+			},
+		},
 		"quarantine removes without obsolete output": {
 			run: func(t *testing.T) {
 				reg := newComponentRegistry()
