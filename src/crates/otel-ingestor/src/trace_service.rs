@@ -23,7 +23,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use file_registry::{MonotonicClock, TenantId, TimestampNs};
+use file_registry::{MonotonicClock, TenantId};
 use opentelemetry_proto::tonic::collector::trace::v1::{
     ExportTraceServiceRequest, ExportTraceServiceResponse, trace_service_server::TraceService,
 };
@@ -41,6 +41,11 @@ const TRACES_PART_KEY: u64 = 0x7472_6163_6573_3031; // "traces01"
 
 /// Fixed opaque content-plane identity recorded in each traces WAL header.
 const TRACES_CONTENT_META: &[u8] = b"traces:v0";
+
+/// WAL `payload_format` id of the traces proof payload: the raw protobuf
+/// `ExportTraceServiceRequest` bytes this service writes. The traces seal
+/// (`otel-ledger::traces_indexer`) pins the same id as its expected format.
+pub const TRACES_PROOF_PAYLOAD_FORMAT: u16 = 2;
 
 pub struct NetdataTracesService {
     writers: Mutex<HashMap<TenantId, wal::Writer>>,
@@ -133,7 +138,10 @@ impl TraceService for NetdataTracesService {
                 &path,
                 wal_config,
                 Arc::clone(&self.seq),
-                Signal::Traces.pipeline_id(),
+                wal::FileStamp {
+                    pipeline_id: Signal::Traces.pipeline_id(),
+                    payload_format: TRACES_PROOF_PAYLOAD_FORMAT,
+                },
             )
             .map_err(|e| {
                 tracing::error!(%e, tenant = %tenant_id, "failed to create traces WAL writer");
@@ -148,12 +156,13 @@ impl TraceService for NetdataTracesService {
                 TRACES_PART_KEY,
                 TRACES_CONTENT_META,
                 &data,
-                span_count,
-                ingestion_ns,
-                // No span-time range for the proof; the seal falls back to the
-                // frame's ingestion_ns for the summary's min/max.
-                TimestampNs::ZERO,
-                TimestampNs::ZERO,
+                wal::FrameMeta {
+                    entry_count: span_count,
+                    ingestion_ns,
+                    // No span-time range for the proof; the seal falls back to
+                    // the frame's ingestion_ns for the summary's min/max.
+                    log_ts_range: None,
+                },
             )
             .map_err(|e| {
                 tracing::error!(%e, "failed to write traces WAL frame");

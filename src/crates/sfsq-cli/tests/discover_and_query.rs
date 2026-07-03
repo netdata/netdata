@@ -137,8 +137,16 @@ fn encode_ng_frame(batch: Vec<ResourceLogs>) -> (Vec<u8>, usize) {
 fn write_wal_seq(wal_tenant_dir: &Path, batches: &[Vec<ResourceLogs>], seq_start: u64) -> PathBuf {
     std::fs::create_dir_all(wal_tenant_dir).unwrap();
     let seq = Arc::new(wal::SeqAllocator::ephemeral(seq_start));
-    let mut writer =
-        wal::Writer::new(wal_tenant_dir, wal::Config::default(), seq, 0).expect("writer");
+    let mut writer = wal::Writer::new(
+        wal_tenant_dir,
+        wal::Config::default(),
+        seq,
+        wal::FileStamp {
+            pipeline_id: 0,
+            payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
+        },
+    )
+    .expect("writer");
     for (i, b) in batches.iter().enumerate() {
         let (data, count) = encode_ng_frame(b.clone());
         let ingestion = TimestampNs((BASE_S + 500 + i as u64) * NS);
@@ -151,10 +159,11 @@ fn write_wal_seq(wal_tenant_dir: &Path, batches: &[Vec<ResourceLogs>], seq_start
                 part_key,
                 &content_meta,
                 &data,
-                count,
-                ingestion,
-                TimestampNs::ZERO,
-                TimestampNs::ZERO,
+                wal::FrameMeta {
+                    entry_count: count,
+                    ingestion_ns: ingestion,
+                    log_ts_range: None,
+                },
             )
             .expect("write_frame");
     }
@@ -285,7 +294,16 @@ fn wal_stream_filter_matches_absent_namespace() {
     // with no service.namespace that is compute_ns_hash(None, name), exactly as
     // the ingestor.
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
-    let mut writer = wal::Writer::new(&wal_dir, wal::Config::default(), seq, 0).expect("writer");
+    let mut writer = wal::Writer::new(
+        &wal_dir,
+        wal::Config::default(),
+        seq,
+        wal::FileStamp {
+            pipeline_id: 0,
+            payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
+        },
+    )
+    .expect("writer");
     let (data, count) = encode_ng_frame(batch_for(records(0..10), "", "api"));
     let stream = ServiceStream::new("", "api");
     let part_key = otel_logs_identity::part_key(&stream);
@@ -295,10 +313,11 @@ fn wal_stream_filter_matches_absent_namespace() {
             part_key,
             &content_meta,
             &data,
-            count,
-            TimestampNs((BASE_S + 500) * NS),
-            TimestampNs::ZERO,
-            TimestampNs::ZERO,
+            wal::FrameMeta {
+                entry_count: count,
+                ingestion_ns: TimestampNs((BASE_S + 500) * NS),
+                log_ts_range: None,
+            },
         )
         .expect("write_frame");
     writer.shutdown_all().expect("shutdown");

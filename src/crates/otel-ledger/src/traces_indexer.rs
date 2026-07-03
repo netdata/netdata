@@ -29,6 +29,12 @@ use tokio_util::sync::CancellationToken;
 use file_lifecycle::component::Component;
 use file_lifecycle::ipc::{IndexerRequest, IndexerResponse};
 
+/// The WAL `payload_format` id this seal expects. Stamped by the producer,
+/// `otel_ingestor::trace_service::TRACES_PROOF_PAYLOAD_FORMAT`; pinned here
+/// because the sibling workers share no crate. Format ids are append-only,
+/// so the pin cannot drift.
+const TRACES_PROOF_PAYLOAD_FORMAT: u16 = 2;
+
 /// Tracks a single in-flight seal operation.
 struct SealTask {
     seq: u64,
@@ -141,6 +147,13 @@ fn start_seal(
 /// `content_meta`.
 fn seal_summary_only(wal_path: &Path, sfst_path: &Path) -> anyhow::Result<(sfst::Summary, u64)> {
     let mut reader = wal::Reader::open(wal_path)?;
+    let found = reader.header().payload_format;
+    if found != TRACES_PROOF_PAYLOAD_FORMAT {
+        anyhow::bail!(
+            "WAL payload format {found} is not the traces proof format \
+             {TRACES_PROOF_PAYLOAD_FORMAT}; refusing to seal a file written by a different codec"
+        );
+    }
     let content_meta = reader.header().content_meta.clone();
 
     let mut record_count: u64 = 0;

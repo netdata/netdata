@@ -23,7 +23,7 @@ pub use format::{FileEvent, Message};
 pub use reader::{Frame, FrameBoundary, FrameRange, Reader, scan_frame_boundaries};
 pub use registry::{File, Registry};
 pub use seq::{DEFAULT_RESERVE_BATCH, SeqAllocator, read_seq_highwater, write_seq_highwater};
-pub use writer::Writer;
+pub use writer::{FileStamp, FrameMeta, Writer};
 
 /// Deterministic opaque partition key for tests. The WAL treats `part_key` as
 /// an opaque `u64` and never decodes it, so tests fabricate distinct keys per

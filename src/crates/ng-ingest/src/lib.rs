@@ -60,18 +60,20 @@ pub fn write_request(
     let frame =
         ng_flatten::prepare_log_frame(req, fallback_base_ns).context("prepare flattened frame")?;
     // `ts_range` is None exactly when the request has no records.
-    let Some((min_ts, max_ts)) = frame.ts_range else {
+    if frame.ts_range.is_none() {
         return Ok(0);
-    };
-    let ingestion_ns = clock.now_ns();
+    }
     writer.write_frame(
         PART_KEY,
         &[],
         &frame.data,
-        frame.records,
-        ingestion_ns,
-        TimestampNs(min_ts),
-        TimestampNs(max_ts),
+        wal::FrameMeta {
+            entry_count: frame.records,
+            ingestion_ns: clock.now_ns(),
+            log_ts_range: frame
+                .ts_range
+                .map(|(min, max)| (TimestampNs(min), TimestampNs(max))),
+        },
     )?;
     Ok(frame.records)
 }
@@ -158,15 +160,15 @@ pub fn write_trace_request(
     }
     let data =
         ng_flatten::encode_trace_frame(&flattened).context("encode flattened trace frame")?;
-    let ingestion_ns = clock.now_ns();
     writer.write_frame(
         PART_KEY,
         &[],
         &data,
-        span_count,
-        ingestion_ns,
-        TimestampNs::ZERO,
-        TimestampNs::ZERO,
+        wal::FrameMeta {
+            entry_count: span_count,
+            ingestion_ns: clock.now_ns(),
+            log_ts_range: None,
+        },
     )?;
     Ok(span_count)
 }

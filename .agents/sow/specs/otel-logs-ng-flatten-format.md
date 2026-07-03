@@ -22,8 +22,20 @@
 ## WAL logs payload (the frame contract)
 
 - The logs WAL frame payload is a **bincode-encoded
-  `ng_flatten::FlattenedRequest`**. The `wal` container is payload-agnostic;
+  `ng_flatten::FlattenedLogRequest`**. The `wal` container is payload-agnostic;
   only logs frames carry this shape.
+- **Versioned per file (2026-07, WAL header v5):** the payload is identified by
+  `ng_flatten::LOG_FRAME_PAYLOAD_FORMAT` (= 1) in the WAL header's opaque
+  `payload_format` tag. Producers stamp it at `wal::Writer::new`; both logs
+  decode sites — the seal build (`ng_index`, `check_payload_format`) and the
+  tail scan (`sfsq::WalScan::drain_flattened`) — check it before any bincode
+  decode and refuse a mismatch with the two ids. bincode is positional (not
+  self-describing), so any change to the frame types (`Record`, `Entry`,
+  `Value`/`Kind` variants, `SchemaTree`) changes the wire shape and MUST ship
+  under a NEW format id; ids are append-only, never reused. By default no
+  decoder for the superseded id is kept — the old file becomes a kept, logged
+  orphan (the decided policy). The flattened traces codec has its own id
+  (`TRACE_FRAME_PAYLOAD_FORMAT` = 3); the traces raw-OTLP proof uses 2.
 - Each frame is **self-contained**: a per-frame typed `ng_flatten::SchemaTree`
   plus resource → scope → record groups of typed `Entry` values, plus the
   per-record columns. No cross-frame state — any frame range decodes alone.
@@ -117,8 +129,8 @@
 
 - Every v9 SFST MUST carry a valid `SchemaTree` descriptor (typed, or flat via
   `SchemaTree::flat`).
-- A logs WAL frame MUST be a self-contained bincode `FlattenedRequest` with no
-  cross-frame dependency.
+- A logs WAL frame MUST be a self-contained bincode `FlattenedLogRequest` with
+  no cross-frame dependency.
 - Seal and tail MUST produce identical `key=value` strings and MUST order by the
   frozen `Record.ts`.
 - The pipeline MUST NOT reintroduce the OTAP/Arrow logs payload or a second logs

@@ -53,6 +53,13 @@ pub enum FlattenedScanError {
     /// The WAL container could not be read (open or frame iteration).
     #[error("wal read: {0}")]
     Wal(#[from] wal::Error),
+    /// The WAL header names a frame codec other than the ng-flatten logs
+    /// format this scan implements — refuse before decoding any frame.
+    #[error(
+        "WAL payload format {found} is not the expected {expected}; \
+         refusing to decode frames written by a different codec"
+    )]
+    PayloadFormat { found: u16, expected: u16 },
     /// A frame's bincode `FlattenedLogRequest` payload failed to decode.
     #[error("frame {frame}: flattened-frame decode failed: {msg}")]
     Decode { frame: u64, msg: String },
@@ -144,16 +151,24 @@ impl WalScan {
     /// per record) and `Record.ts` ordering so the rows fed here are the rows
     /// the sealed builder indexes.
     fn drain_flattened(mut reader: wal::Reader) -> Result<WalScan, FlattenedScanError> {
+        let found = reader.header().payload_format;
+        if found != ng_flatten::LOG_FRAME_PAYLOAD_FORMAT {
+            return Err(FlattenedScanError::PayloadFormat {
+                found,
+                expected: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
+            });
+        }
         let mut sink = ScanSink::default();
         let mut kv = String::new();
         let mut frame_no = 0u64;
         while let Some(frame) = reader.next_frame()? {
             frame_no += 1;
-            let flattened =
-                ng_flatten::decode_log_frame(frame.data).map_err(|e| FlattenedScanError::Decode {
+            let flattened = ng_flatten::decode_log_frame(frame.data).map_err(|e| {
+                FlattenedScanError::Decode {
                     frame: frame_no,
                     msg: e.to_string(),
-                })?;
+                }
+            })?;
             let tree = &flattened.tree;
             // Resolve each node's path once per frame (records reuse the nodes).
             let paths: Vec<String> = (0..tree.len() as ng_flatten::NodeId)

@@ -84,7 +84,14 @@ fn seal(reqs: Vec<ExportTraceServiceRequest>) -> Vec<u8> {
         crc_enabled: true,
         compression_enabled: true,
     };
-    let mut writer = wal::Writer::new(dir.path(), config, seq, 1 /* traces pipeline */).unwrap();
+    let mut writer = wal::Writer::new(
+        dir.path(),
+        config,
+        seq,
+        wal::FileStamp { pipeline_id: 1, payload_format: /* traces pipeline */
+        ng_flatten::TRACE_FRAME_PAYLOAD_FORMAT },
+    )
+    .unwrap();
     let mut clock = MonotonicClock::new();
     for mut r in reqs {
         let count = count_spans(&r);
@@ -98,7 +105,16 @@ fn seal(reqs: Vec<ExportTraceServiceRequest>) -> Vec<u8> {
         let data = ng_flatten::encode_trace_frame(&flat).unwrap();
         let ingestion_ns = clock.now_ns();
         writer
-            .write_frame(0, &[], &data, count, ingestion_ns, TimestampNs::ZERO, TimestampNs::ZERO)
+            .write_frame(
+                0,
+                &[],
+                &data,
+                wal::FrameMeta {
+                    entry_count: count,
+                    ingestion_ns,
+                    log_ts_range: None,
+                },
+            )
             .unwrap();
     }
     writer.shutdown_all().unwrap();
@@ -114,6 +130,50 @@ fn seal(reqs: Vec<ExportTraceServiceRequest>) -> Vec<u8> {
     std::fs::read(&out).unwrap()
 }
 
+#[test]
+fn traces_build_refuses_logs_payload_format() {
+    // The TRACES build must refuse a WAL stamped with the logs frame codec —
+    // the cross-signal mixup the per-file format tag exists to catch.
+    let dir = tempfile::tempdir().unwrap();
+    let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
+    let mut writer = wal::Writer::new(
+        dir.path(),
+        wal::Config::default(),
+        seq,
+        wal::FileStamp {
+            pipeline_id: 1,
+            payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
+        },
+    )
+    .unwrap();
+    writer
+        .write_frame(
+            0,
+            &[],
+            b"x",
+            wal::FrameMeta {
+                entry_count: 1,
+                ingestion_ns: TimestampNs(1),
+                log_ts_range: None,
+            },
+        )
+        .unwrap();
+    writer.shutdown_all().unwrap();
+    let wal_path = std::fs::read_dir(dir.path())
+        .unwrap()
+        .filter_map(Result::ok)
+        .map(|e| e.path())
+        .find(|p| p.extension().is_some_and(|x| x == "wal"))
+        .unwrap();
+    match build_sfst_traces_file(&wal_path, &dir.path().join("t.sfst"), &Metrics::new()) {
+        Err(ng_index::Error::PayloadFormat { found, expected }) => {
+            assert_eq!(found, ng_flatten::LOG_FRAME_PAYLOAD_FORMAT);
+            assert_eq!(expected, ng_flatten::TRACE_FRAME_PAYLOAD_FORMAT);
+        }
+        other => panic!("expected PayloadFormat rejection, got {other:?}"),
+    }
+}
+
 const ROOT_PARENT: [u8; 8] = [0u8; 8]; // unset parent = root
 
 #[test]
@@ -125,21 +185,33 @@ fn trace_by_id_builds_linear_tree() {
         span(t, child, root, 110, 180, "child"),
         span(t, grand, child, 120, 160, "grand"),
     ])]);
-    let tr = IndexReader::open(&bytes).unwrap().trace_by_id(TraceId::from(t)).unwrap();
+    let tr = IndexReader::open(&bytes)
+        .unwrap()
+        .trace_by_id(TraceId::from(t))
+        .unwrap();
 
     assert_eq!(tr.spans.len(), 3);
     assert_eq!(tr.roots.len(), 1);
     // Sorted by start time: root(100), child(110), grand(120).
     assert_eq!(tr.spans[0].span_id, SpanId::from(root));
     assert_eq!(tr.spans[tr.roots[0]].span_id, SpanId::from(root));
-    let kids = |sid: [u8; 8]| tr.children.get(&SpanId::from(sid)).cloned().unwrap_or_default();
+    let kids = |sid: [u8; 8]| {
+        tr.children
+            .get(&SpanId::from(sid))
+            .cloned()
+            .unwrap_or_default()
+    };
     assert_eq!(kids(root).len(), 1);
     assert_eq!(tr.spans[kids(root)[0]].span_id, SpanId::from(child));
     assert_eq!(tr.spans[kids(child)[0]].span_id, SpanId::from(grand));
     assert!(kids(grand).is_empty());
     // The `name` facet materialized onto the span.
     assert_eq!(
-        tr.spans[tr.roots[0]].fields.iter().find(|(k, _)| k == "name").map(|(_, v)| v.as_str()),
+        tr.spans[tr.roots[0]]
+            .fields
+            .iter()
+            .find(|(k, _)| k == "name")
+            .map(|(_, v)| v.as_str()),
         Some("root"),
     );
 }
@@ -154,7 +226,10 @@ fn trace_by_id_collapses_duplicate_span_ids() {
         span(t, dup, root, 110, 150, "a"),
         span(t, dup, root, 110, 150, "a"),
     ])]);
-    let tr = IndexReader::open(&bytes).unwrap().trace_by_id(TraceId::from(t)).unwrap();
+    let tr = IndexReader::open(&bytes)
+        .unwrap()
+        .trace_by_id(TraceId::from(t))
+        .unwrap();
     assert_eq!(tr.spans.len(), 2, "duplicate (trace_id, span_id) collapsed");
     assert_eq!(tr.children.get(&SpanId::from(root)).unwrap().len(), 1);
 }
@@ -169,10 +244,20 @@ fn trace_by_id_forms_a_forest_from_orphans_and_multiple_roots() {
         span(t, r2, ROOT_PARENT, 105, 150, "root2"),
         span(t, orphan, missing, 110, 140, "orphan"),
     ])]);
-    let tr = IndexReader::open(&bytes).unwrap().trace_by_id(TraceId::from(t)).unwrap();
+    let tr = IndexReader::open(&bytes)
+        .unwrap()
+        .trace_by_id(TraceId::from(t))
+        .unwrap();
     assert_eq!(tr.spans.len(), 3);
-    assert_eq!(tr.roots.len(), 3, "two unset-parent roots + one orphan-as-root");
-    assert!(tr.children.is_empty(), "no edges: no in-file parent has children");
+    assert_eq!(
+        tr.roots.len(),
+        3,
+        "two unset-parent roots + one orphan-as-root"
+    );
+    assert!(
+        tr.children.is_empty(),
+        "no edges: no in-file parent has children"
+    );
 }
 
 #[test]
@@ -185,8 +270,15 @@ fn trace_by_id_handles_clock_skew() {
         span(t, root, ROOT_PARENT, 200, 300, "root"),
         span(t, child, root, 100, 150, "child"),
     ])]);
-    let tr = IndexReader::open(&bytes).unwrap().trace_by_id(TraceId::from(t)).unwrap();
-    assert_eq!(tr.spans[0].span_id, SpanId::from(child), "earliest start sorts first");
+    let tr = IndexReader::open(&bytes)
+        .unwrap()
+        .trace_by_id(TraceId::from(t))
+        .unwrap();
+    assert_eq!(
+        tr.spans[0].span_id,
+        SpanId::from(child),
+        "earliest start sorts first"
+    );
     assert_eq!(tr.roots.len(), 1);
     assert_eq!(tr.spans[tr.roots[0]].span_id, SpanId::from(root));
     let kids = tr.children.get(&SpanId::from(root)).unwrap();
@@ -205,7 +297,10 @@ fn trace_by_id_handles_large_fan_out() {
         spans.push(span(t, sid, root, 100 + i, 200, "leaf"));
     }
     let bytes = seal(vec![req(spans)]);
-    let tr = IndexReader::open(&bytes).unwrap().trace_by_id(TraceId::from(t)).unwrap();
+    let tr = IndexReader::open(&bytes)
+        .unwrap()
+        .trace_by_id(TraceId::from(t))
+        .unwrap();
     assert_eq!(tr.spans.len(), 201);
     assert_eq!(tr.roots.len(), 1);
     assert_eq!(tr.children.get(&SpanId::from(root)).unwrap().len(), 200);
@@ -222,10 +317,21 @@ fn trace_by_id_cycle_surfaces_all_spans_under_a_root() {
         span(t, a, b, 100, 200, "a"), // a's parent is b
         span(t, b, a, 110, 190, "b"), // b's parent is a
     ])]);
-    let tr = IndexReader::open(&bytes).unwrap().trace_by_id(TraceId::from(t)).unwrap();
+    let tr = IndexReader::open(&bytes)
+        .unwrap()
+        .trace_by_id(TraceId::from(t))
+        .unwrap();
     assert_eq!(tr.spans.len(), 2);
-    assert_eq!(tr.roots.len(), 1, "cycle guard promotes the earliest span as a root");
-    assert_eq!(tr.spans[tr.roots[0]].span_id, SpanId::from(a), "earliest (start 100) is the root");
+    assert_eq!(
+        tr.roots.len(),
+        1,
+        "cycle guard promotes the earliest span as a root"
+    );
+    assert_eq!(
+        tr.spans[tr.roots[0]].span_id,
+        SpanId::from(a),
+        "earliest (start 100) is the root"
+    );
 }
 
 #[test]
@@ -243,8 +349,15 @@ fn trace_by_id_keeps_distinct_unset_span_ids() {
         ..Default::default()
     };
     let bytes = seal(vec![req(vec![mk("a", 100), mk("b", 110)])]);
-    let tr = IndexReader::open(&bytes).unwrap().trace_by_id(TraceId::from(t)).unwrap();
-    assert_eq!(tr.spans.len(), 2, "distinct unset-span-id spans are not collapsed");
+    let tr = IndexReader::open(&bytes)
+        .unwrap()
+        .trace_by_id(TraceId::from(t))
+        .unwrap();
+    assert_eq!(
+        tr.spans.len(),
+        2,
+        "distinct unset-span-id spans are not collapsed"
+    );
     assert!(tr.spans.iter().all(|s| s.span_id == SpanId::UNSET));
     assert_eq!(tr.roots.len(), 2, "both are roots (unset parent)");
 }
@@ -262,7 +375,10 @@ fn trace_by_id_reaches_all_spans_despite_a_cyclic_component() {
         span(t, x, y, 120, 160, "x"), // x's parent is y
         span(t, y, x, 130, 170, "y"), // y's parent is x (cycle)
     ])]);
-    let tr = IndexReader::open(&bytes).unwrap().trace_by_id(TraceId::from(t)).unwrap();
+    let tr = IndexReader::open(&bytes)
+        .unwrap()
+        .trace_by_id(TraceId::from(t))
+        .unwrap();
     assert_eq!(tr.spans.len(), 4);
     // A revisit-guarded walk from the roots must reach every span.
     let mut seen: HashSet<usize> = HashSet::new();
@@ -285,7 +401,10 @@ fn trace_by_id_self_parent_is_a_root() {
     let t = [0x9eu8; 16];
     let s = [1u8; 8];
     let bytes = seal(vec![req(vec![span(t, s, s, 100, 200, "self")])]);
-    let tr = IndexReader::open(&bytes).unwrap().trace_by_id(TraceId::from(t)).unwrap();
+    let tr = IndexReader::open(&bytes)
+        .unwrap()
+        .trace_by_id(TraceId::from(t))
+        .unwrap();
     assert_eq!(tr.spans.len(), 1);
     assert_eq!(tr.roots.len(), 1, "self-parent treated as root");
     assert!(tr.children.is_empty(), "no self-edge");
@@ -299,7 +418,10 @@ fn trace_by_id_surfaces_flags_and_dropped_count() {
     s.flags = 0x1;
     s.dropped_attributes_count = 3;
     let bytes = seal(vec![req(vec![s])]);
-    let tr = IndexReader::open(&bytes).unwrap().trace_by_id(TraceId::from(t)).unwrap();
+    let tr = IndexReader::open(&bytes)
+        .unwrap()
+        .trace_by_id(TraceId::from(t))
+        .unwrap();
     assert_eq!(tr.spans[0].flags, 0x1);
     assert_eq!(tr.spans[0].dropped_attributes_count, 3);
 }
@@ -307,7 +429,14 @@ fn trace_by_id_surfaces_flags_and_dropped_count() {
 #[test]
 fn trace_by_id_absent_is_empty() {
     let t = [0xF6u8; 16];
-    let bytes = seal(vec![req(vec![span(t, [1u8; 8], ROOT_PARENT, 100, 200, "x")])]);
+    let bytes = seal(vec![req(vec![span(
+        t,
+        [1u8; 8],
+        ROOT_PARENT,
+        100,
+        200,
+        "x",
+    )])]);
     let tr = IndexReader::open(&bytes)
         .unwrap()
         .trace_by_id(TraceId::from([0x11u8; 16]))
@@ -359,7 +488,10 @@ fn oracle_real_wal_self_consistency() {
                     if tid == [0u8; 16] {
                         continue;
                     }
-                    truth.entry(tid).or_default().insert(*span.span_id.as_bytes());
+                    truth
+                        .entry(tid)
+                        .or_default()
+                        .insert(*span.span_id.as_bytes());
                 }
             }
         }
@@ -384,7 +516,12 @@ fn oracle_real_wal_self_consistency() {
     for tid in &ids[..checked] {
         let tr = index.trace_by_id(TraceId::from(*tid)).unwrap();
         let got: HashSet<[u8; 8]> = tr.spans.iter().map(|s| *s.span_id.as_bytes()).collect();
-        assert_eq!(&got, &truth[tid], "trace {} span-set mismatch", TraceId::from(*tid));
+        assert_eq!(
+            &got,
+            &truth[tid],
+            "trace {} span-set mismatch",
+            TraceId::from(*tid)
+        );
     }
     println!(
         "oracle OK: {} spans, {} distinct traces; {} sampled traces reconstructed consistently",

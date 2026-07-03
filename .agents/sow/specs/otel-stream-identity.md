@@ -131,11 +131,13 @@ The substrate stores the opaque `content_meta` (display identity) but **not** th
   `file_registry::FileSummary { min_timestamp_s, max_timestamp_s, record_count,
   content_meta }`. v7 dropped the `part_key` field from the summary; v6 had
   dropped the typed `ServiceStream` in favor of opaque `part_key` + `content_meta`.
-- **WAL** (`wal` `FORMAT_VERSION = 4`): the header carries the opaque
+- **WAL** (`wal` `FORMAT_VERSION = 5`): the header carries the opaque
   `content_meta` blob (so an unsealed WAL can be named/displayed without decoding
-  frames — see the stream selector). v4 dropped the 8-byte `part_key` slot from
-  the header (`content_meta_len` shifted to offset 16); v2 had replaced the typed
-  stream String pairs with the opaque blob.
+  frames — see the stream selector). v5 added the opaque `payload_format` tag,
+  unknown-flag-bit rejection, and a header CRC32 (`content_meta_len` now sits at
+  offset 18, after `payload_format` at 16); v4 dropped the 8-byte `part_key`
+  slot from the header; v2 had replaced the typed stream String pairs with the
+  opaque blob.
 - **Catalog** (`otel-catalog` `FORMAT_VERSION = 4`): each `CatalogEntry` carries
   `content_meta`; v3 dropped the top-level `part_key` (it lives in `entry.id`); v4
   marks the per-signal remote-key layout below — a pre-v4 catalog's entries embed
@@ -151,9 +153,14 @@ The substrate stores the opaque `content_meta` (display identity) but **not** th
 
 There is **no back-compat** at any tier — every reader hard-rejects an older
 version (`UnsupportedVersion`) before deserializing the payload, so an unsealed
-old-format WAL/SFST/catalog file is lost on upgrade (accepted: the feature is
-experimental and files are short-lived). `recover()` reads the `part_key` from
-the **filename** (`FileId`) on restart, not the header.
+old-format WAL/SFST/catalog file becomes a kept, logged orphan on upgrade (the
+decided policy; files are local-only and short-lived). Since WAL header v5 the
+frame *payload* is versioned separately from the container: the header's opaque
+`payload_format` tag names the frame codec per file and every decode site
+checks it before deserializing (see
+[otel-storage-substrate.md](otel-storage-substrate.md), "WAL header evolution
+contract"). `recover()` reads the `part_key` from the **filename** (`FileId`)
+on restart, not the header.
 
 The writer→ledger **ferryboat IPC** carries the opaque identity too:
 `FileEvent::Created` holds the `content_meta` blob (not a typed stream). Ferryboat

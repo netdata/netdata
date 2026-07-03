@@ -522,7 +522,10 @@ impl LogsService for NetdataLogsService {
                     &path,
                     wal_config,
                     Arc::clone(&self.seq),
-                    Signal::Logs.pipeline_id(),
+                    wal::FileStamp {
+                        pipeline_id: Signal::Logs.pipeline_id(),
+                        payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
+                    },
                 )
                 .map_err(|e| {
                     tracing::error!(%e, tenant = %tenant_id, "failed to create WAL writer");
@@ -538,29 +541,25 @@ impl LogsService for NetdataLogsService {
         let events = {
             let mut writer = writer.lock().unwrap();
             for p in &prepared {
-                // Accepted groups carry at least one record (empty
-                // `ResourceLogs` are filtered before grouping), so the range
-                // is always present.
-                let (log_min_ts, log_max_ts) = p
-                    .frame
-                    .ts_range
-                    .map(|(min, max)| {
-                        (
-                            file_registry::TimestampNs(min),
-                            file_registry::TimestampNs(max),
-                        )
-                    })
-                    .expect("accepted group has at least one log record");
                 let ingestion_ns = self.clock.lock().unwrap().now_ns();
                 writer
                     .write_frame(
                         p.part_key,
                         &p.content_meta,
                         &p.frame.data,
-                        p.frame.records,
-                        ingestion_ns,
-                        log_min_ts,
-                        log_max_ts,
+                        wal::FrameMeta {
+                            entry_count: p.frame.records,
+                            ingestion_ns,
+                            // Always Some here: accepted groups carry at least
+                            // one record (empty `ResourceLogs` are filtered
+                            // before grouping).
+                            log_ts_range: p.frame.ts_range.map(|(min, max)| {
+                                (
+                                    file_registry::TimestampNs(min),
+                                    file_registry::TimestampNs(max),
+                                )
+                            }),
+                        },
                     )
                     .map_err(|e| {
                         tracing::error!(%e, "failed to write WAL entry");

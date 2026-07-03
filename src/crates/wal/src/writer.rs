@@ -33,6 +33,39 @@ struct ActiveFile {
     first_frame_at_ns: Option<TimestampNs>,
 }
 
+/// The two opaque identifiers a writer stamps into every file it produces:
+/// `pipeline_id` into the filename (`FileId`, the signal axis the ledger
+/// routes by) and `payload_format` into the header (the frame-codec tag
+/// consumers check before decoding). The content plane assigns both; the WAL
+/// interprets neither. Named fields so the two `u16`s cannot be swapped at a
+/// call site.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FileStamp {
+    pub pipeline_id: u16,
+    pub payload_format: u16,
+}
+
+/// Per-frame inputs accompanying the payload bytes of a
+/// [`write_frame`](Writer::write_frame) call. All fields are mandatory except
+/// `log_ts_range`, which is `None` when no record in the frame had a usable
+/// timestamp.
+#[derive(Debug, Clone, Copy)]
+pub struct FrameMeta {
+    /// Number of log records in the frame's payload.
+    pub entry_count: usize,
+    /// The caller's monotonic timestamp for this frame, stamped into the
+    /// frame header on disk. Typically from a single process-wide
+    /// [`file_registry::MonotonicClock`] so frame ordering is consistent
+    /// across streams.
+    pub ingestion_ns: TimestampNs,
+    /// `(min, max)` of the record timestamps inside the payload, as resolved
+    /// by the caller (for OTel logs, ingest normalization — see
+    /// `ng_flatten::normalize_log_request`). Feeds the per-file range
+    /// accumulator surfaced in `Synced`/`Closed` events; `None` leaves the
+    /// accumulator unchanged.
+    pub log_ts_range: Option<(TimestampNs, TimestampNs)>,
+}
+
 /// Shared sequence counter for globally unique file numbering. Wraps
 /// the process-wide [`SeqAllocator`], which never reissues a seq across
 /// restarts (see `seq.rs`).
@@ -55,10 +88,9 @@ struct Stream {
     dir: Arc<FileDir>,
     machine_id: Uuid,
     boot_id: Uuid,
-    /// Opaque signal axis stamped into every `FileId` this stream writes
-    /// (logs and traces each use their own). Lets one writer process feed
-    /// multiple signals while the ledger routes by `pipeline_id`.
-    pipeline_id: u16,
+    /// The pipeline/payload-format pair stamped into every file this stream
+    /// writes (see [`FileStamp`]).
+    stamp: FileStamp,
     config: Config,
     active: Option<ActiveFile>,
     seq: SeqCounter,
@@ -77,7 +109,7 @@ impl Stream {
         dir: Arc<FileDir>,
         machine_id: Uuid,
         boot_id: Uuid,
-        pipeline_id: u16,
+        stamp: FileStamp,
         config: Config,
         seq: SeqCounter,
         part_key: u64,
@@ -87,7 +119,7 @@ impl Stream {
             dir,
             machine_id,
             boot_id,
-            pipeline_id,
+            stamp,
             config,
             active: None,
             seq,
@@ -102,28 +134,21 @@ impl Stream {
         FileId::new(
             self.machine_id,
             self.boot_id,
-            self.pipeline_id,
+            self.stamp.pipeline_id,
             seq,
             self.part_key,
         )
     }
 
-    fn write_frame(
-        &mut self,
-        data: &[u8],
-        log_entry_count: usize,
-        ingestion_ns: TimestampNs,
-        log_min_ts_ns: TimestampNs,
-        log_max_ts_ns: TimestampNs,
-    ) -> Result<u64> {
-        if self.should_rotate_with(log_entry_count as u64, ingestion_ns) {
+    fn write_frame(&mut self, data: &[u8], meta: FrameMeta) -> Result<u64> {
+        if self.should_rotate_with(meta.entry_count as u64, meta.ingestion_ns) {
             self.sync()?;
             self.close_active_file();
         }
 
         self.ensure_file()?;
 
-        let ts = ingestion_ns;
+        let ts = meta.ingestion_ns;
 
         let compressed = if self.config.compression_lz4() {
             lz4_flex::block::compress(data)
@@ -133,7 +158,10 @@ impl Stream {
 
         let payload_len = compressed.len() as u32;
         let uncompressed_len = data.len() as u32;
-        let entry_count = log_entry_count as u32;
+        // The on-disk frame header stores u32; the payload cap keeps real
+        // frames orders of magnitude below it.
+        debug_assert!(meta.entry_count <= u32::MAX as usize);
+        let entry_count = meta.entry_count as u32;
 
         let crc = if self.config.crc_enabled {
             let mut hasher = crc32fast::Hasher::new();
@@ -165,17 +193,15 @@ impl Stream {
         }
 
         active.frame_count += 1;
-        active.log_entry_count += log_entry_count as u64;
+        active.log_entry_count += meta.entry_count as u64;
         active.bytes_written = ByteSize(active.bytes_written.0 + (frame_bytes + padding) as u64);
         if active.first_frame_at_ns.is_none() {
             active.first_frame_at_ns = Some(ts);
         }
 
-        // Accumulate log-data min/max for this file. ZERO means "no log
-        // timestamps in this frame" (all rows missing both
-        // `time_unix_nano` and `observed_time_unix_nano`); skip in that
-        // case so the prior accumulator state isn't clobbered.
-        if log_min_ts_ns != TimestampNs::ZERO {
+        // Accumulate log-data min/max for this file; a frame with no usable
+        // record timestamps leaves the accumulator unchanged.
+        if let Some((log_min_ts_ns, log_max_ts_ns)) = meta.log_ts_range {
             if active.min_timestamp_ns == TimestampNs::ZERO
                 || log_min_ts_ns < active.min_timestamp_ns
             {
@@ -252,6 +278,7 @@ impl Stream {
             version: FORMAT_VERSION,
             flags,
             created_at: created_at_ns.0,
+            payload_format: self.stamp.payload_format,
             content_meta: self.content_meta.clone(),
         };
         writer.write_all(&header.to_bytes())?;
@@ -339,19 +366,18 @@ pub struct Writer {
     dir: Arc<FileDir>,
     machine_id: Uuid,
     boot_id: Uuid,
-    /// Signal axis stamped into every `FileId` this writer produces. One writer
-    /// process serves one signal; the ledger routes by this `pipeline_id`.
-    pipeline_id: u16,
+    /// The pipeline/payload-format pair stamped into every file this writer
+    /// produces (see [`FileStamp`]). One writer process serves one signal.
+    stamp: FileStamp,
     config: Config,
     seq: Arc<SeqAllocator>,
     streams: HashMap<u64, Stream>,
 }
 
 impl Writer {
-    /// Create a new writer that stamps every file it produces with `pipeline_id`,
-    /// the opaque signal axis the ledger routes by. The caller's integration layer
-    /// assigns it (one id per OTel signal); the WAL ascribes no meaning to the
-    /// value and there is no default — construction always names the axis.
+    /// Create a new writer. `stamp` names the two identifiers written into
+    /// every file (see [`FileStamp`]); there are no defaults, and the
+    /// reserved `payload_format` `0` is rejected.
     ///
     /// Machine and boot IDs are loaded from the system. The caller provides
     /// a shared sequence counter (e.g., shared across per-tenant writers).
@@ -360,17 +386,25 @@ impl Writer {
         path: &Path,
         config: Config,
         seq: Arc<SeqAllocator>,
-        pipeline_id: u16,
+        stamp: FileStamp,
     ) -> Result<Self> {
-        let machine_id = journal_common::load_machine_id().map_err(|e| crate::Error::Io(e))?;
-        let boot_id = journal_common::load_boot_id().map_err(|e| crate::Error::Io(e))?;
+        // A producer stamping the reserved id would write files every reader
+        // rejects — acknowledged but unqueryable data. Refuse at construction.
+        if stamp.payload_format == 0 {
+            return Err(crate::Error::InvalidHeader(
+                "payload_format 0 is reserved (unspecified); producers must pass their codec's id"
+                    .to_string(),
+            ));
+        }
+        let machine_id = journal_common::load_machine_id().map_err(crate::Error::Io)?;
+        let boot_id = journal_common::load_boot_id().map_err(crate::Error::Io)?;
         let dir = Arc::new(FileDir::new(path, WAL_EXT));
         std::fs::create_dir_all(dir.path())?;
         Ok(Self {
             dir,
             machine_id,
             boot_id,
-            pipeline_id,
+            stamp,
             config,
             seq,
             streams: HashMap::new(),
@@ -385,27 +419,15 @@ impl Writer {
     /// [`MAX_CONTENT_META_BYTES`](crate::format::MAX_CONTENT_META_BYTES) is
     /// rejected (the caller drops the record) rather than truncated.
     ///
-    /// `ingestion_ns` is the caller's monotonic timestamp for this frame —
-    /// stamped into the frame header on disk. Callers should typically obtain it
-    /// from a single process-wide [`file_registry::MonotonicClock`]. How a
-    /// consumer uses it is consumer-specific (the WAL is payload-agnostic).
-    ///
-    /// `log_min_ts_ns` / `log_max_ts_ns` describe the time range of the records
-    /// inside `data`, as resolved by the caller (for OTel logs, ingest
-    /// normalization resolves each record's timestamp and returns the range;
-    /// see `ng_flatten::normalize_log_request`).
-    /// Pass `TimestampNs::ZERO` for both when no row in the frame had a usable
-    /// timestamp — the writer's per-file accumulator is then left unchanged.
-    #[allow(clippy::too_many_arguments)]
+    /// `meta` carries the frame's record count, the caller's monotonic
+    /// ingestion timestamp (stamped into the frame header), and the optional
+    /// record time range feeding the per-file accumulator — see [`FrameMeta`].
     pub fn write_frame(
         &mut self,
         part_key: u64,
         content_meta: &[u8],
         data: &[u8],
-        log_entry_count: usize,
-        ingestion_ns: TimestampNs,
-        log_min_ts_ns: TimestampNs,
-        log_max_ts_ns: TimestampNs,
+        meta: FrameMeta,
     ) -> Result<u64> {
         if content_meta.len() > crate::format::MAX_CONTENT_META_BYTES {
             return Err(crate::Error::InvalidHeader(format!(
@@ -414,13 +436,8 @@ impl Writer {
                 crate::format::MAX_CONTENT_META_BYTES
             )));
         }
-        self.get_or_create(part_key, content_meta).write_frame(
-            data,
-            log_entry_count,
-            ingestion_ns,
-            log_min_ts_ns,
-            log_max_ts_ns,
-        )
+        self.get_or_create(part_key, content_meta)
+            .write_frame(data, meta)
     }
 
     /// Get or lazily create the writer for `part_key`. On first use the stream
@@ -432,7 +449,7 @@ impl Writer {
                 Arc::clone(&self.dir),
                 self.machine_id,
                 self.boot_id,
-                self.pipeline_id,
+                self.stamp,
                 self.config.clone(),
                 SeqCounter(Arc::clone(&self.seq)),
                 part_key,
@@ -475,13 +492,45 @@ mod tests {
 
     fn test_writer(tmp: &std::path::Path) -> Writer {
         let seq = Arc::new(SeqAllocator::ephemeral(0));
-        Writer::new(tmp, Config::default(), seq, 0).unwrap()
+        Writer::new(
+            tmp,
+            Config::default(),
+            seq,
+            crate::FileStamp {
+                pipeline_id: 0,
+                payload_format: 7,
+            },
+        )
+        .unwrap()
     }
 
     /// A distinct opaque `part_key` per label — distinct labels give distinct
     /// keys, so a test can partition by key without hand-picking values.
     fn pk(label: u64) -> u64 {
         crate::opaque_part_key("ns", &format!("svc{label}"))
+    }
+
+    #[test]
+    fn rejects_reserved_payload_format_zero() {
+        // 0 is the reserved "unspecified" id; construction must refuse it in
+        // every build profile, before any file can be written.
+        let tmp = tempfile::tempdir().unwrap();
+        let seq = Arc::new(SeqAllocator::ephemeral(0));
+        match Writer::new(
+            tmp.path(),
+            Config::default(),
+            seq,
+            crate::FileStamp {
+                pipeline_id: 0,
+                payload_format: 0,
+            },
+        ) {
+            Err(crate::Error::InvalidHeader(msg)) => {
+                assert!(msg.contains("reserved"), "got: {msg}")
+            }
+            Err(e) => panic!("wrong error: {e:?}"),
+            Ok(_) => panic!("payload_format 0 must be rejected"),
+        }
     }
 
     #[test]
@@ -496,10 +545,11 @@ mod tests {
                 pk(1),
                 &[],
                 data,
-                1,
-                TimestampNs(1),
-                TimestampNs::ZERO,
-                TimestampNs::ZERO,
+                crate::FrameMeta {
+                    entry_count: 1,
+                    ingestion_ns: TimestampNs(1),
+                    log_ts_range: None,
+                },
             )
             .unwrap();
         writer
@@ -507,10 +557,11 @@ mod tests {
                 pk(2),
                 &[],
                 data,
-                1,
-                TimestampNs(2),
-                TimestampNs::ZERO,
-                TimestampNs::ZERO,
+                crate::FrameMeta {
+                    entry_count: 1,
+                    ingestion_ns: TimestampNs(2),
+                    log_ts_range: None,
+                },
             )
             .unwrap();
         writer
@@ -518,10 +569,11 @@ mod tests {
                 pk(1),
                 &[],
                 data,
-                1,
-                TimestampNs(3),
-                TimestampNs::ZERO,
-                TimestampNs::ZERO,
+                crate::FrameMeta {
+                    entry_count: 1,
+                    ingestion_ns: TimestampNs(3),
+                    log_ts_range: None,
+                },
             )
             .unwrap();
 
@@ -558,10 +610,11 @@ mod tests {
                 pk(1),
                 &[],
                 data,
-                1,
-                TimestampNs(1),
-                TimestampNs(200),
-                TimestampNs(300),
+                crate::FrameMeta {
+                    entry_count: 1,
+                    ingestion_ns: TimestampNs(1),
+                    log_ts_range: Some((TimestampNs(200), TimestampNs(300))),
+                },
             )
             .unwrap();
         writer
@@ -569,10 +622,11 @@ mod tests {
                 pk(1),
                 &[],
                 data,
-                1,
-                TimestampNs(2),
-                TimestampNs(150),
-                TimestampNs(250),
+                crate::FrameMeta {
+                    entry_count: 1,
+                    ingestion_ns: TimestampNs(2),
+                    log_ts_range: Some((TimestampNs(150), TimestampNs(250))),
+                },
             )
             .unwrap();
         writer
@@ -580,10 +634,11 @@ mod tests {
                 pk(1),
                 &[],
                 data,
-                1,
-                TimestampNs(3),
-                TimestampNs(180),
-                TimestampNs(400),
+                crate::FrameMeta {
+                    entry_count: 1,
+                    ingestion_ns: TimestampNs(3),
+                    log_ts_range: Some((TimestampNs(180), TimestampNs(400))),
+                },
             )
             .unwrap();
 
@@ -629,10 +684,11 @@ mod tests {
                 pk(1),
                 &[],
                 data,
-                1,
-                TimestampNs(1),
-                TimestampNs(500),
-                TimestampNs(600),
+                crate::FrameMeta {
+                    entry_count: 1,
+                    ingestion_ns: TimestampNs(1),
+                    log_ts_range: Some((TimestampNs(500), TimestampNs(600))),
+                },
             )
             .unwrap();
         // Frame whose logs all lacked time/observed timestamps — must
@@ -644,10 +700,11 @@ mod tests {
                 pk(1),
                 &[],
                 data,
-                1,
-                TimestampNs(2),
-                TimestampNs::ZERO,
-                TimestampNs::ZERO,
+                crate::FrameMeta {
+                    entry_count: 1,
+                    ingestion_ns: TimestampNs(2),
+                    log_ts_range: None,
+                },
             )
             .unwrap();
 
@@ -678,10 +735,11 @@ mod tests {
                 pk(10),
                 &[],
                 data,
-                1,
-                TimestampNs(1),
-                TimestampNs::ZERO,
-                TimestampNs::ZERO,
+                crate::FrameMeta {
+                    entry_count: 1,
+                    ingestion_ns: TimestampNs(1),
+                    log_ts_range: None,
+                },
             )
             .unwrap();
         writer
@@ -689,10 +747,11 @@ mod tests {
                 pk(20),
                 &[],
                 data,
-                1,
-                TimestampNs(2),
-                TimestampNs::ZERO,
-                TimestampNs::ZERO,
+                crate::FrameMeta {
+                    entry_count: 1,
+                    ingestion_ns: TimestampNs(2),
+                    log_ts_range: None,
+                },
             )
             .unwrap();
 

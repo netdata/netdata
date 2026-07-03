@@ -391,7 +391,16 @@ mod tests {
     /// byte offset of the end of frame `i`).
     fn write_frames(dir: &Path, payloads: &[&[u8]]) -> (std::path::PathBuf, Vec<u64>) {
         let seq = Arc::new(SeqAllocator::ephemeral(0));
-        let mut writer = Writer::new(dir, Config::default(), seq, 0).unwrap();
+        let mut writer = Writer::new(
+            dir,
+            Config::default(),
+            seq,
+            crate::FileStamp {
+                pipeline_id: 0,
+                payload_format: 7,
+            },
+        )
+        .unwrap();
         let mut bounds = Vec::new();
         for (i, payload) in payloads.iter().enumerate() {
             writer
@@ -399,10 +408,11 @@ mod tests {
                     crate::opaque_part_key("ns", "svc"),
                     &[],
                     payload,
-                    1,
-                    TimestampNs(i as u64 + 1),
-                    TimestampNs::ZERO,
-                    TimestampNs::ZERO,
+                    crate::FrameMeta {
+                        entry_count: 1,
+                        ingestion_ns: TimestampNs(i as u64 + 1),
+                        log_ts_range: None,
+                    },
                 )
                 .unwrap();
             writer.sync_all().unwrap();
@@ -442,6 +452,9 @@ mod tests {
         let (path, _) = write_frames(dir.path(), &[b"alpha", b"bravo", b"charlie"]);
 
         let mut reader = Reader::open(&path).unwrap();
+        // The writer's payload_format (7 in the test helper) survives the
+        // writer → disk → reader path.
+        assert_eq!(reader.header().payload_format, 7);
         let frames = collect(&mut reader);
         assert_eq!(
             frames,
@@ -576,7 +589,16 @@ mod tests {
     /// syncing after each. Returns the path and per-frame end offsets.
     fn write_counted_frames(dir: &Path, counts: &[usize]) -> (std::path::PathBuf, Vec<u64>) {
         let seq = Arc::new(SeqAllocator::ephemeral(0));
-        let mut writer = Writer::new(dir, Config::default(), seq, 0).unwrap();
+        let mut writer = Writer::new(
+            dir,
+            Config::default(),
+            seq,
+            crate::FileStamp {
+                pipeline_id: 0,
+                payload_format: 7,
+            },
+        )
+        .unwrap();
         let mut bounds = Vec::new();
         for (i, &count) in counts.iter().enumerate() {
             writer
@@ -584,10 +606,11 @@ mod tests {
                     crate::opaque_part_key("ns", "svc"),
                     &[],
                     b"payload",
-                    count,
-                    TimestampNs(i as u64 + 1),
-                    TimestampNs::ZERO,
-                    TimestampNs::ZERO,
+                    crate::FrameMeta {
+                        entry_count: count,
+                        ingestion_ns: TimestampNs(i as u64 + 1),
+                        log_ts_range: None,
+                    },
                 )
                 .unwrap();
             writer.sync_all().unwrap();

@@ -17,7 +17,9 @@ pub use sfst_build::{
 
 // Re-export the flattening + frame vocabulary so the binary (and any consumer) gets
 // it from `ng-index` without depending on `ng-flatten` directly.
-pub use ng_flatten::{Entry, FlattenedLogRequest, NodeId, SchemaTree, Value, build_kv, decode_log_frame};
+pub use ng_flatten::{
+    Entry, FlattenedLogRequest, NodeId, SchemaTree, Value, build_kv, decode_log_frame,
+};
 
 /// Errors reading a flattened WAL or building an SFST from it.
 #[derive(Debug, thiserror::Error)]
@@ -30,6 +32,11 @@ pub enum Error {
     NoWal(PathBuf),
     #[error("multiple .wal files in {0}; expected exactly one")]
     MultipleWal(PathBuf),
+    #[error(
+        "WAL payload format {found} is not the expected {expected}; \
+         refusing to decode frames written by a different codec"
+    )]
+    PayloadFormat { found: u16, expected: u16 },
     #[error("frame {frame}: bincode decode failed: {source}")]
     BincodeDecode {
         frame: u64,

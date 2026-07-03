@@ -3,18 +3,26 @@
 //! substrate they build on (the [`Flattener`], [`SchemaTree`], ids, rendering,
 //! bincode codec) lives in [`crate::common`].
 //!
-//! NOTE: the frame payload carries NO inner schema version — it is just the
-//! bincode of [`FlattenedLogRequest`]. Any change to these types (e.g. new
-//! [`Record`] fields) is a breaking change: WAL frames written by an older
-//! `ng-ingest` cannot be decoded by the new `ng-index` (the new fields would
-//! consume bytes from the old payload). There is no migration; drain/regenerate
-//! WAL files on upgrade. Acceptable while ng-* is pre-GA (see the project SOW).
+//! VERSIONING: the frame payload is the bincode of [`FlattenedLogRequest`] —
+//! positional, not self-describing — identified per WAL file by
+//! [`LOG_FRAME_PAYLOAD_FORMAT`] in the WAL header. Any change to these types
+//! (new [`Record`] fields, [`Value`]/[`Kind`] variants) changes the wire shape
+//! and MUST ship under a NEW format id; readers check the id before decoding
+//! and reject a mismatch. A file with a superseded id is skipped as a logged
+//! orphan unless a decoder for it is deliberately kept.
 
 use serde::{Deserialize, Serialize};
 
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 
 use crate::common::*;
+
+/// WAL `payload_format` id of the bincode [`FlattenedLogRequest`] frame codec.
+/// Producers stamp it via `wal::Writer::new`; every consumer that decodes log
+/// frames checks it first. The id space is append-only: `0` is reserved,
+/// `2` is the traces raw-OTLP proof payload; a changed logs wire shape takes
+/// the next free id, never reuses this one.
+pub const LOG_FRAME_PAYLOAD_FORMAT: u16 = 1;
 
 /// A flattened request: one schema tree shared by all its records, plus the OTLP
 /// grouping. Resource/scope are flattened once per group; records hold only their

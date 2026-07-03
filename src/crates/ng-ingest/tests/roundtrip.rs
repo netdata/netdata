@@ -130,7 +130,16 @@ fn at<'a>(leaves: &'a [Leaf], path: &str) -> Vec<&'a Value> {
 fn request_roundtrips_through_a_wal_frame() {
     let dir = tempfile::tempdir().unwrap();
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
-    let mut writer = wal::Writer::new(dir.path(), one_file_config(), seq, PIPELINE_ID).unwrap();
+    let mut writer = wal::Writer::new(
+        dir.path(),
+        one_file_config(),
+        seq,
+        wal::FileStamp {
+            pipeline_id: PIPELINE_ID,
+            payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
+        },
+    )
+    .unwrap();
     let mut clock = MonotonicClock::new();
 
     let original = sample_request();
@@ -247,7 +256,16 @@ fn request_roundtrips_through_a_wal_frame() {
 fn empty_request_writes_no_frame() {
     let dir = tempfile::tempdir().unwrap();
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
-    let mut writer = wal::Writer::new(dir.path(), one_file_config(), seq, PIPELINE_ID).unwrap();
+    let mut writer = wal::Writer::new(
+        dir.path(),
+        one_file_config(),
+        seq,
+        wal::FileStamp {
+            pipeline_id: PIPELINE_ID,
+            payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
+        },
+    )
+    .unwrap();
     let mut clock = MonotonicClock::new();
 
     // A request whose ResourceLogs carries zero log records writes nothing.
@@ -286,7 +304,16 @@ fn request_with(log_records: Vec<LogRecord>) -> ExportLogsServiceRequest {
 fn write_and_decode_records(req: ExportLogsServiceRequest) -> Vec<ng_flatten::Record> {
     let dir = tempfile::tempdir().unwrap();
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
-    let mut writer = wal::Writer::new(dir.path(), one_file_config(), seq, PIPELINE_ID).unwrap();
+    let mut writer = wal::Writer::new(
+        dir.path(),
+        one_file_config(),
+        seq,
+        wal::FileStamp {
+            pipeline_id: PIPELINE_ID,
+            payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
+        },
+    )
+    .unwrap();
     let mut clock = MonotonicClock::new();
     write_request(&mut writer, &mut clock, req).unwrap();
     writer.shutdown_all().unwrap();
@@ -427,8 +454,16 @@ fn trace_request_roundtrips_through_a_wal_frame() {
 
     let dir = tempfile::tempdir().unwrap();
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
-    let mut writer =
-        wal::Writer::new(dir.path(), one_file_config(), seq, TRACES_PIPELINE_ID).unwrap();
+    let mut writer = wal::Writer::new(
+        dir.path(),
+        one_file_config(),
+        seq,
+        wal::FileStamp {
+            pipeline_id: TRACES_PIPELINE_ID,
+            payload_format: ng_flatten::TRACE_FRAME_PAYLOAD_FORMAT,
+        },
+    )
+    .unwrap();
     let mut clock = MonotonicClock::new();
     let expected = count_spans(&req);
     let written = write_trace_request(&mut writer, &mut clock, req).unwrap();

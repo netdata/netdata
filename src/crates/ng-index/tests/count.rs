@@ -46,7 +46,16 @@ fn request(n: usize) -> ExportLogsServiceRequest {
 /// same flatten + hash + bincode encoding `ng-ingest` performs at ingest.
 fn write_flattened_wal(dir: &std::path::Path, counts: &[usize]) {
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
-    let mut writer = wal::Writer::new(dir, wal::Config::default(), seq, 0).unwrap();
+    let mut writer = wal::Writer::new(
+        dir,
+        wal::Config::default(),
+        seq,
+        wal::FileStamp {
+            pipeline_id: 0,
+            payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
+        },
+    )
+    .unwrap();
     for (i, &n) in counts.iter().enumerate() {
         let (flattened, _) = flatten_log_request(request(n));
         let bytes = encode_log_frame(&flattened).unwrap();
@@ -55,14 +64,58 @@ fn write_flattened_wal(dir: &std::path::Path, counts: &[usize]) {
                 0,
                 &[],
                 &bytes,
-                n,
-                TimestampNs(i as u64 + 1),
-                TimestampNs::ZERO,
-                TimestampNs::ZERO,
+                wal::FrameMeta {
+                    entry_count: n,
+                    ingestion_ns: TimestampNs(i as u64 + 1),
+                    log_ts_range: None,
+                },
             )
             .unwrap();
     }
     writer.shutdown_all().unwrap();
+}
+
+#[test]
+fn wrong_payload_format_refuses_to_build() {
+    // A WAL stamped with the traces frame codec must be refused by the LOGS
+    // build before any bincode decode — the format check, not a decode error.
+    let flat = tempfile::tempdir().unwrap();
+    let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
+    let mut writer = wal::Writer::new(
+        flat.path(),
+        wal::Config::default(),
+        seq,
+        wal::FileStamp {
+            pipeline_id: 0,
+            payload_format: ng_flatten::TRACE_FRAME_PAYLOAD_FORMAT,
+        },
+    )
+    .unwrap();
+    let (flattened, _) = flatten_log_request(request(1));
+    let bytes = encode_log_frame(&flattened).unwrap();
+    writer
+        .write_frame(
+            0,
+            &[],
+            &bytes,
+            wal::FrameMeta {
+                entry_count: 1,
+                ingestion_ns: TimestampNs(1),
+                log_ts_range: None,
+            },
+        )
+        .unwrap();
+    writer.shutdown_all().unwrap();
+
+    let out_dir = tempfile::tempdir().unwrap();
+    let out = out_dir.path().join("mismatch.sfst");
+    match build_sfst(flat.path(), &out, &Metrics::new()) {
+        Err(ng_index::Error::PayloadFormat { found, expected }) => {
+            assert_eq!(found, ng_flatten::TRACE_FRAME_PAYLOAD_FORMAT);
+            assert_eq!(expected, ng_flatten::LOG_FRAME_PAYLOAD_FORMAT);
+        }
+        other => panic!("expected PayloadFormat rejection, got {other:?}"),
+    }
 }
 
 #[test]
@@ -122,7 +175,16 @@ fn per_row_columns_roundtrip_in_chronological_order() {
     // Build a one-frame flattened WAL of reverse-chronological records.
     let flat = tempfile::tempdir().unwrap();
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
-    let mut writer = wal::Writer::new(flat.path(), wal::Config::default(), seq, 0).unwrap();
+    let mut writer = wal::Writer::new(
+        flat.path(),
+        wal::Config::default(),
+        seq,
+        wal::FileStamp {
+            pipeline_id: 0,
+            payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
+        },
+    )
+    .unwrap();
     let (flattened, _) = flatten_log_request(request_cols(N));
     let bytes = encode_log_frame(&flattened).unwrap();
     writer
@@ -130,10 +192,11 @@ fn per_row_columns_roundtrip_in_chronological_order() {
             0,
             &[],
             &bytes,
-            N,
-            TimestampNs(1),
-            TimestampNs::ZERO,
-            TimestampNs::ZERO,
+            wal::FrameMeta {
+                entry_count: N,
+                ingestion_ns: TimestampNs(1),
+                log_ts_range: None,
+            },
         )
         .unwrap();
     writer.shutdown_all().unwrap();
@@ -188,7 +251,11 @@ fn per_row_columns_roundtrip_in_chronological_order() {
             (BASE + 1000 + i as u64) as i64,
             "observed at {p}"
         );
-        assert_eq!(trace.get(p), TraceId::from([i as u8; 16]), "trace_id at {p}");
+        assert_eq!(
+            trace.get(p),
+            TraceId::from([i as u8; 16]),
+            "trace_id at {p}"
+        );
         assert_eq!(span.get(p), SpanId::from([i as u8; 8]), "span_id at {p}");
         assert_eq!(flags.0[p], 0x100 | i as u32, "flags at {p}");
         assert_eq!(drac.0[p], i as u32, "dropped_attributes_count at {p}");
@@ -241,7 +308,16 @@ fn typed_tree_and_coalesced_kinds_roundtrip() {
     // One frame of typed records.
     let flat = tempfile::tempdir().unwrap();
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
-    let mut writer = wal::Writer::new(flat.path(), wal::Config::default(), seq, 0).unwrap();
+    let mut writer = wal::Writer::new(
+        flat.path(),
+        wal::Config::default(),
+        seq,
+        wal::FileStamp {
+            pipeline_id: 0,
+            payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
+        },
+    )
+    .unwrap();
     let (flattened, _) = flatten_log_request(request_typed());
     let bytes = encode_log_frame(&flattened).unwrap();
     writer
@@ -249,10 +325,11 @@ fn typed_tree_and_coalesced_kinds_roundtrip() {
             0,
             &[],
             &bytes,
-            4,
-            TimestampNs(1),
-            TimestampNs::ZERO,
-            TimestampNs::ZERO,
+            wal::FrameMeta {
+                entry_count: 4,
+                ingestion_ns: TimestampNs(1),
+                log_ts_range: None,
+            },
         )
         .unwrap();
     writer.shutdown_all().unwrap();
@@ -298,7 +375,16 @@ fn missing_flattened_wal_is_an_error() {
 fn write_multiframe_flat_wal(num_frames: usize) -> (tempfile::TempDir, std::path::PathBuf) {
     let flat = tempfile::tempdir().unwrap();
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
-    let mut writer = wal::Writer::new(flat.path(), wal::Config::default(), seq, 0).unwrap();
+    let mut writer = wal::Writer::new(
+        flat.path(),
+        wal::Config::default(),
+        seq,
+        wal::FileStamp {
+            pipeline_id: 0,
+            payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
+        },
+    )
+    .unwrap();
     for i in 0..num_frames {
         let (flattened, _) = flatten_log_request(request_typed());
         let bytes = encode_log_frame(&flattened).unwrap();
@@ -307,10 +393,11 @@ fn write_multiframe_flat_wal(num_frames: usize) -> (tempfile::TempDir, std::path
                 0,
                 &[],
                 &bytes,
-                4,
-                TimestampNs((i + 1) as u64),
-                TimestampNs::ZERO,
-                TimestampNs::ZERO,
+                wal::FrameMeta {
+                    entry_count: 4,
+                    ingestion_ns: TimestampNs((i + 1) as u64),
+                    log_ts_range: None,
+                },
             )
             .unwrap();
     }
@@ -418,7 +505,16 @@ fn attribute_key_containing_eq_is_sanitized_and_queryable() {
 
     let flat = tempfile::tempdir().unwrap();
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
-    let mut writer = wal::Writer::new(flat.path(), wal::Config::default(), seq, 0).unwrap();
+    let mut writer = wal::Writer::new(
+        flat.path(),
+        wal::Config::default(),
+        seq,
+        wal::FileStamp {
+            pipeline_id: 0,
+            payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
+        },
+    )
+    .unwrap();
     let (flattened, sanitized) = flatten_log_request(req);
     assert_eq!(sanitized, 1);
     let bytes = encode_log_frame(&flattened).unwrap();
@@ -427,10 +523,11 @@ fn attribute_key_containing_eq_is_sanitized_and_queryable() {
             0,
             &[],
             &bytes,
-            1,
-            TimestampNs(1),
-            TimestampNs::ZERO,
-            TimestampNs::ZERO,
+            wal::FrameMeta {
+                entry_count: 1,
+                ingestion_ns: TimestampNs(1),
+                log_ts_range: None,
+            },
         )
         .unwrap();
     writer.shutdown_all().unwrap();

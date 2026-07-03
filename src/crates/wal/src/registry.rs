@@ -293,7 +293,7 @@ fn read_header(path: &std::path::Path) -> Result<crate::format::FileHeader> {
     let mut file = fs::File::open(path)?;
     let mut buf = [0u8; HEADER_SIZE];
     file.read_exact(&mut buf)?;
-    Ok(crate::format::FileHeader::from_bytes(&buf)?)
+    crate::format::FileHeader::from_bytes(&buf)
 }
 
 #[cfg(test)]
@@ -321,7 +321,16 @@ mod tests {
             compression_enabled: true,
         };
         let seq = std::sync::Arc::new(crate::SeqAllocator::ephemeral(0));
-        let mut writer = Writer::new(dir, config, seq, 0).unwrap();
+        let mut writer = Writer::new(
+            dir,
+            config,
+            seq,
+            crate::FileStamp {
+                pipeline_id: 0,
+                payload_format: 7,
+            },
+        )
+        .unwrap();
         let mut all_events = Vec::new();
         for &count in entry_counts {
             for i in 0..count {
@@ -330,10 +339,11 @@ mod tests {
                         crate::opaque_part_key("ns", "svc"),
                         &[],
                         &(i as u32).to_le_bytes(),
-                        1,
-                        TimestampNs(i as u64 + 1),
-                        TimestampNs::ZERO,
-                        TimestampNs::ZERO,
+                        crate::FrameMeta {
+                            entry_count: 1,
+                            ingestion_ns: TimestampNs(i as u64 + 1),
+                            log_ts_range: None,
+                        },
                     )
                     .unwrap();
             }

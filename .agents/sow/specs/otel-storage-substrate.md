@@ -112,10 +112,12 @@ by `bridge::signals` as the single source of truth:
   the opaque `pipeline_id`/`SignalSpec`. The ledger holds its pipelines and
   per-signal frame-seq gap-check in a fixed `Signal`-indexed structure (not a
   `HashMap<u16, _>`), so routing to a known signal cannot miss. Both WAL writers
-  stamp their axis explicitly via `Writer::new(path, config, seq, Signal::_.pipeline_id())`
-  — there is no default pipeline at any layer (`FileId`/`Writer` construction always
-  takes an explicit `pipeline_id`), so an axis mismatch is a call-site error, never
-  silently swallowed by a defaulted constructor.
+  stamp their axis explicitly via `Writer::new(path, config, seq,
+  FileStamp { pipeline_id, payload_format })` — there is no default pipeline
+  and no default payload format at any layer (the named `FileStamp` fields
+  cannot be swapped, and `Writer::new` rejects the reserved `payload_format`
+  0), so an axis or codec mismatch is a call-site error, never silently
+  swallowed by a defaulted constructor.
 
 ## `Pipeline` seam
 
@@ -228,6 +230,38 @@ Contracts:
 - **Eviction is one removal:** `evict_seq` drops the `sfst` entry and the `seqs` entry;
   a future per-seq axis is a new `SeqState` field, with no extra cleanup site.
 - In-memory only — rebuilt by recovery on startup; never serialized.
+
+## WAL header evolution contract (v5, 2026-07)
+
+The WAL file header (one 4 KiB page, `wal/src/format.rs`) is the substrate's
+evolvable surface; it was hardened before GA so future format changes are
+detectable on disk:
+
+- `payload_format: u16` — opaque per-file frame-codec tag. Producers name it at
+  `wal::Writer::new` (no default; `0` is reserved "unspecified" and never
+  written); consumers check it before decoding any frame payload. The substrate
+  stamps and exposes the value, never interprets it — same posture as
+  `part_key` and `content_meta`. Assigned ids are **append-only** (a changed
+  wire shape takes a new id, never reuses one): `1` = ng-flatten log frames
+  (`ng_flatten::LOG_FRAME_PAYLOAD_FORMAT`), `2` = traces raw-OTLP proof
+  (`otel_ingestor::trace_service`), `3` = ng-flatten trace frames
+  (pre-graduation).
+- **Unknown flag bits are rejected** (`KNOWN_FLAGS_MASK`): a future version can
+  claim a free bit to gate a new optional header field, knowing old readers
+  refuse instead of misreading. This is the sanctioned mechanism for *optional*
+  header extensions; incompatible layout changes bump `FORMAT_VERSION`
+  (hard-rejected, no back-compat).
+- **Header CRC32** in the page's last 4 bytes, computed over everything before
+  it (reserved zeros included) — a corrupt-but-parseable header (flipped flag,
+  renamed identity blob) is rejected, not misread. Frames were already
+  CRC-protected.
+- **Orphan policy (user decision, 2026-07-03): unreadable/unsealable WAL files
+  are kept.** Recovery logs and skips a file whose header fails validation
+  (`wal::Registry::recover`); a seal failure is logged and the file stays on
+  disk (`IndexFailed` handling). No quarantine, no auto-delete — this is
+  intentional, not an accident: the files are evidence, and disk cost is
+  bounded by WAL transience. Detection shipped at GA; decoders for superseded
+  formats are added later only if a real migration ever needs them.
 
 ## Invariants
 

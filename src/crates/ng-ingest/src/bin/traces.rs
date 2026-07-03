@@ -116,8 +116,16 @@ async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
-    let writer = wal::Writer::new(&args.out, one_file_config(), seq, TRACES_PIPELINE_ID)
-        .with_context(|| format!("failed to create WAL writer in {}", args.out.display()))?;
+    let writer = wal::Writer::new(
+        &args.out,
+        one_file_config(),
+        seq,
+        wal::FileStamp {
+            pipeline_id: TRACES_PIPELINE_ID,
+            payload_format: ng_flatten::TRACE_FRAME_PAYLOAD_FORMAT,
+        },
+    )
+    .with_context(|| format!("failed to create WAL writer in {}", args.out.display()))?;
 
     let sink = Arc::new(Mutex::new(Sink {
         writer,

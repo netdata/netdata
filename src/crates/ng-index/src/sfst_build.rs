@@ -126,6 +126,7 @@ fn populate_row_index(
     row_index: &mut RowIndex<'_>,
     metrics: &Metrics,
 ) -> Result<SfstStats, Error> {
+    check_payload_format(reader, ng_flatten::LOG_FRAME_PAYLOAD_FORMAT)?;
     let mut stats = SfstStats::default();
     let mut kv = String::new();
     // Accumulates the global typed schema tree by interning every frame's
@@ -243,6 +244,17 @@ fn populate_row_index(
     Ok(stats)
 }
 
+/// Refuse to decode a WAL whose header names a different frame codec, before
+/// the first frame decode — a mismatched file fails with the format ids
+/// instead of a bincode error or a silent mis-decode.
+fn check_payload_format(reader: &wal::Reader, expected: u16) -> Result<(), Error> {
+    let found = reader.header().payload_format;
+    if found != expected {
+        return Err(Error::PayloadFormat { found, expected });
+    }
+    Ok(())
+}
+
 /// Build an SFST index file at `out_path` from the flattened WAL in `flat_dir`.
 /// Single pass; phases timed: `read` / `deserialize` / `index` / `build`.
 pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result<SfstStats, Error> {
@@ -316,6 +328,7 @@ fn populate_trace_row_index(
     row_index: &mut RowIndex<'_>,
     metrics: &Metrics,
 ) -> Result<SfstStats, Error> {
+    check_payload_format(reader, ng_flatten::TRACE_FRAME_PAYLOAD_FORMAT)?;
     let mut stats = SfstStats::default();
     let mut kv = String::new();
     let mut flattener = ng_flatten::Flattener::new();
@@ -514,8 +527,16 @@ mod tests {
         let mut ri = RowIndex::new(&arena, CARDINALITY_THRESHOLD);
         let paths = vec!["k".to_string()];
         let entries = vec![
-            Entry { node: 0, value: Value::Int(1), hash: 42 },
-            Entry { node: 0, value: Value::Int(2), hash: 42 }, // distinct value, same hash
+            Entry {
+                node: 0,
+                value: Value::Int(1),
+                hash: 42,
+            },
+            Entry {
+                node: 0,
+                value: Value::Int(2),
+                hash: 42,
+            }, // distinct value, same hash
         ];
         let mut kv = String::new();
         let mut stats = SfstStats::default();

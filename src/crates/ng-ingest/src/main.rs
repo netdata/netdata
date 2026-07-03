@@ -145,8 +145,16 @@ async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
-    let writer = wal::Writer::new(&args.out, one_file_config(), seq, PIPELINE_ID)
-        .with_context(|| format!("failed to create WAL writer in {}", args.out.display()))?;
+    let writer = wal::Writer::new(
+        &args.out,
+        one_file_config(),
+        seq,
+        wal::FileStamp {
+            pipeline_id: PIPELINE_ID,
+            payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
+        },
+    )
+    .with_context(|| format!("failed to create WAL writer in {}", args.out.display()))?;
 
     let dump = args
         .dump_requests

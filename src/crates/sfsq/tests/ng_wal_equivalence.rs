@@ -305,11 +305,65 @@ fn gen_corpus(seed: u64) -> Corpus {
 // WAL writing (ng-flatten frames) + the two evaluation paths
 // ---------------------------------------------------------------------------
 
+#[test]
+fn tail_scan_refuses_wrong_payload_format() {
+    // The tail scan must refuse a WAL whose header names a different frame
+    // codec (here: the traces format) before decoding any frame.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let seq = std::sync::Arc::new(wal::SeqAllocator::ephemeral(0));
+    let mut writer = wal::Writer::new(
+        dir.path(),
+        wal::Config::default(),
+        seq,
+        wal::FileStamp {
+            pipeline_id: 0,
+            payload_format: ng_flatten::TRACE_FRAME_PAYLOAD_FORMAT,
+        },
+    )
+    .expect("writer");
+    writer
+        .write_frame(
+            0,
+            &[],
+            b"x",
+            wal::FrameMeta {
+                entry_count: 1,
+                ingestion_ns: TimestampNs(1),
+                log_ts_range: None,
+            },
+        )
+        .expect("write frame");
+    writer.shutdown_all().expect("shutdown");
+    let wal_path = std::fs::read_dir(dir.path())
+        .expect("read dir")
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .find(|p| p.extension().is_some_and(|x| x == "wal"))
+        .expect("a wal file");
+    match sfsq::logs::WalScan::scan_flattened(&wal_path) {
+        Err(sfsq::logs::FlattenedScanError::PayloadFormat { found, expected }) => {
+            assert_eq!(found, ng_flatten::TRACE_FRAME_PAYLOAD_FORMAT);
+            assert_eq!(expected, ng_flatten::LOG_FRAME_PAYLOAD_FORMAT);
+        }
+        Err(other) => panic!("expected PayloadFormat rejection, got {other:?}"),
+        Ok(_) => panic!("expected PayloadFormat rejection, scan succeeded"),
+    }
+}
+
 /// Write the corpus as a flattened-frame WAL (one frame per batch) using the
 /// `ng-flatten` encode + the production `wal::Writer`.
 fn write_flattened_wal(dir: &Path, corpus: &Corpus) -> std::path::PathBuf {
     let seq = std::sync::Arc::new(wal::SeqAllocator::ephemeral(0));
-    let mut writer = wal::Writer::new(dir, wal::Config::default(), seq, 0).expect("writer");
+    let mut writer = wal::Writer::new(
+        dir,
+        wal::Config::default(),
+        seq,
+        wal::FileStamp {
+            pipeline_id: 0,
+            payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
+        },
+    )
+    .expect("writer");
     for (i, batch) in corpus.batches.iter().enumerate() {
         let request = ExportLogsServiceRequest {
             resource_logs: batch.clone(),
@@ -327,10 +381,11 @@ fn write_flattened_wal(dir: &Path, corpus: &Corpus) -> std::path::PathBuf {
                 0,
                 &[],
                 &bytes,
-                count,
-                ingestion,
-                TimestampNs::ZERO,
-                TimestampNs::ZERO,
+                wal::FrameMeta {
+                    entry_count: count,
+                    ingestion_ns: ingestion,
+                    log_ts_range: None,
+                },
             )
             .expect("write frame");
     }

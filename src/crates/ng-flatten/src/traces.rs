@@ -187,6 +187,12 @@ pub fn normalize_span_timestamps(req: &mut ExportTraceServiceRequest, fallback_b
     }
 }
 
+/// WAL `payload_format` id of the bincode [`FlattenedTraceRequest`] frame
+/// codec — the span analog of [`crate::logs::LOG_FRAME_PAYLOAD_FORMAT`], same
+/// append-only id space. The production traces proof writes raw OTLP bytes
+/// under id `2` instead.
+pub const TRACE_FRAME_PAYLOAD_FORMAT: u16 = 3;
+
 /// Encode a [`FlattenedTraceRequest`] to the bincode bytes stored in a traces WAL
 /// frame — the span analog of [`crate::logs::encode_log_frame`], same codec.
 /// Span `Entry.hash`es are filled at emit time by the flattener (as the logs
