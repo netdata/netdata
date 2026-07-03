@@ -9,13 +9,13 @@ Netdata offers two database modes to suit your needs for performance and data pe
 | dbengine (default) | High-performance, multi-tier storage with compression. Metric samples are cached in memory and then written to disk in multiple tiers for efficient retrieval and long-term storage.                                                   |
 |        ram         | In-memory storage. Metric samples are stored in memory only, and older data is overwritten as new data arrives. This mode prioritizes speed, making it ideal for Netdata Child instances that stream data to a central Netdata parent. |
 
-## `dbengine`
-
 :::note
 
-By default, the Agent stores its metrics database files on disk under `/var/cache/netdata`, and identity files (such as the claim token and API key) under `/var/lib/netdata`. The exact paths can vary depending on your installation method, operating system, and whether you run Netdata in Docker or Kubernetes. For the full list of paths and the steps to inspect, back up, or relocate these files, see [Backing up a Netdata Agent](/docs/netdata-agent/backup-and-restore-an-agent.md).
+Regardless of database mode, the Agent stores identity files (such as the claim token and API key) on disk. When using `dbengine`, it also stores the metrics database files on disk. The exact locations vary depending on your installation method, operating system, and whether you run Netdata in Docker or Kubernetes. For the full list of paths and the steps to inspect, back up, or relocate these files, see [Backing up a Netdata Agent](/docs/netdata-agent/backup-and-restore-an-agent.md).
 
 :::
+
+## `dbengine`
 
 Netdata's `dbengine` mode efficiently stores data on disk using compression. The actual disk space used depends on how well the data compresses.
 This mode uses a tiered storage approach: data is saved in multiple tiers on disk. Each tier retains data at a different resolution (detail level). Higher tiers store a down-sampled (less detailed) version of the data found in lower tiers.
