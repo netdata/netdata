@@ -25,6 +25,7 @@ use crate::signals::Signal;
 /// are global (one policy for the process); only rotation/retention/crc tuning
 /// is per signal.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PluginConfig {
     pub endpoint: EndpointConfig,
     pub metrics: MetricsConfig,
@@ -141,6 +142,7 @@ impl LegacyLogsConfig {
 
 /// gRPC server endpoint configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EndpointConfig {
     /// Bind address (e.g., "127.0.0.1:4317").
     pub path: String,
@@ -157,6 +159,7 @@ pub struct EndpointConfig {
 
 /// Metrics ingestion configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MetricsConfig {
     /// Directory containing metric chart config files.
     #[serde(default)]
@@ -181,6 +184,7 @@ pub struct MetricsConfig {
 /// storage is process-global and owned by the coordinator shell — NOT injected
 /// here.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SignalConfig {
     /// Whether to verify stored data with checksums. Hidden knob: absent from
     /// the stock file, overridable via user file / env.
@@ -215,6 +219,7 @@ impl Default for SignalConfig {
 
 /// Catalog tuning for one signal (the dir is derived, not configured).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CatalogTuning {
     /// Number of SFST entries accumulated before the catalog builder
     /// rotates an in-memory accumulator to an immutable catalog file.
@@ -255,6 +260,7 @@ pub struct LifecycleConfig {
 /// directory is derived (`{base_dir}/{signal}/remote-read`), not configured here
 /// (see [`LifecycleConfig::read_cache_dir`]).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct StorageConfig {
     /// Whether remote storage is enabled.
     #[serde(default)]
@@ -311,7 +317,9 @@ pub struct WalConfig {
 
 /// A rotation policy entry. All fields are optional so that per-tenant
 /// entries can override only specific values from the `"default"` entry.
+/// Tenant names are open map keys; the fields inside an entry are strict.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct RotationEntry {
     #[serde(default, with = "opt_bytesize")]
     pub max_file_size: Option<ByteSize>,
@@ -455,7 +463,9 @@ impl From<RotationPolicy> for HashMap<String, RotationEntry> {
 
 /// A retention policy entry. All fields are optional so that per-tenant
 /// entries can override only specific values from the `"default"` entry.
+/// Tenant names are open map keys; the fields inside an entry are strict.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct RetentionEntry {
     #[serde(default)]
     pub max_files: Option<usize>,
@@ -593,17 +603,12 @@ impl From<RetentionPolicy> for HashMap<String, RetentionEntry> {
 }
 
 /// Tenant authentication configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AuthConfig {
     /// When false, all data routes to the "default" tenant.
     #[serde(default)]
     pub enabled: bool,
-}
-
-impl Default for AuthConfig {
-    fn default() -> Self {
-        Self { enabled: false }
-    }
 }
 
 impl AuthConfig {

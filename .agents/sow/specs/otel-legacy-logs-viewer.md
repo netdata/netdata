@@ -25,12 +25,17 @@ graduated from experimental, so the whole feature is best-effort.
   writes, rotates, prunes, or deletes them. Pruning is the user's
   responsibility (neither plugin supports remote config; users manage files /
   edit `otel.yaml` on the host).
-- **Directory resolution:** the worker reads the journal directory from the
-  former schema's `logs.journal_dir` in the user `otel.yaml` (then stock). The
-  current `PluginConfig` schema does not carry this field, so it is read in
-  place; the new loader tolerates the former schema because no config struct
-  denies unknown fields (a malformed `otel.yaml` is warned about and skipped, not
-  silently treated as "no override"). The default mirrors the former plugin's
+- **Directory resolution:** the worker reads the journal directory from
+  `logs.journal_dir` in the user `otel.yaml` (then stock). The runtime
+  `PluginConfig` does not carry this field; it is read in place by the
+  dedicated `resolve_legacy_journal_dir` probe, whose probe-local structs stay
+  deliberately tolerant (a malformed `otel.yaml` is warned about and skipped,
+  not silently treated as "no override"). The main config parsers are STRICT
+  (`deny_unknown_fields`, 2026-07): `logs.journal_dir` is a declared, accepted
+  key of the current schema, but a user file still carrying other
+  former-schema keys (`size_of_journal_file`, ...) refuses startup with a
+  migration guide (`config/legacy.rs`) — so in practice the viewer only runs
+  once the user file passes strict parsing. The default mirrors the former plugin's
   `@logdir_POST@/otel/v1`: `$NETDATA_LOG_DIR/otel/v1`, falling back to
   `/var/log/netdata/otel/v1` only when `NETDATA_LOG_DIR` is unset. The initial
   directory scan is recursive (walkdir), so the per-`<machine_id>` subdirectory

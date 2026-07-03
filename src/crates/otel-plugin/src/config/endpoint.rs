@@ -2,6 +2,7 @@ use bridge::config::EndpointConfig;
 use serde::Deserialize;
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(super) struct EndpointOverride {
     #[serde(default)]
     pub(super) path: Option<String>,

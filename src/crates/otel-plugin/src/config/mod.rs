@@ -7,6 +7,7 @@
 
 mod endpoint;
 mod env;
+mod legacy;
 mod metrics;
 mod signal;
 
@@ -26,8 +27,10 @@ const LEGACY_DEFAULT_JOURNAL_DIR: &str = "/var/log/netdata/otel/v1";
 /// Resolve the read-only journal directory of the former otel plugin.
 /// The former schema's `logs.journal_dir` does not exist in the
 /// current [`PluginConfig`], so this reads it in place from the user otel.yaml
-/// (then stock), tolerating the former schema since neither file denies unknown
-/// fields. The viewer never writes here.
+/// (then stock) with its own deliberately tolerant probe. The main parsers
+/// deny unknown fields (a former-schema user file refuses startup with a
+/// migration guide), but this probe stays tolerant: it must extract the one
+/// still-valid key from whatever file it finds. The viewer never writes here.
 ///
 /// The default mirrors the former plugin's `@logdir_POST@/otel/v1`: the agent's
 /// log directory (`NETDATA_LOG_DIR`) plus `otel/v1`, so custom install prefixes
@@ -98,8 +101,9 @@ fn pick_journal_dir<'a>(
 ///
 /// Returns `Ok(None)` when the file parses but carries no override, and `Err`
 /// when the YAML is malformed (the caller warns and falls back rather than
-/// silently using the default). Unknown fields are tolerated — the former
-/// schema is a superset and neither config file denies unknown fields.
+/// silently using the default). Unknown fields are tolerated by these
+/// probe-local structs — unlike the main parsers — because the probe's whole
+/// job is extracting one key from a possibly former-schema file.
 fn journal_dir_from_yaml(contents: &str) -> Result<Option<PathBuf>, serde_yaml::Error> {
     #[derive(Deserialize)]
     struct Probe {
@@ -138,13 +142,12 @@ impl ConfigFile {
         serde_yaml::from_str(&contents).with_context(|| format!("parsing {}", self.path.display()))
     }
 
-    /// Read and parse an optional file. An absent file yields `Ok(None)`; an
-    /// unreadable or malformed one is an error carrying the path.
-    fn parse_optional<T: serde::de::DeserializeOwned>(&self) -> Result<Option<T>> {
+    /// Read an optional file. An absent file yields `Ok(None)`; an unreadable
+    /// one is an error carrying the path. Parsing is the caller's job — the
+    /// user-file path needs the raw contents for former-schema detection.
+    fn read_optional(&self) -> Result<Option<String>> {
         match std::fs::read_to_string(&self.path) {
-            Ok(contents) => serde_yaml::from_str(&contents)
-                .map(Some)
-                .with_context(|| format!("parsing {}", self.path.display())),
+            Ok(contents) => Ok(Some(contents)),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
             Err(e) => {
                 Err(anyhow::Error::new(e).context(format!("reading {}", self.path.display())))
@@ -200,13 +203,19 @@ impl ConfigResolver {
         log_config("stock", &config);
 
         if let Some(user) = &self.user {
-            if let Some(overrides) = user.parse_optional::<ConfigOverride>()? {
+            if let Some(contents) = user.read_optional()? {
+                let overrides: ConfigOverride = serde_yaml::from_str(&contents)
+                    .map_err(|e| legacy::enrich_parse_error(&user.path, &contents, e))?;
+                overrides
+                    .validate()
+                    .with_context(|| format!("parsing {}", user.path.display()))?;
                 apply_overrides(&mut config, &overrides);
                 log_config("user", &config);
             }
         }
 
         if self.env.has_any() {
+            self.env.validate()?;
             apply_overrides(&mut config, &self.env);
         }
 
@@ -325,6 +334,7 @@ fn validate(config: &PluginConfig) -> Result<()> {
 // ============================================================================
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct ConfigOverride {
     #[serde(default)]
     endpoint: Option<EndpointOverride>,
@@ -343,6 +353,23 @@ pub(crate) struct ConfigOverride {
 }
 
 impl ConfigOverride {
+    /// Reject overrides that parse but are not valid in their position.
+    /// `journal_dir` (the former plugin's read-only journal location) is a
+    /// logs-only key; there are no legacy traces journals to point at.
+    fn validate(&self) -> Result<()> {
+        if self
+            .traces
+            .as_ref()
+            .is_some_and(|t| t.journal_dir.is_some())
+        {
+            anyhow::bail!(
+                "traces.journal_dir is not a valid option: journal_dir points at the \
+                 former plugin's log journals and is only accepted under 'logs:'"
+            );
+        }
+        Ok(())
+    }
+
     fn has_any(&self) -> bool {
         self.endpoint.is_some()
             || self.metrics.is_some()
@@ -731,18 +758,117 @@ logs:
         assert_eq!(config.metrics.interval_secs, Some(10));
     }
 
+    // -- Strict parsing: unknown keys refuse startup (in every section) --
+    //
+    // Deliberate contract flip: unknown keys used to be silently ignored for
+    // forward compatibility. A silently dropped typo means defaults apply
+    // where the operator configured otherwise (e.g. leaner retention wiping
+    // data they meant to keep), so the file must be fully understood or the
+    // plugin does not run — consistent with how syntax errors already behave.
+
     #[test]
-    fn unknown_fields_ignored() {
+    fn unknown_keys_rejected_per_section() {
+        for user_yaml in [
+            "some_future_option: true\n",
+            "endpoint:\n  unknown: x\n",
+            "metrics:\n  unknown: x\n",
+            "storage:\n  unknown: x\n",
+            "auth:\n  unknown: x\n",
+            "logs:\n  unknown: x\n",
+            "traces:\n  unknown: x\n",
+            "logs:\n  catalog:\n    unknown: x\n",
+        ] {
+            let err = resolve_with_user(user_yaml).unwrap_err();
+            assert!(
+                format!("{err:#}").contains("unknown field `unknown`")
+                    || format!("{err:#}").contains("unknown field `some_future_option`"),
+                "expected unknown-field rejection for {user_yaml:?}, got: {err:#}"
+            );
+        }
+    }
+
+    #[test]
+    fn unknown_key_names_the_user_file() {
+        let err = resolve_with_user("logs:\n  unknown: x\n").unwrap_err();
+        assert!(format!("{err:#}").contains("user.yaml"), "{err:#}");
+    }
+
+    #[test]
+    fn tenant_names_stay_open_but_entry_typos_are_caught() {
+        // Arbitrary tenant names are map data, not schema.
         let config = resolve_with_user(
-            r#"
-some_future_option: true
-endpoint:
-  path: "0.0.0.0:9999"
-  unknown: x
-"#,
+            "logs:\n  rotation:\n    any-tenant-name:\n      max_file_size: \"10MB\"\n",
         )
         .unwrap();
-        assert_eq!(config.endpoint.path, "0.0.0.0:9999");
+        assert_eq!(
+            config
+                .logs
+                .rotation
+                .resolve("any-tenant-name")
+                .max_file_size,
+            ByteSize::mb(10)
+        );
+
+        // A typo INSIDE a tenant entry is schema and is rejected.
+        let err =
+            resolve_with_user("logs:\n  rotation:\n    default:\n      max_filesize: \"10MB\"\n")
+                .unwrap_err();
+        assert!(
+            format!("{err:#}").contains("unknown field `max_filesize`"),
+            "{err:#}"
+        );
+        let err = resolve_with_user("logs:\n  retention:\n    default:\n      max_filez: 5\n")
+            .unwrap_err();
+        assert!(
+            format!("{err:#}").contains("unknown field `max_filez`"),
+            "{err:#}"
+        );
+    }
+
+    #[test]
+    fn unknown_key_in_stock_rejected() {
+        // The stock file is ours; strictness catches shipping mistakes too.
+        let err =
+            resolve_stock_yaml(&format!("{STOCK_YAML}\nsome_future_option: true\n")).unwrap_err();
+        assert!(format!("{err:#}").contains("unknown field"), "{err:#}");
+    }
+
+    #[test]
+    fn former_schema_user_file_gets_migration_guide() {
+        let err = resolve_with_user(
+            r#"
+logs:
+  journal_dir: /var/log/netdata/otel/v1
+  size_of_journal_file: "100MB"
+  number_of_journal_files: 10
+"#,
+        )
+        .unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("former (experimental) otel.yaml schema"),
+            "{msg}"
+        );
+        assert!(msg.contains("logs.rotation.default.max_file_size"), "{msg}");
+        assert!(msg.contains("re-decide"), "{msg}");
+        assert!(msg.contains("Old logs remain queryable"), "{msg}");
+        // The underlying serde error is still in the chain.
+        assert!(msg.contains("unknown field"), "{msg}");
+    }
+
+    #[test]
+    fn journal_dir_accepted_under_logs_only() {
+        // Valid current key: points the read-only legacy viewer at the former
+        // plugin's journals. Parsed (strictness) but not merged (the value is
+        // consumed by resolve_legacy_journal_dir reading the raw file).
+        resolve_with_user("logs:\n  journal_dir: /var/log/netdata/otel/v1\n").unwrap();
+
+        let err =
+            resolve_with_user("traces:\n  journal_dir: /var/log/netdata/otel/v1\n").unwrap_err();
+        assert!(
+            format!("{err:#}").contains("traces.journal_dir is not a valid option"),
+            "{err:#}"
+        );
     }
 
     // -- Validation --
@@ -835,6 +961,31 @@ logs:
             .iter()
             .map(|(k, v)| (k.to_string(), std::ffi::OsString::from(*v)))
             .collect()
+    }
+
+    #[test]
+    fn env_unrecognized_variable_rejected() {
+        // Same strictness as YAML keys: a typo'd NETDATA_OTEL_* name is fatal,
+        // not silently ignored. The error names every offender.
+        let err = ConfigOverride::from_map(&env_map(&[
+            ("NETDATA_OTEL_LOGS_RETENSION_MAX_FILES", "5"),
+            ("NETDATA_OTEL_ENDPOINT_PATH", "0.0.0.0:9999"),
+        ]))
+        .unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains("unrecognized environment variable"), "{msg}");
+        assert!(
+            msg.contains("NETDATA_OTEL_LOGS_RETENSION_MAX_FILES"),
+            "{msg}"
+        );
+        // Old (pre-rework) storage/auth names are typos now too.
+        let err =
+            ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_LOGS_STORAGE_ENABLED", "true")]))
+                .unwrap_err();
+        assert!(
+            format!("{err:#}").contains("NETDATA_OTEL_LOGS_STORAGE_ENABLED"),
+            "{err:#}"
+        );
     }
 
     #[test]
@@ -975,17 +1126,21 @@ logs:
 
     #[cfg(unix)]
     #[test]
-    fn env_non_utf8_value_ignored_when_unconsumed() {
+    fn env_non_utf8_value_rejected_as_unrecognized_name() {
         use std::ffi::OsString;
         use std::os::unix::ffi::OsStringExt;
-        // A prefixed but unrecognized var whose value is not UTF-8 must not fail
-        // loading — it is never read.
+        // An unrecognized name is fatal before its value is ever read, so the
+        // error is the unrecognized-name one, not a UTF-8 one.
         let mut env: std::collections::HashMap<String, OsString> = std::collections::HashMap::new();
         env.insert(
             "NETDATA_OTEL_UNKNOWN_FUTURE".to_string(),
             OsString::from_vec(vec![0xff, 0xfe]),
         );
-        assert!(!ConfigOverride::from_map(&env).unwrap().has_any());
+        let err = ConfigOverride::from_map(&env).unwrap_err();
+        assert!(
+            format!("{err:#}").contains("unrecognized environment variable"),
+            "{err:#}"
+        );
     }
 
     #[cfg(unix)]

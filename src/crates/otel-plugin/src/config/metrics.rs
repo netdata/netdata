@@ -2,6 +2,7 @@ use bridge::config::MetricsConfig;
 use serde::Deserialize;
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(super) struct MetricsOverride {
     #[serde(default)]
     pub(super) chart_configs_dir: Option<String>,

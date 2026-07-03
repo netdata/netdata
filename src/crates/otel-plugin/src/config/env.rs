@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -12,8 +13,9 @@ use super::signal::{AuthOverride, CatalogOverride, SignalOverride, StorageOverri
 
 /// A snapshot of `NETDATA_OTEL_*` (name → raw value), so config resolution reads
 /// from an injected map rather than `std::env` and stays unit-testable. Values
-/// stay `OsString`; UTF-8 is checked only when a var is read ([`get_env`]), so an
-/// unconsumed non-UTF-8 var can't fail loading.
+/// stay `OsString`; a value's UTF-8 is checked only when read ([`get_env`]).
+/// Every name in the snapshot must be recognized ([`EnvReader`]) — an unknown
+/// name is fatal before its value matters.
 pub(super) type EnvMap = HashMap<String, OsString>;
 
 /// Collect the `NETDATA_OTEL_*` environment into an [`EnvMap`] — the only reader
@@ -31,9 +33,55 @@ pub(super) fn otel_env_from_process() -> EnvMap {
     env
 }
 
+/// An [`EnvMap`] that records every name looked up, so that after resolution
+/// the leftovers — `NETDATA_OTEL_*` names no consumer recognizes, i.e. typos —
+/// can be rejected. The consumers query their full fixed vocabulary
+/// unconditionally, so "read" equals "recognized" by construction; there is no
+/// hand-maintained list of accepted names to drift out of sync.
+struct EnvReader<'a> {
+    map: &'a EnvMap,
+    read: RefCell<HashSet<String>>,
+}
+
+impl<'a> EnvReader<'a> {
+    fn new(map: &'a EnvMap) -> Self {
+        Self {
+            map,
+            read: RefCell::new(HashSet::new()),
+        }
+    }
+
+    /// Look up a name, recording it as recognized whether or not it is set.
+    fn get(&self, name: &str) -> Option<&'a OsString> {
+        self.read.borrow_mut().insert(name.to_string());
+        self.map.get(name)
+    }
+
+    /// Error on any variable in the snapshot that no consumer looked up.
+    fn ensure_fully_consumed(&self) -> Result<()> {
+        let read = self.read.borrow();
+        let mut unknown: Vec<&str> = self
+            .map
+            .keys()
+            .filter(|name| !read.contains(*name))
+            .map(String::as_str)
+            .collect();
+        if unknown.is_empty() {
+            return Ok(());
+        }
+        unknown.sort_unstable();
+        anyhow::bail!(
+            "unrecognized environment variable{}: {} — NETDATA_OTEL_* names are \
+             checked strictly so a typo cannot be silently ignored",
+            if unknown.len() == 1 { "" } else { "s" },
+            unknown.join(", ")
+        );
+    }
+}
+
 /// Look up a variable, erroring only if the value we actually consume is not
 /// valid UTF-8 (matching the former `std::env::var` semantics).
-fn get_env<'a>(env: &'a EnvMap, name: &str) -> Result<Option<&'a str>> {
+fn get_env<'a>(env: &EnvReader<'a>, name: &str) -> Result<Option<&'a str>> {
     match env.get(name) {
         None => Ok(None),
         Some(value) => value
@@ -43,7 +91,7 @@ fn get_env<'a>(env: &'a EnvMap, name: &str) -> Result<Option<&'a str>> {
     }
 }
 
-fn parse_env_var<T: std::str::FromStr>(env: &EnvMap, name: &str) -> Result<Option<T>>
+fn parse_env_var<T: std::str::FromStr>(env: &EnvReader<'_>, name: &str) -> Result<Option<T>>
 where
     T::Err: std::fmt::Display,
 {
@@ -56,7 +104,7 @@ where
     }
 }
 
-fn parse_env_duration(env: &EnvMap, name: &str) -> Result<Option<Duration>> {
+fn parse_env_duration(env: &EnvReader<'_>, name: &str) -> Result<Option<Duration>> {
     match get_env(env, name)? {
         Some(val) => humantime::parse_duration(val)
             .map(Some)
@@ -68,7 +116,7 @@ fn parse_env_duration(env: &EnvMap, name: &str) -> Result<Option<Duration>> {
 /// Parse a boolean env var. Accepted values are case-insensitive: `true`/`1`/`yes`
 /// and `false`/`0`/`no`; anything else is an error (this is the user-facing
 /// vocabulary for `NETDATA_OTEL_*_ENABLED` flags).
-fn parse_env_bool(env: &EnvMap, name: &str) -> Result<Option<bool>> {
+fn parse_env_bool(env: &EnvReader<'_>, name: &str) -> Result<Option<bool>> {
     match get_env(env, name)? {
         Some(val) => match val.to_lowercase().as_str() {
             "true" | "1" | "yes" => Ok(Some(true)),
@@ -86,7 +134,11 @@ fn parse_env_bool(env: &EnvMap, name: &str) -> Result<Option<bool>> {
 impl ConfigOverride {
     /// Build the config overrides from an [`EnvMap`] snapshot of `NETDATA_OTEL_*`
     /// variables. Pure: reads only the provided map, never the process env.
+    /// A name in the snapshot that no consumer recognizes is an error — the
+    /// consumers below query their full vocabulary unconditionally, so after
+    /// they run, an unread name can only be a typo or a removed variable.
     pub(super) fn from_map(env: &EnvMap) -> Result<Self> {
+        let env = &EnvReader::new(env);
         let endpoint = EndpointOverride::from_map(env)?;
         let metrics = MetricsOverride::from_map(env)?;
         let base_dir = get_env(env, "NETDATA_OTEL_BASE_DIR")?.map(PathBuf::from);
@@ -94,6 +146,7 @@ impl ConfigOverride {
         let auth = AuthOverride::from_map(env)?;
         let logs = SignalOverride::from_map(env, "LOGS")?;
         let traces = SignalOverride::from_map(env, "TRACES")?;
+        env.ensure_fully_consumed()?;
 
         Ok(Self {
             endpoint: if endpoint.has_any() {
@@ -120,7 +173,7 @@ impl ConfigOverride {
 }
 
 impl EndpointOverride {
-    fn from_map(env: &EnvMap) -> Result<Self> {
+    fn from_map(env: &EnvReader<'_>) -> Result<Self> {
         Ok(Self {
             path: get_env(env, "NETDATA_OTEL_ENDPOINT_PATH")?.map(str::to_string),
             tls_cert_path: get_env(env, "NETDATA_OTEL_ENDPOINT_TLS_CERT_PATH")?.map(str::to_string),
@@ -132,7 +185,7 @@ impl EndpointOverride {
 }
 
 impl MetricsOverride {
-    fn from_map(env: &EnvMap) -> Result<Self> {
+    fn from_map(env: &EnvReader<'_>) -> Result<Self> {
         Ok(Self {
             chart_configs_dir: get_env(env, "NETDATA_OTEL_METRICS_CHART_CONFIGS_DIR")?
                 .map(str::to_string),
@@ -148,7 +201,7 @@ impl MetricsOverride {
 }
 
 impl StorageOverride {
-    fn from_map(env: &EnvMap) -> Result<Self> {
+    fn from_map(env: &EnvReader<'_>) -> Result<Self> {
         Ok(Self {
             enabled: parse_env_bool(env, "NETDATA_OTEL_STORAGE_ENABLED")?,
             uri: get_env(env, "NETDATA_OTEL_STORAGE_URI")?.map(str::to_string),
@@ -158,7 +211,7 @@ impl StorageOverride {
 }
 
 impl AuthOverride {
-    fn from_map(env: &EnvMap) -> Result<Self> {
+    fn from_map(env: &EnvReader<'_>) -> Result<Self> {
         Ok(Self {
             enabled: parse_env_bool(env, "NETDATA_OTEL_AUTH_ENABLED")?,
         })
@@ -169,7 +222,7 @@ impl SignalOverride {
     /// Build a per-signal tuning override from `NETDATA_OTEL_{PREFIX}_*` entries
     /// in the map (`PREFIX` is `LOGS` or `TRACES`). Dirs and storage are not
     /// per-signal and so have no per-signal env vars.
-    fn from_map(env: &EnvMap, prefix: &str) -> Result<Self> {
+    fn from_map(env: &EnvReader<'_>, prefix: &str) -> Result<Self> {
         let rotation_default = bridge::config::RotationEntry {
             max_file_size: parse_env_var(env, &var(prefix, "ROTATION_MAX_FILE_SIZE"))?,
             max_log_entries: parse_env_var(env, &var(prefix, "ROTATION_MAX_LOG_ENTRIES"))?,
@@ -211,6 +264,8 @@ impl SignalOverride {
             } else {
                 None
             },
+            // The legacy journal dir has no env var; it is a YAML-only key.
+            journal_dir: None,
         })
     }
 }

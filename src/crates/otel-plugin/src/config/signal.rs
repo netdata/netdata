@@ -7,12 +7,14 @@
 //! are global, merged by [`apply_storage`] / [`apply_auth`].
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use bridge::config::{AuthConfig, RetentionEntry, SignalConfig, StorageConfig};
 use bytesize::ByteSize;
 use serde::Deserialize;
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(super) struct SignalOverride {
     #[serde(default)]
     pub(super) crc_enabled: Option<bool>,
@@ -24,15 +26,23 @@ pub(super) struct SignalOverride {
     pub(super) retention: Option<HashMap<String, RetentionEntry>>,
     #[serde(default)]
     pub(super) catalog: Option<CatalogOverride>,
+    /// Where the FORMER plugin's journal files live, for the read-only
+    /// legacy-logs viewer. Declared so strict parsing accepts it, valid under
+    /// `logs:` only (rejected for `traces:` at resolve). The value is consumed
+    /// by `resolve_legacy_journal_dir` reading the raw file, not merged here.
+    #[serde(default)]
+    pub(super) journal_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(super) struct CatalogOverride {
     #[serde(default)]
     pub(super) rotation_count: Option<usize>,
 }
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(super) struct StorageOverride {
     #[serde(default)]
     pub(super) enabled: Option<bool>,
@@ -43,6 +53,7 @@ pub(super) struct StorageOverride {
 }
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(super) struct AuthOverride {
     #[serde(default)]
     pub(super) enabled: Option<bool>,
@@ -61,6 +72,7 @@ impl SignalOverride {
             || self.rotation.is_some()
             || self.retention.is_some()
             || self.catalog.as_ref().is_some_and(|c| c.has_any())
+            || self.journal_dir.is_some()
     }
 }
 

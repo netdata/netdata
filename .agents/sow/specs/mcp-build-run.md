@@ -129,9 +129,10 @@ reader cannot infer from the code:
   `logs_rotation_max_log_entries`, `traces_retention_max_files`) configure the
   two pipelines independently in one call — an omitted knob keeps that signal's
   stock default. The generated YAML MUST use the plugin's flat per-signal shape
-  (`logs.rotation`/`logs.retention`/…, NO `wal:`/`index:` nesting): serde
-  ignores unknown keys, so an old-shape emission silently no-ops instead of
-  failing. `storage_enabled`/`storage_uri` and the OTLP endpoint are **global**
+  (`logs.rotation`/`logs.retention`/…, NO `wal:`/`index:` nesting): the plugin
+  parses strictly (`deny_unknown_fields`), so an old-shape emission makes the
+  launched agent's otel plugin refuse to start.
+  `storage_enabled`/`storage_uri` and the OTLP endpoint are **global**
   (unprefixed), mirroring the plugin's global storage + per-signal tuning model;
   `journal_dir` is logs-only (below). The runtime writes
   them to `<run_dir>/etc/otel.yaml` and **pins `[directories] config` to
@@ -146,16 +147,16 @@ reader cannot infer from the code:
     caller-supplied
     path the plugin only **reads**. It is the one knob that lets the MCP point
     the legacy viewer at a fixture for scripted verification.
-  - Coupling: emitting `journal_dir` as a sibling of the tuning keys under
-    `logs` relies on the otel plugin's override structs **not** using
-    `serde(deny_unknown_fields)` (it reads `journal_dir` via a separate permissive
-    probe). A future agent-side tightening that adds `deny_unknown_fields` to the
-    `logs` override would make every MCP-launched agent fail to parse its user
-    `otel.yaml`; keep the `logs` override permissive, or stop emitting this key.
-    The same permissiveness cuts the other way: a schema reshape on the plugin
-    side (like the 2026-07 wal/index flatten) does NOT break the MCP loudly —
-    stale-shape keys are silently ignored. When the plugin's public otel.yaml
-    schema changes, this tool's knob mapping MUST be updated in the same change.
+  - Coupling: the plugin's override structs use `serde(deny_unknown_fields)`
+    (2026-07 strictness pass), and `journal_dir` is a **declared** field of the
+    logs override — valid under `logs:` only, rejected under `traces:`. The
+    value is still consumed by the plugin's separate tolerant probe
+    (`resolve_legacy_journal_dir`), not by the strict parser. Strictness makes
+    the coupling loud in both directions: an MCP emission the plugin does not
+    recognize (stale shape, typo'd knob) makes the launched agent's otel plugin
+    refuse to start instead of silently no-opping. When the plugin's public
+    otel.yaml schema changes, this tool's knob mapping MUST be updated in the
+    same change.
 - **Synthetic push (per signal).** Two one-shot tools, one per signal:
   - `netdata_agent_otel_push_logs` → `otel-streams` `synth`. Generates a
     deterministic batch of OTLP `LogRecord`s (monotonic timestamps; cycled

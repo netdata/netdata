@@ -36,15 +36,27 @@ with no shim:
 - `NETDATA_OTEL_LOGS_AUTH_ENABLED` → `NETDATA_OTEL_AUTH_ENABLED`.
 - `NETDATA_OTEL_LOGS_STORAGE_READ_CACHE_DIR` is **removed** with no replacement —
   the read-cache dir is now derived per signal (`{base_dir}/{signal}/remote-read`).
-- The old names are not read and not warned about; an operator using them must
-  update their environment file. The per-signal WAL/index/catalog tuning env vars
-  keep their `NETDATA_OTEL_{LOGS,TRACES}_*` namespaces.
-- The same silent-drop applies to **removed YAML keys**: a user `otel.yaml`
-  carrying the old `logs.{wal,index,catalog}.dir`, `logs.storage.*`, or
-  `logs.auth.*` keys parses without error (serde ignores unknown fields) and
-  those settings are silently dropped — the plugin falls back to the derived
-  layout and the global storage/auth defaults. By decision, there is no
-  deprecation warning (experimental, no GA users); this note is the record.
+- The old env names are now **fatal at startup**: env resolution rejects any
+  `NETDATA_OTEL_*` variable no consumer recognizes (read-tracking in
+  `config/env.rs` — consumers query their full vocabulary unconditionally, so
+  an unread name is a typo or a removed variable; there is no separate
+  accepted-name list to maintain). The per-signal tuning env vars keep their
+  `NETDATA_OTEL_{LOGS,TRACES}_*` namespaces.
+- **Removed/unknown YAML keys are fatal too** (2026-07 strictness pass): every
+  config struct on both parse paths (stock `PluginConfig`, user
+  `ConfigOverride`) carries `serde(deny_unknown_fields)`, so a user `otel.yaml`
+  with old-schema keys, misplaced sections, or typos refuses startup with an
+  error naming the key and file. Per-tenant `rotation:`/`retention:` maps stay
+  open (tenant names are data); typos inside a tenant entry are caught via the
+  strict `RotationEntry`/`RetentionEntry` structs. When the rejected user file
+  is recognizably the FORMER plugin's schema (`logs.size_of_journal_file`,
+  `logs.number_of_journal_files`, ...), the error carries a migration guide
+  (`config/legacy.rs`): the old→new key mapping, a defaults-changed warning
+  (values are never migrated automatically — journal-file counts/sizes do not
+  translate to SFST retention), and the note that old logs remain queryable.
+  `logs.journal_dir` is the one former key still valid: a declared,
+  strict-parse-accepted field (logs-only; rejected under `traces:`) whose value
+  is consumed by the separate tolerant probe `resolve_legacy_journal_dir`.
 - `uri` is a single **OpenDAL URI**. The scheme selects the backend
   (`fs://`, `s3://`, …); all **non-secret** backend options are URI query params
   (`s3://bucket/prefix?region=…&endpoint=…`). OpenDAL owns the per-backend option
