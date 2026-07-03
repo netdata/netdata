@@ -112,7 +112,13 @@ static size_t macos_logs_process_entry(FACETS *facets, OSLogEntry *entry) {
 
     NSString *message = entry.composedMessage;
     macos_logs_add_string(facets, MACOS_LOGS_FIELD_MESSAGE, message);
-    bytes += message ? message.length : 0;
+    // Count actual UTF-8 bytes, not NSString.length (UTF-16 code units), so
+    // bytes_read / bytes_per_second stay accurate for non-ASCII log content
+    // and match how other log collectors account for bytes.
+    if (message) {
+        NSUInteger n = [message lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+        bytes += (n != NSNotFound) ? n : message.length;
+    }
 
     facets_add_key_value(facets, MACOS_LOGS_FIELD_ENTRY_TYPE, macos_logs_entry_type(entry));
     facets_add_key_value(facets, MACOS_LOGS_FIELD_STORE_CATEGORY, macos_logs_store_category_name(entry.storeCategory));
