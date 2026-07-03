@@ -219,9 +219,10 @@ static int macos_logs_response(BUFFER *wb, LOGS_QUERY_STATUS *lqs, MACOS_LOGS_QU
     return wb->response_code;
 }
 
-void function_macos_logs(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled,
-                         BUFFER *payload, HTTP_ACCESS access __maybe_unused,
-                         const char *source __maybe_unused, void *data __maybe_unused) {
+BUFFER *function_macos_logs_result(
+    const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled,
+    BUFFER *payload, HTTP_ACCESS access __maybe_unused,
+    const char *source __maybe_unused, void *data __maybe_unused) {
     LOGS_QUERY_STATUS tmp_lqs = {
         .facets = lqs_facets_create(
             LQS_DEFAULT_ITEMS_PER_QUERY,
@@ -238,7 +239,7 @@ void function_macos_logs(const char *transaction, char *function, usec_t *stop_m
     };
     LOGS_QUERY_STATUS *lqs = &tmp_lqs;
 
-    CLEAN_BUFFER *wb = lqs_create_output_buffer();
+    BUFFER *wb = lqs_create_output_buffer();
 
     if(lqs_request_parse_and_validate(lqs, wb, function, payload, LQS_DEFAULT_SLICE_MODE, MACOS_LOGS_FIELD_LEVEL)) {
         macos_logs_register_fields(lqs);
@@ -254,19 +255,275 @@ void function_macos_logs(const char *transaction, char *function, usec_t *stop_m
         }
     }
 
+    lqs_cleanup(lqs);
+
+    return wb;
+}
+
+void function_macos_logs(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled,
+                         BUFFER *payload, HTTP_ACCESS access,
+                         const char *source, void *data) {
+    BUFFER *wb = function_macos_logs_result(
+        transaction, function, stop_monotonic_ut, cancelled, payload, access, source, data);
+
     netdata_mutex_lock(&stdout_mutex);
     pluginsd_function_result_to_stdout(transaction, wb);
     netdata_mutex_unlock(&stdout_mutex);
 
-    lqs_cleanup(lqs);
+    buffer_free(wb);
 }
 
-int main(int argc __maybe_unused, char **argv __maybe_unused) {
+// ----------------------------------------------------------------------------
+// --test command-line interface (mirrors systemd-journal.plugin --test):
+//   macos-logs.plugin --test macos-logs [--timeout <seconds>] < payload.json
+// OSLog reads the live system unified-log store, so (unlike systemd-journal)
+// there is no --dir backend to pin. The request payload (same JSON the dashboard
+// sends, incl. facet selections) is read from stdin and the raw JSON result is
+// written to stdout -- letting us reproduce/verify filtering without netdata.
+
+#define MACOS_LOGS_TEST_TIMEOUT_DISABLED_SECONDS (100ULL * 365ULL * 24ULL * 60ULL * 60ULL)
+#define MACOS_LOGS_TEST_MAX_REQUEST_BYTES (16ULL * 1024ULL * 1024ULL)
+
+struct macos_logs_test_command {
+    bool enabled;
+    const char *function_name;
+    uint64_t timeout_seconds;
+    bool timeout_seconds_set;
+};
+
+static void macos_logs_test_usage(FILE *stream)
+{
+    fprintf(
+        stream,
+        "usage: macos-logs.plugin --test macos-logs [--timeout <seconds>] < payload.json\n");
+}
+
+static bool macos_logs_test_option_present(int argc, char **argv)
+{
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--test") == 0 || strncmp(argv[i], "--test=", strlen("--test=")) == 0)
+            return true;
+    }
+    return false;
+}
+
+static int macos_logs_test_set_required_option_once(const char **slot, const char *value, const char *option)
+{
+    if (*slot) {
+        fprintf(stderr, "duplicate %s\n", option);
+        macos_logs_test_usage(stderr);
+        return 2;
+    }
+    if (!value || !*value) {
+        fprintf(stderr, "missing value for %s\n", option);
+        macos_logs_test_usage(stderr);
+        return 2;
+    }
+    *slot = value;
+    return 0;
+}
+
+static int macos_logs_test_set_timeout_option_once(uint64_t *slot, bool *slot_set, const char *value)
+{
+    if (*slot_set) {
+        fprintf(stderr, "duplicate --timeout\n");
+        macos_logs_test_usage(stderr);
+        return 2;
+    }
+    if (!value || !*value) {
+        fprintf(stderr, "missing value for --timeout\n");
+        macos_logs_test_usage(stderr);
+        return 2;
+    }
+    for (const char *s = value; *s; s++) {
+        if (*s < '0' || *s > '9') {
+            fprintf(stderr, "invalid value for --timeout '%s'; expected seconds\n", value);
+            macos_logs_test_usage(stderr);
+            return 2;
+        }
+    }
+    errno = 0;
+    unsigned long long parsed = strtoull(value, NULL, 10);
+    if (errno == ERANGE) {
+        fprintf(stderr, "invalid value for --timeout '%s'; expected seconds\n", value);
+        macos_logs_test_usage(stderr);
+        return 2;
+    }
+#if ULLONG_MAX > UINT64_MAX
+    if (parsed > UINT64_MAX) {
+        fprintf(stderr, "invalid value for --timeout '%s'; expected seconds\n", value);
+        macos_logs_test_usage(stderr);
+        return 2;
+    }
+#endif
+    *slot = (uint64_t)parsed;
+    *slot_set = true;
+    return 0;
+}
+
+static int parse_macos_logs_test_command(int argc, char **argv, struct macos_logs_test_command *cmd)
+{
+    *cmd = (struct macos_logs_test_command){0};
+    if (!macos_logs_test_option_present(argc, argv))
+        return 0;
+
+    cmd->enabled = true;
+
+    for (int i = 1; i < argc; i++) {
+        const char *arg = argv[i];
+        if (strcmp(arg, "--test") == 0) {
+            if (++i >= argc)
+                return macos_logs_test_set_required_option_once(&cmd->function_name, NULL, "--test");
+            int rc = macos_logs_test_set_required_option_once(&cmd->function_name, argv[i], "--test");
+            if (rc)
+                return rc;
+        }
+        else if (strncmp(arg, "--test=", strlen("--test=")) == 0) {
+            int rc = macos_logs_test_set_required_option_once(&cmd->function_name, arg + strlen("--test="), "--test");
+            if (rc)
+                return rc;
+        }
+        else if (strcmp(arg, "--timeout") == 0) {
+            if (++i >= argc)
+                return macos_logs_test_set_timeout_option_once(&cmd->timeout_seconds, &cmd->timeout_seconds_set, NULL);
+            int rc = macos_logs_test_set_timeout_option_once(&cmd->timeout_seconds, &cmd->timeout_seconds_set, argv[i]);
+            if (rc)
+                return rc;
+        }
+        else if (strncmp(arg, "--timeout=", strlen("--timeout=")) == 0) {
+            int rc = macos_logs_test_set_timeout_option_once(
+                &cmd->timeout_seconds,
+                &cmd->timeout_seconds_set,
+                arg + strlen("--timeout="));
+            if (rc)
+                return rc;
+        }
+        else if (strcmp(arg, "-h") == 0 || strcmp(arg, "--help") == 0) {
+            macos_logs_test_usage(stderr);
+            return 2;
+        }
+        else {
+            fprintf(stderr, "unsupported macos-logs test option '%s'\n", arg);
+            macos_logs_test_usage(stderr);
+            return 2;
+        }
+    }
+
+    if (!cmd->function_name) {
+        fprintf(stderr, "missing required --test\n");
+        macos_logs_test_usage(stderr);
+        return 2;
+    }
+
+    if (!cmd->timeout_seconds_set)
+        cmd->timeout_seconds = MACOS_LOGS_DEFAULT_TIMEOUT;
+
+    return 0;
+}
+
+static usec_t macos_logs_test_stop_monotonic_usec(uint64_t timeout_seconds)
+{
+    usec_t now_ut = now_monotonic_usec();
+    uint64_t effective_timeout_seconds =
+        timeout_seconds ? timeout_seconds : MACOS_LOGS_TEST_TIMEOUT_DISABLED_SECONDS;
+    uint64_t max_timeout_seconds = (UINT64_MAX - now_ut) / USEC_PER_SEC;
+    if (effective_timeout_seconds > max_timeout_seconds)
+        return UINT64_MAX;
+    return now_ut + effective_timeout_seconds * USEC_PER_SEC;
+}
+
+static BUFFER *macos_logs_test_read_request_payload_from_stdin(void)
+{
+    BUFFER *payload = buffer_create(8192, NULL);
+    size_t total = 0;
+    while (true) {
+        char buf[8192];
+        ssize_t bytes_read = read(STDIN_FILENO, buf, sizeof(buf));
+        if (bytes_read == -1) {
+            if (errno == EINTR)
+                continue;
+            fprintf(stderr, "failed to read request payload from stdin: %s\n", strerror(errno));
+            buffer_free(payload);
+            return NULL;
+        }
+        if (bytes_read == 0)
+            break;
+        if ((uint64_t)total + (uint64_t)bytes_read > MACOS_LOGS_TEST_MAX_REQUEST_BYTES) {
+            fprintf(
+                stderr,
+                "request payload from stdin is too large: max %llu bytes\n",
+                (unsigned long long)MACOS_LOGS_TEST_MAX_REQUEST_BYTES);
+            buffer_free(payload);
+            return NULL;
+        }
+        buffer_memcat(payload, buf, (size_t)bytes_read);
+        total += (size_t)bytes_read;
+    }
+    if (total == 0) {
+        fprintf(stderr, "request payload from stdin is empty\n");
+        buffer_free(payload);
+        return NULL;
+    }
+    payload->content_type = CT_APPLICATION_JSON;
+    return payload;
+}
+
+static int run_macos_logs_test_command(const struct macos_logs_test_command *cmd)
+{
+    if (strcmp(cmd->function_name, MACOS_LOGS_FUNCTION_NAME) != 0) {
+        fprintf(
+            stderr,
+            "unsupported macos-logs test function '%s' (expected '%s')\n",
+            cmd->function_name,
+            MACOS_LOGS_FUNCTION_NAME);
+        return 2;
+    }
+
+    CLEAN_BUFFER *payload = macos_logs_test_read_request_payload_from_stdin();
+    if (!payload)
+        return 1;
+
+    bool cancelled = false;
+    usec_t stop_monotonic_ut = macos_logs_test_stop_monotonic_usec(cmd->timeout_seconds);
+
+    char *function = strdupz(cmd->function_name);
+    BUFFER *result = function_macos_logs_result(
+        "test", function, &stop_monotonic_ut, &cancelled, payload, HTTP_ACCESS_ALL, "test-cli", NULL);
+    freez(function);
+
+    int rc = 1;
+    if (result) {
+        if (buffer_strlen(result))
+            fwrite(buffer_tostring(result), buffer_strlen(result), 1, stdout);
+        fprintf(stdout, "\n");
+        fflush(stdout);
+        if (result->response_code >= HTTP_RESP_OK && result->response_code < 300)
+            rc = 0;
+        buffer_free(result);
+    }
+    else {
+        fprintf(stderr, "macos-logs test function returned no result\n");
+    }
+    return rc;
+}
+
+int main(int argc, char **argv) {
+    struct macos_logs_test_command test_command = {0};
+    int test_parse_rc = parse_macos_logs_test_command(argc, argv, &test_command);
+    if (test_parse_rc)
+        exit(test_parse_rc);
+
     nd_thread_tag_set("macos-logs.plugin");
     nd_log_initialize_for_external_plugins("macos-logs.plugin");
     netdata_threads_init_for_external_plugins(0);
 
     used_hashes_registry = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+
+    if (test_command.enabled) {
+        int rc = run_macos_logs_test_command(&test_command);
+        dictionary_destroy(used_hashes_registry);
+        exit(rc);
+    }
 
     if(argc >= 2 && strcmp(argv[argc - 1], "debug") == 0) {
         bool cancelled = false;

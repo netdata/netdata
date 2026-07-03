@@ -96,6 +96,8 @@ extern netdata_mutex_t stdout_mutex;
 extern DICTIONARY *used_hashes_registry;
 
 MACOS_LOGS_QUERY_STATUS macos_logs_query_oslog(LOGS_QUERY_STATUS *lqs);
+BUFFER *function_macos_logs_result(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled,
+                                   BUFFER *payload, HTTP_ACCESS access, const char *source, void *data);
 void function_macos_logs(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled,
                          BUFFER *payload, HTTP_ACCESS access, const char *source, void *data);
 
