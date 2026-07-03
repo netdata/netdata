@@ -63,6 +63,25 @@ To verify:
 ls /opt/netdata/usr/libexec/netdata/plugins.d/netflow-plugin
 ```
 
+## Docker / OCI image
+
+The netflow plugin is **already bundled in the official `netdata/netdata` Docker image** — there is no separate package to install and no extra build step. The plugin is enabled by default and opens its stock UDP listeners (`2055` for NetFlow/IPFIX, `6343` for sFlow), the same as a native install.
+
+The only Docker-specific detail is the network mode, because it determines whether the flow ports are reachable:
+
+- **Host networking (`--network=host`)** — the recommended run mode for Netdata containers. The container shares the host's network, so the UDP listeners are reachable by your routers and switches with **no extra port flags**. Use the command from the [Docker installation guide](/packaging/docker/README.md#create-a-new-netdata-agent-container) unchanged.
+- **Bridge networking** — if you run without `--network=host`, the container's network is isolated. The image only declares the dashboard port (`19999`) in its `EXPOSE`, so you must publish the flow UDP ports yourself, otherwise no flow data arrives:
+
+```bash
+docker run -d --name=netdata \
+  -p 19999:19999 \
+  -p 2055:2055/udp \
+  -p 6343:6343/udp \
+  netdata/netdata
+```
+
+To listen on different ports (for example, if `2055` or `6343` is in use on the host), edit `netflow.yaml` and publish the matching ports. See [Configuration](/docs/npm/network-flows/configuration.md).
+
 ## Source build
 
 Building from source requires a Rust toolchain (rustc + cargo, version 1.83 or later). When CMake detects Rust, the plugin is built and installed alongside the rest of Netdata.
