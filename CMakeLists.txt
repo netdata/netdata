@@ -2104,6 +2104,7 @@ set(MACOS_PLUGIN_FILES
         src/collectors/macos.plugin/macos_mach_smi.c
         src/collectors/macos.plugin/macos_fw.c
         src/collectors/macos.plugin/macos_power.c
+        src/collectors/macos.plugin/macos_gpu.c
         src/collectors/macos.plugin/macos_powermetrics.c
         src/collectors/macos.plugin/macos_nvme.c
 )

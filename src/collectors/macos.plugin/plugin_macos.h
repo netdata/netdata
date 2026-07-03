@@ -9,9 +9,13 @@ int do_macos_sysctl(int update_every, usec_t dt);
 int do_macos_mach_smi(int update_every, usec_t dt);
 int do_macos_iokit(int update_every, usec_t dt);
 int do_macos_power_sources(int update_every, usec_t dt);
+int do_macos_gpu(int update_every, usec_t dt);
 int do_macos_powermetrics(int update_every, usec_t dt);
 int do_macos_nvme_smart(int update_every, usec_t dt);
 
+bool macos_gpu_ioreport_available(void);
+bool macos_gpu_temperature_available(void);
+void macos_gpu_cleanup(void);
 void macos_powermetrics_cleanup(void);
 void macos_nvme_smart_cleanup(void);
 void macos_power_sources_cleanup(void);

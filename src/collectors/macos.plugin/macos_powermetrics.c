@@ -9,19 +9,29 @@
 #include <unistd.h>
 
 #define MACOS_POWERMETRICS_DEFAULT_COMMAND "/usr/bin/powermetrics"
+#define MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL_SMC_GPU "powermetrics-thermal-smc-gpu"
+#define MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL_GPU "powermetrics-thermal-gpu"
 #define MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL_SMC "powermetrics-thermal-smc"
 #define MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL "powermetrics-thermal"
+#define MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL_SMC_GPU_LOOP "powermetrics-thermal-smc-gpu-loop"
+#define MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL_GPU_LOOP "powermetrics-thermal-gpu-loop"
+#define MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL_SMC_LOOP "powermetrics-thermal-smc-loop"
+#define MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL_LOOP "powermetrics-thermal-loop"
+#define MACOS_POWERMETRICS_SAMPLERS_THERMAL_SMC_GPU "thermal,smc,gpu_power"
+#define MACOS_POWERMETRICS_SAMPLERS_THERMAL_GPU "thermal,gpu_power"
 #define MACOS_POWERMETRICS_SAMPLERS_THERMAL_SMC "thermal,smc"
 #define MACOS_POWERMETRICS_SAMPLERS_THERMAL "thermal"
 #define MACOS_POWERMETRICS_DEFAULT_SAMPLE_EVERY 60
 #define MACOS_POWERMETRICS_DEFAULT_SAMPLE_WINDOW_MS 1000
-// Must match the ceiling the setuid ndsudo helper enforces for
-// --sampleWindowMs (NDSUDO_POWERMETRICS_SAMPLE_WINDOW_MS_MAX in ndsudo.c);
-// the configured sample window is clamped to this so ndsudo never rejects it.
-#define MACOS_POWERMETRICS_SAMPLE_WINDOW_MS_MAX 60000
+// Must match the ceiling the setuid ndsudo helper enforces for powermetrics
+// interval arguments; configured values are clamped so ndsudo never rejects them.
+#define MACOS_POWERMETRICS_INTERVAL_MS_MAX 60000
 #define MACOS_POWERMETRICS_DEFAULT_TIMEOUT_MS 5000
 #define MACOS_POWERMETRICS_READ_STEP_MS 250
 #define MACOS_POWERMETRICS_MAX_OUTPUT (1024 * 1024)
+#define MACOS_POWERMETRICS_INITIAL_BACKOFF_MS 1000
+#define MACOS_POWERMETRICS_MAX_BACKOFF_MS 60000
+#define MACOS_POWERMETRICS_STARTUP_FAILURES_MAX 3
 
 enum macos_thermal_pressure {
     MACOS_THERMAL_PRESSURE_NOMINAL,
@@ -31,6 +41,21 @@ enum macos_thermal_pressure {
     MACOS_THERMAL_PRESSURE_TRAPPING,
     MACOS_THERMAL_PRESSURE_UNDEFINED,
     MACOS_THERMAL_PRESSURE_COUNT,
+};
+
+enum macos_powermetrics_sampler {
+    MACOS_POWERMETRICS_SAMPLER_NONE,
+    MACOS_POWERMETRICS_SAMPLER_THERMAL_SMC_GPU,
+    MACOS_POWERMETRICS_SAMPLER_THERMAL_GPU,
+    MACOS_POWERMETRICS_SAMPLER_THERMAL_SMC,
+    MACOS_POWERMETRICS_SAMPLER_THERMAL,
+};
+
+struct macos_powermetrics_sampler_spec {
+    enum macos_powermetrics_sampler id;
+    const char *samplers;
+    const char *ndsudo_probe_command;
+    const char *ndsudo_loop_command;
 };
 
 struct macos_powermetrics_sample {
@@ -58,6 +83,9 @@ struct macos_powermetrics_sample {
     bool has_smc_prochot;
     bool smc_prochot;
 
+    bool has_gpu_power;
+    double gpu_power_w;
+
     usec_t collected_ut;
 };
 
@@ -65,10 +93,11 @@ struct macos_powermetrics_state {
     bool initialized;
     bool failed_permanently;
     bool logged_unavailable;
+    bool logged_loop_failure;
     int consecutive_failures;
 
     bool use_ndsudo;
-    int sample_every_s;
+    int sample_interval_ms;
     int sample_window_ms;
     int command_timeout_ms;
     char command[FILENAME_MAX + 1];
@@ -76,6 +105,7 @@ struct macos_powermetrics_state {
     netdata_mutex_t mutex;
     ND_THREAD *thread;
     struct macos_powermetrics_sample sample;
+    uint64_t sample_sequence;
 };
 
 static struct macos_powermetrics_state pm = {0};
@@ -96,6 +126,35 @@ static RRDSET *st_cpu_die = NULL;
 static RRDDIM *rd_cpu_die = NULL;
 static RRDSET *st_gpu_die = NULL;
 static RRDDIM *rd_gpu_die = NULL;
+static RRDSET *st_gpu_power = NULL;
+static RRDDIM *rd_gpu_power = NULL;
+
+static const struct macos_powermetrics_sampler_spec macos_powermetrics_sampler_specs[] = {
+    {
+        .id = MACOS_POWERMETRICS_SAMPLER_THERMAL_SMC_GPU,
+        .samplers = MACOS_POWERMETRICS_SAMPLERS_THERMAL_SMC_GPU,
+        .ndsudo_probe_command = MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL_SMC_GPU,
+        .ndsudo_loop_command = MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL_SMC_GPU_LOOP,
+    },
+    {
+        .id = MACOS_POWERMETRICS_SAMPLER_THERMAL_GPU,
+        .samplers = MACOS_POWERMETRICS_SAMPLERS_THERMAL_GPU,
+        .ndsudo_probe_command = MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL_GPU,
+        .ndsudo_loop_command = MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL_GPU_LOOP,
+    },
+    {
+        .id = MACOS_POWERMETRICS_SAMPLER_THERMAL_SMC,
+        .samplers = MACOS_POWERMETRICS_SAMPLERS_THERMAL_SMC,
+        .ndsudo_probe_command = MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL_SMC,
+        .ndsudo_loop_command = MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL_SMC_LOOP,
+    },
+    {
+        .id = MACOS_POWERMETRICS_SAMPLER_THERMAL,
+        .samplers = MACOS_POWERMETRICS_SAMPLERS_THERMAL,
+        .ndsudo_probe_command = MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL,
+        .ndsudo_loop_command = MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL_LOOP,
+    },
+};
 
 static const char *macos_thermal_pressure_names[MACOS_THERMAL_PRESSURE_COUNT] = {
     [MACOS_THERMAL_PRESSURE_NOMINAL] = "nominal",
@@ -120,6 +179,8 @@ static void macos_powermetrics_mark_charts_obsolete(void)
         rrdset_is_obsolete___safe_from_collector_thread(st_cpu_die);
     if (st_gpu_die)
         rrdset_is_obsolete___safe_from_collector_thread(st_gpu_die);
+    if (st_gpu_power)
+        rrdset_is_obsolete___safe_from_collector_thread(st_gpu_power);
 }
 
 static bool cf_dictionary_get_double(CFDictionaryRef dict, CFStringRef key, double *value)
@@ -164,6 +225,19 @@ static bool cf_dictionary_get_bool(CFDictionaryRef dict, CFStringRef key, bool *
     return true;
 }
 
+static bool cf_dictionary_get_nested_dictionary(CFDictionaryRef dict, CFStringRef key, CFDictionaryRef *value)
+{
+    if (!dict || !key || !value)
+        return false;
+
+    CFTypeRef obj = CFDictionaryGetValue(dict, key);
+    if (!obj || CFGetTypeID(obj) != CFDictionaryGetTypeID())
+        return false;
+
+    *value = (CFDictionaryRef)obj;
+    return true;
+}
+
 static bool cf_dictionary_get_cstring(CFDictionaryRef dict, CFStringRef key, char *dst, size_t dst_size)
 {
     if (!dict || !key || !dst || dst_size == 0)
@@ -178,6 +252,24 @@ static bool cf_dictionary_get_cstring(CFDictionaryRef dict, CFStringRef key, cha
 
     dst[dst_size - 1] = '\0';
     return dst[0] != '\0';
+}
+
+static bool macos_powermetrics_parse_gpu_power(CFDictionaryRef root, double *power_w)
+{
+    double power_mw = 0.0;
+    if (cf_dictionary_get_double(root, CFSTR("gpu_power"), &power_mw)) {
+        *power_w = power_mw / 1000.0;
+        return true;
+    }
+
+    CFDictionaryRef gpu_dict = NULL;
+    if (cf_dictionary_get_nested_dictionary(root, CFSTR("gpu"), &gpu_dict) &&
+        cf_dictionary_get_double(gpu_dict, CFSTR("gpu_power"), &power_mw)) {
+        *power_w = power_mw / 1000.0;
+        return true;
+    }
+
+    return false;
 }
 
 static enum macos_thermal_pressure macos_thermal_pressure_from_string(const char *value)
@@ -369,10 +461,12 @@ static bool macos_powermetrics_parse_plist(const char *data, size_t size, struct
         parsed.has_smc_prochot = cf_dictionary_get_bool(smc, CFSTR("smc_prochot"), &parsed.smc_prochot);
     }
 
+    parsed.has_gpu_power = macos_powermetrics_parse_gpu_power(root, &parsed.gpu_power_w);
+
     parsed.valid =
         parsed.has_thermal_pressure || parsed.has_fan || parsed.has_cpu_die || parsed.has_gpu_die ||
         parsed.has_cpu_thermal_level || parsed.has_gpu_thermal_level || parsed.has_io_thermal_level ||
-        parsed.has_cpu_prochot || parsed.has_smc_prochot;
+        parsed.has_cpu_prochot || parsed.has_smc_prochot || parsed.has_gpu_power;
     parsed.collected_ut = now_monotonic_usec();
 
     CFRelease(plist);
@@ -409,103 +503,302 @@ static bool macos_powermetrics_run_argv(const char **argv, struct macos_powermet
     return ok;
 }
 
-static bool macos_powermetrics_run_sample(struct macos_powermetrics_sample *sample)
+static void macos_powermetrics_store_sample(const struct macos_powermetrics_sample *sample)
+{
+    netdata_mutex_lock(&pm.mutex);
+    pm.sample = *sample;
+    pm.sample_sequence++;
+    pm.consecutive_failures = 0;
+    pm.failed_permanently = false;
+    netdata_mutex_unlock(&pm.mutex);
+}
+
+static bool macos_powermetrics_run_probe(
+    const struct macos_powermetrics_sampler_spec *spec,
+    struct macos_powermetrics_sample *sample)
 {
     char interval_ms[32];
     snprintfz(interval_ms, sizeof(interval_ms), "%d", pm.sample_window_ms);
 
-    const char *argv_ndsudo_thermal[] = {
+    const char *argv_ndsudo[] = {
         pm.command,
-        MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL,
+        spec->ndsudo_probe_command,
         "--sampleWindowMs",
         interval_ms,
         NULL,
     };
 
-    // Try the full thermal+SMC sampler first; fall back to thermal-only when the
-    // SMC samplers are unavailable (e.g. Apple Silicon without SMC). Retrying
-    // the SMC path each sample means a transient SMC outage recovers on the next
-    // cycle; the cost during a permanent outage is one failed spawn per sample
-    // (~60s default), which is negligible.
-    const char *argv_ndsudo_thermal_smc[] = {
-        pm.command,
-        MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL_SMC,
-        "--sampleWindowMs",
-        interval_ms,
-        NULL,
-    };
-
-    const char *argv_direct_thermal_smc[] = {
+    const char *argv_direct[] = {
         pm.command,
         "-n",
         "1",
         "-i",
         interval_ms,
         "-s",
-        MACOS_POWERMETRICS_SAMPLERS_THERMAL_SMC,
+        spec->samplers,
         "-f",
         "plist",
         NULL,
     };
 
-    const char **argv_thermal_smc = pm.use_ndsudo ? argv_ndsudo_thermal_smc : argv_direct_thermal_smc;
-    if (macos_powermetrics_run_argv(argv_thermal_smc, sample))
-        return true;
+    return macos_powermetrics_run_argv(pm.use_ndsudo ? argv_ndsudo : argv_direct, sample);
+}
 
-    const char *argv_direct_thermal[] = {
+static const struct macos_powermetrics_sampler_spec *macos_powermetrics_probe_sampler(void)
+{
+    for (size_t i = 0; i < _countof(macos_powermetrics_sampler_specs); i++) {
+        struct macos_powermetrics_sample sample = {0};
+        if (!macos_powermetrics_run_probe(&macos_powermetrics_sampler_specs[i], &sample))
+            continue;
+
+        macos_powermetrics_store_sample(&sample);
+        return &macos_powermetrics_sampler_specs[i];
+    }
+
+    return NULL;
+}
+
+static POPEN_INSTANCE *macos_powermetrics_start_loop(const struct macos_powermetrics_sampler_spec *spec)
+{
+    char interval_ms[32];
+    snprintfz(interval_ms, sizeof(interval_ms), "%d", pm.sample_interval_ms);
+
+    const char *argv_ndsudo[] = {
+        pm.command,
+        spec->ndsudo_loop_command,
+        "--sampleIntervalMs",
+        interval_ms,
+        NULL,
+    };
+
+    const char *argv_direct[] = {
         pm.command,
         "-n",
-        "1",
+        "0",
+        "-b",
+        "0",
         "-i",
         interval_ms,
         "-s",
-        MACOS_POWERMETRICS_SAMPLERS_THERMAL,
+        spec->samplers,
         "-f",
         "plist",
         NULL,
     };
 
-    const char **argv_thermal = pm.use_ndsudo ? argv_ndsudo_thermal : argv_direct_thermal;
-    if (macos_powermetrics_run_argv(argv_thermal, sample))
-        return true;
+    return spawn_popen_run_argv(pm.use_ndsudo ? argv_ndsudo : argv_direct);
+}
 
-    return false;
+static bool macos_powermetrics_process_stream_document(const char *data, size_t size)
+{
+    struct macos_powermetrics_sample sample = {0};
+    if (!macos_powermetrics_parse_plist(data, size, &sample))
+        return false;
+
+    macos_powermetrics_store_sample(&sample);
+    return true;
+}
+
+static bool macos_powermetrics_process_stream_buffer(char *buf, size_t *used, bool *stored_sample)
+{
+    size_t start = 0;
+    *stored_sample = false;
+
+    for (size_t i = 0; i < *used; i++) {
+        if (buf[i] != '\0')
+            continue;
+
+        size_t document_size = i - start;
+        if (document_size > 0) {
+            if (!macos_powermetrics_process_stream_document(&buf[start], document_size))
+                return false;
+            *stored_sample = true;
+        }
+
+        start = i + 1;
+    }
+
+    if (start > 0) {
+        *used -= start;
+        memmove(buf, &buf[start], *used);
+        buf[*used] = '\0';
+    }
+
+    return *used < MACOS_POWERMETRICS_MAX_OUTPUT;
+}
+
+static bool macos_powermetrics_run_loop(const struct macos_powermetrics_sampler_spec *spec)
+{
+    POPEN_INSTANCE *pi = macos_powermetrics_start_loop(spec);
+    if (!pi)
+        return false;
+
+    int fd = spawn_popen_read_fd(pi);
+    if (fd < 0) {
+        spawn_popen_kill(pi, pm.command_timeout_ms);
+        return false;
+    }
+
+    char *buf = NULL;
+    size_t used = 0, size = 0;
+    usec_t last_sample_ut = now_monotonic_usec();
+    bool ok = true;
+
+    while (!nd_thread_signaled_to_cancel() && service_running(SERVICE_COLLECTORS)) {
+        usec_t now_ut = now_monotonic_usec();
+        usec_t stale_after_ut =
+            last_sample_ut + (usec_t)(pm.sample_interval_ms + pm.command_timeout_ms) * USEC_PER_MS;
+        if (now_ut >= stale_after_ut) {
+            ok = false;
+            break;
+        }
+
+        int remaining_ms = (int)((stale_after_ut - now_ut) / USEC_PER_MS);
+        if (remaining_ms > MACOS_POWERMETRICS_READ_STEP_MS)
+            remaining_ms = MACOS_POWERMETRICS_READ_STEP_MS;
+        if (remaining_ms < 1)
+            remaining_ms = 1;
+
+        struct pollfd pfd = {
+            .fd = fd,
+            .events = POLLIN | POLLHUP,
+        };
+
+        int rc = poll(&pfd, 1, remaining_ms);
+        if (rc < 0) {
+            if (errno == EINTR)
+                continue;
+            ok = false;
+            break;
+        }
+
+        if (rc == 0)
+            continue;
+
+        if (pfd.revents & POLLIN) {
+            char tmp[4096];
+            ssize_t bytes = read(fd, tmp, sizeof(tmp));
+            if (bytes < 0) {
+                if (errno == EINTR)
+                    continue;
+                ok = false;
+                break;
+            }
+
+            if (bytes == 0) {
+                ok = false;
+                break;
+            }
+
+            if (!macos_powermetrics_append(&buf, &used, &size, tmp, (size_t)bytes)) {
+                ok = false;
+                break;
+            }
+
+            bool stored_sample = false;
+            if (!macos_powermetrics_process_stream_buffer(buf, &used, &stored_sample)) {
+                ok = false;
+                break;
+            }
+
+            if (stored_sample)
+                last_sample_ut = now_monotonic_usec();
+        }
+
+        if ((pfd.revents & POLLHUP) && !(pfd.revents & POLLIN)) {
+            ok = false;
+            break;
+        }
+
+        if (pfd.revents & (POLLERR | POLLNVAL)) {
+            ok = false;
+            break;
+        }
+    }
+
+    freez(buf);
+    spawn_popen_kill(pi, pm.command_timeout_ms);
+    return ok && !nd_thread_signaled_to_cancel() && service_running(SERVICE_COLLECTORS);
+}
+
+static void macos_powermetrics_sleep_interruptibly(int timeout_ms)
+{
+    while (timeout_ms > 0 && !nd_thread_signaled_to_cancel() && service_running(SERVICE_COLLECTORS)) {
+        int step_ms = timeout_ms > 1000 ? 1000 : timeout_ms;
+        sleep_usec((usec_t)step_ms * USEC_PER_MS);
+        timeout_ms -= step_ms;
+    }
 }
 
 static void macos_powermetrics_thread(void *ptr __maybe_unused)
 {
     nd_thread_tag_set("macos-pwrmet");
 
-    while (!nd_thread_signaled_to_cancel() && service_running(SERVICE_COLLECTORS)) {
-        struct macos_powermetrics_sample sample = {0};
-        bool ok = macos_powermetrics_run_sample(&sample);
+    int backoff_ms = MACOS_POWERMETRICS_INITIAL_BACKOFF_MS;
 
-        netdata_mutex_lock(&pm.mutex);
-        if (ok) {
-            pm.sample = sample;
-            pm.consecutive_failures = 0;
-            pm.failed_permanently = false;
-        } else if (++pm.consecutive_failures >= 3) {
-            pm.failed_permanently = true;
+    while (!nd_thread_signaled_to_cancel() && service_running(SERVICE_COLLECTORS)) {
+        const struct macos_powermetrics_sampler_spec *spec = macos_powermetrics_probe_sampler();
+        if (!spec) {
+            netdata_mutex_lock(&pm.mutex);
+            if (pm.sample_sequence == 0 && ++pm.consecutive_failures >= MACOS_POWERMETRICS_STARTUP_FAILURES_MAX)
+                pm.failed_permanently = true;
+
+            bool failed_permanently = pm.failed_permanently;
+            bool should_log = failed_permanently && !pm.logged_unavailable;
+            if (should_log)
+                pm.logged_unavailable = true;
+            netdata_mutex_unlock(&pm.mutex);
+
+            if (should_log)
+                collector_error(
+                    "MACOS: disabling powermetrics thermal/fan collection after repeated sampler probe failures; "
+                    "this usually means powermetrics is unavailable, netdata cannot run it with sufficient privileges, "
+                    "or this macOS version does not expose the requested sampler");
+
+            if (failed_permanently)
+                break;
+
+            macos_powermetrics_sleep_interruptibly(backoff_ms);
+            if (backoff_ms < MACOS_POWERMETRICS_MAX_BACKOFF_MS)
+                backoff_ms *= 2;
+            if (backoff_ms > MACOS_POWERMETRICS_MAX_BACKOFF_MS)
+                backoff_ms = MACOS_POWERMETRICS_MAX_BACKOFF_MS;
+            continue;
         }
-        bool failed_permanently = pm.failed_permanently;
-        bool should_log = failed_permanently && !pm.logged_unavailable;
-        if (should_log)
-            pm.logged_unavailable = true;
-        int sample_every_s = pm.sample_every_s;
+
+        uint64_t sequence_before_loop;
+        netdata_mutex_lock(&pm.mutex);
+        sequence_before_loop = pm.sample_sequence;
         netdata_mutex_unlock(&pm.mutex);
 
-        if (should_log)
-            collector_error(
-                "MACOS: disabling powermetrics thermal/fan collection after repeated failures; "
-                "this usually means powermetrics is unavailable, netdata cannot run it with sufficient privileges, "
-                "or this macOS version does not expose the requested sampler");
-
-        if (failed_permanently)
+        (void)macos_powermetrics_run_loop(spec);
+        if (nd_thread_signaled_to_cancel() || !service_running(SERVICE_COLLECTORS))
             break;
 
-        for (int i = 0; i < sample_every_s && !nd_thread_signaled_to_cancel() && service_running(SERVICE_COLLECTORS); i++)
-            sleep_usec(USEC_PER_SEC);
+        bool should_log_loop_failure = false;
+        uint64_t sequence_after_loop;
+        netdata_mutex_lock(&pm.mutex);
+        sequence_after_loop = pm.sample_sequence;
+        if (!pm.logged_loop_failure) {
+            pm.logged_loop_failure = true;
+            should_log_loop_failure = true;
+        }
+        netdata_mutex_unlock(&pm.mutex);
+
+        if (should_log_loop_failure)
+            collector_error("MACOS: powermetrics loop stopped; probing samplers again before restarting loop mode");
+
+        bool loop_produced_sample = sequence_after_loop > sequence_before_loop;
+        macos_powermetrics_sleep_interruptibly(
+            loop_produced_sample ? MACOS_POWERMETRICS_INITIAL_BACKOFF_MS : backoff_ms);
+        if (loop_produced_sample)
+            backoff_ms = MACOS_POWERMETRICS_INITIAL_BACKOFF_MS;
+        else {
+            if (backoff_ms < MACOS_POWERMETRICS_MAX_BACKOFF_MS)
+                backoff_ms *= 2;
+            if (backoff_ms > MACOS_POWERMETRICS_MAX_BACKOFF_MS)
+                backoff_ms = MACOS_POWERMETRICS_MAX_BACKOFF_MS;
+        }
     }
 }
 
@@ -516,13 +809,15 @@ static void macos_powermetrics_init(void)
 
     netdata_mutex_init(&pm.mutex);
 
-    pm.sample_every_s = (int)inicfg_get_duration_seconds(
+    pm.sample_interval_ms = (int)inicfg_get_duration_ms(
         &netdata_config,
         "plugin:macos:powermetrics",
         "sample every",
-        MACOS_POWERMETRICS_DEFAULT_SAMPLE_EVERY);
-    if (pm.sample_every_s < 10)
-        pm.sample_every_s = 10;
+        MACOS_POWERMETRICS_DEFAULT_SAMPLE_EVERY * MSEC_PER_SEC);
+    if (pm.sample_interval_ms < (int)MSEC_PER_SEC)
+        pm.sample_interval_ms = MSEC_PER_SEC;
+    if (pm.sample_interval_ms > MACOS_POWERMETRICS_INTERVAL_MS_MAX)
+        pm.sample_interval_ms = MACOS_POWERMETRICS_INTERVAL_MS_MAX;
 
     pm.sample_window_ms = (int)inicfg_get_duration_ms(
         &netdata_config,
@@ -531,11 +826,8 @@ static void macos_powermetrics_init(void)
         MACOS_POWERMETRICS_DEFAULT_SAMPLE_WINDOW_MS);
     if (pm.sample_window_ms < 100)
         pm.sample_window_ms = 100;
-    // Keep this within the ceiling the setuid ndsudo helper enforces for
-    // --sampleWindowMs (NDSUDO_POWERMETRICS_SAMPLE_WINDOW_MS_MAX). A larger
-    // configured value would otherwise be rejected by ndsudo on every sample.
-    if (pm.sample_window_ms > MACOS_POWERMETRICS_SAMPLE_WINDOW_MS_MAX)
-        pm.sample_window_ms = MACOS_POWERMETRICS_SAMPLE_WINDOW_MS_MAX;
+    if (pm.sample_window_ms > MACOS_POWERMETRICS_INTERVAL_MS_MAX)
+        pm.sample_window_ms = MACOS_POWERMETRICS_INTERVAL_MS_MAX;
 
     pm.command_timeout_ms = (int)inicfg_get_duration_ms(
         &netdata_config,
@@ -707,10 +999,35 @@ static void macos_powermetrics_update_prochot(const struct macos_powermetrics_sa
     rrdset_done(st_smc_prochot);
 }
 
+static void macos_powermetrics_update_gpu_power(const struct macos_powermetrics_sample *sample, int update_every)
+{
+    if (!st_gpu_power) {
+        st_gpu_power = rrdset_create_localhost(
+            "macos",
+            "gpu_power",
+            NULL,
+            "gpu",
+            "macos.gpu_power",
+            "GPU Power",
+            "W",
+            "macos.plugin",
+            "powermetrics",
+            NETDATA_CHART_PRIO_SENSORS - 18,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rrdlabels_add(st_gpu_power->rrdlabels, "source", "powermetrics", RRDLABEL_SRC_AUTO);
+        rd_gpu_power = rrddim_add(st_gpu_power, "power", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(st_gpu_power, rd_gpu_power, (collected_number)llround(sample->gpu_power_w * 1000.0));
+    rrdset_done(st_gpu_power);
+}
+
 int do_macos_powermetrics(int update_every, usec_t dt __maybe_unused)
 {
     static int do_thermal_pressure = -1, do_smc_fan = -1, do_smc_temperatures = -1,
-               do_smc_thermal_levels = -1, do_smc_prochot = -1;
+               do_smc_thermal_levels = -1, do_smc_prochot = -1, do_gpu_power = -1;
 
     if (unlikely(do_thermal_pressure == -1)) {
         do_thermal_pressure =
@@ -721,8 +1038,10 @@ int do_macos_powermetrics(int update_every, usec_t dt __maybe_unused)
         do_smc_thermal_levels =
             inicfg_get_boolean(&netdata_config, "plugin:macos:powermetrics", "SMC thermal levels", 1);
         do_smc_prochot = inicfg_get_boolean(&netdata_config, "plugin:macos:powermetrics", "SMC prochot", 1);
+        do_gpu_power = inicfg_get_boolean(&netdata_config, "plugin:macos:powermetrics", "GPU power", 1);
 
-        if (!do_thermal_pressure && !do_smc_fan && !do_smc_temperatures && !do_smc_thermal_levels && !do_smc_prochot)
+        if (!do_thermal_pressure && !do_smc_fan && !do_smc_temperatures && !do_smc_thermal_levels &&
+            !do_smc_prochot && !do_gpu_power)
             return 1;
 
         macos_powermetrics_init();
@@ -730,10 +1049,13 @@ int do_macos_powermetrics(int update_every, usec_t dt __maybe_unused)
 
     struct macos_powermetrics_sample sample = {0};
     bool failed_permanently;
+    uint64_t sample_sequence;
+    static uint64_t last_sample_sequence = 0;
 
     netdata_mutex_lock(&pm.mutex);
     sample = pm.sample;
     failed_permanently = pm.failed_permanently;
+    sample_sequence = pm.sample_sequence;
     netdata_mutex_unlock(&pm.mutex);
 
     if (failed_permanently) {
@@ -745,8 +1067,9 @@ int do_macos_powermetrics(int update_every, usec_t dt __maybe_unused)
         return 1;
     }
 
-    if (!sample.valid)
+    if (!sample.valid || sample_sequence == 0 || sample_sequence == last_sample_sequence)
         return 0;
+    last_sample_sequence = sample_sequence;
 
     if (do_thermal_pressure && sample.has_thermal_pressure)
         macos_powermetrics_update_thermal_pressure(&sample, update_every);
@@ -781,7 +1104,7 @@ int do_macos_powermetrics(int update_every, usec_t dt __maybe_unused)
             (collected_number)llround(sample.cpu_die_c * 1000.0),
             1000);
 
-    if (do_smc_temperatures && sample.has_gpu_die)
+    if (do_smc_temperatures && sample.has_gpu_die && !macos_gpu_temperature_available())
         macos_powermetrics_update_sensor(
             &st_gpu_die,
             &rd_gpu_die,
@@ -802,6 +1125,9 @@ int do_macos_powermetrics(int update_every, usec_t dt __maybe_unused)
 
     if (do_smc_prochot && (sample.has_cpu_prochot || sample.has_smc_prochot))
         macos_powermetrics_update_prochot(&sample, update_every);
+
+    if (do_gpu_power && sample.has_gpu_power && !macos_gpu_ioreport_available())
+        macos_powermetrics_update_gpu_power(&sample, update_every);
 
     return 0;
 }

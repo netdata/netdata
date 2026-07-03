@@ -222,6 +222,22 @@ struct command {
         },
     },
     {
+        .name = "powermetrics-thermal-smc-gpu",
+        .params = "-n 1 -i {{sampleWindowMs}} -s thermal,smc,gpu_power -f plist",
+        .search = {
+            [0] = "powermetrics",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "powermetrics-thermal-gpu",
+        .params = "-n 1 -i {{sampleWindowMs}} -s thermal,gpu_power -f plist",
+        .search = {
+            [0] = "powermetrics",
+            [1] = NULL,
+        },
+    },
+    {
         .name = "powermetrics-thermal-smc",
         .params = "-n 1 -i {{sampleWindowMs}} -s thermal,smc -f plist",
         .search = {
@@ -232,6 +248,38 @@ struct command {
     {
         .name = "powermetrics-thermal",
         .params = "-n 1 -i {{sampleWindowMs}} -s thermal -f plist",
+        .search = {
+            [0] = "powermetrics",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "powermetrics-thermal-smc-gpu-loop",
+        .params = "-n 0 -b 0 -i {{sampleIntervalMs}} -s thermal,smc,gpu_power -f plist",
+        .search = {
+            [0] = "powermetrics",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "powermetrics-thermal-gpu-loop",
+        .params = "-n 0 -b 0 -i {{sampleIntervalMs}} -s thermal,gpu_power -f plist",
+        .search = {
+            [0] = "powermetrics",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "powermetrics-thermal-smc-loop",
+        .params = "-n 0 -b 0 -i {{sampleIntervalMs}} -s thermal,smc -f plist",
+        .search = {
+            [0] = "powermetrics",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "powermetrics-thermal-loop",
+        .params = "-n 0 -b 0 -i {{sampleIntervalMs}} -s thermal -f plist",
         .search = {
             [0] = "powermetrics",
             [1] = NULL,
@@ -385,14 +433,22 @@ bool check_positive_integer_argument(const char *cmd, int argc, char **argv, con
     return false;
 }
 
-// Upper bound for the powermetrics sample window accepted by the setuid helper,
-// to keep the privileged powermetrics invocation bounded even when ndsudo is
-// invoked directly. The macos plugin uses a 1s window; 60s is a generous ceiling.
-#define NDSUDO_POWERMETRICS_SAMPLE_WINDOW_MS_MAX 60000UL
+// Upper bound for powermetrics sample intervals accepted by the setuid helper,
+// to keep privileged powermetrics invocations bounded when ndsudo is invoked directly.
+#define NDSUDO_POWERMETRICS_INTERVAL_MS_MAX 60000UL
 
 bool check_command_specific_params(const char *cmd, int argc, char **argv, char *err, size_t err_size) {
-    if (strcmp(cmd, "powermetrics-thermal-smc") == 0 || strcmp(cmd, "powermetrics-thermal") == 0)
-        return check_positive_integer_argument(cmd, argc, argv, "--sampleWindowMs", NDSUDO_POWERMETRICS_SAMPLE_WINDOW_MS_MAX, err, err_size);
+    if (strcmp(cmd, "powermetrics-thermal-smc-gpu") == 0 ||
+        strcmp(cmd, "powermetrics-thermal-gpu") == 0 ||
+        strcmp(cmd, "powermetrics-thermal-smc") == 0 ||
+        strcmp(cmd, "powermetrics-thermal") == 0)
+        return check_positive_integer_argument(cmd, argc, argv, "--sampleWindowMs", NDSUDO_POWERMETRICS_INTERVAL_MS_MAX, err, err_size);
+
+    if (strcmp(cmd, "powermetrics-thermal-smc-gpu-loop") == 0 ||
+        strcmp(cmd, "powermetrics-thermal-gpu-loop") == 0 ||
+        strcmp(cmd, "powermetrics-thermal-smc-loop") == 0 ||
+        strcmp(cmd, "powermetrics-thermal-loop") == 0)
+        return check_positive_integer_argument(cmd, argc, argv, "--sampleIntervalMs", NDSUDO_POWERMETRICS_INTERVAL_MS_MAX, err, err_size);
 
     return true;
 }
