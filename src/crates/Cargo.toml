@@ -234,7 +234,17 @@ wal = { path = "wal" }
 ng-flatten = { path = "ng-flatten" }
 ng-index = { path = "ng-index" }
 
-opendal = { version = "0.55", default-features = false, features = ["services-fs", "services-s3", "executors-tokio"] }
+# reqwest-rustls-tls is load-bearing: without a TLS backend, reqwest rejects
+# every https:// URL in-process (S3/STS never reachable). Guarded by
+# file-lifecycle's TLS-capability test.
+opendal = { version = "0.57", default-features = false, features = [
+  "services-fs",
+  "services-s3",
+  "executors-tokio",
+  "layers-retry",
+  "reqwest-rustls-tls",
+  "auto-register-services",
+] }
 
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
 tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }

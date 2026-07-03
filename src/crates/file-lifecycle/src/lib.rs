@@ -31,6 +31,7 @@ pub mod ipc;
 pub mod pipeline;
 pub mod query;
 pub mod recovery;
+pub(crate) mod redact;
 pub mod registry;
 pub mod remote_keys;
 pub mod storage;

@@ -41,4 +41,7 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 bytesize = { workspace = true }
+# Deliberately NO tls feature here: the TLS backend must arrive via feature
+# unification from opendal's `reqwest-rustls-tls` (see tests/tls_capability.rs).
+reqwest = { version = "0.13", default-features = false }
 tempfile = { workspace = true }

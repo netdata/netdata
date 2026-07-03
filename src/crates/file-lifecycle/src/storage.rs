@@ -15,6 +15,8 @@
 use std::future::Future;
 use std::time::Duration;
 
+use crate::redact::redact;
+
 /// Metadata returned by a successful [`Storage::write`].
 pub struct WriteMeta {
     /// Size the backend reports for the written object. Some backends report
@@ -31,8 +33,11 @@ pub struct WriteMeta {
 /// reconcile branches three ways on it (present / missing / transient); folding
 /// it into `Other` would turn "transient -> skip" into "missing -> re-upload".
 ///
-/// `Debug` is derived (not delegated to `Display`) so `{:?}` on an `Other`
-/// preserves the full `anyhow` source chain.
+/// `Display` renders the FULL error source chain with URL query strings
+/// stripped (see [`crate::redact`]) — safe to log, and complete enough to
+/// diagnose (a top-level-only message once hid a missing-TLS root cause behind
+/// "error sending request"). `Debug` is derived and UNREDACTED — it exists for
+/// test assertions and must not be used to log real backend errors.
 #[derive(Debug)]
 pub enum StorageError {
     NotFound,
@@ -43,7 +48,7 @@ impl std::fmt::Display for StorageError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             StorageError::NotFound => write!(f, "not found"),
-            StorageError::Other(e) => write!(f, "{e}"),
+            StorageError::Other(e) => write!(f, "{}", redact(&format!("{e:#}"))),
         }
     }
 }
@@ -113,10 +118,13 @@ impl OpendalStorage {
             .with_max_times(10)
             .with_factor(2.0)
             .with_jitter()
-            .with_notify(|err: &opendal::Error, dur: Duration| {
+            .with_notify(|event: opendal::layers::RetryEvent<'_>| {
                 tracing::warn!(
-                    "remote storage operation failed, retrying in {:.1}s: {err}",
-                    dur.as_secs_f64(),
+                    op = %event.op,
+                    attempt = event.attempt,
+                    "remote storage operation failed, retrying in {:.1}s: {}",
+                    event.retry_after.as_secs_f64(),
+                    redact(&event.err.to_string()),
                 );
             });
         let op = opendal::Operator::from_uri(uri)
@@ -273,6 +281,28 @@ impl Storage for MockStorage {
 #[cfg(test)]
 mod storage_tests {
     use super::*;
+
+    #[test]
+    fn display_renders_redacted_full_chain() {
+        // The chain's inner cause embeds a credential-bearing URL — Display
+        // must surface BOTH levels (diagnosability) with the query stripped
+        // (credential safety).
+        let inner = anyhow::anyhow!(
+            "error sending request for url (https://sts.amazonaws.com/?Action=AssumeRoleWithWebIdentity&WebIdentityToken=SENTINEL_JWT)"
+        );
+        let err = StorageError::Other(inner.context("upload failed"));
+        let rendered = err.to_string();
+        assert!(!rendered.contains("SENTINEL_JWT"), "leaked: {rendered}");
+        assert!(
+            rendered.contains("upload failed"),
+            "outer context lost: {rendered}"
+        );
+        assert!(
+            rendered
+                .contains("error sending request for url (https://sts.amazonaws.com/?[REDACTED])"),
+            "inner cause lost or unredacted: {rendered}"
+        );
+    }
 
     #[tokio::test]
     async fn probe_treats_found_and_notfound_as_reachable() {

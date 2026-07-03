@@ -98,13 +98,20 @@ with no shim:
   dump (`otel-plugin` `config::log_config` via `redact_uri`) logs `storage.uri`
   as its scheme only (`s3://[redacted]`). The redaction is logging-only — the
   verbatim URI still crosses the supervisor→worker IPC intact.
-- The plugin does **not** sanitize errors raised by OpenDAL itself: a
-  `from_uri` parse failure (`OpendalStorage::new`) or a probe/operation error may
-  quote the URI or endpoint, and the plugin logs those errors as-is. This is
-  acceptable by design — the guarantee is only that *plugin-authored* messages
-  don't echo the URI. Credentials therefore MUST NOT appear in the URI (the
-  credential contract above); a misplaced secret could surface through an
-  OpenDAL error.
+- Storage **operation/probe errors are credential-redacted before logging**:
+  `StorageError`'s `Display` (file-lifecycle `storage.rs`) renders the full
+  error source chain through `redact` (file-lifecycle `redact.rs`), which
+  strips every URL query string (`?…` → `?[REDACTED]`) — that is where AWS
+  requests carry credentials (the raw web-identity JWT on the STS call,
+  `X-Amz-Signature`/`X-Amz-Security-Token` on query-signed requests; reqsign
+  sends the STS call as GET-with-token-in-query). The retry-layer notify log
+  goes through the same redaction. `Debug` on `StorageError` is UNREDACTED
+  (test-only) and MUST NOT be used to log real backend errors.
+- One remaining unredacted path: a `from_uri` **parse** failure
+  (`OpendalStorage::new`) may quote the URI as-is — parse errors carry no
+  request, so only a secret misplaced in the URI itself could surface there.
+  Credentials therefore still MUST NOT appear in the URI (the credential
+  contract above).
 - Logs land in systemd-journal under `otel-plugin/ledger` (query via the MCP
   `netdata_agent_logs` tool, component `ledger`).
 
