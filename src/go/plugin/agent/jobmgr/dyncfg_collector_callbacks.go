@@ -140,16 +140,14 @@ func (cb *collectorCallbacks) Start(cfg confgroup.Config) error {
 	})
 
 	if createErr != nil {
-		var ce dyncfg.CodedError
-		if errors.As(createErr, &ce) {
+		if _, ok := errors.AsType[dyncfg.CodedError](createErr); ok {
 			return createErr
 		}
 		return &codedError{err: fmt.Errorf("invalid configuration: failed to apply configuration: %w", createErr), code: 400}
 	}
 	if err != nil {
 		cb.mgr.emissionGates.remove(cfg.FullName())
-		var ce dyncfg.CodedError
-		if errors.As(err, &ce) {
+		if _, ok := errors.AsType[dyncfg.CodedError](err); ok {
 			if dyncfg.IsRetryableError(err) {
 				cb.mgr.scheduleRetryTask(cfg, job)
 			}
