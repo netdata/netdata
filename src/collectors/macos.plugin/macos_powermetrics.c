@@ -282,6 +282,13 @@ static bool macos_powermetrics_read_stdout(POPEN_INSTANCE *pi, char **output, si
         // POLLIN is also set would discard the tail of the plist.
         if ((pfd.revents & POLLHUP) && !(pfd.revents & POLLIN))
             break;
+
+        // POLLERR/POLLNVAL without POLLIN would neither read nor break, making the
+        // loop spin until the step timeout; treat a pipe error as a hard failure.
+        if (pfd.revents & (POLLERR | POLLNVAL)) {
+            ok = false;
+            break;
+        }
     }
 
     if (nd_thread_signaled_to_cancel())

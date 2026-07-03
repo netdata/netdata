@@ -222,92 +222,94 @@ MACOS_LOGS_QUERY_STATUS macos_logs_query_oslog(LOGS_QUERY_STATUS *lqs) {
         facets_rows_begin(lqs->facets);
 
         for(OSLogEntry *entry in enumerator) {
-            usec_t msg_ut = macos_logs_entry_time_ut(entry);
-            if(!msg_ut)
-                continue;
-
-            if(forward) {
-                if(msg_ut < start_ut)
+            @autoreleasepool {
+                usec_t msg_ut = macos_logs_entry_time_ut(entry);
+                if(!msg_ut)
                     continue;
 
-                if(msg_ut > stop_ut)
-                    break;
-            }
-            else {
-                if(msg_ut > stop_ut)
-                    continue;
-
-                if(msg_ut < start_ut)
-                    break;
-            }
-
-            if(msg_ut > lqs->last_modified)
-                lqs->last_modified = msg_ut;
-
-            bytes += macos_logs_process_entry(lqs->facets, entry);
-
-            if(forward) {
-                if(unlikely(msg_ut >= last_usec_from && msg_ut <= last_usec_to))
-                    msg_ut = ++last_usec_to;
-                else
-                    last_usec_from = last_usec_to = msg_ut;
-            }
-            else {
-                if(unlikely(msg_ut >= last_usec_from && msg_ut <= last_usec_to))
-                    msg_ut = --last_usec_from;
-                else
-                    last_usec_from = last_usec_to = msg_ut;
-            }
-
-            if(facets_row_finished(lqs->facets, msg_ut))
-                rows_useful++;
-
-            row_counter++;
-            if(unlikely((row_counter % MACOS_LOGS_DATA_ONLY_CHECK_EVERY_ROWS) == 0 &&
-                        lqs->query.stop_when_full &&
-                        facets_rows(lqs->facets) >= lqs->rq.entries)) {
                 if(forward) {
-                    usec_t newest = facets_row_newest_ut(lqs->facets);
-                    if(newest && msg_ut > newest + lqs->anchor.delta_ut)
+                    if(msg_ut < start_ut)
+                        continue;
+
+                    if(msg_ut > stop_ut)
                         break;
                 }
                 else {
-                    usec_t oldest = facets_row_oldest_ut(lqs->facets);
-                    if(oldest && msg_ut < oldest - lqs->anchor.delta_ut)
+                    if(msg_ut > stop_ut)
+                        continue;
+
+                    if(msg_ut < start_ut)
                         break;
                 }
-            }
 
-            if(unlikely(row_counter >= MACOS_LOGS_MAX_ROWS_SCANNED)) {
-                lqs->c.rows_read += row_counter - last_row_counter;
-                lqs->c.bytes_read += bytes - last_bytes;
-                lqs->c.rows_useful += rows_useful;
-                lqs->c.query_finished_ut = now_monotonic_usec();
-                return MACOS_LOGS_QUERY_SCAN_LIMIT_REACHED;
-            }
+                if(msg_ut > lqs->last_modified)
+                    lqs->last_modified = msg_ut;
 
-            if(unlikely(row_counter % MACOS_LOGS_PROGRESS_EVERY_ROWS == 0)) {
-                if(macos_logs_check_stop(lqs)) {
+                bytes += macos_logs_process_entry(lqs->facets, entry);
+
+                if(forward) {
+                    if(unlikely(msg_ut >= last_usec_from && msg_ut <= last_usec_to))
+                        msg_ut = ++last_usec_to;
+                    else
+                        last_usec_from = last_usec_to = msg_ut;
+                }
+                else {
+                    if(unlikely(msg_ut >= last_usec_from && msg_ut <= last_usec_to))
+                        msg_ut = --last_usec_from;
+                    else
+                        last_usec_from = last_usec_to = msg_ut;
+                }
+
+                if(facets_row_finished(lqs->facets, msg_ut))
+                    rows_useful++;
+
+                row_counter++;
+                if(unlikely((row_counter % MACOS_LOGS_DATA_ONLY_CHECK_EVERY_ROWS) == 0 &&
+                            lqs->query.stop_when_full &&
+                            facets_rows(lqs->facets) >= lqs->rq.entries)) {
+                    if(forward) {
+                        usec_t newest = facets_row_newest_ut(lqs->facets);
+                        if(newest && msg_ut > newest + lqs->anchor.delta_ut)
+                            break;
+                    }
+                    else {
+                        usec_t oldest = facets_row_oldest_ut(lqs->facets);
+                        if(oldest && msg_ut < oldest - lqs->anchor.delta_ut)
+                            break;
+                    }
+                }
+
+                if(unlikely(row_counter >= MACOS_LOGS_MAX_ROWS_SCANNED)) {
                     lqs->c.rows_read += row_counter - last_row_counter;
                     lqs->c.bytes_read += bytes - last_bytes;
                     lqs->c.rows_useful += rows_useful;
                     lqs->c.query_finished_ut = now_monotonic_usec();
-                    return (lqs->cancelled && __atomic_load_n(lqs->cancelled, __ATOMIC_RELAXED)) ?
-                        MACOS_LOGS_QUERY_CANCELLED : MACOS_LOGS_QUERY_TIMED_OUT;
+                    return MACOS_LOGS_QUERY_SCAN_LIMIT_REACHED;
                 }
 
-                usec_t now_ut = now_monotonic_usec();
-                if(now_ut - lqs->c.progress_last_ut >= MACOS_LOGS_PROGRESS_EVERY_UT) {
-                    lqs->c.progress_last_ut = now_ut;
-                    netdata_mutex_lock(&stdout_mutex);
-                    pluginsd_function_progress_to_stdout(lqs->rq.transaction, row_counter, MACOS_LOGS_MAX_ROWS_SCANNED);
-                    netdata_mutex_unlock(&stdout_mutex);
-                }
+                if(unlikely(row_counter % MACOS_LOGS_PROGRESS_EVERY_ROWS == 0)) {
+                    if(macos_logs_check_stop(lqs)) {
+                        lqs->c.rows_read += row_counter - last_row_counter;
+                        lqs->c.bytes_read += bytes - last_bytes;
+                        lqs->c.rows_useful += rows_useful;
+                        lqs->c.query_finished_ut = now_monotonic_usec();
+                        return (lqs->cancelled && __atomic_load_n(lqs->cancelled, __ATOMIC_RELAXED)) ?
+                            MACOS_LOGS_QUERY_CANCELLED : MACOS_LOGS_QUERY_TIMED_OUT;
+                    }
 
-                lqs->c.rows_read += row_counter - last_row_counter;
-                last_row_counter = row_counter;
-                lqs->c.bytes_read += bytes - last_bytes;
-                last_bytes = bytes;
+                    usec_t now_ut = now_monotonic_usec();
+                    if(now_ut - lqs->c.progress_last_ut >= MACOS_LOGS_PROGRESS_EVERY_UT) {
+                        lqs->c.progress_last_ut = now_ut;
+                        netdata_mutex_lock(&stdout_mutex);
+                        pluginsd_function_progress_to_stdout(lqs->rq.transaction, row_counter, MACOS_LOGS_MAX_ROWS_SCANNED);
+                        netdata_mutex_unlock(&stdout_mutex);
+                    }
+
+                    lqs->c.rows_read += row_counter - last_row_counter;
+                    last_row_counter = row_counter;
+                    lqs->c.bytes_read += bytes - last_bytes;
+                    last_bytes = bytes;
+                }
             }
         }
 
