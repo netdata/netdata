@@ -109,6 +109,7 @@ func (s *Service) QuarantineComponent(name string) {
 	if s == nil {
 		return
 	}
+	name = strings.TrimSpace(name)
 
 	s.mu.Lock()
 	job := s.job

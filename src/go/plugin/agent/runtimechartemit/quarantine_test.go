@@ -268,6 +268,21 @@ func TestServiceQuarantineComponent(t *testing.T) {
 				assert.Empty(t, svc.registry.snapshot())
 			},
 		},
+		"quarantine normalizes the component name like the other entry points": {
+			run: func(t *testing.T) {
+				svc := New(nil)
+				store := metrix.NewRuntimeStore()
+				require.NoError(t, svc.RegisterComponent(ComponentConfig{
+					Name:         "component",
+					Store:        store,
+					TemplateYAML: []byte(runtimeGaugeTemplateYAML()),
+				}))
+
+				svc.QuarantineComponent("  component  ")
+
+				assert.Empty(t, svc.registry.snapshot(), "a padded name must still hit the registration")
+			},
+		},
 	}
 
 	for name, tc := range tests {
