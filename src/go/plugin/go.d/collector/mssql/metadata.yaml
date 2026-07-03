@@ -78,26 +78,21 @@ modules:
             By default, it tries to connect to SQL Server on localhost:1433 without authentication.
             You must configure proper credentials for monitoring.
         limits:
-          description: |
-            The collector works with all SQL Server editions, including Express Edition. SQL Server Agent job metrics and Always On Availability Group metrics are available only on editions that include those features; on editions that lack them (such as Express), the collector omits those metrics without error.
+          description: ""
         performance_impact:
           description: |
             The collector executes lightweight queries against system views.
             Most queries complete in milliseconds and have minimal impact on server performance.
       additional_permissions:
         description: |
-          The collector works with all SQL Server editions, including Express Edition.
-
-          On editions that do not include SQL Server Agent (such as Express), SQL Agent job metrics are not collected; the collector omits them without error, just as it does when `msdb` grants are missing.
-
-          On editions that do not support Always On Availability Groups (such as Express), AG metrics are not collected.
-
           The monitoring user requires the VIEW SERVER STATE permission to access DMVs.
 
           SQL Agent job metrics require access to `msdb.dbo.sysjobs`.
 
           SQL Agent job execution metrics additionally require access to `msdb.dbo.sysjobhistory` and `msdb.dbo.sysjobactivity`.
           If those optional `msdb` grants are missing, the collector continues collecting other SQL Server metrics and omits only the affected SQL Agent job metrics.
+
+          The collector does not detect the SQL Server edition. On editions without SQL Server Agent (such as Express), the job queries fail the same way they do when the optional `msdb` grants above are missing, so job metrics are omitted without error.
 
           Current job execution time is based on the latest visible SQL Server Agent activity session.
           If SQL Server Agent stops or crashes while a job is recorded as running, `sysjobactivity` can report that job as running until Agent creates a newer session or activity/history state changes.
@@ -107,6 +102,8 @@ modules:
 
           Always On AG monitoring requires VIEW ANY DEFINITION for access to availability group catalog views.
           On SQL Server 2022+, HADR DMVs may additionally require VIEW SERVER PERFORMANCE STATE.
+
+          Before querying AG DMVs, the collector checks whether HADR is enabled on the instance and skips AG metrics entirely when it is not, which is normally the case on editions that do not support Always On Availability Groups (such as Express).
       supported_platforms:
         include: []
         exclude: []
