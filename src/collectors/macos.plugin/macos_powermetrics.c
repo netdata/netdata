@@ -15,6 +15,10 @@
 #define MACOS_POWERMETRICS_SAMPLERS_THERMAL "thermal"
 #define MACOS_POWERMETRICS_DEFAULT_SAMPLE_EVERY 60
 #define MACOS_POWERMETRICS_DEFAULT_SAMPLE_WINDOW_MS 1000
+// Must match the ceiling the setuid ndsudo helper enforces for
+// --sampleWindowMs (NDSUDO_POWERMETRICS_SAMPLE_WINDOW_MS_MAX in ndsudo.c);
+// the configured sample window is clamped to this so ndsudo never rejects it.
+#define MACOS_POWERMETRICS_SAMPLE_WINDOW_MS_MAX 60000
 #define MACOS_POWERMETRICS_DEFAULT_TIMEOUT_MS 5000
 #define MACOS_POWERMETRICS_READ_STEP_MS 250
 #define MACOS_POWERMETRICS_MAX_OUTPUT (1024 * 1024)
@@ -408,6 +412,12 @@ static bool macos_powermetrics_run_argv(const char **argv, struct macos_powermet
 
 static bool macos_powermetrics_run_sample(struct macos_powermetrics_sample *sample)
 {
+    // Retry the full thermal+SMC path on every sample: thermal_only_fallback is
+    // set below when the SMC samplers fail, but resetting it here means a
+    // transient SMC outage does not permanently drop fan/SMC metrics for the
+    // lifetime of the process.
+    pm.thermal_only_fallback = false;
+
     char interval_ms[32];
     snprintfz(interval_ms, sizeof(interval_ms), "%d", pm.sample_window_ms);
 
@@ -529,6 +539,11 @@ static void macos_powermetrics_init(void)
         MACOS_POWERMETRICS_DEFAULT_SAMPLE_WINDOW_MS);
     if (pm.sample_window_ms < 100)
         pm.sample_window_ms = 100;
+    // Keep this within the ceiling the setuid ndsudo helper enforces for
+    // --sampleWindowMs (NDSUDO_POWERMETRICS_SAMPLE_WINDOW_MS_MAX). A larger
+    // configured value would otherwise be rejected by ndsudo on every sample.
+    if (pm.sample_window_ms > MACOS_POWERMETRICS_SAMPLE_WINDOW_MS_MAX)
+        pm.sample_window_ms = MACOS_POWERMETRICS_SAMPLE_WINDOW_MS_MAX;
 
     pm.command_timeout_ms = (int)inicfg_get_duration_ms(
         &netdata_config,

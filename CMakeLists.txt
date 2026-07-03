@@ -94,7 +94,7 @@ include(NetdataCompilerFlags)
 
 if(OS_MACOS)
   enable_language(OBJC)
-  if(OSLOG)
+  if(OSLOG AND FOUNDATION)
     add_compile_definitions(HAVE_OSLOG)
   endif()
 endif()

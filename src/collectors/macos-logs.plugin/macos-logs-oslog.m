@@ -222,6 +222,7 @@ MACOS_LOGS_QUERY_STATUS macos_logs_query_oslog(LOGS_QUERY_STATUS *lqs) {
         size_t row_counter = 0;
         size_t last_row_counter = 0;
         size_t rows_useful = 0;
+        size_t last_rows_useful = 0;
         size_t bytes = 0;
         size_t last_bytes = 0;
         usec_t last_usec_from = 0;
@@ -288,7 +289,7 @@ MACOS_LOGS_QUERY_STATUS macos_logs_query_oslog(LOGS_QUERY_STATUS *lqs) {
                 if(unlikely(row_counter >= MACOS_LOGS_MAX_ROWS_SCANNED)) {
                     lqs->c.rows_read += row_counter - last_row_counter;
                     lqs->c.bytes_read += bytes - last_bytes;
-                    lqs->c.rows_useful += rows_useful;
+                    lqs->c.rows_useful += rows_useful - last_rows_useful;
                     lqs->c.query_finished_ut = now_monotonic_usec();
                     return MACOS_LOGS_QUERY_SCAN_LIMIT_REACHED;
                 }
@@ -297,7 +298,7 @@ MACOS_LOGS_QUERY_STATUS macos_logs_query_oslog(LOGS_QUERY_STATUS *lqs) {
                     if(macos_logs_check_stop(lqs)) {
                         lqs->c.rows_read += row_counter - last_row_counter;
                         lqs->c.bytes_read += bytes - last_bytes;
-                        lqs->c.rows_useful += rows_useful;
+                        lqs->c.rows_useful += rows_useful - last_rows_useful;
                         lqs->c.query_finished_ut = now_monotonic_usec();
                         return (lqs->cancelled && __atomic_load_n(lqs->cancelled, __ATOMIC_RELAXED)) ?
                             MACOS_LOGS_QUERY_CANCELLED : MACOS_LOGS_QUERY_TIMED_OUT;
@@ -321,7 +322,7 @@ MACOS_LOGS_QUERY_STATUS macos_logs_query_oslog(LOGS_QUERY_STATUS *lqs) {
 
         lqs->c.rows_read += row_counter - last_row_counter;
         lqs->c.bytes_read += bytes - last_bytes;
-        lqs->c.rows_useful += rows_useful;
+        lqs->c.rows_useful += rows_useful - last_rows_useful;
         lqs->c.query_finished_ut = now_monotonic_usec();
 
         return MACOS_LOGS_QUERY_OK;
