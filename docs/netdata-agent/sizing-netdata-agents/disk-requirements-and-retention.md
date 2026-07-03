@@ -11,6 +11,12 @@ Netdata offers two database modes to suit your needs for performance and data pe
 
 ## `dbengine`
 
+:::note
+
+By default, `dbengine` stores its metrics database files on disk. The exact location depends on your installation method, operating system, and whether you run Netdata in Docker or Kubernetes — see [Backing up a Netdata Agent](/docs/netdata-agent/backup-and-restore-an-agent.md) for the default path and other Netdata data locations.
+
+:::
+
 Netdata's `dbengine` mode efficiently stores data on disk using compression. The actual disk space used depends on how well the data compresses.
 This mode uses a tiered storage approach: data is saved in multiple tiers on disk. Each tier retains data at a different resolution (detail level). Higher tiers store a down-sampled (less detailed) version of the data found in lower tiers.
 
