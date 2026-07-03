@@ -1,0 +1,5 @@
+taxonomy_version: 1
+plugin_name: macos.plugin
+module_name: macos
+taxonomy_optout:
+  reason: macos.plugin covers many heterogeneous macOS OS subsystems (power sources, thermal/SMC, NVMe SMART) across independent IOKit collection modules. Dashboard taxonomy placement for these contexts has not yet been defined.
