@@ -126,7 +126,7 @@ func TestManagerCreateCollectorJobV2Branching(t *testing.T) {
 				cfg.Set("function_only", true)
 			}
 
-			job, err := mgr.createCollectorJob(cfg)
+			job, err := mgr.createCollectorJob(context.Background(), cfg)
 			if tc.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.wantErr)
@@ -151,7 +151,7 @@ func TestManagerCreateCollectorJobSingleInstancePolicyAllowsV2FunctionOnly(t *te
 		},
 	}
 
-	job, err := mgr.createCollectorJob(prepareFunctionOnlyCfg("testmod", "testmod"))
+	job, err := mgr.createCollectorJob(context.Background(), prepareFunctionOnlyCfg("testmod", "testmod"))
 	require.NoError(t, err)
 	require.NotNil(t, job)
 	require.NoError(t, job.AutoDetection(context.Background()))
@@ -172,7 +172,7 @@ func TestManagerCreateCollectorJobSetsJobNameV2(t *testing.T) {
 		},
 	}
 
-	job, err := mgr.createCollectorJob(prepareUserCfg("testmod", "job1"))
+	job, err := mgr.createCollectorJob(context.Background(), prepareUserCfg("testmod", "job1"))
 	require.NoError(t, err)
 	assert.Same(t, mod, job.Collector())
 	assert.Equal(t, "job1", mod.jobName)
@@ -187,7 +187,7 @@ func TestManagerCreateCollectorJobSetsJobNameV1(t *testing.T) {
 		},
 	}
 
-	job, err := mgr.createCollectorJob(prepareUserCfg("testmod", "job1"))
+	job, err := mgr.createCollectorJob(context.Background(), prepareUserCfg("testmod", "job1"))
 	require.NoError(t, err)
 	assert.Same(t, mod, job.Collector())
 	assert.Equal(t, "job1", mod.jobName)
@@ -247,7 +247,7 @@ func TestManagerCreateCollectorJobSingleInstancePolicyRequiresCanonicalName(t *t
 				"testmod": tc.creator(&created),
 			}
 
-			job, err := mgr.createCollectorJob(prepareUserCfg("testmod", tc.jobName))
+			job, err := mgr.createCollectorJob(context.Background(), prepareUserCfg("testmod", tc.jobName))
 			if tc.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.wantErr)

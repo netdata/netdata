@@ -26,6 +26,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/internal/wiretest"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -95,69 +96,6 @@ func (h *charHarness) outputContains(substr string) func() bool {
 	return func() bool { return strings.Contains(h.out.String(), substr) }
 }
 
-type wireRecordWant struct {
-	name     string
-	contains []string
-}
-
-func atomicWireRecords(output string) []string {
-	var records []string
-	lines := strings.Split(output, "\n")
-	for i := 0; i < len(lines); {
-		line := lines[i]
-		if line == "" {
-			i++
-			continue
-		}
-		if !strings.HasPrefix(line, "FUNCTION_RESULT_BEGIN ") {
-			records = append(records, line)
-			i++
-			continue
-		}
-
-		var b strings.Builder
-		b.WriteString(line)
-		i++
-		for i < len(lines) {
-			b.WriteByte('\n')
-			b.WriteString(lines[i])
-			if lines[i] == "FUNCTION_RESULT_END" {
-				i++
-				break
-			}
-			i++
-		}
-		records = append(records, b.String())
-	}
-	return records
-}
-
-func requireWireRecordSubsequence(t *testing.T, output string, wants []wireRecordWant) {
-	t.Helper()
-
-	records := atomicWireRecords(output)
-	next := 0
-	for _, want := range wants {
-		found := -1
-		for i := next; i < len(records); i++ {
-			matched := true
-			for _, substr := range want.contains {
-				if !strings.Contains(records[i], substr) {
-					matched = false
-					break
-				}
-			}
-			if matched {
-				found = i
-				break
-			}
-		}
-		require.NotEqualf(t, -1, found, "wire record %q not found after index %d in records:\n%s",
-			want.name, next, strings.Join(records, "\n---\n"))
-		next = found + 1
-	}
-}
-
 func charSuccessCreator() collectorapi.Creator {
 	return collectorapi.Creator{
 		JobConfigSchema: collectorapi.MockConfigSchema,
@@ -172,10 +110,10 @@ func charSuccessCreator() collectorapi.Creator {
 	}
 }
 
-// FLIPS-BY-DESIGN: today one slow enable (synchronous AutoDetection on the
-// single run loop) blocks every other dyncfg command, including commands for
-// unrelated configs. The per-key concurrency redesign inverts this: an
-// unrelated config's commands must complete while another config detects.
+// INVERTED FLIPS-BY-DESIGN pin (previously pinned global serialization):
+// with per-key lanes an unrelated config's commands MUST complete while
+// another config's slow detection is in flight. Regressing this back to
+// cross-key blocking is a defect.
 func TestCharacterization_RunLoopSerialization(t *testing.T) {
 	tests := map[string]struct {
 		run func(t *testing.T)
@@ -220,18 +158,19 @@ func TestCharacterization_RunLoopSerialization(t *testing.T) {
 					t.Fatal("slow module Init did not start")
 				}
 
-				// Queued behind the blocked enable: even the unrelated add's terminal
-				// response cannot be emitted while the loop is inside AutoDetection.
+				// The unrelated add runs on its own key lane: its terminal must
+				// arrive while the slow enable is still blocked in AutoDetection.
 				h.dyncfg("3-add-b", []string{h.mgr.dyncfgModID("success"), "add", "b"}, []byte("{}"))
 
-				require.Never(t, h.outputContains("FUNCTION_RESULT_BEGIN 3-add-b"), charNeverWait, charTick,
-					"unrelated command completed while another config's enable was blocked in AutoDetection; "+
-						"global serialization no longer holds - update this FLIPS-BY-DESIGN pin deliberately")
+				require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN 3-add-b"), charWait, charTick,
+					"unrelated command did not complete while another config's enable was blocked in AutoDetection; "+
+						"per-key concurrency regressed to cross-key blocking")
+				assert.False(t, h.outputContains("FUNCTION_RESULT_BEGIN 2-enable-a")(),
+					"the slow enable must still be in flight")
 
 				release <- struct{}{}
 
 				require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN 2-enable-a"), charWait, charTick)
-				require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN 3-add-b"), charWait, charTick)
 			},
 		},
 	}
@@ -242,104 +181,100 @@ func TestCharacterization_RunLoopSerialization(t *testing.T) {
 }
 
 // Mixed classes, marked per case:
-//   - FLIPS-BY-DESIGN: the gate is global today - while one discovered config
-//     awaits its enable/disable decision, discovery processing (addCh AND
-//     rmCh) freezes for ALL other configs; the redesign scopes waiting to the
-//     affected key only, so unrelated adds/removals proceed.
-//   - MUST-NOT-FLIP: dyncfg commands execute immediately while the gate is
-//     armed, with state-machine outcomes - load-bearing in the redesign too
-//     (a parked command would deadlock its functions lane against the
-//     gate-clearing enable).
+//   - INVERTED FLIPS-BY-DESIGN: waiting is scoped to the affected key -
+//     while one discovered config awaits its enable/disable decision,
+//     unrelated adds AND removals MUST proceed (previously the global gate
+//     froze all discovery).
+//   - MUST-NOT-FLIP: dyncfg commands execute immediately while a key is
+//     wait-parked, with state-machine outcomes - load-bearing under per-key
+//     lanes too (a parked command would deadlock its functions lane against
+//     the gate-clearing enable).
 func TestCharacterization_WaitGateBehavior(t *testing.T) {
 	tests := map[string]struct {
 		run func(t *testing.T, h *charHarness)
 	}{
-		"global wait gate freezes unrelated discovery": {
+		"wait-parked key does not block unrelated discovery": {
 			run: func(t *testing.T, h *charHarness) {
 				cfgA := prepareUserCfg("success", "a")
 				cfgB := prepareUserCfg("success", "b")
 
 				h.in <- prepareCfgGroups(cfgA.Source(), cfgA)
-				require.Eventually(t, func() bool { return h.mgr.collectorHandler.WaitingForDecision() }, charWait, charTick,
-					"wait gate did not arm for the first discovered config")
+				require.Eventually(t, h.outputContains("CONFIG test:collector:success:a create accepted"), charWait, charTick,
+					"first discovered config was not exposed")
 
-				go func() { h.in <- prepareCfgGroups(cfgB.Source(), cfgB) }()
-
-				require.Never(t, func() bool {
-					_, ok := h.mgr.collectorExposed.LookupByKey(cfgB.ExposedKey())
-					return ok
-				}, charNeverWait, charTick,
-					"second discovered config was exposed while the first awaited a decision; "+
-						"the global wait gate no longer freezes discovery - update this FLIPS-BY-DESIGN pin deliberately")
-
-				h.dyncfg("1-enable-a", []string{h.mgr.dyncfgJobID(cfgA), "enable"}, nil)
+				h.in <- prepareCfgGroups(cfgB.Source(), cfgB)
 
 				require.Eventually(t, func() bool {
 					_, ok := h.mgr.collectorExposed.LookupByKey(cfgB.ExposedKey())
 					return ok
-				}, charWait, charTick, "second config was not processed after the first received its decision")
+				}, charWait, charTick,
+					"second discovered config was not exposed while the first awaited its decision; "+
+						"waiting regressed to a global freeze")
+
+				// The parked key still takes its decision.
+				h.dyncfg("1-enable-a", []string{h.mgr.dyncfgJobID(cfgA), "enable"}, nil)
+				require.Eventually(t, h.outputContains("CONFIG test:collector:success:a status running"), charWait, charTick)
 			},
 		},
-		"global wait gate freezes unrelated removal": {
+		"wait-parked key does not block unrelated removal": {
 			run: func(t *testing.T, h *charHarness) {
 				cfgA := prepareUserCfg("success", "a")
 				cfgB := prepareUserCfg("success", "b")
 
-				// Establish B as a running job first, then arm the gate with A.
+				// Establish B as a running job first, then park A awaiting its decision.
 				h.in <- prepareCfgGroups(cfgB.Source(), cfgB)
-				require.Eventually(t, func() bool { return h.mgr.collectorHandler.WaitingForDecision() }, charWait, charTick)
+				require.Eventually(t, h.outputContains("CONFIG test:collector:success:b create accepted"), charWait, charTick)
 				h.dyncfg("1-enable-b", []string{h.mgr.dyncfgJobID(cfgB), "enable"}, nil)
 				// Entry.Status is loop-owned (dyncfg cache contract) - observe the
 				// transition through the wire output instead of reading the field.
 				require.Eventually(t, h.outputContains("CONFIG test:collector:success:b status running"), charWait, charTick)
 
 				h.in <- prepareCfgGroups(cfgA.Source(), cfgA)
-				require.Eventually(t, func() bool { return h.mgr.collectorHandler.WaitingForDecision() }, charWait, charTick,
-					"wait gate did not arm for the second discovered config")
+				require.Eventually(t, h.outputContains("CONFIG test:collector:success:a create accepted"), charWait, charTick,
+					"second discovered config was not exposed")
 
 				// B vanishes from discovery while A awaits its decision: the
-				// removal must NOT be consumed (rmCh is frozen by the gate).
+				// removal MUST be consumed (waiting is per-key).
 				h.in <- prepareCfgGroups(cfgB.Source())
-
-				require.Never(t, func() bool {
-					_, ok := h.mgr.collectorExposed.LookupByKey(cfgB.ExposedKey())
-					return !ok
-				}, charNeverWait, charTick,
-					"unrelated config's removal was processed while another config awaited a decision; "+
-						"the global wait gate no longer freezes rmCh - update this FLIPS-BY-DESIGN pin deliberately")
-
-				h.dyncfg("2-enable-a", []string{h.mgr.dyncfgJobID(cfgA), "enable"}, nil)
 
 				require.Eventually(t, func() bool {
 					_, ok := h.mgr.collectorExposed.LookupByKey(cfgB.ExposedKey())
 					return !ok
-				}, charWait, charTick, "pending removal was not processed after the decision cleared the gate")
+				}, charWait, charTick,
+					"unrelated config's removal was not processed while another key awaited a decision; "+
+						"waiting regressed to a global freeze")
+
+				// A's decision still lands.
+				h.dyncfg("2-enable-a", []string{h.mgr.dyncfgJobID(cfgA), "enable"}, nil)
+				require.Eventually(t, h.outputContains("CONFIG test:collector:success:a status running"), charWait, charTick)
 			},
 		},
-		"dyncfg commands execute while wait gate is armed": {
+		"dyncfg commands execute while a key is wait-parked": {
 			run: func(t *testing.T, h *charHarness) {
 				cfg := prepareUserCfg("success", "waity")
 				h.in <- prepareCfgGroups(cfg.Source(), cfg)
-				require.Eventually(t, func() bool { return h.mgr.collectorHandler.WaitingForDecision() }, charWait, charTick)
+				require.Eventually(t, h.outputContains("CONFIG test:collector:success:waity create accepted"), charWait, charTick)
 
 				h.dyncfg("1-update", []string{h.mgr.dyncfgJobID(cfg), "update"}, []byte("{}"))
 				require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN 1-update"), charWait, charTick)
 				var updateResp map[string]any
 				mustDecodeFunctionPayload(t, h.out.String(), "1-update", &updateResp)
 				assert.Equal(t, float64(403), updateResp["status"], "premature update must be rejected with 403")
-				assert.True(t, h.mgr.collectorHandler.WaitingForDecision(), "non-decision command must not clear the wait gate")
 
 				h.dyncfg("2-restart", []string{h.mgr.dyncfgJobID(cfg), "restart"}, nil)
 				require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN 2-restart"), charWait, charTick)
 				var restartResp map[string]any
 				mustDecodeFunctionPayload(t, h.out.String(), "2-restart", &restartResp)
 				assert.Equal(t, float64(405), restartResp["status"], "premature restart must be rejected with 405")
-				assert.True(t, h.mgr.collectorHandler.WaitingForDecision())
 
+				// Non-decision commands must not have cleared the wait park: the
+				// key still takes its decision and only then starts.
+				assert.False(t, h.outputContains("CONFIG test:collector:success:waity status running")(),
+					"job started before its enable decision")
 				h.dyncfg("3-enable", []string{h.mgr.dyncfgJobID(cfg), "enable"}, nil)
-				require.Eventually(t, func() bool { return !h.mgr.collectorHandler.WaitingForDecision() }, charWait, charTick,
-					"matching enable did not clear the wait gate")
 				require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN 3-enable"), charWait, charTick)
+				require.Eventually(t, h.outputContains("CONFIG test:collector:success:waity status running"), charWait, charTick,
+					"matching enable did not unpark the key")
 			},
 		},
 	}
@@ -376,22 +311,22 @@ func TestCharacterization_WireOrderByDomain(t *testing.T) {
 
 				require.Eventually(t, h.outputContains("CONFIG test:collector:success:ord status running"), charWait, charTick)
 
-				requireWireRecordSubsequence(t, h.out.String(), []wireRecordWant{
+				wiretest.RequireSubsequence(t, h.out.String(), []wiretest.RecordWant{
 					{
-						name:     "add terminal",
-						contains: []string{"FUNCTION_RESULT_BEGIN 1-add"},
+						Name:     "add terminal",
+						Contains: []string{"FUNCTION_RESULT_BEGIN 1-add"},
 					},
 					{
-						name:     "add config create",
-						contains: []string{"CONFIG test:collector:success:ord create"},
+						Name:     "add config create",
+						Contains: []string{"CONFIG test:collector:success:ord create"},
 					},
 					{
-						name:     "enable terminal",
-						contains: []string{"FUNCTION_RESULT_BEGIN 2-enable"},
+						Name:     "enable terminal",
+						Contains: []string{"FUNCTION_RESULT_BEGIN 2-enable"},
 					},
 					{
-						name:     "enable config status",
-						contains: []string{"CONFIG test:collector:success:ord status running"},
+						Name:     "enable config status",
+						Contains: []string{"CONFIG test:collector:success:ord status running"},
 					},
 				})
 			},
@@ -411,7 +346,7 @@ func TestCharacterization_WireOrderByDomain(t *testing.T) {
 					Set("option_int", 1)
 				mgr.collectorExposed.Add(&dyncfg.Entry[confgroup.Config]{Cfg: cfg, Status: dyncfg.StatusRunning})
 				mgr.syncSecretStoreDepsForConfig(cfg)
-				require.NoError(t, mgr.collectorCallbacks.Start(cfg))
+				require.NoError(t, mgr.collectorCallbacks.Start(context.Background(), cfg))
 
 				badFn := dyncfg.NewFunction(functions.Function{
 					UID:         "ss-update-bad",
@@ -422,14 +357,14 @@ func TestCharacterization_WireOrderByDomain(t *testing.T) {
 				mgr.dyncfgSecretStoreSeqExec(badFn)
 
 				output := out.String()
-				requireWireRecordSubsequence(t, output, []wireRecordWant{
+				wiretest.RequireSubsequence(t, output, []wiretest.RecordWant{
 					{
-						name:     "dependent job failed status",
-						contains: []string{"CONFIG test:collector:gated:mysql status failed"},
+						Name:     "dependent job failed status",
+						Contains: []string{"CONFIG test:collector:gated:mysql status failed"},
 					},
 					{
-						name:     "store update terminal",
-						contains: []string{"FUNCTION_RESULT_BEGIN ss-update-bad"},
+						Name:     "store update terminal",
+						Contains: []string{"FUNCTION_RESULT_BEGIN ss-update-bad"},
 					},
 				})
 
@@ -529,7 +464,7 @@ func TestCharacterization_RetryTasks(t *testing.T) {
 
 				cfg := prepareUserCfg("flaky", "r1").Set("autodetection_retry", 1)
 				h.in <- prepareCfgGroups(cfg.Source(), cfg)
-				require.Eventually(t, func() bool { return h.mgr.collectorHandler.WaitingForDecision() }, charWait, charTick)
+				require.Eventually(t, h.outputContains("CONFIG test:collector:flaky:r1 create accepted"), charWait, charTick)
 
 				h.dyncfg("1-enable", []string{h.mgr.dyncfgJobID(cfg), "enable"}, nil)
 				require.Eventually(t, h.outputContains("job enable failed"), charWait, charTick)
@@ -570,8 +505,8 @@ func TestCharacterization_FileStatusHookPoints(t *testing.T) {
 			run: func(t *testing.T, mgr *Manager, cb *collectorCallbacks) {
 				cfg := prepareDyncfgCfg("success", "job")
 
-				require.NoError(t, cb.Start(cfg))
-				t.Cleanup(func() { mgr.stopRunningJob(cfg.FullName()) })
+				require.NoError(t, cb.Start(context.Background(), cfg))
+				t.Cleanup(func() { mgr.stopRunningJob(context.Background(), cfg.FullName()) })
 				_, running := mgr.runningJobs.lookup(cfg.FullName())
 				require.True(t, running)
 
@@ -614,7 +549,7 @@ func TestCharacterization_FileStatusHookPoints(t *testing.T) {
 				mgr.runningJobs.unlock()
 				mgr.fileStatus.add(cfg, dyncfg.StatusRunning.String())
 
-				cb.Stop(cfg)
+				cb.Stop(context.Background(), cfg)
 
 				assert.True(t, job.stopped)
 				_, ok := mgr.fileStatus.lookup(cfg)
@@ -635,8 +570,8 @@ func TestCharacterization_FileStatusHookPoints(t *testing.T) {
 				mgr.runningJobs.unlock()
 				mgr.fileStatus.add(oldCfg, dyncfg.StatusRunning.String())
 
-				require.NoError(t, cb.Update(oldCfg, newCfg))
-				t.Cleanup(func() { mgr.stopRunningJob(newCfg.FullName()) })
+				require.NoError(t, cb.Update(context.Background(), oldCfg, newCfg))
+				t.Cleanup(func() { mgr.stopRunningJob(context.Background(), newCfg.FullName()) })
 
 				assert.True(t, job.stopped)
 				_, oldOK := mgr.fileStatus.lookup(oldCfg)

@@ -67,7 +67,7 @@ func (m *mockCallbacks) ExtractKey(fn Function) (string, string, bool) {
 	return parts[1], parts[1], true
 }
 
-func (m *mockCallbacks) ParseAndValidate(fn Function, name string) (testConfig, error) {
+func (m *mockCallbacks) ParseAndValidate(_ context.Context, fn Function, name string) (testConfig, error) {
 	if m.parseAndValidateFn != nil {
 		return m.parseAndValidateFn(fn, name)
 	}
@@ -78,7 +78,7 @@ func (m *mockCallbacks) ValidateConfigName(name string) error {
 	return JobNameRuleStrict(name)
 }
 
-func (m *mockCallbacks) Start(cfg testConfig) error {
+func (m *mockCallbacks) Start(_ context.Context, cfg testConfig) error {
 	m.startCalls = append(m.startCalls, cfg)
 	if m.startFn != nil {
 		return m.startFn(cfg)
@@ -86,7 +86,7 @@ func (m *mockCallbacks) Start(cfg testConfig) error {
 	return nil
 }
 
-func (m *mockCallbacks) Update(oldCfg, newCfg testConfig) error {
+func (m *mockCallbacks) Update(_ context.Context, oldCfg, newCfg testConfig) error {
 	m.updateCalls = append(m.updateCalls, updateCall{oldCfg, newCfg})
 	if m.updateFn != nil {
 		return m.updateFn(oldCfg, newCfg)
@@ -94,7 +94,7 @@ func (m *mockCallbacks) Update(oldCfg, newCfg testConfig) error {
 	return nil
 }
 
-func (m *mockCallbacks) Stop(cfg testConfig) {
+func (m *mockCallbacks) Stop(_ context.Context, cfg testConfig) {
 	m.stopCalls = append(m.stopCalls, cfg)
 	if m.stopFn != nil {
 		m.stopFn(cfg)
@@ -1394,5 +1394,245 @@ func TestJobNameRuleAllowDots(t *testing.T) {
 				assert.NoError(t, err, fmt.Sprintf("JobNameRuleAllowDots(%q) should pass", tt.input))
 			}
 		})
+	}
+}
+
+// --- Stop-commit outcome mapping ---
+
+// commitErrRunner skips the blocking phase and commits err directly: the
+// executor produces these outcomes (never-ran, abandoned, recovered panic)
+// without the closure completing normally.
+func commitErrRunner(err error) StepRunner {
+	return func(_ func(context.Context) error, commit func(error)) {
+		commit(err)
+	}
+}
+
+// chainErrRunner executes the first phase normally (validation) and commits
+// err for every later phase - the shape of a chained stop/update phase that
+// the executor refused or that broke.
+func chainErrRunner(err error) StepRunner {
+	seq := 0
+	return func(effect func(context.Context) error, commit func(error)) {
+		if seq++; seq == 1 {
+			commit(effect(context.Background()))
+			return
+		}
+		commit(err)
+	}
+}
+
+// TestStopCommitOutcomeMapping pins how stop-shaped commits map the three
+// executor outcomes: abandoned (stop ran, wedged, output fenced) publishes
+// success by contract; never-ran answers 503 and restores stage-time cache
+// removals; anything else (a recovered panic) proves nothing about the job's
+// state and must commit failed, never success.
+func TestStopCommitOutcomeMapping(t *testing.T) {
+	abandonedErr := fmt.Errorf("%w: timed out after 1s", ErrPhaseAbandoned)
+	panicErr := errors.New("internal error: effect panic: boom")
+
+	tests := map[string]struct {
+		run func(t *testing.T)
+	}{
+		"disable abandoned publishes disabled": {
+			run: func(t *testing.T) {
+				cb := &mockCallbacks{}
+				h, out := newTestHandlerWithOutput(cb, 5*time.Second)
+				cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
+				h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusRunning})
+
+				h.CmdDisableStep(newTestFn("test:job1", "disable", "", nil), commitErrRunner(abandonedErr))
+
+				entry, _ := h.exposed.LookupByKey("job1")
+				assert.Equal(t, StatusDisabled, entry.Status)
+				assert.Contains(t, out.String(), `"status":200`)
+				assert.Contains(t, out.String(), "status disabled")
+			},
+		},
+		"disable never-ran answers 503 and publishes nothing": {
+			run: func(t *testing.T) {
+				cb := &mockCallbacks{}
+				h, out := newTestHandlerWithOutput(cb, 5*time.Second)
+				cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
+				h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusRunning})
+
+				h.CmdDisableStep(newTestFn("test:job1", "disable", "", nil), commitErrRunner(ErrPhaseNeverRan))
+
+				entry, _ := h.exposed.LookupByKey("job1")
+				assert.Equal(t, StatusRunning, entry.Status, "a stop that never ran must not change the status")
+				assert.Contains(t, out.String(), `"status":503`)
+				assert.NotContains(t, out.String(), "status disabled")
+			},
+		},
+		"disable broken stop commits failed, never disabled": {
+			run: func(t *testing.T) {
+				cb := &mockCallbacks{}
+				h, out := newTestHandlerWithOutput(cb, 5*time.Second)
+				cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
+				h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusRunning})
+
+				h.CmdDisableStep(newTestFn("test:job1", "disable", "", nil), commitErrRunner(panicErr))
+
+				entry, _ := h.exposed.LookupByKey("job1")
+				assert.Equal(t, StatusFailed, entry.Status)
+				assert.Contains(t, out.String(), `"status":500`)
+				assert.Contains(t, out.String(), "status failed")
+				assert.NotContains(t, out.String(), "status disabled")
+				require.Len(t, cb.statusCalls, 1)
+			},
+		},
+		"remove abandoned publishes delete": {
+			run: func(t *testing.T) {
+				cb := &mockCallbacks{}
+				h, out := newTestHandlerWithOutput(cb, 5*time.Second)
+				cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
+				h.seen.Add(cfg)
+				h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusRunning})
+
+				h.CmdRemoveStep(newTestFn("test:job1", "remove", "", nil), commitErrRunner(abandonedErr))
+
+				_, exposed := h.exposed.LookupByKey("job1")
+				assert.False(t, exposed, "the abandoned remove must commit the removal")
+				assert.Contains(t, out.String(), `"status":200`)
+				assert.Contains(t, out.String(), "delete")
+			},
+		},
+		"remove never-ran restores caches and answers 503": {
+			run: func(t *testing.T) {
+				cb := &mockCallbacks{}
+				h, out := newTestHandlerWithOutput(cb, 5*time.Second)
+				cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
+				h.seen.Add(cfg)
+				h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusRunning})
+
+				h.CmdRemoveStep(newTestFn("test:job1", "remove", "", nil), commitErrRunner(ErrPhaseNeverRan))
+
+				entry, exposed := h.exposed.LookupByKey("job1")
+				require.True(t, exposed, "the never-ran remove must restore the exposed entry")
+				assert.Equal(t, StatusRunning, entry.Status)
+				_, seen := h.seen.Lookup(cfg)
+				assert.True(t, seen, "the never-ran remove must restore the seen entry")
+				assert.Contains(t, out.String(), `"status":503`)
+				assert.NotContains(t, out.String(), "delete")
+			},
+		},
+		"remove broken stop restores caches with failed status": {
+			run: func(t *testing.T) {
+				cb := &mockCallbacks{}
+				h, out := newTestHandlerWithOutput(cb, 5*time.Second)
+				cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
+				h.seen.Add(cfg)
+				h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusRunning})
+
+				h.CmdRemoveStep(newTestFn("test:job1", "remove", "", nil), commitErrRunner(panicErr))
+
+				entry, exposed := h.exposed.LookupByKey("job1")
+				require.True(t, exposed, "the broken remove must restore the exposed entry")
+				assert.Equal(t, StatusFailed, entry.Status)
+				assert.Contains(t, out.String(), `"status":500`)
+				assert.Contains(t, out.String(), "status failed")
+				assert.NotContains(t, out.String(), "delete")
+			},
+		},
+		"enable never-ran answers 503 without failing the entry": {
+			run: func(t *testing.T) {
+				cb := &mockCallbacks{}
+				h, out := newTestHandlerWithOutput(cb, 5*time.Second)
+				// Stock source: a failed enable would also trigger stock
+				// removal - never-ran must trigger neither.
+				cfg := testConfig{uid: "stock:job1", key: "job1", sourceType: "stock"}
+				h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusAccepted})
+
+				h.CmdEnableStep(newTestFn("test:job1", "enable", "", nil), commitErrRunner(ErrPhaseNeverRan))
+
+				entry, exposed := h.exposed.LookupByKey("job1")
+				require.True(t, exposed, "never-ran must not remove the stock config")
+				assert.Equal(t, StatusAccepted, entry.Status, "an unstarted config must not be marked failed")
+				assert.Contains(t, out.String(), `"status":503`)
+				assert.NotContains(t, out.String(), "status failed")
+			},
+		},
+		"conversion update stop never-ran answers 503 without failing the old job": {
+			run: func(t *testing.T) {
+				cb := &mockCallbacks{}
+				h, out := newTestHandlerWithOutput(cb, 5*time.Second)
+				oldCfg := testConfig{uid: "stock:job1", key: "job1", sourceType: "stock", hash: 100}
+				h.seen.Add(oldCfg)
+				h.exposed.Add(&Entry[testConfig]{Cfg: oldCfg, Status: StatusRunning})
+				cb.parseAndValidateFn = func(_ Function, _ string) (testConfig, error) {
+					return testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg", hash: 200}, nil
+				}
+
+				h.CmdUpdateStep(newTestFn("test:job1", "update", "job1", []byte(`{}`)), chainErrRunner(ErrPhaseNeverRan))
+
+				entry, exposed := h.exposed.LookupByKey("job1")
+				require.True(t, exposed)
+				assert.Equal(t, "stock:job1", entry.Cfg.UID(), "the old discovery entry must stay exposed")
+				assert.Equal(t, StatusRunning, entry.Status, "an untouched old job must not be marked failed")
+				assert.Contains(t, out.String(), `"status":503`)
+				assert.NotContains(t, out.String(), "status failed")
+			},
+		},
+		"restart never-ran answers 503 without failing the entry": {
+			run: func(t *testing.T) {
+				cb := &mockCallbacks{}
+				h, out := newTestHandlerWithOutput(cb, 5*time.Second)
+				cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
+				h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusRunning})
+
+				h.CmdRestartStep(newTestFn("test:job1", "restart", "", nil), commitErrRunner(ErrPhaseNeverRan))
+
+				entry, _ := h.exposed.LookupByKey("job1")
+				assert.Equal(t, StatusRunning, entry.Status, "an untouched job must not be marked failed")
+				assert.Contains(t, out.String(), `"status":503`)
+				assert.NotContains(t, out.String(), "status failed")
+			},
+		},
+		"add-replace broken stop keeps the old instance": {
+			run: func(t *testing.T) {
+				cb := &mockCallbacks{}
+				h, out := newTestHandlerWithOutput(cb, 5*time.Second)
+				oldCfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg", hash: 100}
+				h.seen.Add(oldCfg)
+				h.exposed.Add(&Entry[testConfig]{Cfg: oldCfg, Status: StatusRunning})
+				cb.parseAndValidateFn = func(_ Function, _ string) (testConfig, error) {
+					return testConfig{uid: "dyncfg:job1-new", key: "job1", sourceType: "dyncfg", hash: 200}, nil
+				}
+
+				h.CmdAddStep(newTestFn("test:job1", "add", "job1", []byte(`{}`)), chainErrRunner(panicErr))
+
+				entry, exposed := h.exposed.LookupByKey("job1")
+				require.True(t, exposed, "the old entry must be restored")
+				assert.Equal(t, "dyncfg:job1", entry.Cfg.UID(), "no replacement may be exposed next to a job in an unknown state")
+				assert.Contains(t, out.String(), `"status":500`)
+			},
+		},
+		"update chained never-ran rolls back and answers 503": {
+			run: func(t *testing.T) {
+				cb := &mockCallbacks{}
+				h, out := newTestHandlerWithOutput(cb, 5*time.Second)
+				oldCfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg", hash: 100}
+				h.seen.Add(oldCfg)
+				h.exposed.Add(&Entry[testConfig]{Cfg: oldCfg, Status: StatusRunning})
+				cb.parseAndValidateFn = func(_ Function, _ string) (testConfig, error) {
+					return testConfig{uid: "dyncfg:job1-new", key: "job1", sourceType: "dyncfg", hash: 200}, nil
+				}
+
+				h.CmdUpdateStep(newTestFn("test:job1", "update", "job1", []byte(`{}`)), chainErrRunner(ErrPhaseNeverRan))
+
+				entry, exposed := h.exposed.LookupByKey("job1")
+				require.True(t, exposed)
+				assert.Equal(t, "dyncfg:job1", entry.Cfg.UID(), "the never-ran update must roll back to the old config")
+				assert.Equal(t, StatusRunning, entry.Status)
+				_, seenOld := h.seen.Lookup(oldCfg)
+				assert.True(t, seenOld, "the old seen entry must be restored")
+				assert.Contains(t, out.String(), `"status":503`)
+				assert.NotContains(t, out.String(), "status failed")
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, tc.run)
 	}
 }

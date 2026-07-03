@@ -409,7 +409,7 @@ func TestInstanceFunctionRegisteredHandlerPaths(t *testing.T) {
 			if tc.wantDataValue != nil {
 				assert.Equal(t, tc.wantDataValue, jsonNestedArrayValue(t, resp["data"], 0, 0))
 			}
-			mgr.stopRunningJob("mod_job1")
+			mgr.stopRunningJob(context.Background(), "mod_job1")
 		})
 	}
 }

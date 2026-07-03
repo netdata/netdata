@@ -136,7 +136,7 @@ func (cb *secretStoreCallbacks) ValidateConfigName(name string) error {
 	return dyncfg.JobNameRuleAllowDots(name)
 }
 
-func (cb *secretStoreCallbacks) ParseAndValidate(fn dyncfg.Function, name string) (secretstore.Config, error) {
+func (cb *secretStoreCallbacks) ParseAndValidate(_ context.Context, fn dyncfg.Function, name string) (secretstore.Config, error) {
 	var kind secretstore.StoreKind
 	if fn.Command() == dyncfg.CommandAdd {
 		var ok bool
@@ -166,7 +166,7 @@ func (cb *secretStoreCallbacks) ParseAndValidate(fn dyncfg.Function, name string
 	return cfg, nil
 }
 
-func (cb *secretStoreCallbacks) Start(cfg secretstore.Config) error {
+func (cb *secretStoreCallbacks) Start(_ context.Context, cfg secretstore.Config) error {
 	cb.commandMessage = ""
 	key := cfg.ExposedKey()
 	if cb.deps.service == nil {
@@ -185,7 +185,7 @@ func (cb *secretStoreCallbacks) Start(cfg secretstore.Config) error {
 	return nil
 }
 
-func (cb *secretStoreCallbacks) Update(oldCfg, newCfg secretstore.Config) error {
+func (cb *secretStoreCallbacks) Update(_ context.Context, oldCfg, newCfg secretstore.Config) error {
 	cb.commandMessage = ""
 	key := oldCfg.ExposedKey()
 	if cb.deps.service == nil {
@@ -204,7 +204,7 @@ func (cb *secretStoreCallbacks) Update(oldCfg, newCfg secretstore.Config) error 
 	return nil
 }
 
-func (cb *secretStoreCallbacks) Stop(cfg secretstore.Config) {
+func (cb *secretStoreCallbacks) Stop(_ context.Context, cfg secretstore.Config) {
 	cb.commandMessage = ""
 	key := cfg.ExposedKey()
 	if cb.deps.service == nil {

@@ -41,6 +41,19 @@ func TestTicker(t *testing.T) {
 	}
 }
 
+func TestTickerStopReleasesPromptly(t *testing.T) {
+	tk := New(time.Hour)
+	tk.Stop()
+	select {
+	case _, ok := <-tk.C:
+		if ok {
+			t.Error("expected the tick channel to be closed after Stop")
+		}
+	case <-time.After(time.Second):
+		t.Error("Stop must release the ticker goroutine promptly, not after the current interval")
+	}
+}
+
 func abs(a time.Duration) time.Duration {
 	if a < 0 {
 		return -a

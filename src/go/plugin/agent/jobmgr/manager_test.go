@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/internal/wiretest"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
@@ -251,12 +253,14 @@ CONFIG test:collector:fail:name delete
 						}))
 
 						sendConfGroup(in, discCfg.Source(), discCfg)
+						waitSourceExposed(mgr, discCfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-enable",
 							Args: []string{mgr.dyncfgJobID(discCfg), "enable"},
 						}))
 
 						sendConfGroup(in, userCfg.Source(), userCfg)
+						waitSourceExposed(mgr, userCfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "3-enable",
 							Args: []string{mgr.dyncfgJobID(userCfg), "enable"},
@@ -277,31 +281,23 @@ CONFIG test:collector:fail:name delete
 						{cfg: userCfg, status: dyncfg.StatusFailed},
 					},
 					wantRunning: nil,
-					wantDyncfg: `
-CONFIG test:collector:fail:stock create accepted job /collectors/test/Jobs stock 'type=stock,module=fail,job=stock' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
-
-FUNCTION_RESULT_BEGIN 1-enable 200 application/json
-{"status":200,"message":"job enable failed: mock failed init"}
-FUNCTION_RESULT_END
-
-CONFIG test:collector:fail:stock delete
-
-CONFIG test:collector:fail:discovered create accepted job /collectors/test/Jobs discovered 'type=discovered,module=fail,job=discovered' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
-
-FUNCTION_RESULT_BEGIN 2-enable 200 application/json
-{"status":200,"message":"job enable failed: mock failed init"}
-FUNCTION_RESULT_END
-
-CONFIG test:collector:fail:discovered status failed
-
-CONFIG test:collector:fail:user create accepted job /collectors/test/Jobs user 'type=user,module=fail,job=user' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
-
-FUNCTION_RESULT_BEGIN 3-enable 200 application/json
-{"status":200,"message":"job enable failed: mock failed init"}
-FUNCTION_RESULT_END
-
-CONFIG test:collector:fail:user status failed
-		`,
+					wantDyncfgRecords: [][]wiretest.RecordWant{
+						{
+							{Name: "stock create", Contains: []string{"CONFIG test:collector:fail:stock create accepted job /collectors/test/Jobs stock 'type=stock,module=fail,job=stock'"}},
+							{Name: "stock enable failed", Contains: []string{"FUNCTION_RESULT_BEGIN 1-enable 200", `"message":"job enable failed: mock failed init"`}},
+							{Name: "stock delete", Contains: []string{"CONFIG test:collector:fail:stock delete"}},
+						},
+						{
+							{Name: "discovered create", Contains: []string{"CONFIG test:collector:fail:discovered create accepted job /collectors/test/Jobs discovered 'type=discovered,module=fail,job=discovered'"}},
+							{Name: "discovered enable failed", Contains: []string{"FUNCTION_RESULT_BEGIN 2-enable 200", `"message":"job enable failed: mock failed init"`}},
+							{Name: "discovered status failed", Contains: []string{"CONFIG test:collector:fail:discovered status failed"}},
+						},
+						{
+							{Name: "user create", Contains: []string{"CONFIG test:collector:fail:user create accepted job /collectors/test/Jobs user 'type=user,module=fail,job=user'"}},
+							{Name: "user enable failed", Contains: []string{"FUNCTION_RESULT_BEGIN 3-enable 200", `"message":"job enable failed: mock failed init"`}},
+							{Name: "user status failed", Contains: []string{"CONFIG test:collector:fail:user status failed"}},
+						},
+					},
 				}
 			},
 		},
@@ -320,12 +316,14 @@ CONFIG test:collector:fail:user status failed
 						}))
 
 						sendConfGroup(in, discCfg.Source(), discCfg)
+						waitSourceExposed(mgr, discCfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-enable",
 							Args: []string{mgr.dyncfgJobID(discCfg), "enable"},
 						}))
 
 						sendConfGroup(in, userCfg.Source(), userCfg)
+						waitSourceExposed(mgr, userCfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "3-enable",
 							Args: []string{mgr.dyncfgJobID(userCfg), "enable"},
@@ -388,12 +386,14 @@ CONFIG test:collector:fail:name status failed
 						}))
 
 						sendConfGroup(in, discCfg.Source(), discCfg)
+						waitSourceExposed(mgr, discCfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-enable",
 							Args: []string{mgr.dyncfgJobID(discCfg), "enable"},
 						}))
 
 						sendConfGroup(in, userCfg.Source(), userCfg)
+						waitSourceExposed(mgr, userCfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "3-enable",
 							Args: []string{mgr.dyncfgJobID(userCfg), "enable"},
@@ -1621,43 +1621,26 @@ FUNCTION_RESULT_END
 						{cfg: discCfg, status: dyncfg.StatusRunning},
 					},
 					wantRunning: []string{stockCfg.FullName(), userCfg.FullName(), discCfg.FullName()},
-					wantDyncfg: `
-CONFIG test:collector:success:stock create accepted job /collectors/test/Jobs stock 'type=stock,module=success,job=stock' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
-
-FUNCTION_RESULT_BEGIN 1-enable 200 application/json
-{"status":200,"message":""}
-FUNCTION_RESULT_END
-
-CONFIG test:collector:success:stock status running
-
-CONFIG test:collector:success:user create accepted job /collectors/test/Jobs user 'type=user,module=success,job=user' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
-
-FUNCTION_RESULT_BEGIN 2-enable 200 application/json
-{"status":200,"message":""}
-FUNCTION_RESULT_END
-
-CONFIG test:collector:success:user status running
-
-CONFIG test:collector:success:discovered create accepted job /collectors/test/Jobs discovered 'type=discovered,module=success,job=discovered' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
-
-FUNCTION_RESULT_BEGIN 3-enable 200 application/json
-{"status":200,"message":""}
-FUNCTION_RESULT_END
-
-CONFIG test:collector:success:discovered status running
-
-FUNCTION_RESULT_BEGIN 1-remove 405 application/json
-{"status":405,"errorMessage":"removing configurations of source type 'stock' is not supported, only 'dyncfg' configurations can be removed."}
-FUNCTION_RESULT_END
-
-FUNCTION_RESULT_BEGIN 2-remove 405 application/json
-{"status":405,"errorMessage":"removing configurations of source type 'user' is not supported, only 'dyncfg' configurations can be removed."}
-FUNCTION_RESULT_END
-
-FUNCTION_RESULT_BEGIN 3-remove 405 application/json
-{"status":405,"errorMessage":"removing configurations of source type 'discovered' is not supported, only 'dyncfg' configurations can be removed."}
-FUNCTION_RESULT_END
-`,
+					wantDyncfgRecords: [][]wiretest.RecordWant{
+						{
+							{Name: "stock create", Contains: []string{"CONFIG test:collector:success:stock create accepted job /collectors/test/Jobs stock 'type=stock,module=success,job=stock'"}},
+							{Name: "stock enable ok", Contains: []string{"FUNCTION_RESULT_BEGIN 1-enable 200", `"status":200`}},
+							{Name: "stock running", Contains: []string{"CONFIG test:collector:success:stock status running"}},
+							{Name: "stock remove rejected", Contains: []string{"FUNCTION_RESULT_BEGIN 1-remove 405", "source type 'stock' is not supported"}},
+						},
+						{
+							{Name: "user create", Contains: []string{"CONFIG test:collector:success:user create accepted job /collectors/test/Jobs user 'type=user,module=success,job=user'"}},
+							{Name: "user enable ok", Contains: []string{"FUNCTION_RESULT_BEGIN 2-enable 200", `"status":200`}},
+							{Name: "user running", Contains: []string{"CONFIG test:collector:success:user status running"}},
+							{Name: "user remove rejected", Contains: []string{"FUNCTION_RESULT_BEGIN 2-remove 405", "source type 'user' is not supported"}},
+						},
+						{
+							{Name: "discovered create", Contains: []string{"CONFIG test:collector:success:discovered create accepted job /collectors/test/Jobs discovered 'type=discovered,module=success,job=discovered'"}},
+							{Name: "discovered enable ok", Contains: []string{"FUNCTION_RESULT_BEGIN 3-enable 200", `"status":200`}},
+							{Name: "discovered running", Contains: []string{"CONFIG test:collector:success:discovered status running"}},
+							{Name: "discovered remove rejected", Contains: []string{"FUNCTION_RESULT_BEGIN 3-remove 405", "source type 'discovered' is not supported"}},
+						},
+					},
 				}
 			},
 		},
@@ -1911,6 +1894,20 @@ CONFIG test:collector:success:test status disabled
 			sim := test.createSim()
 			sim.run(t)
 		})
+	}
+}
+
+// waitSourceExposed blocks until cfg's source type owns the exposed entry for
+// its key - the daemon-faithful sequencing point: a real daemon sends a
+// config's enable only after receiving that config's CONFIG CREATE, so tests
+// driving multiple same-key configs must not fire an enable before the
+// previous command's effect published the replacement.
+func waitSourceExposed(mgr *Manager, cfg confgroup.Config) {
+	for range 500 {
+		if e, ok := mgr.collectorExposed.LookupByKey(cfg.ExposedKey()); ok && e.Cfg.SourceType() == cfg.SourceType() {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 

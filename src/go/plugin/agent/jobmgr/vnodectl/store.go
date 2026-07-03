@@ -4,13 +4,15 @@ package vnodectl
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
-// vnodeStore is intentionally lock-free because mutations are serialized by jobmgr.
-// Any caller outside that serialized path must add its own synchronization first.
+// vnodeStore is read from collector command effects running off the jobmgr
+// loop while vnode mutations stay loop-serialized, so access is guarded by mu.
 type vnodeStore struct {
+	mu    sync.RWMutex
 	items map[string]*vnodes.VirtualNode
 }
 
@@ -22,11 +24,15 @@ func newVnodeStore(items map[string]*vnodes.VirtualNode) *vnodeStore {
 }
 
 func (s *vnodeStore) Lookup(name string) (*vnodes.VirtualNode, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	cfg, ok := s.items[name]
 	return cfg, ok
 }
 
 func (s *vnodeStore) Upsert(cfg *vnodes.VirtualNode) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if cfg == nil {
 		return false, fmt.Errorf("nil vnode config")
 	}
@@ -38,6 +44,8 @@ func (s *vnodeStore) Upsert(cfg *vnodes.VirtualNode) (bool, error) {
 }
 
 func (s *vnodeStore) Remove(name string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if _, ok := s.items[name]; !ok {
 		return false
 	}
@@ -46,6 +54,8 @@ func (s *vnodeStore) Remove(name string) bool {
 }
 
 func (s *vnodeStore) ForEach(fn func(cfg *vnodes.VirtualNode) bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	for _, cfg := range s.items {
 		if !fn(cfg) {
 			return

@@ -213,7 +213,7 @@ func TestCreateCollectorJob_UsesVnodeControllerLookup(t *testing.T) {
 			mgr := New(Config{PluginName: testPluginName, Vnodes: tc.vnodes})
 			mgr.modules = prepareMockRegistry()
 
-			job, err := mgr.createCollectorJob(tc.cfg)
+			job, err := mgr.createCollectorJob(context.Background(), tc.cfg)
 			if tc.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.wantErr)

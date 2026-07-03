@@ -29,12 +29,12 @@ func TestSecretStoreCallbacks(t *testing.T) {
 				assert.Equal(t, secretstore.StoreKey(secretstore.KindVault, "vault_prod"), key)
 				assert.Equal(t, "vault_prod", name)
 
-				cfg, err := cb.ParseAndValidate(addFn, name)
+				cfg, err := cb.ParseAndValidate(context.Background(), addFn, name)
 				require.NoError(t, err)
 				assert.Empty(t, restart.calls)
 				assert.Equal(t, "", cb.TakeCommandMessage())
 
-				require.NoError(t, cb.Start(cfg))
+				require.NoError(t, cb.Start(context.Background(), cfg))
 				assert.Equal(t, []string{key}, restart.calls)
 				assert.Equal(t, "restart:"+key, cb.TakeCommandMessage())
 				assert.Equal(t, testSecretStoreConfigID(key), cb.ConfigID(cfg))
@@ -51,16 +51,16 @@ func TestSecretStoreCallbacks(t *testing.T) {
 				assert.Equal(t, key, updateKey)
 				assert.Equal(t, name, updateName)
 
-				updatedCfg, err := cb.ParseAndValidate(updateFn, "")
+				updatedCfg, err := cb.ParseAndValidate(context.Background(), updateFn, "")
 				require.NoError(t, err)
 				assert.Len(t, restart.calls, 1)
 
-				require.NoError(t, cb.Update(cfg, updatedCfg))
+				require.NoError(t, cb.Update(context.Background(), cfg, updatedCfg))
 				assert.Equal(t, []string{key, key}, restart.calls)
 				assert.Equal(t, "restart:"+key, cb.TakeCommandMessage())
 				assert.Equal(t, "two", resolveTestStoreValue(t, svc, key))
 
-				cb.Stop(updatedCfg)
+				cb.Stop(context.Background(), updatedCfg)
 				assert.Equal(t, []string{key, key, key}, restart.calls)
 				assert.Equal(t, "restart:"+key, cb.TakeCommandMessage())
 				_, ok = svc.GetStatus(key)
@@ -73,7 +73,7 @@ func TestSecretStoreCallbacks(t *testing.T) {
 				key, name, ok := cb.ExtractKey(addFn)
 				require.True(t, ok)
 
-				cfg, err := cb.ParseAndValidate(addFn, name)
+				cfg, err := cb.ParseAndValidate(context.Background(), addFn, name)
 				require.NoError(t, err)
 				assert.Empty(t, restart.calls)
 
@@ -82,20 +82,20 @@ func TestSecretStoreCallbacks(t *testing.T) {
 				cb.OnStatusChange(nil, dyncfg.StatusAccepted, addFn)
 				assert.Empty(t, restart.calls)
 
-				require.NoError(t, cb.Start(cfg))
+				require.NoError(t, cb.Start(context.Background(), cfg))
 				assert.Equal(t, []string{key}, restart.calls)
 				assert.Equal(t, "restart:"+key, cb.TakeCommandMessage())
 
 				updateFn := newSecretStoreCallbackFunction(t, "ss-mutate-update", testSecretStoreConfigID(key), dyncfg.CommandUpdate, "", map[string]any{"value": "two"})
-				updatedCfg, err := cb.ParseAndValidate(updateFn, "")
+				updatedCfg, err := cb.ParseAndValidate(context.Background(), updateFn, "")
 				require.NoError(t, err)
 				assert.Len(t, restart.calls, 1)
 
-				require.NoError(t, cb.Update(cfg, updatedCfg))
+				require.NoError(t, cb.Update(context.Background(), cfg, updatedCfg))
 				assert.Equal(t, []string{key, key}, restart.calls)
 				assert.Equal(t, "restart:"+key, cb.TakeCommandMessage())
 
-				cb.Stop(updatedCfg)
+				cb.Stop(context.Background(), updatedCfg)
 				assert.Equal(t, []string{key, key, key}, restart.calls)
 				assert.Equal(t, "restart:"+key, cb.TakeCommandMessage())
 			},

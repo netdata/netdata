@@ -3,6 +3,7 @@
 package secretsctl
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -98,7 +99,7 @@ func (c *Controller) dyncfgCmdAdd(fn dyncfg.Function) {
 	code := 200
 	msg := ""
 	if prepErr == nil {
-		if err := c.cb.Start(cfg); err == nil {
+		if err := c.cb.Start(context.Background(), cfg); err == nil {
 			entry.Status = dyncfg.StatusRunning
 			msg = c.cb.TakeCommandMessage()
 		} else {

@@ -3,6 +3,7 @@
 package secretsctl
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -61,7 +62,7 @@ func (c *Controller) rememberDiscoveredConfig(cfg secretstore.Config) (*dyncfg.E
 	}
 
 	if entry.Status == dyncfg.StatusRunning || entry.Status == dyncfg.StatusFailed {
-		c.cb.Stop(entry.Cfg)
+		c.cb.Stop(context.Background(), entry.Cfg)
 		c.cb.TakeCommandMessage()
 	}
 
@@ -84,7 +85,7 @@ func (c *Controller) removeDiscoveredConfig(cfg secretstore.Config) (*dyncfg.Ent
 		return nil, false
 	}
 
-	c.cb.Stop(entry.Cfg)
+	c.cb.Stop(context.Background(), entry.Cfg)
 	c.cb.TakeCommandMessage()
 	c.handler.NotifyConfigRemove(entry.Cfg)
 	return entry, true

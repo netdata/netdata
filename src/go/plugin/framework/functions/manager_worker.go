@@ -42,6 +42,9 @@ func (m *Manager) runWorker() {
 			if ctx == nil {
 				ctx = context.Background()
 			}
+			if req.laneMeta != nil {
+				ctx = context.WithValue(ctx, laneMetaCtxKey{}, req.laneMeta)
+			}
 			req.handler(ctx, fn)
 		}()
 

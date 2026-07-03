@@ -105,7 +105,7 @@ func TestRunNotifyRunningJobs_TickOutsideLock(t *testing.T) {
 
 	stopDone := make(chan struct{})
 	go func() {
-		mgr.stopRunningJob(job.FullName())
+		mgr.stopRunningJob(context.Background(), job.FullName())
 		close(stopDone)
 	}()
 
@@ -361,59 +361,6 @@ func TestRequestFunctionReconcile_CoalescesPendingModules(t *testing.T) {
 	assert.Equal(t, []string{"mod"}, mgr.takePendingFunctionReconcileModules())
 }
 
-func TestRunWaitDecisionStep(t *testing.T) {
-	tests := map[string]struct {
-		run func(t *testing.T)
-	}{
-		"executes dyncfg command while waiting": {
-			run: func(t *testing.T) {
-				var out bytes.Buffer
-				mgr := New(Config{PluginName: testPluginName, Out: &out})
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-				mgr.ctx = ctx
-				mgr.collectorHandler.WaitForDecision(prepareUserCfg("mod", "job"))
-				mgr.dyncfgCh <- dyncfg.NewFunction(functions.Function{
-					UID:  "unknown",
-					Name: "config",
-					Args: []string{"unknown", string(dyncfg.CommandSchema)},
-				})
-
-				require.True(t, mgr.runWaitDecisionStep())
-				assert.Contains(t, out.String(), "unknown function")
-			},
-		},
-		"expires wait decision": {
-			run: func(t *testing.T) {
-				mgr := New(Config{PluginName: testPluginName})
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-				mgr.ctx = ctx
-				mgr.collectorHandler = newTestCollectorHandlerWithWaitTimeout(mgr, time.Nanosecond)
-				mgr.collectorHandler.WaitForDecision(prepareUserCfg("mod", "job"))
-
-				require.True(t, mgr.runWaitDecisionStep())
-				assert.False(t, mgr.collectorHandler.WaitingForDecision())
-			},
-		},
-		"context cancel returns false": {
-			run: func(t *testing.T) {
-				mgr := New(Config{PluginName: testPluginName})
-				ctx, cancel := context.WithCancel(context.Background())
-				mgr.ctx = ctx
-				mgr.collectorHandler.WaitForDecision(prepareUserCfg("mod", "job"))
-				cancel()
-
-				assert.False(t, mgr.runWaitDecisionStep())
-			},
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, tc.run)
-	}
-}
-
 func TestRunFunctionReconciler_DoesNotBlockManagerControlLoop(t *testing.T) {
 	reg := &recordingFunctionRegistry{}
 	var out simOutput
@@ -533,7 +480,7 @@ func TestFunctionReconcileFunnelConcurrentLifecycle(t *testing.T) {
 				fullName := fmt.Sprintf("mod_%s", name)
 				job := &tickProbeJob{fullName: fullName, moduleName: "mod", name: name, collector: availability}
 				mgr.startRunningJob(job)
-				mgr.stopRunningJob(fullName)
+				mgr.stopRunningJob(context.Background(), fullName)
 			}
 		}(worker)
 	}
@@ -605,7 +552,7 @@ func TestFunctionReconcileFunnelWithdrawsStoppedInstanceAfterInFlightPublish(t *
 		t.Fatal("reconcile did not check instance Function availability")
 	}
 
-	mgr.stopRunningJob(job.FullName())
+	mgr.stopRunningJob(context.Background(), job.FullName())
 	close(releaseAvailability)
 
 	require.Eventually(t, func() bool {
@@ -1018,6 +965,11 @@ func (a managerFunctionAvailability) FunctionAvailable(functionID string) bool {
 	return a.fn(functionID)
 }
 
+type registeredPrefix struct {
+	name   string
+	prefix string
+}
+
 type recordingFunctionRegistry struct {
 	mu           sync.Mutex
 	registered   []string
@@ -1065,28 +1017,4 @@ func (r *recordingFunctionRegistry) registeredPrefixes() []registeredPrefix {
 	out := make([]registeredPrefix, len(r.prefixes))
 	copy(out, r.prefixes)
 	return out
-}
-
-func newTestCollectorHandlerWithWaitTimeout(mgr *Manager, timeout time.Duration) *dyncfg.Handler[confgroup.Config] {
-	return dyncfg.NewHandler(dyncfg.HandlerOpts[confgroup.Config]{
-		Logger:    mgr.Logger,
-		API:       mgr.dyncfgResponder,
-		Seen:      dyncfg.NewSeenCache[confgroup.Config](),
-		Exposed:   dyncfg.NewExposedCache[confgroup.Config](),
-		Callbacks: mgr.collectorCallbacks,
-		WaitKey: func(cfg confgroup.Config) string {
-			return cfg.FullName()
-		},
-
-		Path:                    fmt.Sprintf(dyncfgCollectorPath, testPluginName),
-		EnableFailCode:          200,
-		RemoveStockOnEnableFail: true,
-		ConfigCommands:          dyncfgCollectorConfigCmds(),
-		WaitTimeout:             timeout,
-	})
-}
-
-type registeredPrefix struct {
-	name   string
-	prefix string
 }

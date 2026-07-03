@@ -4,12 +4,17 @@ package jobmgr
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/internal/wiretest"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
@@ -215,47 +220,52 @@ func TestExecutor_KeyDerivation(t *testing.T) {
 	}
 }
 
+// Per-key FIFO pin: events for ONE key execute and emit in arrival order
+// through the running manager (cross-key order is unconstrained by design).
 func TestExecutor_DispatchOrder(t *testing.T) {
 	tests := map[string]struct {
-		run func(t *testing.T, mgr *Manager, buf *bytes.Buffer)
+		run func(t *testing.T, h *charHarness)
 	}{
-		"dyncfg commands emit terminals in dispatch order": {
-			run: func(t *testing.T, mgr *Manager, buf *bytes.Buffer) {
-				var wants []wireRecordWant
+		"same-key dyncfg commands emit terminals in dispatch order": {
+			run: func(t *testing.T, h *charHarness) {
+				var wants []wiretest.RecordWant
 				for i := 1; i <= 3; i++ {
 					uid := fmt.Sprintf("order-%d", i)
-					fn := newExecutorTestFn(uid, []string{fmt.Sprintf("test:collector:success:missing%d", i), "get"}, nil)
-					mgr.executor.dispatch(mgr.newDyncfgEvent(fn))
-					wants = append(wants, wireRecordWant{
-						name:     uid + " terminal",
-						contains: []string{"FUNCTION_RESULT_BEGIN " + uid},
+					h.dyncfg(uid, []string{"test:collector:success:missing", "get"}, nil)
+					wants = append(wants, wiretest.RecordWant{
+						Name:     uid + " terminal",
+						Contains: []string{"FUNCTION_RESULT_BEGIN " + uid},
 					})
 				}
 
-				requireWireRecordSubsequence(t, buf.String(), wants)
+				require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN order-3"), charWait, charTick)
+				wiretest.RequireSubsequence(t, h.out.String(), wants)
 			},
 		},
-		"discovery and dyncfg events execute in dispatch order": {
-			run: func(t *testing.T, mgr *Manager, buf *bytes.Buffer) {
+		"same-key discovery and dyncfg events keep arrival order": {
+			run: func(t *testing.T, h *charHarness) {
 				cfg := prepareUserCfg("success", "o1")
 
-				mgr.executor.dispatch(mgr.newDiscoveryAddEvent(cfg))
-				mgr.executor.dispatch(mgr.newDyncfgEvent(newExecutorTestFn("mid-get", []string{mgr.dyncfgJobID(cfg), "get"}, nil)))
-				mgr.executor.dispatch(mgr.newDiscoveryRemoveEvent(cfg))
+				h.in <- prepareCfgGroups(cfg.Source(), cfg)
+				require.Eventually(t, h.outputContains("CONFIG test:collector:success:o1 create"), charWait, charTick)
+				h.dyncfg("mid-update", []string{h.mgr.dyncfgJobID(cfg), "update"}, []byte("{}"))
+				require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN mid-update"), charWait, charTick)
+				// The decision unparks the key; a wait-parked key's own discovery
+				// events (including its removal) stay parked until it.
+				h.dyncfg("then-enable", []string{h.mgr.dyncfgJobID(cfg), "enable"}, nil)
+				require.Eventually(t, h.outputContains("CONFIG test:collector:success:o1 status running"), charWait, charTick)
+				h.in <- prepareCfgGroups(cfg.Source())
+				require.Eventually(t, func() bool {
+					_, ok := h.mgr.collectorExposed.LookupByKey(cfg.ExposedKey())
+					return !ok
+				}, charWait, charTick)
 
-				requireWireRecordSubsequence(t, buf.String(), []wireRecordWant{
-					{
-						name:     "discovery add config create",
-						contains: []string{"CONFIG test:collector:success:o1 create"},
-					},
-					{
-						name:     "get terminal",
-						contains: []string{"FUNCTION_RESULT_BEGIN mid-get"},
-					},
-					{
-						name:     "discovery remove config delete",
-						contains: []string{"CONFIG test:collector:success:o1 delete"},
-					},
+				wiretest.RequireSubsequence(t, h.out.String(), []wiretest.RecordWant{
+					{Name: "discovery add config create", Contains: []string{"CONFIG test:collector:success:o1 create"}},
+					{Name: "premature update terminal", Contains: []string{"FUNCTION_RESULT_BEGIN mid-update"}},
+					{Name: "enable terminal", Contains: []string{"FUNCTION_RESULT_BEGIN then-enable"}},
+					{Name: "running status", Contains: []string{"CONFIG test:collector:success:o1 status running"}},
+					{Name: "discovery remove config delete", Contains: []string{"CONFIG test:collector:success:o1 delete"}},
 				})
 			},
 		},
@@ -263,14 +273,13 @@ func TestExecutor_DispatchOrder(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			mgr, buf := newExecutorTestManager()
-			tc.run(t, mgr, buf)
+			reg := collectorapi.Registry{}
+			reg.Register("success", charSuccessCreator())
+
+			tc.run(t, startCharManager(t, reg))
 		})
 	}
 }
-
-// Underivable events take the fallback key and must still execute, reaching
-// each domain's existing rejection (or template-scope success) paths.
 func TestExecutor_UnderivableEventExecution(t *testing.T) {
 	tests := map[string]struct {
 		fn       dyncfg.Function
@@ -328,4 +337,188 @@ func TestExecutor_UnderivableEventExecution(t *testing.T) {
 			}
 		})
 	}
+}
+
+// captureDeriverRegistry records lane derivers so their key derivation can be
+// pinned without a live functions manager.
+type captureDeriverRegistry struct {
+	noop
+	derivers map[string]functions.LaneKeyDeriver
+}
+
+func (c *captureDeriverRegistry) RegisterPrefixLaneDeriver(_, prefix string, d functions.LaneKeyDeriver) {
+	c.derivers[prefix] = d
+}
+
+// TestDyncfgLaneDerivers_TestIsKeyless pins the functions-lane half of the
+// keyless-test contract: the collector deriver gives every test request its
+// own lane, so a test never serializes behind the config's mutating lane
+// (held until that command's terminal finalize) or behind other tests.
+func TestDyncfgLaneDerivers_TestIsKeyless(t *testing.T) {
+	reg := &captureDeriverRegistry{derivers: map[string]functions.LaneKeyDeriver{}}
+	mgr := newCollectorTestManagerWithService(newTestSecretStoreService())
+	mgr.fnReg = reg
+	mgr.registerDyncfgLaneDerivers()
+
+	derive := reg.derivers[mgr.dyncfgCollectorPrefixValue()]
+	require.NotNil(t, derive, "the collector prefix must have a lane deriver")
+
+	jobID := mgr.dyncfgJobID(prepareDyncfgCfg("success", "web"))
+	enableKey, _ := derive(functions.Function{UID: "u1", Args: []string{jobID, "enable"}})
+	testKey1, _ := derive(functions.Function{UID: "u2", Args: []string{jobID, "test"}})
+	testKey2, _ := derive(functions.Function{UID: "u3", Args: []string{jobID, "test"}})
+	templateTestKey, _ := derive(functions.Function{UID: "u4", Args: []string{mgr.dyncfgModID("success"), "test"}})
+
+	require.NotEmpty(t, enableKey)
+	require.NotEmpty(t, testKey1)
+	assert.NotEqual(t, enableKey, testKey1,
+		"a test must not share the lane of the config's mutating commands")
+	assert.NotEqual(t, testKey1, testKey2,
+		"each test request must get its own lane")
+	require.NotEmpty(t, templateTestKey,
+		"a template-ID test must not fall back to the registration-wide lane")
+	assert.NotEqual(t, testKey1, templateTestKey,
+		"template-ID tests get their own lanes too")
+}
+
+// TestSuperviseEffect_AbandonFenceClassification pins that only a FENCED
+// abandon carries ErrPhaseAbandoned: stop-shaped commits publish success on
+// that sentinel, so an abandon that wins before the stop registered its
+// quarantine must classify as a plain failure instead.
+func TestSuperviseEffect_AbandonFenceClassification(t *testing.T) {
+	newMgr := func() *Manager {
+		mgr := New(Config{PluginName: testPluginName})
+		mgr.effectDeadline = 50 * time.Millisecond
+		return mgr
+	}
+
+	t.Run("unfenced abandon is a plain failure", func(t *testing.T) {
+		mgr := newMgr()
+		block := make(chan struct{})
+		defer close(block)
+
+		res := mgr.superviseEffect(effectTask{key: "k", effect: func(context.Context) error {
+			<-block
+			return nil
+		}})
+
+		require.True(t, res.abandoned)
+		assert.False(t, errors.Is(res.err, dyncfg.ErrPhaseAbandoned),
+			"an abandon with no fence installed must not claim the fenced outcome")
+	})
+
+	t.Run("fenced abandon carries ErrPhaseAbandoned", func(t *testing.T) {
+		mgr := newMgr()
+		block := make(chan struct{})
+		defer close(block)
+		var fenceRan atomic.Bool
+
+		res := mgr.superviseEffect(effectTask{key: "k", effect: func(ctx context.Context) error {
+			effectControlFrom(ctx).setQuarantine(func() { fenceRan.Store(true) })
+			<-block
+			return nil
+		}})
+
+		require.True(t, res.abandoned)
+		assert.True(t, fenceRan.Load(), "the worker must run the fence before reporting the abandon")
+		assert.True(t, errors.Is(res.err, dyncfg.ErrPhaseAbandoned))
+	})
+
+	t.Run("unfenced shutdown abandon is never-ran", func(t *testing.T) {
+		mgr := newMgr()
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		mgr.ctx = ctx // shutdown already began
+		block := make(chan struct{})
+		defer close(block)
+
+		res := mgr.superviseEffect(effectTask{key: "k", effect: func(context.Context) error {
+			<-block
+			return nil
+		}})
+
+		require.True(t, res.abandoned)
+		assert.True(t, errors.Is(res.err, dyncfg.ErrPhaseNeverRan),
+			"a shutdown interruption must answer retryably no matter which side wins the claim")
+	})
+
+	t.Run("disruptive shutdown abandon is a plain failure, never never-ran", func(t *testing.T) {
+		mgr := newMgr()
+		mgr.effectDeadline = time.Hour // only the cancellation may abandon
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		mgr.ctx = ctx
+		block := make(chan struct{})
+		defer close(block)
+		marked := make(chan struct{})
+		go func() {
+			// Shutdown lands strictly AFTER the point of no return.
+			<-marked
+			cancel()
+		}()
+
+		res := mgr.superviseEffect(effectTask{key: "k", effect: func(ctx context.Context) error {
+			effectControlFrom(ctx).markDisruptive()
+			close(marked)
+			<-block
+			return nil
+		}})
+
+		require.True(t, res.abandoned)
+		assert.False(t, errors.Is(res.err, dyncfg.ErrPhaseNeverRan),
+			"a never-ran outcome would roll back caches for a state that no longer exists")
+		assert.False(t, errors.Is(res.err, dyncfg.ErrPhaseAbandoned),
+			"no fence ran - success must not be published")
+	})
+
+	t.Run("fenced shutdown abandon carries ErrPhaseAbandoned", func(t *testing.T) {
+		mgr := newMgr()
+		mgr.effectDeadline = time.Hour // only the cancellation may abandon
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		mgr.ctx = ctx
+		block := make(chan struct{})
+		defer close(block)
+		fenceSet := make(chan struct{})
+		go func() {
+			// Shutdown lands strictly AFTER the stop registered its fence.
+			<-fenceSet
+			cancel()
+		}()
+
+		res := mgr.superviseEffect(effectTask{key: "k", effect: func(ctx context.Context) error {
+			effectControlFrom(ctx).setQuarantine(func() {})
+			close(fenceSet)
+			<-block
+			return nil
+		}})
+
+		require.True(t, res.abandoned)
+		assert.True(t, errors.Is(res.err, dyncfg.ErrPhaseAbandoned),
+			"a fenced stop may publish success even when shutdown is the cause")
+	})
+}
+
+// TestResumeWarmJob_IneligibleDropDisposesGate pins that a warm job dropped
+// on the ineligible path (its exposed entry is gone or replaced - reachable
+// when a stock enable failure removed the entry) deregisters its own
+// emission gate along with the module cleanup.
+func TestResumeWarmJob_IneligibleDropDisposesGate(t *testing.T) {
+	mgr, _ := newExecutorTestManager()
+	cfg := prepareDyncfgCfg("success", "gone")
+
+	job, err := mgr.createCollectorJob(context.Background(), cfg)
+	require.NoError(t, err)
+	gate, hasGate := mgr.emissionGates.lookup(cfg.FullName())
+	require.True(t, hasGate, "creation must register the gate")
+
+	// The config is NOT exposed: the continuation is ineligible.
+	mgr.resumeWarmJob(&warmResume{cfg: cfg, job: job, gate: gate})
+
+	_, hasGate = mgr.emissionGates.lookup(cfg.FullName())
+	assert.False(t, hasGate, "the dropped warm job's gate must be deregistered")
+	mgr.runningJobs.lock()
+	_, running := mgr.runningJobs.lookup(cfg.FullName())
+	mgr.runningJobs.unlock()
+	assert.False(t, running, "an ineligible warm job must never start")
 }

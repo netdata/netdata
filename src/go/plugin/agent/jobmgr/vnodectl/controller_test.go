@@ -6,8 +6,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/internal/wiretest"
 	"regexp"
-	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -351,14 +351,14 @@ func TestControllerSeqExec(t *testing.T) {
 				fn := dyncfg.NewFunction(functions.Function{UID: "vn-remove", Args: []string{ctl.configID("db"), string(dyncfg.CommandRemove)}})
 				ctl.SeqExec(fn)
 
-				requireWireRecordSubsequence(t, out.String(), []wireRecordWant{
+				wiretest.RequireSubsequence(t, out.String(), []wiretest.RecordWant{
 					{
-						name:     "vnode config delete",
-						contains: []string{"CONFIG test:vnode:db delete"},
+						Name:     "vnode config delete",
+						Contains: []string{"CONFIG test:vnode:db delete"},
 					},
 					{
-						name:     "vnode remove terminal",
-						contains: []string{"FUNCTION_RESULT_BEGIN vn-remove 200"},
+						Name:     "vnode remove terminal",
+						Contains: []string{"FUNCTION_RESULT_BEGIN vn-remove 200"},
 					},
 				})
 				assert.Equal(t, []string{"db"}, seams.affectedJobsCalls)
@@ -492,69 +492,6 @@ func mustFunctionBody(t *testing.T, output, uid string) string {
 	match := re.FindStringSubmatch(output)
 	require.Len(t, match, 2, "function result for uid '%s' not found in output:\n%s", uid, output)
 	return match[1]
-}
-
-type wireRecordWant struct {
-	name     string
-	contains []string
-}
-
-func atomicWireRecords(output string) []string {
-	var records []string
-	lines := strings.Split(output, "\n")
-	for i := 0; i < len(lines); {
-		line := lines[i]
-		if line == "" {
-			i++
-			continue
-		}
-		if !strings.HasPrefix(line, "FUNCTION_RESULT_BEGIN ") {
-			records = append(records, line)
-			i++
-			continue
-		}
-
-		var b strings.Builder
-		b.WriteString(line)
-		i++
-		for i < len(lines) {
-			b.WriteByte('\n')
-			b.WriteString(lines[i])
-			if lines[i] == "FUNCTION_RESULT_END" {
-				i++
-				break
-			}
-			i++
-		}
-		records = append(records, b.String())
-	}
-	return records
-}
-
-func requireWireRecordSubsequence(t *testing.T, output string, wants []wireRecordWant) {
-	t.Helper()
-
-	records := atomicWireRecords(output)
-	next := 0
-	for _, want := range wants {
-		found := -1
-		for i := next; i < len(records); i++ {
-			matched := true
-			for _, substr := range want.contains {
-				if !strings.Contains(records[i], substr) {
-					matched = false
-					break
-				}
-			}
-			if matched {
-				found = i
-				break
-			}
-		}
-		require.NotEqualf(t, -1, found, "wire record %q not found after index %d in records:\n%s",
-			want.name, next, strings.Join(records, "\n---\n"))
-		next = found + 1
-	}
 }
 
 func mustDecodeFunctionPayload(t *testing.T, output, uid string, dst any) {

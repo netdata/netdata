@@ -9,6 +9,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 )
 
 // scheduleRetryTask schedules a retry if the job supports auto-detection retry.
@@ -23,6 +24,28 @@ func (m *Manager) scheduleRetryTask(cfg confgroup.Config, job runtimeJob) {
 	m.retryingTasks.add(cfg, &retryTask{cancel: cancel})
 
 	go runRetryTask(ctx, m.addCh, cfg)
+}
+
+// resumeWarmJob starts an already-detected job whose detection was abandoned
+// at its deadline but succeeded late. The caller (run loop) has already
+// validated the continuation (no commits on the key since the abandon); here
+// the exposed entry must still be this config in its abandoned-failed state,
+// else the warm job is disposed (module cleanup + gate deregistration).
+func (m *Manager) resumeWarmJob(r *warmResume) {
+	entry, ok := m.collectorExposed.LookupByKey(r.cfg.ExposedKey())
+	if !ok || entry.Cfg.UID() != r.cfg.UID() || entry.Status != dyncfg.StatusFailed {
+		m.Infof("dropping late detection success for '%s': config no longer eligible", r.cfg.FullName())
+		r.job.Cleanup()
+		m.emissionGates.removeMatching(r.cfg.FullName(), r.gate)
+		return
+	}
+	m.retryingTasks.remove(r.cfg)
+	oldStatus := entry.Status
+	m.startRunningJob(r.job)
+	entry.Status = dyncfg.StatusRunning
+	m.collectorHandler.NotifyConfigStatus(entry.Cfg, dyncfg.StatusRunning)
+	m.collectorCallbacks.OnStatusChange(entry, oldStatus, dyncfg.NewFunction(functions.Function{}))
+	m.Infof("late detection success for '%s': warm job started", r.cfg.FullName())
 }
 
 // --- collectorCallbacks implements dyncfg.Callbacks[confgroup.Config] ---
@@ -93,7 +116,7 @@ func (cb *collectorCallbacks) ValidateConfigName(name string) error {
 	return dyncfg.JobNameRuleStrict(name)
 }
 
-func (cb *collectorCallbacks) ParseAndValidate(fn dyncfg.Function, name string) (confgroup.Config, error) {
+func (cb *collectorCallbacks) ParseAndValidate(ctx context.Context, fn dyncfg.Function, name string) (confgroup.Config, error) {
 	mn, ok := cb.mgr.extractModuleName(fn.ID())
 	if !ok {
 		return nil, fmt.Errorf("could not extract module name from ID: %s", fn.ID())
@@ -106,112 +129,207 @@ func (cb *collectorCallbacks) ParseAndValidate(fn dyncfg.Function, name string) 
 
 	cb.mgr.dyncfgSetConfigMeta(cfg, mn, name, fn)
 
-	// Payload parsing above is cheap and stays with the caller; the full
-	// validation (config apply incl. secret resolution) is blocking module
-	// work and runs as an effect.
-	err = cb.mgr.runEffectSync(cfg.FullName(), func(context.Context) error {
-		return cb.mgr.validateCollectorJob(cfg)
-	})
-	if err != nil {
+	if err := cb.mgr.validateCollectorJob(ctx, cfg); err != nil {
+		if errors.Is(context.Cause(ctx), context.Canceled) {
+			// Shutdown interrupted validation (e.g. a cancelled secret
+			// fetch): the config is not invalid - answer retryably.
+			return nil, fmt.Errorf("validation interrupted: %w", dyncfg.ErrPhaseNeverRan)
+		}
 		return nil, fmt.Errorf("invalid configuration: failed to apply configuration: %v", err)
 	}
 
 	return cfg, nil
 }
 
-func (cb *collectorCallbacks) Start(cfg confgroup.Config) error {
+func (cb *collectorCallbacks) Start(ctx context.Context, cfg confgroup.Config) error {
 	cb.mgr.retryingTasks.remove(cfg)
 
-	// The blocking module work (job creation incl. secret resolution, then
-	// detection) runs as one effect; retry scheduling and the running-job
-	// registration stay with the loop-owned state below.
-	var job runtimeJob
-	var createErr error
-	err := cb.mgr.runEffectSync(cfg.FullName(), func(ctx context.Context) error {
-		job, createErr = cb.mgr.createCollectorJob(cfg)
-		if createErr != nil {
-			return createErr
-		}
-		if err := job.AutoDetection(ctx); err != nil {
-			job.Cleanup()
-			return err
-		}
-		return nil
-	})
-
-	if createErr != nil {
-		if _, ok := errors.AsType[dyncfg.CodedError](createErr); ok {
-			return createErr
-		}
-		return &codedError{err: fmt.Errorf("invalid configuration: failed to apply configuration: %w", createErr), code: 400}
-	}
+	job, err := cb.mgr.createCollectorJob(ctx, cfg)
 	if err != nil {
+		// Creation failures cannot outlive the deadline meaningfully; claim
+		// so a raced abandon does not also expect a late outcome... they can:
+		// the claim decides which side reports.
+		effectControlFrom(ctx).claimCompletion()
+		if errors.Is(context.Cause(ctx), context.Canceled) {
+			return fmt.Errorf("job not created: %w", dyncfg.ErrPhaseNeverRan)
+		}
+		if _, ok := errors.AsType[dyncfg.CodedError](err); !ok {
+			err = &codedError{err: fmt.Errorf("invalid configuration: failed to apply configuration: %w", err), code: 400}
+		}
+		return err
+	}
+
+	detErr := job.AutoDetection(ctx)
+
+	if !effectControlFrom(ctx).claimCompletion() {
+		// Abandoned at the deadline: the command already committed its
+		// failure. SUCCESS becomes a warm-start continuation the loop
+		// validates and starts; FAILURE cleans up and evaluates retry
+		// eligibility now, under the normal rules.
+		if detErr == nil {
+			// The registered gate is this job's own (the key is busy for the
+			// whole effect, so no same-name replacement can interleave); drop
+			// paths deregister exactly it.
+			gate, _ := cb.mgr.emissionGates.lookup(cfg.FullName())
+			effectControlFrom(ctx).setResume(&warmResume{cfg: cfg, job: job, gate: gate})
+			return nil
+		}
+		job.Cleanup()
+		cb.mgr.emissionGates.remove(cfg.FullName())
+		if _, ok := errors.AsType[dyncfg.CodedError](detErr); ok {
+			if dyncfg.IsRetryableError(detErr) {
+				cb.mgr.scheduleRetryTask(cfg, job)
+			}
+		} else {
+			cb.mgr.scheduleRetryTask(cfg, job)
+		}
+		return detErr
+	}
+
+	if detErr != nil {
+		job.Cleanup()
 		// Tracking removal only. The gate itself stays open by contract -
 		// closing is reserved for abandoning a wedged stop - and no writer
 		// survives here anyway: the job never started.
 		cb.mgr.emissionGates.remove(cfg.FullName())
-		if _, ok := errors.AsType[dyncfg.CodedError](err); ok {
-			if dyncfg.IsRetryableError(err) {
+		if errors.Is(context.Cause(ctx), context.Canceled) {
+			// Shutdown interrupted the detection (a ctx-honoring module
+			// returned early): not a detection failure - answer retryably,
+			// publish nothing, schedule nothing.
+			return fmt.Errorf("detection interrupted: %w", dyncfg.ErrPhaseNeverRan)
+		}
+		if _, ok := errors.AsType[dyncfg.CodedError](detErr); ok {
+			if dyncfg.IsRetryableError(detErr) {
 				cb.mgr.scheduleRetryTask(cfg, job)
 			}
-			return err
+			return detErr
 		}
 		cb.mgr.scheduleRetryTask(cfg, job)
-		return fmt.Errorf("job enable failed: %w", err)
+		return fmt.Errorf("job enable failed: %w", detErr)
+	}
+
+	if errors.Is(context.Cause(ctx), context.Canceled) {
+		// Shutdown began while the detection was finishing (the child won
+		// the completion claim against the cancelled context): never start
+		// fresh collector work - the enable answers retryably instead.
+		job.Cleanup()
+		cb.mgr.emissionGates.remove(cfg.FullName())
+		return fmt.Errorf("job not started: %w", dyncfg.ErrPhaseNeverRan)
 	}
 
 	cb.mgr.startRunningJob(job)
 	return nil
 }
 
-func (cb *collectorCallbacks) Update(oldCfg, newCfg confgroup.Config) error {
+func (cb *collectorCallbacks) Update(ctx context.Context, oldCfg, newCfg confgroup.Config) error {
 	cb.mgr.retryingTasks.remove(oldCfg)
-	cb.mgr.stopRunningJob(oldCfg.FullName())
 	cb.mgr.fileStatus.remove(oldCfg)
-
-	var job runtimeJob
-	var createErr error
-	err := cb.mgr.runEffectSync(newCfg.FullName(), func(ctx context.Context) error {
-		job, createErr = cb.mgr.createCollectorJob(newCfg)
-		if createErr != nil {
-			return createErr
-		}
-		if err := job.AutoDetection(ctx); err != nil {
-			job.Cleanup()
-			return err
-		}
-		return nil
-	})
-
-	if createErr != nil {
-		var ce dyncfg.CodedError
-		if errors.As(createErr, &ce) {
-			return createErr
-		}
-		return fmt.Errorf("job update failed: %w", createErr)
+	stopped := cb.mgr.stopRunningJob(ctx, oldCfg.FullName())
+	if stopped {
+		// Point of no return: the old instance is stopped. A shutdown
+		// interruption from here on must commit as a disruptive failure - a
+		// never-ran rollback would resurrect a state that no longer exists.
+		// A no-op stop (the old config was not running) tears nothing down,
+		// so never-ran (and its rollback) stays the truthful outcome.
+		effectControlFrom(ctx).markDisruptive()
 	}
+
+	// A stop phase that exceeded its deadline fails the update here: the
+	// replacement's start phase never begins (no second instance).
+	if effectControlFrom(ctx).abandonedNow() {
+		return fmt.Errorf("job update failed: the previous instance's stop timed out and was abandoned")
+	}
+
+	job, err := cb.mgr.createCollectorJob(ctx, newCfg)
 	if err != nil {
-		// Tracking removal only; see the identical note in Start.
-		cb.mgr.emissionGates.remove(newCfg.FullName())
+		effectControlFrom(ctx).claimCompletion()
+		if errors.Is(context.Cause(ctx), context.Canceled) {
+			if !stopped {
+				// Nothing was torn down: answer retryably with rollback.
+				return fmt.Errorf("job not created: %w", dyncfg.ErrPhaseNeverRan)
+			}
+			// Shutdown interrupted the replacement's creation. The old
+			// instance is already stopped: a disruptive failure, not a
+			// rollback.
+			return fmt.Errorf("job update failed: the manager is shutting down; the replacement was not created")
+		}
 		var ce dyncfg.CodedError
 		if errors.As(err, &ce) {
-			if dyncfg.IsRetryableError(err) {
-				cb.mgr.scheduleRetryTask(newCfg, job)
-			}
 			return err
 		}
-		cb.mgr.scheduleRetryTask(newCfg, job)
 		return fmt.Errorf("job update failed: %w", err)
 	}
 
+	detErr := job.AutoDetection(ctx)
+
+	if !effectControlFrom(ctx).claimCompletion() {
+		if detErr == nil {
+			gate, _ := cb.mgr.emissionGates.lookup(newCfg.FullName())
+			effectControlFrom(ctx).setResume(&warmResume{cfg: newCfg, job: job, gate: gate})
+			return nil
+		}
+		job.Cleanup()
+		cb.mgr.emissionGates.remove(newCfg.FullName())
+		if _, ok := errors.AsType[dyncfg.CodedError](detErr); ok {
+			if dyncfg.IsRetryableError(detErr) {
+				cb.mgr.scheduleRetryTask(newCfg, job)
+			}
+		} else {
+			cb.mgr.scheduleRetryTask(newCfg, job)
+		}
+		return detErr
+	}
+
+	if detErr != nil {
+		job.Cleanup()
+		// Tracking removal only; see the identical note in Start.
+		cb.mgr.emissionGates.remove(newCfg.FullName())
+		if errors.Is(context.Cause(ctx), context.Canceled) {
+			if !stopped {
+				return fmt.Errorf("job not started: %w", dyncfg.ErrPhaseNeverRan)
+			}
+			// Shutdown interrupted the replacement's detection: disruptive
+			// failure (the old instance is already stopped), no retry.
+			return fmt.Errorf("job update failed: the manager is shutting down; the replacement was not started")
+		}
+		var ce dyncfg.CodedError
+		if errors.As(detErr, &ce) {
+			if dyncfg.IsRetryableError(detErr) {
+				cb.mgr.scheduleRetryTask(newCfg, job)
+			}
+			return detErr
+		}
+		cb.mgr.scheduleRetryTask(newCfg, job)
+		return fmt.Errorf("job update failed: %w", detErr)
+	}
+
+	if errors.Is(context.Cause(ctx), context.Canceled) {
+		// Shutdown began while the replacement's detection was finishing:
+		// never start fresh collector work.
+		job.Cleanup()
+		cb.mgr.emissionGates.remove(newCfg.FullName())
+		if !stopped {
+			// Nothing was torn down: answer retryably with rollback.
+			return fmt.Errorf("job not started: %w", dyncfg.ErrPhaseNeverRan)
+		}
+		// The old instance is already stopped, so this is a disruptive
+		// failure (status failed), not a rollback - unlike the never-ran
+		// phase, half the update happened.
+		return fmt.Errorf("job update failed: the manager is shutting down; the replacement was not started")
+	}
+
 	cb.mgr.startRunningJob(job)
 	return nil
 }
 
-func (cb *collectorCallbacks) Stop(cfg confgroup.Config) {
+func (cb *collectorCallbacks) Stop(ctx context.Context, cfg confgroup.Config) {
 	cb.mgr.retryingTasks.remove(cfg)
-	cb.mgr.stopRunningJob(cfg.FullName())
+	// Persisted-status removal precedes the blocking wait so the deadline
+	// path (which commits disable/remove while the stop is still wedged)
+	// observes it done.
 	cb.mgr.fileStatus.remove(cfg)
+	cb.mgr.stopRunningJob(ctx, cfg.FullName())
+	effectControlFrom(ctx).claimCompletion()
 }
 
 func (cb *collectorCallbacks) OnStatusChange(entry *dyncfg.Entry[confgroup.Config], _ dyncfg.Status, _ dyncfg.Function) {
