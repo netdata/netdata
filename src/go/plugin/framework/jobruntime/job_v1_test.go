@@ -102,14 +102,14 @@ func TestJob_RetryAutoDetection(t *testing.T) {
 	assert.True(t, job.RetryAutoDetection())
 	assert.Equal(t, infTries, job.AutoDetectTries)
 	for range 1000 {
-		_ = job.check()
+		_ = job.check(context.Background())
 	}
 	assert.True(t, job.RetryAutoDetection())
 	assert.Equal(t, infTries, job.AutoDetectTries)
 
 	job.AutoDetectTries = 10
 	for range 10 {
-		_ = job.check()
+		_ = job.check(context.Background())
 	}
 	assert.False(t, job.RetryAutoDetection())
 	assert.Equal(t, 0, job.AutoDetectTries)
@@ -134,7 +134,7 @@ func TestJob_AutoDetection(t *testing.T) {
 	}
 	job.module = m
 
-	assert.NoError(t, job.AutoDetection())
+	assert.NoError(t, job.AutoDetection(context.Background()))
 	assert.Equal(t, 3, v)
 }
 
@@ -148,7 +148,7 @@ func TestJob_AutoDetection_FailInit(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection())
+	assert.Error(t, job.AutoDetection(context.Background()))
 	assert.False(t, job.RetryAutoDetection())
 	assert.True(t, m.CleanupDone)
 }
@@ -163,7 +163,7 @@ func TestJob_AutoDetection_RetryableFailInitKeepsRetry(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection())
+	assert.Error(t, job.AutoDetection(context.Background()))
 	assert.True(t, job.RetryAutoDetection())
 	assert.True(t, m.CleanupDone)
 }
@@ -178,7 +178,7 @@ func TestJob_AutoDetection_ForeignRetryableFailInitDisablesRetry(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection())
+	assert.Error(t, job.AutoDetection(context.Background()))
 	assert.False(t, job.RetryAutoDetection())
 	assert.True(t, m.CleanupDone)
 }
@@ -195,7 +195,7 @@ func TestJob_AutoDetection_FailCheck(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection())
+	assert.Error(t, job.AutoDetection(context.Background()))
 	assert.True(t, m.CleanupDone)
 }
 
@@ -214,7 +214,7 @@ func TestJob_AutoDetection_FailPostCheck(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection())
+	assert.Error(t, job.AutoDetection(context.Background()))
 	assert.True(t, m.CleanupDone)
 }
 
@@ -227,7 +227,7 @@ func TestJob_AutoDetection_PanicInit(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection())
+	assert.Error(t, job.AutoDetection(context.Background()))
 	assert.True(t, m.CleanupDone)
 }
 
@@ -243,7 +243,7 @@ func TestJob_AutoDetection_PanicCheck(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection())
+	assert.Error(t, job.AutoDetection(context.Background()))
 	assert.True(t, m.CleanupDone)
 }
 
@@ -262,7 +262,7 @@ func TestJob_AutoDetection_PanicPostCheck(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection())
+	assert.Error(t, job.AutoDetection(context.Background()))
 	assert.True(t, m.CleanupDone)
 }
 
@@ -424,7 +424,7 @@ func TestJob_AutoDetection_FunctionOnly_NilCharts(t *testing.T) {
 	}
 	job.module = m
 
-	assert.NoError(t, job.AutoDetection())
+	assert.NoError(t, job.AutoDetection(context.Background()))
 }
 
 func TestJob_AutoDetection_FunctionOnlyFailCheckCleansUp(t *testing.T) {
@@ -443,7 +443,7 @@ func TestJob_AutoDetection_FunctionOnlyFailCheckCleansUp(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection())
+	assert.Error(t, job.AutoDetection(context.Background()))
 	assert.True(t, m.CleanupDone)
 	assert.Equal(t, 1, cleanupCalls)
 }

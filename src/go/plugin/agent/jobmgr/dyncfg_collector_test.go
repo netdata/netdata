@@ -1806,7 +1806,7 @@ func (j *collectorProbeJob) Collector() any     { return nil }
 func (j *collectorProbeJob) Start()             {}
 func (j *collectorProbeJob) Stop()              { j.stopped = true }
 func (j *collectorProbeJob) Tick(int)           {}
-func (j *collectorProbeJob) AutoDetection() error {
+func (j *collectorProbeJob) AutoDetection(context.Context) error {
 	return nil
 }
 func (j *collectorProbeJob) AutoDetectionEvery() int { return 0 }

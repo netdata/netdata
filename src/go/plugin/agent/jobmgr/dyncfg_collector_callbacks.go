@@ -125,7 +125,9 @@ func (cb *collectorCallbacks) Start(cfg confgroup.Config) error {
 		return &codedError{err: fmt.Errorf("invalid configuration: failed to apply configuration: %w", err), code: 400}
 	}
 
-	if err := job.AutoDetection(); err != nil {
+	// Detection is uncancellable by contract: Init/Check run to completion
+	// (no deadline or shutdown cancellation is wired into this path).
+	if err := job.AutoDetection(context.Background()); err != nil {
 		job.Cleanup()
 		var ce dyncfg.CodedError
 		if errors.As(err, &ce) {
@@ -156,7 +158,9 @@ func (cb *collectorCallbacks) Update(oldCfg, newCfg confgroup.Config) error {
 		return fmt.Errorf("job update failed: %w", err)
 	}
 
-	if err := job.AutoDetection(); err != nil {
+	// Detection is uncancellable by contract: Init/Check run to completion
+	// (no deadline or shutdown cancellation is wired into this path).
+	if err := job.AutoDetection(context.Background()); err != nil {
 		job.Cleanup()
 		var ce dyncfg.CodedError
 		if errors.As(err, &ce) {

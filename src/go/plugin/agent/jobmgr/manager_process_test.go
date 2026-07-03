@@ -975,7 +975,7 @@ func (j *lockProbeJob) Tick(_ int) {
 		<-j.tickRelease
 	})
 }
-func (j *lockProbeJob) AutoDetection() error              { return nil }
+func (j *lockProbeJob) AutoDetection(context.Context) error              { return nil }
 func (j *lockProbeJob) AutoDetectionEvery() int           { return 0 }
 func (j *lockProbeJob) RetryAutoDetection() bool          { return false }
 func (j *lockProbeJob) Cleanup()                          {}
@@ -998,7 +998,7 @@ func (j *tickProbeJob) Collector() any                    { return j.collector }
 func (j *tickProbeJob) Start()                            {}
 func (j *tickProbeJob) Stop()                             {}
 func (j *tickProbeJob) Tick(int)                          {}
-func (j *tickProbeJob) AutoDetection() error              { return nil }
+func (j *tickProbeJob) AutoDetection(context.Context) error              { return nil }
 func (j *tickProbeJob) AutoDetectionEvery() int           { return 0 }
 func (j *tickProbeJob) RetryAutoDetection() bool          { return false }
 func (j *tickProbeJob) Cleanup()                          {}
