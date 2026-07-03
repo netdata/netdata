@@ -39,6 +39,7 @@ type jobFactory struct {
 	modules     collectorapi.Registry
 	vnodeLookup func(string) (*vnodes.VirtualNode, bool)
 	out         io.Writer
+	gates       *emissionGates
 
 	validationOnly bool
 
@@ -66,6 +67,7 @@ func newJobFactory(m *Manager) *jobFactory {
 		modules:     m.modules,
 		vnodeLookup: m.vnodesCtl.Lookup,
 		out:         m.out,
+		gates:       m.emissionGates,
 
 		auditMode:     m.auditMode,
 		auditAnalyzer: m.auditAnalyzer,
@@ -114,10 +116,23 @@ func (f *jobFactory) create(cfg confgroup.Config) (runtimeJob, error) {
 
 	f.logger.Debugf("creating %s[%s] job, config: %v", cfg.Module(), cfg.Name(), cfg)
 
-	if creator.CreateV2 != nil {
-		return f.createV2(cfg, creator, functionOnly, vnode)
+	// Every runnable job writes through its own emission gateway so job
+	// output can be provably fenced off; the gate stays open for the job's
+	// whole life on the normal path. Validation-only jobs never run, so they
+	// get no gate registration.
+	gatedF := *f
+	if !f.validationOnly {
+		gate := newEmissionGateway(f.out)
+		gatedF.out = gate
+		if f.gates != nil {
+			f.gates.add(cfg.FullName(), gate)
+		}
 	}
-	return f.createV1(cfg, creator, functionOnly, vnode)
+
+	if creator.CreateV2 != nil {
+		return gatedF.createV2(cfg, creator, functionOnly, vnode)
+	}
+	return gatedF.createV1(cfg, creator, functionOnly, vnode)
 }
 
 func (f *jobFactory) logApplyConfigError(cfg confgroup.Config, err error) {

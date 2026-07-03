@@ -112,6 +112,7 @@ func New(cfg Config) *Manager {
 		collectorExposed:  exposed,
 		secretStoreDeps:   newSecretStoreDeps(),
 		runningJobs:       newRunningJobsCache(),
+		emissionGates:     newEmissionGates(),
 		retryingTasks:     newRetryingTasksCache(),
 
 		started:          make(chan struct{}),
@@ -211,6 +212,7 @@ type Manager struct {
 	secretStoreDeps   *secretStoreDeps
 	retryingTasks     *retryingTasks
 	runningJobs       *runningJobs
+	emissionGates     *emissionGates
 
 	// Controllers and handlers.
 	funcCtl            *funcctl.Controller
@@ -551,6 +553,7 @@ func (m *Manager) stopRunningJob(name string) {
 		m.funcCtl.OnJobStop(job)
 		m.requestFunctionReconcile(job.ModuleName())
 		job.Stop()
+		m.emissionGates.remove(name)
 	}
 }
 
