@@ -337,7 +337,7 @@ bool check_params(int argc, char **argv, char *err, size_t err_size) {
     return true;
 }
 
-bool check_positive_integer_argument(const char *cmd, int argc, char **argv, const char *name, char *err, size_t err_size) {
+bool check_positive_integer_argument(const char *cmd, int argc, char **argv, const char *name, unsigned long max, char *err, size_t err_size) {
     for (int i = 2; i < argc - 1; i++) {
         if (strcmp(argv[i], name) != 0)
             continue;
@@ -367,6 +367,17 @@ bool check_positive_integer_argument(const char *cmd, int argc, char **argv, con
             return false;
         }
 
+        // Bound privileged-helper inputs: ndsudo is setuid-root, so an unbounded
+        // value here could keep a root powermetrics process running for a long time.
+        if (max) {
+            errno = 0;
+            unsigned long v = strtoul(value, NULL, 10);
+            if (errno == ERANGE || v > max) {
+                snprintf(err, err_size, "%s: %s must be at most %lu ms", cmd, name, max);
+                return false;
+            }
+        }
+
         return true;
     }
 
@@ -374,9 +385,14 @@ bool check_positive_integer_argument(const char *cmd, int argc, char **argv, con
     return false;
 }
 
+// Upper bound for the powermetrics sample window accepted by the setuid helper,
+// to keep the privileged powermetrics invocation bounded even when ndsudo is
+// invoked directly. The macos plugin uses a 1s window; 60s is a generous ceiling.
+#define NDSUDO_POWERMETRICS_SAMPLE_WINDOW_MS_MAX 60000UL
+
 bool check_command_specific_params(const char *cmd, int argc, char **argv, char *err, size_t err_size) {
     if (strcmp(cmd, "powermetrics-thermal-smc") == 0 || strcmp(cmd, "powermetrics-thermal") == 0)
-        return check_positive_integer_argument(cmd, argc, argv, "--sampleWindowMs", err, err_size);
+        return check_positive_integer_argument(cmd, argc, argv, "--sampleWindowMs", NDSUDO_POWERMETRICS_SAMPLE_WINDOW_MS_MAX, err, err_size);
 
     return true;
 }
