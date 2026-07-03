@@ -36,7 +36,7 @@ metrics:
   # Limits cardinality explosion from high-cardinality label combinations.
   max_new_charts_per_request: 100
 
-# Directory where all OpenTelemetry data (logs, traces) is stored.
+# Directory where OpenTelemetry logs and traces are stored.
 # Must be an absolute path.
 base_dir: @logdir_POST@/otel/v2
 
@@ -67,13 +67,13 @@ storage:
 auth:
   # Require senders to identify a tenant via the X-Scope-OrgID gRPC header.
   # When disabled, all data belongs to a single "default" tenant.
-  # Applies to logs (and traces); metrics have no tenants.
+  # Applies to logs and traces; metrics have no tenants.
   enabled: false
 
 logs:
   rotation:
     # Incoming logs are appended to a current file; a new file starts when
-    # any of these limits is reached.
+    # any of these limits is reached after a request is received.
     default:
       max_file_size: "25MB"
       max_log_entries: 50000
