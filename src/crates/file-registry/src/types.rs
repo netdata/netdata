@@ -24,8 +24,11 @@ impl TenantId {
     /// to name it.
     pub const DEFAULT: &'static str = "default";
 
-    /// Byte-length cap shared by both validation policies.
-    pub const MAX_LEN: usize = 255;
+    /// Byte-length cap shared by both validation policies. 64 keeps the
+    /// deepest tenant-derived path well under legacy Windows `MAX_PATH`
+    /// (260) and every path component under eCryptfs's ~143-char limit;
+    /// the charset is ASCII-only, so bytes equal characters.
+    pub const MAX_LEN: usize = 64;
 
     /// The [`DEFAULT`](TenantId::DEFAULT) tenant.
     pub fn default_tenant() -> Self {
@@ -33,14 +36,14 @@ impl TenantId {
     }
 
     /// Ingest-side validation: a client-supplied tenant id becomes a
-    /// per-tenant directory name, so the rules are strict — 1-255
+    /// per-tenant directory name, so the rules are strict — 1-64
     /// bytes of `[a-zA-Z0-9._-]`, and never `.`, `..`, or the literal
     /// [`DEFAULT`](TenantId::DEFAULT) (clients may not claim the
     /// auth-disabled tenant). The error is the human-readable reason,
     /// for the transport layer to wrap.
     pub fn validate_ingest(id: &str) -> Result<Self, &'static str> {
         if id.is_empty() || id.len() > Self::MAX_LEN {
-            return Err("tenant ID must be 1-255 bytes");
+            return Err("tenant ID must be 1-64 bytes");
         }
         if id == "." || id == ".." || id == Self::DEFAULT {
             return Err("tenant ID must not be '.', '..', or 'default'");
@@ -419,9 +422,15 @@ mod tenant_id_tests {
         let cases: std::collections::HashMap<&str, (&str, bool)> = [
             ("simple id", ("tenant-a", true)),
             ("all allowed classes", ("a.B_9-z", true)),
-            ("exactly max length", ("x".repeat(255).leak() as &str, true)),
+            (
+                "exactly max length",
+                ("x".repeat(TenantId::MAX_LEN).leak() as &str, true),
+            ),
             ("empty", ("", false)),
-            ("over max length", ("x".repeat(256).leak() as &str, false)),
+            (
+                "over max length",
+                ("x".repeat(TenantId::MAX_LEN + 1).leak() as &str, false),
+            ),
             ("dot", (".", false)),
             ("dotdot", ("..", false)),
             ("reserved default", ("default", false)),
@@ -449,7 +458,7 @@ mod tenant_id_tests {
             TenantId::resolve_query(Some("")),
             TenantId::default_tenant()
         );
-        let long = "x".repeat(256);
+        let long = "x".repeat(TenantId::MAX_LEN + 1);
         assert_eq!(
             TenantId::resolve_query(Some(&long)),
             TenantId::default_tenant()
