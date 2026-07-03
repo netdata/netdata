@@ -68,6 +68,8 @@ func (m *mockRuntimeComponentService) UnregisterComponent(name string) {
 	m.unregistered = append(m.unregistered, name)
 }
 
+func (m *mockRuntimeComponentService) QuarantineComponent(_ string) {}
+
 func (m *mockRuntimeComponentService) RegisterProducer(_ string, _ func() error) error {
 	return nil
 }
