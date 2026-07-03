@@ -765,6 +765,10 @@ int do_macos_nvme_smart(int update_every __maybe_unused, usec_t dt __maybe_unuse
             // keep rediscovery gated for up to discovery_every_s, leaving NVMe
             // health charts missing long after IOKit is readable again.
             last_discovery_ut = 0;
+            // Reuse the device-id space so the same physical NVMe devices get
+            // stable nvme0/nvme1 chart names on recovery instead of churning to
+            // ever-higher ids across each transient outage.
+            nvme_next_device_id = 0;
         }
     } else {
         consecutive_read_failures = 0;
