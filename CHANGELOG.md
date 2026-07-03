@@ -532,6 +532,15 @@
 - Docs: Clarify netdata.conf is comment-only with built-in defaults ([#22823](https://github.com/netdata/netdata/issues/22823))
 - Docs: Add Windows free-tier dashboard lock note to access control doc ([#22824](https://github.com/netdata/netdata/issues/22824))
 - Update vendored NetIPC to 98ec474 ([#22936](https://github.com/netdata/netdata/issues/22936))
+- Feat(go.d): add AWS cloudwatch collector ([#22874](https://github.com/netdata/netdata/issues/22874))
+- Docs: Add SQL Server Express edition support note to mssql metadata ([#22838](https://github.com/netdata/netdata/issues/22838))
+- Feat(go.d/cloudwatch): add Amazon CloudFront support ([#22944](https://github.com/netdata/netdata/issues/22944))
+- Docs: consolidate cloud VM sizing into impact-on-resources.md ([#22837](https://github.com/netdata/netdata/issues/22837))
+- Feat(go.d/cloudwatch): add profiles for Auto Scaling, Bedrock, EventBridge, and Site-to-Site VPN ([#22948](https://github.com/netdata/netdata/issues/22948))
+- Feat(go.d/cloudwatch): add EKS control-plane profile ([#22949](https://github.com/netdata/netdata/issues/22949))
+- Regenerate integrations docs ([#22933](https://github.com/netdata/netdata/issues/22933))
+- Test(go.d): add jobmgr/dyncfg characterization tests ([#22950](https://github.com/netdata/netdata/issues/22950))
+- Refactor(go.d): route jobmgr commands through an executor seam ([#22951](https://github.com/netdata/netdata/issues/22951))
 
 ## [2.10.0] - 2026-04-09
 
