@@ -328,7 +328,7 @@ For more information, see [Netdata's impact on resources](/docs/netdata-agent/si
 
 ## Practical Implications
 
-Please also see [Netdata Enterprise Evaluation Guide](/docs/netdata-enterprise-evaluation-corrected.md) and [Netdata's Security and Privacy Design](/docs/security-and-privacy-design/README.md).
+Please also see [Netdata Enterprise Evaluation Guide](/docs/netdata-enterprise-evaluation.md) and [Netdata's Security and Privacy Design](/docs/security-and-privacy-design/README.md).
 
 ### For Small Teams
 

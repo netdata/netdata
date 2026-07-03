@@ -355,7 +355,7 @@ There is some extra network latency involved, but this is usually small (a few m
 
 - **[Deploy your first Agent](/docs/deployment-guides/standalone-deployment.md)** - Start monitoring in 60 seconds
 - **[Configure Parents](/docs/deployment-guides/deployment-with-centralization-points.md)** - Scale to hundreds of nodes
-- **[Design for Enterprise](/docs/netdata-enterprise-evaluation-corrected.md)** - Architect for thousands
+- **[Design for Enterprise](/docs/netdata-enterprise-evaluation.md)** - Architect for thousands
 - **[Try Netdata Cloud](/docs/netdata-cloud/README.md)** - Unified visibility across everything
 
 *Based on real production deployments, independent research (University of Amsterdam, ICSOC 2023), and comparative testing (2025). All metrics and resource usage figures represent typical production scenarios.*
