@@ -798,3 +798,168 @@ async fn reconcile_remote_uploads_skips_unparseable_key() {
 
     cancel.cancel();
 }
+
+// ── recover_unindexed: skip-and-orphan on seal failure ──────────────────
+
+/// Indexer mock that fails every request — drives the skip-and-orphan path
+/// without needing an undecodable fixture.
+struct FailingIndexer;
+
+impl crate::component::Component for FailingIndexer {
+    type Request = crate::ipc::IndexerRequest;
+    type Response = crate::ipc::IndexerResponse;
+    type Args = ();
+
+    async fn run(
+        _args: (),
+        mut rx: tokio::sync::mpsc::UnboundedReceiver<Self::Request>,
+        tx: tokio::sync::mpsc::UnboundedSender<Self::Response>,
+        _cancel: tokio_util::sync::CancellationToken,
+    ) {
+        while let Some(req) = rx.recv().await {
+            let crate::ipc::IndexerRequest::Index { wal_path, .. } = req;
+            let _ = tx.send(crate::ipc::IndexerResponse::IndexFailed {
+                path: wal_path,
+                error: "mock: undecodable".into(),
+            });
+        }
+    }
+}
+
+/// Cleaner mock that panics on any request — the failure path must send
+/// none (no `DeleteWalFile` for an orphan: the file is kept on disk).
+struct IdleCleaner;
+
+impl crate::component::Component for IdleCleaner {
+    type Request = crate::ipc::CleanerRequest;
+    type Response = crate::ipc::CleanerResponse;
+    type Args = ();
+
+    async fn run(
+        _args: (),
+        mut rx: tokio::sync::mpsc::UnboundedReceiver<Self::Request>,
+        _tx: tokio::sync::mpsc::UnboundedSender<Self::Response>,
+        _cancel: tokio_util::sync::CancellationToken,
+    ) {
+        if let Some(req) = rx.recv().await {
+            panic!("the orphan path must send no cleaner requests, got: {req:?}");
+        }
+    }
+}
+
+#[tokio::test]
+async fn recover_unindexed_orphans_unsealable_wals() {
+    // A real archived WAL file, tracked by directory recovery.
+    let wal_dir = tempfile::tempdir().unwrap();
+    let seq_alloc = std::sync::Arc::new(wal::SeqAllocator::ephemeral(0));
+    let mut writer = wal::Writer::new(
+        wal_dir.path(),
+        wal::Config::default(),
+        seq_alloc,
+        wal::FileStamp {
+            pipeline_id: 0,
+            payload_format: 7,
+        },
+    )
+    .unwrap();
+    writer
+        .write_frame(
+            1,
+            &[],
+            b"junk",
+            wal::FrameMeta {
+                entry_count: 1,
+                ingestion_ns: file_registry::TimestampNs(1),
+                log_ts_range: None,
+            },
+        )
+        .unwrap();
+    writer.shutdown_all().unwrap();
+
+    let mut wal_reg = wal::Registry::new(wal_dir.path());
+    wal_reg.recover().unwrap();
+    let sfst_dir = tempfile::tempdir().unwrap();
+    let catalog_dir = tempfile::tempdir().unwrap();
+    let mut registry = Registry::new(
+        wal_reg,
+        sfst::Registry::new(sfst_dir.path()),
+        otel_catalog::Registry::new(catalog_dir.path(), TenantId::from("tenant1")),
+    );
+
+    let ids = registry.unindexed_ids();
+    assert_eq!(ids.len(), 1, "one archived unindexed WAL");
+    let wal_path = registry.wal.file_path(ids[0]);
+    let seq = ids[0].seq;
+
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let mut indexer =
+        crate::component::ComponentHandle::spawn::<FailingIndexer>((), cancel.clone());
+    let mut cleaner = crate::component::ComponentHandle::spawn::<IdleCleaner>((), cancel.clone());
+
+    // A seal failure must not fail recovery (the pre-change code bailed with
+    // "refusing to start").
+    recover_unindexed(&mut registry, &mut indexer, &mut cleaner)
+        .await
+        .expect("seal failures are skipped, not fatal");
+
+    // The entry is untracked (the planner never sees it)...
+    assert!(registry.wal.get(seq).is_none(), "WAL entry untracked");
+    assert!(registry.unindexed_ids().is_empty());
+    // ...the routing predicate drops it (no dangling seq_to_tenant entry)...
+    assert!(!registry.holds_seq(seq), "orphan seq must not be routable");
+    // ...and the bytes stay on disk (keep-orphans policy).
+    assert!(wal_path.exists(), "orphan file kept on disk");
+
+    // Second restart: the orphan is re-discovered (its header is valid),
+    // the seal is retried, and it re-orphans — the self-healing loop the
+    // policy promises, not a one-shot skip.
+    let mut wal_reg2 = wal::Registry::new(wal_dir.path());
+    wal_reg2.recover().unwrap();
+    let sfst_dir2 = tempfile::tempdir().unwrap();
+    let catalog_dir2 = tempfile::tempdir().unwrap();
+    let mut registry2 = Registry::new(
+        wal_reg2,
+        sfst::Registry::new(sfst_dir2.path()),
+        otel_catalog::Registry::new(catalog_dir2.path(), TenantId::from("tenant1")),
+    );
+    assert_eq!(
+        registry2.unindexed_ids(),
+        vec![ids[0]],
+        "orphan re-discovered on restart"
+    );
+    recover_unindexed(&mut registry2, &mut indexer, &mut cleaner)
+        .await
+        .expect("re-orphaning is not fatal either");
+    assert!(registry2.wal.get(seq).is_none(), "re-untracked");
+    assert!(wal_path.exists(), "orphan still on disk after second cycle");
+
+    cancel.cancel();
+}
+
+/// The routing predicate the pipeline's post-recovery filter keys on: a WAL
+/// entry alone suffices, an SFST entry alone suffices, neither means the seq
+/// must not be routed (a flipped `||` or a dropped arm fails here).
+#[test]
+fn holds_seq_tracks_wal_or_sfst_artifacts() {
+    let catalog_dir = tempfile::tempdir().unwrap();
+    let mut registry = make_registry(catalog_dir.path());
+    let id = file_registry::FileId::new(machine(), boot(), 0, 7, 1);
+
+    assert!(!registry.holds_seq(7), "nothing tracked yet");
+
+    registry
+        .wal
+        .apply_event(&wal::FileEvent::Created {
+            file_id: id,
+            created_at_ns: file_registry::TimestampNs(1),
+            content_meta: vec![],
+        })
+        .unwrap();
+    assert!(registry.holds_seq(7), "a WAL entry alone suffices");
+
+    registry.wal.remove_by_seq(7);
+    assert!(!registry.holds_seq(7), "untracked after removal");
+
+    registry.sfst.track(id, ByteSize(1), empty_summary());
+    assert!(registry.holds_seq(7), "an SFST entry alone suffices");
+}

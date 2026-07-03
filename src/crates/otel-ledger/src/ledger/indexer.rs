@@ -39,6 +39,9 @@ impl Ledger {
     pub(super) async fn handle_indexer_resp(&mut self, signal: Signal, resp: IndexerResponse) {
         let (seq, summary, size) = match resp {
             IndexerResponse::IndexFailed { path, error } => {
+                // Intentional divergence from `recover_unindexed`: at runtime
+                // the entry stays tracked (and queryable as a WAL) until the
+                // next restart's recovery retries the seal and orphans it.
                 tracing::error!(path = %path.display(), "indexing failed: {error}");
                 return;
             }

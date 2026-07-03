@@ -246,7 +246,9 @@ impl Registry {
     /// today). Either way the planner has no authoritative range to
     /// filter against. The same `Archived(ZERO, ZERO)` case from a
     /// failed `recover_unindexed` is impossible in steady state because
-    /// the ledger refuses to start when indexing fails.
+    /// recovery untracks the entry on a seal failure (the file is kept
+    /// on disk as an orphan and retried at the next restart), so it
+    /// never reaches this filter.
     ///
     /// Partition filter is matched against the file's `id.part_key`
     /// (one key per `(namespace, name)` pair); equivalent to comparing

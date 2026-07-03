@@ -244,7 +244,18 @@ where
     tracing::info!(signal = segment, "recovery complete");
 
     for (seq, tenant_id) in seq_routes {
-        registries.route_seq_to(seq, tenant_id);
+        // Routes were collected before recovery, which may have dropped the
+        // seq since: an unsealable WAL untracked as an orphan, or an
+        // empty-WAL seal whose entry the cleaner drain removed. A route to a
+        // seq with no entry would dangle for the process lifetime — route
+        // only what survived.
+        let survives = registries
+            .tenants
+            .get(&tenant_id)
+            .is_some_and(|r| r.holds_seq(seq));
+        if survives {
+            registries.route_seq_to(seq, tenant_id);
+        }
     }
 
     // Wrap registries for shared access between the run-loop and

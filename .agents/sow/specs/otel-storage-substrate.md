@@ -256,12 +256,20 @@ detectable on disk:
   renamed identity blob) is rejected, not misread. Frames were already
   CRC-protected.
 - **Orphan policy (user decision, 2026-07-03): unreadable/unsealable WAL files
-  are kept.** Recovery logs and skips a file whose header fails validation
-  (`wal::Registry::recover`); a seal failure is logged and the file stays on
-  disk (`IndexFailed` handling). No quarantine, no auto-delete — this is
-  intentional, not an accident: the files are evidence, and disk cost is
-  bounded by WAL transience. Detection shipped at GA; decoders for superseded
-  formats are added later only if a real migration ever needs them.
+  are kept, and never block startup.**
+  - Unreadable header (bad version/CRC/flags): `wal::Registry::recover` logs
+    and skips the file — never tracked, invisible to the planner.
+  - Seal failure at startup: `recover_unindexed` logs it, removes the
+    registry entry, and continues — the file stays on disk, the ledger starts
+    and serves without it, and the next restart re-discovers and retries it
+    (self-healing for transient causes at the next restart, not at runtime).
+    The pre-2026-07 refuse-to-start behavior was replaced by user decision.
+  - Seal failure at runtime: logged; the file stays on disk and its entry
+    converges to the same orphan state at the next restart's recovery.
+  - No quarantine, no auto-delete — intentional: the files are evidence, and
+    disk cost is bounded by WAL transience. Detection shipped at GA; decoders
+    for superseded formats are added later only if a real migration ever
+    needs them.
 
 ## Invariants
 

@@ -13,12 +13,14 @@ use super::now_ns;
 
 /// Index any WAL files that were archived but not yet indexed.
 ///
-/// **Hard-fails** if any WAL cannot be indexed: the ledger refuses to
-/// start with un-indexable WAL files, because leaving them around would
-/// produce a registry entry with no SFST counterpart and a `(ZERO, ZERO)`
-/// log-data range — an invalid state the query planner would have to
-/// special-case. Operators must remove or repair the offending file
-/// before restarting.
+/// A WAL that cannot be indexed is **skipped as an orphan**: the failure is
+/// logged, the file's registry entry is removed (so no tracked entry without
+/// an SFST counterpart survives — the query planner never sees it), and the
+/// bytes stay on disk. No quarantine, no auto-delete, and startup proceeds.
+/// The next restart re-discovers the file (its header is valid), retries the
+/// seal, and re-orphans it on failure — so a transient cause (e.g. a disk
+/// error) self-heals, while an undecodable file is retried and logged once
+/// per restart, never silently dropped.
 pub async fn recover_unindexed(
     registry: &mut Registry,
     indexer: &mut ComponentHandle<IndexerRequest, IndexerResponse>,
@@ -39,7 +41,7 @@ pub async fn recover_unindexed(
         })
         .collect();
 
-    let mut failures: Vec<(std::path::PathBuf, String)> = Vec::new();
+    let mut failures: usize = 0;
     batch_recover(requests, indexer, |resp| match resp {
         IndexerResponse::Indexed { seq, summary, .. } => {
             let wf = match registry.wal.get(seq) {
@@ -87,29 +89,39 @@ pub async fn recover_unindexed(
             }
         }
         IndexerResponse::IndexFailed { path, error } => {
+            // Skip-and-orphan (the decided policy): untrack the entry so the
+            // planner never sees a WAL without an SFST, keep the file on
+            // disk, and carry on serving.
+            failures += 1;
             tracing::error!(
-                "recovery: indexing failed path={} error={error}",
+                "recovery: indexing failed path={} error={error}; \
+                 kept on disk as an orphan (untracked; retried next restart)",
                 path.display(),
             );
-            failures.push((path.clone(), error.clone()));
+            match file_registry::FileId::parse(&path) {
+                Some(id) => {
+                    registry.wal.remove_by_seq(id.seq);
+                }
+                None => {
+                    // Unreachable in practice: the path came from a tracked
+                    // FileId. Log rather than assume.
+                    tracing::error!(
+                        "recovery: cannot parse FileId from failed WAL path {}; \
+                         entry left tracked",
+                        path.display(),
+                    );
+                }
+            }
         }
     })
     .await?;
 
-    if !failures.is_empty() {
-        let detail = failures
-            .iter()
-            .map(|(p, e)| format!("{} ({e})", p.display()))
-            .collect::<Vec<_>>()
-            .join("; ");
-        anyhow::bail!(
-            "recovery: failed to index {} WAL file(s); refusing to start. \
-             Resolve the underlying failure (corrupt frame, disk error, etc.) \
-             and remove or repair the offending file before retrying. Details: {detail}",
-            failures.len(),
+    if failures > 0 {
+        tracing::warn!(
+            "recovery: {failures} WAL file(s) could not be indexed; \
+             kept on disk as orphans, not tracked"
         );
     }
-
     tracing::info!("recovery indexing complete");
     Ok(())
 }
