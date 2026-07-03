@@ -7591,7 +7591,7 @@
           },
           "virtualization": {
             "type": "string",
-            "description": "Virtualization Type. Linux/macOS values follow the systemd-detect-virt taxonomy (kvm, qemu, vmware, xen, microsoft, oracle, amazon, ...); Windows agents emit the same canonical values via the windows-api probe chain (microsoft for Hyper-V guests, vmware for VMware guests, oracle for VirtualBox, kvm/qemu for KVM/QEMU guests, none for bare metal).",
+            "description": "Virtualization Type. Linux/macOS values follow the systemd-detect-virt taxonomy (kvm, qemu, vmware, xen, microsoft, oracle, amazon, ...). Windows agents emit the same canonical values when the windows-api probe chain can identify the hypervisor (for example microsoft for Hyper-V guests including Microsoft Hv markers, vmware for VMware guests, oracle for VirtualBox, kvm/qemu for KVM/QEMU guests, none for bare metal) and emit unknown when Windows confirms virtualization but cannot safely name the platform.",
             "example": "kvm"
           },
           "virt_detection": {
