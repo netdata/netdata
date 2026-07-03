@@ -37,6 +37,7 @@ static void macos_main_cleanup(void *pptr)
 
     macos_powermetrics_cleanup();
     macos_nvme_smart_cleanup();
+    macos_power_sources_cleanup();
     worker_unregister();
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;

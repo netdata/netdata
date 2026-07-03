@@ -276,7 +276,11 @@ static bool macos_powermetrics_read_stdout(POPEN_INSTANCE *pi, char **output, si
             }
         }
 
-        if (pfd.revents & POLLHUP)
+        // Drain any buffered data before reacting to POLLHUP: poll reports
+        // POLLIN | POLLHUP together when the writer closes with data still in the
+        // pipe, and a single read() only pulls a chunk. Breaking on POLLHUP while
+        // POLLIN is also set would discard the tail of the plist.
+        if ((pfd.revents & POLLHUP) && !(pfd.revents & POLLIN))
             break;
     }
 
@@ -400,14 +404,6 @@ static bool macos_powermetrics_run_sample(struct macos_powermetrics_sample *samp
     char interval_ms[32];
     snprintfz(interval_ms, sizeof(interval_ms), "%d", pm.sample_window_ms);
 
-    const char *argv_ndsudo_thermal_smc[] = {
-        pm.command,
-        MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL_SMC,
-        "--sampleWindowMs",
-        interval_ms,
-        NULL,
-    };
-
     const char *argv_ndsudo_thermal[] = {
         pm.command,
         MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL,
@@ -416,18 +412,34 @@ static bool macos_powermetrics_run_sample(struct macos_powermetrics_sample *samp
         NULL,
     };
 
-    const char *argv_direct_thermal_smc[] = {
-        pm.command,
-        "-n",
-        "1",
-        "-i",
-        interval_ms,
-        "-s",
-        MACOS_POWERMETRICS_SAMPLERS_THERMAL_SMC,
-        "-f",
-        "plist",
-        NULL,
-    };
+    if (!pm.thermal_only_fallback) {
+        // These two argv variants are only used in this branch; keep them scoped
+        // here (cppcheck variableScope) rather than at function scope.
+        const char *argv_ndsudo_thermal_smc[] = {
+            pm.command,
+            MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL_SMC,
+            "--sampleWindowMs",
+            interval_ms,
+            NULL,
+        };
+
+        const char *argv_direct_thermal_smc[] = {
+            pm.command,
+            "-n",
+            "1",
+            "-i",
+            interval_ms,
+            "-s",
+            MACOS_POWERMETRICS_SAMPLERS_THERMAL_SMC,
+            "-f",
+            "plist",
+            NULL,
+        };
+
+        const char **argv_thermal_smc = pm.use_ndsudo ? argv_ndsudo_thermal_smc : argv_direct_thermal_smc;
+        if (macos_powermetrics_run_argv(argv_thermal_smc, sample))
+            return true;
+    }
 
     const char *argv_direct_thermal[] = {
         pm.command,
@@ -441,12 +453,6 @@ static bool macos_powermetrics_run_sample(struct macos_powermetrics_sample *samp
         "plist",
         NULL,
     };
-
-    if (!pm.thermal_only_fallback) {
-        const char **argv_thermal_smc = pm.use_ndsudo ? argv_ndsudo_thermal_smc : argv_direct_thermal_smc;
-        if (macos_powermetrics_run_argv(argv_thermal_smc, sample))
-            return true;
-    }
 
     const char **argv_thermal = pm.use_ndsudo ? argv_ndsudo_thermal : argv_direct_thermal;
     if (macos_powermetrics_run_argv(argv_thermal, sample)) {

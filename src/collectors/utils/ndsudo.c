@@ -355,7 +355,14 @@ bool check_positive_integer_argument(const char *cmd, int argc, char **argv, con
             }
         }
 
-        if (value[0] == '0' && value[1] == '\0') {
+        bool all_zero = true;
+        for (const char *s = value; *s; s++) {
+            if (*s != '0') {
+                all_zero = false;
+                break;
+            }
+        }
+        if (all_zero) {
             snprintf(err, err_size, "%s: %s must be greater than zero", cmd, name);
             return false;
         }

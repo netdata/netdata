@@ -14,5 +14,6 @@ int do_macos_nvme_smart(int update_every, usec_t dt);
 
 void macos_powermetrics_cleanup(void);
 void macos_nvme_smart_cleanup(void);
+void macos_power_sources_cleanup(void);
 
 #endif /* NETDATA_PLUGIN_MACOS_H */

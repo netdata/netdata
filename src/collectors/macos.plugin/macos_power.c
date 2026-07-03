@@ -15,6 +15,7 @@
 
 struct macos_power_source {
     struct power_supply ps;
+    char *raw_name;
     struct simple_property capacity;
     struct simple_property voltage;
 
@@ -102,20 +103,43 @@ static void macos_power_source_free(struct macos_power_source *ps)
         return;
 
     macos_power_source_obsolete(ps);
+    freez(ps->raw_name);
     freez(ps->ps.name);
     freez(ps);
 }
 
+void macos_power_sources_cleanup(void)
+{
+    // Release every known power source on plugin shutdown / module disable:
+    // macos_power_source_free() marks each source's charts obsolete and frees
+    // the name + struct allocated in macos_power_source_get_or_create().
+    for (struct macos_power_source *ps = power_sources_root; ps; ) {
+        struct macos_power_source *next = ps->next;
+        macos_power_source_free(ps);
+        ps = next;
+    }
+    power_sources_root = NULL;
+}
+
 static struct macos_power_source *macos_power_source_get_or_create(const char *name)
 {
+    // Lookup is keyed on the RAW IOKit name: two sources whose names sanitize
+    // to the same chart id must stay distinct entries, otherwise the second
+    // source's metrics would silently overwrite the first. The sanitized form is
+    // stored separately in ps->ps.name for chart id / label use.
     for (struct macos_power_source *ps = power_sources_root; ps; ps = ps->next) {
-        if (ps->ps.name && !strcmp(ps->ps.name, name))
+        if (ps->raw_name && !strcmp(ps->raw_name, name))
             return ps;
     }
 
+    char chart_id[MACOS_POWER_SOURCE_NAME_MAX + 1];
+    snprintfz(chart_id, sizeof(chart_id), "%s", name);
+    netdata_fix_chart_id(chart_id);
+
     struct macos_power_source *ps = callocz(1, sizeof(*ps));
-    ps->ps.name = strdupz(name);
-    ps->ps.hash = simple_hash(name);
+    ps->raw_name = strdupz(name);
+    ps->ps.name = strdupz(chart_id);
+    ps->ps.hash = simple_hash(chart_id);
     ps->ps.capacity = &ps->capacity;
     ps->capacity.fd = -1;
     ps->ps.next = NULL;
@@ -339,7 +363,6 @@ int do_macos_power_sources(int update_every, usec_t dt __maybe_unused)
         if (!cf_dictionary_get_string(desc, CFSTR(kIOPSNameKey), name, sizeof(name)))
             snprintfz(name, sizeof(name), "PowerSource%ld", (long)i + 1);
 
-        netdata_fix_chart_id(name);
         struct macos_power_source *ps = macos_power_source_get_or_create(name);
         ps->seen = true;
 

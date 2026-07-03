@@ -309,6 +309,10 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     }
 
     functions_evloop_cancel_threads(wg);
+    // Wait for function worker threads to fully exit before freeing the registry:
+    // cancel only requests cancellation, and workers access used_hashes_registry via
+    // facets_report(), so destroying it first would be a use-after-free.
+    functions_evloop_join_threads(wg);
     dictionary_destroy(used_hashes_registry);
     return 0;
 }

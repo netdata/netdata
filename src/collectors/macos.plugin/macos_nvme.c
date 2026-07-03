@@ -758,8 +758,14 @@ int do_macos_nvme_smart(int update_every __maybe_unused, usec_t dt __maybe_unuse
                 "NVMe health charts will appear when macOS exposes readable NVMe SMART data");
             nvme_logged_read_error = true;
         }
-        if (consecutive_read_failures >= 3)
+        if (consecutive_read_failures >= 3) {
             macos_nvme_free_devices();
+            // Force immediate rediscovery on the next sample cycle: a transient
+            // read outage freed the devices, but last_discovery_ut would otherwise
+            // keep rediscovery gated for up to discovery_every_s, leaving NVMe
+            // health charts missing long after IOKit is readable again.
+            last_discovery_ut = 0;
+        }
     } else {
         consecutive_read_failures = 0;
     }
