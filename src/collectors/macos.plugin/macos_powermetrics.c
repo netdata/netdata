@@ -66,7 +66,6 @@ struct macos_powermetrics_state {
     bool failed_permanently;
     bool logged_unavailable;
     int consecutive_failures;
-    bool thermal_only_fallback;
 
     bool use_ndsudo;
     int sample_every_s;
@@ -412,12 +411,6 @@ static bool macos_powermetrics_run_argv(const char **argv, struct macos_powermet
 
 static bool macos_powermetrics_run_sample(struct macos_powermetrics_sample *sample)
 {
-    // Retry the full thermal+SMC path on every sample: thermal_only_fallback is
-    // set below when the SMC samplers fail, but resetting it here means a
-    // transient SMC outage does not permanently drop fan/SMC metrics for the
-    // lifetime of the process.
-    pm.thermal_only_fallback = false;
-
     char interval_ms[32];
     snprintfz(interval_ms, sizeof(interval_ms), "%d", pm.sample_window_ms);
 
@@ -429,34 +422,35 @@ static bool macos_powermetrics_run_sample(struct macos_powermetrics_sample *samp
         NULL,
     };
 
-    if (!pm.thermal_only_fallback) {
-        // These two argv variants are only used in this branch; keep them scoped
-        // here (cppcheck variableScope) rather than at function scope.
-        const char *argv_ndsudo_thermal_smc[] = {
-            pm.command,
-            MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL_SMC,
-            "--sampleWindowMs",
-            interval_ms,
-            NULL,
-        };
+    // Try the full thermal+SMC sampler first; fall back to thermal-only when the
+    // SMC samplers are unavailable (e.g. Apple Silicon without SMC). Retrying
+    // the SMC path each sample means a transient SMC outage recovers on the next
+    // cycle; the cost during a permanent outage is one failed spawn per sample
+    // (~60s default), which is negligible.
+    const char *argv_ndsudo_thermal_smc[] = {
+        pm.command,
+        MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL_SMC,
+        "--sampleWindowMs",
+        interval_ms,
+        NULL,
+    };
 
-        const char *argv_direct_thermal_smc[] = {
-            pm.command,
-            "-n",
-            "1",
-            "-i",
-            interval_ms,
-            "-s",
-            MACOS_POWERMETRICS_SAMPLERS_THERMAL_SMC,
-            "-f",
-            "plist",
-            NULL,
-        };
+    const char *argv_direct_thermal_smc[] = {
+        pm.command,
+        "-n",
+        "1",
+        "-i",
+        interval_ms,
+        "-s",
+        MACOS_POWERMETRICS_SAMPLERS_THERMAL_SMC,
+        "-f",
+        "plist",
+        NULL,
+    };
 
-        const char **argv_thermal_smc = pm.use_ndsudo ? argv_ndsudo_thermal_smc : argv_direct_thermal_smc;
-        if (macos_powermetrics_run_argv(argv_thermal_smc, sample))
-            return true;
-    }
+    const char **argv_thermal_smc = pm.use_ndsudo ? argv_ndsudo_thermal_smc : argv_direct_thermal_smc;
+    if (macos_powermetrics_run_argv(argv_thermal_smc, sample))
+        return true;
 
     const char *argv_direct_thermal[] = {
         pm.command,
@@ -472,10 +466,8 @@ static bool macos_powermetrics_run_sample(struct macos_powermetrics_sample *samp
     };
 
     const char **argv_thermal = pm.use_ndsudo ? argv_ndsudo_thermal : argv_direct_thermal;
-    if (macos_powermetrics_run_argv(argv_thermal, sample)) {
-        pm.thermal_only_fallback = true;
+    if (macos_powermetrics_run_argv(argv_thermal, sample))
         return true;
-    }
 
     return false;
 }
@@ -670,18 +662,20 @@ static void macos_powermetrics_update_thermal_levels(const struct macos_powermet
         rd_smc_io_thermal_level = rrddim_add(st_smc_thermal_level, "io", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    if (sample->has_cpu_thermal_level)
-        rrddim_set_by_pointer(
-            st_smc_thermal_level,
-            rd_smc_cpu_thermal_level,
-            (collected_number)sample->cpu_thermal_level);
-    if (sample->has_gpu_thermal_level)
-        rrddim_set_by_pointer(
-            st_smc_thermal_level,
-            rd_smc_gpu_thermal_level,
-            (collected_number)sample->gpu_thermal_level);
-    if (sample->has_io_thermal_level)
-        rrddim_set_by_pointer(st_smc_thermal_level, rd_smc_io_thermal_level, (collected_number)sample->io_thermal_level);
+    // Set every dimension each sample (0 when the sampler omitted it) so the
+    // chart reflects the current sample instead of latching the previous value.
+    rrddim_set_by_pointer(
+        st_smc_thermal_level,
+        rd_smc_cpu_thermal_level,
+        sample->has_cpu_thermal_level ? (collected_number)sample->cpu_thermal_level : 0);
+    rrddim_set_by_pointer(
+        st_smc_thermal_level,
+        rd_smc_gpu_thermal_level,
+        sample->has_gpu_thermal_level ? (collected_number)sample->gpu_thermal_level : 0);
+    rrddim_set_by_pointer(
+        st_smc_thermal_level,
+        rd_smc_io_thermal_level,
+        sample->has_io_thermal_level ? (collected_number)sample->io_thermal_level : 0);
 
     rrdset_done(st_smc_thermal_level);
 }
@@ -707,10 +701,8 @@ static void macos_powermetrics_update_prochot(const struct macos_powermetrics_sa
         rd_smc_prochot = rrddim_add(st_smc_prochot, "smc", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    if (sample->has_cpu_prochot)
-        rrddim_set_by_pointer(st_smc_prochot, rd_smc_cpu_prochot, sample->cpu_prochot ? 1 : 0);
-    if (sample->has_smc_prochot)
-        rrddim_set_by_pointer(st_smc_prochot, rd_smc_prochot, sample->smc_prochot ? 1 : 0);
+    rrddim_set_by_pointer(st_smc_prochot, rd_smc_cpu_prochot, sample->has_cpu_prochot ? (sample->cpu_prochot ? 1 : 0) : 0);
+    rrddim_set_by_pointer(st_smc_prochot, rd_smc_prochot, sample->has_smc_prochot ? (sample->smc_prochot ? 1 : 0) : 0);
 
     rrdset_done(st_smc_prochot);
 }
@@ -746,6 +738,10 @@ int do_macos_powermetrics(int update_every, usec_t dt __maybe_unused)
 
     if (failed_permanently) {
         macos_powermetrics_mark_charts_obsolete();
+        // Join the background thread and release the mutex now, instead of
+        // deferring to full plugin shutdown, so disabling the module does not
+        // leak the worker thread until exit.
+        macos_powermetrics_cleanup();
         return 1;
     }
 

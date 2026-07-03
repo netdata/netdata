@@ -80,7 +80,7 @@ UI configuration requires paid Netdata Cloud plan.
 
 Install `smartmontools` version 7.0 or later using your operating system's package manager. Version 7.0 introduced the `--json` output mode, which is required for this collector to function properly.
 
-On macOS, Netdata runs `smartctl` through the setuid `ndsudo` helper. The `smartctl` binary must be available from a root-controlled trusted path searched by `ndsudo`; do not add user-writable package-manager prefixes to the setuid helper path. Apple internal NVMe/Apple Fabric storage may still not expose detailed SMART data through smartmontools even when the tool is installed.
+On macOS, Netdata runs `smartctl` through the setuid `ndsudo` helper. The `smartctl` binary must be found in `ndsudo`'s search PATH (`/bin`, `/sbin`, `/usr/bin`, `/usr/sbin`, `/usr/local/bin`, `/usr/local/sbin`); install it via a package manager that places it in one of those directories. Apple internal NVMe/Apple Fabric storage may still not expose detailed SMART data through smartmontools even when the tool is installed.
 
 
 #### For Netdata running in a Docker container
