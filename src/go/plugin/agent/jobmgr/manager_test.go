@@ -23,7 +23,7 @@ func TestManager_Run(t *testing.T) {
 				cfg := prepareStockCfg("success", "name")
 
 				return &runSim{
-					do: func(mgr *Manager, in chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, cfg.Source(), cfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
@@ -55,7 +55,7 @@ CONFIG test:collector:success:name delete
 				cfg := prepareStockCfg("fail", "name")
 
 				return &runSim{
-					do: func(mgr *Manager, in chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, cfg.Source(), cfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
@@ -85,7 +85,7 @@ CONFIG test:collector:fail:name delete
 				cfg := prepareStockCfg("fail", "name")
 
 				return &runSim{
-					do: func(mgr *Manager, in chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, cfg.Source(), cfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
@@ -115,7 +115,7 @@ CONFIG test:collector:fail:name delete
 				cfg := prepareUserCfg("success", "name")
 
 				return &runSim{
-					do: func(mgr *Manager, in chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, cfg.Source(), cfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
@@ -147,7 +147,7 @@ CONFIG test:collector:success:name delete
 				cfg := prepareUserCfg("fail", "name")
 
 				return &runSim{
-					do: func(mgr *Manager, in chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, cfg.Source(), cfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
@@ -179,7 +179,7 @@ CONFIG test:collector:fail:name delete
 				cfg := prepareDiscoveredCfg("success", "name")
 
 				return &runSim{
-					do: func(mgr *Manager, in chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, cfg.Source(), cfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
@@ -211,7 +211,7 @@ CONFIG test:collector:success:name delete
 				cfg := prepareDiscoveredCfg("fail", "name")
 
 				return &runSim{
-					do: func(mgr *Manager, in chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, cfg.Source(), cfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
@@ -245,7 +245,7 @@ CONFIG test:collector:fail:name delete
 				userCfg := prepareUserCfg("fail", "user")
 
 				return &runSim{
-					do: func(mgr *Manager, in chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, stockCfg.Source(), stockCfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
@@ -253,14 +253,14 @@ CONFIG test:collector:fail:name delete
 						}))
 
 						sendConfGroup(in, discCfg.Source(), discCfg)
-						waitSourceExposed(mgr, discCfg)
+						waitSourceExposed(t, mgr, discCfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-enable",
 							Args: []string{mgr.dyncfgJobID(discCfg), "enable"},
 						}))
 
 						sendConfGroup(in, userCfg.Source(), userCfg)
-						waitSourceExposed(mgr, userCfg)
+						waitSourceExposed(t, mgr, userCfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "3-enable",
 							Args: []string{mgr.dyncfgJobID(userCfg), "enable"},
@@ -308,7 +308,7 @@ CONFIG test:collector:fail:name delete
 				userCfg := prepareUserCfg("fail", "name")
 
 				return &runSim{
-					do: func(mgr *Manager, in chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, stockCfg.Source(), stockCfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
@@ -316,14 +316,14 @@ CONFIG test:collector:fail:name delete
 						}))
 
 						sendConfGroup(in, discCfg.Source(), discCfg)
-						waitSourceExposed(mgr, discCfg)
+						waitSourceExposed(t, mgr, discCfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-enable",
 							Args: []string{mgr.dyncfgJobID(discCfg), "enable"},
 						}))
 
 						sendConfGroup(in, userCfg.Source(), userCfg)
-						waitSourceExposed(mgr, userCfg)
+						waitSourceExposed(t, mgr, userCfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "3-enable",
 							Args: []string{mgr.dyncfgJobID(userCfg), "enable"},
@@ -378,7 +378,7 @@ CONFIG test:collector:fail:name status failed
 				userCfg := prepareUserCfg("fail", "name")
 
 				return &runSim{
-					do: func(mgr *Manager, in chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, stockCfg.Source(), stockCfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
@@ -386,14 +386,14 @@ CONFIG test:collector:fail:name status failed
 						}))
 
 						sendConfGroup(in, discCfg.Source(), discCfg)
-						waitSourceExposed(mgr, discCfg)
+						waitSourceExposed(t, mgr, discCfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-enable",
 							Args: []string{mgr.dyncfgJobID(discCfg), "enable"},
 						}))
 
 						sendConfGroup(in, userCfg.Source(), userCfg)
-						waitSourceExposed(mgr, userCfg)
+						waitSourceExposed(t, mgr, userCfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "3-enable",
 							Args: []string{mgr.dyncfgJobID(userCfg), "enable"},
@@ -444,7 +444,7 @@ CONFIG test:collector:fail:name delete
 				stockCfg := prepareStockCfg("fail", "name")
 
 				return &runSim{
-					do: func(mgr *Manager, in chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, userCfg.Source(), userCfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
@@ -487,7 +487,7 @@ CONFIG test:collector:fail:name status failed
 				stockCfg := prepareStockCfg("fail", "name")
 
 				return &runSim{
-					do: func(mgr *Manager, in chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, userCfg.Source(), userCfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
@@ -540,7 +540,7 @@ func TestManager_Run_Dyncfg_Get(t *testing.T) {
 				cfg := prepareDyncfgCfg("success", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-get",
 							Args: []string{mgr.dyncfgJobID(cfg), "get"},
@@ -567,7 +567,7 @@ FUNCTION_RESULT_END
 				bs, _ := json.Marshal(cfg)
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
@@ -609,7 +609,7 @@ FUNCTION_RESULT_END
 				bs, _ := json.Marshal(cfg)
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
@@ -663,7 +663,7 @@ func TestManager_Run_Dyncfg_Userconfig(t *testing.T) {
 				cfg := prepareDyncfgCfg("success", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-userconfig",
 							Args: []string{mgr.dyncfgJobID(cfg), "userconfig"},
@@ -690,7 +690,7 @@ FUNCTION_RESULT_END
 				cfg := prepareDyncfgCfg("success!", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-userconfig",
 							Args: []string{mgr.dyncfgJobID(cfg), "userconfig"},
@@ -727,7 +727,7 @@ func TestManager_Run_Dyncfg_Add(t *testing.T) {
 				cfg := prepareDyncfgCfg("success", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
@@ -759,7 +759,7 @@ CONFIG test:collector:success:test create accepted job /collectors/test/Jobs dyn
 				cfg := prepareDyncfgCfg("fail", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
@@ -791,7 +791,7 @@ CONFIG test:collector:fail:test create accepted job /collectors/test/Jobs dyncfg
 				cfg := prepareDyncfgCfg("success", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
@@ -849,7 +849,7 @@ func TestManager_Run_Dyncfg_Enable(t *testing.T) {
 				cfg := prepareDyncfgCfg("success", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
 							Args: []string{mgr.dyncfgJobID(cfg), "enable"},
@@ -873,7 +873,7 @@ FUNCTION_RESULT_END
 				cfg := prepareDyncfgCfg("success", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
@@ -915,7 +915,7 @@ CONFIG test:collector:success:test status running
 				cfg := prepareDyncfgCfg("success", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
@@ -967,7 +967,7 @@ CONFIG test:collector:success:test status running
 				cfg := prepareDyncfgCfg("fail", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
@@ -1009,7 +1009,7 @@ CONFIG test:collector:fail:test status failed
 				cfg := prepareDyncfgCfg("fail", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
@@ -1075,7 +1075,7 @@ func TestManager_Run_Dyncfg_Disable(t *testing.T) {
 				cfg := prepareDyncfgCfg("success", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-disable",
 							Args: []string{mgr.dyncfgJobID(cfg), "disable"},
@@ -1099,7 +1099,7 @@ FUNCTION_RESULT_END
 				cfg := prepareDyncfgCfg("success", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
@@ -1141,7 +1141,7 @@ CONFIG test:collector:success:test status disabled
 				cfg := prepareDyncfgCfg("success", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
@@ -1193,7 +1193,7 @@ CONFIG test:collector:success:test status disabled
 				cfg := prepareDyncfgCfg("fail", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
@@ -1235,7 +1235,7 @@ CONFIG test:collector:fail:test status disabled
 				cfg := prepareDyncfgCfg("fail", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
@@ -1301,7 +1301,7 @@ func TestManager_Run_Dyncfg_Restart(t *testing.T) {
 				cfg := prepareDyncfgCfg("success", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-restart",
 							Args: []string{mgr.dyncfgJobID(cfg), "restart"},
@@ -1325,7 +1325,7 @@ FUNCTION_RESULT_END
 				cfg := prepareDyncfgCfg("success", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
@@ -1367,7 +1367,7 @@ CONFIG test:collector:success:test status accepted
 				cfg := prepareDyncfgCfg("success", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
@@ -1419,7 +1419,7 @@ CONFIG test:collector:success:test status running
 				cfg := prepareDyncfgCfg("success", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
@@ -1471,7 +1471,7 @@ CONFIG test:collector:success:test status disabled
 				cfg := prepareDyncfgCfg("success", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
@@ -1547,7 +1547,7 @@ func TestManager_Run_Dyncfg_Remove(t *testing.T) {
 				cfg := prepareDyncfgCfg("success", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-remove",
 							Args: []string{mgr.dyncfgJobID(cfg), "remove"},
@@ -1573,7 +1573,7 @@ FUNCTION_RESULT_END
 				discCfg := prepareDiscoveredCfg("success", "discovered")
 
 				return &runSim{
-					do: func(mgr *Manager, in chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, stockCfg.Source(), stockCfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
@@ -1649,7 +1649,7 @@ FUNCTION_RESULT_END
 				cfg := prepareDyncfgCfg("success", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
@@ -1687,7 +1687,7 @@ CONFIG test:collector:success:test delete
 				cfg := prepareDyncfgCfg("success", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
@@ -1749,7 +1749,7 @@ func TestManager_Run_Dyncfg_Update(t *testing.T) {
 				cfg := prepareDyncfgCfg("success", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-update",
 							Args:    []string{mgr.dyncfgJobID(cfg), "update"},
@@ -1779,7 +1779,7 @@ FUNCTION_RESULT_END
 				updBs, _ := json.Marshal(updCfg)
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
@@ -1838,7 +1838,7 @@ CONFIG test:collector:success:test status running
 				updBs, _ := json.Marshal(updCfg)
 
 				return &runSim{
-					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
@@ -1902,13 +1902,16 @@ CONFIG test:collector:success:test status disabled
 // config's enable only after receiving that config's CONFIG CREATE, so tests
 // driving multiple same-key configs must not fire an enable before the
 // previous command's effect published the replacement.
-func waitSourceExposed(mgr *Manager, cfg confgroup.Config) {
+func waitSourceExposed(t *testing.T, mgr *Manager, cfg confgroup.Config) {
+	t.Helper()
 	for range 500 {
 		if e, ok := mgr.collectorExposed.LookupByKey(cfg.ExposedKey()); ok && e.Cfg.SourceType() == cfg.SourceType() {
 			return
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
+	t.Fatalf("timed out waiting for source type %q to own the exposed entry for %q",
+		cfg.SourceType(), cfg.ExposedKey())
 }
 
 func sendConfGroup(in chan []*confgroup.Group, src string, configs ...confgroup.Config) {
@@ -1975,7 +1978,7 @@ func TestManager_Run_FunctionOnly(t *testing.T) {
 				cfg := prepareFunctionOnlyCfg("nofuncs", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, in chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, cfg.Source(), cfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
@@ -2007,7 +2010,7 @@ CONFIG test:collector:nofuncs:test status failed
 				cfg := prepareFunctionOnlyCfg("withfuncs", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, in chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, cfg.Source(), cfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
@@ -2039,7 +2042,7 @@ CONFIG test:collector:withfuncs:test status running
 				cfg := prepareUserCfg("funconly", "test")
 
 				return &runSim{
-					do: func(mgr *Manager, in chan []*confgroup.Group) {
+					do: func(t *testing.T, mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, cfg.Source(), cfg)
 						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",

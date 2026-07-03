@@ -2,7 +2,10 @@
 
 package ticker
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 
 type (
 	// Ticker holds a channel that delivers ticks of a clock at intervals.
@@ -10,6 +13,7 @@ type (
 	Ticker struct {
 		C        <-chan int
 		done     chan struct{}
+		stopOnce sync.Once
 		loops    int
 		interval time.Duration
 	}
@@ -21,7 +25,7 @@ type (
 func New(interval time.Duration) *Ticker {
 	ticker := &Ticker{
 		interval: interval,
-		done:     make(chan struct{}, 1),
+		done:     make(chan struct{}),
 	}
 	ticker.start()
 	return ticker
@@ -58,7 +62,8 @@ func (t *Ticker) start() {
 
 // Stop turns off a Ticker and promptly releases its goroutine. After Stop,
 // no more ticks are sent and the channel is closed once the goroutine
-// observes the stop; do not read C after Stop.
+// observes the stop; do not read C after Stop. Stop is idempotent: repeated
+// calls are safe and never block.
 func (t *Ticker) Stop() {
-	t.done <- struct{}{}
+	t.stopOnce.Do(func() { close(t.done) })
 }

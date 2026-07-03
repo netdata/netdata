@@ -60,3 +60,19 @@ func abs(a time.Duration) time.Duration {
 	}
 	return a
 }
+
+func TestTickerStopIsIdempotent(t *testing.T) {
+	tk := New(time.Hour)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		tk.Stop()
+		tk.Stop() // repeated Stop must never block
+		tk.Stop()
+	}()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Error("repeated Stop must not block")
+	}
+}

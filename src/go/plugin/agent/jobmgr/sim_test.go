@@ -31,7 +31,7 @@ type wantExposedEntry struct {
 }
 
 type runSim struct {
-	do func(mgr *Manager, in chan []*confgroup.Group)
+	do func(t *testing.T, mgr *Manager, in chan []*confgroup.Group)
 
 	wantDiscovered []confgroup.Config
 	wantSeen       []confgroup.Config
@@ -112,7 +112,7 @@ func (s *runSim) run(t *testing.T) {
 		t.Errorf("failed to start work in %s", timeout)
 	}
 
-	s.do(mgr, grpCh)
+	s.do(t, mgr, grpCh)
 
 	expectedResults := strings.Count(s.wantDyncfg, "FUNCTION_RESULT_END")
 	for _, wants := range s.wantDyncfgRecords {

@@ -157,7 +157,11 @@ func ageSeconds(sinceNanos int64) float64 {
 	if sinceNanos == 0 {
 		return 0
 	}
-	return time.Since(time.Unix(0, sinceNanos)).Seconds()
+	// Clamped: a wall-clock step backwards must not report negative age.
+	if s := time.Since(time.Unix(0, sinceNanos)).Seconds(); s > 0 {
+		return s
+	}
+	return 0
 }
 
 func (m *Manager) registerExecutorRuntimeComponent() {

@@ -27,7 +27,7 @@ func TestLaneKeyDerivation(t *testing.T) {
 				})
 			},
 			fn:       Function{Name: "config", Args: []string{"collector:job-a", "enable"}},
-			wantKey:  "config|collector:|job-a",
+			wantKey:  "config|collector:\x00job-a",
 			wantMeta: "meta-a",
 		},
 		"underivable request keeps the registration-wide lane": {

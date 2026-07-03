@@ -752,7 +752,11 @@ func (m *Manager) lookupFunctionRoute(fn Function) (handler Handler, scheduleKey
 					if laneKey, meta := m.deriveLaneKey(derive, fn); laneKey != "" {
 						// Narrow the registration lane to the derived identity;
 						// underivable requests keep the registration-wide lane.
-						return routeHandler, key + "|" + laneKey, meta, true
+						// A NUL byte joins the parts: it cannot appear in the
+						// line-based plugins.d protocol, so two different
+						// (route, lane) pairs can never concatenate into the
+						// same schedule key.
+						return routeHandler, key + "\x00" + laneKey, meta, true
 					}
 				}
 				return routeHandler, key, nil, true
