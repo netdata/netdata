@@ -143,9 +143,9 @@ The substrate stores the opaque `content_meta` (display identity) but **not** th
   marks the per-signal remote-key layout below — a pre-v4 catalog's entries embed
   the old segment-less `remote_key`, so it is rejected on recovery (per the
   no-back-compat rule below) rather than republished with stale keys.
-- **Remote object keys** (`otel-ledger` `remote_keys`, `SCHEMA_VERSION = "v1"`):
-  signal-scoped — `v1/{signal}/tenants/{tenant}/sfst/{date}/{file}.sfst` and
-  `v1/{signal}/catalog/{date}/{tenant}/{file}.catalog`. The `{signal}` segment is
+- **Remote object keys** (`file-lifecycle` `remote_keys`, `SCHEMA_VERSION = "v2"` (the former plugin's artifacts were the v1 generation)):
+  signal-scoped — `v2/{signal}/tenants/{tenant}/sfst/{date}/{file}.sfst` and
+  `v2/{signal}/catalog/{date}/{tenant}/{file}.catalog`. The `{signal}` segment is
   the per-signal storage separator (the decided design: signals live in distinct
   paths, not disambiguated by the filename); the `part_key` is still embedded via
   the `FileId` in the SFST filename. Each pipeline supplies its own signal name

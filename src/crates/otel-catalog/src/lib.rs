@@ -25,7 +25,7 @@ pub use registry::{File, Registry, filename, scan_max_sequence};
 /// lives only in `entry.id` (the `FileId`), the single source of truth.
 ///
 /// v4: each entry's `remote_key` now embeds the per-signal path segment
-/// (`v1/{signal}/...`). A pre-v4 catalog references the old segment-less layout
+/// (`v2/{signal}/...`). A pre-v4 catalog references the old segment-less layout
 /// (`v1/tenants/...`), so it is rejected on recovery rather than reused — this
 /// prevents a stale catalog from republishing remote keys that point at the
 /// now-orphaned old layout. There is no migration (experimental feature).

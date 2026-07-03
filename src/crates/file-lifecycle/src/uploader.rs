@@ -240,7 +240,7 @@ mod tests {
             pipeline_id: 0,
             seq: 7,
             local_path: path.to_path_buf(),
-            remote_key: "v1/key".to_owned(),
+            remote_key: "v2/key".to_owned(),
         }
     }
 
@@ -320,7 +320,7 @@ mod tests {
         let req = UploaderRequest::UploadCatalog {
             pipeline_id: 0,
             local_path: file.path().to_path_buf(),
-            remote_key: "v1/catalog/key".to_owned(),
+            remote_key: "v2/catalog/key".to_owned(),
             seqs: vec![1, 2, 3],
         };
         let resp = process(&storage, req).await;
@@ -340,7 +340,7 @@ mod tests {
         let req = UploaderRequest::UploadCatalog {
             pipeline_id: 0,
             local_path: file.path().to_path_buf(),
-            remote_key: "v1/catalog/key".to_owned(),
+            remote_key: "v2/catalog/key".to_owned(),
             seqs: vec![5],
         };
         let resp = process(&storage, req).await;

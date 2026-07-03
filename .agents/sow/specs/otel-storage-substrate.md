@@ -36,8 +36,8 @@ The substrate owns the machinery that operates only on neutral types
   catalog accumulation + rotation).
 - `storage` — the `Storage` trait + `OpendalStorage` client + reachability probe.
 - `remote_keys` — the object-storage key scheme, **signal-scoped at the root**
-  (`v1/{signal}/tenants/{tenant}/sfst/{date}/{file_id}.sfst` and
-  `v1/{signal}/catalog/{date}/{tenant}/…`); every signal carries its segment,
+  (`v2/{signal}/tenants/{tenant}/sfst/{date}/{file_id}.sfst` and
+  `v2/{signal}/catalog/{date}/{tenant}/…`); every signal carries its segment,
   none is implicit.
 - `chunk` — the query-time chunk cache (build singleflight + byte-budget LRU).
 - `query` — neutral candidate selection over the registry (local + remote).
@@ -94,7 +94,7 @@ by `bridge::signals` as the single source of truth:
 
 - `Signal { Logs, Traces }` — the closed enum of business signals. It owns the
   mapping: `pipeline_id() -> u16` (Logs=0, Traces=1), `segment() -> &'static str`
-  (`"logs"`/`"traces"`, the `v1/{segment}/` remote-key segment), `spec() ->
+  (`"logs"`/`"traces"`, the `v2/{segment}/` remote-key segment), `spec() ->
   SignalSpec`, and `TryFrom<u16>` (the wire/disk decode).
 - `SignalSpec { pipeline_id, segment }` — opaque, private fields, constructible
   only via `Signal::spec()`. It is the typed pair handed DOWN to the

@@ -1118,7 +1118,7 @@ async fn remote_only_sfst_is_fetched_and_served() {
 
     // Place the object in an fs:// remote backend at its catalog remote_key.
     let remote_dir = tempfile::tempdir().unwrap().keep();
-    let remote_key = "v1/logs/tenants/default/sfst/seq1.sfst";
+    let remote_key = "v2/logs/tenants/default/sfst/seq1.sfst";
     let obj_path = remote_dir.join(remote_key);
     std::fs::create_dir_all(obj_path.parent().unwrap()).unwrap();
     std::fs::write(&obj_path, &sfst_bytes).unwrap();
@@ -1241,11 +1241,11 @@ fn read_errors_reach_the_cache_log_redacted() {
     let inner = anyhow::anyhow!(
         "error sending request for url (https://sts.amazonaws.com/?Action=AssumeRoleWithWebIdentity&WebIdentityToken=SENTINEL_JWT)"
     );
-    let err = read_error_to_anyhow("v1/logs/x.sfst", StorageError::Other(inner));
+    let err = read_error_to_anyhow("v2/logs/x.sfst", StorageError::Other(inner));
     let rendered = format!("{err:#}");
     assert!(!rendered.contains("SENTINEL_JWT"), "leaked: {rendered}");
     assert!(
-        rendered.contains("remote read failed for v1/logs/x.sfst"),
+        rendered.contains("remote read failed for v2/logs/x.sfst"),
         "context lost: {rendered}"
     );
     assert!(
@@ -1253,6 +1253,6 @@ fn read_errors_reach_the_cache_log_redacted() {
         "cause lost or unredacted: {rendered}"
     );
 
-    let nf = read_error_to_anyhow("v1/logs/x.sfst", StorageError::NotFound);
+    let nf = read_error_to_anyhow("v2/logs/x.sfst", StorageError::NotFound);
     assert!(format!("{nf:#}").contains("remote object not found"));
 }

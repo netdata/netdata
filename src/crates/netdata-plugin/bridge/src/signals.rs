@@ -3,7 +3,7 @@
 //! A signal's identity is two values that must always agree: a numeric
 //! `pipeline_id` (stamped into every `FileId`, serialized into filenames and WAL
 //! frames, and used by the ledger to route events to the owning pipeline) and a
-//! remote-key segment (`v1/{segment}/...`). [`Signal`] is the one place that maps
+//! remote-key segment (`v2/{segment}/...`). [`Signal`] is the one place that maps
 //! a signal to that pair, so the two cannot drift apart; downstream layers carry
 //! `Signal` (or its opaque [`SignalSpec`]) instead of loose `(u16, &str)` pairs.
 //!
@@ -36,7 +36,7 @@ impl Signal {
         }
     }
 
-    /// The remote-key segment for this signal (`v1/{segment}/...`).
+    /// The remote-key segment for this signal (`v2/{segment}/...`).
     pub const fn segment(self) -> &'static str {
         match self {
             Signal::Logs => "logs",
@@ -96,7 +96,7 @@ impl SignalSpec {
         self.pipeline_id
     }
 
-    /// The remote-key segment (`v1/{segment}/...`).
+    /// The remote-key segment (`v2/{segment}/...`).
     pub const fn segment(&self) -> &'static str {
         self.segment
     }

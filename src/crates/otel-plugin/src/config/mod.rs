@@ -429,10 +429,10 @@ metrics:
   grace_period_secs: 60
   expiry_duration_secs: 900
   max_new_charts_per_request: 100
-base_dir: /var/log/netdata/otel/v1
+base_dir: /var/log/netdata/otel/v2
 storage:
   enabled: false
-  uri: "fs:///var/log/netdata/otel/v1/remote"
+  uri: "fs:///var/log/netdata/otel/v2/remote"
 auth:
   enabled: false
 logs:
@@ -518,11 +518,11 @@ traces:
         let config = resolved_stock();
         assert_eq!(
             config.base_dir,
-            std::path::Path::new("/var/log/netdata/otel/v1")
+            std::path::Path::new("/var/log/netdata/otel/v2")
         );
         // Storage + auth are global.
         assert!(!config.storage.enabled);
-        assert_eq!(config.storage.uri, "fs:///var/log/netdata/otel/v1/remote");
+        assert_eq!(config.storage.uri, "fs:///var/log/netdata/otel/v2/remote");
         // The fixture omits read_cache_max_size → the code default (1 GB).
         assert_eq!(config.storage.read_cache_max_size, ByteSize::gb(1));
         assert!(!config.auth.enabled);
@@ -535,15 +535,15 @@ traces:
         let logs = config.lifecycle_for(bridge::signals::Signal::Logs);
         assert_eq!(
             logs.wal.dir,
-            std::path::Path::new("/var/log/netdata/otel/v1/logs/wal")
+            std::path::Path::new("/var/log/netdata/otel/v2/logs/wal")
         );
         assert_eq!(
             logs.index.dir,
-            std::path::Path::new("/var/log/netdata/otel/v1/logs/index")
+            std::path::Path::new("/var/log/netdata/otel/v2/logs/index")
         );
         assert_eq!(
             logs.catalog.dir,
-            std::path::Path::new("/var/log/netdata/otel/v1/logs/catalog")
+            std::path::Path::new("/var/log/netdata/otel/v2/logs/catalog")
         );
         let rotation = config.logs.rotation.resolve("default");
         assert_eq!(rotation.max_file_size, ByteSize::mb(100));
@@ -563,7 +563,7 @@ traces:
         let traces = config.lifecycle_for(bridge::signals::Signal::Traces);
         assert_eq!(
             traces.wal.dir,
-            std::path::Path::new("/var/log/netdata/otel/v1/traces/wal")
+            std::path::Path::new("/var/log/netdata/otel/v2/traces/wal")
         );
         let rotation = config.traces.rotation.resolve("default");
         assert_eq!(rotation.max_log_entries, 50000);
@@ -721,11 +721,11 @@ storage:
         let traces = config.lifecycle_for(bridge::signals::Signal::Traces);
         assert_eq!(
             logs.read_cache_dir,
-            std::path::Path::new("/var/log/netdata/otel/v1/logs/remote-read")
+            std::path::Path::new("/var/log/netdata/otel/v2/logs/remote-read")
         );
         assert_eq!(
             traces.read_cache_dir,
-            std::path::Path::new("/var/log/netdata/otel/v1/traces/remote-read")
+            std::path::Path::new("/var/log/netdata/otel/v2/traces/remote-read")
         );
     }
 

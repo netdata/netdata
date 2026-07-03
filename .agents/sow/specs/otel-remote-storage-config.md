@@ -22,8 +22,8 @@ config (`config/signal.rs`, `config/env.rs`), `netdata-plugin/bridge` config
   runtime `LifecycleConfig::read_cache_dir` by `PluginConfig::lifecycle_for`. See
   [otel-storage-substrate.md](otel-storage-substrate.md) for the base-dir /
   derived-layout contract.
-- Each signal uploads under its own remote-key segment `v1/{signal}/...` (e.g.
-  `v1/logs/...`, `v1/traces/...`), so one backend cleanly holds every signal.
+- Each signal uploads under its own remote-key segment `v2/{signal}/...` (e.g.
+  `v2/logs/...`, `v2/traces/...`), so one backend cleanly holds every signal.
 
 ### Operator migration (storage moved global)
 

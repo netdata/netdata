@@ -36,7 +36,7 @@ pub struct PluginConfig {
     /// `{base_dir}/shared/`.
     pub base_dir: PathBuf,
     /// Remote object storage — global across signals (one on/off + one
-    /// backend). Each signal uploads under its own `v1/{signal}/...` prefix.
+    /// backend). Each signal uploads under its own `v2/{signal}/...` prefix.
     pub storage: StorageConfig,
     /// Tenant authentication — global across signals (one gRPC tenant policy
     /// for the process).
