@@ -27,6 +27,9 @@ async fn https_requests_reach_the_network_instead_of_failing_in_process() {
         .send()
         .await
         .expect_err("unroutable address must not succeed");
+    // The guard keys on reqwest's TLS-less rejection wording ("invalid URL,
+    // scheme is not http"). If a reqwest upgrade ever rephrases it, this
+    // assertion stops catching the regression — re-check the wording then.
     let rendered = format!("{err:?}");
     assert!(
         !rendered.contains("scheme"),

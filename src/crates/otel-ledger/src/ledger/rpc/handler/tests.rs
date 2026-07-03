@@ -1232,3 +1232,27 @@ async fn remote_fetch_failure_degrades() {
         "unreadable remote source is omitted: {v:#}"
     );
 }
+
+#[test]
+fn read_errors_reach_the_cache_log_redacted() {
+    // The cache logs this error with `{e:#}` — a raw inner chain would put
+    // the STS token (carried in the URL query) into the journal. Pin that
+    // the conversion flattens through StorageError's redacted Display.
+    let inner = anyhow::anyhow!(
+        "error sending request for url (https://sts.amazonaws.com/?Action=AssumeRoleWithWebIdentity&WebIdentityToken=SENTINEL_JWT)"
+    );
+    let err = read_error_to_anyhow("v1/logs/x.sfst", StorageError::Other(inner));
+    let rendered = format!("{err:#}");
+    assert!(!rendered.contains("SENTINEL_JWT"), "leaked: {rendered}");
+    assert!(
+        rendered.contains("remote read failed for v1/logs/x.sfst"),
+        "context lost: {rendered}"
+    );
+    assert!(
+        rendered.contains("https://sts.amazonaws.com/?[REDACTED]"),
+        "cause lost or unredacted: {rendered}"
+    );
+
+    let nf = read_error_to_anyhow("v1/logs/x.sfst", StorageError::NotFound);
+    assert!(format!("{nf:#}").contains("remote object not found"));
+}

@@ -105,7 +105,11 @@ with no shim:
   requests carry credentials (the raw web-identity JWT on the STS call,
   `X-Amz-Signature`/`X-Amz-Security-Token` on query-signed requests; reqsign
   sends the STS call as GET-with-token-in-query). The retry-layer notify log
-  goes through the same redaction. `Debug` on `StorageError` is UNREDACTED
+  goes through the same redaction, and the query-path remote-read errors
+  handed to the file-cache (which logs `{e:#}` verbatim) are flattened
+  through the same `Display` (otel-ledger `rpc/handler.rs`
+  `read_error_to_anyhow` — never extract the raw inner error there).
+  `Debug` on `StorageError` is UNREDACTED
   (test-only) and MUST NOT be used to log real backend errors.
 - One remaining unredacted path: a `from_uri` **parse** failure
   (`OpendalStorage::new`) may quote the URI as-is — parse errors carry no

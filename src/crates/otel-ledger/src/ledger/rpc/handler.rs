@@ -200,19 +200,11 @@ impl RemoteRead {
                     let key = keys.get(filename).cloned();
                     async move {
                         match key {
-                            // Preserve the full error chain: pull the inner
-                            // `anyhow::Error` out of `Other` (the cache logs the
-                            // fetch error with `{e:#}`) rather than flattening it
-                            // via `to_string()`.
                             Some(k) => {
-                                let bytes = storage.read(&k).await.map_err(|e| match e {
-                                    StorageError::NotFound => {
-                                        anyhow::anyhow!("remote object not found: {k}")
-                                    }
-                                    StorageError::Other(err) => {
-                                        err.context(format!("remote read failed for {k}"))
-                                    }
-                                })?;
+                                let bytes = storage
+                                    .read(&k)
+                                    .await
+                                    .map_err(|e| read_error_to_anyhow(&k, e))?;
                                 // One download done — advance the fetch-phase bar.
                                 progress.fetch_add(1, Ordering::Relaxed);
                                 Ok(bytes)
@@ -664,6 +656,22 @@ pub(crate) fn patch_args_into_payload(args: &[String], payload: Option<&[u8]>) -
     }
 
     serde_json::to_vec(&serde_json::Value::Object(map)).ok()
+}
+
+/// Convert a remote-read failure into the `anyhow::Error` handed to the
+/// file-cache — which logs it verbatim with `{e:#}`.
+///
+/// MUST flatten through `StorageError`'s `Display`, never extract the raw
+/// inner error: `Display` renders the full source chain with URL query
+/// strings redacted (`file-lifecycle`'s `redact`), and a raw chain would put
+/// request credentials in the journal (AWS carries the STS web-identity JWT
+/// and request signatures in URL queries). Nothing is lost by flattening —
+/// `Display` already carries every chain level as text.
+fn read_error_to_anyhow(key: &str, e: StorageError) -> anyhow::Error {
+    match e {
+        StorageError::NotFound => anyhow::anyhow!("remote object not found: {key}"),
+        other => anyhow::anyhow!("remote read failed for {key}: {other}"),
+    }
 }
 
 #[cfg(test)]

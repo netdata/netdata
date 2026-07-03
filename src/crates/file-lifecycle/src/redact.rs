@@ -15,6 +15,12 @@
 /// previously contained `://` (prose like "failed?" is untouched). The query
 /// is dropped up to the token's end or a closing delimiter, preserving
 /// surrounding punctuation from formats like reqwest's `… for url (https://…)`.
+///
+/// Scope assumptions (fine for the error text reqwest/opendal produce, stated
+/// so nobody assumes universal coverage): a URL must carry an explicit
+/// `scheme://` (a bare `host:port/?…` passes through), and a URL split across
+/// error-chain levels (whitespace between `://` and `?`) would not be caught —
+/// reqwest renders each URL as a single unbroken token.
 pub(crate) fn redact(text: &str) -> String {
     let chars: Vec<char> = text.chars().collect();
     let mut out = String::with_capacity(text.len());
