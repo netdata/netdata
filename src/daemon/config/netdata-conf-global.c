@@ -144,6 +144,7 @@ void netdata_conf_section_global(void) {
 
     netdata_conf_section_directories();
     netdata_conf_section_global_hostname();
+    netdata_conf_section_global_wmi_timeout();
 
     nd_profile_setup(); // required for configuring the database
     netdata_conf_section_db();
@@ -153,6 +154,19 @@ void netdata_conf_section_global(void) {
 
     os_get_system_cpus_uncached();
     os_get_system_pid_max();
+}
+
+void netdata_conf_section_global_wmi_timeout(void) {
+    FUNCTION_RUN_ONCE();
+
+    long long default_ms = 5000;
+    long long configured = inicfg_get_number_range(
+        &netdata_config, CONFIG_SECTION_GLOBAL, "wmi startup timeout",
+        default_ms, 100, 60000);
+
+    char buf[32];
+    snprintfz(buf, sizeof(buf), "%lld", configured);
+    nd_setenv("NETDATA_WMI_STARTUP_TIMEOUT_MS", buf, 1);
 }
 
 void netdata_conf_section_global_run_as_user(const char **user) {

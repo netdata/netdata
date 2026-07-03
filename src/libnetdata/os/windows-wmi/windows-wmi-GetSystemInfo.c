@@ -4,6 +4,20 @@
 
 #if defined(OS_WINDOWS)
 
+#define WMI_GETSYSTEMINFO_TIMEOUT_DEFAULT_MS 5000
+
+static ULONG wmi_getsysteminfo_timeout_ms(void) {
+    const char *env = getenv("NETDATA_WMI_STARTUP_TIMEOUT_MS");
+    if(!env || !*env) return WMI_GETSYSTEMINFO_TIMEOUT_DEFAULT_MS;
+
+    char *end = NULL;
+    long v = strtol(env, &end, 10);
+    if(!end || *end || end == env || v < 100 || v > 60000)
+        return WMI_GETSYSTEMINFO_TIMEOUT_DEFAULT_MS;
+
+    return (ULONG)v;
+}
+
 static bool wmi_get_string_property(IWbemClassObject *pclsObj, const wchar_t *prop, char *out, size_t out_size) {
     if(!pclsObj || !out || out_size == 0) return false;
 
@@ -51,13 +65,20 @@ static IWbemClassObject *wmi_exec_single_row_query(const wchar_t *query_text, co
         return NULL;
     }
 
+    ULONG timeout_ms = wmi_getsysteminfo_timeout_ms();
+
     IWbemClassObject *pclsObj = NULL;
     ULONG uReturn = 0;
-    hr = pEnumerator->lpVtbl->Next(pEnumerator, WBEM_INFINITE, 1, &pclsObj, &uReturn);
+    hr = pEnumerator->lpVtbl->Next(pEnumerator, timeout_ms, 1, &pclsObj, &uReturn);
     pEnumerator->lpVtbl->Release(pEnumerator);
 
-    if(FAILED(hr) || uReturn == 0 || !pclsObj)
+    if(FAILED(hr) || uReturn == 0 || !pclsObj) {
+        if(!FAILED(hr) && uReturn == 0) {
+            nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                   "%s WMI query timed out after %lu ms", caller, timeout_ms);
+        }
         return NULL;
+    }
 
     return pclsObj;
 }

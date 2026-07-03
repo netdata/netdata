@@ -123,6 +123,30 @@ The nice level ranges from -20 (the highest priority) to 19 (the lowest priority
 
 </details>
 
+## Windows WMI Startup Timeout (Windows only)
+
+When running on Windows, the Netdata Agent classifies whether the host is bare metal or a virtual machine (Hyper-V, VMware, VirtualBox, KVM, QEMU, Parallels, Xen, etc.) by probing the host's WMI, SMBIOS, and registry. To keep agent startup from blocking on a slow or unhealthy WMI provider, each WMI query uses a bounded timeout before falling back to the next detection path.
+
+<details>
+<summary>Tune the WMI startup timeout</summary>
+
+To change the timeout, [edit](/docs/netdata-agent/configuration/README.md#edit-configuration-files) `netdata.conf`:
+
+```text
+[global]
+    wmi startup timeout = 5000
+```
+
+**Valid Range**: `100` to `60000` milliseconds. Values outside this range are silently clamped to the nearest boundary.
+
+**Default**: `5000` (5 seconds).
+
+**Behavior when a WMI query times out**: The probe chain falls back to the next detection path (SMBIOS strings, registry key existence) and ultimately reports `NETDATA_SYSTEM_VIRTUALIZATION = none` for bare metal or the matching hypervisor name (e.g. `microsoft` for Hyper-V, `vmware`, `oracle` for VirtualBox). A timeout is logged at debug level and never blocks startup.
+
+This option has no effect on Linux, macOS, or FreeBSD; those operating systems use `src/daemon/system-info.sh` for virt/container detection and do not call WMI.
+
+</details>
+
 ## Debugging
 
 When Netdata is compiled with debugging enabled:
