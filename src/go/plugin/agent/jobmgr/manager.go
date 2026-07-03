@@ -119,6 +119,7 @@ func New(cfg Config) *Manager {
 		addCh:            make(chan confgroup.Config),
 		rmCh:             make(chan confgroup.Config),
 		dyncfgCh:         make(chan dyncfg.Function, 32),
+		effectDoneCh:     make(chan effectResult, 1),
 		funcReconPending: make(map[string]struct{}),
 		funcReconWake:    make(chan struct{}, 1),
 		cmdTestSem:       make(chan struct{}, cmdTestWorkerCap),
@@ -228,6 +229,7 @@ type Manager struct {
 	addCh            chan confgroup.Config
 	rmCh             chan confgroup.Config
 	dyncfgCh         chan dyncfg.Function
+	effectDoneCh     chan effectResult
 	funcReconMu      sync.Mutex
 	funcReconPending map[string]struct{}
 	funcReconWake    chan struct{}
@@ -351,6 +353,8 @@ func (m *Manager) run() {
 				m.executor.dispatch(m.newDiscoveryRemoveEvent(cfg))
 			case fn := <-m.dyncfgCh:
 				m.executor.dispatch(m.newDyncfgEvent(fn))
+			case res := <-m.effectDoneCh:
+				m.handleUnexpectedEffectDone(res)
 			}
 		}
 	}
@@ -403,6 +407,8 @@ func (m *Manager) runWaitDecisionStep() bool {
 			return false
 		case fn := <-m.dyncfgCh:
 			m.executor.dispatch(m.newDyncfgEvent(fn))
+		case res := <-m.effectDoneCh:
+			m.handleUnexpectedEffectDone(res)
 		}
 		return true
 	}
@@ -422,6 +428,8 @@ func (m *Manager) runWaitDecisionStep() bool {
 		return false
 	case fn := <-m.dyncfgCh:
 		m.executor.dispatch(m.newDyncfgEvent(fn))
+	case res := <-m.effectDoneCh:
+		m.handleUnexpectedEffectDone(res)
 	case <-timer.C:
 		m.collectorHandler.ExpireWaitDecision()
 	}
@@ -552,7 +560,12 @@ func (m *Manager) stopRunningJob(name string) {
 		m.secretStoreDeps.setRunning(name, false)
 		m.funcCtl.OnJobStop(job)
 		m.requestFunctionReconcile(job.ModuleName())
-		job.Stop()
+		// Registry removals above happen before the blocking stop so function
+		// routing to the job ends immediately; only the wait itself is an effect.
+		_ = m.runEffectSync(name, func(context.Context) error {
+			job.Stop()
+			return nil
+		})
 		m.emissionGates.remove(name)
 	}
 }
