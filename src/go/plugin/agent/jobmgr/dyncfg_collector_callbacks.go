@@ -106,7 +106,13 @@ func (cb *collectorCallbacks) ParseAndValidate(fn dyncfg.Function, name string) 
 
 	cb.mgr.dyncfgSetConfigMeta(cfg, mn, name, fn)
 
-	if err := cb.mgr.validateCollectorJob(cfg); err != nil {
+	// Payload parsing above is cheap and stays with the caller; the full
+	// validation (config apply incl. secret resolution) is blocking module
+	// work and runs as an effect.
+	err = cb.mgr.runEffectSync(cfg.FullName(), func(context.Context) error {
+		return cb.mgr.validateCollectorJob(cfg)
+	})
+	if err != nil {
 		return nil, fmt.Errorf("invalid configuration: failed to apply configuration: %v", err)
 	}
 
@@ -116,19 +122,35 @@ func (cb *collectorCallbacks) ParseAndValidate(fn dyncfg.Function, name string) 
 func (cb *collectorCallbacks) Start(cfg confgroup.Config) error {
 	cb.mgr.retryingTasks.remove(cfg)
 
-	job, err := cb.mgr.createCollectorJob(cfg)
-	if err != nil {
-		var ce dyncfg.CodedError
-		if errors.As(err, &ce) {
+	// The blocking module work (job creation incl. secret resolution, then
+	// detection) runs as one effect; retry scheduling and the running-job
+	// registration stay with the loop-owned state below.
+	var job runtimeJob
+	var createErr error
+	err := cb.mgr.runEffectSync(cfg.FullName(), func(ctx context.Context) error {
+		job, createErr = cb.mgr.createCollectorJob(cfg)
+		if createErr != nil {
+			return createErr
+		}
+		if err := job.AutoDetection(ctx); err != nil {
+			job.Cleanup()
 			return err
 		}
-		return &codedError{err: fmt.Errorf("invalid configuration: failed to apply configuration: %w", err), code: 400}
-	}
+		return nil
+	})
 
-	if err := job.AutoDetection(); err != nil {
-		job.Cleanup()
-		var ce dyncfg.CodedError
-		if errors.As(err, &ce) {
+	if createErr != nil {
+		if _, ok := errors.AsType[dyncfg.CodedError](createErr); ok {
+			return createErr
+		}
+		return &codedError{err: fmt.Errorf("invalid configuration: failed to apply configuration: %w", createErr), code: 400}
+	}
+	if err != nil {
+		// Tracking removal only. The gate itself stays open by contract -
+		// closing is reserved for abandoning a wedged stop - and no writer
+		// survives here anyway: the job never started.
+		cb.mgr.emissionGates.remove(cfg.FullName())
+		if _, ok := errors.AsType[dyncfg.CodedError](err); ok {
 			if dyncfg.IsRetryableError(err) {
 				cb.mgr.scheduleRetryTask(cfg, job)
 			}
@@ -147,17 +169,30 @@ func (cb *collectorCallbacks) Update(oldCfg, newCfg confgroup.Config) error {
 	cb.mgr.stopRunningJob(oldCfg.FullName())
 	cb.mgr.fileStatus.remove(oldCfg)
 
-	job, err := cb.mgr.createCollectorJob(newCfg)
-	if err != nil {
-		var ce dyncfg.CodedError
-		if errors.As(err, &ce) {
+	var job runtimeJob
+	var createErr error
+	err := cb.mgr.runEffectSync(newCfg.FullName(), func(ctx context.Context) error {
+		job, createErr = cb.mgr.createCollectorJob(newCfg)
+		if createErr != nil {
+			return createErr
+		}
+		if err := job.AutoDetection(ctx); err != nil {
+			job.Cleanup()
 			return err
 		}
-		return fmt.Errorf("job update failed: %w", err)
-	}
+		return nil
+	})
 
-	if err := job.AutoDetection(); err != nil {
-		job.Cleanup()
+	if createErr != nil {
+		var ce dyncfg.CodedError
+		if errors.As(createErr, &ce) {
+			return createErr
+		}
+		return fmt.Errorf("job update failed: %w", createErr)
+	}
+	if err != nil {
+		// Tracking removal only; see the identical note in Start.
+		cb.mgr.emissionGates.remove(newCfg.FullName())
 		var ce dyncfg.CodedError
 		if errors.As(err, &ce) {
 			if dyncfg.IsRetryableError(err) {

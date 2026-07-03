@@ -222,7 +222,8 @@ func (j *Job) Vnode() vnodes.VirtualNode {
 }
 
 // AutoDetection invokes init, check and postCheck. It handles panic.
-func (j *Job) AutoDetection() (err error) {
+// ctx flows into the module's Init/Check calls and must be non-nil.
+func (j *Job) AutoDetection(ctx context.Context) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("panic %v", r)
@@ -243,7 +244,7 @@ func (j *Job) AutoDetection() (err error) {
 		j.Mute()
 	}
 
-	if err = j.init(); err != nil {
+	if err = j.init(ctx); err != nil {
 		j.Errorf("init failed: %v", err)
 		j.Unmute()
 		if !isRetryableError(err) {
@@ -252,7 +253,7 @@ func (j *Job) AutoDetection() (err error) {
 		return err
 	}
 
-	if err = j.check(); err != nil {
+	if err = j.check(ctx); err != nil {
 		j.Errorf("check failed: %v", err)
 		j.Unmute()
 		return err
@@ -404,12 +405,12 @@ func (j *Job) Cleanup() {
 	}
 }
 
-func (j *Job) init() error {
+func (j *Job) init(ctx context.Context) error {
 	if j.initialized {
 		return nil
 	}
 
-	if err := j.module.Init(context.TODO()); err != nil {
+	if err := j.module.Init(ctx); err != nil {
 		return err
 	}
 
@@ -418,8 +419,8 @@ func (j *Job) init() error {
 	return nil
 }
 
-func (j *Job) check() error {
-	if err := j.module.Check(context.TODO()); err != nil {
+func (j *Job) check(ctx context.Context) error {
+	if err := j.module.Check(ctx); err != nil {
 		consumeAutoDetectTry(&j.AutoDetectTries)
 		return err
 	}

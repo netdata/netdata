@@ -316,7 +316,7 @@ func (j *vnodeUpdateProbeJob) Collector() any     { return nil }
 func (j *vnodeUpdateProbeJob) Start()             {}
 func (j *vnodeUpdateProbeJob) Stop()              {}
 func (j *vnodeUpdateProbeJob) Tick(int)           {}
-func (j *vnodeUpdateProbeJob) AutoDetection() error {
+func (j *vnodeUpdateProbeJob) AutoDetection(context.Context) error {
 	return nil
 }
 func (j *vnodeUpdateProbeJob) AutoDetectionEvery() int { return 0 }

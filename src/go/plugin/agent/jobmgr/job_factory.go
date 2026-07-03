@@ -31,7 +31,10 @@ func jobLogSource(cfg confgroup.Config) string {
 	return fmt.Sprintf("%s/%s", sourceType, provider)
 }
 
-// jobFactory builds runtime jobs from configs without mutating manager-owned runtime maps.
+// jobFactory builds runtime jobs from configs. It does not mutate
+// manager-owned runtime maps, with one disclosed exception: a successful
+// create registers the job's emission gateway in the manager's gate
+// registry, which carries its own lock.
 type jobFactory struct {
 	logger *logger.Logger
 
@@ -39,6 +42,7 @@ type jobFactory struct {
 	modules     collectorapi.Registry
 	vnodeLookup func(string) (*vnodes.VirtualNode, bool)
 	out         io.Writer
+	gates       *emissionGates
 
 	validationOnly bool
 
@@ -66,6 +70,7 @@ func newJobFactory(m *Manager) *jobFactory {
 		modules:     m.modules,
 		vnodeLookup: m.vnodesCtl.Lookup,
 		out:         m.out,
+		gates:       m.emissionGates,
 
 		auditMode:     m.auditMode,
 		auditAnalyzer: m.auditAnalyzer,
@@ -114,10 +119,35 @@ func (f *jobFactory) create(cfg confgroup.Config) (runtimeJob, error) {
 
 	f.logger.Debugf("creating %s[%s] job, config: %v", cfg.Module(), cfg.Name(), cfg)
 
-	if creator.CreateV2 != nil {
-		return f.createV2(cfg, creator, functionOnly, vnode)
+	// Every runnable job writes through its own emission gateway so job
+	// output can be provably fenced off; the gate stays open for the job's
+	// whole life on the normal path. Validation-only jobs never run, so they
+	// get no gate. The gate is tracked only for jobs that construct
+	// successfully; the create/detect and stop paths drop the entry when the
+	// job fails or stops. A same-name replacement overwrites the previous
+	// entry here, and startRunningJob preserves the tracked gate across its
+	// defensive stop - the entry always belongs to the newest created job.
+	gatedF := *f
+	var gate *emissionGateway
+	if !f.validationOnly {
+		gate = newEmissionGateway(f.out)
+		gatedF.out = gate
 	}
-	return f.createV1(cfg, creator, functionOnly, vnode)
+
+	var job runtimeJob
+	var err error
+	if creator.CreateV2 != nil {
+		job, err = gatedF.createV2(cfg, creator, functionOnly, vnode)
+	} else {
+		job, err = gatedF.createV1(cfg, creator, functionOnly, vnode)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if gate != nil && f.gates != nil {
+		f.gates.add(cfg.FullName(), gate)
+	}
+	return job, nil
 }
 
 func (f *jobFactory) logApplyConfigError(cfg confgroup.Config, err error) {

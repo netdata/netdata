@@ -248,7 +248,9 @@ func (j *JobV2) Cleanup() {
 	j.clearAllScopeStateAfterCleanup()
 }
 
-func (j *JobV2) AutoDetection() (err error) {
+// AutoDetection invokes init, check and postCheck. It handles panic.
+// ctx flows into the module's Init/Check calls and must be non-nil.
+func (j *JobV2) AutoDetection(ctx context.Context) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("panic %v", r)
@@ -267,7 +269,7 @@ func (j *JobV2) AutoDetection() (err error) {
 		j.Mute()
 	}
 
-	if err = j.init(); err != nil {
+	if err = j.init(ctx); err != nil {
 		j.Errorf("init failed: %v", err)
 		j.Unmute()
 		if !isRetryableError(err) {
@@ -275,7 +277,7 @@ func (j *JobV2) AutoDetection() (err error) {
 		}
 		return err
 	}
-	if err = j.check(); err != nil {
+	if err = j.check(ctx); err != nil {
 		j.Errorf("check failed: %v", err)
 		j.Unmute()
 		return err
@@ -396,19 +398,19 @@ func (j *JobV2) shouldCollect(clock int) bool {
 	return shouldCollectWithPenalty(clock, j.updateEvery, int(j.retries.Load()))
 }
 
-func (j *JobV2) init() error {
+func (j *JobV2) init(ctx context.Context) error {
 	if j.initialized {
 		return nil
 	}
-	if err := j.module.Init(j.moduleContext()); err != nil {
+	if err := j.module.Init(j.moduleContextFrom(ctx)); err != nil {
 		return err
 	}
 	j.initialized = true
 	return nil
 }
 
-func (j *JobV2) check() error {
-	if err := j.module.Check(j.moduleContext()); err != nil {
+func (j *JobV2) check(ctx context.Context) error {
+	if err := j.module.Check(j.moduleContextFrom(ctx)); err != nil {
 		consumeAutoDetectTry(&j.autoDetectTries)
 		return err
 	}
@@ -865,6 +867,13 @@ func (j *JobV2) moduleContext() context.Context {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	return j.moduleContextFrom(ctx)
+}
+
+// moduleContextFrom attaches the runtime-component service to a
+// caller-supplied context (the detection path receives its context from
+// the caller instead of the run context, which does not exist pre-Start).
+func (j *JobV2) moduleContextFrom(ctx context.Context) context.Context {
 	if j.runtimeService != nil {
 		return runtimecomp.ContextWithService(ctx, j.runtimeService)
 	}

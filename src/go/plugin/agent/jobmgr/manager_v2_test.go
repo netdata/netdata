@@ -154,7 +154,7 @@ func TestManagerCreateCollectorJobSingleInstancePolicyAllowsV2FunctionOnly(t *te
 	job, err := mgr.createCollectorJob(prepareFunctionOnlyCfg("testmod", "testmod"))
 	require.NoError(t, err)
 	require.NotNil(t, job)
-	require.NoError(t, job.AutoDetection())
+	require.NoError(t, job.AutoDetection(context.Background()))
 
 	_, isV2 := job.(*jobruntime.JobV2)
 	assert.True(t, isV2)

@@ -975,14 +975,14 @@ func (j *lockProbeJob) Tick(_ int) {
 		<-j.tickRelease
 	})
 }
-func (j *lockProbeJob) AutoDetection() error              { return nil }
-func (j *lockProbeJob) AutoDetectionEvery() int           { return 0 }
-func (j *lockProbeJob) RetryAutoDetection() bool          { return false }
-func (j *lockProbeJob) Cleanup()                          {}
-func (j *lockProbeJob) IsRunning() bool                   { return true }
-func (j *lockProbeJob) Panicked() bool                    { return false }
-func (j *lockProbeJob) Vnode() vnodes.VirtualNode         { return vnodes.VirtualNode{} }
-func (j *lockProbeJob) UpdateVnode(_ *vnodes.VirtualNode) {}
+func (j *lockProbeJob) AutoDetection(context.Context) error { return nil }
+func (j *lockProbeJob) AutoDetectionEvery() int             { return 0 }
+func (j *lockProbeJob) RetryAutoDetection() bool            { return false }
+func (j *lockProbeJob) Cleanup()                            {}
+func (j *lockProbeJob) IsRunning() bool                     { return true }
+func (j *lockProbeJob) Panicked() bool                      { return false }
+func (j *lockProbeJob) Vnode() vnodes.VirtualNode           { return vnodes.VirtualNode{} }
+func (j *lockProbeJob) UpdateVnode(_ *vnodes.VirtualNode)   {}
 
 type tickProbeJob struct {
 	fullName   string
@@ -991,21 +991,21 @@ type tickProbeJob struct {
 	collector  any
 }
 
-func (j *tickProbeJob) FullName() string                  { return j.fullName }
-func (j *tickProbeJob) ModuleName() string                { return j.moduleName }
-func (j *tickProbeJob) Name() string                      { return j.name }
-func (j *tickProbeJob) Collector() any                    { return j.collector }
-func (j *tickProbeJob) Start()                            {}
-func (j *tickProbeJob) Stop()                             {}
-func (j *tickProbeJob) Tick(int)                          {}
-func (j *tickProbeJob) AutoDetection() error              { return nil }
-func (j *tickProbeJob) AutoDetectionEvery() int           { return 0 }
-func (j *tickProbeJob) RetryAutoDetection() bool          { return false }
-func (j *tickProbeJob) Cleanup()                          {}
-func (j *tickProbeJob) IsRunning() bool                   { return true }
-func (j *tickProbeJob) Panicked() bool                    { return false }
-func (j *tickProbeJob) Vnode() vnodes.VirtualNode         { return vnodes.VirtualNode{} }
-func (j *tickProbeJob) UpdateVnode(_ *vnodes.VirtualNode) {}
+func (j *tickProbeJob) FullName() string                    { return j.fullName }
+func (j *tickProbeJob) ModuleName() string                  { return j.moduleName }
+func (j *tickProbeJob) Name() string                        { return j.name }
+func (j *tickProbeJob) Collector() any                      { return j.collector }
+func (j *tickProbeJob) Start()                              {}
+func (j *tickProbeJob) Stop()                               {}
+func (j *tickProbeJob) Tick(int)                            {}
+func (j *tickProbeJob) AutoDetection(context.Context) error { return nil }
+func (j *tickProbeJob) AutoDetectionEvery() int             { return 0 }
+func (j *tickProbeJob) RetryAutoDetection() bool            { return false }
+func (j *tickProbeJob) Cleanup()                            {}
+func (j *tickProbeJob) IsRunning() bool                     { return true }
+func (j *tickProbeJob) Panicked() bool                      { return false }
+func (j *tickProbeJob) Vnode() vnodes.VirtualNode           { return vnodes.VirtualNode{} }
+func (j *tickProbeJob) UpdateVnode(_ *vnodes.VirtualNode)   {}
 
 type managerFunctionAvailability struct {
 	fn func(string) bool

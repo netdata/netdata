@@ -21,7 +21,7 @@ type runtimeJob interface {
 	Stop()
 	Tick(clock int)
 
-	AutoDetection() error
+	AutoDetection(ctx context.Context) error
 	AutoDetectionEvery() int
 	RetryAutoDetection() bool
 	Cleanup()

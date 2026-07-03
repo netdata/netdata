@@ -4,6 +4,7 @@ package nagios
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"os"
 	"path/filepath"
@@ -163,7 +164,7 @@ func newTestJobV2(t *testing.T, name string, coll *Collector, out io.Writer) *jo
 		Out:         out,
 		UpdateEvery: 1,
 	})
-	require.NoError(t, job.AutoDetection())
+	require.NoError(t, job.AutoDetection(context.Background()))
 	return job
 }
 

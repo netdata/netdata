@@ -38,6 +38,14 @@ type ComponentConfig struct {
 type Service interface {
 	RegisterComponent(cfg ComponentConfig) error
 	UnregisterComponent(name string)
+
+	// QuarantineComponent removes a component and its emission state WITHOUT
+	// removal/obsoletion output, returning only after any in-progress emission
+	// tick (including its post-write state finalizers) has completed - after
+	// it returns, no output for the component can reach the wire. Unlike
+	// UnregisterComponent, which stops future snapshots but lets an
+	// in-progress tick finish and later emits removal-obsolete output.
+	QuarantineComponent(name string)
 	RegisterProducer(name string, tickFn func() error) error
 	UnregisterProducer(name string)
 }
