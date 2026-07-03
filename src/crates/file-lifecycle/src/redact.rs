@@ -68,6 +68,22 @@ mod tests {
     }
 
     #[test]
+    fn redacts_the_field_reported_opendal_error_shape() {
+        // Mirrors the exact structure of the field-reported leak: opendal's
+        // Display (kind/status/op + context map + message) with a reqsign STS
+        // failure as the source — RoleArn and the web-identity JWT both live
+        // in the URL query. Values are sanitized stand-ins.
+        let input = "Unexpected (temporary) at list, context: { called: reqsign::LoadCredential, service: s3, path: v1/tenants/default/sfst/2026-05-22/, listed: 0 } => loading credential to sign http request, source: error sending request for url (https://sts.us-east-1.amazonaws.com/?Action=AssumeRoleWithWebIdentity&RoleArn=arn:aws:iam::000000000000:role/EXAMPLE_ROLE&WebIdentityToken=eyJSENTINEL_HEADER.eyJSENTINEL_PAYLOAD.SENTINEL-SIG_with-mixed_chars123&Version=2011-06-15&RoleSessionName=reqsign)";
+        let out = redact(input);
+        assert!(!out.contains("SENTINEL"), "token leaked: {out}");
+        assert!(!out.contains("EXAMPLE_ROLE"), "role arn leaked: {out}");
+        assert_eq!(
+            out,
+            "Unexpected (temporary) at list, context: { called: reqsign::LoadCredential, service: s3, path: v1/tenants/default/sfst/2026-05-22/, listed: 0 } => loading credential to sign http request, source: error sending request for url (https://sts.us-east-1.amazonaws.com/?[REDACTED])"
+        );
+    }
+
+    #[test]
     fn preserves_reqwest_parenthesized_url_format() {
         let input =
             "error sending request for url (https://sts.amazonaws.com/?WebIdentityToken=SENTINEL)";
