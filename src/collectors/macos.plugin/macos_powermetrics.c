@@ -861,22 +861,37 @@ static void macos_powermetrics_init(void)
     pm.initialized = true;
 }
 
+static int macos_powermetrics_chart_update_every(int plugin_update_every)
+{
+    int chart_update_every = (pm.sample_interval_ms + (int)MSEC_PER_SEC - 1) / (int)MSEC_PER_SEC;
+
+    if (chart_update_every < plugin_update_every)
+        chart_update_every = plugin_update_every;
+    if (chart_update_every < 1)
+        chart_update_every = 1;
+
+    return chart_update_every;
+}
+
 static void macos_powermetrics_update_thermal_pressure(const struct macos_powermetrics_sample *sample, int update_every)
 {
     if (!st_thermal_pressure) {
         st_thermal_pressure = rrdset_create_localhost(
-            "macos",
-            "thermal_pressure",
+            "sensors",
+            "macos_thermal_pressure_state",
             NULL,
-            "thermal",
-            "macos.thermal_pressure",
-            "Thermal Pressure",
-            "state",
+            "State",
+            "system.hw.sensor.state.input",
+            "Thermal Pressure State",
+            "status",
             "macos.plugin",
             "powermetrics",
             NETDATA_CHART_PRIO_SENSORS - 10,
             update_every,
             RRDSET_TYPE_LINE);
+
+        rrdlabels_add(st_thermal_pressure->rrdlabels, "source", "powermetrics", RRDLABEL_SRC_AUTO);
+        rrdlabels_add(st_thermal_pressure->rrdlabels, "sensor", "thermal_pressure", RRDLABEL_SRC_AUTO);
 
         for (size_t i = 0; i < MACOS_THERMAL_PRESSURE_COUNT; i++)
             rd_thermal_pressure[i] =
@@ -1004,11 +1019,11 @@ static void macos_powermetrics_update_gpu_power(const struct macos_powermetrics_
     if (!st_gpu_power) {
         st_gpu_power = rrdset_create_localhost(
             "macos",
-            "gpu_power",
+            "gpu_power_draw",
             NULL,
             "gpu",
-            "macos.gpu_power",
-            "GPU Power",
+            "macos.gpu_power_draw",
+            "GPU Power Draw",
             "W",
             "macos.plugin",
             "powermetrics",
@@ -1017,7 +1032,7 @@ static void macos_powermetrics_update_gpu_power(const struct macos_powermetrics_
             RRDSET_TYPE_LINE);
 
         rrdlabels_add(st_gpu_power->rrdlabels, "source", "powermetrics", RRDLABEL_SRC_AUTO);
-        rd_gpu_power = rrddim_add(st_gpu_power, "power", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+        rd_gpu_power = rrddim_add(st_gpu_power, "power_draw", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(st_gpu_power, rd_gpu_power, (collected_number)llround(sample->gpu_power_w * 1000.0));
@@ -1047,6 +1062,8 @@ int do_macos_powermetrics(int update_every, usec_t dt __maybe_unused)
         macos_powermetrics_init();
     }
 
+    int chart_update_every = macos_powermetrics_chart_update_every(update_every);
+
     struct macos_powermetrics_sample sample = {0};
     bool failed_permanently;
     uint64_t sample_sequence;
@@ -1072,7 +1089,7 @@ int do_macos_powermetrics(int update_every, usec_t dt __maybe_unused)
     last_sample_sequence = sample_sequence;
 
     if (do_thermal_pressure && sample.has_thermal_pressure)
-        macos_powermetrics_update_thermal_pressure(&sample, update_every);
+        macos_powermetrics_update_thermal_pressure(&sample, chart_update_every);
 
     if (do_smc_fan && sample.has_fan)
         macos_powermetrics_update_sensor(
@@ -1085,7 +1102,7 @@ int do_macos_powermetrics(int update_every, usec_t dt __maybe_unused)
             "rotations per minute",
             "fan",
             NETDATA_CHART_PRIO_SENSORS + 5,
-            update_every,
+            chart_update_every,
             (collected_number)llround(sample.fan_rpm),
             1);
 
@@ -1100,7 +1117,7 @@ int do_macos_powermetrics(int update_every, usec_t dt __maybe_unused)
             "degrees Celsius",
             "cpu_die",
             NETDATA_CHART_PRIO_SENSORS,
-            update_every,
+            chart_update_every,
             (collected_number)llround(sample.cpu_die_c * 1000.0),
             1000);
 
@@ -1115,19 +1132,19 @@ int do_macos_powermetrics(int update_every, usec_t dt __maybe_unused)
             "degrees Celsius",
             "gpu_die",
             NETDATA_CHART_PRIO_SENSORS + 1,
-            update_every,
+            chart_update_every,
             (collected_number)llround(sample.gpu_die_c * 1000.0),
             1000);
 
     if (do_smc_thermal_levels &&
         (sample.has_cpu_thermal_level || sample.has_gpu_thermal_level || sample.has_io_thermal_level))
-        macos_powermetrics_update_thermal_levels(&sample, update_every);
+        macos_powermetrics_update_thermal_levels(&sample, chart_update_every);
 
     if (do_smc_prochot && (sample.has_cpu_prochot || sample.has_smc_prochot))
-        macos_powermetrics_update_prochot(&sample, update_every);
+        macos_powermetrics_update_prochot(&sample, chart_update_every);
 
     if (do_gpu_power && sample.has_gpu_power && !macos_gpu_ioreport_available())
-        macos_powermetrics_update_gpu_power(&sample, update_every);
+        macos_powermetrics_update_gpu_power(&sample, chart_update_every);
 
     return 0;
 }

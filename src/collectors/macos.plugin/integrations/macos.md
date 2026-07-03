@@ -308,7 +308,6 @@ Metrics:
 | ipv6.icmptypes | InType1, InType128, InType129, InType136, OutType1, OutType128, OutType129, OutType133, OutType135, OutType143 | messages/s |
 | system.uptime | uptime | seconds |
 | system.io | in, out | KiB/s |
-| macos.thermal_pressure | nominal, moderate, heavy, sleeping, trapping, undefined | state |
 | macos.smc_thermal_level | cpu, gpu, io | level |
 | macos.smc_prochot | cpu, smc | status |
 
@@ -327,9 +326,9 @@ Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| macos.gpu_active_residency | active | percentage |
-| macos.gpu_frequency | frequency | MHz |
-| macos.gpu_power | power | W |
+| macos.gpu_utilization | utilization | percentage |
+| macos.gpu_clock_freq | frequency | MHz |
+| macos.gpu_power_draw | power_draw | W |
 
 ### Per power source
 
@@ -371,6 +370,7 @@ Metrics:
 |:------|:----------|:----|
 | system.hw.sensor.temperature.input | input | degrees Celsius |
 | system.hw.sensor.fan.input | input | rotations per minute |
+| system.hw.sensor.state.input | nominal, moderate, heavy, sleeping, trapping, undefined | status |
 
 ### Per nvme device
 

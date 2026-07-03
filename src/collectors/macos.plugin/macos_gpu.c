@@ -838,11 +838,11 @@ static void macos_gpu_update_gpu_charts(const struct macos_gpu_metrics *metrics,
         if (!gpu.st_active_residency) {
             gpu.st_active_residency = rrdset_create_localhost(
                 "macos",
-                "gpu_active_residency",
+                "gpu_utilization",
                 NULL,
                 "gpu",
-                "macos.gpu_active_residency",
-                "GPU Active Residency",
+                "macos.gpu_utilization",
+                "GPU Utilization",
                 "percentage",
                 "macos.plugin",
                 "gpu",
@@ -850,7 +850,8 @@ static void macos_gpu_update_gpu_charts(const struct macos_gpu_metrics *metrics,
                 update_every,
                 RRDSET_TYPE_LINE);
             rrdlabels_add(gpu.st_active_residency->rrdlabels, "source", "ioreport", RRDLABEL_SRC_AUTO);
-            gpu.rd_active_residency = rrddim_add(gpu.st_active_residency, "active", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+            gpu.rd_active_residency =
+                rrddim_add(gpu.st_active_residency, "utilization", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
         }
         rrddim_set_by_pointer(gpu.st_active_residency, gpu.rd_active_residency, (collected_number)llround(metrics->active_residency_perc * 1000.0));
         rrdset_done(gpu.st_active_residency);
@@ -860,11 +861,11 @@ static void macos_gpu_update_gpu_charts(const struct macos_gpu_metrics *metrics,
         if (!gpu.st_frequency) {
             gpu.st_frequency = rrdset_create_localhost(
                 "macos",
-                "gpu_frequency",
+                "gpu_clock_freq",
                 NULL,
                 "gpu",
-                "macos.gpu_frequency",
-                "GPU Frequency",
+                "macos.gpu_clock_freq",
+                "GPU Clock Frequency",
                 "MHz",
                 "macos.plugin",
                 "gpu",
@@ -882,11 +883,11 @@ static void macos_gpu_update_gpu_charts(const struct macos_gpu_metrics *metrics,
         if (!gpu.st_power) {
             gpu.st_power = rrdset_create_localhost(
                 "macos",
-                "gpu_power",
+                "gpu_power_draw",
                 NULL,
                 "gpu",
-                "macos.gpu_power",
-                "GPU Power",
+                "macos.gpu_power_draw",
+                "GPU Power Draw",
                 "W",
                 "macos.plugin",
                 "gpu",
@@ -894,7 +895,7 @@ static void macos_gpu_update_gpu_charts(const struct macos_gpu_metrics *metrics,
                 update_every,
                 RRDSET_TYPE_LINE);
             rrdlabels_add(gpu.st_power->rrdlabels, "source", "ioreport", RRDLABEL_SRC_AUTO);
-            gpu.rd_power = rrddim_add(gpu.st_power, "power", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+            gpu.rd_power = rrddim_add(gpu.st_power, "power_draw", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
         }
         rrddim_set_by_pointer(gpu.st_power, gpu.rd_power, (collected_number)llround(metrics->power_w * 1000.0));
         rrdset_done(gpu.st_power);

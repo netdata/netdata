@@ -411,7 +411,7 @@ modules:
 
               Battery, UPS power-source, and IOReport GPU charts do not depend on `powermetrics` and should still appear when macOS exposes their data.
           - name: NVMe health charts are missing
-            description: |
+            description: |-
               Native NVMe health charts appear only when macOS exposes NVMe SMART-capable services through IOKit and allows the native SMART user client to open them. The collector does not use `nvme-cli` or any external NVMe tool on macOS.
 
               If generic disk I/O charts are present but NVMe health charts are absent, the device, controller, or macOS driver may not expose a readable native NVMe SMART user client. Some Apple internal Apple Fabric SSDs expose disk I/O and filesystem metrics but not detailed public NVMe health fields.
@@ -751,17 +751,6 @@ modules:
               dimensions:
                 - name: in
                 - name: out
-            - name: macos.thermal_pressure
-              description: macOS thermal pressure state
-              unit: "state"
-              chart_type: line
-              dimensions:
-                - name: nominal
-                - name: moderate
-                - name: heavy
-                - name: sleeping
-                - name: trapping
-                - name: undefined
             - name: macos.smc_thermal_level
               description: SMC thermal levels
               unit: "level"
@@ -784,24 +773,24 @@ modules:
             - name: source
               description: Data source
           metrics:
-            - name: macos.gpu_active_residency
-              description: GPU active residency
+            - name: macos.gpu_utilization
+              description: GPU utilization (active residency)
               unit: "percentage"
               chart_type: line
               dimensions:
-                - name: active
-            - name: macos.gpu_frequency
-              description: Weighted average GPU frequency
+                - name: utilization
+            - name: macos.gpu_clock_freq
+              description: Weighted average GPU clock frequency
               unit: "MHz"
               chart_type: line
               dimensions:
                 - name: frequency
-            - name: macos.gpu_power
+            - name: macos.gpu_power_draw
               description: GPU power draw
               unit: "W"
               chart_type: line
               dimensions:
-                - name: power
+                - name: power_draw
         - name: power source
           description: |
             These metrics refer to macOS battery and UPS power sources.
@@ -858,6 +847,17 @@ modules:
               chart_type: line
               dimensions:
                 - name: input
+            - name: system.hw.sensor.state.input
+              description: Sensor state input
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: nominal
+                - name: moderate
+                - name: heavy
+                - name: sleeping
+                - name: trapping
+                - name: undefined
         - name: nvme device
           description: |
             These metrics refer to native macOS NVMe SMART-capable devices.
