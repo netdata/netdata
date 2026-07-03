@@ -444,6 +444,7 @@ dependencies = [
  "tokio-util",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
@@ -3090,6 +3091,7 @@ dependencies = [
  "sfst",
  "tempfile",
  "thiserror 2.0.18",
+ "uuid",
  "wal",
 ]
 
@@ -3100,6 +3102,7 @@ dependencies = [
  "anyhow",
  "clap",
  "file-registry",
+ "journal-common",
  "ng-flatten",
  "opentelemetry-proto",
  "prost",
@@ -3108,6 +3111,7 @@ dependencies = [
  "tonic",
  "tracing",
  "tracing-subscriber",
+ "uuid",
  "wal",
 ]
 
@@ -3567,6 +3571,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -4890,6 +4895,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio-util",
  "tracing",
+ "uuid",
  "wal",
 ]
 
@@ -4914,6 +4920,7 @@ dependencies = [
  "tokio-util",
  "tracing",
  "tracing-subscriber",
+ "uuid",
  "wal",
 ]
 
@@ -5975,7 +5982,6 @@ version = "0.1.3"
 dependencies = [
  "crc32fast",
  "file-registry",
- "journal-common",
  "lz4_flex 0.12.2",
  "nix 0.30.1",
  "serde",

@@ -319,6 +319,8 @@ fn tail_scan_refuses_wrong_payload_format() {
             pipeline_id: 0,
             payload_format: ng_flatten::TRACE_FRAME_PAYLOAD_FORMAT,
         },
+        uuid::Uuid::from_u128(1),
+        uuid::Uuid::from_u128(2),
     )
     .expect("writer");
     writer
@@ -362,6 +364,8 @@ fn write_flattened_wal(dir: &Path, corpus: &Corpus) -> std::path::PathBuf {
             pipeline_id: 0,
             payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
         },
+        uuid::Uuid::from_u128(1),
+        uuid::Uuid::from_u128(2),
     )
     .expect("writer");
     for (i, batch) in corpus.batches.iter().enumerate() {

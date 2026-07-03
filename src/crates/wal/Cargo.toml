@@ -10,7 +10,6 @@ workspace = true
 [dependencies]
 crc32fast = { workspace = true }
 file-registry = { workspace = true }
-journal-common = { workspace = true }
 lz4_flex = { workspace = true }
 nix = { workspace = true, features = ["fs"] }
 serde = { workspace = true, features = ["derive"] }

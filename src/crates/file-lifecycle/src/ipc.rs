@@ -177,7 +177,7 @@ pub enum UploaderResponse {
 #[derive(Debug, Clone)]
 pub enum CatalogBuilderRequest {
     /// Add a newly-uploaded SFST's catalog entry to the in-memory accumulator
-    /// for its scope `(tenant_id, date, entry.id.machine_id, entry.id.boot_id)`.
+    /// for its scope `(tenant_id, date, entry.id.machine_id, entry.id.invocation_id)`.
     /// The builder may rotate and emit a new catalog file as a side effect
     /// (see [`CatalogBuilderResponse::Rotated`]).
     AddEntry {
@@ -200,7 +200,7 @@ pub enum CatalogBuilderResponse {
         tenant_id: TenantId,
         date: chrono::NaiveDate,
         machine_id: uuid::Uuid,
-        boot_id: uuid::Uuid,
+        invocation_id: uuid::Uuid,
         max_seq: u64,
         /// Union `[min_timestamp_s, max_timestamp_s]` across all
         /// entries in the rotated catalog. Encoded into the filename
@@ -218,7 +218,7 @@ pub enum CatalogBuilderResponse {
         tenant_id: TenantId,
         date: chrono::NaiveDate,
         machine_id: uuid::Uuid,
-        boot_id: uuid::Uuid,
+        invocation_id: uuid::Uuid,
         max_seq: u64,
         error: String,
     },

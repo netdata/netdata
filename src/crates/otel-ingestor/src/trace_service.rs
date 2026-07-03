@@ -60,6 +60,10 @@ pub struct NetdataTracesService {
     /// Shared global seq allocator (file `seq` is globally unique across signals).
     seq: Arc<wal::SeqAllocator>,
     auth: AuthConfig,
+    /// Identity stamped into every WAL FileId (env-resolved by the supervisor,
+    /// see `bridge::config::PluginConfig::{machine_id, invocation_id}`).
+    machine_id: uuid::Uuid,
+    invocation_id: uuid::Uuid,
 }
 
 impl NetdataTracesService {
@@ -70,6 +74,8 @@ impl NetdataTracesService {
         seq: Arc<wal::SeqAllocator>,
         clock: Arc<Mutex<MonotonicClock>>,
         auth: AuthConfig,
+        machine_id: uuid::Uuid,
+        invocation_id: uuid::Uuid,
     ) -> Self {
         Self {
             writers: Mutex::new(HashMap::new()),
@@ -79,6 +85,8 @@ impl NetdataTracesService {
             wal_config,
             seq,
             auth,
+            machine_id,
+            invocation_id,
         }
     }
 
@@ -142,6 +150,8 @@ impl TraceService for NetdataTracesService {
                     pipeline_id: Signal::Traces.pipeline_id(),
                     payload_format: TRACES_PROOF_PAYLOAD_FORMAT,
                 },
+                self.machine_id,
+                self.invocation_id,
             )
             .map_err(|e| {
                 tracing::error!(%e, tenant = %tenant_id, "failed to create traces WAL writer");

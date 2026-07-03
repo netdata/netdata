@@ -28,3 +28,4 @@ wal = { workspace = true }
 file-registry = { workspace = true }
 opentelemetry-proto = { workspace = true }
 tempfile = { workspace = true }
+uuid = { workspace = true }

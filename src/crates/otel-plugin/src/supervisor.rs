@@ -20,6 +20,33 @@ const WORKER_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 
 use crate::config;
 
+/// Parse an agent identity env var into a [`uuid::Uuid`], hard-erroring with a
+/// clear message naming the variable if it is missing, empty, not a valid
+/// UUID, or the nil UUID. `Uuid::parse_str` accepts both dashed
+/// (`550e8400-...`) and compact (`550e8400...`) forms — the registry file is
+/// dashed, the invocation id is lowercase-compact.
+///
+/// The nil rejection is load-bearing: without it the supervisor's stated
+/// contract ("hard-error before spawning workers") would silently pass a nil
+/// value through to the worker, where `wal::Writer::new` would catch it as a
+/// per-tenant error rather than a clean startup abort.
+fn resolve_identity(value: &Option<String>, var_name: &str) -> anyhow::Result<uuid::Uuid> {
+    let raw = value
+        .as_deref()
+        .ok_or_else(|| anyhow::anyhow!("{var_name} is not set; the agent must export it"))?;
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        anyhow::bail!("{var_name} is set but empty; the agent must export a valid UUID");
+    }
+    let id = uuid::Uuid::parse_str(trimmed).with_context(|| {
+        format!("{var_name} is not a valid UUID: {raw:?} (the agent must export a valid UUID)")
+    })?;
+    if id.is_nil() {
+        anyhow::bail!("{var_name} is the nil UUID; the agent must export a valid non-zero UUID");
+    }
+    Ok(id)
+}
+
 /// Guard that kills a child process on drop.
 struct ChildGuard {
     child: tokio::process::Child,
@@ -605,6 +632,16 @@ pub async fn run() -> anyhow::Result<()> {
 
     plugin_config.writer_socket_path = writer_sock.path().to_string();
 
+    // Resolve the agent identities (machine GUID + per-run invocation id).
+    // The agent always exports both; a missing or invalid value is a fatal
+    // misconfiguration — fail-closed before any worker is spawned. The WAL
+    // writer stamps these into every filename and the catalog references them,
+    // so a nil default would silently corrupt provenance in never-GC'd remote
+    // storage (the writer also rejects nil as defense-in-depth).
+    plugin_config.machine_id =
+        resolve_identity(&nd_env.registry_unique_id, "NETDATA_REGISTRY_UNIQUE_ID")?;
+    plugin_config.invocation_id = resolve_identity(&nd_env.invocation_id, "NETDATA_INVOCATION_ID")?;
+
     // Resolve the former otel plugin's read-only journal directory (read
     // `logs.journal_dir` in place from otel.yaml, falling back to
     // <NETDATA_LOG_DIR>/otel/v1 or /var/log/netdata/otel/v1) and a private
@@ -681,5 +718,100 @@ pub async fn run() -> anyhow::Result<()> {
             supervisor.shutdown_workers().await;
             Err(e)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resolve_identity;
+
+    #[test]
+    fn resolve_identity_accepts_dashed_form() {
+        // The registry file (/var/lib/netdata/registry/netdata.public.unique.id)
+        // stores the machine GUID in dashed form.
+        let v = Some("550e8400-e29b-41d4-a716-446655440000".to_string());
+        let id = resolve_identity(&v, "NETDATA_REGISTRY_UNIQUE_ID").unwrap();
+        assert_eq!(id.to_string(), "550e8400-e29b-41d4-a716-446655440000");
+    }
+
+    #[test]
+    fn resolve_identity_accepts_compact_form() {
+        // systemd INVOCATION_ID is lowercase-compact (no dashes).
+        let v = Some("550e8400e29b41d4a716446655440000".to_string());
+        let id = resolve_identity(&v, "NETDATA_INVOCATION_ID").unwrap();
+        assert_eq!(
+            id.to_string(),
+            "550e8400-e29b-41d4-a716-446655440000",
+            "compact form must parse to the same UUID"
+        );
+    }
+
+    #[test]
+    fn resolve_identity_accepts_whitespace() {
+        // File-based sources may have trailing newlines; the helper trims.
+        let v = Some("550e8400-e29b-41d4-a716-446655440000\n".to_string());
+        let id = resolve_identity(&v, "NETDATA_REGISTRY_UNIQUE_ID").unwrap();
+        assert_eq!(id.to_string(), "550e8400-e29b-41d4-a716-446655440000");
+    }
+
+    #[test]
+    fn resolve_identity_rejects_missing() {
+        // The agent must export both vars; a missing value is fatal before any
+        // worker is spawned.
+        let err = resolve_identity(&None, "NETDATA_REGISTRY_UNIQUE_ID").unwrap_err();
+        assert!(
+            err.to_string().contains("NETDATA_REGISTRY_UNIQUE_ID"),
+            "error must name the variable: {err}"
+        );
+    }
+
+    #[test]
+    fn resolve_identity_rejects_invalid() {
+        let v = Some("not-a-uuid".to_string());
+        let err = resolve_identity(&v, "NETDATA_INVOCATION_ID").unwrap_err();
+        assert!(
+            err.to_string().contains("NETDATA_INVOCATION_ID"),
+            "error must name the variable: {err}"
+        );
+    }
+
+    #[test]
+    fn resolve_identity_rejects_empty_string() {
+        // An empty env var is distinct from "not set" — surface the right fix.
+        let err =
+            resolve_identity(&Some("".to_string()), "NETDATA_REGISTRY_UNIQUE_ID").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("NETDATA_REGISTRY_UNIQUE_ID") && msg.contains("empty"),
+            "error must name the variable and the empty state: {msg}"
+        );
+    }
+
+    #[test]
+    fn resolve_identity_rejects_whitespace_only() {
+        let err =
+            resolve_identity(&Some("  \n ".to_string()), "NETDATA_INVOCATION_ID").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("NETDATA_INVOCATION_ID") && msg.contains("empty"),
+            "whitespace-only must be treated as empty: {msg}"
+        );
+    }
+
+    #[test]
+    fn resolve_identity_rejects_nil_uuid() {
+        // A nil UUID parses but would silently corrupt provenance if it reached
+        // the writer; reject it at the supervisor boundary, before any worker
+        // is spawned, matching the stated startup contract.
+        let err = resolve_identity(
+            &Some("00000000-0000-0000-0000-000000000000".to_string()),
+            "NETDATA_REGISTRY_UNIQUE_ID",
+        )
+        .unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("NETDATA_REGISTRY_UNIQUE_ID") && msg.contains("nil"),
+            "error must name the variable and the nil state: {msg}"
+        );
     }
 }

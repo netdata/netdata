@@ -214,7 +214,7 @@ pub async fn reconcile_local_catalog_uploads<S: Storage>(
                 file.date,
                 tenant_id,
                 file.machine_id,
-                file.boot_id,
+                file.invocation_id,
                 file.max_seq,
                 file.min_timestamp_s,
                 file.max_timestamp_s,

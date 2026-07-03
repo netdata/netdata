@@ -173,24 +173,32 @@ impl fmt::Display for ByteSize {
 // FileId
 // ---------------------------------------------------------------------------
 
-/// Uniquely identifies a file across machines, boots, pipelines, and sequences.
+/// Uniquely identifies a file across machines, agent invocations, pipelines,
+/// and sequences.
 ///
 /// The filename format is:
-/// `<machine_id>-<boot_id>-<pipeline_id:05>-<seq:010>-<part_key:016x>.<ext>`
-/// where machine_id and boot_id are 32-character lowercase hex (no hyphens),
-/// pipeline_id is a 5-digit zero-padded decimal, seq is a 10-digit zero-padded
-/// decimal, and part_key is a 16-character zero-padded hex u64.
+/// `<machine_id>-<invocation_id>-<pipeline_id:05>-<seq:010>-<part_key:016x>.<ext>`
+/// where machine_id and invocation_id are 32-character lowercase hex (no
+/// hyphens), pipeline_id is a 5-digit zero-padded decimal, seq is a 10-digit
+/// zero-padded decimal, and part_key is a 16-character zero-padded hex u64.
 ///
 /// `part_key` is an opaque partition key and `pipeline_id` an opaque
 /// signal/pipeline discriminator: this crate never interprets either. The
 /// content plane derives them and assigns their meaning (for OTel logs today,
 /// `part_key` is the content plane's service-stream hash).
-/// `seq` is a single global counter, unique across pipelines, so it alone
-/// identifies a file; `pipeline_id` routes it to its owning pipeline.
+/// `seq` is a single global counter, unique within an invocation across
+/// pipelines, so it alone identifies a file; `pipeline_id` routes it to its
+/// owning pipeline.
+///
+/// Identity contract: `machine_id` is the Netdata machine GUID (permanent node
+/// identity); `invocation_id` is `NETDATA_INVOCATION_ID` (changes per agent
+/// start, inherited across plugin respawns under one agent). Both are UUIDs;
+/// the 32-hex filename shape is unchanged from when this field held the OS
+/// boot id.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct FileId {
     pub machine_id: Uuid,
-    pub boot_id: Uuid,
+    pub invocation_id: Uuid,
     /// Opaque pipeline/signal discriminator assigned by the integration layer
     /// (the signal↔id mapping is the integration layer's, e.g. `bridge::signals`;
     /// `file-registry` ascribes no meaning to the value). Always chosen
@@ -205,10 +213,16 @@ impl FileId {
     /// Construct a `FileId`. The `pipeline_id` is always chosen explicitly by the
     /// integration layer (the signal↔id mapping is its concern, e.g.
     /// `bridge::signals`); there is no default pipeline.
-    pub fn new(machine_id: Uuid, boot_id: Uuid, pipeline_id: u16, seq: u64, part_key: u64) -> Self {
+    pub fn new(
+        machine_id: Uuid,
+        invocation_id: Uuid,
+        pipeline_id: u16,
+        seq: u64,
+        part_key: u64,
+    ) -> Self {
         Self {
             machine_id,
-            boot_id,
+            invocation_id,
             pipeline_id,
             seq,
             part_key,
@@ -216,11 +230,11 @@ impl FileId {
     }
 
     /// Format the stem portion:
-    /// `<machine_id>-<boot_id>-<pipeline_id:05>-<seq:010>-<part_key:016x>`
+    /// `<machine_id>-<invocation_id>-<pipeline_id:05>-<seq:010>-<part_key:016x>`
     pub fn to_stem(&self) -> String {
         format!(
             "{}-{:05}-{:010}-{:016x}",
-            crate::stem::format_uuid_pair(self.machine_id, self.boot_id),
+            crate::stem::format_uuid_pair(self.machine_id, self.invocation_id),
             self.pipeline_id,
             self.seq,
             self.part_key,
@@ -234,15 +248,15 @@ impl FileId {
 
     /// Parse a filename (not a full path) into a FileId.
     ///
-    /// Expects: `<machine_id>-<boot_id>-<pipeline_id>-<seq>-<part_key>.<ext>`
+    /// Expects: `<machine_id>-<invocation_id>-<pipeline_id>-<seq>-<part_key>.<ext>`
     pub fn parse(path: &Path) -> Option<Self> {
         let name = path.file_stem()?.to_str()?;
         Self::parse_stem(name)
     }
 
-    /// Parse just the stem: `<machine_id>-<boot_id>-<pipeline_id>-<seq>-<part_key>`
+    /// Parse just the stem: `<machine_id>-<invocation_id>-<pipeline_id>-<seq>-<part_key>`
     pub fn parse_stem(stem: &str) -> Option<Self> {
-        let (machine_id, boot_id, rest) = crate::stem::parse_uuid_pair(stem)?;
+        let (machine_id, invocation_id, rest) = crate::stem::parse_uuid_pair(stem)?;
 
         // rest = "<pipeline_id>-<seq>-<part_key>": split off pipeline (first
         // '-'), then split the remainder into seq and part_key (last '-').
@@ -259,7 +273,7 @@ impl FileId {
 
         Some(Self {
             machine_id,
-            boot_id,
+            invocation_id,
             pipeline_id,
             seq,
             part_key,
@@ -278,7 +292,11 @@ impl Ord for FileId {
         self.machine_id
             .as_bytes()
             .cmp(other.machine_id.as_bytes())
-            .then_with(|| self.boot_id.as_bytes().cmp(other.boot_id.as_bytes()))
+            .then_with(|| {
+                self.invocation_id
+                    .as_bytes()
+                    .cmp(other.invocation_id.as_bytes())
+            })
             .then_with(|| self.pipeline_id.cmp(&other.pipeline_id))
             .then_with(|| self.seq.cmp(&other.seq))
             .then_with(|| self.part_key.cmp(&other.part_key))

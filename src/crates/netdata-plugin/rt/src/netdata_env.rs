@@ -19,6 +19,10 @@ pub struct NetdataEnv {
     pub debug_flags: Option<String>,
     pub update_every: Option<u64>,
     pub invocation_id: Option<String>,
+    /// Netdata machine GUID — the product's permanent node identity.
+    /// Exported by the agent as NETDATA_REGISTRY_UNIQUE_ID
+    /// (src/daemon/machine-guid.c). Survives log-volume wipes; defines "same node".
+    pub registry_unique_id: Option<String>,
     pub log_method: Option<LogMethod>,
     pub log_format: Option<LogFormat>,
     pub log_level: Option<LogLevel>,
@@ -100,6 +104,7 @@ impl NetdataEnv {
                 .ok()
                 .and_then(|s| s.parse().ok()),
             invocation_id: env::var("NETDATA_INVOCATION_ID").ok(),
+            registry_unique_id: env::var("NETDATA_REGISTRY_UNIQUE_ID").ok(),
             log_method: env::var("NETDATA_LOG_METHOD")
                 .ok()
                 .and_then(|s| s.parse().ok()),

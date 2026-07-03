@@ -29,7 +29,14 @@ pub use registry::{File, Registry, filename, scan_max_sequence};
 /// (`v1/tenants/...`), so it is rejected on recovery rather than reused — this
 /// prevents a stale catalog from republishing remote keys that point at the
 /// now-orphaned old layout. There is no migration (experimental feature).
-pub const FORMAT_VERSION: u32 = 4;
+///
+/// v5: the `FileId` and `Catalog` envelope field `boot_id` is renamed to
+/// `invocation_id` — the value is now the Netdata agent invocation id
+/// (`NETDATA_INVOCATION_ID`), not the OS boot id, and the JSON wire key follows
+/// the Rust field name (both derive serde with named fields). Pre-GA break;
+/// v4 catalogs are rejected on recovery. The WAL header and SFST formats are
+/// unchanged (identity lives in filenames only, never inside those bytes).
+pub const FORMAT_VERSION: u32 = 5;
 
 /// Magic bytes of the on-disk catalog container.
 pub const CONTAINER_MAGIC: [u8; 4] = *b"NCAT";

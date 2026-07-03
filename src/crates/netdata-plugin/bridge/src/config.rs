@@ -10,6 +10,7 @@ use std::time::Duration;
 
 use bytesize::ByteSize;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::signals::Signal;
 
@@ -56,6 +57,17 @@ pub struct PluginConfig {
     /// Set by the supervisor at runtime, not present in YAML config.
     #[serde(default)]
     pub writer_socket_path: String,
+    /// Netdata machine GUID (env `NETDATA_REGISTRY_UNIQUE_ID`). Permanent node
+    /// identity; defines "same node" across reinstations. Runtime-only: the
+    /// supervisor resolves this from env after YAML load and hard-errors before
+    /// spawning workers if missing or not a valid UUID.
+    #[serde(default)]
+    pub machine_id: Uuid,
+    /// Per-run agent invocation id (env `NETDATA_INVOCATION_ID`). Changes each
+    /// agent start; a plugin respawn under a running agent inherits it. Same
+    /// runtime-only contract as [`machine_id`](Self::machine_id).
+    #[serde(default)]
+    pub invocation_id: Uuid,
 }
 
 impl PluginConfig {

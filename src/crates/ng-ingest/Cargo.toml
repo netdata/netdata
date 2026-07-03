@@ -19,6 +19,7 @@ path = "src/bin/traces.rs"
 anyhow = { workspace = true }
 clap = { workspace = true }
 file-registry = { workspace = true }
+journal-common = { workspace = true }
 ng-flatten = { workspace = true }
 opentelemetry-proto = { workspace = true }
 prost = { workspace = true }
@@ -30,3 +31,4 @@ wal = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+uuid = { workspace = true }

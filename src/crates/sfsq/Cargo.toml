@@ -30,6 +30,7 @@ regex = { workspace = true }
 clap = { workspace = true }
 opentelemetry-proto = { workspace = true }
 tempfile = { workspace = true }
+uuid = { workspace = true }
 # ng-flatten tail-scan equivalence harness (tests/ng_wal_equivalence.rs): builds
 # the sealed ng SFST via ng-index::build_sfst to compare against scan_flattened.
 ng-index = { workspace = true }

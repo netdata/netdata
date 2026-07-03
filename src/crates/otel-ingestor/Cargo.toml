@@ -37,8 +37,8 @@ tokio = { workspace = true }
 tonic = { workspace = true, features = ["gzip", "tls-ring"] }
 tracing = { workspace = true }
 twox-hash = { workspace = true, features = ["xxhash64"] }
+uuid = { workspace = true }
 
 [dev-dependencies]
 bytesize = { workspace = true }
 tempfile = { workspace = true }
-uuid = { workspace = true }

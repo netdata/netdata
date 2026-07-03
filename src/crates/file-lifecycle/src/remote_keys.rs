@@ -3,7 +3,7 @@
 //! ## Bucket layout (versioned + signal-scoped at the root)
 //!
 //! ```text
-//! v2/{signal}/catalog/{YYYY-MM-DD}/{tenant_id}/{machine}-{boot}-{max_seq}-{min_ts}-{max_ts}.catalog
+//! v2/{signal}/catalog/{YYYY-MM-DD}/{tenant_id}/{machine}-{invocation}-{max_seq}-{min_ts}-{max_ts}.catalog
 //! v2/{signal}/tenants/{tenant_id}/sfst/{YYYY-MM-DD}/{file_id}.sfst
 //! ```
 //!
@@ -77,7 +77,7 @@ pub fn catalog(
     date: NaiveDate,
     tenant_id: &TenantId,
     machine_id: Uuid,
-    boot_id: Uuid,
+    invocation_id: Uuid,
     max_seq: u64,
     min_timestamp_s: u32,
     max_timestamp_s: u32,
@@ -88,7 +88,7 @@ pub fn catalog(
         tenant_id,
         otel_catalog::filename(
             machine_id,
-            boot_id,
+            invocation_id,
             max_seq,
             min_timestamp_s,
             max_timestamp_s,

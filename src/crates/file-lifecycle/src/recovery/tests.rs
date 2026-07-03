@@ -860,6 +860,8 @@ async fn recover_unindexed_orphans_unsealable_wals() {
             pipeline_id: 0,
             payload_format: 7,
         },
+        machine(),
+        boot(),
     )
     .unwrap();
     writer

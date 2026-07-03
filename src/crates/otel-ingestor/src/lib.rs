@@ -168,8 +168,18 @@ async fn run_ingestor(
         Arc::clone(&sender),
         Arc::clone(&seq),
         Arc::clone(&clock),
+        config.machine_id,
+        config.invocation_id,
     );
-    let traces_service = create_traces_service(&traces_lifecycle, &config.auth, sender, seq, clock);
+    let traces_service = create_traces_service(
+        &traces_lifecycle,
+        &config.auth,
+        sender,
+        seq,
+        clock,
+        config.machine_id,
+        config.invocation_id,
+    );
 
     // Parse gRPC endpoint address
     let addr =
@@ -337,6 +347,8 @@ fn create_logs_service(
     sender: Arc<ledger_sender::LedgerSender>,
     seq: Arc<wal::SeqAllocator>,
     clock: Arc<std::sync::Mutex<file_registry::MonotonicClock>>,
+    machine_id: uuid::Uuid,
+    invocation_id: uuid::Uuid,
 ) -> NetdataLogsService {
     NetdataLogsService::new(
         sender,
@@ -345,6 +357,8 @@ fn create_logs_service(
         seq,
         clock,
         auth.clone(),
+        machine_id,
+        invocation_id,
     )
 }
 
@@ -358,6 +372,8 @@ fn create_traces_service(
     sender: Arc<ledger_sender::LedgerSender>,
     seq: Arc<wal::SeqAllocator>,
     clock: Arc<std::sync::Mutex<file_registry::MonotonicClock>>,
+    machine_id: uuid::Uuid,
+    invocation_id: uuid::Uuid,
 ) -> NetdataTracesService {
     tracing::info!(
         wal_dir = %lifecycle.wal.dir.display(),
@@ -370,6 +386,8 @@ fn create_traces_service(
         seq,
         clock,
         auth.clone(),
+        machine_id,
+        invocation_id,
     )
 }
 

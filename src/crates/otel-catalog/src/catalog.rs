@@ -16,9 +16,9 @@ use crate::{CONTAINER_MAGIC, CONTAINER_VERSION, Error, FORMAT_VERSION};
 /// not a new file format.
 const CHUNK_JSON: ChunkId = *b"JSON";
 
-/// Per-tenant, per-date, per-machine, per-boot record of uploaded SFSTs.
+/// Per-tenant, per-date, per-machine, per-invocation record of uploaded SFSTs.
 ///
-/// The catalog file's identifying metadata (tenant, date, machine, boot)
+/// The catalog file's identifying metadata (tenant, date, machine, invocation)
 /// is encoded in the path; entries carry their own per-SFST timestamps,
 /// and the file's union `[min, max]` time range is encoded in the
 /// filename. No per-catalog "created_at" timestamp is stored — nothing
@@ -28,17 +28,22 @@ pub struct Catalog {
     pub tenant_id: TenantId,
     pub date: NaiveDate,
     pub machine_id: Uuid,
-    pub boot_id: Uuid,
+    pub invocation_id: Uuid,
     pub entries: BTreeMap<FileId, CatalogEntry>,
 }
 
 impl Catalog {
-    pub fn new(tenant_id: TenantId, date: NaiveDate, machine_id: Uuid, boot_id: Uuid) -> Self {
+    pub fn new(
+        tenant_id: TenantId,
+        date: NaiveDate,
+        machine_id: Uuid,
+        invocation_id: Uuid,
+    ) -> Self {
         Self {
             tenant_id,
             date,
             machine_id,
-            boot_id,
+            invocation_id,
             entries: BTreeMap::new(),
         }
     }
@@ -100,7 +105,7 @@ impl Catalog {
             tenant_id: self.tenant_id.clone(),
             date: self.date,
             machine_id: self.machine_id,
-            boot_id: self.boot_id,
+            invocation_id: self.invocation_id,
             entries: self.entries.values().cloned().collect(),
         };
         Ok(serde_json::to_vec(&env)?)
@@ -130,7 +135,7 @@ impl Catalog {
             tenant_id: env.tenant_id,
             date: env.date,
             machine_id: env.machine_id,
-            boot_id: env.boot_id,
+            invocation_id: env.invocation_id,
             entries,
         })
     }
@@ -150,7 +155,7 @@ struct Envelope {
     tenant_id: TenantId,
     date: NaiveDate,
     machine_id: Uuid,
-    boot_id: Uuid,
+    invocation_id: Uuid,
     entries: Vec<CatalogEntry>,
 }
 
@@ -210,6 +215,23 @@ mod tests {
 
         let bytes = c.to_container_bytes().unwrap();
         assert_eq!(&bytes[0..4], &CONTAINER_MAGIC, "container leads with NCAT");
+
+        // v5 wire contract: the envelope key is `invocation_id` (renamed from
+        // `boot_id` in v5). Pin the JSON wire so a future serde rename can't
+        // silently flip it back without failing here.
+        let container =
+            chunk_file::container::Container::open(&bytes, &CONTAINER_MAGIC, CONTAINER_VERSION)
+                .unwrap();
+        let json = std::str::from_utf8(container.chunk(CHUNK_JSON).unwrap()).unwrap();
+        assert!(
+            json.contains("\"invocation_id\""),
+            "v5 catalog JSON must use the invocation_id key"
+        );
+        assert!(
+            !json.contains("\"boot_id\""),
+            "v5 catalog JSON must not carry the old boot_id key"
+        );
+
         let parsed = Catalog::from_container_bytes(&bytes).unwrap();
         assert_eq!(parsed, c);
     }
@@ -413,6 +435,30 @@ mod tests {
         match Catalog::from_json(json) {
             Err(Error::UnsupportedVersion(3)) => {}
             other => panic!("expected UnsupportedVersion(3), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn from_json_rejects_v4_schema_on_version_not_serde() {
+        // v4 carried the envelope field `boot_id` (renamed to `invocation_id`
+        // in v5). The version peek must reject a v4 catalog before the rename
+        // surfaces as a serde "missing field `invocation_id`" error. Pre-GA
+        // break; there is no migration.
+        let json = br#"{
+            "version": 4,
+            "tenant_id": "t",
+            "date": "2026-04-17",
+            "machine_id": "00000000-0000-0000-0000-000000000000",
+            "boot_id": "00000000-0000-0000-0000-000000000000",
+            "entries": [
+                {"id": "x", "remote_key": "v2/logs/tenants/t/sfst/2026-04-17/x.sfst",
+                 "min_timestamp_s": 1, "max_timestamp_s": 2, "record_count": 5,
+                 "content_meta": [], "size": 10, "uploaded_at_ns": 0, "remote_etag": null}
+            ]
+        }"#;
+        match Catalog::from_json(json) {
+            Err(Error::UnsupportedVersion(4)) => {}
+            other => panic!("expected UnsupportedVersion(4), got {other:?}"),
         }
     }
 

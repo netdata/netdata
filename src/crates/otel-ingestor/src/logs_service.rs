@@ -321,6 +321,10 @@ pub struct NetdataLogsService {
     wal_config: bridge::config::WalConfig,
     seq: Arc<wal::SeqAllocator>,
     auth: AuthConfig,
+    /// Identity stamped into every WAL FileId (env-resolved by the supervisor,
+    /// see `bridge::config::PluginConfig::{machine_id, invocation_id}`).
+    machine_id: uuid::Uuid,
+    invocation_id: uuid::Uuid,
 }
 
 impl NetdataLogsService {
@@ -331,6 +335,8 @@ impl NetdataLogsService {
         seq: Arc<wal::SeqAllocator>,
         clock: Arc<Mutex<MonotonicClock>>,
         auth: AuthConfig,
+        machine_id: uuid::Uuid,
+        invocation_id: uuid::Uuid,
     ) -> Self {
         Self {
             writers: Mutex::new(HashMap::new()),
@@ -341,6 +347,8 @@ impl NetdataLogsService {
             wal_config,
             seq,
             auth,
+            machine_id,
+            invocation_id,
         }
     }
 
@@ -526,6 +534,8 @@ impl LogsService for NetdataLogsService {
                         pipeline_id: Signal::Logs.pipeline_id(),
                         payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
                     },
+                    self.machine_id,
+                    self.invocation_id,
                 )
                 .map_err(|e| {
                     tracing::error!(%e, tenant = %tenant_id, "failed to create WAL writer");
@@ -835,6 +845,8 @@ mod tests {
             Arc::new(wal::SeqAllocator::ephemeral(0)),
             Arc::new(Mutex::new(MonotonicClock::new())),
             bridge::config::AuthConfig::default(),
+            uuid::Uuid::from_u128(1),
+            uuid::Uuid::from_u128(2),
         )
     }
 

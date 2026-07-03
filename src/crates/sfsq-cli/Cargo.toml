@@ -42,3 +42,4 @@ ng-flatten = { workspace = true }
 ng-index = { workspace = true }
 opentelemetry-proto = { workspace = true }
 tempfile = { workspace = true }
+uuid = { workspace = true }
