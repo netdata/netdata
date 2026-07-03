@@ -196,9 +196,11 @@ MACOS_LOGS_QUERY_STATUS macos_logs_query_oslog(LOGS_QUERY_STATUS *lqs) {
         }
 
         bool forward = lqs->rq.direction == FACETS_ANCHOR_DIRECTION_FORWARD;
-        usec_t start_ut = forward ? lqs->query.start_ut : lqs->query.stop_ut;
-        usec_t stop_ut = forward ? lqs->query.stop_ut : lqs->query.start_ut;
-        usec_t position_ut = forward ? start_ut : stop_ut;
+        // lqs_query_timeframe() already orients these per direction:
+        //   forward:  start_ut = oldest edge, stop_ut = newest edge (ascending)
+        //   backward: start_ut = newest edge, stop_ut = oldest edge (descending)
+        // So use them directly as the iteration start/end; do NOT re-swap.
+        usec_t position_ut = lqs->query.start_ut;
 
         NSDate *position_date = macos_logs_date_from_ut(position_ut);
         OSLogEnumeratorOptions options = forward ? 0 : OSLogEnumeratorReverse;
@@ -234,17 +236,15 @@ MACOS_LOGS_QUERY_STATUS macos_logs_query_oslog(LOGS_QUERY_STATUS *lqs) {
                     continue;
 
                 if(forward) {
-                    if(msg_ut < start_ut)
+                    if(msg_ut < lqs->query.start_ut)
                         continue;
-
-                    if(msg_ut > stop_ut)
+                    if(msg_ut > lqs->query.stop_ut)
                         break;
                 }
                 else {
-                    if(msg_ut > stop_ut)
+                    if(msg_ut > lqs->query.start_ut)
                         continue;
-
-                    if(msg_ut < start_ut)
+                    if(msg_ut < lqs->query.stop_ut)
                         break;
                 }
 
