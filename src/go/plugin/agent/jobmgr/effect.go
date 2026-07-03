@@ -8,7 +8,9 @@ import (
 
 // An effect is a unit of blocking module work (config validation, job
 // creation, detection, stop) executed off the manager loop in a supervised
-// child goroutine. Completions are delivered through effectDoneCh.
+// child goroutine. Each dispatcher awaits its own effect over a per-call
+// completion channel; effectDoneCh is armed in every run-loop select as the
+// future asynchronous completion path and carries nothing today.
 //
 // The current execution policy is fully synchronous: runEffectSync spawns
 // the child and immediately drains its completion, so at most one effect is

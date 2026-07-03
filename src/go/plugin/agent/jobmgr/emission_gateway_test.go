@@ -144,6 +144,30 @@ func TestEmissionGateway(t *testing.T) {
 				assert.False(t, tracked, "a job that failed detection must leave no gateway entry")
 			},
 		},
+		"same-name replacement keeps the new job's gateway tracked": {
+			run: func(t *testing.T) {
+				mgr := newCollectorTestManager()
+				cfg := prepareDyncfgCfg("success", "gw-replace")
+
+				oldJob, err := mgr.createCollectorJob(cfg)
+				require.NoError(t, err)
+				mgr.startRunningJob(oldJob)
+
+				newJob, err := mgr.createCollectorJob(cfg)
+				require.NoError(t, err)
+				newGate, tracked := mgr.emissionGates.lookup(cfg.FullName())
+				require.True(t, tracked)
+
+				// The defensive stop inside startRunningJob replaces the old
+				// same-name job; the new job's gate must survive it.
+				mgr.startRunningJob(newJob)
+				t.Cleanup(func() { mgr.stopRunningJob(cfg.FullName()) })
+
+				gate, tracked := mgr.emissionGates.lookup(cfg.FullName())
+				require.True(t, tracked, "replacement dropped the new job's gateway tracking")
+				assert.Same(t, newGate, gate, "the tracked gate must be the new job's gate")
+			},
+		},
 		"validation-only jobs register no gateway": {
 			run: func(t *testing.T) {
 				mgr := newCollectorTestManager()

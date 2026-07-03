@@ -536,7 +536,15 @@ func (m *Manager) takePendingFunctionReconcileModules() []string {
 }
 
 func (m *Manager) startRunningJob(job runtimeJob) {
+	// The defensive stop removes the gate tracked under this name, but that
+	// entry belongs to the job being started (registered at construction,
+	// after any old same-name job's entry was overwritten) - restore it so
+	// a same-name replacement never leaves the new job untracked.
+	gate, hadGate := m.emissionGates.lookup(job.FullName())
 	m.stopRunningJob(job.FullName())
+	if hadGate {
+		m.emissionGates.add(job.FullName(), gate)
+	}
 
 	go job.Start()
 

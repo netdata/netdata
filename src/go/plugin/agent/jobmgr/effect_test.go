@@ -66,3 +66,51 @@ func TestEffect_DeadlineDisabledPin(t *testing.T) {
 		t.Run(name, tc.run)
 	}
 }
+
+// effectDoneCh is armed in every run-loop select state; a stray completion
+// must be drained (bug-detector arm) without wedging the loop.
+func TestEffect_DoneChannelLoopArms(t *testing.T) {
+	tests := map[string]struct {
+		run func(t *testing.T, h *charHarness)
+	}{
+		"idle select drains a completion and keeps serving": {
+			run: func(t *testing.T, h *charHarness) {
+				h.mgr.effectDoneCh <- effectResult{key: "stray"}
+
+				require.Eventually(t, func() bool { return len(h.mgr.effectDoneCh) == 0 }, charWait, charTick,
+					"the run loop did not drain the effect completion")
+
+				h.dyncfg("after-idle-drain", []string{h.mgr.dyncfgJobID(prepareDyncfgCfg("success", "x")), "get"}, nil)
+				require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN after-idle-drain"), charWait, charTick,
+					"the run loop stopped serving after draining a completion")
+			},
+		},
+		"wait-mode select drains a completion and keeps serving dyncfg": {
+			run: func(t *testing.T, h *charHarness) {
+				cfg := prepareUserCfg("success", "waity")
+				h.in <- prepareCfgGroups(cfg.Source(), cfg)
+				require.Eventually(t, func() bool { return h.mgr.collectorHandler.WaitingForDecision() }, charWait, charTick)
+
+				h.mgr.effectDoneCh <- effectResult{key: "stray"}
+
+				require.Eventually(t, func() bool { return len(h.mgr.effectDoneCh) == 0 }, charWait, charTick,
+					"the wait-mode select did not drain the effect completion")
+
+				h.dyncfg("after-wait-drain", []string{h.mgr.dyncfgJobID(cfg), "update"}, []byte("{}"))
+				require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN after-wait-drain"), charWait, charTick,
+					"wait mode stopped serving dyncfg after draining a completion")
+				assert.True(t, h.mgr.collectorHandler.WaitingForDecision(),
+					"a stray completion must not clear the wait gate")
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			reg := collectorapi.Registry{}
+			reg.Register("success", charSuccessCreator())
+
+			tc.run(t, startCharManager(t, reg))
+		})
+	}
+}
