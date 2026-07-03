@@ -119,20 +119,30 @@ func (f *jobFactory) create(cfg confgroup.Config) (runtimeJob, error) {
 	// Every runnable job writes through its own emission gateway so job
 	// output can be provably fenced off; the gate stays open for the job's
 	// whole life on the normal path. Validation-only jobs never run, so they
-	// get no gate registration.
+	// get no gate. The gate is tracked only for jobs that construct
+	// successfully; the create/detect and stop paths drop the entry when the
+	// job fails or stops.
 	gatedF := *f
+	var gate *emissionGateway
 	if !f.validationOnly {
-		gate := newEmissionGateway(f.out)
+		gate = newEmissionGateway(f.out)
 		gatedF.out = gate
-		if f.gates != nil {
-			f.gates.add(cfg.FullName(), gate)
-		}
 	}
 
+	var job runtimeJob
+	var err error
 	if creator.CreateV2 != nil {
-		return gatedF.createV2(cfg, creator, functionOnly, vnode)
+		job, err = gatedF.createV2(cfg, creator, functionOnly, vnode)
+	} else {
+		job, err = gatedF.createV1(cfg, creator, functionOnly, vnode)
 	}
-	return gatedF.createV1(cfg, creator, functionOnly, vnode)
+	if err != nil {
+		return nil, err
+	}
+	if gate != nil && f.gates != nil {
+		f.gates.add(cfg.FullName(), gate)
+	}
+	return job, nil
 }
 
 func (f *jobFactory) logApplyConfigError(cfg confgroup.Config, err error) {

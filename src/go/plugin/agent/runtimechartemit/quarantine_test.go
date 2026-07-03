@@ -151,3 +151,82 @@ func TestRuntimeMetricsJobQuarantineComponent(t *testing.T) {
 		t.Run(name, tc.run)
 	}
 }
+
+func TestServiceQuarantineComponent(t *testing.T) {
+	tests := map[string]struct {
+		run func(t *testing.T)
+	}{
+		"barrier waits out an in-progress tick even during service Stop": {
+			run: func(t *testing.T) {
+				svc := New(nil)
+				store := metrix.NewRuntimeStore()
+				store.Write().StatefulMeter("component").Gauge("load").Set(5)
+				require.NoError(t, svc.RegisterComponent(ComponentConfig{
+					Name:         "component",
+					Store:        store,
+					TemplateYAML: []byte(runtimeGaugeTemplateYAML()),
+				}))
+
+				out := &gatedWriter{started: make(chan struct{}), release: make(chan struct{})}
+				svc.Start("go.d", out)
+
+				select {
+				case <-out.started:
+				case <-time.After(5 * time.Second):
+					t.Fatal("no tick reached its write")
+				}
+
+				stopDone := make(chan struct{})
+				go func() {
+					svc.Stop()
+					close(stopDone)
+				}()
+
+				quarantineDone := make(chan struct{})
+				go func() {
+					svc.QuarantineComponent("component")
+					close(quarantineDone)
+				}()
+
+				quarantineReturned := func() bool {
+					select {
+					case <-quarantineDone:
+						return true
+					default:
+						return false
+					}
+				}
+				require.Never(t, quarantineReturned, 200*time.Millisecond, 10*time.Millisecond,
+					"quarantine degraded to a plain registry remove while a tick was in flight")
+
+				close(out.release)
+				require.Eventually(t, quarantineReturned, 5*time.Second, 10*time.Millisecond)
+				select {
+				case <-stopDone:
+				case <-time.After(5 * time.Second):
+					t.Fatal("service Stop did not finish")
+				}
+				assert.Empty(t, svc.registry.snapshot(), "registration must be gone after quarantine")
+			},
+		},
+		"quarantine on a never-started service removes the registration": {
+			run: func(t *testing.T) {
+				svc := New(nil)
+				store := metrix.NewRuntimeStore()
+				require.NoError(t, svc.RegisterComponent(ComponentConfig{
+					Name:         "component",
+					Store:        store,
+					TemplateYAML: []byte(runtimeGaugeTemplateYAML()),
+				}))
+
+				svc.QuarantineComponent("component")
+
+				assert.Empty(t, svc.registry.snapshot())
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, tc.run)
+	}
+}

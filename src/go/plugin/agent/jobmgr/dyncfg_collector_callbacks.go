@@ -106,7 +106,13 @@ func (cb *collectorCallbacks) ParseAndValidate(fn dyncfg.Function, name string) 
 
 	cb.mgr.dyncfgSetConfigMeta(cfg, mn, name, fn)
 
-	if err := cb.mgr.validateCollectorJob(cfg); err != nil {
+	// Payload parsing above is cheap and stays with the caller; the full
+	// validation (config apply incl. secret resolution) is blocking module
+	// work and runs as an effect.
+	err = cb.mgr.runEffectSync(cfg.FullName(), func(context.Context) error {
+		return cb.mgr.validateCollectorJob(cfg)
+	})
+	if err != nil {
 		return nil, fmt.Errorf("invalid configuration: failed to apply configuration: %v", err)
 	}
 
@@ -141,6 +147,7 @@ func (cb *collectorCallbacks) Start(cfg confgroup.Config) error {
 		return &codedError{err: fmt.Errorf("invalid configuration: failed to apply configuration: %w", createErr), code: 400}
 	}
 	if err != nil {
+		cb.mgr.emissionGates.remove(cfg.FullName())
 		var ce dyncfg.CodedError
 		if errors.As(err, &ce) {
 			if dyncfg.IsRetryableError(err) {
@@ -183,6 +190,7 @@ func (cb *collectorCallbacks) Update(oldCfg, newCfg confgroup.Config) error {
 		return fmt.Errorf("job update failed: %w", createErr)
 	}
 	if err != nil {
+		cb.mgr.emissionGates.remove(newCfg.FullName())
 		var ce dyncfg.CodedError
 		if errors.As(err, &ce) {
 			if dyncfg.IsRetryableError(err) {

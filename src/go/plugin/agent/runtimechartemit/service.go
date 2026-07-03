@@ -136,7 +136,9 @@ func (s *Service) Stop() {
 	job := s.job
 	stopCh := s.tkStop
 	doneCh := s.tkDone
-	s.job = nil
+	// s.job stays set until the emitter has fully stopped: a concurrent
+	// QuarantineComponent must keep finding the job so its barrier waits out
+	// the final in-progress tick instead of degrading to a registry remove.
 	s.tkStop = nil
 	s.tkDone = nil
 	s.started = false
@@ -151,6 +153,12 @@ func (s *Service) Stop() {
 	if job != nil {
 		job.Stop()
 	}
+
+	s.mu.Lock()
+	if s.job == job {
+		s.job = nil
+	}
+	s.mu.Unlock()
 }
 
 // Tick advances runtime producers and runtime emitter job on scheduler cadence.

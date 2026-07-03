@@ -119,6 +119,31 @@ func TestEmissionGateway(t *testing.T) {
 				assert.False(t, tracked, "gateway tracking must end when the job stops")
 			},
 		},
+		"failed construction registers no gateway": {
+			run: func(t *testing.T) {
+				mgr := newCollectorTestManager()
+				cfg := prepareDyncfgCfg("success", "gw-badcfg").Set("vnode", "no-such-vnode")
+
+				_, err := mgr.createCollectorJob(cfg)
+
+				require.Error(t, err)
+				_, tracked := mgr.emissionGates.lookup(cfg.FullName())
+				assert.False(t, tracked, "a job that failed to construct must leave no gateway entry")
+			},
+		},
+		"detection failure drops the gateway entry": {
+			run: func(t *testing.T) {
+				mgr := newCollectorTestManager()
+				cb := &collectorCallbacks{mgr: mgr}
+				cfg := prepareDyncfgCfg("fail", "gw-detect")
+
+				err := cb.Start(cfg)
+
+				require.Error(t, err)
+				_, tracked := mgr.emissionGates.lookup(cfg.FullName())
+				assert.False(t, tracked, "a job that failed detection must leave no gateway entry")
+			},
+		},
 		"validation-only jobs register no gateway": {
 			run: func(t *testing.T) {
 				mgr := newCollectorTestManager()
