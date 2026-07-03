@@ -221,14 +221,12 @@ You can also [edit the file where the alert is defined](#how-to-edit-health-conf
 
 **Use Case:** Enable only a chosen set of alerts and disable everything else
 
-To enable only specific alerts, list their names in `enabled alarms` **without** a trailing `*` wildcard. Only the listed alerts are loaded; every other alert is disabled.
+To enable only specific alerts, list their names in `enabled alarms` **without** a trailing `*` wildcard. Because [simple patterns](/src/libnetdata/simple_pattern/README.md) deny anything that is not explicitly matched, only the listed alerts load; every other alert is disabled.
 
 ```conf
 [health]
-    enabled alarms = 10min_cpu_usage ram_in_use
+    enabled alarms = oom_kill disk_space_usage
 ```
-
-Restart your Netdata Agent after changing `netdata.conf` (`netdatacli reload-health` reloads health configuration files, but does not reload `netdata.conf`).
 
 #### Silence Individual Alert Notifications
 
