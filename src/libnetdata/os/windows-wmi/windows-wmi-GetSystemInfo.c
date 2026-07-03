@@ -73,9 +73,13 @@ static IWbemClassObject *wmi_exec_single_row_query(const wchar_t *query_text, co
     pEnumerator->lpVtbl->Release(pEnumerator);
 
     if(FAILED(hr) || uReturn == 0 || !pclsObj) {
-        if(!FAILED(hr) && uReturn == 0) {
+        if(hr == WBEM_S_TIMEDOUT && uReturn == 0) {
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
                    "%s WMI query timed out after %lu ms", caller, timeout_ms);
+        }
+        else if(!FAILED(hr) && uReturn == 0) {
+            nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                   "%s WMI query returned no rows", caller);
         }
         return NULL;
     }
