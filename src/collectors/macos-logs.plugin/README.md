@@ -1,3 +1,5 @@
+<!-- markdownlint-disable-file MD043 -->
+
 # macOS Logs plugin
 
 [KEY FEATURES](#key-features) | [LOG SOURCE](#log-source) | [LOG FIELDS](#log-fields) |

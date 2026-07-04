@@ -5,7 +5,7 @@
 typedef struct __IOHIDEvent *IOHIDEventRef;
 
 extern IOHIDEventSystemClientRef IOHIDEventSystemClientCreate(CFAllocatorRef allocator);
-extern int IOHIDEventSystemClientSetMatching(IOHIDEventSystemClientRef client, CFDictionaryRef matching);
+extern void IOHIDEventSystemClientSetMatching(IOHIDEventSystemClientRef client, CFDictionaryRef matching);
 extern CFArrayRef IOHIDEventSystemClientCopyServices(IOHIDEventSystemClientRef client);
 extern CFTypeRef IOHIDServiceClientCopyProperty(IOHIDServiceClientRef service, CFStringRef key);
 extern CFTypeRef IOHIDServiceClientGetRegistryID(IOHIDServiceClientRef service);
@@ -100,10 +100,8 @@ CFArrayRef macos_iohid_client_copy_services(struct macos_iohid_client *hid)
         if (!hid->client)
             return NULL;
 
-        if (!IOHIDEventSystemClientSetMatching(hid->client, hid->matching)) {
-            macos_iohid_client_invalidate(hid);
-            return NULL;
-        }
+        // Private API return semantics are not stable; CopyServices validates the configured client.
+        IOHIDEventSystemClientSetMatching(hid->client, hid->matching);
     }
 
     CFArrayRef services = IOHIDEventSystemClientCopyServices(hid->client);

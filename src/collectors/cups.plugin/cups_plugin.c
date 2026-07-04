@@ -176,6 +176,7 @@ int send_job_metrics_to_netdata(const DICTIONARY_ITEM *item, void *entry, void *
 
 struct destination_metrics {
     const char *name;
+    bool has_uri;
     bool is_accepting_jobs;
     bool is_shared;
     int state;
@@ -188,7 +189,8 @@ static void reset_destination_metrics(struct destination_metrics *dest) {
 }
 
 static void collect_destination_metrics(struct destination_metrics *dest) {
-    if (!dest->name)
+    // Keep the former cupsGetDests2() configured-queue guard without invoking Bonjour discovery.
+    if (!dest->name || !dest->has_uri)
         return;
 
     num_dest_total++;
@@ -229,6 +231,7 @@ static void collect_destination_metrics(struct destination_metrics *dest) {
 static bool collect_scheduler_destinations(void) {
     static const char * const requested_attributes[] = {
         "printer-name",
+        "printer-uri-supported",
         "printer-is-accepting-jobs",
         "printer-is-shared",
         "printer-state",
@@ -278,6 +281,10 @@ static bool collect_scheduler_destinations(void) {
 
             if (!strcmp(name, "printer-name") && value_tag == IPP_TAG_NAME)
                 dest.name = ippGetString(attr, 0, NULL);
+            else if (!strcmp(name, "printer-uri-supported") && value_tag == IPP_TAG_URI) {
+                const char *uri = ippGetString(attr, 0, NULL);
+                dest.has_uri = uri && *uri;
+            }
             else if (!strcmp(name, "printer-is-accepting-jobs") && value_tag == IPP_TAG_BOOLEAN)
                 dest.is_accepting_jobs = ippGetBoolean(attr, 0);
             else if (!strcmp(name, "printer-is-shared") && value_tag == IPP_TAG_BOOLEAN)

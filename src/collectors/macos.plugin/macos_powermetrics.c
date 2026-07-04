@@ -510,6 +510,7 @@ static void macos_powermetrics_store_sample(const struct macos_powermetrics_samp
     pm.sample_sequence++;
     pm.consecutive_failures = 0;
     pm.failed_permanently = false;
+    pm.logged_loop_failure = false;
     netdata_mutex_unlock(&pm.mutex);
 }
 

@@ -153,7 +153,8 @@ bool macos_smc_open(io_connect_t *connection)
     io_service_t service;
     while ((service = IOIteratorNext(iter)) != IO_OBJECT_NULL) {
         io_name_t name;
-        if (IORegistryEntryGetName(service, name) == kIOReturnSuccess && !strcmp(name, "AppleSMCKeysEndpoint")) {
+        if (IORegistryEntryGetName(service, name) == kIOReturnSuccess &&
+            (!strcmp(name, "AppleSMCKeysEndpoint") || !strcmp(name, "AppleSMC"))) {
             kr = IOServiceOpen(service, mach_task_self(), 0, connection);
             opened = kr == kIOReturnSuccess;
         }

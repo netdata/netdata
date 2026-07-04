@@ -183,6 +183,11 @@ static void macos_sensors_smc_subsystem_for_key(const char key[MACOS_SMC_KEY_LEN
 {
     const char *subsystem = "hardware";
 
+    if (key[0] == 'F' && isdigit((unsigned char)key[1]) && key[2] == 'A' && key[3] == 'c') {
+        snprintfz(dst, dst_size, "fan");
+        return;
+    }
+
     switch (tolower((unsigned char)key[1])) {
         case 'a':
             subsystem = "ambient";
@@ -513,8 +518,12 @@ static bool macos_sensors_discover_smc(void)
         struct macos_smc_value value;
         NETDATA_DOUBLE decoded;
         if (!macos_smc_read_key(smc_connection, key, &value) ||
-            !macos_sensors_decode_smc_value(kind, &value, &decoded))
+            !macos_sensors_decode_smc_value(kind, &value, &decoded)) {
+            struct macos_smc_sensor_candidate *c = macos_sensors_find_smc_candidate(key);
+            if (c)
+                c->discovered = true;
             continue;
+        }
 
         macos_sensors_get_or_create_smc_candidate(key, kind);
     }
@@ -679,9 +688,10 @@ static void macos_sensors_collect_hid(int update_every)
 
         if (base_feature[0] && has_service_identifier)
             snprintfz(feature, sizeof(feature), "%s_%s", base_feature, service_identifier);
-        else if (base_feature[0])
-            snprintfz(feature, sizeof(feature), "%s", base_feature);
-        else if (has_service_identifier)
+        else if (base_feature[0]) {
+            // Last-resort suffix when IOHID exposes no stable service identity.
+            snprintfz(feature, sizeof(feature), "%s_%ld", base_feature, (long)i);
+        } else if (has_service_identifier)
             snprintfz(feature, sizeof(feature), "temperature_%s", service_identifier);
         else
             snprintfz(feature, sizeof(feature), "temperature_%ld", (long)i);

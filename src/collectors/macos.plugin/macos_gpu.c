@@ -60,6 +60,7 @@ struct macos_gpu_state {
     bool initialized;
     bool permanent_failure;
     bool temperature_available;
+    bool ioreport_power_available;
     bool logged_unavailable;
     bool logged_sample_error;
     bool logged_temperature_error;
@@ -297,6 +298,8 @@ static bool macos_gpu_ioreport_channel_selected(const char *group, const char *s
 
 static void macos_gpu_ioreport_close_subscription(void)
 {
+    gpu.ioreport_power_available = false;
+
     if (gpu.previous_sample) {
         CFRelease(gpu.previous_sample);
         gpu.previous_sample = NULL;
@@ -343,6 +346,7 @@ static bool macos_gpu_ioreport_open_subscription(bool permanent_on_empty)
     if (!gpu.channels || !gpu.selected_channels)
         goto failed;
 
+    gpu.ioreport_power_available = false;
     for (CFIndex i = 0; i < count; i++) {
         CFDictionaryRef item = (CFDictionaryRef)CFArrayGetValueAtIndex(all_channels_array, i);
         if (!item || CFGetTypeID(item) != CFDictionaryGetTypeID())
@@ -353,8 +357,11 @@ static bool macos_gpu_ioreport_open_subscription(bool permanent_on_empty)
                 item, group, sizeof(group), subgroup, sizeof(subgroup), channel, sizeof(channel), unit, sizeof(unit)))
             continue;
 
-        if (macos_gpu_ioreport_channel_selected(group, subgroup, channel))
+        if (macos_gpu_ioreport_channel_selected(group, subgroup, channel)) {
             CFArrayAppendValue(gpu.selected_channels, item);
+            if (!strcmp(group, "Energy Model") && !strcmp(channel, "GPU Energy"))
+                gpu.ioreport_power_available = true;
+        }
     }
 
     if (CFArrayGetCount(gpu.selected_channels) == 0) {
@@ -501,7 +508,7 @@ static bool macos_gpu_read_temperature(NETDATA_DOUBLE *temperature_c)
 static bool macos_gpu_process_residency(CFDictionaryRef item, struct macos_gpu_metrics *metrics)
 {
     int32_t count = gpu.io.state_get_count(item);
-    if (count <= 0 || (size_t)count <= gpu.gpu_freqs_count)
+    if (count <= 0 || (size_t)count < gpu.gpu_freqs_count)
         return false;
 
     int64_t *residencies = callocz((size_t)count, sizeof(*residencies));
@@ -847,7 +854,8 @@ bool macos_gpu_temperature_available(void)
 
 bool macos_gpu_ioreport_available(void)
 {
-    return gpu.initialized && !gpu.permanent_failure && gpu.ioreport_handle && gpu.gpu_freqs_count > 0;
+    return gpu.initialized && !gpu.permanent_failure && gpu.ioreport_handle && gpu.gpu_freqs_count > 0 &&
+           gpu.ioreport_power_available;
 }
 
 int do_macos_gpu(int update_every, usec_t dt __maybe_unused)
@@ -873,6 +881,8 @@ int do_macos_gpu(int update_every, usec_t dt __maybe_unused)
 
     NETDATA_DOUBLE temp;
     if (macos_gpu_read_temperature(&temp)) {
+        gpu.temperature_available = true;
+        gpu.logged_temperature_error = false;
         metrics.has_temperature = true;
         metrics.temperature_c = temp;
     } else if (gpu.temperature_available && !gpu.logged_temperature_error) {
@@ -900,4 +910,5 @@ void macos_gpu_cleanup(void)
     gpu.initialized = false;
     gpu.permanent_failure = false;
     gpu.temperature_available = false;
+    gpu.ioreport_power_available = false;
 }
