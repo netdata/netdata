@@ -21,13 +21,14 @@ struct macos_logs_facet_value_cache {
     const char *key;
     size_t key_length;
     DICTIONARY *values;
+    bool full;
 };
 
 struct macos_logs_cached_facet_value {
     size_t length;
 };
 
-#define MACOS_LOGS_FACET_VALUE_CACHE_ENTRY(field) { field, MACOS_LOGS_FIELD_LENGTH(field), NULL }
+#define MACOS_LOGS_FACET_VALUE_CACHE_ENTRY(field) { field, MACOS_LOGS_FIELD_LENGTH(field), NULL, false }
 
 #define MACOS_LOGS_ALWAYS_VISIBLE_KEYS NULL
 
@@ -86,6 +87,7 @@ static void macos_logs_facet_value_cache_ensure_initialized(void) {
     for(size_t i = 0; i < sizeof(macos_logs_facet_value_caches) / sizeof(macos_logs_facet_value_caches[0]); i++) {
         macos_logs_facet_value_caches[i].values =
             dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
+        macos_logs_facet_value_caches[i].full = false;
     }
 
     macos_logs_facet_value_cache_initialized = true;
@@ -104,6 +106,7 @@ static void macos_logs_facet_value_cache_cleanup(void) {
     for(size_t i = 0; i < sizeof(macos_logs_facet_value_caches) / sizeof(macos_logs_facet_value_caches[0]); i++) {
         dictionary_destroy(macos_logs_facet_value_caches[i].values);
         macos_logs_facet_value_caches[i].values = NULL;
+        macos_logs_facet_value_caches[i].full = false;
     }
     macos_logs_facet_value_cache_initialized = false;
     netdata_mutex_unlock(&macos_logs_facet_value_cache_mutex);
@@ -120,11 +123,18 @@ void macos_logs_cache_facet_value(MACOS_LOGS_FACET_VALUE_CACHE_ID id, const char
         return;
 
     netdata_mutex_lock(&macos_logs_facet_value_cache_mutex);
-    if(dictionary_get_advanced(cache->values, value, (ssize_t)value_length) ||
-       dictionary_entries(cache->values) < MACOS_LOGS_FACET_VALUE_CACHE_MAX_PER_KEY) {
+    if(cache->full || dictionary_get_advanced(cache->values, value, (ssize_t)value_length)) {
+        netdata_mutex_unlock(&macos_logs_facet_value_cache_mutex);
+        return;
+    }
+
+    if(dictionary_entries(cache->values) < MACOS_LOGS_FACET_VALUE_CACHE_MAX_PER_KEY) {
         struct macos_logs_cached_facet_value cached = { .length = value_length };
         dictionary_set_advanced(cache->values, value, (ssize_t)value_length, &cached, sizeof(cached), NULL);
     }
+    else
+        cache->full = true;
+
     netdata_mutex_unlock(&macos_logs_facet_value_cache_mutex);
 }
 

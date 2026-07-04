@@ -65,7 +65,8 @@ static inline MACOS_LOGS_CSTRING_VIEW macos_logs_string_view(NSString *value) {
         return macos_logs_empty_cstring_view();
 
     const char *utf8 = value.UTF8String;
-    return macos_logs_cstring_view(utf8, (size_t)[value lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
+    // UTF8String is NUL-terminated; strlen avoids a second Foundation encoding pass.
+    return macos_logs_cstring_view(utf8, utf8 ? strlen(utf8) : 0); // NOSONAR - NSString.UTF8String is NUL-terminated.
 }
 
 static inline const char *macos_logs_string(NSString *value) {
