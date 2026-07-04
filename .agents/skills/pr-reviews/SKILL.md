@@ -487,7 +487,7 @@ If a new AI reviewer appears in the project, classify it by adding to
 | Symptom                                                | Likely cause                                                         |
 |--------------------------------------------------------|----------------------------------------------------------------------|
 | `fetch-all.sh` returns suspiciously round counts       | Pagination missed pages. Re-run; fetch-all auto-probes when count is a multiple of 100. |
-| `fetch-all.sh` fails with `cursor_args[@]: unbound variable` | macOS Bash 3.2 plus `set -u` treats empty array expansion as unbound. Keep `gh api` argument arrays non-empty before expansion or branch the first-page GraphQL call. |
+| A GraphQL helper script fails with `cursor_args[@]: unbound variable` | macOS Bash 3.2 plus `set -u` treats empty array expansion as unbound. Keep `gh api` argument arrays non-empty before expansion or branch the first-page GraphQL call. This affected both `fetch-all.sh` and `wait-for-activity.sh`. |
 | `reply-thread.sh` -> 404                               | Wrong comment id (use `databaseId` from `review-threads.json`, not the GraphQL node id). |
 | `resolve-thread.sh` -> "thread not found"              | Used REST id instead of GraphQL node id.                              |
 | `trigger-copilot.sh` succeeds but no new review        | Reviewer was already requested -- script removes-then-adds to force a fresh run. If still nothing, copilot may be quota-limited; wait. |
