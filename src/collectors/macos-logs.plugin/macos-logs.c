@@ -113,7 +113,7 @@ static void macos_logs_facet_value_cache_cleanup(void) {
 }
 
 void macos_logs_cache_facet_value(MACOS_LOGS_FACET_VALUE_CACHE_ID id, const char *value, size_t value_length) {
-    if(id >= MACOS_LOGS_FACET_VALUE_CACHE_COUNT || !value || !*value || !value_length)
+    if((int)id < 0 || id >= MACOS_LOGS_FACET_VALUE_CACHE_COUNT || !value || !*value || !value_length)
         return;
 
     macos_logs_facet_value_cache_ensure_initialized();
