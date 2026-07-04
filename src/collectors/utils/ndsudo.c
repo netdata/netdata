@@ -592,7 +592,12 @@ int main(int argc, char *argv[]) {
         return 2;
     }
 
-    char new_path[] = "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin";
+    char new_path[] =
+#ifdef __APPLE__
+        "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:/opt/homebrew/bin:/opt/homebrew/sbin";
+#else
+        "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin";
+#endif
     putenv(new_path);
 
     // Escalate to root before searching PATH and running the whitelisted

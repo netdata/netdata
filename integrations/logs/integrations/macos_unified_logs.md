@@ -36,7 +36,7 @@ You can start exploring macOS unified logs on the "Logs" tab of the Netdata UI.
 - Uses Apple's public **OSLog** framework.
 - Allows filtering on macOS log fields for any selected time frame.
 - Allows full-text search across collected log fields.
-- Provides a histogram for log entries over time, with a break down per field-value.
+- Provides a histogram for log entries over time, with a breakdown per field-value.
 - Supports severity coloring based on the OSLog level.
 - Supports PLAY mode through repeated bounded native queries, without running `log stream`.
 
