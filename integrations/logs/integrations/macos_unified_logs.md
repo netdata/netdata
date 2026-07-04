@@ -45,7 +45,7 @@ You can start exploring macOS unified logs on the "Logs" tab of the Netdata UI.
 ### Prerequisites
 
 - macOS with the OSLog framework available
-- Access to the local unified log store; Apple's OSLog API requires an admin account for local system logs
+- Access to the local unified log store; Apple's OSLog API requires elevated privileges for local system logs, so Netdata installs `macos-logs.plugin` as a root-owned setuid Function plugin
 - A Netdata Cloud account
 
 

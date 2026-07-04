@@ -649,8 +649,13 @@ get_group(){
           print members
         }
       ')"
-      printf "%s:*:%s:%s\n" "${group}" "${gid}" "${members}"
-      return 0
+      case "${gid}" in
+        ''|*[!0-9]*) ;;
+        *)
+          printf "%s:*:%s:%s\n" "${group}" "${gid}" "${members}"
+          return 0
+          ;;
+      esac
     fi
   fi
 
