@@ -541,6 +541,14 @@
 - Regenerate integrations docs ([#22933](https://github.com/netdata/netdata/issues/22933))
 - Test(go.d): add jobmgr/dyncfg characterization tests ([#22950](https://github.com/netdata/netdata/issues/22950))
 - Refactor(go.d): route jobmgr commands through an executor seam ([#22951](https://github.com/netdata/netdata/issues/22951))
+- Netdata fixes part 22 ([#22940](https://github.com/netdata/netdata/issues/22940))
+- Docs: Add cache memory monitoring to database configuration docs ([#22845](https://github.com/netdata/netdata/issues/22845))
+- Docs: Add admin role assignment steps to team invite doc ([#22847](https://github.com/netdata/netdata/issues/22847))
+- Refactor(go.d): run blocking jobmgr collector work as supervised effects ([#22952](https://github.com/netdata/netdata/issues/22952))
+- Docs: Add multi-database export example to enabling connector guide ([#22836](https://github.com/netdata/netdata/issues/22836))
+- Docs: Correct database config key from mode to db in docs ([#22864](https://github.com/netdata/netdata/issues/22864))
+- Docs: Add default database storage path to disk requirements doc ([#22865](https://github.com/netdata/netdata/issues/22865))
+- Feat(go.d): run collector dyncfg commands concurrently on per-key lanes ([#22964](https://github.com/netdata/netdata/issues/22964))
 
 ## [2.10.0] - 2026-04-09
 
