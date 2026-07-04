@@ -216,20 +216,21 @@ mod tests {
         let bytes = c.to_container_bytes().unwrap();
         assert_eq!(&bytes[0..4], &CONTAINER_MAGIC, "container leads with NCAT");
 
-        // v5 wire contract: the envelope key is `instance_id` (renamed from
-        // `boot_id` in v5). Pin the JSON wire so a future serde rename can't
-        // silently flip it back without failing here.
+        // v6 wire contract: the envelope key is `instance_id` (renamed from
+        // `invocation_id` in v6, which was itself `boot_id` through v4). Pin the
+        // JSON wire so a future serde rename can't silently flip it back without
+        // failing here.
         let container =
             chunk_file::container::Container::open(&bytes, &CONTAINER_MAGIC, CONTAINER_VERSION)
                 .unwrap();
         let json = std::str::from_utf8(container.chunk(CHUNK_JSON).unwrap()).unwrap();
         assert!(
             json.contains("\"instance_id\""),
-            "v5 catalog JSON must use the instance_id key"
+            "v6 catalog JSON must use the instance_id key"
         );
         assert!(
             !json.contains("\"boot_id\""),
-            "v5 catalog JSON must not carry the old boot_id key"
+            "v6 catalog JSON must not carry the old boot_id key"
         );
 
         let parsed = Catalog::from_container_bytes(&bytes).unwrap();
@@ -440,10 +441,10 @@ mod tests {
 
     #[test]
     fn from_json_rejects_v4_schema_on_version_not_serde() {
-        // v4 carried the envelope field `boot_id` (renamed to `instance_id`
-        // in v5). The version peek must reject a v4 catalog before the rename
-        // surfaces as a serde "missing field `instance_id`" error. Pre-GA
-        // break; there is no migration.
+        // v4 carried the envelope field `boot_id` (renamed to `invocation_id`
+        // in v5, then to `instance_id` in v6). The version peek must reject a v4
+        // catalog before the rename surfaces as a serde "missing field
+        // `instance_id`" error. Pre-GA break; there is no migration.
         let json = br#"{
             "version": 4,
             "tenant_id": "t",
@@ -459,6 +460,30 @@ mod tests {
         match Catalog::from_json(json) {
             Err(Error::UnsupportedVersion(4)) => {}
             other => panic!("expected UnsupportedVersion(4), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn from_json_rejects_v5_schema_on_version_not_serde() {
+        // v5 carried the envelope field `invocation_id` (renamed to
+        // `instance_id` in v6). The version peek must reject a v5 catalog before
+        // the rename surfaces as a serde "missing field `instance_id`" error.
+        // Pre-GA break; there is no migration.
+        let json = br#"{
+            "version": 5,
+            "tenant_id": "t",
+            "date": "2026-04-17",
+            "machine_id": "00000000-0000-0000-0000-000000000000",
+            "invocation_id": "00000000-0000-0000-0000-000000000000",
+            "entries": [
+                {"id": "x", "remote_key": "v2/logs/tenants/t/sfst/2026-04-17/x.sfst",
+                 "min_timestamp_s": 1, "max_timestamp_s": 2, "record_count": 5,
+                 "content_meta": [], "size": 10, "uploaded_at_ns": 0, "remote_etag": null}
+            ]
+        }"#;
+        match Catalog::from_json(json) {
+            Err(Error::UnsupportedVersion(5)) => {}
+            other => panic!("expected UnsupportedVersion(5), got {other:?}"),
         }
     }
 

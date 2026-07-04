@@ -118,6 +118,11 @@ async fn main() -> anyhow::Result<()> {
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
     let machine_id = journal_common::load_machine_id()
         .context("failed to load machine id from /etc/machine-id")?;
+    // Dev-only stand-in for the per-process instance id. Unlike the production
+    // supervisor (which generates a fresh v4 UUID per process), this tool sources
+    // the OS boot id so repeated dev runs within one boot produce a stable,
+    // reproducible identity. It is intentionally NOT the per-process id the field
+    // name implies — do not copy this into production code.
     let instance_id = journal_common::load_boot_id()
         .context("failed to load boot id from /proc/sys/kernel/random/boot_id")?;
     let writer = wal::Writer::new(

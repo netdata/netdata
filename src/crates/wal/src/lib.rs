@@ -38,10 +38,9 @@ pub(crate) fn opaque_part_key(namespace: &str, name: &str) -> u64 {
     h.finish()
 }
 
-/// Fixed `(machine_id, instance_id)` pair for wal-internal tests — arbitrary
-/// non-nil UUIDs (the writer rejects nil at construction). Mirrors the values
-/// used by `registry::tests::test_file_id` so writer-stamped and directly-
-/// constructed FileIds agree.
+/// Fixed `(machine_id, instance_id)` pair shared by all wal-internal tests
+/// (writer, reader, registry) — arbitrary non-nil UUIDs (the writer rejects nil
+/// at construction), so writer-stamped and directly-constructed FileIds agree.
 #[cfg(test)]
 pub(crate) fn test_identity() -> (uuid::Uuid, uuid::Uuid) {
     let machine_id = uuid::Uuid::try_parse("550e8400e29b41d4a716446655440000").unwrap();

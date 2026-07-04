@@ -305,8 +305,7 @@ mod tests {
     use crate::{Config, RotationConfig, Writer};
 
     fn test_file_id(seq: u64) -> FileId {
-        let machine_id = uuid::Uuid::try_parse("550e8400e29b41d4a716446655440000").unwrap();
-        let instance_id = uuid::Uuid::try_parse("7f3b2a1e9c4d4f8ab1c2d3e4f5a6b7c8").unwrap();
+        let (machine_id, instance_id) = crate::test_identity();
         FileId::new(machine_id, instance_id, 0, seq, 0)
     }
 
@@ -598,8 +597,7 @@ mod tests {
     // ── candidates() tests ───────────────────────────────────────
 
     fn fid_with(seq: u64, part_key: u64) -> FileId {
-        let machine_id = uuid::Uuid::try_parse("550e8400e29b41d4a716446655440000").unwrap();
-        let instance_id = uuid::Uuid::try_parse("7f3b2a1e9c4d4f8ab1c2d3e4f5a6b7c8").unwrap();
+        let (machine_id, instance_id) = crate::test_identity();
         FileId::new(machine_id, instance_id, 0, seq, part_key)
     }
 

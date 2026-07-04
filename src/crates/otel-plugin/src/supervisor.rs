@@ -31,10 +31,9 @@ use crate::config;
 /// contract ("hard-error before spawning workers") would silently pass a nil
 /// value through to the worker, where `wal::Writer::new` would catch it as a
 /// per-tenant error rather than a clean startup abort.
-fn resolve_identity(value: &Option<String>, var_name: &str) -> anyhow::Result<uuid::Uuid> {
-    let raw = value
-        .as_deref()
-        .ok_or_else(|| anyhow::anyhow!("{var_name} is not set; the agent must export it"))?;
+fn resolve_identity(value: Option<&str>, var_name: &str) -> anyhow::Result<uuid::Uuid> {
+    let raw =
+        value.ok_or_else(|| anyhow::anyhow!("{var_name} is not set; the agent must export it"))?;
     let trimmed = raw.trim();
     if trimmed.is_empty() {
         anyhow::bail!("{var_name} is set but empty; the agent must export a valid UUID");
@@ -639,8 +638,10 @@ pub async fn run() -> anyhow::Result<()> {
     // references it, so a nil default would silently corrupt provenance in
     // never-GC'd remote storage (the writer also rejects nil as
     // defense-in-depth).
-    plugin_config.machine_id =
-        resolve_identity(&nd_env.registry_unique_id, "NETDATA_REGISTRY_UNIQUE_ID")?;
+    plugin_config.machine_id = resolve_identity(
+        nd_env.registry_unique_id.as_deref(),
+        "NETDATA_REGISTRY_UNIQUE_ID",
+    )?;
 
     // Instance id: a fresh UUID per process. The agent restarts a crashed
     // plugin without changing NETDATA_INVOCATION_ID, so that value cannot tell
@@ -754,8 +755,9 @@ mod tests {
     fn resolve_identity_accepts_dashed_form() {
         // The registry file (/var/lib/netdata/registry/netdata.public.unique.id)
         // stores the machine GUID in dashed form.
-        let v = Some("550e8400-e29b-41d4-a716-446655440000".to_string());
-        let id = resolve_identity(&v, "NETDATA_REGISTRY_UNIQUE_ID").unwrap();
+        let id =
+            resolve_identity(Some("550e8400-e29b-41d4-a716-446655440000"), "NETDATA_REGISTRY_UNIQUE_ID")
+                .unwrap();
         assert_eq!(id.to_string(), "550e8400-e29b-41d4-a716-446655440000");
     }
 
@@ -764,8 +766,9 @@ mod tests {
         // The helper also accepts lowercase-compact UUIDs (no dashes), so a
         // compact-form source is handled defensively even though the registry
         // file is dashed.
-        let v = Some("550e8400e29b41d4a716446655440000".to_string());
-        let id = resolve_identity(&v, "NETDATA_REGISTRY_UNIQUE_ID").unwrap();
+        let id =
+            resolve_identity(Some("550e8400e29b41d4a716446655440000"), "NETDATA_REGISTRY_UNIQUE_ID")
+                .unwrap();
         assert_eq!(
             id.to_string(),
             "550e8400-e29b-41d4-a716-446655440000",
@@ -776,8 +779,11 @@ mod tests {
     #[test]
     fn resolve_identity_accepts_whitespace() {
         // File-based sources may have trailing newlines; the helper trims.
-        let v = Some("550e8400-e29b-41d4-a716-446655440000\n".to_string());
-        let id = resolve_identity(&v, "NETDATA_REGISTRY_UNIQUE_ID").unwrap();
+        let id = resolve_identity(
+            Some("550e8400-e29b-41d4-a716-446655440000\n"),
+            "NETDATA_REGISTRY_UNIQUE_ID",
+        )
+        .unwrap();
         assert_eq!(id.to_string(), "550e8400-e29b-41d4-a716-446655440000");
     }
 
@@ -785,7 +791,7 @@ mod tests {
     fn resolve_identity_rejects_missing() {
         // The agent must export the machine GUID; a missing value is fatal
         // before any worker is spawned.
-        let err = resolve_identity(&None, "NETDATA_REGISTRY_UNIQUE_ID").unwrap_err();
+        let err = resolve_identity(None, "NETDATA_REGISTRY_UNIQUE_ID").unwrap_err();
         assert!(
             err.to_string().contains("NETDATA_REGISTRY_UNIQUE_ID"),
             "error must name the variable: {err}"
@@ -794,8 +800,7 @@ mod tests {
 
     #[test]
     fn resolve_identity_rejects_invalid() {
-        let v = Some("not-a-uuid".to_string());
-        let err = resolve_identity(&v, "NETDATA_REGISTRY_UNIQUE_ID").unwrap_err();
+        let err = resolve_identity(Some("not-a-uuid"), "NETDATA_REGISTRY_UNIQUE_ID").unwrap_err();
         assert!(
             err.to_string().contains("NETDATA_REGISTRY_UNIQUE_ID"),
             "error must name the variable: {err}"
@@ -805,8 +810,7 @@ mod tests {
     #[test]
     fn resolve_identity_rejects_empty_string() {
         // An empty env var is distinct from "not set" — surface the right fix.
-        let err =
-            resolve_identity(&Some("".to_string()), "NETDATA_REGISTRY_UNIQUE_ID").unwrap_err();
+        let err = resolve_identity(Some(""), "NETDATA_REGISTRY_UNIQUE_ID").unwrap_err();
         let msg = err.to_string();
         assert!(
             msg.contains("NETDATA_REGISTRY_UNIQUE_ID") && msg.contains("empty"),
@@ -816,8 +820,7 @@ mod tests {
 
     #[test]
     fn resolve_identity_rejects_whitespace_only() {
-        let err =
-            resolve_identity(&Some("  \n ".to_string()), "NETDATA_REGISTRY_UNIQUE_ID").unwrap_err();
+        let err = resolve_identity(Some("  \n "), "NETDATA_REGISTRY_UNIQUE_ID").unwrap_err();
         let msg = err.to_string();
         assert!(
             msg.contains("NETDATA_REGISTRY_UNIQUE_ID") && msg.contains("empty"),
@@ -831,7 +834,7 @@ mod tests {
         // the writer; reject it at the supervisor boundary, before any worker
         // is spawned, matching the stated startup contract.
         let err = resolve_identity(
-            &Some("00000000-0000-0000-0000-000000000000".to_string()),
+            Some("00000000-0000-0000-0000-000000000000"),
             "NETDATA_REGISTRY_UNIQUE_ID",
         )
         .unwrap_err();

@@ -4,7 +4,7 @@ fn machine() -> Uuid {
     Uuid::from_u128(0x0011_2233_4455_6677_8899_aabb_ccdd_eeff)
 }
 
-fn boot() -> Uuid {
+fn instance() -> Uuid {
     Uuid::from_u128(0xaaaa_bbbb_cccc_dddd_eeee_ffff_0000_1111)
 }
 
@@ -18,7 +18,7 @@ fn tenant() -> TenantId {
 
 #[test]
 fn sfst_key_and_date_roundtrip() {
-    let id = FileId::new(machine(), boot(), 0, 42, 0);
+    let id = FileId::new(machine(), instance(), 0, 42, 0);
     let key = sfst("logs", &tenant(), sample_date(), id);
     assert!(key.starts_with("v2/logs/tenants/tenant1/sfst/2026-04-17/"));
     assert!(key.ends_with(".sfst"));
@@ -37,7 +37,7 @@ fn sfst_prefix_has_trailing_slash() {
 fn signal_segment_scopes_the_key() {
     // The signal segment is the top-level discriminator: two signals never
     // share a prefix, so per-signal LIST/lifecycle/IAM stays clean.
-    let id = FileId::new(machine(), boot(), 0, 42, 0);
+    let id = FileId::new(machine(), instance(), 0, 42, 0);
     assert!(sfst("logs", &tenant(), sample_date(), id).starts_with("v2/logs/"));
     assert!(sfst("traces", &tenant(), sample_date(), id).starts_with("v2/traces/"));
     assert!(sfst_prefix("traces", &tenant(), sample_date()).starts_with("v2/traces/"));
@@ -50,7 +50,7 @@ fn catalog_key_is_versioned_signal_catalog_date_tenant() {
         sample_date(),
         &tenant(),
         machine(),
-        boot(),
+        instance(),
         100,
         1_700_000_000,
         1_700_003_600,

@@ -7,7 +7,7 @@ fn machine() -> Uuid {
     Uuid::from_u128(0x0011_2233_4455_6677_8899_aabb_ccdd_eeff)
 }
 
-fn boot() -> Uuid {
+fn instance() -> Uuid {
     Uuid::from_u128(0xaaaa_bbbb_cccc_dddd_eeee_ffff_0000_1111)
 }
 
@@ -18,7 +18,7 @@ fn date() -> NaiveDate {
 fn entry_for(seq: u64) -> CatalogEntry {
     let (part_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
     CatalogEntry {
-        id: FileId::new(machine(), boot(), 0, seq, part_key),
+        id: FileId::new(machine(), instance(), 0, seq, part_key),
         remote_key: format!("tenant1/sfst/2026-04-17/{seq}.sfst"),
         min_timestamp_s: 1_700_000_000,
         max_timestamp_s: 1_700_003_600,
@@ -89,7 +89,7 @@ async fn add_entry_below_threshold_is_accepted() {
         &TenantId::from("tenant1"),
         date(),
         machine(),
-        boot(),
+        instance(),
         1,
         1_700_000_000,
         1_700_003_600,
@@ -236,7 +236,7 @@ async fn distinct_scopes_rotate_independently() {
     // tenant1's rotation.
     let other_machine = Uuid::from_u128(0x1111);
     let other_entry = CatalogEntry {
-        id: FileId::new(other_machine, boot(), 0, 1, 0),
+        id: FileId::new(other_machine, instance(), 0, 1, 0),
         ..entry_for(1)
     };
     assert!(matches!(

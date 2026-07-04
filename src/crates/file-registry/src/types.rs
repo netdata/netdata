@@ -352,13 +352,13 @@ mod tests {
         Uuid::try_parse("550e8400e29b41d4a716446655440000").unwrap()
     }
 
-    fn test_boot_id() -> Uuid {
+    fn test_instance_id() -> Uuid {
         Uuid::try_parse("7f3b2a1e9c4d4f8ab1c2d3e4f5a6b7c8").unwrap()
     }
 
     #[test]
     fn file_id_stem_roundtrip() {
-        let id = FileId::new(test_machine_id(), test_boot_id(), 0, 42, 0xa1b2c3d4e5f60001);
+        let id = FileId::new(test_machine_id(), test_instance_id(), 0, 42, 0xa1b2c3d4e5f60001);
         let stem = id.to_stem();
         assert_eq!(
             stem,
@@ -370,7 +370,7 @@ mod tests {
 
     #[test]
     fn file_id_nonzero_pipeline_roundtrip() {
-        let id = FileId::new(test_machine_id(), test_boot_id(), 7, 42, 0xdeadbeef);
+        let id = FileId::new(test_machine_id(), test_instance_id(), 7, 42, 0xdeadbeef);
         let stem = id.to_stem();
         assert!(stem.contains("-00007-0000000042-"));
         let parsed = FileId::parse_stem(&stem).unwrap();
@@ -380,7 +380,7 @@ mod tests {
 
     #[test]
     fn file_id_filename_roundtrip() {
-        let id = FileId::new(test_machine_id(), test_boot_id(), 0, 1, 0);
+        let id = FileId::new(test_machine_id(), test_instance_id(), 0, 1, 0);
         let filename = id.to_filename("wal");
         let path = Path::new(&filename);
         let parsed = FileId::parse(path).unwrap();
@@ -389,7 +389,7 @@ mod tests {
 
     #[test]
     fn file_id_zero_hash() {
-        let id = FileId::new(test_machine_id(), test_boot_id(), 0, 1, 0);
+        let id = FileId::new(test_machine_id(), test_instance_id(), 0, 1, 0);
         let stem = id.to_stem();
         assert!(stem.ends_with("-0000000000000000"));
         let parsed = FileId::parse_stem(&stem).unwrap();
@@ -398,7 +398,7 @@ mod tests {
 
     #[test]
     fn file_id_max_hash() {
-        let id = FileId::new(test_machine_id(), test_boot_id(), 0, 1, u64::MAX);
+        let id = FileId::new(test_machine_id(), test_instance_id(), 0, 1, u64::MAX);
         let stem = id.to_stem();
         assert!(stem.ends_with("-ffffffffffffffff"));
         let parsed = FileId::parse_stem(&stem).unwrap();
@@ -414,19 +414,19 @@ mod tests {
 
     #[test]
     fn file_id_ordering() {
-        let a = FileId::new(test_machine_id(), test_boot_id(), 0, 1, 0);
-        let b = FileId::new(test_machine_id(), test_boot_id(), 0, 2, 0);
+        let a = FileId::new(test_machine_id(), test_instance_id(), 0, 1, 0);
+        let b = FileId::new(test_machine_id(), test_instance_id(), 0, 2, 0);
         assert!(a < b);
 
         // Same seq, different part_key
-        let c = FileId::new(test_machine_id(), test_boot_id(), 0, 1, 1);
-        let d = FileId::new(test_machine_id(), test_boot_id(), 0, 1, 2);
+        let c = FileId::new(test_machine_id(), test_instance_id(), 0, 1, 1);
+        let d = FileId::new(test_machine_id(), test_instance_id(), 0, 1, 2);
         assert!(c < d);
 
         // pipeline_id orders ahead of seq: a lower pipeline sorts first even
         // when its seq is higher.
-        let p0 = FileId::new(test_machine_id(), test_boot_id(), 0, 9, 0);
-        let p1 = FileId::new(test_machine_id(), test_boot_id(), 1, 1, 0);
+        let p0 = FileId::new(test_machine_id(), test_instance_id(), 0, 9, 0);
+        let p1 = FileId::new(test_machine_id(), test_instance_id(), 1, 1, 0);
         assert!(p0 < p1);
     }
 }
