@@ -79,6 +79,51 @@ func TestJob_Panicked(t *testing.T) {
 	assert.Equal(t, job.Panicked(), job.panicked.Load())
 }
 
+// Vnode() is read off-goroutine (the manager loop reads registered jobs'
+// vnodes) while the pre-Start baseline write may still be in flight on the
+// starting goroutine: the accesses must be synchronized. This test fails
+// under -race without vnodeMu.
+func TestJob_VnodeAccessIsSynchronized(t *testing.T) {
+	job := newTestJob()
+	baseline := &vnodes.VirtualNode{Name: "v", Hostname: "baseline", GUID: "guid-b"}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for range 200 {
+			_ = job.Vnode()
+		}
+	}()
+	for range 200 {
+		job.SetVnodeBaseline(baseline)
+	}
+	<-done
+}
+
+// The pre-Start baseline commits into the job WITHOUT draining the live
+// update queue: a concurrently queued newer update must survive the
+// baseline and still apply at collection - a queued (UpdateVnode) baseline
+// would evict it from the one-slot channel, and a job stopped before its
+// first collection would clean up on the stale creation-time vnode.
+func TestJob_SetVnodeBaselineDoesNotDrainQueuedUpdate(t *testing.T) {
+	job := newTestJob()
+	queued := &vnodes.VirtualNode{Name: "v", Hostname: "queued", GUID: "guid-q"}
+	baseline := &vnodes.VirtualNode{Name: "v", Hostname: "baseline", GUID: "guid-b"}
+
+	job.UpdateVnode(queued)
+	job.SetVnodeBaseline(baseline)
+
+	assert.Equal(t, "baseline", job.vnode.Hostname,
+		"the baseline must be committed into the job, visible without a collection")
+	select {
+	case v := <-job.updVnode:
+		assert.Equal(t, "queued", v.Hostname,
+			"the queued live update must survive the baseline and still apply at collection")
+	default:
+		t.Fatal("the baseline must not drain the queued live update")
+	}
+}
+
 func TestJob_AutoDetectionEvery(t *testing.T) {
 	job := newTestJob()
 

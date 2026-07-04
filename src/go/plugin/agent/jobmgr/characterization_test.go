@@ -375,6 +375,60 @@ func TestCharacterization_WireOrderByDomain(t *testing.T) {
 				assert.Contains(t, resp["message"], "gated:mysql")
 			},
 		},
+		"secretstore multi-dependent CONFIG STATUS replay follows sorted job order": {
+			run: func(t *testing.T) {
+				mgr, out := newDyncfgSecretStoreTestManagerWithService(newTestSecretStoreService())
+				mgr.modules["gated"] = collectorapi.Creator{
+					Create: func() collectorapi.CollectorV1 { return &secretAwareCollector{} },
+				}
+
+				key := secretstore.StoreKey(secretstore.KindVault, "vault_prod")
+				seedSecretStore(t, mgr, secretstore.KindVault, "vault_prod", map[string]any{"value": "good"}, dyncfg.StatusRunning)
+
+				// Registered in reverse name order on purpose: the restart
+				// sequence follows the dependency index's sorted job order,
+				// not registration order.
+				for _, name := range []string{"beta", "alpha"} {
+					cfg := prepareDyncfgCfg("gated", name).
+						Set("option_str", "${store:vault:vault_prod:value}").
+						Set("option_int", 1)
+					mgr.collectorExposed.Add(&dyncfg.Entry[confgroup.Config]{Cfg: cfg, Status: dyncfg.StatusRunning})
+					mgr.syncSecretStoreDepsForConfig(cfg)
+					require.NoError(t, mgr.collectorCallbacks.Start(context.Background(), cfg))
+				}
+
+				badFn := dyncfg.NewFunction(functions.Function{
+					UID:         "ss-update-bad",
+					ContentType: "application/json",
+					Payload:     mustJSON(t, map[string]any{"value": "bad"}),
+					Args:        []string{mgr.dyncfgSecretStoreID(key), string(dyncfg.CommandUpdate)},
+				})
+				mgr.dyncfgSecretStoreSeqExec(badFn)
+
+				output := out.String()
+				wiretest.RequireSubsequence(t, output, []wiretest.RecordWant{
+					{
+						Name:     "first dependent in sorted order fails",
+						Contains: []string{"CONFIG test:collector:gated:alpha status failed"},
+					},
+					{
+						Name:     "second dependent in sorted order fails",
+						Contains: []string{"CONFIG test:collector:gated:beta status failed"},
+					},
+					{
+						Name:     "store update terminal",
+						Contains: []string{"FUNCTION_RESULT_BEGIN ss-update-bad"},
+					},
+				})
+
+				var resp map[string]any
+				mustDecodeFunctionPayload(t, output, "ss-update-bad", &resp)
+				msg, _ := resp["message"].(string)
+				assert.Regexp(t,
+					`^Secretstore change applied, but dependent collector restarts failed: gated:alpha \(.+\); gated:beta \(.+\)\.$`,
+					msg, "per-job failures must join in sorted job order with the pinned format")
+			},
+		},
 	}
 
 	for name, tc := range tests {

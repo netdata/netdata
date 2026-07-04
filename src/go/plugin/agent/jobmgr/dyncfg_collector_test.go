@@ -1473,6 +1473,41 @@ func TestCollectorCallbacks_Stop(t *testing.T) {
 	}
 }
 
+func TestCollectorCallbacks_StagedStopCancelsRetryBeforeWait(t *testing.T) {
+	tests := map[string]struct {
+		stage func(*collectorCallbacks, confgroup.Config, confgroup.Config)
+	}{
+		"stop": {
+			stage: func(cb *collectorCallbacks, cfg, _ confgroup.Config) {
+				cb.StageStop(cfg)
+			},
+		},
+		"update": {
+			stage: func(cb *collectorCallbacks, cfg, newCfg confgroup.Config) {
+				cb.StageUpdate(cfg, newCfg)
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			mgr := newCollectorTestManager()
+			cb := &collectorCallbacks{mgr: mgr}
+			cfg := prepareDyncfgCfg("success", "job").Set("autodetection_retry", 1)
+			newCfg := prepareDyncfgCfg("success", "job").Set("autodetection_retry", 1).Set("option_str", "changed")
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			mgr.retryingTasks.add(cfg, &retryTask{cancel: cancel})
+
+			tc.stage(cb, cfg, newCfg)
+
+			_, retryPending := mgr.retryingTasks.lookup(cfg)
+			assert.False(t, retryPending, "retry must be canceled at stage time, before the stop effect can wait in the pool")
+			assert.ErrorIs(t, ctx.Err(), context.Canceled)
+		})
+	}
+}
+
 func TestCollectorCallbacks_OnStatusChange(t *testing.T) {
 	tests := map[string]struct {
 		cfg      confgroup.Config
@@ -1857,12 +1892,13 @@ func (*blockingSecretStoreService) Update(context.Context, string, secretstore.C
 	return nil
 }
 
-func (*blockingSecretStoreService) Remove(string) error      { return nil }
-func (j *collectorProbeJob) Cleanup()                        {}
-func (j *collectorProbeJob) IsRunning() bool                 { return true }
-func (j *collectorProbeJob) Panicked() bool                  { return false }
-func (j *collectorProbeJob) Vnode() vnodes.VirtualNode       { return vnodes.VirtualNode{} }
-func (j *collectorProbeJob) UpdateVnode(*vnodes.VirtualNode) {}
+func (*blockingSecretStoreService) Remove(string) error           { return nil }
+func (j *collectorProbeJob) Cleanup()                             {}
+func (j *collectorProbeJob) IsRunning() bool                      { return true }
+func (j *collectorProbeJob) Panicked() bool                       { return false }
+func (j *collectorProbeJob) Vnode() vnodes.VirtualNode            { return vnodes.VirtualNode{} }
+func (j *collectorProbeJob) UpdateVnode(*vnodes.VirtualNode)      {}
+func (j *collectorProbeJob) SetVnodeBaseline(*vnodes.VirtualNode) {}
 
 type auditAnalyzerSpy struct {
 	registered []string

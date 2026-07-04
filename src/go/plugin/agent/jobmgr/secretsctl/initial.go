@@ -17,8 +17,9 @@ func (c *Controller) publishInitialConfig(rawCfg secretstore.Config) {
 			return
 		}
 		if existing.Status == dyncfg.StatusRunning || existing.Status == dyncfg.StatusFailed {
+			// Boot publishing carries no command run: no restart stage, no
+			// terminal message.
 			c.cb.Stop(context.Background(), existing.Cfg)
-			c.cb.TakeCommandMessage()
 		}
 	}
 
@@ -34,7 +35,7 @@ func (c *Controller) publishInitialConfig(rawCfg secretstore.Config) {
 }
 
 func (c *Controller) prepareConfigCandidate(cfg secretstore.Config) (secretstore.Config, error) {
-	return cfg, c.validateConfig(cfg)
+	return cfg, c.validateConfig(context.Background(), cfg)
 }
 
 func shouldKeepExisting(cfg secretstore.Config, existing *dyncfg.Entry[secretstore.Config]) bool {

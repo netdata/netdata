@@ -32,6 +32,7 @@ func (e *codedErr) DyncfgCode() int { return e.code }
 // mockCallbacks records all callback invocations for verification.
 type mockCallbacks struct {
 	extractKeyFn       func(fn Function) (string, string, bool)
+	parsePayloadFn     func(fn Function, name string) error
 	parseAndValidateFn func(fn Function, name string) (testConfig, error)
 	startFn            func(cfg testConfig) error
 	updateFn           func(oldCfg, newCfg testConfig) error
@@ -65,6 +66,13 @@ func (m *mockCallbacks) ExtractKey(fn Function) (string, string, bool) {
 		return "", "", false
 	}
 	return parts[1], parts[1], true
+}
+
+func (m *mockCallbacks) ParsePayload(fn Function, name string) error {
+	if m.parsePayloadFn != nil {
+		return m.parsePayloadFn(fn, name)
+	}
+	return nil
 }
 
 func (m *mockCallbacks) ParseAndValidate(_ context.Context, fn Function, name string) (testConfig, error) {
@@ -1634,5 +1642,155 @@ func TestStopCommitOutcomeMapping(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, tc.run)
+	}
+}
+
+// TestHandler_RejectionDependsOnStatus pins the status-axis classification
+// consumed by hold-aware claim scheduling: exactly the enable/restart/
+// disable arms against an EXISTING entry are status-derived (their
+// rejection-only outcome can be falsified by a foreign write-claim holder
+// mutating entry.Status); every other command - and every command against
+// a nil entry - rejects on state no foreign holder mutates.
+func TestHandler_RejectionDependsOnStatus(t *testing.T) {
+	cb := &mockCallbacks{}
+	h := newTestHandler(cb)
+	cfg := testConfig{uid: "uid-j", key: "j", sourceType: "dyncfg", source: "test"}
+	entry := &Entry[testConfig]{Cfg: cfg, Status: StatusRunning}
+
+	commands := []Command{CommandAdd, CommandUpdate, CommandEnable, CommandRestart,
+		CommandDisable, CommandRemove, CommandGet, CommandSchema}
+	for _, cmd := range commands {
+		fn := newTestFn("test:j", string(cmd), "", nil)
+		want := cmd == CommandEnable || cmd == CommandRestart || cmd == CommandDisable
+		assert.Equal(t, want, h.RejectionDependsOnStatus(fn, entry), "command %s with an entry", cmd)
+		assert.False(t, h.RejectionDependsOnStatus(fn, nil), "command %s with a nil entry", cmd)
+	}
+}
+
+// TestHandler_CommandActsParity drives every state-gated command against
+// every gate combination and asserts CommandActs agrees with the Cmd*
+// implementations: blocking work runs (the step runner is invoked) exactly
+// when CommandActs reports true. Claim scheduling relies on this predicate
+// to skip dependency reservations for rejection-only commands - a gate
+// change in a Cmd* body without a matching CommandActs update fails here
+// as the starvation bug it would be. The payload axis is part of the
+// matrix: add and update answer 400 before any blocking work when the
+// payload is missing.
+func TestHandler_CommandActsParity(t *testing.T) {
+	type gate struct {
+		sourceType string
+		configType ConfigType
+	}
+	statuses := []Status{StatusAccepted, StatusRunning, StatusFailed, StatusDisabled}
+	gates := []gate{
+		{"dyncfg", ConfigTypeJob},
+		{"user", ConfigTypeJob},
+		{"stock", ConfigTypeJob},
+		{"dyncfg", ConfigTypeSingle},
+	}
+	commands := []Command{CommandUpdate, CommandEnable, CommandRestart, CommandDisable, CommandRemove}
+	payloads := []struct {
+		name    string
+		payload []byte
+	}{
+		{"with payload", []byte(`{}`)},
+		{"without payload", nil},
+		{"with unparsable payload", []byte("garbage")},
+	}
+	// The PayloadParser stage gate: "garbage" fails the cheap parse, so
+	// add/update with it are rejection-only before any blocking work.
+	parsePayload := func(fn Function, _ string) error {
+		if string(fn.Fn().Payload) == "garbage" {
+			return errors.New("unparsable payload")
+		}
+		return nil
+	}
+
+	driveWithSpy := func(h *Handler[testConfig], cmd Command, fn Function) bool {
+		ran := false
+		spy := func(effect func(context.Context) error, commit func(error)) {
+			ran = true
+			RunStepSync(effect, commit)
+		}
+		switch cmd {
+		case CommandAdd:
+			h.cmdAdd(fn, spy)
+		case CommandUpdate:
+			h.cmdUpdate(fn, spy)
+		case CommandEnable:
+			h.cmdEnable(fn, spy)
+		case CommandRestart:
+			h.cmdRestart(fn, spy)
+		case CommandDisable:
+			h.cmdDisable(fn, spy)
+		case CommandRemove:
+			h.cmdRemove(fn, spy)
+		}
+		return ran
+	}
+
+	for _, cmd := range commands {
+		for _, st := range statuses {
+			for _, g := range gates {
+				for _, pl := range payloads {
+					name := fmt.Sprintf("%s on %s %s %s %s", cmd, st, g.sourceType, g.configType, pl.name)
+					t.Run(name, func(t *testing.T) {
+						cb := &mockCallbacks{
+							configTypeFn:   func(testConfig) ConfigType { return g.configType },
+							parsePayloadFn: parsePayload,
+						}
+						h := newTestHandler(cb)
+						cfg := testConfig{uid: "uid-j", key: "j", sourceType: g.sourceType, source: "test"}
+						entry := &Entry[testConfig]{Cfg: cfg, Status: st}
+						h.seen.Add(cfg)
+						h.exposed.Add(entry)
+
+						fn := newTestFn("test:j", string(cmd), "", pl.payload)
+
+						// Capture the predicate BEFORE running: the command's
+						// commit mutates entry.Status (that is its job), and the
+						// executor consults the predicate pre-execution.
+						acts := h.CommandActs(fn, entry)
+
+						ran := driveWithSpy(h, cmd, fn)
+
+						assert.Equal(t, acts, ran,
+							"CommandActs must mirror whether the handler runs blocking work")
+					})
+				}
+			}
+		}
+	}
+
+	// Add cells: a nil entry acts only for add, an existing entry takes the
+	// replace path - both gated on payload presence AND the callback name
+	// policy (the mock uses JobNameRuleStrict, so a dotted name answers 400
+	// before any blocking work).
+	for _, pl := range payloads {
+		for _, existing := range []bool{false, true} {
+			for _, jobName := range []string{"j", "bad.name"} {
+				name := fmt.Sprintf("add %s existing=%v name=%s", pl.name, existing, jobName)
+				t.Run(name, func(t *testing.T) {
+					cb := &mockCallbacks{parsePayloadFn: parsePayload}
+					h := newTestHandler(cb)
+					var entry *Entry[testConfig]
+					if existing {
+						cfg := testConfig{uid: "uid-" + jobName, key: jobName, sourceType: "dyncfg", source: "test"}
+						entry = &Entry[testConfig]{Cfg: cfg, Status: StatusRunning}
+						h.seen.Add(cfg)
+						h.exposed.Add(entry)
+					}
+
+					fn := newTestFn("test:"+jobName, string(CommandAdd), jobName, pl.payload)
+
+					acts := h.CommandActs(fn, entry)
+
+					ran := driveWithSpy(h, CommandAdd, fn)
+
+					assert.Equal(t, acts, ran,
+						"CommandActs must mirror whether the handler runs blocking work")
+				})
+			}
+		}
 	}
 }

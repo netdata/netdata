@@ -206,6 +206,26 @@ func (j *JobV2) UpdateVnode(vnode *vnodes.VirtualNode) {
 	}
 	j.updVnode <- vnode
 }
+
+// SetVnodeBaseline commits the vnode config into the job BEFORE Start -
+// same contract as the V1 method: visible to cleanup without a collection,
+// never drains a concurrently queued live update, never overrides
+// module-owned vnode state, pre-Start callers only.
+func (j *JobV2) SetVnodeBaseline(vnode *vnodes.VirtualNode) {
+	if vnode == nil {
+		return
+	}
+	if j.module != nil && j.module.VirtualNode() != nil {
+		return
+	}
+	next := vnode.Copy()
+	j.vnodeMu.Lock()
+	j.vnode = *next
+	j.vnodeMu.Unlock()
+	if state := j.scopeStates[defaultHostScopeKey]; state != nil {
+		state.host.invalidateDefine()
+	}
+}
 func (j *JobV2) Cleanup() {
 	j.buf.Reset()
 	snapshots := j.captureScopeCleanupSnapshots()

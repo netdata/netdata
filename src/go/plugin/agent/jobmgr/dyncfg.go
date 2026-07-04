@@ -7,17 +7,20 @@ import (
 )
 
 func (m *Manager) dyncfgConfig(fn dyncfg.Function) {
-	if err := fn.ValidateArgs(2); err != nil {
-		m.Warningf("dyncfg: %v", err)
-		m.dyncfgResponder.SendCodef(fn, 400, "%v", err)
-		return
-	}
-
+	// The shutdown check precedes even argument validation: once shutdown
+	// begins EVERY non-terminal command answers 503-publish-nothing (one
+	// rule), malformed ones included.
 	select {
 	case <-m.ctx.Done():
 		m.dyncfgResponder.SendCodef(fn, 503, "Job manager is shutting down.")
 		return
 	default:
+	}
+
+	if err := fn.ValidateArgs(2); err != nil {
+		m.Warningf("dyncfg: %v", err)
+		m.dyncfgResponder.SendCodef(fn, 400, "%v", err)
+		return
 	}
 
 	m.dyncfgQueuedExec(fn)

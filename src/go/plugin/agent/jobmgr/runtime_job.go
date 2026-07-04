@@ -31,6 +31,10 @@ type runtimeJob interface {
 
 	Vnode() vnodes.VirtualNode
 	UpdateVnode(vnode *vnodes.VirtualNode)
+	// SetVnodeBaseline commits a vnode config into the job pre-Start
+	// (visible to cleanup without a collection; never drains a queued
+	// live update). Callers must not use it on a started job.
+	SetVnodeBaseline(vnode *vnodes.VirtualNode)
 }
 
 // configModule is the shared Init/Check/config contract for dyncfg config test/get

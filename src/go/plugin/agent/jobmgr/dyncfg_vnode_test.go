@@ -336,3 +336,8 @@ func (j *vnodeUpdateProbeJob) UpdateVnode(vnode *vnodes.VirtualNode) {
 	j.updated = &copy
 	j.vnode = copy
 }
+func (j *vnodeUpdateProbeJob) SetVnodeBaseline(vnode *vnodes.VirtualNode) {
+	if vnode != nil {
+		j.vnode = *vnode
+	}
+}
