@@ -41,6 +41,11 @@ impl TenantId {
     /// [`DEFAULT`](TenantId::DEFAULT) (clients may not claim the
     /// auth-disabled tenant). The error is the human-readable reason,
     /// for the transport layer to wrap.
+    ///
+    /// This is the INGEST policy; to validate a tenant segment recovered from
+    /// an already-stored key or a local directory name, use
+    /// [`validate_path_segment`](Self::validate_path_segment) — the stored
+    /// `default` tenant is a legitimate segment there.
     pub fn validate_ingest(id: &str) -> Result<Self, &'static str> {
         if id.is_empty() || id.len() > Self::MAX_LEN {
             return Err("tenant ID must be 1-64 bytes");
@@ -48,13 +53,38 @@ impl TenantId {
         if id == "." || id == ".." || id == Self::DEFAULT {
             return Err("tenant ID must not be '.', '..', or 'default'");
         }
+        Self::path_charset_ok(id)?;
+        Ok(Self::from(id))
+    }
+
+    /// Path-safety validation for a tenant segment recovered from a remote key
+    /// or a local directory name (NOT from a client). Enforces the same length
+    /// and `[a-zA-Z0-9._-]` charset as [`validate_ingest`](Self::validate_ingest)
+    /// (so `/` and control bytes are impossible — no path traversal), and still
+    /// rejects `.`/`..` (`date_tenant_dir(base, date, "..")` would escape), but
+    /// ALLOWS the literal [`DEFAULT`](TenantId::DEFAULT): a catalog this node
+    /// itself wrote under the auth-disabled tenant is a legitimate object to
+    /// parse. The `default`-rejection in `validate_ingest` is an ingest-side
+    /// policy (clients may not claim it), not a path-safety rule.
+    pub fn validate_path_segment(id: &str) -> Result<Self, &'static str> {
+        if id.is_empty() || id.len() > Self::MAX_LEN {
+            return Err("tenant segment must be 1-64 bytes");
+        }
+        if id == "." || id == ".." {
+            return Err("tenant segment must not be '.' or '..'");
+        }
+        Self::path_charset_ok(id)?;
+        Ok(Self::from(id))
+    }
+
+    fn path_charset_ok(id: &str) -> Result<(), &'static str> {
         if !id
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'_' || b == b'-')
         {
             return Err("tenant ID must contain only [a-zA-Z0-9._-]");
         }
-        Ok(Self::from(id))
+        Ok(())
     }
 
     /// Query-side resolution: a tenant here is a scoping selector into
@@ -694,6 +724,39 @@ mod tenant_id_tests {
                 "case '{name}' (input {input:?})"
             );
         }
+    }
+
+    #[test]
+    fn validate_path_segment_contract() {
+        // Same path-safety as ingest (charset, length, no '.'/'..'), but the
+        // stored `default` tenant is ACCEPTED (a node writes under it when auth
+        // is off; the ingest-side "no default" is a client policy, not a path
+        // rule). This is the auth-off restore blackout guard at the unit level.
+        let cases: std::collections::HashMap<&str, (&str, bool)> = [
+            ("simple id", ("tenant-a", true)),
+            ("stored default", ("default", true)),
+            ("dot", (".", false)),
+            ("dotdot", ("..", false)),
+            ("empty", ("", false)),
+            ("slash", ("a/b", false)),
+            ("bad charset", ("bad!tenant", false)),
+            (
+                "over max length",
+                ("x".repeat(TenantId::MAX_LEN + 1).leak() as &str, false),
+            ),
+        ]
+        .into_iter()
+        .collect();
+        for (name, (input, ok)) in cases {
+            assert_eq!(
+                TenantId::validate_path_segment(input).is_ok(),
+                ok,
+                "case '{name}' (input {input:?})"
+            );
+        }
+        // The two validators agree everywhere EXCEPT `default`.
+        assert!(TenantId::validate_ingest("default").is_err());
+        assert!(TenantId::validate_path_segment("default").is_ok());
     }
 
     #[test]

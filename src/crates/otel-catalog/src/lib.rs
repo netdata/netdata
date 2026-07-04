@@ -15,7 +15,7 @@ pub mod registry;
 
 pub use catalog::Catalog;
 pub use entry::CatalogEntry;
-pub use registry::{File, Registry, filename, scan_max_sequence};
+pub use registry::{File, Registry, filename, parse_stem, scan_max_sequence};
 
 /// Current catalog JSON schema version (the `version` field inside the
 /// JSON payload). Distinct from [`CONTAINER_VERSION`], which versions

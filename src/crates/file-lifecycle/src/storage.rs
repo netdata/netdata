@@ -63,7 +63,13 @@ pub trait Storage: Send + Sync + 'static {
         data: Vec<u8>,
     ) -> impl Future<Output = Result<WriteMeta, StorageError>> + Send;
 
-    /// List object keys (full paths) under `prefix`.
+    /// List object keys (full paths) under `prefix`, RECURSIVELY — every object
+    /// at any depth below `prefix`, not just the immediate level. Directory
+    /// placeholder entries (keys ending in `/`) may be returned by some backends
+    /// and MUST be filtered by callers that want objects only. Leaf-prefix
+    /// callers (a single date directory) are unaffected by the recursive
+    /// contract; the startup catalog sync depends on it (one LIST of the whole
+    /// `catalog/` prefix spanning many date/tenant subdirectories).
     fn list(&self, prefix: &str) -> impl Future<Output = Result<Vec<String>, StorageError>> + Send;
 
     /// Read the whole object at `key` into memory. `NotFound` is preserved for
@@ -164,7 +170,11 @@ impl Storage for OpendalStorage {
     }
 
     async fn list(&self, prefix: &str) -> Result<Vec<String>, StorageError> {
-        let entries = self.op.list(prefix).await?;
+        // `recursive(true)` walks the whole sub-tree under `prefix` (opendal's
+        // plain `list` is one level only). Required by the startup catalog sync,
+        // which LISTs the whole `catalog/` prefix; leaf-prefix callers are
+        // unaffected (a single date dir has no sub-levels).
+        let entries = self.op.list_with(prefix).recursive(true).await?;
         Ok(entries.into_iter().map(|e| e.path().to_owned()).collect())
     }
 
@@ -199,7 +209,12 @@ pub(crate) struct MockStorage {
     pub list_response: Vec<String>,
     /// If `Some`, `list` fails with this message — drives the LIST-error path.
     pub list_error: Option<String>,
-    /// Bytes every `read` call returns (the happy path). Empty by default.
+    /// Per-key read bodies. A `read(key)` hitting this map returns its bytes;
+    /// otherwise it falls back to `read_response`. Lets the diff-sync tests give
+    /// each catalog object its own container bytes.
+    pub read_bodies: std::collections::HashMap<String, Vec<u8>>,
+    /// Bytes every `read` call returns when `read_bodies` has no entry for the
+    /// key (the single-blob happy path). Empty by default.
     pub read_response: Vec<u8>,
     /// If `Some`, `read` fails with this message — drives the fetch-error path.
     pub read_error: Option<String>,
@@ -207,6 +222,9 @@ pub(crate) struct MockStorage {
     /// Takes priority over `read_error`; a real backend never returns both, so
     /// tests set exactly one error mode at a time.
     pub read_not_found: bool,
+    /// Counts `read` calls (shared, so a `.clone()` of the mock still counts) —
+    /// lets the normal-boot no-op test assert zero downloads.
+    pub read_calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
 }
 
 #[cfg(test)]
@@ -226,9 +244,11 @@ impl Default for MockStorage {
             stat: MockStat::NotFound,
             list_response: Vec::new(),
             list_error: None,
+            read_bodies: std::collections::HashMap::new(),
             read_response: Vec::new(),
             read_error: None,
             read_not_found: false,
+            read_calls: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         }
     }
 }
@@ -249,6 +269,11 @@ impl Storage for MockStorage {
         if let Some(msg) = &self.list_error {
             return Err(StorageError::Other(anyhow::anyhow!(msg.clone())));
         }
+        // Flat `starts_with` over the pre-populated `list_response`: recursive-in
+        // -effect, but it does NOT prove the real backend's `recursive(true)`
+        // (a non-recursive `OpendalStorage::list` would still pass mock tests).
+        // The real recursive contract is covered by `startup_sync_restores_after
+        // _wipe`, which runs an fs-backed `OpendalStorage` over nested dirs.
         // Honor the prefix like a real backend, so multi-day reconcile tests
         // see each key only under its own date prefix.
         Ok(self
@@ -259,12 +284,17 @@ impl Storage for MockStorage {
             .collect())
     }
 
-    async fn read(&self, _key: &str) -> Result<Vec<u8>, StorageError> {
+    async fn read(&self, key: &str) -> Result<Vec<u8>, StorageError> {
+        self.read_calls
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         if self.read_not_found {
             return Err(StorageError::NotFound);
         }
         if let Some(msg) = &self.read_error {
             return Err(StorageError::Other(anyhow::anyhow!(msg.clone())));
+        }
+        if let Some(body) = self.read_bodies.get(key) {
+            return Ok(body.clone());
         }
         Ok(self.read_response.clone())
     }

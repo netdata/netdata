@@ -355,11 +355,29 @@ pub struct StorageConfig {
     /// Hard byte cap for the remote-read cache on disk. Default 1 GB.
     #[serde(default = "default_read_cache_max_size")]
     pub read_cache_max_size: ByteSize,
+    /// Per-operation timeout for the required startup catalog diff-sync (each
+    /// LIST and each download is bounded by it). Default 5 min. It SHOULD exceed
+    /// the storage retry layer's ~3-min in-op backoff ceiling so inner retries
+    /// still run; a lower value cuts those retries short and can crash-loop the
+    /// plugin under a flaky remote (fail-closed is still safe, just noisy). Not
+    /// enforced — a lab/test operator may legitimately want a fast fail. There is
+    /// no phase-total cap, so a large restore stays work-proportional; the per-op
+    /// bound alone makes a hung connection impossible. It also bounds the single
+    /// recursive LIST, which scales with the whole bucket's catalog cardinality
+    /// (shared buckets list every machine's objects), so very large fleets may
+    /// need a higher value.
+    #[serde(with = "duration", default = "default_startup_op_timeout")]
+    pub startup_op_timeout: Duration,
 }
 
 /// Default remote-read cache size: 1 GB (decimal, like every other size here).
 fn default_read_cache_max_size() -> ByteSize {
     ByteSize::gb(1)
+}
+
+/// Default startup diff-sync per-operation timeout: 5 minutes.
+fn default_startup_op_timeout() -> Duration {
+    Duration::from_secs(5 * 60)
 }
 
 /// Index file configuration (runtime-only; lives in [`LifecycleConfig`], built by
@@ -976,6 +994,17 @@ traces:
             future_skew: Duration::from_secs(0),
         };
         assert_eq!(huge.reconcile_days(), 36_500);
+    }
+
+    #[test]
+    fn storage_startup_op_timeout_default_and_roundtrip() {
+        // Absent → 5 min default.
+        let c: StorageConfig = serde_yaml::from_str("uri: \"fs:///x\"\n").unwrap();
+        assert_eq!(c.startup_op_timeout, Duration::from_secs(5 * 60));
+        // Present humantime string round-trips.
+        let c: StorageConfig =
+            serde_yaml::from_str("uri: \"fs:///x\"\nstartup_op_timeout: \"5 minutes\"\n").unwrap();
+        assert_eq!(c.startup_op_timeout, Duration::from_secs(5 * 60));
     }
 
     #[test]

@@ -199,22 +199,10 @@ async fn rotate_scope(
         .expect("rotate_scope called with a key not in accumulators")
         .catalog;
 
-    // Fold the accumulator down to (max_seq, min_ts, max_ts, seqs) in one pass.
-    // `unwrap_or(0)` covers the structurally-impossible empty case (an
-    // accumulator exists only while non-empty).
-    let max_seq = catalog.entries.values().map(|e| e.id.seq).max().unwrap_or(0);
-    let min_timestamp_s = catalog
-        .entries
-        .values()
-        .map(|e| e.min_timestamp_s)
-        .min()
-        .unwrap_or(0);
-    let max_timestamp_s = catalog
-        .entries
-        .values()
-        .map(|e| e.max_timestamp_s)
-        .max()
-        .unwrap_or(0);
+    // Fold to the filename fields via the shared `Catalog::fold` (the same
+    // fold `recovery::startup::validate_catalog` recomputes to check a
+    // downloaded catalog against its filename — one source, no drift).
+    let (max_seq, min_timestamp_s, max_timestamp_s) = catalog.fold();
     let seqs: Vec<u64> = catalog.entries.values().map(|e| e.id.seq).collect();
 
     let bytes = match catalog.to_container_bytes() {

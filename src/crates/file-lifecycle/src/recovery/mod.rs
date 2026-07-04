@@ -26,9 +26,11 @@ use crate::registry::Registry;
 
 mod local;
 mod remote;
+mod startup;
 
 pub use local::*;
 pub use remote::*;
+pub use startup::*;
 
 pub fn now_ns() -> u64 {
     // `Duration::as_nanos()` returns `u128`; the `u64` cast is safe until

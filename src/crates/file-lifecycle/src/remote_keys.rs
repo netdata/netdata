@@ -47,6 +47,11 @@ use file_registry::{FileId, Identity, TenantId};
 /// `v2/...`).
 const SCHEMA_VERSION: &str = "v2";
 
+/// Object extensions, matching the filename builders (`otel_catalog::filename`
+/// stamps `.catalog`; SFST keys use `FileId::to_filename("sfst")`).
+const CATALOG_EXT: &str = "catalog";
+const SFST_EXT: &str = "sfst";
+
 /// Remote key for an uploaded SFST file, scoped to `signal`.
 pub fn sfst(signal: &str, tenant_id: &TenantId, date: NaiveDate, id: FileId) -> String {
     format!(
@@ -86,6 +91,88 @@ pub fn catalog(
         tenant_id,
         otel_catalog::filename(identity, max_seq, min_timestamp_s, max_timestamp_s),
     )
+}
+
+/// LIST prefix for every catalog uploaded for `signal` (all dates/tenants).
+/// The startup diff-sync issues one recursive LIST against this prefix.
+pub fn catalog_prefix(signal: &str) -> String {
+    format!("{SCHEMA_VERSION}/{signal}/catalog/")
+}
+
+/// The identity + fold fields recovered from a catalog remote key.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedCatalogKey {
+    pub date: NaiveDate,
+    pub tenant_id: TenantId,
+    pub identity: Identity,
+    pub max_seq: u64,
+    pub min_timestamp_s: u32,
+    pub max_timestamp_s: u32,
+}
+
+/// Inverse of [`catalog`]: parse + sanitize a listed catalog key. Returns
+/// `None` for any deviation from the exact shape
+/// `v2/{expected_signal}/catalog/{YYYY-MM-DD}/{tenant}/{filename}.catalog` — the
+/// caller warns and skips (garbage keys never reach the install path). The
+/// `{signal}` segment must equal `expected_signal` (the prefix the caller
+/// LISTed). The tenant segment goes through [`TenantId::validate_path_segment`]
+/// whose charset excludes `/` (path-traversal dies) but admits the stored
+/// `default` tenant.
+pub fn parse_catalog_key(key: &str, expected_signal: &str) -> Option<ParsedCatalogKey> {
+    let parts: Vec<&str> = key.split('/').collect();
+    if parts.len() != 6
+        || parts[0] != SCHEMA_VERSION
+        || parts[1] != expected_signal
+        || parts[2] != "catalog"
+    {
+        return None;
+    }
+    let date = NaiveDate::parse_from_str(parts[3], "%Y-%m-%d").ok()?;
+    let tenant_id = TenantId::validate_path_segment(parts[4]).ok()?;
+    // Require the catalog extension (`file_stem`/`parse_stem` would otherwise
+    // strip ANY extension, so an `.sfst` key would parse as a catalog).
+    let filename = std::path::Path::new(parts[5]);
+    if filename.extension()?.to_str()? != CATALOG_EXT {
+        return None;
+    }
+    let stem = filename.file_stem()?.to_str()?;
+    let (identity, max_seq, min_timestamp_s, max_timestamp_s) = otel_catalog::parse_stem(stem)?;
+    Some(ParsedCatalogKey {
+        date,
+        tenant_id,
+        identity,
+        max_seq,
+        min_timestamp_s,
+        max_timestamp_s,
+    })
+}
+
+/// Parse an SFST remote key into its [`FileId`] and tenant. Used to validate a
+/// catalog entry's `remote_key`: the caller checks the `FileId.machine_id`
+/// belongs to this machine and the returned tenant matches the catalog's tenant.
+/// The `{signal}` segment must equal `expected_signal` (mirroring
+/// [`parse_catalog_key`]), so a tampered catalog body can't redirect a fetch
+/// into another signal's object path. Returns `None` for any shape other than
+/// `v2/{expected_signal}/tenants/{tenant}/sfst/{YYYY-MM-DD}/{file_id}.sfst`.
+pub fn parse_sfst_key(key: &str, expected_signal: &str) -> Option<(FileId, TenantId)> {
+    let parts: Vec<&str> = key.split('/').collect();
+    if parts.len() != 7
+        || parts[0] != SCHEMA_VERSION
+        || parts[1] != expected_signal
+        || parts[2] != "tenants"
+        || parts[4] != "sfst"
+    {
+        return None;
+    }
+    let tenant_id = TenantId::validate_path_segment(parts[3]).ok()?;
+    NaiveDate::parse_from_str(parts[5], "%Y-%m-%d").ok()?;
+    // Require the SFST extension (`FileId::parse` would otherwise strip any).
+    let filename = std::path::Path::new(parts[6]);
+    if filename.extension()?.to_str()? != SFST_EXT {
+        return None;
+    }
+    let id = FileId::parse(filename)?;
+    Some((id, tenant_id))
 }
 
 /// Extract the date from an SFST remote key.

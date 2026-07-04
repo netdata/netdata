@@ -1414,3 +1414,631 @@ async fn reconcile_local_catalog_marks_under_catalog_own_identity() {
     );
     cancel.cancel();
 }
+
+// ── P7: startup catalog diff-sync ────────────────────────────
+
+/// A [`Storage`] whose every op never resolves — solely for the timeout
+/// fail-closed test (`std::future::pending()`).
+#[derive(Clone)]
+struct HangingStorage;
+
+impl crate::storage::Storage for HangingStorage {
+    async fn write(
+        &self,
+        _key: &str,
+        _data: Vec<u8>,
+    ) -> Result<crate::storage::WriteMeta, crate::storage::StorageError> {
+        std::future::pending().await
+    }
+    async fn list(&self, _prefix: &str) -> Result<Vec<String>, crate::storage::StorageError> {
+        std::future::pending().await
+    }
+    async fn read(&self, _key: &str) -> Result<Vec<u8>, crate::storage::StorageError> {
+        std::future::pending().await
+    }
+    async fn stat(&self, _key: &str) -> Result<(), crate::storage::StorageError> {
+        std::future::pending().await
+    }
+}
+
+fn long_timeout() -> std::time::Duration {
+    std::time::Duration::from_secs(300)
+}
+
+/// Build an own-catalog remote object: its key and container bytes. All entries
+/// share min/max ts 100/200 so the fold matches the filename fields. Each
+/// entry's `remote_key` is a well-formed own-machine SFST key.
+fn catalog_object(
+    tenant: &TenantId,
+    date: NaiveDate,
+    identity: file_registry::Identity,
+    seqs: &[u64],
+) -> (String, Vec<u8>) {
+    let mut catalog = otel_catalog::Catalog::new(tenant.clone(), date, identity);
+    for &seq in seqs {
+        let (part_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
+        let id = file_registry::FileId::new(identity, 0, seq, part_key);
+        catalog.add(otel_catalog::CatalogEntry {
+            id,
+            remote_key: crate::remote_keys::sfst("logs", tenant, date, id),
+            min_timestamp_s: 100,
+            max_timestamp_s: 200,
+            record_count: 1,
+            content_meta,
+            size: ByteSize(1),
+            uploaded_at_ns: file_registry::TimestampNs(0),
+            remote_etag: None,
+        });
+    }
+    let max_seq = *seqs.iter().max().unwrap();
+    let key = crate::remote_keys::catalog("logs", date, tenant, identity, max_seq, 100, 200);
+    (key, catalog.to_container_bytes().unwrap())
+}
+
+fn d(day: u32) -> NaiveDate {
+    NaiveDate::from_ymd_opt(2026, 4, day).unwrap()
+}
+
+/// Acceptance 1 — restore after wipe, fs-backed. TWO tenants × TWO dates of
+/// own-machine catalogs, plus a foreign-machine catalog and a garbage key, are
+/// synced from EMPTY local dirs. Uses a REAL OpendalStorage over nested
+/// date/tenant dirs — this is the recursive-LIST regression guard: a
+/// silently-non-recursive `list()` returns nothing below the prefix and fails it.
+#[tokio::test]
+async fn startup_sync_restores_after_wipe() {
+    let (op, _op_tmp) = fs_operator();
+    let storage = crate::storage::OpendalStorage::from_operator(op.clone());
+    let t1 = TenantId::from("t1");
+    let t2 = TenantId::from("t2");
+
+    let mut objs = vec![
+        catalog_object(&t1, d(17), ident(), &[10, 11]),
+        catalog_object(&t1, d(18), ident(), &[20]),
+        catalog_object(&t2, d(17), ident(), &[30]),
+        catalog_object(&t2, d(18), ident(), &[40, 41, 42]),
+    ];
+    // Foreign machine (skipped by D6) and a garbage key (skipped by sanitizer).
+    let foreign = file_registry::Identity::new(machine2(), instance());
+    objs.push(catalog_object(&t1, d(17), foreign, &[99]));
+    for (key, bytes) in &objs {
+        op.write(key, bytes.clone()).await.unwrap();
+    }
+    op.write("v2/logs/catalog/not-a-real-key", b"garbage".to_vec())
+        .await
+        .unwrap();
+
+    let catalog_base = tempfile::tempdir().unwrap();
+    let hw = tempfile::tempdir().unwrap();
+    let hw_path = hw.path().join("seq_highwater");
+
+    let tenants = startup_catalog_sync(
+        &storage,
+        "logs",
+        machine(),
+        catalog_base.path(),
+        &hw_path,
+        long_timeout(),
+    )
+    .await
+    .unwrap();
+
+    // Both own tenants discovered; foreign machine's tenant-shape not added by an
+    // own-tenant it happens to share (t1 is present from own keys regardless).
+    assert!(tenants.contains(&t1) && tenants.contains(&t2));
+
+    // All four own catalogs installed byte-identical; the foreign one is absent.
+    for (key, bytes) in &objs[..4] {
+        let parsed = crate::remote_keys::parse_catalog_key(key, "logs").unwrap();
+        let path = file_registry::layout::date_tenant_dir(
+            catalog_base.path(),
+            parsed.date,
+            parsed.tenant_id.as_str(),
+        )
+        .join(otel_catalog::filename(
+            parsed.identity,
+            parsed.max_seq,
+            parsed.min_timestamp_s,
+            parsed.max_timestamp_s,
+        ));
+        assert_eq!(&std::fs::read(&path).unwrap(), bytes, "installed byte-identical");
+    }
+    let foreign_parsed = crate::remote_keys::parse_catalog_key(&objs[4].0, "logs").unwrap();
+    let foreign_path = file_registry::layout::date_tenant_dir(
+        catalog_base.path(),
+        foreign_parsed.date,
+        foreign_parsed.tenant_id.as_str(),
+    )
+    .join(otel_catalog::filename(foreign_parsed.identity, 99, 100, 200));
+    assert!(!foreign_path.exists(), "foreign-machine catalog must not install");
+
+    // Highwater raised to the max filename seq across kept keys (42).
+    assert_eq!(wal::read_seq_highwater(&hw_path), Some(42));
+
+    // The installed catalogs are queryable: build a registry over the catalog dir
+    // and confirm remote_candidates serves an entry.
+    let wal_dir = tempfile::tempdir().unwrap();
+    let idx_dir = tempfile::tempdir().unwrap();
+    let mut regs = crate::registry::TenantRegistries::new(
+        wal_dir.path().to_path_buf(),
+        idx_dir.path().to_path_buf(),
+        catalog_base.path().to_path_buf(),
+    );
+    let reg = regs.get_or_create(&t1);
+    reg.recover();
+    seed_from_catalog_files(reg);
+    let q = file_registry::Query {
+        time_range: 0..u32::MAX,
+        partition_keys: Vec::new(),
+    };
+    assert!(
+        !reg.remote_candidates(&q).is_empty(),
+        "installed catalog entries must be servable from remote"
+    );
+}
+
+/// Acceptance 7 — fail-closed: LIST error, download transport error, and a hang
+/// each surface as an Err out of the phase (not a warn/skip).
+#[tokio::test]
+async fn startup_sync_fails_closed_on_list_error() {
+    let catalog_base = tempfile::tempdir().unwrap();
+    let hw = tempfile::tempdir().unwrap();
+    let storage = crate::storage::MockStorage {
+        list_error: Some("list boom".to_owned()),
+        ..crate::storage::MockStorage::default()
+    };
+    assert!(
+        startup_catalog_sync(&storage, "logs", machine(), catalog_base.path(), &hw.path().join("hw"), long_timeout())
+            .await
+            .is_err(),
+        "LIST error must fail closed"
+    );
+}
+
+#[tokio::test]
+async fn startup_sync_fails_closed_on_transport_error() {
+    let catalog_base = tempfile::tempdir().unwrap();
+    let hw = tempfile::tempdir().unwrap();
+    // Key parses + own-machine + missing locally, so it reaches the download.
+    let (key, _bytes) = catalog_object(&TenantId::from("t1"), d(17), ident(), &[5]);
+    let storage = crate::storage::MockStorage {
+        list_response: vec![key],
+        read_error: Some("read boom".to_owned()),
+        ..crate::storage::MockStorage::default()
+    };
+    assert!(
+        startup_catalog_sync(&storage, "logs", machine(), catalog_base.path(), &hw.path().join("hw"), long_timeout())
+            .await
+            .is_err(),
+        "download transport error must fail closed"
+    );
+}
+
+#[tokio::test]
+async fn startup_sync_fails_closed_on_hang() {
+    let catalog_base = tempfile::tempdir().unwrap();
+    let hw = tempfile::tempdir().unwrap();
+    // Every op pends; a short op_timeout must turn it into an Err, not a hang.
+    assert!(
+        startup_catalog_sync(
+            &HangingStorage,
+            "logs",
+            machine(),
+            catalog_base.path(),
+            &hw.path().join("hw"),
+            std::time::Duration::from_millis(50),
+        )
+        .await
+        .is_err(),
+        "a hung backend must time out, not hang"
+    );
+}
+
+/// Normal boot: all listed catalogs already local ⇒ zero downloads, and the
+/// highwater is untouched when it already exceeds the remote max.
+#[tokio::test]
+async fn startup_sync_noop_when_all_local() {
+    let t1 = TenantId::from("t1");
+    let (key, bytes) = catalog_object(&t1, d(17), ident(), &[7]);
+    let parsed = crate::remote_keys::parse_catalog_key(&key, "logs").unwrap();
+
+    // Pre-install the catalog locally at its canonical path.
+    let catalog_base = tempfile::tempdir().unwrap();
+    let path = file_registry::layout::date_tenant_dir(catalog_base.path(), parsed.date, "t1")
+        .join(otel_catalog::filename(parsed.identity, 7, 100, 200));
+    file_registry::durable::write_atomic(&path, &bytes).unwrap();
+
+    // Pre-seed highwater ABOVE the remote max (7) so no write happens.
+    let hw = tempfile::tempdir().unwrap();
+    let hw_path = hw.path().join("hw");
+    wal::write_seq_highwater(&hw_path, 1000).unwrap();
+
+    let storage = crate::storage::MockStorage {
+        list_response: vec![key],
+        ..crate::storage::MockStorage::default()
+    };
+    startup_catalog_sync(&storage, "logs", machine(), catalog_base.path(), &hw_path, long_timeout())
+        .await
+        .unwrap();
+
+    assert_eq!(
+        storage.read_calls.load(std::sync::atomic::Ordering::Relaxed),
+        0,
+        "no downloads when every catalog is already local"
+    );
+    assert_eq!(
+        wal::read_seq_highwater(&hw_path),
+        Some(1000),
+        "highwater unchanged when it already exceeds the remote max"
+    );
+}
+
+/// Validation rejects: each malformed body is NOT installed (loud log), the
+/// phase continues, and a valid sibling IS installed.
+#[tokio::test]
+async fn startup_sync_rejects_invalid_bodies() {
+    let t1 = TenantId::from("t1");
+    let t2 = TenantId::from("t2");
+
+    let (good_key, good_bytes) = catalog_object(&t1, d(17), ident(), &[5]);
+    // Body tenant != key tenant: build under t2 but list under a t1 key.
+    let (tenant_key, _) = catalog_object(&t1, d(17), ident(), &[6]);
+    let (_, wrong_tenant_bytes) = catalog_object(&t2, d(17), ident(), &[6]);
+    // Corrupt container bytes.
+    let (corrupt_key, _) = catalog_object(&t1, d(17), ident(), &[7]);
+    // Fold mismatch: key claims max_seq 8 but body's entry is seq 9.
+    let corrupt_bad = b"not a catalog container".to_vec();
+    let (_, fold_bytes) = catalog_object(&t1, d(17), ident(), &[9]);
+    let fold_key = crate::remote_keys::catalog("logs", d(17), &t1, ident(), 8, 100, 200);
+
+    let mut read_bodies = std::collections::HashMap::new();
+    read_bodies.insert(good_key.clone(), good_bytes.clone());
+    read_bodies.insert(tenant_key.clone(), wrong_tenant_bytes);
+    read_bodies.insert(corrupt_key.clone(), corrupt_bad);
+    read_bodies.insert(fold_key.clone(), fold_bytes);
+
+    let storage = crate::storage::MockStorage {
+        list_response: vec![good_key.clone(), tenant_key, corrupt_key, fold_key],
+        read_bodies,
+        ..crate::storage::MockStorage::default()
+    };
+    let catalog_base = tempfile::tempdir().unwrap();
+    let hw = tempfile::tempdir().unwrap();
+    startup_catalog_sync(
+        &storage,
+        "logs",
+        machine(),
+        catalog_base.path(),
+        &hw.path().join("hw"),
+        long_timeout(),
+    )
+    .await
+    .expect("phase continues past invalid bodies");
+
+    // Only the good catalog installed.
+    let gp = crate::remote_keys::parse_catalog_key(&good_key, "logs").unwrap();
+    let good_path = file_registry::layout::date_tenant_dir(catalog_base.path(), gp.date, "t1")
+        .join(otel_catalog::filename(gp.identity, 5, 100, 200));
+    assert!(good_path.exists(), "valid catalog installed");
+    // The three invalid ones did not install (t1 dir holds exactly the good file).
+    let t1_dir = file_registry::layout::date_tenant_dir(catalog_base.path(), d(17), "t1");
+    let count = std::fs::read_dir(&t1_dir).unwrap().count();
+    assert_eq!(count, 1, "only the valid catalog is installed: {count} files");
+}
+
+/// Seed correctness from filenames alone: highwater is raised to the max
+/// filename seq even when nothing needs downloading.
+#[tokio::test]
+async fn startup_sync_seeds_from_filenames() {
+    let t1 = TenantId::from("t1");
+    let (key, bytes) = catalog_object(&t1, d(17), ident(), &[500]);
+    let parsed = crate::remote_keys::parse_catalog_key(&key, "logs").unwrap();
+
+    // Catalog already local (no download needed) but highwater below 500.
+    let catalog_base = tempfile::tempdir().unwrap();
+    let path = file_registry::layout::date_tenant_dir(catalog_base.path(), parsed.date, "t1")
+        .join(otel_catalog::filename(parsed.identity, 500, 100, 200));
+    file_registry::durable::write_atomic(&path, &bytes).unwrap();
+    let hw = tempfile::tempdir().unwrap();
+    let hw_path = hw.path().join("hw");
+
+    let storage = crate::storage::MockStorage {
+        list_response: vec![key],
+        ..crate::storage::MockStorage::default()
+    };
+    startup_catalog_sync(&storage, "logs", machine(), catalog_base.path(), &hw_path, long_timeout())
+        .await
+        .unwrap();
+
+    assert_eq!(wal::read_seq_highwater(&hw_path), Some(500));
+    assert_eq!(
+        storage.read_calls.load(std::sync::atomic::Ordering::Relaxed),
+        0,
+        "seeding needs no downloads"
+    );
+}
+
+/// The sanitizer skips hostile keys without panicking: bad tenant charset, a
+/// path-traversal segment, wrong segment count, and a DIR placeholder.
+#[tokio::test]
+async fn startup_sync_sanitizer_skips_hostile_keys() {
+    let storage = crate::storage::MockStorage {
+        list_response: vec![
+            "v2/logs/catalog/2026-04-17/bad!tenant/x.catalog".to_owned(),
+            "v2/logs/catalog/2026-04-17/../etc/passwd".to_owned(),
+            "v2/logs/catalog/2026-04-17".to_owned(),
+            "v2/logs/catalog/2026-04-17/t1/".to_owned(),
+        ],
+        ..crate::storage::MockStorage::default()
+    };
+    let catalog_base = tempfile::tempdir().unwrap();
+    let hw = tempfile::tempdir().unwrap();
+    let tenants = startup_catalog_sync(
+        &storage,
+        "logs",
+        machine(),
+        catalog_base.path(),
+        &hw.path().join("hw"),
+        long_timeout(),
+    )
+    .await
+    .expect("hostile keys skipped, not fatal");
+    assert!(tenants.is_empty(), "no tenant discovered from hostile keys");
+    assert_eq!(
+        storage.read_calls.load(std::sync::atomic::Ordering::Relaxed),
+        0
+    );
+}
+
+/// A [`Storage`] for the short-circuit test only: one key's `read` errors
+/// instantly, every other `read` hangs (`pending()`). With `buffer_unordered`
+/// + `try_collect`, the instant error must abort the phase before the hung
+/// downloads (or any later ones) complete.
+#[derive(Clone)]
+struct PartialFailStorage {
+    list_response: Vec<String>,
+    fail_key: String,
+    read_calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+}
+
+impl crate::storage::Storage for PartialFailStorage {
+    async fn write(
+        &self,
+        _key: &str,
+        _data: Vec<u8>,
+    ) -> Result<crate::storage::WriteMeta, crate::storage::StorageError> {
+        std::future::pending().await
+    }
+    async fn list(&self, _prefix: &str) -> Result<Vec<String>, crate::storage::StorageError> {
+        Ok(self.list_response.clone())
+    }
+    async fn read(&self, key: &str) -> Result<Vec<u8>, crate::storage::StorageError> {
+        self.read_calls
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if key == self.fail_key {
+            return Err(crate::storage::StorageError::Other(anyhow::anyhow!("boom")));
+        }
+        std::future::pending().await
+    }
+    async fn stat(&self, _key: &str) -> Result<(), crate::storage::StorageError> {
+        std::future::pending().await
+    }
+}
+
+/// The download phase short-circuits on the first transport error: with 20
+/// missing catalogs where the first errors instantly and the rest hang, the
+/// phase returns Err having attempted strictly fewer than all 20 downloads
+/// (no timing assertion — the hung reads never resolve).
+#[tokio::test]
+async fn startup_sync_short_circuits_on_first_download_error() {
+    let t1 = TenantId::from("t1");
+    let keys: Vec<String> = (1..=20u64)
+        .map(|s| catalog_object(&t1, d(17), ident(), &[s]).0)
+        .collect();
+    let read_calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let storage = PartialFailStorage {
+        list_response: keys.clone(),
+        fail_key: keys[0].clone(),
+        read_calls: read_calls.clone(),
+    };
+    let catalog_base = tempfile::tempdir().unwrap();
+    let hw = tempfile::tempdir().unwrap();
+
+    let res = startup_catalog_sync(
+        &storage,
+        "logs",
+        machine(),
+        catalog_base.path(),
+        &hw.path().join("hw"),
+        long_timeout(),
+    )
+    .await;
+
+    assert!(res.is_err(), "first download error must fail the phase");
+    let attempted = read_calls.load(std::sync::atomic::Ordering::Relaxed);
+    // `buffer_unordered` eagerly polls at most one concurrency window before the
+    // first error short-circuits `try_collect`, so no more than
+    // DOWNLOAD_CONCURRENCY downloads are ever attempted (of the 20 queued).
+    assert!(
+        attempted <= super::startup::DOWNLOAD_CONCURRENCY,
+        "phase short-circuited: {attempted} of 20 downloads attempted (≤ {} expected)",
+        super::startup::DOWNLOAD_CONCURRENCY,
+    );
+}
+
+/// End-to-end fold guard: drive a REAL `CatalogBuilder` rotation, then run the
+/// written file through `validate_catalog`. The builder's filename and the
+/// validator both derive the fold `(max_seq, min_ts, max_ts)` from
+/// `Catalog::fold`, so any future divergence (a filename encoding fields the
+/// validator recomputes differently) fails here.
+#[tokio::test]
+async fn rotated_catalog_passes_validate_catalog() {
+    use crate::catalog_builder::{CatalogBuilder, CatalogBuilderArgs};
+    use crate::component::ComponentHandle;
+    use crate::ipc::{CatalogBuilderRequest, CatalogBuilderResponse};
+    use tokio_util::sync::CancellationToken;
+
+    let base = tempfile::tempdir().unwrap();
+    let cancel = CancellationToken::new();
+    let mut handle = ComponentHandle::spawn::<CatalogBuilder>(
+        CatalogBuilderArgs {
+            catalog_base_dir: base.path().to_path_buf(),
+            rotation_count: 3,
+            rotation_period: std::time::Duration::from_secs(3600),
+        },
+        cancel.child_token(),
+    );
+
+    // Feed three entries with well-formed own-machine SFST remote keys (varied
+    // timestamps so the fold is non-trivial), so the rotated catalog passes
+    // validate_catalog's per-entry key checks.
+    let tenant = TenantId::from("tenant1");
+    let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
+    let mut last = None;
+    for seq in 1..=3u64 {
+        let (part_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
+        let id = file_registry::FileId::new(ident(), 0, seq, part_key);
+        let entry = otel_catalog::CatalogEntry {
+            id,
+            remote_key: crate::remote_keys::sfst("logs", &tenant, date, id),
+            min_timestamp_s: 100 + seq as u32,
+            max_timestamp_s: 200 + seq as u32,
+            record_count: 1,
+            content_meta,
+            size: ByteSize(1),
+            uploaded_at_ns: file_registry::TimestampNs(0),
+            remote_etag: None,
+        };
+        handle
+            .send(CatalogBuilderRequest::AddEntry {
+                tenant_id: tenant.clone(),
+                date,
+                entry,
+            })
+            .unwrap();
+        last = Some(handle.recv().await.unwrap());
+    }
+
+    let (path, parsed) = match last.unwrap() {
+        CatalogBuilderResponse::Rotated {
+            tenant_id,
+            date,
+            identity,
+            max_seq,
+            min_timestamp_s,
+            max_timestamp_s,
+            path,
+            ..
+        } => (
+            path,
+            crate::remote_keys::ParsedCatalogKey {
+                date,
+                tenant_id,
+                identity,
+                max_seq,
+                min_timestamp_s,
+                max_timestamp_s,
+            },
+        ),
+        other => panic!("expected Rotated, got {other:?}"),
+    };
+    cancel.cancel();
+
+    // The on-disk filename is exactly fold() → filename(), and the body
+    // validates against the parsed key.
+    let bytes = std::fs::read(&path).unwrap();
+    assert_eq!(
+        path.file_name().unwrap().to_str().unwrap(),
+        otel_catalog::filename(
+            parsed.identity,
+            parsed.max_seq,
+            parsed.min_timestamp_s,
+            parsed.max_timestamp_s,
+        ),
+        "builder filename must match the fold-derived filename",
+    );
+    super::startup::validate_catalog(&bytes, &parsed, machine(), "logs")
+        .expect("rotated catalog must pass validate_catalog");
+}
+
+/// Auth-off restore blackout guard (finding #1): with auth disabled all data is
+/// stored under the "default" tenant. A wiped node MUST still restore it — the
+/// bug was that the key parsers rejected "default". fs-backed end to end.
+#[tokio::test]
+async fn startup_sync_restores_default_tenant() {
+    let (op, _op_tmp) = fs_operator();
+    let storage = crate::storage::OpendalStorage::from_operator(op.clone());
+    let default = TenantId::default_tenant();
+    let (key, bytes) = catalog_object(&default, d(17), ident(), &[10, 11]);
+    op.write(&key, bytes.clone()).await.unwrap();
+
+    let catalog_base = tempfile::tempdir().unwrap();
+    let hw = tempfile::tempdir().unwrap();
+    let hw_path = hw.path().join("hw");
+
+    let tenants = startup_catalog_sync(
+        &storage,
+        "logs",
+        machine(),
+        catalog_base.path(),
+        &hw_path,
+        long_timeout(),
+    )
+    .await
+    .unwrap();
+
+    assert!(tenants.contains(&default), "default tenant must be discovered");
+    let parsed = crate::remote_keys::parse_catalog_key(&key, "logs").unwrap();
+    let path = file_registry::layout::date_tenant_dir(catalog_base.path(), parsed.date, "default")
+        .join(otel_catalog::filename(parsed.identity, 11, 100, 200));
+    assert_eq!(&std::fs::read(&path).unwrap(), &bytes, "default catalog installed");
+    assert_eq!(wal::read_seq_highwater(&hw_path), Some(11));
+}
+
+/// A LIST error leaves a pre-seeded highwater untouched (no partial write slips
+/// through the fail-closed path).
+#[tokio::test]
+async fn startup_sync_list_error_leaves_highwater_untouched() {
+    let hw = tempfile::tempdir().unwrap();
+    let hw_path = hw.path().join("hw");
+    wal::write_seq_highwater(&hw_path, 777).unwrap();
+    let catalog_base = tempfile::tempdir().unwrap();
+    let storage = crate::storage::MockStorage {
+        list_error: Some("boom".to_owned()),
+        ..crate::storage::MockStorage::default()
+    };
+    assert!(
+        startup_catalog_sync(&storage, "logs", machine(), catalog_base.path(), &hw_path, long_timeout())
+            .await
+            .is_err()
+    );
+    assert_eq!(wal::read_seq_highwater(&hw_path), Some(777), "highwater untouched on LIST error");
+}
+
+/// A LIST of only foreign-machine keys discovers no tenants and leaves the
+/// highwater untouched (remote_max stays 0).
+#[tokio::test]
+async fn startup_sync_foreign_only_list_is_inert() {
+    let foreign = file_registry::Identity::new(machine2(), instance());
+    let (k1, _) = catalog_object(&TenantId::from("t1"), d(17), foreign, &[50]);
+    let (k2, _) = catalog_object(&TenantId::from("t2"), d(18), foreign, &[60]);
+    let hw = tempfile::tempdir().unwrap();
+    let hw_path = hw.path().join("hw");
+    wal::write_seq_highwater(&hw_path, 5).unwrap();
+    let catalog_base = tempfile::tempdir().unwrap();
+    let storage = crate::storage::MockStorage {
+        list_response: vec![k1, k2],
+        ..crate::storage::MockStorage::default()
+    };
+    let tenants = startup_catalog_sync(
+        &storage, "logs", machine(), catalog_base.path(), &hw_path, long_timeout(),
+    )
+    .await
+    .unwrap();
+    assert!(tenants.is_empty(), "no own-machine tenant discovered");
+    assert_eq!(
+        storage.read_calls.load(std::sync::atomic::Ordering::Relaxed),
+        0,
+        "foreign keys are never downloaded"
+    );
+    assert_eq!(wal::read_seq_highwater(&hw_path), Some(5), "highwater untouched");
+}

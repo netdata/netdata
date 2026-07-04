@@ -76,6 +76,8 @@ pub(super) struct StorageOverride {
     pub(super) uri: Option<String>,
     #[serde(default)]
     pub(super) read_cache_max_size: Option<ByteSize>,
+    #[serde(default, deserialize_with = "opt_humantime")]
+    pub(super) startup_op_timeout: Option<Duration>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -105,7 +107,10 @@ impl SignalOverride {
 
 impl StorageOverride {
     pub(super) fn has_any(&self) -> bool {
-        self.enabled.is_some() || self.uri.is_some() || self.read_cache_max_size.is_some()
+        self.enabled.is_some()
+            || self.uri.is_some()
+            || self.read_cache_max_size.is_some()
+            || self.startup_op_timeout.is_some()
     }
 }
 
@@ -163,6 +168,9 @@ pub(super) fn apply_storage(config: &mut StorageConfig, o: &StorageOverride) {
     }
     if let Some(v) = o.read_cache_max_size {
         config.read_cache_max_size = v;
+    }
+    if let Some(v) = o.startup_op_timeout {
+        config.startup_op_timeout = v;
     }
 }
 

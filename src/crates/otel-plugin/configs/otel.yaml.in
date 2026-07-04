@@ -64,6 +64,19 @@ storage:
   # that cache:
   read_cache_max_size: "1GB"
 
+  # Per-operation timeout for the startup catalog sync (each remote LIST and
+  # each catalog download). This phase runs before the plugin serves data and
+  # must reach the remote, so it fails startup rather than hanging if the
+  # backend is unreachable; the agent then retries by restarting the plugin.
+  # Bounds each operation, not the whole restore, so recovering a large archive
+  # stays proportional to its size. It also bounds the single recursive LIST,
+  # which scales with the whole bucket's catalog count (shared buckets list every
+  # machine's objects), so very large fleets may need a higher value. Should
+  # exceed the backend's own retry window (~3 min) so transient blips still retry
+  # internally; a lower value cuts those retries short and can crash-loop the
+  # plugin under a flaky remote:
+  startup_op_timeout: "5 minutes"
+
 auth:
   # Require senders to identify a tenant via the X-Scope-OrgID gRPC header.
   # When disabled, all data belongs to a single "default" tenant.

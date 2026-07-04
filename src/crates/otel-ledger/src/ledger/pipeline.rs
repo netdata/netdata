@@ -75,6 +75,8 @@ pub(crate) async fn build_pipeline<F>(
     signal: Signal,
     config: &LifecycleConfig,
     own_machine: file_registry::MachineId,
+    seq_highwater_path: &std::path::Path,
+    startup_op_timeout: std::time::Duration,
     cancel: &CancellationToken,
     cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
     mut uploader: Option<&mut ComponentHandle<UploaderRequest, UploaderResponse>>,
@@ -102,7 +104,33 @@ where
 
     let mut registries =
         TenantRegistries::new(wal_base_dir, index_base_dir, catalog_base_dir.clone());
-    registries.discover_tenants();
+
+    // Startup catalog diff-sync (P7): when storage is enabled, make the local
+    // catalog set complete BEFORE tenant discovery. It runs first so a local
+    // tenant that gains new catalogs sees them through `discover_tenants`'
+    // per-tenant `recover()`; remote-ONLY tenants (no local WAL/index dir) are
+    // then instantiated explicitly. Required + fail-closed: any infrastructure
+    // failure returns here (before `Ready`). NOT wrapped in STARTUP_REMOTE_BUDGET
+    // — unlike the two optional reconciles below, this phase must not be skipped.
+    if let Some(storage) = storage {
+        let remote_tenants = file_lifecycle::recovery::startup_catalog_sync(
+            storage,
+            segment,
+            own_machine,
+            &catalog_base_dir,
+            seq_highwater_path,
+            startup_op_timeout,
+        )
+        .await?;
+        registries.discover_tenants();
+        for tenant_id in remote_tenants {
+            if !registries.tenants.contains_key(&tenant_id) {
+                registries.get_or_create(&tenant_id).recover();
+            }
+        }
+    } else {
+        registries.discover_tenants();
+    }
 
     // The seal/index worker was spawned by the caller (it owns the concrete
     // Component type); the catalog builder is signal-neutral, so it is spawned
@@ -325,6 +353,8 @@ pub(crate) async fn build_logs_pipeline(
     signal: Signal,
     config: &LifecycleConfig,
     own_machine: file_registry::MachineId,
+    seq_highwater_path: &std::path::Path,
+    startup_op_timeout: std::time::Duration,
     cancel: &CancellationToken,
     cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
     uploader: Option<&mut ComponentHandle<UploaderRequest, UploaderResponse>>,
@@ -345,6 +375,8 @@ pub(crate) async fn build_logs_pipeline(
         signal,
         config,
         own_machine,
+        seq_highwater_path,
+        startup_op_timeout,
         cancel,
         cleaner,
         uploader,

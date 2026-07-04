@@ -165,6 +165,14 @@ impl Ledger {
         // each pipeline's remote reconcile so its LIST is filtered to own-machine
         // objects (D6 key layout keeps the whole fleet under one prefix).
         own_machine: file_registry::MachineId,
+        // Shared seq highwater file path (from `PluginConfig::seq_highwater_path`).
+        // The startup catalog sync raises it to cover the remote max; the ingestor
+        // (configured strictly later) reads it. Both signals' sync phases run
+        // SEQUENTIALLY below (`build_logs_pipeline().await?` then
+        // `build_traces_pipeline().await?`), so the read-modify-write is
+        // single-threaded — a future refactor that builds the pipelines
+        // concurrently MUST revisit that (the highwater would then race).
+        seq_highwater_path: &std::path::Path,
         lifecycle: &LifecycleConfig,
         // PROOF SCAFFOLD (traces-proof SOW): the skeletal traces pipeline's
         // lifecycle config, derived by `PluginConfig::lifecycle_for(Signal::Traces)`
@@ -262,6 +270,8 @@ impl Ledger {
             Signal::Logs,
             lifecycle,
             own_machine,
+            seq_highwater_path,
+            storage_config.startup_op_timeout,
             &cancel,
             &mut cleaner,
             uploader.as_mut(),
@@ -281,6 +291,8 @@ impl Ledger {
             Signal::Traces,
             traces_lifecycle,
             own_machine,
+            seq_highwater_path,
+            storage_config.startup_op_timeout,
             &cancel,
             &mut cleaner,
             uploader.as_mut(),

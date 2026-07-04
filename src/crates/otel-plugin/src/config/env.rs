@@ -206,6 +206,10 @@ impl StorageOverride {
             enabled: parse_env_bool(env, "NETDATA_OTEL_STORAGE_ENABLED")?,
             uri: get_env(env, "NETDATA_OTEL_STORAGE_URI")?.map(str::to_string),
             read_cache_max_size: parse_env_var(env, "NETDATA_OTEL_STORAGE_READ_CACHE_MAX_SIZE")?,
+            startup_op_timeout: parse_env_duration(
+                env,
+                "NETDATA_OTEL_STORAGE_STARTUP_OP_TIMEOUT",
+            )?,
         })
     }
 }

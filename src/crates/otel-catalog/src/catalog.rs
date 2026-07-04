@@ -50,6 +50,29 @@ impl Catalog {
         self.entries.remove(id)
     }
 
+    /// Fold the entries down to the filename fields `(max_seq, min_ts, max_ts)`
+    /// in one pass. `(0, 0, 0)` for an empty catalog — structurally not
+    /// produced (an accumulator exists only while non-empty), matched by the
+    /// `unwrap_or(0)` fallbacks. This is the single source of the rotation
+    /// filename fields (`catalog_builder`) and of the download-time filename
+    /// check (`recovery::startup::validate_catalog`), so the two cannot drift.
+    pub fn fold(&self) -> (u64, u32, u32) {
+        let max_seq = self.entries.values().map(|e| e.id.seq).max().unwrap_or(0);
+        let min_ts = self
+            .entries
+            .values()
+            .map(|e| e.min_timestamp_s)
+            .min()
+            .unwrap_or(0);
+        let max_ts = self
+            .entries
+            .values()
+            .map(|e| e.max_timestamp_s)
+            .max()
+            .unwrap_or(0);
+        (max_seq, min_ts, max_ts)
+    }
+
     // TODO: O(n) scan. The BTreeMap is keyed by FileId, not time, so range
     // filtering touches every entry. Fine at current scales (~hundreds of
     // entries per scope); revisit with an interval index or date-bucketed

@@ -62,6 +62,7 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
         supervisor,
         &config.writer_socket_path,
         identity.machine_id,
+        &config.seq_highwater_path(),
         &config.lifecycle_for(Signal::Logs),
         &config.lifecycle_for(Signal::Traces),
         &config.storage,
