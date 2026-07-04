@@ -236,7 +236,7 @@ static bool macos_nvme_read_metrics(io_service_t service, struct macos_nvme_metr
 
     metrics->percentage_used = (collected_number)data.PERCENTAGE_USED;
     metrics->available_spare = (collected_number)data.AVAILABLE_SPARE;
-    metrics->temperature_c = (collected_number)((double)kelvin - 273.15);
+    metrics->temperature_c = (collected_number)kelvin - 273;
     metrics->data_units_read_bytes = macos_nvme_le128_to_number(data.DATA_UNITS_READ, 1000ULL * 512ULL);
     metrics->data_units_written_bytes = macos_nvme_le128_to_number(data.DATA_UNITS_WRITTEN, 1000ULL * 512ULL);
     metrics->power_cycles = macos_nvme_le128_to_number(data.POWER_CYCLES, 1);
