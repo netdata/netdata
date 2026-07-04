@@ -27,7 +27,7 @@ modules:
             - The function `host_statistics` is called to collect CPU and virtual memory data.
             - The function `IOServiceGetMatchingServices` is called to collect storage information.
             - The function `IOPSCopyPowerSourcesInfo` is called to collect battery and UPS power source data.
-            - The private Apple IOReport framework is loaded at runtime to collect Apple Silicon GPU active residency, performance-state residency, frequency, and power without root privileges when macOS exposes the required channels.
+            - The private Apple IOReport framework is loaded at runtime to collect Apple Silicon GPU utilization, performance-state residency, clock frequency, and power draw without root privileges when macOS exposes the required channels.
             - AppleSMC and IOHID are sampled directly to collect hardware temperature, fan, voltage, current, and power sensors without requiring `powermetrics`.
             - The native Apple `powermetrics` command is sampled in continuous loop mode to collect thermal pressure, plus SMC temperatures, fan speed, and fallback GPU power when the macOS sampler is available.
             - The native IOKit NVMe SMART user client is sampled to collect NVMe health data when macOS exposes readable SMART-capable NVMe services.
@@ -431,7 +431,7 @@ modules:
         list:
           - name: GPU charts are missing
             description: |
-              Apple Silicon GPU active residency, frequency, and power charts require IOReport GPU channels. These channels are exposed by Apple Silicon GPU drivers and are not available on Intel Macs. The collector loads IOReport at runtime and disables the GPU module cleanly when the framework, DVFS table, or GPU channels are unavailable.
+              Apple Silicon GPU utilization, performance-state residency, clock frequency, and power draw charts require IOReport GPU channels. These channels are exposed by Apple Silicon GPU drivers and are not available on Intel Macs. The collector loads IOReport at runtime and disables the GPU module cleanly when the framework, DVFS table, or GPU channels are unavailable.
 
               GPU power may still appear from `powermetrics` on systems where the `gpu_power` sampler exposes a plist `gpu_power` value and IOReport GPU power is unavailable. GPU temperature uses direct SMC/IOHID reads from the GPU module when available; otherwise, the `powermetrics` SMC path can still provide the same GPU temperature metric.
           - name: Thermal and fan charts are missing

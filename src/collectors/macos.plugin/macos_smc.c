@@ -2,6 +2,7 @@
 
 #include "macos_smc.h"
 
+#include <ctype.h>
 #include <math.h>
 #include <string.h>
 
@@ -67,6 +68,19 @@ static uint32_t macos_smc_key_from_cstr(const char key[MACOS_SMC_KEY_LEN + 1])
 {
     return ((uint32_t)(uint8_t)key[0] << 24) | ((uint32_t)(uint8_t)key[1] << 16) |
            ((uint32_t)(uint8_t)key[2] << 8) | (uint32_t)(uint8_t)key[3];
+}
+
+static bool macos_smc_key_is_valid(const char key[MACOS_SMC_KEY_LEN + 1])
+{
+    if (!key)
+        return false;
+
+    for (size_t i = 0; i < MACOS_SMC_KEY_LEN; i++) {
+        if (!isprint((unsigned char)key[i]))
+            return false;
+    }
+
+    return key[MACOS_SMC_KEY_LEN] == '\0';
 }
 
 static void macos_smc_key_to_cstr(uint32_t key, char dst[MACOS_SMC_KEY_LEN + 1])
@@ -195,7 +209,7 @@ bool macos_smc_key_by_index(io_connect_t connection, uint32_t index, char key[MA
 
 bool macos_smc_read_key(io_connect_t connection, const char key[MACOS_SMC_KEY_LEN + 1], struct macos_smc_value *value)
 {
-    if (!key || !value)
+    if (!macos_smc_key_is_valid(key) || !value)
         return false;
 
     uint32_t smc_key = macos_smc_key_from_cstr(key);

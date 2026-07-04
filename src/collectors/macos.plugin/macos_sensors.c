@@ -22,6 +22,7 @@ extern IOHIDEventSystemClientRef IOHIDEventSystemClientCreate(CFAllocatorRef all
 extern int IOHIDEventSystemClientSetMatching(IOHIDEventSystemClientRef client, CFDictionaryRef matching);
 extern CFArrayRef IOHIDEventSystemClientCopyServices(IOHIDEventSystemClientRef client);
 extern CFTypeRef IOHIDServiceClientCopyProperty(IOHIDServiceClientRef service, CFStringRef key);
+extern CFTypeRef IOHIDServiceClientGetRegistryID(IOHIDServiceClientRef service);
 extern IOHIDEventRef IOHIDServiceClientCopyEvent(
     IOHIDServiceClientRef service,
     int64_t type,
@@ -544,15 +545,15 @@ static bool macos_sensors_discover_smc(void)
     }
 
     macos_sensors_prune_smc_candidates();
-    return smc_candidates_root != NULL;
+    return true;
 }
 
 static void macos_sensors_collect_smc(int update_every)
 {
     usec_t now_ut = now_monotonic_usec();
     if (!last_smc_discovery_ut || now_ut - last_smc_discovery_ut >= (usec_t)discovery_every_s * USEC_PER_SEC) {
-        macos_sensors_discover_smc();
-        last_smc_discovery_ut = now_ut;
+        if (macos_sensors_discover_smc())
+            last_smc_discovery_ut = now_ut;
     }
 
     if (smc_connection == IO_OBJECT_NULL || !smc_candidates_root)
@@ -635,21 +636,57 @@ static bool macos_sensors_hid_product_name(IOHIDServiceClientRef service, char *
     return ok;
 }
 
-static unsigned macos_sensors_hid_duplicate_index(CFArrayRef services, CFIndex current, const char *name)
+static bool macos_sensors_cf_value_identifier(CFTypeRef value, char *dst, size_t dst_size)
 {
-    unsigned duplicates = 0;
+    if (!value || !dst || dst_size == 0)
+        return false;
 
-    for (CFIndex i = 0; i < current; i++) {
-        IOHIDServiceClientRef service = (IOHIDServiceClientRef)CFArrayGetValueAtIndex(services, i);
-        if (!service)
-            continue;
+    dst[0] = '\0';
 
-        char other[128];
-        if (macos_sensors_hid_product_name(service, other, sizeof(other)) && !strcmp(other, name))
-            duplicates++;
+    if (CFGetTypeID(value) == CFNumberGetTypeID()) {
+        int64_t signed_id = 0;
+        if (!CFNumberGetValue((CFNumberRef)value, kCFNumberSInt64Type, &signed_id))
+            return false;
+
+        uint64_t id = (uint64_t)signed_id;
+        snprintfz(dst, dst_size, "%llx", (unsigned long long)id);
+        return dst[0] != '\0';
     }
 
-    return duplicates;
+    if (CFGetTypeID(value) == CFStringGetTypeID()) {
+        if (!macos_sensors_cfstring_to_cstr((CFStringRef)value, dst, dst_size))
+            return false;
+
+        netdata_fix_chart_id(dst);
+        return dst[0] != '\0';
+    }
+
+    return false;
+}
+
+static bool macos_sensors_hid_service_identifier(IOHIDServiceClientRef service, char *dst, size_t dst_size)
+{
+    CFTypeRef registry_id = IOHIDServiceClientGetRegistryID(service);
+    if (macos_sensors_cf_value_identifier(registry_id, dst, dst_size)) {
+        char prefixed[128];
+        snprintfz(prefixed, sizeof(prefixed), "registry_%s", dst);
+        snprintfz(dst, dst_size, "%s", prefixed);
+        return true;
+    }
+
+    CFTypeRef location_id = IOHIDServiceClientCopyProperty(service, CFSTR("LocationID"));
+    if (!location_id)
+        return false;
+
+    bool ok = macos_sensors_cf_value_identifier(location_id, dst, dst_size);
+    CFRelease(location_id);
+    if (!ok)
+        return false;
+
+    char prefixed[128];
+    snprintfz(prefixed, sizeof(prefixed), "location_%s", dst);
+    snprintfz(dst, dst_size, "%s", prefixed);
+    return true;
 }
 
 static void macos_sensors_collect_hid(int update_every)
@@ -692,18 +729,26 @@ static void macos_sensors_collect_hid(int update_every)
             snprintfz(label, sizeof(label), "IOHID Temperature Sensor");
 
         char feature[128];
+        char base_feature[128] = "";
         if (has_product) {
-            snprintfz(feature, sizeof(feature), "%s", label);
-            netdata_fix_chart_id(feature);
-        } else
+            snprintfz(base_feature, sizeof(base_feature), "%s", label);
+            netdata_fix_chart_id(base_feature);
+        }
+
+        char service_identifier[128] = "";
+        bool has_service_identifier =
+            macos_sensors_hid_service_identifier(service, service_identifier, sizeof(service_identifier));
+
+        if (base_feature[0] && has_service_identifier)
+            snprintfz(feature, sizeof(feature), "%s_%s", base_feature, service_identifier);
+        else if (base_feature[0])
+            snprintfz(feature, sizeof(feature), "%s", base_feature);
+        else if (has_service_identifier)
+            snprintfz(feature, sizeof(feature), "temperature_%s", service_identifier);
+        else
             snprintfz(feature, sizeof(feature), "temperature_%ld", (long)i);
 
-        unsigned duplicate_index = has_product ? macos_sensors_hid_duplicate_index(services, i, label) : 0;
-        if (duplicate_index) {
-            char duplicate_feature[128];
-            snprintfz(duplicate_feature, sizeof(duplicate_feature), "%s_%u", feature, duplicate_index);
-            snprintfz(feature, sizeof(feature), "%s", duplicate_feature);
-        }
+        netdata_fix_chart_id(feature);
 
         char chart_id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(chart_id, sizeof(chart_id), "macos_iohid_temperature_%s", feature);

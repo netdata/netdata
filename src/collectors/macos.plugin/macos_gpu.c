@@ -134,12 +134,13 @@ static bool macos_gpu_ioreport_string(CFStringRef str, char *dst, size_t dst_siz
     while (*start && isspace((unsigned char)*start))
         start++;
 
-    char *end = start + strlen(start);
+    size_t remaining = dst_size - (size_t)(start - dst);
+    char *end = start + strnlen(start, remaining);
     while (end > start && isspace((unsigned char)end[-1]))
         *--end = '\0';
 
     if (start != dst)
-        memmove(dst, start, strlen(start) + 1);
+        memmove(dst, start, (size_t)(end - start) + 1);
 
     return dst[0] != '\0';
 }
@@ -913,7 +914,6 @@ int do_macos_gpu(int update_every, usec_t dt __maybe_unused)
             collector_error("MACOS: cannot collect IOReport GPU sample; GPU charts will resume when IOReport sampling recovers");
             gpu.logged_sample_error = true;
         }
-        return 0;
     }
 
     NETDATA_DOUBLE temp;
