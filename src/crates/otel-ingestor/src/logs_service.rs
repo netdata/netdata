@@ -391,6 +391,12 @@ impl NetdataLogsService {
         self.wal_config.rotation.resolve("default").max_file_duration
     }
 
+    /// The resolved ingestion `future_skew`. Used at startup to warn when it is
+    /// zero, which admits no clock skew between sender and server.
+    pub fn ingest_future_skew(&self) -> std::time::Duration {
+        self.ingest_bounds.future_skew
+    }
+
     /// Rotate any per-tenant WAL stream whose active file has passed a rotation
     /// threshold as of now, without a new frame (the idle-rotation sweep, I2/P4).
     /// Called periodically off the write path so a quiet stream still seals,
@@ -578,23 +584,26 @@ impl LogsService for NetdataLogsService {
         // `prepare_log_frame` consumes an owned request and needs nothing
         // shared, so concurrent exports overlap all of this CPU work. The
         // clock tick here is the base for synthesized fallback timestamps AND
-        // the reference "now" for the ingestion time-bounds (P3); the frame
-        // header's `ingestion_ns` is ticked at write time, inside the writer
-        // lock, so it stays monotonic per file. A prepare error therefore
-        // rejects the request before ANY of its frames is written.
+        // the reference "now" for the ingestion time-bounds (P3); it is read
+        // once per request so every stream group shares one window and one
+        // fallback base. The frame header's `ingestion_ns` is ticked separately
+        // at write time, inside the writer lock, so it stays monotonic per file.
+        // A prepare error therefore rejects the request before ANY of its frames
+        // is written.
+        let fallback_base_ns = self.clock.lock().unwrap().now_ns().as_u64();
+        // Inclusive window [now - max_age, now + future_skew] on the RESOLVED
+        // per-record timestamp. Loop-invariant (one base per request), so it is
+        // built once. Synthesized (now-based) fallbacks land inside by
+        // construction, so timestamp-less records are never rejected.
+        let bounds = ng_flatten::TimeBounds {
+            min_ns: fallback_base_ns.saturating_sub(self.ingest_bounds.max_age_ns()),
+            max_ns: fallback_base_ns.saturating_add(self.ingest_bounds.future_skew_ns()),
+        };
         let mut out_of_window: usize = 0;
         let mut prepared = Vec::with_capacity(accepted.len());
         for s in accepted {
             let request = ExportLogsServiceRequest {
                 resource_logs: s.group.resource_logs,
-            };
-            let fallback_base_ns = self.clock.lock().unwrap().now_ns().as_u64();
-            // Inclusive window [now - max_age, now + future_skew] on the RESOLVED
-            // per-record timestamp. Synthesized (now-based) fallbacks land inside
-            // by construction, so timestamp-less records are never rejected.
-            let bounds = ng_flatten::TimeBounds {
-                min_ns: fallback_base_ns.saturating_sub(self.ingest_bounds.max_age_ns()),
-                max_ns: fallback_base_ns.saturating_add(self.ingest_bounds.future_skew_ns()),
             };
             let frame = ng_flatten::prepare_log_frame(request, fallback_base_ns, Some(bounds))
                 .map_err(|e| {
@@ -1473,6 +1482,61 @@ mod tests {
         assert!(
             service.writers.lock().unwrap().is_empty(),
             "no WAL writer should be created when every record is rejected",
+        );
+    }
+
+    #[tokio::test]
+    async fn export_shares_one_synthesized_base_across_stream_groups() {
+        let tmp = tempfile::tempdir().unwrap();
+        let service = test_service(tmp.path().to_path_buf());
+
+        // Two distinct streams (different service.name) in ONE request, each with
+        // a single timestamp-less record so both resolve via the synthesized
+        // fallback (`fallback_base_ns + k`). The clock is read once per request,
+        // so both groups derive from the same base and their single record
+        // resolves to the identical timestamp. A per-group clock read (the prior
+        // behavior) would hand the second group a strictly-later base, so the two
+        // ranges would differ — this pins the "one clock read per request"
+        // contract against a silent revert.
+        let a = rl(Some("prod"), Some("api"), 1);
+        let b = rl(Some("prod"), Some("web"), 1);
+        service
+            .export(Request::new(ExportLogsServiceRequest {
+                resource_logs: vec![a, b],
+            }))
+            .await
+            .unwrap();
+
+        let writer = Arc::clone(
+            service
+                .writers
+                .lock()
+                .unwrap()
+                .get(&TenantId::default_tenant())
+                .unwrap(),
+        );
+        let events = writer.lock().unwrap().shutdown_all().unwrap();
+        let bases: Vec<u64> = events
+            .iter()
+            .filter_map(|e| match e {
+                wal::FileEvent::Closed {
+                    min_timestamp_ns,
+                    max_timestamp_ns,
+                    ..
+                } => {
+                    // One record per stream → the range collapses to a point.
+                    assert_eq!(min_timestamp_ns.0, max_timestamp_ns.0);
+                    Some(min_timestamp_ns.0)
+                }
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(bases.len(), 2, "both streams must seal a file: {events:?}");
+        assert!(bases[0] > 0, "synthesized timestamps are non-zero");
+        assert_eq!(
+            bases[0], bases[1],
+            "both stream groups in one request must share one synthesized base",
         );
     }
 }

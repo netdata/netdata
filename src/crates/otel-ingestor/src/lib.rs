@@ -197,6 +197,16 @@ async fn run_ingestor(
              idle streams will rotate at sweep granularity (active streams still rotate on write)"
         );
     }
+    // A zero future_skew makes the ingestion window's upper bound exactly the
+    // server clock: any record even 1ns ahead is rejected. Ordinary sender/server
+    // clock skew then causes routine rejections. Warn once so that is a choice,
+    // not a surprise.
+    if logs_service.ingest_future_skew().is_zero() {
+        tracing::warn!(
+            "logs ingest future_skew is 0; records timestamped even 1ns ahead of the \
+             server clock will be rejected (ordinary sender/server clock skew will cause rejections)"
+        );
+    }
     let sweep_service = Arc::clone(&logs_service);
     let sweep_handle = tokio::spawn(async move {
         let mut interval = tokio::time::interval(WAL_SWEEP_INTERVAL);
