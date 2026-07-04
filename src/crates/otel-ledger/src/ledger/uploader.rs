@@ -10,7 +10,7 @@
 //! retry queue so they're re-issued with backoff rather than dropped.
 
 use bridge::signals::Signal;
-use file_registry::TimestampNs;
+use file_registry::{SeqKey, TimestampNs};
 use tokio::time::Instant;
 
 use file_lifecycle::ipc::{CatalogBuilderRequest, UploaderRequest, UploaderResponse};
@@ -53,9 +53,9 @@ impl Ledger {
                 self.upload_retry.clear_sfst(seq);
                 let (tenant_id, entry, date) = {
                     let mut registries = registries.write().await;
-                    match registries.for_seq_mut(seq) {
+                    match registries.for_seq_mut(seq.seq) {
                         Some((tid, registry)) => {
-                            let Some(sfst_file) = registry.sfst.get(seq).cloned() else {
+                            let Some(sfst_file) = registry.sfst.get(seq.seq).cloned() else {
                                 // Registry doesn't know about this seq —
                                 // defensive against races on restart. Mark
                                 // uploaded anyway so we don't keep
@@ -91,7 +91,7 @@ impl Ledger {
                 error,
                 ..
             } => {
-                tracing::error!(seq, remote_key = %remote_key, "upload failed: {error}");
+                tracing::error!(seq = %seq, remote_key = %remote_key, "upload failed: {error}");
                 // Retry only while the local source still exists; if it was
                 // retention-evicted the upload can never succeed, so abandon it
                 // rather than loop on a missing file.
@@ -106,13 +106,14 @@ impl Ledger {
                         Instant::now(),
                     );
                 } else {
-                    tracing::warn!(seq, "local index file gone; abandoning upload retry");
+                    tracing::warn!(seq = %seq, "local index file gone; abandoning upload retry");
                     self.upload_retry.clear_sfst(seq);
                 }
             }
             UploaderResponse::CatalogUploaded {
                 local_path,
                 remote_key,
+                identity,
                 seqs,
                 ..
             } => {
@@ -127,12 +128,31 @@ impl Ledger {
                 // via its own route: don't resolve the tenant from just the
                 // first seq — if that one was already evicted (its route gone)
                 // the still-registered siblings would otherwise never be marked
-                // and would be deferred from eviction forever.
+                // and would be deferred from eviction forever. Key each mark by
+                // the catalog's own identity (echoed from the request).
                 if !seqs.is_empty() {
                     let mut registries = registries.write().await;
                     for seq in &seqs {
+                        let key = SeqKey::new(identity, *seq);
                         if let Some((_tenant, registry)) = registries.for_seq_mut(*seq) {
-                            registry.mark_remote_cataloged([*seq]);
+                            // The mark records a true remote fact under the
+                            // catalog's OWN identity, so it is always correct to
+                            // record. When a still-local SFST of that identity
+                            // exists (a recovered prior instance's file), the mark
+                            // is exactly what makes it evictable — the case that
+                            // matters. When no local SFST matches the full
+                            // identity, the mark is inert (bounded, in-memory,
+                            // reset on restart) — a debug breadcrumb, not a bug.
+                            // We do NOT gate the mark on a local-SFST lookup: that
+                            // would reintroduce the very lookup-in-the-mark-path
+                            // dependency this identity-keying removes.
+                            if registry.sfst.get(*seq).map(|e| SeqKey::from(&e.id)) != Some(key) {
+                                tracing::debug!(
+                                    mark = %key,
+                                    "remote-cataloged mark has no matching local SFST (inert)"
+                                );
+                            }
+                            registry.mark_remote_cataloged([key]);
                         }
                     }
                 }
@@ -140,6 +160,7 @@ impl Ledger {
             UploaderResponse::CatalogUploadFailed {
                 local_path,
                 remote_key,
+                identity,
                 seqs,
                 error,
                 ..
@@ -156,6 +177,7 @@ impl Ledger {
                             pipeline_id,
                             local_path,
                             remote_key,
+                            identity,
                             seqs,
                         },
                         Instant::now(),

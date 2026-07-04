@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
 
-use file_registry::{FileId, TenantId};
+use file_registry::{FileId, SeqKey, TenantId};
 
 /// An active (or sealed-but-unindexed) WAL file overlapping a query
 /// window — owned so it outlives the registry read lock. The query path
@@ -139,12 +139,16 @@ pub struct Registry {
     pub sfst: sfst::Registry,
     /// Immutable catalog files present on local disk.
     pub catalog_files: otel_catalog::Registry,
-    /// Per-seq lifecycle state (upload + catalog axes). Separate from `sfst`
-    /// because state legitimately outlives a local SFST entry — e.g. a remote
-    /// SFST discovered at recovery is marked uploaded with no local file. Gated
-    /// access via [`Registry::mark_uploaded`] / [`Registry::mark_rotated`] /
+    /// Per-identity lifecycle state (upload + catalog axes), keyed by full
+    /// [`SeqKey`] because it crosses identity boundaries: it is derived from
+    /// remote LIST results and catalogs, so a bare seq reused by another process
+    /// instance (post-wipe reseed) or another machine (shared bucket) must not
+    /// alias this state. Separate from `sfst` because state legitimately
+    /// outlives a local SFST entry — e.g. a remote SFST discovered at recovery
+    /// is marked uploaded with no local file. Gated access via
+    /// [`Registry::mark_uploaded`] / [`Registry::mark_rotated`] /
     /// [`Registry::mark_remote_cataloged`] and their `is_*` readers.
-    seqs: BTreeMap<u64, SeqState>,
+    seqs: BTreeMap<SeqKey, SeqState>,
 }
 
 impl Registry {
@@ -220,83 +224,85 @@ impl Registry {
     pub fn unuploaded_ids(&self) -> Vec<FileId> {
         self.sfst
             .values()
-            .filter(|entry| !self.is_uploaded(entry.id.seq))
+            .filter(|entry| !self.is_uploaded(SeqKey::from(&entry.id)))
             .map(|entry| entry.id)
             .collect()
     }
 
-    /// The lifecycle record for `seq`, creating a default (`NotUploaded` /
-    /// `NotRotated`) one on first mark. State may exist for a seq with no local
+    /// The lifecycle record for `key`, creating a default (`NotUploaded` /
+    /// `NotRotated`) one on first mark. State may exist for a key with no local
     /// SFST entry (e.g. a remote SFST discovered at recovery).
-    fn seq_mut(&mut self, seq: u64) -> &mut SeqState {
-        self.seqs.entry(seq).or_default()
+    fn seq_mut(&mut self, key: SeqKey) -> &mut SeqState {
+        self.seqs.entry(key).or_default()
     }
 
-    /// Mark this SFST sequence as uploaded to remote object storage.
-    pub fn mark_uploaded(&mut self, seq: u64) {
-        self.seq_mut(seq).upload = UploadState::Uploaded;
+    /// Mark this SFST as uploaded to remote object storage.
+    pub fn mark_uploaded(&mut self, key: SeqKey) {
+        self.seq_mut(key).upload = UploadState::Uploaded;
     }
 
-    /// Whether this SFST sequence has been uploaded.
-    pub fn is_uploaded(&self, seq: u64) -> bool {
+    /// Whether this SFST has been uploaded.
+    pub fn is_uploaded(&self, key: SeqKey) -> bool {
         self.seqs
-            .get(&seq)
+            .get(&key)
             .is_some_and(|s| s.upload == UploadState::Uploaded)
     }
 
-    /// Mark this SFST sequence as written into a closed, on-disk catalog file
+    /// Mark this SFST as written into a closed, on-disk catalog file
     /// (local rotation). Eviction is gated on the remote stage, not this one;
     /// `RotatedLocal` tracks local-catalog membership for reconciliation dedup.
-    /// Monotone: never downgrades a seq already confirmed `Remote`.
-    pub fn mark_rotated(&mut self, seq: u64) {
-        let catalog = &mut self.seq_mut(seq).catalog;
+    /// Monotone: never downgrades a key already confirmed `Remote`.
+    pub fn mark_rotated(&mut self, key: SeqKey) {
+        let catalog = &mut self.seq_mut(key).catalog;
         if *catalog < CatalogStage::RotatedLocal {
             *catalog = CatalogStage::RotatedLocal;
         }
     }
 
-    /// Mark many SFST sequences as rotated in one call.
-    pub fn mark_rotated_many(&mut self, seqs: impl IntoIterator<Item = u64>) {
-        for seq in seqs {
-            self.mark_rotated(seq);
+    /// Mark many SFSTs as rotated in one call.
+    pub fn mark_rotated_many(&mut self, keys: impl IntoIterator<Item = SeqKey>) {
+        for key in keys {
+            self.mark_rotated(key);
         }
     }
 
-    /// Whether this SFST sequence's catalog entry is in a closed catalog file
+    /// Whether this SFST's catalog entry is in a closed catalog file
     /// (locally or, subsuming that, confirmed on remote).
-    pub fn is_rotated(&self, seq: u64) -> bool {
+    pub fn is_rotated(&self, key: SeqKey) -> bool {
         self.seqs
-            .get(&seq)
+            .get(&key)
             .is_some_and(|s| s.catalog >= CatalogStage::RotatedLocal)
     }
 
-    /// Mark these SFST sequences as confirmed present in a remote catalog.
+    /// Mark these SFSTs as confirmed present in a remote catalog.
     /// Called when a catalog upload completes (or its remote presence is
     /// confirmed at recovery). `Remote` subsumes `RotatedLocal`, so this makes
     /// `is_rotated` true by construction — the "remote-cataloged implies rotated"
     /// invariant is structural, not a caller-ordering assumption.
-    pub fn mark_remote_cataloged(&mut self, seqs: impl IntoIterator<Item = u64>) {
-        for seq in seqs {
-            self.seq_mut(seq).catalog = CatalogStage::Remote;
+    pub fn mark_remote_cataloged(&mut self, keys: impl IntoIterator<Item = SeqKey>) {
+        for key in keys {
+            self.seq_mut(key).catalog = CatalogStage::Remote;
         }
     }
 
-    /// Whether this SFST sequence's catalog entry is confirmed in remote
+    /// Whether this SFST's catalog entry is confirmed in remote
     /// storage. The eviction guard consults this before deleting a local SFST.
-    pub fn is_remote_cataloged(&self, seq: u64) -> bool {
+    pub fn is_remote_cataloged(&self, key: SeqKey) -> bool {
         // `>=` (not `==`) for the "reaches Remote" semantics, mirroring
         // `is_rotated`; equivalent today since `Remote` is the max stage, but
         // forward-compatible if a stage above `Remote` is ever added.
         self.seqs
-            .get(&seq)
+            .get(&key)
             .is_some_and(|s| s.catalog >= CatalogStage::Remote)
     }
 
-    /// Drop all per-seq state for this sequence: one map removal, so a future
-    /// per-seq axis (a new `SeqState` field) is covered with no extra site.
-    pub fn evict_seq(&mut self, seq: u64) {
-        self.sfst.remove(seq);
-        self.seqs.remove(&seq);
+    /// Drop all per-identity state for this key: one map removal, so a future
+    /// per-seq axis (a new `SeqState` field) is covered with no extra site. The
+    /// local `sfst` removal stays seq-keyed — it indexes only locally-present
+    /// files, where seq alone is unique (I5 boundary).
+    pub fn evict_seq(&mut self, key: SeqKey) {
+        self.sfst.remove(key.seq);
+        self.seqs.remove(&key);
     }
 }
 
@@ -312,6 +318,14 @@ pub struct TenantRegistries {
     /// Maps an SFST sequence number to the tenant that owns it. Populated
     /// as files are created / discovered on disk and consumed by every
     /// seq-keyed response handler.
+    ///
+    /// STAYS bare-seq (not [`SeqKey`]-keyed) by design (I5 boundary): it indexes
+    /// only files physically routed on THIS process instance, where seq alone is
+    /// unique (correct seeding guarantees local uniqueness; a post-wipe reseed
+    /// cannot collide because the old local files are gone). Identity safety is
+    /// enforced one layer down, at the [`SeqState`] marks — a response routed by
+    /// bare seq then marks under its full `SeqKey`, so a mis-routed foreign key
+    /// lands as inert state, never a false mark.
     seq_to_tenant: HashMap<u64, TenantId>,
     wal_base_dir: std::path::PathBuf,
     index_base_dir: std::path::PathBuf,
@@ -474,11 +488,10 @@ impl TenantRegistries {
     /// The full candidate set for `q`, scoped to `tenant`: every
     /// overlapping on-disk SFST, plus every overlapping WAL that has
     /// **not** been indexed yet
-    /// (active or sealed-but-unindexed). Deduplicated by sequence number
-    /// — an SFST always wins over the WAL of the same seq (seq is a
-    /// single global counter shared across tenants and streams, so a
-    /// plain `seq` key is unambiguous), covering the post-index/pre-delete
-    /// window where both exist. WALs with no known durable prefix
+    /// (active or sealed-but-unindexed). Deduplicated by [`SeqKey`]
+    /// — an SFST always wins over the WAL of the same identity+seq (a local
+    /// SFST and its source WAL carry the same `FileId`, so the key matches),
+    /// covering the post-index/pre-delete window where both exist. WALs with no known durable prefix
     /// (`valid_up_to == 0`: recovered from disk, or not yet synced) are
     /// excluded — there is no trustworthy byte bound to read them by.
     /// (Recovered WALs are already excluded upstream by `candidates`,
@@ -494,12 +507,12 @@ impl TenantRegistries {
         q: &file_registry::Query,
     ) -> (Vec<file_registry::SelectedFile>, Vec<WalDesc>) {
         let sfsts = self.sfst_candidates(tenant, q);
-        let sfst_seqs: HashSet<u64> = sfsts.iter().map(|c| c.id.seq).collect();
+        let sfst_seqs: HashSet<SeqKey> = sfsts.iter().map(|c| SeqKey::from(&c.id)).collect();
 
         let mut wals = Vec::new();
         if let Some(r) = self.tenants.get(tenant) {
             for f in r.wal.candidates(q) {
-                if sfst_seqs.contains(&f.id.seq) || f.valid_up_to.0 == 0 {
+                if sfst_seqs.contains(&SeqKey::from(&f.id)) || f.valid_up_to.0 == 0 {
                     continue;
                 }
                 wals.push(WalDesc {
@@ -530,7 +543,11 @@ impl TenantRegistries {
     /// Seqs in `q`'s window with a servable local copy — the mask that hides a
     /// remote catalog entry already served locally. See
     /// [`Registry::local_servable_seqs`]. An unknown tenant yields empty.
-    pub fn local_servable_seqs(&self, tenant: &TenantId, q: &file_registry::Query) -> HashSet<u64> {
+    pub fn local_servable_seqs(
+        &self,
+        tenant: &TenantId,
+        q: &file_registry::Query,
+    ) -> HashSet<SeqKey> {
         self.tenants
             .get(tenant)
             .map(|r| r.local_servable_seqs(q))
@@ -560,7 +577,7 @@ impl TenantRegistries {
         tenant: &TenantId,
         q: &file_registry::Query,
         catalog: &[otel_catalog::CatalogEntry],
-        local_seqs: &HashSet<u64>,
+        local_seqs: &HashSet<SeqKey>,
     ) -> Vec<otel_catalog::CatalogEntry> {
         self.tenants
             .get(tenant)
@@ -607,16 +624,19 @@ impl Registry {
     /// set [`TenantRegistries::query_snapshot`] builds. This is the mask that
     /// hides a remote catalog entry whose data is already local. Safe to compute
     /// time-only and reuse for the remote fetch (one seq → one stream; see
-    /// [`Registry::remote_candidates_from`]).
-    pub fn local_servable_seqs(&self, q: &file_registry::Query) -> HashSet<u64> {
+    /// [`Registry::remote_candidates_from`]). Keyed by [`SeqKey`] so the mask
+    /// hides a remote entry only when THIS identity holds the local copy — a
+    /// remote entry of a prior instance / other machine at an equal seq is not
+    /// masked by a current-identity local file.
+    pub fn local_servable_seqs(&self, q: &file_registry::Query) -> HashSet<SeqKey> {
         self.sfst
             .candidates(q)
-            .map(|f| f.id.seq)
+            .map(|f| SeqKey::from(&f.id))
             .chain(
                 self.wal
                     .candidates(q)
                     .filter(|f| f.valid_up_to.0 != 0)
-                    .map(|f| f.id.seq),
+                    .map(|f| SeqKey::from(&f.id)),
             )
             .collect()
     }
@@ -653,9 +673,9 @@ impl Registry {
         // over an unsynced, `valid_up_to == 0` WAL's seq, which a servable-only mask
         // would not catch. `insert` returns false on a seq already present, giving
         // SFST-wins-over-WAL and single-entry-per-seq for free.
-        let mut folded: HashSet<u64> = HashSet::new();
+        let mut folded: HashSet<SeqKey> = HashSet::new();
         for f in self.sfst.candidates(q) {
-            folded.insert(f.id.seq);
+            folded.insert(SeqKey::from(&f.id));
             by_part
                 .entry(f.id.part_key)
                 .or_insert_with(|| {
@@ -669,7 +689,7 @@ impl Registry {
         }
         for f in self.wal.candidates(q) {
             // SFST-wins over its own WAL in the post-index/pre-delete window.
-            if !folded.insert(f.id.seq) {
+            if !folded.insert(SeqKey::from(&f.id)) {
                 continue;
             }
             // WAL ranges are nanoseconds; the selector works in seconds. `File.size`
@@ -685,7 +705,7 @@ impl Registry {
         // Remote-only partitions: catalog entries whose seq has no local file folded
         // above (and deduped against a seq re-cataloged into more than one file).
         for e in catalog {
-            if !folded.insert(e.id.seq) {
+            if !folded.insert(SeqKey::from(&e.id)) {
                 continue;
             }
             by_part

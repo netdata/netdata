@@ -80,18 +80,21 @@ fn build_files_response(tr: &TenantRegistries) -> FilesResponse {
             let mut sfst: Vec<SfstFileEntry> = reg
                 .sfst
                 .values()
-                .map(|f| SfstFileEntry {
-                    seq: f.id.seq,
-                    ns_hash: format!("{:016x}", f.id.part_key),
-                    stream: stream_id_from_content_meta(&f.summary.content_meta),
-                    size: f.size.as_u64(),
-                    total_logs: f.summary.record_count,
-                    min_ts_s: f.summary.min_timestamp_s,
-                    max_ts_s: f.summary.max_timestamp_s,
-                    rotated: reg.is_rotated(f.id.seq),
-                    uploaded: reg.is_uploaded(f.id.seq),
-                    remote_cataloged: reg.is_remote_cataloged(f.id.seq),
-                    pending_deletion: f.is_pending_deletion(),
+                .map(|f| {
+                    let key = file_registry::SeqKey::from(&f.id);
+                    SfstFileEntry {
+                        seq: f.id.seq,
+                        ns_hash: format!("{:016x}", f.id.part_key),
+                        stream: stream_id_from_content_meta(&f.summary.content_meta),
+                        size: f.size.as_u64(),
+                        total_logs: f.summary.record_count,
+                        min_ts_s: f.summary.min_timestamp_s,
+                        max_ts_s: f.summary.max_timestamp_s,
+                        rotated: reg.is_rotated(key),
+                        uploaded: reg.is_uploaded(key),
+                        remote_cataloged: reg.is_remote_cataloged(key),
+                        pending_deletion: f.is_pending_deletion(),
+                    }
                 })
                 .collect();
             sfst.sort_by_key(|e| e.seq);

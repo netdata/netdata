@@ -76,7 +76,10 @@ impl Ledger {
                             size,
                         );
                         registry.catalog_files.track(file, path.clone());
-                        registry.mark_rotated_many(seqs.iter().copied());
+                        registry.mark_rotated_many(
+                            seqs.iter()
+                                .map(|s| file_registry::SeqKey::new(identity, *s)),
+                        );
                     }
                 }
 
@@ -85,6 +88,7 @@ impl Ledger {
                         pipeline_id: signal.pipeline_id(),
                         local_path: path,
                         remote_key,
+                        identity,
                         seqs,
                     };
                     if let Err(e) = uploader.send(req) {

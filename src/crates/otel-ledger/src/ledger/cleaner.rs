@@ -41,10 +41,12 @@ impl Ledger {
                 tracing::info!("WAL file deleted seq={sequence}");
             }
             CleanerResponse::IndexFileDeleted { sequence, .. } => {
-                if let Some((_, registry)) = registries.for_seq_mut(sequence) {
+                // Route by bare seq (local-presence index); evict the exact
+                // identity-keyed state the delete confirmed.
+                if let Some((_, registry)) = registries.for_seq_mut(sequence.seq) {
                     registry.evict_seq(sequence);
                 }
-                registries.forget_seq(sequence);
+                registries.forget_seq(sequence.seq);
                 tracing::info!("index file evicted seq={sequence}");
             }
             CleanerResponse::WalFileFailed {
@@ -56,8 +58,8 @@ impl Ledger {
                 sequence, error, ..
             } => {
                 tracing::error!("index file deletion failed seq={sequence} error={error}");
-                if let Some((_, registry)) = registries.for_seq_mut(sequence) {
-                    registry.sfst.clear_pending_deletion(sequence);
+                if let Some((_, registry)) = registries.for_seq_mut(sequence.seq) {
+                    registry.sfst.clear_pending_deletion(sequence.seq);
                 }
             }
             CleanerResponse::CatalogFileDeleted { path, .. } => {

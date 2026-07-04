@@ -319,9 +319,10 @@ async fn files_request_returns_inventory_with_upload_state() {
     // per-seq flags (the reason this goes to the plugin, not the filesystem).
     {
         let reg = tr.get_or_create(&TenantId::from("default"));
-        reg.mark_rotated(1);
-        reg.mark_uploaded(1);
-        reg.mark_remote_cataloged([1]);
+        let key = file_registry::SeqKey::new(test_identity(), 1);
+        reg.mark_rotated(key);
+        reg.mark_uploaded(key);
+        reg.mark_remote_cataloged([key]);
         reg.sfst.mark_pending_deletion(2); // seq 2 queued for eviction (still tracked)
     }
 

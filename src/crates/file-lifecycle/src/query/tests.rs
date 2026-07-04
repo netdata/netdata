@@ -143,6 +143,40 @@ fn remote_candidates_excludes_locally_present_seqs() {
 }
 
 #[test]
+fn remote_candidates_not_masked_by_different_identity_local_file() {
+    // The query-time mask is keyed by full identity: a remote catalog entry at
+    // seq X under identity A must NOT be hidden by a local SFST at the SAME seq
+    // under identity B (the post-restore reused-seq shape). Contrast with
+    // `remote_candidates_excludes_locally_present_seqs`, where the SAME identity
+    // masks. Guards the query-plane SeqKey dedup (local_servable_seqs +
+    // remote_candidates_from).
+    let mut reg = make_registry();
+    track_remote(&mut reg, 5, 100, 200); // remote entry under ident()
+
+    // A local SFST at seq 5 under a DIFFERENT identity (same machine, other
+    // instance) — its FileId carries the foreign identity.
+    let other = file_registry::Identity::new(
+        machine(),
+        file_registry::InstanceId::new(Uuid::from_u128(0x9999_8888_7777_6666_5555_4444_3333_2222))
+            .unwrap(),
+    );
+    let id = FileId::new(other, 0, 5, crate::test_helpers::opaque_part_key("ns", "a"));
+    reg.sfst.track(
+        id,
+        ByteSize(1),
+        crate::test_helpers::summary_for("ns", "a", 1, 100, 200),
+    );
+
+    // The remote entry survives — the foreign-identity local copy does not mask it.
+    assert_eq!(seqs(&reg.remote_candidates(&full_range_query())), vec![5]);
+
+    // The mask itself holds the OTHER identity's key, not the remote entry's.
+    let servable = reg.local_servable_seqs(&full_range_query());
+    assert!(servable.contains(&file_registry::SeqKey::new(other, 5)));
+    assert!(!servable.contains(&file_registry::SeqKey::new(ident(), 5)));
+}
+
+#[test]
 fn remote_candidates_kept_when_wal_has_no_durable_prefix() {
     // A WAL with no durable prefix (`valid_up_to == 0`, as `track_wal` produces)
     // is not a servable local copy — `query_snapshot` skips it too — so it must

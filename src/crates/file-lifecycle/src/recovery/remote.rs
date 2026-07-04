@@ -2,9 +2,10 @@
 //! remote uploads that were never cataloged, and re-uploading local catalog
 //! files missing from the remote. These talk to object storage directly.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use file_registry::TenantId;
+use file_registry::{MachineId, SeqKey, TenantId};
 use otel_catalog::Catalog;
 
 use crate::component::ComponentHandle;
@@ -49,7 +50,7 @@ pub fn recover_unuploaded(
             continue;
         };
         if let Err(e) = uploader.send(req) {
-            tracing::error!(seq = id.seq, "recovery: failed to queue upload: {e}");
+            tracing::error!(seq = %SeqKey::from(&id), "recovery: failed to queue upload: {e}");
         }
     }
 }
@@ -76,9 +77,18 @@ pub fn recover_unuploaded(
 /// SFSTs discovered in remote storage whose local file is missing are
 /// logged and skipped — the catalog entry cannot be reconstructed
 /// without the file's header.
+///
+/// `own_machine` filters the LIST to this node's own objects (D6 key layout
+/// keeps every machine's keys under one prefix, so each consumer MUST filter):
+/// keys of a DIFFERENT machine are dropped. Keys of a prior process instance on
+/// THIS machine are kept — they are ours (a wipe/restart changes instance, not
+/// machine) — and marked under their own full identity, so they can never alias
+/// a new SFST at the same seq under the current instance.
+#[allow(clippy::too_many_arguments)]
 pub async fn reconcile_remote_uploads<S: Storage>(
     registry: &mut Registry,
     signal: &str,
+    own_machine: MachineId,
     catalog_builder: &mut ComponentHandle<CatalogBuilderRequest, CatalogBuilderResponse>,
     storage: &S,
     tenant_id: &TenantId,
@@ -118,18 +128,38 @@ pub async fn reconcile_remote_uploads<S: Storage>(
                 None => continue,
             };
 
-            registry.mark_uploaded(id.seq);
+            // D6 filter: another machine's object sharing this bucket is not
+            // ours to mark. Own machine, any instance, is ours.
+            if id.machine_id != own_machine {
+                continue;
+            }
 
-            if registry.is_rotated(id.seq) {
+            let key = SeqKey::from(&id);
+            registry.mark_uploaded(key);
+
+            if registry.is_rotated(key) {
                 continue;
             }
 
             let sfst_entry = match registry.sfst.get(id.seq) {
-                Some(e) => e,
+                // The local file at this seq is the local copy of this remote
+                // object only when its FULL identity matches; a same-seq file of
+                // a different instance is a distinct file (its own remote copy),
+                // never this object's — splicing it would mix a local FileId with
+                // a foreign remote_key in one catalog entry.
+                Some(e) if SeqKey::from(&e.id) == key => e,
+                Some(_) => {
+                    tracing::warn!(
+                        remote_key = %path,
+                        listed = %key,
+                        "remote SFST's seq holds a different local identity, skipping catalog reconstruction"
+                    );
+                    continue;
+                }
                 None => {
                     tracing::warn!(
-                        seq = id.seq,
                         remote_key = %path,
+                        listed = %key,
                         "remote SFST has no local file, skipping catalog reconstruction"
                     );
                     continue;
@@ -206,40 +236,59 @@ pub async fn reconcile_local_catalog_uploads<S: Storage>(
     // bounded), NOT by catalog date/horizon: after downtime longer than
     // `max_age`, a local SFST past `max_age` still needs its now-old catalog
     // confirmed — a date bound would strand it and wedge eviction for ~horizon.
-    // A catalog can gate a local SFST only if its `max_seq` reaches the oldest
-    // local SFST's seq; catalogs below that cover only already-evicted SFSTs.
-    // With no local SFSTs there is nothing to confirm, and the set is bounded by
-    // the local-SFST tail, never by the (much larger) horizon.
-    let Some(min_local_seq) = registry.sfst.values().map(|f| f.id.seq).min() else {
+    //
+    // The seq floor is PER IDENTITY: local SFSTs can span this machine's prior
+    // process instances, and a bare-seq floor would compare across identities
+    // (a high seq under one instance would strand a low-seq catalog of another).
+    // A catalog (single-identity by construction) can gate a local SFST only if
+    // its `max_seq` reaches the oldest local SFST seq OF ITS OWN identity;
+    // catalogs of an identity with no local SFSTs cover only already-evicted
+    // files and are skipped. The confirm set stays bounded by the local-SFST
+    // tail, never by the (much larger) horizon.
+    let mut min_local_seq_by_identity: HashMap<file_registry::Identity, u64> = HashMap::new();
+    for f in registry.sfst.values() {
+        let identity = file_registry::Identity::new(f.id.machine_id, f.id.instance_id);
+        min_local_seq_by_identity
+            .entry(identity)
+            .and_modify(|m| *m = (*m).min(f.id.seq))
+            .or_insert(f.id.seq);
+    }
+    if min_local_seq_by_identity.is_empty() {
         return Ok(());
-    };
+    }
 
-    // Snapshot the (path, date, remote_key) list so we can mutate the registry
-    // (`mark_remote_cataloged`) while processing without holding the iterator's
-    // borrow of `registry.catalog_files`.
-    let catalogs: Vec<(PathBuf, chrono::NaiveDate, String)> = registry
+    // Snapshot the (path, date, remote_key, identity) list so we can mutate the
+    // registry (`mark_remote_cataloged`) while processing without holding the
+    // iterator's borrow of `registry.catalog_files`.
+    let catalogs: Vec<(PathBuf, chrono::NaiveDate, String, file_registry::Identity)> = registry
         .catalog_files
         .iter()
         .filter(|(_, file)| !file.is_pending_deletion())
-        .filter(|(_, file)| file.max_seq >= min_local_seq)
-        .map(|(local_path, file)| {
+        .filter_map(|(local_path, file)| {
+            let identity = file_registry::Identity::new(file.machine_id, file.instance_id);
+            // Gate against this catalog's OWN identity's local-SFST floor; an
+            // identity with no local SFSTs has nothing left to confirm.
+            let floor = min_local_seq_by_identity.get(&identity)?;
+            if file.max_seq < *floor {
+                return None;
+            }
             let remote_key = crate::remote_keys::catalog(
                 signal,
                 file.date,
                 tenant_id,
-                file_registry::Identity::new(file.machine_id, file.instance_id),
+                identity,
                 file.max_seq,
                 file.min_timestamp_s,
                 file.max_timestamp_s,
             );
-            (local_path.clone(), file.date, remote_key)
+            Some((local_path.clone(), file.date, remote_key, identity))
         })
         .collect();
 
     let mut reconciled = 0usize;
     let mut confirmed = 0usize;
 
-    for (local_path, date, remote_key) in catalogs {
+    for (local_path, date, remote_key, identity) in catalogs {
         // The catalog's SFST seqs are needed both to mark them remote-cataloged
         // (on confirmed presence) and to carry into a re-upload request.
         let Some(seqs) = read_catalog_seqs(&local_path) else {
@@ -252,8 +301,10 @@ pub async fn reconcile_local_catalog_uploads<S: Storage>(
 
         match storage.stat(&remote_key).await {
             Ok(()) => {
-                // Present remotely: its SFSTs are safe to evict locally.
-                registry.mark_remote_cataloged(seqs);
+                // Present remotely: its SFSTs are safe to evict locally. Key the
+                // marks by the catalog's own identity (single-identity by
+                // construction), not the running process's.
+                registry.mark_remote_cataloged(seqs.iter().map(|s| SeqKey::new(identity, *s)));
                 confirmed += 1;
             }
             Err(StorageError::NotFound) => {
@@ -268,6 +319,7 @@ pub async fn reconcile_local_catalog_uploads<S: Storage>(
                     pipeline_id,
                     local_path: local_path.clone(),
                     remote_key,
+                    identity,
                     seqs,
                 };
                 if let Err(e) = uploader.send(req) {

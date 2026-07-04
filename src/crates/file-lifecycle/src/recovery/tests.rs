@@ -6,6 +6,8 @@ fn instance() -> file_registry::InstanceId { file_registry::InstanceId::new(uuid
 
 fn ident() -> file_registry::Identity { file_registry::Identity::new(machine(), instance()) }
 
+fn sk(seq: u64) -> file_registry::SeqKey { file_registry::SeqKey::new(ident(), seq) }
+
 use crate::test_helpers::empty_summary;
 
 fn make_entry(seq: u64) -> otel_catalog::CatalogEntry {
@@ -76,8 +78,8 @@ fn seed_from_catalog_files_populates_both_sets() {
     seed_from_catalog_files(&mut reg);
 
     for seq in [1u64, 2, 3] {
-        assert!(reg.is_uploaded(seq));
-        assert!(reg.is_rotated(seq));
+        assert!(reg.is_uploaded(sk(seq)));
+        assert!(reg.is_rotated(sk(seq)));
     }
 }
 
@@ -97,8 +99,8 @@ fn seed_from_catalog_files_skips_corrupt_files() {
     reg.catalog_files.recover();
 
     seed_from_catalog_files(&mut reg);
-    assert!(!reg.is_uploaded(1));
-    assert!(!reg.is_rotated(1));
+    assert!(!reg.is_uploaded(sk(1)));
+    assert!(!reg.is_rotated(sk(1)));
 }
 
 async fn run_recover_retention(
@@ -140,10 +142,10 @@ async fn recover_retention_evicts_only_remote_cataloged() {
         reg.sfst.track(id, ByteSize(1), empty_summary());
     }
     // seq=2: rotated AND confirmed present on the remote -> evictable.
-    reg.mark_rotated(2);
-    reg.mark_remote_cataloged([2]);
+    reg.mark_rotated(sk(2));
+    reg.mark_remote_cataloged([sk(2)]);
     // seq=3: rotated locally but NOT confirmed on the remote -> must defer.
-    reg.mark_rotated(3);
+    reg.mark_rotated(sk(3));
     // seq=1: neither rotated nor remote-cataloged -> must defer.
 
     run_recover_retention(&mut reg, &evict_all_retention(), true).await;
@@ -161,7 +163,7 @@ async fn recover_retention_evicts_only_remote_cataloged() {
         "remote-cataloged seq must be evicted"
     );
     assert!(
-        !reg.is_remote_cataloged(2),
+        !reg.is_remote_cataloged(sk(2)),
         "evict_seq must clear remote_cataloged"
     );
 }
@@ -354,14 +356,14 @@ async fn reconcile_local_catalog_uploads_skips_existing_files() {
     // The confirmed-present catalog's seq is now marked remote-cataloged, so
     // its SFST becomes eligible for local eviction.
     assert!(
-        reg.is_remote_cataloged(10),
+        reg.is_remote_cataloged(sk(10)),
         "confirmed-present catalog must seed remote_cataloged"
     );
     // Integration check: this seq was never separately `mark_rotated` (the setup
     // only places a local catalog), yet remote-cataloging it through the real
     // reconcile caller makes it report rotated — the structural subsumption.
     assert!(
-        reg.is_rotated(10),
+        reg.is_rotated(sk(10)),
         "remote-cataloged via reconcile must imply rotated (Remote subsumes RotatedLocal)"
     );
 
@@ -415,7 +417,7 @@ async fn reconcile_local_catalog_uploads_skips_catalogs_of_evicted_sfsts() {
     // The old catalog (whose SFSTs are gone) was not statted or re-uploaded.
     assert_eq!(uploader.pending(), 0);
     assert!(
-        !reg.is_remote_cataloged(5),
+        !reg.is_remote_cataloged(sk(5)),
         "a catalog below the local-SFST floor must not be confirmed"
     );
 
@@ -491,7 +493,7 @@ async fn reconcile_confirms_old_catalog_of_still_local_sfst_so_it_can_evict() {
 
     // The old catalog was confirmed present → its SFST is now remote-cataloged.
     assert!(
-        reg.is_remote_cataloged(10),
+        reg.is_remote_cataloged(sk(10)),
         "old catalog of a still-local SFST must be confirmed (no wedge)"
     );
 
@@ -610,7 +612,7 @@ async fn reconcile_local_catalog_uploads_skips_on_transient_stat_error() {
     // Nothing enqueued for upload, and the seq is NOT confirmed remote-cataloged.
     assert_eq!(uploader.pending(), 0);
     assert!(
-        !reg.is_remote_cataloged(10),
+        !reg.is_remote_cataloged(sk(10)),
         "transient stat error must not confirm the catalog present"
     );
 
@@ -663,13 +665,13 @@ async fn reconcile_local_catalog_uploads_confirms_present_via_mock() {
 
     assert_eq!(uploader.pending(), 0);
     assert!(
-        reg.is_remote_cataloged(10),
+        reg.is_remote_cataloged(sk(10)),
         "present catalog must seed remote_cataloged"
     );
     // Same subsumption check at the integration boundary: never separately
     // mark_rotated, yet remote-cataloging via reconcile makes it report rotated.
     assert!(
-        reg.is_rotated(10),
+        reg.is_rotated(sk(10)),
         "remote-cataloged via reconcile must imply rotated (Remote subsumes RotatedLocal)"
     );
 
@@ -742,6 +744,7 @@ async fn reconcile_remote_uploads_marks_uploaded_and_enqueues_add_entry() {
     reconcile_remote_uploads(
         &mut reg,
         "logs",
+        machine(),
         &mut catalog_builder,
         &storage,
         &TenantId::from("tenant1"),
@@ -751,7 +754,7 @@ async fn reconcile_remote_uploads_marks_uploaded_and_enqueues_add_entry() {
     .await
     .unwrap();
 
-    assert!(reg.is_uploaded(10), "remote SFST must be marked uploaded");
+    assert!(reg.is_uploaded(sk(10)), "remote SFST must be marked uploaded");
     assert_eq!(
         catalog_builder.pending(),
         1,
@@ -768,7 +771,7 @@ async fn reconcile_remote_uploads_skips_already_rotated() {
 
     let (id, key) = remote_sfst_key(10);
     reg.sfst.track(id, ByteSize(1), empty_summary());
-    reg.mark_rotated(10); // already in a closed catalog
+    reg.mark_rotated(sk(10)); // already in a closed catalog
 
     let storage = crate::storage::MockStorage {
         list_response: vec![key],
@@ -780,6 +783,7 @@ async fn reconcile_remote_uploads_skips_already_rotated() {
     reconcile_remote_uploads(
         &mut reg,
         "logs",
+        machine(),
         &mut catalog_builder,
         &storage,
         &TenantId::from("tenant1"),
@@ -789,7 +793,7 @@ async fn reconcile_remote_uploads_skips_already_rotated() {
     .await
     .unwrap();
 
-    assert!(reg.is_uploaded(10), "still marked uploaded");
+    assert!(reg.is_uploaded(sk(10)), "still marked uploaded");
     assert_eq!(
         catalog_builder.pending(),
         0,
@@ -817,6 +821,7 @@ async fn reconcile_remote_uploads_skips_when_local_sfst_missing() {
     reconcile_remote_uploads(
         &mut reg,
         "logs",
+        machine(),
         &mut catalog_builder,
         &storage,
         &TenantId::from("tenant1"),
@@ -827,7 +832,7 @@ async fn reconcile_remote_uploads_skips_when_local_sfst_missing() {
     .unwrap();
 
     assert!(
-        reg.is_uploaded(10),
+        reg.is_uploaded(sk(10)),
         "marked uploaded before the missing-local check"
     );
     assert_eq!(
@@ -856,6 +861,7 @@ async fn reconcile_remote_uploads_propagates_list_error() {
     let result = reconcile_remote_uploads(
         &mut reg,
         "logs",
+        machine(),
         &mut catalog_builder,
         &storage,
         &TenantId::from("tenant1"),
@@ -899,6 +905,7 @@ async fn reconcile_remote_uploads_skips_unparseable_key() {
     reconcile_remote_uploads(
         &mut reg,
         "logs",
+        machine(),
         &mut catalog_builder,
         &storage,
         &TenantId::from("tenant1"),
@@ -1081,4 +1088,329 @@ fn holds_seq_tracks_wal_or_sfst_artifacts() {
 
     registry.sfst.track(id, ByteSize(1), empty_summary());
     assert!(registry.holds_seq(7), "an SFST entry alone suffices");
+}
+
+// ── P6: multi-identity coverage ──────────────────────────────
+// The fixtures above are single-identity; these exercise the identity boundary
+// (D6 filter, splice guard, per-identity floor, mark round-trip).
+
+fn machine2() -> file_registry::MachineId {
+    file_registry::MachineId::new(uuid::Uuid::from_u128(0x2222_3333_4444_5555_6666_7777_8888_9999))
+        .unwrap()
+}
+
+fn instance2() -> file_registry::InstanceId {
+    file_registry::InstanceId::new(uuid::Uuid::from_u128(
+        0xbbbb_cccc_dddd_eeee_ffff_0000_1111_2222,
+    ))
+    .unwrap()
+}
+
+/// Remote SFST object key for `seq` under `identity` (today's prefix — the D6
+/// layout puts identity in the FILENAME, so every identity shares one prefix).
+fn remote_sfst_key_for(
+    identity: file_registry::Identity,
+    seq: u64,
+) -> (file_registry::FileId, String) {
+    let id = file_registry::FileId::new(identity, 0, seq, 0);
+    let today = chrono::Utc::now().date_naive();
+    (
+        id,
+        crate::remote_keys::sfst("logs", &TenantId::from("tenant1"), today, id),
+    )
+}
+
+/// Like `place_local_catalog`, but for an arbitrary `identity` (single-entry
+/// catalog at `max_seq`).
+fn place_local_catalog_for(
+    reg: &mut Registry,
+    date: NaiveDate,
+    identity: file_registry::Identity,
+    max_seq: u64,
+    min_ts: u32,
+    max_ts: u32,
+) -> std::path::PathBuf {
+    let path = reg
+        .catalog_files
+        .file_path(date, identity, max_seq, min_ts, max_ts);
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    let mut catalog = otel_catalog::Catalog::new(TenantId::from("tenant1"), date, identity);
+    let (part_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
+    catalog.add(otel_catalog::CatalogEntry {
+        id: file_registry::FileId::new(identity, 0, max_seq, part_key),
+        remote_key: String::new(),
+        min_timestamp_s: min_ts,
+        max_timestamp_s: max_ts,
+        record_count: 1,
+        content_meta,
+        size: ByteSize(1),
+        uploaded_at_ns: file_registry::TimestampNs(0),
+        remote_etag: None,
+    });
+    let bytes = catalog.to_container_bytes().unwrap();
+    std::fs::write(&path, &bytes).unwrap();
+    reg.catalog_files.track(
+        otel_catalog::File::new(date, identity, max_seq, min_ts, max_ts, ByteSize(bytes.len() as u64)),
+        path.clone(),
+    );
+    path
+}
+
+fn spawn_mock_uploader(
+    storage: &crate::storage::MockStorage,
+    cancel: &tokio_util::sync::CancellationToken,
+) -> crate::component::ComponentHandle<crate::ipc::UploaderRequest, crate::ipc::UploaderResponse> {
+    crate::component::ComponentHandle::spawn::<crate::uploader::Uploader<crate::storage::MockStorage>>(
+        crate::uploader::UploaderArgs {
+            storage: storage.clone(),
+            max_concurrent: 4,
+        },
+        cancel.child_token(),
+    )
+}
+
+/// Acceptance 2: a stale remote object at a reused seq (same machine/prior
+/// instance, and a different machine) must not falsely mark a new local SFST
+/// uploaded — it stays in the unuploaded set.
+#[tokio::test]
+async fn reconcile_remote_does_not_falsely_mark_local_sfst_at_reused_seq() {
+    let catalog_dir = tempfile::tempdir().unwrap();
+    let mut reg = make_registry(catalog_dir.path());
+
+    // A brand-new, never-uploaded local SFST at seq 5 under the CURRENT identity.
+    reg.sfst.track(
+        file_registry::FileId::new(ident(), 0, 5, 0),
+        ByteSize(1),
+        empty_summary(),
+    );
+
+    let prior = file_registry::Identity::new(machine(), instance2());
+    let foreign = file_registry::Identity::new(machine2(), instance());
+    let (_p, prior_key) = remote_sfst_key_for(prior, 5);
+    let (_f, foreign_key) = remote_sfst_key_for(foreign, 5);
+
+    let storage = crate::storage::MockStorage {
+        list_response: vec![prior_key, foreign_key],
+        ..crate::storage::MockStorage::default()
+    };
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let mut catalog_builder = spawn_idle_catalog_builder(&cancel);
+
+    reconcile_remote_uploads(
+        &mut reg,
+        "logs",
+        machine(),
+        &mut catalog_builder,
+        &storage,
+        &TenantId::from("tenant1"),
+        &today_window_retention(),
+        &bridge::config::IngestConfig::default(),
+    )
+    .await
+    .unwrap();
+
+    assert!(
+        !reg.is_uploaded(sk(5)),
+        "a stale/foreign object at the same seq must not mark the current-identity file"
+    );
+    let unuploaded: Vec<u64> = reg.unuploaded_ids().iter().map(|i| i.seq).collect();
+    assert_eq!(unuploaded, vec![5], "the current-identity SFST is still unuploaded");
+    // The same-machine prior-instance object is ours, marked under its own key.
+    assert!(reg.is_uploaded(file_registry::SeqKey::new(prior, 5)));
+    // No AddEntry: the prior object's local seq holds a different identity.
+    assert_eq!(catalog_builder.pending(), 0);
+    cancel.cancel();
+}
+
+/// Acceptance 3: two machines' objects interleaved in one LIST — only own-machine
+/// keys mutate state; the foreign machine's object is inert.
+#[tokio::test]
+async fn reconcile_remote_ignores_foreign_machine_objects() {
+    let catalog_dir = tempfile::tempdir().unwrap();
+    let mut reg = make_registry(catalog_dir.path());
+
+    let (own_id, own_key) = remote_sfst_key(10);
+    reg.sfst.track(own_id, ByteSize(1), empty_summary());
+    let foreign = file_registry::Identity::new(machine2(), instance());
+    let (_f, foreign_key) = remote_sfst_key_for(foreign, 20);
+
+    let storage = crate::storage::MockStorage {
+        list_response: vec![own_key, foreign_key],
+        ..crate::storage::MockStorage::default()
+    };
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let mut catalog_builder = spawn_idle_catalog_builder(&cancel);
+
+    reconcile_remote_uploads(
+        &mut reg,
+        "logs",
+        machine(),
+        &mut catalog_builder,
+        &storage,
+        &TenantId::from("tenant1"),
+        &today_window_retention(),
+        &bridge::config::IngestConfig::default(),
+    )
+    .await
+    .unwrap();
+
+    assert!(reg.is_uploaded(sk(10)), "own object is marked");
+    assert!(
+        !reg.is_uploaded(file_registry::SeqKey::new(foreign, 20)),
+        "foreign machine's object must not mutate any state"
+    );
+    assert_eq!(
+        catalog_builder.pending(),
+        1,
+        "only the own-machine object enqueues an AddEntry"
+    );
+    cancel.cancel();
+}
+
+/// The splice guard: a listed object whose seq exists locally under a DIFFERENT
+/// identity must not be spliced into a catalog entry (local FileId + foreign
+/// remote_key). It is marked under its own identity, and no AddEntry is built.
+#[tokio::test]
+async fn reconcile_remote_splice_guard_rejects_identity_mismatch() {
+    let catalog_dir = tempfile::tempdir().unwrap();
+    let mut reg = make_registry(catalog_dir.path());
+
+    // Local seq 7 under the current instance.
+    reg.sfst.track(
+        file_registry::FileId::new(ident(), 0, 7, 0),
+        ByteSize(1),
+        empty_summary(),
+    );
+    // Listed remote object: same machine, PRIOR instance, same seq 7.
+    let prior = file_registry::Identity::new(machine(), instance2());
+    let (_p, prior_key) = remote_sfst_key_for(prior, 7);
+
+    let storage = crate::storage::MockStorage {
+        list_response: vec![prior_key],
+        ..crate::storage::MockStorage::default()
+    };
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let mut catalog_builder = spawn_idle_catalog_builder(&cancel);
+
+    reconcile_remote_uploads(
+        &mut reg,
+        "logs",
+        machine(),
+        &mut catalog_builder,
+        &storage,
+        &TenantId::from("tenant1"),
+        &today_window_retention(),
+        &bridge::config::IngestConfig::default(),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        catalog_builder.pending(),
+        0,
+        "an identity-mismatched local seq must not be spliced into a catalog entry"
+    );
+    assert!(reg.is_uploaded(file_registry::SeqKey::new(prior, 7)));
+    assert!(!reg.is_uploaded(sk(7)), "the current-identity local file is untouched");
+    cancel.cancel();
+}
+
+/// The catalog-confirm seq floor is per-identity: a catalog of an identity with
+/// NO local SFSTs is skipped even when its `max_seq` clears the global-min floor
+/// of another identity's local files.
+#[tokio::test]
+async fn reconcile_local_catalog_floor_is_per_identity() {
+    let catalog_dir = tempfile::tempdir().unwrap();
+    let mut reg = make_registry(catalog_dir.path());
+    let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
+
+    // Current identity: one local SFST at seq 5 (its floor) + a catalog for it.
+    reg.sfst.track(
+        file_registry::FileId::new(ident(), 0, 5, 0),
+        ByteSize(1),
+        empty_summary(),
+    );
+    place_local_catalog_for(&mut reg, date, ident(), 5, 100, 200);
+
+    // A prior identity's catalog at seq 50 — above the global-min floor (5) but
+    // with NO local SFSTs of that identity. Per-identity floor must skip it.
+    let prior = file_registry::Identity::new(machine(), instance2());
+    place_local_catalog_for(&mut reg, date, prior, 50, 100, 200);
+
+    let storage = crate::storage::MockStorage {
+        stat: crate::storage::MockStat::Found,
+        ..crate::storage::MockStorage::default()
+    };
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let mut uploader = spawn_mock_uploader(&storage, &cancel);
+
+    reconcile_local_catalog_uploads(
+        &mut reg,
+        0,
+        "logs",
+        &mut uploader,
+        &storage,
+        &TenantId::from("tenant1"),
+        &evict_all_retention(),
+    )
+    .await
+    .unwrap();
+
+    assert!(
+        reg.is_remote_cataloged(sk(5)),
+        "the current identity's catalog (with a local SFST) is confirmed"
+    );
+    assert!(
+        !reg.is_remote_cataloged(file_registry::SeqKey::new(prior, 50)),
+        "a catalog of an identity with no local SFSTs is skipped by the per-identity floor"
+    );
+    cancel.cancel();
+}
+
+/// A confirmed prior-instance catalog marks its seqs under ITS OWN identity, not
+/// the running process's — the CatalogUploaded identity round-trip at the
+/// reconcile layer.
+#[tokio::test]
+async fn reconcile_local_catalog_marks_under_catalog_own_identity() {
+    let catalog_dir = tempfile::tempdir().unwrap();
+    let mut reg = make_registry(catalog_dir.path());
+    let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
+
+    // A prior instance's still-local SFST at seq 7 and its catalog.
+    let prior = file_registry::Identity::new(machine(), instance2());
+    reg.sfst.track(
+        file_registry::FileId::new(prior, 0, 7, 0),
+        ByteSize(1),
+        empty_summary(),
+    );
+    place_local_catalog_for(&mut reg, date, prior, 7, 100, 200);
+
+    let storage = crate::storage::MockStorage {
+        stat: crate::storage::MockStat::Found,
+        ..crate::storage::MockStorage::default()
+    };
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let mut uploader = spawn_mock_uploader(&storage, &cancel);
+
+    reconcile_local_catalog_uploads(
+        &mut reg,
+        0,
+        "logs",
+        &mut uploader,
+        &storage,
+        &TenantId::from("tenant1"),
+        &evict_all_retention(),
+    )
+    .await
+    .unwrap();
+
+    assert!(
+        reg.is_remote_cataloged(file_registry::SeqKey::new(prior, 7)),
+        "marked under the catalog's own (prior) identity"
+    );
+    assert!(
+        !reg.is_remote_cataloged(sk(7)),
+        "NOT marked under the running process's current identity"
+    );
+    cancel.cancel();
 }

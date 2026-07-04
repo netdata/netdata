@@ -44,6 +44,13 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
         }
     };
 
+    // The supervisor always resolves the identity before configuring a worker;
+    // its absence here is a supervisor bug, not a runtime condition. The ledger
+    // needs the machine id to filter every remote LIST to its own objects (D6).
+    let identity = config
+        .identity
+        .context("plugin config reached the ledger without a resolved identity")?;
+
     // `Ledger::new` runs the full supervisor handshake; see its docs for the
     // step order and what `Ready` claims. Each signal's lifecycle config is
     // derived from the shared `PluginConfig` via `lifecycle_for` (one base dir
@@ -54,6 +61,7 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
     let mut ledger = Ledger::new(
         supervisor,
         &config.writer_socket_path,
+        identity.machine_id,
         &config.lifecycle_for(Signal::Logs),
         &config.lifecycle_for(Signal::Traces),
         &config.storage,

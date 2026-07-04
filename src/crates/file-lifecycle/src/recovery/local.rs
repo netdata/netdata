@@ -2,7 +2,7 @@
 //! seeding in-memory upload state from local catalog files. None of these
 //! touch remote storage.
 
-use file_registry::ByteSize;
+use file_registry::{ByteSize, SeqKey};
 use otel_catalog::Catalog;
 
 use crate::component::{ComponentHandle, batch_recover, drain_pending};
@@ -216,13 +216,29 @@ pub async fn recover_retention(
     // entry isn't yet confirmed present on the remote (see the identical guard
     // in `evaluate_retention`). Holding the local SFST until its catalog is
     // durable remotely means a failed catalog upload can't orphan it.
-    let (evictable_sfst, deferred_sfst): (Vec<u64>, Vec<u64>) = to_evict_sfst
-        .into_iter()
-        .partition(|&seq| !storage_enabled || registry.is_remote_cataloged(seq));
+    let (evictable_sfst, deferred_sfst): (Vec<u64>, Vec<u64>) =
+        to_evict_sfst.into_iter().partition(|&seq| {
+            // Gate on the SFST's OWN identity: the seq came from the local SFST
+            // retention scan, so its entry (and full identity) is present. A
+            // missing entry (not reachable through that scan) is DEFERRED, never
+            // evicted — `is_some_and` returns false when absent.
+            !storage_enabled
+                || registry
+                    .sfst
+                    .get(seq)
+                    .is_some_and(|e| registry.is_remote_cataloged(SeqKey::from(&e.id)))
+        });
     for seq in deferred_sfst {
-        tracing::warn!(
-            "recovery: deferring eviction of seq={seq} (catalog not yet confirmed on remote)"
-        );
+        // Log the full identity when the entry is present (the multi-identity
+        // case this defers for); fall back to bare seq for the absent guard.
+        match registry.sfst.get(seq).map(|e| SeqKey::from(&e.id)) {
+            Some(key) => tracing::warn!(
+                "recovery: deferring eviction of seq={key} (catalog not yet confirmed on remote)"
+            ),
+            None => tracing::warn!(
+                "recovery: deferring eviction of seq={seq} (catalog not yet confirmed on remote)"
+            ),
+        }
     }
 
     // Catalog pass. Day-count driven by the remote-archive horizon.
@@ -254,7 +270,7 @@ pub async fn recover_retention(
             let path = registry.sfst.file_path(entry.id);
             requests.push(CleanerRequest::DeleteIndexFile {
                 pipeline_id: entry.id.pipeline_id,
-                sequence: seq,
+                sequence: SeqKey::from(&entry.id),
                 path,
             });
         }
@@ -329,8 +345,11 @@ pub fn seed_from_catalog_files(registry: &mut Registry) {
             }
         };
         for entry in catalog.entries.values() {
-            registry.mark_uploaded(entry.id.seq);
-            registry.mark_rotated(entry.id.seq);
+            // Each entry carries its own full identity (a local catalog may hold
+            // a prior instance's entries); key the marks by it.
+            let key = SeqKey::from(&entry.id);
+            registry.mark_uploaded(key);
+            registry.mark_rotated(key);
             seeded += 1;
         }
     }

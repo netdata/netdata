@@ -90,7 +90,7 @@ pub fn sfst_upload_request(
         date_from_summary(&sfst_file.summary).unwrap_or_else(|| chrono::Utc::now().date_naive());
     Some(UploaderRequest::Upload {
         pipeline_id: id.pipeline_id,
-        seq: id.seq,
+        seq: file_registry::SeqKey::from(&id),
         local_path: registry.sfst.file_path(id),
         remote_key: crate::remote_keys::sfst(signal, tenant_id, date, id),
     })

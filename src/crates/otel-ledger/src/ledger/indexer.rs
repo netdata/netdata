@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use bridge::signals::Signal;
-use file_registry::{FileId, TenantId};
+use file_registry::{FileId, SeqKey, TenantId};
 
 use file_lifecycle::ipc::{CleanerRequest, IndexerResponse, UploaderRequest};
 
@@ -136,7 +136,7 @@ impl Ledger {
                 }
                 if let Err(e) = self.cleaner.send(CleanerRequest::DeleteIndexFile {
                     pipeline_id: file_id.pipeline_id,
-                    sequence: file_id.seq,
+                    sequence: SeqKey::from(&file_id),
                     path: sfst_path,
                 }) {
                     tracing::error!(

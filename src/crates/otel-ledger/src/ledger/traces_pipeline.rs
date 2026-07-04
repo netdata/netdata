@@ -75,6 +75,7 @@ fn traces_arg_shim(_args: &[String], _payload: Option<&[u8]>) -> Option<Vec<u8>>
 pub(crate) async fn build_traces_pipeline(
     signal: Signal,
     config: &LifecycleConfig,
+    own_machine: file_registry::MachineId,
     cancel: &CancellationToken,
     cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
     uploader: Option<&mut ComponentHandle<UploaderRequest, UploaderResponse>>,
@@ -86,6 +87,7 @@ pub(crate) async fn build_traces_pipeline(
     super::pipeline::build_pipeline(
         signal,
         config,
+        own_machine,
         cancel,
         cleaner,
         uploader,

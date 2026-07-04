@@ -85,10 +85,15 @@ impl Part {
 /// Ordering is lexicographic over `(timestamp_ns, file_seq, part,
 /// position)` — the total order the multi-file merge and the exclusive
 /// anchor comparison rely on. `file_seq` is the SFST/WAL file's monotonic
-/// `seq` (globally unique). `part` distinguishes the sub-sources of one
-/// active WAL that share a `seq` (see [`Part`]); it only breaks ties at
-/// equal `(timestamp_ns, file_seq)`, exactly as `position` breaks ties
-/// within one chunk/file.
+/// `seq`, unique within one process instance's local files. Across process
+/// instances or machines (a post-restore archive) two files can share a
+/// `seq`, so a `file_seq` tie is theoretically possible when their
+/// `timestamp_ns` is also equal; that collision is accepted here (the cursor
+/// is an opaque wire string the consumer echoes back — widening it to a full
+/// identity+seq key is a format break, tracked as a P9 follow-up). `part`
+/// distinguishes the sub-sources of one active WAL that share a `seq` (see
+/// [`Part`]); it only breaks ties at equal `(timestamp_ns, file_seq)`, exactly
+/// as `position` breaks ties within one chunk/file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Cursor {
     pub timestamp_ns: i64,

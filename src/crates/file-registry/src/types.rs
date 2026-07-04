@@ -306,6 +306,62 @@ pub fn test_identity() -> Identity {
     )
 }
 
+/// The `(machine, instance, seq)` projection of a [`FileId`], dropping the
+/// pipeline/partition dimensions. It is the key for lifecycle state that crosses
+/// an identity boundary — the upload/rotate/remote-cataloged marks derived from
+/// remote LIST results or catalogs — so a seq reused by a different process
+/// instance (post-wipe reseed) or a different machine (shared bucket) cannot
+/// alias another's state. `seq` alone is only unique WITHIN one process
+/// instance's local files, which is why cross-identity state needs the full key.
+///
+/// Deliberately NOT `Serialize`/`Deserialize` (unlike [`Identity`]/[`FileId`]):
+/// it is a purely in-process map/IPC key over tokio channels, never persisted
+/// and never crossing the ferryboat plugin-config boundary. Durable/cross-process
+/// identity travels as a [`FileId`] (catalog wire) or [`Identity`] instead.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct SeqKey {
+    pub machine_id: MachineId,
+    pub instance_id: InstanceId,
+    pub seq: u64,
+}
+
+impl SeqKey {
+    /// Build a key from an identity and a seq (for sites that hold the two
+    /// separately — e.g. a single-identity catalog's scope key plus its seqs).
+    pub fn new(identity: Identity, seq: u64) -> Self {
+        Self {
+            machine_id: identity.machine_id,
+            instance_id: identity.instance_id,
+            seq,
+        }
+    }
+}
+
+impl From<&FileId> for SeqKey {
+    fn from(id: &FileId) -> Self {
+        Self {
+            machine_id: id.machine_id,
+            instance_id: id.instance_id,
+            seq: id.seq,
+        }
+    }
+}
+
+impl std::fmt::Display for SeqKey {
+    /// `<seq>@<machine>/<instance>` — the seq leads (the operator-facing handle)
+    /// with the identity that disambiguates it after a reseed or in a shared
+    /// bucket. Used in lifecycle log lines.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}@{}/{}",
+            self.seq,
+            self.machine_id.as_uuid(),
+            self.instance_id.as_uuid()
+        )
+    }
+}
+
 // ---------------------------------------------------------------------------
 // FileId
 // ---------------------------------------------------------------------------
@@ -323,9 +379,11 @@ pub fn test_identity() -> Identity {
 /// signal/pipeline discriminator: this crate never interprets either. The
 /// content plane derives them and assigns their meaning (for OTel logs today,
 /// `part_key` is the content plane's service-stream hash).
-/// `seq` is a single global counter, unique within a process instance across
-/// pipelines, so it alone identifies a file; `pipeline_id` routes it to its
-/// owning pipeline.
+/// `seq` is a single counter, unique within ONE process instance across
+/// pipelines — so it alone identifies a LOCAL file, but not across process
+/// instances or machines (a post-wipe reseed or a shared bucket can repeat a
+/// seq). State that crosses an identity boundary is keyed by [`SeqKey`], not
+/// bare `seq`. `pipeline_id` routes a file to its owning pipeline.
 ///
 /// Identity contract: `machine_id` is the Netdata machine GUID (permanent node
 /// identity); `instance_id` is a fresh UUID the plugin generates once per

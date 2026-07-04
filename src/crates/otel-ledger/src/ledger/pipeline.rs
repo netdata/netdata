@@ -74,6 +74,7 @@ const STARTUP_REMOTE_BUDGET: std::time::Duration = std::time::Duration::from_sec
 pub(crate) async fn build_pipeline<F>(
     signal: Signal,
     config: &LifecycleConfig,
+    own_machine: file_registry::MachineId,
     cancel: &CancellationToken,
     cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
     mut uploader: Option<&mut ComponentHandle<UploaderRequest, UploaderResponse>>,
@@ -162,6 +163,7 @@ where
                 file_lifecycle::recovery::reconcile_remote_uploads(
                     registry,
                     segment,
+                    own_machine,
                     &mut catalog_builder,
                     storage,
                     tenant_id,
@@ -322,6 +324,7 @@ where
 pub(crate) async fn build_logs_pipeline(
     signal: Signal,
     config: &LifecycleConfig,
+    own_machine: file_registry::MachineId,
     cancel: &CancellationToken,
     cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
     uploader: Option<&mut ComponentHandle<UploaderRequest, UploaderResponse>>,
@@ -341,6 +344,7 @@ pub(crate) async fn build_logs_pipeline(
     build_pipeline(
         signal,
         config,
+        own_machine,
         cancel,
         cleaner,
         uploader,

@@ -3,6 +3,7 @@ use file_registry::ByteSize;
 use uuid::Uuid;
 use file_registry::{Identity, InstanceId, MachineId};
 fn ident() -> Identity { Identity::new(MachineId::new(Uuid::from_u128(1)).unwrap(), InstanceId::new(Uuid::from_u128(2)).unwrap()) }
+fn sk(seq: u64) -> file_registry::SeqKey { file_registry::SeqKey::new(ident(), seq) }
 
 fn make_registry() -> Registry {
     let wal_dir = tempfile::tempdir().unwrap();
@@ -26,8 +27,8 @@ fn unuploaded_ids_excludes_uploaded_seqs() {
         let id = FileId::new(ident(), 0, seq, 0);
         reg.sfst.track(id, ByteSize(1), empty_summary());
     }
-    reg.mark_uploaded(2);
-    reg.mark_uploaded(3);
+    reg.mark_uploaded(sk(2));
+    reg.mark_uploaded(sk(3));
 
     let unuploaded: Vec<u64> = reg.unuploaded_ids().iter().map(|id| id.seq).collect();
     assert_eq!(unuploaded, vec![1]);
@@ -38,7 +39,7 @@ fn unuploaded_ids_is_empty_when_all_uploaded() {
     let mut reg = make_registry();
     let id = FileId::new(ident(), 0, 5, 0);
     reg.sfst.track(id, ByteSize(1), empty_summary());
-    reg.mark_uploaded(5);
+    reg.mark_uploaded(sk(5));
 
     assert!(reg.unuploaded_ids().is_empty());
 }
@@ -53,21 +54,21 @@ fn catalog_stage_axis_ordering_and_subsumption() {
 
     let mut reg = make_registry();
     // mark_rotated → rotated only; the upload axis and remote stage are untouched.
-    assert!(!reg.is_rotated(1));
-    reg.mark_rotated(1);
-    assert!(reg.is_rotated(1));
-    assert!(!reg.is_remote_cataloged(1));
-    assert!(!reg.is_uploaded(1));
+    assert!(!reg.is_rotated(sk(1)));
+    reg.mark_rotated(sk(1));
+    assert!(reg.is_rotated(sk(1)));
+    assert!(!reg.is_remote_cataloged(sk(1)));
+    assert!(!reg.is_uploaded(sk(1)));
 
     // mark_remote_cataloged ALONE (no prior mark_rotated) makes the seq both
     // remote-cataloged AND rotated (Remote subsumes RotatedLocal) — the
     // "remote-cataloged implies rotated" invariant, structural rather than by
     // caller ordering. The independent upload axis stays untouched.
-    reg.mark_remote_cataloged([2]);
-    assert!(reg.is_remote_cataloged(2));
-    assert!(reg.is_rotated(2), "Remote must subsume RotatedLocal");
+    reg.mark_remote_cataloged([sk(2)]);
+    assert!(reg.is_remote_cataloged(sk(2)));
+    assert!(reg.is_rotated(sk(2)), "Remote must subsume RotatedLocal");
     assert!(
-        !reg.is_uploaded(2),
+        !reg.is_uploaded(sk(2)),
         "catalog axis must not touch the upload axis"
     );
 }
@@ -77,17 +78,17 @@ fn catalog_stage_axis_is_monotone() {
     let mut reg = make_registry();
     // mark_rotated after Remote must NOT downgrade the stage (else the eviction
     // gate would defer forever for a re-rotated remote-cataloged seq).
-    reg.mark_remote_cataloged([1]);
-    reg.mark_rotated(1);
+    reg.mark_remote_cataloged([sk(1)]);
+    reg.mark_rotated(sk(1));
     assert!(
-        reg.is_remote_cataloged(1),
+        reg.is_remote_cataloged(sk(1)),
         "mark_rotated must not downgrade a Remote seq"
     );
-    assert!(reg.is_rotated(1));
+    assert!(reg.is_rotated(sk(1)));
     // Same guarantee via the batch variant.
-    reg.mark_remote_cataloged([2]);
-    reg.mark_rotated_many([2]);
-    assert!(reg.is_remote_cataloged(2));
+    reg.mark_remote_cataloged([sk(2)]);
+    reg.mark_rotated_many([sk(2)]);
+    assert!(reg.is_remote_cataloged(sk(2)));
 }
 
 #[test]
@@ -95,16 +96,41 @@ fn evict_seq_clears_all_per_seq_state() {
     let mut reg = make_registry();
     let id = FileId::new(ident(), 0, 42, 0);
     reg.sfst.track(id, ByteSize(1), empty_summary());
-    reg.mark_uploaded(42);
-    reg.mark_rotated(42);
-    reg.mark_remote_cataloged([42]);
+    reg.mark_uploaded(sk(42));
+    reg.mark_rotated(sk(42));
+    reg.mark_remote_cataloged([sk(42)]);
 
-    reg.evict_seq(42);
+    reg.evict_seq(sk(42));
 
     assert!(reg.sfst.get(42).is_none());
-    assert!(!reg.is_uploaded(42));
-    assert!(!reg.is_rotated(42));
-    assert!(!reg.is_remote_cataloged(42));
+    assert!(!reg.is_uploaded(sk(42)));
+    assert!(!reg.is_rotated(sk(42)));
+    assert!(!reg.is_remote_cataloged(sk(42)));
+}
+
+#[test]
+fn seqstate_is_isolated_per_identity() {
+    // Two identities sharing the SAME machine and seq but a different instance
+    // (the post-wipe reseed shape) must never alias each other's lifecycle state.
+    let mut reg = make_registry();
+    let a = sk(5);
+    let other_instance = Identity::new(
+        MachineId::new(Uuid::from_u128(1)).unwrap(),
+        InstanceId::new(Uuid::from_u128(0x99)).unwrap(),
+    );
+    let b = file_registry::SeqKey::new(other_instance, 5);
+
+    reg.mark_uploaded(a);
+    reg.mark_remote_cataloged([a]);
+    assert!(reg.is_uploaded(a));
+    assert!(!reg.is_uploaded(b), "same seq, different identity: independent");
+    assert!(!reg.is_remote_cataloged(b));
+
+    // Evicting one identity's key must leave the other's state intact.
+    reg.mark_uploaded(b);
+    reg.evict_seq(a);
+    assert!(!reg.is_uploaded(a));
+    assert!(reg.is_uploaded(b), "evicting one identity must not touch another");
 }
 
 #[test]
@@ -124,8 +150,8 @@ fn for_seq_mut_round_trips_routing() {
 
     let (tid, registry) = tr.for_seq_mut(10).expect("routed");
     assert_eq!(tid, tenant_a);
-    registry.mark_uploaded(10);
-    assert!(tr.for_seq(10).unwrap().1.is_uploaded(10));
+    registry.mark_uploaded(sk(10));
+    assert!(tr.for_seq(10).unwrap().1.is_uploaded(sk(10)));
 
     let forgotten = tr.forget_seq(10);
     assert_eq!(forgotten, Some(tenant_a));

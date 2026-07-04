@@ -181,6 +181,7 @@ async fn process<S: Storage>(storage: &S, request: UploaderRequest) -> UploaderR
             pipeline_id,
             local_path,
             remote_key,
+            identity,
             seqs,
         } => {
             let start = Instant::now();
@@ -200,6 +201,7 @@ async fn process<S: Storage>(storage: &S, request: UploaderRequest) -> UploaderR
                         pipeline_id,
                         local_path,
                         remote_key,
+                        identity,
                         seqs,
                     }
                 }
@@ -212,6 +214,7 @@ async fn process<S: Storage>(storage: &S, request: UploaderRequest) -> UploaderR
                         pipeline_id,
                         local_path,
                         remote_key,
+                        identity,
                         seqs,
                         error,
                     }
@@ -235,10 +238,14 @@ mod tests {
         (f, contents.len() as u64)
     }
 
+    fn sk(seq: u64) -> file_registry::SeqKey {
+        file_registry::SeqKey::new(file_registry::test_identity(), seq)
+    }
+
     fn upload_req(path: &Path) -> UploaderRequest {
         UploaderRequest::Upload {
             pipeline_id: 0,
-            seq: 7,
+            seq: sk(7),
             local_path: path.to_path_buf(),
             remote_key: "v2/key".to_owned(),
         }
@@ -251,7 +258,7 @@ mod tests {
         let resp = process(&storage, upload_req(file.path())).await;
         match resp {
             UploaderResponse::Uploaded { seq, etag, .. } => {
-                assert_eq!(seq, 7);
+                assert_eq!(seq, sk(7));
                 assert_eq!(etag.as_deref(), Some("mock-etag"));
             }
             other => panic!("expected Uploaded, got {other:?}"),
@@ -321,6 +328,7 @@ mod tests {
             pipeline_id: 0,
             local_path: file.path().to_path_buf(),
             remote_key: "v2/catalog/key".to_owned(),
+            identity: file_registry::test_identity(),
             seqs: vec![1, 2, 3],
         };
         let resp = process(&storage, req).await;
@@ -341,6 +349,7 @@ mod tests {
             pipeline_id: 0,
             local_path: file.path().to_path_buf(),
             remote_key: "v2/catalog/key".to_owned(),
+            identity: file_registry::test_identity(),
             seqs: vec![5],
         };
         let resp = process(&storage, req).await;

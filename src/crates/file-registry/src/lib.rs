@@ -4,7 +4,7 @@ pub mod stem;
 
 mod types;
 pub use types::{
-    ByteSize, FileId, FileSummary, Identity, InstanceId, MachineId, NilIdentity, TenantId,
+    ByteSize, FileId, FileSummary, Identity, InstanceId, MachineId, NilIdentity, SeqKey, TenantId,
     TimestampNs, test_identity,
 };
 

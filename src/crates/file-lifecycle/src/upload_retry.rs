@@ -16,6 +16,8 @@ use std::time::Duration;
 
 use tokio::time::Instant;
 
+use file_registry::SeqKey;
+
 use crate::ipc::UploaderRequest;
 
 /// First retry delay; doubles each attempt up to [`MAX_BACKOFF`].
@@ -27,7 +29,7 @@ pub const PERSISTENT_FAILURE_ATTEMPTS: u32 = 5;
 
 #[derive(PartialEq, Eq, Hash, Clone)]
 enum Key {
-    Sfst(u64),
+    Sfst(SeqKey),
     Catalog(String),
 }
 
@@ -85,8 +87,8 @@ impl UploadRetry {
 
     /// Remove any pending retry for an SFST — either it uploaded successfully,
     /// or it can no longer be retried (its local file is gone).
-    pub fn clear_sfst(&mut self, seq: u64) {
-        self.items.remove(&Key::Sfst(seq));
+    pub fn clear_sfst(&mut self, key: SeqKey) {
+        self.items.remove(&Key::Sfst(key));
     }
 
     /// Remove any pending retry for a catalog — uploaded successfully, or no
@@ -128,10 +130,14 @@ fn backoff(attempts: u32) -> Duration {
 mod tests {
     use super::*;
 
+    fn sk(seq: u64) -> SeqKey {
+        SeqKey::new(file_registry::test_identity(), seq)
+    }
+
     fn upload(seq: u64) -> UploaderRequest {
         UploaderRequest::Upload {
             pipeline_id: 0,
-            seq,
+            seq: sk(seq),
             local_path: format!("/tmp/{seq}.sfst").into(),
             remote_key: format!("k{seq}"),
         }
@@ -153,7 +159,7 @@ mod tests {
         assert!(q.take_due(t0 + Duration::from_secs(31)).is_empty());
 
         // Success (or abandonment) removes it.
-        q.clear_sfst(1);
+        q.clear_sfst(sk(1));
         assert!(q.is_empty());
     }
 

@@ -1,7 +1,7 @@
 //! Steady-state retention pass.
 
 use bridge::signals::Signal;
-use file_registry::TenantId;
+use file_registry::{SeqKey, TenantId};
 
 use file_lifecycle::ipc::CleanerRequest;
 use file_lifecycle::recovery::now_ns;
@@ -50,15 +50,20 @@ impl Ledger {
                 .evaluate_retention(&sfst_retention_policy(&retention), now_ns());
             let mut reqs = Vec::with_capacity(to_evict.len());
             for seq in to_evict {
+                // The seq came from the local SFST retention scan, so its entry
+                // (and full identity) is present; key the confirm gate by it.
+                let Some(key) = registry.sfst.get(seq).map(|e| SeqKey::from(&e.id)) else {
+                    continue;
+                };
                 // Don't evict the local SFST until its catalog entry is
                 // confirmed present on the remote. This covers "not yet
                 // uploaded", "uploaded but not yet cataloged", and "cataloged
                 // locally but the catalog upload hasn't landed" — in all of
                 // them the remote SFST would be orphaned (referenced by no
                 // remote catalog) if we deleted the local copy now.
-                if storage_enabled && !registry.is_remote_cataloged(seq) {
+                if storage_enabled && !registry.is_remote_cataloged(key) {
                     tracing::warn!(
-                        "retention: deferring eviction of seq={seq} (catalog not yet confirmed on remote)"
+                        "retention: deferring eviction of seq={key} (catalog not yet confirmed on remote)"
                     );
                     continue;
                 }
@@ -66,10 +71,10 @@ impl Ledger {
                 registry.sfst.mark_pending_deletion(seq);
                 if let Some(entry) = registry.sfst.get(seq) {
                     let path = registry.sfst.file_path(entry.id);
-                    tracing::info!("retention: evicting seq={seq} path={}", path.display());
+                    tracing::info!("retention: evicting seq={key} path={}", path.display());
                     reqs.push(CleanerRequest::DeleteIndexFile {
                         pipeline_id: entry.id.pipeline_id,
-                        sequence: seq,
+                        sequence: key,
                         path,
                     });
                 }
@@ -78,15 +83,15 @@ impl Ledger {
         };
 
         for req in sfst_reqs {
-            let seq = match &req {
+            let key = match &req {
                 CleanerRequest::DeleteIndexFile { sequence, .. } => *sequence,
                 _ => unreachable!(),
             };
             if let Err(e) = self.cleaner.send(req) {
-                tracing::error!("failed to send index eviction seq={seq}: {e}");
+                tracing::error!("failed to send index eviction seq={key}: {e}");
                 let mut registries = registries.write().await;
                 if let Some(registry) = registries.get_mut(tenant_id) {
-                    registry.sfst.clear_pending_deletion(seq);
+                    registry.sfst.clear_pending_deletion(key.seq);
                 }
             }
         }

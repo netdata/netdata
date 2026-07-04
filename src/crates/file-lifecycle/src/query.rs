@@ -7,7 +7,7 @@
 
 use std::collections::HashSet;
 
-use file_registry::Query;
+use file_registry::{Query, SeqKey};
 
 use crate::registry::Registry;
 
@@ -19,7 +19,7 @@ impl Registry {
     /// query path (`TenantRegistries::query_snapshot`): a local SFST always masks the
     /// remote entry, and so does a WAL *with a durable prefix* — but a WAL with
     /// `valid_up_to == 0` does not, because `query_snapshot` cannot serve it either.
-    /// Deduped by seq; sorted by seq for determinism.
+    /// Deduped by identity+seq ([`SeqKey`]); sorted by seq for determinism.
     pub fn remote_candidates(&self, q: &Query) -> Vec<otel_catalog::CatalogEntry> {
         let catalog: Vec<otel_catalog::CatalogEntry> = self.catalog_files.candidates(q).collect();
         let local_seqs = self.local_servable_seqs(q);
@@ -27,27 +27,32 @@ impl Registry {
     }
 
     /// Remote-only catalog entries from a pre-parsed in-window `catalog` (the
-    /// 3b "parse once" path): the entries matching `q`'s stream filter whose seq
-    /// has no servable local copy (`local_seqs`), deduped by seq and sorted by seq.
+    /// 3b "parse once" path): the entries matching `q`'s stream filter whose
+    /// identity+seq has no servable local copy (`local_seqs`), deduped by
+    /// [`SeqKey`] and sorted by seq.
     ///
-    /// `local_seqs` may be computed time-only (all streams) and still be correct
-    /// here: one seq maps to exactly one file and one partition (`build_catalog_entry`
-    /// copies `id` — which carries `part_key` — from the same SFST), so a stream-matching
-    /// entry whose seq is locally served is served by that same stream — the
-    /// time-only and stream-filtered masks agree on every entry the stream filter
-    /// keeps. `catalog` parsed time-only means the stream filter is NOT applied
-    /// during parsing, so it is reapplied here via `q.matches_partition`.
+    /// The mask is keyed by full identity, not bare seq: a catalog entry
+    /// recorded by a prior process instance or another machine at a seq that a
+    /// CURRENT-identity local file happens to reuse is NOT masked — it is a
+    /// genuinely remote-only object that must be fetched. `local_seqs` may still
+    /// be computed time-only (all streams): one `FileId` maps to exactly one
+    /// file and one partition (`build_catalog_entry` copies `id` — carrying
+    /// `part_key` — from the same SFST), so a stream-matching entry whose key is
+    /// locally served is served by that same stream. `catalog` parsed time-only
+    /// means the stream filter is reapplied here via `q.matches_partition`.
     pub fn remote_candidates_from(
         &self,
         q: &Query,
         catalog: &[otel_catalog::CatalogEntry],
-        local_seqs: &HashSet<u64>,
+        local_seqs: &HashSet<SeqKey>,
     ) -> Vec<otel_catalog::CatalogEntry> {
-        let mut seen: HashSet<u64> = HashSet::new();
+        let mut seen: HashSet<SeqKey> = HashSet::new();
         let mut out: Vec<otel_catalog::CatalogEntry> = catalog
             .iter()
             .filter(|e| q.matches_partition(e.id.part_key))
-            .filter(|e| !local_seqs.contains(&e.id.seq) && seen.insert(e.id.seq))
+            .filter(|e| {
+                !local_seqs.contains(&SeqKey::from(&e.id)) && seen.insert(SeqKey::from(&e.id))
+            })
             .cloned()
             .collect();
         out.sort_by_key(|e| e.id.seq);

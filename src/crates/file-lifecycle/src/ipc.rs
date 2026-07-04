@@ -6,7 +6,7 @@
 use std::path::PathBuf;
 
 use ferryboat::{Connection, Endpoint, Listener};
-use file_registry::TenantId;
+use file_registry::{Identity, SeqKey, TenantId};
 
 /// Default socket path for the writer → ledger connection.
 pub const WRITER_SOCKET_PATH: &str = "/tmp/netdata-ledger-writer.sock";
@@ -27,10 +27,12 @@ pub enum CleanerRequest {
         sequence: u64,
         path: PathBuf,
     },
-    /// Delete an index file evicted by retention policy.
+    /// Delete an index file evicted by retention policy. Keyed by full
+    /// [`SeqKey`]: its confirmation drives `evict_seq`, which destroys
+    /// identity-keyed lifecycle state, so the echo must name the exact identity.
     DeleteIndexFile {
         pipeline_id: u16,
-        sequence: u64,
+        sequence: SeqKey,
         path: PathBuf,
     },
     /// Delete a catalog file evicted by retention policy. Catalog files are
@@ -47,7 +49,7 @@ pub enum CleanerResponse {
     /// A WAL file has been deleted.
     WalFileDeleted { pipeline_id: u16, sequence: u64 },
     /// An index file has been deleted.
-    IndexFileDeleted { pipeline_id: u16, sequence: u64 },
+    IndexFileDeleted { pipeline_id: u16, sequence: SeqKey },
     /// A catalog file has been deleted.
     CatalogFileDeleted { pipeline_id: u16, path: PathBuf },
     /// Failed to delete a WAL file.
@@ -59,7 +61,7 @@ pub enum CleanerResponse {
     /// Failed to delete an index file.
     IndexFileFailed {
         pipeline_id: u16,
-        sequence: u64,
+        sequence: SeqKey,
         error: String,
     },
     /// Failed to delete a catalog file.
@@ -113,7 +115,7 @@ pub enum UploaderRequest {
     /// Upload an index (SFST) file to remote object storage.
     Upload {
         pipeline_id: u16,
-        seq: u64,
+        seq: SeqKey,
         local_path: PathBuf,
         remote_key: String,
     },
@@ -122,6 +124,11 @@ pub enum UploaderRequest {
         pipeline_id: u16,
         local_path: PathBuf,
         remote_key: String,
+        /// The single identity every entry in this catalog belongs to (a
+        /// catalog is single-identity by construction — the accumulator scope
+        /// key carries it). Echoed on the response so the ledger keys the
+        /// remote-cataloged marks by full identity, not bare seq.
+        identity: Identity,
         /// SFST sequence numbers contained in this catalog. Carried through to
         /// the response so the ledger can mark them remotely-cataloged (which
         /// gates their local eviction) only once the catalog is durably on the
@@ -138,7 +145,7 @@ pub enum UploaderResponse {
     /// An SFST file has been uploaded successfully.
     Uploaded {
         pipeline_id: u16,
-        seq: u64,
+        seq: SeqKey,
         remote_key: String,
         /// Remote object validator (S3 ETag) returned by the write, if the
         /// backend supplied one. Recorded on the catalog entry for later
@@ -149,7 +156,7 @@ pub enum UploaderResponse {
     /// the retry queue can re-issue the upload without rebuilding them.
     UploadFailed {
         pipeline_id: u16,
-        seq: u64,
+        seq: SeqKey,
         local_path: PathBuf,
         remote_key: String,
         error: String,
@@ -160,6 +167,10 @@ pub enum UploaderResponse {
         pipeline_id: u16,
         local_path: PathBuf,
         remote_key: String,
+        /// The catalog's single identity, echoed from the request so the marks
+        /// are keyed by full identity (a recovered prior-instance catalog marks
+        /// under ITS identity, not the running process's).
+        identity: Identity,
         seqs: Vec<u64>,
     },
     /// Failed to upload a catalog file. `seqs` are carried so a retry can be
@@ -168,6 +179,7 @@ pub enum UploaderResponse {
         pipeline_id: u16,
         local_path: PathBuf,
         remote_key: String,
+        identity: Identity,
         seqs: Vec<u64>,
         error: String,
     },

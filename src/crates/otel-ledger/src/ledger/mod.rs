@@ -161,6 +161,10 @@ impl Ledger {
     pub async fn new(
         mut supervisor: Connection<LedgerResponse, LedgerRequest>,
         writer_socket_path: &str,
+        // This node's machine identity (from the plugin config). Threaded into
+        // each pipeline's remote reconcile so its LIST is filtered to own-machine
+        // objects (D6 key layout keeps the whole fleet under one prefix).
+        own_machine: file_registry::MachineId,
         lifecycle: &LifecycleConfig,
         // PROOF SCAFFOLD (traces-proof SOW): the skeletal traces pipeline's
         // lifecycle config, derived by `PluginConfig::lifecycle_for(Signal::Traces)`
@@ -257,6 +261,7 @@ impl Ledger {
         let logs = pipeline::build_logs_pipeline(
             Signal::Logs,
             lifecycle,
+            own_machine,
             &cancel,
             &mut cleaner,
             uploader.as_mut(),
@@ -275,6 +280,7 @@ impl Ledger {
         let traces = traces_pipeline::build_traces_pipeline(
             Signal::Traces,
             traces_lifecycle,
+            own_machine,
             &cancel,
             &mut cleaner,
             uploader.as_mut(),
