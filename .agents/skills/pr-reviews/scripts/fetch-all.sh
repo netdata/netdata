@@ -120,14 +120,14 @@ trap 'rm -f "${threads_tmp}"' EXIT
 cursor=""
 echo '[]' > "${DIR}/review-threads.json"
 while true; do
-    cursor_args=()
+    gh_args=(-F owner="${owner}" -F name="${name}" -F number="${PR}")
     if [[ -n "${cursor}" ]]; then
-        cursor_args+=(-F "after=${cursor}")
+        gh_args+=(-F "after=${cursor}")
     fi
     # The single-quoted GraphQL string contains $owner/$name/$number as
     # GraphQL placeholders, not shell variables; SC2016 is expected here.
     # shellcheck disable=SC2016
-    gh api graphql -F owner="${owner}" -F name="${name}" -F number="${PR}" "${cursor_args[@]}" -f query='
+    gh api graphql "${gh_args[@]}" -f query='
         query($owner:String!, $name:String!, $number:Int!, $after:String) {
             repository(owner:$owner, name:$name) {
                 pullRequest(number:$number) {
