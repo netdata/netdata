@@ -873,14 +873,18 @@ static int macos_powermetrics_chart_update_every(int plugin_update_every)
     return chart_update_every;
 }
 
-static void macos_powermetrics_add_sensor_labels(RRDSET *st, const char *feature, const char *label)
+static void macos_powermetrics_add_sensor_labels(
+    RRDSET *st,
+    const char *feature,
+    const char *label,
+    const char *subsystem)
 {
     char path[128];
     snprintfz(path, sizeof(path), "powermetrics/%s", feature);
 
     rrdlabels_add(st->rrdlabels, "source", "powermetrics", RRDLABEL_SRC_AUTO);
     rrdlabels_add(st->rrdlabels, "driver", "powermetrics", RRDLABEL_SRC_AUTO);
-    rrdlabels_add(st->rrdlabels, "subsystem", "platform", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "subsystem", subsystem, RRDLABEL_SRC_AUTO);
     rrdlabels_add(st->rrdlabels, "feature", feature, RRDLABEL_SRC_AUTO);
     rrdlabels_add(st->rrdlabels, "label", label, RRDLABEL_SRC_AUTO);
     rrdlabels_add(st->rrdlabels, "path", path, RRDLABEL_SRC_AUTO);
@@ -904,7 +908,11 @@ static void macos_powermetrics_update_thermal_pressure(const struct macos_powerm
             update_every,
             RRDSET_TYPE_LINE);
 
-        macos_powermetrics_add_sensor_labels(st_thermal_pressure, "thermal_pressure", "Thermal Pressure State");
+        macos_powermetrics_add_sensor_labels(
+            st_thermal_pressure,
+            "thermal_pressure",
+            "Thermal Pressure State",
+            "thermal");
 
         for (size_t i = 0; i < MACOS_THERMAL_PRESSURE_COUNT; i++)
             rd_thermal_pressure[i] =
@@ -929,6 +937,7 @@ static void macos_powermetrics_update_sensor(
     const char *context,
     const char *units,
     const char *sensor_label,
+    const char *subsystem,
     int priority,
     int update_every,
     collected_number value,
@@ -949,7 +958,7 @@ static void macos_powermetrics_update_sensor(
             update_every,
             RRDSET_TYPE_LINE);
 
-        macos_powermetrics_add_sensor_labels(*st, sensor_label, title);
+        macos_powermetrics_add_sensor_labels(*st, sensor_label, title, subsystem);
     }
 
     if (!*rd)
@@ -1153,6 +1162,7 @@ int do_macos_powermetrics(int update_every, usec_t dt __maybe_unused)
             "system.hw.sensor.fan.input",
             "rotations per minute",
             "fan",
+            "fan",
             NETDATA_CHART_PRIO_SENSORS + 5,
             chart_update_every,
             (collected_number)llround(sample.fan_rpm),
@@ -1168,6 +1178,7 @@ int do_macos_powermetrics(int update_every, usec_t dt __maybe_unused)
             "system.hw.sensor.temperature.input",
             "degrees Celsius",
             "cpu_die",
+            "cpu",
             NETDATA_CHART_PRIO_SENSORS,
             chart_update_every,
             (collected_number)llround(sample.cpu_die_c * 1000.0),

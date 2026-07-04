@@ -383,14 +383,13 @@ Labels:
 | Label      | Description     |
 |:-----------|:----------------|
 | driver | Sensor driver or macOS API source compatible with Linux hardware sensor grouping |
-| subsystem | Sensor subsystem compatible with Linux hardware sensor grouping |
+| subsystem | Hardware subsystem inferred from the sensor source, used with driver for Linux-compatible hardware sensor grouping |
 | chip_id | Sensor chip or macOS service identifier |
 | feature | Stable sensor feature identifier |
 | label | Human-readable sensor label |
 | path | Stable source path for the sensor |
 | source | Data source |
 | sensor | Sensor name |
-| component | Hardware component inferred from the sensor source when available |
 | device | Sanitized device name when available |
 
 Metrics:

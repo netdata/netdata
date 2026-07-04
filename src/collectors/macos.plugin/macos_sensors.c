@@ -49,7 +49,6 @@ struct macos_sensor_chart {
     char subsystem[64];
     char chip_id[128];
     char source[32];
-    char component[64];
 
     bool seen;
     unsigned missing_cycles;
@@ -63,7 +62,7 @@ struct macos_smc_sensor_candidate {
     char key[MACOS_SMC_KEY_LEN + 1];
     enum macos_sensor_kind kind;
     char label[128];
-    char component[64];
+    char subsystem[64];
     bool discovered;
 
     struct macos_smc_sensor_candidate *next;
@@ -180,49 +179,49 @@ static bool macos_sensors_smc_kind_for_key(const char key[MACOS_SMC_KEY_LEN + 1]
     return false;
 }
 
-static void macos_sensors_smc_component_for_key(const char key[MACOS_SMC_KEY_LEN + 1], char *dst, size_t dst_size)
+static void macos_sensors_smc_subsystem_for_key(const char key[MACOS_SMC_KEY_LEN + 1], char *dst, size_t dst_size)
 {
-    const char *component = "hardware";
+    const char *subsystem = "hardware";
 
     switch (tolower((unsigned char)key[1])) {
         case 'a':
-            component = "ambient";
+            subsystem = "ambient";
             break;
         case 'b':
-            component = "battery";
+            subsystem = "battery";
             break;
         case 'c':
-            component = "cpu";
+            subsystem = "cpu";
             break;
         case 'd':
         case 'h':
         case 'n':
-            component = "storage";
+            subsystem = "storage";
             break;
         case 'f':
-            component = "fan";
+            subsystem = "fan";
             break;
         case 'g':
-            component = "gpu";
+            subsystem = "gpu";
             break;
         case 'm':
-            component = "memory";
+            subsystem = "memory";
             break;
         case 'p':
         case 's':
-            component = "soc";
+            subsystem = "soc";
             break;
         case 'w':
-            component = "wireless";
+            subsystem = "wireless";
             break;
         case 'z':
-            component = "power";
+            subsystem = "power";
             break;
         default:
             break;
     }
 
-    snprintfz(dst, dst_size, "%s", component);
+    snprintfz(dst, dst_size, "%s", subsystem);
 }
 
 static void macos_sensors_smc_label_for_key(
@@ -326,8 +325,7 @@ static struct macos_sensor_chart *macos_sensors_get_or_create_chart(
     const char *driver,
     const char *subsystem,
     const char *chip_id,
-    const char *source,
-    const char *component)
+    const char *source)
 {
     struct macos_sensor_chart *s = macos_sensors_find_chart(id);
     if (s)
@@ -343,7 +341,6 @@ static struct macos_sensor_chart *macos_sensors_get_or_create_chart(
     snprintfz(s->subsystem, sizeof(s->subsystem), "%s", subsystem);
     snprintfz(s->chip_id, sizeof(s->chip_id), "%s", chip_id);
     snprintfz(s->source, sizeof(s->source), "%s", source);
-    snprintfz(s->component, sizeof(s->component), "%s", component);
 
     s->next = sensor_charts_root;
     sensor_charts_root = s;
@@ -395,12 +392,11 @@ static void macos_sensors_update_chart(
     const char *subsystem,
     const char *chip_id,
     const char *source,
-    const char *component,
     NETDATA_DOUBLE value,
     int update_every)
 {
     struct macos_sensor_chart *s = macos_sensors_get_or_create_chart(
-        id, kind, label, feature, path, driver, subsystem, chip_id, source, component);
+        id, kind, label, feature, path, driver, subsystem, chip_id, source);
     const struct macos_sensor_kind_def *def = &macos_sensor_defs[kind];
 
     s->seen = true;
@@ -428,7 +424,6 @@ static void macos_sensors_update_chart(
         rrdlabels_add(s->st->rrdlabels, "label", s->label, RRDLABEL_SRC_AUTO);
         rrdlabels_add(s->st->rrdlabels, "path", s->path, RRDLABEL_SRC_AUTO);
         rrdlabels_add(s->st->rrdlabels, "source", s->source, RRDLABEL_SRC_AUTO);
-        rrdlabels_add(s->st->rrdlabels, "component", s->component, RRDLABEL_SRC_AUTO);
         rrdlabels_add(s->st->rrdlabels, "sensor", s->feature, RRDLABEL_SRC_AUTO);
     }
 
@@ -464,7 +459,7 @@ static struct macos_smc_sensor_candidate *macos_sensors_get_or_create_smc_candid
     c->kind = kind;
     c->discovered = true;
     macos_sensors_smc_label_for_key(key, kind, c->label, sizeof(c->label));
-    macos_sensors_smc_component_for_key(key, c->component, sizeof(c->component));
+    macos_sensors_smc_subsystem_for_key(key, c->subsystem, sizeof(c->subsystem));
 
     c->next = smc_candidates_root;
     smc_candidates_root = c;
@@ -560,10 +555,9 @@ static void macos_sensors_collect_smc(int update_every)
             c->key,
             path,
             "AppleSMC",
-            "platform",
+            c->subsystem,
             "AppleSMC",
             "smc",
-            c->component,
             decoded,
             update_every);
     }
@@ -708,10 +702,9 @@ static void macos_sensors_collect_hid(int update_every)
             feature,
             path,
             "IOHID",
-            "hid",
+            "thermal",
             "IOHIDEventSystemClient",
             "iohid",
-            "thermal",
             temp,
             update_every);
     }

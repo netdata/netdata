@@ -875,7 +875,7 @@ modules:
             - name: driver
               description: Sensor driver or macOS API source compatible with Linux hardware sensor grouping
             - name: subsystem
-              description: Sensor subsystem compatible with Linux hardware sensor grouping
+              description: Hardware subsystem inferred from the sensor source, used with driver for Linux-compatible hardware sensor grouping
             - name: chip_id
               description: Sensor chip or macOS service identifier
             - name: feature
@@ -888,8 +888,6 @@ modules:
               description: Data source
             - name: sensor
               description: Sensor name
-            - name: component
-              description: Hardware component inferred from the sensor source when available
             - name: device
               description: Sanitized device name when available
           metrics:
