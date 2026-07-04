@@ -24,14 +24,15 @@ Module: mach_smi
 Monitor macOS metrics for efficient operating system performance, power sources, thermal pressure, sensors, fans, storage, and networking.
 
 The plugin uses eight different methods to collect data:
-  - The function `sysctlbyname` is called to collect network, swap, loadavg, and boot time.
-  - The function `host_statistics` is called to collect CPU and virtual memory data.
-  - The function `IOServiceGetMatchingServices` is called to collect storage information.
-  - The function `IOPSCopyPowerSourcesInfo` is called to collect battery and UPS power source data.
-  - The private Apple IOReport framework is loaded at runtime to collect Apple Silicon GPU utilization, performance-state residency, clock frequency, and power draw without root privileges when macOS exposes the required channels.
-  - AppleSMC and IOHID are sampled directly to collect hardware temperature, fan, voltage, current, and power sensors without requiring `powermetrics`.
-  - The native Apple `powermetrics` command is sampled in continuous loop mode to collect thermal pressure, plus SMC temperatures, fan speed, and fallback GPU power when the macOS sampler is available.
-  - The native IOKit NVMe SMART user client is sampled to collect NVMe health data when macOS exposes readable SMART-capable NVMe services.
+
+- The function `sysctlbyname` is called to collect network, swap, loadavg, and boot time.
+- The function `host_statistics` is called to collect CPU and virtual memory data.
+- The function `IOServiceGetMatchingServices` is called to collect storage information.
+- The function `IOPSCopyPowerSourcesInfo` is called to collect battery and UPS power source data.
+- The private Apple IOReport framework is loaded at runtime to collect Apple Silicon GPU utilization, performance-state residency, clock frequency, and power draw without root privileges when macOS exposes the required channels.
+- AppleSMC and IOHID are sampled directly to collect hardware temperature, fan, voltage, current, and power sensors without requiring `powermetrics`.
+- The native Apple `powermetrics` command is sampled in continuous loop mode to collect thermal pressure, plus SMC temperatures, fan speed, and fallback GPU power when the macOS sampler is available.
+- The native IOKit NVMe SMART user client is sampled to collect NVMe health data when macOS exposes readable SMART-capable NVMe services.
 
 
 This collector is only supported on the following platforms:
@@ -176,7 +177,7 @@ sudo ./edit-config netdata.conf
 
 ##### Examples
 
-###### Disable swap monitoring.
+###### Disable swap monitoring
 
 A basic example that discards swap monitoring
 
@@ -191,7 +192,7 @@ A basic example that discards swap monitoring
 ```
 </details>
 
-###### Disable complete Machine SMI section.
+###### Disable complete Machine SMI section
 
 A basic example that discards swap monitoring
 
@@ -208,7 +209,7 @@ A basic example that discards swap monitoring
 ```
 </details>
 
-###### Disable thermal and fan sampling.
+###### Disable thermal and fan sampling
 
 Disable the privileged `powermetrics` sampler while keeping the rest of `macos.plugin` enabled.
 
@@ -221,7 +222,7 @@ Disable the privileged `powermetrics` sampler while keeping the rest of `macos.p
 ```
 </details>
 
-###### Disable Apple Silicon GPU monitoring.
+###### Disable Apple Silicon GPU monitoring
 
 Disable IOReport GPU monitoring while keeping other macOS metrics enabled.
 
@@ -234,7 +235,7 @@ Disable IOReport GPU monitoring while keeping other macOS metrics enabled.
 ```
 </details>
 
-###### Disable direct hardware sensor monitoring.
+###### Disable direct hardware sensor monitoring
 
 Disable direct AppleSMC and IOHID hardware sensor monitoring while keeping the rest of `macos.plugin` enabled.
 
@@ -247,7 +248,7 @@ Disable direct AppleSMC and IOHID hardware sensor monitoring while keeping the r
 ```
 </details>
 
-###### Disable native NVMe SMART sampling.
+###### Disable native NVMe SMART sampling
 
 Disable native IOKit NVMe SMART health monitoring while keeping generic disk I/O monitoring enabled.
 
@@ -346,7 +347,7 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | macos.gpu_utilization | utilization | percentage |
-| macos.gpu_performance_state_residency | pstate_<index>_<mhz>mhz | percentage |
+| macos.gpu_performance_state_residency | pstate_&lt;index&gt;_&lt;mhz&gt;mhz | percentage |
 | macos.gpu_clock_freq | frequency | MHz |
 | macos.gpu_power_draw | power_draw | W |
 | macos.gpu_temperature | temperature | degrees Celsius |

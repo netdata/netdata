@@ -23,14 +23,15 @@ modules:
         metrics_description: "Monitor macOS metrics for efficient operating system performance, power sources, thermal pressure, sensors, fans, storage, and networking."
         method_description: |
           The plugin uses eight different methods to collect data:
-            - The function `sysctlbyname` is called to collect network, swap, loadavg, and boot time.
-            - The function `host_statistics` is called to collect CPU and virtual memory data.
-            - The function `IOServiceGetMatchingServices` is called to collect storage information.
-            - The function `IOPSCopyPowerSourcesInfo` is called to collect battery and UPS power source data.
-            - The private Apple IOReport framework is loaded at runtime to collect Apple Silicon GPU utilization, performance-state residency, clock frequency, and power draw without root privileges when macOS exposes the required channels.
-            - AppleSMC and IOHID are sampled directly to collect hardware temperature, fan, voltage, current, and power sensors without requiring `powermetrics`.
-            - The native Apple `powermetrics` command is sampled in continuous loop mode to collect thermal pressure, plus SMC temperatures, fan speed, and fallback GPU power when the macOS sampler is available.
-            - The native IOKit NVMe SMART user client is sampled to collect NVMe health data when macOS exposes readable SMART-capable NVMe services.
+
+          - The function `sysctlbyname` is called to collect network, swap, loadavg, and boot time.
+          - The function `host_statistics` is called to collect CPU and virtual memory data.
+          - The function `IOServiceGetMatchingServices` is called to collect storage information.
+          - The function `IOPSCopyPowerSourcesInfo` is called to collect battery and UPS power source data.
+          - The private Apple IOReport framework is loaded at runtime to collect Apple Silicon GPU utilization, performance-state residency, clock frequency, and power draw without root privileges when macOS exposes the required channels.
+          - AppleSMC and IOHID are sampled directly to collect hardware temperature, fan, voltage, current, and power sensors without requiring `powermetrics`.
+          - The native Apple `powermetrics` command is sampled in continuous loop mode to collect thermal pressure, plus SMC temperatures, fan speed, and fallback GPU power when the macOS sampler is available.
+          - The native IOKit NVMe SMART user client is sampled to collect NVMe health data when macOS exposes readable SMART-capable NVMe services.
       supported_platforms:
         include:
           - macOS
@@ -378,7 +379,7 @@ modules:
             enabled: false
             title: "Config"
           list:
-            - name: Disable swap monitoring.
+            - name: Disable swap monitoring
               folding:
                 enabled: true
               description: A basic example that discards swap monitoring
@@ -387,7 +388,7 @@ modules:
                   system swap = no
                 [plugin:macos:mach_smi]
                   swap i/o = no
-            - name: Disable complete Machine SMI section.
+            - name: Disable complete Machine SMI section
               folding:
                 enabled: true
               description: A basic example that discards swap monitoring
@@ -398,28 +399,28 @@ modules:
                   swap i/o = no
                   memory page faults = no
                   disk i/o = no
-            - name: Disable thermal and fan sampling.
+            - name: Disable thermal and fan sampling
               folding:
                 enabled: true
               description: Disable the privileged `powermetrics` sampler while keeping the rest of `macos.plugin` enabled.
               config: |
                 [plugin:macos]
                   powermetrics = no
-            - name: Disable Apple Silicon GPU monitoring.
+            - name: Disable Apple Silicon GPU monitoring
               folding:
                 enabled: true
               description: Disable IOReport GPU monitoring while keeping other macOS metrics enabled.
               config: |
                 [plugin:macos]
                   gpu = no
-            - name: Disable direct hardware sensor monitoring.
+            - name: Disable direct hardware sensor monitoring
               folding:
                 enabled: true
               description: Disable direct AppleSMC and IOHID hardware sensor monitoring while keeping the rest of `macos.plugin` enabled.
               config: |
                 [plugin:macos]
                   sensors = no
-            - name: Disable native NVMe SMART sampling.
+            - name: Disable native NVMe SMART sampling
               folding:
                 enabled: true
               description: Disable native IOKit NVMe SMART health monitoring while keeping generic disk I/O monitoring enabled.
@@ -815,7 +816,7 @@ modules:
               unit: "percentage"
               chart_type: stacked
               dimensions:
-                - name: pstate_<index>_<mhz>mhz
+                - name: pstate_&lt;index&gt;_&lt;mhz&gt;mhz
             - name: macos.gpu_clock_freq
               description: Weighted average GPU clock frequency
               unit: "MHz"

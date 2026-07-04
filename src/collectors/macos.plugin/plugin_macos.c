@@ -27,6 +27,7 @@ static struct macos_module {
 };
 
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < 8
+// cppcheck-suppress preprocessorErrorDirective
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 8
 #endif
 
