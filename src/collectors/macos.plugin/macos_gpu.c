@@ -13,6 +13,7 @@
 
 #define MACOS_GPU_DVFS_KEY "voltage-states9"
 #define MACOS_GPU_DVFS_SCALE_HZ_PER_MHZ 1000000.0
+#define MACOS_GPU_MAX_DVFS_STATES 64
 #define MACOS_GPU_SAMPLE_STALE_AFTER_SEC 30
 #define MACOS_GPU_MAX_SMC_KEYS 64
 #define MACOS_GPU_SMC_KEY_LEN 4
@@ -87,6 +88,9 @@ struct macos_gpu_key_data {
 struct macos_gpu_metrics {
     bool has_active_residency;
     NETDATA_DOUBLE active_residency_perc;
+    bool has_performance_state_residency;
+    size_t performance_state_count;
+    NETDATA_DOUBLE performance_state_residency_perc[MACOS_GPU_MAX_DVFS_STATES];
     bool has_frequency;
     NETDATA_DOUBLE frequency_mhz;
     bool has_power;
@@ -124,6 +128,8 @@ struct macos_gpu_state {
 
     RRDSET *st_active_residency;
     RRDDIM *rd_active_residency;
+    RRDSET *st_performance_state_residency;
+    RRDDIM *rd_performance_state_residency[MACOS_GPU_MAX_DVFS_STATES];
     RRDSET *st_frequency;
     RRDDIM *rd_frequency;
     RRDSET *st_power;
@@ -216,10 +222,27 @@ static bool macos_gpu_ioreport_item_strings(
     return group[0] != '\0' && channel[0] != '\0';
 }
 
+static void macos_gpu_performance_state_dim_name(size_t index, char *dst, size_t dst_size)
+{
+    if (index < gpu.gpu_freqs_count && isfinite(gpu.gpu_freqs_mhz[index]) && gpu.gpu_freqs_mhz[index] > 0.0) {
+        snprintfz(
+            dst,
+            dst_size,
+            "pstate_%zu_%lldmhz",
+            index,
+            (long long)llround(gpu.gpu_freqs_mhz[index]));
+        return;
+    }
+
+    snprintfz(dst, dst_size, "pstate_%zu", index);
+}
+
 static void macos_gpu_mark_charts_obsolete(void)
 {
     if (gpu.st_active_residency)
         rrdset_is_obsolete___safe_from_collector_thread(gpu.st_active_residency);
+    if (gpu.st_performance_state_residency)
+        rrdset_is_obsolete___safe_from_collector_thread(gpu.st_performance_state_residency);
     if (gpu.st_frequency)
         rrdset_is_obsolete___safe_from_collector_thread(gpu.st_frequency);
     if (gpu.st_power)
@@ -719,6 +742,15 @@ static bool macos_gpu_process_residency(CFDictionaryRef item, struct macos_gpu_m
     for (int32_t i = offset; i < count; i++)
         active += (NETDATA_DOUBLE)residencies[i];
 
+    if (gpu.gpu_freqs_count <= MACOS_GPU_MAX_DVFS_STATES) {
+        metrics->has_performance_state_residency = true;
+        metrics->performance_state_count = gpu.gpu_freqs_count;
+        for (size_t i = 0; i < gpu.gpu_freqs_count; i++) {
+            metrics->performance_state_residency_perc[i] =
+                active > 0.0 ? ((NETDATA_DOUBLE)residencies[offset + (int)i] / active) * 100.0 : 0.0;
+        }
+    }
+
     NETDATA_DOUBLE average_mhz = 0.0;
     if (active > 0.0) {
         for (size_t i = 0; i < gpu.gpu_freqs_count; i++)
@@ -855,6 +887,62 @@ static void macos_gpu_update_gpu_charts(const struct macos_gpu_metrics *metrics,
         }
         rrddim_set_by_pointer(gpu.st_active_residency, gpu.rd_active_residency, (collected_number)llround(metrics->active_residency_perc * 1000.0));
         rrdset_done(gpu.st_active_residency);
+    }
+
+    if (metrics->has_performance_state_residency && metrics->performance_state_count > 0) {
+        size_t state_count = metrics->performance_state_count;
+        if (state_count > MACOS_GPU_MAX_DVFS_STATES)
+            state_count = MACOS_GPU_MAX_DVFS_STATES;
+
+        if (!gpu.st_performance_state_residency) {
+            gpu.st_performance_state_residency = rrdset_create_localhost(
+                "macos",
+                "gpu_performance_state_residency",
+                NULL,
+                "gpu",
+                "macos.gpu_performance_state_residency",
+                "GPU Performance State Residency",
+                "percentage",
+                "macos.plugin",
+                "gpu",
+                NETDATA_CHART_PRIO_SENSORS - 17,
+                update_every,
+                RRDSET_TYPE_STACKED);
+            rrdlabels_add(
+                gpu.st_performance_state_residency->rrdlabels,
+                "source",
+                "ioreport",
+                RRDLABEL_SRC_AUTO);
+        }
+
+        for (size_t i = 0; i < state_count; i++) {
+            if (!gpu.rd_performance_state_residency[i]) {
+                char dim_name[64];
+                macos_gpu_performance_state_dim_name(i, dim_name, sizeof(dim_name));
+                gpu.rd_performance_state_residency[i] =
+                    rrddim_add(
+                        gpu.st_performance_state_residency,
+                        dim_name,
+                        NULL,
+                        1,
+                        1000,
+                        RRD_ALGORITHM_ABSOLUTE);
+            }
+            rrddim_set_by_pointer(
+                gpu.st_performance_state_residency,
+                gpu.rd_performance_state_residency[i],
+                (collected_number)llround(metrics->performance_state_residency_perc[i] * 1000.0));
+        }
+
+        for (size_t i = state_count; i < MACOS_GPU_MAX_DVFS_STATES; i++) {
+            if (gpu.rd_performance_state_residency[i])
+                rrddim_set_by_pointer(
+                    gpu.st_performance_state_residency,
+                    gpu.rd_performance_state_residency[i],
+                    0);
+        }
+
+        rrdset_done(gpu.st_performance_state_residency);
     }
 
     if (metrics->has_frequency) {

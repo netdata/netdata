@@ -28,7 +28,7 @@ The plugin uses seven different methods to collect data:
   - The function `host_statistics` is called to collect CPU and virtual memory data.
   - The function `IOServiceGetMatchingServices` is called to collect storage information.
   - The function `IOPSCopyPowerSourcesInfo` is called to collect battery and UPS power source data.
-  - The private Apple IOReport framework is loaded at runtime to collect Apple Silicon GPU active residency, frequency, and power without root privileges when macOS exposes the required channels.
+  - The private Apple IOReport framework is loaded at runtime to collect Apple Silicon GPU active residency, performance-state residency, frequency, and power without root privileges when macOS exposes the required channels.
   - The native Apple `powermetrics` command is sampled in continuous loop mode to collect thermal pressure, plus SMC temperatures, fan speed, and fallback GPU power when the macOS sampler is available.
   - The native IOKit NVMe SMART user client is sampled to collect NVMe health data when macOS exposes readable SMART-capable NVMe services.
 
@@ -327,6 +327,7 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | macos.gpu_utilization | utilization | percentage |
+| macos.gpu_performance_state_residency | pstate_<index>_<mhz>mhz | percentage |
 | macos.gpu_clock_freq | frequency | MHz |
 | macos.gpu_power_draw | power_draw | W |
 
