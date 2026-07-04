@@ -213,7 +213,7 @@ static void collect_destination_metrics(struct destination_metrics *dest) {
             break;
         case INT_MIN:
             if (debug)
-                fprintf(stderr, "printer state is missing for destination %s", dest->name);
+                fprintf(stderr, "printer state is missing for destination %s\n", dest->name);
             break;
         default:
             netdata_log_error("Unknown printer state (%d) found.", dest->state);
