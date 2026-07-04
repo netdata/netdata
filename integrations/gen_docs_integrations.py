@@ -16,6 +16,10 @@ id_to_path = {}
 # -----------------------------
 # FS utilities
 # -----------------------------
+def with_single_final_newline(md: str) -> str:
+    return md.rstrip("\r\n") + "\n"
+
+
 def cleanup(only_base_paths=None):
     """
     Clean generated /integrations folders.
@@ -51,7 +55,7 @@ def clean_and_write(md: str, path: Path):
     md = re.sub(r'\{% details open=true summary="(.*?)" %\}', r'<details open><summary>\1</summary>\n', md)
     md = re.sub(r'\{% details summary="(.*?)" %\}', r'<details><summary>\1</summary>\n', md)
     md = md.replace("{% /details %}", "</details>\n")
-    path.write_text(md.rstrip() + "\n", encoding="utf-8")
+    path.write_text(with_single_final_newline(md), encoding="utf-8")
 
 
 def resolve_related_links():
@@ -76,7 +80,7 @@ def resolve_related_links():
             return name
 
         md = re.sub(r'\{% relatedResource id="([^"]*)" %\}(.*?)\{% /relatedResource %\}', _resolve, md)
-        p.write_text(md.rstrip() + "\n", encoding="utf-8")
+        p.write_text(with_single_final_newline(md), encoding="utf-8")
 
 
 def build_path(meta_yaml_link: str) -> str:
