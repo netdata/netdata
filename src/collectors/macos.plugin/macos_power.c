@@ -156,6 +156,21 @@ static void macos_power_source_labels(RRDSET *st, const struct macos_power_sourc
     rrdlabels_add(st->rrdlabels, "source", "iokit", RRDLABEL_SRC_AUTO);
 }
 
+static void macos_power_source_temperature_labels(RRDSET *st, const struct macos_power_source *ps)
+{
+    char path[RRD_ID_LENGTH_MAX + 32];
+    snprintfz(path, sizeof(path), "IOPowerSources/%s", ps->ps.name);
+
+    macos_power_source_labels(st, ps);
+    rrdlabels_add(st->rrdlabels, "driver", "IOPowerSources", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "subsystem", "power_supply", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "chip_id", ps->ps.name, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "feature", "battery_temperature", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "label", "Battery Temperature", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "path", path, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "sensor", "battery_temperature", RRDLABEL_SRC_AUTO);
+}
+
 static void macos_power_source_update_current(struct macos_power_source *ps, int update_every)
 {
     if (!ps->st_current) {
@@ -204,8 +219,7 @@ static void macos_power_source_update_temperature(struct macos_power_source *ps,
             update_every,
             RRDSET_TYPE_LINE);
 
-        macos_power_source_labels(ps->st_temperature, ps);
-        rrdlabels_add(ps->st_temperature->rrdlabels, "sensor", "battery_temperature", RRDLABEL_SRC_AUTO);
+        macos_power_source_temperature_labels(ps->st_temperature, ps);
     }
 
     if (!ps->rd_temperature)

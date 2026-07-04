@@ -873,6 +873,21 @@ static int macos_powermetrics_chart_update_every(int plugin_update_every)
     return chart_update_every;
 }
 
+static void macos_powermetrics_add_sensor_labels(RRDSET *st, const char *feature, const char *label)
+{
+    char path[128];
+    snprintfz(path, sizeof(path), "powermetrics/%s", feature);
+
+    rrdlabels_add(st->rrdlabels, "source", "powermetrics", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "driver", "powermetrics", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "subsystem", "platform", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "chip_id", "powermetrics", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "feature", feature, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "label", label, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "path", path, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "sensor", feature, RRDLABEL_SRC_AUTO);
+}
+
 static void macos_powermetrics_update_thermal_pressure(const struct macos_powermetrics_sample *sample, int update_every)
 {
     if (!st_thermal_pressure) {
@@ -890,8 +905,7 @@ static void macos_powermetrics_update_thermal_pressure(const struct macos_powerm
             update_every,
             RRDSET_TYPE_LINE);
 
-        rrdlabels_add(st_thermal_pressure->rrdlabels, "source", "powermetrics", RRDLABEL_SRC_AUTO);
-        rrdlabels_add(st_thermal_pressure->rrdlabels, "sensor", "thermal_pressure", RRDLABEL_SRC_AUTO);
+        macos_powermetrics_add_sensor_labels(st_thermal_pressure, "thermal_pressure", "Thermal Pressure State");
 
         for (size_t i = 0; i < MACOS_THERMAL_PRESSURE_COUNT; i++)
             rd_thermal_pressure[i] =
@@ -936,8 +950,7 @@ static void macos_powermetrics_update_sensor(
             update_every,
             RRDSET_TYPE_LINE);
 
-        rrdlabels_add((*st)->rrdlabels, "source", "powermetrics", RRDLABEL_SRC_AUTO);
-        rrdlabels_add((*st)->rrdlabels, "sensor", sensor_label, RRDLABEL_SRC_AUTO);
+        macos_powermetrics_add_sensor_labels(*st, sensor_label, title);
     }
 
     if (!*rd)

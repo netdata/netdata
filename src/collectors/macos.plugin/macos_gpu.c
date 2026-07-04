@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "macos_smc.h"
 #include "plugin_macos.h"
 
 #include <CoreFoundation/CoreFoundation.h>
@@ -16,7 +17,6 @@
 #define MACOS_GPU_MAX_DVFS_STATES 64
 #define MACOS_GPU_SAMPLE_STALE_AFTER_SEC 30
 #define MACOS_GPU_MAX_SMC_KEYS 64
-#define MACOS_GPU_SMC_KEY_LEN 4
 
 typedef const void *IOReportSubscriptionRef;
 typedef struct __IOHIDEventSystemClient *IOHIDEventSystemClientRef;
@@ -49,40 +49,6 @@ struct macos_gpu_ioreport_funcs {
     int32_t (*state_get_count)(CFDictionaryRef);
     CFStringRef (*state_get_name_for_index)(CFDictionaryRef, int32_t);
     int64_t (*state_get_residency)(CFDictionaryRef, int32_t);
-};
-
-struct macos_gpu_key_data_ver {
-    uint8_t major;
-    uint8_t minor;
-    uint8_t build;
-    uint8_t reserved;
-    uint16_t release;
-};
-
-struct macos_gpu_p_limit_data {
-    uint16_t version;
-    uint16_t length;
-    uint32_t cpu_p_limit;
-    uint32_t gpu_p_limit;
-    uint32_t mem_p_limit;
-};
-
-struct macos_gpu_key_info {
-    uint32_t data_size;
-    uint32_t data_type;
-    uint8_t data_attributes;
-};
-
-struct macos_gpu_key_data {
-    uint32_t key;
-    struct macos_gpu_key_data_ver vers;
-    struct macos_gpu_p_limit_data p_limit_data;
-    struct macos_gpu_key_info key_info;
-    uint8_t result;
-    uint8_t status;
-    uint8_t data8;
-    uint32_t data32;
-    uint8_t bytes[32];
 };
 
 struct macos_gpu_metrics {
@@ -122,7 +88,7 @@ struct macos_gpu_state {
     size_t gpu_freqs_count;
 
     io_connect_t smc_connection;
-    char smc_gpu_keys[MACOS_GPU_MAX_SMC_KEYS][MACOS_GPU_SMC_KEY_LEN + 1];
+    char smc_gpu_keys[MACOS_GPU_MAX_SMC_KEYS][MACOS_SMC_KEY_LEN + 1];
     size_t smc_gpu_keys_count;
     CFDictionaryRef hid_matching;
 
@@ -143,26 +109,6 @@ static struct macos_gpu_state gpu = {0};
 static uint32_t macos_gpu_read_le32(const uint8_t *p)
 {
     return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
-}
-
-static uint32_t macos_gpu_read_be32(const uint8_t *p)
-{
-    return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) | (uint32_t)p[3];
-}
-
-static uint32_t macos_gpu_key_from_cstr(const char key[MACOS_GPU_SMC_KEY_LEN + 1])
-{
-    return ((uint32_t)(uint8_t)key[0] << 24) | ((uint32_t)(uint8_t)key[1] << 16) |
-           ((uint32_t)(uint8_t)key[2] << 8) | (uint32_t)(uint8_t)key[3];
-}
-
-static void macos_gpu_key_to_cstr(uint32_t key, char dst[MACOS_GPU_SMC_KEY_LEN + 1])
-{
-    dst[0] = (char)((key >> 24) & 0xff);
-    dst[1] = (char)((key >> 16) & 0xff);
-    dst[2] = (char)((key >> 8) & 0xff);
-    dst[3] = (char)(key & 0xff);
-    dst[4] = '\0';
 }
 
 static bool macos_gpu_cfstring_to_cstr(CFStringRef str, char *dst, size_t dst_size)
@@ -438,146 +384,29 @@ failed:
     return false;
 }
 
-static bool macos_gpu_smc_call(const struct macos_gpu_key_data *input, struct macos_gpu_key_data *output)
-{
-    size_t output_size = sizeof(*output);
-    memset(output, 0, sizeof(*output));
-
-    IOReturn kr = IOConnectCallStructMethod(
-        gpu.smc_connection,
-        2,
-        input,
-        sizeof(*input),
-        output,
-        &output_size);
-
-    if (kr != kIOReturnSuccess)
-        return false;
-
-    return output->result == 0;
-}
-
-static bool macos_gpu_smc_read_key_info(uint32_t key, struct macos_gpu_key_info *info)
-{
-    struct macos_gpu_key_data input = {
-        .key = key,
-        .data8 = 9,
-    };
-    struct macos_gpu_key_data output;
-
-    if (!macos_gpu_smc_call(&input, &output))
-        return false;
-
-    *info = output.key_info;
-    return true;
-}
-
-static bool macos_gpu_smc_read_value(uint32_t key, const struct macos_gpu_key_info *info, struct macos_gpu_key_data *output)
-{
-    struct macos_gpu_key_data input = {
-        .key = key,
-        .key_info = *info,
-        .data8 = 5,
-    };
-
-    return macos_gpu_smc_call(&input, output);
-}
-
-static bool macos_gpu_smc_read_float_key(const char key_name[MACOS_GPU_SMC_KEY_LEN + 1], NETDATA_DOUBLE *value)
-{
-    uint32_t key = macos_gpu_key_from_cstr(key_name);
-    struct macos_gpu_key_info info;
-    if (!macos_gpu_smc_read_key_info(key, &info))
-        return false;
-
-    if (info.data_size != 4 || info.data_type != macos_gpu_key_from_cstr("flt "))
-        return false;
-
-    struct macos_gpu_key_data output;
-    if (!macos_gpu_smc_read_value(key, &info, &output))
-        return false;
-
-    uint32_t raw = macos_gpu_read_le32(output.bytes);
-    float temp;
-    memcpy(&temp, &raw, sizeof(temp));
-    if (!isfinite(temp) || temp <= 0.0 || temp > 150.0)
-        return false;
-
-    *value = (NETDATA_DOUBLE)temp;
-    return true;
-}
-
-static bool macos_gpu_smc_key_by_index(uint32_t index, char key_name[MACOS_GPU_SMC_KEY_LEN + 1])
-{
-    struct macos_gpu_key_data input = {
-        .data8 = 8,
-        .data32 = index,
-    };
-    struct macos_gpu_key_data output;
-
-    if (!macos_gpu_smc_call(&input, &output))
-        return false;
-
-    macos_gpu_key_to_cstr(output.key, key_name);
-    return true;
-}
-
-static bool macos_gpu_smc_key_count(uint32_t *count)
-{
-    uint32_t key = macos_gpu_key_from_cstr("#KEY");
-    struct macos_gpu_key_info info;
-    if (!macos_gpu_smc_read_key_info(key, &info))
-        return false;
-
-    struct macos_gpu_key_data output;
-    if (!macos_gpu_smc_read_value(key, &info, &output))
-        return false;
-
-    *count = macos_gpu_read_be32(output.bytes);
-    return true;
-}
-
 static bool macos_gpu_open_smc(void)
 {
-    io_iterator_t iter = IO_OBJECT_NULL;
-    IOReturn kr = IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("AppleSMC"), &iter);
-    if (kr != kIOReturnSuccess || iter == IO_OBJECT_NULL)
-        return false;
-
-    bool opened = false;
-    io_service_t service;
-    while ((service = IOIteratorNext(iter)) != IO_OBJECT_NULL) {
-        io_name_t name;
-        if (IORegistryEntryGetName(service, name) == kIOReturnSuccess && !strcmp(name, "AppleSMCKeysEndpoint")) {
-            kr = IOServiceOpen(service, mach_task_self(), 0, &gpu.smc_connection);
-            opened = kr == kIOReturnSuccess;
-        }
-        IOObjectRelease(service);
-        if (opened)
-            break;
-    }
-    IOObjectRelease(iter);
-
-    if (!opened)
+    if (!macos_smc_open(&gpu.smc_connection))
         return false;
 
     uint32_t count = 0;
-    if (!macos_gpu_smc_key_count(&count)) {
-        IOServiceClose(gpu.smc_connection);
-        gpu.smc_connection = IO_OBJECT_NULL;
+    if (!macos_smc_key_count(gpu.smc_connection, &count)) {
+        macos_smc_close(&gpu.smc_connection);
         return false;
     }
 
     for (uint32_t i = 0; i < count && gpu.smc_gpu_keys_count < MACOS_GPU_MAX_SMC_KEYS; i++) {
-        char key[MACOS_GPU_SMC_KEY_LEN + 1];
-        if (!macos_gpu_smc_key_by_index(i, key))
+        char key[MACOS_SMC_KEY_LEN + 1];
+        if (!macos_smc_key_by_index(gpu.smc_connection, i, key))
             continue;
 
         if (strncmp(key, "Tg", 2) != 0)
             continue;
 
+        struct macos_smc_value value;
         NETDATA_DOUBLE ignored;
-        if (!macos_gpu_smc_read_float_key(key, &ignored))
+        if (!macos_smc_read_key(gpu.smc_connection, key, &value) ||
+            !macos_smc_decode_temperature(&value, &ignored))
             continue;
 
         snprintfz(gpu.smc_gpu_keys[gpu.smc_gpu_keys_count], sizeof(gpu.smc_gpu_keys[gpu.smc_gpu_keys_count]), "%s", key);
@@ -585,8 +414,7 @@ static bool macos_gpu_open_smc(void)
     }
 
     if (gpu.smc_gpu_keys_count == 0) {
-        IOServiceClose(gpu.smc_connection);
-        gpu.smc_connection = IO_OBJECT_NULL;
+        macos_smc_close(&gpu.smc_connection);
         return false;
     }
 
@@ -696,8 +524,10 @@ static bool macos_gpu_read_temperature(NETDATA_DOUBLE *temperature_c)
         NETDATA_DOUBLE sum = 0.0;
         size_t values = 0;
         for (size_t i = 0; i < gpu.smc_gpu_keys_count; i++) {
+            struct macos_smc_value value;
             NETDATA_DOUBLE temp;
-            if (!macos_gpu_smc_read_float_key(gpu.smc_gpu_keys[i], &temp))
+            if (!macos_smc_read_key(gpu.smc_connection, gpu.smc_gpu_keys[i], &value) ||
+                !macos_smc_decode_temperature(&value, &temp))
                 continue;
             sum += temp;
             values++;
@@ -1105,10 +935,7 @@ void macos_gpu_cleanup(void)
 {
     macos_gpu_ioreport_close_subscription();
 
-    if (gpu.smc_connection) {
-        IOServiceClose(gpu.smc_connection);
-        gpu.smc_connection = IO_OBJECT_NULL;
-    }
+    macos_smc_close(&gpu.smc_connection);
     if (gpu.hid_matching) {
         CFRelease(gpu.hid_matching);
         gpu.hid_matching = NULL;

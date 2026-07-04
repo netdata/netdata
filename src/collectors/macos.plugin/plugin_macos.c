@@ -18,6 +18,7 @@ static struct macos_module {
     {.name = "iokit",                            .dim = "iokit",    .enabled = 1, .func = do_macos_iokit},
     {.name = "power sources",                    .dim = "power",    .enabled = 1, .func = do_macos_power_sources},
     {.name = "gpu",                              .dim = "gpu",      .enabled = 1, .func = do_macos_gpu},
+    {.name = "sensors",                          .dim = "sensors",  .enabled = 1, .func = do_macos_sensors},
     {.name = "powermetrics",                     .dim = "pwrmet",   .enabled = 1, .func = do_macos_powermetrics},
     {.name = "nvme smart",                       .dim = "nvme",     .enabled = 1, .func = do_macos_nvme_smart},
 
@@ -25,8 +26,8 @@ static struct macos_module {
     {.name = NULL, .dim = NULL, .enabled = 0, .func = NULL}
 };
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 7
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 7
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 8
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 8
 #endif
 
 static void macos_main_cleanup(void *pptr)
@@ -37,6 +38,7 @@ static void macos_main_cleanup(void *pptr)
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     macos_gpu_cleanup();
+    macos_sensors_cleanup();
     macos_powermetrics_cleanup();
     macos_nvme_smart_cleanup();
     macos_power_sources_cleanup();
