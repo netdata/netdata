@@ -145,8 +145,7 @@ fn write_wal_seq(wal_tenant_dir: &Path, batches: &[Vec<ResourceLogs>], seq_start
             pipeline_id: 0,
             payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
         },
-        uuid::Uuid::from_u128(1),
-        uuid::Uuid::from_u128(2),
+        wal::test_identity(),
     )
     .expect("writer");
     for (i, b) in batches.iter().enumerate() {
@@ -304,8 +303,7 @@ fn wal_stream_filter_matches_absent_namespace() {
             pipeline_id: 0,
             payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
         },
-        uuid::Uuid::from_u128(1),
-        uuid::Uuid::from_u128(2),
+        wal::test_identity(),
     )
     .expect("writer");
     let (data, count) = encode_ng_frame(batch_for(records(0..10), "", "api"));

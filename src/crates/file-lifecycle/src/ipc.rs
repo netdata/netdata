@@ -199,8 +199,7 @@ pub enum CatalogBuilderResponse {
     Rotated {
         tenant_id: TenantId,
         date: chrono::NaiveDate,
-        machine_id: uuid::Uuid,
-        instance_id: uuid::Uuid,
+        identity: file_registry::Identity,
         max_seq: u64,
         /// Union `[min_timestamp_s, max_timestamp_s]` across all
         /// entries in the rotated catalog. Encoded into the filename
@@ -217,8 +216,7 @@ pub enum CatalogBuilderResponse {
     RotationFailed {
         tenant_id: TenantId,
         date: chrono::NaiveDate,
-        machine_id: uuid::Uuid,
-        instance_id: uuid::Uuid,
+        identity: file_registry::Identity,
         max_seq: u64,
         error: String,
     },

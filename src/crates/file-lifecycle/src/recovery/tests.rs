@@ -1,18 +1,16 @@
 use super::*;
 
-fn machine() -> uuid::Uuid {
-    uuid::Uuid::from_u128(0x0011_2233_4455_6677_8899_aabb_ccdd_eeff)
-}
+fn machine() -> file_registry::MachineId { file_registry::MachineId::new(uuid::Uuid::from_u128(0x0011_2233_4455_6677_8899_aabb_ccdd_eeff)).unwrap() }
 
-fn instance() -> uuid::Uuid {
-    uuid::Uuid::from_u128(0xaaaa_bbbb_cccc_dddd_eeee_ffff_0000_1111)
-}
+fn instance() -> file_registry::InstanceId { file_registry::InstanceId::new(uuid::Uuid::from_u128(0xaaaa_bbbb_cccc_dddd_eeee_ffff_0000_1111)).unwrap() }
+
+fn ident() -> file_registry::Identity { file_registry::Identity::new(machine(), instance()) }
 
 use crate::test_helpers::empty_summary;
 
 fn make_entry(seq: u64) -> otel_catalog::CatalogEntry {
     let (part_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
-    let id = file_registry::FileId::new(machine(), instance(), 0, seq, part_key);
+    let id = file_registry::FileId::new(ident(), 0, seq, part_key);
     let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
     otel_catalog::CatalogEntry {
         id,
@@ -49,13 +47,12 @@ fn write_catalog_file(
     let min_ts = entries.iter().map(|e| e.min_timestamp_s).min().unwrap_or(0);
     let max_ts = entries.iter().map(|e| e.max_timestamp_s).max().unwrap_or(0);
     let path = dir.join(otel_catalog::filename(
-        machine(),
-        instance(),
+        ident(),
         max_seq,
         min_ts,
         max_ts,
     ));
-    let mut catalog = Catalog::new(TenantId::from("tenant1"), date, machine(), instance());
+    let mut catalog = Catalog::new(TenantId::from("tenant1"), date, ident());
     for entry in entries {
         catalog.add(entry.clone());
     }
@@ -93,7 +90,7 @@ fn seed_from_catalog_files_skips_corrupt_files() {
     let dir = file_registry::layout::date_tenant_dir(catalog_dir.path(), date, "tenant1");
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(
-        dir.join(otel_catalog::filename(machine(), instance(), 1, 0, 0)),
+        dir.join(otel_catalog::filename(ident(), 1, 0, 0)),
         b"not valid json",
     )
     .unwrap();
@@ -138,7 +135,7 @@ async fn recover_retention_evicts_only_remote_cataloged() {
     let mut reg = make_registry(catalog_dir.path());
 
     for seq in [1u64, 2, 3] {
-        let id = file_registry::FileId::new(machine(), instance(), 0, seq, 0);
+        let id = file_registry::FileId::new(ident(), 0, seq, 0);
         reg.sfst.track(id, ByteSize(1), empty_summary());
     }
     // seq=2: rotated AND confirmed present on the remote -> evictable.
@@ -174,7 +171,7 @@ async fn recover_retention_evicts_all_when_storage_disabled() {
     let mut reg = make_registry(catalog_dir.path());
 
     for seq in [1u64, 2] {
-        let id = file_registry::FileId::new(machine(), instance(), 0, seq, 0);
+        let id = file_registry::FileId::new(ident(), 0, seq, 0);
         reg.sfst.track(id, ByteSize(1), empty_summary());
     }
 
@@ -212,20 +209,20 @@ fn place_local_catalog(
 ) -> std::path::PathBuf {
     let path = reg
         .catalog_files
-        .file_path(date, machine(), instance(), max_seq, min_ts, max_ts);
+        .file_path(date, ident(), max_seq, min_ts, max_ts);
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
 
     // Write a real catalog container so reconcile can read its SFST seqs; the
     // single entry's seq is `max_seq`.
     let mut catalog =
-        otel_catalog::Catalog::new(TenantId::from("tenant1"), date, machine(), instance());
+        otel_catalog::Catalog::new(TenantId::from("tenant1"), date, ident());
     catalog.add(make_entry(max_seq));
     let bytes = catalog.to_container_bytes().unwrap();
     std::fs::write(&path, &bytes).unwrap();
 
     let size = ByteSize(bytes.len() as u64);
     reg.catalog_files.track(
-        otel_catalog::File::new(date, machine(), instance(), max_seq, min_ts, max_ts, size),
+        otel_catalog::File::new(date, ident(), max_seq, min_ts, max_ts, size),
         path.clone(),
     );
     path
@@ -273,8 +270,7 @@ async fn reconcile_local_catalog_uploads_re_uploads_missing_files() {
         "logs",
         date,
         &TenantId::from("tenant1"),
-        machine(),
-        instance(),
+        ident(),
         10,
         100,
         200,
@@ -304,8 +300,7 @@ async fn reconcile_local_catalog_uploads_skips_existing_files() {
         "logs",
         date,
         &TenantId::from("tenant1"),
-        machine(),
-        instance(),
+        ident(),
         10,
         100,
         200,
@@ -449,8 +444,7 @@ async fn reconcile_local_catalog_uploads_skips_pending_deletion_files() {
         "logs",
         date,
         &TenantId::from("tenant1"),
-        machine(),
-        instance(),
+        ident(),
         10,
         100,
         200,
@@ -602,7 +596,7 @@ fn spawn_idle_catalog_builder(
 
 /// Remote SFST object key for `seq` under today's prefix.
 fn remote_sfst_key(seq: u64) -> (file_registry::FileId, String) {
-    let id = file_registry::FileId::new(machine(), instance(), 0, seq, 0);
+    let id = file_registry::FileId::new(ident(), 0, seq, 0);
     let today = chrono::Utc::now().date_naive();
     (
         id,
@@ -860,8 +854,7 @@ async fn recover_unindexed_orphans_unsealable_wals() {
             pipeline_id: 0,
             payload_format: 7,
         },
-        machine(),
-        instance(),
+        ident(),
     )
     .unwrap();
     writer
@@ -945,7 +938,7 @@ async fn recover_unindexed_orphans_unsealable_wals() {
 fn holds_seq_tracks_wal_or_sfst_artifacts() {
     let catalog_dir = tempfile::tempdir().unwrap();
     let mut registry = make_registry(catalog_dir.path());
-    let id = file_registry::FileId::new(machine(), instance(), 0, 7, 1);
+    let id = file_registry::FileId::new(ident(), 0, 7, 1);
 
     assert!(!registry.holds_seq(7), "nothing tracked yet");
 

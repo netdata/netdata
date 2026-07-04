@@ -6,6 +6,7 @@ use sfst::BitmapValue;
 use std::collections::HashMap;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
+use file_registry::{test_identity, Identity, InstanceId, MachineId};
 
 fn make_tenant_registries() -> TenantRegistries {
     TenantRegistries::new(
@@ -114,12 +115,9 @@ fn write_test_sfst(path: &std::path::Path, min_s: u32) {
     std::fs::write(path, &buf).unwrap();
 }
 
-/// Install a single SFST file under tenant `t`, returning the
-/// machine/instance uuids used so callers can reason about seq.
-fn install_sfst(tr: &mut TenantRegistries, tenant: &str, seq: u64, min_s: u32) -> (Uuid, Uuid) {
-    let machine = Uuid::from_u128(0x11);
-    let instance = Uuid::from_u128(0x22);
-    let id = FileId::new(machine, instance, 0, seq, 7);
+/// Install a single SFST file under tenant `t`.
+fn install_sfst(tr: &mut TenantRegistries, tenant: &str, seq: u64, min_s: u32) {
+    let id = FileId::new(test_identity(), 0, seq, 7);
 
     // get_or_create initializes the tenant subdir; we then write
     // the file at the registry's computed path and track it.
@@ -130,7 +128,6 @@ fn install_sfst(tr: &mut TenantRegistries, tenant: &str, seq: u64, min_s: u32) -
     let summary =
         crate::test_helpers::summary_for(&ServiceStream::new("ns", "svc"), 6, min_s, min_s + 5);
     reg.sfst.track(id, size, summary);
-    (machine, instance)
 }
 
 /// Write a 3-log SFST with only a `service` field — no
@@ -196,7 +193,7 @@ fn write_service_only_sfst(path: &std::path::Path, min_s: u32) {
 
 /// Install a 3-log service-only SFST (see [`write_service_only_sfst`]).
 fn install_service_only_sfst(tr: &mut TenantRegistries, tenant: &str, seq: u64, min_s: u32) {
-    let id = FileId::new(Uuid::from_u128(0x11), Uuid::from_u128(0x22), 0, seq, 7);
+    let id = FileId::new(test_identity(), 0, seq, 7);
     let reg = tr.get_or_create(&TenantId::from(tenant));
     let path = reg.sfst.file_path(id);
     write_service_only_sfst(&path, min_s);
@@ -259,7 +256,7 @@ fn write_same_ts_sfst(path: &std::path::Path, ts_s: u32, n: usize) {
 }
 
 fn install_same_ts_sfst(tr: &mut TenantRegistries, tenant: &str, seq: u64, ts_s: u32, n: usize) {
-    let id = FileId::new(Uuid::from_u128(0x11), Uuid::from_u128(0x22), 0, seq, 7);
+    let id = FileId::new(test_identity(), 0, seq, 7);
     let reg = tr.get_or_create(&TenantId::from(tenant));
     let path = reg.sfst.file_path(id);
     write_same_ts_sfst(&path, ts_s, n);
@@ -367,14 +364,14 @@ async fn files_request_includes_wal_and_catalog_entries() {
     use chrono::NaiveDate;
 
     let mut tr = make_tenant_registries();
-    let machine = Uuid::from_u128(0xa1);
-    let instance = Uuid::from_u128(0xb2);
+    let machine = MachineId::new(Uuid::from_u128(0xa1)).unwrap();
+    let instance = InstanceId::new(Uuid::from_u128(0xb2)).unwrap();
     let stream = ServiceStream::new("walns", "walsvc");
     let (_, wal_content_meta) = crate::test_helpers::identity_for(&stream);
     {
         let reg = tr.get_or_create(&TenantId::from("default"));
         // An active WAL: Created, then Synced sets entry_count + time range.
-        let active = FileId::new(machine, instance, 0, 10, 0xab);
+        let active = FileId::new(Identity::new(machine, instance), 0, 10, 0xab);
         reg.wal
             .apply_event(&wal::FileEvent::Created {
                 file_id: active,
@@ -393,7 +390,7 @@ async fn files_request_includes_wal_and_catalog_entries() {
             })
             .unwrap();
         // An archived WAL: Created, then Closed seals it + sets size.
-        let archived = FileId::new(machine, instance, 0, 11, 0xcd);
+        let archived = FileId::new(Identity::new(machine, instance), 0, 11, 0xcd);
         reg.wal
             .apply_event(&wal::FileEvent::Created {
                 file_id: archived,
@@ -413,8 +410,7 @@ async fn files_request_includes_wal_and_catalog_entries() {
         // A tracked catalog file.
         let cat = otel_catalog::File::new(
             NaiveDate::from_ymd_opt(2026, 6, 19).unwrap(),
-            machine,
-            instance,
+            Identity::new(machine, instance),
             7,   // max_seq
             100, // min_ts_s
             200, // max_ts_s
@@ -1073,21 +1069,19 @@ fn track_remote_catalog(
     let mut catalog = otel_catalog::Catalog::new(
         TenantId::from(tenant),
         date,
-        id.machine_id,
-        id.instance_id,
+        Identity::new(id.machine_id, id.instance_id),
     );
     catalog.add(entry);
     let path =
         reg.catalog_files
-            .file_path(date, id.machine_id, id.instance_id, id.seq, min_s, max_s);
+            .file_path(date, Identity::new(id.machine_id, id.instance_id), id.seq, min_s, max_s);
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     std::fs::write(&path, catalog.to_container_bytes().unwrap()).unwrap();
     let csize = ByteSize(std::fs::metadata(&path).unwrap().len());
     reg.catalog_files.track(
         otel_catalog::File::new(
             date,
-            id.machine_id,
-            id.instance_id,
+            Identity::new(id.machine_id, id.instance_id),
             id.seq,
             min_s,
             max_s,
@@ -1117,8 +1111,7 @@ async fn remote_only_sfst_is_fetched_and_served() {
     // Build a real SFST's bytes; do NOT install it locally. The FileId's ns_hash
     // matches the stream (as production `build_catalog_entry` guarantees).
     let id = FileId::new(
-        Uuid::from_u128(0x11),
-        Uuid::from_u128(0x22),
+        Identity::new(MachineId::new(Uuid::from_u128(0x11)).unwrap(), InstanceId::new(Uuid::from_u128(0x22)).unwrap()),
         0,
         1,
         ServiceStream::new("ns", "svc").ns_hash(),
@@ -1202,8 +1195,7 @@ async fn remote_only_sfst_is_fetched_and_served() {
 async fn remote_fetch_failure_degrades() {
     let mut tr = make_tenant_registries();
     let id = FileId::new(
-        Uuid::from_u128(0x11),
-        Uuid::from_u128(0x22),
+        Identity::new(MachineId::new(Uuid::from_u128(0x11)).unwrap(), InstanceId::new(Uuid::from_u128(0x22)).unwrap()),
         0,
         1,
         ServiceStream::new("ns", "svc").ns_hash(),

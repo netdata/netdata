@@ -1,6 +1,8 @@
 use super::*;
 use file_registry::ByteSize;
 use uuid::Uuid;
+use file_registry::{Identity, InstanceId, MachineId};
+fn ident() -> Identity { Identity::new(MachineId::new(Uuid::from_u128(1)).unwrap(), InstanceId::new(Uuid::from_u128(2)).unwrap()) }
 
 fn make_registry() -> Registry {
     let wal_dir = tempfile::tempdir().unwrap();
@@ -21,7 +23,7 @@ fn unuploaded_ids_excludes_uploaded_seqs() {
     let mut reg = make_registry();
 
     for seq in [1u64, 2, 3] {
-        let id = FileId::new(Uuid::from_u128(1), Uuid::from_u128(2), 0, seq, 0);
+        let id = FileId::new(ident(), 0, seq, 0);
         reg.sfst.track(id, ByteSize(1), empty_summary());
     }
     reg.mark_uploaded(2);
@@ -34,7 +36,7 @@ fn unuploaded_ids_excludes_uploaded_seqs() {
 #[test]
 fn unuploaded_ids_is_empty_when_all_uploaded() {
     let mut reg = make_registry();
-    let id = FileId::new(Uuid::from_u128(1), Uuid::from_u128(2), 0, 5, 0);
+    let id = FileId::new(ident(), 0, 5, 0);
     reg.sfst.track(id, ByteSize(1), empty_summary());
     reg.mark_uploaded(5);
 
@@ -91,7 +93,7 @@ fn catalog_stage_axis_is_monotone() {
 #[test]
 fn evict_seq_clears_all_per_seq_state() {
     let mut reg = make_registry();
-    let id = FileId::new(Uuid::from_u128(1), Uuid::from_u128(2), 0, 42, 0);
+    let id = FileId::new(ident(), 0, 42, 0);
     reg.sfst.track(id, ByteSize(1), empty_summary());
     reg.mark_uploaded(42);
     reg.mark_rotated(42);
@@ -147,12 +149,12 @@ fn query_snapshot_is_scoped_to_one_tenant() {
     let tenant_a = TenantId::from("tenant-a");
     let tenant_b = TenantId::from("tenant-b");
     tr.get_or_create(&tenant_a).sfst.track(
-        FileId::new(Uuid::from_u128(1), Uuid::from_u128(2), 0, 1, part_key),
+        FileId::new(ident(), 0, 1, part_key),
         ByteSize(1),
         summary.clone(),
     );
     tr.get_or_create(&tenant_b).sfst.track(
-        FileId::new(Uuid::from_u128(1), Uuid::from_u128(2), 0, 2, part_key),
+        FileId::new(ident(), 0, 2, part_key),
         ByteSize(1),
         summary,
     );
@@ -190,8 +192,8 @@ fn enumerate_streams_dedups_and_aggregates_sfst_and_unsealed_wal() {
         catalog_base.path().to_path_buf(),
     );
     let tenant = TenantId::from("t");
-    let mid = Uuid::from_u128(1);
-    let bid = Uuid::from_u128(2);
+    let mid = MachineId::new(Uuid::from_u128(1)).unwrap();
+    let bid = InstanceId::new(Uuid::from_u128(2)).unwrap();
     // Logical streams as opaque `(namespace, name)` tuples; the substrate keys
     // them by an opaque `part_key` and never decodes the identity.
     let api = ("prod", "api");
@@ -205,12 +207,12 @@ fn enumerate_streams_dedups_and_aggregates_sfst_and_unsealed_wal() {
         let r = tr.get_or_create(&tenant);
         // Two SFSTs on the same stream → aggregated into one entry.
         r.sfst.track(
-            FileId::new(mid, bid, 0, 1, pk(api)),
+            FileId::new(Identity::new(mid, bid), 0, 1, pk(api)),
             ByteSize(1000),
             sfst_sum(100, 200, api),
         );
         r.sfst.track(
-            FileId::new(mid, bid, 0, 2, pk(api)),
+            FileId::new(Identity::new(mid, bid), 0, 2, pk(api)),
             ByteSize(500),
             sfst_sum(200, 300, api),
         );
@@ -219,7 +221,7 @@ fn enumerate_streams_dedups_and_aggregates_sfst_and_unsealed_wal() {
         // active, synced WAL: `Synced` sets the durable byte count and the
         // range but NOT `File.size` (that lands on close), so this also
         // exercises the `valid_up_to` size proxy in `enumerate_streams`.
-        let db_id = FileId::new(mid, bid, 0, 3, pk(db));
+        let db_id = FileId::new(Identity::new(mid, bid), 0, 3, pk(db));
         let (_, db_content_meta) = crate::test_helpers::identity_for(db.0, db.1);
         r.wal
             .apply_event(&FileEvent::Created {
@@ -240,7 +242,7 @@ fn enumerate_streams_dedups_and_aggregates_sfst_and_unsealed_wal() {
             .unwrap();
         // A WAL shadow of SFST seq=1 (post-index/pre-delete window). SFST
         // wins by seq, so its huge size must NOT double-count.
-        let shadow = FileId::new(mid, bid, 0, 1, pk(api));
+        let shadow = FileId::new(Identity::new(mid, bid), 0, 1, pk(api));
         let (_, api_content_meta) = crate::test_helpers::identity_for(api.0, api.1);
         r.wal
             .apply_event(&FileEvent::Created {

@@ -12,11 +12,10 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use chrono::NaiveDate;
-use file_registry::{ByteSize, TenantId};
+use file_registry::{ByteSize, Identity, InstanceId, MachineId, TenantId};
 use otel_catalog::Catalog;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
-use uuid::Uuid;
 
 use crate::component::Component;
 use crate::ipc::{CatalogBuilderRequest, CatalogBuilderResponse};
@@ -31,7 +30,7 @@ pub struct CatalogBuilderArgs {
 
 pub struct CatalogBuilder;
 
-type ScopeKey = (TenantId, NaiveDate, Uuid, Uuid);
+type ScopeKey = (TenantId, NaiveDate, MachineId, InstanceId);
 
 impl Component for CatalogBuilder {
     type Request = CatalogBuilderRequest;
@@ -76,10 +75,11 @@ async fn handle_request(
     let machine_id = entry.id.machine_id;
     let instance_id = entry.id.instance_id;
 
+    let identity = Identity::new(machine_id, instance_id);
     let key: ScopeKey = (tenant_id.clone(), date, machine_id, instance_id);
     let catalog = accumulators
         .entry(key.clone())
-        .or_insert_with(|| Catalog::new(tenant_id.clone(), date, machine_id, instance_id));
+        .or_insert_with(|| Catalog::new(tenant_id.clone(), date, identity));
     catalog.add(entry);
 
     if catalog.entries.len() < args.rotation_count {
@@ -120,8 +120,7 @@ async fn handle_request(
             return CatalogBuilderResponse::RotationFailed {
                 tenant_id,
                 date,
-                machine_id,
-                instance_id,
+                identity,
                 max_seq,
                 error: e.to_string(),
             };
@@ -133,8 +132,7 @@ async fn handle_request(
         &args.catalog_base_dir,
         &tenant_id,
         date,
-        machine_id,
-        instance_id,
+        identity,
         max_seq,
         min_timestamp_s,
         max_timestamp_s,
@@ -148,8 +146,7 @@ async fn handle_request(
         return CatalogBuilderResponse::RotationFailed {
             tenant_id,
             date,
-            machine_id,
-            instance_id,
+            identity,
             max_seq,
             error: e.to_string(),
         };
@@ -169,8 +166,7 @@ async fn handle_request(
     CatalogBuilderResponse::Rotated {
         tenant_id,
         date,
-        machine_id,
-        instance_id,
+        identity,
         max_seq,
         min_timestamp_s,
         max_timestamp_s,
@@ -194,20 +190,13 @@ pub(crate) fn scope_path(
     base: &Path,
     tenant_id: &TenantId,
     date: NaiveDate,
-    machine_id: Uuid,
-    instance_id: Uuid,
+    identity: Identity,
     max_seq: u64,
     min_timestamp_s: u32,
     max_timestamp_s: u32,
 ) -> PathBuf {
     file_registry::layout::date_tenant_dir(base, date, tenant_id.as_str()).join(
-        otel_catalog::filename(
-            machine_id,
-            instance_id,
-            max_seq,
-            min_timestamp_s,
-            max_timestamp_s,
-        ),
+        otel_catalog::filename(identity, max_seq, min_timestamp_s, max_timestamp_s),
     )
 }
 

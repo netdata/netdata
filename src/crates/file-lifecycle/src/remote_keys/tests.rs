@@ -1,12 +1,11 @@
 use super::*;
+use uuid::Uuid;
 
-fn machine() -> Uuid {
-    Uuid::from_u128(0x0011_2233_4455_6677_8899_aabb_ccdd_eeff)
-}
+fn machine() -> file_registry::MachineId { file_registry::MachineId::new(Uuid::from_u128(0x0011_2233_4455_6677_8899_aabb_ccdd_eeff)).unwrap() }
 
-fn instance() -> Uuid {
-    Uuid::from_u128(0xaaaa_bbbb_cccc_dddd_eeee_ffff_0000_1111)
-}
+fn instance() -> file_registry::InstanceId { file_registry::InstanceId::new(Uuid::from_u128(0xaaaa_bbbb_cccc_dddd_eeee_ffff_0000_1111)).unwrap() }
+
+fn ident() -> file_registry::Identity { file_registry::Identity::new(machine(), instance()) }
 
 fn sample_date() -> NaiveDate {
     NaiveDate::from_ymd_opt(2026, 4, 17).unwrap()
@@ -18,7 +17,7 @@ fn tenant() -> TenantId {
 
 #[test]
 fn sfst_key_and_date_roundtrip() {
-    let id = FileId::new(machine(), instance(), 0, 42, 0);
+    let id = FileId::new(ident(), 0, 42, 0);
     let key = sfst("logs", &tenant(), sample_date(), id);
     assert!(key.starts_with("v2/logs/tenants/tenant1/sfst/2026-04-17/"));
     assert!(key.ends_with(".sfst"));
@@ -37,7 +36,7 @@ fn sfst_prefix_has_trailing_slash() {
 fn signal_segment_scopes_the_key() {
     // The signal segment is the top-level discriminator: two signals never
     // share a prefix, so per-signal LIST/lifecycle/IAM stays clean.
-    let id = FileId::new(machine(), instance(), 0, 42, 0);
+    let id = FileId::new(ident(), 0, 42, 0);
     assert!(sfst("logs", &tenant(), sample_date(), id).starts_with("v2/logs/"));
     assert!(sfst("traces", &tenant(), sample_date(), id).starts_with("v2/traces/"));
     assert!(sfst_prefix("traces", &tenant(), sample_date()).starts_with("v2/traces/"));
@@ -49,8 +48,7 @@ fn catalog_key_is_versioned_signal_catalog_date_tenant() {
         "logs",
         sample_date(),
         &tenant(),
-        machine(),
-        instance(),
+        ident(),
         100,
         1_700_000_000,
         1_700_003_600,

@@ -4,9 +4,8 @@ use std::ops::Range;
 use chrono::NaiveDate;
 use chunk_file::ChunkId;
 use chunk_file::container::{Container, ContainerBuilder};
-use file_registry::{FileId, Query, TenantId};
+use file_registry::{FileId, Identity, InstanceId, MachineId, Query, TenantId};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 use crate::entry::CatalogEntry;
 use crate::{CONTAINER_MAGIC, CONTAINER_VERSION, Error, FORMAT_VERSION};
@@ -27,23 +26,18 @@ const CHUNK_JSON: ChunkId = *b"JSON";
 pub struct Catalog {
     pub tenant_id: TenantId,
     pub date: NaiveDate,
-    pub machine_id: Uuid,
-    pub instance_id: Uuid,
+    pub machine_id: MachineId,
+    pub instance_id: InstanceId,
     pub entries: BTreeMap<FileId, CatalogEntry>,
 }
 
 impl Catalog {
-    pub fn new(
-        tenant_id: TenantId,
-        date: NaiveDate,
-        machine_id: Uuid,
-        instance_id: Uuid,
-    ) -> Self {
+    pub fn new(tenant_id: TenantId, date: NaiveDate, identity: Identity) -> Self {
         Self {
             tenant_id,
             date,
-            machine_id,
-            instance_id,
+            machine_id: identity.machine_id,
+            instance_id: identity.instance_id,
             entries: BTreeMap::new(),
         }
     }
@@ -154,8 +148,8 @@ struct Envelope {
     version: u32,
     tenant_id: TenantId,
     date: NaiveDate,
-    machine_id: Uuid,
-    instance_id: Uuid,
+    machine_id: MachineId,
+    instance_id: InstanceId,
     entries: Vec<CatalogEntry>,
 }
 
@@ -164,20 +158,28 @@ mod tests {
     use super::*;
     use crate::entry::opaque_part_key;
     use file_registry::{ByteSize, TimestampNs};
+    use uuid::Uuid;
+
+    fn ident() -> Identity {
+        // Arbitrary non-nil identities (the newtypes reject the nil UUID).
+        Identity::new(
+            MachineId::new(Uuid::from_u128(0xa1)).unwrap(),
+            InstanceId::new(Uuid::from_u128(1)).unwrap(),
+        )
+    }
 
     fn test_catalog() -> Catalog {
         Catalog::new(
             TenantId::from("tenant1"),
             NaiveDate::from_ymd_opt(2026, 4, 17).unwrap(),
-            Uuid::nil(),
-            Uuid::from_u128(1),
+            ident(),
         )
     }
 
     fn entry_at(seq: u64, min_s: u32, max_s: u32, ns: &str, name: &str) -> CatalogEntry {
         let part_key = opaque_part_key(ns, name);
         CatalogEntry {
-            id: FileId::new(Uuid::nil(), Uuid::from_u128(1), 0, seq, part_key),
+            id: FileId::new(ident(), 0, seq, part_key),
             remote_key: format!("tenant1/sfst/2026-04-17/{seq}.sfst"),
             min_timestamp_s: min_s,
             max_timestamp_s: max_s,

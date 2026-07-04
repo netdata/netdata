@@ -19,8 +19,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use chrono::NaiveDate;
-use file_registry::{ByteSize, Query, TenantId};
-use uuid::Uuid;
+use file_registry::{ByteSize, Identity, InstanceId, MachineId, Query, TenantId};
 
 use crate::{Catalog, CatalogEntry};
 
@@ -30,8 +29,8 @@ const CATALOG_EXT: &str = "catalog";
 #[derive(Debug, Clone)]
 pub struct File {
     pub date: NaiveDate,
-    pub machine_id: Uuid,
-    pub instance_id: Uuid,
+    pub machine_id: MachineId,
+    pub instance_id: InstanceId,
     /// Highest SFST sequence number contained in this catalog.
     pub max_seq: u64,
     /// Min of the contained entries' `min_timestamp_s`.
@@ -47,8 +46,7 @@ impl File {
     /// ledger when a new catalog file is written.
     pub fn new(
         date: NaiveDate,
-        machine_id: Uuid,
-        instance_id: Uuid,
+        identity: Identity,
         max_seq: u64,
         min_timestamp_s: u32,
         max_timestamp_s: u32,
@@ -56,8 +54,8 @@ impl File {
     ) -> Self {
         Self {
             date,
-            machine_id,
-            instance_id,
+            machine_id: identity.machine_id,
+            instance_id: identity.instance_id,
             max_seq,
             min_timestamp_s,
             max_timestamp_s,
@@ -108,21 +106,13 @@ impl Registry {
     pub fn file_path(
         &self,
         date: NaiveDate,
-        machine_id: Uuid,
-        instance_id: Uuid,
+        identity: Identity,
         max_seq: u64,
         min_timestamp_s: u32,
         max_timestamp_s: u32,
     ) -> PathBuf {
-        file_registry::layout::date_tenant_dir(&self.base_dir, date, self.tenant_id.as_str()).join(
-            filename(
-                machine_id,
-                instance_id,
-                max_seq,
-                min_timestamp_s,
-                max_timestamp_s,
-            ),
-        )
+        file_registry::layout::date_tenant_dir(&self.base_dir, date, self.tenant_id.as_str())
+            .join(filename(identity, max_seq, min_timestamp_s, max_timestamp_s))
     }
 
     /// Register a catalog file that has been written to disk.
@@ -270,7 +260,7 @@ impl Registry {
                     Some(s) => s,
                     None => continue,
                 };
-                let (machine_id, instance_id, max_seq, min_ts, max_ts) = match parse_stem(stem) {
+                let (identity, max_seq, min_ts, max_ts) = match parse_stem(stem) {
                     Some(v) => v,
                     None => {
                         tracing::warn!(
@@ -294,8 +284,8 @@ impl Registry {
                     path,
                     File {
                         date,
-                        machine_id,
-                        instance_id,
+                        machine_id: identity.machine_id,
+                        instance_id: identity.instance_id,
                         max_seq,
                         min_timestamp_s: min_ts,
                         max_timestamp_s: max_ts,
@@ -379,7 +369,7 @@ pub fn scan_max_sequence(catalog_base: &Path) -> std::io::Result<u64> {
             let Some(stem) = name.strip_suffix(&format!(".{CATALOG_EXT}")) else {
                 continue;
             };
-            if let Some((_, _, seq, _, _)) = parse_stem(stem) {
+            if let Some((_, seq, _, _)) = parse_stem(stem) {
                 max_seq = max_seq.max(seq);
             }
         }
@@ -390,15 +380,17 @@ pub fn scan_max_sequence(catalog_base: &Path) -> std::io::Result<u64> {
 /// Format a catalog filename:
 /// `{machine:32}-{instance:32}-{max_seq:010}-{min_ts:010}-{max_ts:010}.catalog`.
 pub fn filename(
-    machine_id: Uuid,
-    instance_id: Uuid,
+    identity: Identity,
     max_seq: u64,
     min_timestamp_s: u32,
     max_timestamp_s: u32,
 ) -> String {
     format!(
         "{}-{:010}-{:010}-{:010}.{CATALOG_EXT}",
-        file_registry::stem::format_uuid_pair(machine_id, instance_id),
+        file_registry::stem::format_uuid_pair(
+            identity.machine_id.as_uuid(),
+            identity.instance_id.as_uuid()
+        ),
         max_seq,
         min_timestamp_s,
         max_timestamp_s,
@@ -406,9 +398,10 @@ pub fn filename(
 }
 
 /// Parse the stem `{machine:32}-{instance:32}-{max_seq}-{min_ts}-{max_ts}` into
-/// its components.
-pub fn parse_stem(stem: &str) -> Option<(Uuid, Uuid, u64, u32, u32)> {
-    let (machine_id, instance_id, tail) = file_registry::stem::parse_uuid_pair(stem)?;
+/// its components. A nil-bearing name is rejected (the [`Identity`] newtypes
+/// refuse nil), so a corrupt or pre-identity file surfaces as unparseable.
+pub fn parse_stem(stem: &str) -> Option<(Identity, u64, u32, u32)> {
+    let (machine_uuid, instance_uuid, tail) = file_registry::stem::parse_uuid_pair(stem)?;
     // Split the remaining "max_seq-min_ts-max_ts" by '-'. `splitn(3)`
     // packs any extra '-'-joined trailing segments into the third item,
     // so trailing garbage fails the numeric parse below.
@@ -416,19 +409,28 @@ pub fn parse_stem(stem: &str) -> Option<(Uuid, Uuid, u64, u32, u32)> {
     let max_seq: u64 = parts.next()?.parse().ok()?;
     let min_ts: u32 = parts.next()?.parse().ok()?;
     let max_ts: u32 = parts.next()?.parse().ok()?;
-    Some((machine_id, instance_id, max_seq, min_ts, max_ts))
+    let identity = Identity::new(
+        MachineId::new(machine_uuid).ok()?,
+        InstanceId::new(instance_uuid).ok()?,
+    );
+    Some((identity, max_seq, min_ts, max_ts))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use uuid::Uuid;
 
-    fn machine() -> Uuid {
-        Uuid::from_u128(0x0011_2233_4455_6677_8899_aabb_ccdd_eeff)
+    fn machine() -> MachineId {
+        MachineId::new(Uuid::from_u128(0x0011_2233_4455_6677_8899_aabb_ccdd_eeff)).unwrap()
     }
 
-    fn instance() -> Uuid {
-        Uuid::from_u128(0xaaaa_bbbb_cccc_dddd_eeee_ffff_0000_1111)
+    fn instance() -> InstanceId {
+        InstanceId::new(Uuid::from_u128(0xaaaa_bbbb_cccc_dddd_eeee_ffff_0000_1111)).unwrap()
+    }
+
+    fn ident() -> Identity {
+        Identity::new(machine(), instance())
     }
 
     fn date() -> NaiveDate {
@@ -437,15 +439,25 @@ mod tests {
 
     #[test]
     fn filename_and_parse_roundtrip() {
-        let name = filename(machine(), instance(), 42, 1_700_000_000, 1_700_003_600);
+        let name = filename(ident(), 42, 1_700_000_000, 1_700_003_600);
         assert!(name.ends_with(".catalog"));
         let stem = name.strip_suffix(".catalog").unwrap();
-        let (m, b, s, lo, hi) = parse_stem(stem).unwrap();
-        assert_eq!(m, machine());
-        assert_eq!(b, instance());
+        let (id, s, lo, hi) = parse_stem(stem).unwrap();
+        assert_eq!(id.machine_id, machine());
+        assert_eq!(id.instance_id, instance());
         assert_eq!(s, 42);
         assert_eq!(lo, 1_700_000_000);
         assert_eq!(hi, 1_700_003_600);
+    }
+
+    #[test]
+    fn parse_stem_rejects_nil_identity() {
+        // A nil machine or instance in a catalog filename has no provenance;
+        // parse must reject it (recovery then warn+skips the file).
+        let nil = "00000000000000000000000000000000";
+        let good = machine().as_uuid().simple().to_string();
+        assert!(parse_stem(&format!("{nil}-{good}-42-1-2")).is_none());
+        assert!(parse_stem(&format!("{good}-{nil}-42-1-2")).is_none());
     }
 
     #[test]
@@ -456,8 +468,8 @@ mod tests {
         assert!(
             parse_stem(&format!(
                 "{}-{}-1",
-                machine().as_simple(),
-                instance().as_simple()
+                machine().as_uuid().as_simple(),
+                instance().as_uuid().as_simple()
             ))
             .is_none()
         );
@@ -465,8 +477,8 @@ mod tests {
         assert!(
             parse_stem(&format!(
                 "{}-{}-1-2-3-4",
-                machine().as_simple(),
-                instance().as_simple()
+                machine().as_uuid().as_simple(),
+                instance().as_uuid().as_simple()
             ))
             .is_none()
         );
@@ -483,7 +495,7 @@ mod tests {
     fn file_path_is_base_date_tenant_filename() {
         let tmp = tempfile::tempdir().unwrap();
         let reg = Registry::new(tmp.path(), TenantId::from(TENANT));
-        let p = reg.file_path(date(), machine(), instance(), 7, 100, 200);
+        let p = reg.file_path(date(), ident(), 7, 100, 200);
         assert!(p.starts_with(tmp.path()));
         let s = p.to_str().unwrap();
         assert!(s.contains("2026-04-17"));
@@ -496,7 +508,7 @@ mod tests {
     fn track_and_remove() {
         let tmp = tempfile::tempdir().unwrap();
         let mut reg = Registry::new(tmp.path(), TenantId::from(TENANT));
-        let path = reg.file_path(date(), machine(), instance(), 10, 100, 200);
+        let path = reg.file_path(date(), ident(), 10, 100, 200);
         let file = File {
             date: date(),
             machine_id: machine(),
@@ -522,7 +534,7 @@ mod tests {
     fn pending_deletion_roundtrip() {
         let tmp = tempfile::tempdir().unwrap();
         let mut reg = Registry::new(tmp.path(), TenantId::from(TENANT));
-        let path = reg.file_path(date(), machine(), instance(), 1, 0, 0);
+        let path = reg.file_path(date(), ident(), 1, 0, 0);
         reg.track(
             File {
                 date: date(),
@@ -547,8 +559,7 @@ mod tests {
     fn recover_picks_up_files_written_on_disk() {
         let tmp = tempfile::tempdir().unwrap();
         let expected = tmp.path().join("2026-04-17").join(TENANT).join(filename(
-            machine(),
-            instance(),
+            ident(),
             42,
             100,
             200,
@@ -571,8 +582,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         // Same date, two tenants.
         write_catalog_at(&tmp.path().join("2026-04-17").join(TENANT).join(filename(
-            machine(),
-            instance(),
+            ident(),
             1,
             100,
             200,
@@ -581,7 +591,7 @@ mod tests {
             &tmp.path()
                 .join("2026-04-17")
                 .join("other-tenant")
-                .join(filename(machine(), instance(), 2, 100, 200)),
+                .join(filename(ident(), 2, 100, 200)),
         );
 
         let mut reg = Registry::new(tmp.path(), TenantId::from(TENANT));
@@ -614,8 +624,7 @@ mod tests {
     fn recover_sweeps_stale_catalog_tmp_files() {
         let tmp = tempfile::tempdir().unwrap();
         let good = tmp.path().join("2026-04-17").join(TENANT).join(filename(
-            machine(),
-            instance(),
+            ident(),
             42,
             100,
             200,
@@ -652,19 +661,19 @@ mod tests {
             &tmp.path()
                 .join("2026-04-17")
                 .join("tenant-a")
-                .join(filename(machine(), instance(), 42, 100, 200)),
+                .join(filename(ident(), 42, 100, 200)),
         );
         write_catalog_at(
             &tmp.path()
                 .join("2026-04-17")
                 .join("tenant-b")
-                .join(filename(machine(), instance(), 99, 100, 200)),
+                .join(filename(ident(), 99, 100, 200)),
         );
         write_catalog_at(
             &tmp.path()
                 .join("2026-04-18")
                 .join("tenant-a")
-                .join(filename(machine(), instance(), 7, 100, 200)),
+                .join(filename(ident(), 7, 100, 200)),
         );
         // Non-date subdir and unparseable filename: ignored.
         std::fs::create_dir_all(tmp.path().join("not-a-date").join("tenant-a")).unwrap();
@@ -695,12 +704,11 @@ mod tests {
         min_ts: u32,
         max_ts: u32,
     ) -> PathBuf {
-        let path = reg.file_path(d, machine(), instance(), max_seq, min_ts, max_ts);
+        let path = reg.file_path(d, ident(), max_seq, min_ts, max_ts);
         reg.track(
             File::new(
                 d,
-                machine(),
-                instance(),
+                ident(),
                 max_seq,
                 min_ts,
                 max_ts,
@@ -775,10 +783,10 @@ mod tests {
     fn write_catalog_file(reg: &mut Registry, max_seq: u64, entries: Vec<CatalogEntry>) -> PathBuf {
         let min_ts = entries.iter().map(|e| e.min_timestamp_s).min().unwrap_or(0);
         let max_ts = entries.iter().map(|e| e.max_timestamp_s).max().unwrap_or(0);
-        let path = reg.file_path(date(), machine(), instance(), max_seq, min_ts, max_ts);
+        let path = reg.file_path(date(), ident(), max_seq, min_ts, max_ts);
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         let cat = {
-            let mut c = Catalog::new(TenantId::from(TENANT), date(), machine(), instance());
+            let mut c = Catalog::new(TenantId::from(TENANT), date(), ident());
             for e in entries {
                 c.add(e);
             }
@@ -789,8 +797,7 @@ mod tests {
         reg.track(
             File::new(
                 date(),
-                machine(),
-                instance(),
+                ident(),
                 max_seq,
                 min_ts,
                 max_ts,
@@ -804,7 +811,7 @@ mod tests {
     fn entry_at(seq: u64, min_s: u32, max_s: u32, ns: &str, name: &str) -> CatalogEntry {
         let part_key = opaque_part_key(ns, name);
         CatalogEntry {
-            id: file_registry::FileId::new(machine(), instance(), 0, seq, part_key),
+            id: file_registry::FileId::new(ident(), 0, seq, part_key),
             remote_key: format!("k{seq}"),
             min_timestamp_s: min_s,
             max_timestamp_s: max_s,
@@ -905,11 +912,11 @@ mod tests {
         // tracks it; candidates() should log+skip it without poisoning
         // the iterator. Bounds chosen to overlap the query so the
         // file-level pre-filter passes and the body parse is attempted.
-        let bad_path = reg.file_path(date(), machine(), instance(), 20, 100, 200);
+        let bad_path = reg.file_path(date(), ident(), 20, 100, 200);
         std::fs::create_dir_all(bad_path.parent().unwrap()).unwrap();
         std::fs::write(&bad_path, b"not valid json").unwrap();
         reg.track(
-            File::new(date(), machine(), instance(), 20, 100, 200, ByteSize(14)),
+            File::new(date(), ident(), 20, 100, 200, ByteSize(14)),
             bad_path,
         );
 
@@ -931,14 +938,13 @@ mod tests {
         write_catalog_file(&mut reg, 10, vec![entry_at(1, 100, 200, "ns", "a")]);
 
         // Out-of-window catalog with corrupt body — would error if parsed.
-        let oo_path = reg.file_path(date(), machine(), instance(), 20, 1000, 2000);
+        let oo_path = reg.file_path(date(), ident(), 20, 1000, 2000);
         std::fs::create_dir_all(oo_path.parent().unwrap()).unwrap();
         std::fs::write(&oo_path, b"not valid json").unwrap();
         reg.track(
             File::new(
                 date(),
-                machine(),
-                instance(),
+                ident(),
                 20,
                 1000,
                 2000,

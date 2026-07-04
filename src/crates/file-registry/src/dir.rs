@@ -137,6 +137,7 @@ pub fn scan_max_sequence_recursive(base: &Path, ext: &'static str) -> io::Result
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{Identity, InstanceId, MachineId};
     use uuid::Uuid;
 
     fn test_machine_id() -> Uuid {
@@ -147,10 +148,17 @@ mod tests {
         Uuid::try_parse("7f3b2a1e9c4d4f8ab1c2d3e4f5a6b7c8").unwrap()
     }
 
+    fn ident() -> Identity {
+        Identity::new(
+            MachineId::new(test_machine_id()).unwrap(),
+            InstanceId::new(test_instance_id()).unwrap(),
+        )
+    }
+
     #[test]
     fn file_path_derivation() {
         let dir = FileDir::new(Path::new("/tmp/wal"), "wal");
-        let id = FileId::new(test_machine_id(), test_instance_id(), 0, 1, 0);
+        let id = FileId::new(ident(), 0, 1, 0);
         let path = dir.file_path(id);
         assert!(path.to_str().unwrap().ends_with(".wal"));
         assert!(path.starts_with("/tmp/wal"));
@@ -158,7 +166,7 @@ mod tests {
 
     #[test]
     fn parse_matching_extension() {
-        let id = FileId::new(test_machine_id(), test_instance_id(), 0, 42, 0);
+        let id = FileId::new(ident(), 0, 42, 0);
         let filename = id.to_filename("sfst");
         let path = Path::new(&filename);
 
@@ -191,7 +199,7 @@ mod tests {
     /// Create an empty file named `<machine>-<instance>-<pipeline:05>-<seq:010>-<part_key:016x>.<ext>`
     /// under `dir`. Sentinel for the recursive-scan tests below.
     fn touch_file(dir: &Path, seq: u64, ext: &str) {
-        let id = FileId::new(test_machine_id(), test_instance_id(), 0, seq, 0);
+        let id = FileId::new(ident(), 0, seq, 0);
         std::fs::File::create(dir.join(id.to_filename(ext))).unwrap();
     }
 

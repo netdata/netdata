@@ -39,8 +39,7 @@
 //! inverse `parse_*` functions sit together so they stay in sync.
 
 use chrono::NaiveDate;
-use file_registry::{FileId, TenantId};
-use uuid::Uuid;
+use file_registry::{FileId, Identity, TenantId};
 
 /// Schema version prefix. `v2` matches the plugin's namespace (the former
 /// plugin's artifacts were the `v1` generation); bumping this enables
@@ -76,8 +75,7 @@ pub fn catalog(
     signal: &str,
     date: NaiveDate,
     tenant_id: &TenantId,
-    machine_id: Uuid,
-    instance_id: Uuid,
+    identity: Identity,
     max_seq: u64,
     min_timestamp_s: u32,
     max_timestamp_s: u32,
@@ -86,13 +84,7 @@ pub fn catalog(
         "{SCHEMA_VERSION}/{signal}/catalog/{}/{}/{}",
         date.format("%Y-%m-%d"),
         tenant_id,
-        otel_catalog::filename(
-            machine_id,
-            instance_id,
-            max_seq,
-            min_timestamp_s,
-            max_timestamp_s,
-        ),
+        otel_catalog::filename(identity, max_seq, min_timestamp_s, max_timestamp_s),
     )
 }
 

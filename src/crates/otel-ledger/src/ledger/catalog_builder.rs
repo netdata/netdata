@@ -24,8 +24,7 @@ impl Ledger {
             CatalogBuilderResponse::Rotated {
                 tenant_id,
                 date,
-                machine_id,
-                instance_id,
+                identity,
                 max_seq,
                 min_timestamp_s,
                 max_timestamp_s,
@@ -47,8 +46,7 @@ impl Ledger {
                     pipeline.signal(),
                     date,
                     &tenant_id,
-                    machine_id,
-                    instance_id,
+                    identity,
                     max_seq,
                     min_timestamp_s,
                     max_timestamp_s,
@@ -59,8 +57,7 @@ impl Ledger {
                     if let Some(registry) = registries.get_mut(&tenant_id) {
                         let file = otel_catalog::File::new(
                             date,
-                            machine_id,
-                            instance_id,
+                            identity,
                             max_seq,
                             min_timestamp_s,
                             max_timestamp_s,

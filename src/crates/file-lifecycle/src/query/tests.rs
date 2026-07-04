@@ -9,14 +9,12 @@ fn ss(namespace: &str, name: &str) -> (String, String) {
     (namespace.to_owned(), name.to_owned())
 }
 
-fn machine() -> Uuid {
-    Uuid::from_u128(0x0011_2233_4455_6677_8899_aabb_ccdd_eeff)
-}
-fn instance() -> Uuid {
-    Uuid::from_u128(0xaaaa_bbbb_cccc_dddd_eeee_ffff_0000_1111)
-}
+fn machine() -> file_registry::MachineId { file_registry::MachineId::new(Uuid::from_u128(0x0011_2233_4455_6677_8899_aabb_ccdd_eeff)).unwrap() }
+fn instance() -> file_registry::InstanceId { file_registry::InstanceId::new(Uuid::from_u128(0xaaaa_bbbb_cccc_dddd_eeee_ffff_0000_1111)).unwrap() }
+
+fn ident() -> file_registry::Identity { file_registry::Identity::new(machine(), instance()) }
 fn fid(seq: u64, part_key: u64) -> FileId {
-    FileId::new(machine(), instance(), 0, seq, part_key)
+    FileId::new(ident(), 0, seq, part_key)
 }
 
 fn make_registry() -> Registry {
@@ -91,17 +89,17 @@ fn track_remote_as(reg: &mut Registry, seq: u64, ns: &str, name: &str, min_s: u3
     };
 
     let mut catalog =
-        otel_catalog::Catalog::new(TenantId::from("tenant1"), date, machine(), instance());
+        otel_catalog::Catalog::new(TenantId::from("tenant1"), date, ident());
     catalog.add(entry);
 
     let path = reg
         .catalog_files
-        .file_path(date, machine(), instance(), seq, min_s, max_s);
+        .file_path(date, ident(), seq, min_s, max_s);
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     std::fs::write(&path, catalog.to_container_bytes().unwrap()).unwrap();
     let size = ByteSize(std::fs::metadata(&path).unwrap().len());
     reg.catalog_files.track(
-        otel_catalog::File::new(date, machine(), instance(), seq, min_s, max_s, size),
+        otel_catalog::File::new(date, ident(), seq, min_s, max_s, size),
         path,
     );
 }

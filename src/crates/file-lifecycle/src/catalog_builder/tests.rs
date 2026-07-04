@@ -1,15 +1,14 @@
 use super::*;
+use uuid::Uuid;
 use crate::component::ComponentHandle;
 use file_registry::FileId;
 use otel_catalog::CatalogEntry;
 
-fn machine() -> Uuid {
-    Uuid::from_u128(0x0011_2233_4455_6677_8899_aabb_ccdd_eeff)
-}
+fn machine() -> file_registry::MachineId { file_registry::MachineId::new(Uuid::from_u128(0x0011_2233_4455_6677_8899_aabb_ccdd_eeff)).unwrap() }
 
-fn instance() -> Uuid {
-    Uuid::from_u128(0xaaaa_bbbb_cccc_dddd_eeee_ffff_0000_1111)
-}
+fn instance() -> file_registry::InstanceId { file_registry::InstanceId::new(Uuid::from_u128(0xaaaa_bbbb_cccc_dddd_eeee_ffff_0000_1111)).unwrap() }
+
+fn ident() -> file_registry::Identity { file_registry::Identity::new(machine(), instance()) }
 
 fn date() -> NaiveDate {
     NaiveDate::from_ymd_opt(2026, 4, 17).unwrap()
@@ -18,7 +17,7 @@ fn date() -> NaiveDate {
 fn entry_for(seq: u64) -> CatalogEntry {
     let (part_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
     CatalogEntry {
-        id: FileId::new(machine(), instance(), 0, seq, part_key),
+        id: FileId::new(ident(), 0, seq, part_key),
         remote_key: format!("tenant1/sfst/2026-04-17/{seq}.sfst"),
         min_timestamp_s: 1_700_000_000,
         max_timestamp_s: 1_700_003_600,
@@ -88,8 +87,7 @@ async fn add_entry_below_threshold_is_accepted() {
         &h.base,
         &TenantId::from("tenant1"),
         date(),
-        machine(),
-        instance(),
+        ident(),
         1,
         1_700_000_000,
         1_700_003_600,
@@ -234,9 +232,9 @@ async fn distinct_scopes_rotate_independently() {
 
     // A different scope (different machine_id) — shouldn't trigger
     // tenant1's rotation.
-    let other_machine = Uuid::from_u128(0x1111);
+    let other_machine = file_registry::MachineId::new(Uuid::from_u128(0x1111)).unwrap();
     let other_entry = CatalogEntry {
-        id: FileId::new(other_machine, instance(), 0, 1, 0),
+        id: FileId::new(file_registry::Identity::new(other_machine, instance()), 0, 1, 0),
         ..entry_for(1)
     };
     assert!(matches!(
@@ -253,9 +251,9 @@ async fn distinct_scopes_rotate_independently() {
     let resp = h.send_recv(add_request(2)).await;
     match resp {
         CatalogBuilderResponse::Rotated {
-            machine_id, seqs, ..
+            identity, seqs, ..
         } => {
-            assert_eq!(machine_id, machine());
+            assert_eq!(identity.machine_id, machine());
             let mut sorted = seqs.clone();
             sorted.sort();
             assert_eq!(sorted, vec![1, 2]);

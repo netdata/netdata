@@ -3,7 +3,10 @@ pub mod layout;
 pub mod stem;
 
 mod types;
-pub use types::{ByteSize, FileId, FileSummary, TenantId, TimestampNs};
+pub use types::{
+    ByteSize, FileId, FileSummary, Identity, InstanceId, MachineId, NilIdentity, TenantId,
+    TimestampNs, test_identity,
+};
 
 mod selection;
 pub use selection::SelectedFile;

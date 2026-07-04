@@ -28,6 +28,7 @@ serde_json = { workspace = true }
 serde = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { workspace = true, features = ["serde"] }
+file-registry = { workspace = true }
 
 [dev-dependencies]
 console-subscriber = { workspace = true }

@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 
 use bridge::config::AuthConfig;
 use bridge::signals::Signal;
-use file_registry::{MonotonicClock, TenantId};
+use file_registry::{Identity, MonotonicClock, TenantId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
     logs_service_server::LogsService,
@@ -321,10 +321,10 @@ pub struct NetdataLogsService {
     wal_config: bridge::config::WalConfig,
     seq: Arc<wal::SeqAllocator>,
     auth: AuthConfig,
-    /// Identity stamped into every WAL FileId (env-resolved by the supervisor,
-    /// see `bridge::config::PluginConfig::{machine_id, instance_id}`).
-    machine_id: uuid::Uuid,
-    instance_id: uuid::Uuid,
+    /// Identity stamped into every WAL FileId (the machine GUID resolved by the
+    /// supervisor plus its self-generated per-process instance id; see
+    /// `bridge::config::PluginConfig::identity`).
+    identity: Identity,
 }
 
 impl NetdataLogsService {
@@ -335,8 +335,7 @@ impl NetdataLogsService {
         seq: Arc<wal::SeqAllocator>,
         clock: Arc<Mutex<MonotonicClock>>,
         auth: AuthConfig,
-        machine_id: uuid::Uuid,
-        instance_id: uuid::Uuid,
+        identity: Identity,
     ) -> Self {
         Self {
             writers: Mutex::new(HashMap::new()),
@@ -347,8 +346,7 @@ impl NetdataLogsService {
             wal_config,
             seq,
             auth,
-            machine_id,
-            instance_id,
+            identity,
         }
     }
 
@@ -534,8 +532,7 @@ impl LogsService for NetdataLogsService {
                         pipeline_id: Signal::Logs.pipeline_id(),
                         payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
                     },
-                    self.machine_id,
-                    self.instance_id,
+                    self.identity,
                 )
                 .map_err(|e| {
                     tracing::error!(%e, tenant = %tenant_id, "failed to create WAL writer");
@@ -593,6 +590,7 @@ impl LogsService for NetdataLogsService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use file_registry::{InstanceId, MachineId};
     use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue};
     use opentelemetry_proto::tonic::logs::v1::{LogRecord, ScopeLogs};
     use opentelemetry_proto::tonic::resource::v1::Resource;
@@ -845,8 +843,10 @@ mod tests {
             Arc::new(wal::SeqAllocator::ephemeral(0)),
             Arc::new(Mutex::new(MonotonicClock::new())),
             bridge::config::AuthConfig::default(),
-            uuid::Uuid::from_u128(1),
-            uuid::Uuid::from_u128(2),
+            Identity::new(
+                MachineId::new(uuid::Uuid::from_u128(1)).unwrap(),
+                InstanceId::new(uuid::Uuid::from_u128(2)).unwrap(),
+            ),
         )
     }
 

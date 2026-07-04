@@ -24,6 +24,9 @@ pub use reader::{Frame, FrameBoundary, FrameRange, Reader, scan_frame_boundaries
 pub use registry::{File, Registry};
 pub use seq::{DEFAULT_RESERVE_BATCH, SeqAllocator, read_seq_highwater, write_seq_highwater};
 pub use writer::{FileStamp, FrameMeta, Writer};
+// Re-exported so callers of `Writer::new` can name the identity types it takes
+// (and the shared test fixture) without a direct `file-registry` dependency.
+pub use file_registry::{Identity, InstanceId, MachineId, test_identity};
 
 /// Deterministic opaque partition key for tests. The WAL treats `part_key` as
 /// an opaque `u64` and never decodes it, so tests fabricate distinct keys per
@@ -38,15 +41,9 @@ pub(crate) fn opaque_part_key(namespace: &str, name: &str) -> u64 {
     h.finish()
 }
 
-/// Fixed `(machine_id, instance_id)` pair shared by all wal-internal tests
-/// (writer, reader, registry) — arbitrary non-nil UUIDs (the writer rejects nil
-/// at construction), so writer-stamped and directly-constructed FileIds agree.
-#[cfg(test)]
-pub(crate) fn test_identity() -> (uuid::Uuid, uuid::Uuid) {
-    let machine_id = uuid::Uuid::try_parse("550e8400e29b41d4a716446655440000").unwrap();
-    let instance_id = uuid::Uuid::try_parse("7f3b2a1e9c4d4f8ab1c2d3e4f5a6b7c8").unwrap();
-    (machine_id, instance_id)
-}
+// The shared test identity fixture is re-exported above as
+// [`test_identity`](file_registry::test_identity); wal-internal tests call
+// `crate::test_identity()`.
 
 /// Highest WAL sequence on disk across every tenant subdir of `base`.
 /// Returns `0` when `base` is missing or empty. Used at process

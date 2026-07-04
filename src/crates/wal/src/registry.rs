@@ -305,8 +305,8 @@ mod tests {
     use crate::{Config, RotationConfig, Writer};
 
     fn test_file_id(seq: u64) -> FileId {
-        let (machine_id, instance_id) = crate::test_identity();
-        FileId::new(machine_id, instance_id, 0, seq, 0)
+        let identity = crate::test_identity();
+        FileId::new(identity, 0, seq, 0)
     }
 
     /// Helper: create a Writer, write entries, shutdown, and return all events.
@@ -322,7 +322,7 @@ mod tests {
             compression_enabled: true,
         };
         let seq = std::sync::Arc::new(crate::SeqAllocator::ephemeral(0));
-        let (machine_id, instance_id) = crate::test_identity();
+        let identity = crate::test_identity();
         let mut writer = Writer::new(
             dir,
             config,
@@ -331,8 +331,7 @@ mod tests {
                 pipeline_id: 0,
                 payload_format: 7,
             },
-            machine_id,
-            instance_id,
+            identity,
         )
         .unwrap();
         let mut all_events = Vec::new();
@@ -597,8 +596,8 @@ mod tests {
     // ── candidates() tests ───────────────────────────────────────
 
     fn fid_with(seq: u64, part_key: u64) -> FileId {
-        let (machine_id, instance_id) = crate::test_identity();
-        FileId::new(machine_id, instance_id, 0, seq, part_key)
+        let identity = crate::test_identity();
+        FileId::new(identity, 0, seq, part_key)
     }
 
     /// Insert a file via the event flow with the given (min, max) range

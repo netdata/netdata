@@ -46,12 +46,17 @@ pub(crate) fn opaque_part_key(namespace: &str, name: &str) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use file_registry::{Identity, InstanceId, MachineId};
     use uuid::Uuid;
 
     #[test]
     fn catalog_entry_roundtrip() {
+        let ident = Identity::new(
+            MachineId::new(Uuid::from_u128(0xa1)).unwrap(),
+            InstanceId::new(Uuid::from_u128(1)).unwrap(),
+        );
         let entry = CatalogEntry {
-            id: FileId::new(Uuid::nil(), Uuid::from_u128(1), 0, 1, 42),
+            id: FileId::new(ident, 0, 1, 42),
             remote_key: "tenant/sfst/2026-04-17/foo.sfst".into(),
             min_timestamp_s: 1_700_000_000,
             max_timestamp_s: 1_700_003_600,

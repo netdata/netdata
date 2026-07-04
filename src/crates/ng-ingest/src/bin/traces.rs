@@ -125,6 +125,11 @@ async fn main() -> anyhow::Result<()> {
     // name implies — do not copy this into production code.
     let instance_id = journal_common::load_boot_id()
         .context("failed to load boot id from /proc/sys/kernel/random/boot_id")?;
+    let identity = file_registry::Identity::new(
+        file_registry::MachineId::new(machine_id).context("machine id must not be the nil UUID")?,
+        file_registry::InstanceId::new(instance_id)
+            .context("instance id must not be the nil UUID")?,
+    );
     let writer = wal::Writer::new(
         &args.out,
         one_file_config(),
@@ -133,8 +138,7 @@ async fn main() -> anyhow::Result<()> {
             pipeline_id: TRACES_PIPELINE_ID,
             payload_format: ng_flatten::TRACE_FRAME_PAYLOAD_FORMAT,
         },
-        machine_id,
-        instance_id,
+        identity,
     )
     .with_context(|| format!("failed to create WAL writer in {}", args.out.display()))?;
 

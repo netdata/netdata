@@ -23,7 +23,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use file_registry::{MonotonicClock, TenantId};
+use file_registry::{Identity, MonotonicClock, TenantId};
 use opentelemetry_proto::tonic::collector::trace::v1::{
     ExportTraceServiceRequest, ExportTraceServiceResponse, trace_service_server::TraceService,
 };
@@ -60,10 +60,10 @@ pub struct NetdataTracesService {
     /// Shared global seq allocator (file `seq` is globally unique across signals).
     seq: Arc<wal::SeqAllocator>,
     auth: AuthConfig,
-    /// Identity stamped into every WAL FileId (env-resolved by the supervisor,
-    /// see `bridge::config::PluginConfig::{machine_id, instance_id}`).
-    machine_id: uuid::Uuid,
-    instance_id: uuid::Uuid,
+    /// Identity stamped into every WAL FileId (the machine GUID resolved by the
+    /// supervisor plus its self-generated per-process instance id; see
+    /// `bridge::config::PluginConfig::identity`).
+    identity: Identity,
 }
 
 impl NetdataTracesService {
@@ -74,8 +74,7 @@ impl NetdataTracesService {
         seq: Arc<wal::SeqAllocator>,
         clock: Arc<Mutex<MonotonicClock>>,
         auth: AuthConfig,
-        machine_id: uuid::Uuid,
-        instance_id: uuid::Uuid,
+        identity: Identity,
     ) -> Self {
         Self {
             writers: Mutex::new(HashMap::new()),
@@ -85,8 +84,7 @@ impl NetdataTracesService {
             wal_config,
             seq,
             auth,
-            machine_id,
-            instance_id,
+            identity,
         }
     }
 
@@ -150,8 +148,7 @@ impl TraceService for NetdataTracesService {
                     pipeline_id: Signal::Traces.pipeline_id(),
                     payload_format: TRACES_PROOF_PAYLOAD_FORMAT,
                 },
-                self.machine_id,
-                self.instance_id,
+                self.identity,
             )
             .map_err(|e| {
                 tracing::error!(%e, tenant = %tenant_id, "failed to create traces WAL writer");

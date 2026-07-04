@@ -138,8 +138,7 @@ fn request_roundtrips_through_a_wal_frame() {
             pipeline_id: PIPELINE_ID,
             payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
         },
-        uuid::Uuid::from_u128(1),
-        uuid::Uuid::from_u128(2),
+        wal::test_identity(),
     )
     .unwrap();
     let mut clock = MonotonicClock::new();
@@ -266,8 +265,7 @@ fn empty_request_writes_no_frame() {
             pipeline_id: PIPELINE_ID,
             payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
         },
-        uuid::Uuid::from_u128(1),
-        uuid::Uuid::from_u128(2),
+        wal::test_identity(),
     )
     .unwrap();
     let mut clock = MonotonicClock::new();
@@ -316,8 +314,7 @@ fn write_and_decode_records(req: ExportLogsServiceRequest) -> Vec<ng_flatten::Re
             pipeline_id: PIPELINE_ID,
             payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
         },
-        uuid::Uuid::from_u128(1),
-        uuid::Uuid::from_u128(2),
+        wal::test_identity(),
     )
     .unwrap();
     let mut clock = MonotonicClock::new();
@@ -468,8 +465,7 @@ fn trace_request_roundtrips_through_a_wal_frame() {
             pipeline_id: TRACES_PIPELINE_ID,
             payload_format: ng_flatten::TRACE_FRAME_PAYLOAD_FORMAT,
         },
-        uuid::Uuid::from_u128(1),
-        uuid::Uuid::from_u128(2),
+        wal::test_identity(),
     )
     .unwrap();
     let mut clock = MonotonicClock::new();

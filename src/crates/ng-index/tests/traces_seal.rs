@@ -90,8 +90,7 @@ fn seal(reqs: Vec<ExportTraceServiceRequest>) -> Vec<u8> {
         seq,
         wal::FileStamp { pipeline_id: 1, payload_format: /* traces pipeline */
         ng_flatten::TRACE_FRAME_PAYLOAD_FORMAT },
-        uuid::Uuid::from_u128(1),
-        uuid::Uuid::from_u128(2),
+        wal::test_identity(),
     )
     .unwrap();
     let mut clock = MonotonicClock::new();
@@ -146,8 +145,7 @@ fn traces_build_refuses_logs_payload_format() {
             pipeline_id: 1,
             payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
         },
-        uuid::Uuid::from_u128(1),
-        uuid::Uuid::from_u128(2),
+        wal::test_identity(),
     )
     .unwrap();
     writer

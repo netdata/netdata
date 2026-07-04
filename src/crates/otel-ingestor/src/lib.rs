@@ -162,14 +162,18 @@ async fn run_ingestor(
     let clock = Arc::new(std::sync::Mutex::new(file_registry::MonotonicClock::new()));
     let logs_lifecycle = config.lifecycle_for(Signal::Logs);
     let traces_lifecycle = config.lifecycle_for(Signal::Traces);
+    // The supervisor always resolves the identity before configuring a worker;
+    // its absence here is a supervisor bug, not a runtime condition.
+    let identity = config
+        .identity
+        .context("plugin config reached the ingestor without a resolved identity")?;
     let logs_service = create_logs_service(
         &logs_lifecycle,
         &config.auth,
         Arc::clone(&sender),
         Arc::clone(&seq),
         Arc::clone(&clock),
-        config.machine_id,
-        config.instance_id,
+        identity,
     );
     let traces_service = create_traces_service(
         &traces_lifecycle,
@@ -177,8 +181,7 @@ async fn run_ingestor(
         sender,
         seq,
         clock,
-        config.machine_id,
-        config.instance_id,
+        identity,
     );
 
     // Parse gRPC endpoint address
@@ -347,8 +350,7 @@ fn create_logs_service(
     sender: Arc<ledger_sender::LedgerSender>,
     seq: Arc<wal::SeqAllocator>,
     clock: Arc<std::sync::Mutex<file_registry::MonotonicClock>>,
-    machine_id: uuid::Uuid,
-    instance_id: uuid::Uuid,
+    identity: file_registry::Identity,
 ) -> NetdataLogsService {
     NetdataLogsService::new(
         sender,
@@ -357,8 +359,7 @@ fn create_logs_service(
         seq,
         clock,
         auth.clone(),
-        machine_id,
-        instance_id,
+        identity,
     )
 }
 
@@ -372,8 +373,7 @@ fn create_traces_service(
     sender: Arc<ledger_sender::LedgerSender>,
     seq: Arc<wal::SeqAllocator>,
     clock: Arc<std::sync::Mutex<file_registry::MonotonicClock>>,
-    machine_id: uuid::Uuid,
-    instance_id: uuid::Uuid,
+    identity: file_registry::Identity,
 ) -> NetdataTracesService {
     tracing::info!(
         wal_dir = %lifecycle.wal.dir.display(),
@@ -386,8 +386,7 @@ fn create_traces_service(
         seq,
         clock,
         auth.clone(),
-        machine_id,
-        instance_id,
+        identity,
     )
 }
 
@@ -440,8 +439,7 @@ mod seed_tests {
     /// real `FileId` codec so it can never drift from the on-disk format.
     fn data_filename(seq: u64, ext: &str) -> String {
         file_registry::FileId::new(
-            uuid::Uuid::from_u128(1),
-            uuid::Uuid::from_u128(2),
+            file_registry::Identity::new(file_registry::MachineId::new(uuid::Uuid::from_u128(1)).unwrap(), file_registry::InstanceId::new(uuid::Uuid::from_u128(2)).unwrap()),
             0,
             seq,
             0xabcd,
@@ -477,8 +475,7 @@ mod seed_tests {
         std::fs::create_dir_all(&cat_dir).unwrap();
         std::fs::write(
             cat_dir.join(otel_catalog::filename(
-                uuid::Uuid::from_u128(1),
-                uuid::Uuid::from_u128(2),
+                file_registry::Identity::new(file_registry::MachineId::new(uuid::Uuid::from_u128(1)).unwrap(), file_registry::InstanceId::new(uuid::Uuid::from_u128(2)).unwrap()),
                 25,
                 100,
                 200,
@@ -517,8 +514,7 @@ mod seed_tests {
         std::fs::create_dir_all(&cat_dir).unwrap();
         std::fs::write(
             cat_dir.join(otel_catalog::filename(
-                uuid::Uuid::from_u128(1),
-                uuid::Uuid::from_u128(2),
+                file_registry::Identity::new(file_registry::MachineId::new(uuid::Uuid::from_u128(1)).unwrap(), file_registry::InstanceId::new(uuid::Uuid::from_u128(2)).unwrap()),
                 7,
                 100,
                 200,

@@ -54,8 +54,7 @@ fn write_flattened_wal(dir: &std::path::Path, counts: &[usize]) {
             pipeline_id: 0,
             payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
         },
-        uuid::Uuid::from_u128(1),
-        uuid::Uuid::from_u128(2),
+        wal::test_identity(),
     )
     .unwrap();
     for (i, &n) in counts.iter().enumerate() {
@@ -91,8 +90,7 @@ fn wrong_payload_format_refuses_to_build() {
             pipeline_id: 0,
             payload_format: ng_flatten::TRACE_FRAME_PAYLOAD_FORMAT,
         },
-        uuid::Uuid::from_u128(1),
-        uuid::Uuid::from_u128(2),
+        wal::test_identity(),
     )
     .unwrap();
     let (flattened, _) = flatten_log_request(request(1));
@@ -187,8 +185,7 @@ fn per_row_columns_roundtrip_in_chronological_order() {
             pipeline_id: 0,
             payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
         },
-        uuid::Uuid::from_u128(1),
-        uuid::Uuid::from_u128(2),
+        wal::test_identity(),
     )
     .unwrap();
     let (flattened, _) = flatten_log_request(request_cols(N));
@@ -322,8 +319,7 @@ fn typed_tree_and_coalesced_kinds_roundtrip() {
             pipeline_id: 0,
             payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
         },
-        uuid::Uuid::from_u128(1),
-        uuid::Uuid::from_u128(2),
+        wal::test_identity(),
     )
     .unwrap();
     let (flattened, _) = flatten_log_request(request_typed());
@@ -391,8 +387,7 @@ fn write_multiframe_flat_wal(num_frames: usize) -> (tempfile::TempDir, std::path
             pipeline_id: 0,
             payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
         },
-        uuid::Uuid::from_u128(1),
-        uuid::Uuid::from_u128(2),
+        wal::test_identity(),
     )
     .unwrap();
     for i in 0..num_frames {
@@ -523,8 +518,7 @@ fn attribute_key_containing_eq_is_sanitized_and_queryable() {
             pipeline_id: 0,
             payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
         },
-        uuid::Uuid::from_u128(1),
-        uuid::Uuid::from_u128(2),
+        wal::test_identity(),
     )
     .unwrap();
     let (flattened, sanitized) = flatten_log_request(req);

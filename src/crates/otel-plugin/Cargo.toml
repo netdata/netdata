@@ -31,6 +31,7 @@ serde_yaml = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
+file-registry = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

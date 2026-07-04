@@ -10,7 +10,6 @@ use std::time::Duration;
 
 use bytesize::ByteSize;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 use crate::signals::Signal;
 
@@ -57,20 +56,17 @@ pub struct PluginConfig {
     /// Set by the supervisor at runtime, not present in YAML config.
     #[serde(default)]
     pub writer_socket_path: String,
-    /// Netdata machine GUID (env `NETDATA_REGISTRY_UNIQUE_ID`). Permanent node
-    /// identity; defines "same node" across reinstations. Runtime-only: the
-    /// supervisor resolves this from env after YAML load and hard-errors before
-    /// spawning workers if missing or not a valid UUID.
+    /// Producer identity stamped into every WAL FileId: the Netdata machine GUID
+    /// (env `NETDATA_REGISTRY_UNIQUE_ID`, the permanent node identity) plus a
+    /// fresh per-process instance id the supervisor generates at startup (so each
+    /// plugin process — including a crash-respawn under one running agent — has a
+    /// distinct identity). Runtime-only: `None` after YAML load; the supervisor
+    /// resolves the machine GUID and generates the instance id, setting this to
+    /// `Some` before configuring any worker. Workers therefore always observe
+    /// `Some`. The [`Identity`](file_registry::Identity) newtypes make the pair
+    /// non-nil and un-transposable by construction.
     #[serde(default)]
-    pub machine_id: Uuid,
-    /// Per-process instance id. The supervisor generates a fresh v4 UUID at
-    /// startup, so each plugin process — including a crash-respawn under one
-    /// running agent — has a distinct identity (unlike the agent invocation id,
-    /// which a respawn inherits unchanged). Same runtime-only contract as
-    /// [`machine_id`](Self::machine_id): resolved after YAML load, defaulted
-    /// only so deserialize does not require it.
-    #[serde(default)]
-    pub instance_id: Uuid,
+    pub identity: Option<file_registry::Identity>,
 }
 
 impl PluginConfig {

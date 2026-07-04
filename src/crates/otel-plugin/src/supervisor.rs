@@ -11,6 +11,7 @@ use bridge::{
     LegacyLogsResponse,
 };
 use ferryboat::{Connection, Endpoint, Listener};
+use file_registry::{Identity, InstanceId, MachineId};
 use netdata_plugin_protocol::{Message, MessageReader, MessageWriter};
 use netdata_plugin_types::{FunctionDeclaration, FunctionProgressResponse, FunctionResult};
 use tokio::process::Command;
@@ -31,7 +32,7 @@ use crate::config;
 /// contract ("hard-error before spawning workers") would silently pass a nil
 /// value through to the worker, where `wal::Writer::new` would catch it as a
 /// per-tenant error rather than a clean startup abort.
-fn resolve_identity(value: Option<&str>, var_name: &str) -> anyhow::Result<uuid::Uuid> {
+fn resolve_identity(value: Option<&str>, var_name: &str) -> anyhow::Result<MachineId> {
     let raw =
         value.ok_or_else(|| anyhow::anyhow!("{var_name} is not set; the agent must export it"))?;
     let trimmed = raw.trim();
@@ -41,10 +42,11 @@ fn resolve_identity(value: Option<&str>, var_name: &str) -> anyhow::Result<uuid:
     let id = uuid::Uuid::parse_str(trimmed).with_context(|| {
         format!("{var_name} is not a valid UUID: {raw:?} (the agent must export a valid UUID)")
     })?;
-    if id.is_nil() {
-        anyhow::bail!("{var_name} is the nil UUID; the agent must export a valid non-zero UUID");
-    }
-    Ok(id)
+    // `MachineId::new` is the single place the non-nil invariant lives; surface
+    // its rejection with the variable name so the operator knows what to fix.
+    MachineId::new(id).map_err(|_| {
+        anyhow::anyhow!("{var_name} is the nil UUID; the agent must export a valid non-zero UUID")
+    })
 }
 
 /// Guard that kills a child process on drop.
@@ -635,10 +637,9 @@ pub async fn run() -> anyhow::Result<()> {
     // Machine GUID: the permanent node identity, the one id the plugin cannot
     // invent. Fatal if missing/invalid — fail-closed before any worker is
     // spawned. The WAL writer stamps it into every filename and the catalog
-    // references it, so a nil default would silently corrupt provenance in
-    // never-GC'd remote storage (the writer also rejects nil as
-    // defense-in-depth).
-    plugin_config.machine_id = resolve_identity(
+    // references it, so a nil value would silently corrupt provenance in
+    // never-GC'd remote storage (the `MachineId` newtype refuses nil).
+    let machine_id = resolve_identity(
         nd_env.registry_unique_id.as_deref(),
         "NETDATA_REGISTRY_UNIQUE_ID",
     )?;
@@ -649,8 +650,8 @@ pub async fn run() -> anyhow::Result<()> {
     // distinct WAL identity. The agent invocation id is now informational only
     // — logged for correlation, never stamped into files — so a missing or
     // malformed value warns but does not abort startup.
-    let instance_id = uuid::Uuid::new_v4();
-    plugin_config.instance_id = instance_id;
+    let instance_id = InstanceId::generate();
+    plugin_config.identity = Some(Identity::new(machine_id, instance_id));
     match nd_env.invocation_id.as_deref().map(str::trim) {
         Some(inv) if !inv.is_empty() && uuid::Uuid::parse_str(inv).is_ok() => {
             tracing::info!(

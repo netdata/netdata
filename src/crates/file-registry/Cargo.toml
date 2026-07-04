@@ -10,7 +10,7 @@ workspace = true
 [dependencies]
 chrono = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-uuid = { workspace = true, features = ["serde"] }
+uuid = { workspace = true, features = ["serde", "v4"] }
 tracing = { workspace = true }
 
 [dev-dependencies]

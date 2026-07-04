@@ -21,8 +21,8 @@ fn write_sfst_with_summary(dir: &Path, id: FileId, summary: &Summary) {
 #[test]
 fn recover_rebuilds_summary_from_disk() {
     let dir = tempfile::tempdir().unwrap();
-    let id1 = FileId::new(uuid::Uuid::nil(), uuid::Uuid::from_u128(1), 0, 1, 7);
-    let id2 = FileId::new(uuid::Uuid::nil(), uuid::Uuid::from_u128(1), 0, 2, 7);
+    let id1 = FileId::new(file_registry::test_identity(), 0, 1, 7);
+    let id2 = FileId::new(file_registry::test_identity(), 0, 2, 7);
 
     let s1 = Summary {
         min_timestamp_s: 100,
@@ -50,8 +50,8 @@ fn recover_rebuilds_summary_from_disk() {
 #[test]
 fn recover_skips_unreadable_files() {
     let dir = tempfile::tempdir().unwrap();
-    let id_good = FileId::new(uuid::Uuid::nil(), uuid::Uuid::from_u128(1), 0, 1, 7);
-    let id_bad = FileId::new(uuid::Uuid::nil(), uuid::Uuid::from_u128(1), 0, 2, 7);
+    let id_good = FileId::new(file_registry::test_identity(), 0, 1, 7);
+    let id_bad = FileId::new(file_registry::test_identity(), 0, 2, 7);
     let s = Summary {
         min_timestamp_s: 1,
         max_timestamp_s: 2,
@@ -73,7 +73,7 @@ fn recover_skips_unreadable_files() {
 fn track_sets_summary() {
     let dir = tempfile::tempdir().unwrap();
     let mut reg = Registry::new(dir.path());
-    let id = FileId::new(uuid::Uuid::nil(), uuid::Uuid::from_u128(1), 0, 5, 7);
+    let id = FileId::new(file_registry::test_identity(), 0, 5, 7);
     let summary = Summary {
         min_timestamp_s: 1,
         max_timestamp_s: 9,
@@ -96,8 +96,7 @@ fn populate(
         let part_key = crate::opaque_part_key(ns, name);
         reg.track(
             FileId::new(
-                uuid::Uuid::nil(),
-                uuid::Uuid::from_u128(1),
+                file_registry::test_identity(),
                 0,
                 seq,
                 part_key,
