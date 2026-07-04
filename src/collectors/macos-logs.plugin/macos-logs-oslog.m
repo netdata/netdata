@@ -9,16 +9,6 @@
 
 #define MACOS_LOGS_PREDICATE_PROBE_ROWS 2000
 
-// OSLog system-store enumerations do not tolerate concurrency: two overlapping
-// OSLogEventStream enumerations explode dispatch threads (hitting the soft limit)
-// and memory, and nextObject blocks on a dispatch semaphore that never resolves,
-// wedging the worker threads. Serialize all OSLog queries on this mutex so only
-// one enumeration runs at a time.
-static netdata_mutex_t macos_logs_oslog_mutex;
-static void __attribute__((constructor)) macos_logs_oslog_init_mutex(void) {
-    netdata_mutex_init(&macos_logs_oslog_mutex);
-}
-
 static inline bool macos_logs_check_stop(const LOGS_QUERY_STATUS *lqs) {
     if(lqs->cancelled && __atomic_load_n(lqs->cancelled, __ATOMIC_RELAXED))
         return true;
@@ -859,10 +849,6 @@ MACOS_LOGS_QUERY_STATUS macos_logs_query_oslog(LOGS_QUERY_STATUS *lqs) {
         return (lqs->cancelled && __atomic_load_n(lqs->cancelled, __ATOMIC_RELAXED)) ?
                    MACOS_LOGS_QUERY_CANCELLED : MACOS_LOGS_QUERY_TIMED_OUT;
 
-    // Serialize OSLog enumerations on this mutex (see macos_logs_oslog_mutex):
-    // only one system-store enumeration may run at a time. @finally releases the
-    // lock on every return path, including the early-error ones below.
-    netdata_mutex_lock(&macos_logs_oslog_mutex);
     @try {
         @autoreleasepool {
         if(macos_logs_check_stop(lqs))
@@ -1042,7 +1028,5 @@ MACOS_LOGS_QUERY_STATUS macos_logs_query_oslog(LOGS_QUERY_STATUS *lqs) {
                exception_reason ? exception_reason : "no reason");
         lqs->c.query_finished_ut = now_monotonic_usec();
         return MACOS_LOGS_QUERY_ENUMERATOR_FAILED;
-    } @finally {
-        netdata_mutex_unlock(&macos_logs_oslog_mutex);
     }
 }
