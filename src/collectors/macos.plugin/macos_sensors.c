@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "macos_iohid.h"
 #include "macos_smc.h"
 #include "plugin_macos.h"
 
@@ -13,22 +14,6 @@
 #define MACOS_SENSORS_DEFAULT_DISCOVERY_EVERY 300
 #define MACOS_SENSORS_MAX_SMC_KEYS 8192
 #define MACOS_SENSORS_MISSING_CYCLES_BEFORE_OBSOLETE 3
-
-typedef struct __IOHIDEventSystemClient *IOHIDEventSystemClientRef;
-typedef struct __IOHIDServiceClient *IOHIDServiceClientRef;
-typedef struct __IOHIDEvent *IOHIDEventRef;
-
-extern IOHIDEventSystemClientRef IOHIDEventSystemClientCreate(CFAllocatorRef allocator);
-extern int IOHIDEventSystemClientSetMatching(IOHIDEventSystemClientRef client, CFDictionaryRef matching);
-extern CFArrayRef IOHIDEventSystemClientCopyServices(IOHIDEventSystemClientRef client);
-extern CFTypeRef IOHIDServiceClientCopyProperty(IOHIDServiceClientRef service, CFStringRef key);
-extern CFTypeRef IOHIDServiceClientGetRegistryID(IOHIDServiceClientRef service);
-extern IOHIDEventRef IOHIDServiceClientCopyEvent(
-    IOHIDServiceClientRef service,
-    int64_t type,
-    int32_t options,
-    int64_t timestamp);
-extern double IOHIDEventGetFloatValue(IOHIDEventRef event, int32_t field);
 
 enum {
     MACOS_SENSORS_HID_PAGE_APPLE_VENDOR = 0xff00,
@@ -130,7 +115,7 @@ static const struct macos_sensor_kind_def macos_sensor_defs[MACOS_SENSOR_KIND_CO
 static struct macos_sensor_chart *sensor_charts_root = NULL;
 static struct macos_smc_sensor_candidate *smc_candidates_root = NULL;
 static io_connect_t smc_connection = IO_OBJECT_NULL;
-static CFDictionaryRef hid_matching = NULL;
+static struct macos_iohid_client hid_client = {0};
 
 static bool initialized = false;
 static bool do_smc = true;
@@ -150,11 +135,6 @@ static bool macos_sensors_cfstring_to_cstr(CFStringRef str, char *dst, size_t ds
 
     dst[dst_size - 1] = '\0';
     return dst[0] != '\0';
-}
-
-static CFNumberRef macos_sensors_cfnumber_int(int value)
-{
-    return CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &value);
 }
 
 static bool macos_sensors_smc_key_is_printable(const char key[MACOS_SMC_KEY_LEN + 1])
@@ -589,42 +569,11 @@ static void macos_sensors_collect_smc(int update_every)
     }
 }
 
-static bool macos_sensors_hid_matching_init(void)
-{
-    if (hid_matching)
-        return true;
-
-    CFStringRef keys[] = {CFSTR("PrimaryUsagePage"), CFSTR("PrimaryUsage")};
-    CFNumberRef values[] = {
-        macos_sensors_cfnumber_int(MACOS_SENSORS_HID_PAGE_APPLE_VENDOR),
-        macos_sensors_cfnumber_int(MACOS_SENSORS_HID_USAGE_TEMPERATURE_SENSOR),
-    };
-    if (!values[0] || !values[1]) {
-        if (values[0])
-            CFRelease(values[0]);
-        if (values[1])
-            CFRelease(values[1]);
-        return false;
-    }
-
-    hid_matching = CFDictionaryCreate(
-        kCFAllocatorDefault,
-        (const void **)keys,
-        (const void **)values,
-        2,
-        &kCFTypeDictionaryKeyCallBacks,
-        &kCFTypeDictionaryValueCallBacks);
-
-    CFRelease(values[0]);
-    CFRelease(values[1]);
-    return hid_matching != NULL;
-}
-
 static bool macos_sensors_hid_product_name(IOHIDServiceClientRef service, char *name, size_t name_size)
 {
     name[0] = '\0';
 
-    CFTypeRef product = IOHIDServiceClientCopyProperty(service, CFSTR("Product"));
+    CFTypeRef product = macos_iohid_service_copy_property(service, CFSTR("Product"));
     if (!product)
         return false;
 
@@ -666,7 +615,7 @@ static bool macos_sensors_cf_value_identifier(CFTypeRef value, char *dst, size_t
 
 static bool macos_sensors_hid_service_identifier(IOHIDServiceClientRef service, char *dst, size_t dst_size)
 {
-    CFTypeRef registry_id = IOHIDServiceClientGetRegistryID(service);
+    CFTypeRef registry_id = macos_iohid_service_get_registry_id(service);
     if (macos_sensors_cf_value_identifier(registry_id, dst, dst_size)) {
         char prefixed[128];
         snprintfz(prefixed, sizeof(prefixed), "registry_%s", dst);
@@ -674,7 +623,7 @@ static bool macos_sensors_hid_service_identifier(IOHIDServiceClientRef service, 
         return true;
     }
 
-    CFTypeRef location_id = IOHIDServiceClientCopyProperty(service, CFSTR("LocationID"));
+    CFTypeRef location_id = macos_iohid_service_copy_property(service, CFSTR("LocationID"));
     if (!location_id)
         return false;
 
@@ -691,19 +640,15 @@ static bool macos_sensors_hid_service_identifier(IOHIDServiceClientRef service, 
 
 static void macos_sensors_collect_hid(int update_every)
 {
-    if (!macos_sensors_hid_matching_init())
+    if (!macos_iohid_client_set_matching(
+            &hid_client,
+            MACOS_SENSORS_HID_PAGE_APPLE_VENDOR,
+            MACOS_SENSORS_HID_USAGE_TEMPERATURE_SENSOR))
         return;
 
-    IOHIDEventSystemClientRef client = IOHIDEventSystemClientCreate(kCFAllocatorDefault);
-    if (!client)
+    CFArrayRef services = macos_iohid_client_copy_services(&hid_client);
+    if (!services)
         return;
-
-    IOHIDEventSystemClientSetMatching(client, hid_matching);
-    CFArrayRef services = IOHIDEventSystemClientCopyServices(client);
-    if (!services) {
-        CFRelease(client);
-        return;
-    }
 
     CFIndex count = CFArrayGetCount(services);
     for (CFIndex i = 0; i < count; i++) {
@@ -711,14 +656,13 @@ static void macos_sensors_collect_hid(int update_every)
         if (!service)
             continue;
 
-        IOHIDEventRef event =
-            IOHIDServiceClientCopyEvent(service, MACOS_SENSORS_HID_EVENT_TYPE_TEMPERATURE, 0, 0);
-        if (!event)
+        NETDATA_DOUBLE temp;
+        if (!macos_iohid_service_copy_event_float(
+                service,
+                MACOS_SENSORS_HID_EVENT_TYPE_TEMPERATURE,
+                MACOS_SENSORS_HID_EVENT_TYPE_TEMPERATURE << 16,
+                &temp))
             continue;
-
-        NETDATA_DOUBLE temp =
-            IOHIDEventGetFloatValue(event, MACOS_SENSORS_HID_EVENT_TYPE_TEMPERATURE << 16);
-        CFRelease(event);
 
         if (!macos_sensors_validate_value(MACOS_SENSOR_TEMPERATURE, temp))
             continue;
@@ -773,7 +717,6 @@ static void macos_sensors_collect_hid(int update_every)
     }
 
     CFRelease(services);
-    CFRelease(client);
 }
 
 static void macos_sensors_init(void)
@@ -831,10 +774,7 @@ void macos_sensors_cleanup(void)
 
     macos_smc_close(&smc_connection);
 
-    if (hid_matching) {
-        CFRelease(hid_matching);
-        hid_matching = NULL;
-    }
+    macos_iohid_client_cleanup(&hid_client);
 
     initialized = false;
     last_smc_discovery_ut = 0;

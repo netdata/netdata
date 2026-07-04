@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "macos_iohid.h"
 #include "macos_smc.h"
 #include "plugin_macos.h"
 
@@ -19,16 +20,6 @@
 #define MACOS_GPU_MAX_SMC_KEYS 64
 
 typedef const void *IOReportSubscriptionRef;
-typedef struct __IOHIDEventSystemClient *IOHIDEventSystemClientRef;
-typedef struct __IOHIDServiceClient *IOHIDServiceClientRef;
-typedef struct __IOHIDEvent *IOHIDEventRef;
-
-extern IOHIDEventSystemClientRef IOHIDEventSystemClientCreate(CFAllocatorRef allocator);
-extern int IOHIDEventSystemClientSetMatching(IOHIDEventSystemClientRef client, CFDictionaryRef matching);
-extern CFArrayRef IOHIDEventSystemClientCopyServices(IOHIDEventSystemClientRef client);
-extern CFTypeRef IOHIDServiceClientCopyProperty(IOHIDServiceClientRef service, CFStringRef key);
-extern IOHIDEventRef IOHIDServiceClientCopyEvent(IOHIDServiceClientRef service, int64_t type, int32_t options, int64_t timestamp);
-extern double IOHIDEventGetFloatValue(IOHIDEventRef event, int32_t field);
 
 enum {
     MACOS_GPU_HID_PAGE_APPLE_VENDOR = 0xff00,
@@ -90,7 +81,7 @@ struct macos_gpu_state {
     io_connect_t smc_connection;
     char smc_gpu_keys[MACOS_GPU_MAX_SMC_KEYS][MACOS_SMC_KEY_LEN + 1];
     size_t smc_gpu_keys_count;
-    CFDictionaryRef hid_matching;
+    struct macos_iohid_client hid_client;
 
     RRDSET *st_active_residency;
     RRDDIM *rd_active_residency;
@@ -423,26 +414,11 @@ static bool macos_gpu_open_smc(void)
     return true;
 }
 
-static CFNumberRef macos_gpu_cfnumber_int(int value)
-{
-    return CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &value);
-}
-
 static bool macos_gpu_read_hid_temperature(NETDATA_DOUBLE *temperature_c)
 {
-    if (!gpu.hid_matching)
+    CFArrayRef services = macos_iohid_client_copy_services(&gpu.hid_client);
+    if (!services)
         return false;
-
-    IOHIDEventSystemClientRef client = IOHIDEventSystemClientCreate(kCFAllocatorDefault);
-    if (!client)
-        return false;
-
-    IOHIDEventSystemClientSetMatching(client, gpu.hid_matching);
-    CFArrayRef services = IOHIDEventSystemClientCopyServices(client);
-    if (!services) {
-        CFRelease(client);
-        return false;
-    }
 
     NETDATA_DOUBLE sum = 0.0;
     size_t values = 0;
@@ -452,7 +428,7 @@ static bool macos_gpu_read_hid_temperature(NETDATA_DOUBLE *temperature_c)
         if (!service)
             continue;
 
-        CFTypeRef product = IOHIDServiceClientCopyProperty(service, CFSTR("Product"));
+        CFTypeRef product = macos_iohid_service_copy_property(service, CFSTR("Product"));
         char name[128] = "";
         if (product) {
             if (CFGetTypeID(product) == CFStringGetTypeID())
@@ -462,12 +438,13 @@ static bool macos_gpu_read_hid_temperature(NETDATA_DOUBLE *temperature_c)
         if (strncmp(name, "GPU MTR Temp Sensor", strlen("GPU MTR Temp Sensor")) != 0)
             continue;
 
-        IOHIDEventRef event = IOHIDServiceClientCopyEvent(service, MACOS_GPU_HID_EVENT_TYPE_TEMPERATURE, 0, 0);
-        if (!event)
+        NETDATA_DOUBLE temp;
+        if (!macos_iohid_service_copy_event_float(
+                service,
+                MACOS_GPU_HID_EVENT_TYPE_TEMPERATURE,
+                MACOS_GPU_HID_EVENT_TYPE_TEMPERATURE << 16,
+                &temp))
             continue;
-
-        NETDATA_DOUBLE temp = IOHIDEventGetFloatValue(event, MACOS_GPU_HID_EVENT_TYPE_TEMPERATURE << 16);
-        CFRelease(event);
         if (!isfinite(temp) || temp <= 0.0 || temp > 150.0)
             continue;
 
@@ -476,7 +453,6 @@ static bool macos_gpu_read_hid_temperature(NETDATA_DOUBLE *temperature_c)
     }
 
     CFRelease(services);
-    CFRelease(client);
 
     if (!values)
         return false;
@@ -487,31 +463,10 @@ static bool macos_gpu_read_hid_temperature(NETDATA_DOUBLE *temperature_c)
 
 static bool macos_gpu_init_hid(void)
 {
-    CFStringRef keys[] = {CFSTR("PrimaryUsagePage"), CFSTR("PrimaryUsage")};
-    CFNumberRef values[] = {
-        macos_gpu_cfnumber_int(MACOS_GPU_HID_PAGE_APPLE_VENDOR),
-        macos_gpu_cfnumber_int(MACOS_GPU_HID_USAGE_TEMPERATURE_SENSOR),
-    };
-    if (!values[0] || !values[1]) {
-        if (values[0])
-            CFRelease(values[0]);
-        if (values[1])
-            CFRelease(values[1]);
-        return false;
-    }
-
-    gpu.hid_matching = CFDictionaryCreate(
-        kCFAllocatorDefault,
-        (const void **)keys,
-        (const void **)values,
-        2,
-        &kCFTypeDictionaryKeyCallBacks,
-        &kCFTypeDictionaryValueCallBacks);
-
-    CFRelease(values[0]);
-    CFRelease(values[1]);
-
-    if (!gpu.hid_matching)
+    if (!macos_iohid_client_set_matching(
+            &gpu.hid_client,
+            MACOS_GPU_HID_PAGE_APPLE_VENDOR,
+            MACOS_GPU_HID_USAGE_TEMPERATURE_SENSOR))
         return false;
 
     NETDATA_DOUBLE probe;
@@ -936,10 +891,7 @@ void macos_gpu_cleanup(void)
     macos_gpu_ioreport_close_subscription();
 
     macos_smc_close(&gpu.smc_connection);
-    if (gpu.hid_matching) {
-        CFRelease(gpu.hid_matching);
-        gpu.hid_matching = NULL;
-    }
+    macos_iohid_client_cleanup(&gpu.hid_client);
     macos_gpu_unload_ioreport();
 
     freez(gpu.gpu_freqs_mhz);
