@@ -17,10 +17,21 @@ static void __attribute__((destructor)) destroy_mutex(void) {
 
 static bool plugin_should_exit = false;
 
+struct macos_logs_facet_value_cache {
+    const char *key;
+    DICTIONARY *values;
+};
+
 #define MACOS_LOGS_ALWAYS_VISIBLE_KEYS NULL
 
 #define MACOS_LOGS_KEYS_EXCLUDED_FROM_FACETS \
     "|" MACOS_LOGS_FIELD_MESSAGE             \
+    "|" MACOS_LOGS_FIELD_PID                 \
+    "|" MACOS_LOGS_FIELD_THREAD_ID           \
+    "|" MACOS_LOGS_FIELD_ACTIVITY_ID         \
+    "|" MACOS_LOGS_FIELD_PARENT_ACTIVITY_ID  \
+    "|" MACOS_LOGS_FIELD_FORMAT_STRING       \
+    "|" MACOS_LOGS_FIELD_SIGNPOST_ID         \
     ""
 
 #define MACOS_LOGS_KEYS_INCLUDED_IN_FACETS  \
@@ -31,7 +42,116 @@ static bool plugin_should_exit = false;
     "|" MACOS_LOGS_FIELD_CATEGORY           \
     "|" MACOS_LOGS_FIELD_ENTRY_TYPE         \
     "|" MACOS_LOGS_FIELD_STORE_CATEGORY     \
+    "|" MACOS_LOGS_FIELD_COMPONENT_COUNT    \
+    "|" MACOS_LOGS_FIELD_SIGNPOST_NAME      \
+    "|" MACOS_LOGS_FIELD_SIGNPOST_TYPE      \
     ""
+
+static netdata_mutex_t macos_logs_facet_value_cache_mutex;
+static struct macos_logs_facet_value_cache macos_logs_facet_value_caches[] = {
+    { MACOS_LOGS_FIELD_LEVEL, NULL },
+    { MACOS_LOGS_FIELD_PROCESS, NULL },
+    { MACOS_LOGS_FIELD_SENDER, NULL },
+    { MACOS_LOGS_FIELD_SUBSYSTEM, NULL },
+    { MACOS_LOGS_FIELD_CATEGORY, NULL },
+    { MACOS_LOGS_FIELD_ENTRY_TYPE, NULL },
+    { MACOS_LOGS_FIELD_STORE_CATEGORY, NULL },
+    { MACOS_LOGS_FIELD_COMPONENT_COUNT, NULL },
+    { MACOS_LOGS_FIELD_SIGNPOST_NAME, NULL },
+    { MACOS_LOGS_FIELD_SIGNPOST_TYPE, NULL },
+};
+static bool macos_logs_facet_value_cache_initialized = false;
+
+static void __attribute__((constructor)) macos_logs_facet_value_cache_init(void) {
+    netdata_mutex_init(&macos_logs_facet_value_cache_mutex);
+}
+
+static void macos_logs_facet_value_cache_ensure_initialized(void) {
+    if(macos_logs_facet_value_cache_initialized)
+        return;
+
+    netdata_mutex_lock(&macos_logs_facet_value_cache_mutex);
+    if(macos_logs_facet_value_cache_initialized) {
+        netdata_mutex_unlock(&macos_logs_facet_value_cache_mutex);
+        return;
+    }
+
+    for(size_t i = 0; i < sizeof(macos_logs_facet_value_caches) / sizeof(macos_logs_facet_value_caches[0]); i++) {
+        macos_logs_facet_value_caches[i].values =
+            dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
+    }
+
+    macos_logs_facet_value_cache_initialized = true;
+    netdata_mutex_unlock(&macos_logs_facet_value_cache_mutex);
+}
+
+static void __attribute__((destructor)) macos_logs_facet_value_cache_destroy_mutex(void) {
+    netdata_mutex_destroy(&macos_logs_facet_value_cache_mutex);
+}
+
+static void macos_logs_facet_value_cache_cleanup(void) {
+    if(!macos_logs_facet_value_cache_initialized)
+        return;
+
+    netdata_mutex_lock(&macos_logs_facet_value_cache_mutex);
+    for(size_t i = 0; i < sizeof(macos_logs_facet_value_caches) / sizeof(macos_logs_facet_value_caches[0]); i++) {
+        dictionary_destroy(macos_logs_facet_value_caches[i].values);
+        macos_logs_facet_value_caches[i].values = NULL;
+    }
+    macos_logs_facet_value_cache_initialized = false;
+    netdata_mutex_unlock(&macos_logs_facet_value_cache_mutex);
+}
+
+static struct macos_logs_facet_value_cache *macos_logs_facet_value_cache_for_key(const char *key) {
+    if(!key || !*key)
+        return NULL;
+
+    for(size_t i = 0; i < sizeof(macos_logs_facet_value_caches) / sizeof(macos_logs_facet_value_caches[0]); i++) {
+        if(strcmp(key, macos_logs_facet_value_caches[i].key) == 0)
+            return &macos_logs_facet_value_caches[i];
+    }
+
+    return NULL;
+}
+
+void macos_logs_cache_facet_value(const char *key, const char *value) {
+    if(!value || !*value)
+        return;
+
+    macos_logs_facet_value_cache_ensure_initialized();
+
+    struct macos_logs_facet_value_cache *cache = macos_logs_facet_value_cache_for_key(key);
+    if(!cache || !cache->values)
+        return;
+
+    netdata_mutex_lock(&macos_logs_facet_value_cache_mutex);
+    if(dictionary_get(cache->values, value) ||
+       dictionary_entries(cache->values) < MACOS_LOGS_FACET_VALUE_CACHE_MAX_PER_KEY) {
+        char present = 1;
+        dictionary_set(cache->values, value, &present, sizeof(present));
+    }
+    netdata_mutex_unlock(&macos_logs_facet_value_cache_mutex);
+}
+
+void macos_logs_add_cached_facet_values(FACETS *facets) {
+    macos_logs_facet_value_cache_ensure_initialized();
+
+    netdata_mutex_lock(&macos_logs_facet_value_cache_mutex);
+    for(size_t i = 0; i < sizeof(macos_logs_facet_value_caches) / sizeof(macos_logs_facet_value_caches[0]); i++) {
+        struct macos_logs_facet_value_cache *cache = &macos_logs_facet_value_caches[i];
+        if(!cache->values)
+            continue;
+
+        char *present;
+        dfe_start_read(cache->values, present) {
+            const char *value = present_dfe.name;
+            facets_add_possible_value_name_to_key(
+                facets, cache->key, strlen(cache->key), value, strlen(value));
+        }
+        dfe_done(present);
+    }
+    netdata_mutex_unlock(&macos_logs_facet_value_cache_mutex);
+}
 
 static FACET_ROW_SEVERITY macos_logs_level_to_facet_severity(
     FACETS *facets __maybe_unused, FACET_ROW *row, void *data __maybe_unused) {
@@ -78,7 +198,7 @@ static void macos_logs_register_fields(LOGS_QUERY_STATUS *lqs) {
         MACOS_LOGS_FIELD_PROCESS,
         rq->default_facet | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_VISIBLE);
 
-    facets_register_key_name(facets, MACOS_LOGS_FIELD_PID, FACET_KEY_OPTION_FTS);
+    facets_register_key_name(facets, MACOS_LOGS_FIELD_PID, FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_FTS);
 
     facets_register_key_name(
         facets,
@@ -105,8 +225,14 @@ static void macos_logs_register_fields(LOGS_QUERY_STATUS *lqs) {
         MACOS_LOGS_FIELD_STORE_CATEGORY,
         rq->default_facet | FACET_KEY_OPTION_FTS);
 
-    facets_register_key_name(facets, MACOS_LOGS_FIELD_THREAD_ID, FACET_KEY_OPTION_FTS);
-    facets_register_key_name(facets, MACOS_LOGS_FIELD_ACTIVITY_ID, FACET_KEY_OPTION_FTS);
+    facets_register_key_name(facets, MACOS_LOGS_FIELD_THREAD_ID, FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_FTS);
+    facets_register_key_name(facets, MACOS_LOGS_FIELD_ACTIVITY_ID, FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_FTS);
+    facets_register_key_name(facets, MACOS_LOGS_FIELD_PARENT_ACTIVITY_ID, FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_FTS);
+    facets_register_key_name(facets, MACOS_LOGS_FIELD_FORMAT_STRING, FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_FTS);
+    facets_register_key_name(facets, MACOS_LOGS_FIELD_COMPONENT_COUNT, FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS);
+    facets_register_key_name(facets, MACOS_LOGS_FIELD_SIGNPOST_ID, FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_FTS);
+    facets_register_key_name(facets, MACOS_LOGS_FIELD_SIGNPOST_NAME, FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS);
+    facets_register_key_name(facets, MACOS_LOGS_FIELD_SIGNPOST_TYPE, FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS);
 }
 
 static void buffer_json_macos_logs_versions(BUFFER *wb) {
@@ -118,7 +244,7 @@ static void buffer_json_macos_logs_versions(BUFFER *wb) {
 }
 
 static int macos_logs_response(BUFFER *wb, LOGS_QUERY_STATUS *lqs, MACOS_LOGS_QUERY_STATUS status) {
-    bool partial = status == MACOS_LOGS_QUERY_TIMED_OUT || status == MACOS_LOGS_QUERY_SCAN_LIMIT_REACHED;
+    bool partial = status == MACOS_LOGS_QUERY_TIMED_OUT;
 
     switch(status) {
         case MACOS_LOGS_QUERY_OK:
@@ -127,7 +253,6 @@ static int macos_logs_response(BUFFER *wb, LOGS_QUERY_STATUS *lqs, MACOS_LOGS_QU
             break;
 
         case MACOS_LOGS_QUERY_TIMED_OUT:
-        case MACOS_LOGS_QUERY_SCAN_LIMIT_REACHED:
             break;
 
         case MACOS_LOGS_QUERY_CANCELLED:
@@ -157,15 +282,6 @@ static int macos_logs_response(BUFFER *wb, LOGS_QUERY_STATUS *lqs, MACOS_LOGS_QU
             buffer_strcat(msg_description, "QUERY TIMEOUT: The query timed out and may not include all data in the selected window. ");
             msg_priority = NDLP_WARNING;
         }
-        else if(status == MACOS_LOGS_QUERY_SCAN_LIMIT_REACHED) {
-            buffer_strcat(msg, "Query scan limit reached, incomplete data. ");
-            buffer_sprintf(
-                msg_description,
-                "SCAN LIMIT: The query reached the safety scan limit of %zu log entries and may not include all data in the selected window. ",
-                lqs->c.rows_scanned_limit);
-            msg_priority = NDLP_WARNING;
-        }
-
         buffer_json_member_add_object(wb, "message");
         if(buffer_tostring(msg)) {
             buffer_json_member_add_string(wb, "title", buffer_tostring(msg));
@@ -207,6 +323,9 @@ static int macos_logs_response(BUFFER *wb, LOGS_QUERY_STATUS *lqs, MACOS_LOGS_QU
 
     if(!lqs->rq.data_only || lqs->rq.tail)
         buffer_json_member_add_uint64(wb, "last_modified", lqs->last_modified);
+
+    if(lqs->rq.slice)
+        macos_logs_add_cached_facet_values(lqs->facets);
 
     facets_sort_and_reorder_keys(lqs->facets);
     facets_report(lqs->facets, wb, used_hashes_registry);
@@ -521,6 +640,7 @@ int main(int argc, char **argv) {
 
     if (test_command.enabled) {
         int rc = run_macos_logs_test_command(&test_command);
+        macos_logs_facet_value_cache_cleanup();
         dictionary_destroy(used_hashes_registry);
         exit(rc);
     }
@@ -530,6 +650,7 @@ int main(int argc, char **argv) {
         usec_t stop_monotonic_ut = now_monotonic_usec() + MACOS_LOGS_DEFAULT_TIMEOUT * USEC_PER_SEC;
         char buf[] = MACOS_LOGS_FUNCTION_NAME " info";
         function_macos_logs("debug-transaction", buf, &stop_monotonic_ut, &cancelled, NULL, HTTP_ACCESS_ALL, NULL, NULL);
+        macos_logs_facet_value_cache_cleanup();
         dictionary_destroy(used_hashes_registry);
         return 0;
     }
@@ -570,6 +691,7 @@ int main(int argc, char **argv) {
     // cancel only requests cancellation, and workers access used_hashes_registry via
     // facets_report(), so destroying it first would be a use-after-free.
     functions_evloop_join_threads(wg);
+    macos_logs_facet_value_cache_cleanup();
     dictionary_destroy(used_hashes_registry);
     return 0;
 }

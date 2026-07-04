@@ -9,13 +9,15 @@
 #define MACOS_LOGS_FUNCTION_DESCRIPTION "View, search and analyze macOS unified logs."
 #define MACOS_LOGS_FUNCTION_NAME "macos-logs"
 
-#define MACOS_LOGS_WORKER_THREADS 2
+#define MACOS_LOGS_WORKER_THREADS 1
 #define MACOS_LOGS_DEFAULT_TIMEOUT 60
 #define MACOS_LOGS_PROGRESS_EVERY_UT (250 * USEC_PER_MS)
 #define MACOS_LOGS_PROGRESS_EVERY_ROWS 2000
+#define MACOS_LOGS_PROGRESS_TOTAL 10000
 #define MACOS_LOGS_DATA_ONLY_CHECK_EVERY_ROWS 1000
 #define MACOS_LOGS_ANCHOR_DELTA_UT (10 * USEC_PER_SEC)
-#define MACOS_LOGS_MAX_ROWS_SCANNED 1000000
+#define MACOS_LOGS_SAMPLING_THRESHOLD 1000000
+#define MACOS_LOGS_FACET_VALUE_CACHE_MAX_PER_KEY 4096
 
 #define MACOS_LOGS_FIELD_MESSAGE "MESSAGE"
 #define MACOS_LOGS_FIELD_LEVEL "LEVEL"
@@ -29,6 +31,12 @@
 #define MACOS_LOGS_FIELD_STORE_CATEGORY "STORE_CATEGORY"
 #define MACOS_LOGS_FIELD_THREAD_ID "THREAD_ID"
 #define MACOS_LOGS_FIELD_ACTIVITY_ID "ACTIVITY_ID"
+#define MACOS_LOGS_FIELD_PARENT_ACTIVITY_ID "PARENT_ACTIVITY_ID"
+#define MACOS_LOGS_FIELD_FORMAT_STRING "FORMAT_STRING"
+#define MACOS_LOGS_FIELD_COMPONENT_COUNT "COMPONENT_COUNT"
+#define MACOS_LOGS_FIELD_SIGNPOST_ID "SIGNPOST_ID"
+#define MACOS_LOGS_FIELD_SIGNPOST_NAME "SIGNPOST_NAME"
+#define MACOS_LOGS_FIELD_SIGNPOST_TYPE "SIGNPOST_TYPE"
 
 typedef enum {
     MACOS_LOGS_QUERY_OK,
@@ -36,7 +44,6 @@ typedef enum {
     MACOS_LOGS_QUERY_ENUMERATOR_FAILED,
     MACOS_LOGS_QUERY_TIMED_OUT,
     MACOS_LOGS_QUERY_CANCELLED,
-    MACOS_LOGS_QUERY_SCAN_LIMIT_REACHED,
 } MACOS_LOGS_QUERY_STATUS;
 
 typedef enum {
@@ -52,7 +59,6 @@ struct lqs_extension {
     size_t rows_useful;
     size_t rows_read;
     size_t bytes_read;
-    size_t rows_scanned_limit;
 };
 
 static inline MACOS_LOGS_SOURCE_TYPE macos_logs_source_type(const char *value) {
@@ -79,11 +85,11 @@ static inline void macos_logs_sources_to_json_array(BUFFER *wb) {
     buffer_json_object_close(wb);
 }
 
-#define LQS_DEFAULT_SLICE_MODE 0
+#define LQS_DEFAULT_SLICE_MODE 1
 #define LQS_FUNCTION_NAME MACOS_LOGS_FUNCTION_NAME
 #define LQS_FUNCTION_DESCRIPTION MACOS_LOGS_FUNCTION_DESCRIPTION
 #define LQS_DEFAULT_ITEMS_PER_QUERY 200
-#define LQS_DEFAULT_ITEMS_SAMPLING MACOS_LOGS_MAX_ROWS_SCANNED
+#define LQS_DEFAULT_ITEMS_SAMPLING MACOS_LOGS_SAMPLING_THRESHOLD
 #define LQS_SOURCE_TYPE MACOS_LOGS_SOURCE_TYPE
 #define LQS_SOURCE_TYPE_ALL MACOS_LOGS_SOURCE_ALL
 #define LQS_SOURCE_TYPE_NONE MACOS_LOGS_SOURCE_NONE
@@ -96,6 +102,8 @@ extern netdata_mutex_t stdout_mutex;
 extern DICTIONARY *used_hashes_registry;
 
 MACOS_LOGS_QUERY_STATUS macos_logs_query_oslog(LOGS_QUERY_STATUS *lqs);
+void macos_logs_cache_facet_value(const char *key, const char *value);
+void macos_logs_add_cached_facet_values(FACETS *facets);
 BUFFER *function_macos_logs_result(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled,
                                    BUFFER *payload, HTTP_ACCESS access, const char *source, void *data);
 void function_macos_logs(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled,
