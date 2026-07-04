@@ -1039,6 +1039,46 @@ static void macos_powermetrics_update_gpu_power(const struct macos_powermetrics_
     rrdset_done(st_gpu_power);
 }
 
+static void macos_powermetrics_update_gpu_temperature(
+    const struct macos_powermetrics_sample *sample,
+    int update_every)
+{
+    if (!st_gpu_die) {
+        st_gpu_die = rrdset_create_localhost(
+            "macos",
+            "gpu_temperature",
+            NULL,
+            "gpu",
+            "macos.gpu_temperature",
+            "GPU Temperature",
+            "degrees Celsius",
+            "macos.plugin",
+            "powermetrics",
+            NETDATA_CHART_PRIO_SENSORS - 16,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rrdlabels_add(
+            st_gpu_die->rrdlabels,
+            "source",
+            "powermetrics",
+            RRDLABEL_SRC_AUTO);
+        rd_gpu_die = rrddim_add(
+            st_gpu_die,
+            "temperature",
+            NULL,
+            1,
+            1000,
+            RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(
+        st_gpu_die,
+        rd_gpu_die,
+        (collected_number)llround(sample->gpu_die_c * 1000.0));
+    rrdset_done(st_gpu_die);
+}
+
 int do_macos_powermetrics(int update_every, usec_t dt __maybe_unused)
 {
     static int do_thermal_pressure = -1, do_smc_fan = -1, do_smc_temperatures = -1,
@@ -1122,19 +1162,7 @@ int do_macos_powermetrics(int update_every, usec_t dt __maybe_unused)
             1000);
 
     if (do_smc_temperatures && sample.has_gpu_die && !macos_gpu_temperature_available())
-        macos_powermetrics_update_sensor(
-            &st_gpu_die,
-            &rd_gpu_die,
-            "macos_gpu_die_temperature",
-            "GPU Die Temperature",
-            "Temperature",
-            "system.hw.sensor.temperature.input",
-            "degrees Celsius",
-            "gpu_die",
-            NETDATA_CHART_PRIO_SENSORS + 1,
-            chart_update_every,
-            (collected_number)llround(sample.gpu_die_c * 1000.0),
-            1000);
+        macos_powermetrics_update_gpu_temperature(&sample, chart_update_every);
 
     if (do_smc_thermal_levels &&
         (sample.has_cpu_thermal_level || sample.has_gpu_thermal_level || sample.has_io_thermal_level))

@@ -404,7 +404,7 @@ modules:
             description: |
               Apple Silicon GPU active residency, frequency, and power charts require IOReport GPU channels. These channels are exposed by Apple Silicon GPU drivers and are not available on Intel Macs. The collector loads IOReport at runtime and disables the GPU module cleanly when the framework, DVFS table, or GPU channels are unavailable.
 
-              GPU power may still appear from `powermetrics` on systems where the `gpu_power` sampler exposes a plist `gpu_power` value and IOReport GPU power is unavailable. GPU temperature uses direct SMC/IOHID reads from the GPU module when available; otherwise, the `powermetrics` SMC path can still provide the existing `gpu_die` sensor.
+              GPU power may still appear from `powermetrics` on systems where the `gpu_power` sampler exposes a plist `gpu_power` value and IOReport GPU power is unavailable. GPU temperature uses direct SMC/IOHID reads from the GPU module when available; otherwise, the `powermetrics` SMC path can still provide the same GPU temperature metric.
           - name: Thermal and fan charts are missing
             description: |
               The thermal and fan charts depend on the native Apple `powermetrics` command. On macOS, `powermetrics` requires superuser privileges, so the default installation runs it through Netdata's setuid `ndsudo` helper with hard-coded allow-list entries for the probed sampler sets. Some Macs expose thermal pressure but no SMC sampler; in that case, thermal pressure can still appear while fan and SMC temperature charts remain absent. If `ndsudo` is missing, not setuid root, or the allow-list rejects all startup probe commands, the sampler disables itself after repeated startup failures to avoid log noise. If the running loop exits later, Netdata probes again and restarts loop mode.
@@ -797,6 +797,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: power_draw
+            - name: macos.gpu_temperature
+              description: GPU temperature
+              unit: "degrees Celsius"
+              chart_type: line
+              dimensions:
+                - name: temperature
         - name: power source
           description: |
             These metrics refer to macOS battery and UPS power sources.
@@ -832,7 +838,7 @@ modules:
                 - name: cycles
         - name: sensor
           description: |
-            These metrics refer to macOS battery, GPU, thermal, and fan sensors.
+            These metrics refer to macOS battery, CPU, thermal, and fan sensors.
           labels:
             - name: source
               description: Data source

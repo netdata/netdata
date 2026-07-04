@@ -330,6 +330,7 @@ Metrics:
 | macos.gpu_performance_state_residency | pstate_<index>_<mhz>mhz | percentage |
 | macos.gpu_clock_freq | frequency | MHz |
 | macos.gpu_power_draw | power_draw | W |
+| macos.gpu_temperature | temperature | degrees Celsius |
 
 ### Per power source
 
@@ -354,7 +355,7 @@ Metrics:
 
 ### Per sensor
 
-These metrics refer to macOS battery, GPU, thermal, and fan sensors.
+These metrics refer to macOS battery, CPU, thermal, and fan sensors.
 
 
 Labels:
@@ -456,7 +457,7 @@ Metrics:
 
 Apple Silicon GPU active residency, frequency, and power charts require IOReport GPU channels. These channels are exposed by Apple Silicon GPU drivers and are not available on Intel Macs. The collector loads IOReport at runtime and disables the GPU module cleanly when the framework, DVFS table, or GPU channels are unavailable.
 
-GPU power may still appear from `powermetrics` on systems where the `gpu_power` sampler exposes a plist `gpu_power` value and IOReport GPU power is unavailable. GPU temperature uses direct SMC/IOHID reads from the GPU module when available; otherwise, the `powermetrics` SMC path can still provide the existing `gpu_die` sensor.
+GPU power may still appear from `powermetrics` on systems where the `gpu_power` sampler exposes a plist `gpu_power` value and IOReport GPU power is unavailable. GPU temperature uses direct SMC/IOHID reads from the GPU module when available; otherwise, the `powermetrics` SMC path can still provide the same GPU temperature metric.
 
 
 ### Thermal and fan charts are missing

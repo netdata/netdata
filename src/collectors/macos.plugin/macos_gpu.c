@@ -997,24 +997,27 @@ static void macos_gpu_update_temperature(const struct macos_gpu_metrics *metrics
 
     if (!gpu.st_temperature) {
         gpu.st_temperature = rrdset_create_localhost(
-            "sensors",
-            "macos_gpu_die_temperature",
+            "macos",
+            "gpu_temperature",
             NULL,
-            "Temperature",
-            "system.hw.sensor.temperature.input",
-            "GPU Die Temperature",
+            "gpu",
+            "macos.gpu_temperature",
+            "GPU Temperature",
             "degrees Celsius",
             "macos.plugin",
             "gpu",
-            NETDATA_CHART_PRIO_SENSORS + 1,
+            NETDATA_CHART_PRIO_SENSORS - 16,
             update_every,
             RRDSET_TYPE_LINE);
         rrdlabels_add(gpu.st_temperature->rrdlabels, "source", "iokit", RRDLABEL_SRC_AUTO);
-        rrdlabels_add(gpu.st_temperature->rrdlabels, "sensor", "gpu_die", RRDLABEL_SRC_AUTO);
-        gpu.rd_temperature = rrddim_add(gpu.st_temperature, "input", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+        gpu.rd_temperature =
+            rrddim_add(gpu.st_temperature, "temperature", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    rrddim_set_by_pointer(gpu.st_temperature, gpu.rd_temperature, (collected_number)llround(metrics->temperature_c * 1000.0));
+    rrddim_set_by_pointer(
+        gpu.st_temperature,
+        gpu.rd_temperature,
+        (collected_number)llround(metrics->temperature_c * 1000.0));
     rrdset_done(gpu.st_temperature);
 }
 
