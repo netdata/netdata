@@ -38,6 +38,8 @@
 #define MACOS_LOGS_FIELD_SIGNPOST_NAME "SIGNPOST_NAME"
 #define MACOS_LOGS_FIELD_SIGNPOST_TYPE "SIGNPOST_TYPE"
 
+#define MACOS_LOGS_FIELD_LENGTH(field) (sizeof(field) - 1)
+
 typedef enum {
     MACOS_LOGS_FACET_VALUE_CACHE_LEVEL,
     MACOS_LOGS_FACET_VALUE_CACHE_PROCESS,
@@ -116,7 +118,7 @@ extern netdata_mutex_t stdout_mutex;
 extern DICTIONARY *used_hashes_registry;
 
 MACOS_LOGS_QUERY_STATUS macos_logs_query_oslog(LOGS_QUERY_STATUS *lqs);
-void macos_logs_cache_facet_value(MACOS_LOGS_FACET_VALUE_CACHE_ID id, const char *value);
+void macos_logs_cache_facet_value(MACOS_LOGS_FACET_VALUE_CACHE_ID id, const char *value, size_t value_length);
 void macos_logs_add_cached_facet_values(FACETS *facets);
 BUFFER *function_macos_logs_result(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled,
                                    BUFFER *payload, HTTP_ACCESS access, const char *source, void *data);

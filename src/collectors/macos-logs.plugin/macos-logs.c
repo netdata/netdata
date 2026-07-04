@@ -19,8 +19,15 @@ static bool plugin_should_exit = false;
 
 struct macos_logs_facet_value_cache {
     const char *key;
+    size_t key_length;
     DICTIONARY *values;
 };
+
+struct macos_logs_cached_facet_value {
+    size_t length;
+};
+
+#define MACOS_LOGS_FACET_VALUE_CACHE_ENTRY(field) { field, MACOS_LOGS_FIELD_LENGTH(field), NULL }
 
 #define MACOS_LOGS_ALWAYS_VISIBLE_KEYS NULL
 
@@ -49,16 +56,16 @@ struct macos_logs_facet_value_cache {
 
 static netdata_mutex_t macos_logs_facet_value_cache_mutex;
 static struct macos_logs_facet_value_cache macos_logs_facet_value_caches[MACOS_LOGS_FACET_VALUE_CACHE_COUNT] = {
-    { MACOS_LOGS_FIELD_LEVEL, NULL },
-    { MACOS_LOGS_FIELD_PROCESS, NULL },
-    { MACOS_LOGS_FIELD_SENDER, NULL },
-    { MACOS_LOGS_FIELD_SUBSYSTEM, NULL },
-    { MACOS_LOGS_FIELD_CATEGORY, NULL },
-    { MACOS_LOGS_FIELD_ENTRY_TYPE, NULL },
-    { MACOS_LOGS_FIELD_STORE_CATEGORY, NULL },
-    { MACOS_LOGS_FIELD_COMPONENT_COUNT, NULL },
-    { MACOS_LOGS_FIELD_SIGNPOST_NAME, NULL },
-    { MACOS_LOGS_FIELD_SIGNPOST_TYPE, NULL },
+    MACOS_LOGS_FACET_VALUE_CACHE_ENTRY(MACOS_LOGS_FIELD_LEVEL),
+    MACOS_LOGS_FACET_VALUE_CACHE_ENTRY(MACOS_LOGS_FIELD_PROCESS),
+    MACOS_LOGS_FACET_VALUE_CACHE_ENTRY(MACOS_LOGS_FIELD_SENDER),
+    MACOS_LOGS_FACET_VALUE_CACHE_ENTRY(MACOS_LOGS_FIELD_SUBSYSTEM),
+    MACOS_LOGS_FACET_VALUE_CACHE_ENTRY(MACOS_LOGS_FIELD_CATEGORY),
+    MACOS_LOGS_FACET_VALUE_CACHE_ENTRY(MACOS_LOGS_FIELD_ENTRY_TYPE),
+    MACOS_LOGS_FACET_VALUE_CACHE_ENTRY(MACOS_LOGS_FIELD_STORE_CATEGORY),
+    MACOS_LOGS_FACET_VALUE_CACHE_ENTRY(MACOS_LOGS_FIELD_COMPONENT_COUNT),
+    MACOS_LOGS_FACET_VALUE_CACHE_ENTRY(MACOS_LOGS_FIELD_SIGNPOST_NAME),
+    MACOS_LOGS_FACET_VALUE_CACHE_ENTRY(MACOS_LOGS_FIELD_SIGNPOST_TYPE),
 };
 static bool macos_logs_facet_value_cache_initialized = false;
 
@@ -102,8 +109,8 @@ static void macos_logs_facet_value_cache_cleanup(void) {
     netdata_mutex_unlock(&macos_logs_facet_value_cache_mutex);
 }
 
-void macos_logs_cache_facet_value(MACOS_LOGS_FACET_VALUE_CACHE_ID id, const char *value) {
-    if(id >= MACOS_LOGS_FACET_VALUE_CACHE_COUNT || !value || !*value)
+void macos_logs_cache_facet_value(MACOS_LOGS_FACET_VALUE_CACHE_ID id, const char *value, size_t value_length) {
+    if(id >= MACOS_LOGS_FACET_VALUE_CACHE_COUNT || !value || !*value || !value_length)
         return;
 
     macos_logs_facet_value_cache_ensure_initialized();
@@ -113,10 +120,10 @@ void macos_logs_cache_facet_value(MACOS_LOGS_FACET_VALUE_CACHE_ID id, const char
         return;
 
     netdata_mutex_lock(&macos_logs_facet_value_cache_mutex);
-    if(dictionary_get(cache->values, value) ||
+    if(dictionary_get_advanced(cache->values, value, (ssize_t)value_length) ||
        dictionary_entries(cache->values) < MACOS_LOGS_FACET_VALUE_CACHE_MAX_PER_KEY) {
-        char present = 1;
-        dictionary_set(cache->values, value, &present, sizeof(present));
+        struct macos_logs_cached_facet_value cached = { .length = value_length };
+        dictionary_set_advanced(cache->values, value, (ssize_t)value_length, &cached, sizeof(cached), NULL);
     }
     netdata_mutex_unlock(&macos_logs_facet_value_cache_mutex);
 }
@@ -130,16 +137,14 @@ void macos_logs_add_cached_facet_values(FACETS *facets) {
         if(!cache->key || !*cache->key || !cache->values)
             continue;
 
-        size_t key_length = strlen(cache->key);
-        char *present;
+        struct macos_logs_cached_facet_value *present;
         dfe_start_read(cache->values, present) {
             const char *value = present_dfe.name;
-            if(!value || !*value)
+            if(!value || !*value || !present || !present->length)
                 continue;
 
-            size_t value_length = strlen(value);
             facets_add_possible_value_name_to_key(
-                facets, cache->key, key_length, value, value_length);
+                facets, cache->key, cache->key_length, value, present->length);
         }
         dfe_done(present);
     }
