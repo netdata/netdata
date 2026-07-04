@@ -30,6 +30,12 @@ struct ActiveFile {
     min_timestamp_ns: TimestampNs,
     max_timestamp_ns: TimestampNs,
     first_frame_at_ns: Option<TimestampNs>,
+    /// Durable prefix / record count as of the last `sync()`. `Closed` carries
+    /// these (not the live `bytes_written`/`log_entry_count`) so a sealed file's
+    /// authoritative prefix never includes bytes past the last fsync — matters
+    /// only on the `Drop` close path, which writes no `sync()` first.
+    synced_up_to: ByteSize,
+    synced_entry_count: u64,
 }
 
 /// The two opaque identifiers a writer stamps into every file it produces:
@@ -205,19 +211,36 @@ impl Stream {
         Ok(frame_offset)
     }
 
-    fn sync(&mut self) -> Result<()> {
+    /// Flush and fsync the active file, recording the now-durable prefix on it.
+    /// Does NOT emit a `Synced` event: the idle-rotation path uses this and then
+    /// relies on the authoritative `Closed` (which carries the prefix) instead of
+    /// a redundant `Synced` on an already-synced file.
+    fn sync_data(&mut self) -> Result<()> {
         if let Some(active) = &mut self.active {
             active.writer.flush()?;
             active.writer.get_ref().sync_all()?;
 
-            self.pending_events.push(FileEvent::Synced {
+            // The just-fsynced prefix is now durable; remember it so a later
+            // `Closed` (which may not be preceded by a fresh sync on the `Drop`
+            // path) reports the durable value, not unsynced tail bytes.
+            active.synced_up_to = active.bytes_written;
+            active.synced_entry_count = active.log_entry_count;
+        }
+        Ok(())
+    }
+
+    fn sync(&mut self) -> Result<()> {
+        self.sync_data()?;
+        if let Some(active) = &self.active {
+            let event = FileEvent::Synced {
                 file_id: active.file_id,
-                valid_up_to: active.bytes_written,
+                valid_up_to: active.synced_up_to,
                 frame_count: active.frame_count,
-                entry_count: active.log_entry_count,
+                entry_count: active.synced_entry_count,
                 min_timestamp_ns: active.min_timestamp_ns,
                 max_timestamp_ns: active.max_timestamp_ns,
-            });
+            };
+            self.pending_events.push(event);
         }
         Ok(())
     }
@@ -292,6 +315,8 @@ impl Stream {
             min_timestamp_ns: TimestampNs::ZERO,
             max_timestamp_ns: TimestampNs::ZERO,
             first_frame_at_ns: None,
+            synced_up_to: ByteSize(HEADER_SIZE as u64),
+            synced_entry_count: 0,
         });
 
         Ok(())
@@ -326,8 +351,30 @@ impl Stream {
                 min_timestamp_ns: active.min_timestamp_ns,
                 max_timestamp_ns: active.max_timestamp_ns,
                 size: active.bytes_written,
+                valid_up_to: active.synced_up_to,
+                entry_count: active.synced_entry_count,
             });
         }
+    }
+
+    /// Rotate this stream's active file if it has met a rotation threshold as of
+    /// `now_ns`, without any new frame. Reuses the write-path decision
+    /// (`should_rotate_with` with zero incoming entries) so idle rotation shares
+    /// the exact same thresholds. The duration arm is the usual trigger; the
+    /// size arm also fires if the last write pushed the file over `max_file_size`
+    /// and no further write arrived to rotate it (write-path rotation is checked
+    /// only at the next `write_frame`), so the sweep also seals over-limit idle
+    /// files. A stream with no active file is a no-op (never creates a file).
+    /// Returns whether it rotated. It fsyncs (`sync_data`) but emits no `Synced`:
+    /// the `Closed` it pushes carries the authoritative durable prefix, so a
+    /// redundant `Synced` is not sent.
+    fn rotate_if_expired(&mut self, now_ns: TimestampNs) -> Result<bool> {
+        if self.active.is_none() || !self.should_rotate_with(0, now_ns) {
+            return Ok(false);
+        }
+        self.sync_data()?;
+        self.close_active_file();
+        Ok(true)
     }
 }
 
@@ -465,6 +512,37 @@ impl Writer {
         Ok(())
     }
 
+    /// Rotate every stream whose active file has met a rotation threshold as of
+    /// `now_ns` (the idle-rotation sweep). No new frames are written and no files
+    /// are created; streams with no active file are skipped. Rotation events are
+    /// queued in the streams' pending buffers — drain them with
+    /// [`take_all_events`](Self::take_all_events) and forward to the ledger.
+    ///
+    /// Best-effort across streams: a per-stream fsync failure MUST NOT strand the
+    /// tenant's other idle streams, so every stream is attempted and the first
+    /// error is surfaced afterward (the caller still drains the events queued by
+    /// the streams that did rotate). Returns the number of files rotated on full
+    /// success.
+    pub fn rotate_expired(&mut self, now_ns: TimestampNs) -> Result<usize> {
+        let mut rotated = 0;
+        let mut first_err: Option<crate::Error> = None;
+        for stream in self.streams.values_mut() {
+            match stream.rotate_if_expired(now_ns) {
+                Ok(true) => rotated += 1,
+                Ok(false) => {}
+                Err(e) => {
+                    if first_err.is_none() {
+                        first_err = Some(e);
+                    }
+                }
+            }
+        }
+        match first_err {
+            Some(e) => Err(e),
+            None => Ok(rotated),
+        }
+    }
+
     /// Shut down all streams, returning any remaining events.
     pub fn shutdown_all(&mut self) -> Result<Vec<FileEvent>> {
         let mut events = Vec::new();
@@ -577,6 +655,77 @@ mod tests {
             wal_name.starts_with(&format!("{machine_hex}-{instance_hex}-")),
             "filename {wal_name} must start with the passed identity pair"
         );
+    }
+
+    #[test]
+    fn rotate_expired_seals_only_expired_streams() {
+        // Default rotation `max_duration` is 1h; the idle sweep rotates a
+        // stream whose lone frame is older than that, leaves a fresh one, and
+        // never creates a file for a stream with no active file.
+        let tmp = tempfile::tempdir().unwrap();
+        let mut writer = test_writer(tmp.path());
+        let hour_ns: u64 = 3600 * 1_000_000_000;
+        let now = TimestampNs(hour_ns + 2);
+
+        // Stream A: sole frame long ago (expired at `now`).
+        writer
+            .write_frame(
+                pk(1),
+                &[],
+                b"aaa",
+                crate::FrameMeta {
+                    entry_count: 3,
+                    ingestion_ns: TimestampNs(1),
+                    log_ts_range: None,
+                },
+            )
+            .unwrap();
+        // Stream B: a fresh frame just before `now` (not expired).
+        writer
+            .write_frame(
+                pk(2),
+                &[],
+                b"b",
+                crate::FrameMeta {
+                    entry_count: 1,
+                    ingestion_ns: TimestampNs(hour_ns + 1),
+                    log_ts_range: None,
+                },
+            )
+            .unwrap();
+        // Clear the writes' Created/Synced so we observe only sweep events.
+        let _ = writer.take_all_events();
+
+        // Sweep: only A's idle file is past `max_duration`.
+        assert_eq!(writer.rotate_expired(now).unwrap(), 1);
+        let events = writer.take_all_events();
+        let closed: Vec<_> = events
+            .iter()
+            .filter_map(|e| match e {
+                FileEvent::Closed {
+                    file_id,
+                    valid_up_to,
+                    entry_count,
+                    size,
+                    ..
+                } => Some((file_id.part_key, *valid_up_to, *entry_count, *size)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(closed.len(), 1, "exactly one stream should seal: {events:?}");
+        let (part_key, valid_up_to, entry_count, size) = closed[0];
+        assert_eq!(part_key, pk(1), "the expired stream (A) must be sealed");
+        assert!(
+            valid_up_to.0 > HEADER_SIZE as u64,
+            "valid_up_to must include the written frame"
+        );
+        assert_eq!(valid_up_to, size, "sealed file: valid_up_to == size");
+        assert_eq!(entry_count, 3, "entry_count carried from the accumulator");
+
+        // A now has no active file; B is still fresh — another sweep no-ops and
+        // creates nothing.
+        assert_eq!(writer.rotate_expired(now).unwrap(), 0);
+        assert!(writer.take_all_events().is_empty());
     }
 
     #[test]

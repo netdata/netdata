@@ -1403,7 +1403,7 @@ logs:
             let rotation = signal.rotation.resolve("default");
             assert_eq!(rotation.max_file_size, ByteSize::mb(25));
             assert_eq!(rotation.max_log_entries, 50000);
-            assert_eq!(rotation.max_file_duration, Duration::from_secs(2 * 3600));
+            assert_eq!(rotation.max_file_duration, Duration::from_secs(15 * 60));
             let retention = signal.retention.resolve("default");
             assert_eq!(retention.max_files, 100_000);
             assert_eq!(retention.max_total_size, ByteSize::gb(1));

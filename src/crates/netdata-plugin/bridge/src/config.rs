@@ -499,7 +499,11 @@ impl Default for RotationPolicy {
             default: RotationConfig {
                 max_file_size: ByteSize::mb(25),
                 max_log_entries: 50_000,
-                max_file_duration: Duration::from_secs(2 * 3600),
+                // 15 min so idle logs streams seal promptly (the logs ingestor's
+                // idle-rotation sweep enforces this even with no new frames). This
+                // default also backs the traces signal, which has no sweep yet, so
+                // an idle traces file rotates only on its next write.
+                max_file_duration: Duration::from_secs(15 * 60),
             },
             tenants: HashMap::new(),
         }
@@ -793,7 +797,7 @@ traces:
         let rotation = config.traces.rotation.resolve("default");
         assert_eq!(rotation.max_file_size, ByteSize::mb(25));
         assert_eq!(rotation.max_log_entries, 50_000);
-        assert_eq!(rotation.max_file_duration, Duration::from_secs(2 * 3600));
+        assert_eq!(rotation.max_file_duration, Duration::from_secs(15 * 60));
         let retention = config.traces.retention.resolve("default");
         assert_eq!(retention.max_files, 100_000);
         assert_eq!(retention.max_total_size, ByteSize::gb(1));

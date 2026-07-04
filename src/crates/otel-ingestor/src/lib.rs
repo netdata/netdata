@@ -33,6 +33,12 @@ use logs_service::NetdataLogsService;
 use metrics_service::{ChartManager, NetdataMetricsService};
 use trace_service::NetdataTracesService;
 
+/// How often the idle-rotation sweep runs (P4/I2). Fixed, no config knob: it
+/// bounds only the *idle*-stream rotation latency — active streams still rotate
+/// precisely on the next write. 30s mirrors Loki's flush-sweep cadence; a no-op
+/// tick is cheap (one lock + arithmetic per tenant, no I/O).
+const WAL_SWEEP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
+
 /// Ingestor worker entry point.
 ///
 /// Connects to the supervisor's IPC socket, performs the Configure → Ready
@@ -167,14 +173,47 @@ async fn run_ingestor(
     let identity = config
         .identity
         .context("plugin config reached the ingestor without a resolved identity")?;
-    let logs_service = create_logs_service(
+    let logs_service = Arc::new(create_logs_service(
         &logs_lifecycle,
         &config.auth,
         Arc::clone(&sender),
         Arc::clone(&seq),
         Arc::clone(&clock),
         identity,
-    );
+    ));
+
+    // Idle-rotation sweep (P4/I2): a periodic task closes WAL streams that have
+    // passed their duration threshold with no new frames, so quiet streams still
+    // get indexed (and, with remote storage, uploaded). The sweep interval is a
+    // floor on idle-stream latency only; if an operator sets a default rotation
+    // shorter than it, idle files rotate at sweep granularity (active files are
+    // unaffected — they rotate on write). Warn once so that is not a surprise.
+    let default_rotation = logs_service.default_max_file_duration();
+    if default_rotation <= WAL_SWEEP_INTERVAL {
+        tracing::warn!(
+            max_file_duration_secs = default_rotation.as_secs(),
+            sweep_interval_secs = WAL_SWEEP_INTERVAL.as_secs(),
+            "logs WAL max_file_duration is at or below the idle-rotation sweep interval; \
+             idle streams will rotate at sweep granularity (active streams still rotate on write)"
+        );
+    }
+    let sweep_service = Arc::clone(&logs_service);
+    let sweep_handle = tokio::spawn(async move {
+        let mut interval = tokio::time::interval(WAL_SWEEP_INTERVAL);
+        // A slow tick (many tenants sealing at once on slow storage) must not
+        // burst-fire the backlog; skip missed ticks instead.
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            interval.tick().await;
+            let svc = Arc::clone(&sweep_service);
+            // The sweep does serial `fsync`s; run it off the async worker pool so
+            // it can never stall the runtime.
+            if let Err(e) = tokio::task::spawn_blocking(move || svc.sweep_expired_rotations()).await
+            {
+                tracing::error!(%e, "WAL idle-rotation sweep task failed");
+            }
+        }
+    });
     let traces_service = create_traces_service(
         &traces_lifecycle,
         &config.auth,
@@ -225,7 +264,7 @@ async fn run_ingestor(
     // Build gRPC router with metrics + logs + (proof-scaffold) traces
     let metrics_svc = MetricsServiceServer::new(metrics_service)
         .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
-    let logs_svc = LogsServiceServer::new(logs_service)
+    let logs_svc = LogsServiceServer::from_arc(logs_service)
         .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
     let traces_svc = TraceServiceServer::new(traces_service)
         .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
@@ -288,6 +327,7 @@ async fn run_ingestor(
     }
 
     tick_handle.abort();
+    sweep_handle.abort();
     Ok(())
 }
 

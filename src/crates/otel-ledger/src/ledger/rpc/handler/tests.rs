@@ -405,6 +405,8 @@ async fn files_request_includes_wal_and_catalog_entries() {
                 min_timestamp_ns: TimestampNs(300),
                 max_timestamp_ns: TimestampNs(400),
                 size: ByteSize(1234),
+                valid_up_to: ByteSize(1234),
+                entry_count: 3,
             })
             .unwrap();
         // A tracked catalog file.

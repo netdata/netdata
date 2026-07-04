@@ -73,11 +73,13 @@ auth:
 logs:
   rotation:
     # Incoming logs are appended to a current file; a new file starts when
-    # any of these limits is reached after a request is received.
+    # any of these limits is reached. Size/entry limits are checked as requests
+    # arrive; max_file_duration also seals an idle file with no new requests
+    # (checked by a background sweep, so a quiet stream still rotates on time).
     default:
       max_file_size: "25MB"
       max_log_entries: 50000
-      max_file_duration: "2 hours"
+      max_file_duration: "15 minutes"
 
     # Per-tenant overrides (any subset of the fields above):
     # my-tenant:

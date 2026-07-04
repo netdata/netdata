@@ -224,6 +224,12 @@ pub enum FileEvent {
         /// Latest log-data timestamp in this file (final value).
         max_timestamp_ns: TimestampNs,
         size: ByteSize,
+        /// Durable prefix at seal time (== the last `Synced`'s `valid_up_to`).
+        /// Carried so a sealed file's prefix is authoritative even if the final
+        /// `Synced` was reordered or lost in flight to the ledger.
+        valid_up_to: ByteSize,
+        /// Total records at seal time (== the last `Synced`'s `entry_count`).
+        entry_count: u64,
     },
 }
 

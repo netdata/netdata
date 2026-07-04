@@ -383,6 +383,71 @@ impl NetdataLogsService {
             compression_enabled: self.wal_config.compression_enabled,
         }
     }
+
+    /// The default (non-overridden) WAL rotation `max_duration` — the value the
+    /// idle-rotation sweep enforces for most streams. Used at startup to warn
+    /// when it is below the sweep granularity.
+    pub fn default_max_file_duration(&self) -> std::time::Duration {
+        self.wal_config.rotation.resolve("default").max_file_duration
+    }
+
+    /// Rotate any per-tenant WAL stream whose active file has passed a rotation
+    /// threshold as of now, without a new frame (the idle-rotation sweep, I2/P4).
+    /// Called periodically off the write path so a quiet stream still seals,
+    /// gets indexed, and (with remote storage) uploaded.
+    ///
+    /// Lock discipline mirrors the export path exactly:
+    /// - read the monotonic clock ONCE and drop its guard before locking any
+    ///   writer, so the sweep's order is clock-then-writer while the export
+    ///   path's is writer-then-clock; since neither holds both locks at once,
+    ///   the two orders cannot form an AB-BA cycle;
+    /// - snapshot the tenant→writer handles under the map lock (held only for the
+    ///   clone), so exports and new-tenant creation are not blocked by the sweep;
+    /// - per writer: lock it, rotate, then drain AND send UNDER that lock so the
+    ///   sealed file's events reach the ledger in order (see the export path).
+    pub fn sweep_expired_rotations(&self) {
+        let now_ns = self.clock.lock().unwrap().now_ns();
+
+        let writers: Vec<(TenantId, Arc<Mutex<wal::Writer>>)> = {
+            let guard = self.writers.lock().unwrap();
+            guard
+                .iter()
+                .map(|(t, w)| (t.clone(), Arc::clone(w)))
+                .collect()
+        };
+
+        for (tenant_id, writer) in writers {
+            let (result, forwarded) = {
+                let mut w = writer.lock().unwrap();
+                let result = w.rotate_expired(now_ns);
+                // Drain UNCONDITIONALLY, even if a later stream errored mid-loop:
+                // `rotate_expired` may have already sealed earlier streams before
+                // the error, and their `Closed` events must still reach the
+                // ledger. Draining regardless also flushes anything a prior failed
+                // sweep left queued. Send under the lock (ordering, as in export).
+                let events = w.take_all_events();
+                let forwarded = events.len();
+                if forwarded > 0 {
+                    self.sender.send_events(tenant_id.clone(), events);
+                }
+                (result, forwarded)
+            };
+            match result {
+                Ok(n) if n > 0 => tracing::debug!(
+                    tenant = %tenant_id,
+                    rotated = n,
+                    "idle WAL rotation: sealed expired stream(s)"
+                ),
+                Ok(_) => {}
+                Err(e) => tracing::error!(
+                    %e,
+                    tenant = %tenant_id,
+                    forwarded_events = forwarded,
+                    "idle WAL rotation failed; forwarded already-sealed streams' events"
+                ),
+            }
+        }
+    }
 }
 
 /// Lower a stream identity onto the substrate's content-agnostic contract:
@@ -599,7 +664,7 @@ impl LogsService for NetdataLogsService {
                 )
             }
         };
-        let events = {
+        {
             let mut writer = writer.lock().unwrap();
             for p in &prepared {
                 let ingestion_ns = self.clock.lock().unwrap().now_ns();
@@ -631,9 +696,17 @@ impl LogsService for NetdataLogsService {
                 tracing::error!(%e, "failed to sync WAL");
                 Status::internal("WAL sync error")
             })?;
-            writer.take_all_events()
-        };
-        self.sender.send_events(tenant_id, events);
+            // Drain AND forward the lifecycle events while STILL holding the
+            // writer lock, so drain+send is atomic per tenant: a file's
+            // Created→Synced→Closed reach the single ledger channel in
+            // lock-acquisition (== logical) order. Sending after releasing the
+            // lock would let a concurrent op on the same tenant (another export,
+            // or the idle-rotation sweep) interleave its events. `send_events`
+            // is synchronous and non-blocking (unbounded channel), so no
+            // `.await` is held under the lock.
+            let events = writer.take_all_events();
+            self.sender.send_events(tenant_id, events);
+        }
 
         Ok(Response::new(ExportLogsServiceResponse {
             partial_success: build_partial_success(&collisions, &oversized, out_of_window),
@@ -964,6 +1037,92 @@ mod tests {
             )),
             "Closed event must carry the resolved log-data range: {events:?}"
         );
+    }
+
+    #[tokio::test]
+    async fn idle_sweep_seals_and_forwards_closed_to_ledger() {
+        use ferryboat::{Endpoint, Listener};
+
+        let tmp = tempfile::tempdir().unwrap();
+        let wal_dir = tmp.path().to_path_buf();
+        let socket = format!("/tmp/netdata-sweep-idle-test-{}.sock", std::process::id());
+        let _ = std::fs::remove_file(&socket);
+
+        // Ledger side: capture every `wal::Message` the service forwards.
+        let mut listener = Listener::<(), wal::Message>::bind(Endpoint::ipc(&socket))
+            .open()
+            .expect("bind ledger listener");
+
+        // A zero rotation duration makes any elapsed time expire an idle stream;
+        // point the service's sender at our capturing listener.
+        let sender = Arc::new(LedgerSender::new(&socket));
+        let mut rotation = HashMap::new();
+        rotation.insert(
+            "default".to_string(),
+            bridge::config::RotationEntry {
+                max_file_size: Some(bytesize::ByteSize::mb(64)),
+                max_log_entries: Some(100_000),
+                max_file_duration: Some(std::time::Duration::ZERO),
+            },
+        );
+        let wal_config = bridge::config::WalConfig {
+            dir: wal_dir.clone(),
+            crc_enabled: true,
+            compression_enabled: true,
+            rotation: bridge::config::RotationPolicy::try_from(rotation).unwrap(),
+        };
+        let service = NetdataLogsService::new(
+            sender,
+            wal_dir.clone(),
+            wal_config,
+            bridge::config::IngestConfig {
+                max_age: std::time::Duration::from_secs(u64::MAX),
+                future_skew: std::time::Duration::from_secs(u64::MAX),
+            },
+            Arc::new(wal::SeqAllocator::ephemeral(0)),
+            Arc::new(Mutex::new(MonotonicClock::new())),
+            bridge::config::AuthConfig::default(),
+            Identity::new(
+                MachineId::new(uuid::Uuid::from_u128(1)).unwrap(),
+                InstanceId::new(uuid::Uuid::from_u128(2)).unwrap(),
+            ),
+        );
+
+        let mut conn = listener.accept().await.expect("accept writer connection");
+
+        // One export creates a live WAL stream (emits Created + Synced).
+        service
+            .export(Request::new(ExportLogsServiceRequest {
+                resource_logs: vec![rl(Some("prod"), Some("api"), 1)],
+            }))
+            .await
+            .unwrap();
+
+        // The idle sweep must seal it (Closed) with no further writes, and the
+        // Closed must reach the ledger carrying the authoritative durable prefix.
+        service.sweep_expired_rotations();
+
+        let (entry_count, valid_up_to) =
+            tokio::time::timeout(std::time::Duration::from_secs(5), async {
+                loop {
+                    let msg = conn.recv().await.expect("recv wal message");
+                    if let wal::FileEvent::Closed {
+                        entry_count,
+                        valid_up_to,
+                        ..
+                    } = msg.event
+                    {
+                        return (entry_count, valid_up_to);
+                    }
+                }
+            })
+            .await
+            .expect("a Closed event must reach the ledger");
+
+        assert_eq!(entry_count, 1, "Closed carries the record count");
+        assert!(valid_up_to.0 > 0, "Closed carries a non-zero durable prefix");
+
+        let _ = std::fs::remove_file(&socket);
     }
 
     #[tokio::test]

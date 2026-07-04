@@ -180,6 +180,12 @@ impl Registry {
                     .files
                     .get_mut(file_id.seq)
                     .ok_or(Error::UnknownSequence(file_id.seq))?;
+                // `Closed` is authoritative and final; ignore a `Synced` that
+                // arrives after it (a reordered or late in-flight event) so it
+                // can never regress a sealed file's prefix.
+                if entry.status == FileStatus::Archived {
+                    return Ok(());
+                }
                 entry.min_timestamp_ns = *min_timestamp_ns;
                 entry.max_timestamp_ns = *max_timestamp_ns;
                 entry.valid_up_to = *valid_up_to;
@@ -191,6 +197,8 @@ impl Registry {
                 size,
                 min_timestamp_ns,
                 max_timestamp_ns,
+                valid_up_to,
+                entry_count,
                 ..
             } => {
                 let entry = self
@@ -201,6 +209,10 @@ impl Registry {
                 entry.size = *size;
                 entry.min_timestamp_ns = *min_timestamp_ns;
                 entry.max_timestamp_ns = *max_timestamp_ns;
+                // Carry the authoritative durable prefix so it is correct even if
+                // the final `Synced` was reordered or lost before this event.
+                entry.valid_up_to = *valid_up_to;
+                entry.entry_count = *entry_count;
                 Ok(())
             }
         }
@@ -473,6 +485,8 @@ mod tests {
                 min_timestamp_ns: TimestampNs(150),
                 max_timestamp_ns: TimestampNs(400),
                 size: ByteSize(200),
+                valid_up_to: ByteSize(200),
+                entry_count: 0,
             })
             .unwrap();
         let f = registry.get(7).unwrap();
@@ -529,8 +543,7 @@ mod tests {
         assert_eq!(f.valid_up_to, ByteSize(8704));
         assert_eq!(f.entry_count, 30);
 
-        // Closed carries no prefix fields; the final Synced's values
-        // (which equal the file size for a sealed file) are preserved.
+        // Closed carries the authoritative durable prefix and record count.
         registry
             .apply_event(&FileEvent::Closed {
                 file_id: id,
@@ -538,12 +551,58 @@ mod tests {
                 min_timestamp_ns: TimestampNs(100),
                 max_timestamp_ns: TimestampNs(300),
                 size: ByteSize(8704),
+                valid_up_to: ByteSize(8704),
+                entry_count: 30,
             })
             .unwrap();
         let f = registry.get(3).unwrap();
         assert_eq!(f.status, FileStatus::Archived);
         assert_eq!(f.valid_up_to, ByteSize(8704));
         assert_eq!(f.entry_count, 30);
+    }
+
+    #[test]
+    fn closed_prefix_wins_over_stale_or_lost_synced() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut registry = Registry::new(dir.path());
+        let id = test_file_id(9);
+
+        registry
+            .apply_event(&FileEvent::Created {
+                file_id: id,
+                created_at_ns: TimestampNs(1),
+                content_meta: Vec::new(),
+            })
+            .unwrap();
+        // Closed establishes the authoritative prefix even if no final Synced
+        // ever arrived (lost in flight).
+        registry
+            .apply_event(&FileEvent::Closed {
+                file_id: id,
+                frame_count: 3,
+                min_timestamp_ns: TimestampNs(100),
+                max_timestamp_ns: TimestampNs(300),
+                size: ByteSize(9000),
+                valid_up_to: ByteSize(9000),
+                entry_count: 42,
+            })
+            .unwrap();
+        // A stale/reordered Synced arriving after Closed must not regress it.
+        registry
+            .apply_event(&FileEvent::Synced {
+                file_id: id,
+                valid_up_to: ByteSize(4096),
+                frame_count: 1,
+                entry_count: 10,
+                min_timestamp_ns: TimestampNs(100),
+                max_timestamp_ns: TimestampNs(200),
+            })
+            .unwrap();
+        let f = registry.get(9).unwrap();
+        assert_eq!(f.status, FileStatus::Archived);
+        assert_eq!(f.valid_up_to, ByteSize(9000));
+        assert_eq!(f.entry_count, 42);
+        assert_eq!(f.max_timestamp_ns, TimestampNs(300));
     }
 
     #[test]
@@ -587,6 +646,8 @@ mod tests {
                 min_timestamp_ns: TimestampNs(1_000_000_000),
                 max_timestamp_ns: TimestampNs(1_000_000_000),
                 size: ByteSize(4096),
+                valid_up_to: ByteSize(4096),
+                entry_count: 0,
             })
             .unwrap();
 
@@ -636,6 +697,8 @@ mod tests {
                     min_timestamp_ns: TimestampNs(min_ns),
                     max_timestamp_ns: TimestampNs(max_ns),
                     size: ByteSize(0),
+                    valid_up_to: ByteSize(0),
+                    entry_count: 0,
                 })
                 .unwrap();
             }

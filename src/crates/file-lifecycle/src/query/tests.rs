@@ -48,6 +48,8 @@ fn track_wal(reg: &mut Registry, seq: u64, min_s: u32, max_s: u32) {
             min_timestamp_ns: TimestampNs(min_s as u64 * NS),
             max_timestamp_ns: TimestampNs(max_s as u64 * NS),
             size: ByteSize(0),
+            valid_up_to: ByteSize(0),
+            entry_count: 0,
         })
         .unwrap();
 }

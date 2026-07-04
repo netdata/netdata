@@ -258,6 +258,8 @@ fn enumerate_streams_dedups_and_aggregates_sfst_and_unsealed_wal() {
                 min_timestamp_ns: TimestampNs(100 * NS),
                 max_timestamp_ns: TimestampNs(200 * NS),
                 size: ByteSize(9999),
+                valid_up_to: ByteSize(9999),
+                entry_count: 1,
             })
             .unwrap();
     }
