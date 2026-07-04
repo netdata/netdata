@@ -356,6 +356,7 @@ fn create_logs_service(
         sender,
         lifecycle.wal.dir.clone(),
         lifecycle.wal.clone(),
+        lifecycle.ingest.clone(),
         seq,
         clock,
         auth.clone(),

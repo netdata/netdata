@@ -9,7 +9,7 @@ use anyhow::Result;
 use super::ConfigOverride;
 use super::endpoint::EndpointOverride;
 use super::metrics::MetricsOverride;
-use super::signal::{AuthOverride, CatalogOverride, SignalOverride, StorageOverride};
+use super::signal::{AuthOverride, CatalogOverride, IngestOverride, SignalOverride, StorageOverride};
 
 /// A snapshot of `NETDATA_OTEL_*` (name → raw value), so config resolution reads
 /// from an injected map rather than `std::env` and stays unit-testable. Values
@@ -242,6 +242,10 @@ impl SignalOverride {
         let catalog = CatalogOverride {
             rotation_count: parse_env_var(env, &var(prefix, "CATALOG_ROTATION_COUNT"))?,
         };
+        let ingest = IngestOverride {
+            max_age: parse_env_duration(env, &var(prefix, "INGEST_MAX_AGE"))?,
+            future_skew: parse_env_duration(env, &var(prefix, "INGEST_FUTURE_SKEW"))?,
+        };
         Ok(Self {
             crc_enabled: parse_env_bool(env, &var(prefix, "CRC_ENABLED"))?,
             compression_enabled: parse_env_bool(env, &var(prefix, "COMPRESSION_ENABLED"))?,
@@ -261,6 +265,11 @@ impl SignalOverride {
             },
             catalog: if catalog.has_any() {
                 Some(catalog)
+            } else {
+                None
+            },
+            ingest: if ingest.has_any() {
+                Some(ingest)
             } else {
                 None
             },

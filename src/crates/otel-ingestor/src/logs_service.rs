@@ -208,24 +208,30 @@ struct OversizedDrop {
 fn build_partial_success(
     collisions: &[Collision],
     oversized: &[OversizedDrop],
+    out_of_window: usize,
 ) -> Option<ExportLogsPartialSuccess> {
-    if collisions.is_empty() && oversized.is_empty() {
+    if collisions.is_empty() && oversized.is_empty() && out_of_window == 0 {
         return None;
     }
     let total: i64 = collisions
         .iter()
         .map(|c| c.rejected_log_records as i64)
         .sum::<i64>()
-        + oversized.iter().map(|o| o.log_records as i64).sum::<i64>();
+        + oversized.iter().map(|o| o.log_records as i64).sum::<i64>()
+        + out_of_window as i64;
     Some(ExportLogsPartialSuccess {
         rejected_log_records: total,
-        error_message: format_rejection_error(collisions, oversized),
+        error_message: format_rejection_error(collisions, oversized, out_of_window),
     })
 }
 
 /// Format the rejected-records detail for `ExportLogsPartialSuccess::error_message`,
 /// covering both `ns_hash` collisions and oversized-identity frame drops.
-fn format_rejection_error(collisions: &[Collision], oversized: &[OversizedDrop]) -> String {
+fn format_rejection_error(
+    collisions: &[Collision],
+    oversized: &[OversizedDrop],
+    out_of_window: usize,
+) -> String {
     fn show(s: &str) -> &str {
         if s.is_empty() { "<none>" } else { s }
     }
@@ -278,6 +284,14 @@ fn format_rejection_error(collisions: &[Collision], oversized: &[OversizedDrop])
         ));
     }
 
+    if out_of_window > 0 {
+        sections.push(format!(
+            "{} log record{} rejected: timestamp outside the ingestion window (older than max_age or more than future_skew ahead)",
+            out_of_window,
+            if out_of_window == 1 { "" } else { "s" },
+        ));
+    }
+
     sections.join(" | ")
 }
 
@@ -319,6 +333,10 @@ pub struct NetdataLogsService {
     sender: Arc<LedgerSender>,
     wal_base_dir: PathBuf,
     wal_config: bridge::config::WalConfig,
+    /// Global ingestion time-bounds (P3): reject records whose resolved
+    /// timestamp is older than `max_age` or more than `future_skew` ahead.
+    /// Applied per record inside `prepare_log_frame`.
+    ingest_bounds: bridge::config::IngestConfig,
     seq: Arc<wal::SeqAllocator>,
     auth: AuthConfig,
     /// Identity stamped into every WAL FileId (the machine GUID resolved by the
@@ -328,10 +346,12 @@ pub struct NetdataLogsService {
 }
 
 impl NetdataLogsService {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         sender: Arc<LedgerSender>,
         wal_base_dir: PathBuf,
         wal_config: bridge::config::WalConfig,
+        ingest_bounds: bridge::config::IngestConfig,
         seq: Arc<wal::SeqAllocator>,
         clock: Arc<Mutex<MonotonicClock>>,
         auth: AuthConfig,
@@ -344,6 +364,7 @@ impl NetdataLogsService {
             sender,
             wal_base_dir,
             wal_config,
+            ingest_bounds,
             seq,
             auth,
             identity,
@@ -484,33 +505,66 @@ impl LogsService for NetdataLogsService {
         // rejected records — collisions and oversized drops — to the client.
         if accepted.is_empty() {
             return Ok(Response::new(ExportLogsServiceResponse {
-                partial_success: build_partial_success(&collisions, &oversized),
+                partial_success: build_partial_success(&collisions, &oversized, 0),
             }));
         }
 
         // Phase 1 — prepare every frame WITHOUT holding any writer lock:
         // `prepare_log_frame` consumes an owned request and needs nothing
         // shared, so concurrent exports overlap all of this CPU work. The
-        // clock tick here is only the base for synthesized fallback
-        // timestamps; the frame header's `ingestion_ns` is ticked at write
-        // time, inside the writer lock, so it stays monotonic per file.
-        // A prepare error therefore rejects the request before ANY of its
-        // frames is written.
+        // clock tick here is the base for synthesized fallback timestamps AND
+        // the reference "now" for the ingestion time-bounds (P3); the frame
+        // header's `ingestion_ns` is ticked at write time, inside the writer
+        // lock, so it stays monotonic per file. A prepare error therefore
+        // rejects the request before ANY of its frames is written.
+        let mut out_of_window: usize = 0;
         let mut prepared = Vec::with_capacity(accepted.len());
         for s in accepted {
             let request = ExportLogsServiceRequest {
                 resource_logs: s.group.resource_logs,
             };
             let fallback_base_ns = self.clock.lock().unwrap().now_ns().as_u64();
-            let frame = ng_flatten::prepare_log_frame(request, fallback_base_ns).map_err(|e| {
-                tracing::error!(%e, "failed to encode flattened frame");
-                Status::internal("flatten encode error")
-            })?;
+            // Inclusive window [now - max_age, now + future_skew] on the RESOLVED
+            // per-record timestamp. Synthesized (now-based) fallbacks land inside
+            // by construction, so timestamp-less records are never rejected.
+            let bounds = ng_flatten::TimeBounds {
+                min_ns: fallback_base_ns.saturating_sub(self.ingest_bounds.max_age_ns()),
+                max_ns: fallback_base_ns.saturating_add(self.ingest_bounds.future_skew_ns()),
+            };
+            let frame = ng_flatten::prepare_log_frame(request, fallback_base_ns, Some(bounds))
+                .map_err(|e| {
+                    tracing::error!(%e, "failed to encode flattened frame");
+                    Status::internal("flatten encode error")
+                })?;
+            out_of_window += frame.rejected;
+            // Every record in this stream fell outside the ingestion window:
+            // nothing to write. Skip it (the write path below assumes each
+            // prepared frame carries at least one record).
+            if frame.records == 0 {
+                continue;
+            }
             prepared.push(PreparedStream {
                 part_key: s.part_key,
                 content_meta: s.content_meta,
                 frame,
             });
+        }
+
+        if out_of_window > 0 {
+            tracing::warn!(
+                tenant = %tenant_id,
+                rejected = out_of_window,
+                "rejected {} log records outside the ingestion time window",
+                out_of_window,
+            );
+        }
+
+        // Every accepted stream was fully rejected as out-of-window: nothing to
+        // write, but still report the rejected records to the client.
+        if prepared.is_empty() {
+            return Ok(Response::new(ExportLogsServiceResponse {
+                partial_success: build_partial_success(&collisions, &oversized, out_of_window),
+            }));
         }
 
         // Phase 2 — the serialized region, under THIS TENANT's writer lock
@@ -582,7 +636,7 @@ impl LogsService for NetdataLogsService {
         self.sender.send_events(tenant_id, events);
 
         Ok(Response::new(ExportLogsServiceResponse {
-            partial_success: build_partial_success(&collisions, &oversized),
+            partial_success: build_partial_success(&collisions, &oversized, out_of_window),
         }))
     }
 }
@@ -816,6 +870,24 @@ mod tests {
     /// background reconnect task gets dropped at end of test along with
     /// the tokio runtime.
     fn test_service(wal_dir: std::path::PathBuf) -> NetdataLogsService {
+        // Existing tests use arbitrary fixed timestamps and do not exercise the
+        // ingestion window; give them an effectively-unbounded window
+        // (`from_secs(u64::MAX)` clamps to `[0, u64::MAX]` in `max_age_ns` /
+        // `future_skew_ns`). The window itself is covered by ng-flatten's bounds
+        // tests and `export_rejects_out_of_window_records_via_partial_success`.
+        test_service_with_ingest(
+            wal_dir,
+            bridge::config::IngestConfig {
+                max_age: std::time::Duration::from_secs(u64::MAX),
+                future_skew: std::time::Duration::from_secs(u64::MAX),
+            },
+        )
+    }
+
+    fn test_service_with_ingest(
+        wal_dir: std::path::PathBuf,
+        ingest: bridge::config::IngestConfig,
+    ) -> NetdataLogsService {
         let socket = format!("/tmp/netdata-ingestor-test-{}.sock", std::process::id());
         let sender = Arc::new(LedgerSender::new(&socket));
 
@@ -840,6 +912,7 @@ mod tests {
             sender,
             wal_dir,
             wal_config,
+            ingest,
             Arc::new(wal::SeqAllocator::ephemeral(0)),
             Arc::new(Mutex::new(MonotonicClock::new())),
             bridge::config::AuthConfig::default(),
@@ -1087,7 +1160,7 @@ mod tests {
                 rejected_log_records: 1,
             },
         ];
-        let msg = format_rejection_error(&collisions, &[]);
+        let msg = format_rejection_error(&collisions, &[], 0);
         assert!(msg.contains("2 ns_hash collisions"));
         assert!(msg.contains("prod"));
         assert!(msg.contains("staging"));
@@ -1106,12 +1179,141 @@ mod tests {
             name_preview: "api".to_string(),
             log_records: 5,
         }];
-        let msg = format_rejection_error(&[], &oversized);
+        let msg = format_rejection_error(&[], &oversized, 0);
         assert!(msg.contains("1 stream dropped for oversized identity"));
         assert!(msg.contains("part_key=0xabc"));
         assert!(msg.contains("len=2048"));
         // The bounded preview names the offending stream, like the collision path.
         assert!(msg.contains("prod-namespace"));
         assert!(msg.contains("5 log records"));
+    }
+
+    #[test]
+    fn partial_success_totals_combine_collision_oversized_and_out_of_window() {
+        let collisions = vec![Collision {
+            hash: 0x1,
+            canonical: ServiceStream::new("prod", "api"),
+            rejected: ServiceStream::new("staging", "api"),
+            rejected_log_records: 3,
+        }];
+        let oversized = vec![OversizedDrop {
+            part_key: 0xabc,
+            namespace_len: 2048,
+            name_len: 4,
+            namespace_preview: "prod".to_string(),
+            name_preview: "api".to_string(),
+            log_records: 5,
+        }];
+        let ps =
+            build_partial_success(&collisions, &oversized, 7).expect("rejections present => Some");
+        assert_eq!(ps.rejected_log_records, 3 + 5 + 7);
+        // All three rejection classes appear in the aggregated message.
+        assert!(ps.error_message.contains("ns_hash collision"));
+        assert!(ps.error_message.contains("oversized identity"));
+        assert!(ps.error_message.contains("7 log records rejected"));
+        assert!(ps.error_message.contains("ingestion window"));
+    }
+
+    #[test]
+    fn partial_success_is_none_when_nothing_rejected() {
+        assert!(build_partial_success(&[], &[], 0).is_none());
+    }
+
+    #[test]
+    fn partial_success_reports_out_of_window_alone() {
+        let ps = build_partial_success(&[], &[], 1).expect("out-of-window => Some");
+        assert_eq!(ps.rejected_log_records, 1);
+        // Singular phrasing for a single record.
+        assert!(ps.error_message.contains("1 log record rejected"));
+    }
+
+    #[tokio::test]
+    async fn export_rejects_out_of_window_records_via_partial_success() {
+        let tmp = tempfile::tempdir().unwrap();
+        // Tight window: 1h past, 1m future. The service reads the same epoch-based
+        // wall clock we sample here (`MonotonicClock` is UNIX-epoch monotonic).
+        let service = test_service_with_ingest(
+            tmp.path().to_path_buf(),
+            bridge::config::IngestConfig {
+                max_age: std::time::Duration::from_secs(3600),
+                future_skew: std::time::Duration::from_secs(60),
+            },
+        );
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        let two_hours_ns = 2 * 3600 * 1_000_000_000u64;
+
+        let mut r = rl(Some("prod"), Some("api"), 2);
+        r.scope_logs[0].log_records[0].time_unix_nano = now - two_hours_ns; // too old
+        r.scope_logs[0].log_records[1].time_unix_nano = now; // in window
+
+        let resp = service
+            .export(Request::new(ExportLogsServiceRequest {
+                resource_logs: vec![r],
+            }))
+            .await
+            .unwrap()
+            .into_inner();
+
+        // The out-of-window record is reported; the in-window one is stored.
+        let ps = resp
+            .partial_success
+            .expect("one out-of-window record must be reported");
+        assert_eq!(ps.rejected_log_records, 1);
+        assert!(ps.error_message.contains("ingestion window"));
+        assert!(
+            service
+                .writers
+                .lock()
+                .unwrap()
+                .contains_key(&TenantId::default_tenant()),
+            "the in-window record must still be written",
+        );
+    }
+
+    #[tokio::test]
+    async fn export_all_out_of_window_acks_partial_success_and_writes_nothing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let service = test_service_with_ingest(
+            tmp.path().to_path_buf(),
+            bridge::config::IngestConfig {
+                max_age: std::time::Duration::from_secs(3600),
+                future_skew: std::time::Duration::from_secs(60),
+            },
+        );
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        let two_hours_ns = 2 * 3600 * 1_000_000_000u64;
+
+        // Every record is ~2h old → all rejected → nothing to write. Exercises
+        // the `prepared.is_empty()` branch: still ack with partial_success, no
+        // writer created.
+        let mut r = rl(Some("prod"), Some("api"), 2);
+        r.scope_logs[0].log_records[0].time_unix_nano = now - two_hours_ns;
+        r.scope_logs[0].log_records[1].time_unix_nano = now - two_hours_ns - 1;
+
+        let resp = service
+            .export(Request::new(ExportLogsServiceRequest {
+                resource_logs: vec![r],
+            }))
+            .await
+            .unwrap()
+            .into_inner();
+
+        let ps = resp
+            .partial_success
+            .expect("all records rejected must be reported");
+        assert_eq!(ps.rejected_log_records, 2);
+        assert!(ps.error_message.contains("ingestion window"));
+        assert!(
+            service.writers.lock().unwrap().is_empty(),
+            "no WAL writer should be created when every record is rejected",
+        );
     }
 }

@@ -165,6 +165,7 @@ where
                     storage,
                     tenant_id,
                     &retention,
+                    &config.ingest,
                 ),
             )
             .await

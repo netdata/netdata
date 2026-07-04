@@ -54,26 +54,21 @@ pub fn recover_unuploaded(
     }
 }
 
-/// Upper bound on the date range walked by `reconcile_remote_uploads`.
-/// Caps the loop so a pathologically-configured retention (e.g.,
-/// `max_age` that overflows to `u32::MAX` days in
-/// `catalog_retention_days`) doesn't issue millions of LIST calls at
-/// startup. 366 days covers any reasonable human-scale retention; older
-/// remote SFSTs are still queryable via locally-recovered catalog
-/// files, just not auto-discovered if their catalog never landed.
-const MAX_RECONCILE_DAYS: u32 = 366;
-
 /// List SFSTs in remote storage for every date in the catalog retention
 /// window (today, today-1, ..., today-N). For each one, mark it uploaded;
 /// for those not yet rotated into a closed catalog, build a fresh
 /// `AddEntry` from the local SFST registry's summary and send it to the
 /// catalog builder.
 ///
-/// Multi-day scope guards against the "agent down for >1 day" case:
-/// SFSTs uploaded yesterday but never rotated would otherwise stay
-/// invisible to the catalog builder on the next start. The window is
-/// capped at the catalog retention window — older catalogs would have
-/// been retention-evicted anyway, so reconstructing them is pointless.
+/// The window is capped at the smaller of the catalog retention window and the
+/// ingestion window (`ingest.reconcile_days()`, itself hard-capped). This LIST
+/// only PRE-MARKS recently-uploaded SFSTs so they are not needlessly re-uploaded;
+/// any local SFST it misses (uploaded before a multi-day outage, older than the
+/// window) is still re-uploaded and re-cataloged by `recover_unuploaded`, which
+/// has no age bound — upload state is not persisted, so a missed SFST reads as
+/// un-uploaded on the next start and is re-queued. So a narrow window costs a
+/// redundant re-upload of an already-present immutable object, never a lost
+/// catalog entry; and the `reconcile_days` cap bounds the startup LIST fan-out.
 ///
 /// Returns `Err` if the remote is unreachable — the caller should skip
 /// further remote-dependent recovery.
@@ -88,9 +83,10 @@ pub async fn reconcile_remote_uploads<S: Storage>(
     storage: &S,
     tenant_id: &TenantId,
     retention: &bridge::config::RetentionConfig,
+    ingest: &bridge::config::IngestConfig,
 ) -> Result<(), StorageError> {
     let today = chrono::Utc::now().date_naive();
-    let max_days = crate::helpers::catalog_retention_days(retention).min(MAX_RECONCILE_DAYS);
+    let max_days = crate::helpers::catalog_retention_days(retention).min(ingest.reconcile_days());
     let uploaded_at_ns = file_registry::TimestampNs(now_ns());
 
     // Build the date-and-prefix list, then issue all LIST calls in

@@ -1031,6 +1031,18 @@ logs:
     }
 
     #[test]
+    fn env_override_logs_ingest() {
+        let o = ConfigOverride::from_map(&env_map(&[
+            ("NETDATA_OTEL_LOGS_INGEST_MAX_AGE", "36 hours"),
+            ("NETDATA_OTEL_LOGS_INGEST_FUTURE_SKEW", "30 seconds"),
+        ]))
+        .unwrap();
+        let ingest = o.logs.as_ref().unwrap().ingest.as_ref().unwrap();
+        assert_eq!(ingest.max_age, Some(Duration::from_secs(36 * 3600)));
+        assert_eq!(ingest.future_skew, Some(Duration::from_secs(30)));
+    }
+
+    #[test]
     fn env_override_logs_bool() {
         let o = ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_LOGS_CRC_ENABLED", "yes")]))
             .unwrap();

@@ -428,6 +428,7 @@ name = "bridge"
 version = "0.1.3"
 dependencies = [
  "async-trait",
+ "bincode 2.0.1",
  "bytesize",
  "console-subscriber",
  "file-registry",

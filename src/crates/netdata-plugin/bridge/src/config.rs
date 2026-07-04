@@ -101,6 +101,7 @@ impl PluginConfig {
                 dir: root.join("catalog"),
                 rotation_count: tuning.catalog.rotation_count,
             },
+            ingest: tuning.ingest.clone(),
             read_cache_dir: root.join("remote-read"),
         }
     }
@@ -214,6 +215,9 @@ pub struct SignalConfig {
     /// Catalog tuning (rotation count) — no dir.
     #[serde(default)]
     pub catalog: CatalogTuning,
+    /// Ingestion time-bounds (P3): reject out-of-window records per-record.
+    #[serde(default)]
+    pub ingest: IngestConfig,
 }
 
 impl Default for SignalConfig {
@@ -224,6 +228,7 @@ impl Default for SignalConfig {
             rotation: RotationPolicy::default(),
             retention: RetentionPolicy::default(),
             catalog: CatalogTuning::default(),
+            ingest: IngestConfig::default(),
         }
     }
 }
@@ -246,6 +251,64 @@ impl Default for CatalogTuning {
     }
 }
 
+/// Ingestion time-bounds for one signal (P3). Records whose RESOLVED timestamp
+/// is older than `max_age` or more than `future_skew` in the future are rejected
+/// per-record at ingestion and reported via OTLP `partial_success`. Global for
+/// the signal — not per-tenant.
+///
+/// Enforced for the LOGS signal only. Traces is a summary-only scaffold with no
+/// per-record ingestion path, so `traces.ingest.future_skew` is accepted but
+/// inert, and `traces.ingest.max_age` influences only the traces startup
+/// reconcile window (not record acceptance). Both take effect for traces once
+/// real traces ingestion lands.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IngestConfig {
+    /// Reject records older than this (past bound). Default 24h.
+    #[serde(with = "duration", default = "default_ingest_max_age")]
+    pub max_age: Duration,
+    /// Accept records dated at most this far in the future (clock-skew
+    /// tolerance). Default 10 min.
+    #[serde(with = "duration", default = "default_ingest_future_skew")]
+    pub future_skew: Duration,
+}
+
+impl Default for IngestConfig {
+    fn default() -> Self {
+        Self {
+            max_age: default_ingest_max_age(),
+            future_skew: default_ingest_future_skew(),
+        }
+    }
+}
+
+impl IngestConfig {
+    /// `max_age` as nanoseconds, saturating (a pathologically large configured
+    /// value clamps to `u64::MAX` ns rather than wrapping).
+    pub fn max_age_ns(&self) -> u64 {
+        u64::try_from(self.max_age.as_nanos()).unwrap_or(u64::MAX)
+    }
+
+    /// `future_skew` as nanoseconds, saturating.
+    pub fn future_skew_ns(&self) -> u64 {
+        u64::try_from(self.future_skew.as_nanos()).unwrap_or(u64::MAX)
+    }
+
+    /// Days back a startup reconcile must LIST to cover the ingestion window:
+    /// `ceil(max_age / 1 day) + 1` (one day of boundary margin), then hard-capped.
+    /// The cap bounds the reconcile LIST fan-out at startup so a mis-sized
+    /// `max_age` (multi-decade, or pathological) can't allocate a giant date list
+    /// / fire unbounded concurrent LISTs; 100 years admits any real config.
+    pub fn reconcile_days(&self) -> u32 {
+        const DAY_SECS: u64 = 24 * 3600;
+        const MAX_RECONCILE_DAYS: u32 = 36_500;
+        let days = self.max_age.as_secs().div_ceil(DAY_SECS).saturating_add(1);
+        u32::try_from(days)
+            .unwrap_or(u32::MAX)
+            .min(MAX_RECONCILE_DAYS)
+    }
+}
+
 /// Signal-neutral file-lifecycle configuration: the per-signal WAL, index, and
 /// catalog settings the ledger substrate needs to manage a signal's file
 /// lifecycle. Built by [`PluginConfig::lifecycle_for`] (derived dirs + per-signal
@@ -260,6 +323,9 @@ pub struct LifecycleConfig {
     pub index: IndexConfig,
     /// Catalog file configuration (derived dir, rotation count).
     pub catalog: CatalogConfig,
+    /// Ingestion time-bounds (P3): the ingestor enforces them per record; the
+    /// ledger derives its reconcile LIST window from `ingest.max_age`.
+    pub ingest: IngestConfig,
     /// Derived local directory for this signal's remote-read cache
     /// (`{base_dir}/{signal}/remote-read`). Used only when the shell has remote
     /// storage enabled.
@@ -307,6 +373,14 @@ pub struct CatalogConfig {
     /// Number of SFST entries accumulated before the catalog builder
     /// rotates an in-memory accumulator to an immutable catalog file.
     pub rotation_count: usize,
+}
+
+fn default_ingest_max_age() -> Duration {
+    Duration::from_secs(24 * 3600)
+}
+
+fn default_ingest_future_skew() -> Duration {
+    Duration::from_secs(10 * 60)
 }
 
 fn default_catalog_rotation_count() -> usize {
@@ -796,6 +870,79 @@ traces:
             c.seq_highwater_path(),
             PathBuf::from("/var/lib/netdata/otel/shared/seq_highwater")
         );
+    }
+
+    #[test]
+    fn ingest_config_defaults_and_reconcile_days() {
+        let c = IngestConfig::default();
+        assert_eq!(c.max_age, Duration::from_secs(24 * 3600));
+        assert_eq!(c.future_skew, Duration::from_secs(10 * 60));
+        // ceil(24h / 1 day) + 1 = 2
+        assert_eq!(c.reconcile_days(), 2);
+        // ceil(50h / 1 day) + 1 = 3 + 1 = 4
+        let wide = IngestConfig {
+            max_age: Duration::from_secs(50 * 3600),
+            future_skew: Duration::from_secs(0),
+        };
+        assert_eq!(wide.reconcile_days(), 4);
+        // A multi-decade / pathological max_age is hard-capped at 100 years so
+        // the startup reconcile LIST fan-out stays bounded.
+        let huge = IngestConfig {
+            max_age: Duration::from_secs(1_000 * 365 * 24 * 3600),
+            future_skew: Duration::from_secs(0),
+        };
+        assert_eq!(huge.reconcile_days(), 36_500);
+    }
+
+    #[test]
+    fn ingest_config_yaml_roundtrip() {
+        let c: IngestConfig = serde_yaml::from_str("max_age: 12h\nfuture_skew: 30s\n").unwrap();
+        assert_eq!(c.max_age, Duration::from_secs(12 * 3600));
+        assert_eq!(c.future_skew, Duration::from_secs(30));
+    }
+
+    #[test]
+    fn ingest_config_survives_bincode_ipc() {
+        // PluginConfig travels ingestor/ledger over bincode (ferryboat); the
+        // `duration` helper must round-trip a NON-human-readable format — a bare
+        // humantime string would not. Mirrors the opt_duration contract.
+        let c = IngestConfig {
+            max_age: Duration::from_secs(3605),
+            future_skew: Duration::from_millis(1500),
+        };
+        let bytes = bincode::serde::encode_to_vec(&c, bincode::config::standard()).unwrap();
+        let (back, _): (IngestConfig, usize) =
+            bincode::serde::decode_from_slice(&bytes, bincode::config::standard()).unwrap();
+        assert_eq!(back.max_age, c.max_age);
+        assert_eq!(back.future_skew, c.future_skew);
+    }
+}
+
+/// Serde for a required `Duration`, dual-mode like [`opt_duration`]: a humantime
+/// string in human-readable formats (YAML), a `(secs, nanos)` tuple otherwise
+/// (bincode IPC — a humantime string would not round-trip through bincode).
+mod duration {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::time::Duration;
+
+    pub fn serialize<S: Serializer>(val: &Duration, s: S) -> Result<S::Ok, S::Error> {
+        if s.is_human_readable() {
+            humantime_serde::re::humantime::format_duration(*val)
+                .to_string()
+                .serialize(s)
+        } else {
+            (val.as_secs(), val.subsec_nanos()).serialize(s)
+        }
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Duration, D::Error> {
+        if d.is_human_readable() {
+            let s = String::deserialize(d)?;
+            humantime_serde::re::humantime::parse_duration(&s).map_err(serde::de::Error::custom)
+        } else {
+            let (secs, nanos) = <(u64, u32)>::deserialize(d)?;
+            Ok(Duration::new(secs, nanos))
+        }
     }
 }
 

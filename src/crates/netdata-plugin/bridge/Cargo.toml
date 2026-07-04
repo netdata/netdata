@@ -31,6 +31,7 @@ uuid = { workspace = true, features = ["serde"] }
 file-registry = { workspace = true }
 
 [dev-dependencies]
+bincode = { workspace = true }
 console-subscriber = { workspace = true }
 serde_yaml = { workspace = true }
 

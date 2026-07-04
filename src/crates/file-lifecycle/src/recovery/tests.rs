@@ -627,6 +627,7 @@ async fn reconcile_remote_uploads_marks_uploaded_and_enqueues_add_entry() {
         &storage,
         &TenantId::from("tenant1"),
         &today_window_retention(),
+        &bridge::config::IngestConfig::default(),
     )
     .await
     .unwrap();
@@ -664,6 +665,7 @@ async fn reconcile_remote_uploads_skips_already_rotated() {
         &storage,
         &TenantId::from("tenant1"),
         &today_window_retention(),
+        &bridge::config::IngestConfig::default(),
     )
     .await
     .unwrap();
@@ -700,6 +702,7 @@ async fn reconcile_remote_uploads_skips_when_local_sfst_missing() {
         &storage,
         &TenantId::from("tenant1"),
         &today_window_retention(),
+        &bridge::config::IngestConfig::default(),
     )
     .await
     .unwrap();
@@ -738,6 +741,7 @@ async fn reconcile_remote_uploads_propagates_list_error() {
         &storage,
         &TenantId::from("tenant1"),
         &today_window_retention(),
+        &bridge::config::IngestConfig::default(),
     )
     .await;
 
@@ -780,6 +784,7 @@ async fn reconcile_remote_uploads_skips_unparseable_key() {
         &storage,
         &TenantId::from("tenant1"),
         &today_window_retention(),
+        &bridge::config::IngestConfig::default(),
     )
     .await
     .unwrap();

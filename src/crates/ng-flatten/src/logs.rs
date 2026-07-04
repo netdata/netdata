@@ -127,16 +127,28 @@ pub fn flatten_log_into(
     resources
 }
 
+/// Inclusive resolved-timestamp acceptance window `[min_ns, max_ns]` for
+/// ingestion. A record whose resolved `time_unix_nano` falls outside is dropped
+/// by [`normalize_log_request`] and counted in [`LogNormalization::rejected`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TimeBounds {
+    pub min_ns: u64,
+    pub max_ns: u64,
+}
+
 /// What one [`normalize_log_request`] walk observed and fixed across a request.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct LogNormalization {
     /// Malformed (non-empty, wrong-length) trace/span ids cleared to absent.
     pub bad_ids: MalformedIds,
-    /// Total log records in the request.
+    /// Total log records KEPT in the request (after any out-of-window drops).
     pub records: usize,
     /// `(min, max)` of the **resolved** per-record `time_unix_nano` — the WAL
-    /// frame's log-data time range. `None` when the request has no records.
+    /// frame's log-data time range. `None` when no records were kept.
     pub ts_range: Option<(u64, u64)>,
+    /// Records dropped because their resolved timestamp fell outside the
+    /// ingestion [`TimeBounds`] (0 when no bounds were applied).
+    pub rejected: usize,
 }
 
 /// Normalize a logs request in place before flattening — ONE walk over every
@@ -163,6 +175,7 @@ pub struct LogNormalization {
 pub fn normalize_log_request(
     req: &mut ExportLogsServiceRequest,
     fallback_base_ns: u64,
+    bounds: Option<TimeBounds>,
 ) -> LogNormalization {
     let mut out = LogNormalization::default();
     let mut fallback_offset: u64 = 0;
@@ -170,7 +183,18 @@ pub fn normalize_log_request(
     let mut max = 0u64;
     for rl in &mut req.resource_logs {
         for sl in &mut rl.scope_logs {
-            for r in &mut sl.log_records {
+            // `retain_mut` resolves the timestamp and applies the bounds in the
+            // same walk, dropping out-of-window records in place — so `records`
+            // and `ts_range` are computed over kept records only and can never
+            // drift from what actually gets stored.
+            sl.log_records.retain_mut(|r| {
+                // A record with NEITHER field carries no client-provided time;
+                // we synthesize a server "now"-based value below. The bounds
+                // police client time, so synthesized values are always kept —
+                // that is what makes timestamp-less records pass regardless of
+                // `future_skew` (a value we just stamped "now" is never judged
+                // out-of-window).
+                let synthesized = r.time_unix_nano == 0 && r.observed_time_unix_nano == 0;
                 if r.time_unix_nano == 0 {
                     r.time_unix_nano = if r.observed_time_unix_nano != 0 {
                         r.observed_time_unix_nano
@@ -178,6 +202,15 @@ pub fn normalize_log_request(
                         fallback_offset += 1;
                         fallback_base_ns.saturating_add(fallback_offset)
                     };
+                }
+                // Bounds apply to the RESOLVED, client-provided timestamp (inclusive).
+                if let Some(b) = bounds {
+                    if !synthesized
+                        && (r.time_unix_nano < b.min_ns || r.time_unix_nano > b.max_ns)
+                    {
+                        out.rejected += 1;
+                        return false;
+                    }
                 }
                 if !r.trace_id.is_empty() && r.trace_id.len() != TRACE_ID_LEN {
                     r.trace_id.clear();
@@ -190,9 +223,16 @@ pub fn normalize_log_request(
                 out.records += 1;
                 min = min.min(r.time_unix_nano);
                 max = max.max(r.time_unix_nano);
-            }
+                true
+            });
         }
+        // Drop scopes emptied by the bounds filter (or sent empty): their scope
+        // attributes would otherwise be flattened/interned into the SFST with no
+        // rows referencing them, surfacing as zero-row values in the field picker.
+        rl.scope_logs.retain(|sl| !sl.log_records.is_empty());
     }
+    // Drop resources whose every scope was emptied, for the same reason.
+    req.resource_logs.retain(|rl| !rl.scope_logs.is_empty());
     if out.records > 0 {
         out.ts_range = Some((min, max));
     }
@@ -237,6 +277,9 @@ pub struct PreparedLogFrame {
     /// Attribute keys sanitized (`'='` → `'_'`) during flattening (already
     /// warned).
     pub sanitized_keys: u64,
+    /// Records dropped as out-of-window by the ingestion [`TimeBounds`]
+    /// (0 when no bounds were applied). The caller reports these to the client.
+    pub rejected: usize,
 }
 
 /// The single owner of the logs frame-payload recipe: normalize (ONE record
@@ -251,20 +294,24 @@ pub struct PreparedLogFrame {
 pub fn prepare_log_frame(
     mut req: ExportLogsServiceRequest,
     fallback_base_ns: u64,
+    bounds: Option<TimeBounds>,
 ) -> Result<PreparedLogFrame, bincode::error::EncodeError> {
-    let norm = normalize_log_request(&mut req, fallback_base_ns);
-    // Nothing to flatten or encode without records; callers skip writing
-    // (`ts_range` is `None`). Recordless resource/scope attributes are
-    // skipped too — same as not writing the frame.
+    let norm = normalize_log_request(&mut req, fallback_base_ns, bounds);
+    // Nothing to flatten or encode without kept records; callers skip writing
+    // (`ts_range` is `None`). This also covers a frame whose every record was
+    // dropped as out-of-window — `rejected` still carries the count so the
+    // caller can report it. Recordless resource/scope attributes are skipped
+    // too — same as not writing the frame.
     if norm.records == 0 {
-        // `bad_ids` is necessarily zero here (normalization inspects only
-        // records) — carried through so the invariant is visible, not assumed.
+        // `bad_ids` is necessarily zero here (normalization clears ids only on
+        // kept records) — carried through so the invariant is visible.
         return Ok(PreparedLogFrame {
             data: Vec::new(),
             records: 0,
             ts_range: None,
             bad_ids: norm.bad_ids,
             sanitized_keys: 0,
+            rejected: norm.rejected,
         });
     }
     if norm.bad_ids.any() {
@@ -291,6 +338,7 @@ pub fn prepare_log_frame(
         ts_range: norm.ts_range,
         bad_ids: norm.bad_ids,
         sanitized_keys,
+        rejected: norm.rejected,
     })
 }
 

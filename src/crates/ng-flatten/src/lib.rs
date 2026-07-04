@@ -731,7 +731,7 @@ mod tests {
                 ..Default::default()
             },
         ]);
-        let norm = normalize_log_request(&mut req, 1000);
+        let norm = normalize_log_request(&mut req, 1000, None);
         let ts: Vec<u64> = req.resource_logs[0].scope_logs[0]
             .log_records
             .iter()
@@ -742,6 +742,200 @@ mod tests {
         // The frame range is min/max of the RESOLVED timestamps — the same
         // values the rows store, by construction.
         assert_eq!(norm.ts_range, Some((77, 1002)));
+    }
+
+    #[test]
+    fn bounds_reject_out_of_window_records_inclusive() {
+        // Inclusive window [1000, 2000] on the RESOLVED timestamp.
+        let bounds = TimeBounds {
+            min_ns: 1000,
+            max_ns: 2000,
+        };
+        let mut req = req_of(vec![
+            LogRecord {
+                time_unix_nano: 999, // one below the lower bound -> rejected
+                ..Default::default()
+            },
+            LogRecord {
+                time_unix_nano: 1000, // inclusive lower -> kept
+                ..Default::default()
+            },
+            LogRecord {
+                time_unix_nano: 1500,
+                ..Default::default()
+            },
+            LogRecord {
+                time_unix_nano: 2000, // inclusive upper -> kept
+                ..Default::default()
+            },
+            LogRecord {
+                time_unix_nano: 2001, // one above the upper bound -> rejected
+                ..Default::default()
+            },
+        ]);
+        let norm = normalize_log_request(&mut req, 1500, Some(bounds));
+        assert_eq!(norm.rejected, 2);
+        assert_eq!(norm.records, 3);
+        // Range and kept rows are computed over the SURVIVORS only.
+        assert_eq!(norm.ts_range, Some((1000, 2000)));
+        let kept: Vec<u64> = req.resource_logs[0].scope_logs[0]
+            .log_records
+            .iter()
+            .map(|r| r.time_unix_nano)
+            .collect();
+        assert_eq!(kept, vec![1000, 1500, 2000]);
+    }
+
+    #[test]
+    fn bounds_judge_resolved_timestamp_and_pass_synthesized() {
+        // Window [900, 1100], "now" (fallback base) = 1000 sits inside it.
+        let bounds = TimeBounds {
+            min_ns: 900,
+            max_ns: 1100,
+        };
+        let mut req = req_of(vec![
+            // timestamp-less -> synthesized 1000+1 = 1001 (in window) -> kept
+            LogRecord {
+                time_unix_nano: 0,
+                observed_time_unix_nano: 0,
+                ..Default::default()
+            },
+            // resolves to observed 950 (in window) -> kept
+            LogRecord {
+                time_unix_nano: 0,
+                observed_time_unix_nano: 950,
+                ..Default::default()
+            },
+            // resolves to observed 500 (out of window) -> rejected
+            LogRecord {
+                time_unix_nano: 0,
+                observed_time_unix_nano: 500,
+                ..Default::default()
+            },
+        ]);
+        let norm = normalize_log_request(&mut req, 1000, Some(bounds));
+        assert_eq!(norm.rejected, 1);
+        assert_eq!(norm.records, 2);
+        let kept: Vec<u64> = req.resource_logs[0].scope_logs[0]
+            .log_records
+            .iter()
+            .map(|r| r.time_unix_nano)
+            .collect();
+        assert_eq!(kept, vec![1001, 950]);
+    }
+
+    #[test]
+    fn bounds_none_keeps_everything() {
+        let mut req = req_of(vec![
+            LogRecord {
+                time_unix_nano: 1,
+                ..Default::default()
+            },
+            LogRecord {
+                time_unix_nano: u64::MAX / 2,
+                ..Default::default()
+            },
+        ]);
+        let norm = normalize_log_request(&mut req, 1000, None);
+        assert_eq!(norm.rejected, 0);
+        assert_eq!(norm.records, 2);
+    }
+
+    #[test]
+    fn bounds_reject_all_leaves_zero_records_and_no_range() {
+        let bounds = TimeBounds {
+            min_ns: 10_000,
+            max_ns: 20_000,
+        };
+        let mut req = req_of(vec![
+            LogRecord {
+                time_unix_nano: 5,
+                ..Default::default()
+            },
+            LogRecord {
+                time_unix_nano: 30_000,
+                ..Default::default()
+            },
+        ]);
+        let norm = normalize_log_request(&mut req, 15_000, Some(bounds));
+        assert_eq!(norm.rejected, 2);
+        assert_eq!(norm.records, 0);
+        assert_eq!(norm.ts_range, None);
+        // Every record dropped → the emptied scope and its resource are pruned.
+        assert!(req.resource_logs.is_empty());
+    }
+
+    #[test]
+    fn bounds_keep_synthesized_with_zero_future_skew() {
+        // future_skew = 0 → upper bound == now. A timestamp-less record
+        // synthesizes now + k (past the bound) but is EXEMPT (server-stamped
+        // "now"), so it is kept; a real client timestamp 1ns past `now` is
+        // rejected; a real one exactly at `now` passes (inclusive).
+        let now = 1_000_000u64;
+        let bounds = TimeBounds {
+            min_ns: now - 100,
+            max_ns: now, // future_skew = 0
+        };
+        let mut req = req_of(vec![
+            LogRecord {
+                time_unix_nano: 0,
+                observed_time_unix_nano: 0,
+                ..Default::default()
+            }, // synthesized now+1 -> exempt -> kept
+            LogRecord {
+                time_unix_nano: now + 1,
+                ..Default::default()
+            }, // real, 1ns future -> rejected
+            LogRecord {
+                time_unix_nano: now,
+                ..Default::default()
+            }, // real, at the boundary -> kept
+        ]);
+        let norm = normalize_log_request(&mut req, now, Some(bounds));
+        assert_eq!(norm.rejected, 1);
+        assert_eq!(norm.records, 2);
+        let kept: Vec<u64> = req.resource_logs[0].scope_logs[0]
+            .log_records
+            .iter()
+            .map(|r| r.time_unix_nano)
+            .collect();
+        assert_eq!(kept, vec![now + 1, now]); // synthesized(now+1), real boundary(now)
+    }
+
+    #[test]
+    fn bounds_prune_scope_and_resource_emptied_by_drop() {
+        // Two resources: one all in-window, one all out-of-window. After the
+        // drop, the fully-rejected resource (and its empty scope) is pruned so
+        // its attributes are never flattened into the frame.
+        let bounds = TimeBounds {
+            min_ns: 1_000,
+            max_ns: 2_000,
+        };
+        let keep = req_of(vec![LogRecord {
+            time_unix_nano: 1_500,
+            ..Default::default()
+        }])
+        .resource_logs
+        .remove(0);
+        let dropped = req_of(vec![LogRecord {
+            time_unix_nano: 9_999,
+            ..Default::default()
+        }])
+        .resource_logs
+        .remove(0);
+        let mut req = ExportLogsServiceRequest {
+            resource_logs: vec![keep, dropped],
+        };
+        let norm = normalize_log_request(&mut req, 1_500, Some(bounds));
+        assert_eq!(norm.rejected, 1);
+        assert_eq!(norm.records, 1);
+        // The out-of-window resource is gone; only the surviving one remains.
+        assert_eq!(req.resource_logs.len(), 1);
+        assert_eq!(req.resource_logs[0].scope_logs[0].log_records.len(), 1);
+        assert_eq!(
+            req.resource_logs[0].scope_logs[0].log_records[0].time_unix_nano,
+            1_500
+        );
     }
 
     #[test]
@@ -769,13 +963,13 @@ mod tests {
                 .remove(0),
             ],
         };
-        let norm = normalize_log_request(&mut req, 1000);
+        let norm = normalize_log_request(&mut req, 1000, None);
         assert_eq!(norm.records, 3);
         assert_eq!(norm.ts_range, Some((90, 700)));
 
         // No records: no range, nothing counted.
         let mut empty = ExportLogsServiceRequest::default();
-        let norm = normalize_log_request(&mut empty, 1000);
+        let norm = normalize_log_request(&mut empty, 1000, None);
         assert_eq!(norm.records, 0);
         assert_eq!(norm.ts_range, None);
         assert!(!norm.bad_ids.any());
@@ -790,7 +984,7 @@ mod tests {
                 req_of(vec![no_ts()]).resource_logs.remove(0),
             ],
         };
-        let norm = normalize_log_request(&mut req, 1000);
+        let norm = normalize_log_request(&mut req, 1000, None);
         let ts: Vec<u64> = req
             .resource_logs
             .iter()
@@ -824,7 +1018,7 @@ mod tests {
                 ..Default::default()
             },
         ]);
-        let norm = normalize_log_request(&mut req, 1000);
+        let norm = normalize_log_request(&mut req, 1000, None);
         let bad = norm.bad_ids;
         assert_eq!((bad.trace, bad.span), (1, 1));
         assert!(bad.any());
