@@ -32,7 +32,7 @@ The substrate owns the machinery that operates only on neutral types
   `part_key`; a content binding decodes `content_meta` for display).
 - `component` — the `Component` / `ComponentHandle` worker actor framework.
 - `cleaner`, `uploader`, `catalog_builder` — the worker **components**
-  (stateless deletion; concurrency-bounded upload; per-`(tenant,date,machine,boot)`
+  (stateless deletion; concurrency-bounded upload; per-`(tenant,date,machine,instance)`
   catalog accumulation + rotation).
 - `storage` — the `Storage` trait + `OpendalStorage` client + reachability probe.
 - `remote_keys` — the object-storage key scheme, **signal-scoped at the root**

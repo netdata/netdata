@@ -138,11 +138,17 @@ The substrate stores the opaque `content_meta` (display identity) but **not** th
   offset 18, after `payload_format` at 16); v4 dropped the 8-byte `part_key`
   slot from the header; v2 had replaced the typed stream String pairs with the
   opaque blob.
-- **Catalog** (`otel-catalog` `FORMAT_VERSION = 4`): each `CatalogEntry` carries
+- **Catalog** (`otel-catalog` `FORMAT_VERSION = 6`): each `CatalogEntry` carries
   `content_meta`; v3 dropped the top-level `part_key` (it lives in `entry.id`); v4
   marks the per-signal remote-key layout below — a pre-v4 catalog's entries embed
   the old segment-less `remote_key`, so it is rejected on recovery (per the
-  no-back-compat rule below) rather than republished with stale keys.
+  no-back-compat rule below) rather than republished with stale keys; v5 renamed
+  the `boot_id` field to `invocation_id`; v6 renamed it to `instance_id` (a fresh
+  per-process id the plugin self-generates at startup, not the agent invocation
+  id). The `(machine, instance)` pair is carried as typed `MachineId` /
+  `InstanceId` newtypes that serialize as bare UUIDs, so the v6 wire is
+  byte-identical to v5's field values and no version bump was needed for the
+  newtype change.
 - **Remote object keys** (`file-lifecycle` `remote_keys`, `SCHEMA_VERSION = "v2"` (the former plugin's artifacts were the v1 generation)):
   signal-scoped — `v2/{signal}/tenants/{tenant}/sfst/{date}/{file}.sfst` and
   `v2/{signal}/catalog/{date}/{tenant}/{file}.catalog`. The `{signal}` segment is
