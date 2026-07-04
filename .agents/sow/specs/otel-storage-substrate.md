@@ -203,11 +203,13 @@ resolved by `otel-plugin` `config/{mod,signal,env}.rs`, consumed by both workers
   old data is **orphaned, not migrated** — it stays on disk but is not read. Recover
   with `sfsq-cli --wal-dir/--sfst-dir` pointed at the old paths, or relocate the dirs.
 
-## SFST per-seq lifecycle state
+## SFST per-identity lifecycle state
 
 `Registry` (per tenant) tracks each sealed SFST's lifecycle in ONE map
-`seqs: BTreeMap<u64, SeqState>` keyed by `seq` (replacing the former three parallel
-`BTreeSet<u64>`). `SeqState` carries two **independent** axes:
+`seqs: BTreeMap<SeqKey, SeqState>` keyed by `SeqKey { machine_id, instance_id, seq }`
+(a `(machine, instance, seq)` projection of `FileId`; replacing the former three
+parallel `BTreeSet<u64>`, and — as of the archive-restore work — the earlier
+bare-`seq` key). `SeqState` carries two **independent** axes:
 
 - **Upload** — `UploadState { NotUploaded, Uploaded }`: whether the SFST's bytes are
   confirmed on remote object storage. Independent of the catalog axis: an SFST may be
@@ -219,15 +221,35 @@ resolved by `otel-plugin` `config/{mod,signal,env}.rs`, consumed by both workers
 
 Contracts:
 
-- **Eviction gate:** with storage enabled, a local SFST is evicted only once its seq
-  reaches `CatalogStage::Remote` (`is_remote_cataloged`), so a local file is never
-  deleted before its catalog is durably remote (else the remote SFST is orphaned).
+- **Cross-identity keying (I5 boundary):** state that crosses an identity boundary is
+  keyed by full `SeqKey`, not bare `seq` — the mark/is family, and the query-plane
+  servable/dedup sets. A `seq` reused by a different process instance (post-wipe
+  reseed) or a different machine (shared bucket) cannot alias another identity's marks.
+  State that only indexes files physically present in THIS machine's local dirs stays
+  `seq`-keyed by design (the `seq_to_tenant` routing map, the WAL/SFST registries):
+  correct seeding makes `seq` unique among local files, and a mis-routed foreign key
+  lands as inert `SeqState`, never a false mark.
+- **D6 own-machine LIST filter:** the remote-key layout keeps every machine's objects
+  under one prefix, so each LIST consumer (reconcile, and later the startup diff-sync)
+  MUST drop keys whose `machine_id` ≠ this node's — foreign objects never mutate local
+  state. Keys of a prior process instance on THIS machine are ours and are marked under
+  their own full identity.
+- **Per-identity reconcile floor:** the startup catalog-confirm pass bounds its stat set
+  by the minimum local SFST seq **per `(machine, instance)`**; a catalog of an identity
+  with no local SFSTs is skipped, so a high seq under one instance cannot strand a
+  low-seq catalog of another. The reconcile splice guard treats a same-`seq` local file
+  as the copy of a listed remote object only when the full identity matches.
+- **Eviction gate:** with storage enabled, a local SFST is evicted only once its
+  `SeqKey` reaches `CatalogStage::Remote` (`is_remote_cataloged`), so a local file is
+  never deleted before its catalog is durably remote (else the remote SFST is orphaned).
 - **"remote-cataloged implies rotated" is structural:** `CatalogStage` is ordered and
   `Remote > RotatedLocal`, so `is_remote_cataloged ⇒ is_rotated` always holds — not a
   caller-ordering assumption.
 - **State may outlive a local SFST entry:** the map is separate from `self.sfst`, so a
-  remote SFST discovered at recovery (no local file) is still marked `Uploaded`.
-- **Eviction is one removal:** `evict_seq` drops the `sfst` entry and the `seqs` entry;
+  remote SFST discovered at recovery (no local file) is still marked `Uploaded` under
+  its own full identity.
+- **Eviction is one removal:** `evict_seq(SeqKey)` drops the `seqs` entry by full key and
+  the local `sfst` entry by `key.seq` (the SFST registry is local-presence, seq-keyed);
   a future per-seq axis is a new `SeqState` field, with no extra cleanup site.
 - In-memory only — rebuilt by recovery on startup; never serialized.
 
