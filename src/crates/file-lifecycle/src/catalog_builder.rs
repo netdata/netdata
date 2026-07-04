@@ -1,5 +1,5 @@
 //! Catalog builder component: accumulates `CatalogEntry` rows in memory
-//! per `(tenant, date, machine, invocation)` scope and rotates to an immutable
+//! per `(tenant, date, machine, instance)` scope and rotates to an immutable
 //! catalog file on disk once the accumulator reaches `rotation_count`.
 //!
 //! Catalog files are atomic (tmp + rename). Upload to remote is handled
@@ -74,12 +74,12 @@ async fn handle_request(
 
     let seq = entry.id.seq;
     let machine_id = entry.id.machine_id;
-    let invocation_id = entry.id.invocation_id;
+    let instance_id = entry.id.instance_id;
 
-    let key: ScopeKey = (tenant_id.clone(), date, machine_id, invocation_id);
+    let key: ScopeKey = (tenant_id.clone(), date, machine_id, instance_id);
     let catalog = accumulators
         .entry(key.clone())
-        .or_insert_with(|| Catalog::new(tenant_id.clone(), date, machine_id, invocation_id));
+        .or_insert_with(|| Catalog::new(tenant_id.clone(), date, machine_id, instance_id));
     catalog.add(entry);
 
     if catalog.entries.len() < args.rotation_count {
@@ -121,7 +121,7 @@ async fn handle_request(
                 tenant_id,
                 date,
                 machine_id,
-                invocation_id,
+                instance_id,
                 max_seq,
                 error: e.to_string(),
             };
@@ -134,7 +134,7 @@ async fn handle_request(
         &tenant_id,
         date,
         machine_id,
-        invocation_id,
+        instance_id,
         max_seq,
         min_timestamp_s,
         max_timestamp_s,
@@ -149,7 +149,7 @@ async fn handle_request(
             tenant_id,
             date,
             machine_id,
-            invocation_id,
+            instance_id,
             max_seq,
             error: e.to_string(),
         };
@@ -170,7 +170,7 @@ async fn handle_request(
         tenant_id,
         date,
         machine_id,
-        invocation_id,
+        instance_id,
         max_seq,
         min_timestamp_s,
         max_timestamp_s,
@@ -182,7 +182,7 @@ async fn handle_request(
 
 /// Full on-disk path for a catalog file.
 ///
-/// Layout: `{base}/{YYYY-MM-DD}/{tenant_id}/{machine}-{invocation}-{max_seq}-{min_ts}-{max_ts}.catalog`.
+/// Layout: `{base}/{YYYY-MM-DD}/{tenant_id}/{machine}-{instance}-{max_seq}-{min_ts}-{max_ts}.catalog`.
 /// The base directory (the signal's derived catalog dir,
 /// `{base_dir}/{signal}/catalog`) is dedicated to catalog files, so there's no
 /// `catalog/` subdir — same convention as WAL and SFST.
@@ -195,7 +195,7 @@ pub(crate) fn scope_path(
     tenant_id: &TenantId,
     date: NaiveDate,
     machine_id: Uuid,
-    invocation_id: Uuid,
+    instance_id: Uuid,
     max_seq: u64,
     min_timestamp_s: u32,
     max_timestamp_s: u32,
@@ -203,7 +203,7 @@ pub(crate) fn scope_path(
     file_registry::layout::date_tenant_dir(base, date, tenant_id.as_str()).join(
         otel_catalog::filename(
             machine_id,
-            invocation_id,
+            instance_id,
             max_seq,
             min_timestamp_s,
             max_timestamp_s,

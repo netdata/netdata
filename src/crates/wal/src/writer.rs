@@ -87,7 +87,7 @@ impl SeqCounter {
 struct Stream {
     dir: Arc<FileDir>,
     machine_id: Uuid,
-    invocation_id: Uuid,
+    instance_id: Uuid,
     /// The pipeline/payload-format pair stamped into every file this stream
     /// writes (see [`FileStamp`]).
     stamp: FileStamp,
@@ -108,7 +108,7 @@ impl Stream {
     fn new(
         dir: Arc<FileDir>,
         machine_id: Uuid,
-        invocation_id: Uuid,
+        instance_id: Uuid,
         stamp: FileStamp,
         config: Config,
         seq: SeqCounter,
@@ -118,7 +118,7 @@ impl Stream {
         Self {
             dir,
             machine_id,
-            invocation_id,
+            instance_id,
             stamp,
             config,
             active: None,
@@ -133,7 +133,7 @@ impl Stream {
     fn file_id(&self, seq: u64) -> FileId {
         FileId::new(
             self.machine_id,
-            self.invocation_id,
+            self.instance_id,
             self.stamp.pipeline_id,
             seq,
             self.part_key,
@@ -365,7 +365,7 @@ impl Config {
 pub struct Writer {
     dir: Arc<FileDir>,
     machine_id: Uuid,
-    invocation_id: Uuid,
+    instance_id: Uuid,
     /// The pipeline/payload-format pair stamped into every file this writer
     /// produces (see [`FileStamp`]). One writer process serves one signal.
     stamp: FileStamp,
@@ -379,20 +379,21 @@ impl Writer {
     /// every file (see [`FileStamp`]); there are no defaults, and the
     /// reserved `payload_format` `0` is rejected.
     ///
-    /// `machine_id` and `invocation_id` are the producer identities stamped
+    /// `machine_id` and `instance_id` are the producer identities stamped
     /// into every file's `FileId`. They MUST come from the caller (the otel
-    /// path resolves them from `NETDATA_REGISTRY_UNIQUE_ID` /
-    /// `NETDATA_INVOCATION_ID`); a nil UUID is rejected as a defense against a
-    /// supervisor that failed to inject them before sending the config to a
-    /// worker. The caller provides a shared sequence counter (e.g., shared
-    /// across per-tenant writers). The directory is created if it doesn't exist.
+    /// path resolves `machine_id` from `NETDATA_REGISTRY_UNIQUE_ID` and
+    /// generates a fresh `instance_id` per process); a nil UUID is rejected as a
+    /// defense against a supervisor that failed to inject them before sending
+    /// the config to a worker. The caller provides a shared sequence counter
+    /// (e.g., shared across per-tenant writers). The directory is created if it
+    /// doesn't exist.
     pub fn new(
         path: &Path,
         config: Config,
         seq: Arc<SeqAllocator>,
         stamp: FileStamp,
         machine_id: uuid::Uuid,
-        invocation_id: uuid::Uuid,
+        instance_id: uuid::Uuid,
     ) -> Result<Self> {
         // A producer stamping the reserved id would write files every reader
         // rejects — acknowledged but unqueryable data. Refuse at construction.
@@ -405,10 +406,11 @@ impl Writer {
         // A nil identity leaks into filenames as a valid 32-hex zero prefix and
         // is never garbage-collected from remote storage — refuse at the
         // boundary that stamps it. Mirrors the payload_format guard above.
-        if machine_id.is_nil() || invocation_id.is_nil() {
+        if machine_id.is_nil() || instance_id.is_nil() {
             return Err(crate::Error::InvalidHeader(
-                "machine_id/invocation_id must not be the nil UUID; the supervisor \
-                 must inject NETDATA_REGISTRY_UNIQUE_ID / NETDATA_INVOCATION_ID"
+                "machine_id/instance_id must not be the nil UUID; the supervisor \
+                 must inject a valid machine_id (from NETDATA_REGISTRY_UNIQUE_ID) \
+                 and a generated instance_id"
                     .to_string(),
             ));
         }
@@ -417,7 +419,7 @@ impl Writer {
         Ok(Self {
             dir,
             machine_id,
-            invocation_id,
+            instance_id,
             stamp,
             config,
             seq,
@@ -462,7 +464,7 @@ impl Writer {
             Stream::new(
                 Arc::clone(&self.dir),
                 self.machine_id,
-                self.invocation_id,
+                self.instance_id,
                 self.stamp,
                 self.config.clone(),
                 SeqCounter(Arc::clone(&self.seq)),
@@ -506,7 +508,7 @@ mod tests {
 
     fn test_writer(tmp: &std::path::Path) -> Writer {
         let seq = Arc::new(SeqAllocator::ephemeral(0));
-        let (machine_id, invocation_id) = crate::test_identity();
+        let (machine_id, instance_id) = crate::test_identity();
         Writer::new(
             tmp,
             Config::default(),
@@ -516,7 +518,7 @@ mod tests {
                 payload_format: 7,
             },
             machine_id,
-            invocation_id,
+            instance_id,
         )
         .unwrap()
     }
@@ -533,7 +535,7 @@ mod tests {
         // every build profile, before any file can be written.
         let tmp = tempfile::tempdir().unwrap();
         let seq = Arc::new(SeqAllocator::ephemeral(0));
-        let (machine_id, invocation_id) = crate::test_identity();
+        let (machine_id, instance_id) = crate::test_identity();
         match Writer::new(
             tmp.path(),
             Config::default(),
@@ -543,7 +545,7 @@ mod tests {
                 payload_format: 0,
             },
             machine_id,
-            invocation_id,
+            instance_id,
         ) {
             Err(crate::Error::InvalidHeader(msg)) => {
                 assert!(msg.contains("reserved"), "got: {msg}")
@@ -581,11 +583,11 @@ mod tests {
 
     #[test]
     fn filename_embeds_passed_identity() {
-        // The caller-supplied machine_id/invocation_id MUST land in the FileId
-        // stem so the file is attributable to this node and invocation. The
-        // 32-hex simple form is the filename's only copy of these values.
+        // The caller-supplied machine_id/instance_id MUST land in the FileId
+        // stem so the file is attributable to this node and process instance.
+        // The 32-hex simple form is the filename's only copy of these values.
         let tmp = tempfile::tempdir().unwrap();
-        let (machine_id, invocation_id) = crate::test_identity();
+        let (machine_id, instance_id) = crate::test_identity();
         let seq = Arc::new(SeqAllocator::ephemeral(0));
         let mut writer = Writer::new(
             tmp.path(),
@@ -596,7 +598,7 @@ mod tests {
                 payload_format: 7,
             },
             machine_id,
-            invocation_id,
+            instance_id,
         )
         .unwrap();
         writer
@@ -612,7 +614,7 @@ mod tests {
             )
             .unwrap();
 
-        // The WAL filename is `{machine:32hex}-{invocation:32hex}-{...}.wal`.
+        // The WAL filename is `{machine:32hex}-{instance:32hex}-{...}.wal`.
         let entries = std::fs::read_dir(tmp.path()).unwrap();
         let wal_name = entries
             .filter_map(|e| e.ok())
@@ -621,9 +623,9 @@ mod tests {
             .file_name();
         let wal_name = wal_name.to_str().unwrap();
         let machine_hex = machine_id.as_simple().to_string();
-        let invocation_hex = invocation_id.as_simple().to_string();
+        let instance_hex = instance_id.as_simple().to_string();
         assert!(
-            wal_name.starts_with(&format!("{machine_hex}-{invocation_hex}-")),
+            wal_name.starts_with(&format!("{machine_hex}-{instance_hex}-")),
             "filename {wal_name} must start with the passed identity pair"
         );
     }

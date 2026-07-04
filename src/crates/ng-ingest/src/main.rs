@@ -147,7 +147,7 @@ async fn main() -> anyhow::Result<()> {
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
     let machine_id = journal_common::load_machine_id()
         .context("failed to load machine id from /etc/machine-id")?;
-    let invocation_id = journal_common::load_boot_id()
+    let instance_id = journal_common::load_boot_id()
         .context("failed to load boot id from /proc/sys/kernel/random/boot_id")?;
     let writer = wal::Writer::new(
         &args.out,
@@ -158,7 +158,7 @@ async fn main() -> anyhow::Result<()> {
             payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
         },
         machine_id,
-        invocation_id,
+        instance_id,
     )
     .with_context(|| format!("failed to create WAL writer in {}", args.out.display()))?;
 

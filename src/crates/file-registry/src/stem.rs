@@ -1,16 +1,16 @@
-//! Shared filename-stem codec for the `{machine}-{invocation}-...` shape.
+//! Shared filename-stem codec for the `{machine}-{instance}-...` shape.
 //!
 //! Every durable artifact's filename starts with the producing
-//! machine's id and invocation id as 32-hex-char simple UUIDs; the fields
+//! machine's id and instance id as 32-hex-char simple UUIDs; the fields
 //! after that prefix are the artifact's own (pipeline + seq + part_key for
 //! data files, seq + time bounds for catalogs). This module owns the shared
 //! prefix so no format parses it by hand.
 
 use uuid::Uuid;
 
-/// Format the `{machine}-{invocation}` prefix (two simple-form UUIDs).
-pub fn format_uuid_pair(machine_id: Uuid, invocation_id: Uuid) -> String {
-    format!("{}-{}", machine_id.as_simple(), invocation_id.as_simple())
+/// Format the `{machine}-{instance}` prefix (two simple-form UUIDs).
+pub fn format_uuid_pair(machine_id: Uuid, instance_id: Uuid) -> String {
+    format!("{}-{}", machine_id.as_simple(), instance_id.as_simple())
 }
 
 /// Parse a stem's `{32hex}-{32hex}-` prefix; returns the two UUIDs and
@@ -21,13 +21,13 @@ pub fn parse_uuid_pair(stem: &str) -> Option<(Uuid, Uuid, &str)> {
     if stem.as_bytes().get(32)? != &b'-' {
         return None;
     }
-    let invocation_str = stem.get(33..65)?;
+    let instance_str = stem.get(33..65)?;
     if stem.as_bytes().get(65)? != &b'-' {
         return None;
     }
     let machine_id = Uuid::try_parse(machine_str).ok()?;
-    let invocation_id = Uuid::try_parse(invocation_str).ok()?;
-    Some((machine_id, invocation_id, stem.get(66..)?))
+    let instance_id = Uuid::try_parse(instance_str).ok()?;
+    Some((machine_id, instance_id, stem.get(66..)?))
 }
 
 #[cfg(test)]

@@ -31,12 +31,19 @@ pub use registry::{File, Registry, filename, scan_max_sequence};
 /// now-orphaned old layout. There is no migration (experimental feature).
 ///
 /// v5: the `FileId` and `Catalog` envelope field `boot_id` is renamed to
-/// `invocation_id` — the value is now the Netdata agent invocation id
+/// `invocation_id` — the value was the Netdata agent invocation id
 /// (`NETDATA_INVOCATION_ID`), not the OS boot id, and the JSON wire key follows
 /// the Rust field name (both derive serde with named fields). Pre-GA break;
-/// v4 catalogs are rejected on recovery. The WAL header and SFST formats are
-/// unchanged (identity lives in filenames only, never inside those bytes).
-pub const FORMAT_VERSION: u32 = 5;
+/// v4 catalogs are rejected on recovery.
+///
+/// v6: `invocation_id` is renamed to `instance_id` and its meaning changes — the
+/// plugin now self-generates a fresh v4 UUID per process at startup instead of
+/// carrying the agent invocation id (which a crashed-and-respawned plugin would
+/// inherit unchanged, colliding provenance across distinct processes). The JSON
+/// wire key follows the field name; pre-GA break, v5 catalogs are rejected on
+/// recovery. The WAL header and SFST formats are unchanged (identity lives in
+/// filenames only, never inside those bytes).
+pub const FORMAT_VERSION: u32 = 6;
 
 /// Magic bytes of the on-disk catalog container.
 pub const CONTAINER_MAGIC: [u8; 4] = *b"NCAT";

@@ -2,7 +2,7 @@
 //!
 //! Catalog files are immutable snapshots produced by a `CatalogBuilder`
 //! whenever a per-scope accumulator is rotated. Each file is named
-//! `{machine_id}-{invocation_id}-{max_seq}-{min_ts_s}-{max_ts_s}.catalog` and
+//! `{machine_id}-{instance_id}-{max_seq}-{min_ts_s}-{max_ts_s}.catalog` and
 //! lives under a date-partitioned directory:
 //! `{base}/{YYYY-MM-DD}/{tenant_id}/{name}.catalog`.
 //!
@@ -31,7 +31,7 @@ const CATALOG_EXT: &str = "catalog";
 pub struct File {
     pub date: NaiveDate,
     pub machine_id: Uuid,
-    pub invocation_id: Uuid,
+    pub instance_id: Uuid,
     /// Highest SFST sequence number contained in this catalog.
     pub max_seq: u64,
     /// Min of the contained entries' `min_timestamp_s`.
@@ -48,7 +48,7 @@ impl File {
     pub fn new(
         date: NaiveDate,
         machine_id: Uuid,
-        invocation_id: Uuid,
+        instance_id: Uuid,
         max_seq: u64,
         min_timestamp_s: u32,
         max_timestamp_s: u32,
@@ -57,7 +57,7 @@ impl File {
         Self {
             date,
             machine_id,
-            invocation_id,
+            instance_id,
             max_seq,
             min_timestamp_s,
             max_timestamp_s,
@@ -82,7 +82,7 @@ pub struct Registry {
     /// The tenant this `Registry` owns. Recovery filters to this tenant.
     tenant_id: TenantId,
     /// Keyed by on-disk path. Catalog files are identified by their full
-    /// `(date, machine, invocation, max_seq, min_ts, max_ts)` tuple which the
+    /// `(date, machine, instance, max_seq, min_ts, max_ts)` tuple which the
     /// path encodes.
     files: BTreeMap<PathBuf, File>,
 }
@@ -109,7 +109,7 @@ impl Registry {
         &self,
         date: NaiveDate,
         machine_id: Uuid,
-        invocation_id: Uuid,
+        instance_id: Uuid,
         max_seq: u64,
         min_timestamp_s: u32,
         max_timestamp_s: u32,
@@ -117,7 +117,7 @@ impl Registry {
         file_registry::layout::date_tenant_dir(&self.base_dir, date, self.tenant_id.as_str()).join(
             filename(
                 machine_id,
-                invocation_id,
+                instance_id,
                 max_seq,
                 min_timestamp_s,
                 max_timestamp_s,
@@ -221,7 +221,7 @@ impl Registry {
     /// tenant are loaded; other tenants' subdirs under the same date are
     /// skipped.
     ///
-    /// All identifying data (machine, invocation, seq, time bounds) comes from
+    /// All identifying data (machine, instance, seq, time bounds) comes from
     /// the filename — the body is not read during recovery.
     ///
     /// Files with unparseable names are logged and skipped. Date
@@ -270,7 +270,7 @@ impl Registry {
                     Some(s) => s,
                     None => continue,
                 };
-                let (machine_id, invocation_id, max_seq, min_ts, max_ts) = match parse_stem(stem) {
+                let (machine_id, instance_id, max_seq, min_ts, max_ts) = match parse_stem(stem) {
                     Some(v) => v,
                     None => {
                         tracing::warn!(
@@ -295,7 +295,7 @@ impl Registry {
                     File {
                         date,
                         machine_id,
-                        invocation_id,
+                        instance_id,
                         max_seq,
                         min_timestamp_s: min_ts,
                         max_timestamp_s: max_ts,
@@ -388,27 +388,27 @@ pub fn scan_max_sequence(catalog_base: &Path) -> std::io::Result<u64> {
 }
 
 /// Format a catalog filename:
-/// `{machine:32}-{invocation:32}-{max_seq:010}-{min_ts:010}-{max_ts:010}.catalog`.
+/// `{machine:32}-{instance:32}-{max_seq:010}-{min_ts:010}-{max_ts:010}.catalog`.
 pub fn filename(
     machine_id: Uuid,
-    invocation_id: Uuid,
+    instance_id: Uuid,
     max_seq: u64,
     min_timestamp_s: u32,
     max_timestamp_s: u32,
 ) -> String {
     format!(
         "{}-{:010}-{:010}-{:010}.{CATALOG_EXT}",
-        file_registry::stem::format_uuid_pair(machine_id, invocation_id),
+        file_registry::stem::format_uuid_pair(machine_id, instance_id),
         max_seq,
         min_timestamp_s,
         max_timestamp_s,
     )
 }
 
-/// Parse the stem `{machine:32}-{invocation:32}-{max_seq}-{min_ts}-{max_ts}` into
+/// Parse the stem `{machine:32}-{instance:32}-{max_seq}-{min_ts}-{max_ts}` into
 /// its components.
 pub fn parse_stem(stem: &str) -> Option<(Uuid, Uuid, u64, u32, u32)> {
-    let (machine_id, invocation_id, tail) = file_registry::stem::parse_uuid_pair(stem)?;
+    let (machine_id, instance_id, tail) = file_registry::stem::parse_uuid_pair(stem)?;
     // Split the remaining "max_seq-min_ts-max_ts" by '-'. `splitn(3)`
     // packs any extra '-'-joined trailing segments into the third item,
     // so trailing garbage fails the numeric parse below.
@@ -416,7 +416,7 @@ pub fn parse_stem(stem: &str) -> Option<(Uuid, Uuid, u64, u32, u32)> {
     let max_seq: u64 = parts.next()?.parse().ok()?;
     let min_ts: u32 = parts.next()?.parse().ok()?;
     let max_ts: u32 = parts.next()?.parse().ok()?;
-    Some((machine_id, invocation_id, max_seq, min_ts, max_ts))
+    Some((machine_id, instance_id, max_seq, min_ts, max_ts))
 }
 
 #[cfg(test)]
@@ -427,7 +427,7 @@ mod tests {
         Uuid::from_u128(0x0011_2233_4455_6677_8899_aabb_ccdd_eeff)
     }
 
-    fn invocation() -> Uuid {
+    fn instance() -> Uuid {
         Uuid::from_u128(0xaaaa_bbbb_cccc_dddd_eeee_ffff_0000_1111)
     }
 
@@ -437,12 +437,12 @@ mod tests {
 
     #[test]
     fn filename_and_parse_roundtrip() {
-        let name = filename(machine(), invocation(), 42, 1_700_000_000, 1_700_003_600);
+        let name = filename(machine(), instance(), 42, 1_700_000_000, 1_700_003_600);
         assert!(name.ends_with(".catalog"));
         let stem = name.strip_suffix(".catalog").unwrap();
         let (m, b, s, lo, hi) = parse_stem(stem).unwrap();
         assert_eq!(m, machine());
-        assert_eq!(b, invocation());
+        assert_eq!(b, instance());
         assert_eq!(s, 42);
         assert_eq!(lo, 1_700_000_000);
         assert_eq!(hi, 1_700_003_600);
@@ -457,7 +457,7 @@ mod tests {
             parse_stem(&format!(
                 "{}-{}-1",
                 machine().as_simple(),
-                invocation().as_simple()
+                instance().as_simple()
             ))
             .is_none()
         );
@@ -466,7 +466,7 @@ mod tests {
             parse_stem(&format!(
                 "{}-{}-1-2-3-4",
                 machine().as_simple(),
-                invocation().as_simple()
+                instance().as_simple()
             ))
             .is_none()
         );
@@ -483,7 +483,7 @@ mod tests {
     fn file_path_is_base_date_tenant_filename() {
         let tmp = tempfile::tempdir().unwrap();
         let reg = Registry::new(tmp.path(), TenantId::from(TENANT));
-        let p = reg.file_path(date(), machine(), invocation(), 7, 100, 200);
+        let p = reg.file_path(date(), machine(), instance(), 7, 100, 200);
         assert!(p.starts_with(tmp.path()));
         let s = p.to_str().unwrap();
         assert!(s.contains("2026-04-17"));
@@ -496,11 +496,11 @@ mod tests {
     fn track_and_remove() {
         let tmp = tempfile::tempdir().unwrap();
         let mut reg = Registry::new(tmp.path(), TenantId::from(TENANT));
-        let path = reg.file_path(date(), machine(), invocation(), 10, 100, 200);
+        let path = reg.file_path(date(), machine(), instance(), 10, 100, 200);
         let file = File {
             date: date(),
             machine_id: machine(),
-            invocation_id: invocation(),
+            instance_id: instance(),
             max_seq: 10,
             min_timestamp_s: 100,
             max_timestamp_s: 200,
@@ -522,12 +522,12 @@ mod tests {
     fn pending_deletion_roundtrip() {
         let tmp = tempfile::tempdir().unwrap();
         let mut reg = Registry::new(tmp.path(), TenantId::from(TENANT));
-        let path = reg.file_path(date(), machine(), invocation(), 1, 0, 0);
+        let path = reg.file_path(date(), machine(), instance(), 1, 0, 0);
         reg.track(
             File {
                 date: date(),
                 machine_id: machine(),
-                invocation_id: invocation(),
+                instance_id: instance(),
                 max_seq: 1,
                 min_timestamp_s: 0,
                 max_timestamp_s: 0,
@@ -548,7 +548,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let expected = tmp.path().join("2026-04-17").join(TENANT).join(filename(
             machine(),
-            invocation(),
+            instance(),
             42,
             100,
             200,
@@ -572,7 +572,7 @@ mod tests {
         // Same date, two tenants.
         write_catalog_at(&tmp.path().join("2026-04-17").join(TENANT).join(filename(
             machine(),
-            invocation(),
+            instance(),
             1,
             100,
             200,
@@ -581,7 +581,7 @@ mod tests {
             &tmp.path()
                 .join("2026-04-17")
                 .join("other-tenant")
-                .join(filename(machine(), invocation(), 2, 100, 200)),
+                .join(filename(machine(), instance(), 2, 100, 200)),
         );
 
         let mut reg = Registry::new(tmp.path(), TenantId::from(TENANT));
@@ -615,7 +615,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let good = tmp.path().join("2026-04-17").join(TENANT).join(filename(
             machine(),
-            invocation(),
+            instance(),
             42,
             100,
             200,
@@ -652,19 +652,19 @@ mod tests {
             &tmp.path()
                 .join("2026-04-17")
                 .join("tenant-a")
-                .join(filename(machine(), invocation(), 42, 100, 200)),
+                .join(filename(machine(), instance(), 42, 100, 200)),
         );
         write_catalog_at(
             &tmp.path()
                 .join("2026-04-17")
                 .join("tenant-b")
-                .join(filename(machine(), invocation(), 99, 100, 200)),
+                .join(filename(machine(), instance(), 99, 100, 200)),
         );
         write_catalog_at(
             &tmp.path()
                 .join("2026-04-18")
                 .join("tenant-a")
-                .join(filename(machine(), invocation(), 7, 100, 200)),
+                .join(filename(machine(), instance(), 7, 100, 200)),
         );
         // Non-date subdir and unparseable filename: ignored.
         std::fs::create_dir_all(tmp.path().join("not-a-date").join("tenant-a")).unwrap();
@@ -695,12 +695,12 @@ mod tests {
         min_ts: u32,
         max_ts: u32,
     ) -> PathBuf {
-        let path = reg.file_path(d, machine(), invocation(), max_seq, min_ts, max_ts);
+        let path = reg.file_path(d, machine(), instance(), max_seq, min_ts, max_ts);
         reg.track(
             File::new(
                 d,
                 machine(),
-                invocation(),
+                instance(),
                 max_seq,
                 min_ts,
                 max_ts,
@@ -770,15 +770,15 @@ mod tests {
 
     /// Write a catalog file containing `entries` to disk and return the
     /// path. Also tracks it in the registry under the canonical
-    /// `(date, machine, invocation, max_seq, min_ts, max_ts)` path. The file's
+    /// `(date, machine, instance, max_seq, min_ts, max_ts)` path. The file's
     /// min/max bounds are computed as the union of the entries' ranges.
     fn write_catalog_file(reg: &mut Registry, max_seq: u64, entries: Vec<CatalogEntry>) -> PathBuf {
         let min_ts = entries.iter().map(|e| e.min_timestamp_s).min().unwrap_or(0);
         let max_ts = entries.iter().map(|e| e.max_timestamp_s).max().unwrap_or(0);
-        let path = reg.file_path(date(), machine(), invocation(), max_seq, min_ts, max_ts);
+        let path = reg.file_path(date(), machine(), instance(), max_seq, min_ts, max_ts);
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         let cat = {
-            let mut c = Catalog::new(TenantId::from(TENANT), date(), machine(), invocation());
+            let mut c = Catalog::new(TenantId::from(TENANT), date(), machine(), instance());
             for e in entries {
                 c.add(e);
             }
@@ -790,7 +790,7 @@ mod tests {
             File::new(
                 date(),
                 machine(),
-                invocation(),
+                instance(),
                 max_seq,
                 min_ts,
                 max_ts,
@@ -804,7 +804,7 @@ mod tests {
     fn entry_at(seq: u64, min_s: u32, max_s: u32, ns: &str, name: &str) -> CatalogEntry {
         let part_key = opaque_part_key(ns, name);
         CatalogEntry {
-            id: file_registry::FileId::new(machine(), invocation(), 0, seq, part_key),
+            id: file_registry::FileId::new(machine(), instance(), 0, seq, part_key),
             remote_key: format!("k{seq}"),
             min_timestamp_s: min_s,
             max_timestamp_s: max_s,
@@ -905,11 +905,11 @@ mod tests {
         // tracks it; candidates() should log+skip it without poisoning
         // the iterator. Bounds chosen to overlap the query so the
         // file-level pre-filter passes and the body parse is attempted.
-        let bad_path = reg.file_path(date(), machine(), invocation(), 20, 100, 200);
+        let bad_path = reg.file_path(date(), machine(), instance(), 20, 100, 200);
         std::fs::create_dir_all(bad_path.parent().unwrap()).unwrap();
         std::fs::write(&bad_path, b"not valid json").unwrap();
         reg.track(
-            File::new(date(), machine(), invocation(), 20, 100, 200, ByteSize(14)),
+            File::new(date(), machine(), instance(), 20, 100, 200, ByteSize(14)),
             bad_path,
         );
 
@@ -931,14 +931,14 @@ mod tests {
         write_catalog_file(&mut reg, 10, vec![entry_at(1, 100, 200, "ns", "a")]);
 
         // Out-of-window catalog with corrupt body — would error if parsed.
-        let oo_path = reg.file_path(date(), machine(), invocation(), 20, 1000, 2000);
+        let oo_path = reg.file_path(date(), machine(), instance(), 20, 1000, 2000);
         std::fs::create_dir_all(oo_path.parent().unwrap()).unwrap();
         std::fs::write(&oo_path, b"not valid json").unwrap();
         reg.track(
             File::new(
                 date(),
                 machine(),
-                invocation(),
+                instance(),
                 20,
                 1000,
                 2000,

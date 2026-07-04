@@ -20,11 +20,12 @@ const WORKER_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 
 use crate::config;
 
-/// Parse an agent identity env var into a [`uuid::Uuid`], hard-erroring with a
-/// clear message naming the variable if it is missing, empty, not a valid
-/// UUID, or the nil UUID. `Uuid::parse_str` accepts both dashed
-/// (`550e8400-...`) and compact (`550e8400...`) forms — the registry file is
-/// dashed, the invocation id is lowercase-compact.
+/// Parse a required identity env var into a [`uuid::Uuid`], hard-erroring with a
+/// clear message naming the variable if it is missing, empty, not a valid UUID,
+/// or the nil UUID. Used for the machine GUID (`NETDATA_REGISTRY_UNIQUE_ID`) —
+/// the one identity the plugin cannot invent for itself (the instance id is
+/// self-generated). `Uuid::parse_str` accepts both dashed (`550e8400-...`) and
+/// compact (`550e8400...`) forms; the registry file is dashed.
 ///
 /// The nil rejection is load-bearing: without it the supervisor's stated
 /// contract ("hard-error before spawning workers") would silently pass a nil
@@ -632,15 +633,39 @@ pub async fn run() -> anyhow::Result<()> {
 
     plugin_config.writer_socket_path = writer_sock.path().to_string();
 
-    // Resolve the agent identities (machine GUID + per-run invocation id).
-    // The agent always exports both; a missing or invalid value is a fatal
-    // misconfiguration — fail-closed before any worker is spawned. The WAL
-    // writer stamps these into every filename and the catalog references them,
-    // so a nil default would silently corrupt provenance in never-GC'd remote
-    // storage (the writer also rejects nil as defense-in-depth).
+    // Machine GUID: the permanent node identity, the one id the plugin cannot
+    // invent. Fatal if missing/invalid — fail-closed before any worker is
+    // spawned. The WAL writer stamps it into every filename and the catalog
+    // references it, so a nil default would silently corrupt provenance in
+    // never-GC'd remote storage (the writer also rejects nil as
+    // defense-in-depth).
     plugin_config.machine_id =
         resolve_identity(&nd_env.registry_unique_id, "NETDATA_REGISTRY_UNIQUE_ID")?;
-    plugin_config.invocation_id = resolve_identity(&nd_env.invocation_id, "NETDATA_INVOCATION_ID")?;
+
+    // Instance id: a fresh UUID per process. The agent restarts a crashed
+    // plugin without changing NETDATA_INVOCATION_ID, so that value cannot tell
+    // two plugin processes apart; a self-generated id gives each process a
+    // distinct WAL identity. The agent invocation id is now informational only
+    // — logged for correlation, never stamped into files — so a missing or
+    // malformed value warns but does not abort startup.
+    let instance_id = uuid::Uuid::new_v4();
+    plugin_config.instance_id = instance_id;
+    match nd_env.invocation_id.as_deref().map(str::trim) {
+        Some(inv) if !inv.is_empty() && uuid::Uuid::parse_str(inv).is_ok() => {
+            tracing::info!(
+                %instance_id,
+                netdata_invocation_id = inv,
+                "generated per-process WAL instance id (agent invocation id logged for correlation)"
+            );
+        }
+        other => {
+            tracing::warn!(
+                %instance_id,
+                netdata_invocation_id = other.filter(|s| !s.is_empty()).unwrap_or("<unset>"),
+                "generated per-process WAL instance id; NETDATA_INVOCATION_ID missing or not a valid UUID (continuing — the instance id is self-generated)"
+            );
+        }
+    }
 
     // Resolve the former otel plugin's read-only journal directory (read
     // `logs.journal_dir` in place from otel.yaml, falling back to
@@ -736,9 +761,11 @@ mod tests {
 
     #[test]
     fn resolve_identity_accepts_compact_form() {
-        // systemd INVOCATION_ID is lowercase-compact (no dashes).
+        // The helper also accepts lowercase-compact UUIDs (no dashes), so a
+        // compact-form source is handled defensively even though the registry
+        // file is dashed.
         let v = Some("550e8400e29b41d4a716446655440000".to_string());
-        let id = resolve_identity(&v, "NETDATA_INVOCATION_ID").unwrap();
+        let id = resolve_identity(&v, "NETDATA_REGISTRY_UNIQUE_ID").unwrap();
         assert_eq!(
             id.to_string(),
             "550e8400-e29b-41d4-a716-446655440000",
@@ -756,8 +783,8 @@ mod tests {
 
     #[test]
     fn resolve_identity_rejects_missing() {
-        // The agent must export both vars; a missing value is fatal before any
-        // worker is spawned.
+        // The agent must export the machine GUID; a missing value is fatal
+        // before any worker is spawned.
         let err = resolve_identity(&None, "NETDATA_REGISTRY_UNIQUE_ID").unwrap_err();
         assert!(
             err.to_string().contains("NETDATA_REGISTRY_UNIQUE_ID"),
@@ -768,9 +795,9 @@ mod tests {
     #[test]
     fn resolve_identity_rejects_invalid() {
         let v = Some("not-a-uuid".to_string());
-        let err = resolve_identity(&v, "NETDATA_INVOCATION_ID").unwrap_err();
+        let err = resolve_identity(&v, "NETDATA_REGISTRY_UNIQUE_ID").unwrap_err();
         assert!(
-            err.to_string().contains("NETDATA_INVOCATION_ID"),
+            err.to_string().contains("NETDATA_REGISTRY_UNIQUE_ID"),
             "error must name the variable: {err}"
         );
     }
@@ -790,10 +817,10 @@ mod tests {
     #[test]
     fn resolve_identity_rejects_whitespace_only() {
         let err =
-            resolve_identity(&Some("  \n ".to_string()), "NETDATA_INVOCATION_ID").unwrap_err();
+            resolve_identity(&Some("  \n ".to_string()), "NETDATA_REGISTRY_UNIQUE_ID").unwrap_err();
         let msg = err.to_string();
         assert!(
-            msg.contains("NETDATA_INVOCATION_ID") && msg.contains("empty"),
+            msg.contains("NETDATA_REGISTRY_UNIQUE_ID") && msg.contains("empty"),
             "whitespace-only must be treated as empty: {msg}"
         );
     }

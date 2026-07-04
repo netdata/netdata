@@ -63,11 +63,14 @@ pub struct PluginConfig {
     /// spawning workers if missing or not a valid UUID.
     #[serde(default)]
     pub machine_id: Uuid,
-    /// Per-run agent invocation id (env `NETDATA_INVOCATION_ID`). Changes each
-    /// agent start; a plugin respawn under a running agent inherits it. Same
-    /// runtime-only contract as [`machine_id`](Self::machine_id).
+    /// Per-process instance id. The supervisor generates a fresh v4 UUID at
+    /// startup, so each plugin process — including a crash-respawn under one
+    /// running agent — has a distinct identity (unlike the agent invocation id,
+    /// which a respawn inherits unchanged). Same runtime-only contract as
+    /// [`machine_id`](Self::machine_id): resolved after YAML load, defaulted
+    /// only so deserialize does not require it.
     #[serde(default)]
-    pub invocation_id: Uuid,
+    pub instance_id: Uuid,
 }
 
 impl PluginConfig {

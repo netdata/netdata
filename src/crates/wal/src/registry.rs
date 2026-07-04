@@ -306,8 +306,8 @@ mod tests {
 
     fn test_file_id(seq: u64) -> FileId {
         let machine_id = uuid::Uuid::try_parse("550e8400e29b41d4a716446655440000").unwrap();
-        let invocation_id = uuid::Uuid::try_parse("7f3b2a1e9c4d4f8ab1c2d3e4f5a6b7c8").unwrap();
-        FileId::new(machine_id, invocation_id, 0, seq, 0)
+        let instance_id = uuid::Uuid::try_parse("7f3b2a1e9c4d4f8ab1c2d3e4f5a6b7c8").unwrap();
+        FileId::new(machine_id, instance_id, 0, seq, 0)
     }
 
     /// Helper: create a Writer, write entries, shutdown, and return all events.
@@ -323,7 +323,7 @@ mod tests {
             compression_enabled: true,
         };
         let seq = std::sync::Arc::new(crate::SeqAllocator::ephemeral(0));
-        let (machine_id, invocation_id) = crate::test_identity();
+        let (machine_id, instance_id) = crate::test_identity();
         let mut writer = Writer::new(
             dir,
             config,
@@ -333,7 +333,7 @@ mod tests {
                 payload_format: 7,
             },
             machine_id,
-            invocation_id,
+            instance_id,
         )
         .unwrap();
         let mut all_events = Vec::new();
@@ -599,8 +599,8 @@ mod tests {
 
     fn fid_with(seq: u64, part_key: u64) -> FileId {
         let machine_id = uuid::Uuid::try_parse("550e8400e29b41d4a716446655440000").unwrap();
-        let invocation_id = uuid::Uuid::try_parse("7f3b2a1e9c4d4f8ab1c2d3e4f5a6b7c8").unwrap();
-        FileId::new(machine_id, invocation_id, 0, seq, part_key)
+        let instance_id = uuid::Uuid::try_parse("7f3b2a1e9c4d4f8ab1c2d3e4f5a6b7c8").unwrap();
+        FileId::new(machine_id, instance_id, 0, seq, part_key)
     }
 
     /// Insert a file via the event flow with the given (min, max) range

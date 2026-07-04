@@ -16,9 +16,9 @@ use crate::{CONTAINER_MAGIC, CONTAINER_VERSION, Error, FORMAT_VERSION};
 /// not a new file format.
 const CHUNK_JSON: ChunkId = *b"JSON";
 
-/// Per-tenant, per-date, per-machine, per-invocation record of uploaded SFSTs.
+/// Per-tenant, per-date, per-machine, per-instance record of uploaded SFSTs.
 ///
-/// The catalog file's identifying metadata (tenant, date, machine, invocation)
+/// The catalog file's identifying metadata (tenant, date, machine, instance)
 /// is encoded in the path; entries carry their own per-SFST timestamps,
 /// and the file's union `[min, max]` time range is encoded in the
 /// filename. No per-catalog "created_at" timestamp is stored — nothing
@@ -28,7 +28,7 @@ pub struct Catalog {
     pub tenant_id: TenantId,
     pub date: NaiveDate,
     pub machine_id: Uuid,
-    pub invocation_id: Uuid,
+    pub instance_id: Uuid,
     pub entries: BTreeMap<FileId, CatalogEntry>,
 }
 
@@ -37,13 +37,13 @@ impl Catalog {
         tenant_id: TenantId,
         date: NaiveDate,
         machine_id: Uuid,
-        invocation_id: Uuid,
+        instance_id: Uuid,
     ) -> Self {
         Self {
             tenant_id,
             date,
             machine_id,
-            invocation_id,
+            instance_id,
             entries: BTreeMap::new(),
         }
     }
@@ -105,7 +105,7 @@ impl Catalog {
             tenant_id: self.tenant_id.clone(),
             date: self.date,
             machine_id: self.machine_id,
-            invocation_id: self.invocation_id,
+            instance_id: self.instance_id,
             entries: self.entries.values().cloned().collect(),
         };
         Ok(serde_json::to_vec(&env)?)
@@ -135,7 +135,7 @@ impl Catalog {
             tenant_id: env.tenant_id,
             date: env.date,
             machine_id: env.machine_id,
-            invocation_id: env.invocation_id,
+            instance_id: env.instance_id,
             entries,
         })
     }
@@ -155,7 +155,7 @@ struct Envelope {
     tenant_id: TenantId,
     date: NaiveDate,
     machine_id: Uuid,
-    invocation_id: Uuid,
+    instance_id: Uuid,
     entries: Vec<CatalogEntry>,
 }
 
@@ -216,7 +216,7 @@ mod tests {
         let bytes = c.to_container_bytes().unwrap();
         assert_eq!(&bytes[0..4], &CONTAINER_MAGIC, "container leads with NCAT");
 
-        // v5 wire contract: the envelope key is `invocation_id` (renamed from
+        // v5 wire contract: the envelope key is `instance_id` (renamed from
         // `boot_id` in v5). Pin the JSON wire so a future serde rename can't
         // silently flip it back without failing here.
         let container =
@@ -224,8 +224,8 @@ mod tests {
                 .unwrap();
         let json = std::str::from_utf8(container.chunk(CHUNK_JSON).unwrap()).unwrap();
         assert!(
-            json.contains("\"invocation_id\""),
-            "v5 catalog JSON must use the invocation_id key"
+            json.contains("\"instance_id\""),
+            "v5 catalog JSON must use the instance_id key"
         );
         assert!(
             !json.contains("\"boot_id\""),
@@ -440,9 +440,9 @@ mod tests {
 
     #[test]
     fn from_json_rejects_v4_schema_on_version_not_serde() {
-        // v4 carried the envelope field `boot_id` (renamed to `invocation_id`
+        // v4 carried the envelope field `boot_id` (renamed to `instance_id`
         // in v5). The version peek must reject a v4 catalog before the rename
-        // surfaces as a serde "missing field `invocation_id`" error. Pre-GA
+        // surfaces as a serde "missing field `instance_id`" error. Pre-GA
         // break; there is no migration.
         let json = br#"{
             "version": 4,
