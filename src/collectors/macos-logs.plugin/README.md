@@ -92,3 +92,7 @@ range with userspace filtering only.
 
 Progress reports use the scanned OSLog timestamp range when the enumerator order makes a percentage meaningful. If the
 timestamp range cannot produce a safe percentage, progress falls back to a scanned-row working counter.
+
+For broad queries without full-text search or filters on high-cardinality detail fields, the plugin avoids materializing
+expensive row-detail fields for entries that cannot be returned in the current page. In that fast path, diagnostic
+`bytes_read` counters report materialized message bytes, not every raw OSLog payload byte scanned.

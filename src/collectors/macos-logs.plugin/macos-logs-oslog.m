@@ -55,9 +55,15 @@ static inline const char *macos_logs_error_domain(NSError *error) {
 }
 
 static inline void macos_logs_add_cstring(FACETS *facets, const char *key, const char *value) {
+    if(value && *value)
+        facets_add_key_value(facets, key, value);
+}
+
+static inline void macos_logs_add_facet_cstring(
+    FACETS *facets, const char *key, MACOS_LOGS_FACET_VALUE_CACHE_ID cache_id, const char *value) {
     if(value && *value) {
         facets_add_key_value(facets, key, value);
-        macos_logs_cache_facet_value(key, value);
+        macos_logs_cache_facet_value(cache_id, value);
     }
 }
 
@@ -66,10 +72,23 @@ static inline void macos_logs_add_string(FACETS *facets, const char *key, NSStri
     macos_logs_add_cstring(facets, key, s);
 }
 
+static inline void macos_logs_add_facet_string(
+    FACETS *facets, const char *key, MACOS_LOGS_FACET_VALUE_CACHE_ID cache_id, NSString *value) {
+    const char *s = macos_logs_string(value);
+    macos_logs_add_facet_cstring(facets, key, cache_id, s);
+}
+
 static inline void macos_logs_add_uint64(FACETS *facets, const char *key, uint64_t value) {
     char buffer[32];
     snprintfz(buffer, sizeof(buffer), "%" PRIu64, value);
     macos_logs_add_cstring(facets, key, buffer);
+}
+
+static inline void macos_logs_add_facet_uint64(
+    FACETS *facets, const char *key, MACOS_LOGS_FACET_VALUE_CACHE_ID cache_id, uint64_t value) {
+    char buffer[32];
+    snprintfz(buffer, sizeof(buffer), "%" PRIu64, value);
+    macos_logs_add_facet_cstring(facets, key, cache_id, buffer);
 }
 
 static inline const char *macos_logs_level_name(OSLogEntryLogLevel level) {
@@ -182,62 +201,108 @@ static inline bool macos_logs_progress_by_time(
     return true;
 }
 
-static size_t macos_logs_process_entry(FACETS *facets, OSLogEntry *entry) {
+static bool macos_logs_filter_requires_detail_fields(FACETS *facets, const char *key) {
+    return facets_key_name_is_filter(facets, key);
+}
+
+static bool macos_logs_query_requires_detail_fields(LOGS_QUERY_STATUS *lqs) {
+    if(lqs->rq.query)
+        return true;
+
+    if(lqs->rq.default_facet == FACET_KEY_OPTION_NONE)
+        return true;
+
+    return macos_logs_filter_requires_detail_fields(lqs->facets, MACOS_LOGS_FIELD_MESSAGE) ||
+           macos_logs_filter_requires_detail_fields(lqs->facets, MACOS_LOGS_FIELD_LEVEL_ID) ||
+           macos_logs_filter_requires_detail_fields(lqs->facets, MACOS_LOGS_FIELD_PID) ||
+           macos_logs_filter_requires_detail_fields(lqs->facets, MACOS_LOGS_FIELD_THREAD_ID) ||
+           macos_logs_filter_requires_detail_fields(lqs->facets, MACOS_LOGS_FIELD_ACTIVITY_ID) ||
+           macos_logs_filter_requires_detail_fields(lqs->facets, MACOS_LOGS_FIELD_PARENT_ACTIVITY_ID) ||
+           macos_logs_filter_requires_detail_fields(lqs->facets, MACOS_LOGS_FIELD_FORMAT_STRING) ||
+           macos_logs_filter_requires_detail_fields(lqs->facets, MACOS_LOGS_FIELD_SIGNPOST_ID);
+}
+
+static size_t macos_logs_process_entry(FACETS *facets, OSLogEntry *entry, bool need_details) {
     size_t bytes = 0;
 
-    NSString *message = entry.composedMessage;
-    macos_logs_add_string(facets, MACOS_LOGS_FIELD_MESSAGE, message);
-    // Count actual UTF-8 bytes, not NSString.length (UTF-16 code units), so
-    // bytes_read / bytes_per_second stay accurate for non-ASCII log content
-    // and match how other log collectors account for bytes.
-    if (message) {
-        NSUInteger n = [message lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
-        bytes += (n != NSNotFound) ? n : message.length;
+    if(need_details) {
+        const char *message = macos_logs_string(entry.composedMessage);
+        macos_logs_add_cstring(facets, MACOS_LOGS_FIELD_MESSAGE, message);
+        if(message)
+            bytes += strlen(message);
     }
 
-    macos_logs_add_cstring(facets, MACOS_LOGS_FIELD_ENTRY_TYPE, macos_logs_entry_type(entry));
-    macos_logs_add_cstring(facets, MACOS_LOGS_FIELD_STORE_CATEGORY, macos_logs_store_category_name(entry.storeCategory));
+    macos_logs_add_facet_cstring(
+        facets, MACOS_LOGS_FIELD_ENTRY_TYPE, MACOS_LOGS_FACET_VALUE_CACHE_ENTRY_TYPE, macos_logs_entry_type(entry));
+    macos_logs_add_facet_cstring(
+        facets,
+        MACOS_LOGS_FIELD_STORE_CATEGORY,
+        MACOS_LOGS_FACET_VALUE_CACHE_STORE_CATEGORY,
+        macos_logs_store_category_name(entry.storeCategory));
 
     if([entry isKindOfClass:[OSLogEntryLog class]]) {
         OSLogEntryLog *log_entry = (OSLogEntryLog *)entry;
         OSLogEntryLogLevel level = log_entry.level;
 
-        macos_logs_add_cstring(facets, MACOS_LOGS_FIELD_LEVEL, macos_logs_level_name(level));
-        macos_logs_add_uint64(facets, MACOS_LOGS_FIELD_LEVEL_ID, (uint64_t)level);
+        macos_logs_add_facet_cstring(
+            facets, MACOS_LOGS_FIELD_LEVEL, MACOS_LOGS_FACET_VALUE_CACHE_LEVEL, macos_logs_level_name(level));
+        if(need_details)
+            macos_logs_add_uint64(facets, MACOS_LOGS_FIELD_LEVEL_ID, (uint64_t)level);
     }
     else {
-        macos_logs_add_cstring(facets, MACOS_LOGS_FIELD_LEVEL, "Undefined");
-        macos_logs_add_uint64(facets, MACOS_LOGS_FIELD_LEVEL_ID, (uint64_t)OSLogEntryLogLevelUndefined);
+        macos_logs_add_facet_cstring(
+            facets, MACOS_LOGS_FIELD_LEVEL, MACOS_LOGS_FACET_VALUE_CACHE_LEVEL, "Undefined");
+        if(need_details)
+            macos_logs_add_uint64(facets, MACOS_LOGS_FIELD_LEVEL_ID, (uint64_t)OSLogEntryLogLevelUndefined);
     }
 
     if([entry conformsToProtocol:@protocol(OSLogEntryFromProcess)]) {
         id<OSLogEntryFromProcess> process_entry = (id<OSLogEntryFromProcess>)entry;
-        macos_logs_add_string(facets, MACOS_LOGS_FIELD_PROCESS, process_entry.process);
-        macos_logs_add_uint64(facets, MACOS_LOGS_FIELD_PID, (uint64_t)process_entry.processIdentifier);
-        macos_logs_add_string(facets, MACOS_LOGS_FIELD_SENDER, process_entry.sender);
-        macos_logs_add_uint64(facets, MACOS_LOGS_FIELD_THREAD_ID, process_entry.threadIdentifier);
-        macos_logs_add_uint64(facets, MACOS_LOGS_FIELD_ACTIVITY_ID, process_entry.activityIdentifier);
+        macos_logs_add_facet_string(
+            facets, MACOS_LOGS_FIELD_PROCESS, MACOS_LOGS_FACET_VALUE_CACHE_PROCESS, process_entry.process);
+        macos_logs_add_facet_string(
+            facets, MACOS_LOGS_FIELD_SENDER, MACOS_LOGS_FACET_VALUE_CACHE_SENDER, process_entry.sender);
+        if(need_details) {
+            macos_logs_add_uint64(facets, MACOS_LOGS_FIELD_PID, (uint64_t)process_entry.processIdentifier);
+            macos_logs_add_uint64(facets, MACOS_LOGS_FIELD_THREAD_ID, process_entry.threadIdentifier);
+            macos_logs_add_uint64(facets, MACOS_LOGS_FIELD_ACTIVITY_ID, process_entry.activityIdentifier);
+        }
     }
 
     if([entry conformsToProtocol:@protocol(OSLogEntryWithPayload)]) {
         id<OSLogEntryWithPayload> payload_entry = (id<OSLogEntryWithPayload>)entry;
-        macos_logs_add_string(facets, MACOS_LOGS_FIELD_SUBSYSTEM, payload_entry.subsystem);
-        macos_logs_add_string(facets, MACOS_LOGS_FIELD_CATEGORY, payload_entry.category);
-        macos_logs_add_string(facets, MACOS_LOGS_FIELD_FORMAT_STRING, payload_entry.formatString);
-        macos_logs_add_uint64(facets, MACOS_LOGS_FIELD_COMPONENT_COUNT, payload_entry.components.count);
+        macos_logs_add_facet_string(
+            facets, MACOS_LOGS_FIELD_SUBSYSTEM, MACOS_LOGS_FACET_VALUE_CACHE_SUBSYSTEM, payload_entry.subsystem);
+        macos_logs_add_facet_string(
+            facets, MACOS_LOGS_FIELD_CATEGORY, MACOS_LOGS_FACET_VALUE_CACHE_CATEGORY, payload_entry.category);
+        macos_logs_add_facet_uint64(
+            facets,
+            MACOS_LOGS_FIELD_COMPONENT_COUNT,
+            MACOS_LOGS_FACET_VALUE_CACHE_COMPONENT_COUNT,
+            payload_entry.components.count);
+        if(need_details)
+            macos_logs_add_string(facets, MACOS_LOGS_FIELD_FORMAT_STRING, payload_entry.formatString);
     }
 
-    if([entry isKindOfClass:[OSLogEntryActivity class]]) {
+    if(need_details && [entry isKindOfClass:[OSLogEntryActivity class]]) {
         OSLogEntryActivity *activity_entry = (OSLogEntryActivity *)entry;
         macos_logs_add_uint64(facets, MACOS_LOGS_FIELD_PARENT_ACTIVITY_ID, activity_entry.parentActivityIdentifier);
     }
 
     if([entry isKindOfClass:[OSLogEntrySignpost class]]) {
         OSLogEntrySignpost *signpost_entry = (OSLogEntrySignpost *)entry;
-        macos_logs_add_uint64(facets, MACOS_LOGS_FIELD_SIGNPOST_ID, signpost_entry.signpostIdentifier);
-        macos_logs_add_string(facets, MACOS_LOGS_FIELD_SIGNPOST_NAME, signpost_entry.signpostName);
-        macos_logs_add_cstring(
-            facets, MACOS_LOGS_FIELD_SIGNPOST_TYPE, macos_logs_signpost_type_name(signpost_entry.signpostType));
+        macos_logs_add_facet_string(
+            facets,
+            MACOS_LOGS_FIELD_SIGNPOST_NAME,
+            MACOS_LOGS_FACET_VALUE_CACHE_SIGNPOST_NAME,
+            signpost_entry.signpostName);
+        macos_logs_add_facet_cstring(
+            facets,
+            MACOS_LOGS_FIELD_SIGNPOST_TYPE,
+            MACOS_LOGS_FACET_VALUE_CACHE_SIGNPOST_TYPE,
+            macos_logs_signpost_type_name(signpost_entry.signpostType));
+        if(need_details)
+            macos_logs_add_uint64(facets, MACOS_LOGS_FIELD_SIGNPOST_ID, signpost_entry.signpostIdentifier);
     }
 
     return bytes;
@@ -468,8 +533,12 @@ static bool macos_logs_probe_native_predicate(
     size_t rows_checked = 0;
     *native_matched = false;
 
-    for(OSLogEntry *entry in enumerator) {
+    while(true) {
         @autoreleasepool {
+            OSLogEntry *entry = [enumerator nextObject];
+            if(!entry)
+                break;
+
             rows_checked++;
             if(rows_checked > MACOS_LOGS_PREDICATE_PROBE_ROWS)
                 break;
@@ -516,8 +585,12 @@ static bool macos_logs_probe_unfiltered_has_match(
     }
 
     size_t rows_checked = 0;
-    for(OSLogEntry *entry in enumerator) {
+    while(true) {
         @autoreleasepool {
+            OSLogEntry *entry = [enumerator nextObject];
+            if(!entry)
+                break;
+
             rows_checked++;
             if(rows_checked > MACOS_LOGS_PREDICATE_PROBE_ROWS)
                 break;
@@ -762,11 +835,16 @@ MACOS_LOGS_QUERY_STATUS macos_logs_query_oslog(LOGS_QUERY_STATUS *lqs) {
         size_t last_progress_done = 0;
         usec_t last_usec_from = 0;
         usec_t last_usec_to = 0;
+        bool query_requires_detail_fields = macos_logs_query_requires_detail_fields(lqs);
 
         facets_rows_begin(lqs->facets);
 
-        for(OSLogEntry *entry in enumerator) {
+        while(true) {
             @autoreleasepool {
+                OSLogEntry *entry = [enumerator nextObject];
+                if(!entry)
+                    break;
+
                 usec_t msg_ut = macos_logs_entry_time_ut(entry);
                 if(!msg_ut)
                     continue;
@@ -789,7 +867,9 @@ MACOS_LOGS_QUERY_STATUS macos_logs_query_oslog(LOGS_QUERY_STATUS *lqs) {
                 if(msg_ut > lqs->last_modified)
                     lqs->last_modified = msg_ut;
 
-                bytes += macos_logs_process_entry(lqs->facets, entry);
+                bool need_details =
+                    query_requires_detail_fields || facets_row_candidate_to_keep(lqs->facets, msg_ut);
+                bytes += macos_logs_process_entry(lqs->facets, entry, need_details);
 
                 if(forward) {
                     if(unlikely(msg_ut >= last_usec_from && msg_ut <= last_usec_to))

@@ -48,7 +48,7 @@ struct macos_logs_facet_value_cache {
     ""
 
 static netdata_mutex_t macos_logs_facet_value_cache_mutex;
-static struct macos_logs_facet_value_cache macos_logs_facet_value_caches[] = {
+static struct macos_logs_facet_value_cache macos_logs_facet_value_caches[MACOS_LOGS_FACET_VALUE_CACHE_COUNT] = {
     { MACOS_LOGS_FIELD_LEVEL, NULL },
     { MACOS_LOGS_FIELD_PROCESS, NULL },
     { MACOS_LOGS_FIELD_SENDER, NULL },
@@ -102,26 +102,14 @@ static void macos_logs_facet_value_cache_cleanup(void) {
     netdata_mutex_unlock(&macos_logs_facet_value_cache_mutex);
 }
 
-static struct macos_logs_facet_value_cache *macos_logs_facet_value_cache_for_key(const char *key) {
-    if(!key || !*key)
-        return NULL;
-
-    for(size_t i = 0; i < sizeof(macos_logs_facet_value_caches) / sizeof(macos_logs_facet_value_caches[0]); i++) {
-        if(strcmp(key, macos_logs_facet_value_caches[i].key) == 0)
-            return &macos_logs_facet_value_caches[i];
-    }
-
-    return NULL;
-}
-
-void macos_logs_cache_facet_value(const char *key, const char *value) {
-    if(!value || !*value)
+void macos_logs_cache_facet_value(MACOS_LOGS_FACET_VALUE_CACHE_ID id, const char *value) {
+    if(id >= MACOS_LOGS_FACET_VALUE_CACHE_COUNT || !value || !*value)
         return;
 
     macos_logs_facet_value_cache_ensure_initialized();
 
-    struct macos_logs_facet_value_cache *cache = macos_logs_facet_value_cache_for_key(key);
-    if(!cache || !cache->values)
+    struct macos_logs_facet_value_cache *cache = &macos_logs_facet_value_caches[id];
+    if(!cache->values)
         return;
 
     netdata_mutex_lock(&macos_logs_facet_value_cache_mutex);
@@ -139,14 +127,19 @@ void macos_logs_add_cached_facet_values(FACETS *facets) {
     netdata_mutex_lock(&macos_logs_facet_value_cache_mutex);
     for(size_t i = 0; i < sizeof(macos_logs_facet_value_caches) / sizeof(macos_logs_facet_value_caches[0]); i++) {
         struct macos_logs_facet_value_cache *cache = &macos_logs_facet_value_caches[i];
-        if(!cache->values)
+        if(!cache->key || !*cache->key || !cache->values)
             continue;
 
+        size_t key_length = strlen(cache->key);
         char *present;
         dfe_start_read(cache->values, present) {
             const char *value = present_dfe.name;
+            if(!value || !*value)
+                continue;
+
+            size_t value_length = strlen(value);
             facets_add_possible_value_name_to_key(
-                facets, cache->key, strlen(cache->key), value, strlen(value));
+                facets, cache->key, key_length, value, value_length);
         }
         dfe_done(present);
     }

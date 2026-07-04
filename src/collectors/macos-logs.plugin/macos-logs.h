@@ -39,6 +39,20 @@
 #define MACOS_LOGS_FIELD_SIGNPOST_TYPE "SIGNPOST_TYPE"
 
 typedef enum {
+    MACOS_LOGS_FACET_VALUE_CACHE_LEVEL,
+    MACOS_LOGS_FACET_VALUE_CACHE_PROCESS,
+    MACOS_LOGS_FACET_VALUE_CACHE_SENDER,
+    MACOS_LOGS_FACET_VALUE_CACHE_SUBSYSTEM,
+    MACOS_LOGS_FACET_VALUE_CACHE_CATEGORY,
+    MACOS_LOGS_FACET_VALUE_CACHE_ENTRY_TYPE,
+    MACOS_LOGS_FACET_VALUE_CACHE_STORE_CATEGORY,
+    MACOS_LOGS_FACET_VALUE_CACHE_COMPONENT_COUNT,
+    MACOS_LOGS_FACET_VALUE_CACHE_SIGNPOST_NAME,
+    MACOS_LOGS_FACET_VALUE_CACHE_SIGNPOST_TYPE,
+    MACOS_LOGS_FACET_VALUE_CACHE_COUNT,
+} MACOS_LOGS_FACET_VALUE_CACHE_ID;
+
+typedef enum {
     MACOS_LOGS_QUERY_OK,
     MACOS_LOGS_QUERY_OPEN_FAILED,
     MACOS_LOGS_QUERY_ENUMERATOR_FAILED,
@@ -102,7 +116,7 @@ extern netdata_mutex_t stdout_mutex;
 extern DICTIONARY *used_hashes_registry;
 
 MACOS_LOGS_QUERY_STATUS macos_logs_query_oslog(LOGS_QUERY_STATUS *lqs);
-void macos_logs_cache_facet_value(const char *key, const char *value);
+void macos_logs_cache_facet_value(MACOS_LOGS_FACET_VALUE_CACHE_ID id, const char *value);
 void macos_logs_add_cached_facet_values(FACETS *facets);
 BUFFER *function_macos_logs_result(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled,
                                    BUFFER *payload, HTTP_ACCESS access, const char *source, void *data);
